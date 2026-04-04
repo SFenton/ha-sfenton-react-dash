@@ -100,47 +100,32 @@ function TodoListInner({ entityId, title, hideWhenEmpty }: TodoListCardProps) {
   const entity = useEntity(entityId);
   const pendingCount = parseInt(entity?.state ?? '0', 10);
   const lastChanged = entity?.last_changed;
+  const connection = useHass((s) => s.connection);
 
-  // Fetch items via HA REST API
+  // Fetch items via HA WebSocket (todo/item/list command)
   useEffect(() => {
     let cancelled = false;
 
     async function fetchItems() {
+      if (!connection) return;
       try {
-        const { joinHassUrl } = useHass.getState().helpers;
-        const state = useHass.getState() as any;
-        const token =
-          state.connection?.options?.auth?.accessToken ??
-          state.helpers?.getConnection?.()?.options?.auth?.accessToken;
-        if (!token) return;
-
-        const resp = await fetch(joinHassUrl('/api/services/todo/get_items'), {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ entity_id: entityId }),
+        const result: { items: TodoItem[] } = await (connection as any).sendMessagePromise({
+          type: 'todo/item/list',
+          entity_id: entityId,
         });
-
-        if (resp.ok) {
-          const data = await resp.json();
-          // Response shape from HA: { "entity_id": { "items": [...] } }
-          // or array of service call results
-          const todoItems = extractItems(data, entityId);
-          if (!cancelled) {
-            setItems(todoItems);
-            setFetched(true);
-          }
+        if (!cancelled && result?.items) {
+          setItems(result.items);
+          setFetched(true);
         }
-      } catch {
+      } catch (e) {
+        console.warn(`[TodoListCard] WS fetch failed for ${entityId}:`, e);
         if (!cancelled) setFetched(true);
       }
     }
 
     fetchItems();
     return () => { cancelled = true; };
-  }, [entityId, lastChanged]);
+  }, [entityId, lastChanged, connection]);
 
   if (hideWhenEmpty && pendingCount === 0 && items.length === 0) return null;
 
@@ -170,31 +155,24 @@ function TodoListInner({ entityId, title, hideWhenEmpty }: TodoListCardProps) {
 
 function TodoItemRow({ item, entityId }: { item: TodoItem; entityId: string }) {
   const [completing, setCompleting] = useState(false);
+  const connection = useHass((s) => s.connection);
 
   const handleComplete = async () => {
+    if (!connection) return;
     setCompleting(true);
     try {
-      const { joinHassUrl } = useHass.getState().helpers;
-      const state = useHass.getState() as any;
-      const token =
-        state.connection?.options?.auth?.accessToken ??
-        state.helpers?.getConnection?.()?.options?.auth?.accessToken;
-      if (!token) return;
-
-      await fetch(joinHassUrl('/api/services/todo/update_item'), {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          entity_id: entityId,
+      await (connection as any).sendMessagePromise({
+        type: 'call_service',
+        domain: 'todo',
+        service: 'update_item',
+        target: { entity_id: entityId },
+        service_data: {
           item: item.uid,
           status: 'completed',
-        }),
+        },
       });
-    } catch {
-      // ignore
+    } catch (e) {
+      console.warn('Failed to complete todo:', e);
     }
     setCompleting(false);
   };
@@ -217,23 +195,6 @@ function TodoItemRow({ item, entityId }: { item: TodoItem; entityId: string }) {
       )}
     </div>
   );
-}
-
-function extractItems(data: any, entityId: string): TodoItem[] {
-  // HA returns different shapes depending on version
-  // Shape 1: { "entity_id": { "items": [...] } }
-  if (data?.[entityId]?.items) return data[entityId].items;
-  // Shape 2: direct array from service call response
-  if (Array.isArray(data)) {
-    // Could be array of entities' results
-    for (const entry of data) {
-      if (entry?.[entityId]?.items) return entry[entityId].items;
-      if (entry?.items) return entry.items;
-    }
-  }
-  // Shape 3: { items: [...] }
-  if (data?.items) return data.items;
-  return [];
 }
 
 function formatDue(due: string): string {
