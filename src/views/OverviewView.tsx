@@ -7,9 +7,10 @@ import { ClimatePopupContent } from '../components/ClimatePopupContent';
 import { OccupancyPopupContent } from '../components/OccupancyPopupContent';
 import { ContactPopupContent } from '../components/ContactPopupContent';
 import { AqiPopupContent } from '../components/AqiPopupContent';
-import { CameraPopupContent } from '../components/CameraPopupContent';
 import { useNavigation } from '../store';
 import { AREA_ROUTES } from '../routes';
+import { AREA_ENTITIES } from '../areaEntities';
+import type { AreaRoute } from '../routes';
 
 const chipStyles = css`
   flex-shrink: 0;
@@ -42,22 +43,81 @@ const weatherRowStyles = css`
 `;
 
 const OVERVIEW_CHIPS = [
-  { label: '?? Lights', hash: 'lights-overview' },
-  { label: '?? Security', hash: 'security-system' },
-  { label: '?? Climate', hash: 'climate-overview' },
-  { label: '?? Occupancy', hash: 'occupancy-overview' },
-  { label: '?? Contact Sensors', hash: 'contact-sensors-overview' },
-  { label: '?? Air Quality', hash: 'aqi-overview' },
-  { label: '?? Front Door', hash: 'camera-front-door' },
-  { label: '?? Driveway', hash: 'camera-driveway' },
-  { label: '?? Upper Deck', hash: 'camera-upper-deck' },
-  { label: '?? Lower Deck', hash: 'camera-lower-deck' },
+  { label: '💡 Lights', hash: 'lights-overview' },
+  { label: '🛡 Security', hash: 'security-system' },
+  { label: '🌡 Climate', hash: 'climate-overview' },
+  { label: '👤 Occupancy', hash: 'occupancy-overview' },
+  { label: '🚪 Contact Sensors', hash: 'contact-sensors-overview' },
+  { label: '🌬 Air Quality', hash: 'aqi-overview' },
 ];
+
+/** Build popup data from real AREA_ENTITIES */
+function buildLightSections() {
+  return (Object.entries(AREA_ENTITIES) as [AreaRoute, typeof AREA_ENTITIES[AreaRoute]][])
+    .filter(([, config]) => config.lights.length > 0)
+    .map(([area, config]) => {
+      const label = AREA_ROUTES.find((a) => a.route === area)?.label ?? area;
+      return {
+        title: label,
+        toggleEntity: config.groupLight,
+        lights: config.lights.map((l) => ({ entityId: l.entityId, name: l.name })),
+      };
+    });
+}
+
+function buildClimateSensors() {
+  const sensors: { entityId: string; name: string; colorEntity?: string }[] = [];
+  for (const [area, config] of Object.entries(AREA_ENTITIES) as [AreaRoute, typeof AREA_ENTITIES[AreaRoute]][]) {
+    const label = AREA_ROUTES.find((a) => a.route === area)?.label ?? area;
+    // Pick the first ecobee sensor if available, otherwise first sensor
+    const ecobee = config.climate.find((c) => c.name === 'Ecobee');
+    const primary = ecobee ?? config.climate[0];
+    if (primary) {
+      sensors.push({ entityId: primary.entityId, name: label, colorEntity: primary.colorEntity });
+    }
+  }
+  return sensors;
+}
+
+function buildOccupancySensors() {
+  const sensors: { entityId: string; name: string }[] = [];
+  for (const [area, config] of Object.entries(AREA_ENTITIES) as [AreaRoute, typeof AREA_ENTITIES[AreaRoute]][]) {
+    const label = AREA_ROUTES.find((a) => a.route === area)?.label ?? area;
+    if (config.occupancy.length > 0) {
+      sensors.push({ entityId: config.occupancy[0].entityId, name: label });
+    }
+  }
+  return sensors;
+}
+
+function buildContactSensors() {
+  const doors: { entityId: string; name: string }[] = [];
+  const windows: { entityId: string; name: string }[] = [];
+  for (const [, config] of Object.entries(AREA_ENTITIES)) {
+    for (const d of config.doors) doors.push(d);
+    for (const w of config.windows) windows.push(w);
+  }
+  return { doors, windows };
+}
+
+function buildAqiSensors() {
+  const sensors: { entityId: string; name: string; pm25Entity?: string }[] = [];
+  for (const [, config] of Object.entries(AREA_ENTITIES)) {
+    for (const a of config.aqi) sensors.push(a);
+  }
+  return sensors;
+}
 
 export function OverviewView() {
   const { openPopup } = useNavigation();
   const { getAllEntities } = useHass.getState().helpers;
   const entityCount = Object.keys(getAllEntities()).length;
+
+  const lightSections = buildLightSections();
+  const climateSensors = buildClimateSensors();
+  const occupancySensors = buildOccupancySensors();
+  const { doors, windows } = buildContactSensors();
+  const aqiSensors = buildAqiSensors();
 
   return (
     <>
@@ -90,149 +150,28 @@ export function OverviewView() {
       {/* ===== Popup Panels ===== */}
 
       <PopupPanel hash="lights-overview">
-        <LightPopupContent
-          title="House Lights"
-          sections={[
-            {
-              title: 'Living Room',
-              toggleEntity: 'light.living_room',
-              lights: [
-                { entityId: 'light.living_room_front_left_light', name: 'Front Left' },
-                { entityId: 'light.living_room_front_right_light', name: 'Front Right' },
-                { entityId: 'light.living_room_back_left_light', name: 'Back Left' },
-                { entityId: 'light.living_room_back_right_light', name: 'Back Right' },
-              ],
-            },
-            {
-              title: 'Master Bedroom',
-              toggleEntity: 'light.master_bedroom',
-              lights: [
-                { entityId: 'light.master_bedroom_window_light', name: 'Window Light' },
-                { entityId: 'light.master_bedroom_bathroom_light', name: 'Bathroom Light' },
-                { entityId: 'light.master_bedroom_door_light', name: 'Door Light' },
-                { entityId: 'light.stephen_nightstand_light', name: 'Stephen Nightstand' },
-                { entityId: 'light.steph_nightstand_light', name: 'Steph Nightstand' },
-                { entityId: 'light.master_bedroom_closet_light', name: 'Closet Light' },
-              ],
-            },
-            {
-              title: 'Guest Room',
-              toggleEntity: 'light.guest_room',
-              lights: [
-                { entityId: 'light.guest_room_tv_light', name: 'TV Light' },
-                { entityId: 'light.guest_room_bed_light', name: 'Bed Light' },
-              ],
-            },
-            {
-              title: 'Kitchen',
-              toggleEntity: 'light.kitchen',
-              lights: [
-                { entityId: 'light.kitchen_main_light', name: 'Main Light' },
-                { entityId: 'light.kitchen_island_light', name: 'Island Light' },
-              ],
-            },
-            {
-              title: 'Office',
-              lights: [
-                { entityId: 'light.office_light', name: 'Office Light' },
-              ],
-            },
-            {
-              title: 'Gym',
-              lights: [
-                { entityId: 'light.gym_light', name: 'Gym Light' },
-              ],
-            },
-            {
-              title: 'Hallway',
-              toggleEntity: 'light.hallway',
-              lights: [
-                { entityId: 'light.hallway_entry_light', name: 'Entry Light' },
-                { entityId: 'light.hallway_gym_light', name: 'Gym Light' },
-                { entityId: 'light.hallway_guest_room_light', name: 'Guest Room Light' },
-                { entityId: 'light.hallway_office_light', name: 'Office Light' },
-              ],
-            },
-          ]}
-        />
+        <LightPopupContent title="House Lights" sections={lightSections} />
       </PopupPanel>
 
       <PopupPanel hash="security-system">
         <p style={{ fontSize: 18, fontWeight: 600, marginBottom: 16 }}>Security System</p>
-        <p style={{ opacity: 0.5 }}>Alarm panel + lock controls — wired in Phase 6.</p>
+        <p style={{ opacity: 0.5 }}>Use the Security tab for full alarm controls.</p>
       </PopupPanel>
 
       <PopupPanel hash="climate-overview">
-        <ClimatePopupContent
-          title="Climate Overview"
-          sensors={[
-            { entityId: 'sensor.living_room_temperature', name: 'Living Room' },
-            { entityId: 'sensor.master_bedroom_temperature', name: 'Master Bedroom' },
-            { entityId: 'sensor.guest_room_temperature', name: 'Guest Room' },
-            { entityId: 'sensor.office_temperature', name: 'Office' },
-            { entityId: 'sensor.kitchen_temperature', name: 'Kitchen' },
-            { entityId: 'sensor.gym_temperature', name: 'Gym' },
-          ]}
-        />
+        <ClimatePopupContent title="Climate Overview" sensors={climateSensors} />
       </PopupPanel>
 
       <PopupPanel hash="occupancy-overview">
-        <OccupancyPopupContent
-          title="Occupancy Overview"
-          sensors={[
-            { entityId: 'binary_sensor.living_room_occupancy', name: 'Living Room' },
-            { entityId: 'binary_sensor.master_bedroom_occupancy', name: 'Master Bedroom' },
-            { entityId: 'binary_sensor.guest_room_occupancy', name: 'Guest Room' },
-            { entityId: 'binary_sensor.office_occupancy', name: 'Office' },
-            { entityId: 'binary_sensor.kitchen_occupancy', name: 'Kitchen' },
-            { entityId: 'binary_sensor.gym_occupancy', name: 'Gym' },
-            { entityId: 'binary_sensor.hallway_occupancy', name: 'Hallway' },
-          ]}
-        />
+        <OccupancyPopupContent title="Occupancy Overview" sensors={occupancySensors} />
       </PopupPanel>
 
       <PopupPanel hash="contact-sensors-overview">
-        <ContactPopupContent
-          title="Contact Sensors"
-          doors={[
-            { entityId: 'binary_sensor.front_door_contact', name: 'Front Door' },
-            { entityId: 'binary_sensor.back_door_contact', name: 'Back Door' },
-            { entityId: 'binary_sensor.garage_door_contact', name: 'Garage Door' },
-          ]}
-          windows={[
-            { entityId: 'binary_sensor.living_room_window_contact', name: 'Living Room' },
-            { entityId: 'binary_sensor.master_bedroom_window_contact', name: 'Master Bedroom' },
-            { entityId: 'binary_sensor.guest_room_window_contact', name: 'Guest Room' },
-            { entityId: 'binary_sensor.office_window_contact', name: 'Office' },
-          ]}
-        />
+        <ContactPopupContent title="Contact Sensors" doors={doors} windows={windows} />
       </PopupPanel>
 
       <PopupPanel hash="aqi-overview">
-        <AqiPopupContent
-          title="Air Quality"
-          sensors={[
-            { entityId: 'sensor.living_room_air_quality', name: 'Living Room' },
-            { entityId: 'sensor.master_bedroom_air_quality', name: 'Master Bedroom' },
-            { entityId: 'sensor.office_air_quality', name: 'Office' },
-          ]}
-        />
-      </PopupPanel>
-
-      <PopupPanel hash="camera-front-door">
-        <CameraPopupContent title="Front Door Camera" entityId="camera.front_door" />
-      </PopupPanel>
-
-      <PopupPanel hash="camera-driveway">
-        <CameraPopupContent title="Driveway Camera" entityId="camera.driveway" />
-      </PopupPanel>
-
-      <PopupPanel hash="camera-upper-deck">
-        <CameraPopupContent title="Upper Deck Camera" entityId="camera.upper_deck" />
-      </PopupPanel>
-
-      <PopupPanel hash="camera-lower-deck">
-        <CameraPopupContent title="Lower Deck Camera" entityId="camera.lower_deck" />
+        <AqiPopupContent title="Air Quality" sensors={aqiSensors} />
       </PopupPanel>
     </>
   );
