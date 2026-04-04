@@ -1,5 +1,6 @@
 import { css } from '@emotion/react';
 import { ClimateSensor } from './ClimateSensor';
+import { ErrorBoundary } from './ErrorBoundary';
 import { twoColumnGrid } from '../styles';
 
 const popupTitleStyles = css`
@@ -26,12 +27,13 @@ export function ClimatePopupContent({ title, sensors }: ClimatePopupContentProps
       <p css={popupTitleStyles}>{title}</p>
       <div css={twoColumnGrid}>
         {sensors.map((sensor) => (
-          <ClimateSensor
-            key={sensor.entityId}
-            entityId={sensor.entityId}
-            name={sensor.name}
-            colorEntity={sensor.colorEntity}
-          />
+          <ErrorBoundary key={sensor.entityId}>
+            <ClimateSensor
+              entityId={sensor.entityId}
+              name={sensor.name}
+              colorEntity={sensor.colorEntity}
+            />
+          </ErrorBoundary>
         ))}
       </div>
     </>

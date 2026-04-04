@@ -1,5 +1,5 @@
 ﻿import { css } from '@emotion/react';
-import { ViewHeader, Separator, LightSlider, ClimateSensor, OccupancySensor, DoorSensor, WindowSensor, VentButton, AqiCard } from '../components';
+import { ViewHeader, Separator, LightSlider, ClimateSensor, OccupancySensor, DoorSensor, WindowSensor, VentButton, AqiCard, ErrorBoundary } from '../components';
 import { twoColumnGrid } from '../styles';
 import type { AreaRoute } from '../routes';
 import { AREA_ROUTES } from '../routes';
@@ -27,7 +27,9 @@ export function AreaDetailView({ area }: AreaDetailViewProps) {
           <Separator title="Lights" toggleEntity={config.groupLight} />
           <div css={twoColumnGrid}>
             {config.lights.map((l) => (
-              <LightSlider key={l.entityId} entityId={l.entityId} name={l.name} interactive={!l.readonly} />
+              <ErrorBoundary key={l.entityId}>
+                <LightSlider entityId={l.entityId} name={l.name} interactive={!l.readonly} />
+              </ErrorBoundary>
             ))}
           </div>
         </div>
@@ -38,7 +40,9 @@ export function AreaDetailView({ area }: AreaDetailViewProps) {
           <Separator title="Climate" />
           <div css={twoColumnGrid}>
             {config.climate.map((c) => (
-              <ClimateSensor key={c.entityId} entityId={c.entityId} name={c.name} colorEntity={c.colorEntity} />
+              <ErrorBoundary key={c.entityId}>
+                <ClimateSensor entityId={c.entityId} name={c.name} colorEntity={c.colorEntity} />
+              </ErrorBoundary>
             ))}
           </div>
         </div>
@@ -49,7 +53,9 @@ export function AreaDetailView({ area }: AreaDetailViewProps) {
           <Separator title="Occupancy" />
           <div css={twoColumnGrid}>
             {config.occupancy.map((o) => (
-              <OccupancySensor key={o.entityId} entityId={o.entityId} name={o.name} />
+              <ErrorBoundary key={o.entityId}>
+                <OccupancySensor entityId={o.entityId} name={o.name} />
+              </ErrorBoundary>
             ))}
           </div>
         </div>
@@ -60,10 +66,14 @@ export function AreaDetailView({ area }: AreaDetailViewProps) {
           <Separator title="Contact Sensors" />
           <div css={twoColumnGrid}>
             {config.doors.map((d) => (
-              <DoorSensor key={d.entityId} entityId={d.entityId} name={d.name} />
+              <ErrorBoundary key={d.entityId}>
+                <DoorSensor entityId={d.entityId} name={d.name} />
+              </ErrorBoundary>
             ))}
             {config.windows.map((w) => (
-              <WindowSensor key={w.entityId} entityId={w.entityId} name={w.name} />
+              <ErrorBoundary key={w.entityId}>
+                <WindowSensor entityId={w.entityId} name={w.name} />
+              </ErrorBoundary>
             ))}
           </div>
         </div>
@@ -74,7 +84,9 @@ export function AreaDetailView({ area }: AreaDetailViewProps) {
           <Separator title="Vents" />
           <div css={twoColumnGrid}>
             {config.vents.map((v) => (
-              <VentButton key={v.entityId} entityId={v.entityId} name={v.name} />
+              <ErrorBoundary key={v.entityId}>
+                <VentButton entityId={v.entityId} name={v.name} />
+              </ErrorBoundary>
             ))}
           </div>
         </div>
@@ -85,7 +97,9 @@ export function AreaDetailView({ area }: AreaDetailViewProps) {
           <Separator title="Air Quality" />
           <div css={twoColumnGrid}>
             {config.aqi.map((a) => (
-              <AqiCard key={a.entityId} entityId={a.entityId} name={a.name} pm25Entity={a.pm25Entity} />
+              <ErrorBoundary key={a.entityId}>
+                <AqiCard entityId={a.entityId} name={a.name} pm25Entity={a.pm25Entity} />
+              </ErrorBoundary>
             ))}
           </div>
         </div>

@@ -7,6 +7,7 @@ export { LayoutShell } from './LayoutShell';
 export { Navbar } from './Navbar';
 export { ViewHeader } from './ViewHeader';
 export { PopupPanel } from './PopupPanel';
+export { ErrorBoundary } from './ErrorBoundary';
 
 // Entity display
 export { LightSlider } from './LightSlider';

@@ -1,5 +1,6 @@
 import { css } from '@emotion/react';
 import { OccupancySensor } from './OccupancySensor';
+import { ErrorBoundary } from './ErrorBoundary';
 import { twoColumnGrid } from '../styles';
 
 const popupTitleStyles = css`
@@ -25,7 +26,9 @@ export function OccupancyPopupContent({ title, sensors }: OccupancyPopupContentP
       <p css={popupTitleStyles}>{title}</p>
       <div css={twoColumnGrid}>
         {sensors.map((sensor) => (
-          <OccupancySensor key={sensor.entityId} entityId={sensor.entityId} name={sensor.name} />
+          <ErrorBoundary key={sensor.entityId}>
+            <OccupancySensor entityId={sensor.entityId} name={sensor.name} />
+          </ErrorBoundary>
         ))}
       </div>
     </>

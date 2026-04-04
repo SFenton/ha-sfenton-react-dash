@@ -1,5 +1,6 @@
 import { css } from '@emotion/react';
 import { AqiCard } from './AqiCard';
+import { ErrorBoundary } from './ErrorBoundary';
 import { twoColumnGrid } from '../styles';
 
 const popupTitleStyles = css`
@@ -26,7 +27,9 @@ export function AqiPopupContent({ title, sensors }: AqiPopupContentProps) {
       <p css={popupTitleStyles}>{title}</p>
       <div css={twoColumnGrid}>
         {sensors.map((s) => (
-          <AqiCard key={s.entityId} entityId={s.entityId} name={s.name} pm25Entity={s.pm25Entity} />
+          <ErrorBoundary key={s.entityId}>
+            <AqiCard entityId={s.entityId} name={s.name} pm25Entity={s.pm25Entity} />
+          </ErrorBoundary>
         ))}
       </div>
     </>

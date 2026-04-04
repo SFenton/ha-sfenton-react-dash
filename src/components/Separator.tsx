@@ -1,5 +1,5 @@
 import { css } from '@emotion/react';
-import { useEntity, useService } from '@hakit/core';
+import { useService } from '@hakit/core';
 import { sectionSeparator, sectionTitle } from '../styles';
 
 const toggleButtonStyles = css`
@@ -19,33 +19,33 @@ const toggleButtonStyles = css`
 
 interface SeparatorProps {
   title: string;
-  /** Optional entity to show a toggle button for (e.g. light group) */
   toggleEntity?: string;
 }
 
 export function Separator({ title, toggleEntity }: SeparatorProps) {
-  const entity = useEntity(toggleEntity ?? 'sun.sun');
+  return (
+    <div css={sectionSeparator}>
+      <span css={sectionTitle}>{title}</span>
+      {toggleEntity && <SeparatorToggle entityId={toggleEntity} />}
+    </div>
+  );
+}
+
+/** Separate component so useEntity is only called when we actually have an entity */
+function SeparatorToggle({ entityId }: { entityId: string }) {
   const { callService } = useService();
-  const hasToggle = !!toggleEntity;
-  const isOn = hasToggle && entity?.state === 'on';
 
   const handleToggle = () => {
-    if (!toggleEntity) return;
     callService({
       domain: 'homeassistant',
       service: 'toggle',
-      target: { entity_id: toggleEntity },
+      target: { entity_id: entityId },
     });
   };
 
   return (
-    <div css={sectionSeparator}>
-      <span css={sectionTitle}>{title}</span>
-      {hasToggle && (
-        <button css={toggleButtonStyles} onClick={handleToggle}>
-          {isOn ? 'Turn Off' : 'Turn On'}
-        </button>
-      )}
-    </div>
+    <button css={toggleButtonStyles} onClick={handleToggle}>
+      Toggle
+    </button>
   );
 }

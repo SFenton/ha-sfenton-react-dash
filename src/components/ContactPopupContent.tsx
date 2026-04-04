@@ -1,6 +1,7 @@
 import { css } from '@emotion/react';
 import { DoorSensor, WindowSensor } from './ContactSensor';
 import { Separator } from './Separator';
+import { ErrorBoundary } from './ErrorBoundary';
 import { twoColumnGrid } from '../styles';
 
 const popupTitleStyles = css`
@@ -30,7 +31,9 @@ export function ContactPopupContent({ title, doors = [], windows = [] }: Contact
           <Separator title="Doors" />
           <div css={twoColumnGrid}>
             {doors.map((d) => (
-              <DoorSensor key={d.entityId} entityId={d.entityId} name={d.name} />
+              <ErrorBoundary key={d.entityId}>
+                <DoorSensor entityId={d.entityId} name={d.name} />
+              </ErrorBoundary>
             ))}
           </div>
         </>
@@ -40,7 +43,9 @@ export function ContactPopupContent({ title, doors = [], windows = [] }: Contact
           <Separator title="Windows" />
           <div css={twoColumnGrid}>
             {windows.map((w) => (
-              <WindowSensor key={w.entityId} entityId={w.entityId} name={w.name} />
+              <ErrorBoundary key={w.entityId}>
+                <WindowSensor entityId={w.entityId} name={w.name} />
+              </ErrorBoundary>
             ))}
           </div>
         </>
