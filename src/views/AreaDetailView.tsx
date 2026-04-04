@@ -1,19 +1,11 @@
-import { css } from '@emotion/react';
-import { ViewHeader } from '../components/ViewHeader';
+﻿import { css } from '@emotion/react';
+import { ViewHeader, Separator, LightSlider, ClimateSensor, OccupancySensor, DoorSensor, WindowSensor, VentButton } from '../components';
+import { twoColumnGrid } from '../styles';
 import type { AreaRoute } from '../routes';
 import { AREA_ROUTES } from '../routes';
 
 const sectionStyles = css`
-  margin-bottom: 24px;
-`;
-
-const sectionTitleStyles = css`
-  font-size: 14px;
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.5);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  margin: 0 0 12px;
+  margin-bottom: 20px;
 `;
 
 const placeholderStyles = css`
@@ -29,37 +21,55 @@ interface AreaDetailViewProps {
   area: AreaRoute;
 }
 
+/**
+ * Area detail view — shows entity sections for a specific room.
+ * Entity IDs follow HA naming conventions: domain.{area}_{sensor_type}
+ * These will be populated with real entity IDs per-room in Phase 5.
+ * For now, we render the component structure with placeholder entity patterns.
+ */
 export function AreaDetailView({ area }: AreaDetailViewProps) {
   const areaInfo = AREA_ROUTES.find((a) => a.route === area);
   const title = areaInfo?.label ?? area;
+  const prefix = area.replace(/-/g, '_');
 
   return (
     <>
       <ViewHeader title={title} showBack />
 
       <div css={sectionStyles}>
-        <p css={sectionTitleStyles}>Lights</p>
-        <div css={placeholderStyles}>Light controls — Phase 5</div>
+        <Separator title="Lights" toggleEntity={`light.${prefix}`} />
+        <div css={twoColumnGrid}>
+          <LightSlider entityId={`light.${prefix}_light`} name={`${title} Light`} />
+        </div>
       </div>
 
       <div css={sectionStyles}>
-        <p css={sectionTitleStyles}>Climate</p>
-        <div css={placeholderStyles}>Climate sensors — Phase 5</div>
+        <Separator title="Climate" />
+        <div css={twoColumnGrid}>
+          <ClimateSensor entityId={`sensor.${prefix}_temperature`} name={title} />
+        </div>
       </div>
 
       <div css={sectionStyles}>
-        <p css={sectionTitleStyles}>Occupancy</p>
-        <div css={placeholderStyles}>Occupancy sensors — Phase 5</div>
+        <Separator title="Occupancy" />
+        <div css={twoColumnGrid}>
+          <OccupancySensor entityId={`binary_sensor.${prefix}_occupancy`} name={title} />
+        </div>
       </div>
 
       <div css={sectionStyles}>
-        <p css={sectionTitleStyles}>Contact Sensors</p>
-        <div css={placeholderStyles}>Door/window sensors — Phase 5</div>
+        <Separator title="Contact Sensors" />
+        <div css={twoColumnGrid}>
+          <DoorSensor entityId={`binary_sensor.${prefix}_door_contact`} name={`${title} Door`} />
+          <WindowSensor entityId={`binary_sensor.${prefix}_window_contact`} name={`${title} Window`} />
+        </div>
       </div>
 
       <div css={sectionStyles}>
-        <p css={sectionTitleStyles}>Vents</p>
-        <div css={placeholderStyles}>Vent controls — Phase 5</div>
+        <Separator title="Vents" />
+        <div css={twoColumnGrid}>
+          <VentButton entityId={`cover.${prefix}_vent`} name={`${title} Vent`} />
+        </div>
       </div>
     </>
   );
