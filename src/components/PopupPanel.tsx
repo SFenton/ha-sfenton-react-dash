@@ -1,6 +1,6 @@
 import { css } from '@emotion/react';
 import { useNavigation } from '../store';
-import type { ReactNode } from 'react';
+import { useEffect, type ReactNode } from 'react';
 
 const overlayStyles = css`
   position: fixed;
@@ -56,8 +56,19 @@ interface PopupPanelProps {
 
 export function PopupPanel({ hash, children }: PopupPanelProps) {
   const { popup, closePopup } = useNavigation();
+  const isOpen = popup === hash;
 
-  if (popup !== hash) return null;
+  // Close on ESC key
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') closePopup();
+    };
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, [isOpen, closePopup]);
+
+  if (!isOpen) return null;
 
   return (
     <div css={overlayStyles} onClick={closePopup}>

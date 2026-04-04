@@ -2,6 +2,14 @@ import { css } from '@emotion/react';
 import { useNavigation } from '../store';
 import { TOP_LEVEL_ROUTES } from '../routes';
 
+const ICON_MAP: Record<string, string> = {
+  'mdi:home': '🏠',
+  'mdi:shield': '🛡',
+  'mdi:thermostat': '🌡',
+  'mdi:checkbox-marked-outline': '📋',
+  'mdi:cog': '⚙️',
+};
+
 const navbarStyles = css`
   position: fixed;
   bottom: 0;
@@ -11,8 +19,8 @@ const navbarStyles = css`
   display: flex;
   justify-content: space-around;
   align-items: center;
-  height: 60px;
-  background: rgba(20, 20, 20, 0.85);
+  height: 64px;
+  background: rgba(20, 20, 20, 0.92);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   border-top: 1px solid rgba(255, 255, 255, 0.08);
@@ -23,18 +31,22 @@ const navItemStyles = css`
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 2px;
-  padding: 6px 12px;
+  gap: 3px;
+  padding: 8px 16px;
   border: none;
   background: transparent;
   color: rgba(255, 255, 255, 0.4);
   font-size: 10px;
   cursor: pointer;
-  transition: color 0.2s;
+  transition: color 0.2s, transform 0.15s;
   -webkit-tap-highlight-color: transparent;
+  border-radius: 12px;
 
   &:hover {
     color: rgba(255, 255, 255, 0.7);
+  }
+  &:active {
+    transform: scale(0.92);
   }
 `;
 
@@ -43,7 +55,7 @@ const navItemActiveStyles = css`
 `;
 
 const iconStyles = css`
-  font-size: 22px;
+  font-size: 20px;
   line-height: 1;
 `;
 
@@ -58,18 +70,10 @@ export function Navbar() {
           css={[navItemStyles, currentRoute === route && navItemActiveStyles]}
           onClick={() => navigate(route)}
         >
-          <span css={iconStyles} className="mdi">
-            {iconToChar(icon)}
-          </span>
+          <span css={iconStyles}>{ICON_MAP[icon] ?? '•'}</span>
           <span>{label}</span>
         </button>
       ))}
     </nav>
   );
-}
-
-/** Render MDI icon name as text for now — will use ha-icon or iconify later */
-function iconToChar(icon: string): string {
-  // Strip mdi: prefix and show as label for now
-  return icon.replace('mdi:', '').replace(/-/g, ' ').charAt(0).toUpperCase();
 }

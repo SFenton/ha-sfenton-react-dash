@@ -1,76 +1,95 @@
 ﻿import { css } from '@emotion/react';
-import { ViewHeader, Separator, LightSlider, ClimateSensor, OccupancySensor, DoorSensor, WindowSensor, VentButton } from '../components';
+import { ViewHeader, Separator, LightSlider, ClimateSensor, OccupancySensor, DoorSensor, WindowSensor, VentButton, AqiCard } from '../components';
 import { twoColumnGrid } from '../styles';
 import type { AreaRoute } from '../routes';
 import { AREA_ROUTES } from '../routes';
+import { AREA_ENTITIES } from '../areaEntities';
 
 const sectionStyles = css`
   margin-bottom: 20px;
-`;
-
-const placeholderStyles = css`
-  padding: 16px;
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px dashed rgba(255, 255, 255, 0.1);
-  color: rgba(255, 255, 255, 0.3);
-  font-size: 13px;
 `;
 
 interface AreaDetailViewProps {
   area: AreaRoute;
 }
 
-/**
- * Area detail view — shows entity sections for a specific room.
- * Entity IDs follow HA naming conventions: domain.{area}_{sensor_type}
- * These will be populated with real entity IDs per-room in Phase 5.
- * For now, we render the component structure with placeholder entity patterns.
- */
 export function AreaDetailView({ area }: AreaDetailViewProps) {
   const areaInfo = AREA_ROUTES.find((a) => a.route === area);
   const title = areaInfo?.label ?? area;
-  const prefix = area.replace(/-/g, '_');
+  const config = AREA_ENTITIES[area];
 
   return (
     <>
       <ViewHeader title={title} showBack />
 
-      <div css={sectionStyles}>
-        <Separator title="Lights" toggleEntity={`light.${prefix}`} />
-        <div css={twoColumnGrid}>
-          <LightSlider entityId={`light.${prefix}_light`} name={`${title} Light`} />
+      {config.lights.length > 0 && (
+        <div css={sectionStyles}>
+          <Separator title="Lights" toggleEntity={config.groupLight} />
+          <div css={twoColumnGrid}>
+            {config.lights.map((l) => (
+              <LightSlider key={l.entityId} entityId={l.entityId} name={l.name} interactive={!l.readonly} />
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
-      <div css={sectionStyles}>
-        <Separator title="Climate" />
-        <div css={twoColumnGrid}>
-          <ClimateSensor entityId={`sensor.${prefix}_temperature`} name={title} />
+      {config.climate.length > 0 && (
+        <div css={sectionStyles}>
+          <Separator title="Climate" />
+          <div css={twoColumnGrid}>
+            {config.climate.map((c) => (
+              <ClimateSensor key={c.entityId} entityId={c.entityId} name={c.name} colorEntity={c.colorEntity} />
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
-      <div css={sectionStyles}>
-        <Separator title="Occupancy" />
-        <div css={twoColumnGrid}>
-          <OccupancySensor entityId={`binary_sensor.${prefix}_occupancy`} name={title} />
+      {config.occupancy.length > 0 && (
+        <div css={sectionStyles}>
+          <Separator title="Occupancy" />
+          <div css={twoColumnGrid}>
+            {config.occupancy.map((o) => (
+              <OccupancySensor key={o.entityId} entityId={o.entityId} name={o.name} />
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
-      <div css={sectionStyles}>
-        <Separator title="Contact Sensors" />
-        <div css={twoColumnGrid}>
-          <DoorSensor entityId={`binary_sensor.${prefix}_door_contact`} name={`${title} Door`} />
-          <WindowSensor entityId={`binary_sensor.${prefix}_window_contact`} name={`${title} Window`} />
+      {(config.doors.length > 0 || config.windows.length > 0) && (
+        <div css={sectionStyles}>
+          <Separator title="Contact Sensors" />
+          <div css={twoColumnGrid}>
+            {config.doors.map((d) => (
+              <DoorSensor key={d.entityId} entityId={d.entityId} name={d.name} />
+            ))}
+            {config.windows.map((w) => (
+              <WindowSensor key={w.entityId} entityId={w.entityId} name={w.name} />
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
-      <div css={sectionStyles}>
-        <Separator title="Vents" />
-        <div css={twoColumnGrid}>
-          <VentButton entityId={`cover.${prefix}_vent`} name={`${title} Vent`} />
+      {config.vents.length > 0 && (
+        <div css={sectionStyles}>
+          <Separator title="Vents" />
+          <div css={twoColumnGrid}>
+            {config.vents.map((v) => (
+              <VentButton key={v.entityId} entityId={v.entityId} name={v.name} />
+            ))}
+          </div>
         </div>
-      </div>
+      )}
+
+      {config.aqi.length > 0 && (
+        <div css={sectionStyles}>
+          <Separator title="Air Quality" />
+          <div css={twoColumnGrid}>
+            {config.aqi.map((a) => (
+              <AqiCard key={a.entityId} entityId={a.entityId} name={a.name} pm25Entity={a.pm25Entity} />
+            ))}
+          </div>
+        </div>
+      )}
     </>
   );
 }
