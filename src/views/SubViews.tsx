@@ -1,0 +1,353 @@
+import { css } from '@emotion/react';
+import { useEntity, useService, useHass } from '@hakit/core';
+import { ViewHeader, Separator, EntityToggle, ErrorBoundary, PopupPanel, TodoListCard } from '../components';
+import { useNavigation } from '../store';
+import { frostedGlass, frostedGlassHover } from '../styles';
+
+const sectionStyles = css`
+  margin-bottom: 24px;
+`;
+
+const btnGridStyles = css`
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 8px;
+`;
+
+const btnStyles = css`
+  ${frostedGlass};
+  ${frostedGlassHover};
+  padding: 14px 16px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  transition: background 0.2s, transform 0.15s;
+  &:active { transform: scale(0.97); }
+`;
+
+const btnIconStyles = css`font-size: 18px;`;
+const btnLabelStyles = css`font-size: 13px; font-weight: 500;`;
+const infoStyles = css`
+  ${frostedGlass};
+  padding: 14px 16px;
+  margin-bottom: 8px;
+  font-size: 13px;
+  opacity: 0.6;
+`;
+
+// ============================================================
+// Admin
+// ============================================================
+export function AdminView() {
+  const { openPopup } = useNavigation();
+
+  return (
+    <>
+      <ViewHeader title="Admin Controls" showBack />
+
+      <div css={sectionStyles}>
+        <Separator title="Security Controls" />
+        <div css={infoStyles}>Manage security automation settings.</div>
+        <ErrorBoundary>
+          <EntityToggle entityId="input_boolean.front_door_auto_lock" name="Front Door Auto-Lock" />
+        </ErrorBoundary>
+      </div>
+
+      <div css={sectionStyles}>
+        <Separator title="Presence-Based Light Overrides" />
+        <div css={infoStyles}>Override automatic lighting for specific rooms.</div>
+        <div css={btnGridStyles}>
+          <div css={btnStyles} onClick={() => openPopup('presence-based-overrides')}>
+            <span css={btnIconStyles}>💡</span>
+            <span css={btnLabelStyles}>Open Overrides</span>
+          </div>
+        </div>
+      </div>
+
+      <div css={sectionStyles}>
+        <Separator title="Show Specific Controls" />
+        <div css={infoStyles}>Toggle visibility of special controls.</div>
+        <div css={btnGridStyles}>
+          <ErrorBoundary>
+            <EntityToggle entityId="input_boolean.show_outdoor_faucets" name="Outdoor Faucets" />
+          </ErrorBoundary>
+          <ErrorBoundary>
+            <EntityToggle entityId="input_boolean.show_christmas_lights" name="Christmas Lights" />
+          </ErrorBoundary>
+        </div>
+      </div>
+
+      <div css={sectionStyles}>
+        <Separator title="Auto Presence Setting Overrides" />
+        <div css={infoStyles}>Configure auto-reset behavior for presence overrides.</div>
+        <div css={btnGridStyles}>
+          <div css={btnStyles} onClick={() => openPopup('presence-based-overrides-auto')}>
+            <span css={btnIconStyles}>🔄</span>
+            <span css={btnLabelStyles}>Auto-Reset Config</span>
+          </div>
+        </div>
+      </div>
+
+      <PopupPanel hash="presence-based-overrides">
+        <p style={{ fontSize: 18, fontWeight: 600, marginBottom: 16 }}>Presence-Based Overrides</p>
+        <p style={{ opacity: 0.5, fontSize: 13 }}>Per-room presence override toggles will be populated here.</p>
+      </PopupPanel>
+
+      <PopupPanel hash="presence-based-overrides-auto">
+        <p style={{ fontSize: 18, fontWeight: 600, marginBottom: 16 }}>Auto-Reset Configuration</p>
+        <p style={{ opacity: 0.5, fontSize: 13 }}>Per-room auto-reset toggles will be populated here.</p>
+      </PopupPanel>
+    </>
+  );
+}
+
+// ============================================================
+// Guests Staying Over
+// ============================================================
+export function GuestsView() {
+  const { callService } = useService();
+
+  return (
+    <>
+      <ViewHeader title="Guests Staying Over" showBack />
+
+      <div css={sectionStyles}>
+        <Separator title="Guest Controls" />
+        <div css={infoStyles}>Enable guest mode for specific rooms.</div>
+        <div css={btnGridStyles}>
+          {['Guest Room', 'Music Room', 'Theater Room'].map((room) => (
+            <div key={room} css={btnStyles}>
+              <span css={btnIconStyles}>🏠</span>
+              <span css={btnLabelStyles}>{room}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </>
+  );
+}
+
+// ============================================================
+// To-Do (single todo list)
+// ============================================================
+export function TodoView() {
+  return (
+    <>
+      <ViewHeader title="To-Do" showBack />
+      <TodoListCard entityId="todo.groceries" title="Grocery List" />
+    </>
+  );
+}
+
+// ============================================================
+// Groceries
+// ============================================================
+export function GroceriesView() {
+  return (
+    <>
+      <ViewHeader title="Groceries" showBack />
+      <Separator title="Grocery List" />
+      <TodoListCard entityId="todo.shopping_list" title="Shopping List" />
+    </>
+  );
+}
+
+// ============================================================
+// Stephen's Chores
+// ============================================================
+export function StephensChoresView() {
+  return (
+    <>
+      <ViewHeader title="Stephen's Tasks" showBack />
+      <TodoListCard entityId="todo.stephen_s_past_due" title="Past Due" />
+      <TodoListCard entityId="todo.stephen_s_due_today" title="Due Today" />
+      <TodoListCard entityId="todo.stephen_s_upcoming" title="Upcoming" />
+      <TodoListCard entityId="todo.stephen_s_no_due_date" title="No Due Date" />
+    </>
+  );
+}
+
+// ============================================================
+// Steph's Chores
+// ============================================================
+export function StephsChoresView() {
+  return (
+    <>
+      <ViewHeader title="Steph's Tasks" showBack />
+      <TodoListCard entityId="todo.steph_s_past_due" title="Past Due" />
+      <TodoListCard entityId="todo.steph_s_due_today" title="Due Today" />
+      <TodoListCard entityId="todo.steph_s_upcoming" title="Upcoming" />
+      <TodoListCard entityId="todo.steph_s_no_due_date" title="No Due Date" />
+    </>
+  );
+}
+
+// ============================================================
+// Unassigned Chores
+// ============================================================
+export function UnassignedChoresView() {
+  return (
+    <>
+      <ViewHeader title="Unassigned Tasks" showBack />
+      <TodoListCard entityId="todo.unassigned_past_due" title="Past Due" />
+      <TodoListCard entityId="todo.unassigned_due_today" title="Due Today" />
+      <TodoListCard entityId="todo.unassigned_upcoming" title="Upcoming" />
+      <TodoListCard entityId="todo.unassigned_no_due_date" title="No Due Date" />
+    </>
+  );
+}
+
+// ============================================================
+// Home Improvement Chores
+// ============================================================
+export function HomeImprovementChoresView() {
+  return (
+    <>
+      <ViewHeader title="Home Improvement Tasks" showBack />
+      <TodoListCard entityId="todo.home_improvement_s_past_due" title="Past Due" />
+      <TodoListCard entityId="todo.home_improvement_s_due_today" title="Due Today" />
+      <TodoListCard entityId="todo.home_improvement_s_upcoming" title="Upcoming" />
+      <TodoListCard entityId="todo.home_improvement_s_no_due_date" title="No Due Date" />
+    </>
+  );
+}
+
+// ============================================================
+// Mach-E
+// ============================================================
+export function MachEView() {
+  return (
+    <>
+      <ViewHeader title="Mach-E" showBack />
+
+      <div css={sectionStyles}>
+        <ErrorBoundary>
+          <EntityToggle entityId="binary_sensor.mach_e_charge_status" name="Charge Status" />
+        </ErrorBoundary>
+      </div>
+
+      <div css={sectionStyles}>
+        <Separator title="Car Controls" />
+        <div css={btnGridStyles}>
+          {[
+            { label: 'Doors', icon: '🚪' },
+            { label: "Driver's Seat", icon: '💺' },
+            { label: "Passenger Seat", icon: '💺' },
+            { label: 'Climate', icon: '🌡' },
+          ].map((item) => (
+            <div key={item.label} css={btnStyles}>
+              <span css={btnIconStyles}>{item.icon}</span>
+              <span css={btnLabelStyles}>{item.label}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </>
+  );
+}
+
+// ============================================================
+// Vacuums
+// ============================================================
+export function VacuumsView() {
+  const { openPopup } = useNavigation();
+
+  return (
+    <>
+      <ViewHeader title="Robot Vacuums" showBack />
+
+      <div css={sectionStyles}>
+        <Separator title="Robot Vacuums" />
+        <div css={btnGridStyles}>
+          {[
+            { label: 'Main Floor', hash: 'main-floor-robot-vacuum' },
+            { label: 'Music Room', hash: 'music-room-robot-vacuum' },
+            { label: 'Theater Room', hash: 'theater-room-robot-vacuum' },
+          ].map((v) => (
+            <div key={v.hash} css={btnStyles} onClick={() => openPopup(v.hash)}>
+              <span css={btnIconStyles}>🤖</span>
+              <span css={btnLabelStyles}>{v.label}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {['main-floor-robot-vacuum', 'music-room-robot-vacuum', 'theater-room-robot-vacuum'].map((hash) => (
+        <PopupPanel key={hash} hash={hash}>
+          <p style={{ fontSize: 18, fontWeight: 600, marginBottom: 16 }}>
+            {hash.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())}
+          </p>
+          <p style={{ opacity: 0.5, fontSize: 13 }}>
+            Vacuum map and zone controls — requires valetudo-map-card integration.
+          </p>
+        </PopupPanel>
+      ))}
+    </>
+  );
+}
+
+// ============================================================
+// Media
+// ============================================================
+export function MediaView() {
+  const { openPopup } = useNavigation();
+
+  return (
+    <>
+      <ViewHeader title="Media" showBack />
+
+      <div css={sectionStyles}>
+        <Separator title="Living Room" />
+        <div css={btnGridStyles}>
+          <div css={btnStyles} onClick={() => openPopup('living-room-shield')}>
+            <span css={btnIconStyles}>🎮</span>
+            <span css={btnLabelStyles}>SHIELD</span>
+          </div>
+        </div>
+      </div>
+
+      <div css={sectionStyles}>
+        <Separator title="Theater Room" />
+        <div css={btnGridStyles}>
+          <div css={btnStyles} onClick={() => openPopup('theater-room-shield')}>
+            <span css={btnIconStyles}>🎮</span>
+            <span css={btnLabelStyles}>SHIELD</span>
+          </div>
+          <div css={btnStyles} onClick={() => openPopup('theater-room-switch')}>
+            <span css={btnIconStyles}>🕹</span>
+            <span css={btnLabelStyles}>Nintendo Switch</span>
+          </div>
+        </div>
+      </div>
+
+      {['living-room-shield', 'theater-room-shield', 'theater-room-switch'].map((hash) => (
+        <PopupPanel key={hash} hash={hash}>
+          <p style={{ fontSize: 18, fontWeight: 600, marginBottom: 16 }}>
+            {hash.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())}
+          </p>
+          <p style={{ opacity: 0.5, fontSize: 13 }}>Remote controls + volume — requires media player entities.</p>
+        </PopupPanel>
+      ))}
+    </>
+  );
+}
+
+// ============================================================
+// Custom Lights
+// ============================================================
+export function CustomLightsView() {
+  return (
+    <>
+      <ViewHeader title="Custom Lights" showBack />
+
+      <div css={sectionStyles}>
+        <Separator title="Front Yard" />
+        <ErrorBoundary>
+          <EntityToggle entityId="input_boolean.manually_control_front_yard_lights" name="Manual Front Yard Control" />
+        </ErrorBoundary>
+        <div css={infoStyles}>Bollard light controls will be rendered here when manual mode is enabled.</div>
+      </div>
+    </>
+  );
+}

@@ -2,6 +2,20 @@
 
 export type TopLevelRoute = 'overview' | 'security' | 'ecobee' | 'chores' | 'settings';
 
+export type SubRoute =
+  | 'admin'
+  | 'guests-staying-over'
+  | 'to-do'
+  | 'mach-e'
+  | 'groceries'
+  | 'stephens-chores'
+  | 'stephs-chores'
+  | 'unassigned-chores'
+  | 'home-improvement-chores'
+  | 'vacuums'
+  | 'media'
+  | 'custom-lights';
+
 export type AreaRoute =
   | 'living-room'
   | 'guest-room'
@@ -20,7 +34,7 @@ export type AreaRoute =
   | 'dining-room'
   | 'entryway';
 
-export type Route = TopLevelRoute | AreaRoute;
+export type Route = TopLevelRoute | AreaRoute | SubRoute;
 
 export const TOP_LEVEL_ROUTES: { route: TopLevelRoute; label: string; icon: string }[] = [
   { route: 'overview', label: 'Home', icon: 'mdi:home' },
