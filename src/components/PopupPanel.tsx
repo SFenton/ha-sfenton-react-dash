@@ -1,4 +1,5 @@
 import { css } from '@emotion/react';
+import { createPortal } from 'react-dom';
 import { useNavigation } from '../store';
 import { useEffect, type ReactNode } from 'react';
 
@@ -70,12 +71,13 @@ export function PopupPanel({ hash, children }: PopupPanelProps) {
 
   if (!isOpen) return null;
 
-  return (
+  return createPortal(
     <div css={overlayStyles} onClick={closePopup}>
       <div css={panelStyles} onClick={(e) => e.stopPropagation()}>
         <div css={handleStyles} />
         {children}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
