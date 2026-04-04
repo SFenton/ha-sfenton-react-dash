@@ -1,6 +1,7 @@
 import { css } from '@emotion/react';
 import { useEntity, useService } from '@hakit/core';
-import { frostedGlass, activeGlow } from '../styles';
+import { frostedGlass } from '../styles';
+import { useLightGlow } from '../hooks';
 
 const cardStyles = css`
   ${frostedGlass};
@@ -93,6 +94,7 @@ interface LightSliderProps {
 export function LightSlider({ entityId, name, interactive = true }: LightSliderProps) {
   const entity = useEntity(entityId);
   const { callService } = useService();
+  const glow = useLightGlow(entityId);
   const isOn = entity?.state === 'on';
   const brightness = entity?.attributes?.brightness ?? 0;
   const brightnessPct = Math.round((brightness / 255) * 100);
@@ -126,7 +128,7 @@ export function LightSlider({ entityId, name, interactive = true }: LightSliderP
   };
 
   return (
-    <div css={[cardStyles, isOn && activeGlow()]}>
+    <div css={[cardStyles, isOn && css`box-shadow: 0 0 20px ${glow.glowColor}; background: ${glow.bgTint};`]}>
       <div css={headerStyles}>
         <button css={iconButtonStyles} onClick={handleToggle}>
           💡

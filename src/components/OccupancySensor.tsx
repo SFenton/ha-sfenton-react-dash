@@ -1,6 +1,6 @@
 import { css } from '@emotion/react';
-import { useEntity } from '@hakit/core';
-import { frostedGlass, activeGlow } from '../styles';
+import { frostedGlass } from '../styles';
+import { useOccupancyState } from '../hooks';
 
 const cardStyles = css`
   ${frostedGlass};
@@ -40,14 +40,13 @@ interface OccupancySensorProps {
 }
 
 export function OccupancySensor({ entityId, name }: OccupancySensorProps) {
-  const entity = useEntity(entityId);
-  const isDetected = entity?.state === 'on';
+  const { isDetected, bgColor, label } = useOccupancyState(entityId);
 
   return (
-    <div css={[cardStyles, isDetected && activeGlow('rgba(76, 175, 80, 0.2)')]}>
+    <div css={[cardStyles, isDetected && css`box-shadow: 0 0 15px ${bgColor}; background: ${bgColor};`]}>
       <div css={dotStyles(isDetected)} />
       <span css={nameStyles}>{name}</span>
-      <span css={stateStyles}>{isDetected ? 'Detected' : 'Clear'}</span>
+      <span css={stateStyles}>{label}</span>
     </div>
   );
 }

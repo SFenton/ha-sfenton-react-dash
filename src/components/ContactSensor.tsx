@@ -1,6 +1,6 @@
 import { css } from '@emotion/react';
-import { useEntity } from '@hakit/core';
-import { frostedGlass, activeGlow } from '../styles';
+import { frostedGlass } from '../styles';
+import { useDoorState } from '../hooks';
 
 const cardStyles = css`
   ${frostedGlass};
@@ -39,15 +39,14 @@ interface ContactSensorProps {
 }
 
 export function ContactSensor({ entityId, name, type }: ContactSensorProps) {
-  const entity = useEntity(entityId);
-  const isOpen = entity?.state === 'on';
+  const { isOpen, bgColor, label } = useDoorState(entityId, type);
   const icon = type === 'door' ? (isOpen ? '🚪' : '🔒') : (isOpen ? '🪟' : '🪟');
 
   return (
-    <div css={[cardStyles, isOpen && activeGlow('rgba(239, 83, 80, 0.2)')]}>
+    <div css={[cardStyles, isOpen && css`box-shadow: 0 0 15px ${bgColor}; background: ${bgColor};`]}>
       <span css={iconStyles(isOpen)}>{icon}</span>
       <span css={nameStyles}>{name}</span>
-      <span css={stateStyles(isOpen)}>{isOpen ? 'Open' : 'Closed'}</span>
+      <span css={stateStyles(isOpen)}>{label}</span>
     </div>
   );
 }

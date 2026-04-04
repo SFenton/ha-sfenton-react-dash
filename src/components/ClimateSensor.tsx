@@ -1,6 +1,6 @@
 import { css } from '@emotion/react';
-import { useEntity } from '@hakit/core';
 import { frostedGlass } from '../styles';
+import { useClimateColor } from '../hooks';
 
 const cardStyles = css`
   ${frostedGlass};
@@ -40,15 +40,6 @@ const tempStyles = css`
   font-weight: 700;
 `;
 
-/** Map temperature to a color gradient (blue=cold → orange=warm → red=hot) */
-function tempToColor(temp: number): string {
-  if (temp <= 60) return 'rgba(66, 133, 244, 0.6)';   // cold blue
-  if (temp <= 68) return 'rgba(52, 168, 83, 0.6)';    // cool green
-  if (temp <= 72) return 'rgba(251, 188, 4, 0.6)';    // comfortable yellow
-  if (temp <= 76) return 'rgba(234, 134, 0, 0.6)';    // warm orange
-  return 'rgba(234, 67, 53, 0.6)';                     // hot red
-}
-
 interface ClimateSensorProps {
   entityId: string;
   name: string;
@@ -57,12 +48,8 @@ interface ClimateSensorProps {
 }
 
 export function ClimateSensor({ entityId, name, colorEntity }: ClimateSensorProps) {
-  const entity = useEntity(entityId);
-  const colorHint = useEntity(colorEntity ?? entityId);
-  const temp = parseFloat(entity?.state ?? '0');
-  const unit = entity?.attributes?.unit_of_measurement ?? '°F';
-  const displayTemp = isNaN(temp) ? entity?.state ?? '—' : `${Math.round(temp)}${unit}`;
-  const color = tempToColor(temp);
+  const { color, bgColor, temp, unit, label } = useClimateColor(entityId, colorEntity);
+  const displayTemp = isNaN(temp) ? '—' : `${Math.round(temp)}${unit}`;
 
   return (
     <div css={cardStyles}>

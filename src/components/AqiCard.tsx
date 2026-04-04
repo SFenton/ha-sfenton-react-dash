@@ -1,6 +1,6 @@
 import { css } from '@emotion/react';
-import { useEntity } from '@hakit/core';
 import { frostedGlass } from '../styles';
+import { useAqiColor } from '../hooks';
 
 const cardStyles = css`
   ${frostedGlass};
@@ -45,25 +45,6 @@ const subStyles = css`
   opacity: 0.5;
 `;
 
-/** Map AQI value to color (EPA scale) */
-function aqiToColor(aqi: number): string {
-  if (aqi <= 50) return 'rgba(76, 175, 80, 0.6)';     // Good - green
-  if (aqi <= 100) return 'rgba(255, 235, 59, 0.6)';   // Moderate - yellow
-  if (aqi <= 150) return 'rgba(255, 152, 0, 0.6)';    // USG - orange
-  if (aqi <= 200) return 'rgba(244, 67, 54, 0.6)';    // Unhealthy - red
-  if (aqi <= 300) return 'rgba(156, 39, 176, 0.6)';   // Very Unhealthy - purple
-  return 'rgba(126, 0, 35, 0.6)';                      // Hazardous - maroon
-}
-
-function aqiLabel(aqi: number): string {
-  if (aqi <= 50) return 'Good';
-  if (aqi <= 100) return 'Moderate';
-  if (aqi <= 150) return 'Unhealthy (SG)';
-  if (aqi <= 200) return 'Unhealthy';
-  if (aqi <= 300) return 'Very Unhealthy';
-  return 'Hazardous';
-}
-
 interface AqiCardProps {
   entityId: string;
   name: string;
@@ -72,25 +53,20 @@ interface AqiCardProps {
 }
 
 export function AqiCard({ entityId, name, pm25Entity }: AqiCardProps) {
-  const entity = useEntity(entityId);
-  const pm25 = useEntity(pm25Entity ?? entityId);
-  const aqi = parseFloat(entity?.state ?? '0');
-  const color = aqiToColor(isNaN(aqi) ? 0 : aqi);
-  const hasPm25 = pm25Entity && pm25Entity !== entityId;
-  const pm25Value = hasPm25 ? pm25?.state : undefined;
+  const { color, bgColor, aqi, pm25, label } = useAqiColor(entityId, pm25Entity);
 
   return (
     <div css={cardStyles}>
-      <div css={iconStyles(color)}>🌬</div>
+      <div css={iconStyles(bgColor)}>🌬</div>
       <div css={infoStyles}>
         <div css={nameStyles}>{name}</div>
         <div css={valueStyles}>
-          {isNaN(aqi) ? entity?.state ?? '—' : Math.round(aqi)} AQI
+          {Math.round(aqi)} AQI
         </div>
-        {hasPm25 && pm25Value && (
-          <div css={subStyles}>PM2.5: {pm25Value} µg/m³</div>
+        {pm25 !== null && (
+          <div css={subStyles}>PM2.5: {pm25} µg/m³</div>
         )}
-        <div css={subStyles}>{aqiLabel(isNaN(aqi) ? 0 : aqi)}</div>
+        <div css={subStyles}>{label}</div>
       </div>
     </div>
   );
