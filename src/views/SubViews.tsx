@@ -36,6 +36,55 @@ const infoStyles = css`
   opacity: 0.6;
 `;
 
+const descStyles = css`
+  ${frostedGlass};
+  padding: 14px 16px;
+  margin-bottom: 12px;
+  font-size: 13px;
+  opacity: 0.7;
+  line-height: 1.5;
+`;
+
+const toggleGridStyles = css`
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 8px;
+`;
+
+const PRESENCE_SWITCHES = [
+  { entity: 'switch.living_room_presence_living_room_lights_presence_allowed', name: 'Living Room' },
+  { entity: 'switch.kitchen_presence_kitchen_lights_presence_allowed', name: 'Kitchen' },
+  { entity: 'switch.hallway_presence_hallway_lights_presence_allowed', name: 'Hallway' },
+  { entity: 'switch.gym_presence_gym_light_presence_allowed', name: 'Gym' },
+  { entity: 'switch.guest_bathroom_presence_guest_bathroom_dimmer_switch_presence_allowed', name: 'Guest Bathroom' },
+  { entity: 'switch.guest_room_presence_guest_room_presence_allowed', name: 'Guest Room' },
+  { entity: 'switch.office_presence_office_light_presence_allowed', name: 'Office' },
+  { entity: 'switch.master_bedroom_presence_master_bedroom_presence_allowed', name: 'Master Bedroom' },
+  { entity: 'switch.master_bathroom_presence_master_bathroom_dimmer_switch_presence_allowed', name: 'Master Bathroom' },
+  { entity: 'switch.dining_room_presence_dining_room_dimmer_switch_presence_allowed', name: 'Dining Room' },
+  { entity: 'switch.theater_room_presence_theater_room_presence_allowed', name: 'Theater Room' },
+  { entity: 'switch.downstairs_hallway_presence_downstairs_hallway_light_presence_allowed', name: 'Downstairs Hallway' },
+  { entity: 'switch.music_room_presence_music_room_lights_presence_allowed', name: 'Music Room' },
+  { entity: 'switch.upper_deck_presence_back_deck_lights_presence_allowed', name: 'Upper Deck' },
+];
+
+const AUTO_REENABLE_SWITCHES = [
+  { entity: 'switch.living_room_auto_re_enable_presence_lighting', name: 'Living Room' },
+  { entity: 'switch.kitchen_auto_re_enable_presence_lighting', name: 'Kitchen' },
+  { entity: 'switch.hallway_auto_re_enable_presence_lighting', name: 'Hallway' },
+  { entity: 'switch.gym_auto_re_enable_presence_lighting', name: 'Gym' },
+  { entity: 'switch.guest_bathroom_auto_re_enable_presence_lighting', name: 'Guest Bathroom' },
+  { entity: 'switch.guest_room_auto_re_enable_presence_lighting', name: 'Guest Room' },
+  { entity: 'switch.office_auto_re_enable_presence_lighting', name: 'Office' },
+  { entity: 'switch.master_bedroom_auto_re_enable_presence_lighting', name: 'Master Bedroom' },
+  { entity: 'switch.master_bathroom_auto_re_enable_presence_lighting', name: 'Master Bathroom' },
+  { entity: 'switch.dining_room_auto_re_enable_presence_lighting', name: 'Dining Room' },
+  { entity: 'switch.theater_room_auto_re_enable_presence_lighting', name: 'Theater Room' },
+  { entity: 'switch.downstairs_hallway_auto_re_enable_presence_lighting', name: 'Downstairs Hallway' },
+  { entity: 'switch.music_room_auto_re_enable_presence_lighting', name: 'Music Room' },
+  { entity: 'switch.upper_deck_auto_re_enable_presence_lighting', name: 'Upper Deck' },
+];
+
 // ============================================================
 // Admin
 // ============================================================
@@ -44,11 +93,14 @@ export function AdminView() {
 
   return (
     <>
-      <ViewHeader title="Admin Controls" showBack />
+      <ViewHeader title="Admin" showBack />
 
       <div css={sectionStyles}>
         <Separator title="Security Controls" />
-        <div css={infoStyles}>Manage security automation settings.</div>
+        <div css={descStyles}>
+          Disables automatic locking of the front door. Useful for when contractors
+          are over, or we have people frequently entering/leaving the home.
+        </div>
         <ErrorBoundary>
           <EntityToggle entityId="input_boolean.front_door_auto_lock" name="Front Door Auto-Lock" />
         </ErrorBoundary>
@@ -56,7 +108,11 @@ export function AdminView() {
 
       <div css={sectionStyles}>
         <Separator title="Presence-Based Light Overrides" />
-        <div css={infoStyles}>Override automatic lighting for specific rooms.</div>
+        <div css={descStyles}>
+          Enable or disable presence-based lighting in specific rooms. Useful for
+          when we have company, or need to quickly keep lights on or off without
+          using the voice commands.
+        </div>
         <div css={btnGridStyles}>
           <div css={btnStyles} onClick={() => openPopup('presence-based-overrides')}>
             <span css={btnIconStyles}>💡</span>
@@ -67,7 +123,10 @@ export function AdminView() {
 
       <div css={sectionStyles}>
         <Separator title="Show Specific Controls" />
-        <div css={infoStyles}>Toggle visibility of special controls.</div>
+        <div css={descStyles}>
+          Shows the outdoor faucets in our Home Assistant pages. Useful to disable
+          during the winter, when we aren't using them.
+        </div>
         <div css={btnGridStyles}>
           <ErrorBoundary>
             <EntityToggle entityId="input_boolean.show_outdoor_faucets" name="Outdoor Faucets" />
@@ -79,8 +138,16 @@ export function AdminView() {
       </div>
 
       <div css={sectionStyles}>
-        <Separator title="Auto Presence Setting Overrides" />
-        <div css={infoStyles}>Configure auto-reset behavior for presence overrides.</div>
+        <Separator title="Automatic Presence Setting Overrides" />
+        <div css={descStyles}>
+          Sometimes, we disable automatic presence-based lighting in rooms that we'd
+          otherwise want to wake up and have that presence-based lighting active.
+        </div>
+        <div css={descStyles}>
+          If a toggle here is enabled, it means that in the morning, before we usually
+          wake up, if the room has been cleared for a sufficient amount of time during
+          the night, we'll re-enable presence-based lighting in that room.
+        </div>
         <div css={btnGridStyles}>
           <div css={btnStyles} onClick={() => openPopup('presence-based-overrides-auto')}>
             <span css={btnIconStyles}>🔄</span>
@@ -89,14 +156,28 @@ export function AdminView() {
         </div>
       </div>
 
+      {/* Presence Override Popup — 14 room toggles */}
       <PopupPanel hash="presence-based-overrides">
         <p style={{ fontSize: 18, fontWeight: 600, marginBottom: 16 }}>Presence-Based Overrides</p>
-        <p style={{ opacity: 0.5, fontSize: 13 }}>Per-room presence override toggles will be populated here.</p>
+        <div css={toggleGridStyles}>
+          {PRESENCE_SWITCHES.map((s) => (
+            <ErrorBoundary key={s.entity}>
+              <EntityToggle entityId={s.entity} name={s.name} />
+            </ErrorBoundary>
+          ))}
+        </div>
       </PopupPanel>
 
+      {/* Auto Re-enable Popup — 14 room toggles */}
       <PopupPanel hash="presence-based-overrides-auto">
-        <p style={{ fontSize: 18, fontWeight: 600, marginBottom: 16 }}>Auto-Reset Configuration</p>
-        <p style={{ opacity: 0.5, fontSize: 13 }}>Per-room auto-reset toggles will be populated here.</p>
+        <p style={{ fontSize: 18, fontWeight: 600, marginBottom: 16 }}>Presence-Based Overrides Auto-Reset</p>
+        <div css={toggleGridStyles}>
+          {AUTO_REENABLE_SWITCHES.map((s) => (
+            <ErrorBoundary key={s.entity}>
+              <EntityToggle entityId={s.entity} name={s.name} />
+            </ErrorBoundary>
+          ))}
+        </div>
       </PopupPanel>
     </>
   );
