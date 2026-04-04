@@ -1,5 +1,5 @@
 ﻿import { css } from '@emotion/react';
-import { ViewHeader, Separator, LightSlider, ClimateSensor, OccupancySensor, DoorSensor, WindowSensor, VentButton, AqiCard, ErrorBoundary, SwipeRow, PopupPanel } from '../components';
+import { ViewHeader, ErrorBoundary, SwipeRow, PopupPanel } from '../components';
 import { LightPopupContent } from '../components/LightPopupContent';
 import { ClimatePopupContent } from '../components/ClimatePopupContent';
 import { OccupancyPopupContent } from '../components/OccupancyPopupContent';
@@ -7,14 +7,9 @@ import { ContactPopupContent } from '../components/ContactPopupContent';
 import { VentPopupContent } from '../components/VentPopupContent';
 import { AqiPopupContent } from '../components/AqiPopupContent';
 import { useNavigation } from '../store';
-import { twoColumnGrid } from '../styles';
 import type { AreaRoute } from '../routes';
 import { AREA_ROUTES } from '../routes';
 import { AREA_ENTITIES } from '../areaEntities';
-
-const sectionStyles = css`
-  margin-bottom: 20px;
-`;
 
 const chipStyles = css`
   flex-shrink: 0;
@@ -67,89 +62,6 @@ export function AreaDetailView({ area }: AreaDetailViewProps) {
             </button>
           ))}
         </SwipeRow>
-      )}
-
-      {config.lights.length > 0 && (
-        <div css={sectionStyles}>
-          <Separator title="Lights" toggleEntity={config.groupLight} />
-          <div css={twoColumnGrid}>
-            {config.lights.map((l) => (
-              <ErrorBoundary key={l.entityId}>
-                <LightSlider entityId={l.entityId} name={l.name} interactive={!l.readonly} />
-              </ErrorBoundary>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {config.climate.length > 0 && (
-        <div css={sectionStyles}>
-          <Separator title="Climate" />
-          <div css={twoColumnGrid}>
-            {config.climate.map((c) => (
-              <ErrorBoundary key={c.entityId}>
-                <ClimateSensor entityId={c.entityId} name={c.name} colorEntity={c.colorEntity} />
-              </ErrorBoundary>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {config.occupancy.length > 0 && (
-        <div css={sectionStyles}>
-          <Separator title="Occupancy" />
-          <div css={twoColumnGrid}>
-            {config.occupancy.map((o) => (
-              <ErrorBoundary key={o.entityId}>
-                <OccupancySensor entityId={o.entityId} name={o.name} />
-              </ErrorBoundary>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {(config.doors.length > 0 || config.windows.length > 0) && (
-        <div css={sectionStyles}>
-          <Separator title="Contact Sensors" />
-          <div css={twoColumnGrid}>
-            {config.doors.map((d) => (
-              <ErrorBoundary key={d.entityId}>
-                <DoorSensor entityId={d.entityId} name={d.name} />
-              </ErrorBoundary>
-            ))}
-            {config.windows.map((w) => (
-              <ErrorBoundary key={w.entityId}>
-                <WindowSensor entityId={w.entityId} name={w.name} />
-              </ErrorBoundary>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {config.vents.length > 0 && (
-        <div css={sectionStyles}>
-          <Separator title="Vents" />
-          <div css={twoColumnGrid}>
-            {config.vents.map((v) => (
-              <ErrorBoundary key={v.entityId}>
-                <VentButton entityId={v.entityId} name={v.name} />
-              </ErrorBoundary>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {config.aqi.length > 0 && (
-        <div css={sectionStyles}>
-          <Separator title="Air Quality" />
-          <div css={twoColumnGrid}>
-            {config.aqi.map((a) => (
-              <ErrorBoundary key={a.entityId}>
-                <AqiCard entityId={a.entityId} name={a.name} pm25Entity={a.pm25Entity} />
-              </ErrorBoundary>
-            ))}
-          </div>
-        </div>
       )}
 
       {/* ===== Room-specific Popup Panels ===== */}
