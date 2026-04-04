@@ -1,6 +1,5 @@
 ﻿import { css } from '@emotion/react';
-import { useEntity } from '@hakit/core';
-import { ViewHeader, Separator, ErrorBoundary } from '../components';
+import { ViewHeader, Separator, TodoListCard } from '../components';
 import { useNavigation } from '../store';
 import { frostedGlass, frostedGlassHover } from '../styles';
 
@@ -38,48 +37,6 @@ const linkLabelStyles = css`
   font-weight: 500;
 `;
 
-const todoSectionStyles = css`
-  margin-bottom: 16px;
-`;
-
-const todoItemStyles = css`
-  ${frostedGlass};
-  padding: 12px 14px;
-  margin-bottom: 4px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-size: 13px;
-`;
-
-const todoCheckStyles = css`
-  width: 18px;
-  height: 18px;
-  border-radius: 4px;
-  border: 2px solid rgba(255, 255, 255, 0.3);
-  flex-shrink: 0;
-`;
-
-const todoTextStyles = css`
-  flex: 1;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-`;
-
-const todoDueStyles = css`
-  font-size: 11px;
-  opacity: 0.4;
-  white-space: nowrap;
-`;
-
-const emptyStyles = css`
-  padding: 16px;
-  text-align: center;
-  opacity: 0.4;
-  font-size: 13px;
-`;
-
 const QUICK_LINKS = [
   { label: 'Groceries', icon: '🛒', route: 'groceries' as const },
   { label: "Stephen's Tasks", icon: '📋', route: 'stephens-chores' as const },
@@ -112,28 +69,6 @@ const STEPH_TODOS: TodoSection[] = [
   { label: 'Upcoming', entityId: 'todo.steph_s_upcoming_today_by_time_and_future_with_unassigned' },
 ];
 
-function TodoList({ label, entityId }: TodoSection) {
-  const entity = useEntity(entityId);
-  const items: { summary: string; due?: string; status?: string }[] =
-    (entity?.attributes as any)?.items ?? [];
-  const pending = items.filter((i) => i.status !== 'completed');
-
-  if (pending.length === 0) return null;
-
-  return (
-    <div css={todoSectionStyles}>
-      <Separator title={`${label} (${pending.length})`} />
-      {pending.map((item, i) => (
-        <div key={i} css={todoItemStyles}>
-          <div css={todoCheckStyles} />
-          <span css={todoTextStyles}>{item.summary}</span>
-          {item.due && <span css={todoDueStyles}>{item.due}</span>}
-        </div>
-      ))}
-    </div>
-  );
-}
-
 export function ChoresView() {
   const { navigate } = useNavigation();
 
@@ -157,23 +92,25 @@ export function ChoresView() {
         </div>
       </div>
 
-      <div css={sectionStyles}>
-        <Separator title="Stephen's Tasks" />
-        {STEPHEN_TODOS.map((todo) => (
-          <ErrorBoundary key={todo.entityId}>
-            <TodoList {...todo} />
-          </ErrorBoundary>
-        ))}
-      </div>
+      <Separator title="Stephen's Tasks" />
+      {STEPHEN_TODOS.map((todo) => (
+        <TodoListCard
+          key={todo.entityId}
+          entityId={todo.entityId}
+          title={todo.label}
+          hideWhenEmpty
+        />
+      ))}
 
-      <div css={sectionStyles}>
-        <Separator title="Steph's Tasks" />
-        {STEPH_TODOS.map((todo) => (
-          <ErrorBoundary key={todo.entityId}>
-            <TodoList {...todo} />
-          </ErrorBoundary>
-        ))}
-      </div>
+      <Separator title="Steph's Tasks" />
+      {STEPH_TODOS.map((todo) => (
+        <TodoListCard
+          key={todo.entityId}
+          entityId={todo.entityId}
+          title={todo.label}
+          hideWhenEmpty
+        />
+      ))}
     </>
   );
 }
