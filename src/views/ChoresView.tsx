@@ -1,100 +1,178 @@
-import { css } from '@emotion/react';
-import { useService } from '@hakit/core';
-import { ViewHeader, Separator } from '../components';
+﻿import { css } from '@emotion/react';
+import { useEntity } from '@hakit/core';
+import { ViewHeader, Separator, ErrorBoundary } from '../components';
+import { useNavigation } from '../store';
 import { frostedGlass, frostedGlassHover } from '../styles';
 
 const sectionStyles = css`
   margin-bottom: 24px;
 `;
 
-const cardStyles = css`
+const linkGridStyles = css`
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 8px;
+`;
+
+const linkCardStyles = css`
   ${frostedGlass};
   ${frostedGlassHover};
-  padding: 16px;
+  padding: 14px 16px;
   cursor: pointer;
-  margin-bottom: 8px;
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
+  transition: background 0.2s, transform 0.15s;
 
   &:active {
-    transform: scale(0.98);
+    transform: scale(0.97);
   }
 `;
 
-const iconStyles = css`
-  font-size: 24px;
+const linkIconStyles = css`
+  font-size: 18px;
 `;
 
-const nameStyles = css`
-  font-size: 14px;
+const linkLabelStyles = css`
+  font-size: 13px;
   font-weight: 500;
 `;
 
-const descStyles = css`
-  font-size: 12px;
-  opacity: 0.5;
+const todoSectionStyles = css`
+  margin-bottom: 16px;
 `;
 
-export function ChoresView() {
-  const { callService } = useService();
+const todoItemStyles = css`
+  ${frostedGlass};
+  padding: 12px 14px;
+  margin-bottom: 4px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+`;
 
-  const runScript = (entityId: string) => {
-    callService({
-      domain: 'script',
-      service: 'turn_on',
-      target: { entity_id: entityId },
-    });
-  };
+const todoCheckStyles = css`
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  flex-shrink: 0;
+`;
+
+const todoTextStyles = css`
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+`;
+
+const todoDueStyles = css`
+  font-size: 11px;
+  opacity: 0.4;
+  white-space: nowrap;
+`;
+
+const emptyStyles = css`
+  padding: 16px;
+  text-align: center;
+  opacity: 0.4;
+  font-size: 13px;
+`;
+
+const QUICK_LINKS = [
+  { label: 'Groceries', icon: '🛒', route: 'groceries' as const },
+  { label: "Stephen's Tasks", icon: '📋', route: 'stephens-chores' as const },
+  { label: "Steph's Tasks", icon: '📋', route: 'stephs-chores' as const },
+  { label: 'Unassigned', icon: '📦', route: 'unassigned-chores' as const },
+  { label: 'Home Tasks', icon: '🏠', route: 'home-improvement-chores' as const },
+];
+
+interface TodoSection {
+  label: string;
+  entityId: string;
+}
+
+const STEPHEN_TODOS: TodoSection[] = [
+  { label: 'Past Due', entityId: 'todo.stephen_s_past_due_with_unassigned' },
+  { label: 'Evening Tasks', entityId: 'todo.stephen_s_evening_with_unassigned' },
+  { label: 'Afternoon Tasks', entityId: 'todo.stephen_s_afternoon_with_unassigned' },
+  { label: 'Morning Tasks', entityId: 'todo.stephen_s_morning_with_unassigned' },
+  { label: 'Due Any Time Today', entityId: 'todo.stephen_s_all_day_with_unassigned' },
+  { label: 'No Due Date', entityId: 'todo.stephen_s_no_due_date_with_unassigned' },
+  { label: 'Upcoming', entityId: 'todo.stephen_s_upcoming_today_by_time_and_future_with_unassigned' },
+];
+
+const STEPH_TODOS: TodoSection[] = [
+  { label: 'Evening Tasks', entityId: 'todo.steph_s_evening_with_unassigned' },
+  { label: 'Afternoon Tasks', entityId: 'todo.steph_s_afternoon_with_unassigned' },
+  { label: 'Morning Tasks', entityId: 'todo.steph_s_morning_with_unassigned' },
+  { label: 'Due Any Time Today', entityId: 'todo.steph_s_all_day_with_unassigned' },
+  { label: 'No Due Date', entityId: 'todo.steph_s_no_due_date_with_unassigned' },
+  { label: 'Upcoming', entityId: 'todo.steph_s_upcoming_today_by_time_and_future_with_unassigned' },
+];
+
+function TodoList({ label, entityId }: TodoSection) {
+  const entity = useEntity(entityId);
+  const items: { summary: string; due?: string; status?: string }[] =
+    (entity?.attributes as any)?.items ?? [];
+  const pending = items.filter((i) => i.status !== 'completed');
+
+  if (pending.length === 0) return null;
+
+  return (
+    <div css={todoSectionStyles}>
+      <Separator title={`${label} (${pending.length})`} />
+      {pending.map((item, i) => (
+        <div key={i} css={todoItemStyles}>
+          <div css={todoCheckStyles} />
+          <span css={todoTextStyles}>{item.summary}</span>
+          {item.due && <span css={todoDueStyles}>{item.due}</span>}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+export function ChoresView() {
+  const { navigate } = useNavigation();
 
   return (
     <>
       <ViewHeader title="Tasks" />
 
       <div css={sectionStyles}>
-        <Separator title="Quick Actions" />
-        <div
-          css={cardStyles}
-          onClick={() => runScript('script.create_donetick_task')}
-        >
-          <span css={iconStyles}>📝</span>
-          <div>
-            <div css={nameStyles}>Create Task</div>
-            <div css={descStyles}>Add a new task to Donetick</div>
-          </div>
+        <Separator title="Quick Links" />
+        <div css={linkGridStyles}>
+          {QUICK_LINKS.map((link) => (
+            <div
+              key={link.route}
+              css={linkCardStyles}
+              onClick={() => navigate(link.route as any)}
+            >
+              <span css={linkIconStyles}>{link.icon}</span>
+              <span css={linkLabelStyles}>{link.label}</span>
+            </div>
+          ))}
         </div>
       </div>
 
       <div css={sectionStyles}>
-        <Separator title="Vacuum" />
-        <div
-          css={cardStyles}
-          onClick={() => callService({
-            domain: 'vacuum',
-            service: 'start',
-            target: { entity_id: 'vacuum.valetido_politefatherlykingfisher' },
-          })}
-        >
-          <span css={iconStyles}>🤖</span>
-          <div>
-            <div css={nameStyles}>Start Vacuum</div>
-            <div css={descStyles}>Begin full clean</div>
-          </div>
-        </div>
-        <div
-          css={cardStyles}
-          onClick={() => callService({
-            domain: 'vacuum',
-            service: 'return_to_base',
-            target: { entity_id: 'vacuum.valetido_politefatherlykingfisher' },
-          })}
-        >
-          <span css={iconStyles}>🏠</span>
-          <div>
-            <div css={nameStyles}>Return to Dock</div>
-            <div css={descStyles}>Send vacuum home</div>
-          </div>
-        </div>
+        <Separator title="Stephen's Tasks" />
+        {STEPHEN_TODOS.map((todo) => (
+          <ErrorBoundary key={todo.entityId}>
+            <TodoList {...todo} />
+          </ErrorBoundary>
+        ))}
+      </div>
+
+      <div css={sectionStyles}>
+        <Separator title="Steph's Tasks" />
+        {STEPH_TODOS.map((todo) => (
+          <ErrorBoundary key={todo.entityId}>
+            <TodoList {...todo} />
+          </ErrorBoundary>
+        ))}
       </div>
     </>
   );
