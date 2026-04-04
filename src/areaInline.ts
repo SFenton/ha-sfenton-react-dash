@@ -31,7 +31,7 @@ export const AREA_INLINE: Partial<Record<AreaRoute, AreaInlineConfig>> = {
         title: 'Climate',
         buttons: [
           { label: 'Vents', action: '#living-room-vents', icon: '🌀' },
-          { label: 'Air Purifier', action: '#living-room-aqi', icon: '🌬' },
+          { label: 'Air Purifier', action: '#living-room-air-purifier', icon: '🌬' },
         ],
       },
       {
@@ -55,7 +55,7 @@ export const AREA_INLINE: Partial<Record<AreaRoute, AreaInlineConfig>> = {
         title: 'Climate',
         buttons: [
           { label: 'Vents', action: '#master-bedroom-vents', icon: '🌀' },
-          { label: 'Air Purifier', action: '#master-bedroom-aqi', icon: '🌬' },
+          { label: 'Air Purifier', action: '#master-bedroom-air-purifier', icon: '🌬' },
           { label: 'Humidifier', action: '#master-bedroom-humidifier', icon: '💧' },
         ],
       },
@@ -81,7 +81,7 @@ export const AREA_INLINE: Partial<Record<AreaRoute, AreaInlineConfig>> = {
         title: 'Climate',
         buttons: [
           { label: 'Vents', action: '#theater-room-vents', icon: '🌀' },
-          { label: 'Air Purifier', action: '#theater-room-aqi', icon: '🌬' },
+          { label: 'Air Purifier', action: '#theater-room-air-purifier', icon: '🌬' },
         ],
       },
       {
@@ -112,7 +112,7 @@ export const AREA_INLINE: Partial<Record<AreaRoute, AreaInlineConfig>> = {
         title: 'Climate',
         buttons: [
           { label: 'Vents', action: '#music-room-vents', icon: '🌀' },
-          { label: 'Air Purifier', action: '#music-room-aqi', icon: '🌬' },
+          { label: 'Air Purifier', action: '#music-room-air-purifier', icon: '🌬' },
         ],
       },
       {
@@ -141,7 +141,7 @@ export const AREA_INLINE: Partial<Record<AreaRoute, AreaInlineConfig>> = {
         title: 'Climate',
         buttons: [
           { label: 'Vent', action: '#office-vents', icon: '🌀' },
-          { label: 'Air Purifier', action: '#office-aqi', icon: '🌬' },
+          { label: 'Air Purifier', action: '#office-air-purifier', icon: '🌬' },
         ],
       },
       {
@@ -171,7 +171,7 @@ export const AREA_INLINE: Partial<Record<AreaRoute, AreaInlineConfig>> = {
         title: 'Climate',
         buttons: [
           { label: 'Vent', action: '#guest-room-vents', icon: '🌀' },
-          { label: 'Air Purifier', action: '#guest-room-aqi', icon: '🌬' },
+          { label: 'Air Purifier', action: '#guest-room-air-purifier', icon: '🌬' },
         ],
       },
     ],

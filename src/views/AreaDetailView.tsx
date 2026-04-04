@@ -6,6 +6,7 @@ import { OccupancyPopupContent } from '../components/OccupancyPopupContent';
 import { ContactPopupContent } from '../components/ContactPopupContent';
 import { VentPopupContent } from '../components/VentPopupContent';
 import { AqiPopupContent } from '../components/AqiPopupContent';
+import { AirPurifierPopupContent } from '../components/AirPurifierPopupContent';
 import { useNavigation } from '../store';
 import { useService } from '@hakit/core';
 import type { AreaRoute } from '../routes';
@@ -191,6 +192,15 @@ export function AreaDetailView({ area }: AreaDetailViewProps) {
           <AqiPopupContent
             title={`${title} Air Quality`}
             sensors={config.aqi}
+          />
+        </PopupPanel>
+      )}
+
+      {config.airPurifier && (
+        <PopupPanel hash={`${area}-air-purifier`}>
+          <AirPurifierPopupContent
+            title={`${title} Air Purifier`}
+            config={config.airPurifier}
           />
         </PopupPanel>
       )}

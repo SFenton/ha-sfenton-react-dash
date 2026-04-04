@@ -10,6 +10,12 @@ interface ContactEntry { entityId: string; name: string }
 interface VentEntry { entityId: string; name: string }
 interface AqiEntry { entityId: string; name: string; pm25Entity?: string }
 
+export interface AirPurifierConfig {
+  fanModeEntity: string;
+  autoModeEntity: string;
+  fanEntity: string;
+}
+
 export interface AreaConfig {
   groupLight?: string;
   lights: LightEntry[];
@@ -19,6 +25,7 @@ export interface AreaConfig {
   windows: ContactEntry[];
   vents: VentEntry[];
   aqi: AqiEntry[];
+  airPurifier?: AirPurifierConfig;
 }
 
 export const AREA_ENTITIES: Record<AreaRoute, AreaConfig> = {
@@ -53,6 +60,11 @@ export const AREA_ENTITIES: Record<AreaRoute, AreaConfig> = {
     aqi: [
       { entityId: 'sensor.living_room_air_purifier_air_quality_index', name: 'Living Room', pm25Entity: 'sensor.living_room_air_purifier_pm2_5' },
     ],
+    airPurifier: {
+      fanModeEntity: 'select.living_room_air_purifier_fan_mode',
+      autoModeEntity: 'select.living_room_air_purifier_auto_mode',
+      fanEntity: 'fan.living_room_air_purifier_levoit_purifier',
+    },
   },
 
   kitchen: {
@@ -111,6 +123,11 @@ export const AREA_ENTITIES: Record<AreaRoute, AreaConfig> = {
     aqi: [
       { entityId: 'sensor.master_bedroom_air_purifier_air_quality_index', name: 'Bedroom', pm25Entity: 'sensor.master_bedroom_air_purifier_pm2_5' },
     ],
+    airPurifier: {
+      fanModeEntity: 'select.master_bedroom_air_purifier_fan_mode',
+      autoModeEntity: 'select.master_bedroom_air_purifier_auto_mode',
+      fanEntity: 'fan.master_bedroom_air_purifier_levoit_purifier',
+    },
   },
 
   'guest-room': {
@@ -138,6 +155,11 @@ export const AREA_ENTITIES: Record<AreaRoute, AreaConfig> = {
     aqi: [
       { entityId: 'sensor.guest_room_air_purifier_air_quality_index', name: 'Guest Room', pm25Entity: 'sensor.guest_room_air_purifier_pm2_5' },
     ],
+    airPurifier: {
+      fanModeEntity: 'select.guest_room_air_purifier_fan_mode',
+      autoModeEntity: 'select.guest_room_air_purifier_auto_mode',
+      fanEntity: 'fan.guest_room_air_purifier_levoit_purifier',
+    },
   },
 
   office: {
@@ -164,6 +186,11 @@ export const AREA_ENTITIES: Record<AreaRoute, AreaConfig> = {
     aqi: [
       { entityId: 'sensor.office_air_purifier_air_quality_index', name: 'Office', pm25Entity: 'sensor.office_air_purifier_pm2_5' },
     ],
+    airPurifier: {
+      fanModeEntity: 'select.office_air_purifier_fan_mode',
+      autoModeEntity: 'select.office_air_purifier_auto_mode',
+      fanEntity: 'fan.office_air_purifier_levoit_purifier',
+    },
   },
 
   gym: {
@@ -240,6 +267,11 @@ export const AREA_ENTITIES: Record<AreaRoute, AreaConfig> = {
     aqi: [
       { entityId: 'sensor.air_purifier_air_quality_index', name: 'Music Room', pm25Entity: 'sensor.air_purifier_pm2_5' },
     ],
+    airPurifier: {
+      fanModeEntity: 'select.air_purifier_fan_mode',
+      autoModeEntity: 'select.air_purifier_auto_mode',
+      fanEntity: 'fan.air_purifier_levoit_purifier',
+    },
   },
 
   garage: {
@@ -279,6 +311,11 @@ export const AREA_ENTITIES: Record<AreaRoute, AreaConfig> = {
     aqi: [
       { entityId: 'sensor.theater_room_air_purifier_air_quality_index', name: 'Theater', pm25Entity: 'sensor.theater_room_air_purifier_pm2_5' },
     ],
+    airPurifier: {
+      fanModeEntity: 'select.theater_room_air_purifier_fan_mode',
+      autoModeEntity: 'select.theater_room_air_purifier_auto_mode',
+      fanEntity: 'fan.theater_room_air_purifier_levoit_purifier',
+    },
   },
 
   'back-deck': {
