@@ -111,12 +111,12 @@
 }
 
 .headerPill .icon {
-  width: 46px;
+  width: 36px;
   height: 46px;
 }
 
 .headerPill .icon svg {
-  transform: translateX(-8px);
+  transform: translateX(-4px);
 }
 
 .headerPill .title {

@@ -14,7 +14,7 @@
 }
 
 .chip {
-  flex: 0 0 var(--chip-width, 150px);
+  flex: 0 0 calc(var(--chip-width, 150px) - 18px);
   height: 60px;
   scroll-snap-align: start;
 }

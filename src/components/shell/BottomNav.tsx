@@ -26,10 +26,10 @@ export function BottomNav({ activeHash, onOpenHash }: BottomNavProps) {
             className={`${styles.tab} ${isActive ? styles.active : ''}`}
             onClick={() => onOpenHash(tab.hash)}
             type="button"
+            aria-label={tab.label}
             aria-current={isActive ? 'page' : undefined}
           >
-            <Icon name={tab.icon} size={20} />
-            <span>{tab.label}</span>
+            <Icon name={tab.icon} size={23} />
           </button>
         )
       })}
