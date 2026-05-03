@@ -1,0 +1,20 @@
+.sectionHeader {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 12px;
+  margin: 26px 0 12px;
+}
+
+.sectionHeader h2 {
+  margin: 0;
+  color: var(--color-text);
+  font-size: 0.92rem;
+  font-weight: 750;
+  letter-spacing: 0;
+}
+
+.rule {
+  height: 1px;
+  background: linear-gradient(to right, rgba(255, 255, 255, 0.34), rgba(255, 255, 255, 0.04));
+}

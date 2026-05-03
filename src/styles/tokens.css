@@ -1,0 +1,26 @@
+:root {
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
+  --color-text: #f7fbff;
+  --color-muted: rgba(247, 251, 255, 0.68);
+  --color-subtle: rgba(247, 251, 255, 0.46);
+  --color-line: rgba(255, 255, 255, 0.2);
+  --color-glass: rgba(25, 36, 54, 0.55);
+  --color-glass-strong: rgba(25, 36, 54, 0.72);
+  --color-glass-soft: rgba(255, 255, 255, 0.13);
+  --color-tile-off: rgba(255, 255, 255, 0.52);
+  --color-light: rgba(150, 80, 28, 0.66);
+  --color-security: rgba(30, 136, 229, 0.66);
+  --color-climate: rgba(80, 160, 100, 0.66);
+  --color-presence: rgba(67, 160, 71, 0.66);
+  --color-warning: rgba(229, 57, 53, 0.7);
+  --blur-glass: blur(20px) saturate(1.25);
+  --shadow-glass: 0 1px 2px rgba(0, 0, 0, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.16);
+  --shadow-soft: 0 1px 2px rgba(0, 0, 0, 0.12);
+  --radius-card: 28px;
+  --radius-panel: 32px;
+  --radius-pill: 999px;
+  --space-page-x: 16px;
+  --bottom-nav-height: 86px;
+  --duration-fast: 160ms;
+  --duration-med: 260ms;
+}

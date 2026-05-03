@@ -1,0 +1,200 @@
+.tile {
+  position: relative;
+  display: flex;
+  width: 100%;
+  min-height: 120px;
+  border: 0;
+  border-radius: 32px;
+  padding: 16px;
+  overflow: hidden;
+  color: var(--color-text);
+  background: var(--tile-color, var(--color-glass-soft));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22), inset 0 -1px 0 rgba(0, 0, 0, 0.08);
+  box-sizing: border-box;
+  backdrop-filter: blur(15px) saturate(1.08);
+  -webkit-backdrop-filter: blur(15px) saturate(1.08);
+}
+
+.button {
+  appearance: none;
+  border: 0;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    transform var(--duration-fast) ease,
+    background var(--duration-fast) ease;
+}
+
+.button:active {
+  transform: scale(0.975);
+}
+
+.content {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 10px;
+}
+
+.icon {
+  display: grid;
+  width: 42px;
+  height: 42px;
+  place-items: center;
+  border-radius: 32px;
+  color: white;
+  background: transparent;
+  box-shadow: none;
+}
+
+.labelGroup {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.title {
+  color: var(--color-text);
+  font-size: 0.93rem;
+  font-weight: 760;
+  line-height: 1.15;
+}
+
+.subtitle {
+  color: var(--color-muted);
+  font-size: 0.76rem;
+  font-weight: 630;
+  line-height: 1.25;
+}
+
+.tile:not(.compact, .headerPill) .icon {
+  width: 44px;
+  height: 44px;
+}
+
+.tile:not(.compact, .headerPill) .title {
+  font-size: 0.98rem;
+}
+
+.compact {
+  min-height: 68px;
+  border-radius: 28px;
+  padding: 11px 12px;
+}
+
+.compact .content {
+  gap: 12px;
+}
+
+.compact .icon {
+  width: 34px;
+  height: 34px;
+}
+
+.headerPill {
+  min-height: 56px;
+  border: 0;
+  border-radius: 0;
+  padding: 7px 0;
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.headerPill .content {
+  gap: 0px;
+}
+
+.headerPill .icon {
+  width: 46px;
+  height: 46px;
+}
+
+.headerPill .icon svg {
+  transform: translateX(-8px);
+}
+
+.headerPill .title {
+  color: white;
+  font-size: 0.86rem;
+  font-weight: 760;
+}
+
+.headerPill .subtitle {
+  color: rgba(255, 255, 255, 0.76);
+  font-size: 0.72rem;
+  font-weight: 670;
+}
+
+.headerPill.light .icon {
+  color: rgb(255, 150, 48);
+}
+
+.headerPill.security .icon {
+  color: rgb(30, 136, 229);
+}
+
+.headerPill.climate .icon {
+  color: rgb(255, 204, 0);
+}
+
+.headerPill.presence .icon {
+  color: white;
+}
+
+.headerPill.contact .icon {
+  color: rgba(67, 160, 71, 0.6);
+}
+
+.headerPill.air .icon {
+  color: rgb(0, 150, 136);
+}
+
+.light {
+  --tile-color: rgba(0, 0, 255, 0.22);
+}
+
+.security {
+  --tile-color: rgba(30, 136, 229, 0.32);
+}
+
+.climate {
+  --tile-color: rgba(25, 84, 130, 0.6);
+}
+
+.presence {
+  --tile-color: rgba(67, 160, 71, 0.6);
+}
+
+.contact {
+  --tile-color: rgba(67, 160, 71, 0.3);
+}
+
+.air {
+  --tile-color: rgba(0, 150, 136, 0.34);
+}
+
+.neutral {
+  --tile-color: rgba(255, 255, 255, 0.1);
+}
+
+.vacuum {
+  --tile-color: rgba(67, 160, 71, 0.6);
+}
+
+.media {
+  --tile-color: rgba(255, 100, 150, 0.6);
+}
+
+.off {
+  --tile-color: rgba(255, 255, 255, 0.1);
+}
+
+.warning {
+  --tile-color: var(--color-warning);
+}
