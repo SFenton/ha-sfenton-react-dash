@@ -9,12 +9,6 @@ const WEBRTC_CHROME_STYLE_ID = 'sfenton-webrtc-camera-chrome'
 
 let webRtcModulePromise: Promise<void> | null = null
 
-declare global {
-  interface Window {
-    __webrtcGetMuteState?: (targetId: string) => boolean
-  }
-}
-
 interface WebRtcElement extends HTMLElement {
   setConfig: (config: Record<string, unknown>) => void
   hass: unknown
@@ -38,19 +32,6 @@ function disabledDigitalPtzConfig() {
     touch_tap_drag_zoom: false,
     persist: true,
   }
-}
-
-function webRtcMutedClass(targetId: string) {
-  return `webrtc-muted-${targetId}`
-}
-
-function isWebRtcMuted(targetId: string) {
-  return document.body.classList.contains(webRtcMutedClass(targetId))
-}
-
-function clickWebRtcShadowControl(element: WebRtcElement | null, selector: string) {
-  const control = element?.shadowRoot?.querySelector<HTMLElement>(selector)
-  control?.click()
 }
 
 function hideWebRtcChrome(element: HTMLElement) {
@@ -123,10 +104,6 @@ export function WebRtcCamera({ camera, variant, minHeight, controls = false }: W
   const hassShimRef = useRef(hassShim)
 
   useEffect(() => {
-    window.__webrtcGetMuteState = isWebRtcMuted
-  }, [])
-
-  useEffect(() => {
     hassShimRef.current = hassShim
     if (webRtcElementRef.current) {
       webRtcElementRef.current.hass = hassShim
@@ -188,34 +165,6 @@ export function WebRtcCamera({ camera, variant, minHeight, controls = false }: W
       if (host) host.textContent = ''
     }
   }, [camera.streamId, camera.title, cardId, connection, controls, hassUrl, variant])
-
-  useEffect(() => {
-    if (variant !== 'modal') return undefined
-
-    const handleScreenshot = (event: Event) => {
-      const detail = (event as CustomEvent<{ target_id?: string }>).detail
-      if (detail?.target_id === cardId) {
-        clickWebRtcShadowControl(webRtcElementRef.current, '.screenshot')
-      }
-    }
-
-    const handleToggleMute = (event: Event) => {
-      const detail = (event as CustomEvent<{ target_id?: string }>).detail
-      if (detail?.target_id !== cardId) return
-
-      clickWebRtcShadowControl(webRtcElementRef.current, '.volume')
-      window.setTimeout(() => {
-        window.dispatchEvent(new CustomEvent('webrtc-audio-state', { detail: { target_id: cardId, muted: isWebRtcMuted(cardId) } }))
-      }, 80)
-    }
-
-    window.addEventListener('webrtc-screenshot', handleScreenshot)
-    window.addEventListener('webrtc-toggle-mute', handleToggleMute)
-    return () => {
-      window.removeEventListener('webrtc-screenshot', handleScreenshot)
-      window.removeEventListener('webrtc-toggle-mute', handleToggleMute)
-    }
-  }, [cardId, variant])
 
   return (
     <div

@@ -20,7 +20,7 @@ npm run dev -- --host 127.0.0.1
 npm run build
 npm run lint
 npm run sync
-npm run deploy
+npm run deploy  # SSH fallback only; prefer SMB deployment below
 ```
 
 When running terminal commands, explicitly set the working directory to this repo or use `npm --prefix "C:\\Users\\sfent\\source\\repos\\homeassistant\\ha-sfenton-react-dash" ...`; terminals may reuse another workspace folder.
@@ -28,6 +28,8 @@ When running terminal commands, explicitly set the working directory to this rep
 ## Deployment To Home Assistant
 
 The deployed Home Assistant version should be a production Vite build, not the dev server.
+
+Prefer SMB deployment over the SSH deploy script. Use `npm run deploy` only as a fallback when the SMB share is unavailable and the required SSH env vars are configured.
 
 Use:
 
@@ -38,7 +40,14 @@ npm --prefix "C:\\Users\\sfent\\source\\repos\\homeassistant\\ha-sfenton-react-d
 Deploy the contents of `dist/` to:
 
 ```text
-\\\\192.168.1.22\\config\\www\\ha-sfenton-react-dash
+\\192.168.1.22\config\www\ha-sfenton-react-dash
+```
+
+PowerShell SMB deployment example:
+
+```powershell
+Remove-Item "\\192.168.1.22\config\www\ha-sfenton-react-dash\*" -Recurse -Force
+Copy-Item "C:\Users\sfent\source\repos\homeassistant\ha-sfenton-react-dash\dist\*" -Destination "\\192.168.1.22\config\www\ha-sfenton-react-dash" -Recurse -Force
 ```
 
 The app is served by Home Assistant at:
@@ -141,9 +150,13 @@ When validating deployment, check both:
 
 Use cache-busting query params or a fresh browser page when Lovelace resources appear stale.
 
+If the deployed bundle changed but `/sfenton-react-dash/home` still behaves like old code, update the wrapper card URL itself with a new query string, for example `/local/ha-sfenton-react-dash/index.html?v=YYYYMMDD-HHMM`. The custom wrapper iframe can keep loading cached `index.html` even after the SMB copy succeeds.
+
 ## WebRTC And Cameras
 
 Camera implementation must support real WebRTC behavior, not static placeholders.
+
+The custom `webrtc-camera-sfenton` card owns camera audio state. It exposes `window.__webrtcGetMuteState(cardId)`, emits `webrtc-audio-state`, and handles `webrtc-mute`, `webrtc-unmute`, `webrtc-toggle-mute`, and `webrtc-screenshot` events. React controls should dispatch these events and listen for `webrtc-audio-state`; do not shadow-click the card's internal `.volume` control or maintain a separate body-class-based mute source of truth.
 
 When implementing camera sections or modals:
 

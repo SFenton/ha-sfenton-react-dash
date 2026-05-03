@@ -50,7 +50,7 @@ function sheetTitle(hash: string) {
   return camera ? camera.title : SHEET_TITLES[hash] ?? 'Overview'
 }
 
-function dispatchWebRtcAction(eventName: 'webrtc-screenshot' | 'webrtc-toggle-mute', targetId: string) {
+function dispatchWebRtcAction(eventName: 'webrtc-screenshot' | 'webrtc-mute' | 'webrtc-unmute', targetId: string) {
   window.dispatchEvent(new CustomEvent(eventName, { detail: { target_id: targetId } }))
 }
 
@@ -114,8 +114,9 @@ function CameraSheet({ hash }: { hash: string }) {
     dispatchWebRtcAction('webrtc-screenshot', camera.popupCardId)
   }
   const toggleMute = () => {
-    setIsMuted((current) => !current)
-    dispatchWebRtcAction('webrtc-toggle-mute', camera.popupCardId)
+    const nextMuted = !getMuteState(camera.popupCardId)
+    setIsMuted(nextMuted)
+    dispatchWebRtcAction(nextMuted ? 'webrtc-mute' : 'webrtc-unmute', camera.popupCardId)
   }
   const isRecording = recordingEntity?.state === 'on'
 
