@@ -25,6 +25,32 @@ npm run deploy
 
 When running terminal commands, explicitly set the working directory to this repo or use `npm --prefix "C:\\Users\\sfent\\source\\repos\\homeassistant\\ha-sfenton-react-dash" ...`; terminals may reuse another workspace folder.
 
+## Deployment To Home Assistant
+
+The deployed Home Assistant version should be a production Vite build, not the dev server.
+
+Use:
+
+```bash
+npm --prefix "C:\\Users\\sfent\\source\\repos\\homeassistant\\ha-sfenton-react-dash" run build
+```
+
+Deploy the contents of `dist/` to:
+
+```text
+\\\\192.168.1.22\\config\\www\\ha-sfenton-react-dash
+```
+
+The app is served by Home Assistant at:
+
+```text
+/local/ha-sfenton-react-dash/index.html
+```
+
+`vite.config.ts` must keep `base: './'` so assets resolve correctly from the `/local/ha-sfenton-react-dash/` subpath.
+
+Do not embed production Home Assistant tokens. In the Home Assistant dashboard context, HAKit can inherit the existing HA session via `window.top.hassConnection`.
+
 ## Architecture Direction
 
 Model the structure after `FortniteFestivalWeb`, but do not copy code between projects.
@@ -84,6 +110,37 @@ Do not recreate the Home Assistant sidebar or top bar for now. Focus on the dash
 - Avoid hard-coded UI state if the corresponding Home Assistant entity state is available.
 - Keep entity IDs and route/page configuration in constants rather than scattering strings across components.
 
+## Home Assistant Sidebar Wrapper
+
+Expose the React app through a non-default Home Assistant dashboard:
+
+- URL path: `sfenton-react-dash`
+- Title: `React Dash`
+- Show in sidebar: true
+- Do not make it the default dashboard
+
+Use the custom Lovelace card `custom:sfenton-react-app-card` for the wrapper. Avoid the built-in iframe card for the final experience because it leaves HA card chrome, spacing, aspect-ratio behavior, and background/border artifacts that are especially noticeable on iOS.
+
+The wrapper should fill the viewport and remove Home Assistant dashboard chrome. Use kiosk mode:
+
+```json
+{
+	"hide_header": true,
+	"hide_sidebar": true,
+	"mobile_settings": {
+		"hide_header": true,
+		"hide_sidebar": true
+	}
+}
+```
+
+When validating deployment, check both:
+
+- Raw app: `/local/ha-sfenton-react-dash/index.html`
+- Sidebar dashboard: `/sfenton-react-dash/home`
+
+Use cache-busting query params or a fresh browser page when Lovelace resources appear stale.
+
 ## WebRTC And Cameras
 
 Camera implementation must support real WebRTC behavior, not static placeholders.
@@ -115,6 +172,9 @@ Add tests as features are implemented.
 
 ## Git And Safety
 
+- The project is backed by the private GitHub repo `https://github.com/SFenton/ha-sfenton-react-dash`.
+- The default branch is `master`.
+- If PowerShell does not pick up `gh` from PATH, use the direct GitHub CLI path: `& "C:\\Program Files\\GitHub CLI\\gh.exe" ...`.
 - The repo was reset from an older dashboard; many old files may appear deleted in git. Do not restore old files unless explicitly requested.
 - Do not print `VITE_HA_TOKEN` or other secrets.
 - Do not commit changes unless explicitly requested.
