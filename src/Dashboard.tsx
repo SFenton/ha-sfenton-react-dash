@@ -1,78 +1,36 @@
-import { useNavigation } from './store';
-import { LayoutShell } from './components/LayoutShell';
-import { Navbar } from './components/Navbar';
-import { OverviewView } from './views/OverviewView';
-import { SecurityView } from './views/SecurityView';
-import { EcobeeView } from './views/EcobeeView';
-import { ChoresView } from './views/ChoresView';
-import { SettingsView } from './views/SettingsView';
-import { AreaDetailView } from './views/AreaDetailView';
-import {
-  AdminView, GuestsView, TodoView, GroceriesView,
-  StephensChoresView, StephsChoresView, UnassignedChoresView,
-  HomeImprovementChoresView, MachEView, VacuumsView, MediaView,
-  CustomLightsView,
-} from './views/SubViews';
-import { AREA_ROUTES } from './routes';
-import type { AreaRoute } from './routes';
+import { Column, Row, TimeCard } from '@hakit/components'
+import { useHass } from '@hakit/core'
 
-function ViewRouter() {
-  const { currentRoute } = useNavigation();
+function Dashboard() {
+  const { getAllEntities } = useHass.getState().helpers
+  const entityCount = Object.keys(getAllEntities()).length
 
-  // Check if it's an area route
-  const isArea = AREA_ROUTES.some((a) => a.route === currentRoute);
-  if (isArea) {
-    return <AreaDetailView area={currentRoute as AreaRoute} />;
-  }
-
-  switch (currentRoute) {
-    case 'overview':
-      return <OverviewView />;
-    case 'security':
-      return <SecurityView />;
-    case 'ecobee':
-      return <EcobeeView />;
-    case 'chores':
-      return <ChoresView />;
-    case 'settings':
-      return <SettingsView />;
-    // Sub-routes
-    case 'admin':
-      return <AdminView />;
-    case 'guests-staying-over':
-      return <GuestsView />;
-    case 'to-do':
-      return <TodoView />;
-    case 'groceries':
-      return <GroceriesView />;
-    case 'stephens-chores':
-      return <StephensChoresView />;
-    case 'stephs-chores':
-      return <StephsChoresView />;
-    case 'unassigned-chores':
-      return <UnassignedChoresView />;
-    case 'home-improvement-chores':
-      return <HomeImprovementChoresView />;
-    case 'mach-e':
-      return <MachEView />;
-    case 'vacuums':
-      return <VacuumsView />;
-    case 'media':
-      return <MediaView />;
-    case 'custom-lights':
-      return <CustomLightsView />;
-    default:
-      return <OverviewView />;
-  }
-}
-
-export function Dashboard() {
   return (
-    <>
-      <LayoutShell>
-        <ViewRouter />
-      </LayoutShell>
-      <Navbar />
-    </>
-  );
+    <main className="dashboard-shell">
+      <Column fullWidth gap="1rem">
+        <header className="dashboard-header">
+          <div>
+            <p className="eyebrow">Sfenton Home</p>
+            <h1>Dashboard Draft</h1>
+          </div>
+          <div className="status-pill">{entityCount} entities</div>
+        </header>
+
+        <Row gap="1rem" wrap="wrap">
+          <section className="panel clock-panel">
+            <TimeCard />
+          </section>
+          <section className="panel planning-panel">
+            <h2>Fresh Scaffold</h2>
+            <p>
+              Connected through HAKit to {import.meta.env.VITE_HA_URL}. This is
+              the clean starting point for the new React dashboard.
+            </p>
+          </section>
+        </Row>
+      </Column>
+    </main>
+  )
 }
+
+export default Dashboard
