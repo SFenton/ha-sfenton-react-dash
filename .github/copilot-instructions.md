@@ -50,6 +50,18 @@ Remove-Item "\\192.168.1.22\config\www\ha-sfenton-react-dash\*" -Recurse -Force
 Copy-Item "C:\Users\sfent\source\repos\homeassistant\ha-sfenton-react-dash\dist\*" -Destination "\\192.168.1.22\config\www\ha-sfenton-react-dash" -Recurse -Force
 ```
 
+After every production deployment, bump the Home Assistant wrapper card URL query string so the sidebar dashboard reloads `index.html` instead of a cached copy. Use a unique value such as the commit SHA or `YYYYMMDD-HHMM`:
+
+```text
+/local/ha-sfenton-react-dash/index.html?v=<unique-deploy-version>
+```
+
+Use Home Assistant MCP to update the storage-mode dashboard:
+
+1. Read the current wrapper config with `ha_config_get_dashboard(url_path="sfenton-react-dash", force_reload=True)`.
+2. Update the custom card URL with `ha_config_set_dashboard(url_path="sfenton-react-dash", config_hash=<hash>, python_transform="config['views'][0]['cards'][0]['url'] = '/local/ha-sfenton-react-dash/index.html?v=<unique-deploy-version>'")`.
+3. Re-open or reload `/sfenton-react-dash/home` and verify it loads the same deployed version.
+
 The app is served by Home Assistant at:
 
 ```text
@@ -148,9 +160,7 @@ When validating deployment, check both:
 - Raw app: `/local/ha-sfenton-react-dash/index.html`
 - Sidebar dashboard: `/sfenton-react-dash/home`
 
-Use cache-busting query params or a fresh browser page when Lovelace resources appear stale.
-
-If the deployed bundle changed but `/sfenton-react-dash/home` still behaves like old code, update the wrapper card URL itself with a new query string, for example `/local/ha-sfenton-react-dash/index.html?v=YYYYMMDD-HHMM`. The custom wrapper iframe can keep loading cached `index.html` even after the SMB copy succeeds.
+Always validate the raw app with a cache-busting query param, and always bump the wrapper card URL after copying `dist/`. The custom wrapper iframe can keep loading cached `index.html` even after the SMB copy succeeds.
 
 ## WebRTC And Cameras
 
