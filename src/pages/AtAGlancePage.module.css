@@ -48,8 +48,11 @@
 }
 
 @media (min-width: 720px) {
-  .areaGrid,
   .quickGrid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .areaGrid {
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   }
 }

@@ -1,22 +1,32 @@
 export type IconKey =
   | 'air'
+  | 'bath'
   | 'bed'
   | 'camera'
   | 'car'
   | 'checklist'
   | 'contact'
   | 'deck'
+  | 'door'
+  | 'door-open'
+  | 'dumbbell'
   | 'garage'
+  | 'grill'
   | 'home'
+  | 'kitchen'
   | 'light'
   | 'media'
   | 'music'
+  | 'office'
   | 'presence'
   | 'security'
   | 'settings'
   | 'sofa'
   | 'sparkles'
+  | 'stairs'
+  | 'theater'
   | 'thermostat'
+  | 'utensils'
   | 'vacuum'
   | 'weather'
 
@@ -44,6 +54,11 @@ export interface AreaConfig {
   title: string
   route: string
   icon: IconKey
+  color: {
+    r: number
+    g: number
+    b: number
+  }
 }
 
 export interface EntityButtonConfig {
@@ -197,22 +212,22 @@ export const CAMERA_ITEMS: CameraConfig[] = [
 ]
 
 export const AREA_ITEMS: AreaConfig[] = [
-  { title: 'Living Room', route: '/at-a-glance/living-room', icon: 'sofa' },
-  { title: 'Guest Room', route: '/at-a-glance/guest-room', icon: 'bed' },
-  { title: 'Gym', route: '/at-a-glance/gym', icon: 'presence' },
-  { title: 'Master Bedroom', route: '/at-a-glance/master-bedroom', icon: 'bed' },
-  { title: 'Office', route: '/at-a-glance/office', icon: 'settings' },
-  { title: 'Hallway', route: '/at-a-glance/hallway', icon: 'home' },
-  { title: 'Kitchen', route: '/at-a-glance/kitchen', icon: 'home' },
-  { title: 'Music Room', route: '/at-a-glance/music-room', icon: 'music' },
-  { title: 'Garage', route: '/at-a-glance/garage', icon: 'garage' },
-  { title: 'Theater Room', route: '/at-a-glance/theater-room', icon: 'media' },
-  { title: 'Back Deck', route: '/at-a-glance/back-deck', icon: 'deck' },
-  { title: 'Downstairs Hallway', route: '/at-a-glance/downstairs-hallway', icon: 'home' },
-  { title: 'Guest Bathroom', route: '/at-a-glance/guest-bathroom', icon: 'air' },
-  { title: 'Master Bathroom', route: '/at-a-glance/master-bathroom', icon: 'air' },
-  { title: 'Dining Room', route: '/at-a-glance/dining-room', icon: 'home' },
-  { title: 'Entryway', route: '/at-a-glance/entryway', icon: 'home' },
+  { title: 'Living Room', route: '/at-a-glance/living-room', icon: 'sofa', color: { r: 218, g: 206, b: 164 } },
+  { title: 'Guest Room', route: '/at-a-glance/guest-room', icon: 'bed', color: { r: 51, g: 193, b: 146 } },
+  { title: 'Gym', route: '/at-a-glance/gym', icon: 'dumbbell', color: { r: 213, g: 117, b: 26 } },
+  { title: 'Master Bedroom', route: '/at-a-glance/master-bedroom', icon: 'bed', color: { r: 20, g: 33, b: 215 } },
+  { title: 'Office', route: '/at-a-glance/office', icon: 'office', color: { r: 20, g: 219, b: 206 } },
+  { title: 'Hallway', route: '/at-a-glance/hallway', icon: 'door-open', color: { r: 65, g: 49, b: 31 } },
+  { title: 'Kitchen', route: '/at-a-glance/kitchen', icon: 'kitchen', color: { r: 177, g: 200, b: 60 } },
+  { title: 'Music Room', route: '/at-a-glance/music-room', icon: 'music', color: { r: 183, g: 18, b: 186 } },
+  { title: 'Garage', route: '/at-a-glance/garage', icon: 'garage', color: { r: 223, g: 12, b: 12 } },
+  { title: 'Theater Room', route: '/at-a-glance/theater-room', icon: 'theater', color: { r: 0, g: 0, b: 1 } },
+  { title: 'Back Deck', route: '/at-a-glance/back-deck', icon: 'grill', color: { r: 5, g: 77, b: 6 } },
+  { title: 'Downstairs Hallway', route: '/at-a-glance/downstairs-hallway', icon: 'stairs', color: { r: 234, g: 236, b: 203 } },
+  { title: 'Guest Bathroom', route: '/at-a-glance/guest-bathroom', icon: 'bath', color: { r: 43, g: 227, b: 224 } },
+  { title: 'Master Bathroom', route: '/at-a-glance/master-bathroom', icon: 'bath', color: { r: 95, g: 93, b: 93 } },
+  { title: 'Dining Room', route: '/at-a-glance/dining-room', icon: 'utensils', color: { r: 217, g: 179, b: 115 } },
+  { title: 'Entryway', route: '/at-a-glance/entryway', icon: 'door', color: { r: 250, g: 217, b: 0 } },
 ]
 
 export const LIGHT_GROUPS: EntityGroupConfig[] = [

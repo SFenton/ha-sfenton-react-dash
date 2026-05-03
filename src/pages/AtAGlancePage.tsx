@@ -6,6 +6,7 @@ import { BottomNav } from '../components/shell/BottomNav'
 import { ActionPill } from '../components/core/ActionPill'
 import { GlassTile } from '../components/core/GlassTile'
 import { ModalSheet } from '../components/core/ModalSheet'
+import { RoomCard } from '../components/core/RoomCard'
 import { SectionHeader } from '../components/core/SectionHeader'
 import { CameraTile } from '../components/hass/CameraTile'
 import { EntityGroup } from '../components/hass/EntityGroup'
@@ -198,7 +199,7 @@ export function AtAGlancePage() {
         <section className={styles.areaGrid}>
           {AREA_ITEMS.map((area, index) => (
             <div key={area.title} style={buildStaggerStyle(staggerMs(index, 28, 190))}>
-              <GlassTile compact icon={area.icon} subtitle={area.route.replace('/at-a-glance/', '')} title={area.title} />
+              <RoomCard area={area} />
             </div>
           ))}
         </section>
