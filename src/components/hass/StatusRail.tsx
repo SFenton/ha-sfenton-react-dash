@@ -8,14 +8,15 @@ import styles from './StatusRail.module.css'
 interface StatusRailProps {
   chips: StatusChipConfig[]
   onOpenHash: (hash: string) => void
+  subtitleByHash?: Partial<Record<string, string>>
 }
 
-function StatusChip({ chip, onOpenHash }: { chip: StatusChipConfig; onOpenHash: (hash: string) => void }) {
+function StatusChip({ chip, onOpenHash, subtitleOverride }: { chip: StatusChipConfig; onOpenHash: (hash: string) => void; subtitleOverride?: string }) {
   const entity = useEntity(asEntityName(chip.entityId), { returnNullIfNotFound: true })
   const secondaryEntity = useEntity(asEntityName(chip.secondaryEntityId ?? chip.entityId), { returnNullIfNotFound: true })
   const primaryState = formatCompactEntityState(entity)
   const secondaryState = chip.secondaryEntityId ? formatCompactEntityState(secondaryEntity) : null
-  const subtitle = secondaryState ? `${primaryState} / ${secondaryState}` : primaryState
+  const subtitle = subtitleOverride ?? (secondaryState ? `${primaryState} / ${secondaryState}` : primaryState)
 
   return (
     <div className={styles.chip} style={{ '--chip-width': `${chip.width ?? 150}px` } as CSSProperties}>
@@ -33,11 +34,11 @@ function StatusChip({ chip, onOpenHash }: { chip: StatusChipConfig; onOpenHash: 
   )
 }
 
-export function StatusRail({ chips, onOpenHash }: StatusRailProps) {
+export function StatusRail({ chips, onOpenHash, subtitleByHash }: StatusRailProps) {
   return (
     <div className={styles.rail}>
       {chips.map((chip) => (
-        <StatusChip chip={chip} key={chip.title} onOpenHash={onOpenHash} />
+        <StatusChip chip={chip} key={chip.title} onOpenHash={onOpenHash} subtitleOverride={subtitleByHash?.[chip.hash]} />
       ))}
     </div>
   )

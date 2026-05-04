@@ -1,0 +1,7 @@
+.separator {
+  display: block;
+  min-width: 24px;
+  height: 1px;
+  border-radius: var(--radius-pill);
+  background: linear-gradient(to right, rgba(255, 255, 255, 0.34), rgba(255, 255, 255, 0.08));
+}

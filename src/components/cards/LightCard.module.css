@@ -1,0 +1,24 @@
+.multiIcon {
+  position: relative;
+  display: inline-block;
+  width: var(--multi-light-size);
+  height: var(--multi-light-size);
+  color: currentColor;
+}
+
+.multiIcon svg {
+  position: absolute;
+  width: 74%;
+  height: 74%;
+}
+
+.rearBulb {
+  top: 15%;
+  left: 1%;
+  opacity: 0.72;
+}
+
+.frontBulb {
+  top: 3%;
+  right: 2%;
+}

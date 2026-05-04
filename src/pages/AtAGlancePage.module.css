@@ -47,6 +47,160 @@
   padding: 28px 6px 6px;
 }
 
+.lightsSheet {
+  display: flex;
+  height: 100%;
+  min-height: 0;
+  flex-direction: column;
+  gap: 14px;
+  overflow: hidden;
+  padding-top: 2px;
+}
+
+.lightSectionHeader {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.lightSectionLabel {
+  flex: 0 0 auto;
+  margin: 0;
+  color: var(--color-text);
+  font-size: 0.86rem;
+  font-weight: 800;
+  letter-spacing: 0;
+}
+
+.lightSectionSeparator {
+  flex: 1 1 auto;
+}
+
+.roomLightGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.lightContent {
+  min-height: 0;
+  flex: 1 1 auto;
+  margin: 0 -16px;
+  padding: 0 16px 14px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.lightContent::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+.roomLightsOverview[data-exiting='true'] .roomLightCardShell {
+  pointer-events: none;
+  animation: lightCardsFadeAway 190ms cubic-bezier(.2,.9,.2,1) forwards;
+}
+
+.roomLightDetail {
+  display: grid;
+  gap: 12px;
+}
+
+.roomLightHeader {
+  display: flex;
+  min-height: 52px;
+  align-items: center;
+  gap: 10px;
+  padding: 0 2px 2px;
+  color: var(--color-text);
+}
+
+.lightBackButton,
+.roomLightToggle {
+  flex: 0 0 auto;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: white;
+  background: rgba(255, 255, 255, 0.14);
+  cursor: pointer;
+}
+
+.lightBackButton {
+  display: grid;
+  width: 40px;
+  height: 40px;
+  place-items: center;
+  border-radius: 50%;
+}
+
+.roomLightTitleBlock {
+  display: grid;
+  min-width: 0;
+  flex: 0 1 auto;
+  gap: 3px;
+}
+
+.roomLightSeparator {
+  flex: 1 1 auto;
+}
+
+.roomLightTitleBlock h3 {
+  overflow: hidden;
+  margin: 0;
+  color: var(--color-text);
+  font-size: 0.92rem;
+  font-weight: 820;
+  letter-spacing: 0;
+  line-height: 1.16;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.roomLightTitleBlock p {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: 0.74rem;
+  font-weight: 720;
+  line-height: 1.1;
+}
+
+.roomLightToggle {
+  display: inline-flex;
+  height: 40px;
+  min-height: 40px;
+  align-items: center;
+  gap: 8px;
+  border-radius: var(--radius-pill);
+  padding: 0 13px;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.roomLightToggle[data-active='true'] {
+  background: var(--color-light);
+}
+
+.lightBackButton:active,
+.roomLightToggle:active {
+  transform: scale(0.96);
+}
+
+@keyframes lightCardsFadeAway {
+  from {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+
+  to {
+    opacity: 0;
+    transform: translate3d(0, 10px, 0) scale(0.985);
+  }
+}
+
 @media (min-width: 720px) {
   .quickGrid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -54,5 +208,9 @@
 
   .areaGrid {
     grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  }
+
+  .roomLightGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }

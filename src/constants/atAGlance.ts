@@ -232,13 +232,6 @@ export const AREA_ITEMS: AreaConfig[] = [
 
 export const LIGHT_GROUPS: EntityGroupConfig[] = [
   {
-    title: 'House Lights',
-    items: [
-      { title: 'Important Lights', entityId: 'light.important_lights', tone: 'light' },
-      { title: 'All Lights', entityId: 'light.lights', tone: 'light' },
-    ],
-  },
-  {
     title: 'Living Room Lights',
     toggleEntityId: 'light.living_room',
     items: [
@@ -246,6 +239,14 @@ export const LIGHT_GROUPS: EntityGroupConfig[] = [
       { title: 'Front Right', entityId: 'light.living_room_front_right_light', tone: 'light' },
       { title: 'Back Left', entityId: 'light.living_room_back_left_light', tone: 'light' },
       { title: 'Back Right', entityId: 'light.living_room_back_right_light', tone: 'light' },
+    ],
+  },
+  {
+    title: 'Guest Room Lights',
+    toggleEntityId: 'light.guest_room',
+    items: [
+      { title: 'TV Light', entityId: 'light.guest_room_tv_light', tone: 'light' },
+      { title: 'Bed Light', entityId: 'light.guest_room_bed_light', tone: 'light' },
     ],
   },
   {
@@ -261,6 +262,26 @@ export const LIGHT_GROUPS: EntityGroupConfig[] = [
     ],
   },
   {
+    title: 'Gym Light',
+    toggleEntityId: 'light.gym_light',
+    items: [{ title: 'Gym Light', entityId: 'light.gym_light', tone: 'light' }],
+  },
+  {
+    title: 'Hallway Lights',
+    toggleEntityId: 'light.hallway',
+    items: [
+      { title: 'Entry Light', entityId: 'light.hallway_entry_light', tone: 'light' },
+      { title: 'Gym Light', entityId: 'light.hallway_gym_light', tone: 'light' },
+      { title: 'Guest Room Light', entityId: 'light.hallway_guest_room_light', tone: 'light' },
+      { title: 'Office Light', entityId: 'light.hallway_office_light', tone: 'light' },
+    ],
+  },
+  {
+    title: 'Office Light',
+    toggleEntityId: 'light.office_light',
+    items: [{ title: 'Office Light', entityId: 'light.office_light', tone: 'light' }],
+  },
+  {
     title: 'Kitchen Lights',
     toggleEntityId: 'light.kitchen',
     items: [
@@ -271,14 +292,70 @@ export const LIGHT_GROUPS: EntityGroupConfig[] = [
     ],
   },
   {
+    title: 'Dining Room Light',
+    toggleEntityId: 'light.dining_room_dimmer_switch',
+    items: [{ title: 'Dining Room Light', entityId: 'light.dining_room_dimmer_switch', tone: 'light' }],
+  },
+  {
+    title: 'Back Deck Lights',
+    toggleEntityId: 'light.back_deck',
+    items: [
+      { title: 'Grill Light', entityId: 'light.grill_light', tone: 'light' },
+      { title: 'Couches Light', entityId: 'light.couch_light', tone: 'light' },
+    ],
+  },
+  {
+    title: 'Music Room Lights',
+    toggleEntityId: 'light.music_room',
+    items: [
+      { title: 'Fireplace Light', entityId: 'light.hue_color_downlight_2', tone: 'light' },
+      { title: 'Window Light', entityId: 'light.hue_color_downlight_4', tone: 'light' },
+      { title: 'Entry Light', entityId: 'light.hue_color_downlight_1', tone: 'light' },
+      { title: 'Drums Light', entityId: 'light.hue_color_downlight_3', tone: 'light' },
+      { title: 'Bathroom Light', entityId: 'light.hue_color_downlight_5', tone: 'light' },
+      { title: 'Couch Light', entityId: 'light.hue_color_downlight_6', tone: 'light' },
+      { title: 'Server Light', entityId: 'light.hue_color_downlight_8', tone: 'light' },
+      { title: 'TV Light', entityId: 'light.hue_color_downlight_7', tone: 'light' },
+      { title: 'TV Left Light', entityId: 'light.hue_play_2', tone: 'light' },
+      { title: 'TV Right Light', entityId: 'light.hue_play_1', tone: 'light' },
+    ],
+  },
+  {
     title: 'Theater Room Lights',
     toggleEntityId: 'light.theater_room',
     items: [
       { title: 'Front Screen', entityId: 'light.theater_room_front_screen_light', tone: 'light' },
       { title: 'Front Right', entityId: 'light.theater_room_front_right_light', tone: 'light' },
+      { title: 'Front Back', entityId: 'light.theater_room_front_rear_light', tone: 'light' },
       { title: 'Rear Front', entityId: 'light.theater_room_rear_front_light', tone: 'light' },
       { title: 'Rear Back', entityId: 'light.theater_room_rear_back_light', tone: 'light' },
+      { title: 'Rear Right', entityId: 'light.theater_room_rear_right_light', tone: 'light' },
     ],
+  },
+  {
+    title: 'Downstairs Hallway Light',
+    toggleEntityId: 'light.downstairs_hallway_light',
+    items: [{ title: 'Downstairs Hallway Light', entityId: 'light.downstairs_hallway_light', tone: 'light' }],
+  },
+  {
+    title: 'Guest Bathroom Light',
+    toggleEntityId: 'light.guest_bathroom_dimmer_switch',
+    items: [{ title: 'Guest Bathroom Light', entityId: 'light.guest_bathroom_dimmer_switch', tone: 'light' }],
+  },
+  {
+    title: 'Master Bathroom Light',
+    toggleEntityId: 'light.master_bathroom_dimmer_switch',
+    items: [{ title: 'Master Bathroom Light', entityId: 'light.master_bathroom_dimmer_switch', tone: 'light' }],
+  },
+  {
+    title: 'Entryway Light',
+    toggleEntityId: 'switch.upper_entryway_light_switch_top',
+    items: [{ title: 'Entryway Light', entityId: 'switch.upper_entryway_light_switch_top', tone: 'light' }],
+  },
+  {
+    title: 'Driveway Light',
+    toggleEntityId: 'light.garage_camera_floodlight',
+    items: [{ title: 'Floodlight', entityId: 'light.garage_camera_floodlight', tone: 'light' }],
   },
 ]
 

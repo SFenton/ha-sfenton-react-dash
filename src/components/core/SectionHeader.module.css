@@ -15,6 +15,5 @@
 }
 
 .rule {
-  height: 1px;
-  background: linear-gradient(to right, rgba(255, 255, 255, 0.34), rgba(255, 255, 255, 0.04));
+  width: 100%;
 }

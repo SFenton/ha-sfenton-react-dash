@@ -1,19 +1,21 @@
 import { useEntity, useHass } from '@hakit/core'
-import { Camera as CameraIcon, CircleDot, Volume2, VolumeX } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { Camera as CameraIcon, ChevronLeft, CircleDot, Volume2, VolumeX } from 'lucide-react'
+import { useEffect, useRef, useState, type RefObject } from 'react'
+import { LightCard, MultiLightIcon } from '../components/cards/LightCard'
+import { RoomCard } from '../components/cards/RoomCard'
 import { AppShell } from '../components/shell/AppShell'
 import { BottomNav } from '../components/shell/BottomNav'
 import { ActionPill } from '../components/core/ActionPill'
 import { GlassTile } from '../components/core/GlassTile'
 import { ModalSheet } from '../components/core/ModalSheet'
-import { RoomCard } from '../components/core/RoomCard'
+import { Separator } from '../components/core/Separator'
 import { SectionHeader } from '../components/core/SectionHeader'
 import { CameraTile } from '../components/hass/CameraTile'
 import { EntityGroup } from '../components/hass/EntityGroup'
 import { SecurityControls } from '../components/hass/SecurityControls'
 import { StatusRail } from '../components/hass/StatusRail'
 import { WeatherSummary } from '../components/hass/WeatherSummary'
-import { asEntityName, formatCompactEntityState } from '../components/hass/entityState'
+import { asEntityName, formatCompactEntityState, isActiveState } from '../components/hass/entityState'
 import { WebRtcCamera } from '../components/hass/WebRtcCamera'
 import {
   AREA_ITEMS,
@@ -22,9 +24,11 @@ import {
   LIGHT_GROUPS,
   OVERVIEW_STATUS_CHIPS,
   QUICK_ACCESS_ITEMS,
+  type EntityGroupConfig,
   type QuickAccessConfig,
 } from '../constants/atAGlance'
 import { buildStaggerStyle, staggerMs } from '../hooks/useStaggerStyle'
+import { useScrollFade } from '../hooks/useScrollFade'
 import { useHashModal } from '../hooks/useHashModal'
 import styles from './AtAGlancePage.module.css'
 import { Page } from './Page'
@@ -46,9 +50,23 @@ const SHEET_TITLES: Record<string, string> = {
   '#settings-preview': 'Settings',
 }
 
+const LIGHTS_SUFFIX = ' Lights'
+const LIGHT_SUFFIX = ' Light'
+const ROOM_LIGHT_GROUPS = LIGHT_GROUPS
+const ROOM_LIGHT_ENTITY_IDS = [...new Set(ROOM_LIGHT_GROUPS.flatMap((group) => group.items.map((item) => item.entityId)))]
+
 function sheetTitle(hash: string) {
   const camera = CAMERA_ITEMS.find((item) => item.hash === hash)
   return camera ? camera.title : SHEET_TITLES[hash] ?? 'Overview'
+}
+
+function lightsSheetTitle(activeLightCount: number) {
+  return `Lights (${lightCountSubtitle(activeLightCount)})`
+}
+
+function lightCountSubtitle(activeLightCount: number) {
+  if (activeLightCount === 0) return 'All Off'
+  return `${activeLightCount} On`
 }
 
 function dispatchWebRtcAction(eventName: 'webrtc-screenshot' | 'webrtc-mute' | 'webrtc-unmute', targetId: string) {
@@ -62,6 +80,12 @@ function getMuteState(targetId: string) {
 function formatClimatePowerState(entity: ReturnType<typeof useEntity>) {
   if (!entity || entity.state === 'unavailable') return 'Unavailable'
   return entity.state === 'off' ? 'Off' : 'On'
+}
+
+function roomTitleFromLightGroup(group: EntityGroupConfig) {
+  if (group.title.endsWith(LIGHTS_SUFFIX)) return group.title.slice(0, -LIGHTS_SUFFIX.length)
+  if (group.title.endsWith(LIGHT_SUFFIX)) return group.title.slice(0, -LIGHT_SUFFIX.length)
+  return group.title
 }
 
 function QuickAccessTile({ item, onOpenHash }: { item: QuickAccessConfig; onOpenHash: (hash: string) => void }) {
@@ -143,9 +167,125 @@ function CameraSheet({ hash }: { hash: string }) {
   )
 }
 
+function RoomsHeader() {
+  return (
+    <div className={styles.lightSectionHeader}>
+      <h3 className={styles.lightSectionLabel}>Rooms</h3>
+      <Separator className={styles.lightSectionSeparator} />
+    </div>
+  )
+}
+
+function RoomLightOverviewCard({ group, onSelect }: { group: EntityGroupConfig; onSelect: (group: EntityGroupConfig) => void }) {
+  const entityId = group.toggleEntityId ?? group.items[0]?.entityId ?? 'light.unavailable'
+
+  return <LightCard ariaLabel={`Open ${group.title}`} entityId={entityId} onClick={() => onSelect(group)} title={roomTitleFromLightGroup(group)} />
+}
+
+function RoomLightDetailHeader({ group, onBack, onToggle }: { group: EntityGroupConfig; onBack: () => void; onToggle: (entityId: string) => void }) {
+  const groupToggleEntityId = group.toggleEntityId
+  const groupEntity = useEntity(asEntityName(groupToggleEntityId ?? 'light.unavailable'), { returnNullIfNotFound: true })
+  const groupActive = isActiveState(groupEntity)
+  const groupState = formatCompactEntityState(groupEntity, 'Off')
+  const roomTitle = roomTitleFromLightGroup(group)
+
+  return (
+    <div className={styles.roomLightHeader} style={buildStaggerStyle(30)}>
+      <button aria-label="Back to room lights" className={styles.lightBackButton} onClick={onBack} type="button">
+        <ChevronLeft size={22} strokeWidth={2.35} />
+      </button>
+      <div className={styles.roomLightTitleBlock}>
+        <h3>{roomTitle} Lights</h3>
+        <p>{groupState}</p>
+      </div>
+      {groupToggleEntityId && <Separator className={styles.roomLightSeparator} />}
+      {groupToggleEntityId && (
+        <button className={styles.roomLightToggle} data-active={groupActive} onClick={() => onToggle(groupToggleEntityId)} type="button">
+          <MultiLightIcon active={groupActive} size={20} />
+          <span>Toggle</span>
+        </button>
+      )}
+    </div>
+  )
+}
+
+function RoomLightDetailCards({ group, gridRef, onToggle }: { group: EntityGroupConfig; gridRef: RefObject<HTMLDivElement | null>; onToggle: (entityId: string) => void }) {
+  return (
+    <section className={styles.roomLightDetail}>
+      <div className={styles.roomLightGrid} ref={gridRef}>
+        {group.items.map((item, index) => (
+          <div className={styles.roomLightCardShell} key={item.entityId} style={buildStaggerStyle(staggerMs(index, 42, 92))}>
+            <LightCard entityId={item.entityId} onClick={() => onToggle(item.entityId)} pressed size="compact" title={item.title} />
+          </div>
+        ))}
+      </div>
+    </section>
+  )
+}
+
+function LightsSheet() {
+  const callService = useHass((state) => state.helpers.callService)
+  const [selectedGroup, setSelectedGroup] = useState<EntityGroupConfig | null>(null)
+  const [roomCardsExiting, setRoomCardsExiting] = useState(false)
+  const transitionTimer = useRef<number | null>(null)
+  const lightContentRef = useRef<HTMLDivElement>(null)
+  const lightGridRef = useRef<HTMLDivElement>(null)
+  const roomGroups = ROOM_LIGHT_GROUPS
+
+  useScrollFade(lightContentRef, lightGridRef, [selectedGroup?.title, roomCardsExiting], { distance: 42 })
+
+  useEffect(() => {
+    return () => {
+      if (transitionTimer.current !== null) window.clearTimeout(transitionTimer.current)
+    }
+  }, [])
+
+  const toggleEntity = (entityId: string) => {
+    callService({ domain: 'homeassistant', service: 'toggle', target: entityId })
+  }
+
+  const selectGroup = (group: EntityGroupConfig) => {
+    if (transitionTimer.current !== null) window.clearTimeout(transitionTimer.current)
+    setRoomCardsExiting(true)
+    transitionTimer.current = window.setTimeout(() => {
+      setSelectedGroup(group)
+      setRoomCardsExiting(false)
+      transitionTimer.current = null
+    }, 190)
+  }
+
+  const showRoomOverview = () => {
+    if (transitionTimer.current !== null) window.clearTimeout(transitionTimer.current)
+    transitionTimer.current = null
+    setRoomCardsExiting(false)
+    setSelectedGroup(null)
+  }
+
+  return (
+    <div className={styles.lightsSheet}>
+      {selectedGroup ? <RoomLightDetailHeader group={selectedGroup} onBack={showRoomOverview} onToggle={toggleEntity} /> : <RoomsHeader />}
+      <div className={styles.lightContent} ref={lightContentRef}>
+        {selectedGroup ? (
+          <RoomLightDetailCards group={selectedGroup} gridRef={lightGridRef} onToggle={toggleEntity} />
+        ) : (
+          <section className={styles.roomLightsOverview} data-exiting={roomCardsExiting}>
+            <div className={styles.roomLightGrid} ref={lightGridRef}>
+              {roomGroups.map((group, index) => (
+                <div className={styles.roomLightCardShell} key={group.title} style={roomCardsExiting ? undefined : buildStaggerStyle(staggerMs(index, 38, 76))}>
+                  <RoomLightOverviewCard group={group} onSelect={selectGroup} />
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+      </div>
+    </div>
+  )
+}
+
 function SheetContent({ hash }: { hash: string }) {
   if (hash === '#lights-overview') {
-    return LIGHT_GROUPS.map((group) => <EntityGroup group={group} key={group.title} />)
+    return <LightsSheet />
   }
 
   if (hash === '#climate-overview') {
@@ -161,6 +301,11 @@ function SheetContent({ hash }: { hash: string }) {
 
 export function AtAGlancePage() {
   const { hash, openHash, closeHash } = useHashModal()
+  const activeRoomLightCount = useHass((state) =>
+    ROOM_LIGHT_ENTITY_IDS.reduce((count, entityId) => count + (isActiveState(state.entities[entityId] ?? null) ? 1 : 0), 0),
+  )
+  const lightStatusSubtitle = lightCountSubtitle(activeRoomLightCount)
+  const modalTitle = hash === '#lights-overview' ? lightsSheetTitle(activeRoomLightCount) : sheetTitle(hash)
 
   const openOrCloseHash = (nextHash: string) => {
     if (!nextHash) {
@@ -172,7 +317,11 @@ export function AtAGlancePage() {
 
   return (
     <AppShell bottomNav={<BottomNav activeHash={hash} onOpenHash={openOrCloseHash} />}>
-      <Page title="Home" onSettings={() => openHash('#settings-preview')} headerQuickLinks={<StatusRail chips={OVERVIEW_STATUS_CHIPS} onOpenHash={openHash} />}>
+      <Page
+        title="Home"
+        onSettings={() => openHash('#settings-preview')}
+        headerQuickLinks={<StatusRail chips={OVERVIEW_STATUS_CHIPS} onOpenHash={openHash} subtitleByHash={{ '#lights-overview': lightStatusSubtitle }} />}
+      >
         <div className={styles.weatherWrap} style={buildStaggerStyle(120)}>
           <WeatherSummary />
         </div>
@@ -205,7 +354,7 @@ export function AtAGlancePage() {
         </section>
       </Page>
 
-      <ModalSheet open={hash !== ''} title={sheetTitle(hash)} onClose={closeHash}>
+      <ModalSheet open={hash !== ''} title={modalTitle} onClose={closeHash}>
         <SheetContent hash={hash} />
       </ModalSheet>
     </AppShell>
