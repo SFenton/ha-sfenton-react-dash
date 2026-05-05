@@ -1,54 +1,31 @@
-.summary {
+.controls {
   display: grid;
-  gap: 6px;
-  margin: 8px 0 18px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  border-radius: 24px;
-  padding: 16px;
-  background: rgba(255, 255, 255, 0.1);
+  gap: 14px;
+  padding-top: 4px;
 }
 
-.summaryLabel {
-  color: var(--color-muted);
-  font-size: 0.75rem;
-  font-weight: 700;
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 2px 0;
 }
 
-.summaryState {
+.sectionLabel {
+  flex: 0 0 auto;
+  margin: 0;
   color: var(--color-text);
-  font-size: 1.25rem;
-  font-weight: 820;
+  font-size: 0.86rem;
+  font-weight: 800;
+  letter-spacing: 0;
+}
+
+.sectionSeparator {
+  flex: 1 1 auto;
 }
 
 .actions {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
-  margin: 0 0 18px;
-}
-
-.action {
-  display: grid;
-  min-height: 82px;
-  place-items: center;
-  gap: 7px;
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  border-radius: 24px;
-  color: white;
-  background: rgba(30, 136, 229, 0.46);
-  font: inherit;
-  font-size: 0.82rem;
-  font-weight: 780;
-  cursor: pointer;
-}
-
-.action:active {
-  transform: scale(0.975);
-}
-
-.note {
-  margin: 0 2px 18px;
-  color: var(--color-muted);
-  font-size: 0.76rem;
-  line-height: 1.35;
 }
