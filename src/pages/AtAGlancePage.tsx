@@ -1,17 +1,19 @@
 import { useEntity, useHass } from '@hakit/core'
 import { Camera as CameraIcon, ChevronLeft, CircleDot, Volume2, VolumeX } from 'lucide-react'
 import { useEffect, useRef, useState, type RefObject } from 'react'
+import type { HassEntity } from 'home-assistant-js-websocket'
+import { ClimateCard } from '../components/cards/ClimateCard'
 import { LightCard, MultiLightIcon } from '../components/cards/LightCard'
 import { RoomCard } from '../components/cards/RoomCard'
 import { AppShell } from '../components/shell/AppShell'
 import { BottomNav } from '../components/shell/BottomNav'
 import { ActionPill } from '../components/core/ActionPill'
 import { GlassTile } from '../components/core/GlassTile'
+import { Icon } from '../components/core/Icon'
 import { ModalSheet } from '../components/core/ModalSheet'
 import { Separator } from '../components/core/Separator'
 import { SectionHeader } from '../components/core/SectionHeader'
 import { CameraTile } from '../components/hass/CameraTile'
-import { EntityGroup } from '../components/hass/EntityGroup'
 import { SecurityControls } from '../components/hass/SecurityControls'
 import { StatusRail } from '../components/hass/StatusRail'
 import { WeatherSummary } from '../components/hass/WeatherSummary'
@@ -52,8 +54,11 @@ const SHEET_TITLES: Record<string, string> = {
 
 const LIGHTS_SUFFIX = ' Lights'
 const LIGHT_SUFFIX = ' Light'
+const CLIMATE_SUFFIX = ' Climate'
 const ROOM_LIGHT_GROUPS = LIGHT_GROUPS
 const ROOM_LIGHT_ENTITY_IDS = [...new Set(ROOM_LIGHT_GROUPS.flatMap((group) => group.items.map((item) => item.entityId)))]
+const ROOM_CLIMATE_GROUPS = CLIMATE_GROUPS
+const DEFAULT_CLIMATE_COLOR = { r: 25, g: 84, b: 130 }
 
 function sheetTitle(hash: string) {
   const camera = CAMERA_ITEMS.find((item) => item.hash === hash)
@@ -67,6 +72,71 @@ function lightsSheetTitle(activeLightCount: number) {
 function lightCountSubtitle(activeLightCount: number) {
   if (activeLightCount === 0) return 'All Off'
   return `${activeLightCount} On`
+}
+
+function areaForTitle(title: string) {
+  return AREA_ITEMS.find((area) => area.title === title)
+}
+
+function climateRoomTitle(group: EntityGroupConfig) {
+  if (group.title.endsWith(CLIMATE_SUFFIX)) return group.title.slice(0, -CLIMATE_SUFFIX.length)
+  return group.title
+}
+
+function climateGroupColor(group: EntityGroupConfig) {
+  return areaForTitle(climateRoomTitle(group))?.color ?? DEFAULT_CLIMATE_COLOR
+}
+
+function climateGroupIcon(group: EntityGroupConfig) {
+  return areaForTitle(climateRoomTitle(group))?.icon ?? 'thermostat'
+}
+
+function climateItemIcon(entityId: string) {
+  return entityId.startsWith('cover.') ? 'vent' : 'temperature'
+}
+
+function isVentClimateItem(entityId: string) {
+  return entityId.startsWith('cover.')
+}
+
+function climateVentSectionTitle(ventItems: EntityGroupConfig['items']) {
+  return ventItems.length === 1 && ventItems[0]?.title !== 'Vents' ? 'Vent' : 'Vents'
+}
+
+function climateReading(entity: HassEntity | null | undefined) {
+  if (!entity || !entity.entity_id.startsWith('sensor.')) return null
+  if (entity.state === 'unavailable' || entity.state === 'unknown') return null
+
+  const value = Number(entity.state)
+  if (!Number.isFinite(value)) return null
+
+  const unit = typeof entity.attributes.unit_of_measurement === 'string' ? entity.attributes.unit_of_measurement : ''
+  return { unit, value }
+}
+
+function formatClimateReading(value: number, unit: string) {
+  const displayValue = (Math.trunc(value * 10) / 10).toFixed(1)
+  return `${displayValue}${unit}`
+}
+
+function normalizeClimateRangeText(value: string | undefined) {
+  if (!value || value === 'unknown' || value === 'unavailable') return null
+
+  return value.replace(/-?\d+(?:\.\d+)?/g, (match) => (Math.trunc(Number(match) * 10) / 10).toFixed(1))
+}
+
+function climateGroupSubtitle(group: EntityGroupConfig, entities: Record<string, HassEntity | undefined>) {
+  const readings = group.items.map((item) => climateReading(entities[item.entityId])).filter((reading): reading is { unit: string; value: number } => Boolean(reading))
+
+  if (readings.length === 0) return `${group.items.length} sensors`
+
+  const values = readings.map((reading) => reading.value)
+  const min = Math.min(...values)
+  const max = Math.max(...values)
+  const unit = readings[0]?.unit ?? ''
+
+  if (Math.abs(min - max) < 0.05) return formatClimateReading(min, unit)
+  return `${formatClimateReading(min, unit)} - ${formatClimateReading(max, unit)}`
 }
 
 function dispatchWebRtcAction(eventName: 'webrtc-screenshot' | 'webrtc-mute' | 'webrtc-unmute', targetId: string) {
@@ -167,11 +237,11 @@ function CameraSheet({ hash }: { hash: string }) {
   )
 }
 
-function RoomsHeader() {
+function RoomsHeader({ showSeparator = true }: { showSeparator?: boolean }) {
   return (
     <div className={styles.lightSectionHeader}>
       <h3 className={styles.lightSectionLabel}>Rooms</h3>
-      <Separator className={styles.lightSectionSeparator} />
+      <Separator className={styles.lightSectionSeparator} visible={showSeparator} />
     </div>
   )
 }
@@ -283,13 +353,148 @@ function LightsSheet() {
   )
 }
 
+function RoomClimateOverviewCard({ group, onSelect }: { group: EntityGroupConfig; onSelect: (group: EntityGroupConfig) => void }) {
+  const rangeEntity = useEntity(asEntityName(group.rangeEntityId ?? 'input_text.unavailable'), { returnNullIfNotFound: true })
+  const fallbackSubtitle = useHass((state) => climateGroupSubtitle(group, state.entities))
+  const subtitle = normalizeClimateRangeText(rangeEntity?.state) ?? fallbackSubtitle
+  const roomTitle = climateRoomTitle(group)
+
+  return (
+    <ClimateCard
+      ariaLabel={`Open ${group.title}`}
+      color={climateGroupColor(group)}
+      colorEntityId={group.colorEntityId}
+      icon={<Icon name={climateGroupIcon(group)} size={42} />}
+      onClick={() => onSelect(group)}
+      subtitle={subtitle}
+      title={roomTitle}
+    />
+  )
+}
+
+function RoomClimateDetailHeader({ group, onBack }: { group: EntityGroupConfig; onBack: () => void }) {
+  const rangeEntity = useEntity(asEntityName(group.rangeEntityId ?? 'input_text.unavailable'), { returnNullIfNotFound: true })
+  const fallbackSubtitle = useHass((state) => climateGroupSubtitle(group, state.entities))
+  const subtitle = normalizeClimateRangeText(rangeEntity?.state) ?? fallbackSubtitle
+  const roomTitle = climateRoomTitle(group)
+
+  return (
+    <div className={styles.roomClimateHeader} style={buildStaggerStyle(30)}>
+      <button aria-label="Back to room climates" className={styles.lightBackButton} onClick={onBack} type="button">
+        <ChevronLeft size={22} strokeWidth={2.35} />
+      </button>
+      <div className={styles.roomLightTitleBlock}>
+        <h3>{roomTitle} Climate</h3>
+        <p>{subtitle}</p>
+      </div>
+      <Separator className={styles.roomLightSeparator} visible={false} />
+    </div>
+  )
+}
+
+function RoomClimateDetailCards({ group, gridRef }: { group: EntityGroupConfig; gridRef: RefObject<HTMLDivElement | null> }) {
+  const color = climateGroupColor(group)
+  const temperatureItems = group.items.filter((item) => !isVentClimateItem(item.entityId))
+  const ventItems = group.items.filter((item) => isVentClimateItem(item.entityId))
+
+  const renderCards = (items: EntityGroupConfig['items'], indexOffset: number) => (
+    <div className={styles.roomClimateGrid}>
+      {items.map((item, index) => (
+        <div className={styles.roomLightCardShell} key={item.entityId} style={buildStaggerStyle(staggerMs(index + indexOffset, 42, 92))}>
+          <ClimateCard color={color} colorEntityId={item.colorEntityId} entityId={item.entityId} icon={climateItemIcon(item.entityId)} size="compact" title={item.title} />
+        </div>
+      ))}
+    </div>
+  )
+
+  return (
+    <section className={styles.roomClimateDetail}>
+      <div className={styles.roomClimateDetailContent} ref={gridRef}>
+        {temperatureItems.length > 0 && (
+          <section className={styles.roomClimateDetailSection}>
+            <div className={styles.lightSectionHeader}>
+              <h3 className={styles.lightSectionLabel}>{temperatureItems.length === 1 ? 'Temperature Sensor' : 'Temperature Sensors'}</h3>
+              <Separator className={styles.lightSectionSeparator} />
+            </div>
+            {renderCards(temperatureItems, 0)}
+          </section>
+        )}
+        {ventItems.length > 0 && (
+          <section className={styles.roomClimateDetailSection}>
+            <div className={styles.lightSectionHeader}>
+              <h3 className={styles.lightSectionLabel}>{climateVentSectionTitle(ventItems)}</h3>
+              <Separator className={styles.lightSectionSeparator} />
+            </div>
+            {renderCards(ventItems, temperatureItems.length)}
+          </section>
+        )}
+      </div>
+    </section>
+  )
+}
+
+function ClimateSheet() {
+  const [selectedGroup, setSelectedGroup] = useState<EntityGroupConfig | null>(null)
+  const [roomCardsExiting, setRoomCardsExiting] = useState(false)
+  const transitionTimer = useRef<number | null>(null)
+  const climateContentRef = useRef<HTMLDivElement>(null)
+  const climateGridRef = useRef<HTMLDivElement>(null)
+  const roomGroups = ROOM_CLIMATE_GROUPS
+
+  useScrollFade(climateContentRef, climateGridRef, [selectedGroup?.title, roomCardsExiting], { distance: 42 })
+
+  useEffect(() => {
+    return () => {
+      if (transitionTimer.current !== null) window.clearTimeout(transitionTimer.current)
+    }
+  }, [])
+
+  const selectGroup = (group: EntityGroupConfig) => {
+    if (transitionTimer.current !== null) window.clearTimeout(transitionTimer.current)
+    setRoomCardsExiting(true)
+    transitionTimer.current = window.setTimeout(() => {
+      setSelectedGroup(group)
+      setRoomCardsExiting(false)
+      transitionTimer.current = null
+    }, 190)
+  }
+
+  const showRoomOverview = () => {
+    if (transitionTimer.current !== null) window.clearTimeout(transitionTimer.current)
+    transitionTimer.current = null
+    setRoomCardsExiting(false)
+    setSelectedGroup(null)
+  }
+
+  return (
+    <div className={styles.climateSheet}>
+      {selectedGroup ? <RoomClimateDetailHeader group={selectedGroup} onBack={showRoomOverview} /> : <RoomsHeader />}
+      <div className={styles.climateContent} ref={climateContentRef}>
+        {selectedGroup ? (
+          <RoomClimateDetailCards group={selectedGroup} gridRef={climateGridRef} />
+        ) : (
+          <section className={styles.roomClimateOverview} data-exiting={roomCardsExiting}>
+            <div className={styles.roomClimateGrid} ref={climateGridRef}>
+              {roomGroups.map((group, index) => (
+                <div className={styles.roomLightCardShell} key={group.title} style={roomCardsExiting ? undefined : buildStaggerStyle(staggerMs(index, 38, 76))}>
+                  <RoomClimateOverviewCard group={group} onSelect={selectGroup} />
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+      </div>
+    </div>
+  )
+}
+
 function SheetContent({ hash }: { hash: string }) {
   if (hash === '#lights-overview') {
     return <LightsSheet />
   }
 
   if (hash === '#climate-overview') {
-    return CLIMATE_GROUPS.map((group) => <EntityGroup group={group} key={group.title} />)
+    return <ClimateSheet />
   }
 
   if (hash === '#security-system') return <SecurityControls />
