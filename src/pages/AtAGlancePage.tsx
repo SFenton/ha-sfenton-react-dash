@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, type RefObject } from 'react'
 import type { HassEntity } from 'home-assistant-js-websocket'
 import { ClimateCard } from '../components/cards/ClimateCard'
 import { LightCard, MultiLightIcon } from '../components/cards/LightCard'
+import { OccupancyCard } from '../components/cards/OccupancyCard'
 import { RoomCard } from '../components/cards/RoomCard'
 import { AppShell } from '../components/shell/AppShell'
 import { BottomNav } from '../components/shell/BottomNav'
@@ -17,13 +18,14 @@ import { CameraTile } from '../components/hass/CameraTile'
 import { SecurityControls } from '../components/hass/SecurityControls'
 import { StatusRail } from '../components/hass/StatusRail'
 import { WeatherSummary } from '../components/hass/WeatherSummary'
-import { asEntityName, formatCompactEntityState, isActiveState } from '../components/hass/entityState'
+import { asEntityName, formatCompactEntityState, isActiveState, isOccupancyActive } from '../components/hass/entityState'
 import { WebRtcCamera } from '../components/hass/WebRtcCamera'
 import {
   AREA_ITEMS,
   CAMERA_ITEMS,
   CLIMATE_GROUPS,
   LIGHT_GROUPS,
+  OCCUPANCY_GROUPS,
   OVERVIEW_STATUS_CHIPS,
   QUICK_ACCESS_ITEMS,
   type EntityGroupConfig,
@@ -55,10 +57,13 @@ const SHEET_TITLES: Record<string, string> = {
 const LIGHTS_SUFFIX = ' Lights'
 const LIGHT_SUFFIX = ' Light'
 const CLIMATE_SUFFIX = ' Climate'
+const OCCUPANCY_SUFFIX = ' Occupancy'
 const ROOM_LIGHT_GROUPS = LIGHT_GROUPS
 const ROOM_LIGHT_ENTITY_IDS = [...new Set(ROOM_LIGHT_GROUPS.flatMap((group) => group.items.map((item) => item.entityId)))]
 const ROOM_CLIMATE_GROUPS = CLIMATE_GROUPS
+const ROOM_OCCUPANCY_GROUPS = OCCUPANCY_GROUPS
 const DEFAULT_CLIMATE_COLOR = { r: 25, g: 84, b: 130 }
+const DEFAULT_OCCUPANCY_COLOR = { r: 46, g: 180, b: 120 }
 
 function sheetTitle(hash: string) {
   const camera = CAMERA_ITEMS.find((item) => item.hash === hash)
@@ -83,12 +88,21 @@ function climateRoomTitle(group: EntityGroupConfig) {
   return group.title
 }
 
+function occupancyRoomTitle(group: EntityGroupConfig) {
+  if (group.title.endsWith(OCCUPANCY_SUFFIX)) return group.title.slice(0, -OCCUPANCY_SUFFIX.length)
+  return group.title
+}
+
 function climateGroupColor(group: EntityGroupConfig) {
   return areaForTitle(climateRoomTitle(group))?.color ?? DEFAULT_CLIMATE_COLOR
 }
 
 function climateGroupIcon(group: EntityGroupConfig) {
   return areaForTitle(climateRoomTitle(group))?.icon ?? 'thermostat'
+}
+
+function occupancyGroupColor(group: EntityGroupConfig) {
+  return areaForTitle(occupancyRoomTitle(group))?.color ?? DEFAULT_OCCUPANCY_COLOR
 }
 
 function climateItemIcon(entityId: string) {
@@ -137,6 +151,21 @@ function climateGroupSubtitle(group: EntityGroupConfig, entities: Record<string,
 
   if (Math.abs(min - max) < 0.05) return formatClimateReading(min, unit)
   return `${formatClimateReading(min, unit)} - ${formatClimateReading(max, unit)}`
+}
+
+function occupancyGroupActiveCount(group: EntityGroupConfig, entities: Record<string, HassEntity | undefined>) {
+  return group.items.reduce((count, item) => count + (isOccupancyActive(entities[item.entityId]) ? 1 : 0), 0)
+}
+
+function occupancyGroupSubtitle(group: EntityGroupConfig, entities: Record<string, HassEntity | undefined>) {
+  const activeCount = occupancyGroupActiveCount(group, entities)
+
+  return activeCount > 0 ? 'Occupied' : 'Not Occupied'
+}
+
+function occupancyGroupSensorSubtitle(group: EntityGroupConfig, entities: Record<string, HassEntity | undefined>) {
+  const activeCount = occupancyGroupActiveCount(group, entities)
+  return `${activeCount} sensor${activeCount === 1 ? '' : 's'} occupied`
 }
 
 function dispatchWebRtcAction(eventName: 'webrtc-screenshot' | 'webrtc-mute' | 'webrtc-unmute', targetId: string) {
@@ -488,6 +517,112 @@ function ClimateSheet() {
   )
 }
 
+function RoomOccupancyOverviewCard({ group, onSelect }: { group: EntityGroupConfig; onSelect: (group: EntityGroupConfig) => void }) {
+  const active = useHass((state) => occupancyGroupActiveCount(group, state.entities) > 0)
+  const subtitle = useHass((state) => occupancyGroupSubtitle(group, state.entities))
+  const roomTitle = occupancyRoomTitle(group)
+
+  return (
+    <OccupancyCard
+      active={active}
+      ariaLabel={`Open ${group.title}`}
+      color={occupancyGroupColor(group)}
+      onClick={() => onSelect(group)}
+      subtitle={subtitle}
+      title={roomTitle}
+    />
+  )
+}
+
+function RoomOccupancyDetailHeader({ group, onBack }: { group: EntityGroupConfig; onBack: () => void }) {
+  const subtitle = useHass((state) => occupancyGroupSensorSubtitle(group, state.entities))
+  const roomTitle = occupancyRoomTitle(group)
+
+  return (
+    <div className={styles.roomOccupancyHeader} style={buildStaggerStyle(30)}>
+      <button aria-label="Back to room occupancy" className={styles.lightBackButton} onClick={onBack} type="button">
+        <ChevronLeft size={22} strokeWidth={2.35} />
+      </button>
+      <div className={styles.roomLightTitleBlock}>
+        <h3>{roomTitle} Occupancy</h3>
+        <p>{subtitle}</p>
+      </div>
+      <Separator className={styles.roomLightSeparator} visible={false} />
+    </div>
+  )
+}
+
+function RoomOccupancyDetailCards({ group, gridRef }: { group: EntityGroupConfig; gridRef: RefObject<HTMLDivElement | null> }) {
+  const color = occupancyGroupColor(group)
+
+  return (
+    <section className={styles.roomOccupancyDetail}>
+      <div className={styles.roomOccupancyGrid} ref={gridRef}>
+        {group.items.map((item, index) => (
+          <div className={styles.roomLightCardShell} key={item.entityId} style={buildStaggerStyle(staggerMs(index, 42, 92))}>
+            <OccupancyCard color={color} entityId={item.entityId} size="compact" title={item.title} />
+          </div>
+        ))}
+      </div>
+    </section>
+  )
+}
+
+function OccupancySheet() {
+  const [selectedGroup, setSelectedGroup] = useState<EntityGroupConfig | null>(null)
+  const [roomCardsExiting, setRoomCardsExiting] = useState(false)
+  const transitionTimer = useRef<number | null>(null)
+  const occupancyContentRef = useRef<HTMLDivElement>(null)
+  const occupancyGridRef = useRef<HTMLDivElement>(null)
+  const roomGroups = ROOM_OCCUPANCY_GROUPS
+
+  useScrollFade(occupancyContentRef, occupancyGridRef, [selectedGroup?.title, roomCardsExiting], { distance: 42 })
+
+  useEffect(() => {
+    return () => {
+      if (transitionTimer.current !== null) window.clearTimeout(transitionTimer.current)
+    }
+  }, [])
+
+  const selectGroup = (group: EntityGroupConfig) => {
+    if (transitionTimer.current !== null) window.clearTimeout(transitionTimer.current)
+    setRoomCardsExiting(true)
+    transitionTimer.current = window.setTimeout(() => {
+      setSelectedGroup(group)
+      setRoomCardsExiting(false)
+      transitionTimer.current = null
+    }, 190)
+  }
+
+  const showRoomOverview = () => {
+    if (transitionTimer.current !== null) window.clearTimeout(transitionTimer.current)
+    transitionTimer.current = null
+    setRoomCardsExiting(false)
+    setSelectedGroup(null)
+  }
+
+  return (
+    <div className={styles.occupancySheet}>
+      {selectedGroup ? <RoomOccupancyDetailHeader group={selectedGroup} onBack={showRoomOverview} /> : <RoomsHeader />}
+      <div className={styles.occupancyContent} ref={occupancyContentRef}>
+        {selectedGroup ? (
+          <RoomOccupancyDetailCards group={selectedGroup} gridRef={occupancyGridRef} />
+        ) : (
+          <section className={styles.roomOccupancyOverview} data-exiting={roomCardsExiting}>
+            <div className={styles.roomOccupancyGrid} ref={occupancyGridRef}>
+              {roomGroups.map((group, index) => (
+                <div className={styles.roomLightCardShell} key={group.title} style={roomCardsExiting ? undefined : buildStaggerStyle(staggerMs(index, 38, 76))}>
+                  <RoomOccupancyOverviewCard group={group} onSelect={selectGroup} />
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+      </div>
+    </div>
+  )
+}
+
 function SheetContent({ hash }: { hash: string }) {
   if (hash === '#lights-overview') {
     return <LightsSheet />
@@ -495,6 +630,10 @@ function SheetContent({ hash }: { hash: string }) {
 
   if (hash === '#climate-overview') {
     return <ClimateSheet />
+  }
+
+  if (hash === '#occupancy-overview') {
+    return <OccupancySheet />
   }
 
   if (hash === '#security-system') return <SecurityControls />

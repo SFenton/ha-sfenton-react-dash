@@ -20,6 +20,19 @@ export function isActiveState(entity: HassEntity | null) {
   return ['on', 'open', 'playing', 'recording', 'home', 'heat', 'cool'].includes(entity.state)
 }
 
+export function isOccupancyActive(entity: HassEntity | null | undefined) {
+  return entity?.state === 'on' || entity?.state === 'active' || entity?.state === 'occupied'
+}
+
+export function formatOccupancyEntityState(entity: HassEntity | null | undefined, fallback = 'Unavailable') {
+  if (!entity) return fallback
+  if (entity.state === 'unavailable') return 'Unavailable'
+  if (entity.state === 'unknown') return 'Unknown'
+  if (isOccupancyActive(entity)) return 'Occupied'
+  if (entity.state === 'off' || entity.state === 'inactive' || entity.state === 'clear' || entity.state === 'not_occupied') return 'Not Occupied'
+  return titleCaseState(entity.state)
+}
+
 export function formatCompactEntityState(entity: HassEntity | null, fallback = 'Unavailable') {
   if (!entity) return fallback
   if (entity.state === 'unavailable') return 'Unavailable'

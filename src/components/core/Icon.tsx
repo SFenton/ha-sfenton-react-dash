@@ -26,6 +26,8 @@ import {
   Sparkles,
   Thermometer,
   UtensilsCrossed,
+  UserRoundCheck,
+  UserRoundX,
   Warehouse,
 } from 'lucide-react'
 import type { ComponentType } from 'react'
@@ -56,7 +58,8 @@ const ICONS = {
   media: Film,
   music: Music,
   office: Monitor,
-  presence: CircleDot,
+  presence: UserRoundCheck,
+  'presence-off': UserRoundX,
   security: Shield,
   settings: Settings,
   sofa: Sofa,

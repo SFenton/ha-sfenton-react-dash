@@ -19,6 +19,7 @@ export type IconKey =
   | 'music'
   | 'office'
   | 'presence'
+  | 'presence-off'
   | 'security'
   | 'settings'
   | 'sofa'
@@ -507,6 +508,91 @@ export const CLIMATE_GROUPS: EntityGroupConfig[] = [
     rangeEntityId: 'input_text.front_door_climate_range',
     colorEntityId: 'input_text.front_door_climate_color',
     items: [{ title: 'Front Door', entityId: 'sensor.front_door_presence_sensor_temperature', colorEntityId: 'input_text.entryway_climate_color', tone: 'climate' }],
+  },
+]
+
+export const OCCUPANCY_GROUPS: EntityGroupConfig[] = [
+  {
+    title: 'Living Room Occupancy',
+    items: [
+      { title: 'Back Wall', entityId: 'binary_sensor.living_room_back_wall_presence_sensor_presence', tone: 'presence' },
+      { title: 'Bar', entityId: 'binary_sensor.living_room_bar_presence_sensor_presence', tone: 'presence' },
+      { title: 'Kitchen Wall', entityId: 'binary_sensor.living_room_kitchen_wall_presence_sensor_presence', tone: 'presence' },
+      { title: 'Fireplace', entityId: 'binary_sensor.living_room_fireplace_presence_sensor_presence', tone: 'presence' },
+    ],
+  },
+  {
+    title: 'Hallway Occupancy',
+    items: [
+      { title: 'Entryway', entityId: 'binary_sensor.entryway_presence_sensor_presence', tone: 'presence' },
+      { title: 'Bathroom', entityId: 'binary_sensor.hallway_guest_room_presence_sensor_presence', tone: 'presence' },
+      { title: 'Office', entityId: 'binary_sensor.hallway_office_presence_sensor_presence', tone: 'presence' },
+    ],
+  },
+  {
+    title: 'Kitchen Occupancy',
+    items: [{ title: 'Kitchen', entityId: 'binary_sensor.kitchen_wall_presence_sensor_presence', tone: 'presence' }],
+  },
+  {
+    title: 'Guest Room Occupancy',
+    items: [
+      { title: 'Guest Room', entityId: 'binary_sensor.guest_room_presence_sensor_presence', tone: 'presence' },
+      { title: 'Closet', entityId: 'binary_sensor.guest_room_closet_facing_presence_sensor_presence', tone: 'presence' },
+    ],
+  },
+  {
+    title: 'Gym Occupancy',
+    items: [{ title: 'Gym', entityId: 'binary_sensor.gym_presence_sensor_presence', tone: 'presence' }],
+  },
+  {
+    title: 'Office Occupancy',
+    items: [
+      { title: 'Office', entityId: 'binary_sensor.office_presence_sensor_presence', tone: 'presence' },
+      { title: 'Closet', entityId: 'binary_sensor.office_closet_presence_sensor_presence', tone: 'presence' },
+    ],
+  },
+  {
+    title: 'Master Bedroom Occupancy',
+    items: [
+      { title: 'Master Bedroom', entityId: 'binary_sensor.master_bedroom_window_presence_sensor_presence', tone: 'presence' },
+      { title: 'Bathroom', entityId: 'binary_sensor.master_bedroom_bathroom_presence_sensor_presence', tone: 'presence' },
+      { title: 'Closet', entityId: 'binary_sensor.master_bedroom_closet_presence_sensor_presence', tone: 'presence' },
+    ],
+  },
+  {
+    title: 'Guest Bathroom Occupancy',
+    items: [
+      { title: 'Guest Bathroom', entityId: 'binary_sensor.guest_bathroom_presence_sensor_presence', tone: 'presence' },
+      { title: 'Entry', entityId: 'binary_sensor.guest_bathroom_entry_presence_sensor_presence', tone: 'presence' },
+    ],
+  },
+  {
+    title: 'Master Bathroom Occupancy',
+    items: [{ title: 'Master Bathroom', entityId: 'binary_sensor.master_bathroom_presence_sensor_presence', tone: 'presence' }],
+  },
+  {
+    title: 'Music Room Occupancy',
+    items: [
+      { title: 'North Wall', entityId: 'binary_sensor.music_room_north_wall_presence_sensor_presence', tone: 'presence' },
+      { title: 'Kitchenette', entityId: 'binary_sensor.music_room_kitchenette_presence_sensor_presence', tone: 'presence' },
+      { title: 'Door', entityId: 'binary_sensor.music_room_door_presence_sensor_presence', tone: 'presence' },
+    ],
+  },
+  {
+    title: 'Dining Room Occupancy',
+    items: [{ title: 'Dining Room', entityId: 'binary_sensor.dining_room_presence_sensor_presence', tone: 'presence' }],
+  },
+  {
+    title: 'Theater Room Occupancy',
+    items: [{ title: 'Theater Room', entityId: 'binary_sensor.theater_room_presence_sensor_presence', tone: 'presence' }],
+  },
+  {
+    title: 'Entryway Occupancy',
+    items: [{ title: 'Front Door', entityId: 'binary_sensor.front_door_presence_sensor_presence', tone: 'presence' }],
+  },
+  {
+    title: 'Downstairs Hallway Occupancy',
+    items: [{ title: 'Downstairs Hallway', entityId: 'binary_sensor.downstairs_hallway_presence_sensor_presence', tone: 'presence' }],
   },
 ]
 
