@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, within } from '@testing-library/react'
+import { materialIconPath } from '../components/core/iconPaths'
 import { DashboardViewPage } from './DashboardViewPage'
 import { ROOM_PAGE_CONFIGS, ROOM_PAGE_ORDER } from '../constants/roomPages'
 import { mockCallServiceCalls, mockEntities, resetMockHass } from '../test/mocks/hakitCoreState'
@@ -20,6 +21,13 @@ describe('DashboardViewPage', () => {
     mockEntities['select.valetudo_exaltedsneakydeer_water'].state = 'medium'
     mockEntities['input_select.main_floor_vacuum_cleaning_passes'].state = '1'
     mockEntities['input_boolean.roborock_living_room_toggle'].state = 'off'
+    mockEntities['media_player.living_room_shield_2'].state = 'off'
+    mockEntities['media_player.sonos'].state = 'playing'
+    mockEntities['media_player.master_bedroom_apple_tv'].state = 'paused'
+    mockEntities['media_player.primary_bedroom'].state = 'playing'
+    mockEntities['media_player.theater_room_shield'].state = 'off'
+    mockEntities['media_player.theater'].state = 'off'
+    mockEntities['media_player.sony_projector'].state = 'off'
   })
 
   it('renders a statically ported room page from React-owned config', () => {
@@ -112,6 +120,130 @@ describe('DashboardViewPage', () => {
     expect(screen.getByRole('heading', { name: 'Master Bedroom: Humidifier' })).toBeInTheDocument()
     expect(screen.getByText('#humidifier-master-bedroom')).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: 'Master Bedroom Climate' })).not.toBeInTheDocument()
+  })
+
+  it('ports the Living Room SHIELD remote modal and only runs explicit controls', async () => {
+    mockEntities['media_player.living_room_shield_2'].state = 'playing'
+    render(<DashboardViewPage activePath="living-room" onNavigate={() => undefined} path="living-room" />)
+
+    fireEvent.click(screen.getByRole('button', { name: /^SHIELD Off$/i }))
+
+    expect(await screen.findByRole('dialog')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Living Room: SHIELD' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'SHIELD Remote' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Sonos Volume' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Controls' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Power' })).toHaveStyle({ color: 'rgb(255, 0, 0)' })
+    expect(screen.getByRole('button', { name: 'Select' }).querySelector('path')).toHaveAttribute('d', materialIconPath('mdi:circle'))
+    expect(screen.getByRole('button', { name: 'Back' }).querySelector('path')).toHaveAttribute('transform', 'rotate(90 12 12)')
+    expect(mockCallServiceCalls).toEqual([])
+
+    fireEvent.click(screen.getByRole('button', { name: 'Up' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Pause' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Volume Down' }))
+
+    expect(mockCallServiceCalls).toEqual([
+      { domain: 'remote', service: 'send_command', target: 'remote.living_room_shield', serviceData: { command: 'DPAD_UP' } },
+      { domain: 'androidtv', service: 'adb_command', target: 'media_player.living_room_shield_2', serviceData: { command: 'input keyevent KEYCODE_MEDIA_PAUSE' } },
+      { domain: 'media_player', service: 'volume_down', target: 'media_player.sonos', serviceData: undefined },
+    ])
+  })
+
+  it('hides remote volume and playback sections when their entities are off', async () => {
+    mockEntities['media_player.living_room_shield_2'].state = 'off'
+    mockEntities['media_player.sonos'].state = 'off'
+    render(<DashboardViewPage activePath="living-room" onNavigate={() => undefined} path="living-room" />)
+
+    fireEvent.click(screen.getByRole('button', { name: /^SHIELD Off$/i }))
+
+    expect(await screen.findByRole('dialog')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'SHIELD Remote' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Power' })).toHaveStyle({ color: 'rgb(0, 128, 0)' })
+    expect(screen.queryByRole('heading', { name: 'Sonos Volume' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Controls' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Volume Down' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Pause' })).not.toBeInTheDocument()
+    expect(mockCallServiceCalls).toEqual([])
+  })
+
+  it('ports media app cards inside remote modals with YAML service payloads', async () => {
+    mockEntities['media_player.living_room_shield_2'].state = 'playing'
+    let view = render(<DashboardViewPage activePath="living-room" onNavigate={() => undefined} path="living-room" />)
+    fireEvent.click(screen.getByRole('button', { name: /^SHIELD Off$/i }))
+    expect(await screen.findByRole('heading', { name: 'Media' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'YouTube' })).toHaveAttribute('data-background', 'white')
+    fireEvent.click(screen.getByRole('button', { name: 'Plex' }))
+    expect(mockCallServiceCalls).toEqual([
+      { domain: 'script', service: 'launch_app_on_media_player', target: undefined, serviceData: { entity: 'media_player.living_room_shield', remote_entity: 'remote.living_room_shield', app_id: 'com.plexapp.android' } },
+    ])
+    view.unmount()
+    resetMockHass()
+    window.history.replaceState(null, '', window.location.pathname)
+
+    view = render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
+    fireEvent.click(screen.getByRole('button', { name: /^Apple TV Paused$/i }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Plex' }))
+    expect(mockCallServiceCalls).toEqual([
+      { domain: 'script', service: 'launch_app_on_apple_tv', target: undefined, serviceData: { entity: 'media_player.master_bedroom_apple_tv', app_name: 'Plex', remote_entity: 'remote.master_bedroom_apple_tv' } },
+    ])
+    view.unmount()
+    resetMockHass()
+    window.history.replaceState(null, '', window.location.pathname)
+
+    render(<DashboardViewPage activePath="theater-room" onNavigate={() => undefined} path="theater-room" />)
+    fireEvent.click(screen.getByRole('button', { name: /^Theater Room Off$/i }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Disney+' }))
+    expect(mockCallServiceCalls).toEqual([
+      { domain: 'script', service: 'launch_app_on_media_player', target: undefined, serviceData: { entity: 'media_player.theater_room_shield', remote_entity: 'remote.theater_shield', app_id: 'com.disney.disneyplus', turn_on_projector: true } },
+    ])
+  })
+
+  it('ports the Master Bedroom Apple TV remote modal from the YAML popup', async () => {
+    render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
+
+    fireEvent.click(screen.getByRole('button', { name: /^Apple TV Paused$/i }))
+
+    expect(await screen.findByRole('dialog')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Master Bedroom: Apple TV' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Apple TV Remote' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Volume' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Power' })).toHaveStyle({ color: 'rgb(255, 0, 0)' })
+    expect(mockCallServiceCalls).toEqual([])
+
+    fireEvent.click(screen.getByRole('button', { name: 'Select' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Mute' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Play' }))
+
+    expect(mockCallServiceCalls).toEqual([
+      { domain: 'script', service: 'apple_tv_remote_send_command', target: undefined, serviceData: { remote_entity: 'remote.master_bedroom_apple_tv', command: 'select' } },
+      { domain: 'script', service: 'toggle_sonos_mute', target: undefined, serviceData: { sonosdevice: ['media_player.primary_bedroom'] } },
+      { domain: 'script', service: 'apple_tv_remote_send_command', target: undefined, serviceData: { remote_entity: 'remote.master_bedroom_apple_tv', command: 'play' } },
+    ])
+  })
+
+  it('ports the Theater Room remote modal with device controls', async () => {
+    mockEntities['media_player.theater_room_shield'].state = 'playing'
+    mockEntities['media_player.theater'].state = 'on'
+    render(<DashboardViewPage activePath="theater-room" onNavigate={() => undefined} path="theater-room" />)
+
+    fireEvent.click(screen.getByRole('button', { name: /^Theater Room Off$/i }))
+
+    expect(await screen.findByRole('dialog')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Theater Room: Theater Room' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Theater Remote' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Devices' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Power' })).toHaveStyle({ color: 'rgb(255, 0, 0)' })
+    expect(mockCallServiceCalls).toEqual([])
+
+    fireEvent.click(screen.getByRole('button', { name: 'Power' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Right' }))
+    fireEvent.click(screen.getByRole('button', { name: /Projector Off/i }))
+
+    expect(mockCallServiceCalls).toEqual([
+      { domain: 'script', service: 'toggle_on_off_theater_room', target: undefined, serviceData: undefined },
+      { domain: 'remote', service: 'send_command', target: 'remote.theater_shield_remote', serviceData: { command: 'DPAD_RIGHT' } },
+      { domain: 'media_player', service: 'toggle', target: 'media_player.sony_projector', serviceData: undefined },
+    ])
   })
 
   it('opens room vacuum source cards with reusable vacuum modal controls', async () => {

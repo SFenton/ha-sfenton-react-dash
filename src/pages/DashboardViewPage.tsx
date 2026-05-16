@@ -14,6 +14,7 @@ import { CameraTile } from '../components/hass/CameraTile'
 import { VacuumCard, VacuumModalContent } from '../components/hass/VacuumCard'
 import { AirQualityModalContent } from '../components/hass/AirQualityModalContent'
 import { GrillModalContent } from '../components/hass/GrillModalContent'
+import { MediaRemoteModalContent } from '../components/hass/MediaRemoteModalContent'
 import { Card, type CardColor } from '../components/core/Card'
 import { MaterialIcon } from '../components/core/Icon'
 import { ModalSheet } from '../components/core/ModalSheet'
@@ -45,6 +46,7 @@ import {
   type EntitySectionConfig,
 } from '../constants/portedDashboard'
 import { ROOM_PAGE_CONFIGS, type RoomSourceCardConfig, type RoomSourceKind, type RoomSourceModalItem } from '../constants/roomPages'
+import { MEDIA_REMOTE_CONFIGS } from '../constants/mediaRemotes'
 import { Page } from './Page'
 import { ClimateSheet, ContactSheet, LightsSheet, OccupancySheet } from './AtAGlancePage'
 import styles from './DashboardViewPage.module.css'
@@ -283,6 +285,11 @@ function renderRoomReusableSheet(card: RoomSourceCardConfig, roomTitle: string):
 
   if (card.kind === 'grill' && card.hash === '#bear-grills') {
     return <GrillModalContent key={card.entityId} />
+  }
+
+  if (card.kind === 'media' && card.hash) {
+    const mediaRemote = MEDIA_REMOTE_CONFIGS[card.hash]
+    if (mediaRemote) return <MediaRemoteModalContent config={mediaRemote} key={mediaRemote.hash} />
   }
 
   return null

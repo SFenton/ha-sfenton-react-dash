@@ -1,0 +1,184 @@
+.remoteModal {
+  display: grid;
+  gap: 18px;
+  color: white;
+}
+
+.section {
+  display: grid;
+  gap: 10px;
+}
+
+.sectionHeader {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  align-items: center;
+  gap: 10px;
+}
+
+.sectionHeader h3 {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.88);
+  font-size: 0.82rem;
+  font-weight: 850;
+}
+
+.sectionHeader span {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.powerRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 64px;
+  gap: 10px;
+  align-items: stretch;
+}
+
+.remotePad {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 64px));
+  justify-content: center;
+  gap: 10px;
+}
+
+.buttonRow {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 64px));
+  justify-content: center;
+  gap: 10px;
+}
+
+.remoteButton {
+  display: grid;
+  width: 64px;
+  height: 64px;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+  color: white;
+  background: rgba(255, 255, 255, 0.13);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14), 0 16px 32px rgba(0, 0, 0, 0.18);
+  cursor: pointer;
+}
+
+.remoteButton[data-size='small'] {
+  width: 64px;
+  height: 64px;
+}
+
+.remoteButton:disabled {
+  cursor: default;
+  opacity: 0.38;
+}
+
+.remoteButton:not(:disabled):active {
+  transform: scale(0.95);
+}
+
+.appGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.appButton {
+  display: grid;
+  aspect-ratio: 1;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 16px;
+  padding: 0;
+  color: white;
+  background: rgba(255, 255, 255, 0.11);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12), 0 14px 28px rgba(0, 0, 0, 0.14);
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.appButton:active {
+  transform: scale(0.98);
+}
+
+.appButton[data-background='white'] {
+  background: #fff;
+}
+
+.appImage {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.deviceGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.deviceButton {
+  display: grid;
+  min-height: 68px;
+  grid-template-columns: 38px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 16px;
+  padding: 10px 12px;
+  color: white;
+  background: rgba(255, 255, 255, 0.11);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  text-align: left;
+  cursor: pointer;
+}
+
+.deviceButton:disabled {
+  cursor: default;
+  opacity: 0.42;
+}
+
+.deviceButton:not(:disabled):active {
+  transform: scale(0.98);
+}
+
+.deviceIcon {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  border-radius: 12px;
+  background: rgba(218, 88, 132, 0.3);
+}
+
+.deviceButton strong,
+.deviceButton span span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.deviceButton strong {
+  font-size: 0.82rem;
+  font-weight: 850;
+}
+
+.deviceButton span span {
+  margin-top: 3px;
+  color: rgba(255, 255, 255, 0.68);
+  font-size: 0.74rem;
+  font-weight: 720;
+}
+
+@media (max-width: 340px) {
+  .powerRow,
+  .appGrid,
+  .deviceGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .powerRow > button {
+    justify-self: center;
+  }
+}

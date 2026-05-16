@@ -59,6 +59,33 @@ test('living room header chips open climate occupancy and air quality popups', a
   await expect(page.getByText('AQI')).toBeVisible()
 })
 
+test('room media cards open ported remote modals', async ({ page }) => {
+  await page.goto('/at-a-glance/living-room')
+  await page.getByRole('button', { name: /^SHIELD Off$/i }).click()
+  await expect(page.getByRole('heading', { name: 'Living Room: SHIELD' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'SHIELD Remote' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Sonos Volume' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Plex' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Disney+' })).toBeVisible()
+  await page.getByRole('button', { name: 'Close' }).click()
+
+  await page.goto('/at-a-glance/master-bedroom')
+  await page.getByRole('button', { name: /^Apple TV Paused$/i }).click()
+  await expect(page.getByRole('heading', { name: 'Master Bedroom: Apple TV' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Apple TV Remote' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Menu' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Plex' })).toBeVisible()
+  await page.getByRole('button', { name: 'Close' }).click()
+
+  await page.goto('/at-a-glance/theater-room')
+  await page.getByRole('button', { name: /^Theater Room Off$/i }).click()
+  await expect(page.getByRole('heading', { name: 'Theater Room: Theater Room' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Theater Remote' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Devices' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Prime Video' })).toBeVisible()
+  await expect(page.getByRole('button', { name: /Projector Off/i })).toBeVisible()
+})
+
 test('room vacuum cards open reusable vacuum modal controls', async ({ page }) => {
   await page.goto('/at-a-glance/living-room')
 
