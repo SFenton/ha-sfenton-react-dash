@@ -10,7 +10,7 @@ interface BottomNavProps {
 const TABS: { label: string; icon: IconKey; hash: string }[] = [
   { label: 'Home', icon: 'home', hash: '' },
   { label: 'Security', icon: 'security', hash: '#security-system' },
-  { label: 'Ecobee', icon: 'thermostat', hash: '#climate-overview' },
+  { label: 'Climate', icon: 'thermostat', hash: '#climate-overview' },
   { label: 'Chores', icon: 'checklist', hash: '#chores-preview' },
   { label: 'Settings', icon: 'settings', hash: '#settings-preview' },
 ]

@@ -47,7 +47,7 @@ export interface QuickAccessConfig {
   hash?: string
   route?: string
   entityId?: string
-  status?: 'climate_power' | 'entity_state'
+  status?: 'entity_state'
   tone: 'security' | 'climate' | 'neutral' | 'light' | 'vacuum' | 'media'
 }
 
@@ -147,14 +147,6 @@ export const QUICK_ACCESS_ITEMS: QuickAccessConfig[] = [
     hash: '#security-system',
     status: 'entity_state',
     tone: 'security',
-  },
-  {
-    title: 'Ecobee',
-    icon: 'thermostat',
-    entityId: 'climate.home',
-    route: '/at-a-glance/ecobee',
-    status: 'climate_power',
-    tone: 'climate',
   },
   {
     title: 'Vacuums',
@@ -373,7 +365,6 @@ export const CLIMATE_GROUPS: EntityGroupConfig[] = [
       { title: 'Bar', entityId: 'sensor.living_room_bar_presence_sensor_temperature', colorEntityId: 'input_text.living_room_bar_climate_color', tone: 'climate' },
       { title: 'Kitchen Wall', entityId: 'sensor.living_room_kitchen_wall_presence_sensor_temperature', colorEntityId: 'input_text.living_room_kitchen_wall_climate_color', tone: 'climate' },
       { title: 'Fireplace', entityId: 'sensor.living_room_fireplace_presence_sensor_temperature', colorEntityId: 'input_text.living_room_fireplace_climate_color', tone: 'climate' },
-      { title: 'Ecobee', entityId: 'sensor.living_room_temperature', colorEntityId: 'input_text.living_room_ecobee_climate_color', tone: 'climate' },
       { title: 'Vents', entityId: 'cover.living_room_vents', tone: 'neutral' },
     ],
   },
@@ -383,7 +374,6 @@ export const CLIMATE_GROUPS: EntityGroupConfig[] = [
     colorEntityId: 'input_text.guest_room_climate_color',
     items: [
       { title: 'Presence', entityId: 'sensor.guest_room_presence_sensor_temperature', colorEntityId: 'input_text.guest_room_presence_climate_color', tone: 'climate' },
-      { title: 'Ecobee', entityId: 'sensor.guest_room_temperature', colorEntityId: 'input_text.guest_room_ecobee_climate_color', tone: 'climate' },
       { title: 'Closet', entityId: 'sensor.guest_room_closet_facing_presence_sensor_temperature', colorEntityId: 'input_text.guest_room_closet_climate_color', tone: 'climate' },
       { title: 'Vent', entityId: 'cover.guest_room_vent_vent', tone: 'neutral' },
     ],
@@ -394,7 +384,6 @@ export const CLIMATE_GROUPS: EntityGroupConfig[] = [
     colorEntityId: 'input_text.master_bedroom_climate_color',
     items: [
       { title: 'Window', entityId: 'sensor.master_bedroom_window_presence_sensor_temperature', colorEntityId: 'input_text.master_bedroom_window_climate_color', tone: 'climate' },
-      { title: 'Ecobee', entityId: 'sensor.bedroom_temperature', colorEntityId: 'input_text.master_bedroom_ecobee_climate_color', tone: 'climate' },
       { title: 'Bathroom', entityId: 'sensor.master_bedroom_bathroom_presence_sensor_temperature', colorEntityId: 'input_text.master_bedroom_bathroom_climate_color', tone: 'climate' },
       { title: 'Closet', entityId: 'sensor.master_bedroom_closet_presence_sensor_temperature', colorEntityId: 'input_text.master_bedroom_closet_climate_color', tone: 'climate' },
       { title: 'Vents', entityId: 'cover.master_bedroom_vents', tone: 'neutral' },
@@ -407,7 +396,6 @@ export const CLIMATE_GROUPS: EntityGroupConfig[] = [
     items: [
       { title: 'Presence', entityId: 'sensor.gym_presence_sensor_temperature', colorEntityId: 'input_text.gym_presence_climate_color', tone: 'climate' },
       { title: 'Door', entityId: 'sensor.hallway_guest_room_presence_sensor_temperature', colorEntityId: 'input_text.gym_door_guest_bath_climate_color', tone: 'climate' },
-      { title: 'Ecobee', entityId: 'sensor.gym_temperature', colorEntityId: 'input_text.gym_ecobee_climate_color', tone: 'climate' },
       { title: 'Vent', entityId: 'cover.gym_vent_vent', tone: 'neutral' },
     ],
   },
@@ -419,7 +407,6 @@ export const CLIMATE_GROUPS: EntityGroupConfig[] = [
       { title: 'Entry', entityId: 'sensor.entryway_presence_sensor_temperature', colorEntityId: 'input_text.entryway_climate_color', tone: 'climate' },
       { title: 'Guest Room', entityId: 'sensor.hallway_guest_room_presence_sensor_temperature', colorEntityId: 'input_text.gym_door_guest_bath_climate_color', tone: 'climate' },
       { title: 'Office', entityId: 'sensor.hallway_office_presence_sensor_temperature', colorEntityId: 'input_text.office_door_climate_color', tone: 'climate' },
-      { title: 'Ecobee', entityId: 'sensor.home_current_temperature', colorEntityId: 'input_text.hallway_ecobee_climate_color', tone: 'climate' },
     ],
   },
   {
@@ -429,7 +416,6 @@ export const CLIMATE_GROUPS: EntityGroupConfig[] = [
     items: [
       { title: 'Door', entityId: 'sensor.hallway_office_presence_sensor_temperature', colorEntityId: 'input_text.office_door_climate_color', tone: 'climate' },
       { title: 'Presence', entityId: 'sensor.office_presence_sensor_temperature', colorEntityId: 'input_text.office_presence_climate_color', tone: 'climate' },
-      { title: 'Ecobee', entityId: 'sensor.office_temperature', colorEntityId: 'input_text.office_ecobee_climate_color', tone: 'climate' },
       { title: 'Closet', entityId: 'sensor.office_closet_presence_sensor_temperature', colorEntityId: 'input_text.office_closet_climate_color', tone: 'climate' },
       { title: 'Vent', entityId: 'cover.office_vent_vent', tone: 'neutral' },
     ],
@@ -440,7 +426,6 @@ export const CLIMATE_GROUPS: EntityGroupConfig[] = [
     colorEntityId: 'input_text.kitchen_climate_color',
     items: [
       { title: 'Kitchen', entityId: 'sensor.kitchen_wall_presence_sensor_temperature', colorEntityId: 'input_text.kitchen_presence_climate_color', tone: 'climate' },
-      { title: 'Ecobee', entityId: 'sensor.kitchen_temperature', colorEntityId: 'input_text.kitchen_ecobee_climate_color', tone: 'climate' },
       { title: 'Vent', entityId: 'cover.kitchen_vent_vent', tone: 'neutral' },
     ],
   },
@@ -450,7 +435,6 @@ export const CLIMATE_GROUPS: EntityGroupConfig[] = [
     colorEntityId: 'input_text.dining_room_climate_color',
     items: [
       { title: 'Presence', entityId: 'sensor.dining_room_presence_sensor_temperature', colorEntityId: 'input_text.dining_room_presence_climate_color', tone: 'climate' },
-      { title: 'Ecobee', entityId: 'sensor.dining_room_temperature', colorEntityId: 'input_text.dining_room_ecobee_climate_color', tone: 'climate' },
       { title: 'Vent', entityId: 'cover.dining_room_vent_vent', tone: 'neutral' },
     ],
   },
@@ -459,7 +443,6 @@ export const CLIMATE_GROUPS: EntityGroupConfig[] = [
     rangeEntityId: 'input_text.music_room_climate_range',
     colorEntityId: 'input_text.music_room_climate_color',
     items: [
-      { title: 'Ecobee', entityId: 'sensor.music_room_temperature', colorEntityId: 'input_text.music_room_ecobee_climate_color', tone: 'climate' },
       { title: 'Kitchenette', entityId: 'sensor.music_room_kitchenette_presence_sensor_temperature', colorEntityId: 'input_text.music_room_kitchenette_climate_color', tone: 'climate' },
       { title: 'North Wall', entityId: 'sensor.music_room_north_wall_presence_sensor_temperature', colorEntityId: 'input_text.music_room_north_wall_climate_color', tone: 'climate' },
       { title: 'Door', entityId: 'sensor.music_room_door_presence_sensor_temperature', colorEntityId: 'input_text.music_room_door_climate_color', tone: 'climate' },
@@ -471,7 +454,6 @@ export const CLIMATE_GROUPS: EntityGroupConfig[] = [
     rangeEntityId: 'input_text.theater_room_climate_range',
     colorEntityId: 'input_text.theater_room_climate_color',
     items: [
-      { title: 'Ecobee', entityId: 'sensor.theater_room_temperature', colorEntityId: 'input_text.theater_room_ecobee_climate_color', tone: 'climate' },
       { title: 'Presence', entityId: 'sensor.theater_room_presence_sensor_temperature', colorEntityId: 'input_text.theater_room_presence_sensor_climate_color', tone: 'climate' },
       { title: 'Vents', entityId: 'cover.theater_room_vents', tone: 'neutral' },
     ],
@@ -488,7 +470,6 @@ export const CLIMATE_GROUPS: EntityGroupConfig[] = [
     colorEntityId: 'input_text.guest_bathroom_climate_color',
     items: [
       { title: 'Presence', entityId: 'sensor.guest_bathroom_presence_sensor_temperature', colorEntityId: 'input_text.guest_bathroom_presence_climate_color', tone: 'climate' },
-      { title: 'Ecobee', entityId: 'sensor.guest_bathroom_temperature', colorEntityId: 'input_text.guest_bathroom_ecobee_climate_color', tone: 'climate' },
       { title: 'Entry', entityId: 'sensor.guest_bathroom_entry_presence_sensor_temperature', colorEntityId: 'input_text.guest_bathroom_entry_climate_color', tone: 'climate' },
       { title: 'Vent', entityId: 'cover.guest_bathroom_vent_vent', tone: 'neutral' },
     ],
@@ -499,7 +480,6 @@ export const CLIMATE_GROUPS: EntityGroupConfig[] = [
     colorEntityId: 'input_text.master_bathroom_climate_color',
     items: [
       { title: 'Presence', entityId: 'sensor.master_bathroom_presence_sensor_temperature', colorEntityId: 'input_text.master_bathroom_presence_climate_color', tone: 'climate' },
-      { title: 'Ecobee', entityId: 'sensor.master_bathroom_temperature', colorEntityId: 'input_text.master_bathroom_ecobee_climate_color', tone: 'climate' },
       { title: 'Vent', entityId: 'cover.master_bathroom_vent_vent', tone: 'neutral' },
     ],
   },

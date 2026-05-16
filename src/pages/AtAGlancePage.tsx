@@ -176,11 +176,6 @@ function getMuteState(targetId: string) {
   return window.__webrtcGetMuteState?.(targetId) ?? true
 }
 
-function formatClimatePowerState(entity: ReturnType<typeof useEntity>) {
-  if (!entity || entity.state === 'unavailable') return 'Unavailable'
-  return entity.state === 'off' ? 'Off' : 'On'
-}
-
 function roomTitleFromLightGroup(group: EntityGroupConfig) {
   if (group.title.endsWith(LIGHTS_SUFFIX)) return group.title.slice(0, -LIGHTS_SUFFIX.length)
   if (group.title.endsWith(LIGHT_SUFFIX)) return group.title.slice(0, -LIGHT_SUFFIX.length)
@@ -189,7 +184,7 @@ function roomTitleFromLightGroup(group: EntityGroupConfig) {
 
 function QuickAccessTile({ item, onOpenHash }: { item: QuickAccessConfig; onOpenHash: (hash: string) => void }) {
   const entity = useEntity(asEntityName(item.entityId ?? 'sensor.unavailable'), { returnNullIfNotFound: true })
-  const subtitle = item.status === 'climate_power' ? formatClimatePowerState(entity) : item.status === 'entity_state' ? formatCompactEntityState(entity) : undefined
+  const subtitle = item.status === 'entity_state' ? formatCompactEntityState(entity) : undefined
   const itemHash = item.hash
 
   return (

@@ -31,7 +31,6 @@ The overview page content is organized as:
 - `Weather` section with a large clock/weather card and forecast bars.
 - `Quick Access` section with large two-column tiles:
   - Security System -> `#security-system`
-  - Ecobee -> `/at-a-glance/ecobee`
   - Vacuums -> `/at-a-glance/vacuums`
   - Media -> `/at-a-glance/media`
   - Custom Lights -> `/at-a-glance/custom-lights`
@@ -52,7 +51,7 @@ Important popup hashes discovered from MCP include:
 Primary route targets include:
 
 - `/at-a-glance/living-room`, `/guest-room`, `/master-bedroom`, `/gym`, `/hallway`, `/office`, `/kitchen`, `/dining-room`, `/back-deck`, `/music-room`, `/theater-room`, `/downstairs-hallway`, `/garage`, `/guest-bathroom`, `/master-bathroom`, `/entryway`.
-- `/at-a-glance/security`, `/chores`, `/ecobee`, `/vacuums`, `/media`, `/custom-lights`, `/admin`, `/settings`, `/to-do`, `/groceries`, and chore subpages.
+- `/at-a-glance/security`, `/chores`, `/vacuums`, `/media`, `/custom-lights`, `/admin`, `/settings`, `/to-do`, `/groceries`, and chore subpages.
 
 ## Mobile Findings
 
@@ -105,7 +104,7 @@ Shell and routing:
 
 - `src/components/shell/AppShell.tsx`: full-screen app frame, background layer, route chrome slots, bottom nav.
 - `src/components/shell/BackgroundLayer.tsx`: image/backdrop blur, dim overlay, optional saturation.
-- `src/components/shell/BottomNav.tsx`: FNF-inspired fixed/frosted bottom nav with Home, Security, Ecobee, Chores, Settings.
+- `src/components/shell/BottomNav.tsx`: FNF-inspired fixed/frosted bottom nav with Home, Security, Climate, Chores, Settings.
 - `src/components/shell/TopViewRail.tsx`: optional horizontal icon rail for quick dashboard view switching.
 - `src/routes.ts`: centralized route constants and route helpers modeled after FNF.
 
@@ -124,7 +123,7 @@ Home page components:
 - `src/pages/AtAGlancePage.tsx`: declarative composition of overview sections.
 - `src/components/hass/OverviewStatusChip.tsx`: entity-backed top rail chips.
 - `src/components/hass/WeatherOverviewCard.tsx`: HASS weather/clock data mapped into the large mobile card.
-- `src/components/hass/QuickAccessTile.tsx`: route/hash tile for security, ecobee, vacuums, media, custom lights.
+- `src/components/hass/QuickAccessTile.tsx`: route/hash tile for security, vacuums, media, custom lights.
 - `src/components/hass/CameraTile.tsx`: live camera tile with modal open behavior.
 - `src/components/hass/AreaTile.tsx`: route tile for rooms, with icon and optional state color.
 
