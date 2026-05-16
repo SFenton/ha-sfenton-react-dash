@@ -6,6 +6,7 @@ export type IconKey =
   | 'car'
   | 'checklist'
   | 'contact'
+  | 'contact-open'
   | 'deck'
   | 'door'
   | 'door-open'
@@ -66,6 +67,7 @@ export interface EntityButtonConfig {
   title: string
   entityId: string
   colorEntityId?: string
+  contactCount?: number
   tone?: 'light' | 'climate' | 'security' | 'presence' | 'contact' | 'neutral'
 }
 
@@ -573,6 +575,56 @@ export const OCCUPANCY_GROUPS: EntityGroupConfig[] = [
   {
     title: 'Downstairs Hallway Occupancy',
     items: [{ title: 'Downstairs Hallway', entityId: 'binary_sensor.downstairs_hallway_presence_sensor_presence', tone: 'presence' }],
+  },
+]
+
+export const CONTACT_GROUPS: EntityGroupConfig[] = [
+  {
+    title: 'Entryway Contact Sensors',
+    items: [{ title: 'Front Door', entityId: 'binary_sensor.front_door_contact_sensor_contact', tone: 'contact' }],
+  },
+  {
+    title: 'Office Contact Sensors',
+    items: [
+      { title: 'PC Window', entityId: 'binary_sensor.office_pc_window_sensor_contact', tone: 'contact' },
+      { title: 'Window', entityId: 'binary_sensor.office_window_contact_sensor_contact', tone: 'contact' },
+    ],
+  },
+  {
+    title: 'Living Room Contact Sensors',
+    items: [{ title: 'Window', entityId: 'binary_sensor.living_room_window_contact_sensor_contact', tone: 'contact' }],
+  },
+  {
+    title: 'Garage Contact Sensors',
+    items: [{ title: 'Garage Door', entityId: 'binary_sensor.garage_door_contact_sensor_contact', tone: 'contact' }],
+  },
+  {
+    title: 'Master Bedroom Contact Sensors',
+    items: [{ title: 'Street Windows', entityId: 'binary_sensor.master_bedroom_street_window_contact_sensor_contact', contactCount: 2, tone: 'contact' }],
+  },
+  {
+    title: 'Dining Room Contact Sensors',
+    items: [{ title: 'Dining Room Door', entityId: 'binary_sensor.dining_room_door_contact_sensor_contact', tone: 'contact' }],
+  },
+  {
+    title: 'Kitchen Contact Sensors',
+    items: [{ title: 'Kitchen Door', entityId: 'binary_sensor.kitchen_door_contact_sensor_contact', tone: 'contact' }],
+  },
+  {
+    title: 'Music Room Contact Sensors',
+    items: [{ title: 'Music Room Door', entityId: 'binary_sensor.music_room_door_contact_sensor_contact', tone: 'contact' }],
+  },
+  {
+    title: 'Theater Room Contact Sensors',
+    items: [{ title: 'Theater Room Door', entityId: 'binary_sensor.theater_room_door_contact_sensor_contact', tone: 'contact' }],
+  },
+  {
+    title: 'Guest Room Contact Sensors',
+    items: [{ title: 'Window', entityId: 'binary_sensor.guest_room_window_contact_sensor_contact', tone: 'contact' }],
+  },
+  {
+    title: 'Gym Contact Sensors',
+    items: [{ title: 'Window', entityId: 'binary_sensor.gym_window_contact_sensor_contact', tone: 'contact' }],
   },
 ]
 

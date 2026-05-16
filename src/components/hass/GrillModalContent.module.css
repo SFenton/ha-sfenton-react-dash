@@ -1,0 +1,63 @@
+.sheet {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding-top: 4px;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 2px 2px 0;
+}
+
+.headerIcon {
+  display: grid;
+  flex: 0 0 46px;
+  width: 46px;
+  height: 46px;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 50%;
+  color: rgb(255, 221, 185);
+  background: rgba(206, 114, 38, 0.22);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16);
+}
+
+.titleBlock {
+  min-width: 0;
+}
+
+.titleBlock h3,
+.titleBlock p {
+  margin: 0;
+}
+
+.titleBlock h3 {
+  color: var(--color-text);
+  font-size: 1.15rem;
+  font-weight: 780;
+}
+
+.titleBlock p {
+  margin-top: 3px;
+  color: var(--color-text-muted);
+  font-size: 0.88rem;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.reviewNotice {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 18px;
+  padding: 12px 14px;
+  color: rgba(232, 240, 255, 0.74);
+  background: rgba(255, 255, 255, 0.06);
+  font-size: 0.82rem;
+  line-height: 1.45;
+}

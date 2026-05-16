@@ -10,6 +10,7 @@ export interface CardColor {
 interface CardProps {
   ariaLabel?: string
   color?: CardColor
+  disabled?: boolean
   icon: ReactNode
   muted?: boolean
   onClick?: MouseEventHandler<HTMLButtonElement>
@@ -26,6 +27,7 @@ type CardStyle = CSSProperties & {
 export function Card({
   ariaLabel,
   color = { r: 150, g: 80, b: 28 },
+  disabled = false,
   icon,
   muted = false,
   onClick,
@@ -57,7 +59,9 @@ export function Card({
         aria-pressed={pressed}
         className={className}
         data-clickable="true"
+        data-disabled={disabled}
         data-muted={muted}
+        disabled={disabled}
         onClick={onClick}
         style={style}
         type="button"
@@ -68,7 +72,7 @@ export function Card({
   }
 
   return (
-    <article aria-label={ariaLabel ?? title} className={className} data-muted={muted} style={style}>
+    <article aria-label={ariaLabel ?? title} className={className} data-disabled={disabled} data-muted={muted} style={style}>
       {content}
     </article>
   )

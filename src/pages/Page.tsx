@@ -1,5 +1,5 @@
-import { Settings, UserRound } from 'lucide-react'
 import { useRef, type ReactNode } from 'react'
+import { MaterialIcon } from '../components/core/Icon'
 import { useScrollFade, type ScrollFadeOptions } from '../hooks/useScrollFade'
 import styles from './Page.module.css'
 
@@ -24,10 +24,10 @@ export function Page({ title, headerQuickLinks, children, onProfile, onSettings,
           <h1 className={styles.title}>{title}</h1>
           <div className={styles.actions} aria-label="Page actions">
             <button className={styles.iconButton} onClick={onSettings} type="button" aria-label="Settings">
-              <Settings size={21} strokeWidth={2.05} absoluteStrokeWidth />
+              <MaterialIcon name="mdi:cog" size={21} />
             </button>
             <button className={styles.iconButton} onClick={onProfile} type="button" aria-label="Profile">
-              <UserRound size={21} strokeWidth={2.05} absoluteStrokeWidth />
+              <MaterialIcon name="mdi:account-circle" size={21} />
             </button>
           </div>
         </header>

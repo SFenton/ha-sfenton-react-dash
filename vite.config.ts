@@ -1,5 +1,6 @@
 import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
+import { fileURLToPath, URL } from 'node:url'
 
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
@@ -9,6 +10,14 @@ export default defineConfig(({ mode }) => {
   return {
     base: './',
     plugins: [react()],
+    resolve: {
+      alias: mode === 'test'
+        ? {
+            '@hakit/components': fileURLToPath(new URL('./src/test/mocks/hakitComponents.tsx', import.meta.url)),
+            '@hakit/core': fileURLToPath(new URL('./src/test/mocks/hakitCore.ts', import.meta.url)),
+          }
+        : undefined,
+    },
     server: {
       host: '0.0.0.0',
       proxy: {

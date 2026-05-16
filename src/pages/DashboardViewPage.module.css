@@ -1,0 +1,131 @@
+.stack {
+  display: grid;
+  gap: 18px;
+}
+
+.section {
+  display: grid;
+  gap: 10px;
+  scroll-margin-top: 130px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.roomRail {
+  display: flex;
+  gap: 8px;
+  margin: 0 0 10px;
+  padding: 0 0 8px;
+  overflow-x: auto;
+  scroll-snap-type: x proximity;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.roomRail::-webkit-scrollbar {
+  display: none;
+}
+
+.roomChip {
+  display: inline-flex;
+  min-width: max-content;
+  height: 44px;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  border-radius: 999px;
+  padding: 0 13px;
+  color: white;
+  background: rgba(255, 255, 255, 0.11);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14);
+  font: inherit;
+  font-size: 0.76rem;
+  font-weight: 820;
+  scroll-snap-align: start;
+  cursor: pointer;
+}
+
+.roomChip:active {
+  transform: scale(0.96);
+}
+
+.cameraGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.notice {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 18px;
+  padding: 14px;
+  color: var(--color-muted);
+  background: rgba(255, 255, 255, 0.08);
+  box-shadow: var(--shadow-glass);
+  font-size: 0.84rem;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.review {
+  color: #f8df9d;
+  background: rgba(161, 111, 20, 0.18);
+}
+
+.sourceModal {
+  display: grid;
+  gap: 12px;
+  color: white;
+}
+
+.sourceModalIcon {
+  display: grid;
+  width: 54px;
+  height: 54px;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.sourceModal strong,
+.sourceModal span {
+  display: block;
+}
+
+.sourceModal strong {
+  margin-bottom: 6px;
+  font-size: 0.88rem;
+  font-weight: 840;
+}
+
+.sourceModal span,
+.sourceEntity {
+  color: rgba(255, 255, 255, 0.74);
+  font-size: 0.8rem;
+  font-weight: 720;
+  line-height: 1.42;
+}
+
+.sourceEntity {
+  overflow-wrap: anywhere;
+}
+
+.appIcon {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  object-fit: contain;
+}
+
+@media (max-width: 340px) {
+  .grid,
+  .cameraGrid {
+    grid-template-columns: 1fr;
+  }
+
+}

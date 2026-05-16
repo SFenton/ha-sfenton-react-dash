@@ -1,6 +1,6 @@
 import { useEntity } from '@hakit/core'
-import { Lightbulb } from 'lucide-react'
 import type { CSSProperties } from 'react'
+import { MaterialIcon } from '../core/Icon'
 import { asEntityName, formatCompactEntityState, isActiveState } from '../hass/entityState'
 import { Card, type CardColor } from '../core/Card'
 import styles from './LightCard.module.css'
@@ -17,26 +17,25 @@ type MultiLightIconStyle = CSSProperties & {
 }
 
 export function MultiLightIcon({ active, size = 28 }: MultiLightIconProps) {
-  const fill = active ? 'currentColor' : 'none'
-  const style: MultiLightIconStyle = { '--multi-light-size': `${size}px` }
+  const style: MultiLightIconStyle = { '--multi-light-size': `${size}px`, opacity: active ? 1 : 0.72 }
 
   return (
     <span className={styles.multiIcon} style={style}>
-      <Lightbulb absoluteStrokeWidth className={styles.rearBulb} fill={fill} strokeWidth={2.1} />
-      <Lightbulb absoluteStrokeWidth className={styles.frontBulb} fill={fill} strokeWidth={2.1} />
+      <span className={styles.rearBulb}><MaterialIcon name="mdi:lightbulb" size={size} /></span>
+      <span className={styles.frontBulb}><MaterialIcon name="mdi:lightbulb" size={size} /></span>
     </span>
   )
 }
 
 function SingleLightIcon({ active }: { active: boolean }) {
-  return <Lightbulb absoluteStrokeWidth fill={active ? 'currentColor' : 'none'} size={42} strokeWidth={2.08} />
+  return <MaterialIcon name={active ? 'mdi:lightbulb' : 'mdi:lightbulb'} size={42} />
 }
 
 interface LightCardProps {
   ariaLabel?: string
   entityId: string
   icon?: 'single' | 'multi'
-  onClick: () => void
+  onClick?: () => void
   pressed?: boolean
   size?: 'standard' | 'compact'
   title: string

@@ -29,7 +29,18 @@
   cursor: pointer;
 }
 
-.card[data-clickable='true']:active {
+.card[data-disabled='true'] {
+  cursor: default;
+  filter: saturate(0.45);
+}
+
+.card[data-disabled='true'] .icon,
+.card[data-disabled='true'] .subtitle,
+.card[data-disabled='true'] .title {
+  opacity: 0.72;
+}
+
+.card[data-clickable='true']:not(:disabled):active {
   transform: scale(0.975);
 }
 

@@ -1,8 +1,8 @@
 import { useEntity, useHass } from '@hakit/core'
-import { Home, Moon, Shield, ShieldAlert, ShieldOff } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { SECURITY_ENTITY } from '../../constants/atAGlance'
 import { Card, type CardColor } from '../core/Card'
+import { MaterialIcon } from '../core/Icon'
 import { Separator } from '../core/Separator'
 import { asEntityName, titleCaseState } from './entityState'
 import styles from './SecurityControls.module.css'
@@ -10,7 +10,6 @@ import styles from './SecurityControls.module.css'
 type SecurityModeState = 'armed_away' | 'armed_home' | 'armed_night' | 'disarmed' | 'triggered'
 
 const SECURITY_ICON_SIZE = 30
-const SECURITY_ICON_STROKE = 2.08
 
 const SECURITY_COLORS = {
   armed_away: { r: 229, g: 57, b: 53 },
@@ -22,10 +21,10 @@ const SECURITY_COLORS = {
 } satisfies Record<SecurityModeState | 'unknown', CardColor>
 
 const SECURITY_MODES = [
-  { title: 'Home', service: 'alarm_arm_home', state: 'armed_home', icon: <Home absoluteStrokeWidth size={SECURITY_ICON_SIZE} strokeWidth={SECURITY_ICON_STROKE} /> },
-  { title: 'Away', service: 'alarm_arm_away', state: 'armed_away', icon: <Shield absoluteStrokeWidth size={SECURITY_ICON_SIZE} strokeWidth={SECURITY_ICON_STROKE} /> },
-  { title: 'Night', service: 'alarm_arm_night', state: 'armed_night', icon: <Moon absoluteStrokeWidth size={SECURITY_ICON_SIZE} strokeWidth={SECURITY_ICON_STROKE} /> },
-  { title: 'Disarmed', service: 'alarm_disarm', state: 'disarmed', icon: <ShieldOff absoluteStrokeWidth size={SECURITY_ICON_SIZE} strokeWidth={SECURITY_ICON_STROKE} /> },
+  { title: 'Home', service: 'alarm_arm_home', state: 'armed_home', icon: <MaterialIcon name="mdi:shield-home" size={SECURITY_ICON_SIZE} /> },
+  { title: 'Away', service: 'alarm_arm_away', state: 'armed_away', icon: <MaterialIcon name="mdi:shield" size={SECURITY_ICON_SIZE} /> },
+  { title: 'Night', service: 'alarm_arm_night', state: 'armed_night', icon: <MaterialIcon name="mdi:shield-moon" size={SECURITY_ICON_SIZE} /> },
+  { title: 'Disarmed', service: 'alarm_disarm', state: 'disarmed', icon: <MaterialIcon name="mdi:shield-off" size={SECURITY_ICON_SIZE} /> },
 ] as const
 
 function securityStateColor(state?: string): CardColor {
@@ -33,11 +32,11 @@ function securityStateColor(state?: string): CardColor {
 }
 
 function securityStateIcon(state?: string) {
-  if (state === 'disarmed') return <ShieldOff absoluteStrokeWidth size={SECURITY_ICON_SIZE} strokeWidth={SECURITY_ICON_STROKE} />
-  if (state === 'armed_home') return <Home absoluteStrokeWidth size={SECURITY_ICON_SIZE} strokeWidth={SECURITY_ICON_STROKE} />
-  if (state === 'armed_night') return <Moon absoluteStrokeWidth size={SECURITY_ICON_SIZE} strokeWidth={SECURITY_ICON_STROKE} />
-  if (state === 'triggered') return <ShieldAlert absoluteStrokeWidth size={SECURITY_ICON_SIZE} strokeWidth={SECURITY_ICON_STROKE} />
-  return <Shield absoluteStrokeWidth size={SECURITY_ICON_SIZE} strokeWidth={SECURITY_ICON_STROKE} />
+  if (state === 'disarmed') return <MaterialIcon name="mdi:shield-off" size={SECURITY_ICON_SIZE} />
+  if (state === 'armed_home') return <MaterialIcon name="mdi:shield-home" size={SECURITY_ICON_SIZE} />
+  if (state === 'armed_night') return <MaterialIcon name="mdi:shield-moon" size={SECURITY_ICON_SIZE} />
+  if (state === 'triggered') return <MaterialIcon name="mdi:shield-alert" size={SECURITY_ICON_SIZE} />
+  return <MaterialIcon name="mdi:shield" size={SECURITY_ICON_SIZE} />
 }
 
 interface SecurityCardProps {

@@ -77,6 +77,16 @@
   padding-top: 2px;
 }
 
+.contactSheet {
+  display: flex;
+  height: 100%;
+  min-height: 0;
+  flex-direction: column;
+  gap: 14px;
+  overflow: hidden;
+  padding-top: 2px;
+}
+
 .lightSectionHeader {
   flex: 0 0 auto;
   display: flex;
@@ -110,6 +120,12 @@
 }
 
 .roomOccupancyGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.roomContactGrid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
@@ -151,6 +167,18 @@
   -webkit-overflow-scrolling: touch;
 }
 
+.contactContent {
+  min-height: 0;
+  flex: 1 1 auto;
+  margin: 0 -16px;
+  padding: 0 16px 14px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  -webkit-overflow-scrolling: touch;
+}
+
 .lightContent::-webkit-scrollbar {
   display: none;
   width: 0;
@@ -164,6 +192,12 @@
 }
 
 .occupancyContent::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+.contactContent::-webkit-scrollbar {
   display: none;
   width: 0;
   height: 0;
@@ -184,6 +218,11 @@
   animation: lightCardsFadeAway 190ms cubic-bezier(.2,.9,.2,1) forwards;
 }
 
+.roomContactOverview[data-exiting='true'] .roomLightCardShell {
+  pointer-events: none;
+  animation: lightCardsFadeAway 190ms cubic-bezier(.2,.9,.2,1) forwards;
+}
+
 .roomLightDetail {
   display: grid;
   gap: 12px;
@@ -195,6 +234,11 @@
 }
 
 .roomOccupancyDetail {
+  display: grid;
+  gap: 12px;
+}
+
+.roomContactDetail {
   display: grid;
   gap: 12px;
 }
@@ -228,6 +272,15 @@
 }
 
 .roomOccupancyHeader {
+  display: flex;
+  min-height: 52px;
+  align-items: center;
+  gap: 10px;
+  padding: 0 2px 2px;
+  color: var(--color-text);
+}
+
+.roomContactHeader {
   display: flex;
   min-height: 52px;
   align-items: center;
@@ -335,6 +388,10 @@
   }
 
   .roomOccupancyGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .roomContactGrid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }

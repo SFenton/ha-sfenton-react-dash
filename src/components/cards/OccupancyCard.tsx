@@ -1,6 +1,6 @@
 import { useEntity } from '@hakit/core'
-import { UserRoundCheck, UserRoundX } from 'lucide-react'
 import { Card, type CardColor } from '../core/Card'
+import { MaterialIcon } from '../core/Icon'
 import { asEntityName, formatOccupancyEntityState, isOccupancyActive } from '../hass/entityState'
 
 interface OccupancyCardProps {
@@ -18,8 +18,7 @@ interface OccupancyCardProps {
 const DEFAULT_OCCUPANCY_COLOR: CardColor = { r: 46, g: 180, b: 120 }
 
 function OccupancyIcon({ active }: { active: boolean }) {
-  const Component = active ? UserRoundCheck : UserRoundX
-  return <Component absoluteStrokeWidth size={38} strokeWidth={2.08} />
+  return <MaterialIcon name={active ? 'mdi:account-check' : 'mdi:checkbox-blank-circle-outline'} size={38} />
 }
 
 export function OccupancyCard({ active, ariaLabel, color = DEFAULT_OCCUPANCY_COLOR, entityId, icon, onClick, size = 'standard', subtitle, title }: OccupancyCardProps) {

@@ -24,12 +24,25 @@ export function isOccupancyActive(entity: HassEntity | null | undefined) {
   return entity?.state === 'on' || entity?.state === 'active' || entity?.state === 'occupied'
 }
 
+export function isContactOpen(entity: HassEntity | null | undefined) {
+  return entity?.state === 'on' || entity?.state === 'open'
+}
+
 export function formatOccupancyEntityState(entity: HassEntity | null | undefined, fallback = 'Unavailable') {
   if (!entity) return fallback
   if (entity.state === 'unavailable') return 'Unavailable'
   if (entity.state === 'unknown') return 'Unknown'
-  if (isOccupancyActive(entity)) return 'Occupied'
-  if (entity.state === 'off' || entity.state === 'inactive' || entity.state === 'clear' || entity.state === 'not_occupied') return 'Not Occupied'
+  if (isOccupancyActive(entity)) return 'Detected'
+  if (entity.state === 'off' || entity.state === 'inactive' || entity.state === 'clear' || entity.state === 'not_occupied') return 'Clear'
+  return titleCaseState(entity.state)
+}
+
+export function formatContactEntityState(entity: HassEntity | null | undefined, fallback = 'Unavailable') {
+  if (!entity) return fallback
+  if (entity.state === 'unavailable') return 'Unavailable'
+  if (entity.state === 'unknown') return 'Unknown'
+  if (isContactOpen(entity)) return 'Open'
+  if (entity.state === 'off' || entity.state === 'closed') return 'Closed'
   return titleCaseState(entity.state)
 }
 

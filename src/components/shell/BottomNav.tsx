@@ -1,35 +1,27 @@
-import { Icon } from '../core/Icon'
-import type { IconKey } from '../../constants/atAGlance'
+import { MaterialIcon } from '../core/Icon'
+import { PRIMARY_NAV_ROUTES } from '../../constants/routes'
 import styles from './BottomNav.module.css'
 
 interface BottomNavProps {
-  activeHash: string
-  onOpenHash: (hash: string) => void
+  activePath: string
+  onNavigate: (path: string) => void
 }
 
-const TABS: { label: string; icon: IconKey; hash: string }[] = [
-  { label: 'Home', icon: 'home', hash: '' },
-  { label: 'Security', icon: 'security', hash: '#security-system' },
-  { label: 'Climate', icon: 'thermostat', hash: '#climate-overview' },
-  { label: 'Chores', icon: 'checklist', hash: '#chores-preview' },
-  { label: 'Settings', icon: 'settings', hash: '#settings-preview' },
-]
-
-export function BottomNav({ activeHash, onOpenHash }: BottomNavProps) {
+export function BottomNav({ activePath, onNavigate }: BottomNavProps) {
   return (
     <nav className={styles.nav} aria-label="Dashboard sections">
-      {TABS.map((tab) => {
-        const isActive = tab.hash ? activeHash === tab.hash : activeHash === ''
+      {PRIMARY_NAV_ROUTES.map((tab) => {
+        const isActive = activePath === tab.path
         return (
           <button
             key={tab.label}
             className={`${styles.tab} ${isActive ? styles.active : ''}`}
-            onClick={() => onOpenHash(tab.hash)}
+            onClick={() => onNavigate(tab.path)}
             type="button"
             aria-label={tab.label}
             aria-current={isActive ? 'page' : undefined}
           >
-            <Icon name={tab.icon} size={23} />
+            <MaterialIcon name={tab.icon} size={23} />
           </button>
         )
       })}

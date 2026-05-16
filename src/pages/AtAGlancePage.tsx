@@ -1,8 +1,8 @@
 import { useEntity, useHass } from '@hakit/core'
-import { Camera as CameraIcon, ChevronLeft, CircleDot, Volume2, VolumeX } from 'lucide-react'
 import { useEffect, useRef, useState, type RefObject } from 'react'
 import type { HassEntity } from 'home-assistant-js-websocket'
 import { ClimateCard } from '../components/cards/ClimateCard'
+import { ContactSensorCard } from '../components/cards/ContactSensorCard'
 import { LightCard, MultiLightIcon } from '../components/cards/LightCard'
 import { OccupancyCard } from '../components/cards/OccupancyCard'
 import { RoomCard } from '../components/cards/RoomCard'
@@ -10,7 +10,7 @@ import { AppShell } from '../components/shell/AppShell'
 import { BottomNav } from '../components/shell/BottomNav'
 import { ActionPill } from '../components/core/ActionPill'
 import { GlassTile } from '../components/core/GlassTile'
-import { Icon } from '../components/core/Icon'
+import { Icon, MaterialIcon } from '../components/core/Icon'
 import { ModalSheet } from '../components/core/ModalSheet'
 import { Separator } from '../components/core/Separator'
 import { SectionHeader } from '../components/core/SectionHeader'
@@ -18,12 +18,13 @@ import { CameraTile } from '../components/hass/CameraTile'
 import { SecurityControls } from '../components/hass/SecurityControls'
 import { StatusRail } from '../components/hass/StatusRail'
 import { WeatherSummary } from '../components/hass/WeatherSummary'
-import { asEntityName, formatCompactEntityState, isActiveState, isOccupancyActive } from '../components/hass/entityState'
+import { asEntityName, formatCompactEntityState, isActiveState, isContactOpen, isOccupancyActive } from '../components/hass/entityState'
 import { WebRtcCamera } from '../components/hass/WebRtcCamera'
 import {
   AREA_ITEMS,
   CAMERA_ITEMS,
   CLIMATE_GROUPS,
+  CONTACT_GROUPS,
   LIGHT_GROUPS,
   OCCUPANCY_GROUPS,
   OVERVIEW_STATUS_CHIPS,
@@ -58,12 +59,16 @@ const LIGHTS_SUFFIX = ' Lights'
 const LIGHT_SUFFIX = ' Light'
 const CLIMATE_SUFFIX = ' Climate'
 const OCCUPANCY_SUFFIX = ' Occupancy'
+const CONTACT_SUFFIX = ' Contact Sensors'
 const ROOM_LIGHT_GROUPS = LIGHT_GROUPS
 const ROOM_LIGHT_ENTITY_IDS = [...new Set(ROOM_LIGHT_GROUPS.flatMap((group) => group.items.map((item) => item.entityId)))]
 const ROOM_CLIMATE_GROUPS = CLIMATE_GROUPS
 const ROOM_OCCUPANCY_GROUPS = OCCUPANCY_GROUPS
+const ROOM_CONTACT_GROUPS = CONTACT_GROUPS
+const ROOM_CONTACT_ENTITY_IDS = [...new Set(ROOM_CONTACT_GROUPS.flatMap((group) => group.items.map((item) => item.entityId)))]
 const DEFAULT_CLIMATE_COLOR = { r: 25, g: 84, b: 130 }
 const DEFAULT_OCCUPANCY_COLOR = { r: 46, g: 180, b: 120 }
+const DEFAULT_CONTACT_COLOR = { r: 220, g: 92, b: 68 }
 
 function sheetTitle(hash: string) {
   const camera = CAMERA_ITEMS.find((item) => item.hash === hash)
@@ -93,6 +98,11 @@ function occupancyRoomTitle(group: EntityGroupConfig) {
   return group.title
 }
 
+function contactRoomTitle(group: EntityGroupConfig) {
+  if (group.title.endsWith(CONTACT_SUFFIX)) return group.title.slice(0, -CONTACT_SUFFIX.length)
+  return group.title
+}
+
 function climateGroupColor(group: EntityGroupConfig) {
   return areaForTitle(climateRoomTitle(group))?.color ?? DEFAULT_CLIMATE_COLOR
 }
@@ -103,6 +113,23 @@ function climateGroupIcon(group: EntityGroupConfig) {
 
 function occupancyGroupColor(group: EntityGroupConfig) {
   return areaForTitle(occupancyRoomTitle(group))?.color ?? DEFAULT_OCCUPANCY_COLOR
+}
+
+function contactGroupColor(group: EntityGroupConfig) {
+  return areaForTitle(contactRoomTitle(group))?.color ?? DEFAULT_CONTACT_COLOR
+}
+
+function contactItemKind(item: EntityGroupConfig['items'][number]) {
+  const value = `${item.title} ${item.entityId}`.toLowerCase()
+  return value.includes('window') ? 'window' : 'door'
+}
+
+function contactGroupKind(group: EntityGroupConfig) {
+  return group.items.every((item) => contactItemKind(item) === 'window') ? 'window' : 'door'
+}
+
+function contactItemCount(item: EntityGroupConfig['items'][number]) {
+  return item.contactCount ?? 1
 }
 
 function climateItemIcon(entityId: string) {
@@ -168,6 +195,62 @@ function occupancyGroupSensorSubtitle(group: EntityGroupConfig, entities: Record
   return `${activeCount} sensor${activeCount === 1 ? '' : 's'} occupied`
 }
 
+function contactGroupOpenCount(group: EntityGroupConfig, entities: Record<string, HassEntity | undefined>) {
+  return group.items.reduce((count, item) => count + (isContactOpen(entities[item.entityId]) ? 1 : 0), 0)
+}
+
+function contactSensorActiveSubtitle(activeCount: number) {
+  return `${activeCount} Sensor${activeCount === 1 ? '' : 's'} Active`
+}
+
+function contactKindLabel(kind: ReturnType<typeof contactItemKind>, count: number) {
+  if (kind === 'window') return count === 1 ? 'Window' : 'Windows'
+  return count === 1 ? 'Door' : 'Doors'
+}
+
+function contactKindOpenSummary(kind: ReturnType<typeof contactItemKind>, openCount: number, totalCount: number) {
+  if (totalCount === 1) return `${contactKindLabel(kind, 1)} ${openCount === 1 ? 'Open' : 'Closed'}`
+  if (openCount === 0) return `All ${contactKindLabel(kind, totalCount)} Closed`
+  if (openCount === totalCount) return `All ${contactKindLabel(kind, totalCount)} Open`
+  return `${openCount} ${contactKindLabel(kind, openCount)} Open`
+}
+
+function contactGroupOpenSummary(group: EntityGroupConfig, entities: Record<string, HassEntity | undefined>) {
+  const counts = group.items.reduce(
+    (nextCounts, item) => {
+      const kind = contactItemKind(item)
+      nextCounts[kind].total += contactItemCount(item)
+      if (isContactOpen(entities[item.entityId])) nextCounts[kind].open += 1
+      return nextCounts
+    },
+    {
+      door: { open: 0, total: 0 },
+      window: { open: 0, total: 0 },
+    },
+  )
+
+  const activeKinds = (['window', 'door'] as const).filter((kind) => counts[kind].total > 0)
+
+  if (activeKinds.length === 1) {
+    const kind = activeKinds[0]
+    return contactKindOpenSummary(kind, counts[kind].open, counts[kind].total)
+  }
+
+  const openParts = activeKinds
+    .filter((kind) => counts[kind].open > 0)
+    .map((kind) => contactKindOpenSummary(kind, counts[kind].open, counts[kind].total))
+
+  return openParts.length > 0 ? openParts.join(', ') : 'All Closed'
+}
+
+function contactGroupSubtitle(group: EntityGroupConfig, entities: Record<string, HassEntity | undefined>) {
+  return contactGroupOpenSummary(group, entities)
+}
+
+function contactGroupSensorSubtitle(group: EntityGroupConfig, entities: Record<string, HassEntity | undefined>) {
+  return contactGroupOpenSummary(group, entities)
+}
+
 function dispatchWebRtcAction(eventName: 'webrtc-screenshot' | 'webrtc-mute' | 'webrtc-unmute', targetId: string) {
   window.dispatchEvent(new CustomEvent(eventName, { detail: { target_id: targetId } }))
 }
@@ -182,15 +265,23 @@ function roomTitleFromLightGroup(group: EntityGroupConfig) {
   return group.title
 }
 
-function QuickAccessTile({ item, onOpenHash }: { item: QuickAccessConfig; onOpenHash: (hash: string) => void }) {
+function QuickAccessTile({ item, onNavigate, onOpenHash }: { item: QuickAccessConfig; onNavigate: (path: string) => void; onOpenHash: (hash: string) => void }) {
   const entity = useEntity(asEntityName(item.entityId ?? 'sensor.unavailable'), { returnNullIfNotFound: true })
   const subtitle = item.status === 'entity_state' ? formatCompactEntityState(entity) : undefined
   const itemHash = item.hash
 
+  const handleClick = () => {
+    if (itemHash) {
+      onOpenHash(itemHash)
+      return
+    }
+    if (item.route) onNavigate(item.route.split('/').filter(Boolean).at(-1) ?? 'overview')
+  }
+
   return (
     <GlassTile
       icon={item.icon}
-      onClick={itemHash ? () => onOpenHash(itemHash) : undefined}
+      onClick={itemHash || item.route ? handleClick : undefined}
       subtitle={subtitle}
       title={item.title}
       tone={item.tone}
@@ -246,14 +337,14 @@ function CameraSheet({ hash }: { hash: string }) {
       </div>
       <div className={styles.cameraControls} aria-label={`${camera.title} camera controls`}>
         <ActionPill active={snapshotPulse} label="Snapshot" onClick={takeSnapshot} pulse={snapshotPulse}>
-          <CameraIcon size={24} strokeWidth={2.4} />
+          <MaterialIcon name="mdi:camera" size={24} />
         </ActionPill>
         <ActionPill active={isMuted} label={isMuted ? 'Muted' : 'Audio'} onClick={toggleMute}>
-          {isMuted ? <VolumeX size={24} strokeWidth={2.4} /> : <Volume2 size={24} strokeWidth={2.4} />}
+          <MaterialIcon name={isMuted ? 'mdi:volume-off' : 'mdi:volume-high'} size={24} />
         </ActionPill>
         {camera.recordingScriptEntityId && (
           <ActionPill active={isRecording} danger label={isRecording ? 'Recording' : 'Record'} onClick={toggleRecording} pulse={isRecording}>
-            <CircleDot size={25} strokeWidth={2.5} />
+            <MaterialIcon name="mdi:record-circle" size={25} />
           </ActionPill>
         )}
       </div>
@@ -276,7 +367,7 @@ function RoomLightOverviewCard({ group, onSelect }: { group: EntityGroupConfig; 
   return <LightCard ariaLabel={`Open ${group.title}`} entityId={entityId} onClick={() => onSelect(group)} title={roomTitleFromLightGroup(group)} />
 }
 
-function RoomLightDetailHeader({ group, onBack, onToggle }: { group: EntityGroupConfig; onBack: () => void; onToggle: (entityId: string) => void }) {
+function RoomLightDetailHeader({ group, onBack, onToggle }: { group: EntityGroupConfig; onBack?: () => void; onToggle: (entityId: string) => void }) {
   const groupToggleEntityId = group.toggleEntityId
   const groupEntity = useEntity(asEntityName(groupToggleEntityId ?? 'light.unavailable'), { returnNullIfNotFound: true })
   const groupActive = isActiveState(groupEntity)
@@ -285,9 +376,11 @@ function RoomLightDetailHeader({ group, onBack, onToggle }: { group: EntityGroup
 
   return (
     <div className={styles.roomLightHeader} style={buildStaggerStyle(30)}>
-      <button aria-label="Back to room lights" className={styles.lightBackButton} onClick={onBack} type="button">
-        <ChevronLeft size={22} strokeWidth={2.35} />
-      </button>
+      {onBack && (
+        <button aria-label="Back to room lights" className={styles.lightBackButton} onClick={onBack} type="button">
+          <MaterialIcon name="mdi:chevron-left" size={22} />
+        </button>
+      )}
       <div className={styles.roomLightTitleBlock}>
         <h3>{roomTitle} Lights</h3>
         <p>{groupState}</p>
@@ -317,14 +410,15 @@ function RoomLightDetailCards({ group, gridRef, onToggle }: { group: EntityGroup
   )
 }
 
-function LightsSheet() {
+export function LightsSheet({ directGroup }: { directGroup?: EntityGroupConfig } = {}) {
   const callService = useHass((state) => state.helpers.callService)
-  const [selectedGroup, setSelectedGroup] = useState<EntityGroupConfig | null>(null)
+  const [selectedGroup, setSelectedGroup] = useState<EntityGroupConfig | null>(directGroup ?? null)
   const [roomCardsExiting, setRoomCardsExiting] = useState(false)
   const transitionTimer = useRef<number | null>(null)
   const lightContentRef = useRef<HTMLDivElement>(null)
   const lightGridRef = useRef<HTMLDivElement>(null)
   const roomGroups = ROOM_LIGHT_GROUPS
+  const directMode = Boolean(directGroup)
 
   useScrollFade(lightContentRef, lightGridRef, [selectedGroup?.title, roomCardsExiting], { distance: 42 })
 
@@ -357,7 +451,7 @@ function LightsSheet() {
 
   return (
     <div className={styles.lightsSheet}>
-      {selectedGroup ? <RoomLightDetailHeader group={selectedGroup} onBack={showRoomOverview} onToggle={toggleEntity} /> : <RoomsHeader />}
+      {selectedGroup ? <RoomLightDetailHeader group={selectedGroup} onBack={directMode ? undefined : showRoomOverview} onToggle={toggleEntity} /> : <RoomsHeader />}
       <div className={styles.lightContent} ref={lightContentRef}>
         {selectedGroup ? (
           <RoomLightDetailCards group={selectedGroup} gridRef={lightGridRef} onToggle={toggleEntity} />
@@ -396,7 +490,7 @@ function RoomClimateOverviewCard({ group, onSelect }: { group: EntityGroupConfig
   )
 }
 
-function RoomClimateDetailHeader({ group, onBack }: { group: EntityGroupConfig; onBack: () => void }) {
+function RoomClimateDetailHeader({ group, onBack }: { group: EntityGroupConfig; onBack?: () => void }) {
   const rangeEntity = useEntity(asEntityName(group.rangeEntityId ?? 'input_text.unavailable'), { returnNullIfNotFound: true })
   const fallbackSubtitle = useHass((state) => climateGroupSubtitle(group, state.entities))
   const subtitle = normalizeClimateRangeText(rangeEntity?.state) ?? fallbackSubtitle
@@ -404,9 +498,11 @@ function RoomClimateDetailHeader({ group, onBack }: { group: EntityGroupConfig; 
 
   return (
     <div className={styles.roomClimateHeader} style={buildStaggerStyle(30)}>
-      <button aria-label="Back to room climates" className={styles.lightBackButton} onClick={onBack} type="button">
-        <ChevronLeft size={22} strokeWidth={2.35} />
-      </button>
+      {onBack && (
+        <button aria-label="Back to room climates" className={styles.lightBackButton} onClick={onBack} type="button">
+          <MaterialIcon name="mdi:chevron-left" size={22} />
+        </button>
+      )}
       <div className={styles.roomLightTitleBlock}>
         <h3>{roomTitle} Climate</h3>
         <p>{subtitle}</p>
@@ -457,13 +553,14 @@ function RoomClimateDetailCards({ group, gridRef }: { group: EntityGroupConfig; 
   )
 }
 
-function ClimateSheet() {
-  const [selectedGroup, setSelectedGroup] = useState<EntityGroupConfig | null>(null)
+export function ClimateSheet({ directGroup }: { directGroup?: EntityGroupConfig } = {}) {
+  const [selectedGroup, setSelectedGroup] = useState<EntityGroupConfig | null>(directGroup ?? null)
   const [roomCardsExiting, setRoomCardsExiting] = useState(false)
   const transitionTimer = useRef<number | null>(null)
   const climateContentRef = useRef<HTMLDivElement>(null)
   const climateGridRef = useRef<HTMLDivElement>(null)
   const roomGroups = ROOM_CLIMATE_GROUPS
+  const directMode = Boolean(directGroup)
 
   useScrollFade(climateContentRef, climateGridRef, [selectedGroup?.title, roomCardsExiting], { distance: 42 })
 
@@ -492,7 +589,7 @@ function ClimateSheet() {
 
   return (
     <div className={styles.climateSheet}>
-      {selectedGroup ? <RoomClimateDetailHeader group={selectedGroup} onBack={showRoomOverview} /> : <RoomsHeader />}
+      {selectedGroup ? <RoomClimateDetailHeader group={selectedGroup} onBack={directMode ? undefined : showRoomOverview} /> : <RoomsHeader />}
       <div className={styles.climateContent} ref={climateContentRef}>
         {selectedGroup ? (
           <RoomClimateDetailCards group={selectedGroup} gridRef={climateGridRef} />
@@ -529,15 +626,17 @@ function RoomOccupancyOverviewCard({ group, onSelect }: { group: EntityGroupConf
   )
 }
 
-function RoomOccupancyDetailHeader({ group, onBack }: { group: EntityGroupConfig; onBack: () => void }) {
+function RoomOccupancyDetailHeader({ group, onBack }: { group: EntityGroupConfig; onBack?: () => void }) {
   const subtitle = useHass((state) => occupancyGroupSensorSubtitle(group, state.entities))
   const roomTitle = occupancyRoomTitle(group)
 
   return (
     <div className={styles.roomOccupancyHeader} style={buildStaggerStyle(30)}>
-      <button aria-label="Back to room occupancy" className={styles.lightBackButton} onClick={onBack} type="button">
-        <ChevronLeft size={22} strokeWidth={2.35} />
-      </button>
+      {onBack && (
+        <button aria-label="Back to room occupancy" className={styles.lightBackButton} onClick={onBack} type="button">
+          <MaterialIcon name="mdi:chevron-left" size={22} />
+        </button>
+      )}
       <div className={styles.roomLightTitleBlock}>
         <h3>{roomTitle} Occupancy</h3>
         <p>{subtitle}</p>
@@ -563,13 +662,14 @@ function RoomOccupancyDetailCards({ group, gridRef }: { group: EntityGroupConfig
   )
 }
 
-function OccupancySheet() {
-  const [selectedGroup, setSelectedGroup] = useState<EntityGroupConfig | null>(null)
+export function OccupancySheet({ directGroup }: { directGroup?: EntityGroupConfig } = {}) {
+  const [selectedGroup, setSelectedGroup] = useState<EntityGroupConfig | null>(directGroup ?? null)
   const [roomCardsExiting, setRoomCardsExiting] = useState(false)
   const transitionTimer = useRef<number | null>(null)
   const occupancyContentRef = useRef<HTMLDivElement>(null)
   const occupancyGridRef = useRef<HTMLDivElement>(null)
   const roomGroups = ROOM_OCCUPANCY_GROUPS
+  const directMode = Boolean(directGroup)
 
   useScrollFade(occupancyContentRef, occupancyGridRef, [selectedGroup?.title, roomCardsExiting], { distance: 42 })
 
@@ -598,7 +698,7 @@ function OccupancySheet() {
 
   return (
     <div className={styles.occupancySheet}>
-      {selectedGroup ? <RoomOccupancyDetailHeader group={selectedGroup} onBack={showRoomOverview} /> : <RoomsHeader />}
+      {selectedGroup ? <RoomOccupancyDetailHeader group={selectedGroup} onBack={directMode ? undefined : showRoomOverview} /> : <RoomsHeader />}
       <div className={styles.occupancyContent} ref={occupancyContentRef}>
         {selectedGroup ? (
           <RoomOccupancyDetailCards group={selectedGroup} gridRef={occupancyGridRef} />
@@ -608,6 +708,116 @@ function OccupancySheet() {
               {roomGroups.map((group, index) => (
                 <div className={styles.roomLightCardShell} key={group.title} style={roomCardsExiting ? undefined : buildStaggerStyle(staggerMs(index, 38, 76))}>
                   <RoomOccupancyOverviewCard group={group} onSelect={selectGroup} />
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function RoomContactOverviewCard({ group, onSelect }: { group: EntityGroupConfig; onSelect: (group: EntityGroupConfig) => void }) {
+  const active = useHass((state) => contactGroupOpenCount(group, state.entities) > 0)
+  const subtitle = useHass((state) => contactGroupSubtitle(group, state.entities))
+  const roomTitle = contactRoomTitle(group)
+
+  return (
+    <ContactSensorCard
+      active={active}
+      ariaLabel={`Open ${group.title}`}
+      color={contactGroupColor(group)}
+      kind={contactGroupKind(group)}
+      onClick={() => onSelect(group)}
+      subtitle={subtitle}
+      title={roomTitle}
+    />
+  )
+}
+
+function RoomContactDetailHeader({ group, onBack }: { group: EntityGroupConfig; onBack?: () => void }) {
+  const subtitle = useHass((state) => contactGroupSensorSubtitle(group, state.entities))
+  const roomTitle = contactRoomTitle(group)
+
+  return (
+    <div className={styles.roomContactHeader} style={buildStaggerStyle(30)}>
+      {onBack && (
+        <button aria-label="Back to room contact sensors" className={styles.lightBackButton} onClick={onBack} type="button">
+          <MaterialIcon name="mdi:chevron-left" size={22} />
+        </button>
+      )}
+      <div className={styles.roomLightTitleBlock}>
+        <h3>{roomTitle} Contact Sensors</h3>
+        <p>{subtitle}</p>
+      </div>
+      <Separator className={styles.roomLightSeparator} visible={false} />
+    </div>
+  )
+}
+
+function RoomContactDetailCards({ group, gridRef }: { group: EntityGroupConfig; gridRef: RefObject<HTMLDivElement | null> }) {
+  const color = contactGroupColor(group)
+
+  return (
+    <section className={styles.roomContactDetail}>
+      <div className={styles.roomContactGrid} ref={gridRef}>
+        {group.items.map((item, index) => (
+          <div className={styles.roomLightCardShell} key={item.entityId} style={buildStaggerStyle(staggerMs(index, 42, 92))}>
+            <ContactSensorCard color={color} entityId={item.entityId} size="compact" title={item.title} />
+          </div>
+        ))}
+      </div>
+    </section>
+  )
+}
+
+export function ContactSheet({ directGroup }: { directGroup?: EntityGroupConfig } = {}) {
+  const [selectedGroup, setSelectedGroup] = useState<EntityGroupConfig | null>(directGroup ?? null)
+  const [roomCardsExiting, setRoomCardsExiting] = useState(false)
+  const transitionTimer = useRef<number | null>(null)
+  const contactContentRef = useRef<HTMLDivElement>(null)
+  const contactGridRef = useRef<HTMLDivElement>(null)
+  const roomGroups = ROOM_CONTACT_GROUPS
+  const directMode = Boolean(directGroup)
+
+  useScrollFade(contactContentRef, contactGridRef, [selectedGroup?.title, roomCardsExiting], { distance: 42 })
+
+  useEffect(() => {
+    return () => {
+      if (transitionTimer.current !== null) window.clearTimeout(transitionTimer.current)
+    }
+  }, [])
+
+  const selectGroup = (group: EntityGroupConfig) => {
+    if (transitionTimer.current !== null) window.clearTimeout(transitionTimer.current)
+    setRoomCardsExiting(true)
+    transitionTimer.current = window.setTimeout(() => {
+      setSelectedGroup(group)
+      setRoomCardsExiting(false)
+      transitionTimer.current = null
+    }, 190)
+  }
+
+  const showRoomOverview = () => {
+    if (transitionTimer.current !== null) window.clearTimeout(transitionTimer.current)
+    transitionTimer.current = null
+    setRoomCardsExiting(false)
+    setSelectedGroup(null)
+  }
+
+  return (
+    <div className={styles.contactSheet}>
+      {selectedGroup ? <RoomContactDetailHeader group={selectedGroup} onBack={directMode ? undefined : showRoomOverview} /> : <RoomsHeader />}
+      <div className={styles.contactContent} ref={contactContentRef}>
+        {selectedGroup ? (
+          <RoomContactDetailCards group={selectedGroup} gridRef={contactGridRef} />
+        ) : (
+          <section className={styles.roomContactOverview} data-exiting={roomCardsExiting}>
+            <div className={styles.roomContactGrid} ref={contactGridRef}>
+              {roomGroups.map((group, index) => (
+                <div className={styles.roomLightCardShell} key={group.title} style={roomCardsExiting ? undefined : buildStaggerStyle(staggerMs(index, 38, 76))}>
+                  <RoomContactOverviewCard group={group} onSelect={selectGroup} />
                 </div>
               ))}
             </div>
@@ -631,6 +841,10 @@ function SheetContent({ hash }: { hash: string }) {
     return <OccupancySheet />
   }
 
+  if (hash === '#contact-sensors-overview') {
+    return <ContactSheet />
+  }
+
   if (hash === '#security-system') return <SecurityControls />
 
   if (CAMERA_ITEMS.some((item) => item.hash === hash)) return <CameraSheet hash={hash} key={hash} />
@@ -638,28 +852,35 @@ function SheetContent({ hash }: { hash: string }) {
   return <p className={styles.sheetText}>This section is represented in the Home Assistant dashboard and is queued for the next recreation pass.</p>
 }
 
-export function AtAGlancePage() {
+interface AtAGlancePageProps {
+  activePath?: string
+  onNavigate?: (path: string) => void
+}
+
+export function AtAGlancePage({ activePath = 'overview', onNavigate = () => undefined }: AtAGlancePageProps) {
   const { hash, openHash, closeHash } = useHashModal()
   const activeRoomLightCount = useHass((state) =>
     ROOM_LIGHT_ENTITY_IDS.reduce((count, entityId) => count + (isActiveState(state.entities[entityId] ?? null) ? 1 : 0), 0),
   )
+  const activeContactSensorCount = useHass((state) =>
+    ROOM_CONTACT_ENTITY_IDS.reduce((count, entityId) => count + (isContactOpen(state.entities[entityId]) ? 1 : 0), 0),
+  )
   const lightStatusSubtitle = lightCountSubtitle(activeRoomLightCount)
+  const contactStatusSubtitle = contactSensorActiveSubtitle(activeContactSensorCount)
   const modalTitle = hash === '#lights-overview' ? lightsSheetTitle(activeRoomLightCount) : sheetTitle(hash)
 
-  const openOrCloseHash = (nextHash: string) => {
-    if (!nextHash) {
-      closeHash()
-      return
-    }
-    openHash(nextHash)
-  }
-
   return (
-    <AppShell bottomNav={<BottomNav activeHash={hash} onOpenHash={openOrCloseHash} />}>
+    <AppShell bottomNav={<BottomNav activePath={activePath} onNavigate={onNavigate} />}>
       <Page
         title="Home"
         onSettings={() => openHash('#settings-preview')}
-        headerQuickLinks={<StatusRail chips={OVERVIEW_STATUS_CHIPS} onOpenHash={openHash} subtitleByHash={{ '#lights-overview': lightStatusSubtitle }} />}
+        headerQuickLinks={
+          <StatusRail
+            chips={OVERVIEW_STATUS_CHIPS}
+            onOpenHash={openHash}
+            subtitleByHash={{ '#contact-sensors-overview': contactStatusSubtitle, '#lights-overview': lightStatusSubtitle }}
+          />
+        }
       >
         <div className={styles.weatherWrap} style={buildStaggerStyle(120)}>
           <WeatherSummary />
@@ -669,7 +890,7 @@ export function AtAGlancePage() {
         <section className={styles.quickGrid}>
           {QUICK_ACCESS_ITEMS.map((item, index) => (
             <div key={item.title} style={buildStaggerStyle(staggerMs(index, 42, 70))}>
-              <QuickAccessTile item={item} onOpenHash={openHash} />
+              <QuickAccessTile item={item} onNavigate={onNavigate} onOpenHash={openHash} />
             </div>
           ))}
         </section>
@@ -687,7 +908,7 @@ export function AtAGlancePage() {
         <section className={styles.areaGrid}>
           {AREA_ITEMS.map((area, index) => (
             <div key={area.title} style={buildStaggerStyle(staggerMs(index, 28, 190))}>
-              <RoomCard area={area} />
+              <RoomCard area={area} onNavigate={onNavigate} />
             </div>
           ))}
         </section>

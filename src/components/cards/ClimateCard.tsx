@@ -1,7 +1,7 @@
 import { useEntity } from '@hakit/core'
-import { AirVent, Thermometer } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { Card, type CardColor } from '../core/Card'
+import { MaterialIcon } from '../core/Icon'
 import { asEntityName, formatCompactEntityState } from '../hass/entityState'
 
 interface ClimateCardProps {
@@ -17,7 +17,6 @@ interface ClimateCardProps {
 }
 
 const CLIMATE_ICON_SIZE = 38
-const CLIMATE_ICON_STROKE = 2.08
 const DEFAULT_CLIMATE_COLOR: CardColor = { r: 128, g: 128, b: 128 }
 const VENT_CLOSED_COLOR: CardColor = { r: 128, g: 128, b: 128 }
 const VENT_OPEN_COLOR: CardColor = { r: 30, g: 136, b: 229 }
@@ -32,8 +31,8 @@ const TEMPERATURE_GRADIENT = [
 
 function iconSlot(icon: ClimateCardProps['icon']) {
   if (icon && icon !== 'temperature' && icon !== 'vent') return icon
-  if (icon === 'vent') return <AirVent absoluteStrokeWidth size={CLIMATE_ICON_SIZE} strokeWidth={CLIMATE_ICON_STROKE} />
-  return <Thermometer absoluteStrokeWidth size={CLIMATE_ICON_SIZE} strokeWidth={CLIMATE_ICON_STROKE} />
+  if (icon === 'vent') return <MaterialIcon name="mdi:fan" size={CLIMATE_ICON_SIZE} />
+  return <MaterialIcon name="mdi:thermometer" size={CLIMATE_ICON_SIZE} />
 }
 
 function truncateToOneDecimal(value: number) {
