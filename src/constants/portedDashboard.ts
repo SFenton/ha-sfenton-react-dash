@@ -43,6 +43,7 @@ export interface VacuumConfig {
   hash: string
   mapScale: number
   modeEntityId?: string
+  modeTextEntityId?: string
   passesEntityId: string
   statusFlagEntityId: string
   vacuumMapId: string
@@ -147,6 +148,7 @@ export const VACUUMS: VacuumConfig[] = [
     hash: 'music-room-robot-vacuum',
     mapScale: 2.4,
     modeEntityId: 'select.valetudo_elatedusedram_mode',
+    modeTextEntityId: 'input_text.music_room_vacuum_mode',
     passesEntityId: 'input_select.music_room_vacuum_cleaning_passes',
     statusFlagEntityId: 'sensor.valetudo_elatedusedram_status_flag',
     vacuumMapId: 'valetudo_elatedusedram',
@@ -168,9 +170,11 @@ export const VACUUMS: VacuumConfig[] = [
     fanEntityId: 'select.valetudo_politefatherlykingfisher_fan',
     hash: 'theater-room-robot-vacuum',
     mapScale: 2.4,
+    modeEntityId: 'select.valetudo_politefatherlykingfisher_mode',
     passesEntityId: 'input_select.theater_room_vacuum_cleaning_passes',
     statusFlagEntityId: 'sensor.valetudo_politefatherlykingfisher_status_flag',
     vacuumMapId: 'valetudo_politefatherlykingfisher',
+    waterEntityId: 'select.valetudo_politefatherlykingfisher_water',
     zones: [],
   },
   {
@@ -185,6 +189,7 @@ export const VACUUMS: VacuumConfig[] = [
     hash: 'main-floor-robot-vacuum',
     mapScale: 1.2,
     modeEntityId: 'select.valetudo_exaltedsneakydeer_mode',
+    modeTextEntityId: 'input_text.main_floor_vacuum_mode',
     passesEntityId: 'input_select.main_floor_vacuum_cleaning_passes',
     statusFlagEntityId: 'sensor.valetudo_exaltedsneakydeer_status_flag',
     vacuumMapId: 'valetudo_exaltedsneakydeer',

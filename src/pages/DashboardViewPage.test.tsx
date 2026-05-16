@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import { DashboardViewPage } from './DashboardViewPage'
 import { ROOM_PAGE_CONFIGS, ROOM_PAGE_ORDER } from '../constants/roomPages'
 import { mockCallServiceCalls, mockEntities, resetMockHass } from '../test/mocks/hakitCoreState'
@@ -10,6 +10,16 @@ describe('DashboardViewPage', () => {
     mockEntities['select.living_room_air_purifier_fan_mode'].state = 'Auto'
     mockEntities['select.living_room_air_purifier_auto_mode'].state = 'Default'
     mockEntities['fan.living_room_air_purifier_levoit_purifier'].attributes.percentage = 33
+    mockEntities['vacuum.valetudo_exaltedsneakydeer'].state = 'docked'
+    mockEntities['sensor.valetudo_exaltedsneakydeer_status_flag'].state = 'ready'
+    mockEntities['sensor.valetudo_exaltedsneakydeer_error'].state = 'No error'
+    mockEntities['input_text.main_floor_vacuum_error_message'].state = ''
+    mockEntities['input_text.main_floor_vacuum_mode'].state = 'Vacuum'
+    mockEntities['select.valetudo_exaltedsneakydeer_mode'].state = 'vacuum'
+    mockEntities['select.valetudo_exaltedsneakydeer_fan'].state = 'balanced'
+    mockEntities['select.valetudo_exaltedsneakydeer_water'].state = 'medium'
+    mockEntities['input_select.main_floor_vacuum_cleaning_passes'].state = '1'
+    mockEntities['input_boolean.roborock_living_room_toggle'].state = 'off'
   })
 
   it('renders a statically ported room page from React-owned config', () => {
@@ -111,9 +121,88 @@ describe('DashboardViewPage', () => {
 
     expect(await screen.findByRole('dialog')).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Living Room: Robot Vacuum' })).toBeInTheDocument()
-    expect(screen.getByText('Main Floor Robot Vacuum')).toBeInTheDocument()
+    expect(screen.queryByText('Main Floor Robot Vacuum')).not.toBeInTheDocument()
+    expect(screen.getByRole('region', { name: 'Main Floor Valetudo map' })).toBeInTheDocument()
+    expect(screen.queryByText('No error')).not.toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Vacuum Controls' })).toBeInTheDocument()
     expect(screen.getByText('Power Settings')).toBeInTheDocument()
+    expect(screen.getByRole('group', { name: 'Power Settings' })).toBeInTheDocument()
+    const dockedGroup = screen.getByRole('group', { name: 'Docked' })
+    expect(dockedGroup).toBeInTheDocument()
+    expect(within(dockedGroup).queryByRole('button', { name: 'Empty Dock' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('group', { name: 'Mode options' })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /Mode Vacuum/i }))
+    const modePicker = await screen.findByRole('dialog', { name: 'Mode' })
+    expect(within(modePicker).getByRole('button', { name: 'Vacuum' })).toHaveAttribute('aria-pressed', 'true')
+    fireEvent.click(within(modePicker).getByRole('button', { name: 'Close' }))
+    fireEvent.click(screen.getByRole('button', { name: /Fan Balanced/i }))
+    const fanPicker = await screen.findByRole('dialog', { name: 'Fan' })
+    expect(within(fanPicker).getByRole('button', { name: 'Balanced' })).toHaveAttribute('aria-pressed', 'true')
+    fireEvent.click(within(fanPicker).getByRole('button', { name: 'Close' }))
+    expect(screen.getByRole('heading', { name: 'Docked' })).toBeInTheDocument()
+    const cleaningPassesButton = screen.getByRole('button', { name: /Cleaning Passes 1/i })
+    expect(cleaningPassesButton).toHaveAttribute('data-has-icon', 'false')
+    fireEvent.click(cleaningPassesButton)
+    const passesPicker = await screen.findByRole('dialog', { name: 'Cleaning Passes' })
+    expect(within(passesPicker).getByRole('button', { name: '1' })).toHaveAttribute('aria-pressed', 'true')
+    fireEvent.click(within(passesPicker).getByRole('button', { name: 'Close' }))
+    expect(screen.getByRole('button', { name: 'Clean' })).toHaveAttribute('data-icon', 'mdi:play')
+    const zonesHeading = screen.getByRole('heading', { name: 'Zones' })
+    const emptyDockHeading = screen.getByRole('heading', { name: 'Empty Dock' })
+    expect(zonesHeading.compareDocumentPosition(emptyDockHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Empty Dock' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /living room/i })).toBeInTheDocument()
+  })
+
+  it('runs source-derived vacuum modal services without activating hidden actions', async () => {
+    render(<DashboardViewPage activePath="living-room" onNavigate={() => undefined} path="living-room" />)
+
+    fireEvent.click(screen.getByRole('button', { name: /Robot Vacuum Docked/i }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Locate' }))
+    fireEvent.click(screen.getByRole('button', { name: /Fan Balanced/i }))
+    fireEvent.click(within(await screen.findByRole('dialog', { name: 'Fan' })).getByRole('button', { name: 'Turbo' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Clean' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Empty Dock' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Living Room' }))
+
+    expect(mockCallServiceCalls).toEqual([
+      { domain: 'vacuum', service: 'locate', target: 'vacuum.valetudo_exaltedsneakydeer' },
+      { domain: 'select', service: 'select_option', target: 'select.valetudo_exaltedsneakydeer_fan', serviceData: { option: 'turbo' } },
+      { domain: 'script', service: 'main_floor_vacuum_clean_selected_segments', target: undefined },
+      { domain: 'button', service: 'press', target: 'button.valetudo_exaltedsneakydeer_trigger_auto_empty_dock' },
+      { domain: 'input_boolean', service: 'toggle', target: 'input_boolean.roborock_living_room_toggle' },
+    ])
+  })
+
+  it('keeps mapped vacuum error text visible in the modal status area', async () => {
+    mockEntities['vacuum.valetudo_exaltedsneakydeer'].state = 'error'
+    mockEntities['sensor.valetudo_exaltedsneakydeer_error'].state = 'Brush stuck'
+    mockEntities['input_text.main_floor_vacuum_error_message'].state = 'Main brush is stuck under the sofa'
+    render(<DashboardViewPage activePath="living-room" onNavigate={() => undefined} path="living-room" />)
+
+    fireEvent.click(screen.getByRole('button', { name: /Robot Vacuum Error/i }))
+
+    const errorMessage = await screen.findByRole('alert')
+    expect(within(errorMessage).getByText('Main brush is stuck under the sofa')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Stop' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Dock' })).toBeInTheDocument()
+  })
+
+  it('opens Theater Room vacuum with map and full Valetudo power controls', async () => {
+    render(<DashboardViewPage activePath="theater-room" onNavigate={() => undefined} path="theater-room" />)
+
+    fireEvent.click(screen.getByRole('button', { name: /Robot Vacuum Docked/i }))
+
+    expect(await screen.findByRole('dialog')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Theater Room: Robot Vacuum' })).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: 'Theater Room Valetudo map' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /Mode Vacuum/i }))
+    const theaterModePicker = await screen.findByRole('dialog', { name: 'Mode' })
+    expect(within(theaterModePicker).getByRole('button', { name: 'Vacuum' })).toHaveAttribute('aria-pressed', 'true')
+    fireEvent.click(within(theaterModePicker).getByRole('button', { name: 'Close' }))
+    fireEvent.click(screen.getByRole('button', { name: /Fan Balanced/i }))
+    expect(within(await screen.findByRole('dialog', { name: 'Fan' })).getByRole('button', { name: 'Balanced' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.queryByText(/Entity not available/i)).not.toBeInTheDocument()
   })
 
   it('matches Kitchen section order and dishwasher subtitle', () => {
@@ -198,8 +287,12 @@ describe('DashboardViewPage', () => {
 
     expect(await screen.findByRole('dialog')).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Main Floor Robot Vacuum' })).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: 'Main Floor Valetudo map' })).toBeInTheDocument()
+    expect(screen.queryByText('No error')).not.toBeInTheDocument()
     expect(screen.getByText('Power Settings')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /clean/i })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /Fan Balanced/i }))
+    expect(within(await screen.findByRole('dialog', { name: 'Fan' })).getByRole('button', { name: 'Balanced' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: 'Clean' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /living room/i })).toBeInTheDocument()
   })
 })

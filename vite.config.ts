@@ -21,6 +21,21 @@ export default defineConfig(({ mode }) => {
     server: {
       host: '0.0.0.0',
       proxy: {
+        '/assets/valetudo': {
+          target: hassTarget,
+          changeOrigin: true,
+          secure: false,
+        },
+        '/api': {
+          target: hassTarget,
+          changeOrigin: true,
+          secure: false,
+        },
+        '/hacsfiles': {
+          target: hassTarget,
+          changeOrigin: true,
+          secure: false,
+        },
         '/webrtc': {
           target: hassTarget,
           changeOrigin: true,

@@ -1,187 +1,339 @@
 .modalBody {
   display: grid;
-  gap: 14px;
+  gap: 16px;
   padding-top: 2px;
 }
 
-.separator {
+.mapStage {
+  position: relative;
+  min-width: 0;
+}
+
+.locateButton {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  z-index: 5;
+  min-height: 40px;
+  border-radius: 15px;
+  padding: 0 11px;
+  background: rgba(25, 36, 54, 0.76);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.statusPanel {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.errorMessage {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: 22px minmax(0, 1fr);
+  align-items: start;
+  gap: 7px;
+  padding: 0 3px;
+  color: rgb(255, 95, 87);
+  font-size: 0.78rem;
+  font-weight: 780;
+  line-height: 1.25;
+}
+
+.errorMessage > svg {
+  margin-top: 0;
+}
+
+.errorMessage > span {
+  padding-top: 2px;
+}
+
+.section {
+  display: grid;
+  gap: 10px;
+}
+
+.controlStack {
+  display: grid;
+  gap: 10px;
+}
+
+.sectionHeader {
   display: flex;
   align-items: center;
   gap: 10px;
-  color: white;
-  font-size: 0.9rem;
+  padding: 2px 2px 0;
+}
+
+.sectionHeader h3 {
+  flex: 0 0 auto;
+  margin: 0;
+  color: var(--color-text);
+  font-size: 0.86rem;
   font-weight: 820;
   letter-spacing: 0;
 }
 
-.separator::after {
+.sectionHeader span {
   flex: 1 1 auto;
   height: 1px;
-  background: rgba(255, 255, 255, 0.12);
-  content: '';
+  border-radius: var(--radius-pill);
+  background: linear-gradient(to right, rgba(255, 255, 255, 0.28), rgba(255, 255, 255, 0.07));
 }
 
-.mapShell {
-  position: relative;
-  min-height: 260px;
-  overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  border-radius: 26px;
-  background:
-    radial-gradient(circle at 44% 40%, rgba(255, 255, 255, 0.16), transparent 30%),
-    linear-gradient(135deg, rgba(54, 74, 93, 0.72), rgba(20, 30, 45, 0.66));
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14), var(--shadow-glass);
-}
-
-.mapShell::before {
-  position: absolute;
-  inset: 22px;
-  border: 2px solid rgba(255, 255, 255, 0.42);
-  border-radius: 20px 20px 36px 18px;
-  clip-path: polygon(0 0, 68% 0, 68% 30%, 100% 30%, 100% 100%, 0 100%);
-  content: '';
-}
-
-.mapShell::after {
-  position: absolute;
-  inset: 50px 44px 72px 78px;
-  border: 1px solid rgba(255, 255, 255, 0.34);
-  border-width: 0 1px 1px 0;
-  content: '';
-}
-
-.mapMeta {
-  position: absolute;
-  right: 16px;
-  bottom: 14px;
-  left: 16px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  color: rgba(255, 255, 255, 0.78);
-  font-size: 0.72rem;
-  font-weight: 720;
-}
-
-.mapBadge {
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  border-radius: 999px;
-  padding: 7px 10px;
-  background: rgba(255, 255, 255, 0.1);
-}
-
-.mapRooms {
-  position: absolute;
-  inset: 34px 22px 58px;
+.settingGrid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
-  align-content: center;
-  transform: scale(var(--map-scale, 1));
-  transform-origin: center;
 }
 
-.mapRoom {
-  min-height: 54px;
-  border: 1px solid rgba(255, 255, 255, 0.22);
-  border-radius: 16px;
-  color: rgba(255, 255, 255, 0.8);
-  background: rgba(255, 255, 255, 0.08);
-  font-size: 0.68rem;
-  font-weight: 760;
+.actionGrid {
   display: grid;
-  place-items: center;
-  text-align: center;
-}
-
-.reviewNotice {
-  border: 1px solid rgba(248, 223, 157, 0.3);
-  border-radius: 18px;
-  padding: 12px;
-  color: #f8df9d;
-  background: rgba(161, 111, 20, 0.16);
-  font-size: 0.78rem;
-  font-weight: 760;
-  line-height: 1.35;
-}
-
-.controlCard {
-  display: grid;
-  gap: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  border-radius: 24px;
-  padding: 14px;
-  color: white;
-  background: rgba(255, 255, 255, 0.11);
-  box-shadow: var(--shadow-glass);
-}
-
-.controlHeader {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.controlTitle {
-  display: grid;
-  gap: 3px;
-}
-
-.controlTitle strong {
-  font-size: 0.9rem;
-  font-weight: 820;
-}
-
-.controlTitle span {
-  color: rgba(255, 255, 255, 0.72);
-  font-size: 0.74rem;
-  font-weight: 720;
-}
-
-.buttonRow {
-  display: flex;
-  flex-wrap: wrap;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
 }
 
 .actionButton,
-.infoPill,
+.settingPill,
+.subInfoPill,
+.subSelectButton,
 .zoneButton {
+  min-width: 0;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: white;
+  background: rgba(255, 255, 255, 0.1);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  font: inherit;
+}
+
+.actionButton {
   display: inline-flex;
-  min-height: 38px;
+  min-height: 48px;
   align-items: center;
   justify-content: center;
-  gap: 7px;
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  border-radius: 999px;
-  color: white;
-  background: rgba(255, 255, 255, 0.12);
-  font: inherit;
-  font-size: 0.76rem;
+  gap: 8px;
+  border-radius: 18px;
+  padding: 0 12px;
+  cursor: pointer;
+  font-size: 0.78rem;
   font-weight: 820;
 }
 
-.actionButton,
-.zoneButton {
-  cursor: pointer;
+.actionButton[data-tone='primary'] {
+  background: rgba(67, 160, 71, 0.48);
+}
+
+.actionButton[data-tone='warning'] {
+  background: rgba(251, 140, 0, 0.4);
+}
+
+.actionButton[data-tone='danger'] {
+  background: rgba(229, 57, 53, 0.46);
 }
 
 .actionButton:active,
+.subSelectButton:active,
 .zoneButton:active {
-  transform: scale(0.96);
+  transform: scale(0.965);
 }
 
-.actionButton:disabled,
-.zoneButton:disabled {
-  cursor: default;
-  opacity: 0.58;
+.actionButton[data-variant='sub'] {
+  min-height: 44px;
+  border-radius: 15px;
+  padding: 0 10px;
+  font-size: 0.72rem;
 }
 
-.infoPill {
-  color: rgba(255, 255, 255, 0.78);
-  cursor: default;
+.compositeButton {
+  display: grid;
+  gap: 11px;
+  min-width: 0;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 22px;
+  padding: 12px;
+  color: white;
+  background: rgba(255, 255, 255, 0.1);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+
+.compositeHeader {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+}
+
+.compositeIcon {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.compositeText {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.compositeText h3 {
+  margin: 0;
+  color: var(--color-text);
+  font-size: 0.86rem;
+  font-weight: 840;
+  letter-spacing: 0;
+  line-height: 1.08;
+}
+
+.compositeText > span {
+  overflow: hidden;
+  color: rgba(232, 240, 255, 0.62);
+  font-size: 0.68rem;
+  font-weight: 760;
+  line-height: 1.08;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.compositeControls {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(86px, 1fr));
+  gap: 8px;
+}
+
+.compositeControls > * {
+  width: 100%;
+  min-width: 0;
+}
+
+.singleAction {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.singleAction .actionButton {
+  min-height: 58px;
+}
+
+.settingPill {
+  display: grid;
+  min-height: 58px;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 9px;
+  border-radius: 18px;
+  padding: 9px 10px;
+}
+
+.settingButton {
+  width: 100%;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  cursor: pointer;
+  text-align: left;
+}
+
+.settingButton:active {
+  transform: scale(0.975);
+}
+
+.settingIcon,
+.settingPill > svg {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.settingText {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.settingText span {
+  color: rgba(232, 240, 255, 0.62);
+  font-size: 0.68rem;
+  font-weight: 760;
+  line-height: 1.05;
+}
+
+.settingText strong {
+  overflow: hidden;
+  color: rgba(255, 255, 255, 0.95);
+  font-size: 0.8rem;
+  font-weight: 840;
+  line-height: 1.12;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settingChevron {
+  display: grid;
+  width: 24px;
+  height: 24px;
+  place-items: center;
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.subInfoPill,
+.subSelectButton {
+  display: grid;
+  min-height: 44px;
+  align-items: center;
+  border-radius: 15px;
+  padding: 7px 8px;
+}
+
+.subSelectButton {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 7px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.subSelectButton[data-has-icon='false'] {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.subInfoPill {
+  gap: 2px;
+}
+
+.subSelectText,
+.subInfoPill {
+  min-width: 0;
+}
+
+.subSelectText {
+  display: grid;
+  gap: 2px;
+}
+
+.subSelectText span,
+.subInfoPill span {
+  overflow: hidden;
+  color: rgba(232, 240, 255, 0.62);
+  font-size: 0.6rem;
+  font-weight: 760;
+  line-height: 1.02;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.subSelectText strong,
+.subInfoPill strong {
+  overflow: hidden;
+  color: rgba(255, 255, 255, 0.95);
+  font-size: 0.7rem;
+  font-weight: 840;
+  line-height: 1.08;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .zones {
@@ -191,26 +343,36 @@
 }
 
 .zoneButton {
-  min-height: 48px;
+  display: inline-flex;
+  min-height: 58px;
+  align-items: center;
+  justify-content: center;
   border-radius: 18px;
   padding: 0 10px;
+  cursor: pointer;
+  font-size: 0.76rem;
+  font-weight: 820;
+  line-height: 1.1;
   text-align: center;
 }
 
 .zoneButton[data-active='true'] {
-  background: rgba(67, 160, 71, 0.48);
+  background: rgba(67, 160, 71, 0.5);
 }
 
-.instructions {
-  margin: -4px 0 0;
-  color: rgba(255, 255, 255, 0.72);
-  font-size: 0.76rem;
-  font-weight: 700;
-  line-height: 1.42;
+.zoneButton:disabled {
+  cursor: default;
+  opacity: 0.52;
 }
 
-.errorText {
-  color: #ffdad6;
-  font-size: 0.88rem;
-  font-weight: 820;
+@media (max-width: 420px) {
+  .statusPanel {
+    grid-template-columns: 1fr;
+  }
+
+  .settingGrid,
+  .actionGrid,
+  .zones {
+    grid-template-columns: 1fr;
+  }
 }
