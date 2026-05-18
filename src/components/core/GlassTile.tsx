@@ -7,6 +7,7 @@ export type TileTone = 'air' | 'climate' | 'contact' | 'light' | 'media' | 'neut
 interface GlassTileProps {
   title: string
   icon: IconKey | string
+  iconColor?: string
   subtitle?: string
   tone?: TileTone
   compact?: boolean
@@ -18,6 +19,7 @@ interface GlassTileProps {
 export function GlassTile({
   title,
   icon,
+  iconColor,
   subtitle,
   tone = 'neutral',
   compact = false,
@@ -39,7 +41,7 @@ export function GlassTile({
 
   const content = (
     <span className={styles.content}>
-      <span className={styles.icon} aria-hidden="true">
+      <span aria-hidden="true" className={styles.icon} style={iconColor ? { color: iconColor } : undefined}>
         <Icon name={icon} size={iconSize} />
       </span>
       <span className={styles.labelGroup}>
@@ -51,11 +53,15 @@ export function GlassTile({
 
   if (onClick) {
     return (
-      <button className={className} onClick={onClick} type="button">
+      <button className={className} data-icon={icon} data-icon-color={iconColor} onClick={onClick} type="button">
         {content}
       </button>
     )
   }
 
-  return <div className={className}>{content}</div>
+  return (
+    <div className={className} data-icon={icon} data-icon-color={iconColor}>
+      {content}
+    </div>
+  )
 }

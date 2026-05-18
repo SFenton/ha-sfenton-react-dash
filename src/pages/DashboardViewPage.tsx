@@ -7,10 +7,9 @@ import { OccupancyCard } from '../components/cards/OccupancyCard'
 import { AppShell } from '../components/shell/AppShell'
 import { BottomNav } from '../components/shell/BottomNav'
 import { EntityActionCard } from '../components/hass/EntityActionCard'
-import { SecurityControls } from '../components/hass/SecurityControls'
+import { SecurityDashboard } from '../components/hass/SecurityDashboard'
 import { StatusRail, type StatusRailChip } from '../components/hass/StatusRail'
 import { TodoListPanel } from '../components/hass/TodoListPanel'
-import { CameraTile } from '../components/hass/CameraTile'
 import { VacuumCard, VacuumModalContent } from '../components/hass/VacuumCard'
 import { AirQualityModalContent } from '../components/hass/AirQualityModalContent'
 import { GrillModalContent } from '../components/hass/GrillModalContent'
@@ -22,7 +21,6 @@ import { SectionHeader } from '../components/core/SectionHeader'
 import { asEntityName, formatCompactEntityState, isActiveState } from '../components/hass/entityState'
 import {
   AREA_ITEMS,
-  CAMERA_ITEMS,
   CLIMATE_GROUPS,
   CONTACT_GROUPS,
   LIGHT_GROUPS,
@@ -37,7 +35,6 @@ import {
   NEUTRAL_COLOR,
   MEDIA_SECTIONS,
   ROOM_EXTRA_SECTIONS,
-  SECURITY_SECTIONS,
   THERMOSTAT_ROOMS,
   TODO_PAGES,
   UNAVAILABLE_COLOR,
@@ -511,24 +508,8 @@ function VacuumPage() {
   )
 }
 
-function SecurityPage({ onNavigate }: { onNavigate: (path: string) => void }) {
-  return (
-    <div className={styles.stack}>
-      <section className={styles.section}>
-        <SectionHeader title="Security System" />
-        <SecurityControls />
-      </section>
-      <section className={styles.section}>
-        <SectionHeader title="Cameras" />
-        <div className={styles.cameraGrid}>
-          {CAMERA_ITEMS.map((camera) => (
-            <CameraTile camera={camera} key={camera.entityId} onOpen={() => undefined} />
-          ))}
-        </div>
-      </section>
-      <EntitySections onNavigate={onNavigate} sections={SECURITY_SECTIONS} />
-    </div>
-  )
+function SecurityPage() {
+  return <SecurityDashboard />
 }
 
 function MediaPage({ onNavigate }: { onNavigate: (path: string) => void }) {
@@ -584,7 +565,7 @@ function Content({ onNavigate, path }: { onNavigate: (path: string) => void; pat
   const roomTitle = roomNameFromPath(path)
   if (roomTitle) return <RoomPage onNavigate={onNavigate} path={path} title={roomTitle} />
   if (TODO_PAGES[path]) return <TodoPage path={path} />
-  if (path === 'security') return <SecurityPage onNavigate={onNavigate} />
+  if (path === 'security') return <SecurityPage />
   if (path === 'vacuums') return <VacuumPage />
   if (path === 'media') return <MediaPage onNavigate={onNavigate} />
   if (path === 'ecobee') return <ThermostatPage onNavigate={onNavigate} />

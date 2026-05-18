@@ -1,0 +1,58 @@
+.dashboard {
+  display: grid;
+  gap: 20px;
+}
+
+.section {
+  display: grid;
+  gap: 10px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.cameraGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.modalStack {
+  display: grid;
+  gap: 18px;
+  padding-top: 2px;
+}
+
+.contactGroup {
+  display: grid;
+  gap: 10px;
+}
+
+.contactHeading {
+  margin: 0 2px;
+  color: var(--color-text);
+  font-size: 0.86rem;
+  font-weight: 800;
+  letter-spacing: 0;
+}
+
+.contactGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.statusRailWrap {
+  min-width: 0;
+}
+
+@media (max-width: 390px) {
+  .grid,
+  .cameraGrid,
+  .contactGrid {
+    gap: 8px;
+  }
+}

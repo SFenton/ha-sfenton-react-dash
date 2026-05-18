@@ -8,7 +8,7 @@ import styles from './StatusRail.module.css'
 export interface StatusRailChip extends Omit<StatusChipConfig, 'hash' | 'icon' | 'tone'> {
   hash?: string
   icon: StatusChipConfig['icon'] | string
-  stateKind?: 'contact' | 'presence'
+  stateKind?: 'contact' | 'presence' | 'security'
   tone: TileTone
 }
 
@@ -18,22 +18,36 @@ interface StatusRailProps {
   subtitleByHash?: Partial<Record<string, string>>
 }
 
+const SECURITY_STATE_META: Record<string, { color: string; icon: string }> = {
+  disarmed: { color: 'rgb(67, 160, 71)', icon: 'mdi:shield-off' },
+  armed_home: { color: 'rgb(30, 136, 229)', icon: 'mdi:shield-home' },
+  armed_night: { color: 'rgb(142, 36, 170)', icon: 'mdi:shield-moon' },
+  armed_away: { color: 'rgb(229, 57, 53)', icon: 'mdi:shield' },
+  triggered: { color: 'rgb(229, 57, 53)', icon: 'mdi:shield-alert' },
+}
+
+function securityStateMeta(state: string | undefined) {
+  return (state && SECURITY_STATE_META[state]) || { color: 'rgb(84, 110, 122)', icon: 'mdi:shield-outline' }
+}
+
 function StatusChip({ chip, onOpenHash, subtitleOverride }: { chip: StatusRailChip; onOpenHash: (hash: string) => void; subtitleOverride?: string }) {
   const entity = useEntity(asEntityName(chip.entityId), { returnNullIfNotFound: true })
   const secondaryEntity = useEntity(asEntityName(chip.secondaryEntityId ?? chip.entityId), { returnNullIfNotFound: true })
-  const stateKind = chip.stateKind ?? chip.icon
+  const stateKind = chip.stateKind ?? (chip.tone === 'security' ? 'security' : chip.icon)
   let primaryState = stateKind === 'presence' ? formatOccupancyEntityState(entity) : stateKind === 'contact' ? formatContactEntityState(entity) : formatCompactEntityState(entity)
   if (stateKind === 'contact' && !isContactOpen(entity) && chip.title.endsWith('s')) primaryState = 'All Closed'
   const secondaryState = chip.secondaryEntityId ? formatCompactEntityState(secondaryEntity) : null
   const subtitle = subtitleOverride ?? (secondaryState ? `${primaryState} / ${secondaryState}` : primaryState)
-  const isOff = !isActiveState(entity) && !chip.secondaryEntityId
-  const icon = stateKind === 'presence' && isOff ? 'presence-off' : stateKind === 'contact' && isContactOpen(entity) ? 'contact-open' : chip.icon
+  const isOff = stateKind === 'security' ? false : !isActiveState(entity) && !chip.secondaryEntityId
+  const securityMeta = stateKind === 'security' ? securityStateMeta(entity?.state) : null
+  const icon = securityMeta?.icon ?? (stateKind === 'presence' && isOff ? 'presence-off' : stateKind === 'contact' && isContactOpen(entity) ? 'contact-open' : chip.icon)
 
   return (
     <div className={styles.chip} style={{ '--chip-width': `${chip.width ?? 150}px` } as CSSProperties}>
       <GlassTile
         compact
         icon={icon}
+        iconColor={securityMeta?.color}
         isOff={isOff}
         onClick={chip.hash ? () => onOpenHash(chip.hash as string) : undefined}
         subtitle={subtitle}

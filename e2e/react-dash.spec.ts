@@ -86,6 +86,40 @@ test('room media cards open ported remote modals', async ({ page }) => {
   await expect(page.getByRole('button', { name: /Projector Off/i })).toBeVisible()
 })
 
+test('security page opens ported security, contact, and camera modals', async ({ page }) => {
+  await page.goto('/at-a-glance/security')
+
+  await expect(page.getByRole('heading', { level: 1, name: 'Security' })).toBeVisible()
+  await expect(page.getByRole('button', { name: /Security System Armed Home/i })).toBeVisible()
+  await expect(page.getByRole('button', { name: /Front Door Locked/i })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Cameras' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Open Front Door camera' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Mach-E' })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: /Doors Locked/i })).toHaveCount(0)
+
+  await page.getByRole('button', { name: /Security System Armed Home/i }).click()
+  await expect(page.getByRole('dialog')).toBeVisible()
+  await expect(page.getByRole('heading', { level: 2, name: 'Security System' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Set security system to Away' })).toBeVisible()
+  await page.getByRole('button', { name: 'Close' }).click()
+
+  await page.getByRole('button', { name: /Contact Sensors\s*All Closed/i }).click()
+  await expect(page.getByRole('dialog')).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Rooms' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Open Entryway Contact Sensors' })).toBeVisible()
+  await page.getByRole('button', { name: 'Open Office Contact Sensors' }).click()
+  await expect(page.getByRole('heading', { name: 'Office Contact Sensors' })).toBeVisible()
+  await expect(page.getByLabel('PC Window Closed')).toBeVisible()
+  await page.getByRole('button', { name: 'Close' }).click()
+
+  await page.getByRole('button', { name: 'Open Front Door camera' }).click()
+  await expect(page.getByRole('dialog')).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Front Door Camera' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Snapshot' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Muted' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Record' })).toBeVisible()
+})
+
 test('room vacuum cards open reusable vacuum modal controls', async ({ page }) => {
   await page.goto('/at-a-glance/living-room')
 

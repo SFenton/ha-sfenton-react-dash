@@ -1,0 +1,19 @@
+.cameraSheet {
+  display: grid;
+  gap: 14px;
+  padding-top: 4px;
+}
+
+.cameraFocus {
+  overflow: hidden;
+  border-radius: 28px;
+  background: rgba(0, 0, 0, 0.28);
+}
+
+.cameraControls {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  justify-content: center;
+  gap: 10px;
+  padding: 28px 6px 6px;
+}

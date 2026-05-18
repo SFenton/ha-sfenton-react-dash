@@ -8,6 +8,9 @@ describe('DashboardViewPage', () => {
   beforeEach(() => {
     window.history.replaceState(null, '', window.location.pathname)
     resetMockHass()
+    mockEntities['alarm_control_panel.aqara_hub_m3_0056_security_system_2'].state = 'armed_home'
+    mockEntities['binary_sensor.all_contact_sensors'].state = 'off'
+    mockEntities['binary_sensor.contact_sensors'].state = 'off'
     mockEntities['select.living_room_air_purifier_fan_mode'].state = 'Auto'
     mockEntities['select.living_room_air_purifier_auto_mode'].state = 'Default'
     mockEntities['fan.living_room_air_purifier_levoit_purifier'].attributes.percentage = 33
@@ -28,6 +31,10 @@ describe('DashboardViewPage', () => {
     mockEntities['media_player.theater_room_shield'].state = 'off'
     mockEntities['media_player.theater'].state = 'off'
     mockEntities['media_player.sony_projector'].state = 'off'
+    mockEntities['cover.left_door'].state = 'closed'
+    mockEntities['cover.right_door'].state = 'closed'
+    mockEntities['lock.aqara_smart_lock_u100'].state = 'locked'
+    mockEntities['lock.fordpass_3fmtk3su5mma09266_doorlock'].state = 'locked'
   })
 
   it('renders a statically ported room page from React-owned config', () => {
@@ -386,6 +393,142 @@ describe('DashboardViewPage', () => {
     expect(screen.getByRole('heading', { name: 'Office PCs' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Stephen's PC Off/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Steph's PC Off/i })).toBeInTheDocument()
+  })
+
+  it('ports the Security page visible YAML sections and controls', () => {
+    render(<DashboardViewPage activePath="security" onNavigate={() => undefined} path="security" />)
+
+    expect(screen.getAllByRole('heading', { name: 'Security' }).length).toBeGreaterThanOrEqual(2)
+    expect(screen.getByRole('button', { name: /Security\s*Armed Home/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Security\s*Armed Home/i })).toHaveAttribute('data-icon', 'mdi:shield-home')
+    expect(screen.getByRole('button', { name: /Security\s*Armed Home/i })).toHaveAttribute('data-icon-color', 'rgb(30, 136, 229)')
+    expect(screen.getByRole('button', { name: /Contact Sensors\s*All Closed/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Contact Sensors\s*All Closed/i })).toHaveAttribute('data-icon', 'contact')
+    expect(screen.getByRole('button', { name: /Security System Armed Home/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Front Door Locked/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Left Door Closed/i })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Cameras' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Open Front Door camera' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Mach-E' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Doors Locked/i })).not.toBeInTheDocument()
+    expect(screen.queryByText(/manual review/i)).not.toBeInTheDocument()
+  })
+
+  it('reflects alarm state in the Security header chip', () => {
+    mockEntities['alarm_control_panel.aqara_hub_m3_0056_security_system_2'].state = 'disarmed'
+    const disarmedView = render(<DashboardViewPage activePath="security" onNavigate={() => undefined} path="security" />)
+
+    expect(screen.getByRole('button', { name: /Security\s*Disarmed/i })).toHaveAttribute('data-icon', 'mdi:shield-off')
+    expect(screen.getByRole('button', { name: /Security\s*Disarmed/i })).toHaveAttribute('data-icon-color', 'rgb(67, 160, 71)')
+    disarmedView.unmount()
+
+    mockEntities['alarm_control_panel.aqara_hub_m3_0056_security_system_2'].state = 'armed_away'
+    const awayView = render(<DashboardViewPage activePath="security" onNavigate={() => undefined} path="security" />)
+
+    expect(screen.getByRole('button', { name: /Security\s*Armed Away/i })).toHaveAttribute('data-icon', 'mdi:shield')
+    expect(screen.getByRole('button', { name: /Security\s*Armed Away/i })).toHaveAttribute('data-icon-color', 'rgb(229, 57, 53)')
+    awayView.unmount()
+
+    mockEntities['alarm_control_panel.aqara_hub_m3_0056_security_system_2'].state = 'armed_night'
+    render(<DashboardViewPage activePath="security" onNavigate={() => undefined} path="security" />)
+
+    expect(screen.getByRole('button', { name: /Security\s*Armed Night/i })).toHaveAttribute('data-icon', 'mdi:shield-moon')
+    expect(screen.getByRole('button', { name: /Security\s*Armed Night/i })).toHaveAttribute('data-icon-color', 'rgb(142, 36, 170)')
+  })
+
+  it('matches HASS Security garage door colors for closed, open, and closing states', () => {
+    const closedView = render(<DashboardViewPage activePath="security" onNavigate={() => undefined} path="security" />)
+
+    expect(screen.getByRole('button', { name: /Left Door Closed/i })).toHaveStyle('--card-rgb: 67 160 71')
+    expect(screen.getByRole('button', { name: /Left Door Closed/i })).toHaveAttribute('data-muted', 'false')
+    expect(screen.getByRole('button', { name: /Right Door Closed/i })).toHaveStyle('--card-rgb: 67 160 71')
+    expect(screen.getByRole('button', { name: /Right Door Closed/i })).toHaveAttribute('data-muted', 'false')
+    closedView.unmount()
+
+    mockEntities['cover.left_door'].state = 'open'
+    mockEntities['cover.right_door'].state = 'open'
+    const openView = render(<DashboardViewPage activePath="security" onNavigate={() => undefined} path="security" />)
+
+    expect(screen.getByRole('button', { name: /Left Door Open/i })).toHaveStyle('--card-rgb: 229 57 53')
+    expect(screen.getByRole('button', { name: /Left Door Open/i })).toHaveAttribute('data-muted', 'false')
+    expect(screen.getByRole('button', { name: /Right Door Open/i })).toHaveStyle('--card-rgb: 229 57 53')
+    expect(screen.getByRole('button', { name: /Right Door Open/i })).toHaveAttribute('data-muted', 'false')
+    openView.unmount()
+
+    mockEntities['cover.left_door'].state = 'closing'
+    mockEntities['cover.right_door'].state = 'closing'
+    render(<DashboardViewPage activePath="security" onNavigate={() => undefined} path="security" />)
+
+    expect(screen.getByRole('button', { name: /Left Door Closing/i })).toHaveStyle('--card-rgb: 30 136 229')
+    expect(screen.getByRole('button', { name: /Left Door Closing/i })).toHaveAttribute('data-muted', 'false')
+    expect(screen.getByRole('button', { name: /Right Door Closing/i })).toHaveStyle('--card-rgb: 30 136 229')
+    expect(screen.getByRole('button', { name: /Right Door Closing/i })).toHaveAttribute('data-muted', 'false')
+  })
+
+  it('opens Security System as a modal and only calls alarm services from explicit mode buttons', async () => {
+    render(<DashboardViewPage activePath="security" onNavigate={() => undefined} path="security" />)
+
+    fireEvent.click(screen.getByRole('button', { name: /Security System Armed Home/i }))
+
+    expect(await screen.findByRole('dialog')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Security System' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Set security system to Away' })).toBeInTheDocument()
+    expect(mockCallServiceCalls).toEqual([])
+
+    fireEvent.click(screen.getByRole('button', { name: 'Set security system to Away' }))
+
+    expect(mockCallServiceCalls).toEqual([
+      { domain: 'alarm_control_panel', service: 'alarm_arm_away', target: 'alarm_control_panel.aqara_hub_m3_0056_security_system_2' },
+    ])
+  })
+
+  it('runs YAML toggle actions for Security locks and garage doors', () => {
+    render(<DashboardViewPage activePath="security" onNavigate={() => undefined} path="security" />)
+
+    fireEvent.click(screen.getByRole('button', { name: /Front Door Locked/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Left Door Closed/i }))
+
+    expect(mockCallServiceCalls).toEqual([
+      { domain: 'homeassistant', service: 'toggle', target: 'lock.aqara_smart_lock_u100' },
+      { domain: 'homeassistant', service: 'toggle', target: 'cover.left_door' },
+    ])
+  })
+
+  it('opens the Security contact sensor overview grouped from the YAML popup', async () => {
+    render(<DashboardViewPage activePath="security" onNavigate={() => undefined} path="security" />)
+
+    fireEvent.click(screen.getByRole('button', { name: /Contact Sensors\s*All Closed/i }))
+
+    expect(await screen.findByRole('dialog')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Contact Sensors' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Rooms' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Open Entryway Contact Sensors' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Open Office Contact Sensors' })).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open Office Contact Sensors' }))
+
+    expect(await screen.findByRole('heading', { name: 'Office Contact Sensors' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Back to room contact sensors' })).toBeInTheDocument()
+    expect(screen.getByLabelText('PC Window Closed')).toBeInTheDocument()
+    expect(screen.getByLabelText('Window Closed')).toBeInTheDocument()
+  })
+
+  it('opens Security camera popups with WebRTC actions and recording script payloads', async () => {
+    const firedEvents: string[] = []
+    window.addEventListener('webrtc-screenshot', () => firedEvents.push('webrtc-screenshot'), { once: true })
+    window.addEventListener('webrtc-toggle-mute', () => firedEvents.push('webrtc-toggle-mute'), { once: true })
+    render(<DashboardViewPage activePath="security" onNavigate={() => undefined} path="security" />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open Front Door camera' }))
+
+    expect(await screen.findByRole('dialog')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Front Door Camera' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Snapshot' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Muted' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Record' }))
+
+    expect(firedEvents).toEqual(['webrtc-screenshot', 'webrtc-toggle-mute'])
+    expect(mockCallServiceCalls).toEqual([{ domain: 'script', service: 'turn_on', target: 'script.front_door_manual_recording' }])
   })
 
   it('has YAML-derived scaffolds for every room route', () => {
