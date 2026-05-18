@@ -33,7 +33,7 @@ describe('DashboardViewPage', () => {
     mockEntities['media_player.sony_projector'].state = 'off'
     mockEntities['cover.left_door'].state = 'closed'
     mockEntities['cover.right_door'].state = 'closed'
-    mockEntities['lock.aqara_smart_lock_u100'].state = 'locked'
+    mockEntities['lock.aqara_smart_lock_u400'].state = 'locked'
     mockEntities['lock.fordpass_3fmtk3su5mma09266_doorlock'].state = 'locked'
   })
 
@@ -489,7 +489,7 @@ describe('DashboardViewPage', () => {
     fireEvent.click(screen.getByRole('button', { name: /Left Door Closed/i }))
 
     expect(mockCallServiceCalls).toEqual([
-      { domain: 'homeassistant', service: 'toggle', target: 'lock.aqara_smart_lock_u100' },
+      { domain: 'homeassistant', service: 'toggle', target: 'lock.aqara_smart_lock_u400' },
       { domain: 'homeassistant', service: 'toggle', target: 'cover.left_door' },
     ])
   })

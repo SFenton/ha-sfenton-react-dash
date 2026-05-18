@@ -69,7 +69,7 @@ export const mockEntities: Record<string, MockEntity> = {
   'remote.living_room_shield': entity('remote.living_room_shield', 'on'),
   'remote.master_bedroom_apple_tv': entity('remote.master_bedroom_apple_tv', 'on'),
   'remote.theater_shield_remote': entity('remote.theater_shield_remote', 'on'),
-  'lock.aqara_smart_lock_u100': entity('lock.aqara_smart_lock_u100', 'locked'),
+  'lock.aqara_smart_lock_u400': entity('lock.aqara_smart_lock_u400', 'locked'),
   'lock.fordpass_3fmtk3su5mma09266_doorlock': entity('lock.fordpass_3fmtk3su5mma09266_doorlock', 'locked'),
   'sensor.living_room_back_wall_presence_sensor_temperature': entity('sensor.living_room_back_wall_presence_sensor_temperature', '70.1', { unit_of_measurement: '°F' }),
   'sensor.living_room_bar_presence_sensor_temperature': entity('sensor.living_room_bar_presence_sensor_temperature', '70.4', { unit_of_measurement: '°F' }),

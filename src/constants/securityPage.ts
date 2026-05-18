@@ -46,7 +46,7 @@ export const SECURITY_CONTROL_TILES: SecurityTileConfig[] = [
   },
   {
     title: 'Front Door',
-    entityId: 'lock.aqara_smart_lock_u100',
+    entityId: 'lock.aqara_smart_lock_u400',
     icon: 'mdi:lock',
     tone: 'lock',
     action: { type: 'toggle' },

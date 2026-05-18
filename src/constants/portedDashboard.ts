@@ -229,7 +229,7 @@ export const SECURITY_SECTIONS: EntitySectionConfig[] = [
     title: 'Security',
     items: [
       { title: 'Alarm', entityId: 'alarm_control_panel.aqara_hub_m3_0056_security_system_2', icon: 'mdi:shield', color: SECURITY_COLOR },
-      { title: 'Front Door Lock', entityId: 'lock.aqara_smart_lock_u100', icon: 'mdi:lock', color: SECURITY_COLOR, manualReview: true },
+      { title: 'Front Door Lock', entityId: 'lock.aqara_smart_lock_u400', icon: 'mdi:lock', color: SECURITY_COLOR, manualReview: true },
       { title: 'Left Garage Door', entityId: 'cover.left_door', icon: 'mdi:garage', color: SECURITY_COLOR, manualReview: true },
       { title: 'Right Garage Door', entityId: 'cover.right_door', icon: 'mdi:garage', color: SECURITY_COLOR, manualReview: true },
     ],
