@@ -27,8 +27,8 @@ export function MultiLightIcon({ active, size = 28 }: MultiLightIconProps) {
   )
 }
 
-function SingleLightIcon({ active }: { active: boolean }) {
-  return <MaterialIcon name={active ? 'mdi:lightbulb' : 'mdi:lightbulb'} size={42} />
+function SingleLightIcon({ active, size }: { active: boolean; size: number }) {
+  return <MaterialIcon name={active ? 'mdi:lightbulb' : 'mdi:lightbulb'} size={size} />
 }
 
 interface LightCardProps {
@@ -45,7 +45,8 @@ export function LightCard({ ariaLabel, entityId, icon = 'single', onClick, press
   const entity = useEntity(asEntityName(entityId), { returnNullIfNotFound: true })
   const active = isActiveState(entity)
   const subtitle = formatCompactEntityState(entity, 'Off')
-  const iconSlot = icon === 'multi' ? <MultiLightIcon active={active} size={42} /> : <SingleLightIcon active={active} />
+  const iconSize = size === 'compact' ? 24 : 42
+  const iconSlot = icon === 'multi' ? <MultiLightIcon active={active} size={iconSize} /> : <SingleLightIcon active={active} size={iconSize} />
 
   return (
     <Card

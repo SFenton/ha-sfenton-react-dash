@@ -2,7 +2,7 @@ import { Icon } from './Icon'
 import type { IconKey } from '../../constants/atAGlance'
 import styles from './GlassTile.module.css'
 
-export type TileTone = 'air' | 'climate' | 'contact' | 'light' | 'media' | 'neutral' | 'presence' | 'security' | 'vacuum' | 'warning'
+export type TileTone = 'air' | 'climate' | 'contact' | 'danger' | 'light' | 'media' | 'neutral' | 'presence' | 'security' | 'vacuum' | 'warning'
 
 interface GlassTileProps {
   title: string

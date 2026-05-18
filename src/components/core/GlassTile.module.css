@@ -179,6 +179,10 @@
   --tile-color: rgba(67, 160, 71, 0.3);
 }
 
+.danger {
+  --tile-color: rgba(229, 57, 53, 0.34);
+}
+
 .air {
   --tile-color: rgba(0, 150, 136, 0.34);
 }

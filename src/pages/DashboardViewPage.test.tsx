@@ -482,16 +482,25 @@ describe('DashboardViewPage', () => {
     ])
   })
 
-  it('runs YAML toggle actions for Security locks and garage doors', () => {
+  it('runs explicit lock services and YAML toggle actions for garage doors', () => {
     render(<DashboardViewPage activePath="security" onNavigate={() => undefined} path="security" />)
 
     fireEvent.click(screen.getByRole('button', { name: /Front Door Locked/i }))
     fireEvent.click(screen.getByRole('button', { name: /Left Door Closed/i }))
 
     expect(mockCallServiceCalls).toEqual([
-      { domain: 'homeassistant', service: 'toggle', target: 'lock.aqara_smart_lock_u400' },
+      { domain: 'lock', service: 'unlock', target: 'lock.aqara_smart_lock_u400' },
       { domain: 'homeassistant', service: 'toggle', target: 'cover.left_door' },
     ])
+  })
+
+  it('locks the Front Door when the U400 lock is already unlocked', () => {
+    mockEntities['lock.aqara_smart_lock_u400'].state = 'unlocked'
+    render(<DashboardViewPage activePath="security" onNavigate={() => undefined} path="security" />)
+
+    fireEvent.click(screen.getByRole('button', { name: /Front Door Unlocked/i }))
+
+    expect(mockCallServiceCalls).toEqual([{ domain: 'lock', service: 'lock', target: 'lock.aqara_smart_lock_u400' }])
   })
 
   it('opens the Security contact sensor overview grouped from the YAML popup', async () => {

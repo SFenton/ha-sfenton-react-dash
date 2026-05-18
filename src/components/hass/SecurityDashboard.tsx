@@ -1,7 +1,6 @@
 import { useEntity, useHass } from '@hakit/core'
 import { CameraTile } from './CameraTile'
-import { Card, type CardColor } from '../core/Card'
-import { MaterialIcon } from '../core/Icon'
+import { GlassTile, type TileTone } from '../core/GlassTile'
 import { ModalSheet } from '../core/ModalSheet'
 import { SectionHeader } from '../core/SectionHeader'
 import { CAMERA_ITEMS, CONTACT_GROUPS } from '../../constants/atAGlance'
@@ -19,34 +18,7 @@ import { SecurityControls } from './SecurityControls'
 import { StatusRail } from './StatusRail'
 import styles from './SecurityDashboard.module.css'
 
-const UNAVAILABLE_COLOR: CardColor = { r: 255, g: 255, b: 255 }
-const UNKNOWN_COLOR: CardColor = { r: 84, g: 110, b: 122 }
-const CLOSED_COVER_COLOR: CardColor = { r: 67, g: 160, b: 71 }
-const OPEN_COVER_COLOR: CardColor = { r: 229, g: 57, b: 53 }
-const TRANSITION_COVER_COLOR: CardColor = { r: 30, g: 136, b: 229 }
 const SHOW_MACHE_SECTION = false
-
-const ALARM_COLORS: Record<string, CardColor> = {
-  disarmed: { r: 67, g: 160, b: 71 },
-  armed_home: { r: 30, g: 136, b: 229 },
-  armed_night: { r: 142, g: 36, b: 170 },
-  armed_away: { r: 229, g: 57, b: 53 },
-  triggered: { r: 229, g: 57, b: 53 },
-}
-
-const LOCK_COLORS: Record<string, CardColor> = {
-  locked: { r: 67, g: 160, b: 71 },
-  locking: { r: 30, g: 136, b: 229 },
-  unlocking: { r: 30, g: 136, b: 229 },
-  unlocked: { r: 229, g: 57, b: 53 },
-}
-
-const COVER_COLORS: Record<string, CardColor> = {
-  closed: CLOSED_COVER_COLOR,
-  closing: TRANSITION_COVER_COLOR,
-  open: OPEN_COVER_COLOR,
-  opening: OPEN_COVER_COLOR,
-}
 
 type CallService = (params: Record<string, unknown>) => void
 
@@ -59,23 +31,29 @@ function alarmIcon(state?: string) {
   return 'mdi:shield-outline'
 }
 
-function tileColor(item: SecurityTileConfig, state?: string, unavailable = false): CardColor {
-  if (unavailable) return UNAVAILABLE_COLOR
-  if (item.tone === 'alarm') return (state && ALARM_COLORS[state]) || UNKNOWN_COLOR
-  if (item.tone === 'lock') return (state && LOCK_COLORS[state]) || UNKNOWN_COLOR
-  if (item.tone === 'cover') return (state && COVER_COLORS[state]) || UNKNOWN_COLOR
-  return item.color ?? UNKNOWN_COLOR
-}
-
 function tileIcon(item: SecurityTileConfig, state?: string) {
   if (item.tone === 'alarm') return alarmIcon(state)
   return item.icon
 }
 
-function tileMuted(item: SecurityTileConfig, active: boolean, unavailable: boolean) {
-  if (unavailable) return true
-  if (item.tone === 'alarm' || item.tone === 'cover' || item.tone === 'lock') return false
-  return !active
+function tileTone(item: SecurityTileConfig, state: string | undefined, unavailable: boolean): TileTone {
+  if (unavailable) return 'neutral'
+  if (item.tone === 'cover') {
+    if (state === 'closed') return 'contact'
+    if (state === 'closing') return 'security'
+    if (state === 'open' || state === 'opening') return 'danger'
+  }
+  if (item.tone === 'lock') {
+    if (state === 'locked') return 'contact'
+    if (state === 'locking' || state === 'unlocking') return 'security'
+    if (state === 'unlocked') return 'danger'
+  }
+  if (item.tone === 'alarm') return state === 'disarmed' ? 'contact' : 'security'
+  return 'security'
+}
+
+function lockServiceForState(state: string | undefined) {
+  return state === 'unlocked' || state === 'unlocking' ? 'lock' : 'unlock'
 }
 
 function SecurityTile({ item, onOpenHash }: { item: SecurityTileConfig; onOpenHash: (hash: string) => void }) {
@@ -91,21 +69,21 @@ function SecurityTile({ item, onOpenHash }: { item: SecurityTileConfig; onOpenHa
       onOpenHash(item.action.hash)
       return
     }
+    if (item.tone === 'lock') {
+      callService({ domain: 'lock', service: lockServiceForState(entity?.state), target: item.entityId })
+      return
+    }
     callService({ domain: 'homeassistant', service: 'toggle', target: item.entityId })
   }
 
   return (
-    <Card
-      ariaLabel={`${item.title} ${stateText}`}
-      color={tileColor(item, entity?.state, unavailable)}
-      disabled={unavailable}
-      icon={<MaterialIcon name={tileIcon(item, entity?.state)} size={38} />}
-      muted={tileMuted(item, active, unavailable)}
+    <GlassTile
+      icon={tileIcon(item, entity?.state)}
+      isOff={unavailable || (item.tone === 'vehicle' && !active)}
       onClick={item.action && !unavailable ? runAction : undefined}
-      pressed={item.action?.type === 'toggle' ? active : undefined}
-      size="compact"
       subtitle={stateText}
       title={item.title}
+      tone={tileTone(item, entity?.state, unavailable)}
     />
   )
 }

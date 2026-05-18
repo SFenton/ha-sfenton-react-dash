@@ -104,7 +104,6 @@ export function SecurityControls() {
               key={mode.service}
               onClick={() => callAlarmService(mode.service)}
               size="compact"
-              subtitle={active ? 'Active' : 'Inactive'}
               title={mode.title}
             />
           )

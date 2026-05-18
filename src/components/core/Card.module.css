@@ -62,11 +62,17 @@
 
 .icon {
   display: grid;
+  flex: 0 0 48px;
   width: 48px;
   height: 48px;
   place-items: center;
   color: rgba(255, 255, 255, 0.94);
   filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.24));
+}
+
+.icon > svg,
+.icon > img {
+  display: block;
 }
 
 .copy {
@@ -111,8 +117,15 @@
 }
 
 .compact .icon {
-  width: 42px;
-  height: 42px;
+  flex-basis: 44px;
+  width: 44px;
+  height: 44px;
+}
+
+.compact .icon > svg,
+.compact .icon > img {
+  width: 24px;
+  height: 24px;
 }
 
 .compact .title {
