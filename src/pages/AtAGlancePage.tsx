@@ -951,7 +951,7 @@ export function AtAGlancePage({ activePath = 'overview', onNavigate = () => unde
   const airQualityStatusSubtitle = useHass((state) => {
     const aqiRange = formatCompactEntityState(state.entities['input_text.all_aqi_range'] ?? null)
     const pm25Range = formatCompactEntityState(state.entities['input_text.all_pm25_range'] ?? null)
-    return `AQI ${aqiRange} / PM2.5 ${pm25Range}`
+    return `AQI ${aqiRange} · PM2.5 ${pm25Range}`
   })
   const lightStatusSubtitle = lightCountSubtitle(activeRoomLightCount)
   const contactStatusSubtitle = contactSensorActiveSubtitle(activeContactSensorCount)

@@ -12,7 +12,7 @@ describe('AtAGlancePage', () => {
     mockEntities['input_text.office_aqi_color'].state = 'rgba(229, 57, 53, 1)'
     render(<AtAGlancePage />)
 
-    fireEvent.click(screen.getByRole('button', { name: /Air Quality AQI 1 \/ PM2\.5 0μg\/m³ - 1μg\/m³/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Air Quality AQI 1 · PM2\.5 0μg\/m³ - 1μg\/m³/i }))
 
     const dialog = await screen.findByRole('dialog')
     expect(within(dialog).getByText('Rooms')).toBeInTheDocument()

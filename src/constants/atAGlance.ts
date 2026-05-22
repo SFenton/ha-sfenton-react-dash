@@ -146,7 +146,7 @@ export const OVERVIEW_STATUS_CHIPS: StatusChipConfig[] = [
     secondaryEntityId: 'input_text.all_pm25_range',
     hash: '#aqi-overview',
     tone: 'air',
-    width: 184,
+    width: 236,
   },
 ]
 
