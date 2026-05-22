@@ -32,9 +32,11 @@ export type IconKey =
   | 'vacuum'
   | 'weather'
 
+export type DashboardIcon = IconKey | `mdi:${string}`
+
 export interface StatusChipConfig {
   title: string
-  icon: IconKey
+  icon: DashboardIcon
   entityId: string
   hash: string
   tone: 'light' | 'security' | 'climate' | 'presence' | 'contact' | 'air'
@@ -45,7 +47,7 @@ export interface StatusChipConfig {
 
 export interface QuickAccessConfig {
   title: string
-  icon: IconKey
+  icon: DashboardIcon
   hash?: string
   route?: string
   entityId?: string
@@ -56,7 +58,7 @@ export interface QuickAccessConfig {
 export interface AreaConfig {
   title: string
   route: string
-  icon: IconKey
+  icon: DashboardIcon
   color: {
     r: number
     g: number
@@ -100,7 +102,7 @@ export interface CameraConfig {
 export const OVERVIEW_STATUS_CHIPS: StatusChipConfig[] = [
   {
     title: 'Lights',
-    icon: 'light',
+    icon: 'mdi:lightbulb-group',
     entityId: 'light.lights',
     hash: '#lights-overview',
     tone: 'light',
@@ -108,7 +110,7 @@ export const OVERVIEW_STATUS_CHIPS: StatusChipConfig[] = [
   },
   {
     title: 'Security',
-    icon: 'security',
+    icon: 'mdi:shield-outline',
     entityId: 'alarm_control_panel.aqara_hub_m3_0056_security_system_2',
     hash: '#security-system',
     tone: 'security',
@@ -116,7 +118,7 @@ export const OVERVIEW_STATUS_CHIPS: StatusChipConfig[] = [
   },
   {
     title: 'Climate',
-    icon: 'thermostat',
+    icon: 'mdi:thermometer',
     entityId: 'input_text.all_climate_range',
     hash: '#climate-overview',
     tone: 'climate',
@@ -124,7 +126,7 @@ export const OVERVIEW_STATUS_CHIPS: StatusChipConfig[] = [
   },
   {
     title: 'Occupancy',
-    icon: 'presence',
+    icon: 'mdi:motion-sensor',
     entityId: 'binary_sensor.occupancy_sensors',
     hash: '#occupancy-overview',
     tone: 'presence',
@@ -132,7 +134,7 @@ export const OVERVIEW_STATUS_CHIPS: StatusChipConfig[] = [
   },
   {
     title: 'Contact Sensors',
-    icon: 'contact',
+    icon: 'mdi:door',
     entityId: 'binary_sensor.contact_sensors',
     hash: '#contact-sensors-overview',
     tone: 'contact',
@@ -140,7 +142,7 @@ export const OVERVIEW_STATUS_CHIPS: StatusChipConfig[] = [
   },
   {
     title: 'Air Quality',
-    icon: 'air',
+    icon: 'mdi:blur',
     entityId: 'input_text.all_aqi_range',
     colorEntityId: 'input_text.all_aqi_color',
     secondaryEntityId: 'input_text.all_pm25_range',
@@ -192,7 +194,7 @@ export const AIR_QUALITY_ROOMS: AirQualityRoomConfig[] = [
 export const QUICK_ACCESS_ITEMS: QuickAccessConfig[] = [
   {
     title: 'Security System',
-    icon: 'security',
+    icon: 'mdi:shield-outline',
     entityId: 'alarm_control_panel.aqara_hub_m3_0056_security_system_2',
     hash: '#security-system',
     status: 'entity_state',
@@ -200,19 +202,19 @@ export const QUICK_ACCESS_ITEMS: QuickAccessConfig[] = [
   },
   {
     title: 'Vacuums',
-    icon: 'vacuum',
+    icon: 'mdi:robot-vacuum',
     route: '/at-a-glance/vacuums',
     tone: 'vacuum',
   },
   {
     title: 'Media',
-    icon: 'media',
+    icon: 'mdi:remote',
     route: '/at-a-glance/media',
     tone: 'media',
   },
   {
     title: 'Custom Lights',
-    icon: 'sparkles',
+    icon: 'mdi:lightbulb-group',
     route: '/at-a-glance/custom-lights',
     tone: 'light',
   },
@@ -258,22 +260,22 @@ export const CAMERA_ITEMS: CameraConfig[] = [
 ]
 
 export const AREA_ITEMS: AreaConfig[] = [
-  { title: 'Living Room', route: '/at-a-glance/living-room', icon: 'sofa', color: { r: 218, g: 206, b: 164 } },
-  { title: 'Guest Room', route: '/at-a-glance/guest-room', icon: 'bed', color: { r: 51, g: 193, b: 146 } },
-  { title: 'Gym', route: '/at-a-glance/gym', icon: 'dumbbell', color: { r: 213, g: 117, b: 26 } },
-  { title: 'Master Bedroom', route: '/at-a-glance/master-bedroom', icon: 'bed', color: { r: 20, g: 33, b: 215 } },
-  { title: 'Office', route: '/at-a-glance/office', icon: 'office', color: { r: 20, g: 219, b: 206 } },
-  { title: 'Hallway', route: '/at-a-glance/hallway', icon: 'door-open', color: { r: 65, g: 49, b: 31 } },
-  { title: 'Kitchen', route: '/at-a-glance/kitchen', icon: 'kitchen', color: { r: 177, g: 200, b: 60 } },
-  { title: 'Music Room', route: '/at-a-glance/music-room', icon: 'music', color: { r: 183, g: 18, b: 186 } },
-  { title: 'Garage', route: '/at-a-glance/garage', icon: 'garage', color: { r: 223, g: 12, b: 12 } },
-  { title: 'Theater Room', route: '/at-a-glance/theater-room', icon: 'theater', color: { r: 0, g: 0, b: 1 } },
-  { title: 'Back Deck', route: '/at-a-glance/back-deck', icon: 'grill', color: { r: 5, g: 77, b: 6 } },
-  { title: 'Downstairs Hallway', route: '/at-a-glance/downstairs-hallway', icon: 'stairs', color: { r: 234, g: 236, b: 203 } },
-  { title: 'Guest Bathroom', route: '/at-a-glance/guest-bathroom', icon: 'bath', color: { r: 43, g: 227, b: 224 } },
-  { title: 'Master Bathroom', route: '/at-a-glance/master-bathroom', icon: 'bath', color: { r: 95, g: 93, b: 93 } },
-  { title: 'Dining Room', route: '/at-a-glance/dining-room', icon: 'utensils', color: { r: 217, g: 179, b: 115 } },
-  { title: 'Entryway', route: '/at-a-glance/entryway', icon: 'door', color: { r: 250, g: 217, b: 0 } },
+  { title: 'Living Room', route: '/at-a-glance/living-room', icon: 'mdi:sofa', color: { r: 218, g: 206, b: 164 } },
+  { title: 'Guest Room', route: '/at-a-glance/guest-room', icon: 'mdi:bed', color: { r: 51, g: 193, b: 146 } },
+  { title: 'Gym', route: '/at-a-glance/gym', icon: 'mdi:dumbbell', color: { r: 213, g: 117, b: 26 } },
+  { title: 'Master Bedroom', route: '/at-a-glance/master-bedroom', icon: 'mdi:bed-king', color: { r: 20, g: 33, b: 215 } },
+  { title: 'Office', route: '/at-a-glance/office', icon: 'mdi:desktop-tower', color: { r: 20, g: 219, b: 206 } },
+  { title: 'Hallway', route: '/at-a-glance/hallway', icon: 'mdi:door-open', color: { r: 65, g: 49, b: 31 } },
+  { title: 'Kitchen', route: '/at-a-glance/kitchen', icon: 'mdi:stove', color: { r: 177, g: 200, b: 60 } },
+  { title: 'Music Room', route: '/at-a-glance/music-room', icon: 'mdi:music', color: { r: 183, g: 18, b: 186 } },
+  { title: 'Garage', route: '/at-a-glance/garage', icon: 'mdi:garage', color: { r: 223, g: 12, b: 12 } },
+  { title: 'Theater Room', route: '/at-a-glance/theater-room', icon: 'mdi:movie-open', color: { r: 0, g: 0, b: 1 } },
+  { title: 'Back Deck', route: '/at-a-glance/back-deck', icon: 'mdi:grill', color: { r: 5, g: 77, b: 6 } },
+  { title: 'Downstairs Hallway', route: '/at-a-glance/downstairs-hallway', icon: 'mdi:stairs', color: { r: 234, g: 236, b: 203 } },
+  { title: 'Guest Bathroom', route: '/at-a-glance/guest-bathroom', icon: 'mdi:shower', color: { r: 43, g: 227, b: 224 } },
+  { title: 'Master Bathroom', route: '/at-a-glance/master-bathroom', icon: 'mdi:bathtub', color: { r: 95, g: 93, b: 93 } },
+  { title: 'Dining Room', route: '/at-a-glance/dining-room', icon: 'mdi:silverware-fork-knife', color: { r: 217, g: 179, b: 115 } },
+  { title: 'Entryway', route: '/at-a-glance/entryway', icon: 'mdi:door', color: { r: 250, g: 217, b: 0 } },
 ]
 
 export const LIGHT_GROUPS: EntityGroupConfig[] = [
@@ -679,10 +681,10 @@ export const CONTACT_GROUPS: EntityGroupConfig[] = [
 export const SECURITY_ENTITY = 'alarm_control_panel.aqara_hub_m3_0056_security_system_2'
 
 export const SECURITY_ACTIONS = [
-  { title: 'Home', service: 'alarm_arm_home', icon: 'home' },
-  { title: 'Away', service: 'alarm_arm_away', icon: 'security' },
-  { title: 'Night', service: 'alarm_arm_night', icon: 'weather' },
-  { title: 'Disarmed', service: 'alarm_disarm', icon: 'contact' },
+  { title: 'Home', service: 'alarm_arm_home', icon: 'mdi:shield-home' },
+  { title: 'Away', service: 'alarm_arm_away', icon: 'mdi:shield' },
+  { title: 'Night', service: 'alarm_arm_night', icon: 'mdi:shield-moon' },
+  { title: 'Disarmed', service: 'alarm_disarm', icon: 'mdi:shield-off' },
 ] as const
 
 export const WEATHER_ENTITY = 'weather.pirate_weather'

@@ -170,7 +170,7 @@ Do not copy FNF's visual theme. Use the architecture and mechanics, then style f
 
 Checked current npm metadata:
 
-- `lucide-react` 1.14.0: recommended. Provides consistent React icons. Use before hand-rolled SVGs.
+- `@mdi/js` 7.4.47: recommended. Matches Home Assistant's MDI icon names and keeps the React dash aligned with Lovelace.
 - `motion` 12.38.0: recommended for springy sheet/card/nav transitions if CSS keyframes feel too stiff.
 - `vaul` 1.1.2: recommended to prototype modal sheets quickly. It maps well to the mobile popup behavior and can still be styled as Home material.
 - `embla-carousel-react` 8.6.0: defer. Use CSS scroll snap first for the status rail; add Embla only if touch precision or momentum feels weak.
@@ -179,7 +179,7 @@ Checked current npm metadata:
 Initial install candidate once implementation begins:
 
 ```bash
-npm install lucide-react motion vaul
+npm install @mdi/js motion vaul
 ```
 
 ## First Build Sequence

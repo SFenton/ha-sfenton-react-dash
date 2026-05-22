@@ -403,7 +403,7 @@ describe('DashboardViewPage', () => {
     expect(screen.getByRole('button', { name: /Security\s*Armed Home/i })).toHaveAttribute('data-icon', 'mdi:shield-home')
     expect(screen.getByRole('button', { name: /Security\s*Armed Home/i })).toHaveAttribute('data-icon-color', 'rgb(30, 136, 229)')
     expect(screen.getByRole('button', { name: /Contact Sensors\s*All Closed/i })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Contact Sensors\s*All Closed/i })).toHaveAttribute('data-icon', 'contact')
+    expect(screen.getByRole('button', { name: /Contact Sensors\s*All Closed/i })).toHaveAttribute('data-icon', 'mdi:door')
     expect(screen.getByRole('button', { name: /Security System Armed Home/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Front Door Locked/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Left Door Closed/i })).toBeInTheDocument()

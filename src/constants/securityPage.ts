@@ -19,7 +19,7 @@ export interface SecurityTileConfig {
 export const SECURITY_STATUS_CHIPS: StatusRailChip[] = [
   {
     title: 'Security',
-    icon: 'security',
+    icon: 'mdi:shield-outline',
     entityId: SECURITY_ENTITY,
     hash: '#security-system',
     tone: 'security',
@@ -27,7 +27,7 @@ export const SECURITY_STATUS_CHIPS: StatusRailChip[] = [
   },
   {
     title: 'Contact Sensors',
-    icon: 'contact',
+    icon: 'mdi:door',
     entityId: 'binary_sensor.all_contact_sensors',
     hash: '#contact-sensors-overview',
     stateKind: 'contact',

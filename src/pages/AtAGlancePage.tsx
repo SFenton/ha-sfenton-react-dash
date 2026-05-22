@@ -860,7 +860,7 @@ function airQualityRoomArea(room: AirQualityRoomConfig, colorEntity: HassEntity 
 
   return {
     color: parseCssColor(colorEntity?.state) ?? { r: 0, g: 150, b: 136 },
-    icon: 'air',
+    icon: 'mdi:blur',
     route: baseArea?.route ?? '/overview',
     title: room.title,
   }

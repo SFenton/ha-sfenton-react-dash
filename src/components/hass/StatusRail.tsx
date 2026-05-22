@@ -40,7 +40,7 @@ function StatusChip({ chip, onOpenHash, subtitleOverride }: { chip: StatusRailCh
   const entity = useEntity(asEntityName(chip.entityId), { returnNullIfNotFound: true })
   const secondaryEntity = useEntity(asEntityName(chip.secondaryEntityId ?? chip.entityId), { returnNullIfNotFound: true })
   const colorEntity = useEntity(asEntityName(chip.colorEntityId ?? chip.entityId), { returnNullIfNotFound: true })
-  const stateKind = chip.stateKind ?? (chip.tone === 'security' ? 'security' : chip.icon)
+  const stateKind = chip.stateKind ?? (chip.tone === 'security' ? 'security' : chip.tone === 'presence' ? 'presence' : chip.tone === 'contact' ? 'contact' : undefined)
   let primaryState = stateKind === 'presence' ? formatOccupancyEntityState(entity) : stateKind === 'contact' ? formatContactEntityState(entity) : formatCompactEntityState(entity)
   if (stateKind === 'contact' && !isContactOpen(entity) && chip.title.endsWith('s')) primaryState = 'All Closed'
   const secondaryState = chip.secondaryEntityId ? formatCompactEntityState(secondaryEntity) : null
@@ -48,7 +48,7 @@ function StatusChip({ chip, onOpenHash, subtitleOverride }: { chip: StatusRailCh
   const isOff = stateKind === 'security' ? false : !isActiveState(entity) && !chip.secondaryEntityId
   const securityMeta = stateKind === 'security' ? securityStateMeta(entity?.state) : null
   const dynamicColor = chip.colorEntityId ? colorState(colorEntity) : undefined
-  const icon = securityMeta?.icon ?? (stateKind === 'presence' && isOff ? 'presence-off' : stateKind === 'contact' && isContactOpen(entity) ? 'contact-open' : chip.icon)
+  const icon = securityMeta?.icon ?? (stateKind === 'contact' && isContactOpen(entity) ? 'mdi:door-open' : chip.icon)
 
   return (
     <div className={styles.chip} style={{ '--chip-width': `${chip.width ?? 150}px` } as CSSProperties}>
