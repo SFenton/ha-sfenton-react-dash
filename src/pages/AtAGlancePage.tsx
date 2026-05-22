@@ -22,6 +22,7 @@ import { asEntityName, formatCompactEntityState, isActiveState, isContactOpen, i
 import { WebRtcCamera } from '../components/hass/WebRtcCamera'
 import {
   AREA_ITEMS,
+  AIR_QUALITY_ROOMS,
   CAMERA_ITEMS,
   CLIMATE_GROUPS,
   CONTACT_GROUPS,
@@ -29,6 +30,8 @@ import {
   OCCUPANCY_GROUPS,
   OVERVIEW_STATUS_CHIPS,
   QUICK_ACCESS_ITEMS,
+  type AirQualityRoomConfig,
+  type AreaConfig,
   type EntityGroupConfig,
   type QuickAccessConfig,
 } from '../constants/atAGlance'
@@ -65,6 +68,7 @@ const ROOM_LIGHT_ENTITY_IDS = [...new Set(ROOM_LIGHT_GROUPS.flatMap((group) => g
 const ROOM_CLIMATE_GROUPS = CLIMATE_GROUPS
 const ROOM_OCCUPANCY_GROUPS = OCCUPANCY_GROUPS
 const ROOM_CONTACT_GROUPS = CONTACT_GROUPS
+const ROOM_AIR_QUALITY_GROUPS = AIR_QUALITY_ROOMS
 const ROOM_CONTACT_ENTITY_IDS = [...new Set(ROOM_CONTACT_GROUPS.flatMap((group) => group.items.map((item) => item.entityId)))]
 const DEFAULT_CLIMATE_COLOR = { r: 25, g: 84, b: 130 }
 const DEFAULT_OCCUPANCY_COLOR = { r: 46, g: 180, b: 120 }
@@ -117,6 +121,29 @@ function occupancyGroupColor(group: EntityGroupConfig) {
 
 function contactGroupColor(group: EntityGroupConfig) {
   return areaForTitle(contactRoomTitle(group))?.color ?? DEFAULT_CONTACT_COLOR
+}
+
+function parseCssColor(value: string | undefined) {
+  if (!value) return null
+
+  const rgb = value.match(/rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)/i)
+  if (rgb) return { r: Number(rgb[1]), g: Number(rgb[2]), b: Number(rgb[3]) }
+
+  const hex = value.match(/^#([0-9a-f]{6})$/i)
+  if (!hex) return null
+
+  return {
+    r: Number.parseInt(hex[1].slice(0, 2), 16),
+    g: Number.parseInt(hex[1].slice(2, 4), 16),
+    b: Number.parseInt(hex[1].slice(4, 6), 16),
+  }
+}
+
+function formatAirMetricState(entity: HassEntity | null | undefined, fallback = 'Unavailable') {
+  if (!entity) return fallback
+  const state = formatCompactEntityState(entity, fallback)
+  const unit = typeof entity.attributes.unit_of_measurement === 'string' ? entity.attributes.unit_of_measurement : ''
+  return unit && state !== fallback && !state.includes(unit) ? `${state}${unit}` : state
 }
 
 function contactItemKind(item: EntityGroupConfig['items'][number]) {
@@ -828,6 +855,58 @@ export function ContactSheet({ directGroup }: { directGroup?: EntityGroupConfig 
   )
 }
 
+function airQualityRoomArea(room: AirQualityRoomConfig, colorEntity: HassEntity | null | undefined): AreaConfig {
+  const baseArea = areaForTitle(room.title)
+
+  return {
+    color: parseCssColor(colorEntity?.state) ?? { r: 0, g: 150, b: 136 },
+    icon: 'air',
+    route: baseArea?.route ?? '/overview',
+    title: room.title,
+  }
+}
+
+function RoomAirQualityOverviewCard({ room }: { room: AirQualityRoomConfig }) {
+  const aqiEntity = useEntity(asEntityName(room.aqiEntityId), { returnNullIfNotFound: true })
+  const colorEntity = useEntity(asEntityName(room.colorEntityId), { returnNullIfNotFound: true })
+  const pm25Entity = useEntity(asEntityName(room.pm25EntityId), { returnNullIfNotFound: true })
+  const aqiRow = `AQI ${formatAirMetricState(aqiEntity)}`
+  const pm25Row = `PM2.5 ${formatAirMetricState(pm25Entity)}`
+
+  return (
+    <RoomCard
+      area={airQualityRoomArea(room, colorEntity)}
+      ariaLabel={`${room.title} ${aqiRow} ${pm25Row}`}
+      secondarySubtitle={pm25Row}
+      subtitle={aqiRow}
+    />
+  )
+}
+
+export function AirQualitySheet() {
+  const airQualityContentRef = useRef<HTMLDivElement>(null)
+  const airQualityGridRef = useRef<HTMLDivElement>(null)
+
+  useScrollFade(airQualityContentRef, airQualityGridRef, [], { distance: 42 })
+
+  return (
+    <div className={styles.airQualitySheet}>
+      <RoomsHeader />
+      <div className={styles.airQualityContent} ref={airQualityContentRef}>
+        <section className={styles.roomAirQualityOverview}>
+          <div className={styles.roomAirQualityGrid} ref={airQualityGridRef}>
+            {ROOM_AIR_QUALITY_GROUPS.map((room, index) => (
+              <div className={styles.roomLightCardShell} key={room.title} style={buildStaggerStyle(staggerMs(index, 38, 76))}>
+                <RoomAirQualityOverviewCard room={room} />
+              </div>
+            ))}
+          </div>
+        </section>
+      </div>
+    </div>
+  )
+}
+
 function SheetContent({ hash }: { hash: string }) {
   if (hash === '#lights-overview') {
     return <LightsSheet />
@@ -843,6 +922,10 @@ function SheetContent({ hash }: { hash: string }) {
 
   if (hash === '#contact-sensors-overview') {
     return <ContactSheet />
+  }
+
+  if (hash === '#aqi-overview') {
+    return <AirQualitySheet />
   }
 
   if (hash === '#security-system') return <SecurityControls />
@@ -865,6 +948,11 @@ export function AtAGlancePage({ activePath = 'overview', onNavigate = () => unde
   const activeContactSensorCount = useHass((state) =>
     ROOM_CONTACT_ENTITY_IDS.reduce((count, entityId) => count + (isContactOpen(state.entities[entityId]) ? 1 : 0), 0),
   )
+  const airQualityStatusSubtitle = useHass((state) => {
+    const aqiRange = formatCompactEntityState(state.entities['input_text.all_aqi_range'] ?? null)
+    const pm25Range = formatCompactEntityState(state.entities['input_text.all_pm25_range'] ?? null)
+    return `AQI ${aqiRange} / PM2.5 ${pm25Range}`
+  })
   const lightStatusSubtitle = lightCountSubtitle(activeRoomLightCount)
   const contactStatusSubtitle = contactSensorActiveSubtitle(activeContactSensorCount)
   const modalTitle = hash === '#lights-overview' ? lightsSheetTitle(activeRoomLightCount) : sheetTitle(hash)
@@ -878,7 +966,7 @@ export function AtAGlancePage({ activePath = 'overview', onNavigate = () => unde
           <StatusRail
             chips={OVERVIEW_STATUS_CHIPS}
             onOpenHash={openHash}
-            subtitleByHash={{ '#contact-sensors-overview': contactStatusSubtitle, '#lights-overview': lightStatusSubtitle }}
+            subtitleByHash={{ '#aqi-overview': airQualityStatusSubtitle, '#contact-sensors-overview': contactStatusSubtitle, '#lights-overview': lightStatusSubtitle }}
           />
         }
       >

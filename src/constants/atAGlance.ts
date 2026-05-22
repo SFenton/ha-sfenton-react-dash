@@ -38,6 +38,7 @@ export interface StatusChipConfig {
   entityId: string
   hash: string
   tone: 'light' | 'security' | 'climate' | 'presence' | 'contact' | 'air'
+  colorEntityId?: string
   secondaryEntityId?: string
   width?: number
 }
@@ -77,6 +78,13 @@ export interface EntityGroupConfig {
   rangeEntityId?: string
   toggleEntityId?: string
   items: EntityButtonConfig[]
+}
+
+export interface AirQualityRoomConfig {
+  title: string
+  aqiEntityId: string
+  colorEntityId: string
+  pm25EntityId: string
 }
 
 export interface CameraConfig {
@@ -134,10 +142,50 @@ export const OVERVIEW_STATUS_CHIPS: StatusChipConfig[] = [
     title: 'Air Quality',
     icon: 'air',
     entityId: 'input_text.all_aqi_range',
+    colorEntityId: 'input_text.all_aqi_color',
     secondaryEntityId: 'input_text.all_pm25_range',
     hash: '#aqi-overview',
     tone: 'air',
     width: 184,
+  },
+]
+
+export const AIR_QUALITY_ROOMS: AirQualityRoomConfig[] = [
+  {
+    title: 'Living Room',
+    aqiEntityId: 'sensor.living_room_air_purifier_air_quality_index',
+    colorEntityId: 'input_text.living_room_aqi_color',
+    pm25EntityId: 'sensor.living_room_air_purifier_pm2_5',
+  },
+  {
+    title: 'Guest Room',
+    aqiEntityId: 'sensor.guest_room_air_purifier_air_quality_index',
+    colorEntityId: 'input_text.guest_room_aqi_color',
+    pm25EntityId: 'sensor.guest_room_air_purifier_pm2_5',
+  },
+  {
+    title: 'Office',
+    aqiEntityId: 'sensor.office_air_purifier_air_quality_index',
+    colorEntityId: 'input_text.office_aqi_color',
+    pm25EntityId: 'sensor.office_air_purifier_pm2_5',
+  },
+  {
+    title: 'Master Bedroom',
+    aqiEntityId: 'sensor.master_bedroom_air_purifier_air_quality_index',
+    colorEntityId: 'input_text.master_bedroom_aqi_color',
+    pm25EntityId: 'sensor.master_bedroom_air_purifier_pm2_5',
+  },
+  {
+    title: 'Music Room',
+    aqiEntityId: 'sensor.air_purifier_air_quality_index',
+    colorEntityId: 'input_text.music_room_aqi_color',
+    pm25EntityId: 'sensor.air_purifier_pm2_5',
+  },
+  {
+    title: 'Theater Room',
+    aqiEntityId: 'sensor.theater_room_air_purifier_air_quality_index',
+    colorEntityId: 'input_text.theater_room_aqi_color',
+    pm25EntityId: 'sensor.theater_room_air_purifier_pm2_5',
   },
 ]
 

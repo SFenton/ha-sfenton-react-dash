@@ -1,5 +1,6 @@
 import { useEntity } from '@hakit/core'
 import type { CSSProperties } from 'react'
+import type { HassEntity } from 'home-assistant-js-websocket'
 import { GlassTile, type TileTone } from '../core/GlassTile'
 import type { StatusChipConfig } from '../../constants/atAGlance'
 import { asEntityName, formatCompactEntityState, formatContactEntityState, formatOccupancyEntityState, isActiveState, isContactOpen } from './entityState'
@@ -30,9 +31,15 @@ function securityStateMeta(state: string | undefined) {
   return (state && SECURITY_STATE_META[state]) || { color: 'rgb(84, 110, 122)', icon: 'mdi:shield-outline' }
 }
 
+function colorState(entity: HassEntity | null | undefined) {
+  const state = entity?.state ?? ''
+  return /^(#|rgb\(|rgba\(|hsl\(|hsla\()/i.test(state) ? state : undefined
+}
+
 function StatusChip({ chip, onOpenHash, subtitleOverride }: { chip: StatusRailChip; onOpenHash: (hash: string) => void; subtitleOverride?: string }) {
   const entity = useEntity(asEntityName(chip.entityId), { returnNullIfNotFound: true })
   const secondaryEntity = useEntity(asEntityName(chip.secondaryEntityId ?? chip.entityId), { returnNullIfNotFound: true })
+  const colorEntity = useEntity(asEntityName(chip.colorEntityId ?? chip.entityId), { returnNullIfNotFound: true })
   const stateKind = chip.stateKind ?? (chip.tone === 'security' ? 'security' : chip.icon)
   let primaryState = stateKind === 'presence' ? formatOccupancyEntityState(entity) : stateKind === 'contact' ? formatContactEntityState(entity) : formatCompactEntityState(entity)
   if (stateKind === 'contact' && !isContactOpen(entity) && chip.title.endsWith('s')) primaryState = 'All Closed'
@@ -40,6 +47,7 @@ function StatusChip({ chip, onOpenHash, subtitleOverride }: { chip: StatusRailCh
   const subtitle = subtitleOverride ?? (secondaryState ? `${primaryState} / ${secondaryState}` : primaryState)
   const isOff = stateKind === 'security' ? false : !isActiveState(entity) && !chip.secondaryEntityId
   const securityMeta = stateKind === 'security' ? securityStateMeta(entity?.state) : null
+  const dynamicColor = chip.colorEntityId ? colorState(colorEntity) : undefined
   const icon = securityMeta?.icon ?? (stateKind === 'presence' && isOff ? 'presence-off' : stateKind === 'contact' && isContactOpen(entity) ? 'contact-open' : chip.icon)
 
   return (
@@ -47,7 +55,7 @@ function StatusChip({ chip, onOpenHash, subtitleOverride }: { chip: StatusRailCh
       <GlassTile
         compact
         icon={icon}
-        iconColor={securityMeta?.color}
+        iconColor={securityMeta?.color ?? dynamicColor}
         isOff={isOff}
         onClick={chip.hash ? () => onOpenHash(chip.hash as string) : undefined}
         subtitle={subtitle}

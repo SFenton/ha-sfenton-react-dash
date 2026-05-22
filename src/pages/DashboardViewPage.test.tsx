@@ -439,9 +439,9 @@ describe('DashboardViewPage', () => {
   it('matches HASS Security garage door colors for closed, open, and closing states', () => {
     const closedView = render(<DashboardViewPage activePath="security" onNavigate={() => undefined} path="security" />)
 
-    expect(screen.getByRole('button', { name: /Left Door Closed/i })).toHaveStyle('--card-rgb: 67 160 71')
+    expect(screen.getByRole('button', { name: /Left Door Closed/i })).toHaveAttribute('data-tone', 'contact')
     expect(screen.getByRole('button', { name: /Left Door Closed/i })).toHaveAttribute('data-muted', 'false')
-    expect(screen.getByRole('button', { name: /Right Door Closed/i })).toHaveStyle('--card-rgb: 67 160 71')
+    expect(screen.getByRole('button', { name: /Right Door Closed/i })).toHaveAttribute('data-tone', 'contact')
     expect(screen.getByRole('button', { name: /Right Door Closed/i })).toHaveAttribute('data-muted', 'false')
     closedView.unmount()
 
@@ -449,9 +449,9 @@ describe('DashboardViewPage', () => {
     mockEntities['cover.right_door'].state = 'open'
     const openView = render(<DashboardViewPage activePath="security" onNavigate={() => undefined} path="security" />)
 
-    expect(screen.getByRole('button', { name: /Left Door Open/i })).toHaveStyle('--card-rgb: 229 57 53')
+    expect(screen.getByRole('button', { name: /Left Door Open/i })).toHaveAttribute('data-tone', 'danger')
     expect(screen.getByRole('button', { name: /Left Door Open/i })).toHaveAttribute('data-muted', 'false')
-    expect(screen.getByRole('button', { name: /Right Door Open/i })).toHaveStyle('--card-rgb: 229 57 53')
+    expect(screen.getByRole('button', { name: /Right Door Open/i })).toHaveAttribute('data-tone', 'danger')
     expect(screen.getByRole('button', { name: /Right Door Open/i })).toHaveAttribute('data-muted', 'false')
     openView.unmount()
 
@@ -459,9 +459,9 @@ describe('DashboardViewPage', () => {
     mockEntities['cover.right_door'].state = 'closing'
     render(<DashboardViewPage activePath="security" onNavigate={() => undefined} path="security" />)
 
-    expect(screen.getByRole('button', { name: /Left Door Closing/i })).toHaveStyle('--card-rgb: 30 136 229')
+    expect(screen.getByRole('button', { name: /Left Door Closing/i })).toHaveAttribute('data-tone', 'security')
     expect(screen.getByRole('button', { name: /Left Door Closing/i })).toHaveAttribute('data-muted', 'false')
-    expect(screen.getByRole('button', { name: /Right Door Closing/i })).toHaveStyle('--card-rgb: 30 136 229')
+    expect(screen.getByRole('button', { name: /Right Door Closing/i })).toHaveAttribute('data-tone', 'security')
     expect(screen.getByRole('button', { name: /Right Door Closing/i })).toHaveAttribute('data-muted', 'false')
   })
 

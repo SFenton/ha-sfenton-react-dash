@@ -87,6 +87,16 @@
   padding-top: 2px;
 }
 
+.airQualitySheet {
+  display: flex;
+  height: 100%;
+  min-height: 0;
+  flex-direction: column;
+  gap: 14px;
+  overflow: hidden;
+  padding-top: 2px;
+}
+
 .lightSectionHeader {
   flex: 0 0 auto;
   display: flex;
@@ -126,6 +136,12 @@
 }
 
 .roomContactGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.roomAirQualityGrid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
@@ -179,6 +195,18 @@
   -webkit-overflow-scrolling: touch;
 }
 
+.airQualityContent {
+  min-height: 0;
+  flex: 1 1 auto;
+  margin: 0 -16px;
+  padding: 0 16px 14px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  -webkit-overflow-scrolling: touch;
+}
+
 .lightContent::-webkit-scrollbar {
   display: none;
   width: 0;
@@ -203,6 +231,12 @@
   height: 0;
 }
 
+.airQualityContent::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
 .roomLightsOverview[data-exiting='true'] .roomLightCardShell {
   pointer-events: none;
   animation: lightCardsFadeAway 190ms cubic-bezier(.2,.9,.2,1) forwards;
@@ -219,6 +253,11 @@
 }
 
 .roomContactOverview[data-exiting='true'] .roomLightCardShell {
+  pointer-events: none;
+  animation: lightCardsFadeAway 190ms cubic-bezier(.2,.9,.2,1) forwards;
+}
+
+.roomAirQualityOverview[data-exiting='true'] .roomLightCardShell {
   pointer-events: none;
   animation: lightCardsFadeAway 190ms cubic-bezier(.2,.9,.2,1) forwards;
 }
@@ -392,6 +431,10 @@
   }
 
   .roomContactGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .roomAirQualityGrid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }

@@ -15,6 +15,7 @@ interface CardProps {
   muted?: boolean
   onClick?: MouseEventHandler<HTMLButtonElement>
   pressed?: boolean
+  secondarySubtitle?: string
   size?: 'standard' | 'compact'
   subtitle?: string
   title: string
@@ -32,6 +33,7 @@ export function Card({
   muted = false,
   onClick,
   pressed,
+  secondarySubtitle,
   size = 'standard',
   subtitle,
   title,
@@ -39,7 +41,7 @@ export function Card({
   const style: CardStyle = {
     '--card-rgb': `${color.r} ${color.g} ${color.b}`,
   }
-  const className = [styles.card, subtitle ? styles.hasSubtitle : '', size === 'compact' ? styles.compact : ''].filter(Boolean).join(' ')
+  const className = [styles.card, subtitle || secondarySubtitle ? styles.hasSubtitle : '', size === 'compact' ? styles.compact : ''].filter(Boolean).join(' ')
   const content = (
     <>
       <span aria-hidden="true" className={styles.icon}>
@@ -48,6 +50,7 @@ export function Card({
       <span className={styles.copy}>
         <span className={styles.title}>{title}</span>
         {subtitle && <span className={styles.subtitle}>{subtitle}</span>}
+        {secondarySubtitle && <span className={styles.secondarySubtitle}>{secondarySubtitle}</span>}
       </span>
     </>
   )
