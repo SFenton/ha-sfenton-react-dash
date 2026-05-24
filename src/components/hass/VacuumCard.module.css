@@ -28,6 +28,14 @@
   gap: 8px;
 }
 
+.statusPanel .settingPill {
+  border-color: rgba(255, 255, 255, 0.18);
+  background: var(--color-glass-soft);
+  box-shadow: var(--shadow-glass), inset 0 -1px 0 rgba(0, 0, 0, 0.12);
+  backdrop-filter: blur(15px) saturate(1.08);
+  -webkit-backdrop-filter: blur(15px) saturate(1.08);
+}
+
 .errorMessage {
   display: grid;
   grid-column: 1 / -1;
@@ -80,6 +88,20 @@
   height: 1px;
   border-radius: var(--radius-pill);
   background: linear-gradient(to right, rgba(255, 255, 255, 0.28), rgba(255, 255, 255, 0.07));
+}
+
+.sectionText {
+  display: grid;
+  gap: 7px;
+  padding: 0 3px 2px;
+}
+
+.sectionText p {
+  margin: 0;
+  color: white;
+  font-size: 0.76rem;
+  font-weight: 720;
+  line-height: 1.28;
 }
 
 .settingGrid {
@@ -217,6 +239,17 @@
 
 .singleAction .actionButton {
   min-height: 58px;
+  justify-content: flex-start;
+  text-align: left;
+}
+
+.singleAction .actionButton,
+.zoneButton {
+  border-color: rgba(255, 255, 255, 0.18);
+  background: var(--color-glass-soft);
+  box-shadow: var(--shadow-glass), inset 0 -1px 0 rgba(0, 0, 0, 0.12);
+  backdrop-filter: blur(15px) saturate(1.08);
+  -webkit-backdrop-filter: blur(15px) saturate(1.08);
 }
 
 .settingPill {
@@ -346,18 +379,28 @@
   display: inline-flex;
   min-height: 58px;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
+  gap: 10px;
   border-radius: 18px;
-  padding: 0 10px;
+  padding: 0 12px;
   cursor: pointer;
   font-size: 0.76rem;
   font-weight: 820;
   line-height: 1.1;
-  text-align: center;
+  text-align: left;
+}
+
+.zoneButton > span {
+  min-width: 0;
+}
+
+.zoneButton > svg {
+  flex: 0 0 auto;
 }
 
 .zoneButton[data-active='true'] {
-  background: rgba(67, 160, 71, 0.5);
+  border-color: rgba(129, 199, 132, 0.48);
+  background: linear-gradient(135deg, rgba(67, 160, 71, 0.62), rgba(67, 160, 71, 0.34)), var(--color-glass-soft);
 }
 
 .zoneButton:disabled {

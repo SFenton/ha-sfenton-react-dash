@@ -61,7 +61,7 @@ function ensureHaIconElement() {
   customElements.define(
     'ha-icon',
     class ReactDashHaIcon extends HTMLElement {
-      private iconName = 'mdi:home'
+      private iconName = ''
 
       static get observedAttributes() {
         return ['icon']
@@ -82,7 +82,7 @@ function ensureHaIconElement() {
       }
 
       attributeChangedCallback(_name: string, _oldValue: string | null, newValue: string | null) {
-        if (newValue) this.icon = newValue
+        this.icon = newValue ?? ''
       }
 
       connectedCallback() {
@@ -92,10 +92,12 @@ function ensureHaIconElement() {
       private render() {
         if (!this.shadowRoot) return
 
+        const iconPath = this.iconName ? materialIconPath(this.iconName) : ''
+
         this.shadowRoot.innerHTML = `
           <style>
             :host {
-              display: inline-grid;
+              display: ${iconPath ? 'inline-grid' : 'none'};
               width: 24px;
               height: 24px;
               place-items: center;
@@ -110,7 +112,7 @@ function ensureHaIconElement() {
             }
           </style>
           <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24">
-            <path d="${materialIconPath(this.iconName)}"></path>
+            <path d="${iconPath}"></path>
           </svg>
         `
       }

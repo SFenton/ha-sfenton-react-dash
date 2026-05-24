@@ -287,10 +287,12 @@ describe('DashboardViewPage', () => {
     fireEvent.click(within(passesPicker).getByRole('button', { name: 'Close' }))
     expect(screen.getByRole('button', { name: 'Clean' })).toHaveAttribute('data-icon', 'mdi:play')
     const zonesHeading = screen.getByRole('heading', { name: 'Zones' })
-    const emptyDockHeading = screen.getByRole('heading', { name: 'Empty Dock' })
-    expect(zonesHeading.compareDocumentPosition(emptyDockHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
-    expect(screen.getByRole('button', { name: 'Empty Dock' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /living room/i })).toBeInTheDocument()
+    expect(screen.getByText('Select any zones to focus cleaning in those areas. If you press clean and no zones are selected, we will clean all zones on the Main Floor.')).toBeInTheDocument()
+    expect(screen.getByText('Zones are not selectable or changeable while cleaning is ongoing.')).toBeInTheDocument()
+    const additionalControlsHeading = screen.getByRole('heading', { name: 'Additional Controls' })
+    expect(zonesHeading.compareDocumentPosition(additionalControlsHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Empty Dock' }).querySelector('path')).toHaveAttribute('d', materialIconPath('mdi:delete-restore'))
+    expect(screen.getByRole('button', { name: /living room/i }).querySelector('path')).toHaveAttribute('d', materialIconPath('mdi:sofa'))
   })
 
   it('runs source-derived vacuum modal services without activating hidden actions', async () => {

@@ -88,6 +88,16 @@ function SectionHeader({ title }: { title: string }) {
   )
 }
 
+function SectionText({ lines }: { lines?: string[] }) {
+  if (!lines?.length) return null
+
+  return (
+    <div className={styles.sectionText}>
+      {lines.map((line, index) => <p key={`${index}-${line}`}>{line}</p>)}
+    </div>
+  )
+}
+
 function ActionButton({
   icon,
   label,
@@ -243,7 +253,8 @@ function ZoneButton({ disabled, zone }: { disabled: boolean; zone: VacuumZoneCon
       onClick={() => callService({ domain: 'input_boolean', service: 'toggle', target: zone.entityId })}
       type="button"
     >
-      {zone.title}
+      <MaterialIcon name={zone.icon} size={22} />
+      <span>{zone.title}</span>
     </button>
   )
 }
@@ -351,9 +362,9 @@ function VacuumEmptyDockSection({ vacuum }: { vacuum: VacuumConfig }) {
 
   return (
     <section className={styles.section}>
-      <SectionHeader title="Empty Dock" />
+      <SectionHeader title="Additional Controls" />
       <div className={styles.singleAction}>
-        <ActionButton icon="mdi:home-export-outline" label="Empty Dock" onClick={emptyDock} variant="sub" />
+        <ActionButton icon="mdi:delete-restore" label="Empty Dock" onClick={emptyDock} variant="sub" />
       </div>
     </section>
   )
@@ -385,6 +396,7 @@ function VacuumZones({ vacuum }: { vacuum: VacuumConfig }) {
   return (
     <section className={styles.section}>
       <SectionHeader title="Zones" />
+      <SectionText lines={vacuum.zoneDescription} />
       <div className={styles.zones}>
         {vacuum.zones.map((zone) => <ZoneButton disabled={!editableZones} key={zone.entityId} zone={zone} />)}
       </div>

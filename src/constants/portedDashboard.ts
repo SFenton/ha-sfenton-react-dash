@@ -48,11 +48,13 @@ export interface VacuumConfig {
   statusFlagEntityId: string
   vacuumMapId: string
   waterEntityId?: string
+  zoneDescription?: string[]
   zones: VacuumZoneConfig[]
 }
 
 export interface VacuumZoneConfig {
   entityId: string
+  icon: string
   title: string
 }
 
@@ -153,10 +155,14 @@ export const VACUUMS: VacuumConfig[] = [
     statusFlagEntityId: 'sensor.valetudo_elatedusedram_status_flag',
     vacuumMapId: 'valetudo_elatedusedram',
     waterEntityId: 'select.valetudo_elatedusedram_water',
+    zoneDescription: [
+      'Select any zones to focus cleaning in those areas. If you press clean and no zones are selected, we will clean all zones in the Music Room.',
+      'Zones are not selectable or changeable while cleaning is ongoing.',
+    ],
     zones: [
-      { title: 'Clean Music Room', entityId: 'input_boolean.clean_music_room' },
-      { title: 'Clean Downstairs Hallway', entityId: 'input_boolean.clean_downstairs_hallway' },
-      { title: 'Clean Downstairs Bathroom', entityId: 'input_boolean.clean_downstairs_bathroom' },
+      { title: 'Clean Music Room', entityId: 'input_boolean.clean_music_room', icon: 'mdi:guitar-electric' },
+      { title: 'Clean Downstairs Hallway', entityId: 'input_boolean.clean_downstairs_hallway', icon: 'mdi:wardrobe' },
+      { title: 'Clean Downstairs Bathroom', entityId: 'input_boolean.clean_downstairs_bathroom', icon: 'mdi:shower-head' },
     ],
   },
   {
@@ -194,18 +200,22 @@ export const VACUUMS: VacuumConfig[] = [
     statusFlagEntityId: 'sensor.valetudo_exaltedsneakydeer_status_flag',
     vacuumMapId: 'valetudo_exaltedsneakydeer',
     waterEntityId: 'select.valetudo_exaltedsneakydeer_water',
+    zoneDescription: [
+      'Select any zones to focus cleaning in those areas. If you press clean and no zones are selected, we will clean all zones on the Main Floor.',
+      'Zones are not selectable or changeable while cleaning is ongoing.',
+    ],
     zones: [
-      { title: 'Living Room', entityId: 'input_boolean.roborock_living_room_toggle' },
-      { title: 'Master Bedroom', entityId: 'input_boolean.roborock_master_bedroom_toggle' },
-      { title: 'Kitchen', entityId: 'input_boolean.roborock_kitchen_toggle' },
-      { title: 'Office', entityId: 'input_boolean.roborock_office_toggle' },
-      { title: 'Hallway', entityId: 'input_boolean.roborock_hallway_toggle' },
-      { title: 'Guest Room', entityId: 'input_boolean.roborock_guest_room_toggle' },
-      { title: 'Master Bathroom', entityId: 'input_boolean.roborock_master_bathroom_toggle' },
-      { title: 'Guest Bathroom', entityId: 'input_boolean.roborock_guest_bathroom_toggle' },
-      { title: 'Gym', entityId: 'input_boolean.roborock_gym_toggle' },
-      { title: 'Closet', entityId: 'input_boolean.roborock_master_bedroom_closet_toggle' },
-      { title: 'Dining Room', entityId: 'input_boolean.roborock_dining_room_toggle' },
+      { title: 'Living Room', entityId: 'input_boolean.roborock_living_room_toggle', icon: 'mdi:sofa' },
+      { title: 'Master Bedroom', entityId: 'input_boolean.roborock_master_bedroom_toggle', icon: 'mdi:bed-double' },
+      { title: 'Kitchen', entityId: 'input_boolean.roborock_kitchen_toggle', icon: 'mdi:fridge' },
+      { title: 'Office', entityId: 'input_boolean.roborock_office_toggle', icon: 'mdi:laptop' },
+      { title: 'Hallway', entityId: 'input_boolean.roborock_hallway_toggle', icon: 'mdi:wardrobe' },
+      { title: 'Guest Room', entityId: 'input_boolean.roborock_guest_room_toggle', icon: 'mdi:bed' },
+      { title: 'Master Bathroom', entityId: 'input_boolean.roborock_master_bathroom_toggle', icon: 'mdi:shower' },
+      { title: 'Guest Bathroom', entityId: 'input_boolean.roborock_guest_bathroom_toggle', icon: 'mdi:shower' },
+      { title: 'Gym', entityId: 'input_boolean.roborock_gym_toggle', icon: 'mdi:weight-lifter' },
+      { title: 'Closet', entityId: 'input_boolean.roborock_master_bedroom_closet_toggle', icon: 'mdi:wardrobe' },
+      { title: 'Dining Room', entityId: 'input_boolean.roborock_dining_room_toggle', icon: 'mdi:silverware-fork-knife' },
     ],
   },
 ]
