@@ -1,5 +1,5 @@
 import { useEntity, useHass } from '@hakit/core'
-import { useEffect, useRef, useState, type RefObject } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { HassEntity } from 'home-assistant-js-websocket'
 import { ClimateCard } from '../components/cards/ClimateCard'
 import { ContactSensorCard } from '../components/cards/ContactSensorCard'
@@ -36,7 +36,6 @@ import {
   type QuickAccessConfig,
 } from '../constants/atAGlance'
 import { buildStaggerStyle, staggerMs } from '../hooks/useStaggerStyle'
-import { useScrollFade } from '../hooks/useScrollFade'
 import { useHashModal } from '../hooks/useHashModal'
 import styles from './AtAGlancePage.module.css'
 import { Page } from './Page'
@@ -423,10 +422,10 @@ function RoomLightDetailHeader({ group, onBack, onToggle }: { group: EntityGroup
   )
 }
 
-function RoomLightDetailCards({ group, gridRef, onToggle }: { group: EntityGroupConfig; gridRef: RefObject<HTMLDivElement | null>; onToggle: (entityId: string) => void }) {
+function RoomLightDetailCards({ group, onToggle }: { group: EntityGroupConfig; onToggle: (entityId: string) => void }) {
   return (
     <section className={styles.roomLightDetail}>
-      <div className={styles.roomLightGrid} ref={gridRef}>
+      <div className={styles.roomLightGrid}>
         {group.items.map((item, index) => (
           <div className={styles.roomLightCardShell} key={item.entityId} style={buildStaggerStyle(staggerMs(index, 42, 92))}>
             <LightCard entityId={item.entityId} onClick={() => onToggle(item.entityId)} pressed size="compact" title={item.title} />
@@ -442,12 +441,8 @@ export function LightsSheet({ directGroup }: { directGroup?: EntityGroupConfig }
   const [selectedGroup, setSelectedGroup] = useState<EntityGroupConfig | null>(directGroup ?? null)
   const [roomCardsExiting, setRoomCardsExiting] = useState(false)
   const transitionTimer = useRef<number | null>(null)
-  const lightContentRef = useRef<HTMLDivElement>(null)
-  const lightGridRef = useRef<HTMLDivElement>(null)
   const roomGroups = ROOM_LIGHT_GROUPS
   const directMode = Boolean(directGroup)
-
-  useScrollFade(lightContentRef, lightGridRef, [selectedGroup?.title, roomCardsExiting], { distance: 42 })
 
   useEffect(() => {
     return () => {
@@ -479,12 +474,12 @@ export function LightsSheet({ directGroup }: { directGroup?: EntityGroupConfig }
   return (
     <div className={styles.lightsSheet}>
       {selectedGroup ? <RoomLightDetailHeader group={selectedGroup} onBack={directMode ? undefined : showRoomOverview} onToggle={toggleEntity} /> : <RoomsHeader />}
-      <div className={styles.lightContent} ref={lightContentRef}>
+      <div className={styles.lightContent}>
         {selectedGroup ? (
-          <RoomLightDetailCards group={selectedGroup} gridRef={lightGridRef} onToggle={toggleEntity} />
+          <RoomLightDetailCards group={selectedGroup} onToggle={toggleEntity} />
         ) : (
           <section className={styles.roomLightsOverview} data-exiting={roomCardsExiting}>
-            <div className={styles.roomLightGrid} ref={lightGridRef}>
+            <div className={styles.roomLightGrid}>
               {roomGroups.map((group, index) => (
                 <div className={styles.roomLightCardShell} key={group.title} style={roomCardsExiting ? undefined : buildStaggerStyle(staggerMs(index, 38, 76))}>
                   <RoomLightOverviewCard group={group} onSelect={selectGroup} />
@@ -539,7 +534,7 @@ function RoomClimateDetailHeader({ group, onBack }: { group: EntityGroupConfig; 
   )
 }
 
-function RoomClimateDetailCards({ group, gridRef }: { group: EntityGroupConfig; gridRef: RefObject<HTMLDivElement | null> }) {
+function RoomClimateDetailCards({ group }: { group: EntityGroupConfig }) {
   const color = climateGroupColor(group)
   const temperatureItems = group.items.filter((item) => !isVentClimateItem(item.entityId))
   const ventItems = group.items.filter((item) => isVentClimateItem(item.entityId))
@@ -556,7 +551,7 @@ function RoomClimateDetailCards({ group, gridRef }: { group: EntityGroupConfig; 
 
   return (
     <section className={styles.roomClimateDetail}>
-      <div className={styles.roomClimateDetailContent} ref={gridRef}>
+      <div className={styles.roomClimateDetailContent}>
         {temperatureItems.length > 0 && (
           <section className={styles.roomClimateDetailSection}>
             <div className={styles.lightSectionHeader}>
@@ -584,12 +579,8 @@ export function ClimateSheet({ directGroup }: { directGroup?: EntityGroupConfig 
   const [selectedGroup, setSelectedGroup] = useState<EntityGroupConfig | null>(directGroup ?? null)
   const [roomCardsExiting, setRoomCardsExiting] = useState(false)
   const transitionTimer = useRef<number | null>(null)
-  const climateContentRef = useRef<HTMLDivElement>(null)
-  const climateGridRef = useRef<HTMLDivElement>(null)
   const roomGroups = ROOM_CLIMATE_GROUPS
   const directMode = Boolean(directGroup)
-
-  useScrollFade(climateContentRef, climateGridRef, [selectedGroup?.title, roomCardsExiting], { distance: 42 })
 
   useEffect(() => {
     return () => {
@@ -617,12 +608,12 @@ export function ClimateSheet({ directGroup }: { directGroup?: EntityGroupConfig 
   return (
     <div className={styles.climateSheet}>
       {selectedGroup ? <RoomClimateDetailHeader group={selectedGroup} onBack={directMode ? undefined : showRoomOverview} /> : <RoomsHeader />}
-      <div className={styles.climateContent} ref={climateContentRef}>
+      <div className={styles.climateContent}>
         {selectedGroup ? (
-          <RoomClimateDetailCards group={selectedGroup} gridRef={climateGridRef} />
+          <RoomClimateDetailCards group={selectedGroup} />
         ) : (
           <section className={styles.roomClimateOverview} data-exiting={roomCardsExiting}>
-            <div className={styles.roomClimateGrid} ref={climateGridRef}>
+            <div className={styles.roomClimateGrid}>
               {roomGroups.map((group, index) => (
                 <div className={styles.roomLightCardShell} key={group.title} style={roomCardsExiting ? undefined : buildStaggerStyle(staggerMs(index, 38, 76))}>
                   <RoomClimateOverviewCard group={group} onSelect={selectGroup} />
@@ -673,12 +664,12 @@ function RoomOccupancyDetailHeader({ group, onBack }: { group: EntityGroupConfig
   )
 }
 
-function RoomOccupancyDetailCards({ group, gridRef }: { group: EntityGroupConfig; gridRef: RefObject<HTMLDivElement | null> }) {
+function RoomOccupancyDetailCards({ group }: { group: EntityGroupConfig }) {
   const color = occupancyGroupColor(group)
 
   return (
     <section className={styles.roomOccupancyDetail}>
-      <div className={styles.roomOccupancyGrid} ref={gridRef}>
+      <div className={styles.roomOccupancyGrid}>
         {group.items.map((item, index) => (
           <div className={styles.roomLightCardShell} key={item.entityId} style={buildStaggerStyle(staggerMs(index, 42, 92))}>
             <OccupancyCard color={color} entityId={item.entityId} size="compact" title={item.title} />
@@ -693,12 +684,8 @@ export function OccupancySheet({ directGroup }: { directGroup?: EntityGroupConfi
   const [selectedGroup, setSelectedGroup] = useState<EntityGroupConfig | null>(directGroup ?? null)
   const [roomCardsExiting, setRoomCardsExiting] = useState(false)
   const transitionTimer = useRef<number | null>(null)
-  const occupancyContentRef = useRef<HTMLDivElement>(null)
-  const occupancyGridRef = useRef<HTMLDivElement>(null)
   const roomGroups = ROOM_OCCUPANCY_GROUPS
   const directMode = Boolean(directGroup)
-
-  useScrollFade(occupancyContentRef, occupancyGridRef, [selectedGroup?.title, roomCardsExiting], { distance: 42 })
 
   useEffect(() => {
     return () => {
@@ -726,12 +713,12 @@ export function OccupancySheet({ directGroup }: { directGroup?: EntityGroupConfi
   return (
     <div className={styles.occupancySheet}>
       {selectedGroup ? <RoomOccupancyDetailHeader group={selectedGroup} onBack={directMode ? undefined : showRoomOverview} /> : <RoomsHeader />}
-      <div className={styles.occupancyContent} ref={occupancyContentRef}>
+      <div className={styles.occupancyContent}>
         {selectedGroup ? (
-          <RoomOccupancyDetailCards group={selectedGroup} gridRef={occupancyGridRef} />
+          <RoomOccupancyDetailCards group={selectedGroup} />
         ) : (
           <section className={styles.roomOccupancyOverview} data-exiting={roomCardsExiting}>
-            <div className={styles.roomOccupancyGrid} ref={occupancyGridRef}>
+            <div className={styles.roomOccupancyGrid}>
               {roomGroups.map((group, index) => (
                 <div className={styles.roomLightCardShell} key={group.title} style={roomCardsExiting ? undefined : buildStaggerStyle(staggerMs(index, 38, 76))}>
                   <RoomOccupancyOverviewCard group={group} onSelect={selectGroup} />
@@ -783,12 +770,12 @@ function RoomContactDetailHeader({ group, onBack }: { group: EntityGroupConfig; 
   )
 }
 
-function RoomContactDetailCards({ group, gridRef }: { group: EntityGroupConfig; gridRef: RefObject<HTMLDivElement | null> }) {
+function RoomContactDetailCards({ group }: { group: EntityGroupConfig }) {
   const color = contactGroupColor(group)
 
   return (
     <section className={styles.roomContactDetail}>
-      <div className={styles.roomContactGrid} ref={gridRef}>
+      <div className={styles.roomContactGrid}>
         {group.items.map((item, index) => (
           <div className={styles.roomLightCardShell} key={item.entityId} style={buildStaggerStyle(staggerMs(index, 42, 92))}>
             <ContactSensorCard color={color} entityId={item.entityId} size="compact" title={item.title} />
@@ -803,12 +790,8 @@ export function ContactSheet({ directGroup }: { directGroup?: EntityGroupConfig 
   const [selectedGroup, setSelectedGroup] = useState<EntityGroupConfig | null>(directGroup ?? null)
   const [roomCardsExiting, setRoomCardsExiting] = useState(false)
   const transitionTimer = useRef<number | null>(null)
-  const contactContentRef = useRef<HTMLDivElement>(null)
-  const contactGridRef = useRef<HTMLDivElement>(null)
   const roomGroups = ROOM_CONTACT_GROUPS
   const directMode = Boolean(directGroup)
-
-  useScrollFade(contactContentRef, contactGridRef, [selectedGroup?.title, roomCardsExiting], { distance: 42 })
 
   useEffect(() => {
     return () => {
@@ -836,12 +819,12 @@ export function ContactSheet({ directGroup }: { directGroup?: EntityGroupConfig 
   return (
     <div className={styles.contactSheet}>
       {selectedGroup ? <RoomContactDetailHeader group={selectedGroup} onBack={directMode ? undefined : showRoomOverview} /> : <RoomsHeader />}
-      <div className={styles.contactContent} ref={contactContentRef}>
+      <div className={styles.contactContent}>
         {selectedGroup ? (
-          <RoomContactDetailCards group={selectedGroup} gridRef={contactGridRef} />
+          <RoomContactDetailCards group={selectedGroup} />
         ) : (
           <section className={styles.roomContactOverview} data-exiting={roomCardsExiting}>
-            <div className={styles.roomContactGrid} ref={contactGridRef}>
+            <div className={styles.roomContactGrid}>
               {roomGroups.map((group, index) => (
                 <div className={styles.roomLightCardShell} key={group.title} style={roomCardsExiting ? undefined : buildStaggerStyle(staggerMs(index, 38, 76))}>
                   <RoomContactOverviewCard group={group} onSelect={selectGroup} />
@@ -884,17 +867,12 @@ function RoomAirQualityOverviewCard({ room }: { room: AirQualityRoomConfig }) {
 }
 
 export function AirQualitySheet() {
-  const airQualityContentRef = useRef<HTMLDivElement>(null)
-  const airQualityGridRef = useRef<HTMLDivElement>(null)
-
-  useScrollFade(airQualityContentRef, airQualityGridRef, [], { distance: 42 })
-
   return (
     <div className={styles.airQualitySheet}>
       <RoomsHeader />
-      <div className={styles.airQualityContent} ref={airQualityContentRef}>
+      <div className={styles.airQualityContent}>
         <section className={styles.roomAirQualityOverview}>
-          <div className={styles.roomAirQualityGrid} ref={airQualityGridRef}>
+          <div className={styles.roomAirQualityGrid}>
             {ROOM_AIR_QUALITY_GROUPS.map((room, index) => (
               <div className={styles.roomLightCardShell} key={room.title} style={buildStaggerStyle(staggerMs(index, 38, 76))}>
                 <RoomAirQualityOverviewCard room={room} />

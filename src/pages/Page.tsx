@@ -1,6 +1,5 @@
-import { useRef, type ReactNode } from 'react'
+import type { ReactNode } from 'react'
 import { MaterialIcon } from '../components/core/Icon'
-import { useScrollFade, type ScrollFadeOptions } from '../hooks/useScrollFade'
 import styles from './Page.module.css'
 
 interface PageProps {
@@ -9,14 +8,9 @@ interface PageProps {
   children: ReactNode
   onProfile?: () => void
   onSettings?: () => void
-  scrollFadeOptions?: ScrollFadeOptions
 }
 
-export function Page({ title, headerQuickLinks, children, onProfile, onSettings, scrollFadeOptions }: PageProps) {
-  const scrollerRef = useRef<HTMLDivElement>(null)
-  const scrollContentRef = useRef<HTMLDivElement>(null)
-  useScrollFade(scrollerRef, scrollContentRef, [children], scrollFadeOptions)
-
+export function Page({ title, headerQuickLinks, children, onProfile, onSettings }: PageProps) {
   return (
     <main className={styles.page}>
       <div className={styles.headerDock}>
@@ -33,8 +27,8 @@ export function Page({ title, headerQuickLinks, children, onProfile, onSettings,
         </header>
         {headerQuickLinks && <div className={styles.headerQuickLinks}>{headerQuickLinks}</div>}
       </div>
-      <div className={styles.scroller} ref={scrollerRef}>
-        <div className={styles.scrollContent} ref={scrollContentRef}>{children}</div>
+      <div className={styles.scroller}>
+        <div className={styles.scrollContent}>{children}</div>
       </div>
     </main>
   )
