@@ -18,7 +18,7 @@ interface OccupancyCardProps {
 const DEFAULT_OCCUPANCY_COLOR: CardColor = { r: 46, g: 180, b: 120 }
 
 function OccupancyIcon({ active }: { active: boolean }) {
-  return <MaterialIcon name={active ? 'mdi:account-check' : 'mdi:checkbox-blank-circle-outline'} size={38} />
+  return <MaterialIcon name={active ? 'mdi:motion-sensor' : 'mdi:motion-sensor-off'} size={38} />
 }
 
 export function OccupancyCard({ active, ariaLabel, color = DEFAULT_OCCUPANCY_COLOR, entityId, icon, onClick, size = 'standard', subtitle, title }: OccupancyCardProps) {
