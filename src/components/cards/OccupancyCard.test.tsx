@@ -6,8 +6,8 @@ describe('OccupancyCard', () => {
   it('uses the Home Assistant occupancy icon pair for detected and clear states', () => {
     render(
       <>
-        <OccupancyCard entityId="binary_sensor.living_room_presence_sensor_occupancy" title="Back Wall" />
-        <OccupancyCard entityId="binary_sensor.aqara_presence_multisensor_fp300_occupancy_9" title="Bar" />
+        <OccupancyCard entityId="binary_sensor.living_room_back_wall_presence_occupancy" title="Back Wall" />
+        <OccupancyCard entityId="binary_sensor.living_room_bar_presence_occupancy" title="Bar" />
       </>,
     )
 

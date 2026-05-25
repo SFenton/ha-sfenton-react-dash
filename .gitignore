@@ -16,7 +16,6 @@ test-results
 test-results.xml
 tmp-*.png
 modified_files.txt
-migration-backups/
 
 # Editor directories and files
 .vscode/*
