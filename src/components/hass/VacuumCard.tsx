@@ -98,6 +98,11 @@ function SectionText({ lines }: { lines?: string[] }) {
   )
 }
 
+function stringListAttribute(entity: EntityLike | null | undefined, name: string) {
+  const value = entity?.attributes[name]
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string' && item.trim().length > 0) : []
+}
+
 function ActionButton({
   icon,
   label,
@@ -382,6 +387,38 @@ function VacuumControlsSection({ vacuum }: { vacuum: VacuumConfig }) {
   )
 }
 
+function VacuumWhileAwaySection({ vacuum }: { vacuum: VacuumConfig }) {
+  const session = useOptionalEntity(vacuum.coordinatorSessionEntityId)
+  const cleaned = stringListAttribute(session, 'while_away_cleaned')
+  const issues = stringListAttribute(session, 'while_away_issues')
+
+  if (!cleaned.length && !issues.length) return null
+
+  return (
+    <section className={styles.section}>
+      <SectionHeader title="While You Were Away" />
+      <div className={styles.awaySummary}>
+        {cleaned.length > 0 && (
+          <div className={styles.awayGroup}>
+            <h4>Cleaned</h4>
+            <ul>
+              {cleaned.map((line) => <li key={line}>{line}</li>)}
+            </ul>
+          </div>
+        )}
+        {issues.length > 0 && (
+          <div className={styles.awayGroup} data-tone="issue">
+            <h4>Issues</h4>
+            <ul>
+              {issues.map((line) => <li key={line}>{line}</li>)}
+            </ul>
+          </div>
+        )}
+      </div>
+    </section>
+  )
+}
+
 function VacuumZones({ vacuum }: { vacuum: VacuumConfig }) {
   const entity = useEntity(asEntityName(vacuum.entityId), { returnNullIfNotFound: true })
   const statusFlag = useEntity(asEntityName(vacuum.statusFlagEntityId), { returnNullIfNotFound: true })
@@ -408,6 +445,7 @@ function VacuumControls({ vacuum }: { vacuum: VacuumConfig }) {
   return (
     <>
       <VacuumStatusSummary vacuum={vacuum} />
+      <VacuumWhileAwaySection vacuum={vacuum} />
       <VacuumControlsSection vacuum={vacuum} />
       <VacuumZones vacuum={vacuum} />
       <VacuumEmptyDockSection vacuum={vacuum} />

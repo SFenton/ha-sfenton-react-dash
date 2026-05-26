@@ -36,6 +36,7 @@ export interface VacuumConfig {
   entityId: string
   batteryEntityId: string
   cleanScript: string
+  coordinatorSessionEntityId?: string
   dockButtonEntityId?: string
   errorEntityId: string
   errorMessageEntityId: string
@@ -188,6 +189,7 @@ export const VACUUMS: VacuumConfig[] = [
     entityId: 'vacuum.valetudo_exaltedsneakydeer',
     batteryEntityId: 'sensor.valetudo_exaltedsneakydeer_battery_level',
     cleanScript: 'script.main_floor_vacuum_clean_selected_segments',
+    coordinatorSessionEntityId: 'sensor.main_floor_vacuum_coordinator_session_state',
     dockButtonEntityId: 'button.valetudo_exaltedsneakydeer_trigger_auto_empty_dock',
     errorEntityId: 'sensor.valetudo_exaltedsneakydeer_error',
     errorMessageEntityId: 'input_text.main_floor_vacuum_error_message',
