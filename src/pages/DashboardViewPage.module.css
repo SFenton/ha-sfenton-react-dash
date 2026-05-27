@@ -15,6 +15,65 @@
   gap: 10px;
 }
 
+.adminWideGrid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+
+.adminModalGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.adminDescription {
+  display: grid;
+  gap: 10px;
+  padding: 0 4px;
+  color: #fff;
+  background: transparent;
+  font-size: 0.82rem;
+  font-weight: 730;
+  line-height: 1.38;
+}
+
+.adminDescription p {
+  margin: 0;
+}
+
+.adminHashButton {
+  position: relative;
+  display: flex;
+  min-height: 116px;
+  width: 100%;
+  align-items: center;
+  justify-content: flex-start;
+  border: 0;
+  border-radius: 24px;
+  padding: 18px;
+  color: white;
+  background: rgb(67 160 71 / 0.6);
+  box-shadow: var(--shadow-glass), inset 0 1px 0 rgba(255, 255, 255, 0.18), inset 0 -1px 0 rgba(0, 0, 0, 0.14);
+  backdrop-filter: blur(15px) saturate(1.12);
+  -webkit-backdrop-filter: blur(15px) saturate(1.12);
+  font: inherit;
+  font-size: 0.94rem;
+  font-weight: 820;
+  line-height: 1.12;
+  text-align: left;
+  cursor: pointer;
+  transition: transform var(--duration-fast) ease, background var(--duration-fast) ease;
+}
+
+.adminHashButton:active {
+  transform: scale(0.975);
+}
+
+.adminModalBody {
+  margin: 0;
+}
+
 .roomRail {
   display: flex;
   gap: 8px;

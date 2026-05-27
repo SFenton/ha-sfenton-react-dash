@@ -100,6 +100,64 @@ describe('DashboardViewPage', () => {
     ])
   })
 
+  it('ports the Admin page sections, descriptions, and presence override modal', async () => {
+    render(<DashboardViewPage activePath="admin" onNavigate={() => undefined} path="admin" />)
+
+    expect(screen.getByRole('heading', { name: 'Admin' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Security Controls' })).toBeInTheDocument()
+    expect(screen.getByText('Disables automatic locking of the front door. Useful for when contractors are over, or we have people frequently entering/leaving the home.')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Front Door Auto-Lock On/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Front Door Auto-Lock On/i })).toHaveStyle({ '--card-rgb': '67 160 71' })
+    expect(screen.getByRole('heading', { name: 'Presence-Based Light Overrides' })).toBeInTheDocument()
+    expect(screen.getByText('Enable or disable presence-based lighting in specific rooms. Useful for when we have company, or need to quickly keep lights on or off without using the voice commands.')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Open Presence-Based Overrides' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Open Presence-Based Overrides' })).toHaveAttribute('data-tone', 'switch-active')
+    expect(screen.getByRole('heading', { name: 'Show Specific Controls' })).toBeInTheDocument()
+    expect(screen.getByText("Shows the outdoor faucets in our Home Assistant pages. Useful to disable during the winter, when we aren't using them.")).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Outdoor Faucets Off/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Christmas Lights Off/i })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Automatic Presence Setting Overrides' })).toBeInTheDocument()
+    expect(screen.getByText("Sometimes, we disable automatic presence-based lighting in rooms that we'd otherwise want to wake up and have that presence-based lighting active.")).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Open Presence-Based Auto-Reset Configuration' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Open Presence-Based Auto-Reset Configuration' })).toHaveAttribute('data-tone', 'switch-active')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open Presence-Based Overrides' }))
+    expect(await screen.findByRole('dialog')).toBeInTheDocument()
+    expect(screen.getByRole('dialog')).toHaveAttribute('data-surface', 'hass-popup')
+    expect(screen.getByRole('heading', { name: 'Presence-Based Overrides' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Living Room On · Active/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Living Room On · Active/i })).toHaveStyle({ '--card-rgb': '67 160 71' })
+    expect(screen.getByRole('button', { name: /Living Room On · Active/i }).querySelector('path')).toHaveAttribute('d', materialIconPath('mdi:lightbulb-auto'))
+    expect(screen.getByRole('button', { name: /Upper Deck On · Active/i })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /Living Room On · Active/i }))
+
+    expect(mockCallServiceCalls).toEqual([
+      {
+        domain: 'script',
+        service: 'toggle_presence_lighting_override',
+        serviceData: { presence_switch: 'switch.living_room_presence_living_room_lights_presence_allowed' },
+      },
+    ])
+  })
+
+  it('opens the Admin auto-reset modal and toggles room auto re-enable switches', async () => {
+    render(<DashboardViewPage activePath="admin" onNavigate={() => undefined} path="admin" />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open Presence-Based Auto-Reset Configuration' }))
+
+    expect(await screen.findByRole('dialog')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Presence-Based Overrides Auto-Reset' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Living Room On/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Living Room On/i })).toHaveStyle({ '--card-rgb': '67 160 71' })
+    expect(screen.getByRole('button', { name: /Living Room On/i }).querySelector('path')).toHaveAttribute('d', materialIconPath('mdi:autorenew'))
+    expect(screen.getByRole('button', { name: /Upper Deck On/i })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /Kitchen On/i }))
+
+    expect(mockCallServiceCalls).toEqual([
+      { domain: 'homeassistant', service: 'toggle', target: 'switch.kitchen_auto_re_enable_presence_lighting' },
+    ])
+  })
+
   it('shows manual air purifier fan speeds and runs fan percentage services', async () => {
     mockEntities['select.living_room_air_purifier_fan_mode'].state = 'Manual'
     mockEntities['fan.living_room_air_purifier_levoit_purifier'].attributes.percentage = 66

@@ -24,6 +24,44 @@ export function entity(entityId: string, state: string, attributes: Record<strin
 
 export const mockCallServiceCalls: Record<string, unknown>[] = []
 
+const adminPresenceSwitchEntityIds = [
+  'switch.living_room_presence_living_room_lights_presence_allowed',
+  'switch.kitchen_presence_kitchen_lights_presence_allowed',
+  'switch.hallway_presence_hallway_lights_presence_allowed',
+  'switch.gym_presence_gym_light_presence_allowed',
+  'switch.guest_bathroom_presence_guest_bathroom_dimmer_switch_presence_allowed',
+  'switch.guest_room_presence_guest_room_presence_allowed',
+  'switch.office_presence_office_light_presence_allowed',
+  'switch.master_bedroom_presence_master_bedroom_presence_allowed',
+  'switch.master_bathroom_presence_master_bathroom_dimmer_switch_presence_allowed',
+  'switch.dining_room_presence_dining_room_dimmer_switch_presence_allowed',
+  'switch.theater_room_presence_theater_room_presence_allowed',
+  'switch.downstairs_hallway_presence_downstairs_hallway_light_presence_allowed',
+  'switch.music_room_presence_music_room_lights_presence_allowed',
+  'switch.upper_deck_presence_back_deck_lights_presence_allowed',
+] as const
+
+const adminAutoReEnableSwitchEntityIds = [
+  'switch.living_room_auto_re_enable_presence_lighting',
+  'switch.kitchen_auto_re_enable_presence_lighting',
+  'switch.hallway_auto_re_enable_presence_lighting',
+  'switch.gym_auto_re_enable_presence_lighting',
+  'switch.guest_bathroom_auto_re_enable_presence_lighting',
+  'switch.guest_room_auto_re_enable_presence_lighting',
+  'switch.office_auto_re_enable_presence_lighting',
+  'switch.master_bedroom_auto_re_enable_presence_lighting',
+  'switch.master_bathroom_auto_re_enable_presence_lighting',
+  'switch.dining_room_auto_re_enable_presence_lighting',
+  'switch.theater_room_auto_re_enable_presence_lighting',
+  'switch.downstairs_hallway_auto_re_enable_presence_lighting',
+  'switch.music_room_auto_re_enable_presence_lighting',
+  'switch.upper_deck_auto_re_enable_presence_lighting',
+] as const
+
+function mockSwitchEntities(entityIds: readonly string[], attributes: Record<string, unknown> = {}) {
+  return Object.fromEntries(entityIds.map((entityId) => [entityId, entity(entityId, 'on', attributes)]))
+}
+
 export const mockEntities: Record<string, MockEntity> = {
   'alarm_control_panel.aqara_hub_m3_0056_security_system_2': entity('alarm_control_panel.aqara_hub_m3_0056_security_system_2', 'armed_home'),
   'binary_sensor.all_contact_sensors': entity('binary_sensor.all_contact_sensors', 'off'),
@@ -53,6 +91,9 @@ export const mockEntities: Record<string, MockEntity> = {
   'input_boolean.stephen_s_pc_power': entity('input_boolean.stephen_s_pc_power', 'off'),
   'input_boolean.steph_s_pc_power': entity('input_boolean.steph_s_pc_power', 'off'),
   'input_boolean.theater_pc_power': entity('input_boolean.theater_pc_power', 'off'),
+  'input_boolean.is_front_door_auto_lock_enabled': entity('input_boolean.is_front_door_auto_lock_enabled', 'on'),
+  'input_boolean.show_outdoor_faucets': entity('input_boolean.show_outdoor_faucets', 'off'),
+  'input_boolean.show_christmas_lights': entity('input_boolean.show_christmas_lights', 'off'),
   'input_boolean.is_driveway_recording': entity('input_boolean.is_driveway_recording', 'on'),
   'input_boolean.is_front_door_recording': entity('input_boolean.is_front_door_recording', 'off'),
   'input_boolean.is_lower_deck_recording': entity('input_boolean.is_lower_deck_recording', 'on'),
@@ -143,6 +184,8 @@ export const mockEntities: Record<string, MockEntity> = {
   'sensor.theater_room_air_purifier_pm2_5': entity('sensor.theater_room_air_purifier_pm2_5', '2', { unit_of_measurement: 'μg/m³' }),
   'switch.d8478fa2ad0a_keep_warm_enabled': entity('switch.d8478fa2ad0a_keep_warm_enabled', 'off'),
   'switch.d8478fa2ad0a_super_smoke_enabled': entity('switch.d8478fa2ad0a_super_smoke_enabled', 'off'),
+  ...mockSwitchEntities(adminPresenceSwitchEntityIds, { automation_paused: false }),
+  ...mockSwitchEntities(adminAutoReEnableSwitchEntityIds),
   'todo.shopping_list': entity('todo.shopping_list', '2'),
   'todo.groceries': entity('todo.groceries', '1'),
   'todo.stephen_s_past_due_with_unassigned': entity('todo.stephen_s_past_due_with_unassigned', '1'),

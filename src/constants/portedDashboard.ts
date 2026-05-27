@@ -3,7 +3,14 @@ import type { CardColor } from '../components/core/Card'
 export type EntityAction =
   | { type: 'navigate'; path: string }
   | { type: 'toggle' }
-  | { type: 'service'; domain: string; service: string; target?: string; serviceData?: Record<string, unknown> }
+  | { type: 'service'; domain: string; service: string; target?: string | null; serviceData?: Record<string, unknown> }
+
+export interface EntityStateLabelConfig {
+  attribute: string
+  falseLabel: string
+  includeState?: boolean
+  trueLabel: string
+}
 
 export interface EntityTileConfig {
   title: string
@@ -14,6 +21,7 @@ export interface EntityTileConfig {
   disabledWhenUnavailable?: boolean
   manualReview?: boolean
   showSubtitle?: boolean
+  stateLabel?: EntityStateLabelConfig
 }
 
 export interface EntitySectionConfig {
@@ -72,6 +80,77 @@ export const VACUUM_COLOR: CardColor = { r: 67, g: 160, b: 71 }
 export const MEDIA_COLOR: CardColor = { r: 218, g: 88, b: 132 }
 export const CONTROL_COLOR: CardColor = { r: 75, g: 126, b: 210 }
 export const UNAVAILABLE_COLOR: CardColor = { r: 255, g: 255, b: 255 }
+export const SWITCH_ACTIVE_COLOR: CardColor = { r: 67, g: 160, b: 71 }
+
+export const ADMIN_DESCRIPTIONS = {
+  autoLock: 'Disables automatic locking of the front door. Useful for when contractors are over, or we have people frequently entering/leaving the home.',
+  presenceOverrides: 'Enable or disable presence-based lighting in specific rooms. Useful for when we have company, or need to quickly keep lights on or off without using the voice commands.',
+  showSpecific: "Shows the outdoor faucets in our Home Assistant pages. Useful to disable during the winter, when we aren't using them.",
+  autoReset:
+    "Sometimes, we disable automatic presence-based lighting in rooms that we'd otherwise want to wake up and have that presence-based lighting active.\n\nIf a toggle here is enabled, it means that in the morning, before we usually wake up, if the room has been cleared for a sufficient amount of time during the night, we'll re-enable presence-based lighting in that room.",
+} as const
+
+export const ADMIN_SECURITY_CONTROLS: EntityTileConfig[] = [
+  { title: 'Front Door Auto-Lock', entityId: 'input_boolean.is_front_door_auto_lock_enabled', icon: 'mdi:lock-clock', color: SWITCH_ACTIVE_COLOR, action: { type: 'toggle' }, showSubtitle: true },
+]
+
+export const ADMIN_SHOW_SPECIFIC_CONTROLS: EntityTileConfig[] = [
+  { title: 'Outdoor Faucets', entityId: 'input_boolean.show_outdoor_faucets', icon: 'mdi:water', color: SWITCH_ACTIVE_COLOR, action: { type: 'toggle' }, showSubtitle: true },
+  { title: 'Christmas Lights', entityId: 'input_boolean.show_christmas_lights', icon: 'mdi:string-lights', color: SWITCH_ACTIVE_COLOR, action: { type: 'toggle' }, showSubtitle: true },
+]
+
+const ADMIN_PRESENCE_ICON = 'mdi:lightbulb-auto'
+const ADMIN_AUTO_REENABLE_ICON = 'mdi:autorenew'
+const PRESENCE_STATE_LABEL: EntityStateLabelConfig = { attribute: 'automation_paused', falseLabel: 'Active', includeState: true, trueLabel: 'Paused' }
+
+function presenceOverride(title: string, entityId: string): EntityTileConfig {
+  return {
+    title,
+    entityId,
+    icon: ADMIN_PRESENCE_ICON,
+    color: SWITCH_ACTIVE_COLOR,
+    action: { type: 'service', domain: 'script', service: 'toggle_presence_lighting_override', target: null, serviceData: { presence_switch: entityId } },
+    stateLabel: PRESENCE_STATE_LABEL,
+  }
+}
+
+function autoReenable(title: string, entityId: string): EntityTileConfig {
+  return { title, entityId, icon: ADMIN_AUTO_REENABLE_ICON, color: SWITCH_ACTIVE_COLOR, action: { type: 'toggle' }, showSubtitle: true }
+}
+
+export const ADMIN_PRESENCE_OVERRIDE_ITEMS: EntityTileConfig[] = [
+  presenceOverride('Living Room', 'switch.living_room_presence_living_room_lights_presence_allowed'),
+  presenceOverride('Kitchen', 'switch.kitchen_presence_kitchen_lights_presence_allowed'),
+  presenceOverride('Hallway', 'switch.hallway_presence_hallway_lights_presence_allowed'),
+  presenceOverride('Gym', 'switch.gym_presence_gym_light_presence_allowed'),
+  presenceOverride('Guest Bathroom', 'switch.guest_bathroom_presence_guest_bathroom_dimmer_switch_presence_allowed'),
+  presenceOverride('Guest Room', 'switch.guest_room_presence_guest_room_presence_allowed'),
+  presenceOverride('Office', 'switch.office_presence_office_light_presence_allowed'),
+  presenceOverride('Master Bedroom', 'switch.master_bedroom_presence_master_bedroom_presence_allowed'),
+  presenceOverride('Master Bathroom', 'switch.master_bathroom_presence_master_bathroom_dimmer_switch_presence_allowed'),
+  presenceOverride('Dining Room', 'switch.dining_room_presence_dining_room_dimmer_switch_presence_allowed'),
+  presenceOverride('Theater Room', 'switch.theater_room_presence_theater_room_presence_allowed'),
+  presenceOverride('Downstairs Hallway', 'switch.downstairs_hallway_presence_downstairs_hallway_light_presence_allowed'),
+  presenceOverride('Music Room', 'switch.music_room_presence_music_room_lights_presence_allowed'),
+  presenceOverride('Upper Deck', 'switch.upper_deck_presence_back_deck_lights_presence_allowed'),
+]
+
+export const ADMIN_AUTO_REENABLE_ITEMS: EntityTileConfig[] = [
+  autoReenable('Living Room', 'switch.living_room_auto_re_enable_presence_lighting'),
+  autoReenable('Kitchen', 'switch.kitchen_auto_re_enable_presence_lighting'),
+  autoReenable('Hallway', 'switch.hallway_auto_re_enable_presence_lighting'),
+  autoReenable('Gym', 'switch.gym_auto_re_enable_presence_lighting'),
+  autoReenable('Guest Bathroom', 'switch.guest_bathroom_auto_re_enable_presence_lighting'),
+  autoReenable('Guest Room', 'switch.guest_room_auto_re_enable_presence_lighting'),
+  autoReenable('Office', 'switch.office_auto_re_enable_presence_lighting'),
+  autoReenable('Master Bedroom', 'switch.master_bedroom_auto_re_enable_presence_lighting'),
+  autoReenable('Master Bathroom', 'switch.master_bathroom_auto_re_enable_presence_lighting'),
+  autoReenable('Dining Room', 'switch.dining_room_auto_re_enable_presence_lighting'),
+  autoReenable('Theater Room', 'switch.theater_room_auto_re_enable_presence_lighting'),
+  autoReenable('Downstairs Hallway', 'switch.downstairs_hallway_auto_re_enable_presence_lighting'),
+  autoReenable('Music Room', 'switch.music_room_auto_re_enable_presence_lighting'),
+  autoReenable('Upper Deck', 'switch.upper_deck_auto_re_enable_presence_lighting'),
+]
 
 export const TODO_PAGES: Record<string, TodoPageConfig> = {
   chores: {
@@ -264,34 +343,11 @@ export const CONTROL_PAGES: Record<string, { title: string; sections: EntitySect
       {
         title: 'Pages',
         items: [
-          { title: 'Admin', entityId: 'sensor.unavailable', icon: 'mdi:home-assistant', color: CONTROL_COLOR, action: { type: 'navigate', path: 'admin' } },
+          { title: 'Admin Controls', entityId: 'sensor.unavailable', icon: 'mdi:shield-account', color: CONTROL_COLOR, action: { type: 'navigate', path: 'admin' } },
           { title: 'Guests Staying Over', entityId: 'sensor.unavailable', icon: 'mdi:account-group', color: CONTROL_COLOR, action: { type: 'navigate', path: 'guests-staying-over' } },
           { title: 'Groceries', entityId: 'sensor.unavailable', icon: 'mdi:cart', color: CONTROL_COLOR, action: { type: 'navigate', path: 'groceries' } },
           { title: 'Custom Lights', entityId: 'sensor.unavailable', icon: 'mdi:lightbulb-group', color: CONTROL_COLOR, action: { type: 'navigate', path: 'custom-lights' } },
           { title: 'Mach-E', entityId: 'sensor.unavailable', icon: 'mdi:car-electric', color: CONTROL_COLOR, action: { type: 'navigate', path: 'mach-e' } },
-        ],
-      },
-    ],
-  },
-  admin: {
-    title: 'Admin',
-    sections: [
-      {
-        title: 'Security Controls',
-        items: [{ title: 'Front Door Auto-Lock', entityId: 'input_boolean.is_front_door_auto_lock_enabled', icon: 'mdi:lock-clock', color: SECURITY_COLOR, action: { type: 'toggle' } }],
-      },
-      {
-        title: 'Show Specific Controls',
-        items: [
-          { title: 'Outdoor Faucets', entityId: 'input_boolean.show_outdoor_faucets', icon: 'mdi:water', color: CONTROL_COLOR, action: { type: 'toggle' } },
-          { title: 'Christmas Lights', entityId: 'input_boolean.show_christmas_lights', icon: 'mdi:string-lights', color: CONTROL_COLOR, action: { type: 'toggle' } },
-        ],
-      },
-      {
-        title: 'Presence-Based Lighting',
-        items: [
-          { title: 'Presence Overrides', entityId: 'sensor.unavailable', icon: 'mdi:account-cog', color: CONTROL_COLOR, manualReview: true },
-          { title: 'Auto-Reset Configuration', entityId: 'sensor.unavailable', icon: 'mdi:timer-cog', color: CONTROL_COLOR, manualReview: true },
         ],
       },
     ],

@@ -8,9 +8,10 @@ interface ModalSheetProps {
   title: string
   onClose: () => void
   children: ReactNode
+  surface?: 'default' | 'hass-popup'
 }
 
-export function ModalSheet({ open, title, onClose, children }: ModalSheetProps) {
+export function ModalSheet({ open, title, onClose, children, surface = 'default' }: ModalSheetProps) {
   const contentRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
@@ -34,7 +35,7 @@ export function ModalSheet({ open, title, onClose, children }: ModalSheetProps) 
     <Drawer.Root open={open} onOpenChange={(nextOpen) => !nextOpen && onClose()}>
       <Drawer.Portal>
         <Drawer.Overlay className={styles.overlay} />
-        <Drawer.Content ref={contentRef} className={styles.content}>
+        <Drawer.Content ref={contentRef} className={styles.content} data-surface={surface}>
           <div className={styles.handle} />
           <div className={styles.header}>
             <Drawer.Title className={styles.title}>{title}</Drawer.Title>

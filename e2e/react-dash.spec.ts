@@ -120,6 +120,21 @@ test('security page opens ported security, contact, and camera modals', async ({
   await expect(page.getByRole('button', { name: 'Record' })).toBeVisible()
 })
 
+test('admin page opens ported presence override modals', async ({ page }) => {
+  await page.goto('/at-a-glance/admin')
+
+  await expect(page.getByRole('heading', { level: 1, name: 'Admin' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Security Controls' })).toBeVisible()
+  await expect(page.getByText('Disables automatic locking of the front door.')).toBeVisible()
+  await expect(page.getByRole('button', { name: /Front Door Auto-Lock On/i })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Presence-Based Light Overrides' })).toBeVisible()
+  await page.getByRole('button', { name: 'Open Presence-Based Auto-Reset Configuration' }).click()
+  await expect(page.getByRole('dialog')).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Presence-Based Overrides Auto-Reset' })).toBeVisible()
+  await expect(page.getByRole('button', { name: /Living Room On/i })).toBeVisible()
+  await expect(page.getByRole('button', { name: /Upper Deck On/i })).toBeVisible()
+})
+
 test('room vacuum cards open reusable vacuum modal controls', async ({ page }) => {
   await page.goto('/at-a-glance/living-room')
 

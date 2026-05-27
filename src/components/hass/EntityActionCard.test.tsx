@@ -39,4 +39,35 @@ describe('EntityActionCard', () => {
     expect(navigate).toHaveBeenCalledWith('vacuums')
     expect(mockCallServiceCalls).toEqual([])
   })
+
+  it('can run script service actions without adding an entity target', () => {
+    render(
+      <EntityActionCard
+        item={{
+          title: 'Living Room',
+          entityId: 'switch.living_room_presence_living_room_lights_presence_allowed',
+          icon: 'mdi:sofa',
+          action: {
+            type: 'service',
+            domain: 'script',
+            service: 'toggle_presence_lighting_override',
+            target: null,
+            serviceData: { presence_switch: 'switch.living_room_presence_living_room_lights_presence_allowed' },
+          },
+        }}
+        onNavigate={() => undefined}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: /living room/i }))
+
+    expect(mockCallServiceCalls).toEqual([
+      {
+        domain: 'script',
+        service: 'toggle_presence_lighting_override',
+        serviceData: { presence_switch: 'switch.living_room_presence_living_room_lights_presence_allowed' },
+      },
+    ])
+  })
+
 })

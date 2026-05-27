@@ -30,6 +30,19 @@
   overflow: hidden;
 }
 
+.content[data-surface='hass-popup'] {
+  border-color: rgba(0, 0, 0, 0);
+  color: #e1e1e1;
+  background: rgba(29, 29, 29, 0.88);
+  box-shadow: none;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.content[data-surface='hass-popup'] .title {
+  color: #fff;
+}
+
 .handle {
   flex: 0 0 5px;
   width: 42px;

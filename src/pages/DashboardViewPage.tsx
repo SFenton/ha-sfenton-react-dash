@@ -19,6 +19,7 @@ import { MaterialIcon } from '../components/core/Icon'
 import { ModalSheet } from '../components/core/ModalSheet'
 import { SectionHeader } from '../components/core/SectionHeader'
 import { asEntityName, formatCompactEntityState, isActiveState } from '../components/hass/entityState'
+import { useHashModal } from '../hooks/useHashModal'
 import {
   AREA_ITEMS,
   CLIMATE_GROUPS,
@@ -29,6 +30,11 @@ import {
 } from '../constants/atAGlance'
 import { DASHBOARD_ROUTES } from '../constants/routes'
 import {
+  ADMIN_AUTO_REENABLE_ITEMS,
+  ADMIN_DESCRIPTIONS,
+  ADMIN_PRESENCE_OVERRIDE_ITEMS,
+  ADMIN_SECURITY_CONTROLS,
+  ADMIN_SHOW_SPECIFIC_CONTROLS,
   CLIMATE_COLOR,
   CONTROL_PAGES,
   MEDIA_COLOR,
@@ -108,6 +114,43 @@ function EntitySections({ onNavigate, sections }: { onNavigate: (path: string) =
         </section>
       ))}
     </div>
+  )
+}
+
+function AdminDescription({ children }: { children: string }) {
+  return (
+    <div className={styles.adminDescription}>
+      {children.split('\n\n').map((paragraph) => (
+        <p key={paragraph}>{paragraph}</p>
+      ))}
+    </div>
+  )
+}
+
+function AdminWideGrid({ children }: { children: ReactNode }) {
+  return <div className={styles.adminWideGrid}>{children}</div>
+}
+
+function AdminModalGrid({ children }: { children: ReactNode }) {
+  return <div className={styles.adminModalGrid}>{children}</div>
+}
+
+function AdminHashButton({ hash, onOpen, title }: { hash: string; onOpen: (hash: string) => void; title: string }) {
+  return (
+    <button className={styles.adminHashButton} data-tone="switch-active" onClick={() => onOpen(hash)} type="button">
+      <span>{title}</span>
+    </button>
+  )
+}
+
+function AdminTileGrid({ items, onNavigate, variant = 'wide' }: { items: EntitySectionConfig['items']; onNavigate: (path: string) => void; variant?: 'admin-modal' | 'compact' | 'wide' }) {
+  const Wrapper = variant === 'wide' ? AdminWideGrid : variant === 'admin-modal' ? AdminModalGrid : Grid
+  return (
+    <Wrapper>
+      {items.map((item) => (
+        <EntityActionCard item={item} key={`${item.entityId}-${item.title}`} onNavigate={onNavigate} size={variant} />
+      ))}
+    </Wrapper>
   )
 }
 
@@ -516,6 +559,50 @@ function MediaPage({ onNavigate }: { onNavigate: (path: string) => void }) {
   return <EntitySections onNavigate={onNavigate} sections={MEDIA_SECTIONS} />
 }
 
+function AdminPage({ onNavigate }: { onNavigate: (path: string) => void }) {
+  const { closeHash, hash, openHash } = useHashModal()
+
+  return (
+    <div className={styles.stack}>
+      <section className={styles.section}>
+        <SectionHeader title="Security Controls" />
+        <AdminDescription>{ADMIN_DESCRIPTIONS.autoLock}</AdminDescription>
+        <AdminTileGrid items={ADMIN_SECURITY_CONTROLS} onNavigate={onNavigate} />
+      </section>
+
+      <section className={styles.section}>
+        <SectionHeader title="Presence-Based Light Overrides" />
+        <AdminDescription>{ADMIN_DESCRIPTIONS.presenceOverrides}</AdminDescription>
+        <AdminHashButton hash="#presence-based-overrides" onOpen={openHash} title="Open Presence-Based Overrides" />
+      </section>
+
+      <section className={styles.section}>
+        <SectionHeader title="Show Specific Controls" />
+        <AdminDescription>{ADMIN_DESCRIPTIONS.showSpecific}</AdminDescription>
+        <AdminTileGrid items={ADMIN_SHOW_SPECIFIC_CONTROLS} onNavigate={onNavigate} />
+      </section>
+
+      <section className={styles.section}>
+        <SectionHeader title="Automatic Presence Setting Overrides" />
+        <AdminDescription>{ADMIN_DESCRIPTIONS.autoReset}</AdminDescription>
+        <AdminHashButton hash="#presence-based-overrides-auto" onOpen={openHash} title="Open Presence-Based Auto-Reset Configuration" />
+      </section>
+
+      <ModalSheet onClose={closeHash} open={hash === '#presence-based-overrides'} surface="hass-popup" title="Presence-Based Overrides">
+        <div className={styles.adminModalBody}>
+          <AdminTileGrid items={ADMIN_PRESENCE_OVERRIDE_ITEMS} onNavigate={onNavigate} variant="admin-modal" />
+        </div>
+      </ModalSheet>
+
+      <ModalSheet onClose={closeHash} open={hash === '#presence-based-overrides-auto'} surface="hass-popup" title="Presence-Based Overrides Auto-Reset">
+        <div className={styles.adminModalBody}>
+          <AdminTileGrid items={ADMIN_AUTO_REENABLE_ITEMS} onNavigate={onNavigate} variant="admin-modal" />
+        </div>
+      </ModalSheet>
+    </div>
+  )
+}
+
 function ThermostatPage({ onNavigate }: { onNavigate: (path: string) => void }) {
   return (
     <div className={styles.stack}>
@@ -568,6 +655,7 @@ function Content({ onNavigate, path }: { onNavigate: (path: string) => void; pat
   if (path === 'security') return <SecurityPage />
   if (path === 'vacuums') return <VacuumPage />
   if (path === 'media') return <MediaPage onNavigate={onNavigate} />
+  if (path === 'admin') return <AdminPage onNavigate={onNavigate} />
   if (path === 'ecobee') return <ThermostatPage onNavigate={onNavigate} />
   if (CONTROL_PAGES[path]) return <ControlPage onNavigate={onNavigate} path={path} />
   return <FallbackPage title={routeTitle(path)} />

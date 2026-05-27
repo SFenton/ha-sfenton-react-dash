@@ -9,6 +9,7 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
+    "porting:capture": "tsx scripts/hass-porting-capture.ts",
     "sync": "tsx scripts/sync-types.ts",
     "deploy": "tsx scripts/deploy.ts",
     "test": "vitest",

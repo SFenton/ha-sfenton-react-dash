@@ -7,6 +7,7 @@ import { asEntityName, formatCompactEntityState, isActiveState } from './entityS
 interface EntityActionCardProps {
   item: EntityTileConfig
   onNavigate: (path: string) => void
+  size?: 'standard' | 'compact' | 'wide' | 'admin-modal'
 }
 
 function domainOf(entityId: string) {
@@ -45,15 +46,27 @@ function useActionRunner(onNavigate: (path: string) => void) {
       callService({ domain: 'homeassistant', service: 'toggle', target: entityId })
       return
     }
-    callService({ domain: action.domain, service: action.service, target: action.target ?? entityId, serviceData: action.serviceData })
+    const target = action.target === null ? undefined : action.target ?? entityId
+    const params: Record<string, unknown> = { domain: action.domain, service: action.service, serviceData: action.serviceData }
+    if (target !== undefined) params.target = target
+    callService(params)
   }
 }
 
-export function EntityActionCard({ item, onNavigate }: EntityActionCardProps) {
+function formatStateLabel(item: EntityTileConfig, entity: ReturnType<typeof useEntity>) {
+  if (!item.stateLabel || !entity) return undefined
+  const value = entity.attributes[item.stateLabel.attribute]
+  if (value === undefined || value === null) return undefined
+  const label = value === true || value === 'true' || value === 'on' ? item.stateLabel.trueLabel : item.stateLabel.falseLabel
+  return item.stateLabel.includeState ? `${formatCompactEntityState(entity, 'Unavailable')} · ${label}` : label
+}
+
+export function EntityActionCard({ item, onNavigate, size = 'compact' }: EntityActionCardProps) {
   const entity = useEntity(asEntityName(item.entityId), { returnNullIfNotFound: true })
   const runAction = useActionRunner(onNavigate)
   const entityUnavailable = !entity || entity.state === 'unavailable' || entity.state === 'unknown'
-  const subtitle = item.manualReview ? `${formatCompactEntityState(entity, 'Review')} - review` : item.showSubtitle ? formatCompactEntityState(entity, 'Unavailable') : undefined
+  const stateLabel = formatStateLabel(item, entity)
+  const subtitle = item.manualReview ? `${formatCompactEntityState(entity, 'Review')} - review` : stateLabel ?? (item.showSubtitle ? formatCompactEntityState(entity, 'Unavailable') : undefined)
   const active = isActiveState(entity)
   const disabled = Boolean(item.disabledWhenUnavailable && entityUnavailable)
   const clickable = Boolean(item.action) && !disabled
@@ -67,7 +80,7 @@ export function EntityActionCard({ item, onNavigate }: EntityActionCardProps) {
       muted={disabled || (!active && item.action?.type !== 'navigate')}
       onClick={clickable ? () => runAction(item.entityId, item.action) : undefined}
       pressed={clickable && item.action?.type !== 'navigate' ? active : undefined}
-      size="compact"
+      size={size}
       subtitle={subtitle}
       title={item.title}
     />
