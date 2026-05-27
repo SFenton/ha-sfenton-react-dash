@@ -15,6 +15,7 @@ import { AirQualityModalContent } from '../components/hass/AirQualityModalConten
 import { GrillModalContent } from '../components/hass/GrillModalContent'
 import { MediaRemoteModalContent } from '../components/hass/MediaRemoteModalContent'
 import { Card, type CardColor } from '../components/core/Card'
+import { Description } from '../components/core/Description'
 import { MaterialIcon } from '../components/core/Icon'
 import { ModalSheet } from '../components/core/ModalSheet'
 import { SectionHeader } from '../components/core/SectionHeader'
@@ -37,6 +38,8 @@ import {
   ADMIN_SHOW_SPECIFIC_CONTROLS,
   CLIMATE_COLOR,
   CONTROL_PAGES,
+  GUEST_CONTROLS_DESCRIPTION,
+  GUEST_CONTROL_ITEMS,
   MEDIA_COLOR,
   NEUTRAL_COLOR,
   MEDIA_SECTIONS,
@@ -114,16 +117,6 @@ function EntitySections({ onNavigate, sections }: { onNavigate: (path: string) =
             ))}
           </Grid>
         </section>
-      ))}
-    </div>
-  )
-}
-
-function AdminDescription({ children }: { children: string }) {
-  return (
-    <div className={styles.adminDescription}>
-      {children.split('\n\n').map((paragraph) => (
-        <p key={paragraph}>{paragraph}</p>
       ))}
     </div>
   )
@@ -603,6 +596,25 @@ function SettingsPage({ onNavigate }: { onNavigate: (path: string) => void }) {
   )
 }
 
+function GuestControlsPage({ onNavigate }: { onNavigate: (path: string) => void }) {
+  return (
+    <main className={styles.guestPage}>
+      <header className={styles.guestHeader}>
+        <button aria-label="Back to overview" className={styles.guestBackButton} onClick={() => onNavigate('overview')} type="button">
+          <MaterialIcon name="mdi:chevron-left" size={36} />
+        </button>
+        <h1>Guest Controls</h1>
+      </header>
+
+      <section className={styles.guestSection}>
+        <SectionHeader title="Guest Controls" />
+        <Description>{GUEST_CONTROLS_DESCRIPTION}</Description>
+        <AdminTileGrid items={GUEST_CONTROL_ITEMS} onNavigate={onNavigate} variant="admin-modal" />
+      </section>
+    </main>
+  )
+}
+
 function MediaPage({ onNavigate }: { onNavigate: (path: string) => void }) {
   return <EntitySections onNavigate={onNavigate} sections={MEDIA_SECTIONS} />
 }
@@ -614,25 +626,25 @@ function AdminPage({ onNavigate }: { onNavigate: (path: string) => void }) {
     <div className={styles.stack}>
       <section className={styles.section}>
         <SectionHeader title="Security Controls" />
-        <AdminDescription>{ADMIN_DESCRIPTIONS.autoLock}</AdminDescription>
+        <Description>{ADMIN_DESCRIPTIONS.autoLock}</Description>
         <AdminTileGrid items={ADMIN_SECURITY_CONTROLS} onNavigate={onNavigate} />
       </section>
 
       <section className={styles.section}>
         <SectionHeader title="Presence-Based Light Overrides" />
-        <AdminDescription>{ADMIN_DESCRIPTIONS.presenceOverrides}</AdminDescription>
+        <Description>{ADMIN_DESCRIPTIONS.presenceOverrides}</Description>
         <AdminHashButton hash="#presence-based-overrides" onOpen={openHash} title="Open Presence-Based Overrides" />
       </section>
 
       <section className={styles.section}>
         <SectionHeader title="Show Specific Controls" />
-        <AdminDescription>{ADMIN_DESCRIPTIONS.showSpecific}</AdminDescription>
+        <Description>{ADMIN_DESCRIPTIONS.showSpecific}</Description>
         <AdminTileGrid items={ADMIN_SHOW_SPECIFIC_CONTROLS} onNavigate={onNavigate} />
       </section>
 
       <section className={styles.section}>
         <SectionHeader title="Automatic Presence Setting Overrides" />
-        <AdminDescription>{ADMIN_DESCRIPTIONS.autoReset}</AdminDescription>
+        <Description>{ADMIN_DESCRIPTIONS.autoReset}</Description>
         <AdminHashButton hash="#presence-based-overrides-auto" onOpen={openHash} title="Open Presence-Based Auto-Reset Configuration" />
       </section>
 
@@ -712,6 +724,14 @@ function Content({ onNavigate, path }: { onNavigate: (path: string) => void; pat
 export function DashboardViewPage({ activePath, onNavigate, path }: DashboardViewPageProps) {
   const roomTitle = roomNameFromPath(path)
   const title = roomTitle ?? TODO_PAGES[path]?.title ?? CONTROL_PAGES[path]?.title ?? routeTitle(path)
+
+  if (path === 'guests-staying-over') {
+    return (
+      <AppShell bottomNav={<BottomNav activePath={activePath} onNavigate={onNavigate} />}>
+        <GuestControlsPage onNavigate={onNavigate} />
+      </AppShell>
+    )
+  }
 
   if (path === 'settings') {
     return (

@@ -27,21 +27,6 @@
   gap: 8px;
 }
 
-.adminDescription {
-  display: grid;
-  gap: 10px;
-  padding: 0 4px;
-  color: #fff;
-  background: transparent;
-  font-size: 0.82rem;
-  font-weight: 730;
-  line-height: 1.38;
-}
-
-.adminDescription p {
-  margin: 0;
-}
-
 .adminHashButton {
   position: relative;
   display: flex;
@@ -290,6 +275,63 @@
   line-height: 1.2;
   text-overflow: clip;
   white-space: nowrap;
+}
+
+.guestPage {
+  width: min(100%, 820px);
+  height: 100vh;
+  min-height: 0;
+  margin: 0 auto;
+  padding: calc(24px + env(safe-area-inset-top, 0px)) 8px calc(var(--bottom-nav-height) + 42px + env(safe-area-inset-bottom, 0px));
+  box-sizing: border-box;
+  overflow-x: hidden;
+  overflow-y: auto;
+  color: white;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.guestPage::-webkit-scrollbar {
+  display: none;
+}
+
+.guestHeader {
+  display: grid;
+  min-height: 56px;
+  grid-template-columns: 56px minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+}
+
+.guestHeader h1 {
+  margin: 0 0 0 -32px;
+  color: white;
+  font-size: 2rem;
+  font-weight: 860;
+  letter-spacing: 0;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.guestBackButton {
+  display: grid;
+  width: 56px;
+  height: 56px;
+  place-items: center;
+  border: 0;
+  padding: 0;
+  color: white;
+  background: transparent;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.guestBackButton:active {
+  transform: scale(0.96);
+}
+
+.guestSection {
+  margin-top: 0;
 }
 
 @media (max-width: 340px) {

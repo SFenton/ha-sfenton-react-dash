@@ -1,0 +1,14 @@
+.description {
+  display: grid;
+  gap: 10px;
+  padding: 0 4px;
+  color: #fff;
+  background: transparent;
+  font-size: 0.82rem;
+  font-weight: 730;
+  line-height: 1.38;
+}
+
+.description p {
+  margin: 0;
+}

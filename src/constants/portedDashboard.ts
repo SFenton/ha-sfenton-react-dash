@@ -193,6 +193,14 @@ export const SETTINGS_PAGE_ITEMS: SettingsLinkConfig[] = [
   },
 ]
 
+export const GUEST_CONTROLS_DESCRIPTION = "When guests stay over, toggle these controls on based on the rooms they're staying in to disable automations (like automatic vacuuming in the music room) and ensure that rooms are tracked for temperature monitoring and vent control."
+
+export const GUEST_CONTROL_ITEMS: EntityTileConfig[] = [
+  { title: 'Guest Room', entityId: 'input_boolean.guests_staying_in_guest_room', icon: 'mdi:bed', color: SWITCH_ACTIVE_COLOR, action: { type: 'toggle' }, showSubtitle: true },
+  { title: 'Music Room', entityId: 'input_boolean.guests_staying_in_music_room', icon: 'mdi:guitar-electric', color: SWITCH_ACTIVE_COLOR, action: { type: 'toggle' }, showSubtitle: true },
+  { title: 'Theater Room', entityId: 'input_boolean.guests_staying_in_theater_room', icon: 'mdi:projector', color: SWITCH_ACTIVE_COLOR, action: { type: 'toggle' }, showSubtitle: true },
+]
+
 export const TODO_PAGES: Record<string, TodoPageConfig> = {
   chores: {
     title: 'Chores',
@@ -378,19 +386,6 @@ export const SECURITY_SECTIONS: EntitySectionConfig[] = [
 ]
 
 export const CONTROL_PAGES: Record<string, { title: string; sections: EntitySectionConfig[] }> = {
-  'guests-staying-over': {
-    title: 'Guests Staying Over',
-    sections: [
-      {
-        title: 'Guest Controls',
-        items: [
-          { title: 'Guest Room', entityId: 'input_boolean.guests_staying_in_guest_room', icon: 'mdi:bed-single', color: CONTROL_COLOR, action: { type: 'toggle' } },
-          { title: 'Music Room', entityId: 'input_boolean.guests_staying_in_music_room', icon: 'mdi:guitar-electric', color: CONTROL_COLOR, action: { type: 'toggle' } },
-          { title: 'Theater Room', entityId: 'input_boolean.guests_staying_in_theater_room', icon: 'mdi:projector', color: CONTROL_COLOR, action: { type: 'toggle' } },
-        ],
-      },
-    ],
-  },
   'custom-lights': {
     title: 'Custom Lights',
     sections: [

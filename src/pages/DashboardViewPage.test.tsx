@@ -24,6 +24,9 @@ describe('DashboardViewPage', () => {
     mockEntities['select.valetudo_exaltedsneakydeer_water'].state = 'medium'
     mockEntities['input_select.main_floor_vacuum_cleaning_passes'].state = '1'
     mockEntities['input_boolean.roborock_living_room_toggle'].state = 'off'
+    mockEntities['input_boolean.guests_staying_in_guest_room'].state = 'off'
+    mockEntities['input_boolean.guests_staying_in_music_room'].state = 'off'
+    mockEntities['input_boolean.guests_staying_in_theater_room'].state = 'off'
     mockEntities['media_player.living_room_shield_2'].state = 'off'
     mockEntities['media_player.sonos'].state = 'playing'
     mockEntities['media_player.master_bedroom_apple_tv'].state = 'paused'
@@ -186,6 +189,40 @@ describe('DashboardViewPage', () => {
 
     const hassSettings = screen.getByRole('button', { name: /Home Assistant Settings Access more in-depth Home Assistant details and settings\./i })
     expect(hassSettings).toHaveAttribute('data-external-path', '/config')
+  })
+
+  it('ports the Guest Controls page with source text, icons, states, and toggle actions', () => {
+    mockEntities['input_boolean.guests_staying_in_guest_room'].state = 'off'
+    mockEntities['input_boolean.guests_staying_in_music_room'].state = 'on'
+    mockEntities['input_boolean.guests_staying_in_theater_room'].state = 'off'
+    const navigate = vi.fn()
+
+    render(<DashboardViewPage activePath="settings" onNavigate={navigate} path="guests-staying-over" />)
+
+    expect(screen.getByRole('heading', { name: 'Guest Controls', level: 1 })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Guests Staying Over' })).not.toBeInTheDocument()
+    expect(screen.getByText("When guests stay over, toggle these controls on based on the rooms they're staying in to disable automations (like automatic vacuuming in the music room) and ensure that rooms are tracked for temperature monitoring and vent control.")).toBeInTheDocument()
+
+    const back = screen.getByRole('button', { name: 'Back to overview' })
+    fireEvent.click(back)
+    expect(navigate).toHaveBeenCalledWith('overview')
+
+    const guestRoom = screen.getByRole('button', { name: /Guest Room Off/i })
+    expect(guestRoom).toHaveAttribute('aria-pressed', 'false')
+    expect(guestRoom.querySelector('path')).toHaveAttribute('d', materialIconPath('mdi:bed'))
+
+    const musicRoom = screen.getByRole('button', { name: /Music Room On/i })
+    expect(musicRoom).toHaveAttribute('aria-pressed', 'true')
+    expect(musicRoom).toHaveStyle({ '--card-rgb': '67 160 71' })
+    expect(musicRoom.querySelector('path')).toHaveAttribute('d', materialIconPath('mdi:guitar-electric'))
+
+    const theaterRoom = screen.getByRole('button', { name: /Theater Room Off/i })
+    expect(theaterRoom.querySelector('path')).toHaveAttribute('d', materialIconPath('mdi:projector'))
+    fireEvent.click(theaterRoom)
+
+    expect(mockCallServiceCalls).toEqual([
+      { domain: 'homeassistant', service: 'toggle', target: 'input_boolean.guests_staying_in_theater_room' },
+    ])
   })
 
   it('shows manual air purifier fan speeds and runs fan percentage services', async () => {
