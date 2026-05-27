@@ -181,10 +181,131 @@
   object-fit: contain;
 }
 
+.settingsPage {
+  width: min(100%, 820px);
+  height: 100vh;
+  min-height: 0;
+  margin: 0 auto;
+  padding: calc(24px + env(safe-area-inset-top, 0px)) 8px calc(var(--bottom-nav-height) + 42px + env(safe-area-inset-bottom, 0px));
+  box-sizing: border-box;
+  overflow-x: hidden;
+  overflow-y: auto;
+  color: white;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.settingsPage::-webkit-scrollbar {
+  display: none;
+}
+
+.settingsHeader {
+  display: flex;
+  min-height: 56px;
+  align-items: center;
+  gap: 8px;
+  color: white;
+}
+
+.settingsHeaderIcon {
+  display: grid;
+  width: 56px;
+  height: 56px;
+  place-items: center;
+  color: rgba(255, 255, 255, 0.86);
+}
+
+.settingsHeader h1 {
+  margin: 0;
+  color: white;
+  font-size: 2rem;
+  font-weight: 860;
+  letter-spacing: 0;
+  line-height: 1;
+}
+
+.settingsList {
+  display: grid;
+  gap: 8px;
+  margin-top: 24px;
+}
+
+.settingsLink {
+  display: grid;
+  width: 100%;
+  min-height: 88px;
+  grid-template-columns: 56px minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+  border: 0;
+  padding: 0;
+  color: white;
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.settingsLink:focus {
+  outline: none;
+}
+
+.settingsLink:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.62);
+  outline-offset: 4px;
+}
+
+.settingsLinkIcon {
+  display: grid;
+  width: 56px;
+  height: 56px;
+  place-items: center;
+  color: rgba(255, 255, 255, 0.86);
+}
+
+.settingsLinkCopy {
+  display: grid;
+  min-width: 0;
+  gap: 8px;
+}
+
+.settingsLinkTitle {
+  overflow: hidden;
+  color: white;
+  font-size: clamp(1.2rem, 5vw, 1.42rem);
+  font-weight: 830;
+  letter-spacing: 0;
+  line-height: 1.05;
+  text-overflow: clip;
+  white-space: nowrap;
+}
+
+.settingsLinkSubtitle {
+  overflow: hidden;
+  color: rgba(255, 255, 255, 0.66);
+  font-size: clamp(0.86rem, 4vw, 1rem);
+  font-weight: 710;
+  letter-spacing: 0;
+  line-height: 1.2;
+  text-overflow: clip;
+  white-space: nowrap;
+}
+
 @media (max-width: 340px) {
   .grid,
   .cameraGrid {
     grid-template-columns: 1fr;
+  }
+
+  .settingsPage {
+    padding-right: 8px;
+    padding-left: 8px;
+  }
+
+  .settingsLink {
+    grid-template-columns: 52px minmax(0, 1fr);
+    gap: 6px;
   }
 
 }

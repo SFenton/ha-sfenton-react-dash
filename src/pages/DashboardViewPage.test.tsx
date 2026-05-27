@@ -158,6 +158,36 @@ describe('DashboardViewPage', () => {
     ])
   })
 
+  it('ports the Settings tab as the source row list with exact navigation targets', () => {
+    const navigate = vi.fn()
+    render(<DashboardViewPage activePath="settings" onNavigate={navigate} path="settings" />)
+
+    expect(screen.getByRole('heading', { name: 'Settings' })).toBeInTheDocument()
+    expect(screen.getByRole('navigation', { name: 'Settings pages' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Pages' })).not.toBeInTheDocument()
+    expect(screen.queryByText('Groceries')).not.toBeInTheDocument()
+    expect(screen.queryByText('Custom Lights')).not.toBeInTheDocument()
+
+    const admin = screen.getByRole('button', { name: /Admin Controls Presence-Based Toggles, Automation Overrides, and More/i })
+    expect(admin.querySelector('path')).toHaveAttribute('d', materialIconPath('mdi:shield-account'))
+    fireEvent.click(admin)
+    expect(navigate).toHaveBeenLastCalledWith('admin')
+
+    fireEvent.click(screen.getByRole('button', { name: /Guest Controls Toggle automations when guests stay over\./i }))
+    expect(navigate).toHaveBeenLastCalledWith('guests-staying-over')
+
+    fireEvent.click(screen.getByRole('button', { name: /To-Do An admin panel for to-do tasks\./i }))
+    expect(navigate).toHaveBeenLastCalledWith('to-do')
+
+    const machE = screen.getByRole('button', { name: /Mach-E Controls for the Mustang Mach-E\./i })
+    expect(machE.querySelector('path')).toHaveAttribute('d', materialIconPath('mdi:car-estate'))
+    fireEvent.click(machE)
+    expect(navigate).toHaveBeenLastCalledWith('mach-e')
+
+    const hassSettings = screen.getByRole('button', { name: /Home Assistant Settings Access more in-depth Home Assistant details and settings\./i })
+    expect(hassSettings).toHaveAttribute('data-external-path', '/config')
+  })
+
   it('shows manual air purifier fan speeds and runs fan percentage services', async () => {
     mockEntities['select.living_room_air_purifier_fan_mode'].state = 'Manual'
     mockEntities['fan.living_room_air_purifier_levoit_purifier'].attributes.percentage = 66

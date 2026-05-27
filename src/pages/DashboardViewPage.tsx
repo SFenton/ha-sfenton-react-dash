@@ -41,12 +41,14 @@ import {
   NEUTRAL_COLOR,
   MEDIA_SECTIONS,
   ROOM_EXTRA_SECTIONS,
+  SETTINGS_PAGE_ITEMS,
   THERMOSTAT_ROOMS,
   TODO_PAGES,
   UNAVAILABLE_COLOR,
   VACUUM_COLOR,
   VACUUMS,
   type EntitySectionConfig,
+  type SettingsLinkConfig,
 } from '../constants/portedDashboard'
 import { ROOM_PAGE_CONFIGS, type RoomSourceCardConfig, type RoomSourceKind, type RoomSourceModalItem } from '../constants/roomPages'
 import { MEDIA_REMOTE_CONFIGS } from '../constants/mediaRemotes'
@@ -555,6 +557,52 @@ function SecurityPage() {
   return <SecurityDashboard />
 }
 
+function navigateExternal(path: string) {
+  try {
+    const targetWindow = window.top && window.top !== window ? window.top : window
+    targetWindow.location.assign(path)
+  } catch {
+    window.location.assign(path)
+  }
+}
+
+function SettingsLink({ item, onNavigate }: { item: SettingsLinkConfig; onNavigate: (path: string) => void }) {
+  const activate = () => {
+    if (item.path) onNavigate(item.path)
+    else if (item.externalPath) navigateExternal(item.externalPath)
+  }
+
+  return (
+    <button aria-label={`${item.title} ${item.subtitle}`} className={styles.settingsLink} data-external-path={item.externalPath} data-navigation-path={item.path} onClick={activate} type="button">
+      <span aria-hidden="true" className={styles.settingsLinkIcon}>
+        <MaterialIcon name={item.icon} size={32} />
+      </span>
+      <span className={styles.settingsLinkCopy}>
+        <span className={styles.settingsLinkTitle}>{item.title}</span>
+        <span className={styles.settingsLinkSubtitle}>{item.subtitle}</span>
+      </span>
+    </button>
+  )
+}
+
+function SettingsPage({ onNavigate }: { onNavigate: (path: string) => void }) {
+  return (
+    <main className={styles.settingsPage}>
+      <header className={styles.settingsHeader}>
+        <span aria-hidden="true" className={styles.settingsHeaderIcon}>
+          <MaterialIcon name="mdi:cog" size={32} />
+        </span>
+        <h1>Settings</h1>
+      </header>
+      <nav aria-label="Settings pages" className={styles.settingsList}>
+        {SETTINGS_PAGE_ITEMS.map((item) => (
+          <SettingsLink item={item} key={item.title} onNavigate={onNavigate} />
+        ))}
+      </nav>
+    </main>
+  )
+}
+
 function MediaPage({ onNavigate }: { onNavigate: (path: string) => void }) {
   return <EntitySections onNavigate={onNavigate} sections={MEDIA_SECTIONS} />
 }
@@ -664,6 +712,14 @@ function Content({ onNavigate, path }: { onNavigate: (path: string) => void; pat
 export function DashboardViewPage({ activePath, onNavigate, path }: DashboardViewPageProps) {
   const roomTitle = roomNameFromPath(path)
   const title = roomTitle ?? TODO_PAGES[path]?.title ?? CONTROL_PAGES[path]?.title ?? routeTitle(path)
+
+  if (path === 'settings') {
+    return (
+      <AppShell bottomNav={<BottomNav activePath={activePath} onNavigate={onNavigate} />}>
+        <SettingsPage onNavigate={onNavigate} />
+      </AppShell>
+    )
+  }
 
   return (
     <AppShell bottomNav={<BottomNav activePath={activePath} onNavigate={onNavigate} />}>

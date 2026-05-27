@@ -29,6 +29,14 @@ export interface EntitySectionConfig {
   items: EntityTileConfig[]
 }
 
+export interface SettingsLinkConfig {
+  title: string
+  subtitle: string
+  icon: string
+  externalPath?: string
+  path?: string
+}
+
 export interface TodoListConfig {
   title: string
   entityId: string
@@ -150,6 +158,39 @@ export const ADMIN_AUTO_REENABLE_ITEMS: EntityTileConfig[] = [
   autoReenable('Downstairs Hallway', 'switch.downstairs_hallway_auto_re_enable_presence_lighting'),
   autoReenable('Music Room', 'switch.music_room_auto_re_enable_presence_lighting'),
   autoReenable('Upper Deck', 'switch.upper_deck_auto_re_enable_presence_lighting'),
+]
+
+export const SETTINGS_PAGE_ITEMS: SettingsLinkConfig[] = [
+  {
+    title: 'Admin Controls',
+    subtitle: 'Presence-Based Toggles, Automation Overrides, and More',
+    icon: 'mdi:shield-account',
+    path: 'admin',
+  },
+  {
+    title: 'Guest Controls',
+    subtitle: 'Toggle automations when guests stay over.',
+    icon: 'mdi:account-multiple',
+    path: 'guests-staying-over',
+  },
+  {
+    title: 'To-Do',
+    subtitle: 'An admin panel for to-do tasks.',
+    icon: 'mdi:clipboard-list',
+    path: 'to-do',
+  },
+  {
+    title: 'Mach-E',
+    subtitle: 'Controls for the Mustang Mach-E.',
+    icon: 'mdi:car-estate',
+    path: 'mach-e',
+  },
+  {
+    title: 'Home Assistant Settings',
+    subtitle: 'Access more in-depth Home Assistant details and settings.',
+    icon: 'mdi:cog',
+    externalPath: '/config',
+  },
 ]
 
 export const TODO_PAGES: Record<string, TodoPageConfig> = {
@@ -337,21 +378,6 @@ export const SECURITY_SECTIONS: EntitySectionConfig[] = [
 ]
 
 export const CONTROL_PAGES: Record<string, { title: string; sections: EntitySectionConfig[] }> = {
-  settings: {
-    title: 'Settings',
-    sections: [
-      {
-        title: 'Pages',
-        items: [
-          { title: 'Admin Controls', entityId: 'sensor.unavailable', icon: 'mdi:shield-account', color: CONTROL_COLOR, action: { type: 'navigate', path: 'admin' } },
-          { title: 'Guests Staying Over', entityId: 'sensor.unavailable', icon: 'mdi:account-group', color: CONTROL_COLOR, action: { type: 'navigate', path: 'guests-staying-over' } },
-          { title: 'Groceries', entityId: 'sensor.unavailable', icon: 'mdi:cart', color: CONTROL_COLOR, action: { type: 'navigate', path: 'groceries' } },
-          { title: 'Custom Lights', entityId: 'sensor.unavailable', icon: 'mdi:lightbulb-group', color: CONTROL_COLOR, action: { type: 'navigate', path: 'custom-lights' } },
-          { title: 'Mach-E', entityId: 'sensor.unavailable', icon: 'mdi:car-electric', color: CONTROL_COLOR, action: { type: 'navigate', path: 'mach-e' } },
-        ],
-      },
-    ],
-  },
   'guests-staying-over': {
     title: 'Guests Staying Over',
     sections: [

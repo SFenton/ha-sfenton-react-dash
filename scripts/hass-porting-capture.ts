@@ -120,12 +120,22 @@ async function installEvaluateHelpers(page: Page) {
 }
 
 async function loginToHass(page: Page, username: string, password: string) {
-  if ((await page.getByRole('button', { name: /log in|login/i }).count()) === 0) return
-  const textboxes = page.getByRole('textbox')
-  await textboxes.nth(0).fill(username)
-  await textboxes.nth(1).fill(password)
-  await page.getByRole('button', { name: /log in|login/i }).click()
+  const loginButton = page.getByRole('button', { name: /log in|login/i }).first()
+  const hasLoginForm = await loginButton.waitFor({ state: 'visible', timeout: 10_000 }).then(
+    () => true,
+    () => false,
+  )
+  if (!hasLoginForm) return
+
+  const usernameInput = page.locator('input[name="username"], input[autocomplete="username"], input[type="text"]').first()
+  const passwordInput = page.locator('input[name="password"], input[autocomplete="current-password"], input[type="password"]').first()
+  await usernameInput.waitFor({ state: 'visible', timeout: 15_000 })
+  await passwordInput.waitFor({ state: 'visible', timeout: 15_000 })
+  await usernameInput.fill(username)
+  await passwordInput.fill(password)
+  await loginButton.click()
   await page.waitForLoadState('domcontentloaded')
+  await page.waitForFunction(() => Boolean(document.querySelector('home-assistant')?.hass), null, { timeout: 30_000 }).catch(() => undefined)
 }
 
 async function capturePage(page: Page, filePrefix: string, labels: string[], entities: string[], includeHassState: boolean) {
