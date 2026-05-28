@@ -938,7 +938,9 @@ export function AtAGlancePage({ activePath = 'overview', onNavigate = () => unde
   return (
     <AppShell bottomNav={<BottomNav activePath={activePath} onNavigate={onNavigate} />}>
       <Page
+        activePath={activePath}
         title="Home"
+        onNavigate={onNavigate}
         onSettings={() => openHash('#settings-preview')}
         headerQuickLinks={
           <StatusRail

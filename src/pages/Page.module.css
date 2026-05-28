@@ -16,45 +16,6 @@
   padding: calc(20px + env(safe-area-inset-top, 0px)) var(--space-page-x) 0;
 }
 
-.header {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 14px;
-  align-items: center;
-}
-
-.title {
-  margin: 0;
-  color: var(--color-text);
-  font-size: clamp(1.64rem, 7vw, 2.16rem);
-  font-weight: 780;
-  letter-spacing: 0;
-  line-height: 0.98;
-}
-
-.actions {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-}
-
-.iconButton {
-  display: grid;
-  width: 42px;
-  height: 42px;
-  place-items: center;
-  border: 0;
-  border-radius: 50%;
-  color: white;
-  background: transparent;
-  box-shadow: none;
-  cursor: pointer;
-}
-
-.iconButton:active {
-  transform: scale(0.94);
-}
-
 .headerQuickLinks {
   margin-top: 18px;
 }

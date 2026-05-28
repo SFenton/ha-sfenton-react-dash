@@ -24,4 +24,21 @@ describe('AtAGlancePage', () => {
     expect(within(dialog).getAllByText('AQI 1')).toHaveLength(6)
     expect(within(dialog).getAllByText('PM2.5 2μg/m³')).toHaveLength(6)
   })
+
+  it('uses the shell header menu and More actions', async () => {
+    const navigate = vi.fn()
+    render(<AtAGlancePage onNavigate={navigate} />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open navigation menu' }))
+  expect(screen.getByText('Navigation')).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Close navigation menu' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Security' }))
+    expect(navigate).toHaveBeenCalledWith('security')
+
+    fireEvent.click(screen.getByRole('button', { name: 'More actions' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Settings' }))
+
+    const dialog = await screen.findByRole('dialog')
+    expect(within(dialog).getByRole('heading', { name: 'Settings' })).toBeInTheDocument()
+  })
 })

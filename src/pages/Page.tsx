@@ -1,30 +1,28 @@
 import type { ReactNode } from 'react'
-import { MaterialIcon } from '../components/core/Icon'
+import { AppHeader, type AppHeaderAction } from '../components/shell/AppHeader'
 import styles from './Page.module.css'
 
 interface PageProps {
+  activePath?: string
+  backPath?: string
   title: string
   headerQuickLinks?: ReactNode
   children: ReactNode
+  onNavigate?: (path: string) => void
   onProfile?: () => void
   onSettings?: () => void
 }
 
-export function Page({ title, headerQuickLinks, children, onProfile, onSettings }: PageProps) {
+export function Page({ activePath, backPath, title, headerQuickLinks, children, onNavigate, onProfile, onSettings }: PageProps) {
+  const actions: AppHeaderAction[] = [
+    ...(onSettings ? [{ icon: 'mdi:cog', label: 'Settings', onClick: onSettings }] : []),
+    ...(onProfile ? [{ icon: 'mdi:account-circle', label: 'Profile', onClick: onProfile }] : []),
+  ]
+
   return (
     <main className={styles.page}>
       <div className={styles.headerDock}>
-        <header className={styles.header}>
-          <h1 className={styles.title}>{title}</h1>
-          <div className={styles.actions} aria-label="Page actions">
-            <button className={styles.iconButton} onClick={onSettings} type="button" aria-label="Settings">
-              <MaterialIcon name="mdi:cog" size={21} />
-            </button>
-            <button className={styles.iconButton} onClick={onProfile} type="button" aria-label="Profile">
-              <MaterialIcon name="mdi:account-circle" size={21} />
-            </button>
-          </div>
-        </header>
+        <AppHeader activePath={activePath} actions={actions} backPath={backPath} onNavigate={onNavigate} title={title} />
         {headerQuickLinks && <div className={styles.headerQuickLinks}>{headerQuickLinks}</div>}
       </div>
       <div className={styles.scroller}>

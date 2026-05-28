@@ -184,31 +184,6 @@
   display: none;
 }
 
-.settingsHeader {
-  display: flex;
-  min-height: 56px;
-  align-items: center;
-  gap: 8px;
-  color: white;
-}
-
-.settingsHeaderIcon {
-  display: grid;
-  width: 56px;
-  height: 56px;
-  place-items: center;
-  color: rgba(255, 255, 255, 0.86);
-}
-
-.settingsHeader h1 {
-  margin: 0;
-  color: white;
-  font-size: 2rem;
-  font-weight: 860;
-  letter-spacing: 0;
-  line-height: 1;
-}
-
 .settingsList {
   display: grid;
   gap: 8px;
@@ -293,41 +268,6 @@
 
 .guestPage::-webkit-scrollbar {
   display: none;
-}
-
-.guestHeader {
-  display: grid;
-  min-height: 56px;
-  grid-template-columns: 56px minmax(0, 1fr);
-  gap: 8px;
-  align-items: center;
-}
-
-.guestHeader h1 {
-  margin: 0 0 0 -32px;
-  color: white;
-  font-size: 2rem;
-  font-weight: 860;
-  letter-spacing: 0;
-  line-height: 1;
-  white-space: nowrap;
-}
-
-.guestBackButton {
-  display: grid;
-  width: 56px;
-  height: 56px;
-  place-items: center;
-  border: 0;
-  padding: 0;
-  color: white;
-  background: transparent;
-  cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
-}
-
-.guestBackButton:active {
-  transform: scale(0.96);
 }
 
 .guestSection {

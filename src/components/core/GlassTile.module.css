@@ -51,6 +51,14 @@
   box-shadow: none;
 }
 
+.icon > img {
+  display: block;
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  object-fit: contain;
+}
+
 .labelGroup {
   display: grid;
   min-width: 0;

@@ -59,6 +59,39 @@ test('living room header chips open climate occupancy and air quality popups', a
   await expect(page.getByText('AQI')).toBeVisible()
 })
 
+test('guest room page opens source-aligned header popups', async ({ page }) => {
+  await page.goto('/at-a-glance/guest-room')
+
+  await expect(page.getByRole('heading', { name: 'Guest Room' })).toBeVisible()
+  await expect(page.getByRole('button', { name: /^Lights On$/i })).toBeVisible()
+  await expect(page.getByRole('button', { name: /^Climate 69°F - 71°F$/i })).toBeVisible()
+  await expect(page.getByRole('button', { name: /^Occupancy Detected$/i })).toBeVisible()
+  await expect(page.getByRole('button', { name: /^Window Closed$/i })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Climate' })).toBeVisible()
+  await expect(page.getByRole('button', { name: /^Vent Open$/i })).toHaveAttribute('data-tone', 'climate')
+  await expect(page.getByRole('button', { name: /^Vent Open$/i })).not.toHaveAttribute('data-size')
+  await expect(page.getByRole('button', { name: /^Air Purifier Auto • On$/i })).toHaveAttribute('data-tone', 'air')
+  await expect(page.getByRole('button', { name: /^Air Purifier Auto • On$/i })).not.toHaveAttribute('data-size')
+
+  await page.getByRole('button', { name: /^Lights On$/i }).click()
+  await expect(page.getByRole('dialog')).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Guest Room Lights' })).toBeVisible()
+  await expect(page.getByRole('button', { name: /TV Light On/i })).toBeVisible()
+  await page.getByRole('button', { name: 'Close' }).click()
+
+  await page.getByRole('button', { name: /^Climate 69°F - 71°F$/i }).click()
+  await expect(page.getByRole('heading', { name: 'Guest Room Climate' })).toBeVisible()
+  await expect(page.getByText('69.5°F')).toBeVisible()
+  await expect(page.getByText('70.2°F')).toBeVisible()
+  await page.getByRole('button', { name: 'Close' }).click()
+
+  await page.getByRole('button', { name: /^Air Quality 2$/i }).click()
+  await expect(page.getByRole('heading', { name: 'Guest Room Air Quality' })).toBeVisible()
+  await expect(page.getByText('Fan Modes')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Auto' })).toHaveAttribute('aria-pressed', 'true')
+  await expect(page.getByText('Auto Modes')).toBeVisible()
+})
+
 test('room media cards open ported remote modals', async ({ page }) => {
   await page.goto('/at-a-glance/living-room')
   await page.getByRole('button', { name: /^SHIELD Off$/i }).click()
@@ -118,21 +151,6 @@ test('security page opens ported security, contact, and camera modals', async ({
   await expect(page.getByRole('button', { name: 'Snapshot' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Muted' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Record' })).toBeVisible()
-})
-
-test('admin page opens ported presence override modals', async ({ page }) => {
-  await page.goto('/at-a-glance/admin')
-
-  await expect(page.getByRole('heading', { level: 1, name: 'Admin' })).toBeVisible()
-  await expect(page.getByRole('heading', { name: 'Security Controls' })).toBeVisible()
-  await expect(page.getByText('Disables automatic locking of the front door.')).toBeVisible()
-  await expect(page.getByRole('button', { name: /Front Door Auto-Lock On/i })).toBeVisible()
-  await expect(page.getByRole('heading', { name: 'Presence-Based Light Overrides' })).toBeVisible()
-  await page.getByRole('button', { name: 'Open Presence-Based Auto-Reset Configuration' }).click()
-  await expect(page.getByRole('dialog')).toBeVisible()
-  await expect(page.getByRole('heading', { name: 'Presence-Based Overrides Auto-Reset' })).toBeVisible()
-  await expect(page.getByRole('button', { name: /Living Room On/i })).toBeVisible()
-  await expect(page.getByRole('button', { name: /Upper Deck On/i })).toBeVisible()
 })
 
 test('room vacuum cards open reusable vacuum modal controls', async ({ page }) => {

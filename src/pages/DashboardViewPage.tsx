@@ -5,6 +5,7 @@ import { ContactSensorCard } from '../components/cards/ContactSensorCard'
 import { LightCard } from '../components/cards/LightCard'
 import { OccupancyCard } from '../components/cards/OccupancyCard'
 import { AppShell } from '../components/shell/AppShell'
+import { AppHeader } from '../components/shell/AppHeader'
 import { BottomNav } from '../components/shell/BottomNav'
 import { EntityActionCard } from '../components/hass/EntityActionCard'
 import { SecurityDashboard } from '../components/hass/SecurityDashboard'
@@ -16,6 +17,7 @@ import { GrillModalContent } from '../components/hass/GrillModalContent'
 import { MediaRemoteModalContent } from '../components/hass/MediaRemoteModalContent'
 import { Card, type CardColor } from '../components/core/Card'
 import { Description } from '../components/core/Description'
+import { GlassTile } from '../components/core/GlassTile'
 import { MaterialIcon } from '../components/core/Icon'
 import { ModalSheet } from '../components/core/ModalSheet'
 import { SectionHeader } from '../components/core/SectionHeader'
@@ -29,7 +31,7 @@ import {
   OCCUPANCY_GROUPS,
   type EntityGroupConfig,
 } from '../constants/atAGlance'
-import { DASHBOARD_ROUTES } from '../constants/routes'
+import { DASHBOARD_ROUTES, PRIMARY_NAV_ROUTES } from '../constants/routes'
 import {
   ADMIN_AUTO_REENABLE_ITEMS,
   ADMIN_DESCRIPTIONS,
@@ -373,16 +375,13 @@ function RoomSourceCard({ card, onOpen }: { card: RoomSourceCardConfig; onOpen: 
   const inactiveMuted = !unavailable && !isActiveState(entity) && ['fan', 'grill', 'light', 'media', 'power'].includes(card.kind)
 
   return (
-    <Card
-      ariaLabel={subtitle ? `${card.title} ${subtitle}` : card.title}
-      color={unavailable ? UNAVAILABLE_COLOR : sourceColor(card.kind)}
-      disabled={unavailable}
-      icon={<SourceCardIcon card={card} />}
-      muted={unavailable || disabledByState || inactiveMuted}
+    <GlassTile
+      icon={<SourceCardIcon card={card} size={24} />}
+      isOff={unavailable || disabledByState || inactiveMuted}
       onClick={clickable ? () => onOpen(card) : undefined}
-      size="compact"
       subtitle={subtitle}
       title={card.title}
+      tone={unavailable ? 'neutral' : toneForSourceKind(card.kind)}
     />
   )
 }
@@ -581,12 +580,7 @@ function SettingsLink({ item, onNavigate }: { item: SettingsLinkConfig; onNaviga
 function SettingsPage({ onNavigate }: { onNavigate: (path: string) => void }) {
   return (
     <main className={styles.settingsPage}>
-      <header className={styles.settingsHeader}>
-        <span aria-hidden="true" className={styles.settingsHeaderIcon}>
-          <MaterialIcon name="mdi:cog" size={32} />
-        </span>
-        <h1>Settings</h1>
-      </header>
+      <AppHeader activePath="settings" onNavigate={onNavigate} title="Settings" />
       <nav aria-label="Settings pages" className={styles.settingsList}>
         {SETTINGS_PAGE_ITEMS.map((item) => (
           <SettingsLink item={item} key={item.title} onNavigate={onNavigate} />
@@ -599,12 +593,7 @@ function SettingsPage({ onNavigate }: { onNavigate: (path: string) => void }) {
 function GuestControlsPage({ onNavigate }: { onNavigate: (path: string) => void }) {
   return (
     <main className={styles.guestPage}>
-      <header className={styles.guestHeader}>
-        <button aria-label="Back to overview" className={styles.guestBackButton} onClick={() => onNavigate('overview')} type="button">
-          <MaterialIcon name="mdi:chevron-left" size={36} />
-        </button>
-        <h1>Guest Controls</h1>
-      </header>
+      <AppHeader activePath="settings" backPath="overview" onNavigate={onNavigate} title="Guest Controls" />
 
       <section className={styles.guestSection}>
         <SectionHeader title="Guest Controls" />
@@ -724,6 +713,7 @@ function Content({ onNavigate, path }: { onNavigate: (path: string) => void; pat
 export function DashboardViewPage({ activePath, onNavigate, path }: DashboardViewPageProps) {
   const roomTitle = roomNameFromPath(path)
   const title = roomTitle ?? TODO_PAGES[path]?.title ?? CONTROL_PAGES[path]?.title ?? routeTitle(path)
+  const showBack = !PRIMARY_NAV_ROUTES.some((route) => route.path === path)
 
   if (path === 'guests-staying-over') {
     return (
@@ -743,7 +733,7 @@ export function DashboardViewPage({ activePath, onNavigate, path }: DashboardVie
 
   return (
     <AppShell bottomNav={<BottomNav activePath={activePath} onNavigate={onNavigate} />}>
-      <Page headerQuickLinks={roomTitle ? <RoomSectionRail path={path} title={roomTitle} /> : undefined} title={title}>
+      <Page activePath={activePath} backPath={showBack ? 'overview' : undefined} headerQuickLinks={roomTitle ? <RoomSectionRail path={path} title={roomTitle} /> : undefined} onNavigate={onNavigate} title={title}>
         <Content onNavigate={onNavigate} path={path} />
       </Page>
     </AppShell>

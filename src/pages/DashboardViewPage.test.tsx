@@ -41,9 +41,15 @@ describe('DashboardViewPage', () => {
   })
 
   it('renders a statically ported room page from React-owned config', () => {
-    render(<DashboardViewPage activePath="living-room" onNavigate={() => undefined} path="living-room" />)
+    const navigate = vi.fn()
+    const back = vi.spyOn(window.history, 'back').mockImplementation(() => undefined)
+    render(<DashboardViewPage activePath="living-room" onNavigate={navigate} path="living-room" />)
 
     expect(screen.getByRole('heading', { name: 'Living Room' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Go back' }))
+    expect(back).toHaveBeenCalled()
+    expect(navigate).not.toHaveBeenCalledWith('overview')
+    back.mockRestore()
     expect(screen.queryByRole('heading', { name: 'Room Status' })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Lights/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Window/i })).toBeInTheDocument()
@@ -82,6 +88,56 @@ describe('DashboardViewPage', () => {
     fireEvent.click(screen.getAllByRole('button', { name: /Air Quality/i })[0])
     expect(await screen.findByRole('dialog')).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Living Room Air Quality' })).toBeInTheDocument()
+    expect(screen.getByText('Fan Modes')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Auto' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByText('Auto Modes')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Default' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByText('PM2.5')).toBeInTheDocument()
+    expect(screen.getByText('AQI')).toBeInTheDocument()
+  })
+
+  it('ports the Guest Room source page with its status chips and reusable popups', async () => {
+    const renderGuestRoom = () => render(<DashboardViewPage activePath="guest-room" onNavigate={() => undefined} path="guest-room" />)
+
+    let view = renderGuestRoom()
+    expect(screen.getByRole('heading', { name: 'Guest Room' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Room Status' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^Lights On$/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^Climate 69°F - 71°F$/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^Occupancy Detected$/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^Window Closed$/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^Air Quality 2$/i })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Climate' })).toBeInTheDocument()
+    const ventCard = screen.getByRole('button', { name: /^Vent Open$/i })
+    const airPurifierCard = screen.getByRole('button', { name: /^Air Purifier Auto • On$/i })
+    expect(ventCard).toHaveAttribute('data-tone', 'climate')
+    expect(ventCard).not.toHaveAttribute('data-size')
+    expect(airPurifierCard).toHaveAttribute('data-tone', 'air')
+    expect(airPurifierCard).not.toHaveAttribute('data-size')
+
+    fireEvent.click(screen.getByRole('button', { name: /^Lights On$/i }))
+    expect(await screen.findByRole('dialog')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Guest Room Lights' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /TV Light On/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Bed Light Off/i })).toBeInTheDocument()
+    view.unmount()
+    window.history.replaceState(null, '', window.location.pathname)
+
+    view = renderGuestRoom()
+    fireEvent.click(screen.getByRole('button', { name: /^Climate 69°F - 71°F$/i }))
+    expect(await screen.findByRole('dialog')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Guest Room Climate' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Temperature Sensors' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Vent' })).toBeInTheDocument()
+    expect(screen.getByText('69.5°F')).toBeInTheDocument()
+    expect(screen.getByText('70.2°F')).toBeInTheDocument()
+    view.unmount()
+    window.history.replaceState(null, '', window.location.pathname)
+
+    renderGuestRoom()
+    fireEvent.click(screen.getByRole('button', { name: /^Air Quality 2$/i }))
+    expect(await screen.findByRole('dialog')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Guest Room Air Quality' })).toBeInTheDocument()
     expect(screen.getByText('Fan Modes')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Auto' })).toHaveAttribute('aria-pressed', 'true')
     expect(screen.getByText('Auto Modes')).toBeInTheDocument()
@@ -171,6 +227,10 @@ describe('DashboardViewPage', () => {
     expect(screen.queryByText('Groceries')).not.toBeInTheDocument()
     expect(screen.queryByText('Custom Lights')).not.toBeInTheDocument()
 
+    fireEvent.click(screen.getByRole('button', { name: 'Open navigation menu' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Security' }))
+    expect(navigate).toHaveBeenLastCalledWith('security')
+
     const admin = screen.getByRole('button', { name: /Admin Controls Presence-Based Toggles, Automation Overrides, and More/i })
     expect(admin.querySelector('path')).toHaveAttribute('d', materialIconPath('mdi:shield-account'))
     fireEvent.click(admin)
@@ -196,6 +256,7 @@ describe('DashboardViewPage', () => {
     mockEntities['input_boolean.guests_staying_in_music_room'].state = 'on'
     mockEntities['input_boolean.guests_staying_in_theater_room'].state = 'off'
     const navigate = vi.fn()
+    const back = vi.spyOn(window.history, 'back').mockImplementation(() => undefined)
 
     render(<DashboardViewPage activePath="settings" onNavigate={navigate} path="guests-staying-over" />)
 
@@ -203,9 +264,10 @@ describe('DashboardViewPage', () => {
     expect(screen.queryByRole('heading', { name: 'Guests Staying Over' })).not.toBeInTheDocument()
     expect(screen.getByText("When guests stay over, toggle these controls on based on the rooms they're staying in to disable automations (like automatic vacuuming in the music room) and ensure that rooms are tracked for temperature monitoring and vent control.")).toBeInTheDocument()
 
-    const back = screen.getByRole('button', { name: 'Back to overview' })
-    fireEvent.click(back)
-    expect(navigate).toHaveBeenCalledWith('overview')
+    fireEvent.click(screen.getByRole('button', { name: 'Go back' }))
+    expect(back).toHaveBeenCalled()
+    expect(navigate).not.toHaveBeenCalledWith('overview')
+    back.mockRestore()
 
     const guestRoom = screen.getByRole('button', { name: /Guest Room Off/i })
     expect(guestRoom).toHaveAttribute('aria-pressed', 'false')
@@ -484,7 +546,10 @@ describe('DashboardViewPage', () => {
   it('opens Kitchen vent as the exact vent popup rather than the full climate sheet', async () => {
     render(<DashboardViewPage activePath="kitchen" onNavigate={() => undefined} path="kitchen" />)
 
-    fireEvent.click(screen.getByRole('button', { name: /Vent Open/i }))
+    const ventCard = screen.getByRole('button', { name: /Vent Open/i })
+    expect(ventCard).toHaveAttribute('data-tone', 'climate')
+    expect(ventCard).not.toHaveAttribute('data-size')
+    fireEvent.click(ventCard)
 
     expect(await screen.findByRole('dialog')).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Kitchen: Vent' })).toBeInTheDocument()
