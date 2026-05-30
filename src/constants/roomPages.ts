@@ -1,8 +1,9 @@
-import type { EntityAction } from './portedDashboard'
+import type { EntityBasicAction, EntityStateAction } from './portedDashboard'
 import { MEDIA_REMOTE_CONFIGS, type MediaRemoteAction } from './mediaRemotes'
 
 export type RoomSourceKind = 'air' | 'appliance' | 'climate' | 'contact' | 'fan' | 'grill' | 'laundry' | 'light' | 'media' | 'occupancy' | 'power' | 'vacuum' | 'vent'
-export type RoomSourceCardAction = Exclude<EntityAction, { type: 'navigate' }>
+type RoomSourceBaseAction = Exclude<EntityBasicAction, { type: 'navigate' }>
+export type RoomSourceCardAction = RoomSourceBaseAction | EntityStateAction<RoomSourceBaseAction>
 
 export interface RoomSourceCardConfig {
   action?: RoomSourceCardAction
@@ -63,6 +64,18 @@ const sourceControlReview = 'This YAML control can call a real service and needs
 function sourceActionFromMediaAction(action: MediaRemoteAction, serviceDataOverride?: Record<string, unknown>): RoomSourceCardAction | undefined {
   if (action.type !== 'service') return undefined
   return { type: 'service', domain: action.domain, service: action.service, target: action.target ?? null, serviceData: { ...action.serviceData, ...serviceDataOverride } }
+}
+
+function inputButtonPress(target: string): RoomSourceBaseAction {
+  return { type: 'service', domain: 'input_button', service: 'press', target }
+}
+
+function pcPowerAction(onTarget: string, offTarget: string): RoomSourceCardAction {
+  return {
+    type: 'state',
+    cases: [{ states: ['on'], action: inputButtonPress(offTarget) }],
+    defaultAction: inputButtonPress(onTarget),
+  }
 }
 
 function mediaAppShortcuts(hash: string, entityId: string, serviceDataOverride?: Record<string, unknown>): RoomSourceCardConfig[] {
@@ -178,8 +191,8 @@ export const ROOM_PAGE_CONFIGS: Record<string, RoomPageSourceConfig> = {
         { title: 'Air Purifier', entityId: 'select.office_air_purifier_fan_mode', icon: 'mdi:fan', kind: 'air', hash: '#air-purifier', modalEntityId: 'sensor.office_air_purifier_pm2_5', subtitleEntityIds: ['select.office_air_purifier_fan_mode', 'fan.office_air_purifier_levoit_purifier'] },
       ] },
       { title: 'Office PCs', cards: [
-        { title: "Stephen's PC", entityId: 'input_boolean.stephen_s_pc_power', icon: 'mdi:controller', kind: 'power', subtitleEntityIds: ['input_text.stephen_s_pc_power_state'], action: { type: 'service', domain: 'input_button', service: 'press', target: 'input_button.control_stephen_s_pc' } },
-        { title: "Steph's PC", entityId: 'input_boolean.steph_s_pc_power', icon: 'mdi:controller', kind: 'power', subtitleEntityIds: ['input_text.steph_s_pc_power_state'], action: { type: 'service', domain: 'input_button', service: 'press', target: 'input_button.control_steph_s_pc' } },
+        { title: "Stephen's PC", entityId: 'input_boolean.stephen_s_pc_power', icon: 'mdi:controller', kind: 'power', subtitleEntityIds: ['input_text.stephen_s_pc_power_state'], action: pcPowerAction('input_button.stephen_s_pc_on', 'input_button.stephen_s_pc_off') },
+        { title: "Steph's PC", entityId: 'input_boolean.steph_s_pc_power', icon: 'mdi:controller', kind: 'power', subtitleEntityIds: ['input_text.steph_s_pc_power_state'], action: pcPowerAction('input_button.steph_s_pc_on', 'input_button.steph_s_pc_off') },
       ] },
     ],
     popupTemplates: ['light-popup-single', 'window-popup-2', 'vent-popup-single', 'climate-popup-3', 'air-purifier-popup', 'occupancy-popup-2'],
@@ -266,7 +279,7 @@ export const ROOM_PAGE_CONFIGS: Record<string, RoomPageSourceConfig> = {
         { title: 'Nintendo Switch', entityId: 'input_boolean.is_nintendo_switch_active', icon: 'mdi:gamepad', kind: 'media', showState: true, manualReview: sourceControlReview },
         ...theaterAppShortcuts,
       ] },
-      { title: 'Theater Room PCs', cards: [{ title: 'Theater Room PC', entityId: 'input_boolean.theater_pc_power', icon: 'mdi:projector', kind: 'power', subtitleEntityIds: ['input_text.theater_pc_power_state'], action: { type: 'service', domain: 'input_button', service: 'press', target: 'input_button.control_theater_pc' } }] },
+      { title: 'Theater Room PCs', cards: [{ title: 'Theater Room PC', entityId: 'input_boolean.theater_pc_power', icon: 'mdi:projector', kind: 'power', subtitleEntityIds: ['input_text.theater_pc_power_state'], action: pcPowerAction('input_button.theater_pc_on', 'input_button.theater_pc_off') }] },
       { title: 'Devices', cards: [{ title: 'Theater Room', modalTitle: 'Robot Vacuum', entityId: 'vacuum.valetudo_politefatherlykingfisher', icon: 'mdi:robot-vacuum', kind: 'vacuum', hash: '#robot-vacuum', subtitleEntityIds: ['vacuum.valetudo_politefatherlykingfisher', 'sensor.valetudo_politefatherlykingfisher_battery_level'], span: 'full', manualReview: sourcePopupReview }] },
     ],
     popupTemplates: ['light-popup-6', 'door-popup-single', 'occupancy-popup-single', 'vent-popup-2', 'climate-popup-1', 'air-purifier-popup', 'media-player-popup', 'vacuum-*'],

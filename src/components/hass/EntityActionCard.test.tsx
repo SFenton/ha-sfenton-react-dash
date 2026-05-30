@@ -70,4 +70,33 @@ describe('EntityActionCard', () => {
     ])
   })
 
+  it('runs the action case for the current entity state', () => {
+    render(
+      <EntityActionCard
+        item={{
+          title: "Stephen's PC",
+          entityId: 'input_boolean.stephen_s_pc_power',
+          icon: 'mdi:controller',
+          action: {
+            type: 'state',
+            cases: [{ states: ['on'], action: { type: 'service', domain: 'input_button', service: 'press', target: 'input_button.stephen_s_pc_off' } }],
+            defaultAction: { type: 'service', domain: 'input_button', service: 'press', target: 'input_button.stephen_s_pc_on' },
+          },
+        }}
+        onNavigate={() => undefined}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: /stephen's pc/i }))
+
+    expect(mockCallServiceCalls).toEqual([
+      {
+        domain: 'input_button',
+        service: 'press',
+        serviceData: undefined,
+        target: 'input_button.stephen_s_pc_on',
+      },
+    ])
+  })
+
 })

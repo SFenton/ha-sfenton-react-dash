@@ -39,13 +39,14 @@ HASS_PORTING_REACT_URL=http://127.0.0.1:5173
 
 1. Clarify the target only when necessary. Accept page names, route paths, popup hashes, entity IDs, card names, screenshots, or component names as anchors.
 2. Pull the matching Home Assistant dashboard config with HA MCP. For the source dashboard, default to `url_path="at-a-glance"` with `force_reload=True`.
-3. Locate the target cards and all relevant nested config: `streamline-card`, `decluttering-card`, `bubble-card` popups, conditional cards, grids, stacks, custom cards, module references, styles, tap/hold/double actions, sub-buttons, and navigation targets.
+3. Locate the target cards and all relevant nested config: `streamline-card`, `decluttering-card`, `bubble-card` popups, conditional cards, grids, stacks, custom cards, module references, styles, tap/hold/double actions, sub-buttons, and navigation targets. For every clickable surface, build a state-to-service action matrix. Include generic helper actions that fan out through scripts, input buttons, automations, or related on/off helpers; active and inactive states may intentionally call different services.
 4. Expand or mentally resolve templates enough to understand the rendered structure. Preserve template-driven behavior such as variable-dependent names, icons, colors, visibility, service data, and conditional state.
 5. Open the Home Assistant dashboard in Playwright and log in using `.env.hass-porting.local` when needed.
 6. Open the React dashboard in a second Playwright page after starting the dev server.
 7. Set both pages to the same mobile viewport first. Later check tablet or desktop only when the requested surface needs it.
 8. Build a source evidence packet before implementing. This is mandatory, not optional. The packet must combine:
    - Lovelace/YAML/MCP config for structure, templates, entities, actions, visibility, and state/color branches
+   - a state-to-service action matrix for each clickable control, including the current live state and at least active/on and inactive/off branches when the control can change behavior by state
    - Playwright DOM and accessibility snapshots for rendered text, roles, hierarchy, clickable surfaces, and shadow DOM/custom-card internals
    - a text/state content matrix listing every visible label, state line, secondary line, attribute-derived string, badge/chip value, and hidden-but-accessible name for each card/control state
    - computed style snapshots for source elements, shadow hosts, important descendants, pseudo-elements, and CSS variables
@@ -62,10 +63,10 @@ HASS_PORTING_REACT_URL=http://127.0.0.1:5173
    - screenshot-visible rendered colors, gradients, blur layers, and opacity, especially when custom cards report transparent computed backgrounds
    - animations, transitions, press feedback, and modal open/close behavior
    - every clickable surface, including nested controls and sub-buttons
-   - service calls, navigation, popup hashes, no-op clicks, hold actions, and double-tap actions
+   - service calls, state-dependent service branches, navigation, popup hashes, no-op clicks, hold actions, and double-tap actions
 11. Inspect existing React pages, components, hooks, constants, tests, and Playwright specs before implementing. Reuse or extend existing primitives when practical.
 12. Implement the port against real Home Assistant state through HAKit and `@hakit/core`. Keep entity IDs and route metadata in constants when they are reused.
-13. Add or update focused unit tests for rendering, state formatting, service-call behavior, modal behavior, navigation logic, and source-derived color/state mappings.
+13. Add or update focused unit tests for rendering, state formatting, service-call behavior, state-dependent service-call branches, modal behavior, navigation logic, and source-derived color/state mappings.
 14. Add or update Playwright coverage for the ported page/control where the behavior is user-visible or regression-prone.
 15. Compare Home Assistant and React in Playwright at the same viewport after implementation. Capture screenshots of both and use DOM/style/pixel checks when visual fidelity matters. Also compare the React rendered text, subtitles, attribute-derived strings, and accessible names against the source text/state content matrix; iterate until the result is close enough to defend.
 16. Run focused validation first, then broader validation as needed: targeted Vitest, targeted Playwright, `npm run lint`, and `npm run build` when the change warrants it.
@@ -74,7 +75,7 @@ HASS_PORTING_REACT_URL=http://127.0.0.1:5173
 
 A Home Assistant port or update is not complete until both comparison tracks have been performed and summarized:
 
-- **Code/config comparison**: compare the Lovelace/MCP config, expanded templates, entity IDs, service calls, navigation/popup targets, state/color branches, visibility rules, and text/state content matrix against the React implementation and focused tests.
+- **Code/config comparison**: compare the Lovelace/MCP config, expanded templates, entity IDs, service calls, state-dependent service branches, navigation/popup targets, state/color branches, visibility rules, and text/state content matrix against the React implementation and focused tests.
 - **Playwright visual comparison**: compare the live Home Assistant source page and the local or deployed React page side by side in Playwright at the same viewport, mobile first. Capture screenshots and inspect DOM/accessibility/computed styles for layout, density, spacing, scroll containers, modal behavior, color/state rendering, text, icons, and clickable surfaces.
 
 Do not substitute unit tests, API/WebSocket checks, build/lint output, code inspection, or user feedback for the Playwright comparison. If Playwright, credentials, the live backend, or source assets are unavailable, report that blocker before finalizing and mark visual parity as unverified. Do not claim a port is visually complete without the Playwright comparison.
@@ -103,6 +104,7 @@ Before choosing React colors for a ported card, control, popup, separator, butto
 
 - Match the source behavior, not just the static screenshot.
 - A click must do in React what it does in Home Assistant: navigate, call a service, open a modal, toggle an entity, adjust a slider, run a script, select a sub-control, or intentionally do nothing.
+- If a click routes through a generic helper, script, or input button, inspect the related helper/automation targets enough to know whether different entity states call different downstream services. Encode that state-specific behavior in React instead of collapsing it to one generic action.
 - Port sub-buttons and nested controls explicitly. Do not collapse them into a single generic card action when Home Assistant exposes distinct actions.
 - Preserve state-dependent rendering, including names, labels, values, icons, colors, visibility, disabled states, and unavailable/error handling.
 - Preserve icon resolution order. If the HASS template/card defines an icon, use that; if it omits the icon, inspect the live entity attributes and map `attributes.icon` rather than reusing a neighboring template's icon.

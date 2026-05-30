@@ -574,7 +574,7 @@ describe('DashboardViewPage', () => {
     expect(screen.getByRole('button', { name: /Theater Room Docked • 99%/i })).toBeInTheDocument()
     expect(mockCallServiceCalls).toEqual([
       { domain: 'script', service: 'launch_app_on_media_player', serviceData: { entity: 'media_player.theater_room_shield', remote_entity: 'remote.theater_shield_remote', app_id: 'com.plexapp.android', turn_on_projector: true } },
-      { domain: 'input_button', service: 'press', target: 'input_button.control_theater_pc' },
+      { domain: 'input_button', service: 'press', target: 'input_button.theater_pc_on' },
     ])
   })
 
@@ -620,6 +620,7 @@ describe('DashboardViewPage', () => {
   it('ports the Theater Room remote modal with device controls', async () => {
     mockEntities['media_player.theater_room_shield'].state = 'playing'
     mockEntities['media_player.theater'].state = 'on'
+    mockEntities['input_boolean.theater_pc_power'].state = 'on'
     render(<DashboardViewPage activePath="theater-room" onNavigate={() => undefined} path="theater-room" />)
 
     fireEvent.click(screen.getByRole('button', { name: /^Theater Room Off$/i }))
@@ -634,11 +635,13 @@ describe('DashboardViewPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Power' }))
     fireEvent.click(screen.getByRole('button', { name: 'Right' }))
     fireEvent.click(screen.getByRole('button', { name: /Projector Off/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Theater Room PC On/i }))
 
     expect(mockCallServiceCalls).toEqual([
       { domain: 'script', service: 'toggle_on_off_theater_room', target: undefined, serviceData: undefined },
       { domain: 'remote', service: 'send_command', target: 'remote.theater_shield_remote', serviceData: { command: 'DPAD_RIGHT' } },
       { domain: 'media_player', service: 'toggle', target: 'media_player.sony_projector', serviceData: undefined },
+      { domain: 'input_button', service: 'press', target: 'input_button.theater_pc_off', serviceData: undefined },
     ])
   })
 
@@ -802,8 +805,8 @@ describe('DashboardViewPage', () => {
     fireEvent.click(stephPc)
 
     expect(mockCallServiceCalls).toEqual([
-      { domain: 'input_button', service: 'press', target: 'input_button.control_stephen_s_pc' },
-      { domain: 'input_button', service: 'press', target: 'input_button.control_steph_s_pc' },
+      { domain: 'input_button', service: 'press', target: 'input_button.stephen_s_pc_off' },
+      { domain: 'input_button', service: 'press', target: 'input_button.steph_s_pc_on' },
     ])
   })
 

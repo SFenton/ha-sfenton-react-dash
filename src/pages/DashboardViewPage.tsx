@@ -23,6 +23,7 @@ import { MaterialIcon } from '../components/core/Icon'
 import { ModalSheet } from '../components/core/ModalSheet'
 import { OptionPickerDialog, type PickerOption } from '../components/core/OptionPickerDialog'
 import { SectionHeader } from '../components/core/SectionHeader'
+import { resolveEntityAction, type EntityActionStateMap } from '../components/hass/entityActions'
 import { asEntityName, formatCompactEntityState, isActiveState, isContactOpen, titleCaseState } from '../components/hass/entityState'
 import { DASHBOARD_ROUTE_CHANGE_EVENT, dashboardEventTargets, dashboardHash, dashboardPathWithSearch, replaceDashboardUrl } from '../hooks/dashboardLocation'
 import { useHashModal } from '../hooks/useHashModal'
@@ -55,11 +56,10 @@ import {
   UNAVAILABLE_COLOR,
   VACUUM_COLOR,
   VACUUMS,
-  type EntityAction,
   type EntitySectionConfig,
   type SettingsLinkConfig,
 } from '../constants/portedDashboard'
-import { ROOM_PAGE_CONFIGS, type RoomSourceCardConfig, type RoomSourceKind, type RoomSourceModalItem } from '../constants/roomPages'
+import { ROOM_PAGE_CONFIGS, type RoomSourceCardAction, type RoomSourceCardConfig, type RoomSourceKind, type RoomSourceModalItem } from '../constants/roomPages'
 import { MEDIA_REMOTE_CONFIGS } from '../constants/mediaRemotes'
 import { Page } from './Page'
 import { ClimateSheet, ContactSheet, LightsSheet, OccupancySheet } from './AtAGlancePage'
@@ -423,17 +423,19 @@ function RoomSourceMediaAppCard({ card, isOff, onClick }: { card: RoomSourceCard
 
 function useRoomSourceActionRunner() {
   const callService = useHass((state) => state.helpers.callService) as unknown as (params: Record<string, unknown>) => void
+  const entities = useHass((state) => state.entities) as unknown as EntityActionStateMap
 
-  return (entityId: string, action: Exclude<EntityAction, { type: 'navigate' }> | undefined) => {
-    if (!action) return
-    if (action.type === 'toggle') {
+  return (entityId: string, action: RoomSourceCardAction | undefined) => {
+    const resolvedAction = resolveEntityAction(entityId, action, entities)
+    if (!resolvedAction) return
+    if (resolvedAction.type === 'toggle') {
       callService({ domain: 'homeassistant', service: 'toggle', target: entityId })
       return
     }
 
-    const target = action.target === null ? undefined : action.target ?? entityId
-    const params: Record<string, unknown> = { domain: action.domain, service: action.service }
-    if (action.serviceData !== undefined) params.serviceData = action.serviceData
+    const target = resolvedAction.target === null ? undefined : resolvedAction.target ?? entityId
+    const params: Record<string, unknown> = { domain: resolvedAction.domain, service: resolvedAction.service }
+    if (resolvedAction.serviceData !== undefined) params.serviceData = resolvedAction.serviceData
     if (target !== undefined) params.target = target
     callService(params)
   }

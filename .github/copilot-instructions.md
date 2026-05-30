@@ -99,6 +99,7 @@ Before implementing each Home Assistant page:
 
 1. Pull the matching Lovelace dashboard config through Home Assistant MCP before or alongside browser inspection. For the main dashboard, use `ha_config_get_dashboard(url_path="at-a-glance", force_reload=True)`; use search mode to find specific entities, card types, headings, popup hashes, and navigation targets when the full config is too large.
 2. Treat the MCP dashboard config as the structural baseline for entity IDs, view paths, popup hashes, card groupings, navigation actions, and custom-card behavior. Treat Playwright/browser inspection as the source of truth for runtime layout, scrolling, modal behavior, visual details, and interaction feel.
+	For every clickable card/control, build a state-to-service action matrix before implementing. Include `tap_action`, `button_action`, `icon_action`, hold/double actions, sub-buttons, scripts, helper input buttons, and any automation/helper entities that branch on the displayed entity state. Do not assume active and inactive states call the same service just because the visible Lovelace card has one generic action.
 3. Inspect the matching page in the live Home Assistant browser tab.
 4. Scroll vertically and horizontally inside the page and inside nested containers. Record what scrolls, what stays fixed, and which direction each container scrolls.
 5. Click visible controls and cards on the page.
@@ -112,7 +113,7 @@ Before implementing each Home Assistant page:
 Completion gate for Home Assistant ports:
 
 - Do not call a port or port update complete until both the code/config comparison and Playwright visual comparison have been completed, or until the blocker is explicitly reported.
-- Code/config comparison is required: compare the Lovelace/MCP config, expanded templates, entity IDs, service actions, state/color branches, and visible text/state matrix against the React implementation and focused tests.
+- Code/config comparison is required: compare the Lovelace/MCP config, expanded templates, entity IDs, service actions, state-dependent service branches, state/color branches, and visible text/state matrix against the React implementation and focused tests.
 - Playwright visual comparison is required: open the live Home Assistant source page and the local or deployed React page side by side at the same viewport, mobile first, and compare screenshots/DOM/accessibility/style evidence for layout, spacing, text, scroll behavior, modal behavior, colors, and interactive states.
 - Unit tests, API/WebSocket checks, build/lint success, manual code review, and user feedback do not replace the Playwright comparison. If browser comparison cannot run, say so before finalizing and mark visual parity as unverified.
 
@@ -137,6 +138,7 @@ Do not recreate the Home Assistant sidebar or top bar for now. Focus on the dash
 
 - Use HAKit and `@hakit/core` for Home Assistant state, services, and connection management.
 - Controls must call real Home Assistant services.
+- Controls whose click behavior changes by entity state must encode and test that state-to-service mapping explicitly, such as on/off helpers that press different input buttons or scripts for startup versus shutdown.
 - Entity-aware components should be reusable and typed narrowly enough to prevent invalid service calls where practical.
 - Avoid hard-coded UI state if the corresponding Home Assistant entity state is available.
 - Keep entity IDs and route/page configuration in constants rather than scattering strings across components.

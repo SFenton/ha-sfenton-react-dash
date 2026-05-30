@@ -58,15 +58,25 @@ function textInputCommand(value: string) {
   return `input text '${value.replace(/'/g, "'\\''")}'`
 }
 
-function runAction(callService: CallService, action: MediaRemoteAction) {
-  if (action.type === 'textPrompt') {
+function resolveAction(action: MediaRemoteAction, entityId: string | undefined, entities: Record<string, EntityLike | undefined>) {
+  if (action.type !== 'state') return action
+  const stateEntityId = action.entityId ?? entityId
+  const state = stateEntityId ? entities[stateEntityId]?.state : undefined
+  const matchedCase = action.cases.find((candidate) => state !== undefined && candidate.states.includes(state))
+  return matchedCase?.action ?? action.defaultAction
+}
+
+function runAction(callService: CallService, action: MediaRemoteAction, entities: Record<string, EntityLike | undefined>, entityId?: string) {
+  const resolvedAction = resolveAction(action, entityId, entities)
+
+  if (resolvedAction.type === 'textPrompt') {
     const text = window.prompt('Enter text to send to SHIELD:')
     if (!text) return
-    callService({ domain: 'androidtv', service: 'adb_command', target: action.targetEntityId, serviceData: { command: textInputCommand(text) } })
+    callService({ domain: 'androidtv', service: 'adb_command', target: resolvedAction.targetEntityId, serviceData: { command: textInputCommand(text) } })
     return
   }
 
-  callService({ domain: action.domain, service: action.service, target: action.target, serviceData: action.serviceData })
+  callService({ domain: resolvedAction.domain, service: resolvedAction.service, target: resolvedAction.target, serviceData: resolvedAction.serviceData })
 }
 
 function iconColorFromRule(rule: MediaRemoteIconColorRule | undefined, entities: Record<string, EntityLike | undefined>) {
@@ -102,7 +112,7 @@ function RemoteButton({ button, disabled = false, size = 'normal' }: { button: M
       data-icon={button.icon}
       data-size={size}
       disabled={disabled}
-      onClick={() => runAction(callService, button.action)}
+      onClick={() => runAction(callService, button.action, entities)}
       style={iconColor ? { color: iconColor } : undefined}
       type="button"
     >
@@ -173,12 +183,13 @@ function VolumeSummary({ entityId, title }: { entityId: string; title: string })
 
 function DeviceButton({ device }: { device: MediaRemoteDeviceConfig }) {
   const callService = useHass((state) => state.helpers.callService) as unknown as CallService
+  const entities = useHass((state) => state.entities) as unknown as Record<string, EntityLike | undefined>
   const entity = useEntity(asEntityName(device.entityId), { returnNullIfNotFound: true }) as EntityLike | null
   const unavailable = isUnavailable(entity)
   const subtitle = formatMediaState(entity)
 
   return (
-    <button aria-label={`${device.title} ${subtitle}`} className={styles.deviceButton} disabled={unavailable} onClick={() => runAction(callService, device.action)} type="button">
+    <button aria-label={`${device.title} ${subtitle}`} className={styles.deviceButton} disabled={unavailable} onClick={() => runAction(callService, device.action, entities, device.entityId)} type="button">
       <span className={styles.deviceIcon}>
         <MaterialIcon name={device.icon} size={22} />
       </span>
@@ -192,10 +203,11 @@ function DeviceButton({ device }: { device: MediaRemoteDeviceConfig }) {
 
 function AppButton({ app }: { app: MediaRemoteAppConfig }) {
   const callService = useHass((state) => state.helpers.callService) as unknown as CallService
+  const entities = useHass((state) => state.entities) as unknown as Record<string, EntityLike | undefined>
   const [imageFailed, setImageFailed] = useState(false)
 
   return (
-    <button aria-label={app.title} className={styles.appButton} data-background={app.background} onClick={() => runAction(callService, app.action)} type="button">
+    <button aria-label={app.title} className={styles.appButton} data-background={app.background} onClick={() => runAction(callService, app.action, entities)} type="button">
       {imageFailed ? <MaterialIcon name={app.icon ?? 'mdi:play-box'} size={34} /> : <img alt="" className={styles.appImage} onError={() => setImageFailed(true)} src={app.imageUrl} />}
     </button>
   )

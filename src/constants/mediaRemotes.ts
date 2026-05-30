@@ -1,6 +1,7 @@
 export type MediaRemoteAction =
   | { type: 'service'; domain: string; service: string; target?: string; serviceData?: Record<string, unknown> }
   | { type: 'textPrompt'; targetEntityId: string }
+  | { type: 'state'; cases: Array<{ action: Exclude<MediaRemoteAction, { type: 'state' }>; states: string[] }>; defaultAction: Exclude<MediaRemoteAction, { type: 'state' }>; entityId?: string }
 
 export interface MediaRemoteIconColorRule {
   activeColor: string
@@ -63,6 +64,18 @@ export interface MediaRemoteConfig {
 
 function service(domain: string, serviceName: string, target?: string, serviceData?: Record<string, unknown>): MediaRemoteAction {
   return { type: 'service', domain, service: serviceName, target, serviceData }
+}
+
+function inputButtonPress(target: string): Exclude<MediaRemoteAction, { type: 'state' }> {
+  return { type: 'service', domain: 'input_button', service: 'press', target }
+}
+
+function pcPowerAction(onTarget: string, offTarget: string): MediaRemoteAction {
+  return {
+    type: 'state',
+    cases: [{ states: ['on'], action: inputButtonPress(offTarget) }],
+    defaultAction: inputButtonPress(onTarget),
+  }
 }
 
 function remoteCommand(remoteEntityId: string, command: string): MediaRemoteAction {
@@ -203,7 +216,7 @@ export const MEDIA_REMOTE_CONFIGS: Record<string, MediaRemoteConfig> = {
       { title: 'Projector', entityId: theaterProjector, icon: 'mdi:projector', action: service('media_player', 'toggle', theaterProjector) },
       { title: 'Yamaha AVR', entityId: theaterReceiver, icon: 'mdi:audio-video', action: service('media_player', 'toggle', theaterReceiver) },
       { title: 'SHIELD', entityId: theaterShield, icon: 'mdi:remote-tv', action: service('media_player', 'toggle', theaterShield) },
-      { title: 'Theater Room PC', entityId: 'input_boolean.theater_pc_power', icon: 'mdi:projector', action: service('input_button', 'press', 'input_button.control_theater_pc') },
+      { title: 'Theater Room PC', entityId: 'input_boolean.theater_pc_power', icon: 'mdi:projector', action: pcPowerAction('input_button.theater_pc_on', 'input_button.theater_pc_off') },
     ],
   },
 }

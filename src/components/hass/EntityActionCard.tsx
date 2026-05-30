@@ -2,6 +2,7 @@ import { useEntity, useHass } from '@hakit/core'
 import { Card } from '../core/Card'
 import { MaterialIcon } from '../core/Icon'
 import type { EntityAction, EntityTileConfig } from '../../constants/portedDashboard'
+import { resolveEntityAction, type EntityActionStateMap } from './entityActions'
 import { asEntityName, formatCompactEntityState, isActiveState } from './entityState'
 
 interface EntityActionCardProps {
@@ -35,19 +36,21 @@ function defaultIcon(entityId: string) {
 
 function useActionRunner(onNavigate: (path: string) => void) {
   const callService = useHass((state) => state.helpers.callService) as unknown as (params: Record<string, unknown>) => void
+  const entities = useHass((state) => state.entities) as unknown as EntityActionStateMap
 
   return (entityId: string, action: EntityAction | undefined) => {
-    if (!action) return
-    if (action.type === 'navigate') {
-      onNavigate(action.path)
+    const resolvedAction = resolveEntityAction(entityId, action, entities)
+    if (!resolvedAction) return
+    if (resolvedAction.type === 'navigate') {
+      onNavigate(resolvedAction.path)
       return
     }
-    if (action.type === 'toggle') {
+    if (resolvedAction.type === 'toggle') {
       callService({ domain: 'homeassistant', service: 'toggle', target: entityId })
       return
     }
-    const target = action.target === null ? undefined : action.target ?? entityId
-    const params: Record<string, unknown> = { domain: action.domain, service: action.service, serviceData: action.serviceData }
+    const target = resolvedAction.target === null ? undefined : resolvedAction.target ?? entityId
+    const params: Record<string, unknown> = { domain: resolvedAction.domain, service: resolvedAction.service, serviceData: resolvedAction.serviceData }
     if (target !== undefined) params.target = target
     callService(params)
   }
@@ -64,6 +67,8 @@ function formatStateLabel(item: EntityTileConfig, entity: ReturnType<typeof useE
 export function EntityActionCard({ item, onNavigate, size = 'compact' }: EntityActionCardProps) {
   const entity = useEntity(asEntityName(item.entityId), { returnNullIfNotFound: true })
   const runAction = useActionRunner(onNavigate)
+  const entities = useHass((state) => state.entities) as unknown as EntityActionStateMap
+  const resolvedAction = resolveEntityAction(item.entityId, item.action, entities)
   const entityUnavailable = !entity || entity.state === 'unavailable' || entity.state === 'unknown'
   const stateLabel = formatStateLabel(item, entity)
   const subtitle = item.manualReview ? `${formatCompactEntityState(entity, 'Review')} - review` : stateLabel ?? (item.showSubtitle ? formatCompactEntityState(entity, 'Unavailable') : undefined)
@@ -77,9 +82,9 @@ export function EntityActionCard({ item, onNavigate, size = 'compact' }: EntityA
       color={item.color}
       disabled={disabled}
       icon={<MaterialIcon name={item.icon ?? defaultIcon(item.entityId)} size={38} />}
-      muted={disabled || (!active && item.action?.type !== 'navigate')}
+      muted={disabled || (!active && resolvedAction?.type !== 'navigate')}
       onClick={clickable ? () => runAction(item.entityId, item.action) : undefined}
-      pressed={clickable && item.action?.type !== 'navigate' ? active : undefined}
+      pressed={clickable && resolvedAction?.type !== 'navigate' ? active : undefined}
       size={size}
       subtitle={subtitle}
       title={item.title}

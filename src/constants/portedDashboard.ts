@@ -1,9 +1,18 @@
 import type { CardColor } from '../components/core/Card'
 
-export type EntityAction =
+export type EntityBasicAction =
   | { type: 'navigate'; path: string }
   | { type: 'toggle' }
   | { type: 'service'; domain: string; service: string; target?: string | null; serviceData?: Record<string, unknown> }
+
+export interface EntityStateAction<TAction extends EntityBasicAction = EntityBasicAction> {
+  cases: Array<{ action: TAction; states: string[] }>
+  defaultAction: TAction
+  entityId?: string
+  type: 'state'
+}
+
+export type EntityAction = EntityBasicAction | EntityStateAction
 
 export interface EntityStateLabelConfig {
   attribute: string
