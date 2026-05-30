@@ -1,22 +1,29 @@
 import { useCallback, useEffect, useState } from 'react'
 import { routePathFromUrl } from '../constants/routes'
+import { DASHBOARD_ROUTE_CHANGE_EVENT, dashboardEventTargets, dashboardHref, pushDashboardUrl } from './dashboardLocation'
 
 export function useDashboardRoute() {
-  const [path, setPath] = useState(() => routePathFromUrl(window.location.pathname))
+  const [path, setPath] = useState(() => routePathFromUrl(dashboardHref()))
 
   useEffect(() => {
-    const handleNavigation = () => setPath(routePathFromUrl(window.location.pathname))
-    window.addEventListener('popstate', handleNavigation)
-    window.addEventListener('dashboard-route-change', handleNavigation)
+    const handleNavigation = () => setPath(routePathFromUrl(dashboardHref()))
+    const targets = dashboardEventTargets()
+
+    targets.forEach((target) => {
+      target.addEventListener('popstate', handleNavigation)
+      target.addEventListener(DASHBOARD_ROUTE_CHANGE_EVENT, handleNavigation)
+    })
+
     return () => {
-      window.removeEventListener('popstate', handleNavigation)
-      window.removeEventListener('dashboard-route-change', handleNavigation)
+      targets.forEach((target) => {
+        target.removeEventListener('popstate', handleNavigation)
+        target.removeEventListener(DASHBOARD_ROUTE_CHANGE_EVENT, handleNavigation)
+      })
     }
   }, [])
 
   const navigate = useCallback((url: string) => {
-    window.history.pushState({}, '', url)
-    window.dispatchEvent(new Event('dashboard-route-change'))
+    pushDashboardUrl(url, {})
   }, [])
 
   return { navigate, path }

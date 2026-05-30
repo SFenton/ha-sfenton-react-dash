@@ -7,8 +7,21 @@ describe('routes', () => {
     expect(routePathFromUrl('/local/ha-sfenton-react-dash/index.html')).toBe('overview')
   })
 
+  it('extracts wrapper and static app query route paths', () => {
+    expect(routePathFromUrl('/sfenton-react-dash/home?path=security#security-system')).toBe('security')
+    expect(routePathFromUrl('/sfenton-react-dash/home?path=/at-a-glance/living-room#lights-living-room')).toBe('living-room')
+    expect(routePathFromUrl('/local/ha-sfenton-react-dash/index.html?v=20260530&path=vacuums')).toBe('vacuums')
+    expect(routePathFromUrl('/sfenton-react-dash/home')).toBe('overview')
+  })
+
   it('builds at-a-glance URLs', () => {
     expect(routeUrl('vacuums')).toBe('/at-a-glance/vacuums')
     expect(routeUrl('')).toBe('/at-a-glance/overview')
+  })
+
+  it('builds shareable wrapper and static app URLs', () => {
+    expect(routeUrl('security', '/sfenton-react-dash/home?path=overview')).toBe('/sfenton-react-dash/home?path=security')
+    expect(routeUrl('living-room', '/sfenton-react-dash/home?v=20260530', '#lights-living-room')).toBe('/sfenton-react-dash/home?v=20260530&path=living-room#lights-living-room')
+    expect(routeUrl('vacuums', '/local/ha-sfenton-react-dash/index.html?v=20260530#old-popup')).toBe('/local/ha-sfenton-react-dash/index.html?v=20260530&path=vacuums')
   })
 })

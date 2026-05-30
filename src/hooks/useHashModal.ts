@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
+import { DASHBOARD_ROUTE_CHANGE_EVENT, dashboardEventTargets, dashboardHash, dashboardPathWithSearch, pushDashboardUrl } from './dashboardLocation'
 
 function currentHash() {
-  return window.location.hash
+  return dashboardHash()
 }
 
 export function useHashModal() {
@@ -9,23 +10,32 @@ export function useHashModal() {
 
   useEffect(() => {
     const syncHash = () => setHash(currentHash())
-    window.addEventListener('hashchange', syncHash)
-    window.addEventListener('popstate', syncHash)
+    const targets = dashboardEventTargets()
+
+    targets.forEach((target) => {
+      target.addEventListener('hashchange', syncHash)
+      target.addEventListener('popstate', syncHash)
+      target.addEventListener(DASHBOARD_ROUTE_CHANGE_EVENT, syncHash)
+    })
+
     return () => {
-      window.removeEventListener('hashchange', syncHash)
-      window.removeEventListener('popstate', syncHash)
+      targets.forEach((target) => {
+        target.removeEventListener('hashchange', syncHash)
+        target.removeEventListener('popstate', syncHash)
+        target.removeEventListener(DASHBOARD_ROUTE_CHANGE_EVENT, syncHash)
+      })
     }
   }, [])
 
   const openHash = useCallback((nextHash: string) => {
     if (currentHash() === nextHash) return
-    window.history.pushState(null, '', nextHash)
+    pushDashboardUrl(nextHash)
     setHash(nextHash)
   }, [])
 
   const closeHash = useCallback(() => {
-    const nextUrl = `${window.location.pathname}${window.location.search}`
-    window.history.pushState(null, '', nextUrl)
+    const nextUrl = dashboardPathWithSearch()
+    pushDashboardUrl(nextUrl)
     setHash('')
   }, [])
 

@@ -22,6 +22,7 @@ import { MaterialIcon } from '../components/core/Icon'
 import { ModalSheet } from '../components/core/ModalSheet'
 import { SectionHeader } from '../components/core/SectionHeader'
 import { asEntityName, formatCompactEntityState, isActiveState } from '../components/hass/entityState'
+import { DASHBOARD_ROUTE_CHANGE_EVENT, dashboardEventTargets, dashboardHash, dashboardPathWithSearch, replaceDashboardUrl } from '../hooks/dashboardLocation'
 import { useHashModal } from '../hooks/useHashModal'
 import {
   AREA_ITEMS,
@@ -161,8 +162,7 @@ function scrollToSection(title: string) {
 }
 
 function setRoomHash(hash: string) {
-  window.history.replaceState(null, '', `${window.location.pathname}${hash}`)
-  window.dispatchEvent(new HashChangeEvent('hashchange'))
+  replaceDashboardUrl(`${dashboardPathWithSearch()}${hash}`)
 }
 
 function toneForSourceKind(kind: RoomSourceKind): StatusRailChip['tone'] {
@@ -501,21 +501,31 @@ function SourceRoomPage({ room }: { room: (typeof ROOM_PAGE_CONFIGS)[string] }) 
 
   const closeSourceCard = () => {
     setSelectedCard(null)
-    if (window.location.hash) {
-      window.history.replaceState(null, '', window.location.pathname)
-    }
+    if (dashboardHash()) replaceDashboardUrl(dashboardPathWithSearch())
   }
 
   useEffect(() => {
     const allCards = [...room.overviewCards, ...room.sourceSections.flatMap((section) => section.cards)]
     const syncFromHash = () => {
-      const card = allCards.find((candidate) => candidate.hash === window.location.hash)
+      const card = allCards.find((candidate) => candidate.hash === dashboardHash())
       setSelectedCard(card ?? null)
     }
 
+    const targets = dashboardEventTargets()
     syncFromHash()
-    window.addEventListener('hashchange', syncFromHash)
-    return () => window.removeEventListener('hashchange', syncFromHash)
+    targets.forEach((target) => {
+      target.addEventListener('hashchange', syncFromHash)
+      target.addEventListener('popstate', syncFromHash)
+      target.addEventListener(DASHBOARD_ROUTE_CHANGE_EVENT, syncFromHash)
+    })
+
+    return () => {
+      targets.forEach((target) => {
+        target.removeEventListener('hashchange', syncFromHash)
+        target.removeEventListener('popstate', syncFromHash)
+        target.removeEventListener(DASHBOARD_ROUTE_CHANGE_EVENT, syncFromHash)
+      })
+    }
   }, [room.overviewCards, room.sourceSections])
 
   const openSourceCard = (card: RoomSourceCardConfig) => {

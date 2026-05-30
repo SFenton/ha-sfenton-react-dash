@@ -49,17 +49,97 @@ export const PRIMARY_NAV_ROUTES = [
   { label: 'Settings', path: 'settings', icon: 'mdi:cog' },
 ]
 
-export function routePathFromUrl(url: string | undefined) {
-  if (!url) return 'overview'
-  const cleanUrl = url.split('#', 1)[0]
-  const parts = cleanUrl.split('/').filter(Boolean)
-  const atAGlanceIndex = parts.lastIndexOf('at-a-glance')
-  if (atAGlanceIndex >= 0) return parts[atAGlanceIndex + 1] || 'overview'
-  const lastPart = parts.at(-1)
-  if (!lastPart || lastPart === 'home' || lastPart === 'index.html') return 'overview'
-  return DASHBOARD_ROUTES.some((route) => route.path === lastPart) ? lastPart : 'overview'
+const DEFAULT_ROUTE_PATH = 'overview'
+const URL_PARSE_ORIGIN = 'http://ha-sfenton-react-dash.local'
+const ROUTE_QUERY_KEYS = ['path', 'route', 'view']
+
+function parseRouteUrl(url: string) {
+  return new URL(url, URL_PARSE_ORIGIN)
 }
 
-export function routeUrl(path: string) {
-  return `/at-a-glance/${path || 'overview'}`
+function isKnownRoute(path: string | undefined) {
+  return Boolean(path && DASHBOARD_ROUTES.some((route) => route.path === path))
+}
+
+function routeSegment(segment: string | undefined) {
+  if (!segment || segment === 'home' || segment === 'index.html') return undefined
+  return isKnownRoute(segment) ? segment : undefined
+}
+
+function routePathFromPathname(pathname: string) {
+  const parts = pathname.split('/').filter(Boolean)
+  const atAGlanceIndex = parts.lastIndexOf('at-a-glance')
+  if (atAGlanceIndex >= 0) return routeSegment(parts[atAGlanceIndex + 1]) ?? DEFAULT_ROUTE_PATH
+
+  const wrapperIndex = parts.lastIndexOf('sfenton-react-dash')
+  if (wrapperIndex >= 0) return routeSegment(parts[wrapperIndex + 1]) ?? DEFAULT_ROUTE_PATH
+
+  return routeSegment(parts.at(-1))
+}
+
+function routePathFromValue(value: string | null) {
+  if (!value) return undefined
+
+  let decodedValue = value.trim()
+  if (!decodedValue) return undefined
+
+
+  try {
+    decodedValue = decodeURIComponent(decodedValue)
+  } catch {
+    // Keep the raw value if it was not URI-encoded cleanly.
+  }
+
+  const withoutHash = decodedValue.split('#', 1)[0]
+  const withoutSearch = withoutHash.split('?', 1)[0]
+  if (isKnownRoute(withoutSearch)) return withoutSearch
+  return routePathFromPathname(withoutSearch)
+}
+
+function isWrapperDashboardPath(pathname: string) {
+  return pathname.split('/').filter(Boolean).includes('sfenton-react-dash')
+}
+
+function isStaticAppPath(pathname: string) {
+  const parts = pathname.split('/').filter(Boolean)
+  const appIndex = parts.lastIndexOf('ha-sfenton-react-dash')
+  return appIndex >= 0 && parts[appIndex + 1] === 'index.html'
+}
+
+function shouldUseQueryRoute(url: URL) {
+  return isWrapperDashboardPath(url.pathname) || isStaticAppPath(url.pathname)
+}
+
+function normalizedHash(hash: string | undefined) {
+  if (!hash) return ''
+  return hash.startsWith('#') ? hash : `#${hash}`
+}
+
+function relativeUrl(url: URL) {
+  return `${url.pathname}${url.search}${url.hash}`
+}
+
+export function routePathFromUrl(url: string | undefined) {
+  if (!url) return DEFAULT_ROUTE_PATH
+  const parsedUrl = parseRouteUrl(url)
+
+  for (const key of ROUTE_QUERY_KEYS) {
+    const queryRoute = routePathFromValue(parsedUrl.searchParams.get(key))
+    if (queryRoute) return queryRoute
+  }
+
+  return routePathFromPathname(parsedUrl.pathname) ?? DEFAULT_ROUTE_PATH
+}
+
+export function routeUrl(path: string, currentUrl?: string, hash?: string) {
+  const routePath = routePathFromValue(path) ?? DEFAULT_ROUTE_PATH
+
+  if (!currentUrl) return `/at-a-glance/${routePath}${normalizedHash(hash)}`
+
+  const parsedUrl = parseRouteUrl(currentUrl)
+  if (!shouldUseQueryRoute(parsedUrl)) return `/at-a-glance/${routePath}${normalizedHash(hash)}`
+
+  parsedUrl.searchParams.set('path', routePath)
+  parsedUrl.hash = normalizedHash(hash)
+  return relativeUrl(parsedUrl)
 }
