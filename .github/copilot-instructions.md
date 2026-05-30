@@ -109,6 +109,8 @@ Before implementing each Home Assistant page:
 10. Implement the React page against the real Home Assistant backend, not mock data, unless writing tests.
 11. Validate in the local React tab and compare against the Home Assistant tab at the same viewport size.
 
+When doing Home Assistant visual comparisons, use the repo env files to authenticate instead of relying on an already-logged-in browser tab. Read `VITE_HA_URL` from `.env` and `VITE_HA_TOKEN` from `.env.development` or `.env`; never print the token. Use those values for Home Assistant API/WebSocket reads and for browser setup before opening `/at-a-glance/...` or `/sfenton-react-dash/...`. If a fresh browser page lands on the Home Assistant login screen, stop and authenticate from the env-backed flow rather than comparing against the login page.
+
 Do not recreate the Home Assistant sidebar or top bar for now. Focus on the dashboard content, page headers, tab/bottom navigation, sections, buttons, modals, and entity controls.
 
 ## UI Expectations
