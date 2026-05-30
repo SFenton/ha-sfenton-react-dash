@@ -109,6 +109,13 @@ Before implementing each Home Assistant page:
 10. Implement the React page against the real Home Assistant backend, not mock data, unless writing tests.
 11. Validate in the local React tab and compare against the Home Assistant tab at the same viewport size.
 
+Completion gate for Home Assistant ports:
+
+- Do not call a port or port update complete until both the code/config comparison and Playwright visual comparison have been completed, or until the blocker is explicitly reported.
+- Code/config comparison is required: compare the Lovelace/MCP config, expanded templates, entity IDs, service actions, state/color branches, and visible text/state matrix against the React implementation and focused tests.
+- Playwright visual comparison is required: open the live Home Assistant source page and the local or deployed React page side by side at the same viewport, mobile first, and compare screenshots/DOM/accessibility/style evidence for layout, spacing, text, scroll behavior, modal behavior, colors, and interactive states.
+- Unit tests, API/WebSocket checks, build/lint success, manual code review, and user feedback do not replace the Playwright comparison. If browser comparison cannot run, say so before finalizing and mark visual parity as unverified.
+
 When doing Home Assistant visual comparisons, use the repo env files to authenticate instead of relying on an already-logged-in browser tab. Read `VITE_HA_URL` from `.env` and `VITE_HA_TOKEN` from `.env.development` or `.env`; never print the token. Use those values for Home Assistant API/WebSocket reads and for browser setup before opening `/at-a-glance/...` or `/sfenton-react-dash/...`. If a fresh browser page lands on the Home Assistant login screen, stop and authenticate from the env-backed flow rather than comparing against the login page.
 
 Do not recreate the Home Assistant sidebar or top bar for now. Focus on the dashboard content, page headers, tab/bottom navigation, sections, buttons, modals, and entity controls.

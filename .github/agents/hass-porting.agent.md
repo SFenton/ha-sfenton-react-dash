@@ -70,6 +70,15 @@ HASS_PORTING_REACT_URL=http://127.0.0.1:5173
 15. Compare Home Assistant and React in Playwright at the same viewport after implementation. Capture screenshots of both and use DOM/style/pixel checks when visual fidelity matters. Also compare the React rendered text, subtitles, attribute-derived strings, and accessible names against the source text/state content matrix; iterate until the result is close enough to defend.
 16. Run focused validation first, then broader validation as needed: targeted Vitest, targeted Playwright, `npm run lint`, and `npm run build` when the change warrants it.
 
+## Porting Completion Gate
+
+A Home Assistant port or update is not complete until both comparison tracks have been performed and summarized:
+
+- **Code/config comparison**: compare the Lovelace/MCP config, expanded templates, entity IDs, service calls, navigation/popup targets, state/color branches, visibility rules, and text/state content matrix against the React implementation and focused tests.
+- **Playwright visual comparison**: compare the live Home Assistant source page and the local or deployed React page side by side in Playwright at the same viewport, mobile first. Capture screenshots and inspect DOM/accessibility/computed styles for layout, density, spacing, scroll containers, modal behavior, color/state rendering, text, icons, and clickable surfaces.
+
+Do not substitute unit tests, API/WebSocket checks, build/lint output, code inspection, or user feedback for the Playwright comparison. If Playwright, credentials, the live backend, or source assets are unavailable, report that blocker before finalizing and mark visual parity as unverified. Do not claim a port is visually complete without the Playwright comparison.
+
 ## Color Capture Gate
 
 Before choosing React colors for a ported card, control, popup, separator, button, chip, or modal surface, capture the source colors from the live Home Assistant render.
