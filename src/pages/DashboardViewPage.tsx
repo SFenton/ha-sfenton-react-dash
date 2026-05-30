@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react'
-import { useEntity } from '@hakit/core'
+import { useEntity, useHass } from '@hakit/core'
 import { ClimateCard } from '../components/cards/ClimateCard'
 import { ContactSensorCard } from '../components/cards/ContactSensorCard'
 import { LightCard } from '../components/cards/LightCard'
@@ -52,6 +52,7 @@ import {
   UNAVAILABLE_COLOR,
   VACUUM_COLOR,
   VACUUMS,
+  type EntityAction,
   type EntitySectionConfig,
   type SettingsLinkConfig,
 } from '../constants/portedDashboard'
@@ -172,6 +173,7 @@ function toneForSourceKind(kind: RoomSourceKind): StatusRailChip['tone'] {
   if (kind === 'contact') return 'contact'
   if (kind === 'vacuum') return 'vacuum'
   if (kind === 'media') return 'media'
+  if (kind === 'power') return 'switch'
   if (kind === 'grill') return 'warning'
   return 'neutral'
 }
@@ -238,6 +240,39 @@ function sourceColor(kind: RoomSourceKind): CardColor {
 
 function isUnavailable(entity: ReturnType<typeof useEntity>) {
   return !entity || entity.state === 'unavailable' || entity.state === 'unknown'
+}
+
+function formatRoomSourceState(card: RoomSourceCardConfig, entity: ReturnType<typeof useEntity>) {
+  if (!entity) return 'Unavailable'
+  const sourceLabel = card.stateLabels?.[entity.state]
+  if (sourceLabel) return sourceLabel
+  if (card.stateDisplay !== 'climate-action-temperature') return formatCompactEntityState(entity, 'Unavailable')
+  const hvacAction = typeof entity.attributes.hvac_action === 'string' ? entity.attributes.hvac_action : entity.state
+  const temperature = entity.attributes.temperature ?? entity.attributes.current_temperature
+  if (entity.state === 'off' || hvacAction === 'off') return 'Off'
+  const action = String(hvacAction === 'heat_cool' ? entity.state : hvacAction)
+  const actionLabel = action.split('_').map((part) => `${part.slice(0, 1).toUpperCase()}${part.slice(1)}`).join(' ')
+  return typeof temperature === 'number' || typeof temperature === 'string' ? `${actionLabel} • ${temperature} °F` : actionLabel
+}
+
+function formatRoomSourceSubtitleEntity(entity: ReturnType<typeof useEntity>) {
+  const value = formatCompactEntityState(entity, 'Unavailable')
+  const unit = typeof entity?.attributes.unit_of_measurement === 'string' ? entity.attributes.unit_of_measurement : ''
+  if (!unit || value === 'Unavailable' || value === 'Unknown' || value.endsWith(unit)) return value
+  return `${value}${unit}`
+}
+
+function roomSourceBackgroundColor(card: RoomSourceCardConfig, entity: ReturnType<typeof useEntity>, presenceEntity: ReturnType<typeof useEntity>) {
+  if (!entity) return undefined
+  const sourceStateColor = card.stateColors?.[entity.state]
+  if (sourceStateColor) return sourceStateColor
+  if (card.stateTone !== 'climate-action') return undefined
+  const hvacAction = typeof entity.attributes.hvac_action === 'string' ? entity.attributes.hvac_action : entity.state
+  if (hvacAction === 'heating') return 'rgba(136, 64, 26, 0.6)'
+  if (hvacAction === 'cooling') return 'rgba(25, 84, 130, 0.6)'
+  if (hvacAction === 'idle') return 'rgba(229, 57, 53, 0.6)'
+  if (entity.state === 'off' && presenceEntity?.state === 'on') return 'rgba(0, 150, 136, 0.6)'
+  return undefined
 }
 
 function roomLightGroup(roomTitle: string) {
@@ -357,42 +392,107 @@ function SourceCardIcon({ card, size = 38 }: { card: RoomSourceCardConfig; size?
   return <MaterialIcon name={card.icon} size={size} />
 }
 
+function RoomSourceMediaAppCard({ card, isOff, onClick }: { card: RoomSourceCardConfig; isOff: boolean; onClick?: () => void }) {
+  const [imageFailed, setImageFailed] = useState(false)
+  const className = [styles.mediaAppTile, card.imageBackground === 'white' ? styles.mediaAppTileWhite : '', isOff ? styles.mediaAppTileMuted : ''].filter(Boolean).join(' ')
+  const content = imageFailed ? (
+    <span className={styles.mediaAppFallback}>
+      <MaterialIcon name={card.icon} size={34} />
+      <span>{card.title}</span>
+    </span>
+  ) : (
+    <img alt="" onError={() => setImageFailed(true)} src={card.imageUrl} />
+  )
+
+  if (onClick) {
+    return (
+      <button aria-label={card.title} className={className} data-card="media-app" data-muted={isOff ? 'true' : 'false'} data-tone="media" onClick={onClick} type="button">
+        {content}
+      </button>
+    )
+  }
+
+  return (
+    <div aria-label={card.title} className={className} data-card="media-app" data-muted={isOff ? 'true' : 'false'} data-tone="media">
+      {content}
+    </div>
+  )
+}
+
+function useRoomSourceActionRunner() {
+  const callService = useHass((state) => state.helpers.callService) as unknown as (params: Record<string, unknown>) => void
+
+  return (entityId: string, action: Exclude<EntityAction, { type: 'navigate' }> | undefined) => {
+    if (!action) return
+    if (action.type === 'toggle') {
+      callService({ domain: 'homeassistant', service: 'toggle', target: entityId })
+      return
+    }
+
+    const target = action.target === null ? undefined : action.target ?? entityId
+    const params: Record<string, unknown> = { domain: action.domain, service: action.service }
+    if (action.serviceData !== undefined) params.serviceData = action.serviceData
+    if (target !== undefined) params.target = target
+    callService(params)
+  }
+}
+
 function RoomSourceCard({ card, onOpen }: { card: RoomSourceCardConfig; onOpen: (card: RoomSourceCardConfig) => void }) {
   const alternateGate = useEntity(asEntityName(card.alternate?.whenEntityId ?? card.entityId), { returnNullIfNotFound: true })
+  const runAction = useRoomSourceActionRunner()
   const useAlternate = Boolean(card.alternate && alternateGate && card.alternate.whenStates.includes(alternateGate.state))
   const effectiveEntityId = useAlternate ? card.alternate?.entityId ?? card.entityId : card.entityId
   const effectiveShowState = useAlternate ? card.alternate?.showState : card.showState
   const effectiveSubtitleEntityIds = useAlternate ? card.alternate?.subtitleEntityIds : card.subtitleEntityIds
   const entity = useEntity(asEntityName(effectiveEntityId), { returnNullIfNotFound: true })
+  const presenceEntity = useEntity(asEntityName(card.presenceEntityId ?? effectiveEntityId), { returnNullIfNotFound: true })
   const subtitleEntityOne = useEntity(asEntityName(effectiveSubtitleEntityIds?.[0] ?? effectiveEntityId), { returnNullIfNotFound: true })
   const subtitleEntityTwo = useEntity(asEntityName(effectiveSubtitleEntityIds?.[1] ?? effectiveEntityId), { returnNullIfNotFound: true })
   const unavailable = isUnavailable(entity)
   const disabledByState = Boolean(entity && card.disabledStates?.includes(entity.state))
   const subtitle = effectiveSubtitleEntityIds
-    ? [subtitleEntityOne, subtitleEntityTwo].slice(0, effectiveSubtitleEntityIds.length).map((subtitleEntity) => formatCompactEntityState(subtitleEntity, 'Unavailable')).join(' • ')
-    : effectiveShowState ? formatCompactEntityState(entity, 'Unavailable') : undefined
-  const clickable = Boolean(card.hash || card.manualReview) && !unavailable && !disabledByState
-  const inactiveMuted = !unavailable && !isActiveState(entity) && ['fan', 'grill', 'light', 'media', 'power'].includes(card.kind)
-
-  return (
+    ? [subtitleEntityOne, subtitleEntityTwo].slice(0, effectiveSubtitleEntityIds.length).map((subtitleEntity) => formatRoomSourceSubtitleEntity(subtitleEntity)).join(' • ')
+    : effectiveShowState ? formatRoomSourceState(card, entity) : undefined
+  const clickable = Boolean(card.hash || card.manualReview || card.action) && !unavailable && !disabledByState
+  const activeByState = Boolean(entity && card.activeStates?.includes(entity.state))
+  const sourceStateInactive = card.stateDisplay === 'climate-action-temperature' && (entity?.state === 'off' || entity?.attributes.hvac_action === 'off')
+  const inactiveMuted = sourceStateInactive || (!unavailable && !activeByState && !isActiveState(entity) && ['fan', 'grill', 'light', 'media', 'power'].includes(card.kind))
+  const handleClick = clickable ? (card.action ? () => runAction(card.entityId, card.action) : () => onOpen(card)) : undefined
+  const backgroundColor = roomSourceBackgroundColor(card, entity, presenceEntity)
+  const content = card.imageUrl && card.kind === 'media' && card.action ? (
+    <RoomSourceMediaAppCard card={card} isOff={unavailable || disabledByState} onClick={handleClick} />
+  ) : (
     <GlassTile
       icon={<SourceCardIcon card={card} size={24} />}
+      backgroundColor={backgroundColor}
       isOff={unavailable || disabledByState || inactiveMuted}
-      onClick={clickable ? () => onOpen(card) : undefined}
+      onClick={handleClick}
       subtitle={subtitle}
       title={card.title}
       tone={unavailable ? 'neutral' : toneForSourceKind(card.kind)}
     />
   )
+
+  if (card.span === 'full') return <div className={styles.fullSpan}>{content}</div>
+  return content
 }
 
 function RoomSourceModal({ card, onClose, roomTitle }: { card: RoomSourceCardConfig | null; onClose: () => void; roomTitle: string }) {
   const content = card ? renderRoomReusableSheet(card, roomTitle) : null
 
   return (
-    <ModalSheet onClose={onClose} open={Boolean(card)} title={card ? `${roomTitle}: ${card.title}` : roomTitle}>
+    <ModalSheet onClose={onClose} open={Boolean(card)} title={card ? `${roomTitle}: ${card.modalTitle ?? card.title}` : roomTitle}>
       {card && (content ?? <RoomSourceFallback card={card} />)}
     </ModalSheet>
+  )
+}
+
+function EmptyRoomState() {
+  return (
+    <div className={styles.emptyRoomState}>
+      <h2>Nothing Here Yet!</h2>
+      <Description>Once some devices are added to this room, we can display them here.</Description>
+    </div>
   )
 }
 
@@ -425,6 +525,8 @@ function SourceRoomPage({ room }: { room: (typeof ROOM_PAGE_CONFIGS)[string] }) 
 
   return (
     <div className={styles.stack}>
+      {room.sourceSections.length === 0 && <EmptyRoomState />}
+
       {room.sourceSections.map((section) => (
         <section className={styles.section} id={sectionId(section.title)} key={`${room.path}-${section.title}`}>
           <SectionHeader title={section.title} />

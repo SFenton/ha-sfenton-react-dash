@@ -162,6 +162,10 @@
   color: rgba(67, 160, 71, 0.6);
 }
 
+.headerPill.switch .icon {
+  color: rgba(67, 160, 71, 0.8);
+}
+
 .headerPill.air .icon {
   color: rgb(0, 150, 136);
 }
@@ -183,6 +187,10 @@
 }
 
 .presence {
+  --tile-color: rgba(67, 160, 71, 0.6);
+}
+
+.switch {
   --tile-color: rgba(67, 160, 71, 0.6);
 }
 

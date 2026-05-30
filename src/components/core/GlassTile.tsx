@@ -3,7 +3,7 @@ import { isValidElement, type CSSProperties, type ReactNode } from 'react'
 import type { IconKey } from '../../constants/atAGlance'
 import styles from './GlassTile.module.css'
 
-export type TileTone = 'air' | 'climate' | 'contact' | 'danger' | 'light' | 'media' | 'neutral' | 'presence' | 'security' | 'vacuum' | 'warning'
+export type TileTone = 'air' | 'climate' | 'contact' | 'danger' | 'light' | 'media' | 'neutral' | 'presence' | 'security' | 'switch' | 'vacuum' | 'warning'
 
 interface GlassTileProps {
   title: string

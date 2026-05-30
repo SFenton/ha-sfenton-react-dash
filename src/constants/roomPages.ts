@@ -1,6 +1,12 @@
+import type { EntityAction } from './portedDashboard'
+import { MEDIA_REMOTE_CONFIGS, type MediaRemoteAction } from './mediaRemotes'
+
 export type RoomSourceKind = 'air' | 'appliance' | 'climate' | 'contact' | 'fan' | 'grill' | 'laundry' | 'light' | 'media' | 'occupancy' | 'power' | 'vacuum' | 'vent'
+export type RoomSourceCardAction = Exclude<EntityAction, { type: 'navigate' }>
 
 export interface RoomSourceCardConfig {
+  action?: RoomSourceCardAction
+  activeStates?: string[]
   alternate?: {
     entityId: string
     showState?: boolean
@@ -12,12 +18,20 @@ export interface RoomSourceCardConfig {
   entityId: string
   hash?: string
   icon: string
+  imageBackground?: 'white'
   imageUrl?: string
   kind: RoomSourceKind
   manualReview?: string
   modalEntityId?: string
   modalItems?: RoomSourceModalItem[]
+  modalTitle?: string
+  presenceEntityId?: string
   showState?: boolean
+  span?: 'full'
+  stateColors?: Partial<Record<string, string>>
+  stateDisplay?: 'climate-action-temperature'
+  stateLabels?: Partial<Record<string, string>>
+  stateTone?: 'climate-action'
   subtitleEntityIds?: string[]
   title: string
 }
@@ -46,16 +60,25 @@ export interface RoomPageSourceConfig {
 const sourcePopupReview = 'This opens a YAML bubble-card popup that still needs a dedicated React modal port.'
 const sourceControlReview = 'This YAML control can call a real service and needs a dedicated safe React control.'
 
-const shieldAppShortcuts: RoomSourceCardConfig[] = [
-  { title: 'Plex', entityId: 'media_player.living_room_shield', icon: 'mdi:play-box', imageUrl: '/local/images/apps/plex.png', kind: 'media', manualReview: sourceControlReview },
-  { title: 'YouTube', entityId: 'media_player.living_room_shield', icon: 'mdi:youtube', imageUrl: '/local/images/apps/youtube.png', kind: 'media', manualReview: sourceControlReview },
-  { title: 'Netflix', entityId: 'media_player.living_room_shield', icon: 'mdi:netflix', imageUrl: '/local/images/apps/netflix.png', kind: 'media', manualReview: sourceControlReview },
-  { title: 'Prime Video', entityId: 'media_player.living_room_shield', icon: 'mdi:play-box', imageUrl: '/local/images/apps/prime.jpeg', kind: 'media', manualReview: sourceControlReview },
-  { title: 'Paramount+', entityId: 'media_player.living_room_shield', icon: 'mdi:play-box', imageUrl: '/local/images/apps/paramount.png', kind: 'media', manualReview: sourceControlReview },
-  { title: 'Disney+', entityId: 'media_player.living_room_shield', icon: 'mdi:play-box', imageUrl: '/local/images/apps/disney.png', kind: 'media', manualReview: sourceControlReview },
-]
+function sourceActionFromMediaAction(action: MediaRemoteAction, serviceDataOverride?: Record<string, unknown>): RoomSourceCardAction | undefined {
+  if (action.type !== 'service') return undefined
+  return { type: 'service', domain: action.domain, service: action.service, target: action.target ?? null, serviceData: { ...action.serviceData, ...serviceDataOverride } }
+}
 
-const theaterAppShortcuts: RoomSourceCardConfig[] = shieldAppShortcuts.map((card) => ({ ...card, entityId: 'media_player.theater_room_shield' }))
+function mediaAppShortcuts(hash: string, entityId: string, serviceDataOverride?: Record<string, unknown>): RoomSourceCardConfig[] {
+  return (MEDIA_REMOTE_CONFIGS[hash]?.appCards ?? []).map((app) => ({
+    title: app.title,
+    entityId,
+    icon: app.icon ?? 'mdi:play-box',
+    imageBackground: app.background,
+    imageUrl: app.imageUrl,
+    kind: 'media',
+    action: sourceActionFromMediaAction(app.action, serviceDataOverride),
+  }))
+}
+
+const livingRoomShieldAppShortcuts = mediaAppShortcuts('#living-room-shield', 'media_player.living_room_shield')
+const theaterAppShortcuts = mediaAppShortcuts('#theater-room-shield', 'media_player.theater_room_shield', { remote_entity: 'remote.theater_shield_remote' })
 
 export const ROOM_PAGE_CONFIGS: Record<string, RoomPageSourceConfig> = {
   'living-room': {
@@ -73,8 +96,8 @@ export const ROOM_PAGE_CONFIGS: Record<string, RoomPageSourceConfig> = {
         { title: 'Vents', entityId: 'cover.living_room_vents', icon: 'mdi:air-filter', kind: 'vent', hash: '#vents', showState: true, modalItems: [{ title: 'Vent 1', entityId: 'cover.living_room_vent_1_vent', icon: 'mdi:air-filter' }, { title: 'Vent 2', entityId: 'cover.living_room_vent_2_vent', icon: 'mdi:air-filter' }], manualReview: sourcePopupReview },
         { title: 'Air Purifier', entityId: 'select.living_room_air_purifier_fan_mode', icon: 'mdi:fan', kind: 'air', hash: '#air-purifier', modalEntityId: 'sensor.living_room_air_purifier_pm2_5', subtitleEntityIds: ['select.living_room_air_purifier_fan_mode', 'fan.living_room_air_purifier_levoit_purifier'] },
       ] },
-      { title: 'Devices', cards: [{ title: 'Robot Vacuum', entityId: 'vacuum.valetudo_exaltedsneakydeer', icon: 'mdi:robot-vacuum', kind: 'vacuum', hash: '#robot-vacuum', showState: true, manualReview: sourcePopupReview }] },
-      { title: 'SHIELD', cards: [{ title: 'SHIELD', entityId: 'media_player.living_room_shield', icon: 'mdi:remote', kind: 'media', hash: '#living-room-shield', showState: true }, ...shieldAppShortcuts] },
+      { title: 'Devices', cards: [{ title: 'Main Floor', modalTitle: 'Robot Vacuum', entityId: 'vacuum.valetudo_exaltedsneakydeer', icon: 'mdi:robot-vacuum', kind: 'vacuum', hash: '#robot-vacuum', subtitleEntityIds: ['vacuum.valetudo_exaltedsneakydeer', 'sensor.valetudo_exaltedsneakydeer_battery_level'], span: 'full', manualReview: sourcePopupReview }] },
+      { title: 'SHIELD', cards: [{ title: 'SHIELD', entityId: 'media_player.living_room_shield', icon: 'mdi:remote', kind: 'media', hash: '#living-room-shield', showState: true, span: 'full' }, ...livingRoomShieldAppShortcuts] },
     ],
     popupTemplates: ['light-slider-toggle', 'window-popup-single', 'air-purifier-popup', 'vent-popup-2', 'vacuum-*', 'media-player-popup'],
   },
@@ -108,11 +131,11 @@ export const ROOM_PAGE_CONFIGS: Record<string, RoomPageSourceConfig> = {
       { title: 'Climate', cards: [
         { title: 'Vents', entityId: 'cover.master_bedroom_vents', icon: 'mdi:air-filter', kind: 'vent', hash: '#vents', showState: true, modalItems: [{ title: 'Vent 1', entityId: 'cover.master_bedroom_vent_2_vent', icon: 'mdi:air-filter' }, { title: 'Vent 2', entityId: 'cover.master_bedroom_vent_3_vent', icon: 'mdi:air-filter' }], manualReview: sourcePopupReview },
         { title: 'Air Purifier', entityId: 'select.master_bedroom_air_purifier_fan_mode', icon: 'mdi:fan', kind: 'air', hash: '#air-purifier', modalEntityId: 'sensor.master_bedroom_air_purifier_pm2_5', subtitleEntityIds: ['select.master_bedroom_air_purifier_fan_mode', 'fan.master_bedroom_air_purifier_levoit_purifier'] },
-        { title: 'Humidifier', entityId: 'humidifier.master_bedroom_humidifier', icon: 'mdi:air-humidifier', kind: 'climate', hash: '#humidifier-master-bedroom', manualReview: sourcePopupReview },
-        { title: "Stephen's Bed", entityId: 'climate.stephen_s_eight_sleep_side_climate', icon: 'mdi:bed', kind: 'climate', hash: '#stephens-bed', manualReview: sourcePopupReview },
-        { title: "Steph's Bed", entityId: 'climate.steph_s_eight_sleep_side_climate', icon: 'mdi:bed', kind: 'climate', hash: '#stephs-bed', manualReview: sourcePopupReview },
+        { title: 'Humidifier', entityId: 'humidifier.master_bedroom_humidifier', icon: 'mdi:air-humidifier', kind: 'climate', hash: '#humidifier-master-bedroom', showState: true, manualReview: sourcePopupReview },
+        { title: "Stephen's Bed", entityId: 'climate.stephen_s_eight_sleep_side_climate', icon: 'mdi:bed', kind: 'climate', hash: '#stephens-bed', showState: true, stateDisplay: 'climate-action-temperature', stateTone: 'climate-action', presenceEntityId: 'binary_sensor.stephen_s_eight_sleep_side_bed_presence', manualReview: sourcePopupReview },
+        { title: "Steph's Bed", entityId: 'climate.steph_s_eight_sleep_side_climate', icon: 'mdi:bed', kind: 'climate', hash: '#stephs-bed', showState: true, stateDisplay: 'climate-action-temperature', stateTone: 'climate-action', presenceEntityId: 'binary_sensor.steph_s_eight_sleep_side_bed_presence', manualReview: sourcePopupReview },
       ] },
-      { title: 'Media', cards: [{ title: 'Apple TV', entityId: 'media_player.master_bedroom_apple_tv', icon: 'mdi:apple', kind: 'media', hash: '#master-bedroom-apple-tv', showState: true }] },
+      { title: 'Media', cards: [{ title: 'Apple TV', entityId: 'media_player.master_bedroom_apple_tv', icon: 'mdi:apple', kind: 'media', hash: '#master-bedroom-apple-tv', showState: true, span: 'full', activeStates: ['idle', 'paused', 'playing'] }] },
     ],
     popupTemplates: ['light-popup-6', 'window-popup-single', 'humidifier', 'vent-popup-2', 'climate-popup-3', 'air-purifier-popup', 'eight-sleep-popups', 'media-player-popup', 'occupancy-popup-3'],
   },
@@ -155,8 +178,8 @@ export const ROOM_PAGE_CONFIGS: Record<string, RoomPageSourceConfig> = {
         { title: 'Air Purifier', entityId: 'select.office_air_purifier_fan_mode', icon: 'mdi:fan', kind: 'air', hash: '#air-purifier', modalEntityId: 'sensor.office_air_purifier_pm2_5', subtitleEntityIds: ['select.office_air_purifier_fan_mode', 'fan.office_air_purifier_levoit_purifier'] },
       ] },
       { title: 'Office PCs', cards: [
-        { title: "Stephen's PC", entityId: 'input_boolean.stephen_s_pc_power', icon: 'mdi:controller', kind: 'power', subtitleEntityIds: ['input_text.stephen_s_pc_power_state'], manualReview: sourceControlReview },
-        { title: "Steph's PC", entityId: 'input_boolean.steph_s_pc_power', icon: 'mdi:controller', kind: 'power', subtitleEntityIds: ['input_text.steph_s_pc_power_state'], manualReview: sourceControlReview },
+        { title: "Stephen's PC", entityId: 'input_boolean.stephen_s_pc_power', icon: 'mdi:controller', kind: 'power', subtitleEntityIds: ['input_text.stephen_s_pc_power_state'], action: { type: 'service', domain: 'input_button', service: 'press', target: 'input_button.control_stephen_s_pc' } },
+        { title: "Steph's PC", entityId: 'input_boolean.steph_s_pc_power', icon: 'mdi:controller', kind: 'power', subtitleEntityIds: ['input_text.steph_s_pc_power_state'], action: { type: 'service', domain: 'input_button', service: 'press', target: 'input_button.control_steph_s_pc' } },
       ] },
     ],
     popupTemplates: ['light-popup-single', 'window-popup-2', 'vent-popup-single', 'climate-popup-3', 'air-purifier-popup', 'occupancy-popup-2'],
@@ -199,7 +222,7 @@ export const ROOM_PAGE_CONFIGS: Record<string, RoomPageSourceConfig> = {
       { title: 'Doors', entityId: 'binary_sensor.back_deck_doors', icon: 'mdi:door', kind: 'contact', hash: '#doors-back-deck', showState: true, manualReview: sourcePopupReview },
     ],
     sourceSections: [{ title: 'Grill', cards: [
-      { title: 'Bear Grills', entityId: 'sensor.d8478fa2ad0a_grill_state', icon: 'mdi:grill', kind: 'grill', hash: '#bear-grills', showState: true, disabledStates: ['off', 'unavailable', 'unknown'], manualReview: sourcePopupReview },
+      { title: 'Bear Grills', entityId: 'sensor.d8478fa2ad0a_grill_state', icon: 'mdi:grill', kind: 'grill', hash: '#bear-grills', showState: true, disabledStates: ['off', 'unavailable', 'unknown'], stateLabels: { off: 'Off', unavailable: 'Off', unknown: 'Off' }, manualReview: sourcePopupReview },
     ] }],
     popupTemplates: ['light-popup-2', 'door-popup-2', 'grill-popup'],
   },
@@ -218,7 +241,7 @@ export const ROOM_PAGE_CONFIGS: Record<string, RoomPageSourceConfig> = {
         { title: 'Vents', entityId: 'cover.music_room_vent_vent', icon: 'mdi:air-filter', kind: 'vent', hash: '#vents', showState: true, modalItems: [{ title: 'Vent', entityId: 'cover.music_room_vent_vent', icon: 'mdi:air-filter' }], manualReview: sourcePopupReview },
         { title: 'Air Purifier', entityId: 'select.air_purifier_fan_mode', icon: 'mdi:fan', kind: 'air', hash: '#air-purifier', modalEntityId: 'sensor.air_purifier_pm2_5', subtitleEntityIds: ['select.air_purifier_fan_mode', 'fan.air_purifier_levoit_purifier'] },
       ] },
-      { title: 'Devices', cards: [{ title: 'Robot Vacuum', entityId: 'vacuum.valetudo_elatedusedram', icon: 'mdi:robot-vacuum', kind: 'vacuum', hash: '#robot-vacuum', showState: true, manualReview: sourcePopupReview }] },
+      { title: 'Devices', cards: [{ title: 'Music Room', modalTitle: 'Robot Vacuum', entityId: 'vacuum.valetudo_elatedusedram', icon: 'mdi:robot-vacuum', kind: 'vacuum', hash: '#robot-vacuum', subtitleEntityIds: ['vacuum.valetudo_elatedusedram', 'sensor.valetudo_elatedusedram_battery_level'], span: 'full', manualReview: sourcePopupReview }] },
     ],
     popupTemplates: ['light-popup-10', 'door-popup-single', 'vent-popup-single', 'climate-popup-3', 'air-purifier-popup', 'occupancy-popup-3', 'vacuum-*'],
   },
@@ -243,8 +266,8 @@ export const ROOM_PAGE_CONFIGS: Record<string, RoomPageSourceConfig> = {
         { title: 'Nintendo Switch', entityId: 'input_boolean.is_nintendo_switch_active', icon: 'mdi:gamepad', kind: 'media', showState: true, manualReview: sourceControlReview },
         ...theaterAppShortcuts,
       ] },
-      { title: 'Theater Room PCs', cards: [{ title: 'Theater Room PC', entityId: 'input_boolean.theater_pc_power', icon: 'mdi:projector', kind: 'power', subtitleEntityIds: ['input_text.theater_pc_power_state'], manualReview: sourceControlReview }] },
-      { title: 'Devices', cards: [{ title: 'Robot Vacuum', entityId: 'vacuum.valetudo_politefatherlykingfisher', icon: 'mdi:robot-vacuum', kind: 'vacuum', hash: '#robot-vacuum', showState: true, manualReview: sourcePopupReview }] },
+      { title: 'Theater Room PCs', cards: [{ title: 'Theater Room PC', entityId: 'input_boolean.theater_pc_power', icon: 'mdi:projector', kind: 'power', subtitleEntityIds: ['input_text.theater_pc_power_state'], action: { type: 'service', domain: 'input_button', service: 'press', target: 'input_button.control_theater_pc' } }] },
+      { title: 'Devices', cards: [{ title: 'Theater Room', modalTitle: 'Robot Vacuum', entityId: 'vacuum.valetudo_politefatherlykingfisher', icon: 'mdi:robot-vacuum', kind: 'vacuum', hash: '#robot-vacuum', subtitleEntityIds: ['vacuum.valetudo_politefatherlykingfisher', 'sensor.valetudo_politefatherlykingfisher_battery_level'], span: 'full', manualReview: sourcePopupReview }] },
     ],
     popupTemplates: ['light-popup-6', 'door-popup-single', 'occupancy-popup-single', 'vent-popup-2', 'climate-popup-1', 'air-purifier-popup', 'media-player-popup', 'vacuum-*'],
   },
@@ -289,8 +312,8 @@ export const ROOM_PAGE_CONFIGS: Record<string, RoomPageSourceConfig> = {
     ],
     sourceSections: [{ title: 'Climate', cards: [
       { title: 'Vent', entityId: 'cover.guest_bathroom_vent_vent', icon: 'mdi:air-filter', kind: 'vent', hash: '#vents', showState: true, modalItems: [{ title: 'Vent', entityId: 'cover.guest_bathroom_vent_vent', icon: 'mdi:air-filter' }], manualReview: sourcePopupReview },
-      { title: 'Fan', entityId: 'switch.guest_bathroom_fan_switch_top', icon: 'mdi:fan', kind: 'fan', showState: true, manualReview: sourceControlReview },
-      { title: 'Towel Rack', entityId: 'switch.guest_bathroom_towel_rack_switch_top', icon: 'mdi:heat-wave', kind: 'light', showState: true, manualReview: sourceControlReview },
+      { title: 'Fan', entityId: 'switch.guest_bathroom_fan_switch_top', icon: 'mdi:fan', kind: 'fan', showState: true, action: { type: 'toggle' } },
+      { title: 'Towel Rack', entityId: 'switch.guest_bathroom_towel_rack_switch_top', icon: 'mdi:heat-wave', kind: 'light', showState: true, stateColors: { on: 'rgba(136, 64, 26, 0.6)' }, action: { type: 'toggle' } },
     ] }],
     popupTemplates: ['light-popup-single', 'climate-overview-popup', 'vent-popup-single', 'occupancy-popup-2', 'fan-switch'],
   },
@@ -304,8 +327,8 @@ export const ROOM_PAGE_CONFIGS: Record<string, RoomPageSourceConfig> = {
     ],
     sourceSections: [{ title: 'Climate', cards: [
       { title: 'Vent', entityId: 'cover.master_bathroom_vent_vent', icon: 'mdi:air-filter', kind: 'vent', hash: '#vents', showState: true, modalItems: [{ title: 'Vent', entityId: 'cover.master_bathroom_vent_vent', icon: 'mdi:air-filter' }], manualReview: sourcePopupReview },
-      { title: 'Fan', entityId: 'switch.master_bathroom_fan_switch_top', icon: 'mdi:fan', kind: 'fan', showState: true, manualReview: sourceControlReview },
-      { title: 'Towel Rack', entityId: 'switch.master_bathroom_towel_rack_switch_top', icon: 'mdi:heat-wave', kind: 'light', showState: true, manualReview: sourceControlReview },
+      { title: 'Fan', entityId: 'switch.master_bathroom_fan_switch_top', icon: 'mdi:fan', kind: 'fan', showState: true, action: { type: 'toggle' } },
+      { title: 'Towel Rack', entityId: 'switch.master_bathroom_towel_rack_switch_top', icon: 'mdi:heat-wave', kind: 'light', showState: true, stateColors: { on: 'rgba(136, 64, 26, 0.6)' }, action: { type: 'toggle' } },
     ] }],
     popupTemplates: ['light-popup-single', 'climate-popup-1', 'vent-popup-single', 'fan-switch', 'occupancy-popup-single'],
   },

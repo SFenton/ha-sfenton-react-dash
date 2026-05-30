@@ -23,6 +23,7 @@ describe('DashboardViewPage', () => {
     mockEntities['select.valetudo_exaltedsneakydeer_fan'].state = 'balanced'
     mockEntities['select.valetudo_exaltedsneakydeer_water'].state = 'medium'
     mockEntities['input_select.main_floor_vacuum_cleaning_passes'].state = '1'
+    mockEntities['vacuum.valetudo_elatedusedram'].state = 'unavailable'
     mockEntities['input_boolean.roborock_living_room_toggle'].state = 'off'
     mockEntities['input_boolean.guests_staying_in_guest_room'].state = 'off'
     mockEntities['input_boolean.guests_staying_in_music_room'].state = 'off'
@@ -34,6 +35,10 @@ describe('DashboardViewPage', () => {
     mockEntities['media_player.theater_room_shield'].state = 'off'
     mockEntities['media_player.theater'].state = 'off'
     mockEntities['media_player.sony_projector'].state = 'off'
+    mockEntities['switch.guest_bathroom_fan_switch_top'].state = 'off'
+    mockEntities['switch.guest_bathroom_towel_rack_switch_top'].state = 'on'
+    mockEntities['switch.master_bathroom_fan_switch_top'].state = 'off'
+    mockEntities['switch.master_bathroom_towel_rack_switch_top'].state = 'on'
     mockEntities['cover.left_door'].state = 'closed'
     mockEntities['cover.right_door'].state = 'closed'
     mockEntities['lock.aqara_smart_lock_u400'].state = 'locked'
@@ -55,6 +60,14 @@ describe('DashboardViewPage', () => {
     expect(screen.getByRole('button', { name: /Window/i })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Climate' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Devices' })).toBeInTheDocument()
+  })
+
+  it('renders the source empty room state for room pages without body cards', () => {
+    render(<DashboardViewPage activePath="hallway" onNavigate={() => undefined} path="hallway" />)
+
+    expect(screen.getByRole('heading', { name: 'Hallway' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Nothing Here Yet!' })).toBeInTheDocument()
+    expect(screen.getByText('Once some devices are added to this room, we can display them here.')).toBeInTheDocument()
   })
 
   it('opens room status hashes with reusable Home modal sheets directly', async () => {
@@ -306,13 +319,17 @@ describe('DashboardViewPage', () => {
   })
 
   it('keeps dedicated climate popups in manual review fallback', async () => {
+    mockEntities['humidifier.master_bedroom_humidifier'].state = 'unavailable'
     render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
 
-    fireEvent.click(screen.getByRole('button', { name: /Humidifier/i }))
+    expect(screen.getByLabelText(/Humidifier Unavailable/i)).toHaveAttribute('data-muted', 'true')
+    expect(screen.getByRole('button', { name: /Stephen's Bed Heating • 86 °F/i })).toHaveStyle('--tile-color: rgba(136, 64, 26, 0.6)')
+    expect(screen.getByRole('button', { name: /Steph's Bed Off/i })).toHaveAttribute('data-muted', 'true')
+    expect(screen.getByRole('button', { name: /Apple TV Paused/i })).toHaveAttribute('data-muted', 'false')
 
-    expect(await screen.findByRole('dialog')).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Master Bedroom: Humidifier' })).toBeInTheDocument()
-    expect(screen.getByText('#humidifier-master-bedroom')).toBeInTheDocument()
+    fireEvent.click(screen.getByLabelText(/Humidifier Unavailable/i))
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: 'Master Bedroom Climate' })).not.toBeInTheDocument()
   })
 
@@ -365,8 +382,9 @@ describe('DashboardViewPage', () => {
     let view = render(<DashboardViewPage activePath="living-room" onNavigate={() => undefined} path="living-room" />)
     fireEvent.click(screen.getByRole('button', { name: /^SHIELD Off$/i }))
     expect(await screen.findByRole('heading', { name: 'Media' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'YouTube' })).toHaveAttribute('data-background', 'white')
-    fireEvent.click(screen.getByRole('button', { name: 'Plex' }))
+    const livingRoomRemoteDialog = screen.getByRole('dialog')
+    expect(within(livingRoomRemoteDialog).getByRole('button', { name: 'YouTube' })).toHaveAttribute('data-background', 'white')
+    fireEvent.click(within(livingRoomRemoteDialog).getByRole('button', { name: 'Plex' }))
     expect(mockCallServiceCalls).toEqual([
       { domain: 'script', service: 'launch_app_on_media_player', target: undefined, serviceData: { entity: 'media_player.living_room_shield', remote_entity: 'remote.living_room_shield', app_id: 'com.plexapp.android' } },
     ])
@@ -376,7 +394,7 @@ describe('DashboardViewPage', () => {
 
     view = render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
     fireEvent.click(screen.getByRole('button', { name: /^Apple TV Paused$/i }))
-    fireEvent.click(await screen.findByRole('button', { name: 'Plex' }))
+    fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Plex' }))
     expect(mockCallServiceCalls).toEqual([
       { domain: 'script', service: 'launch_app_on_apple_tv', target: undefined, serviceData: { entity: 'media_player.master_bedroom_apple_tv', app_name: 'Plex', remote_entity: 'remote.master_bedroom_apple_tv' } },
     ])
@@ -386,9 +404,62 @@ describe('DashboardViewPage', () => {
 
     render(<DashboardViewPage activePath="theater-room" onNavigate={() => undefined} path="theater-room" />)
     fireEvent.click(screen.getByRole('button', { name: /^Theater Room Off$/i }))
-    fireEvent.click(await screen.findByRole('button', { name: 'Disney+' }))
+    fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Disney+' }))
     expect(mockCallServiceCalls).toEqual([
       { domain: 'script', service: 'launch_app_on_media_player', target: undefined, serviceData: { entity: 'media_player.theater_room_shield', remote_entity: 'remote.theater_shield', app_id: 'com.disney.disneyplus', turn_on_projector: true } },
+    ])
+  })
+
+  it('runs Living Room page-level media app shortcuts from source image tiles', () => {
+    render(<DashboardViewPage activePath="living-room" onNavigate={() => undefined} path="living-room" />)
+
+    const plex = screen.getByRole('button', { name: 'Plex' })
+    expect(plex).toHaveAttribute('data-card', 'media-app')
+    expect(screen.getByRole('button', { name: 'YouTube' })).toHaveClass(/mediaAppTileWhite/)
+
+    fireEvent.click(plex)
+
+    expect(mockCallServiceCalls).toEqual([
+      { domain: 'script', service: 'launch_app_on_media_player', target: undefined, serviceData: { entity: 'media_player.living_room_shield', remote_entity: 'remote.living_room_shield', app_id: 'com.plexapp.android' } },
+    ])
+  })
+
+  it('matches the Music Room source vacuum overview card', () => {
+    mockEntities['vacuum.valetudo_elatedusedram'].state = 'docked'
+    mockEntities['sensor.valetudo_elatedusedram_battery_level'].state = '100'
+    render(<DashboardViewPage activePath="music-room" onNavigate={() => undefined} path="music-room" />)
+
+    expect(screen.getByRole('heading', { name: 'Devices' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Music Room Docked • 100%/i })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Robot Vacuum Docked/i })).not.toBeInTheDocument()
+  })
+
+  it('matches Theater Room source media app, PC, and vacuum cards', () => {
+    render(<DashboardViewPage activePath="theater-room" onNavigate={() => undefined} path="theater-room" />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Plex' }))
+    fireEvent.click(screen.getByRole('button', { name: /Theater Room PC Off/i }))
+
+    expect(screen.getByRole('button', { name: /Theater Room Docked • 99%/i })).toBeInTheDocument()
+    expect(mockCallServiceCalls).toEqual([
+      { domain: 'script', service: 'launch_app_on_media_player', serviceData: { entity: 'media_player.theater_room_shield', remote_entity: 'remote.theater_shield_remote', app_id: 'com.plexapp.android', turn_on_projector: true } },
+      { domain: 'input_button', service: 'press', target: 'input_button.control_theater_pc' },
+    ])
+  })
+
+  it('runs bathroom switch cards and preserves source switch colors', () => {
+    render(<DashboardViewPage activePath="guest-bathroom" onNavigate={() => undefined} path="guest-bathroom" />)
+
+    const fan = screen.getByRole('button', { name: /Fan Off/i })
+    const towelRack = screen.getByRole('button', { name: /Towel Rack On/i })
+    expect(towelRack).toHaveStyle('--tile-color: rgba(136, 64, 26, 0.6)')
+
+    fireEvent.click(fan)
+    fireEvent.click(towelRack)
+
+    expect(mockCallServiceCalls).toEqual([
+      { domain: 'homeassistant', service: 'toggle', target: 'switch.guest_bathroom_fan_switch_top' },
+      { domain: 'homeassistant', service: 'toggle', target: 'switch.guest_bathroom_towel_rack_switch_top' },
     ])
   })
 
@@ -443,7 +514,7 @@ describe('DashboardViewPage', () => {
   it('opens room vacuum source cards with reusable vacuum modal controls', async () => {
     render(<DashboardViewPage activePath="living-room" onNavigate={() => undefined} path="living-room" />)
 
-    fireEvent.click(screen.getByRole('button', { name: /Robot Vacuum Docked/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Main Floor Docked/i }))
 
     expect(await screen.findByRole('dialog')).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Living Room: Robot Vacuum' })).toBeInTheDocument()
@@ -485,7 +556,7 @@ describe('DashboardViewPage', () => {
   it('runs source-derived vacuum modal services without activating hidden actions', async () => {
     render(<DashboardViewPage activePath="living-room" onNavigate={() => undefined} path="living-room" />)
 
-    fireEvent.click(screen.getByRole('button', { name: /Robot Vacuum Docked/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Main Floor Docked/i }))
     fireEvent.click(await screen.findByRole('button', { name: 'Locate' }))
     fireEvent.click(screen.getByRole('button', { name: /Fan Balanced/i }))
     fireEvent.click(within(await screen.findByRole('dialog', { name: 'Fan' })).getByRole('button', { name: 'Turbo' }))
@@ -508,7 +579,7 @@ describe('DashboardViewPage', () => {
     mockEntities['input_text.main_floor_vacuum_error_message'].state = 'Main brush is stuck under the sofa'
     render(<DashboardViewPage activePath="living-room" onNavigate={() => undefined} path="living-room" />)
 
-    fireEvent.click(screen.getByRole('button', { name: /Robot Vacuum Error/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Main Floor Error/i }))
 
     const errorMessage = await screen.findByRole('alert')
     expect(within(errorMessage).getByText('Main brush is stuck under the sofa')).toBeInTheDocument()
@@ -519,7 +590,7 @@ describe('DashboardViewPage', () => {
   it('opens Theater Room vacuum with map and full Valetudo power controls', async () => {
     render(<DashboardViewPage activePath="theater-room" onNavigate={() => undefined} path="theater-room" />)
 
-    fireEvent.click(screen.getByRole('button', { name: /Robot Vacuum Docked/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Theater Room Docked/i }))
 
     expect(await screen.findByRole('dialog')).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Theater Room: Robot Vacuum' })).toBeInTheDocument()
@@ -561,7 +632,7 @@ describe('DashboardViewPage', () => {
 
     expect(screen.getByRole('heading', { name: 'Grill' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Bear Grills Off/i })).not.toBeInTheDocument()
-    expect(screen.getByText('Bear Grills')).toBeInTheDocument()
+    expect(screen.getByLabelText('Bear Grills Off')).toHaveAttribute('data-muted', 'true')
     expect(screen.queryByText('Pellet Level')).not.toBeInTheDocument()
     expect(screen.queryByText('Keep Warm')).not.toBeInTheDocument()
 
@@ -580,11 +651,29 @@ describe('DashboardViewPage', () => {
   })
 
   it('matches HASS Office PC icons and subtitles', () => {
+    mockEntities['input_boolean.stephen_s_pc_power'].state = 'on'
+    mockEntities['input_text.stephen_s_pc_power_state'].state = 'On'
+    mockEntities['input_boolean.steph_s_pc_power'].state = 'off'
+    mockEntities['input_text.steph_s_pc_power_state'].state = 'Off'
     render(<DashboardViewPage activePath="office" onNavigate={() => undefined} path="office" />)
 
     expect(screen.getByRole('heading', { name: 'Office PCs' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Stephen's PC Off/i })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Steph's PC Off/i })).toBeInTheDocument()
+    const stephenPc = screen.getByRole('button', { name: /Stephen's PC On/i })
+    const stephPc = screen.getByRole('button', { name: /Steph's PC Off/i })
+    expect(stephenPc).toHaveAttribute('data-tone', 'switch')
+    expect(stephenPc).toHaveAttribute('data-muted', 'false')
+    expect(stephPc).toHaveAttribute('data-tone', 'switch')
+    expect(stephPc).toHaveAttribute('data-muted', 'true')
+    expect(stephenPc.querySelector('path')).toHaveAttribute('d', materialIconPath('mdi:controller'))
+    expect(stephPc.querySelector('path')).toHaveAttribute('d', materialIconPath('mdi:controller'))
+
+    fireEvent.click(stephenPc)
+    fireEvent.click(stephPc)
+
+    expect(mockCallServiceCalls).toEqual([
+      { domain: 'input_button', service: 'press', target: 'input_button.control_stephen_s_pc' },
+      { domain: 'input_button', service: 'press', target: 'input_button.control_steph_s_pc' },
+    ])
   })
 
   it('ports the Security page visible YAML sections and controls', () => {
