@@ -1,5 +1,6 @@
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useEntity, useHass } from '@hakit/core'
+import { ControlSliderCircular } from '@hakit/components'
 import { ClimateCard } from '../components/cards/ClimateCard'
 import { ContactSensorCard } from '../components/cards/ContactSensorCard'
 import { LightCard } from '../components/cards/LightCard'
@@ -20,8 +21,9 @@ import { Description } from '../components/core/Description'
 import { GlassTile } from '../components/core/GlassTile'
 import { MaterialIcon } from '../components/core/Icon'
 import { ModalSheet } from '../components/core/ModalSheet'
+import { OptionPickerDialog, type PickerOption } from '../components/core/OptionPickerDialog'
 import { SectionHeader } from '../components/core/SectionHeader'
-import { asEntityName, formatCompactEntityState, isActiveState } from '../components/hass/entityState'
+import { asEntityName, formatCompactEntityState, isActiveState, isContactOpen, titleCaseState } from '../components/hass/entityState'
 import { DASHBOARD_ROUTE_CHANGE_EVENT, dashboardEventTargets, dashboardHash, dashboardPathWithSearch, replaceDashboardUrl } from '../hooks/dashboardLocation'
 import { useHashModal } from '../hooks/useHashModal'
 import {
@@ -764,37 +766,492 @@ function AdminPage({ onNavigate }: { onNavigate: (path: string) => void }) {
   )
 }
 
-function ThermostatPage({ onNavigate }: { onNavigate: (path: string) => void }) {
+const THERMOSTAT_SECTION_DESCRIPTIONS = {
+  ecoMode:
+    "Enable Eco Mode to only track active rooms, and disable heating/cooling inactive, but critical temperature, rooms.\n\nUse the dropdown on the right side of the button to configure Eco Mode's behavior when everyone is out of the house.\n\nTo have specific rooms override Eco mode, enable Track Selected Rooms, and select the rooms you'd like to enable critical monitoring for.",
+  forceCritical:
+    "For rooms that are not selected above, you can select rooms here that we should still monitor for critical temperatures.\n\nA good example is the theater room, which sits below rooms we want heated or cooled, or the music room, which sits below the living room; even if we aren't actively monitoring them, those rooms being around temp mean more comfortable conditions upstairs.",
+  integration: 'Enable or disable automatic thermostat control.',
+  trackSelected:
+    'Track only a subset of monitored rooms for automated control. Monitored rooms can be configured in the integration settings.\n\nThis setting works in tandem with eco mode, but eco mode is not required to be enabled to use it.',
+} as const
+
+const THERMOSTAT_CONTACT_SENSORS = [
+  { entityId: 'binary_sensor.office_window_contact_sensor_contact', title: 'Office Window' },
+  { entityId: 'binary_sensor.office_pc_window_sensor_contact', title: 'Office PC Window' },
+  { entityId: 'binary_sensor.living_room_window_contact_sensor_contact', title: 'Living Room Window' },
+  { entityId: 'binary_sensor.front_door_contact_sensor_contact', title: 'Front Door' },
+  { entityId: 'binary_sensor.garage_door_contact_sensor_contact', title: 'Garage Door' },
+  { entityId: 'binary_sensor.theater_room_door_contact_sensor_contact', title: 'Theater Room Door' },
+  { entityId: 'binary_sensor.kitchen_door_contact_sensor_contact', title: 'Kitchen Door' },
+  { entityId: 'binary_sensor.guest_room_window_contact_sensor_contact', title: 'Guest Room Window' },
+  { entityId: 'binary_sensor.gym_window_contact_sensor_contact', title: 'Gym Window' },
+  { entityId: 'binary_sensor.dining_room_door_contact_sensor_contact', title: 'Dining Room Door' },
+  { entityId: 'binary_sensor.music_room_door_contact_sensor_contact', title: 'Music Room Door' },
+] as const
+
+type ThermostatRoomView = (typeof THERMOSTAT_ROOMS)[number] & {
+  hash: string
+  key: string
+}
+
+function thermostatRoomKey(title: string) {
+  return title.toLowerCase().replaceAll(' ', '_')
+}
+
+function thermostatRoomHash(title: string) {
+  return `#${title.toLowerCase().replaceAll(' ', '-')}`
+}
+
+const THERMOSTAT_ROOM_VIEWS: ThermostatRoomView[] = THERMOSTAT_ROOMS.map((room) => ({
+  ...room,
+  hash: thermostatRoomHash(room.title),
+  key: thermostatRoomKey(room.title),
+}))
+const GLOBAL_THERMOSTAT_ENTITY_ID = 'climate.thermostat_contact_sensors_global_virtual_thermostat'
+const THERMOSTAT_ROOM_CLIMATE_ENTITY_IDS = THERMOSTAT_ROOM_VIEWS.map((room) => room.climateEntityId)
+const THERMOSTAT_HEAT_COLOR = '#cd5401'
+const THERMOSTAT_COOL_COLOR = '#2c8e98'
+const THERMOSTAT_NEUTRAL_COLOR = 'rgba(255, 255, 255, 0.78)'
+
+function thermostatTemperatureEntityId(room: ThermostatRoomView) {
+  return `sensor.thermostat_contact_sensors_${room.key}_temperature`
+}
+
+function thermostatOccupancyEntityId(room: ThermostatRoomView) {
+  return `sensor.thermostat_contact_sensors_${room.key}_occupancy`
+}
+
+function thermostatTrackEntityId(room: ThermostatRoomView) {
+  return `switch.thermostat_contact_sensors_track_${room.key}`
+}
+
+function thermostatForceCriticalEntityId(room: ThermostatRoomView) {
+  return `switch.thermostat_contact_sensors_${room.key}_force_track_when_critical`
+}
+
+function numberValue(value: unknown) {
+  if (value === null || value === undefined) return null
+  if (typeof value === 'string' && value.trim() === '') return null
+  const parsed = Number(value)
+  return Number.isFinite(parsed) ? parsed : null
+}
+
+function formatOneDecimal(value: unknown, fallback = '--') {
+  const parsed = numberValue(value)
+  return parsed === null ? fallback : parsed.toFixed(1)
+}
+
+function formatTemperatureValue(value: unknown, unit = '°F') {
+  return `${formatOneDecimal(value)}${unit}`
+}
+
+function temperatureUnit(entity: ReturnType<typeof useEntity>) {
+  if (typeof entity?.attributes.temperature_unit === 'string') return entity.attributes.temperature_unit
+  if (typeof entity?.attributes.unit_of_measurement === 'string') return entity.attributes.unit_of_measurement
+  return '°F'
+}
+
+function formatSelectOption(value: string) {
+  if (!value) return 'Unknown'
+  if (value.includes(' ')) return value
+  return titleCaseState(value)
+}
+
+function useCallService() {
+  return useHass((state) => state.helpers.callService) as unknown as (params: Record<string, unknown>) => void
+}
+
+type ThermostatSliderTarget = 'high' | 'low' | 'value'
+type ThermostatDisplayTargets = { high: number | null; low: number | null; sourceKey: string; target: number | null }
+type ThermostatThermalStatus = 'cool' | 'heat' | 'idle'
+
+function rawThermostatAction(entity: ReturnType<typeof useEntity>) {
+  return typeof entity?.attributes.hvac_action === 'string' ? entity.attributes.hvac_action : entity?.state ?? 'idle'
+}
+
+function thermostatThermalStatus(action: string): ThermostatThermalStatus {
+  if (action === 'heating' || action === 'heat') return 'heat'
+  if (action === 'cooling' || action === 'cool') return 'cool'
+  return 'idle'
+}
+
+function thermostatActionColor(action: string) {
+  const status = thermostatThermalStatus(action)
+  if (status === 'heat') return THERMOSTAT_HEAT_COLOR
+  if (status === 'cool') return THERMOSTAT_COOL_COLOR
+  return undefined
+}
+
+function thermostatSliderColors(action: string) {
+  return {
+    color: thermostatActionColor(action) ?? THERMOSTAT_NEUTRAL_COLOR,
+    highColor: THERMOSTAT_COOL_COLOR,
+    lowColor: THERMOSTAT_HEAT_COLOR,
+  }
+}
+
+function ThermostatDial({ entityId, size = 'page', title }: { entityId: string; size?: 'modal' | 'page'; title: string }) {
+  const entity = useEntity(asEntityName(entityId), { returnNullIfNotFound: true })
+  const callService = useCallService()
+  const unit = temperatureUnit(entity)
+  const currentTemperature = entity?.attributes.current_temperature
+  const targetLow = entity?.attributes.target_temp_low
+  const targetHigh = entity?.attributes.target_temp_high
+  const targetTemperature = entity?.attributes.temperature
+  const minTemperature = numberValue(entity?.attributes.min_temp) ?? 45
+  const maxTemperature = numberValue(entity?.attributes.max_temp) ?? 95
+  const targetStep = numberValue(entity?.attributes.target_temp_step) ?? 0.5
+  const current = numberValue(currentTemperature) ?? undefined
+  const low = numberValue(targetLow)
+  const high = numberValue(targetHigh)
+  const target = numberValue(targetTemperature)
+  const hasRange = low !== null && high !== null
+  const sourceTargetKey = `${low ?? 'none'}-${high ?? 'none'}-${target ?? 'none'}`
+  const sourceTargets: ThermostatDisplayTargets = { high, low, sourceKey: sourceTargetKey, target }
+  const [pendingTargets, setPendingTargets] = useState<ThermostatDisplayTargets | null>(null)
+  const lastTemperatureCommit = useRef<{ key: string; time: number } | null>(null)
+  const displayTargets = pendingTargets?.sourceKey === sourceTargetKey ? pendingTargets : sourceTargets
+  const displayLow = displayTargets.low
+  const displayHigh = displayTargets.high
+  const displayTarget = displayTargets.target
+  const displayRangeText = hasRange ? `${formatOneDecimal(displayLow ?? undefined)} · ${formatOneDecimal(displayHigh ?? undefined)}` : formatTemperatureValue(displayTarget ?? targetTemperature, unit)
+  // HAKit 6.0.2 syncs the numeric high prop into localLow after mount; string coercion preserves the high handle and the key remounts on HA updates.
+  const sliderHigh = displayHigh !== null ? (String(displayHigh) as unknown as number) : undefined
+  const rawHvacAction = rawThermostatAction(entity)
+  const actionColor = thermostatActionColor(rawHvacAction)
+  const disabled = !entity || entity.state === 'unavailable' || entity.state === 'unknown'
+  const inactive = disabled || (!hasRange && !actionColor && entity?.state === 'off')
+  const hvacAction = titleCaseState(rawHvacAction)
+
+  const updateDisplayedTarget = (value: number, type: ThermostatSliderTarget) => {
+    setPendingTargets((previous) => {
+      const base = previous?.sourceKey === sourceTargetKey ? previous : sourceTargets
+      if (!hasRange) return { ...base, target: value }
+      if (type === 'low') return { ...base, low: value }
+      if (type === 'high') return { ...base, high: value }
+      return base
+    })
+  }
+
+  const commitTemperature = (serviceData: Record<string, number>) => {
+    const commitKey = JSON.stringify(serviceData)
+    const now = Date.now()
+    if (lastTemperatureCommit.current?.key === commitKey && now - lastTemperatureCommit.current.time < 400) return
+    lastTemperatureCommit.current = { key: commitKey, time: now }
+    const target = entityId === GLOBAL_THERMOSTAT_ENTITY_ID && 'target_temp_low' in serviceData && 'target_temp_high' in serviceData ? THERMOSTAT_ROOM_CLIMATE_ENTITY_IDS : entityId
+    callService({ domain: 'climate', service: 'set_temperature', target, serviceData })
+  }
+
+  const commitDisplayedTargets = () => {
+    if (!entity) return
+    if (hasRange && displayLow !== null && displayHigh !== null) {
+      commitTemperature({ target_temp_low: displayLow, target_temp_high: displayHigh })
+      return
+    }
+    if (!hasRange && displayTarget !== null) commitTemperature({ temperature: displayTarget })
+  }
+
+  const applySliderChange = (value: number, type: ThermostatSliderTarget) => {
+    if (!entity) return
+    updateDisplayedTarget(value, type)
+    const nextLow = type === 'low' ? value : displayLow
+    const nextHigh = type === 'high' ? value : displayHigh
+    if (hasRange && nextLow !== null && nextHigh !== null) {
+      commitTemperature({ target_temp_low: nextLow, target_temp_high: nextHigh })
+      return
+    }
+
+    if (!hasRange) commitTemperature({ temperature: value })
+  }
+
   return (
-    <div className={styles.stack}>
-      <Notice tone="review">Thermostat controls are ported as state cards and room drill-ins for now. The original HASS thermostat UX is dense and should be manually reviewed before replacing it.</Notice>
+    <div aria-label={`${title} thermostat ${hvacAction} ${formatTemperatureValue(currentTemperature, unit)} ${displayRangeText}`} className={styles.thermostatDial} data-hvac-action={rawHvacAction} data-size={size} role="region">
+      <ControlSliderCircular
+        key={`${entityId}-${sourceTargetKey}`}
+        className={styles.thermostatCircularSlider}
+        colors={thermostatSliderColors(rawHvacAction)}
+        current={current}
+        disabled={disabled}
+        dual={hasRange}
+        high={sliderHigh}
+        inactive={inactive}
+        label={`${title} target temperature`}
+        low={displayLow ?? undefined}
+        max={maxTemperature}
+        min={minTemperature}
+        mode={hasRange ? undefined : 'full'}
+        onChange={updateDisplayedTarget}
+        onChangeApplied={applySliderChange}
+        onPointerUpCapture={commitDisplayedTargets}
+        step={targetStep}
+        value={displayTarget ?? current}
+      />
+      <div className={styles.thermostatDialReadout}>
+        <span className={styles.thermostatAction}>{hvacAction}</span>
+        <span className={styles.thermostatPrimaryValue}>{formatOneDecimal(currentTemperature, '--').replace(/\.0$/, '')}<small>{unit}</small></span>
+        <span className={styles.thermostatRange}>
+          <MaterialIcon name="mdi:thermostat" size={17} />
+          {displayRangeText}
+        </span>
+      </div>
+    </div>
+  )
+}
+
+function ThermostatSelectButton({
+  entityId,
+  hideWhenEmpty = false,
+  icon,
+  optionsAttribute = 'options',
+  selectedIcon = 'mdi:thermometer-check',
+  serviceKind = 'select',
+  title,
+  valueAttribute,
+}: {
+  entityId: string
+  hideWhenEmpty?: boolean
+  icon: string
+  optionsAttribute?: string
+  selectedIcon?: string
+  serviceKind?: 'climate' | 'climate-fan' | 'select'
+  title: string
+  valueAttribute?: string
+}) {
+  const [open, setOpen] = useState(false)
+  const entity = useEntity(asEntityName(entityId), { returnNullIfNotFound: true })
+  const callService = useCallService()
+  const rawOptions = entity?.attributes[optionsAttribute]
+  const options: PickerOption[] = Array.isArray(rawOptions) ? rawOptions.map((option) => ({ label: formatSelectOption(String(option)), value: String(option) })) : []
+  const value = valueAttribute && typeof entity?.attributes[valueAttribute] === 'string' ? entity.attributes[valueAttribute] : entity?.state ?? ''
+  const disabled = options.length === 0
+
+  if (hideWhenEmpty && disabled) return null
+
+  const selectOption = (nextValue: string) => {
+    if (nextValue === value) {
+      setOpen(false)
+      return
+    }
+
+    if (serviceKind === 'climate') callService({ domain: 'climate', service: 'set_hvac_mode', target: entityId, serviceData: { hvac_mode: nextValue } })
+    else if (serviceKind === 'climate-fan') callService({ domain: 'climate', service: 'set_fan_mode', target: entityId, serviceData: { fan_mode: nextValue } })
+    else callService({ domain: 'select', service: 'select_option', target: entityId, serviceData: { option: nextValue } })
+    setOpen(false)
+  }
+
+  return (
+    <>
+      <button aria-label={`${title} ${formatSelectOption(value)}`} className={styles.thermostatSubButton} disabled={disabled} onClick={() => setOpen(true)} type="button">
+        <MaterialIcon name={icon} size={22} />
+        <MaterialIcon name="mdi:chevron-down" size={22} />
+      </button>
+      <OptionPickerDialog icon={icon} onClose={() => setOpen(false)} onSelect={selectOption} open={open} options={options} presentation="sheet" selectedIcon={selectedIcon} title={title} value={value} />
+    </>
+  )
+}
+
+function ThermostatRoomRow({ onOpen, room }: { onOpen: (hash: string) => void; room: ThermostatRoomView }) {
+  const temperature = useEntity(asEntityName(thermostatTemperatureEntityId(room)), { returnNullIfNotFound: true })
+  const occupancy = useEntity(asEntityName(thermostatOccupancyEntityId(room)), { returnNullIfNotFound: true })
+  const active = occupancy?.state === 'active'
+  const subtitle = `${formatTemperatureValue(temperature?.state, temperatureUnit(temperature))} · ${titleCaseState(occupancy?.state)}`
+
+  return (
+    <button aria-label={`${room.title} ${subtitle}`} className={styles.thermostatRoomRow} onClick={() => onOpen(room.hash)} type="button">
+      <MaterialIcon name={active ? 'mdi:thermometer-check' : 'mdi:thermometer-off'} size={32} />
+      <span>
+        <strong>{room.title}</strong>
+        <small>{subtitle}</small>
+      </span>
+    </button>
+  )
+}
+
+function ThermostatGlassCard({ active = false, ariaLabel, children, hvacAction, icon, onMainClick, pressed, stateText, thermalStatus = 'idle', title }: { active?: boolean; ariaLabel?: string; children?: ReactNode; hvacAction?: string; icon: string; onMainClick?: () => void; pressed?: boolean; stateText: string; thermalStatus?: ThermostatThermalStatus; title: string }) {
+  const content = (
+    <>
+      <MaterialIcon name={icon} size={34} />
+      <span>
+        <strong>{title}</strong>
+        <small>{stateText}</small>
+      </span>
+    </>
+  )
+
+  return (
+    <div aria-label={ariaLabel} className={styles.thermostatGlassCard} data-active={active ? 'true' : 'false'} data-hvac-action={hvacAction} data-thermal-status={thermalStatus}>
+      {onMainClick ? (
+        <button aria-label={`${title} ${stateText}`} aria-pressed={pressed ?? active} className={styles.thermostatGlassMain} onClick={onMainClick} type="button">
+          {content}
+        </button>
+      ) : (
+        <span className={styles.thermostatGlassMain}>{content}</span>
+      )}
+      {children && <div className={styles.thermostatGlassActions}>{children}</div>}
+    </div>
+  )
+}
+
+function ThermostatHubPill() {
+  const entity = useEntity(asEntityName('climate.thermostat_hub_w200'), { returnNullIfNotFound: true })
+  const rawHvacAction = rawThermostatAction(entity)
+  const stateText = formatCompactEntityState(entity, 'Unavailable')
+
+  return (
+    <ThermostatGlassCard ariaLabel={`Thermostat Hub ${stateText}`} hvacAction={rawHvacAction} icon="mdi:thermostat" stateText={stateText} thermalStatus={thermostatThermalStatus(rawHvacAction)} title="Thermostat Hub">
+      <ThermostatSelectButton entityId="climate.thermostat_hub_w200" icon="mdi:power" optionsAttribute="hvac_modes" serviceKind="climate" title="Thermostat Hub Mode" />
+      <ThermostatSelectButton entityId="climate.thermostat_hub_w200" hideWhenEmpty icon="mdi:fan" optionsAttribute="fan_modes" selectedIcon="mdi:fan-check" serviceKind="climate-fan" title="Thermostat Hub Fan" valueAttribute="fan_mode" />
+    </ThermostatGlassCard>
+  )
+}
+
+function ThermostatSwitchCard({ children, entityId, icon, title }: { children?: ReactNode; entityId: string; icon: string; title: string }) {
+  const entity = useEntity(asEntityName(entityId), { returnNullIfNotFound: true })
+  const callService = useCallService()
+  const active = entity?.state === 'on'
+  const stateText = formatCompactEntityState(entity, 'Unavailable')
+
+  return (
+    <ThermostatGlassCard active={active} icon={icon} onMainClick={() => callService({ domain: 'homeassistant', service: 'toggle', target: entityId })} stateText={stateText} title={title}>
+      {children}
+    </ThermostatGlassCard>
+  )
+}
+
+function ThermostatCheckbox({ entityId, showState = true, title }: { entityId: string; showState?: boolean; title: string }) {
+  const entity = useEntity(asEntityName(entityId), { returnNullIfNotFound: true })
+  const callService = useCallService()
+  const active = entity?.state === 'on'
+
+  return (
+    <button aria-label={showState ? `${title} ${formatCompactEntityState(entity, 'Unavailable')}` : title} aria-pressed={active} className={styles.thermostatCheckbox} onClick={() => callService({ domain: 'homeassistant', service: 'toggle', target: entityId })} type="button">
+      <MaterialIcon name={active ? 'mdi:checkbox-marked-outline' : 'mdi:checkbox-blank-outline'} size={34} />
+      <span>
+        <strong>{title}</strong>
+        {showState && <small>{formatCompactEntityState(entity, 'Unavailable')}</small>}
+      </span>
+    </button>
+  )
+}
+
+function ThermostatTrackCheckbox({ room }: { room: ThermostatRoomView }) {
+  return <ThermostatCheckbox entityId={thermostatTrackEntityId(room)} title={room.title} />
+}
+
+function ThermostatForceCheckbox({ room }: { room: ThermostatRoomView }) {
+  const trackEntity = useEntity(asEntityName(thermostatTrackEntityId(room)), { returnNullIfNotFound: true })
+  if (trackEntity?.state === 'on') return null
+  return <ThermostatCheckbox entityId={thermostatForceCriticalEntityId(room)} showState={false} title={room.title} />
+}
+
+function ThermostatTrackSection() {
+  const trackSelected = useEntity(asEntityName('switch.thermostat_contact_sensors_only_track_selected_rooms'), { returnNullIfNotFound: true })
+  const criticalTracking = useEntity(asEntityName('select.thermostat_contact_sensors_eco_mode_critical_tracking'), { returnNullIfNotFound: true })
+  const showSelectedRooms = trackSelected?.state === 'on'
+  const showCriticalRooms = showSelectedRooms && criticalTracking?.state === 'Track Select Critical'
+
+  return (
+    <>
+      <section className={styles.section}>
+        <SectionHeader title="Track Selected Rooms" />
+        <Description className={styles.thermostatDescription}>{THERMOSTAT_SECTION_DESCRIPTIONS.trackSelected}</Description>
+        <ThermostatSwitchCard entityId="switch.thermostat_contact_sensors_only_track_selected_rooms" icon="mdi:home-thermometer" title="Track Selected Rooms" />
+        {showSelectedRooms && (
+          <div className={styles.thermostatCheckboxGrid}>
+            {THERMOSTAT_ROOM_VIEWS.map((room) => <ThermostatTrackCheckbox key={room.key} room={room} />)}
+          </div>
+        )}
+      </section>
+      {showCriticalRooms && (
+        <section className={styles.section}>
+          <SectionHeader title="Force Track Critical Temperature" />
+          <Description className={styles.thermostatDescription}>{THERMOSTAT_SECTION_DESCRIPTIONS.forceCritical}</Description>
+          <div className={styles.thermostatCheckboxGrid}>
+            {THERMOSTAT_ROOM_VIEWS.map((room) => <ThermostatForceCheckbox key={room.key} room={room} />)}
+          </div>
+        </section>
+      )}
+    </>
+  )
+}
+
+function OpenContactSensorCard({ entityId, title }: { entityId: string; title: string }) {
+  const entity = useEntity(asEntityName(entityId), { returnNullIfNotFound: true })
+  if (!entity || !isContactOpen(entity)) return null
+  return <ContactSensorCard entityId={entityId} size="compact" title={title} />
+}
+
+function OpenContactSensorsSection() {
+  const aggregate = useEntity(asEntityName('binary_sensor.contact_sensors'), { returnNullIfNotFound: true })
+  if (!isContactOpen(aggregate)) return null
+
+  return (
+    <section className={styles.section}>
+      <SectionHeader title="Open Contact Sensors" />
+      <Grid>
+        {THERMOSTAT_CONTACT_SENSORS.map((sensor) => <OpenContactSensorCard entityId={sensor.entityId} key={sensor.entityId} title={sensor.title} />)}
+      </Grid>
+    </section>
+  )
+}
+
+function ThermostatRoomModal({ onClose, room }: { onClose: () => void; room: ThermostatRoomView | null }) {
+  const awayMode = useEntity(asEntityName('binary_sensor.thermostat_contact_sensors_away_mode_active'), { returnNullIfNotFound: true })
+  const title = room?.title ?? 'Thermostat'
+  const ventTitle = room ? `${room.title} ${room.ventEntityIds.length > 1 ? 'Vents' : 'Vent'}` : 'Vents'
+
+  return (
+    <ModalSheet onClose={onClose} open={Boolean(room)} surface="hass-popup" title={title}>
+      {room && (
+        <div className={styles.thermostatModalBody}>
+          <ThermostatDial entityId={room.climateEntityId} size="modal" title={room.title} />
+          {awayMode?.state === 'on' && <Notice>Away Mode Active. The room may be cooler or warmer than your heat/cool targets to save energy while away.</Notice>}
+          <section className={styles.section}>
+            <SectionHeader title={ventTitle} />
+            <Grid>
+              {room.ventEntityIds.map((entityId, index) => <ClimateCard entityId={entityId} icon="vent" key={entityId} size="compact" title={room.ventEntityIds.length > 1 ? `Vent ${index + 1}` : 'Vent'} />)}
+            </Grid>
+          </section>
+        </div>
+      )}
+    </ModalSheet>
+  )
+}
+
+function ThermostatPage() {
+  const { closeHash, hash, openHash } = useHashModal()
+  const selectedRoom = THERMOSTAT_ROOM_VIEWS.find((room) => room.hash === hash) ?? null
+
+  return (
+    <div className={`${styles.stack} ${styles.thermostatPage}`}>
       <section className={styles.section}>
         <SectionHeader title="Whole Home" />
-        <Grid>
-          <ClimateCard entityId="climate.thermostat_contact_sensors_global_virtual_thermostat" icon={<MaterialIcon name="mdi:thermostat" size={38} />} size="compact" title="Whole Home" />
-          <ClimateCard entityId="climate.thermostat_hub_w200" icon={<MaterialIcon name="mdi:thermostat" size={38} />} size="compact" title="Thermostat Hub" />
-        </Grid>
+        <ThermostatDial entityId={GLOBAL_THERMOSTAT_ENTITY_ID} title="Whole Home" />
+        <ThermostatHubPill />
       </section>
+      <OpenContactSensorsSection />
       <section className={styles.section}>
         <SectionHeader title="Rooms" />
-        <Grid>
-          {THERMOSTAT_ROOMS.map((room) => (
-            <EntityActionCard
-              item={{ title: room.title, entityId: room.climateEntityId, icon: 'mdi:thermostat', color: CLIMATE_COLOR, action: { type: 'navigate', path: room.title.toLowerCase().replaceAll(' ', '-') }, manualReview: true }}
-              key={room.climateEntityId}
-              onNavigate={onNavigate}
-            />
-          ))}
-        </Grid>
+        <div className={styles.thermostatRoomGrid}>
+          {THERMOSTAT_ROOM_VIEWS.map((room) => <ThermostatRoomRow key={room.key} onOpen={openHash} room={room} />)}
+        </div>
       </section>
       <section className={styles.section}>
-        <SectionHeader title="Automatic Thermostat" />
-        <Grid>
-          <EntityActionCard item={{ title: 'Eco Mode', entityId: 'switch.thermostat_contact_sensors_eco_mode', icon: 'mdi:leaf', color: CLIMATE_COLOR, action: { type: 'toggle' }, manualReview: true }} onNavigate={onNavigate} />
-          <EntityActionCard item={{ title: 'Track Selected Rooms', entityId: 'switch.thermostat_contact_sensors_only_track_selected_rooms', icon: 'mdi:map-marker-check', color: CLIMATE_COLOR, action: { type: 'toggle' }, manualReview: true }} onNavigate={onNavigate} />
-          <EntityActionCard item={{ title: 'Integration Enabled', entityId: 'input_boolean.enable_disable_thermostat_contact_sensors_integration', icon: 'mdi:home-thermometer', color: CLIMATE_COLOR, action: { type: 'toggle' }, manualReview: true }} onNavigate={onNavigate} />
-        </Grid>
+        <SectionHeader title="Eco Mode" />
+        <Description className={styles.thermostatDescription}>{THERMOSTAT_SECTION_DESCRIPTIONS.ecoMode}</Description>
+        <ThermostatSwitchCard entityId="switch.thermostat_contact_sensors_eco_mode" icon="mdi:leaf" title="Eco Mode">
+          <ThermostatSelectButton entityId="select.thermostat_contact_sensors_eco_mode_critical_tracking" icon="mdi:thermometer-alert" title="Eco Mode Critical Tracking" />
+          <ThermostatSelectButton entityId="select.thermostat_contact_sensors_eco_behavior_when_away" icon="mdi:leaf-circle" title="Eco Behavior When Away" />
+        </ThermostatSwitchCard>
       </section>
+      <ThermostatTrackSection />
+      <section className={styles.section}>
+        <SectionHeader title="Automatic Thermostat" />
+        <Description className={styles.thermostatDescription}>{THERMOSTAT_SECTION_DESCRIPTIONS.integration}</Description>
+        <ThermostatSwitchCard entityId="input_boolean.enable_disable_thermostat_contact_sensors_integration" icon="mdi:thermostat" title="Automatic Thermostat" />
+      </section>
+      <ThermostatRoomModal onClose={closeHash} room={selectedRoom} />
     </div>
   )
 }
@@ -817,7 +1274,7 @@ function Content({ onNavigate, path }: { onNavigate: (path: string) => void; pat
   if (path === 'vacuums') return <VacuumPage />
   if (path === 'media') return <MediaPage onNavigate={onNavigate} />
   if (path === 'admin') return <AdminPage onNavigate={onNavigate} />
-  if (path === 'ecobee') return <ThermostatPage onNavigate={onNavigate} />
+  if (path === 'ecobee') return <ThermostatPage />
   if (CONTROL_PAGES[path]) return <ControlPage onNavigate={onNavigate} path={path} />
   return <FallbackPage title={routeTitle(path)} />
 }

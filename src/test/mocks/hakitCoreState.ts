@@ -62,6 +62,52 @@ function mockSwitchEntities(entityIds: readonly string[], attributes: Record<str
   return Object.fromEntries(entityIds.map((entityId) => [entityId, entity(entityId, 'on', attributes)]))
 }
 
+const thermostatRoomMockData = [
+  { key: 'living_room', title: 'Living Room', temperature: '70.2', occupancy: 'inactive', track: 'on', force: 'off', climate: 'climate.thermostat_contact_sensors_living_room_virtual_thermostat', vents: [['cover.living_room_vent_1_vent', 'open'], ['cover.living_room_vent_2_vent', 'open']] },
+  { key: 'office', title: 'Office', temperature: '71.6', occupancy: 'active', track: 'off', force: 'off', climate: 'climate.thermostat_contact_sensors_office_virtual_thermostat', vents: [['cover.office_vent_vent', 'closed']] },
+  { key: 'master_bedroom', title: 'Master Bedroom', temperature: '71.0', occupancy: 'active', track: 'on', force: 'off', climate: 'climate.thermostat_contact_sensors_master_bedroom_virtual_thermostat', vents: [['cover.master_bedroom_vent_2_vent', 'closed'], ['cover.master_bedroom_vent_3_vent', 'closed']] },
+  { key: 'master_bathroom', title: 'Master Bathroom', temperature: '74.9', occupancy: 'inactive', track: 'on', force: 'off', climate: 'climate.thermostat_contact_sensors_master_bathroom_virtual_thermostat', vents: [['cover.master_bathroom_vent_vent', 'closed']] },
+  { key: 'kitchen', title: 'Kitchen', temperature: '71.1', occupancy: 'inactive', track: 'on', force: 'off', climate: 'climate.thermostat_contact_sensors_kitchen_virtual_thermostat', vents: [['cover.kitchen_vent_vent', 'closed']] },
+  { key: 'guest_room', title: 'Guest Room', temperature: '70.9', occupancy: 'inactive', track: 'on', force: 'off', climate: 'climate.thermostat_contact_sensors_guest_room_virtual_thermostat', vents: [['cover.guest_room_vent_vent', 'closed']] },
+  { key: 'dining_room', title: 'Dining Room', temperature: '69.7', occupancy: 'inactive', track: 'on', force: 'off', climate: 'climate.thermostat_contact_sensors_dining_room_virtual_thermostat', vents: [['cover.dining_room_vent_vent', 'open']] },
+  { key: 'gym', title: 'Gym', temperature: '70.6', occupancy: 'inactive', track: 'on', force: 'off', climate: 'climate.thermostat_contact_sensors_gym_virtual_thermostat', vents: [['cover.gym_vent_vent', 'closed']] },
+  { key: 'guest_bathroom', title: 'Guest Bathroom', temperature: '76.9', occupancy: 'inactive', track: 'on', force: 'off', climate: 'climate.thermostat_contact_sensors_guest_bathroom_virtual_thermostat', vents: [['cover.guest_bathroom_vent_vent', 'closed']] },
+  { key: 'music_room', title: 'Music Room', temperature: '70.6', occupancy: 'inactive', track: 'off', force: 'on', climate: 'climate.thermostat_contact_sensors_music_room_virtual_thermostat', vents: [['cover.music_room_vent_vent', 'closed']] },
+  { key: 'theater_room', title: 'Theater Room', temperature: '70.5', occupancy: 'inactive', track: 'off', force: 'on', climate: 'climate.thermostat_contact_sensors_theater_room_virtual_thermostat', vents: [['cover.theater_room_vent_1_vent', 'open'], ['cover.theater_room_vent_2_vent', 'open']] },
+] as const
+
+function thermostatMockEntities() {
+  const entries: [string, MockEntity][] = [
+    [
+      'climate.thermostat_contact_sensors_global_virtual_thermostat',
+      entity('climate.thermostat_contact_sensors_global_virtual_thermostat', 'off', { current_temperature: 71, hvac_action: 'idle', hvac_modes: ['off', 'heat', 'cool', 'heat_cool'], target_temp_high: 74, target_temp_low: 72, temperature_unit: '°F' }),
+    ],
+    ['climate.thermostat_hub_w200', entity('climate.thermostat_hub_w200', 'off', { current_temperature: 73.4, hvac_action: 'idle', hvac_modes: ['off', 'heat', 'cool', 'heat_cool'], target_temp_high: 74, target_temp_low: 72, temperature_unit: '°F' })],
+    ['sensor.thermostat_hub_w200_temperature', entity('sensor.thermostat_hub_w200_temperature', '73.4', { unit_of_measurement: '°F' })],
+    ['sensor.thermostat_hub_w200_humidity', entity('sensor.thermostat_hub_w200_humidity', '38.0', { unit_of_measurement: '%' })],
+    ['switch.thermostat_contact_sensors_eco_mode', entity('switch.thermostat_contact_sensors_eco_mode', 'on')],
+    ['switch.thermostat_contact_sensors_only_track_selected_rooms', entity('switch.thermostat_contact_sensors_only_track_selected_rooms', 'on')],
+    ['input_boolean.enable_disable_thermostat_contact_sensors_integration', entity('input_boolean.enable_disable_thermostat_contact_sensors_integration', 'on')],
+    ['binary_sensor.thermostat_contact_sensors_away_mode_active', entity('binary_sensor.thermostat_contact_sensors_away_mode_active', 'off')],
+    ['select.thermostat_contact_sensors_eco_mode_critical_tracking', entity('select.thermostat_contact_sensors_eco_mode_critical_tracking', 'Track Select Critical', { options: ['Track Select Critical', 'Track Select Active', 'Ignore Critical'] })],
+    ['select.thermostat_contact_sensors_eco_behavior_when_away', entity('select.thermostat_contact_sensors_eco_behavior_when_away', 'Keep Eco Active', { options: ['Keep Eco Active', 'Disable Eco Mode', 'Pause Integration'] })],
+  ]
+
+  for (const room of thermostatRoomMockData) {
+    entries.push([`sensor.thermostat_contact_sensors_${room.key}_temperature`, entity(`sensor.thermostat_contact_sensors_${room.key}_temperature`, room.temperature, { unit_of_measurement: '°F' })])
+    entries.push([`sensor.thermostat_contact_sensors_${room.key}_occupancy`, entity(`sensor.thermostat_contact_sensors_${room.key}_occupancy`, room.occupancy, { friendly_name: `${room.title} Occupancy` })])
+    entries.push([`switch.thermostat_contact_sensors_track_${room.key}`, entity(`switch.thermostat_contact_sensors_track_${room.key}`, room.track)])
+    entries.push([`switch.thermostat_contact_sensors_${room.key}_force_track_when_critical`, entity(`switch.thermostat_contact_sensors_${room.key}_force_track_when_critical`, room.force)])
+    entries.push([room.climate, entity(room.climate, 'off', { current_temperature: Number(room.temperature), hvac_action: 'idle', hvac_modes: ['off', 'heat', 'cool', 'heat_cool'], target_temp_high: 74, target_temp_low: 72, temperature_unit: '°F' })])
+    for (const [ventEntityId, ventState] of room.vents) {
+      if (ventEntityId === 'cover.guest_room_vent_vent' || ventEntityId === 'cover.kitchen_vent_vent') continue
+      entries.push([ventEntityId, entity(ventEntityId, ventState)])
+    }
+  }
+
+  return Object.fromEntries(entries)
+}
+
 export const mockEntities: Record<string, MockEntity> = {
   'alarm_control_panel.aqara_hub_m3_0056_security_system_2': entity('alarm_control_panel.aqara_hub_m3_0056_security_system_2', 'armed_home'),
   'binary_sensor.all_contact_sensors': entity('binary_sensor.all_contact_sensors', 'off'),
@@ -264,6 +310,7 @@ export const mockEntities: Record<string, MockEntity> = {
   'input_boolean.roborock_gym_toggle': entity('input_boolean.roborock_gym_toggle', 'off'),
   'input_boolean.roborock_master_bedroom_closet_toggle': entity('input_boolean.roborock_master_bedroom_closet_toggle', 'off'),
   'input_boolean.roborock_dining_room_toggle': entity('input_boolean.roborock_dining_room_toggle', 'off'),
+  ...thermostatMockEntities(),
   'button.valetudo_exaltedsneakydeer_trigger_auto_empty_dock': entity('button.valetudo_exaltedsneakydeer_trigger_auto_empty_dock', 'unknown'),
   'camera.valetudo_exaltedsneakydeer_map_data': entity('camera.valetudo_exaltedsneakydeer_map_data', 'idle'),
   'weather.pirate_weather': entity('weather.pirate_weather', 'partlycloudy', { temperature: 45, temperature_unit: '°F' }),

@@ -300,6 +300,137 @@ describe('DashboardViewPage', () => {
     ])
   })
 
+  it('keeps the Whole Home thermostat range colors visible while the aggregate climate is off', () => {
+    render(<DashboardViewPage activePath="ecobee" onNavigate={() => undefined} path="ecobee" />)
+
+    expect(screen.getByRole('region', { name: /Whole Home thermostat Idle 71.0°F 72.0 · 74.0/i })).toBeInTheDocument()
+    expect(screen.getAllByTestId('control-slider-circular')[0]).toHaveStyle({ '--ha-control-slider-color': 'rgba(255, 255, 255, 0.78)', '--ha-control-slider-high-color': '#2c8e98', '--ha-control-slider-low-color': '#cd5401' })
+    expect(screen.getAllByTestId('control-slider-circular')[0]).toHaveAttribute('data-inactive', 'false')
+  })
+
+  it('colors the Thermostat Hub glass card from active heat and cool status', () => {
+    mockEntities['climate.thermostat_hub_w200'].attributes.hvac_action = 'cooling'
+    const view = render(<DashboardViewPage activePath="ecobee" onNavigate={() => undefined} path="ecobee" />)
+
+    expect(screen.getByLabelText(/Thermostat Hub Off/i)).toHaveAttribute('data-thermal-status', 'cool')
+
+    view.unmount()
+    mockEntities['climate.thermostat_hub_w200'].attributes.hvac_action = 'heating'
+    render(<DashboardViewPage activePath="ecobee" onNavigate={() => undefined} path="ecobee" />)
+
+    expect(screen.getByLabelText(/Thermostat Hub Off/i)).toHaveAttribute('data-thermal-status', 'heat')
+  })
+
+  it('uses HASS climate dropdowns for Thermostat Hub mode and fan mode when exposed', async () => {
+    mockEntities['climate.thermostat_hub_w200'].attributes.fan_modes = ['auto', 'off']
+    mockEntities['climate.thermostat_hub_w200'].attributes.fan_mode = 'auto'
+    render(<DashboardViewPage activePath="ecobee" onNavigate={() => undefined} path="ecobee" />)
+
+    fireEvent.click(screen.getByLabelText(/Thermostat Hub Mode Off/i))
+    let pickerSheet = await screen.findByRole('dialog')
+    fireEvent.click(within(pickerSheet).getByRole('button', { name: 'Heat' }))
+    expect(mockCallServiceCalls).toContainEqual({ domain: 'climate', service: 'set_hvac_mode', target: 'climate.thermostat_hub_w200', serviceData: { hvac_mode: 'heat' } })
+
+    fireEvent.click(screen.getByLabelText(/Thermostat Hub Fan Auto/i))
+    pickerSheet = await screen.findByRole('dialog')
+    fireEvent.click(within(pickerSheet).getByRole('button', { name: 'Off' }))
+    expect(mockCallServiceCalls).toContainEqual({ domain: 'climate', service: 'set_fan_mode', target: 'climate.thermostat_hub_w200', serviceData: { fan_mode: 'off' } })
+  })
+
+  it('renders Thermostat Hub as a mode-only card without temperature and humidity chips', () => {
+    render(<DashboardViewPage activePath="ecobee" onNavigate={() => undefined} path="ecobee" />)
+
+    expect(screen.getByLabelText(/Thermostat Hub Off/i)).toBeInTheDocument()
+    expect(screen.getByLabelText(/Thermostat Hub Mode Off/i)).toBeInTheDocument()
+    expect(screen.queryByText('73.4 °F')).not.toBeInTheDocument()
+    expect(screen.queryByText('38.0%')).not.toBeInTheDocument()
+  })
+
+  it('ports the Ecobee thermostat page with source controls and room popups', async () => {
+    mockEntities['climate.thermostat_contact_sensors_global_virtual_thermostat'].attributes.hvac_action = 'heating'
+    mockEntities['climate.thermostat_contact_sensors_living_room_virtual_thermostat'].attributes.current_temperature = null
+    render(<DashboardViewPage activePath="ecobee" onNavigate={() => undefined} path="ecobee" />)
+
+    expect(screen.getByRole('heading', { name: 'Thermostat' })).toBeInTheDocument()
+    expect(screen.queryByText(/manual review/i)).not.toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Whole Home' })).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: /Whole Home thermostat Heating 71.0°F 72.0 · 74.0/i })).toBeInTheDocument()
+    expect(screen.getAllByTestId('control-slider-circular')[0]).toHaveStyle({ '--ha-control-slider-color': '#cd5401', '--ha-control-slider-high-color': '#2c8e98', '--ha-control-slider-low-color': '#cd5401' })
+    expect(screen.getAllByTestId('control-slider-circular')[0]).toHaveAttribute('data-inactive', 'false')
+    expect(screen.queryByRole('button', { name: /Decrease Whole Home target temperature/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Increase Whole Home target temperature/i })).not.toBeInTheDocument()
+    const targetSliders = screen.getAllByRole('slider', { name: 'Whole Home target temperature' })
+    expect(targetSliders).toHaveLength(2)
+    fireEvent.change(targetSliders[0], { target: { value: '73' } })
+    expect(screen.getByRole('region', { name: /Whole Home thermostat Heating 71.0°F 73.0 · 74.0/i })).toBeInTheDocument()
+    expect(mockCallServiceCalls).toEqual([])
+    fireEvent.pointerUp(targetSliders[0])
+    expect(mockCallServiceCalls).toEqual([{ domain: 'climate', service: 'set_temperature', target: [
+      'climate.thermostat_contact_sensors_living_room_virtual_thermostat',
+      'climate.thermostat_contact_sensors_office_virtual_thermostat',
+      'climate.thermostat_contact_sensors_master_bedroom_virtual_thermostat',
+      'climate.thermostat_contact_sensors_master_bathroom_virtual_thermostat',
+      'climate.thermostat_contact_sensors_kitchen_virtual_thermostat',
+      'climate.thermostat_contact_sensors_guest_room_virtual_thermostat',
+      'climate.thermostat_contact_sensors_dining_room_virtual_thermostat',
+      'climate.thermostat_contact_sensors_gym_virtual_thermostat',
+      'climate.thermostat_contact_sensors_guest_bathroom_virtual_thermostat',
+      'climate.thermostat_contact_sensors_music_room_virtual_thermostat',
+      'climate.thermostat_contact_sensors_theater_room_virtual_thermostat',
+    ], serviceData: { target_temp_high: 74, target_temp_low: 73 } }])
+    mockCallServiceCalls.length = 0
+    expect(screen.getByLabelText(/Thermostat Hub Off/i)).toBeInTheDocument()
+    expect(screen.getByLabelText(/Thermostat Hub Mode Off/i)).toBeInTheDocument()
+    expect(screen.queryByText('73.4 °F')).not.toBeInTheDocument()
+    expect(screen.queryByText('38.0%')).not.toBeInTheDocument()
+
+    expect(screen.getByRole('button', { name: 'Living Room 70.2°F · Inactive' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Office 71.6°F · Active' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Master Bedroom 71.0°F · Active' })).toBeInTheDocument()
+
+    const ecoMode = screen.getByRole('button', { name: /^Eco Mode On$/i })
+    expect(ecoMode).toHaveAttribute('aria-pressed', 'true')
+    expect(ecoMode.closest('[data-active]')).toHaveAttribute('data-active', 'true')
+    expect(screen.getByLabelText(/Eco Mode Critical Tracking Track Select Critical/i)).toBeInTheDocument()
+    expect(screen.getByLabelText(/Eco Behavior When Away Keep Eco Active/i)).toBeInTheDocument()
+    fireEvent.click(screen.getByLabelText(/Eco Mode Critical Tracking Track Select Critical/i))
+    const pickerSheet = await screen.findByRole('dialog')
+    expect(pickerSheet).toHaveAttribute('data-surface', 'default')
+    expect(within(pickerSheet).getByRole('group', { name: 'Eco Mode Critical Tracking options' })).toHaveAttribute('data-layout', 'card-grid')
+    expect(within(pickerSheet).getByRole('button', { name: 'Track Select Critical' }).querySelector('path')).toHaveAttribute('d', materialIconPath('mdi:thermometer-check'))
+    expect(within(pickerSheet).getByRole('button', { name: 'Track Select Critical' }).querySelectorAll('path')).toHaveLength(1)
+    expect(within(pickerSheet).getByRole('button', { name: 'Track Select Active' }).querySelector('path')).toHaveAttribute('d', materialIconPath('mdi:thermometer-alert'))
+    fireEvent.click(within(pickerSheet).getByRole('button', { name: 'Track Select Critical' }))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(screen.getByText(/Enable Eco Mode to only track active rooms/i)).toBeInTheDocument()
+
+    expect(screen.getByRole('heading', { name: 'Track Selected Rooms' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^Living Room On$/i })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: /^Office Off$/i })).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.getByRole('heading', { name: 'Force Track Critical Temperature' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Music Room' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: 'Theater Room' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.queryByRole('button', { name: /^Master Bedroom$/i })).not.toBeInTheDocument()
+
+    fireEvent.click(ecoMode)
+    fireEvent.click(screen.getByRole('button', { name: /^Automatic Thermostat On$/i }))
+    expect(mockCallServiceCalls).toEqual([
+      { domain: 'homeassistant', service: 'toggle', target: 'switch.thermostat_contact_sensors_eco_mode' },
+      { domain: 'homeassistant', service: 'toggle', target: 'input_boolean.enable_disable_thermostat_contact_sensors_integration' },
+    ])
+
+    fireEvent.click(screen.getByRole('button', { name: 'Living Room 70.2°F · Inactive' }))
+    expect(await screen.findByRole('dialog')).toHaveAttribute('data-surface', 'hass-popup')
+    expect(screen.getByRole('heading', { name: 'Living Room' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Living Room Vents' })).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: /Living Room thermostat Idle --°F 72.0 · 74.0/i })).toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: /Living Room thermostat Idle 0.0°F/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Decrease Living Room target temperature/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Increase Living Room target temperature/i })).not.toBeInTheDocument()
+    expect(screen.getByRole('article', { name: /^Vent 1 Open$/i })).toBeInTheDocument()
+    expect(screen.getByRole('article', { name: /^Vent 2 Open$/i })).toBeInTheDocument()
+  })
+
   it('shows manual air purifier fan speeds and runs fan percentage services', async () => {
     mockEntities['select.living_room_air_purifier_fan_mode'].state = 'Manual'
     mockEntities['fan.living_room_air_purifier_levoit_purifier'].attributes.percentage = 66
@@ -837,11 +968,12 @@ describe('DashboardViewPage', () => {
     expect(await screen.findByText('Mock task one')).toBeInTheDocument()
   })
 
-  it('flags the thermostat route for manual review', () => {
+  it('renders the thermostat route as a dedicated Ecobee port', () => {
     render(<DashboardViewPage activePath="ecobee" onNavigate={() => undefined} path="ecobee" />)
 
     expect(screen.getByRole('heading', { name: 'Thermostat' })).toBeInTheDocument()
-    expect(screen.getByText(/manually reviewed/i)).toBeInTheDocument()
+    expect(screen.queryByText(/manually reviewed/i)).not.toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Eco Mode' })).toBeInTheDocument()
   })
 
   it('opens available vacuum cards as modal controls and leaves unavailable cards inert', async () => {

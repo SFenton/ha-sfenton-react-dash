@@ -102,10 +102,6 @@
   background: rgba(0, 150, 136, 0.6);
 }
 
-.modeButton:active:not(:disabled) {
-  transform: scale(0.97);
-}
-
 .modeButton:disabled {
   cursor: default;
   opacity: 0.48;

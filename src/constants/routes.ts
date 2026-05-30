@@ -29,7 +29,7 @@ export const DASHBOARD_ROUTES: DashboardRouteConfig[] = [
   { title: 'Entryway', path: 'entryway', icon: 'mdi:door' },
   { title: 'Settings', path: 'settings', icon: 'mdi:cog' },
   { title: 'To-Do', path: 'to-do', icon: 'mdi:clipboard-list' },
-  { title: 'Thermostat', path: 'ecobee', icon: 'mdi:thermostat', manualReview: true },
+  { title: 'Thermostat', path: 'ecobee', icon: 'mdi:thermostat' },
   { title: 'Groceries', path: 'groceries', icon: 'mdi:cart' },
   { title: "Stephen's Chores", path: 'stephens-chores', icon: 'mdi:account-check' },
   { title: "Steph's Chores", path: 'stephs-chores', icon: 'mdi:account-check' },

@@ -26,10 +26,6 @@
     background var(--duration-fast) ease;
 }
 
-.button:active {
-  transform: scale(0.975);
-}
-
 .content {
   position: relative;
   z-index: 1;

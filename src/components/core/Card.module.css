@@ -40,10 +40,6 @@
   opacity: 0.72;
 }
 
-.card[data-clickable='true']:not(:disabled):active {
-  transform: scale(0.975);
-}
-
 .card::after {
   position: absolute;
   inset: 0;

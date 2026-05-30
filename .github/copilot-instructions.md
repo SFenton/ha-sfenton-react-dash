@@ -116,10 +116,11 @@ Do not recreate the Home Assistant sidebar or top bar for now. Focus on the dash
 ## UI Expectations
 
 - Match the Home Assistant dashboard headers, buttons, section headers, content grouping, card density, and modal behavior closely.
-- Design toward a fluid native iOS Home app feel: blurred material layers, clear safe-area handling, springy touch feedback, fast transitions, large tactile tiles, and restrained text density.
+- Design toward a fluid native iOS Home app feel: blurred material layers, clear safe-area handling, fast transitions, large tactile tiles, and restrained text density.
 - Primary layout is mobile-first with comfortable touch targets and no text overlap.
 - Bottom navigation should be modeled after the FortniteFestivalWeb mobile bottom nav pattern: a route-aware fixed/frosted nav surface with icon+label buttons and clear active state.
 - Use reusable primitives for recurring patterns such as section headers, quick access buttons, entity rows, chip buttons, modal sheets, light sliders, and camera cards.
+- Do not add visual press/click feedback to dashboard cards, glass tiles, modal cards, dropdown options, toggles, or entity controls. Avoid `:active` scale transforms, press animations, transient background flashes, opacity changes, or similar interaction-only visual effects. Persistent state indicators such as selected, checked, active, on/off, disabled, unavailable, or HA state-derived colors are still expected.
 - Prefer lightweight packages when they materially speed up native-feeling interactions or accessibility, but keep them focused and document why they are worth adding before installing.
 - Use CSS Modules for components with meaningful styling; use inline styles only for tiny one-off cases.
 - Use stagger/rush-stagger behavior for list/card entrance animations where it improves perceived responsiveness.

@@ -392,11 +392,6 @@
   background: var(--color-light);
 }
 
-.lightBackButton:active,
-.roomLightToggle:active {
-  transform: scale(0.96);
-}
-
 @keyframes lightCardsFadeAway {
   from {
     opacity: 1;

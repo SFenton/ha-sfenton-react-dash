@@ -72,6 +72,12 @@
   height: 0;
 }
 
+.sheetOptions {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  padding: 6px 0 0;
+}
+
 .option {
   display: grid;
   min-height: 48px;
@@ -97,6 +103,43 @@
   background: rgba(67, 160, 71, 0.5);
 }
 
-.option:active {
-  transform: scale(0.975);
+.sheetOption {
+  appearance: none;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
 }
+
+.sheetOption[data-active='true'] {
+  background: rgba(67, 160, 71, 0.6);
+}
+
+.sheetOptionContent {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 10px;
+}
+
+.sheetOptionIcon {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  flex: 0 0 44px;
+  place-items: center;
+  border-radius: 32px;
+  color: white;
+}
+
+.sheetOptionLabel {
+  min-width: 0;
+  flex: 1 1 auto;
+  color: var(--color-text);
+  font-size: 0.98rem;
+  font-weight: 760;
+  line-height: 1.15;
+}
+

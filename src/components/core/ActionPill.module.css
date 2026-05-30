@@ -24,10 +24,6 @@
     box-shadow var(--duration-fast) ease;
 }
 
-.button:active {
-  transform: scale(0.94);
-}
-
 .button[data-active='true'] {
   border-color: rgba(255, 255, 255, 0.28);
   background: rgba(255, 255, 255, 0.25);

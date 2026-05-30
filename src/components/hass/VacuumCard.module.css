@@ -198,12 +198,6 @@
   background: rgba(229, 57, 53, 0.46);
 }
 
-.actionButton:active,
-.subSelectButton:active,
-.zoneButton:active {
-  transform: scale(0.965);
-}
-
 .actionButton[data-variant='sub'] {
   min-height: 44px;
   border-radius: 15px;
@@ -311,10 +305,6 @@
   grid-template-columns: auto minmax(0, 1fr) auto;
   cursor: pointer;
   text-align: left;
-}
-
-.settingButton:active {
-  transform: scale(0.975);
 }
 
 .settingIcon,

@@ -48,10 +48,6 @@
   background: var(--entity-active, rgba(150, 80, 28, 0.66));
 }
 
-.entityButton:active[data-clickable='true'] {
-  transform: scale(0.975);
-}
-
 .entityTitle {
   font-size: 0.82rem;
   font-weight: 760;
