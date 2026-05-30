@@ -228,9 +228,46 @@ test('available vacuum cards open source-style modal controls', async ({ page })
   await expect(page.getByRole('button', { name: 'Empty Dock' })).toBeVisible()
 })
 
-test('thermostat page is explicitly marked for manual review', async ({ page }) => {
+test('thermostat hero dial allows vertical swipe scrolling', async ({ page, browserName }) => {
   await page.goto('/at-a-glance/ecobee')
 
   await expect(page.getByRole('heading', { level: 1, name: 'Thermostat' })).toBeVisible()
-  await expect(page.getByText(/manually reviewed/i)).toBeVisible()
+  await expect(page.getByText(/manually reviewed/i)).toHaveCount(0)
+
+  const heroDial = page.getByRole('region', { name: /Whole Home thermostat/i })
+  await expect(heroDial).toBeVisible()
+  await expect(heroDial.locator('[data-testid="control-slider-circular"]')).toHaveCSS('touch-action', 'pan-y')
+
+  const scrollTop = () => heroDial.evaluate((element) => {
+    let current = element.parentElement
+    while (current) {
+      const style = window.getComputedStyle(current)
+      if (/(auto|scroll)/.test(style.overflowY) && current.scrollHeight > current.clientHeight) return current.scrollTop
+      current = current.parentElement
+    }
+    return window.scrollY
+  })
+
+  const before = await scrollTop()
+  const box = await heroDial.boundingBox()
+  expect(box).not.toBeNull()
+
+  if (browserName === 'chromium') {
+    const client = await page.context().newCDPSession(page)
+    const startX = box!.x + box!.width * 0.86
+    const startY = box!.y + box!.height * 0.5
+    await client.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: startX, y: startY }] })
+    for (let step = 1; step <= 8; step += 1) {
+      await client.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: startX, y: startY - step * 28 }] })
+    }
+    await client.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
+    await client.detach()
+  } else {
+    await page.mouse.move(box!.x + box!.width * 0.86, box!.y + box!.height * 0.5)
+    await page.mouse.down()
+    await page.mouse.move(box!.x + box!.width * 0.86, box!.y + box!.height * 0.5 - 224, { steps: 8 })
+    await page.mouse.up()
+  }
+
+  await expect.poll(scrollTop).toBeGreaterThan(before + 40)
 })
