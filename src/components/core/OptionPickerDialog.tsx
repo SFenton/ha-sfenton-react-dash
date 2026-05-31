@@ -7,6 +7,8 @@ import styles from './OptionPickerDialog.module.css'
 export interface PickerOption {
   label: ReactNode
   value: string
+  icon?: string
+  activeBackground?: string
 }
 
 interface OptionPickerDialogProps {
@@ -39,7 +41,7 @@ export function OptionPickerDialog({ open, options, title, value, icon, selected
     <div aria-label={`${title} options`} className={`${styles.options} ${presentation === 'sheet' ? styles.sheetOptions : ''}`} data-layout={presentation === 'sheet' ? 'card-grid' : 'list'} role="group">
       {options.map((option) => {
         const active = option.value === value
-        const sheetIcon = active ? (selectedIcon ?? icon) : icon
+        const sheetIcon = option.icon ?? (active ? (selectedIcon ?? icon) : icon)
         return (
           <button
             aria-pressed={active}
@@ -48,6 +50,7 @@ export function OptionPickerDialog({ open, options, title, value, icon, selected
             key={option.value}
             onClick={() => onSelect(option.value)}
             ref={active ? firstActiveRef : undefined}
+            style={active && option.activeBackground ? { background: option.activeBackground } : undefined}
             type="button"
           >
             {isSheet ? (

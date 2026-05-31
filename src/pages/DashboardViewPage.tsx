@@ -1157,10 +1157,34 @@ function ThermostatDial({ entityId, size = 'page', title }: { entityId: string; 
   )
 }
 
+const HVAC_MODE_ICONS: Record<string, string> = {
+  auto: 'mdi:autorenew',
+  cool: 'mdi:snowflake',
+  dry: 'mdi:water-percent',
+  fan_only: 'mdi:fan',
+  heat: 'mdi:fire',
+  heat_cool: 'mdi:sun-snowflake-variant',
+  off: 'mdi:power',
+}
+
+const HVAC_MODE_LABELS: Record<string, string> = {
+  heat_cool: 'Heat/Cool',
+}
+
+const HVAC_MODE_ACTIVE_COLORS: Record<string, string> = {
+  cool: 'rgba(44, 142, 152, 0.6)',
+  heat: 'rgba(205, 84, 1, 0.6)',
+  heat_cool: 'linear-gradient(90deg, rgba(205, 84, 1, 0.6) 0%, rgba(44, 142, 152, 0.6) 100%)',
+}
+
 function ThermostatSelectButton({
   entityId,
   hideWhenEmpty = false,
   icon,
+  keepOpenOnSelect = false,
+  optionActiveColors,
+  optionIcons,
+  optionLabels,
   optionsAttribute = 'options',
   selectedIcon = 'mdi:thermometer-check',
   serviceKind = 'select',
@@ -1170,6 +1194,10 @@ function ThermostatSelectButton({
   entityId: string
   hideWhenEmpty?: boolean
   icon: string
+  keepOpenOnSelect?: boolean
+  optionActiveColors?: Record<string, string>
+  optionIcons?: Record<string, string>
+  optionLabels?: Record<string, string>
   optionsAttribute?: string
   selectedIcon?: string
   serviceKind?: 'climate' | 'climate-fan' | 'select'
@@ -1180,7 +1208,12 @@ function ThermostatSelectButton({
   const entity = useEntity(asEntityName(entityId), { returnNullIfNotFound: true })
   const callService = useCallService()
   const rawOptions = entity?.attributes[optionsAttribute]
-  const options: PickerOption[] = Array.isArray(rawOptions) ? rawOptions.map((option) => ({ label: formatSelectOption(String(option)), value: String(option) })) : []
+  const options: PickerOption[] = Array.isArray(rawOptions)
+    ? rawOptions.map((option) => {
+        const optionValue = String(option)
+        return { activeBackground: optionActiveColors?.[optionValue], icon: optionIcons?.[optionValue], label: optionLabels?.[optionValue] ?? formatSelectOption(optionValue), value: optionValue }
+      })
+    : []
   const value = valueAttribute && typeof entity?.attributes[valueAttribute] === 'string' ? entity.attributes[valueAttribute] : entity?.state ?? ''
   const disabled = options.length === 0
 
@@ -1188,14 +1221,14 @@ function ThermostatSelectButton({
 
   const selectOption = (nextValue: string) => {
     if (nextValue === value) {
-      setOpen(false)
+      if (!keepOpenOnSelect) setOpen(false)
       return
     }
 
     if (serviceKind === 'climate') callService({ domain: 'climate', service: 'set_hvac_mode', target: entityId, serviceData: { hvac_mode: nextValue } })
     else if (serviceKind === 'climate-fan') callService({ domain: 'climate', service: 'set_fan_mode', target: entityId, serviceData: { fan_mode: nextValue } })
     else callService({ domain: 'select', service: 'select_option', target: entityId, serviceData: { option: nextValue } })
-    setOpen(false)
+    if (!keepOpenOnSelect) setOpen(false)
   }
 
   return (
@@ -1258,7 +1291,7 @@ function ThermostatHubPill() {
 
   return (
     <ThermostatGlassCard ariaLabel={`Thermostat Hub ${stateText}`} hvacAction={rawHvacAction} icon="mdi:thermostat" stateText={stateText} thermalStatus={thermostatThermalStatus(rawHvacAction)} title="Thermostat Hub">
-      <ThermostatSelectButton entityId="climate.thermostat_hub_w200" icon="mdi:power" optionsAttribute="hvac_modes" serviceKind="climate" title="Thermostat Hub Mode" />
+      <ThermostatSelectButton entityId="climate.thermostat_hub_w200" icon="mdi:power" keepOpenOnSelect optionActiveColors={HVAC_MODE_ACTIVE_COLORS} optionIcons={HVAC_MODE_ICONS} optionLabels={HVAC_MODE_LABELS} optionsAttribute="hvac_modes" serviceKind="climate" title="Thermostat Hub Mode" />
       <ThermostatSelectButton entityId="climate.thermostat_hub_w200" hideWhenEmpty icon="mdi:fan" optionsAttribute="fan_modes" selectedIcon="mdi:fan-check" serviceKind="climate-fan" title="Thermostat Hub Fan" valueAttribute="fan_mode" />
     </ThermostatGlassCard>
   )

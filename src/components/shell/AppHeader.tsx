@@ -45,12 +45,12 @@ export function AppHeader({ activePath, actions = [], backLabel = 'Go back', bac
       <div className={styles.leading}>
         {showBack && (
           <button aria-label={backLabel} className={styles.iconButton} onClick={goBack} type="button">
-            <MaterialIcon name="mdi:chevron-left" size={34} />
+            <MaterialIcon name="mdi:chevron-left" size={22} />
           </button>
         )}
         {showMenu && (
           <button aria-expanded={menuOpen} aria-label="Open navigation menu" className={styles.iconButton} onClick={() => { setMenuOpen((open) => !open); setActionsOpen(false) }} type="button">
-            <MaterialIcon name="mdi:menu" size={30} />
+            <MaterialIcon name="mdi:menu" size={22} />
           </button>
         )}
       </div>
@@ -60,7 +60,7 @@ export function AppHeader({ activePath, actions = [], backLabel = 'Go back', bac
       <div className={styles.trailing}>
         {showActions && (
           <button aria-expanded={actionsOpen} aria-label="More actions" className={styles.iconButton} onClick={() => { setActionsOpen((open) => !open); setMenuOpen(false) }} type="button">
-            <MaterialIcon name="mdi:dots-horizontal" size={30} />
+            <MaterialIcon name="mdi:dots-horizontal" size={28} />
           </button>
         )}
       </div>

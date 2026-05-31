@@ -63,14 +63,14 @@
 
 .title {
   color: var(--color-text);
-  font-size: 0.93rem;
+  font-size: 0.86rem;
   font-weight: 760;
   line-height: 1.15;
 }
 
 .subtitle {
   color: var(--color-muted);
-  font-size: 0.76rem;
+  font-size: 0.72rem;
   font-weight: 630;
   line-height: 1.25;
 }
@@ -81,7 +81,7 @@
 }
 
 .tile:not(.compact, .headerPill) .title {
-  font-size: 0.98rem;
+  font-size: 0.9rem;
 }
 
 .compact {
