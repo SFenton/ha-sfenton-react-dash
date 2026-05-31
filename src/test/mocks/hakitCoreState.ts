@@ -313,6 +313,16 @@ export const mockEntities: Record<string, MockEntity> = {
   ...thermostatMockEntities(),
   'button.valetudo_exaltedsneakydeer_trigger_auto_empty_dock': entity('button.valetudo_exaltedsneakydeer_trigger_auto_empty_dock', 'unknown'),
   'camera.valetudo_exaltedsneakydeer_map_data': entity('camera.valetudo_exaltedsneakydeer_map_data', 'idle'),
+  'input_boolean.manually_control_front_yard_lights': entity('input_boolean.manually_control_front_yard_lights', 'off', { icon: 'mdi:lightbulb' }),
+  'input_select.front_yard_custom_lights': entity('input_select.front_yard_custom_lights', 'Default', { options: ['Default', 'Custom', 'Seahawks', "Valentine's Day"], icon: 'mdi:lightbulb-group' }),
+  'light.front_door_exterior_left_light': entity('light.front_door_exterior_left_light', 'off', { brightness: null }),
+  'light.front_door_exterior_light_v2': entity('light.front_door_exterior_light_v2', 'off', { brightness: null }),
+  'light.front_door_bollard_1': entity('light.front_door_bollard_1', 'off', { brightness: null }),
+  'light.front_door_bollard_2': entity('light.front_door_bollard_2', 'off', { brightness: null }),
+  'light.front_door_bollard_3': entity('light.front_door_bollard_3', 'off', { brightness: null }),
+  'light.front_door_bollard_4': entity('light.front_door_bollard_4', 'off', { brightness: null }),
+  'light.front_door_bollard_5': entity('light.front_door_bollard_5', 'off', { brightness: null }),
+  'light.front_door_bollard_6': entity('light.front_door_bollard_6', 'off', { brightness: null }),
   'weather.pirate_weather': entity('weather.pirate_weather', 'partlycloudy', { temperature: 45, temperature_unit: '°F' }),
 }
 

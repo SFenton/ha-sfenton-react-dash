@@ -1,0 +1,149 @@
+.body {
+  display: grid;
+  gap: 16px;
+  padding: 4px 2px 8px;
+}
+
+.colorPicker {
+  display: flex;
+  justify-content: center;
+  padding: 4px 0 8px;
+}
+
+/* Wrap the wheel in a fixed square so the gesture overlay lines up exactly with
+   the visible circle and the marker math (which assumes a square box) is correct. */
+.wheelWrap {
+  position: relative;
+  width: 100%;
+  max-width: min(72vw, 300px);
+  aspect-ratio: 1 / 1;
+}
+
+/* Force HAKit's color picker to fill the square wrapper. Its emotion styles set a
+   viewport-relative height that would otherwise make the box non-square. */
+.wheelWrap :global(.color-picker) {
+  width: 100% !important;
+  height: 100% !important;
+  max-height: none !important;
+  min-height: 0 !important;
+}
+
+/* Hide HAKit's built-in marker; it lags because it only moves once HA echoes the
+   new color back. We render our own optimistic marker instead. Note: the whole
+   `.color-picker .cursor` path must live inside one :global(), otherwise CSS
+   Modules re-scopes `.cursor` to a hashed local name and the rule never matches. */
+.wheelWrap :global(.color-picker .cursor) {
+  display: none;
+}
+
+.wheel {
+  width: 100%;
+}
+
+/* Transparent gesture layer over the wheel. We own tap / marker-drag here and let
+   any other drag fall through to the sheet for swipe-to-dismiss. */
+.wheelOverlay {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  touch-action: none;
+}
+
+/* Optimistic marker: tracks the finger instantly while the backend catches up. */
+.wheelMarker {
+  position: absolute;
+  width: 26px;
+  height: 26px;
+  margin: -13px 0 0 -13px;
+  border-radius: 50%;
+  border: 2px solid #ffffff;
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.3),
+    0 1px 3px rgba(0, 0, 0, 0.15);
+  background: rgba(0, 0, 0, 0.001);
+  pointer-events: none;
+  transition: left 90ms ease-out, top 90ms ease-out;
+}
+
+/* While actively dragging, follow the finger with no smoothing for zero latency. */
+.wheelMarker[data-dragging='true'] {
+  transition: none;
+}
+
+.rgbRow {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+.rgbField {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 8px;
+  border-radius: 14px;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.1);
+  transition: box-shadow var(--duration-fast) ease;
+}
+
+/* Show focus on the whole field instead of the browser's default blue outline. */
+.rgbField:focus-within {
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.32);
+}
+
+.rgbLabel {
+  color: rgba(255, 255, 255, 0.74);
+  font-size: 0.82rem;
+  font-weight: 760;
+}
+
+.rgbInput {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: white;
+  /* 16px keeps iOS Safari from auto-zooming the page when the field is focused. */
+  font-size: 16px;
+  font-weight: 700;
+  text-align: right;
+  outline: none;
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+.rgbInput::-webkit-outer-spin-button,
+.rgbInput::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.actionRow {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.separator {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 4px;
+  color: white;
+  font-size: 0.86rem;
+  font-weight: 800;
+}
+
+.separator::after {
+  flex: 1 1 auto;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.12);
+  content: '';
+}
+
+.otherGrid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+}

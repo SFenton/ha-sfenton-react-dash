@@ -396,17 +396,9 @@ export const SECURITY_SECTIONS: EntitySectionConfig[] = [
 
 export const CONTROL_PAGES: Record<string, { title: string; sections: EntitySectionConfig[] }> = {
   'custom-lights': {
+    // Rendered by the dedicated CustomLightsPage; entry retained for title resolution.
     title: 'Custom Lights',
-    sections: [
-      {
-        title: 'Front Yard',
-        items: [
-          { title: 'Manual Front Yard', entityId: 'input_boolean.manually_control_front_yard_lights', icon: 'mdi:lightbulb-group', color: CONTROL_COLOR, action: { type: 'toggle' } },
-          { title: 'Exterior Left', entityId: 'light.front_door_exterior_left_light', icon: 'mdi:lightbulb', color: CONTROL_COLOR },
-          { title: 'Exterior Right', entityId: 'light.front_door_exterior_light_v2', icon: 'mdi:lightbulb', color: CONTROL_COLOR },
-        ],
-      },
-    ],
+    sections: [],
   },
   'mach-e': {
     title: 'Mach-E',

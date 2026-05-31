@@ -57,3 +57,12 @@ export function ControlSliderCircular({ className, colors, disabled, dual, high,
 export function ThemeProvider() {
   return null
 }
+
+type ColorPickerProps = {
+  entity: string
+  className?: string
+}
+
+export function ColorPicker({ entity, className }: ColorPickerProps) {
+  return <div className={className} data-testid="color-picker" data-entity={entity} />
+}

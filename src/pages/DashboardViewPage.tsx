@@ -66,6 +66,7 @@ import { ROOM_PAGE_CONFIGS, type RoomSourceCardAction, type RoomSourceCardConfig
 import { MEDIA_REMOTE_CONFIGS } from '../constants/mediaRemotes'
 import { Page } from './Page'
 import { ClimateSheet, ContactSheet, LightsSheet, OccupancySheet } from './AtAGlancePage'
+import { CustomLightsPage } from './CustomLightsPage'
 import styles from './DashboardViewPage.module.css'
 
 interface DashboardViewPageProps {
@@ -1481,6 +1482,7 @@ function Content({ onNavigate, path }: { onNavigate: (path: string) => void; pat
   if (path === 'media') return <MediaPage onNavigate={onNavigate} />
   if (path === 'admin') return <AdminPage onNavigate={onNavigate} />
   if (path === 'ecobee') return <ThermostatPage />
+  if (path === 'custom-lights') return <CustomLightsPage />
   if (CONTROL_PAGES[path]) return <ControlPage onNavigate={onNavigate} path={path} />
   return <FallbackPage title={routeTitle(path)} />
 }
