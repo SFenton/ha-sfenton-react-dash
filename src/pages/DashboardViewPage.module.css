@@ -235,10 +235,10 @@
 }
 
 .settingsPage {
-  width: min(100%, 820px);
+  width: 100%;
   height: 100vh;
   min-height: 0;
-  margin: 0 auto;
+  margin: 0;
   padding: calc(24px + env(safe-area-inset-top, 0px)) 8px calc(var(--bottom-nav-height) + 42px + env(safe-area-inset-bottom, 0px));
   box-sizing: border-box;
   overflow-x: hidden;
@@ -321,10 +321,10 @@
 }
 
 .guestPage {
-  width: min(100%, 820px);
+  width: 100%;
   height: 100vh;
   min-height: 0;
-  margin: 0 auto;
+  margin: 0;
   padding: calc(24px + env(safe-area-inset-top, 0px)) 8px calc(var(--bottom-nav-height) + 42px + env(safe-area-inset-bottom, 0px));
   box-sizing: border-box;
   overflow-x: hidden;
