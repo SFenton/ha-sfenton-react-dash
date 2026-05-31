@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type PointerEvent, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type CSSProperties, type PointerEvent, type ReactNode } from 'react'
 import { useEntity, useHass } from '@hakit/core'
 import { ControlSliderCircular } from '@hakit/components'
 import type { HassEntity } from 'home-assistant-js-websocket'
@@ -847,6 +847,7 @@ const THERMOSTAT_ROOM_CLIMATE_ENTITY_IDS = THERMOSTAT_ROOM_VIEWS.map((room) => r
 const THERMOSTAT_HEAT_COLOR = '#cd5401'
 const THERMOSTAT_COOL_COLOR = '#2c8e98'
 const THERMOSTAT_NEUTRAL_COLOR = 'rgba(255, 255, 255, 0.78)'
+const THERMOSTAT_RING_RADIUS = (145 / 320) * 100
 
 function thermostatTemperatureEntityId(room: ThermostatRoomView) {
   return `sensor.thermostat_contact_sensors_${room.key}_temperature`
@@ -925,15 +926,52 @@ function thermostatSliderColors(action: string) {
   }
 }
 
-function stopThermostatRingPointerDown(event: PointerEvent<HTMLElement>) {
-  if (event.target instanceof Element && event.target.closest('.target, .target-border')) return
-  event.stopPropagation()
-  event.nativeEvent.stopImmediatePropagation()
+function valueToThermostatPoint(value: number, min: number, max: number) {
+  const percentage = (value - min) / (max - min)
+  const angle = percentage * 270
+  const radians = ((angle - 225) * Math.PI) / 180
+  return {
+    x: 50 + Math.cos(radians) * THERMOSTAT_RING_RADIUS,
+    y: 50 + Math.sin(radians) * THERMOSTAT_RING_RADIUS,
+  }
+}
+
+function thermostatArcPath(from: number, to: number, min: number, max: number) {
+  const startValue = Math.max(Math.min(from, max), min)
+  const endValue = Math.max(Math.min(to, max), min)
+  const delta = endValue - startValue
+  if (delta <= 0) return null
+  const start = valueToThermostatPoint(startValue, min, max)
+  const end = valueToThermostatPoint(endValue, min, max)
+  const largeArcFlag = (delta / (max - min)) * 270 > 180 ? 1 : 0
+  return `M ${start.x} ${start.y} A ${THERMOSTAT_RING_RADIUS} ${THERMOSTAT_RING_RADIUS} 0 ${largeArcFlag} 1 ${end.x} ${end.y}`
+}
+
+function thermostatHandleStyle(value: number, min: number, max: number) {
+  const point = valueToThermostatPoint(value, min, max)
+  return {
+    '--thermostat-handle-x': `${point.x}%`,
+    '--thermostat-handle-y': `${point.y}%`,
+  } as CSSProperties
+}
+
+function thermostatValueFromPoint(rect: DOMRect, clientX: number, clientY: number, min: number, max: number, step: number) {
+  const x = (2 * (clientX - rect.left - rect.width / 2)) / rect.width
+  const y = (2 * (clientY - rect.top - rect.height / 2)) / rect.height
+  const phi = Math.atan2(y, x)
+  const degrees = (phi / Math.PI) * 180
+  const angle = ((degrees + 270) % 360) - 45
+  const percentage = Math.max(Math.min(angle / 270, 1), 0)
+  const raw = min + (max - min) * percentage
+  const stepped = min + Math.round((raw - min) / step) * step
+  return Number(Math.max(Math.min(stepped, max), min).toFixed(3))
 }
 
 function ThermostatDial({ entityId, size = 'page', title }: { entityId: string; size?: 'modal' | 'page'; title: string }) {
   const entity = useEntity(asEntityName(entityId), { returnNullIfNotFound: true })
   const callService = useCallService()
+  const dialRef = useRef<HTMLDivElement>(null)
+  const activeHandle = useRef<{ pointerId: number; type: ThermostatSliderTarget } | null>(null)
   const unit = temperatureUnit(entity)
   const currentTemperature = entity?.attributes.current_temperature
   const targetLow = entity?.attributes.target_temp_low
@@ -950,7 +988,8 @@ function ThermostatDial({ entityId, size = 'page', title }: { entityId: string; 
   const sourceTargetKey = `${low ?? 'none'}-${high ?? 'none'}-${target ?? 'none'}`
   const sourceTargets: ThermostatDisplayTargets = { high, low, sourceKey: sourceTargetKey, target }
   const [pendingTargets, setPendingTargets] = useState<ThermostatDisplayTargets | null>(null)
-  const lastTemperatureCommit = useRef<{ key: string; time: number } | null>(null)
+  const lastTemperatureCommit = useRef<string | null>(null)
+  const lastTemperatureCommitReset = useRef<number | null>(null)
   const displayTargets = pendingTargets?.sourceKey === sourceTargetKey ? pendingTargets : sourceTargets
   const displayLow = displayTargets.low
   const displayHigh = displayTargets.high
@@ -976,12 +1015,20 @@ function ThermostatDial({ entityId, size = 'page', title }: { entityId: string; 
 
   const commitTemperature = (serviceData: Record<string, number>) => {
     const commitKey = JSON.stringify(serviceData)
-    const now = Date.now()
-    if (lastTemperatureCommit.current?.key === commitKey && now - lastTemperatureCommit.current.time < 400) return
-    lastTemperatureCommit.current = { key: commitKey, time: now }
+    if (lastTemperatureCommit.current === commitKey) return
+    lastTemperatureCommit.current = commitKey
+    if (lastTemperatureCommitReset.current !== null) window.clearTimeout(lastTemperatureCommitReset.current)
+    lastTemperatureCommitReset.current = window.setTimeout(() => {
+      if (lastTemperatureCommit.current === commitKey) lastTemperatureCommit.current = null
+      lastTemperatureCommitReset.current = null
+    }, 400)
     const target = entityId === GLOBAL_THERMOSTAT_ENTITY_ID && 'target_temp_low' in serviceData && 'target_temp_high' in serviceData ? THERMOSTAT_ROOM_CLIMATE_ENTITY_IDS : entityId
     callService({ domain: 'climate', service: 'set_temperature', target, serviceData })
   }
+
+  useEffect(() => () => {
+    if (lastTemperatureCommitReset.current !== null) window.clearTimeout(lastTemperatureCommitReset.current)
+  }, [])
 
   const commitDisplayedTargets = () => {
     if (!entity) return
@@ -1005,8 +1052,57 @@ function ThermostatDial({ entityId, size = 'page', title }: { entityId: string; 
     if (!hasRange) commitTemperature({ temperature: value })
   }
 
+  const nextValueFromHandleEvent = (event: PointerEvent<HTMLElement>, type: ThermostatSliderTarget) => {
+    const rect = dialRef.current?.getBoundingClientRect()
+    if (!rect) return null
+    const rawValue = thermostatValueFromPoint(rect, event.clientX, event.clientY, minTemperature, maxTemperature, targetStep)
+    if (hasRange && type === 'low' && displayHigh !== null) return Math.min(rawValue, displayHigh)
+    if (hasRange && type === 'high' && displayLow !== null) return Math.max(rawValue, displayLow)
+    return rawValue
+  }
+
+  const startHandleDrag = (type: ThermostatSliderTarget) => (event: PointerEvent<HTMLElement>) => {
+    const nextValue = nextValueFromHandleEvent(event, type)
+    if (nextValue === null) return
+    event.preventDefault()
+    event.stopPropagation()
+    event.currentTarget.setPointerCapture(event.pointerId)
+    activeHandle.current = { pointerId: event.pointerId, type }
+    updateDisplayedTarget(nextValue, type)
+  }
+
+  const moveHandleDrag = (event: PointerEvent<HTMLElement>) => {
+    const active = activeHandle.current
+    if (!active || active.pointerId !== event.pointerId) return
+    const nextValue = nextValueFromHandleEvent(event, active.type)
+    if (nextValue === null) return
+    event.preventDefault()
+    updateDisplayedTarget(nextValue, active.type)
+  }
+
+  const endHandleDrag = (event: PointerEvent<HTMLElement>) => {
+    const active = activeHandle.current
+    if (!active || active.pointerId !== event.pointerId) return
+    const nextValue = nextValueFromHandleEvent(event, active.type)
+    activeHandle.current = null
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId)
+    if (nextValue === null) return
+    event.preventDefault()
+    event.stopPropagation()
+    applySliderChange(nextValue, active.type)
+  }
+
+  const handleTargets = hasRange
+    ? ([
+        displayLow !== null ? { type: 'low' as const, value: displayLow } : null,
+        displayHigh !== null ? { type: 'high' as const, value: displayHigh } : null,
+      ].filter(Boolean) as Array<{ type: ThermostatSliderTarget; value: number }>)
+    : displayTarget !== null
+      ? [{ type: 'value' as const, value: displayTarget }]
+      : []
+
   return (
-    <div aria-label={`${title} thermostat ${hvacAction} ${formatTemperatureValue(currentTemperature, unit)} ${displayRangeText}`} className={styles.thermostatDial} data-hvac-action={rawHvacAction} data-size={size} role="region">
+    <div aria-label={`${title} thermostat ${hvacAction} ${formatTemperatureValue(currentTemperature, unit)} ${displayRangeText}`} className={styles.thermostatDial} data-hvac-action={rawHvacAction} data-size={size} ref={dialRef} role="region">
       <ControlSliderCircular
         key={`${entityId}-${sourceTargetKey}`}
         className={styles.thermostatCircularSlider}
@@ -1023,11 +1119,32 @@ function ThermostatDial({ entityId, size = 'page', title }: { entityId: string; 
         mode={hasRange ? undefined : 'full'}
         onChange={updateDisplayedTarget}
         onChangeApplied={applySliderChange}
-        onPointerDownCapture={stopThermostatRingPointerDown}
         onPointerUpCapture={commitDisplayedTargets}
         step={targetStep}
         value={displayTarget ?? current}
       />
+      {hasRange && displayLow !== null && displayHigh !== null && (
+        <svg aria-hidden="true" className={styles.thermostatRangeArcLayer} viewBox="0 0 100 100">
+          <path className={styles.thermostatRangeArcLow} d={thermostatArcPath(minTemperature, displayLow, minTemperature, maxTemperature) ?? undefined} data-target="low-arc" pathLength="100" />
+          <path className={styles.thermostatRangeArcHigh} d={thermostatArcPath(displayHigh, maxTemperature, minTemperature, maxTemperature) ?? undefined} data-target="high-arc" pathLength="100" />
+        </svg>
+      )}
+      {!disabled && handleTargets.length > 0 && (
+        <div aria-hidden="true" className={styles.thermostatHandleLayer}>
+          {handleTargets.map((handle) => (
+            <span
+              className={styles.thermostatHandleHitTarget}
+              data-target={handle.type}
+              key={handle.type}
+              onPointerCancel={endHandleDrag}
+              onPointerDown={startHandleDrag(handle.type)}
+              onPointerMove={moveHandleDrag}
+              onPointerUp={endHandleDrag}
+              style={thermostatHandleStyle(handle.value, minTemperature, maxTemperature)}
+            />
+          ))}
+        </div>
+      )}
       <div className={styles.thermostatDialReadout}>
         <span className={styles.thermostatAction}>{hvacAction}</span>
         <span className={styles.thermostatPrimaryValue}>{formatOneDecimal(currentTemperature, '--').replace(/\.0$/, '')}<small>{unit}</small></span>

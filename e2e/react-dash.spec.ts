@@ -288,15 +288,34 @@ test('thermostat hero dial allows vertical swipe scrolling', async ({ page, brow
   const box = await heroDial.boundingBox()
   expect(box).not.toBeNull()
 
-  let labelBeforeRingSwipe = beforeLabel!
-  if (await heroDial.locator('.target, .target-border').count()) {
-    const highHandleStart = pointForTemperature(box!, 74)
-    const highHandleEnd = pointForTemperature(box!, 78)
-    await mouseDrag(highHandleStart.x, highHandleStart.y, highHandleEnd.x, highHandleEnd.y)
-    await expect(heroDial).not.toHaveAttribute('aria-label', beforeLabel!)
-    await page.waitForTimeout(300)
-    labelBeforeRingSwipe = (await heroDial.getAttribute('aria-label')) ?? labelBeforeRingSwipe
-  }
+  const highHandle = heroDial.locator('[data-target="high"]')
+  await expect(highHandle).toHaveCount(1)
+  const highHandleBox = await highHandle.boundingBox()
+  expect(highHandleBox).not.toBeNull()
+  const highArc = heroDial.locator('[data-target="high-arc"]')
+  await expect(highArc).toHaveCount(1)
+  await expect(highArc).toHaveCSS('stroke', 'rgb(44, 142, 152)')
+  const highArcBefore = await highArc.getAttribute('d')
+  const highHandleEnd = pointForTemperature(box!, 78)
+  await mouseDrag(highHandleBox!.x + highHandleBox!.width / 2, highHandleBox!.y + highHandleBox!.height / 2, highHandleEnd.x, highHandleEnd.y)
+  await expect(heroDial).not.toHaveAttribute('aria-label', beforeLabel!)
+  const highHandleBoxAfter = await highHandle.boundingBox()
+  expect(highHandleBoxAfter).not.toBeNull()
+  expect(highHandleBoxAfter!.x).toBeGreaterThan(highHandleBox!.x + 20)
+  await expect(highArc).not.toHaveAttribute('d', highArcBefore!)
+  const lowHandle = heroDial.locator('[data-target="low"]')
+  await expect(lowHandle).toHaveCount(1)
+  const lowHandleBox = await lowHandle.boundingBox()
+  expect(lowHandleBox).not.toBeNull()
+  const lowArc = heroDial.locator('[data-target="low-arc"]')
+  await expect(lowArc).toHaveCount(1)
+  await expect(lowArc).toHaveCSS('stroke', 'rgb(205, 84, 1)')
+  const lowArcBefore = await lowArc.getAttribute('d')
+  const lowHandleEnd = pointForTemperature(box!, 68)
+  await mouseDrag(lowHandleBox!.x + lowHandleBox!.width / 2, lowHandleBox!.y + lowHandleBox!.height / 2, lowHandleEnd.x, lowHandleEnd.y)
+  await expect(lowArc).not.toHaveAttribute('d', lowArcBefore!)
+  await page.waitForTimeout(300)
+  const labelBeforeRingSwipe = (await heroDial.getAttribute('aria-label')) ?? beforeLabel!
 
   const ringX = box!.x + box!.width * 0.86
   const ringY = box!.y + box!.height * 0.5
