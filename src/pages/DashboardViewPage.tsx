@@ -29,6 +29,7 @@ import { resolveEntityAction, type EntityActionStateMap } from '../components/ha
 import { asEntityName, formatCompactEntityState, isActiveState, isContactOpen, isOccupancyActive, titleCaseState } from '../components/hass/entityState'
 import { DASHBOARD_ROUTE_CHANGE_EVENT, dashboardEventTargets, dashboardHash, dashboardPathWithSearch, replaceDashboardUrl } from '../hooks/dashboardLocation'
 import { useHashModal } from '../hooks/useHashModal'
+import { useOptimisticState } from '../hooks/useOptimisticState'
 import {
   AREA_ITEMS,
   CLIMATE_GROUPS,
@@ -1215,16 +1216,18 @@ function ThermostatSelectButton({
       })
     : []
   const value = valueAttribute && typeof entity?.attributes[valueAttribute] === 'string' ? entity.attributes[valueAttribute] : entity?.state ?? ''
+  const [displayValue, commitValue] = useOptimisticState(value)
   const disabled = options.length === 0
 
   if (hideWhenEmpty && disabled) return null
 
   const selectOption = (nextValue: string) => {
-    if (nextValue === value) {
+    if (nextValue === displayValue) {
       if (!keepOpenOnSelect) setOpen(false)
       return
     }
 
+    commitValue(nextValue)
     if (serviceKind === 'climate') callService({ domain: 'climate', service: 'set_hvac_mode', target: entityId, serviceData: { hvac_mode: nextValue } })
     else if (serviceKind === 'climate-fan') callService({ domain: 'climate', service: 'set_fan_mode', target: entityId, serviceData: { fan_mode: nextValue } })
     else callService({ domain: 'select', service: 'select_option', target: entityId, serviceData: { option: nextValue } })
@@ -1233,11 +1236,11 @@ function ThermostatSelectButton({
 
   return (
     <>
-      <button aria-label={`${title} ${formatSelectOption(value)}`} className={styles.thermostatSubButton} disabled={disabled} onClick={() => setOpen(true)} type="button">
+      <button aria-label={`${title} ${formatSelectOption(displayValue)}`} className={styles.thermostatSubButton} disabled={disabled} onClick={() => setOpen(true)} type="button">
         <MaterialIcon name={icon} size={22} />
         <MaterialIcon name="mdi:chevron-down" size={22} />
       </button>
-      <OptionPickerDialog icon={icon} onClose={() => setOpen(false)} onSelect={selectOption} open={open} options={options} presentation="sheet" selectedIcon={selectedIcon} title={title} value={value} />
+      <OptionPickerDialog icon={icon} onClose={() => setOpen(false)} onSelect={selectOption} open={open} options={options} presentation="sheet" selectedIcon={selectedIcon} title={title} value={displayValue} />
     </>
   )
 }
@@ -1300,11 +1303,17 @@ function ThermostatHubPill() {
 function ThermostatSwitchCard({ children, entityId, icon, title }: { children?: ReactNode; entityId: string; icon: string; title: string }) {
   const entity = useEntity(asEntityName(entityId), { returnNullIfNotFound: true })
   const callService = useCallService()
-  const active = entity?.state === 'on'
-  const stateText = formatCompactEntityState(entity, 'Unavailable')
+  const [state, commitState] = useOptimisticState(entity?.state ?? 'unavailable')
+  const active = state === 'on'
+  const stateText = formatCompactEntityState(entity, 'Unavailable', state)
+
+  const toggle = () => {
+    commitState(active ? 'off' : 'on')
+    callService({ domain: 'homeassistant', service: 'toggle', target: entityId })
+  }
 
   return (
-    <ThermostatGlassCard active={active} icon={icon} onMainClick={() => callService({ domain: 'homeassistant', service: 'toggle', target: entityId })} stateText={stateText} title={title}>
+    <ThermostatGlassCard active={active} icon={icon} onMainClick={toggle} stateText={stateText} title={title}>
       {children}
     </ThermostatGlassCard>
   )
@@ -1313,14 +1322,20 @@ function ThermostatSwitchCard({ children, entityId, icon, title }: { children?: 
 function ThermostatCheckbox({ entityId, showState = true, title }: { entityId: string; showState?: boolean; title: string }) {
   const entity = useEntity(asEntityName(entityId), { returnNullIfNotFound: true })
   const callService = useCallService()
-  const active = entity?.state === 'on'
+  const [state, commitState] = useOptimisticState(entity?.state ?? 'unavailable')
+  const active = state === 'on'
+
+  const toggle = () => {
+    commitState(active ? 'off' : 'on')
+    callService({ domain: 'homeassistant', service: 'toggle', target: entityId })
+  }
 
   return (
-    <button aria-label={showState ? `${title} ${formatCompactEntityState(entity, 'Unavailable')}` : title} aria-pressed={active} className={styles.thermostatCheckbox} onClick={() => callService({ domain: 'homeassistant', service: 'toggle', target: entityId })} type="button">
+    <button aria-label={showState ? `${title} ${formatCompactEntityState(entity, 'Unavailable', state)}` : title} aria-pressed={active} className={styles.thermostatCheckbox} onClick={toggle} type="button">
       <MaterialIcon name={active ? 'mdi:checkbox-marked-outline' : 'mdi:checkbox-blank-outline'} size={34} />
       <span>
         <strong>{title}</strong>
-        {showState && <small>{formatCompactEntityState(entity, 'Unavailable')}</small>}
+        {showState && <small>{formatCompactEntityState(entity, 'Unavailable', state)}</small>}
       </span>
     </button>
   )

@@ -46,31 +46,32 @@ export function formatContactEntityState(entity: HassEntity | null | undefined, 
   return titleCaseState(entity.state)
 }
 
-export function formatCompactEntityState(entity: HassEntity | null, fallback = 'Unavailable') {
+export function formatCompactEntityState(entity: HassEntity | null, fallback = 'Unavailable', stateOverride?: string) {
   if (!entity) return fallback
-  if (entity.state === 'unavailable') return 'Unavailable'
+  const state = stateOverride ?? entity.state
+  if (state === 'unavailable') return 'Unavailable'
 
   if (entity.entity_id.startsWith('binary_sensor.contact')) {
-    return entity.state === 'on' ? 'Open' : 'Closed'
+    return state === 'on' ? 'Open' : 'Closed'
   }
 
   if (entity.entity_id.startsWith('binary_sensor.')) {
-    return entity.state === 'on' ? 'Active' : 'Clear'
+    return state === 'on' ? 'Active' : 'Clear'
   }
 
   if (entity.entity_id.startsWith('light.')) {
-    return entity.state === 'on' ? 'On' : 'Off'
+    return state === 'on' ? 'On' : 'Off'
   }
 
   if (entity.entity_id.startsWith('alarm_control_panel.')) {
-    return titleCaseState(entity.state)
+    return titleCaseState(state)
   }
 
   if (entity.entity_id.startsWith('sensor.') || entity.entity_id.startsWith('input_text.')) {
-    return entity.state
+    return state
   }
 
-  return titleCaseState(entity.state)
+  return titleCaseState(state)
 }
 
 export function formatTemperature(entity: HassEntity | null) {
