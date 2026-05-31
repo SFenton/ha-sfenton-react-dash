@@ -138,10 +138,8 @@ test('security page opens ported security, contact, and camera modals', async ({
 
   await page.getByRole('button', { name: /Contact Sensors\s*All Closed/i }).click()
   await expect(page.getByRole('dialog')).toBeVisible()
-  await expect(page.getByRole('heading', { name: 'Rooms' })).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Open Entryway Contact Sensors' })).toBeVisible()
-  await page.getByRole('button', { name: 'Open Office Contact Sensors' }).click()
-  await expect(page.getByRole('heading', { name: 'Office Contact Sensors' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Entryway' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Office' })).toBeVisible()
   await expect(page.getByLabel('PC Window Closed')).toBeVisible()
   await page.getByRole('button', { name: 'Close' }).click()
 
@@ -237,6 +235,44 @@ test('thermostat hero dial allows vertical swipe scrolling', async ({ page, brow
   const heroDial = page.getByRole('region', { name: /Whole Home thermostat/i })
   await expect(heroDial).toBeVisible()
   await expect(heroDial.locator('[data-testid="control-slider-circular"]')).toHaveCSS('touch-action', 'pan-y')
+  const beforeLabel = await heroDial.getAttribute('aria-label')
+  expect(beforeLabel).toContain('Whole Home thermostat')
+
+  const touchDrag = async (startX: number, startY: number, endX: number, endY: number) => {
+    if (browserName === 'chromium') {
+      const client = await page.context().newCDPSession(page)
+      await client.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: startX, y: startY }] })
+      for (let step = 1; step <= 8; step += 1) {
+        await client.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: startX + ((endX - startX) * step) / 8, y: startY + ((endY - startY) * step) / 8 }] })
+      }
+      await client.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
+      await client.detach()
+      return
+    }
+
+    await page.mouse.move(startX, startY)
+    await page.mouse.down()
+    await page.mouse.move(endX, endY, { steps: 8 })
+    await page.mouse.up()
+  }
+
+  const mouseDrag = async (startX: number, startY: number, endX: number, endY: number) => {
+    await page.mouse.move(startX, startY)
+    await page.mouse.down()
+    await page.mouse.move(endX, endY, { steps: 8 })
+    await page.mouse.up()
+  }
+
+  const pointForTemperature = (box: NonNullable<Awaited<ReturnType<typeof heroDial.boundingBox>>>, value: number) => {
+    const percentage = (value - 45) / (95 - 45)
+    const angle = percentage * 270
+    const radians = ((angle - 225) * Math.PI) / 180
+    const radius = box.width * (145 / 320)
+    return {
+      x: box.x + box.width / 2 + Math.cos(radians) * radius,
+      y: box.y + box.height / 2 + Math.sin(radians) * radius,
+    }
+  }
 
   const scrollTop = () => heroDial.evaluate((element) => {
     let current = element.parentElement
@@ -252,22 +288,20 @@ test('thermostat hero dial allows vertical swipe scrolling', async ({ page, brow
   const box = await heroDial.boundingBox()
   expect(box).not.toBeNull()
 
-  if (browserName === 'chromium') {
-    const client = await page.context().newCDPSession(page)
-    const startX = box!.x + box!.width * 0.86
-    const startY = box!.y + box!.height * 0.5
-    await client.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: startX, y: startY }] })
-    for (let step = 1; step <= 8; step += 1) {
-      await client.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: startX, y: startY - step * 28 }] })
-    }
-    await client.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
-    await client.detach()
-  } else {
-    await page.mouse.move(box!.x + box!.width * 0.86, box!.y + box!.height * 0.5)
-    await page.mouse.down()
-    await page.mouse.move(box!.x + box!.width * 0.86, box!.y + box!.height * 0.5 - 224, { steps: 8 })
-    await page.mouse.up()
+  let labelBeforeRingSwipe = beforeLabel!
+  if (await heroDial.locator('.target, .target-border').count()) {
+    const highHandleStart = pointForTemperature(box!, 74)
+    const highHandleEnd = pointForTemperature(box!, 78)
+    await mouseDrag(highHandleStart.x, highHandleStart.y, highHandleEnd.x, highHandleEnd.y)
+    await expect(heroDial).not.toHaveAttribute('aria-label', beforeLabel!)
+    await page.waitForTimeout(300)
+    labelBeforeRingSwipe = (await heroDial.getAttribute('aria-label')) ?? labelBeforeRingSwipe
   }
 
+  const ringX = box!.x + box!.width * 0.86
+  const ringY = box!.y + box!.height * 0.5
+  await touchDrag(ringX, ringY, ringX, ringY - 224)
+
   await expect.poll(scrollTop).toBeGreaterThan(before + 40)
+  await expect(heroDial).toHaveAttribute('aria-label', labelBeforeRingSwipe)
 })

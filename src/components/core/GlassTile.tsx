@@ -15,6 +15,7 @@ interface GlassTileProps {
   compact?: boolean
   isOff?: boolean
   onClick?: () => void
+  pressed?: boolean
   variant?: 'card' | 'header'
 }
 
@@ -28,6 +29,7 @@ export function GlassTile({
   compact = false,
   isOff = false,
   onClick,
+  pressed,
   variant = 'card',
 }: GlassTileProps) {
   const iconSize = variant === 'header' ? 30 : compact ? 18 : 24
@@ -62,6 +64,7 @@ export function GlassTile({
     return (
       <button
         aria-label={accessibleName}
+        aria-pressed={pressed}
         className={className}
         data-icon={iconName}
         data-icon-color={iconColor}

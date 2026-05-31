@@ -2,7 +2,7 @@ import { fireEvent, render, screen, within } from '@testing-library/react'
 import { materialIconPath } from '../components/core/iconPaths'
 import { DashboardViewPage } from './DashboardViewPage'
 import { ROOM_PAGE_CONFIGS, ROOM_PAGE_ORDER } from '../constants/roomPages'
-import { mockCallServiceCalls, mockEntities, resetMockHass } from '../test/mocks/hakitCoreState'
+import { entity, mockCallServiceCalls, mockEntities, resetMockHass } from '../test/mocks/hakitCoreState'
 
 describe('DashboardViewPage', () => {
   beforeEach(() => {
@@ -71,13 +71,36 @@ describe('DashboardViewPage', () => {
   })
 
   it('opens room status hashes with reusable Home modal sheets directly', async () => {
+    mockEntities['light.kitchen'] = entity('light.kitchen', 'off')
+    mockEntities['light.kitchen_table_light'] = entity('light.kitchen_table_light', 'off')
+    mockEntities['light.kitchen_door_light'] = entity('light.kitchen_door_light', 'off')
+    mockEntities['light.kitchen_counter_light'] = entity('light.kitchen_counter_light', 'off')
+    mockEntities['light.kitchen_sink_light'] = entity('light.kitchen_sink_light', 'off')
     render(<DashboardViewPage activePath="kitchen" onNavigate={() => undefined} path="kitchen" />)
 
     fireEvent.click(screen.getByRole('button', { name: /Lights/i }))
 
-    expect(await screen.findByRole('dialog')).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Kitchen Lights' })).toBeInTheDocument()
+    const dialog = await screen.findByRole('dialog')
+    expect(dialog).toBeInTheDocument()
+    expect(screen.getAllByRole('heading', { name: 'Kitchen Lights' })).toHaveLength(1)
+    expect(screen.queryByRole('heading', { name: 'Kitchen: Lights' })).not.toBeInTheDocument()
+    expect(within(dialog).queryByText('Kitchen Lights: Off')).not.toBeInTheDocument()
+    expect(within(dialog).getByText('Kitchen Lights controls and status details')).toBeInTheDocument()
+    const toggle = screen.getByRole('button', { name: 'Toggle Kitchen lights' })
+    expect(toggle).toBeInTheDocument()
+    expect(toggle.querySelector('path')).toHaveAttribute('d', materialIconPath('mdi:lightbulb-multiple-off'))
     expect(screen.queryByText('Rooms')).not.toBeInTheDocument()
+  })
+
+  it('uses a singular active bulb icon for single-light room toggles', async () => {
+    mockEntities['light.gym_light'] = entity('light.gym_light', 'on')
+    render(<DashboardViewPage activePath="gym" onNavigate={() => undefined} path="gym" />)
+
+    fireEvent.click(screen.getByRole('button', { name: /Light/i }))
+
+    expect(await screen.findByRole('dialog')).toBeInTheDocument()
+    const toggle = screen.getByRole('button', { name: 'Toggle Gym lights' })
+    expect(toggle.querySelector('path')).toHaveAttribute('d', materialIconPath('mdi:lightbulb'))
   })
 
   it('opens Living Room climate, occupancy, and air quality popups from header chips', async () => {
@@ -85,28 +108,33 @@ describe('DashboardViewPage', () => {
 
     let view = renderLivingRoom()
     fireEvent.click(screen.getAllByRole('button', { name: /Climate/i })[0])
-    expect(await screen.findByRole('dialog')).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Living Room Climate' })).toBeInTheDocument()
+    let dialog = await screen.findByRole('dialog')
+    expect(dialog).toBeInTheDocument()
+    expect(within(dialog).getAllByRole('heading', { name: 'Living Room Climate' })).toHaveLength(1)
+    expect(within(dialog).getByText('69°F - 72°F')).toBeInTheDocument()
     view.unmount()
     window.history.replaceState(null, '', window.location.pathname)
 
     view = renderLivingRoom()
     fireEvent.click(screen.getAllByRole('button', { name: /Occupancy/i })[0])
-    expect(await screen.findByRole('dialog')).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Living Room Occupancy' })).toBeInTheDocument()
+    dialog = await screen.findByRole('dialog')
+    expect(dialog).toBeInTheDocument()
+    expect(within(dialog).getAllByRole('heading', { name: 'Living Room Occupancy' })).toHaveLength(1)
+    expect(within(dialog).getByText('Occupied')).toBeInTheDocument()
     view.unmount()
     window.history.replaceState(null, '', window.location.pathname)
 
     renderLivingRoom()
     fireEvent.click(screen.getAllByRole('button', { name: /Air Quality/i })[0])
-    expect(await screen.findByRole('dialog')).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Living Room Air Quality' })).toBeInTheDocument()
+    dialog = await screen.findByRole('dialog')
+    expect(dialog).toBeInTheDocument()
+    expect(within(dialog).getByRole('heading', { name: 'Living Room Air Quality' })).toBeInTheDocument()
+    expect(within(dialog).getByText('1 • 2 μg/m³')).toBeInTheDocument()
     expect(screen.getByText('Fan Modes')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Auto' })).toHaveAttribute('aria-pressed', 'true')
     expect(screen.getByText('Auto Modes')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Default' })).toHaveAttribute('aria-pressed', 'true')
-    expect(screen.getByText('PM2.5')).toBeInTheDocument()
-    expect(screen.getByText('AQI')).toBeInTheDocument()
+    expect(screen.queryByText('Current Readings')).not.toBeInTheDocument()
   })
 
   it('ports the Guest Room source page with its status chips and reusable popups', async () => {
@@ -118,8 +146,9 @@ describe('DashboardViewPage', () => {
     expect(screen.getByRole('button', { name: /^Lights On$/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /^Climate 69°F - 71°F$/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /^Occupancy Detected$/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^Occupancy Detected$/i })).toHaveAttribute('data-icon', 'mdi:motion-sensor')
     expect(screen.getByRole('button', { name: /^Window Closed$/i })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /^Air Quality 2$/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^Air Quality 1 • 2 μg\/m³$/i })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Climate' })).toBeInTheDocument()
     const ventCard = screen.getByRole('button', { name: /^Vent Open$/i })
     const airPurifierCard = screen.getByRole('button', { name: /^Air Purifier Auto • On$/i })
@@ -147,16 +176,38 @@ describe('DashboardViewPage', () => {
     view.unmount()
     window.history.replaceState(null, '', window.location.pathname)
 
+    view = renderGuestRoom()
+    fireEvent.click(screen.getByRole('button', { name: /^Window Closed$/i }))
+    let dialog = await screen.findByRole('dialog')
+    expect(dialog).toBeInTheDocument()
+    expect(within(dialog).getByRole('heading', { name: 'Guest Room Window' })).toBeInTheDocument()
+    expect(within(dialog).queryByText('All Closed')).not.toBeInTheDocument()
+    expect(within(dialog).queryByText('Guest Room Window: All Closed')).not.toBeInTheDocument()
+    const windowRow = within(dialog).getByLabelText('Window Closed')
+    expect(windowRow.tagName).toBe('ARTICLE')
+    expect(within(dialog).queryByRole('button', { name: /^Window Closed$/i })).not.toBeInTheDocument()
+    view.unmount()
+    window.history.replaceState(null, '', window.location.pathname)
+
     renderGuestRoom()
-    fireEvent.click(screen.getByRole('button', { name: /^Air Quality 2$/i }))
-    expect(await screen.findByRole('dialog')).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Guest Room Air Quality' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /^Air Quality 1 • 2 μg\/m³$/i }))
+  dialog = await screen.findByRole('dialog')
+    expect(dialog).toBeInTheDocument()
+    expect(within(dialog).getByRole('heading', { name: 'Guest Room Air Quality' })).toBeInTheDocument()
+    expect(within(dialog).getByText('1 • 2 μg/m³')).toBeInTheDocument()
     expect(screen.getByText('Fan Modes')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Auto' })).toHaveAttribute('aria-pressed', 'true')
     expect(screen.getByText('Auto Modes')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Default' })).toHaveAttribute('aria-pressed', 'true')
-    expect(screen.getByText('PM2.5')).toBeInTheDocument()
-    expect(screen.getByText('AQI')).toBeInTheDocument()
+    expect(screen.queryByText('Current Readings')).not.toBeInTheDocument()
+  })
+
+  it('uses the clear motion sensor icon for clear occupancy header chips', () => {
+    mockEntities['binary_sensor.living_room_occupancy_sensors'].state = 'off'
+
+    render(<DashboardViewPage activePath="living-room" onNavigate={() => undefined} path="living-room" />)
+
+    expect(screen.getByRole('button', { name: /^Occupancy Clear$/i })).toHaveAttribute('data-icon', 'mdi:motion-sensor-off')
   })
 
   it('runs HASS air purifier mode services from the source popup', async () => {
@@ -925,16 +976,11 @@ describe('DashboardViewPage', () => {
 
     expect(await screen.findByRole('dialog')).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Contact Sensors' })).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Rooms' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Open Entryway Contact Sensors' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Open Office Contact Sensors' })).toBeInTheDocument()
-
-    fireEvent.click(screen.getByRole('button', { name: 'Open Office Contact Sensors' }))
-
-    expect(await screen.findByRole('heading', { name: 'Office Contact Sensors' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Back to room contact sensors' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Rooms' })).not.toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Entryway' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Office' })).toBeInTheDocument()
     expect(screen.getByLabelText('PC Window Closed')).toBeInTheDocument()
-    expect(screen.getByLabelText('Window Closed')).toBeInTheDocument()
+    expect(screen.getAllByLabelText('Window Closed').length).toBeGreaterThan(0)
   })
 
   it('opens Security camera popups with WebRTC actions and recording script payloads', async () => {

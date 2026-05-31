@@ -16,7 +16,7 @@ interface CardProps {
   onClick?: MouseEventHandler<HTMLButtonElement>
   pressed?: boolean
   secondarySubtitle?: string
-  size?: 'standard' | 'compact' | 'wide' | 'admin-modal'
+  size?: 'standard' | 'compact' | 'bubble' | 'source-row' | 'wide' | 'admin-modal'
   subtitle?: string
   title: string
 }
@@ -41,7 +41,15 @@ export function Card({
   const style: CardStyle = {
     '--card-rgb': `${color.r} ${color.g} ${color.b}`,
   }
-  const className = [styles.card, subtitle || secondarySubtitle ? styles.hasSubtitle : '', size === 'compact' ? styles.compact : '', size === 'wide' ? styles.wide : '', size === 'admin-modal' ? styles.adminModal : ''].filter(Boolean).join(' ')
+  const className = [
+    styles.card,
+    subtitle || secondarySubtitle ? styles.hasSubtitle : '',
+    size === 'compact' ? styles.compact : '',
+    size === 'bubble' ? styles.bubble : '',
+    size === 'source-row' ? styles.sourceRow : '',
+    size === 'wide' ? styles.wide : '',
+    size === 'admin-modal' ? styles.adminModal : '',
+  ].filter(Boolean).join(' ')
   const content = (
     <>
       <span aria-hidden="true" className={styles.icon}>

@@ -369,11 +369,24 @@
   overflow: visible;
 }
 
+.thermostatCircularSlider :global(.display) {
+  pointer-events: auto !important;
+}
+
+.thermostatCircularSlider :global(.background),
+.thermostatCircularSlider :global(.arc),
+.thermostatCircularSlider :global(.current),
+.thermostatCircularSlider :global(.interaction) {
+  pointer-events: none !important;
+}
+
 .thermostatCircularSlider :global(.target-border) {
+  pointer-events: stroke !important;
   stroke: rgba(255, 255, 255, 0.96);
 }
 
 .thermostatCircularSlider :global(.target) {
+  pointer-events: stroke !important;
   stroke: rgba(255, 255, 255, 0.96);
 }
 

@@ -10,7 +10,7 @@ interface OccupancyCardProps {
   entityId?: string
   icon?: React.ReactNode
   onClick?: () => void
-  size?: 'standard' | 'compact'
+  size?: 'standard' | 'compact' | 'bubble' | 'source-row'
   subtitle?: string
   title: string
 }

@@ -73,6 +73,7 @@
 
 .copy {
   display: grid;
+  min-width: 0;
   max-width: 100%;
   gap: 4px;
 }
@@ -142,6 +143,138 @@
 
 .compact .secondarySubtitle {
   font-size: 0.7rem;
+}
+
+.bubble {
+  height: 56px;
+  min-height: 56px;
+  aspect-ratio: auto;
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 9px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+  padding: 0 13px;
+  background: rgb(var(--card-rgb));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22), inset 0 -1px 0 rgba(0, 0, 0, 0.2);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.bubble[data-muted='true'] {
+  background: rgba(255, 255, 255, 0.42);
+}
+
+.bubble::after {
+  display: none;
+}
+
+.bubble .icon {
+  flex-basis: 36px;
+  width: 36px;
+  height: 36px;
+  filter: none;
+}
+
+.bubble .icon > svg,
+.bubble .icon > img {
+  width: 25px;
+  height: 25px;
+}
+
+.bubble .copy {
+  gap: 2px;
+}
+
+.bubble .title {
+  overflow: hidden;
+  font-size: 0.84rem;
+  font-weight: 760;
+  line-height: 1.12;
+  text-overflow: ellipsis;
+  text-shadow: none;
+  white-space: nowrap;
+  word-break: normal;
+}
+
+.bubble .subtitle {
+  color: rgba(255, 255, 255, 0.9);
+  overflow: hidden;
+  font-size: 0.74rem;
+  font-weight: 700;
+  line-height: 1.12;
+  text-overflow: ellipsis;
+  text-shadow: none;
+  white-space: nowrap;
+}
+
+.bubble .secondarySubtitle {
+  font-size: 0.72rem;
+}
+
+.sourceRow {
+  height: 56px;
+  min-height: 56px;
+  aspect-ratio: auto;
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 10px;
+  border: 0;
+  border-radius: 0;
+  padding: 0 0 0 10px;
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.sourceRow[data-muted='true'] {
+  background: transparent;
+}
+
+.sourceRow::after {
+  display: none;
+}
+
+.sourceRow .icon {
+  flex-basis: 40px;
+  width: 40px;
+  height: 40px;
+  filter: none;
+}
+
+.sourceRow .icon > svg,
+.sourceRow .icon > img {
+  width: 26px;
+  height: 26px;
+}
+
+.sourceRow .copy {
+  gap: 2px;
+}
+
+.sourceRow .title {
+  overflow: hidden;
+  font-size: 0.84rem;
+  font-weight: 760;
+  line-height: 1.18;
+  text-overflow: ellipsis;
+  text-shadow: none;
+  white-space: nowrap;
+  word-break: normal;
+}
+
+.sourceRow .subtitle {
+  overflow: hidden;
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 0.74rem;
+  font-weight: 700;
+  line-height: 1.12;
+  text-overflow: ellipsis;
+  text-shadow: none;
+  white-space: nowrap;
 }
 
 .wide {

@@ -3,7 +3,7 @@ import { materialIconPath } from '../core/iconPaths'
 import { OccupancyCard } from './OccupancyCard'
 
 describe('OccupancyCard', () => {
-  it('uses the Home Assistant occupancy icon pair for detected and clear states', () => {
+  it('uses the motion sensor icon pair for detected and clear states', () => {
     render(
       <>
         <OccupancyCard entityId="binary_sensor.living_room_back_wall_presence_occupancy" title="Back Wall" />

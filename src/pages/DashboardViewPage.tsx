@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type PointerEvent, type ReactNode } from 'react'
 import { useEntity, useHass } from '@hakit/core'
 import { ControlSliderCircular } from '@hakit/components'
+import type { HassEntity } from 'home-assistant-js-websocket'
 import { ClimateCard } from '../components/cards/ClimateCard'
 import { ContactSensorCard } from '../components/cards/ContactSensorCard'
 import { LightCard } from '../components/cards/LightCard'
@@ -23,8 +24,9 @@ import { MaterialIcon } from '../components/core/Icon'
 import { ModalSheet } from '../components/core/ModalSheet'
 import { OptionPickerDialog, type PickerOption } from '../components/core/OptionPickerDialog'
 import { SectionHeader } from '../components/core/SectionHeader'
+import { derivedAirPurifierEntityIds, formatAirQualitySummary } from '../components/hass/airQualityState'
 import { resolveEntityAction, type EntityActionStateMap } from '../components/hass/entityActions'
-import { asEntityName, formatCompactEntityState, isActiveState, isContactOpen, titleCaseState } from '../components/hass/entityState'
+import { asEntityName, formatCompactEntityState, isActiveState, isContactOpen, isOccupancyActive, titleCaseState } from '../components/hass/entityState'
 import { DASHBOARD_ROUTE_CHANGE_EVENT, dashboardEventTargets, dashboardHash, dashboardPathWithSearch, replaceDashboardUrl } from '../hooks/dashboardLocation'
 import { useHashModal } from '../hooks/useHashModal'
 import {
@@ -293,6 +295,32 @@ function roomContactGroup(roomTitle: string) {
   return CONTACT_GROUPS.find((group) => contactRoomTitle(group) === roomTitle)
 }
 
+function occupancySensorSubtitleForRoom(roomTitle: string, entities: Record<string, HassEntity | undefined>) {
+  const group = roomOccupancyGroup(roomTitle)
+  if (!group) return undefined
+  const activeCount = group.items.reduce((count, item) => count + (isOccupancyActive(entities[item.entityId]) ? 1 : 0), 0)
+  return activeCount > 0 ? 'Occupied' : 'Clear'
+}
+
+function contactSensorSubtitleForRoom(roomTitle: string, entities: Record<string, HassEntity | undefined>) {
+  const group = roomContactGroup(roomTitle)
+  if (!group) return undefined
+  const openCount = group.items.reduce((count, item) => count + (isContactOpen(entities[item.entityId]) ? 1 : 0), 0)
+  return openCount > 0 ? `${openCount} Open` : 'All Closed'
+}
+
+function roomSourceModalSubtitle(card: RoomSourceCardConfig, roomTitle: string, entities: Record<string, HassEntity | undefined>) {
+  if (card.showState === false) return undefined
+  if (card.kind === 'occupancy') return occupancySensorSubtitleForRoom(roomTitle, entities)
+  if (card.kind === 'contact') return contactSensorSubtitleForRoom(roomTitle, entities)
+  if (card.kind === 'air') {
+    const pm25EntityId = card.modalEntityId ?? card.entityId
+    const { aqiEntityId } = derivedAirPurifierEntityIds(pm25EntityId)
+    return formatAirQualitySummary(entities[aqiEntityId], entities[pm25EntityId])
+  }
+  return formatRoomSourceState(card, entities[card.entityId] ?? null)
+}
+
 function SourceModalItemCard({ fallbackKind, item }: { fallbackKind: RoomSourceKind; item: RoomSourceModalItem }) {
   const entity = useEntity(asEntityName(item.entityId), { returnNullIfNotFound: true })
   const unavailable = isUnavailable(entity)
@@ -330,22 +358,23 @@ function renderRoomReusableSheet(card: RoomSourceCardConfig, roomTitle: string):
 
   if (card.kind === 'light') {
     const group = roomLightGroup(roomTitle)
-    if (group) return <LightsSheet directGroup={group} key={group.title} />
+    if (group) return <LightsSheet directGroup={group} hideDirectTitle key={group.title} />
   }
 
   if (card.kind === 'vent' || (card.kind === 'climate' && card.title === 'Climate')) {
     const group = roomClimateGroup(roomTitle)
-    if (group) return <ClimateSheet directGroup={group} key={group.title} />
+    if (group) return <ClimateSheet directGroup={group} hideDirectHeader key={group.title} />
   }
 
   if (card.kind === 'occupancy') {
     const group = roomOccupancyGroup(roomTitle)
-    if (group) return <OccupancySheet directGroup={group} key={group.title} />
+    if (group) return <OccupancySheet directGroup={group} hideDirectHeader key={group.title} />
   }
 
   if (card.kind === 'contact') {
     const group = roomContactGroup(roomTitle)
-    if (group) return <ContactSheet directGroup={group} key={group.title} />
+    if (group) return <ContactSheet directGroup={group} hideDirectHeader key={group.title} />
+    return <ContactSheet key="contact-sensors-grouped" overviewMode="grouped" />
   }
 
   if (card.kind === 'vacuum') {
@@ -483,9 +512,12 @@ function RoomSourceCard({ card, onOpen }: { card: RoomSourceCardConfig; onOpen: 
 
 function RoomSourceModal({ card, onClose, roomTitle }: { card: RoomSourceCardConfig | null; onClose: () => void; roomTitle: string }) {
   const content = card ? renderRoomReusableSheet(card, roomTitle) : null
+  const plainTitle = card?.kind === 'air' || card?.kind === 'climate' || card?.kind === 'contact' || card?.kind === 'light' || card?.kind === 'occupancy'
+  const title = card ? `${roomTitle}${plainTitle ? ' ' : ': '}${card.modalTitle ?? card.title}` : roomTitle
+  const subtitle = useHass((state) => (card && plainTitle && card.kind !== 'contact' && card.kind !== 'light' ? roomSourceModalSubtitle(card, roomTitle, state.entities) : undefined))
 
   return (
-    <ModalSheet onClose={onClose} open={Boolean(card)} title={card ? `${roomTitle}: ${card.modalTitle ?? card.title}` : roomTitle}>
+    <ModalSheet onClose={onClose} open={Boolean(card)} subtitle={subtitle} title={title}>
       {card && (content ?? <RoomSourceFallback card={card} />)}
     </ModalSheet>
   )
@@ -893,6 +925,12 @@ function thermostatSliderColors(action: string) {
   }
 }
 
+function stopThermostatRingPointerDown(event: PointerEvent<HTMLElement>) {
+  if (event.target instanceof Element && event.target.closest('.target, .target-border')) return
+  event.stopPropagation()
+  event.nativeEvent.stopImmediatePropagation()
+}
+
 function ThermostatDial({ entityId, size = 'page', title }: { entityId: string; size?: 'modal' | 'page'; title: string }) {
   const entity = useEntity(asEntityName(entityId), { returnNullIfNotFound: true })
   const callService = useCallService()
@@ -985,6 +1023,7 @@ function ThermostatDial({ entityId, size = 'page', title }: { entityId: string; 
         mode={hasRange ? undefined : 'full'}
         onChange={updateDisplayedTarget}
         onChangeApplied={applySliderChange}
+        onPointerDownCapture={stopThermostatRingPointerDown}
         onPointerUpCapture={commitDisplayedTargets}
         step={targetStep}
         value={displayTarget ?? current}

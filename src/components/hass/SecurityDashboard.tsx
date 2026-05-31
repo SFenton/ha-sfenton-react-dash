@@ -111,7 +111,7 @@ function modalTitle(hash: string) {
 
 function SecurityModalContent({ hash }: { hash: string }) {
   if (hash === '#security-system') return <SecurityControls />
-  if (hash === '#contact-sensors-overview') return <ContactSheet />
+  if (hash === '#contact-sensors-overview') return <ContactSheet overviewMode="grouped" />
   const camera = CAMERA_ITEMS.find((item) => item.hash === hash)
   if (camera) return <CameraModalContent camera={camera} />
   return null

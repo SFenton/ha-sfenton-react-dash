@@ -1,9 +1,8 @@
 import type { ReactNode } from 'react'
 import { useEntity, useHass } from '@hakit/core'
-import { Card } from '../core/Card'
-import { MaterialIcon } from '../core/Icon'
-import { CLIMATE_COLOR, UNAVAILABLE_COLOR } from '../../constants/portedDashboard'
-import { asEntityName, formatCompactEntityState } from './entityState'
+import { GlassTile } from '../core/GlassTile'
+import { derivedAirPurifierEntityIds } from './airQualityState'
+import { asEntityName } from './entityState'
 import styles from './AirQualityModalContent.module.css'
 
 type CallService = (params: Record<string, unknown>) => void
@@ -32,16 +31,6 @@ interface AirQualityModalContentProps {
   roomTitle: string
 }
 
-function derivedAirPurifierEntityIds(pm25EntityId: string) {
-  const base = pm25EntityId.replace(/^sensor\./, '').replace(/_pm2_5$/, '')
-  return {
-    aqiEntityId: `sensor.${base}_air_quality_index`,
-    autoModeEntityId: `select.${base}_auto_mode`,
-    fanEntityId: `fan.${base}_levoit_purifier`,
-    modeEntityId: `select.${base}_fan_mode`,
-  }
-}
-
 function isUnavailable(state: string | undefined) {
   return !state || state === 'unknown' || state === 'unavailable'
 }
@@ -52,23 +41,6 @@ function selectOption(callService: CallService, entityId: string, option: string
 
 function setFanPercentage(callService: CallService, entityId: string, percentage: number) {
   callService({ domain: 'fan', service: 'set_percentage', target: entityId, serviceData: { percentage } })
-}
-
-function AirMetricCard({ entityId, icon, title }: { entityId: string; icon: string; title: string }) {
-  const entity = useEntity(asEntityName(entityId), { returnNullIfNotFound: true })
-  const unavailable = isUnavailable(entity?.state)
-
-  return (
-    <Card
-      color={unavailable ? UNAVAILABLE_COLOR : CLIMATE_COLOR}
-      disabled={unavailable}
-      icon={<MaterialIcon name={icon} size={34} />}
-      muted={unavailable}
-      size="compact"
-      subtitle={formatCompactEntityState(entity, 'Unavailable')}
-      title={title}
-    />
-  )
 }
 
 function ControlSection({ children, title }: { children: ReactNode; title: string }) {
@@ -82,38 +54,25 @@ function ControlSection({ children, title }: { children: ReactNode; title: strin
 
 function ModeButton({ active, disabled = false, icon, label, onClick }: { active: boolean; disabled?: boolean; icon: string; label: string; onClick: () => void }) {
   return (
-    <button aria-pressed={active} className={styles.modeButton} data-active={active} disabled={disabled} onClick={onClick} type="button">
-      <MaterialIcon name={icon} size={24} />
-      <span>{label}</span>
-    </button>
+    <div className={styles.modeTile} data-disabled={disabled}>
+      <GlassTile compact backgroundColor={active ? 'rgba(0, 150, 136, 0.58)' : undefined} icon={icon} isOff={!active} onClick={disabled ? undefined : onClick} pressed={active} title={label} tone={active ? 'air' : 'neutral'} />
+    </div>
   )
 }
 
 export function AirQualityModalContent({ pm25EntityId, roomTitle }: AirQualityModalContentProps) {
   const callService = useHass((state) => state.helpers.callService) as unknown as CallService
-  const pm25Entity = useEntity(asEntityName(pm25EntityId), { returnNullIfNotFound: true })
-  const { aqiEntityId, autoModeEntityId, fanEntityId, modeEntityId } = derivedAirPurifierEntityIds(pm25EntityId)
+  const { autoModeEntityId, fanEntityId, modeEntityId } = derivedAirPurifierEntityIds(pm25EntityId)
   const modeEntity = useEntity(asEntityName(modeEntityId), { returnNullIfNotFound: true })
   const autoModeEntity = useEntity(asEntityName(autoModeEntityId), { returnNullIfNotFound: true })
   const fanEntity = useEntity(asEntityName(fanEntityId), { returnNullIfNotFound: true })
-  const summary = formatCompactEntityState(pm25Entity, 'Unavailable')
   const fanModeUnavailable = isUnavailable(modeEntity?.state)
   const autoModeUnavailable = isUnavailable(autoModeEntity?.state)
   const fanUnavailable = isUnavailable(fanEntity?.state)
   const fanPercentage = typeof fanEntity?.attributes.percentage === 'number' ? fanEntity.attributes.percentage : undefined
 
   return (
-    <div className={styles.sheet}>
-      <div className={styles.header}>
-        <span className={styles.headerIcon}>
-          <MaterialIcon name="mdi:air-purifier" size={28} />
-        </span>
-        <div className={styles.titleBlock}>
-          <h3>{roomTitle} Air Quality</h3>
-          <p>{summary}</p>
-        </div>
-      </div>
-
+    <div className={styles.sheet} aria-label={`${roomTitle} air purifier controls`}>
       <ControlSection title="Fan Modes">
         {FAN_MODE_OPTIONS.map((option) => (
           <ModeButton
@@ -156,14 +115,6 @@ export function AirQualityModalContent({ pm25EntityId, roomTitle }: AirQualityMo
           ))}
         </ControlSection>
       )}
-
-      <div className={styles.separator}>Current Readings</div>
-      <div className={styles.grid}>
-        <AirMetricCard entityId={pm25EntityId} icon="mdi:air-filter" title="PM2.5" />
-        <AirMetricCard entityId={aqiEntityId} icon="mdi:air-filter" title="AQI" />
-        <AirMetricCard entityId={modeEntityId} icon="mdi:fan" title="Fan Mode" />
-        <AirMetricCard entityId={fanEntityId} icon="mdi:air-purifier" title="Purifier" />
-      </div>
     </div>
   )
 }

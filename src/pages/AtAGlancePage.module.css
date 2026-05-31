@@ -292,6 +292,16 @@
   gap: 10px;
 }
 
+.roomStateStack {
+  display: grid;
+  gap: 14px;
+}
+
+.roomStateSection {
+  display: grid;
+  gap: 14px;
+}
+
 .roomLightHeader {
   display: flex;
   min-height: 52px;
@@ -328,6 +338,10 @@
   color: var(--color-text);
 }
 
+.roomLightHeader[data-title-hidden='true'] {
+  min-height: 40px;
+}
+
 .lightBackButton,
 .roomLightToggle {
   flex: 0 0 auto;
@@ -350,6 +364,14 @@
   min-width: 0;
   flex: 0 1 auto;
   gap: 3px;
+}
+
+.roomLightSeparatorBlock {
+  display: flex;
+  min-width: 0;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: 10px;
 }
 
 .roomLightSeparator {
@@ -377,15 +399,13 @@
 }
 
 .roomLightToggle {
-  display: inline-flex;
+  display: grid;
+  width: 40px;
   height: 40px;
   min-height: 40px;
-  align-items: center;
-  gap: 8px;
-  border-radius: var(--radius-pill);
-  padding: 0 13px;
-  font-size: 0.78rem;
-  font-weight: 800;
+  place-items: center;
+  border-radius: 50%;
+  padding: 0;
 }
 
 .roomLightToggle[data-active='true'] {

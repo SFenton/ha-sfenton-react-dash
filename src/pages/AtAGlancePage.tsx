@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { HassEntity } from 'home-assistant-js-websocket'
 import { ClimateCard } from '../components/cards/ClimateCard'
 import { ContactSensorCard } from '../components/cards/ContactSensorCard'
-import { LightCard, MultiLightIcon } from '../components/cards/LightCard'
+import { LightCard } from '../components/cards/LightCard'
 import { OccupancyCard } from '../components/cards/OccupancyCard'
 import { RoomCard } from '../components/cards/RoomCard'
 import { AppShell } from '../components/shell/AppShell'
@@ -18,6 +18,7 @@ import { CameraTile } from '../components/hass/CameraTile'
 import { SecurityControls } from '../components/hass/SecurityControls'
 import { StatusRail } from '../components/hass/StatusRail'
 import { WeatherSummary } from '../components/hass/WeatherSummary'
+import { formatAirMetricState } from '../components/hass/airQualityState'
 import { asEntityName, formatCompactEntityState, isActiveState, isContactOpen, isOccupancyActive } from '../components/hass/entityState'
 import { WebRtcCamera } from '../components/hass/WebRtcCamera'
 import {
@@ -136,13 +137,6 @@ function parseCssColor(value: string | undefined) {
     g: Number.parseInt(hex[1].slice(2, 4), 16),
     b: Number.parseInt(hex[1].slice(4, 6), 16),
   }
-}
-
-function formatAirMetricState(entity: HassEntity | null | undefined, fallback = 'Unavailable') {
-  if (!entity) return fallback
-  const state = formatCompactEntityState(entity, fallback)
-  const unit = typeof entity.attributes.unit_of_measurement === 'string' ? entity.attributes.unit_of_measurement : ''
-  return unit && state !== fallback && !state.includes(unit) ? `${state}${unit}` : state
 }
 
 function contactItemKind(item: EntityGroupConfig['items'][number]) {
@@ -393,29 +387,54 @@ function RoomLightOverviewCard({ group, onSelect }: { group: EntityGroupConfig; 
   return <LightCard ariaLabel={`Open ${group.title}`} entityId={entityId} onClick={() => onSelect(group)} title={roomTitleFromLightGroup(group)} />
 }
 
-function RoomLightDetailHeader({ group, onBack, onToggle }: { group: EntityGroupConfig; onBack?: () => void; onToggle: (entityId: string) => void }) {
+function roomLightToggleIcon(group: EntityGroupConfig, active: boolean) {
+  if (group.items.length > 1) return active ? 'mdi:lightbulb-multiple' : 'mdi:lightbulb-multiple-off'
+  return active ? 'mdi:lightbulb' : 'mdi:lightbulb-off'
+}
+
+function RoomLightDetailHeader({ group, hideTitleBlock = false, onBack, onToggle }: { group: EntityGroupConfig; hideTitleBlock?: boolean; onBack?: () => void; onToggle: (entityId: string) => void }) {
   const groupToggleEntityId = group.toggleEntityId
   const groupEntity = useEntity(asEntityName(groupToggleEntityId ?? 'light.unavailable'), { returnNullIfNotFound: true })
   const groupActive = isActiveState(groupEntity)
+  const itemActive = useHass((state) => {
+    let foundItemEntity = false
+    let foundActiveItem = false
+    group.items.forEach((item) => {
+      const entity = state.entities[item.entityId] as HassEntity | undefined
+      if (!entity) return
+      foundItemEntity = true
+      if (isActiveState(entity)) foundActiveItem = true
+    })
+    return foundItemEntity ? foundActiveItem : undefined
+  })
+  const toggleActive = itemActive ?? groupActive
+  const toggleIcon = roomLightToggleIcon(group, toggleActive)
   const groupState = formatCompactEntityState(groupEntity, 'Off')
   const roomTitle = roomTitleFromLightGroup(group)
+  const separatorLabel = group.items.length === 1 ? 'Light' : 'Lights'
 
   return (
-    <div className={styles.roomLightHeader} style={buildStaggerStyle(30)}>
+    <div className={styles.roomLightHeader} data-title-hidden={hideTitleBlock} style={buildStaggerStyle(30)}>
       {onBack && (
         <button aria-label="Back to room lights" className={styles.lightBackButton} onClick={onBack} type="button">
           <MaterialIcon name="mdi:chevron-left" size={22} />
         </button>
       )}
-      <div className={styles.roomLightTitleBlock}>
-        <h3>{roomTitle} Lights</h3>
-        <p>{groupState}</p>
-      </div>
-      {groupToggleEntityId && <Separator className={styles.roomLightSeparator} />}
+      {!hideTitleBlock && (
+        <div className={styles.roomLightTitleBlock}>
+          <h3>{roomTitle} Lights</h3>
+          <p>{groupState}</p>
+        </div>
+      )}
       {groupToggleEntityId && (
-        <button className={styles.roomLightToggle} data-active={groupActive} onClick={() => onToggle(groupToggleEntityId)} type="button">
-          <MultiLightIcon active={groupActive} size={20} />
-          <span>Toggle</span>
+        <div className={styles.roomLightSeparatorBlock}>
+          {hideTitleBlock && <h3 className={styles.lightSectionLabel}>{separatorLabel}</h3>}
+          <Separator className={styles.roomLightSeparator} />
+        </div>
+      )}
+      {groupToggleEntityId && (
+        <button aria-label={`Toggle ${roomTitle} lights`} className={styles.roomLightToggle} data-active={toggleActive} onClick={() => onToggle(groupToggleEntityId)} type="button">
+          <MaterialIcon name={toggleIcon} size={22} />
         </button>
       )}
     </div>
@@ -436,7 +455,7 @@ function RoomLightDetailCards({ group, onToggle }: { group: EntityGroupConfig; o
   )
 }
 
-export function LightsSheet({ directGroup }: { directGroup?: EntityGroupConfig } = {}) {
+export function LightsSheet({ directGroup, hideDirectTitle = false }: { directGroup?: EntityGroupConfig; hideDirectTitle?: boolean } = {}) {
   const callService = useHass((state) => state.helpers.callService)
   const [selectedGroup, setSelectedGroup] = useState<EntityGroupConfig | null>(directGroup ?? null)
   const [roomCardsExiting, setRoomCardsExiting] = useState(false)
@@ -473,7 +492,7 @@ export function LightsSheet({ directGroup }: { directGroup?: EntityGroupConfig }
 
   return (
     <div className={styles.lightsSheet}>
-      {selectedGroup ? <RoomLightDetailHeader group={selectedGroup} onBack={directMode ? undefined : showRoomOverview} onToggle={toggleEntity} /> : <RoomsHeader />}
+      {selectedGroup ? <RoomLightDetailHeader group={selectedGroup} hideTitleBlock={directMode && hideDirectTitle} onBack={directMode ? undefined : showRoomOverview} onToggle={toggleEntity} /> : <RoomsHeader />}
       <div className={styles.lightContent}>
         {selectedGroup ? (
           <RoomLightDetailCards group={selectedGroup} onToggle={toggleEntity} />
@@ -575,7 +594,7 @@ function RoomClimateDetailCards({ group }: { group: EntityGroupConfig }) {
   )
 }
 
-export function ClimateSheet({ directGroup }: { directGroup?: EntityGroupConfig } = {}) {
+export function ClimateSheet({ directGroup, hideDirectHeader = false }: { directGroup?: EntityGroupConfig; hideDirectHeader?: boolean } = {}) {
   const [selectedGroup, setSelectedGroup] = useState<EntityGroupConfig | null>(directGroup ?? null)
   const [roomCardsExiting, setRoomCardsExiting] = useState(false)
   const transitionTimer = useRef<number | null>(null)
@@ -607,7 +626,7 @@ export function ClimateSheet({ directGroup }: { directGroup?: EntityGroupConfig 
 
   return (
     <div className={styles.climateSheet}>
-      {selectedGroup ? <RoomClimateDetailHeader group={selectedGroup} onBack={directMode ? undefined : showRoomOverview} /> : <RoomsHeader />}
+      {selectedGroup ? (!hideDirectHeader && <RoomClimateDetailHeader group={selectedGroup} onBack={directMode ? undefined : showRoomOverview} />) : <RoomsHeader />}
       <div className={styles.climateContent}>
         {selectedGroup ? (
           <RoomClimateDetailCards group={selectedGroup} />
@@ -664,15 +683,15 @@ function RoomOccupancyDetailHeader({ group, onBack }: { group: EntityGroupConfig
   )
 }
 
-function RoomOccupancyDetailCards({ group }: { group: EntityGroupConfig }) {
+function RoomOccupancyDetailCards({ group, indexOffset = 0 }: { group: EntityGroupConfig; indexOffset?: number }) {
   const color = occupancyGroupColor(group)
 
   return (
     <section className={styles.roomOccupancyDetail}>
       <div className={styles.roomOccupancyGrid}>
         {group.items.map((item, index) => (
-          <div className={styles.roomLightCardShell} key={item.entityId} style={buildStaggerStyle(staggerMs(index, 42, 92))}>
-            <OccupancyCard color={color} entityId={item.entityId} size="compact" title={item.title} />
+          <div className={styles.roomLightCardShell} key={item.entityId} style={buildStaggerStyle(staggerMs(index + indexOffset, 42, 92))}>
+            <OccupancyCard color={color} entityId={item.entityId} size="source-row" title={item.title} />
           </div>
         ))}
       </div>
@@ -680,7 +699,7 @@ function RoomOccupancyDetailCards({ group }: { group: EntityGroupConfig }) {
   )
 }
 
-export function OccupancySheet({ directGroup }: { directGroup?: EntityGroupConfig } = {}) {
+export function OccupancySheet({ directGroup, hideDirectHeader = false }: { directGroup?: EntityGroupConfig; hideDirectHeader?: boolean } = {}) {
   const [selectedGroup, setSelectedGroup] = useState<EntityGroupConfig | null>(directGroup ?? null)
   const [roomCardsExiting, setRoomCardsExiting] = useState(false)
   const transitionTimer = useRef<number | null>(null)
@@ -712,7 +731,7 @@ export function OccupancySheet({ directGroup }: { directGroup?: EntityGroupConfi
 
   return (
     <div className={styles.occupancySheet}>
-      {selectedGroup ? <RoomOccupancyDetailHeader group={selectedGroup} onBack={directMode ? undefined : showRoomOverview} /> : <RoomsHeader />}
+      {selectedGroup ? (!hideDirectHeader && <RoomOccupancyDetailHeader group={selectedGroup} onBack={directMode ? undefined : showRoomOverview} />) : <RoomsHeader />}
       <div className={styles.occupancyContent}>
         {selectedGroup ? (
           <RoomOccupancyDetailCards group={selectedGroup} />
@@ -770,15 +789,15 @@ function RoomContactDetailHeader({ group, onBack }: { group: EntityGroupConfig; 
   )
 }
 
-function RoomContactDetailCards({ group }: { group: EntityGroupConfig }) {
+function RoomContactDetailCards({ group, indexOffset = 0, size = 'bubble' }: { group: EntityGroupConfig; indexOffset?: number; size?: 'bubble' | 'source-row' }) {
   const color = contactGroupColor(group)
 
   return (
     <section className={styles.roomContactDetail}>
       <div className={styles.roomContactGrid}>
         {group.items.map((item, index) => (
-          <div className={styles.roomLightCardShell} key={item.entityId} style={buildStaggerStyle(staggerMs(index, 42, 92))}>
-            <ContactSensorCard color={color} entityId={item.entityId} size="compact" title={item.title} />
+          <div className={styles.roomLightCardShell} key={item.entityId} style={buildStaggerStyle(staggerMs(index + indexOffset, 42, 92))}>
+            <ContactSensorCard color={color} entityId={item.entityId} size={size} title={item.title} />
           </div>
         ))}
       </div>
@@ -786,7 +805,26 @@ function RoomContactDetailCards({ group }: { group: EntityGroupConfig }) {
   )
 }
 
-export function ContactSheet({ directGroup }: { directGroup?: EntityGroupConfig } = {}) {
+function RoomContactSection({ group, indexOffset = 0 }: { group: EntityGroupConfig; indexOffset?: number }) {
+  return (
+    <section className={styles.roomStateSection}>
+      <div className={styles.lightSectionHeader}>
+        <h3 className={styles.lightSectionLabel}>{contactRoomTitle(group)}</h3>
+        <Separator className={styles.lightSectionSeparator} />
+      </div>
+      <RoomContactDetailCards group={group} indexOffset={indexOffset} />
+    </section>
+  )
+}
+
+function groupsWithIndexOffsets(groups: EntityGroupConfig[]) {
+  return groups.map((group, index) => ({
+    group,
+    indexOffset: groups.slice(0, index).reduce((total, previousGroup) => total + previousGroup.items.length, 0),
+  }))
+}
+
+export function ContactSheet({ directGroup, hideDirectHeader = false, overviewMode = 'rooms' }: { directGroup?: EntityGroupConfig; hideDirectHeader?: boolean; overviewMode?: 'grouped' | 'rooms' } = {}) {
   const [selectedGroup, setSelectedGroup] = useState<EntityGroupConfig | null>(directGroup ?? null)
   const [roomCardsExiting, setRoomCardsExiting] = useState(false)
   const transitionTimer = useRef<number | null>(null)
@@ -816,12 +854,26 @@ export function ContactSheet({ directGroup }: { directGroup?: EntityGroupConfig 
     setSelectedGroup(null)
   }
 
+  if (!directGroup && overviewMode === 'grouped') {
+    return (
+      <div className={styles.contactSheet}>
+        <div className={styles.contactContent}>
+          <section className={styles.roomContactOverview}>
+            <div className={styles.roomStateStack}>
+              {groupsWithIndexOffsets(roomGroups).map(({ group, indexOffset }) => <RoomContactSection group={group} indexOffset={indexOffset} key={group.title} />)}
+            </div>
+          </section>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className={styles.contactSheet}>
-      {selectedGroup ? <RoomContactDetailHeader group={selectedGroup} onBack={directMode ? undefined : showRoomOverview} /> : <RoomsHeader />}
+      {selectedGroup ? (!hideDirectHeader && <RoomContactDetailHeader group={selectedGroup} onBack={directMode ? undefined : showRoomOverview} />) : <RoomsHeader />}
       <div className={styles.contactContent}>
         {selectedGroup ? (
-          <RoomContactDetailCards group={selectedGroup} />
+          <RoomContactDetailCards group={selectedGroup} size={directMode ? 'source-row' : 'bubble'} />
         ) : (
           <section className={styles.roomContactOverview} data-exiting={roomCardsExiting}>
             <div className={styles.roomContactGrid}>
@@ -853,15 +905,14 @@ function RoomAirQualityOverviewCard({ room }: { room: AirQualityRoomConfig }) {
   const aqiEntity = useEntity(asEntityName(room.aqiEntityId), { returnNullIfNotFound: true })
   const colorEntity = useEntity(asEntityName(room.colorEntityId), { returnNullIfNotFound: true })
   const pm25Entity = useEntity(asEntityName(room.pm25EntityId), { returnNullIfNotFound: true })
-  const aqiRow = `AQI ${formatAirMetricState(aqiEntity)}`
-  const pm25Row = `PM2.5 ${formatAirMetricState(pm25Entity)}`
+  const aqiRow = formatAirMetricState(aqiEntity)
+  const pm25Row = formatAirMetricState(pm25Entity)
 
   return (
     <RoomCard
       area={airQualityRoomArea(room, colorEntity)}
-      ariaLabel={`${room.title} ${aqiRow} ${pm25Row}`}
-      secondarySubtitle={pm25Row}
-      subtitle={aqiRow}
+      ariaLabel={`${room.title} AQI ${aqiRow} PM2.5 ${pm25Row}`}
+      subtitle={`${aqiRow} • ${pm25Row}`}
     />
   )
 }
