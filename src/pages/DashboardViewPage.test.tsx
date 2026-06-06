@@ -1,8 +1,8 @@
-import { fireEvent, render, screen, within } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { materialIconPath } from '../components/core/iconPaths'
 import { DashboardViewPage } from './DashboardViewPage'
 import { ROOM_PAGE_CONFIGS, ROOM_PAGE_ORDER } from '../constants/roomPages'
-import { entity, mockCallServiceCalls, mockEntities, resetMockHass } from '../test/mocks/hakitCoreState'
+import { entity, mockCallServiceCalls, mockEntities, mockState, mockTodoItemsByEntity, resetMockHass } from '../test/mocks/hakitCoreState'
 
 describe('DashboardViewPage', () => {
   beforeEach(() => {
@@ -68,6 +68,8 @@ describe('DashboardViewPage', () => {
     expect(screen.getByRole('heading', { name: 'Hallway' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Nothing Here Yet!' })).toBeInTheDocument()
     expect(screen.getByText('Once some devices are added to this room, we can display them here.')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Nothing Here Yet!' }).parentElement).toHaveAttribute('data-empty-layout', 'centered')
+    expect(screen.getByRole('heading', { name: 'Nothing Here Yet!' }).parentElement).toHaveAttribute('data-empty-typography', 'festival')
   })
 
   it('opens room status hashes with reusable Home modal sheets directly', async () => {
@@ -1015,6 +1017,146 @@ describe('DashboardViewPage', () => {
 
     expect(screen.getByRole('heading', { name: 'Groceries' })).toBeInTheDocument()
     expect(await screen.findByText('Mock task one')).toBeInTheDocument()
+  })
+
+  it('ports the Chores page source sections, quick links, and Stephen user visibility', async () => {
+    const navigate = vi.fn()
+    render(<DashboardViewPage activePath="chores" onNavigate={navigate} path="chores" />)
+
+    expect(screen.getByRole('heading', { name: 'Chores' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'House Calendar' })).toBeInTheDocument()
+    expect(await screen.findByText('No events to display')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Quick Links' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /Groceries Off/i }))
+    expect(navigate).toHaveBeenCalledWith('groceries')
+
+    expect(screen.getByRole('heading', { name: 'Past Due' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Evening Tasks' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Afternoon Tasks' })).not.toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'No Due Date' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Upcoming' })).toBeInTheDocument()
+    expect(screen.getAllByLabelText(/todo list$/)).toHaveLength(4)
+    expect(within(screen.getByLabelText('Past Due todo list')).queryByText('Active')).not.toBeInTheDocument()
+  })
+
+  it('switches Chores user-gated todo sections for Steph and updates the Steph list', async () => {
+    mockState.user = { id: '43cb71bbd1cb4860b2a7de4c829020f0', name: 'Steph' }
+    render(<DashboardViewPage activePath="chores" onNavigate={() => undefined} path="chores" />)
+
+    const eveningList = await screen.findByLabelText('Evening Tasks todo list')
+    fireEvent.click(within(eveningList).getByRole('button', { name: /Mock task one/i }))
+
+    expect(mockCallServiceCalls).toContainEqual({
+      domain: 'todo',
+      service: 'update_item',
+      target: 'todo.steph_s_evening_with_unassigned',
+      serviceData: { item: 'todo.steph_s_evening_with_unassigned-1', status: 'completed' },
+    })
+  })
+
+  it('removes completed chore rows immediately and reloads rows when Home Assistant updates the todo entity', async () => {
+    mockTodoItemsByEntity['todo.stephen_s_past_due_with_unassigned'] = [{ uid: 'past-due-1', summary: 'First live task', status: 'needs_action' }]
+    const view = render(<DashboardViewPage activePath="chores" onNavigate={() => undefined} path="chores" />)
+
+    const pastDueList = await screen.findByLabelText('Past Due todo list')
+    fireEvent.click(within(pastDueList).getByRole('button', { name: /First live task/i }))
+
+    await waitFor(() => expect(screen.queryByLabelText('Past Due todo list')).not.toBeInTheDocument())
+
+    mockTodoItemsByEntity['todo.stephen_s_past_due_with_unassigned'] = [{ uid: 'past-due-2', summary: 'Second live task', status: 'needs_action' }]
+    mockEntities['todo.stephen_s_past_due_with_unassigned'].state = '2'
+    view.rerender(<DashboardViewPage activePath="chores" onNavigate={() => undefined} path="chores" />)
+
+    const reloadedPastDueList = await screen.findByLabelText('Past Due todo list')
+    expect(await within(reloadedPastDueList).findByRole('button', { name: /Second live task/i })).toBeInTheDocument()
+  })
+
+  it('does not render chore sections whose loaded todo list has no visible tasks', async () => {
+    mockTodoItemsByEntity['todo.stephen_s_evening_with_unassigned'] = []
+    mockEntities['todo.stephen_s_evening_with_unassigned'].state = '1'
+    render(<DashboardViewPage activePath="chores" onNavigate={() => undefined} path="chores" />)
+
+    expect(screen.getByRole('heading', { name: 'Evening Tasks' })).toBeInTheDocument()
+
+    await waitFor(() => expect(screen.queryByRole('heading', { name: 'Evening Tasks' })).not.toBeInTheDocument())
+  })
+
+  it.each([
+    ['stephs-chores', 'todo.steph_s_due_today', 'Due Today', 'Past Due'],
+    ['stephens-chores', 'todo.stephen_s_due_today', 'Due Today', 'Past Due'],
+    ['unassigned-chores', 'todo.unassigned_upcoming', 'Upcoming', 'Past Due'],
+    ['home-improvement-chores', 'todo.home_improvement_s_upcoming', 'Upcoming', 'No Due Date'],
+  ])('does not render empty sections on the %s subpage', async (path, emptyEntityId, emptyHeading, remainingHeading) => {
+    mockTodoItemsByEntity[emptyEntityId] = []
+    render(<DashboardViewPage activePath={path} onNavigate={() => undefined} path={path} />)
+
+    expect(screen.getByRole('heading', { name: emptyHeading })).toBeInTheDocument()
+
+    await waitFor(() => expect(screen.queryByRole('heading', { name: emptyHeading })).not.toBeInTheDocument())
+    expect(screen.getByRole('heading', { name: remainingHeading })).toBeInTheDocument()
+  })
+
+  it('does not render the Groceries section when the shopping list has no visible items', async () => {
+    mockTodoItemsByEntity['todo.shopping_list'] = []
+    mockEntities['todo.shopping_list'].state = '1'
+    render(<DashboardViewPage activePath="groceries" onNavigate={() => undefined} path="groceries" />)
+
+    expect(screen.getByRole('heading', { name: 'Grocery List' })).toBeInTheDocument()
+
+    await waitFor(() => expect(screen.queryByRole('heading', { name: 'Grocery List' })).not.toBeInTheDocument())
+    expect(screen.getByRole('heading', { name: 'No groceries listed' })).toBeInTheDocument()
+    expect(screen.getByText('Add some groceries via the YAML app for now to see them appear here.')).toBeInTheDocument()
+  })
+
+  it('renders an empty task state when a todo page has no visible task sections', async () => {
+    for (const entityId of ['todo.steph_s_past_due', 'todo.steph_s_due_today', 'todo.steph_s_upcoming', 'todo.steph_s_no_due_date']) {
+      mockTodoItemsByEntity[entityId] = []
+      mockEntities[entityId] = entity(entityId, '1')
+    }
+
+    render(<DashboardViewPage activePath="stephs-chores" onNavigate={() => undefined} path="stephs-chores" />)
+
+    expect(await screen.findByRole('heading', { name: 'No Tasks!' })).toBeInTheDocument()
+    await waitFor(() => expect(screen.queryByLabelText(/todo list$/)).not.toBeInTheDocument())
+    expect(screen.getByRole('heading', { name: 'No Tasks!' }).parentElement).toHaveAttribute('data-empty-layout', 'centered')
+    expect(screen.getByRole('heading', { name: 'No Tasks!' }).parentElement).toHaveAttribute('data-empty-typography', 'festival')
+    expect(screen.getByText('You have no tasks due- nice job!')).toBeInTheDocument()
+  })
+
+  it('renders chore due dates as explicit overdue durations instead of calendar phrases', async () => {
+    mockTodoItemsByEntity['todo.stephen_s_past_due_with_unassigned'] = [
+      { uid: 'past-due-overdue', summary: 'Explicit overdue task', status: 'needs_action', due: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString() },
+      { uid: 'past-due-hours', summary: 'Hours overdue task', status: 'needs_action', due: new Date(Date.now() - 7 * 60 * 60 * 1000).toISOString() },
+      { uid: 'past-due-months', summary: 'Months overdue task', status: 'needs_action', due: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString() },
+      { uid: 'past-due-future', summary: 'Future task', status: 'needs_action', due: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString() },
+    ]
+    render(<DashboardViewPage activePath="chores" onNavigate={() => undefined} path="chores" />)
+
+    const pastDueList = await screen.findByLabelText('Past Due todo list')
+
+    expect(within(pastDueList).getByText('5 days overdue')).toBeInTheDocument()
+    expect(within(pastDueList).getByText('7 hours overdue')).toBeInTheDocument()
+    expect(within(pastDueList).getByText('3 months overdue')).toBeInTheDocument()
+    expect(within(pastDueList).getByText('Due in 2 days')).toBeInTheDocument()
+    expect(within(pastDueList).getByRole('button', { name: /Hours overdue task/i })).toHaveAttribute('data-due-tone', 'overdue-hours')
+    expect(within(pastDueList).getByRole('button', { name: /Explicit overdue task/i })).toHaveAttribute('data-due-tone', 'overdue-long')
+    expect(within(pastDueList).getByRole('button', { name: /Months overdue task/i })).toHaveAttribute('data-due-tone', 'overdue-long')
+    expect(within(pastDueList).queryByText(/last week|this week/i)).not.toBeInTheDocument()
+  })
+
+  it('opens the source create Donetick task more-info event from Chores', async () => {
+    const moreInfo = vi.fn()
+    window.addEventListener('hass-more-info', moreInfo)
+    render(<DashboardViewPage activePath="chores" onNavigate={() => undefined} path="chores" />)
+
+    expect(await screen.findByText('No events to display')).toBeInTheDocument()
+    expect(await screen.findAllByText('Mock task one')).not.toHaveLength(0)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Create Donetick task' }))
+
+    expect(moreInfo).toHaveBeenCalled()
+    expect((moreInfo.mock.calls[0][0] as CustomEvent).detail).toEqual({ entityId: 'script.create_donetick_task' })
+    window.removeEventListener('hass-more-info', moreInfo)
   })
 
   it('renders the thermostat route as a dedicated Ecobee port', () => {

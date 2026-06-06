@@ -7,6 +7,33 @@ test('overview renders with mock Home Assistant state', async ({ page }) => {
   await expect(page.getByRole('heading', { name: 'Quick Links' })).toBeVisible()
 })
 
+test('chores page shows source sections and checkbox todo rows for the logged-in user', async ({ page }) => {
+  await page.goto('/at-a-glance/chores')
+
+  await expect(page.getByRole('heading', { name: 'Chores' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'House Calendar' })).toBeVisible()
+  await expect(page.getByText('No events to display')).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Quick Links' })).toBeVisible()
+  await expect(page.getByRole('button', { name: /Groceries Off/i })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Past Due' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Evening Tasks' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Afternoon Tasks' })).toHaveCount(0)
+  const pastDueList = page.getByLabel('Past Due todo list')
+  await expect(pastDueList.getByRole('button', { name: /Mock task one/i })).toHaveAttribute('aria-pressed', 'false')
+
+  await pastDueList.getByRole('button', { name: /Mock task one/i }).click()
+
+  await expect(pastDueList.getByRole('button', { name: /Mock task one/i })).toHaveCount(0)
+  await expect(page.getByText('Unable to update task')).toHaveCount(0)
+})
+
+test('chore subpages keep the Chores bottom nav item active', async ({ page }) => {
+  await page.goto('/at-a-glance/stephs-chores')
+
+  await expect(page.getByRole('heading', { name: "Steph's Chores" })).toBeVisible()
+  await expect(page.getByRole('navigation', { name: 'Dashboard sections' }).getByRole('button', { name: 'Chores' })).toHaveAttribute('aria-current', 'page')
+})
+
 test('room pages are statically ported React pages', async ({ page }) => {
   await page.goto('/at-a-glance/living-room')
 

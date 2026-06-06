@@ -1,10 +1,14 @@
 import { useEffect, useState } from 'react'
 import { useEntity, useHass } from '@hakit/core'
 import { MaterialIcon } from '../core/Icon'
-import { asEntityName, formatCompactEntityState } from './entityState'
+import { asEntityName } from './entityState'
 import styles from './TodoListPanel.module.css'
 
 interface TodoItem {
+  description?: string
+  due?: string
+  due_date?: string
+  due_datetime?: string
   summary?: string
   status?: string
   uid?: string
@@ -12,6 +16,8 @@ interface TodoItem {
 
 interface TodoListPanelProps {
   entityId: string
+  hideCompleted?: boolean
+  onVisibleItemsChange?: (count: number) => void
   title: string
 }
 
@@ -19,17 +25,63 @@ interface HassConnection {
   sendMessagePromise?: <T>(message: Record<string, unknown>) => Promise<T>
 }
 
-function itemStatus(item: TodoItem) {
-  if (item.status === 'completed') return 'Done'
-  if (item.status === 'needs_action') return 'Open'
-  return item.status ?? 'Open'
+type CallService = (params: Record<string, unknown>) => Promise<unknown> | void
+
+interface DueInfo {
+  label: string
+  tone: 'future' | 'overdue-hours' | 'overdue-long'
 }
 
-export function TodoListPanel({ entityId, title }: TodoListPanelProps) {
+function todoIdentity(item: TodoItem) {
+  return item.uid ?? item.summary ?? ''
+}
+
+function todoDue(item: TodoItem) {
+  return item.due_datetime ?? item.due ?? item.due_date
+}
+
+function relativeDueInfo(value: string | undefined): DueInfo | null {
+  if (!value) return null
+  const dueDate = new Date(value)
+  if (Number.isNaN(dueDate.getTime())) return null
+
+  const now = new Date()
+  const diffMs = dueDate.getTime() - now.getTime()
+  const absMs = Math.abs(diffMs)
+  const hour = 60 * 60 * 1000
+  const day = 24 * hour
+  const week = 7 * day
+  const month = 30 * day
+  const overdue = diffMs < 0
+  const unit = absMs < day ? 'hour' : absMs < 21 * day ? 'day' : absMs < 60 * day ? 'week' : 'month'
+  const divisor = unit === 'hour' ? hour : unit === 'day' ? day : unit === 'week' ? week : month
+  const amount = Math.max(1, Math.round(absMs / divisor))
+  const label = `${amount} ${unit}${amount === 1 ? '' : 's'}`
+
+  if (!overdue) return { label: `Due in ${label}`, tone: 'future' }
+  return { label: `${label} overdue`, tone: unit === 'hour' ? 'overdue-hours' : 'overdue-long' }
+}
+
+function sortByDueDate(items: TodoItem[]) {
+  return [...items].sort((left, right) => {
+    const leftDue = todoDue(left)
+    const rightDue = todoDue(right)
+    if (!leftDue && !rightDue) return 0
+    if (!leftDue) return 1
+    if (!rightDue) return -1
+    return new Date(leftDue).getTime() - new Date(rightDue).getTime()
+  })
+}
+
+export function TodoListPanel({ entityId, hideCompleted = true, onVisibleItemsChange, title }: TodoListPanelProps) {
   const entity = useEntity(asEntityName(entityId), { returnNullIfNotFound: true })
   const connection = useHass((state) => state.connection) as unknown as HassConnection | undefined
-  const [items, setItems] = useState<TodoItem[]>([])
+  const callService = useHass((state) => state.helpers.callService) as unknown as CallService
+  const [items, setItems] = useState<TodoItem[] | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const entityState = entity?.state
+  const entityLastChanged = (entity as { last_changed?: string } | null)?.last_changed
+  const entityLastUpdated = (entity as { last_updated?: string } | null)?.last_updated
 
   useEffect(() => {
     let cancelled = false
@@ -39,36 +91,72 @@ export function TodoListPanel({ entityId, title }: TodoListPanelProps) {
     connection
       .sendMessagePromise<{ items?: TodoItem[] }>({ type: 'todo/item/list', entity_id: entityId })
       .then((response) => {
-        if (!cancelled) setItems(response.items ?? [])
+        if (!cancelled) {
+          setError(null)
+          setItems(sortByDueDate(response.items ?? []))
+        }
       })
       .catch((caughtError: unknown) => {
-        if (!cancelled) setError(caughtError instanceof Error ? caughtError.message : 'Unable to load list')
+        if (!cancelled) {
+          setError(caughtError instanceof Error ? caughtError.message : 'Unable to load list')
+        }
       })
 
     return () => {
       cancelled = true
     }
-  }, [connection, entityId])
+  }, [connection, entityId, entityLastChanged, entityLastUpdated, entityState])
 
-  const openItems = items.filter((item) => item.status !== 'completed')
+  const loadedItems = items ?? []
+  const visibleItems = hideCompleted ? loadedItems.filter((item) => item.status !== 'completed') : loadedItems
+
+  useEffect(() => {
+    if (!items || error) return
+    onVisibleItemsChange?.(visibleItems.length)
+  }, [error, items, onVisibleItemsChange, visibleItems.length])
+
+  const toggleItem = (item: TodoItem) => {
+    const identity = todoIdentity(item)
+    if (!identity || !connection?.sendMessagePromise) return
+    const nextStatus = item.status === 'completed' ? 'needs_action' : 'completed'
+    setItems((current) => (current ?? []).map((currentItem) => (todoIdentity(currentItem) === identity ? { ...currentItem, status: nextStatus } : currentItem)))
+    void Promise.resolve(
+      callService({
+        domain: 'todo',
+        service: 'update_item',
+        target: entityId,
+        serviceData: { item: identity, status: nextStatus },
+      }),
+    )
+      .then(() => setError(null))
+      .catch((caughtError: unknown) => {
+        setItems((current) => (current ?? []).map((currentItem) => (todoIdentity(currentItem) === identity ? { ...currentItem, status: item.status } : currentItem)))
+        setError(caughtError instanceof Error ? caughtError.message : 'Unable to update task')
+      })
+  }
 
   return (
     <article className={styles.panel} aria-label={`${title} todo list`}>
-      <header className={styles.header}>
-        <span className={styles.icon} aria-hidden="true"><MaterialIcon name="mdi:clipboard-list" size={26} /></span>
-        <span className={styles.copy}>
-          <span className={styles.title}>{title}</span>
-          <span className={styles.subtitle}>{error ?? `${openItems.length} open - ${formatCompactEntityState(entity, 'Ready')}`}</span>
-        </span>
-      </header>
-      {openItems.length > 0 && (
+      {error && <span className={styles.error}>{error}</span>}
+      {visibleItems.length > 0 && (
         <ul className={styles.items}>
-          {openItems.slice(0, 5).map((item, index) => (
-            <li className={styles.item} key={item.uid ?? `${entityId}-${index}`}>
-              <span>{item.summary ?? 'Untitled task'}</span>
-              <small>{itemStatus(item)}</small>
-            </li>
-          ))}
+          {visibleItems.map((item, index) => {
+            const due = relativeDueInfo(todoDue(item))
+            return (
+              <li className={styles.item} key={item.uid ?? `${entityId}-${index}`}>
+                <button aria-pressed={item.status === 'completed'} className={styles.itemButton} data-due-tone={due?.tone} onClick={() => toggleItem(item)} type="button">
+                  <span className={styles.checkbox} aria-hidden="true">
+                    {item.status === 'completed' && <MaterialIcon name="mdi:check" size={18} />}
+                  </span>
+                  <span className={styles.itemCopy}>
+                    <span className={styles.summary}>{item.summary ?? 'Untitled task'}</span>
+                    {item.description && <span className={styles.description}>{item.description}</span>}
+                    {due && <small>{due.label}</small>}
+                  </span>
+                </button>
+              </li>
+            )
+          })}
         </ul>
       )}
     </article>

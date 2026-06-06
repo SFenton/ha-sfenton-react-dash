@@ -1,4 +1,4 @@
-import { routePathFromUrl, routeUrl } from './routes'
+import { primaryNavPathForRoute, primaryNavRouteActive, routePathFromUrl, routeUrl } from './routes'
 
 describe('routes', () => {
   it('extracts at-a-glance route paths', () => {
@@ -23,5 +23,16 @@ describe('routes', () => {
     expect(routeUrl('security', '/sfenton-react-dash/home?path=overview')).toBe('/sfenton-react-dash/home?path=security')
     expect(routeUrl('living-room', '/sfenton-react-dash/home?v=20260530', '#lights-living-room')).toBe('/sfenton-react-dash/home?v=20260530&path=living-room#lights-living-room')
     expect(routeUrl('vacuums', '/local/ha-sfenton-react-dash/index.html?v=20260530#old-popup')).toBe('/local/ha-sfenton-react-dash/index.html?v=20260530&path=vacuums')
+  })
+
+  it('groups chore subpages under the Chores primary nav route', () => {
+    expect(primaryNavPathForRoute('chores')).toBe('chores')
+    expect(primaryNavPathForRoute('stephs-chores')).toBe('chores')
+    expect(primaryNavPathForRoute('stephens-chores')).toBe('chores')
+    expect(primaryNavPathForRoute('unassigned-chores')).toBe('chores')
+    expect(primaryNavPathForRoute('home-improvement-chores')).toBe('chores')
+    expect(primaryNavPathForRoute('groceries')).toBe('chores')
+    expect(primaryNavRouteActive('stephs-chores', 'chores')).toBe(true)
+    expect(primaryNavRouteActive('stephs-chores', 'overview')).toBe(false)
   })
 })

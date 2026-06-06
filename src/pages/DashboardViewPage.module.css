@@ -15,6 +15,104 @@
   gap: 10px;
 }
 
+.choreQuickGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.choreQuickGrid > * {
+  min-height: 120px;
+}
+
+.calendarPanel {
+  position: relative;
+  display: grid;
+  min-height: 210px;
+  align-content: stretch;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 28px;
+  padding: 18px;
+  color: rgba(255, 255, 255, 0.82);
+  background: rgba(0, 0, 0, 0.32);
+  box-shadow: var(--shadow-glass), inset 0 1px 0 rgba(255, 255, 255, 0.16);
+  font-size: 0.92rem;
+  font-weight: 700;
+  text-align: center;
+}
+
+.calendarToolbar {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr) auto;
+  gap: 18px;
+  align-items: center;
+  color: rgba(255, 255, 255, 0.88);
+  font-size: 1.05rem;
+}
+
+.calendarToolbar span:first-child {
+  border-radius: 999px;
+  padding: 7px 14px;
+  color: rgb(191, 196, 255);
+  background: rgba(8, 11, 44, 0.82);
+  font-size: 0.8rem;
+}
+
+.calendarToolbar strong {
+  justify-self: center;
+  font-size: 1.35rem;
+  font-weight: 520;
+}
+
+.calendarEmpty {
+  display: grid;
+  min-height: 132px;
+  place-items: center;
+  margin-top: 18px;
+  background: rgba(0, 0, 0, 0.42);
+}
+
+.choresEmpty {
+  display: grid;
+  min-height: calc(100vh - var(--bottom-nav-height) - 160px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+  align-content: center;
+  gap: 10px;
+  padding: 24px 12px;
+  box-sizing: border-box;
+  color: white;
+  justify-items: center;
+  text-align: center;
+}
+
+.choresEmpty h2 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 800;
+  line-height: 1.02;
+}
+
+.choresEmpty > div {
+  max-width: 680px;
+  margin: 0 auto;
+  font-size: 14px;
+}
+
+.createChoreButton {
+  display: grid;
+  width: 72px;
+  height: 72px;
+  justify-self: end;
+  place-items: center;
+  border: 0;
+  border-radius: 999px;
+  padding: 0;
+  color: white;
+  background: rgb(var(--card-rgb) / 0.74);
+  box-shadow: var(--shadow-glass), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  font: inherit;
+  cursor: pointer;
+}
+
 .singleColumn {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -67,18 +165,20 @@
 
 .emptyRoomState {
   display: grid;
-  min-height: min(52vh, 520px);
+  min-height: calc(100vh - var(--bottom-nav-height) - 160px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
   align-content: center;
   gap: 18px;
+  box-sizing: border-box;
   color: rgba(255, 255, 255, 0.86);
+  justify-items: center;
   text-align: center;
 }
 
 .emptyRoomState h2 {
   margin: 0;
   color: rgba(255, 255, 255, 0.9);
-  font-size: clamp(2.35rem, 9vw, 3.45rem);
-  font-weight: 860;
+  font-size: 20px;
+  font-weight: 800;
   line-height: 1.02;
 }
 
@@ -86,7 +186,7 @@
   max-width: 680px;
   margin: 0 auto;
   color: rgba(255, 255, 255, 0.82);
-  font-size: clamp(1.1rem, 4.8vw, 1.7rem);
+  font-size: 14px;
   font-weight: 650;
   line-height: 1.45;
 }

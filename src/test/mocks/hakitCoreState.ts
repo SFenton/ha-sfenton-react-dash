@@ -16,6 +16,7 @@ export interface MockHassState {
     joinHassUrl: (path: string) => string
   }
   services: Record<string, unknown>
+  user: { id: string; name: string } | null
 }
 
 export function entity(entityId: string, state: string, attributes: Record<string, unknown> = {}): MockEntity {
@@ -23,6 +24,16 @@ export function entity(entityId: string, state: string, attributes: Record<strin
 }
 
 export const mockCallServiceCalls: Record<string, unknown>[] = []
+export const mockTodoUpdateMessages: Record<string, unknown>[] = []
+export const mockTodoItemsByEntity: Record<string, MockTodoItem[] | undefined> = {}
+
+interface MockTodoItem {
+  description?: string
+  due?: string
+  status: string
+  summary: string
+  uid: string
+}
 
 const adminPresenceSwitchEntityIds = [
   'switch.living_room_presence_living_room_lights_presence_allowed',
@@ -263,6 +274,18 @@ export const mockEntities: Record<string, MockEntity> = {
   'todo.shopping_list': entity('todo.shopping_list', '2'),
   'todo.groceries': entity('todo.groceries', '1'),
   'todo.stephen_s_past_due_with_unassigned': entity('todo.stephen_s_past_due_with_unassigned', '1'),
+  'todo.stephen_s_evening_with_unassigned': entity('todo.stephen_s_evening_with_unassigned', '1'),
+  'todo.stephen_s_afternoon_with_unassigned': entity('todo.stephen_s_afternoon_with_unassigned', '0'),
+  'todo.stephen_s_morning_with_unassigned': entity('todo.stephen_s_morning_with_unassigned', '0'),
+  'todo.stephen_s_all_day_with_unassigned': entity('todo.stephen_s_all_day_with_unassigned', '0'),
+  'todo.stephen_s_no_due_date_with_unassigned': entity('todo.stephen_s_no_due_date_with_unassigned', '1'),
+  'todo.stephen_s_upcoming_today_by_time_and_future_with_unassigned': entity('todo.stephen_s_upcoming_today_by_time_and_future_with_unassigned', '1'),
+  'todo.steph_s_evening_with_unassigned': entity('todo.steph_s_evening_with_unassigned', '1'),
+  'todo.steph_s_afternoon_with_unassigned': entity('todo.steph_s_afternoon_with_unassigned', '0'),
+  'todo.steph_s_morning_with_unassigned': entity('todo.steph_s_morning_with_unassigned', '0'),
+  'todo.steph_s_all_day_with_unassigned': entity('todo.steph_s_all_day_with_unassigned', '0'),
+  'todo.steph_s_no_due_date_with_unassigned': entity('todo.steph_s_no_due_date_with_unassigned', '1'),
+  'todo.steph_s_upcoming_today_by_time_and_future_with_unassigned': entity('todo.steph_s_upcoming_today_by_time_and_future_with_unassigned', '1'),
   'vacuum.valetudo_elatedusedram': entity('vacuum.valetudo_elatedusedram', 'unavailable'),
   'sensor.valetudo_elatedusedram_battery_level': entity('sensor.valetudo_elatedusedram_battery_level', 'unknown', { unit_of_measurement: '%' }),
   'sensor.valetudo_elatedusedram_status_flag': entity('sensor.valetudo_elatedusedram_status_flag', 'unknown'),
@@ -327,16 +350,20 @@ export const mockEntities: Record<string, MockEntity> = {
 }
 
 function todoItems(entityId: unknown) {
+  const entityKey = String(entityId)
   return {
-    items: [
-      { uid: `${String(entityId)}-1`, summary: 'Mock task one', status: 'needs_action' },
-      { uid: `${String(entityId)}-2`, summary: 'Mock task two', status: 'needs_action' },
+    items: mockTodoItemsByEntity[entityKey] ?? [
+      { uid: `${entityKey}-1`, summary: 'Mock task one', status: 'needs_action', due: '2026-06-04T17:30:00+00:00' },
+      { uid: `${entityKey}-2`, summary: 'Mock task two', status: 'needs_action' },
     ],
   }
 }
 
 export function resetMockHass() {
   mockCallServiceCalls.length = 0
+  mockTodoUpdateMessages.length = 0
+  for (const entityId of Object.keys(mockTodoItemsByEntity)) delete mockTodoItemsByEntity[entityId]
+  mockState.user = { id: '64089b5683944c39b4f944c8f76830b0', name: 'Stephen' }
 }
 
 export const mockState: MockHassState = {
@@ -344,6 +371,11 @@ export const mockState: MockHassState = {
   connection: {
     sendMessagePromise: async <T,>(message: Record<string, unknown>) => {
       if (message.type === 'todo/item/list') return todoItems(message.entity_id) as T
+      if (message.type === 'todo/item/update') {
+        mockTodoUpdateMessages.push(message)
+        return {} as T
+      }
+      if (message.type === 'calendar/event/list') return { events: [] } as T
       return {} as T
     },
   },
@@ -356,4 +388,5 @@ export const mockState: MockHassState = {
     joinHassUrl: (path) => `http://mock-hass.local${path}`,
   },
   services: {},
+  user: { id: '64089b5683944c39b4f944c8f76830b0', name: 'Stephen' },
 }

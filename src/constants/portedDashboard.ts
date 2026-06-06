@@ -6,10 +6,10 @@ export type EntityBasicAction =
   | { type: 'service'; domain: string; service: string; target?: string | null; serviceData?: Record<string, unknown> }
 
 export interface EntityStateAction<TAction extends EntityBasicAction = EntityBasicAction> {
-  cases: Array<{ action: TAction; states: string[] }>
-  defaultAction: TAction
-  entityId?: string
   type: 'state'
+  cases: { action: TAction; states: string[] }[]
+  defaultAction?: TAction
+  entityId?: string
 }
 
 export type EntityAction = EntityBasicAction | EntityStateAction
@@ -49,11 +49,23 @@ export interface SettingsLinkConfig {
 export interface TodoListConfig {
   title: string
   entityId: string
+  hideCompleted?: boolean
+  hideWhenNoOpenItems?: boolean
+  userIds?: string[]
 }
 
 export interface TodoPageConfig {
   title: string
   lists: TodoListConfig[]
+  emptyTitle?: string
+  emptyDescription?: string
+}
+
+export interface ChoreQuickLinkConfig {
+  title: string
+  path: string
+  icon: string
+  color: CardColor
 }
 
 export interface VacuumConfig {
@@ -98,6 +110,20 @@ export const MEDIA_COLOR: CardColor = { r: 218, g: 88, b: 132 }
 export const CONTROL_COLOR: CardColor = { r: 75, g: 126, b: 210 }
 export const UNAVAILABLE_COLOR: CardColor = { r: 255, g: 255, b: 255 }
 export const SWITCH_ACTIVE_COLOR: CardColor = { r: 67, g: 160, b: 71 }
+export const CHORE_BLUE: CardColor = { r: 0, g: 154, b: 199 }
+
+export const CHORE_USER_IDS = {
+  stephen: '64089b5683944c39b4f944c8f76830b0',
+  steph: '43cb71bbd1cb4860b2a7de4c829020f0',
+} as const
+
+export const CHORE_QUICK_LINKS: ChoreQuickLinkConfig[] = [
+  { title: 'Groceries', path: 'groceries', icon: 'mdi:clipboard-list', color: { r: 155, g: 67, b: 72 } },
+  { title: "Stephen's Tasks", path: 'stephens-chores', icon: 'mdi:clipboard-list', color: { r: 0, g: 96, b: 120 } },
+  { title: "Steph's Tasks", path: 'stephs-chores', icon: 'mdi:clipboard-list', color: { r: 212, g: 108, b: 0 } },
+  { title: 'Unassigned Tasks', path: 'unassigned-chores', icon: 'mdi:clipboard-list', color: { r: 81, g: 58, b: 126 } },
+  { title: 'Home Tasks', path: 'home-improvement-chores', icon: 'mdi:clipboard-list', color: { r: 64, g: 143, b: 154 } },
+]
 
 export const ADMIN_DESCRIPTIONS = {
   autoLock: 'Disables automatic locking of the front door. Useful for when contractors are over, or we have people frequently entering/leaving the home.',
@@ -214,19 +240,19 @@ export const TODO_PAGES: Record<string, TodoPageConfig> = {
   chores: {
     title: 'Chores',
     lists: [
-      { title: 'Past Due', entityId: 'todo.stephen_s_past_due_with_unassigned' },
-      { title: 'Stephen Evening', entityId: 'todo.stephen_s_evening_with_unassigned' },
-      { title: 'Stephen Afternoon', entityId: 'todo.stephen_s_afternoon_with_unassigned' },
-      { title: 'Stephen Morning', entityId: 'todo.stephen_s_morning_with_unassigned' },
-      { title: 'Stephen All Day', entityId: 'todo.stephen_s_all_day_with_unassigned' },
-      { title: 'Stephen No Due Date', entityId: 'todo.stephen_s_no_due_date_with_unassigned' },
-      { title: 'Steph Evening', entityId: 'todo.steph_s_evening_with_unassigned' },
-      { title: 'Steph Afternoon', entityId: 'todo.steph_s_afternoon_with_unassigned' },
-      { title: 'Steph Morning', entityId: 'todo.steph_s_morning_with_unassigned' },
-      { title: 'Steph All Day', entityId: 'todo.steph_s_all_day_with_unassigned' },
-      { title: 'Steph No Due Date', entityId: 'todo.steph_s_no_due_date_with_unassigned' },
-      { title: 'Stephen Upcoming', entityId: 'todo.stephen_s_upcoming_today_by_time_and_future_with_unassigned' },
-      { title: 'Steph Upcoming', entityId: 'todo.steph_s_upcoming_today_by_time_and_future_with_unassigned' },
+      { title: 'Past Due', entityId: 'todo.stephen_s_past_due_with_unassigned', hideCompleted: true, hideWhenNoOpenItems: true, userIds: [CHORE_USER_IDS.stephen] },
+      { title: 'Evening Tasks', entityId: 'todo.stephen_s_evening_with_unassigned', hideCompleted: true, hideWhenNoOpenItems: true, userIds: [CHORE_USER_IDS.stephen] },
+      { title: 'Afternoon Tasks', entityId: 'todo.stephen_s_afternoon_with_unassigned', hideCompleted: true, hideWhenNoOpenItems: true, userIds: [CHORE_USER_IDS.stephen] },
+      { title: 'Morning Tasks', entityId: 'todo.stephen_s_morning_with_unassigned', hideCompleted: true, hideWhenNoOpenItems: true, userIds: [CHORE_USER_IDS.stephen] },
+      { title: 'Due Any Time Today', entityId: 'todo.stephen_s_all_day_with_unassigned', hideCompleted: true, hideWhenNoOpenItems: true, userIds: [CHORE_USER_IDS.stephen] },
+      { title: 'No Due Date', entityId: 'todo.stephen_s_no_due_date_with_unassigned', hideCompleted: true, hideWhenNoOpenItems: true, userIds: [CHORE_USER_IDS.stephen] },
+      { title: 'Evening Tasks', entityId: 'todo.steph_s_evening_with_unassigned', hideCompleted: true, hideWhenNoOpenItems: true, userIds: [CHORE_USER_IDS.steph] },
+      { title: 'Afternoon Tasks', entityId: 'todo.steph_s_afternoon_with_unassigned', hideCompleted: true, hideWhenNoOpenItems: true, userIds: [CHORE_USER_IDS.steph] },
+      { title: 'Morning Tasks', entityId: 'todo.steph_s_morning_with_unassigned', hideCompleted: true, hideWhenNoOpenItems: true, userIds: [CHORE_USER_IDS.steph] },
+      { title: 'Due Any Time Today', entityId: 'todo.steph_s_all_day_with_unassigned', hideCompleted: true, hideWhenNoOpenItems: true, userIds: [CHORE_USER_IDS.steph] },
+      { title: 'No Due Date', entityId: 'todo.steph_s_no_due_date_with_unassigned', hideCompleted: true, hideWhenNoOpenItems: true, userIds: [CHORE_USER_IDS.steph] },
+      { title: 'Upcoming', entityId: 'todo.stephen_s_upcoming_today_by_time_and_future_with_unassigned', hideCompleted: true, hideWhenNoOpenItems: true, userIds: [CHORE_USER_IDS.stephen] },
+      { title: 'Upcoming', entityId: 'todo.steph_s_upcoming_today_by_time_and_future_with_unassigned', hideCompleted: true, hideWhenNoOpenItems: true, userIds: [CHORE_USER_IDS.steph] },
     ],
   },
   'to-do': {
@@ -235,6 +261,8 @@ export const TODO_PAGES: Record<string, TodoPageConfig> = {
   },
   groceries: {
     title: 'Groceries',
+    emptyTitle: 'No groceries listed',
+    emptyDescription: 'Add some groceries via the YAML app for now to see them appear here.',
     lists: [{ title: 'Grocery List', entityId: 'todo.shopping_list' }],
   },
   'stephens-chores': {
@@ -396,9 +424,17 @@ export const SECURITY_SECTIONS: EntitySectionConfig[] = [
 
 export const CONTROL_PAGES: Record<string, { title: string; sections: EntitySectionConfig[] }> = {
   'custom-lights': {
-    // Rendered by the dedicated CustomLightsPage; entry retained for title resolution.
     title: 'Custom Lights',
-    sections: [],
+    sections: [
+      {
+        title: 'Front Yard',
+        items: [
+          { title: 'Manual Front Yard', entityId: 'input_boolean.manually_control_front_yard_lights', icon: 'mdi:lightbulb-group', color: CONTROL_COLOR, action: { type: 'toggle' } },
+          { title: 'Exterior Left', entityId: 'light.front_door_exterior_left_light', icon: 'mdi:lightbulb', color: CONTROL_COLOR },
+          { title: 'Exterior Right', entityId: 'light.front_door_exterior_light_v2', icon: 'mdi:lightbulb', color: CONTROL_COLOR },
+        ],
+      },
+    ],
   },
   'mach-e': {
     title: 'Mach-E',

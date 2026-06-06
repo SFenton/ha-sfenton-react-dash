@@ -1,5 +1,6 @@
 :root {
-  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-festival: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-sans: var(--font-festival);
   --color-text: #f7fbff;
   --color-muted: rgba(247, 251, 255, 0.68);
   --color-subtle: rgba(247, 251, 255, 0.46);

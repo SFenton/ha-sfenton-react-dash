@@ -1,5 +1,5 @@
 import { MaterialIcon } from '../core/Icon'
-import { PRIMARY_NAV_ROUTES } from '../../constants/routes'
+import { PRIMARY_NAV_ROUTES, primaryNavRouteActive } from '../../constants/routes'
 import styles from './BottomNav.module.css'
 
 interface BottomNavProps {
@@ -11,7 +11,7 @@ export function BottomNav({ activePath, onNavigate }: BottomNavProps) {
   return (
     <nav className={styles.nav} aria-label="Dashboard sections">
       {PRIMARY_NAV_ROUTES.map((tab) => {
-        const isActive = activePath === tab.path
+        const isActive = primaryNavRouteActive(activePath, tab.path)
         return (
           <button
             key={tab.label}

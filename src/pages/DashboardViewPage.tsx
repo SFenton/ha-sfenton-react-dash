@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type CSSProperties, type PointerEvent, type ReactNode } from 'react'
-import { useEntity, useHass } from '@hakit/core'
+import { useEntity, useHass, useUser } from '@hakit/core'
 import { ControlSliderCircular } from '@hakit/components'
 import type { HassEntity } from 'home-assistant-js-websocket'
 import { ClimateCard } from '../components/cards/ClimateCard'
@@ -41,6 +41,8 @@ import {
 import { DASHBOARD_ROUTES, PRIMARY_NAV_ROUTES } from '../constants/routes'
 import {
   ADMIN_AUTO_REENABLE_ITEMS,
+  CHORE_BLUE,
+  CHORE_QUICK_LINKS,
   ADMIN_DESCRIPTIONS,
   ADMIN_PRESENCE_OVERRIDE_ITEMS,
   ADMIN_SECURITY_CONTROLS,
@@ -59,6 +61,7 @@ import {
   UNAVAILABLE_COLOR,
   VACUUM_COLOR,
   VACUUMS,
+  type TodoListConfig,
   type EntitySectionConfig,
   type SettingsLinkConfig,
 } from '../constants/portedDashboard'
@@ -527,7 +530,7 @@ function RoomSourceModal({ card, onClose, roomTitle }: { card: RoomSourceCardCon
 
 function EmptyRoomState() {
   return (
-    <div className={styles.emptyRoomState}>
+    <div className={styles.emptyRoomState} data-empty-layout="centered" data-empty-typography="festival">
       <h2>Nothing Here Yet!</h2>
       <Description>Once some devices are added to this room, we can display them here.</Description>
     </div>
@@ -664,19 +667,170 @@ function RoomPage({ onNavigate, path, title }: { onNavigate: (path: string) => v
   )
 }
 
-function TodoPage({ path }: { path: string }) {
+function TodoPage({ onNavigate, path }: { onNavigate: (path: string) => void; path: string }) {
   const config = TODO_PAGES[path]
+  const user = useUser()
+  const entities = useHass((state) => state.entities) as unknown as EntityActionStateMap
+  const [sectionStates, setSectionStates] = useState<Record<string, { loaded: boolean; visible: boolean } | undefined>>({})
   if (!config) return null
+  const hideEmptyTodoSections = isChoreTodoPage(path)
+  const visibleLists = config.lists.filter((list) => todoListVisible(list, user?.id, entities))
+  const visibleListKeys = visibleLists.map((list) => list.entityId)
+  const loadedSectionStates = visibleListKeys.map((entityId) => sectionStates[entityId]).filter((state): state is { loaded: boolean; visible: boolean } => Boolean(state))
+  const allSectionsLoaded = hideEmptyTodoSections && visibleListKeys.length > 0 && loadedSectionStates.length === visibleListKeys.length && loadedSectionStates.every((state) => state.loaded)
+  const hasRenderedTaskSection = hideEmptyTodoSections ? loadedSectionStates.some((state) => state.visible) : visibleLists.length > 0
+  const showTodoEmptyState = hideEmptyTodoSections && (visibleLists.length === 0 || (allSectionsLoaded && !hasRenderedTaskSection))
+
+  const handleTodoSectionState = (entityId: string, state: { loaded: boolean; visible: boolean }) => {
+    setSectionStates((current) => {
+      const previous = current[entityId]
+      if (previous?.loaded === state.loaded && previous.visible === state.visible) return current
+      return { ...current, [entityId]: state }
+    })
+  }
 
   return (
     <div className={styles.stack}>
-      {config.lists.map((list) => (
-        <section className={styles.section} key={list.entityId}>
-          <SectionHeader title={list.title} />
-          <TodoListPanel entityId={list.entityId} title={list.title} />
-        </section>
-      ))}
+      {path === 'chores' && <ChoresIntro onNavigate={onNavigate} />}
+      {showTodoEmptyState && <TodoEmptyState description={config.emptyDescription} title={config.emptyTitle} />}
+      {visibleLists.map((list) => {
+        const entity = entities[list.entityId] as (typeof entities)[string] & { last_changed?: string; last_updated?: string }
+        const sectionKey = `${list.entityId}:${entity?.state ?? ''}:${entity?.last_changed ?? ''}:${entity?.last_updated ?? ''}`
+        return <TodoSection hideWhenEmpty={hideEmptyTodoSections} key={sectionKey} list={list} mayHaveItems={todoEntityMayHaveItems(entity)} onSectionStateChange={handleTodoSectionState} />
+      })}
+      {path === 'chores' && <CreateChoreButton />}
     </div>
+  )
+}
+
+function isChoreTodoPage(path: string) {
+  return path === 'chores' || path === 'groceries' || path.endsWith('-chores')
+}
+
+function todoEntityMayHaveItems(entity: EntityActionStateMap[string] & { state?: string } | undefined) {
+  if (!entity || entity.state === undefined || entity.state === 'unknown' || entity.state === 'unavailable') return true
+  return Number(entity.state) > 0
+}
+
+function TodoSection({ hideWhenEmpty, list, mayHaveItems, onSectionStateChange }: { hideWhenEmpty: boolean | undefined; list: TodoListConfig; mayHaveItems: boolean; onSectionStateChange?: (entityId: string, state: { loaded: boolean; visible: boolean }) => void }) {
+  const [visibleItemCount, setVisibleItemCount] = useState<number | null>(hideWhenEmpty && !mayHaveItems ? 0 : null)
+  const sectionVisible = !(hideWhenEmpty && visibleItemCount === 0)
+
+  useEffect(() => {
+    onSectionStateChange?.(list.entityId, { loaded: visibleItemCount !== null, visible: sectionVisible })
+  }, [list.entityId, onSectionStateChange, sectionVisible, visibleItemCount])
+
+  if (!sectionVisible) return null
+
+  return (
+    <section className={styles.section}>
+      <SectionHeader title={list.title} />
+      <TodoListPanel entityId={list.entityId} hideCompleted={list.hideCompleted} onVisibleItemsChange={hideWhenEmpty ? setVisibleItemCount : undefined} title={list.title} />
+    </section>
+  )
+}
+
+function todoListVisible(list: TodoListConfig, userId: string | undefined, entities: EntityActionStateMap) {
+  if (list.userIds?.length && (!userId || !list.userIds.includes(userId))) return false
+  if (!list.hideWhenNoOpenItems) return true
+  return Number(entities[list.entityId]?.state ?? 0) > 0
+}
+
+function ChoresIntro({ onNavigate }: { onNavigate: (path: string) => void }) {
+  return (
+    <>
+      <section className={styles.section}>
+        <SectionHeader title="House Calendar" />
+        <HouseCalendarPanel />
+      </section>
+      <section className={styles.section}>
+        <SectionHeader title="Quick Links" />
+        <div className={styles.choreQuickGrid}>
+          {CHORE_QUICK_LINKS.map((item) => (
+            <ChoreQuickLink item={item} key={item.path} onNavigate={onNavigate} />
+          ))}
+        </div>
+      </section>
+    </>
+  )
+}
+
+function ChoreQuickLink({ item, onNavigate }: { item: (typeof CHORE_QUICK_LINKS)[number]; onNavigate: (path: string) => void }) {
+  return (
+    <GlassTile
+      backgroundColor={`rgba(${item.color.r}, ${item.color.g}, ${item.color.b}, 0.72)`}
+      icon={item.icon}
+      onClick={() => onNavigate(item.path)}
+      subtitle="Off"
+      title={item.title}
+    />
+  )
+}
+
+function HouseCalendarPanel() {
+  const connection = useHass((state) => state.connection) as unknown as { sendMessagePromise?: <T>(message: Record<string, unknown>) => Promise<T> } | undefined
+  const [events, setEvents] = useState<{ end?: string; start?: string; summary?: string }[]>([])
+
+  useEffect(() => {
+    let cancelled = false
+    if (!connection?.sendMessagePromise) return undefined
+    const start = new Date()
+    const end = new Date(start)
+    end.setDate(start.getDate() + 7)
+    connection
+      .sendMessagePromise<{ events?: { end?: string; start?: string; summary?: string }[] }>({ type: 'calendar/event/list', entity_id: 'calendar.house_calendar', start: start.toISOString(), end: end.toISOString() })
+      .then((response) => {
+        if (!cancelled) setEvents(response.events ?? [])
+      })
+      .catch(() => {
+        if (!cancelled) setEvents([])
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [connection])
+
+  return (
+    <article className={styles.calendarPanel} aria-label="House Calendar">
+      <div className={styles.calendarToolbar}>
+        <span>Today</span>
+        <span>‹</span>
+        <strong>{new Intl.DateTimeFormat(undefined, { day: 'numeric', month: 'short' }).format(new Date())}</strong>
+        <span>›</span>
+      </div>
+      {events.length === 0 ? (
+        <span className={styles.calendarEmpty}>No events to display</span>
+      ) : (
+        events.slice(0, 4).map((event, index) => <span key={`${event.summary}-${event.start}-${index}`}>{event.summary ?? 'Calendar event'}</span>)
+      )}
+    </article>
+  )
+}
+
+function TodoEmptyState({ description = 'You have no tasks due- nice job!', title = 'No Tasks!' }: { description?: string; title?: string }) {
+  return (
+    <section className={styles.choresEmpty} data-empty-layout="centered" data-empty-typography="festival">
+      <h2>{title}</h2>
+      <Description>{description}</Description>
+    </section>
+  )
+}
+
+function CreateChoreButton() {
+  const openCreateTask = () => {
+    const event = new CustomEvent('hass-more-info', { bubbles: true, composed: true, detail: { entityId: 'script.create_donetick_task' } })
+    window.dispatchEvent(event)
+    try {
+      if (window.top && window.top !== window) window.top.dispatchEvent(new CustomEvent('hass-more-info', { bubbles: true, composed: true, detail: { entityId: 'script.create_donetick_task' } }))
+    } catch {
+      // Cross-origin wrappers still get the local event above.
+    }
+  }
+
+  return (
+    <button aria-label="Create Donetick task" className={styles.createChoreButton} onClick={openCreateTask} style={{ '--card-rgb': `${CHORE_BLUE.r} ${CHORE_BLUE.g} ${CHORE_BLUE.b}` } as CSSProperties} type="button">
+      <MaterialIcon name="mdi:plus" size={32} />
+    </button>
   )
 }
 
@@ -1476,7 +1630,7 @@ function FallbackPage({ title }: { title: string }) {
 function Content({ onNavigate, path }: { onNavigate: (path: string) => void; path: string }) {
   const roomTitle = roomNameFromPath(path)
   if (roomTitle) return <RoomPage onNavigate={onNavigate} path={path} title={roomTitle} />
-  if (TODO_PAGES[path]) return <TodoPage path={path} />
+  if (TODO_PAGES[path]) return <TodoPage onNavigate={onNavigate} path={path} />
   if (path === 'security') return <SecurityPage />
   if (path === 'vacuums') return <VacuumPage />
   if (path === 'media') return <MediaPage onNavigate={onNavigate} />

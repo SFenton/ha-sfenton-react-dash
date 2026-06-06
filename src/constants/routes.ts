@@ -49,6 +49,16 @@ export const PRIMARY_NAV_ROUTES = [
   { label: 'Settings', path: 'settings', icon: 'mdi:cog' },
 ]
 
+export function primaryNavPathForRoute(path: string | undefined) {
+  if (!path) return 'overview'
+  if (path === 'groceries' || path.endsWith('-chores')) return 'chores'
+  return path
+}
+
+export function primaryNavRouteActive(activePath: string | undefined, routePath: string) {
+  return primaryNavPathForRoute(activePath) === routePath
+}
+
 const DEFAULT_ROUTE_PATH = 'overview'
 const URL_PARSE_ORIGIN = 'http://ha-sfenton-react-dash.local'
 const ROUTE_QUERY_KEYS = ['path', 'route', 'view']

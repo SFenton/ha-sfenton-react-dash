@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react'
-import { PRIMARY_NAV_ROUTES } from '../../constants/routes'
+import { PRIMARY_NAV_ROUTES, primaryNavRouteActive } from '../../constants/routes'
 import { MaterialIcon } from '../core/Icon'
 import styles from './AppHeader.module.css'
 
@@ -76,7 +76,7 @@ export function AppHeader({ activePath, actions = [], backLabel = 'Go back', bac
             </div>
             <nav className={styles.sidebarNav} role="menu">
               {PRIMARY_NAV_ROUTES.map((route) => (
-                <button aria-current={activePath === route.path ? 'page' : undefined} className={styles.menuItem} key={route.path} onClick={() => navigate(route.path)} role="menuitem" type="button">
+                <button aria-current={primaryNavRouteActive(activePath, route.path) ? 'page' : undefined} className={styles.menuItem} key={route.path} onClick={() => navigate(route.path)} role="menuitem" type="button">
                   <MaterialIcon name={route.icon} size={22} />
                   <span>{route.label}</span>
                 </button>
