@@ -100,38 +100,59 @@
 }
 
 .headerPill {
-  min-height: 56px;
+  --header-pill-height: 48px;
+  --header-pill-label-offset: -6px;
+  min-height: var(--header-pill-height);
   border: 0;
-  border-radius: 0;
-  padding: 7px 0;
-  background: transparent;
-  box-shadow: none;
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
+  border-radius: var(--radius-pill);
+  padding: 7px 14px 7px 0;
+  background: rgba(255, 255, 255, 0.12);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22), inset 0 -1px 0 rgba(0, 0, 0, 0.1);
+  backdrop-filter: blur(18px) saturate(1.18);
+  -webkit-backdrop-filter: blur(18px) saturate(1.18);
 }
 
 .headerPill .content {
-  gap: 0px;
+  justify-content: flex-start;
+  gap: 0;
 }
 
 .headerPill .icon {
-  width: 36px;
-  height: 46px;
+  flex: 0 0 var(--header-pill-height);
+  width: var(--header-pill-height);
+  height: 26px;
 }
 
 .headerPill .icon svg {
-  transform: translateX(-4px);
+  transform: none;
+}
+
+.headerPill .labelGroup {
+  margin-left: var(--header-pill-label-offset);
+}
+
+.headerPill[data-icon='mdi:lightbulb-group'] {
+  --header-pill-label-offset: -4px;
+}
+
+.headerPill[data-icon='mdi:thermometer'] {
+  --header-pill-label-offset: -8px;
+}
+
+.headerPill[data-icon='mdi:motion-sensor'],
+.headerPill[data-icon='mdi:motion-sensor-off'] {
+  --header-pill-label-offset: -4px;
 }
 
 .headerPill .title {
   color: white;
-  font-size: 0.86rem;
+  font-size: 0.78rem;
   font-weight: 760;
 }
 
 .headerPill .subtitle {
   color: rgba(255, 255, 255, 0.76);
-  font-size: 0.72rem;
+  font-size: 0.64rem;
   font-weight: 670;
   overflow: hidden;
   text-overflow: ellipsis;

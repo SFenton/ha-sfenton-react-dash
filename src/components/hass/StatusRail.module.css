@@ -1,6 +1,6 @@
 .rail {
   display: flex;
-  gap: 0;
+  gap: 8px;
   margin: 0 0 12px;
   padding: 0 0 8px;
   overflow-x: auto;
@@ -14,12 +14,13 @@
 }
 
 .chip {
-  flex: 0 0 calc(var(--chip-width, 150px) - 18px);
-  height: 60px;
+  flex: 0 0 auto;
+  height: 48px;
   scroll-snap-align: start;
 }
 
 .chip > * {
+  width: auto;
   height: 100%;
   min-height: 0;
 }

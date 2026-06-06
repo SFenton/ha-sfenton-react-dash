@@ -32,7 +32,7 @@ export function GlassTile({
   pressed,
   variant = 'card',
 }: GlassTileProps) {
-  const iconSize = variant === 'header' ? 30 : compact ? 18 : 24
+  const iconSize = variant === 'header' ? 26 : compact ? 18 : 24
   const className = [
     styles.tile,
     onClick ? styles.button : '',
