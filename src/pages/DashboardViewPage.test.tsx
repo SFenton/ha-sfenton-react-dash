@@ -1021,13 +1021,20 @@ describe('DashboardViewPage', () => {
 
   it('ports the Chores page source sections, quick links, and Stephen user visibility', async () => {
     const navigate = vi.fn()
+    mockEntities['todo.stephen_s_tasks'] = entity('todo.stephen_s_tasks', '8')
+    mockEntities['todo.stephen_s_due_today'] = entity('todo.stephen_s_due_today', '4')
+    mockEntities['todo.stephen_s_no_due_date'] = entity('todo.stephen_s_no_due_date', '1')
     render(<DashboardViewPage activePath="chores" onNavigate={navigate} path="chores" />)
 
     expect(screen.getByRole('heading', { name: 'Chores' })).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'House Calendar' })).toBeInTheDocument()
-    expect(await screen.findByText('No events to display')).toBeInTheDocument()
+  expect(screen.queryByRole('heading', { name: 'House Calendar' })).not.toBeInTheDocument()
+  expect(screen.queryByText('No events to display')).not.toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Quick Links' })).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: /Groceries Off/i }))
+    expect(screen.getByRole('button', { name: /Groceries 2 items/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Stephen's Tasks 5 active tasks/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Steph's Tasks No active tasks/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Unassigned Tasks 17 active tasks/i })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /Groceries 2 items/i }))
     expect(navigate).toHaveBeenCalledWith('groceries')
 
     expect(screen.getByRole('heading', { name: 'Past Due' })).toBeInTheDocument()
@@ -1144,19 +1151,147 @@ describe('DashboardViewPage', () => {
     expect(within(pastDueList).queryByText(/last week|this week/i)).not.toBeInTheDocument()
   })
 
-  it('opens the source create Donetick task more-info event from Chores', async () => {
-    const moreInfo = vi.fn()
-    window.addEventListener('hass-more-info', moreInfo)
+  it('opens the source create Donetick task modal from Chores and submits Donetick service data', async () => {
     render(<DashboardViewPage activePath="chores" onNavigate={() => undefined} path="chores" />)
 
-    expect(await screen.findByText('No events to display')).toBeInTheDocument()
     expect(await screen.findAllByText('Mock task one')).not.toHaveLength(0)
 
     fireEvent.click(screen.getByRole('button', { name: 'Create Donetick task' }))
 
-    expect(moreInfo).toHaveBeenCalled()
-    expect((moreInfo.mock.calls[0][0] as CustomEvent).detail).toEqual({ entityId: 'script.create_donetick_task' })
-    window.removeEventListener('hass-more-info', moreInfo)
+    const dialog = await screen.findByRole('dialog')
+    expect(within(dialog).getByRole('heading', { name: 'Create Task' })).toBeInTheDocument()
+    expect(within(dialog).queryByText('Create Donetick Task')).not.toBeInTheDocument()
+    expect(within(dialog).getByLabelText('Task Name')).toBeRequired()
+    expect(within(dialog).getByLabelText('Due Date')).toHaveAttribute('type', 'date')
+    expect(within(dialog).getByLabelText('Due Time')).toHaveAttribute('type', 'time')
+    expect(within(dialog).getByLabelText('Assignee')).toHaveValue('')
+    expect(within(dialog).getByLabelText('Priority')).toHaveValue('critical')
+    expect(within(dialog).getByLabelText('Recurrence')).toHaveValue('no_repeat')
+    expect(within(dialog).queryByRole('option', { name: /Adaptive/i })).not.toBeInTheDocument()
+    expect(within(dialog).queryByLabelText('Repeat Every')).not.toBeInTheDocument()
+    expect(within(dialog).queryByLabelText('Days of Week')).not.toBeInTheDocument()
+
+    fireEvent.change(within(dialog).getByLabelText('Task Name'), { target: { value: 'Clean the gutters' } })
+    fireEvent.change(within(dialog).getByLabelText('Assignee'), { target: { value: '3' } })
+    fireEvent.change(within(dialog).getByLabelText('Description'), { target: { value: 'Use the tall ladder' } })
+    fireEvent.change(within(dialog).getByLabelText('Due Date'), { target: { value: '2026-06-07' } })
+    fireEvent.change(within(dialog).getByLabelText('Due Time'), { target: { value: '08:30' } })
+    fireEvent.change(within(dialog).getByLabelText('Priority'), { target: { value: 'high' } })
+    fireEvent.change(within(dialog).getByLabelText('Recurrence'), { target: { value: 'interval' } })
+    expect(within(dialog).getByLabelText('Repeat Every')).toBeInTheDocument()
+    expect(within(dialog).getByLabelText('Interval Unit')).toBeInTheDocument()
+    expect(within(dialog).queryByLabelText('Days of Week')).not.toBeInTheDocument()
+    expect(within(dialog).getByLabelText('Repeat Every')).toHaveAttribute('inputmode', 'numeric')
+    fireEvent.change(within(dialog).getByLabelText('Repeat Every'), { target: { value: '0' } })
+    fireEvent.blur(within(dialog).getByLabelText('Repeat Every'))
+    expect(within(dialog).getByLabelText('Repeat Every')).toHaveValue('1')
+    fireEvent.change(within(dialog).getByLabelText('Repeat Every'), { target: { value: '2' } })
+    fireEvent.change(within(dialog).getByLabelText('Interval Unit'), { target: { value: 'weeks' } })
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Create Task' }))
+
+    await waitFor(() => expect(mockCallServiceCalls).toEqual([
+      {
+        domain: 'donetick',
+        service: 'create_task_form',
+        serviceData: {
+          assignees: '3',
+          description: 'Use the tall ladder',
+          due_date: '2026-06-07T08:30:00',
+          name: 'Clean the gutters',
+          priority: 'high',
+          recurrence: 'interval',
+          recurrence_days: [],
+          recurrence_interval: 2,
+          recurrence_unit: 'weeks',
+        },
+      },
+    ]))
+    await waitFor(() => expect(screen.getByRole('dialog')).toHaveAttribute('data-state', 'closed'))
+  })
+
+  it('only shows recurrence days for the specific days recurrence option', async () => {
+    render(<DashboardViewPage activePath="chores" onNavigate={() => undefined} path="chores" />)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Create Donetick task' }))
+    const dialog = await screen.findByRole('dialog')
+
+    fireEvent.change(within(dialog).getByLabelText('Recurrence'), { target: { value: 'days_of_the_week' } })
+
+    expect(within(dialog).getByLabelText('Days of Week')).toBeInTheDocument()
+    expect(within(dialog).queryByLabelText('Repeat Every')).not.toBeInTheDocument()
+  })
+
+  it('resets create task recurrence state after closing and reopening the modal', async () => {
+    render(<DashboardViewPage activePath="chores" onNavigate={() => undefined} path="chores" />)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Create Donetick task' }))
+    const dialog = await screen.findByRole('dialog')
+    fireEvent.change(within(dialog).getByLabelText('Recurrence'), { target: { value: 'interval' } })
+
+    expect(within(dialog).getByLabelText('Recurrence')).toHaveValue('interval')
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Close' }))
+    await waitFor(() => expect(dialog).toHaveAttribute('data-state', 'closed'))
+    fireEvent.click(screen.getByRole('button', { name: 'Create Donetick task', hidden: true }))
+
+    const reopenedDialog = await screen.findByRole('dialog')
+    expect(within(reopenedDialog).getByLabelText('Recurrence')).toHaveValue('no_repeat')
+    expect(within(reopenedDialog).queryByLabelText('Repeat Every')).not.toBeInTheDocument()
+  })
+
+  it('shows the create task FAB on chore task pages with route-specific assignee defaults', async () => {
+    const { rerender } = render(<DashboardViewPage activePath="chores" onNavigate={() => undefined} path="chores" />)
+
+    expect(await screen.findByRole('button', { name: 'Create Donetick task' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Create Donetick task' }))
+    expect(within(await screen.findByRole('dialog')).getByLabelText('Assignee')).toHaveValue('')
+
+    rerender(<DashboardViewPage activePath="stephens-chores" onNavigate={() => undefined} path="stephens-chores" />)
+    fireEvent.click(screen.getByRole('button', { name: 'Create Donetick task' }))
+    expect(within(await screen.findByRole('dialog')).getByLabelText('Assignee')).toHaveValue('1')
+
+    rerender(<DashboardViewPage activePath="stephs-chores" onNavigate={() => undefined} path="stephs-chores" />)
+    fireEvent.click(screen.getByRole('button', { name: 'Create Donetick task' }))
+    expect(within(await screen.findByRole('dialog')).getByLabelText('Assignee')).toHaveValue('2')
+
+    rerender(<DashboardViewPage activePath="unassigned-chores" onNavigate={() => undefined} path="unassigned-chores" />)
+    fireEvent.click(screen.getByRole('button', { name: 'Create Donetick task' }))
+    expect(within(await screen.findByRole('dialog')).getByLabelText('Assignee')).toHaveValue('')
+
+    rerender(<DashboardViewPage activePath="home-improvement-chores" onNavigate={() => undefined} path="home-improvement-chores" />)
+    fireEvent.click(screen.getByRole('button', { name: 'Create Donetick task' }))
+    expect(within(await screen.findByRole('dialog')).getByLabelText('Assignee')).toHaveValue('3')
+
+    rerender(<DashboardViewPage activePath="groceries" onNavigate={() => undefined} path="groceries" />)
+    expect(screen.queryByRole('button', { name: 'Create Donetick task' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Add grocery item' })).toBeInTheDocument()
+  })
+
+  it('opens a grocery item modal on the Groceries page and adds to the shopping list', async () => {
+    render(<DashboardViewPage activePath="groceries" onNavigate={() => undefined} path="groceries" />)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Add grocery item' }))
+    const dialog = await screen.findByRole('dialog')
+
+    expect(within(dialog).getByRole('heading', { name: 'Add Grocery Item' })).toBeInTheDocument()
+    expect(within(dialog).getByLabelText('Item')).toBeRequired()
+    expect(within(dialog).queryByLabelText('Assignee')).not.toBeInTheDocument()
+    expect(within(dialog).queryByLabelText('Priority')).not.toBeInTheDocument()
+    expect(within(dialog).queryByLabelText('Recurrence')).not.toBeInTheDocument()
+    expect(within(dialog).queryByLabelText('Description')).not.toBeInTheDocument()
+
+    fireEvent.change(within(dialog).getByLabelText('Item'), { target: { value: 'Bananas' } })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Add Item' }))
+
+    await waitFor(() => expect(mockCallServiceCalls).toEqual([
+      {
+        domain: 'todo',
+        service: 'add_item',
+        target: 'todo.shopping_list',
+        serviceData: { item: 'Bananas' },
+      },
+    ]))
   })
 
   it('renders the thermostat route as a dedicated Ecobee port', () => {

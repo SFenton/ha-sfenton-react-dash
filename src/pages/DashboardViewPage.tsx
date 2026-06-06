@@ -12,6 +12,8 @@ import { BottomNav } from '../components/shell/BottomNav'
 import { EntityActionCard } from '../components/hass/EntityActionCard'
 import { SecurityDashboard } from '../components/hass/SecurityDashboard'
 import { StatusRail, type StatusRailChip } from '../components/hass/StatusRail'
+import { CreateDonetickTaskSheet } from '../components/hass/CreateDonetickTaskSheet'
+import { CreateGroceryItemSheet } from '../components/hass/CreateGroceryItemSheet'
 import { TodoListPanel } from '../components/hass/TodoListPanel'
 import { VacuumCard, VacuumModalContent } from '../components/hass/VacuumCard'
 import { AirQualityModalContent } from '../components/hass/AirQualityModalContent'
@@ -698,7 +700,6 @@ function TodoPage({ onNavigate, path }: { onNavigate: (path: string) => void; pa
         const sectionKey = `${list.entityId}:${entity?.state ?? ''}:${entity?.last_changed ?? ''}:${entity?.last_updated ?? ''}`
         return <TodoSection hideWhenEmpty={hideEmptyTodoSections} key={sectionKey} list={list} mayHaveItems={todoEntityMayHaveItems(entity)} onSectionStateChange={handleTodoSectionState} />
       })}
-      {path === 'chores' && <CreateChoreButton />}
     </div>
   )
 }
@@ -738,73 +739,52 @@ function todoListVisible(list: TodoListConfig, userId: string | undefined, entit
 
 function ChoresIntro({ onNavigate }: { onNavigate: (path: string) => void }) {
   return (
-    <>
-      <section className={styles.section}>
-        <SectionHeader title="House Calendar" />
-        <HouseCalendarPanel />
-      </section>
-      <section className={styles.section}>
-        <SectionHeader title="Quick Links" />
-        <div className={styles.choreQuickGrid}>
-          {CHORE_QUICK_LINKS.map((item) => (
-            <ChoreQuickLink item={item} key={item.path} onNavigate={onNavigate} />
-          ))}
-        </div>
-      </section>
-    </>
+    <section className={styles.section}>
+      <SectionHeader title="Quick Links" />
+      <div className={styles.choreQuickGrid}>
+        {CHORE_QUICK_LINKS.map((item) => (
+          <ChoreQuickLink item={item} key={item.path} onNavigate={onNavigate} />
+        ))}
+      </div>
+    </section>
   )
 }
 
 function ChoreQuickLink({ item, onNavigate }: { item: (typeof CHORE_QUICK_LINKS)[number]; onNavigate: (path: string) => void }) {
+  const entities = useHass((state) => state.entities) as unknown as EntityActionStateMap
+  const count = quickLinkTodoCount(item.path, entities)
+  const subtitle = item.countType === 'groceries' ? groceryCountSubtitle(count) : taskCountSubtitle(count)
+
   return (
     <GlassTile
       backgroundColor={`rgba(${item.color.r}, ${item.color.g}, ${item.color.b}, 0.72)`}
       icon={item.icon}
       onClick={() => onNavigate(item.path)}
-      subtitle="Off"
+      subtitle={subtitle}
       title={item.title}
     />
   )
 }
 
-function HouseCalendarPanel() {
-  const connection = useHass((state) => state.connection) as unknown as { sendMessagePromise?: <T>(message: Record<string, unknown>) => Promise<T> } | undefined
-  const [events, setEvents] = useState<{ end?: string; start?: string; summary?: string }[]>([])
+function quickLinkTodoCount(path: string, entities: EntityActionStateMap) {
+  const page = TODO_PAGES[path]
+  if (!page) return 0
+  return page.lists.reduce((total, list) => {
+    const value = Number(entities[list.entityId]?.state ?? 0)
+    return total + (Number.isFinite(value) && value > 0 ? value : 0)
+  }, 0)
+}
 
-  useEffect(() => {
-    let cancelled = false
-    if (!connection?.sendMessagePromise) return undefined
-    const start = new Date()
-    const end = new Date(start)
-    end.setDate(start.getDate() + 7)
-    connection
-      .sendMessagePromise<{ events?: { end?: string; start?: string; summary?: string }[] }>({ type: 'calendar/event/list', entity_id: 'calendar.house_calendar', start: start.toISOString(), end: end.toISOString() })
-      .then((response) => {
-        if (!cancelled) setEvents(response.events ?? [])
-      })
-      .catch(() => {
-        if (!cancelled) setEvents([])
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [connection])
+function taskCountSubtitle(count: number) {
+  if (!Number.isFinite(count) || count <= 0) return 'No active tasks'
+  if (count === 1) return '1 active task'
+  return `${count} active tasks`
+}
 
-  return (
-    <article className={styles.calendarPanel} aria-label="House Calendar">
-      <div className={styles.calendarToolbar}>
-        <span>Today</span>
-        <span>‹</span>
-        <strong>{new Intl.DateTimeFormat(undefined, { day: 'numeric', month: 'short' }).format(new Date())}</strong>
-        <span>›</span>
-      </div>
-      {events.length === 0 ? (
-        <span className={styles.calendarEmpty}>No events to display</span>
-      ) : (
-        events.slice(0, 4).map((event, index) => <span key={`${event.summary}-${event.start}-${index}`}>{event.summary ?? 'Calendar event'}</span>)
-      )}
-    </article>
-  )
+function groceryCountSubtitle(count: number) {
+  if (!Number.isFinite(count) || count <= 0) return 'No groceries listed'
+  if (count === 1) return '1 item'
+  return `${count} items`
 }
 
 function TodoEmptyState({ description = 'You have no tasks due- nice job!', title = 'No Tasks!' }: { description?: string; title?: string }) {
@@ -816,21 +796,37 @@ function TodoEmptyState({ description = 'You have no tasks due- nice job!', titl
   )
 }
 
-function CreateChoreButton() {
-  const openCreateTask = () => {
-    const event = new CustomEvent('hass-more-info', { bubbles: true, composed: true, detail: { entityId: 'script.create_donetick_task' } })
-    window.dispatchEvent(event)
-    try {
-      if (window.top && window.top !== window) window.top.dispatchEvent(new CustomEvent('hass-more-info', { bubbles: true, composed: true, detail: { entityId: 'script.create_donetick_task' } }))
-    } catch {
-      // Cross-origin wrappers still get the local event above.
-    }
-  }
+function createTaskDefaultAssignee(path: string) {
+  if (path === 'chores' || path === 'unassigned-chores') return ''
+  if (path === 'stephens-chores') return '1'
+  if (path === 'stephs-chores') return '2'
+  if (path === 'home-improvement-chores') return '3'
+  return null
+}
+
+function CreateChoreButton({ defaultAssignee }: { defaultAssignee: string }) {
+  const [modalOpen, setModalOpen] = useState(false)
 
   return (
-    <button aria-label="Create Donetick task" className={styles.createChoreButton} onClick={openCreateTask} style={{ '--card-rgb': `${CHORE_BLUE.r} ${CHORE_BLUE.g} ${CHORE_BLUE.b}` } as CSSProperties} type="button">
-      <MaterialIcon name="mdi:plus" size={32} />
-    </button>
+    <>
+      <button aria-label="Create Donetick task" className={styles.createChoreButton} onClick={() => setModalOpen(true)} style={{ '--card-rgb': `${CHORE_BLUE.r} ${CHORE_BLUE.g} ${CHORE_BLUE.b}` } as CSSProperties} type="button">
+        <MaterialIcon name="mdi:plus" size={32} />
+      </button>
+      <CreateDonetickTaskSheet defaultAssignee={defaultAssignee} onClose={() => setModalOpen(false)} open={modalOpen} />
+    </>
+  )
+}
+
+function CreateGroceryButton() {
+  const [modalOpen, setModalOpen] = useState(false)
+
+  return (
+    <>
+      <button aria-label="Add grocery item" className={styles.createChoreButton} onClick={() => setModalOpen(true)} style={{ '--card-rgb': `${CHORE_BLUE.r} ${CHORE_BLUE.g} ${CHORE_BLUE.b}` } as CSSProperties} type="button">
+        <MaterialIcon name="mdi:plus" size={32} />
+      </button>
+      <CreateGroceryItemSheet entityId="todo.shopping_list" onClose={() => setModalOpen(false)} open={modalOpen} />
+    </>
   )
 }
 
@@ -1645,10 +1641,14 @@ export function DashboardViewPage({ activePath, onNavigate, path }: DashboardVie
   const roomTitle = roomNameFromPath(path)
   const title = roomTitle ?? TODO_PAGES[path]?.title ?? CONTROL_PAGES[path]?.title ?? routeTitle(path)
   const showBack = !PRIMARY_NAV_ROUTES.some((route) => route.path === path)
+  const createTaskAssignee = createTaskDefaultAssignee(path)
+  const floatingAction = path === 'groceries'
+    ? <CreateGroceryButton key={path} />
+    : createTaskAssignee !== null ? <CreateChoreButton defaultAssignee={createTaskAssignee} key={path} /> : undefined
 
   if (path === 'guests-staying-over') {
     return (
-      <AppShell bottomNav={<BottomNav activePath={activePath} onNavigate={onNavigate} />}>
+      <AppShell bottomNav={<BottomNav activePath={activePath} onNavigate={onNavigate} />} floatingAction={floatingAction}>
         <GuestControlsPage onNavigate={onNavigate} />
       </AppShell>
     )
@@ -1656,14 +1656,14 @@ export function DashboardViewPage({ activePath, onNavigate, path }: DashboardVie
 
   if (path === 'settings') {
     return (
-      <AppShell bottomNav={<BottomNav activePath={activePath} onNavigate={onNavigate} />}>
+      <AppShell bottomNav={<BottomNav activePath={activePath} onNavigate={onNavigate} />} floatingAction={floatingAction}>
         <SettingsPage onNavigate={onNavigate} />
       </AppShell>
     )
   }
 
   return (
-    <AppShell bottomNav={<BottomNav activePath={activePath} onNavigate={onNavigate} />}>
+    <AppShell bottomNav={<BottomNav activePath={activePath} onNavigate={onNavigate} />} floatingAction={floatingAction}>
       <Page activePath={activePath} backPath={showBack ? 'overview' : undefined} headerQuickLinks={roomTitle ? <RoomSectionRail path={path} title={roomTitle} /> : undefined} onNavigate={onNavigate} title={title}>
         <Content onNavigate={onNavigate} path={path} />
       </Page>

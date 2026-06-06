@@ -25,53 +25,6 @@
   min-height: 120px;
 }
 
-.calendarPanel {
-  position: relative;
-  display: grid;
-  min-height: 210px;
-  align-content: stretch;
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  border-radius: 28px;
-  padding: 18px;
-  color: rgba(255, 255, 255, 0.82);
-  background: rgba(0, 0, 0, 0.32);
-  box-shadow: var(--shadow-glass), inset 0 1px 0 rgba(255, 255, 255, 0.16);
-  font-size: 0.92rem;
-  font-weight: 700;
-  text-align: center;
-}
-
-.calendarToolbar {
-  display: grid;
-  grid-template-columns: auto auto minmax(0, 1fr) auto;
-  gap: 18px;
-  align-items: center;
-  color: rgba(255, 255, 255, 0.88);
-  font-size: 1.05rem;
-}
-
-.calendarToolbar span:first-child {
-  border-radius: 999px;
-  padding: 7px 14px;
-  color: rgb(191, 196, 255);
-  background: rgba(8, 11, 44, 0.82);
-  font-size: 0.8rem;
-}
-
-.calendarToolbar strong {
-  justify-self: center;
-  font-size: 1.35rem;
-  font-weight: 520;
-}
-
-.calendarEmpty {
-  display: grid;
-  min-height: 132px;
-  place-items: center;
-  margin-top: 18px;
-  background: rgba(0, 0, 0, 0.42);
-}
-
 .choresEmpty {
   display: grid;
   min-height: calc(100vh - var(--bottom-nav-height) - 160px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
@@ -99,15 +52,14 @@
 
 .createChoreButton {
   display: grid;
-  width: 72px;
-  height: 72px;
-  justify-self: end;
+  width: 62px;
+  height: 62px;
   place-items: center;
   border: 0;
   border-radius: 999px;
   padding: 0;
   color: white;
-  background: rgb(var(--card-rgb) / 0.74);
+  background: rgb(var(--card-rgb));
   box-shadow: var(--shadow-glass), inset 0 1px 0 rgba(255, 255, 255, 0.2);
   font: inherit;
   cursor: pointer;

@@ -1,0 +1,179 @@
+.form {
+  display: grid;
+  min-width: 0;
+  gap: 14px;
+  overflow-x: hidden;
+}
+
+.field {
+  display: grid;
+  min-width: 0;
+  gap: 7px;
+  color: rgba(247, 251, 255, 0.9);
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.fieldset {
+  display: grid;
+  min-width: 0;
+  gap: 8px;
+  border: 0;
+  margin: 0;
+  padding: 0;
+  color: rgba(247, 251, 255, 0.9);
+}
+
+.fieldset legend {
+  padding: 0;
+  margin-bottom: 1px;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.field input,
+.field select,
+.field textarea {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  min-height: 48px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 16px;
+  box-sizing: border-box;
+  padding: 12px 13px;
+  color: white;
+  background: rgba(255, 255, 255, 0.12);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  font: inherit;
+  font-size: 16px;
+  font-weight: 720;
+  letter-spacing: 0;
+}
+
+.field textarea {
+  min-height: 110px;
+  resize: vertical;
+}
+
+.field select[multiple] {
+  min-height: 150px;
+}
+
+.pickerShell {
+  position: relative;
+  display: grid;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  min-height: 48px;
+  align-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 16px;
+  box-sizing: border-box;
+  padding: 12px 13px;
+  overflow: hidden;
+  color: white;
+  background: rgba(255, 255, 255, 0.12);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  font-size: 16px;
+  font-weight: 720;
+  line-height: 1.2;
+}
+
+.pickerShell[data-empty='true']::before {
+  content: 'Select';
+  color: rgba(247, 251, 255, 0.48);
+}
+
+.pickerValue {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.field .nativePickerInput {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  border: 0;
+  border-radius: inherit;
+  padding: 0;
+  opacity: 0;
+  background: transparent;
+  box-shadow: none;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.field input:focus,
+.field select:focus,
+.field textarea:focus {
+  border-color: rgba(0, 154, 199, 0.74);
+  outline: 3px solid rgba(0, 154, 199, 0.2);
+}
+
+.pickerShell:focus-within {
+  border-color: rgba(0, 154, 199, 0.74);
+  outline: 3px solid rgba(0, 154, 199, 0.2);
+}
+
+.field small {
+  color: rgba(247, 251, 255, 0.62);
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.twoColumn {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.primaryAction {
+  display: inline-flex;
+  width: 100%;
+  min-height: 48px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 0;
+  border-radius: 16px;
+  padding: 0 14px;
+  color: white;
+  font: inherit;
+  font-size: 0.86rem;
+  font-weight: 850;
+  letter-spacing: 0;
+  cursor: pointer;
+  background: rgba(0, 154, 199, 0.78);
+  box-shadow: var(--shadow-glass), inset 0 1px 0 rgba(255, 255, 255, 0.18);
+}
+
+.primaryAction:disabled {
+  cursor: default;
+  opacity: 0.48;
+}
+
+.error {
+  margin: 0;
+  border: 1px solid rgba(255, 120, 120, 0.28);
+  border-radius: 16px;
+  padding: 12px;
+  color: white;
+  background: rgba(180, 35, 35, 0.34);
+  font-size: 0.84rem;
+  font-weight: 760;
+}
+
+@media (max-width: 420px) {
+  .twoColumn {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

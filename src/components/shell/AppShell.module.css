@@ -32,3 +32,12 @@
   overflow: hidden;
   box-sizing: border-box;
 }
+
+.floatingAction {
+  position: fixed;
+  right: 22px;
+  bottom: calc(var(--bottom-nav-height) + 8px + env(safe-area-inset-bottom, 0px));
+  z-index: 35;
+  display: grid;
+  place-items: center;
+}
