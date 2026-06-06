@@ -30,8 +30,8 @@ describe('AtAGlancePage', () => {
     render(<AtAGlancePage onNavigate={navigate} />)
 
     fireEvent.click(screen.getByRole('button', { name: 'Open navigation menu' }))
-  expect(screen.getByText('Navigation')).toBeInTheDocument()
-  expect(screen.getByRole('button', { name: 'Close navigation menu' })).toBeInTheDocument()
+    expect(screen.getByText('Navigation')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Close navigation menu' })).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('menuitem', { name: 'Security' }))
     expect(navigate).toHaveBeenCalledWith('security')
 

@@ -63,31 +63,42 @@
   position: fixed;
   inset: 0;
   z-index: 80;
-  background: rgba(2, 6, 14, 0.36);
-  backdrop-filter: blur(3px);
-  -webkit-backdrop-filter: blur(3px);
+  background: rgba(0, 0, 0, 0.46);
+  animation: sidebarScrimIn var(--duration-med) cubic-bezier(.2, .9, .2, 1) both;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.sidebarScrim[data-state='closed'] {
+  pointer-events: none;
+  animation-name: sidebarScrimOut;
+  animation-timing-function: cubic-bezier(.4, 0, .2, 1);
 }
 
 .sidebar {
   display: grid;
   width: min(82vw, 320px);
   height: 100%;
-  grid-template-rows: auto 1fr;
+  grid-template-rows: auto minmax(0, 1fr);
   gap: 14px;
   border-right: 1px solid rgba(255, 255, 255, 0.16);
   padding: calc(16px + env(safe-area-inset-top, 0px)) 14px calc(18px + env(safe-area-inset-bottom, 0px));
   box-sizing: border-box;
-  background: rgba(25, 36, 54, 0.86);
+  background: #192436;
   box-shadow: 18px 0 44px rgba(0, 0, 0, 0.34), inset 1px 0 0 rgba(255, 255, 255, 0.1);
-  backdrop-filter: var(--blur-glass);
-  -webkit-backdrop-filter: var(--blur-glass);
+  animation: sidebarIn var(--duration-med) cubic-bezier(.2, .9, .2, 1) both;
+  will-change: transform;
+}
+
+.sidebar[data-state='closed'] {
+  animation-name: sidebarOut;
+  animation-timing-function: cubic-bezier(.4, 0, .2, 1);
 }
 
 .sidebarHeader {
   display: grid;
   min-height: 44px;
-  grid-template-columns: minmax(0, 1fr) 44px;
-  gap: 8px;
+  grid-template-columns: minmax(0, 1fr);
   align-items: center;
   padding-left: 4px;
   color: white;
@@ -97,8 +108,9 @@
 }
 
 .sidebarNav {
-  display: grid;
-  align-content: start;
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
   gap: 7px;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
@@ -107,6 +119,10 @@
 
 .sidebarNav::-webkit-scrollbar {
   display: none;
+}
+
+.sidebarSettingsItem {
+  margin-top: auto;
 }
 
 .menu {
@@ -155,4 +171,52 @@
 
 .menuItem:active {
   transform: scale(0.98);
+}
+
+@keyframes sidebarScrimIn {
+  from {
+    opacity: 0;
+    backdrop-filter: blur(0);
+    -webkit-backdrop-filter: blur(0);
+  }
+
+  to {
+    opacity: 1;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+  }
+}
+
+@keyframes sidebarScrimOut {
+  from {
+    opacity: 1;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+  }
+
+  to {
+    opacity: 0;
+    backdrop-filter: blur(0);
+    -webkit-backdrop-filter: blur(0);
+  }
+}
+
+@keyframes sidebarIn {
+  from {
+    transform: translate3d(-100%, 0, 0);
+  }
+
+  to {
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes sidebarOut {
+  from {
+    transform: translate3d(0, 0, 0);
+  }
+
+  to {
+    transform: translate3d(-100%, 0, 0);
+  }
 }

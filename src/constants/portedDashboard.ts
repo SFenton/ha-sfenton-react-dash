@@ -66,6 +66,7 @@ export interface ChoreQuickLinkConfig {
   path: string
   icon: string
   color: CardColor
+  countType?: 'groceries' | 'tasks'
 }
 
 export interface VacuumConfig {
@@ -118,7 +119,7 @@ export const CHORE_USER_IDS = {
 } as const
 
 export const CHORE_QUICK_LINKS: ChoreQuickLinkConfig[] = [
-  { title: 'Groceries', path: 'groceries', icon: 'mdi:clipboard-list', color: { r: 155, g: 67, b: 72 } },
+  { title: 'Groceries', path: 'groceries', icon: 'mdi:clipboard-list', color: { r: 155, g: 67, b: 72 }, countType: 'groceries' },
   { title: "Stephen's Tasks", path: 'stephens-chores', icon: 'mdi:clipboard-list', color: { r: 0, g: 96, b: 120 } },
   { title: "Steph's Tasks", path: 'stephs-chores', icon: 'mdi:clipboard-list', color: { r: 212, g: 108, b: 0 } },
   { title: 'Unassigned Tasks', path: 'unassigned-chores', icon: 'mdi:clipboard-list', color: { r: 81, g: 58, b: 126 } },
