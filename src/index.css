@@ -53,6 +53,18 @@ select {
   font: inherit;
 }
 
+input:focus,
+textarea:focus,
+select:focus {
+  outline: none;
+}
+
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: none;
+}
+
 button {
   -webkit-tap-highlight-color: transparent;
 }

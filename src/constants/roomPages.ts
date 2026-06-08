@@ -31,6 +31,7 @@ export interface RoomSourceCardConfig {
   span?: 'full'
   stateColors?: Partial<Record<string, string>>
   stateDisplay?: 'climate-action-temperature'
+  stateIcons?: Partial<Record<string, string>>
   stateLabels?: Partial<Record<string, string>>
   stateTone?: 'climate-action'
   subtitleEntityIds?: string[]
@@ -110,7 +111,7 @@ export const ROOM_PAGE_CONFIGS: Record<string, RoomPageSourceConfig> = {
         { title: 'Air Purifier', entityId: 'select.living_room_air_purifier_fan_mode', icon: 'mdi:fan', kind: 'air', hash: '#air-purifier', modalEntityId: 'sensor.living_room_air_purifier_pm2_5', subtitleEntityIds: ['select.living_room_air_purifier_fan_mode', 'fan.living_room_air_purifier_levoit_purifier'] },
       ] },
       { title: 'Devices', cards: [{ title: 'Main Floor', modalTitle: 'Robot Vacuum', entityId: 'vacuum.valetudo_exaltedsneakydeer', icon: 'mdi:robot-vacuum', kind: 'vacuum', hash: '#robot-vacuum', subtitleEntityIds: ['vacuum.valetudo_exaltedsneakydeer', 'sensor.valetudo_exaltedsneakydeer_battery_level'], span: 'full', manualReview: sourcePopupReview }] },
-      { title: 'SHIELD', cards: [{ title: 'SHIELD', entityId: 'media_player.living_room_shield', icon: 'mdi:remote', kind: 'media', hash: '#living-room-shield', showState: true, span: 'full' }, ...livingRoomShieldAppShortcuts] },
+      { title: 'Living Room SHIELD', cards: [{ title: 'Living Room SHIELD', entityId: 'media_player.living_room_shield', icon: 'mdi:remote', kind: 'media', hash: '#living-room-shield', showState: true, span: 'full' }, ...livingRoomShieldAppShortcuts] },
     ],
     popupTemplates: ['light-slider-toggle', 'window-popup-single', 'air-purifier-popup', 'vent-popup-2', 'vacuum-*', 'media-player-popup'],
   },
@@ -275,7 +276,7 @@ export const ROOM_PAGE_CONFIGS: Record<string, RoomPageSourceConfig> = {
       ] },
       { title: 'Media Controls', cards: [
         { title: 'Theater Room', entityId: 'media_player.sony_projector', icon: 'mdi:projector', kind: 'media', hash: '#theater-room-shield', showState: true },
-        { title: 'SHIELD', entityId: 'input_boolean.is_theater_shield_active', icon: 'mdi:television', kind: 'media', showState: true, manualReview: sourceControlReview },
+        { title: 'Theater SHIELD', entityId: 'input_boolean.is_theater_shield_active', icon: 'mdi:television', kind: 'media', showState: true, manualReview: sourceControlReview },
         { title: 'Nintendo Switch', entityId: 'input_boolean.is_nintendo_switch_active', icon: 'mdi:gamepad', kind: 'media', showState: true, manualReview: sourceControlReview },
         ...theaterAppShortcuts,
       ] },

@@ -113,13 +113,13 @@
 .field input:focus,
 .field select:focus,
 .field textarea:focus {
-  border-color: rgba(0, 154, 199, 0.74);
-  outline: 3px solid rgba(0, 154, 199, 0.2);
+  border-color: rgba(255, 255, 255, 0.42);
+  outline: 3px solid rgba(255, 255, 255, 0.1);
 }
 
 .pickerShell:focus-within {
-  border-color: rgba(0, 154, 199, 0.74);
-  outline: 3px solid rgba(0, 154, 199, 0.2);
+  border-color: rgba(255, 255, 255, 0.42);
+  outline: 3px solid rgba(255, 255, 255, 0.1);
 }
 
 .field small {

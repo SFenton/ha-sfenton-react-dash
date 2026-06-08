@@ -42,6 +42,7 @@ export interface MediaRemoteConfig {
   devices?: MediaRemoteDeviceConfig[]
   downButton: MediaRemoteButtonConfig
   hash: string
+  hideKeyboardWhenOff?: boolean
   homeButton: MediaRemoteButtonConfig
   keyboardButton?: MediaRemoteButtonConfig
   leftButton: MediaRemoteButtonConfig
@@ -105,12 +106,10 @@ function powerIconColorRule(entityIds: string[], inactiveStates: string[], inact
 const livingRoomRemote = 'remote.living_room_shield'
 const livingRoomLaunchEntity = 'media_player.living_room_shield'
 const livingRoomShield = 'media_player.living_room_shield_2'
-const theaterRemote = 'remote.theater_shield_remote'
 const theaterLaunchRemote = 'remote.theater_shield'
 const theaterShield = 'media_player.theater_room_shield'
 const theaterProjector = 'media_player.sony_projector'
 const theaterReceiver = 'media_player.theater'
-const theaterPcShutdown = 'button.theater_pc_theaterroom_pc_shutdown'
 
 const androidApps = [
   { title: 'Plex', appId: 'com.plexapp.android', imageUrl: '/local/images/apps/plex.png' },
@@ -133,9 +132,9 @@ function androidAppCards(entity: string, remoteEntity: string, extraServiceData?
 export const MEDIA_REMOTE_CONFIGS: Record<string, MediaRemoteConfig> = {
   '#living-room-shield': {
     hash: '#living-room-shield',
-    title: 'SHIELD',
+    title: 'Living Room SHIELD',
     roomTitle: 'Living Room',
-    remoteTitle: 'SHIELD Remote',
+    remoteTitle: 'Living Room SHIELD Remote',
     mediaEntityId: livingRoomShield,
     controlEntityId: livingRoomShield,
     appSectionTitle: 'Media',
@@ -145,7 +144,7 @@ export const MEDIA_REMOTE_CONFIGS: Record<string, MediaRemoteConfig> = {
     powerButton: { label: 'Power', icon: 'mdi:power', iconColorRule: powerIconColorRule([livingRoomShield], ['off', 'unavailable', 'unknown']), action: remoteCommand(livingRoomRemote, 'POWER') },
     upButton: { label: 'Up', icon: 'mdi:chevron-up', action: remoteCommand(livingRoomRemote, 'DPAD_UP') },
     leftButton: { label: 'Left', icon: 'mdi:chevron-left', action: remoteCommand(livingRoomRemote, 'DPAD_LEFT') },
-    selectButton: { label: 'Select', icon: 'mdi:circle', action: remoteCommand(livingRoomRemote, 'DPAD_CENTER') },
+    selectButton: { label: 'Select', icon: ' ', action: remoteCommand(livingRoomRemote, 'DPAD_CENTER') },
     rightButton: { label: 'Right', icon: 'mdi:chevron-right', action: remoteCommand(livingRoomRemote, 'DPAD_RIGHT') },
     downButton: { label: 'Down', icon: 'mdi:chevron-down', action: remoteCommand(livingRoomRemote, 'DPAD_DOWN') },
     backButton: { label: 'Back', icon: 'mdi:triangle-down', iconRotationDegrees: 90, action: remoteCommand(livingRoomRemote, 'BACK') },
@@ -184,9 +183,9 @@ export const MEDIA_REMOTE_CONFIGS: Record<string, MediaRemoteConfig> = {
   },
   '#theater-room-shield': {
     hash: '#theater-room-shield',
-    title: 'Theater Room',
+    title: 'Theater Room SHIELD',
     roomTitle: 'Theater Room',
-    remoteTitle: 'Theater Remote',
+    remoteTitle: 'Theater Room SHIELD Remote',
     mediaEntityId: theaterShield,
     controlEntityId: theaterShield,
     appSectionTitle: 'Media',
@@ -196,16 +195,16 @@ export const MEDIA_REMOTE_CONFIGS: Record<string, MediaRemoteConfig> = {
     powerButton: {
       label: 'Power',
       icon: 'mdi:power',
-      iconColorRule: powerIconColorRule([theaterProjector, theaterShield, theaterReceiver, theaterPcShutdown], ['off'], { [theaterPcShutdown]: ['unavailable', 'unknown'] }),
+      iconColorRule: powerIconColorRule([theaterShield], ['off', 'unavailable', 'unknown']),
       action: service('script', 'toggle_on_off_theater_room'),
     },
-    upButton: { label: 'Up', icon: 'mdi:chevron-up', action: remoteCommand(theaterRemote, 'DPAD_UP') },
-    leftButton: { label: 'Left', icon: 'mdi:chevron-left', action: remoteCommand(theaterRemote, 'DPAD_LEFT') },
-    selectButton: { label: 'Select', icon: 'mdi:circle', action: remoteCommand(theaterRemote, 'DPAD_CENTER') },
-    rightButton: { label: 'Right', icon: 'mdi:chevron-right', action: remoteCommand(theaterRemote, 'DPAD_RIGHT') },
-    downButton: { label: 'Down', icon: 'mdi:chevron-down', action: remoteCommand(theaterRemote, 'DPAD_DOWN') },
-    backButton: { label: 'Back', icon: 'mdi:triangle-down', iconRotationDegrees: 90, action: remoteCommand(theaterRemote, 'BACK') },
-    homeButton: { label: 'Home', icon: 'mdi:circle', action: remoteCommand(theaterRemote, 'HOME') },
+    upButton: { label: 'Up', icon: 'mdi:chevron-up', action: adbCommand(theaterShield, 'input keyevent DPAD_UP') },
+    leftButton: { label: 'Left', icon: 'mdi:chevron-left', action: adbCommand(theaterShield, 'input keyevent DPAD_LEFT') },
+    selectButton: { label: 'Select', icon: ' ', action: adbCommand(theaterShield, 'input keyevent DPAD_CENTER') },
+    rightButton: { label: 'Right', icon: 'mdi:chevron-right', action: adbCommand(theaterShield, 'input keyevent DPAD_RIGHT') },
+    downButton: { label: 'Down', icon: 'mdi:chevron-down', action: adbCommand(theaterShield, 'input keyevent DPAD_DOWN') },
+    backButton: { label: 'Back', icon: 'mdi:triangle-down', iconRotationDegrees: 90, action: adbCommand(theaterShield, 'input keyevent KEYCODE_BACK') },
+    homeButton: { label: 'Home', icon: 'mdi:circle', action: adbCommand(theaterShield, 'input keyevent KEYCODE_HOME') },
     keyboardButton: { label: 'Keyboard', icon: 'mdi:keyboard', action: { type: 'textPrompt', targetEntityId: theaterShield } },
     volumeDownButton: { label: 'Volume Down', icon: 'mdi:volume-minus', action: service('media_player', 'volume_down', theaterReceiver) },
     volumeMuteButton: { label: 'Mute', icon: 'mdi:volume-mute', action: service('media_player', 'volume_mute', theaterReceiver) },
@@ -215,7 +214,7 @@ export const MEDIA_REMOTE_CONFIGS: Record<string, MediaRemoteConfig> = {
     devices: [
       { title: 'Projector', entityId: theaterProjector, icon: 'mdi:projector', action: service('media_player', 'toggle', theaterProjector) },
       { title: 'Yamaha AVR', entityId: theaterReceiver, icon: 'mdi:audio-video', action: service('media_player', 'toggle', theaterReceiver) },
-      { title: 'SHIELD', entityId: theaterShield, icon: 'mdi:remote-tv', action: service('media_player', 'toggle', theaterShield) },
+      { title: 'Theater Room SHIELD', entityId: theaterShield, icon: 'mdi:remote-tv', action: service('media_player', 'toggle', theaterShield) },
       { title: 'Theater Room PC', entityId: 'input_boolean.theater_pc_power', icon: 'mdi:projector', action: pcPowerAction('input_button.theater_pc_on', 'input_button.theater_pc_off') },
     ],
   },

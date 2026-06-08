@@ -420,14 +420,15 @@ function RoomSourceFallback({ card }: { card: RoomSourceCardConfig }) {
   )
 }
 
-function SourceCardIcon({ card, size = 38 }: { card: RoomSourceCardConfig; size?: number }) {
+function SourceCardIcon({ card, entity, size = 38 }: { card: RoomSourceCardConfig; entity: ReturnType<typeof useEntity>; size?: number }) {
   const [imageFailed, setImageFailed] = useState(false)
+  const stateIcon = entity ? card.stateIcons?.[entity.state] : undefined
 
   if (card.imageUrl && !imageFailed) {
     return <img alt="" className={styles.appIcon} onError={() => setImageFailed(true)} src={card.imageUrl} />
   }
 
-  return <MaterialIcon name={card.icon} size={size} />
+  return <MaterialIcon name={stateIcon ?? card.icon} size={size} />
 }
 
 function RoomSourceMediaAppCard({ card, isOff, onClick }: { card: RoomSourceCardConfig; isOff: boolean; onClick?: () => void }) {
@@ -503,7 +504,7 @@ function RoomSourceCard({ card, onOpen }: { card: RoomSourceCardConfig; onOpen: 
     <RoomSourceMediaAppCard card={card} isOff={unavailable || disabledByState} onClick={handleClick} />
   ) : (
     <GlassTile
-      icon={<SourceCardIcon card={card} size={24} />}
+      icon={<SourceCardIcon card={card} entity={entity} size={24} />}
       backgroundColor={backgroundColor}
       isOff={unavailable || disabledByState || inactiveMuted}
       onClick={handleClick}
@@ -520,7 +521,8 @@ function RoomSourceCard({ card, onOpen }: { card: RoomSourceCardConfig; onOpen: 
 function RoomSourceModal({ card, onClose, roomTitle }: { card: RoomSourceCardConfig | null; onClose: () => void; roomTitle: string }) {
   const content = card ? renderRoomReusableSheet(card, roomTitle) : null
   const plainTitle = card?.kind === 'air' || card?.kind === 'climate' || card?.kind === 'contact' || card?.kind === 'light' || card?.kind === 'occupancy'
-  const title = card ? `${roomTitle}${plainTitle ? ' ' : ': '}${card.modalTitle ?? card.title}` : roomTitle
+  const mediaTitle = card?.kind === 'media' && card.hash ? MEDIA_REMOTE_CONFIGS[card.hash]?.remoteTitle : undefined
+  const title = card ? mediaTitle ?? `${roomTitle}${plainTitle ? ' ' : ': '}${card.modalTitle ?? card.title}` : roomTitle
   const subtitle = useHass((state) => (card && plainTitle && card.kind !== 'contact' && card.kind !== 'light' ? roomSourceModalSubtitle(card, roomTitle, state.entities) : undefined))
 
   return (
@@ -904,8 +906,76 @@ function GuestControlsPage({ onNavigate }: { onNavigate: (path: string) => void 
   )
 }
 
-function MediaPage({ onNavigate }: { onNavigate: (path: string) => void }) {
-  return <EntitySections onNavigate={onNavigate} sections={MEDIA_SECTIONS} />
+function mediaPageCardFromItem(item: EntitySectionConfig['items'][number]): RoomSourceCardConfig {
+  const hash = item.action?.type === 'navigate' && item.action.path.startsWith('#') ? item.action.path : undefined
+  const isLivingRoomShield = item.entityId === 'media_player.living_room_shield'
+  return {
+    action: hash ? undefined : item.action as RoomSourceCardAction | undefined,
+    activeStates: ['on', 'playing'],
+    entityId: item.entityId,
+    hash,
+    icon: isLivingRoomShield ? 'mdi:television' : item.icon ?? 'mdi:remote',
+    kind: 'media',
+    showState: true,
+    span: item.title === 'Theater Room' || item.entityId === 'media_player.living_room_shield' ? 'full' : undefined,
+    stateIcons: isLivingRoomShield ? { off: 'mdi:television-off', unavailable: 'mdi:television-off', unknown: 'mdi:television-off' } : undefined,
+    title: item.title,
+  }
+}
+
+const MEDIA_SOURCE_SECTIONS = MEDIA_SECTIONS.map((section) => ({
+  ...section,
+  cards: section.items.map(mediaPageCardFromItem),
+}))
+
+const MEDIA_SOURCE_CARDS = MEDIA_SOURCE_SECTIONS.flatMap((section) => section.cards)
+
+function MediaPage() {
+  const [selectedCard, setSelectedCard] = useState<RoomSourceCardConfig | null>(null)
+
+  const closeSourceCard = () => {
+    setSelectedCard(null)
+    if (dashboardHash()) replaceDashboardUrl(dashboardPathWithSearch())
+  }
+
+  const openSourceCard = (card: RoomSourceCardConfig) => {
+    setSelectedCard(card)
+    if (card.hash) setRoomHash(card.hash)
+  }
+
+  useEffect(() => {
+    const syncFromHash = () => {
+      const card = MEDIA_SOURCE_CARDS.find((candidate) => candidate.hash === dashboardHash())
+      setSelectedCard(card ?? null)
+    }
+
+    const targets = dashboardEventTargets()
+    syncFromHash()
+    targets.forEach((target) => {
+      target.addEventListener('hashchange', syncFromHash)
+      target.addEventListener(DASHBOARD_ROUTE_CHANGE_EVENT, syncFromHash)
+    })
+    return () => {
+      targets.forEach((target) => {
+        target.removeEventListener('hashchange', syncFromHash)
+        target.removeEventListener(DASHBOARD_ROUTE_CHANGE_EVENT, syncFromHash)
+      })
+    }
+  }, [])
+
+  return (
+    <div className={styles.stack}>
+      {MEDIA_SOURCE_SECTIONS.map((section) => (
+        <section className={styles.section} key={section.title}>
+          <SectionHeader title={section.title} />
+          <Grid>
+            {section.cards.map((card) => <RoomSourceCard card={card} key={`${section.title}-${card.entityId}-${card.title}`} onOpen={openSourceCard} />)}
+          </Grid>
+        </section>
+      ))}
+      <RoomSourceModal card={selectedCard} onClose={closeSourceCard} roomTitle={selectedCard?.title === 'Theater Room' ? 'Theater Room' : 'Living Room'} />
+    </div>
+  )
 }
 
 function AdminPage({ onNavigate }: { onNavigate: (path: string) => void }) {
@@ -1629,7 +1699,7 @@ function Content({ onNavigate, path }: { onNavigate: (path: string) => void; pat
   if (TODO_PAGES[path]) return <TodoPage onNavigate={onNavigate} path={path} />
   if (path === 'security') return <SecurityPage />
   if (path === 'vacuums') return <VacuumPage />
-  if (path === 'media') return <MediaPage onNavigate={onNavigate} />
+  if (path === 'media') return <MediaPage />
   if (path === 'admin') return <AdminPage onNavigate={onNavigate} />
   if (path === 'ecobee') return <ThermostatPage />
   if (path === 'custom-lights') return <CustomLightsPage />
