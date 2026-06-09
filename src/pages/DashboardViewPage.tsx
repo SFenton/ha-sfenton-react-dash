@@ -477,7 +477,7 @@ function useRoomSourceActionRunner() {
   }
 }
 
-function RoomSourceCard({ card, onOpen }: { card: RoomSourceCardConfig; onOpen: (card: RoomSourceCardConfig) => void }) {
+function RoomSourceCard({ card, eightSleepModalState, onOpen }: { card: RoomSourceCardConfig; eightSleepModalState?: EightSleepBedModalState; onOpen: (card: RoomSourceCardConfig) => void }) {
   const alternateGate = useEntity(asEntityName(card.alternate?.whenEntityId ?? card.entityId), { returnNullIfNotFound: true })
   const runAction = useRoomSourceActionRunner()
   const useAlternate = Boolean(card.alternate && alternateGate && card.alternate.whenStates.includes(alternateGate.state))
@@ -493,23 +493,25 @@ function RoomSourceCard({ card, onOpen }: { card: RoomSourceCardConfig; onOpen: 
   const subtitle = effectiveSubtitleEntityIds
     ? [subtitleEntityOne, subtitleEntityTwo].slice(0, effectiveSubtitleEntityIds.length).map((subtitleEntity) => formatRoomSourceSubtitleEntity(subtitleEntity)).join(' • ')
     : effectiveShowState ? formatRoomSourceState(card, entity) : undefined
-  const clickable = Boolean(card.hash || card.manualReview || card.action) && !unavailable && !disabledByState
+  const displayUnavailable = eightSleepModalState ? !eightSleepModalState.sideAvailable : unavailable
+  const displaySubtitle = eightSleepModalState ? (eightSleepModalState.controlsSideOn ? eightSleepModalState.subtitle : 'Off') : subtitle
+  const clickable = Boolean(card.hash || card.manualReview || card.action) && !displayUnavailable && !disabledByState
   const activeByState = Boolean(entity && card.activeStates?.includes(entity.state))
   const sourceStateInactive = card.stateDisplay === 'climate-action-temperature' && (entity?.state === 'off' || entity?.attributes.hvac_action === 'off')
-  const inactiveMuted = sourceStateInactive || (!unavailable && !activeByState && !isActiveState(entity) && ['fan', 'grill', 'light', 'media', 'power'].includes(card.kind))
+  const inactiveMuted = eightSleepModalState ? !eightSleepModalState.controlsSideOn : sourceStateInactive || (!unavailable && !activeByState && !isActiveState(entity) && ['fan', 'grill', 'light', 'media', 'power'].includes(card.kind))
   const handleClick = clickable ? (card.action ? () => runAction(card.entityId, card.action) : () => onOpen(card)) : undefined
-  const backgroundColor = roomSourceBackgroundColor(card, entity, presenceEntity)
+  const backgroundColor = eightSleepModalState ? eightSleepCardBackgroundColor(eightSleepModalState) : roomSourceBackgroundColor(card, entity, presenceEntity)
   const content = card.imageUrl && card.kind === 'media' && card.action ? (
-    <RoomSourceMediaAppCard card={card} isOff={unavailable || disabledByState} onClick={handleClick} />
+    <RoomSourceMediaAppCard card={card} isOff={displayUnavailable || disabledByState} onClick={handleClick} />
   ) : (
     <GlassTile
       icon={<SourceCardIcon card={card} size={24} />}
       backgroundColor={backgroundColor}
-      isOff={unavailable || disabledByState || inactiveMuted}
+      isOff={displayUnavailable || disabledByState || inactiveMuted}
       onClick={handleClick}
-      subtitle={subtitle}
+      subtitle={displaySubtitle}
       title={card.title}
-      tone={unavailable ? 'neutral' : toneForSourceKind(card.kind)}
+      tone={displayUnavailable ? 'neutral' : toneForSourceKind(card.kind)}
     />
   )
 
@@ -517,15 +519,14 @@ function RoomSourceCard({ card, onOpen }: { card: RoomSourceCardConfig; onOpen: 
   return content
 }
 
-function RoomSourceModal({ card, onClose, roomTitle }: { card: RoomSourceCardConfig | null; onClose: () => void; roomTitle: string }) {
+function RoomSourceModal({ card, eightSleepModalState, onClose, roomTitle }: { card: RoomSourceCardConfig | null; eightSleepModalState?: EightSleepBedModalState; onClose: () => void; roomTitle: string }) {
   const eightSleepSide = card ? eightSleepSideForHash(card.hash) : undefined
-  const eightSleepModalState = useEightSleepBedModalState(eightSleepSide)
   const content = card && !eightSleepSide ? renderRoomReusableSheet(card, roomTitle) : null
   const plainTitle = card?.kind === 'air' || card?.kind === 'climate' || card?.kind === 'contact' || card?.kind === 'light' || card?.kind === 'occupancy'
   const title = card ? `${roomTitle}${plainTitle ? ' ' : ': '}${card.modalTitle ?? card.title}` : roomTitle
   const subtitle = useHass((state) => (card && plainTitle && card.kind !== 'contact' && card.kind !== 'light' ? roomSourceModalSubtitle(card, roomTitle, state.entities) : undefined))
 
-  if (card && eightSleepSide) {
+  if (card && eightSleepSide && eightSleepModalState) {
     return (
       <ModalSheet onClose={onClose} open={Boolean(card)} subtitle={eightSleepModalState.subtitle} surface="hass-popup" title={eightSleepSide.title}>
         <EightSleepBedModalContent key={eightSleepSide.hash} modalState={eightSleepModalState} side={eightSleepSide} />
@@ -551,6 +552,7 @@ function EmptyRoomState() {
 
 function SourceRoomPage({ room }: { room: (typeof ROOM_PAGE_CONFIGS)[string] }) {
   const [selectedCard, setSelectedCard] = useState<RoomSourceCardConfig | null>(null)
+  const eightSleepModalStates = useEightSleepBedModalStates()
 
   const closeSourceCard = () => {
     setSelectedCard(null)
@@ -594,12 +596,12 @@ function SourceRoomPage({ room }: { room: (typeof ROOM_PAGE_CONFIGS)[string] }) 
         <section className={styles.section} id={sectionId(section.title)} key={`${room.path}-${section.title}`}>
           <SectionHeader title={section.title} />
           <Grid>
-            {section.cards.map((card) => <RoomSourceCard card={card} key={`${room.path}-${section.title}-${card.title}-${card.entityId}`} onOpen={openSourceCard} />)}
+            {section.cards.map((card) => <RoomSourceCard card={card} eightSleepModalState={card.hash ? eightSleepModalStates[card.hash] : undefined} key={`${room.path}-${section.title}-${card.title}-${card.entityId}`} onOpen={openSourceCard} />)}
           </Grid>
         </section>
       ))}
 
-      <RoomSourceModal card={selectedCard} onClose={closeSourceCard} roomTitle={room.title} />
+      <RoomSourceModal card={selectedCard} eightSleepModalState={selectedCard?.hash ? eightSleepModalStates[selectedCard.hash] : undefined} onClose={closeSourceCard} roomTitle={room.title} />
     </div>
   )
 }
@@ -1179,6 +1181,23 @@ function formatEightSleepLevel(level: number | null) {
   if (level === null) return undefined
   const snappedLevel = snapEightSleepLevel(level)
   return `${snappedLevel > 0 ? `+${snappedLevel}` : snappedLevel}`
+}
+
+function eightSleepCardBackgroundColor(modalState: EightSleepBedModalState) {
+  if (!modalState.controlsSideOn) return undefined
+  if (modalState.heroAction === 'heating') return 'rgba(136, 64, 26, 0.6)'
+  if (modalState.heroAction === 'cooling') return 'rgba(25, 84, 130, 0.6)'
+  return 'rgba(229, 57, 53, 0.6)'
+}
+
+function useEightSleepBedModalStates() {
+  const stephenState = useEightSleepBedModalState(EIGHT_SLEEP_SIDE_CONFIGS[0])
+  const stephState = useEightSleepBedModalState(EIGHT_SLEEP_SIDE_CONFIGS[1])
+
+  return {
+    [EIGHT_SLEEP_SIDE_CONFIGS[0].hash]: stephenState,
+    [EIGHT_SLEEP_SIDE_CONFIGS[1].hash]: stephState,
+  }
 }
 
 function useEightSleepBedModalState(side: EightSleepSideConfig | undefined): EightSleepBedModalState {

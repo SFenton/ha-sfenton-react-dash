@@ -507,7 +507,7 @@ describe('DashboardViewPage', () => {
     render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
 
     expect(screen.getByLabelText(/Humidifier Unavailable/i)).toHaveAttribute('data-muted', 'true')
-    expect(screen.getByRole('button', { name: /Stephen's Bed Heating • 86 °F/i })).toHaveStyle('--tile-color: rgba(136, 64, 26, 0.6)')
+    expect(screen.getByRole('button', { name: /Stephen's Bed Heating • \+1/i })).toHaveStyle('--tile-color: rgba(136, 64, 26, 0.6)')
     expect(screen.getByRole('button', { name: /Steph's Bed Off/i })).toHaveAttribute('data-muted', 'true')
     expect(screen.getByRole('button', { name: /Apple TV Paused/i })).toHaveAttribute('data-muted', 'false')
 
@@ -520,7 +520,7 @@ describe('DashboardViewPage', () => {
   it('opens Eight Sleep bed modals with stage controls and hot flash actions', async () => {
     render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
 
-    fireEvent.click(screen.getByRole('button', { name: /Stephen's Bed Heating • 86 °F/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Stephen's Bed Heating • \+1/i }))
 
     const dialog = await screen.findByRole('dialog')
     expect(dialog).toHaveAttribute('data-surface', 'hass-popup')
@@ -547,6 +547,8 @@ describe('DashboardViewPage', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: "Stephen's Bed bedtime increase" }))
     fireEvent.click(within(dialog).getByRole('button', { name: "Stephen's Bed asleep increase" }))
     fireEvent.click(hotFlash)
+
+    expect(screen.getByRole('button', { name: /Stephen's Bed Heating • \+1/i, hidden: true })).toBeInTheDocument()
 
     expect(mockCallServiceCalls).toEqual([
       { domain: 'eight_sleep', service: 'heat_set', target: 'sensor.stephen_s_eight_sleep_side_bed_temperature', serviceData: { duration: 0, target: 10, sleep_stage: 'override_bedtime' } },
@@ -591,6 +593,7 @@ describe('DashboardViewPage', () => {
     expect(within(dialog).getByRole('button', { name: "Turn off Steph's Bed" })).toBeInTheDocument()
     expect(within(dialog).getByRole('region', { name: /Steph's Bed thermostat Cooling -3/i })).toBeInTheDocument()
     expect(within(dialog).getByRole('button', { name: "Steph's Bed now increase" })).not.toBeDisabled()
+    expect(screen.getByRole('button', { name: /Steph's Bed Cooling • -3/i, hidden: true })).toHaveAttribute('data-muted', 'false')
     expect(mockCallServiceCalls).toEqual([
       { domain: 'eight_sleep', service: 'side_on', target: 'sensor.steph_s_eight_sleep_side_bed_temperature' },
       { domain: 'eight_sleep', service: 'heat_set', target: 'sensor.steph_s_eight_sleep_side_bed_temperature', serviceData: { duration: 0, target: -30, sleep_stage: 'override_bedtime' } },
@@ -603,7 +606,7 @@ describe('DashboardViewPage', () => {
     const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true)
     render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
 
-    fireEvent.click(screen.getByRole('button', { name: /Stephen's Bed Heating • 86 °F/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Stephen's Bed Heating • \+1/i }))
     const dialog = await screen.findByRole('dialog')
     const decreaseNow = within(dialog).getByRole('button', { name: "Stephen's Bed now decrease" })
     fireEvent.click(decreaseNow)
@@ -613,9 +616,11 @@ describe('DashboardViewPage', () => {
 
     mockCallServiceCalls.length = 0
     fireEvent.click(within(dialog).getByRole('button', { name: "Turn off Stephen's Bed" }))
+    expect(screen.getByRole('button', { name: /Stephen's Bed Off/i, hidden: true })).toHaveAttribute('data-muted', 'true')
     fireEvent.click(within(dialog).getByRole('button', { name: "Turn on Stephen's Bed" }))
 
     expect(within(dialog).getByRole('region', { name: /Stephen's Bed thermostat Cooling -3/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Stephen's Bed Cooling • -3/i, hidden: true })).toHaveAttribute('data-muted', 'false')
     expect(mockCallServiceCalls).toEqual([
       { domain: 'eight_sleep', service: 'side_off', target: 'sensor.stephen_s_eight_sleep_side_bed_temperature' },
       { domain: 'eight_sleep', service: 'side_on', target: 'sensor.stephen_s_eight_sleep_side_bed_temperature' },
@@ -628,7 +633,7 @@ describe('DashboardViewPage', () => {
   it('drags the Eight Sleep hero dial as an app-scale NOW control', async () => {
     render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
 
-    fireEvent.click(screen.getByRole('button', { name: /Stephen's Bed Heating • 86 °F/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Stephen's Bed Heating • \+1/i }))
     const dialog = await screen.findByRole('dialog')
     const slider = within(dialog).getByRole('slider', { name: "Stephen's Bed target level" })
 
@@ -638,6 +643,7 @@ describe('DashboardViewPage', () => {
     fireEvent.pointerUp(slider)
 
     expect(within(dialog).getByText("Stephen's Bed: Cooling • -4")).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Stephen's Bed Cooling • -4/i, hidden: true })).toHaveAttribute('data-muted', 'false')
 
     expect(mockCallServiceCalls).toEqual([
       { domain: 'eight_sleep', service: 'heat_set', target: 'sensor.stephen_s_eight_sleep_side_bed_temperature', serviceData: { duration: 0, target: -40, sleep_stage: 'override_bedtime' } },
@@ -648,7 +654,7 @@ describe('DashboardViewPage', () => {
     const confirm = vi.spyOn(window, 'confirm').mockReturnValueOnce(false).mockReturnValueOnce(true)
     render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
 
-    fireEvent.click(screen.getByRole('button', { name: /Stephen's Bed Heating • 86 °F/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Stephen's Bed Heating • \+1/i }))
     const dialog = await screen.findByRole('dialog')
     const toggle = within(dialog).getByRole('button', { name: "Turn off Stephen's Bed" })
 
@@ -663,6 +669,7 @@ describe('DashboardViewPage', () => {
     expect(within(dialog).getByRole('button', { name: "Turn on Stephen's Bed" })).toBeInTheDocument()
     expect(within(dialog).getByRole('region', { name: /Stephen's Bed thermostat Idle 0/i })).toBeInTheDocument()
     expect(within(dialog).getByRole('button', { name: "Stephen's Bed now increase" })).toBeDisabled()
+    expect(screen.getByRole('button', { name: /Stephen's Bed Off/i, hidden: true })).toHaveAttribute('data-muted', 'true')
 
     confirm.mockRestore()
   })
@@ -689,7 +696,7 @@ describe('DashboardViewPage', () => {
   it('keeps Eight Sleep stage edits visible while stale HASS values catch up', async () => {
     const view = render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
 
-    fireEvent.click(screen.getByRole('button', { name: /Stephen's Bed Heating • 86 °F/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Stephen's Bed Heating • \+1/i }))
     const dialog = await screen.findByRole('dialog')
     fireEvent.click(within(dialog).getByRole('button', { name: "Stephen's Bed now decrease" }))
     fireEvent.click(within(dialog).getByRole('button', { name: "Stephen's Bed now decrease" }))
