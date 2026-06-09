@@ -146,12 +146,12 @@ export const ROOM_PAGE_CONFIGS: Record<string, RoomPageSourceConfig> = {
         { title: "Stephen's Bed", entityId: 'climate.stephen_s_eight_sleep_side_climate', icon: 'mdi:bed', kind: 'climate', hash: '#stephens-bed', showState: true, stateDisplay: 'climate-action-temperature', stateTone: 'climate-action', presenceEntityId: 'binary_sensor.stephen_s_eight_sleep_side_bed_presence' },
         { title: "Steph's Bed", entityId: 'climate.steph_s_eight_sleep_side_climate', icon: 'mdi:bed', kind: 'climate', hash: '#stephs-bed', showState: true, stateDisplay: 'climate-action-temperature', stateTone: 'climate-action', presenceEntityId: 'binary_sensor.steph_s_eight_sleep_side_bed_presence' },
       ] },
+      { title: 'Media', cards: [{ title: 'Apple TV', entityId: 'media_player.master_bedroom_apple_tv', icon: 'mdi:apple', kind: 'media', hash: '#master-bedroom-apple-tv', showState: true, span: 'full', activeStates: ['idle', 'paused', 'playing'] }] },
       { title: 'Climate', cards: [
         { title: 'Vents', entityId: 'cover.master_bedroom_vents', icon: 'mdi:air-filter', kind: 'vent', hash: '#vents', showState: true, modalItems: [{ title: 'Vent 1', entityId: 'cover.master_bedroom_vent_2_vent', icon: 'mdi:air-filter' }, { title: 'Vent 2', entityId: 'cover.master_bedroom_vent_3_vent', icon: 'mdi:air-filter' }], manualReview: sourcePopupReview },
         { title: 'Air Purifier', entityId: 'select.master_bedroom_air_purifier_fan_mode', icon: 'mdi:fan', kind: 'air', hash: '#air-purifier', modalEntityId: 'sensor.master_bedroom_air_purifier_pm2_5', subtitleEntityIds: ['select.master_bedroom_air_purifier_fan_mode', 'fan.master_bedroom_air_purifier_levoit_purifier'] },
         { title: 'Humidifier', entityId: 'humidifier.master_bedroom_humidifier', icon: 'mdi:air-humidifier', kind: 'climate', hash: '#humidifier-master-bedroom', showState: true, manualReview: sourcePopupReview },
       ] },
-      { title: 'Media', cards: [{ title: 'Apple TV', entityId: 'media_player.master_bedroom_apple_tv', icon: 'mdi:apple', kind: 'media', hash: '#master-bedroom-apple-tv', showState: true, span: 'full', activeStates: ['idle', 'paused', 'playing'] }] },
     ],
     popupTemplates: ['light-popup-6', 'window-popup-single', 'humidifier', 'vent-popup-2', 'climate-popup-3', 'air-purifier-popup', 'eight-sleep-popups', 'media-player-popup', 'occupancy-popup-3'],
   },
