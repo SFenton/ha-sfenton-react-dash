@@ -1218,6 +1218,7 @@ function useEightSleepBedModalState(side: EightSleepSideConfig | undefined): Eig
   const showingPowerOnPreview = controlsSideOn && powerOnPreviewValue !== null
   const displayedTargetValue = hotFlashActive ? -10 : showingPowerOnPreview ? powerOnPreviewValue : controlsSideOn ? displayNowValue ?? activeValue ?? 0 : 0
   const heroAction = eightSleepLevelAction(displayedTargetValue)
+  const subtitle = controlsSideOn ? `${titleCaseState(heroAction)} • ${formatEightSleepLevel(displayedTargetValue) ?? '0'}` : 'Off'
 
   return {
     activeValue,
@@ -1230,7 +1231,7 @@ function useEightSleepBedModalState(side: EightSleepSideConfig | undefined): Eig
     heroAction,
     hotFlashActive,
     sideAvailable,
-    subtitle: `${titleCaseState(heroAction)} • ${formatEightSleepLevel(displayedTargetValue) ?? '0'}`,
+    subtitle,
   }
 }
 
