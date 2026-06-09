@@ -572,6 +572,41 @@ describe('DashboardViewPage', () => {
     ])
   })
 
+  it('turns on an off Eight Sleep side from the thermostat tap target', async () => {
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false)
+    render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
+
+    fireEvent.click(screen.getByRole('button', { name: /Steph's Bed Off/i }))
+    fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: "Turn on Steph's Bed" }))
+
+    expect(confirm).not.toHaveBeenCalled()
+    expect(mockCallServiceCalls).toEqual([
+      { domain: 'climate', service: 'set_hvac_mode', target: 'climate.steph_s_eight_sleep_side_climate', serviceData: { hvac_mode: 'heat_cool' } },
+    ])
+
+    confirm.mockRestore()
+  })
+
+  it('confirms before turning off an on Eight Sleep side from the thermostat tap target', async () => {
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValueOnce(false).mockReturnValueOnce(true)
+    render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
+
+    fireEvent.click(screen.getByRole('button', { name: /Stephen's Bed Heating • 86 °F/i }))
+    const dialog = await screen.findByRole('dialog')
+    const toggle = within(dialog).getByRole('button', { name: "Turn off Stephen's Bed" })
+
+    fireEvent.click(toggle)
+    expect(confirm).toHaveBeenCalledWith("Turn off Stephen's Bed?")
+    expect(mockCallServiceCalls).toEqual([])
+
+    fireEvent.click(toggle)
+    expect(mockCallServiceCalls).toEqual([
+      { domain: 'climate', service: 'set_hvac_mode', target: 'climate.stephen_s_eight_sleep_side_climate', serviceData: { hvac_mode: 'off' } },
+    ])
+
+    confirm.mockRestore()
+  })
+
   it('disables Eight Sleep stage controls when that bed side is off', async () => {
     mockEntities['input_boolean.eight_sleep_steph_hot_flash_active'].state = 'off'
     render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)

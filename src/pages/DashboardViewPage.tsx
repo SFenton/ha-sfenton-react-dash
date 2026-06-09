@@ -1395,10 +1395,30 @@ function ThermostatDial({ actionOverride, entityId, interactive = true, rangeTex
 }
 
 function EightSleepThermostatHero({ side }: { side: EightSleepSideConfig }) {
+  const climateEntity = useEntity(asEntityName(side.climateEntityId), { returnNullIfNotFound: true })
   const activeEntity = useEntity(asEntityName(side.hotFlashActiveEntityId), { returnNullIfNotFound: true })
+  const callService = useCallService()
   const hotFlashActive = activeEntity?.state === 'on'
+  const sideAvailable = Boolean(climateEntity && !isUnavailable(climateEntity))
+  const sideOn = Boolean(climateEntity && !isUnavailable(climateEntity) && climateEntity.state !== 'off')
 
-  return <ThermostatDial actionOverride={hotFlashActive ? 'cooling' : undefined} entityId={side.climateEntityId} interactive={false} rangeTextOverride={hotFlashActive ? '-10°' : undefined} size="modal" title={side.title} />
+  const toggleSidePower = () => {
+    if (!sideAvailable) return
+    if (!sideOn) {
+      callService({ domain: 'climate', service: 'set_hvac_mode', target: side.climateEntityId, serviceData: { hvac_mode: 'heat_cool' } })
+      return
+    }
+
+    if (!window.confirm(`Turn off ${side.title}?`)) return
+    callService({ domain: 'climate', service: 'set_hvac_mode', target: side.climateEntityId, serviceData: { hvac_mode: 'off' } })
+  }
+
+  return (
+    <div className={styles.eightSleepThermostatHero}>
+      <ThermostatDial actionOverride={hotFlashActive ? 'cooling' : undefined} entityId={side.climateEntityId} interactive={false} rangeTextOverride={hotFlashActive ? '-10°' : undefined} size="modal" title={side.title} />
+      <button aria-label={`${sideOn ? 'Turn off' : 'Turn on'} ${side.title}`} className={styles.eightSleepThermostatButton} disabled={!sideAvailable} onClick={toggleSidePower} type="button" />
+    </div>
+  )
 }
 
 function EightSleepStageControl({ side, stage }: { side: EightSleepSideConfig; stage: EightSleepStageConfig }) {
