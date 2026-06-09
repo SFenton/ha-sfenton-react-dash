@@ -507,6 +507,9 @@ describe('DashboardViewPage', () => {
     render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
 
     expect(screen.getByLabelText(/Humidifier Unavailable/i)).toHaveAttribute('data-muted', 'true')
+    const headings = screen.getAllByRole('heading').map((heading) => heading.textContent)
+    expect(headings.indexOf('Eight Sleep')).toBeGreaterThan(-1)
+    expect(headings.indexOf('Eight Sleep')).toBeLessThan(headings.indexOf('Climate'))
     expect(screen.getByRole('button', { name: /Stephen's Bed Heating • \+1/i })).toHaveStyle('--tile-color: rgba(136, 64, 26, 0.6)')
     expect(screen.getByRole('button', { name: /Steph's Bed Off/i })).toHaveAttribute('data-muted', 'true')
     expect(screen.getByRole('button', { name: /Apple TV Paused/i })).toHaveAttribute('data-muted', 'false')
