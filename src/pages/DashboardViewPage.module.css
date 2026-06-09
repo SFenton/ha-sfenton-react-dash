@@ -709,6 +709,120 @@ button.thermostatGlassMain {
   gap: 18px;
 }
 
+.eightSleepStageGrid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+
+.eightSleepStageControl {
+  display: grid;
+  min-width: 0;
+  gap: 7px;
+}
+
+.eightSleepStageLabel {
+  overflow: hidden;
+  color: white;
+  font-size: 0.74rem;
+  font-weight: 840;
+  letter-spacing: 0;
+  line-height: 1.1;
+  text-align: left;
+  text-overflow: clip;
+  white-space: nowrap;
+}
+
+.eightSleepStepper {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr) 48px;
+  min-height: 48px;
+  align-items: center;
+  gap: 10px;
+}
+
+.eightSleepStepperButton {
+  display: grid;
+  width: 48px;
+  height: 48px;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  border-radius: 999px;
+  color: rgba(255, 255, 255, 0.92);
+  background: rgba(255, 255, 255, 0.1);
+  box-shadow: 0 14px 28px rgba(0, 0, 0, 0.14), inset 0 1px 0 rgba(255, 255, 255, 0.14);
+  backdrop-filter: blur(16px);
+  font: inherit;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.eightSleepStepperButton:disabled {
+  color: rgba(255, 255, 255, 0.28);
+  cursor: default;
+}
+
+.eightSleepStepperButton:focus {
+  outline: none;
+}
+
+.eightSleepStepperButton:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.62);
+  outline-offset: 2px;
+}
+
+.eightSleepStageValue {
+  color: white;
+  font-size: 1.52rem;
+  font-weight: 820;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
+  line-height: 1;
+  text-align: center;
+}
+
+.eightSleepHotFlashStatus {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.eightSleepCountdown {
+  min-width: 48px;
+  color: white;
+  font-size: 0.98rem;
+  font-weight: 820;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
+  line-height: 1;
+  text-align: right;
+}
+
+.eightSleepCancelButton {
+  display: grid;
+  width: 42px;
+  height: 42px;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+  color: white;
+  background: rgba(255, 255, 255, 0.12);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16), 0 10px 22px rgba(0, 0, 0, 0.16);
+  backdrop-filter: blur(16px);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.eightSleepCancelButton:focus {
+  outline: none;
+}
+
+.eightSleepCancelButton:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.62);
+  outline-offset: 2px;
+}
+
 @media (max-width: 340px) {
   .grid,
   .cameraGrid,

@@ -361,6 +361,9 @@ function SourceEntityModalContent({ card }: { card: RoomSourceCardConfig }) {
 function renderRoomReusableSheet(card: RoomSourceCardConfig, roomTitle: string): ReactNode {
   if (!card.hash) return null
 
+  const eightSleepSide = eightSleepSideForHash(card.hash)
+  if (eightSleepSide) return <EightSleepBedModalContent key={eightSleepSide.hash} side={eightSleepSide} />
+
   if (card.modalItems?.length) return <SourceEntityModalContent card={card} key={`${card.entityId}-items`} />
 
   if (card.kind === 'light') {
@@ -420,15 +423,14 @@ function RoomSourceFallback({ card }: { card: RoomSourceCardConfig }) {
   )
 }
 
-function SourceCardIcon({ card, entity, size = 38 }: { card: RoomSourceCardConfig; entity: ReturnType<typeof useEntity>; size?: number }) {
+function SourceCardIcon({ card, size = 38 }: { card: RoomSourceCardConfig; size?: number }) {
   const [imageFailed, setImageFailed] = useState(false)
-  const stateIcon = entity ? card.stateIcons?.[entity.state] : undefined
 
   if (card.imageUrl && !imageFailed) {
     return <img alt="" className={styles.appIcon} onError={() => setImageFailed(true)} src={card.imageUrl} />
   }
 
-  return <MaterialIcon name={stateIcon ?? card.icon} size={size} />
+  return <MaterialIcon name={card.icon} size={size} />
 }
 
 function RoomSourceMediaAppCard({ card, isOff, onClick }: { card: RoomSourceCardConfig; isOff: boolean; onClick?: () => void }) {
@@ -504,7 +506,7 @@ function RoomSourceCard({ card, onOpen }: { card: RoomSourceCardConfig; onOpen: 
     <RoomSourceMediaAppCard card={card} isOff={unavailable || disabledByState} onClick={handleClick} />
   ) : (
     <GlassTile
-      icon={<SourceCardIcon card={card} entity={entity} size={24} />}
+      icon={<SourceCardIcon card={card} size={24} />}
       backgroundColor={backgroundColor}
       isOff={unavailable || disabledByState || inactiveMuted}
       onClick={handleClick}
@@ -520,13 +522,13 @@ function RoomSourceCard({ card, onOpen }: { card: RoomSourceCardConfig; onOpen: 
 
 function RoomSourceModal({ card, onClose, roomTitle }: { card: RoomSourceCardConfig | null; onClose: () => void; roomTitle: string }) {
   const content = card ? renderRoomReusableSheet(card, roomTitle) : null
+  const eightSleepSide = card ? eightSleepSideForHash(card.hash) : undefined
   const plainTitle = card?.kind === 'air' || card?.kind === 'climate' || card?.kind === 'contact' || card?.kind === 'light' || card?.kind === 'occupancy'
-  const mediaTitle = card?.kind === 'media' && card.hash ? MEDIA_REMOTE_CONFIGS[card.hash]?.remoteTitle : undefined
-  const title = card ? mediaTitle ?? `${roomTitle}${plainTitle ? ' ' : ': '}${card.modalTitle ?? card.title}` : roomTitle
+  const title = card ? `${roomTitle}${plainTitle ? ' ' : ': '}${card.modalTitle ?? card.title}` : roomTitle
   const subtitle = useHass((state) => (card && plainTitle && card.kind !== 'contact' && card.kind !== 'light' ? roomSourceModalSubtitle(card, roomTitle, state.entities) : undefined))
 
   return (
-    <ModalSheet onClose={onClose} open={Boolean(card)} subtitle={subtitle} title={title}>
+    <ModalSheet onClose={onClose} open={Boolean(card)} subtitle={subtitle} surface={eightSleepSide ? 'hass-popup' : undefined} title={title}>
       {card && (content ?? <RoomSourceFallback card={card} />)}
     </ModalSheet>
   )
@@ -906,76 +908,8 @@ function GuestControlsPage({ onNavigate }: { onNavigate: (path: string) => void 
   )
 }
 
-function mediaPageCardFromItem(item: EntitySectionConfig['items'][number]): RoomSourceCardConfig {
-  const hash = item.action?.type === 'navigate' && item.action.path.startsWith('#') ? item.action.path : undefined
-  const isLivingRoomShield = item.entityId === 'media_player.living_room_shield'
-  return {
-    action: hash ? undefined : item.action as RoomSourceCardAction | undefined,
-    activeStates: ['on', 'playing'],
-    entityId: item.entityId,
-    hash,
-    icon: isLivingRoomShield ? 'mdi:television' : item.icon ?? 'mdi:remote',
-    kind: 'media',
-    showState: true,
-    span: item.title === 'Theater Room' || item.entityId === 'media_player.living_room_shield' ? 'full' : undefined,
-    stateIcons: isLivingRoomShield ? { off: 'mdi:television-off', unavailable: 'mdi:television-off', unknown: 'mdi:television-off' } : undefined,
-    title: item.title,
-  }
-}
-
-const MEDIA_SOURCE_SECTIONS = MEDIA_SECTIONS.map((section) => ({
-  ...section,
-  cards: section.items.map(mediaPageCardFromItem),
-}))
-
-const MEDIA_SOURCE_CARDS = MEDIA_SOURCE_SECTIONS.flatMap((section) => section.cards)
-
-function MediaPage() {
-  const [selectedCard, setSelectedCard] = useState<RoomSourceCardConfig | null>(null)
-
-  const closeSourceCard = () => {
-    setSelectedCard(null)
-    if (dashboardHash()) replaceDashboardUrl(dashboardPathWithSearch())
-  }
-
-  const openSourceCard = (card: RoomSourceCardConfig) => {
-    setSelectedCard(card)
-    if (card.hash) setRoomHash(card.hash)
-  }
-
-  useEffect(() => {
-    const syncFromHash = () => {
-      const card = MEDIA_SOURCE_CARDS.find((candidate) => candidate.hash === dashboardHash())
-      setSelectedCard(card ?? null)
-    }
-
-    const targets = dashboardEventTargets()
-    syncFromHash()
-    targets.forEach((target) => {
-      target.addEventListener('hashchange', syncFromHash)
-      target.addEventListener(DASHBOARD_ROUTE_CHANGE_EVENT, syncFromHash)
-    })
-    return () => {
-      targets.forEach((target) => {
-        target.removeEventListener('hashchange', syncFromHash)
-        target.removeEventListener(DASHBOARD_ROUTE_CHANGE_EVENT, syncFromHash)
-      })
-    }
-  }, [])
-
-  return (
-    <div className={styles.stack}>
-      {MEDIA_SOURCE_SECTIONS.map((section) => (
-        <section className={styles.section} key={section.title}>
-          <SectionHeader title={section.title} />
-          <Grid>
-            {section.cards.map((card) => <RoomSourceCard card={card} key={`${section.title}-${card.entityId}-${card.title}`} onOpen={openSourceCard} />)}
-          </Grid>
-        </section>
-      ))}
-      <RoomSourceModal card={selectedCard} onClose={closeSourceCard} roomTitle={selectedCard?.title === 'Theater Room' ? 'Theater Room' : 'Living Room'} />
-    </div>
-  )
+function MediaPage({ onNavigate }: { onNavigate: (path: string) => void }) {
+  return <EntitySections onNavigate={onNavigate} sections={MEDIA_SECTIONS} />
 }
 
 function AdminPage({ onNavigate }: { onNavigate: (path: string) => void }) {
@@ -1122,6 +1056,84 @@ function useCallService() {
 type ThermostatSliderTarget = 'high' | 'low' | 'value'
 type ThermostatDisplayTargets = { high: number | null; low: number | null; sourceKey: string; target: number | null }
 type ThermostatThermalStatus = 'cool' | 'heat' | 'idle'
+type EightSleepStage = 'bedTimeLevel' | 'finalSleepLevel' | 'initialSleepLevel' | 'override_bedtime'
+
+interface EightSleepStageConfig {
+  helperEntityId: string
+  label: string
+  sleepStage: EightSleepStage
+  sourceEntityId: string
+}
+
+interface EightSleepSideConfig {
+  bedTemperatureEntityId: string
+  climateEntityId: string
+  hash: string
+  hotFlashActiveEntityId: string
+  hotFlashButtonEntityId: string
+  hotFlashCancelButtonEntityId: string
+  hotFlashTimerEntityId: string
+  stages: EightSleepStageConfig[]
+  title: string
+}
+
+const EIGHT_SLEEP_STAGE_MIN = -10
+const EIGHT_SLEEP_STAGE_MAX = 10
+
+const EIGHT_SLEEP_SIDE_CONFIGS: EightSleepSideConfig[] = [
+  {
+    bedTemperatureEntityId: 'sensor.stephen_s_eight_sleep_side_bed_temperature',
+    climateEntityId: 'climate.stephen_s_eight_sleep_side_climate',
+    hash: '#stephens-bed',
+    hotFlashActiveEntityId: 'input_boolean.eight_sleep_stephen_hot_flash_active',
+    hotFlashButtonEntityId: 'input_button.eight_sleep_stephen_hot_flash',
+    hotFlashCancelButtonEntityId: 'input_button.eight_sleep_stephen_cancel_hot_flash',
+    hotFlashTimerEntityId: 'timer.eight_sleep_stephen_hot_flash',
+    stages: [
+      { helperEntityId: 'input_number.eight_sleep_stephen_bedtime_level', label: 'NOW', sleepStage: 'override_bedtime', sourceEntityId: 'sensor.stephen_s_eight_sleep_side_now_level' },
+      { helperEntityId: 'input_number.eight_sleep_stephen_asleep_level', label: 'ASLEEP', sleepStage: 'initialSleepLevel', sourceEntityId: 'sensor.stephen_s_eight_sleep_side_asleep_level' },
+      { helperEntityId: 'input_number.eight_sleep_stephen_dawn_level', label: 'DAWN', sleepStage: 'finalSleepLevel', sourceEntityId: 'sensor.stephen_s_eight_sleep_side_dawn_level' },
+    ],
+    title: "Stephen's Bed",
+  },
+  {
+    bedTemperatureEntityId: 'sensor.steph_s_eight_sleep_side_bed_temperature',
+    climateEntityId: 'climate.steph_s_eight_sleep_side_climate',
+    hash: '#stephs-bed',
+    hotFlashActiveEntityId: 'input_boolean.eight_sleep_steph_hot_flash_active',
+    hotFlashButtonEntityId: 'input_button.eight_sleep_steph_hot_flash',
+    hotFlashCancelButtonEntityId: 'input_button.eight_sleep_steph_cancel_hot_flash',
+    hotFlashTimerEntityId: 'timer.eight_sleep_steph_hot_flash',
+    stages: [
+      { helperEntityId: 'input_number.eight_sleep_steph_bedtime_level', label: 'NOW', sleepStage: 'override_bedtime', sourceEntityId: 'sensor.steph_s_eight_sleep_side_now_level' },
+      { helperEntityId: 'input_number.eight_sleep_steph_asleep_level', label: 'ASLEEP', sleepStage: 'initialSleepLevel', sourceEntityId: 'sensor.steph_s_eight_sleep_side_asleep_level' },
+      { helperEntityId: 'input_number.eight_sleep_steph_dawn_level', label: 'DAWN', sleepStage: 'finalSleepLevel', sourceEntityId: 'sensor.steph_s_eight_sleep_side_dawn_level' },
+    ],
+    title: "Steph's Bed",
+  },
+]
+
+function eightSleepSideForHash(hash: string | undefined) {
+  return EIGHT_SLEEP_SIDE_CONFIGS.find((side) => side.hash === hash)
+}
+
+function formatEightSleepCountdown(milliseconds: number) {
+  const totalSeconds = Math.max(0, Math.ceil(milliseconds / 1000))
+  const minutes = Math.floor(totalSeconds / 60)
+  const seconds = totalSeconds % 60
+  return `${minutes}:${String(seconds).padStart(2, '0')}`
+}
+
+function eightSleepTimerCountdown(timerEntity: ReturnType<typeof useEntity>, now: number) {
+  if (timerEntity?.state !== 'active') return null
+  const finishesAt = typeof timerEntity.attributes.finishes_at === 'string' ? Date.parse(timerEntity.attributes.finishes_at) : NaN
+  if (Number.isFinite(finishesAt)) return formatEightSleepCountdown(finishesAt - now)
+  if (typeof timerEntity.attributes.remaining === 'string') {
+    const parts = timerEntity.attributes.remaining.split(':').map((part: string) => Number(part))
+    if (parts.length >= 2 && parts.every(Number.isFinite)) return `${parts.at(-2)}:${String(parts.at(-1)).padStart(2, '0')}`
+  }
+  return null
+}
 
 function rawThermostatAction(entity: ReturnType<typeof useEntity>) {
   return typeof entity?.attributes.hvac_action === 'string' ? entity.attributes.hvac_action : entity?.state ?? 'idle'
@@ -1189,7 +1201,7 @@ function thermostatValueFromPoint(rect: DOMRect, clientX: number, clientY: numbe
   return Number(Math.max(Math.min(stepped, max), min).toFixed(3))
 }
 
-function ThermostatDial({ entityId, size = 'page', title }: { entityId: string; size?: 'modal' | 'page'; title: string }) {
+function ThermostatDial({ actionOverride, entityId, interactive = true, rangeTextOverride, size = 'page', title }: { actionOverride?: string; entityId: string; interactive?: boolean; rangeTextOverride?: string; size?: 'modal' | 'page'; title: string }) {
   const entity = useEntity(asEntityName(entityId), { returnNullIfNotFound: true })
   const callService = useCallService()
   const dialRef = useRef<HTMLDivElement>(null)
@@ -1216,10 +1228,11 @@ function ThermostatDial({ entityId, size = 'page', title }: { entityId: string; 
   const displayLow = displayTargets.low
   const displayHigh = displayTargets.high
   const displayTarget = displayTargets.target
-  const displayRangeText = hasRange ? `${formatOneDecimal(displayLow ?? undefined)} · ${formatOneDecimal(displayHigh ?? undefined)}` : formatTemperatureValue(displayTarget ?? targetTemperature, unit)
+  const sourceRangeText = hasRange ? `${formatOneDecimal(displayLow ?? undefined)} · ${formatOneDecimal(displayHigh ?? undefined)}` : formatTemperatureValue(displayTarget ?? targetTemperature, unit)
+  const displayRangeText = rangeTextOverride ?? sourceRangeText
   // HAKit 6.0.2 syncs the numeric high prop into localLow after mount; string coercion preserves the high handle and the key remounts on HA updates.
   const sliderHigh = displayHigh !== null ? (String(displayHigh) as unknown as number) : undefined
-  const rawHvacAction = rawThermostatAction(entity)
+  const rawHvacAction = actionOverride ?? rawThermostatAction(entity)
   const actionColor = thermostatActionColor(rawHvacAction)
   const disabled = !entity || entity.state === 'unavailable' || entity.state === 'unknown'
   const inactive = disabled || (!hasRange && !actionColor && entity?.state === 'off')
@@ -1342,6 +1355,7 @@ function ThermostatDial({ entityId, size = 'page', title }: { entityId: string; 
         onChange={updateDisplayedTarget}
         onChangeApplied={applySliderChange}
         onPointerUpCapture={commitDisplayedTargets}
+        readonly={!interactive}
         step={targetStep}
         value={displayTarget ?? current}
       />
@@ -1351,7 +1365,7 @@ function ThermostatDial({ entityId, size = 'page', title }: { entityId: string; 
           <path className={styles.thermostatRangeArcHigh} d={thermostatArcPath(displayHigh, maxTemperature, minTemperature, maxTemperature) ?? undefined} data-target="high-arc" pathLength="100" />
         </svg>
       )}
-      {!disabled && handleTargets.length > 0 && (
+      {!disabled && interactive && handleTargets.length > 0 && (
         <div aria-hidden="true" className={styles.thermostatHandleLayer}>
           {handleTargets.map((handle) => (
             <span
@@ -1375,6 +1389,105 @@ function ThermostatDial({ entityId, size = 'page', title }: { entityId: string; 
           {displayRangeText}
         </span>
       </div>
+    </div>
+  )
+}
+
+function EightSleepThermostatHero({ side }: { side: EightSleepSideConfig }) {
+  const activeEntity = useEntity(asEntityName(side.hotFlashActiveEntityId), { returnNullIfNotFound: true })
+  const hotFlashActive = activeEntity?.state === 'on'
+
+  return <ThermostatDial actionOverride={hotFlashActive ? 'cooling' : undefined} entityId={side.climateEntityId} interactive={false} rangeTextOverride={hotFlashActive ? '-10°' : undefined} size="modal" title={side.title} />
+}
+
+function EightSleepStageControl({ side, stage }: { side: EightSleepSideConfig; stage: EightSleepStageConfig }) {
+  const sourceEntity = useEntity(asEntityName(stage.sourceEntityId), { returnNullIfNotFound: true })
+  const helperEntity = useEntity(asEntityName(stage.helperEntityId), { returnNullIfNotFound: true })
+  const callService = useCallService()
+  const liveSourceValue = sourceEntity && sourceEntity.state !== 'unavailable' && sourceEntity.state !== 'unknown' ? numberValue(sourceEntity.state) : null
+  const liveHelperValue = helperEntity && helperEntity.state !== 'unavailable' && helperEntity.state !== 'unknown' ? numberValue(helperEntity.state) : null
+  const liveValue = Math.max(EIGHT_SLEEP_STAGE_MIN, Math.min(liveSourceValue ?? liveHelperValue ?? 0, EIGHT_SLEEP_STAGE_MAX))
+  const [displayValue, commitDisplayValue] = useOptimisticState(liveValue)
+  const disabled = !sourceEntity && !helperEntity
+
+  const setStageValue = (nextValue: number) => {
+    if (disabled || nextValue === displayValue) return
+    commitDisplayValue(nextValue)
+    callService({ domain: 'input_number', service: 'set_value', target: stage.helperEntityId, serviceData: { value: nextValue } })
+    callService({ domain: 'eight_sleep', service: 'heat_set', target: side.bedTemperatureEntityId, serviceData: { duration: 0, target: nextValue * 10, sleep_stage: stage.sleepStage } })
+  }
+
+  const decrement = () => setStageValue(Math.max(EIGHT_SLEEP_STAGE_MIN, displayValue - 1))
+  const increment = () => setStageValue(Math.min(EIGHT_SLEEP_STAGE_MAX, displayValue + 1))
+
+  return (
+    <div className={styles.eightSleepStageControl}>
+      <div className={styles.eightSleepStageLabel}>{stage.label}</div>
+      <div className={styles.eightSleepStepper}>
+        <button aria-label={`${side.title} ${stage.label.toLowerCase()} decrease`} className={styles.eightSleepStepperButton} disabled={disabled || displayValue <= EIGHT_SLEEP_STAGE_MIN} onClick={decrement} type="button">
+          <MaterialIcon name="mdi:minus" size={22} />
+        </button>
+        <div aria-label={`${side.title} ${stage.label.toLowerCase()} value ${displayValue}`} className={styles.eightSleepStageValue}>{displayValue > 0 ? `+${displayValue}` : displayValue}</div>
+        <button aria-label={`${side.title} ${stage.label.toLowerCase()} increase`} className={styles.eightSleepStepperButton} disabled={disabled || displayValue >= EIGHT_SLEEP_STAGE_MAX} onClick={increment} type="button">
+          <MaterialIcon name="mdi:plus" size={22} />
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function EightSleepHotFlashButton({ side }: { side: EightSleepSideConfig }) {
+  const activeEntity = useEntity(asEntityName(side.hotFlashActiveEntityId), { returnNullIfNotFound: true })
+  const timerEntity = useEntity(asEntityName(side.hotFlashTimerEntityId), { returnNullIfNotFound: true })
+  const callService = useCallService()
+  const [now, setNow] = useState(() => Date.now())
+  const active = activeEntity?.state === 'on'
+  const stateText = active ? 'Active' : 'Inactive'
+  const countdown = active ? eightSleepTimerCountdown(timerEntity, now) : null
+
+  useEffect(() => {
+    if (!active) return undefined
+    const interval = window.setInterval(() => setNow(Date.now()), 1000)
+    return () => window.clearInterval(interval)
+  }, [active])
+
+  const activate = () => {
+    callService({ domain: 'input_button', service: 'press', target: side.hotFlashButtonEntityId })
+  }
+
+  const cancel = () => {
+    callService({ domain: 'input_button', service: 'press', target: side.hotFlashCancelButtonEntityId })
+  }
+
+  return (
+    <ThermostatGlassCard active={active} icon="mdi:snowflake" onMainClick={activate} pressed={active} stateText={stateText} title="Hot Flash Mode">
+      {active && (
+        <div className={styles.eightSleepHotFlashStatus}>
+          {countdown && <span className={styles.eightSleepCountdown}>{countdown}</span>}
+          <button aria-label={`Cancel ${side.title} hot flash mode`} className={styles.eightSleepCancelButton} onClick={cancel} type="button">
+            <MaterialIcon name="mdi:close" size={20} />
+          </button>
+        </div>
+      )}
+    </ThermostatGlassCard>
+  )
+}
+
+function EightSleepBedModalContent({ side }: { side: EightSleepSideConfig }) {
+  return (
+    <div className={styles.thermostatModalBody}>
+      <EightSleepThermostatHero side={side} />
+      <section className={styles.section}>
+        <SectionHeader title="Sleep Stages" />
+        <div className={styles.eightSleepStageGrid}>
+          {side.stages.map((stage) => <EightSleepStageControl key={stage.sleepStage} side={side} stage={stage} />)}
+        </div>
+      </section>
+      <section className={styles.section}>
+        <SectionHeader title="Special Modes" />
+        <Description className={styles.thermostatDescription}>Activating hot flash mode will set the bed to -10 for fifteen minutes.</Description>
+        <EightSleepHotFlashButton side={side} />
+      </section>
     </div>
   )
 }
@@ -1699,7 +1812,7 @@ function Content({ onNavigate, path }: { onNavigate: (path: string) => void; pat
   if (TODO_PAGES[path]) return <TodoPage onNavigate={onNavigate} path={path} />
   if (path === 'security') return <SecurityPage />
   if (path === 'vacuums') return <VacuumPage />
-  if (path === 'media') return <MediaPage />
+  if (path === 'media') return <MediaPage onNavigate={onNavigate} />
   if (path === 'admin') return <AdminPage onNavigate={onNavigate} />
   if (path === 'ecobee') return <ThermostatPage />
   if (path === 'custom-lights') return <CustomLightsPage />
