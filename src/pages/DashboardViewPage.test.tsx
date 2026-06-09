@@ -578,12 +578,17 @@ describe('DashboardViewPage', () => {
 
   it('turns on an off Eight Sleep side from the thermostat tap target', async () => {
     const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false)
+    mockEntities['input_boolean.eight_sleep_steph_hot_flash_active'].state = 'off'
     render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
 
     fireEvent.click(screen.getByRole('button', { name: /Steph's Bed Off/i }))
-    fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: "Turn on Steph's Bed" }))
+    const dialog = await screen.findByRole('dialog')
+    fireEvent.click(within(dialog).getByRole('button', { name: "Turn on Steph's Bed" }))
 
     expect(confirm).not.toHaveBeenCalled()
+    expect(within(dialog).getByRole('button', { name: "Turn off Steph's Bed" })).toBeInTheDocument()
+    expect(within(dialog).getByRole('region', { name: /Steph's Bed thermostat Idle 72.0°F 79.0°F/i })).toBeInTheDocument()
+    expect(within(dialog).getByRole('button', { name: "Steph's Bed now increase" })).not.toBeDisabled()
     expect(mockCallServiceCalls).toEqual([
       { domain: 'eight_sleep', service: 'side_on', target: 'sensor.steph_s_eight_sleep_side_bed_temperature' },
     ])
@@ -607,6 +612,9 @@ describe('DashboardViewPage', () => {
     expect(mockCallServiceCalls).toEqual([
       { domain: 'eight_sleep', service: 'side_off', target: 'sensor.stephen_s_eight_sleep_side_bed_temperature' },
     ])
+    expect(within(dialog).getByRole('button', { name: "Turn on Stephen's Bed" })).toBeInTheDocument()
+    expect(within(dialog).getByRole('region', { name: /Stephen's Bed thermostat Off 86.0°F 86.0°F/i })).toBeInTheDocument()
+    expect(within(dialog).getByRole('button', { name: "Stephen's Bed now increase" })).toBeDisabled()
 
     confirm.mockRestore()
   })
