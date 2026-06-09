@@ -1147,6 +1147,10 @@ function eightSleepLevelAction(level: number | null) {
   return level > 0 ? 'heating' : 'cooling'
 }
 
+function clampEightSleepLevel(level: number) {
+  return Math.max(EIGHT_SLEEP_STAGE_MIN, Math.min(EIGHT_SLEEP_STAGE_MAX, Math.round(level)))
+}
+
 function formatEightSleepLevel(level: number | null) {
   if (level === null) return undefined
   return `${level > 0 ? `+${level}` : level}`
@@ -1414,15 +1418,69 @@ function ThermostatDial({ actionOverride, entityId, inactiveOverride, interactiv
   )
 }
 
-function EightSleepThermostatHero({ activeValue, liveSideOn, nowValue, onNowValueReapply, onPowerOnPreviewChange, onSidePowerChange, powerOnPreviewValue, side, sideAvailable, sideOn }: { activeValue: number | null; liveSideOn: boolean; nowValue: number | null; onNowValueReapply: (value: number) => void; onPowerOnPreviewChange: (value: number | null) => void; onSidePowerChange: (sideOn: boolean) => void; powerOnPreviewValue: number | null; side: EightSleepSideConfig; sideAvailable: boolean; sideOn: boolean }) {
+function EightSleepThermostatHero({ activeValue, nowValue, onNowValueReapply, onPowerOnPreviewChange, onSidePowerChange, powerOnPreviewValue, side, sideAvailable, sideOn }: { activeValue: number | null; nowValue: number | null; onNowValueReapply: (value: number) => void; onPowerOnPreviewChange: (value: number | null) => void; onSidePowerChange: (sideOn: boolean) => void; powerOnPreviewValue: number | null; side: EightSleepSideConfig; sideAvailable: boolean; sideOn: boolean }) {
   const activeEntity = useEntity(asEntityName(side.hotFlashActiveEntityId), { returnNullIfNotFound: true })
   const callService = useCallService()
+  const dialRef = useRef<HTMLDivElement>(null)
+  const activeHandle = useRef<number | null>(null)
+  const [dragValue, setDragValue] = useState<number | null>(null)
   const hotFlashActive = activeEntity?.state === 'on'
-  const pendingSidePower = sideOn !== liveSideOn
   const showingPowerOnPreview = sideOn && powerOnPreviewValue !== null
-  const displayedTargetValue = hotFlashActive ? -10 : showingPowerOnPreview ? powerOnPreviewValue : sideOn ? nowValue ?? activeValue ?? 0 : 0
+  const displayedTargetValue = dragValue ?? (hotFlashActive ? -10 : showingPowerOnPreview ? powerOnPreviewValue : sideOn ? nowValue ?? activeValue ?? 0 : 0)
   const heroAction = eightSleepLevelAction(displayedTargetValue)
   const heroTargetText = formatEightSleepLevel(displayedTargetValue) ?? '0'
+  const canDragTarget = sideAvailable && sideOn && !hotFlashActive
+
+  const setTargetLevel = (nextValue: number) => {
+    if (!canDragTarget) return
+    const clampedValue = clampEightSleepLevel(nextValue)
+    setDragValue(null)
+    onNowValueReapply(clampedValue)
+    onPowerOnPreviewChange(clampedValue)
+    callService({ domain: 'eight_sleep', service: 'heat_set', target: side.bedTemperatureEntityId, serviceData: { duration: 0, target: clampedValue * 10, sleep_stage: 'override_bedtime' } })
+  }
+
+  const updateDragValue = (nextValue: number) => {
+    setDragValue(clampEightSleepLevel(nextValue))
+  }
+
+  const targetValueFromPointer = (event: PointerEvent<HTMLElement>) => {
+    const rect = dialRef.current?.getBoundingClientRect()
+    if (!rect) return null
+    return thermostatValueFromPoint(rect, event.clientX, event.clientY, EIGHT_SLEEP_STAGE_MIN, EIGHT_SLEEP_STAGE_MAX, 1)
+  }
+
+  const startTargetDrag = (event: PointerEvent<HTMLElement>) => {
+    if (!canDragTarget) return
+    const nextValue = targetValueFromPointer(event)
+    if (nextValue === null) return
+    event.preventDefault()
+    event.stopPropagation()
+    event.currentTarget.setPointerCapture(event.pointerId)
+    activeHandle.current = event.pointerId
+    updateDragValue(nextValue)
+  }
+
+  const moveTargetDrag = (event: PointerEvent<HTMLElement>) => {
+    if (activeHandle.current !== event.pointerId) return
+    const nextValue = targetValueFromPointer(event)
+    if (nextValue === null) return
+    event.preventDefault()
+    updateDragValue(nextValue)
+  }
+
+  const endTargetDrag = (event: PointerEvent<HTMLElement>) => {
+    if (activeHandle.current !== event.pointerId) return
+    const nextValue = targetValueFromPointer(event)
+    activeHandle.current = null
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId)
+    if (nextValue === null) return
+    event.preventDefault()
+    event.stopPropagation()
+    const clampedValue = clampEightSleepLevel(nextValue)
+    setDragValue(null)
+    setTargetLevel(clampedValue)
+  }
 
   const toggleSidePower = () => {
     if (!sideAvailable) return
@@ -1438,6 +1496,7 @@ function EightSleepThermostatHero({ activeValue, liveSideOn, nowValue, onNowValu
     }
 
     if (!window.confirm(`Turn off ${side.title}?`)) return
+    setDragValue(null)
     onSidePowerChange(false)
     onPowerOnPreviewChange(null)
     callService({ domain: 'eight_sleep', service: 'side_off', target: side.bedTemperatureEntityId })
@@ -1445,7 +1504,41 @@ function EightSleepThermostatHero({ activeValue, liveSideOn, nowValue, onNowValu
 
   return (
     <div className={styles.eightSleepThermostatHero}>
-      <ThermostatDial actionOverride={heroAction} entityId={side.climateEntityId} inactiveOverride={hotFlashActive ? undefined : pendingSidePower ? !sideOn : undefined} interactive={false} primaryUnitOverride={null} primaryValueOverride={heroTargetText} rangeTextOverride={null} size="modal" title={side.title} />
+      <div aria-label={`${side.title} thermostat ${titleCaseState(heroAction)} ${heroTargetText}`} className={styles.thermostatDial} data-hvac-action={heroAction} data-size="modal" ref={dialRef} role="region">
+        <ControlSliderCircular
+          className={styles.thermostatCircularSlider}
+          colors={thermostatSliderColors(heroAction)}
+          current={displayedTargetValue}
+          disabled={!canDragTarget}
+          inactive={!sideOn}
+          label={`${side.title} target level`}
+          max={EIGHT_SLEEP_STAGE_MAX}
+          min={EIGHT_SLEEP_STAGE_MIN}
+          mode="full"
+          onChange={updateDragValue}
+          onChangeApplied={setTargetLevel}
+          readonly={!canDragTarget}
+          step={1}
+          value={displayedTargetValue}
+        />
+        {canDragTarget && (
+          <div aria-hidden="true" className={styles.thermostatHandleLayer}>
+            <span
+              className={styles.thermostatHandleHitTarget}
+              data-target="value"
+              onPointerCancel={endTargetDrag}
+              onPointerDown={startTargetDrag}
+              onPointerMove={moveTargetDrag}
+              onPointerUp={endTargetDrag}
+              style={thermostatHandleStyle(displayedTargetValue, EIGHT_SLEEP_STAGE_MIN, EIGHT_SLEEP_STAGE_MAX)}
+            />
+          </div>
+        )}
+        <div className={styles.thermostatDialReadout}>
+          <span className={styles.thermostatAction}>{titleCaseState(heroAction)}</span>
+          <span className={styles.thermostatPrimaryValue}>{heroTargetText}</span>
+        </div>
+      </div>
       <button aria-label={`${sideOn ? 'Turn off' : 'Turn on'} ${side.title}`} className={styles.eightSleepThermostatButton} disabled={!sideAvailable} onClick={toggleSidePower} type="button" />
     </div>
   )
@@ -1543,7 +1636,7 @@ function EightSleepBedModalContent({ side }: { side: EightSleepSideConfig }) {
 
   return (
     <div className={styles.thermostatModalBody}>
-      <EightSleepThermostatHero activeValue={activeValue} liveSideOn={liveSideOn} nowValue={displayNowValue} onNowValueReapply={commitDisplayNowValue} onPowerOnPreviewChange={commitPowerOnPreviewValue} onSidePowerChange={commitDisplaySideOn} powerOnPreviewValue={powerOnPreviewValue} side={side} sideAvailable={sideAvailable} sideOn={controlsSideOn} />
+      <EightSleepThermostatHero activeValue={activeValue} nowValue={displayNowValue} onNowValueReapply={commitDisplayNowValue} onPowerOnPreviewChange={commitPowerOnPreviewValue} onSidePowerChange={commitDisplaySideOn} powerOnPreviewValue={powerOnPreviewValue} side={side} sideAvailable={sideAvailable} sideOn={controlsSideOn} />
       <section className={styles.section}>
         <SectionHeader title="Sleep Stages" />
         <div className={styles.eightSleepStageGrid}>

@@ -526,7 +526,7 @@ describe('DashboardViewPage', () => {
     expect(dialog).toHaveAttribute('data-surface', 'hass-popup')
     expect(within(dialog).getByRole('heading', { name: "Master Bedroom Stephen's Bed" })).toBeInTheDocument()
     expect(within(dialog).getByRole('region', { name: /Stephen's Bed thermostat Heating \+1/i })).toBeInTheDocument()
-    expect(within(dialog).getByRole('slider', { name: "Stephen's Bed target temperature" })).toHaveAttribute('aria-readonly', 'true')
+    expect(within(dialog).getByRole('slider', { name: "Stephen's Bed target level" })).toHaveAttribute('aria-readonly', 'false')
     expect(within(dialog).getByRole('heading', { name: 'Sleep Stages' })).toBeInTheDocument()
     expect(within(dialog).getByText('NOW')).toBeInTheDocument()
     expect(within(dialog).getByLabelText("Stephen's Bed now value 0")).toBeInTheDocument()
@@ -622,6 +622,22 @@ describe('DashboardViewPage', () => {
     ])
 
     confirm.mockRestore()
+  })
+
+  it('drags the Eight Sleep hero dial as an app-scale NOW control', async () => {
+    render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
+
+    fireEvent.click(screen.getByRole('button', { name: /Stephen's Bed Heating • 86 °F/i }))
+    const dialog = await screen.findByRole('dialog')
+    const slider = within(dialog).getByRole('slider', { name: "Stephen's Bed target level" })
+
+    fireEvent.change(slider, { target: { value: '-4' } })
+    expect(within(dialog).getByRole('region', { name: /Stephen's Bed thermostat Cooling -4/i })).toBeInTheDocument()
+    fireEvent.pointerUp(slider)
+
+    expect(mockCallServiceCalls).toEqual([
+      { domain: 'eight_sleep', service: 'heat_set', target: 'sensor.stephen_s_eight_sleep_side_bed_temperature', serviceData: { duration: 0, target: -40, sleep_stage: 'override_bedtime' } },
+    ])
   })
 
   it('confirms before turning off an on Eight Sleep side from the thermostat tap target', async () => {

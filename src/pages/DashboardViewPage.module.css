@@ -562,7 +562,7 @@
 .eightSleepThermostatButton {
   position: absolute;
   inset: 0;
-  z-index: 4;
+  z-index: 2;
   border: 0;
   border-radius: 50%;
   background: transparent;

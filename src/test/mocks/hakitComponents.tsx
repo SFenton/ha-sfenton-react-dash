@@ -21,10 +21,11 @@ type ControlSliderCircularProps = {
   onChangeApplied?: (value: number, type: SliderTarget) => void
   onPointerUpCapture?: () => void
   readonly?: boolean
+  step?: number
   value?: number | string
 }
 
-export function ControlSliderCircular({ className, colors, disabled, dual, high, inactive, label, low, max, min, onChange, onChangeApplied, onPointerUpCapture, readonly, value }: ControlSliderCircularProps) {
+export function ControlSliderCircular({ className, colors, disabled, dual, high, inactive, label, low, max, min, onChange, onChangeApplied, onPointerUpCapture, readonly, step, value }: ControlSliderCircularProps) {
   const values = dual ? [{ type: 'low' as const, value: low }, { type: 'high' as const, value: high }] : [{ type: 'value' as const, value }]
   const style = {
     '--ha-control-slider-color': colors?.color,
@@ -46,6 +47,7 @@ export function ControlSliderCircular({ className, colors, disabled, dual, high,
             onPointerUpCapture?.()
             onChangeApplied?.(Number(event.currentTarget.value), slider.type)
           }}
+          step={step}
           type="range"
           value={slider.value ?? min ?? 0}
         />
