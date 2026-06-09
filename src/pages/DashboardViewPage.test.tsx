@@ -633,7 +633,7 @@ describe('DashboardViewPage', () => {
 
     fireEvent.change(slider, { target: { value: '-3.6' } })
     expect(within(dialog).getByRole('region', { name: /Stephen's Bed thermostat Cooling -4/i })).toBeInTheDocument()
-    expect(within(dialog).getByText("Master Bedroom Stephen's Bed: Cooling")).toBeInTheDocument()
+    expect(within(dialog).getByText("Master Bedroom Stephen's Bed: Cooling • -4")).toBeInTheDocument()
     fireEvent.pointerUp(slider)
 
     expect(mockCallServiceCalls).toEqual([

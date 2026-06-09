@@ -1214,7 +1214,7 @@ function useEightSleepBedModalState(side: EightSleepSideConfig | undefined): Eig
     hotFlashActive,
     sideAvailable,
     setTargetPreviewValue,
-    subtitle: titleCaseState(heroAction),
+    subtitle: `${titleCaseState(heroAction)} • ${formatEightSleepLevel(displayedTargetValue) ?? '0'}`,
   }
 }
 
