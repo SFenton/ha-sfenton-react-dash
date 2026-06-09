@@ -1139,6 +1139,16 @@ function eightSleepTimerCountdown(timerEntity: ReturnType<typeof useEntity>, now
   return null
 }
 
+function eightSleepLevelAction(level: number | null) {
+  if (level === null || level === 0) return 'idle'
+  return level > 0 ? 'heating' : 'cooling'
+}
+
+function formatEightSleepLevel(level: number | null) {
+  if (level === null) return undefined
+  return `${level > 0 ? `+${level}` : level}°`
+}
+
 function rawThermostatAction(entity: ReturnType<typeof useEntity>) {
   return typeof entity?.attributes.hvac_action === 'string' ? entity.attributes.hvac_action : entity?.state ?? 'idle'
 }
@@ -1399,10 +1409,14 @@ function ThermostatDial({ actionOverride, entityId, inactiveOverride, interactiv
 
 function EightSleepThermostatHero({ liveSideOn, onSidePowerChange, side, sideAvailable, sideOn }: { liveSideOn: boolean; onSidePowerChange: (sideOn: boolean) => void; side: EightSleepSideConfig; sideAvailable: boolean; sideOn: boolean }) {
   const activeEntity = useEntity(asEntityName(side.hotFlashActiveEntityId), { returnNullIfNotFound: true })
+  const nowStage = side.stages.find((stage) => stage.sleepStage === 'override_bedtime')
+  const nowEntity = useEntity(asEntityName(nowStage?.sourceEntityId ?? side.bedTemperatureEntityId), { returnNullIfNotFound: true })
   const callService = useCallService()
   const hotFlashActive = activeEntity?.state === 'on'
   const pendingSidePower = sideOn !== liveSideOn
-  const powerActionOverride = pendingSidePower ? (sideOn ? 'idle' : 'off') : undefined
+  const nowValue = nowEntity && !isUnavailable(nowEntity) ? numberValue(nowEntity.state) : null
+  const powerActionOverride = pendingSidePower ? (sideOn ? eightSleepLevelAction(nowValue) : 'off') : undefined
+  const powerRangeTextOverride = pendingSidePower && sideOn ? formatEightSleepLevel(nowValue) : undefined
 
   const toggleSidePower = () => {
     if (!sideAvailable) return
@@ -1419,7 +1433,7 @@ function EightSleepThermostatHero({ liveSideOn, onSidePowerChange, side, sideAva
 
   return (
     <div className={styles.eightSleepThermostatHero}>
-      <ThermostatDial actionOverride={hotFlashActive ? 'cooling' : powerActionOverride} entityId={side.climateEntityId} inactiveOverride={hotFlashActive ? undefined : pendingSidePower ? !sideOn : undefined} interactive={false} rangeTextOverride={hotFlashActive ? '-10°' : undefined} size="modal" title={side.title} />
+      <ThermostatDial actionOverride={hotFlashActive ? 'cooling' : powerActionOverride} entityId={side.climateEntityId} inactiveOverride={hotFlashActive ? undefined : pendingSidePower ? !sideOn : undefined} interactive={false} rangeTextOverride={hotFlashActive ? '-10°' : powerRangeTextOverride} size="modal" title={side.title} />
       <button aria-label={`${sideOn ? 'Turn off' : 'Turn on'} ${side.title}`} className={styles.eightSleepThermostatButton} disabled={!sideAvailable} onClick={toggleSidePower} type="button" />
     </div>
   )
