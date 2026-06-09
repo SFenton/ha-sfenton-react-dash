@@ -524,7 +524,8 @@ describe('DashboardViewPage', () => {
 
     const dialog = await screen.findByRole('dialog')
     expect(dialog).toHaveAttribute('data-surface', 'hass-popup')
-    expect(within(dialog).getByRole('heading', { name: "Master Bedroom Stephen's Bed" })).toBeInTheDocument()
+    expect(within(dialog).getByRole('heading', { name: "Stephen's Bed" })).toBeInTheDocument()
+    expect(within(dialog).getByText("Stephen's Bed: Heating • +1")).toBeInTheDocument()
     expect(within(dialog).getByRole('region', { name: /Stephen's Bed thermostat Heating \+1/i })).toBeInTheDocument()
     expect(within(dialog).getByRole('slider', { name: "Stephen's Bed target level" })).toHaveAttribute('aria-readonly', 'false')
     expect(within(dialog).getByRole('heading', { name: 'Sleep Stages' })).toBeInTheDocument()
@@ -633,10 +634,10 @@ describe('DashboardViewPage', () => {
 
     fireEvent.change(slider, { target: { value: '-3.6' } })
     expect(within(dialog).getByRole('region', { name: /Stephen's Bed thermostat Cooling -4/i })).toBeInTheDocument()
-    expect(within(dialog).queryByText(/Master Bedroom Stephen's Bed: /)).not.toBeInTheDocument()
+    expect(within(dialog).getByText("Stephen's Bed: Heating • +1")).toBeInTheDocument()
     fireEvent.pointerUp(slider)
 
-    expect(within(dialog).queryByText(/Master Bedroom Stephen's Bed: /)).not.toBeInTheDocument()
+    expect(within(dialog).getByText("Stephen's Bed: Cooling • -4")).toBeInTheDocument()
 
     expect(mockCallServiceCalls).toEqual([
       { domain: 'eight_sleep', service: 'heat_set', target: 'sensor.stephen_s_eight_sleep_side_bed_temperature', serviceData: { duration: 0, target: -40, sleep_stage: 'override_bedtime' } },

@@ -527,7 +527,7 @@ function RoomSourceModal({ card, onClose, roomTitle }: { card: RoomSourceCardCon
 
   if (card && eightSleepSide) {
     return (
-      <ModalSheet onClose={onClose} open={Boolean(card)} surface="hass-popup" title={title}>
+      <ModalSheet onClose={onClose} open={Boolean(card)} subtitle={eightSleepModalState.subtitle} surface="hass-popup" title={eightSleepSide.title}>
         <EightSleepBedModalContent key={eightSleepSide.hash} modalState={eightSleepModalState} side={eightSleepSide} />
       </ModalSheet>
     )
