@@ -1096,7 +1096,6 @@ interface EightSleepBedModalState {
   hotFlashActive: boolean
   sideAvailable: boolean
   subtitle: string
-  setTargetPreviewValue: (value: number | null) => void
 }
 
 const EIGHT_SLEEP_STAGE_MIN = -10
@@ -1195,11 +1194,10 @@ function useEightSleepBedModalState(side: EightSleepSideConfig | undefined): Eig
   const [displayNowValue, commitDisplayNowValue] = useOptimisticState(liveNowValue, { clearOn: 'confirmation', revertMs: EIGHT_SLEEP_STAGE_REVERT_MS })
   const [displaySideOn, commitDisplaySideOn] = useOptimisticState(liveSideOn, EIGHT_SLEEP_POWER_REVERT_MS)
   const [powerOnPreviewValue, commitPowerOnPreviewValue] = useOptimisticState<number | null>(null, EIGHT_SLEEP_POWER_REVERT_MS)
-  const [targetPreviewValue, setTargetPreviewValue] = useState<number | null>(null)
   const controlsSideOn = sideAvailable && displaySideOn
   const hotFlashActive = activeEntity?.state === 'on'
   const showingPowerOnPreview = controlsSideOn && powerOnPreviewValue !== null
-  const displayedTargetValue = targetPreviewValue ?? (hotFlashActive ? -10 : showingPowerOnPreview ? powerOnPreviewValue : controlsSideOn ? displayNowValue ?? activeValue ?? 0 : 0)
+  const displayedTargetValue = hotFlashActive ? -10 : showingPowerOnPreview ? powerOnPreviewValue : controlsSideOn ? displayNowValue ?? activeValue ?? 0 : 0
   const heroAction = eightSleepLevelAction(displayedTargetValue)
 
   return {
@@ -1213,7 +1211,6 @@ function useEightSleepBedModalState(side: EightSleepSideConfig | undefined): Eig
     heroAction,
     hotFlashActive,
     sideAvailable,
-    setTargetPreviewValue,
     subtitle: `${titleCaseState(heroAction)} • ${formatEightSleepLevel(displayedTargetValue) ?? '0'}`,
   }
 }
@@ -1489,8 +1486,9 @@ function EightSleepThermostatHero({ modalState, side }: { modalState: EightSleep
   const callService = useCallService()
   const dialRef = useRef<HTMLDivElement>(null)
   const activeHandle = useRef<number | null>(null)
-  const { commitDisplayNowValue, commitDisplaySideOn, commitPowerOnPreviewValue, controlsSideOn, displayNowValue, displayedTargetValue: sourceTargetValue, hotFlashActive, setTargetPreviewValue, sideAvailable } = modalState
-  const displayedTargetValue = sourceTargetValue
+  const [dragValue, setDragValue] = useState<number | null>(null)
+  const { commitDisplayNowValue, commitDisplaySideOn, commitPowerOnPreviewValue, controlsSideOn, displayNowValue, displayedTargetValue: sourceTargetValue, hotFlashActive, sideAvailable } = modalState
+  const displayedTargetValue = dragValue ?? sourceTargetValue
   const heroAction = eightSleepLevelAction(displayedTargetValue)
   const heroTargetText = formatEightSleepLevel(displayedTargetValue) ?? '0'
   const canDragTarget = sideAvailable && controlsSideOn && !hotFlashActive
@@ -1498,7 +1496,7 @@ function EightSleepThermostatHero({ modalState, side }: { modalState: EightSleep
   const setTargetLevel = (nextValue: number) => {
     if (!canDragTarget) return
     const clampedValue = snapEightSleepLevel(nextValue)
-    setTargetPreviewValue(null)
+    setDragValue(null)
     commitDisplayNowValue(clampedValue)
     commitPowerOnPreviewValue(clampedValue)
     callService({ domain: 'eight_sleep', service: 'heat_set', target: side.bedTemperatureEntityId, serviceData: { duration: 0, target: clampedValue * 10, sleep_stage: 'override_bedtime' } })
@@ -1506,7 +1504,7 @@ function EightSleepThermostatHero({ modalState, side }: { modalState: EightSleep
 
   const updateDragValue = (nextValue: number) => {
     const clampedValue = clampEightSleepLevel(nextValue)
-    setTargetPreviewValue(clampedValue)
+    setDragValue(clampedValue)
   }
 
   const targetValueFromPointer = (event: PointerEvent<HTMLElement>) => {
@@ -1564,7 +1562,7 @@ function EightSleepThermostatHero({ modalState, side }: { modalState: EightSleep
     }
 
     if (!window.confirm(`Turn off ${side.title}?`)) return
-    setTargetPreviewValue(null)
+    setDragValue(null)
     commitDisplaySideOn(false)
     commitPowerOnPreviewValue(null)
     callService({ domain: 'eight_sleep', service: 'side_off', target: side.bedTemperatureEntityId })

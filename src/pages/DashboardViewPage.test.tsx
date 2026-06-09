@@ -633,9 +633,12 @@ describe('DashboardViewPage', () => {
 
     fireEvent.change(slider, { target: { value: '-3.6' } })
     expect(within(dialog).getByRole('region', { name: /Stephen's Bed thermostat Cooling -4/i })).toBeInTheDocument()
+    expect(within(dialog).getByText('Heating • +1')).toBeInTheDocument()
+    expect(within(dialog).getByText("Master Bedroom Stephen's Bed: Heating • +1")).toBeInTheDocument()
+    fireEvent.pointerUp(slider)
+
     expect(within(dialog).getByText('Cooling • -4')).toBeInTheDocument()
     expect(within(dialog).getByText("Master Bedroom Stephen's Bed: Cooling • -4")).toBeInTheDocument()
-    fireEvent.pointerUp(slider)
 
     expect(mockCallServiceCalls).toEqual([
       { domain: 'eight_sleep', service: 'heat_set', target: 'sensor.stephen_s_eight_sleep_side_bed_temperature', serviceData: { duration: 0, target: -40, sleep_stage: 'override_bedtime' } },
