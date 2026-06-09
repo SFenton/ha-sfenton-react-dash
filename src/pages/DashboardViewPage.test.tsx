@@ -592,6 +592,33 @@ describe('DashboardViewPage', () => {
     expect(within(dialog).getByRole('button', { name: "Steph's Bed now increase" })).not.toBeDisabled()
     expect(mockCallServiceCalls).toEqual([
       { domain: 'eight_sleep', service: 'side_on', target: 'sensor.steph_s_eight_sleep_side_bed_temperature' },
+      { domain: 'eight_sleep', service: 'heat_set', target: 'sensor.steph_s_eight_sleep_side_bed_temperature', serviceData: { duration: 0, target: -30, sleep_stage: 'override_bedtime' } },
+    ])
+
+    confirm.mockRestore()
+  })
+
+  it('reapplies the displayed Eight Sleep NOW value after power cycling the side', async () => {
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true)
+    render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
+
+    fireEvent.click(screen.getByRole('button', { name: /Stephen's Bed Heating • 86 °F/i }))
+    const dialog = await screen.findByRole('dialog')
+    const decreaseNow = within(dialog).getByRole('button', { name: "Stephen's Bed now decrease" })
+    fireEvent.click(decreaseNow)
+    fireEvent.click(decreaseNow)
+    fireEvent.click(decreaseNow)
+    expect(within(dialog).getByLabelText("Stephen's Bed now value -3")).toHaveTextContent('-3')
+
+    mockCallServiceCalls.length = 0
+    fireEvent.click(within(dialog).getByRole('button', { name: "Turn off Stephen's Bed" }))
+    fireEvent.click(within(dialog).getByRole('button', { name: "Turn on Stephen's Bed" }))
+
+    expect(within(dialog).getByRole('region', { name: /Stephen's Bed thermostat Cooling 86.0°F -3°/i })).toBeInTheDocument()
+    expect(mockCallServiceCalls).toEqual([
+      { domain: 'eight_sleep', service: 'side_off', target: 'sensor.stephen_s_eight_sleep_side_bed_temperature' },
+      { domain: 'eight_sleep', service: 'side_on', target: 'sensor.stephen_s_eight_sleep_side_bed_temperature' },
+      { domain: 'eight_sleep', service: 'heat_set', target: 'sensor.stephen_s_eight_sleep_side_bed_temperature', serviceData: { duration: 0, target: -30, sleep_stage: 'override_bedtime' } },
     ])
 
     confirm.mockRestore()
