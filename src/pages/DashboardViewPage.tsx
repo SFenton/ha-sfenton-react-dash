@@ -1066,6 +1066,7 @@ interface EightSleepStageConfig {
 }
 
 interface EightSleepSideConfig {
+  activeLevelEntityId: string
   bedTemperatureEntityId: string
   climateEntityId: string
   hash: string
@@ -1084,6 +1085,7 @@ const EIGHT_SLEEP_POWER_REVERT_MS = 30000
 
 const EIGHT_SLEEP_SIDE_CONFIGS: EightSleepSideConfig[] = [
   {
+    activeLevelEntityId: 'sensor.stephen_s_eight_sleep_side_active_level',
     bedTemperatureEntityId: 'sensor.stephen_s_eight_sleep_side_bed_temperature',
     climateEntityId: 'climate.stephen_s_eight_sleep_side_climate',
     hash: '#stephens-bed',
@@ -1100,6 +1102,7 @@ const EIGHT_SLEEP_SIDE_CONFIGS: EightSleepSideConfig[] = [
     title: "Stephen's Bed",
   },
   {
+    activeLevelEntityId: 'sensor.steph_s_eight_sleep_side_active_level',
     bedTemperatureEntityId: 'sensor.steph_s_eight_sleep_side_bed_temperature',
     climateEntityId: 'climate.steph_s_eight_sleep_side_climate',
     hash: '#stephs-bed',
@@ -1146,7 +1149,7 @@ function eightSleepLevelAction(level: number | null) {
 
 function formatEightSleepLevel(level: number | null) {
   if (level === null) return undefined
-  return `${level > 0 ? `+${level}` : level}°`
+  return `${level > 0 ? `+${level}` : level}`
 }
 
 function rawThermostatAction(entity: ReturnType<typeof useEntity>) {
@@ -1215,7 +1218,7 @@ function thermostatValueFromPoint(rect: DOMRect, clientX: number, clientY: numbe
   return Number(Math.max(Math.min(stepped, max), min).toFixed(3))
 }
 
-function ThermostatDial({ actionOverride, entityId, inactiveOverride, interactive = true, rangeTextOverride, size = 'page', title }: { actionOverride?: string; entityId: string; inactiveOverride?: boolean; interactive?: boolean; rangeTextOverride?: string; size?: 'modal' | 'page'; title: string }) {
+function ThermostatDial({ actionOverride, entityId, inactiveOverride, interactive = true, primaryUnitOverride, primaryValueOverride, rangeTextOverride, size = 'page', title }: { actionOverride?: string; entityId: string; inactiveOverride?: boolean; interactive?: boolean; primaryUnitOverride?: string | null; primaryValueOverride?: string; rangeTextOverride?: string | null; size?: 'modal' | 'page'; title: string }) {
   const entity = useEntity(asEntityName(entityId), { returnNullIfNotFound: true })
   const callService = useCallService()
   const dialRef = useRef<HTMLDivElement>(null)
@@ -1243,7 +1246,9 @@ function ThermostatDial({ actionOverride, entityId, inactiveOverride, interactiv
   const displayHigh = displayTargets.high
   const displayTarget = displayTargets.target
   const sourceRangeText = hasRange ? `${formatOneDecimal(displayLow ?? undefined)} · ${formatOneDecimal(displayHigh ?? undefined)}` : formatTemperatureValue(displayTarget ?? targetTemperature, unit)
-  const displayRangeText = rangeTextOverride ?? sourceRangeText
+  const displayRangeText = rangeTextOverride === null ? null : rangeTextOverride ?? sourceRangeText
+  const primaryValueText = primaryValueOverride ?? formatOneDecimal(currentTemperature, '--').replace(/\.0$/, '')
+  const primaryUnitText = primaryUnitOverride === undefined ? unit : primaryUnitOverride
   // HAKit 6.0.2 syncs the numeric high prop into localLow after mount; string coercion preserves the high handle and the key remounts on HA updates.
   const sliderHigh = displayHigh !== null ? (String(displayHigh) as unknown as number) : undefined
   const rawHvacAction = actionOverride ?? rawThermostatAction(entity)
@@ -1351,7 +1356,7 @@ function ThermostatDial({ actionOverride, entityId, inactiveOverride, interactiv
       : []
 
   return (
-    <div aria-label={`${title} thermostat ${hvacAction} ${formatTemperatureValue(currentTemperature, unit)} ${displayRangeText}`} className={styles.thermostatDial} data-hvac-action={rawHvacAction} data-size={size} ref={dialRef} role="region">
+    <div aria-label={`${title} thermostat ${hvacAction} ${[primaryValueOverride ?? formatTemperatureValue(currentTemperature, unit), displayRangeText].filter(Boolean).join(' ')}`} className={styles.thermostatDial} data-hvac-action={rawHvacAction} data-size={size} ref={dialRef} role="region">
       <ControlSliderCircular
         key={`${entityId}-${sourceTargetKey}`}
         className={styles.thermostatCircularSlider}
@@ -1397,25 +1402,27 @@ function ThermostatDial({ actionOverride, entityId, inactiveOverride, interactiv
       )}
       <div className={styles.thermostatDialReadout}>
         <span className={styles.thermostatAction}>{hvacAction}</span>
-        <span className={styles.thermostatPrimaryValue}>{formatOneDecimal(currentTemperature, '--').replace(/\.0$/, '')}<small>{unit}</small></span>
-        <span className={styles.thermostatRange}>
-          <MaterialIcon name="mdi:thermostat" size={17} />
-          {displayRangeText}
-        </span>
+        <span className={styles.thermostatPrimaryValue}>{primaryValueText}{primaryUnitText && <small>{primaryUnitText}</small>}</span>
+        {displayRangeText !== null && (
+          <span className={styles.thermostatRange}>
+            <MaterialIcon name="mdi:thermostat" size={17} />
+            {displayRangeText}
+          </span>
+        )}
       </div>
     </div>
   )
 }
 
-function EightSleepThermostatHero({ liveSideOn, nowValue, onNowValueReapply, onPowerOnPreviewChange, onSidePowerChange, powerOnPreviewValue, side, sideAvailable, sideOn }: { liveSideOn: boolean; nowValue: number | null; onNowValueReapply: (value: number) => void; onPowerOnPreviewChange: (value: number | null) => void; onSidePowerChange: (sideOn: boolean) => void; powerOnPreviewValue: number | null; side: EightSleepSideConfig; sideAvailable: boolean; sideOn: boolean }) {
+function EightSleepThermostatHero({ activeValue, liveSideOn, nowValue, onNowValueReapply, onPowerOnPreviewChange, onSidePowerChange, powerOnPreviewValue, side, sideAvailable, sideOn }: { activeValue: number | null; liveSideOn: boolean; nowValue: number | null; onNowValueReapply: (value: number) => void; onPowerOnPreviewChange: (value: number | null) => void; onSidePowerChange: (sideOn: boolean) => void; powerOnPreviewValue: number | null; side: EightSleepSideConfig; sideAvailable: boolean; sideOn: boolean }) {
   const activeEntity = useEntity(asEntityName(side.hotFlashActiveEntityId), { returnNullIfNotFound: true })
   const callService = useCallService()
   const hotFlashActive = activeEntity?.state === 'on'
   const pendingSidePower = sideOn !== liveSideOn
   const showingPowerOnPreview = sideOn && powerOnPreviewValue !== null
-  const displayedNowValue = showingPowerOnPreview ? powerOnPreviewValue : nowValue
-  const powerActionOverride = showingPowerOnPreview ? eightSleepLevelAction(displayedNowValue) : pendingSidePower ? (sideOn ? eightSleepLevelAction(displayedNowValue) : 'off') : undefined
-  const powerRangeTextOverride = showingPowerOnPreview || (pendingSidePower && sideOn) ? formatEightSleepLevel(displayedNowValue) : undefined
+  const displayedTargetValue = hotFlashActive ? -10 : showingPowerOnPreview ? powerOnPreviewValue : sideOn ? nowValue ?? activeValue ?? 0 : 0
+  const heroAction = eightSleepLevelAction(displayedTargetValue)
+  const heroTargetText = formatEightSleepLevel(displayedTargetValue) ?? '0'
 
   const toggleSidePower = () => {
     if (!sideAvailable) return
@@ -1438,7 +1445,7 @@ function EightSleepThermostatHero({ liveSideOn, nowValue, onNowValueReapply, onP
 
   return (
     <div className={styles.eightSleepThermostatHero}>
-      <ThermostatDial actionOverride={hotFlashActive ? 'cooling' : powerActionOverride} entityId={side.climateEntityId} inactiveOverride={hotFlashActive ? undefined : pendingSidePower ? !sideOn : undefined} interactive={false} rangeTextOverride={hotFlashActive ? '-10°' : powerRangeTextOverride} size="modal" title={side.title} />
+      <ThermostatDial actionOverride={heroAction} entityId={side.climateEntityId} inactiveOverride={hotFlashActive ? undefined : pendingSidePower ? !sideOn : undefined} interactive={false} primaryUnitOverride={null} primaryValueOverride={heroTargetText} rangeTextOverride={null} size="modal" title={side.title} />
       <button aria-label={`${sideOn ? 'Turn off' : 'Turn on'} ${side.title}`} className={styles.eightSleepThermostatButton} disabled={!sideAvailable} onClick={toggleSidePower} type="button" />
     </div>
   )
@@ -1521,11 +1528,13 @@ function EightSleepHotFlashButton({ side }: { side: EightSleepSideConfig }) {
 }
 
 function EightSleepBedModalContent({ side }: { side: EightSleepSideConfig }) {
+  const activeLevelEntity = useEntity(asEntityName(side.activeLevelEntityId), { returnNullIfNotFound: true })
   const climateEntity = useEntity(asEntityName(side.climateEntityId), { returnNullIfNotFound: true })
   const nowStage = side.stages.find((stage) => stage.sleepStage === 'override_bedtime')
   const nowEntity = useEntity(asEntityName(nowStage?.sourceEntityId ?? side.bedTemperatureEntityId), { returnNullIfNotFound: true })
   const sideAvailable = Boolean(climateEntity && !isUnavailable(climateEntity))
   const liveSideOn = Boolean(climateEntity && !isUnavailable(climateEntity) && climateEntity.state !== 'off')
+  const activeValue = activeLevelEntity && !isUnavailable(activeLevelEntity) ? numberValue(activeLevelEntity.state) : null
   const liveNowValue = nowEntity && !isUnavailable(nowEntity) ? numberValue(nowEntity.state) : null
   const [displayNowValue, commitDisplayNowValue] = useOptimisticState(liveNowValue, { clearOn: 'confirmation', revertMs: EIGHT_SLEEP_STAGE_REVERT_MS })
   const [displaySideOn, commitDisplaySideOn] = useOptimisticState(liveSideOn, EIGHT_SLEEP_POWER_REVERT_MS)
@@ -1534,7 +1543,7 @@ function EightSleepBedModalContent({ side }: { side: EightSleepSideConfig }) {
 
   return (
     <div className={styles.thermostatModalBody}>
-      <EightSleepThermostatHero liveSideOn={liveSideOn} nowValue={displayNowValue} onNowValueReapply={commitDisplayNowValue} onPowerOnPreviewChange={commitPowerOnPreviewValue} onSidePowerChange={commitDisplaySideOn} powerOnPreviewValue={powerOnPreviewValue} side={side} sideAvailable={sideAvailable} sideOn={controlsSideOn} />
+      <EightSleepThermostatHero activeValue={activeValue} liveSideOn={liveSideOn} nowValue={displayNowValue} onNowValueReapply={commitDisplayNowValue} onPowerOnPreviewChange={commitPowerOnPreviewValue} onSidePowerChange={commitDisplaySideOn} powerOnPreviewValue={powerOnPreviewValue} side={side} sideAvailable={sideAvailable} sideOn={controlsSideOn} />
       <section className={styles.section}>
         <SectionHeader title="Sleep Stages" />
         <div className={styles.eightSleepStageGrid}>

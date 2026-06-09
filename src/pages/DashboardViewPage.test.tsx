@@ -525,7 +525,7 @@ describe('DashboardViewPage', () => {
     const dialog = await screen.findByRole('dialog')
     expect(dialog).toHaveAttribute('data-surface', 'hass-popup')
     expect(within(dialog).getByRole('heading', { name: "Master Bedroom Stephen's Bed" })).toBeInTheDocument()
-    expect(within(dialog).getByRole('region', { name: /Stephen's Bed thermostat Heating 86.0°F 86.0°F/i })).toBeInTheDocument()
+    expect(within(dialog).getByRole('region', { name: /Stephen's Bed thermostat Heating \+1/i })).toBeInTheDocument()
     expect(within(dialog).getByRole('slider', { name: "Stephen's Bed target temperature" })).toHaveAttribute('aria-readonly', 'true')
     expect(within(dialog).getByRole('heading', { name: 'Sleep Stages' })).toBeInTheDocument()
     expect(within(dialog).getByText('NOW')).toBeInTheDocument()
@@ -563,7 +563,7 @@ describe('DashboardViewPage', () => {
     fireEvent.click(screen.getByRole('button', { name: /Steph's Bed Off/i }))
 
     const dialog = await screen.findByRole('dialog')
-    expect(within(dialog).getByRole('region', { name: /Steph's Bed thermostat Cooling 72.0°F -10°/i })).toBeInTheDocument()
+    expect(within(dialog).getByRole('region', { name: /Steph's Bed thermostat Cooling -10/i })).toBeInTheDocument()
     expect(within(dialog).getByRole('button', { name: 'Hot Flash Mode Active' })).toBeInTheDocument()
     expect(within(dialog).getByText('12:34')).toBeInTheDocument()
     const cancel = within(dialog).getByRole('button', { name: "Cancel Steph's Bed hot flash mode" })
@@ -588,7 +588,7 @@ describe('DashboardViewPage', () => {
 
     expect(confirm).not.toHaveBeenCalled()
     expect(within(dialog).getByRole('button', { name: "Turn off Steph's Bed" })).toBeInTheDocument()
-    expect(within(dialog).getByRole('region', { name: /Steph's Bed thermostat Cooling 72.0°F -3°/i })).toBeInTheDocument()
+    expect(within(dialog).getByRole('region', { name: /Steph's Bed thermostat Cooling -3/i })).toBeInTheDocument()
     expect(within(dialog).getByRole('button', { name: "Steph's Bed now increase" })).not.toBeDisabled()
     expect(mockCallServiceCalls).toEqual([
       { domain: 'eight_sleep', service: 'side_on', target: 'sensor.steph_s_eight_sleep_side_bed_temperature' },
@@ -614,7 +614,7 @@ describe('DashboardViewPage', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: "Turn off Stephen's Bed" }))
     fireEvent.click(within(dialog).getByRole('button', { name: "Turn on Stephen's Bed" }))
 
-    expect(within(dialog).getByRole('region', { name: /Stephen's Bed thermostat Cooling 86.0°F -3°/i })).toBeInTheDocument()
+    expect(within(dialog).getByRole('region', { name: /Stephen's Bed thermostat Cooling -3/i })).toBeInTheDocument()
     expect(mockCallServiceCalls).toEqual([
       { domain: 'eight_sleep', service: 'side_off', target: 'sensor.stephen_s_eight_sleep_side_bed_temperature' },
       { domain: 'eight_sleep', service: 'side_on', target: 'sensor.stephen_s_eight_sleep_side_bed_temperature' },
@@ -641,7 +641,7 @@ describe('DashboardViewPage', () => {
       { domain: 'eight_sleep', service: 'side_off', target: 'sensor.stephen_s_eight_sleep_side_bed_temperature' },
     ])
     expect(within(dialog).getByRole('button', { name: "Turn on Stephen's Bed" })).toBeInTheDocument()
-    expect(within(dialog).getByRole('region', { name: /Stephen's Bed thermostat Off 86.0°F 86.0°F/i })).toBeInTheDocument()
+    expect(within(dialog).getByRole('region', { name: /Stephen's Bed thermostat Idle 0/i })).toBeInTheDocument()
     expect(within(dialog).getByRole('button', { name: "Stephen's Bed now increase" })).toBeDisabled()
 
     confirm.mockRestore()
