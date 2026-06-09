@@ -1059,7 +1059,7 @@ type ThermostatThermalStatus = 'cool' | 'heat' | 'idle'
 type EightSleepStage = 'bedTimeLevel' | 'finalSleepLevel' | 'initialSleepLevel' | 'override_bedtime'
 
 interface EightSleepStageConfig {
-  helperEntityId: string
+  helperEntityId?: string
   label: string
   sleepStage: EightSleepStage
   sourceEntityId: string
@@ -1091,7 +1091,8 @@ const EIGHT_SLEEP_SIDE_CONFIGS: EightSleepSideConfig[] = [
     hotFlashCancelButtonEntityId: 'input_button.eight_sleep_stephen_cancel_hot_flash',
     hotFlashTimerEntityId: 'timer.eight_sleep_stephen_hot_flash',
     stages: [
-      { helperEntityId: 'input_number.eight_sleep_stephen_bedtime_level', label: 'NOW', sleepStage: 'override_bedtime', sourceEntityId: 'sensor.stephen_s_eight_sleep_side_now_level' },
+      { label: 'NOW', sleepStage: 'override_bedtime', sourceEntityId: 'sensor.stephen_s_eight_sleep_side_now_level' },
+      { helperEntityId: 'input_number.eight_sleep_stephen_bedtime_level', label: 'BEDTIME', sleepStage: 'bedTimeLevel', sourceEntityId: 'sensor.stephen_s_eight_sleep_side_bedtime_level' },
       { helperEntityId: 'input_number.eight_sleep_stephen_asleep_level', label: 'ASLEEP', sleepStage: 'initialSleepLevel', sourceEntityId: 'sensor.stephen_s_eight_sleep_side_asleep_level' },
       { helperEntityId: 'input_number.eight_sleep_stephen_dawn_level', label: 'DAWN', sleepStage: 'finalSleepLevel', sourceEntityId: 'sensor.stephen_s_eight_sleep_side_dawn_level' },
     ],
@@ -1106,7 +1107,8 @@ const EIGHT_SLEEP_SIDE_CONFIGS: EightSleepSideConfig[] = [
     hotFlashCancelButtonEntityId: 'input_button.eight_sleep_steph_cancel_hot_flash',
     hotFlashTimerEntityId: 'timer.eight_sleep_steph_hot_flash',
     stages: [
-      { helperEntityId: 'input_number.eight_sleep_steph_bedtime_level', label: 'NOW', sleepStage: 'override_bedtime', sourceEntityId: 'sensor.steph_s_eight_sleep_side_now_level' },
+      { label: 'NOW', sleepStage: 'override_bedtime', sourceEntityId: 'sensor.steph_s_eight_sleep_side_now_level' },
+      { helperEntityId: 'input_number.eight_sleep_steph_bedtime_level', label: 'BEDTIME', sleepStage: 'bedTimeLevel', sourceEntityId: 'sensor.steph_s_eight_sleep_side_bedtime_level' },
       { helperEntityId: 'input_number.eight_sleep_steph_asleep_level', label: 'ASLEEP', sleepStage: 'initialSleepLevel', sourceEntityId: 'sensor.steph_s_eight_sleep_side_asleep_level' },
       { helperEntityId: 'input_number.eight_sleep_steph_dawn_level', label: 'DAWN', sleepStage: 'finalSleepLevel', sourceEntityId: 'sensor.steph_s_eight_sleep_side_dawn_level' },
     ],
@@ -1405,12 +1407,12 @@ function EightSleepThermostatHero({ side }: { side: EightSleepSideConfig }) {
   const toggleSidePower = () => {
     if (!sideAvailable) return
     if (!sideOn) {
-      callService({ domain: 'climate', service: 'set_hvac_mode', target: side.climateEntityId, serviceData: { hvac_mode: 'heat_cool' } })
+      callService({ domain: 'eight_sleep', service: 'side_on', target: side.bedTemperatureEntityId })
       return
     }
 
     if (!window.confirm(`Turn off ${side.title}?`)) return
-    callService({ domain: 'climate', service: 'set_hvac_mode', target: side.climateEntityId, serviceData: { hvac_mode: 'off' } })
+    callService({ domain: 'eight_sleep', service: 'side_off', target: side.bedTemperatureEntityId })
   }
 
   return (
@@ -1424,7 +1426,8 @@ function EightSleepThermostatHero({ side }: { side: EightSleepSideConfig }) {
 function EightSleepStageControl({ side, stage }: { side: EightSleepSideConfig; stage: EightSleepStageConfig }) {
   const climateEntity = useEntity(asEntityName(side.climateEntityId), { returnNullIfNotFound: true })
   const sourceEntity = useEntity(asEntityName(stage.sourceEntityId), { returnNullIfNotFound: true })
-  const helperEntity = useEntity(asEntityName(stage.helperEntityId), { returnNullIfNotFound: true })
+  const helperCandidateEntity = useEntity(asEntityName(stage.helperEntityId ?? stage.sourceEntityId), { returnNullIfNotFound: true })
+  const helperEntity = stage.helperEntityId ? helperCandidateEntity : null
   const callService = useCallService()
   const liveSourceValue = sourceEntity && sourceEntity.state !== 'unavailable' && sourceEntity.state !== 'unknown' ? numberValue(sourceEntity.state) : null
   const liveHelperValue = helperEntity && helperEntity.state !== 'unavailable' && helperEntity.state !== 'unknown' ? numberValue(helperEntity.state) : null
@@ -1436,7 +1439,7 @@ function EightSleepStageControl({ side, stage }: { side: EightSleepSideConfig; s
   const setStageValue = (nextValue: number) => {
     if (disabled || nextValue === displayValue) return
     commitDisplayValue(nextValue)
-    callService({ domain: 'input_number', service: 'set_value', target: stage.helperEntityId, serviceData: { value: nextValue } })
+    if (stage.helperEntityId) callService({ domain: 'input_number', service: 'set_value', target: stage.helperEntityId, serviceData: { value: nextValue } })
     callService({ domain: 'eight_sleep', service: 'heat_set', target: side.bedTemperatureEntityId, serviceData: { duration: 0, target: nextValue * 10, sleep_stage: stage.sleepStage } })
   }
 

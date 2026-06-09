@@ -530,6 +530,8 @@ describe('DashboardViewPage', () => {
     expect(within(dialog).getByRole('heading', { name: 'Sleep Stages' })).toBeInTheDocument()
     expect(within(dialog).getByText('NOW')).toBeInTheDocument()
     expect(within(dialog).getByLabelText("Stephen's Bed now value 0")).toBeInTheDocument()
+    expect(within(dialog).getByText('BEDTIME')).toBeInTheDocument()
+    expect(within(dialog).getByLabelText("Stephen's Bed bedtime value -1")).toHaveTextContent('-1')
     expect(within(dialog).getByText('ASLEEP')).toBeInTheDocument()
     expect(within(dialog).getByLabelText("Stephen's Bed asleep value 2")).toHaveTextContent('+2')
     expect(within(dialog).getByText('DAWN')).toBeInTheDocument()
@@ -541,12 +543,14 @@ describe('DashboardViewPage', () => {
     expect(hotFlash.querySelector('path')).toHaveAttribute('d', materialIconPath('mdi:snowflake'))
 
     fireEvent.click(within(dialog).getByRole('button', { name: "Stephen's Bed now increase" }))
+    fireEvent.click(within(dialog).getByRole('button', { name: "Stephen's Bed bedtime increase" }))
     fireEvent.click(within(dialog).getByRole('button', { name: "Stephen's Bed asleep increase" }))
     fireEvent.click(hotFlash)
 
     expect(mockCallServiceCalls).toEqual([
-      { domain: 'input_number', service: 'set_value', target: 'input_number.eight_sleep_stephen_bedtime_level', serviceData: { value: 1 } },
       { domain: 'eight_sleep', service: 'heat_set', target: 'sensor.stephen_s_eight_sleep_side_bed_temperature', serviceData: { duration: 0, target: 10, sleep_stage: 'override_bedtime' } },
+      { domain: 'input_number', service: 'set_value', target: 'input_number.eight_sleep_stephen_bedtime_level', serviceData: { value: 0 } },
+      { domain: 'eight_sleep', service: 'heat_set', target: 'sensor.stephen_s_eight_sleep_side_bed_temperature', serviceData: { duration: 0, target: 0, sleep_stage: 'bedTimeLevel' } },
       { domain: 'input_number', service: 'set_value', target: 'input_number.eight_sleep_stephen_asleep_level', serviceData: { value: 3 } },
       { domain: 'eight_sleep', service: 'heat_set', target: 'sensor.stephen_s_eight_sleep_side_bed_temperature', serviceData: { duration: 0, target: 30, sleep_stage: 'initialSleepLevel' } },
       { domain: 'input_button', service: 'press', target: 'input_button.eight_sleep_stephen_hot_flash' },
@@ -581,7 +585,7 @@ describe('DashboardViewPage', () => {
 
     expect(confirm).not.toHaveBeenCalled()
     expect(mockCallServiceCalls).toEqual([
-      { domain: 'climate', service: 'set_hvac_mode', target: 'climate.steph_s_eight_sleep_side_climate', serviceData: { hvac_mode: 'heat_cool' } },
+      { domain: 'eight_sleep', service: 'side_on', target: 'sensor.steph_s_eight_sleep_side_bed_temperature' },
     ])
 
     confirm.mockRestore()
@@ -601,7 +605,7 @@ describe('DashboardViewPage', () => {
 
     fireEvent.click(toggle)
     expect(mockCallServiceCalls).toEqual([
-      { domain: 'climate', service: 'set_hvac_mode', target: 'climate.stephen_s_eight_sleep_side_climate', serviceData: { hvac_mode: 'off' } },
+      { domain: 'eight_sleep', service: 'side_off', target: 'sensor.stephen_s_eight_sleep_side_bed_temperature' },
     ])
 
     confirm.mockRestore()
@@ -614,7 +618,7 @@ describe('DashboardViewPage', () => {
     fireEvent.click(screen.getByRole('button', { name: /Steph's Bed Off/i }))
 
     const dialog = await screen.findByRole('dialog')
-    for (const label of ['now', 'asleep', 'dawn']) {
+    for (const label of ['now', 'bedtime', 'asleep', 'dawn']) {
       const decrease = within(dialog).getByRole('button', { name: `Steph's Bed ${label} decrease` })
       const increase = within(dialog).getByRole('button', { name: `Steph's Bed ${label} increase` })
       expect(decrease).toBeDisabled()
