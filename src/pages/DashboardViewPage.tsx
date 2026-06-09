@@ -1521,9 +1521,13 @@ function EightSleepThermostatHero({ modalState, side }: { modalState: EightSleep
     if (nextValue === null) return
     event.preventDefault()
     event.stopPropagation()
-    event.currentTarget.setPointerCapture(event.pointerId)
     activeHandle.current = event.pointerId
     updateDragValue(nextValue)
+    try {
+      event.currentTarget.setPointerCapture(event.pointerId)
+    } catch {
+      // Some synthetic/browser-assisted drags do not expose an active pointer capture target.
+    }
   }
 
   const moveTargetDrag = (event: PointerEvent<HTMLElement>) => {
