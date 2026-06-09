@@ -2,6 +2,11 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 
 export const DEFAULT_OPTIMISTIC_REVERT_MS = 2000
 
+interface OptimisticStateOptions {
+  clearOn?: 'confirmation' | 'live-change'
+  revertMs?: number
+}
+
 /**
  * Tracks an optimistic value layered on top of a live (Home Assistant) value.
  *
@@ -11,7 +16,10 @@ export const DEFAULT_OPTIMISTIC_REVERT_MS = 2000
  * never confirms within `revertMs`, the override is discarded so the control falls
  * back to the real state instead of lying about it.
  */
-export function useOptimisticState<T>(liveValue: T, revertMs: number = DEFAULT_OPTIMISTIC_REVERT_MS): [T, (next: T) => void] {
+export function useOptimisticState<T>(liveValue: T, optionsOrRevertMs: OptimisticStateOptions | number = DEFAULT_OPTIMISTIC_REVERT_MS): [T, (next: T) => void] {
+  const options = typeof optionsOrRevertMs === 'number' ? { revertMs: optionsOrRevertMs } : optionsOrRevertMs
+  const clearOn = options.clearOn ?? 'live-change'
+  const revertMs = options.revertMs ?? DEFAULT_OPTIMISTIC_REVERT_MS
   const [pending, setPending] = useState<{ value: T } | null>(null)
   const [prevLive, setPrevLive] = useState(liveValue)
   const timerRef = useRef<number | null>(null)
@@ -28,7 +36,7 @@ export function useOptimisticState<T>(liveValue: T, revertMs: number = DEFAULT_O
   // consumed. This quietly resolves a successful commit and also lets external changes win.
   if (!Object.is(liveValue, prevLive)) {
     setPrevLive(liveValue)
-    if (pending !== null) setPending(null)
+    if (pending !== null && (clearOn === 'live-change' || Object.is(liveValue, pending.value))) setPending(null)
   }
 
   // Cancel any pending revert timer on unmount.

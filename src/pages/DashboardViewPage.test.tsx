@@ -572,6 +572,27 @@ describe('DashboardViewPage', () => {
     ])
   })
 
+  it('keeps Eight Sleep stage edits visible while stale HASS values catch up', async () => {
+    const view = render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
+
+    fireEvent.click(screen.getByRole('button', { name: /Stephen's Bed Heating • 86 °F/i }))
+    const dialog = await screen.findByRole('dialog')
+    fireEvent.click(within(dialog).getByRole('button', { name: "Stephen's Bed now decrease" }))
+    fireEvent.click(within(dialog).getByRole('button', { name: "Stephen's Bed now decrease" }))
+
+    expect(within(dialog).getByLabelText("Stephen's Bed now value -2")).toHaveTextContent('-2')
+
+    mockEntities['sensor.stephen_s_eight_sleep_side_now_level'].state = '-1'
+    view.rerender(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
+    expect(within(screen.getByRole('dialog')).getByLabelText("Stephen's Bed now value -2")).toHaveTextContent('-2')
+
+    mockEntities['sensor.stephen_s_eight_sleep_side_now_level'].state = '-2'
+    view.rerender(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
+    mockEntities['sensor.stephen_s_eight_sleep_side_now_level'].state = '0'
+    view.rerender(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
+    expect(within(screen.getByRole('dialog')).getByLabelText("Stephen's Bed now value 0")).toHaveTextContent('0')
+  })
+
   it('ports the Living Room SHIELD remote modal and only runs explicit controls', async () => {
     mockEntities['media_player.living_room_shield_2'].state = 'playing'
     render(<DashboardViewPage activePath="living-room" onNavigate={() => undefined} path="living-room" />)

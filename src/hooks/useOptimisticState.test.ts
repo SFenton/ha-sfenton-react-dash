@@ -67,4 +67,30 @@ describe('useOptimisticState', () => {
     act(() => vi.advanceTimersByTime(200))
     expect(result.current[0]).toBe('off')
   })
+
+  it('can keep the optimistic value across stale live updates until confirmation', () => {
+    const { result, rerender } = renderHook(({ live }) => useOptimisticState(live, { clearOn: 'confirmation', revertMs: 1000 }), { initialProps: { live: 0 } })
+
+    act(() => result.current[1](-2))
+    expect(result.current[0]).toBe(-2)
+
+    rerender({ live: -1 })
+    expect(result.current[0]).toBe(-2)
+
+    rerender({ live: -2 })
+    expect(result.current[0]).toBe(-2)
+
+    rerender({ live: 0 })
+    expect(result.current[0]).toBe(0)
+  })
+
+  it('still reverts confirmation-only optimistic values when never confirmed', () => {
+    const { result, rerender } = renderHook(({ live }) => useOptimisticState(live, { clearOn: 'confirmation', revertMs: 1000 }), { initialProps: { live: 0 } })
+
+    act(() => result.current[1](-2))
+    rerender({ live: -1 })
+
+    act(() => vi.advanceTimersByTime(1000))
+    expect(result.current[0]).toBe(-1)
+  })
 })

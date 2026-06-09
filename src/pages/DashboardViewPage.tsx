@@ -1079,6 +1079,7 @@ interface EightSleepSideConfig {
 
 const EIGHT_SLEEP_STAGE_MIN = -10
 const EIGHT_SLEEP_STAGE_MAX = 10
+const EIGHT_SLEEP_STAGE_REVERT_MS = 30000
 
 const EIGHT_SLEEP_SIDE_CONFIGS: EightSleepSideConfig[] = [
   {
@@ -1407,7 +1408,7 @@ function EightSleepStageControl({ side, stage }: { side: EightSleepSideConfig; s
   const liveSourceValue = sourceEntity && sourceEntity.state !== 'unavailable' && sourceEntity.state !== 'unknown' ? numberValue(sourceEntity.state) : null
   const liveHelperValue = helperEntity && helperEntity.state !== 'unavailable' && helperEntity.state !== 'unknown' ? numberValue(helperEntity.state) : null
   const liveValue = Math.max(EIGHT_SLEEP_STAGE_MIN, Math.min(liveSourceValue ?? liveHelperValue ?? 0, EIGHT_SLEEP_STAGE_MAX))
-  const [displayValue, commitDisplayValue] = useOptimisticState(liveValue)
+  const [displayValue, commitDisplayValue] = useOptimisticState(liveValue, { clearOn: 'confirmation', revertMs: EIGHT_SLEEP_STAGE_REVERT_MS })
   const disabled = !sourceEntity && !helperEntity
 
   const setStageValue = (nextValue: number) => {
