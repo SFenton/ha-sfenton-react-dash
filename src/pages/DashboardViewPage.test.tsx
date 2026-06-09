@@ -572,6 +572,25 @@ describe('DashboardViewPage', () => {
     ])
   })
 
+  it('disables Eight Sleep stage controls when that bed side is off', async () => {
+    mockEntities['input_boolean.eight_sleep_steph_hot_flash_active'].state = 'off'
+    render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
+
+    fireEvent.click(screen.getByRole('button', { name: /Steph's Bed Off/i }))
+
+    const dialog = await screen.findByRole('dialog')
+    for (const label of ['now', 'asleep', 'dawn']) {
+      const decrease = within(dialog).getByRole('button', { name: `Steph's Bed ${label} decrease` })
+      const increase = within(dialog).getByRole('button', { name: `Steph's Bed ${label} increase` })
+      expect(decrease).toBeDisabled()
+      expect(increase).toBeDisabled()
+      fireEvent.click(decrease)
+      fireEvent.click(increase)
+    }
+
+    expect(mockCallServiceCalls).toEqual([])
+  })
+
   it('keeps Eight Sleep stage edits visible while stale HASS values catch up', async () => {
     const view = render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
 

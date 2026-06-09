@@ -1402,6 +1402,7 @@ function EightSleepThermostatHero({ side }: { side: EightSleepSideConfig }) {
 }
 
 function EightSleepStageControl({ side, stage }: { side: EightSleepSideConfig; stage: EightSleepStageConfig }) {
+  const climateEntity = useEntity(asEntityName(side.climateEntityId), { returnNullIfNotFound: true })
   const sourceEntity = useEntity(asEntityName(stage.sourceEntityId), { returnNullIfNotFound: true })
   const helperEntity = useEntity(asEntityName(stage.helperEntityId), { returnNullIfNotFound: true })
   const callService = useCallService()
@@ -1409,7 +1410,8 @@ function EightSleepStageControl({ side, stage }: { side: EightSleepSideConfig; s
   const liveHelperValue = helperEntity && helperEntity.state !== 'unavailable' && helperEntity.state !== 'unknown' ? numberValue(helperEntity.state) : null
   const liveValue = Math.max(EIGHT_SLEEP_STAGE_MIN, Math.min(liveSourceValue ?? liveHelperValue ?? 0, EIGHT_SLEEP_STAGE_MAX))
   const [displayValue, commitDisplayValue] = useOptimisticState(liveValue, { clearOn: 'confirmation', revertMs: EIGHT_SLEEP_STAGE_REVERT_MS })
-  const disabled = !sourceEntity && !helperEntity
+  const sideOn = Boolean(climateEntity && !isUnavailable(climateEntity) && climateEntity.state !== 'off')
+  const disabled = !sideOn || (!sourceEntity && !helperEntity)
 
   const setStageValue = (nextValue: number) => {
     if (disabled || nextValue === displayValue) return
