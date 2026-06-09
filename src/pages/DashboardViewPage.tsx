@@ -1148,12 +1148,17 @@ function eightSleepLevelAction(level: number | null) {
 }
 
 function clampEightSleepLevel(level: number) {
-  return Math.max(EIGHT_SLEEP_STAGE_MIN, Math.min(EIGHT_SLEEP_STAGE_MAX, Math.round(level)))
+  return Math.max(EIGHT_SLEEP_STAGE_MIN, Math.min(EIGHT_SLEEP_STAGE_MAX, level))
+}
+
+function snapEightSleepLevel(level: number) {
+  return clampEightSleepLevel(Math.round(level))
 }
 
 function formatEightSleepLevel(level: number | null) {
   if (level === null) return undefined
-  return `${level > 0 ? `+${level}` : level}`
+  const snappedLevel = snapEightSleepLevel(level)
+  return `${snappedLevel > 0 ? `+${snappedLevel}` : snappedLevel}`
 }
 
 function rawThermostatAction(entity: ReturnType<typeof useEntity>) {
@@ -1210,7 +1215,7 @@ function thermostatHandleStyle(value: number, min: number, max: number) {
   } as CSSProperties
 }
 
-function thermostatValueFromPoint(rect: DOMRect, clientX: number, clientY: number, min: number, max: number, step: number) {
+function thermostatRawValueFromPoint(rect: DOMRect, clientX: number, clientY: number, min: number, max: number) {
   const x = (2 * (clientX - rect.left - rect.width / 2)) / rect.width
   const y = (2 * (clientY - rect.top - rect.height / 2)) / rect.height
   const phi = Math.atan2(y, x)
@@ -1218,6 +1223,11 @@ function thermostatValueFromPoint(rect: DOMRect, clientX: number, clientY: numbe
   const angle = ((degrees + 270) % 360) - 45
   const percentage = Math.max(Math.min(angle / 270, 1), 0)
   const raw = min + (max - min) * percentage
+  return Number(Math.max(Math.min(raw, max), min).toFixed(3))
+}
+
+function thermostatValueFromPoint(rect: DOMRect, clientX: number, clientY: number, min: number, max: number, step: number) {
+  const raw = thermostatRawValueFromPoint(rect, clientX, clientY, min, max)
   const stepped = min + Math.round((raw - min) / step) * step
   return Number(Math.max(Math.min(stepped, max), min).toFixed(3))
 }
@@ -1433,7 +1443,7 @@ function EightSleepThermostatHero({ activeValue, nowValue, onNowValueReapply, on
 
   const setTargetLevel = (nextValue: number) => {
     if (!canDragTarget) return
-    const clampedValue = clampEightSleepLevel(nextValue)
+    const clampedValue = snapEightSleepLevel(nextValue)
     setDragValue(null)
     onNowValueReapply(clampedValue)
     onPowerOnPreviewChange(clampedValue)
@@ -1447,7 +1457,7 @@ function EightSleepThermostatHero({ activeValue, nowValue, onNowValueReapply, on
   const targetValueFromPointer = (event: PointerEvent<HTMLElement>) => {
     const rect = dialRef.current?.getBoundingClientRect()
     if (!rect) return null
-    return thermostatValueFromPoint(rect, event.clientX, event.clientY, EIGHT_SLEEP_STAGE_MIN, EIGHT_SLEEP_STAGE_MAX, 1)
+    return thermostatRawValueFromPoint(rect, event.clientX, event.clientY, EIGHT_SLEEP_STAGE_MIN, EIGHT_SLEEP_STAGE_MAX)
   }
 
   const startTargetDrag = (event: PointerEvent<HTMLElement>) => {
@@ -1477,7 +1487,7 @@ function EightSleepThermostatHero({ activeValue, nowValue, onNowValueReapply, on
     if (nextValue === null) return
     event.preventDefault()
     event.stopPropagation()
-    const clampedValue = clampEightSleepLevel(nextValue)
+    const clampedValue = snapEightSleepLevel(nextValue)
     setDragValue(null)
     setTargetLevel(clampedValue)
   }
@@ -1530,6 +1540,7 @@ function EightSleepThermostatHero({ activeValue, nowValue, onNowValueReapply, on
               onPointerDown={startTargetDrag}
               onPointerMove={moveTargetDrag}
               onPointerUp={endTargetDrag}
+              data-dragging={activeHandle.current !== null ? 'true' : 'false'}
               style={thermostatHandleStyle(displayedTargetValue, EIGHT_SLEEP_STAGE_MIN, EIGHT_SLEEP_STAGE_MAX)}
             />
           </div>

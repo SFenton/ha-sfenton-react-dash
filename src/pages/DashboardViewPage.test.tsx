@@ -631,7 +631,7 @@ describe('DashboardViewPage', () => {
     const dialog = await screen.findByRole('dialog')
     const slider = within(dialog).getByRole('slider', { name: "Stephen's Bed target level" })
 
-    fireEvent.change(slider, { target: { value: '-4' } })
+    fireEvent.change(slider, { target: { value: '-3.6' } })
     expect(within(dialog).getByRole('region', { name: /Stephen's Bed thermostat Cooling -4/i })).toBeInTheDocument()
     fireEvent.pointerUp(slider)
 

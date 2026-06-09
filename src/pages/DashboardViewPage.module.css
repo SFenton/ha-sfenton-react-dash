@@ -481,7 +481,12 @@
   cursor: grab;
   pointer-events: auto;
   touch-action: none;
+  transition: left var(--duration-fast) ease, top var(--duration-fast) ease;
   transform: translate(-50%, -50%);
+}
+
+.thermostatHandleHitTarget[data-dragging='true'] {
+  transition: none;
 }
 
 .thermostatHandleHitTarget::before {
