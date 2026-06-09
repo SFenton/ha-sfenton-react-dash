@@ -361,9 +361,6 @@ function SourceEntityModalContent({ card }: { card: RoomSourceCardConfig }) {
 function renderRoomReusableSheet(card: RoomSourceCardConfig, roomTitle: string): ReactNode {
   if (!card.hash) return null
 
-  const eightSleepSide = eightSleepSideForHash(card.hash)
-  if (eightSleepSide) return <EightSleepBedModalContent key={eightSleepSide.hash} side={eightSleepSide} />
-
   if (card.modalItems?.length) return <SourceEntityModalContent card={card} key={`${card.entityId}-items`} />
 
   if (card.kind === 'light') {
@@ -521,14 +518,23 @@ function RoomSourceCard({ card, onOpen }: { card: RoomSourceCardConfig; onOpen: 
 }
 
 function RoomSourceModal({ card, onClose, roomTitle }: { card: RoomSourceCardConfig | null; onClose: () => void; roomTitle: string }) {
-  const content = card ? renderRoomReusableSheet(card, roomTitle) : null
   const eightSleepSide = card ? eightSleepSideForHash(card.hash) : undefined
+  const eightSleepModalState = useEightSleepBedModalState(eightSleepSide)
+  const content = card && !eightSleepSide ? renderRoomReusableSheet(card, roomTitle) : null
   const plainTitle = card?.kind === 'air' || card?.kind === 'climate' || card?.kind === 'contact' || card?.kind === 'light' || card?.kind === 'occupancy'
   const title = card ? `${roomTitle}${plainTitle ? ' ' : ': '}${card.modalTitle ?? card.title}` : roomTitle
   const subtitle = useHass((state) => (card && plainTitle && card.kind !== 'contact' && card.kind !== 'light' ? roomSourceModalSubtitle(card, roomTitle, state.entities) : undefined))
 
+  if (card && eightSleepSide) {
+    return (
+      <ModalSheet onClose={onClose} open={Boolean(card)} subtitle={eightSleepModalState.subtitle} surface="hass-popup" title={title}>
+        <EightSleepBedModalContent key={eightSleepSide.hash} modalState={eightSleepModalState} side={eightSleepSide} />
+      </ModalSheet>
+    )
+  }
+
   return (
-    <ModalSheet onClose={onClose} open={Boolean(card)} subtitle={subtitle} surface={eightSleepSide ? 'hass-popup' : undefined} title={title}>
+    <ModalSheet onClose={onClose} open={Boolean(card)} subtitle={subtitle} title={title}>
       {card && (content ?? <RoomSourceFallback card={card} />)}
     </ModalSheet>
   )
@@ -1078,6 +1084,21 @@ interface EightSleepSideConfig {
   title: string
 }
 
+interface EightSleepBedModalState {
+  activeValue: number | null
+  commitDisplayNowValue: (value: number) => void
+  commitDisplaySideOn: (sideOn: boolean) => void
+  commitPowerOnPreviewValue: (value: number | null) => void
+  controlsSideOn: boolean
+  displayedTargetValue: number
+  displayNowValue: number | null
+  heroAction: string
+  hotFlashActive: boolean
+  sideAvailable: boolean
+  subtitle: string
+  setTargetPreviewValue: (value: number | null) => void
+}
+
 const EIGHT_SLEEP_STAGE_MIN = -10
 const EIGHT_SLEEP_STAGE_MAX = 10
 const EIGHT_SLEEP_STAGE_REVERT_MS = 30000
@@ -1159,6 +1180,42 @@ function formatEightSleepLevel(level: number | null) {
   if (level === null) return undefined
   const snappedLevel = snapEightSleepLevel(level)
   return `${snappedLevel > 0 ? `+${snappedLevel}` : snappedLevel}`
+}
+
+function useEightSleepBedModalState(side: EightSleepSideConfig | undefined): EightSleepBedModalState {
+  const activeLevelEntity = useEntity(asEntityName(side?.activeLevelEntityId ?? 'sensor.eight_sleep_unselected_active_level'), { returnNullIfNotFound: true })
+  const activeEntity = useEntity(asEntityName(side?.hotFlashActiveEntityId ?? 'input_boolean.eight_sleep_unselected_hot_flash_active'), { returnNullIfNotFound: true })
+  const climateEntity = useEntity(asEntityName(side?.climateEntityId ?? 'climate.eight_sleep_unselected'), { returnNullIfNotFound: true })
+  const nowStage = side?.stages.find((stage) => stage.sleepStage === 'override_bedtime')
+  const nowEntity = useEntity(asEntityName(nowStage?.sourceEntityId ?? 'sensor.eight_sleep_unselected_now_level'), { returnNullIfNotFound: true })
+  const sideAvailable = Boolean(side && climateEntity && !isUnavailable(climateEntity))
+  const liveSideOn = Boolean(side && climateEntity && !isUnavailable(climateEntity) && climateEntity.state !== 'off')
+  const activeValue = activeLevelEntity && !isUnavailable(activeLevelEntity) ? numberValue(activeLevelEntity.state) : null
+  const liveNowValue = nowEntity && !isUnavailable(nowEntity) ? numberValue(nowEntity.state) : null
+  const [displayNowValue, commitDisplayNowValue] = useOptimisticState(liveNowValue, { clearOn: 'confirmation', revertMs: EIGHT_SLEEP_STAGE_REVERT_MS })
+  const [displaySideOn, commitDisplaySideOn] = useOptimisticState(liveSideOn, EIGHT_SLEEP_POWER_REVERT_MS)
+  const [powerOnPreviewValue, commitPowerOnPreviewValue] = useOptimisticState<number | null>(null, EIGHT_SLEEP_POWER_REVERT_MS)
+  const [targetPreviewValue, setTargetPreviewValue] = useState<number | null>(null)
+  const controlsSideOn = sideAvailable && displaySideOn
+  const hotFlashActive = activeEntity?.state === 'on'
+  const showingPowerOnPreview = controlsSideOn && powerOnPreviewValue !== null
+  const displayedTargetValue = targetPreviewValue ?? (hotFlashActive ? -10 : showingPowerOnPreview ? powerOnPreviewValue : controlsSideOn ? displayNowValue ?? activeValue ?? 0 : 0)
+  const heroAction = eightSleepLevelAction(displayedTargetValue)
+
+  return {
+    activeValue,
+    commitDisplayNowValue,
+    commitDisplaySideOn,
+    commitPowerOnPreviewValue,
+    controlsSideOn,
+    displayedTargetValue,
+    displayNowValue,
+    heroAction,
+    hotFlashActive,
+    sideAvailable,
+    setTargetPreviewValue,
+    subtitle: titleCaseState(heroAction),
+  }
 }
 
 function rawThermostatAction(entity: ReturnType<typeof useEntity>) {
@@ -1428,30 +1485,31 @@ function ThermostatDial({ actionOverride, entityId, inactiveOverride, interactiv
   )
 }
 
-function EightSleepThermostatHero({ activeValue, nowValue, onNowValueReapply, onPowerOnPreviewChange, onSidePowerChange, powerOnPreviewValue, side, sideAvailable, sideOn }: { activeValue: number | null; nowValue: number | null; onNowValueReapply: (value: number) => void; onPowerOnPreviewChange: (value: number | null) => void; onSidePowerChange: (sideOn: boolean) => void; powerOnPreviewValue: number | null; side: EightSleepSideConfig; sideAvailable: boolean; sideOn: boolean }) {
-  const activeEntity = useEntity(asEntityName(side.hotFlashActiveEntityId), { returnNullIfNotFound: true })
+function EightSleepThermostatHero({ modalState, side }: { modalState: EightSleepBedModalState; side: EightSleepSideConfig }) {
   const callService = useCallService()
   const dialRef = useRef<HTMLDivElement>(null)
   const activeHandle = useRef<number | null>(null)
   const [dragValue, setDragValue] = useState<number | null>(null)
-  const hotFlashActive = activeEntity?.state === 'on'
-  const showingPowerOnPreview = sideOn && powerOnPreviewValue !== null
-  const displayedTargetValue = dragValue ?? (hotFlashActive ? -10 : showingPowerOnPreview ? powerOnPreviewValue : sideOn ? nowValue ?? activeValue ?? 0 : 0)
+  const { commitDisplayNowValue, commitDisplaySideOn, commitPowerOnPreviewValue, controlsSideOn, displayNowValue, displayedTargetValue: sourceTargetValue, hotFlashActive, setTargetPreviewValue, sideAvailable } = modalState
+  const displayedTargetValue = dragValue ?? sourceTargetValue
   const heroAction = eightSleepLevelAction(displayedTargetValue)
   const heroTargetText = formatEightSleepLevel(displayedTargetValue) ?? '0'
-  const canDragTarget = sideAvailable && sideOn && !hotFlashActive
+  const canDragTarget = sideAvailable && controlsSideOn && !hotFlashActive
 
   const setTargetLevel = (nextValue: number) => {
     if (!canDragTarget) return
     const clampedValue = snapEightSleepLevel(nextValue)
     setDragValue(null)
-    onNowValueReapply(clampedValue)
-    onPowerOnPreviewChange(clampedValue)
+    setTargetPreviewValue(null)
+    commitDisplayNowValue(clampedValue)
+    commitPowerOnPreviewValue(clampedValue)
     callService({ domain: 'eight_sleep', service: 'heat_set', target: side.bedTemperatureEntityId, serviceData: { duration: 0, target: clampedValue * 10, sleep_stage: 'override_bedtime' } })
   }
 
   const updateDragValue = (nextValue: number) => {
-    setDragValue(clampEightSleepLevel(nextValue))
+    const clampedValue = clampEightSleepLevel(nextValue)
+    setDragValue(clampedValue)
+    setTargetPreviewValue(clampedValue)
   }
 
   const targetValueFromPointer = (event: PointerEvent<HTMLElement>) => {
@@ -1494,21 +1552,22 @@ function EightSleepThermostatHero({ activeValue, nowValue, onNowValueReapply, on
 
   const toggleSidePower = () => {
     if (!sideAvailable) return
-    if (!sideOn) {
-      onSidePowerChange(true)
+    if (!controlsSideOn) {
+      commitDisplaySideOn(true)
       callService({ domain: 'eight_sleep', service: 'side_on', target: side.bedTemperatureEntityId })
-      if (nowValue !== null) {
-        onNowValueReapply(nowValue)
-        onPowerOnPreviewChange(nowValue)
-        callService({ domain: 'eight_sleep', service: 'heat_set', target: side.bedTemperatureEntityId, serviceData: { duration: 0, target: nowValue * 10, sleep_stage: 'override_bedtime' } })
+      if (displayNowValue !== null) {
+        commitDisplayNowValue(displayNowValue)
+        commitPowerOnPreviewValue(displayNowValue)
+        callService({ domain: 'eight_sleep', service: 'heat_set', target: side.bedTemperatureEntityId, serviceData: { duration: 0, target: displayNowValue * 10, sleep_stage: 'override_bedtime' } })
       }
       return
     }
 
     if (!window.confirm(`Turn off ${side.title}?`)) return
     setDragValue(null)
-    onSidePowerChange(false)
-    onPowerOnPreviewChange(null)
+    setTargetPreviewValue(null)
+    commitDisplaySideOn(false)
+    commitPowerOnPreviewValue(null)
     callService({ domain: 'eight_sleep', service: 'side_off', target: side.bedTemperatureEntityId })
   }
 
@@ -1520,7 +1579,7 @@ function EightSleepThermostatHero({ activeValue, nowValue, onNowValueReapply, on
           colors={thermostatSliderColors(heroAction)}
           current={displayedTargetValue}
           disabled={!canDragTarget}
-          inactive={!sideOn}
+          inactive={!controlsSideOn}
           label={`${side.title} target level`}
           max={EIGHT_SLEEP_STAGE_MAX}
           min={EIGHT_SLEEP_STAGE_MIN}
@@ -1550,7 +1609,7 @@ function EightSleepThermostatHero({ activeValue, nowValue, onNowValueReapply, on
           <span className={styles.thermostatPrimaryValue}>{heroTargetText}</span>
         </div>
       </div>
-      <button aria-label={`${sideOn ? 'Turn off' : 'Turn on'} ${side.title}`} className={styles.eightSleepThermostatButton} disabled={!sideAvailable} onClick={toggleSidePower} type="button" />
+      <button aria-label={`${controlsSideOn ? 'Turn off' : 'Turn on'} ${side.title}`} className={styles.eightSleepThermostatButton} disabled={!sideAvailable} onClick={toggleSidePower} type="button" />
     </div>
   )
 }
@@ -1631,23 +1690,12 @@ function EightSleepHotFlashButton({ side }: { side: EightSleepSideConfig }) {
   )
 }
 
-function EightSleepBedModalContent({ side }: { side: EightSleepSideConfig }) {
-  const activeLevelEntity = useEntity(asEntityName(side.activeLevelEntityId), { returnNullIfNotFound: true })
-  const climateEntity = useEntity(asEntityName(side.climateEntityId), { returnNullIfNotFound: true })
-  const nowStage = side.stages.find((stage) => stage.sleepStage === 'override_bedtime')
-  const nowEntity = useEntity(asEntityName(nowStage?.sourceEntityId ?? side.bedTemperatureEntityId), { returnNullIfNotFound: true })
-  const sideAvailable = Boolean(climateEntity && !isUnavailable(climateEntity))
-  const liveSideOn = Boolean(climateEntity && !isUnavailable(climateEntity) && climateEntity.state !== 'off')
-  const activeValue = activeLevelEntity && !isUnavailable(activeLevelEntity) ? numberValue(activeLevelEntity.state) : null
-  const liveNowValue = nowEntity && !isUnavailable(nowEntity) ? numberValue(nowEntity.state) : null
-  const [displayNowValue, commitDisplayNowValue] = useOptimisticState(liveNowValue, { clearOn: 'confirmation', revertMs: EIGHT_SLEEP_STAGE_REVERT_MS })
-  const [displaySideOn, commitDisplaySideOn] = useOptimisticState(liveSideOn, EIGHT_SLEEP_POWER_REVERT_MS)
-  const [powerOnPreviewValue, commitPowerOnPreviewValue] = useOptimisticState<number | null>(null, EIGHT_SLEEP_POWER_REVERT_MS)
-  const controlsSideOn = sideAvailable && displaySideOn
+function EightSleepBedModalContent({ modalState, side }: { modalState: EightSleepBedModalState; side: EightSleepSideConfig }) {
+  const { commitDisplayNowValue, controlsSideOn, displayNowValue } = modalState
 
   return (
     <div className={styles.thermostatModalBody}>
-      <EightSleepThermostatHero activeValue={activeValue} nowValue={displayNowValue} onNowValueReapply={commitDisplayNowValue} onPowerOnPreviewChange={commitPowerOnPreviewValue} onSidePowerChange={commitDisplaySideOn} powerOnPreviewValue={powerOnPreviewValue} side={side} sideAvailable={sideAvailable} sideOn={controlsSideOn} />
+      <EightSleepThermostatHero modalState={modalState} side={side} />
       <section className={styles.section}>
         <SectionHeader title="Sleep Stages" />
         <div className={styles.eightSleepStageGrid}>
