@@ -1489,9 +1489,8 @@ function EightSleepThermostatHero({ modalState, side }: { modalState: EightSleep
   const callService = useCallService()
   const dialRef = useRef<HTMLDivElement>(null)
   const activeHandle = useRef<number | null>(null)
-  const [dragValue, setDragValue] = useState<number | null>(null)
   const { commitDisplayNowValue, commitDisplaySideOn, commitPowerOnPreviewValue, controlsSideOn, displayNowValue, displayedTargetValue: sourceTargetValue, hotFlashActive, setTargetPreviewValue, sideAvailable } = modalState
-  const displayedTargetValue = dragValue ?? sourceTargetValue
+  const displayedTargetValue = sourceTargetValue
   const heroAction = eightSleepLevelAction(displayedTargetValue)
   const heroTargetText = formatEightSleepLevel(displayedTargetValue) ?? '0'
   const canDragTarget = sideAvailable && controlsSideOn && !hotFlashActive
@@ -1499,7 +1498,6 @@ function EightSleepThermostatHero({ modalState, side }: { modalState: EightSleep
   const setTargetLevel = (nextValue: number) => {
     if (!canDragTarget) return
     const clampedValue = snapEightSleepLevel(nextValue)
-    setDragValue(null)
     setTargetPreviewValue(null)
     commitDisplayNowValue(clampedValue)
     commitPowerOnPreviewValue(clampedValue)
@@ -1508,7 +1506,6 @@ function EightSleepThermostatHero({ modalState, side }: { modalState: EightSleep
 
   const updateDragValue = (nextValue: number) => {
     const clampedValue = clampEightSleepLevel(nextValue)
-    setDragValue(clampedValue)
     setTargetPreviewValue(clampedValue)
   }
 
@@ -1546,7 +1543,6 @@ function EightSleepThermostatHero({ modalState, side }: { modalState: EightSleep
     event.preventDefault()
     event.stopPropagation()
     const clampedValue = snapEightSleepLevel(nextValue)
-    setDragValue(null)
     setTargetLevel(clampedValue)
   }
 
@@ -1564,7 +1560,6 @@ function EightSleepThermostatHero({ modalState, side }: { modalState: EightSleep
     }
 
     if (!window.confirm(`Turn off ${side.title}?`)) return
-    setDragValue(null)
     setTargetPreviewValue(null)
     commitDisplaySideOn(false)
     commitPowerOnPreviewValue(null)
