@@ -5,6 +5,7 @@ import { GlassTile, type TileTone } from '../core/GlassTile'
 import type { StatusChipConfig } from '../../constants/atAGlance'
 import { derivedAirPurifierEntityIds, formatAirQualitySummary } from './airQualityState'
 import { asEntityName, formatCompactEntityState, formatContactEntityState, formatOccupancyEntityState, isActiveState, isContactOpen, isOccupancyActive } from './entityState'
+import { securityStateCssColor, securityStateIconName } from './securityState'
 import styles from './StatusRail.module.css'
 
 export interface StatusRailChip extends Omit<StatusChipConfig, 'hash' | 'icon' | 'tone'> {
@@ -18,18 +19,6 @@ interface StatusRailProps {
   chips: StatusRailChip[]
   onOpenHash: (hash: string) => void
   subtitleByHash?: Partial<Record<string, string>>
-}
-
-const SECURITY_STATE_META: Record<string, { color: string; icon: string }> = {
-  disarmed: { color: 'rgb(67, 160, 71)', icon: 'mdi:shield-off' },
-  armed_home: { color: 'rgb(30, 136, 229)', icon: 'mdi:shield-home' },
-  armed_night: { color: 'rgb(142, 36, 170)', icon: 'mdi:shield-moon' },
-  armed_away: { color: 'rgb(229, 57, 53)', icon: 'mdi:shield' },
-  triggered: { color: 'rgb(229, 57, 53)', icon: 'mdi:shield-alert' },
-}
-
-function securityStateMeta(state: string | undefined) {
-  return (state && SECURITY_STATE_META[state]) || { color: 'rgb(84, 110, 122)', icon: 'mdi:shield-outline' }
 }
 
 function colorState(entity: HassEntity | null | undefined) {
@@ -51,16 +40,18 @@ function StatusChip({ chip, onOpenHash, subtitleOverride }: { chip: StatusRailCh
   const subtitle = subtitleOverride ?? airQualityState ?? (secondaryState ? `${primaryState} / ${secondaryState}` : primaryState)
   const presenceActive = stateKind === 'presence' ? isOccupancyActive(entity) : false
   const isOff = stateKind === 'security' ? false : stateKind === 'presence' ? !presenceActive && !chip.secondaryEntityId : !isActiveState(entity) && !chip.secondaryEntityId
-  const securityMeta = stateKind === 'security' ? securityStateMeta(entity?.state) : null
+  const securityBackgroundColor = stateKind === 'security' ? securityStateCssColor(entity?.state, 0.44) : undefined
+  const securityIcon = stateKind === 'security' ? securityStateIconName(entity?.state) : undefined
   const dynamicColor = chip.colorEntityId ? colorState(colorEntity) : undefined
-  const icon = securityMeta?.icon ?? (stateKind === 'presence' ? (presenceActive ? 'mdi:motion-sensor' : 'mdi:motion-sensor-off') : stateKind === 'contact' && isContactOpen(entity) ? 'mdi:door-open' : chip.icon)
+  const icon = securityIcon ?? (stateKind === 'presence' ? (presenceActive ? 'mdi:motion-sensor' : 'mdi:motion-sensor-off') : stateKind === 'contact' && isContactOpen(entity) ? 'mdi:door-open' : chip.icon)
 
   return (
     <div className={styles.chip} style={{ '--chip-width': `${chip.width ?? 150}px` } as CSSProperties}>
       <GlassTile
+        backgroundColor={securityBackgroundColor}
         compact
         icon={icon}
-        iconColor={securityMeta?.color ?? dynamicColor}
+        iconColor={securityIcon ? 'white' : dynamicColor}
         isOff={isOff}
         onClick={chip.hash ? () => onOpenHash(chip.hash as string) : undefined}
         subtitle={subtitle}

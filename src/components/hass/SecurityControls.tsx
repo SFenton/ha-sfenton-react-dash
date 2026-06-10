@@ -5,20 +5,10 @@ import { Card, type CardColor } from '../core/Card'
 import { MaterialIcon } from '../core/Icon'
 import { Separator } from '../core/Separator'
 import { asEntityName, titleCaseState } from './entityState'
+import { securityStateColor, securityStateIconName } from './securityState'
 import styles from './SecurityControls.module.css'
 
-type SecurityModeState = 'armed_away' | 'armed_home' | 'armed_night' | 'disarmed' | 'triggered'
-
 const SECURITY_ICON_SIZE = 30
-
-const SECURITY_COLORS = {
-  armed_away: { r: 229, g: 57, b: 53 },
-  armed_home: { r: 30, g: 136, b: 229 },
-  armed_night: { r: 142, g: 36, b: 170 },
-  disarmed: { r: 67, g: 160, b: 71 },
-  triggered: { r: 229, g: 57, b: 53 },
-  unknown: { r: 84, g: 110, b: 122 },
-} satisfies Record<SecurityModeState | 'unknown', CardColor>
 
 const SECURITY_MODES = [
   { title: 'Home', service: 'alarm_arm_home', state: 'armed_home', icon: <MaterialIcon name="mdi:shield-home" size={SECURITY_ICON_SIZE} /> },
@@ -26,18 +16,6 @@ const SECURITY_MODES = [
   { title: 'Night', service: 'alarm_arm_night', state: 'armed_night', icon: <MaterialIcon name="mdi:shield-moon" size={SECURITY_ICON_SIZE} /> },
   { title: 'Disarmed', service: 'alarm_disarm', state: 'disarmed', icon: <MaterialIcon name="mdi:shield-off" size={SECURITY_ICON_SIZE} /> },
 ] as const
-
-function securityStateColor(state?: string): CardColor {
-  return state && state in SECURITY_COLORS ? SECURITY_COLORS[state as SecurityModeState] : SECURITY_COLORS.unknown
-}
-
-function securityStateIcon(state?: string) {
-  if (state === 'disarmed') return <MaterialIcon name="mdi:shield-off" size={SECURITY_ICON_SIZE} />
-  if (state === 'armed_home') return <MaterialIcon name="mdi:shield-home" size={SECURITY_ICON_SIZE} />
-  if (state === 'armed_night') return <MaterialIcon name="mdi:shield-moon" size={SECURITY_ICON_SIZE} />
-  if (state === 'triggered') return <MaterialIcon name="mdi:shield-alert" size={SECURITY_ICON_SIZE} />
-  return <MaterialIcon name="mdi:shield" size={SECURITY_ICON_SIZE} />
-}
 
 interface SecurityCardProps {
   active?: boolean
@@ -81,7 +59,7 @@ export function SecurityControls() {
       <SecurityCard
         ariaLabel={`Current security system state ${alarmStateTitle}`}
         color={securityStateColor(alarmState)}
-        icon={securityStateIcon(alarmState)}
+        icon={<MaterialIcon name={securityStateIconName(alarmState)} size={SECURITY_ICON_SIZE} />}
         size="compact"
         title={alarmStateTitle}
       />
@@ -99,7 +77,7 @@ export function SecurityControls() {
             <SecurityCard
               active={active}
               ariaLabel={`Set security system to ${mode.title}`}
-              color={SECURITY_COLORS[mode.state]}
+              color={securityStateColor(mode.state)}
               icon={mode.icon}
               key={mode.service}
               onClick={() => callAlarmService(mode.service)}

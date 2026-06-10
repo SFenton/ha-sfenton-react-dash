@@ -5,6 +5,11 @@ import styles from './GlassTile.module.css'
 
 export type TileTone = 'air' | 'climate' | 'contact' | 'danger' | 'light' | 'media' | 'neutral' | 'presence' | 'security' | 'switch' | 'vacuum' | 'warning'
 
+type GlassTileStyle = CSSProperties & {
+  '--header-pill-color'?: string
+  '--tile-color'?: string
+}
+
 interface GlassTileProps {
   title: string
   icon: IconKey | string | ReactNode
@@ -44,7 +49,12 @@ export function GlassTile({
     .filter(Boolean)
     .join(' ')
   const accessibleName = subtitle ? `${title} ${subtitle}` : title
-  const style = backgroundColor ? ({ '--tile-color': backgroundColor } as CSSProperties) : undefined
+  const style: GlassTileStyle | undefined = backgroundColor
+    ? {
+        '--header-pill-color': backgroundColor,
+        '--tile-color': backgroundColor,
+      }
+    : undefined
   const iconName = typeof icon === 'string' ? icon : undefined
   const iconContent = isValidElement(icon) ? icon : <Icon name={iconName ?? 'mdi:help-circle-outline'} size={iconSize} />
 

@@ -20,6 +20,7 @@ import { StatusRail } from '../components/hass/StatusRail'
 import { WeatherSummary } from '../components/hass/WeatherSummary'
 import { formatAirMetricState } from '../components/hass/airQualityState'
 import { asEntityName, formatCompactEntityState, isActiveState, isContactOpen, isOccupancyActive } from '../components/hass/entityState'
+import { securityStateCssColor, securityStateIconName } from '../components/hass/securityState'
 import { WebRtcCamera } from '../components/hass/WebRtcCamera'
 import {
   AREA_ITEMS,
@@ -289,6 +290,7 @@ function QuickAccessTile({ item, onNavigate, onOpenHash }: { item: QuickAccessCo
   const entity = useEntity(asEntityName(item.entityId ?? 'sensor.unavailable'), { returnNullIfNotFound: true })
   const subtitle = item.status === 'entity_state' ? formatCompactEntityState(entity) : undefined
   const itemHash = item.hash
+  const isSecurityTile = item.tone === 'security' && item.entityId?.startsWith('alarm_control_panel.')
 
   const handleClick = () => {
     if (itemHash) {
@@ -300,7 +302,9 @@ function QuickAccessTile({ item, onNavigate, onOpenHash }: { item: QuickAccessCo
 
   return (
     <GlassTile
-      icon={item.icon}
+      backgroundColor={isSecurityTile ? securityStateCssColor(entity?.state, 0.5) : undefined}
+      icon={isSecurityTile ? securityStateIconName(entity?.state) : item.icon}
+      iconColor={isSecurityTile ? 'white' : undefined}
       onClick={itemHash || item.route ? handleClick : undefined}
       subtitle={subtitle}
       title={item.title}

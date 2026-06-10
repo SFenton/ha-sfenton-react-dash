@@ -10,6 +10,7 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "porting:capture": "tsx scripts/hass-porting-capture.ts",
+    "prepare:hallway-z2m": "tsx scripts/prepare-hallway-z2m-migration.ts",
     "sync": "tsx scripts/sync-types.ts",
     "deploy": "tsx scripts/deploy.ts",
     "test": "vitest",

@@ -620,7 +620,10 @@ export const OCCUPANCY_GROUPS: EntityGroupConfig[] = [
   },
   {
     title: 'Entryway Occupancy',
-    items: [{ title: 'Front Door', entityId: 'binary_sensor.front_door_presence_occupancy', tone: 'presence' }],
+    items: [
+      { title: 'Entryway Occupancy', entityId: 'binary_sensor.entryway_presence_occupancy', tone: 'presence' },
+      { title: 'Front Door', entityId: 'binary_sensor.front_door_presence_occupancy', tone: 'presence' },
+    ],
   },
   {
     title: 'Downstairs Hallway Occupancy',

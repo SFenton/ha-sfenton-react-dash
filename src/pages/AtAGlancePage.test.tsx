@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, within } from '@testing-library/react'
 import { AtAGlancePage } from './AtAGlancePage'
+import { SECURITY_ENTITY } from '../constants/atAGlance'
 import { mockEntities, resetMockHass } from '../test/mocks/hakitCoreState'
 
 describe('AtAGlancePage', () => {
@@ -23,6 +24,14 @@ describe('AtAGlancePage', () => {
     expect(within(dialog).queryByRole('button', { name: /Living Room AQI/i })).not.toBeInTheDocument()
 
     expect(within(dialog).getAllByText('1 • 2 μg/m³')).toHaveLength(6)
+  })
+
+  it('colors overview security tiles from the alarm state', () => {
+    mockEntities[SECURITY_ENTITY].state = 'armed_night'
+    render(<AtAGlancePage />)
+
+    expect(screen.getByRole('button', { name: 'Security Armed Night' })).toHaveStyle('--header-pill-color: rgba(142, 36, 170, 0.44)')
+    expect(screen.getByRole('button', { name: 'Security System Armed Night' })).toHaveStyle('--tile-color: rgba(142, 36, 170, 0.5)')
   })
 
   it('uses the shell header menu and More actions', async () => {
