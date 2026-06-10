@@ -744,15 +744,15 @@ describe('DashboardViewPage', () => {
     mockEntities['media_player.living_room_shield_2'].state = 'playing'
     render(<DashboardViewPage activePath="living-room" onNavigate={() => undefined} path="living-room" />)
 
-    fireEvent.click(screen.getByRole('button', { name: /^SHIELD Off$/i }))
+    fireEvent.click(screen.getByRole('button', { name: /^Living Room SHIELD Off$/i }))
 
     expect(await screen.findByRole('dialog')).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Living Room: SHIELD' })).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'SHIELD Remote' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Living Room SHIELD Remote' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Sonos Volume' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Controls' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Power' })).toHaveStyle({ color: 'rgb(255, 0, 0)' })
-    expect(screen.getByRole('button', { name: 'Select' }).querySelector('path')).toHaveAttribute('d', materialIconPath('mdi:circle'))
+    expect(screen.getByRole('button', { name: 'Select' })).toHaveAttribute('data-icon', ' ')
+    expect(screen.getByRole('button', { name: 'Select' }).querySelector('svg')).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Back' }).querySelector('path')).toHaveAttribute('transform', 'rotate(90 12 12)')
     expect(mockCallServiceCalls).toEqual([])
 
@@ -772,10 +772,10 @@ describe('DashboardViewPage', () => {
     mockEntities['media_player.sonos'].state = 'off'
     render(<DashboardViewPage activePath="living-room" onNavigate={() => undefined} path="living-room" />)
 
-    fireEvent.click(screen.getByRole('button', { name: /^SHIELD Off$/i }))
+    fireEvent.click(screen.getByRole('button', { name: /^Living Room SHIELD Off$/i }))
 
     expect(await screen.findByRole('dialog')).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'SHIELD Remote' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Living Room SHIELD Remote' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Power' })).toHaveStyle({ color: 'rgb(0, 128, 0)' })
     expect(screen.queryByRole('heading', { name: 'Sonos Volume' })).not.toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: 'Controls' })).not.toBeInTheDocument()
@@ -787,7 +787,7 @@ describe('DashboardViewPage', () => {
   it('ports media app cards inside remote modals with YAML service payloads', async () => {
     mockEntities['media_player.living_room_shield_2'].state = 'playing'
     let view = render(<DashboardViewPage activePath="living-room" onNavigate={() => undefined} path="living-room" />)
-    fireEvent.click(screen.getByRole('button', { name: /^SHIELD Off$/i }))
+    fireEvent.click(screen.getByRole('button', { name: /^Living Room SHIELD Off$/i }))
     expect(await screen.findByRole('heading', { name: 'Media' })).toBeInTheDocument()
     const livingRoomRemoteDialog = screen.getByRole('dialog')
     expect(within(livingRoomRemoteDialog).getByRole('button', { name: 'YouTube' })).toHaveAttribute('data-background', 'white')
@@ -902,8 +902,7 @@ describe('DashboardViewPage', () => {
     fireEvent.click(screen.getByRole('button', { name: /^Theater Room Off$/i }))
 
     expect(await screen.findByRole('dialog')).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Theater Room: Theater Room' })).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Theater Remote' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Theater Room SHIELD Remote' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Devices' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Power' })).toHaveStyle({ color: 'rgb(255, 0, 0)' })
     expect(mockCallServiceCalls).toEqual([])
@@ -915,7 +914,7 @@ describe('DashboardViewPage', () => {
 
     expect(mockCallServiceCalls).toEqual([
       { domain: 'script', service: 'toggle_on_off_theater_room', target: undefined, serviceData: undefined },
-      { domain: 'remote', service: 'send_command', target: 'remote.theater_shield_remote', serviceData: { command: 'DPAD_RIGHT' } },
+      { domain: 'androidtv', service: 'adb_command', target: 'media_player.theater_room_shield', serviceData: { command: 'input keyevent DPAD_RIGHT' } },
       { domain: 'media_player', service: 'toggle', target: 'media_player.sony_projector', serviceData: undefined },
       { domain: 'input_button', service: 'press', target: 'input_button.theater_pc_off', serviceData: undefined },
     ])
