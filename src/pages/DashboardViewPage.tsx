@@ -1103,6 +1103,7 @@ interface EightSleepBedModalState {
 const EIGHT_SLEEP_STAGE_MIN = -10
 const EIGHT_SLEEP_STAGE_MAX = 10
 const EIGHT_SLEEP_STAGE_REVERT_MS = 30000
+const EIGHT_SLEEP_POWER_ON_NOW_LEVEL = 1
 const EIGHT_SLEEP_POWER_REVERT_MS = 30000
 
 const EIGHT_SLEEP_SIDE_CONFIGS: EightSleepSideConfig[] = [
@@ -1507,10 +1508,13 @@ function EightSleepThermostatHero({ modalState, side }: { modalState: EightSleep
   const dialRef = useRef<HTMLDivElement>(null)
   const activeHandle = useRef<number | null>(null)
   const [dragValue, setDragValue] = useState<number | null>(null)
-  const { commitDisplayNowValue, commitDisplaySideOn, commitPowerOnPreviewValue, controlsSideOn, displayNowValue, displayedTargetValue: sourceTargetValue, hotFlashActive, sideAvailable } = modalState
+  const { commitDisplayNowValue, commitDisplaySideOn, commitPowerOnPreviewValue, controlsSideOn, displayedTargetValue: sourceTargetValue, hotFlashActive, sideAvailable } = modalState
   const displayedTargetValue = dragValue ?? sourceTargetValue
   const heroAction = eightSleepLevelAction(displayedTargetValue)
   const heroTargetText = formatEightSleepLevel(displayedTargetValue) ?? '0'
+  const heroReadoutAction = controlsSideOn ? titleCaseState(heroAction) : null
+  const heroReadoutText = controlsSideOn ? heroTargetText : 'OFF'
+  const heroLabel = controlsSideOn ? `${side.title} thermostat ${heroReadoutAction} ${heroTargetText}` : `${side.title} thermostat Off`
   const canDragTarget = sideAvailable && controlsSideOn && !hotFlashActive
 
   const setTargetLevel = (nextValue: number) => {
@@ -1571,13 +1575,12 @@ function EightSleepThermostatHero({ modalState, side }: { modalState: EightSleep
   const toggleSidePower = () => {
     if (!sideAvailable) return
     if (!controlsSideOn) {
+      const defaultNowValue = EIGHT_SLEEP_POWER_ON_NOW_LEVEL
       commitDisplaySideOn(true)
+      commitDisplayNowValue(defaultNowValue)
+      commitPowerOnPreviewValue(defaultNowValue)
       callService({ domain: 'eight_sleep', service: 'side_on', target: side.bedTemperatureEntityId })
-      if (displayNowValue !== null) {
-        commitDisplayNowValue(displayNowValue)
-        commitPowerOnPreviewValue(displayNowValue)
-        callService({ domain: 'eight_sleep', service: 'heat_set', target: side.bedTemperatureEntityId, serviceData: { duration: 0, target: displayNowValue * 10, sleep_stage: 'override_bedtime' } })
-      }
+      callService({ domain: 'eight_sleep', service: 'heat_set', target: side.bedTemperatureEntityId, serviceData: { duration: 0, target: defaultNowValue * 10, sleep_stage: 'override_bedtime' } })
       return
     }
 
@@ -1590,43 +1593,46 @@ function EightSleepThermostatHero({ modalState, side }: { modalState: EightSleep
 
   return (
     <div className={styles.eightSleepThermostatHero}>
-      <div aria-label={`${side.title} thermostat ${titleCaseState(heroAction)} ${heroTargetText}`} className={styles.thermostatDial} data-hvac-action={heroAction} data-size="modal" ref={dialRef} role="region">
-        <ControlSliderCircular
-          className={styles.thermostatCircularSlider}
-          colors={thermostatSliderColors(heroAction)}
-          current={displayedTargetValue}
-          disabled={!canDragTarget}
-          inactive={!controlsSideOn}
-          label={`${side.title} target level`}
-          max={EIGHT_SLEEP_STAGE_MAX}
-          min={EIGHT_SLEEP_STAGE_MIN}
-          mode="full"
-          onChange={updateDragValue}
-          onChangeApplied={setTargetLevel}
-          readonly={!canDragTarget}
-          step={1}
-          value={displayedTargetValue}
-        />
-        {canDragTarget && (
-          <div aria-hidden="true" className={styles.thermostatHandleLayer}>
-            <span
-              className={styles.thermostatHandleHitTarget}
-              data-target="value"
-              onPointerCancel={endTargetDrag}
-              onPointerDown={startTargetDrag}
-              onPointerMove={moveTargetDrag}
-              onPointerUp={endTargetDrag}
-              data-dragging={activeHandle.current !== null ? 'true' : 'false'}
-              style={thermostatHandleStyle(displayedTargetValue, EIGHT_SLEEP_STAGE_MIN, EIGHT_SLEEP_STAGE_MAX)}
-            />
+      <div className={styles.eightSleepThermostatControl}>
+        <div aria-label={heroLabel} className={styles.thermostatDial} data-hvac-action={heroAction} data-size="modal" ref={dialRef} role="region">
+          <ControlSliderCircular
+            className={styles.thermostatCircularSlider}
+            colors={thermostatSliderColors(heroAction)}
+            current={displayedTargetValue}
+            disabled={!canDragTarget}
+            inactive={!controlsSideOn}
+            label={`${side.title} target level`}
+            max={EIGHT_SLEEP_STAGE_MAX}
+            min={EIGHT_SLEEP_STAGE_MIN}
+            mode="full"
+            onChange={updateDragValue}
+            onChangeApplied={setTargetLevel}
+            readonly={!canDragTarget}
+            step={1}
+            value={displayedTargetValue}
+          />
+          {canDragTarget && (
+            <div aria-hidden="true" className={styles.thermostatHandleLayer}>
+              <span
+                className={styles.thermostatHandleHitTarget}
+                data-target="value"
+                onPointerCancel={endTargetDrag}
+                onPointerDown={startTargetDrag}
+                onPointerMove={moveTargetDrag}
+                onPointerUp={endTargetDrag}
+                data-dragging={activeHandle.current !== null ? 'true' : 'false'}
+                style={thermostatHandleStyle(displayedTargetValue, EIGHT_SLEEP_STAGE_MIN, EIGHT_SLEEP_STAGE_MAX)}
+              />
+            </div>
+          )}
+          <div className={styles.thermostatDialReadout} data-readout-state={heroReadoutAction ? undefined : 'off'} data-single-value={heroReadoutAction ? undefined : 'true'}>
+            {heroReadoutAction && <span className={styles.thermostatAction}>{heroReadoutAction}</span>}
+            <span className={styles.thermostatPrimaryValue}>{heroReadoutText}</span>
           </div>
-        )}
-        <div className={styles.thermostatDialReadout}>
-          <span className={styles.thermostatAction}>{titleCaseState(heroAction)}</span>
-          <span className={styles.thermostatPrimaryValue}>{heroTargetText}</span>
         </div>
+        <button aria-label={`${controlsSideOn ? 'Turn off' : 'Turn on'} ${side.title}`} className={styles.eightSleepThermostatButton} disabled={!sideAvailable} onClick={toggleSidePower} type="button" />
       </div>
-      <button aria-label={`${controlsSideOn ? 'Turn off' : 'Turn on'} ${side.title}`} className={styles.eightSleepThermostatButton} disabled={!sideAvailable} onClick={toggleSidePower} type="button" />
+      {!controlsSideOn && <Description className={styles.eightSleepThermostatHint}>Tap the thermostat to turn on the Pod.</Description>}
     </div>
   )
 }

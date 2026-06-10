@@ -570,7 +570,11 @@ describe('DashboardViewPage', () => {
     fireEvent.click(screen.getByRole('button', { name: /Steph's Bed Off/i }))
 
     const dialog = await screen.findByRole('dialog')
-    expect(within(dialog).getByRole('region', { name: /Steph's Bed thermostat Cooling -10/i })).toBeInTheDocument()
+    const offHero = within(dialog).getByRole('region', { name: /Steph's Bed thermostat Off/i })
+    expect(within(offHero).getByText('OFF').parentElement).toHaveAttribute('data-readout-state', 'off')
+    expect(within(offHero).queryByText('Cooling')).not.toBeInTheDocument()
+    expect(within(offHero).queryByText('-10')).not.toBeInTheDocument()
+    expect(within(dialog).getByText('Tap the thermostat to turn on the Pod.')).toBeInTheDocument()
     expect(within(dialog).getByRole('button', { name: 'Hot Flash Mode Active' })).toBeInTheDocument()
     expect(within(dialog).getByText('12:34')).toBeInTheDocument()
     const cancel = within(dialog).getByRole('button', { name: "Cancel Steph's Bed hot flash mode" })
@@ -596,19 +600,21 @@ describe('DashboardViewPage', () => {
 
     expect(confirm).not.toHaveBeenCalled()
     expect(within(dialog).getByRole('button', { name: "Turn off Steph's Bed" })).toBeInTheDocument()
-    expect(within(dialog).getByText("Steph's Bed: Cooling • -3")).toBeInTheDocument()
-    expect(within(dialog).getByRole('region', { name: /Steph's Bed thermostat Cooling -3/i })).toBeInTheDocument()
+    expect(within(dialog).getByText("Steph's Bed: Heating • +1")).toBeInTheDocument()
+    expect(within(dialog).getByRole('region', { name: /Steph's Bed thermostat Heating \+1/i })).toBeInTheDocument()
+    expect(within(dialog).queryByText('Tap the thermostat to turn on the Pod.')).not.toBeInTheDocument()
+    expect(within(dialog).getByLabelText("Steph's Bed now value 1")).toHaveTextContent('+1')
     expect(within(dialog).getByRole('button', { name: "Steph's Bed now increase" })).not.toBeDisabled()
-    expect(screen.getByRole('button', { name: /Steph's Bed Cooling • -3/i, hidden: true })).toHaveAttribute('data-muted', 'false')
+    expect(screen.getByRole('button', { name: /Steph's Bed Heating • \+1/i, hidden: true })).toHaveAttribute('data-muted', 'false')
     expect(mockCallServiceCalls).toEqual([
       { domain: 'eight_sleep', service: 'side_on', target: 'sensor.steph_s_eight_sleep_side_bed_temperature' },
-      { domain: 'eight_sleep', service: 'heat_set', target: 'sensor.steph_s_eight_sleep_side_bed_temperature', serviceData: { duration: 0, target: -30, sleep_stage: 'override_bedtime' } },
+      { domain: 'eight_sleep', service: 'heat_set', target: 'sensor.steph_s_eight_sleep_side_bed_temperature', serviceData: { duration: 0, target: 10, sleep_stage: 'override_bedtime' } },
     ])
 
     confirm.mockRestore()
   })
 
-  it('reapplies the displayed Eight Sleep NOW value after power cycling the side', async () => {
+  it('defaults Eight Sleep NOW to +1 after power cycling the side', async () => {
     const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true)
     render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
 
@@ -626,13 +632,14 @@ describe('DashboardViewPage', () => {
     expect(screen.getByRole('button', { name: /Stephen's Bed Off/i, hidden: true })).toHaveAttribute('data-muted', 'true')
     fireEvent.click(within(dialog).getByRole('button', { name: "Turn on Stephen's Bed" }))
 
-    expect(within(dialog).getByText("Stephen's Bed: Cooling • -3")).toBeInTheDocument()
-    expect(within(dialog).getByRole('region', { name: /Stephen's Bed thermostat Cooling -3/i })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Stephen's Bed Cooling • -3/i, hidden: true })).toHaveAttribute('data-muted', 'false')
+    expect(within(dialog).getByText("Stephen's Bed: Heating • +1")).toBeInTheDocument()
+    expect(within(dialog).getByRole('region', { name: /Stephen's Bed thermostat Heating \+1/i })).toBeInTheDocument()
+    expect(within(dialog).getByLabelText("Stephen's Bed now value 1")).toHaveTextContent('+1')
+    expect(screen.getByRole('button', { name: /Stephen's Bed Heating • \+1/i, hidden: true })).toHaveAttribute('data-muted', 'false')
     expect(mockCallServiceCalls).toEqual([
       { domain: 'eight_sleep', service: 'side_off', target: 'sensor.stephen_s_eight_sleep_side_bed_temperature' },
       { domain: 'eight_sleep', service: 'side_on', target: 'sensor.stephen_s_eight_sleep_side_bed_temperature' },
-      { domain: 'eight_sleep', service: 'heat_set', target: 'sensor.stephen_s_eight_sleep_side_bed_temperature', serviceData: { duration: 0, target: -30, sleep_stage: 'override_bedtime' } },
+      { domain: 'eight_sleep', service: 'heat_set', target: 'sensor.stephen_s_eight_sleep_side_bed_temperature', serviceData: { duration: 0, target: 10, sleep_stage: 'override_bedtime' } },
     ])
 
     confirm.mockRestore()
@@ -676,7 +683,11 @@ describe('DashboardViewPage', () => {
     ])
     expect(within(dialog).getByRole('button', { name: "Turn on Stephen's Bed" })).toBeInTheDocument()
     expect(within(dialog).getByText("Stephen's Bed: Off")).toBeInTheDocument()
-    expect(within(dialog).getByRole('region', { name: /Stephen's Bed thermostat Idle 0/i })).toBeInTheDocument()
+    const offHero = within(dialog).getByRole('region', { name: /Stephen's Bed thermostat Off/i })
+    expect(within(offHero).getByText('OFF').parentElement).toHaveAttribute('data-readout-state', 'off')
+    expect(within(offHero).queryByText('Idle')).not.toBeInTheDocument()
+    expect(within(offHero).queryByText('0')).not.toBeInTheDocument()
+    expect(within(dialog).getByText('Tap the thermostat to turn on the Pod.')).toBeInTheDocument()
     expect(within(dialog).getByRole('button', { name: "Stephen's Bed now increase" })).toBeDisabled()
     expect(screen.getByRole('button', { name: /Stephen's Bed Off/i, hidden: true })).toHaveAttribute('data-muted', 'true')
 
@@ -691,6 +702,11 @@ describe('DashboardViewPage', () => {
 
     const dialog = await screen.findByRole('dialog')
     expect(within(dialog).getByText("Steph's Bed: Off")).toBeInTheDocument()
+    const offHero = within(dialog).getByRole('region', { name: /Steph's Bed thermostat Off/i })
+    expect(within(offHero).getByText('OFF').parentElement).toHaveAttribute('data-readout-state', 'off')
+    expect(within(offHero).queryByText('Idle')).not.toBeInTheDocument()
+    expect(within(offHero).queryByText('0')).not.toBeInTheDocument()
+    expect(within(dialog).getByText('Tap the thermostat to turn on the Pod.')).toBeInTheDocument()
     for (const label of ['now', 'bedtime', 'asleep', 'dawn']) {
       const decrease = within(dialog).getByRole('button', { name: `Steph's Bed ${label} decrease` })
       const increase = within(dialog).getByRole('button', { name: `Steph's Bed ${label} increase` })

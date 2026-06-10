@@ -544,6 +544,10 @@
   line-height: 0.9;
 }
 
+.thermostatDialReadout[data-single-value='true'] .thermostatPrimaryValue {
+  margin-top: 0;
+}
+
 .thermostatPrimaryValue small {
   margin-top: 0.42em;
   font-size: 0.22em;
@@ -561,7 +565,15 @@
 }
 
 .eightSleepThermostatHero {
+  display: grid;
+  width: 100%;
+  gap: 14px;
+  justify-items: center;
+}
+
+.eightSleepThermostatControl {
   position: relative;
+  width: min(100%, 300px);
 }
 
 .eightSleepThermostatButton {
@@ -583,6 +595,18 @@
 .eightSleepThermostatButton:focus-visible {
   outline: 2px solid rgba(255, 255, 255, 0.78);
   outline-offset: -8px;
+}
+
+.thermostatDialReadout[data-readout-state='off'] .thermostatPrimaryValue {
+  font-size: clamp(3rem, 15vw, 4.2rem);
+  font-weight: 420;
+}
+
+.eightSleepThermostatHint {
+  max-width: 18rem;
+  margin: 0;
+  color: rgba(255, 255, 255, 0.68);
+  text-align: center;
 }
 
 .thermostatSubButton {
