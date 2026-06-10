@@ -21,6 +21,7 @@ import { GrillModalContent } from '../components/hass/GrillModalContent'
 import { MediaRemoteModalContent } from '../components/hass/MediaRemoteModalContent'
 import { Card, type CardColor } from '../components/core/Card'
 import { Description } from '../components/core/Description'
+import { FloatingActionButton } from '../components/core/FloatingActionButton'
 import { GlassTile } from '../components/core/GlassTile'
 import { MaterialIcon } from '../components/core/Icon'
 import { ModalSheet } from '../components/core/ModalSheet'
@@ -822,9 +823,7 @@ function CreateChoreButton({ defaultAssignee }: { defaultAssignee: string }) {
 
   return (
     <>
-      <button aria-label="Create Donetick task" className={styles.createChoreButton} onClick={() => setModalOpen(true)} style={{ '--card-rgb': `${CHORE_BLUE.r} ${CHORE_BLUE.g} ${CHORE_BLUE.b}` } as CSSProperties} type="button">
-        <MaterialIcon name="mdi:plus" size={32} />
-      </button>
+      <FloatingActionButton ariaLabel="Create Donetick task" color={CHORE_BLUE} icon="mdi:plus" onClick={() => setModalOpen(true)} />
       <CreateDonetickTaskSheet defaultAssignee={defaultAssignee} onClose={() => setModalOpen(false)} open={modalOpen} />
     </>
   )
@@ -835,9 +834,7 @@ function CreateGroceryButton() {
 
   return (
     <>
-      <button aria-label="Add grocery item" className={styles.createChoreButton} onClick={() => setModalOpen(true)} style={{ '--card-rgb': `${CHORE_BLUE.r} ${CHORE_BLUE.g} ${CHORE_BLUE.b}` } as CSSProperties} type="button">
-        <MaterialIcon name="mdi:plus" size={32} />
-      </button>
+      <FloatingActionButton ariaLabel="Add grocery item" color={CHORE_BLUE} icon="mdi:plus" onClick={() => setModalOpen(true)} />
       <CreateGroceryItemSheet entityId="todo.shopping_list" onClose={() => setModalOpen(false)} open={modalOpen} />
     </>
   )

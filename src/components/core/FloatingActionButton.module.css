@@ -1,0 +1,14 @@
+.button {
+  display: grid;
+  width: 62px;
+  height: 62px;
+  place-items: center;
+  border: 0;
+  border-radius: 999px;
+  padding: 0;
+  color: white;
+  background: rgb(var(--card-rgb));
+  box-shadow: var(--shadow-glass), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  font: inherit;
+  cursor: pointer;
+}

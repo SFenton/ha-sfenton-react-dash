@@ -9,6 +9,7 @@ import { RoomCard } from '../components/cards/RoomCard'
 import { AppShell } from '../components/shell/AppShell'
 import { BottomNav } from '../components/shell/BottomNav'
 import { ActionPill } from '../components/core/ActionPill'
+import { FloatingActionButton } from '../components/core/FloatingActionButton'
 import { GlassTile } from '../components/core/GlassTile'
 import { Icon, MaterialIcon } from '../components/core/Icon'
 import { ModalSheet } from '../components/core/ModalSheet'
@@ -37,6 +38,7 @@ import {
   type EntityGroupConfig,
   type QuickAccessConfig,
 } from '../constants/atAGlance'
+import { CHORE_BLUE } from '../constants/portedDashboard'
 import { buildStaggerStyle, staggerMs } from '../hooks/useStaggerStyle'
 import { useHashModal } from '../hooks/useHashModal'
 import styles from './AtAGlancePage.module.css'
@@ -968,6 +970,30 @@ function SheetContent({ hash }: { hash: string }) {
   return <p className={styles.sheetText}>This section is represented in the Home Assistant dashboard and is queued for the next recreation pass.</p>
 }
 
+function RoomPickerButton({ onNavigate }: { onNavigate: (path: string) => void }) {
+  const [modalOpen, setModalOpen] = useState(false)
+
+  const handleNavigate = (path: string) => {
+    setModalOpen(false)
+    onNavigate(path)
+  }
+
+  return (
+    <>
+      <FloatingActionButton ariaLabel="Open room layout" color={CHORE_BLUE} icon="mdi:floor-plan" onClick={() => setModalOpen(true)} />
+      <ModalSheet open={modalOpen} title="Rooms" onClose={() => setModalOpen(false)}>
+        <section className={styles.roomPickerGrid} aria-label="Rooms">
+          {AREA_ITEMS.map((area, index) => (
+            <div key={area.title} style={buildStaggerStyle(staggerMs(index, 28, 70))}>
+              <RoomCard area={area} onNavigate={handleNavigate} />
+            </div>
+          ))}
+        </section>
+      </ModalSheet>
+    </>
+  )
+}
+
 interface AtAGlancePageProps {
   activePath?: string
   onNavigate?: (path: string) => void
@@ -991,7 +1017,7 @@ export function AtAGlancePage({ activePath = 'overview', onNavigate = () => unde
   const modalTitle = hash === '#lights-overview' ? lightsSheetTitle(activeRoomLightCount) : sheetTitle(hash)
 
   return (
-    <AppShell bottomNav={<BottomNav activePath={activePath} onNavigate={onNavigate} />}>
+    <AppShell bottomNav={<BottomNav activePath={activePath} onNavigate={onNavigate} />} floatingAction={<RoomPickerButton onNavigate={onNavigate} />}>
       <Page
         activePath={activePath}
         title="Home"
@@ -1023,15 +1049,6 @@ export function AtAGlancePage({ activePath = 'overview', onNavigate = () => unde
           {CAMERA_ITEMS.map((camera, index) => (
             <div key={camera.title} style={buildStaggerStyle(staggerMs(index, 42, 130))}>
               <CameraTile camera={camera} onOpen={openHash} />
-            </div>
-          ))}
-        </section>
-
-        <SectionHeader title="Areas" />
-        <section className={styles.areaGrid}>
-          {AREA_ITEMS.map((area, index) => (
-            <div key={area.title} style={buildStaggerStyle(staggerMs(index, 28, 190))}>
-              <RoomCard area={area} onNavigate={onNavigate} />
             </div>
           ))}
         </section>
