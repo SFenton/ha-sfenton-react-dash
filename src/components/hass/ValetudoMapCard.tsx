@@ -395,6 +395,7 @@ export function ValetudoMapCard({ vacuum }: ValetudoMapCardProps) {
 
   const showFallback = isMockMode || Boolean(error)
   const showImageFallback = !isMockMode && showCameraFallback
+  const mapRotation = `${vacuum.mapRotationDegrees ?? 0}deg`
 
   return (
     <div
@@ -402,7 +403,7 @@ export function ValetudoMapCard({ vacuum }: ValetudoMapCardProps) {
       className={styles.frame}
       data-loaded={isLoaded ? 'true' : 'false'}
       role="region"
-      style={{ '--map-min-height': vacuum.mapScale > 2 ? '300px' : '340px' } as CSSProperties}
+      style={{ '--map-min-height': vacuum.mapScale > 2 ? '300px' : '340px', '--map-rotation': mapRotation } as CSSProperties}
     >
       <div className={styles.host} ref={hostRef} />
       {showImageFallback && <img alt="" className={styles.cameraFallback} src={cameraImageUrl} />}

@@ -80,6 +80,7 @@ export interface VacuumConfig {
   errorMessageEntityId: string
   fanEntityId?: string
   hash: string
+  mapRotationDegrees?: number
   mapScale: number
   modeEntityId?: string
   modeTextEntityId?: string
@@ -361,6 +362,7 @@ export const VACUUMS: VacuumConfig[] = [
     errorMessageEntityId: 'input_text.main_floor_vacuum_error_message',
     fanEntityId: 'select.valetudo_exaltedsneakydeer_fan',
     hash: 'main-floor-robot-vacuum',
+    mapRotationDegrees: 180,
     mapScale: 1.2,
     modeEntityId: 'select.valetudo_exaltedsneakydeer_mode',
     modeTextEntityId: 'input_text.main_floor_vacuum_mode',
