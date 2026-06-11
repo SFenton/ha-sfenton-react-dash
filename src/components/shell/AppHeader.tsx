@@ -1,10 +1,8 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { createPortal } from 'react-dom'
+import { useState, type ReactNode } from 'react'
 import { PRIMARY_NAV_ROUTES, primaryNavRouteActive } from '../../constants/routes'
+import { IconSize } from '../../constants/theme'
 import { MaterialIcon } from '../core/Icon'
 import styles from './AppHeader.module.css'
-
-const SIDEBAR_ANIMATION_MS = 260
 
 export interface AppHeaderAction {
   icon: string
@@ -21,57 +19,31 @@ interface AppHeaderProps {
   title: ReactNode
 }
 
+function BackChevron() {
+  return (
+    <svg aria-hidden="true" fill="none" focusable="false" height={IconSize.back} viewBox="0 0 24 24" width={IconSize.back}>
+      <path d="M15.75 4.5 8.25 12l7.5 7.5" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.6" />
+    </svg>
+  )
+}
+
+function MenuIcon() {
+  return (
+    <svg aria-hidden="true" fill="none" focusable="false" height={IconSize.nav} viewBox="0 0 24 24" width={IconSize.nav}>
+      <path d="M4.5 6.5h15M4.5 12h15M4.5 17.5h15" stroke="currentColor" strokeLinecap="round" strokeWidth="2.5" />
+    </svg>
+  )
+}
+
 export function AppHeader({ activePath, actions = [], backLabel = 'Go back', backPath, onNavigate, title }: AppHeaderProps) {
   const [menuOpen, setMenuOpen] = useState(false)
-  const [sidebarClosing, setSidebarClosing] = useState(false)
   const [actionsOpen, setActionsOpen] = useState(false)
-  const sidebarCloseTimer = useRef<number | null>(null)
   const showBack = Boolean(backPath)
   const showMenu = Boolean(!showBack && onNavigate)
   const showActions = actions.length > 0
-  const sidebarVisible = menuOpen || sidebarClosing
-  const sidebarRoutes = PRIMARY_NAV_ROUTES.filter((route) => route.path !== 'settings')
-  const settingsRoute = PRIMARY_NAV_ROUTES.find((route) => route.path === 'settings')
-
-  const clearSidebarCloseTimer = () => {
-    if (sidebarCloseTimer.current === null) return
-    window.clearTimeout(sidebarCloseTimer.current)
-    sidebarCloseTimer.current = null
-  }
-
-  const finishSidebarClose = () => {
-    clearSidebarCloseTimer()
-    setSidebarClosing(false)
-  }
-
-  const openSidebar = () => {
-    clearSidebarCloseTimer()
-    setSidebarClosing(false)
-    setMenuOpen(true)
-    setActionsOpen(false)
-  }
-
-  const closeSidebar = () => {
-    if (!menuOpen && !sidebarClosing) return
-    clearSidebarCloseTimer()
-    setMenuOpen(false)
-    setSidebarClosing(true)
-    sidebarCloseTimer.current = window.setTimeout(finishSidebarClose, SIDEBAR_ANIMATION_MS)
-  }
-
-  const toggleSidebar = () => {
-    if (menuOpen) {
-      closeSidebar()
-      return
-    }
-
-    openSidebar()
-  }
-
-  useEffect(() => () => clearSidebarCloseTimer(), [])
 
   const closeMenus = () => {
-    closeSidebar()
+    setMenuOpen(false)
     setActionsOpen(false)
   }
 
@@ -85,59 +57,58 @@ export function AppHeader({ activePath, actions = [], backLabel = 'Go back', bac
     window.history.back()
   }
 
-  const sidebarMenu = sidebarVisible && typeof document !== 'undefined'
-    ? createPortal(
-      <div className={styles.sidebarScrim} data-state={menuOpen ? 'open' : 'closed'} onClick={closeMenus}>
-        <aside aria-hidden={sidebarClosing ? true : undefined} aria-label="Navigation menu" className={styles.sidebar} data-state={menuOpen ? 'open' : 'closed'} onAnimationEnd={() => sidebarClosing && finishSidebarClose()} onClick={(event) => event.stopPropagation()}>
-          <div className={styles.sidebarHeader}>
-            <span>Navigation</span>
-          </div>
-          <nav className={styles.sidebarNav} role="menu">
-            {sidebarRoutes.map((route) => (
-              <button aria-current={primaryNavRouteActive(activePath, route.path) ? 'page' : undefined} className={styles.menuItem} key={route.path} onClick={() => navigate(route.path)} role="menuitem" type="button">
-                <MaterialIcon name={route.icon} size={22} />
-                <span>{route.label}</span>
-              </button>
-            ))}
-            {settingsRoute && (
-              <button aria-current={primaryNavRouteActive(activePath, settingsRoute.path) ? 'page' : undefined} className={`${styles.menuItem} ${styles.sidebarSettingsItem}`} onClick={() => navigate(settingsRoute.path)} role="menuitem" type="button">
-                <MaterialIcon name={settingsRoute.icon} size={22} />
-                <span>{settingsRoute.label}</span>
+  return (
+    <header className={`${styles.header} ${showBack ? styles.headerWithBack : ''} ${showMenu ? styles.headerWithMenu : ''}`}>
+      {showBack ? (
+        <>
+          <button aria-label={backLabel} className={styles.backButton} onClick={goBack} type="button">
+            <span className={styles.backIconSlot}><BackChevron /></span>
+            <span className={styles.backTitle}>{title}</span>
+          </button>
+          {typeof title === 'string' && <h1 className={styles.visuallyHidden}>{title}</h1>}
+        </>
+      ) : (
+        <>
+          <div className={styles.leading}>
+            {showMenu && (
+              <button aria-expanded={menuOpen} aria-label="Open navigation menu" className={styles.menuButton} onClick={() => { setMenuOpen((open) => !open); setActionsOpen(false) }} type="button">
+                <MenuIcon />
               </button>
             )}
-          </nav>
-        </aside>
-      </div>,
-      document.body,
-    )
-    : null
+          </div>
 
-  return (
-    <header className={styles.header}>
-      <div className={styles.leading}>
-        {showBack && (
-          <button aria-label={backLabel} className={styles.iconButton} onClick={goBack} type="button">
-            <MaterialIcon name="mdi:chevron-left" size={22} />
-          </button>
-        )}
-        {showMenu && (
-          <button aria-expanded={menuOpen} aria-label="Open navigation menu" className={styles.iconButton} onClick={toggleSidebar} type="button">
-            <MaterialIcon name="mdi:menu" size={22} />
-          </button>
-        )}
-      </div>
-
-      <div className={styles.titleWrap}>{typeof title === 'string' ? <h1 className={styles.title}>{title}</h1> : title}</div>
+          <div className={styles.titleWrap}>{typeof title === 'string' ? <h1 className={styles.title}>{title}</h1> : title}</div>
+        </>
+      )}
 
       <div className={styles.trailing}>
         {showActions && (
-          <button aria-expanded={actionsOpen} aria-label="More actions" className={styles.iconButton} onClick={() => { setActionsOpen((open) => !open); closeSidebar() }} type="button">
+          <button aria-expanded={actionsOpen} aria-label="More actions" className={styles.iconButton} onClick={() => { setActionsOpen((open) => !open); setMenuOpen(false) }} type="button">
             <MaterialIcon name="mdi:dots-horizontal" size={28} />
           </button>
         )}
       </div>
 
-      {sidebarMenu}
+      {menuOpen && (
+        <div className={styles.sidebarScrim} onClick={closeMenus}>
+          <aside aria-label="Navigation menu" className={styles.sidebar} onClick={(event) => event.stopPropagation()}>
+            <div className={styles.sidebarHeader}>
+              <span>Navigation</span>
+              <button aria-label="Close navigation menu" className={styles.iconButton} onClick={closeMenus} type="button">
+                <MaterialIcon name="mdi:close" size={26} />
+              </button>
+            </div>
+            <nav className={styles.sidebarNav} role="menu">
+              {PRIMARY_NAV_ROUTES.map((route) => (
+                <button aria-current={primaryNavRouteActive(activePath, route.path) ? 'page' : undefined} className={styles.menuItem} key={route.path} onClick={() => navigate(route.path)} role="menuitem" type="button">
+                  <MaterialIcon name={route.icon} size={22} />
+                  <span>{route.label}</span>
+                </button>
+              ))}
+            </nav>
+          </aside>
+        </div>
+      )}
 
       {actionsOpen && (
         <div aria-label="Page actions" className={`${styles.menu} ${styles.actionsMenu}`} role="menu">
