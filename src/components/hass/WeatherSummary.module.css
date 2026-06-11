@@ -1,41 +1,984 @@
 .card {
   display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 18px;
-  align-items: end;
-  min-height: 150px;
+  grid-template-columns: 1fr;
+  gap: 0;
+  align-items: start;
+  min-height: 168px;
   border-radius: var(--radius-panel);
-  padding: 22px;
+  padding: 23px 24px 20px;
+  width: 100%;
+  color: var(--color-text);
+  background:
+    radial-gradient(
+      circle at 18% 18%,
+      rgba(180, 215, 245, 0.2),
+      rgba(180, 215, 245, 0) 34%
+    ),
+    radial-gradient(
+      circle at 88% 12%,
+      rgba(255, 255, 255, 0.1),
+      rgba(255, 255, 255, 0) 28%
+    ),
+    linear-gradient(
+      145deg,
+      rgba(69, 137, 206, 0.4),
+      rgba(38, 64, 97, 0.48) 42%,
+      rgba(17, 27, 42, 0.7)
+    );
+  cursor: pointer;
+  text-align: left;
+}
+
+.card:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.72);
+  outline-offset: 3px;
 }
 
 .copy {
   display: grid;
-  gap: 8px;
+  gap: 11px;
+  min-width: 0;
 }
 
-.eyebrow {
-  color: var(--color-muted);
-  font-size: 0.75rem;
-  font-weight: 760;
-  letter-spacing: 0;
+.heroMain {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 16px;
+  min-width: 0;
 }
 
 .condition {
   color: var(--color-text);
-  font-size: 1.2rem;
-  font-weight: 820;
+  font-size: 1.54rem;
+  font-weight: 840;
   line-height: 1.1;
 }
 
-.meta {
-  color: var(--color-muted);
+.conditionRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.summaryIcon {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  filter: drop-shadow(0 8px 16px rgba(0, 0, 0, 0.22));
+}
+
+.weatherGlyph {
+  display: block;
+  overflow: visible;
+}
+
+.heroDayForecast {
+  display: grid;
+  grid-template-columns: 26px 34px minmax(96px, 1fr) 34px;
+  gap: 8px;
+  align-items: center;
+  margin-top: 1px;
+  color: white;
+}
+
+.heroDayIcon {
+  display: inline-flex;
+  color: white;
+}
+
+.heroDayLow,
+.heroDayHigh {
+  color: white;
+  font-size: 0.84rem;
+  font-weight: 820;
+  line-height: 1;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.heroDayRangeTrack {
+  position: relative;
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(22, 36, 52, 0.42);
+}
+
+.heroDayRangeFill {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: var(--range-start, 0%);
+  width: var(--range-size, 0%);
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    #64d8ff,
+    #a8df85 46%,
+    #ffd34d 72%,
+    #ff8a1f
+  );
+}
+
+.heroDayRangeMarker {
+  position: absolute;
+  top: 50%;
+  left: var(--range-marker, 0%);
+  width: 14px;
+  height: 14px;
+  border: 1px solid rgba(112, 119, 128, 0.9);
+  border-radius: 50%;
+  background: #fff;
+  box-shadow:
+    0 0 0 1px rgba(32, 44, 62, 0.44),
+    0 2px 5px rgba(0, 0, 0, 0.28);
+  transform: translate(-50%, -50%);
+}
+
+.heroHourlyStrip {
+  display: grid;
+  grid-auto-columns: 42px;
+  grid-auto-flow: column;
+  gap: 10px;
+  margin: 2px -6px 0;
+  overflow-x: auto;
+  padding: 2px 6px 4px;
+  scrollbar-width: none;
+}
+
+.heroHourlyStrip::-webkit-scrollbar {
+  display: none;
+}
+
+.heroHourlyItem {
+  display: grid;
+  min-height: 62px;
+  align-content: space-between;
+  justify-items: center;
+  padding: 5px 0 3px;
+  color: white;
+}
+
+.heroHourlyTime {
+  color: white;
+  font-size: 0.64rem;
+  font-weight: 820;
+  line-height: 1;
+}
+
+.heroHourlyIcon {
+  display: inline-flex;
+  color: white;
+}
+
+.heroHourlyTemperature {
+  color: white;
   font-size: 0.78rem;
-  font-weight: 630;
+  font-weight: 840;
+  line-height: 1;
+}
+
+.temperatureBlock {
+  display: grid;
+  align-self: center;
+  justify-items: end;
 }
 
 .temperature {
   color: var(--color-text);
-  font-size: 3rem;
-  font-weight: 780;
-  line-height: 0.9;
+  font-size: 1.54rem;
+  font-weight: 840;
+  line-height: 1.1;
+}
+
+.sheet {
+  display: grid;
+  gap: 16px;
+  padding-bottom: 18px;
+}
+
+.modalHero {
+  display: grid;
+  justify-items: center;
+  padding: 10px 12px 20px;
+  text-align: center;
+}
+
+.modalPlace {
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 0.74rem;
+  font-weight: 840;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.modalTemperature {
+  margin-top: 2px;
+  color: white;
+  font-size: 5.1rem;
+  font-weight: 250;
+  letter-spacing: 0;
+  line-height: 0.94;
+}
+
+.modalCondition {
+  color: white;
+  font-size: 1.16rem;
+  font-weight: 760;
+  line-height: 1.1;
+}
+
+.modalHighLow {
+  margin-top: 4px;
+  color: rgba(255, 255, 255, 0.84);
+  font-size: 0.92rem;
+  font-weight: 760;
+}
+
+.currentPanel,
+.hourlyPanel,
+.forecastPanel,
+.highlightTile {
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 24px;
+  background: linear-gradient(
+    145deg,
+    rgba(255, 255, 255, 0.14),
+    rgba(255, 255, 255, 0.06)
+  );
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.14),
+    0 16px 36px rgba(0, 0, 0, 0.18);
+}
+
+.currentPanel {
+  display: grid;
+  gap: 16px;
+  padding: 18px;
+}
+
+.currentHero {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+}
+
+.currentIcon {
+  display: inline-flex;
+  flex: 0 0 auto;
+  color: rgba(255, 255, 255, 0.88);
+}
+
+.currentCopy {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+  color: rgba(255, 255, 255, 0.68);
+  font-size: 0.8rem;
+  font-weight: 680;
+  line-height: 1.25;
+}
+
+.currentCopy strong {
+  color: white;
+  font-size: 1.2rem;
+  font-weight: 840;
+  line-height: 1.05;
+}
+
+.hourlyPanel {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+}
+
+.modeContent {
+  display: grid;
+  gap: 10px;
+  opacity: 1;
+  transform: translateY(0);
+  transition:
+    opacity 140ms ease,
+    transform 140ms ease;
+  will-change: opacity, transform;
+}
+
+.modeContent[data-transition="out"] {
+  opacity: 0;
+  transform: translateY(4px);
+}
+
+.modeContent[data-transition="in"] {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.hourlyHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.hourlyModes {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 999px;
+  padding: 3px;
+  background: rgba(24, 36, 52, 0.28);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+.hourlyModes button {
+  display: inline-flex;
+  min-width: 44px;
+  height: 28px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  border: 0;
+  color: rgba(255, 255, 255, 0.82);
+  background: transparent;
+  cursor: pointer;
+}
+
+.hourlyModes button:focus-visible {
+  outline: 1px solid rgba(255, 255, 255, 0.62);
+  outline-offset: -3px;
+}
+
+.hourlyModes .hourlyModeActive {
+  color: white;
+  background: rgba(255, 255, 255, 0.22);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.2),
+    0 4px 14px rgba(0, 0, 0, 0.14);
+}
+
+.hourlySubhead {
+  color: rgba(255, 255, 255, 0.48);
+  font-size: 0.82rem;
+  font-weight: 720;
+}
+
+.hourlyScroller {
+  display: grid;
+  grid-auto-columns: 62px;
+  grid-auto-flow: column;
+  gap: 12px;
+  margin: 4px -2px 0;
+  overflow-x: auto;
+  padding: 2px 2px 6px;
+  scrollbar-width: none;
+}
+
+.hourlyScroller::-webkit-scrollbar {
+  display: none;
+}
+
+.hourlyItem {
+  display: grid;
+  min-height: 112px;
+  align-content: space-between;
+  justify-items: center;
+  border-radius: 0;
+  padding: 8px 4px;
+  color: white;
+  background: transparent;
+}
+
+.hourlyTime {
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 0.84rem;
+  font-weight: 820;
+}
+
+.hourlyIcon {
+  display: inline-flex;
+  color: rgba(255, 255, 255, 0.92);
+  transform-origin: center;
+}
+
+.hourlyValueGroup {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+}
+
+.hourlyTemperature {
+  color: white;
+  font-size: 1rem;
+  font-weight: 820;
+}
+
+.hourlyDetail {
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 0.66rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.hourlySkeleton {
+  min-height: 124px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.currentLabel,
+.sectionLabel {
+  color: rgba(255, 255, 255, 0.56);
+  font-size: 0.72rem;
+  font-weight: 840;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.forecastPanel {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+}
+
+.forecastList {
+  display: grid;
+  gap: 0;
+}
+
+.forecastRow {
+  display: grid;
+  grid-template-columns: 70px 34px 42px minmax(80px, 1fr) 42px;
+  gap: 9px;
+  align-items: center;
+  min-height: 48px;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.forecastRow[data-mode="precipitation"] {
+  grid-template-columns: 70px 34px minmax(86px, 1fr) 54px 42px;
+}
+
+.forecastRow[data-mode="wind"] {
+  grid-template-columns: 70px 34px minmax(96px, 1fr) minmax(66px, auto);
+}
+
+.forecastRow:first-child {
+  border-top: 0;
+}
+
+.forecastIcon {
+  display: inline-flex;
+  color: rgba(255, 235, 150, 0.96);
+  transform-origin: center;
+}
+
+.forecastRow[data-mode="precipitation"] .forecastIcon,
+.forecastRow[data-mode="wind"] .forecastIcon {
+  color: rgba(255, 255, 255, 0.78);
+}
+
+.forecastDay {
+  color: white;
+  font-size: 0.96rem;
+  font-weight: 840;
+  line-height: 1.05;
+}
+
+.forecastLow {
+  color: rgba(255, 255, 255, 0.42);
+}
+
+.forecastHigh,
+.forecastLow {
+  font-size: 0.95rem;
+  font-weight: 820;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.forecastHigh {
+  color: white;
+}
+
+.rangeTrack {
+  position: relative;
+  height: 5px;
+  border-radius: 999px;
+  background: rgba(22, 36, 52, 0.42);
+  overflow: hidden;
+}
+
+.rangeFill {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: var(--range-start, 0%);
+  width: var(--range-size, 0%);
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    #64d8ff,
+    #a8df85 46%,
+    #ffd34d 72%,
+    #ff8a1f
+  );
+}
+
+.rangeMarker {
+  position: absolute;
+  top: 50%;
+  left: var(--range-marker, 0%);
+  width: 7px;
+  height: 7px;
+  border: 2px solid rgba(255, 255, 255, 0.88);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.5);
+  transform: translate(-50%, -50%);
+  box-shadow: 0 0 0 2px rgba(32, 44, 62, 0.72);
+}
+
+.precipTrack {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: 3px;
+  height: 26px;
+  align-items: end;
+  overflow: hidden;
+}
+
+.precipTrack::before {
+  display: contents;
+  content: "";
+}
+
+.precipTrack::after {
+  position: absolute;
+  inset: 5px 0;
+  border-radius: 999px;
+  background: repeating-linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.1) 0 5px,
+    rgba(255, 255, 255, 0.22) 5px 10px,
+    transparent 10px 15px
+  );
+  content: "";
+  opacity: 0.82;
+}
+
+.precipFill {
+  position: absolute;
+  top: 11px;
+  bottom: 11px;
+  left: 0;
+  width: var(--percent-fill, 0%);
+  min-width: 8px;
+  border-radius: 999px;
+  background: rgba(80, 208, 232, 0.9);
+  box-shadow: 0 0 10px rgba(80, 208, 232, 0.32);
+  z-index: 1;
+}
+
+.forecastAmount,
+.forecastChance,
+.forecastWindRange {
+  color: rgba(255, 255, 255, 0.86);
+  font-size: 0.9rem;
+  font-weight: 820;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.forecastChance {
+  color: rgba(255, 255, 255, 0.54);
+}
+
+.windSparkline {
+  position: relative;
+  height: 28px;
+  border-radius: 8px;
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.04),
+    rgba(255, 255, 255, 0.12) 50%,
+    rgba(255, 255, 255, 0.04)
+  );
+  overflow: hidden;
+}
+
+.windLine {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  left: 8px;
+  height: 4px;
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    rgba(56, 211, 224, 0.65),
+    rgba(56, 211, 224, 0.96)
+  );
+  box-shadow: 0 -6px 0 rgba(56, 211, 224, 0.22);
+}
+
+.highlightsPanel {
+  display: grid;
+  gap: 10px;
+}
+
+.highlightGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.highlightTile {
+  display: grid;
+  min-height: 184px;
+  align-content: space-between;
+  gap: 10px;
+  padding: 14px;
+}
+
+.highlightTitle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: rgba(255, 255, 255, 0.52);
+  font-size: 0.73rem;
+  font-weight: 680;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.highlightIcon {
+  display: inline-flex;
+  transform-origin: center;
+}
+
+.highlightValue {
+  color: white;
+  font-size: 2.35rem;
+  font-weight: 300;
+  line-height: 0.95;
+}
+
+.highlightTile[data-kind="pressure"] .highlightValue {
+  font-size: 2rem;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.highlightTile[data-kind="pressure"] {
+  grid-template-rows: auto 1fr;
+  padding-right: 10px;
+  padding-left: 10px;
+}
+
+.highlightNote {
+  color: rgba(255, 255, 255, 0.76);
+  font-size: 0.88rem;
+  font-weight: 640;
+  line-height: 1.22;
+}
+
+.highlightMeter {
+  position: relative;
+  display: block;
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(22, 36, 52, 0.42);
+}
+
+.highlightMeterFill {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: var(--highlight-percent, 0%);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.highlightMeterMarker {
+  position: absolute;
+  top: 50%;
+  left: var(--highlight-percent, 0%);
+  width: 10px;
+  height: 10px;
+  border: 1px solid rgba(112, 119, 128, 0.9);
+  border-radius: 50%;
+  background: white;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.24);
+  transform: translate(-50%, -50%);
+}
+
+.highlightMeter_uv .highlightMeterFill {
+  width: 100%;
+  background: linear-gradient(
+    90deg,
+    #5fca7a,
+    #f5d94a 42%,
+    #f28b30 68%,
+    #d9568b 100%
+  );
+}
+
+.highlightMeter_precipitation .highlightMeterFill,
+.highlightMeter_humidity .highlightMeterFill {
+  background: linear-gradient(
+    90deg,
+    rgba(80, 208, 232, 0.62),
+    rgba(80, 208, 232, 0.96)
+  );
+}
+
+.highlightMeter_visibility .highlightMeterFill {
+  background: linear-gradient(
+    90deg,
+    rgba(196, 226, 255, 0.62),
+    rgba(255, 255, 255, 0.94)
+  );
+}
+
+.highlightMeter_feels .highlightMeterFill {
+  background: linear-gradient(
+    90deg,
+    #64d8ff,
+    #a8df85 46%,
+    #ffd34d 72%,
+    #ff8a1f
+  );
+}
+
+.highlightCompass {
+  position: relative;
+  display: grid;
+  width: 74px;
+  height: 74px;
+  justify-self: center;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    rgba(255, 255, 255, 0.13),
+    rgba(255, 255, 255, 0.05) 62%,
+    rgba(0, 0, 0, 0.14)
+  );
+}
+
+.compassNorth,
+.compassEast,
+.compassSouth,
+.compassWest {
+  position: absolute;
+  color: white;
+  font-size: 0.58rem;
+  font-weight: 840;
+  line-height: 1;
+}
+
+.compassNorth {
+  top: 7px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.compassEast {
+  top: 50%;
+  right: 7px;
+  transform: translateY(-50%);
+}
+
+.compassSouth {
+  bottom: 7px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.compassWest {
+  top: 50%;
+  left: 7px;
+  transform: translateY(-50%);
+}
+
+.compassNeedle {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  display: inline-flex;
+  color: #56d7ff;
+  filter: drop-shadow(0 1px 4px rgba(0, 0, 0, 0.35));
+  transform: translate(-50%, -50%) rotate(var(--highlight-rotation, 0deg));
+  transform-origin: center;
+}
+
+.pressureGauge {
+  position: relative;
+  display: grid;
+  width: 100%;
+  height: 132px;
+  justify-self: center;
+  place-items: center;
+  align-self: center;
+  margin: -4px 0 0;
+}
+
+.pressureGaugeSvg {
+  position: absolute;
+  top: -5px;
+  left: 50%;
+  width: 100%;
+  height: 134px;
+  overflow: visible;
+  transform: translateX(-50%);
+}
+
+.pressureGaugeTick {
+  stroke: rgba(255, 255, 255, 0.24);
+  stroke-linecap: round;
+  stroke-width: 2.25;
+}
+
+.pressureGaugeIndicator {
+  stroke: white;
+  stroke-linecap: round;
+  stroke-width: 5.5;
+  filter: drop-shadow(0 2px 5px rgba(0, 0, 0, 0.34));
+}
+
+.pressureGaugeReadout {
+  position: absolute;
+  top: 58px;
+  left: 50%;
+  z-index: 2;
+  display: grid;
+  justify-items: center;
+  color: white;
+  transform: translateX(-50%);
+}
+
+.pressureGaugeValue {
+  font-size: 1.42rem;
+  font-weight: 520;
+  line-height: 0.95;
+}
+
+.pressureGaugeReadout small {
+  font-size: 0.78rem;
+  font-weight: 520;
+  line-height: 1;
+}
+
+.pressureGaugeLowLabel,
+.pressureGaugeHighLabel {
+  position: absolute;
+  bottom: 8px;
+  color: white;
+  font-size: 0.78rem;
+  font-weight: 520;
+  line-height: 1;
+}
+
+.pressureGaugeLowLabel {
+  left: var(--pressure-low-label-x, 16px);
+  transform: translateX(-50%);
+}
+
+.pressureGaugeHighLabel {
+  left: var(--pressure-high-label-x, calc(100% - 16px));
+  transform: translateX(-50%);
+}
+
+.cloudMeter {
+  position: relative;
+  display: block;
+  height: 36px;
+  overflow: hidden;
+  border-radius: 14px;
+  background: linear-gradient(
+    180deg,
+    rgba(85, 160, 214, 0.46),
+    rgba(30, 55, 78, 0.4)
+  );
+}
+
+.cloudMeterFill {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: var(--highlight-percent, 0%);
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.84),
+    rgba(255, 255, 255, 0.48)
+  );
+}
+
+.errorState,
+.skeletonRow {
+  border: 1px solid rgba(255, 255, 255, 0.11);
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.errorState {
+  padding: 16px;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 0.86rem;
+  font-weight: 720;
+}
+
+.sheet,
+.sheet .modalPlace,
+.sheet .modalTemperature,
+.sheet .modalCondition,
+.sheet .modalHighLow,
+.sheet .currentCopy,
+.sheet .currentCopy strong,
+.sheet .currentLabel,
+.sheet .sectionLabel,
+.sheet .hourlyModes button,
+.sheet .hourlySubhead,
+.sheet .hourlyTime,
+.sheet .hourlyTemperature,
+.sheet .hourlyDetail,
+.sheet .forecastDay,
+.sheet .forecastHigh,
+.sheet .forecastLow,
+.sheet .forecastAmount,
+.sheet .forecastChance,
+.sheet .forecastWindRange,
+.sheet .highlightTitle,
+.sheet .highlightValue,
+.sheet .highlightNote,
+.sheet .errorState {
+  color: #fff;
+}
+
+.skeletonRow {
+  min-height: 92px;
+}
+
+@media (max-width: 430px) {
+  .currentHero {
+    grid-template-columns: auto 1fr;
+  }
+
+  .currentTemperature {
+    grid-column: 1 / -1;
+    justify-self: start;
+  }
+
+  .forecastMain {
+    grid-template-columns: auto 1fr;
+  }
+
+  .forecastTemps {
+    grid-column: 2;
+  }
 }

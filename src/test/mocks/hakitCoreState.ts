@@ -12,7 +12,7 @@ export interface MockHassState {
   entities: Record<string, MockEntity>
   hassUrl: string
   helpers: {
-    callService: (params: Record<string, unknown>) => void
+    callService: (params: Record<string, unknown>) => unknown
     joinHassUrl: (path: string) => string
   }
   services: Record<string, unknown>
@@ -26,6 +26,32 @@ export function entity(entityId: string, state: string, attributes: Record<strin
 export const mockCallServiceCalls: Record<string, unknown>[] = []
 export const mockTodoUpdateMessages: Record<string, unknown>[] = []
 export const mockTodoItemsByEntity: Record<string, MockTodoItem[] | undefined> = {}
+
+const mockDailyWeatherForecast = [
+  { datetime: '2026-06-10T07:00:00+00:00', condition: 'sunny', temperature: 65, templow: 48, precipitation_probability: 0, precipitation: 0, humidity: 74, dew_point: 48, cloud_coverage: 57, wind_speed: 3.56, wind_gust_speed: 7.97, wind_bearing: 185, uv_index: 6.7 },
+  { datetime: '2026-06-11T07:00:00+00:00', condition: 'sunny', temperature: 71, templow: 50, precipitation_probability: 0, precipitation: 0, humidity: 68, dew_point: 48, cloud_coverage: 14, wind_speed: 2.31, wind_gust_speed: 5.18, wind_bearing: 169, uv_index: 7.44 },
+  { datetime: '2026-06-12T07:00:00+00:00', condition: 'partlycloudy', temperature: 72, templow: 51, precipitation_probability: 0, precipitation: 0, humidity: 66, dew_point: 49, cloud_coverage: 17, wind_speed: 3.18, wind_gust_speed: 6.94, wind_bearing: 212, uv_index: 7.09 },
+  { datetime: '2026-06-13T07:00:00+00:00', condition: 'sunny', temperature: 78, templow: 57, precipitation_probability: 0, precipitation: 0, humidity: 65, dew_point: 53, cloud_coverage: 5, wind_speed: 4.58, wind_gust_speed: 9.06, wind_bearing: 183, uv_index: 7.37 },
+  { datetime: '2026-06-14T07:00:00+00:00', condition: 'sunny', temperature: 86, templow: 60, precipitation_probability: 0, precipitation: 0, humidity: 58, dew_point: 55, cloud_coverage: 8, wind_speed: 4.08, wind_gust_speed: 8.01, wind_bearing: 187, uv_index: 7.45 },
+  { datetime: '2026-06-15T07:00:00+00:00', condition: 'sunny', temperature: 90, templow: 63, precipitation_probability: 0, precipitation: 0, humidity: 55, dew_point: 57, cloud_coverage: 32, wind_speed: 2.31, wind_gust_speed: 5.09, wind_bearing: 149, uv_index: 6.69 },
+  { datetime: '2026-06-16T07:00:00+00:00', condition: 'rainy', temperature: 84, templow: 59, precipitation_probability: 7, precipitation: 0, humidity: 55, dew_point: 56, cloud_coverage: 24, wind_speed: 3.96, wind_gust_speed: 7.89, wind_bearing: 157, uv_index: 7.36 },
+]
+
+const hourlyTemperatures = [57, 58, 60, 61, 63, 64, 65, 64, 62, 60, 58, 56, 55, 54, 53, 52, 51, 50, 49, 49, 50, 52, 55, 58]
+
+const mockHourlyWeatherForecast = Array.from({ length: 24 }, (_, index) => {
+  const forecastDate = new Date('2026-06-10T12:00:00-07:00')
+  forecastDate.setHours(forecastDate.getHours() + index)
+  return {
+    datetime: forecastDate.toISOString(),
+    condition: index < 3 ? 'cloudy' : index < 8 ? 'partlycloudy' : 'sunny',
+    precipitation_probability: index < 6 ? 0 : 4,
+    temperature: hourlyTemperatures[index],
+    wind_bearing: 185,
+    wind_gust_speed: 5 + (index % 5),
+    wind_speed: 3 + (index % 4),
+  }
+})
 
 interface MockTodoItem {
   description?: string
@@ -403,6 +429,9 @@ export const mockState: MockHassState = {
         mockTodoUpdateMessages.push(message)
         return {} as T
       }
+      if (message.type === 'call_service' && message.domain === 'weather' && message.service === 'get_forecasts') {
+        return { service_response: { 'weather.pirate_weather': { forecast: mockDailyWeatherForecast } } } as T
+      }
       if (message.type === 'calendar/event/list') return { events: [] } as T
       return {} as T
     },
@@ -412,6 +441,10 @@ export const mockState: MockHassState = {
   helpers: {
     callService: (params) => {
       mockCallServiceCalls.push(params)
+      if (params.domain === 'weather' && params.service === 'get_forecasts' && params.returnResponse === true) {
+        const forecast = (params.serviceData as { type?: string } | undefined)?.type === 'hourly' ? mockHourlyWeatherForecast : mockDailyWeatherForecast
+        return Promise.resolve({ response: { 'weather.pirate_weather': { forecast } } })
+      }
     },
     joinHassUrl: (path) => `http://mock-hass.local${path}`,
   },

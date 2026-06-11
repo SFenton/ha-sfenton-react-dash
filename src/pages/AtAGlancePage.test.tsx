@@ -36,6 +36,53 @@ describe('AtAGlancePage', () => {
     expect(screen.getByRole('button', { name: 'Security System Armed Night' })).toHaveStyle('--tile-color: rgba(142, 36, 170, 0.5)')
   })
 
+  it('opens a Pirate Weather seven-day forecast sheet', async () => {
+    mockEntities['weather.pirate_weather'].state = 'cloudy'
+    mockEntities['weather.pirate_weather'].attributes = {
+      apparent_temperature: 63,
+      cloud_coverage: 100,
+      dew_point: 48,
+      humidity: 72,
+      precipitation_unit: 'in',
+      temperature: 57,
+      temperature_unit: '°F',
+      visibility: 10,
+      visibility_unit: 'mi',
+      wind_bearing: 59,
+      wind_speed: 0.08,
+      wind_speed_unit: 'mph',
+    }
+    render(<AtAGlancePage />)
+
+    expect(await screen.findByLabelText('Today Sunny H:65° L:48°')).toBeInTheDocument()
+  expect(screen.getByLabelText('Today Sunny H:65° L:48°').querySelector('[class*="heroDayRangeTrack"]')).toHaveStyle({ '--range-marker': '52.94117647058824%', '--range-size': '100%', '--range-start': '0%' })
+    const heroHourly = await screen.findByLabelText('24-hour weather forecast')
+    expect(heroHourly).toHaveTextContent('Now57°1 PM58°')
+    expect(within(heroHourly).getByLabelText('Now Cloudy 57°F')).toBeInTheDocument()
+    expect(within(heroHourly).getByLabelText('11 AM Sunny 58°F')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: /Open seven-day weather forecast/i }))
+
+    const dialog = await screen.findByRole('dialog')
+    expect(within(dialog).getByRole('heading', { name: 'Weather' })).toBeInTheDocument()
+    expect(await within(dialog).findByText('Conditions')).toBeInTheDocument()
+    expect(within(dialog).getByRole('article', { name: 'Now Cloudy 57°F' })).toBeInTheDocument()
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Precipitation conditions' }))
+    expect(await within(dialog).findByRole('article', { name: 'Now precipitation 0%' })).toBeInTheDocument()
+    expect(await within(dialog).findByRole('article', { name: 'Today precipitation 0 in 0%' })).toBeInTheDocument()
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Wind conditions' }))
+    expect(await within(dialog).findByRole('article', { name: 'Now wind 3 mph gusts 5 mph' })).toBeInTheDocument()
+    expect(await within(dialog).findByRole('article', { name: 'Today wind 4-8 mph' })).toBeInTheDocument()
+    expect(await within(dialog).findByText('Next Seven Days')).toBeInTheDocument()
+    expect(within(dialog).getByLabelText('Current weather conditions')).toHaveTextContent('Home57°CloudyH:65° L:48°')
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Conditions conditions' }))
+    expect(await within(dialog).findByRole('article', { name: 'Today Sunny H:65° L:48°' })).toBeInTheDocument()
+    expect(await within(dialog).findByRole('article', { name: 'Thu Sunny H:71° L:50°' })).toBeInTheDocument()
+    expect(await within(dialog).findByRole('article', { name: /Tue Rain H:84° L:59°/ })).toBeInTheDocument()
+    expect(within(dialog).getByRole('article', { name: 'Feels Like 63°F' })).toBeInTheDocument()
+    expect(within(dialog).getByRole('article', { name: 'Humidity 72%' })).toBeInTheDocument()
+  })
+
   it('uses the shell header menu and More actions', async () => {
     const navigate = vi.fn()
     render(<AtAGlancePage onNavigate={navigate} />)
