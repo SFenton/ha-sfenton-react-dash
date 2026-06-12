@@ -1323,6 +1323,30 @@ describe('DashboardViewPage', () => {
     expect(await within(reloadedPastDueList).findByRole('button', { name: /Second live task/i })).toBeInTheDocument()
   })
 
+  it('keeps a visible chore todo section mounted when Home Assistant updates the todo entity', async () => {
+    mockTodoItemsByEntity['todo.stephen_s_evening_with_unassigned'] = [
+      { uid: 'evening-1', summary: 'First visible task', status: 'needs_action' },
+      { uid: 'evening-2', summary: 'Second visible task', status: 'needs_action' },
+    ]
+    mockEntities['todo.stephen_s_evening_with_unassigned'].state = '2'
+    const view = render(<DashboardViewPage activePath="chores" onNavigate={() => undefined} path="chores" />)
+
+    const eveningList = await screen.findByLabelText('Evening Tasks todo list')
+    const eveningSection = eveningList.closest('section')
+    fireEvent.click(within(eveningList).getByRole('button', { name: /First visible task/i }))
+    mockTodoItemsByEntity['todo.stephen_s_evening_with_unassigned'] = [
+      { uid: 'evening-1', summary: 'First visible task', status: 'completed' },
+      { uid: 'evening-2', summary: 'Second visible task', status: 'needs_action' },
+    ]
+    Object.assign(mockEntities['todo.stephen_s_evening_with_unassigned'], { last_updated: '2026-06-12T12:00:00.000Z', state: '1' })
+
+    view.rerender(<DashboardViewPage activePath="chores" onNavigate={() => undefined} path="chores" />)
+
+    await waitFor(() => expect(screen.getByLabelText('Evening Tasks todo list').closest('section')).toBe(eveningSection))
+    expect(within(screen.getByLabelText('Evening Tasks todo list')).queryByText('First visible task')).not.toBeInTheDocument()
+    expect(within(screen.getByLabelText('Evening Tasks todo list')).getByText('Second visible task')).toBeInTheDocument()
+  })
+
   it('does not render chore sections whose loaded todo list has no visible tasks', async () => {
     mockTodoItemsByEntity['todo.stephen_s_evening_with_unassigned'] = []
     mockEntities['todo.stephen_s_evening_with_unassigned'].state = '1'

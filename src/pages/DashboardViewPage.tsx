@@ -710,8 +710,8 @@ function TodoPage({ onNavigate, path }: { onNavigate: (path: string) => void; pa
       {showTodoEmptyState && <TodoEmptyState description={config.emptyDescription} title={config.emptyTitle} />}
       {visibleLists.map((list) => {
         const entity = entities[list.entityId] as (typeof entities)[string] & { last_changed?: string; last_updated?: string }
-        const sectionKey = `${list.entityId}:${entity?.state ?? ''}:${entity?.last_changed ?? ''}:${entity?.last_updated ?? ''}`
-        return <TodoSection hideWhenEmpty={hideEmptyTodoSections} key={sectionKey} list={list} mayHaveItems={todoEntityMayHaveItems(entity)} onSectionStateChange={handleTodoSectionState} />
+        const entityVersion = `${entity?.state ?? ''}:${entity?.last_changed ?? ''}:${entity?.last_updated ?? ''}`
+        return <TodoSection entityVersion={entityVersion} hideWhenEmpty={hideEmptyTodoSections} key={list.entityId} list={list} mayHaveItems={todoEntityMayHaveItems(entity)} onSectionStateChange={handleTodoSectionState} />
       })}
     </div>
   )
@@ -726,9 +726,14 @@ function todoEntityMayHaveItems(entity: EntityActionStateMap[string] & { state?:
   return Number(entity.state) > 0
 }
 
-function TodoSection({ hideWhenEmpty, list, mayHaveItems, onSectionStateChange }: { hideWhenEmpty: boolean | undefined; list: TodoListConfig; mayHaveItems: boolean; onSectionStateChange?: (entityId: string, state: { loaded: boolean; visible: boolean }) => void }) {
+function TodoSection({ entityVersion, hideWhenEmpty, list, mayHaveItems, onSectionStateChange }: { entityVersion: string; hideWhenEmpty: boolean | undefined; list: TodoListConfig; mayHaveItems: boolean; onSectionStateChange?: (entityId: string, state: { loaded: boolean; visible: boolean }) => void }) {
   const [visibleItemCount, setVisibleItemCount] = useState<number | null>(hideWhenEmpty && !mayHaveItems ? 0 : null)
   const sectionVisible = !(hideWhenEmpty && visibleItemCount === 0)
+
+  useEffect(() => {
+    if (!hideWhenEmpty || !mayHaveItems) return
+    setVisibleItemCount((current) => (current === 0 ? null : current))
+  }, [entityVersion, hideWhenEmpty, mayHaveItems])
 
   useEffect(() => {
     onSectionStateChange?.(list.entityId, { loaded: visibleItemCount !== null, visible: sectionVisible })
