@@ -35,4 +35,13 @@ describe('routes', () => {
     expect(primaryNavRouteActive('stephs-chores', 'chores')).toBe(true)
     expect(primaryNavRouteActive('stephs-chores', 'overview')).toBe(false)
   })
+
+  it('groups room subpages under the Home primary nav route', () => {
+    expect(primaryNavPathForRoute('living-room')).toBe('overview')
+    expect(primaryNavPathForRoute('guest-room')).toBe('overview')
+    expect(primaryNavPathForRoute('master-bedroom')).toBe('overview')
+    expect(primaryNavPathForRoute('garage')).toBe('overview')
+    expect(primaryNavRouteActive('living-room', 'overview')).toBe(true)
+    expect(primaryNavRouteActive('living-room', 'chores')).toBe(false)
+  })
 })

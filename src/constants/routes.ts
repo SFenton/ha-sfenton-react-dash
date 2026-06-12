@@ -49,8 +49,28 @@ export const PRIMARY_NAV_ROUTES = [
   { label: 'Settings', path: 'settings', icon: 'mdi:cog' },
 ]
 
+const HOME_SUB_ROUTE_PATHS = new Set([
+  'back-deck',
+  'dining-room',
+  'downstairs-hallway',
+  'entryway',
+  'garage',
+  'guest-bathroom',
+  'guest-room',
+  'gym',
+  'hallway',
+  'kitchen',
+  'living-room',
+  'master-bathroom',
+  'master-bedroom',
+  'music-room',
+  'office',
+  'theater-room',
+])
+
 export function primaryNavPathForRoute(path: string | undefined) {
   if (!path) return 'overview'
+  if (HOME_SUB_ROUTE_PATHS.has(path)) return 'overview'
   if (path === 'groceries' || path.endsWith('-chores')) return 'chores'
   return path
 }
