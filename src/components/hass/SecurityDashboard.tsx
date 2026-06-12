@@ -10,7 +10,6 @@ import {
   SECURITY_STATUS_CHIPS,
   type SecurityTileConfig,
 } from '../../constants/securityPage'
-import { useHashModal } from '../../hooks/useHashModal'
 import { ContactSheet } from '../../pages/AtAGlancePage'
 import { CameraModalContent } from './CameraModalContent'
 import { asEntityName, formatCompactEntityState, isActiveState, isContactOpen } from './entityState'
@@ -88,7 +87,7 @@ function SecurityTile({ item, onOpenHash }: { item: SecurityTileConfig; onOpenHa
   )
 }
 
-function SecurityStatusRail({ onOpenHash }: { onOpenHash: (hash: string) => void }) {
+export function SecurityStatusRail({ onOpenHash }: { onOpenHash: (hash: string) => void }) {
   const openContactCount = useHass((state) =>
     CONTACT_GROUPS.flatMap((group) => group.items).reduce((count, sensor) => count + (isContactOpen(state.entities[sensor.entityId]) ? 1 : 0), 0),
   )
@@ -117,25 +116,27 @@ function SecurityModalContent({ hash }: { hash: string }) {
   return null
 }
 
-export function SecurityDashboard() {
-  const { closeHash, hash, openHash } = useHashModal()
+interface SecurityDashboardProps {
+  closeHash: () => void
+  hash: string
+  onOpenHash: (hash: string) => void
+}
 
+export function SecurityDashboard({ closeHash, hash, onOpenHash }: SecurityDashboardProps) {
   return (
     <>
       <div className={styles.dashboard}>
-        <SecurityStatusRail onOpenHash={openHash} />
-
         <section className={styles.section}>
           <SectionHeader title="Security" />
           <div className={styles.grid}>
-            {SECURITY_CONTROL_TILES.map((item) => <SecurityTile item={item} key={item.entityId} onOpenHash={openHash} />)}
+            {SECURITY_CONTROL_TILES.map((item) => <SecurityTile item={item} key={item.entityId} onOpenHash={onOpenHash} />)}
           </div>
         </section>
 
         <section className={styles.section}>
           <SectionHeader title="Cameras" />
           <div className={styles.cameraGrid}>
-            {CAMERA_ITEMS.map((camera) => <CameraTile camera={camera} key={camera.entityId} onOpen={openHash} />)}
+            {CAMERA_ITEMS.map((camera) => <CameraTile camera={camera} key={camera.entityId} onOpen={onOpenHash} />)}
           </div>
         </section>
 
@@ -143,7 +144,7 @@ export function SecurityDashboard() {
           <section className={styles.section}>
             <SectionHeader title="Mach-E" />
             <div className={styles.grid}>
-              {SECURITY_MACHE_TILES.map((item) => <SecurityTile item={item} key={item.entityId} onOpenHash={openHash} />)}
+              {SECURITY_MACHE_TILES.map((item) => <SecurityTile item={item} key={item.entityId} onOpenHash={onOpenHash} />)}
             </div>
           </section>
         )}

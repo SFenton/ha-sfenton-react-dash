@@ -293,6 +293,12 @@ describe('DashboardViewPage', () => {
     expect(screen.queryByText('Groceries')).not.toBeInTheDocument()
     expect(screen.queryByText('Custom Lights')).not.toBeInTheDocument()
 
+    const page = screen.getByRole('main')
+    const settingsHeading = screen.getByRole('heading', { name: 'Settings' })
+    const [, scroller] = Array.from(page.children)
+    expect(page.firstElementChild).toContainElement(settingsHeading)
+    expect(scroller).not.toContainElement(settingsHeading)
+
     fireEvent.click(screen.getByRole('button', { name: 'Open navigation menu' }))
     fireEvent.click(screen.getByRole('menuitem', { name: 'Security' }))
     expect(navigate).toHaveBeenLastCalledWith('security')
@@ -329,6 +335,12 @@ describe('DashboardViewPage', () => {
     expect(screen.getByRole('heading', { name: 'Guest Controls', level: 1 })).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: 'Guests Staying Over' })).not.toBeInTheDocument()
     expect(screen.getByText("When guests stay over, toggle these controls on based on the rooms they're staying in to disable automations (like automatic vacuuming in the music room) and ensure that rooms are tracked for temperature monitoring and vent control.")).toBeInTheDocument()
+
+    const page = screen.getByRole('main')
+    const guestHeading = screen.getByRole('heading', { name: 'Guest Controls', level: 1 })
+    const [, scroller] = Array.from(page.children)
+    expect(page.firstElementChild).toContainElement(guestHeading)
+    expect(scroller).not.toContainElement(guestHeading)
 
     fireEvent.click(screen.getByRole('button', { name: 'Go back' }))
     expect(back).toHaveBeenCalled()
@@ -1091,7 +1103,7 @@ describe('DashboardViewPage', () => {
     expect(screen.getAllByRole('heading', { name: 'Security' }).length).toBeGreaterThanOrEqual(2)
     expect(screen.getByRole('button', { name: /Security\s*Armed Home/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Security\s*Armed Home/i })).toHaveAttribute('data-icon', 'mdi:shield-home')
-    expect(screen.getByRole('button', { name: /Security\s*Armed Home/i })).toHaveAttribute('data-icon-color', 'rgb(30, 136, 229)')
+    expect(screen.getByRole('button', { name: /Security\s*Armed Home/i })).toHaveAttribute('data-icon-color', 'white')
     expect(screen.getByRole('button', { name: /Contact Sensors\s*All Closed/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Contact Sensors\s*All Closed/i })).toHaveAttribute('data-icon', 'mdi:door')
     expect(screen.getByRole('button', { name: /Security System Armed Home/i })).toBeInTheDocument()
@@ -1104,26 +1116,37 @@ describe('DashboardViewPage', () => {
     expect(screen.queryByText(/manual review/i)).not.toBeInTheDocument()
   })
 
+  it('keeps Security header chips outside the page scroller', () => {
+    render(<DashboardViewPage activePath="security" onNavigate={() => undefined} path="security" />)
+
+    const page = screen.getByRole('main')
+    const securityChip = screen.getByRole('button', { name: /Security\s*Armed Home/i })
+    const [, scroller] = Array.from(page.children)
+
+    expect(page.firstElementChild).toContainElement(securityChip)
+    expect(scroller).not.toContainElement(securityChip)
+  })
+
   it('reflects alarm state in the Security header chip', () => {
     mockEntities['alarm_control_panel.aqara_hub_m3_0056_security_system_2'].state = 'disarmed'
     const disarmedView = render(<DashboardViewPage activePath="security" onNavigate={() => undefined} path="security" />)
 
     expect(screen.getByRole('button', { name: /Security\s*Disarmed/i })).toHaveAttribute('data-icon', 'mdi:shield-off')
-    expect(screen.getByRole('button', { name: /Security\s*Disarmed/i })).toHaveAttribute('data-icon-color', 'rgb(67, 160, 71)')
+    expect(screen.getByRole('button', { name: /Security\s*Disarmed/i })).toHaveAttribute('data-icon-color', 'white')
     disarmedView.unmount()
 
     mockEntities['alarm_control_panel.aqara_hub_m3_0056_security_system_2'].state = 'armed_away'
     const awayView = render(<DashboardViewPage activePath="security" onNavigate={() => undefined} path="security" />)
 
     expect(screen.getByRole('button', { name: /Security\s*Armed Away/i })).toHaveAttribute('data-icon', 'mdi:shield')
-    expect(screen.getByRole('button', { name: /Security\s*Armed Away/i })).toHaveAttribute('data-icon-color', 'rgb(229, 57, 53)')
+    expect(screen.getByRole('button', { name: /Security\s*Armed Away/i })).toHaveAttribute('data-icon-color', 'white')
     awayView.unmount()
 
     mockEntities['alarm_control_panel.aqara_hub_m3_0056_security_system_2'].state = 'armed_night'
     render(<DashboardViewPage activePath="security" onNavigate={() => undefined} path="security" />)
 
     expect(screen.getByRole('button', { name: /Security\s*Armed Night/i })).toHaveAttribute('data-icon', 'mdi:shield-moon')
-    expect(screen.getByRole('button', { name: /Security\s*Armed Night/i })).toHaveAttribute('data-icon-color', 'rgb(142, 36, 170)')
+    expect(screen.getByRole('button', { name: /Security\s*Armed Night/i })).toHaveAttribute('data-icon-color', 'white')
   })
 
   it('matches HASS Security garage door colors for closed, open, and closing states', () => {

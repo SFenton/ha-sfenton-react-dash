@@ -7,10 +7,9 @@ import { ContactSensorCard } from '../components/cards/ContactSensorCard'
 import { LightCard } from '../components/cards/LightCard'
 import { OccupancyCard } from '../components/cards/OccupancyCard'
 import { AppShell } from '../components/shell/AppShell'
-import { AppHeader } from '../components/shell/AppHeader'
 import { BottomNav } from '../components/shell/BottomNav'
 import { EntityActionCard } from '../components/hass/EntityActionCard'
-import { SecurityDashboard } from '../components/hass/SecurityDashboard'
+import { SecurityDashboard, SecurityStatusRail } from '../components/hass/SecurityDashboard'
 import { StatusRail, type StatusRailChip } from '../components/hass/StatusRail'
 import { CreateDonetickTaskSheet } from '../components/hass/CreateDonetickTaskSheet'
 import { CreateGroceryItemSheet } from '../components/hass/CreateGroceryItemSheet'
@@ -855,8 +854,14 @@ function VacuumPage() {
   )
 }
 
-function SecurityPage() {
-  return <SecurityDashboard />
+function SecurityPage({ activePath, backPath, onNavigate, title }: { activePath: string; backPath?: string; onNavigate: (path: string) => void; title: string }) {
+  const { closeHash, hash, openHash } = useHashModal()
+
+  return (
+    <Page activePath={activePath} backPath={backPath} headerQuickLinks={<SecurityStatusRail onOpenHash={openHash} />} onNavigate={onNavigate} title={title}>
+      <SecurityDashboard closeHash={closeHash} hash={hash} onOpenHash={openHash} />
+    </Page>
+  )
 }
 
 function navigateExternal(path: string) {
@@ -889,28 +894,21 @@ function SettingsLink({ item, onNavigate }: { item: SettingsLinkConfig; onNaviga
 
 function SettingsPage({ onNavigate }: { onNavigate: (path: string) => void }) {
   return (
-    <main className={styles.settingsPage}>
-      <AppHeader activePath="settings" onNavigate={onNavigate} title="Settings" />
-      <nav aria-label="Settings pages" className={styles.settingsList}>
-        {SETTINGS_PAGE_ITEMS.map((item) => (
-          <SettingsLink item={item} key={item.title} onNavigate={onNavigate} />
-        ))}
-      </nav>
-    </main>
+    <nav aria-label="Settings pages" className={styles.settingsList}>
+      {SETTINGS_PAGE_ITEMS.map((item) => (
+        <SettingsLink item={item} key={item.title} onNavigate={onNavigate} />
+      ))}
+    </nav>
   )
 }
 
 function GuestControlsPage({ onNavigate }: { onNavigate: (path: string) => void }) {
   return (
-    <main className={styles.guestPage}>
-      <AppHeader activePath="settings" backPath="overview" onNavigate={onNavigate} title="Guest Controls" />
-
-      <section className={styles.guestSection}>
-        <SectionHeader title="Guest Controls" />
-        <Description>{GUEST_CONTROLS_DESCRIPTION}</Description>
-        <AdminTileGrid items={GUEST_CONTROL_ITEMS} onNavigate={onNavigate} variant="admin-modal" />
-      </section>
-    </main>
+    <section className={styles.guestSection}>
+      <SectionHeader title="Guest Controls" />
+      <Description>{GUEST_CONTROLS_DESCRIPTION}</Description>
+      <AdminTileGrid items={GUEST_CONTROL_ITEMS} onNavigate={onNavigate} variant="admin-modal" />
+    </section>
   )
 }
 
@@ -2118,7 +2116,8 @@ function Content({ onNavigate, path }: { onNavigate: (path: string) => void; pat
   const roomTitle = roomNameFromPath(path)
   if (roomTitle) return <RoomPage onNavigate={onNavigate} path={path} title={roomTitle} />
   if (TODO_PAGES[path]) return <TodoPage onNavigate={onNavigate} path={path} />
-  if (path === 'security') return <SecurityPage />
+  if (path === 'settings') return <SettingsPage onNavigate={onNavigate} />
+  if (path === 'guests-staying-over') return <GuestControlsPage onNavigate={onNavigate} />
   if (path === 'vacuums') return <VacuumPage />
   if (path === 'media') return <MediaPage />
   if (path === 'admin') return <AdminPage onNavigate={onNavigate} />
@@ -2130,34 +2129,22 @@ function Content({ onNavigate, path }: { onNavigate: (path: string) => void; pat
 
 export function DashboardViewPage({ activePath, onNavigate, path }: DashboardViewPageProps) {
   const roomTitle = roomNameFromPath(path)
-  const title = roomTitle ?? TODO_PAGES[path]?.title ?? CONTROL_PAGES[path]?.title ?? routeTitle(path)
+  const title = path === 'guests-staying-over' ? 'Guest Controls' : roomTitle ?? TODO_PAGES[path]?.title ?? CONTROL_PAGES[path]?.title ?? routeTitle(path)
   const showBack = !PRIMARY_NAV_ROUTES.some((route) => route.path === path)
   const createTaskAssignee = createTaskDefaultAssignee(path)
   const floatingAction = path === 'groceries'
     ? <CreateGroceryButton key={path} />
     : createTaskAssignee !== null ? <CreateChoreButton defaultAssignee={createTaskAssignee} key={path} /> : undefined
 
-  if (path === 'guests-staying-over') {
-    return (
-      <AppShell bottomNav={<BottomNav activePath={activePath} onNavigate={onNavigate} />} floatingAction={floatingAction}>
-        <GuestControlsPage onNavigate={onNavigate} />
-      </AppShell>
-    )
-  }
-
-  if (path === 'settings') {
-    return (
-      <AppShell bottomNav={<BottomNav activePath={activePath} onNavigate={onNavigate} />} floatingAction={floatingAction}>
-        <SettingsPage onNavigate={onNavigate} />
-      </AppShell>
-    )
-  }
-
   return (
     <AppShell bottomNav={<BottomNav activePath={activePath} onNavigate={onNavigate} />} floatingAction={floatingAction}>
-      <Page activePath={activePath} backPath={showBack ? 'overview' : undefined} headerQuickLinks={roomTitle ? <RoomSectionRail path={path} title={roomTitle} /> : undefined} onNavigate={onNavigate} title={title}>
-        <Content onNavigate={onNavigate} path={path} />
-      </Page>
+      {path === 'security' ? (
+        <SecurityPage activePath={activePath} backPath={showBack ? 'overview' : undefined} onNavigate={onNavigate} title={title} />
+      ) : (
+        <Page activePath={activePath} backPath={showBack ? 'overview' : undefined} headerQuickLinks={roomTitle ? <RoomSectionRail path={path} title={roomTitle} /> : undefined} onNavigate={onNavigate} title={title}>
+          <Content onNavigate={onNavigate} path={path} />
+        </Page>
+      )}
     </AppShell>
   )
 }
