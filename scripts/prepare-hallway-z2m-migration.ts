@@ -518,12 +518,135 @@ const LIVING_FRONT_DINING_SENSORS: SensorPlan[] = [
   },
 ]
 
+const DOWNSTAIRS_THEATER_SENSORS: SensorPlan[] = [
+  {
+    areaGroup: 'downstairs-theater',
+    key: 'downstairsHallway',
+    label: 'Downstairs hallway',
+    currentDeviceName: 'Downstairs Hallway Presence Sensor',
+    expectedIeee: '0x54ef441001498ab8',
+    targetDeviceName: 'Downstairs Hallway Presence Sensor',
+    currentEntities: {
+      occupancy: 'binary_sensor.downstairs_hallway_presence_occupancy',
+      occupancyRlc: 'sensor.downstairs_hallway_presence_sensor_occupancy',
+      temperature: 'sensor.downstairs_hallway_presence_temperature',
+      humidity: 'sensor.downstairs_hallway_presence_humidity',
+      illuminance: 'sensor.downstairs_hallway_presence_illuminance',
+    },
+    targetEntities: {
+      occupancy: 'binary_sensor.downstairs_hallway_presence_occupancy',
+      motion: 'binary_sensor.downstairs_hallway_presence_motion',
+      occupancyRlc: 'sensor.downstairs_hallway_presence_sensor_occupancy',
+      temperature: 'sensor.downstairs_hallway_presence_temperature',
+      humidity: 'sensor.downstairs_hallway_presence_humidity',
+      illuminance: 'sensor.downstairs_hallway_presence_illuminance',
+    },
+  },
+  {
+    areaGroup: 'downstairs-theater',
+    key: 'theaterRoom',
+    label: 'Theater room',
+    currentDeviceName: 'Theater Room Presence Sensor',
+    expectedIeee: '0x54ef441001498b37',
+    targetDeviceName: 'Theater Room Presence Sensor',
+    currentEntities: {
+      occupancy: 'binary_sensor.theater_room_presence_occupancy',
+      occupancyRlc: 'sensor.theater_room_presence_sensor_occupancy',
+      temperature: 'sensor.theater_room_presence_temperature',
+      humidity: 'sensor.theater_room_presence_humidity',
+      illuminance: 'sensor.theater_room_presence_illuminance',
+    },
+    targetEntities: {
+      occupancy: 'binary_sensor.theater_room_presence_occupancy',
+      motion: 'binary_sensor.theater_room_presence_motion',
+      occupancyRlc: 'sensor.theater_room_presence_sensor_occupancy',
+      temperature: 'sensor.theater_room_presence_temperature',
+      humidity: 'sensor.theater_room_presence_humidity',
+      illuminance: 'sensor.theater_room_presence_illuminance',
+    },
+  },
+]
+
+const MUSIC_ROOM_SENSORS: SensorPlan[] = [
+  {
+    areaGroup: 'music-room',
+    key: 'musicRoomDoor',
+    label: 'Music room door',
+    currentDeviceName: 'Music Room Door Presence Sensor',
+    expectedIeee: '0x54ef441001498c47',
+    targetDeviceName: 'Music Room Door Presence Sensor',
+    currentEntities: {
+      occupancy: 'binary_sensor.music_room_door_presence_occupancy',
+      occupancyRlc: 'sensor.music_room_door_presence_sensor_occupancy',
+      temperature: 'sensor.music_room_door_presence_temperature',
+      humidity: 'sensor.music_room_door_presence_humidity',
+      illuminance: 'sensor.music_room_door_presence_illuminance',
+    },
+    targetEntities: {
+      occupancy: 'binary_sensor.music_room_door_presence_occupancy',
+      motion: 'binary_sensor.music_room_door_presence_motion',
+      occupancyRlc: 'sensor.music_room_door_presence_sensor_occupancy',
+      temperature: 'sensor.music_room_door_presence_temperature',
+      humidity: 'sensor.music_room_door_presence_humidity',
+      illuminance: 'sensor.music_room_door_presence_illuminance',
+    },
+  },
+  {
+    areaGroup: 'music-room',
+    key: 'musicRoomKitchenette',
+    label: 'Music room kitchenette',
+    currentDeviceName: 'Music Room Kitchenette Presence Sensor',
+    expectedIeee: '0x54ef4410014ae1d0',
+    targetDeviceName: 'Music Room Kitchenette Presence Sensor',
+    currentEntities: {
+      occupancy: 'binary_sensor.music_room_kitchenette_presence_occupancy',
+      occupancyRlc: 'sensor.music_room_kitchenette_presence_sensor_occupancy',
+      temperature: 'sensor.music_room_kitchenette_presence_temperature',
+      humidity: 'sensor.music_room_kitchenette_presence_humidity',
+      illuminance: 'sensor.music_room_kitchenette_presence_illuminance',
+    },
+    targetEntities: {
+      occupancy: 'binary_sensor.music_room_kitchenette_presence_occupancy',
+      motion: 'binary_sensor.music_room_kitchenette_presence_motion',
+      occupancyRlc: 'sensor.music_room_kitchenette_presence_sensor_occupancy',
+      temperature: 'sensor.music_room_kitchenette_presence_temperature',
+      humidity: 'sensor.music_room_kitchenette_presence_humidity',
+      illuminance: 'sensor.music_room_kitchenette_presence_illuminance',
+    },
+  },
+  {
+    areaGroup: 'music-room',
+    key: 'musicRoomNorthWall',
+    label: 'Music room north wall',
+    currentDeviceName: 'Music Room North Wall Presence Sensor',
+    expectedIeee: '0x54ef441001498bde',
+    targetDeviceName: 'Music Room North Wall Presence Sensor',
+    currentEntities: {
+      occupancy: 'binary_sensor.music_room_north_wall_presence_occupancy',
+      occupancyRlc: 'sensor.music_room_north_wall_presence_sensor_occupancy',
+      temperature: 'sensor.music_room_north_wall_presence_temperature',
+      humidity: 'sensor.music_room_north_wall_presence_humidity',
+      illuminance: 'sensor.music_room_north_wall_presence_illuminance',
+    },
+    targetEntities: {
+      occupancy: 'binary_sensor.music_room_north_wall_presence_occupancy',
+      motion: 'binary_sensor.music_room_north_wall_presence_motion',
+      occupancyRlc: 'sensor.music_room_north_wall_presence_sensor_occupancy',
+      temperature: 'sensor.music_room_north_wall_presence_temperature',
+      humidity: 'sensor.music_room_north_wall_presence_humidity',
+      illuminance: 'sensor.music_room_north_wall_presence_illuminance',
+    },
+  },
+]
+
 const SENSOR_GROUPS: Record<string, SensorPlan[]> = {
-  all: [...HALLWAY_SENSORS, ...MASTER_SENSORS, ...GUEST_GYM_KITCHEN_SENSORS, ...LIVING_FRONT_DINING_SENSORS],
+  all: [...HALLWAY_SENSORS, ...MASTER_SENSORS, ...GUEST_GYM_KITCHEN_SENSORS, ...LIVING_FRONT_DINING_SENSORS, ...DOWNSTAIRS_THEATER_SENSORS, ...MUSIC_ROOM_SENSORS],
+  'downstairs-theater': DOWNSTAIRS_THEATER_SENSORS,
   'guest-gym-kitchen': GUEST_GYM_KITCHEN_SENSORS,
   hallway: HALLWAY_SENSORS,
   'living-front-dining': LIVING_FRONT_DINING_SENSORS,
   master: MASTER_SENSORS,
+  'music-room': MUSIC_ROOM_SENSORS,
 }
 
 let nextMessageId = 1

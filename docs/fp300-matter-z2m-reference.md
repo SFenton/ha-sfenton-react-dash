@@ -37,17 +37,13 @@ Generated from live Home Assistant device/entity registry and Zigbee2MQTT bridge
 
 | Area | Current Matter device | Expected Z2M IEEE | Occupancy | RLC occupancy | Temperature | Humidity | Illuminance | In Z2M now |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Unassigned | Music Room Door Presence Sensor | `0x54ef441001498c47` | `binary_sensor.music_room_door_presence_occupancy` | `sensor.music_room_door_presence_sensor_occupancy` | `sensor.music_room_door_presence_temperature` | `sensor.music_room_door_presence_humidity` | `sensor.music_room_door_presence_illuminance` | no |
-| Unassigned | Music Room Kitchenette Presence Sensor | `0x54ef4410014ae1d0` | `binary_sensor.music_room_kitchenette_presence_occupancy` | `sensor.music_room_kitchenette_presence_sensor_occupancy` | `sensor.music_room_kitchenette_presence_temperature` | `sensor.music_room_kitchenette_presence_humidity` | `sensor.music_room_kitchenette_presence_illuminance` | no |
-| Unassigned | Music Room North Wall Presence Sensor | `0x54ef441001498bde` | `binary_sensor.music_room_north_wall_presence_occupancy` | `sensor.music_room_north_wall_presence_sensor_occupancy` | `sensor.music_room_north_wall_presence_temperature` | `sensor.music_room_north_wall_presence_humidity` | `sensor.music_room_north_wall_presence_illuminance` | no |
-| Unassigned | Theater Room Presence Sensor | `0x54ef441001498b37` | `binary_sensor.theater_room_presence_occupancy` | `sensor.theater_room_presence_sensor_occupancy` | `sensor.theater_room_presence_temperature` | `sensor.theater_room_presence_humidity` | `sensor.theater_room_presence_illuminance` | no |
-| Downstairs Hallway | Downstairs Hallway Presence Sensor | `0x54ef441001498ab8` | `binary_sensor.downstairs_hallway_presence_occupancy` | `sensor.downstairs_hallway_presence_sensor_occupancy` | `sensor.downstairs_hallway_presence_temperature` | `sensor.downstairs_hallway_presence_humidity` | `sensor.downstairs_hallway_presence_illuminance` | no |
 
 ## Already Migrated Z2M FP300 Sensors
 
 | Z2M friendly name | IEEE | Model | Converter version | Interview state | Supported |
 | --- | --- | --- | --- | --- | --- |
 | Dining Room Presence Sensor | `0x54ef44100146ca70` | PS-S04D | 0.0.1 | SUCCESSFUL | yes |
+| Downstairs Hallway Presence Sensor | `0x54ef441001498ab8` | PS-S04D | 0.0.1 | SUCCESSFUL | yes |
 | Entryway Presence Sensor | `0x54ef44100146f60f` | PS-S04D | 0.0.1 | SUCCESSFUL | yes |
 | Front Door Presence Sensor | `0x54ef4410014ae274` | PS-S04D | 0.0.1 | SUCCESSFUL | yes |
 | Guest Bathroom Entry Presence Sensor | `0x54ef4410014aea57` | PS-S04D | 0.0.1 | SUCCESSFUL | yes |
@@ -66,8 +62,12 @@ Generated from live Home Assistant device/entity registry and Zigbee2MQTT bridge
 | Master Bedroom Bathroom Presence Sensor | `0x54ef4410014ae9cb` | PS-S04D | 0.0.1 | SUCCESSFUL | yes |
 | Master Bedroom Closet Presence Sensor | `0x54ef44100146eb59` | PS-S04D | 0.0.1 | SUCCESSFUL | yes |
 | Master Bedroom Window Presence Sensor | `0x54ef44100146f191` | PS-S04D | 0.0.1 | SUCCESSFUL | yes |
+| Music Room Door Presence Sensor | `0x54ef441001498c47` | PS-S04D | 0.0.1 | SUCCESSFUL | yes |
+| Music Room Kitchenette Presence Sensor | `0x54ef4410014ae1d0` | PS-S04D | 0.0.1 | SUCCESSFUL | yes |
+| Music Room North Wall Presence Sensor | `0x54ef441001498bde` | PS-S04D | 0.0.1 | SUCCESSFUL | yes |
 | Office Closet Presence Sensor | `0x54ef441001498afb` | PS-S04D | 0.0.1 | SUCCESSFUL | yes |
 | Office Presence Sensor | `0x54ef44100146c90c` | PS-S04D | 0.0.1 | SUCCESSFUL | yes |
+| Theater Room Presence Sensor | `0x54ef441001498b37` | PS-S04D | 0.0.1 | SUCCESSFUL | yes |
 
 ## Notes
 

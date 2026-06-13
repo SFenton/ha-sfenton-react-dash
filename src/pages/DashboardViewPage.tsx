@@ -887,7 +887,7 @@ function SettingsLink({ item, onNavigate }: { item: SettingsLinkConfig; onNaviga
   return (
     <button aria-label={`${item.title} ${item.subtitle}`} className={styles.settingsLink} data-external-path={item.externalPath} data-navigation-path={item.path} onClick={activate} type="button">
       <span aria-hidden="true" className={styles.settingsLinkIcon}>
-        <MaterialIcon name={item.icon} size={32} />
+        <MaterialIcon name={item.icon} size={28} />
       </span>
       <span className={styles.settingsLinkCopy}>
         <span className={styles.settingsLinkTitle}>{item.title}</span>

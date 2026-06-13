@@ -280,9 +280,9 @@
 .settingsLink {
   display: grid;
   width: 100%;
-  min-height: 88px;
-  grid-template-columns: 56px minmax(0, 1fr);
-  gap: 8px;
+  min-height: 72px;
+  grid-template-columns: 40px minmax(0, 1fr);
+  gap: 14px;
   align-items: center;
   border: 0;
   padding: 0;
@@ -305,25 +305,25 @@
 
 .settingsLinkIcon {
   display: grid;
-  width: 56px;
-  height: 56px;
-  place-items: center;
+  width: 40px;
+  height: 40px;
+  place-items: center start;
   color: rgba(255, 255, 255, 0.86);
 }
 
 .settingsLinkCopy {
   display: grid;
   min-width: 0;
-  gap: 8px;
+  gap: 4px;
 }
 
 .settingsLinkTitle {
   overflow: hidden;
   color: white;
-  font-size: clamp(1.2rem, 5vw, 1.42rem);
-  font-weight: 830;
+  font-size: clamp(1.02rem, 4.2vw, 1.18rem);
+  font-weight: 800;
   letter-spacing: 0;
-  line-height: 1.05;
+  line-height: 1.1;
   text-overflow: clip;
   white-space: nowrap;
 }
@@ -331,8 +331,8 @@
 .settingsLinkSubtitle {
   overflow: hidden;
   color: rgba(255, 255, 255, 0.66);
-  font-size: clamp(0.86rem, 4vw, 1rem);
-  font-weight: 710;
+  font-size: clamp(0.8rem, 3.4vw, 0.9rem);
+  font-weight: 680;
   letter-spacing: 0;
   line-height: 1.2;
   text-overflow: clip;
@@ -840,8 +840,8 @@ button.thermostatGlassMain {
   }
 
   .settingsLink {
-    grid-template-columns: 52px minmax(0, 1fr);
-    gap: 6px;
+    grid-template-columns: 36px minmax(0, 1fr);
+    gap: 12px;
   }
 
 }
