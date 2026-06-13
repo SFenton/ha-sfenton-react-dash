@@ -153,6 +153,30 @@ function AdminHashButton({ hash, onOpen, title }: { hash: string; onOpen: (hash:
   )
 }
 
+const LIVING_ROOM_POWER_RECOVERY_AUTOMATION = 'automation.attempt_to_turn_power_back_on_in_living_room'
+
+function LivingRoomPowerRecoveryButton() {
+  const callService = useCallService()
+  const title = 'Attempt to turn power back on'
+
+  return (
+    <button
+      aria-label={`${title} in Living Room`}
+      className={styles.adminAutomationButton}
+      data-automation-target={LIVING_ROOM_POWER_RECOVERY_AUTOMATION}
+      onClick={() => callService({ domain: 'automation', service: 'trigger', target: LIVING_ROOM_POWER_RECOVERY_AUTOMATION })}
+      type="button"
+    >
+      <span aria-hidden="true" className={styles.adminAutomationButtonIcon}>
+        <MaterialIcon name="mdi:flash" size={30} />
+      </span>
+      <span className={styles.adminAutomationButtonCopy}>
+        <span className={styles.adminAutomationButtonTitle}>{title}</span>
+      </span>
+    </button>
+  )
+}
+
 function AdminTileGrid({ items, onNavigate, variant = 'wide' }: { items: EntitySectionConfig['items']; onNavigate: (path: string) => void; variant?: 'admin-modal' | 'compact' | 'wide' }) {
   const Wrapper = variant === 'wide' ? AdminWideGrid : variant === 'admin-modal' ? AdminModalGrid : Grid
   return (
@@ -998,6 +1022,12 @@ function AdminPage({ onNavigate }: { onNavigate: (path: string) => void }) {
         <SectionHeader title="Security Controls" />
         <Description>{ADMIN_DESCRIPTIONS.autoLock}</Description>
         <AdminTileGrid items={ADMIN_SECURITY_CONTROLS} onNavigate={onNavigate} />
+      </section>
+
+      <section className={styles.section}>
+        <SectionHeader title="Living Room Power Recovery" />
+        <Description>{ADMIN_DESCRIPTIONS.livingRoomPowerRecovery}</Description>
+        <LivingRoomPowerRecoveryButton />
       </section>
 
       <section className={styles.section}>

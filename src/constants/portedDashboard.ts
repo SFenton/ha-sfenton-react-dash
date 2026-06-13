@@ -129,6 +129,8 @@ export const CHORE_QUICK_LINKS: ChoreQuickLinkConfig[] = [
 
 export const ADMIN_DESCRIPTIONS = {
   autoLock: 'Disables automatic locking of the front door. Useful for when contractors are over, or we have people frequently entering/leaving the home.',
+  livingRoomPowerRecovery:
+    'If the living room switch loses power and comes back with the relay off, run this to temporarily couple the top paddle, unlock the relay, turn power back on, relock it, and return the paddle to decoupled mode.',
   presenceOverrides: 'Enable or disable presence-based lighting in specific rooms. Useful for when we have company, or need to quickly keep lights on or off without using the voice commands.',
   showSpecific: "Shows the outdoor faucets in our Home Assistant pages. Useful to disable during the winter, when we aren't using them.",
   autoReset:

@@ -233,6 +233,11 @@ describe('DashboardViewPage', () => {
     expect(screen.getByText('Disables automatic locking of the front door. Useful for when contractors are over, or we have people frequently entering/leaving the home.')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Front Door Auto-Lock On/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Front Door Auto-Lock On/i })).toHaveStyle({ '--card-rgb': '67 160 71' })
+    expect(screen.getByRole('heading', { name: 'Living Room Power Recovery' })).toBeInTheDocument()
+    expect(screen.getByText('If the living room switch loses power and comes back with the relay off, run this to temporarily couple the top paddle, unlock the relay, turn power back on, relock it, and return the paddle to decoupled mode.')).toBeInTheDocument()
+    const recoveryButton = screen.getByRole('button', { name: 'Attempt to turn power back on in Living Room' })
+    expect(recoveryButton).toHaveAttribute('data-automation-target', 'automation.attempt_to_turn_power_back_on_in_living_room')
+    expect(recoveryButton.querySelector('path')).toHaveAttribute('d', materialIconPath('mdi:flash'))
     expect(screen.getByRole('heading', { name: 'Presence-Based Light Overrides' })).toBeInTheDocument()
     expect(screen.getByText('Enable or disable presence-based lighting in specific rooms. Useful for when we have company, or need to quickly keep lights on or off without using the voice commands.')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Open Presence-Based Overrides' })).toBeInTheDocument()
@@ -254,9 +259,15 @@ describe('DashboardViewPage', () => {
     expect(screen.getByRole('button', { name: /Living Room On · Active/i })).toHaveStyle({ '--card-rgb': '67 160 71' })
     expect(screen.getByRole('button', { name: /Living Room On · Active/i }).querySelector('path')).toHaveAttribute('d', materialIconPath('mdi:lightbulb-auto'))
     expect(screen.getByRole('button', { name: /Upper Deck On · Active/i })).toBeInTheDocument()
+    fireEvent.click(recoveryButton)
     fireEvent.click(screen.getByRole('button', { name: /Living Room On · Active/i }))
 
     expect(mockCallServiceCalls).toEqual([
+      {
+        domain: 'automation',
+        service: 'trigger',
+        target: 'automation.attempt_to_turn_power_back_on_in_living_room',
+      },
       {
         domain: 'script',
         service: 'toggle_presence_lighting_override',
