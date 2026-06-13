@@ -1257,6 +1257,26 @@ describe('DashboardViewPage', () => {
     }
   })
 
+  it('keeps room overview chips on the shared icon standard', () => {
+    const expectedIconFor = (title: string, kind: string) => {
+      if (kind === 'light') return title === 'Lights' ? 'mdi:lightbulb-group' : 'mdi:lightbulb'
+      if (kind === 'climate') return 'mdi:thermometer'
+      if (kind === 'occupancy') return 'mdi:motion-sensor'
+      if (kind === 'contact') return title.toLowerCase().includes('window') ? 'mdi:window-closed' : 'mdi:door'
+      if (kind === 'air') return 'mdi:air-purifier'
+      return undefined
+    }
+    const mismatches = ROOM_PAGE_ORDER.flatMap((path) =>
+      ROOM_PAGE_CONFIGS[path].overviewCards.flatMap((card) => {
+        const expectedIcon = expectedIconFor(card.title, card.kind)
+        return expectedIcon && card.icon !== expectedIcon ? [`${path} ${card.title}: ${card.icon} should be ${expectedIcon}`] : []
+      }),
+    )
+
+    expect(mismatches).toEqual([])
+    expect(ROOM_PAGE_CONFIGS.garage.overviewCards.map((card) => card.title)).toEqual(['Doors'])
+  })
+
   it('renders todo list panels through the mock HASS websocket', async () => {
     render(<DashboardViewPage activePath="groceries" onNavigate={() => undefined} path="groceries" />)
 

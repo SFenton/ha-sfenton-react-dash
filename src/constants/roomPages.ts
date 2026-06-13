@@ -303,8 +303,7 @@ export const ROOM_PAGE_CONFIGS: Record<string, RoomPageSourceConfig> = {
     title: 'Garage',
     path: 'garage',
     overviewCards: [
-      { title: 'Light', entityId: 'light.garage_camera_floodlight', icon: 'mdi:lightbulb', kind: 'light', hash: '#lights-garage', showState: true, manualReview: sourcePopupReview },
-      { title: 'Doors', entityId: 'binary_sensor.garage_doors', icon: 'mdi:garage', kind: 'contact', hash: '#doors-garage', showState: true, manualReview: sourcePopupReview },
+      { title: 'Doors', entityId: 'binary_sensor.garage_doors', icon: 'mdi:door', kind: 'contact', hash: '#doors-garage', showState: true, manualReview: sourcePopupReview },
     ],
     sourceSections: [
       { title: 'Appliances', cards: [
@@ -316,7 +315,7 @@ export const ROOM_PAGE_CONFIGS: Record<string, RoomPageSourceConfig> = {
         { title: 'Right Door', entityId: 'cover.right_door', icon: 'mdi:garage', kind: 'contact', showState: true, manualReview: sourceControlReview },
       ] },
     ],
-    popupTemplates: ['door-popup-2', 'light-popup-single'],
+    popupTemplates: ['door-popup-2'],
   },
   'guest-bathroom': {
     title: 'Guest Bathroom',
