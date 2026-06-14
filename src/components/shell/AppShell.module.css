@@ -4,6 +4,14 @@
   overflow: hidden;
   color: var(--color-text);
   background: #111723;
+  --floating-action-size: 62px;
+  --floating-action-gap: 8px;
+  --floating-action-content-gap: 20px;
+  --page-bottom-extra-padding: 22px;
+}
+
+.hasFloatingAction {
+  --page-bottom-extra-padding: calc(var(--floating-action-size) + var(--floating-action-gap) + var(--floating-action-content-gap));
 }
 
 .backdrop {
@@ -36,7 +44,7 @@
 .floatingAction {
   position: fixed;
   right: 22px;
-  bottom: calc(var(--bottom-nav-height) + 8px + env(safe-area-inset-bottom, 0px));
+  bottom: calc(var(--bottom-nav-height) + var(--floating-action-gap) + env(safe-area-inset-bottom, 0px));
   z-index: 35;
   display: grid;
   place-items: center;

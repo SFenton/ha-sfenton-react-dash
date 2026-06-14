@@ -25,7 +25,7 @@
   min-height: 0;
   overflow-x: hidden;
   overflow-y: auto;
-  padding: 12px var(--space-page-x) calc(var(--bottom-nav-height) + 22px + env(safe-area-inset-bottom, 0px));
+  padding: 12px var(--space-page-x) calc(var(--bottom-nav-height) + var(--page-bottom-extra-padding, 22px) + env(safe-area-inset-bottom, 0px));
   box-sizing: border-box;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;

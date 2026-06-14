@@ -1,7 +1,7 @@
 .button {
   display: grid;
-  width: 62px;
-  height: 62px;
+  width: var(--floating-action-size, 62px);
+  height: var(--floating-action-size, 62px);
   place-items: center;
   border: 0;
   border-radius: 999px;
