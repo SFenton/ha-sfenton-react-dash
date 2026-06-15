@@ -143,8 +143,8 @@ export const ROOM_PAGE_CONFIGS: Record<string, RoomPageSourceConfig> = {
     ],
     sourceSections: [
       { title: 'Eight Sleep', cards: [
-        { title: "Stephen's Bed", entityId: 'climate.stephen_s_eight_sleep_side_climate', icon: 'mdi:bed', kind: 'climate', hash: '#stephens-bed', showState: true, stateDisplay: 'climate-action-temperature', stateTone: 'climate-action', presenceEntityId: 'binary_sensor.stephen_s_eight_sleep_side_bed_presence' },
-        { title: "Steph's Bed", entityId: 'climate.steph_s_eight_sleep_side_climate', icon: 'mdi:bed', kind: 'climate', hash: '#stephs-bed', showState: true, stateDisplay: 'climate-action-temperature', stateTone: 'climate-action', presenceEntityId: 'binary_sensor.steph_s_eight_sleep_side_bed_presence' },
+        { title: "Stephen's Bed", entityId: 'number.nightcanvasrestful_left_target_temperature', icon: 'mdi:bed', kind: 'climate', hash: '#stephens-bed', showState: true, stateTone: 'climate-action', presenceEntityId: 'binary_sensor.nightcanvasrestful_left_presence' },
+        { title: "Steph's Bed", entityId: 'number.nightcanvasrestful_right_target_temperature', icon: 'mdi:bed', kind: 'climate', hash: '#stephs-bed', showState: true, stateTone: 'climate-action', presenceEntityId: 'binary_sensor.nightcanvasrestful_right_presence' },
       ] },
       { title: 'Media', cards: [{ title: 'Apple TV', entityId: 'media_player.master_bedroom_apple_tv', icon: 'mdi:apple', kind: 'media', hash: '#master-bedroom-apple-tv', showState: true, span: 'full', activeStates: ['idle', 'paused', 'playing'] }] },
       { title: 'Climate', cards: [

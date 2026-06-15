@@ -1,10 +1,97 @@
-import { expect, test } from '@playwright/test'
+import { expect, test, type Locator, type Page } from '@playwright/test'
+
+type FreeSleepAlarmSnapshot = {
+  enabled: boolean
+  time: string
+}
+
+type FreeSleepSchedulesSnapshot = Partial<Record<'left' | 'right', Partial<Record<string, { alarms?: FreeSleepAlarmSnapshot[] }>>>>
+
+async function openBedAlarmDialog(page: Page, bedButtonName: RegExp) {
+  await page.goto('/at-a-glance/master-bedroom')
+  await page.getByRole('button', { name: bedButtonName }).click()
+  const dialog = page.getByRole('dialog')
+  await expect(dialog).toBeVisible()
+  await dialog.getByRole('button', { name: 'Alarm Schedule Disabled' }).click()
+  await expect(dialog.getByRole('button', { name: 'Alarm Schedule Enabled' })).toBeVisible()
+  return dialog
+}
+
+async function openAddAlarmForm(dialog: Locator, sideTitle: string) {
+  const addAlarmButton = dialog.getByRole('button', { exact: true, name: 'Add Alarm' })
+  await expect(addAlarmButton).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)')
+  await expect(addAlarmButton).toHaveCSS('border-top-style', 'none')
+  await addAlarmButton.click()
+  const addAlarm = dialog.getByRole('group', { name: `Add ${sideTitle} alarm` })
+  await expect(addAlarm).toBeVisible()
+  await expect(addAlarm.getByRole('button', { name: 'New alarm time 7:00 AM' }).locator('svg')).toHaveCount(1)
+  return addAlarm
+}
+
+async function selectAlarmDays(addAlarm: Locator, days: string[]) {
+  await addAlarm.getByRole('button', { name: /Alarm days Choose days/i }).click()
+  for (const day of days) {
+    const option = addAlarm.getByRole('option', { name: day })
+    await option.click()
+    await expect(option).toHaveAttribute('aria-selected', 'true')
+    await expect(option).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)')
+    await expect(option.locator('svg')).toHaveCount(0)
+  }
+}
+
+async function freeSleepSchedules(page: Page) {
+  return page.evaluate(() => (window as unknown as { __mockHass: { freeSleepSchedules: () => FreeSleepSchedulesSnapshot } }).__mockHass.freeSleepSchedules())
+}
+
+async function expectFreeSleepAlarms(page: Page, side: 'left' | 'right', day: string, expected: FreeSleepAlarmSnapshot[]) {
+  await expect.poll(async () => {
+    const schedules = await freeSleepSchedules(page)
+    return (schedules[side]?.[day]?.alarms ?? []).map((alarm) => ({ enabled: alarm.enabled, time: alarm.time }))
+  }).toEqual(expected)
+}
 
 test('overview renders with mock Home Assistant state', async ({ page }) => {
   await page.goto('/at-a-glance/overview')
 
   await expect(page.getByRole('heading', { name: 'Home' })).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Quick Links' })).toBeVisible()
+})
+
+test('settings links to Vacation mode controls', async ({ page }) => {
+  await page.goto('/at-a-glance/settings')
+
+  await expect(page.getByRole('button', { name: /Vacation Set away dates and prepare the house for vacation\./i })).toBeVisible()
+  await page.getByRole('button', { name: /Vacation Set away dates and prepare the house for vacation\./i }).click()
+
+  await expect(page).toHaveURL(/\/at-a-glance\/settings\?path=vacation/)
+  await expect(page.getByRole('heading', { name: 'Vacation Mode', exact: true })).toBeVisible()
+  await expect(page.getByText('Enable or disable vacation mode for the house')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Vacation Mode Off' })).toHaveCSS('min-height', '116px')
+  await page.getByRole('button', { name: 'Vacation Mode Off' }).click()
+  await expect(page.getByRole('button', { name: 'Vacation Mode On' })).toHaveCSS('outline-style', 'none')
+  await expect(page.getByRole('heading', { name: 'Vacation Dates' })).toBeVisible()
+  await expect(page.getByText('Set the start and end time for your vacation. Vacation mode will automatically be turned off at the set end date and time.')).toBeVisible()
+  await expect(page.getByLabel('Start Date')).toHaveAttribute('type', 'date')
+  await expect(page.getByLabel('End Time')).toHaveAttribute('type', 'time')
+  for (const label of ['Start Date', 'Start Time', 'End Date', 'End Time']) {
+    await expect(page.getByText(label, { exact: true })).toHaveCSS('text-align', 'left')
+    await expect(page.getByLabel(label)).toHaveCSS('text-align', 'left')
+  }
+  await page.evaluate(() => {
+    (window as any).__vacationPickerCalls = 0
+    Object.defineProperty(HTMLInputElement.prototype, 'showPicker', {
+      configurable: true,
+      value() {
+        (window as any).__vacationPickerCalls += 1
+      },
+    })
+  })
+  const endDateCard = page.getByText('End Date', { exact: true }).locator('..')
+  await expect(endDateCard).toHaveCSS('cursor', 'pointer')
+  await endDateCard.click({ position: { x: 8, y: 8 } })
+  await expect.poll(() => page.evaluate(() => (window as any).__vacationPickerCalls)).toBe(1)
+  await page.getByLabel('Start Date').click()
+  await expect(page.getByLabel('Start Date').locator('..')).toHaveCSS('outline-style', 'none')
 })
 
 test('chores page shows source sections and checkbox todo rows for the logged-in user', async ({ page }) => {
@@ -200,6 +287,97 @@ test('room media cards open ported remote modals', async ({ page }) => {
   await expect(page.getByRole('heading', { name: 'Devices' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Prime Video' })).toBeVisible()
   await expect(page.getByRole('button', { name: /Projector Off/i })).toBeVisible()
+})
+
+test('Free Sleep Add Alarm writes the expected alarm into the backend schedule', async ({ page }) => {
+  const dialog = await openBedAlarmDialog(page, /Steph's Bed Off/i)
+  const addAlarm = await openAddAlarmForm(dialog, "Steph's Bed")
+
+  await selectAlarmDays(addAlarm, ['Sunday'])
+  await addAlarm.getByRole('textbox', { name: 'New alarm time' }).fill('08:00', { force: true })
+  await addAlarm.getByRole('button', { exact: true, name: 'Add Alarm' }).click()
+
+  const sundaySection = dialog.getByRole('region', { name: "Steph's Bed Sunday alarms" })
+  await expect(sundaySection.getByText('3 alarms')).toBeVisible()
+  await expect(sundaySection.getByRole('article', { name: /Steph's Bed Sunday alarm 3 enabled/i })).toBeVisible()
+  await expectFreeSleepAlarms(page, 'right', 'sunday', [
+    { enabled: true, time: '06:30' },
+    { enabled: true, time: '07:15' },
+    { enabled: true, time: '08:00' },
+  ])
+})
+
+test('Free Sleep individual alarm toggle only disables that alarm in the backend schedule', async ({ page }) => {
+  const dialog = await openBedAlarmDialog(page, /Steph's Bed Off/i)
+  const sundaySection = dialog.getByRole('region', { name: "Steph's Bed Sunday alarms" })
+
+  await sundaySection.getByRole('switch', { exact: true, name: "Disable Steph's Bed Sunday alarm" }).click()
+
+  await expect(sundaySection.getByRole('switch', { exact: true, name: "Enable Steph's Bed Sunday alarm" })).toHaveAttribute('aria-checked', 'false')
+  await expect(sundaySection.getByRole('switch', { exact: true, name: "Disable Steph's Bed Sunday alarm 2" })).toHaveAttribute('aria-checked', 'true')
+  await expectFreeSleepAlarms(page, 'right', 'sunday', [
+    { enabled: false, time: '06:30' },
+    { enabled: true, time: '07:15' },
+  ])
+})
+
+test('Free Sleep alarm time edit keeps the alarm enabled in the UI and backend schedule', async ({ page }) => {
+  const dialog = await openBedAlarmDialog(page, /Steph's Bed Off/i)
+  const sundaySection = dialog.getByRole('region', { name: "Steph's Bed Sunday alarms" })
+
+  await expect(sundaySection.getByRole('switch', { exact: true, name: "Disable Steph's Bed Sunday alarm" })).toHaveAttribute('aria-checked', 'true')
+  await sundaySection.getByRole('textbox', { name: "Steph's Bed Sunday alarm time" }).fill('06:35', { force: true })
+
+  await expect(sundaySection.getByRole('switch', { exact: true, name: "Disable Steph's Bed Sunday alarm" })).toHaveAttribute('aria-checked', 'true')
+  await expectFreeSleepAlarms(page, 'right', 'sunday', [
+    { enabled: true, time: '06:35' },
+    { enabled: true, time: '07:15' },
+  ])
+})
+
+test('Free Sleep alarm delete confirms and removes only that alarm from the backend schedule', async ({ page }) => {
+  const dialog = await openBedAlarmDialog(page, /Steph's Bed Off/i)
+  const sundaySection = dialog.getByRole('region', { name: "Steph's Bed Sunday alarms" })
+  const deleteFirstAlarm = sundaySection.getByRole('button', { exact: true, name: "Delete Steph's Bed Sunday alarm" })
+
+  page.once('dialog', async (confirmDialog) => {
+    expect(confirmDialog.type()).toBe('confirm')
+    expect(confirmDialog.message()).toBe("Delete Steph's Bed Sunday alarm at 6:30 AM?")
+    await confirmDialog.dismiss()
+  })
+  await deleteFirstAlarm.click()
+
+  await expect(sundaySection.getByText('2 alarms')).toBeVisible()
+  await expectFreeSleepAlarms(page, 'right', 'sunday', [
+    { enabled: true, time: '06:30' },
+    { enabled: true, time: '07:15' },
+  ])
+
+  page.once('dialog', async (confirmDialog) => {
+    expect(confirmDialog.message()).toBe("Delete Steph's Bed Sunday alarm at 6:30 AM?")
+    await confirmDialog.accept()
+  })
+  await deleteFirstAlarm.click()
+
+  await expect(sundaySection.getByText('1 alarm')).toBeVisible()
+  await expectFreeSleepAlarms(page, 'right', 'sunday', [
+    { enabled: true, time: '07:15' },
+  ])
+})
+
+test('Free Sleep day toggle disables every alarm for that day in the backend schedule', async ({ page }) => {
+  const dialog = await openBedAlarmDialog(page, /Steph's Bed Off/i)
+  const sundaySection = dialog.getByRole('region', { name: "Steph's Bed Sunday alarms" })
+
+  await sundaySection.getByRole('switch', { name: "Disable Steph's Bed Sunday alarms" }).click()
+
+  await expect(sundaySection.getByRole('switch', { name: "Enable Steph's Bed Sunday alarms" })).toHaveAttribute('aria-checked', 'false')
+  await expect(sundaySection.getByRole('switch', { exact: true, name: "Enable Steph's Bed Sunday alarm" })).toHaveAttribute('aria-checked', 'false')
+  await expect(sundaySection.getByRole('switch', { exact: true, name: "Enable Steph's Bed Sunday alarm 2" })).toHaveAttribute('aria-checked', 'false')
+  await expectFreeSleepAlarms(page, 'right', 'sunday', [
+    { enabled: false, time: '06:30' },
+    { enabled: false, time: '07:15' },
+  ])
 })
 
 test('security page opens ported security, contact, and camera modals', async ({ page }) => {

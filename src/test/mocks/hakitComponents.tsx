@@ -1,4 +1,4 @@
-import type { CSSProperties } from 'react'
+import type { CSSProperties, KeyboardEvent } from 'react'
 
 type SliderTarget = 'high' | 'low' | 'value'
 
@@ -53,6 +53,41 @@ export function ControlSliderCircular({ className, colors, disabled, dual, high,
         />
       ))}
     </div>
+  )
+}
+
+type ControlToggleProps = {
+  'aria-disabled'?: boolean
+  'aria-label'?: string
+  checked?: boolean
+  className?: string
+  color?: string
+  disabled?: boolean
+  offIcon?: string
+  onChange?: (checked: boolean) => void
+  onIcon?: string
+  onKeyDown?: (event: KeyboardEvent<HTMLDivElement>) => void
+  style?: CSSProperties
+  thickness?: number
+  vertical?: boolean
+}
+
+export function ControlToggle({ checked = false, className, disabled, onChange, onKeyDown, style, ...props }: ControlToggleProps) {
+  return (
+    <div
+      aria-checked={checked}
+      aria-disabled={props['aria-disabled']}
+      aria-label={props['aria-label']}
+      className={className}
+      data-disabled={disabled ? 'true' : 'false'}
+      onClick={() => {
+        if (!disabled) onChange?.(!checked)
+      }}
+      onKeyDown={onKeyDown}
+      role="switch"
+      style={style}
+      tabIndex={disabled ? -1 : 0}
+    />
   )
 }
 

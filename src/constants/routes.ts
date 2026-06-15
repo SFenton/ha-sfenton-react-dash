@@ -37,6 +37,7 @@ export const DASHBOARD_ROUTES: DashboardRouteConfig[] = [
   { title: 'Home Improvement Tasks', path: 'home-improvement-chores', icon: 'mdi:hammer-wrench' },
   { title: 'Vacuums', path: 'vacuums', icon: 'mdi:robot-vacuum' },
   { title: 'Guests Staying Over', path: 'guests-staying-over', icon: 'mdi:account-group' },
+  { title: 'Vacation', path: 'vacation', icon: 'mdi:airplane' },
   { title: 'Media', path: 'media', icon: 'mdi:remote' },
   { title: 'Custom Lights', path: 'custom-lights', icon: 'mdi:lightbulb-group' },
 ]
@@ -126,10 +127,6 @@ function routePathFromValue(value: string | null) {
   return routePathFromPathname(withoutSearch)
 }
 
-function isWrapperDashboardPath(pathname: string) {
-  return pathname.split('/').filter(Boolean).includes('sfenton-react-dash')
-}
-
 function isStaticAppPath(pathname: string) {
   const parts = pathname.split('/').filter(Boolean)
   const appIndex = parts.lastIndexOf('ha-sfenton-react-dash')
@@ -137,7 +134,12 @@ function isStaticAppPath(pathname: string) {
 }
 
 function shouldUseQueryRoute(url: URL) {
-  return isWrapperDashboardPath(url.pathname) || isStaticAppPath(url.pathname)
+  return isDashboardRouteHostPath(url.pathname) || isStaticAppPath(url.pathname)
+}
+
+function isDashboardRouteHostPath(pathname: string) {
+  const parts = pathname.split('/').filter(Boolean)
+  return parts.includes('sfenton-react-dash') || parts.includes('at-a-glance')
 }
 
 function normalizedHash(hash: string | undefined) {

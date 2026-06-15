@@ -23,6 +23,8 @@ describe('routes', () => {
     expect(routeUrl('security', '/sfenton-react-dash/home?path=overview')).toBe('/sfenton-react-dash/home?path=security')
     expect(routeUrl('living-room', '/sfenton-react-dash/home?v=20260530', '#lights-living-room')).toBe('/sfenton-react-dash/home?v=20260530&path=living-room#lights-living-room')
     expect(routeUrl('vacuums', '/local/ha-sfenton-react-dash/index.html?v=20260530#old-popup')).toBe('/local/ha-sfenton-react-dash/index.html?v=20260530&path=vacuums')
+    expect(routeUrl('vacation', '/at-a-glance/settings')).toBe('/at-a-glance/settings?path=vacation')
+    expect(routeUrl('security', '/at-a-glance/overview#old-popup', '#security-system')).toBe('/at-a-glance/overview?path=security#security-system')
   })
 
   it('groups chore subpages under the Chores primary nav route', () => {

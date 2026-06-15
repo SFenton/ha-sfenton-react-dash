@@ -66,7 +66,29 @@ select:focus-visible {
 }
 
 button {
+  appearance: none;
+  -webkit-appearance: none;
+  outline: none;
   -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+}
+
+button:focus {
+  outline: none;
+}
+
+@media (hover: none), (pointer: coarse) {
+  button:active,
+  button:focus,
+  button:focus-visible,
+  [role='button']:active,
+  [role='button']:focus,
+  [role='button']:focus-visible {
+    border-color: transparent !important;
+    outline: none !important;
+    outline-offset: 0 !important;
+    -webkit-tap-highlight-color: transparent;
+  }
 }
 
 p,

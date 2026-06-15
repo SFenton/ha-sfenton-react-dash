@@ -23,6 +23,8 @@ export function entity(entityId: string, state: string, attributes: Record<strin
   return { attributes, entity_id: entityId, state }
 }
 
+const freeSleepLevelAttributes = { icon: 'mdi:thermometer-lines', max: 10, min: -10, step: 1, unit_of_measurement: '°' }
+
 export const mockCallServiceCalls: Record<string, unknown>[] = []
 export const mockTodoUpdateMessages: Record<string, unknown>[] = []
 export const mockTodoItemsByEntity: Record<string, MockTodoItem[] | undefined> = {}
@@ -99,6 +101,104 @@ function mockSwitchEntities(entityIds: readonly string[], attributes: Record<str
   return Object.fromEntries(entityIds.map((entityId) => [entityId, entity(entityId, 'on', attributes)]))
 }
 
+const freeSleepAlarmOwners = ['stephen', 'steph'] as const
+const freeSleepAlarmDays = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'] as const
+const freeSleepScheduleSetTopic = 'free-sleep/NightCanvasRestful/schedules/set'
+
+function mockFreeSleepAlarmHelpers() {
+  const entries: [string, MockEntity][] = []
+  for (const owner of freeSleepAlarmOwners) {
+    entries.push([`input_boolean.${owner}_alarms_enabled`, entity(`input_boolean.${owner}_alarms_enabled`, 'off')])
+    for (const day of freeSleepAlarmDays) {
+      entries.push([`input_boolean.${owner}_${day}_alarm_configured`, entity(`input_boolean.${owner}_${day}_alarm_configured`, 'off')])
+      entries.push([`input_boolean.${owner}_${day}_alarm_enabled`, entity(`input_boolean.${owner}_${day}_alarm_enabled`, 'off')])
+      entries.push([`input_datetime.${owner}_${day}_alarm_time`, entity(`input_datetime.${owner}_${day}_alarm_time`, '07:00:00', { has_date: false, has_time: true })])
+    }
+  }
+  return Object.fromEntries(entries)
+}
+
+function mockAlarm(time: string, enabled = true) {
+  return {
+    alarmTemperature: 82,
+    duration: 10,
+    enabled,
+    time,
+    vibrationIntensity: 100,
+    vibrationPattern: 'rise',
+  }
+}
+
+export function mockFreeSleepScheduleAttributes() {
+  return {
+    left: {},
+    right: {
+      sunday: {
+        alarm: mockAlarm('06:30'),
+        alarms: [mockAlarm('06:30'), mockAlarm('07:15')],
+      },
+    },
+  }
+}
+
+function cloneRecord<T>(value: T): T {
+  return JSON.parse(JSON.stringify(value)) as T
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+function applyFreeSleepSchedulePayload(payload: unknown) {
+  if (!isRecord(payload)) return
+  const schedulesEntity = mockEntities['sensor.nightcanvasrestful_schedules']
+  const nextAttributes = cloneRecord(schedulesEntity.attributes)
+  for (const side of ['left', 'right'] as const) {
+    const sidePayload = payload[side]
+    if (!isRecord(sidePayload)) continue
+    const sideAttributes = isRecord(nextAttributes[side]) ? cloneRecord(nextAttributes[side]) : {}
+    for (const day of freeSleepAlarmDays) {
+      const dayPayload = sidePayload[day]
+      if (!isRecord(dayPayload)) continue
+      const dayAttributes = isRecord(sideAttributes[day]) ? cloneRecord(sideAttributes[day]) : {}
+      const alarms = Array.isArray(dayPayload.alarms) ? cloneRecord(dayPayload.alarms) : []
+      dayAttributes.alarms = alarms
+      if (alarms.length > 0) dayAttributes.alarm = alarms[0]
+      else delete dayAttributes.alarm
+      sideAttributes[day] = dayAttributes
+    }
+    nextAttributes[side] = sideAttributes
+  }
+  schedulesEntity.attributes = nextAttributes
+}
+
+function applyMockCallServiceSideEffects(params: Record<string, unknown>) {
+  if (params.domain === 'switch' && typeof params.target === 'string' && (params.service === 'turn_on' || params.service === 'turn_off')) {
+    const switchEntity = mockEntities[params.target]
+    if (switchEntity) switchEntity.state = params.service === 'turn_on' ? 'on' : 'off'
+  }
+
+  if (params.domain !== 'mqtt' || params.service !== 'publish') return
+  const serviceData = isRecord(params.serviceData) ? params.serviceData : {}
+  if (serviceData.topic !== freeSleepScheduleSetTopic || typeof serviceData.payload !== 'string') return
+  applyFreeSleepSchedulePayload(JSON.parse(serviceData.payload))
+}
+
+type MockHassDebugApi = {
+  calls: Record<string, unknown>[]
+  freeSleepSchedules: () => Record<string, unknown>
+  reset: () => void
+}
+
+function exposeMockHassDebugApi() {
+  if (typeof window === 'undefined') return
+  ;(window as unknown as { __mockHass?: MockHassDebugApi }).__mockHass = {
+    calls: mockCallServiceCalls,
+    freeSleepSchedules: () => cloneRecord(mockEntities['sensor.nightcanvasrestful_schedules'].attributes),
+    reset: resetMockHass,
+  }
+}
+
 const thermostatRoomMockData = [
   { key: 'living_room', title: 'Living Room', temperature: '70.2', occupancy: 'inactive', track: 'on', force: 'off', climate: 'climate.thermostat_contact_sensors_living_room_virtual_thermostat', vents: [['cover.living_room_vent_1_vent', 'open'], ['cover.living_room_vent_2_vent', 'open']] },
   { key: 'office', title: 'Office', temperature: '71.6', occupancy: 'active', track: 'off', force: 'off', climate: 'climate.thermostat_contact_sensors_office_virtual_thermostat', vents: [['cover.office_vent_vent', 'closed']] },
@@ -124,6 +224,25 @@ function thermostatMockEntities() {
     ['sensor.thermostat_hub_w200_humidity', entity('sensor.thermostat_hub_w200_humidity', '38.0', { unit_of_measurement: '%' })],
     ['switch.thermostat_contact_sensors_eco_mode', entity('switch.thermostat_contact_sensors_eco_mode', 'on')],
     ['switch.thermostat_contact_sensors_only_track_selected_rooms', entity('switch.thermostat_contact_sensors_only_track_selected_rooms', 'on')],
+    ['switch.thermostat_contact_sensors_predictive_comfort_mode', entity('switch.thermostat_contact_sensors_predictive_comfort_mode', 'off')],
+    ['switch.thermostat_contact_sensors_predictive_auto_adjust', entity('switch.thermostat_contact_sensors_predictive_auto_adjust', 'off')],
+    ['switch.thermostat_contact_sensors_predictive_hvac_mode_changes', entity('switch.thermostat_contact_sensors_predictive_hvac_mode_changes', 'off')],
+    ['switch.thermostat_contact_sensors_predictive_allow_away', entity('switch.thermostat_contact_sensors_predictive_allow_away', 'off')],
+    [
+      'sensor.living_room_thermostat_contact_sensors_predictive_comfort_mode',
+      entity('sensor.living_room_thermostat_contact_sensors_predictive_comfort_mode', 'idle', {
+        active_activity_entities: ['switch.office_pc'],
+        adjustment_status: 'auto_adjust_disabled',
+        comfort_high: 74,
+        comfort_low: 71,
+        forecast_high: 83,
+        forecast_low: 68,
+        indoor_temperature: 72.4,
+        predicted_temperature: 74.8,
+        reason: 'Forecast and current indoor conditions are inside the comfort band',
+        weather_entity: 'weather.pirate_weather',
+      }),
+    ],
     ['input_boolean.enable_disable_thermostat_contact_sensors_integration', entity('input_boolean.enable_disable_thermostat_contact_sensors_integration', 'on')],
     ['binary_sensor.thermostat_contact_sensors_away_mode_active', entity('binary_sensor.thermostat_contact_sensors_away_mode_active', 'off')],
     ['select.thermostat_contact_sensors_eco_mode_critical_tracking', entity('select.thermostat_contact_sensors_eco_mode_critical_tracking', 'Track Select Critical', { options: ['Track Select Critical', 'Track Select Active', 'Ignore Critical'] })],
@@ -159,6 +278,25 @@ export const mockEntities: Record<string, MockEntity> = {
   'climate.thermostat_hub_w200': entity('climate.thermostat_hub_w200', 'heat', { current_temperature: 70, temperature: 71, temperature_unit: '°F' }),
   'climate.stephen_s_eight_sleep_side_climate': entity('climate.stephen_s_eight_sleep_side_climate', 'heat_cool', { current_temperature: 86, temperature: 86, hvac_action: 'heating' }),
   'climate.steph_s_eight_sleep_side_climate': entity('climate.steph_s_eight_sleep_side_climate', 'off', { current_temperature: 72, temperature: 79, hvac_action: 'off' }),
+  'number.nightcanvasrestful_left_target_temperature': entity('number.nightcanvasrestful_left_target_temperature', '-1', { ...freeSleepLevelAttributes }),
+  'number.nightcanvasrestful_right_target_temperature': entity('number.nightcanvasrestful_right_target_temperature', '0', { ...freeSleepLevelAttributes }),
+  'number.nightcanvasrestful_left_bedtime_temperature': entity('number.nightcanvasrestful_left_bedtime_temperature', '0', { ...freeSleepLevelAttributes }),
+  'number.nightcanvasrestful_left_asleep_temperature': entity('number.nightcanvasrestful_left_asleep_temperature', '-1', { ...freeSleepLevelAttributes }),
+  'number.nightcanvasrestful_left_dawn_temperature': entity('number.nightcanvasrestful_left_dawn_temperature', '0', { ...freeSleepLevelAttributes }),
+  'number.nightcanvasrestful_right_bedtime_temperature': entity('number.nightcanvasrestful_right_bedtime_temperature', '0', { ...freeSleepLevelAttributes }),
+  'number.nightcanvasrestful_right_asleep_temperature': entity('number.nightcanvasrestful_right_asleep_temperature', '0', { ...freeSleepLevelAttributes }),
+  'number.nightcanvasrestful_right_dawn_temperature': entity('number.nightcanvasrestful_right_dawn_temperature', '0', { ...freeSleepLevelAttributes }),
+  'sensor.nightcanvasrestful_left_current_temperature': entity('sensor.nightcanvasrestful_left_current_temperature', '86', { unit_of_measurement: '°F', device_class: 'temperature' }),
+  'sensor.nightcanvasrestful_right_current_temperature': entity('sensor.nightcanvasrestful_right_current_temperature', '72', { unit_of_measurement: '°F', device_class: 'temperature' }),
+  'sensor.nightcanvasrestful_left_seconds_remaining': entity('sensor.nightcanvasrestful_left_seconds_remaining', '7200', { unit_of_measurement: 's' }),
+  'sensor.nightcanvasrestful_right_seconds_remaining': entity('sensor.nightcanvasrestful_right_seconds_remaining', '0', { unit_of_measurement: 's' }),
+  'sensor.nightcanvasrestful_schedules': entity('sensor.nightcanvasrestful_schedules', 'ready', mockFreeSleepScheduleAttributes()),
+  'switch.nightcanvasrestful_left_power': entity('switch.nightcanvasrestful_left_power', 'on'),
+  'switch.nightcanvasrestful_right_power': entity('switch.nightcanvasrestful_right_power', 'off'),
+  'switch.nightcanvasrestful_left_away_mode': entity('switch.nightcanvasrestful_left_away_mode', 'off'),
+  'switch.nightcanvasrestful_right_away_mode': entity('switch.nightcanvasrestful_right_away_mode', 'off'),
+  'switch.nightcanvasrestful_left_alarms_enabled': entity('switch.nightcanvasrestful_left_alarms_enabled', 'off'),
+  'switch.nightcanvasrestful_right_alarms_enabled': entity('switch.nightcanvasrestful_right_alarms_enabled', 'off'),
   'sensor.stephen_s_eight_sleep_side_active_level': entity('sensor.stephen_s_eight_sleep_side_active_level', '1', { raw_value: 9, api_field: 'leftTargetHeatingLevel', source: 'target_heating_level', unit_of_measurement: '°' }),
   'sensor.stephen_s_eight_sleep_side_asleep_level': entity('sensor.stephen_s_eight_sleep_side_asleep_level', '2', { raw_value: 17, api_field: 'initialSleepLevel', unit_of_measurement: '°' }),
   'sensor.stephen_s_eight_sleep_side_bedtime_level': entity('sensor.stephen_s_eight_sleep_side_bedtime_level', '-1', { raw_value: -13, api_field: 'bedTimeLevel', unit_of_measurement: '°' }),
@@ -181,6 +319,7 @@ export const mockEntities: Record<string, MockEntity> = {
   'input_number.eight_sleep_steph_asleep_level': entity('input_number.eight_sleep_steph_asleep_level', '1'),
   'input_number.eight_sleep_steph_bedtime_level': entity('input_number.eight_sleep_steph_bedtime_level', '-5'),
   'input_number.eight_sleep_steph_dawn_level': entity('input_number.eight_sleep_steph_dawn_level', '2'),
+  ...mockFreeSleepAlarmHelpers(),
   'timer.eight_sleep_stephen_hot_flash': entity('timer.eight_sleep_stephen_hot_flash', 'idle'),
   'timer.eight_sleep_steph_hot_flash': entity('timer.eight_sleep_steph_hot_flash', 'active', { remaining: '0:12:34' }),
   'input_text.all_aqi_color': entity('input_text.all_aqi_color', 'rgba(0, 150, 136, 1)'),
@@ -207,6 +346,10 @@ export const mockEntities: Record<string, MockEntity> = {
   'input_boolean.guests_staying_in_guest_room': entity('input_boolean.guests_staying_in_guest_room', 'off'),
   'input_boolean.guests_staying_in_music_room': entity('input_boolean.guests_staying_in_music_room', 'off'),
   'input_boolean.guests_staying_in_theater_room': entity('input_boolean.guests_staying_in_theater_room', 'off'),
+  'input_boolean.vacation_mode': entity('input_boolean.vacation_mode', 'off'),
+  'input_boolean.vacation_mode_invalid_dates_pending': entity('input_boolean.vacation_mode_invalid_dates_pending', 'off'),
+  'input_datetime.vacation_start': entity('input_datetime.vacation_start', '2026-06-14 10:01:00', { has_date: true, has_time: true }),
+  'input_datetime.vacation_end': entity('input_datetime.vacation_end', '2026-06-15 10:01:00', { has_date: true, has_time: true }),
   'input_boolean.is_front_door_auto_lock_enabled': entity('input_boolean.is_front_door_auto_lock_enabled', 'on'),
   'input_boolean.show_outdoor_faucets': entity('input_boolean.show_outdoor_faucets', 'off'),
   'input_boolean.show_christmas_lights': entity('input_boolean.show_christmas_lights', 'off'),
@@ -270,6 +413,10 @@ export const mockEntities: Record<string, MockEntity> = {
   'binary_sensor.music_room_door_contact_sensor_contact': entity('binary_sensor.music_room_door_contact_sensor_contact', 'off'),
   'binary_sensor.office_pc_window_sensor_contact': entity('binary_sensor.office_pc_window_sensor_contact', 'off'),
   'binary_sensor.office_window_contact_sensor_contact': entity('binary_sensor.office_window_contact_sensor_contact', 'off'),
+  'binary_sensor.nightcanvasrestful_left_alarm_vibrating': entity('binary_sensor.nightcanvasrestful_left_alarm_vibrating', 'off'),
+  'binary_sensor.nightcanvasrestful_left_presence': entity('binary_sensor.nightcanvasrestful_left_presence', 'on'),
+  'binary_sensor.nightcanvasrestful_right_alarm_vibrating': entity('binary_sensor.nightcanvasrestful_right_alarm_vibrating', 'off'),
+  'binary_sensor.nightcanvasrestful_right_presence': entity('binary_sensor.nightcanvasrestful_right_presence', 'off'),
   'binary_sensor.stephen_s_eight_sleep_side_bed_presence': entity('binary_sensor.stephen_s_eight_sleep_side_bed_presence', 'on'),
   'binary_sensor.steph_s_eight_sleep_side_bed_presence': entity('binary_sensor.steph_s_eight_sleep_side_bed_presence', 'off'),
   'binary_sensor.theater_room_door_contact_sensor_contact': entity('binary_sensor.theater_room_door_contact_sensor_contact', 'off'),
@@ -418,6 +565,10 @@ export function resetMockHass() {
   mockTodoUpdateMessages.length = 0
   for (const entityId of Object.keys(mockTodoItemsByEntity)) delete mockTodoItemsByEntity[entityId]
   mockState.user = { id: '64089b5683944c39b4f944c8f76830b0', name: 'Stephen' }
+  mockEntities['sensor.nightcanvasrestful_schedules'].attributes = mockFreeSleepScheduleAttributes()
+  mockEntities['switch.nightcanvasrestful_left_alarms_enabled'].state = 'off'
+  mockEntities['switch.nightcanvasrestful_right_alarms_enabled'].state = 'off'
+  exposeMockHassDebugApi()
 }
 
 export const mockState: MockHassState = {
@@ -441,6 +592,7 @@ export const mockState: MockHassState = {
   helpers: {
     callService: (params) => {
       mockCallServiceCalls.push(params)
+      applyMockCallServiceSideEffects(params)
       if (params.domain === 'weather' && params.service === 'get_forecasts' && params.returnResponse === true) {
         const forecast = (params.serviceData as { type?: string } | undefined)?.type === 'hourly' ? mockHourlyWeatherForecast : mockDailyWeatherForecast
         return Promise.resolve({ response: { 'weather.pirate_weather': { forecast } } })
@@ -451,3 +603,5 @@ export const mockState: MockHassState = {
   services: {},
   user: { id: '64089b5683944c39b4f944c8f76830b0', name: 'Stephen' },
 }
+
+exposeMockHassDebugApi()

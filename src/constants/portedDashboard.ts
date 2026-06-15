@@ -213,6 +213,12 @@ export const SETTINGS_PAGE_ITEMS: SettingsLinkConfig[] = [
     path: 'guests-staying-over',
   },
   {
+    title: 'Vacation',
+    subtitle: 'Set away dates and prepare the house for vacation.',
+    icon: 'mdi:airplane',
+    path: 'vacation',
+  },
+  {
     title: 'To-Do',
     subtitle: 'An admin panel for to-do tasks.',
     icon: 'mdi:clipboard-list',
@@ -238,6 +244,19 @@ export const GUEST_CONTROL_ITEMS: EntityTileConfig[] = [
   { title: 'Guest Room', entityId: 'input_boolean.guests_staying_in_guest_room', icon: 'mdi:bed', color: SWITCH_ACTIVE_COLOR, action: { type: 'toggle' }, showSubtitle: true },
   { title: 'Music Room', entityId: 'input_boolean.guests_staying_in_music_room', icon: 'mdi:guitar-electric', color: SWITCH_ACTIVE_COLOR, action: { type: 'toggle' }, showSubtitle: true },
   { title: 'Theater Room', entityId: 'input_boolean.guests_staying_in_theater_room', icon: 'mdi:projector', color: SWITCH_ACTIVE_COLOR, action: { type: 'toggle' }, showSubtitle: true },
+]
+
+export const VACATION_MODE_DESCRIPTION = 'Enable or disable vacation mode for the house'
+export const VACATION_DATES_DESCRIPTION = 'Set the start and end time for your vacation. Vacation mode will automatically be turned off at the set end date and time.'
+export const VACATION_DATE_RANGE_ERROR = 'Start date and time must be before end date and time. Vacation mode is disabled until the dates are fixed.'
+
+export const VACATION_MODE_ENTITY_ID = 'input_boolean.vacation_mode'
+export const VACATION_INVALID_DATES_PENDING_ENTITY_ID = 'input_boolean.vacation_mode_invalid_dates_pending'
+export const VACATION_START_ENTITY_ID = 'input_datetime.vacation_start'
+export const VACATION_END_ENTITY_ID = 'input_datetime.vacation_end'
+
+export const VACATION_MODE_ITEMS: EntityTileConfig[] = [
+  { title: 'Vacation Mode', entityId: VACATION_MODE_ENTITY_ID, icon: 'mdi:home-export-outline', color: SWITCH_ACTIVE_COLOR, action: { type: 'toggle' }, showSubtitle: true },
 ]
 
 export const TODO_PAGES: Record<string, TodoPageConfig> = {
@@ -481,8 +500,8 @@ export const ROOM_EXTRA_SECTIONS: Record<string, EntitySectionConfig[]> = {
       title: 'Bedroom Climate',
       items: [
         { title: 'Humidifier', entityId: 'humidifier.master_bedroom_humidifier', icon: 'mdi:air-humidifier', color: CLIMATE_COLOR, manualReview: true },
-        { title: "Stephen's Bed", entityId: 'climate.stephen_s_eight_sleep_side_climate', icon: 'mdi:bed', color: CLIMATE_COLOR, manualReview: true },
-        { title: "Steph's Bed", entityId: 'climate.steph_s_eight_sleep_side_climate', icon: 'mdi:bed', color: CLIMATE_COLOR, manualReview: true },
+        { title: "Stephen's Bed", entityId: 'number.nightcanvasrestful_left_target_temperature', icon: 'mdi:bed', color: CLIMATE_COLOR, manualReview: true },
+        { title: "Steph's Bed", entityId: 'number.nightcanvasrestful_right_target_temperature', icon: 'mdi:bed', color: CLIMATE_COLOR, manualReview: true },
       ],
     },
     {
