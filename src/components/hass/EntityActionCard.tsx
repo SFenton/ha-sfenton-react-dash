@@ -71,7 +71,7 @@ export function EntityActionCard({ item, onNavigate, size = 'compact' }: EntityA
   const resolvedAction = resolveEntityAction(item.entityId, item.action, entities)
   const entityUnavailable = !entity || entity.state === 'unavailable' || entity.state === 'unknown'
   const stateLabel = formatStateLabel(item, entity)
-  const subtitle = item.manualReview ? `${formatCompactEntityState(entity, 'Review')} - review` : stateLabel ?? (item.showSubtitle ? formatCompactEntityState(entity, 'Unavailable') : undefined)
+  const subtitle = stateLabel ?? (item.showSubtitle ? formatCompactEntityState(entity, 'Unavailable') : undefined)
   const active = isActiveState(entity)
   const disabled = Boolean(item.disabledWhenUnavailable && entityUnavailable)
   const clickable = Boolean(item.action) && !disabled

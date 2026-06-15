@@ -38,7 +38,7 @@ import {
   type EntityGroupConfig,
   type QuickAccessConfig,
 } from '../constants/atAGlance'
-import { CHORE_BLUE } from '../constants/portedDashboard'
+import { CHORE_BLUE, CHORE_QUICK_LINKS, SETTINGS_PAGE_ITEMS, TODO_PAGES, type ChoreQuickLinkConfig, type SettingsLinkConfig } from '../constants/portedDashboard'
 import { buildStaggerStyle, staggerMs } from '../hooks/useStaggerStyle'
 import { useHashModal } from '../hooks/useHashModal'
 import styles from './AtAGlancePage.module.css'
@@ -222,8 +222,8 @@ function contactGroupOpenCount(group: EntityGroupConfig, entities: Record<string
   return group.items.reduce((count, item) => count + (isContactOpen(entities[item.entityId]) ? 1 : 0), 0)
 }
 
-function contactSensorActiveSubtitle(activeCount: number) {
-  return `${activeCount} Sensor${activeCount === 1 ? '' : 's'} Active`
+function contactSensorStatusSubtitle(openCount: number) {
+  return openCount > 0 ? `${openCount} Open` : 'All Closed'
 }
 
 function contactKindLabel(kind: ReturnType<typeof contactItemKind>, count: number) {
@@ -312,6 +312,97 @@ function QuickAccessTile({ item, onNavigate, onOpenHash }: { item: QuickAccessCo
       title={item.title}
       tone={item.tone}
     />
+  )
+}
+
+function todoCountForChoreLink(item: ChoreQuickLinkConfig, entities: Record<string, HassEntity | undefined>) {
+  const page = TODO_PAGES[item.path]
+  if (!page) return 0
+  return page.lists.reduce((total, list) => {
+    const value = Number(entities[list.entityId]?.state ?? 0)
+    return total + (Number.isFinite(value) && value > 0 ? value : 0)
+  }, 0)
+}
+
+function taskCountSubtitle(count: number) {
+  if (!Number.isFinite(count) || count <= 0) return 'No active tasks'
+  if (count === 1) return '1 active task'
+  return `${count} active tasks`
+}
+
+function groceryCountSubtitle(count: number) {
+  if (!Number.isFinite(count) || count <= 0) return 'No groceries listed'
+  if (count === 1) return '1 item'
+  return `${count} items`
+}
+
+function ChorePreviewTile({ closeHash, item, onNavigate }: { closeHash: () => void; item: ChoreQuickLinkConfig; onNavigate: (path: string) => void }) {
+  const entities = useHass((state) => state.entities)
+  const count = todoCountForChoreLink(item, entities)
+  const subtitle = item.countType === 'groceries' ? groceryCountSubtitle(count) : taskCountSubtitle(count)
+
+  const openPage = () => {
+    closeHash()
+    onNavigate(item.path)
+  }
+
+  return (
+    <GlassTile
+      backgroundColor={`rgba(${item.color.r}, ${item.color.g}, ${item.color.b}, 0.72)`}
+      icon={item.icon}
+      onClick={openPage}
+      subtitle={subtitle}
+      title={item.title}
+    />
+  )
+}
+
+function ChoresPreviewSheet({ closeHash, onNavigate }: { closeHash: () => void; onNavigate: (path: string) => void }) {
+  return (
+    <div className={styles.previewSheet}>
+      <p className={styles.sheetText}>Open groceries, personal chores, unassigned tasks, or home projects.</p>
+      <div className={styles.previewGrid}>
+        {CHORE_QUICK_LINKS.map((item) => <ChorePreviewTile closeHash={closeHash} item={item} key={item.path} onNavigate={onNavigate} />)}
+      </div>
+    </div>
+  )
+}
+
+function navigateExternal(path: string) {
+  try {
+    const targetWindow = window.top && window.top !== window ? window.top : window
+    targetWindow.location.assign(path)
+  } catch {
+    window.location.assign(path)
+  }
+}
+
+function SettingsPreviewLink({ closeHash, item, onNavigate }: { closeHash: () => void; item: SettingsLinkConfig; onNavigate: (path: string) => void }) {
+  const activate = () => {
+    closeHash()
+    if (item.path) onNavigate(item.path)
+    else if (item.externalPath) navigateExternal(item.externalPath)
+  }
+
+  return (
+    <button aria-label={`${item.title} ${item.subtitle}`} className={styles.previewLink} data-external-path={item.externalPath} data-navigation-path={item.path} onClick={activate} type="button">
+      <span aria-hidden="true" className={styles.previewLinkIcon}>
+        <MaterialIcon name={item.icon} size={28} />
+      </span>
+      <span className={styles.previewLinkCopy}>
+        <strong>{item.title}</strong>
+        <small>{item.subtitle}</small>
+      </span>
+      <MaterialIcon name="mdi:chevron-right" size={24} />
+    </button>
+  )
+}
+
+function SettingsPreviewSheet({ closeHash, onNavigate }: { closeHash: () => void; onNavigate: (path: string) => void }) {
+  return (
+    <nav aria-label="Settings pages" className={styles.previewList}>
+      {SETTINGS_PAGE_ITEMS.map((item) => <SettingsPreviewLink closeHash={closeHash} item={item} key={item.title} onNavigate={onNavigate} />)}
+    </nav>
   )
 }
 
@@ -942,7 +1033,7 @@ export function AirQualitySheet() {
   )
 }
 
-function SheetContent({ hash }: { hash: string }) {
+function SheetContent({ closeHash, hash, onNavigate }: { closeHash: () => void; hash: string; onNavigate: (path: string) => void }) {
   if (hash === '#lights-overview') {
     return <LightsSheet />
   }
@@ -963,11 +1054,13 @@ function SheetContent({ hash }: { hash: string }) {
     return <AirQualitySheet />
   }
 
+  if (hash === '#chores-preview') return <ChoresPreviewSheet closeHash={closeHash} onNavigate={onNavigate} />
+  if (hash === '#settings-preview') return <SettingsPreviewSheet closeHash={closeHash} onNavigate={onNavigate} />
   if (hash === '#security-system') return <SecurityControls />
 
   if (CAMERA_ITEMS.some((item) => item.hash === hash)) return <CameraSheet hash={hash} key={hash} />
 
-  return <p className={styles.sheetText}>This section is represented in the Home Assistant dashboard and is queued for the next recreation pass.</p>
+  return <p className={styles.sheetText}>This overview section is not available from Home.</p>
 }
 
 function RoomPickerButton({ onNavigate }: { onNavigate: (path: string) => void }) {
@@ -1004,7 +1097,7 @@ export function AtAGlancePage({ activePath = 'overview', onNavigate = () => unde
   const activeRoomLightCount = useHass((state) =>
     ROOM_LIGHT_ENTITY_IDS.reduce((count, entityId) => count + (isActiveState(state.entities[entityId] ?? null) ? 1 : 0), 0),
   )
-  const activeContactSensorCount = useHass((state) =>
+  const openContactSensorCount = useHass((state) =>
     ROOM_CONTACT_ENTITY_IDS.reduce((count, entityId) => count + (isContactOpen(state.entities[entityId]) ? 1 : 0), 0),
   )
   const airQualityStatusSubtitle = useHass((state) => {
@@ -1013,7 +1106,7 @@ export function AtAGlancePage({ activePath = 'overview', onNavigate = () => unde
     return `AQI ${aqiRange} · PM2.5 ${pm25Range}`
   })
   const lightStatusSubtitle = lightCountSubtitle(activeRoomLightCount)
-  const contactStatusSubtitle = contactSensorActiveSubtitle(activeContactSensorCount)
+  const contactStatusSubtitle = contactSensorStatusSubtitle(openContactSensorCount)
   const modalTitle = hash === '#lights-overview' ? lightsSheetTitle(activeRoomLightCount) : sheetTitle(hash)
 
   return (
@@ -1055,7 +1148,7 @@ export function AtAGlancePage({ activePath = 'overview', onNavigate = () => unde
       </Page>
 
       <ModalSheet open={hash !== ''} title={modalTitle} onClose={closeHash}>
-        <SheetContent hash={hash} />
+        <SheetContent closeHash={closeHash} hash={hash} onNavigate={onNavigate} />
       </ModalSheet>
     </AppShell>
   )

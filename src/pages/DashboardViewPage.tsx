@@ -17,6 +17,7 @@ import { TodoListPanel } from '../components/hass/TodoListPanel'
 import { VacuumCard, VacuumModalContent } from '../components/hass/VacuumCard'
 import { AirQualityModalContent } from '../components/hass/AirQualityModalContent'
 import { GrillModalContent } from '../components/hass/GrillModalContent'
+import { HumidifierModalContent } from '../components/hass/HumidifierModalContent'
 import { MediaRemoteModalContent } from '../components/hass/MediaRemoteModalContent'
 import { Card, type CardColor } from '../components/core/Card'
 import { Description } from '../components/core/Description'
@@ -125,8 +126,8 @@ function Grid({ children }: { children: ReactNode }) {
   return <div className={styles.grid}>{children}</div>
 }
 
-function Notice({ children, tone = 'default' }: { children: React.ReactNode; tone?: 'default' | 'review' }) {
-  return <div className={`${styles.notice} ${tone === 'review' ? styles.review : ''}`}>{children}</div>
+function Notice({ children }: { children: React.ReactNode }) {
+  return <div className={styles.notice}>{children}</div>
 }
 
 function EntitySections({ onNavigate, sections }: { onNavigate: (path: string) => void; sections: EntitySectionConfig[] }) {
@@ -212,7 +213,7 @@ function setRoomHash(hash: string) {
 function toneForSourceKind(kind: RoomSourceKind): StatusRailChip['tone'] {
   if (kind === 'light') return 'light'
   if (kind === 'air') return 'air'
-  if (kind === 'climate' || kind === 'vent' || kind === 'fan') return 'climate'
+  if (kind === 'climate' || kind === 'vent' || kind === 'fan' || kind === 'humidifier') return 'climate'
   if (kind === 'occupancy') return 'presence'
   if (kind === 'contact') return 'contact'
   if (kind === 'vacuum') return 'vacuum'
@@ -273,7 +274,7 @@ function RoomSectionRail({ path, title }: { path: string; title: string }) {
 
 function sourceColor(kind: RoomSourceKind): CardColor {
   if (kind === 'light') return { r: 230, g: 172, b: 44 }
-  if (kind === 'climate' || kind === 'air' || kind === 'vent' || kind === 'fan') return CLIMATE_COLOR
+  if (kind === 'climate' || kind === 'air' || kind === 'vent' || kind === 'fan' || kind === 'humidifier') return CLIMATE_COLOR
   if (kind === 'occupancy' || kind === 'contact') return { r: 75, g: 126, b: 210 }
   if (kind === 'vacuum') return VACUUM_COLOR
   if (kind === 'media') return MEDIA_COLOR
@@ -386,7 +387,6 @@ function SourceEntityModalContent({ card }: { card: RoomSourceCardConfig }) {
       <Grid>
         {card.modalItems?.map((item) => <SourceModalItemCard fallbackKind={card.kind} item={item} key={item.entityId} />)}
       </Grid>
-      {card.manualReview && <Notice tone="review">{card.manualReview}</Notice>}
     </div>
   )
 }
@@ -426,6 +426,10 @@ function renderRoomReusableSheet(card: RoomSourceCardConfig, roomTitle: string):
     return <AirQualityModalContent key={card.entityId} pm25EntityId={card.modalEntityId ?? card.entityId} roomTitle={roomTitle} />
   }
 
+  if (card.kind === 'humidifier') {
+    return <HumidifierModalContent entityId={card.entityId} key={card.entityId} roomTitle={roomTitle} />
+  }
+
   if (card.kind === 'grill' && card.hash === '#bear-grills') {
     return <GrillModalContent key={card.entityId} />
   }
@@ -446,7 +450,7 @@ function RoomSourceFallback({ card }: { card: RoomSourceCardConfig }) {
       </div>
       <div>
         <strong>{card.hash ?? 'Source control'}</strong>
-        <span>{card.manualReview ?? 'This source card is present in the YAML page and is ready for a dedicated React treatment.'}</span>
+        <span>This source does not have interactive controls available from this view.</span>
       </div>
       <div className={styles.sourceEntity}>{card.entityId}</div>
     </div>
@@ -528,7 +532,7 @@ function RoomSourceCard({ card, eightSleepModalState, onOpen }: { card: RoomSour
     : effectiveShowState ? formatRoomSourceState(card, entity) : undefined
   const displayUnavailable = eightSleepModalState ? !eightSleepModalState.sideAvailable : unavailable
   const displaySubtitle = eightSleepModalState ? (eightSleepModalState.controlsSideOn ? eightSleepModalState.subtitle : 'Off') : subtitle
-  const clickable = Boolean(card.hash || card.manualReview || card.action) && !displayUnavailable && !disabledByState
+  const clickable = Boolean(card.hash || card.action) && !displayUnavailable && !disabledByState
   const activeByState = Boolean(entity && card.activeStates?.includes(entity.state))
   const sourceStateInactive = card.stateDisplay === 'climate-action-temperature' && (entity?.state === 'off' || entity?.attributes.hvac_action === 'off')
   const inactiveMuted = eightSleepModalState ? !eightSleepModalState.controlsSideOn : sourceStateInactive || (!unavailable && !activeByState && !isActiveState(entity) && ['fan', 'grill', 'light', 'media', 'power'].includes(card.kind))
@@ -555,7 +559,7 @@ function RoomSourceCard({ card, eightSleepModalState, onOpen }: { card: RoomSour
 function RoomSourceModal({ card, eightSleepModalState, onClose, roomTitle }: { card: RoomSourceCardConfig | null; eightSleepModalState?: EightSleepBedModalState; onClose: () => void; roomTitle: string }) {
   const eightSleepSide = card ? eightSleepSideForHash(card.hash) : undefined
   const content = card && !eightSleepSide ? renderRoomReusableSheet(card, roomTitle) : null
-  const plainTitle = card?.kind === 'air' || card?.kind === 'climate' || card?.kind === 'contact' || card?.kind === 'light' || card?.kind === 'occupancy'
+  const plainTitle = card?.kind === 'air' || card?.kind === 'climate' || card?.kind === 'contact' || card?.kind === 'humidifier' || card?.kind === 'light' || card?.kind === 'occupancy'
   const mediaTitle = card?.kind === 'media' && card.hash ? MEDIA_REMOTE_CONFIGS[card.hash]?.remoteTitle : undefined
   const title = card ? mediaTitle ?? `${roomTitle}${plainTitle ? ' ' : ': '}${card.modalTitle ?? card.title}` : roomTitle
   const subtitle = useHass((state) => (card && plainTitle && card.kind !== 'contact' && card.kind !== 'light' ? roomSourceModalSubtitle(card, roomTitle, state.entities) : undefined))
@@ -942,11 +946,13 @@ function SettingsPage({ onNavigate }: { onNavigate: (path: string) => void }) {
 
 function GuestControlsPage({ onNavigate }: { onNavigate: (path: string) => void }) {
   return (
-    <section className={styles.guestSection}>
-      <SectionHeader title="Guest Controls" />
-      <Description>{GUEST_CONTROLS_DESCRIPTION}</Description>
-      <AdminTileGrid items={GUEST_CONTROL_ITEMS} onNavigate={onNavigate} variant="admin-modal" />
-    </section>
+    <div className={styles.stack}>
+      <section className={styles.section}>
+        <SectionHeader title="Guest Controls" />
+        <Description>{GUEST_CONTROLS_DESCRIPTION}</Description>
+        <AdminTileGrid items={GUEST_CONTROL_ITEMS} onNavigate={onNavigate} variant="admin-modal" />
+      </section>
+    </div>
   )
 }
 
@@ -1397,10 +1403,13 @@ type FreeSleepScheduleStage = 'bedtime' | 'asleep' | 'dawn'
 type FreeSleepSide = 'left' | 'right'
 type FreeSleepAlarmOwner = 'stephen' | 'steph'
 type FreeSleepAlarmDay = 'sunday' | 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday'
+type FreeSleepSideSchedule = Partial<Record<FreeSleepAlarmDay, FreeSleepDailySchedule>>
 
 interface EightSleepSideConfig {
   alarmOwner: FreeSleepAlarmOwner
   alarmsEnabledEntityId: string
+  alarmSnoozeButtonEntityId: string
+  alarmSnoozeMinutesEntityId: string
   alarmVibratingEntityId: string
   awayModeEntityId: string
   currentTemperatureEntityId: string
@@ -1426,9 +1435,12 @@ interface FreeSleepAlarmSchedule {
 interface FreeSleepDailySchedule {
   alarm?: Partial<FreeSleepAlarmSchedule>
   alarms?: Partial<FreeSleepAlarmSchedule>[]
+  power?: {
+    off?: string
+  }
 }
 
-type FreeSleepSchedulesState = Partial<Record<FreeSleepSide, Partial<Record<FreeSleepAlarmDay, FreeSleepDailySchedule>>>>
+type FreeSleepSchedulesState = Partial<Record<FreeSleepSide, FreeSleepSideSchedule>>
 
 interface FreeSleepAlarmRecord extends FreeSleepAlarmSchedule {
   day: FreeSleepAlarmDay
@@ -1465,7 +1477,7 @@ const FREE_SLEEP_ALARM_DIAGNOSTICS_STORAGE_KEY = 'freeSleepAlarmDiagnostics'
 let freeSleepAlarmDebugSequence = 0
 const FREE_SLEEP_DEFAULT_ALARM: FreeSleepAlarmSchedule = {
   alarmTemperature: 82,
-  duration: 10,
+  duration: 300,
   enabled: true,
   time: '07:00',
   vibrationIntensity: 100,
@@ -1485,11 +1497,16 @@ const FREE_SLEEP_ALARM_DAYS: { key: FreeSleepAlarmDay; label: string }[] = [
   { key: 'friday', label: 'Friday' },
   { key: 'saturday', label: 'Saturday' },
 ]
+const FREE_SLEEP_ALARM_DAY_KEYS = FREE_SLEEP_ALARM_DAYS.map((day) => day.key)
+const FREE_SLEEP_ALARM_SNOOZE_MINUTES = 10
+const FREE_SLEEP_CLEAR_ALARM_ENTITY_ID = 'button.nightcanvasrestful_clear_alarm'
 
 const EIGHT_SLEEP_SIDE_CONFIGS: EightSleepSideConfig[] = [
   {
     alarmOwner: 'stephen',
     alarmsEnabledEntityId: 'switch.nightcanvasrestful_left_alarms_enabled',
+    alarmSnoozeButtonEntityId: 'button.stephen_s_eight_sleep_side_alarm_snooze',
+    alarmSnoozeMinutesEntityId: 'number.stephen_s_eight_sleep_side_alarm_snooze_minutes',
     alarmVibratingEntityId: 'binary_sensor.nightcanvasrestful_left_alarm_vibrating',
     awayModeEntityId: 'switch.nightcanvasrestful_left_away_mode',
     currentTemperatureEntityId: 'sensor.nightcanvasrestful_left_current_temperature',
@@ -1509,6 +1526,8 @@ const EIGHT_SLEEP_SIDE_CONFIGS: EightSleepSideConfig[] = [
   {
     alarmOwner: 'steph',
     alarmsEnabledEntityId: 'switch.nightcanvasrestful_right_alarms_enabled',
+    alarmSnoozeButtonEntityId: 'button.steph_s_eight_sleep_side_alarm_snooze',
+    alarmSnoozeMinutesEntityId: 'number.steph_s_eight_sleep_side_alarm_snooze_minutes',
     alarmVibratingEntityId: 'binary_sensor.nightcanvasrestful_right_alarm_vibrating',
     awayModeEntityId: 'switch.nightcanvasrestful_right_away_mode',
     currentTemperatureEntityId: 'sensor.nightcanvasrestful_right_current_temperature',
@@ -1591,14 +1610,37 @@ function alarmsFromDailySchedule(daySchedule: FreeSleepDailySchedule | undefined
   return legacyAlarm?.enabled ? [legacyAlarm] : []
 }
 
+function alarmDayOffset(day: FreeSleepAlarmDay, offset: number) {
+  const index = FREE_SLEEP_ALARM_DAY_KEYS.indexOf(day)
+  const nextIndex = (index + offset + FREE_SLEEP_ALARM_DAY_KEYS.length) % FREE_SLEEP_ALARM_DAY_KEYS.length
+  return FREE_SLEEP_ALARM_DAY_KEYS[nextIndex]
+}
+
+function alarmExecutesNextMorning(daySchedule: FreeSleepDailySchedule | undefined) {
+  const powerOff = parsedInputTime(daySchedule?.power?.off, '09:00')
+  return Number(powerOff.split(':')[0]) <= 12
+}
+
+function wakeDayFromFreeSleepScheduleDay(scheduleDay: FreeSleepAlarmDay, daySchedule: FreeSleepDailySchedule | undefined) {
+  return alarmExecutesNextMorning(daySchedule) ? alarmDayOffset(scheduleDay, 1) : scheduleDay
+}
+
+function freeSleepScheduleDayFromWakeDay(wakeDay: FreeSleepAlarmDay, sideSchedule: FreeSleepSideSchedule | undefined) {
+  return FREE_SLEEP_ALARM_DAY_KEYS.find((scheduleDay) => wakeDayFromFreeSleepScheduleDay(scheduleDay, sideSchedule?.[scheduleDay]) === wakeDay) ?? alarmDayOffset(wakeDay, -1)
+}
+
 function alarmRecordsFromSchedule(schedule: FreeSleepSchedulesState, side: EightSleepSideConfig): FreeSleepAlarmRecord[] {
-  return FREE_SLEEP_ALARM_DAYS.flatMap((day) =>
-    alarmsFromDailySchedule(schedule[side.scheduleSide]?.[day.key]).map((alarm, index) => ({
-      ...alarm,
-      day: day.key,
-      id: `${day.key}-${index}-${alarm.time}-${alarm.enabled ? 'on' : 'off'}`,
-      index,
-    })),
+  const sideSchedule = schedule[side.scheduleSide]
+  return FREE_SLEEP_ALARM_DAYS.flatMap((scheduleDay) =>
+    alarmsFromDailySchedule(sideSchedule?.[scheduleDay.key]).map((alarm, index) => {
+      const wakeDay = wakeDayFromFreeSleepScheduleDay(scheduleDay.key, sideSchedule?.[scheduleDay.key])
+      return {
+        ...alarm,
+        day: wakeDay,
+        id: `${wakeDay}-${index}-${alarm.time}-${alarm.enabled ? 'on' : 'off'}`,
+        index,
+      }
+    }),
   ).sort(compareAlarmRecords)
 }
 
@@ -1645,12 +1687,13 @@ function alarmRecordPositionKey({ day, index }: FreeSleepAlarmRecord) {
   return `${day}-${index}`
 }
 
-function alarmSchedulePayload(records: FreeSleepAlarmRecord[], side: EightSleepSideConfig) {
+function alarmSchedulePayload(records: FreeSleepAlarmRecord[], side: EightSleepSideConfig, schedule: FreeSleepSchedulesState | null) {
+  const sideSchedule = schedule?.[side.scheduleSide]
   const sidePayload = Object.fromEntries(FREE_SLEEP_ALARM_DAYS.map((day) => [
     day.key,
     {
       alarms: records
-        .filter((alarm) => alarm.day === day.key)
+        .filter((alarm) => freeSleepScheduleDayFromWakeDay(alarm.day, sideSchedule) === day.key)
         .sort(compareAlarmRecords)
         .map(({ alarmTemperature, duration, enabled, time, vibrationIntensity, vibrationPattern }) => ({
           alarmTemperature,
@@ -2753,7 +2796,7 @@ function EightSleepAlarmsSection({ side }: { side: EightSleepSideConfig }) {
       return
     }
 
-    const payload = alarmSchedulePayload(sortedRecords, side)
+    const payload = alarmSchedulePayload(sortedRecords, side, schedule)
     debugFreeSleepAlarm(callService, 'section-sync-mqtt-publish', {
       payload,
       records: compactAlarmRecordsForDebug(sortedRecords),
@@ -2929,6 +2972,27 @@ function EightSleepScheduleTemperatureControl({ entityId, fallbackTemperature, i
   )
 }
 
+function EightSleepAlarmActiveActions({ side }: { side: EightSleepSideConfig }) {
+  const callService = useCallService()
+
+  const cancelAlarm = () => {
+    callService({ domain: 'button', service: 'press', target: FREE_SLEEP_CLEAR_ALARM_ENTITY_ID })
+  }
+
+  const snoozeAlarm = () => {
+    callService({ domain: 'number', service: 'set_value', target: side.alarmSnoozeMinutesEntityId, serviceData: { value: FREE_SLEEP_ALARM_SNOOZE_MINUTES } })
+    callService({ domain: 'button', service: 'press', target: side.alarmSnoozeButtonEntityId })
+    cancelAlarm()
+  }
+
+  return (
+    <div aria-label={`${side.title} active alarm actions`} className={styles.eightSleepAlarmActiveActions} role="group">
+      <ThermostatGlassCard active icon="mdi:timer-cog" onMainClick={snoozeAlarm} stateText={`${FREE_SLEEP_ALARM_SNOOZE_MINUTES} min`} title="Snooze Alarm" />
+      <ThermostatGlassCard icon="mdi:close" onMainClick={cancelAlarm} stateText="Stop now" title="Cancel Alarm" />
+    </div>
+  )
+}
+
 function EightSleepBedModalContent({ modalState, side }: { modalState: EightSleepBedModalState; side: EightSleepSideConfig }) {
   const currentTemperature = useEntity(asEntityName(side.currentTemperatureEntityId), { returnNullIfNotFound: true })
   const presence = useEntity(asEntityName(side.presenceEntityId), { returnNullIfNotFound: true })
@@ -2942,6 +3006,7 @@ function EightSleepBedModalContent({ modalState, side }: { modalState: EightSlee
   return (
     <div className={styles.thermostatModalBody}>
       <EightSleepThermostatHero modalState={modalState} side={side} />
+      {alarmActive && <EightSleepAlarmActiveActions side={side} />}
       <section className={styles.section}>
         <SectionHeader title="Sleep Schedule" />
         <div className={styles.eightSleepStageGrid}>
@@ -3476,7 +3541,7 @@ function ControlPage({ onNavigate, path }: { onNavigate: (path: string) => void;
 }
 
 function FallbackPage({ title }: { title: string }) {
-  return <Notice>{title} is represented in the porting map, but this route still needs a dedicated React view.</Notice>
+  return <Notice>{title} is not available in the React dashboard yet.</Notice>
 }
 
 function Content({ onNavigate, path }: { onNavigate: (path: string) => void; path: string }) {

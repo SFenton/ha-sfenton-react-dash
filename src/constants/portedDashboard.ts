@@ -28,7 +28,6 @@ export interface EntityTileConfig {
   color?: CardColor
   action?: EntityAction
   disabledWhenUnavailable?: boolean
-  manualReview?: boolean
   showSubtitle?: boolean
   stateLabel?: EntityStateLabelConfig
 }
@@ -256,7 +255,7 @@ export const VACATION_START_ENTITY_ID = 'input_datetime.vacation_start'
 export const VACATION_END_ENTITY_ID = 'input_datetime.vacation_end'
 
 export const VACATION_MODE_ITEMS: EntityTileConfig[] = [
-  { title: 'Vacation Mode', entityId: VACATION_MODE_ENTITY_ID, icon: 'mdi:home-export-outline', color: SWITCH_ACTIVE_COLOR, action: { type: 'toggle' }, showSubtitle: true },
+  { title: 'Vacation Mode', entityId: VACATION_MODE_ENTITY_ID, icon: 'mdi:airplane', color: SWITCH_ACTIVE_COLOR, action: { type: 'toggle' }, showSubtitle: true },
 ]
 
 export const TODO_PAGES: Record<string, TodoPageConfig> = {
@@ -430,9 +429,9 @@ export const SECURITY_SECTIONS: EntitySectionConfig[] = [
     title: 'Security',
     items: [
       { title: 'Alarm', entityId: 'alarm_control_panel.aqara_hub_m3_0056_security_system_2', icon: 'mdi:shield', color: SECURITY_COLOR },
-      { title: 'Front Door Lock', entityId: 'lock.aqara_smart_lock_u400', icon: 'mdi:lock', color: SECURITY_COLOR, manualReview: true },
-      { title: 'Left Garage Door', entityId: 'cover.left_door', icon: 'mdi:garage', color: SECURITY_COLOR, manualReview: true },
-      { title: 'Right Garage Door', entityId: 'cover.right_door', icon: 'mdi:garage', color: SECURITY_COLOR, manualReview: true },
+      { title: 'Front Door Lock', entityId: 'lock.aqara_smart_lock_u400', icon: 'mdi:lock', color: SECURITY_COLOR },
+      { title: 'Left Garage Door', entityId: 'cover.left_door', icon: 'mdi:garage', color: SECURITY_COLOR, action: { type: 'toggle' }, showSubtitle: true },
+      { title: 'Right Garage Door', entityId: 'cover.right_door', icon: 'mdi:garage', color: SECURITY_COLOR, action: { type: 'toggle' }, showSubtitle: true },
     ],
   },
   {
@@ -467,10 +466,10 @@ export const CONTROL_PAGES: Record<string, { title: string; sections: EntitySect
         title: 'Charge Status',
         items: [
           { title: 'Charge Status', entityId: 'sensor.fordpass_3fmtk3su5mma09266_elvehcharging', icon: 'mdi:ev-station', color: CONTROL_COLOR },
-          { title: 'Doors', entityId: 'lock.fordpass_3fmtk3su5mma09266_doorlock', icon: 'mdi:car-door-lock', color: CONTROL_COLOR, manualReview: true },
-          { title: "Driver's Seat", entityId: 'select.fordpass_3fmtk3su5mma09266_rccseatfrontleft', icon: 'mdi:car-seat', color: CONTROL_COLOR, manualReview: true },
-          { title: 'Passenger Seat', entityId: 'select.fordpass_3fmtk3su5mma09266_rccseatfrontright', icon: 'mdi:car-seat', color: CONTROL_COLOR, manualReview: true },
-          { title: 'Climate', entityId: 'number.fordpass_3fmtk3su5mma09266_rcctemperature', icon: 'mdi:car-defrost-front', color: CONTROL_COLOR, manualReview: true },
+          { title: 'Doors', entityId: 'lock.fordpass_3fmtk3su5mma09266_doorlock', icon: 'mdi:car-door-lock', color: CONTROL_COLOR, showSubtitle: true },
+          { title: "Driver's Seat", entityId: 'select.fordpass_3fmtk3su5mma09266_rccseatfrontleft', icon: 'mdi:car-seat', color: CONTROL_COLOR, showSubtitle: true },
+          { title: 'Passenger Seat', entityId: 'select.fordpass_3fmtk3su5mma09266_rccseatfrontright', icon: 'mdi:car-seat', color: CONTROL_COLOR, showSubtitle: true },
+          { title: 'Climate', entityId: 'number.fordpass_3fmtk3su5mma09266_rcctemperature', icon: 'mdi:car-defrost-front', color: CONTROL_COLOR, showSubtitle: true },
         ],
       },
     ],
@@ -483,7 +482,7 @@ export const ROOM_EXTRA_SECTIONS: Record<string, EntitySectionConfig[]> = {
       title: 'Devices',
       items: [
         { title: 'Air Purifier', entityId: 'fan.living_room_air_purifier_levoit_purifier', icon: 'mdi:air-purifier', color: CLIMATE_COLOR },
-        { title: 'Air Purifier Mode', entityId: 'select.living_room_air_purifier_fan_mode', icon: 'mdi:fan', color: CLIMATE_COLOR, manualReview: true },
+        { title: 'Air Purifier Mode', entityId: 'select.living_room_air_purifier_fan_mode', icon: 'mdi:fan', color: CLIMATE_COLOR, showSubtitle: true },
         { title: 'Vacuum', entityId: 'vacuum.valetudo_exaltedsneakydeer', icon: 'mdi:robot-vacuum', color: VACUUM_COLOR, action: { type: 'navigate', path: 'vacuums' }, disabledWhenUnavailable: true },
       ],
     },
@@ -499,9 +498,9 @@ export const ROOM_EXTRA_SECTIONS: Record<string, EntitySectionConfig[]> = {
     {
       title: 'Bedroom Climate',
       items: [
-        { title: 'Humidifier', entityId: 'humidifier.master_bedroom_humidifier', icon: 'mdi:air-humidifier', color: CLIMATE_COLOR, manualReview: true },
-        { title: "Stephen's Bed", entityId: 'number.nightcanvasrestful_left_target_temperature', icon: 'mdi:bed', color: CLIMATE_COLOR, manualReview: true },
-        { title: "Steph's Bed", entityId: 'number.nightcanvasrestful_right_target_temperature', icon: 'mdi:bed', color: CLIMATE_COLOR, manualReview: true },
+        { title: 'Humidifier', entityId: 'humidifier.master_bedroom_humidifier', icon: 'mdi:air-humidifier', color: CLIMATE_COLOR, showSubtitle: true },
+        { title: "Stephen's Bed", entityId: 'number.nightcanvasrestful_left_target_temperature', icon: 'mdi:bed', color: CLIMATE_COLOR, showSubtitle: true },
+        { title: "Steph's Bed", entityId: 'number.nightcanvasrestful_right_target_temperature', icon: 'mdi:bed', color: CLIMATE_COLOR, showSubtitle: true },
       ],
     },
     {
@@ -513,8 +512,8 @@ export const ROOM_EXTRA_SECTIONS: Record<string, EntitySectionConfig[]> = {
     {
       title: 'Office PCs',
       items: [
-        { title: "Stephen's PC", entityId: 'input_boolean.stephen_s_pc_power', icon: 'mdi:desktop-tower', color: CONTROL_COLOR, manualReview: true },
-        { title: "Steph's PC", entityId: 'input_boolean.steph_s_pc_power', icon: 'mdi:desktop-tower', color: CONTROL_COLOR, manualReview: true },
+        { title: "Stephen's PC", entityId: 'input_boolean.stephen_s_pc_power', icon: 'mdi:desktop-tower', color: CONTROL_COLOR, showSubtitle: true },
+        { title: "Steph's PC", entityId: 'input_boolean.steph_s_pc_power', icon: 'mdi:desktop-tower', color: CONTROL_COLOR, showSubtitle: true },
       ],
     },
   ],
@@ -533,8 +532,8 @@ export const ROOM_EXTRA_SECTIONS: Record<string, EntitySectionConfig[]> = {
       items: [
         { title: 'Grill State', entityId: 'sensor.d8478fa2ad0a_grill_state', icon: 'mdi:grill', color: CONTROL_COLOR },
         { title: 'Pellet Level', entityId: 'sensor.d8478fa2ad0a_pellet_level', icon: 'mdi:percent', color: CONTROL_COLOR },
-        { title: 'Keep Warm', entityId: 'switch.d8478fa2ad0a_keep_warm_enabled', icon: 'mdi:fire', color: CONTROL_COLOR, manualReview: true },
-        { title: 'Super Smoke', entityId: 'switch.d8478fa2ad0a_super_smoke_enabled', icon: 'mdi:smoke', color: CONTROL_COLOR, manualReview: true },
+        { title: 'Keep Warm', entityId: 'switch.d8478fa2ad0a_keep_warm_enabled', icon: 'mdi:fire', color: CONTROL_COLOR, action: { type: 'toggle' }, showSubtitle: true },
+        { title: 'Super Smoke', entityId: 'switch.d8478fa2ad0a_super_smoke_enabled', icon: 'mdi:smoke', color: CONTROL_COLOR, action: { type: 'toggle' }, showSubtitle: true },
       ],
     },
   ],
@@ -552,8 +551,8 @@ export const ROOM_EXTRA_SECTIONS: Record<string, EntitySectionConfig[]> = {
       title: 'Media Controls',
       items: [
         { title: 'Theater SHIELD', entityId: 'media_player.theater_room_shield', icon: 'mdi:remote', color: MEDIA_COLOR, action: { type: 'navigate', path: 'media' } },
-        { title: 'Projector', entityId: 'media_player.sony_projector', icon: 'mdi:projector', color: MEDIA_COLOR, manualReview: true },
-        { title: 'Theater PC', entityId: 'input_boolean.theater_pc_power', icon: 'mdi:desktop-tower', color: CONTROL_COLOR, manualReview: true },
+        { title: 'Projector', entityId: 'media_player.sony_projector', icon: 'mdi:projector', color: MEDIA_COLOR, showSubtitle: true },
+        { title: 'Theater PC', entityId: 'input_boolean.theater_pc_power', icon: 'mdi:desktop-tower', color: CONTROL_COLOR, showSubtitle: true },
         { title: 'Vacuum', entityId: 'vacuum.valetudo_politefatherlykingfisher', icon: 'mdi:robot-vacuum', color: VACUUM_COLOR, action: { type: 'navigate', path: 'vacuums' }, disabledWhenUnavailable: true },
       ],
     },
@@ -564,8 +563,8 @@ export const ROOM_EXTRA_SECTIONS: Record<string, EntitySectionConfig[]> = {
       items: [
         { title: 'Washing Machine', entityId: 'input_boolean.washer_started_helper', icon: 'mdi:washing-machine', color: CONTROL_COLOR },
         { title: 'Dryer', entityId: 'input_boolean.dryer_started_helper', icon: 'mdi:tumble-dryer', color: CONTROL_COLOR },
-        { title: 'Left Door', entityId: 'cover.left_door', icon: 'mdi:garage', color: SECURITY_COLOR, manualReview: true },
-        { title: 'Right Door', entityId: 'cover.right_door', icon: 'mdi:garage', color: SECURITY_COLOR, manualReview: true },
+        { title: 'Left Door', entityId: 'cover.left_door', icon: 'mdi:garage', color: SECURITY_COLOR, action: { type: 'toggle' }, showSubtitle: true },
+        { title: 'Right Door', entityId: 'cover.right_door', icon: 'mdi:garage', color: SECURITY_COLOR, action: { type: 'toggle' }, showSubtitle: true },
       ],
     },
   ],
@@ -575,17 +574,17 @@ export const MEDIA_SECTIONS: EntitySectionConfig[] = [
   {
     title: 'Living Room',
     items: [
-      { title: 'SHIELD', entityId: 'media_player.living_room_shield', icon: 'mdi:remote', color: MEDIA_COLOR, manualReview: true },
-      { title: 'Living Room SHIELD 2', entityId: 'media_player.living_room_shield_2', icon: 'mdi:remote', color: MEDIA_COLOR, manualReview: true },
+      { title: 'SHIELD', entityId: 'media_player.living_room_shield', icon: 'mdi:remote', color: MEDIA_COLOR },
+      { title: 'Living Room SHIELD 2', entityId: 'media_player.living_room_shield_2', icon: 'mdi:remote', color: MEDIA_COLOR },
       { title: 'Sonos', entityId: 'media_player.sonos', icon: 'mdi:speaker', color: MEDIA_COLOR },
     ],
   },
   {
     title: 'Theater Room',
     items: [
-      { title: 'Theater SHIELD', entityId: 'media_player.theater_room_shield', icon: 'mdi:remote', color: MEDIA_COLOR, manualReview: true },
+      { title: 'Theater SHIELD', entityId: 'media_player.theater_room_shield', icon: 'mdi:remote', color: MEDIA_COLOR },
       { title: 'Theater', entityId: 'media_player.theater', icon: 'mdi:speaker-multiple', color: MEDIA_COLOR },
-      { title: 'Projector', entityId: 'media_player.sony_projector', icon: 'mdi:projector', color: MEDIA_COLOR, manualReview: true },
+      { title: 'Projector', entityId: 'media_player.sony_projector', icon: 'mdi:projector', color: MEDIA_COLOR },
       { title: 'Nintendo Switch', entityId: 'input_boolean.is_nintendo_switch_active', icon: 'mdi:nintendo-switch', color: MEDIA_COLOR, action: { type: 'toggle' } },
       { title: 'Theater SHIELD Active', entityId: 'input_boolean.is_theater_shield_active', icon: 'mdi:television-play', color: MEDIA_COLOR, action: { type: 'toggle' } },
     ],

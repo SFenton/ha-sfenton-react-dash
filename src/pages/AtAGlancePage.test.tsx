@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, within } from '@testing-library/react'
 import { AtAGlancePage } from './AtAGlancePage'
 import { materialIconPath } from '../components/core/iconPaths'
-import { SECURITY_ENTITY } from '../constants/atAGlance'
+import { CONTACT_GROUPS, SECURITY_ENTITY } from '../constants/atAGlance'
 import { CHORE_BLUE } from '../constants/portedDashboard'
 import { mockEntities, resetMockHass } from '../test/mocks/hakitCoreState'
 
@@ -34,6 +34,27 @@ describe('AtAGlancePage', () => {
 
     expect(screen.getByRole('button', { name: 'Security Armed Night' })).toHaveStyle('--header-pill-color: rgba(142, 36, 170, 0.44)')
     expect(screen.getByRole('button', { name: 'Security System Armed Night' })).toHaveStyle('--tile-color: rgba(142, 36, 170, 0.5)')
+  })
+
+  it('uses open and closed language for the home contact sensor chip', () => {
+    render(<AtAGlancePage />)
+
+    expect(screen.getByRole('button', { name: /Contact Sensors\s*All Closed/i })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Contact Sensors\s*0 Sensors Active/i })).not.toBeInTheDocument()
+  })
+
+  it('shows open contact counts on the home contact sensor chip', () => {
+    const contactEntity = mockEntities[CONTACT_GROUPS[0].items[0].entityId]
+    const originalState = contactEntity.state
+    contactEntity.state = 'on'
+
+    try {
+      render(<AtAGlancePage />)
+
+      expect(screen.getByRole('button', { name: /Contact Sensors\s*1 Open/i })).toBeInTheDocument()
+    } finally {
+      contactEntity.state = originalState
+    }
   })
 
   it('opens a Pirate Weather seven-day forecast sheet', async () => {
@@ -89,7 +110,7 @@ describe('AtAGlancePage', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Open navigation menu' }))
     expect(screen.getByText('Navigation')).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Close navigation menu' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Close navigation menu' })).toBeInTheDocument()
     fireEvent.click(screen.getByRole('menuitem', { name: 'Security' }))
     expect(navigate).toHaveBeenCalledWith('security')
 
@@ -98,6 +119,25 @@ describe('AtAGlancePage', () => {
 
     const dialog = await screen.findByRole('dialog')
     expect(within(dialog).getByRole('heading', { name: 'Settings' })).toBeInTheDocument()
+    expect(within(dialog).getByRole('navigation', { name: 'Settings pages' })).toBeInTheDocument()
+    expect(within(dialog).queryByText(/not available from Home/i)).not.toBeInTheDocument()
+    fireEvent.click(within(dialog).getByRole('button', { name: /Admin Controls Presence-Based Toggles, Automation Overrides, and More/i }))
+    expect(navigate).toHaveBeenLastCalledWith('admin')
+  })
+
+  it('opens the Chores preview hash with live chore links', async () => {
+    window.history.replaceState(null, '', `${window.location.pathname}#chores-preview`)
+    const navigate = vi.fn()
+    render(<AtAGlancePage onNavigate={navigate} />)
+
+    const dialog = await screen.findByRole('dialog')
+    expect(within(dialog).getByRole('heading', { name: 'Chores' })).toBeInTheDocument()
+    expect(within(dialog).getByRole('button', { name: /Groceries/i })).toBeInTheDocument()
+    expect(within(dialog).getByRole('button', { name: /Stephen's Tasks/i })).toBeInTheDocument()
+    expect(within(dialog).queryByText(/not available from Home/i)).not.toBeInTheDocument()
+
+    fireEvent.click(within(dialog).getByRole('button', { name: /Groceries/i }))
+    expect(navigate).toHaveBeenCalledWith('groceries')
   })
 
   it('moves overview room navigation into the layout FAB sheet', async () => {

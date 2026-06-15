@@ -1,4 +1,4 @@
-import { useEntity } from '@hakit/core'
+import { useEntity, useHass } from '@hakit/core'
 import { Card } from '../core/Card'
 import { MaterialIcon } from '../core/Icon'
 import { UNAVAILABLE_COLOR } from '../../constants/portedDashboard'
@@ -20,15 +20,20 @@ function isUnavailable(state: string | undefined) {
 
 function GrillMetricCard({ entityId, icon, title }: { entityId: string; icon: string; title: string }) {
   const entity = useEntity(asEntityName(entityId), { returnNullIfNotFound: true })
+  const callService = useHass((state) => state.helpers.callService) as unknown as (params: Record<string, unknown>) => void
   const unavailable = isUnavailable(entity?.state)
   const muted = !unavailable && !isActiveState(entity)
+  const clickable = entityId.startsWith('switch.') && !unavailable
 
   return (
     <Card
+      ariaLabel={`${title} ${formatCompactEntityState(entity, 'Unavailable')}`}
       color={unavailable ? UNAVAILABLE_COLOR : GRILL_COLOR}
       disabled={unavailable}
       icon={<MaterialIcon name={icon} size={34} />}
       muted={unavailable || muted}
+      onClick={clickable ? () => callService({ domain: 'homeassistant', service: 'toggle', target: entityId }) : undefined}
+      pressed={clickable ? isActiveState(entity) : undefined}
       size="compact"
       subtitle={formatCompactEntityState(entity, 'Unavailable')}
       title={title}
@@ -54,7 +59,6 @@ export function GrillModalContent() {
       <div className={styles.grid}>
         {GRILL_DETAILS.map((detail) => <GrillMetricCard entityId={detail.entityId} icon={detail.icon} key={detail.entityId} title={detail.title} />)}
       </div>
-      <div className={styles.reviewNotice}>The YAML popup includes grill status and switches here. This React port keeps them visible in the popup and read-only until the control actions get a dedicated safety review.</div>
     </div>
   )
 }

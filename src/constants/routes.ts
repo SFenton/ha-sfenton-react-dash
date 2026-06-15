@@ -2,7 +2,6 @@ export interface DashboardRouteConfig {
   title: string
   path: string
   icon: string
-  manualReview?: boolean
 }
 
 export const DASHBOARD_ROUTES: DashboardRouteConfig[] = [

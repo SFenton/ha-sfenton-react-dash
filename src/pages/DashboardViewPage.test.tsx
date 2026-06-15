@@ -382,7 +382,7 @@ describe('DashboardViewPage', () => {
       expect(vacationMode).toHaveAttribute('aria-pressed', 'false')
       expect(vacationMode).toHaveAttribute('data-muted', 'true')
       expect(vacationMode.className).toContain('wide')
-      expect(vacationMode.querySelector('path')).toHaveAttribute('d', materialIconPath('mdi:home-export-outline'))
+      expect(vacationMode.querySelector('path')).toHaveAttribute('d', materialIconPath('mdi:airplane'))
 
       fireEvent.click(vacationMode)
       expect(mockCallServiceCalls).toEqual([
@@ -432,33 +432,39 @@ describe('DashboardViewPage', () => {
   })
 
   it('shows invalid Vacation dates as an on but disabled mode with editable date controls', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date(2026, 5, 14, 8, 0, 0))
     mockEntities['input_boolean.vacation_mode'].state = 'off'
     mockEntities['input_boolean.vacation_mode_invalid_dates_pending'].state = 'on'
     mockEntities['input_datetime.vacation_start'].state = '2026-06-14 10:01:00'
     mockEntities['input_datetime.vacation_end'].state = '2026-06-13 09:07:00'
 
-    render(<DashboardViewPage activePath="settings" onNavigate={() => undefined} path="vacation" />)
+    try {
+      render(<DashboardViewPage activePath="settings" onNavigate={() => undefined} path="vacation" />)
 
-    const vacationMode = screen.getByRole('button', { name: 'Vacation Mode On' })
-    expect(vacationMode).toBeDisabled()
-    expect(vacationMode).toHaveAttribute('aria-pressed', 'true')
-    expect(vacationMode).toHaveAttribute('data-disabled', 'true')
-    expect(vacationMode).toHaveAttribute('data-muted', 'true')
-    expect(screen.getByRole('heading', { name: 'Vacation Dates' })).toBeInTheDocument()
-    expect(screen.getByText('Start date and time must be before end date and time. Vacation mode is disabled until the dates are fixed.')).toBeInTheDocument()
-    expect(screen.getByLabelText('Start Date')).toHaveValue('2026-06-14')
-    expect(screen.getByLabelText('Start Time')).toHaveValue('10:01')
-    expect(screen.getByLabelText('End Date')).toHaveValue('2026-06-13')
-    expect(screen.getByLabelText('End Time')).toHaveValue('09:07')
+      const vacationMode = screen.getByRole('button', { name: 'Vacation Mode On' })
+      expect(vacationMode).toBeDisabled()
+      expect(vacationMode).toHaveAttribute('aria-pressed', 'true')
+      expect(vacationMode).toHaveAttribute('data-disabled', 'true')
+      expect(vacationMode).toHaveAttribute('data-muted', 'true')
+      expect(screen.getByRole('heading', { name: 'Vacation Dates' })).toBeInTheDocument()
+      expect(screen.getByText('Start date and time must be before end date and time. Vacation mode is disabled until the dates are fixed.')).toBeInTheDocument()
+      expect(screen.getByLabelText('Start Date')).toHaveValue('2026-06-14')
+      expect(screen.getByLabelText('Start Time')).toHaveValue('10:01')
+      expect(screen.getByLabelText('End Date')).toHaveValue('2026-06-13')
+      expect(screen.getByLabelText('End Time')).toHaveValue('09:07')
 
-    fireEvent.click(vacationMode)
-    fireEvent.change(screen.getByLabelText('End Date'), { target: { value: '2026-06-15' } })
+      fireEvent.click(vacationMode)
+      fireEvent.change(screen.getByLabelText('End Date'), { target: { value: '2026-06-15' } })
 
-    expect(mockCallServiceCalls).toEqual([
-      { domain: 'input_datetime', service: 'set_datetime', target: 'input_datetime.vacation_end', serviceData: { date: '2026-06-15', time: '09:07:00' } },
-      { domain: 'input_boolean', service: 'turn_on', target: 'input_boolean.vacation_mode' },
-      { domain: 'input_boolean', service: 'turn_off', target: 'input_boolean.vacation_mode_invalid_dates_pending' },
-    ])
+      expect(mockCallServiceCalls).toEqual([
+        { domain: 'input_datetime', service: 'set_datetime', target: 'input_datetime.vacation_end', serviceData: { date: '2026-06-15', time: '09:07:00' } },
+        { domain: 'input_boolean', service: 'turn_on', target: 'input_boolean.vacation_mode' },
+        { domain: 'input_boolean', service: 'turn_off', target: 'input_boolean.vacation_mode_invalid_dates_pending' },
+      ])
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('keeps corrected pending-invalid Vacation Mode visible while backend mode turns back on', () => {
@@ -491,6 +497,10 @@ describe('DashboardViewPage', () => {
 
     const page = screen.getByRole('main')
     const guestHeading = screen.getByRole('heading', { name: 'Guest Controls', level: 1 })
+    const guestSectionHeading = screen.getByRole('heading', { name: 'Guest Controls', level: 2 })
+    const guestSection = guestSectionHeading.closest('section')
+    expect(guestSection).toHaveClass(/section/)
+    expect(guestSection?.parentElement).toHaveClass(/stack/)
     const [, scroller] = Array.from(page.children)
     expect(page.firstElementChild).toContainElement(guestHeading)
     expect(scroller).not.toContainElement(guestHeading)
@@ -570,7 +580,7 @@ describe('DashboardViewPage', () => {
     render(<DashboardViewPage activePath="ecobee" onNavigate={() => undefined} path="ecobee" />)
 
     expect(screen.getByRole('heading', { name: 'Thermostat' })).toBeInTheDocument()
-    expect(screen.queryByText(/manual review/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/not available in the React dashboard yet/i)).not.toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Whole Home' })).toBeInTheDocument()
     expect(screen.getByRole('region', { name: /Whole Home thermostat Heating 71.0°F 72.0 · 74.0/i })).toBeInTheDocument()
     expect(screen.getAllByTestId('control-slider-circular')[0]).toHaveStyle({ '--ha-control-slider-color': '#cd5401', '--ha-control-slider-high-color': '#2c8e98', '--ha-control-slider-low-color': '#cd5401' })
@@ -741,7 +751,7 @@ describe('DashboardViewPage', () => {
     mockEntities['fan.living_room_air_purifier_levoit_purifier'].attributes.percentage = 33
   })
 
-  it('keeps dedicated Free Sleep popups in manual review fallback', async () => {
+  it('keeps unavailable humidifier cards read-only while Free Sleep cards use native modals', async () => {
     mockEntities['humidifier.master_bedroom_humidifier'].state = 'unavailable'
     render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
 
@@ -758,6 +768,31 @@ describe('DashboardViewPage', () => {
 
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: 'Master Bedroom Climate' })).not.toBeInTheDocument()
+  })
+
+  it('opens the Master Bedroom humidifier modal with power, target, and mode controls', async () => {
+    render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
+
+    fireEvent.click(screen.getByRole('button', { name: /Humidifier On/i }))
+
+    const dialog = await screen.findByRole('dialog')
+    expect(within(dialog).getByRole('heading', { name: 'Master Bedroom Humidifier' })).toBeInTheDocument()
+    expect(within(dialog).getByLabelText('Master Bedroom humidifier controls')).toBeInTheDocument()
+    expect(within(dialog).getByText('Current Humidity')).toBeInTheDocument()
+    expect(within(dialog).getByText('41%')).toBeInTheDocument()
+    expect(within(dialog).getByLabelText('Target Humidity 45%')).toBeInTheDocument()
+    expect(within(dialog).queryByText(/interactive controls available from this view/i)).not.toBeInTheDocument()
+
+    fireEvent.click(within(dialog).getByRole('button', { name: /Turn Off On/i }))
+    fireEvent.click(within(dialog).getByRole('button', { name: /Increase Target 50%/i }))
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Normal' }))
+
+    expect(within(dialog).getByRole('button', { name: 'Auto' })).toHaveAttribute('aria-pressed', 'true')
+    expect(mockCallServiceCalls).toEqual([
+      { domain: 'humidifier', service: 'toggle', target: 'humidifier.master_bedroom_humidifier' },
+      { domain: 'humidifier', service: 'set_humidity', target: 'humidifier.master_bedroom_humidifier', serviceData: { humidity: 50 } },
+      { domain: 'humidifier', service: 'set_mode', target: 'humidifier.master_bedroom_humidifier', serviceData: { mode: 'normal' } },
+    ])
   })
 
   it('opens Free Sleep bed modals with MQTT status and native controls', async () => {
@@ -797,6 +832,45 @@ describe('DashboardViewPage', () => {
     expect(mockCallServiceCalls).toEqual([
       { domain: 'switch', service: 'turn_on', target: 'switch.nightcanvasrestful_left_away_mode' },
     ])
+  })
+
+  it('shows Free Sleep snooze and cancel actions while a side alarm is active', async () => {
+    mockEntities['binary_sensor.nightcanvasrestful_right_alarm_vibrating'].state = 'on'
+    const { rerender } = render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
+
+    fireEvent.click(screen.getByRole('button', { name: /Steph's Bed Off/i }))
+
+    let dialog = await screen.findByRole('dialog')
+    expect(within(dialog).getByRole('group', { name: "Steph's Bed active alarm actions" })).toBeInTheDocument()
+    expect(within(dialog).getByRole('button', { name: /Snooze Alarm/i })).toBeInTheDocument()
+    expect(within(dialog).getByRole('button', { name: /Cancel Alarm/i })).toBeInTheDocument()
+    expect(within(dialog).getByText('Vibrating')).toBeInTheDocument()
+
+    fireEvent.click(within(dialog).getByRole('button', { name: /Snooze Alarm/i }))
+
+    expect(mockCallServiceCalls).toEqual([
+      { domain: 'number', service: 'set_value', target: 'number.steph_s_eight_sleep_side_alarm_snooze_minutes', serviceData: { value: 10 } },
+      { domain: 'button', service: 'press', target: 'button.steph_s_eight_sleep_side_alarm_snooze' },
+      { domain: 'button', service: 'press', target: 'button.nightcanvasrestful_clear_alarm' },
+    ])
+    expect(mockEntities['binary_sensor.nightcanvasrestful_right_alarm_vibrating'].state).toBe('off')
+
+    act(() => {
+      rerender(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
+    })
+    dialog = screen.getByRole('dialog')
+    expect(within(dialog).queryByRole('button', { name: /Snooze Alarm/i })).not.toBeInTheDocument()
+    expect(within(dialog).queryByRole('button', { name: /Cancel Alarm/i })).not.toBeInTheDocument()
+
+    mockEntities['binary_sensor.nightcanvasrestful_right_alarm_vibrating'].state = 'on'
+    act(() => {
+      rerender(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
+    })
+
+    dialog = screen.getByRole('dialog')
+    expect(within(dialog).getByRole('button', { name: /Snooze Alarm/i })).toBeInTheDocument()
+    fireEvent.click(within(dialog).getByRole('button', { name: /Cancel Alarm/i }))
+    expect(mockCallServiceCalls[mockCallServiceCalls.length - 1]).toEqual({ domain: 'button', service: 'press', target: 'button.nightcanvasrestful_clear_alarm' })
   })
 
   it('adds and controls configured Free Sleep alarms from the bed modal', async () => {
@@ -841,8 +915,8 @@ describe('DashboardViewPage', () => {
       serviceData: { topic: 'free-sleep/NightCanvasRestful/schedules/set' },
     })
     const addedPayload = JSON.parse(String((mockCallServiceCalls[1].serviceData as { payload: string }).payload))
-    expect(addedPayload.left.monday.alarms).toEqual([expect.objectContaining({ enabled: true, time: '06:45' })])
-    expect(addedPayload.left.wednesday.alarms).toEqual([expect.objectContaining({ enabled: true, time: '06:45' })])
+    expect(addedPayload.left.sunday.alarms).toEqual([expect.objectContaining({ enabled: true, time: '06:45' })])
+    expect(addedPayload.left.tuesday.alarms).toEqual([expect.objectContaining({ enabled: true, time: '06:45' })])
 
     const originalShowPicker = HTMLInputElement.prototype.showPicker
     const showPicker = vi.fn()
@@ -863,7 +937,7 @@ describe('DashboardViewPage', () => {
       serviceData: { topic: 'free-sleep/NightCanvasRestful/schedules/set' },
     })
     const changedPayload = JSON.parse(String((mockCallServiceCalls[2].serviceData as { payload: string }).payload))
-    expect(changedPayload.left.monday.alarms).toEqual([expect.objectContaining({ enabled: true, time: '06:50' })])
+    expect(changedPayload.left.sunday.alarms).toEqual([expect.objectContaining({ enabled: true, time: '06:50' })])
 
     fireEvent.click(within(dialog).getByRole('switch', { name: "Disable Stephen's Bed Monday alarm" }))
 
@@ -877,8 +951,8 @@ describe('DashboardViewPage', () => {
       })
     }
     const disabledPayload = JSON.parse(String((mockCallServiceCalls[3].serviceData as { payload: string }).payload))
-    expect(disabledPayload.left.monday.alarms).toEqual([expect.objectContaining({ enabled: false, time: '06:50' })])
-    expect(disabledPayload.left.wednesday.alarms).toEqual([expect.objectContaining({ enabled: true, time: '06:45' })])
+    expect(disabledPayload.left.sunday.alarms).toEqual([expect.objectContaining({ enabled: false, time: '06:50' })])
+    expect(disabledPayload.left.tuesday.alarms).toEqual([expect.objectContaining({ enabled: true, time: '06:45' })])
   })
 
   it('allows multiple Free Sleep alarms on the same day', async () => {
@@ -906,7 +980,7 @@ describe('DashboardViewPage', () => {
     expect(mockCallServiceCalls[0]).toEqual({ domain: 'switch', service: 'turn_on', target: 'switch.nightcanvasrestful_right_alarms_enabled' })
     await waitFor(() => expect(mockCallServiceCalls).toHaveLength(2))
     const addedPayload = JSON.parse(String((mockCallServiceCalls[1].serviceData as { payload: string }).payload))
-    expect(addedPayload.right.sunday.alarms).toEqual([
+    expect(addedPayload.right.saturday.alarms).toEqual([
       expect.objectContaining({ enabled: true, time: '06:30' }),
       expect.objectContaining({ enabled: true, time: '07:15' }),
       expect.objectContaining({ enabled: true, time: '08:00' }),
@@ -928,7 +1002,7 @@ describe('DashboardViewPage', () => {
     expect(within(sundaySection).queryByRole('switch', { exact: true, name: "Enable Steph's Bed Sunday alarm" })).not.toBeInTheDocument()
     await waitFor(() => expect(mockCallServiceCalls).toHaveLength(2))
     const changedPayload = JSON.parse(String((mockCallServiceCalls[1].serviceData as { payload: string }).payload))
-    expect(changedPayload.right.sunday.alarms).toEqual([
+    expect(changedPayload.right.saturday.alarms).toEqual([
       expect.objectContaining({ enabled: true, time: '06:35' }),
       expect.objectContaining({ enabled: true, time: '07:15' }),
     ])
@@ -966,7 +1040,7 @@ describe('DashboardViewPage', () => {
       expect(within(sundaySection).getByText('1 alarm')).toBeInTheDocument()
       await waitFor(() => expect(mockCallServiceCalls).toHaveLength(2))
       const deletePayload = JSON.parse(String((mockCallServiceCalls[1].serviceData as { payload: string }).payload))
-      expect(deletePayload.right.sunday.alarms).toEqual([expect.objectContaining({ enabled: true, time: '07:15' })])
+      expect(deletePayload.right.saturday.alarms).toEqual([expect.objectContaining({ enabled: true, time: '07:15' })])
     } finally {
       confirm.mockRestore()
     }
@@ -989,7 +1063,7 @@ describe('DashboardViewPage', () => {
 
     await waitFor(() => expect(mockCallServiceCalls).toHaveLength(2))
     const finalPayload = JSON.parse(String((mockCallServiceCalls[1].serviceData as { payload: string }).payload))
-    expect(finalPayload.right.sunday.alarms).toEqual([
+    expect(finalPayload.right.saturday.alarms).toEqual([
       expect.objectContaining({ enabled: true, time: '06:30' }),
       expect.objectContaining({ enabled: true, time: '07:15' }),
     ])
@@ -1030,7 +1104,7 @@ describe('DashboardViewPage', () => {
     expect(within(sundaySection).getByRole('switch', { exact: true, name: "Disable Steph's Bed Sunday alarm" })).toHaveAttribute('aria-checked', 'true')
     await waitFor(() => expect(mockCallServiceCalls).toHaveLength(2))
     const finalPayload = JSON.parse(String((mockCallServiceCalls[1].serviceData as { payload: string }).payload))
-    expect(finalPayload.right.sunday.alarms).toEqual([
+    expect(finalPayload.right.saturday.alarms).toEqual([
       expect.objectContaining({ enabled: true, time: '06:30' }),
       expect.objectContaining({ enabled: true, time: '07:15' }),
     ])
@@ -1047,8 +1121,8 @@ describe('DashboardViewPage', () => {
     expect(within(sundaySection).getByRole('switch', { exact: true, name: "Enable Steph's Bed Sunday alarm" })).toHaveAttribute('aria-checked', 'false')
 
     const backendOffAttributes = mockFreeSleepScheduleAttributes()
-    backendOffAttributes.right.sunday.alarm.enabled = false
-    backendOffAttributes.right.sunday.alarms[0].enabled = false
+    backendOffAttributes.right.saturday.alarm.enabled = false
+    backendOffAttributes.right.saturday.alarms[0].enabled = false
     mockEntities['sensor.nightcanvasrestful_schedules'].attributes = backendOffAttributes
 
     act(() => {
@@ -1060,7 +1134,7 @@ describe('DashboardViewPage', () => {
     expect(within(updatedSundaySection).getByRole('switch', { exact: true, name: "Disable Steph's Bed Sunday alarm" })).toHaveAttribute('aria-checked', 'true')
     await waitFor(() => expect(mockCallServiceCalls).toHaveLength(2))
     const finalPayload = JSON.parse(String((mockCallServiceCalls[1].serviceData as { payload: string }).payload))
-    expect(finalPayload.right.sunday.alarms).toEqual([
+    expect(finalPayload.right.saturday.alarms).toEqual([
       expect.objectContaining({ enabled: true, time: '06:30' }),
       expect.objectContaining({ enabled: true, time: '07:15' }),
     ])
@@ -1363,7 +1437,7 @@ describe('DashboardViewPage', () => {
     ])
   })
 
-  it('ports the Master Bedroom Apple TV remote modal from the YAML popup', async () => {
+  it('ports the Master Bedroom Apple TV remote modal from the source popup', async () => {
     render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
 
     fireEvent.click(screen.getByRole('button', { name: /^Apple TV Paused$/i }))
@@ -1505,6 +1579,30 @@ describe('DashboardViewPage', () => {
     expect(screen.queryByText(/Entity not available/i)).not.toBeInTheDocument()
   })
 
+  it('runs migrated room source toggles for theater sources and garage doors', () => {
+    const theaterView = render(<DashboardViewPage activePath="theater-room" onNavigate={() => undefined} path="theater-room" />)
+
+    fireEvent.click(screen.getByRole('button', { name: /^Theater SHIELD Off$/i }))
+    fireEvent.click(screen.getByRole('button', { name: /^Nintendo Switch Off$/i }))
+    expect(screen.queryByText(/interactive controls available from this view/i)).not.toBeInTheDocument()
+    expect(mockCallServiceCalls).toEqual([
+      { domain: 'homeassistant', service: 'toggle', target: 'input_boolean.is_theater_shield_active' },
+      { domain: 'homeassistant', service: 'toggle', target: 'input_boolean.is_nintendo_switch_active' },
+    ])
+
+    theaterView.unmount()
+    mockCallServiceCalls.length = 0
+    render(<DashboardViewPage activePath="garage" onNavigate={() => undefined} path="garage" />)
+
+    fireEvent.click(screen.getByRole('button', { name: /^Left Door Closed$/i }))
+    fireEvent.click(screen.getByRole('button', { name: /^Right Door Closed$/i }))
+    expect(screen.queryByText(/interactive controls available from this view/i)).not.toBeInTheDocument()
+    expect(mockCallServiceCalls).toEqual([
+      { domain: 'homeassistant', service: 'toggle', target: 'cover.left_door' },
+      { domain: 'homeassistant', service: 'toggle', target: 'cover.right_door' },
+    ])
+  })
+
   it('matches Kitchen section order and dishwasher subtitle', () => {
     render(<DashboardViewPage activePath="kitchen" onNavigate={() => undefined} path="kitchen" />)
 
@@ -1542,11 +1640,19 @@ describe('DashboardViewPage', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /Bear Grills Ignite/i }))
 
-    expect(await screen.findByRole('dialog')).toBeInTheDocument()
+    const dialog = await screen.findByRole('dialog')
     expect(screen.getByRole('heading', { name: 'Back Deck: Bear Grills' })).toBeInTheDocument()
     expect(screen.getAllByText('Pellet Level').length).toBeGreaterThan(0)
     expect(screen.getAllByText('Keep Warm').length).toBeGreaterThan(0)
     expect(screen.getAllByText('Super Smoke').length).toBeGreaterThan(0)
+    expect(within(dialog).queryByText(/interactive controls available from this view/i)).not.toBeInTheDocument()
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Keep Warm Off' }))
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Super Smoke Off' }))
+    expect(mockCallServiceCalls).toEqual([
+      { domain: 'homeassistant', service: 'toggle', target: 'switch.d8478fa2ad0a_keep_warm_enabled' },
+      { domain: 'homeassistant', service: 'toggle', target: 'switch.d8478fa2ad0a_super_smoke_enabled' },
+    ])
     activeView.unmount()
     mockEntities['sensor.d8478fa2ad0a_grill_state'].state = 'off'
   })
@@ -1593,7 +1699,7 @@ describe('DashboardViewPage', () => {
     expect(screen.getByRole('button', { name: 'Open Front Door camera' })).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: 'Mach-E' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Doors Locked/i })).not.toBeInTheDocument()
-    expect(screen.queryByText(/manual review/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/not available in the React dashboard yet/i)).not.toBeInTheDocument()
   })
 
   it('keeps Security header chips outside the page scroller', () => {
@@ -1696,7 +1802,7 @@ describe('DashboardViewPage', () => {
     expect(mockCallServiceCalls).toEqual([{ domain: 'lock', service: 'lock', target: 'lock.aqara_smart_lock_u400' }])
   })
 
-  it('opens the Security contact sensor overview grouped from the YAML popup', async () => {
+  it('opens the Security contact sensor overview grouped from the source popup', async () => {
     render(<DashboardViewPage activePath="security" onNavigate={() => undefined} path="security" />)
 
     fireEvent.click(screen.getByRole('button', { name: /Contact Sensors\s*All Closed/i }))
@@ -2067,7 +2173,7 @@ describe('DashboardViewPage', () => {
     render(<DashboardViewPage activePath="ecobee" onNavigate={() => undefined} path="ecobee" />)
 
     expect(screen.getByRole('heading', { name: 'Thermostat' })).toBeInTheDocument()
-    expect(screen.queryByText(/manually reviewed/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/not available in the React dashboard yet/i)).not.toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Eco Mode' })).toBeInTheDocument()
   })
 

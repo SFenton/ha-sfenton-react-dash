@@ -1,0 +1,51 @@
+.sheet {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  padding: 0 0 18px;
+}
+
+.summaryGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.wideTile {
+  grid-column: 1 / -1;
+}
+
+.controlSection {
+  display: grid;
+  gap: 10px;
+}
+
+.separator {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: white;
+  font-size: 0.86rem;
+  font-weight: 800;
+}
+
+.separator::after {
+  flex: 1 1 auto;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.12);
+  content: '';
+}
+
+.modeGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.modeTile {
+  min-width: 0;
+}
+
+.modeTile[data-disabled='true'] {
+  opacity: 0.48;
+}
