@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { routePathFromUrl } from '../constants/routes'
-import { DASHBOARD_ROUTE_CHANGE_EVENT, dashboardEventTargets, dashboardHref, pushDashboardUrl } from './dashboardLocation'
+import { DASHBOARD_ROUTE_CHANGE_EVENT, dashboardEventTargets, dashboardHref, pushDashboardUrl, setDashboardDocumentTitle } from './dashboardLocation'
 
 export function useDashboardRoute() {
   const [path, setPath] = useState(() => routePathFromUrl(dashboardHref()))
@@ -21,6 +21,10 @@ export function useDashboardRoute() {
       })
     }
   }, [])
+
+  useEffect(() => {
+    setDashboardDocumentTitle()
+  }, [path])
 
   const navigate = useCallback((url: string) => {
     pushDashboardUrl(url, {})

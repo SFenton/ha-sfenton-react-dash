@@ -42,6 +42,8 @@ describe('DashboardViewPage', () => {
     mockEntities['number.nightcanvasrestful_right_bedtime_temperature'].state = '0'
     mockEntities['number.nightcanvasrestful_right_asleep_temperature'].state = '0'
     mockEntities['number.nightcanvasrestful_right_dawn_temperature'].state = '0'
+    mockEntities['text.master_bedroom_eight_sleep_pod_5_left_bedtime'].state = '21:30'
+    mockEntities['text.master_bedroom_eight_sleep_pod_5_right_bedtime'].state = '22:00'
     mockEntities['sensor.nightcanvasrestful_left_current_temperature'].state = '86'
     mockEntities['sensor.nightcanvasrestful_right_current_temperature'].state = '72'
     mockEntities['sensor.nightcanvasrestful_left_seconds_remaining'].state = '7200'
@@ -52,6 +54,10 @@ describe('DashboardViewPage', () => {
     mockEntities['switch.nightcanvasrestful_right_away_mode'].state = 'off'
     mockEntities['switch.nightcanvasrestful_left_alarms_enabled'].state = 'off'
     mockEntities['switch.nightcanvasrestful_right_alarms_enabled'].state = 'off'
+    mockEntities['input_boolean.eight_sleep_stephen_hot_flash_active'].state = 'off'
+    mockEntities['input_boolean.eight_sleep_steph_hot_flash_active'].state = 'off'
+    mockEntities['timer.eight_sleep_stephen_hot_flash'].state = 'idle'
+    mockEntities['timer.eight_sleep_steph_hot_flash'].state = 'idle'
     mockEntities['sensor.nightcanvasrestful_schedules'].attributes = mockFreeSleepScheduleAttributes()
     mockEntities['binary_sensor.nightcanvasrestful_left_alarm_vibrating'].state = 'off'
     mockEntities['binary_sensor.nightcanvasrestful_left_presence'].state = 'on'
@@ -760,7 +766,7 @@ describe('DashboardViewPage', () => {
     expect(headings.indexOf('Eight Sleep')).toBeGreaterThan(-1)
     expect(headings.indexOf('Eight Sleep')).toBeLessThan(headings.indexOf('Climate'))
     expect(headings.indexOf('Media')).toBeLessThan(headings.indexOf('Climate'))
-    expect(screen.getByRole('button', { name: /Stephen's Bed Cooling • -1°/i })).toHaveStyle('--tile-color: rgba(25, 84, 130, 0.6)')
+    expect(screen.getByRole('button', { name: /Stephen's Bed Cooling • -1/i })).toHaveStyle('--tile-color: rgba(25, 84, 130, 0.6)')
     expect(screen.getByRole('button', { name: /Steph's Bed Off/i })).toHaveAttribute('data-muted', 'true')
     expect(screen.getByRole('button', { name: /Apple TV Paused/i })).toHaveAttribute('data-muted', 'false')
 
@@ -768,6 +774,20 @@ describe('DashboardViewPage', () => {
 
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: 'Master Bedroom Climate' })).not.toBeInTheDocument()
+  })
+
+  it('shows signed positive Free Sleep target levels on cards and modal readouts', async () => {
+    mockEntities['number.nightcanvasrestful_left_target_temperature'].state = '2'
+    render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
+
+    const bedCard = screen.getByRole('button', { name: /Stephen's Bed Heating • \+2/i })
+    expect(bedCard).toBeInTheDocument()
+
+    fireEvent.click(bedCard)
+
+    const dialog = await screen.findByRole('dialog')
+    expect(within(dialog).getByText("Stephen's Bed: Heating • +2")).toBeInTheDocument()
+    expect(within(dialog).getByRole('region', { name: /Stephen's Bed thermostat Heating \+2/i })).toBeInTheDocument()
   })
 
   it('opens the Master Bedroom humidifier modal with power, target, and mode controls', async () => {
@@ -798,23 +818,37 @@ describe('DashboardViewPage', () => {
   it('opens Free Sleep bed modals with MQTT status and native controls', async () => {
     render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
 
-    fireEvent.click(screen.getByRole('button', { name: /Stephen's Bed Cooling • -1°/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Stephen's Bed Cooling • -1/i }))
 
     const dialog = await screen.findByRole('dialog')
     expect(dialog).toHaveAttribute('data-surface', 'hass-popup')
     expect(within(dialog).getByRole('heading', { name: "Stephen's Bed" })).toBeInTheDocument()
-    expect(within(dialog).getByText("Stephen's Bed: Cooling • -1°")).toBeInTheDocument()
-    expect(within(dialog).getByRole('region', { name: /Stephen's Bed thermostat Cooling -1°/i })).toBeInTheDocument()
+    expect(within(dialog).getByText("Stephen's Bed: Cooling • -1")).toBeInTheDocument()
+    expect(within(dialog).getByRole('region', { name: /Stephen's Bed thermostat Cooling -1/i })).toBeInTheDocument()
     expect(within(dialog).getByRole('slider', { name: "Stephen's Bed target level" })).toHaveAttribute('aria-readonly', 'false')
     expect(within(dialog).getByRole('heading', { name: 'Sleep Schedule' })).toBeInTheDocument()
     expect(within(dialog).getByText('Bedtime')).toBeInTheDocument()
-    expect(within(dialog).getAllByText('0°').length).toBeGreaterThanOrEqual(2)
+    expect(within(dialog).getAllByText('0').length).toBeGreaterThanOrEqual(2)
+    expect(within(dialog).queryByText('0°')).not.toBeInTheDocument()
     expect(within(dialog).getByText('Asleep')).toBeInTheDocument()
-    expect(within(dialog).getAllByText('-1°').length).toBeGreaterThanOrEqual(1)
+    expect(within(dialog).getAllByText('-1').length).toBeGreaterThanOrEqual(1)
     expect(within(dialog).getByText('Dawn')).toBeInTheDocument()
+    expect(within(dialog).queryByRole('heading', { name: 'Alarms' })).not.toBeInTheDocument()
+    expect(within(dialog).queryByRole('heading', { name: 'Special Modes' })).not.toBeInTheDocument()
+    expect(within(dialog).queryByRole('heading', { name: 'Status' })).not.toBeInTheDocument()
+    expect(within(dialog).queryByRole('heading', { name: 'Controls' })).not.toBeInTheDocument()
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Special Modes' }))
+    expect(within(dialog).getByRole('heading', { name: 'Special Modes' })).toBeInTheDocument()
+    expect(within(dialog).getByText('Activating hot flash mode will set the bed to -10 for fifteen minutes.')).toBeInTheDocument()
+    expect(within(dialog).getByRole('button', { name: 'Hot Flash Mode Inactive' })).toBeInTheDocument()
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Alarms' }))
     expect(within(dialog).getByRole('heading', { name: 'Alarms' })).toBeInTheDocument()
     expect(within(dialog).getByRole('button', { name: 'Alarm Schedule Disabled' })).toHaveAttribute('aria-pressed', 'false')
     expect(within(dialog).queryByRole('article', { name: /Stephen's Bed Monday alarm disabled/i })).not.toBeInTheDocument()
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Status' }))
     expect(within(dialog).getByRole('heading', { name: 'Status' })).toBeInTheDocument()
     expect(within(dialog).getByText('Current Temp')).toBeInTheDocument()
     expect(within(dialog).getByText('86°F')).toBeInTheDocument()
@@ -824,6 +858,9 @@ describe('DashboardViewPage', () => {
     expect(within(dialog).getByText('2h')).toBeInTheDocument()
     expect(within(dialog).getByText('Alarm')).toBeInTheDocument()
     expect(within(dialog).getByText('Quiet')).toBeInTheDocument()
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Settings' }))
+    expect(within(dialog).getByRole('heading', { name: 'Bedtime' })).toBeInTheDocument()
     expect(within(dialog).getByRole('heading', { name: 'Controls' })).toBeInTheDocument()
     const awayMode = within(dialog).getByRole('button', { name: 'Away Mode Off' })
 
@@ -834,6 +871,129 @@ describe('DashboardViewPage', () => {
     ])
   })
 
+  it('updates Free Sleep bedtime from the bed modal settings tab', async () => {
+    render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
+
+    fireEvent.click(screen.getByRole('button', { name: /Stephen's Bed Cooling • -1/i }))
+
+    const dialog = await screen.findByRole('dialog')
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Settings' }))
+    expect(within(dialog).getByRole('button', { name: "Stephen's Bed bedtime 9:30 PM" })).toBeInTheDocument()
+    expect(within(dialog).queryByRole('button', { name: "Change Stephen's Bed bedtime" })).not.toBeInTheDocument()
+
+    fireEvent.change(within(dialog).getByLabelText("Stephen's Bed bedtime"), { target: { value: '22:15' } })
+
+    expect(within(dialog).getByRole('button', { name: "Stephen's Bed bedtime 10:15 PM" })).toBeInTheDocument()
+    expect(mockCallServiceCalls).toEqual([
+      { domain: 'text', service: 'set_value', target: 'text.master_bedroom_eight_sleep_pod_5_left_bedtime', serviceData: { value: '22:15' } },
+    ])
+  })
+
+  it('lets Free Sleep bed modals animate closed through the shared sheet state', async () => {
+    render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
+
+    fireEvent.click(screen.getByRole('button', { name: /Stephen's Bed Cooling • -1/i }))
+
+    const dialog = await screen.findByRole('dialog')
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Close' }))
+
+    await waitFor(() => expect(dialog).toHaveAttribute('data-state', 'closed'))
+  })
+
+  it('falls back to the Free Sleep bedtime MQTT command before the text entity is discovered', async () => {
+    mockEntities['text.master_bedroom_eight_sleep_pod_5_left_bedtime'].state = 'unavailable'
+    render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
+
+    fireEvent.click(screen.getByRole('button', { name: /Stephen's Bed Cooling • -1/i }))
+
+    const dialog = await screen.findByRole('dialog')
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Settings' }))
+    expect(within(dialog).getByRole('button', { name: "Stephen's Bed bedtime 9:30 PM" })).toBeInTheDocument()
+
+    fireEvent.change(within(dialog).getByLabelText("Stephen's Bed bedtime"), { target: { value: '20:45' } })
+
+    expect(mockCallServiceCalls).toEqual([
+      { domain: 'mqtt', service: 'publish', serviceData: { payload: '20:45', topic: 'free-sleep/NightCanvasRestful/left/schedule/bedtime/set' } },
+    ])
+  })
+
+  it('resets the bed modal scroll position when switching content tabs', async () => {
+    const originalScrollTo = HTMLElement.prototype.scrollTo
+    const scrollTo = vi.fn()
+    Object.defineProperty(HTMLElement.prototype, 'scrollTo', { configurable: true, value: scrollTo })
+    try {
+      render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
+
+      fireEvent.click(screen.getByRole('button', { name: /Stephen's Bed Cooling • -1/i }))
+
+      const dialog = await screen.findByRole('dialog')
+      scrollTo.mockClear()
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Status' }))
+
+      expect(scrollTo).toHaveBeenCalledWith({ top: 0, behavior: 'auto' })
+    } finally {
+      if (originalScrollTo) Object.defineProperty(HTMLElement.prototype, 'scrollTo', { configurable: true, value: originalScrollTo })
+      else Reflect.deleteProperty(HTMLElement.prototype, 'scrollTo')
+    }
+  })
+
+  it('starts Free Sleep hot flash mode from the bed modal', async () => {
+    render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
+
+    fireEvent.click(screen.getByRole('button', { name: /Stephen's Bed Cooling • -1/i }))
+
+    const dialog = await screen.findByRole('dialog')
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Special Modes' }))
+    const hotFlash = within(dialog).getByRole('button', { name: 'Hot Flash Mode Inactive' })
+    expect(hotFlash.querySelector('path')).toHaveAttribute('d', materialIconPath('mdi:snowflake'))
+
+    fireEvent.click(hotFlash)
+
+    expect(mockCallServiceCalls).toEqual([
+      { domain: 'input_button', service: 'press', target: 'input_button.eight_sleep_stephen_hot_flash' },
+    ])
+  })
+
+  it('shows active Free Sleep hot flash countdown and cancel action', async () => {
+    mockEntities['input_boolean.eight_sleep_steph_hot_flash_active'].state = 'on'
+    mockEntities['timer.eight_sleep_steph_hot_flash'].state = 'active'
+    render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
+
+    fireEvent.click(screen.getByRole('button', { name: /Steph's Bed Hot Flash Mode/i }))
+
+    const dialog = await screen.findByRole('dialog')
+    expect(within(dialog).getByText("Steph's Bed: Hot Flash Mode")).toBeInTheDocument()
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Special Modes' }))
+    expect(within(dialog).getByRole('button', { name: 'Hot Flash Mode Active' })).toBeInTheDocument()
+    expect(within(dialog).getByText('12:34')).toBeInTheDocument()
+    const cancel = within(dialog).getByRole('button', { name: "Cancel Steph's Bed hot flash mode" })
+    expect(cancel.querySelector('path')).toHaveAttribute('d', materialIconPath('mdi:close'))
+
+    fireEvent.click(cancel)
+
+    expect(mockCallServiceCalls).toEqual([
+      { domain: 'input_button', service: 'press', target: 'input_button.eight_sleep_steph_cancel_hot_flash' },
+    ])
+  })
+
+  it('uses Free Sleep target state and restore timestamp fallback during active Hot Flash mode', async () => {
+    mockEntities['input_boolean.eight_sleep_stephen_hot_flash_active'].state = 'on'
+    mockEntities['timer.eight_sleep_stephen_hot_flash'].state = 'idle'
+    mockEntities['number.nightcanvasrestful_left_target_temperature'].state = '-10'
+    mockEntities['input_datetime.eight_sleep_stephen_hot_flash_restore_at'].attributes.timestamp = (Date.now() + (14 * 60 + 34) * 1000) / 1000
+    render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
+
+    fireEvent.click(screen.getByRole('button', { name: /Stephen's Bed Hot Flash Mode/i }))
+
+    const dialog = await screen.findByRole('dialog')
+    expect(within(dialog).getByText("Stephen's Bed: Hot Flash Mode")).toBeInTheDocument()
+    expect(within(dialog).getByRole('region', { name: /Stephen's Bed thermostat Cooling -10/i })).toBeInTheDocument()
+    expect(within(dialog).getByRole('slider', { name: "Stephen's Bed target level" })).toHaveAttribute('aria-readonly', 'false')
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Special Modes' }))
+    expect(within(dialog).getByRole('button', { name: 'Hot Flash Mode Active' })).toBeInTheDocument()
+    expect(within(dialog).getByText('14:34')).toBeInTheDocument()
+  })
+
   it('shows Free Sleep snooze and cancel actions while a side alarm is active', async () => {
     mockEntities['binary_sensor.nightcanvasrestful_right_alarm_vibrating'].state = 'on'
     const { rerender } = render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
@@ -841,10 +1001,13 @@ describe('DashboardViewPage', () => {
     fireEvent.click(screen.getByRole('button', { name: /Steph's Bed Off/i }))
 
     let dialog = await screen.findByRole('dialog')
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Alarms' }))
     expect(within(dialog).getByRole('group', { name: "Steph's Bed active alarm actions" })).toBeInTheDocument()
     expect(within(dialog).getByRole('button', { name: /Snooze Alarm/i })).toBeInTheDocument()
     expect(within(dialog).getByRole('button', { name: /Cancel Alarm/i })).toBeInTheDocument()
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Status' }))
     expect(within(dialog).getByText('Vibrating')).toBeInTheDocument()
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Alarms' }))
 
     fireEvent.click(within(dialog).getByRole('button', { name: /Snooze Alarm/i }))
 
@@ -876,8 +1039,9 @@ describe('DashboardViewPage', () => {
   it('adds and controls configured Free Sleep alarms from the bed modal', async () => {
     render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
 
-    fireEvent.click(screen.getByRole('button', { name: /Stephen's Bed Cooling • -1°/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Stephen's Bed Cooling • -1/i }))
     const dialog = await screen.findByRole('dialog')
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Alarms' }))
     const alarmSchedule = within(dialog).getByRole('button', { name: 'Alarm Schedule Disabled' })
     expect(within(dialog).queryByRole('button', { name: 'Add Alarm' })).not.toBeInTheDocument()
 
@@ -960,6 +1124,7 @@ describe('DashboardViewPage', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /Steph's Bed Off/i }))
     const dialog = await screen.findByRole('dialog')
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Alarms' }))
     fireEvent.click(within(dialog).getByRole('button', { name: 'Alarm Schedule Disabled' }))
 
     const sundaySection = within(dialog).getByRole('region', { name: "Steph's Bed Sunday alarms" })
@@ -992,6 +1157,7 @@ describe('DashboardViewPage', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /Steph's Bed Off/i }))
     const dialog = await screen.findByRole('dialog')
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Alarms' }))
     fireEvent.click(within(dialog).getByRole('button', { name: 'Alarm Schedule Disabled' }))
     const sundaySection = within(dialog).getByRole('region', { name: "Steph's Bed Sunday alarms" })
     const alarmToggle = within(sundaySection).getByRole('switch', { exact: true, name: "Disable Steph's Bed Sunday alarm" })
@@ -1025,6 +1191,7 @@ describe('DashboardViewPage', () => {
     try {
       fireEvent.click(screen.getByRole('button', { name: /Steph's Bed Off/i }))
       const dialog = await screen.findByRole('dialog')
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Alarms' }))
       fireEvent.click(within(dialog).getByRole('button', { name: 'Alarm Schedule Disabled' }))
       const sundaySection = within(dialog).getByRole('region', { name: "Steph's Bed Sunday alarms" })
 
@@ -1051,6 +1218,7 @@ describe('DashboardViewPage', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /Steph's Bed Off/i }))
     const dialog = await screen.findByRole('dialog')
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Alarms' }))
     fireEvent.click(within(dialog).getByRole('button', { name: 'Alarm Schedule Disabled' }))
     const sundaySection = within(dialog).getByRole('region', { name: "Steph's Bed Sunday alarms" })
 
@@ -1074,6 +1242,7 @@ describe('DashboardViewPage', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /Steph's Bed Off/i }))
     const dialog = await screen.findByRole('dialog')
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Alarms' }))
     const masterToggle = within(dialog).getByRole('button', { name: 'Alarm Schedule Disabled' })
     act(() => {
       fireEvent.click(masterToggle)
@@ -1092,6 +1261,7 @@ describe('DashboardViewPage', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /Steph's Bed Off/i }))
     const dialog = await screen.findByRole('dialog')
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Alarms' }))
     fireEvent.click(within(dialog).getByRole('button', { name: 'Alarm Schedule Disabled' }))
     const sundaySection = within(dialog).getByRole('region', { name: "Steph's Bed Sunday alarms" })
     const alarmToggle = within(sundaySection).getByRole('switch', { exact: true, name: "Disable Steph's Bed Sunday alarm" })
@@ -1115,6 +1285,7 @@ describe('DashboardViewPage', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /Steph's Bed Off/i }))
     const dialog = await screen.findByRole('dialog')
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Alarms' }))
     fireEvent.click(within(dialog).getByRole('button', { name: 'Alarm Schedule Disabled' }))
     const sundaySection = within(dialog).getByRole('region', { name: "Steph's Bed Sunday alarms" })
     fireEvent.click(within(sundaySection).getByRole('switch', { exact: true, name: "Disable Steph's Bed Sunday alarm" }))
@@ -1151,10 +1322,10 @@ describe('DashboardViewPage', () => {
 
     expect(confirm).not.toHaveBeenCalled()
     expect(within(dialog).getByRole('button', { name: "Turn off Steph's Bed" })).toBeInTheDocument()
-    expect(within(dialog).getByText("Steph's Bed: Idle • 0°")).toBeInTheDocument()
-    expect(within(dialog).getByRole('region', { name: /Steph's Bed thermostat Idle 0°/i })).toBeInTheDocument()
+    expect(within(dialog).getByText("Steph's Bed: Idle • 0")).toBeInTheDocument()
+    expect(within(dialog).getByRole('region', { name: /Steph's Bed thermostat Idle 0/i })).toBeInTheDocument()
     expect(within(dialog).queryByText('Tap the thermostat to turn on the Pod.')).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Steph's Bed Idle • 0°/i, hidden: true })).toHaveAttribute('data-muted', 'false')
+    expect(screen.getByRole('button', { name: /Steph's Bed Idle • 0/i, hidden: true })).toHaveAttribute('data-muted', 'false')
     expect(mockCallServiceCalls).toEqual([
       { domain: 'switch', service: 'turn_on', target: 'switch.nightcanvasrestful_right_power' },
     ])
@@ -1165,17 +1336,17 @@ describe('DashboardViewPage', () => {
   it('drags the Free Sleep hero dial as a target level control', async () => {
     render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
 
-    fireEvent.click(screen.getByRole('button', { name: /Stephen's Bed Cooling • -1°/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Stephen's Bed Cooling • -1/i }))
     const dialog = await screen.findByRole('dialog')
     const slider = within(dialog).getByRole('slider', { name: "Stephen's Bed target level" })
 
     fireEvent.change(slider, { target: { value: '-2.2' } })
-    expect(within(dialog).getByRole('region', { name: /Stephen's Bed thermostat Cooling -2°/i })).toBeInTheDocument()
-    expect(within(dialog).getByText("Stephen's Bed: Cooling • -1°")).toBeInTheDocument()
+    expect(within(dialog).getByRole('region', { name: /Stephen's Bed thermostat Cooling -2/i })).toBeInTheDocument()
+    expect(within(dialog).getByText("Stephen's Bed: Cooling • -1")).toBeInTheDocument()
     fireEvent.pointerUp(slider)
 
-    expect(within(dialog).getByText("Stephen's Bed: Cooling • -2°")).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Stephen's Bed Cooling • -2°/i, hidden: true })).toHaveAttribute('data-muted', 'false')
+    expect(within(dialog).getByText("Stephen's Bed: Cooling • -2")).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Stephen's Bed Cooling • -2/i, hidden: true })).toHaveAttribute('data-muted', 'false')
 
     await waitFor(() => expect(mockCallServiceCalls).toEqual([
       { domain: 'number', service: 'set_value', target: 'number.nightcanvasrestful_left_target_temperature', serviceData: { value: -2 } },
@@ -1185,12 +1356,13 @@ describe('DashboardViewPage', () => {
   it('updates Free Sleep schedule stage temperatures through MQTT number entities', async () => {
     render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
 
-    fireEvent.click(screen.getByRole('button', { name: /Stephen's Bed Cooling • -1°/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Stephen's Bed Cooling • -1/i }))
     const dialog = await screen.findByRole('dialog')
 
     fireEvent.click(within(dialog).getByRole('button', { name: "Increase Stephen's Bed Asleep level" }))
 
-    expect(within(dialog).getAllByText('0°').length).toBeGreaterThanOrEqual(3)
+    expect(within(dialog).getAllByText('0').length).toBeGreaterThanOrEqual(3)
+    expect(within(dialog).queryByText('0°')).not.toBeInTheDocument()
     await waitFor(() => expect(mockCallServiceCalls).toEqual([
       { domain: 'number', service: 'set_value', target: 'number.nightcanvasrestful_left_asleep_temperature', serviceData: { value: 0 } },
     ]))
@@ -1199,7 +1371,7 @@ describe('DashboardViewPage', () => {
   it('coalesces rapid Free Sleep schedule stage temperature taps to the final value', async () => {
     render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
 
-    fireEvent.click(screen.getByRole('button', { name: /Stephen's Bed Cooling • -1°/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Stephen's Bed Cooling • -1/i }))
     const dialog = await screen.findByRole('dialog')
     const increaseAsleep = within(dialog).getByRole('button', { name: "Increase Stephen's Bed Asleep level" })
 
@@ -1209,7 +1381,7 @@ describe('DashboardViewPage', () => {
       fireEvent.click(increaseAsleep)
     })
 
-    expect(within(dialog).getByText('2°')).toBeInTheDocument()
+    expect(within(dialog).getByText('+2')).toBeInTheDocument()
     expect(mockCallServiceCalls).toEqual([])
     await waitFor(() => expect(mockCallServiceCalls).toEqual([
       { domain: 'number', service: 'set_value', target: 'number.nightcanvasrestful_left_asleep_temperature', serviceData: { value: 2 } },
@@ -1230,7 +1402,7 @@ describe('DashboardViewPage', () => {
 
     fireEvent.click(asleepIncrease)
 
-    expect(within(dialog).getByText('1°')).toBeInTheDocument()
+    expect(within(dialog).getByText('+1')).toBeInTheDocument()
     expect(within(dialog).getByRole('button', { name: "Turn on Steph's Bed" })).toBeInTheDocument()
     await waitFor(() => expect(mockCallServiceCalls).toEqual([
       { domain: 'number', service: 'set_value', target: 'number.nightcanvasrestful_right_asleep_temperature', serviceData: { value: 1 } },
@@ -1241,7 +1413,7 @@ describe('DashboardViewPage', () => {
     const confirm = vi.spyOn(window, 'confirm').mockReturnValueOnce(false).mockReturnValueOnce(true)
     render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
 
-    fireEvent.click(screen.getByRole('button', { name: /Stephen's Bed Cooling • -1°/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Stephen's Bed Cooling • -1/i }))
     const dialog = await screen.findByRole('dialog')
     const toggle = within(dialog).getByRole('button', { name: "Turn off Stephen's Bed" })
 
@@ -1288,23 +1460,23 @@ describe('DashboardViewPage', () => {
   it('keeps Free Sleep target edits visible while stale HASS values catch up', async () => {
     const view = render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
 
-    fireEvent.click(screen.getByRole('button', { name: /Stephen's Bed Cooling • -1°/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Stephen's Bed Cooling • -1/i }))
     const dialog = await screen.findByRole('dialog')
     const slider = within(dialog).getByRole('slider', { name: "Stephen's Bed target level" })
     fireEvent.change(slider, { target: { value: '-2' } })
     fireEvent.pointerUp(slider)
 
-    expect(within(dialog).getByText("Stephen's Bed: Cooling • -2°")).toBeInTheDocument()
+    expect(within(dialog).getByText("Stephen's Bed: Cooling • -2")).toBeInTheDocument()
 
     mockEntities['number.nightcanvasrestful_left_target_temperature'].state = '-1'
     view.rerender(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
-    expect(within(screen.getByRole('dialog')).getByText("Stephen's Bed: Cooling • -2°")).toBeInTheDocument()
+    expect(within(screen.getByRole('dialog')).getByText("Stephen's Bed: Cooling • -2")).toBeInTheDocument()
 
     mockEntities['number.nightcanvasrestful_left_target_temperature'].state = '-2'
     view.rerender(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
     mockEntities['number.nightcanvasrestful_left_target_temperature'].state = '-1'
     view.rerender(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
-    expect(within(screen.getByRole('dialog')).getByText("Stephen's Bed: Cooling • -1°")).toBeInTheDocument()
+    expect(within(screen.getByRole('dialog')).getByText("Stephen's Bed: Cooling • -1")).toBeInTheDocument()
   })
 
   it('ports the Living Room SHIELD remote modal and only runs explicit controls', async () => {
@@ -1986,7 +2158,7 @@ describe('DashboardViewPage', () => {
     expect(screen.getByRole('heading', { name: 'Grocery List' })).toBeInTheDocument()
 
     await waitFor(() => expect(screen.queryByRole('heading', { name: 'Grocery List' })).not.toBeInTheDocument())
-    expect(screen.getByRole('heading', { name: 'No groceries listed' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'No groceries listed' })).toBeInTheDocument()
     expect(screen.getByText('Add some groceries via the YAML app for now to see them appear here.')).toBeInTheDocument()
   })
 

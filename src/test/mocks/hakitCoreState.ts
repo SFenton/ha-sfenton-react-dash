@@ -129,18 +129,26 @@ function mockAlarm(time: string, enabled = true) {
   }
 }
 
+function mockFreeSleepDailySchedule(on: string, off = '09:00', alarms: ReturnType<typeof mockAlarm>[] = []) {
+  return {
+    alarm: alarms[0],
+    alarms,
+    power: {
+      off,
+      on,
+    },
+  }
+}
+
 export function mockFreeSleepScheduleAttributes() {
   return {
-    left: {},
-    right: {
-      saturday: {
-        alarm: mockAlarm('06:30'),
-        alarms: [mockAlarm('06:30'), mockAlarm('07:15')],
-        power: {
-          off: '09:00',
-        },
-      },
-    },
+    left: Object.fromEntries(freeSleepAlarmDays.map((day) => [day, mockFreeSleepDailySchedule('21:30')])) as Record<string, unknown>,
+    right: Object.fromEntries(freeSleepAlarmDays.map((day) => [
+      day,
+      day === 'saturday'
+        ? mockFreeSleepDailySchedule('22:00', '09:00', [mockAlarm('06:30'), mockAlarm('07:15')])
+        : mockFreeSleepDailySchedule('22:00'),
+    ])) as Record<string, unknown>,
   }
 }
 
@@ -164,10 +172,15 @@ function applyFreeSleepSchedulePayload(payload: unknown) {
       const dayPayload = sidePayload[day]
       if (!isRecord(dayPayload)) continue
       const dayAttributes = isRecord(sideAttributes[day]) ? cloneRecord(sideAttributes[day]) : {}
+      if (isRecord(dayPayload.power)) {
+        dayAttributes.power = { ...(isRecord(dayAttributes.power) ? dayAttributes.power : {}), ...dayPayload.power }
+      }
       const alarms = Array.isArray(dayPayload.alarms) ? cloneRecord(dayPayload.alarms) : []
-      dayAttributes.alarms = alarms
-      if (alarms.length > 0) dayAttributes.alarm = alarms[0]
-      else delete dayAttributes.alarm
+      if (Array.isArray(dayPayload.alarms)) {
+        dayAttributes.alarms = alarms
+        if (alarms.length > 0) dayAttributes.alarm = alarms[0]
+        else delete dayAttributes.alarm
+      }
       sideAttributes[day] = dayAttributes
     }
     nextAttributes[side] = sideAttributes
@@ -187,6 +200,12 @@ function applyMockCallServiceSideEffects(params: Record<string, unknown>) {
     if (numberEntity && value !== undefined) numberEntity.state = String(value)
   }
 
+  if (params.domain === 'text' && params.service === 'set_value' && typeof params.target === 'string') {
+    const textEntity = mockEntities[params.target]
+    const value = isRecord(params.serviceData) ? params.serviceData.value : undefined
+    if (textEntity && value !== undefined) textEntity.state = String(value)
+  }
+
   if (params.domain === 'button' && params.service === 'press' && params.target === 'button.nightcanvasrestful_clear_alarm') {
     mockEntities['binary_sensor.nightcanvasrestful_left_alarm_vibrating'].state = 'off'
     mockEntities['binary_sensor.nightcanvasrestful_right_alarm_vibrating'].state = 'off'
@@ -194,8 +213,18 @@ function applyMockCallServiceSideEffects(params: Record<string, unknown>) {
 
   if (params.domain !== 'mqtt' || params.service !== 'publish') return
   const serviceData = isRecord(params.serviceData) ? params.serviceData : {}
-  if (serviceData.topic !== freeSleepScheduleSetTopic || typeof serviceData.payload !== 'string') return
-  applyFreeSleepSchedulePayload(JSON.parse(serviceData.payload))
+  if (typeof serviceData.payload !== 'string') return
+  if (serviceData.topic === freeSleepScheduleSetTopic) {
+    applyFreeSleepSchedulePayload(JSON.parse(serviceData.payload))
+    return
+  }
+  for (const side of ['left', 'right'] as const) {
+    if (serviceData.topic !== `free-sleep/NightCanvasRestful/${side}/schedule/bedtime/set`) continue
+    mockEntities[`text.master_bedroom_eight_sleep_pod_5_${side}_bedtime`].state = serviceData.payload
+    applyFreeSleepSchedulePayload({
+      [side]: Object.fromEntries(freeSleepAlarmDays.map((day) => [day, { power: { on: serviceData.payload } }])),
+    })
+  }
 }
 
 type MockHassDebugApi = {
@@ -303,6 +332,8 @@ export const mockEntities: Record<string, MockEntity> = {
   'number.nightcanvasrestful_right_bedtime_temperature': entity('number.nightcanvasrestful_right_bedtime_temperature', '0', { ...freeSleepLevelAttributes }),
   'number.nightcanvasrestful_right_asleep_temperature': entity('number.nightcanvasrestful_right_asleep_temperature', '0', { ...freeSleepLevelAttributes }),
   'number.nightcanvasrestful_right_dawn_temperature': entity('number.nightcanvasrestful_right_dawn_temperature', '0', { ...freeSleepLevelAttributes }),
+  'text.master_bedroom_eight_sleep_pod_5_left_bedtime': entity('text.master_bedroom_eight_sleep_pod_5_left_bedtime', '21:30', { icon: 'mdi:bed-clock', mode: 'text' }),
+  'text.master_bedroom_eight_sleep_pod_5_right_bedtime': entity('text.master_bedroom_eight_sleep_pod_5_right_bedtime', '22:00', { icon: 'mdi:bed-clock', mode: 'text' }),
   'number.stephen_s_eight_sleep_side_alarm_snooze_minutes': entity('number.stephen_s_eight_sleep_side_alarm_snooze_minutes', '9', { max: 30, min: 5, step: 1, unit_of_measurement: 'min' }),
   'number.steph_s_eight_sleep_side_alarm_snooze_minutes': entity('number.steph_s_eight_sleep_side_alarm_snooze_minutes', '9', { max: 30, min: 5, step: 1, unit_of_measurement: 'min' }),
   'sensor.nightcanvasrestful_left_current_temperature': entity('sensor.nightcanvasrestful_left_current_temperature', '86', { unit_of_measurement: '°F', device_class: 'temperature' }),
@@ -327,11 +358,13 @@ export const mockEntities: Record<string, MockEntity> = {
   'sensor.steph_s_eight_sleep_side_dawn_level': entity('sensor.steph_s_eight_sleep_side_dawn_level', '2', { raw_value: 20, api_field: 'finalSleepLevel', unit_of_measurement: '°' }),
   'sensor.steph_s_eight_sleep_side_now_level': entity('sensor.steph_s_eight_sleep_side_now_level', 'unknown', { raw_value: null, api_field: 'overrideLevels.bedtime', has_override: false, source: 'overrideLevels', unit_of_measurement: '°' }),
   'input_boolean.eight_sleep_stephen_hot_flash_active': entity('input_boolean.eight_sleep_stephen_hot_flash_active', 'off'),
-  'input_boolean.eight_sleep_steph_hot_flash_active': entity('input_boolean.eight_sleep_steph_hot_flash_active', 'on'),
+  'input_boolean.eight_sleep_steph_hot_flash_active': entity('input_boolean.eight_sleep_steph_hot_flash_active', 'off'),
   'input_button.eight_sleep_stephen_cancel_hot_flash': entity('input_button.eight_sleep_stephen_cancel_hot_flash', 'unknown', { icon: 'mdi:close' }),
   'input_button.eight_sleep_stephen_hot_flash': entity('input_button.eight_sleep_stephen_hot_flash', 'unknown', { icon: 'mdi:snowflake' }),
   'input_button.eight_sleep_steph_cancel_hot_flash': entity('input_button.eight_sleep_steph_cancel_hot_flash', 'unknown', { icon: 'mdi:close' }),
   'input_button.eight_sleep_steph_hot_flash': entity('input_button.eight_sleep_steph_hot_flash', 'unknown', { icon: 'mdi:snowflake' }),
+  'input_datetime.eight_sleep_stephen_hot_flash_restore_at': entity('input_datetime.eight_sleep_stephen_hot_flash_restore_at', '2026-06-07 00:00:00', { timestamp: 1780815600 }),
+  'input_datetime.eight_sleep_steph_hot_flash_restore_at': entity('input_datetime.eight_sleep_steph_hot_flash_restore_at', '2026-06-07 00:00:00', { timestamp: 1780815600 }),
   'input_number.eight_sleep_stephen_asleep_level': entity('input_number.eight_sleep_stephen_asleep_level', '1'),
   'input_number.eight_sleep_stephen_bedtime_level': entity('input_number.eight_sleep_stephen_bedtime_level', '-5'),
   'input_number.eight_sleep_stephen_dawn_level': entity('input_number.eight_sleep_stephen_dawn_level', '2'),

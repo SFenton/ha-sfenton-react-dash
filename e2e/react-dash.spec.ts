@@ -7,6 +7,12 @@ type FreeSleepAlarmSnapshot = {
 
 type FreeSleepSchedulesSnapshot = Partial<Record<'left' | 'right', Partial<Record<string, { alarms?: FreeSleepAlarmSnapshot[] }>>>>
 
+declare global {
+  interface Window {
+    __vacationPickerCalls?: number
+  }
+}
+
 async function openBedAlarmDialog(page: Page, bedButtonName: RegExp) {
   await page.goto('/at-a-glance/master-bedroom')
   await page.getByRole('button', { name: bedButtonName }).click()
@@ -53,6 +59,7 @@ async function expectFreeSleepAlarms(page: Page, side: 'left' | 'right', day: st
 test('overview renders with mock Home Assistant state', async ({ page }) => {
   await page.goto('/at-a-glance/overview')
 
+  await expect(page).toHaveTitle('Home Assistant')
   await expect(page.getByRole('heading', { name: 'Home' })).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Quick Links' })).toBeVisible()
 })
@@ -78,18 +85,18 @@ test('settings links to Vacation mode controls', async ({ page }) => {
     await expect(page.getByLabel(label)).toHaveCSS('text-align', 'left')
   }
   await page.evaluate(() => {
-    (window as any).__vacationPickerCalls = 0
+    window.__vacationPickerCalls = 0
     Object.defineProperty(HTMLInputElement.prototype, 'showPicker', {
       configurable: true,
       value() {
-        (window as any).__vacationPickerCalls += 1
+        window.__vacationPickerCalls = (window.__vacationPickerCalls ?? 0) + 1
       },
     })
   })
   const endDateCard = page.getByText('End Date', { exact: true }).locator('..')
   await expect(endDateCard).toHaveCSS('cursor', 'pointer')
   await endDateCard.click({ position: { x: 8, y: 8 } })
-  await expect.poll(() => page.evaluate(() => (window as any).__vacationPickerCalls)).toBe(1)
+  await expect.poll(() => page.evaluate(() => window.__vacationPickerCalls ?? 0)).toBe(1)
   await page.getByLabel('Start Date').click()
   await expect(page.getByLabel('Start Date').locator('..')).toHaveCSS('outline-style', 'none')
 })
@@ -300,7 +307,7 @@ test('Free Sleep Add Alarm writes the expected alarm into the backend schedule',
   const sundaySection = dialog.getByRole('region', { name: "Steph's Bed Sunday alarms" })
   await expect(sundaySection.getByText('3 alarms')).toBeVisible()
   await expect(sundaySection.getByRole('article', { name: /Steph's Bed Sunday alarm 3 enabled/i })).toBeVisible()
-  await expectFreeSleepAlarms(page, 'right', 'sunday', [
+  await expectFreeSleepAlarms(page, 'right', 'saturday', [
     { enabled: true, time: '06:30' },
     { enabled: true, time: '07:15' },
     { enabled: true, time: '08:00' },
@@ -315,7 +322,7 @@ test('Free Sleep individual alarm toggle only disables that alarm in the backend
 
   await expect(sundaySection.getByRole('switch', { exact: true, name: "Enable Steph's Bed Sunday alarm" })).toHaveAttribute('aria-checked', 'false')
   await expect(sundaySection.getByRole('switch', { exact: true, name: "Disable Steph's Bed Sunday alarm 2" })).toHaveAttribute('aria-checked', 'true')
-  await expectFreeSleepAlarms(page, 'right', 'sunday', [
+  await expectFreeSleepAlarms(page, 'right', 'saturday', [
     { enabled: false, time: '06:30' },
     { enabled: true, time: '07:15' },
   ])
@@ -329,7 +336,7 @@ test('Free Sleep alarm time edit keeps the alarm enabled in the UI and backend s
   await sundaySection.getByRole('textbox', { name: "Steph's Bed Sunday alarm time" }).fill('06:35', { force: true })
 
   await expect(sundaySection.getByRole('switch', { exact: true, name: "Disable Steph's Bed Sunday alarm" })).toHaveAttribute('aria-checked', 'true')
-  await expectFreeSleepAlarms(page, 'right', 'sunday', [
+  await expectFreeSleepAlarms(page, 'right', 'saturday', [
     { enabled: true, time: '06:35' },
     { enabled: true, time: '07:15' },
   ])
@@ -348,7 +355,7 @@ test('Free Sleep alarm delete confirms and removes only that alarm from the back
   await deleteFirstAlarm.click()
 
   await expect(sundaySection.getByText('2 alarms')).toBeVisible()
-  await expectFreeSleepAlarms(page, 'right', 'sunday', [
+  await expectFreeSleepAlarms(page, 'right', 'saturday', [
     { enabled: true, time: '06:30' },
     { enabled: true, time: '07:15' },
   ])
@@ -360,7 +367,7 @@ test('Free Sleep alarm delete confirms and removes only that alarm from the back
   await deleteFirstAlarm.click()
 
   await expect(sundaySection.getByText('1 alarm')).toBeVisible()
-  await expectFreeSleepAlarms(page, 'right', 'sunday', [
+  await expectFreeSleepAlarms(page, 'right', 'saturday', [
     { enabled: true, time: '07:15' },
   ])
 })
@@ -374,7 +381,7 @@ test('Free Sleep day toggle disables every alarm for that day in the backend sch
   await expect(sundaySection.getByRole('switch', { name: "Enable Steph's Bed Sunday alarms" })).toHaveAttribute('aria-checked', 'false')
   await expect(sundaySection.getByRole('switch', { exact: true, name: "Enable Steph's Bed Sunday alarm" })).toHaveAttribute('aria-checked', 'false')
   await expect(sundaySection.getByRole('switch', { exact: true, name: "Enable Steph's Bed Sunday alarm 2" })).toHaveAttribute('aria-checked', 'false')
-  await expectFreeSleepAlarms(page, 'right', 'sunday', [
+  await expectFreeSleepAlarms(page, 'right', 'saturday', [
     { enabled: false, time: '06:30' },
     { enabled: false, time: '07:15' },
   ])

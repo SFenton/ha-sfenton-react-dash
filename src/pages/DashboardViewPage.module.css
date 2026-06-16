@@ -770,6 +770,11 @@ button.thermostatGlassMain {
   cursor: pointer;
 }
 
+.thermostatGlassMain:focus,
+.thermostatGlassMain:focus-visible {
+  outline: none;
+}
+
 .thermostatRoomRow span,
 .thermostatGlassMain span,
 .thermostatCheckbox span {
@@ -853,6 +858,85 @@ button.thermostatGlassMain {
 .thermostatModalBody {
   display: grid;
   gap: 18px;
+}
+
+.eightSleepModalHeroShell {
+  display: grid;
+}
+
+.eightSleepModalPanel {
+  display: grid;
+  min-height: 220px;
+  gap: 18px;
+}
+
+.eightSleepModalNav {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  align-items: center;
+  gap: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  padding: 7px;
+  background: rgba(20, 20, 20, 0.72);
+  box-shadow: 0 16px 34px rgba(0, 0, 0, 0.34), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+.eightSleepModalNavButton {
+  display: grid;
+  width: 100%;
+  min-height: 48px;
+  place-items: center;
+  border: 0;
+  border-radius: 999px;
+  color: rgba(255, 255, 255, 0.68);
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: color var(--duration-fast) ease, background var(--duration-fast) ease, transform var(--duration-fast) ease;
+}
+
+.eightSleepModalNavButtonActive {
+  color: #111;
+  background: rgba(255, 255, 255, 0.92);
+}
+
+.eightSleepModalNavButton:active {
+  transform: scale(0.94);
+}
+
+.eightSleepModalNavButton:focus,
+.eightSleepModalNavButton:focus-visible {
+  outline: none;
+}
+
+.eightSleepBedtimeCard {
+  position: relative;
+  cursor: pointer;
+}
+
+.eightSleepBedtimeCard .thermostatGlassMain {
+  pointer-events: none;
+}
+
+.eightSleepBedtimeInput {
+  position: absolute;
+  right: 16px;
+  bottom: 16px;
+  width: 1px;
+  height: 1px;
+  border: 0;
+  padding: 0;
+  opacity: 0;
+  pointer-events: none;
+  color-scheme: dark;
+}
+
+.eightSleepBedtimeInput:focus {
+  outline: none;
 }
 
 .predictiveControlGrid,
@@ -1440,8 +1524,7 @@ button.thermostatGlassMain {
 }
 
 .eightSleepStepperButton:focus-visible {
-  outline: 2px solid rgba(255, 255, 255, 0.62);
-  outline-offset: 2px;
+  outline: none;
 }
 
 .eightSleepStageValue {
@@ -1494,8 +1577,7 @@ button.thermostatGlassMain {
 }
 
 .eightSleepCancelButton:focus-visible {
-  outline: 2px solid rgba(255, 255, 255, 0.62);
-  outline-offset: 2px;
+  outline: none;
 }
 
 @media (max-width: 340px) {

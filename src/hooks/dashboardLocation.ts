@@ -1,4 +1,5 @@
 export const DASHBOARD_ROUTE_CHANGE_EVENT = 'dashboard-route-change'
+export const DASHBOARD_DOCUMENT_TITLE = 'Home Assistant'
 
 function canReadWindow(candidate: Window) {
   try {
@@ -41,6 +42,17 @@ export function dashboardEventTargets() {
   const targetWindow = dashboardWindow()
   if (!targetWindow || targetWindow === window) return [window]
   return [window, targetWindow]
+}
+
+export function setDashboardDocumentTitle(title = DASHBOARD_DOCUMENT_TITLE) {
+  if (typeof document === 'undefined') return
+
+  document.title = title
+
+  const targetWindow = dashboardWindow()
+  if (targetWindow && targetWindow !== window) {
+    targetWindow.document.title = title
+  }
 }
 
 export function dispatchDashboardRouteChange(targetWindow = dashboardWindow()) {

@@ -531,7 +531,7 @@ function RoomSourceCard({ card, eightSleepModalState, onOpen }: { card: RoomSour
     ? [subtitleEntityOne, subtitleEntityTwo].slice(0, effectiveSubtitleEntityIds.length).map((subtitleEntity) => formatRoomSourceSubtitleEntity(subtitleEntity)).join(' • ')
     : effectiveShowState ? formatRoomSourceState(card, entity) : undefined
   const displayUnavailable = eightSleepModalState ? !eightSleepModalState.sideAvailable : unavailable
-  const displaySubtitle = eightSleepModalState ? (eightSleepModalState.controlsSideOn ? eightSleepModalState.subtitle : 'Off') : subtitle
+  const displaySubtitle = eightSleepModalState ? eightSleepModalState.subtitle : subtitle
   const clickable = Boolean(card.hash || card.action) && !displayUnavailable && !disabledByState
   const activeByState = Boolean(entity && card.activeStates?.includes(entity.state))
   const sourceStateInactive = card.stateDisplay === 'climate-action-temperature' && (entity?.state === 'off' || entity?.attributes.hvac_action === 'off')
@@ -557,24 +557,30 @@ function RoomSourceCard({ card, eightSleepModalState, onOpen }: { card: RoomSour
 }
 
 function RoomSourceModal({ card, eightSleepModalState, onClose, roomTitle }: { card: RoomSourceCardConfig | null; eightSleepModalState?: EightSleepBedModalState; onClose: () => void; roomTitle: string }) {
-  const eightSleepSide = card ? eightSleepSideForHash(card.hash) : undefined
-  const content = card && !eightSleepSide ? renderRoomReusableSheet(card, roomTitle) : null
-  const plainTitle = card?.kind === 'air' || card?.kind === 'climate' || card?.kind === 'contact' || card?.kind === 'humidifier' || card?.kind === 'light' || card?.kind === 'occupancy'
-  const mediaTitle = card?.kind === 'media' && card.hash ? MEDIA_REMOTE_CONFIGS[card.hash]?.remoteTitle : undefined
-  const title = card ? mediaTitle ?? `${roomTitle}${plainTitle ? ' ' : ': '}${card.modalTitle ?? card.title}` : roomTitle
-  const subtitle = useHass((state) => (card && plainTitle && card.kind !== 'contact' && card.kind !== 'light' ? roomSourceModalSubtitle(card, roomTitle, state.entities) : undefined))
+  const lastCardRef = useRef<RoomSourceCardConfig | null>(null)
+  const lastEightSleepModalStateRef = useRef<EightSleepBedModalState | null>(null)
+  if (card) lastCardRef.current = card
 
-  if (card && eightSleepSide && eightSleepModalState) {
+  const renderCard = card ?? lastCardRef.current
+  const eightSleepSide = renderCard ? eightSleepSideForHash(renderCard.hash) : undefined
+  if (card && eightSleepSide && eightSleepModalState) lastEightSleepModalStateRef.current = eightSleepModalState
+
+  const renderedEightSleepModalState = card ? eightSleepModalState : lastEightSleepModalStateRef.current
+  const content = renderCard && !eightSleepSide ? renderRoomReusableSheet(renderCard, roomTitle) : null
+  const plainTitle = renderCard?.kind === 'air' || renderCard?.kind === 'climate' || renderCard?.kind === 'contact' || renderCard?.kind === 'humidifier' || renderCard?.kind === 'light' || renderCard?.kind === 'occupancy'
+  const mediaTitle = renderCard?.kind === 'media' && renderCard.hash ? MEDIA_REMOTE_CONFIGS[renderCard.hash]?.remoteTitle : undefined
+  const title = renderCard ? mediaTitle ?? `${roomTitle}${plainTitle ? ' ' : ': '}${renderCard.modalTitle ?? renderCard.title}` : roomTitle
+  const subtitle = useHass((state) => (renderCard && plainTitle && renderCard.kind !== 'contact' && renderCard.kind !== 'light' ? roomSourceModalSubtitle(renderCard, roomTitle, state.entities) : undefined))
+
+  if (renderCard && eightSleepSide && renderedEightSleepModalState) {
     return (
-      <ModalSheet onClose={onClose} open={Boolean(card)} subtitle={eightSleepModalState.subtitle} surface="hass-popup" title={eightSleepSide.title}>
-        <EightSleepBedModalContent key={eightSleepSide.hash} modalState={eightSleepModalState} side={eightSleepSide} />
-      </ModalSheet>
+      <EightSleepBedModal key={eightSleepSide.hash} modalState={renderedEightSleepModalState} onClose={onClose} open={Boolean(card)} side={eightSleepSide} />
     )
   }
 
   return (
     <ModalSheet onClose={onClose} open={Boolean(card)} subtitle={subtitle} title={title}>
-      {card && (content ?? <RoomSourceFallback card={card} />)}
+      {renderCard && (content ?? <RoomSourceFallback card={renderCard} />)}
     </ModalSheet>
   )
 }
@@ -1049,6 +1055,20 @@ function formatClockTime(time: string) {
   return `${hours}:${String(rawMinutes).padStart(2, '0')} ${period}`
 }
 
+function openNativeTimePicker(input: HTMLInputElement | null) {
+  if (!input) return
+  input.focus({ preventScroll: true })
+  if (typeof input.showPicker === 'function') {
+    try {
+      input.showPicker()
+      return
+    } catch {
+      // Fall back to the native click path if the browser rejects programmatic picker opening.
+    }
+  }
+  input.click()
+}
+
 function VacationDateField({ label, onChange, type, value }: { label: string; onChange: (value: string) => void; type: 'date' | 'time'; value: string }) {
   const inputRef = useRef<HTMLInputElement | null>(null)
 
@@ -1412,8 +1432,14 @@ interface EightSleepSideConfig {
   alarmSnoozeMinutesEntityId: string
   alarmVibratingEntityId: string
   awayModeEntityId: string
+  bedtimeEntityId: string
   currentTemperatureEntityId: string
   hash: string
+  hotFlashActiveEntityId: string
+  hotFlashButtonEntityId: string
+  hotFlashCancelButtonEntityId: string
+  hotFlashRestoreAtEntityId: string
+  hotFlashTimerEntityId: string
   powerSwitchEntityId: string
   presenceEntityId: string
   scheduleStageTemperatureEntityIds: Record<FreeSleepScheduleStage, string>
@@ -1436,6 +1462,7 @@ interface FreeSleepDailySchedule {
   alarm?: Partial<FreeSleepAlarmSchedule>
   alarms?: Partial<FreeSleepAlarmSchedule>[]
   power?: {
+    on?: string
     off?: string
   }
 }
@@ -1460,7 +1487,6 @@ interface EightSleepBedModalState {
   targetMax: number
   targetMin: number
   targetStep: number
-  targetUnit: string
 }
 
 const FREE_SLEEP_TARGET_MIN = -10
@@ -1472,6 +1498,7 @@ const FREE_SLEEP_NUMBER_SYNC_DEBOUNCE_MS = 300
 const EIGHT_SLEEP_POWER_REVERT_MS = 30000
 const FREE_SLEEP_SCHEDULE_SENSOR_ENTITY_ID = 'sensor.nightcanvasrestful_schedules'
 const FREE_SLEEP_SCHEDULE_SET_TOPIC = 'free-sleep/NightCanvasRestful/schedules/set'
+const FREE_SLEEP_BEDTIME_SET_TOPIC_PREFIX = 'free-sleep/NightCanvasRestful'
 const FREE_SLEEP_ALARM_DEBUG_TOPIC = 'free-sleep/NightCanvasRestful/debug/react-dash/alarm'
 const FREE_SLEEP_ALARM_DIAGNOSTICS_STORAGE_KEY = 'freeSleepAlarmDiagnostics'
 let freeSleepAlarmDebugSequence = 0
@@ -1484,9 +1511,17 @@ const FREE_SLEEP_DEFAULT_ALARM: FreeSleepAlarmSchedule = {
   vibrationPattern: 'rise',
 }
 const FREE_SLEEP_SCHEDULE_STAGES: { icon: string; key: FreeSleepScheduleStage; label: string }[] = [
-  { icon: 'mdi:bed-clock', key: 'bedtime', label: 'Bedtime' },
-  { icon: 'mdi:sleep', key: 'asleep', label: 'Asleep' },
-  { icon: 'mdi:weather-sunset-up', key: 'dawn', label: 'Dawn' },
+  { icon: 'mdi:bed', key: 'bedtime', label: 'Bedtime' },
+  { icon: 'mdi:moon-waning-crescent', key: 'asleep', label: 'Asleep' },
+  { icon: 'mdi:weather-sunny', key: 'dawn', label: 'Dawn' },
+]
+type EightSleepModalTab = 'schedule' | 'modes' | 'alarms' | 'status' | 'settings'
+const EIGHT_SLEEP_MODAL_TABS: { icon: string; label: string; tab: EightSleepModalTab }[] = [
+  { icon: 'mdi:thermostat', label: 'Sleep Schedule', tab: 'schedule' },
+  { icon: 'mdi:snowflake', label: 'Special Modes', tab: 'modes' },
+  { icon: 'mdi:alarm', label: 'Alarms', tab: 'alarms' },
+  { icon: 'mdi:information-outline', label: 'Status', tab: 'status' },
+  { icon: 'mdi:cog', label: 'Settings', tab: 'settings' },
 ]
 const FREE_SLEEP_ALARM_DAYS: { key: FreeSleepAlarmDay; label: string }[] = [
   { key: 'sunday', label: 'Sunday' },
@@ -1509,8 +1544,14 @@ const EIGHT_SLEEP_SIDE_CONFIGS: EightSleepSideConfig[] = [
     alarmSnoozeMinutesEntityId: 'number.stephen_s_eight_sleep_side_alarm_snooze_minutes',
     alarmVibratingEntityId: 'binary_sensor.nightcanvasrestful_left_alarm_vibrating',
     awayModeEntityId: 'switch.nightcanvasrestful_left_away_mode',
+    bedtimeEntityId: 'text.master_bedroom_eight_sleep_pod_5_left_bedtime',
     currentTemperatureEntityId: 'sensor.nightcanvasrestful_left_current_temperature',
     hash: '#stephens-bed',
+    hotFlashActiveEntityId: 'input_boolean.eight_sleep_stephen_hot_flash_active',
+    hotFlashButtonEntityId: 'input_button.eight_sleep_stephen_hot_flash',
+    hotFlashCancelButtonEntityId: 'input_button.eight_sleep_stephen_cancel_hot_flash',
+    hotFlashRestoreAtEntityId: 'input_datetime.eight_sleep_stephen_hot_flash_restore_at',
+    hotFlashTimerEntityId: 'timer.eight_sleep_stephen_hot_flash',
     powerSwitchEntityId: 'switch.nightcanvasrestful_left_power',
     presenceEntityId: 'binary_sensor.nightcanvasrestful_left_presence',
     scheduleStageTemperatureEntityIds: {
@@ -1530,8 +1571,14 @@ const EIGHT_SLEEP_SIDE_CONFIGS: EightSleepSideConfig[] = [
     alarmSnoozeMinutesEntityId: 'number.steph_s_eight_sleep_side_alarm_snooze_minutes',
     alarmVibratingEntityId: 'binary_sensor.nightcanvasrestful_right_alarm_vibrating',
     awayModeEntityId: 'switch.nightcanvasrestful_right_away_mode',
+    bedtimeEntityId: 'text.master_bedroom_eight_sleep_pod_5_right_bedtime',
     currentTemperatureEntityId: 'sensor.nightcanvasrestful_right_current_temperature',
     hash: '#stephs-bed',
+    hotFlashActiveEntityId: 'input_boolean.eight_sleep_steph_hot_flash_active',
+    hotFlashButtonEntityId: 'input_button.eight_sleep_steph_hot_flash',
+    hotFlashCancelButtonEntityId: 'input_button.eight_sleep_steph_cancel_hot_flash',
+    hotFlashRestoreAtEntityId: 'input_datetime.eight_sleep_steph_hot_flash_restore_at',
+    hotFlashTimerEntityId: 'timer.eight_sleep_steph_hot_flash',
     powerSwitchEntityId: 'switch.nightcanvasrestful_right_power',
     presenceEntityId: 'binary_sensor.nightcanvasrestful_right_presence',
     scheduleStageTemperatureEntityIds: {
@@ -1601,6 +1648,18 @@ function scheduleFromEntityAttributes(attributes: Record<string, unknown> | unde
     }
   }
   return schedule.left || schedule.right ? schedule : null
+}
+
+function sideBedtimeFromSchedule(schedule: FreeSleepSchedulesState | null, side: FreeSleepSide) {
+  const sideSchedule = schedule?.[side]
+  if (!sideSchedule) return null
+  const values = FREE_SLEEP_ALARM_DAYS.map((day) => parsedInputTime(sideSchedule[day.key]?.power?.on, '')).filter(Boolean)
+  const first = values[0]
+  return first && values.length === FREE_SLEEP_ALARM_DAYS.length && values.every((value) => value === first) ? first : null
+}
+
+function freeSleepBedtimeSetTopic(side: FreeSleepSide) {
+  return `${FREE_SLEEP_BEDTIME_SET_TOPIC_PREFIX}/${side}/schedule/bedtime/set`
 }
 
 function alarmsFromDailySchedule(daySchedule: FreeSleepDailySchedule | undefined): FreeSleepAlarmSchedule[] {
@@ -1817,6 +1876,13 @@ function formatTemperatureCompact(value: unknown, unit = '°F') {
   return `${displayValue}${unit}`
 }
 
+function formatEightSleepTargetLevel(value: unknown) {
+  const parsed = numberValue(value)
+  if (parsed === null) return '--'
+  const displayValue = Number.isInteger(parsed) ? String(parsed) : parsed.toFixed(1)
+  return parsed > 0 ? `+${displayValue}` : displayValue
+}
+
 function formatSecondsRemaining(value: unknown) {
   const parsed = numberValue(value)
   if (parsed === null) return 'Unknown'
@@ -1827,6 +1893,39 @@ function formatSecondsRemaining(value: unknown) {
   if (hours > 0) return minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`
   if (minutes > 0) return `${minutes}m`
   return `${totalSeconds}s`
+}
+
+function formatEightSleepCountdown(milliseconds: number) {
+  const totalSeconds = Math.max(0, Math.ceil(milliseconds / 1000))
+  const minutes = Math.floor(totalSeconds / 60)
+  const seconds = totalSeconds % 60
+  return `${minutes}:${String(seconds).padStart(2, '0')}`
+}
+
+function eightSleepTimerCountdown(timerEntity: ReturnType<typeof useEntity>, now: number) {
+  if (timerEntity?.state !== 'active') return null
+  const finishesAt = typeof timerEntity.attributes.finishes_at === 'string' ? Date.parse(timerEntity.attributes.finishes_at) : NaN
+  if (Number.isFinite(finishesAt)) return formatEightSleepCountdown(finishesAt - now)
+  if (typeof timerEntity.attributes.remaining === 'string') {
+    const parts = timerEntity.attributes.remaining.split(':').map((part: string) => Number(part))
+    if (parts.length >= 2 && parts.every(Number.isFinite)) return `${parts.at(-2)}:${String(parts.at(-1)).padStart(2, '0')}`
+  }
+  return null
+}
+
+function eightSleepRestoreAtCountdown(restoreAtEntity: ReturnType<typeof useEntity>, now: number) {
+  if (!restoreAtEntity || isUnavailable(restoreAtEntity)) return null
+  const timestamp = numberValue(restoreAtEntity.attributes.timestamp)
+  if (timestamp !== null) return formatEightSleepCountdown((timestamp * 1000) - now)
+  if (restoreAtEntity.state) {
+    const parsed = Date.parse(restoreAtEntity.state.replace(' ', 'T'))
+    if (Number.isFinite(parsed)) return formatEightSleepCountdown(parsed - now)
+  }
+  return null
+}
+
+function eightSleepHotFlashCountdown(timerEntity: ReturnType<typeof useEntity>, restoreAtEntity: ReturnType<typeof useEntity>, now: number) {
+  return eightSleepTimerCountdown(timerEntity, now) ?? eightSleepRestoreAtCountdown(restoreAtEntity, now)
 }
 
 function snapNumberToStep(value: number, min: number, max: number, step: number) {
@@ -1862,6 +1961,7 @@ function useEightSleepBedModalStates() {
 }
 
 function useEightSleepBedModalState(side: EightSleepSideConfig | undefined): EightSleepBedModalState {
+  const hotFlashActiveEntity = useEntity(asEntityName(side?.hotFlashActiveEntityId ?? 'input_boolean.free_sleep_unselected_hot_flash_active'), { returnNullIfNotFound: true })
   const targetEntity = useEntity(asEntityName(side?.targetTemperatureEntityId ?? 'number.free_sleep_unselected_target_temperature'), { returnNullIfNotFound: true })
   const currentEntity = useEntity(asEntityName(side?.currentTemperatureEntityId ?? 'sensor.free_sleep_unselected_current_temperature'), { returnNullIfNotFound: true })
   const powerEntity = useEntity(asEntityName(side?.powerSwitchEntityId ?? 'switch.free_sleep_unselected_power'), { returnNullIfNotFound: true })
@@ -1869,7 +1969,6 @@ function useEightSleepBedModalState(side: EightSleepSideConfig | undefined): Eig
   const liveSideOn = Boolean(side && powerEntity && !isUnavailable(powerEntity) && powerEntity.state === 'on')
   const liveTargetTemperature = targetEntity && !isUnavailable(targetEntity) ? numberValue(targetEntity.state) : null
   const currentTemperature = currentEntity && !isUnavailable(currentEntity) ? numberValue(currentEntity.state) : null
-  const targetUnit = temperatureUnit(targetEntity)
   const targetMin = numberValue(targetEntity?.attributes.min) ?? FREE_SLEEP_TARGET_MIN
   const targetMax = numberValue(targetEntity?.attributes.max) ?? FREE_SLEEP_TARGET_MAX
   const targetStep = numberValue(targetEntity?.attributes.step) ?? FREE_SLEEP_TARGET_STEP
@@ -1877,7 +1976,8 @@ function useEightSleepBedModalState(side: EightSleepSideConfig | undefined): Eig
   const [displaySideOn, commitDisplaySideOn] = useOptimisticState(liveSideOn, { clearOn: 'confirmation', revertMs: EIGHT_SLEEP_POWER_REVERT_MS })
   const controlsSideOn = sideAvailable && displaySideOn
   const heroAction = eightSleepTemperatureAction(displayedTargetValue, controlsSideOn)
-  const subtitle = controlsSideOn ? `${titleCaseState(heroAction)} • ${formatTemperatureCompact(displayedTargetValue, targetUnit)}` : 'Off'
+  const hotFlashActive = Boolean(side && hotFlashActiveEntity && !isUnavailable(hotFlashActiveEntity) && hotFlashActiveEntity.state === 'on')
+  const subtitle = hotFlashActive ? 'Hot Flash Mode' : controlsSideOn ? `${titleCaseState(heroAction)} • ${formatEightSleepTargetLevel(displayedTargetValue)}` : 'Off'
 
   return {
     commitDisplaySideOn,
@@ -1891,7 +1991,6 @@ function useEightSleepBedModalState(side: EightSleepSideConfig | undefined): Eig
     targetMax,
     targetMin,
     targetStep,
-    targetUnit,
   }
 }
 
@@ -2171,13 +2270,13 @@ function EightSleepThermostatHero({ modalState, side }: { modalState: EightSleep
   const controlsSideOnRef = useRef(false)
   const [dragValue, setDragValue] = useState<number | null>(null)
   const [targetDragging, setTargetDragging] = useState(false)
-  const { commitDisplaySideOn, commitTargetTemperature, controlsSideOn, displayedTargetValue: sourceTargetValue, sideAvailable, targetMax, targetMin, targetStep, targetUnit } = modalState
+  const { commitDisplaySideOn, commitTargetTemperature, controlsSideOn, displayedTargetValue: sourceTargetValue, sideAvailable, targetMax, targetMin, targetStep } = modalState
   const displayedTargetValue = dragValue ?? sourceTargetValue
   const heroAction = eightSleepTemperatureAction(displayedTargetValue, controlsSideOn)
-  const heroTargetText = displayedTargetValue === null ? '--' : formatTemperatureCompact(displayedTargetValue, '').trim()
+  const heroTargetText = displayedTargetValue === null ? '--' : formatEightSleepTargetLevel(displayedTargetValue)
   const heroReadoutAction = controlsSideOn ? titleCaseState(heroAction) : null
   const heroReadoutText = controlsSideOn ? heroTargetText : 'OFF'
-  const heroLabel = controlsSideOn ? `${side.title} thermostat ${heroReadoutAction} ${formatTemperatureCompact(displayedTargetValue, targetUnit)}` : `${side.title} thermostat Off`
+  const heroLabel = controlsSideOn ? `${side.title} thermostat ${heroReadoutAction} ${formatEightSleepTargetLevel(displayedTargetValue)}` : `${side.title} thermostat Off`
   const sliderValue = displayedTargetValue ?? 0
   const canDragTarget = sideAvailable && controlsSideOn && displayedTargetValue !== null
 
@@ -2309,7 +2408,7 @@ function EightSleepThermostatHero({ modalState, side }: { modalState: EightSleep
           )}
           <div className={styles.thermostatDialReadout} data-readout-state={heroReadoutAction ? undefined : 'off'} data-single-value={heroReadoutAction ? undefined : 'true'}>
             {heroReadoutAction && <span className={styles.thermostatAction}>{heroReadoutAction}</span>}
-            <span className={styles.thermostatPrimaryValue}>{heroReadoutText}{heroReadoutAction && <small>{targetUnit}</small>}</span>
+            <span className={styles.thermostatPrimaryValue}>{heroReadoutText}</span>
           </div>
         </div>
         <button aria-label={`${controlsSideOn ? 'Turn off' : 'Turn on'} ${side.title}`} className={styles.eightSleepThermostatButton} disabled={!sideAvailable} onClick={toggleSidePower} type="button" />
@@ -2340,6 +2439,47 @@ function EightSleepAwayModeCard({ side }: { side: EightSleepSideConfig }) {
 
   return (
     <ThermostatGlassCard active={active} icon="mdi:bed-empty" onMainClick={toggleAwayMode} stateText={active ? 'On' : 'Off'} title="Away Mode" />
+  )
+}
+
+function EightSleepBedtimeSetting({ side }: { side: EightSleepSideConfig }) {
+  const inputRef = useRef<HTMLInputElement | null>(null)
+  const bedtimeEntity = useEntity(asEntityName(side.bedtimeEntityId), { returnNullIfNotFound: true })
+  const schedulesEntity = useEntity(asEntityName(FREE_SLEEP_SCHEDULE_SENSOR_ENTITY_ID), { returnNullIfNotFound: true })
+  const callService = useCallService()
+  const fallbackTime = sideBedtimeFromSchedule(scheduleFromEntityAttributes(schedulesEntity?.attributes), side.scheduleSide)
+  const entityTime = !isUnavailable(bedtimeEntity) ? parsedInputTime(bedtimeEntity?.state, '') : ''
+  const liveTime = entityTime || fallbackTime || ''
+  const [displayTime, commitDisplayTime] = useOptimisticState(liveTime, { clearOn: 'confirmation', revertMs: EIGHT_SLEEP_POWER_REVERT_MS })
+  const pickerValue = displayTime || fallbackTime || '21:00'
+  const stateText = displayTime ? formatClockTime(displayTime) : fallbackTime ? formatClockTime(fallbackTime) : schedulesEntity ? 'Mixed' : 'Set time'
+
+  const openPicker = () => {
+    openNativeTimePicker(inputRef.current)
+  }
+
+  const setBedtime = (nextTime: string) => {
+    const normalizedTime = parsedInputTime(nextTime, '')
+    if (!normalizedTime) return
+    commitDisplayTime(normalizedTime)
+    if (!isUnavailable(bedtimeEntity)) {
+      callService({ domain: 'text', service: 'set_value', target: side.bedtimeEntityId, serviceData: { value: normalizedTime } })
+      return
+    }
+    callService({ domain: 'mqtt', service: 'publish', serviceData: { payload: normalizedTime, topic: freeSleepBedtimeSetTopic(side.scheduleSide) } })
+  }
+
+  return (
+    <div className={[styles.thermostatGlassCard, styles.eightSleepBedtimeCard].join(' ')} data-active="true" data-thermal-status="idle" onClick={openPicker}>
+      <button aria-label={`${side.title} bedtime ${stateText}`} className={styles.thermostatGlassMain} type="button">
+        <MaterialIcon name="mdi:bed" size={34} />
+        <span>
+          <strong>Bedtime</strong>
+          <small>{stateText}</small>
+        </span>
+      </button>
+      <input aria-label={`${side.title} bedtime`} className={styles.eightSleepBedtimeInput} onChange={(event) => setBedtime(event.currentTarget.value)} ref={inputRef} type="time" value={pickerValue} />
+    </div>
   )
 }
 
@@ -2413,18 +2553,7 @@ function EightSleepAlarmTimePicker({
   const displayTime = parsedInputTime(time)
 
   const openPicker = () => {
-    const input = inputRef.current
-    if (!input) return
-    input.focus({ preventScroll: true })
-    if (typeof input.showPicker === 'function') {
-      try {
-        input.showPicker()
-        return
-      } catch {
-        // Fall back to the native click path if the browser rejects programmatic picker opening.
-      }
-    }
-    input.click()
+    openNativeTimePicker(inputRef.current)
   }
 
   return (
@@ -2448,18 +2577,7 @@ function EightSleepAddAlarmTimeField({ onChange, value }: { onChange: (value: st
   const inputRef = useRef<HTMLInputElement | null>(null)
 
   const openPicker = () => {
-    const input = inputRef.current
-    if (!input) return
-    input.focus({ preventScroll: true })
-    if (typeof input.showPicker === 'function') {
-      try {
-        input.showPicker()
-        return
-      } catch {
-        // Fall back to the native click path if the browser rejects programmatic picker opening.
-      }
-    }
-    input.click()
+    openNativeTimePicker(inputRef.current)
   }
 
   return (
@@ -2921,8 +3039,7 @@ function EightSleepScheduleTemperatureControl({ entityId, fallbackTemperature, i
   const baseValue = displayValue ?? fallbackTemperature
   const baseValueRef = useRef(baseValue)
   const canChange = !unavailable && baseValue !== null
-  const unit = temperatureUnit(entity)
-  const stateText = displayValue === null ? `--${unit}` : formatTemperatureCompact(displayValue, unit)
+  const stateText = formatEightSleepTargetLevel(displayValue)
 
   useEffect(() => {
     baseValueRef.current = baseValue
@@ -2993,7 +3110,87 @@ function EightSleepAlarmActiveActions({ side }: { side: EightSleepSideConfig }) 
   )
 }
 
-function EightSleepBedModalContent({ modalState, side }: { modalState: EightSleepBedModalState; side: EightSleepSideConfig }) {
+function EightSleepHotFlashButton({ side }: { side: EightSleepSideConfig }) {
+  const activeEntity = useEntity(asEntityName(side.hotFlashActiveEntityId), { returnNullIfNotFound: true })
+  const restoreAtEntity = useEntity(asEntityName(side.hotFlashRestoreAtEntityId), { returnNullIfNotFound: true })
+  const timerEntity = useEntity(asEntityName(side.hotFlashTimerEntityId), { returnNullIfNotFound: true })
+  const callService = useCallService()
+  const [now, setNow] = useState(() => Date.now())
+  const unavailable = !activeEntity || isUnavailable(activeEntity)
+  const active = activeEntity?.state === 'on'
+  const stateText = unavailable ? 'Unavailable' : active ? 'Active' : 'Inactive'
+  const countdown = active ? eightSleepHotFlashCountdown(timerEntity, restoreAtEntity, now) : null
+
+  useEffect(() => {
+    if (!active) return undefined
+    const interval = window.setInterval(() => setNow(Date.now()), 1000)
+    return () => window.clearInterval(interval)
+  }, [active])
+
+  const activate = () => {
+    if (unavailable) return
+    callService({ domain: 'input_button', service: 'press', target: side.hotFlashButtonEntityId })
+  }
+
+  const cancel = () => {
+    callService({ domain: 'input_button', service: 'press', target: side.hotFlashCancelButtonEntityId })
+  }
+
+  return (
+    <ThermostatGlassCard active={active} icon="mdi:snowflake" onMainClick={activate} pressed={active} stateText={stateText} title="Hot Flash Mode">
+      {active && (
+        <div className={styles.eightSleepHotFlashStatus}>
+          {countdown && <span className={styles.eightSleepCountdown}>{countdown}</span>}
+          <button aria-label={`Cancel ${side.title} hot flash mode`} className={styles.eightSleepCancelButton} onClick={cancel} type="button">
+            <MaterialIcon name="mdi:close" size={20} />
+          </button>
+        </div>
+      )}
+    </ThermostatGlassCard>
+  )
+}
+
+function EightSleepBedModal({ modalState, onClose, open, side }: { modalState: EightSleepBedModalState; onClose: () => void; open: boolean; side: EightSleepSideConfig }) {
+  const [activeTab, setActiveTab] = useState<EightSleepModalTab>('schedule')
+
+  return (
+    <ModalSheet
+      footer={<EightSleepModalNav activeTab={activeTab} onTabChange={setActiveTab} sideTitle={side.title} />}
+      onClose={onClose}
+      open={open}
+      subtitle={modalState.subtitle}
+      surface="hass-popup"
+      title={side.title}
+    >
+      <EightSleepBedModalContent activeTab={activeTab} modalState={modalState} side={side} />
+    </ModalSheet>
+  )
+}
+
+function EightSleepModalNav({ activeTab, onTabChange, sideTitle }: { activeTab: EightSleepModalTab; onTabChange: (tab: EightSleepModalTab) => void; sideTitle: string }) {
+  return (
+    <nav aria-label={`${sideTitle} modal sections`} className={styles.eightSleepModalNav}>
+      {EIGHT_SLEEP_MODAL_TABS.map((item) => {
+        const isActive = activeTab === item.tab
+        return (
+          <button
+            aria-current={isActive ? 'page' : undefined}
+            aria-label={item.label}
+            className={[styles.eightSleepModalNavButton, isActive ? styles.eightSleepModalNavButtonActive : ''].filter(Boolean).join(' ')}
+            key={item.tab}
+            onClick={() => onTabChange(item.tab)}
+            type="button"
+          >
+            <MaterialIcon name={item.icon} size={22} />
+          </button>
+        )
+      })}
+    </nav>
+  )
+}
+
+function EightSleepBedModalContent({ activeTab, modalState, side }: { activeTab: EightSleepModalTab; modalState: EightSleepBedModalState; side: EightSleepSideConfig }) {
+  const modalBodyRef = useRef<HTMLDivElement | null>(null)
   const currentTemperature = useEntity(asEntityName(side.currentTemperatureEntityId), { returnNullIfNotFound: true })
   const presence = useEntity(asEntityName(side.presenceEntityId), { returnNullIfNotFound: true })
   const secondsRemaining = useEntity(asEntityName(side.secondsRemainingEntityId), { returnNullIfNotFound: true })
@@ -3002,40 +3199,75 @@ function EightSleepBedModalContent({ modalState, side }: { modalState: EightSlee
   const presenceText = presence?.state === 'on' ? 'In Bed' : presence?.state === 'off' ? 'Away' : titleCaseState(presence?.state ?? 'unavailable')
   const timeRemainingText = formatSecondsRemaining(secondsRemaining?.state)
   const alarmActive = alarmVibrating?.state === 'on'
+  const selectedTabLabel = EIGHT_SLEEP_MODAL_TABS.find((tab) => tab.tab === activeTab)?.label ?? 'Sleep Schedule'
+
+  useEffect(() => {
+    const scrollContainer = modalBodyRef.current?.parentElement
+    if (!scrollContainer || typeof scrollContainer.scrollTo !== 'function') return
+    scrollContainer.scrollTo({ top: 0, behavior: 'auto' })
+  }, [activeTab])
 
   return (
-    <div className={styles.thermostatModalBody}>
-      <EightSleepThermostatHero modalState={modalState} side={side} />
-      {alarmActive && <EightSleepAlarmActiveActions side={side} />}
-      <section className={styles.section}>
-        <SectionHeader title="Sleep Schedule" />
-        <div className={styles.eightSleepStageGrid}>
-          {FREE_SLEEP_SCHEDULE_STAGES.map((stage) => (
-            <EightSleepScheduleTemperatureControl
-              entityId={side.scheduleStageTemperatureEntityIds[stage.key]}
-              fallbackTemperature={modalState.displayedTargetValue}
-              icon={stage.icon}
-              key={stage.key}
-              label={stage.label}
-              sideTitle={side.title}
-            />
-          ))}
-        </div>
-      </section>
-      <EightSleepAlarmsSection side={side} />
-      <section className={styles.section}>
-        <SectionHeader title="Status" />
-        <div className={styles.eightSleepStageGrid}>
-          <ThermostatGlassCard active={modalState.controlsSideOn} hvacAction={modalState.heroAction} icon="mdi:thermometer" stateText={currentTemperatureText} thermalStatus={thermostatThermalStatus(modalState.heroAction)} title="Current Temp" />
-          <ThermostatGlassCard active={presence?.state === 'on'} icon={presence?.state === 'on' ? 'mdi:bed' : 'mdi:bed-empty'} stateText={presenceText} title="Presence" />
-          <ThermostatGlassCard icon="mdi:timer-outline" stateText={timeRemainingText} title="Time Remaining" />
-          <ThermostatGlassCard active={alarmActive} icon={alarmActive ? 'mdi:vibrate' : 'mdi:alarm-check'} stateText={alarmActive ? 'Vibrating' : 'Quiet'} title="Alarm" />
-        </div>
-      </section>
-      <section className={styles.section}>
-        <SectionHeader title="Controls" />
-        <EightSleepAwayModeCard side={side} />
-      </section>
+    <div className={styles.thermostatModalBody} ref={modalBodyRef}>
+      <div className={styles.eightSleepModalHeroShell}>
+        <EightSleepThermostatHero modalState={modalState} side={side} />
+      </div>
+      <div aria-label={`${side.title} ${selectedTabLabel}`} className={styles.eightSleepModalPanel}>
+        {activeTab === 'schedule' && (
+          <section className={styles.section}>
+            <SectionHeader title="Sleep Schedule" />
+            <div className={styles.eightSleepStageGrid}>
+              {FREE_SLEEP_SCHEDULE_STAGES.map((stage) => (
+                <EightSleepScheduleTemperatureControl
+                  entityId={side.scheduleStageTemperatureEntityIds[stage.key]}
+                  fallbackTemperature={modalState.displayedTargetValue}
+                  icon={stage.icon}
+                  key={stage.key}
+                  label={stage.label}
+                  sideTitle={side.title}
+                />
+              ))}
+            </div>
+          </section>
+        )}
+        {activeTab === 'modes' && (
+          <section className={styles.section}>
+            <SectionHeader title="Special Modes" />
+            <Description className={styles.thermostatDescription}>Activating hot flash mode will set the bed to -10 for fifteen minutes.</Description>
+            <EightSleepHotFlashButton side={side} />
+          </section>
+        )}
+        {activeTab === 'alarms' && (
+          <>
+            {alarmActive && <EightSleepAlarmActiveActions side={side} />}
+            <EightSleepAlarmsSection side={side} />
+          </>
+        )}
+        {activeTab === 'status' && (
+          <section className={styles.section}>
+            <SectionHeader title="Status" />
+            <div className={styles.eightSleepStageGrid}>
+              <ThermostatGlassCard active={modalState.controlsSideOn} hvacAction={modalState.heroAction} icon="mdi:thermometer" stateText={currentTemperatureText} thermalStatus={thermostatThermalStatus(modalState.heroAction)} title="Current Temp" />
+              <ThermostatGlassCard active={presence?.state === 'on'} icon={presence?.state === 'on' ? 'mdi:bed' : 'mdi:bed-empty'} stateText={presenceText} title="Presence" />
+              <ThermostatGlassCard icon="mdi:timer-outline" stateText={timeRemainingText} title="Time Remaining" />
+              <ThermostatGlassCard active={alarmActive} icon={alarmActive ? 'mdi:vibrate' : 'mdi:alarm-check'} stateText={alarmActive ? 'Vibrating' : 'Quiet'} title="Alarm" />
+            </div>
+          </section>
+        )}
+        {activeTab === 'settings' && (
+          <>
+            <section className={styles.section}>
+              <SectionHeader title="Bedtime" />
+              <Description className={styles.thermostatDescription}>Choose when this side starts bedtime mode. Free Sleep will prime one hour before the earlier side bedtime.</Description>
+              <EightSleepBedtimeSetting side={side} />
+            </section>
+            <section className={styles.section}>
+              <SectionHeader title="Controls" />
+              <EightSleepAwayModeCard side={side} />
+            </section>
+          </>
+        )}
+      </div>
     </div>
   )
 }

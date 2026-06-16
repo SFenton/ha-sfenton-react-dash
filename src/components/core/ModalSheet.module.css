@@ -33,6 +33,11 @@
   overflow: hidden;
 }
 
+.content:focus,
+.content:focus-visible {
+  outline: none;
+}
+
 .content[data-surface='hass-popup'] {
   border-color: rgba(0, 0, 0, 0);
   color: #e1e1e1;
