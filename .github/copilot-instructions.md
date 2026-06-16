@@ -81,13 +81,13 @@ Preferred layout:
 | Path | Purpose |
 | --- | --- |
 | `src/pages/` | Page-level views such as `AtAGlancePage`, `SecurityPage`, room pages, chores pages |
-| `src/pages/Page.tsx` | Shared page shell: scroll container, scroll restoration, stagger/rush behavior, loading/error spacing |
+| `src/pages/Page.tsx` | Shared page shell: scroll container, scroll restoration, loading/error spacing |
 | `src/components/core/` | Reusable dashboard primitives: cards, buttons, headers, modals, sliders, section headers |
 | `src/components/hass/` | HA entity-aware controls: light sliders, climate cards, alarm controls, todo controls, camera/WebRTC cards |
 | `src/components/shell/` | App shell, mobile header, bottom navigation, route chrome |
 | `src/constants/` | Reused route, entity, area, section, icon, timing, and animation constants |
 | `src/hooks/` | Reusable UI and Home Assistant hooks |
-| `src/styles/` | Shared CSS modules for effects, animations, layout tokens, stagger utilities |
+| `src/styles/` | Shared CSS modules for effects, animations, and layout tokens |
 | `src/test/` or colocated `*.test.tsx` | Unit tests for components, hooks, and page behavior |
 | `e2e/` | Playwright tests added as behavior is implemented |
 
@@ -131,7 +131,7 @@ Do not recreate the Home Assistant sidebar or top bar for now. Focus on the dash
 - Do not add visual press/click feedback to dashboard cards, glass tiles, modal cards, dropdown options, toggles, or entity controls. Avoid `:active` scale transforms, press animations, transient background flashes, opacity changes, or similar interaction-only visual effects. Persistent state indicators such as selected, checked, active, on/off, disabled, unavailable, or HA state-derived colors are still expected.
 - Prefer lightweight packages when they materially speed up native-feeling interactions or accessibility, but keep them focused and document why they are worth adding before installing.
 - Use CSS Modules for components with meaningful styling; use inline styles only for tiny one-off cases.
-- Use stagger/rush-stagger behavior for list/card entrance animations where it improves perceived responsiveness.
+- Do not use staggered entrance animations on pages or inside modals; page and modal content should appear together without sequential delays.
 - Keep dimensions stable for controls, cards, sliders, button groups, modals, and nav items so live entity updates do not cause layout jumps.
 
 ## Home Assistant Integration

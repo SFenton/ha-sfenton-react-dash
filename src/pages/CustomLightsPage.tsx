@@ -6,7 +6,6 @@ import { SectionHeader } from '../components/core/SectionHeader'
 import { asEntityName, isActiveState } from '../components/hass/entityState'
 import { LightBrightnessCard, type LightTapAction } from '../components/hass/LightBrightnessCard'
 import { LightMoreInfoSheet } from '../components/hass/LightMoreInfoSheet'
-import { buildStaggerStyle, staggerMs } from '../hooks/useStaggerStyle'
 import styles from './CustomLightsPage.module.css'
 
 const MANUAL_CONTROL_ENTITY = 'input_boolean.manually_control_front_yard_lights'
@@ -162,8 +161,8 @@ export function CustomLightsPage() {
         <ModeToggleCard onOpenModePicker={() => setPickerOpen(true)} />
         {showCustomGrid && (
           <div className={styles.lightGrid}>
-            {CUSTOM_LIGHTS.map((light, index) => (
-              <div className={styles.lightCell} key={light.entityId} style={buildStaggerStyle(staggerMs(index, 38, 92))}>
+            {CUSTOM_LIGHTS.map((light) => (
+              <div className={styles.lightCell} key={light.entityId}>
                 <LightBrightnessCard
                   entityId={light.entityId}
                   onMoreInfo={(entityId, title) => setMoreInfo({ entityId, title })}

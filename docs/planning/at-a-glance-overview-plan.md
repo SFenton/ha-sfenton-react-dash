@@ -6,7 +6,7 @@
 - Live Home Assistant browser page: `/at-a-glance/overview`.
 - Local React browser page: `/`.
 - Mobile comparison viewport used first: `393x852`.
-- FNF reference app: `FortniteFestivalWeb`, especially page shell, bottom nav, modal, frosted effects, and stagger helpers.
+- FNF reference app: `FortniteFestivalWeb`, especially page shell, bottom nav, modal, and frosted effects.
 
 Use the MCP dashboard config as the structural source of truth for entity IDs, view paths, popup hashes, and navigation actions. Use Playwright inspection and screenshots as the source of truth for runtime layout, scroll behavior, modal behavior, motion, and visual feel.
 
@@ -156,7 +156,6 @@ Styles:
 Take or adapt these patterns from `FortniteFestivalWeb`:
 
 - `src/pages/Page.tsx`: adapt the page shell, scroll container, scroll restore, load phase slots, and bottom spacer behavior. Replace `@festival/theme` imports with local CSS variables and CSS modules.
-- `src/hooks/ui/useStaggerStyle.ts`: take nearly wholesale. It is simple, framework-independent, and ideal for card/list entrance animations.
 - `src/hooks/data/useLoadPhase.ts`: take the state machine idea. Replace `LoadPhase` enum imports with a local enum.
 - `src/components/shell/mobile/BottomNav.tsx`: take the route-aware tab definition and frosted nav pattern, but swap icons and tokens.
 - `src/styles/effects.module.css`: take the CSS-module pattern for `backdrop-filter`, edge fades, and frosted chrome.
@@ -185,7 +184,7 @@ npm install @mdi/js motion vaul
 ## First Build Sequence
 
 1. Add local tokens/effects/animations modules.
-2. Port/adapt FNF `Page`, `BottomNav`, `useStaggerStyle`, `useLoadPhase`, and `useModalState` patterns.
+2. Port/adapt FNF `Page`, `BottomNav`, `useLoadPhase`, and `useModalState` patterns.
 3. Add `routes.ts`, `constants/atAGlance.ts`, `constants/areas.ts`, and `hooks/useHashModal.ts` using the MCP dashboard inventory.
 4. Build `AppShell` with background layer and fixed bottom nav.
 5. Build `AtAGlancePage` mobile-first: header, status rail, weather card, quick access, cameras, areas.

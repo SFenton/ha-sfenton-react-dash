@@ -39,7 +39,6 @@ import {
   type QuickAccessConfig,
 } from '../constants/atAGlance'
 import { CHORE_BLUE, CHORE_QUICK_LINKS, SETTINGS_PAGE_ITEMS, TODO_PAGES, type ChoreQuickLinkConfig, type SettingsLinkConfig } from '../constants/portedDashboard'
-import { buildStaggerStyle, staggerMs } from '../hooks/useStaggerStyle'
 import { useHashModal } from '../hooks/useHashModal'
 import styles from './AtAGlancePage.module.css'
 import { Page } from './Page'
@@ -511,7 +510,7 @@ function RoomLightDetailHeader({ group, hideTitleBlock = false, onBack, onToggle
   const separatorLabel = group.items.length === 1 ? 'Light' : 'Lights'
 
   return (
-    <div className={styles.roomLightHeader} data-title-hidden={hideTitleBlock} style={buildStaggerStyle(30)}>
+    <div className={styles.roomLightHeader} data-title-hidden={hideTitleBlock}>
       {onBack && (
         <button aria-label="Back to room lights" className={styles.lightBackButton} onClick={onBack} type="button">
           <MaterialIcon name="mdi:chevron-left" size={22} />
@@ -542,8 +541,8 @@ function RoomLightDetailCards({ group, onToggle }: { group: EntityGroupConfig; o
   return (
     <section className={styles.roomLightDetail}>
       <div className={styles.roomLightGrid}>
-        {group.items.map((item, index) => (
-          <div className={styles.roomLightCardShell} key={item.entityId} style={buildStaggerStyle(staggerMs(index, 42, 92))}>
+        {group.items.map((item) => (
+          <div className={styles.roomLightCardShell} key={item.entityId}>
             <LightCard entityId={item.entityId} onClick={() => onToggle(item.entityId)} pressed size="compact" title={item.title} />
           </div>
         ))}
@@ -596,8 +595,8 @@ export function LightsSheet({ directGroup, hideDirectTitle = false }: { directGr
         ) : (
           <section className={styles.roomLightsOverview} data-exiting={roomCardsExiting}>
             <div className={styles.roomLightGrid}>
-              {roomGroups.map((group, index) => (
-                <div className={styles.roomLightCardShell} key={group.title} style={roomCardsExiting ? undefined : buildStaggerStyle(staggerMs(index, 38, 76))}>
+              {roomGroups.map((group) => (
+                <div className={styles.roomLightCardShell} key={group.title}>
                   <RoomLightOverviewCard group={group} onSelect={selectGroup} />
                 </div>
               ))}
@@ -635,7 +634,7 @@ function RoomClimateDetailHeader({ group, onBack }: { group: EntityGroupConfig; 
   const roomTitle = climateRoomTitle(group)
 
   return (
-    <div className={styles.roomClimateHeader} style={buildStaggerStyle(30)}>
+    <div className={styles.roomClimateHeader}>
       {onBack && (
         <button aria-label="Back to room climates" className={styles.lightBackButton} onClick={onBack} type="button">
           <MaterialIcon name="mdi:chevron-left" size={22} />
@@ -655,10 +654,10 @@ function RoomClimateDetailCards({ group }: { group: EntityGroupConfig }) {
   const temperatureItems = group.items.filter((item) => !isVentClimateItem(item.entityId))
   const ventItems = group.items.filter((item) => isVentClimateItem(item.entityId))
 
-  const renderCards = (items: EntityGroupConfig['items'], indexOffset: number) => (
+  const renderCards = (items: EntityGroupConfig['items']) => (
     <div className={styles.roomClimateGrid}>
-      {items.map((item, index) => (
-        <div className={styles.roomLightCardShell} key={item.entityId} style={buildStaggerStyle(staggerMs(index + indexOffset, 42, 92))}>
+      {items.map((item) => (
+        <div className={styles.roomLightCardShell} key={item.entityId}>
           <ClimateCard color={color} colorEntityId={item.colorEntityId} entityId={item.entityId} icon={climateItemIcon(item.entityId)} size="compact" title={item.title} />
         </div>
       ))}
@@ -674,7 +673,7 @@ function RoomClimateDetailCards({ group }: { group: EntityGroupConfig }) {
               <h3 className={styles.lightSectionLabel}>{temperatureItems.length === 1 ? 'Temperature Sensor' : 'Temperature Sensors'}</h3>
               <Separator className={styles.lightSectionSeparator} />
             </div>
-            {renderCards(temperatureItems, 0)}
+            {renderCards(temperatureItems)}
           </section>
         )}
         {ventItems.length > 0 && (
@@ -683,7 +682,7 @@ function RoomClimateDetailCards({ group }: { group: EntityGroupConfig }) {
               <h3 className={styles.lightSectionLabel}>{climateVentSectionTitle(ventItems)}</h3>
               <Separator className={styles.lightSectionSeparator} />
             </div>
-            {renderCards(ventItems, temperatureItems.length)}
+            {renderCards(ventItems)}
           </section>
         )}
       </div>
@@ -730,8 +729,8 @@ export function ClimateSheet({ directGroup, hideDirectHeader = false }: { direct
         ) : (
           <section className={styles.roomClimateOverview} data-exiting={roomCardsExiting}>
             <div className={styles.roomClimateGrid}>
-              {roomGroups.map((group, index) => (
-                <div className={styles.roomLightCardShell} key={group.title} style={roomCardsExiting ? undefined : buildStaggerStyle(staggerMs(index, 38, 76))}>
+              {roomGroups.map((group) => (
+                <div className={styles.roomLightCardShell} key={group.title}>
                   <RoomClimateOverviewCard group={group} onSelect={selectGroup} />
                 </div>
               ))}
@@ -765,7 +764,7 @@ function RoomOccupancyDetailHeader({ group, onBack }: { group: EntityGroupConfig
   const roomTitle = occupancyRoomTitle(group)
 
   return (
-    <div className={styles.roomOccupancyHeader} style={buildStaggerStyle(30)}>
+    <div className={styles.roomOccupancyHeader}>
       {onBack && (
         <button aria-label="Back to room occupancy" className={styles.lightBackButton} onClick={onBack} type="button">
           <MaterialIcon name="mdi:chevron-left" size={22} />
@@ -780,14 +779,14 @@ function RoomOccupancyDetailHeader({ group, onBack }: { group: EntityGroupConfig
   )
 }
 
-function RoomOccupancyDetailCards({ group, indexOffset = 0 }: { group: EntityGroupConfig; indexOffset?: number }) {
+function RoomOccupancyDetailCards({ group }: { group: EntityGroupConfig }) {
   const color = occupancyGroupColor(group)
 
   return (
     <section className={styles.roomOccupancyDetail}>
       <div className={styles.roomOccupancyGrid}>
-        {group.items.map((item, index) => (
-          <div className={styles.roomLightCardShell} key={item.entityId} style={buildStaggerStyle(staggerMs(index + indexOffset, 42, 92))}>
+        {group.items.map((item) => (
+          <div className={styles.roomLightCardShell} key={item.entityId}>
             <OccupancyCard color={color} entityId={item.entityId} size="source-row" title={item.title} />
           </div>
         ))}
@@ -835,8 +834,8 @@ export function OccupancySheet({ directGroup, hideDirectHeader = false }: { dire
         ) : (
           <section className={styles.roomOccupancyOverview} data-exiting={roomCardsExiting}>
             <div className={styles.roomOccupancyGrid}>
-              {roomGroups.map((group, index) => (
-                <div className={styles.roomLightCardShell} key={group.title} style={roomCardsExiting ? undefined : buildStaggerStyle(staggerMs(index, 38, 76))}>
+              {roomGroups.map((group) => (
+                <div className={styles.roomLightCardShell} key={group.title}>
                   <RoomOccupancyOverviewCard group={group} onSelect={selectGroup} />
                 </div>
               ))}
@@ -871,7 +870,7 @@ function RoomContactDetailHeader({ group, onBack }: { group: EntityGroupConfig; 
   const roomTitle = contactRoomTitle(group)
 
   return (
-    <div className={styles.roomContactHeader} style={buildStaggerStyle(30)}>
+    <div className={styles.roomContactHeader}>
       {onBack && (
         <button aria-label="Back to room contact sensors" className={styles.lightBackButton} onClick={onBack} type="button">
           <MaterialIcon name="mdi:chevron-left" size={22} />
@@ -886,14 +885,14 @@ function RoomContactDetailHeader({ group, onBack }: { group: EntityGroupConfig; 
   )
 }
 
-function RoomContactDetailCards({ group, indexOffset = 0, size = 'bubble' }: { group: EntityGroupConfig; indexOffset?: number; size?: 'bubble' | 'source-row' }) {
+function RoomContactDetailCards({ group, size = 'bubble' }: { group: EntityGroupConfig; size?: 'bubble' | 'source-row' }) {
   const color = contactGroupColor(group)
 
   return (
     <section className={styles.roomContactDetail}>
       <div className={styles.roomContactGrid}>
-        {group.items.map((item, index) => (
-          <div className={styles.roomLightCardShell} key={item.entityId} style={buildStaggerStyle(staggerMs(index + indexOffset, 42, 92))}>
+        {group.items.map((item) => (
+          <div className={styles.roomLightCardShell} key={item.entityId}>
             <ContactSensorCard color={color} entityId={item.entityId} size={size} title={item.title} />
           </div>
         ))}
@@ -902,23 +901,16 @@ function RoomContactDetailCards({ group, indexOffset = 0, size = 'bubble' }: { g
   )
 }
 
-function RoomContactSection({ group, indexOffset = 0 }: { group: EntityGroupConfig; indexOffset?: number }) {
+function RoomContactSection({ group }: { group: EntityGroupConfig }) {
   return (
     <section className={styles.roomStateSection}>
       <div className={styles.lightSectionHeader}>
         <h3 className={styles.lightSectionLabel}>{contactRoomTitle(group)}</h3>
         <Separator className={styles.lightSectionSeparator} />
       </div>
-      <RoomContactDetailCards group={group} indexOffset={indexOffset} />
+      <RoomContactDetailCards group={group} />
     </section>
   )
-}
-
-function groupsWithIndexOffsets(groups: EntityGroupConfig[]) {
-  return groups.map((group, index) => ({
-    group,
-    indexOffset: groups.slice(0, index).reduce((total, previousGroup) => total + previousGroup.items.length, 0),
-  }))
 }
 
 export function ContactSheet({ directGroup, hideDirectHeader = false, overviewMode = 'rooms' }: { directGroup?: EntityGroupConfig; hideDirectHeader?: boolean; overviewMode?: 'grouped' | 'rooms' } = {}) {
@@ -957,7 +949,7 @@ export function ContactSheet({ directGroup, hideDirectHeader = false, overviewMo
         <div className={styles.contactContent}>
           <section className={styles.roomContactOverview}>
             <div className={styles.roomStateStack}>
-              {groupsWithIndexOffsets(roomGroups).map(({ group, indexOffset }) => <RoomContactSection group={group} indexOffset={indexOffset} key={group.title} />)}
+              {roomGroups.map((group) => <RoomContactSection group={group} key={group.title} />)}
             </div>
           </section>
         </div>
@@ -974,8 +966,8 @@ export function ContactSheet({ directGroup, hideDirectHeader = false, overviewMo
         ) : (
           <section className={styles.roomContactOverview} data-exiting={roomCardsExiting}>
             <div className={styles.roomContactGrid}>
-              {roomGroups.map((group, index) => (
-                <div className={styles.roomLightCardShell} key={group.title} style={roomCardsExiting ? undefined : buildStaggerStyle(staggerMs(index, 38, 76))}>
+              {roomGroups.map((group) => (
+                <div className={styles.roomLightCardShell} key={group.title}>
                   <RoomContactOverviewCard group={group} onSelect={selectGroup} />
                 </div>
               ))}
@@ -1021,8 +1013,8 @@ export function AirQualitySheet() {
       <div className={styles.airQualityContent}>
         <section className={styles.roomAirQualityOverview}>
           <div className={styles.roomAirQualityGrid}>
-            {ROOM_AIR_QUALITY_GROUPS.map((room, index) => (
-              <div className={styles.roomLightCardShell} key={room.title} style={buildStaggerStyle(staggerMs(index, 38, 76))}>
+            {ROOM_AIR_QUALITY_GROUPS.map((room) => (
+              <div className={styles.roomLightCardShell} key={room.title}>
                 <RoomAirQualityOverviewCard room={room} />
               </div>
             ))}
@@ -1076,8 +1068,8 @@ function RoomPickerButton({ onNavigate }: { onNavigate: (path: string) => void }
       <FloatingActionButton ariaLabel="Open room layout" color={CHORE_BLUE} icon="mdi:floor-plan" onClick={() => setModalOpen(true)} />
       <ModalSheet open={modalOpen} title="Rooms" onClose={() => setModalOpen(false)}>
         <section className={styles.roomPickerGrid} aria-label="Rooms">
-          {AREA_ITEMS.map((area, index) => (
-            <div key={area.title} style={buildStaggerStyle(staggerMs(index, 28, 70))}>
+          {AREA_ITEMS.map((area) => (
+            <div key={area.title}>
               <RoomCard area={area} onNavigate={handleNavigate} />
             </div>
           ))}
@@ -1124,14 +1116,14 @@ export function AtAGlancePage({ activePath = 'overview', onNavigate = () => unde
           />
         }
       >
-        <div className={styles.weatherWrap} style={buildStaggerStyle(120)}>
+        <div className={styles.weatherWrap}>
           <WeatherSummary />
         </div>
 
         <SectionHeader title="Quick Links" />
         <section className={styles.quickGrid}>
-          {QUICK_ACCESS_ITEMS.map((item, index) => (
-            <div key={item.title} style={buildStaggerStyle(staggerMs(index, 42, 70))}>
+          {QUICK_ACCESS_ITEMS.map((item) => (
+            <div key={item.title}>
               <QuickAccessTile item={item} onNavigate={onNavigate} onOpenHash={openHash} />
             </div>
           ))}
@@ -1139,8 +1131,8 @@ export function AtAGlancePage({ activePath = 'overview', onNavigate = () => unde
 
         <SectionHeader title="Cameras" />
         <section className={styles.cameraGrid}>
-          {CAMERA_ITEMS.map((camera, index) => (
-            <div key={camera.title} style={buildStaggerStyle(staggerMs(index, 42, 130))}>
+          {CAMERA_ITEMS.map((camera) => (
+            <div key={camera.title}>
               <CameraTile camera={camera} onOpen={openHash} />
             </div>
           ))}
