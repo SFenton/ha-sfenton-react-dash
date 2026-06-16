@@ -1,14 +1,25 @@
 import { useEntity, useHass } from '@hakit/core'
 import type { ReactNode } from 'react'
 import { SECURITY_ENTITY } from '../../constants/atAGlance'
+import type { ModalSheetStyle } from '../core/ModalSheet'
 import { Card, type CardColor } from '../core/Card'
 import { MaterialIcon } from '../core/Icon'
 import { Separator } from '../core/Separator'
 import { asEntityName, titleCaseState } from './entityState'
-import { securityStateColor, securityStateIconName } from './securityState'
+import { securityStateColor } from './securityState'
 import styles from './SecurityControls.module.css'
 
 const SECURITY_ICON_SIZE = 30
+
+export const SECURITY_SYSTEM_MODAL_STYLE: ModalSheetStyle = {
+  '--modal-desktop-height': 'auto',
+  '--modal-desktop-max-width': '500px',
+  '--modal-desktop-width': '500px',
+}
+
+export function securitySystemModalSubtitle(state: string | undefined) {
+  return titleCaseState(state)
+}
 
 const SECURITY_MODES = [
   { title: 'Home', service: 'alarm_arm_home', state: 'armed_home', icon: <MaterialIcon name="mdi:shield-home" size={SECURITY_ICON_SIZE} /> },
@@ -48,7 +59,6 @@ export function SecurityControls() {
   const alarm = useEntity(asEntityName(SECURITY_ENTITY), { returnNullIfNotFound: true })
   const callService = useHass((state) => state.helpers.callService)
   const alarmState = alarm?.state
-  const alarmStateTitle = titleCaseState(alarmState)
 
   const callAlarmService = (service: (typeof SECURITY_MODES)[number]['service']) => {
     callService({ domain: 'alarm_control_panel', service, target: SECURITY_ENTITY })
@@ -56,14 +66,6 @@ export function SecurityControls() {
 
   return (
     <div className={styles.controls}>
-      <SecurityCard
-        ariaLabel={`Current security system state ${alarmStateTitle}`}
-        color={securityStateColor(alarmState)}
-        icon={<MaterialIcon name={securityStateIconName(alarmState)} size={SECURITY_ICON_SIZE} />}
-        size="compact"
-        title={alarmStateTitle}
-      />
-
       <div className={styles.sectionHeader}>
         <h3 className={styles.sectionLabel}>Security System States</h3>
         <Separator className={styles.sectionSeparator} />

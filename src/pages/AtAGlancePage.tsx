@@ -1,5 +1,5 @@
 import { useEntity, useHass } from '@hakit/core'
-import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react'
+import { useCallback, useEffect, useRef, useState, type CSSProperties, type MutableRefObject } from 'react'
 import type { HassEntity } from 'home-assistant-js-websocket'
 import { ClimateCard } from '../components/cards/ClimateCard'
 import { ContactSensorCard } from '../components/cards/ContactSensorCard'
@@ -12,11 +12,11 @@ import { ActionPill } from '../components/core/ActionPill'
 import { FloatingActionButton } from '../components/core/FloatingActionButton'
 import { GlassTile } from '../components/core/GlassTile'
 import { Icon, MaterialIcon } from '../components/core/Icon'
-import { ModalSheet } from '../components/core/ModalSheet'
+import { ModalSheet, type ModalSheetStyle } from '../components/core/ModalSheet'
 import { Separator } from '../components/core/Separator'
 import { SectionHeader } from '../components/core/SectionHeader'
 import { CameraTile } from '../components/hass/CameraTile'
-import { SecurityControls } from '../components/hass/SecurityControls'
+import { SecurityControls, SECURITY_SYSTEM_MODAL_STYLE, securitySystemModalSubtitle } from '../components/hass/SecurityControls'
 import { StatusRail } from '../components/hass/StatusRail'
 import { WeatherSummary } from '../components/hass/WeatherSummary'
 import { formatAirMetricState } from '../components/hass/airQualityState'
@@ -33,6 +33,7 @@ import {
   OCCUPANCY_GROUPS,
   OVERVIEW_STATUS_CHIPS,
   QUICK_ACCESS_ITEMS,
+  SECURITY_ENTITY,
   type AirQualityRoomConfig,
   type AreaConfig,
   type EntityGroupConfig,
@@ -72,118 +73,155 @@ const ROOM_OCCUPANCY_GROUPS = OCCUPANCY_GROUPS
 const ROOM_CONTACT_GROUPS = CONTACT_GROUPS
 const ROOM_AIR_QUALITY_GROUPS = AIR_QUALITY_ROOMS
 const ROOM_CONTACT_ENTITY_IDS = [...new Set(ROOM_CONTACT_GROUPS.flatMap((group) => group.items.map((item) => item.entityId)))]
-const ROOM_PICKER_GRID_GAP = 10
-const ROOM_PICKER_EDGE_GUTTER = 6
-const ROOM_PICKER_MIN_CARD_SIZE = 112
-const ROOM_PICKER_MODAL_HORIZONTAL_PADDING = 48 + ROOM_PICKER_EDGE_GUTTER * 2
+const MODAL_SQUARE_GRID_GAP = 10
+const MODAL_SQUARE_GRID_EDGE_GUTTER = 6
+const MODAL_SQUARE_GRID_CARD_SIZE = 168
+const MODAL_SQUARE_GRID_HORIZONTAL_PADDING = 48 + MODAL_SQUARE_GRID_EDGE_GUTTER * 2
+const CONTACT_MODAL_DESKTOP_VERTICAL_CHROME = 147
 
-interface RoomPickerLayout {
+interface ModalSquareGridLayout {
   cardSize: number
   columns: number
   modalWidth: number
   rows: number
 }
 
-type RoomPickerGridStyle = CSSProperties & {
-  '--room-picker-card-size': string
-  '--room-picker-cols': number
-  '--room-picker-rows': number
+type ModalSquareGridStyle = CSSProperties & {
+  '--modal-square-card-size': string
+  '--modal-square-cols': number
+  '--modal-square-rows': number
 }
 
-type RoomPickerModalStyle = CSSProperties & {
+type ModalSquareGridModalStyle = ModalSheetStyle & {
   '--modal-desktop-width': string
+  '--modal-desktop-height'?: string
 }
 
-function balancedRoomPickerTracks(count: number) {
+function balancedModalSquareGridTracks(count: number) {
   const columns = Math.max(1, Math.ceil(Math.sqrt(count)))
   return { columns, rows: Math.ceil(count / columns) }
 }
 
-function roomPickerCellSize(size: number, tracks: number) {
-  return (size - ROOM_PICKER_GRID_GAP * (tracks - 1)) / tracks
+function modalSquareGridColumnsThatFit(maxGridWidth: number) {
+  return Math.max(1, Math.floor((maxGridWidth + MODAL_SQUARE_GRID_GAP) / (MODAL_SQUARE_GRID_CARD_SIZE + MODAL_SQUARE_GRID_GAP)))
 }
 
-function modalWidthForRoomPicker(columns: number, cardSize: number) {
-  return columns * cardSize + ROOM_PICKER_GRID_GAP * (columns - 1) + ROOM_PICKER_MODAL_HORIZONTAL_PADDING
+function modalWidthForSquareGrid(columns: number) {
+  return columns * MODAL_SQUARE_GRID_CARD_SIZE + MODAL_SQUARE_GRID_GAP * (columns - 1) + MODAL_SQUARE_GRID_HORIZONTAL_PADDING
 }
 
-function fallbackRoomPickerLayout(count: number): RoomPickerLayout {
-  const { columns, rows } = balancedRoomPickerTracks(count)
+function fallbackModalSquareGridLayout(count: number): ModalSquareGridLayout {
+  const { columns, rows } = balancedModalSquareGridTracks(count)
   return {
-    cardSize: ROOM_PICKER_MIN_CARD_SIZE,
+    cardSize: MODAL_SQUARE_GRID_CARD_SIZE,
     columns,
-    modalWidth: modalWidthForRoomPicker(columns, ROOM_PICKER_MIN_CARD_SIZE),
+    modalWidth: modalWidthForSquareGrid(columns),
     rows,
   }
 }
 
-function chooseRoomPickerLayout(height: number, count: number): RoomPickerLayout {
-  if (count <= 0) return fallbackRoomPickerLayout(1)
+function chooseModalSquareGridLayout(count: number): ModalSquareGridLayout {
+  if (count <= 0) return fallbackModalSquareGridLayout(1)
 
-  const { columns, rows } = balancedRoomPickerTracks(count)
+  const balancedTracks = balancedModalSquareGridTracks(count)
   const maxModalWidth = Math.min(window.innerWidth * 0.9, window.innerWidth - 64)
-  const maxGridWidth = Math.max(ROOM_PICKER_MIN_CARD_SIZE, maxModalWidth - ROOM_PICKER_MODAL_HORIZONTAL_PADDING)
-  const cardSize = Math.max(
-    ROOM_PICKER_MIN_CARD_SIZE,
-    Math.floor(Math.min(roomPickerCellSize(maxGridWidth, columns), roomPickerCellSize(height, rows))),
-  )
+  const maxGridWidth = Math.max(MODAL_SQUARE_GRID_CARD_SIZE, maxModalWidth - MODAL_SQUARE_GRID_HORIZONTAL_PADDING)
+  const columns = Math.min(balancedTracks.columns, modalSquareGridColumnsThatFit(maxGridWidth))
+  const rows = Math.ceil(count / columns)
 
   return {
-    cardSize,
+    cardSize: MODAL_SQUARE_GRID_CARD_SIZE,
     columns,
-    modalWidth: Math.min(maxModalWidth, modalWidthForRoomPicker(columns, cardSize)),
+    modalWidth: Math.min(maxModalWidth, modalWidthForSquareGrid(columns)),
     rows,
   }
 }
 
-function useRoomPickerLayout(open: boolean, count: number) {
-  const [grid, setGrid] = useState<HTMLElement | null>(null)
-  const [layout, setLayout] = useState<RoomPickerLayout>(() => fallbackRoomPickerLayout(count))
+function useModalSquareGridLayout(open: boolean, count: number) {
+  const [layoutVersion, setLayoutVersion] = useState(0)
   const gridRef = useCallback((node: HTMLElement | null) => {
-    setGrid(node)
+    void node
   }, [])
+  void layoutVersion
+  const layout = typeof window === 'undefined' ? fallbackModalSquareGridLayout(count) : chooseModalSquareGridLayout(count)
 
   useEffect(() => {
-    if (!open || !grid) return undefined
+    if (!open) return undefined
 
     let frame = 0
-    const updateLayout = () => {
-      const body = grid.parentElement
-      const bodyStyle = body ? window.getComputedStyle(body) : undefined
-      const bodyVerticalPadding = bodyStyle ? parseFloat(bodyStyle.paddingTop) + parseFloat(bodyStyle.paddingBottom) : 0
-      const availableHeight = Math.max(grid.clientHeight, (body?.clientHeight ?? 0) - bodyVerticalPadding)
-      const nextLayout = chooseRoomPickerLayout(availableHeight, count)
-      setLayout((current) => (
-        current.cardSize === nextLayout.cardSize && current.columns === nextLayout.columns && current.modalWidth === nextLayout.modalWidth && current.rows === nextLayout.rows
-          ? current
-          : nextLayout
-      ))
-    }
     const scheduleUpdate = () => {
       window.cancelAnimationFrame(frame)
-      frame = window.requestAnimationFrame(updateLayout)
+      frame = window.requestAnimationFrame(() => setLayoutVersion((version) => version + 1))
     }
 
     scheduleUpdate()
     window.addEventListener('resize', scheduleUpdate)
-    if (typeof ResizeObserver === 'undefined') {
-      return () => {
-        window.cancelAnimationFrame(frame)
-        window.removeEventListener('resize', scheduleUpdate)
-      }
-    }
-
-    const observer = new ResizeObserver(scheduleUpdate)
-    observer.observe(grid)
 
     return () => {
       window.cancelAnimationFrame(frame)
       window.removeEventListener('resize', scheduleUpdate)
-      observer.disconnect()
     }
-  }, [count, grid, open])
+  }, [open])
 
   return [gridRef, layout] as const
+}
+
+function modalSquareGridStyle(layout: ModalSquareGridLayout): ModalSquareGridStyle {
+  return {
+    '--modal-square-card-size': `${layout.cardSize}px`,
+    '--modal-square-cols': layout.columns,
+    '--modal-square-rows': layout.rows,
+  }
+}
+
+function modalSquareGridModalStyle(layout: ModalSquareGridLayout): ModalSquareGridModalStyle {
+  return {
+    '--modal-desktop-width': `${layout.modalWidth}px`,
+  }
+}
+
+function modalSquareGridHeight(layout: ModalSquareGridLayout) {
+  return layout.rows * layout.cardSize + MODAL_SQUARE_GRID_GAP * (layout.rows - 1)
+}
+
+function modalAdaptiveSquareGridModalStyle(layout: ModalSquareGridLayout): ModalSquareGridModalStyle {
+  return {
+    ...modalSquareGridModalStyle(layout),
+    '--modal-desktop-height': 'auto',
+  }
+}
+
+function modalLockedContactGridModalStyle(layout: ModalSquareGridLayout): ModalSquareGridModalStyle {
+  return {
+    ...modalSquareGridModalStyle(layout),
+    '--modal-desktop-height': `${modalSquareGridHeight(layout) + CONTACT_MODAL_DESKTOP_VERTICAL_CHROME}px`,
+  }
+}
+
+function modalSquareGridModalStyleForHash(hash: string, layout: ModalSquareGridLayout) {
+  if (hash === '#contact-sensors-overview') return modalLockedContactGridModalStyle(layout)
+  if (hash === '#aqi-overview') return modalAdaptiveSquareGridModalStyle(layout)
+  return modalSquareGridModalStyle(layout)
+}
+
+function squareGridClassName(baseClassName: string, squareOverview: boolean) {
+  return [baseClassName, squareOverview ? styles.modalSquareGrid : ''].filter(Boolean).join(' ')
+}
+
+function squareGridCellClassName(squareOverview: boolean) {
+  return [styles.roomLightCardShell, squareOverview ? styles.modalSquareCell : ''].filter(Boolean).join(' ')
+}
+
+function immediateSelectGroup(
+  group: EntityGroupConfig,
+  transitionTimer: MutableRefObject<number | null>,
+  setRoomCardsExiting: (exiting: boolean) => void,
+  setSelectedGroup: (group: EntityGroupConfig) => void,
+) {
+  if (transitionTimer.current !== null) window.clearTimeout(transitionTimer.current)
+  transitionTimer.current = null
+  setRoomCardsExiting(false)
+  setSelectedGroup(group)
 }
 const DEFAULT_CLIMATE_COLOR = { r: 25, g: 84, b: 130 }
 const DEFAULT_OCCUPANCY_COLOR = { r: 46, g: 180, b: 120 }
@@ -664,13 +702,23 @@ function RoomLightDetailCards({ group, onToggle }: { group: EntityGroupConfig; o
   )
 }
 
-export function LightsSheet({ directGroup, hideDirectTitle = false }: { directGroup?: EntityGroupConfig; hideDirectTitle?: boolean } = {}) {
+interface LightsSheetProps {
+  directGroup?: EntityGroupConfig
+  hideDirectTitle?: boolean
+  overviewGridRef?: (node: HTMLElement | null) => void
+  overviewGridStyle?: ModalSquareGridStyle
+}
+
+export function LightsSheet({ directGroup, hideDirectTitle = false, overviewGridRef, overviewGridStyle }: LightsSheetProps = {}) {
   const callService = useHass((state) => state.helpers.callService)
   const [selectedGroup, setSelectedGroup] = useState<EntityGroupConfig | null>(directGroup ?? null)
   const [roomCardsExiting, setRoomCardsExiting] = useState(false)
   const transitionTimer = useRef<number | null>(null)
   const roomGroups = ROOM_LIGHT_GROUPS
   const directMode = Boolean(directGroup)
+  const squareOverview = !selectedGroup && Boolean(overviewGridStyle)
+  const lightGridClassName = squareGridClassName(styles.roomLightGrid, squareOverview)
+  const lightCardShellClassName = squareGridCellClassName(squareOverview)
 
   useEffect(() => {
     return () => {
@@ -683,13 +731,7 @@ export function LightsSheet({ directGroup, hideDirectTitle = false }: { directGr
   }
 
   const selectGroup = (group: EntityGroupConfig) => {
-    if (transitionTimer.current !== null) window.clearTimeout(transitionTimer.current)
-    setRoomCardsExiting(true)
-    transitionTimer.current = window.setTimeout(() => {
-      setSelectedGroup(group)
-      setRoomCardsExiting(false)
-      transitionTimer.current = null
-    }, 190)
+    immediateSelectGroup(group, transitionTimer, setRoomCardsExiting, setSelectedGroup)
   }
 
   const showRoomOverview = () => {
@@ -700,16 +742,16 @@ export function LightsSheet({ directGroup, hideDirectTitle = false }: { directGr
   }
 
   return (
-    <div className={styles.lightsSheet}>
+    <div className={styles.lightsSheet} data-square-overview={squareOverview ? 'true' : 'false'}>
       {selectedGroup ? <RoomLightDetailHeader group={selectedGroup} hideTitleBlock={directMode && hideDirectTitle} onBack={directMode ? undefined : showRoomOverview} onToggle={toggleEntity} /> : <RoomsHeader />}
       <div className={styles.lightContent}>
         {selectedGroup ? (
           <RoomLightDetailCards group={selectedGroup} onToggle={toggleEntity} />
         ) : (
-          <section className={styles.roomLightsOverview} data-exiting={roomCardsExiting}>
-            <div className={styles.roomLightGrid}>
+          <section aria-label="Lights by room" className={styles.roomLightsOverview} data-exiting={roomCardsExiting}>
+            <div className={lightGridClassName} ref={overviewGridRef} style={overviewGridStyle}>
               {roomGroups.map((group) => (
-                <div className={styles.roomLightCardShell} key={group.title}>
+                <div className={lightCardShellClassName} key={group.title}>
                   <RoomLightOverviewCard group={group} onSelect={selectGroup} />
                 </div>
               ))}
@@ -803,12 +845,22 @@ function RoomClimateDetailCards({ group }: { group: EntityGroupConfig }) {
   )
 }
 
-export function ClimateSheet({ directGroup, hideDirectHeader = false }: { directGroup?: EntityGroupConfig; hideDirectHeader?: boolean } = {}) {
+interface RoomOverviewSheetProps {
+  directGroup?: EntityGroupConfig
+  hideDirectHeader?: boolean
+  overviewGridRef?: (node: HTMLElement | null) => void
+  overviewGridStyle?: ModalSquareGridStyle
+}
+
+export function ClimateSheet({ directGroup, hideDirectHeader = false, overviewGridRef, overviewGridStyle }: RoomOverviewSheetProps = {}) {
   const [selectedGroup, setSelectedGroup] = useState<EntityGroupConfig | null>(directGroup ?? null)
   const [roomCardsExiting, setRoomCardsExiting] = useState(false)
   const transitionTimer = useRef<number | null>(null)
   const roomGroups = ROOM_CLIMATE_GROUPS
   const directMode = Boolean(directGroup)
+  const squareOverview = !selectedGroup && Boolean(overviewGridStyle)
+  const climateGridClassName = squareGridClassName(styles.roomClimateGrid, squareOverview)
+  const cardShellClassName = squareGridCellClassName(squareOverview)
 
   useEffect(() => {
     return () => {
@@ -817,13 +869,7 @@ export function ClimateSheet({ directGroup, hideDirectHeader = false }: { direct
   }, [])
 
   const selectGroup = (group: EntityGroupConfig) => {
-    if (transitionTimer.current !== null) window.clearTimeout(transitionTimer.current)
-    setRoomCardsExiting(true)
-    transitionTimer.current = window.setTimeout(() => {
-      setSelectedGroup(group)
-      setRoomCardsExiting(false)
-      transitionTimer.current = null
-    }, 190)
+    immediateSelectGroup(group, transitionTimer, setRoomCardsExiting, setSelectedGroup)
   }
 
   const showRoomOverview = () => {
@@ -834,16 +880,16 @@ export function ClimateSheet({ directGroup, hideDirectHeader = false }: { direct
   }
 
   return (
-    <div className={styles.climateSheet}>
+    <div className={styles.climateSheet} data-square-overview={squareOverview ? 'true' : 'false'}>
       {selectedGroup ? (!hideDirectHeader && <RoomClimateDetailHeader group={selectedGroup} onBack={directMode ? undefined : showRoomOverview} />) : <RoomsHeader />}
       <div className={styles.climateContent}>
         {selectedGroup ? (
           <RoomClimateDetailCards group={selectedGroup} />
         ) : (
-          <section className={styles.roomClimateOverview} data-exiting={roomCardsExiting}>
-            <div className={styles.roomClimateGrid}>
+          <section aria-label="Climate by room" className={styles.roomClimateOverview} data-exiting={roomCardsExiting}>
+            <div className={climateGridClassName} ref={overviewGridRef} style={overviewGridStyle}>
               {roomGroups.map((group) => (
-                <div className={styles.roomLightCardShell} key={group.title}>
+                <div className={cardShellClassName} key={group.title}>
                   <RoomClimateOverviewCard group={group} onSelect={selectGroup} />
                 </div>
               ))}
@@ -908,12 +954,15 @@ function RoomOccupancyDetailCards({ group }: { group: EntityGroupConfig }) {
   )
 }
 
-export function OccupancySheet({ directGroup, hideDirectHeader = false }: { directGroup?: EntityGroupConfig; hideDirectHeader?: boolean } = {}) {
+export function OccupancySheet({ directGroup, hideDirectHeader = false, overviewGridRef, overviewGridStyle }: RoomOverviewSheetProps = {}) {
   const [selectedGroup, setSelectedGroup] = useState<EntityGroupConfig | null>(directGroup ?? null)
   const [roomCardsExiting, setRoomCardsExiting] = useState(false)
   const transitionTimer = useRef<number | null>(null)
   const roomGroups = ROOM_OCCUPANCY_GROUPS
   const directMode = Boolean(directGroup)
+  const squareOverview = !selectedGroup && Boolean(overviewGridStyle)
+  const occupancyGridClassName = squareGridClassName(styles.roomOccupancyGrid, squareOverview)
+  const cardShellClassName = squareGridCellClassName(squareOverview)
 
   useEffect(() => {
     return () => {
@@ -922,13 +971,7 @@ export function OccupancySheet({ directGroup, hideDirectHeader = false }: { dire
   }, [])
 
   const selectGroup = (group: EntityGroupConfig) => {
-    if (transitionTimer.current !== null) window.clearTimeout(transitionTimer.current)
-    setRoomCardsExiting(true)
-    transitionTimer.current = window.setTimeout(() => {
-      setSelectedGroup(group)
-      setRoomCardsExiting(false)
-      transitionTimer.current = null
-    }, 190)
+    immediateSelectGroup(group, transitionTimer, setRoomCardsExiting, setSelectedGroup)
   }
 
   const showRoomOverview = () => {
@@ -939,16 +982,16 @@ export function OccupancySheet({ directGroup, hideDirectHeader = false }: { dire
   }
 
   return (
-    <div className={styles.occupancySheet}>
+    <div className={styles.occupancySheet} data-square-overview={squareOverview ? 'true' : 'false'}>
       {selectedGroup ? (!hideDirectHeader && <RoomOccupancyDetailHeader group={selectedGroup} onBack={directMode ? undefined : showRoomOverview} />) : <RoomsHeader />}
       <div className={styles.occupancyContent}>
         {selectedGroup ? (
           <RoomOccupancyDetailCards group={selectedGroup} />
         ) : (
-          <section className={styles.roomOccupancyOverview} data-exiting={roomCardsExiting}>
-            <div className={styles.roomOccupancyGrid}>
+          <section aria-label="Occupancy by room" className={styles.roomOccupancyOverview} data-exiting={roomCardsExiting}>
+            <div className={occupancyGridClassName} ref={overviewGridRef} style={overviewGridStyle}>
               {roomGroups.map((group) => (
-                <div className={styles.roomLightCardShell} key={group.title}>
+                <div className={cardShellClassName} key={group.title}>
                   <RoomOccupancyOverviewCard group={group} onSelect={selectGroup} />
                 </div>
               ))}
@@ -1026,12 +1069,21 @@ function RoomContactSection({ group }: { group: EntityGroupConfig }) {
   )
 }
 
-export function ContactSheet({ directGroup, hideDirectHeader = false, overviewMode = 'rooms' }: { directGroup?: EntityGroupConfig; hideDirectHeader?: boolean; overviewMode?: 'grouped' | 'rooms' } = {}) {
+export function ContactSheet({
+  directGroup,
+  hideDirectHeader = false,
+  overviewGridRef,
+  overviewGridStyle,
+  overviewMode = 'rooms',
+}: RoomOverviewSheetProps & { overviewMode?: 'grouped' | 'rooms' } = {}) {
   const [selectedGroup, setSelectedGroup] = useState<EntityGroupConfig | null>(directGroup ?? null)
   const [roomCardsExiting, setRoomCardsExiting] = useState(false)
   const transitionTimer = useRef<number | null>(null)
   const roomGroups = ROOM_CONTACT_GROUPS
   const directMode = Boolean(directGroup)
+  const squareOverview = overviewMode === 'rooms' && !selectedGroup && Boolean(overviewGridStyle)
+  const contactGridClassName = squareGridClassName(styles.roomContactGrid, squareOverview)
+  const cardShellClassName = squareGridCellClassName(squareOverview)
 
   useEffect(() => {
     return () => {
@@ -1040,13 +1092,7 @@ export function ContactSheet({ directGroup, hideDirectHeader = false, overviewMo
   }, [])
 
   const selectGroup = (group: EntityGroupConfig) => {
-    if (transitionTimer.current !== null) window.clearTimeout(transitionTimer.current)
-    setRoomCardsExiting(true)
-    transitionTimer.current = window.setTimeout(() => {
-      setSelectedGroup(group)
-      setRoomCardsExiting(false)
-      transitionTimer.current = null
-    }, 190)
+    immediateSelectGroup(group, transitionTimer, setRoomCardsExiting, setSelectedGroup)
   }
 
   const showRoomOverview = () => {
@@ -1058,7 +1104,7 @@ export function ContactSheet({ directGroup, hideDirectHeader = false, overviewMo
 
   if (!directGroup && overviewMode === 'grouped') {
     return (
-      <div className={styles.contactSheet}>
+      <div className={styles.contactSheet} data-square-overview={squareOverview ? 'true' : 'false'}>
         <div className={styles.contactContent}>
           <section className={styles.roomContactOverview}>
             <div className={styles.roomStateStack}>
@@ -1077,10 +1123,10 @@ export function ContactSheet({ directGroup, hideDirectHeader = false, overviewMo
         {selectedGroup ? (
           <RoomContactDetailCards group={selectedGroup} size={directMode ? 'source-row' : 'bubble'} />
         ) : (
-          <section className={styles.roomContactOverview} data-exiting={roomCardsExiting}>
-            <div className={styles.roomContactGrid}>
+          <section aria-label="Contact sensors by room" className={styles.roomContactOverview} data-exiting={roomCardsExiting}>
+            <div className={contactGridClassName} ref={overviewGridRef} style={overviewGridStyle}>
               {roomGroups.map((group) => (
-                <div className={styles.roomLightCardShell} key={group.title}>
+                <div className={cardShellClassName} key={group.title}>
                   <RoomContactOverviewCard group={group} onSelect={selectGroup} />
                 </div>
               ))}
@@ -1119,15 +1165,24 @@ function RoomAirQualityOverviewCard({ room }: { room: AirQualityRoomConfig }) {
   )
 }
 
-export function AirQualitySheet() {
+interface AirQualitySheetProps {
+  overviewGridRef?: (node: HTMLElement | null) => void
+  overviewGridStyle?: ModalSquareGridStyle
+}
+
+export function AirQualitySheet({ overviewGridRef, overviewGridStyle }: AirQualitySheetProps = {}) {
+  const squareOverview = Boolean(overviewGridStyle)
+  const airQualityGridClassName = squareGridClassName(styles.roomAirQualityGrid, squareOverview)
+  const cardShellClassName = squareGridCellClassName(squareOverview)
+
   return (
-    <div className={styles.airQualitySheet}>
+    <div className={styles.airQualitySheet} data-square-overview={squareOverview ? 'true' : 'false'}>
       <RoomsHeader />
       <div className={styles.airQualityContent}>
-        <section className={styles.roomAirQualityOverview}>
-          <div className={styles.roomAirQualityGrid}>
+        <section aria-label="AQI by room" className={styles.roomAirQualityOverview}>
+          <div className={airQualityGridClassName} ref={overviewGridRef} style={overviewGridStyle}>
             {ROOM_AIR_QUALITY_GROUPS.map((room) => (
-              <div className={styles.roomLightCardShell} key={room.title}>
+              <div className={cardShellClassName} key={room.title}>
                 <RoomAirQualityOverviewCard room={room} />
               </div>
             ))}
@@ -1138,25 +1193,46 @@ export function AirQualitySheet() {
   )
 }
 
-function SheetContent({ closeHash, hash, onNavigate }: { closeHash: () => void; hash: string; onNavigate: (path: string) => void }) {
+function modalSquareGridCount(hash: string) {
+  if (hash === '#lights-overview') return ROOM_LIGHT_GROUPS.length
+  if (hash === '#climate-overview') return ROOM_CLIMATE_GROUPS.length
+  if (hash === '#occupancy-overview') return ROOM_OCCUPANCY_GROUPS.length
+  if (hash === '#contact-sensors-overview') return ROOM_CONTACT_GROUPS.length
+  if (hash === '#aqi-overview') return ROOM_AIR_QUALITY_GROUPS.length
+  return 0
+}
+
+function SheetContent({
+  closeHash,
+  hash,
+  overviewGridRef,
+  overviewGridStyle,
+  onNavigate,
+}: {
+  closeHash: () => void
+  hash: string
+  overviewGridRef?: (node: HTMLElement | null) => void
+  overviewGridStyle?: ModalSquareGridStyle
+  onNavigate: (path: string) => void
+}) {
   if (hash === '#lights-overview') {
-    return <LightsSheet />
+    return <LightsSheet overviewGridRef={overviewGridRef} overviewGridStyle={overviewGridStyle} />
   }
 
   if (hash === '#climate-overview') {
-    return <ClimateSheet />
+    return <ClimateSheet overviewGridRef={overviewGridRef} overviewGridStyle={overviewGridStyle} />
   }
 
   if (hash === '#occupancy-overview') {
-    return <OccupancySheet />
+    return <OccupancySheet overviewGridRef={overviewGridRef} overviewGridStyle={overviewGridStyle} />
   }
 
   if (hash === '#contact-sensors-overview') {
-    return <ContactSheet />
+    return <ContactSheet overviewGridRef={overviewGridRef} overviewGridStyle={overviewGridStyle} />
   }
 
   if (hash === '#aqi-overview') {
-    return <AirQualitySheet />
+    return <AirQualitySheet overviewGridRef={overviewGridRef} overviewGridStyle={overviewGridStyle} />
   }
 
   if (hash === '#chores-preview') return <ChoresPreviewSheet closeHash={closeHash} onNavigate={onNavigate} />
@@ -1170,15 +1246,9 @@ function SheetContent({ closeHash, hash, onNavigate }: { closeHash: () => void; 
 
 function RoomPickerButton({ onNavigate }: { onNavigate: (path: string) => void }) {
   const [modalOpen, setModalOpen] = useState(false)
-  const [gridRef, gridLayout] = useRoomPickerLayout(modalOpen, AREA_ITEMS.length)
-  const modalStyle: RoomPickerModalStyle = {
-    '--modal-desktop-width': `${gridLayout.modalWidth}px`,
-  }
-  const gridStyle: RoomPickerGridStyle = {
-    '--room-picker-card-size': `${gridLayout.cardSize}px`,
-    '--room-picker-cols': gridLayout.columns,
-    '--room-picker-rows': gridLayout.rows,
-  }
+  const [gridRef, gridLayout] = useModalSquareGridLayout(modalOpen, AREA_ITEMS.length)
+  const modalStyle = modalSquareGridModalStyle(gridLayout)
+  const gridStyle = modalSquareGridStyle(gridLayout)
 
   const handleNavigate = (path: string) => {
     setModalOpen(false)
@@ -1219,9 +1289,17 @@ export function AtAGlancePage({ activePath = 'overview', onNavigate = () => unde
     const pm25Range = formatCompactEntityState(state.entities['input_text.all_pm25_range'] ?? null)
     return `AQI ${aqiRange} · PM2.5 ${pm25Range}`
   })
+  const securitySystemSubtitle = useHass((state) => securitySystemModalSubtitle(state.entities[SECURITY_ENTITY]?.state))
+  const squareGridModalCount = modalSquareGridCount(hash)
+  const squareGridModalOpen = squareGridModalCount > 0
+  const [overviewGridRef, overviewGridLayout] = useModalSquareGridLayout(squareGridModalOpen, squareGridModalCount)
   const lightStatusSubtitle = lightCountSubtitle(activeRoomLightCount)
   const contactStatusSubtitle = contactSensorStatusSubtitle(openContactSensorCount)
   const modalTitle = hash === '#lights-overview' ? lightsSheetTitle(activeRoomLightCount) : sheetTitle(hash)
+  const squareGridModalStyle = modalSquareGridModalStyleForHash(hash, overviewGridLayout)
+  const squareGridStyle = modalSquareGridStyle(overviewGridLayout)
+  const sheetStyle = hash === '#security-system' ? SECURITY_SYSTEM_MODAL_STYLE : squareGridModalOpen ? squareGridModalStyle : undefined
+  const sheetSubtitle = hash === '#security-system' ? securitySystemSubtitle : undefined
 
   return (
     <AppShell bottomNav={<BottomNav activePath={activePath} onNavigate={onNavigate} />} floatingAction={<RoomPickerButton onNavigate={onNavigate} />}>
@@ -1261,8 +1339,8 @@ export function AtAGlancePage({ activePath = 'overview', onNavigate = () => unde
         </section>
       </Page>
 
-      <ModalSheet open={hash !== ''} title={modalTitle} onClose={closeHash}>
-        <SheetContent closeHash={closeHash} hash={hash} onNavigate={onNavigate} />
+      <ModalSheet contentStyle={sheetStyle} open={hash !== ''} subtitle={sheetSubtitle} title={modalTitle} onClose={closeHash}>
+        <SheetContent closeHash={closeHash} hash={hash} overviewGridRef={overviewGridRef} overviewGridStyle={squareGridStyle} onNavigate={onNavigate} />
       </ModalSheet>
     </AppShell>
   )

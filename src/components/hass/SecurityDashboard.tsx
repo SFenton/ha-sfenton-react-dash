@@ -3,7 +3,7 @@ import { CameraTile } from './CameraTile'
 import { GlassTile, type TileTone } from '../core/GlassTile'
 import { ModalSheet } from '../core/ModalSheet'
 import { SectionHeader } from '../core/SectionHeader'
-import { CAMERA_ITEMS, CONTACT_GROUPS } from '../../constants/atAGlance'
+import { CAMERA_ITEMS, CONTACT_GROUPS, SECURITY_ENTITY } from '../../constants/atAGlance'
 import {
   SECURITY_CONTROL_TILES,
   SECURITY_MACHE_TILES,
@@ -13,7 +13,7 @@ import {
 import { ContactSheet } from '../../pages/AtAGlancePage'
 import { CameraModalContent } from './CameraModalContent'
 import { asEntityName, formatCompactEntityState, isActiveState, isContactOpen } from './entityState'
-import { SecurityControls } from './SecurityControls'
+import { SecurityControls, SECURITY_SYSTEM_MODAL_STYLE, securitySystemModalSubtitle } from './SecurityControls'
 import { StatusRail } from './StatusRail'
 import styles from './SecurityDashboard.module.css'
 
@@ -123,6 +123,9 @@ interface SecurityDashboardProps {
 }
 
 export function SecurityDashboard({ closeHash, hash, onOpenHash }: SecurityDashboardProps) {
+  const securitySubtitle = useHass((state) => securitySystemModalSubtitle(state.entities[SECURITY_ENTITY]?.state))
+  const modalSubtitle = hash === '#security-system' ? securitySubtitle : undefined
+
   return (
     <>
       <div className={styles.dashboard}>
@@ -150,7 +153,7 @@ export function SecurityDashboard({ closeHash, hash, onOpenHash }: SecurityDashb
         )}
       </div>
 
-      <ModalSheet onClose={closeHash} open={hash !== ''} title={modalTitle(hash)}>
+      <ModalSheet contentStyle={hash === '#security-system' ? SECURITY_SYSTEM_MODAL_STYLE : undefined} onClose={closeHash} open={hash !== ''} subtitle={modalSubtitle} title={modalTitle(hash)}>
         <SecurityModalContent hash={hash} />
       </ModalSheet>
     </>

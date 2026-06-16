@@ -24,6 +24,10 @@
   min-width: 0;
 }
 
+.modalSquareCell {
+  min-width: 0;
+}
+
 .sheetText {
   margin: 4px 2px 20px;
   color: var(--color-muted);
@@ -524,11 +528,30 @@
 }
 
 @media (min-width: 760px) {
-  .roomPickerGrid {
+  .lightsSheet[data-square-overview='true'] .lightContent,
+  .climateSheet[data-square-overview='true'] .climateContent,
+  .occupancySheet[data-square-overview='true'] .occupancyContent,
+  .contactSheet[data-square-overview='true'] .contactContent,
+  .airQualitySheet[data-square-overview='true'] .airQualityContent {
+    overflow: hidden;
+    padding-bottom: 0;
+  }
+
+  .lightsSheet[data-square-overview='true'] .roomLightsOverview,
+  .climateSheet[data-square-overview='true'] .roomClimateOverview,
+  .occupancySheet[data-square-overview='true'] .roomOccupancyOverview,
+  .contactSheet[data-square-overview='true'] .roomContactOverview,
+  .airQualitySheet[data-square-overview='true'] .roomAirQualityOverview {
     height: 100%;
     min-height: 0;
-    grid-template-columns: repeat(var(--room-picker-cols, 4), var(--room-picker-card-size, 132px));
-    grid-template-rows: repeat(var(--room-picker-rows, 4), var(--room-picker-card-size, 132px));
+  }
+
+  .roomPickerGrid,
+  .modalSquareGrid {
+    height: 100%;
+    min-height: 0;
+    grid-template-columns: repeat(var(--modal-square-cols, 4), var(--modal-square-card-size, 168px));
+    grid-template-rows: repeat(var(--modal-square-rows, 4), var(--modal-square-card-size, 168px));
     align-content: safe center;
     justify-content: center;
     box-sizing: border-box;
@@ -539,20 +562,24 @@
     scrollbar-width: none;
   }
 
-  .roomPickerGrid::-webkit-scrollbar {
+  .roomPickerGrid::-webkit-scrollbar,
+  .modalSquareGrid::-webkit-scrollbar {
     display: none;
     width: 0;
     height: 0;
   }
 
-  .roomPickerCell {
-    width: var(--room-picker-card-size, 132px);
-    height: var(--room-picker-card-size, 132px);
+  .roomPickerCell,
+  .modalSquareCell {
+    width: var(--modal-square-card-size, 168px);
+    height: var(--modal-square-card-size, 168px);
     min-height: 0;
   }
 
   .roomPickerCell > button,
-  .roomPickerCell > article {
+  .roomPickerCell > article,
+  .modalSquareCell > button,
+  .modalSquareCell > article {
     height: 100%;
     min-height: 0;
     aspect-ratio: 1 / 1;
@@ -561,25 +588,33 @@
   }
 
   .roomPickerCell > button > span:first-child,
-  .roomPickerCell > article > span:first-child {
+  .roomPickerCell > article > span:first-child,
+  .modalSquareCell > button > span:first-child,
+  .modalSquareCell > article > span:first-child {
     flex-basis: clamp(38px, 4.2vw, 52px);
     width: clamp(38px, 4.2vw, 52px);
     height: clamp(38px, 4.2vw, 52px);
   }
 
   .roomPickerCell > button > span:first-child svg,
-  .roomPickerCell > article > span:first-child svg {
+  .roomPickerCell > article > span:first-child svg,
+  .modalSquareCell > button > span:first-child svg,
+  .modalSquareCell > article > span:first-child svg {
     width: clamp(30px, 3.4vw, 46px);
     height: clamp(30px, 3.4vw, 46px);
   }
 
   .roomPickerCell > button > span:last-child,
-  .roomPickerCell > article > span:last-child {
+  .roomPickerCell > article > span:last-child,
+  .modalSquareCell > button > span:last-child,
+  .modalSquareCell > article > span:last-child {
     gap: 3px;
   }
 
   .roomPickerCell > button > span:last-child > span:first-child,
-  .roomPickerCell > article > span:last-child > span:first-child {
+  .roomPickerCell > article > span:last-child > span:first-child,
+  .modalSquareCell > button > span:last-child > span:first-child,
+  .modalSquareCell > article > span:last-child > span:first-child {
     font-size: clamp(0.78rem, 1.05vw, 1rem);
     line-height: 1.08;
   }

@@ -56,6 +56,59 @@ async function expectFreeSleepAlarms(page: Page, side: 'left' | 'right', day: st
   }).toEqual(expected)
 }
 
+async function expectDesktopSquareGrid(dialog: Locator, sectionLabel: string) {
+  const grid = dialog.locator(`section[aria-label="${sectionLabel}"] > div`)
+  await expect(grid).toBeVisible()
+  const cardCount = await grid.locator('> div').count()
+  const expectedColumns = Math.max(1, Math.ceil(Math.sqrt(cardCount)))
+  const expectedRows = Math.ceil(cardCount / expectedColumns)
+
+  await expect.poll(async () => {
+    return grid.evaluate((gridElement) => {
+      const firstCard = gridElement.firstElementChild?.firstElementChild
+      const firstCardRect = firstCard?.getBoundingClientRect()
+      const gridStyle = window.getComputedStyle(gridElement)
+      const columns = gridStyle.gridTemplateColumns.split(' ').filter(Boolean).length
+      const rows = gridStyle.gridTemplateRows.split(' ').filter(Boolean).length
+      return {
+        cardCount: gridElement.children.length,
+        cardHeight: Math.round(firstCardRect?.height ?? 0),
+        cardWidth: Math.round(firstCardRect?.width ?? 0),
+        columns,
+        fitsAllRooms: columns * rows >= gridElement.children.length,
+        rows,
+        scrollsHorizontally: gridElement.scrollWidth > gridElement.clientWidth + 1,
+        squareCard: Math.round(firstCardRect?.width ?? 0) === Math.round(firstCardRect?.height ?? 0),
+      }
+    })
+  }).toMatchObject({
+    cardCount,
+    cardHeight: 168,
+    cardWidth: 168,
+    columns: expectedColumns,
+    fitsAllRooms: true,
+    rows: expectedRows,
+    scrollsHorizontally: false,
+    squareCard: true,
+  })
+
+  const dialogBox = await dialog.boundingBox()
+  const gridBox = await grid.boundingBox()
+  expect(Math.round(dialogBox?.width ?? 0)).toBeLessThanOrEqual(Math.round((gridBox?.width ?? 0) + 52))
+  return grid
+}
+
+async function clickWithPointerJitter(page: Page, target: Locator) {
+  const box = await target.boundingBox()
+  if (!box) throw new Error('Target was not measurable')
+  const clickX = box.x + box.width / 2
+  const clickY = box.y + box.height / 2
+  await page.mouse.move(clickX, clickY)
+  await page.mouse.down()
+  await page.mouse.move(clickX, clickY + 4)
+  await page.mouse.up()
+}
+
 test('overview renders with mock Home Assistant state', async ({ page }) => {
   await page.goto('/at-a-glance/overview')
 
@@ -67,7 +120,7 @@ test('overview renders with mock Home Assistant state', async ({ page }) => {
 test.describe('desktop modal layout', () => {
   test.use({ hasTouch: false, isMobile: false, viewport: { width: 1280, height: 900 } })
 
-  test('rooms modal fits square room cards without scrolling when desktop space allows', async ({ page }) => {
+  test('rooms modal uses fixed 168px square room cards on desktop', async ({ page }) => {
     await page.goto('/at-a-glance/overview')
     await page.getByRole('button', { name: 'Open room layout' }).click()
 
@@ -78,34 +131,27 @@ test.describe('desktop modal layout', () => {
       return dialog.locator('section[aria-label="Rooms"]').evaluate((grid) => {
         const firstCard = grid.firstElementChild?.firstElementChild
         const firstCardRect = firstCard?.getBoundingClientRect()
-        const gridRect = grid.getBoundingClientRect()
         const gridStyle = window.getComputedStyle(grid)
         const columns = gridStyle.gridTemplateColumns.split(' ').filter(Boolean).length
         const rows = gridStyle.gridTemplateRows.split(' ').filter(Boolean).length
-        const rowGap = Number.parseFloat(gridStyle.rowGap)
-        const usedGridHeight = rows * (firstCardRect?.height ?? 0) + rowGap * (rows - 1)
         return {
           cardCount: grid.children.length,
-          fillsVerticalSpace: gridRect.height - usedGridHeight <= 8,
           firstCardHeight: Math.round(firstCardRect?.height ?? 0),
           firstCardWidth: Math.round(firstCardRect?.width ?? 0),
           columns,
           fitsAllRooms: columns * rows >= grid.children.length,
-          gridHeight: Math.round(gridRect.height),
-          gridWidth: Math.round(gridRect.width),
           rows,
           scrollsHorizontally: grid.scrollWidth > grid.clientWidth + 1,
-          scrollsVertically: grid.scrollHeight > grid.clientHeight + 1,
         }
       })
     }).toMatchObject({
       cardCount: 16,
+      firstCardHeight: 168,
+      firstCardWidth: 168,
       columns: 4,
-      fillsVerticalSpace: true,
       fitsAllRooms: true,
       rows: 4,
       scrollsHorizontally: false,
-      scrollsVertically: false,
     })
     const firstCard = dialog.locator('section[aria-label="Rooms"] > div').first()
     const box = await firstCard.boundingBox()
@@ -114,7 +160,219 @@ test.describe('desktop modal layout', () => {
     const gridBox = await dialog.locator('section[aria-label="Rooms"]').boundingBox()
     expect(Math.round(dialogBox?.width ?? 0)).toBeLessThan(900)
     expect(Math.round(dialogBox?.width ?? 0)).toBeLessThanOrEqual(Math.round((gridBox?.width ?? 0) + 52))
+
   })
+
+  test('desktop modal has no grabber and cannot be dragged', async ({ page }) => {
+    await page.goto('/at-a-glance/overview')
+    await page.getByRole('button', { name: 'Open room layout' }).click()
+
+    const dialog = page.getByRole('dialog', { name: 'Rooms' })
+    await expect(dialog).toBeVisible()
+    await page.waitForTimeout(250)
+    await expect(dialog.locator('[data-mobile-drag-handle="true"]')).toHaveCount(0)
+
+    const before = await dialog.boundingBox()
+    if (!before) throw new Error('Rooms modal was not measurable before drag')
+    await page.mouse.move(before.x + before.width / 2, before.y + 36)
+    await page.mouse.down()
+    await page.mouse.move(before.x + before.width / 2, before.y + 180)
+    await page.mouse.up()
+
+    await expect(dialog).toBeVisible()
+    const after = await dialog.boundingBox()
+    expect(Math.abs(Math.round(after?.x ?? 0) - Math.round(before.x))).toBeLessThanOrEqual(8)
+    expect(Math.abs(Math.round(after?.y ?? 0) - Math.round(before.y))).toBeLessThanOrEqual(8)
+  })
+
+  test('desktop modal preserves its size during the close fade', async ({ page }) => {
+    await page.goto('/at-a-glance/overview')
+    await page.getByRole('button', { name: 'Open room layout' }).click()
+
+    const dialog = page.getByRole('dialog', { name: 'Rooms' })
+    await expect(dialog).toBeVisible()
+    const roomGrid = dialog.locator('section[aria-label="Rooms"]')
+    await expect(roomGrid).toBeVisible()
+    await expect.poll(async () => {
+      return roomGrid.evaluate((gridElement) => {
+        const firstCard = gridElement.firstElementChild?.firstElementChild
+        const firstCardRect = firstCard?.getBoundingClientRect()
+        return {
+          cardHeight: Math.round(firstCardRect?.height ?? 0),
+          cardWidth: Math.round(firstCardRect?.width ?? 0),
+        }
+      })
+    }).toEqual({ cardHeight: 168, cardWidth: 168 })
+
+    const before = await dialog.boundingBox()
+    if (!before) throw new Error('Rooms modal was not measurable before closing')
+
+    const frames = await page.evaluate(async () => {
+      const dialogElement = document.querySelector('[role="dialog"]') as HTMLElement | null
+      const closeButton = dialogElement?.querySelector('button[aria-label="Close"]') as HTMLButtonElement | null
+      if (!dialogElement || !closeButton) return []
+
+      const samples: Array<{ height: number; width: number }> = []
+      closeButton.click()
+      const start = performance.now()
+
+      await new Promise<void>((resolve) => {
+        const sample = () => {
+          if (!document.body.contains(dialogElement)) {
+            resolve()
+            return
+          }
+
+          const rect = dialogElement.getBoundingClientRect()
+          samples.push({ height: Math.round(rect.height), width: Math.round(rect.width) })
+          if (performance.now() - start >= 150) {
+            resolve()
+            return
+          }
+          requestAnimationFrame(sample)
+        }
+
+        requestAnimationFrame(sample)
+      })
+
+      return samples
+    })
+
+    expect(frames.length).toBeGreaterThan(2)
+    expect(Math.max(...frames.map((frame) => Math.abs(frame.width - Math.round(before.width))))).toBeLessThanOrEqual(2)
+    expect(Math.max(...frames.map((frame) => Math.abs(frame.height - Math.round(before.height))))).toBeLessThanOrEqual(2)
+  })
+
+  test('home lights modal uses fixed 168px square room cards on desktop', async ({ page }) => {
+    await page.goto('/at-a-glance/overview#lights-overview')
+
+    const dialog = page.getByRole('dialog', { name: /Lights/ })
+    await expect(dialog).toBeVisible()
+
+    const grid = dialog.locator('section[aria-label="Lights by room"] > div')
+    await expect.poll(async () => {
+      return grid.evaluate((gridElement) => {
+        const firstCard = gridElement.firstElementChild?.firstElementChild
+        const firstCardRect = firstCard?.getBoundingClientRect()
+        const gridStyle = window.getComputedStyle(gridElement)
+        const columns = gridStyle.gridTemplateColumns.split(' ').filter(Boolean).length
+        const rows = gridStyle.gridTemplateRows.split(' ').filter(Boolean).length
+        return {
+          cardCount: gridElement.children.length,
+          cardHeight: Math.round(firstCardRect?.height ?? 0),
+          cardWidth: Math.round(firstCardRect?.width ?? 0),
+          columns,
+          fitsAllRooms: columns * rows >= gridElement.children.length,
+          rows,
+          scrollsHorizontally: gridElement.scrollWidth > gridElement.clientWidth + 1,
+        }
+      })
+    }).toMatchObject({
+      cardCount: 16,
+      cardHeight: 168,
+      cardWidth: 168,
+      columns: 4,
+      fitsAllRooms: true,
+      rows: 4,
+      scrollsHorizontally: false,
+    })
+    const firstCard = grid.locator('> div').first()
+    const box = await firstCard.boundingBox()
+    expect(Math.round(box?.width ?? 0)).toBe(Math.round(box?.height ?? 0))
+    const dialogBox = await dialog.boundingBox()
+    const gridBox = await grid.boundingBox()
+    expect(Math.round(dialogBox?.width ?? 0)).toBeLessThan(900)
+    expect(Math.round(dialogBox?.width ?? 0)).toBeLessThanOrEqual(Math.round((gridBox?.width ?? 0) + 52))
+
+    const livingRoomButton = grid.getByRole('button', { name: /Open Living Room Lights/i })
+    const livingRoomBox = await livingRoomButton.boundingBox()
+    if (!livingRoomBox) throw new Error('Living Room Lights button was not measurable')
+    const clickX = livingRoomBox.x + livingRoomBox.width / 2
+    const clickY = livingRoomBox.y + livingRoomBox.height / 2
+    await page.mouse.move(clickX, clickY)
+    await page.mouse.down()
+    await page.mouse.move(clickX, clickY + 4)
+    await page.mouse.up()
+    await expect(dialog).toBeVisible()
+    await expect(dialog.getByRole('heading', { name: 'Living Room Lights' })).toBeVisible()
+    await expect(dialog.getByRole('button', { name: 'Back to room lights' })).toBeVisible()
+  })
+
+  test('security system modal is capped at 500px width with adaptive height on desktop', async ({ page }) => {
+    await page.goto('/at-a-glance/overview#security-system')
+
+    const dialog = page.getByRole('dialog', { name: 'Security System' })
+    await expect(dialog).toBeVisible()
+    await expect(dialog.getByText('Armed Home', { exact: true })).toBeVisible()
+    await expect(dialog.getByLabel('Current security system state Armed Home')).toHaveCount(0)
+
+    await expect.poll(async () => Math.round((await dialog.boundingBox())?.width ?? 0)).toBeGreaterThanOrEqual(495)
+    const box = await dialog.boundingBox()
+    expect(Math.round(box?.width ?? 0)).toBeLessThanOrEqual(500)
+    expect(Math.round(box?.height ?? 0)).toBeLessThan(720)
+  })
+
+  const squareOverviewCases = [
+    {
+      backButtonName: 'Back to room climates',
+      buttonName: /Open Living Room Climate/i,
+      detailHeading: 'Living Room Climate',
+      dialogName: 'Climate',
+      hash: '#climate-overview',
+      sectionLabel: 'Climate by room',
+    },
+    {
+      backButtonName: 'Back to room occupancy',
+      buttonName: /Open Living Room Occupancy/i,
+      detailHeading: 'Living Room Occupancy',
+      dialogName: 'Occupancy',
+      hash: '#occupancy-overview',
+      sectionLabel: 'Occupancy by room',
+    },
+    {
+      adaptiveHeight: true,
+      backButtonName: 'Back to room contact sensors',
+      buttonName: /Open Living Room Contact Sensors/i,
+      detailHeading: 'Living Room Contact Sensors',
+      dialogName: 'Contact Sensors',
+      hash: '#contact-sensors-overview',
+      sectionLabel: 'Contact sensors by room',
+    },
+    {
+      adaptiveHeight: true,
+      dialogName: 'Air Quality',
+      hash: '#aqi-overview',
+      sectionLabel: 'AQI by room',
+    },
+  ]
+
+  for (const modalCase of squareOverviewCases) {
+    test(`${modalCase.dialogName} modal uses fixed 168px square room grid on desktop`, async ({ page }) => {
+      await page.goto(`/at-a-glance/overview${modalCase.hash}`)
+
+      const dialog = page.getByRole('dialog', { name: modalCase.dialogName })
+      await expect(dialog).toBeVisible()
+      const grid = await expectDesktopSquareGrid(dialog, modalCase.sectionLabel)
+      const overviewDialogBox = await dialog.boundingBox()
+
+      if ('adaptiveHeight' in modalCase) {
+        const gridBox = await grid.boundingBox()
+        expect(Math.round(overviewDialogBox?.height ?? 0)).toBeLessThan(760)
+        expect(Math.round(overviewDialogBox?.height ?? 0)).toBeLessThanOrEqual(Math.round((gridBox?.height ?? 0) + 180))
+      }
+
+      if ('buttonName' in modalCase) {
+        await clickWithPointerJitter(page, grid.getByRole('button', { name: modalCase.buttonName }))
+        await expect(dialog).toBeVisible()
+        await expect(dialog.getByRole('heading', { name: modalCase.detailHeading })).toBeVisible()
+        await expect(dialog.getByRole('button', { name: modalCase.backButtonName })).toBeVisible()
+        if (modalCase.dialogName === 'Contact Sensors') {
+          const detailDialogBox = await dialog.boundingBox()
+          expect(Math.abs(Math.round(detailDialogBox?.height ?? 0) - Math.round(overviewDialogBox?.height ?? 0))).toBeLessThanOrEqual(2)
+        }
+      }
+    })
+  }
 })
 
 test('settings links to Vacation mode controls', async ({ page }) => {
