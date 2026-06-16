@@ -24,7 +24,7 @@ import { Description } from '../components/core/Description'
 import { FloatingActionButton } from '../components/core/FloatingActionButton'
 import { GlassTile } from '../components/core/GlassTile'
 import { MaterialIcon } from '../components/core/Icon'
-import { ModalSheet } from '../components/core/ModalSheet'
+import { ModalSheet, type ModalSheetStyle } from '../components/core/ModalSheet'
 import { OptionPickerDialog, type PickerOption } from '../components/core/OptionPickerDialog'
 import { SectionHeader } from '../components/core/SectionHeader'
 import { derivedAirPurifierEntityIds, formatAirQualitySummary } from '../components/hass/airQualityState'
@@ -77,6 +77,7 @@ import {
   type EntitySectionConfig,
   type SettingsLinkConfig,
 } from '../constants/portedDashboard'
+import { modalSquareGridModalStyle, modalSquareGridStyle, type ModalSquareGridStyle, useModalSquareGridLayout } from './modalSquareGrid'
 import { ROOM_PAGE_CONFIGS, type RoomSourceCardAction, type RoomSourceCardConfig, type RoomSourceKind, type RoomSourceModalItem } from '../constants/roomPages'
 import { MEDIA_REMOTE_CONFIGS } from '../constants/mediaRemotes'
 import { Page } from './Page'
@@ -151,8 +152,8 @@ function AdminWideGrid({ children }: { children: ReactNode }) {
   return <div className={styles.adminWideGrid}>{children}</div>
 }
 
-function AdminModalGrid({ children }: { children: ReactNode }) {
-  return <div className={styles.adminModalGrid}>{children}</div>
+function AdminModalGrid({ children, label, squareGridRef, squareGridStyle }: { children: ReactNode; label?: string; squareGridRef?: (node: HTMLElement | null) => void; squareGridStyle?: ModalSquareGridStyle }) {
+  return <div aria-label={label} className={squareGridStyle ? styles.adminSquareGrid : styles.adminModalGrid} ref={squareGridRef} role={label ? 'group' : undefined} style={squareGridStyle}>{children}</div>
 }
 
 function AdminHashButton({ hash, onOpen, title }: { hash: string; onOpen: (hash: string) => void; title: string }) {
@@ -187,15 +188,13 @@ function LivingRoomPowerRecoveryButton() {
   )
 }
 
-function AdminTileGrid({ items, onNavigate, variant = 'wide' }: { items: EntitySectionConfig['items']; onNavigate: (path: string) => void; variant?: 'admin-modal' | 'compact' | 'wide' }) {
-  const Wrapper = variant === 'wide' ? AdminWideGrid : variant === 'admin-modal' ? AdminModalGrid : Grid
-  return (
-    <Wrapper>
-      {items.map((item) => (
-        <EntityActionCard item={item} key={`${item.entityId}-${item.title}`} onNavigate={onNavigate} size={variant} />
-      ))}
-    </Wrapper>
-  )
+function AdminTileGrid({ gridLabel, items, onNavigate, squareGridRef, squareGridStyle, variant = 'wide' }: { gridLabel?: string; items: EntitySectionConfig['items']; onNavigate: (path: string) => void; squareGridRef?: (node: HTMLElement | null) => void; squareGridStyle?: ModalSquareGridStyle; variant?: 'admin-modal' | 'compact' | 'wide' }) {
+  const cards = items.map((item) => (
+    <EntityActionCard item={item} key={`${item.entityId}-${item.title}`} onNavigate={onNavigate} size={variant} />
+  ))
+  if (variant === 'wide') return <AdminWideGrid>{cards}</AdminWideGrid>
+  if (variant === 'admin-modal') return <AdminModalGrid label={gridLabel} squareGridRef={squareGridRef} squareGridStyle={squareGridStyle}>{cards}</AdminModalGrid>
+  return <Grid>{cards}</Grid>
 }
 
 function sectionId(title: string) {
@@ -1261,6 +1260,10 @@ function MediaPage() {
 
 function AdminPage({ onNavigate }: { onNavigate: (path: string) => void }) {
   const { closeHash, hash, openHash } = useHashModal()
+  const presenceModalOpen = hash === '#presence-based-overrides'
+  const autoResetModalOpen = hash === '#presence-based-overrides-auto'
+  const [presenceGridRef, presenceGridLayout] = useModalSquareGridLayout(presenceModalOpen, ADMIN_PRESENCE_OVERRIDE_ITEMS.length)
+  const [autoResetGridRef, autoResetGridLayout] = useModalSquareGridLayout(autoResetModalOpen, ADMIN_AUTO_REENABLE_ITEMS.length)
 
   return (
     <div className={styles.stack}>
@@ -1294,15 +1297,15 @@ function AdminPage({ onNavigate }: { onNavigate: (path: string) => void }) {
         <AdminHashButton hash="#presence-based-overrides-auto" onOpen={openHash} title="Open Presence-Based Auto-Reset Configuration" />
       </section>
 
-      <ModalSheet onClose={closeHash} open={hash === '#presence-based-overrides'} surface="hass-popup" title="Presence-Based Overrides">
+      <ModalSheet contentStyle={modalSquareGridModalStyle(presenceGridLayout)} onClose={closeHash} open={presenceModalOpen} surface="hass-popup" title="Presence-Based Overrides">
         <div className={styles.adminModalBody}>
-          <AdminTileGrid items={ADMIN_PRESENCE_OVERRIDE_ITEMS} onNavigate={onNavigate} variant="admin-modal" />
+          <AdminTileGrid gridLabel="Presence-Based Overrides by room" items={ADMIN_PRESENCE_OVERRIDE_ITEMS} onNavigate={onNavigate} squareGridRef={presenceGridRef} squareGridStyle={modalSquareGridStyle(presenceGridLayout)} variant="admin-modal" />
         </div>
       </ModalSheet>
 
-      <ModalSheet onClose={closeHash} open={hash === '#presence-based-overrides-auto'} surface="hass-popup" title="Presence-Based Overrides Auto-Reset">
+      <ModalSheet contentStyle={modalSquareGridModalStyle(autoResetGridLayout)} onClose={closeHash} open={autoResetModalOpen} surface="hass-popup" title="Presence-Based Overrides Auto-Reset">
         <div className={styles.adminModalBody}>
-          <AdminTileGrid items={ADMIN_AUTO_REENABLE_ITEMS} onNavigate={onNavigate} variant="admin-modal" />
+          <AdminTileGrid gridLabel="Presence-Based Auto-Reset by room" items={ADMIN_AUTO_REENABLE_ITEMS} onNavigate={onNavigate} squareGridRef={autoResetGridRef} squareGridStyle={modalSquareGridStyle(autoResetGridLayout)} variant="admin-modal" />
         </div>
       </ModalSheet>
     </div>
@@ -1365,6 +1368,11 @@ const THERMOSTAT_HEAT_COLOR = '#cd5401'
 const THERMOSTAT_COOL_COLOR = '#2c8e98'
 const THERMOSTAT_NEUTRAL_COLOR = 'rgba(255, 255, 255, 0.78)'
 const THERMOSTAT_RING_RADIUS = (145 / 320) * 100
+const THERMOSTAT_ROOM_MODAL_STYLE: ModalSheetStyle = {
+  '--modal-desktop-width': '600px',
+  '--modal-desktop-max-width': '600px',
+  '--modal-desktop-height': 'auto',
+}
 
 function thermostatTemperatureEntityId(room: ThermostatRoomView) {
   return `sensor.thermostat_contact_sensors_${room.key}_temperature`
@@ -1523,6 +1531,13 @@ const EIGHT_SLEEP_MODAL_TABS: { icon: string; label: string; tab: EightSleepModa
   { icon: 'mdi:information-outline', label: 'Status', tab: 'status' },
   { icon: 'mdi:cog', label: 'Settings', tab: 'settings' },
 ]
+const EIGHT_SLEEP_BED_MODAL_STYLE: ModalSheetStyle = {
+  '--modal-desktop-width': '700px',
+  '--modal-desktop-max-width': '700px',
+  '--modal-desktop-height': '70vh',
+  '--modal-desktop-max-height': '70vh',
+  '--modal-desktop-body-overflow-y': 'hidden',
+}
 const FREE_SLEEP_ALARM_DAYS: { key: FreeSleepAlarmDay; label: string }[] = [
   { key: 'sunday', label: 'Sunday' },
   { key: 'monday', label: 'Monday' },
@@ -2277,6 +2292,7 @@ function EightSleepThermostatHero({ modalState, side }: { modalState: EightSleep
   const heroReadoutAction = controlsSideOn ? titleCaseState(heroAction) : null
   const heroReadoutText = controlsSideOn ? heroTargetText : 'OFF'
   const heroLabel = controlsSideOn ? `${side.title} thermostat ${heroReadoutAction} ${formatEightSleepTargetLevel(displayedTargetValue)}` : `${side.title} thermostat Off`
+  const heroHintText = `Tap the thermostat to turn ${controlsSideOn ? 'off' : 'on'} the Pod.`
   const sliderValue = displayedTargetValue ?? 0
   const canDragTarget = sideAvailable && controlsSideOn && displayedTargetValue !== null
 
@@ -2413,7 +2429,7 @@ function EightSleepThermostatHero({ modalState, side }: { modalState: EightSleep
         </div>
         <button aria-label={`${controlsSideOn ? 'Turn off' : 'Turn on'} ${side.title}`} className={styles.eightSleepThermostatButton} disabled={!sideAvailable} onClick={toggleSidePower} type="button" />
       </div>
-      {!controlsSideOn && <Description className={styles.eightSleepThermostatHint}>Tap the thermostat to turn on the Pod.</Description>}
+      <Description className={styles.eightSleepThermostatHint}>{heroHintText}</Description>
     </div>
   )
 }
@@ -3155,6 +3171,7 @@ function EightSleepBedModal({ modalState, onClose, open, side }: { modalState: E
 
   return (
     <ModalSheet
+      contentStyle={EIGHT_SLEEP_BED_MODAL_STYLE}
       footer={<EightSleepModalNav activeTab={activeTab} onTabChange={setActiveTab} sideTitle={side.title} />}
       onClose={onClose}
       open={open}
@@ -3191,6 +3208,7 @@ function EightSleepModalNav({ activeTab, onTabChange, sideTitle }: { activeTab: 
 
 function EightSleepBedModalContent({ activeTab, modalState, side }: { activeTab: EightSleepModalTab; modalState: EightSleepBedModalState; side: EightSleepSideConfig }) {
   const modalBodyRef = useRef<HTMLDivElement | null>(null)
+  const modalPanelRef = useRef<HTMLDivElement | null>(null)
   const currentTemperature = useEntity(asEntityName(side.currentTemperatureEntityId), { returnNullIfNotFound: true })
   const presence = useEntity(asEntityName(side.presenceEntityId), { returnNullIfNotFound: true })
   const secondsRemaining = useEntity(asEntityName(side.secondsRemainingEntityId), { returnNullIfNotFound: true })
@@ -3202,17 +3220,19 @@ function EightSleepBedModalContent({ activeTab, modalState, side }: { activeTab:
   const selectedTabLabel = EIGHT_SLEEP_MODAL_TABS.find((tab) => tab.tab === activeTab)?.label ?? 'Sleep Schedule'
 
   useEffect(() => {
-    const scrollContainer = modalBodyRef.current?.parentElement
-    if (!scrollContainer || typeof scrollContainer.scrollTo !== 'function') return
-    scrollContainer.scrollTo({ top: 0, behavior: 'auto' })
+    const scrollContainers = [modalPanelRef.current, modalBodyRef.current?.parentElement]
+    for (const scrollContainer of scrollContainers) {
+      if (!scrollContainer || typeof scrollContainer.scrollTo !== 'function') continue
+      scrollContainer.scrollTo({ top: 0, behavior: 'auto' })
+    }
   }, [activeTab])
 
   return (
-    <div className={styles.thermostatModalBody} ref={modalBodyRef}>
-      <div className={styles.eightSleepModalHeroShell}>
+    <div className={`${styles.thermostatModalBody} ${styles.eightSleepModalBody}`} data-layout="eight-sleep-modal-body" ref={modalBodyRef}>
+      <div className={styles.eightSleepModalHeroShell} data-section="eight-sleep-hero">
         <EightSleepThermostatHero modalState={modalState} side={side} />
       </div>
-      <div aria-label={`${side.title} ${selectedTabLabel}`} className={styles.eightSleepModalPanel}>
+      <div aria-label={`${side.title} ${selectedTabLabel}`} className={styles.eightSleepModalPanel} data-scroll-region="eight-sleep-panel" ref={modalPanelRef}>
         {activeTab === 'schedule' && (
           <section className={styles.section}>
             <SectionHeader title="Sleep Schedule" />
@@ -3291,6 +3311,11 @@ const HVAC_MODE_ACTIVE_COLORS: Record<string, string> = {
   heat: 'rgba(205, 84, 1, 0.6)',
   heat_cool: 'linear-gradient(90deg, rgba(205, 84, 1, 0.6) 0%, rgba(44, 142, 152, 0.6) 100%)',
 }
+const THERMOSTAT_COMPACT_PICKER_MODAL_STYLE: ModalSheetStyle = {
+  '--modal-desktop-height': 'auto',
+  '--modal-desktop-max-width': '500px',
+  '--modal-desktop-width': '500px',
+}
 
 function ThermostatSelectButton({
   entityId,
@@ -3301,6 +3326,8 @@ function ThermostatSelectButton({
   optionIcons,
   optionLabels,
   optionsAttribute = 'options',
+  pickerSheetLayout,
+  pickerSheetStyle,
   selectedIcon = 'mdi:thermometer-check',
   serviceKind = 'select',
   title,
@@ -3314,6 +3341,8 @@ function ThermostatSelectButton({
   optionIcons?: Record<string, string>
   optionLabels?: Record<string, string>
   optionsAttribute?: string
+  pickerSheetLayout?: 'card-grid' | 'compact-grid'
+  pickerSheetStyle?: ModalSheetStyle
   selectedIcon?: string
   serviceKind?: 'climate' | 'climate-fan' | 'select'
   title: string
@@ -3354,7 +3383,7 @@ function ThermostatSelectButton({
         <MaterialIcon name={icon} size={22} />
         <MaterialIcon name="mdi:chevron-down" size={22} />
       </button>
-      <OptionPickerDialog icon={icon} onClose={() => setOpen(false)} onSelect={selectOption} open={open} options={options} presentation="sheet" selectedIcon={selectedIcon} title={title} value={displayValue} />
+      <OptionPickerDialog icon={icon} onClose={() => setOpen(false)} onSelect={selectOption} open={open} options={options} presentation="sheet" selectedIcon={selectedIcon} sheetLayout={pickerSheetLayout} sheetStyle={pickerSheetStyle} title={title} value={displayValue} />
     </>
   )
 }
@@ -3408,7 +3437,7 @@ function ThermostatHubPill() {
 
   return (
     <ThermostatGlassCard ariaLabel={`Thermostat Hub ${stateText}`} hvacAction={rawHvacAction} icon="mdi:thermostat" stateText={stateText} thermalStatus={thermostatThermalStatus(rawHvacAction)} title="Thermostat Hub">
-      <ThermostatSelectButton entityId="climate.thermostat_hub_w200" icon="mdi:power" keepOpenOnSelect optionActiveColors={HVAC_MODE_ACTIVE_COLORS} optionIcons={HVAC_MODE_ICONS} optionLabels={HVAC_MODE_LABELS} optionsAttribute="hvac_modes" serviceKind="climate" title="Thermostat Hub Mode" />
+      <ThermostatSelectButton entityId="climate.thermostat_hub_w200" icon="mdi:power" keepOpenOnSelect optionActiveColors={HVAC_MODE_ACTIVE_COLORS} optionIcons={HVAC_MODE_ICONS} optionLabels={HVAC_MODE_LABELS} optionsAttribute="hvac_modes" pickerSheetLayout="compact-grid" pickerSheetStyle={THERMOSTAT_COMPACT_PICKER_MODAL_STYLE} serviceKind="climate" title="Thermostat Hub Mode" />
       <ThermostatSelectButton entityId="climate.thermostat_hub_w200" hideWhenEmpty icon="mdi:fan" optionsAttribute="fan_modes" selectedIcon="mdi:fan-check" serviceKind="climate-fan" title="Thermostat Hub Fan" valueAttribute="fan_mode" />
     </ThermostatGlassCard>
   )
@@ -3707,17 +3736,23 @@ function ThermostatRoomModal({ onClose, open, room }: { onClose: () => void; ope
   const ventTitle = room ? `${room.title} ${room.ventEntityIds.length > 1 ? 'Vents' : 'Vent'}` : 'Vents'
 
   return (
-    <ModalSheet onClose={onClose} open={open} surface="hass-popup" title={title}>
+    <ModalSheet contentStyle={THERMOSTAT_ROOM_MODAL_STYLE} onClose={onClose} open={open} surface="hass-popup" title={title}>
       {room && (
         <div className={styles.thermostatModalBody}>
-          <ThermostatDial entityId={room.climateEntityId} size="modal" title={room.title} />
-          {awayMode?.state === 'on' && <Notice>Away Mode Active. The room may be cooler or warmer than your heat/cool targets to save energy while away.</Notice>}
-          <section className={styles.section}>
+          <section aria-label={`${room.title} thermostat control`} className={styles.thermostatModalHero}>
+            <ThermostatDial entityId={room.climateEntityId} size="modal" title={room.title} />
+          </section>
+          <section aria-label={ventTitle} className={`${styles.section} ${styles.thermostatModalVents}`}>
             <SectionHeader title={ventTitle} />
             <Grid>
               {room.ventEntityIds.map((entityId, index) => <ClimateCard entityId={entityId} icon="vent" key={entityId} size="compact" title={room.ventEntityIds.length > 1 ? `Vent ${index + 1}` : 'Vent'} />)}
             </Grid>
           </section>
+          {awayMode?.state === 'on' && (
+            <section aria-label={`${room.title} away mode`} className={styles.thermostatModalAway}>
+              <Notice>Away Mode Active. The room may be cooler or warmer than your heat/cool targets to save energy while away.</Notice>
+            </section>
+          )}
         </div>
       )}
     </ModalSheet>
@@ -3760,8 +3795,8 @@ function ThermostatPage() {
         <SectionHeader title="Eco Mode" />
         <Description className={styles.thermostatDescription}>{THERMOSTAT_SECTION_DESCRIPTIONS.ecoMode}</Description>
         <ThermostatSwitchCard entityId="switch.thermostat_contact_sensors_eco_mode" icon="mdi:leaf" title="Eco Mode">
-          <ThermostatSelectButton entityId="select.thermostat_contact_sensors_eco_mode_critical_tracking" icon="mdi:thermometer-alert" title="Eco Mode Critical Tracking" />
-          <ThermostatSelectButton entityId="select.thermostat_contact_sensors_eco_behavior_when_away" icon="mdi:leaf-circle" title="Eco Behavior When Away" />
+          <ThermostatSelectButton entityId="select.thermostat_contact_sensors_eco_mode_critical_tracking" icon="mdi:thermometer-alert" pickerSheetLayout="compact-grid" pickerSheetStyle={THERMOSTAT_COMPACT_PICKER_MODAL_STYLE} title="Eco Mode Critical Tracking" />
+          <ThermostatSelectButton entityId="select.thermostat_contact_sensors_eco_behavior_when_away" icon="mdi:leaf-circle" pickerSheetLayout="compact-grid" pickerSheetStyle={THERMOSTAT_COMPACT_PICKER_MODAL_STYLE} title="Eco Behavior When Away" />
         </ThermostatSwitchCard>
       </section>
       <section className={styles.section}>

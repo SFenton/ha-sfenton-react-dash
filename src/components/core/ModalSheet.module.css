@@ -229,6 +229,7 @@
 
   .body {
     padding: 0 24px 26px;
+    overflow-y: var(--modal-desktop-body-overflow-y, auto);
   }
 
   .footer {

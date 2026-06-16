@@ -77,7 +77,14 @@ describe('LightMoreInfoSheet', () => {
 
   it('copies another light color onto the open light', () => {
     render(<LightMoreInfoSheet entityId={OPEN} lights={LIGHTS} onClose={() => {}} open title="Bollard 1" />)
-    fireEvent.click(screen.getByRole('button', { name: 'Apply Bollard 2 Color' }))
+    const swatch = screen.getByRole('button', { name: 'Apply Bollard 2 Color' })
+    expect(swatch).toHaveAttribute('data-icon', 'mdi:outdoor-lamp')
+    expect(swatch).toHaveAttribute('data-icon-color', '#ffffff')
+    expect(swatch).toHaveAttribute('data-has-color', 'true')
+    expect(swatch.style.getPropertyValue('--other-light-color')).toBe('rgb(200 100 50)')
+    expect(swatch.textContent).toBe('')
+
+    fireEvent.click(swatch)
     expect(mockCallServiceCalls).toEqual([
       { domain: 'light', service: 'turn_on', target: OPEN, serviceData: { rgb_color: [200, 100, 50] } },
     ])
@@ -136,5 +143,37 @@ describe('LightMoreInfoSheet', () => {
   it('groups the other lights under an "Other Lights" separator', () => {
     render(<LightMoreInfoSheet entityId={OPEN} lights={LIGHTS} onClose={() => {}} open title="Bollard 1" />)
     expect(screen.getByText('Other Lights')).toBeInTheDocument()
+  })
+
+  it('uses a 700px desktop split layout with the light slider spanning both columns', () => {
+    render(<LightMoreInfoSheet entityId={OPEN} lights={LIGHTS} onClose={() => {}} open title="Bollard 1" />)
+
+    const dialog = screen.getByRole('dialog', { name: 'Bollard 1' })
+    expect(dialog).toHaveStyle({
+      '--modal-desktop-height': 'auto',
+      '--modal-desktop-max-width': '700px',
+      '--modal-desktop-width': '700px',
+    })
+
+    const layout = dialog.querySelector('[data-has-other-lights="true"]')
+    if (!(layout instanceof HTMLElement)) throw new Error('Light color picker layout was not rendered')
+
+    const slider = screen.getByRole('region', { name: 'Bollard 1 light slider' })
+    const controls = screen.getByRole('region', { name: 'Bollard 1 color controls' })
+    const otherLights = screen.getByRole('region', { name: 'Other Lights' })
+    const otherLightsGrid = otherLights.querySelector('[data-layout="color-swatch-grid"]')
+    expect(layout).toContainElement(slider)
+    expect(layout).toContainElement(controls)
+    expect(layout).toContainElement(otherLights)
+    expect(slider).toHaveAttribute('data-layout', 'light-slider')
+    expect(slider).toContainElement(screen.getByRole('group', { name: 'Bollard 1' }))
+    expect(otherLightsGrid).toBeInTheDocument()
+    const reset = screen.getByRole('button', { name: 'Reset' })
+    const applyToAll = screen.getByRole('button', { name: 'Apply to All Lights' })
+    expect(reset).toHaveAttribute('data-icon-color', '#ffffff')
+    expect(applyToAll).toHaveAttribute('data-icon-color', '#ffffff')
+    expect(controls).toContainElement(reset)
+    expect(controls).toContainElement(applyToAll)
+    expect(otherLights).toContainElement(screen.getByRole('button', { name: 'Apply Bollard 2 Color' }))
   })
 })

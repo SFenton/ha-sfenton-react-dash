@@ -22,13 +22,15 @@ interface ModalSheetProps {
 type ModalSheetSnapshot = Pick<ModalSheetProps, 'children' | 'chrome' | 'contentStyle' | 'footer' | 'subtitle' | 'title'>
 
 function desktopModalLayoutMatches() {
-  return typeof window !== 'undefined' && window.matchMedia('(min-width: 760px)').matches
+  return typeof window !== 'undefined' && typeof window.matchMedia === 'function' && window.matchMedia('(min-width: 760px)').matches
 }
 
 function useDesktopModalLayout() {
   const [isDesktopModalLayout, setIsDesktopModalLayout] = useState(desktopModalLayoutMatches)
 
   useEffect(() => {
+    if (typeof window.matchMedia !== 'function') return
+
     const mediaQuery = window.matchMedia('(min-width: 760px)')
     const syncLayout = () => setIsDesktopModalLayout(mediaQuery.matches)
     syncLayout()

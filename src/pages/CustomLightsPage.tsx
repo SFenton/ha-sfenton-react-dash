@@ -2,6 +2,7 @@ import { useEntity, useHass } from '@hakit/core'
 import { useState } from 'react'
 import { MaterialIcon } from '../components/core/Icon'
 import { OptionPickerDialog } from '../components/core/OptionPickerDialog'
+import type { ModalSheetStyle } from '../components/core/ModalSheet'
 import { SectionHeader } from '../components/core/SectionHeader'
 import { asEntityName, isActiveState } from '../components/hass/entityState'
 import { LightBrightnessCard, type LightTapAction } from '../components/hass/LightBrightnessCard'
@@ -10,6 +11,11 @@ import styles from './CustomLightsPage.module.css'
 
 const MANUAL_CONTROL_ENTITY = 'input_boolean.manually_control_front_yard_lights'
 const MODE_SELECT_ENTITY = 'input_select.front_yard_custom_lights'
+const LIGHTING_MODE_MODAL_STYLE: ModalSheetStyle = {
+  '--modal-desktop-height': 'auto',
+  '--modal-desktop-max-width': '500px',
+  '--modal-desktop-width': '500px',
+}
 
 interface CustomLight {
   entityId: string
@@ -188,6 +194,8 @@ export function CustomLightsPage() {
         open={pickerOpen}
         options={modeOptions.map((option) => ({ label: option, value: option, activeBackground: modeBackground(option) }))}
         presentation="sheet"
+        sheetLayout="compact-grid"
+        sheetStyle={LIGHTING_MODE_MODAL_STYLE}
         title="Lighting Mode"
         value={mode}
       />

@@ -11,6 +11,7 @@ import {
   type SecurityTileConfig,
 } from '../../constants/securityPage'
 import { ContactSheet } from '../../pages/AtAGlancePage'
+import { modalSquareGridModalStyleForHash, modalSquareGridStyle, useModalSquareGridLayout, type ModalSquareGridStyle } from '../../pages/modalSquareGrid'
 import { CameraModalContent } from './CameraModalContent'
 import { asEntityName, formatCompactEntityState, isActiveState, isContactOpen } from './entityState'
 import { SecurityControls, SECURITY_SYSTEM_MODAL_STYLE, securitySystemModalSubtitle } from './SecurityControls'
@@ -108,9 +109,19 @@ function modalTitle(hash: string) {
   return 'Security'
 }
 
-function SecurityModalContent({ hash }: { hash: string }) {
+const CONTACT_SENSORS_HASH = '#contact-sensors-overview'
+
+function SecurityModalContent({
+  contactGridRef,
+  contactGridStyle,
+  hash,
+}: {
+  contactGridRef?: (node: HTMLElement | null) => void
+  contactGridStyle?: ModalSquareGridStyle
+  hash: string
+}) {
   if (hash === '#security-system') return <SecurityControls />
-  if (hash === '#contact-sensors-overview') return <ContactSheet overviewMode="grouped" />
+  if (hash === CONTACT_SENSORS_HASH) return <ContactSheet overviewGridRef={contactGridRef} overviewGridStyle={contactGridStyle} />
   const camera = CAMERA_ITEMS.find((item) => item.hash === hash)
   if (camera) return <CameraModalContent camera={camera} />
   return null
@@ -124,7 +135,11 @@ interface SecurityDashboardProps {
 
 export function SecurityDashboard({ closeHash, hash, onOpenHash }: SecurityDashboardProps) {
   const securitySubtitle = useHass((state) => securitySystemModalSubtitle(state.entities[SECURITY_ENTITY]?.state))
+  const contactModalOpen = hash === CONTACT_SENSORS_HASH
+  const [contactGridRef, contactGridLayout] = useModalSquareGridLayout(contactModalOpen, CONTACT_GROUPS.length)
+  const contactGridStyle = modalSquareGridStyle(contactGridLayout)
   const modalSubtitle = hash === '#security-system' ? securitySubtitle : undefined
+  const modalContentStyle = hash === '#security-system' ? SECURITY_SYSTEM_MODAL_STYLE : contactModalOpen ? modalSquareGridModalStyleForHash(CONTACT_SENSORS_HASH, contactGridLayout) : undefined
 
   return (
     <>
@@ -153,8 +168,8 @@ export function SecurityDashboard({ closeHash, hash, onOpenHash }: SecurityDashb
         )}
       </div>
 
-      <ModalSheet contentStyle={hash === '#security-system' ? SECURITY_SYSTEM_MODAL_STYLE : undefined} onClose={closeHash} open={hash !== ''} subtitle={modalSubtitle} title={modalTitle(hash)}>
-        <SecurityModalContent hash={hash} />
+      <ModalSheet contentStyle={modalContentStyle} onClose={closeHash} open={hash !== ''} subtitle={modalSubtitle} title={modalTitle(hash)}>
+        <SecurityModalContent contactGridRef={contactGridRef} contactGridStyle={contactGridStyle} hash={hash} />
       </ModalSheet>
     </>
   )

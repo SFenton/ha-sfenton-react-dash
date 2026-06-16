@@ -1,16 +1,22 @@
 import { ColorPicker } from '@hakit/components'
 import { useEntity, useHass } from '@hakit/core'
 import type { EntityName, FilterByDomain } from '@hakit/core'
-import { useRef, useState } from 'react'
+import { useRef, useState, type CSSProperties } from 'react'
 import { useOptimisticState } from '../../hooks/useOptimisticState'
 import { GlassTile } from '../core/GlassTile'
-import { ModalSheet } from '../core/ModalSheet'
+import { MaterialIcon } from '../core/Icon'
+import { ModalSheet, type ModalSheetStyle } from '../core/ModalSheet'
 import { LightBrightnessCard } from './LightBrightnessCard'
 import { asEntityName } from './entityState'
 import styles from './LightMoreInfoSheet.module.css'
 
 const FRONT_YARD_GROUP = 'light.front_yard_lights'
 const COLOR_MODES = ['hs', 'rgb', 'rgbw', 'rgbww', 'xy']
+const LIGHT_COLOR_PICKER_MODAL_STYLE: ModalSheetStyle = {
+  '--modal-desktop-width': '700px',
+  '--modal-desktop-max-width': '700px',
+  '--modal-desktop-height': 'auto',
+}
 
 // Pointer distance (px) from the wheel marker that still counts as grabbing it.
 const NEAR_MARKER_PX = 28
@@ -31,10 +37,6 @@ function readRgb(rgbColor: unknown): Rgb | null {
     return [rgbColor[0] as number, rgbColor[1] as number, rgbColor[2] as number]
   }
   return null
-}
-
-function rgbLuminance([r, g, b]: Rgb) {
-  return 0.299 * r + 0.587 * g + 0.114 * b
 }
 
 function rgbCss(rgb: Rgb) {
@@ -235,17 +237,26 @@ function ColorWheel({ entityId }: { entityId: string }) {
 function OtherLightButton({ light, onApply }: { light: LightRef; onApply: (rgb: Rgb) => void }) {
   const entity = useEntity(asEntityName(light.entityId), { returnNullIfNotFound: true })
   const rgb = readRgb(entity?.attributes?.rgb_color)
-  const iconColor = rgb && rgbLuminance(rgb) > 150 ? '#16110b' : '#ffffff'
+  const style = {
+    '--other-light-color': rgb ? rgbCss(rgb) : undefined,
+  } as CSSProperties
 
   return (
-    <GlassTile
-      backgroundColor={rgb ? rgbCss(rgb) : undefined}
-      icon="mdi:palette"
-      iconColor={iconColor}
+    <button
+      aria-label={`Apply ${light.title} Color`}
+      className={styles.otherSwatch}
+      data-has-color={rgb ? 'true' : 'false'}
+      data-icon="mdi:outdoor-lamp"
+      data-icon-color="#ffffff"
+      disabled={!rgb}
       onClick={() => rgb && onApply(rgb)}
-      title={`Apply ${light.title} Color`}
-      tone="light"
-    />
+      style={style}
+      type="button"
+    >
+      <span aria-hidden="true" className={styles.otherIcon}>
+        <MaterialIcon name="mdi:outdoor-lamp" size={28} />
+      </span>
+    </button>
   )
 }
 
@@ -294,13 +305,18 @@ export function LightMoreInfoSheet({ entityId, title, open, onClose, lights = []
   }
 
   const otherLights = lights.filter((light) => light.entityId !== entityId)
+  const hasOtherColorLights = supportsColor && otherLights.length > 0
 
   return (
-    <ModalSheet onClose={onClose} open={open} title={title}>
-      <div className={styles.body}>
-        {entityId && <LightBrightnessCard entityId={entityId} showStatus tapAction="toggle" title={title} />}
+    <ModalSheet contentStyle={LIGHT_COLOR_PICKER_MODAL_STYLE} onClose={onClose} open={open} title={title}>
+      <div className={styles.body} data-has-other-lights={hasOtherColorLights ? 'true' : 'false'}>
+        {entityId && (
+          <section aria-label={`${title} light slider`} className={styles.sliderPane} data-layout="light-slider">
+            <LightBrightnessCard entityId={entityId} showStatus tapAction="toggle" title={title} />
+          </section>
+        )}
         {entityId && supportsColor && (
-          <>
+          <section aria-label={`${title} color controls`} className={styles.controlsPane}>
             <ColorWheel entityId={entityId} />
 
             <div className={styles.rgbRow}>
@@ -325,7 +341,7 @@ export function LightMoreInfoSheet({ entityId, title, open, onClose, lights = []
               <GlassTile
                 backgroundColor="rgb(255 197 143)"
                 icon="mdi:restore"
-                iconColor="#16110b"
+                iconColor="#ffffff"
                 onClick={handleReset}
                 title="Reset"
                 tone="light"
@@ -333,24 +349,23 @@ export function LightMoreInfoSheet({ entityId, title, open, onClose, lights = []
               <GlassTile
                 backgroundColor={liveRgb ? rgbCss(liveRgb) : undefined}
                 icon="mdi:lightbulb-group"
-                iconColor={liveRgb && rgbLuminance(liveRgb) > 150 ? '#16110b' : '#ffffff'}
+                iconColor="#ffffff"
                 onClick={handleApplyAll}
                 title="Apply to All Lights"
                 tone="light"
               />
             </div>
-
-            {otherLights.length > 0 && (
-              <>
-                <div className={styles.separator}>Other Lights</div>
-                <div className={styles.otherGrid}>
-                  {otherLights.map((light) => (
-                    <OtherLightButton key={light.entityId} light={light} onApply={(rgb) => applyColor(rgb, entityId)} />
-                  ))}
-                </div>
-              </>
-            )}
-          </>
+          </section>
+        )}
+        {entityId && hasOtherColorLights && (
+          <section aria-label="Other Lights" className={styles.otherPane}>
+            <div className={styles.separator}>Other Lights</div>
+            <div className={styles.otherGrid} data-layout="color-swatch-grid">
+              {otherLights.map((light) => (
+                <OtherLightButton key={light.entityId} light={light} onApply={(rgb) => applyColor(rgb, entityId)} />
+              ))}
+            </div>
+          </section>
         )}
       </div>
     </ModalSheet>

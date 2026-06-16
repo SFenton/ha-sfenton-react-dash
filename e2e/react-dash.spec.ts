@@ -98,6 +98,49 @@ async function expectDesktopSquareGrid(dialog: Locator, sectionLabel: string) {
   return grid
 }
 
+async function expectDesktopAdminSquareGrid(dialog: Locator, gridLabel: string) {
+  const grid = dialog.getByRole('group', { name: gridLabel })
+  await expect(grid).toBeVisible()
+  const cardCount = await grid.locator('> button, > article').count()
+  const expectedColumns = Math.max(1, Math.ceil(Math.sqrt(cardCount)))
+  const expectedRows = Math.ceil(cardCount / expectedColumns)
+
+  await expect.poll(async () => {
+    return grid.evaluate((gridElement) => {
+      const firstCard = gridElement.firstElementChild
+      const firstCardRect = firstCard?.getBoundingClientRect()
+      const gridStyle = window.getComputedStyle(gridElement)
+      const columns = gridStyle.gridTemplateColumns.split(' ').filter(Boolean).length
+      const rows = gridStyle.gridTemplateRows.split(' ').filter(Boolean).length
+      return {
+        cardCount: gridElement.children.length,
+        cardHeight: Math.round(firstCardRect?.height ?? 0),
+        cardWidth: Math.round(firstCardRect?.width ?? 0),
+        columns,
+        fitsAllCards: columns * rows >= gridElement.children.length,
+        rows,
+        scrollsHorizontally: gridElement.scrollWidth > gridElement.clientWidth + 1,
+        squareCard: Math.round(firstCardRect?.width ?? 0) === Math.round(firstCardRect?.height ?? 0),
+      }
+    })
+  }).toMatchObject({
+    cardCount,
+    cardHeight: 168,
+    cardWidth: 168,
+    columns: expectedColumns,
+    fitsAllCards: true,
+    rows: expectedRows,
+    scrollsHorizontally: false,
+    squareCard: true,
+  })
+
+  const dialogBox = await dialog.boundingBox()
+  const gridBox = await grid.boundingBox()
+  expect(Math.round(dialogBox?.width ?? 0)).toBeLessThan(900)
+  expect(Math.round(dialogBox?.width ?? 0)).toBeLessThanOrEqual(Math.round((gridBox?.width ?? 0) + 52))
+  return grid
+}
+
 async function clickWithPointerJitter(page: Page, target: Locator) {
   const box = await target.boundingBox()
   if (!box) throw new Error('Target was not measurable')
@@ -183,6 +226,89 @@ test.describe('desktop modal layout', () => {
     const after = await dialog.boundingBox()
     expect(Math.abs(Math.round(after?.x ?? 0) - Math.round(before.x))).toBeLessThanOrEqual(8)
     expect(Math.abs(Math.round(after?.y ?? 0) - Math.round(before.y))).toBeLessThanOrEqual(8)
+  })
+
+  test('bed modal uses fixed desktop hero with 700px width and 70vh height', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 500 })
+    await page.goto('/at-a-glance/master-bedroom')
+    await page.getByRole('button', { name: /Steph's Bed Off/i }).click()
+
+    const dialog = page.getByRole('dialog', { name: "Steph's Bed" })
+    await expect(dialog).toBeVisible()
+    await expect.poll(async () => {
+      return dialog.evaluate((element) => ({
+        boxWidth: Math.round(element.getBoundingClientRect().width),
+        boxHeight: Math.round(element.getBoundingClientRect().height),
+        heightVar: getComputedStyle(element).getPropertyValue('--modal-desktop-height').trim(),
+        maxHeightVar: getComputedStyle(element).getPropertyValue('--modal-desktop-max-height').trim(),
+        maxWidthVar: getComputedStyle(element).getPropertyValue('--modal-desktop-max-width').trim(),
+        widthVar: getComputedStyle(element).getPropertyValue('--modal-desktop-width').trim(),
+      }))
+    }).toEqual({
+      boxHeight: 350,
+      boxWidth: 700,
+      heightVar: '70vh',
+      maxHeightVar: '70vh',
+      maxWidthVar: '700px',
+      widthVar: '700px',
+    })
+
+    await dialog.getByRole('button', { name: 'Alarms' }).click()
+    const body = dialog.locator('[data-layout="eight-sleep-modal-body"]')
+    const hero = dialog.locator('[data-section="eight-sleep-hero"]')
+    const panel = dialog.locator('[data-scroll-region="eight-sleep-panel"]')
+    await expect(hero.getByText('Tap the thermostat to turn on the Pod.')).toBeVisible()
+    const offHeroBox = await hero.boundingBox()
+    await hero.getByRole('button', { name: "Turn on Steph's Bed" }).click()
+    await expect(hero.getByText('Tap the thermostat to turn off the Pod.')).toBeVisible()
+    const onHeroBox = await hero.boundingBox()
+    if (!offHeroBox) throw new Error('Eight Sleep hero was not measurable before toggling on')
+    if (!onHeroBox) throw new Error('Eight Sleep hero was not measurable after toggling on')
+    expect(Math.abs(Math.round(onHeroBox.height) - Math.round(offHeroBox.height))).toBeLessThanOrEqual(1)
+    expect(Math.abs(Math.round(onHeroBox.y) - Math.round(offHeroBox.y))).toBeLessThanOrEqual(1)
+    await expect(panel).toHaveAttribute('aria-label', "Steph's Bed Alarms")
+    await expect.poll(async () => {
+      return { alignContent: await hero.evaluate((element) => getComputedStyle(element).alignContent), alignSelf: await hero.evaluate((element) => getComputedStyle(element).alignSelf) }
+    }).toEqual({ alignContent: 'center', alignSelf: 'center' })
+    const bodyBox = await body.boundingBox()
+    const beforeScrollHeroBox = await hero.boundingBox()
+    if (!bodyBox) throw new Error('Eight Sleep modal body was not measurable')
+    if (!beforeScrollHeroBox) throw new Error('Eight Sleep hero was not measurable before panel scroll')
+    const heroCenterY = beforeScrollHeroBox.y + beforeScrollHeroBox.height / 2
+    const bodyCenterY = bodyBox.y + bodyBox.height / 2
+    expect(Math.abs(Math.round(heroCenterY) - Math.round(bodyCenterY))).toBeLessThanOrEqual(8)
+
+    await panel.evaluate((element) => {
+      element.scrollTop = element.scrollHeight
+    })
+    await expect.poll(async () => panel.evaluate((element) => Math.round(element.scrollTop))).toBeGreaterThan(0)
+
+    const afterScrollHeroBox = await hero.boundingBox()
+    expect(Math.abs(Math.round(afterScrollHeroBox?.y ?? 0) - Math.round(beforeScrollHeroBox.y))).toBeLessThanOrEqual(1)
+
+    await dialog.getByRole('button', { name: 'Special Modes' }).click()
+    await expect(panel).toHaveAttribute('aria-label', "Steph's Bed Special Modes")
+    await expect.poll(async () => {
+      return panel.evaluate((element) => {
+        const heading = element.querySelector('h2')
+        const description = element.querySelector('p')
+        const button = element.querySelector('button')
+        const headingBox = heading?.getBoundingClientRect()
+        const descriptionBox = description?.getBoundingClientRect()
+        const buttonBox = button?.getBoundingClientRect()
+        const descriptionGap = Math.round((descriptionBox?.top ?? 0) - (headingBox?.bottom ?? 0))
+        const buttonGap = Math.round((buttonBox?.top ?? 0) - (descriptionBox?.bottom ?? 0))
+        return {
+          compactNaturalGaps: descriptionGap > 0 && descriptionGap <= 24 && buttonGap > 0 && buttonGap <= 40,
+          panelAlignItems: getComputedStyle(element).alignItems,
+          sectionAlignContent: getComputedStyle(element.querySelector('section') as Element).alignContent,
+        }
+      })
+    }).toEqual({
+      compactNaturalGaps: true,
+      panelAlignItems: 'start',
+      sectionAlignContent: 'start',
+    })
   })
 
   test('desktop modal preserves its size during the close fade', async ({ page }) => {
@@ -312,6 +438,91 @@ test.describe('desktop modal layout', () => {
     expect(Math.round(box?.height ?? 0)).toBeLessThan(720)
   })
 
+  test('thermostat room modal uses 600px desktop split layout', async ({ page }) => {
+    await page.goto('/at-a-glance/ecobee#living-room')
+
+    const dialog = page.getByRole('dialog', { name: 'Living Room' })
+    await expect(dialog).toBeVisible()
+    const thermostatHero = dialog.getByLabel('Living Room thermostat control')
+    const vents = dialog.getByLabel('Living Room Vents')
+    await expect(thermostatHero).toBeVisible()
+    await expect(vents).toBeVisible()
+    const ventGrid = vents.locator(':scope > div').nth(1)
+
+    await expect.poll(async () => Math.round((await dialog.boundingBox())?.width ?? 0)).toBeGreaterThanOrEqual(595)
+    const dialogBox = await dialog.boundingBox()
+    const heroBox = await thermostatHero.boundingBox()
+    const ventsBox = await vents.boundingBox()
+    if (!dialogBox || !heroBox || !ventsBox) throw new Error('Thermostat modal layout was not measurable')
+
+    expect(Math.round(dialogBox.width)).toBeLessThanOrEqual(600)
+    expect(heroBox.x).toBeLessThan(ventsBox.x)
+    expect(Math.abs(heroBox.y - ventsBox.y)).toBeLessThanOrEqual(24)
+    expect(heroBox.y + heroBox.height).toBeGreaterThan(ventsBox.y)
+    await expect.poll(async () => ventGrid.evaluate((gridElement) => {
+      const firstCardRect = gridElement.firstElementChild?.getBoundingClientRect()
+      const gridRect = gridElement.getBoundingClientRect()
+      const gridStyle = window.getComputedStyle(gridElement)
+      return {
+        cardFillsContainer: Math.round(firstCardRect?.width ?? 0) >= Math.round(gridRect.width) - 2,
+        columns: gridStyle.gridTemplateColumns.split(' ').filter(Boolean).length,
+      }
+    })).toEqual({ cardFillsContainer: true, columns: 1 })
+  })
+
+  test('thermostat hub mode uses security-style desktop picker without separator', async ({ page }) => {
+    await page.goto('/at-a-glance/ecobee')
+
+    await page.getByLabel(/Thermostat Hub Mode Off/i).click()
+    const dialog = page.getByRole('dialog', { name: 'Thermostat Hub Mode' })
+    await expect(dialog).toBeVisible()
+    const options = dialog.getByRole('group', { name: 'Thermostat Hub Mode options' })
+    await expect(options).toHaveAttribute('data-layout', 'compact-grid')
+    await expect(dialog.locator('span[aria-hidden="true"][class*="separator"]')).toHaveCount(0)
+
+    await expect.poll(async () => Math.round((await dialog.boundingBox())?.width ?? 0)).toBeGreaterThanOrEqual(495)
+    const dialogBox = await dialog.boundingBox()
+    expect(Math.round(dialogBox?.width ?? 0)).toBeLessThanOrEqual(500)
+    await expect.poll(async () => options.evaluate((optionsElement) => {
+      const firstOption = optionsElement.firstElementChild?.getBoundingClientRect()
+      const style = window.getComputedStyle(optionsElement)
+      return {
+        columns: style.gridTemplateColumns.split(' ').filter(Boolean).length,
+        optionHeight: Math.round(firstOption?.height ?? 0),
+      }
+    })).toEqual({ columns: 2, optionHeight: 74 })
+  })
+
+  test('eco mode pickers use security-style desktop layout without separators', async ({ page }) => {
+    await page.goto('/at-a-glance/ecobee')
+
+    const assertCompactPicker = async (triggerName: RegExp, dialogName: string) => {
+      await page.getByLabel(triggerName).click()
+      const dialog = page.getByRole('dialog', { name: dialogName })
+      await expect(dialog).toBeVisible()
+      const options = dialog.getByRole('group', { name: `${dialogName} options` })
+      await expect(options).toHaveAttribute('data-layout', 'compact-grid')
+      await expect(dialog.locator('span[aria-hidden="true"][class*="separator"]')).toHaveCount(0)
+
+      await expect.poll(async () => Math.round((await dialog.boundingBox())?.width ?? 0)).toBeGreaterThanOrEqual(495)
+      const dialogBox = await dialog.boundingBox()
+      expect(Math.round(dialogBox?.width ?? 0)).toBeLessThanOrEqual(500)
+      await expect.poll(async () => options.evaluate((optionsElement) => {
+        const firstOption = optionsElement.firstElementChild?.getBoundingClientRect()
+        const style = window.getComputedStyle(optionsElement)
+        return {
+          columns: style.gridTemplateColumns.split(' ').filter(Boolean).length,
+          optionHeight: Math.round(firstOption?.height ?? 0),
+        }
+      })).toEqual({ columns: 2, optionHeight: 74 })
+      await dialog.getByRole('button', { name: 'Close' }).click()
+      await expect(dialog).toBeHidden()
+    }
+
+    await assertCompactPicker(/Eco Mode Critical Tracking Track Select Critical/i, 'Eco Mode Critical Tracking')
+    await assertCompactPicker(/Eco Behavior When Away Keep Eco Active/i, 'Eco Behavior When Away')
+  })
+
   const squareOverviewCases = [
     {
       backButtonName: 'Back to room climates',
@@ -373,6 +584,45 @@ test.describe('desktop modal layout', () => {
       }
     })
   }
+
+  const adminSquareCases = [
+    {
+      dialogName: 'Presence-Based Overrides',
+      gridLabel: 'Presence-Based Overrides by room',
+      hash: '#presence-based-overrides',
+    },
+    {
+      dialogName: 'Presence-Based Overrides Auto-Reset',
+      gridLabel: 'Presence-Based Auto-Reset by room',
+      hash: '#presence-based-overrides-auto',
+    },
+  ]
+
+  for (const modalCase of adminSquareCases) {
+    test(`${modalCase.dialogName} modal uses fixed 168px square admin cards on desktop`, async ({ page }) => {
+      await page.goto(`/at-a-glance/admin${modalCase.hash}`)
+
+      const dialog = page.getByRole('dialog', { name: modalCase.dialogName })
+      await expect(dialog).toBeVisible()
+      await expectDesktopAdminSquareGrid(dialog, modalCase.gridLabel)
+    })
+  }
+
+  test('security page contact chip opens the same desktop contact sensors modal as Home', async ({ page }) => {
+    await page.goto('/at-a-glance/security')
+
+    await page.getByRole('button', { name: /Contact Sensors\s*All Closed/i }).click()
+    const dialog = page.getByRole('dialog', { name: 'Contact Sensors' })
+    await expect(dialog).toBeVisible()
+    const grid = await expectDesktopSquareGrid(dialog, 'Contact sensors by room')
+    const overviewDialogBox = await dialog.boundingBox()
+
+    await clickWithPointerJitter(page, grid.getByRole('button', { name: /Open Living Room Contact Sensors/i }))
+    await expect(dialog.getByRole('heading', { name: 'Living Room Contact Sensors' })).toBeVisible()
+    await expect(dialog.getByRole('button', { name: 'Back to room contact sensors' })).toBeVisible()
+    const detailDialogBox = await dialog.boundingBox()
+    expect(Math.abs(Math.round(detailDialogBox?.height ?? 0) - Math.round(overviewDialogBox?.height ?? 0))).toBeLessThanOrEqual(2)
+  })
 })
 
 test('settings links to Vacation mode controls', async ({ page }) => {
@@ -717,9 +967,11 @@ test('security page opens ported security, contact, and camera modals', async ({
 
   await page.getByRole('button', { name: /Contact Sensors\s*All Closed/i }).click()
   await expect(page.getByRole('dialog')).toBeVisible()
-  await expect(page.getByRole('heading', { name: 'Entryway' })).toBeVisible()
-  await expect(page.getByRole('heading', { name: 'Office' })).toBeVisible()
-  await expect(page.getByLabel('PC Window Closed')).toBeVisible()
+  await expect(page.getByLabel('Contact sensors by room')).toBeVisible()
+  await expect(page.getByRole('button', { name: /Open Living Room Contact Sensors/i })).toBeVisible()
+  await page.getByRole('button', { name: /Open Living Room Contact Sensors/i }).click()
+  await expect(page.getByRole('heading', { name: 'Living Room Contact Sensors' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Back to room contact sensors' })).toBeVisible()
   await page.getByRole('button', { name: 'Close' }).click()
 
   await page.getByRole('button', { name: 'Open Front Door camera' }).click()

@@ -1,7 +1,7 @@
 import { useEffect, useId, useRef, type ReactNode } from 'react'
 import { MaterialIcon } from './Icon'
 import glassTileStyles from './GlassTile.module.css'
-import { ModalSheet } from './ModalSheet'
+import { ModalSheet, type ModalSheetStyle } from './ModalSheet'
 import styles from './OptionPickerDialog.module.css'
 
 export interface PickerOption {
@@ -19,14 +19,17 @@ interface OptionPickerDialogProps {
   icon?: string
   selectedIcon?: string
   presentation?: 'dialog' | 'sheet'
+  sheetLayout?: 'card-grid' | 'compact-grid'
+  sheetStyle?: ModalSheetStyle
   onClose: () => void
   onSelect: (value: string) => void
 }
 
-export function OptionPickerDialog({ open, options, title, value, icon, selectedIcon, presentation = 'dialog', onClose, onSelect }: OptionPickerDialogProps) {
+export function OptionPickerDialog({ open, options, title, value, icon, selectedIcon, presentation = 'dialog', sheetLayout = 'card-grid', sheetStyle, onClose, onSelect }: OptionPickerDialogProps) {
   const titleId = useId()
   const firstActiveRef = useRef<HTMLButtonElement | null>(null)
   const isSheet = presentation === 'sheet'
+  const optionLayout = isSheet ? sheetLayout : 'list'
 
   useEffect(() => {
     if (!open) return undefined
@@ -38,14 +41,14 @@ export function OptionPickerDialog({ open, options, title, value, icon, selected
   if (!open) return null
 
   const optionList = (
-    <div aria-label={`${title} options`} className={`${styles.options} ${presentation === 'sheet' ? styles.sheetOptions : ''}`} data-layout={presentation === 'sheet' ? 'card-grid' : 'list'} role="group">
+    <div aria-label={`${title} options`} className={`${styles.options} ${isSheet ? styles.sheetOptions : ''} ${isSheet && sheetLayout === 'compact-grid' ? styles.compactSheetOptions : ''}`} data-layout={optionLayout} role="group">
       {options.map((option) => {
         const active = option.value === value
         const sheetIcon = option.icon ?? (active ? (selectedIcon ?? icon) : icon)
         return (
           <button
             aria-pressed={active}
-            className={isSheet ? `${glassTileStyles.tile} ${styles.sheetOption}` : styles.option}
+            className={isSheet ? `${glassTileStyles.tile} ${styles.sheetOption} ${sheetLayout === 'compact-grid' ? styles.compactSheetOption : ''}` : styles.option}
             data-active={active}
             key={option.value}
             onClick={() => onSelect(option.value)}
@@ -72,7 +75,7 @@ export function OptionPickerDialog({ open, options, title, value, icon, selected
 
   if (isSheet) {
     return (
-      <ModalSheet onClose={onClose} open={open} title={title}>
+      <ModalSheet contentStyle={sheetStyle} onClose={onClose} open={open} title={title}>
         {optionList}
       </ModalSheet>
     )
