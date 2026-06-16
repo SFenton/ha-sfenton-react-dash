@@ -20,6 +20,10 @@
   gap: 10px;
 }
 
+.roomPickerCell {
+  min-width: 0;
+}
+
 .sheetText {
   margin: 4px 2px 20px;
   color: var(--color-muted);
@@ -516,5 +520,67 @@
 
   .roomAirQualityGrid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 760px) {
+  .roomPickerGrid {
+    height: 100%;
+    min-height: 0;
+    grid-template-columns: repeat(var(--room-picker-cols, 4), var(--room-picker-card-size, 132px));
+    grid-template-rows: repeat(var(--room-picker-rows, 4), var(--room-picker-card-size, 132px));
+    align-content: safe center;
+    justify-content: center;
+    box-sizing: border-box;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding-inline: 6px;
+    scrollbar-width: none;
+  }
+
+  .roomPickerGrid::-webkit-scrollbar {
+    display: none;
+    width: 0;
+    height: 0;
+  }
+
+  .roomPickerCell {
+    width: var(--room-picker-card-size, 132px);
+    height: var(--room-picker-card-size, 132px);
+    min-height: 0;
+  }
+
+  .roomPickerCell > button,
+  .roomPickerCell > article {
+    height: 100%;
+    min-height: 0;
+    aspect-ratio: 1 / 1;
+    border-radius: clamp(22px, 2.4vw, 34px);
+    padding: clamp(14px, 1.6vw, 22px);
+  }
+
+  .roomPickerCell > button > span:first-child,
+  .roomPickerCell > article > span:first-child {
+    flex-basis: clamp(38px, 4.2vw, 52px);
+    width: clamp(38px, 4.2vw, 52px);
+    height: clamp(38px, 4.2vw, 52px);
+  }
+
+  .roomPickerCell > button > span:first-child svg,
+  .roomPickerCell > article > span:first-child svg {
+    width: clamp(30px, 3.4vw, 46px);
+    height: clamp(30px, 3.4vw, 46px);
+  }
+
+  .roomPickerCell > button > span:last-child,
+  .roomPickerCell > article > span:last-child {
+    gap: 3px;
+  }
+
+  .roomPickerCell > button > span:last-child > span:first-child,
+  .roomPickerCell > article > span:last-child > span:first-child {
+    font-size: clamp(0.78rem, 1.05vw, 1rem);
+    line-height: 1.08;
   }
 }

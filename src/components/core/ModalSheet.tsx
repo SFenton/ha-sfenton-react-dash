@@ -1,4 +1,4 @@
-import { useEffect, useRef, type ReactNode } from 'react'
+import { useEffect, useRef, type CSSProperties, type ReactNode } from 'react'
 import { Drawer } from 'vaul'
 import { MaterialIcon } from './Icon'
 import styles from './ModalSheet.module.css'
@@ -9,12 +9,13 @@ interface ModalSheetProps {
   onClose: () => void
   children: ReactNode
   chrome?: 'default' | 'source-popup'
+  contentStyle?: CSSProperties
   footer?: ReactNode
   subtitle?: string
   surface?: 'hass-popup'
 }
 
-export function ModalSheet({ open, title, onClose, children, chrome = 'default', footer, subtitle }: ModalSheetProps) {
+export function ModalSheet({ open, title, onClose, children, chrome = 'default', contentStyle, footer, subtitle }: ModalSheetProps) {
   const contentRef = useRef<HTMLDivElement | null>(null)
   const sourcePopup = chrome === 'source-popup'
 
@@ -39,7 +40,7 @@ export function ModalSheet({ open, title, onClose, children, chrome = 'default',
     <Drawer.Root open={open} onOpenChange={(nextOpen) => !nextOpen && onClose()} repositionInputs={false}>
       <Drawer.Portal>
         <Drawer.Overlay className={styles.overlay} />
-        <Drawer.Content ref={contentRef} className={styles.content} data-chrome={chrome} data-has-footer={footer ? 'true' : 'false'} data-has-subtitle={subtitle ? 'true' : 'false'} data-surface="hass-popup">
+        <Drawer.Content ref={contentRef} className={styles.content} data-chrome={chrome} data-has-footer={footer ? 'true' : 'false'} data-has-subtitle={subtitle ? 'true' : 'false'} data-surface="hass-popup" style={contentStyle}>
           {!sourcePopup && <div className={styles.handle} />}
           <div className={styles.header}>
             <div className={styles.titleBlock}>

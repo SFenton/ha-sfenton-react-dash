@@ -182,28 +182,107 @@
 
 @media (min-width: 760px) {
   .content {
-    top: 52px;
-    right: 20px;
-    bottom: 20px;
-    left: auto;
-    width: min(520px, calc(100vw - 40px));
-    max-width: calc(100vw - 40px);
-    height: auto;
-    max-height: none;
-    border: 1px solid rgba(0, 0, 0, 0);
-    border-radius: 30px;
+    top: 50%;
+    right: auto;
+    bottom: auto;
+    left: 50%;
+    width: var(--modal-desktop-width, 90vw);
+    max-width: calc(100vw - 64px);
+    height: 90vh;
+    max-height: calc(100vh - 64px);
+    height: 90dvh;
+    max-height: calc(100dvh - 64px);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 34px;
+    box-shadow: 0 26px 86px rgba(0, 0, 0, 0.48), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    transform: translate3d(-50%, -50%, 0);
+    will-change: opacity, transform;
+  }
+
+  .content::after {
+    display: none;
+  }
+
+  .content[data-vaul-drawer][data-vaul-snap-points='false'][data-vaul-drawer-direction='bottom'][data-state='open'] {
+    animation-name: desktopModalIn;
+    animation-duration: var(--duration-med);
+    animation-timing-function: cubic-bezier(.2, .9, .2, 1);
+  }
+
+  .content[data-vaul-drawer][data-vaul-snap-points='false'][data-vaul-drawer-direction='bottom'][data-state='closed'] {
+    animation-name: desktopModalOut;
+    animation-duration: 200ms;
+    animation-timing-function: cubic-bezier(.4, 0, .2, 1);
+  }
+
+  .handle {
+    display: none;
+  }
+
+  .header {
+    padding: 20px 24px 16px;
+  }
+
+  .title {
+    font-size: 1.2rem;
+  }
+
+  .body {
+    padding: 0 24px 26px;
+  }
+
+  .footer {
+    padding: 12px 24px 20px;
   }
 
   .content[data-chrome='source-popup'] {
-    top: 52px;
-    right: 20px;
-    bottom: 20px;
+    top: 50%;
+    right: auto;
+    bottom: auto;
+    left: 50%;
+    width: var(--modal-desktop-width, 90vw);
+    max-width: calc(100vw - 64px);
+    height: 90vh;
+    max-height: calc(100vh - 64px);
+    height: 90dvh;
+    max-height: calc(100dvh - 64px);
+    border-radius: 34px;
+    transform: translate3d(-50%, -50%, 0);
+  }
+
+  .content[data-chrome='source-popup'] .header {
+    position: relative;
+    top: auto;
+    right: auto;
     left: auto;
-    width: min(520px, calc(100vw - 40px));
-    max-width: calc(100vw - 40px);
-    height: auto;
-    max-height: none;
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    border-radius: 30px;
+    padding: 20px 24px 16px;
+  }
+
+  .content[data-chrome='source-popup'] .body {
+    padding: 0 24px 26px;
+  }
+}
+
+@keyframes desktopModalIn {
+  from {
+    opacity: 0;
+    transform: translate3d(-50%, calc(-50% + 18px), 0) scale(0.965);
+  }
+
+  to {
+    opacity: 1;
+    transform: translate3d(-50%, -50%, 0) scale(1);
+  }
+}
+
+@keyframes desktopModalOut {
+  from {
+    opacity: 1;
+    transform: translate3d(-50%, -50%, 0) scale(1);
+  }
+
+  to {
+    opacity: 0;
+    transform: translate3d(-50%, calc(-50% + 12px), 0) scale(0.985);
   }
 }

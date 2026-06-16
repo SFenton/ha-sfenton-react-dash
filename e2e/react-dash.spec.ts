@@ -64,6 +64,59 @@ test('overview renders with mock Home Assistant state', async ({ page }) => {
   await expect(page.getByRole('heading', { name: 'Quick Links' })).toBeVisible()
 })
 
+test.describe('desktop modal layout', () => {
+  test.use({ hasTouch: false, isMobile: false, viewport: { width: 1280, height: 900 } })
+
+  test('rooms modal fits square room cards without scrolling when desktop space allows', async ({ page }) => {
+    await page.goto('/at-a-glance/overview')
+    await page.getByRole('button', { name: 'Open room layout' }).click()
+
+    const dialog = page.getByRole('dialog', { name: 'Rooms' })
+    await expect(dialog).toBeVisible()
+
+    await expect.poll(async () => {
+      return dialog.locator('section[aria-label="Rooms"]').evaluate((grid) => {
+        const firstCard = grid.firstElementChild?.firstElementChild
+        const firstCardRect = firstCard?.getBoundingClientRect()
+        const gridRect = grid.getBoundingClientRect()
+        const gridStyle = window.getComputedStyle(grid)
+        const columns = gridStyle.gridTemplateColumns.split(' ').filter(Boolean).length
+        const rows = gridStyle.gridTemplateRows.split(' ').filter(Boolean).length
+        const rowGap = Number.parseFloat(gridStyle.rowGap)
+        const usedGridHeight = rows * (firstCardRect?.height ?? 0) + rowGap * (rows - 1)
+        return {
+          cardCount: grid.children.length,
+          fillsVerticalSpace: gridRect.height - usedGridHeight <= 8,
+          firstCardHeight: Math.round(firstCardRect?.height ?? 0),
+          firstCardWidth: Math.round(firstCardRect?.width ?? 0),
+          columns,
+          fitsAllRooms: columns * rows >= grid.children.length,
+          gridHeight: Math.round(gridRect.height),
+          gridWidth: Math.round(gridRect.width),
+          rows,
+          scrollsHorizontally: grid.scrollWidth > grid.clientWidth + 1,
+          scrollsVertically: grid.scrollHeight > grid.clientHeight + 1,
+        }
+      })
+    }).toMatchObject({
+      cardCount: 16,
+      columns: 4,
+      fillsVerticalSpace: true,
+      fitsAllRooms: true,
+      rows: 4,
+      scrollsHorizontally: false,
+      scrollsVertically: false,
+    })
+    const firstCard = dialog.locator('section[aria-label="Rooms"] > div').first()
+    const box = await firstCard.boundingBox()
+    expect(Math.round(box?.width ?? 0)).toBe(Math.round(box?.height ?? 0))
+    const dialogBox = await dialog.boundingBox()
+    const gridBox = await dialog.locator('section[aria-label="Rooms"]').boundingBox()
+    expect(Math.round(dialogBox?.width ?? 0)).toBeLessThan(900)
+    expect(Math.round(dialogBox?.width ?? 0)).toBeLessThanOrEqual(Math.round((gridBox?.width ?? 0) + 52))
+  })
+})
+
 test('settings links to Vacation mode controls', async ({ page }) => {
   await page.goto('/at-a-glance/settings')
 

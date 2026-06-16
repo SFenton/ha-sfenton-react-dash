@@ -1,5 +1,5 @@
 import { useEntity, useHass } from '@hakit/core'
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react'
 import type { HassEntity } from 'home-assistant-js-websocket'
 import { ClimateCard } from '../components/cards/ClimateCard'
 import { ContactSensorCard } from '../components/cards/ContactSensorCard'
@@ -72,6 +72,119 @@ const ROOM_OCCUPANCY_GROUPS = OCCUPANCY_GROUPS
 const ROOM_CONTACT_GROUPS = CONTACT_GROUPS
 const ROOM_AIR_QUALITY_GROUPS = AIR_QUALITY_ROOMS
 const ROOM_CONTACT_ENTITY_IDS = [...new Set(ROOM_CONTACT_GROUPS.flatMap((group) => group.items.map((item) => item.entityId)))]
+const ROOM_PICKER_GRID_GAP = 10
+const ROOM_PICKER_EDGE_GUTTER = 6
+const ROOM_PICKER_MIN_CARD_SIZE = 112
+const ROOM_PICKER_MODAL_HORIZONTAL_PADDING = 48 + ROOM_PICKER_EDGE_GUTTER * 2
+
+interface RoomPickerLayout {
+  cardSize: number
+  columns: number
+  modalWidth: number
+  rows: number
+}
+
+type RoomPickerGridStyle = CSSProperties & {
+  '--room-picker-card-size': string
+  '--room-picker-cols': number
+  '--room-picker-rows': number
+}
+
+type RoomPickerModalStyle = CSSProperties & {
+  '--modal-desktop-width': string
+}
+
+function balancedRoomPickerTracks(count: number) {
+  const columns = Math.max(1, Math.ceil(Math.sqrt(count)))
+  return { columns, rows: Math.ceil(count / columns) }
+}
+
+function roomPickerCellSize(size: number, tracks: number) {
+  return (size - ROOM_PICKER_GRID_GAP * (tracks - 1)) / tracks
+}
+
+function modalWidthForRoomPicker(columns: number, cardSize: number) {
+  return columns * cardSize + ROOM_PICKER_GRID_GAP * (columns - 1) + ROOM_PICKER_MODAL_HORIZONTAL_PADDING
+}
+
+function fallbackRoomPickerLayout(count: number): RoomPickerLayout {
+  const { columns, rows } = balancedRoomPickerTracks(count)
+  return {
+    cardSize: ROOM_PICKER_MIN_CARD_SIZE,
+    columns,
+    modalWidth: modalWidthForRoomPicker(columns, ROOM_PICKER_MIN_CARD_SIZE),
+    rows,
+  }
+}
+
+function chooseRoomPickerLayout(height: number, count: number): RoomPickerLayout {
+  if (count <= 0) return fallbackRoomPickerLayout(1)
+
+  const { columns, rows } = balancedRoomPickerTracks(count)
+  const maxModalWidth = Math.min(window.innerWidth * 0.9, window.innerWidth - 64)
+  const maxGridWidth = Math.max(ROOM_PICKER_MIN_CARD_SIZE, maxModalWidth - ROOM_PICKER_MODAL_HORIZONTAL_PADDING)
+  const cardSize = Math.max(
+    ROOM_PICKER_MIN_CARD_SIZE,
+    Math.floor(Math.min(roomPickerCellSize(maxGridWidth, columns), roomPickerCellSize(height, rows))),
+  )
+
+  return {
+    cardSize,
+    columns,
+    modalWidth: Math.min(maxModalWidth, modalWidthForRoomPicker(columns, cardSize)),
+    rows,
+  }
+}
+
+function useRoomPickerLayout(open: boolean, count: number) {
+  const [grid, setGrid] = useState<HTMLElement | null>(null)
+  const [layout, setLayout] = useState<RoomPickerLayout>(() => fallbackRoomPickerLayout(count))
+  const gridRef = useCallback((node: HTMLElement | null) => {
+    setGrid(node)
+  }, [])
+
+  useEffect(() => {
+    if (!open || !grid) return undefined
+
+    let frame = 0
+    const updateLayout = () => {
+      const body = grid.parentElement
+      const bodyStyle = body ? window.getComputedStyle(body) : undefined
+      const bodyVerticalPadding = bodyStyle ? parseFloat(bodyStyle.paddingTop) + parseFloat(bodyStyle.paddingBottom) : 0
+      const availableHeight = Math.max(grid.clientHeight, (body?.clientHeight ?? 0) - bodyVerticalPadding)
+      const nextLayout = chooseRoomPickerLayout(availableHeight, count)
+      setLayout((current) => (
+        current.cardSize === nextLayout.cardSize && current.columns === nextLayout.columns && current.modalWidth === nextLayout.modalWidth && current.rows === nextLayout.rows
+          ? current
+          : nextLayout
+      ))
+    }
+    const scheduleUpdate = () => {
+      window.cancelAnimationFrame(frame)
+      frame = window.requestAnimationFrame(updateLayout)
+    }
+
+    scheduleUpdate()
+    window.addEventListener('resize', scheduleUpdate)
+    if (typeof ResizeObserver === 'undefined') {
+      return () => {
+        window.cancelAnimationFrame(frame)
+        window.removeEventListener('resize', scheduleUpdate)
+      }
+    }
+
+    const observer = new ResizeObserver(scheduleUpdate)
+    observer.observe(grid)
+
+    return () => {
+      window.cancelAnimationFrame(frame)
+      window.removeEventListener('resize', scheduleUpdate)
+      observer.disconnect()
+    }
+  }, [count, grid, open])
+
+  return [gridRef, layout] as const
+}
 const DEFAULT_CLIMATE_COLOR = { r: 25, g: 84, b: 130 }
 const DEFAULT_OCCUPANCY_COLOR = { r: 46, g: 180, b: 120 }
 const DEFAULT_CONTACT_COLOR = { r: 220, g: 92, b: 68 }
@@ -1057,6 +1170,15 @@ function SheetContent({ closeHash, hash, onNavigate }: { closeHash: () => void; 
 
 function RoomPickerButton({ onNavigate }: { onNavigate: (path: string) => void }) {
   const [modalOpen, setModalOpen] = useState(false)
+  const [gridRef, gridLayout] = useRoomPickerLayout(modalOpen, AREA_ITEMS.length)
+  const modalStyle: RoomPickerModalStyle = {
+    '--modal-desktop-width': `${gridLayout.modalWidth}px`,
+  }
+  const gridStyle: RoomPickerGridStyle = {
+    '--room-picker-card-size': `${gridLayout.cardSize}px`,
+    '--room-picker-cols': gridLayout.columns,
+    '--room-picker-rows': gridLayout.rows,
+  }
 
   const handleNavigate = (path: string) => {
     setModalOpen(false)
@@ -1066,10 +1188,10 @@ function RoomPickerButton({ onNavigate }: { onNavigate: (path: string) => void }
   return (
     <>
       <FloatingActionButton ariaLabel="Open room layout" color={CHORE_BLUE} icon="mdi:floor-plan" onClick={() => setModalOpen(true)} />
-      <ModalSheet open={modalOpen} title="Rooms" onClose={() => setModalOpen(false)}>
-        <section className={styles.roomPickerGrid} aria-label="Rooms">
+      <ModalSheet contentStyle={modalStyle} open={modalOpen} title="Rooms" onClose={() => setModalOpen(false)}>
+        <section className={styles.roomPickerGrid} aria-label="Rooms" ref={gridRef} style={gridStyle}>
           {AREA_ITEMS.map((area) => (
-            <div key={area.title}>
+            <div className={styles.roomPickerCell} key={area.title}>
               <RoomCard area={area} onNavigate={handleNavigate} />
             </div>
           ))}
