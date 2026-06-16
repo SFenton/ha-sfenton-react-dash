@@ -5,9 +5,9 @@
   display: grid;
   place-items: center;
   padding: 22px;
-  background: rgba(0, 0, 0, 0.42);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  background: var(--color-modal-overlay);
+  backdrop-filter: var(--blur-modal);
+  -webkit-backdrop-filter: var(--blur-modal);
   pointer-events: auto;
 }
 
@@ -16,13 +16,13 @@
   width: min(360px, calc(100vw - 36px));
   max-height: min(72vh, 520px);
   grid-template-rows: auto minmax(0, 1fr);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(0, 0, 0, 0);
   border-radius: 26px;
-  color: var(--color-text);
-  background: rgba(25, 36, 54, 0.78);
-  box-shadow: 0 26px 70px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.16);
-  backdrop-filter: var(--blur-glass);
-  -webkit-backdrop-filter: var(--blur-glass);
+  color: #e1e1e1;
+  background: var(--color-modal-surface);
+  box-shadow: none;
+  backdrop-filter: var(--blur-modal);
+  -webkit-backdrop-filter: var(--blur-modal);
   overflow: hidden;
   pointer-events: auto;
 }
@@ -37,7 +37,7 @@
 
 .header h2 {
   margin: 0;
-  color: var(--color-text);
+  color: #fff;
   font-size: 1.03rem;
   font-weight: 820;
   letter-spacing: 0;
@@ -142,4 +142,3 @@
   font-weight: 760;
   line-height: 1.15;
 }
-

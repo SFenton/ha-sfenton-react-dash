@@ -11,10 +11,10 @@ interface ModalSheetProps {
   chrome?: 'default' | 'source-popup'
   footer?: ReactNode
   subtitle?: string
-  surface?: 'default' | 'hass-popup'
+  surface?: 'hass-popup'
 }
 
-export function ModalSheet({ open, title, onClose, children, chrome = 'default', footer, subtitle, surface = 'default' }: ModalSheetProps) {
+export function ModalSheet({ open, title, onClose, children, chrome = 'default', footer, subtitle }: ModalSheetProps) {
   const contentRef = useRef<HTMLDivElement | null>(null)
   const sourcePopup = chrome === 'source-popup'
 
@@ -39,7 +39,7 @@ export function ModalSheet({ open, title, onClose, children, chrome = 'default',
     <Drawer.Root open={open} onOpenChange={(nextOpen) => !nextOpen && onClose()} repositionInputs={false}>
       <Drawer.Portal>
         <Drawer.Overlay className={styles.overlay} />
-        <Drawer.Content ref={contentRef} className={styles.content} data-chrome={chrome} data-has-footer={footer ? 'true' : 'false'} data-has-subtitle={subtitle ? 'true' : 'false'} data-surface={surface}>
+        <Drawer.Content ref={contentRef} className={styles.content} data-chrome={chrome} data-has-footer={footer ? 'true' : 'false'} data-has-subtitle={subtitle ? 'true' : 'false'} data-surface="hass-popup">
           {!sourcePopup && <div className={styles.handle} />}
           <div className={styles.header}>
             <div className={styles.titleBlock}>

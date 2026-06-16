@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useEntity, useHass } from '@hakit/core'
-import { Card } from '../core/Card'
+import { GlassTile } from '../core/GlassTile'
 import { MaterialIcon } from '../core/Icon'
 import { ModalSheet } from '../core/ModalSheet'
 import { OptionPickerDialog, type PickerOption } from '../core/OptionPickerDialog'
-import { UNAVAILABLE_COLOR, VACUUM_COLOR, type VacuumConfig, type VacuumZoneConfig } from '../../constants/portedDashboard'
+import { type VacuumConfig, type VacuumZoneConfig } from '../../constants/portedDashboard'
 import { asEntityName, titleCaseState } from './entityState'
 import { ValetudoMapCard } from './ValetudoMapCard'
 import styles from './VacuumCard.module.css'
@@ -506,15 +506,12 @@ export function VacuumCard({ vacuum }: VacuumCardProps) {
 
   return (
     <>
-      <Card
-        ariaLabel={subtitle ? `${vacuum.title} ${subtitle}` : vacuum.title}
-        color={unavailable ? UNAVAILABLE_COLOR : VACUUM_COLOR}
-        disabled={unavailable}
-        icon={<MaterialIcon name="mdi:robot-vacuum" size={38} />}
-        muted={unavailable}
+      <GlassTile
+        icon="mdi:robot-vacuum"
+        isOff={unavailable}
         onClick={unavailable ? undefined : openModal}
-        size="compact"
         subtitle={subtitle}
+        tone="vacuum"
         title={vacuum.title}
       />
       {modal}

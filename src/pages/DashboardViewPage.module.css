@@ -331,7 +331,7 @@
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 18px;
   padding: 14px;
-  color: var(--color-muted);
+  color: #fff;
   background: rgba(255, 255, 255, 0.08);
   box-shadow: var(--shadow-glass);
   font-size: 0.84rem;

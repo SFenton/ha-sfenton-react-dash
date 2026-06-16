@@ -2,9 +2,9 @@
   position: fixed;
   inset: 0;
   z-index: 40;
-  background: rgba(0, 0, 0, 0.46);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  background: var(--color-modal-overlay);
+  backdrop-filter: var(--blur-modal);
+  -webkit-backdrop-filter: var(--blur-modal);
 }
 
 .content {
@@ -21,14 +21,14 @@
   height: 90dvh;
   max-height: 90dvh;
   flex-direction: column;
-  border: 1px solid rgba(255, 255, 255, 0.18);
+  border: 1px solid rgba(0, 0, 0, 0);
   border-bottom: 0;
   border-radius: 30px 30px 0 0;
-  color: var(--color-text);
-  background: rgba(25, 36, 54, 0.68);
-  box-shadow: 0 -20px 55px rgba(0, 0, 0, 0.52), inset 0 1px 0 rgba(255, 255, 255, 0.16);
-  backdrop-filter: var(--blur-glass);
-  -webkit-backdrop-filter: var(--blur-glass);
+  color: #e1e1e1;
+  background: var(--color-modal-surface);
+  box-shadow: none;
+  backdrop-filter: var(--blur-modal);
+  -webkit-backdrop-filter: var(--blur-modal);
   box-sizing: border-box;
   overflow: hidden;
 }
@@ -36,19 +36,6 @@
 .content:focus,
 .content:focus-visible {
   outline: none;
-}
-
-.content[data-surface='hass-popup'] {
-  border-color: rgba(0, 0, 0, 0);
-  color: #e1e1e1;
-  background: rgba(29, 29, 29, 0.88);
-  box-shadow: none;
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-}
-
-.content[data-surface='hass-popup'] .title {
-  color: #fff;
 }
 
 .content[data-chrome='source-popup'] {
@@ -59,7 +46,7 @@
   max-height: 100dvh;
   border: 0;
   border-radius: 0;
-  background: rgba(18, 27, 42, 0.82);
+  background: var(--color-modal-surface);
 }
 
 .content[data-chrome='source-popup'] .header {
@@ -118,7 +105,7 @@
 
 .title {
   margin: 0;
-  color: var(--color-text);
+  color: #fff;
   font-size: 1.08rem;
   font-weight: 780;
 }
@@ -190,11 +177,7 @@
   flex: 0 0 auto;
   box-sizing: border-box;
   padding: 10px 16px calc(18px + env(safe-area-inset-bottom, 0px));
-  background: linear-gradient(to top, rgba(25, 36, 54, 0.86) 72%, rgba(25, 36, 54, 0));
-}
-
-.content[data-surface='hass-popup'] .footer {
-  background: linear-gradient(to top, rgba(29, 29, 29, 0.92) 72%, rgba(29, 29, 29, 0));
+  background: linear-gradient(to top, var(--color-modal-footer) 72%, var(--color-modal-footer-transparent));
 }
 
 @media (min-width: 760px) {
@@ -207,7 +190,7 @@
     max-width: calc(100vw - 40px);
     height: auto;
     max-height: none;
-    border: 1px solid rgba(255, 255, 255, 0.18);
+    border: 1px solid rgba(0, 0, 0, 0);
     border-radius: 30px;
   }
 

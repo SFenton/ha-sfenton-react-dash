@@ -3435,10 +3435,14 @@ function ThermostatSwitchCard({ children, entityId, icon, title }: { children?: 
 
 function PredictiveComfortCard({ onOpen }: { onOpen: () => void }) {
   const entity = useEntity(asEntityName(PREDICTIVE_COMFORT_SWITCH_ENTITY_ID), { returnNullIfNotFound: true })
+  const sensor = useEntity(asEntityName(PREDICTIVE_COMFORT_SENSOR_ENTITY_ID), { returnNullIfNotFound: true })
   const callService = useCallService()
   const [state, commitState] = useOptimisticState(entity?.state ?? 'unavailable')
   const active = state === 'on'
-  const stateText = formatCompactEntityState(entity, 'Unavailable', state)
+  const currentRecommendation = predictiveAttribute(entity, 'current_recommendation') ?? sensor?.state
+  const stateText = active
+    ? `${formatCompactEntityState(entity, 'Unavailable', state)} · ${formatPredictiveState(currentRecommendation)}`
+    : formatCompactEntityState(entity, 'Unavailable', state)
 
   const handleMainClick = () => {
     if (active) {
@@ -3571,11 +3575,8 @@ function PredictiveComfortModal({ onClose, open }: { onClose: () => void; open: 
   const reasonBullets = buildPredictiveReasonBullets(sensor)
 
   return (
-    <ModalSheet onClose={onClose} open={open} surface="hass-popup" title="Predictive Comfort">
+    <ModalSheet onClose={onClose} open={open} subtitle={formatPredictiveState(currentRecommendation)} surface="hass-popup" title="Predictive Comfort">
       <div className={styles.thermostatModalBody}>
-        <Notice>
-          Recommendation: {formatPredictiveState(currentRecommendation)}
-        </Notice>
         <section className={styles.section}>
           <SectionHeader title="Controls" />
           <div className={styles.predictiveControlGrid}>
@@ -3700,13 +3701,13 @@ function OpenContactSensorsSection() {
   )
 }
 
-function ThermostatRoomModal({ onClose, room }: { onClose: () => void; room: ThermostatRoomView | null }) {
+function ThermostatRoomModal({ onClose, open, room }: { onClose: () => void; open: boolean; room: ThermostatRoomView | null }) {
   const awayMode = useEntity(asEntityName('binary_sensor.thermostat_contact_sensors_away_mode_active'), { returnNullIfNotFound: true })
   const title = room?.title ?? 'Thermostat'
   const ventTitle = room ? `${room.title} ${room.ventEntityIds.length > 1 ? 'Vents' : 'Vent'}` : 'Vents'
 
   return (
-    <ModalSheet onClose={onClose} open={Boolean(room)} surface="hass-popup" title={title}>
+    <ModalSheet onClose={onClose} open={open} surface="hass-popup" title={title}>
       {room && (
         <div className={styles.thermostatModalBody}>
           <ThermostatDial entityId={room.climateEntityId} size="modal" title={room.title} />
@@ -3726,6 +3727,20 @@ function ThermostatRoomModal({ onClose, room }: { onClose: () => void; room: The
 function ThermostatPage() {
   const { closeHash, hash, openHash } = useHashModal()
   const selectedRoom = THERMOSTAT_ROOM_VIEWS.find((room) => room.hash === hash) ?? null
+  const [renderedRoom, setRenderedRoom] = useState<ThermostatRoomView | null>(selectedRoom)
+  const roomModalOpen = Boolean(selectedRoom)
+  const modalRoom = selectedRoom ?? renderedRoom
+
+  const openThermostatRoom = (nextHash: string) => {
+    const nextRoom = THERMOSTAT_ROOM_VIEWS.find((room) => room.hash === nextHash) ?? null
+    if (nextRoom) setRenderedRoom(nextRoom)
+    openHash(nextHash)
+  }
+
+  const closeThermostatRoom = () => {
+    if (selectedRoom) setRenderedRoom(selectedRoom)
+    closeHash()
+  }
 
   return (
     <div className={`${styles.stack} ${styles.thermostatPage}`}>
@@ -3738,7 +3753,7 @@ function ThermostatPage() {
       <section className={styles.section}>
         <SectionHeader title="Rooms" />
         <div className={styles.thermostatRoomGrid}>
-          {THERMOSTAT_ROOM_VIEWS.map((room) => <ThermostatRoomRow key={room.key} onOpen={openHash} room={room} />)}
+          {THERMOSTAT_ROOM_VIEWS.map((room) => <ThermostatRoomRow key={room.key} onOpen={openThermostatRoom} room={room} />)}
         </div>
       </section>
       <section className={styles.section}>
@@ -3761,7 +3776,7 @@ function ThermostatPage() {
         <ThermostatSwitchCard entityId="input_boolean.enable_disable_thermostat_contact_sensors_integration" icon="mdi:thermostat" title="Automatic Thermostat" />
       </section>
       <PredictiveComfortModal onClose={closeHash} open={hash === PREDICTIVE_COMFORT_HASH} />
-      <ThermostatRoomModal onClose={closeHash} room={selectedRoom} />
+      <ThermostatRoomModal onClose={closeThermostatRoom} open={roomModalOpen} room={modalRoom} />
     </div>
   )
 }

@@ -477,7 +477,9 @@ test('vacuums page renders without live HASS backend', async ({ page }) => {
 
   await expect(page.getByRole('heading', { level: 1, name: 'Vacuums' })).toBeVisible()
   await expect(page.getByLabel('Music Room')).toBeVisible()
-  await expect(page.getByRole('button', { name: /Main Floor Docked/i })).toBeVisible()
+  const mainFloorVacuum = page.getByRole('button', { name: /Main Floor Docked/i })
+  await expect(mainFloorVacuum).toBeVisible()
+  await expect(mainFloorVacuum).toHaveAttribute('data-tone', 'vacuum')
 })
 
 test('available vacuum cards open source-style modal controls', async ({ page }) => {
