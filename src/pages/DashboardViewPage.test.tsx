@@ -1,9 +1,16 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { act } from 'react'
 import { materialIconPath } from '../components/core/iconPaths'
+import { VACUUM_MODAL_STYLE } from '../components/hass/vacuumModalStyle'
 import { DashboardViewPage } from './DashboardViewPage'
 import { ROOM_PAGE_CONFIGS, ROOM_PAGE_ORDER } from '../constants/roomPages'
 import { entity, mockCallServiceCalls, mockEntities, mockFreeSleepScheduleAttributes, mockState, mockTodoItemsByEntity, resetMockHass } from '../test/mocks/hakitCoreState'
+
+const ROOM_SOURCE_SECURITY_SIZED_MODAL_STYLE = {
+  '--modal-desktop-height': 'auto',
+  '--modal-desktop-max-width': '500px',
+  '--modal-desktop-width': '500px',
+}
 
 describe('DashboardViewPage', () => {
   beforeEach(() => {
@@ -190,8 +197,18 @@ describe('DashboardViewPage', () => {
     expect(airPurifierCard).toHaveAttribute('data-tone', 'air')
     expect(airPurifierCard).not.toHaveAttribute('data-size')
 
+    fireEvent.click(ventCard)
+    let dialog = await screen.findByRole('dialog')
+    expect(dialog).toHaveStyle(ROOM_SOURCE_SECURITY_SIZED_MODAL_STYLE)
+    expect(within(dialog).getByRole('heading', { name: 'Guest Room: Vent' })).toBeInTheDocument()
+    expect(within(dialog).getByRole('article', { name: /^Vent Open$/i })).toBeInTheDocument()
+    view.unmount()
+    window.history.replaceState(null, '', window.location.pathname)
+
+    view = renderGuestRoom()
     fireEvent.click(screen.getByRole('button', { name: /^Lights On$/i }))
-    expect(await screen.findByRole('dialog')).toBeInTheDocument()
+    dialog = await screen.findByRole('dialog')
+    expect(dialog).toHaveStyle(ROOM_SOURCE_SECURITY_SIZED_MODAL_STYLE)
     expect(screen.getByRole('heading', { name: 'Guest Room Lights' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /TV Light On/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Bed Light Off/i })).toBeInTheDocument()
@@ -200,7 +217,8 @@ describe('DashboardViewPage', () => {
 
     view = renderGuestRoom()
     fireEvent.click(screen.getByRole('button', { name: /^Climate 69°F - 71°F$/i }))
-    expect(await screen.findByRole('dialog')).toBeInTheDocument()
+    dialog = await screen.findByRole('dialog')
+    expect(dialog).toHaveStyle(ROOM_SOURCE_SECURITY_SIZED_MODAL_STYLE)
     expect(screen.getByRole('heading', { name: 'Guest Room Climate' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Temperature Sensors' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Vent' })).toBeInTheDocument()
@@ -210,9 +228,18 @@ describe('DashboardViewPage', () => {
     window.history.replaceState(null, '', window.location.pathname)
 
     view = renderGuestRoom()
+    fireEvent.click(screen.getByRole('button', { name: /^Occupancy Detected$/i }))
+    dialog = await screen.findByRole('dialog')
+    expect(dialog).toHaveStyle(ROOM_SOURCE_SECURITY_SIZED_MODAL_STYLE)
+    expect(within(dialog).getByRole('heading', { name: 'Guest Room Occupancy' })).toBeInTheDocument()
+    expect(within(dialog).getByText('Detected')).toBeInTheDocument()
+    view.unmount()
+    window.history.replaceState(null, '', window.location.pathname)
+
+    view = renderGuestRoom()
     fireEvent.click(screen.getByRole('button', { name: /^Window Closed$/i }))
-    let dialog = await screen.findByRole('dialog')
-    expect(dialog).toBeInTheDocument()
+    dialog = await screen.findByRole('dialog')
+    expect(dialog).toHaveStyle(ROOM_SOURCE_SECURITY_SIZED_MODAL_STYLE)
     expect(within(dialog).getByRole('heading', { name: 'Guest Room Window' })).toBeInTheDocument()
     expect(within(dialog).queryByText('All Closed')).not.toBeInTheDocument()
     expect(within(dialog).queryByText('Guest Room Window: All Closed')).not.toBeInTheDocument()
@@ -224,8 +251,8 @@ describe('DashboardViewPage', () => {
 
     renderGuestRoom()
     fireEvent.click(screen.getByRole('button', { name: /^Air Quality 1 • 2 μg\/m³$/i }))
-  dialog = await screen.findByRole('dialog')
-    expect(dialog).toBeInTheDocument()
+    dialog = await screen.findByRole('dialog')
+    expect(dialog).toHaveStyle(ROOM_SOURCE_SECURITY_SIZED_MODAL_STYLE)
     expect(within(dialog).getByRole('heading', { name: 'Guest Room Air Quality' })).toBeInTheDocument()
     expect(within(dialog).getByText('1 • 2 μg/m³')).toBeInTheDocument()
     expect(screen.getByText('Fan Modes')).toBeInTheDocument()
@@ -1678,12 +1705,16 @@ describe('DashboardViewPage', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /Main Floor Docked/i }))
 
-    expect(await screen.findByRole('dialog')).toBeInTheDocument()
+    const dialog = await screen.findByRole('dialog')
+    expect(dialog).toHaveStyle(VACUUM_MODAL_STYLE)
     expect(screen.getByRole('heading', { name: 'Living Room: Robot Vacuum' })).toBeInTheDocument()
     expect(screen.queryByText('Main Floor Robot Vacuum')).not.toBeInTheDocument()
-    expect(screen.getByRole('region', { name: 'Main Floor Valetudo map' })).toBeInTheDocument()
+    const mapPane = within(dialog).getByRole('group', { name: 'Main Floor map and status' })
+    const controlsPane = within(dialog).getByRole('group', { name: 'Main Floor controls, zones, and actions' })
+    expect(within(mapPane).getByRole('region', { name: 'Main Floor Valetudo map' })).toBeInTheDocument()
+    expect(within(mapPane).getByText('Battery')).toBeInTheDocument()
     expect(screen.queryByText('No error')).not.toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Vacuum Controls' })).toBeInTheDocument()
+    expect(within(controlsPane).getByRole('heading', { name: 'Vacuum Controls' })).toBeInTheDocument()
     expect(screen.getByText('Power Settings')).toBeInTheDocument()
     expect(screen.getByRole('group', { name: 'Power Settings' })).toBeInTheDocument()
     const dockedGroup = screen.getByRole('group', { name: 'Docked' })
@@ -1706,10 +1737,10 @@ describe('DashboardViewPage', () => {
     expect(within(passesPicker).getByRole('button', { name: '1' })).toHaveAttribute('aria-pressed', 'true')
     fireEvent.click(within(passesPicker).getByRole('button', { name: 'Close' }))
     expect(screen.getByRole('button', { name: 'Clean' })).toHaveAttribute('data-icon', 'mdi:play')
-    const zonesHeading = screen.getByRole('heading', { name: 'Zones' })
+    const zonesHeading = within(controlsPane).getByRole('heading', { name: 'Zones' })
     expect(screen.getByText('Select any zones to focus cleaning in those areas. If you press clean and no zones are selected, we will clean all zones on the Main Floor.')).toBeInTheDocument()
     expect(screen.getByText('Zones are not selectable or changeable while cleaning is ongoing.')).toBeInTheDocument()
-    const additionalControlsHeading = screen.getByRole('heading', { name: 'Additional Controls' })
+    const additionalControlsHeading = within(controlsPane).getByRole('heading', { name: 'Additional Controls' })
     expect(zonesHeading.compareDocumentPosition(additionalControlsHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Empty Dock' }).querySelector('path')).toHaveAttribute('d', materialIconPath('mdi:delete-restore'))
     expect(screen.getByRole('button', { name: /living room/i }).querySelector('path')).toHaveAttribute('d', materialIconPath('mdi:sofa'))
@@ -2372,11 +2403,15 @@ describe('DashboardViewPage', () => {
     expect(mainFloorVacuum).toHaveAttribute('data-tone', 'vacuum')
     fireEvent.click(mainFloorVacuum)
 
-    expect(await screen.findByRole('dialog')).toBeInTheDocument()
+    const dialog = await screen.findByRole('dialog')
+    expect(dialog).toHaveStyle(VACUUM_MODAL_STYLE)
     expect(screen.getByRole('heading', { name: 'Main Floor Robot Vacuum' })).toBeInTheDocument()
-    expect(screen.getByRole('region', { name: 'Main Floor Valetudo map' })).toBeInTheDocument()
+    const mapPane = within(dialog).getByRole('group', { name: 'Main Floor map and status' })
+    const controlsPane = within(dialog).getByRole('group', { name: 'Main Floor controls, zones, and actions' })
+    expect(within(mapPane).getByRole('region', { name: 'Main Floor Valetudo map' })).toBeInTheDocument()
+    expect(within(mapPane).getByText('Battery')).toBeInTheDocument()
     expect(screen.queryByText('No error')).not.toBeInTheDocument()
-    expect(screen.getByText('Power Settings')).toBeInTheDocument()
+    expect(within(controlsPane).getByText('Power Settings')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: /Fan Balanced/i }))
     expect(within(await screen.findByRole('dialog', { name: 'Fan' })).getByRole('button', { name: 'Balanced' })).toHaveAttribute('aria-pressed', 'true')
     expect(screen.getByRole('button', { name: 'Clean' })).toBeInTheDocument()

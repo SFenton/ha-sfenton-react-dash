@@ -5,7 +5,7 @@ const MODAL_SQUARE_GRID_GAP = 10
 const MODAL_SQUARE_GRID_EDGE_GUTTER = 6
 const MODAL_SQUARE_GRID_CARD_SIZE = 168
 const MODAL_SQUARE_GRID_HORIZONTAL_PADDING = 48 + MODAL_SQUARE_GRID_EDGE_GUTTER * 2
-const CONTACT_MODAL_DESKTOP_VERTICAL_CHROME = 147
+const MODAL_SQUARE_GRID_DESKTOP_VERTICAL_CHROME = 147
 
 interface ModalSquareGridLayout {
   cardSize: number
@@ -105,6 +105,7 @@ export function modalSquareGridStyle(layout: ModalSquareGridLayout): ModalSquare
 export function modalSquareGridModalStyle(layout: ModalSquareGridLayout): ModalSquareGridModalStyle {
   return {
     '--modal-desktop-width': `${layout.modalWidth}px`,
+    '--modal-desktop-height': `${modalSquareGridHeight(layout) + MODAL_SQUARE_GRID_DESKTOP_VERTICAL_CHROME}px`,
   }
 }
 
@@ -119,15 +120,7 @@ function modalAdaptiveSquareGridModalStyle(layout: ModalSquareGridLayout): Modal
   }
 }
 
-function modalLockedContactGridModalStyle(layout: ModalSquareGridLayout): ModalSquareGridModalStyle {
-  return {
-    ...modalSquareGridModalStyle(layout),
-    '--modal-desktop-height': `${modalSquareGridHeight(layout) + CONTACT_MODAL_DESKTOP_VERTICAL_CHROME}px`,
-  }
-}
-
 export function modalSquareGridModalStyleForHash(hash: string, layout: ModalSquareGridLayout) {
-  if (hash === '#contact-sensors-overview') return modalLockedContactGridModalStyle(layout)
   if (hash === '#aqi-overview') return modalAdaptiveSquareGridModalStyle(layout)
   return modalSquareGridModalStyle(layout)
 }

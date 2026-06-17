@@ -8,10 +8,10 @@
   --color-glass: rgba(25, 36, 54, 0.55);
   --color-glass-strong: rgba(25, 36, 54, 0.72);
   --color-glass-soft: rgba(255, 255, 255, 0.13);
-  --color-modal-overlay: rgba(0, 0, 0, 0.46);
-  --color-modal-surface: rgba(29, 29, 29, 0.88);
-  --color-modal-footer: rgba(29, 29, 29, 0.92);
-  --color-modal-footer-transparent: rgba(29, 29, 29, 0);
+  --color-modal-overlay: rgba(0, 0, 0, 0.58);
+  --color-modal-surface: rgba(24, 24, 24, 0.97);
+  --color-modal-footer: rgba(24, 24, 24, 0.99);
+  --color-modal-footer-transparent: rgba(24, 24, 24, 0);
   --color-tile-off: rgba(255, 255, 255, 0.52);
   --color-light: rgba(150, 80, 28, 0.66);
   --color-security: rgba(30, 136, 229, 0.66);

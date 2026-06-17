@@ -14,7 +14,8 @@ import { StatusRail, type StatusRailChip } from '../components/hass/StatusRail'
 import { CreateDonetickTaskSheet } from '../components/hass/CreateDonetickTaskSheet'
 import { CreateGroceryItemSheet } from '../components/hass/CreateGroceryItemSheet'
 import { TodoListPanel } from '../components/hass/TodoListPanel'
-import { VacuumCard, VacuumModalContent } from '../components/hass/VacuumCard'
+import { VacuumCard, VacuumRoomSourceModalContent } from '../components/hass/VacuumCard'
+import { VACUUM_MODAL_STYLE } from '../components/hass/vacuumModalStyle'
 import { AirQualityModalContent } from '../components/hass/AirQualityModalContent'
 import { GrillModalContent } from '../components/hass/GrillModalContent'
 import { HumidifierModalContent } from '../components/hass/HumidifierModalContent'
@@ -125,6 +126,14 @@ function sectionHasItems(section: EntityGroupConfig | undefined) {
 
 function Grid({ children }: { children: ReactNode }) {
   return <div className={styles.grid}>{children}</div>
+}
+
+const SECURITY_SIZED_ROOM_SOURCE_KINDS = new Set<RoomSourceKind>(['air', 'climate', 'contact', 'light', 'occupancy', 'vent'])
+
+const ROOM_SOURCE_SECURITY_SIZED_MODAL_STYLE: ModalSheetStyle = {
+  '--modal-desktop-height': 'auto',
+  '--modal-desktop-max-width': '500px',
+  '--modal-desktop-width': '500px',
 }
 
 function Notice({ children }: { children: React.ReactNode }) {
@@ -418,7 +427,7 @@ function renderRoomReusableSheet(card: RoomSourceCardConfig, roomTitle: string):
 
   if (card.kind === 'vacuum') {
     const vacuum = VACUUMS.find((candidate) => candidate.entityId === card.entityId)
-    if (vacuum) return <VacuumModalContent key={vacuum.entityId} vacuum={vacuum} />
+    if (vacuum) return <VacuumRoomSourceModalContent key={vacuum.entityId} vacuum={vacuum} />
   }
 
   if (card.kind === 'air') {
@@ -570,6 +579,9 @@ function RoomSourceModal({ card, eightSleepModalState, onClose, roomTitle }: { c
   const mediaTitle = renderCard?.kind === 'media' && renderCard.hash ? MEDIA_REMOTE_CONFIGS[renderCard.hash]?.remoteTitle : undefined
   const title = renderCard ? mediaTitle ?? `${roomTitle}${plainTitle ? ' ' : ': '}${renderCard.modalTitle ?? renderCard.title}` : roomTitle
   const subtitle = useHass((state) => (renderCard && plainTitle && renderCard.kind !== 'contact' && renderCard.kind !== 'light' ? roomSourceModalSubtitle(renderCard, roomTitle, state.entities) : undefined))
+  const modalStyle = renderCard?.kind === 'vacuum'
+    ? VACUUM_MODAL_STYLE
+    : renderCard && SECURITY_SIZED_ROOM_SOURCE_KINDS.has(renderCard.kind) ? ROOM_SOURCE_SECURITY_SIZED_MODAL_STYLE : undefined
 
   if (renderCard && eightSleepSide && renderedEightSleepModalState) {
     return (
@@ -578,7 +590,7 @@ function RoomSourceModal({ card, eightSleepModalState, onClose, roomTitle }: { c
   }
 
   return (
-    <ModalSheet onClose={onClose} open={Boolean(card)} subtitle={subtitle} title={title}>
+    <ModalSheet contentStyle={modalStyle} onClose={onClose} open={Boolean(card)} subtitle={subtitle} title={title}>
       {renderCard && (content ?? <RoomSourceFallback card={renderCard} />)}
     </ModalSheet>
   )

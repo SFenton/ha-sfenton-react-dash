@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useEntity, useHass } from '@hakit/core'
 import { GlassTile } from '../core/GlassTile'
 import { MaterialIcon } from '../core/Icon'
@@ -7,7 +7,16 @@ import { OptionPickerDialog, type PickerOption } from '../core/OptionPickerDialo
 import { type VacuumConfig, type VacuumZoneConfig } from '../../constants/portedDashboard'
 import { asEntityName, titleCaseState } from './entityState'
 import { ValetudoMapCard } from './ValetudoMapCard'
+import { VACUUM_MODAL_STYLE } from './vacuumModalStyle'
 import styles from './VacuumCard.module.css'
+
+type VacuumModalTab = 'controls' | 'zones' | 'more'
+
+const VACUUM_MODAL_TABS: { icon: string; label: string; tab: VacuumModalTab }[] = [
+  { icon: 'mdi:information', label: 'Controls', tab: 'controls' },
+  { icon: 'mdi:floor-plan', label: 'Zones', tab: 'zones' },
+  { icon: 'mdi:dots-horizontal', label: 'More', tab: 'more' },
+]
 
 type CallService = (params: Record<string, unknown>) => void
 
@@ -441,24 +450,61 @@ function VacuumZones({ vacuum }: { vacuum: VacuumConfig }) {
   )
 }
 
-function VacuumControls({ vacuum }: { vacuum: VacuumConfig }) {
+function VacuumModalNav({ activeTab, onTabChange, vacuumTitle }: { activeTab: VacuumModalTab; onTabChange: (tab: VacuumModalTab) => void; vacuumTitle: string }) {
   return (
-    <>
-      <VacuumStatusSummary vacuum={vacuum} />
-      <VacuumWhileAwaySection vacuum={vacuum} />
-      <VacuumControlsSection vacuum={vacuum} />
-      <VacuumZones vacuum={vacuum} />
-      <VacuumEmptyDockSection vacuum={vacuum} />
-    </>
+    <nav aria-label={`${vacuumTitle} modal sections`} className={styles.vacuumModalNav}>
+      {VACUUM_MODAL_TABS.map((item) => {
+        const isActive = activeTab === item.tab
+        return (
+          <button
+            aria-current={isActive ? 'page' : undefined}
+            aria-label={item.label}
+            className={[styles.vacuumModalNavButton, isActive ? styles.vacuumModalNavButtonActive : ''].filter(Boolean).join(' ')}
+            key={item.tab}
+            onClick={() => onTabChange(item.tab)}
+            type="button"
+          >
+            <MaterialIcon name={item.icon} size={22} />
+          </button>
+        )
+      })}
+    </nav>
   )
 }
 
-export function VacuumModalContent({ vacuum }: VacuumCardProps) {
+function VacuumModalTabContent({ activeTab, vacuum }: { activeTab: VacuumModalTab; vacuum: VacuumConfig }) {
+  const modalBodyRef = useRef<HTMLDivElement | null>(null)
+  const modalPanelRef = useRef<HTMLDivElement | null>(null)
+  const selectedTabLabel = VACUUM_MODAL_TABS.find((tab) => tab.tab === activeTab)?.label ?? 'Controls'
+
+  useEffect(() => {
+    const scrollContainers = [modalPanelRef.current, modalBodyRef.current?.parentElement]
+    for (const scrollContainer of scrollContainers) {
+      if (!scrollContainer || typeof scrollContainer.scrollTo !== 'function') continue
+      scrollContainer.scrollTo({ top: 0, behavior: 'auto' })
+    }
+  }, [activeTab])
+
+  return (
+    <div className={styles.modalBody} ref={modalBodyRef}>
+      <div aria-label={`${vacuum.title} map and status`} className={styles.leftPane} role="group">
+        <VacuumMapAndStatus vacuum={vacuum} />
+      </div>
+      <div aria-label={`${vacuum.title} ${selectedTabLabel}`} className={styles.rightPane} data-scroll-region="vacuum-panel" ref={modalPanelRef} role="group">
+        {activeTab === 'controls' && <VacuumControlsSection vacuum={vacuum} />}
+        {activeTab === 'zones' && <VacuumZones vacuum={vacuum} />}
+        {activeTab === 'more' && <VacuumEmptyDockSection vacuum={vacuum} />}
+      </div>
+    </div>
+  )
+}
+
+function VacuumMapAndStatus({ vacuum }: { vacuum: VacuumConfig }) {
   const callService = useHass((state) => state.helpers.callService) as unknown as CallService
   const locate = useCallback(() => callServiceAction(callService, 'vacuum.locate', vacuum.entityId), [callService, vacuum.entityId])
 
   return (
-    <div className={styles.modalBody}>
+    <>
       <div className={styles.mapStage}>
         <ValetudoMapCard vacuum={vacuum} />
         <button className={`${styles.actionButton} ${styles.locateButton}`} data-icon="mdi:map-marker" data-tone="neutral" onClick={locate} type="button">
@@ -466,8 +512,37 @@ export function VacuumModalContent({ vacuum }: VacuumCardProps) {
           Locate
         </button>
       </div>
-      <VacuumControls vacuum={vacuum} />
-    </div>
+      <VacuumStatusSummary vacuum={vacuum} />
+      <VacuumWhileAwaySection vacuum={vacuum} />
+    </>
+  )
+}
+
+export function VacuumRoomSourceModalContent({ vacuum }: VacuumCardProps) {
+  const [activeTab, setActiveTab] = useState<VacuumModalTab>('controls')
+
+  return (
+    <>
+      <VacuumModalTabContent activeTab={activeTab} vacuum={vacuum} />
+      <VacuumModalNav activeTab={activeTab} onTabChange={setActiveTab} vacuumTitle={vacuum.title} />
+    </>
+  )
+}
+
+function VacuumModal({ onClose, open, vacuum }: { onClose: () => void; open: boolean; vacuum: VacuumConfig }) {
+  const [activeTab, setActiveTab] = useState<VacuumModalTab>('controls')
+  const title = `${vacuum.title} Robot Vacuum`
+
+  return (
+    <ModalSheet
+      contentStyle={VACUUM_MODAL_STYLE}
+      footer={<VacuumModalNav activeTab={activeTab} onTabChange={setActiveTab} vacuumTitle={vacuum.title} />}
+      onClose={onClose}
+      open={open}
+      title={title}
+    >
+      <VacuumModalTabContent activeTab={activeTab} vacuum={vacuum} />
+    </ModalSheet>
   )
 }
 
@@ -478,7 +553,6 @@ export function VacuumCard({ vacuum }: VacuumCardProps) {
   const state = entity?.state
   const unavailable = isUnavailableState(state)
   const subtitle = vacuumSubtitle(state, battery?.state)
-  const title = `${vacuum.title} Robot Vacuum`
 
   useEffect(() => {
     const syncFromHash = () => setOpen(window.location.hash === `#${vacuum.hash}` && !unavailable)
@@ -498,11 +572,7 @@ export function VacuumCard({ vacuum }: VacuumCardProps) {
     setOpen(false)
   }, [])
 
-  const modal = useMemo(() => (
-    <ModalSheet onClose={closeModal} open={open} title={title}>
-      <VacuumModalContent vacuum={vacuum} />
-    </ModalSheet>
-  ), [closeModal, open, title, vacuum])
+  const modal = useMemo(() => <VacuumModal onClose={closeModal} open={open} vacuum={vacuum} />, [closeModal, open, vacuum])
 
   return (
     <>
