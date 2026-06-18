@@ -1,6 +1,7 @@
 .shell {
   position: relative;
-  min-height: 100vh;
+  height: 100dvh;
+  min-height: 100dvh;
   overflow: hidden;
   color: var(--color-text);
   background: #111723;
@@ -35,7 +36,7 @@
 .content {
   position: relative;
   z-index: 2;
-  height: 100vh;
+  height: 100dvh;
   min-height: 0;
   overflow: hidden;
   box-sizing: border-box;

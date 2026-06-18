@@ -2,15 +2,23 @@ import { useEffect, useRef, useState, type CSSProperties, type RefObject } from 
 import { flushSync } from 'react-dom'
 import { useEntity, useHass } from '@hakit/core'
 import { MaterialIcon } from '../core/Icon'
+import { GlassTile, type TileTone } from '../core/GlassTile'
 import type { MediaRemoteAction, MediaRemoteAppConfig, MediaRemoteButtonConfig, MediaRemoteConfig, MediaRemoteDeviceConfig, MediaRemoteIconColorRule } from '../../constants/mediaRemotes'
 import { asEntityName, titleCaseState } from './entityState'
 import styles from './MediaRemoteModalContent.module.css'
 
 type CallService = (params: Record<string, unknown>) => void
 type TextPromptAction = Extract<MediaRemoteAction, { type: 'textPrompt' }>
+export type MediaRemoteModalTab = 'controls' | 'apps' | 'devices'
 
 const VOLUME_OPTIMISTIC_REVERT_MS = 2500
 const REMOTE_ACCORDION_DEBUG_KEY = 'haDash.remoteAccordionDebug'
+const BASE_MEDIA_REMOTE_MODAL_TABS: { icon: string; label: string; tab: MediaRemoteModalTab }[] = [
+  { icon: 'mdi:remote', label: 'Controls', tab: 'controls' },
+  { icon: 'mdi:play-box', label: 'Apps', tab: 'apps' },
+]
+const DEVICES_MEDIA_REMOTE_MODAL_TAB: { icon: string; label: string; tab: MediaRemoteModalTab } = { icon: 'mdi:projector', label: 'Devices', tab: 'devices' }
+const DESKTOP_MODAL_QUERY = '(min-width: 760px)'
 
 interface EntityLike {
   attributes: Record<string, unknown>
@@ -31,6 +39,14 @@ function formatMediaState(entity: EntityLike | null | undefined, fallback = 'Una
   if (entity.state === 'unavailable') return 'Unavailable'
   if (entity.state === 'unknown') return 'Unknown'
   return titleCaseState(entity.state)
+}
+
+function mediaRemoteModalTabs(showDevices: boolean) {
+  return showDevices ? [...BASE_MEDIA_REMOTE_MODAL_TABS, DEVICES_MEDIA_REMOTE_MODAL_TAB] : BASE_MEDIA_REMOTE_MODAL_TABS
+}
+
+function shouldResetScrollOnTabChange() {
+  return typeof window.matchMedia !== 'function' || window.matchMedia(DESKTOP_MODAL_QUERY).matches
 }
 
 function textInputCommand(value: string) {
@@ -164,25 +180,16 @@ function RemoteSpacer({ size = 'large' }: { size?: 'large' | 'round' | 'small' }
   return <span aria-hidden="true" className={styles.remoteSpacer} data-size={size} />
 }
 
-function remoteGridButtonSize(config: MediaRemoteConfig, button: MediaRemoteButtonConfig): 'large' | 'round' | 'small' {
-  if (button === config.powerButton) return 'small'
-  if (button === config.backButton || button === config.homeButton || button === config.keyboardButton) return 'round'
-  return 'large'
-}
-
-function RemoteGrid({ config, disabled, hideKeyboard, onTextPrompt }: { config: MediaRemoteConfig; disabled: boolean; hideKeyboard: boolean; onTextPrompt: (action: TextPromptAction) => void }) {
-  const keyboardButton = hideKeyboard ? undefined : config.keyboardButton
+function RemoteGrid({ config, disabled, onTextPrompt }: { config: MediaRemoteConfig; disabled: boolean; onTextPrompt: (action: TextPromptAction) => void }) {
   const cells = [
-    undefined, undefined, config.powerButton,
     undefined, config.upButton, undefined,
     config.leftButton, config.selectButton, config.rightButton,
     undefined, config.downButton, undefined,
-    config.backButton, config.homeButton, keyboardButton,
   ]
 
   return (
     <div className={styles.remoteGrid} role="group" aria-label={`${config.title} remote controls`}>
-      {cells.map((button, index) => button ? <RemoteButton button={button} disabled={button === config.powerButton ? false : disabled} key={`${button.label}-${index}`} onTextPrompt={onTextPrompt} size={remoteGridButtonSize(config, button)} /> : <RemoteSpacer key={`spacer-${index}`} />)}
+      {cells.map((button, index) => button ? <RemoteButton button={button} disabled={disabled} key={`${button.label}-${index}`} onTextPrompt={onTextPrompt} size="large" /> : <RemoteSpacer key={`spacer-${index}`} />)}
     </div>
   )
 }
@@ -192,6 +199,69 @@ function ButtonRow({ buttons, disabled, onTextPrompt, size = 'small' }: { button
     <div className={styles.buttonRow} data-size={size}>
       {buttons.map((button, index) => button ? <RemoteButton button={button} disabled={disabled} key={button.label} onTextPrompt={onTextPrompt} size={size} /> : <RemoteSpacer key={`empty-${index}`} size={size} />)}
     </div>
+  )
+}
+
+function PowerButton({ button, controlEntity, onTextPrompt }: { button: MediaRemoteButtonConfig; controlEntity: EntityLike | null; onTextPrompt: (action: TextPromptAction) => void }) {
+  const callService = useHass((state) => state.helpers.callService) as unknown as CallService
+  const entities = useHass((state) => state.entities) as unknown as Record<string, EntityLike | undefined>
+  const iconColor = iconColorFromRule(button.iconColorRule, entities)
+  const iconRotation = button.iconRotationDegrees ? `rotate(${button.iconRotationDegrees} 12 12)` : undefined
+  const powerLabel = isOff(controlEntity) ? 'Power On' : 'Power Off'
+
+  return (
+    <button
+      aria-label={button.label}
+      className={`${styles.remoteButton} ${styles.powerButton}`}
+      data-icon={button.icon}
+      data-size="power"
+      onClick={() => runAction(callService, button.action, entities, undefined, onTextPrompt)}
+      style={iconColor ? { color: iconColor } : undefined}
+      type="button"
+    >
+      <MaterialIcon name={button.icon} pathTransform={iconRotation} size={30} />
+      <span aria-hidden="true" className={styles.powerButtonLabel}>{powerLabel}</span>
+    </button>
+  )
+}
+
+function PowerSection({ config, controlEntity, onTextPrompt }: { config: MediaRemoteConfig; controlEntity: EntityLike | null; onTextPrompt: (action: TextPromptAction) => void }) {
+  return (
+    <section className={`${styles.section} ${styles.powerSection}`} data-section="remote-power">
+      <PowerButton button={config.powerButton} controlEntity={controlEntity} onTextPrompt={onTextPrompt} />
+    </section>
+  )
+}
+
+function RemoteShortcutSection({
+  config,
+  controlsDisabled,
+  hideKeyboard,
+  onTextPrompt,
+  onTextPromptCancel,
+  onTextPromptExited,
+  onTextPromptSubmit,
+  textPrompt,
+  textPromptInputRef,
+}: {
+  config: MediaRemoteConfig
+  controlsDisabled: boolean
+  hideKeyboard: boolean
+  onTextPrompt: (action: TextPromptAction) => void
+  onTextPromptCancel: () => void
+  onTextPromptExited: () => void
+  onTextPromptSubmit: (action: TextPromptAction, text: string) => void
+  textPrompt: { action: TextPromptAction; open: boolean } | null
+  textPromptInputRef: RefObject<HTMLInputElement | null>
+}) {
+  const keyboardButton = hideKeyboard ? undefined : config.keyboardButton
+
+  return (
+    <section className={styles.section} data-section="remote-shortcuts">
+      <SectionHeader title="Navigation" />
+      <ButtonRow buttons={[config.backButton, config.homeButton, keyboardButton]} disabled={controlsDisabled} onTextPrompt={onTextPrompt} size="round" />
+      {textPrompt ? <TextPromptForm action={textPrompt.action} inputRef={textPromptInputRef} onCancel={onTextPromptCancel} onExited={onTextPromptExited} onSubmit={onTextPromptSubmit} open={textPrompt.open} /> : null}
+    </section>
   )
 }
 
@@ -335,7 +405,7 @@ function VolumeSlider({ entityId, title }: { entityId: string; title: string }) 
   const entity = useEntity(asEntityName(entityId), { returnNullIfNotFound: true }) as EntityLike | null
   const [optimisticPercent, setOptimisticPercent] = useState<number | null>(null)
   const revertTimerRef = useRef<number | null>(null)
-  const unavailable = isUnavailable(entity)
+  const disabled = isOff(entity)
   const volumeLevel = typeof entity?.attributes.volume_level === 'number' ? entity.attributes.volume_level : 0
   const volumePercent = Math.round(volumeLevel * 100)
   const displayedPercent = optimisticPercent ?? volumePercent
@@ -366,11 +436,11 @@ function VolumeSlider({ entityId, title }: { entityId: string; title: string }) 
   }
 
   return (
-    <label className={styles.volumeSlider} data-muted={unavailable ? 'true' : 'false'}>
+    <label className={styles.volumeSlider} data-muted={disabled ? 'true' : 'false'}>
       <span className={styles.srOnly}>{title} volume</span>
       <input
         aria-label={`${title} volume`}
-        disabled={unavailable}
+        disabled={disabled}
         max={100}
         min={0}
         onChange={(event) => commitVolume(Number(event.currentTarget.value))}
@@ -388,17 +458,11 @@ function DeviceButton({ device }: { device: MediaRemoteDeviceConfig }) {
   const entity = useEntity(asEntityName(device.entityId), { returnNullIfNotFound: true }) as EntityLike | null
   const unavailable = isUnavailable(entity)
   const subtitle = formatMediaState(entity)
+  const tone: TileTone = device.entityId.startsWith('input_boolean.') ? 'switch' : 'media'
+  const runDeviceAction = unavailable ? undefined : () => runAction(callService, device.action, entities, device.entityId, () => undefined)
 
   return (
-    <button aria-label={`${device.title} ${subtitle}`} className={styles.deviceButton} disabled={unavailable} onClick={() => runAction(callService, device.action, entities, device.entityId, () => undefined)} type="button">
-      <span className={styles.deviceIcon}>
-        <MaterialIcon name={device.icon} size={22} />
-      </span>
-      <span>
-        <strong>{device.title}</strong>
-        <span>{subtitle}</span>
-      </span>
-    </button>
+    <GlassTile icon={device.icon} isOff={isOff(entity)} onClick={runDeviceAction} subtitle={subtitle} title={device.title} tone={tone} />
   )
 }
 
@@ -414,16 +478,162 @@ function AppButton({ app }: { app: MediaRemoteAppConfig }) {
   )
 }
 
-export function MediaRemoteModalContent({ config }: { config: MediaRemoteConfig }) {
+export function MediaRemoteModalNav({ activeTab, onTabChange, remoteTitle, showDevices = false }: { activeTab: MediaRemoteModalTab; onTabChange: (tab: MediaRemoteModalTab) => void; remoteTitle: string; showDevices?: boolean }) {
+  const tabs = mediaRemoteModalTabs(showDevices)
+  const effectiveActiveTab = tabs.some((tab) => tab.tab === activeTab) ? activeTab : 'controls'
+
+  return (
+    <nav aria-label={`${remoteTitle} modal sections`} className={styles.remoteModalNav} style={{ '--remote-nav-tab-count': tabs.length } as CSSProperties}>
+      {tabs.map((item) => {
+        const isActive = effectiveActiveTab === item.tab
+        return (
+          <button
+            aria-current={isActive ? 'page' : undefined}
+            aria-label={item.label}
+            className={[styles.remoteModalNavButton, isActive ? styles.remoteModalNavButtonActive : ''].filter(Boolean).join(' ')}
+            key={item.tab}
+            onClick={() => onTabChange(item.tab)}
+            type="button"
+          >
+            <MaterialIcon name={item.icon} size={22} />
+          </button>
+        )
+      })}
+    </nav>
+  )
+}
+
+function MediaRemoteModalTabContent({
+  activeTab,
+  config,
+  controlsDisabled,
+  hideKeyboard,
+  onTextPrompt,
+  showMediaControls,
+  showVolumeControls,
+  volumeControlsDisabled,
+  textPrompt,
+  textPromptInputRef,
+  onTextPromptCancel,
+  onTextPromptExited,
+  onTextPromptSubmit,
+}: {
+  activeTab: MediaRemoteModalTab
+  config: MediaRemoteConfig
+  controlsDisabled: boolean
+  hideKeyboard: boolean
+  onTextPrompt: (action: TextPromptAction) => void
+  showMediaControls: boolean
+  showVolumeControls: boolean
+  volumeControlsDisabled: boolean
+  textPrompt: { action: TextPromptAction; open: boolean } | null
+  textPromptInputRef: RefObject<HTMLInputElement | null>
+  onTextPromptCancel: () => void
+  onTextPromptExited: () => void
+  onTextPromptSubmit: (action: TextPromptAction, text: string) => void
+}) {
+  const controlEntity = useEntity(asEntityName(config.controlEntityId), { returnNullIfNotFound: true }) as EntityLike | null
+  const modalBodyRef = useRef<HTMLDivElement | null>(null)
+  const modalPanelRef = useRef<HTMLDivElement | null>(null)
+  const tabContentRef = useRef<HTMLDivElement | null>(null)
+  const availableTabs = mediaRemoteModalTabs(Boolean(config.devices?.length))
+  const effectiveActiveTab = availableTabs.some((tab) => tab.tab === activeTab) ? activeTab : 'controls'
+  const selectedTabLabel = availableTabs.find((tab) => tab.tab === effectiveActiveTab)?.label ?? 'Controls'
+
+  useEffect(() => {
+    if (!shouldResetScrollOnTabChange()) return
+
+    const scrollContainers = [
+      modalPanelRef.current,
+      tabContentRef.current,
+      modalBodyRef.current,
+      modalBodyRef.current ? scrollableAncestor(modalBodyRef.current) : null,
+    ]
+    for (const scrollContainer of scrollContainers) {
+      if (!scrollContainer || typeof scrollContainer.scrollTo !== 'function') continue
+      scrollContainer.scrollTo({ top: 0, behavior: 'auto' })
+    }
+  }, [activeTab])
+
+  return (
+    <div className={styles.modalBody} ref={modalBodyRef}>
+      <div aria-label={`${config.title} ${selectedTabLabel}`} className={styles.rightPane} role="group">
+        <PowerSection config={config} controlEntity={controlEntity} onTextPrompt={onTextPrompt} />
+
+        <div className={styles.tabPanel} data-scroll-region="media-remote-panel" data-tab={effectiveActiveTab} ref={modalPanelRef}>
+          <section className={`${styles.section} ${styles.remoteControlSection}`}>
+            <RemoteGrid config={config} disabled={controlsDisabled} onTextPrompt={onTextPrompt} />
+          </section>
+
+          <div className={styles.tabContent} ref={tabContentRef}>
+            {effectiveActiveTab === 'controls' ? (
+              <>
+                {showVolumeControls ? (
+                  <section className={styles.section}>
+                    <SectionHeader title={config.volumeTitle} />
+                    <VolumeSlider entityId={config.volumeEntityId} title={config.volumeTitle} />
+                    <ButtonRow buttons={[config.volumeDownButton, config.volumeMuteButton, config.volumeUpButton]} disabled={volumeControlsDisabled} onTextPrompt={onTextPrompt} size="round" />
+                  </section>
+                ) : null}
+
+                <RemoteShortcutSection
+                  config={config}
+                  controlsDisabled={controlsDisabled}
+                  hideKeyboard={hideKeyboard}
+                  onTextPrompt={onTextPrompt}
+                  onTextPromptCancel={onTextPromptCancel}
+                  onTextPromptExited={onTextPromptExited}
+                  onTextPromptSubmit={onTextPromptSubmit}
+                  textPrompt={textPrompt}
+                  textPromptInputRef={textPromptInputRef}
+                />
+
+                <section className={styles.section} data-desktop-muted-only={showMediaControls ? 'false' : 'true'} data-muted={showMediaControls ? 'false' : 'true'}>
+                  <SectionHeader title="Controls" />
+                  <ButtonRow buttons={[config.pauseButton, undefined, config.playButton]} disabled={controlsDisabled} onTextPrompt={onTextPrompt} size="round" />
+                </section>
+              </>
+            ) : null}
+
+            {effectiveActiveTab === 'apps' && config.appCards?.length ? (
+              <section className={styles.section}>
+                <SectionHeader title={config.appSectionTitle ?? 'Media'} />
+                <div className={styles.appGrid}>
+                  {config.appCards.map((app) => <AppButton app={app} key={app.title} />)}
+                </div>
+              </section>
+            ) : null}
+
+            {effectiveActiveTab === 'devices' && config.devices?.length ? (
+              <section className={styles.section}>
+                <SectionHeader title="Devices" />
+                <div className={styles.deviceGrid}>
+                  {config.devices.map((device) => <DeviceButton device={device} key={device.title} />)}
+                </div>
+              </section>
+            ) : null}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+export function MediaRemoteModalContent({ activeTab: controlledActiveTab, config, onTabChange }: { activeTab?: MediaRemoteModalTab; config: MediaRemoteConfig; onTabChange?: (tab: MediaRemoteModalTab) => void }) {
   const callService = useHass((state) => state.helpers.callService) as unknown as CallService
   const controlEntity = useEntity(asEntityName(config.controlEntityId), { returnNullIfNotFound: true }) as EntityLike | null
   const volumeEntity = useEntity(asEntityName(config.volumeEntityId), { returnNullIfNotFound: true }) as EntityLike | null
+  const [localActiveTab, setLocalActiveTab] = useState<MediaRemoteModalTab>('controls')
   const [textPrompt, setTextPrompt] = useState<{ action: TextPromptAction; open: boolean } | null>(null)
   const textPromptInputRef = useRef<HTMLInputElement | null>(null)
+  const activeTab = controlledActiveTab ?? localActiveTab
+  const setActiveTab = onTabChange ?? setLocalActiveTab
+  const hasExternalNav = Boolean(onTabChange)
   const controlEntityOff = isOff(controlEntity)
   const controlsDisabled = controlEntityOff
   const hideKeyboard = Boolean(config.hideKeyboardWhenOff && controlEntityOff)
-  const showVolumeControls = !isOff(volumeEntity)
+  const volumeControlsDisabled = isOff(volumeEntity)
+  const showVolumeControls = config.showVolumeWhenOff ? Boolean(volumeEntity) : !volumeControlsDisabled
   const showMediaControls = !isOff(controlEntity)
 
   const openTextPrompt = (action: TextPromptAction) => {
@@ -450,44 +660,23 @@ export function MediaRemoteModalContent({ config }: { config: MediaRemoteConfig 
   }
 
   return (
-    <div className={styles.remoteModal}>
-      <section className={`${styles.section} ${styles.remoteControlSection}`}>
-        <RemoteGrid config={config} disabled={controlsDisabled} hideKeyboard={hideKeyboard} onTextPrompt={openTextPrompt} />
-        {textPrompt ? <TextPromptForm action={textPrompt.action} inputRef={textPromptInputRef} onCancel={closeTextPrompt} onExited={() => setTextPrompt(null)} onSubmit={submitTextPrompt} open={textPrompt.open} /> : null}
-      </section>
-
-      {showVolumeControls ? (
-        <section className={styles.section}>
-          <SectionHeader title={config.volumeTitle} />
-          <VolumeSlider entityId={config.volumeEntityId} title={config.volumeTitle} />
-          <ButtonRow buttons={[config.volumeDownButton, config.volumeMuteButton, config.volumeUpButton]} disabled={isUnavailable(controlEntity)} onTextPrompt={openTextPrompt} size="round" />
-        </section>
-      ) : null}
-
-      {showMediaControls ? (
-        <section className={styles.section}>
-          <SectionHeader title="Controls" />
-          <ButtonRow buttons={[config.pauseButton, undefined, config.playButton]} disabled={controlsDisabled} onTextPrompt={openTextPrompt} size="round" />
-        </section>
-      ) : null}
-
-      {config.appCards?.length ? (
-        <section className={styles.section}>
-          <SectionHeader title={config.appSectionTitle ?? 'Media'} />
-          <div className={styles.appGrid}>
-            {config.appCards.map((app) => <AppButton app={app} key={app.title} />)}
-          </div>
-        </section>
-      ) : null}
-
-      {config.devices?.length ? (
-        <section className={styles.section}>
-          <SectionHeader title="Devices" />
-          <div className={styles.deviceGrid}>
-            {config.devices.map((device) => <DeviceButton device={device} key={device.title} />)}
-          </div>
-        </section>
-      ) : null}
+    <div className={styles.remoteModal} data-inline-nav={hasExternalNav ? 'false' : 'true'}>
+      <MediaRemoteModalTabContent
+        activeTab={activeTab}
+        config={config}
+        controlsDisabled={controlsDisabled}
+        hideKeyboard={hideKeyboard}
+        onTextPrompt={openTextPrompt}
+        onTextPromptCancel={closeTextPrompt}
+        onTextPromptExited={() => setTextPrompt(null)}
+        onTextPromptSubmit={submitTextPrompt}
+        showMediaControls={showMediaControls}
+        showVolumeControls={showVolumeControls}
+        volumeControlsDisabled={volumeControlsDisabled}
+        textPrompt={textPrompt}
+        textPromptInputRef={textPromptInputRef}
+      />
+      {!hasExternalNav ? <MediaRemoteModalNav activeTab={activeTab} onTabChange={setActiveTab} remoteTitle={config.title} showDevices={Boolean(config.devices?.length)} /> : null}
     </div>
   )
 }

@@ -574,19 +574,15 @@ export const MEDIA_SECTIONS: EntitySectionConfig[] = [
   {
     title: 'Living Room',
     items: [
-      { title: 'SHIELD', entityId: 'media_player.living_room_shield', icon: 'mdi:remote', color: MEDIA_COLOR },
-      { title: 'Living Room SHIELD 2', entityId: 'media_player.living_room_shield_2', icon: 'mdi:remote', color: MEDIA_COLOR },
-      { title: 'Sonos', entityId: 'media_player.sonos', icon: 'mdi:speaker', color: MEDIA_COLOR },
+      { title: 'Living Room SHIELD', entityId: 'media_player.living_room_shield', icon: 'mdi:remote', color: MEDIA_COLOR },
     ],
   },
   {
     title: 'Theater Room',
     items: [
-      { title: 'Theater SHIELD', entityId: 'media_player.theater_room_shield', icon: 'mdi:remote', color: MEDIA_COLOR },
-      { title: 'Theater', entityId: 'media_player.theater', icon: 'mdi:speaker-multiple', color: MEDIA_COLOR },
-      { title: 'Projector', entityId: 'media_player.sony_projector', icon: 'mdi:projector', color: MEDIA_COLOR },
-      { title: 'Nintendo Switch', entityId: 'input_boolean.is_nintendo_switch_active', icon: 'mdi:nintendo-switch', color: MEDIA_COLOR, action: { type: 'toggle' } },
-      { title: 'Theater SHIELD Active', entityId: 'input_boolean.is_theater_shield_active', icon: 'mdi:television-play', color: MEDIA_COLOR, action: { type: 'toggle' } },
+      { title: 'Theater Room', entityId: 'media_player.sony_projector', icon: 'mdi:projector', color: MEDIA_COLOR },
+      { title: 'Nintendo Switch', entityId: 'input_boolean.is_nintendo_switch_active', icon: 'mdi:nintendo-switch', color: MEDIA_COLOR, action: { type: 'service', domain: 'script', service: 'theater_room_nintendo_switch', target: null } },
+      { title: 'Theater SHIELD', entityId: 'input_boolean.is_theater_shield_active', icon: 'mdi:television', color: MEDIA_COLOR, action: { type: 'service', domain: 'script', service: 'theater_room_tv_movie', target: null } },
     ],
   },
 ]

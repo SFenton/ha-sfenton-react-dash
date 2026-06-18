@@ -16,10 +16,10 @@
   display: flex;
   width: 100vw;
   max-width: 100vw;
-  height: 90vh;
-  max-height: 90vh;
-  height: 90dvh;
-  max-height: 90dvh;
+  height: var(--modal-mobile-height, 90vh);
+  max-height: var(--modal-mobile-max-height, 90vh);
+  height: var(--modal-mobile-height, 90dvh);
+  max-height: var(--modal-mobile-max-height, 90dvh);
   flex-direction: column;
   border: 1px solid rgba(0, 0, 0, 0);
   border-bottom: 0;

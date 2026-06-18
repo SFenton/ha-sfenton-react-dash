@@ -54,6 +54,7 @@ export interface MediaRemoteConfig {
   rightButton: MediaRemoteButtonConfig
   roomTitle: string
   selectButton: MediaRemoteButtonConfig
+  showVolumeWhenOff?: boolean
   title: string
   upButton: MediaRemoteButtonConfig
   volumeDownButton: MediaRemoteButtonConfig
@@ -83,10 +84,6 @@ function remoteCommand(remoteEntityId: string, command: string): MediaRemoteActi
   return service('remote', 'send_command', remoteEntityId, { command })
 }
 
-function adbCommand(targetEntityId: string, command: string): MediaRemoteAction {
-  return service('androidtv', 'adb_command', targetEntityId, { command })
-}
-
 function appleTvCommand(command: string): MediaRemoteAction {
   return service('script', 'apple_tv_remote_send_command', undefined, { remote_entity: 'remote.master_bedroom_apple_tv', command })
 }
@@ -106,7 +103,8 @@ function powerIconColorRule(entityIds: string[], inactiveStates: string[], inact
 const livingRoomRemote = 'remote.living_room_shield'
 const livingRoomLaunchEntity = 'media_player.living_room_shield'
 const livingRoomShield = 'media_player.living_room_shield_2'
-const theaterLaunchRemote = 'remote.theater_shield'
+const theaterRemote = 'remote.theater_shield_remote'
+const theaterLaunchRemote = theaterRemote
 const theaterShield = 'media_player.theater_room_shield'
 const theaterProjector = 'media_player.sony_projector'
 const theaterReceiver = 'media_player.theater'
@@ -153,8 +151,8 @@ export const MEDIA_REMOTE_CONFIGS: Record<string, MediaRemoteConfig> = {
     volumeDownButton: { label: 'Volume Down', icon: 'mdi:volume-minus', action: service('media_player', 'volume_down', 'media_player.sonos') },
     volumeMuteButton: { label: 'Mute', icon: 'mdi:volume-mute', action: service('script', 'toggle_sonos_mute', undefined, { sonosdevice: ['media_player.sonos'] }) },
     volumeUpButton: { label: 'Volume Up', icon: 'mdi:volume-plus', action: service('media_player', 'volume_up', 'media_player.sonos') },
-    pauseButton: { label: 'Pause', icon: 'mdi:pause', action: adbCommand(livingRoomShield, 'input keyevent KEYCODE_MEDIA_PAUSE') },
-    playButton: { label: 'Play', icon: 'mdi:play', action: adbCommand(livingRoomShield, 'input keyevent KEYCODE_MEDIA_PLAY') },
+    pauseButton: { label: 'Pause', icon: 'mdi:pause', action: remoteCommand(livingRoomRemote, 'MEDIA_PAUSE') },
+    playButton: { label: 'Play', icon: 'mdi:play', action: remoteCommand(livingRoomRemote, 'MEDIA_PLAY') },
   },
   '#master-bedroom-apple-tv': {
     hash: '#master-bedroom-apple-tv',
@@ -190,27 +188,28 @@ export const MEDIA_REMOTE_CONFIGS: Record<string, MediaRemoteConfig> = {
     controlEntityId: theaterShield,
     appSectionTitle: 'Media',
     appCards: androidAppCards(theaterShield, theaterLaunchRemote, { turn_on_projector: true }),
-    volumeTitle: 'Volume',
+    volumeTitle: 'Yamaha Volume',
     volumeEntityId: theaterReceiver,
+    showVolumeWhenOff: true,
     powerButton: {
       label: 'Power',
       icon: 'mdi:power',
       iconColorRule: powerIconColorRule([theaterShield], ['off', 'unavailable', 'unknown']),
       action: service('script', 'toggle_on_off_theater_room'),
     },
-    upButton: { label: 'Up', icon: 'mdi:chevron-up', action: adbCommand(theaterShield, 'input keyevent DPAD_UP') },
-    leftButton: { label: 'Left', icon: 'mdi:chevron-left', action: adbCommand(theaterShield, 'input keyevent DPAD_LEFT') },
-    selectButton: { label: 'Select', icon: ' ', action: adbCommand(theaterShield, 'input keyevent DPAD_CENTER') },
-    rightButton: { label: 'Right', icon: 'mdi:chevron-right', action: adbCommand(theaterShield, 'input keyevent DPAD_RIGHT') },
-    downButton: { label: 'Down', icon: 'mdi:chevron-down', action: adbCommand(theaterShield, 'input keyevent DPAD_DOWN') },
-    backButton: { label: 'Back', icon: 'mdi:triangle-down', iconRotationDegrees: 90, action: adbCommand(theaterShield, 'input keyevent KEYCODE_BACK') },
-    homeButton: { label: 'Home', icon: 'mdi:circle', action: adbCommand(theaterShield, 'input keyevent KEYCODE_HOME') },
+    upButton: { label: 'Up', icon: 'mdi:chevron-up', action: remoteCommand(theaterRemote, 'DPAD_UP') },
+    leftButton: { label: 'Left', icon: 'mdi:chevron-left', action: remoteCommand(theaterRemote, 'DPAD_LEFT') },
+    selectButton: { label: 'Select', icon: ' ', action: remoteCommand(theaterRemote, 'DPAD_CENTER') },
+    rightButton: { label: 'Right', icon: 'mdi:chevron-right', action: remoteCommand(theaterRemote, 'DPAD_RIGHT') },
+    downButton: { label: 'Down', icon: 'mdi:chevron-down', action: remoteCommand(theaterRemote, 'DPAD_DOWN') },
+    backButton: { label: 'Back', icon: 'mdi:triangle-down', iconRotationDegrees: 90, action: remoteCommand(theaterRemote, 'BACK') },
+    homeButton: { label: 'Home', icon: 'mdi:circle', action: remoteCommand(theaterRemote, 'HOME') },
     keyboardButton: { label: 'Keyboard', icon: 'mdi:keyboard', action: { type: 'textPrompt', targetEntityId: theaterShield } },
     volumeDownButton: { label: 'Volume Down', icon: 'mdi:volume-minus', action: service('media_player', 'volume_down', theaterReceiver) },
-    volumeMuteButton: { label: 'Mute', icon: 'mdi:volume-mute', action: service('media_player', 'volume_mute', theaterReceiver) },
+    volumeMuteButton: { label: 'Mute', icon: 'mdi:volume-mute', action: service('media_player', 'volume_mute', theaterReceiver, { is_volume_muted: true }) },
     volumeUpButton: { label: 'Volume Up', icon: 'mdi:volume-plus', action: service('media_player', 'volume_up', theaterReceiver) },
-    pauseButton: { label: 'Pause', icon: 'mdi:pause', action: adbCommand(theaterShield, 'input keyevent KEYCODE_MEDIA_PAUSE') },
-    playButton: { label: 'Play', icon: 'mdi:play', action: adbCommand(theaterShield, 'input keyevent KEYCODE_MEDIA_PLAY') },
+    pauseButton: { label: 'Pause', icon: 'mdi:pause', action: remoteCommand(theaterRemote, 'MEDIA_PAUSE') },
+    playButton: { label: 'Play', icon: 'mdi:play', action: remoteCommand(theaterRemote, 'MEDIA_PLAY') },
     devices: [
       { title: 'Projector', entityId: theaterProjector, icon: 'mdi:projector', action: service('media_player', 'toggle', theaterProjector) },
       { title: 'Yamaha AVR', entityId: theaterReceiver, icon: 'mdi:audio-video', action: service('media_player', 'toggle', theaterReceiver) },

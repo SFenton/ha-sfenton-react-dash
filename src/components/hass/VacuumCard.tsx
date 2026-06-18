@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { useEntity, useHass } from '@hakit/core'
 import { GlassTile } from '../core/GlassTile'
 import { MaterialIcon } from '../core/Icon'
@@ -17,6 +17,7 @@ const VACUUM_MODAL_TABS: { icon: string; label: string; tab: VacuumModalTab }[] 
   { icon: 'mdi:floor-plan', label: 'Zones', tab: 'zones' },
   { icon: 'mdi:dots-horizontal', label: 'More', tab: 'more' },
 ]
+const DESKTOP_MODAL_QUERY = '(min-width: 760px)'
 
 type CallService = (params: Record<string, unknown>) => void
 
@@ -36,6 +37,14 @@ function isUnavailableState(state: string | undefined) {
 
 function isResumable(statusFlag: string | undefined) {
   return statusFlag === 'resumable'
+}
+
+function shouldResetScrollOnTabChange() {
+  return typeof window.matchMedia !== 'function' || window.matchMedia(DESKTOP_MODAL_QUERY).matches
+}
+
+function vacuumModalTabs(vacuum: VacuumConfig) {
+  return vacuum.zones.length > 0 ? VACUUM_MODAL_TABS : VACUUM_MODAL_TABS.filter((tab) => tab.tab !== 'zones')
 }
 
 function isMeaningfulText(value: string | undefined) {
@@ -450,11 +459,14 @@ function VacuumZones({ vacuum }: { vacuum: VacuumConfig }) {
   )
 }
 
-function VacuumModalNav({ activeTab, onTabChange, vacuumTitle }: { activeTab: VacuumModalTab; onTabChange: (tab: VacuumModalTab) => void; vacuumTitle: string }) {
+function VacuumModalNav({ activeTab, onTabChange, vacuum }: { activeTab: VacuumModalTab; onTabChange: (tab: VacuumModalTab) => void; vacuum: VacuumConfig }) {
+  const tabs = vacuumModalTabs(vacuum)
+  const effectiveActiveTab = tabs.some((tab) => tab.tab === activeTab) ? activeTab : 'controls'
+
   return (
-    <nav aria-label={`${vacuumTitle} modal sections`} className={styles.vacuumModalNav}>
-      {VACUUM_MODAL_TABS.map((item) => {
-        const isActive = activeTab === item.tab
+    <nav aria-label={`${vacuum.title} modal sections`} className={styles.vacuumModalNav} style={{ '--vacuum-nav-tab-count': tabs.length } as CSSProperties}>
+      {tabs.map((item) => {
+        const isActive = effectiveActiveTab === item.tab
         return (
           <button
             aria-current={isActive ? 'page' : undefined}
@@ -475,9 +487,13 @@ function VacuumModalNav({ activeTab, onTabChange, vacuumTitle }: { activeTab: Va
 function VacuumModalTabContent({ activeTab, vacuum }: { activeTab: VacuumModalTab; vacuum: VacuumConfig }) {
   const modalBodyRef = useRef<HTMLDivElement | null>(null)
   const modalPanelRef = useRef<HTMLDivElement | null>(null)
-  const selectedTabLabel = VACUUM_MODAL_TABS.find((tab) => tab.tab === activeTab)?.label ?? 'Controls'
+  const tabs = vacuumModalTabs(vacuum)
+  const effectiveActiveTab = tabs.some((tab) => tab.tab === activeTab) ? activeTab : 'controls'
+  const panelLabel = vacuum.zones.length > 0 ? `${vacuum.title} controls, zones, and actions` : `${vacuum.title} controls and actions`
 
   useEffect(() => {
+    if (!shouldResetScrollOnTabChange()) return
+
     const scrollContainers = [modalPanelRef.current, modalBodyRef.current?.parentElement]
     for (const scrollContainer of scrollContainers) {
       if (!scrollContainer || typeof scrollContainer.scrollTo !== 'function') continue
@@ -490,10 +506,10 @@ function VacuumModalTabContent({ activeTab, vacuum }: { activeTab: VacuumModalTa
       <div aria-label={`${vacuum.title} map and status`} className={styles.leftPane} role="group">
         <VacuumMapAndStatus vacuum={vacuum} />
       </div>
-      <div aria-label={`${vacuum.title} ${selectedTabLabel}`} className={styles.rightPane} data-scroll-region="vacuum-panel" ref={modalPanelRef} role="group">
-        {activeTab === 'controls' && <VacuumControlsSection vacuum={vacuum} />}
-        {activeTab === 'zones' && <VacuumZones vacuum={vacuum} />}
-        {activeTab === 'more' && <VacuumEmptyDockSection vacuum={vacuum} />}
+      <div aria-label={panelLabel} className={styles.rightPane} data-scroll-region="vacuum-panel" data-tab={effectiveActiveTab} ref={modalPanelRef} role="group">
+        {effectiveActiveTab === 'controls' && <VacuumControlsSection vacuum={vacuum} />}
+        {effectiveActiveTab === 'zones' && <VacuumZones vacuum={vacuum} />}
+        {effectiveActiveTab === 'more' && <VacuumEmptyDockSection vacuum={vacuum} />}
       </div>
     </div>
   )
@@ -524,7 +540,7 @@ export function VacuumRoomSourceModalContent({ vacuum }: VacuumCardProps) {
   return (
     <>
       <VacuumModalTabContent activeTab={activeTab} vacuum={vacuum} />
-      <VacuumModalNav activeTab={activeTab} onTabChange={setActiveTab} vacuumTitle={vacuum.title} />
+      <VacuumModalNav activeTab={activeTab} onTabChange={setActiveTab} vacuum={vacuum} />
     </>
   )
 }
@@ -536,7 +552,7 @@ function VacuumModal({ onClose, open, vacuum }: { onClose: () => void; open: boo
   return (
     <ModalSheet
       contentStyle={VACUUM_MODAL_STYLE}
-      footer={<VacuumModalNav activeTab={activeTab} onTabChange={setActiveTab} vacuumTitle={vacuum.title} />}
+      footer={<VacuumModalNav activeTab={activeTab} onTabChange={setActiveTab} vacuum={vacuum} />}
       onClose={onClose}
       open={open}
       title={title}

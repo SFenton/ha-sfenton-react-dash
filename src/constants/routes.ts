@@ -51,6 +51,7 @@ export const PRIMARY_NAV_ROUTES = [
 
 const HOME_SUB_ROUTE_PATHS = new Set([
   'back-deck',
+  'custom-lights',
   'dining-room',
   'downstairs-hallway',
   'entryway',
@@ -63,9 +64,11 @@ const HOME_SUB_ROUTE_PATHS = new Set([
   'living-room',
   'master-bathroom',
   'master-bedroom',
+  'media',
   'music-room',
   'office',
   'theater-room',
+  'vacuums',
 ])
 
 export function primaryNavPathForRoute(path: string | undefined) {

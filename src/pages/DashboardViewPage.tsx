@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type MouseEvent, type PointerEvent, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type MouseEvent, type PointerEvent, type ReactNode } from 'react'
 import { useEntity, useHass, useUser } from '@hakit/core'
 import { ControlSliderCircular, ControlToggle } from '@hakit/components'
 import type { HassEntity } from 'home-assistant-js-websocket'
@@ -19,7 +19,8 @@ import { VACUUM_MODAL_STYLE } from '../components/hass/vacuumModalStyle'
 import { AirQualityModalContent } from '../components/hass/AirQualityModalContent'
 import { GrillModalContent } from '../components/hass/GrillModalContent'
 import { HumidifierModalContent } from '../components/hass/HumidifierModalContent'
-import { MediaRemoteModalContent } from '../components/hass/MediaRemoteModalContent'
+import { MediaRemoteModalContent, MediaRemoteModalNav, type MediaRemoteModalTab } from '../components/hass/MediaRemoteModalContent'
+import { MEDIA_REMOTE_MODAL_STYLE } from '../components/hass/mediaRemoteModalStyle'
 import { Card, type CardColor } from '../components/core/Card'
 import { Description } from '../components/core/Description'
 import { FloatingActionButton } from '../components/core/FloatingActionButton'
@@ -30,7 +31,7 @@ import { OptionPickerDialog, type PickerOption } from '../components/core/Option
 import { SectionHeader } from '../components/core/SectionHeader'
 import { derivedAirPurifierEntityIds, formatAirQualitySummary } from '../components/hass/airQualityState'
 import { resolveEntityAction, type EntityActionStateMap } from '../components/hass/entityActions'
-import { asEntityName, formatCompactEntityState, isActiveState, isContactOpen, isOccupancyActive, titleCaseState } from '../components/hass/entityState'
+import { asEntityName, formatCompactEntityState, formatContactEntityState, isActiveState, isContactOpen, isOccupancyActive, titleCaseState } from '../components/hass/entityState'
 import { DASHBOARD_ROUTE_CHANGE_EVENT, dashboardEventTargets, dashboardHash, dashboardPathWithSearch, replaceDashboardUrl } from '../hooks/dashboardLocation'
 import { useHashModal } from '../hooks/useHashModal'
 import { useOptimisticState } from '../hooks/useOptimisticState'
@@ -75,6 +76,7 @@ import {
   VACUUM_COLOR,
   VACUUMS,
   type TodoListConfig,
+  type TodoPageConfig,
   type EntitySectionConfig,
   type SettingsLinkConfig,
 } from '../constants/portedDashboard'
@@ -567,6 +569,7 @@ function RoomSourceCard({ card, eightSleepModalState, onOpen }: { card: RoomSour
 function RoomSourceModal({ card, eightSleepModalState, onClose, roomTitle }: { card: RoomSourceCardConfig | null; eightSleepModalState?: EightSleepBedModalState; onClose: () => void; roomTitle: string }) {
   const lastCardRef = useRef<RoomSourceCardConfig | null>(null)
   const lastEightSleepModalStateRef = useRef<EightSleepBedModalState | null>(null)
+  const [mediaActiveTab, setMediaActiveTab] = useState<MediaRemoteModalTab>('controls')
   if (card) lastCardRef.current = card
 
   const renderCard = card ?? lastCardRef.current
@@ -574,14 +577,25 @@ function RoomSourceModal({ card, eightSleepModalState, onClose, roomTitle }: { c
   if (card && eightSleepSide && eightSleepModalState) lastEightSleepModalStateRef.current = eightSleepModalState
 
   const renderedEightSleepModalState = card ? eightSleepModalState : lastEightSleepModalStateRef.current
-  const content = renderCard && !eightSleepSide ? renderRoomReusableSheet(renderCard, roomTitle) : null
+  const mediaRemote = renderCard?.kind === 'media' && renderCard.hash ? MEDIA_REMOTE_CONFIGS[renderCard.hash] : undefined
+  const content = renderCard && !eightSleepSide
+    ? mediaRemote
+      ? <MediaRemoteModalContent activeTab={mediaActiveTab} config={mediaRemote} key={mediaRemote.hash} onTabChange={setMediaActiveTab} />
+      : renderRoomReusableSheet(renderCard, roomTitle)
+    : null
   const plainTitle = renderCard?.kind === 'air' || renderCard?.kind === 'climate' || renderCard?.kind === 'contact' || renderCard?.kind === 'humidifier' || renderCard?.kind === 'light' || renderCard?.kind === 'occupancy'
-  const mediaTitle = renderCard?.kind === 'media' && renderCard.hash ? MEDIA_REMOTE_CONFIGS[renderCard.hash]?.remoteTitle : undefined
+  const mediaTitle = mediaRemote?.remoteTitle
   const title = renderCard ? mediaTitle ?? `${roomTitle}${plainTitle ? ' ' : ': '}${renderCard.modalTitle ?? renderCard.title}` : roomTitle
   const subtitle = useHass((state) => (renderCard && plainTitle && renderCard.kind !== 'contact' && renderCard.kind !== 'light' ? roomSourceModalSubtitle(renderCard, roomTitle, state.entities) : undefined))
-  const modalStyle = renderCard?.kind === 'vacuum'
-    ? VACUUM_MODAL_STYLE
+  const modalStyle = renderCard?.kind === 'media'
+    ? MEDIA_REMOTE_MODAL_STYLE
+    : renderCard?.kind === 'vacuum'
+      ? VACUUM_MODAL_STYLE
     : renderCard && SECURITY_SIZED_ROOM_SOURCE_KINDS.has(renderCard.kind) ? ROOM_SOURCE_SECURITY_SIZED_MODAL_STYLE : undefined
+
+  useEffect(() => {
+    setMediaActiveTab('controls')
+  }, [mediaRemote?.hash])
 
   if (renderCard && eightSleepSide && renderedEightSleepModalState) {
     return (
@@ -590,7 +604,14 @@ function RoomSourceModal({ card, eightSleepModalState, onClose, roomTitle }: { c
   }
 
   return (
-    <ModalSheet contentStyle={modalStyle} onClose={onClose} open={Boolean(card)} subtitle={subtitle} title={title}>
+    <ModalSheet
+      contentStyle={modalStyle}
+      footer={mediaRemote ? <MediaRemoteModalNav activeTab={mediaActiveTab} onTabChange={setMediaActiveTab} remoteTitle={mediaRemote.title} showDevices={Boolean(mediaRemote.devices?.length)} /> : undefined}
+      onClose={onClose}
+      open={Boolean(card)}
+      subtitle={subtitle}
+      title={title}
+    >
       {renderCard && (content ?? <RoomSourceFallback card={renderCard} />)}
     </ModalSheet>
   )
@@ -736,12 +757,16 @@ function RoomPage({ onNavigate, path, title }: { onNavigate: (path: string) => v
   )
 }
 
-function TodoPage({ onNavigate, path }: { onNavigate: (path: string) => void; path: string }) {
+function TodoPage({ onNavigate, onScrollLockChange, path }: { onNavigate: (path: string) => void; onScrollLockChange?: (locked: boolean) => void; path: string }) {
   const config = TODO_PAGES[path]
+  if (!config) return null
+  return <TodoPageContent config={config} onNavigate={onNavigate} onScrollLockChange={onScrollLockChange} path={path} />
+}
+
+function TodoPageContent({ config, onNavigate, onScrollLockChange, path }: { config: TodoPageConfig; onNavigate: (path: string) => void; onScrollLockChange?: (locked: boolean) => void; path: string }) {
   const user = useUser()
   const entities = useHass((state) => state.entities) as unknown as EntityActionStateMap
   const [sectionStates, setSectionStates] = useState<Record<string, { loaded: boolean; visible: boolean } | undefined>>({})
-  if (!config) return null
   const hideEmptyTodoSections = isChoreTodoPage(path)
   const visibleLists = config.lists.filter((list) => todoListVisible(list, user?.id, entities))
   const visibleListKeys = visibleLists.map((list) => list.entityId)
@@ -749,6 +774,7 @@ function TodoPage({ onNavigate, path }: { onNavigate: (path: string) => void; pa
   const allSectionsLoaded = hideEmptyTodoSections && visibleListKeys.length > 0 && loadedSectionStates.length === visibleListKeys.length && loadedSectionStates.every((state) => state.loaded)
   const hasRenderedTaskSection = hideEmptyTodoSections ? loadedSectionStates.some((state) => state.visible) : visibleLists.length > 0
   const showTodoEmptyState = hideEmptyTodoSections && (visibleLists.length === 0 || (allSectionsLoaded && !hasRenderedTaskSection))
+  const lockPageScroll = path !== 'chores' && showTodoEmptyState
 
   const handleTodoSectionState = (entityId: string, state: { loaded: boolean; visible: boolean }) => {
     setSectionStates((current) => {
@@ -758,8 +784,13 @@ function TodoPage({ onNavigate, path }: { onNavigate: (path: string) => void; pa
     })
   }
 
+  useEffect(() => {
+    onScrollLockChange?.(lockPageScroll)
+    return () => onScrollLockChange?.(false)
+  }, [lockPageScroll, onScrollLockChange])
+
   return (
-    <div className={styles.stack}>
+    <div className={styles.stack} data-empty-todo-page={lockPageScroll ? 'true' : undefined}>
       {path === 'chores' && <ChoresIntro onNavigate={onNavigate} />}
       {showTodoEmptyState && <TodoEmptyState description={config.emptyDescription} title={config.emptyTitle} />}
       {visibleLists.map((list) => {
@@ -1198,8 +1229,17 @@ function VacationPage() {
   )
 }
 
+const MEDIA_PAGE_REMOTE_HASH_BY_ENTITY_ID: Record<string, string> = {
+  'media_player.living_room_shield': '#living-room-shield',
+  'media_player.living_room_shield_2': '#living-room-shield',
+  'media_player.sony_projector': '#theater-room-shield',
+  'media_player.theater_room_shield': '#theater-room-shield',
+}
+
 function mediaPageCardFromItem(item: EntitySectionConfig['items'][number]): RoomSourceCardConfig {
-  const hash = item.action?.type === 'navigate' && item.action.path.startsWith('#') ? item.action.path : undefined
+  const hash = item.action?.type === 'navigate' && item.action.path.startsWith('#')
+    ? item.action.path
+    : MEDIA_PAGE_REMOTE_HASH_BY_ENTITY_ID[item.entityId]
   const isLivingRoomShield = item.entityId === 'media_player.living_room_shield'
   return {
     action: hash ? undefined : item.action as RoomSourceCardAction | undefined,
@@ -1439,6 +1479,7 @@ type DashboardCallService = ReturnType<typeof useCallService>
 type ThermostatSliderTarget = 'high' | 'low' | 'value'
 type ThermostatDisplayTargets = { high: number | null; low: number | null; sourceKey: string; target: number | null }
 type ThermostatThermalStatus = 'cool' | 'heat' | 'idle'
+type ThermostatGlassTone = 'contact' | 'default'
 type FreeSleepScheduleStage = 'bedtime' | 'asleep' | 'dawn'
 type FreeSleepSide = 'left' | 'right'
 type FreeSleepAlarmOwner = 'stephen' | 'steph'
@@ -1550,6 +1591,7 @@ const EIGHT_SLEEP_BED_MODAL_STYLE: ModalSheetStyle = {
   '--modal-desktop-max-height': '70vh',
   '--modal-desktop-body-overflow-y': 'hidden',
 }
+const DESKTOP_MODAL_QUERY = '(min-width: 760px)'
 const FREE_SLEEP_ALARM_DAYS: { key: FreeSleepAlarmDay; label: string }[] = [
   { key: 'sunday', label: 'Sunday' },
   { key: 'monday', label: 'Monday' },
@@ -1559,6 +1601,10 @@ const FREE_SLEEP_ALARM_DAYS: { key: FreeSleepAlarmDay; label: string }[] = [
   { key: 'friday', label: 'Friday' },
   { key: 'saturday', label: 'Saturday' },
 ]
+
+function shouldResetScrollOnTabChange() {
+  return typeof window.matchMedia !== 'function' || window.matchMedia(DESKTOP_MODAL_QUERY).matches
+}
 const FREE_SLEEP_ALARM_DAY_KEYS = FREE_SLEEP_ALARM_DAYS.map((day) => day.key)
 const FREE_SLEEP_ALARM_SNOOZE_MINUTES = 10
 const FREE_SLEEP_CLEAR_ALARM_ENTITY_ID = 'button.nightcanvasrestful_clear_alarm'
@@ -3232,6 +3278,8 @@ function EightSleepBedModalContent({ activeTab, modalState, side }: { activeTab:
   const selectedTabLabel = EIGHT_SLEEP_MODAL_TABS.find((tab) => tab.tab === activeTab)?.label ?? 'Sleep Schedule'
 
   useEffect(() => {
+    if (!shouldResetScrollOnTabChange()) return
+
     const scrollContainers = [modalPanelRef.current, modalBodyRef.current?.parentElement]
     for (const scrollContainer of scrollContainers) {
       if (!scrollContainer || typeof scrollContainer.scrollTo !== 'function') continue
@@ -3417,7 +3465,7 @@ function ThermostatRoomRow({ onOpen, room }: { onOpen: (hash: string) => void; r
   )
 }
 
-function ThermostatGlassCard({ active = false, ariaLabel, children, hvacAction, icon, onMainClick, pressed, stateText, thermalStatus = 'idle', title }: { active?: boolean; ariaLabel?: string; children?: ReactNode; hvacAction?: string; icon: string; onMainClick?: () => void; pressed?: boolean; stateText: string; thermalStatus?: ThermostatThermalStatus; title: string }) {
+function ThermostatGlassCard({ active = false, ariaLabel, children, hvacAction, icon, onMainClick, pressed, stateText, thermalStatus = 'idle', title, tone = 'default' }: { active?: boolean; ariaLabel?: string; children?: ReactNode; hvacAction?: string; icon: string; onMainClick?: () => void; pressed?: boolean; stateText: string; thermalStatus?: ThermostatThermalStatus; title: string; tone?: ThermostatGlassTone }) {
   const content = (
     <>
       <MaterialIcon name={icon} size={34} />
@@ -3429,7 +3477,7 @@ function ThermostatGlassCard({ active = false, ariaLabel, children, hvacAction, 
   )
 
   return (
-    <div aria-label={ariaLabel} className={styles.thermostatGlassCard} data-active={active ? 'true' : 'false'} data-hvac-action={hvacAction} data-thermal-status={thermalStatus}>
+    <div aria-label={ariaLabel} className={styles.thermostatGlassCard} data-active={active ? 'true' : 'false'} data-hvac-action={hvacAction} data-thermal-status={thermalStatus} data-tone={tone}>
       {onMainClick ? (
         <button aria-label={`${title} ${stateText}`} aria-pressed={pressed ?? active} className={styles.thermostatGlassMain} onClick={onMainClick} type="button">
           {content}
@@ -3725,7 +3773,9 @@ function ThermostatTrackSection() {
 function OpenContactSensorCard({ entityId, title }: { entityId: string; title: string }) {
   const entity = useEntity(asEntityName(entityId), { returnNullIfNotFound: true })
   if (!entity || !isContactOpen(entity)) return null
-  return <ContactSensorCard entityId={entityId} size="compact" title={title} />
+  const icon = title.toLowerCase().includes('window') ? 'mdi:window-open' : 'mdi:door-open'
+  const stateText = formatContactEntityState(entity)
+  return <ThermostatGlassCard active ariaLabel={`${title} ${stateText}`} icon={icon} stateText={stateText} title={title} tone="contact" />
 }
 
 function OpenContactSensorsSection() {
@@ -3838,10 +3888,10 @@ function FallbackPage({ title }: { title: string }) {
   return <Notice>{title} is not available in the React dashboard yet.</Notice>
 }
 
-function Content({ onNavigate, path }: { onNavigate: (path: string) => void; path: string }) {
+function Content({ onNavigate, onScrollLockChange, path }: { onNavigate: (path: string) => void; onScrollLockChange?: (locked: boolean) => void; path: string }) {
   const roomTitle = roomNameFromPath(path)
   if (roomTitle) return <RoomPage onNavigate={onNavigate} path={path} title={roomTitle} />
-  if (TODO_PAGES[path]) return <TodoPage onNavigate={onNavigate} path={path} />
+  if (TODO_PAGES[path]) return <TodoPage onNavigate={onNavigate} onScrollLockChange={onScrollLockChange} path={path} />
   if (path === 'settings') return <SettingsPage onNavigate={onNavigate} />
   if (path === 'guests-staying-over') return <GuestControlsPage onNavigate={onNavigate} />
   if (path === 'vacation') return <VacationPage />
@@ -3859,6 +3909,11 @@ export function DashboardViewPage({ activePath, onNavigate, path }: DashboardVie
   const title = path === 'guests-staying-over' ? 'Guest Controls' : roomTitle ?? TODO_PAGES[path]?.title ?? CONTROL_PAGES[path]?.title ?? routeTitle(path)
   const showBack = !PRIMARY_NAV_ROUTES.some((route) => route.path === path)
   const createTaskAssignee = createTaskDefaultAssignee(path)
+  const [pageScrollLock, setPageScrollLock] = useState<{ locked: boolean; path: string }>({ locked: false, path })
+  const pageScrollLocked = pageScrollLock.path === path && pageScrollLock.locked
+  const handlePageScrollLockChange = useCallback((locked: boolean) => {
+    setPageScrollLock((current) => (current.path === path && current.locked === locked ? current : { locked, path }))
+  }, [path])
   const floatingAction = path === 'groceries'
     ? <CreateGroceryButton key={path} />
     : createTaskAssignee !== null ? <CreateChoreButton defaultAssignee={createTaskAssignee} key={path} /> : undefined
@@ -3868,8 +3923,8 @@ export function DashboardViewPage({ activePath, onNavigate, path }: DashboardVie
       {path === 'security' ? (
         <SecurityPage activePath={activePath} backPath={showBack ? 'overview' : undefined} onNavigate={onNavigate} title={title} />
       ) : (
-        <Page activePath={activePath} backPath={showBack ? 'overview' : undefined} headerQuickLinks={roomTitle ? <RoomSectionRail path={path} title={roomTitle} /> : undefined} onNavigate={onNavigate} title={title}>
-          <Content onNavigate={onNavigate} path={path} />
+        <Page activePath={activePath} backPath={showBack ? 'overview' : undefined} headerQuickLinks={roomTitle ? <RoomSectionRail path={path} title={roomTitle} /> : undefined} onNavigate={onNavigate} scrollLocked={pageScrollLocked} title={title}>
+          <Content onNavigate={onNavigate} onScrollLockChange={handlePageScrollLockChange} path={path} />
         </Page>
       )}
     </AppShell>

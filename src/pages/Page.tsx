@@ -11,9 +11,10 @@ interface PageProps {
   onNavigate?: (path: string) => void
   onProfile?: () => void
   onSettings?: () => void
+  scrollLocked?: boolean
 }
 
-export function Page({ activePath, backPath, title, headerQuickLinks, children, onNavigate, onProfile, onSettings }: PageProps) {
+export function Page({ activePath, backPath, title, headerQuickLinks, children, onNavigate, onProfile, onSettings, scrollLocked = false }: PageProps) {
   const actions: AppHeaderAction[] = [
     ...(onSettings ? [{ icon: 'mdi:cog', label: 'Settings', onClick: onSettings }] : []),
     ...(onProfile ? [{ icon: 'mdi:account-circle', label: 'Profile', onClick: onProfile }] : []),
@@ -25,8 +26,8 @@ export function Page({ activePath, backPath, title, headerQuickLinks, children, 
         <AppHeader activePath={activePath} actions={actions} backPath={backPath} onNavigate={onNavigate} title={title} />
         {headerQuickLinks && <div className={styles.headerQuickLinks}>{headerQuickLinks}</div>}
       </div>
-      <div className={styles.scroller}>
-        <div className={styles.scrollContent}>{children}</div>
+      <div className={styles.scroller} data-scroll-lock={scrollLocked ? 'true' : undefined}>
+        <div className={styles.scrollContent} data-scroll-lock={scrollLocked ? 'true' : undefined}>{children}</div>
       </div>
     </main>
   )

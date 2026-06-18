@@ -67,6 +67,10 @@ function inputButtonPress(target: string): RoomSourceBaseAction {
   return { type: 'service', domain: 'input_button', service: 'press', target }
 }
 
+function scriptAction(service: string): RoomSourceBaseAction {
+  return { type: 'service', domain: 'script', service, target: null }
+}
+
 function pcPowerAction(onTarget: string, offTarget: string): RoomSourceCardAction {
   return {
     type: 'state',
@@ -274,8 +278,8 @@ export const ROOM_PAGE_CONFIGS: Record<string, RoomPageSourceConfig> = {
       ] },
       { title: 'Media Controls', cards: [
         { title: 'Theater Room', entityId: 'media_player.sony_projector', icon: 'mdi:projector', kind: 'media', hash: '#theater-room-shield', showState: true },
-        { title: 'Theater SHIELD', entityId: 'input_boolean.is_theater_shield_active', icon: 'mdi:television', kind: 'media', showState: true, action: { type: 'toggle' } },
-        { title: 'Nintendo Switch', entityId: 'input_boolean.is_nintendo_switch_active', icon: 'mdi:gamepad', kind: 'media', showState: true, action: { type: 'toggle' } },
+        { title: 'Theater SHIELD', entityId: 'input_boolean.is_theater_shield_active', icon: 'mdi:television', kind: 'media', showState: true, action: scriptAction('theater_room_tv_movie') },
+        { title: 'Nintendo Switch', entityId: 'input_boolean.is_nintendo_switch_active', icon: 'mdi:gamepad', kind: 'media', showState: true, action: scriptAction('theater_room_nintendo_switch') },
         ...theaterAppShortcuts,
       ] },
       { title: 'Theater Room PCs', cards: [{ title: 'Theater Room PC', entityId: 'input_boolean.theater_pc_power', icon: 'mdi:projector', kind: 'power', subtitleEntityIds: ['input_text.theater_pc_power_state'], action: pcPowerAction('input_button.theater_pc_on', 'input_button.theater_pc_off') }] },

@@ -1,7 +1,48 @@
 .remoteModal {
   display: grid;
-  gap: 18px;
+  height: 100%;
+  min-height: 0;
   color: white;
+  overflow: hidden;
+}
+
+.remoteModal[data-inline-nav='true'] {
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: 10px;
+}
+
+.remoteModal[data-inline-nav='false'] {
+  grid-template-rows: minmax(0, 1fr);
+}
+
+.modalBody {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr);
+  height: 100%;
+  min-height: 0;
+  gap: 14px;
+  padding-top: 2px;
+  overflow-x: hidden;
+  overflow-y: hidden;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+}
+
+.modalBody::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+.rightPane {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  min-width: 0;
+  height: 100%;
+  min-height: 0;
+  align-content: stretch;
+  gap: 12px;
+  overflow: hidden;
 }
 
 .section {
@@ -9,8 +50,41 @@
   gap: 12px;
 }
 
+.section[data-desktop-muted-only='true'] {
+  display: grid;
+  opacity: 0.42;
+}
+
 .remoteControlSection {
   gap: 0;
+}
+
+.powerSection {
+  justify-items: end;
+}
+
+.tabPanel {
+  display: grid;
+  min-height: 0;
+  align-content: start;
+  gap: 12px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+}
+
+.tabContent {
+  display: grid;
+  min-height: 0;
+  align-content: start;
+  gap: 12px;
+}
+
+.tabPanel::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
 }
 
 .sectionHeader {
@@ -34,8 +108,10 @@
 
 .remoteGrid {
   display: grid;
+  width: min(100%, 270px);
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
+  justify-self: center;
+  gap: 6px;
   align-items: center;
 }
 
@@ -47,8 +123,9 @@
 }
 
 .buttonRow[data-size='round'] {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
+  grid-template-columns: repeat(3, 78px);
+  justify-content: space-between;
+  gap: 10px;
 }
 
 .remoteButton {
@@ -57,7 +134,7 @@
   aspect-ratio: 1;
   place-items: center;
   border: 1px solid rgba(255, 255, 255, 0.16);
-  border-radius: 28px;
+  border-radius: 22px;
   color: rgba(255, 255, 255, 0.62);
   background: rgba(20, 22, 24, 0.66);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14), 0 16px 32px rgba(0, 0, 0, 0.18);
@@ -65,8 +142,8 @@
 }
 
 .remoteButton[data-size='small'] {
-  width: 64px;
-  height: 64px;
+  width: 52px;
+  height: 52px;
   aspect-ratio: auto;
   justify-self: center;
   border-color: rgba(255, 255, 255, 0.12);
@@ -80,11 +157,39 @@
   height: 78px;
   aspect-ratio: auto;
   justify-self: center;
-  margin-block: 8px;
+  margin-block: 0;
   border-color: rgba(255, 255, 255, 0.13);
   border-radius: 999px;
   color: white;
   background: rgba(255, 255, 255, 0.12);
+}
+
+.remoteButton[data-size='power'] {
+  display: inline-grid;
+  width: max-content;
+  min-width: 132px;
+  min-height: 58px;
+  height: auto;
+  grid-template-columns: 42px max-content;
+  align-items: center;
+  justify-items: center;
+  gap: 8px;
+  aspect-ratio: auto;
+  border-color: rgba(255, 255, 255, 0.13);
+  border-radius: 999px;
+  padding: 5px 14px 5px 7px;
+  color: white;
+  background: rgba(255, 255, 255, 0.12);
+  text-align: left;
+}
+
+.powerButtonLabel {
+  display: block;
+  justify-self: start;
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 0.88rem;
+  font-weight: 850;
+  line-height: 1;
 }
 
 .remoteButton[data-size='large']:not(:disabled) {
@@ -99,12 +204,12 @@
 .remoteSpacer {
   display: block;
   min-width: 0;
-  aspect-ratio: 1;
+  min-height: 0;
 }
 
 .remoteSpacer[data-size='small'] {
-  width: 64px;
-  height: 64px;
+  width: 52px;
+  height: 52px;
   aspect-ratio: auto;
 }
 
@@ -112,7 +217,7 @@
   width: 78px;
   height: 78px;
   aspect-ratio: auto;
-  margin-block: 8px;
+  margin-block: 0;
 }
 
 .volumeSlider {
@@ -239,16 +344,18 @@
 
 .appGrid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(168px, 100%), 168px));
+  justify-content: center;
   gap: 10px;
 }
 
 .appButton {
   display: grid;
+  width: min(168px, 100%);
   aspect-ratio: 1;
   place-items: center;
   border: 1px solid rgba(255, 255, 255, 0.14);
-  border-radius: 16px;
+  border-radius: 14px;
   padding: 0;
   color: white;
   background: rgba(255, 255, 255, 0.11);
@@ -274,59 +381,144 @@
   gap: 10px;
 }
 
-.deviceButton {
+.remoteModalNav {
   display: grid;
-  min-height: 68px;
-  grid-template-columns: 38px minmax(0, 1fr);
+  grid-template-columns: repeat(var(--remote-nav-tab-count, 2), minmax(0, 1fr));
   align-items: center;
-  gap: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  border-radius: 16px;
-  padding: 10px 12px;
-  color: white;
-  background: rgba(255, 255, 255, 0.11);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12);
-  text-align: left;
-  cursor: pointer;
+  gap: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  padding: 7px;
+  background: rgba(20, 20, 20, 0.72);
+  box-shadow: 0 16px 34px rgba(0, 0, 0, 0.34), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
 }
 
-.deviceButton:disabled {
-  cursor: default;
-  opacity: 0.42;
-}
-
-.deviceIcon {
+.remoteModalNavButton {
   display: grid;
-  width: 38px;
-  height: 38px;
+  width: 100%;
+  min-height: 48px;
   place-items: center;
-  border-radius: 12px;
-  background: rgba(218, 88, 132, 0.3);
-}
-
-.deviceButton strong,
-.deviceButton span span {
-  display: block;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.deviceButton strong {
-  font-size: 0.82rem;
-  font-weight: 850;
-}
-
-.deviceButton span span {
-  margin-top: 3px;
+  border: 0;
+  border-radius: 999px;
   color: rgba(255, 255, 255, 0.68);
-  font-size: 0.74rem;
-  font-weight: 720;
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.remoteModalNavButtonActive {
+  color: #111;
+  background: rgba(255, 255, 255, 0.92);
+}
+
+.remoteModalNavButton:focus,
+.remoteModalNavButton:focus-visible {
+  outline: none;
 }
 
 @media (max-width: 340px) {
   .appGrid,
   .deviceGrid {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (min-width: 760px) {
+  .modalBody {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
+    align-items: start;
+    height: 100%;
+    min-height: 0;
+    gap: 16px;
+    overflow: hidden;
+  }
+
+  .section[data-desktop-muted-only='true'] {
+    display: grid;
+  }
+
+  .rightPane {
+    min-height: 0;
+    max-height: 100%;
+    align-self: start;
+    grid-template-areas:
+      'remote power'
+      'remote tabs';
+    grid-template-columns: minmax(286px, 0.95fr) minmax(300px, 0.8fr);
+    grid-template-rows: auto minmax(0, 1fr);
+    align-content: stretch;
+    align-items: start;
+    overflow-x: hidden;
+    overflow-y: hidden;
+  }
+
+  .remoteControlSection {
+    grid-area: remote;
+    height: 100%;
+    align-self: stretch;
+    align-content: center;
+    padding: 10px 8px;
+  }
+
+  .remoteGrid {
+    width: min(100%, 390px);
+    gap: 10px;
+  }
+
+  .powerSection {
+    grid-area: power;
+    justify-items: end;
+  }
+
+  .remoteButton[data-size='power'] {
+    display: inline-grid;
+    width: max-content;
+    min-width: 148px;
+    min-height: 64px;
+    height: auto;
+    grid-template-columns: 48px max-content;
+    align-items: center;
+    justify-items: center;
+    gap: 10px;
+    border-radius: 999px;
+    padding: 6px 16px 6px 8px;
+    text-align: left;
+  }
+
+  .powerButtonLabel {
+    display: block;
+    justify-self: start;
+    color: rgba(255, 255, 255, 0.9);
+    font-size: 0.92rem;
+    font-weight: 850;
+    line-height: 1;
+  }
+
+  .buttonRow[data-size='round'] {
+    padding-block: 8px;
+  }
+
+  .tabPanel {
+    display: contents;
+  }
+
+  .tabContent {
+    grid-area: tabs;
+    width: 100%;
+    max-height: 100%;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: none;
+  }
+
+  .tabContent::-webkit-scrollbar {
+    display: none;
+    width: 0;
+    height: 0;
   }
 }
