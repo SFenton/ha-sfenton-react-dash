@@ -14,6 +14,26 @@
   gap: 10px;
 }
 
+.homeContent {
+  animation: homeContentFadeIn 260ms ease-out both;
+}
+
+@keyframes homeContentFadeIn {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .homeContent {
+    animation-duration: 1ms;
+  }
+}
+
 .roomPickerGrid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

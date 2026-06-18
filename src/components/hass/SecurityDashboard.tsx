@@ -115,15 +115,17 @@ function SecurityModalContent({
   contactGridRef,
   contactGridStyle,
   hash,
+  live = true,
 }: {
   contactGridRef?: (node: HTMLElement | null) => void
   contactGridStyle?: ModalSquareGridStyle
   hash: string
+  live?: boolean
 }) {
   if (hash === '#security-system') return <SecurityControls />
   if (hash === CONTACT_SENSORS_HASH) return <ContactSheet overviewGridRef={contactGridRef} overviewGridStyle={contactGridStyle} overviewMode="grouped" />
   const camera = CAMERA_ITEMS.find((item) => item.hash === hash)
-  if (camera) return <CameraModalContent camera={camera} />
+  if (camera) return <CameraModalContent camera={camera} live={live} />
   return null
 }
 
@@ -131,15 +133,20 @@ interface SecurityDashboardProps {
   closeHash: () => void
   hash: string
   onOpenHash: (hash: string) => void
+  preload?: boolean
+  preloadHash?: string
+  preloadHashes?: string[]
 }
 
-export function SecurityDashboard({ closeHash, hash, onOpenHash }: SecurityDashboardProps) {
+export function SecurityDashboard({ closeHash, hash, onOpenHash, preload = false, preloadHash, preloadHashes = [] }: SecurityDashboardProps) {
   const securitySubtitle = useHass((state) => securitySystemModalSubtitle(state.entities[SECURITY_ENTITY]?.state))
+  const contentHash = hash || preloadHash || ''
   const contactModalOpen = hash === CONTACT_SENSORS_HASH
+  const contactModalContentActive = contentHash === CONTACT_SENSORS_HASH
   const [contactGridRef, contactGridLayout] = useModalSquareGridLayout(contactModalOpen, CONTACT_GROUPS.length)
   const contactGridStyle = modalSquareGridStyle(contactGridLayout)
-  const modalSubtitle = hash === '#security-system' ? securitySubtitle : undefined
-  const modalContentStyle = hash === '#security-system' ? SECURITY_SYSTEM_MODAL_STYLE : contactModalOpen ? modalSquareGridModalStyleForHash(CONTACT_SENSORS_HASH, contactGridLayout) : undefined
+  const modalSubtitle = contentHash === '#security-system' ? securitySubtitle : undefined
+  const modalContentStyle = contentHash === '#security-system' ? SECURITY_SYSTEM_MODAL_STYLE : contactModalContentActive ? modalSquareGridModalStyleForHash(CONTACT_SENSORS_HASH, contactGridLayout) : undefined
 
   return (
     <>
@@ -154,7 +161,7 @@ export function SecurityDashboard({ closeHash, hash, onOpenHash }: SecurityDashb
         <section className={styles.section}>
           <SectionHeader title="Cameras" />
           <div className={styles.cameraGrid}>
-            {CAMERA_ITEMS.map((camera) => <CameraTile camera={camera} key={camera.entityId} onOpen={onOpenHash} />)}
+            {CAMERA_ITEMS.map((camera) => <CameraTile camera={camera} key={camera.entityId} live={!preload} onOpen={onOpenHash} />)}
           </div>
         </section>
 
@@ -168,9 +175,14 @@ export function SecurityDashboard({ closeHash, hash, onOpenHash }: SecurityDashb
         )}
       </div>
 
-      <ModalSheet contentStyle={modalContentStyle} onClose={closeHash} open={hash !== ''} subtitle={modalSubtitle} title={modalTitle(hash)}>
-        <SecurityModalContent contactGridRef={contactGridRef} contactGridStyle={contactGridStyle} hash={hash} />
+      <ModalSheet contentStyle={modalContentStyle} onClose={closeHash} open={hash !== ''} subtitle={modalSubtitle} title={modalTitle(contentHash)}>
+        <SecurityModalContent contactGridRef={contactGridRef} contactGridStyle={contactGridStyle} hash={contentHash} />
       </ModalSheet>
+      {preloadHashes.map((preloadTargetHash) => (
+        <div data-preload-modal={`security${preloadTargetHash}`} key={`security-preload-${preloadTargetHash}`}>
+          <SecurityModalContent hash={preloadTargetHash} live={false} />
+        </div>
+      ))}
     </>
   )
 }

@@ -39,6 +39,10 @@
   will-change: opacity, transform;
 }
 
+.scroller[data-chrome-hidden='true'] {
+  padding: 0 var(--space-page-x);
+}
+
 .scroller[data-scroll-lock='true'] {
   overflow-y: hidden;
   -webkit-overflow-scrolling: auto;
@@ -55,6 +59,12 @@
 .scrollContent[data-scroll-lock='true'] {
   height: 100%;
   min-height: 0;
+}
+
+.scrollContent[data-chrome-hidden='true'] {
+  display: grid;
+  min-height: 100%;
+  align-items: center;
 }
 
 :global([data-route-transition-state='exiting']) .headerQuickLinks,

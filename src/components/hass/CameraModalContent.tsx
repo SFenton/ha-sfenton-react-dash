@@ -24,7 +24,7 @@ function getMuteState(targetId: string) {
   return window.__webrtcGetMuteState?.(targetId) ?? true
 }
 
-export function CameraModalContent({ camera }: { camera: CameraConfig }) {
+export function CameraModalContent({ camera, live = true }: { camera: CameraConfig; live?: boolean }) {
   const recordingEntity = useEntity(asEntityName(camera.recordingEntityId ?? 'input_boolean.unknown'), { returnNullIfNotFound: true })
   const callService = useHass((state) => state.helpers.callService) as unknown as CallService
   const [isMuted, setIsMuted] = useState(() => getMuteState(camera.popupCardId))
@@ -72,7 +72,7 @@ export function CameraModalContent({ camera }: { camera: CameraConfig }) {
   return (
     <div className={styles.cameraSheet}>
       <div className={styles.cameraFocus}>
-        <WebRtcCamera camera={camera} controls minHeight={310} variant="modal" />
+        {live ? <WebRtcCamera camera={camera} controls minHeight={310} variant="modal" /> : <div style={{ minHeight: 310 }} />}
       </div>
       <div className={styles.cameraControls} aria-label={`${camera.title} camera controls`}>
         <ActionPill active={snapshotPulse} label="Snapshot" onClick={takeSnapshot} pulse={snapshotPulse}>

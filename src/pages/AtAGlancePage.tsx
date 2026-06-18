@@ -1,5 +1,5 @@
 import { useEntity, useHass } from '@hakit/core'
-import { useEffect, useRef, useState, type MutableRefObject } from 'react'
+import { useEffect, useMemo, useRef, useState, type MutableRefObject } from 'react'
 import type { HassEntity } from 'home-assistant-js-websocket'
 import { ClimateCard } from '../components/cards/ClimateCard'
 import { ContactSensorCard } from '../components/cards/ContactSensorCard'
@@ -8,6 +8,7 @@ import { OccupancyCard } from '../components/cards/OccupancyCard'
 import { RoomCard } from '../components/cards/RoomCard'
 import { AppShell } from '../components/shell/AppShell'
 import { BottomNav } from '../components/shell/BottomNav'
+import { DashboardPageLoading, type DashboardPageLoadingPhase } from '../components/shell/DashboardPageLoading'
 import { ActionPill } from '../components/core/ActionPill'
 import { FloatingActionButton } from '../components/core/FloatingActionButton'
 import { GlassTile } from '../components/core/GlassTile'
@@ -41,6 +42,8 @@ import {
 } from '../constants/atAGlance'
 import { CHORE_BLUE, CHORE_QUICK_LINKS, SETTINGS_PAGE_ITEMS, TODO_PAGES, type ChoreQuickLinkConfig, type SettingsLinkConfig } from '../constants/portedDashboard'
 import { useHashModal } from '../hooks/useHashModal'
+import { markDeferredRouteHydrated, useDeferredRouteHydration, type DeferredRouteHydrationPhase } from '../hooks/useDeferredRouteHydration'
+import type { RouteTransitionState } from '../components/shell/SmoothRouteOutlet'
 import { modalSquareGridModalStyle, modalSquareGridModalStyleForHash, modalSquareGridStyle, useModalSquareGridLayout, type ModalSquareGridStyle } from './modalSquareGrid'
 import styles from './AtAGlancePage.module.css'
 import { Page } from './Page'
@@ -427,7 +430,7 @@ function SettingsPreviewSheet({ closeHash, onNavigate }: { closeHash: () => void
   )
 }
 
-function CameraSheet({ hash }: { hash: string }) {
+function CameraSheet({ hash, live = true }: { hash: string; live?: boolean }) {
   const camera = CAMERA_ITEMS.find((item) => item.hash === hash)
   const recordingEntity = useEntity(asEntityName(camera?.recordingEntityId ?? 'input_boolean.unknown'), { returnNullIfNotFound: true })
   const callService = useHass((state) => state.helpers.callService)
@@ -471,7 +474,7 @@ function CameraSheet({ hash }: { hash: string }) {
   return (
     <div className={styles.cameraSheet}>
       <div className={styles.cameraFocus}>
-        <WebRtcCamera camera={camera} controls minHeight={310} variant="modal" />
+        {live ? <WebRtcCamera camera={camera} controls minHeight={310} variant="modal" /> : <div style={{ minHeight: 310 }} />}
       </div>
       <div className={styles.cameraControls} aria-label={`${camera.title} camera controls`}>
         <ActionPill active={snapshotPulse} label="Snapshot" onClick={takeSnapshot} pulse={snapshotPulse}>
@@ -1079,12 +1082,14 @@ function SheetContent({
   overviewGridRef,
   overviewGridStyle,
   onNavigate,
+  preload = false,
 }: {
   closeHash: () => void
   hash: string
   overviewGridRef?: (node: HTMLElement | null) => void
   overviewGridStyle?: ModalSquareGridStyle
   onNavigate: (path: string) => void
+  preload?: boolean
 }) {
   if (hash === '#lights-overview') {
     return <LightsSheet overviewGridRef={overviewGridRef} overviewGridStyle={overviewGridStyle} />
@@ -1110,7 +1115,7 @@ function SheetContent({
   if (hash === '#settings-preview') return <SettingsPreviewSheet closeHash={closeHash} onNavigate={onNavigate} />
   if (hash === '#security-system') return <SecurityControls />
 
-  if (CAMERA_ITEMS.some((item) => item.hash === hash)) return <CameraSheet hash={hash} key={hash} />
+  if (CAMERA_ITEMS.some((item) => item.hash === hash)) return <CameraSheet hash={hash} key={hash} live={!preload} />
 
   return <p className={styles.sheetText}>This overview section is not available from Home.</p>
 }
@@ -1144,12 +1149,24 @@ export function RoomPickerButton({ onNavigate }: { onNavigate: (path: string) =>
 
 interface AtAGlancePageProps {
   activePath?: string
+  deferRouteContent?: boolean
+  onHydrationPhaseChange?: (phase: DeferredRouteHydrationPhase) => void
   onNavigate?: (path: string) => void
+  loadingPhase?: DashboardPageLoadingPhase
+  preload?: boolean
+  preloadHash?: string
+  preloadHashes?: string[]
+  routeTransitionState?: RouteTransitionState
   withShell?: boolean
 }
 
-export function AtAGlancePage({ activePath = 'overview', onNavigate = () => undefined, withShell = true }: AtAGlancePageProps) {
+export function AtAGlancePage({ activePath = 'overview', deferRouteContent = false, loadingPhase: routeLoadingPhase, onHydrationPhaseChange, onNavigate = () => undefined, preload = false, preloadHash, preloadHashes = [], routeTransitionState = 'idle', withShell = true }: AtAGlancePageProps) {
   const { hash, openHash, closeHash } = useHashModal()
+  const { hydrateHeavyContent, loadingPhase: homeHydrationPhase, showContent } = useDeferredRouteHydration({
+    cacheKey: 'home',
+    enabled: deferRouteContent,
+    transitionState: routeTransitionState,
+  })
   const activeRoomLightCount = useHass((state) =>
     ROOM_LIGHT_ENTITY_IDS.reduce((count, entityId) => count + (isActiveState(state.entities[entityId] ?? null) ? 1 : 0), 0),
   )
@@ -1162,21 +1179,34 @@ export function AtAGlancePage({ activePath = 'overview', onNavigate = () => unde
     return `AQI ${aqiRange} · PM2.5 ${pm25Range}`
   })
   const securitySystemSubtitle = useHass((state) => securitySystemModalSubtitle(state.entities[SECURITY_ENTITY]?.state))
-  const squareGridModalCount = modalSquareGridCount(hash)
+  const contentHash = hash || preloadHash || ''
+  const squareGridModalCount = modalSquareGridCount(contentHash)
   const squareGridModalOpen = squareGridModalCount > 0
   const [overviewGridRef, overviewGridLayout] = useModalSquareGridLayout(squareGridModalOpen, squareGridModalCount)
   const lightStatusSubtitle = lightCountSubtitle(activeRoomLightCount)
   const contactStatusSubtitle = contactSensorStatusSubtitle(openContactSensorCount)
-  const modalTitle = hash === '#lights-overview' ? lightsSheetTitle(activeRoomLightCount) : sheetTitle(hash)
-  const squareGridModalStyle = modalSquareGridModalStyleForHash(hash, overviewGridLayout)
+  const modalTitle = contentHash === '#lights-overview' ? lightsSheetTitle(activeRoomLightCount) : sheetTitle(contentHash)
+  const squareGridModalStyle = modalSquareGridModalStyleForHash(contentHash, overviewGridLayout)
   const squareGridStyle = modalSquareGridStyle(overviewGridLayout)
-  const sheetStyle = hash === '#security-system' ? SECURITY_SYSTEM_MODAL_STYLE : squareGridModalOpen ? squareGridModalStyle : undefined
-  const sheetSubtitle = hash === '#security-system' ? securitySystemSubtitle : undefined
+  const sheetStyle = contentHash === '#security-system' ? SECURITY_SYSTEM_MODAL_STYLE : squareGridModalOpen ? squareGridModalStyle : undefined
+  const sheetSubtitle = contentHash === '#security-system' ? securitySystemSubtitle : undefined
+  const preloadModalHashes = useMemo(() => [...new Set(preloadHashes.filter((targetHash) => targetHash !== contentHash))], [contentHash, preloadHashes])
+  const homeLoadingPhase: DashboardPageLoadingPhase | undefined = showContent ? undefined : homeHydrationPhase === 'loading-exiting' ? 'exiting' : 'loading'
+  const activeLoadingPhase = routeLoadingPhase ?? homeLoadingPhase
+
+  useEffect(() => {
+    onHydrationPhaseChange?.(homeHydrationPhase)
+  }, [homeHydrationPhase, onHydrationPhaseChange])
+
+  useEffect(() => {
+    if (preload) markDeferredRouteHydrated('home')
+  }, [preload])
 
   const page = (
     <>
       <Page
         activePath={activePath}
+        chromeHidden={Boolean(activeLoadingPhase)}
         title="Home"
         onNavigate={onNavigate}
         headerQuickLinks={
@@ -1187,39 +1217,50 @@ export function AtAGlancePage({ activePath = 'overview', onNavigate = () => unde
           />
         }
       >
-        <div className={styles.weatherWrap}>
-          <WeatherSummary />
-        </div>
-
-        <SectionHeader title="Quick Links" />
-        <section className={styles.quickGrid}>
-          {QUICK_ACCESS_ITEMS.map((item) => (
-            <div key={item.title}>
-              <QuickAccessTile item={item} onNavigate={onNavigate} onOpenHash={openHash} />
+        {activeLoadingPhase ? (
+          <DashboardPageLoading label="Loading Home dashboard content" phase={activeLoadingPhase} />
+        ) : (
+          <div className={styles.homeContent}>
+            <div className={styles.weatherWrap}>
+              <WeatherSummary deferRefresh={!hydrateHeavyContent} />
             </div>
-          ))}
-        </section>
 
-        <SectionHeader title="Cameras" />
-        <section className={styles.cameraGrid}>
-          {CAMERA_ITEMS.map((camera) => (
-            <div key={camera.title}>
-              <CameraTile camera={camera} onOpen={openHash} />
-            </div>
-          ))}
-        </section>
+            <SectionHeader title="Quick Links" />
+            <section className={styles.quickGrid}>
+              {QUICK_ACCESS_ITEMS.map((item) => (
+                <div key={item.title}>
+                  <QuickAccessTile item={item} onNavigate={onNavigate} onOpenHash={openHash} />
+                </div>
+              ))}
+            </section>
+
+            <SectionHeader title="Cameras" />
+            <section className={styles.cameraGrid}>
+              {CAMERA_ITEMS.map((camera) => (
+                <div key={camera.title}>
+                  <CameraTile camera={camera} live={hydrateHeavyContent && !preload} onOpen={openHash} />
+                </div>
+              ))}
+            </section>
+          </div>
+        )}
       </Page>
 
       <ModalSheet contentStyle={sheetStyle} open={hash !== ''} subtitle={sheetSubtitle} title={modalTitle} onClose={closeHash}>
-        <SheetContent closeHash={closeHash} hash={hash} overviewGridRef={overviewGridRef} overviewGridStyle={squareGridStyle} onNavigate={onNavigate} />
+        <SheetContent closeHash={closeHash} hash={contentHash} overviewGridRef={overviewGridRef} overviewGridStyle={squareGridStyle} onNavigate={onNavigate} />
       </ModalSheet>
+      {preloadModalHashes.map((preloadTargetHash) => (
+        <div data-preload-modal={`overview${preloadTargetHash}`} key={`overview-preload-${preloadTargetHash}`}>
+          <SheetContent closeHash={closeHash} hash={preloadTargetHash} onNavigate={onNavigate} preload />
+        </div>
+      ))}
     </>
   )
 
   if (!withShell) return page
 
   return (
-    <AppShell bottomNav={<BottomNav activePath={activePath} onNavigate={onNavigate} />} floatingAction={<RoomPickerButton onNavigate={onNavigate} />}>
+    <AppShell bottomNav={<BottomNav activePath={activePath} onNavigate={onNavigate} />} chromeHidden={Boolean(activeLoadingPhase)} floatingAction={<RoomPickerButton onNavigate={onNavigate} />}>
       {page}
     </AppShell>
   )

@@ -29,10 +29,7 @@
   font: inherit;
   letter-spacing: 0;
   cursor: pointer;
-  transition:
-    color var(--duration-fast) ease,
-    background var(--duration-fast) ease,
-    transform var(--duration-fast) ease;
+  transition: transform var(--duration-fast) ease;
 }
 
 .tab:active {

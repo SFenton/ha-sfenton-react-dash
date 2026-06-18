@@ -27,6 +27,7 @@ export function useDashboardRoute() {
   }, [path])
 
   const navigate = useCallback((url: string) => {
+    setPath(routePathFromUrl(url))
     pushDashboardUrl(url, {})
   }, [])
 

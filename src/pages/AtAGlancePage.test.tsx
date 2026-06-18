@@ -1,14 +1,52 @@
-import { fireEvent, render, screen, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import { AtAGlancePage } from './AtAGlancePage'
 import { materialIconPath } from '../components/core/iconPaths'
 import { CONTACT_GROUPS, SECURITY_ENTITY } from '../constants/atAGlance'
 import { CHORE_BLUE } from '../constants/portedDashboard'
 import { mockEntities, resetMockHass } from '../test/mocks/hakitCoreState'
+import { resetDeferredRouteHydrationCache } from '../hooks/useDeferredRouteHydration'
 
 describe('AtAGlancePage', () => {
   beforeEach(() => {
     window.history.replaceState(null, '', window.location.pathname)
+    resetDeferredRouteHydrationCache()
     resetMockHass()
+  })
+
+  it('keeps cold Home content behind a centered spinner before fading content in', () => {
+    vi.useFakeTimers()
+    try {
+      const { rerender } = render(<AtAGlancePage deferRouteContent routeTransitionState="entering" />)
+
+      expect(screen.getByRole('status', { name: 'Loading Home dashboard content' })).toHaveAttribute('data-state', 'loading')
+      expect(screen.queryByRole('button', { name: /Open seven-day weather forecast/i })).not.toBeInTheDocument()
+
+      rerender(<AtAGlancePage deferRouteContent routeTransitionState="idle" />)
+      act(() => {
+        vi.advanceTimersByTime(999)
+      })
+      expect(screen.getByRole('status', { name: 'Loading Home dashboard content' })).toHaveAttribute('data-state', 'loading')
+
+      act(() => {
+        vi.advanceTimersByTime(1)
+      })
+      expect(screen.getByRole('status', { name: 'Loading Home dashboard content' })).toHaveAttribute('data-state', 'exiting')
+      expect(screen.queryByRole('button', { name: /Open seven-day weather forecast/i })).not.toBeInTheDocument()
+
+      act(() => {
+        vi.advanceTimersByTime(499)
+      })
+      expect(screen.getByRole('status', { name: 'Loading Home dashboard content' })).toHaveAttribute('data-state', 'exiting')
+
+      act(() => {
+        vi.advanceTimersByTime(1)
+      })
+      expect(screen.queryByRole('status', { name: 'Loading Home dashboard content' })).not.toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /Open seven-day weather forecast/i })).toBeInTheDocument()
+      expect(screen.getAllByText('Cameras')).toHaveLength(1)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('opens the Air Quality overview from the header chip with room cards', async () => {

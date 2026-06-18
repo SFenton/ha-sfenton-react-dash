@@ -105,6 +105,23 @@
   background: rgba(22, 36, 52, 0.42);
 }
 
+.heroDayForecastPlaceholder {
+  opacity: 0.58;
+}
+
+.heroDayIconPlaceholder,
+.heroHourlyPlaceholderDot,
+.heroHourlyPlaceholderLine {
+  display: block;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.heroDayIconPlaceholder {
+  width: 22px;
+  height: 22px;
+}
+
 .heroDayRangeFill {
   position: absolute;
   top: 0;
@@ -147,6 +164,10 @@
   scrollbar-width: none;
 }
 
+.heroHourlyStripPlaceholder {
+  pointer-events: none;
+}
+
 .heroHourlyStrip::-webkit-scrollbar {
   display: none;
 }
@@ -177,6 +198,16 @@
   font-size: 0.78rem;
   font-weight: 840;
   line-height: 1;
+}
+
+.heroHourlyPlaceholderLine {
+  width: 28px;
+  height: 8px;
+}
+
+.heroHourlyPlaceholderDot {
+  width: 20px;
+  height: 20px;
 }
 
 .temperatureBlock {

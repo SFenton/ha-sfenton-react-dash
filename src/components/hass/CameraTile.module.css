@@ -34,6 +34,13 @@
   background: linear-gradient(140deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.05));
 }
 
+.warming {
+  color: rgba(255, 255, 255, 0.48);
+  background:
+    radial-gradient(circle at 50% 42%, rgba(255, 255, 255, 0.13), transparent 34%),
+    linear-gradient(140deg, rgba(255, 255, 255, 0.13), rgba(255, 255, 255, 0.05));
+}
+
 .label {
   position: absolute;
   right: 10px;

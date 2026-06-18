@@ -8,6 +8,7 @@ import { LightCard } from '../components/cards/LightCard'
 import { OccupancyCard } from '../components/cards/OccupancyCard'
 import { AppShell } from '../components/shell/AppShell'
 import { BottomNav } from '../components/shell/BottomNav'
+import { DashboardPageLoading, type DashboardPageLoadingPhase } from '../components/shell/DashboardPageLoading'
 import { DashboardFloatingAction } from '../components/shell/DashboardFloatingAction'
 import { dashboardRoomNameFromPath, hasDashboardFloatingAction } from '../components/shell/dashboardFloatingAction'
 import { EntityActionCard } from '../components/hass/EntityActionCard'
@@ -88,7 +89,11 @@ import styles from './DashboardViewPage.module.css'
 interface DashboardViewPageProps {
   activePath: string
   onNavigate: (path: string) => void
+  loadingPhase?: DashboardPageLoadingPhase
   path: string
+  preload?: boolean
+  preloadHash?: string
+  preloadHashes?: string[]
   withShell?: boolean
 }
 
@@ -560,13 +565,13 @@ function RoomSourceCard({ card, eightSleepModalState, onOpen }: { card: RoomSour
   return content
 }
 
-function RoomSourceModal({ card, eightSleepModalState, onClose, roomTitle }: { card: RoomSourceCardConfig | null; eightSleepModalState?: EightSleepBedModalState; onClose: () => void; roomTitle: string }) {
+function RoomSourceModal({ card, eightSleepModalState, onClose, preloadCard, roomTitle }: { card: RoomSourceCardConfig | null; eightSleepModalState?: EightSleepBedModalState; onClose: () => void; preloadCard?: RoomSourceCardConfig | null; roomTitle: string }) {
   const lastCardRef = useRef<RoomSourceCardConfig | null>(null)
   const lastEightSleepModalStateRef = useRef<EightSleepBedModalState | null>(null)
   const [mediaActiveTab, setMediaActiveTab] = useState<MediaRemoteModalTab>('controls')
   if (card) lastCardRef.current = card
 
-  const renderCard = card ?? lastCardRef.current
+  const renderCard = card ?? preloadCard ?? lastCardRef.current
   const eightSleepSide = renderCard ? eightSleepSideForHash(renderCard.hash) : undefined
   if (card && eightSleepSide && eightSleepModalState) lastEightSleepModalStateRef.current = eightSleepModalState
 
@@ -611,6 +616,17 @@ function RoomSourceModal({ card, eightSleepModalState, onClose, roomTitle }: { c
   )
 }
 
+function RoomSourcePreloadContent({ card, eightSleepModalState, roomTitle }: { card: RoomSourceCardConfig; eightSleepModalState?: EightSleepBedModalState; roomTitle: string }) {
+  const eightSleepSide = eightSleepSideForHash(card.hash)
+  if (eightSleepSide && eightSleepModalState) {
+    return <EightSleepBedModalContent activeTab="schedule" modalState={eightSleepModalState} side={eightSleepSide} />
+  }
+
+  const mediaRemote = card.kind === 'media' && card.hash ? MEDIA_REMOTE_CONFIGS[card.hash] : undefined
+  const content = mediaRemote ? <MediaRemoteModalContent config={mediaRemote} /> : renderRoomReusableSheet(card, roomTitle)
+  return <>{content ?? <RoomSourceFallback card={card} />}</>
+}
+
 function EmptyRoomState() {
   return (
     <div className={styles.emptyRoomState} data-empty-layout="centered" data-empty-typography="festival">
@@ -620,9 +636,12 @@ function EmptyRoomState() {
   )
 }
 
-function SourceRoomPage({ room }: { room: (typeof ROOM_PAGE_CONFIGS)[string] }) {
+function SourceRoomPage({ preloadHash, preloadHashes = [], room }: { preloadHash?: string; preloadHashes?: string[]; room: (typeof ROOM_PAGE_CONFIGS)[string] }) {
   const [selectedCard, setSelectedCard] = useState<RoomSourceCardConfig | null>(null)
   const eightSleepModalStates = useEightSleepBedModalStates()
+  const allCards = useMemo(() => [...room.overviewCards, ...room.sourceSections.flatMap((section) => section.cards)], [room.overviewCards, room.sourceSections])
+  const preloadCard = preloadHash ? allCards.find((candidate) => candidate.hash === preloadHash) ?? null : null
+  const preloadCards = useMemo(() => preloadHashes.map((preloadTargetHash) => allCards.find((candidate) => candidate.hash === preloadTargetHash)).filter((card): card is RoomSourceCardConfig => Boolean(card?.hash)), [allCards, preloadHashes])
 
   const closeSourceCard = () => {
     setSelectedCard(null)
@@ -630,7 +649,6 @@ function SourceRoomPage({ room }: { room: (typeof ROOM_PAGE_CONFIGS)[string] }) 
   }
 
   useEffect(() => {
-    const allCards = [...room.overviewCards, ...room.sourceSections.flatMap((section) => section.cards)]
     const syncFromHash = () => {
       const card = allCards.find((candidate) => candidate.hash === dashboardHash())
       setSelectedCard(card ?? null)
@@ -651,7 +669,7 @@ function SourceRoomPage({ room }: { room: (typeof ROOM_PAGE_CONFIGS)[string] }) 
         target.removeEventListener(DASHBOARD_ROUTE_CHANGE_EVENT, syncFromHash)
       })
     }
-  }, [room.overviewCards, room.sourceSections])
+  }, [allCards])
 
   const openSourceCard = (card: RoomSourceCardConfig) => {
     if (card.hash) setRoomHash(card.hash)
@@ -671,14 +689,19 @@ function SourceRoomPage({ room }: { room: (typeof ROOM_PAGE_CONFIGS)[string] }) 
         </section>
       ))}
 
-      <RoomSourceModal card={selectedCard} eightSleepModalState={selectedCard?.hash ? eightSleepModalStates[selectedCard.hash] : undefined} onClose={closeSourceCard} roomTitle={room.title} />
+      <RoomSourceModal card={selectedCard} eightSleepModalState={selectedCard?.hash ? eightSleepModalStates[selectedCard.hash] : preloadCard?.hash ? eightSleepModalStates[preloadCard.hash] : undefined} onClose={closeSourceCard} preloadCard={preloadCard} roomTitle={room.title} />
+      {preloadCards.map((card) => (
+        <div data-preload-modal={`${room.path}${card.hash}`} key={`${room.path}-preload-${card.hash}`}>
+          <RoomSourcePreloadContent card={card} eightSleepModalState={card.hash ? eightSleepModalStates[card.hash] : undefined} roomTitle={room.title} />
+        </div>
+      ))}
     </div>
   )
 }
 
-function RoomPage({ onNavigate, path, title }: { onNavigate: (path: string) => void; path: string; title: string }) {
+function RoomPage({ onNavigate, path, preloadHash, preloadHashes, title }: { onNavigate: (path: string) => void; path: string; preloadHash?: string; preloadHashes?: string[]; title: string }) {
   const sourceRoom = ROOM_PAGE_CONFIGS[path]
-  if (sourceRoom) return <SourceRoomPage room={sourceRoom} />
+  if (sourceRoom) return <SourceRoomPage preloadHash={preloadHash} preloadHashes={preloadHashes} room={sourceRoom} />
 
   const lightGroup = LIGHT_GROUPS.find((group) => lightRoomTitle(group) === title)
   const climateGroup = CLIMATE_GROUPS.find((group) => climateRoomTitle(group) === title)
@@ -908,12 +931,11 @@ function VacuumPage() {
   )
 }
 
-function SecurityPage({ activePath, backPath, onNavigate, title }: { activePath: string; backPath?: string; onNavigate: (path: string) => void; title: string }) {
+function SecurityPage({ activePath, backPath, loadingPhase, onNavigate, preload = false, preloadHash, preloadHashes, title }: { activePath: string; backPath?: string; loadingPhase?: DashboardPageLoadingPhase; onNavigate: (path: string) => void; preload?: boolean; preloadHash?: string; preloadHashes?: string[]; title: string }) {
   const { closeHash, hash, openHash } = useHashModal()
-
   return (
-    <Page activePath={activePath} backPath={backPath} headerQuickLinks={<SecurityStatusRail onOpenHash={openHash} />} onNavigate={onNavigate} title={title}>
-      <SecurityDashboard closeHash={closeHash} hash={hash} onOpenHash={openHash} />
+    <Page activePath={activePath} backPath={backPath} chromeHidden={Boolean(loadingPhase)} headerQuickLinks={<SecurityStatusRail onOpenHash={openHash} />} onNavigate={onNavigate} title={title}>
+      {loadingPhase ? <DashboardPageLoading phase={loadingPhase} /> : <SecurityDashboard closeHash={closeHash} hash={hash} onOpenHash={openHash} preload={preload} preloadHash={preloadHash} preloadHashes={preloadHashes} />}
     </Page>
   )
 }
@@ -1226,8 +1248,10 @@ const MEDIA_SOURCE_SECTIONS = MEDIA_SECTIONS.map((section) => ({
 
 const MEDIA_SOURCE_CARDS = MEDIA_SOURCE_SECTIONS.flatMap((section) => section.cards)
 
-function MediaPage() {
+function MediaPage({ preloadHash, preloadHashes = [] }: { preloadHash?: string; preloadHashes?: string[] }) {
   const [selectedCard, setSelectedCard] = useState<RoomSourceCardConfig | null>(null)
+  const preloadCard = preloadHash ? MEDIA_SOURCE_CARDS.find((candidate) => candidate.hash === preloadHash) ?? null : null
+  const preloadCards = useMemo(() => preloadHashes.map((preloadTargetHash) => MEDIA_SOURCE_CARDS.find((candidate) => candidate.hash === preloadTargetHash)).filter((card): card is RoomSourceCardConfig => Boolean(card?.hash)), [preloadHashes])
 
   const closeSourceCard = () => {
     setSelectedCard(null)
@@ -1269,15 +1293,23 @@ function MediaPage() {
           </Grid>
         </section>
       ))}
-      <RoomSourceModal card={selectedCard} onClose={closeSourceCard} roomTitle={selectedCard?.title === 'Theater Room' ? 'Theater Room' : 'Living Room'} />
+      <RoomSourceModal card={selectedCard} onClose={closeSourceCard} preloadCard={preloadCard} roomTitle={(selectedCard ?? preloadCard)?.title === 'Theater Room' ? 'Theater Room' : 'Living Room'} />
+      {preloadCards.map((card) => (
+        <div data-preload-modal={`media${card.hash}`} key={`media-preload-${card.hash}`}>
+          <RoomSourcePreloadContent card={card} roomTitle={card.title === 'Theater Room' ? 'Theater Room' : 'Living Room'} />
+        </div>
+      ))}
     </div>
   )
 }
 
-function AdminPage({ onNavigate }: { onNavigate: (path: string) => void }) {
+function AdminPage({ onNavigate, preloadHash, preloadHashes = [] }: { onNavigate: (path: string) => void; preloadHash?: string; preloadHashes?: string[] }) {
   const { closeHash, hash, openHash } = useHashModal()
+  const contentHash = hash || preloadHash || ''
   const presenceModalOpen = hash === '#presence-based-overrides'
   const autoResetModalOpen = hash === '#presence-based-overrides-auto'
+  const presenceModalContentActive = contentHash === '#presence-based-overrides'
+  const autoResetModalContentActive = contentHash === '#presence-based-overrides-auto'
   const [presenceGridRef, presenceGridLayout] = useModalSquareGridLayout(presenceModalOpen, ADMIN_PRESENCE_OVERRIDE_ITEMS.length)
   const [autoResetGridRef, autoResetGridLayout] = useModalSquareGridLayout(autoResetModalOpen, ADMIN_AUTO_REENABLE_ITEMS.length)
 
@@ -1313,17 +1345,31 @@ function AdminPage({ onNavigate }: { onNavigate: (path: string) => void }) {
         <AdminHashButton hash="#presence-based-overrides-auto" onOpen={openHash} title="Open Presence-Based Auto-Reset Configuration" />
       </section>
 
-      <ModalSheet contentStyle={modalSquareGridModalStyle(presenceGridLayout)} onClose={closeHash} open={presenceModalOpen} surface="hass-popup" title="Presence-Based Overrides">
+      <ModalSheet contentStyle={presenceModalContentActive ? modalSquareGridModalStyle(presenceGridLayout) : undefined} onClose={closeHash} open={presenceModalOpen} surface="hass-popup" title="Presence-Based Overrides">
         <div className={styles.adminModalBody}>
-          <AdminTileGrid gridLabel="Presence-Based Overrides by room" items={ADMIN_PRESENCE_OVERRIDE_ITEMS} onNavigate={onNavigate} squareGridRef={presenceGridRef} squareGridStyle={modalSquareGridStyle(presenceGridLayout)} variant="admin-modal" />
+          {presenceModalContentActive && <AdminTileGrid gridLabel="Presence-Based Overrides by room" items={ADMIN_PRESENCE_OVERRIDE_ITEMS} onNavigate={onNavigate} squareGridRef={presenceGridRef} squareGridStyle={modalSquareGridStyle(presenceGridLayout)} variant="admin-modal" />}
         </div>
       </ModalSheet>
 
-      <ModalSheet contentStyle={modalSquareGridModalStyle(autoResetGridLayout)} onClose={closeHash} open={autoResetModalOpen} surface="hass-popup" title="Presence-Based Overrides Auto-Reset">
+      <ModalSheet contentStyle={autoResetModalContentActive ? modalSquareGridModalStyle(autoResetGridLayout) : undefined} onClose={closeHash} open={autoResetModalOpen} surface="hass-popup" title="Presence-Based Overrides Auto-Reset">
         <div className={styles.adminModalBody}>
-          <AdminTileGrid gridLabel="Presence-Based Auto-Reset by room" items={ADMIN_AUTO_REENABLE_ITEMS} onNavigate={onNavigate} squareGridRef={autoResetGridRef} squareGridStyle={modalSquareGridStyle(autoResetGridLayout)} variant="admin-modal" />
+          {autoResetModalContentActive && <AdminTileGrid gridLabel="Presence-Based Auto-Reset by room" items={ADMIN_AUTO_REENABLE_ITEMS} onNavigate={onNavigate} squareGridRef={autoResetGridRef} squareGridStyle={modalSquareGridStyle(autoResetGridLayout)} variant="admin-modal" />}
         </div>
       </ModalSheet>
+      {preloadHashes.includes('#presence-based-overrides') && (
+        <div data-preload-modal="admin#presence-based-overrides">
+          <div className={styles.adminModalBody}>
+            <AdminTileGrid gridLabel="Presence-Based Overrides by room" items={ADMIN_PRESENCE_OVERRIDE_ITEMS} onNavigate={onNavigate} variant="admin-modal" />
+          </div>
+        </div>
+      )}
+      {preloadHashes.includes('#presence-based-overrides-auto') && (
+        <div data-preload-modal="admin#presence-based-overrides-auto">
+          <div className={styles.adminModalBody}>
+            <AdminTileGrid gridLabel="Presence-Based Auto-Reset by room" items={ADMIN_AUTO_REENABLE_ITEMS} onNavigate={onNavigate} variant="admin-modal" />
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -3614,7 +3660,7 @@ function PredictiveMetric({ label, value }: { label: string; value: string }) {
   )
 }
 
-function PredictiveComfortModal({ onClose, open }: { onClose: () => void; open: boolean }) {
+function usePredictiveComfortData() {
   const sensor = useEntity(asEntityName(PREDICTIVE_COMFORT_SENSOR_ENTITY_ID), { returnNullIfNotFound: true })
   const switchEntity = useEntity(asEntityName(PREDICTIVE_COMFORT_SWITCH_ENTITY_ID), { returnNullIfNotFound: true })
   const currentRecommendation = predictiveAttribute(switchEntity, 'current_recommendation') ?? sensor?.state
@@ -3627,46 +3673,67 @@ function PredictiveComfortModal({ onClose, open }: { onClose: () => void; open: 
     : `${formatTemperatureValue(forecastLow)} - ${formatTemperatureValue(forecastHigh)}`
   const reasonBullets = buildPredictiveReasonBullets(sensor)
 
+  return {
+    comfortHigh,
+    comfortLow,
+    currentRecommendation,
+    forecastSummary,
+    reasonBullets,
+    sensor,
+  }
+}
+
+function PredictiveComfortModalContent() {
+  const { comfortHigh, comfortLow, forecastSummary, reasonBullets, sensor } = usePredictiveComfortData()
+
+  return (
+    <div className={styles.thermostatModalBody}>
+      <section className={styles.section}>
+        <SectionHeader title="Controls" />
+        <div className={styles.predictiveControlGrid}>
+          <div className={styles.predictiveControlGroup}>
+            <Description>Lets Predictive Comfort nudge the thermostat target before the house drifts out of range.</Description>
+            <ThermostatSwitchCard entityId={PREDICTIVE_AUTO_ADJUST_SWITCH_ENTITY_ID} icon="mdi:thermostat-auto" title="Auto Setpoint Adjustments" />
+          </div>
+          <div className={styles.predictiveControlGroup}>
+            <Description>Allows Predictive Comfort to switch between heat and cool when a proactive correction needs it.</Description>
+            <ThermostatSwitchCard entityId={PREDICTIVE_HVAC_MODE_CHANGE_SWITCH_ENTITY_ID} icon="mdi:hvac" title="HVAC Mode Changes" />
+          </div>
+          <div className={styles.predictiveControlGroup}>
+            <Description>Allows proactive thermostat changes while everyone is away; leave off to only act when someone is home.</Description>
+            <ThermostatSwitchCard entityId={PREDICTIVE_ALLOW_AWAY_SWITCH_ENTITY_ID} icon="mdi:home-export-outline" title="Predictive Comfort While Away" />
+          </div>
+        </div>
+      </section>
+      <section className={styles.section}>
+        <SectionHeader title="Current Prediction" />
+        <div className={styles.predictiveMetricGrid}>
+          <PredictiveMetric label="Indoor" value={formatTemperatureValue(predictiveAttribute(sensor, 'indoor_temperature'))} />
+          <PredictiveMetric label="Predicted" value={formatTemperatureValue(predictiveAttribute(sensor, 'predicted_temperature'))} />
+          <PredictiveMetric label="Comfort Band" value={`${formatTemperatureValue(comfortLow)} - ${formatTemperatureValue(comfortHigh)}`} />
+          <PredictiveMetric label="Forecast" value={forecastSummary} />
+          <PredictiveMetric label="Weather" value={String(predictiveAttribute(sensor, 'weather_entity') ?? 'Unknown')} />
+          <PredictiveMetric label="Adjustment" value={formatPredictiveState(predictiveAttribute(sensor, 'adjustment_status'))} />
+        </div>
+        <div className={styles.predictiveReasonCard}>
+          <strong>Why this prediction?</strong>
+          <ul>
+            {reasonBullets.map((bullet) => (
+              <li key={bullet}>{bullet}</li>
+            ))}
+          </ul>
+        </div>
+      </section>
+    </div>
+  )
+}
+
+function PredictiveComfortModal({ onClose, open }: { onClose: () => void; open: boolean }) {
+  const { currentRecommendation } = usePredictiveComfortData()
+
   return (
     <ModalSheet onClose={onClose} open={open} subtitle={formatPredictiveState(currentRecommendation)} surface="hass-popup" title="Predictive Comfort">
-      <div className={styles.thermostatModalBody}>
-        <section className={styles.section}>
-          <SectionHeader title="Controls" />
-          <div className={styles.predictiveControlGrid}>
-            <div className={styles.predictiveControlGroup}>
-              <Description>Lets Predictive Comfort nudge the thermostat target before the house drifts out of range.</Description>
-              <ThermostatSwitchCard entityId={PREDICTIVE_AUTO_ADJUST_SWITCH_ENTITY_ID} icon="mdi:thermostat-auto" title="Auto Setpoint Adjustments" />
-            </div>
-            <div className={styles.predictiveControlGroup}>
-              <Description>Allows Predictive Comfort to switch between heat and cool when a proactive correction needs it.</Description>
-              <ThermostatSwitchCard entityId={PREDICTIVE_HVAC_MODE_CHANGE_SWITCH_ENTITY_ID} icon="mdi:hvac" title="HVAC Mode Changes" />
-            </div>
-            <div className={styles.predictiveControlGroup}>
-              <Description>Allows proactive thermostat changes while everyone is away; leave off to only act when someone is home.</Description>
-              <ThermostatSwitchCard entityId={PREDICTIVE_ALLOW_AWAY_SWITCH_ENTITY_ID} icon="mdi:home-export-outline" title="Predictive Comfort While Away" />
-            </div>
-          </div>
-        </section>
-        <section className={styles.section}>
-          <SectionHeader title="Current Prediction" />
-          <div className={styles.predictiveMetricGrid}>
-            <PredictiveMetric label="Indoor" value={formatTemperatureValue(predictiveAttribute(sensor, 'indoor_temperature'))} />
-            <PredictiveMetric label="Predicted" value={formatTemperatureValue(predictiveAttribute(sensor, 'predicted_temperature'))} />
-            <PredictiveMetric label="Comfort Band" value={`${formatTemperatureValue(comfortLow)} - ${formatTemperatureValue(comfortHigh)}`} />
-            <PredictiveMetric label="Forecast" value={forecastSummary} />
-            <PredictiveMetric label="Weather" value={String(predictiveAttribute(sensor, 'weather_entity') ?? 'Unknown')} />
-            <PredictiveMetric label="Adjustment" value={formatPredictiveState(predictiveAttribute(sensor, 'adjustment_status'))} />
-          </div>
-          <div className={styles.predictiveReasonCard}>
-            <strong>Why this prediction?</strong>
-            <ul>
-              {reasonBullets.map((bullet) => (
-                <li key={bullet}>{bullet}</li>
-              ))}
-            </ul>
-          </div>
-        </section>
-      </div>
+      <PredictiveComfortModalContent />
     </ModalSheet>
   )
 }
@@ -3756,41 +3823,48 @@ function OpenContactSensorsSection() {
   )
 }
 
-function ThermostatRoomModal({ onClose, open, room }: { onClose: () => void; open: boolean; room: ThermostatRoomView | null }) {
+function ThermostatRoomModalContent({ room }: { room: ThermostatRoomView }) {
   const awayMode = useEntity(asEntityName('binary_sensor.thermostat_contact_sensors_away_mode_active'), { returnNullIfNotFound: true })
+  const ventTitle = `${room.title} ${room.ventEntityIds.length > 1 ? 'Vents' : 'Vent'}`
+
+  return (
+    <div className={styles.thermostatModalBody}>
+      <section aria-label={`${room.title} thermostat control`} className={styles.thermostatModalHero}>
+        <ThermostatDial entityId={room.climateEntityId} size="modal" title={room.title} />
+      </section>
+      <section aria-label={ventTitle} className={`${styles.section} ${styles.thermostatModalVents}`}>
+        <SectionHeader title={ventTitle} />
+        <Grid>
+          {room.ventEntityIds.map((entityId, index) => <ClimateCard entityId={entityId} icon="vent" key={entityId} size="compact" title={room.ventEntityIds.length > 1 ? `Vent ${index + 1}` : 'Vent'} />)}
+        </Grid>
+      </section>
+      {awayMode?.state === 'on' && (
+        <section aria-label={`${room.title} away mode`} className={styles.thermostatModalAway}>
+          <Notice>Away Mode Active. The room may be cooler or warmer than your heat/cool targets to save energy while away.</Notice>
+        </section>
+      )}
+    </div>
+  )
+}
+
+function ThermostatRoomModal({ onClose, open, room }: { onClose: () => void; open: boolean; room: ThermostatRoomView | null }) {
   const title = room?.title ?? 'Thermostat'
-  const ventTitle = room ? `${room.title} ${room.ventEntityIds.length > 1 ? 'Vents' : 'Vent'}` : 'Vents'
 
   return (
     <ModalSheet contentStyle={THERMOSTAT_ROOM_MODAL_STYLE} onClose={onClose} open={open} surface="hass-popup" title={title}>
-      {room && (
-        <div className={styles.thermostatModalBody}>
-          <section aria-label={`${room.title} thermostat control`} className={styles.thermostatModalHero}>
-            <ThermostatDial entityId={room.climateEntityId} size="modal" title={room.title} />
-          </section>
-          <section aria-label={ventTitle} className={`${styles.section} ${styles.thermostatModalVents}`}>
-            <SectionHeader title={ventTitle} />
-            <Grid>
-              {room.ventEntityIds.map((entityId, index) => <ClimateCard entityId={entityId} icon="vent" key={entityId} size="compact" title={room.ventEntityIds.length > 1 ? `Vent ${index + 1}` : 'Vent'} />)}
-            </Grid>
-          </section>
-          {awayMode?.state === 'on' && (
-            <section aria-label={`${room.title} away mode`} className={styles.thermostatModalAway}>
-              <Notice>Away Mode Active. The room may be cooler or warmer than your heat/cool targets to save energy while away.</Notice>
-            </section>
-          )}
-        </div>
-      )}
+      {room && <ThermostatRoomModalContent room={room} />}
     </ModalSheet>
   )
 }
 
-function ThermostatPage() {
+function ThermostatPage({ preloadHash, preloadHashes = [] }: { preloadHash?: string; preloadHashes?: string[] }) {
   const { closeHash, hash, openHash } = useHashModal()
   const selectedRoom = THERMOSTAT_ROOM_VIEWS.find((room) => room.hash === hash) ?? null
+  const preloadRoom = preloadHash ? THERMOSTAT_ROOM_VIEWS.find((room) => room.hash === preloadHash) ?? null : null
+  const preloadRooms = useMemo(() => preloadHashes.map((preloadTargetHash) => THERMOSTAT_ROOM_VIEWS.find((room) => room.hash === preloadTargetHash)).filter((room): room is ThermostatRoomView => Boolean(room)), [preloadHashes])
   const [renderedRoom, setRenderedRoom] = useState<ThermostatRoomView | null>(selectedRoom)
   const roomModalOpen = Boolean(selectedRoom)
-  const modalRoom = selectedRoom ?? renderedRoom
+  const modalRoom = selectedRoom ?? preloadRoom ?? renderedRoom
 
   const openThermostatRoom = (nextHash: string) => {
     const nextRoom = THERMOSTAT_ROOM_VIEWS.find((room) => room.hash === nextHash) ?? null
@@ -3838,6 +3912,16 @@ function ThermostatPage() {
       </section>
       <PredictiveComfortModal onClose={closeHash} open={hash === PREDICTIVE_COMFORT_HASH} />
       <ThermostatRoomModal onClose={closeThermostatRoom} open={roomModalOpen} room={modalRoom} />
+      {preloadHashes.includes(PREDICTIVE_COMFORT_HASH) && (
+        <div data-preload-modal={`ecobee${PREDICTIVE_COMFORT_HASH}`}>
+          <PredictiveComfortModalContent />
+        </div>
+      )}
+      {preloadRooms.map((room) => (
+        <div data-preload-modal={`ecobee${room.hash}`} key={`ecobee-preload-${room.hash}`}>
+          <ThermostatRoomModalContent room={room} />
+        </div>
+      ))}
     </div>
   )
 }
@@ -3852,23 +3936,23 @@ function FallbackPage({ title }: { title: string }) {
   return <Notice>{title} is not available in the React dashboard yet.</Notice>
 }
 
-function Content({ onNavigate, onScrollLockChange, path }: { onNavigate: (path: string) => void; onScrollLockChange?: (locked: boolean) => void; path: string }) {
+function Content({ onNavigate, onScrollLockChange, path, preloadHash, preloadHashes }: { onNavigate: (path: string) => void; onScrollLockChange?: (locked: boolean) => void; path: string; preloadHash?: string; preloadHashes?: string[] }) {
   const roomTitle = dashboardRoomNameFromPath(path)
-  if (roomTitle) return <RoomPage onNavigate={onNavigate} path={path} title={roomTitle} />
+  if (roomTitle) return <RoomPage onNavigate={onNavigate} path={path} preloadHash={preloadHash} preloadHashes={preloadHashes} title={roomTitle} />
   if (TODO_PAGES[path]) return <TodoPage onNavigate={onNavigate} onScrollLockChange={onScrollLockChange} path={path} />
   if (path === 'settings') return <SettingsPage onNavigate={onNavigate} />
   if (path === 'guests-staying-over') return <GuestControlsPage onNavigate={onNavigate} />
   if (path === 'vacation') return <VacationPage />
   if (path === 'vacuums') return <VacuumPage />
-  if (path === 'media') return <MediaPage />
-  if (path === 'admin') return <AdminPage onNavigate={onNavigate} />
-  if (path === 'ecobee') return <ThermostatPage />
+  if (path === 'media') return <MediaPage preloadHash={preloadHash} preloadHashes={preloadHashes} />
+  if (path === 'admin') return <AdminPage onNavigate={onNavigate} preloadHash={preloadHash} preloadHashes={preloadHashes} />
+  if (path === 'ecobee') return <ThermostatPage preloadHash={preloadHash} preloadHashes={preloadHashes} />
   if (path === 'custom-lights') return <CustomLightsPage />
   if (CONTROL_PAGES[path]) return <ControlPage onNavigate={onNavigate} path={path} />
   return <FallbackPage title={routeTitle(path)} />
 }
 
-export function DashboardViewPage({ activePath, onNavigate, path, withShell = true }: DashboardViewPageProps) {
+export function DashboardViewPage({ activePath, loadingPhase, onNavigate, path, preload = false, preloadHash, preloadHashes, withShell = true }: DashboardViewPageProps) {
   const roomTitle = dashboardRoomNameFromPath(path)
   const title = path === 'guests-staying-over' ? 'Guest Controls' : roomTitle ?? TODO_PAGES[path]?.title ?? CONTROL_PAGES[path]?.title ?? routeTitle(path)
   const showBack = !PRIMARY_NAV_ROUTES.some((route) => route.path === path)
@@ -3879,17 +3963,17 @@ export function DashboardViewPage({ activePath, onNavigate, path, withShell = tr
   }, [path])
 
   const page = path === 'security' ? (
-    <SecurityPage activePath={activePath} backPath={showBack ? 'overview' : undefined} onNavigate={onNavigate} title={title} />
+    <SecurityPage activePath={activePath} backPath={showBack ? 'overview' : undefined} loadingPhase={loadingPhase} onNavigate={onNavigate} preload={preload} preloadHash={preloadHash} preloadHashes={preloadHashes} title={title} />
   ) : (
-    <Page activePath={activePath} backPath={showBack ? 'overview' : undefined} headerQuickLinks={roomTitle ? <RoomSectionRail path={path} title={roomTitle} /> : undefined} onNavigate={onNavigate} scrollLocked={pageScrollLocked} title={title}>
-      <Content onNavigate={onNavigate} onScrollLockChange={handlePageScrollLockChange} path={path} />
+    <Page activePath={activePath} backPath={showBack ? 'overview' : undefined} chromeHidden={Boolean(loadingPhase)} headerQuickLinks={roomTitle ? <RoomSectionRail path={path} title={roomTitle} /> : undefined} onNavigate={onNavigate} scrollLocked={pageScrollLocked} title={title}>
+      {loadingPhase ? <DashboardPageLoading phase={loadingPhase} /> : <Content onNavigate={onNavigate} onScrollLockChange={handlePageScrollLockChange} path={path} preloadHash={preloadHash} preloadHashes={preloadHashes} />}
     </Page>
   )
 
   if (!withShell) return page
 
   return (
-    <AppShell bottomNav={<BottomNav activePath={activePath} onNavigate={onNavigate} />} floatingAction={hasDashboardFloatingAction(path) ? <DashboardFloatingAction onNavigate={onNavigate} path={path} /> : undefined}>
+    <AppShell bottomNav={<BottomNav activePath={activePath} onNavigate={onNavigate} />} chromeHidden={Boolean(loadingPhase)} floatingAction={hasDashboardFloatingAction(path) ? <DashboardFloatingAction onNavigate={onNavigate} path={path} /> : undefined}>
       {page}
     </AppShell>
   )

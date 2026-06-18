@@ -287,9 +287,23 @@ export function WeatherGlyph({ condition, size = 24 }: { condition?: string; siz
 }
 
 const FORECAST_PLACEHOLDERS = Array.from({ length: 7 }, (_, index) => index)
+const HERO_HOURLY_PLACEHOLDERS = Array.from({ length: 8 }, (_, index) => index)
+const FORECAST_CACHE_TTL_MS = 5 * 60 * 1000
 const PRESSURE_TICK_COUNT = 49
 const PRESSURE_ARC_START_DEGREES = 145
 const PRESSURE_ARC_SPAN_DEGREES = 250
+
+interface ForecastCache {
+  forecasts: WeatherForecast[]
+  updatedAt: number
+}
+
+let dailyForecastCache: ForecastCache | null = null
+let hourlyForecastCache: ForecastCache | null = null
+
+function cacheFresh(cache: ForecastCache | null) {
+  return Boolean(cache && Date.now() - cache.updatedAt < FORECAST_CACHE_TTL_MS)
+}
 
 function pressureGaugeLine(percent: number, innerRadius: number, outerRadius: number) {
   const angle = ((PRESSURE_ARC_START_DEGREES + (clampPercent(percent) / 100) * PRESSURE_ARC_SPAN_DEGREES) * Math.PI) / 180
@@ -803,7 +817,16 @@ function HourlyConditionItem({ entity, forecast, index, mode }: { entity: HassEn
 }
 
 function HeroDayForecast({ entity, forecast }: { entity: HassEntity | null; forecast: WeatherForecast | undefined }) {
-  if (!forecast) return null
+  if (!forecast) {
+    return (
+      <span aria-hidden="true" className={`${styles.heroDayForecast} ${styles.heroDayForecastPlaceholder}`}>
+        <span className={styles.heroDayIconPlaceholder} />
+        <span className={styles.heroDayLow} />
+        <span className={styles.heroDayRangeTrack} />
+        <span className={styles.heroDayHigh} />
+      </span>
+    )
+  }
 
   const condition = conditionInfo(forecast.condition)
   return (
@@ -822,7 +845,19 @@ function HeroDayForecast({ entity, forecast }: { entity: HassEntity | null; fore
 }
 
 function HeroHourlyStrip({ entity, forecasts }: { entity: HassEntity | null; forecasts: WeatherForecast[] }) {
-  if (forecasts.length === 0) return null
+  if (forecasts.length === 0) {
+    return (
+      <span aria-hidden="true" className={`${styles.heroHourlyStrip} ${styles.heroHourlyStripPlaceholder}`}>
+        {HERO_HOURLY_PLACEHOLDERS.map((item) => (
+          <span className={styles.heroHourlyItem} key={item}>
+            <span className={styles.heroHourlyPlaceholderLine} />
+            <span className={styles.heroHourlyPlaceholderDot} />
+            <span className={styles.heroHourlyPlaceholderLine} />
+          </span>
+        ))}
+      </span>
+    )
+  }
 
   return (
     <span className={styles.heroHourlyStrip} aria-label="24-hour weather forecast">
@@ -945,7 +980,7 @@ function WeatherForecastSheet({
     if (selectedMode === displayMode) return undefined
 
     let animationFrame = 0
-    setTransitionPhase('out')
+    const exitTimer = window.setTimeout(() => setTransitionPhase('out'), 0)
 
     const swapTimer = window.setTimeout(() => {
       setDisplayMode(selectedMode)
@@ -955,6 +990,7 @@ function WeatherForecastSheet({
     const settleTimer = window.setTimeout(() => setTransitionPhase('idle'), 320)
 
     return () => {
+      window.clearTimeout(exitTimer)
       window.clearTimeout(swapTimer)
       window.clearTimeout(settleTimer)
       if (animationFrame) window.cancelAnimationFrame(animationFrame)
@@ -1015,24 +1051,38 @@ function WeatherForecastSheet({
   )
 }
 
-export function WeatherSummary() {
+interface WeatherSummaryProps {
+  deferRefresh?: boolean
+}
+
+export function WeatherSummary({ deferRefresh = false }: WeatherSummaryProps) {
   const weather = useEntity(asEntityName(WEATHER_ENTITY), {
     returnNullIfNotFound: true,
   })
   const callService = useHass((state) => state.helpers.callService) as unknown as CallService
   const [open, setOpen] = useState(false)
-  const [forecasts, setForecasts] = useState<WeatherForecast[]>([])
+  const [forecasts, setForecasts] = useState<WeatherForecast[]>(() => dailyForecastCache?.forecasts ?? [])
   const [forecastError, setForecastError] = useState<string | null>(null)
   const [forecastLoading, setForecastLoading] = useState(false)
-  const [hourlyForecasts, setHourlyForecasts] = useState<WeatherForecast[]>([])
+  const [hourlyForecasts, setHourlyForecasts] = useState<WeatherForecast[]>(() => hourlyForecastCache?.forecasts ?? [])
   const [hourlyForecastError, setHourlyForecastError] = useState<string | null>(null)
   const [hourlyForecastLoading, setHourlyForecastLoading] = useState(false)
 
   useEffect(() => {
     let cancelled = false
+    const cached = dailyForecastCache
+    if (deferRefresh || cacheFresh(cached)) {
+      const settleTimer = window.setTimeout(() => setForecastLoading(false), 0)
+      return () => {
+        cancelled = true
+        window.clearTimeout(settleTimer)
+      }
+    }
 
-    setForecastLoading(open)
-    setForecastError(null)
+    const loadingTimer = window.setTimeout(() => {
+      setForecastLoading(open && !cached)
+      setForecastError(null)
+    }, 0)
 
     Promise.resolve(
       callService<WeatherForecastResponse>({
@@ -1045,12 +1095,14 @@ export function WeatherSummary() {
     )
       .then((serviceResponse) => {
         if (cancelled) return
-        setForecasts(serviceResponse ? extractForecasts(serviceResponse.response) : [])
+        const nextForecasts = serviceResponse ? extractForecasts(serviceResponse.response) : []
+        dailyForecastCache = { forecasts: nextForecasts, updatedAt: Date.now() }
+        setForecasts(nextForecasts)
         setForecastError(null)
       })
       .catch((caughtError: unknown) => {
         if (cancelled) return
-        setForecastError(caughtError instanceof Error ? caughtError.message : 'Unable to load Pirate Weather forecast.')
+        if (!cached) setForecastError(caughtError instanceof Error ? caughtError.message : 'Unable to load Pirate Weather forecast.')
       })
       .finally(() => {
         if (!cancelled) setForecastLoading(false)
@@ -1058,14 +1110,25 @@ export function WeatherSummary() {
 
     return () => {
       cancelled = true
+      window.clearTimeout(loadingTimer)
     }
-  }, [callService, open])
+  }, [callService, deferRefresh, open])
 
   useEffect(() => {
     let cancelled = false
+    const cached = hourlyForecastCache
+    if (deferRefresh || cacheFresh(cached)) {
+      const settleTimer = window.setTimeout(() => setHourlyForecastLoading(false), 0)
+      return () => {
+        cancelled = true
+        window.clearTimeout(settleTimer)
+      }
+    }
 
-    setHourlyForecastLoading(true)
-    setHourlyForecastError(null)
+    const loadingTimer = window.setTimeout(() => {
+      setHourlyForecastLoading(!cached)
+      setHourlyForecastError(null)
+    }, 0)
 
     Promise.resolve(
       callService<WeatherForecastResponse>({
@@ -1078,12 +1141,14 @@ export function WeatherSummary() {
     )
       .then((serviceResponse) => {
         if (cancelled) return
-        setHourlyForecasts(serviceResponse ? extractForecasts(serviceResponse.response, 24) : [])
+        const nextForecasts = serviceResponse ? extractForecasts(serviceResponse.response, 24) : []
+        hourlyForecastCache = { forecasts: nextForecasts, updatedAt: Date.now() }
+        setHourlyForecasts(nextForecasts)
         setHourlyForecastError(null)
       })
       .catch((caughtError: unknown) => {
         if (cancelled) return
-        setHourlyForecastError(caughtError instanceof Error ? caughtError.message : 'Unable to load Pirate Weather hourly forecast.')
+        if (!cached) setHourlyForecastError(caughtError instanceof Error ? caughtError.message : 'Unable to load Pirate Weather hourly forecast.')
       })
       .finally(() => {
         if (!cancelled) setHourlyForecastLoading(false)
@@ -1091,8 +1156,9 @@ export function WeatherSummary() {
 
     return () => {
       cancelled = true
+      window.clearTimeout(loadingTimer)
     }
-  }, [callService, open])
+  }, [callService, deferRefresh, open])
 
   const condition = conditionInfo(weather?.state)
   const today = forecasts[0]
