@@ -8,11 +8,11 @@ import { LightCard } from '../components/cards/LightCard'
 import { OccupancyCard } from '../components/cards/OccupancyCard'
 import { AppShell } from '../components/shell/AppShell'
 import { BottomNav } from '../components/shell/BottomNav'
+import { DashboardFloatingAction } from '../components/shell/DashboardFloatingAction'
+import { dashboardRoomNameFromPath, hasDashboardFloatingAction } from '../components/shell/dashboardFloatingAction'
 import { EntityActionCard } from '../components/hass/EntityActionCard'
 import { SecurityDashboard, SecurityStatusRail } from '../components/hass/SecurityDashboard'
 import { StatusRail, type StatusRailChip } from '../components/hass/StatusRail'
-import { CreateDonetickTaskSheet } from '../components/hass/CreateDonetickTaskSheet'
-import { CreateGroceryItemSheet } from '../components/hass/CreateGroceryItemSheet'
 import { TodoListPanel } from '../components/hass/TodoListPanel'
 import { VacuumCard, VacuumRoomSourceModalContent } from '../components/hass/VacuumCard'
 import { VACUUM_MODAL_STYLE } from '../components/hass/vacuumModalStyle'
@@ -23,7 +23,6 @@ import { MediaRemoteModalContent, MediaRemoteModalNav, type MediaRemoteModalTab 
 import { MEDIA_REMOTE_MODAL_STYLE } from '../components/hass/mediaRemoteModalStyle'
 import { Card, type CardColor } from '../components/core/Card'
 import { Description } from '../components/core/Description'
-import { FloatingActionButton } from '../components/core/FloatingActionButton'
 import { GlassTile } from '../components/core/GlassTile'
 import { MaterialIcon } from '../components/core/Icon'
 import { ModalSheet, type ModalSheetStyle } from '../components/core/ModalSheet'
@@ -36,7 +35,6 @@ import { DASHBOARD_ROUTE_CHANGE_EVENT, dashboardEventTargets, dashboardHash, das
 import { useHashModal } from '../hooks/useHashModal'
 import { useOptimisticState } from '../hooks/useOptimisticState'
 import {
-  AREA_ITEMS,
   CLIMATE_GROUPS,
   CONTACT_GROUPS,
   LIGHT_GROUPS,
@@ -46,7 +44,6 @@ import {
 import { DASHBOARD_ROUTES, PRIMARY_NAV_ROUTES } from '../constants/routes'
 import {
   ADMIN_AUTO_REENABLE_ITEMS,
-  CHORE_BLUE,
   CHORE_QUICK_LINKS,
   ADMIN_DESCRIPTIONS,
   ADMIN_PRESENCE_OVERRIDE_ITEMS,
@@ -84,7 +81,7 @@ import { modalSquareGridModalStyle, modalSquareGridStyle, type ModalSquareGridSt
 import { ROOM_PAGE_CONFIGS, type RoomSourceCardAction, type RoomSourceCardConfig, type RoomSourceKind, type RoomSourceModalItem } from '../constants/roomPages'
 import { MEDIA_REMOTE_CONFIGS } from '../constants/mediaRemotes'
 import { Page } from './Page'
-import { ClimateSheet, ContactSheet, LightsSheet, OccupancySheet, RoomPickerButton } from './AtAGlancePage'
+import { ClimateSheet, ContactSheet, LightsSheet, OccupancySheet } from './AtAGlancePage'
 import { CustomLightsPage } from './CustomLightsPage'
 import styles from './DashboardViewPage.module.css'
 
@@ -92,14 +89,11 @@ interface DashboardViewPageProps {
   activePath: string
   onNavigate: (path: string) => void
   path: string
+  withShell?: boolean
 }
 
 function routeTitle(path: string) {
   return DASHBOARD_ROUTES.find((route) => route.path === path)?.title ?? 'Dashboard'
-}
-
-function roomNameFromPath(path: string) {
-  return AREA_ITEMS.find((area) => area.route.endsWith(`/${path}`))?.title
 }
 
 function removeSuffix(value: string, suffix: string) {
@@ -896,36 +890,6 @@ function TodoEmptyState({ description = 'You have no tasks due- nice job!', titl
       <h2>{title}</h2>
       <Description>{description}</Description>
     </section>
-  )
-}
-
-function createTaskDefaultAssignee(path: string) {
-  if (path === 'chores' || path === 'unassigned-chores') return ''
-  if (path === 'stephens-chores') return '1'
-  if (path === 'stephs-chores') return '2'
-  if (path === 'home-improvement-chores') return '3'
-  return null
-}
-
-function CreateChoreButton({ defaultAssignee }: { defaultAssignee: string }) {
-  const [modalOpen, setModalOpen] = useState(false)
-
-  return (
-    <>
-      <FloatingActionButton color={CHORE_BLUE} icon="mdi:plus" label="Add Task" onClick={() => setModalOpen(true)} />
-      <CreateDonetickTaskSheet defaultAssignee={defaultAssignee} onClose={() => setModalOpen(false)} open={modalOpen} />
-    </>
-  )
-}
-
-function CreateGroceryButton() {
-  const [modalOpen, setModalOpen] = useState(false)
-
-  return (
-    <>
-      <FloatingActionButton color={CHORE_BLUE} icon="mdi:plus" label="Add Groceries" onClick={() => setModalOpen(true)} />
-      <CreateGroceryItemSheet entityId="todo.shopping_list" onClose={() => setModalOpen(false)} open={modalOpen} />
-    </>
   )
 }
 
@@ -3857,8 +3821,8 @@ function ThermostatPage() {
         <SectionHeader title="Eco Mode" />
         <Description className={styles.thermostatDescription}>{THERMOSTAT_SECTION_DESCRIPTIONS.ecoMode}</Description>
         <ThermostatSwitchCard entityId="switch.thermostat_contact_sensors_eco_mode" icon="mdi:leaf" title="Eco Mode">
-          <ThermostatSelectButton entityId="select.thermostat_contact_sensors_eco_mode_critical_tracking" icon="mdi:thermometer-alert" pickerSheetLayout="compact-grid" pickerSheetStyle={THERMOSTAT_COMPACT_PICKER_MODAL_STYLE} title="Eco Mode Critical Tracking" />
-          <ThermostatSelectButton entityId="select.thermostat_contact_sensors_eco_behavior_when_away" icon="mdi:leaf-circle" pickerSheetLayout="compact-grid" pickerSheetStyle={THERMOSTAT_COMPACT_PICKER_MODAL_STYLE} title="Eco Behavior When Away" />
+          <ThermostatSelectButton entityId="select.thermostat_contact_sensors_eco_mode_critical_tracking" icon="mdi:thermometer-alert" pickerSheetLayout="card-grid" pickerSheetStyle={THERMOSTAT_COMPACT_PICKER_MODAL_STYLE} title="Eco Mode Critical Tracking" />
+          <ThermostatSelectButton entityId="select.thermostat_contact_sensors_eco_behavior_when_away" icon="mdi:leaf-circle" pickerSheetLayout="card-grid" pickerSheetStyle={THERMOSTAT_COMPACT_PICKER_MODAL_STYLE} title="Eco Behavior When Away" />
         </ThermostatSwitchCard>
       </section>
       <section className={styles.section}>
@@ -3889,7 +3853,7 @@ function FallbackPage({ title }: { title: string }) {
 }
 
 function Content({ onNavigate, onScrollLockChange, path }: { onNavigate: (path: string) => void; onScrollLockChange?: (locked: boolean) => void; path: string }) {
-  const roomTitle = roomNameFromPath(path)
+  const roomTitle = dashboardRoomNameFromPath(path)
   if (roomTitle) return <RoomPage onNavigate={onNavigate} path={path} title={roomTitle} />
   if (TODO_PAGES[path]) return <TodoPage onNavigate={onNavigate} onScrollLockChange={onScrollLockChange} path={path} />
   if (path === 'settings') return <SettingsPage onNavigate={onNavigate} />
@@ -3904,30 +3868,29 @@ function Content({ onNavigate, onScrollLockChange, path }: { onNavigate: (path: 
   return <FallbackPage title={routeTitle(path)} />
 }
 
-export function DashboardViewPage({ activePath, onNavigate, path }: DashboardViewPageProps) {
-  const roomTitle = roomNameFromPath(path)
+export function DashboardViewPage({ activePath, onNavigate, path, withShell = true }: DashboardViewPageProps) {
+  const roomTitle = dashboardRoomNameFromPath(path)
   const title = path === 'guests-staying-over' ? 'Guest Controls' : roomTitle ?? TODO_PAGES[path]?.title ?? CONTROL_PAGES[path]?.title ?? routeTitle(path)
   const showBack = !PRIMARY_NAV_ROUTES.some((route) => route.path === path)
-  const createTaskAssignee = createTaskDefaultAssignee(path)
   const [pageScrollLock, setPageScrollLock] = useState<{ locked: boolean; path: string }>({ locked: false, path })
   const pageScrollLocked = pageScrollLock.path === path && pageScrollLock.locked
   const handlePageScrollLockChange = useCallback((locked: boolean) => {
     setPageScrollLock((current) => (current.path === path && current.locked === locked ? current : { locked, path }))
   }, [path])
-  let floatingAction: ReactNode
-  if (roomTitle) floatingAction = <RoomPickerButton key={path} onNavigate={onNavigate} />
-  else if (path === 'groceries') floatingAction = <CreateGroceryButton key={path} />
-  else if (createTaskAssignee !== null) floatingAction = <CreateChoreButton defaultAssignee={createTaskAssignee} key={path} />
+
+  const page = path === 'security' ? (
+    <SecurityPage activePath={activePath} backPath={showBack ? 'overview' : undefined} onNavigate={onNavigate} title={title} />
+  ) : (
+    <Page activePath={activePath} backPath={showBack ? 'overview' : undefined} headerQuickLinks={roomTitle ? <RoomSectionRail path={path} title={roomTitle} /> : undefined} onNavigate={onNavigate} scrollLocked={pageScrollLocked} title={title}>
+      <Content onNavigate={onNavigate} onScrollLockChange={handlePageScrollLockChange} path={path} />
+    </Page>
+  )
+
+  if (!withShell) return page
 
   return (
-    <AppShell bottomNav={<BottomNav activePath={activePath} onNavigate={onNavigate} />} floatingAction={floatingAction}>
-      {path === 'security' ? (
-        <SecurityPage activePath={activePath} backPath={showBack ? 'overview' : undefined} onNavigate={onNavigate} title={title} />
-      ) : (
-        <Page activePath={activePath} backPath={showBack ? 'overview' : undefined} headerQuickLinks={roomTitle ? <RoomSectionRail path={path} title={roomTitle} /> : undefined} onNavigate={onNavigate} scrollLocked={pageScrollLocked} title={title}>
-          <Content onNavigate={onNavigate} onScrollLockChange={handlePageScrollLockChange} path={path} />
-        </Page>
-      )}
+    <AppShell bottomNav={<BottomNav activePath={activePath} onNavigate={onNavigate} />} floatingAction={hasDashboardFloatingAction(path) ? <DashboardFloatingAction onNavigate={onNavigate} path={path} /> : undefined}>
+      {page}
     </AppShell>
   )
 }

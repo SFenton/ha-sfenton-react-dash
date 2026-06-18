@@ -18,6 +18,10 @@
 
 .headerQuickLinks {
   margin-top: 18px;
+  transition:
+    opacity 170ms ease-out,
+    transform 170ms ease-out;
+  will-change: opacity, transform;
 }
 
 .scroller {
@@ -29,6 +33,10 @@
   box-sizing: border-box;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
+  transition:
+    opacity 170ms ease-out,
+    transform 170ms ease-out;
+  will-change: opacity, transform;
 }
 
 .scroller[data-scroll-lock='true'] {
@@ -47,4 +55,26 @@
 .scrollContent[data-scroll-lock='true'] {
   height: 100%;
   min-height: 0;
+}
+
+:global([data-route-transition-state='exiting']) .headerQuickLinks,
+:global([data-route-transition-state='exiting']) .scroller {
+  opacity: 0;
+  transform: translate3d(0, 5px, 0);
+  transition-duration: 130ms;
+  transition-timing-function: ease;
+}
+
+:global([data-route-transition-state='pre-entering']) .headerQuickLinks,
+:global([data-route-transition-state='pre-entering']) .scroller {
+  opacity: 0;
+  transform: translate3d(0, 5px, 0);
+  transition: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .headerQuickLinks,
+  .scroller {
+    transition: none;
+  }
 }

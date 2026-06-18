@@ -1145,9 +1145,10 @@ export function RoomPickerButton({ onNavigate }: { onNavigate: (path: string) =>
 interface AtAGlancePageProps {
   activePath?: string
   onNavigate?: (path: string) => void
+  withShell?: boolean
 }
 
-export function AtAGlancePage({ activePath = 'overview', onNavigate = () => undefined }: AtAGlancePageProps) {
+export function AtAGlancePage({ activePath = 'overview', onNavigate = () => undefined, withShell = true }: AtAGlancePageProps) {
   const { hash, openHash, closeHash } = useHashModal()
   const activeRoomLightCount = useHass((state) =>
     ROOM_LIGHT_ENTITY_IDS.reduce((count, entityId) => count + (isActiveState(state.entities[entityId] ?? null) ? 1 : 0), 0),
@@ -1172,8 +1173,8 @@ export function AtAGlancePage({ activePath = 'overview', onNavigate = () => unde
   const sheetStyle = hash === '#security-system' ? SECURITY_SYSTEM_MODAL_STYLE : squareGridModalOpen ? squareGridModalStyle : undefined
   const sheetSubtitle = hash === '#security-system' ? securitySystemSubtitle : undefined
 
-  return (
-    <AppShell bottomNav={<BottomNav activePath={activePath} onNavigate={onNavigate} />} floatingAction={<RoomPickerButton onNavigate={onNavigate} />}>
+  const page = (
+    <>
       <Page
         activePath={activePath}
         title="Home"
@@ -1212,6 +1213,14 @@ export function AtAGlancePage({ activePath = 'overview', onNavigate = () => unde
       <ModalSheet contentStyle={sheetStyle} open={hash !== ''} subtitle={sheetSubtitle} title={modalTitle} onClose={closeHash}>
         <SheetContent closeHash={closeHash} hash={hash} overviewGridRef={overviewGridRef} overviewGridStyle={squareGridStyle} onNavigate={onNavigate} />
       </ModalSheet>
+    </>
+  )
+
+  if (!withShell) return page
+
+  return (
+    <AppShell bottomNav={<BottomNav activePath={activePath} onNavigate={onNavigate} />} floatingAction={<RoomPickerButton onNavigate={onNavigate} />}>
+      {page}
     </AppShell>
   )
 }

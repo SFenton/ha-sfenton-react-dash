@@ -1,0 +1,11 @@
+.outlet {
+  position: relative;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.route {
+  height: 100%;
+  min-height: 0;
+}

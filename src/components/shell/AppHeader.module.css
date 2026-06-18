@@ -41,6 +41,10 @@
   flex: 0 0 28px;
   align-items: center;
   justify-content: center;
+  transition:
+    opacity 170ms ease-out,
+    transform 170ms ease-out;
+  will-change: opacity, transform;
 }
 
 .backTitle {
@@ -51,6 +55,10 @@
   letter-spacing: 0;
   line-height: 1.15;
   text-overflow: ellipsis;
+  transition:
+    opacity 170ms ease-out,
+    transform 170ms ease-out;
+  will-change: opacity, transform;
   white-space: nowrap;
 }
 
@@ -71,8 +79,26 @@
   place-items: center;
 }
 
+.leading {
+  transition:
+    opacity 170ms ease-out,
+    transform 170ms ease-out;
+  will-change: opacity, transform;
+}
+
 .titleWrap {
   min-width: 0;
+  transition:
+    opacity 170ms ease-out,
+    transform 170ms ease-out;
+  will-change: opacity, transform;
+}
+
+.trailing {
+  transition:
+    opacity 170ms ease-out,
+    transform 170ms ease-out;
+  will-change: opacity, transform;
 }
 
 .headerWithMenu .titleWrap {
@@ -130,6 +156,48 @@
   position: absolute;
   inset: -8px;
   content: '';
+}
+
+:global([data-route-transition-state='exiting']) .backTitle,
+:global([data-route-transition-state='exiting']) .titleWrap,
+:global([data-route-transition-state='exiting']) .trailing {
+  opacity: 0;
+  transform: translate3d(0, 5px, 0);
+  transition-duration: 130ms;
+  transition-timing-function: ease;
+}
+
+:global([data-route-leading-chrome-transition='changing'][data-route-transition-state='exiting']) .backIconSlot,
+:global([data-route-leading-chrome-transition='changing'][data-route-transition-state='exiting']) .leading {
+  opacity: 0;
+  transform: translate3d(0, 5px, 0);
+  transition-duration: 130ms;
+  transition-timing-function: ease;
+}
+
+:global([data-route-transition-state='pre-entering']) .backTitle,
+:global([data-route-transition-state='pre-entering']) .titleWrap,
+:global([data-route-transition-state='pre-entering']) .trailing {
+  opacity: 0;
+  transform: translate3d(0, 5px, 0);
+  transition: none;
+}
+
+:global([data-route-leading-chrome-transition='changing'][data-route-transition-state='pre-entering']) .backIconSlot,
+:global([data-route-leading-chrome-transition='changing'][data-route-transition-state='pre-entering']) .leading {
+  opacity: 0;
+  transform: translate3d(0, 5px, 0);
+  transition: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .leading,
+  .backIconSlot,
+  .backTitle,
+  .titleWrap,
+  .trailing {
+    transition: none;
+  }
 }
 
 .iconButton:focus,
