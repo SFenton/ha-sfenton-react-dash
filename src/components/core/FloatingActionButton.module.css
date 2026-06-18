@@ -1,8 +1,11 @@
 .button {
-  display: grid;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
   width: var(--floating-action-size, 62px);
+  min-width: var(--floating-action-size, 62px);
   height: var(--floating-action-size, 62px);
-  place-items: center;
   border: 0;
   border-radius: 999px;
   padding: 0;
@@ -11,4 +14,21 @@
   box-shadow: var(--shadow-glass), inset 0 1px 0 rgba(255, 255, 255, 0.2);
   font: inherit;
   cursor: pointer;
+}
+
+.button svg {
+  flex: 0 0 auto;
+}
+
+.pill {
+  width: auto;
+  gap: 10px;
+  padding: 0 20px 0 16px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.label {
+  line-height: 1;
+  white-space: nowrap;
 }

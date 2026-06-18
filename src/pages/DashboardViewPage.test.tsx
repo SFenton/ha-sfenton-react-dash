@@ -123,6 +123,7 @@ describe('DashboardViewPage', () => {
     mockEntities['light.kitchen_sink_light'] = entity('light.kitchen_sink_light', 'off')
     render(<DashboardViewPage activePath="kitchen" onNavigate={() => undefined} path="kitchen" />)
 
+    expect(screen.getByRole('button', { name: 'Rooms' })).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: /Lights/i }))
 
     const dialog = await screen.findByRole('dialog')
@@ -134,7 +135,21 @@ describe('DashboardViewPage', () => {
     const toggle = screen.getByRole('button', { name: 'Toggle Kitchen lights' })
     expect(toggle).toBeInTheDocument()
     expect(toggle.querySelector('path')).toHaveAttribute('d', materialIconPath('mdi:lightbulb-multiple-off'))
-    expect(screen.queryByText('Rooms')).not.toBeInTheDocument()
+    expect(within(dialog).queryByText('Rooms')).not.toBeInTheDocument()
+  })
+
+  it('shows the Rooms FAB on room pages and navigates through the room picker', async () => {
+    const navigate = vi.fn()
+    render(<DashboardViewPage activePath="master-bedroom" onNavigate={navigate} path="master-bedroom" />)
+
+    const roomsButton = screen.getByRole('button', { name: 'Rooms' })
+    expect(roomsButton).toHaveTextContent('Rooms')
+    fireEvent.click(roomsButton)
+
+    const dialog = await screen.findByRole('dialog', { name: 'Rooms' })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Living Room area' }))
+
+    expect(navigate).toHaveBeenCalledWith('living-room')
   })
 
   it('uses a singular active bulb icon for single-light room toggles', async () => {
@@ -400,6 +415,13 @@ describe('DashboardViewPage', () => {
 
     const hassSettings = screen.getByRole('button', { name: /Home Assistant Settings Access more in-depth Home Assistant details and settings\./i })
     expect(hassSettings).toHaveAttribute('data-external-path', '/config')
+  })
+
+  it('keeps the Settings bottom nav item active on settings subpages', () => {
+    render(<DashboardViewPage activePath="vacation" onNavigate={() => undefined} path="vacation" />)
+
+    const bottomNav = screen.getByRole('navigation', { name: 'Dashboard sections' })
+    expect(within(bottomNav).getByRole('button', { name: 'Settings' })).toHaveAttribute('aria-current', 'page')
   })
 
   it('renders the Vacation page with the admin-sized Vacation Mode toggle', () => {
@@ -2415,7 +2437,7 @@ describe('DashboardViewPage', () => {
 
     expect(await screen.findAllByText('Mock task one')).not.toHaveLength(0)
 
-    fireEvent.click(screen.getByRole('button', { name: 'Create Donetick task' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Add Task' }))
 
     const dialog = await screen.findByRole('dialog')
     expect(within(dialog).getByRole('heading', { name: 'Create Task' })).toBeInTheDocument()
@@ -2472,7 +2494,7 @@ describe('DashboardViewPage', () => {
   it('only shows recurrence days for the specific days recurrence option', async () => {
     render(<DashboardViewPage activePath="chores" onNavigate={() => undefined} path="chores" />)
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Create Donetick task' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Add Task' }))
     const dialog = await screen.findByRole('dialog')
 
     fireEvent.change(within(dialog).getByLabelText('Recurrence'), { target: { value: 'days_of_the_week' } })
@@ -2484,7 +2506,7 @@ describe('DashboardViewPage', () => {
   it('resets create task recurrence state after closing and reopening the modal', async () => {
     render(<DashboardViewPage activePath="chores" onNavigate={() => undefined} path="chores" />)
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Create Donetick task' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Add Task' }))
     const dialog = await screen.findByRole('dialog')
     fireEvent.change(within(dialog).getByLabelText('Recurrence'), { target: { value: 'interval' } })
 
@@ -2492,7 +2514,7 @@ describe('DashboardViewPage', () => {
 
     fireEvent.click(within(dialog).getByRole('button', { name: 'Close' }))
     await waitFor(() => expect(dialog).toHaveAttribute('data-state', 'closed'))
-    fireEvent.click(screen.getByRole('button', { name: 'Create Donetick task', hidden: true }))
+    fireEvent.click(screen.getByRole('button', { name: 'Add Task', hidden: true }))
 
     const reopenedDialog = await screen.findByRole('dialog')
     expect(within(reopenedDialog).getByLabelText('Recurrence')).toHaveValue('no_repeat')
@@ -2502,35 +2524,35 @@ describe('DashboardViewPage', () => {
   it('shows the create task FAB on chore task pages with route-specific assignee defaults', async () => {
     const { rerender } = render(<DashboardViewPage activePath="chores" onNavigate={() => undefined} path="chores" />)
 
-    expect(await screen.findByRole('button', { name: 'Create Donetick task' })).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: 'Create Donetick task' }))
+    expect(await screen.findByRole('button', { name: 'Add Task' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Add Task' }))
     expect(within(await screen.findByRole('dialog')).getByLabelText('Assignee')).toHaveValue('')
 
     rerender(<DashboardViewPage activePath="stephens-chores" onNavigate={() => undefined} path="stephens-chores" />)
-    fireEvent.click(screen.getByRole('button', { name: 'Create Donetick task' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Add Task' }))
     expect(within(await screen.findByRole('dialog')).getByLabelText('Assignee')).toHaveValue('1')
 
     rerender(<DashboardViewPage activePath="stephs-chores" onNavigate={() => undefined} path="stephs-chores" />)
-    fireEvent.click(screen.getByRole('button', { name: 'Create Donetick task' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Add Task' }))
     expect(within(await screen.findByRole('dialog')).getByLabelText('Assignee')).toHaveValue('2')
 
     rerender(<DashboardViewPage activePath="unassigned-chores" onNavigate={() => undefined} path="unassigned-chores" />)
-    fireEvent.click(screen.getByRole('button', { name: 'Create Donetick task' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Add Task' }))
     expect(within(await screen.findByRole('dialog')).getByLabelText('Assignee')).toHaveValue('')
 
     rerender(<DashboardViewPage activePath="home-improvement-chores" onNavigate={() => undefined} path="home-improvement-chores" />)
-    fireEvent.click(screen.getByRole('button', { name: 'Create Donetick task' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Add Task' }))
     expect(within(await screen.findByRole('dialog')).getByLabelText('Assignee')).toHaveValue('3')
 
     rerender(<DashboardViewPage activePath="groceries" onNavigate={() => undefined} path="groceries" />)
-    expect(screen.queryByRole('button', { name: 'Create Donetick task' })).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Add grocery item' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Add Task' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Add Groceries' })).toBeInTheDocument()
   })
 
   it('opens a grocery item modal on the Groceries page and adds to the shopping list', async () => {
     render(<DashboardViewPage activePath="groceries" onNavigate={() => undefined} path="groceries" />)
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Add grocery item' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Add Groceries' }))
     const dialog = await screen.findByRole('dialog')
 
     expect(within(dialog).getByRole('heading', { name: 'Add Grocery Item' })).toBeInTheDocument()

@@ -84,7 +84,7 @@ import { modalSquareGridModalStyle, modalSquareGridStyle, type ModalSquareGridSt
 import { ROOM_PAGE_CONFIGS, type RoomSourceCardAction, type RoomSourceCardConfig, type RoomSourceKind, type RoomSourceModalItem } from '../constants/roomPages'
 import { MEDIA_REMOTE_CONFIGS } from '../constants/mediaRemotes'
 import { Page } from './Page'
-import { ClimateSheet, ContactSheet, LightsSheet, OccupancySheet } from './AtAGlancePage'
+import { ClimateSheet, ContactSheet, LightsSheet, OccupancySheet, RoomPickerButton } from './AtAGlancePage'
 import { CustomLightsPage } from './CustomLightsPage'
 import styles from './DashboardViewPage.module.css'
 
@@ -912,7 +912,7 @@ function CreateChoreButton({ defaultAssignee }: { defaultAssignee: string }) {
 
   return (
     <>
-      <FloatingActionButton ariaLabel="Create Donetick task" color={CHORE_BLUE} icon="mdi:plus" onClick={() => setModalOpen(true)} />
+      <FloatingActionButton color={CHORE_BLUE} icon="mdi:plus" label="Add Task" onClick={() => setModalOpen(true)} />
       <CreateDonetickTaskSheet defaultAssignee={defaultAssignee} onClose={() => setModalOpen(false)} open={modalOpen} />
     </>
   )
@@ -923,7 +923,7 @@ function CreateGroceryButton() {
 
   return (
     <>
-      <FloatingActionButton ariaLabel="Add grocery item" color={CHORE_BLUE} icon="mdi:plus" onClick={() => setModalOpen(true)} />
+      <FloatingActionButton color={CHORE_BLUE} icon="mdi:plus" label="Add Groceries" onClick={() => setModalOpen(true)} />
       <CreateGroceryItemSheet entityId="todo.shopping_list" onClose={() => setModalOpen(false)} open={modalOpen} />
     </>
   )
@@ -3914,9 +3914,10 @@ export function DashboardViewPage({ activePath, onNavigate, path }: DashboardVie
   const handlePageScrollLockChange = useCallback((locked: boolean) => {
     setPageScrollLock((current) => (current.path === path && current.locked === locked ? current : { locked, path }))
   }, [path])
-  const floatingAction = path === 'groceries'
-    ? <CreateGroceryButton key={path} />
-    : createTaskAssignee !== null ? <CreateChoreButton defaultAssignee={createTaskAssignee} key={path} /> : undefined
+  let floatingAction: ReactNode
+  if (roomTitle) floatingAction = <RoomPickerButton key={path} onNavigate={onNavigate} />
+  else if (path === 'groceries') floatingAction = <CreateGroceryButton key={path} />
+  else if (createTaskAssignee !== null) floatingAction = <CreateChoreButton defaultAssignee={createTaskAssignee} key={path} />
 
   return (
     <AppShell bottomNav={<BottomNav activePath={activePath} onNavigate={onNavigate} />} floatingAction={floatingAction}>

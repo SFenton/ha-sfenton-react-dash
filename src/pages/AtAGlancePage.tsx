@@ -1115,7 +1115,7 @@ function SheetContent({
   return <p className={styles.sheetText}>This overview section is not available from Home.</p>
 }
 
-function RoomPickerButton({ onNavigate }: { onNavigate: (path: string) => void }) {
+export function RoomPickerButton({ onNavigate }: { onNavigate: (path: string) => void }) {
   const [modalOpen, setModalOpen] = useState(false)
   const [gridRef, gridLayout] = useModalSquareGridLayout(modalOpen, AREA_ITEMS.length)
   const modalStyle = modalSquareGridModalStyle(gridLayout)
@@ -1128,7 +1128,7 @@ function RoomPickerButton({ onNavigate }: { onNavigate: (path: string) => void }
 
   return (
     <>
-      <FloatingActionButton ariaLabel="Open room layout" color={CHORE_BLUE} icon="mdi:floor-plan" onClick={() => setModalOpen(true)} />
+      <FloatingActionButton color={CHORE_BLUE} icon="mdi:floor-plan" label="Rooms" onClick={() => setModalOpen(true)} />
       <ModalSheet contentStyle={modalStyle} open={modalOpen} title="Rooms" onClose={() => setModalOpen(false)}>
         <section className={styles.roomPickerGrid} aria-label="Rooms" ref={gridRef} style={gridStyle}>
           {AREA_ITEMS.map((area) => (
@@ -1178,7 +1178,6 @@ export function AtAGlancePage({ activePath = 'overview', onNavigate = () => unde
         activePath={activePath}
         title="Home"
         onNavigate={onNavigate}
-        onSettings={() => openHash('#settings-preview')}
         headerQuickLinks={
           <StatusRail
             chips={OVERVIEW_STATUS_CHIPS}

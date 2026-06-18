@@ -182,13 +182,18 @@
 .sidebarHeader {
   display: grid;
   min-height: 44px;
-  grid-template-columns: minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
   align-items: center;
   padding-left: 4px;
   color: white;
   font-size: 1.08rem;
   font-weight: 830;
   letter-spacing: 0;
+}
+
+.sidebarHeader .iconButton {
+  justify-self: end;
 }
 
 .sidebarNav {

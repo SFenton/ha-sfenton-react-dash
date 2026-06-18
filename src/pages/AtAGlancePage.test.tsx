@@ -104,25 +104,22 @@ describe('AtAGlancePage', () => {
     expect(within(dialog).getByRole('article', { name: 'Humidity 72%' })).toBeInTheDocument()
   })
 
-  it('uses the shell header menu and More actions', async () => {
+  it('uses the shell header menu without Home header actions', async () => {
     const navigate = vi.fn()
     render(<AtAGlancePage onNavigate={navigate} />)
 
     fireEvent.click(screen.getByRole('button', { name: 'Open navigation menu' }))
     expect(screen.getByText('Navigation')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Close navigation menu' })).toBeInTheDocument()
+    const sidebar = screen.getByLabelText('Navigation menu')
+    expect(sidebar).toHaveAttribute('data-state', 'open')
+    fireEvent.click(screen.getByRole('button', { name: 'Close navigation menu' }))
+    expect(sidebar).toHaveAttribute('data-state', 'closed')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open navigation menu' }))
     fireEvent.click(screen.getByRole('menuitem', { name: 'Security' }))
     expect(navigate).toHaveBeenCalledWith('security')
-
-    fireEvent.click(screen.getByRole('button', { name: 'More actions' }))
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Settings' }))
-
-    const dialog = await screen.findByRole('dialog')
-    expect(within(dialog).getByRole('heading', { name: 'Settings' })).toBeInTheDocument()
-    expect(within(dialog).getByRole('navigation', { name: 'Settings pages' })).toBeInTheDocument()
-    expect(within(dialog).queryByText(/not available from Home/i)).not.toBeInTheDocument()
-    fireEvent.click(within(dialog).getByRole('button', { name: /Admin Controls Presence-Based Toggles, Automation Overrides, and More/i }))
-    expect(navigate).toHaveBeenLastCalledWith('admin')
+    expect(screen.queryByRole('button', { name: 'More actions' })).not.toBeInTheDocument()
   })
 
   it('opens the Chores preview hash with live chore links', async () => {
@@ -145,8 +142,9 @@ describe('AtAGlancePage', () => {
     render(<AtAGlancePage onNavigate={navigate} />)
 
     expect(screen.queryByRole('heading', { name: 'Areas' })).not.toBeInTheDocument()
-    const layoutButton = screen.getByRole('button', { name: 'Open room layout' })
+    const layoutButton = screen.getByRole('button', { name: 'Rooms' })
     expect(layoutButton).toHaveStyle(`--card-rgb: ${CHORE_BLUE.r} ${CHORE_BLUE.g} ${CHORE_BLUE.b}`)
+    expect(layoutButton).toHaveTextContent('Rooms')
     expect(layoutButton.querySelector('path')).toHaveAttribute('d', materialIconPath('mdi:floor-plan'))
     fireEvent.click(layoutButton)
 

@@ -71,10 +71,19 @@ const HOME_SUB_ROUTE_PATHS = new Set([
   'vacuums',
 ])
 
+const SETTINGS_SUB_ROUTE_PATHS = new Set([
+  'admin',
+  'guests-staying-over',
+  'mach-e',
+  'to-do',
+  'vacation',
+])
+
 export function primaryNavPathForRoute(path: string | undefined) {
   if (!path) return 'overview'
   if (HOME_SUB_ROUTE_PATHS.has(path)) return 'overview'
   if (path === 'groceries' || path.endsWith('-chores')) return 'chores'
+  if (SETTINGS_SUB_ROUTE_PATHS.has(path)) return 'settings'
   return path
 }
 

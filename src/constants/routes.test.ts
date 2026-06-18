@@ -7,6 +7,7 @@ describe('routes', () => {
     expect(routePathFromUrl('/local/ha-sfenton-react-dash/index.html')).toBe('overview')
   })
 
+
   it('extracts wrapper and static app query route paths', () => {
     expect(routePathFromUrl('/sfenton-react-dash/home?path=security#security-system')).toBe('security')
     expect(routePathFromUrl('/sfenton-react-dash/home?path=/at-a-glance/living-room#lights-living-room')).toBe('living-room')
@@ -52,5 +53,15 @@ describe('routes', () => {
     expect(primaryNavRouteActive('custom-lights', 'overview')).toBe(true)
     expect(primaryNavRouteActive('living-room', 'chores')).toBe(false)
     expect(primaryNavRouteActive('vacuums', 'chores')).toBe(false)
+  })
+
+  it('groups settings subpages under the Settings primary nav route', () => {
+    expect(primaryNavPathForRoute('admin')).toBe('settings')
+    expect(primaryNavPathForRoute('guests-staying-over')).toBe('settings')
+    expect(primaryNavPathForRoute('mach-e')).toBe('settings')
+    expect(primaryNavPathForRoute('to-do')).toBe('settings')
+    expect(primaryNavPathForRoute('vacation')).toBe('settings')
+    expect(primaryNavRouteActive('vacation', 'settings')).toBe(true)
+    expect(primaryNavRouteActive('admin', 'overview')).toBe(false)
   })
 })

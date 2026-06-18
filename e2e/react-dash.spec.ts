@@ -165,7 +165,7 @@ test.describe('desktop modal layout', () => {
 
   test('rooms modal uses fixed 168px square room cards on desktop', async ({ page }) => {
     await page.goto('/at-a-glance/overview')
-    await page.getByRole('button', { name: 'Open room layout' }).click()
+    await page.getByRole('button', { name: 'Rooms' }).click()
 
     const dialog = page.getByRole('dialog', { name: 'Rooms' })
     await expect(dialog).toBeVisible()
@@ -208,7 +208,7 @@ test.describe('desktop modal layout', () => {
 
   test('desktop modal has no grabber and cannot be dragged', async ({ page }) => {
     await page.goto('/at-a-glance/overview')
-    await page.getByRole('button', { name: 'Open room layout' }).click()
+    await page.getByRole('button', { name: 'Rooms' }).click()
 
     const dialog = page.getByRole('dialog', { name: 'Rooms' })
     await expect(dialog).toBeVisible()
@@ -313,7 +313,7 @@ test.describe('desktop modal layout', () => {
 
   test('desktop modal preserves its size during the close fade', async ({ page }) => {
     await page.goto('/at-a-glance/overview')
-    await page.getByRole('button', { name: 'Open room layout' }).click()
+    await page.getByRole('button', { name: 'Rooms' }).click()
 
     const dialog = page.getByRole('dialog', { name: 'Rooms' })
     await expect(dialog).toBeVisible()
@@ -686,10 +686,9 @@ test('chores create task FAB opens the source-shaped task modal', async ({ page 
   await page.goto('/at-a-glance/chores')
 
   await expect(page.getByRole('heading', { name: 'Chores' })).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Create Donetick task' })).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Create Donetick task' })).toHaveCSS('width', '62px')
-  await expect(page.getByRole('button', { name: 'Create Donetick task' })).toHaveCSS('background-color', 'rgb(0, 154, 199)')
-  await page.getByRole('button', { name: 'Create Donetick task' }).click()
+  await expect(page.getByRole('button', { name: 'Add Task' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Add Task' })).toHaveCSS('background-color', 'rgb(0, 154, 199)')
+  await page.getByRole('button', { name: 'Add Task' }).click()
   const dialog = page.getByRole('dialog')
   await expect(dialog).toBeVisible()
   await expect(dialog.getByRole('heading', { name: 'Create Task' })).toBeVisible()
@@ -715,7 +714,7 @@ test('chores create task FAB opens the source-shaped task modal', async ({ page 
   await expect(dialog.getByRole('button', { name: 'Cancel' })).toHaveCount(0)
   await dialog.getByRole('button', { name: 'Close' }).click()
   await expect(dialog).toHaveAttribute('data-state', 'closed')
-  await page.getByRole('button', { name: 'Create Donetick task' }).click()
+  await page.getByRole('button', { name: 'Add Task' }).click()
   await expect(dialog.getByLabel('Recurrence')).toHaveValue('no_repeat')
   await expect(dialog.getByLabel('Repeat Every')).toHaveCount(0)
 })
@@ -725,8 +724,8 @@ test('chore subpages keep the Chores bottom nav item active', async ({ page }) =
 
   await expect(page.getByRole('heading', { name: "Steph's Chores" })).toBeVisible()
   await expect(page.getByRole('navigation', { name: 'Dashboard sections' }).getByRole('button', { name: 'Chores' })).toHaveAttribute('aria-current', 'page')
-  await expect(page.getByRole('button', { name: 'Create Donetick task' })).toBeVisible()
-  await page.getByRole('button', { name: 'Create Donetick task' }).click()
+  await expect(page.getByRole('button', { name: 'Add Task' })).toBeVisible()
+  await page.getByRole('button', { name: 'Add Task' }).click()
   await expect(page.getByRole('dialog').getByLabel('Assignee')).toHaveValue('2')
 })
 
@@ -734,8 +733,8 @@ test('groceries page opens a shopping-list add item modal', async ({ page }) => 
   await page.goto('/at-a-glance/groceries')
 
   await expect(page.getByRole('heading', { name: 'Groceries' })).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Add grocery item' })).toBeVisible()
-  await page.getByRole('button', { name: 'Add grocery item' }).click()
+  await expect(page.getByRole('button', { name: 'Add Groceries' })).toBeVisible()
+  await page.getByRole('button', { name: 'Add Groceries' }).click()
   const dialog = page.getByRole('dialog')
   await expect(dialog.getByRole('heading', { name: 'Add Grocery Item' })).toBeVisible()
   await expect(dialog.getByLabel('Item')).toBeVisible()
@@ -769,11 +768,12 @@ test('room sections keep popup-only grill controls out of the Back Deck page', a
 test('room status chips open direct reusable modal sheets', async ({ page }) => {
   await page.goto('/at-a-glance/kitchen')
 
+  await expect(page.getByRole('button', { name: 'Rooms' })).toBeVisible()
   await page.getByRole('button', { name: /Lights/i }).first().click()
 
   await expect(page.getByRole('dialog')).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Kitchen Lights' })).toBeVisible()
-  await expect(page.getByText('Rooms')).toHaveCount(0)
+  await expect(page.getByRole('dialog').getByText('Rooms')).toHaveCount(0)
 })
 
 test('living room header chips open climate occupancy and air quality popups', async ({ page }) => {
