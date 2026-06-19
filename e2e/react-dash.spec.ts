@@ -228,6 +228,21 @@ test.describe('desktop modal layout', () => {
     expect(Math.abs(Math.round(after?.y ?? 0) - Math.round(before.y))).toBeLessThanOrEqual(8)
   })
 
+  test('media remote modal uses the shared desktop sheet height', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 760 })
+    await page.goto('/at-a-glance/living-room')
+    await page.getByRole('button', { name: /^Living Room SHIELD Off$/i }).click()
+
+    const dialog = page.getByRole('dialog')
+    await expect(dialog).toBeVisible()
+    await expect.poll(async () => {
+      return dialog.evaluate((element) => {
+        const rect = element.getBoundingClientRect()
+        return Math.round((rect.height / window.innerHeight) * 100)
+      })
+    }).toBe(90)
+  })
+
   test('bed modal uses fixed desktop hero with 700px width and 70vh height', async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 500 })
     await page.goto('/at-a-glance/master-bedroom')
@@ -832,28 +847,37 @@ test('guest room page opens source-aligned header popups', async ({ page }) => {
 
 test('room media cards open ported remote modals', async ({ page }) => {
   await page.goto('/at-a-glance/living-room')
-  await page.getByRole('button', { name: /^SHIELD Off$/i }).click()
-  await expect(page.getByRole('heading', { name: 'Living Room: SHIELD' })).toBeVisible()
-  await expect(page.getByRole('heading', { name: 'SHIELD Remote' })).toBeVisible()
+  await page.getByRole('button', { name: /^Living Room SHIELD Off$/i }).click()
+  const dialog = page.getByRole('dialog')
+  await expect(dialog).toBeVisible()
+  await expect.poll(async () => {
+    return dialog.evaluate((element) => {
+      const rect = element.getBoundingClientRect()
+      return Math.round((rect.height / window.innerHeight) * 100)
+    })
+  }).toBe(90)
+  await expect(page.getByRole('heading', { name: 'Living Room SHIELD Remote' })).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Sonos Volume' })).toBeVisible()
+  await dialog.getByRole('button', { name: 'Apps' }).click()
   await expect(page.getByRole('button', { name: 'Plex' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Disney+' })).toBeVisible()
   await page.getByRole('button', { name: 'Close' }).click()
 
   await page.goto('/at-a-glance/master-bedroom')
   await page.getByRole('button', { name: /^Apple TV Paused$/i }).click()
-  await expect(page.getByRole('heading', { name: 'Master Bedroom: Apple TV' })).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Apple TV Remote' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Menu' })).toBeVisible()
+  await page.getByRole('dialog').getByRole('button', { name: 'Apps' }).click()
   await expect(page.getByRole('button', { name: 'Plex' })).toBeVisible()
   await page.getByRole('button', { name: 'Close' }).click()
 
   await page.goto('/at-a-glance/theater-room')
   await page.getByRole('button', { name: /^Theater Room Off$/i }).click()
-  await expect(page.getByRole('heading', { name: 'Theater Room: Theater Room' })).toBeVisible()
-  await expect(page.getByRole('heading', { name: 'Theater Remote' })).toBeVisible()
-  await expect(page.getByRole('heading', { name: 'Devices' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Theater Room SHIELD Remote' })).toBeVisible()
+  await page.getByRole('dialog').getByRole('button', { name: 'Apps' }).click()
   await expect(page.getByRole('button', { name: 'Prime Video' })).toBeVisible()
+  await page.getByRole('dialog').getByRole('button', { name: 'Devices' }).click()
+  await expect(page.getByRole('heading', { name: 'Devices' })).toBeVisible()
   await expect(page.getByRole('button', { name: /Projector Off/i })).toBeVisible()
 })
 
