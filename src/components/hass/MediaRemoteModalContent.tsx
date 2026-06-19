@@ -4,6 +4,7 @@ import { useEntity, useHass } from '@hakit/core'
 import { MaterialIcon } from '../core/Icon'
 import { GlassTile, type TileTone } from '../core/GlassTile'
 import type { MediaRemoteAction, MediaRemoteAppConfig, MediaRemoteButtonConfig, MediaRemoteConfig, MediaRemoteDeviceConfig, MediaRemoteIconColorRule } from '../../constants/mediaRemotes'
+import { useImmediateVisualTab, useSmoothDisplayedModalTab } from '../../hooks/useSmoothDisplayedModalTab'
 import { asEntityName, titleCaseState } from './entityState'
 import styles from './MediaRemoteModalContent.module.css'
 
@@ -481,18 +482,27 @@ function AppButton({ app }: { app: MediaRemoteAppConfig }) {
 export function MediaRemoteModalNav({ activeTab, onTabChange, remoteTitle, showDevices = false }: { activeTab: MediaRemoteModalTab; onTabChange: (tab: MediaRemoteModalTab) => void; remoteTitle: string; showDevices?: boolean }) {
   const tabs = mediaRemoteModalTabs(showDevices)
   const effectiveActiveTab = tabs.some((tab) => tab.tab === activeTab) ? activeTab : 'controls'
+  const { clearVisualTab, setVisualTabNow, visualActiveTab } = useImmediateVisualTab(effectiveActiveTab)
 
   return (
     <nav aria-label={`${remoteTitle} modal sections`} className={styles.remoteModalNav} style={{ '--remote-nav-tab-count': tabs.length } as CSSProperties}>
       {tabs.map((item) => {
-        const isActive = effectiveActiveTab === item.tab
+        const isActive = visualActiveTab === item.tab
+        const isCurrent = effectiveActiveTab === item.tab
         return (
           <button
-            aria-current={isActive ? 'page' : undefined}
+            aria-current={isCurrent ? 'page' : undefined}
             aria-label={item.label}
             className={[styles.remoteModalNavButton, isActive ? styles.remoteModalNavButtonActive : ''].filter(Boolean).join(' ')}
+            data-active={isActive}
             key={item.tab}
-            onClick={() => onTabChange(item.tab)}
+            onBlur={clearVisualTab}
+            onClick={() => {
+              setVisualTabNow(item.tab)
+              onTabChange(item.tab)
+            }}
+            onPointerCancel={clearVisualTab}
+            onPointerDown={() => setVisualTabNow(item.tab)}
             type="button"
           >
             <MaterialIcon name={item.icon} size={22} />
@@ -537,7 +547,8 @@ function MediaRemoteModalTabContent({
   const modalPanelRef = useRef<HTMLDivElement | null>(null)
   const tabContentRef = useRef<HTMLDivElement | null>(null)
   const availableTabs = mediaRemoteModalTabs(Boolean(config.devices?.length))
-  const effectiveActiveTab = availableTabs.some((tab) => tab.tab === activeTab) ? activeTab : 'controls'
+  const targetTab = availableTabs.some((tab) => tab.tab === activeTab) ? activeTab : 'controls'
+  const { displayedTab: effectiveActiveTab, transitionState } = useSmoothDisplayedModalTab(targetTab)
   const selectedTabLabel = availableTabs.find((tab) => tab.tab === effectiveActiveTab)?.label ?? 'Controls'
 
   useEffect(() => {
@@ -553,7 +564,7 @@ function MediaRemoteModalTabContent({
       if (!scrollContainer || typeof scrollContainer.scrollTo !== 'function') continue
       scrollContainer.scrollTo({ top: 0, behavior: 'auto' })
     }
-  }, [activeTab])
+  }, [effectiveActiveTab])
 
   return (
     <div className={styles.modalBody} ref={modalBodyRef}>
@@ -565,7 +576,7 @@ function MediaRemoteModalTabContent({
             <RemoteGrid config={config} disabled={controlsDisabled} onTextPrompt={onTextPrompt} />
           </section>
 
-          <div className={styles.tabContent} ref={tabContentRef}>
+          <div className={styles.tabContent} data-modal-tab-transition-state={transitionState} ref={tabContentRef}>
             {effectiveActiveTab === 'controls' ? (
               <>
                 {showVolumeControls ? (

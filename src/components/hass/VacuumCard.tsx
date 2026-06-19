@@ -5,6 +5,7 @@ import { MaterialIcon } from '../core/Icon'
 import { ModalSheet } from '../core/ModalSheet'
 import { OptionPickerDialog, type PickerOption } from '../core/OptionPickerDialog'
 import { type VacuumConfig, type VacuumZoneConfig } from '../../constants/portedDashboard'
+import { useImmediateVisualTab, useSmoothDisplayedModalTab } from '../../hooks/useSmoothDisplayedModalTab'
 import { asEntityName, titleCaseState } from './entityState'
 import { ValetudoMapCard } from './ValetudoMapCard'
 import { VACUUM_MODAL_STYLE } from './vacuumModalStyle'
@@ -462,18 +463,27 @@ function VacuumZones({ vacuum }: { vacuum: VacuumConfig }) {
 function VacuumModalNav({ activeTab, onTabChange, vacuum }: { activeTab: VacuumModalTab; onTabChange: (tab: VacuumModalTab) => void; vacuum: VacuumConfig }) {
   const tabs = vacuumModalTabs(vacuum)
   const effectiveActiveTab = tabs.some((tab) => tab.tab === activeTab) ? activeTab : 'controls'
+  const { clearVisualTab, setVisualTabNow, visualActiveTab } = useImmediateVisualTab(effectiveActiveTab)
 
   return (
     <nav aria-label={`${vacuum.title} modal sections`} className={styles.vacuumModalNav} style={{ '--vacuum-nav-tab-count': tabs.length } as CSSProperties}>
       {tabs.map((item) => {
-        const isActive = effectiveActiveTab === item.tab
+        const isActive = visualActiveTab === item.tab
+        const isCurrent = effectiveActiveTab === item.tab
         return (
           <button
-            aria-current={isActive ? 'page' : undefined}
+            aria-current={isCurrent ? 'page' : undefined}
             aria-label={item.label}
             className={[styles.vacuumModalNavButton, isActive ? styles.vacuumModalNavButtonActive : ''].filter(Boolean).join(' ')}
+            data-active={isActive}
             key={item.tab}
-            onClick={() => onTabChange(item.tab)}
+            onBlur={clearVisualTab}
+            onClick={() => {
+              setVisualTabNow(item.tab)
+              onTabChange(item.tab)
+            }}
+            onPointerCancel={clearVisualTab}
+            onPointerDown={() => setVisualTabNow(item.tab)}
             type="button"
           >
             <MaterialIcon name={item.icon} size={22} />
@@ -488,7 +498,8 @@ function VacuumModalTabContent({ activeTab, vacuum }: { activeTab: VacuumModalTa
   const modalBodyRef = useRef<HTMLDivElement | null>(null)
   const modalPanelRef = useRef<HTMLDivElement | null>(null)
   const tabs = vacuumModalTabs(vacuum)
-  const effectiveActiveTab = tabs.some((tab) => tab.tab === activeTab) ? activeTab : 'controls'
+  const targetTab = tabs.some((tab) => tab.tab === activeTab) ? activeTab : 'controls'
+  const { displayedTab: effectiveActiveTab, transitionState } = useSmoothDisplayedModalTab(targetTab)
   const panelLabel = vacuum.zones.length > 0 ? `${vacuum.title} controls, zones, and actions` : `${vacuum.title} controls and actions`
 
   useEffect(() => {
@@ -499,14 +510,14 @@ function VacuumModalTabContent({ activeTab, vacuum }: { activeTab: VacuumModalTa
       if (!scrollContainer || typeof scrollContainer.scrollTo !== 'function') continue
       scrollContainer.scrollTo({ top: 0, behavior: 'auto' })
     }
-  }, [activeTab])
+  }, [effectiveActiveTab])
 
   return (
     <div className={styles.modalBody} ref={modalBodyRef}>
       <div aria-label={`${vacuum.title} map and status`} className={styles.leftPane} role="group">
         <VacuumMapAndStatus vacuum={vacuum} />
       </div>
-      <div aria-label={panelLabel} className={styles.rightPane} data-scroll-region="vacuum-panel" data-tab={effectiveActiveTab} ref={modalPanelRef} role="group">
+      <div aria-label={panelLabel} className={styles.rightPane} data-modal-tab-transition-state={transitionState} data-scroll-region="vacuum-panel" data-tab={effectiveActiveTab} ref={modalPanelRef} role="group">
         {effectiveActiveTab === 'controls' && <VacuumControlsSection vacuum={vacuum} />}
         {effectiveActiveTab === 'zones' && <VacuumZones vacuum={vacuum} />}
         {effectiveActiveTab === 'more' && <VacuumEmptyDockSection vacuum={vacuum} />}

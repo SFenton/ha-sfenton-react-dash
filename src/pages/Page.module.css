@@ -14,6 +14,10 @@
   z-index: 12;
   flex: 0 0 auto;
   padding: calc(20px + env(safe-area-inset-top, 0px)) var(--space-page-x) 0;
+  transition:
+    opacity 170ms ease-out,
+    transform 170ms ease-out;
+  will-change: opacity, transform;
 }
 
 .headerQuickLinks {
@@ -82,7 +86,21 @@
   transition: none;
 }
 
+.page[data-content-transition-state='pre-entering'] .headerDock,
+.page[data-content-transition-state='pre-entering'] .scroller {
+  opacity: 0;
+  transform: translate3d(0, 5px, 0);
+  transition: none;
+}
+
+.page[data-content-transition-state='entering'] .headerDock,
+.page[data-content-transition-state='entering'] .scroller {
+  opacity: 1;
+  transform: translate3d(0, 0, 0);
+}
+
 @media (prefers-reduced-motion: reduce) {
+  .headerDock,
   .headerQuickLinks,
   .scroller {
     transition: none;

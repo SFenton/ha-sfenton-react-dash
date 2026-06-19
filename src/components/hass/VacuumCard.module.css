@@ -12,6 +12,26 @@
   gap: 12px;
 }
 
+.rightPane {
+  opacity: 1;
+  transform: translate3d(0, 0, 0);
+  transition:
+    opacity 170ms ease,
+    transform 170ms ease;
+}
+
+.rightPane[data-modal-tab-transition-state='exiting'] {
+  opacity: 0;
+  transform: translate3d(0, 5px, 0);
+  transition-duration: 130ms;
+}
+
+.rightPane[data-modal-tab-transition-state='pre-entering'] {
+  opacity: 0;
+  transform: translate3d(0, 5px, 0);
+  transition: none;
+}
+
 .mapStage {
   position: relative;
   min-width: 0;
@@ -524,7 +544,7 @@
   font: inherit;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
-  transition: color var(--duration-fast) ease, background var(--duration-fast) ease, transform var(--duration-fast) ease;
+  transition: transform var(--duration-fast) ease;
 }
 
 .vacuumModalNavButtonActive {
@@ -539,4 +559,11 @@
 .vacuumModalNavButton:focus,
 .vacuumModalNavButton:focus-visible {
   outline: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rightPane,
+  .vacuumModalNavButton {
+    transition: none;
+  }
 }

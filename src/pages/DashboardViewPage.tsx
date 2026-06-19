@@ -35,6 +35,7 @@ import { asEntityName, formatCompactEntityState, formatContactEntityState, isAct
 import { DASHBOARD_ROUTE_CHANGE_EVENT, dashboardEventTargets, dashboardHash, dashboardPathWithSearch, replaceDashboardUrl } from '../hooks/dashboardLocation'
 import { useHashModal } from '../hooks/useHashModal'
 import { useOptimisticState } from '../hooks/useOptimisticState'
+import { useImmediateVisualTab, useSmoothDisplayedModalTab } from '../hooks/useSmoothDisplayedModalTab'
 import {
   CLIMATE_GROUPS,
   CONTACT_GROUPS,
@@ -89,6 +90,7 @@ import styles from './DashboardViewPage.module.css'
 interface DashboardViewPageProps {
   activePath: string
   onNavigate: (path: string) => void
+  initialContentTransitionState?: 'entering' | 'idle' | 'pre-entering'
   loadingPhase?: DashboardPageLoadingPhase
   path: string
   preload?: boolean
@@ -931,10 +933,10 @@ function VacuumPage() {
   )
 }
 
-function SecurityPage({ activePath, backPath, loadingPhase, onNavigate, preload = false, preloadHash, preloadHashes, title }: { activePath: string; backPath?: string; loadingPhase?: DashboardPageLoadingPhase; onNavigate: (path: string) => void; preload?: boolean; preloadHash?: string; preloadHashes?: string[]; title: string }) {
+function SecurityPage({ activePath, backPath, contentTransitionState = 'idle', loadingPhase, onNavigate, preload = false, preloadHash, preloadHashes, title }: { activePath: string; backPath?: string; contentTransitionState?: 'entering' | 'idle' | 'pre-entering'; loadingPhase?: DashboardPageLoadingPhase; onNavigate: (path: string) => void; preload?: boolean; preloadHash?: string; preloadHashes?: string[]; title: string }) {
   const { closeHash, hash, openHash } = useHashModal()
   return (
-    <Page activePath={activePath} backPath={backPath} chromeHidden={Boolean(loadingPhase)} headerQuickLinks={<SecurityStatusRail onOpenHash={openHash} />} onNavigate={onNavigate} title={title}>
+    <Page activePath={activePath} backPath={backPath} chromeHidden={Boolean(loadingPhase)} contentTransitionState={contentTransitionState} headerQuickLinks={<SecurityStatusRail onOpenHash={openHash} />} onNavigate={onNavigate} title={title}>
       {loadingPhase ? <DashboardPageLoading phase={loadingPhase} /> : <SecurityDashboard closeHash={closeHash} hash={hash} onOpenHash={openHash} preload={preload} preloadHash={preloadHash} preloadHashes={preloadHashes} />}
     </Page>
   )
@@ -3253,17 +3255,27 @@ function EightSleepBedModal({ modalState, onClose, open, side }: { modalState: E
 }
 
 function EightSleepModalNav({ activeTab, onTabChange, sideTitle }: { activeTab: EightSleepModalTab; onTabChange: (tab: EightSleepModalTab) => void; sideTitle: string }) {
+  const { clearVisualTab, setVisualTabNow, visualActiveTab } = useImmediateVisualTab(activeTab)
+
   return (
     <nav aria-label={`${sideTitle} modal sections`} className={styles.eightSleepModalNav}>
       {EIGHT_SLEEP_MODAL_TABS.map((item) => {
-        const isActive = activeTab === item.tab
+        const isActive = visualActiveTab === item.tab
+        const isCurrent = activeTab === item.tab
         return (
           <button
-            aria-current={isActive ? 'page' : undefined}
+            aria-current={isCurrent ? 'page' : undefined}
             aria-label={item.label}
             className={[styles.eightSleepModalNavButton, isActive ? styles.eightSleepModalNavButtonActive : ''].filter(Boolean).join(' ')}
+            data-active={isActive}
             key={item.tab}
-            onClick={() => onTabChange(item.tab)}
+            onBlur={clearVisualTab}
+            onClick={() => {
+              setVisualTabNow(item.tab)
+              onTabChange(item.tab)
+            }}
+            onPointerCancel={clearVisualTab}
+            onPointerDown={() => setVisualTabNow(item.tab)}
             type="button"
           >
             <MaterialIcon name={item.icon} size={22} />
@@ -3277,6 +3289,7 @@ function EightSleepModalNav({ activeTab, onTabChange, sideTitle }: { activeTab: 
 function EightSleepBedModalContent({ activeTab, modalState, side }: { activeTab: EightSleepModalTab; modalState: EightSleepBedModalState; side: EightSleepSideConfig }) {
   const modalBodyRef = useRef<HTMLDivElement | null>(null)
   const modalPanelRef = useRef<HTMLDivElement | null>(null)
+  const { displayedTab: effectiveActiveTab, transitionState } = useSmoothDisplayedModalTab(activeTab)
   const currentTemperature = useEntity(asEntityName(side.currentTemperatureEntityId), { returnNullIfNotFound: true })
   const presence = useEntity(asEntityName(side.presenceEntityId), { returnNullIfNotFound: true })
   const secondsRemaining = useEntity(asEntityName(side.secondsRemainingEntityId), { returnNullIfNotFound: true })
@@ -3285,7 +3298,7 @@ function EightSleepBedModalContent({ activeTab, modalState, side }: { activeTab:
   const presenceText = presence?.state === 'on' ? 'In Bed' : presence?.state === 'off' ? 'Away' : titleCaseState(presence?.state ?? 'unavailable')
   const timeRemainingText = formatSecondsRemaining(secondsRemaining?.state)
   const alarmActive = alarmVibrating?.state === 'on'
-  const selectedTabLabel = EIGHT_SLEEP_MODAL_TABS.find((tab) => tab.tab === activeTab)?.label ?? 'Sleep Schedule'
+  const selectedTabLabel = EIGHT_SLEEP_MODAL_TABS.find((tab) => tab.tab === effectiveActiveTab)?.label ?? 'Sleep Schedule'
 
   useEffect(() => {
     if (!shouldResetScrollOnTabChange()) return
@@ -3295,15 +3308,15 @@ function EightSleepBedModalContent({ activeTab, modalState, side }: { activeTab:
       if (!scrollContainer || typeof scrollContainer.scrollTo !== 'function') continue
       scrollContainer.scrollTo({ top: 0, behavior: 'auto' })
     }
-  }, [activeTab])
+  }, [effectiveActiveTab])
 
   return (
     <div className={`${styles.thermostatModalBody} ${styles.eightSleepModalBody}`} data-layout="eight-sleep-modal-body" ref={modalBodyRef}>
       <div className={styles.eightSleepModalHeroShell} data-section="eight-sleep-hero">
         <EightSleepThermostatHero modalState={modalState} side={side} />
       </div>
-      <div aria-label={`${side.title} ${selectedTabLabel}`} className={styles.eightSleepModalPanel} data-scroll-region="eight-sleep-panel" ref={modalPanelRef}>
-        {activeTab === 'schedule' && (
+      <div aria-label={`${side.title} ${selectedTabLabel}`} className={styles.eightSleepModalPanel} data-modal-tab-transition-state={transitionState} data-scroll-region="eight-sleep-panel" ref={modalPanelRef}>
+        {effectiveActiveTab === 'schedule' && (
           <section className={styles.section}>
             <SectionHeader title="Sleep Schedule" />
             <div className={styles.eightSleepStageGrid}>
@@ -3320,20 +3333,20 @@ function EightSleepBedModalContent({ activeTab, modalState, side }: { activeTab:
             </div>
           </section>
         )}
-        {activeTab === 'modes' && (
+        {effectiveActiveTab === 'modes' && (
           <section className={styles.section}>
             <SectionHeader title="Special Modes" />
             <Description className={styles.thermostatDescription}>Activating hot flash mode will set the bed to -10 for fifteen minutes.</Description>
             <EightSleepHotFlashButton side={side} />
           </section>
         )}
-        {activeTab === 'alarms' && (
+        {effectiveActiveTab === 'alarms' && (
           <>
             {alarmActive && <EightSleepAlarmActiveActions side={side} />}
             <EightSleepAlarmsSection side={side} />
           </>
         )}
-        {activeTab === 'status' && (
+        {effectiveActiveTab === 'status' && (
           <section className={styles.section}>
             <SectionHeader title="Status" />
             <div className={styles.eightSleepStageGrid}>
@@ -3344,7 +3357,7 @@ function EightSleepBedModalContent({ activeTab, modalState, side }: { activeTab:
             </div>
           </section>
         )}
-        {activeTab === 'settings' && (
+        {effectiveActiveTab === 'settings' && (
           <>
             <section className={styles.section}>
               <SectionHeader title="Bedtime" />
@@ -3952,7 +3965,7 @@ function Content({ onNavigate, onScrollLockChange, path, preloadHash, preloadHas
   return <FallbackPage title={routeTitle(path)} />
 }
 
-export function DashboardViewPage({ activePath, loadingPhase, onNavigate, path, preload = false, preloadHash, preloadHashes, withShell = true }: DashboardViewPageProps) {
+export function DashboardViewPage({ activePath, initialContentTransitionState = 'idle', loadingPhase, onNavigate, path, preload = false, preloadHash, preloadHashes, withShell = true }: DashboardViewPageProps) {
   const roomTitle = dashboardRoomNameFromPath(path)
   const title = path === 'guests-staying-over' ? 'Guest Controls' : roomTitle ?? TODO_PAGES[path]?.title ?? CONTROL_PAGES[path]?.title ?? routeTitle(path)
   const showBack = !PRIMARY_NAV_ROUTES.some((route) => route.path === path)
@@ -3963,9 +3976,9 @@ export function DashboardViewPage({ activePath, loadingPhase, onNavigate, path, 
   }, [path])
 
   const page = path === 'security' ? (
-    <SecurityPage activePath={activePath} backPath={showBack ? 'overview' : undefined} loadingPhase={loadingPhase} onNavigate={onNavigate} preload={preload} preloadHash={preloadHash} preloadHashes={preloadHashes} title={title} />
+    <SecurityPage activePath={activePath} backPath={showBack ? 'overview' : undefined} contentTransitionState={loadingPhase ? 'idle' : initialContentTransitionState} loadingPhase={loadingPhase} onNavigate={onNavigate} preload={preload} preloadHash={preloadHash} preloadHashes={preloadHashes} title={title} />
   ) : (
-    <Page activePath={activePath} backPath={showBack ? 'overview' : undefined} chromeHidden={Boolean(loadingPhase)} headerQuickLinks={roomTitle ? <RoomSectionRail path={path} title={roomTitle} /> : undefined} onNavigate={onNavigate} scrollLocked={pageScrollLocked} title={title}>
+    <Page activePath={activePath} backPath={showBack ? 'overview' : undefined} chromeHidden={Boolean(loadingPhase)} contentTransitionState={loadingPhase ? 'idle' : initialContentTransitionState} headerQuickLinks={roomTitle ? <RoomSectionRail path={path} title={roomTitle} /> : undefined} onNavigate={onNavigate} scrollLocked={pageScrollLocked} title={title}>
       {loadingPhase ? <DashboardPageLoading phase={loadingPhase} /> : <Content onNavigate={onNavigate} onScrollLockChange={handlePageScrollLockChange} path={path} preloadHash={preloadHash} preloadHashes={preloadHashes} />}
     </Page>
   )

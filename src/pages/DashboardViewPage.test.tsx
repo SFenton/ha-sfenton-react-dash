@@ -13,6 +13,23 @@ const ROOM_SOURCE_SECURITY_SIZED_MODAL_STYLE = {
   '--modal-desktop-max-width': '500px',
   '--modal-desktop-width': '500px',
 }
+const MODAL_TAB_TEST_SETTLE_MS = 340
+
+type RoleScope = Pick<typeof screen, 'getByRole'>
+
+async function settleModalTabTransition() {
+  await act(async () => {
+    await new Promise((resolve) => window.setTimeout(resolve, MODAL_TAB_TEST_SETTLE_MS))
+  })
+}
+
+async function clickModalTab(scope: RoleScope, name: string) {
+  const button = scope.getByRole('button', { name })
+  fireEvent.pointerDown(button)
+  fireEvent.click(button)
+  await settleModalTabTransition()
+  return button
+}
 
 describe('DashboardViewPage', () => {
   beforeEach(() => {
@@ -113,6 +130,21 @@ describe('DashboardViewPage', () => {
     expect(screen.getByText('Once some devices are added to this room, we can display them here.')).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Nothing Here Yet!' }).parentElement).toHaveAttribute('data-empty-layout', 'centered')
     expect(screen.getByRole('heading', { name: 'Nothing Here Yet!' }).parentElement).toHaveAttribute('data-empty-typography', 'festival')
+  })
+
+  it('keeps non-Home content hidden for the first frame after the preload spinner exits', () => {
+    const { container, rerender } = render(<DashboardViewPage activePath="security" initialContentTransitionState="pre-entering" onNavigate={() => undefined} path="security" />)
+    const page = container.querySelector('main')
+
+    expect(page).toHaveAttribute('data-content-transition-state', 'pre-entering')
+
+    rerender(<DashboardViewPage activePath="security" initialContentTransitionState="entering" onNavigate={() => undefined} path="security" />)
+
+    expect(page).toHaveAttribute('data-content-transition-state', 'entering')
+
+    rerender(<DashboardViewPage activePath="security" initialContentTransitionState="idle" onNavigate={() => undefined} path="security" />)
+
+    expect(page).not.toHaveAttribute('data-content-transition-state')
   })
 
   it('opens room status hashes with reusable Home modal sheets directly', async () => {
@@ -920,17 +952,17 @@ describe('DashboardViewPage', () => {
     expect(within(dialog).queryByRole('heading', { name: 'Status' })).not.toBeInTheDocument()
     expect(within(dialog).queryByRole('heading', { name: 'Controls' })).not.toBeInTheDocument()
 
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Special Modes' }))
+    await clickModalTab(within(dialog), 'Special Modes')
     expect(within(dialog).getByRole('heading', { name: 'Special Modes' })).toBeInTheDocument()
     expect(within(dialog).getByText('Activating hot flash mode will set the bed to -10 for fifteen minutes.')).toBeInTheDocument()
     expect(within(dialog).getByRole('button', { name: 'Hot Flash Mode Inactive' })).toBeInTheDocument()
 
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Alarms' }))
+    await clickModalTab(within(dialog), 'Alarms')
     expect(within(dialog).getByRole('heading', { name: 'Alarms' })).toBeInTheDocument()
     expect(within(dialog).getByRole('button', { name: 'Alarm Schedule Disabled' })).toHaveAttribute('aria-pressed', 'false')
     expect(within(dialog).queryByRole('article', { name: /Stephen's Bed Monday alarm disabled/i })).not.toBeInTheDocument()
 
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Status' }))
+    await clickModalTab(within(dialog), 'Status')
     expect(within(dialog).getByRole('heading', { name: 'Status' })).toBeInTheDocument()
     expect(within(dialog).getByText('Current Temp')).toBeInTheDocument()
     expect(within(dialog).getByText('86°F')).toBeInTheDocument()
@@ -941,7 +973,7 @@ describe('DashboardViewPage', () => {
     expect(within(dialog).getByText('Alarm')).toBeInTheDocument()
     expect(within(dialog).getByText('Quiet')).toBeInTheDocument()
 
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Settings' }))
+    await clickModalTab(within(dialog), 'Settings')
     expect(within(dialog).getByRole('heading', { name: 'Bedtime' })).toBeInTheDocument()
     expect(within(dialog).getByRole('heading', { name: 'Controls' })).toBeInTheDocument()
     const awayMode = within(dialog).getByRole('button', { name: 'Away Mode Off' })
@@ -959,7 +991,7 @@ describe('DashboardViewPage', () => {
     fireEvent.click(screen.getByRole('button', { name: /Stephen's Bed Cooling • -1/i }))
 
     const dialog = await screen.findByRole('dialog')
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Settings' }))
+    await clickModalTab(within(dialog), 'Settings')
     expect(within(dialog).getByRole('button', { name: "Stephen's Bed bedtime 9:30 PM" })).toBeInTheDocument()
     expect(within(dialog).queryByRole('button', { name: "Change Stephen's Bed bedtime" })).not.toBeInTheDocument()
 
@@ -989,7 +1021,7 @@ describe('DashboardViewPage', () => {
     fireEvent.click(screen.getByRole('button', { name: /Stephen's Bed Cooling • -1/i }))
 
     const dialog = await screen.findByRole('dialog')
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Settings' }))
+    await clickModalTab(within(dialog), 'Settings')
     expect(within(dialog).getByRole('button', { name: "Stephen's Bed bedtime 9:30 PM" })).toBeInTheDocument()
 
     fireEvent.change(within(dialog).getByLabelText("Stephen's Bed bedtime"), { target: { value: '20:45' } })
@@ -1010,7 +1042,7 @@ describe('DashboardViewPage', () => {
 
       const dialog = await screen.findByRole('dialog')
       scrollTo.mockClear()
-      fireEvent.click(within(dialog).getByRole('button', { name: 'Status' }))
+      await clickModalTab(within(dialog), 'Status')
 
       expect(scrollTo).toHaveBeenCalledWith({ top: 0, behavior: 'auto' })
     } finally {
@@ -1025,7 +1057,7 @@ describe('DashboardViewPage', () => {
     fireEvent.click(screen.getByRole('button', { name: /Stephen's Bed Cooling • -1/i }))
 
     const dialog = await screen.findByRole('dialog')
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Special Modes' }))
+    await clickModalTab(within(dialog), 'Special Modes')
     const hotFlash = within(dialog).getByRole('button', { name: 'Hot Flash Mode Inactive' })
     expect(hotFlash.querySelector('path')).toHaveAttribute('d', materialIconPath('mdi:snowflake'))
 
@@ -1045,7 +1077,7 @@ describe('DashboardViewPage', () => {
 
     const dialog = await screen.findByRole('dialog')
     expect(within(dialog).getByText("Steph's Bed: Hot Flash Mode")).toBeInTheDocument()
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Special Modes' }))
+    await clickModalTab(within(dialog), 'Special Modes')
     expect(within(dialog).getByRole('button', { name: 'Hot Flash Mode Active' })).toBeInTheDocument()
     expect(within(dialog).getByText('12:34')).toBeInTheDocument()
     const cancel = within(dialog).getByRole('button', { name: "Cancel Steph's Bed hot flash mode" })
@@ -1071,7 +1103,7 @@ describe('DashboardViewPage', () => {
     expect(within(dialog).getByText("Stephen's Bed: Hot Flash Mode")).toBeInTheDocument()
     expect(within(dialog).getByRole('region', { name: /Stephen's Bed thermostat Cooling -10/i })).toBeInTheDocument()
     expect(within(dialog).getByRole('slider', { name: "Stephen's Bed target level" })).toHaveAttribute('aria-readonly', 'false')
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Special Modes' }))
+    await clickModalTab(within(dialog), 'Special Modes')
     expect(within(dialog).getByRole('button', { name: 'Hot Flash Mode Active' })).toBeInTheDocument()
     expect(within(dialog).getByText('14:34')).toBeInTheDocument()
   })
@@ -1083,13 +1115,13 @@ describe('DashboardViewPage', () => {
     fireEvent.click(screen.getByRole('button', { name: /Steph's Bed Off/i }))
 
     let dialog = await screen.findByRole('dialog')
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Alarms' }))
+    await clickModalTab(within(dialog), 'Alarms')
     expect(within(dialog).getByRole('group', { name: "Steph's Bed active alarm actions" })).toBeInTheDocument()
     expect(within(dialog).getByRole('button', { name: /Snooze Alarm/i })).toBeInTheDocument()
     expect(within(dialog).getByRole('button', { name: /Cancel Alarm/i })).toBeInTheDocument()
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Status' }))
+    await clickModalTab(within(dialog), 'Status')
     expect(within(dialog).getByText('Vibrating')).toBeInTheDocument()
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Alarms' }))
+    await clickModalTab(within(dialog), 'Alarms')
 
     fireEvent.click(within(dialog).getByRole('button', { name: /Snooze Alarm/i }))
 
@@ -1123,7 +1155,7 @@ describe('DashboardViewPage', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /Stephen's Bed Cooling • -1/i }))
     const dialog = await screen.findByRole('dialog')
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Alarms' }))
+    await clickModalTab(within(dialog), 'Alarms')
     const alarmSchedule = within(dialog).getByRole('button', { name: 'Alarm Schedule Disabled' })
     expect(within(dialog).queryByRole('button', { name: 'Add Alarm' })).not.toBeInTheDocument()
 
@@ -1206,7 +1238,7 @@ describe('DashboardViewPage', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /Steph's Bed Off/i }))
     const dialog = await screen.findByRole('dialog')
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Alarms' }))
+    await clickModalTab(within(dialog), 'Alarms')
     fireEvent.click(within(dialog).getByRole('button', { name: 'Alarm Schedule Disabled' }))
 
     const sundaySection = within(dialog).getByRole('region', { name: "Steph's Bed Sunday alarms" })
@@ -1239,7 +1271,7 @@ describe('DashboardViewPage', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /Steph's Bed Off/i }))
     const dialog = await screen.findByRole('dialog')
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Alarms' }))
+    await clickModalTab(within(dialog), 'Alarms')
     fireEvent.click(within(dialog).getByRole('button', { name: 'Alarm Schedule Disabled' }))
     const sundaySection = within(dialog).getByRole('region', { name: "Steph's Bed Sunday alarms" })
     const alarmToggle = within(sundaySection).getByRole('switch', { exact: true, name: "Disable Steph's Bed Sunday alarm" })
@@ -1273,7 +1305,7 @@ describe('DashboardViewPage', () => {
     try {
       fireEvent.click(screen.getByRole('button', { name: /Steph's Bed Off/i }))
       const dialog = await screen.findByRole('dialog')
-      fireEvent.click(within(dialog).getByRole('button', { name: 'Alarms' }))
+      await clickModalTab(within(dialog), 'Alarms')
       fireEvent.click(within(dialog).getByRole('button', { name: 'Alarm Schedule Disabled' }))
       const sundaySection = within(dialog).getByRole('region', { name: "Steph's Bed Sunday alarms" })
 
@@ -1300,7 +1332,7 @@ describe('DashboardViewPage', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /Steph's Bed Off/i }))
     const dialog = await screen.findByRole('dialog')
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Alarms' }))
+    await clickModalTab(within(dialog), 'Alarms')
     fireEvent.click(within(dialog).getByRole('button', { name: 'Alarm Schedule Disabled' }))
     const sundaySection = within(dialog).getByRole('region', { name: "Steph's Bed Sunday alarms" })
 
@@ -1324,7 +1356,7 @@ describe('DashboardViewPage', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /Steph's Bed Off/i }))
     const dialog = await screen.findByRole('dialog')
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Alarms' }))
+    await clickModalTab(within(dialog), 'Alarms')
     const masterToggle = within(dialog).getByRole('button', { name: 'Alarm Schedule Disabled' })
     act(() => {
       fireEvent.click(masterToggle)
@@ -1343,7 +1375,7 @@ describe('DashboardViewPage', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /Steph's Bed Off/i }))
     const dialog = await screen.findByRole('dialog')
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Alarms' }))
+    await clickModalTab(within(dialog), 'Alarms')
     fireEvent.click(within(dialog).getByRole('button', { name: 'Alarm Schedule Disabled' }))
     const sundaySection = within(dialog).getByRole('region', { name: "Steph's Bed Sunday alarms" })
     const alarmToggle = within(sundaySection).getByRole('switch', { exact: true, name: "Disable Steph's Bed Sunday alarm" })
@@ -1367,7 +1399,7 @@ describe('DashboardViewPage', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /Steph's Bed Off/i }))
     const dialog = await screen.findByRole('dialog')
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Alarms' }))
+    await clickModalTab(within(dialog), 'Alarms')
     fireEvent.click(within(dialog).getByRole('button', { name: 'Alarm Schedule Disabled' }))
     const sundaySection = within(dialog).getByRole('region', { name: "Steph's Bed Sunday alarms" })
     fireEvent.click(within(sundaySection).getByRole('switch', { exact: true, name: "Disable Steph's Bed Sunday alarm" }))
@@ -1643,7 +1675,7 @@ describe('DashboardViewPage', () => {
       expect(panel).toBeInTheDocument()
 
       panel!.scrollTop = 137
-      fireEvent.click(within(dialog).getByRole('button', { name: 'Apps' }))
+      await clickModalTab(within(dialog), 'Apps')
 
       expect(panel).toHaveAttribute('data-tab', 'apps')
       expect(panel!.scrollTop).toBe(137)
@@ -1656,7 +1688,7 @@ describe('DashboardViewPage', () => {
     mockEntities['media_player.living_room_shield_2'].state = 'playing'
     let view = render(<DashboardViewPage activePath="living-room" onNavigate={() => undefined} path="living-room" />)
     fireEvent.click(screen.getByRole('button', { name: /^Living Room SHIELD Off$/i }))
-    fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Apps' }))
+    await clickModalTab(within(await screen.findByRole('dialog')), 'Apps')
     expect(await screen.findByRole('heading', { name: 'Media' })).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: 'Power' })).not.toBeInTheDocument()
     expect(screen.getByText('Power Off')).toBeInTheDocument()
@@ -1673,7 +1705,7 @@ describe('DashboardViewPage', () => {
 
     view = render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
     fireEvent.click(screen.getByRole('button', { name: /^Apple TV Paused$/i }))
-    fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Apps' }))
+    await clickModalTab(within(await screen.findByRole('dialog')), 'Apps')
     fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Plex' }))
     expect(mockCallServiceCalls).toEqual([
       { domain: 'script', service: 'launch_app_on_apple_tv', target: undefined, serviceData: { entity: 'media_player.master_bedroom_apple_tv', app_name: 'Plex', remote_entity: 'remote.master_bedroom_apple_tv' } },
@@ -1684,7 +1716,7 @@ describe('DashboardViewPage', () => {
 
     render(<DashboardViewPage activePath="theater-room" onNavigate={() => undefined} path="theater-room" />)
     fireEvent.click(screen.getByRole('button', { name: /^Theater Room Off$/i }))
-    fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Apps' }))
+    await clickModalTab(within(await screen.findByRole('dialog')), 'Apps')
     fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Disney+' }))
     expect(mockCallServiceCalls).toEqual([
       { domain: 'script', service: 'launch_app_on_media_player', target: undefined, serviceData: { entity: 'media_player.theater_room_shield', remote_entity: 'remote.theater_shield_remote', app_id: 'com.disney.disneyplus', turn_on_projector: true } },
@@ -1835,7 +1867,7 @@ describe('DashboardViewPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Volume Up' }))
     fireEvent.click(screen.getByRole('button', { name: 'Mute' }))
 
-    fireEvent.click(screen.getByRole('button', { name: 'Devices' }))
+    await clickModalTab(within(screen.getByRole('dialog')), 'Devices')
     expect(screen.getByRole('button', { name: 'Devices' })).toHaveAttribute('aria-current', 'page')
     expect(screen.getByRole('heading', { name: 'Devices' })).toBeInTheDocument()
     expect(remoteControls.closest('[data-scroll-region="media-remote-panel"]')).toHaveAttribute('data-tab', 'devices')
@@ -1910,12 +1942,12 @@ describe('DashboardViewPage', () => {
     expect(within(passesPicker).getByRole('button', { name: '1' })).toHaveAttribute('aria-pressed', 'true')
     fireEvent.click(within(passesPicker).getByRole('button', { name: 'Close' }))
     expect(screen.getByRole('button', { name: 'Clean' })).toHaveAttribute('data-icon', 'mdi:play')
-    fireEvent.click(screen.getByRole('button', { name: 'Zones' }))
+    await clickModalTab(within(dialog), 'Zones')
     const zonesHeading = within(controlsPane).getByRole('heading', { name: 'Zones' })
     expect(screen.getByText('Select any zones to focus cleaning in those areas. If you press clean and no zones are selected, we will clean all zones on the Main Floor.')).toBeInTheDocument()
     expect(screen.getByText('Zones are not selectable or changeable while cleaning is ongoing.')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /living room/i }).querySelector('path')).toHaveAttribute('d', materialIconPath('mdi:sofa'))
-    fireEvent.click(screen.getByRole('button', { name: 'More' }))
+    await clickModalTab(within(dialog), 'More')
     const additionalControlsHeading = within(controlsPane).getByRole('heading', { name: 'Additional Controls' })
     expect(additionalControlsHeading).toBeInTheDocument()
     expect(zonesHeading).not.toBeInTheDocument()
@@ -1930,9 +1962,9 @@ describe('DashboardViewPage', () => {
     fireEvent.click(screen.getByRole('button', { name: /Fan Balanced/i }))
     fireEvent.click(within(await screen.findByRole('dialog', { name: 'Fan' })).getByRole('button', { name: 'Turbo' }))
     fireEvent.click(screen.getByRole('button', { name: 'Clean' }))
-    fireEvent.click(screen.getByRole('button', { name: 'More' }))
+    await clickModalTab(within(screen.getByRole('dialog')), 'More')
     fireEvent.click(screen.getByRole('button', { name: 'Empty Dock' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Zones' }))
+    await clickModalTab(within(screen.getByRole('dialog')), 'Zones')
     fireEvent.click(screen.getByRole('button', { name: 'Living Room' }))
 
     expect(mockCallServiceCalls).toEqual([
@@ -2605,7 +2637,7 @@ describe('DashboardViewPage', () => {
     expect(within(fanPicker).getByRole('button', { name: 'Balanced' })).toHaveAttribute('aria-pressed', 'true')
     fireEvent.click(within(fanPicker).getByRole('button', { name: 'Close' }))
     expect(screen.getByRole('button', { name: 'Clean' })).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: 'Zones' }))
+    await clickModalTab(within(dialog), 'Zones')
     expect(screen.getByRole('button', { name: /living room/i })).toBeInTheDocument()
   })
 })

@@ -79,6 +79,23 @@
   min-height: 0;
   align-content: start;
   gap: 12px;
+  opacity: 1;
+  transform: translate3d(0, 0, 0);
+  transition:
+    opacity 170ms ease,
+    transform 170ms ease;
+}
+
+.tabContent[data-modal-tab-transition-state='exiting'] {
+  opacity: 0;
+  transform: translate3d(0, 5px, 0);
+  transition-duration: 130ms;
+}
+
+.tabContent[data-modal-tab-transition-state='pre-entering'] {
+  opacity: 0;
+  transform: translate3d(0, 5px, 0);
+  transition: none;
 }
 
 .tabPanel::-webkit-scrollbar {
@@ -407,6 +424,7 @@
   font: inherit;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
+  transition: transform var(--duration-fast) ease;
 }
 
 .remoteModalNavButtonActive {
@@ -417,6 +435,13 @@
 .remoteModalNavButton:focus,
 .remoteModalNavButton:focus-visible {
   outline: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tabContent,
+  .remoteModalNavButton {
+    transition: none;
+  }
 }
 
 @media (max-width: 340px) {

@@ -1014,6 +1014,23 @@ button.thermostatGlassMain {
   display: grid;
   min-height: 220px;
   gap: 18px;
+  opacity: 1;
+  transform: translate3d(0, 0, 0);
+  transition:
+    opacity 170ms ease,
+    transform 170ms ease;
+}
+
+.eightSleepModalPanel[data-modal-tab-transition-state='exiting'] {
+  opacity: 0;
+  transform: translate3d(0, 5px, 0);
+  transition-duration: 130ms;
+}
+
+.eightSleepModalPanel[data-modal-tab-transition-state='pre-entering'] {
+  opacity: 0;
+  transform: translate3d(0, 5px, 0);
+  transition: none;
 }
 
 .eightSleepModalNav {
@@ -1042,7 +1059,7 @@ button.thermostatGlassMain {
   font: inherit;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
-  transition: color var(--duration-fast) ease, background var(--duration-fast) ease, transform var(--duration-fast) ease;
+  transition: transform var(--duration-fast) ease;
 }
 
 .eightSleepModalNavButtonActive {
@@ -1057,6 +1074,13 @@ button.thermostatGlassMain {
 .eightSleepModalNavButton:focus,
 .eightSleepModalNavButton:focus-visible {
   outline: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .eightSleepModalPanel,
+  .eightSleepModalNavButton {
+    transition: none;
+  }
 }
 
 .eightSleepBedtimeCard {
