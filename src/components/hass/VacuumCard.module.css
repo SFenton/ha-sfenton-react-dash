@@ -64,6 +64,41 @@
   -webkit-backdrop-filter: blur(15px) saturate(1.08);
 }
 
+.consumablesPanel {
+  display: grid;
+  gap: 10px;
+}
+
+.consumablesGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.consumablesGrid .settingPill {
+  min-height: 54px;
+  border-color: rgba(255, 255, 255, 0.16);
+  background: var(--color-glass-soft);
+  box-shadow: var(--shadow-glass), inset 0 -1px 0 rgba(0, 0, 0, 0.12);
+  backdrop-filter: blur(15px) saturate(1.08);
+  -webkit-backdrop-filter: blur(15px) saturate(1.08);
+}
+
+.settingPill[data-tone='ok'] {
+  border-color: rgba(129, 199, 132, 0.34);
+  background: linear-gradient(135deg, rgba(67, 160, 71, 0.2), rgba(67, 160, 71, 0.08)), var(--color-glass-soft);
+}
+
+.settingPill[data-tone='warning'] {
+  border-color: rgba(255, 183, 77, 0.38);
+  background: linear-gradient(135deg, rgba(251, 140, 0, 0.22), rgba(251, 140, 0, 0.09)), var(--color-glass-soft);
+}
+
+.settingPill[data-tone='danger'] {
+  border-color: rgba(255, 95, 87, 0.42);
+  background: linear-gradient(135deg, rgba(229, 57, 53, 0.25), rgba(229, 57, 53, 0.1)), var(--color-glass-soft);
+}
+
 .errorMessage {
   display: grid;
   grid-column: 1 / -1;

@@ -73,6 +73,7 @@ export interface VacuumConfig {
   entityId: string
   batteryEntityId: string
   cleanScript: string
+  consumables: VacuumConsumableConfig[]
   coordinatorSessionEntityId?: string
   dockButtonEntityId?: string
   errorEntityId: string
@@ -89,6 +90,13 @@ export interface VacuumConfig {
   waterEntityId?: string
   zoneDescription?: string[]
   zones: VacuumZoneConfig[]
+}
+
+export interface VacuumConsumableConfig {
+  title: string
+  entityId: string
+  icon: string
+  valueKind: 'duration' | 'status'
 }
 
 export interface VacuumZoneConfig {
@@ -239,6 +247,25 @@ export const SETTINGS_PAGE_ITEMS: SettingsLinkConfig[] = [
 
 export const GUEST_CONTROLS_DESCRIPTION = "When guests stay over, toggle these controls on based on the rooms they're staying in to disable automations (like automatic vacuuming in the music room) and ensure that rooms are tracked for temperature monitoring and vent control."
 
+const VALETUDO_CONSUMABLES: (Omit<VacuumConsumableConfig, 'entityId'> & { entitySuffix: string })[] = [
+  { title: 'Main Brush', entitySuffix: 'main_brush', icon: 'mdi:brush', valueKind: 'duration' },
+  { title: 'Side Brush', entitySuffix: 'right_brush', icon: 'mdi:brush-variant', valueKind: 'duration' },
+  { title: 'Main Filter', entitySuffix: 'main_filter', icon: 'mdi:air-filter', valueKind: 'duration' },
+  { title: 'Sensors', entitySuffix: 'sensor_cleaning', icon: 'mdi:radar', valueKind: 'duration' },
+  { title: 'Wheels', entitySuffix: 'wheel_cleaning', icon: 'mdi:tire', valueKind: 'duration' },
+  { title: 'Dustbag', entitySuffix: 'dustbag_dock_component', icon: 'mdi:delete', valueKind: 'status' },
+  { title: 'Fresh Water', entitySuffix: 'freshwater_dock_component', icon: 'mdi:water', valueKind: 'status' },
+  { title: 'Waste Water', entitySuffix: 'wastewater_dock_component', icon: 'mdi:water-off', valueKind: 'status' },
+  { title: 'Detergent', entitySuffix: 'detergent_dock_component', icon: 'mdi:bottle-tonic', valueKind: 'status' },
+]
+
+function valetudoConsumables(vacuumMapId: string): VacuumConsumableConfig[] {
+  return VALETUDO_CONSUMABLES.map(({ entitySuffix, ...consumable }) => ({
+    ...consumable,
+    entityId: `sensor.${vacuumMapId}_${entitySuffix}`,
+  }))
+}
+
 export const GUEST_CONTROL_ITEMS: EntityTileConfig[] = [
   { title: 'Guest Room', entityId: 'input_boolean.guests_staying_in_guest_room', icon: 'mdi:bed', color: SWITCH_ACTIVE_COLOR, action: { type: 'toggle' }, showSubtitle: true },
   { title: 'Music Room', entityId: 'input_boolean.guests_staying_in_music_room', icon: 'mdi:guitar-electric', color: SWITCH_ACTIVE_COLOR, action: { type: 'toggle' }, showSubtitle: true },
@@ -331,6 +358,7 @@ export const VACUUMS: VacuumConfig[] = [
     entityId: 'vacuum.valetudo_elatedusedram',
     batteryEntityId: 'sensor.valetudo_elatedusedram_battery_level',
     cleanScript: 'script.music_room_vacuum_clean_selected_segments',
+    consumables: valetudoConsumables('valetudo_elatedusedram'),
     dockButtonEntityId: 'button.valetudo_elatedusedram_trigger_auto_empty_dock',
     errorEntityId: 'sensor.valetudo_elatedusedram_error',
     errorMessageEntityId: 'input_text.music_room_vacuum_error_message',
@@ -358,6 +386,7 @@ export const VACUUMS: VacuumConfig[] = [
     entityId: 'vacuum.valetudo_politefatherlykingfisher',
     batteryEntityId: 'sensor.valetudo_politefatherlykingfisher_battery_level',
     cleanScript: 'script.theater_room_vacuum_clean_selected_segments',
+    consumables: valetudoConsumables('valetudo_politefatherlykingfisher'),
     dockButtonEntityId: 'button.valetudo_politefatherlykingfisher_trigger_auto_empty_dock',
     errorEntityId: 'sensor.valetudo_politefatherlykingfisher_error',
     errorMessageEntityId: 'input_text.theater_room_vacuum_error_message',
@@ -376,6 +405,7 @@ export const VACUUMS: VacuumConfig[] = [
     entityId: 'vacuum.valetudo_exaltedsneakydeer',
     batteryEntityId: 'sensor.valetudo_exaltedsneakydeer_battery_level',
     cleanScript: 'script.main_floor_vacuum_clean_selected_segments',
+    consumables: valetudoConsumables('valetudo_exaltedsneakydeer'),
     coordinatorSessionEntityId: 'sensor.main_floor_vacuum_coordinator_session_state',
     dockButtonEntityId: 'button.valetudo_exaltedsneakydeer_trigger_auto_empty_dock',
     errorEntityId: 'sensor.valetudo_exaltedsneakydeer_error',

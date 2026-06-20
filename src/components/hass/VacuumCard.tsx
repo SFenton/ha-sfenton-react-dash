@@ -4,19 +4,20 @@ import { GlassTile } from '../core/GlassTile'
 import { MaterialIcon } from '../core/Icon'
 import { ModalSheet } from '../core/ModalSheet'
 import { OptionPickerDialog, type PickerOption } from '../core/OptionPickerDialog'
-import { type VacuumConfig, type VacuumZoneConfig } from '../../constants/portedDashboard'
+import { type VacuumConfig, type VacuumConsumableConfig, type VacuumZoneConfig } from '../../constants/portedDashboard'
 import { useImmediateVisualTab, useSmoothDisplayedModalTab } from '../../hooks/useSmoothDisplayedModalTab'
 import { asEntityName, titleCaseState } from './entityState'
 import { ValetudoMapCard } from './ValetudoMapCard'
 import { VACUUM_MODAL_STYLE } from './vacuumModalStyle'
 import styles from './VacuumCard.module.css'
 
-type VacuumModalTab = 'controls' | 'zones' | 'more'
+type VacuumModalTab = 'controls' | 'zones' | 'more' | 'info'
 
 const VACUUM_MODAL_TABS: { icon: string; label: string; tab: VacuumModalTab }[] = [
-  { icon: 'mdi:information', label: 'Controls', tab: 'controls' },
+  { icon: 'mdi:robot-vacuum', label: 'Controls', tab: 'controls' },
   { icon: 'mdi:floor-plan', label: 'Zones', tab: 'zones' },
   { icon: 'mdi:dots-horizontal', label: 'More', tab: 'more' },
+  { icon: 'mdi:information', label: 'Info', tab: 'info' },
 ]
 const DESKTOP_MODAL_QUERY = '(min-width: 760px)'
 
@@ -45,7 +46,11 @@ function shouldResetScrollOnTabChange() {
 }
 
 function vacuumModalTabs(vacuum: VacuumConfig) {
-  return vacuum.zones.length > 0 ? VACUUM_MODAL_TABS : VACUUM_MODAL_TABS.filter((tab) => tab.tab !== 'zones')
+  return VACUUM_MODAL_TABS.filter((tab) => {
+    if (tab.tab === 'zones') return vacuum.zones.length > 0
+    if (tab.tab === 'info') return vacuum.consumables.length > 0
+    return true
+  })
 }
 
 function isMeaningfulText(value: string | undefined) {
@@ -143,9 +148,13 @@ function ActionButton({
   )
 }
 
-function InfoPill({ icon, label, value }: { icon: string; label: string; value: string }) {
+type InfoPillTone = 'danger' | 'ok' | 'warning'
+
+function InfoPill({ grouped = false, icon, label, tone, value }: { grouped?: boolean; icon: string; label: string; tone?: InfoPillTone; value: string }) {
+  const accessibilityProps = grouped ? { 'aria-label': `${label} ${value}`, role: 'group' as const } : {}
+
   return (
-    <span className={styles.settingPill}>
+    <span {...accessibilityProps} className={styles.settingPill} data-tone={tone}>
       <MaterialIcon name={icon} size={18} />
       <span className={styles.settingText}>
         <span>{label}</span>
@@ -153,6 +162,50 @@ function InfoPill({ icon, label, value }: { icon: string; label: string; value: 
       </span>
     </span>
   )
+}
+
+function formatHours(hours: number) {
+  const rounded = hours < 10 ? Math.round(hours * 10) / 10 : Math.round(hours)
+  return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1)
+}
+
+function formatConsumableDuration(entity: EntityLike) {
+  const minutes = Number(entity.state)
+  if (!Number.isFinite(minutes)) {
+    const unit = typeof entity.attributes.unit_of_measurement === 'string' ? entity.attributes.unit_of_measurement : ''
+    return `${entity.state}${unit ? ` ${unit}` : ''}`
+  }
+  if (minutes <= 0) return 'Due'
+  if (minutes < 60) return `${Math.round(minutes)}m left`
+  return `${formatHours(minutes / 60)}h left`
+}
+
+function formatConsumableValue(consumable: VacuumConsumableConfig, entity: EntityLike | null | undefined) {
+  if (!entity || isUnavailableState(entity.state)) return undefined
+  if (consumable.valueKind === 'duration') return formatConsumableDuration(entity)
+  const value = formatStateValue(entity.state)
+  return value.toLowerCase() === 'ok' ? 'OK' : value
+}
+
+function consumableTone(consumable: VacuumConsumableConfig, entity: EntityLike | null | undefined): InfoPillTone | undefined {
+  if (!entity || isUnavailableState(entity.state)) return undefined
+  if (consumable.valueKind === 'duration') {
+    const minutes = Number(entity.state)
+    if (!Number.isFinite(minutes)) return undefined
+    if (minutes <= 0) return 'danger'
+    if (minutes <= 600) return 'warning'
+    return undefined
+  }
+  return entity.state.trim().toLowerCase() === 'ok' ? 'ok' : 'warning'
+}
+
+function VacuumConsumablePill({ consumable }: { consumable: VacuumConsumableConfig }) {
+  const entity = useOptionalEntity(consumable.entityId)
+  const value = formatConsumableValue(consumable, entity)
+
+  if (!value) return null
+
+  return <InfoPill grouped icon={consumable.icon} label={consumable.title} tone={consumableTone(consumable, entity)} value={value} />
 }
 
 function CompositeControl({ children, icon, subtitle, title }: { children: ReactNode; icon: string; subtitle?: string; title: string }) {
@@ -311,6 +364,23 @@ function VacuumStatusSummary({ vacuum }: { vacuum: VacuumConfig }) {
       ) : null}
     </section>
   )
+}
+
+function VacuumConsumablesPanel({ vacuum }: { vacuum: VacuumConfig }) {
+  if (vacuum.consumables.length === 0) return null
+
+  return (
+    <section aria-label="Consumables" className={styles.consumablesPanel}>
+      <SectionHeader title="Consumables" />
+      <div className={styles.consumablesGrid}>
+        {vacuum.consumables.map((consumable) => <VacuumConsumablePill consumable={consumable} key={consumable.entityId} />)}
+      </div>
+    </section>
+  )
+}
+
+function VacuumInfoSection({ vacuum }: { vacuum: VacuumConfig }) {
+  return <VacuumConsumablesPanel vacuum={vacuum} />
 }
 
 function VacuumPowerSettings({ vacuum }: { vacuum: VacuumConfig }) {
@@ -500,7 +570,7 @@ function VacuumModalTabContent({ activeTab, vacuum }: { activeTab: VacuumModalTa
   const tabs = vacuumModalTabs(vacuum)
   const targetTab = tabs.some((tab) => tab.tab === activeTab) ? activeTab : 'controls'
   const { displayedTab: effectiveActiveTab, transitionState } = useSmoothDisplayedModalTab(targetTab)
-  const panelLabel = vacuum.zones.length > 0 ? `${vacuum.title} controls, zones, and actions` : `${vacuum.title} controls and actions`
+  const panelLabel = vacuum.zones.length > 0 ? `${vacuum.title} controls, zones, actions, and info` : `${vacuum.title} controls, actions, and info`
 
   useEffect(() => {
     if (!shouldResetScrollOnTabChange()) return
@@ -521,6 +591,7 @@ function VacuumModalTabContent({ activeTab, vacuum }: { activeTab: VacuumModalTa
         {effectiveActiveTab === 'controls' && <VacuumControlsSection vacuum={vacuum} />}
         {effectiveActiveTab === 'zones' && <VacuumZones vacuum={vacuum} />}
         {effectiveActiveTab === 'more' && <VacuumEmptyDockSection vacuum={vacuum} />}
+        {effectiveActiveTab === 'info' && <VacuumInfoSection vacuum={vacuum} />}
       </div>
     </div>
   )

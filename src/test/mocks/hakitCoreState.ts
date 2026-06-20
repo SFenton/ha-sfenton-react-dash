@@ -307,6 +307,34 @@ function thermostatMockEntities() {
   return Object.fromEntries(entries)
 }
 
+function valetudoConsumableMockEntities(vacuumMapId: string, values: Partial<Record<string, string>> = {}) {
+  const durationAttributes = { device_class: 'duration', icon: 'mdi:progress-wrench', state_class: 'measurement', unit_of_measurement: 'min' }
+  const durationDefaults = {
+    main_brush: '12240',
+    main_filter: '3240',
+    right_brush: '6240',
+    sensor_cleaning: '120',
+    wheel_cleaning: '120',
+  }
+  const statusDefaults = {
+    detergent_dock_component: 'ok',
+    dustbag_dock_component: 'ok',
+    freshwater_dock_component: 'ok',
+    wastewater_dock_component: 'ok',
+  }
+
+  return Object.fromEntries([
+    ...Object.entries(durationDefaults).map(([suffix, defaultState]) => [
+      `sensor.${vacuumMapId}_${suffix}`,
+      entity(`sensor.${vacuumMapId}_${suffix}`, values[suffix] ?? defaultState, durationAttributes),
+    ]),
+    ...Object.entries(statusDefaults).map(([suffix, defaultState]) => [
+      `sensor.${vacuumMapId}_${suffix}`,
+      entity(`sensor.${vacuumMapId}_${suffix}`, values[suffix] ?? defaultState),
+    ]),
+  ])
+}
+
 export const mockEntities: Record<string, MockEntity> = {
   'alarm_control_panel.aqara_hub_m3_0056_security_system_2': entity('alarm_control_panel.aqara_hub_m3_0056_security_system_2', 'armed_home'),
   'binary_sensor.all_contact_sensors': entity('binary_sensor.all_contact_sensors', 'off'),
@@ -543,6 +571,7 @@ export const mockEntities: Record<string, MockEntity> = {
   'sensor.valetudo_elatedusedram_battery_level': entity('sensor.valetudo_elatedusedram_battery_level', 'unknown', { unit_of_measurement: '%' }),
   'sensor.valetudo_elatedusedram_status_flag': entity('sensor.valetudo_elatedusedram_status_flag', 'unknown'),
   'sensor.valetudo_elatedusedram_error': entity('sensor.valetudo_elatedusedram_error', 'unavailable'),
+  ...valetudoConsumableMockEntities('valetudo_elatedusedram'),
   'input_text.music_room_vacuum_error_message': entity('input_text.music_room_vacuum_error_message', ''),
   'input_text.music_room_vacuum_mode': entity('input_text.music_room_vacuum_mode', 'Vacuum'),
   'select.valetudo_elatedusedram_mode': entity('select.valetudo_elatedusedram_mode', 'unavailable', { options: ['vacuum', 'mop', 'vacuum_and_mop'] }),
@@ -558,6 +587,11 @@ export const mockEntities: Record<string, MockEntity> = {
   'sensor.valetudo_politefatherlykingfisher_battery_level': entity('sensor.valetudo_politefatherlykingfisher_battery_level', '99', { unit_of_measurement: '%' }),
   'sensor.valetudo_politefatherlykingfisher_status_flag': entity('sensor.valetudo_politefatherlykingfisher_status_flag', 'ready'),
   'sensor.valetudo_politefatherlykingfisher_error': entity('sensor.valetudo_politefatherlykingfisher_error', 'No error'),
+  ...valetudoConsumableMockEntities('valetudo_politefatherlykingfisher', {
+    main_brush: '14700',
+    main_filter: '5700',
+    right_brush: '8700',
+  }),
   'input_text.theater_room_vacuum_error_message': entity('input_text.theater_room_vacuum_error_message', ''),
   'select.valetudo_politefatherlykingfisher_mode': entity('select.valetudo_politefatherlykingfisher_mode', 'vacuum', { options: ['vacuum_and_mop', 'mop', 'vacuum', 'vacuum_then_mop'] }),
   'select.valetudo_politefatherlykingfisher_fan': entity('select.valetudo_politefatherlykingfisher_fan', 'balanced', { options: ['quiet', 'balanced', 'turbo', 'max'] }),
@@ -569,6 +603,7 @@ export const mockEntities: Record<string, MockEntity> = {
   'sensor.valetudo_exaltedsneakydeer_battery_level': entity('sensor.valetudo_exaltedsneakydeer_battery_level', '99', { unit_of_measurement: '%' }),
   'sensor.valetudo_exaltedsneakydeer_status_flag': entity('sensor.valetudo_exaltedsneakydeer_status_flag', 'ready'),
   'sensor.valetudo_exaltedsneakydeer_error': entity('sensor.valetudo_exaltedsneakydeer_error', 'No error'),
+  ...valetudoConsumableMockEntities('valetudo_exaltedsneakydeer'),
   'input_text.main_floor_vacuum_error_message': entity('input_text.main_floor_vacuum_error_message', ''),
   'input_text.main_floor_vacuum_mode': entity('input_text.main_floor_vacuum_mode', 'Vacuum'),
   'select.valetudo_exaltedsneakydeer_mode': entity('select.valetudo_exaltedsneakydeer_mode', 'vacuum', { options: ['vacuum', 'mop', 'vacuum_and_mop'] }),
