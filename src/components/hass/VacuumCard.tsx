@@ -6,6 +6,7 @@ import { MaterialIcon } from '../core/Icon'
 import { ModalSheet } from '../core/ModalSheet'
 import { type VacuumConfig, type VacuumConsumableConfig, type VacuumZoneConfig } from '../../constants/portedDashboard'
 import { useImmediateVisualTab, useSmoothDisplayedModalTab } from '../../hooks/useSmoothDisplayedModalTab'
+import { useOptimisticState } from '../../hooks/useOptimisticState'
 import { asEntityName, titleCaseState } from './entityState'
 import { ValetudoMapCard } from './ValetudoMapCard'
 import { VACUUM_MODAL_STYLE } from './vacuumModalStyle'
@@ -24,6 +25,8 @@ const CLEANING_SETUP_DESCRIPTION = 'Choose how many passes the vacuum should mak
 const MODE_DESCRIPTION = 'Choose whether the robot vacuums, mops, or combines both for the next run.'
 const FAN_DESCRIPTION = 'Adjust suction strength for carpets, hard floors, and quieter cleaning.'
 const WATER_DESCRIPTION = 'Set mop water flow so floors get the right amount of moisture.'
+const VACUUM_OPTIMISTIC_REVERT_MS = 8000
+const VACUUM_CLEAN_SETTLE_QUIET_MS = 650
 
 type CallService = (params: Record<string, unknown>) => void
 
@@ -35,6 +38,27 @@ interface EntityLike {
 
 interface VacuumCardProps {
   vacuum: VacuumConfig
+}
+
+interface OptimisticVacuumState {
+  commitState: (nextState: string) => void
+  liveState: string
+  state: string
+}
+
+interface VacuumPendingIntent {
+  expectedState: string
+  issuedAt: number
+}
+
+interface VacuumCommandCoordinator {
+  cleanQueued: boolean
+  controlsDisabled: boolean
+  confirmIntent: (entityId: string, liveState: string | undefined) => void
+  intentRevision: number
+  pendingIntentCount: number
+  registerIntent: (entityId: string, expectedState: string) => void
+  requestClean: (action: string) => void
 }
 
 function isUnavailableState(state: string | undefined) {
@@ -109,8 +133,151 @@ function callServiceAction(callService: CallService, action: string, target?: st
   callService({ domain, service, target })
 }
 
+function nowMs() {
+  return typeof window === 'undefined' ? Date.now() : window.performance.now()
+}
+
+function useVacuumCommandCoordinator(liveState: string, commitDisplayState: (nextState: string) => void): VacuumCommandCoordinator {
+  const callService = useHass((state) => state.helpers.callService) as unknown as CallService
+  const [pendingIntents, setPendingIntents] = useState<Record<string, VacuumPendingIntent>>({})
+  const [lastIntentAt, setLastIntentAt] = useState(Number.NEGATIVE_INFINITY)
+  const [settleTick, setSettleTick] = useState(0)
+  const [queuedCleanAction, setQueuedCleanAction] = useState<string | null>(null)
+  const [cleanStartPending, setCleanStartPending] = useState(false)
+  const [cleanStartRevision, setCleanStartRevision] = useState(0)
+  const [intentRevision, setIntentRevision] = useState(0)
+  const pendingIntentCount = Object.keys(pendingIntents).length
+  const settingsSettled = pendingIntentCount === 0 && nowMs() >= lastIntentAt + VACUUM_CLEAN_SETTLE_QUIET_MS
+  const controlsDisabled = cleanStartPending
+
+  const registerIntent = useCallback((entityId: string, expectedState: string) => {
+    const issuedAt = nowMs()
+    setLastIntentAt(issuedAt)
+    setIntentRevision((revision) => revision + 1)
+    setPendingIntents((current) => ({
+      ...current,
+      [entityId]: { expectedState, issuedAt },
+    }))
+  }, [])
+
+  const confirmIntent = useCallback((entityId: string, liveIntentState: string | undefined) => {
+    setPendingIntents((current) => {
+      const pending = current[entityId]
+      if (!pending || liveIntentState !== pending.expectedState) return current
+      const next = { ...current }
+      delete next[entityId]
+      return next
+    })
+    setSettleTick((tick) => tick + 1)
+  }, [])
+
+  const requestClean = useCallback(
+    (action: string) => {
+      commitDisplayState('cleaning')
+      setCleanStartPending(true)
+      if (settingsSettled) {
+        callServiceAction(callService, action)
+        setCleanStartRevision((revision) => revision + 1)
+        return
+      }
+      setQueuedCleanAction(action)
+    },
+    [callService, commitDisplayState, settingsSettled],
+  )
+
+  useEffect(() => {
+    if (pendingIntentCount > 0) return undefined
+    const remainingMs = lastIntentAt + VACUUM_CLEAN_SETTLE_QUIET_MS - nowMs()
+    if (remainingMs <= 0) return undefined
+    const timeout = window.setTimeout(() => setSettleTick((tick) => tick + 1), remainingMs)
+    return () => window.clearTimeout(timeout)
+  }, [lastIntentAt, pendingIntentCount, settleTick])
+
+  useEffect(() => {
+    if (pendingIntentCount === 0) return undefined
+    const nextExpiryMs = Math.min(...Object.values(pendingIntents).map((intent) => intent.issuedAt + VACUUM_OPTIMISTIC_REVERT_MS))
+    const timeout = window.setTimeout(() => {
+      const currentTime = nowMs()
+      setPendingIntents((current) => Object.fromEntries(Object.entries(current).filter(([, intent]) => currentTime < intent.issuedAt + VACUUM_OPTIMISTIC_REVERT_MS)))
+      setQueuedCleanAction(null)
+      setCleanStartPending(false)
+    }, Math.max(0, nextExpiryMs - nowMs()))
+    return () => window.clearTimeout(timeout)
+  }, [pendingIntentCount, pendingIntents])
+
+  useEffect(() => {
+    if (!queuedCleanAction || !settingsSettled) return undefined
+    const timeout = window.setTimeout(() => {
+      callServiceAction(callService, queuedCleanAction)
+      setQueuedCleanAction(null)
+      setCleanStartRevision((revision) => revision + 1)
+    }, 0)
+    return () => window.clearTimeout(timeout)
+  }, [callService, queuedCleanAction, settingsSettled])
+
+  useEffect(() => {
+    if (!cleanStartPending) return undefined
+    if (liveState === 'cleaning') {
+      const timeout = window.setTimeout(() => {
+        setCleanStartPending(false)
+        setQueuedCleanAction(null)
+      }, 0)
+      return () => window.clearTimeout(timeout)
+    }
+
+    const timeout = window.setTimeout(() => {
+      setCleanStartPending(false)
+      setQueuedCleanAction(null)
+    }, VACUUM_OPTIMISTIC_REVERT_MS)
+    return () => window.clearTimeout(timeout)
+  }, [cleanStartPending, cleanStartRevision, liveState])
+
+  return {
+    cleanQueued: queuedCleanAction !== null,
+    controlsDisabled,
+    confirmIntent,
+    intentRevision,
+    pendingIntentCount,
+    registerIntent,
+    requestClean,
+  }
+}
+
 function useOptionalEntity(entityId: string | undefined) {
   return useEntity(asEntityName(entityId ?? 'sensor.unavailable'), { returnNullIfNotFound: true }) as EntityLike | null
+}
+
+function useVacuumSettingIntentConfirmations(vacuum: VacuumConfig, onLiveState: (entityId: string, liveState: string | undefined) => void) {
+  const mode = useOptionalEntity(vacuum.modeEntityId)
+  const fan = useOptionalEntity(vacuum.fanEntityId)
+  const water = useOptionalEntity(vacuum.waterEntityId)
+  const passes = useOptionalEntity(vacuum.passesEntityId)
+
+  useEffect(() => {
+    if (vacuum.modeEntityId) onLiveState(vacuum.modeEntityId, mode?.state)
+    if (vacuum.fanEntityId) onLiveState(vacuum.fanEntityId, fan?.state)
+    if (vacuum.waterEntityId) onLiveState(vacuum.waterEntityId, water?.state)
+    onLiveState(vacuum.passesEntityId, passes?.state)
+  }, [fan?.state, mode?.state, onLiveState, passes?.state, vacuum.fanEntityId, vacuum.modeEntityId, vacuum.passesEntityId, vacuum.waterEntityId, water?.state])
+}
+
+function VacuumIntentConfirmationTracker({ entityId, intentRevision, onLiveState }: { entityId: string; intentRevision: number; onLiveState: (entityId: string, liveState: string | undefined) => void }) {
+  const entity = useEntity(asEntityName(entityId), { returnNullIfNotFound: true }) as EntityLike | null
+  const liveState = entity?.state
+
+  useEffect(() => {
+    onLiveState(entityId, liveState)
+  }, [entityId, intentRevision, liveState, onLiveState])
+
+  return null
+}
+
+function VacuumIntentConfirmationTrackers({ coordinator, vacuum }: { coordinator: VacuumCommandCoordinator; vacuum: VacuumConfig }) {
+  return (
+    <>
+      {vacuum.zones.map((zone) => <VacuumIntentConfirmationTracker entityId={zone.entityId} intentRevision={coordinator.intentRevision} key={zone.entityId} onLiveState={coordinator.confirmIntent} />)}
+    </>
+  )
 }
 
 function SectionHeader({ title }: { title: string }) {
@@ -148,6 +315,7 @@ function ControlItem({ children, description }: { children: ReactNode; descripti
 
 function ActionButton({
   description,
+  disabled = false,
   icon,
   label,
   onClick,
@@ -155,6 +323,7 @@ function ActionButton({
   variant = 'default',
 }: {
   description?: string
+  disabled?: boolean
   icon: string
   label: string
   onClick: () => void
@@ -163,7 +332,7 @@ function ActionButton({
 }) {
   return (
     <ControlItem description={description}>
-      <button aria-label={label} className={styles.actionButton} data-icon={icon} data-tone={tone} data-variant={variant} onClick={onClick} type="button">
+      <button aria-label={label} className={styles.actionButton} data-icon={icon} data-tone={tone} data-variant={variant} disabled={disabled} onClick={onClick} type="button">
         <MaterialIcon name={icon} size={18} />
         <span className={styles.actionButtonText}>{label}</span>
       </button>
@@ -242,34 +411,48 @@ function ControlSection({ children, title }: { children: ReactNode; title: strin
 
 function SelectSetting({
   description,
+  disabled = false,
   entity,
   entityId,
   formatOptionLabel,
   hideLabel = false,
   icon,
   label,
+  onIntent,
+  onOptimisticValueChange,
+  optimisticValue,
   showIcon = true,
   valueLabel,
   variant = 'setting',
 }: {
   description?: string
+  disabled?: boolean
   entity: EntityLike | null | undefined
   entityId: string
   formatOptionLabel?: (value: string) => string
   hideLabel?: boolean
   icon: string
   label: string
+  onIntent?: (entityId: string, expectedState: string) => void
+  onOptimisticValueChange?: (value: string) => void
+  optimisticValue?: string
   showIcon?: boolean
   valueLabel?: string
   variant?: 'setting' | 'sub'
 }) {
   const callService = useHass((state) => state.helpers.callService) as unknown as CallService
+  const liveValue = entity?.state ?? ''
+  const [internalValue, commitInternalValue] = useOptimisticState(liveValue, { clearOn: 'confirmation', revertMs: VACUUM_OPTIMISTIC_REVERT_MS })
   const unavailable = !entity || isUnavailableState(entity.state)
   const options = entityOptions(entity)
-  const value = entity?.state ?? ''
-  const displayValue = valueLabel ?? formatEntityValue(entity, label)
+  const value = optimisticValue ?? internalValue
+  const displayValue = value === liveValue && valueLabel ? valueLabel : value ? (formatOptionLabel ? formatOptionLabel(value) : formatStateValue(value, label)) : formatEntityValue(entity, label)
   const selectOption = (option: string) => {
-    if (option !== value) callService({ domain: domainFromEntity(entityId), service: 'select_option', target: entityId, serviceData: { option } })
+    if (disabled || option === value) return
+    commitInternalValue(option)
+    onOptimisticValueChange?.(option)
+    onIntent?.(entityId, option)
+    callService({ domain: domainFromEntity(entityId), service: 'select_option', target: entityId, serviceData: { option } })
   }
 
   if (unavailable || options.length === 0) {
@@ -288,12 +471,19 @@ function SelectSetting({
   }
 
   const renderedOptions = options.includes(value) ? options : [value, ...options].filter(Boolean)
-  const selectOptions = renderedOptions.map((option) => ({ value: option, label: formatOptionLabel ? formatOptionLabel(option) : option === value && valueLabel ? valueLabel : formatStateValue(option) }))
+  const selectOptions = renderedOptions.map((option) => ({ value: option, label: formatOptionLabel ? formatOptionLabel(option) : formatStateValue(option) }))
   const nativeSelect = (
     <select
       aria-label={`${label} ${displayValue}`}
       className={styles.nativeSelect}
-      onChange={(event) => selectOption(event.currentTarget.value)}
+      disabled={disabled}
+      onChange={(event) => {
+        const select = event.currentTarget
+        const option = select.value
+        select.blur()
+        window.requestAnimationFrame(() => select.blur())
+        selectOption(option)
+      }}
       value={value}
     >
       {selectOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
@@ -303,7 +493,7 @@ function SelectSetting({
   if (variant === 'sub') {
     return (
       <ControlItem description={description}>
-        <span className={styles.subSelectButton} data-has-icon={showIcon ? 'true' : 'false'} data-label-hidden={hideLabel ? 'true' : 'false'} data-native-select="true">
+        <span className={styles.subSelectButton} data-disabled={disabled ? 'true' : 'false'} data-has-icon={showIcon ? 'true' : 'false'} data-label-hidden={hideLabel ? 'true' : 'false'} data-native-select="true">
           {showIcon && <MaterialIcon name={icon} size={17} />}
           <span aria-hidden="true" className={styles.subSelectText}>
             {!hideLabel && <span>{label}</span>}
@@ -318,7 +508,7 @@ function SelectSetting({
 
   return (
     <ControlItem description={description}>
-      <span className={`${styles.settingPill} ${styles.settingButton}`} data-native-select="true">
+      <span className={`${styles.settingPill} ${styles.settingButton}`} data-disabled={disabled ? 'true' : 'false'} data-native-select="true">
         <span className={styles.settingIcon}>
           <MaterialIcon name={icon} size={18} />
         </span>
@@ -335,17 +525,23 @@ function SelectSetting({
   )
 }
 
-function ZoneButton({ disabled, zone }: { disabled: boolean; zone: VacuumZoneConfig }) {
+function ZoneButton({ disabled, onIntent, zone }: { disabled: boolean; onIntent: (entityId: string, expectedState: string) => void; zone: VacuumZoneConfig }) {
   const callService = useHass((state) => state.helpers.callService) as unknown as CallService
   const entity = useEntity(asEntityName(zone.entityId), { returnNullIfNotFound: true })
-  const active = entity?.state === 'on'
+  const liveActive = entity?.state === 'on'
+  const [active, commitActive] = useOptimisticState(liveActive, { clearOn: 'confirmation', revertMs: VACUUM_OPTIMISTIC_REVERT_MS })
+  const nextActive = !active
 
   return (
     <button
       className={styles.zoneButton}
       data-active={active}
       disabled={disabled}
-      onClick={() => callService({ domain: 'input_boolean', service: 'toggle', target: zone.entityId })}
+      onClick={() => {
+        commitActive(nextActive)
+        onIntent(zone.entityId, nextActive ? 'on' : 'off')
+        callService({ domain: 'input_boolean', service: nextActive ? 'turn_on' : 'turn_off', target: zone.entityId })
+      }}
       type="button"
     >
       <MaterialIcon name={zone.icon} size={22} />
@@ -354,13 +550,12 @@ function ZoneButton({ disabled, zone }: { disabled: boolean; zone: VacuumZoneCon
   )
 }
 
-function VacuumStatusSummary({ vacuum }: { vacuum: VacuumConfig }) {
-  const entity = useEntity(asEntityName(vacuum.entityId), { returnNullIfNotFound: true })
+function VacuumStatusSummary({ displayState, vacuum }: { displayState: string; vacuum: VacuumConfig }) {
   const battery = useEntity(asEntityName(vacuum.batteryEntityId), { returnNullIfNotFound: true })
   const statusFlag = useEntity(asEntityName(vacuum.statusFlagEntityId), { returnNullIfNotFound: true })
   const error = useEntity(asEntityName(vacuum.errorEntityId), { returnNullIfNotFound: true })
   const mappedError = useEntity(asEntityName(vacuum.errorMessageEntityId), { returnNullIfNotFound: true })
-  const state = entity?.state
+  const state = displayState
   const lowBattery = error?.state === 'Low battery'
   const chargingBeforeResume = (state === 'docked' && isResumable(statusFlag?.state)) || (state === 'error' && lowBattery)
   const stateLabel = chargingBeforeResume ? 'Charging Before Resuming' : formatStateValue(state)
@@ -411,50 +606,55 @@ function VacuumInfoSection({ vacuum }: { vacuum: VacuumConfig }) {
   )
 }
 
-function VacuumPowerSettings({ vacuum }: { vacuum: VacuumConfig }) {
+function VacuumPowerSettings({ coordinator, vacuum }: { coordinator: VacuumCommandCoordinator; vacuum: VacuumConfig }) {
   const mode = useOptionalEntity(vacuum.modeEntityId)
   const modeText = useOptionalEntity(vacuum.modeTextEntityId)
   const fan = useOptionalEntity(vacuum.fanEntityId)
   const water = useOptionalEntity(vacuum.waterEntityId)
   const modeState = mode?.state
+  const [displayModeState, commitDisplayModeState] = useOptimisticState(modeState ?? '', { clearOn: 'confirmation', revertMs: VACUUM_OPTIMISTIC_REVERT_MS })
   const hasMode = Boolean(vacuum.modeEntityId && mode && !isUnavailableState(mode.state))
-  const showFan = Boolean(vacuum.fanEntityId && fan && !isUnavailableState(fan.state) && modeState !== 'mop')
-  const showWater = Boolean(vacuum.waterEntityId && water && !isUnavailableState(water.state) && (!hasMode || modeState !== 'vacuum'))
-  const modeLabel = isMeaningfulText(modeText?.state) ? modeText?.state : formatEntityValue(mode, 'Mode')
+  const optimisticModeState = hasMode ? displayModeState : modeState
+  const showFan = Boolean(vacuum.fanEntityId && fan && !isUnavailableState(fan.state) && optimisticModeState !== 'mop')
+  const showWater = Boolean(vacuum.waterEntityId && water && !isUnavailableState(water.state) && (!hasMode || optimisticModeState !== 'vacuum'))
+  const modeLabel = optimisticModeState === modeState && isMeaningfulText(modeText?.state) ? modeText?.state : formatStateValue(optimisticModeState, 'Mode')
 
   if (!hasMode && !showFan && !showWater) return null
 
   return (
     <ControlSection title="Power Settings">
-      {hasMode && vacuum.modeEntityId && <SelectSetting description={MODE_DESCRIPTION} entity={mode} entityId={vacuum.modeEntityId} icon="mdi:robot-vacuum" label="Mode" valueLabel={modeLabel} variant="sub" />}
-      {showFan && vacuum.fanEntityId && <SelectSetting description={FAN_DESCRIPTION} entity={fan} entityId={vacuum.fanEntityId} icon="mdi:fan" label="Fan" variant="sub" />}
-      {showWater && vacuum.waterEntityId && <SelectSetting description={WATER_DESCRIPTION} entity={water} entityId={vacuum.waterEntityId} icon="mdi:water" label="Water" variant="sub" />}
+      {hasMode && vacuum.modeEntityId && <SelectSetting description={MODE_DESCRIPTION} disabled={coordinator.controlsDisabled} entity={mode} entityId={vacuum.modeEntityId} icon="mdi:robot-vacuum" label="Mode" onIntent={coordinator.registerIntent} onOptimisticValueChange={commitDisplayModeState} optimisticValue={displayModeState} valueLabel={modeLabel} variant="sub" />}
+      {showFan && vacuum.fanEntityId && <SelectSetting description={FAN_DESCRIPTION} disabled={coordinator.controlsDisabled} entity={fan} entityId={vacuum.fanEntityId} icon="mdi:fan" label="Fan" onIntent={coordinator.registerIntent} variant="sub" />}
+      {showWater && vacuum.waterEntityId && <SelectSetting description={WATER_DESCRIPTION} disabled={coordinator.controlsDisabled} entity={water} entityId={vacuum.waterEntityId} icon="mdi:water" label="Water" onIntent={coordinator.registerIntent} variant="sub" />}
     </ControlSection>
   )
 }
 
-function VacuumStateActions({ vacuum }: { vacuum: VacuumConfig }) {
+function VacuumStateActions({ coordinator, optimisticState, vacuum }: { coordinator: VacuumCommandCoordinator; optimisticState: OptimisticVacuumState; vacuum: VacuumConfig }) {
   const callService = useHass((state) => state.helpers.callService) as unknown as CallService
-  const entity = useEntity(asEntityName(vacuum.entityId), { returnNullIfNotFound: true })
   const statusFlag = useEntity(asEntityName(vacuum.statusFlagEntityId), { returnNullIfNotFound: true })
   const error = useEntity(asEntityName(vacuum.errorEntityId), { returnNullIfNotFound: true })
   const passes = useEntity(asEntityName(vacuum.passesEntityId), { returnNullIfNotFound: true }) as EntityLike | null
-  const state = entity?.state
+  const state = optimisticState.state
   const resumable = isResumable(statusFlag?.state)
   const lowBattery = error?.state === 'Low battery'
   const chargingBeforeResume = (state === 'docked' && resumable) || (state === 'error' && lowBattery)
   const showCleaningSetup = (state === 'docked' && !resumable) || state === 'idle' || (state === 'error' && !resumable && !lowBattery)
   const sectionTitle = chargingBeforeResume ? 'Charging Before Resuming' : formatStateValue(state, 'Vacuum')
-  const clean = () => callServiceAction(callService, vacuum.cleanScript)
-  const dock = () => callServiceAction(callService, 'vacuum.return_to_base', vacuum.entityId)
-  const stop = () => callServiceAction(callService, state === 'error' || chargingBeforeResume ? 'vacuum.stop' : 'vacuum.return_to_base', vacuum.entityId)
-  const pause = () => callServiceAction(callService, 'vacuum.pause', vacuum.entityId)
-  const start = () => callServiceAction(callService, 'vacuum.start', vacuum.entityId)
+  const commitAndCall = (nextState: string, action: string, target?: string) => {
+    optimisticState.commitState(nextState)
+    callServiceAction(callService, action, target)
+  }
+  const clean = () => coordinator.requestClean(vacuum.cleanScript)
+  const dock = () => commitAndCall('returning', 'vacuum.return_to_base', vacuum.entityId)
+  const stop = () => commitAndCall(state === 'error' ? 'idle' : chargingBeforeResume ? 'docked' : 'returning', state === 'error' || chargingBeforeResume ? 'vacuum.stop' : 'vacuum.return_to_base', vacuum.entityId)
+  const pause = () => commitAndCall('paused', 'vacuum.pause', vacuum.entityId)
+  const start = () => commitAndCall('cleaning', 'vacuum.start', vacuum.entityId)
   const cleaningSetupControls = showCleaningSetup ? (
     <>
       <Description>{CLEANING_SETUP_DESCRIPTION}</Description>
       <div className={styles.cleaningActionGrid} data-layout="cleaning">
-        <SelectSetting entity={passes} entityId={vacuum.passesEntityId} formatOptionLabel={formatPassCount} hideLabel icon="mdi:numeric" label="Cleaning Passes" showIcon={false} valueLabel={formatPassCount(passes?.state)} variant="sub" />
+        <SelectSetting disabled={coordinator.controlsDisabled} entity={passes} entityId={vacuum.passesEntityId} formatOptionLabel={formatPassCount} hideLabel icon="mdi:numeric" label="Cleaning Passes" onIntent={coordinator.registerIntent} showIcon={false} valueLabel={formatPassCount(passes?.state)} variant="sub" />
         <ActionButton icon="mdi:play" label="Clean" onClick={clean} tone="primary" variant="sub" />
       </div>
     </>
@@ -465,25 +665,24 @@ function VacuumStateActions({ vacuum }: { vacuum: VacuumConfig }) {
   return (
     <ControlSection title={sectionTitle}>
       {cleaningSetupControls}
-      {state === 'idle' && <ActionButton description="Send the robot back to the dock." icon="mdi:home" label="Dock" onClick={dock} variant="sub" />}
-      {state === 'error' && !resumable && !lowBattery && <ActionButton description="Stop the current vacuum task." icon="mdi:stop" label="Stop" onClick={stop} tone="danger" variant="sub" />}
-      {state === 'error' && !resumable && !lowBattery && <ActionButton description="Send the robot back to the dock." icon="mdi:home" label="Dock" onClick={dock} variant="sub" />}
-      {chargingBeforeResume && <ActionButton description="Continue the interrupted cleaning run." icon="mdi:play" label="Resume" onClick={start} tone="primary" variant="sub" />}
-      {chargingBeforeResume && <ActionButton description="Cancel the pending cleaning resume." icon="mdi:stop" label="Cancel" onClick={stop} tone="danger" variant="sub" />}
-      {state === 'cleaning' && <ActionButton description="Pause the current cleaning run." icon="mdi:pause" label="Pause" onClick={pause} tone="warning" variant="sub" />}
-      {state === 'cleaning' && <ActionButton description="Stop the current cleaning run." icon="mdi:stop" label="Stop" onClick={stop} tone="danger" variant="sub" />}
-      {state === 'paused' && <ActionButton description="Continue the paused cleaning run." icon="mdi:play" label="Resume" onClick={start} tone="primary" variant="sub" />}
-      {state === 'paused' && <ActionButton description="Stop the paused cleaning run." icon="mdi:stop" label="Stop" onClick={stop} tone="danger" variant="sub" />}
-      {state === 'returning' && <ActionButton description="Pause the return-to-dock action." icon="mdi:pause" label="Pause" onClick={pause} tone="warning" variant="sub" />}
+      {state === 'idle' && <ActionButton description="Send the robot back to the dock." disabled={coordinator.controlsDisabled} icon="mdi:home" label="Dock" onClick={dock} variant="sub" />}
+      {state === 'error' && !resumable && !lowBattery && <ActionButton description="Stop the current vacuum task." disabled={coordinator.controlsDisabled} icon="mdi:stop" label="Stop" onClick={stop} tone="danger" variant="sub" />}
+      {state === 'error' && !resumable && !lowBattery && <ActionButton description="Send the robot back to the dock." disabled={coordinator.controlsDisabled} icon="mdi:home" label="Dock" onClick={dock} variant="sub" />}
+      {chargingBeforeResume && <ActionButton description="Continue the interrupted cleaning run." disabled={coordinator.controlsDisabled} icon="mdi:play" label="Resume" onClick={start} tone="primary" variant="sub" />}
+      {chargingBeforeResume && <ActionButton description="Cancel the pending cleaning resume." disabled={coordinator.controlsDisabled} icon="mdi:stop" label="Cancel" onClick={stop} tone="danger" variant="sub" />}
+      {state === 'cleaning' && <ActionButton description="Pause the current cleaning run." disabled={coordinator.controlsDisabled} icon="mdi:pause" label="Pause" onClick={pause} tone="warning" variant="sub" />}
+      {state === 'cleaning' && <ActionButton description="Stop the current cleaning run." disabled={coordinator.controlsDisabled} icon="mdi:stop" label="Stop" onClick={stop} tone="danger" variant="sub" />}
+      {state === 'paused' && <ActionButton description="Continue the paused cleaning run." disabled={coordinator.controlsDisabled} icon="mdi:play" label="Resume" onClick={start} tone="primary" variant="sub" />}
+      {state === 'paused' && <ActionButton description="Stop the paused cleaning run." disabled={coordinator.controlsDisabled} icon="mdi:stop" label="Stop" onClick={stop} tone="danger" variant="sub" />}
+      {state === 'returning' && <ActionButton description="Pause the return-to-dock action." disabled={coordinator.controlsDisabled} icon="mdi:pause" label="Pause" onClick={pause} tone="warning" variant="sub" />}
     </ControlSection>
   )
 }
 
-function VacuumEmptyDockSection({ vacuum }: { vacuum: VacuumConfig }) {
+function VacuumEmptyDockSection({ optimisticState, vacuum }: { optimisticState: OptimisticVacuumState; vacuum: VacuumConfig }) {
   const callService = useHass((state) => state.helpers.callService) as unknown as CallService
-  const entity = useEntity(asEntityName(vacuum.entityId), { returnNullIfNotFound: true })
   const statusFlag = useEntity(asEntityName(vacuum.statusFlagEntityId), { returnNullIfNotFound: true })
-  const state = entity?.state
+  const state = optimisticState.state
   const resumable = isResumable(statusFlag?.state)
   const emptyDock = () => vacuum.dockButtonEntityId && callServiceAction(callService, 'button.press', vacuum.dockButtonEntityId)
   const showEmptyDock = Boolean(vacuum.dockButtonEntityId && state === 'docked' && !resumable)
@@ -500,11 +699,11 @@ function VacuumEmptyDockSection({ vacuum }: { vacuum: VacuumConfig }) {
   )
 }
 
-function VacuumControlsSection({ vacuum }: { vacuum: VacuumConfig }) {
+function VacuumControlsSection({ coordinator, optimisticState, vacuum }: { coordinator: VacuumCommandCoordinator; optimisticState: OptimisticVacuumState; vacuum: VacuumConfig }) {
   return (
     <div className={styles.controlStack}>
-      <VacuumStateActions vacuum={vacuum} />
-      <VacuumPowerSettings vacuum={vacuum} />
+      <VacuumStateActions coordinator={coordinator} optimisticState={optimisticState} vacuum={vacuum} />
+      <VacuumPowerSettings coordinator={coordinator} vacuum={vacuum} />
     </div>
   )
 }
@@ -541,11 +740,10 @@ function VacuumWhileAwaySection({ vacuum }: { vacuum: VacuumConfig }) {
   )
 }
 
-function VacuumZones({ vacuum }: { vacuum: VacuumConfig }) {
-  const entity = useEntity(asEntityName(vacuum.entityId), { returnNullIfNotFound: true })
+function VacuumZones({ coordinator, optimisticState, vacuum }: { coordinator: VacuumCommandCoordinator; optimisticState: OptimisticVacuumState; vacuum: VacuumConfig }) {
   const statusFlag = useEntity(asEntityName(vacuum.statusFlagEntityId), { returnNullIfNotFound: true })
   const error = useEntity(asEntityName(vacuum.errorEntityId), { returnNullIfNotFound: true })
-  const state = entity?.state
+  const state = optimisticState.state
   const resumable = isResumable(statusFlag?.state)
   const lowBattery = error?.state === 'Low battery'
   const editableZones = (state === 'docked' && !resumable) || state === 'idle' || (state === 'error' && !resumable && !lowBattery)
@@ -557,7 +755,7 @@ function VacuumZones({ vacuum }: { vacuum: VacuumConfig }) {
       <SectionHeader title="Zones" />
       <SectionText lines={vacuum.zoneDescription} />
       <div className={styles.zones}>
-        {vacuum.zones.map((zone) => <ZoneButton disabled={!editableZones} key={zone.entityId} zone={zone} />)}
+        {vacuum.zones.map((zone) => <ZoneButton disabled={!editableZones || coordinator.controlsDisabled} key={zone.entityId} onIntent={coordinator.registerIntent} zone={zone} />)}
       </div>
     </section>
   )
@@ -598,12 +796,18 @@ function VacuumModalNav({ activeTab, onTabChange, vacuum }: { activeTab: VacuumM
 }
 
 function VacuumModalTabContent({ activeTab, vacuum }: { activeTab: VacuumModalTab; vacuum: VacuumConfig }) {
+  const entity = useEntity(asEntityName(vacuum.entityId), { returnNullIfNotFound: true })
+  const liveState = entity?.state ?? 'unavailable'
+  const [displayState, commitDisplayState] = useOptimisticState(liveState, { clearOn: 'confirmation', revertMs: VACUUM_OPTIMISTIC_REVERT_MS })
   const modalBodyRef = useRef<HTMLDivElement | null>(null)
   const modalPanelRef = useRef<HTMLDivElement | null>(null)
   const tabs = vacuumModalTabs(vacuum)
   const targetTab = tabs.some((tab) => tab.tab === activeTab) ? activeTab : 'controls'
   const { displayedTab: effectiveActiveTab, transitionState } = useSmoothDisplayedModalTab(targetTab)
   const panelLabel = vacuum.zones.length > 0 ? `${vacuum.title} controls, zones, actions, and info` : `${vacuum.title} controls, actions, and info`
+  const optimisticState = useMemo<OptimisticVacuumState>(() => ({ commitState: commitDisplayState, liveState, state: displayState }), [commitDisplayState, displayState, liveState])
+  const coordinator = useVacuumCommandCoordinator(liveState, commitDisplayState)
+  useVacuumSettingIntentConfirmations(vacuum, coordinator.confirmIntent)
 
   useEffect(() => {
     if (!shouldResetScrollOnTabChange()) return
@@ -617,20 +821,21 @@ function VacuumModalTabContent({ activeTab, vacuum }: { activeTab: VacuumModalTa
 
   return (
     <div className={styles.modalBody} ref={modalBodyRef}>
+      <VacuumIntentConfirmationTrackers coordinator={coordinator} vacuum={vacuum} />
       <div aria-label={`${vacuum.title} map and status`} className={styles.leftPane} role="group">
-        <VacuumMapAndStatus vacuum={vacuum} />
+        <VacuumMapAndStatus optimisticState={optimisticState} vacuum={vacuum} />
       </div>
       <div aria-label={panelLabel} className={styles.rightPane} data-modal-tab-transition-state={transitionState} data-scroll-region="vacuum-panel" data-tab={effectiveActiveTab} ref={modalPanelRef} role="group">
-        {effectiveActiveTab === 'controls' && <VacuumControlsSection vacuum={vacuum} />}
-        {effectiveActiveTab === 'zones' && <VacuumZones vacuum={vacuum} />}
-        {effectiveActiveTab === 'more' && <VacuumEmptyDockSection vacuum={vacuum} />}
+        {effectiveActiveTab === 'controls' && <VacuumControlsSection coordinator={coordinator} optimisticState={optimisticState} vacuum={vacuum} />}
+        {effectiveActiveTab === 'zones' && <VacuumZones coordinator={coordinator} optimisticState={optimisticState} vacuum={vacuum} />}
+        {effectiveActiveTab === 'more' && <VacuumEmptyDockSection optimisticState={optimisticState} vacuum={vacuum} />}
         {effectiveActiveTab === 'info' && <VacuumInfoSection vacuum={vacuum} />}
       </div>
     </div>
   )
 }
 
-function VacuumMapAndStatus({ vacuum }: { vacuum: VacuumConfig }) {
+function VacuumMapAndStatus({ optimisticState, vacuum }: { optimisticState: OptimisticVacuumState; vacuum: VacuumConfig }) {
   const callService = useHass((state) => state.helpers.callService) as unknown as CallService
   const locate = useCallback(() => callServiceAction(callService, 'vacuum.locate', vacuum.entityId), [callService, vacuum.entityId])
 
@@ -643,7 +848,7 @@ function VacuumMapAndStatus({ vacuum }: { vacuum: VacuumConfig }) {
           Locate
         </button>
       </div>
-      <VacuumStatusSummary vacuum={vacuum} />
+      <VacuumStatusSummary displayState={optimisticState.state} vacuum={vacuum} />
       <VacuumWhileAwaySection vacuum={vacuum} />
     </>
   )

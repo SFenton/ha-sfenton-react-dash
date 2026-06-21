@@ -104,6 +104,7 @@ function mockSwitchEntities(entityIds: readonly string[], attributes: Record<str
 const freeSleepAlarmOwners = ['stephen', 'steph'] as const
 const freeSleepAlarmDays = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'] as const
 const freeSleepScheduleSetTopic = 'free-sleep/NightCanvasRestful/schedules/set'
+const sleepypodScheduleSetTopic = 'sleepypod/eight-pod/cmd/set-schedules'
 
 function mockFreeSleepAlarmHelpers() {
   const entries: [string, MockEntity][] = []
@@ -160,9 +161,10 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
-function applyFreeSleepSchedulePayload(payload: unknown) {
+function applySchedulePayload(entityId: string, payload: unknown) {
   if (!isRecord(payload)) return
-  const schedulesEntity = mockEntities['sensor.nightcanvasrestful_schedules']
+  const schedulesEntity = mockEntities[entityId]
+  if (!schedulesEntity) return
   const nextAttributes = cloneRecord(schedulesEntity.attributes)
   for (const side of ['left', 'right'] as const) {
     const sidePayload = payload[side]
@@ -175,6 +177,9 @@ function applyFreeSleepSchedulePayload(payload: unknown) {
       if (isRecord(dayPayload.power)) {
         dayAttributes.power = { ...(isRecord(dayAttributes.power) ? dayAttributes.power : {}), ...dayPayload.power }
       }
+      if (isRecord(dayPayload.temperatures)) {
+        dayAttributes.temperatures = { ...(isRecord(dayAttributes.temperatures) ? dayAttributes.temperatures : {}), ...dayPayload.temperatures }
+      }
       const alarms = Array.isArray(dayPayload.alarms) ? cloneRecord(dayPayload.alarms) : []
       if (Array.isArray(dayPayload.alarms)) {
         dayAttributes.alarms = alarms
@@ -186,6 +191,10 @@ function applyFreeSleepSchedulePayload(payload: unknown) {
     nextAttributes[side] = sideAttributes
   }
   schedulesEntity.attributes = nextAttributes
+}
+
+function applyFreeSleepSchedulePayload(payload: unknown) {
+  applySchedulePayload('sensor.nightcanvasrestful_schedules', payload)
 }
 
 function applyMockCallServiceSideEffects(params: Record<string, unknown>) {
@@ -218,6 +227,10 @@ function applyMockCallServiceSideEffects(params: Record<string, unknown>) {
     applyFreeSleepSchedulePayload(JSON.parse(serviceData.payload))
     return
   }
+  if (serviceData.topic === sleepypodScheduleSetTopic) {
+    applySchedulePayload('sensor.master_bedroom_sleepypod_eight_pod_schedules', JSON.parse(serviceData.payload))
+    return
+  }
   for (const side of ['left', 'right'] as const) {
     if (serviceData.topic !== `free-sleep/NightCanvasRestful/${side}/schedule/bedtime/set`) continue
     mockEntities[`text.master_bedroom_eight_sleep_pod_5_${side}_bedtime`].state = serviceData.payload
@@ -246,12 +259,12 @@ const thermostatRoomMockData = [
   { key: 'living_room', title: 'Living Room', temperature: '70.2', occupancy: 'inactive', track: 'on', force: 'off', climate: 'climate.thermostat_contact_sensors_living_room_virtual_thermostat', vents: [['cover.living_room_vent_1_vent', 'open'], ['cover.living_room_vent_2_vent', 'open']] },
   { key: 'office', title: 'Office', temperature: '71.6', occupancy: 'active', track: 'off', force: 'off', climate: 'climate.thermostat_contact_sensors_office_virtual_thermostat', vents: [['cover.office_vent_vent', 'closed']] },
   { key: 'master_bedroom', title: 'Master Bedroom', temperature: '71.0', occupancy: 'active', track: 'on', force: 'off', climate: 'climate.thermostat_contact_sensors_master_bedroom_virtual_thermostat', vents: [['cover.master_bedroom_vent_2_vent', 'closed'], ['cover.master_bedroom_vent_3_vent', 'closed']] },
-  { key: 'master_bathroom', title: 'Master Bathroom', temperature: '74.9', occupancy: 'inactive', track: 'on', force: 'off', climate: 'climate.thermostat_contact_sensors_master_bathroom_virtual_thermostat', vents: [['cover.master_bathroom_vent_vent', 'closed']] },
+  { key: 'master_bathroom', title: 'Master Bathroom', temperature: '74.9', occupancy: 'inactive', track: 'on', force: 'off', trackOnlyWhenOccupied: 'on', climate: 'climate.thermostat_contact_sensors_master_bathroom_virtual_thermostat', vents: [['cover.master_bathroom_vent_vent', 'closed']] },
   { key: 'kitchen', title: 'Kitchen', temperature: '71.1', occupancy: 'inactive', track: 'on', force: 'off', climate: 'climate.thermostat_contact_sensors_kitchen_virtual_thermostat', vents: [['cover.kitchen_vent_vent', 'closed']] },
   { key: 'guest_room', title: 'Guest Room', temperature: '70.9', occupancy: 'inactive', track: 'on', force: 'off', climate: 'climate.thermostat_contact_sensors_guest_room_virtual_thermostat', vents: [['cover.guest_room_vent_vent', 'closed']] },
   { key: 'dining_room', title: 'Dining Room', temperature: '69.7', occupancy: 'inactive', track: 'on', force: 'off', climate: 'climate.thermostat_contact_sensors_dining_room_virtual_thermostat', vents: [['cover.dining_room_vent_vent', 'open']] },
   { key: 'gym', title: 'Gym', temperature: '70.6', occupancy: 'inactive', track: 'on', force: 'off', climate: 'climate.thermostat_contact_sensors_gym_virtual_thermostat', vents: [['cover.gym_vent_vent', 'closed']] },
-  { key: 'guest_bathroom', title: 'Guest Bathroom', temperature: '76.9', occupancy: 'inactive', track: 'on', force: 'off', climate: 'climate.thermostat_contact_sensors_guest_bathroom_virtual_thermostat', vents: [['cover.guest_bathroom_vent_vent', 'closed']] },
+  { key: 'guest_bathroom', title: 'Guest Bathroom', temperature: '76.9', occupancy: 'inactive', track: 'on', force: 'off', trackOnlyWhenOccupied: 'on', climate: 'climate.thermostat_contact_sensors_guest_bathroom_virtual_thermostat', vents: [['cover.guest_bathroom_vent_vent', 'closed']] },
   { key: 'music_room', title: 'Music Room', temperature: '70.6', occupancy: 'inactive', track: 'off', force: 'on', climate: 'climate.thermostat_contact_sensors_music_room_virtual_thermostat', vents: [['cover.music_room_vent_vent', 'closed']] },
   { key: 'theater_room', title: 'Theater Room', temperature: '70.5', occupancy: 'inactive', track: 'off', force: 'on', climate: 'climate.thermostat_contact_sensors_theater_room_virtual_thermostat', vents: [['cover.theater_room_vent_1_vent', 'open'], ['cover.theater_room_vent_2_vent', 'open']] },
 ] as const
@@ -297,6 +310,7 @@ function thermostatMockEntities() {
     entries.push([`sensor.thermostat_contact_sensors_${room.key}_occupancy`, entity(`sensor.thermostat_contact_sensors_${room.key}_occupancy`, room.occupancy, { friendly_name: `${room.title} Occupancy` })])
     entries.push([`switch.thermostat_contact_sensors_track_${room.key}`, entity(`switch.thermostat_contact_sensors_track_${room.key}`, room.track)])
     entries.push([`switch.thermostat_contact_sensors_${room.key}_force_track_when_critical`, entity(`switch.thermostat_contact_sensors_${room.key}_force_track_when_critical`, room.force)])
+    entries.push([`switch.living_room_thermostat_contact_sensors_${room.key}_track_only_when_occupied`, entity(`switch.living_room_thermostat_contact_sensors_${room.key}_track_only_when_occupied`, 'trackOnlyWhenOccupied' in room ? room.trackOnlyWhenOccupied : 'off')])
     entries.push([room.climate, entity(room.climate, 'off', { current_temperature: Number(room.temperature), hvac_action: 'idle', hvac_modes: ['off', 'heat', 'cool', 'heat_cool'], target_temp_high: 74, target_temp_low: 72, temperature_unit: '°F' })])
     for (const [ventEntityId, ventState] of room.vents) {
       if (ventEntityId === 'cover.guest_room_vent_vent' || ventEntityId === 'cover.kitchen_vent_vent') continue
@@ -608,7 +622,7 @@ export const mockEntities: Record<string, MockEntity> = {
   ...valetudoConsumableMockEntities('valetudo_exaltedsneakydeer'),
   'input_text.main_floor_vacuum_error_message': entity('input_text.main_floor_vacuum_error_message', ''),
   'input_text.main_floor_vacuum_mode': entity('input_text.main_floor_vacuum_mode', 'Vacuum'),
-  'select.valetudo_exaltedsneakydeer_mode': entity('select.valetudo_exaltedsneakydeer_mode', 'vacuum', { options: ['vacuum', 'mop', 'vacuum_and_mop'] }),
+  'select.valetudo_exaltedsneakydeer_mode': entity('select.valetudo_exaltedsneakydeer_mode', 'vacuum', { options: ['vacuum_and_mop', 'mop', 'vacuum', 'vacuum_then_mop'] }),
   'select.valetudo_exaltedsneakydeer_fan': entity('select.valetudo_exaltedsneakydeer_fan', 'balanced', { options: ['quiet', 'balanced', 'turbo', 'max'] }),
   'select.valetudo_exaltedsneakydeer_water': entity('select.valetudo_exaltedsneakydeer_water', 'medium', { options: ['low', 'medium', 'high'] }),
   'input_select.main_floor_vacuum_cleaning_passes': entity('input_select.main_floor_vacuum_cleaning_passes', '1', { options: ['1', '2', '3'] }),
@@ -661,6 +675,9 @@ export function resetMockHass() {
   mockEntities['binary_sensor.nightcanvasrestful_right_alarm_vibrating'].state = 'off'
   mockEntities['number.stephen_s_eight_sleep_side_alarm_snooze_minutes'].state = '9'
   mockEntities['number.steph_s_eight_sleep_side_alarm_snooze_minutes'].state = '9'
+  for (const room of thermostatRoomMockData) {
+    mockEntities[`switch.living_room_thermostat_contact_sensors_${room.key}_track_only_when_occupied`].state = 'trackOnlyWhenOccupied' in room ? room.trackOnlyWhenOccupied : 'off'
+  }
   mockEntities['humidifier.master_bedroom_humidifier'].state = 'on'
   mockEntities['humidifier.master_bedroom_humidifier'].attributes = { available_modes: ['auto', 'normal'], current_humidity: 41, humidity: 45, max_humidity: 80, min_humidity: 30, mode: 'auto' }
   exposeMockHassDebugApi()

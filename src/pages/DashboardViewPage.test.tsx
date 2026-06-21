@@ -761,6 +761,11 @@ describe('DashboardViewPage', () => {
     expect(screen.getByRole('button', { name: 'Music Room' })).toHaveAttribute('aria-pressed', 'true')
     expect(screen.getByRole('button', { name: 'Theater Room' })).toHaveAttribute('aria-pressed', 'true')
     expect(screen.queryByRole('button', { name: /^Master Bedroom$/i })).not.toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Track Only When Occupied' })).toBeInTheDocument()
+    expect(screen.getByText(/Keep high-airflow rooms out of thermostat decisions until they are occupied/i)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^Guest Bathroom Occupied Only On$/i })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: /^Master Bathroom Occupied Only On$/i })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.queryByRole('button', { name: /^Living Room Occupied Only/i })).not.toBeInTheDocument()
 
     fireEvent.click(ecoMode)
     fireEvent.click(predictiveComfort)
@@ -781,6 +786,22 @@ describe('DashboardViewPage', () => {
     expect(screen.queryByRole('button', { name: /Increase Living Room target temperature/i })).not.toBeInTheDocument()
     expect(screen.getByRole('article', { name: /^Vent 1 Open$/i })).toBeInTheDocument()
     expect(screen.getByRole('article', { name: /^Vent 2 Open$/i })).toBeInTheDocument()
+  })
+
+  it('toggles occupancy-only bathroom thermostat rooms from the Ecobee page', () => {
+    render(<DashboardViewPage activePath="ecobee" onNavigate={() => undefined} path="ecobee" />)
+
+    const guestBathroomGate = screen.getByRole('button', { name: /^Guest Bathroom Occupied Only On$/i })
+    const masterBathroomGate = screen.getByRole('button', { name: /^Master Bathroom Occupied Only On$/i })
+
+    fireEvent.click(guestBathroomGate)
+
+    expect(guestBathroomGate).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.getByRole('button', { name: /^Guest Bathroom Occupied Only Off$/i })).toBe(guestBathroomGate)
+    expect(masterBathroomGate).toHaveAttribute('aria-pressed', 'true')
+    expect(mockCallServiceCalls).toEqual([
+      { domain: 'homeassistant', service: 'toggle', target: 'switch.living_room_thermostat_contact_sensors_guest_bathroom_track_only_when_occupied' },
+    ])
   })
 
   it('keeps the Ecobee room modal title stable while closing', async () => {
@@ -973,6 +994,17 @@ describe('DashboardViewPage', () => {
       target: 'input_number.eight_sleep_stephen_bedtime_level',
       serviceData: { value: 1 },
     }))
+    await waitFor(() => expect(mockCallServiceCalls).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        domain: 'mqtt',
+        service: 'publish',
+        serviceData: expect.objectContaining({ topic: 'sleepypod/eight-pod/cmd/set-schedules' }),
+      }),
+    ])))
+    const schedulePublish = mockCallServiceCalls.find((call) => call.domain === 'mqtt' && (call.serviceData as { topic?: string } | undefined)?.topic === 'sleepypod/eight-pod/cmd/set-schedules')
+    const stagePayload = JSON.parse(String((schedulePublish?.serviceData as { payload: string }).payload))
+    expect(stagePayload.left.monday.power).toEqual({ enabled: true, off: '09:00', on: '21:30', onTemperature: 85 })
+    expect(stagePayload.left.monday.temperatures).toEqual({ '01:00': 80, '05:00': 83 })
 
     const targetSlider = within(dialog).getByRole('slider', { name: "Stephen's Bed target level" })
     fireEvent.change(targetSlider, { target: { value: '-3' } })
@@ -2174,24 +2206,37 @@ describe('DashboardViewPage', () => {
   })
 
   it('runs source-derived vacuum modal services without activating hidden actions', async () => {
-    render(<DashboardViewPage activePath="living-room" onNavigate={() => undefined} path="living-room" />)
+    const { rerender } = render(<DashboardViewPage activePath="living-room" onNavigate={() => undefined} path="living-room" />)
 
     fireEvent.click(screen.getByRole('button', { name: /Main Floor Docked/i }))
     fireEvent.click(await screen.findByRole('button', { name: 'Locate' }))
     fireEvent.change(screen.getByRole('combobox', { name: /Fan Balanced/i }), { target: { value: 'turbo' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Clean' }))
+    expect(screen.getByRole('combobox', { name: /Fan Turbo/i })).toHaveValue('turbo')
     await clickModalTab(within(screen.getByRole('dialog')), 'Actions')
     fireEvent.click(screen.getByRole('button', { name: 'Empty Dock' }))
     await clickModalTab(within(screen.getByRole('dialog')), 'Zones')
     fireEvent.click(screen.getByRole('button', { name: 'Living Room' }))
+    await clickModalTab(within(screen.getByRole('dialog')), 'Controls')
+    fireEvent.click(screen.getByRole('button', { name: 'Clean' }))
 
     expect(mockCallServiceCalls).toEqual([
       { domain: 'vacuum', service: 'locate', target: 'vacuum.valetudo_exaltedsneakydeer' },
       { domain: 'select', service: 'select_option', target: 'select.valetudo_exaltedsneakydeer_fan', serviceData: { option: 'turbo' } },
-      { domain: 'script', service: 'main_floor_vacuum_clean_selected_segments', target: undefined },
       { domain: 'button', service: 'press', target: 'button.valetudo_exaltedsneakydeer_trigger_auto_empty_dock' },
-      { domain: 'input_boolean', service: 'toggle', target: 'input_boolean.roborock_living_room_toggle' },
+      { domain: 'input_boolean', service: 'turn_on', target: 'input_boolean.roborock_living_room_toggle' },
     ])
+
+    mockEntities['select.valetudo_exaltedsneakydeer_fan'].state = 'turbo'
+    mockEntities['input_boolean.roborock_living_room_toggle'].state = 'on'
+    rerender(<DashboardViewPage activePath="living-room" onNavigate={() => undefined} path="living-room" />)
+
+    await waitFor(() => expect(mockCallServiceCalls).toEqual([
+      { domain: 'vacuum', service: 'locate', target: 'vacuum.valetudo_exaltedsneakydeer' },
+      { domain: 'select', service: 'select_option', target: 'select.valetudo_exaltedsneakydeer_fan', serviceData: { option: 'turbo' } },
+      { domain: 'button', service: 'press', target: 'button.valetudo_exaltedsneakydeer_trigger_auto_empty_dock' },
+      { domain: 'input_boolean', service: 'turn_on', target: 'input_boolean.roborock_living_room_toggle' },
+      { domain: 'script', service: 'main_floor_vacuum_clean_selected_segments', target: undefined },
+    ]), { timeout: 1500 })
   })
 
   it('keeps mapped vacuum error text visible in the modal status area', async () => {
@@ -2830,6 +2875,86 @@ describe('DashboardViewPage', () => {
     expect(screen.getByRole('heading', { name: 'Thermostat' })).toBeInTheDocument()
     expect(screen.queryByText(/not available in the React dashboard yet/i)).not.toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Eco Mode' })).toBeInTheDocument()
+  })
+
+  it('keeps vacuum modal controls optimistic while Valetudo state is still stale', async () => {
+    const { rerender } = render(<DashboardViewPage activePath="living-room" onNavigate={() => undefined} path="living-room" />)
+
+    fireEvent.click(screen.getByRole('button', { name: /Main Floor Docked/i }))
+
+    const dialog = await screen.findByRole('dialog')
+    const controlsPane = within(dialog).getByRole('group', { name: 'Main Floor controls, zones, actions, and info' })
+    const modeSelect = screen.getByRole('combobox', { name: /Mode Vacuum/i })
+    modeSelect.focus()
+    expect(modeSelect).toHaveFocus()
+    fireEvent.change(modeSelect, { target: { value: 'mop' } })
+
+    expect(mockEntities['select.valetudo_exaltedsneakydeer_mode'].state).toBe('vacuum')
+    expect(screen.getByRole('combobox', { name: /Mode Mop/i })).toHaveValue('mop')
+    expect(Array.from(screen.getByRole<HTMLSelectElement>('combobox', { name: /Mode Mop/i }).options).map((option) => option.text)).toEqual(['Vacuum And Mop', 'Mop', 'Vacuum', 'Vacuum Then Mop'])
+    expect(screen.getByRole('combobox', { name: /Mode Mop/i })).not.toHaveFocus()
+    expect(screen.queryByRole('combobox', { name: /Fan/i })).not.toBeInTheDocument()
+    expect(screen.getByRole('combobox', { name: /Water Medium/i })).toHaveValue('medium')
+
+    const cleaningPasses = screen.getByRole('combobox', { name: /Cleaning Passes 1x/i })
+    fireEvent.change(cleaningPasses, { target: { value: '3' } })
+
+    expect(mockEntities['input_select.main_floor_vacuum_cleaning_passes'].state).toBe('1')
+    expect(screen.getByRole('combobox', { name: /Cleaning Passes 3x/i })).toHaveValue('3')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Clean' }))
+
+    expect(mockEntities['vacuum.valetudo_exaltedsneakydeer'].state).toBe('docked')
+    expect(within(controlsPane).getByRole('heading', { name: 'Cleaning' })).toBeInTheDocument()
+    expect(within(controlsPane).queryByRole('button', { name: 'Clean' })).not.toBeInTheDocument()
+    expect(within(controlsPane).getByRole('button', { name: 'Pause' })).toBeDisabled()
+    expect(within(controlsPane).getByRole('button', { name: 'Stop' })).toBeDisabled()
+
+    await clickModalTab(within(dialog), 'Zones')
+    const livingRoomZone = screen.getByRole('button', { name: 'Living Room' })
+    expect(livingRoomZone).toBeDisabled()
+
+    expect(mockCallServiceCalls).toEqual([
+      { domain: 'select', service: 'select_option', target: 'select.valetudo_exaltedsneakydeer_mode', serviceData: { option: 'mop' } },
+      { domain: 'input_select', service: 'select_option', target: 'input_select.main_floor_vacuum_cleaning_passes', serviceData: { option: '3' } },
+    ])
+
+    mockEntities['select.valetudo_exaltedsneakydeer_mode'].state = 'mop'
+    mockEntities['input_select.main_floor_vacuum_cleaning_passes'].state = '3'
+    rerender(<DashboardViewPage activePath="living-room" onNavigate={() => undefined} path="living-room" />)
+
+    await waitFor(() => expect(mockCallServiceCalls).toEqual([
+      { domain: 'select', service: 'select_option', target: 'select.valetudo_exaltedsneakydeer_mode', serviceData: { option: 'mop' } },
+      { domain: 'input_select', service: 'select_option', target: 'input_select.main_floor_vacuum_cleaning_passes', serviceData: { option: '3' } },
+      { domain: 'script', service: 'main_floor_vacuum_clean_selected_segments', target: undefined },
+    ]), { timeout: 1500 })
+
+    await clickModalTab(within(dialog), 'Controls')
+    expect(within(controlsPane).getByRole('button', { name: 'Pause' })).toBeDisabled()
+    mockEntities['vacuum.valetudo_exaltedsneakydeer'].state = 'cleaning'
+    rerender(<DashboardViewPage activePath="living-room" onNavigate={() => undefined} path="living-room" />)
+
+    await waitFor(() => expect(within(controlsPane).getByRole('button', { name: 'Pause' })).toBeEnabled())
+    expect(within(controlsPane).getByRole('button', { name: 'Stop' })).toBeEnabled()
+  })
+
+  it('toggles vacuum zones optimistically while Home Assistant input booleans are still stale', async () => {
+    render(<DashboardViewPage activePath="living-room" onNavigate={() => undefined} path="living-room" />)
+
+    fireEvent.click(screen.getByRole('button', { name: /Main Floor Docked/i }))
+    const dialog = await screen.findByRole('dialog')
+    await clickModalTab(within(dialog), 'Zones')
+
+    const livingRoomZone = screen.getByRole('button', { name: 'Living Room' })
+    expect(livingRoomZone).toHaveAttribute('data-active', 'false')
+
+    fireEvent.click(livingRoomZone)
+
+    expect(mockEntities['input_boolean.roborock_living_room_toggle'].state).toBe('off')
+    expect(livingRoomZone).toHaveAttribute('data-active', 'true')
+    expect(mockCallServiceCalls).toEqual([
+      { domain: 'input_boolean', service: 'turn_on', target: 'input_boolean.roborock_living_room_toggle' },
+    ])
   })
 
   it('opens available vacuum cards as modal controls and leaves unavailable cards inert', async () => {

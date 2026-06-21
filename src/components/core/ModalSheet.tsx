@@ -20,9 +20,15 @@ interface ModalSheetProps {
 }
 
 type ModalSheetSnapshot = Pick<ModalSheetProps, 'children' | 'chrome' | 'contentStyle' | 'footer' | 'subtitle' | 'title'>
+const RECENT_OPEN_INTERNAL_CLOSE_GUARD_MS = 450
+const EXIT_ANIMATION_UNMOUNT_MS = 260
 
 function desktopModalLayoutMatches() {
   return typeof window !== 'undefined' && typeof window.matchMedia === 'function' && window.matchMedia('(min-width: 760px)').matches
+}
+
+function closeWasWithinExitAnimation(closeRequestedAt: number) {
+  return typeof window !== 'undefined' && window.performance.now() - closeRequestedAt <= EXIT_ANIMATION_UNMOUNT_MS
 }
 
 function useDesktopModalLayout() {
@@ -43,24 +49,47 @@ function useDesktopModalLayout() {
 
 export function ModalSheet({ open, title, onClose, children, chrome = 'default', contentStyle, footer, subtitle }: ModalSheetProps) {
   const contentRef = useRef<HTMLDivElement | null>(null)
+  const closeRequestedAtRef = useRef(Number.NEGATIVE_INFINITY)
+  const ignoreInternalCloseUntilRef = useRef(0)
   const currentSnapshot: ModalSheetSnapshot = { children, chrome, contentStyle, footer, subtitle, title }
   const [lastOpenSnapshot, setLastOpenSnapshot] = useState<ModalSheetSnapshot>(currentSnapshot)
+  const [mounted, setMounted] = useState(open)
+  const [rapidReopen, setRapidReopen] = useState(false)
+  if (open && !mounted) setMounted(true)
   const rendered = open ? currentSnapshot : lastOpenSnapshot
   const closing = !open
+  const shouldRender = open || mounted
   const renderedContentStyle: ModalSheetStyle | undefined = closing ? { ...rendered.contentStyle, pointerEvents: 'none' } : rendered.contentStyle
   const sourcePopup = rendered.chrome === 'source-popup'
   const isDesktopModalLayout = useDesktopModalLayout()
   const showDragHandle = !sourcePopup && !isDesktopModalLayout
 
   const requestClose = () => {
+    closeRequestedAtRef.current = window.performance.now()
+    setRapidReopen(true)
     setLastOpenSnapshot(currentSnapshot)
     onClose()
   }
 
   const handleOpenChange = (nextOpen: boolean) => {
     if (nextOpen) return
+    if (open && window.performance.now() < ignoreInternalCloseUntilRef.current) return
     requestClose()
   }
+
+  useLayoutEffect(() => {
+    if (open) {
+      const now = window.performance.now()
+      ignoreInternalCloseUntilRef.current = closeWasWithinExitAnimation(closeRequestedAtRef.current) ? now + RECENT_OPEN_INTERNAL_CLOSE_GUARD_MS : 0
+      return undefined
+    }
+
+    const timeout = window.setTimeout(() => {
+      setRapidReopen(false)
+      setMounted(false)
+    }, EXIT_ANIMATION_UNMOUNT_MS)
+    return () => window.clearTimeout(timeout)
+  }, [open])
 
   useEffect(() => {
     if (!open) return
@@ -84,6 +113,8 @@ export function ModalSheet({ open, title, onClose, children, chrome = 'default',
     document.body.style.pointerEvents = 'auto'
   }, [closing])
 
+  if (!shouldRender) return null
+
   return (
     <Drawer.Root handleOnly modal={false} open={open} onOpenChange={handleOpenChange} repositionInputs={false}>
       <Drawer.Portal>
@@ -97,6 +128,7 @@ export function ModalSheet({ open, title, onClose, children, chrome = 'default',
           data-closing={closing ? 'true' : 'false'}
           data-has-footer={rendered.footer ? 'true' : 'false'}
           data-has-subtitle={rendered.subtitle ? 'true' : 'false'}
+          data-rapid-reopen={rapidReopen ? 'true' : 'false'}
           data-surface="hass-popup"
           inert={closing ? true : undefined}
           style={renderedContentStyle}

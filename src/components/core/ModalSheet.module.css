@@ -39,6 +39,11 @@
   pointer-events: none;
 }
 
+.content[data-rapid-reopen='true'][data-state='open'] {
+  animation: none !important;
+  transform: none !important;
+}
+
 .content:focus,
 .content:focus-visible {
   outline: none;
@@ -213,6 +218,11 @@
     animation-name: desktopModalIn;
     animation-duration: var(--duration-med);
     animation-timing-function: cubic-bezier(.2, .9, .2, 1);
+  }
+
+  .content[data-rapid-reopen='true'][data-state='open'] {
+    animation: none !important;
+    transform: translate3d(-50%, -50%, 0) !important;
   }
 
   .content[data-vaul-drawer][data-vaul-snap-points='false'][data-vaul-drawer-direction='bottom'][data-state='closed'] {

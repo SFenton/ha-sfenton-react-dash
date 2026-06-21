@@ -1422,6 +1422,8 @@ const THERMOSTAT_SECTION_DESCRIPTIONS = {
   integration: 'Enable or disable automatic thermostat control.',
   predictiveComfort:
     'Use forecast weather, humidity, indoor sensors, and learned heat-load patterns to prepare the house before it drifts out of the comfort band.\n\nThis enables predictive recommendations. Thermostat setpoint changes still require the separate auto-adjust option in the integration settings.',
+  trackOnlyWhenOccupied:
+    'Keep high-airflow rooms out of thermostat decisions until they are occupied. When enabled, the room is ignored for temperature demand and minimum-vent balancing while empty, and its vent closes; once occupied, it participates normally.',
   trackSelected:
     'Track only a subset of monitored rooms for automated control. Monitored rooms can be configured in the integration settings.\n\nThis setting works in tandem with eco mode, but eco mode is not required to be enabled to use it.',
 } as const
@@ -1458,6 +1460,10 @@ const THERMOSTAT_ROOM_VIEWS: ThermostatRoomView[] = THERMOSTAT_ROOMS.map((room) 
   hash: thermostatRoomHash(room.title),
   key: thermostatRoomKey(room.title),
 }))
+const THERMOSTAT_OCCUPANCY_GATED_ROOM_KEYS = ['guest_bathroom', 'master_bathroom'] as const
+const THERMOSTAT_OCCUPANCY_GATED_ROOM_VIEWS = THERMOSTAT_OCCUPANCY_GATED_ROOM_KEYS
+  .map((roomKey) => THERMOSTAT_ROOM_VIEWS.find((room) => room.key === roomKey))
+  .filter((room): room is ThermostatRoomView => Boolean(room))
 const GLOBAL_THERMOSTAT_ENTITY_ID = 'climate.thermostat_contact_sensors_global_virtual_thermostat'
 const PREDICTIVE_COMFORT_SWITCH_ENTITY_ID = 'switch.thermostat_contact_sensors_predictive_comfort_mode'
 const PREDICTIVE_AUTO_ADJUST_SWITCH_ENTITY_ID = 'switch.thermostat_contact_sensors_predictive_auto_adjust'
@@ -1490,6 +1496,10 @@ function thermostatTrackEntityId(room: ThermostatRoomView) {
 
 function thermostatForceCriticalEntityId(room: ThermostatRoomView) {
   return `switch.thermostat_contact_sensors_${room.key}_force_track_when_critical`
+}
+
+function thermostatTrackOnlyWhenOccupiedEntityId(room: ThermostatRoomView) {
+  return `switch.living_room_thermostat_contact_sensors_${room.key}_track_only_when_occupied`
 }
 
 function numberValue(value: unknown) {
@@ -1582,9 +1592,12 @@ interface FreeSleepDailySchedule {
   alarm?: Partial<FreeSleepAlarmSchedule>
   alarms?: Partial<FreeSleepAlarmSchedule>[]
   power?: {
+    enabled?: boolean
     on?: string
     off?: string
+    onTemperature?: number
   }
+  temperatures?: Record<string, unknown>
 }
 
 type FreeSleepSchedulesState = Partial<Record<FreeSleepSide, FreeSleepSideSchedule>>
@@ -1620,6 +1633,8 @@ const FREE_SLEEP_TARGET_STEP = 1
 const FREE_SLEEP_TARGET_REVERT_MS = 30000
 const FREE_SLEEP_ALARM_SYNC_DEBOUNCE_MS = 450
 const FREE_SLEEP_NUMBER_SYNC_DEBOUNCE_MS = 300
+const EIGHT_SLEEP_LEVEL_ZERO_F = 82.5
+const EIGHT_SLEEP_LEVEL_RANGE_F = 27.5
 const EIGHT_SLEEP_POWER_REVERT_MS = 30000
 const EIGHT_SLEEP_UNAVAILABLE_HOLD_MS = 10000
 const FREE_SLEEP_SCHEDULE_SENSOR_ENTITY_ID = 'sensor.nightcanvasrestful_schedules'
@@ -1629,6 +1644,10 @@ const SLEEPYPOD_SCHEDULE_SET_TOPIC = 'sleepypod/eight-pod/cmd/set-schedules'
 const FREE_SLEEP_BEDTIME_SET_TOPIC_PREFIX = 'free-sleep/NightCanvasRestful'
 const FREE_SLEEP_ALARM_DEBUG_TOPIC = 'free-sleep/NightCanvasRestful/debug/react-dash/alarm'
 const FREE_SLEEP_ALARM_DIAGNOSTICS_STORAGE_KEY = 'freeSleepAlarmDiagnostics'
+const SLEEPYPOD_DEFAULT_BEDTIME = '21:30'
+const SLEEPYPOD_DEFAULT_WAKE_TIME = '09:00'
+const SLEEPYPOD_DEFAULT_ASLEEP_TIME = '01:00'
+const SLEEPYPOD_DEFAULT_DAWN_TIME = '05:00'
 let freeSleepAlarmDebugSequence = 0
 const FREE_SLEEP_DEFAULT_ALARM: FreeSleepAlarmSchedule = {
   alarmTemperature: 82,
@@ -1824,6 +1843,73 @@ function sideBedtimeFromSchedule(schedule: FreeSleepSchedulesState | null, side:
 
 function freeSleepBedtimeSetTopic(side: FreeSleepSide) {
   return `${FREE_SLEEP_BEDTIME_SET_TOPIC_PREFIX}/${side}/schedule/bedtime/set`
+}
+
+function eightSleepLevelToFahrenheit(level: number) {
+  return Math.round(EIGHT_SLEEP_LEVEL_ZERO_F + (level / FREE_SLEEP_TARGET_MAX) * EIGHT_SLEEP_LEVEL_RANGE_F)
+}
+
+function scheduleTemperatureEntries(daySchedule: FreeSleepDailySchedule | undefined, powerOn: string) {
+  return Object.entries(daySchedule?.temperatures ?? {})
+    .map(([time, value]) => {
+      const parsedTime = parsedInputTime(time, '')
+      const temperature = numberValue(isRecord(value) ? value.temperature ?? value.temperatureF ?? value.level ?? value.value : value)
+      return parsedTime && temperature !== null ? { temperature, time: parsedTime } : null
+    })
+    .filter((entry): entry is { temperature: number; time: string } => Boolean(entry))
+    .sort((a, b) => {
+      const adjustedA = (timeStringToMinutes(a.time) - timeStringToMinutes(powerOn) + 1440) % 1440
+      const adjustedB = (timeStringToMinutes(b.time) - timeStringToMinutes(powerOn) + 1440) % 1440
+      return adjustedA - adjustedB
+    })
+}
+
+function timeStringToMinutes(time: string) {
+  const [hours, minutes] = time.split(':').map(Number)
+  return hours * 60 + minutes
+}
+
+function isSleepypodPlaceholderPower(power: FreeSleepDailySchedule['power'] | undefined) {
+  return parsedInputTime(power?.on, '') === '00:00' && parsedInputTime(power?.off, '') === '23:59'
+}
+
+function sleepypodPowerForPayload(daySchedule: FreeSleepDailySchedule | undefined, bedtimeLevel: number) {
+  const power = daySchedule?.power
+  const useExistingTimes = power && !isSleepypodPlaceholderPower(power)
+  return {
+    enabled: power?.enabled !== false,
+    off: useExistingTimes ? parsedInputTime(power.off, SLEEPYPOD_DEFAULT_WAKE_TIME) : SLEEPYPOD_DEFAULT_WAKE_TIME,
+    on: useExistingTimes ? parsedInputTime(power.on, SLEEPYPOD_DEFAULT_BEDTIME) : SLEEPYPOD_DEFAULT_BEDTIME,
+    onTemperature: eightSleepLevelToFahrenheit(bedtimeLevel),
+  }
+}
+
+function sleepypodTemperaturesForPayload(daySchedule: FreeSleepDailySchedule | undefined, powerOn: string, levels: Record<FreeSleepScheduleStage, number>) {
+  const entries = scheduleTemperatureEntries(daySchedule, powerOn)
+  const asleepTime = entries[0]?.time ?? SLEEPYPOD_DEFAULT_ASLEEP_TIME
+  const dawnTime = entries.length > 1 ? entries.at(-1)?.time ?? SLEEPYPOD_DEFAULT_DAWN_TIME : SLEEPYPOD_DEFAULT_DAWN_TIME
+  const temperatures = Object.fromEntries(entries.map(({ temperature, time }) => [time, temperature]))
+  temperatures[asleepTime] = eightSleepLevelToFahrenheit(levels.asleep)
+  temperatures[dawnTime] = eightSleepLevelToFahrenheit(levels.dawn)
+  return temperatures
+}
+
+function sleepypodSchedulePayload(side: EightSleepSideConfig, schedule: FreeSleepSchedulesState | null, levels: Record<FreeSleepScheduleStage, number>) {
+  const sideSchedule = schedule?.[side.scheduleSide]
+  return {
+    [side.scheduleSide]: Object.fromEntries(FREE_SLEEP_ALARM_DAYS.map((day) => {
+      const daySchedule = sideSchedule?.[day.key]
+      const power = sleepypodPowerForPayload(daySchedule, levels.bedtime)
+      return [
+        day.key,
+        {
+          alarms: alarmsFromDailySchedule(daySchedule),
+          power,
+          temperatures: sleepypodTemperaturesForPayload(daySchedule, power.on, levels),
+        },
+      ]
+    })),
+  }
 }
 
 function alarmsFromDailySchedule(daySchedule: FreeSleepDailySchedule | undefined): FreeSleepAlarmSchedule[] {
@@ -2663,6 +2749,9 @@ function EightSleepAwayModeCard({ side }: { side: EightSleepSideConfig }) {
 }
 
 function EightSleepScheduleSection({ modalState, side }: { modalState: EightSleepBedModalState; side: EightSleepSideConfig }) {
+  const scheduleEntityId = modalState.controlMode === 'climate' ? SLEEPYPOD_SCHEDULE_SENSOR_ENTITY_ID : FREE_SLEEP_SCHEDULE_SENSOR_ENTITY_ID
+  const scheduleSetTopic = modalState.controlMode === 'climate' ? SLEEPYPOD_SCHEDULE_SET_TOPIC : undefined
+
   return (
     <section className={styles.section}>
       <SectionHeader title="Sleep Schedule" />
@@ -2674,7 +2763,11 @@ function EightSleepScheduleSection({ modalState, side }: { modalState: EightSlee
             icon={stage.icon}
             key={stage.key}
             label={stage.label}
+            scheduleEntityId={scheduleEntityId}
+            scheduleSetTopic={scheduleSetTopic}
+            side={side}
             sideTitle={side.title}
+            stageKey={stage.key}
           />
         ))}
       </div>
@@ -3277,8 +3370,30 @@ function EightSleepAlarmsSection({
   )
 }
 
-function EightSleepScheduleTemperatureControl({ entityId, fallbackTemperature, icon, label, sideTitle }: { entityId: string; fallbackTemperature: number | null; icon: string; label: string; sideTitle: string }) {
+function EightSleepScheduleTemperatureControl({
+  entityId,
+  fallbackTemperature,
+  icon,
+  label,
+  scheduleEntityId,
+  scheduleSetTopic,
+  side,
+  sideTitle,
+  stageKey,
+}: {
+  entityId: string
+  fallbackTemperature: number | null
+  icon: string
+  label: string
+  scheduleEntityId: string
+  scheduleSetTopic?: string
+  side: EightSleepSideConfig
+  sideTitle: string
+  stageKey: FreeSleepScheduleStage
+}) {
   const entity = useEntity(asEntityName(entityId), { returnNullIfNotFound: true })
+  const scheduleEntity = useEntity(asEntityName(scheduleEntityId), { returnNullIfNotFound: true })
+  const entities = useHass((state) => state.entities) as unknown as EntityActionStateMap
   const callService = useCallService()
   const valueSyncTimerRef = useRef<number | null>(null)
   const pendingValueRef = useRef<number | null>(null)
@@ -3310,6 +3425,22 @@ function EightSleepScheduleTemperatureControl({ entityId, fallbackTemperature, i
       valueSyncTimerRef.current = null
       if (pendingValue === null) return
       callService({ domain: entityId.split('.')[0], service: 'set_value', target: entityId, serviceData: { value: pendingValue } })
+      if (scheduleSetTopic) {
+        const levels = Object.fromEntries(FREE_SLEEP_SCHEDULE_STAGES.map((stage) => {
+          if (stage.key === stageKey) return [stage.key, pendingValue]
+          const stageEntityId = side.scheduleStageTemperatureEntityIds[stage.key]
+          return [stage.key, numberValue(entities[stageEntityId]?.state) ?? fallbackTemperature ?? 0]
+        })) as Record<FreeSleepScheduleStage, number>
+        const schedule = scheduleFromEntityAttributes(scheduleEntity?.attributes as Record<string, unknown> | undefined)
+        callService({
+          domain: 'mqtt',
+          service: 'publish',
+          serviceData: {
+            payload: JSON.stringify(sleepypodSchedulePayload(side, schedule, levels)),
+            topic: scheduleSetTopic,
+          },
+        })
+      }
     }, FREE_SLEEP_NUMBER_SYNC_DEBOUNCE_MS)
   }
 
@@ -3972,6 +4103,10 @@ function ThermostatForceCheckbox({ room }: { room: ThermostatRoomView }) {
   return <ThermostatCheckbox entityId={thermostatForceCriticalEntityId(room)} showState={false} title={room.title} />
 }
 
+function ThermostatTrackOnlyWhenOccupiedCheckbox({ room }: { room: ThermostatRoomView }) {
+  return <ThermostatCheckbox entityId={thermostatTrackOnlyWhenOccupiedEntityId(room)} title={`${room.title} Occupied Only`} />
+}
+
 function ThermostatTrackSection() {
   const trackSelected = useEntity(asEntityName('switch.thermostat_contact_sensors_only_track_selected_rooms'), { returnNullIfNotFound: true })
   const criticalTracking = useEntity(asEntityName('select.thermostat_contact_sensors_eco_mode_critical_tracking'), { returnNullIfNotFound: true })
@@ -4000,6 +4135,18 @@ function ThermostatTrackSection() {
         </section>
       )}
     </>
+  )
+}
+
+function ThermostatTrackOnlyWhenOccupiedSection() {
+  return (
+    <section className={styles.section}>
+      <SectionHeader title="Track Only When Occupied" />
+      <Description className={styles.thermostatDescription}>{THERMOSTAT_SECTION_DESCRIPTIONS.trackOnlyWhenOccupied}</Description>
+      <div className={styles.thermostatCheckboxGrid}>
+        {THERMOSTAT_OCCUPANCY_GATED_ROOM_VIEWS.map((room) => <ThermostatTrackOnlyWhenOccupiedCheckbox key={room.key} room={room} />)}
+      </div>
+    </section>
   )
 }
 
@@ -4107,6 +4254,7 @@ function ThermostatPage({ preloadHash, preloadHashes = [] }: { preloadHash?: str
         <PredictiveComfortCard onOpen={() => openHash(PREDICTIVE_COMFORT_HASH)} />
       </section>
       <ThermostatTrackSection />
+      <ThermostatTrackOnlyWhenOccupiedSection />
       <section className={styles.section}>
         <SectionHeader title="Automatic Thermostat" />
         <Description className={styles.thermostatDescription}>{THERMOSTAT_SECTION_DESCRIPTIONS.integration}</Description>

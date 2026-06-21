@@ -1142,6 +1142,113 @@ test('available vacuum cards open source-style modal controls', async ({ page })
   await expect(page.getByRole('group', { name: 'Detergent OK' })).toBeVisible()
 })
 
+test('vacuum native dropdown stays aligned after rapid close and reopen', async ({ page }) => {
+  await page.goto('/at-a-glance/vacuums')
+
+  const mainFloorVacuum = page.getByRole('button', { name: /Main Floor Docked/i })
+  const cardBox = await mainFloorVacuum.boundingBox()
+  if (!cardBox) throw new Error('Main Floor vacuum card was not measurable')
+
+  await mainFloorVacuum.click()
+  await expect(page.getByRole('dialog')).toBeVisible()
+  await page.waitForTimeout(450)
+
+  await page.getByRole('combobox', { name: /Cleaning Passes/i }).selectOption('3')
+  const closeBox = await page.getByRole('button', { name: 'Close' }).boundingBox()
+  if (!closeBox) throw new Error('Vacuum modal close button was not measurable')
+
+  await page.mouse.click(closeBox.x + closeBox.width / 2, closeBox.y + closeBox.height / 2)
+  await page.waitForTimeout(50)
+  await page.mouse.click(cardBox.x + cardBox.width / 2, cardBox.y + cardBox.height / 2)
+
+  const rapidReopenState = await page.evaluate(() => {
+    const dialog = document.querySelector<HTMLElement>('[role="dialog"]')
+    const select = document.querySelector<HTMLSelectElement>('select[aria-label^="Cleaning Passes"]')
+    const rect = select?.getBoundingClientRect()
+    const style = dialog ? getComputedStyle(dialog) : null
+    const selectStyle = select ? getComputedStyle(select) : null
+
+    return {
+      animationName: style?.animationName,
+      pointerEvents: selectStyle?.pointerEvents,
+      rapidReopen: dialog?.getAttribute('data-rapid-reopen'),
+      selectRect: rect ? { y: rect.y, height: rect.height } : null,
+      transform: style?.transform,
+      value: select?.value,
+    }
+  })
+
+  expect(rapidReopenState.rapidReopen).toBe('true')
+  expect(rapidReopenState.animationName).toBe('none')
+  expect(rapidReopenState.transform).toBe('none')
+  expect(rapidReopenState.pointerEvents).toBe('auto')
+  expect(rapidReopenState.selectRect?.y).toBeLessThan(720)
+  expect(rapidReopenState.value).toBe('3')
+
+  await page.getByRole('combobox', { name: /Cleaning Passes/i }).selectOption('2')
+  await expect(page.getByRole('combobox', { name: /Cleaning Passes/i })).toHaveValue('2')
+})
+
+test('vacuum mode dropdown keeps source option labels while optimistic', async ({ page }) => {
+  await page.goto('/at-a-glance/vacuums')
+
+  const mainFloorVacuum = page.getByRole('button', { name: /Main Floor Docked/i })
+  const cardBox = await mainFloorVacuum.boundingBox()
+  if (!cardBox) throw new Error('Main Floor vacuum card was not measurable')
+
+  await mainFloorVacuum.click()
+  await expect(page.getByRole('dialog')).toBeVisible()
+
+  await page.getByRole('combobox', { name: /Mode/i }).selectOption('mop')
+
+  const closeBox = await page.getByRole('button', { name: 'Close' }).boundingBox()
+  if (!closeBox) throw new Error('Vacuum modal close button was not measurable')
+
+  await page.mouse.click(closeBox.x + closeBox.width / 2, closeBox.y + closeBox.height / 2)
+  await page.waitForTimeout(50)
+  await page.mouse.click(cardBox.x + cardBox.width / 2, cardBox.y + cardBox.height / 2)
+
+  const modeOptions = await page.getByRole('combobox', { name: /Mode Mop/i }).evaluate((select) => {
+    const dialog = document.querySelector<HTMLElement>('[role="dialog"]')
+    const style = dialog ? getComputedStyle(dialog) : null
+    return {
+      animationName: style?.animationName,
+      options: Array.from((select as HTMLSelectElement).options).map((option) => ({ label: option.label, value: option.value })),
+      rapidReopen: dialog?.getAttribute('data-rapid-reopen'),
+      transform: style?.transform,
+      value: (select as HTMLSelectElement).value,
+    }
+  })
+
+  expect(modeOptions.rapidReopen).toBe('true')
+  expect(modeOptions.animationName).toBe('none')
+  expect(modeOptions.transform).toBe('none')
+  expect(modeOptions.value).toBe('mop')
+  expect(modeOptions.options).toEqual([
+    { label: 'Vacuum And Mop', value: 'vacuum_and_mop' },
+    { label: 'Mop', value: 'mop' },
+    { label: 'Vacuum', value: 'vacuum' },
+    { label: 'Vacuum Then Mop', value: 'vacuum_then_mop' },
+  ])
+
+  await page.getByRole('combobox', { name: /Mode Mop/i }).selectOption('vacuum')
+  await expect(page.getByRole('combobox', { name: /Mode Vacuum/i })).toHaveValue('vacuum')
+})
+
+test('vacuum clean start shows disabled optimistic controls while backend is stale', async ({ page }) => {
+  await page.goto('/at-a-glance/vacuums')
+
+  await page.getByRole('button', { name: /Main Floor Docked/i }).click()
+  await expect(page.getByRole('dialog')).toBeVisible()
+
+  await page.getByRole('button', { name: 'Clean', exact: true }).click()
+
+  await expect(page.getByRole('heading', { name: 'Cleaning' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Clean', exact: true })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Pause' })).toBeDisabled()
+  await expect(page.getByRole('button', { name: 'Stop' })).toBeDisabled()
+})
+
 test('thermostat hero dial allows vertical swipe scrolling', async ({ page, browserName }) => {
   await page.goto('/at-a-glance/ecobee')
 

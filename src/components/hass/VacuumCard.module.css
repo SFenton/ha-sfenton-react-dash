@@ -271,6 +271,13 @@
   font-size: 0.72rem;
 }
 
+.actionButton:disabled,
+.settingButton[data-disabled='true'],
+.subSelectButton[data-disabled='true'] {
+  cursor: default;
+  opacity: 0.52;
+}
+
 .controlGrid {
   display: grid;
   grid-template-columns: 1fr;
@@ -429,6 +436,10 @@
   outline: none;
 }
 
+.nativeSelect:disabled {
+  cursor: default;
+}
+
 .subInfoPill {
   gap: 2px;
 }
@@ -580,16 +591,11 @@
   font: inherit;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
-  transition: transform var(--duration-fast) ease;
 }
 
 .vacuumModalNavButtonActive {
   color: #111;
   background: rgba(255, 255, 255, 0.92);
-}
-
-.vacuumModalNavButton:active {
-  transform: scale(0.94);
 }
 
 .vacuumModalNavButton:focus,
@@ -598,8 +604,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .rightPane,
-  .vacuumModalNavButton {
+  .rightPane {
     transition: none;
   }
 }
