@@ -4100,7 +4100,7 @@ function ThermostatForceCheckbox({ room }: { room: ThermostatRoomView }) {
 }
 
 function ThermostatTrackOnlyWhenOccupiedCheckbox({ room }: { room: ThermostatRoomView }) {
-  return <ThermostatCheckbox entityId={thermostatTrackOnlyWhenOccupiedEntityId(room)} title={`${room.title} Occupied Only`} />
+  return <ThermostatCheckbox entityId={thermostatTrackOnlyWhenOccupiedEntityId(room)} showState={false} title={room.title} />
 }
 
 function ThermostatTrackSection() {
