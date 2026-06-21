@@ -310,6 +310,11 @@ export const LIGHT_GROUPS: EntityGroupConfig[] = [
     ],
   },
   {
+    title: 'Master Bedroom Closet Light',
+    toggleEntityId: 'light.master_bedroom_closet_light',
+    items: [{ title: 'Closet Light', entityId: 'light.master_bedroom_closet_light', tone: 'light' }],
+  },
+  {
     title: 'Gym Light',
     toggleEntityId: 'light.gym_light',
     items: [{ title: 'Gym Light', entityId: 'light.gym_light', tone: 'light' }],
@@ -590,6 +595,10 @@ export const OCCUPANCY_GROUPS: EntityGroupConfig[] = [
       { title: 'Bathroom', entityId: 'binary_sensor.master_bedroom_bathroom_presence_occupancy', tone: 'presence' },
       { title: 'Closet', entityId: 'binary_sensor.master_bedroom_closet_presence_occupancy', tone: 'presence' },
     ],
+  },
+  {
+    title: 'Master Bedroom Closet Occupancy',
+    items: [{ title: 'Closet', entityId: 'binary_sensor.master_bedroom_closet_presence_occupancy', tone: 'presence' }],
   },
   {
     title: 'Guest Bathroom Occupancy',

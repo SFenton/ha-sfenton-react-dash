@@ -142,9 +142,9 @@ export const ROOM_PAGE_CONFIGS: Record<string, RoomPageSourceConfig> = {
       { title: 'Air Quality', entityId: 'sensor.master_bedroom_air_purifier_pm2_5', icon: 'mdi:air-purifier', kind: 'air', hash: '#air-purifier', showState: true },
     ],
     sourceSections: [
-      { title: 'Eight Sleep', cards: [
-        { title: "Stephen's Bed", entityId: 'number.nightcanvasrestful_left_target_temperature', icon: 'mdi:bed', kind: 'climate', hash: '#stephens-bed', showState: true, stateTone: 'climate-action', presenceEntityId: 'binary_sensor.nightcanvasrestful_left_presence' },
-        { title: "Steph's Bed", entityId: 'number.nightcanvasrestful_right_target_temperature', icon: 'mdi:bed', kind: 'climate', hash: '#stephs-bed', showState: true, stateTone: 'climate-action', presenceEntityId: 'binary_sensor.nightcanvasrestful_right_presence' },
+      { title: 'SleepyPod', cards: [
+        { title: "Stephen's Bed", entityId: 'climate.sleepypod_eight_pod_left_side', icon: 'mdi:bed', kind: 'climate', hash: '#stephens-bed', showState: true, stateTone: 'climate-action' },
+        { title: "Steph's Bed", entityId: 'climate.sleepypod_eight_pod_right_side', icon: 'mdi:bed', kind: 'climate', hash: '#stephs-bed', showState: true, stateTone: 'climate-action' },
       ] },
       { title: 'Media', cards: [{ title: 'Apple TV', entityId: 'media_player.master_bedroom_apple_tv', icon: 'mdi:apple', kind: 'media', hash: '#master-bedroom-apple-tv', showState: true, span: 'full', activeStates: ['idle', 'paused', 'playing'] }] },
       { title: 'Climate', cards: [

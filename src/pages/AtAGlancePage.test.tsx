@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import { AtAGlancePage } from './AtAGlancePage'
 import { materialIconPath } from '../components/core/iconPaths'
-import { CONTACT_GROUPS, SECURITY_ENTITY } from '../constants/atAGlance'
+import { CONTACT_GROUPS, LIGHT_GROUPS, OCCUPANCY_GROUPS, SECURITY_ENTITY } from '../constants/atAGlance'
 import { CHORE_BLUE } from '../constants/portedDashboard'
 import { mockEntities, resetMockHass } from '../test/mocks/hakitCoreState'
 import { resetDeferredRouteHydrationCache } from '../hooks/useDeferredRouteHydration'
@@ -12,6 +12,22 @@ describe('AtAGlancePage', () => {
     resetDeferredRouteHydrationCache()
     resetMockHass()
   })
+
+  function setExistingMockEntityStates(entityIds: Iterable<string | undefined>, state: string) {
+    const originalStates = new Map<string, string>()
+
+    for (const entityId of entityIds) {
+      if (!entityId || !mockEntities[entityId]) continue
+      originalStates.set(entityId, mockEntities[entityId].state)
+      mockEntities[entityId].state = state
+    }
+
+    return () => {
+      for (const [entityId, originalState] of originalStates) {
+        mockEntities[entityId].state = originalState
+      }
+    }
+  }
 
   it('keeps cold Home content behind a centered spinner before fading content in', () => {
     vi.useFakeTimers()
@@ -92,6 +108,90 @@ describe('AtAGlancePage', () => {
       expect(screen.getByRole('button', { name: /Contact Sensors\s*1 Open/i })).toBeInTheDocument()
     } finally {
       contactEntity.state = originalState
+    }
+  })
+
+  it('shows Master Bedroom Closet as a top-level light card', async () => {
+    render(<AtAGlancePage />)
+
+    fireEvent.click(screen.getByRole('button', { name: /^Lights\b/i }))
+
+    const dialog = await screen.findByRole('dialog')
+    const closetCard = within(dialog).getByLabelText('Open Master Bedroom Closet Light')
+    expect(closetCard).toBeInTheDocument()
+
+    fireEvent.click(closetCard)
+
+    expect(within(dialog).getByRole('heading', { name: 'Master Bedroom Closet Lights' })).toBeInTheDocument()
+    expect(within(dialog).getByRole('button', { name: /Closet Light Off/i })).toBeInTheDocument()
+  })
+
+  it('groups the Lights overview by on and off rooms', async () => {
+    render(<AtAGlancePage />)
+
+    fireEvent.click(screen.getByRole('button', { name: /^Lights\b/i }))
+
+    const dialog = await screen.findByRole('dialog')
+    expect(within(dialog).queryByRole('heading', { name: 'Rooms' })).not.toBeInTheDocument()
+    expect(within(dialog).getByRole('heading', { name: 'Lights On' })).toBeInTheDocument()
+    expect(within(dialog).getByRole('heading', { name: 'Lights Off' })).toBeInTheDocument()
+  })
+
+  it('hides the Lights On section when no light room is on', async () => {
+    const restoreLights = setExistingMockEntityStates(new Set(LIGHT_GROUPS.flatMap((group) => [group.toggleEntityId, ...group.items.map((item) => item.entityId)])), 'off')
+
+    try {
+      render(<AtAGlancePage />)
+
+      fireEvent.click(screen.getByRole('button', { name: /^Lights\b/i }))
+
+      const dialog = await screen.findByRole('dialog')
+      expect(within(dialog).queryByRole('heading', { name: 'Lights On' })).not.toBeInTheDocument()
+      expect(within(dialog).getByRole('heading', { name: 'Lights Off' })).toBeInTheDocument()
+    } finally {
+      restoreLights()
+    }
+  })
+
+  it('shows Master Bedroom Closet as a top-level occupancy card', async () => {
+    render(<AtAGlancePage />)
+
+    fireEvent.click(screen.getByRole('button', { name: /^Occupancy\b/i }))
+
+    const dialog = await screen.findByRole('dialog')
+    const closetCard = within(dialog).getByLabelText('Open Master Bedroom Closet Occupancy')
+    expect(closetCard).toBeInTheDocument()
+
+    fireEvent.click(closetCard)
+
+    expect(within(dialog).getByRole('heading', { name: 'Master Bedroom Closet Occupancy' })).toBeInTheDocument()
+    expect(within(dialog).getByRole('article', { name: /Closet Clear/i })).toBeInTheDocument()
+  })
+
+  it('groups the Occupancy overview by occupied and clear rooms', async () => {
+    render(<AtAGlancePage />)
+
+    fireEvent.click(screen.getByRole('button', { name: /^Occupancy\b/i }))
+
+    const dialog = await screen.findByRole('dialog')
+    expect(within(dialog).queryByRole('heading', { name: 'Rooms' })).not.toBeInTheDocument()
+    expect(within(dialog).getByRole('heading', { name: 'Occupied' })).toBeInTheDocument()
+    expect(within(dialog).getByRole('heading', { name: 'Clear' })).toBeInTheDocument()
+  })
+
+  it('hides the Occupied section when no room is occupied', async () => {
+    const restoreOccupancy = setExistingMockEntityStates(new Set(OCCUPANCY_GROUPS.flatMap((group) => group.items.map((item) => item.entityId))), 'off')
+
+    try {
+      render(<AtAGlancePage />)
+
+      fireEvent.click(screen.getByRole('button', { name: /^Occupancy\b/i }))
+
+      const dialog = await screen.findByRole('dialog')
+      expect(within(dialog).queryByRole('heading', { name: 'Occupied' })).not.toBeInTheDocument()
+      expect(within(dialog).getByRole('heading', { name: 'Clear' })).toBeInTheDocument()
+    } finally {
+      restoreOccupancy()
     }
   })
 

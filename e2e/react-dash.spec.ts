@@ -152,12 +152,65 @@ async function clickWithPointerJitter(page: Page, target: Locator) {
   await page.mouse.up()
 }
 
+async function swipeWithTouch(page: Page, x: number, startY: number, endY: number) {
+  const client = await page.context().newCDPSession(page)
+  await client.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ id: 1, radiusX: 4, radiusY: 4, x, y: startY }] })
+  for (let step = 1; step <= 8; step += 1) {
+    const y = startY + ((endY - startY) * step) / 8
+    await client.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ id: 1, radiusX: 4, radiusY: 4, x, y }] })
+  }
+  await client.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
+  await client.detach()
+}
+
 test('overview renders with mock Home Assistant state', async ({ page }) => {
   await page.goto('/at-a-glance/overview')
 
   await expect(page).toHaveTitle('Home Assistant')
   await expect(page.getByRole('heading', { name: 'Home' })).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Quick Links' })).toBeVisible()
+})
+
+test('thermostat page accepts the first mobile scroll gesture after closing a room modal', async ({ page }) => {
+  await page.goto('/at-a-glance/ecobee')
+
+  await page.getByRole('button', { name: 'Living Room 70.2°F · Inactive' }).click()
+  const dialog = page.getByRole('dialog', { name: 'Living Room' })
+  await expect(dialog).toBeVisible()
+  await dialog.getByRole('button', { name: 'Close' }).click()
+  await expect(dialog).toHaveAttribute('data-state', 'closed')
+
+  await expect.poll(async () => page.evaluate(() => ({
+    bodyPointerEvents: document.body.style.pointerEvents,
+    scrollLocked: document.body.getAttribute('data-scroll-locked'),
+    modalOverlays: document.querySelectorAll('[data-modal-sheet-overlay]').length,
+    closingDialogPointerEvents: window.getComputedStyle(document.querySelector('[role="dialog"]') as Element).pointerEvents,
+    closingDialogInert: document.querySelector('[role="dialog"]')?.hasAttribute('inert') ?? false,
+  }))).toEqual({
+    bodyPointerEvents: 'auto',
+    scrollLocked: null,
+    modalOverlays: 0,
+    closingDialogPointerEvents: 'none',
+    closingDialogInert: true,
+  })
+
+  const scroller = page.locator('main > div').nth(1)
+  const { before, maxScrollTop } = await scroller.evaluate((element) => ({
+    before: element.scrollTop,
+    maxScrollTop: element.scrollHeight - element.clientHeight,
+  }))
+  const scrollerBox = await scroller.boundingBox()
+  if (!scrollerBox) throw new Error('Ecobee page scroller was not measurable')
+  const canScrollDown = before < maxScrollTop - 20
+  const swipeX = scrollerBox.x + scrollerBox.width / 2
+  const lowerSwipeY = scrollerBox.y + scrollerBox.height * 0.72
+  const upperSwipeY = scrollerBox.y + scrollerBox.height * 0.28
+  await swipeWithTouch(page, swipeX, canScrollDown ? lowerSwipeY : upperSwipeY, canScrollDown ? upperSwipeY : lowerSwipeY)
+  if (canScrollDown) {
+    await expect.poll(async () => scroller.evaluate((element) => element.scrollTop)).toBeGreaterThan(before + 20)
+  } else {
+    await expect.poll(async () => scroller.evaluate((element) => element.scrollTop)).toBeLessThan(before - 20)
+  }
 })
 
 test.describe('desktop modal layout', () => {
@@ -1015,28 +1068,25 @@ test('room vacuum cards open reusable vacuum modal controls', async ({ page }) =
   await expect(page.getByText('Main Floor Robot Vacuum')).toHaveCount(0)
   await expect(page.getByRole('region', { name: 'Main Floor Valetudo map' })).toBeVisible()
   await expect(page.getByText('No error')).toHaveCount(0)
-  await expect(page.getByRole('heading', { name: 'Vacuum Controls' })).toBeVisible()
-  await expect(page.getByText('Power Settings')).toBeVisible()
-  await expect(page.getByRole('group', { name: 'Power Settings' })).toBeVisible()
-  await expect(page.getByRole('group', { name: 'Docked' })).toBeVisible()
-  await expect(page.getByRole('group', { name: 'Docked' }).getByRole('button', { name: 'Empty Dock' })).toHaveCount(0)
+  await expect(page.getByRole('heading', { name: 'Vacuum Controls' })).toHaveCount(0)
+  await expect(page.getByRole('heading', { name: 'Docked' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Power Settings' })).toBeVisible()
+  await expect(page.getByText('Choose whether the robot vacuums, mops, or combines both for the next run.')).toBeVisible()
+  await expect(page.getByText('Adjust suction strength for carpets, hard floors, and quieter cleaning.')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Empty Dock' })).toHaveCount(0)
+  await expect(page.getByText('Choose how many passes the vacuum should make, then start cleaning with the selected zones.')).toBeVisible()
+  await expect(page.getByRole('combobox', { name: /Cleaning Passes 1x/i })).toHaveValue('1')
   await expect(page.getByRole('button', { name: 'Clean', exact: true })).toHaveAttribute('data-icon', 'mdi:play')
   await expect(page.getByRole('button', { name: 'Info' })).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Consumables' })).toHaveCount(0)
   await expect(page.getByRole('group', { name: 'Mode options' })).toHaveCount(0)
-  await page.getByRole('button', { name: /Mode Vacuum/i }).click()
-  const modePicker = page.getByRole('dialog', { name: 'Mode' })
-  await expect(modePicker).toBeVisible()
-  await expect(modePicker.getByRole('button', { name: /^Vacuum$/ })).toHaveAttribute('aria-pressed', 'true')
-  await modePicker.getByRole('button', { name: 'Close' }).click()
-  await page.getByRole('button', { name: /Fan Balanced/i }).click()
-  const fanPicker = page.getByRole('dialog', { name: 'Fan' })
-  await expect(fanPicker).toBeVisible()
-  await expect(fanPicker.getByRole('button', { name: 'Balanced' })).toHaveAttribute('aria-pressed', 'true')
-  await fanPicker.getByRole('button', { name: 'Close' }).click()
+  await expect(page.getByRole('combobox', { name: /Mode Vacuum/i })).toHaveValue('vacuum')
+  await expect(page.getByRole('dialog', { name: 'Mode' })).toHaveCount(0)
+  await expect(page.getByRole('combobox', { name: /Fan Balanced/i })).toHaveValue('balanced')
+  await expect(page.getByRole('dialog', { name: 'Fan' })).toHaveCount(0)
   await page.getByRole('button', { name: 'Zones' }).click()
   await expect(page.getByRole('button', { name: /living room/i })).toBeVisible()
-  await page.getByRole('button', { name: 'More' }).click()
+  await page.getByRole('button', { name: 'Actions' }).click()
   await expect(page.getByRole('button', { name: 'Empty Dock' })).toBeVisible()
   await page.getByRole('button', { name: 'Info' }).click()
   await expect(page.getByRole('heading', { name: 'Consumables' })).toBeVisible()
@@ -1054,14 +1104,10 @@ test('theater room vacuum opens with map and Valetudo power controls', async ({ 
   await expect(page.getByRole('region', { name: 'Theater Room Valetudo map' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Info' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Zones' })).toHaveCount(0)
-  await page.getByRole('button', { name: /Mode Vacuum/i }).click()
-  const modePicker = page.getByRole('dialog', { name: 'Mode' })
-  await expect(modePicker.getByRole('button', { name: /^Vacuum$/ })).toHaveAttribute('aria-pressed', 'true')
-  await modePicker.getByRole('button', { name: 'Close' }).click()
-  await page.getByRole('button', { name: /Fan Balanced/i }).click()
-  const fanPicker = page.getByRole('dialog', { name: 'Fan' })
-  await expect(fanPicker.getByRole('button', { name: 'Balanced' })).toHaveAttribute('aria-pressed', 'true')
-  await fanPicker.getByRole('button', { name: 'Close' }).click()
+  await expect(page.getByRole('combobox', { name: /Mode Vacuum/i })).toHaveValue('vacuum')
+  await expect(page.getByRole('dialog', { name: 'Mode' })).toHaveCount(0)
+  await expect(page.getByRole('combobox', { name: /Fan Balanced/i })).toHaveValue('balanced')
+  await expect(page.getByRole('dialog', { name: 'Fan' })).toHaveCount(0)
   await page.getByRole('button', { name: 'Info' }).click()
   await expect(page.getByRole('group', { name: 'Main Brush 245h left' })).toBeVisible()
   await expect(page.getByText(/Entity not available/i)).toHaveCount(0)
@@ -1089,7 +1135,7 @@ test('available vacuum cards open source-style modal controls', async ({ page })
   await expect(page.getByRole('button', { name: 'Clean', exact: true })).toBeVisible()
   await page.getByRole('button', { name: 'Zones' }).click()
   await expect(page.getByText('Zones').first()).toBeVisible()
-  await page.getByRole('button', { name: 'More' }).click()
+  await page.getByRole('button', { name: 'Actions' }).click()
   await expect(page.getByRole('button', { name: 'Empty Dock' })).toBeVisible()
   await page.getByRole('button', { name: 'Info' }).click()
   await expect(page.getByRole('group', { name: 'Main Filter 54h left' })).toBeVisible()

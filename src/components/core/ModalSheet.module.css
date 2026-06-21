@@ -5,6 +5,7 @@
   background: var(--color-modal-overlay);
   backdrop-filter: var(--blur-modal);
   -webkit-backdrop-filter: var(--blur-modal);
+  pointer-events: auto;
 }
 
 .content {
@@ -31,6 +32,11 @@
   -webkit-backdrop-filter: var(--blur-modal);
   box-sizing: border-box;
   overflow: hidden;
+  pointer-events: auto;
+}
+
+.content[data-closing='true'] {
+  pointer-events: none;
 }
 
 .content:focus,

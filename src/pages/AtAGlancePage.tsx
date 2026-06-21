@@ -1,5 +1,5 @@
 import { useEntity, useHass } from '@hakit/core'
-import { useEffect, useMemo, useRef, useState, type MutableRefObject } from 'react'
+import { useEffect, useMemo, useRef, useState, type MutableRefObject, type ReactNode } from 'react'
 import type { HassEntity } from 'home-assistant-js-websocket'
 import { ClimateCard } from '../components/cards/ClimateCard'
 import { ContactSensorCard } from '../components/cards/ContactSensorCard'
@@ -229,6 +229,25 @@ function climateGroupSubtitle(group: EntityGroupConfig, entities: Record<string,
 
 function occupancyGroupActiveCount(group: EntityGroupConfig, entities: Record<string, HassEntity | undefined>) {
   return group.items.reduce((count, item) => count + (isOccupancyActive(entities[item.entityId]) ? 1 : 0), 0)
+}
+
+function lightGroupActive(group: EntityGroupConfig, entities: Record<string, HassEntity | undefined>) {
+  const toggleActive = group.toggleEntityId ? isActiveState(entities[group.toggleEntityId] ?? null) : false
+  return toggleActive || group.items.some((item) => isActiveState(entities[item.entityId] ?? null))
+}
+
+function splitRoomGroupsByState(
+  groups: EntityGroupConfig[],
+  entities: Record<string, HassEntity | undefined>,
+  isGroupActive: (group: EntityGroupConfig, entities: Record<string, HassEntity | undefined>) => boolean,
+) {
+  return groups.reduce(
+    (sections, group) => {
+      sections[isGroupActive(group, entities) ? 'active' : 'inactive'].push(group)
+      return sections
+    },
+    { active: [] as EntityGroupConfig[], inactive: [] as EntityGroupConfig[] },
+  )
 }
 
 function occupancyGroupSubtitle(group: EntityGroupConfig, entities: Record<string, HassEntity | undefined>) {
@@ -493,11 +512,59 @@ function CameraSheet({ hash, live = true }: { hash: string; live?: boolean }) {
   )
 }
 
-function RoomsHeader({ showSeparator = true }: { showSeparator?: boolean }) {
+function RoomSectionHeader({ showSeparator = true, title }: { showSeparator?: boolean; title: string }) {
   return (
     <div className={styles.lightSectionHeader}>
-      <h3 className={styles.lightSectionLabel}>Rooms</h3>
+      <h3 className={styles.lightSectionLabel}>{title}</h3>
       <Separator className={styles.lightSectionSeparator} visible={showSeparator} />
+    </div>
+  )
+}
+
+function RoomsHeader({ showSeparator = true }: { showSeparator?: boolean }) {
+  return <RoomSectionHeader showSeparator={showSeparator} title="Rooms" />
+}
+
+interface GroupedRoomOverviewProps {
+  activeGroups: EntityGroupConfig[]
+  activeTitle: string
+  cardShellClassName: string
+  gridClassName: string
+  inactiveGroups: EntityGroupConfig[]
+  inactiveTitle: string
+  overviewGridRef?: (node: HTMLElement | null) => void
+  overviewGridStyle?: ModalSquareGridStyle
+  renderCard: (group: EntityGroupConfig) => ReactNode
+}
+
+function groupedRoomGridStyle(overviewGridStyle: ModalSquareGridStyle | undefined, groupCount: number) {
+  if (!overviewGridStyle) return undefined
+
+  const columnCount = Number(overviewGridStyle['--modal-square-cols'])
+  const sectionRows = Number.isFinite(columnCount) && columnCount > 0 ? Math.ceil(groupCount / columnCount) : overviewGridStyle['--modal-square-rows']
+  return { ...overviewGridStyle, '--modal-square-rows': sectionRows }
+}
+
+function GroupedRoomOverview({ activeGroups, activeTitle, cardShellClassName, gridClassName, inactiveGroups, inactiveTitle, overviewGridRef, overviewGridStyle, renderCard }: GroupedRoomOverviewProps) {
+  const sections = [
+    ...(activeGroups.length > 0 ? [{ groups: activeGroups, title: activeTitle }] : []),
+    ...(inactiveGroups.length > 0 ? [{ groups: inactiveGroups, title: inactiveTitle }] : []),
+  ]
+
+  return (
+    <div className={styles.roomStateStack}>
+      {sections.map((section, sectionIndex) => (
+        <section aria-label={`${section.title} rooms`} className={styles.roomStateSection} key={section.title}>
+          <RoomSectionHeader title={section.title} />
+          <div className={gridClassName} ref={sectionIndex === 0 ? overviewGridRef : undefined} style={groupedRoomGridStyle(overviewGridStyle, section.groups.length)}>
+            {section.groups.map((group) => (
+              <div className={cardShellClassName} key={group.title}>
+                {renderCard(group)}
+              </div>
+            ))}
+          </div>
+        </section>
+      ))}
     </div>
   )
 }
@@ -589,6 +656,8 @@ export function LightsSheet({ directGroup, hideDirectTitle = false, overviewGrid
   const [roomCardsExiting, setRoomCardsExiting] = useState(false)
   const transitionTimer = useRef<number | null>(null)
   const roomGroups = ROOM_LIGHT_GROUPS
+  const entities = useHass((state) => state.entities)
+  const groupedRoomGroups = splitRoomGroupsByState(roomGroups, entities, lightGroupActive)
   const directMode = Boolean(directGroup)
   const squareOverview = !selectedGroup && Boolean(overviewGridStyle)
   const lightGridClassName = squareGridClassName(styles.roomLightGrid, squareOverview)
@@ -616,20 +685,24 @@ export function LightsSheet({ directGroup, hideDirectTitle = false, overviewGrid
   }
 
   return (
-    <div className={styles.lightsSheet} data-square-overview={squareOverview ? 'true' : 'false'}>
-      {selectedGroup ? <RoomLightDetailHeader group={selectedGroup} hideTitleBlock={directMode && hideDirectTitle} onBack={directMode ? undefined : showRoomOverview} onToggle={toggleEntity} /> : <RoomsHeader />}
+    <div className={styles.lightsSheet} data-square-overview="false">
+      {selectedGroup && <RoomLightDetailHeader group={selectedGroup} hideTitleBlock={directMode && hideDirectTitle} onBack={directMode ? undefined : showRoomOverview} onToggle={toggleEntity} />}
       <div className={styles.lightContent}>
         {selectedGroup ? (
           <RoomLightDetailCards group={selectedGroup} onToggle={toggleEntity} />
         ) : (
           <section aria-label="Lights by room" className={styles.roomLightsOverview} data-exiting={roomCardsExiting}>
-            <div className={lightGridClassName} ref={overviewGridRef} style={overviewGridStyle}>
-              {roomGroups.map((group) => (
-                <div className={lightCardShellClassName} key={group.title}>
-                  <RoomLightOverviewCard group={group} onSelect={selectGroup} />
-                </div>
-              ))}
-            </div>
+            <GroupedRoomOverview
+              activeGroups={groupedRoomGroups.active}
+              activeTitle="Lights On"
+              cardShellClassName={lightCardShellClassName}
+              gridClassName={lightGridClassName}
+              inactiveGroups={groupedRoomGroups.inactive}
+              inactiveTitle="Lights Off"
+              overviewGridRef={overviewGridRef}
+              overviewGridStyle={overviewGridStyle}
+              renderCard={(group) => <RoomLightOverviewCard group={group} onSelect={selectGroup} />}
+            />
           </section>
         )}
       </div>
@@ -833,6 +906,8 @@ export function OccupancySheet({ directGroup, hideDirectHeader = false, overview
   const [roomCardsExiting, setRoomCardsExiting] = useState(false)
   const transitionTimer = useRef<number | null>(null)
   const roomGroups = ROOM_OCCUPANCY_GROUPS
+  const entities = useHass((state) => state.entities)
+  const groupedRoomGroups = splitRoomGroupsByState(roomGroups, entities, (group, entities) => occupancyGroupActiveCount(group, entities) > 0)
   const directMode = Boolean(directGroup)
   const squareOverview = !selectedGroup && Boolean(overviewGridStyle)
   const occupancyGridClassName = squareGridClassName(styles.roomOccupancyGrid, squareOverview)
@@ -856,20 +931,24 @@ export function OccupancySheet({ directGroup, hideDirectHeader = false, overview
   }
 
   return (
-    <div className={styles.occupancySheet} data-square-overview={squareOverview ? 'true' : 'false'}>
-      {selectedGroup ? (!hideDirectHeader && <RoomOccupancyDetailHeader group={selectedGroup} onBack={directMode ? undefined : showRoomOverview} />) : <RoomsHeader />}
+    <div className={styles.occupancySheet} data-square-overview="false">
+      {selectedGroup && !hideDirectHeader && <RoomOccupancyDetailHeader group={selectedGroup} onBack={directMode ? undefined : showRoomOverview} />}
       <div className={styles.occupancyContent}>
         {selectedGroup ? (
           <RoomOccupancyDetailCards group={selectedGroup} />
         ) : (
           <section aria-label="Occupancy by room" className={styles.roomOccupancyOverview} data-exiting={roomCardsExiting}>
-            <div className={occupancyGridClassName} ref={overviewGridRef} style={overviewGridStyle}>
-              {roomGroups.map((group) => (
-                <div className={cardShellClassName} key={group.title}>
-                  <RoomOccupancyOverviewCard group={group} onSelect={selectGroup} />
-                </div>
-              ))}
-            </div>
+            <GroupedRoomOverview
+              activeGroups={groupedRoomGroups.active}
+              activeTitle="Occupied"
+              cardShellClassName={cardShellClassName}
+              gridClassName={occupancyGridClassName}
+              inactiveGroups={groupedRoomGroups.inactive}
+              inactiveTitle="Clear"
+              overviewGridRef={overviewGridRef}
+              overviewGridStyle={overviewGridStyle}
+              renderCard={(group) => <RoomOccupancyOverviewCard group={group} onSelect={selectGroup} />}
+            />
           </section>
         )}
       </div>

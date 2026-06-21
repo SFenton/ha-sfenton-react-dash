@@ -298,6 +298,44 @@ function isUnavailable(entity: ReturnType<typeof useEntity>) {
   return !entity || entity.state === 'unavailable' || entity.state === 'unknown'
 }
 
+function snapshotEntity(entity: ReturnType<typeof useEntity>): ReturnType<typeof useEntity> {
+  if (!entity) return entity
+  return { ...entity, attributes: { ...entity.attributes } } as ReturnType<typeof useEntity>
+}
+
+function useRecentAvailableEntity(entity: ReturnType<typeof useEntity>, holdMs: number) {
+  const [stableEntity, setStableEntity] = useState(() => snapshotEntity(entity))
+  const [trackedState, setTrackedState] = useState(entity?.state)
+  const timerRef = useRef<number | null>(null)
+  const entityState = entity?.state
+
+  const clearTimer = useCallback(() => {
+    if (timerRef.current === null) return
+    window.clearTimeout(timerRef.current)
+    timerRef.current = null
+  }, [])
+
+  if (entityState !== trackedState) {
+    setTrackedState(entityState)
+    if (!isUnavailable(entity)) setStableEntity(snapshotEntity(entity))
+  }
+
+  useEffect(() => clearTimer, [clearTimer])
+
+  useEffect(() => {
+    clearTimer()
+    if (!isUnavailable(entity)) return
+
+    const entitySnapshot = snapshotEntity(entity)
+    timerRef.current = window.setTimeout(() => {
+      setStableEntity(entitySnapshot)
+      timerRef.current = null
+    }, holdMs)
+  }, [clearTimer, entity, entity?.state, holdMs])
+
+  return isUnavailable(entity) ? stableEntity : entity
+}
+
 function formatRoomSourceState(card: RoomSourceCardConfig, entity: ReturnType<typeof useEntity>) {
   if (!entity) return 'Unavailable'
   const sourceLabel = card.stateLabels?.[entity.state]
@@ -1506,18 +1544,27 @@ interface EightSleepSideConfig {
   alarmVibratingEntityId: string
   awayModeEntityId: string
   bedtimeEntityId: string
+  breathingRateEntityId?: string
+  climateEntityId?: string
   currentTemperatureEntityId: string
   hash: string
+  heartRateEntityId?: string
   hotFlashActiveEntityId: string
   hotFlashButtonEntityId: string
   hotFlashCancelButtonEntityId: string
   hotFlashRestoreAtEntityId: string
   hotFlashTimerEntityId: string
+  hrvEntityId?: string
   powerSwitchEntityId: string
   presenceEntityId: string
+  pumpClogEntityId?: string
+  pumpLoopTemperatureEntityId?: string
+  pumpRpmEntityId?: string
+  pumpStallEntityId?: string
   scheduleStageTemperatureEntityIds: Record<FreeSleepScheduleStage, string>
   secondsRemainingEntityId: string
   scheduleSide: FreeSleepSide
+  targetLevelEntityId?: string
   targetTemperatureEntityId: string
   title: string
 }
@@ -1550,15 +1597,20 @@ interface FreeSleepAlarmRecord extends FreeSleepAlarmSchedule {
 
 interface EightSleepBedModalState {
   commitDisplaySideOn: (sideOn: boolean) => void
+  commitHotFlashActive: (active: boolean) => void
   commitTargetTemperature: (value: number) => void
+  controlMode: 'climate' | 'legacy'
   controlsSideOn: boolean
   currentTemperature: number | null
   displayedTargetValue: number | null
   heroAction: string
+  hotFlashActive: boolean
+  hotFlashAvailable: boolean
   sideAvailable: boolean
   subtitle: string
   targetMax: number
   targetMin: number
+  targetScale: 'level' | 'temperature'
   targetStep: number
 }
 
@@ -1569,8 +1621,11 @@ const FREE_SLEEP_TARGET_REVERT_MS = 30000
 const FREE_SLEEP_ALARM_SYNC_DEBOUNCE_MS = 450
 const FREE_SLEEP_NUMBER_SYNC_DEBOUNCE_MS = 300
 const EIGHT_SLEEP_POWER_REVERT_MS = 30000
+const EIGHT_SLEEP_UNAVAILABLE_HOLD_MS = 10000
 const FREE_SLEEP_SCHEDULE_SENSOR_ENTITY_ID = 'sensor.nightcanvasrestful_schedules'
 const FREE_SLEEP_SCHEDULE_SET_TOPIC = 'free-sleep/NightCanvasRestful/schedules/set'
+const SLEEPYPOD_SCHEDULE_SENSOR_ENTITY_ID = 'sensor.master_bedroom_sleepypod_eight_pod_schedules'
+const SLEEPYPOD_SCHEDULE_SET_TOPIC = 'sleepypod/eight-pod/cmd/set-schedules'
 const FREE_SLEEP_BEDTIME_SET_TOPIC_PREFIX = 'free-sleep/NightCanvasRestful'
 const FREE_SLEEP_ALARM_DEBUG_TOPIC = 'free-sleep/NightCanvasRestful/debug/react-dash/alarm'
 const FREE_SLEEP_ALARM_DIAGNOSTICS_STORAGE_KEY = 'freeSleepAlarmDiagnostics'
@@ -1595,6 +1650,12 @@ const EIGHT_SLEEP_MODAL_TABS: { icon: string; label: string; tab: EightSleepModa
   { icon: 'mdi:alarm', label: 'Alarms', tab: 'alarms' },
   { icon: 'mdi:information-outline', label: 'Status', tab: 'status' },
   { icon: 'mdi:cog', label: 'Settings', tab: 'settings' },
+]
+const SLEEPYPOD_MODAL_TABS: { icon: string; label: string; tab: EightSleepModalTab }[] = [
+  { icon: 'mdi:thermostat', label: 'Temperature', tab: 'schedule' },
+  { icon: 'mdi:snowflake', label: 'Special Modes', tab: 'modes' },
+  { icon: 'mdi:alarm', label: 'Alarms', tab: 'alarms' },
+  { icon: 'mdi:information-outline', label: 'Status', tab: 'status' },
 ]
 const EIGHT_SLEEP_BED_MODAL_STYLE: ModalSheetStyle = {
   '--modal-desktop-width': '700px',
@@ -1630,22 +1691,31 @@ const EIGHT_SLEEP_SIDE_CONFIGS: EightSleepSideConfig[] = [
     alarmVibratingEntityId: 'binary_sensor.nightcanvasrestful_left_alarm_vibrating',
     awayModeEntityId: 'switch.nightcanvasrestful_left_away_mode',
     bedtimeEntityId: 'text.master_bedroom_eight_sleep_pod_5_left_bedtime',
+    breathingRateEntityId: 'sensor.sleepypod_eight_pod_left_breathing_rate',
+    climateEntityId: 'climate.sleepypod_eight_pod_left_side',
     currentTemperatureEntityId: 'sensor.nightcanvasrestful_left_current_temperature',
     hash: '#stephens-bed',
+    heartRateEntityId: 'sensor.sleepypod_eight_pod_left_heart_rate',
     hotFlashActiveEntityId: 'input_boolean.eight_sleep_stephen_hot_flash_active',
     hotFlashButtonEntityId: 'input_button.eight_sleep_stephen_hot_flash',
     hotFlashCancelButtonEntityId: 'input_button.eight_sleep_stephen_cancel_hot_flash',
     hotFlashRestoreAtEntityId: 'input_datetime.eight_sleep_stephen_hot_flash_restore_at',
     hotFlashTimerEntityId: 'timer.eight_sleep_stephen_hot_flash',
+    hrvEntityId: 'sensor.sleepypod_eight_pod_left_hrv',
     powerSwitchEntityId: 'switch.nightcanvasrestful_left_power',
     presenceEntityId: 'binary_sensor.nightcanvasrestful_left_presence',
+    pumpClogEntityId: 'binary_sensor.sleepypod_eight_pod_left_pump_clog_detected',
+    pumpLoopTemperatureEntityId: 'sensor.sleepypod_eight_pod_left_pump_loop_temp',
+    pumpRpmEntityId: 'sensor.sleepypod_eight_pod_left_pump_rpm',
+    pumpStallEntityId: 'binary_sensor.sleepypod_eight_pod_left_pump_stall',
     scheduleStageTemperatureEntityIds: {
-      asleep: 'number.nightcanvasrestful_left_asleep_temperature',
-      bedtime: 'number.nightcanvasrestful_left_bedtime_temperature',
-      dawn: 'number.nightcanvasrestful_left_dawn_temperature',
+      asleep: 'input_number.eight_sleep_stephen_asleep_level',
+      bedtime: 'input_number.eight_sleep_stephen_bedtime_level',
+      dawn: 'input_number.eight_sleep_stephen_dawn_level',
     },
     secondsRemainingEntityId: 'sensor.nightcanvasrestful_left_seconds_remaining',
     scheduleSide: 'left',
+    targetLevelEntityId: 'number.master_bedroom_sleepypod_eight_pod_left_target_level',
     targetTemperatureEntityId: 'number.nightcanvasrestful_left_target_temperature',
     title: "Stephen's Bed",
   },
@@ -1657,22 +1727,31 @@ const EIGHT_SLEEP_SIDE_CONFIGS: EightSleepSideConfig[] = [
     alarmVibratingEntityId: 'binary_sensor.nightcanvasrestful_right_alarm_vibrating',
     awayModeEntityId: 'switch.nightcanvasrestful_right_away_mode',
     bedtimeEntityId: 'text.master_bedroom_eight_sleep_pod_5_right_bedtime',
+    breathingRateEntityId: 'sensor.sleepypod_eight_pod_right_breathing_rate',
+    climateEntityId: 'climate.sleepypod_eight_pod_right_side',
     currentTemperatureEntityId: 'sensor.nightcanvasrestful_right_current_temperature',
     hash: '#stephs-bed',
+    heartRateEntityId: 'sensor.sleepypod_eight_pod_right_heart_rate',
     hotFlashActiveEntityId: 'input_boolean.eight_sleep_steph_hot_flash_active',
     hotFlashButtonEntityId: 'input_button.eight_sleep_steph_hot_flash',
     hotFlashCancelButtonEntityId: 'input_button.eight_sleep_steph_cancel_hot_flash',
     hotFlashRestoreAtEntityId: 'input_datetime.eight_sleep_steph_hot_flash_restore_at',
     hotFlashTimerEntityId: 'timer.eight_sleep_steph_hot_flash',
+    hrvEntityId: 'sensor.sleepypod_eight_pod_right_hrv',
     powerSwitchEntityId: 'switch.nightcanvasrestful_right_power',
     presenceEntityId: 'binary_sensor.nightcanvasrestful_right_presence',
+    pumpClogEntityId: 'binary_sensor.sleepypod_eight_pod_right_pump_clog_detected',
+    pumpLoopTemperatureEntityId: 'sensor.sleepypod_eight_pod_right_pump_loop_temp',
+    pumpRpmEntityId: 'sensor.sleepypod_eight_pod_right_pump_rpm',
+    pumpStallEntityId: 'binary_sensor.sleepypod_eight_pod_right_pump_stall',
     scheduleStageTemperatureEntityIds: {
-      asleep: 'number.nightcanvasrestful_right_asleep_temperature',
-      bedtime: 'number.nightcanvasrestful_right_bedtime_temperature',
-      dawn: 'number.nightcanvasrestful_right_dawn_temperature',
+      asleep: 'input_number.eight_sleep_steph_asleep_level',
+      bedtime: 'input_number.eight_sleep_steph_bedtime_level',
+      dawn: 'input_number.eight_sleep_steph_dawn_level',
     },
     secondsRemainingEntityId: 'sensor.nightcanvasrestful_right_seconds_remaining',
     scheduleSide: 'right',
+    targetLevelEntityId: 'number.master_bedroom_sleepypod_eight_pod_right_target_level',
     targetTemperatureEntityId: 'number.nightcanvasrestful_right_target_temperature',
     title: "Steph's Bed",
   },
@@ -1968,6 +2047,11 @@ function formatEightSleepTargetLevel(value: unknown) {
   return parsed > 0 ? `+${displayValue}` : displayValue
 }
 
+function formatBedTargetValue(value: unknown, modalState: EightSleepBedModalState) {
+  if (modalState.targetScale === 'temperature') return formatTemperatureCompact(value)
+  return formatEightSleepTargetLevel(value)
+}
+
 function formatSecondsRemaining(value: unknown) {
   const parsed = numberValue(value)
   if (parsed === null) return 'Unknown'
@@ -2028,6 +2112,14 @@ function eightSleepTemperatureAction(targetLevel: number | null, sideOn: boolean
   return 'idle'
 }
 
+function sleepypodTemperatureAction(targetTemperature: number | null, currentTemperature: number | null, sideOn: boolean) {
+  if (!sideOn) return 'off'
+  if (targetTemperature === null || currentTemperature === null) return 'idle'
+  if (targetTemperature > currentTemperature + 0.5) return 'heating'
+  if (targetTemperature < currentTemperature - 0.5) return 'cooling'
+  return 'idle'
+}
+
 function eightSleepCardBackgroundColor(modalState: EightSleepBedModalState) {
   if (!modalState.controlsSideOn) return undefined
   if (modalState.heroAction === 'heating') return 'rgba(136, 64, 26, 0.6)'
@@ -2046,35 +2138,71 @@ function useEightSleepBedModalStates() {
 }
 
 function useEightSleepBedModalState(side: EightSleepSideConfig | undefined): EightSleepBedModalState {
+  const climateEntity = useEntity(asEntityName(side?.climateEntityId ?? 'climate.sleepypod_unselected_side'), { returnNullIfNotFound: true })
   const hotFlashActiveEntity = useEntity(asEntityName(side?.hotFlashActiveEntityId ?? 'input_boolean.free_sleep_unselected_hot_flash_active'), { returnNullIfNotFound: true })
+  const targetLevelEntity = useEntity(asEntityName(side?.targetLevelEntityId ?? 'number.sleepypod_unselected_target_level'), { returnNullIfNotFound: true })
   const targetEntity = useEntity(asEntityName(side?.targetTemperatureEntityId ?? 'number.free_sleep_unselected_target_temperature'), { returnNullIfNotFound: true })
   const currentEntity = useEntity(asEntityName(side?.currentTemperatureEntityId ?? 'sensor.free_sleep_unselected_current_temperature'), { returnNullIfNotFound: true })
   const powerEntity = useEntity(asEntityName(side?.powerSwitchEntityId ?? 'switch.free_sleep_unselected_power'), { returnNullIfNotFound: true })
-  const sideAvailable = Boolean(side && targetEntity && powerEntity && !isUnavailable(targetEntity) && !isUnavailable(powerEntity))
-  const liveSideOn = Boolean(side && powerEntity && !isUnavailable(powerEntity) && powerEntity.state === 'on')
-  const liveTargetTemperature = targetEntity && !isUnavailable(targetEntity) ? numberValue(targetEntity.state) : null
-  const currentTemperature = currentEntity && !isUnavailable(currentEntity) ? numberValue(currentEntity.state) : null
-  const targetMin = numberValue(targetEntity?.attributes.min) ?? FREE_SLEEP_TARGET_MIN
-  const targetMax = numberValue(targetEntity?.attributes.max) ?? FREE_SLEEP_TARGET_MAX
-  const targetStep = numberValue(targetEntity?.attributes.step) ?? FREE_SLEEP_TARGET_STEP
-  const [displayedTargetValue, commitTargetTemperature] = useOptimisticState(liveTargetTemperature, { clearOn: 'confirmation', revertMs: FREE_SLEEP_TARGET_REVERT_MS })
+  const stableClimateEntity = useRecentAvailableEntity(climateEntity, EIGHT_SLEEP_UNAVAILABLE_HOLD_MS)
+  const stableTargetLevelEntity = useRecentAvailableEntity(targetLevelEntity, EIGHT_SLEEP_UNAVAILABLE_HOLD_MS)
+  const stablePowerEntity = useRecentAvailableEntity(powerEntity, EIGHT_SLEEP_UNAVAILABLE_HOLD_MS)
+  const stableTargetEntity = useRecentAvailableEntity(targetEntity, EIGHT_SLEEP_UNAVAILABLE_HOLD_MS)
+  const stableCurrentEntity = useRecentAvailableEntity(currentEntity, EIGHT_SLEEP_UNAVAILABLE_HOLD_MS)
+  const useClimateEntity = Boolean(side?.climateEntityId && stableClimateEntity && !isUnavailable(stableClimateEntity))
+  const useTargetLevelEntity = Boolean(side?.targetLevelEntityId && stableTargetLevelEntity && !isUnavailable(stableTargetLevelEntity))
+  const targetScale = useTargetLevelEntity ? 'level' : useClimateEntity ? 'temperature' : 'level'
+  const sideAvailable = useClimateEntity
+    ? Boolean(side && stableClimateEntity && !isUnavailable(stableClimateEntity))
+    : Boolean(side && stableTargetEntity && stablePowerEntity && !isUnavailable(stableTargetEntity) && !isUnavailable(stablePowerEntity))
+  const liveSideOn = useClimateEntity
+    ? Boolean(stableClimateEntity && !isUnavailable(stableClimateEntity) && stableClimateEntity.state !== 'off')
+    : Boolean(side && stablePowerEntity && !isUnavailable(stablePowerEntity) && stablePowerEntity.state === 'on')
+  const climateCurrentTemperature = stableClimateEntity && !isUnavailable(stableClimateEntity) ? numberValue(stableClimateEntity.attributes.current_temperature) : null
+  const liveTargetTemperature = useTargetLevelEntity
+    ? numberValue(stableTargetLevelEntity?.state)
+    : useClimateEntity
+    ? numberValue(stableClimateEntity?.attributes.temperature) ?? climateCurrentTemperature
+    : stableTargetEntity && !isUnavailable(stableTargetEntity) ? numberValue(stableTargetEntity.state) : null
+  const currentTemperature = useClimateEntity
+    ? climateCurrentTemperature
+    : stableCurrentEntity && !isUnavailable(stableCurrentEntity) ? numberValue(stableCurrentEntity.state) : null
+  const targetMin = useTargetLevelEntity
+    ? numberValue(stableTargetLevelEntity?.attributes.min) ?? FREE_SLEEP_TARGET_MIN
+    : useClimateEntity ? numberValue(stableClimateEntity?.attributes.min_temp) ?? 55 : numberValue(stableTargetEntity?.attributes.min) ?? FREE_SLEEP_TARGET_MIN
+  const targetMax = useTargetLevelEntity
+    ? numberValue(stableTargetLevelEntity?.attributes.max) ?? FREE_SLEEP_TARGET_MAX
+    : useClimateEntity ? numberValue(stableClimateEntity?.attributes.max_temp) ?? 110 : numberValue(stableTargetEntity?.attributes.max) ?? FREE_SLEEP_TARGET_MAX
+  const targetStep = useTargetLevelEntity
+    ? numberValue(stableTargetLevelEntity?.attributes.step) ?? FREE_SLEEP_TARGET_STEP
+    : useClimateEntity ? numberValue(stableClimateEntity?.attributes.target_temp_step) ?? 1 : numberValue(stableTargetEntity?.attributes.step) ?? FREE_SLEEP_TARGET_STEP
+  const liveHotFlashActive = Boolean(side && hotFlashActiveEntity && !isUnavailable(hotFlashActiveEntity) && hotFlashActiveEntity.state === 'on')
+  const hotFlashAvailable = Boolean(side && hotFlashActiveEntity && !isUnavailable(hotFlashActiveEntity))
+  const [displayHotFlashActive, commitHotFlashActive] = useOptimisticState(liveHotFlashActive, { clearOn: 'confirmation', revertMs: EIGHT_SLEEP_POWER_REVERT_MS })
+  const [displayedTargetValueRaw, commitTargetTemperature] = useOptimisticState(liveTargetTemperature, { clearOn: 'confirmation', revertMs: FREE_SLEEP_TARGET_REVERT_MS })
   const [displaySideOn, commitDisplaySideOn] = useOptimisticState(liveSideOn, { clearOn: 'confirmation', revertMs: EIGHT_SLEEP_POWER_REVERT_MS })
+  const displayedTargetValue = displayHotFlashActive ? targetMin : displayedTargetValueRaw
   const controlsSideOn = sideAvailable && displaySideOn
-  const heroAction = eightSleepTemperatureAction(displayedTargetValue, controlsSideOn)
-  const hotFlashActive = Boolean(side && hotFlashActiveEntity && !isUnavailable(hotFlashActiveEntity) && hotFlashActiveEntity.state === 'on')
-  const subtitle = hotFlashActive ? 'Hot Flash Mode' : controlsSideOn ? `${titleCaseState(heroAction)} • ${formatEightSleepTargetLevel(displayedTargetValue)}` : 'Off'
+  const heroAction = targetScale === 'temperature' ? sleepypodTemperatureAction(displayedTargetValue, currentTemperature, controlsSideOn) : eightSleepTemperatureAction(displayedTargetValue, controlsSideOn)
+  const targetText = targetScale === 'temperature' ? formatTemperatureCompact(displayedTargetValue) : formatEightSleepTargetLevel(displayedTargetValue)
+  const subtitle = displayHotFlashActive ? 'Hot Flash Mode' : controlsSideOn ? `${titleCaseState(heroAction)} • ${targetText}` : 'Off'
 
   return {
     commitDisplaySideOn,
+    commitHotFlashActive,
     commitTargetTemperature,
+    controlMode: useClimateEntity ? 'climate' : 'legacy',
     controlsSideOn,
     currentTemperature,
     displayedTargetValue,
     heroAction,
+    hotFlashActive: displayHotFlashActive,
+    hotFlashAvailable,
     sideAvailable,
     subtitle,
     targetMax,
     targetMin,
+    targetScale,
     targetStep,
   }
 }
@@ -2355,15 +2483,15 @@ function EightSleepThermostatHero({ modalState, side }: { modalState: EightSleep
   const controlsSideOnRef = useRef(false)
   const [dragValue, setDragValue] = useState<number | null>(null)
   const [targetDragging, setTargetDragging] = useState(false)
-  const { commitDisplaySideOn, commitTargetTemperature, controlsSideOn, displayedTargetValue: sourceTargetValue, sideAvailable, targetMax, targetMin, targetStep } = modalState
+  const { commitDisplaySideOn, commitTargetTemperature, controlMode, controlsSideOn, currentTemperature, displayedTargetValue: sourceTargetValue, sideAvailable, targetMax, targetMin, targetScale, targetStep } = modalState
   const displayedTargetValue = dragValue ?? sourceTargetValue
-  const heroAction = eightSleepTemperatureAction(displayedTargetValue, controlsSideOn)
-  const heroTargetText = displayedTargetValue === null ? '--' : formatEightSleepTargetLevel(displayedTargetValue)
+  const heroAction = targetScale === 'temperature' ? sleepypodTemperatureAction(displayedTargetValue, currentTemperature, controlsSideOn) : eightSleepTemperatureAction(displayedTargetValue, controlsSideOn)
+  const heroTargetText = displayedTargetValue === null ? '--' : formatBedTargetValue(displayedTargetValue, modalState)
   const heroReadoutAction = controlsSideOn ? titleCaseState(heroAction) : null
   const heroReadoutText = controlsSideOn ? heroTargetText : 'OFF'
-  const heroLabel = controlsSideOn ? `${side.title} thermostat ${heroReadoutAction} ${formatEightSleepTargetLevel(displayedTargetValue)}` : `${side.title} thermostat Off`
+  const heroLabel = controlsSideOn ? `${side.title} thermostat ${heroReadoutAction} ${heroTargetText}` : `${side.title} thermostat Off`
   const heroHintText = `Tap the thermostat to turn ${controlsSideOn ? 'off' : 'on'} the Pod.`
-  const sliderValue = displayedTargetValue ?? 0
+  const sliderValue = displayedTargetValue ?? (targetScale === 'temperature' ? targetMin : 0)
   const canDragTarget = sideAvailable && controlsSideOn && displayedTargetValue !== null
 
   useEffect(() => {
@@ -2382,7 +2510,11 @@ function EightSleepThermostatHero({ modalState, side }: { modalState: EightSleep
       pendingTargetValueRef.current = null
       targetSyncTimerRef.current = null
       if (pendingValue === null) return
-      callService({ domain: 'number', service: 'set_value', target: side.targetTemperatureEntityId, serviceData: { value: pendingValue } })
+      if (controlMode === 'climate' && targetScale === 'temperature' && side.climateEntityId) {
+        callService({ domain: 'climate', service: 'set_temperature', target: side.climateEntityId, serviceData: { temperature: pendingValue } })
+        return
+      }
+      callService({ domain: 'number', service: 'set_value', target: controlMode === 'climate' && side.targetLevelEntityId ? side.targetLevelEntityId : side.targetTemperatureEntityId, serviceData: { value: pendingValue } })
     }, FREE_SLEEP_NUMBER_SYNC_DEBOUNCE_MS)
   }
 
@@ -2447,7 +2579,8 @@ function EightSleepThermostatHero({ modalState, side }: { modalState: EightSleep
     if (!controlsSideOnRef.current) {
       controlsSideOnRef.current = true
       commitDisplaySideOn(true)
-      callService({ domain: 'switch', service: 'turn_on', target: side.powerSwitchEntityId })
+      if (controlMode === 'climate' && side.climateEntityId) callService({ domain: 'climate', service: 'set_hvac_mode', target: side.climateEntityId, serviceData: { hvac_mode: 'heat' } })
+      else callService({ domain: 'switch', service: 'turn_on', target: side.powerSwitchEntityId })
       return
     }
 
@@ -2455,7 +2588,8 @@ function EightSleepThermostatHero({ modalState, side }: { modalState: EightSleep
     controlsSideOnRef.current = false
     setDragValue(null)
     commitDisplaySideOn(false)
-    callService({ domain: 'switch', service: 'turn_off', target: side.powerSwitchEntityId })
+    if (controlMode === 'climate' && side.climateEntityId) callService({ domain: 'climate', service: 'set_hvac_mode', target: side.climateEntityId, serviceData: { hvac_mode: 'off' } })
+    else callService({ domain: 'switch', service: 'turn_off', target: side.powerSwitchEntityId })
   }
 
   return (
@@ -2468,7 +2602,7 @@ function EightSleepThermostatHero({ modalState, side }: { modalState: EightSleep
             current={0}
             disabled={!canDragTarget}
             inactive={!controlsSideOn}
-            label={`${side.title} target level`}
+            label={`${side.title} target ${targetScale === 'temperature' ? 'temperature' : 'level'}`}
             max={targetMax}
             min={targetMin}
             mode="full"
@@ -2528,6 +2662,26 @@ function EightSleepAwayModeCard({ side }: { side: EightSleepSideConfig }) {
   )
 }
 
+function EightSleepScheduleSection({ modalState, side }: { modalState: EightSleepBedModalState; side: EightSleepSideConfig }) {
+  return (
+    <section className={styles.section}>
+      <SectionHeader title="Sleep Schedule" />
+      <div className={styles.eightSleepStageGrid}>
+        {FREE_SLEEP_SCHEDULE_STAGES.map((stage) => (
+          <EightSleepScheduleTemperatureControl
+            entityId={side.scheduleStageTemperatureEntityIds[stage.key]}
+            fallbackTemperature={modalState.displayedTargetValue}
+            icon={stage.icon}
+            key={stage.key}
+            label={stage.label}
+            sideTitle={side.title}
+          />
+        ))}
+      </div>
+    </section>
+  )
+}
+
 function EightSleepBedtimeSetting({ side }: { side: EightSleepSideConfig }) {
   const inputRef = useRef<HTMLInputElement | null>(null)
   const bedtimeEntity = useEntity(asEntityName(side.bedtimeEntityId), { returnNullIfNotFound: true })
@@ -2569,15 +2723,16 @@ function EightSleepBedtimeSetting({ side }: { side: EightSleepSideConfig }) {
   )
 }
 
-function EightSleepAlarmMasterCard({ enabled, onAddAlarm, onEnabledChange, side }: { enabled: boolean; onAddAlarm: () => void; onEnabledChange: (enabled: boolean) => void; side: EightSleepSideConfig }) {
+function EightSleepAlarmMasterCard({ enabled, locked = false, onAddAlarm, onEnabledChange, side }: { enabled: boolean; locked?: boolean; onAddAlarm: () => void; onEnabledChange: (enabled: boolean) => void; side: EightSleepSideConfig }) {
   const freeSleepEntity = useEntity(asEntityName(side.alarmsEnabledEntityId), { returnNullIfNotFound: true })
   const legacyEntityId = eightSleepAlarmMasterEntityId(side.alarmOwner)
   const legacyEntity = useEntity(asEntityName(legacyEntityId), { returnNullIfNotFound: true })
-  const entity = freeSleepEntity ?? legacyEntity
-  const entityId = freeSleepEntity ? side.alarmsEnabledEntityId : legacyEntityId
-  const domain = freeSleepEntity ? 'switch' : 'input_boolean'
+  const useFreeSleepEntity = Boolean(freeSleepEntity && !isUnavailable(freeSleepEntity))
+  const entity = useFreeSleepEntity ? freeSleepEntity : legacyEntity
+  const entityId = useFreeSleepEntity ? side.alarmsEnabledEntityId : legacyEntityId
+  const domain = useFreeSleepEntity ? 'switch' : 'input_boolean'
   const callService = useCallService()
-  const unavailable = !entity || isUnavailable(entity)
+  const unavailable = !locked && (!entity || isUnavailable(entity))
   const enabledRef = useRef(enabled)
 
   useEffect(() => {
@@ -2585,6 +2740,7 @@ function EightSleepAlarmMasterCard({ enabled, onAddAlarm, onEnabledChange, side 
   }, [enabled])
 
   const toggleAlarms = () => {
+    if (locked) return
     if (unavailable) return
     const nextEnabled = !enabledRef.current
     debugFreeSleepAlarm(callService, 'alarm-master-toggle-click', {
@@ -2925,15 +3081,25 @@ function EightSleepAlarmDayGroup({
   )
 }
 
-function EightSleepAlarmsSection({ side }: { side: EightSleepSideConfig }) {
+function EightSleepAlarmsSection({
+  alwaysEnabled = false,
+  scheduleEntityId = FREE_SLEEP_SCHEDULE_SENSOR_ENTITY_ID,
+  scheduleSetTopic = FREE_SLEEP_SCHEDULE_SET_TOPIC,
+  side,
+}: {
+  alwaysEnabled?: boolean
+  scheduleEntityId?: string
+  scheduleSetTopic?: string
+  side: EightSleepSideConfig
+}) {
   const freeSleepMasterEntity = useEntity(asEntityName(side.alarmsEnabledEntityId), { returnNullIfNotFound: true })
   const legacyMasterEntity = useEntity(asEntityName(eightSleepAlarmMasterEntityId(side.alarmOwner)), { returnNullIfNotFound: true })
-  const masterEntity = freeSleepMasterEntity ?? legacyMasterEntity
-  const scheduleEntity = useEntity(asEntityName(FREE_SLEEP_SCHEDULE_SENSOR_ENTITY_ID), { returnNullIfNotFound: true })
+  const masterEntity = freeSleepMasterEntity && !isUnavailable(freeSleepMasterEntity) ? freeSleepMasterEntity : legacyMasterEntity
+  const scheduleEntity = useEntity(asEntityName(scheduleEntityId), { returnNullIfNotFound: true })
   const entities = useHass((state) => state.entities) as unknown as EntityActionStateMap
   const callService = useCallService()
   const [displayEnabled, commitEnabled] = useOptimisticState(masterEntity?.state === 'on', { clearOn: 'confirmation', revertMs: EIGHT_SLEEP_POWER_REVERT_MS })
-  const enabled = displayEnabled && Boolean(masterEntity) && !isUnavailable(masterEntity)
+  const enabled = alwaysEnabled || (displayEnabled && Boolean(masterEntity) && !isUnavailable(masterEntity))
   const schedule = scheduleFromEntityAttributes(scheduleEntity?.attributes as Record<string, unknown> | undefined)
   const sourceRecords = schedule ? alarmRecordsFromSchedule(schedule, side) : legacyAlarmRecords(side.alarmOwner, entities)
   const sourceRecordKey = alarmRecordsStateKey(sourceRecords)
@@ -3005,14 +3171,14 @@ function EightSleepAlarmsSection({ side }: { side: EightSleepSideConfig }) {
       payload,
       records: compactAlarmRecordsForDebug(sortedRecords),
       side: side.scheduleSide,
-      topic: FREE_SLEEP_SCHEDULE_SET_TOPIC,
+      topic: scheduleSetTopic,
     })
     callService({
       domain: 'mqtt',
       service: 'publish',
       serviceData: {
         payload: JSON.stringify(payload),
-        topic: FREE_SLEEP_SCHEDULE_SET_TOPIC,
+        topic: scheduleSetTopic,
       },
     })
   }
@@ -3099,7 +3265,7 @@ function EightSleepAlarmsSection({ side }: { side: EightSleepSideConfig }) {
   return (
     <section className={styles.section}>
       <SectionHeader title="Alarms" />
-      <EightSleepAlarmMasterCard enabled={enabled} onAddAlarm={() => setAddAlarmOpen(true)} onEnabledChange={commitEnabled} side={side} />
+      <EightSleepAlarmMasterCard enabled={enabled} locked={alwaysEnabled} onAddAlarm={() => setAddAlarmOpen(true)} onEnabledChange={commitEnabled} side={side} />
       {enabled && (
         <div className={styles.eightSleepAlarmList}>
           <EightSleepAddAlarmForm onAdded={handleAlarmAdded} onOpenChange={setAddAlarmOpen} open={addAlarmOpen} side={side} />
@@ -3143,7 +3309,7 @@ function EightSleepScheduleTemperatureControl({ entityId, fallbackTemperature, i
       pendingValueRef.current = null
       valueSyncTimerRef.current = null
       if (pendingValue === null) return
-      callService({ domain: 'number', service: 'set_value', target: entityId, serviceData: { value: pendingValue } })
+      callService({ domain: entityId.split('.')[0], service: 'set_value', target: entityId, serviceData: { value: pendingValue } })
     }, FREE_SLEEP_NUMBER_SYNC_DEBOUNCE_MS)
   }
 
@@ -3196,14 +3362,13 @@ function EightSleepAlarmActiveActions({ side }: { side: EightSleepSideConfig }) 
   )
 }
 
-function EightSleepHotFlashButton({ side }: { side: EightSleepSideConfig }) {
-  const activeEntity = useEntity(asEntityName(side.hotFlashActiveEntityId), { returnNullIfNotFound: true })
+function EightSleepHotFlashButton({ modalState, side }: { modalState: EightSleepBedModalState; side: EightSleepSideConfig }) {
   const restoreAtEntity = useEntity(asEntityName(side.hotFlashRestoreAtEntityId), { returnNullIfNotFound: true })
   const timerEntity = useEntity(asEntityName(side.hotFlashTimerEntityId), { returnNullIfNotFound: true })
   const callService = useCallService()
   const [now, setNow] = useState(() => Date.now())
-  const unavailable = !activeEntity || isUnavailable(activeEntity)
-  const active = activeEntity?.state === 'on'
+  const unavailable = !modalState.hotFlashAvailable
+  const active = modalState.hotFlashActive
   const stateText = unavailable ? 'Unavailable' : active ? 'Active' : 'Inactive'
   const countdown = active ? eightSleepHotFlashCountdown(timerEntity, restoreAtEntity, now) : null
 
@@ -3215,10 +3380,13 @@ function EightSleepHotFlashButton({ side }: { side: EightSleepSideConfig }) {
 
   const activate = () => {
     if (unavailable) return
+    modalState.commitHotFlashActive(true)
+    modalState.commitDisplaySideOn(true)
     callService({ domain: 'input_button', service: 'press', target: side.hotFlashButtonEntityId })
   }
 
   const cancel = () => {
+    modalState.commitHotFlashActive(false)
     callService({ domain: 'input_button', service: 'press', target: side.hotFlashCancelButtonEntityId })
   }
 
@@ -3238,28 +3406,31 @@ function EightSleepHotFlashButton({ side }: { side: EightSleepSideConfig }) {
 
 function EightSleepBedModal({ modalState, onClose, open, side }: { modalState: EightSleepBedModalState; onClose: () => void; open: boolean; side: EightSleepSideConfig }) {
   const [activeTab, setActiveTab] = useState<EightSleepModalTab>('schedule')
+  const tabs = modalState.controlMode === 'climate' ? SLEEPYPOD_MODAL_TABS : EIGHT_SLEEP_MODAL_TABS
+  const renderedActiveTab = tabs.some((tab) => tab.tab === activeTab) ? activeTab : tabs[0].tab
 
   return (
     <ModalSheet
       contentStyle={EIGHT_SLEEP_BED_MODAL_STYLE}
-      footer={<EightSleepModalNav activeTab={activeTab} onTabChange={setActiveTab} sideTitle={side.title} />}
+      footer={<EightSleepModalNav activeTab={renderedActiveTab} onTabChange={setActiveTab} sideTitle={side.title} tabs={tabs} />}
       onClose={onClose}
       open={open}
       subtitle={modalState.subtitle}
       surface="hass-popup"
       title={side.title}
     >
-      <EightSleepBedModalContent activeTab={activeTab} modalState={modalState} side={side} />
+      <EightSleepBedModalContent activeTab={renderedActiveTab} modalState={modalState} side={side} tabs={tabs} />
     </ModalSheet>
   )
 }
 
-function EightSleepModalNav({ activeTab, onTabChange, sideTitle }: { activeTab: EightSleepModalTab; onTabChange: (tab: EightSleepModalTab) => void; sideTitle: string }) {
+function EightSleepModalNav({ activeTab, onTabChange, sideTitle, tabs }: { activeTab: EightSleepModalTab; onTabChange: (tab: EightSleepModalTab) => void; sideTitle: string; tabs: typeof EIGHT_SLEEP_MODAL_TABS }) {
   const { clearVisualTab, setVisualTabNow, visualActiveTab } = useImmediateVisualTab(activeTab)
+  const navStyle = { '--eight-sleep-modal-nav-cols': tabs.length } as CSSProperties
 
   return (
-    <nav aria-label={`${sideTitle} modal sections`} className={styles.eightSleepModalNav}>
-      {EIGHT_SLEEP_MODAL_TABS.map((item) => {
+    <nav aria-label={`${sideTitle} modal sections`} className={styles.eightSleepModalNav} data-tab-count={tabs.length} style={navStyle}>
+      {tabs.map((item) => {
         const isActive = visualActiveTab === item.tab
         const isCurrent = activeTab === item.tab
         return (
@@ -3286,7 +3457,35 @@ function EightSleepModalNav({ activeTab, onTabChange, sideTitle }: { activeTab: 
   )
 }
 
-function EightSleepBedModalContent({ activeTab, modalState, side }: { activeTab: EightSleepModalTab; modalState: EightSleepBedModalState; side: EightSleepSideConfig }) {
+function SleepypodMetricCard({ active = false, entityId, icon, title }: { active?: boolean; entityId: string | undefined; icon: string; title: string }) {
+  const entity = useEntity(asEntityName(entityId ?? 'sensor.sleepypod_unselected_metric'), { returnNullIfNotFound: true })
+  const stateText = formatCompactEntityState(entity, 'Unavailable')
+  return <ThermostatGlassCard active={active && !isUnavailable(entity)} icon={icon} stateText={stateText} title={title} />
+}
+
+function SleepypodStatusSection({ modalState, side }: { modalState: EightSleepBedModalState; side: EightSleepSideConfig }) {
+  const pumpStall = useEntity(asEntityName(side.pumpStallEntityId ?? 'binary_sensor.sleepypod_unselected_pump_stall'), { returnNullIfNotFound: true })
+  const pumpClog = useEntity(asEntityName(side.pumpClogEntityId ?? 'binary_sensor.sleepypod_unselected_pump_clog'), { returnNullIfNotFound: true })
+  const pumpAlert = pumpStall?.state === 'on' || pumpClog?.state === 'on'
+  const pumpText = pumpAlert ? 'Check pump' : pumpStall || pumpClog ? 'OK' : 'Unavailable'
+
+  return (
+    <section className={styles.section}>
+      <SectionHeader title="Status" />
+      <div className={styles.eightSleepStageGrid}>
+        <ThermostatGlassCard active={modalState.controlsSideOn} hvacAction={modalState.heroAction} icon="mdi:thermometer" stateText={formatTemperatureCompact(modalState.currentTemperature)} thermalStatus={thermostatThermalStatus(modalState.heroAction)} title="Current Temp" />
+        <ThermostatGlassCard active={!pumpAlert && Boolean(pumpStall || pumpClog)} icon={pumpAlert ? 'mdi:alert' : 'mdi:pump'} stateText={pumpText} title="Pump Status" />
+        <SleepypodMetricCard entityId={side.pumpLoopTemperatureEntityId} icon="mdi:coolant-temperature" title="Loop Temp" />
+        <SleepypodMetricCard entityId={side.pumpRpmEntityId} icon="mdi:pump" title="Pump RPM" />
+        <SleepypodMetricCard active entityId={side.heartRateEntityId} icon="mdi:heart-pulse" title="Heart Rate" />
+        <SleepypodMetricCard active entityId={side.breathingRateEntityId} icon="mdi:lungs" title="Breathing" />
+        <SleepypodMetricCard active entityId={side.hrvEntityId} icon="mdi:chart-bell-curve" title="HRV" />
+      </div>
+    </section>
+  )
+}
+
+function EightSleepBedModalContent({ activeTab, modalState, side, tabs }: { activeTab: EightSleepModalTab; modalState: EightSleepBedModalState; side: EightSleepSideConfig; tabs?: typeof EIGHT_SLEEP_MODAL_TABS }) {
   const modalBodyRef = useRef<HTMLDivElement | null>(null)
   const modalPanelRef = useRef<HTMLDivElement | null>(null)
   const { displayedTab: effectiveActiveTab, transitionState } = useSmoothDisplayedModalTab(activeTab)
@@ -3298,7 +3497,7 @@ function EightSleepBedModalContent({ activeTab, modalState, side }: { activeTab:
   const presenceText = presence?.state === 'on' ? 'In Bed' : presence?.state === 'off' ? 'Away' : titleCaseState(presence?.state ?? 'unavailable')
   const timeRemainingText = formatSecondsRemaining(secondsRemaining?.state)
   const alarmActive = alarmVibrating?.state === 'on'
-  const selectedTabLabel = EIGHT_SLEEP_MODAL_TABS.find((tab) => tab.tab === effectiveActiveTab)?.label ?? 'Sleep Schedule'
+  const selectedTabLabel = (tabs ?? EIGHT_SLEEP_MODAL_TABS).find((tab) => tab.tab === effectiveActiveTab)?.label ?? 'Sleep Schedule'
 
   useEffect(() => {
     if (!shouldResetScrollOnTabChange()) return
@@ -3316,37 +3515,27 @@ function EightSleepBedModalContent({ activeTab, modalState, side }: { activeTab:
         <EightSleepThermostatHero modalState={modalState} side={side} />
       </div>
       <div aria-label={`${side.title} ${selectedTabLabel}`} className={styles.eightSleepModalPanel} data-modal-tab-transition-state={transitionState} data-scroll-region="eight-sleep-panel" ref={modalPanelRef}>
-        {effectiveActiveTab === 'schedule' && (
-          <section className={styles.section}>
-            <SectionHeader title="Sleep Schedule" />
-            <div className={styles.eightSleepStageGrid}>
-              {FREE_SLEEP_SCHEDULE_STAGES.map((stage) => (
-                <EightSleepScheduleTemperatureControl
-                  entityId={side.scheduleStageTemperatureEntityIds[stage.key]}
-                  fallbackTemperature={modalState.displayedTargetValue}
-                  icon={stage.icon}
-                  key={stage.key}
-                  label={stage.label}
-                  sideTitle={side.title}
-                />
-              ))}
-            </div>
-          </section>
-        )}
+        {effectiveActiveTab === 'schedule' && <EightSleepScheduleSection modalState={modalState} side={side} />}
         {effectiveActiveTab === 'modes' && (
           <section className={styles.section}>
             <SectionHeader title="Special Modes" />
-            <Description className={styles.thermostatDescription}>Activating hot flash mode will set the bed to -10 for fifteen minutes.</Description>
-            <EightSleepHotFlashButton side={side} />
+            <Description className={styles.thermostatDescription}>Activating hot flash mode will set the bed to {modalState.targetScale === 'temperature' ? '55°F' : '-10'} for fifteen minutes.</Description>
+            <EightSleepHotFlashButton modalState={modalState} side={side} />
           </section>
         )}
         {effectiveActiveTab === 'alarms' && (
           <>
             {alarmActive && <EightSleepAlarmActiveActions side={side} />}
-            <EightSleepAlarmsSection side={side} />
+            <EightSleepAlarmsSection
+              alwaysEnabled={modalState.controlMode === 'climate'}
+              scheduleEntityId={modalState.controlMode === 'climate' ? SLEEPYPOD_SCHEDULE_SENSOR_ENTITY_ID : FREE_SLEEP_SCHEDULE_SENSOR_ENTITY_ID}
+              scheduleSetTopic={modalState.controlMode === 'climate' ? SLEEPYPOD_SCHEDULE_SET_TOPIC : FREE_SLEEP_SCHEDULE_SET_TOPIC}
+              side={side}
+            />
           </>
         )}
-        {effectiveActiveTab === 'status' && (
+        {effectiveActiveTab === 'status' && modalState.controlMode === 'climate' && <SleepypodStatusSection modalState={modalState} side={side} />}
+        {effectiveActiveTab === 'status' && modalState.controlMode === 'legacy' && (
           <section className={styles.section}>
             <SectionHeader title="Status" />
             <div className={styles.eightSleepStageGrid}>
@@ -3357,7 +3546,7 @@ function EightSleepBedModalContent({ activeTab, modalState, side }: { activeTab:
             </div>
           </section>
         )}
-        {effectiveActiveTab === 'settings' && (
+        {effectiveActiveTab === 'settings' && modalState.controlMode === 'legacy' && (
           <>
             <section className={styles.section}>
               <SectionHeader title="Bedtime" />

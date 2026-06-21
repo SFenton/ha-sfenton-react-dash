@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { useEntity, useHass } from '@hakit/core'
 import { GlassTile } from '../core/GlassTile'
+import { Description } from '../core/Description'
 import { MaterialIcon } from '../core/Icon'
 import { ModalSheet } from '../core/ModalSheet'
-import { OptionPickerDialog, type PickerOption } from '../core/OptionPickerDialog'
 import { type VacuumConfig, type VacuumConsumableConfig, type VacuumZoneConfig } from '../../constants/portedDashboard'
 import { useImmediateVisualTab, useSmoothDisplayedModalTab } from '../../hooks/useSmoothDisplayedModalTab'
 import { asEntityName, titleCaseState } from './entityState'
@@ -16,10 +16,14 @@ type VacuumModalTab = 'controls' | 'zones' | 'more' | 'info'
 const VACUUM_MODAL_TABS: { icon: string; label: string; tab: VacuumModalTab }[] = [
   { icon: 'mdi:robot-vacuum', label: 'Controls', tab: 'controls' },
   { icon: 'mdi:floor-plan', label: 'Zones', tab: 'zones' },
-  { icon: 'mdi:dots-horizontal', label: 'More', tab: 'more' },
-  { icon: 'mdi:information', label: 'Info', tab: 'info' },
+  { icon: 'mdi:flash', label: 'Actions', tab: 'more' },
+  { icon: 'mdi:information-outline', label: 'Info', tab: 'info' },
 ]
 const DESKTOP_MODAL_QUERY = '(min-width: 760px)'
+const CLEANING_SETUP_DESCRIPTION = 'Choose how many passes the vacuum should make, then start cleaning with the selected zones.'
+const MODE_DESCRIPTION = 'Choose whether the robot vacuums, mops, or combines both for the next run.'
+const FAN_DESCRIPTION = 'Adjust suction strength for carpets, hard floors, and quieter cleaning.'
+const WATER_DESCRIPTION = 'Set mop water flow so floors get the right amount of moisture.'
 
 type CallService = (params: Record<string, unknown>) => void
 
@@ -78,6 +82,12 @@ function formatStateValue(value: string | undefined, fallback = 'Unavailable') {
   return titleCaseState(value)
 }
 
+function formatPassCount(value: string | undefined) {
+  if (!value) return '1x'
+  const passes = Number(value)
+  return Number.isFinite(passes) ? `${passes}x` : formatStateValue(value)
+}
+
 function formatEntityValue(entity: EntityLike | null | undefined, fallback = 'Unavailable') {
   if (!entity) return fallback
   if (entity.entity_id.startsWith('sensor.') || entity.entity_id.startsWith('input_text.')) return entity.state || fallback
@@ -127,13 +137,24 @@ function stringListAttribute(entity: EntityLike | null | undefined, name: string
   return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string' && item.trim().length > 0) : []
 }
 
+function ControlItem({ children, description }: { children: ReactNode; description?: string }) {
+  return (
+    <div className={styles.controlItem} data-has-description={description ? 'true' : 'false'}>
+      {description && <Description>{description}</Description>}
+      {children}
+    </div>
+  )
+}
+
 function ActionButton({
+  description,
   icon,
   label,
   onClick,
   tone = 'neutral',
   variant = 'default',
 }: {
+  description?: string
   icon: string
   label: string
   onClick: () => void
@@ -141,10 +162,12 @@ function ActionButton({
   variant?: 'default' | 'sub'
 }) {
   return (
-    <button className={styles.actionButton} data-icon={icon} data-tone={tone} data-variant={variant} onClick={onClick} type="button">
-      <MaterialIcon name={icon} size={18} />
-      {label}
-    </button>
+    <ControlItem description={description}>
+      <button aria-label={label} className={styles.actionButton} data-icon={icon} data-tone={tone} data-variant={variant} onClick={onClick} type="button">
+        <MaterialIcon name={icon} size={18} />
+        <span className={styles.actionButtonText}>{label}</span>
+      </button>
+    </ControlItem>
   )
 }
 
@@ -208,34 +231,32 @@ function VacuumConsumablePill({ consumable }: { consumable: VacuumConsumableConf
   return <InfoPill grouped icon={consumable.icon} label={consumable.title} tone={consumableTone(consumable, entity)} value={value} />
 }
 
-function CompositeControl({ children, icon, subtitle, title }: { children: ReactNode; icon: string; subtitle?: string; title: string }) {
+function ControlSection({ children, title }: { children: ReactNode; title: string }) {
   return (
-    <div aria-label={title} className={styles.compositeButton} role="group">
-      <div className={styles.compositeHeader}>
-        <span className={styles.compositeIcon}>
-          <MaterialIcon name={icon} size={20} />
-        </span>
-        <span className={styles.compositeText}>
-          <h3>{title}</h3>
-          {subtitle && <span>{subtitle}</span>}
-        </span>
-      </div>
-      <div className={styles.compositeControls}>{children}</div>
-    </div>
+    <section className={styles.section}>
+      <SectionHeader title={title} />
+      <div className={styles.controlGrid} data-layout="default">{children}</div>
+    </section>
   )
 }
 
 function SelectSetting({
+  description,
   entity,
   entityId,
+  formatOptionLabel,
+  hideLabel = false,
   icon,
   label,
   showIcon = true,
   valueLabel,
   variant = 'setting',
 }: {
+  description?: string
   entity: EntityLike | null | undefined
   entityId: string
+  formatOptionLabel?: (value: string) => string
+  hideLabel?: boolean
   icon: string
   label: string
   showIcon?: boolean
@@ -243,77 +264,74 @@ function SelectSetting({
   variant?: 'setting' | 'sub'
 }) {
   const callService = useHass((state) => state.helpers.callService) as unknown as CallService
-  const [pickerOpen, setPickerOpen] = useState(false)
   const unavailable = !entity || isUnavailableState(entity.state)
   const options = entityOptions(entity)
   const value = entity?.state ?? ''
   const displayValue = valueLabel ?? formatEntityValue(entity, label)
   const selectOption = (option: string) => {
-    setPickerOpen(false)
     if (option !== value) callService({ domain: domainFromEntity(entityId), service: 'select_option', target: entityId, serviceData: { option } })
   }
 
   if (unavailable || options.length === 0) {
     return variant === 'sub' ? (
-      <span className={styles.subInfoPill}>
-        <span>{label}</span>
-        <strong>{displayValue}</strong>
-      </span>
+      <ControlItem description={description}>
+        <span className={styles.subInfoPill}>
+          {!hideLabel && <span>{label}</span>}
+          <strong>{displayValue}</strong>
+        </span>
+      </ControlItem>
     ) : (
-      <InfoPill icon={icon} label={label} value={displayValue} />
+      <ControlItem description={description}>
+        <InfoPill icon={icon} label={label} value={displayValue} />
+      </ControlItem>
     )
   }
 
   const renderedOptions = options.includes(value) ? options : [value, ...options].filter(Boolean)
-  const pickerOptions: PickerOption[] = renderedOptions.map((option) => ({ value: option, label: formatStateValue(option) }))
+  const selectOptions = renderedOptions.map((option) => ({ value: option, label: formatOptionLabel ? formatOptionLabel(option) : option === value && valueLabel ? valueLabel : formatStateValue(option) }))
+  const nativeSelect = (
+    <select
+      aria-label={`${label} ${displayValue}`}
+      className={styles.nativeSelect}
+      onChange={(event) => selectOption(event.currentTarget.value)}
+      value={value}
+    >
+      {selectOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+    </select>
+  )
 
   if (variant === 'sub') {
     return (
-      <>
-        <button
-          aria-expanded={pickerOpen}
-          aria-haspopup="dialog"
-          aria-label={`${label} ${displayValue}`}
-          className={styles.subSelectButton}
-          data-has-icon={showIcon ? 'true' : 'false'}
-          onClick={() => setPickerOpen(true)}
-          type="button"
-        >
+      <ControlItem description={description}>
+        <span className={styles.subSelectButton} data-has-icon={showIcon ? 'true' : 'false'} data-label-hidden={hideLabel ? 'true' : 'false'} data-native-select="true">
           {showIcon && <MaterialIcon name={icon} size={17} />}
-          <span className={styles.subSelectText}>
-            <span>{label}</span>
+          <span aria-hidden="true" className={styles.subSelectText}>
+            {!hideLabel && <span>{label}</span>}
             <strong>{displayValue}</strong>
           </span>
           <MaterialIcon name="mdi:chevron-down" size={17} />
-        </button>
-        <OptionPickerDialog onClose={() => setPickerOpen(false)} onSelect={selectOption} open={pickerOpen} options={pickerOptions} title={label} value={value} />
-      </>
+          {nativeSelect}
+        </span>
+      </ControlItem>
     )
   }
 
   return (
-    <>
-      <button
-        aria-expanded={pickerOpen}
-        aria-haspopup="dialog"
-        aria-label={`${label} ${displayValue}`}
-        className={`${styles.settingPill} ${styles.settingButton}`}
-        onClick={() => setPickerOpen(true)}
-        type="button"
-      >
+    <ControlItem description={description}>
+      <span className={`${styles.settingPill} ${styles.settingButton}`} data-native-select="true">
         <span className={styles.settingIcon}>
           <MaterialIcon name={icon} size={18} />
         </span>
-        <span className={styles.settingText}>
+        <span aria-hidden="true" className={styles.settingText}>
           <span>{label}</span>
           <strong>{displayValue}</strong>
         </span>
         <span className={styles.settingChevron}>
           <MaterialIcon name="mdi:chevron-down" size={18} />
         </span>
-      </button>
-      <OptionPickerDialog onClose={() => setPickerOpen(false)} onSelect={selectOption} open={pickerOpen} options={pickerOptions} title={label} value={value} />
-    </>
+        {nativeSelect}
+      </span>
+    </ControlItem>
   )
 }
 
@@ -366,21 +384,31 @@ function VacuumStatusSummary({ vacuum }: { vacuum: VacuumConfig }) {
   )
 }
 
-function VacuumConsumablesPanel({ vacuum }: { vacuum: VacuumConfig }) {
-  if (vacuum.consumables.length === 0) return null
+function VacuumConsumableGroup({ consumables, title }: { consumables: VacuumConsumableConfig[]; title: string }) {
+  if (consumables.length === 0) return null
 
   return (
-    <section aria-label="Consumables" className={styles.consumablesPanel}>
-      <SectionHeader title="Consumables" />
+    <section aria-label={title} className={styles.consumablesPanel}>
+      <SectionHeader title={title} />
       <div className={styles.consumablesGrid}>
-        {vacuum.consumables.map((consumable) => <VacuumConsumablePill consumable={consumable} key={consumable.entityId} />)}
+        {consumables.map((consumable) => <VacuumConsumablePill consumable={consumable} key={consumable.entityId} />)}
       </div>
     </section>
   )
 }
 
 function VacuumInfoSection({ vacuum }: { vacuum: VacuumConfig }) {
-  return <VacuumConsumablesPanel vacuum={vacuum} />
+  const binState = vacuum.consumables.filter((consumable) => consumable.valueKind === 'status')
+  const consumables = vacuum.consumables.filter((consumable) => consumable.valueKind === 'duration')
+
+  if (binState.length === 0 && consumables.length === 0) return null
+
+  return (
+    <>
+      <VacuumConsumableGroup consumables={binState} title="Bin State" />
+      <VacuumConsumableGroup consumables={consumables} title="Consumables" />
+    </>
+  )
 }
 
 function VacuumPowerSettings({ vacuum }: { vacuum: VacuumConfig }) {
@@ -397,11 +425,11 @@ function VacuumPowerSettings({ vacuum }: { vacuum: VacuumConfig }) {
   if (!hasMode && !showFan && !showWater) return null
 
   return (
-    <CompositeControl icon="mdi:robot-vacuum" title="Power Settings">
-      {hasMode && vacuum.modeEntityId && <SelectSetting entity={mode} entityId={vacuum.modeEntityId} icon="mdi:robot-vacuum" label="Mode" valueLabel={modeLabel} variant="sub" />}
-      {showFan && vacuum.fanEntityId && <SelectSetting entity={fan} entityId={vacuum.fanEntityId} icon="mdi:fan" label="Fan" variant="sub" />}
-      {showWater && vacuum.waterEntityId && <SelectSetting entity={water} entityId={vacuum.waterEntityId} icon="mdi:water" label="Water" variant="sub" />}
-    </CompositeControl>
+    <ControlSection title="Power Settings">
+      {hasMode && vacuum.modeEntityId && <SelectSetting description={MODE_DESCRIPTION} entity={mode} entityId={vacuum.modeEntityId} icon="mdi:robot-vacuum" label="Mode" valueLabel={modeLabel} variant="sub" />}
+      {showFan && vacuum.fanEntityId && <SelectSetting description={FAN_DESCRIPTION} entity={fan} entityId={vacuum.fanEntityId} icon="mdi:fan" label="Fan" variant="sub" />}
+      {showWater && vacuum.waterEntityId && <SelectSetting description={WATER_DESCRIPTION} entity={water} entityId={vacuum.waterEntityId} icon="mdi:water" label="Water" variant="sub" />}
+    </ControlSection>
   )
 }
 
@@ -422,24 +450,32 @@ function VacuumStateActions({ vacuum }: { vacuum: VacuumConfig }) {
   const stop = () => callServiceAction(callService, state === 'error' || chargingBeforeResume ? 'vacuum.stop' : 'vacuum.return_to_base', vacuum.entityId)
   const pause = () => callServiceAction(callService, 'vacuum.pause', vacuum.entityId)
   const start = () => callServiceAction(callService, 'vacuum.start', vacuum.entityId)
+  const cleaningSetupControls = showCleaningSetup ? (
+    <>
+      <Description>{CLEANING_SETUP_DESCRIPTION}</Description>
+      <div className={styles.cleaningActionGrid} data-layout="cleaning">
+        <SelectSetting entity={passes} entityId={vacuum.passesEntityId} formatOptionLabel={formatPassCount} hideLabel icon="mdi:numeric" label="Cleaning Passes" showIcon={false} valueLabel={formatPassCount(passes?.state)} variant="sub" />
+        <ActionButton icon="mdi:play" label="Clean" onClick={clean} tone="primary" variant="sub" />
+      </div>
+    </>
+  ) : null
 
   if (isUnavailableState(state)) return null
 
   return (
-    <CompositeControl icon="mdi:home" title={sectionTitle}>
-      {showCleaningSetup && <SelectSetting entity={passes} entityId={vacuum.passesEntityId} icon="mdi:numeric" label="Cleaning Passes" showIcon={false} variant="sub" />}
-      {showCleaningSetup && <ActionButton icon="mdi:play" label="Clean" onClick={clean} tone="primary" variant="sub" />}
-      {state === 'idle' && <ActionButton icon="mdi:home" label="Dock" onClick={dock} variant="sub" />}
-      {state === 'error' && !resumable && !lowBattery && <ActionButton icon="mdi:stop" label="Stop" onClick={stop} tone="danger" variant="sub" />}
-      {state === 'error' && !resumable && !lowBattery && <ActionButton icon="mdi:home" label="Dock" onClick={dock} variant="sub" />}
-      {chargingBeforeResume && <ActionButton icon="mdi:play" label="Resume" onClick={start} tone="primary" variant="sub" />}
-      {chargingBeforeResume && <ActionButton icon="mdi:stop" label="Cancel" onClick={stop} tone="danger" variant="sub" />}
-      {state === 'cleaning' && <ActionButton icon="mdi:pause" label="Pause" onClick={pause} tone="warning" variant="sub" />}
-      {state === 'cleaning' && <ActionButton icon="mdi:stop" label="Stop" onClick={stop} tone="danger" variant="sub" />}
-      {state === 'paused' && <ActionButton icon="mdi:play" label="Resume" onClick={start} tone="primary" variant="sub" />}
-      {state === 'paused' && <ActionButton icon="mdi:stop" label="Stop" onClick={stop} tone="danger" variant="sub" />}
-      {state === 'returning' && <ActionButton icon="mdi:pause" label="Pause" onClick={pause} tone="warning" variant="sub" />}
-    </CompositeControl>
+    <ControlSection title={sectionTitle}>
+      {cleaningSetupControls}
+      {state === 'idle' && <ActionButton description="Send the robot back to the dock." icon="mdi:home" label="Dock" onClick={dock} variant="sub" />}
+      {state === 'error' && !resumable && !lowBattery && <ActionButton description="Stop the current vacuum task." icon="mdi:stop" label="Stop" onClick={stop} tone="danger" variant="sub" />}
+      {state === 'error' && !resumable && !lowBattery && <ActionButton description="Send the robot back to the dock." icon="mdi:home" label="Dock" onClick={dock} variant="sub" />}
+      {chargingBeforeResume && <ActionButton description="Continue the interrupted cleaning run." icon="mdi:play" label="Resume" onClick={start} tone="primary" variant="sub" />}
+      {chargingBeforeResume && <ActionButton description="Cancel the pending cleaning resume." icon="mdi:stop" label="Cancel" onClick={stop} tone="danger" variant="sub" />}
+      {state === 'cleaning' && <ActionButton description="Pause the current cleaning run." icon="mdi:pause" label="Pause" onClick={pause} tone="warning" variant="sub" />}
+      {state === 'cleaning' && <ActionButton description="Stop the current cleaning run." icon="mdi:stop" label="Stop" onClick={stop} tone="danger" variant="sub" />}
+      {state === 'paused' && <ActionButton description="Continue the paused cleaning run." icon="mdi:play" label="Resume" onClick={start} tone="primary" variant="sub" />}
+      {state === 'paused' && <ActionButton description="Stop the paused cleaning run." icon="mdi:stop" label="Stop" onClick={stop} tone="danger" variant="sub" />}
+      {state === 'returning' && <ActionButton description="Pause the return-to-dock action." icon="mdi:pause" label="Pause" onClick={pause} tone="warning" variant="sub" />}
+    </ControlSection>
   )
 }
 
@@ -458,7 +494,7 @@ function VacuumEmptyDockSection({ vacuum }: { vacuum: VacuumConfig }) {
     <section className={styles.section}>
       <SectionHeader title="Additional Controls" />
       <div className={styles.singleAction}>
-        <ActionButton icon="mdi:delete-restore" label="Empty Dock" onClick={emptyDock} variant="sub" />
+        <ActionButton description="Trigger the auto-empty dock now." icon="mdi:delete-restore" label="Empty Dock" onClick={emptyDock} variant="sub" />
       </div>
     </section>
   )
@@ -466,13 +502,10 @@ function VacuumEmptyDockSection({ vacuum }: { vacuum: VacuumConfig }) {
 
 function VacuumControlsSection({ vacuum }: { vacuum: VacuumConfig }) {
   return (
-    <section className={styles.section}>
-      <SectionHeader title="Vacuum Controls" />
-      <div className={styles.controlStack}>
-        <VacuumPowerSettings vacuum={vacuum} />
-        <VacuumStateActions vacuum={vacuum} />
-      </div>
-    </section>
+    <div className={styles.controlStack}>
+      <VacuumStateActions vacuum={vacuum} />
+      <VacuumPowerSettings vacuum={vacuum} />
+    </div>
   )
 }
 

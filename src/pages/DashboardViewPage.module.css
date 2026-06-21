@@ -1035,7 +1035,7 @@ button.thermostatGlassMain {
 
 .eightSleepModalNav {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(var(--eight-sleep-modal-nav-cols, 5), minmax(0, 1fr));
   align-items: center;
   gap: 8px;
   border: 1px solid rgba(255, 255, 255, 0.12);

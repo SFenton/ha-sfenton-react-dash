@@ -589,6 +589,12 @@
     height: 0;
   }
 
+  .roomStateSection .modalSquareGrid {
+    height: auto;
+    grid-template-rows: repeat(var(--modal-square-rows, 1), var(--modal-square-card-size, 168px));
+    align-content: start;
+  }
+
   .roomPickerCell,
   .modalSquareCell {
     width: var(--modal-square-card-size, 168px);

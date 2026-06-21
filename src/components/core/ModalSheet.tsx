@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { Drawer } from 'vaul'
 import { MaterialIcon } from './Icon'
 import styles from './ModalSheet.module.css'
@@ -46,14 +46,20 @@ export function ModalSheet({ open, title, onClose, children, chrome = 'default',
   const currentSnapshot: ModalSheetSnapshot = { children, chrome, contentStyle, footer, subtitle, title }
   const [lastOpenSnapshot, setLastOpenSnapshot] = useState<ModalSheetSnapshot>(currentSnapshot)
   const rendered = open ? currentSnapshot : lastOpenSnapshot
+  const closing = !open
+  const renderedContentStyle: ModalSheetStyle | undefined = closing ? { ...rendered.contentStyle, pointerEvents: 'none' } : rendered.contentStyle
   const sourcePopup = rendered.chrome === 'source-popup'
   const isDesktopModalLayout = useDesktopModalLayout()
   const showDragHandle = !sourcePopup && !isDesktopModalLayout
 
-  const handleOpenChange = (nextOpen: boolean) => {
-    if (nextOpen) return
+  const requestClose = () => {
     setLastOpenSnapshot(currentSnapshot)
     onClose()
+  }
+
+  const handleOpenChange = (nextOpen: boolean) => {
+    if (nextOpen) return
+    requestClose()
   }
 
   useEffect(() => {
@@ -73,11 +79,28 @@ export function ModalSheet({ open, title, onClose, children, chrome = 'default',
     return () => window.clearTimeout(timeout)
   }, [open])
 
+  useLayoutEffect(() => {
+    if (!closing || typeof document === 'undefined') return
+    document.body.style.pointerEvents = 'auto'
+  }, [closing])
+
   return (
-    <Drawer.Root handleOnly open={open} onOpenChange={handleOpenChange} repositionInputs={false}>
+    <Drawer.Root handleOnly modal={false} open={open} onOpenChange={handleOpenChange} repositionInputs={false}>
       <Drawer.Portal>
-        <Drawer.Overlay className={styles.overlay} />
-        <Drawer.Content ref={contentRef} className={styles.content} data-chrome={rendered.chrome} data-has-footer={rendered.footer ? 'true' : 'false'} data-has-subtitle={rendered.subtitle ? 'true' : 'false'} data-surface="hass-popup" style={rendered.contentStyle}>
+        {open && <div className={styles.overlay} data-modal-sheet-overlay="true" onPointerDown={(event) => {
+          if (event.currentTarget === event.target) requestClose()
+        }} />}
+        <Drawer.Content
+          ref={contentRef}
+          className={styles.content}
+          data-chrome={rendered.chrome}
+          data-closing={closing ? 'true' : 'false'}
+          data-has-footer={rendered.footer ? 'true' : 'false'}
+          data-has-subtitle={rendered.subtitle ? 'true' : 'false'}
+          data-surface="hass-popup"
+          inert={closing ? true : undefined}
+          style={renderedContentStyle}
+        >
           {showDragHandle && <Drawer.Handle className={styles.handle} data-mobile-drag-handle="true" />}
           <div className={styles.header}>
             <div className={styles.titleBlock}>
@@ -85,9 +108,9 @@ export function ModalSheet({ open, title, onClose, children, chrome = 'default',
               {rendered.subtitle && <p className={styles.subtitle}>{rendered.subtitle}</p>}
             </div>
             <Drawer.Description className={styles.description}>{rendered.subtitle ? `${rendered.title}: ${rendered.subtitle}` : `${rendered.title} controls and status details`}</Drawer.Description>
-            <Drawer.Close className={styles.close} aria-label="Close" type="button">
+            <button className={styles.close} aria-label="Close" onClick={requestClose} type="button">
               <MaterialIcon name="mdi:close" size={sourcePopup ? 30 : 19} />
-            </Drawer.Close>
+            </button>
           </div>
           <div className={styles.body}>{rendered.children}</div>
           {rendered.footer && <div className={styles.footer}>{rendered.footer}</div>}
