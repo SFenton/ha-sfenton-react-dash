@@ -1423,7 +1423,7 @@ const THERMOSTAT_SECTION_DESCRIPTIONS = {
   predictiveComfort:
     'Use forecast weather, humidity, indoor sensors, and learned heat-load patterns to prepare the house before it drifts out of the comfort band.\n\nThis enables predictive recommendations. Thermostat setpoint changes still require the separate auto-adjust option in the integration settings.',
   trackOnlyWhenOccupied:
-    'Keep high-airflow rooms out of thermostat decisions until they are occupied. When enabled, the room is ignored for temperature demand and minimum-vent balancing while empty, and its vent closes; once occupied, it participates normally.',
+    'Choose which rooms should stay out of thermostat decisions until they are occupied. When enabled, the room is ignored for temperature demand and minimum-vent balancing while empty, and its vent closes; once occupied, it participates normally.',
   trackSelected:
     'Track only a subset of monitored rooms for automated control. Monitored rooms can be configured in the integration settings.\n\nThis setting works in tandem with eco mode, but eco mode is not required to be enabled to use it.',
 } as const
@@ -1460,10 +1460,6 @@ const THERMOSTAT_ROOM_VIEWS: ThermostatRoomView[] = THERMOSTAT_ROOMS.map((room) 
   hash: thermostatRoomHash(room.title),
   key: thermostatRoomKey(room.title),
 }))
-const THERMOSTAT_OCCUPANCY_GATED_ROOM_KEYS = ['guest_bathroom', 'master_bathroom'] as const
-const THERMOSTAT_OCCUPANCY_GATED_ROOM_VIEWS = THERMOSTAT_OCCUPANCY_GATED_ROOM_KEYS
-  .map((roomKey) => THERMOSTAT_ROOM_VIEWS.find((room) => room.key === roomKey))
-  .filter((room): room is ThermostatRoomView => Boolean(room))
 const GLOBAL_THERMOSTAT_ENTITY_ID = 'climate.thermostat_contact_sensors_global_virtual_thermostat'
 const PREDICTIVE_COMFORT_SWITCH_ENTITY_ID = 'switch.thermostat_contact_sensors_predictive_comfort_mode'
 const PREDICTIVE_AUTO_ADJUST_SWITCH_ENTITY_ID = 'switch.thermostat_contact_sensors_predictive_auto_adjust'
@@ -4144,7 +4140,7 @@ function ThermostatTrackOnlyWhenOccupiedSection() {
       <SectionHeader title="Track Only When Occupied" />
       <Description className={styles.thermostatDescription}>{THERMOSTAT_SECTION_DESCRIPTIONS.trackOnlyWhenOccupied}</Description>
       <div className={styles.thermostatCheckboxGrid}>
-        {THERMOSTAT_OCCUPANCY_GATED_ROOM_VIEWS.map((room) => <ThermostatTrackOnlyWhenOccupiedCheckbox key={room.key} room={room} />)}
+        {THERMOSTAT_ROOM_VIEWS.map((room) => <ThermostatTrackOnlyWhenOccupiedCheckbox key={room.key} room={room} />)}
       </div>
     </section>
   )

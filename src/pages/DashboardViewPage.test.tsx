@@ -762,10 +762,12 @@ describe('DashboardViewPage', () => {
     expect(screen.getByRole('button', { name: 'Theater Room' })).toHaveAttribute('aria-pressed', 'true')
     expect(screen.queryByRole('button', { name: /^Master Bedroom$/i })).not.toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Track Only When Occupied' })).toBeInTheDocument()
-    expect(screen.getByText(/Keep high-airflow rooms out of thermostat decisions until they are occupied/i)).toBeInTheDocument()
+    expect(screen.getByText(/Choose which rooms should stay out of thermostat decisions until they are occupied/i)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^Living Room Occupied Only Off$/i })).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.getByRole('button', { name: /^Office Occupied Only Off$/i })).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.getByRole('button', { name: /^Master Bedroom Occupied Only Off$/i })).toHaveAttribute('aria-pressed', 'false')
     expect(screen.getByRole('button', { name: /^Guest Bathroom Occupied Only On$/i })).toHaveAttribute('aria-pressed', 'true')
     expect(screen.getByRole('button', { name: /^Master Bathroom Occupied Only On$/i })).toHaveAttribute('aria-pressed', 'true')
-    expect(screen.queryByRole('button', { name: /^Living Room Occupied Only/i })).not.toBeInTheDocument()
 
     fireEvent.click(ecoMode)
     fireEvent.click(predictiveComfort)
@@ -788,18 +790,23 @@ describe('DashboardViewPage', () => {
     expect(screen.getByRole('article', { name: /^Vent 2 Open$/i })).toBeInTheDocument()
   })
 
-  it('toggles occupancy-only bathroom thermostat rooms from the Ecobee page', () => {
+  it('toggles occupancy-only thermostat rooms from the Ecobee page', () => {
     render(<DashboardViewPage activePath="ecobee" onNavigate={() => undefined} path="ecobee" />)
 
+    const livingRoomGate = screen.getByRole('button', { name: /^Living Room Occupied Only Off$/i })
     const guestBathroomGate = screen.getByRole('button', { name: /^Guest Bathroom Occupied Only On$/i })
     const masterBathroomGate = screen.getByRole('button', { name: /^Master Bathroom Occupied Only On$/i })
 
+    fireEvent.click(livingRoomGate)
     fireEvent.click(guestBathroomGate)
 
+    expect(livingRoomGate).toHaveAttribute('aria-pressed', 'true')
     expect(guestBathroomGate).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.getByRole('button', { name: /^Living Room Occupied Only On$/i })).toBe(livingRoomGate)
     expect(screen.getByRole('button', { name: /^Guest Bathroom Occupied Only Off$/i })).toBe(guestBathroomGate)
     expect(masterBathroomGate).toHaveAttribute('aria-pressed', 'true')
     expect(mockCallServiceCalls).toEqual([
+      { domain: 'homeassistant', service: 'toggle', target: 'switch.living_room_thermostat_contact_sensors_living_room_track_only_when_occupied' },
       { domain: 'homeassistant', service: 'toggle', target: 'switch.living_room_thermostat_contact_sensors_guest_bathroom_track_only_when_occupied' },
     ])
   })
