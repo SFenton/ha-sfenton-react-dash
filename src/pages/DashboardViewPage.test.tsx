@@ -2151,12 +2151,13 @@ describe('DashboardViewPage', () => {
     expect(screen.getByRole('heading', { name: 'Living Room: Robot Vacuum' })).toBeInTheDocument()
     expect(screen.queryByText('Main Floor Robot Vacuum')).not.toBeInTheDocument()
     const mapPane = within(dialog).getByRole('group', { name: 'Main Floor map and status' })
-    const controlsPane = within(dialog).getByRole('group', { name: 'Main Floor controls, zones, actions, and info' })
+    const controlsPane = within(dialog).getByRole('group', { name: 'Main Floor controls, zones, auto-clean, actions, info' })
     const modalNav = within(dialog).getByRole('navigation', { name: 'Main Floor modal sections' })
     const modalNavButtons = within(modalNav).getAllByRole('button')
-    expect(modalNavButtons.map((button) => button.getAttribute('aria-label'))).toEqual(['Controls', 'Zones', 'Actions', 'Info'])
-    expect(modalNavButtons[2].querySelector('path')).toHaveAttribute('d', materialIconPath('mdi:flash'))
-    expect(modalNavButtons[3].querySelector('path')).toHaveAttribute('d', materialIconPath('mdi:information-outline'))
+    expect(modalNavButtons.map((button) => button.getAttribute('aria-label'))).toEqual(['Controls', 'Zones', 'Auto-Clean', 'Actions', 'Info'])
+    expect(modalNavButtons[2].querySelector('path')).toHaveAttribute('d', materialIconPath('mdi:robot-vacuum-off'))
+    expect(modalNavButtons[3].querySelector('path')).toHaveAttribute('d', materialIconPath('mdi:flash'))
+    expect(modalNavButtons[4].querySelector('path')).toHaveAttribute('d', materialIconPath('mdi:information-outline'))
     expect(within(mapPane).getByRole('region', { name: 'Main Floor Valetudo map' })).toBeInTheDocument()
     expect(within(mapPane).getByText('Battery')).toBeInTheDocument()
     expect(within(mapPane).queryByRole('heading', { name: 'Consumables' })).not.toBeInTheDocument()
@@ -2201,10 +2202,20 @@ describe('DashboardViewPage', () => {
     expect(screen.getByText('Select any zones to focus cleaning in those areas. If you press clean and no zones are selected, we will clean all zones on the Main Floor.')).toBeInTheDocument()
     expect(screen.getByText('Zones are not selectable or changeable while cleaning is ongoing.')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /living room/i }).querySelector('path')).toHaveAttribute('d', materialIconPath('mdi:sofa'))
+    await clickModalTab(within(dialog), 'Auto-Clean')
+    const autoCleanHeading = within(controlsPane).getByRole('heading', { name: 'Disabled Auto-Clean Rooms' })
+    expect(autoCleanHeading).toBeInTheDocument()
+    expect(screen.getByText('Check rooms that should be skipped when the coordinator starts an automatic away clean. Use this for closed doors, guests, or projects on the floor; manual selected-room cleans still use the Zones tab.')).toBeInTheDocument()
+    const livingRoomAutoClean = screen.getByRole('button', { name: 'Living Room auto-clean enabled' })
+    expect(livingRoomAutoClean).toHaveAttribute('aria-pressed', 'false')
+    expect(livingRoomAutoClean.querySelector('path')).toHaveAttribute('d', materialIconPath('mdi:checkbox-blank-outline'))
+    expect(within(livingRoomAutoClean).getByText('Auto-clean enabled')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Closet auto-clean enabled' })).toBeInTheDocument()
     await clickModalTab(within(dialog), 'Actions')
     const additionalControlsHeading = within(controlsPane).getByRole('heading', { name: 'Additional Controls' })
     expect(additionalControlsHeading).toBeInTheDocument()
     expect(zonesHeading).not.toBeInTheDocument()
+    expect(autoCleanHeading).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Empty Dock' }).querySelector('path')).toHaveAttribute('d', materialIconPath('mdi:delete-restore'))
     await clickModalTab(within(dialog), 'Info')
     expect(within(controlsPane).getAllByRole('heading').map((heading) => heading.textContent)).toEqual(['Bin State', 'Consumables'])
@@ -2225,6 +2236,8 @@ describe('DashboardViewPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Empty Dock' }))
     await clickModalTab(within(screen.getByRole('dialog')), 'Zones')
     fireEvent.click(screen.getByRole('button', { name: 'Living Room' }))
+    await clickModalTab(within(screen.getByRole('dialog')), 'Auto-Clean')
+    fireEvent.click(screen.getByRole('button', { name: 'Office auto-clean enabled' }))
     await clickModalTab(within(screen.getByRole('dialog')), 'Controls')
     fireEvent.click(screen.getByRole('button', { name: 'Clean' }))
 
@@ -2233,6 +2246,7 @@ describe('DashboardViewPage', () => {
       { domain: 'select', service: 'select_option', target: 'select.valetudo_exaltedsneakydeer_fan', serviceData: { option: 'turbo' } },
       { domain: 'button', service: 'press', target: 'button.valetudo_exaltedsneakydeer_trigger_auto_empty_dock' },
       { domain: 'input_boolean', service: 'turn_on', target: 'input_boolean.roborock_living_room_toggle' },
+      { domain: 'switch', service: 'turn_on', target: 'switch.main_floor_vacuum_coordinator_office_auto_clean_disabled' },
     ])
 
     mockEntities['select.valetudo_exaltedsneakydeer_fan'].state = 'turbo'
@@ -2244,6 +2258,7 @@ describe('DashboardViewPage', () => {
       { domain: 'select', service: 'select_option', target: 'select.valetudo_exaltedsneakydeer_fan', serviceData: { option: 'turbo' } },
       { domain: 'button', service: 'press', target: 'button.valetudo_exaltedsneakydeer_trigger_auto_empty_dock' },
       { domain: 'input_boolean', service: 'turn_on', target: 'input_boolean.roborock_living_room_toggle' },
+      { domain: 'switch', service: 'turn_on', target: 'switch.main_floor_vacuum_coordinator_office_auto_clean_disabled' },
       { domain: 'script', service: 'main_floor_vacuum_clean_selected_segments', target: undefined },
     ]), { timeout: 1500 })
   })
@@ -2892,7 +2907,7 @@ describe('DashboardViewPage', () => {
     fireEvent.click(screen.getByRole('button', { name: /Main Floor Docked/i }))
 
     const dialog = await screen.findByRole('dialog')
-    const controlsPane = within(dialog).getByRole('group', { name: 'Main Floor controls, zones, actions, and info' })
+    const controlsPane = within(dialog).getByRole('group', { name: 'Main Floor controls, zones, auto-clean, actions, info' })
     const modeSelect = screen.getByRole('combobox', { name: /Mode Vacuum/i })
     modeSelect.focus()
     expect(modeSelect).toHaveFocus()
@@ -2978,7 +2993,7 @@ describe('DashboardViewPage', () => {
     expect(dialog).toHaveStyle(VACUUM_MODAL_STYLE)
     expect(screen.getByRole('heading', { name: 'Main Floor Robot Vacuum' })).toBeInTheDocument()
     const mapPane = within(dialog).getByRole('group', { name: 'Main Floor map and status' })
-    const controlsPane = within(dialog).getByRole('group', { name: 'Main Floor controls, zones, actions, and info' })
+    const controlsPane = within(dialog).getByRole('group', { name: 'Main Floor controls, zones, auto-clean, actions, info' })
     expect(within(mapPane).getByRole('region', { name: 'Main Floor Valetudo map' })).toBeInTheDocument()
     expect(within(mapPane).getByText('Battery')).toBeInTheDocument()
     expect(screen.queryByText('No error')).not.toBeInTheDocument()
@@ -2996,6 +3011,8 @@ describe('DashboardViewPage', () => {
     expect(screen.getByRole('button', { name: 'Clean' })).toBeInTheDocument()
     await clickModalTab(within(dialog), 'Zones')
     expect(screen.getByRole('button', { name: /living room/i })).toBeInTheDocument()
+    await clickModalTab(within(dialog), 'Auto-Clean')
+    expect(screen.getByRole('button', { name: 'Dining Room auto-clean enabled' })).toBeInTheDocument()
     await clickModalTab(within(dialog), 'Info')
     expect(within(controlsPane).getByRole('group', { name: 'Main Filter 54h left' })).toBeInTheDocument()
     expect(within(controlsPane).getByRole('group', { name: 'Detergent OK' })).toBeInTheDocument()

@@ -516,6 +516,68 @@
   background: linear-gradient(135deg, rgba(67, 160, 71, 0.62), rgba(67, 160, 71, 0.34)), var(--color-glass-soft);
 }
 
+.autoCleanDescription {
+  white-space: normal;
+}
+
+.autoCleanCheckboxGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.autoCleanCheckbox {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+  min-height: 66px;
+  border: 0;
+  padding: 8px 6px;
+  color: rgba(255, 255, 255, 0.88);
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.autoCleanCheckbox span {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+}
+
+.autoCleanCheckbox strong {
+  overflow: hidden;
+  color: white;
+  font-size: 0.9rem;
+  font-weight: 820;
+  letter-spacing: 0;
+  line-height: 1.25;
+  padding-bottom: 2px;
+  text-overflow: clip;
+  white-space: nowrap;
+}
+
+.autoCleanCheckbox small {
+  overflow: hidden;
+  color: rgba(255, 255, 255, 0.66);
+  font-size: 0.78rem;
+  font-weight: 720;
+  letter-spacing: 0;
+  line-height: 1.2;
+  padding-bottom: 2px;
+  text-overflow: clip;
+  white-space: nowrap;
+}
+
+.autoCleanCheckbox:disabled {
+  cursor: default;
+  opacity: 0.52;
+}
+
 .zoneButton:disabled {
   cursor: default;
   opacity: 0.52;
@@ -524,7 +586,8 @@
 @media (max-width: 420px) {
   .settingGrid,
   .actionGrid,
-  .zones {
+  .zones,
+  .autoCleanCheckboxGrid {
     grid-template-columns: 1fr;
   }
 }

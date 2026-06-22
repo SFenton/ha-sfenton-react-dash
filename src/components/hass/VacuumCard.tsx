@@ -4,7 +4,7 @@ import { GlassTile } from '../core/GlassTile'
 import { Description } from '../core/Description'
 import { MaterialIcon } from '../core/Icon'
 import { ModalSheet } from '../core/ModalSheet'
-import { type VacuumConfig, type VacuumConsumableConfig, type VacuumZoneConfig } from '../../constants/portedDashboard'
+import { type VacuumAutoCleanDisabledRoomConfig, type VacuumConfig, type VacuumConsumableConfig, type VacuumZoneConfig } from '../../constants/portedDashboard'
 import { useImmediateVisualTab, useSmoothDisplayedModalTab } from '../../hooks/useSmoothDisplayedModalTab'
 import { useOptimisticState } from '../../hooks/useOptimisticState'
 import { asEntityName, titleCaseState } from './entityState'
@@ -12,16 +12,18 @@ import { ValetudoMapCard } from './ValetudoMapCard'
 import { VACUUM_MODAL_STYLE } from './vacuumModalStyle'
 import styles from './VacuumCard.module.css'
 
-type VacuumModalTab = 'controls' | 'zones' | 'more' | 'info'
+type VacuumModalTab = 'controls' | 'zones' | 'autoClean' | 'more' | 'info'
 
 const VACUUM_MODAL_TABS: { icon: string; label: string; tab: VacuumModalTab }[] = [
   { icon: 'mdi:robot-vacuum', label: 'Controls', tab: 'controls' },
   { icon: 'mdi:floor-plan', label: 'Zones', tab: 'zones' },
+  { icon: 'mdi:robot-vacuum-off', label: 'Auto-Clean', tab: 'autoClean' },
   { icon: 'mdi:flash', label: 'Actions', tab: 'more' },
   { icon: 'mdi:information-outline', label: 'Info', tab: 'info' },
 ]
 const DESKTOP_MODAL_QUERY = '(min-width: 760px)'
 const CLEANING_SETUP_DESCRIPTION = 'Choose how many passes the vacuum should make, then start cleaning with the selected zones.'
+const AUTO_CLEAN_DISABLED_DESCRIPTION = 'Check rooms that should be skipped when the coordinator starts an automatic away clean. Use this for closed doors, guests, or projects on the floor; manual selected-room cleans still use the Zones tab.'
 const MODE_DESCRIPTION = 'Choose whether the robot vacuums, mops, or combines both for the next run.'
 const FAN_DESCRIPTION = 'Adjust suction strength for carpets, hard floors, and quieter cleaning.'
 const WATER_DESCRIPTION = 'Set mop water flow so floors get the right amount of moisture.'
@@ -76,6 +78,7 @@ function shouldResetScrollOnTabChange() {
 function vacuumModalTabs(vacuum: VacuumConfig) {
   return VACUUM_MODAL_TABS.filter((tab) => {
     if (tab.tab === 'zones') return vacuum.zones.length > 0
+    if (tab.tab === 'autoClean') return Boolean(vacuum.autoCleanDisabledRooms?.length)
     if (tab.tab === 'info') return vacuum.consumables.length > 0
     return true
   })
@@ -550,6 +553,38 @@ function ZoneButton({ disabled, onIntent, zone }: { disabled: boolean; onIntent:
   )
 }
 
+function AutoCleanDisabledRoomCheckbox({ room }: { room: VacuumAutoCleanDisabledRoomConfig }) {
+  const callService = useHass((state) => state.helpers.callService) as unknown as CallService
+  const entity = useEntity(asEntityName(room.entityId), { returnNullIfNotFound: true })
+  const liveDisabled = entity?.state === 'on'
+  const unavailable = !entity || isUnavailableState(entity.state)
+  const [disabledForAutoClean, commitDisabledForAutoClean] = useOptimisticState(liveDisabled, { clearOn: 'confirmation', revertMs: VACUUM_OPTIMISTIC_REVERT_MS })
+  const nextDisabled = !disabledForAutoClean
+  const stateText = disabledForAutoClean ? 'Auto-clean disabled' : 'Auto-clean enabled'
+
+  return (
+    <button
+      aria-label={`${room.title} auto-clean ${disabledForAutoClean ? 'disabled' : 'enabled'}`}
+      aria-pressed={disabledForAutoClean}
+      className={styles.autoCleanCheckbox}
+      data-active={disabledForAutoClean}
+      disabled={unavailable}
+      onClick={() => {
+        if (unavailable) return
+        commitDisabledForAutoClean(nextDisabled)
+        callService({ domain: domainFromEntity(room.entityId), service: nextDisabled ? 'turn_on' : 'turn_off', target: room.entityId })
+      }}
+      type="button"
+    >
+      <MaterialIcon name={disabledForAutoClean ? 'mdi:checkbox-marked-outline' : 'mdi:checkbox-blank-outline'} size={34} />
+      <span>
+        <strong>{room.title}</strong>
+        <small>{unavailable ? 'Unavailable' : stateText}</small>
+      </span>
+    </button>
+  )
+}
+
 function VacuumStatusSummary({ displayState, vacuum }: { displayState: string; vacuum: VacuumConfig }) {
   const battery = useEntity(asEntityName(vacuum.batteryEntityId), { returnNullIfNotFound: true })
   const statusFlag = useEntity(asEntityName(vacuum.statusFlagEntityId), { returnNullIfNotFound: true })
@@ -761,6 +796,22 @@ function VacuumZones({ coordinator, optimisticState, vacuum }: { coordinator: Va
   )
 }
 
+function VacuumAutoCleanDisabledRooms({ vacuum }: { vacuum: VacuumConfig }) {
+  const rooms = vacuum.autoCleanDisabledRooms ?? []
+
+  if (rooms.length === 0) return null
+
+  return (
+    <section className={styles.section}>
+      <SectionHeader title="Disabled Auto-Clean Rooms" />
+      <Description className={styles.autoCleanDescription}>{AUTO_CLEAN_DISABLED_DESCRIPTION}</Description>
+      <div className={styles.autoCleanCheckboxGrid}>
+        {rooms.map((room) => <AutoCleanDisabledRoomCheckbox key={room.entityId} room={room} />)}
+      </div>
+    </section>
+  )
+}
+
 function VacuumModalNav({ activeTab, onTabChange, vacuum }: { activeTab: VacuumModalTab; onTabChange: (tab: VacuumModalTab) => void; vacuum: VacuumConfig }) {
   const tabs = vacuumModalTabs(vacuum)
   const effectiveActiveTab = tabs.some((tab) => tab.tab === activeTab) ? activeTab : 'controls'
@@ -804,7 +855,14 @@ function VacuumModalTabContent({ activeTab, vacuum }: { activeTab: VacuumModalTa
   const tabs = vacuumModalTabs(vacuum)
   const targetTab = tabs.some((tab) => tab.tab === activeTab) ? activeTab : 'controls'
   const { displayedTab: effectiveActiveTab, transitionState } = useSmoothDisplayedModalTab(targetTab)
-  const panelLabel = vacuum.zones.length > 0 ? `${vacuum.title} controls, zones, actions, and info` : `${vacuum.title} controls, actions, and info`
+  const panelSections = [
+    'controls',
+    vacuum.zones.length > 0 ? 'zones' : null,
+    vacuum.autoCleanDisabledRooms?.length ? 'auto-clean' : null,
+    'actions',
+    'info',
+  ].filter(Boolean)
+  const panelLabel = `${vacuum.title} ${panelSections.join(', ')}`
   const optimisticState = useMemo<OptimisticVacuumState>(() => ({ commitState: commitDisplayState, liveState, state: displayState }), [commitDisplayState, displayState, liveState])
   const coordinator = useVacuumCommandCoordinator(liveState, commitDisplayState)
   useVacuumSettingIntentConfirmations(vacuum, coordinator.confirmIntent)
@@ -828,6 +886,7 @@ function VacuumModalTabContent({ activeTab, vacuum }: { activeTab: VacuumModalTa
       <div aria-label={panelLabel} className={styles.rightPane} data-modal-tab-transition-state={transitionState} data-scroll-region="vacuum-panel" data-tab={effectiveActiveTab} ref={modalPanelRef} role="group">
         {effectiveActiveTab === 'controls' && <VacuumControlsSection coordinator={coordinator} optimisticState={optimisticState} vacuum={vacuum} />}
         {effectiveActiveTab === 'zones' && <VacuumZones coordinator={coordinator} optimisticState={optimisticState} vacuum={vacuum} />}
+        {effectiveActiveTab === 'autoClean' && <VacuumAutoCleanDisabledRooms vacuum={vacuum} />}
         {effectiveActiveTab === 'more' && <VacuumEmptyDockSection optimisticState={optimisticState} vacuum={vacuum} />}
         {effectiveActiveTab === 'info' && <VacuumInfoSection vacuum={vacuum} />}
       </div>

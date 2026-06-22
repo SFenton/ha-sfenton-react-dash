@@ -349,6 +349,31 @@ function valetudoConsumableMockEntities(vacuumMapId: string, values: Partial<Rec
   ])
 }
 
+const mainFloorAutoCleanDisabledRoomIds = [
+  'living_room',
+  'master_bedroom',
+  'kitchen',
+  'office',
+  'hallway',
+  'guest_room',
+  'master_bathroom',
+  'guest_bathroom',
+  'gym',
+  'master_bedroom_closet',
+  'dining_room',
+] as const
+
+function mainFloorAutoCleanDisabledEntityId(roomId: string) {
+  return `switch.main_floor_vacuum_coordinator_${roomId}_auto_clean_disabled`
+}
+
+function mainFloorAutoCleanDisabledMockEntities() {
+  return Object.fromEntries(mainFloorAutoCleanDisabledRoomIds.map((roomId) => {
+    const entityId = mainFloorAutoCleanDisabledEntityId(roomId)
+    return [entityId, entity(entityId, 'off')]
+  }))
+}
+
 export const mockEntities: Record<string, MockEntity> = {
   'alarm_control_panel.aqara_hub_m3_0056_security_system_2': entity('alarm_control_panel.aqara_hub_m3_0056_security_system_2', 'armed_home'),
   'binary_sensor.all_contact_sensors': entity('binary_sensor.all_contact_sensors', 'off'),
@@ -637,6 +662,7 @@ export const mockEntities: Record<string, MockEntity> = {
   'input_boolean.roborock_gym_toggle': entity('input_boolean.roborock_gym_toggle', 'off'),
   'input_boolean.roborock_master_bedroom_closet_toggle': entity('input_boolean.roborock_master_bedroom_closet_toggle', 'off'),
   'input_boolean.roborock_dining_room_toggle': entity('input_boolean.roborock_dining_room_toggle', 'off'),
+  ...mainFloorAutoCleanDisabledMockEntities(),
   ...thermostatMockEntities(),
   'button.valetudo_exaltedsneakydeer_trigger_auto_empty_dock': entity('button.valetudo_exaltedsneakydeer_trigger_auto_empty_dock', 'unknown'),
   'camera.valetudo_exaltedsneakydeer_map_data': entity('camera.valetudo_exaltedsneakydeer_map_data', 'idle'),
@@ -677,6 +703,9 @@ export function resetMockHass() {
   mockEntities['number.steph_s_eight_sleep_side_alarm_snooze_minutes'].state = '9'
   for (const room of thermostatRoomMockData) {
     mockEntities[`switch.living_room_thermostat_contact_sensors_${room.key}_track_only_when_occupied`].state = 'trackOnlyWhenOccupied' in room ? room.trackOnlyWhenOccupied : 'off'
+  }
+  for (const roomId of mainFloorAutoCleanDisabledRoomIds) {
+    mockEntities[mainFloorAutoCleanDisabledEntityId(roomId)].state = 'off'
   }
   mockEntities['humidifier.master_bedroom_humidifier'].state = 'on'
   mockEntities['humidifier.master_bedroom_humidifier'].attributes = { available_modes: ['auto', 'normal'], current_humidity: 41, humidity: 45, max_humidity: 80, min_humidity: 30, mode: 'auto' }

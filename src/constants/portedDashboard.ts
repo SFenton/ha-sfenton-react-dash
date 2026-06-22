@@ -69,6 +69,7 @@ export interface ChoreQuickLinkConfig {
 }
 
 export interface VacuumConfig {
+  autoCleanDisabledRooms?: VacuumAutoCleanDisabledRoomConfig[]
   title: string
   entityId: string
   batteryEntityId: string
@@ -100,6 +101,12 @@ export interface VacuumConsumableConfig {
 }
 
 export interface VacuumZoneConfig {
+  entityId: string
+  icon: string
+  title: string
+}
+
+export interface VacuumAutoCleanDisabledRoomConfig {
   entityId: string
   icon: string
   title: string
@@ -266,6 +273,14 @@ function valetudoConsumables(vacuumMapId: string): VacuumConsumableConfig[] {
   }))
 }
 
+function mainFloorAutoCleanDisabledRoom(title: string, roomId: string, icon: string): VacuumAutoCleanDisabledRoomConfig {
+  return {
+    title,
+    entityId: `switch.main_floor_vacuum_coordinator_${roomId}_auto_clean_disabled`,
+    icon,
+  }
+}
+
 export const GUEST_CONTROL_ITEMS: EntityTileConfig[] = [
   { title: 'Guest Room', entityId: 'input_boolean.guests_staying_in_guest_room', icon: 'mdi:bed', color: SWITCH_ACTIVE_COLOR, action: { type: 'toggle' }, showSubtitle: true },
   { title: 'Music Room', entityId: 'input_boolean.guests_staying_in_music_room', icon: 'mdi:guitar-electric', color: SWITCH_ACTIVE_COLOR, action: { type: 'toggle' }, showSubtitle: true },
@@ -420,6 +435,19 @@ export const VACUUMS: VacuumConfig[] = [
     statusFlagEntityId: 'sensor.valetudo_exaltedsneakydeer_status_flag',
     vacuumMapId: 'valetudo_exaltedsneakydeer',
     waterEntityId: 'select.valetudo_exaltedsneakydeer_water',
+    autoCleanDisabledRooms: [
+      mainFloorAutoCleanDisabledRoom('Living Room', 'living_room', 'mdi:sofa'),
+      mainFloorAutoCleanDisabledRoom('Master Bedroom', 'master_bedroom', 'mdi:bed-double'),
+      mainFloorAutoCleanDisabledRoom('Kitchen', 'kitchen', 'mdi:fridge'),
+      mainFloorAutoCleanDisabledRoom('Office', 'office', 'mdi:laptop'),
+      mainFloorAutoCleanDisabledRoom('Hallway', 'hallway', 'mdi:wardrobe'),
+      mainFloorAutoCleanDisabledRoom('Guest Room', 'guest_room', 'mdi:bed'),
+      mainFloorAutoCleanDisabledRoom('Master Bathroom', 'master_bathroom', 'mdi:shower'),
+      mainFloorAutoCleanDisabledRoom('Guest Bathroom', 'guest_bathroom', 'mdi:shower'),
+      mainFloorAutoCleanDisabledRoom('Gym', 'gym', 'mdi:weight-lifter'),
+      mainFloorAutoCleanDisabledRoom('Closet', 'master_bedroom_closet', 'mdi:wardrobe'),
+      mainFloorAutoCleanDisabledRoom('Dining Room', 'dining_room', 'mdi:silverware-fork-knife'),
+    ],
     zoneDescription: [
       'Select any zones to focus cleaning in those areas. If you press clean and no zones are selected, we will clean all zones on the Main Floor.',
       'Zones are not selectable or changeable while cleaning is ongoing.',
