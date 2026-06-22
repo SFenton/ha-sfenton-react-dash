@@ -951,6 +951,8 @@ describe('DashboardViewPage', () => {
     fireEvent.change(targetSlider, { target: { value: '68' } })
     fireEvent.pointerUp(targetSlider)
 
+    expect(within(dialog).getByRole('region', { name: /Stephen's Bed thermostat Cooling 68°F/i })).toBeInTheDocument()
+
     await waitFor(() => expect(mockCallServiceCalls).toContainEqual({
       domain: 'climate',
       service: 'set_temperature',
@@ -1018,6 +1020,8 @@ describe('DashboardViewPage', () => {
     const targetSlider = within(dialog).getByRole('slider', { name: "Stephen's Bed target level" })
     fireEvent.change(targetSlider, { target: { value: '-3' } })
     fireEvent.pointerUp(targetSlider)
+
+    expect(within(dialog).getByRole('region', { name: /Stephen's Bed thermostat Cooling -3/i })).toBeInTheDocument()
 
     await waitFor(() => expect(mockCallServiceCalls).toContainEqual({
       domain: 'number',

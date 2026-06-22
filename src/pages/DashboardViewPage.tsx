@@ -2566,7 +2566,8 @@ function EightSleepThermostatHero({ modalState, side }: { modalState: EightSleep
   const [dragValue, setDragValue] = useState<number | null>(null)
   const [targetDragging, setTargetDragging] = useState(false)
   const { commitDisplaySideOn, commitTargetTemperature, controlMode, controlsSideOn, currentTemperature, displayedTargetValue: sourceTargetValue, sideAvailable, targetMax, targetMin, targetScale, targetStep } = modalState
-  const displayedTargetValue = dragValue ?? sourceTargetValue
+  const [optimisticTargetValue, commitHeroTargetValue] = useOptimisticState(sourceTargetValue, { clearOn: 'confirmation', revertMs: FREE_SLEEP_TARGET_REVERT_MS })
+  const displayedTargetValue = dragValue ?? (modalState.hotFlashActive ? sourceTargetValue : optimisticTargetValue)
   const heroAction = targetScale === 'temperature' ? sleepypodTemperatureAction(displayedTargetValue, currentTemperature, controlsSideOn) : eightSleepTemperatureAction(displayedTargetValue, controlsSideOn)
   const heroTargetText = displayedTargetValue === null ? '--' : formatBedTargetValue(displayedTargetValue, modalState)
   const heroReadoutAction = controlsSideOn ? titleCaseState(heroAction) : null
@@ -2604,6 +2605,7 @@ function EightSleepThermostatHero({ modalState, side }: { modalState: EightSleep
     if (!canDragTarget) return
     const clampedValue = snapNumberToStep(nextValue, targetMin, targetMax, targetStep)
     setDragValue(null)
+    commitHeroTargetValue(clampedValue)
     commitTargetTemperature(clampedValue)
     queueTargetTemperatureSync(clampedValue)
   }
