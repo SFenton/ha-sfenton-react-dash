@@ -792,16 +792,14 @@ button.thermostatGlassMain {
 }
 
 .thermostatRoomRow span,
-.thermostatGlassMain span,
-.thermostatCheckbox span {
+.thermostatGlassMain span {
   display: grid;
   min-width: 0;
   gap: 4px;
 }
 
 .thermostatRoomRow strong,
-.thermostatGlassMain strong,
-.thermostatCheckbox strong {
+.thermostatGlassMain strong {
   overflow: hidden;
   color: white;
   font-size: 0.9rem;
@@ -814,8 +812,7 @@ button.thermostatGlassMain {
 }
 
 .thermostatRoomRow small,
-.thermostatGlassMain small,
-.thermostatCheckbox small {
+.thermostatGlassMain small {
   overflow: hidden;
   color: rgba(255, 255, 255, 0.66);
   font-size: 0.78rem;
@@ -841,8 +838,7 @@ button.thermostatGlassMain {
   gap: 8px;
 }
 
-.thermostatRoomRow,
-.thermostatCheckbox {
+.thermostatRoomRow {
   display: grid;
   grid-template-columns: 38px minmax(0, 1fr);
   gap: 8px;

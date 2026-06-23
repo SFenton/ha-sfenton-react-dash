@@ -2594,6 +2594,32 @@ describe('DashboardViewPage', () => {
     expect(Array.from(screen.getByRole('main').children)[1]).not.toHaveAttribute('data-scroll-lock')
   })
 
+  it('renders chore tasks as Ecobee-style checkbox rows with optional subtitles', async () => {
+    for (const entityId of ['todo.stephen_s_past_due', 'todo.stephen_s_due_today', 'todo.stephen_s_upcoming', 'todo.stephen_s_no_due_date']) {
+      mockTodoItemsByEntity[entityId] = []
+    }
+    mockTodoItemsByEntity['todo.stephen_s_due_today'] = [
+      {
+        uid: 'with-subtitle',
+        summary: 'Replace HVAC filter',
+        description: 'Use MERV 13',
+        status: 'needs_action',
+        due: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString(),
+      },
+      { uid: 'plain-task', summary: 'Take out trash', description: '   ', status: 'needs_action' },
+    ]
+
+    render(<DashboardViewPage activePath="stephens-chores" onNavigate={() => undefined} path="stephens-chores" />)
+
+    const dueTodayList = await screen.findByLabelText('Due Today todo list')
+    const describedTask = within(dueTodayList).getByRole('button', { name: /Replace HVAC filter\s+Use MERV 13 · Due in 2 days/i })
+    const plainTask = within(dueTodayList).getByRole('button', { name: 'Take out trash' })
+
+    expect(describedTask.querySelector('path')).toHaveAttribute('d', materialIconPath('mdi:checkbox-blank-outline'))
+    expect(within(describedTask).getByText('Use MERV 13 · Due in 2 days')).toBeInTheDocument()
+    expect(plainTask.querySelector('small')).toBeNull()
+  })
+
   it('ports the Chores page source sections, quick links, and Stephen user visibility', async () => {
     const navigate = vi.fn()
     mockEntities['todo.stephen_s_tasks'] = entity('todo.stephen_s_tasks', '8')

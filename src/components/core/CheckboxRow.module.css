@@ -1,0 +1,51 @@
+.checkboxRow {
+  display: grid;
+  width: 100%;
+  min-height: 66px;
+  grid-template-columns: 38px minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+  border: 0;
+  padding: 8px 6px;
+  color: rgba(255, 255, 255, 0.88);
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.checkboxRow:focus,
+.checkboxRow:focus-visible {
+  outline: none;
+}
+
+.copy {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+}
+
+.copy strong {
+  overflow: hidden;
+  color: white;
+  font-size: 0.9rem;
+  font-weight: 820;
+  letter-spacing: 0;
+  line-height: 1.25;
+  padding-bottom: 2px;
+  text-overflow: clip;
+  white-space: nowrap;
+}
+
+.copy small {
+  overflow: hidden;
+  color: rgba(255, 255, 255, 0.66);
+  font-size: 0.78rem;
+  font-weight: 720;
+  letter-spacing: 0;
+  line-height: 1.2;
+  padding-bottom: 2px;
+  text-overflow: clip;
+  white-space: nowrap;
+}

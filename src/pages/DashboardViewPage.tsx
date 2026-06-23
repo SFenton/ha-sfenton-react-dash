@@ -23,6 +23,7 @@ import { HumidifierModalContent } from '../components/hass/HumidifierModalConten
 import { MediaRemoteModalContent, MediaRemoteModalNav, type MediaRemoteModalTab } from '../components/hass/MediaRemoteModalContent'
 import { MEDIA_REMOTE_MODAL_STYLE } from '../components/hass/mediaRemoteModalStyle'
 import { Card, type CardColor } from '../components/core/Card'
+import { CheckboxRow } from '../components/core/CheckboxRow'
 import { Description } from '../components/core/Description'
 import { GlassTile } from '../components/core/GlassTile'
 import { MaterialIcon } from '../components/core/Icon'
@@ -4081,13 +4082,14 @@ function ThermostatCheckbox({ entityId, showState = true, title }: { entityId: s
   }
 
   return (
-    <button aria-label={showState ? `${title} ${formatCompactEntityState(entity, 'Unavailable', state)}` : title} aria-pressed={active} className={styles.thermostatCheckbox} onClick={toggle} type="button">
-      <MaterialIcon name={active ? 'mdi:checkbox-marked-outline' : 'mdi:checkbox-blank-outline'} size={34} />
-      <span>
-        <strong>{title}</strong>
-        {showState && <small>{formatCompactEntityState(entity, 'Unavailable', state)}</small>}
-      </span>
-    </button>
+    <CheckboxRow
+      active={active}
+      aria-label={showState ? `${title} ${formatCompactEntityState(entity, 'Unavailable', state)}` : title}
+      className={styles.thermostatCheckbox}
+      onClick={toggle}
+      subtitle={showState ? formatCompactEntityState(entity, 'Unavailable', state) : undefined}
+      title={title}
+    />
   )
 }
 

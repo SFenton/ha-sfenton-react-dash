@@ -1,13 +1,7 @@
 .panel {
   display: grid;
-  gap: 18px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 28px;
-  padding: 18px;
+  gap: 10px;
   color: var(--color-text);
-  background: rgba(255, 255, 255, 0.08);
-  box-shadow: var(--shadow-glass);
-  backdrop-filter: blur(22px) saturate(1.35);
 }
 
 .header {
@@ -62,7 +56,7 @@
 
 .items {
   display: grid;
-  gap: 10px;
+  gap: 2px;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -72,83 +66,10 @@
   min-width: 0;
 }
 
-.itemButton {
-  display: grid;
-  width: 100%;
-  grid-template-columns: auto minmax(0, 1fr);
-  gap: 12px;
-  align-items: center;
-  border: 0;
-  border-radius: 18px;
-  padding: 12px;
-  color: inherit;
-  background: rgba(255, 255, 255, 0.06);
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-
-.checkbox {
-  display: grid;
-  width: 23px;
-  height: 23px;
-  flex: 0 0 auto;
-  place-items: center;
-  border: 2px solid rgba(255, 255, 255, 0.48);
-  border-radius: 6px;
-  color: white;
-  box-sizing: border-box;
-}
-
-.itemButton[aria-pressed='true'] .checkbox {
-  border-color: rgba(255, 255, 255, 0.78);
-  background: rgba(75, 126, 210, 0.76);
-}
-
-.itemButton[aria-pressed='true'] .summary {
-  color: rgba(255, 255, 255, 0.62);
-  text-decoration: line-through;
-}
-
-.itemButton[data-due-tone='overdue-hours'] .summary,
-.itemButton[data-due-tone='overdue-hours'] .description,
 .itemButton[data-due-tone='overdue-hours'] small {
   color: #ffd965;
 }
 
-.itemButton[data-due-tone='overdue-long'] .summary,
-.itemButton[data-due-tone='overdue-long'] .description,
 .itemButton[data-due-tone='overdue-long'] small {
   color: #ff6b6b;
-}
-
-.itemCopy {
-  display: grid;
-  min-width: 0;
-  gap: 4px;
-}
-
-.summary {
-  overflow: hidden;
-  color: rgba(255, 255, 255, 0.94);
-  font-size: 0.94rem;
-  font-weight: 680;
-  line-height: 1.22;
-  text-overflow: ellipsis;
-}
-
-.description {
-  color: rgba(255, 255, 255, 0.7);
-  font-size: 0.78rem;
-  font-weight: 580;
-  line-height: 1.35;
-}
-
-.item small {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  color: var(--color-muted);
-  font-size: 0.72rem;
-  font-weight: 760;
 }

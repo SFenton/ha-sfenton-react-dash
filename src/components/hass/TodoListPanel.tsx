@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useEntity, useHass } from '@hakit/core'
-import { MaterialIcon } from '../core/Icon'
+import { CheckboxRow } from '../core/CheckboxRow'
 import { asEntityName } from './entityState'
 import styles from './TodoListPanel.module.css'
 
@@ -38,6 +38,16 @@ function todoIdentity(item: TodoItem) {
 
 function todoDue(item: TodoItem) {
   return item.due_datetime ?? item.due ?? item.due_date
+}
+
+function compactText(value: string | undefined) {
+  const trimmed = value?.trim()
+  return trimmed ? trimmed : undefined
+}
+
+function todoSubtitle(item: TodoItem, due: DueInfo | null) {
+  const subtitle = [compactText(item.description), due?.label].filter((part): part is string => Boolean(part)).join(' · ')
+  return subtitle || undefined
 }
 
 function relativeDueInfo(value: string | undefined): DueInfo | null {
@@ -142,18 +152,19 @@ export function TodoListPanel({ entityId, hideCompleted = true, onVisibleItemsCh
         <ul className={styles.items}>
           {visibleItems.map((item, index) => {
             const due = relativeDueInfo(todoDue(item))
+            const titleText = compactText(item.summary) ?? 'Untitled task'
+            const subtitle = todoSubtitle(item, due)
             return (
               <li className={styles.item} key={item.uid ?? `${entityId}-${index}`}>
-                <button aria-pressed={item.status === 'completed'} className={styles.itemButton} data-due-tone={due?.tone} onClick={() => toggleItem(item)} type="button">
-                  <span className={styles.checkbox} aria-hidden="true">
-                    {item.status === 'completed' && <MaterialIcon name="mdi:check" size={18} />}
-                  </span>
-                  <span className={styles.itemCopy}>
-                    <span className={styles.summary}>{item.summary ?? 'Untitled task'}</span>
-                    {item.description && <span className={styles.description}>{item.description}</span>}
-                    {due && <small>{due.label}</small>}
-                  </span>
-                </button>
+                <CheckboxRow
+                  active={item.status === 'completed'}
+                  aria-label={subtitle ? `${titleText} ${subtitle}` : titleText}
+                  className={styles.itemButton}
+                  data-due-tone={due?.tone}
+                  onClick={() => toggleItem(item)}
+                  subtitle={subtitle}
+                  title={titleText}
+                />
               </li>
             )
           })}
