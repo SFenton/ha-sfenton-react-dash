@@ -93,4 +93,24 @@ describe('useOptimisticState', () => {
     act(() => vi.advanceTimersByTime(1000))
     expect(result.current[0]).toBe(-1)
   })
+
+  it('can hold a confirmed value through a short stale live echo', () => {
+    const { result, rerender } = renderHook(({ live }) => useOptimisticState(live, { clearOn: 'confirmation', confirmationHoldMs: 250, revertMs: 1000 }), { initialProps: { live: -3 } })
+
+    act(() => result.current[1](2))
+    rerender({ live: 2 })
+    expect(result.current[0]).toBe(2)
+
+    rerender({ live: -3 })
+    expect(result.current[0]).toBe(2)
+
+    act(() => vi.advanceTimersByTime(249))
+    expect(result.current[0]).toBe(2)
+
+    act(() => vi.advanceTimersByTime(1))
+    expect(result.current[0]).toBe(-3)
+
+    rerender({ live: 2 })
+    expect(result.current[0]).toBe(2)
+  })
 })

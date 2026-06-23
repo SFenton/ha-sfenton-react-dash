@@ -1031,6 +1031,50 @@ describe('DashboardViewPage', () => {
     }))
   })
 
+  it('keeps the SleepyPod target-level hero stable through stale confirmation echoes', async () => {
+    mockEntities['climate.sleepypod_eight_pod_left_side'] = entity('climate.sleepypod_eight_pod_left_side', 'heat', {
+      current_temperature: 81,
+      hvac_modes: ['off', 'heat'],
+      max_temp: 110,
+      min_temp: 55,
+      target_temp_step: 1,
+      temperature: 77,
+    })
+    mockEntities['number.master_bedroom_sleepypod_eight_pod_left_target_level'] = entity('number.master_bedroom_sleepypod_eight_pod_left_target_level', '-3', {
+      max: 10,
+      min: -10,
+      step: 1,
+    })
+    const view = render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
+
+    fireEvent.click(screen.getByRole('button', { name: /Stephen's Bed Cooling • -3/i }))
+
+    const dialog = await screen.findByRole('dialog', { name: "Stephen's Bed" })
+    vi.useFakeTimers()
+    try {
+      const targetSlider = within(dialog).getByRole('slider', { name: "Stephen's Bed target level" })
+      fireEvent.change(targetSlider, { target: { value: '2' } })
+      fireEvent.pointerUp(targetSlider)
+      expect(within(dialog).getByRole('region', { name: /Stephen's Bed thermostat Heating \+2/i })).toBeInTheDocument()
+
+      act(() => {
+        mockEntities['number.master_bedroom_sleepypod_eight_pod_left_target_level'].state = '2'
+        view.rerender(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
+      })
+      expect(within(dialog).getByRole('region', { name: /Stephen's Bed thermostat Heating \+2/i })).toBeInTheDocument()
+
+      act(() => {
+        mockEntities['number.master_bedroom_sleepypod_eight_pod_left_target_level'].state = '-3'
+        view.rerender(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
+      })
+      expect(within(dialog).getByRole('region', { name: /Stephen's Bed thermostat Heating \+2/i })).toBeInTheDocument()
+      expect(within(dialog).queryByRole('region', { name: /Stephen's Bed thermostat Cooling -3/i })).not.toBeInTheDocument()
+    } finally {
+      vi.clearAllTimers()
+      vi.useRealTimers()
+    }
+  })
+
   it('shows SleepyPod multi-alarm configuration and writes schedule changes to the SleepyPod MQTT topic', async () => {
     const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'] as const
     const mondayAlarms = [
