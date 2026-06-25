@@ -4,6 +4,12 @@
   padding-top: 2px;
 }
 
+.roomSourceModalShell {
+  display: grid;
+  min-height: 0;
+  gap: 12px;
+}
+
 .leftPane,
 .rightPane {
   display: grid;
@@ -532,7 +538,7 @@
   grid-template-columns: 38px minmax(0, 1fr);
   gap: 8px;
   align-items: center;
-  min-height: 66px;
+  min-height: 58px;
   border: 0;
   padding: 8px 6px;
   color: rgba(255, 255, 255, 0.88);
@@ -544,30 +550,18 @@
 }
 
 .autoCleanCheckbox span {
-  display: grid;
+  display: block;
   min-width: 0;
-  gap: 4px;
 }
 
 .autoCleanCheckbox strong {
+  display: block;
   overflow: hidden;
   color: white;
   font-size: 0.9rem;
   font-weight: 820;
   letter-spacing: 0;
   line-height: 1.25;
-  padding-bottom: 2px;
-  text-overflow: clip;
-  white-space: nowrap;
-}
-
-.autoCleanCheckbox small {
-  overflow: hidden;
-  color: rgba(255, 255, 255, 0.66);
-  font-size: 0.78rem;
-  font-weight: 720;
-  letter-spacing: 0;
-  line-height: 1.2;
   padding-bottom: 2px;
   text-overflow: clip;
   white-space: nowrap;
@@ -593,6 +587,13 @@
 }
 
 @media (min-width: 760px) {
+  .roomSourceModalShell {
+    grid-template-rows: minmax(0, 1fr) auto;
+    height: min(720px, calc(100vh - 150px));
+    height: min(720px, calc(100dvh - 150px));
+    max-height: 100%;
+  }
+
   .modalBody {
     grid-template-columns: minmax(0, 1.15fr) minmax(330px, 0.85fr);
     align-items: start;
@@ -610,7 +611,8 @@
 
   .rightPane {
     min-height: 0;
-    max-height: 100%;
+    max-height: min(560px, calc(100vh - 220px));
+    max-height: min(560px, calc(100dvh - 220px));
     align-self: start;
     align-content: start;
     align-items: start;

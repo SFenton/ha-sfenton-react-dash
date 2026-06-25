@@ -281,6 +281,40 @@ test.describe('desktop modal layout', () => {
     expect(Math.abs(Math.round(after?.y ?? 0) - Math.round(before.y))).toBeLessThanOrEqual(8)
   })
 
+  test('room-source vacuum zones tab scrolls above its constrained desktop modal nav', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 620 })
+    await page.goto('/at-a-glance/living-room')
+
+    await page.getByRole('button', { name: /Main Floor Docked/i }).click()
+    const dialog = page.getByRole('dialog')
+    await expect(dialog).toBeVisible()
+    await dialog.getByRole('button', { name: 'Zones' }).click()
+    await expect(dialog.getByRole('heading', { name: 'Zones' })).toBeVisible()
+
+    const zonesPane = dialog.getByRole('group', { name: 'Main Floor controls, zones, auto-clean, actions, info' })
+    const modalNav = dialog.getByRole('navigation', { name: 'Main Floor modal sections' })
+    const diningRoomZone = dialog.getByRole('button', { name: 'Dining Room' })
+    await expect.poll(async () => zonesPane.evaluate((element) => {
+      const style = window.getComputedStyle(element)
+      element.scrollTop = element.scrollHeight
+      return {
+        canScroll: element.scrollTop > 0,
+        overflows: element.scrollHeight > element.clientHeight + 1,
+        overflowY: style.overflowY,
+      }
+    })).toEqual({
+      canScroll: true,
+      overflows: true,
+      overflowY: 'auto',
+    })
+    await expect.poll(async () => diningRoomZone.evaluate((zoneElement) => {
+      const zoneBox = zoneElement.getBoundingClientRect()
+      const navBox = document.querySelector('nav[aria-label="Main Floor modal sections"]')?.getBoundingClientRect()
+      return Boolean(navBox && zoneBox.bottom <= navBox.top - 4)
+    })).toBe(true)
+    await expect(modalNav).toBeVisible()
+  })
+
   test('media remote modal uses the shared desktop sheet height', async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 760 })
     await page.goto('/at-a-glance/living-room')

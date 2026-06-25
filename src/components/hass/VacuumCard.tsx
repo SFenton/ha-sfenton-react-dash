@@ -484,7 +484,6 @@ function SelectSetting({
         const select = event.currentTarget
         const option = select.value
         select.blur()
-        window.requestAnimationFrame(() => select.blur())
         selectOption(option)
       }}
       value={value}
@@ -560,7 +559,6 @@ function AutoCleanDisabledRoomCheckbox({ room }: { room: VacuumAutoCleanDisabled
   const unavailable = !entity || isUnavailableState(entity.state)
   const [disabledForAutoClean, commitDisabledForAutoClean] = useOptimisticState(liveDisabled, { clearOn: 'confirmation', revertMs: VACUUM_OPTIMISTIC_REVERT_MS })
   const nextDisabled = !disabledForAutoClean
-  const stateText = disabledForAutoClean ? 'Auto-clean disabled' : 'Auto-clean enabled'
 
   return (
     <button
@@ -579,7 +577,6 @@ function AutoCleanDisabledRoomCheckbox({ room }: { room: VacuumAutoCleanDisabled
       <MaterialIcon name={disabledForAutoClean ? 'mdi:checkbox-marked-outline' : 'mdi:checkbox-blank-outline'} size={34} />
       <span>
         <strong>{room.title}</strong>
-        <small>{unavailable ? 'Unavailable' : stateText}</small>
       </span>
     </button>
   )
@@ -917,10 +914,10 @@ export function VacuumRoomSourceModalContent({ vacuum }: VacuumCardProps) {
   const [activeTab, setActiveTab] = useState<VacuumModalTab>('controls')
 
   return (
-    <>
+    <div className={styles.roomSourceModalShell}>
       <VacuumModalTabContent activeTab={activeTab} vacuum={vacuum} />
       <VacuumModalNav activeTab={activeTab} onTabChange={setActiveTab} vacuum={vacuum} />
-    </>
+    </div>
   )
 }
 

@@ -2257,7 +2257,7 @@ describe('DashboardViewPage', () => {
     const livingRoomAutoClean = screen.getByRole('button', { name: 'Living Room auto-clean enabled' })
     expect(livingRoomAutoClean).toHaveAttribute('aria-pressed', 'false')
     expect(livingRoomAutoClean.querySelector('path')).toHaveAttribute('d', materialIconPath('mdi:checkbox-blank-outline'))
-    expect(within(livingRoomAutoClean).getByText('Auto-clean enabled')).toBeInTheDocument()
+    expect(within(livingRoomAutoClean).queryByText(/auto-clean/i)).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Closet auto-clean enabled' })).toBeInTheDocument()
     await clickModalTab(within(dialog), 'Actions')
     const additionalControlsHeading = within(controlsPane).getByRole('heading', { name: 'Additional Controls' })
@@ -3034,6 +3034,28 @@ describe('DashboardViewPage', () => {
 
     await waitFor(() => expect(within(controlsPane).getByRole('button', { name: 'Pause' })).toBeEnabled())
     expect(within(controlsPane).getByRole('button', { name: 'Stop' })).toBeEnabled()
+  })
+
+  it('does not steal focus from a vacuum dropdown reopened immediately after changing', async () => {
+    render(<DashboardViewPage activePath="living-room" onNavigate={() => undefined} path="living-room" />)
+
+    fireEvent.click(screen.getByRole('button', { name: /Main Floor Docked/i }))
+
+    const modeSelect = await screen.findByRole('combobox', { name: /Mode Vacuum/i })
+    fireEvent.change(modeSelect, { target: { value: 'mop' } })
+
+    const reopenedModeSelect = screen.getByRole('combobox', { name: /Mode Mop/i })
+    reopenedModeSelect.focus()
+    expect(reopenedModeSelect).toHaveFocus()
+
+    await act(async () => {
+      await new Promise((resolve) => window.requestAnimationFrame(resolve))
+    })
+
+    expect(screen.getByRole('combobox', { name: /Mode Mop/i })).toHaveFocus()
+    expect(mockCallServiceCalls).toEqual([
+      { domain: 'select', service: 'select_option', target: 'select.valetudo_exaltedsneakydeer_mode', serviceData: { option: 'mop' } },
+    ])
   })
 
   it('toggles vacuum zones optimistically while Home Assistant input booleans are still stale', async () => {
