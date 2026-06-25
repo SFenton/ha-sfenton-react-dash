@@ -738,6 +738,27 @@ export const mockState: MockHassState = {
         const forecast = (params.serviceData as { type?: string } | undefined)?.type === 'hourly' ? mockHourlyWeatherForecast : mockDailyWeatherForecast
         return Promise.resolve({ response: { 'weather.pirate_weather': { forecast } } })
       }
+      if (params.domain === 'evershelf' && params.service === 'resolve_barcode' && params.returnResponse === true) {
+        const barcode = (params.serviceData as { barcode?: string } | undefined)?.barcode
+        return Promise.resolve({
+          response: {
+            barcode,
+            found: true,
+            product: { brand: 'Ferrero', image_url: 'https://example.test/nutella.jpg', name: 'Nutella' },
+            source: 'mock',
+          },
+        })
+      }
+      if (params.domain === 'evershelf' && params.service === 'read_expiry_image' && params.returnResponse === true) {
+        return Promise.resolve({
+          response: {
+            expiry_date: '2026-06-30',
+            raw_text: 'EXP 06/30/2026',
+            source: 'mock_ocr',
+            success: true,
+          },
+        })
+      }
     },
     joinHassUrl: (path) => `http://mock-hass.local${path}`,
   },

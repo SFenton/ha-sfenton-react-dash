@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { act } from 'react'
+import { vi } from 'vitest'
 import { materialIconPath } from '../components/core/iconPaths'
 import { MEDIA_REMOTE_MODAL_STYLE } from '../components/hass/mediaRemoteModalStyle'
 import { VACUUM_MODAL_STYLE } from '../components/hass/vacuumModalStyle'
@@ -7,6 +8,39 @@ import { DashboardViewPage } from './DashboardViewPage'
 import { CONTACT_GROUPS } from '../constants/atAGlance'
 import { ROOM_PAGE_CONFIGS, ROOM_PAGE_ORDER } from '../constants/roomPages'
 import { entity, mockCallServiceCalls, mockEntities, mockFreeSleepScheduleAttributes, mockState, mockTodoItemsByEntity, resetMockHass } from '../test/mocks/hakitCoreState'
+
+type MockDecodeCallback = (
+  result: { getText: () => string } | undefined,
+  error: { name?: string } | undefined,
+  controls: { stop: () => void },
+) => void
+
+const zxingMock = vi.hoisted(() => ({
+  decodeFromVideoElement: vi.fn(),
+  latestCallback: undefined as MockDecodeCallback | undefined,
+  possibleFormats: [] as unknown[],
+  scannerStop: vi.fn(),
+}))
+
+vi.mock('@zxing/browser', () => ({
+  BarcodeFormat: {
+    CODE_128: 'CODE_128',
+    CODE_39: 'CODE_39',
+    EAN_13: 'EAN_13',
+    EAN_8: 'EAN_8',
+    ITF: 'ITF',
+    UPC_A: 'UPC_A',
+    UPC_E: 'UPC_E',
+  },
+  BrowserMultiFormatReader: vi.fn(function BrowserMultiFormatReader() {
+    return {
+      set possibleFormats(formats: unknown[]) {
+        zxingMock.possibleFormats = formats
+      },
+      decodeFromVideoElement: zxingMock.decodeFromVideoElement,
+    }
+  }),
+}))
 
 const ROOM_SOURCE_SECURITY_SIZED_MODAL_STYLE = {
   '--modal-desktop-height': 'auto',
@@ -31,10 +65,71 @@ async function clickModalTab(scope: RoleScope, name: string) {
   return button
 }
 
+function restoreProperty(target: object, property: PropertyKey, descriptor: PropertyDescriptor | undefined) {
+  if (descriptor) {
+    Object.defineProperty(target, property, descriptor)
+  } else {
+    delete (target as Record<PropertyKey, unknown>)[property]
+  }
+}
+
+function setupMockCamera() {
+  const stop = vi.fn()
+  const stream = { getTracks: () => [{ stop } as unknown as MediaStreamTrack] } as unknown as MediaStream
+  const getUserMedia = vi.fn(() => Promise.resolve(stream))
+  const originalMediaDevices = navigator.mediaDevices
+  const originalIsSecureContext = window.isSecureContext
+  const originalVideoWidth = Object.getOwnPropertyDescriptor(HTMLVideoElement.prototype, 'videoWidth')
+  const originalVideoHeight = Object.getOwnPropertyDescriptor(HTMLVideoElement.prototype, 'videoHeight')
+  const originalReadyState = Object.getOwnPropertyDescriptor(HTMLMediaElement.prototype, 'readyState')
+  const playSpy = vi.spyOn(HTMLMediaElement.prototype, 'play').mockResolvedValue(undefined)
+  Object.defineProperty(window, 'isSecureContext', { configurable: true, value: true })
+  Object.defineProperty(navigator, 'mediaDevices', { configurable: true, value: { getUserMedia } })
+  Object.defineProperty(HTMLVideoElement.prototype, 'videoWidth', { configurable: true, value: 1280 })
+  Object.defineProperty(HTMLVideoElement.prototype, 'videoHeight', { configurable: true, value: 720 })
+  Object.defineProperty(HTMLMediaElement.prototype, 'readyState', { configurable: true, value: 4 })
+
+  return {
+    getUserMedia,
+    restore: () => {
+      playSpy.mockRestore()
+      Object.defineProperty(window, 'isSecureContext', { configurable: true, value: originalIsSecureContext })
+      Object.defineProperty(navigator, 'mediaDevices', { configurable: true, value: originalMediaDevices })
+      restoreProperty(HTMLVideoElement.prototype, 'videoWidth', originalVideoWidth)
+      restoreProperty(HTMLVideoElement.prototype, 'videoHeight', originalVideoHeight)
+      restoreProperty(HTMLMediaElement.prototype, 'readyState', originalReadyState)
+    },
+    stop,
+  }
+}
+
+function setupMockCanvas(dataUrl = 'data:image/jpeg;base64,expiry-image') {
+  const drawImage = vi.fn()
+  const getContextSpy = vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(() => ({ drawImage }) as unknown as CanvasRenderingContext2D)
+  const toDataUrlSpy = vi.spyOn(HTMLCanvasElement.prototype, 'toDataURL').mockReturnValue(dataUrl)
+
+  return {
+    dataUrl,
+    drawImage,
+    restore: () => {
+      getContextSpy.mockRestore()
+      toDataUrlSpy.mockRestore()
+    },
+  }
+}
+
 describe('DashboardViewPage', () => {
   beforeEach(() => {
     window.history.replaceState(null, '', window.location.pathname)
     resetMockHass()
+    zxingMock.decodeFromVideoElement.mockReset()
+    zxingMock.latestCallback = undefined
+    zxingMock.possibleFormats = []
+    zxingMock.scannerStop.mockReset()
+    zxingMock.decodeFromVideoElement.mockImplementation(async (_video: HTMLVideoElement, callback: MockDecodeCallback) => {
+      zxingMock.latestCallback = callback
+      return { stop: zxingMock.scannerStop }
+    })
     delete mockEntities['climate.sleepypod_eight_pod_left_side']
     delete mockEntities['climate.sleepypod_eight_pod_right_side']
     delete mockEntities['number.master_bedroom_sleepypod_eight_pod_left_target_level']
@@ -165,7 +260,7 @@ describe('DashboardViewPage', () => {
     mockEntities['light.kitchen_sink_light'] = entity('light.kitchen_sink_light', 'off')
     render(<DashboardViewPage activePath="kitchen" onNavigate={() => undefined} path="kitchen" />)
 
-    expect(screen.getByRole('button', { name: 'Rooms' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Scan Item' })).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: /Lights/i }))
 
     const dialog = await screen.findByRole('dialog')
@@ -192,6 +287,127 @@ describe('DashboardViewPage', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: 'Living Room area' }))
 
     expect(navigate).toHaveBeenCalledWith('living-room')
+  })
+
+  it('opens the Kitchen scan item camera modal from the FAB', async () => {
+    const camera = setupMockCamera()
+
+    try {
+      render(<DashboardViewPage activePath="kitchen" onNavigate={() => undefined} path="kitchen" />)
+
+      expect(screen.queryByRole('button', { name: 'Rooms' })).not.toBeInTheDocument()
+      const scanButton = screen.getByRole('button', { name: 'Scan Item' })
+      expect(scanButton).toHaveTextContent('Scan Item')
+      fireEvent.click(scanButton)
+
+      expect(await screen.findByRole('dialog', { name: 'Scan Item' })).toBeInTheDocument()
+      expect(screen.getByText('Scan Barcode · Step 1 of 2')).toBeInTheDocument()
+      expect(screen.getByText('Use the product barcode to look up item details')).toBeInTheDocument()
+      expect(screen.getByText('Center the barcode inside the camera window and hold steady.')).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Skip Barcode' })).toBeEnabled()
+      expect(await screen.findByLabelText('Live item scan camera feed')).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Back to barcode scan' })).not.toBeInTheDocument()
+      await waitFor(() => expect(camera.getUserMedia).toHaveBeenCalledWith({
+        audio: false,
+        video: {
+          aspectRatio: { ideal: 16 / 9 },
+          facingMode: { ideal: 'environment' },
+          height: { ideal: 720 },
+          width: { ideal: 1280 },
+        },
+      }))
+      expect(await screen.findByRole('button', { name: 'Skip Barcode' })).toBeEnabled()
+      await waitFor(() => expect(zxingMock.decodeFromVideoElement).toHaveBeenCalled())
+
+      fireEvent.click(screen.getByRole('button', { name: 'Close' }))
+      await waitFor(() => expect(camera.stop).toHaveBeenCalled())
+    } finally {
+      camera.restore()
+    }
+  })
+
+  it('resolves scanned Kitchen barcodes through EverShelf', async () => {
+    const camera = setupMockCamera()
+
+    try {
+      render(<DashboardViewPage activePath="kitchen" onNavigate={() => undefined} path="kitchen" />)
+
+      fireEvent.click(screen.getByRole('button', { name: 'Scan Item' }))
+      expect(await screen.findByRole('dialog', { name: 'Scan Item' })).toBeInTheDocument()
+      await waitFor(() => expect(zxingMock.latestCallback).toEqual(expect.any(Function)))
+
+      act(() => {
+        zxingMock.latestCallback?.({ getText: () => '3017620422003' }, undefined, { stop: zxingMock.scannerStop })
+      })
+
+      await waitFor(() => expect(mockCallServiceCalls).toContainEqual({
+        domain: 'evershelf',
+        returnResponse: true,
+        service: 'resolve_barcode',
+        serviceData: { barcode: '3017620422003' },
+      }))
+      expect(await screen.findByText('Nutella')).toBeInTheDocument()
+      expect(screen.getByText('Ferrero')).toBeInTheDocument()
+      expect(screen.getByText('Source: mock')).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Next' })).toBeEnabled()
+      expect(camera.stop).not.toHaveBeenCalled()
+
+      fireEvent.click(screen.getByRole('button', { name: 'Close' }))
+      await waitFor(() => expect(camera.stop).toHaveBeenCalled())
+    } finally {
+      camera.restore()
+    }
+  })
+
+  it('reads expiration dates from Kitchen scan item photos through EverShelf', async () => {
+    const camera = setupMockCamera()
+    const canvas = setupMockCanvas()
+
+    try {
+      render(<DashboardViewPage activePath="kitchen" onNavigate={() => undefined} path="kitchen" />)
+
+      fireEvent.click(screen.getByRole('button', { name: 'Scan Item' }))
+      expect(await screen.findByRole('dialog', { name: 'Scan Item' })).toBeInTheDocument()
+      expect(await screen.findByLabelText('Live item scan camera feed')).toBeInTheDocument()
+      await waitFor(() => expect(zxingMock.decodeFromVideoElement).toHaveBeenCalledTimes(1))
+      fireEvent.click(screen.getByRole('button', { name: 'Skip Barcode' }))
+      expect(screen.getByText('Expiration Date · Step 2 of 2')).toBeInTheDocument()
+      expect(screen.getByText('Take a clear photo of the printed expiration date')).toBeInTheDocument()
+      expect(screen.getByText('Center the printed expiration date inside the camera window and keep the label flat.')).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Back to barcode scan' })).toBeInTheDocument()
+      expect(await screen.findByLabelText('Live expiration date camera feed')).toBeInTheDocument()
+      expect(camera.getUserMedia).toHaveBeenCalledTimes(1)
+      fireEvent.click(screen.getByRole('button', { name: 'Back to barcode scan' }))
+      expect(screen.getByText('Scan Barcode · Step 1 of 2')).toBeInTheDocument()
+      expect(await screen.findByLabelText('Live item scan camera feed')).toBeInTheDocument()
+      await waitFor(() => expect(zxingMock.decodeFromVideoElement).toHaveBeenCalledTimes(2))
+      expect(camera.getUserMedia).toHaveBeenCalledTimes(1)
+      fireEvent.click(screen.getByRole('button', { name: 'Skip Barcode' }))
+
+      expect(await screen.findByLabelText('Live expiration date camera feed')).toBeInTheDocument()
+      expect(camera.getUserMedia).toHaveBeenCalledTimes(1)
+      const readButton = await screen.findByRole('button', { name: 'Read Expiration Date' })
+      expect(readButton).toBeEnabled()
+      fireEvent.click(readButton)
+
+      await waitFor(() => expect(mockCallServiceCalls).toContainEqual({
+        domain: 'evershelf',
+        returnResponse: true,
+        service: 'read_expiry_image',
+        serviceData: { image: canvas.dataUrl },
+      }))
+      expect(await screen.findByText('Jun 30, 2026')).toBeInTheDocument()
+      expect(screen.getByText('Source: mock_ocr')).toBeInTheDocument()
+      expect(screen.getByText('Read: EXP 06/30/2026')).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Done' })).toBeEnabled()
+      expect(screen.getByAltText('Captured expiration date preview')).toHaveAttribute('src', canvas.dataUrl)
+      expect(camera.stop).not.toHaveBeenCalled()
+      fireEvent.click(screen.getByRole('button', { name: 'Done' }))
+      await waitFor(() => expect(camera.stop).toHaveBeenCalled())
+    } finally {
+      canvas.restore()
+      camera.restore()
+    }
   })
 
   it('uses a singular active bulb icon for single-light room toggles', async () => {

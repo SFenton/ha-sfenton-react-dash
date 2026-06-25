@@ -12,14 +12,16 @@ interface ModalSheetProps {
   title: string
   onClose: () => void
   children: ReactNode
+  backLabel?: string
   chrome?: 'default' | 'source-popup'
   contentStyle?: ModalSheetStyle
   footer?: ReactNode
+  onBack?: () => void
   subtitle?: string
   surface?: 'hass-popup'
 }
 
-type ModalSheetSnapshot = Pick<ModalSheetProps, 'children' | 'chrome' | 'contentStyle' | 'footer' | 'subtitle' | 'title'>
+type ModalSheetSnapshot = Pick<ModalSheetProps, 'backLabel' | 'children' | 'chrome' | 'contentStyle' | 'footer' | 'onBack' | 'subtitle' | 'title'>
 const RECENT_OPEN_INTERNAL_CLOSE_GUARD_MS = 450
 const EXIT_ANIMATION_UNMOUNT_MS = 260
 
@@ -47,11 +49,11 @@ function useDesktopModalLayout() {
   return isDesktopModalLayout
 }
 
-export function ModalSheet({ open, title, onClose, children, chrome = 'default', contentStyle, footer, subtitle }: ModalSheetProps) {
+export function ModalSheet({ open, title, onClose, children, backLabel = 'Back', chrome = 'default', contentStyle, footer, onBack, subtitle }: ModalSheetProps) {
   const contentRef = useRef<HTMLDivElement | null>(null)
   const closeRequestedAtRef = useRef(Number.NEGATIVE_INFINITY)
   const ignoreInternalCloseUntilRef = useRef(0)
-  const currentSnapshot: ModalSheetSnapshot = { children, chrome, contentStyle, footer, subtitle, title }
+  const currentSnapshot: ModalSheetSnapshot = { backLabel, children, chrome, contentStyle, footer, onBack, subtitle, title }
   const [lastOpenSnapshot, setLastOpenSnapshot] = useState<ModalSheetSnapshot>(currentSnapshot)
   const [mounted, setMounted] = useState(open)
   const [rapidReopen, setRapidReopen] = useState(false)
@@ -135,9 +137,16 @@ export function ModalSheet({ open, title, onClose, children, chrome = 'default',
         >
           {showDragHandle && <Drawer.Handle className={styles.handle} data-mobile-drag-handle="true" />}
           <div className={styles.header}>
-            <div className={styles.titleBlock}>
-              <Drawer.Title className={styles.title}>{rendered.title}</Drawer.Title>
-              {rendered.subtitle && <p className={styles.subtitle}>{rendered.subtitle}</p>}
+            <div className={styles.headingGroup}>
+              {rendered.onBack && (
+                <button aria-label={rendered.backLabel} className={styles.back} onClick={rendered.onBack} type="button">
+                  <MaterialIcon name="mdi:chevron-left" size={22} />
+                </button>
+              )}
+              <div className={styles.titleBlock}>
+                <Drawer.Title className={styles.title}>{rendered.title}</Drawer.Title>
+                {rendered.subtitle && <p className={styles.subtitle}>{rendered.subtitle}</p>}
+              </div>
             </div>
             <Drawer.Description className={styles.description}>{rendered.subtitle ? `${rendered.title}: ${rendered.subtitle}` : `${rendered.title} controls and status details`}</Drawer.Description>
             <button className={styles.close} aria-label="Close" onClick={requestClose} type="button">
