@@ -82,6 +82,14 @@ describe('AtAGlancePage', () => {
     expect(within(dialog).getAllByText('1 • 2 μg/m³')).toHaveLength(6)
   })
 
+  it('preloads modal content without opening the live URL hash modal', () => {
+    window.history.replaceState(null, '', `${window.location.pathname}#lights-overview`)
+    const { container } = render(<AtAGlancePage preload preloadHashes={['#lights-overview']} />)
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(container.querySelector('[data-preload-modal="overview#lights-overview"]')).toBeInTheDocument()
+  })
+
   it('colors overview security tiles from the alarm state', () => {
     mockEntities[SECURITY_ENTITY].state = 'armed_night'
     render(<AtAGlancePage />)

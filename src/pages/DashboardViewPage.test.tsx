@@ -3128,6 +3128,22 @@ describe('DashboardViewPage', () => {
     expect(screen.queryByText(/not available in the React dashboard yet/i)).not.toBeInTheDocument()
   })
 
+  it('does not open the Security modal for a Home-only URL hash', () => {
+    window.history.replaceState(null, '', `${window.location.pathname}#lights-overview`)
+    render(<DashboardViewPage activePath="security" onNavigate={() => undefined} path="security" />)
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(screen.getAllByRole('heading', { name: 'Security' }).length).toBeGreaterThanOrEqual(1)
+  })
+
+  it('preloads Security modal content without opening the live URL hash modal', () => {
+    window.history.replaceState(null, '', `${window.location.pathname}#lights-overview`)
+    const { container } = render(<DashboardViewPage activePath="security" onNavigate={() => undefined} path="security" preload preloadHashes={['#security-system']} />)
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(container.querySelector('[data-preload-modal="security#security-system"]')).toBeInTheDocument()
+  })
+
   it('keeps Security header chips outside the page scroller', () => {
     render(<DashboardViewPage activePath="security" onNavigate={() => undefined} path="security" />)
 
@@ -3916,5 +3932,21 @@ describe('DashboardViewPage', () => {
     await clickModalTab(within(dialog), 'Info')
     expect(within(controlsPane).getByRole('group', { name: 'Main Filter 54h left' })).toBeInTheDocument()
     expect(within(controlsPane).getByRole('group', { name: 'Detergent OK' })).toBeInTheDocument()
+  })
+
+  it('opens the real Vacuums route modal from a vacuum URL hash', async () => {
+    window.history.replaceState(null, '', `${window.location.pathname}#main-floor-robot-vacuum`)
+    render(<DashboardViewPage activePath="vacuums" onNavigate={() => undefined} path="vacuums" />)
+
+    expect(await screen.findByRole('dialog')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Main Floor Robot Vacuum' })).toBeInTheDocument()
+  })
+
+  it('preloads the Vacuums route without opening a vacuum URL hash modal', () => {
+    window.history.replaceState(null, '', `${window.location.pathname}#main-floor-robot-vacuum`)
+    render(<DashboardViewPage activePath="vacuums" onNavigate={() => undefined} path="vacuums" preload />)
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Robot Vacuums' })).toBeInTheDocument()
   })
 })

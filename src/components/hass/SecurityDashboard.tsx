@@ -111,6 +111,10 @@ function modalTitle(hash: string) {
 
 const CONTACT_SENSORS_HASH = '#contact-sensors-overview'
 
+function isSecurityModalHash(hash: string) {
+  return SECURITY_STATUS_CHIPS.some((chip) => chip.hash === hash) || CAMERA_ITEMS.some((item) => item.hash === hash)
+}
+
 function SecurityModalContent({
   contactGridRef,
   contactGridStyle,
@@ -140,13 +144,16 @@ interface SecurityDashboardProps {
 
 export function SecurityDashboard({ closeHash, hash, onOpenHash, preload = false, preloadHash, preloadHashes = [] }: SecurityDashboardProps) {
   const securitySubtitle = useHass((state) => securitySystemModalSubtitle(state.entities[SECURITY_ENTITY]?.state))
-  const contentHash = hash || preloadHash || ''
-  const contactModalOpen = hash === CONTACT_SENSORS_HASH
+  const activeHash = isSecurityModalHash(hash) ? hash : ''
+  const preloadContentHash = preloadHash && isSecurityModalHash(preloadHash) ? preloadHash : ''
+  const contentHash = activeHash || preloadContentHash
+  const contactModalOpen = activeHash === CONTACT_SENSORS_HASH
   const contactModalContentActive = contentHash === CONTACT_SENSORS_HASH
   const [contactGridRef, contactGridLayout] = useModalSquareGridLayout(contactModalOpen, CONTACT_GROUPS.length)
   const contactGridStyle = modalSquareGridStyle(contactGridLayout)
   const modalSubtitle = contentHash === '#security-system' ? securitySubtitle : undefined
   const modalContentStyle = contentHash === '#security-system' ? SECURITY_SYSTEM_MODAL_STYLE : contactModalContentActive ? modalSquareGridModalStyleForHash(CONTACT_SENSORS_HASH, contactGridLayout) : undefined
+  const preloadModalHashes = preloadHashes.filter(isSecurityModalHash)
 
   return (
     <>
@@ -175,10 +182,10 @@ export function SecurityDashboard({ closeHash, hash, onOpenHash, preload = false
         )}
       </div>
 
-      <ModalSheet contentStyle={modalContentStyle} onClose={closeHash} open={hash !== ''} subtitle={modalSubtitle} title={modalTitle(contentHash)}>
+      <ModalSheet contentStyle={modalContentStyle} onClose={closeHash} open={activeHash !== ''} subtitle={modalSubtitle} title={modalTitle(contentHash)}>
         <SecurityModalContent contactGridRef={contactGridRef} contactGridStyle={contactGridStyle} hash={contentHash} />
       </ModalSheet>
-      {preloadHashes.map((preloadTargetHash) => (
+      {preloadModalHashes.map((preloadTargetHash) => (
         <div data-preload-modal={`security${preloadTargetHash}`} key={`security-preload-${preloadTargetHash}`}>
           <SecurityModalContent hash={preloadTargetHash} live={false} />
         </div>

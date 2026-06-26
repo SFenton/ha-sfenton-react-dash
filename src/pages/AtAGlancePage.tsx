@@ -1251,7 +1251,7 @@ interface AtAGlancePageProps {
 }
 
 export function AtAGlancePage({ activePath = 'overview', deferRouteContent = false, loadingPhase: routeLoadingPhase, onHydrationPhaseChange, onNavigate = () => undefined, preload = false, preloadHash, preloadHashes = [], routeTransitionState = 'idle', withShell = true }: AtAGlancePageProps) {
-  const { hash, openHash, closeHash } = useHashModal()
+  const { hash, openHash, closeHash } = useHashModal({ disabled: preload })
   const { hydrateHeavyContent, loadingPhase: homeHydrationPhase, showContent } = useDeferredRouteHydration({
     cacheKey: 'home',
     enabled: deferRouteContent,

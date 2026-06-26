@@ -680,7 +680,7 @@ function EmptyRoomState() {
   )
 }
 
-function SourceRoomPage({ onNavigate, preloadHash, preloadHashes = [], room }: { onNavigate: (path: string) => void; preloadHash?: string; preloadHashes?: string[]; room: (typeof ROOM_PAGE_CONFIGS)[string] }) {
+function SourceRoomPage({ onNavigate, preload = false, preloadHash, preloadHashes = [], room }: { onNavigate: (path: string) => void; preload?: boolean; preloadHash?: string; preloadHashes?: string[]; room: (typeof ROOM_PAGE_CONFIGS)[string] }) {
   const [selectedCard, setSelectedCard] = useState<RoomSourceCardConfig | null>(null)
   const eightSleepModalStates = useEightSleepBedModalStates()
   const allCards = useMemo(() => [...room.overviewCards, ...room.sourceSections.flatMap((section) => section.cards)], [room.overviewCards, room.sourceSections])
@@ -689,10 +689,13 @@ function SourceRoomPage({ onNavigate, preloadHash, preloadHashes = [], room }: {
 
   const closeSourceCard = () => {
     setSelectedCard(null)
+    if (preload) return
     if (dashboardHash()) replaceDashboardUrl(dashboardPathWithSearch())
   }
 
   useEffect(() => {
+    if (preload) return undefined
+
     const syncFromHash = () => {
       const card = allCards.find((candidate) => candidate.hash === dashboardHash())
       setSelectedCard(card ?? null)
@@ -713,7 +716,7 @@ function SourceRoomPage({ onNavigate, preloadHash, preloadHashes = [], room }: {
         target.removeEventListener(DASHBOARD_ROUTE_CHANGE_EVENT, syncFromHash)
       })
     }
-  }, [allCards])
+  }, [allCards, preload])
 
   const openSourceCard = (card: RoomSourceCardConfig) => {
     if (card.hash) setRoomHash(card.hash)
@@ -745,9 +748,9 @@ function SourceRoomPage({ onNavigate, preloadHash, preloadHashes = [], room }: {
   )
 }
 
-function RoomPage({ onNavigate, path, preloadHash, preloadHashes, title }: { onNavigate: (path: string) => void; path: string; preloadHash?: string; preloadHashes?: string[]; title: string }) {
+function RoomPage({ onNavigate, path, preload = false, preloadHash, preloadHashes, title }: { onNavigate: (path: string) => void; path: string; preload?: boolean; preloadHash?: string; preloadHashes?: string[]; title: string }) {
   const sourceRoom = ROOM_PAGE_CONFIGS[path]
-  if (sourceRoom) return <SourceRoomPage onNavigate={onNavigate} preloadHash={preloadHash} preloadHashes={preloadHashes} room={sourceRoom} />
+  if (sourceRoom) return <SourceRoomPage onNavigate={onNavigate} preload={preload} preloadHash={preloadHash} preloadHashes={preloadHashes} room={sourceRoom} />
 
   const lightGroup = LIGHT_GROUPS.find((group) => lightRoomTitle(group) === title)
   const climateGroup = CLIMATE_GROUPS.find((group) => climateRoomTitle(group) === title)
@@ -1062,14 +1065,14 @@ function TodoEmptyState({ description = 'You have no tasks due- nice job!', titl
   )
 }
 
-function VacuumPage() {
+function VacuumPage({ preload = false }: { preload?: boolean }) {
   return (
     <div className={styles.stack}>
       <section className={styles.section}>
         <SectionHeader title="Robot Vacuums" />
         <Grid>
           {VACUUMS.map((vacuum) => (
-            <VacuumCard key={vacuum.entityId} vacuum={vacuum} />
+            <VacuumCard disableHashSync={preload} key={vacuum.entityId} vacuum={vacuum} />
           ))}
         </Grid>
       </section>
@@ -1078,7 +1081,7 @@ function VacuumPage() {
 }
 
 function SecurityPage({ activePath, backPath, contentTransitionState = 'idle', loadingPhase, onNavigate, preload = false, preloadHash, preloadHashes, title }: { activePath: string; backPath?: string; contentTransitionState?: 'entering' | 'idle' | 'pre-entering'; loadingPhase?: DashboardPageLoadingPhase; onNavigate: (path: string) => void; preload?: boolean; preloadHash?: string; preloadHashes?: string[]; title: string }) {
-  const { closeHash, hash, openHash } = useHashModal()
+  const { closeHash, hash, openHash } = useHashModal({ disabled: preload })
   return (
     <Page activePath={activePath} backPath={backPath} chromeHidden={Boolean(loadingPhase)} contentTransitionState={contentTransitionState} headerQuickLinks={<SecurityStatusRail onOpenHash={openHash} />} onNavigate={onNavigate} title={title}>
       {loadingPhase ? <DashboardPageLoading phase={loadingPhase} /> : <SecurityDashboard closeHash={closeHash} hash={hash} onOpenHash={openHash} preload={preload} preloadHash={preloadHash} preloadHashes={preloadHashes} />}
@@ -1394,13 +1397,14 @@ const MEDIA_SOURCE_SECTIONS = MEDIA_SECTIONS.map((section) => ({
 
 const MEDIA_SOURCE_CARDS = MEDIA_SOURCE_SECTIONS.flatMap((section) => section.cards)
 
-function MediaPage({ preloadHash, preloadHashes = [] }: { preloadHash?: string; preloadHashes?: string[] }) {
+function MediaPage({ preload = false, preloadHash, preloadHashes = [] }: { preload?: boolean; preloadHash?: string; preloadHashes?: string[] }) {
   const [selectedCard, setSelectedCard] = useState<RoomSourceCardConfig | null>(null)
   const preloadCard = preloadHash ? MEDIA_SOURCE_CARDS.find((candidate) => candidate.hash === preloadHash) ?? null : null
   const preloadCards = useMemo(() => preloadHashes.map((preloadTargetHash) => MEDIA_SOURCE_CARDS.find((candidate) => candidate.hash === preloadTargetHash)).filter((card): card is RoomSourceCardConfig => Boolean(card?.hash)), [preloadHashes])
 
   const closeSourceCard = () => {
     setSelectedCard(null)
+    if (preload) return
     if (dashboardHash()) replaceDashboardUrl(dashboardPathWithSearch())
   }
 
@@ -1410,6 +1414,8 @@ function MediaPage({ preloadHash, preloadHashes = [] }: { preloadHash?: string; 
   }
 
   useEffect(() => {
+    if (preload) return undefined
+
     const syncFromHash = () => {
       const card = MEDIA_SOURCE_CARDS.find((candidate) => candidate.hash === dashboardHash())
       setSelectedCard(card ?? null)
@@ -1427,7 +1433,7 @@ function MediaPage({ preloadHash, preloadHashes = [] }: { preloadHash?: string; 
         target.removeEventListener(DASHBOARD_ROUTE_CHANGE_EVENT, syncFromHash)
       })
     }
-  }, [])
+  }, [preload])
 
   return (
     <div className={styles.stack}>
@@ -1449,8 +1455,8 @@ function MediaPage({ preloadHash, preloadHashes = [] }: { preloadHash?: string; 
   )
 }
 
-function AdminPage({ onNavigate, preloadHash, preloadHashes = [] }: { onNavigate: (path: string) => void; preloadHash?: string; preloadHashes?: string[] }) {
-  const { closeHash, hash, openHash } = useHashModal()
+function AdminPage({ onNavigate, preload = false, preloadHash, preloadHashes = [] }: { onNavigate: (path: string) => void; preload?: boolean; preloadHash?: string; preloadHashes?: string[] }) {
+  const { closeHash, hash, openHash } = useHashModal({ disabled: preload })
   const contentHash = hash || preloadHash || ''
   const presenceModalOpen = hash === '#presence-based-overrides'
   const autoResetModalOpen = hash === '#presence-based-overrides-auto'
@@ -4314,8 +4320,8 @@ function ThermostatRoomModal({ onClose, open, room }: { onClose: () => void; ope
   )
 }
 
-function ThermostatPage({ preloadHash, preloadHashes = [] }: { preloadHash?: string; preloadHashes?: string[] }) {
-  const { closeHash, hash, openHash } = useHashModal()
+function ThermostatPage({ preload = false, preloadHash, preloadHashes = [] }: { preload?: boolean; preloadHash?: string; preloadHashes?: string[] }) {
+  const { closeHash, hash, openHash } = useHashModal({ disabled: preload })
   const selectedRoom = THERMOSTAT_ROOM_VIEWS.find((room) => room.hash === hash) ?? null
   const preloadRoom = preloadHash ? THERMOSTAT_ROOM_VIEWS.find((room) => room.hash === preloadHash) ?? null : null
   const preloadRooms = useMemo(() => preloadHashes.map((preloadTargetHash) => THERMOSTAT_ROOM_VIEWS.find((room) => room.hash === preloadTargetHash)).filter((room): room is ThermostatRoomView => Boolean(room)), [preloadHashes])
@@ -4400,18 +4406,18 @@ function FallbackPage({ title }: { title: string }) {
   return <Notice>{title} is not available in the React dashboard yet.</Notice>
 }
 
-function Content({ inventoryControls, onNavigate, onScrollLockChange, path, preloadHash, preloadHashes }: { inventoryControls: EverShelfInventoryControls; onNavigate: (path: string) => void; onScrollLockChange?: (locked: boolean) => void; path: string; preloadHash?: string; preloadHashes?: string[] }) {
+function Content({ inventoryControls, onNavigate, onScrollLockChange, path, preload = false, preloadHash, preloadHashes }: { inventoryControls: EverShelfInventoryControls; onNavigate: (path: string) => void; onScrollLockChange?: (locked: boolean) => void; path: string; preload?: boolean; preloadHash?: string; preloadHashes?: string[] }) {
   const roomTitle = dashboardRoomNameFromPath(path)
-  if (roomTitle) return <RoomPage onNavigate={onNavigate} path={path} preloadHash={preloadHash} preloadHashes={preloadHashes} title={roomTitle} />
+  if (roomTitle) return <RoomPage onNavigate={onNavigate} path={path} preload={preload} preloadHash={preloadHash} preloadHashes={preloadHashes} title={roomTitle} />
   const todoConfigPath = todoPageConfigPath(path)
   if (TODO_PAGES[todoConfigPath]) return <TodoPage configPath={todoConfigPath} onNavigate={onNavigate} onScrollLockChange={onScrollLockChange} path={path} />
   if (path === 'settings') return <SettingsPage onNavigate={onNavigate} />
   if (path === 'guests-staying-over') return <GuestControlsPage onNavigate={onNavigate} />
   if (path === 'vacation') return <VacationPage />
-  if (path === 'vacuums') return <VacuumPage />
-  if (path === 'media') return <MediaPage preloadHash={preloadHash} preloadHashes={preloadHashes} />
-  if (path === 'admin') return <AdminPage onNavigate={onNavigate} preloadHash={preloadHash} preloadHashes={preloadHashes} />
-  if (path === 'ecobee') return <ThermostatPage preloadHash={preloadHash} preloadHashes={preloadHashes} />
+  if (path === 'vacuums') return <VacuumPage preload={preload} />
+  if (path === 'media') return <MediaPage preload={preload} preloadHash={preloadHash} preloadHashes={preloadHashes} />
+  if (path === 'admin') return <AdminPage onNavigate={onNavigate} preload={preload} preloadHash={preloadHash} preloadHashes={preloadHashes} />
+  if (path === 'ecobee') return <ThermostatPage preload={preload} preloadHash={preloadHash} preloadHashes={preloadHashes} />
   if (path === 'custom-lights') return <CustomLightsPage />
   if (EVERSHELF_INVENTORY_PAGES[path]) return <EverShelfInventoryPage controls={inventoryControls} path={path} />
   if (CONTROL_PAGES[path]) return <ControlPage onNavigate={onNavigate} path={path} />
@@ -4435,7 +4441,7 @@ export function DashboardViewPage({ activePath, initialContentTransitionState = 
     <SecurityPage activePath={activePath} backPath={showBack ? 'overview' : undefined} contentTransitionState={loadingPhase ? 'idle' : initialContentTransitionState} loadingPhase={loadingPhase} onNavigate={onNavigate} preload={preload} preloadHash={preloadHash} preloadHashes={preloadHashes} title={title} />
   ) : (
     <Page activePath={activePath} backPath={showBack ? 'overview' : undefined} chromeHidden={Boolean(loadingPhase)} contentTransitionState={loadingPhase ? 'idle' : initialContentTransitionState} headerQuickLinks={roomTitle ? <RoomSectionRail path={path} title={roomTitle} /> : undefined} onNavigate={onNavigate} scrollLocked={pageScrollLocked} title={title}>
-      {loadingPhase ? <DashboardPageLoading phase={loadingPhase} /> : <Content inventoryControls={inventoryControls} onNavigate={onNavigate} onScrollLockChange={handlePageScrollLockChange} path={path} preloadHash={preloadHash} preloadHashes={preloadHashes} />}
+      {loadingPhase ? <DashboardPageLoading phase={loadingPhase} /> : <Content inventoryControls={inventoryControls} onNavigate={onNavigate} onScrollLockChange={handlePageScrollLockChange} path={path} preload={preload} preloadHash={preloadHash} preloadHashes={preloadHashes} />}
     </Page>
   )
 

@@ -5,6 +5,7 @@ import { Description } from '../core/Description'
 import { MaterialIcon } from '../core/Icon'
 import { ModalSheet } from '../core/ModalSheet'
 import { type VacuumAutoCleanDisabledRoomConfig, type VacuumConfig, type VacuumConsumableConfig, type VacuumZoneConfig } from '../../constants/portedDashboard'
+import { DASHBOARD_ROUTE_CHANGE_EVENT, dashboardEventTargets, dashboardHash, dashboardPathWithSearch, replaceDashboardUrl } from '../../hooks/dashboardLocation'
 import { useImmediateVisualTab, useSmoothDisplayedModalTab } from '../../hooks/useSmoothDisplayedModalTab'
 import { useOptimisticState } from '../../hooks/useOptimisticState'
 import { asEntityName, titleCaseState } from './entityState'
@@ -39,6 +40,7 @@ interface EntityLike {
 }
 
 interface VacuumCardProps {
+  disableHashSync?: boolean
   vacuum: VacuumConfig
 }
 
@@ -938,7 +940,7 @@ function VacuumModal({ onClose, open, vacuum }: { onClose: () => void; open: boo
   )
 }
 
-export function VacuumCard({ vacuum }: VacuumCardProps) {
+export function VacuumCard({ disableHashSync = false, vacuum }: VacuumCardProps) {
   const entity = useEntity(asEntityName(vacuum.entityId), { returnNullIfNotFound: true })
   const battery = useEntity(asEntityName(vacuum.batteryEntityId), { returnNullIfNotFound: true })
   const [open, setOpen] = useState(false)
@@ -947,22 +949,36 @@ export function VacuumCard({ vacuum }: VacuumCardProps) {
   const subtitle = vacuumSubtitle(state, battery?.state)
 
   useEffect(() => {
-    const syncFromHash = () => setOpen(window.location.hash === `#${vacuum.hash}` && !unavailable)
+    if (disableHashSync) return undefined
+
+    const syncFromHash = () => setOpen(dashboardHash() === `#${vacuum.hash}` && !unavailable)
+    const targets = dashboardEventTargets()
+
     syncFromHash()
-    window.addEventListener('hashchange', syncFromHash)
-    return () => window.removeEventListener('hashchange', syncFromHash)
-  }, [unavailable, vacuum.hash])
+    targets.forEach((target) => {
+      target.addEventListener('hashchange', syncFromHash)
+      target.addEventListener('popstate', syncFromHash)
+      target.addEventListener(DASHBOARD_ROUTE_CHANGE_EVENT, syncFromHash)
+    })
+    return () => {
+      targets.forEach((target) => {
+        target.removeEventListener('hashchange', syncFromHash)
+        target.removeEventListener('popstate', syncFromHash)
+        target.removeEventListener(DASHBOARD_ROUTE_CHANGE_EVENT, syncFromHash)
+      })
+    }
+  }, [disableHashSync, unavailable, vacuum.hash])
 
   const openModal = useCallback(() => {
-    if (unavailable) return
-    window.history.replaceState(null, '', `${window.location.pathname}#${vacuum.hash}`)
+    if (disableHashSync || unavailable) return
+    replaceDashboardUrl(`${dashboardPathWithSearch()}#${vacuum.hash}`)
     setOpen(true)
-  }, [unavailable, vacuum.hash])
+  }, [disableHashSync, unavailable, vacuum.hash])
 
   const closeModal = useCallback(() => {
-    window.history.replaceState(null, '', window.location.pathname)
+    if (!disableHashSync) replaceDashboardUrl(dashboardPathWithSearch())
     setOpen(false)
-  }, [])
+  }, [disableHashSync])
 
   const modal = useMemo(() => <VacuumModal onClose={closeModal} open={open} vacuum={vacuum} />, [closeModal, open, vacuum])
 
