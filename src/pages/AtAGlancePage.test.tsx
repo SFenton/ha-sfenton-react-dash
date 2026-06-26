@@ -3,7 +3,7 @@ import { AtAGlancePage } from './AtAGlancePage'
 import { materialIconPath } from '../components/core/iconPaths'
 import { CONTACT_GROUPS, LIGHT_GROUPS, OCCUPANCY_GROUPS, SECURITY_ENTITY } from '../constants/atAGlance'
 import { CHORE_BLUE } from '../constants/portedDashboard'
-import { mockEntities, resetMockHass } from '../test/mocks/hakitCoreState'
+import { entity, mockEntities, resetMockHass } from '../test/mocks/hakitCoreState'
 import { resetDeferredRouteHydrationCache } from '../hooks/useDeferredRouteHydration'
 
 describe('AtAGlancePage', () => {
@@ -135,6 +135,42 @@ describe('AtAGlancePage', () => {
     expect(within(dialog).queryByRole('heading', { name: 'Rooms' })).not.toBeInTheDocument()
     expect(within(dialog).getByRole('heading', { name: 'Lights On' })).toBeInTheDocument()
     expect(within(dialog).getByRole('heading', { name: 'Lights Off' })).toBeInTheDocument()
+  })
+
+  it('uses child light state for room light cards when a group toggle entity is stale', async () => {
+    const hallwayGroup = LIGHT_GROUPS.find((group) => group.title === 'Hallway Lights')
+    expect(hallwayGroup).toBeDefined()
+    if (!hallwayGroup) return
+
+    const originalEntities = new Map<string, typeof mockEntities[string] | undefined>()
+    const setMockEntity = (entityId: string, state: string) => {
+      if (!originalEntities.has(entityId)) originalEntities.set(entityId, mockEntities[entityId])
+      mockEntities[entityId] = entity(entityId, state)
+    }
+
+    setMockEntity('light.hallway_lights', 'off')
+    hallwayGroup.items.forEach((item) => setMockEntity(item.entityId, 'on'))
+
+    try {
+      render(<AtAGlancePage />)
+
+      fireEvent.click(screen.getByRole('button', { name: /^Lights\b/i }))
+
+      const dialog = await screen.findByRole('dialog')
+      const hallwayCard = within(dialog).getByLabelText('Open Hallway Lights')
+      expect(within(hallwayCard).getByText('4 On')).toBeInTheDocument()
+      expect(hallwayCard).toHaveAttribute('data-muted', 'false')
+
+      fireEvent.click(hallwayCard)
+
+      expect(within(dialog).getByRole('heading', { name: 'Hallway Lights' })).toBeInTheDocument()
+      expect(within(dialog).getByText('4 On')).toBeInTheDocument()
+    } finally {
+      for (const [entityId, originalEntity] of originalEntities) {
+        if (originalEntity) mockEntities[entityId] = originalEntity
+        else delete mockEntities[entityId]
+      }
+    }
   })
 
   it('hides the Lights On section when no light room is on', async () => {

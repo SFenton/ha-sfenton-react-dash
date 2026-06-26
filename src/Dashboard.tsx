@@ -7,6 +7,7 @@ import { BottomNav } from './components/shell/BottomNav'
 import type { DashboardPageLoadingPhase } from './components/shell/DashboardPageLoading'
 import { DashboardPreloadCache } from './components/shell/DashboardPreloadCache'
 import { DashboardFloatingAction } from './components/shell/DashboardFloatingAction'
+import { useEverShelfInventoryControls, type EverShelfInventoryControls } from './components/hass/EverShelfInventoryControls'
 import { SmoothRouteOutlet } from './components/shell/SmoothRouteOutlet'
 import { hasDashboardFloatingAction } from './components/shell/dashboardFloatingAction'
 import { PRIMARY_NAV_ROUTES, routeUrl } from './constants/routes'
@@ -21,16 +22,16 @@ let initialPreloadCompleted = false
 
 type InitialContentTransitionState = 'entering' | 'idle' | 'pre-entering'
 
-function pageForPath(path: string, activePath: string, onNavigate: (path: string) => void, transitionState: RouteTransitionState, loadingPhase?: DashboardPageLoadingPhase, initialContentTransitionState: InitialContentTransitionState = 'idle') {
+function pageForPath(path: string, activePath: string, onNavigate: (path: string) => void, transitionState: RouteTransitionState, inventoryControls: EverShelfInventoryControls, loadingPhase?: DashboardPageLoadingPhase, initialContentTransitionState: InitialContentTransitionState = 'idle') {
   if (path === 'overview') {
     return <AtAGlancePage activePath={activePath} deferRouteContent loadingPhase={loadingPhase} onNavigate={onNavigate} routeTransitionState={transitionState} withShell={false} />
   }
 
-  return <DashboardViewPage activePath={activePath} initialContentTransitionState={initialContentTransitionState} loadingPhase={loadingPhase} onNavigate={onNavigate} path={path} withShell={false} />
+  return <DashboardViewPage activePath={activePath} initialContentTransitionState={initialContentTransitionState} inventoryControls={inventoryControls} loadingPhase={loadingPhase} onNavigate={onNavigate} path={path} withShell={false} />
 }
 
-function floatingActionForPath(path: string, onNavigate: (path: string) => void): ReactNode {
-  return hasDashboardFloatingAction(path) ? <DashboardFloatingAction key={path} onNavigate={onNavigate} path={path} /> : undefined
+function floatingActionForPath(path: string, onNavigate: (path: string) => void, inventoryControls: EverShelfInventoryControls): ReactNode {
+  return hasDashboardFloatingAction(path) ? <DashboardFloatingAction inventoryControls={inventoryControls} key={path} onNavigate={onNavigate} path={path} /> : undefined
 }
 
 function routeUsesMenuChrome(path: string) {
@@ -48,6 +49,7 @@ function Dashboard() {
   const contentEnterSettleTimerRef = useRef<number | null>(null)
   const preloadStartedAtRef = useRef<number | null>(null)
   const routeLoadingPhase = preloadGatePhase === 'content' ? undefined : preloadGatePhase
+  const inventoryControls = useEverShelfInventoryControls(displayedPath)
 
   const handlePreloadComplete = useCallback(() => {
     setPreloadReady(true)
@@ -105,9 +107,9 @@ function Dashboard() {
   }
 
   return (
-    <AppShell bottomNav={<BottomNav activePath={path} onNavigate={navigateToPath} />} chromeHidden={Boolean(routeLoadingPhase)} floatingAction={floatingActionForPath(displayedPath, navigateToPath)}>
+    <AppShell bottomNav={<BottomNav activePath={path} onNavigate={navigateToPath} />} chromeHidden={Boolean(routeLoadingPhase)} floatingAction={floatingActionForPath(displayedPath, navigateToPath, inventoryControls)}>
       <SmoothRouteOutlet leadingChromeTransition={leadingChromeTransition} routePath={displayedPath} transitionState={transitionState}>
-        {pageForPath(displayedPath, path, navigateToPath, transitionState, routeLoadingPhase, initialContentTransitionState)}
+        {pageForPath(displayedPath, path, navigateToPath, transitionState, inventoryControls, routeLoadingPhase, initialContentTransitionState)}
       </SmoothRouteOutlet>
       {!initialPreloadCompleted && <DashboardPreloadCache active onComplete={handlePreloadComplete} />}
     </AppShell>

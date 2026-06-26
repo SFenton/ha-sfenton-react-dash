@@ -5,8 +5,8 @@
   overflow: hidden;
   color: var(--color-text);
   background: #111723;
-  --floating-action-size: 62px;
-  --floating-action-gap: 8px;
+  --floating-action-size: 56px;
+  --floating-action-gap: 4px;
   --floating-action-content-gap: 20px;
   --page-bottom-extra-padding: 22px;
 }
@@ -44,9 +44,16 @@
 
 .floatingAction {
   position: fixed;
+  left: 20px;
   right: 22px;
-  bottom: calc(var(--bottom-nav-height) + var(--floating-action-gap) + env(safe-area-inset-bottom, 0px));
+  bottom: calc(var(--bottom-nav-height) - 2px + env(safe-area-inset-bottom, 0px));
   z-index: 35;
-  display: grid;
-  place-items: center;
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--floating-action-gap);
+  pointer-events: none;
+}
+
+.floatingAction > button {
+  pointer-events: auto;
 }

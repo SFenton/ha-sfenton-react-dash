@@ -15,6 +15,8 @@ import { EntityActionCard } from '../components/hass/EntityActionCard'
 import { SecurityDashboard, SecurityStatusRail } from '../components/hass/SecurityDashboard'
 import { StatusRail, type StatusRailChip } from '../components/hass/StatusRail'
 import { TodoListPanel } from '../components/hass/TodoListPanel'
+import { EverShelfInventoryPanel, type EverShelfInventoryLocation } from '../components/hass/EverShelfInventoryPanel'
+import { useEverShelfInventoryControls, type EverShelfInventoryControls } from '../components/hass/EverShelfInventoryControls'
 import { VacuumCard, VacuumRoomSourceModalContent } from '../components/hass/VacuumCard'
 import { VACUUM_MODAL_STYLE } from '../components/hass/vacuumModalStyle'
 import { AirQualityModalContent } from '../components/hass/AirQualityModalContent'
@@ -44,7 +46,7 @@ import {
   OCCUPANCY_GROUPS,
   type EntityGroupConfig,
 } from '../constants/atAGlance'
-import { DASHBOARD_ROUTES, PRIMARY_NAV_ROUTES } from '../constants/routes'
+import { DASHBOARD_ROUTES, HOME_FREEZER_ROUTE_PATH, HOME_FRIDGE_ROUTE_PATH, HOME_GROCERY_LIST_ROUTE_PATH, HOME_PANTRY_ROUTE_PATH, PRIMARY_NAV_ROUTES } from '../constants/routes'
 import {
   ADMIN_AUTO_REENABLE_ITEMS,
   CHORE_QUICK_LINKS,
@@ -92,6 +94,7 @@ interface DashboardViewPageProps {
   activePath: string
   onNavigate: (path: string) => void
   initialContentTransitionState?: 'entering' | 'idle' | 'pre-entering'
+  inventoryControls?: EverShelfInventoryControls
   loadingPhase?: DashboardPageLoadingPhase
   path: string
   preload?: boolean
@@ -677,7 +680,7 @@ function EmptyRoomState() {
   )
 }
 
-function SourceRoomPage({ preloadHash, preloadHashes = [], room }: { preloadHash?: string; preloadHashes?: string[]; room: (typeof ROOM_PAGE_CONFIGS)[string] }) {
+function SourceRoomPage({ onNavigate, preloadHash, preloadHashes = [], room }: { onNavigate: (path: string) => void; preloadHash?: string; preloadHashes?: string[]; room: (typeof ROOM_PAGE_CONFIGS)[string] }) {
   const [selectedCard, setSelectedCard] = useState<RoomSourceCardConfig | null>(null)
   const eightSleepModalStates = useEightSleepBedModalStates()
   const allCards = useMemo(() => [...room.overviewCards, ...room.sourceSections.flatMap((section) => section.cards)], [room.overviewCards, room.sourceSections])
@@ -721,6 +724,8 @@ function SourceRoomPage({ preloadHash, preloadHashes = [], room }: { preloadHash
     <div className={styles.stack}>
       {room.sourceSections.length === 0 && <EmptyRoomState />}
 
+      {room.path === 'kitchen' && <KitchenGroceriesSection onNavigate={onNavigate} />}
+
       {room.sourceSections.map((section) => (
         <section className={styles.section} id={sectionId(section.title)} key={`${room.path}-${section.title}`}>
           <SectionHeader title={section.title} />
@@ -742,7 +747,7 @@ function SourceRoomPage({ preloadHash, preloadHashes = [], room }: { preloadHash
 
 function RoomPage({ onNavigate, path, preloadHash, preloadHashes, title }: { onNavigate: (path: string) => void; path: string; preloadHash?: string; preloadHashes?: string[]; title: string }) {
   const sourceRoom = ROOM_PAGE_CONFIGS[path]
-  if (sourceRoom) return <SourceRoomPage preloadHash={preloadHash} preloadHashes={preloadHashes} room={sourceRoom} />
+  if (sourceRoom) return <SourceRoomPage onNavigate={onNavigate} preloadHash={preloadHash} preloadHashes={preloadHashes} room={sourceRoom} />
 
   const lightGroup = LIGHT_GROUPS.find((group) => lightRoomTitle(group) === title)
   const climateGroup = CLIMATE_GROUPS.find((group) => climateRoomTitle(group) === title)
@@ -815,17 +820,21 @@ function RoomPage({ onNavigate, path, preloadHash, preloadHashes, title }: { onN
   )
 }
 
-function TodoPage({ onNavigate, onScrollLockChange, path }: { onNavigate: (path: string) => void; onScrollLockChange?: (locked: boolean) => void; path: string }) {
-  const config = TODO_PAGES[path]
-  if (!config) return null
-  return <TodoPageContent config={config} onNavigate={onNavigate} onScrollLockChange={onScrollLockChange} path={path} />
+function todoPageConfigPath(path: string) {
+  return path === HOME_GROCERY_LIST_ROUTE_PATH ? 'groceries' : path
 }
 
-function TodoPageContent({ config, onNavigate, onScrollLockChange, path }: { config: TodoPageConfig; onNavigate: (path: string) => void; onScrollLockChange?: (locked: boolean) => void; path: string }) {
+function TodoPage({ path, configPath = path, onNavigate, onScrollLockChange }: { configPath?: string; onNavigate: (path: string) => void; onScrollLockChange?: (locked: boolean) => void; path: string }) {
+  const config = TODO_PAGES[configPath]
+  if (!config) return null
+  return <TodoPageContent config={config} configPath={configPath} onNavigate={onNavigate} onScrollLockChange={onScrollLockChange} path={path} />
+}
+
+function TodoPageContent({ config, configPath, onNavigate, onScrollLockChange, path }: { config: TodoPageConfig; configPath: string; onNavigate: (path: string) => void; onScrollLockChange?: (locked: boolean) => void; path: string }) {
   const user = useUser()
   const entities = useHass((state) => state.entities) as unknown as EntityActionStateMap
   const [sectionStates, setSectionStates] = useState<Record<string, { loaded: boolean; visible: boolean } | undefined>>({})
-  const hideEmptyTodoSections = isChoreTodoPage(path)
+  const hideEmptyTodoSections = isChoreTodoPage(configPath)
   const visibleLists = config.lists.filter((list) => todoListVisible(list, user?.id, entities))
   const visibleListKeys = visibleLists.map((list) => list.entityId)
   const loadedSectionStates = visibleListKeys.map((entityId) => sectionStates[entityId]).filter((state): state is { loaded: boolean; visible: boolean } => Boolean(state))
@@ -849,7 +858,7 @@ function TodoPageContent({ config, onNavigate, onScrollLockChange, path }: { con
 
   return (
     <div className={styles.stack} data-empty-todo-page={lockPageScroll ? 'true' : undefined}>
-      {path === 'chores' && <ChoresIntro onNavigate={onNavigate} />}
+      {configPath === 'chores' && <ChoresIntro onNavigate={onNavigate} />}
       {showTodoEmptyState && <TodoEmptyState description={config.emptyDescription} title={config.emptyTitle} />}
       {visibleLists.map((list) => {
         const entity = entities[list.entityId] as (typeof entities)[string] & { last_changed?: string; last_updated?: string }
@@ -946,6 +955,102 @@ function groceryCountSubtitle(count: number) {
   if (!Number.isFinite(count) || count <= 0) return 'No groceries listed'
   if (count === 1) return '1 item'
   return `${count} items`
+}
+
+const EVERSHELF_EXPIRING_SOON_ENTITY_ID = 'sensor.evershelf_expiring_soon'
+const EVERSHELF_GROCERY_PLACES = [
+  { title: 'Pantry', entityId: 'sensor.evershelf_items_in_pantry', location: 'dispensa', icon: 'mdi:food-fork-drink', color: { r: 155, g: 110, b: 64 }, routePath: HOME_PANTRY_ROUTE_PATH },
+  { title: 'Fridge', entityId: 'sensor.evershelf_items_in_fridge', location: 'frigo', icon: 'mdi:fridge', color: { r: 42, g: 126, b: 180 }, routePath: HOME_FRIDGE_ROUTE_PATH },
+  { title: 'Freezer', entityId: 'sensor.evershelf_items_in_freezer', location: 'freezer', icon: 'mdi:snowflake', color: { r: 52, g: 103, b: 176 }, routePath: HOME_FREEZER_ROUTE_PATH },
+] as const
+
+const EVERSHELF_INVENTORY_PAGES: Record<string, { location: EverShelfInventoryLocation; title: string }> = {
+  [HOME_PANTRY_ROUTE_PATH]: { location: 'dispensa', title: 'Pantry' },
+  [HOME_FRIDGE_ROUTE_PATH]: { location: 'frigo', title: 'Fridge' },
+  [HOME_FREEZER_ROUTE_PATH]: { location: 'freezer', title: 'Freezer' },
+}
+
+function numericEntityState(entity: EntityActionStateMap[string] | undefined) {
+  const value = Number(entity?.state)
+  return Number.isFinite(value) && value > 0 ? value : 0
+}
+
+function normalizedEverShelfLocation(value: unknown) {
+  const normalized = String(value ?? '').trim().toLowerCase()
+  if (normalized === 'pantry') return 'dispensa'
+  if (normalized === 'fridge') return 'frigo'
+  return normalized
+}
+
+function dateOnly(value: Date) {
+  return new Date(value.getFullYear(), value.getMonth(), value.getDate())
+}
+
+function dateFromIsoDate(value: string) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(value)
+  if (!match) return null
+  const [, year, month, day] = match
+  return new Date(Number(year), Number(month) - 1, Number(day))
+}
+
+function itemExpiresWithinWeek(item: Record<string, unknown>) {
+  const daysRemaining = Number(item.days_remaining)
+  if (Number.isFinite(daysRemaining)) return daysRemaining >= 0 && daysRemaining <= 7
+
+  const expiryDate = typeof item.expiry_date === 'string' ? dateFromIsoDate(item.expiry_date) : null
+  if (!expiryDate) return false
+  const today = dateOnly(new Date())
+  const nextWeek = new Date(today)
+  nextWeek.setDate(today.getDate() + 7)
+  return expiryDate >= today && expiryDate <= nextWeek
+}
+
+function expiringSoonCountForLocation(entities: EntityActionStateMap, location: string) {
+  const expiringEntity = entities[EVERSHELF_EXPIRING_SOON_ENTITY_ID] as (EntityActionStateMap[string] & { attributes?: { expiring_list?: unknown } }) | undefined
+  const expiringList = expiringEntity?.attributes?.expiring_list
+  if (!Array.isArray(expiringList)) return 0
+  return expiringList.filter((item) => {
+    if (!item || typeof item !== 'object') return false
+    const expiringItem = item as Record<string, unknown>
+    return normalizedEverShelfLocation(expiringItem.location) === location && itemExpiresWithinWeek(expiringItem)
+  }).length
+}
+
+function groceryPlaceSubtitle(entities: EntityActionStateMap, entityId: string, location: string) {
+  const itemCount = numericEntityState(entities[entityId])
+  const expiringCount = expiringSoonCountForLocation(entities, location)
+  return `${itemCount} Items • ${expiringCount} Expiring Soon`
+}
+
+function KitchenGroceriesSection({ onNavigate }: { onNavigate: (path: string) => void }) {
+  const entities = useHass((state) => state.entities) as unknown as EntityActionStateMap
+  const groceryList = TODO_PAGES.groceries?.lists[0]
+  const groceryCount = quickLinkTodoCount('groceries', entities)
+
+  return (
+    <section className={styles.section} id={sectionId('Groceries')}>
+      <SectionHeader title="Groceries" />
+      <Grid>
+        <GlassTile
+          backgroundColor="rgba(155, 67, 72, 0.72)"
+          icon="mdi:clipboard-list"
+          onClick={() => onNavigate(HOME_GROCERY_LIST_ROUTE_PATH)}
+          subtitle={groceryCountSubtitle(groceryCount)}
+          title={groceryList?.title ?? 'Grocery List'}
+        />
+        {EVERSHELF_GROCERY_PLACES.map((place) => (
+          <GlassTile
+            backgroundColor={`rgba(${place.color.r}, ${place.color.g}, ${place.color.b}, 0.72)`}
+            icon={place.icon}
+            key={place.location}
+            onClick={() => onNavigate(place.routePath)}
+            subtitle={groceryPlaceSubtitle(entities, place.entityId, place.location)}
+            title={place.title}
+          />
+        ))}
+      </Grid>
+    </section>
+  )
 }
 
 function TodoEmptyState({ description = 'You have no tasks due- nice job!', title = 'No Tasks!' }: { description?: string; title?: string }) {
@@ -4285,14 +4390,21 @@ function ControlPage({ onNavigate, path }: { onNavigate: (path: string) => void;
   return <EntitySections onNavigate={onNavigate} sections={config.sections} />
 }
 
+function EverShelfInventoryPage({ controls, path }: { controls: EverShelfInventoryControls; path: string }) {
+  const config = EVERSHELF_INVENTORY_PAGES[path]
+  if (!config) return null
+  return <EverShelfInventoryPanel controls={controls} location={config.location} title={config.title} />
+}
+
 function FallbackPage({ title }: { title: string }) {
   return <Notice>{title} is not available in the React dashboard yet.</Notice>
 }
 
-function Content({ onNavigate, onScrollLockChange, path, preloadHash, preloadHashes }: { onNavigate: (path: string) => void; onScrollLockChange?: (locked: boolean) => void; path: string; preloadHash?: string; preloadHashes?: string[] }) {
+function Content({ inventoryControls, onNavigate, onScrollLockChange, path, preloadHash, preloadHashes }: { inventoryControls: EverShelfInventoryControls; onNavigate: (path: string) => void; onScrollLockChange?: (locked: boolean) => void; path: string; preloadHash?: string; preloadHashes?: string[] }) {
   const roomTitle = dashboardRoomNameFromPath(path)
   if (roomTitle) return <RoomPage onNavigate={onNavigate} path={path} preloadHash={preloadHash} preloadHashes={preloadHashes} title={roomTitle} />
-  if (TODO_PAGES[path]) return <TodoPage onNavigate={onNavigate} onScrollLockChange={onScrollLockChange} path={path} />
+  const todoConfigPath = todoPageConfigPath(path)
+  if (TODO_PAGES[todoConfigPath]) return <TodoPage configPath={todoConfigPath} onNavigate={onNavigate} onScrollLockChange={onScrollLockChange} path={path} />
   if (path === 'settings') return <SettingsPage onNavigate={onNavigate} />
   if (path === 'guests-staying-over') return <GuestControlsPage onNavigate={onNavigate} />
   if (path === 'vacation') return <VacationPage />
@@ -4301,16 +4413,20 @@ function Content({ onNavigate, onScrollLockChange, path, preloadHash, preloadHas
   if (path === 'admin') return <AdminPage onNavigate={onNavigate} preloadHash={preloadHash} preloadHashes={preloadHashes} />
   if (path === 'ecobee') return <ThermostatPage preloadHash={preloadHash} preloadHashes={preloadHashes} />
   if (path === 'custom-lights') return <CustomLightsPage />
+  if (EVERSHELF_INVENTORY_PAGES[path]) return <EverShelfInventoryPage controls={inventoryControls} path={path} />
   if (CONTROL_PAGES[path]) return <ControlPage onNavigate={onNavigate} path={path} />
   return <FallbackPage title={routeTitle(path)} />
 }
 
-export function DashboardViewPage({ activePath, initialContentTransitionState = 'idle', loadingPhase, onNavigate, path, preload = false, preloadHash, preloadHashes, withShell = true }: DashboardViewPageProps) {
+export function DashboardViewPage({ activePath, initialContentTransitionState = 'idle', inventoryControls: providedInventoryControls, loadingPhase, onNavigate, path, preload = false, preloadHash, preloadHashes, withShell = true }: DashboardViewPageProps) {
   const roomTitle = dashboardRoomNameFromPath(path)
-  const title = path === 'guests-staying-over' ? 'Guest Controls' : roomTitle ?? TODO_PAGES[path]?.title ?? CONTROL_PAGES[path]?.title ?? routeTitle(path)
+  const todoConfig = TODO_PAGES[todoPageConfigPath(path)]
+  const title = path === 'guests-staying-over' ? 'Guest Controls' : roomTitle ?? todoConfig?.title ?? CONTROL_PAGES[path]?.title ?? routeTitle(path)
   const showBack = !PRIMARY_NAV_ROUTES.some((route) => route.path === path)
   const [pageScrollLock, setPageScrollLock] = useState<{ locked: boolean; path: string }>({ locked: false, path })
   const pageScrollLocked = pageScrollLock.path === path && pageScrollLock.locked
+  const fallbackInventoryControls = useEverShelfInventoryControls(path)
+  const inventoryControls = providedInventoryControls ?? fallbackInventoryControls
   const handlePageScrollLockChange = useCallback((locked: boolean) => {
     setPageScrollLock((current) => (current.path === path && current.locked === locked ? current : { locked, path }))
   }, [path])
@@ -4319,14 +4435,14 @@ export function DashboardViewPage({ activePath, initialContentTransitionState = 
     <SecurityPage activePath={activePath} backPath={showBack ? 'overview' : undefined} contentTransitionState={loadingPhase ? 'idle' : initialContentTransitionState} loadingPhase={loadingPhase} onNavigate={onNavigate} preload={preload} preloadHash={preloadHash} preloadHashes={preloadHashes} title={title} />
   ) : (
     <Page activePath={activePath} backPath={showBack ? 'overview' : undefined} chromeHidden={Boolean(loadingPhase)} contentTransitionState={loadingPhase ? 'idle' : initialContentTransitionState} headerQuickLinks={roomTitle ? <RoomSectionRail path={path} title={roomTitle} /> : undefined} onNavigate={onNavigate} scrollLocked={pageScrollLocked} title={title}>
-      {loadingPhase ? <DashboardPageLoading phase={loadingPhase} /> : <Content onNavigate={onNavigate} onScrollLockChange={handlePageScrollLockChange} path={path} preloadHash={preloadHash} preloadHashes={preloadHashes} />}
+      {loadingPhase ? <DashboardPageLoading phase={loadingPhase} /> : <Content inventoryControls={inventoryControls} onNavigate={onNavigate} onScrollLockChange={handlePageScrollLockChange} path={path} preloadHash={preloadHash} preloadHashes={preloadHashes} />}
     </Page>
   )
 
   if (!withShell) return page
 
   return (
-    <AppShell bottomNav={<BottomNav activePath={activePath} onNavigate={onNavigate} />} chromeHidden={Boolean(loadingPhase)} floatingAction={hasDashboardFloatingAction(path) ? <DashboardFloatingAction onNavigate={onNavigate} path={path} /> : undefined}>
+    <AppShell bottomNav={<BottomNav activePath={activePath} onNavigate={onNavigate} />} chromeHidden={Boolean(loadingPhase)} floatingAction={hasDashboardFloatingAction(path) ? <DashboardFloatingAction inventoryControls={inventoryControls} onNavigate={onNavigate} path={path} /> : undefined}>
       {page}
     </AppShell>
   )

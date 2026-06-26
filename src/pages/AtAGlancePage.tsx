@@ -231,9 +231,21 @@ function occupancyGroupActiveCount(group: EntityGroupConfig, entities: Record<st
   return group.items.reduce((count, item) => count + (isOccupancyActive(entities[item.entityId]) ? 1 : 0), 0)
 }
 
+function lightGroupActiveCount(group: EntityGroupConfig, entities: Record<string, HassEntity | undefined>) {
+  return group.items.reduce((count, item) => count + (isActiveState(entities[item.entityId] ?? null) ? 1 : 0), 0)
+}
+
 function lightGroupActive(group: EntityGroupConfig, entities: Record<string, HassEntity | undefined>) {
   const toggleActive = group.toggleEntityId ? isActiveState(entities[group.toggleEntityId] ?? null) : false
-  return toggleActive || group.items.some((item) => isActiveState(entities[item.entityId] ?? null))
+  return toggleActive || lightGroupActiveCount(group, entities) > 0
+}
+
+function lightGroupSubtitle(group: EntityGroupConfig, entities: Record<string, HassEntity | undefined>) {
+  const activeItemCount = lightGroupActiveCount(group, entities)
+  if (activeItemCount > 0) return group.items.length === 1 ? 'On' : `${activeItemCount} On`
+
+  const toggleEntity = group.toggleEntityId ? entities[group.toggleEntityId] ?? null : null
+  return formatCompactEntityState(toggleEntity, 'Off')
 }
 
 function splitRoomGroupsByState(
@@ -571,8 +583,20 @@ function GroupedRoomOverview({ activeGroups, activeTitle, cardShellClassName, gr
 
 function RoomLightOverviewCard({ group, onSelect }: { group: EntityGroupConfig; onSelect: (group: EntityGroupConfig) => void }) {
   const entityId = group.toggleEntityId ?? group.items[0]?.entityId ?? 'light.unavailable'
+  const active = useHass((state) => lightGroupActive(group, state.entities))
+  const subtitle = useHass((state) => lightGroupSubtitle(group, state.entities))
 
-  return <LightCard ariaLabel={`Open ${group.title}`} entityId={entityId} onClick={() => onSelect(group)} title={roomTitleFromLightGroup(group)} />
+  return (
+    <LightCard
+      activeOverride={active}
+      ariaLabel={`Open ${group.title}`}
+      entityId={entityId}
+      icon={group.items.length > 1 ? 'multi' : 'single'}
+      onClick={() => onSelect(group)}
+      subtitleOverride={subtitle}
+      title={roomTitleFromLightGroup(group)}
+    />
+  )
 }
 
 function roomLightToggleIcon(group: EntityGroupConfig, active: boolean) {
@@ -582,22 +606,9 @@ function roomLightToggleIcon(group: EntityGroupConfig, active: boolean) {
 
 function RoomLightDetailHeader({ group, hideTitleBlock = false, onBack, onToggle }: { group: EntityGroupConfig; hideTitleBlock?: boolean; onBack?: () => void; onToggle: (entityId: string) => void }) {
   const groupToggleEntityId = group.toggleEntityId
-  const groupEntity = useEntity(asEntityName(groupToggleEntityId ?? 'light.unavailable'), { returnNullIfNotFound: true })
-  const groupActive = isActiveState(groupEntity)
-  const itemActive = useHass((state) => {
-    let foundItemEntity = false
-    let foundActiveItem = false
-    group.items.forEach((item) => {
-      const entity = state.entities[item.entityId] as HassEntity | undefined
-      if (!entity) return
-      foundItemEntity = true
-      if (isActiveState(entity)) foundActiveItem = true
-    })
-    return foundItemEntity ? foundActiveItem : undefined
-  })
-  const toggleActive = itemActive ?? groupActive
+  const toggleActive = useHass((state) => lightGroupActive(group, state.entities))
   const toggleIcon = roomLightToggleIcon(group, toggleActive)
-  const groupState = formatCompactEntityState(groupEntity, 'Off')
+  const groupState = useHass((state) => lightGroupSubtitle(group, state.entities))
   const roomTitle = roomTitleFromLightGroup(group)
   const separatorLabel = group.items.length === 1 ? 'Light' : 'Lights'
 

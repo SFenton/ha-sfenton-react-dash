@@ -55,6 +55,15 @@ const mockHourlyWeatherForecast = Array.from({ length: 24 }, (_, index) => {
   }
 })
 
+function mockDateOffset(days: number) {
+  const date = new Date()
+  date.setDate(date.getDate() + days)
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
 interface MockTodoItem {
   description?: string
   due?: string
@@ -651,6 +660,18 @@ export const mockEntities: Record<string, MockEntity> = {
   'select.valetudo_exaltedsneakydeer_fan': entity('select.valetudo_exaltedsneakydeer_fan', 'balanced', { options: ['quiet', 'balanced', 'turbo', 'max'] }),
   'select.valetudo_exaltedsneakydeer_water': entity('select.valetudo_exaltedsneakydeer_water', 'medium', { options: ['low', 'medium', 'high'] }),
   'input_select.main_floor_vacuum_cleaning_passes': entity('input_select.main_floor_vacuum_cleaning_passes', '1', { options: ['1', '2', '3'] }),
+  'sensor.evershelf_items_in_pantry': entity('sensor.evershelf_items_in_pantry', '12', { unit_of_measurement: 'items' }),
+  'sensor.evershelf_items_in_fridge': entity('sensor.evershelf_items_in_fridge', '8', { unit_of_measurement: 'items' }),
+  'sensor.evershelf_items_in_freezer': entity('sensor.evershelf_items_in_freezer', '5', { unit_of_measurement: 'items' }),
+  'sensor.evershelf_expiring_soon': entity('sensor.evershelf_expiring_soon', '4', {
+    expiring_list: [
+      { days_remaining: 2, expiry_date: '2026-06-27', location: 'dispensa', name: 'Rice' },
+      { days_remaining: 7, expiry_date: '2026-07-02', location: 'frigo', name: 'Milk' },
+      { days_remaining: 8, expiry_date: '2026-07-03', location: 'frigo', name: 'Yogurt' },
+      { days_remaining: 5, expiry_date: '2026-06-30', location: 'freezer', name: 'Waffles' },
+    ],
+    unit_of_measurement: 'items',
+  }),
   'input_boolean.roborock_living_room_toggle': entity('input_boolean.roborock_living_room_toggle', 'off'),
   'input_boolean.roborock_master_bedroom_toggle': entity('input_boolean.roborock_master_bedroom_toggle', 'off'),
   'input_boolean.roborock_kitchen_toggle': entity('input_boolean.roborock_kitchen_toggle', 'off'),
@@ -758,6 +779,26 @@ export const mockState: MockHassState = {
             success: true,
           },
         })
+      }
+      if (params.domain === 'evershelf' && params.service === 'list_inventory' && params.returnResponse === true) {
+        const location = (params.serviceData as { location?: string } | undefined)?.location
+        const inventory = location === 'frigo'
+          ? [
+              { expiry_date: mockDateOffset(370), id: 204, location: 'frigo', name: 'Salsa' },
+              { expiry_date: mockDateOffset(-400), id: 205, location: 'frigo', name: 'Milk' },
+              { expiry_date: mockDateOffset(5), id: 203, location: 'frigo', name: 'Greek Yogurt' },
+            ]
+          : location === 'freezer'
+            ? [
+                { expiry_date: mockDateOffset(190), id: 304, location: 'freezer', name: 'Waffles' },
+                { expiry_date: mockDateOffset(20), id: 303, location: 'freezer', name: 'Frozen Peas' },
+              ]
+            : [
+                { expiry_date: mockDateOffset(40), id: 103, location: 'dispensa', name: 'Ziti' },
+                { expiry_date: mockDateOffset(3), id: 102, location: 'dispensa', name: 'Canned Beans' },
+                { expiry_date: mockDateOffset(-10), id: 101, location: 'dispensa', name: 'Almond Flour' },
+              ]
+        return Promise.resolve({ response: { inventory } })
       }
       if (params.domain === 'evershelf' && params.service === 'add_scanned_item' && params.returnResponse === true) {
         const serviceData = params.serviceData as { name?: string } | undefined

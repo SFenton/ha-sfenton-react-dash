@@ -321,7 +321,7 @@ export const LIGHT_GROUPS: EntityGroupConfig[] = [
   },
   {
     title: 'Hallway Lights',
-    toggleEntityId: 'light.hallway',
+    toggleEntityId: 'light.hallway_lights',
     items: [
       { title: 'Entry Light', entityId: 'light.hallway_entry_light', tone: 'light' },
       { title: 'Gym Light', entityId: 'light.hallway_gym_light', tone: 'light' },

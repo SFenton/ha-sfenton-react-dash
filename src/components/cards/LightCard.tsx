@@ -32,19 +32,21 @@ function SingleLightIcon({ active, size }: { active: boolean; size: number }) {
 }
 
 interface LightCardProps {
+  activeOverride?: boolean
   ariaLabel?: string
   entityId: string
   icon?: 'single' | 'multi'
   onClick?: () => void
   pressed?: boolean
   size?: 'standard' | 'compact'
+  subtitleOverride?: string
   title: string
 }
 
-export function LightCard({ ariaLabel, entityId, icon = 'single', onClick, pressed, size = 'standard', title }: LightCardProps) {
+export function LightCard({ activeOverride, ariaLabel, entityId, icon = 'single', onClick, pressed, size = 'standard', subtitleOverride, title }: LightCardProps) {
   const entity = useEntity(asEntityName(entityId), { returnNullIfNotFound: true })
-  const active = isActiveState(entity)
-  const subtitle = formatCompactEntityState(entity, 'Off')
+  const active = activeOverride ?? isActiveState(entity)
+  const subtitle = subtitleOverride ?? formatCompactEntityState(entity, 'Off')
   const iconSize = size === 'compact' ? 24 : 42
   const iconSlot = icon === 'multi' ? <MultiLightIcon active={active} size={iconSize} /> : <SingleLightIcon active={active} size={iconSize} />
 
