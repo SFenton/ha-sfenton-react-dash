@@ -27,6 +27,7 @@ import { MEDIA_REMOTE_MODAL_STYLE } from '../components/hass/mediaRemoteModalSty
 import { Card, type CardColor } from '../components/core/Card'
 import { CheckboxRow } from '../components/core/CheckboxRow'
 import { Description } from '../components/core/Description'
+import { EmptyState } from '../components/core/EmptyState'
 import { GlassTile } from '../components/core/GlassTile'
 import { MaterialIcon } from '../components/core/Icon'
 import { ModalSheet, type ModalSheetStyle } from '../components/core/ModalSheet'
@@ -46,7 +47,7 @@ import {
   OCCUPANCY_GROUPS,
   type EntityGroupConfig,
 } from '../constants/atAGlance'
-import { DASHBOARD_ROUTES, HOME_FREEZER_ROUTE_PATH, HOME_FRIDGE_ROUTE_PATH, HOME_GROCERY_LIST_ROUTE_PATH, HOME_PANTRY_ROUTE_PATH, PRIMARY_NAV_ROUTES } from '../constants/routes'
+import { DASHBOARD_ROUTES, HOME_CABINET_ROUTE_PATH, HOME_FOOD_ROUTE_PATH, HOME_FREEZER_ROUTE_PATH, HOME_FRIDGE_ROUTE_PATH, HOME_GROCERY_LIST_ROUTE_PATH, HOME_PANTRY_ROUTE_PATH, HOME_SPICE_RACK_ROUTE_PATH, PRIMARY_NAV_ROUTES } from '../constants/routes'
 import {
   ADMIN_AUTO_REENABLE_ITEMS,
   CHORE_QUICK_LINKS,
@@ -961,16 +962,20 @@ function groceryCountSubtitle(count: number) {
 }
 
 const EVERSHELF_EXPIRING_SOON_ENTITY_ID = 'sensor.evershelf_expiring_soon'
-const EVERSHELF_GROCERY_PLACES = [
+const EVERSHELF_FOOD_SPACES = [
   { title: 'Pantry', entityId: 'sensor.evershelf_items_in_pantry', location: 'dispensa', icon: 'mdi:food-fork-drink', color: { r: 155, g: 110, b: 64 }, routePath: HOME_PANTRY_ROUTE_PATH },
   { title: 'Fridge', entityId: 'sensor.evershelf_items_in_fridge', location: 'frigo', icon: 'mdi:fridge', color: { r: 42, g: 126, b: 180 }, routePath: HOME_FRIDGE_ROUTE_PATH },
   { title: 'Freezer', entityId: 'sensor.evershelf_items_in_freezer', location: 'freezer', icon: 'mdi:snowflake', color: { r: 52, g: 103, b: 176 }, routePath: HOME_FREEZER_ROUTE_PATH },
+  { title: 'Spice Rack', entityId: 'sensor.evershelf_items_in_spice_rack', location: 'spice_rack', icon: 'mdi:shaker-outline', color: { r: 183, g: 98, b: 56 }, routePath: HOME_SPICE_RACK_ROUTE_PATH },
+  { title: 'Cabinet', entityId: 'sensor.evershelf_items_in_cabinet', location: 'cabinet', icon: 'mdi:cupboard', color: { r: 118, g: 96, b: 72 }, routePath: HOME_CABINET_ROUTE_PATH },
 ] as const
 
 const EVERSHELF_INVENTORY_PAGES: Record<string, { location: EverShelfInventoryLocation; title: string }> = {
   [HOME_PANTRY_ROUTE_PATH]: { location: 'dispensa', title: 'Pantry' },
   [HOME_FRIDGE_ROUTE_PATH]: { location: 'frigo', title: 'Fridge' },
   [HOME_FREEZER_ROUTE_PATH]: { location: 'freezer', title: 'Freezer' },
+  [HOME_SPICE_RACK_ROUTE_PATH]: { location: 'spice_rack', title: 'Spice Rack' },
+  [HOME_CABINET_ROUTE_PATH]: { location: 'cabinet', title: 'Cabinet' },
 }
 
 function numericEntityState(entity: EntityActionStateMap[string] | undefined) {
@@ -982,6 +987,7 @@ function normalizedEverShelfLocation(value: unknown) {
   const normalized = String(value ?? '').trim().toLowerCase()
   if (normalized === 'pantry') return 'dispensa'
   if (normalized === 'fridge') return 'frigo'
+  if (normalized === 'spice rack' || normalized === 'spice-rack') return 'spice_rack'
   return normalized
 }
 
@@ -1025,6 +1031,29 @@ function groceryPlaceSubtitle(entities: EntityActionStateMap, entityId: string, 
   return `${itemCount} Items • ${expiringCount} Expiring Soon`
 }
 
+function foodSummarySubtitle(entities: EntityActionStateMap) {
+  const itemCount = EVERSHELF_FOOD_SPACES.reduce((total, place) => total + numericEntityState(entities[place.entityId]), 0)
+  const expiringCount = EVERSHELF_FOOD_SPACES.reduce((total, place) => total + expiringSoonCountForLocation(entities, place.location), 0)
+  return `${itemCount} Items • ${expiringCount} Expiring Soon`
+}
+
+function FoodSpacesGrid({ entities, onNavigate }: { entities: EntityActionStateMap; onNavigate: (path: string) => void }) {
+  return (
+    <Grid>
+      {EVERSHELF_FOOD_SPACES.map((place) => (
+        <GlassTile
+          backgroundColor={`rgba(${place.color.r}, ${place.color.g}, ${place.color.b}, 0.72)`}
+          icon={place.icon}
+          key={place.location}
+          onClick={() => onNavigate(place.routePath)}
+          subtitle={groceryPlaceSubtitle(entities, place.entityId, place.location)}
+          title={place.title}
+        />
+      ))}
+    </Grid>
+  )
+}
+
 function KitchenGroceriesSection({ onNavigate }: { onNavigate: (path: string) => void }) {
   const entities = useHass((state) => state.entities) as unknown as EntityActionStateMap
   const groceryList = TODO_PAGES.groceries?.lists[0]
@@ -1041,28 +1070,33 @@ function KitchenGroceriesSection({ onNavigate }: { onNavigate: (path: string) =>
           subtitle={groceryCountSubtitle(groceryCount)}
           title={groceryList?.title ?? 'Grocery List'}
         />
-        {EVERSHELF_GROCERY_PLACES.map((place) => (
-          <GlassTile
-            backgroundColor={`rgba(${place.color.r}, ${place.color.g}, ${place.color.b}, 0.72)`}
-            icon={place.icon}
-            key={place.location}
-            onClick={() => onNavigate(place.routePath)}
-            subtitle={groceryPlaceSubtitle(entities, place.entityId, place.location)}
-            title={place.title}
-          />
-        ))}
+        <GlassTile
+          backgroundColor="rgba(155, 110, 64, 0.72)"
+          icon="mdi:food-fork-drink"
+          onClick={() => onNavigate(HOME_FOOD_ROUTE_PATH)}
+          subtitle={foodSummarySubtitle(entities)}
+          title="Food"
+        />
       </Grid>
     </section>
   )
 }
 
-function TodoEmptyState({ description = 'You have no tasks due- nice job!', title = 'No Tasks!' }: { description?: string; title?: string }) {
+function FoodPage({ onNavigate }: { onNavigate: (path: string) => void }) {
+  const entities = useHass((state) => state.entities) as unknown as EntityActionStateMap
+
   return (
-    <section className={styles.choresEmpty} data-empty-layout="centered" data-empty-typography="festival">
-      <h2>{title}</h2>
-      <Description>{description}</Description>
-    </section>
+    <div className={styles.stack}>
+      <section className={styles.section} id={sectionId('Food Spaces')}>
+        <SectionHeader title="Food Spaces" />
+        <FoodSpacesGrid entities={entities} onNavigate={onNavigate} />
+      </section>
+    </div>
   )
+}
+
+function TodoEmptyState({ description = 'You have no tasks due- nice job!', title = 'No Tasks!' }: { description?: string; title?: string }) {
+  return <EmptyState className={styles.choresEmpty} description={description} title={title} />
 }
 
 function VacuumPage({ preload = false }: { preload?: boolean }) {
@@ -4419,6 +4453,7 @@ function Content({ inventoryControls, onNavigate, onScrollLockChange, path, prel
   if (path === 'admin') return <AdminPage onNavigate={onNavigate} preload={preload} preloadHash={preloadHash} preloadHashes={preloadHashes} />
   if (path === 'ecobee') return <ThermostatPage preload={preload} preloadHash={preloadHash} preloadHashes={preloadHashes} />
   if (path === 'custom-lights') return <CustomLightsPage />
+  if (path === HOME_FOOD_ROUTE_PATH) return <FoodPage onNavigate={onNavigate} />
   if (EVERSHELF_INVENTORY_PAGES[path]) return <EverShelfInventoryPage controls={inventoryControls} path={path} />
   if (CONTROL_PAGES[path]) return <ControlPage onNavigate={onNavigate} path={path} />
   return <FallbackPage title={routeTitle(path)} />

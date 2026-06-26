@@ -1,14 +1,17 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type KeyboardEvent, type MouseEvent, type PointerEvent, type TouchEvent } from 'react'
+import { flushSync } from 'react-dom'
 import { useHass } from '@hakit/core'
 import { Description } from '../core/Description'
+import { EmptyState } from '../core/EmptyState'
 import { FloatingActionButton } from '../core/FloatingActionButton'
 import { MaterialIcon } from '../core/Icon'
 import { ModalSheet } from '../core/ModalSheet'
 import { RadioRow } from '../core/RadioRow'
+import { DashboardPageLoading } from '../shell/DashboardPageLoading'
 import type { EverShelfInventoryControls, InventoryFilterMode, InventorySortDirection, InventorySortMode } from './EverShelfInventoryControls'
 import styles from './EverShelfInventoryPanel.module.css'
 
-export type EverShelfInventoryLocation = 'dispensa' | 'frigo' | 'freezer'
+export type EverShelfInventoryLocation = 'dispensa' | 'frigo' | 'freezer' | 'spice_rack' | 'cabinet'
 
 interface EverShelfInventoryPanelProps {
   controls: EverShelfInventoryControls
@@ -23,6 +26,7 @@ interface EverShelfInventoryItem {
   id?: number | string
   inventory_id?: number | string
   name?: string | null
+  quantity?: number | string | null
 }
 
 type CallService = (params: Record<string, unknown>) => Promise<unknown> | unknown
@@ -35,6 +39,10 @@ interface ExpiryInfo {
 const DAY_MS = 24 * 60 * 60 * 1000
 const SORT_FILTER_COLOR = { r: 42, g: 126, b: 180 }
 const SORT_FILTER_ACTIVE_COLOR = { r: 155, g: 110, b: 64 }
+const DASHBOARD_FAB_KEYBOARD_INSET_VAR = '--dashboard-fab-keyboard-inset'
+const INVENTORY_SEARCH_EXPANDED_ATTR = 'data-inventory-search-expanded'
+const INVENTORY_LOADING_EXIT_MS = 500
+const KEYBOARD_STATE_CLEAR_MS = 150
 
 const SORT_OPTIONS: { label: string; subtitle: string; value: InventorySortMode }[] = [
   { label: 'Title', subtitle: 'Sort alphabetically by item name.', value: 'title' },
@@ -87,20 +95,23 @@ function itemExpiryTime(item: EverShelfInventoryItem) {
   return parseIsoDateOnly(value)?.getTime() ?? null
 }
 
+function itemSearchText(item: EverShelfInventoryItem) {
+  return itemName(item).toLocaleLowerCase()
+}
+
+function normalizedSearchQuery(query: string) {
+  return query.trim().toLocaleLowerCase()
+}
+
 function todayDateOnly() {
   const now = new Date()
   return new Date(now.getFullYear(), now.getMonth(), now.getDate())
 }
 
-function plural(amount: number, unit: 'day' | 'week' | 'month' | 'year') {
-  return `${amount} ${unit}${amount === 1 ? '' : 's'}`
-}
-
-function roundedDuration(absDays: number) {
-  if (absDays < 7) return plural(absDays, 'day')
-  if (absDays < 30) return plural(Math.max(1, Math.round(absDays / 7)), 'week')
-  if (absDays < 365) return plural(Math.max(1, Math.round(absDays / 30)), 'month')
-  return plural(Math.max(1, Math.round(absDays / 365)), 'year')
+function formatDisplayDate(value: Date) {
+  const month = String(value.getMonth() + 1).padStart(2, '0')
+  const day = String(value.getDate()).padStart(2, '0')
+  return `${month}/${day}/${value.getFullYear()}`
 }
 
 function expiryInfo(value: string | undefined): ExpiryInfo {
@@ -111,10 +122,10 @@ function expiryInfo(value: string | undefined): ExpiryInfo {
 
   const daysUntilExpiry = daysUntilDate(expiryDate)
   if (daysUntilExpiry < 0) {
-    return { label: `Expired for ${roundedDuration(Math.abs(daysUntilExpiry))}`, tone: 'expired' }
+    return { label: `Expired on ${formatDisplayDate(expiryDate)}`, tone: 'expired' }
   }
 
-  const label = `Expires in ${roundedDuration(daysUntilExpiry)}`
+  const label = `Expires on ${formatDisplayDate(expiryDate)}`
   return daysUntilExpiry < 7 ? { label, tone: 'soon' } : { label }
 }
 
@@ -138,9 +149,8 @@ function inventoryFromResponse(result: unknown): EverShelfInventoryItem[] {
   return Array.isArray(inventory) ? inventory.filter((item): item is EverShelfInventoryItem => Boolean(item && typeof item === 'object')) : []
 }
 
-function filterInventoryItems(items: EverShelfInventoryItem[], filterMode: InventoryFilterMode) {
-  if (filterMode === 'all') return items
-  return items.filter((item) => {
+function filterInventoryItems(items: EverShelfInventoryItem[], filterMode: InventoryFilterMode, searchQuery: string) {
+  const filteredItems = filterMode === 'all' ? items : items.filter((item) => {
     const days = daysUntilExpiry(item)
     if (filterMode === 'no-expiration') return days === null
     if (days === null) return false
@@ -151,6 +161,9 @@ function filterInventoryItems(items: EverShelfInventoryItem[], filterMode: Inven
     if (filterMode === 'six-months') return days <= 183
     return days <= 365
   })
+  const query = normalizedSearchQuery(searchQuery)
+  if (!query) return filteredItems
+  return filteredItems.filter((item) => itemSearchText(item).includes(query))
 }
 
 function sortInventoryItems(items: EverShelfInventoryItem[], sortMode: InventorySortMode, sortDirection: InventorySortDirection) {
@@ -168,16 +181,47 @@ function sortInventoryItems(items: EverShelfInventoryItem[], sortMode: Inventory
   })
 }
 
-function visibleInventoryItems(items: EverShelfInventoryItem[], sortMode: InventorySortMode, sortDirection: InventorySortDirection, filterMode: InventoryFilterMode) {
-  return sortInventoryItems(filterInventoryItems(items, filterMode), sortMode, sortDirection)
+function visibleInventoryItems(items: EverShelfInventoryItem[], sortMode: InventorySortMode, sortDirection: InventorySortDirection, filterMode: InventoryFilterMode, searchQuery: string) {
+  return sortInventoryItems(filterInventoryItems(items, filterMode, searchQuery), sortMode, sortDirection)
 }
 
-function PantryRow({ expiry, title }: { expiry: ExpiryInfo; title: string }) {
+function emptyMatchMessage(searchActive: boolean, filterActive: boolean) {
+  if (searchActive && filterActive) return 'No items match the current search and selected filter.'
+  if (searchActive) return 'No items match the current search.'
+  return 'No items match the selected filter.'
+}
+
+function emptySearchDescription(filterActive: boolean) {
+  return filterActive
+    ? 'Try a different search, clear the selected filter, or clear the search to show all items.'
+    : 'Try a different search or clear the search to show all items.'
+}
+
+function inventoryErrorDescription(error: string) {
+  return error === 'Unable to load inventory' ? 'Try again in a moment, or scan an item while inventory is unavailable.' : error
+}
+
+function itemQuantity(item: EverShelfInventoryItem) {
+  const quantity = Number(item.quantity)
+  return Number.isFinite(quantity) && quantity > 1 ? quantity : null
+}
+
+function formatQuantity(value: number) {
+  return Number.isInteger(value) ? String(value) : String(value).replace(/(\.\d*?)0+$/, '$1').replace(/\.$/, '')
+}
+
+function rowSubtitle(expiry: ExpiryInfo, quantity: number | null) {
+  return quantity === null ? expiry.label : `Quantity ${formatQuantity(quantity)} - ${expiry.label}`
+}
+
+function PantryRow({ expiry, quantity, title }: { expiry: ExpiryInfo; quantity: number | null; title: string }) {
+  const subtitle = rowSubtitle(expiry, quantity)
+
   return (
-    <div aria-label={`${title} ${expiry.label}`} className={styles.pantryRow} data-expiry-tone={expiry.tone} role="group">
+    <div aria-label={`${title} ${subtitle}`} className={styles.pantryRow} data-expiry-tone={expiry.tone} role="group">
       <span className={styles.pantryRowCopy}>
         <strong>{title}</strong>
-        <small>{expiry.label}</small>
+        <small>{subtitle}</small>
       </span>
       <span aria-label={`${title} actions`} className={styles.pantryRowActions} role="group">
         <button aria-label={`Add ${title} to shopping list`} className={styles.rowAction} disabled type="button">
@@ -278,11 +322,216 @@ function InventoryFilterSheet({ draftMode, onApply, onClose, onDraftModeChange, 
   )
 }
 
+function updateFabKeyboardInset(inset: number) {
+  document.documentElement.style.setProperty(DASHBOARD_FAB_KEYBOARD_INSET_VAR, `${inset}px`)
+}
+
+function updateInventorySearchExpanded(expanded: boolean) {
+  if (expanded) document.documentElement.setAttribute(INVENTORY_SEARCH_EXPANDED_ATTR, 'true')
+  else document.documentElement.removeAttribute(INVENTORY_SEARCH_EXPANDED_ATTR)
+}
+
+function useFloatingSearchKeyboardInset(active: boolean) {
+  const [keyboardInset, setKeyboardInset] = useState(0)
+  const baselineRef = useRef<number | null>(null)
+  const clearTimerRef = useRef<number | null>(null)
+
+  const clearTimer = useCallback(() => {
+    if (clearTimerRef.current === null) return
+    window.clearTimeout(clearTimerRef.current)
+    clearTimerRef.current = null
+  }, [])
+
+  const captureKeyboardBaseline = useCallback(() => {
+    clearTimer()
+    const visualViewport = window.visualViewport
+    const visualViewportBottom = visualViewport ? visualViewport.height + visualViewport.offsetTop : 0
+    baselineRef.current = Math.max(
+      baselineRef.current ?? 0,
+      window.innerHeight || 0,
+      document.documentElement.clientHeight || 0,
+      visualViewportBottom,
+    )
+  }, [clearTimer])
+
+  const clearKeyboardStateSoon = useCallback(() => {
+    clearTimer()
+    clearTimerRef.current = window.setTimeout(() => {
+      baselineRef.current = null
+      setKeyboardInset(0)
+      clearTimerRef.current = null
+    }, KEYBOARD_STATE_CLEAR_MS)
+  }, [clearTimer])
+
+  const updateKeyboardInset = useCallback(() => {
+    if (!active) {
+      setKeyboardInset(0)
+      return
+    }
+    const visualViewport = window.visualViewport
+    if (!visualViewport) {
+      setKeyboardInset(0)
+      return
+    }
+    captureKeyboardBaseline()
+    const baseline = baselineRef.current ?? window.innerHeight
+    const visibleBottom = visualViewport.height + visualViewport.offsetTop
+    const visualViewportLoss = baseline - visibleBottom
+    const innerHeightLoss = baseline - window.innerHeight
+    setKeyboardInset(Math.max(0, Math.round(visualViewportLoss), Math.round(innerHeightLoss)))
+  }, [active, captureKeyboardBaseline])
+
+  useEffect(() => {
+    updateFabKeyboardInset(keyboardInset)
+  }, [keyboardInset])
+
+  useEffect(() => {
+    if (!active) return undefined
+    const frameId = window.requestAnimationFrame(updateKeyboardInset)
+    const visualViewport = window.visualViewport
+    visualViewport?.addEventListener('resize', updateKeyboardInset)
+    visualViewport?.addEventListener('scroll', updateKeyboardInset)
+    window.addEventListener('resize', updateKeyboardInset)
+    return () => {
+      window.cancelAnimationFrame(frameId)
+      visualViewport?.removeEventListener('resize', updateKeyboardInset)
+      visualViewport?.removeEventListener('scroll', updateKeyboardInset)
+      window.removeEventListener('resize', updateKeyboardInset)
+    }
+  }, [active, updateKeyboardInset])
+
+  useEffect(() => () => {
+    clearTimer()
+    document.documentElement.style.removeProperty(DASHBOARD_FAB_KEYBOARD_INSET_VAR)
+  }, [clearTimer])
+
+  return { captureKeyboardBaseline, clearKeyboardStateSoon }
+}
+
+function InventorySearchAction({ controls, onExpandedChange }: { controls: EverShelfInventoryControls; onExpandedChange: (expanded: boolean) => void }) {
+  const [expanded, setExpanded] = useState(false)
+  const [searchFocused, setSearchFocused] = useState(false)
+  const inputRef = useRef<HTMLInputElement>(null)
+  const hasQuery = controls.searchQuery.trim() !== ''
+  const { captureKeyboardBaseline, clearKeyboardStateSoon } = useFloatingSearchKeyboardInset(searchFocused)
+
+  useEffect(() => {
+    onExpandedChange(expanded)
+    updateInventorySearchExpanded(expanded)
+    return () => updateInventorySearchExpanded(false)
+  }, [expanded, onExpandedChange])
+
+  const focusInput = useCallback(() => {
+    captureKeyboardBaseline()
+    inputRef.current?.focus({ preventScroll: true })
+  }, [captureKeyboardBaseline])
+
+  const expandSearch = useCallback(() => {
+    captureKeyboardBaseline()
+    flushSync(() => setExpanded(true))
+    focusInput()
+  }, [captureKeyboardBaseline, focusInput])
+
+  const handleInputChange = useCallback((event: ChangeEvent<HTMLInputElement>) => {
+    controls.setSearchQuery(event.target.value)
+  }, [controls])
+
+  const handleInputKeyDown = useCallback((event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === 'Enter') event.currentTarget.blur()
+  }, [])
+
+  const handleInputFocus = useCallback(() => {
+    captureKeyboardBaseline()
+    setSearchFocused(true)
+  }, [captureKeyboardBaseline])
+
+  const handleInputBlur = useCallback(() => {
+    setSearchFocused(false)
+    setExpanded(false)
+    clearKeyboardStateSoon()
+  }, [clearKeyboardStateSoon])
+
+  const clearSearch = useCallback(() => {
+    controls.setSearchQuery('')
+    focusInput()
+  }, [controls, focusInput])
+
+  const handleClearSearchPressStart = useCallback((event: MouseEvent<HTMLButtonElement> | PointerEvent<HTMLButtonElement> | TouchEvent<HTMLButtonElement>) => {
+    event.preventDefault()
+    event.stopPropagation()
+    clearSearch()
+  }, [clearSearch])
+
+  const handleClearSearchClick = useCallback((event: MouseEvent<HTMLButtonElement>) => {
+    event.preventDefault()
+    event.stopPropagation()
+    clearSearch()
+  }, [clearSearch])
+
+  if (!expanded) {
+    return (
+      <div className={styles.inventorySearchSlot} data-expanded="false">
+        <button aria-label="Search inventory" className={styles.inventorySearchButton} data-active={hasQuery ? 'true' : undefined} onClick={expandSearch} type="button">
+          <MaterialIcon name="mdi:magnify" size={26} />
+          <span>{hasQuery ? controls.searchQuery : 'Search'}</span>
+        </button>
+      </div>
+    )
+  }
+
+  return (
+    <div className={styles.inventorySearchSlot} data-expanded="true">
+      <label className={styles.inventorySearchBar}>
+        <span className={styles.inventorySearchIcon} aria-hidden="true"><MaterialIcon name="mdi:magnify" size={26} /></span>
+        <input
+          aria-label="Search inventory"
+          autoComplete="off"
+          className={styles.inventorySearchInput}
+          enterKeyHint="search"
+          onBlur={handleInputBlur}
+          onChange={handleInputChange}
+          onFocus={handleInputFocus}
+          onKeyDown={handleInputKeyDown}
+          placeholder="Search items..."
+          ref={inputRef}
+          type="search"
+          value={controls.searchQuery}
+        />
+        {hasQuery && (
+          <button
+            aria-label="Clear Search"
+            className={styles.inventorySearchClear}
+            data-inventory-search-clear="true"
+            onClick={handleClearSearchClick}
+            onMouseDown={handleClearSearchPressStart}
+            onPointerDown={handleClearSearchPressStart}
+            onTouchStart={handleClearSearchPressStart}
+            title="Clear Search"
+            type="button"
+          >
+            <MaterialIcon name="mdi:close" size={20} />
+          </button>
+        )}
+      </label>
+    </div>
+  )
+}
+
 export function EverShelfInventoryFloatingActions({ controls }: { controls: EverShelfInventoryControls }) {
+  const [searchExpanded, setSearchExpanded] = useState(false)
+  if (controls.inventoryLoadPhase !== 'content' || controls.inventoryItemCount === 0) return null
+
+  const actionsCollapsed = searchExpanded
+
   return (
     <>
-      <FloatingActionButton ariaLabel="Sort" color={controls.sortActive ? SORT_FILTER_ACTIVE_COLOR : SORT_FILTER_COLOR} icon="mdi:swap-vertical" onClick={controls.openSortSheet} />
-      <FloatingActionButton ariaLabel="Filter" color={controls.filterActive ? SORT_FILTER_ACTIVE_COLOR : SORT_FILTER_COLOR} icon="mdi:tune-vertical" onClick={controls.openFilterSheet} />
+      <InventorySearchAction controls={controls} onExpandedChange={setSearchExpanded} />
+      <span className={styles.inventoryActionSlot} data-collapsed={actionsCollapsed ? 'true' : undefined}>
+        <FloatingActionButton ariaLabel="Sort" color={controls.sortActive ? SORT_FILTER_ACTIVE_COLOR : SORT_FILTER_COLOR} icon="mdi:swap-vertical" onClick={controls.openSortSheet} />
+      </span>
+      <span className={styles.inventoryActionSlot} data-collapsed={actionsCollapsed ? 'true' : undefined}>
+        <FloatingActionButton ariaLabel="Filter" color={controls.filterActive ? SORT_FILTER_ACTIVE_COLOR : SORT_FILTER_COLOR} icon="mdi:tune-vertical" onClick={controls.openFilterSheet} />
+      </span>
       <InventorySortSheet
         draftDirection={controls.sortDraftDirection}
         draftMode={controls.sortDraftMode}
@@ -307,11 +556,30 @@ export function EverShelfInventoryFloatingActions({ controls }: { controls: Ever
 
 export function EverShelfInventoryPanel({ controls, location, title }: EverShelfInventoryPanelProps) {
   const callService = useHass((state) => state.helpers.callService) as unknown as CallService
+  const { inventoryLoadPhase, setInventoryItemCount, setInventoryLoadPhase } = controls
   const [items, setItems] = useState<EverShelfInventoryItem[] | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
+    let finishTimer: number | null = null
+
+    queueMicrotask(() => {
+      if (cancelled) return
+      setInventoryItemCount(null)
+      setInventoryLoadPhase('loading')
+    })
+
+    const finishLoading = (nextItems: EverShelfInventoryItem[], nextError: string | null = null) => {
+      setInventoryLoadPhase('exiting')
+      finishTimer = window.setTimeout(() => {
+        if (cancelled) return
+        setError(nextError)
+        setItems(nextItems)
+        setInventoryItemCount(nextError ? 0 : nextItems.length)
+        setInventoryLoadPhase('content')
+      }, INVENTORY_LOADING_EXIT_MS)
+    }
 
     void Promise.resolve(
       callService({
@@ -323,40 +591,54 @@ export function EverShelfInventoryPanel({ controls, location, title }: EverShelf
     )
       .then((result) => {
         if (cancelled) return
-        setError(null)
-        setItems(inventoryFromResponse(result))
+        const nextItems = inventoryFromResponse(result)
+        finishLoading(nextItems)
       })
       .catch((caughtError: unknown) => {
-        if (!cancelled) setError(caughtError instanceof Error ? caughtError.message : 'Unable to load inventory')
+        if (!cancelled) {
+          finishLoading([], caughtError instanceof Error ? caughtError.message : 'Unable to load inventory')
+        }
       })
 
     return () => {
       cancelled = true
+      if (finishTimer !== null) window.clearTimeout(finishTimer)
     }
-  }, [callService, location])
+  }, [callService, location, setInventoryItemCount, setInventoryLoadPhase])
 
   const loadedItems = useMemo(() => items ?? [], [items])
-  const visibleItems = useMemo(() => visibleInventoryItems(loadedItems, controls.sortMode, controls.sortDirection, controls.filterMode), [controls.filterMode, controls.sortDirection, controls.sortMode, loadedItems])
+  const effectiveSearchQuery = controls.debouncedSearchQuery.trim()
+  const visibleItems = useMemo(() => visibleInventoryItems(loadedItems, controls.sortMode, controls.sortDirection, controls.filterMode, controls.debouncedSearchQuery), [controls.debouncedSearchQuery, controls.filterMode, controls.sortDirection, controls.sortMode, loadedItems])
 
   return (
     <>
       <article aria-label={`${title} inventory list`} className={styles.panel}>
-        {items === null && !error && <span className={styles.status}>Loading inventory...</span>}
-        {error && <span className={styles.error}>{error}</span>}
-        {items !== null && loadedItems.length === 0 && <Description>No items found.</Description>}
-        {items !== null && loadedItems.length > 0 && visibleItems.length === 0 && <Description>No items match the selected filter.</Description>}
-        {visibleItems.length > 0 && (
-          <ul className={styles.items}>
-            {visibleItems.map((item, index) => {
-              const name = itemName(item)
-              const expiry = expiryInfo(itemExpiryDate(item))
-              return (
-                <li className={styles.item} key={item.inventory_id ?? item.id ?? `${location}-${name}-${index}`}>
-                  <PantryRow expiry={expiry} title={name} />
-                </li>
-              )
-            })}
-          </ul>
+        {inventoryLoadPhase !== 'content' ? (
+          <DashboardPageLoading className={styles.inventoryLoading} label={`Loading ${title} inventory`} phase={inventoryLoadPhase === 'exiting' ? 'exiting' : 'loading'} />
+        ) : (
+          <div className={styles.inventoryContent}>
+            {error ? (
+              <EmptyState className={styles.inventoryEmpty} description={inventoryErrorDescription(error)} title="Unable to load inventory" />
+            ) : items !== null && loadedItems.length === 0 ? (
+              <EmptyState className={styles.inventoryEmpty} description={`Scan an item to add it to your ${title.toLowerCase()}.`} title="No items found" />
+            ) : items !== null && loadedItems.length > 0 && visibleItems.length === 0 && (effectiveSearchQuery
+              ? <EmptyState className={styles.inventoryEmpty} description={emptySearchDescription(controls.filterActive)} title="No matching items" />
+              : <Description>{emptyMatchMessage(false, controls.filterActive)}</Description>)}
+            {visibleItems.length > 0 && (
+              <ul className={styles.items}>
+                {visibleItems.map((item, index) => {
+                  const name = itemName(item)
+                  const expiry = expiryInfo(itemExpiryDate(item))
+                  const quantity = itemQuantity(item)
+                  return (
+                    <li className={styles.item} key={item.inventory_id ?? item.id ?? `${location}-${name}-${index}`}>
+                      <PantryRow expiry={expiry} quantity={quantity} title={name} />
+                    </li>
+                  )
+                })}
+              </ul>
+            )}
+          </div>
         )}
       </article>
     </>

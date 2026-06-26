@@ -663,12 +663,16 @@ export const mockEntities: Record<string, MockEntity> = {
   'sensor.evershelf_items_in_pantry': entity('sensor.evershelf_items_in_pantry', '12', { unit_of_measurement: 'items' }),
   'sensor.evershelf_items_in_fridge': entity('sensor.evershelf_items_in_fridge', '8', { unit_of_measurement: 'items' }),
   'sensor.evershelf_items_in_freezer': entity('sensor.evershelf_items_in_freezer', '5', { unit_of_measurement: 'items' }),
-  'sensor.evershelf_expiring_soon': entity('sensor.evershelf_expiring_soon', '4', {
+  'sensor.evershelf_items_in_spice_rack': entity('sensor.evershelf_items_in_spice_rack', '6', { unit_of_measurement: 'items' }),
+  'sensor.evershelf_items_in_cabinet': entity('sensor.evershelf_items_in_cabinet', '4', { unit_of_measurement: 'items' }),
+  'sensor.evershelf_expiring_soon': entity('sensor.evershelf_expiring_soon', '6', {
     expiring_list: [
       { days_remaining: 2, expiry_date: '2026-06-27', location: 'dispensa', name: 'Rice' },
       { days_remaining: 7, expiry_date: '2026-07-02', location: 'frigo', name: 'Milk' },
       { days_remaining: 8, expiry_date: '2026-07-03', location: 'frigo', name: 'Yogurt' },
       { days_remaining: 5, expiry_date: '2026-06-30', location: 'freezer', name: 'Waffles' },
+      { days_remaining: 4, expiry_date: '2026-06-29', location: 'spice_rack', name: 'Paprika' },
+      { days_remaining: 6, expiry_date: '2026-07-01', location: 'cabinet', name: 'Tea Bags' },
     ],
     unit_of_measurement: 'items',
   }),
@@ -786,18 +790,28 @@ export const mockState: MockHassState = {
           ? [
               { expiry_date: mockDateOffset(370), id: 204, location: 'frigo', name: 'Salsa' },
               { expiry_date: mockDateOffset(-400), id: 205, location: 'frigo', name: 'Milk' },
-              { expiry_date: mockDateOffset(5), id: 203, location: 'frigo', name: 'Greek Yogurt' },
+              { expiry_date: mockDateOffset(5), id: 203, location: 'frigo', name: 'Greek Yogurt', quantity: 2 },
             ]
           : location === 'freezer'
             ? [
                 { expiry_date: mockDateOffset(190), id: 304, location: 'freezer', name: 'Waffles' },
                 { expiry_date: mockDateOffset(20), id: 303, location: 'freezer', name: 'Frozen Peas' },
               ]
-            : [
-                { expiry_date: mockDateOffset(40), id: 103, location: 'dispensa', name: 'Ziti' },
-                { expiry_date: mockDateOffset(3), id: 102, location: 'dispensa', name: 'Canned Beans' },
-                { expiry_date: mockDateOffset(-10), id: 101, location: 'dispensa', name: 'Almond Flour' },
-              ]
+            : location === 'spice_rack'
+              ? [
+                  { expiry_date: mockDateOffset(400), id: 404, location: 'spice_rack', name: 'Cumin' },
+                  { expiry_date: mockDateOffset(4), id: 403, location: 'spice_rack', name: 'Paprika' },
+                ]
+              : location === 'cabinet'
+                ? [
+                    { expiry_date: mockDateOffset(6), id: 503, location: 'cabinet', name: 'Tea Bags' },
+                    { expiry_date: mockDateOffset(80), id: 504, location: 'cabinet', name: 'Paper Plates' },
+                  ]
+                : [
+                    { expiry_date: mockDateOffset(40), id: 103, location: 'dispensa', name: 'Ziti' },
+                    { expiry_date: mockDateOffset(3), id: 102, location: 'dispensa', name: 'Canned Beans', quantity: 2 },
+                    { expiry_date: mockDateOffset(-10), id: 101, location: 'dispensa', name: 'Almond Flour' },
+                  ]
         return Promise.resolve({ response: { inventory } })
       }
       if (params.domain === 'evershelf' && params.service === 'add_scanned_item' && params.returnResponse === true) {

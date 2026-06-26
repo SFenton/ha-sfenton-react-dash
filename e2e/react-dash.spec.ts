@@ -10,6 +10,7 @@ type FreeSleepSchedulesSnapshot = Partial<Record<'left' | 'right', Partial<Recor
 declare global {
   interface Window {
     __vacationPickerCalls?: number
+    __setInventoryFakeKeyboardHeight?: (height: number) => void
   }
 }
 
@@ -163,12 +164,100 @@ async function swipeWithTouch(page: Page, x: number, startY: number, endY: numbe
   await client.detach()
 }
 
+async function inventoryRowLabels(page: Page, listLabel: string) {
+  return page.getByLabel(listLabel).evaluate((list) => (
+    Array.from(list.querySelectorAll(':scope li > [role="group"]'))
+      .map((row) => row.getAttribute('aria-label'))
+  ))
+}
+
 test('overview renders with mock Home Assistant state', async ({ page }) => {
   await page.goto('/at-a-glance/overview')
 
   await expect(page).toHaveTitle('Home Assistant')
   await expect(page.getByRole('heading', { name: 'Home' })).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Quick Links' })).toBeVisible()
+})
+
+test('inventory FAB search follows Festival mobile keyboard and clear behavior', async ({ page }) => {
+  await page.goto('/at-a-glance/fridge')
+
+  const dock = page.locator('[data-floating-action-dock="true"]')
+  const inventoryListLabel = 'Fridge inventory list'
+  await expect(page.getByLabel(inventoryListLabel)).toBeVisible()
+  await expect.poll(() => inventoryRowLabels(page, inventoryListLabel)).toHaveLength(3)
+
+  await page.evaluate(() => {
+    const fakeVisualViewport = new EventTarget() as EventTarget & {
+      height: number
+      offsetTop: number
+      pageLeft: number
+      pageTop: number
+      scale: number
+      width: number
+    }
+    fakeVisualViewport.width = window.innerWidth
+    fakeVisualViewport.height = window.innerHeight
+    fakeVisualViewport.offsetTop = 0
+    fakeVisualViewport.pageLeft = 0
+    fakeVisualViewport.pageTop = 0
+    fakeVisualViewport.scale = 1
+    Object.defineProperty(window, 'visualViewport', { configurable: true, value: fakeVisualViewport })
+    window.__setInventoryFakeKeyboardHeight = (height: number) => {
+      fakeVisualViewport.height = height
+      fakeVisualViewport.dispatchEvent(new Event('resize'))
+      window.dispatchEvent(new Event('resize'))
+    }
+  })
+
+  await dock.getByRole('button', { name: 'Search inventory' }).click()
+  const input = page.getByLabel('Search inventory')
+  await expect(input).toBeFocused()
+  await expect(dock.getByRole('button', { name: 'Sort' }).locator('xpath=..')).toHaveAttribute('data-collapsed', 'true')
+  await expect(dock.getByRole('button', { name: 'Filter' }).locator('xpath=..')).toHaveAttribute('data-collapsed', 'true')
+  await expect(dock.getByRole('button', { name: 'Scan Item' })).toHaveCSS('opacity', '0')
+
+  const beforeBox = await dock.boundingBox()
+  if (!beforeBox) throw new Error('Inventory floating action dock was not measurable')
+  const expectedKeyboardInset = await page.evaluate(() => window.innerHeight - 520)
+  await page.evaluate(() => window.__setInventoryFakeKeyboardHeight?.(520))
+  await expect.poll(async () => {
+    const box = await dock.boundingBox()
+    return Math.round(520 - ((box?.y ?? 0) + (box?.height ?? 0)))
+  }).toBeGreaterThanOrEqual(6)
+  await expect.poll(async () => {
+    const box = await dock.boundingBox()
+    return Math.round(520 - ((box?.y ?? 0) + (box?.height ?? 0)))
+  }).toBeLessThanOrEqual(28)
+  await expect.poll(async () => page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--dashboard-fab-keyboard-inset').trim())).toBe(`${expectedKeyboardInset}px`)
+  await input.fill('dragonfruit')
+  await expect(page.getByRole('heading', { name: 'No matching items' })).toBeVisible()
+  await expect(page.getByText('Try a different search or clear the search to show all items.')).toBeVisible()
+  await expect.poll(async () => page.evaluate(() => {
+    const article = document.querySelector('article[aria-label="Fridge inventory list"]')
+    const dockElement = document.querySelector('[data-floating-action-dock="true"]')
+    const empty = document.querySelector('[data-empty-layout="centered"]')
+    if (!article || !dockElement || !empty) return Number.POSITIVE_INFINITY
+    const articleTop = article.getBoundingClientRect().top
+    const dockTop = dockElement.getBoundingClientRect().top
+    const emptyRect = empty.getBoundingClientRect()
+    return Math.round(Math.abs((emptyRect.top + emptyRect.height / 2) - ((articleTop + dockTop) / 2)))
+  })).toBeLessThanOrEqual(32)
+  await page.evaluate(() => window.__setInventoryFakeKeyboardHeight?.(window.innerHeight))
+  await expect.poll(async () => Math.round((await dock.boundingBox())?.y ?? 0)).toBe(Math.round(beforeBox.y))
+
+  await input.fill('milk')
+  await expect(page.getByRole('button', { name: 'Clear Search' })).toBeVisible()
+  await expect.poll(() => inventoryRowLabels(page, inventoryListLabel)).toEqual([
+    expect.stringContaining('Milk'),
+  ])
+
+  await input.press('Enter')
+  await expect(dock.getByRole('button', { name: 'Search inventory' })).toContainText('milk')
+  await dock.getByRole('button', { name: 'Search inventory' }).click()
+  await page.getByRole('button', { name: 'Clear Search' }).click()
+  await expect(input).toHaveValue('')
+  await expect.poll(() => inventoryRowLabels(page, inventoryListLabel)).toHaveLength(3)
 })
 
 test('thermostat page accepts the first mobile scroll gesture after closing a room modal', async ({ page }) => {

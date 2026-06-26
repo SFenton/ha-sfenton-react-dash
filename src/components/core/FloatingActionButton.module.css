@@ -20,6 +20,11 @@
   flex: 0 0 auto;
 }
 
+.button:focus,
+.button:focus-visible {
+  outline: none;
+}
+
 .pill {
   width: auto;
   gap: 10px;

@@ -52,8 +52,33 @@
   justify-content: flex-end;
   gap: var(--floating-action-gap);
   pointer-events: none;
+  --floating-action-keyboard-lift: min(0px, calc(var(--bottom-nav-height) - 14px + env(safe-area-inset-bottom, 0px) - var(--dashboard-fab-keyboard-inset, 0px)));
+  animation: floatingActionFadeIn 170ms ease-out;
+  transform: translate3d(0, var(--floating-action-keyboard-lift), 0);
+  transition: transform 150ms ease;
 }
 
-.floatingAction > button {
+.floatingAction > * {
   pointer-events: auto;
+}
+
+:global(html[data-inventory-search-expanded='true']) .floatingAction > button[aria-label='Scan Item'] {
+  width: 0;
+  min-width: 0;
+  overflow: hidden;
+  opacity: 0;
+  padding: 0;
+  pointer-events: none;
+}
+
+@keyframes floatingActionFadeIn {
+  from {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .floatingAction {
+    animation-duration: 1ms;
+  }
 }

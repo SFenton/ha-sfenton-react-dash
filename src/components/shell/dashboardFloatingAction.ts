@@ -1,5 +1,5 @@
 import { AREA_ITEMS } from '../../constants/atAGlance'
-import { HOME_FREEZER_ROUTE_PATH, HOME_FRIDGE_ROUTE_PATH, HOME_GROCERY_LIST_ROUTE_PATH, HOME_PANTRY_ROUTE_PATH } from '../../constants/routes'
+import { HOME_CABINET_ROUTE_PATH, HOME_FOOD_ROUTE_PATH, HOME_FREEZER_ROUTE_PATH, HOME_FRIDGE_ROUTE_PATH, HOME_GROCERY_LIST_ROUTE_PATH, HOME_PANTRY_ROUTE_PATH, HOME_SPICE_RACK_ROUTE_PATH } from '../../constants/routes'
 
 export function dashboardRoomNameFromPath(path: string) {
   return AREA_ITEMS.find((area) => area.route.endsWith(`/${path}`))?.title
@@ -14,9 +14,9 @@ export function createTaskDefaultAssignee(path: string) {
 }
 
 export function isEverShelfInventoryRoute(path: string) {
-  return path === HOME_PANTRY_ROUTE_PATH || path === HOME_FRIDGE_ROUTE_PATH || path === HOME_FREEZER_ROUTE_PATH
+  return path === HOME_PANTRY_ROUTE_PATH || path === HOME_FRIDGE_ROUTE_PATH || path === HOME_FREEZER_ROUTE_PATH || path === HOME_SPICE_RACK_ROUTE_PATH || path === HOME_CABINET_ROUTE_PATH
 }
 
 export function hasDashboardFloatingAction(path: string) {
-  return path === 'overview' || Boolean(dashboardRoomNameFromPath(path)) || path === 'groceries' || path === HOME_GROCERY_LIST_ROUTE_PATH || isEverShelfInventoryRoute(path) || createTaskDefaultAssignee(path) !== null
+  return path === 'overview' || Boolean(dashboardRoomNameFromPath(path)) || path === 'groceries' || path === HOME_GROCERY_LIST_ROUTE_PATH || path === HOME_FOOD_ROUTE_PATH || isEverShelfInventoryRoute(path) || createTaskDefaultAssignee(path) !== null
 }

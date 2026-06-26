@@ -21,7 +21,7 @@ type CameraStatus = 'idle' | 'starting' | 'ready' | 'error'
 type LookupStatus = 'idle' | 'scanning' | 'resolving' | 'found' | 'not-found' | 'error'
 type ExpiryStatus = 'idle' | 'ready' | 'reading' | 'found' | 'not-found' | 'error'
 type AddItemStatus = 'idle' | 'adding' | 'added' | 'error'
-export type EverShelfLocation = 'dispensa' | 'frigo' | 'freezer' | 'altro'
+export type EverShelfLocation = 'dispensa' | 'frigo' | 'freezer' | 'spice_rack' | 'cabinet' | 'altro'
 type QuickExpirationValue = '3-days' | '1-week' | '1-month' | '6-months' | '1-year'
 type CallService = <Response extends object>(params: Record<string, unknown>) => Promise<{ response: Response }> | void
 type BarcodeFormatEnum = typeof import('@zxing/browser')['BarcodeFormat']
@@ -102,6 +102,8 @@ const EVERSHELF_LOCATIONS: { label: string, value: EverShelfLocation }[] = [
   { label: 'Pantry', value: 'dispensa' },
   { label: 'Fridge', value: 'frigo' },
   { label: 'Freezer', value: 'freezer' },
+  { label: 'Spice Rack', value: 'spice_rack' },
+  { label: 'Cabinet', value: 'cabinet' },
   { label: 'Other', value: 'altro' },
 ]
 const QUICK_EXPIRATION_OPTIONS: { label: string, value: QuickExpirationValue }[] = [
@@ -120,6 +122,8 @@ function locationDestination(value: EverShelfLocation) {
   if (value === 'dispensa') return 'pantry'
   if (value === 'frigo') return 'fridge'
   if (value === 'freezer') return 'freezer'
+  if (value === 'spice_rack') return 'spice rack'
+  if (value === 'cabinet') return 'cabinet'
   return 'storage'
 }
 

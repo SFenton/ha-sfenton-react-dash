@@ -16,6 +16,15 @@
   min-width: 0;
 }
 
+.inventoryContent {
+  opacity: 0;
+  animation: inventoryContentFadeIn 170ms ease-out forwards;
+}
+
+.inventoryLoading {
+  min-height: max(260px, calc(100dvh - var(--bottom-nav-height) - 80px - env(safe-area-inset-bottom, 0px)));
+}
+
 .pantryRow {
   display: grid;
   width: 100%;
@@ -114,6 +123,159 @@
 
 .error {
   color: #ffb4b4;
+}
+
+.inventoryEmpty {
+  --inventory-empty-keyboard-lift: max(0px, calc(var(--dashboard-fab-keyboard-inset, 0px) - var(--bottom-nav-height) + 14px - env(safe-area-inset-bottom, 0px)));
+  min-height: max(180px, calc(100dvh - var(--bottom-nav-height) - 160px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - var(--inventory-empty-keyboard-lift)));
+}
+
+.inventorySearchSlot {
+  display: flex;
+  height: var(--floating-action-size, 56px);
+  min-width: 0;
+  flex: 1 1 auto;
+  pointer-events: auto;
+  transition:
+    flex-basis 360ms ease,
+    opacity 280ms ease,
+    width 360ms ease;
+}
+
+.inventorySearchButton,
+.inventorySearchBar {
+  display: flex;
+  width: 100%;
+  height: var(--floating-action-size, 56px);
+  min-width: 0;
+  align-items: center;
+  box-sizing: border-box;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+  color: white;
+  background: rgba(18, 24, 38, 0.96);
+  box-shadow: var(--shadow-glass), inset 0 1px 0 rgba(255, 255, 255, 0.14);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.inventorySearchButton {
+  gap: 10px;
+  justify-content: flex-start;
+  padding: 0 18px;
+  font: inherit;
+  font-size: 0.92rem;
+  font-weight: 760;
+  letter-spacing: 0;
+  cursor: pointer;
+}
+
+.inventorySearchButton[data-active='true'],
+.inventorySearchBar:focus-within {
+  border-color: rgba(42, 126, 180, 0.86);
+  box-shadow: var(--shadow-glass), 0 0 0 1px rgba(42, 126, 180, 0.48), inset 0 1px 0 rgba(255, 255, 255, 0.14);
+}
+
+.inventorySearchButton span {
+  overflow: hidden;
+  min-width: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.inventorySearchButton:focus,
+.inventorySearchButton:focus-visible,
+.inventorySearchClear:focus,
+.inventorySearchClear:focus-visible,
+.inventorySearchInput:focus,
+.inventorySearchInput:focus-visible {
+  outline: none;
+}
+
+.inventorySearchBar {
+  gap: 10px;
+  padding: 0 14px 0 18px;
+  cursor: text;
+}
+
+.inventorySearchIcon {
+  display: inline-grid;
+  flex: 0 0 auto;
+  place-items: center;
+  color: rgba(255, 255, 255, 0.94);
+}
+
+.inventorySearchInput {
+  width: 100%;
+  min-width: 0;
+  flex: 1 1 auto;
+  border: 0;
+  padding: 0;
+  color: white;
+  background: transparent;
+  font: inherit;
+  font-size: 16px;
+  line-height: 1;
+}
+
+.inventorySearchInput::placeholder {
+  color: rgba(255, 255, 255, 0.58);
+}
+
+.inventorySearchInput::-webkit-search-cancel-button {
+  display: none;
+}
+
+.inventorySearchClear {
+  display: inline-grid;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 0;
+  border-radius: 999px;
+  padding: 0;
+  color: white;
+  background: rgba(255, 255, 255, 0.1);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.inventoryActionSlot {
+  display: inline-flex;
+  width: var(--floating-action-size, 56px);
+  min-width: 0;
+  flex: 0 0 var(--floating-action-size, 56px);
+  overflow: visible;
+  opacity: 1;
+  pointer-events: auto;
+  transition:
+    flex-basis 360ms ease,
+    opacity 280ms ease,
+    width 360ms ease;
+}
+
+.inventoryActionSlot[data-collapsed='true'] {
+  width: 0;
+  flex-basis: 0;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.inventoryActionSlot[data-collapsed='true'] > button {
+  pointer-events: none;
+}
+
+@keyframes inventoryContentFadeIn {
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .inventoryContent {
+    animation-duration: 1ms;
+  }
 }
 
 .sheetStack,
