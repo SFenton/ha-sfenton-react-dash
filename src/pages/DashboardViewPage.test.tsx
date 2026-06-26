@@ -3312,14 +3312,21 @@ describe('DashboardViewPage', () => {
     expect(screen.getByRole('button', { name: 'Sort' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Filter' })).toBeInTheDocument()
     const pantryList = await screen.findByLabelText('Pantry inventory list')
-    await waitFor(() => expect(within(pantryList).getAllByRole('button')).toHaveLength(3))
-    expect(within(pantryList).getAllByRole('button').map((row) => row.getAttribute('aria-label'))).toEqual([
+    await waitFor(() => expect(within(pantryList).getAllByRole('group', { name: /Expires|Expired|No expiration date/i })).toHaveLength(3))
+    expect(within(pantryList).getAllByRole('group', { name: /Expires|Expired|No expiration date/i }).map((row) => row.getAttribute('aria-label'))).toEqual([
       'Almond Flour Expired for 1 week',
       'Canned Beans Expires in 3 days',
       'Ziti Expires in 1 month',
     ])
-    expect(within(pantryList).getByRole('button', { name: 'Almond Flour Expired for 1 week' })).toHaveAttribute('data-expiry-tone', 'expired')
-    expect(within(pantryList).getByRole('button', { name: 'Canned Beans Expires in 3 days' })).toHaveAttribute('data-expiry-tone', 'soon')
+    expect(within(pantryList).getByRole('group', { name: 'Almond Flour Expired for 1 week' })).toHaveAttribute('data-expiry-tone', 'expired')
+    const cannedBeansRow = within(pantryList).getByRole('group', { name: 'Canned Beans Expires in 3 days' })
+    expect(cannedBeansRow).toHaveAttribute('data-expiry-tone', 'soon')
+    expect(cannedBeansRow.querySelector('path')).toHaveAttribute('d', materialIconPath('mdi:cart-plus'))
+    expect(cannedBeansRow.querySelector(`path[d="${materialIconPath('mdi:checkbox-blank-outline')}"]`)).toBeNull()
+    expect(within(cannedBeansRow).getByRole('button', { name: 'Add Canned Beans to shopping list' })).toBeDisabled()
+    expect(within(cannedBeansRow).getByRole('button', { name: 'Edit Canned Beans' }).querySelector('path')).toHaveAttribute('d', materialIconPath('mdi:pencil'))
+    expect(within(cannedBeansRow).getByRole('button', { name: 'Delete Canned Beans' })).toHaveClass(/deleteAction/)
+    expect(within(cannedBeansRow).getByRole('button', { name: 'Delete Canned Beans' }).querySelector('path')).toHaveAttribute('d', materialIconPath('mdi:delete'))
     expect(mockCallServiceCalls).toContainEqual({
       domain: 'evershelf',
       returnResponse: true,
@@ -3333,14 +3340,14 @@ describe('DashboardViewPage', () => {
 
     expect(screen.getByRole('heading', { name: 'Fridge' })).toBeInTheDocument()
     const fridgeList = await screen.findByLabelText('Fridge inventory list')
-    await waitFor(() => expect(within(fridgeList).getAllByRole('button')).toHaveLength(3))
-    expect(within(fridgeList).getAllByRole('button').map((row) => row.getAttribute('aria-label'))).toEqual([
+    await waitFor(() => expect(within(fridgeList).getAllByRole('group', { name: /Expires|Expired|No expiration date/i })).toHaveLength(3))
+    expect(within(fridgeList).getAllByRole('group', { name: /Expires|Expired|No expiration date/i }).map((row) => row.getAttribute('aria-label'))).toEqual([
       'Greek Yogurt Expires in 5 days',
       'Milk Expired for 1 year',
       'Salsa Expires in 1 year',
     ])
-    expect(within(fridgeList).getByRole('button', { name: 'Greek Yogurt Expires in 5 days' })).toHaveAttribute('data-expiry-tone', 'soon')
-    expect(within(fridgeList).getByRole('button', { name: 'Milk Expired for 1 year' })).toHaveAttribute('data-expiry-tone', 'expired')
+    expect(within(fridgeList).getByRole('group', { name: 'Greek Yogurt Expires in 5 days' })).toHaveAttribute('data-expiry-tone', 'soon')
+    expect(within(fridgeList).getByRole('group', { name: 'Milk Expired for 1 year' })).toHaveAttribute('data-expiry-tone', 'expired')
     expect(mockCallServiceCalls).toContainEqual({
       domain: 'evershelf',
       returnResponse: true,
@@ -3354,8 +3361,8 @@ describe('DashboardViewPage', () => {
 
     expect(screen.getByRole('heading', { name: 'Freezer' })).toBeInTheDocument()
     const freezerList = await screen.findByLabelText('Freezer inventory list')
-    await waitFor(() => expect(within(freezerList).getAllByRole('button')).toHaveLength(2))
-    expect(within(freezerList).getAllByRole('button').map((row) => row.getAttribute('aria-label'))).toEqual([
+    await waitFor(() => expect(within(freezerList).getAllByRole('group', { name: /Expires|Expired|No expiration date/i })).toHaveLength(2))
+    expect(within(freezerList).getAllByRole('group', { name: /Expires|Expired|No expiration date/i }).map((row) => row.getAttribute('aria-label'))).toEqual([
       'Frozen Peas Expires in 3 weeks',
       'Waffles Expires in 6 months',
     ])
@@ -3371,8 +3378,8 @@ describe('DashboardViewPage', () => {
     render(<DashboardViewPage activePath="fridge" onNavigate={() => undefined} path="fridge" />)
 
     const fridgeList = await screen.findByLabelText('Fridge inventory list')
-    await waitFor(() => expect(within(fridgeList).getAllByRole('button')).toHaveLength(3))
-    expect(within(fridgeList).getAllByRole('button').map((row) => row.getAttribute('aria-label'))).toEqual([
+    await waitFor(() => expect(within(fridgeList).getAllByRole('group', { name: /Expires|Expired|No expiration date/i })).toHaveLength(3))
+    expect(within(fridgeList).getAllByRole('group', { name: /Expires|Expired|No expiration date/i }).map((row) => row.getAttribute('aria-label'))).toEqual([
       'Greek Yogurt Expires in 5 days',
       'Milk Expired for 1 year',
       'Salsa Expires in 1 year',
@@ -3402,7 +3409,7 @@ describe('DashboardViewPage', () => {
 
     await waitFor(() => expect(screen.queryByRole('heading', { name: 'Sort Inventory' })).not.toBeInTheDocument())
     expect(sortButton).toHaveStyle({ '--card-rgb': '155 110 64' })
-    expect(within(fridgeList).getAllByRole('button').map((row) => row.getAttribute('aria-label'))).toEqual([
+    expect(within(fridgeList).getAllByRole('group', { name: /Expires|Expired|No expiration date/i }).map((row) => row.getAttribute('aria-label'))).toEqual([
       'Milk Expired for 1 year',
       'Greek Yogurt Expires in 5 days',
       'Salsa Expires in 1 year',
@@ -3416,7 +3423,7 @@ describe('DashboardViewPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Apply' }))
 
     await waitFor(() => expect(screen.queryByRole('heading', { name: 'Sort Inventory' })).not.toBeInTheDocument())
-    expect(within(fridgeList).getAllByRole('button').map((row) => row.getAttribute('aria-label'))).toEqual([
+    expect(within(fridgeList).getAllByRole('group', { name: /Expires|Expired|No expiration date/i }).map((row) => row.getAttribute('aria-label'))).toEqual([
       'Salsa Expires in 1 year',
       'Greek Yogurt Expires in 5 days',
       'Milk Expired for 1 year',
@@ -3430,7 +3437,7 @@ describe('DashboardViewPage', () => {
 
     await waitFor(() => expect(screen.queryByRole('heading', { name: 'Filter Inventory' })).not.toBeInTheDocument())
     expect(filterButton).toHaveStyle({ '--card-rgb': '155 110 64' })
-    expect(within(fridgeList).getAllByRole('button').map((row) => row.getAttribute('aria-label'))).toEqual([
+    expect(within(fridgeList).getAllByRole('group', { name: /Expires|Expired|No expiration date/i }).map((row) => row.getAttribute('aria-label'))).toEqual([
       'Greek Yogurt Expires in 5 days',
     ])
   })

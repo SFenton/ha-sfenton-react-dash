@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useHass } from '@hakit/core'
-import { CheckboxRow } from '../core/CheckboxRow'
 import { Description } from '../core/Description'
 import { FloatingActionButton } from '../core/FloatingActionButton'
 import { MaterialIcon } from '../core/Icon'
@@ -173,6 +172,28 @@ function visibleInventoryItems(items: EverShelfInventoryItem[], sortMode: Invent
   return sortInventoryItems(filterInventoryItems(items, filterMode), sortMode, sortDirection)
 }
 
+function PantryRow({ expiry, title }: { expiry: ExpiryInfo; title: string }) {
+  return (
+    <div aria-label={`${title} ${expiry.label}`} className={styles.pantryRow} data-expiry-tone={expiry.tone} role="group">
+      <span className={styles.pantryRowCopy}>
+        <strong>{title}</strong>
+        <small>{expiry.label}</small>
+      </span>
+      <span aria-label={`${title} actions`} className={styles.pantryRowActions} role="group">
+        <button aria-label={`Add ${title} to shopping list`} className={styles.rowAction} disabled type="button">
+          <MaterialIcon name="mdi:cart-plus" size={22} />
+        </button>
+        <button aria-label={`Edit ${title}`} className={styles.rowAction} disabled type="button">
+          <MaterialIcon name="mdi:pencil" size={22} />
+        </button>
+        <button aria-label={`Delete ${title}`} className={`${styles.rowAction} ${styles.deleteAction}`} disabled type="button">
+          <MaterialIcon name="mdi:delete" size={22} />
+        </button>
+      </span>
+    </div>
+  )
+}
+
 function InventorySortSheet({ draftDirection, draftMode, onApply, onClose, onDraftDirectionChange, onDraftModeChange, onReset, open }: { draftDirection: InventorySortDirection; draftMode: InventorySortMode; onApply: () => void; onClose: () => void; onDraftDirectionChange: (direction: InventorySortDirection) => void; onDraftModeChange: (mode: InventorySortMode) => void; onReset: () => void; open: boolean }) {
   return (
     <ModalSheet
@@ -331,15 +352,7 @@ export function EverShelfInventoryPanel({ controls, location, title }: EverShelf
               const expiry = expiryInfo(itemExpiryDate(item))
               return (
                 <li className={styles.item} key={item.inventory_id ?? item.id ?? `${location}-${name}-${index}`}>
-                  <CheckboxRow
-                    active={false}
-                    aria-label={`${name} ${expiry.label}`}
-                    className={styles.itemButton}
-                    data-expiry-tone={expiry.tone}
-                    disabled
-                    subtitle={expiry.label}
-                    title={name}
-                  />
+                  <PantryRow expiry={expiry} title={name} />
                 </li>
               )
             })}

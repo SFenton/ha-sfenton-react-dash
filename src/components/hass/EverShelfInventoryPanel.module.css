@@ -16,16 +16,88 @@
   min-width: 0;
 }
 
-.itemButton:disabled {
+.pantryRow {
+  display: grid;
+  width: 100%;
+  min-height: 66px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 8px 0 8px 6px;
+  color: rgba(255, 255, 255, 0.88);
+}
+
+.pantryRowCopy {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+}
+
+.pantryRowCopy strong {
+  overflow: hidden;
+  color: white;
+  font-size: 0.9rem;
+  font-weight: 820;
+  letter-spacing: 0;
+  line-height: 1.25;
+  padding-bottom: 2px;
+  text-overflow: clip;
+  white-space: nowrap;
+}
+
+.pantryRowCopy small {
+  overflow: hidden;
+  color: rgba(255, 255, 255, 0.66);
+  font-size: 0.78rem;
+  font-weight: 720;
+  letter-spacing: 0;
+  line-height: 1.2;
+  padding-bottom: 2px;
+  text-overflow: clip;
+  white-space: nowrap;
+}
+
+.pantryRowActions {
+  display: inline-flex;
+  flex: 0 0 auto;
+  gap: 2px;
+  align-items: center;
+  transform: translateX(5.5px);
+}
+
+.rowAction {
+  display: inline-grid;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  border: 0;
+  border-radius: 999px;
+  padding: 0;
+  color: rgba(255, 255, 255, 0.72);
+  background: transparent;
+  cursor: default;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.rowAction:disabled {
   cursor: default;
   opacity: 1;
 }
 
-.itemButton[data-expiry-tone='soon'] small {
+.rowAction:focus,
+.rowAction:focus-visible {
+  outline: none;
+}
+
+.deleteAction {
+  color: #ff6b6b;
+}
+
+.pantryRow[data-expiry-tone='soon'] small {
   color: #ffd965;
 }
 
-.itemButton[data-expiry-tone='expired'] small {
+.pantryRow[data-expiry-tone='expired'] small {
   color: #ff6b6b;
 }
 
