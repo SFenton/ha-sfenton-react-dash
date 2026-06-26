@@ -94,8 +94,6 @@ const CAMERA_CONSTRAINTS: MediaStreamConstraints = {
     width: { ideal: 1280 },
   },
 }
-const EXPIRY_CAPTURE_MAX_EDGE = 1024
-const EXPIRY_CAPTURE_JPEG_QUALITY = 0.72
 const SECURE_CONTEXT_MESSAGE = 'Camera access requires a secure origin. Use HTTPS for the Home Assistant wrapper, or localhost/127.0.0.1 during local development.'
 const UNSUPPORTED_CAMERA_MESSAGE = 'This browser does not expose camera access to React Dash.'
 const TRANSIENT_SCAN_ERRORS = new Set(['ChecksumException', 'FormatException', 'NotFoundException'])
@@ -138,11 +136,28 @@ function stopStream(stream: MediaStream) {
   stream.getTracks().forEach((track) => track.stop())
 }
 
-function scaledCaptureSize(width: number, height: number) {
-  const scale = Math.min(1, EXPIRY_CAPTURE_MAX_EDGE / Math.max(width, height))
+function visibleVideoCrop(video: HTMLVideoElement) {
+  const videoWidth = video.videoWidth
+  const videoHeight = video.videoHeight
+  const rect = video.getBoundingClientRect()
+  const viewportAspect = rect.width > 0 && rect.height > 0 ? rect.width / rect.height : videoWidth / videoHeight
+  const videoAspect = videoWidth / videoHeight
+  if (videoAspect > viewportAspect) {
+    const sourceWidth = Math.round(videoHeight * viewportAspect)
+    return {
+      sourceHeight: videoHeight,
+      sourceWidth,
+      sourceX: Math.round((videoWidth - sourceWidth) / 2),
+      sourceY: 0,
+    }
+  }
+
+  const sourceHeight = Math.round(videoWidth / viewportAspect)
   return {
-    height: Math.max(1, Math.round(height * scale)),
-    width: Math.max(1, Math.round(width * scale)),
+    sourceHeight,
+    sourceWidth: videoWidth,
+    sourceX: 0,
+    sourceY: Math.round((videoHeight - sourceHeight) / 2),
   }
 }
 
@@ -697,18 +712,18 @@ export function ScanItemCameraSheet({ open, onClose }: ScanItemCameraSheetProps)
     }
 
     const canvas = document.createElement('canvas')
-    const captureSize = scaledCaptureSize(video.videoWidth, video.videoHeight)
-    canvas.width = captureSize.width
-    canvas.height = captureSize.height
+    const crop = visibleVideoCrop(video)
+    canvas.width = crop.sourceWidth
+    canvas.height = crop.sourceHeight
     const context = canvas.getContext('2d')
     if (!context) {
       setError('Unable to capture an image from this camera feed.')
       return null
     }
 
-    context.drawImage(video, 0, 0, canvas.width, canvas.height)
+    context.drawImage(video, crop.sourceX, crop.sourceY, crop.sourceWidth, crop.sourceHeight, 0, 0, canvas.width, canvas.height)
     setError(null)
-    return canvas.toDataURL('image/jpeg', EXPIRY_CAPTURE_JPEG_QUALITY)
+    return canvas.toDataURL('image/jpeg')
   }
 
   const readExpirationDate = async () => {

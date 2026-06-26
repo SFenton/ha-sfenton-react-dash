@@ -73,7 +73,18 @@ function restoreProperty(target: object, property: PropertyKey, descriptor: Prop
   }
 }
 
-function setupMockCamera() {
+interface MockCameraOptions {
+  viewportHeight?: number
+  viewportWidth?: number
+  videoHeight?: number
+  videoWidth?: number
+}
+
+function setupMockCamera(options: MockCameraOptions = {}) {
+  const videoWidth = options.videoWidth ?? 1280
+  const videoHeight = options.videoHeight ?? 720
+  const viewportWidth = options.viewportWidth ?? 320
+  const viewportHeight = options.viewportHeight ?? 180
   const stop = vi.fn()
   const stream = { getTracks: () => [{ stop } as unknown as MediaStreamTrack] } as unknown as MediaStream
   const getUserMedia = vi.fn(() => Promise.resolve(stream))
@@ -83,16 +94,28 @@ function setupMockCamera() {
   const originalVideoHeight = Object.getOwnPropertyDescriptor(HTMLVideoElement.prototype, 'videoHeight')
   const originalReadyState = Object.getOwnPropertyDescriptor(HTMLMediaElement.prototype, 'readyState')
   const playSpy = vi.spyOn(HTMLMediaElement.prototype, 'play').mockResolvedValue(undefined)
+  const rectSpy = vi.spyOn(HTMLVideoElement.prototype, 'getBoundingClientRect').mockReturnValue({
+    bottom: viewportHeight,
+    height: viewportHeight,
+    left: 0,
+    right: viewportWidth,
+    toJSON: () => ({}),
+    top: 0,
+    width: viewportWidth,
+    x: 0,
+    y: 0,
+  } as DOMRect)
   Object.defineProperty(window, 'isSecureContext', { configurable: true, value: true })
   Object.defineProperty(navigator, 'mediaDevices', { configurable: true, value: { getUserMedia } })
-  Object.defineProperty(HTMLVideoElement.prototype, 'videoWidth', { configurable: true, value: 1280 })
-  Object.defineProperty(HTMLVideoElement.prototype, 'videoHeight', { configurable: true, value: 720 })
+  Object.defineProperty(HTMLVideoElement.prototype, 'videoWidth', { configurable: true, value: videoWidth })
+  Object.defineProperty(HTMLVideoElement.prototype, 'videoHeight', { configurable: true, value: videoHeight })
   Object.defineProperty(HTMLMediaElement.prototype, 'readyState', { configurable: true, value: 4 })
 
   return {
     getUserMedia,
     restore: () => {
       playSpy.mockRestore()
+      rectSpy.mockRestore()
       Object.defineProperty(window, 'isSecureContext', { configurable: true, value: originalIsSecureContext })
       Object.defineProperty(navigator, 'mediaDevices', { configurable: true, value: originalMediaDevices })
       restoreProperty(HTMLVideoElement.prototype, 'videoWidth', originalVideoWidth)
@@ -549,7 +572,7 @@ describe('DashboardViewPage', () => {
   })
 
   it('reads expiration dates from Kitchen scan item photos through EverShelf', async () => {
-    const camera = setupMockCamera()
+    const camera = setupMockCamera({ videoHeight: 960, videoWidth: 1280 })
     const canvas = setupMockCanvas()
 
     try {
@@ -585,8 +608,8 @@ describe('DashboardViewPage', () => {
       expect(camera.getUserMedia).toHaveBeenCalledTimes(3)
       fireEvent.click(await screen.findByRole('button', { name: 'Read Expiration Date' }))
 
-      expect(canvas.drawImage).toHaveBeenCalledWith(expect.any(HTMLVideoElement), 0, 0, 1024, 576)
-      expect(canvas.toDataUrl).toHaveBeenCalledWith('image/jpeg', 0.72)
+      expect(canvas.drawImage).toHaveBeenCalledWith(expect.any(HTMLVideoElement), 0, 120, 1280, 720, 0, 0, 1280, 720)
+      expect(canvas.toDataUrl).toHaveBeenCalledWith('image/jpeg')
       await waitFor(() => expect(mockCallServiceCalls).toContainEqual({
         domain: 'evershelf',
         returnResponse: true,
