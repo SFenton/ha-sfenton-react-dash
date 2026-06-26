@@ -759,6 +759,28 @@ export const mockState: MockHassState = {
           },
         })
       }
+      if (params.domain === 'evershelf' && params.service === 'add_scanned_item' && params.returnResponse === true) {
+        const serviceData = params.serviceData as { name?: string } | undefined
+        if (serviceData?.name === 'Fail Item') {
+          return Promise.resolve({
+            response: {
+              message: 'Mock add failure',
+              success: false,
+            },
+          })
+        }
+        return Promise.resolve({
+          response: {
+            inventory: {
+              new_qty: 1,
+              total_qty: 1,
+              unit: 'pz',
+            },
+            product_id: 123,
+            success: true,
+          },
+        })
+      }
     },
     joinHassUrl: (path) => `http://mock-hass.local${path}`,
   },

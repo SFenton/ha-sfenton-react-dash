@@ -1,0 +1,63 @@
+.field {
+  display: grid;
+  min-width: 0;
+  gap: 7px;
+  color: rgba(247, 251, 255, 0.9);
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.pickerShell {
+  position: relative;
+  display: grid;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  min-height: 48px;
+  align-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 16px;
+  box-sizing: border-box;
+  padding: 12px 13px;
+  overflow: hidden;
+  color: white;
+  background: rgba(255, 255, 255, 0.12);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  font-size: 16px;
+  font-weight: 720;
+  line-height: 1.2;
+}
+
+.pickerShell[data-empty='true']::before {
+  content: 'Select';
+  color: rgba(247, 251, 255, 0.48);
+}
+
+.pickerValue {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nativePickerInput {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  border: 0;
+  border-radius: inherit;
+  padding: 0;
+  opacity: 0;
+  background: transparent;
+  box-shadow: none;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.pickerShell:focus-within {
+  border-color: rgba(255, 255, 255, 0.42);
+  outline: 3px solid rgba(255, 255, 255, 0.1);
+}

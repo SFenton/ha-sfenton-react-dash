@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react'
 import { useHass } from '@hakit/core'
 import { MaterialIcon } from '../core/Icon'
 import { ModalSheet } from '../core/ModalSheet'
+import { NativePickerField } from '../core/NativePickerField'
 import styles from './CreateDonetickTaskSheet.module.css'
 
 type CallService = (params: Record<string, unknown>) => Promise<unknown> | void
@@ -81,22 +82,6 @@ function sourceDueValue(dueDate: string, dueTime: string) {
   const normalizedDueTime = normalizeTime(dueTime)
   if (dueDate) return `${dueDate}T${normalizedDueTime || '12:00:00'}`
   return normalizedDueTime
-}
-
-function formatDueDate(value: string) {
-  if (!value) return ''
-  const [year, month, day] = value.split('-').map(Number)
-  if (!year || !month || !day) return value
-  return new Intl.DateTimeFormat(undefined, { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(year, month - 1, day))
-}
-
-function formatDueTime(value: string) {
-  if (!value) return ''
-  const [hours, minutes] = value.split(':').map(Number)
-  if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return value
-  const date = new Date()
-  date.setHours(hours, minutes, 0, 0)
-  return new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' }).format(date)
 }
 
 function repeatEveryValue(value: string) {
@@ -202,20 +187,8 @@ export function CreateDonetickTaskSheet({ defaultAssignee = '', open, onClose }:
           <textarea name="description" onChange={(event) => updateField('description', event.target.value)} rows={4} value={form.description} />
         </label>
         <div className={styles.twoColumn}>
-          <label className={styles.field}>
-            <span>Due Date</span>
-            <span className={styles.pickerShell} data-empty={form.dueDate ? 'false' : 'true'}>
-              <span className={styles.pickerValue} aria-hidden="true">{formatDueDate(form.dueDate)}</span>
-              <input aria-label="Due Date" className={styles.nativePickerInput} name="due_date" onChange={(event) => updateField('dueDate', event.target.value)} type="date" value={form.dueDate} />
-            </span>
-          </label>
-          <label className={styles.field}>
-            <span>Due Time</span>
-            <span className={styles.pickerShell} data-empty={form.dueTime ? 'false' : 'true'}>
-              <span className={styles.pickerValue} aria-hidden="true">{formatDueTime(form.dueTime)}</span>
-              <input aria-label="Due Time" className={styles.nativePickerInput} name="due_time" onChange={(event) => updateField('dueTime', event.target.value)} type="time" value={form.dueTime} />
-            </span>
-          </label>
+          <NativePickerField label="Due Date" name="due_date" onChange={(value) => updateField('dueDate', value)} type="date" value={form.dueDate} />
+          <NativePickerField label="Due Time" name="due_time" onChange={(value) => updateField('dueTime', value)} type="time" value={form.dueTime} />
         </div>
         <label className={styles.field}>
           <span>Priority</span>

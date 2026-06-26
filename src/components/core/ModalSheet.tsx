@@ -17,11 +17,12 @@ interface ModalSheetProps {
   contentStyle?: ModalSheetStyle
   footer?: ReactNode
   onBack?: () => void
+  scrollResetKey?: string | number | boolean
   subtitle?: string
   surface?: 'hass-popup'
 }
 
-type ModalSheetSnapshot = Pick<ModalSheetProps, 'backLabel' | 'children' | 'chrome' | 'contentStyle' | 'footer' | 'onBack' | 'subtitle' | 'title'>
+type ModalSheetSnapshot = Pick<ModalSheetProps, 'backLabel' | 'children' | 'chrome' | 'contentStyle' | 'footer' | 'onBack' | 'scrollResetKey' | 'subtitle' | 'title'>
 const RECENT_OPEN_INTERNAL_CLOSE_GUARD_MS = 450
 const EXIT_ANIMATION_UNMOUNT_MS = 260
 
@@ -49,11 +50,12 @@ function useDesktopModalLayout() {
   return isDesktopModalLayout
 }
 
-export function ModalSheet({ open, title, onClose, children, backLabel = 'Back', chrome = 'default', contentStyle, footer, onBack, subtitle }: ModalSheetProps) {
+export function ModalSheet({ open, title, onClose, children, backLabel = 'Back', chrome = 'default', contentStyle, footer, onBack, scrollResetKey, subtitle }: ModalSheetProps) {
   const contentRef = useRef<HTMLDivElement | null>(null)
+  const bodyRef = useRef<HTMLDivElement | null>(null)
   const closeRequestedAtRef = useRef(Number.NEGATIVE_INFINITY)
   const ignoreInternalCloseUntilRef = useRef(0)
-  const currentSnapshot: ModalSheetSnapshot = { backLabel, children, chrome, contentStyle, footer, onBack, subtitle, title }
+  const currentSnapshot: ModalSheetSnapshot = { backLabel, children, chrome, contentStyle, footer, onBack, scrollResetKey, subtitle, title }
   const [lastOpenSnapshot, setLastOpenSnapshot] = useState<ModalSheetSnapshot>(currentSnapshot)
   const [mounted, setMounted] = useState(open)
   const [rapidReopen, setRapidReopen] = useState(false)
@@ -115,6 +117,12 @@ export function ModalSheet({ open, title, onClose, children, backLabel = 'Back',
     document.body.style.pointerEvents = 'auto'
   }, [closing])
 
+  useLayoutEffect(() => {
+    if (!open) return
+    if (!bodyRef.current) return
+    bodyRef.current.scrollTop = 0
+  }, [open, scrollResetKey])
+
   if (!shouldRender) return null
 
   return (
@@ -153,7 +161,7 @@ export function ModalSheet({ open, title, onClose, children, backLabel = 'Back',
               <MaterialIcon name="mdi:close" size={sourcePopup ? 30 : 19} />
             </button>
           </div>
-          <div className={styles.body}>{rendered.children}</div>
+          <div className={styles.body} data-modal-sheet-body="true" ref={bodyRef}>{rendered.children}</div>
           {rendered.footer && <div className={styles.footer}>{rendered.footer}</div>}
         </Drawer.Content>
       </Drawer.Portal>

@@ -11,7 +11,7 @@ import { entity, mockCallServiceCalls, mockEntities, mockFreeSleepScheduleAttrib
 
 type MockDecodeCallback = (
   result: { getText: () => string } | undefined,
-  error: { name?: string } | undefined,
+  error: { message?: string, name?: string } | undefined,
   controls: { stop: () => void },
 ) => void
 
@@ -111,11 +111,54 @@ function setupMockCanvas(dataUrl = 'data:image/jpeg;base64,expiry-image') {
   return {
     dataUrl,
     drawImage,
+    toDataUrl: toDataUrlSpy,
     restore: () => {
       getContextSpy.mockRestore()
       toDataUrlSpy.mockRestore()
     },
   }
+}
+
+function testDateInputValue(date: Date) {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+function testTodayDate() {
+  const now = new Date()
+  return new Date(now.getFullYear(), now.getMonth(), now.getDate())
+}
+
+function testAddDays(date: Date, days: number) {
+  const nextDate = new Date(date)
+  nextDate.setDate(nextDate.getDate() + days)
+  return nextDate
+}
+
+function testAddMonths(date: Date, months: number) {
+  const nextDate = new Date(date.getFullYear(), date.getMonth() + months, 1)
+  const lastDay = new Date(nextDate.getFullYear(), nextDate.getMonth() + 1, 0).getDate()
+  nextDate.setDate(Math.min(date.getDate(), lastDay))
+  return nextDate
+}
+
+function testQuickExpirationDateValue(value: '3-days' | '1-week' | '1-month' | '6-months' | '1-year') {
+  const today = testTodayDate()
+  if (value === '3-days') return testDateInputValue(testAddDays(today, 3))
+  if (value === '1-week') return testDateInputValue(testAddDays(today, 7))
+  if (value === '1-month') return testDateInputValue(testAddMonths(today, 1))
+  if (value === '6-months') return testDateInputValue(testAddMonths(today, 6))
+  return testDateInputValue(testAddMonths(today, 12))
+}
+
+async function startAndCaptureExpirationDate(buttonName = 'Read Expiration Date') {
+  fireEvent.click(await screen.findByRole('button', { name: buttonName }))
+  expect(await screen.findByLabelText('Live expiration date camera feed')).toBeInTheDocument()
+  await act(async () => {
+    fireEvent.click(await screen.findByRole('button', { name: buttonName }))
+  })
 }
 
 describe('DashboardViewPage', () => {
@@ -300,12 +343,14 @@ describe('DashboardViewPage', () => {
       expect(scanButton).toHaveTextContent('Scan Item')
       fireEvent.click(scanButton)
 
-      expect(await screen.findByRole('dialog', { name: 'Scan Item' })).toBeInTheDocument()
-      expect(screen.getByText('Scan Barcode · Step 1 of 2')).toBeInTheDocument()
+      expect(await screen.findByRole('dialog', { name: 'Add Item' })).toBeInTheDocument()
+      expect(screen.getByText('Scan Barcode · Step 1 of 3')).toBeInTheDocument()
       expect(screen.getByText('Use the product barcode to look up item details')).toBeInTheDocument()
       expect(screen.getByText('Center the barcode inside the camera window and hold steady.')).toBeInTheDocument()
       expect(screen.getByRole('button', { name: 'Skip Barcode' })).toBeEnabled()
+      expect(screen.queryByText('Scanning for a barcode...')).not.toBeInTheDocument()
       expect(await screen.findByLabelText('Live item scan camera feed')).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Manually Enter Name' })).toBeEnabled()
       expect(screen.queryByRole('button', { name: 'Back to barcode scan' })).not.toBeInTheDocument()
       await waitFor(() => expect(camera.getUserMedia).toHaveBeenCalledWith({
         audio: false,
@@ -318,6 +363,11 @@ describe('DashboardViewPage', () => {
       }))
       expect(await screen.findByRole('button', { name: 'Skip Barcode' })).toBeEnabled()
       await waitFor(() => expect(zxingMock.decodeFromVideoElement).toHaveBeenCalled())
+      act(() => {
+        zxingMock.latestCallback?.(undefined, { message: 'No MultiFormat Readers were able to detect the code.', name: 'Error' }, { stop: zxingMock.scannerStop })
+      })
+      expect(screen.queryByText(/No MultiFormat Readers/i)).not.toBeInTheDocument()
+      expect(screen.queryByRole('status')).not.toBeInTheDocument()
 
       fireEvent.click(screen.getByRole('button', { name: 'Close' }))
       await waitFor(() => expect(camera.stop).toHaveBeenCalled())
@@ -333,7 +383,7 @@ describe('DashboardViewPage', () => {
       render(<DashboardViewPage activePath="kitchen" onNavigate={() => undefined} path="kitchen" />)
 
       fireEvent.click(screen.getByRole('button', { name: 'Scan Item' }))
-      expect(await screen.findByRole('dialog', { name: 'Scan Item' })).toBeInTheDocument()
+      expect(await screen.findByRole('dialog', { name: 'Add Item' })).toBeInTheDocument()
       await waitFor(() => expect(zxingMock.latestCallback).toEqual(expect.any(Function)))
 
       act(() => {
@@ -346,15 +396,154 @@ describe('DashboardViewPage', () => {
         service: 'resolve_barcode',
         serviceData: { barcode: '3017620422003' },
       }))
-      expect(await screen.findByText('Nutella')).toBeInTheDocument()
-      expect(screen.getByText('Ferrero')).toBeInTheDocument()
-      expect(screen.getByText('Source: mock')).toBeInTheDocument()
+      expect(await screen.findByLabelText('Product name')).toHaveValue('Nutella')
+      expect(screen.getByRole('button', { name: 'Scan Barcode Again' })).toBeEnabled()
+      expect(screen.queryByText('Source: mock')).not.toBeInTheDocument()
+      expect(screen.queryByLabelText('Live item scan camera feed')).not.toBeInTheDocument()
       expect(screen.getByRole('button', { name: 'Next' })).toBeEnabled()
-      expect(camera.stop).not.toHaveBeenCalled()
+      expect(camera.stop).toHaveBeenCalled()
 
       fireEvent.click(screen.getByRole('button', { name: 'Close' }))
       await waitFor(() => expect(camera.stop).toHaveBeenCalled())
     } finally {
+      camera.restore()
+    }
+  })
+
+  it('allows manual Kitchen item name and expiration date entry from scan pages', async () => {
+    const camera = setupMockCamera()
+
+    try {
+      render(<DashboardViewPage activePath="kitchen" onNavigate={() => undefined} path="kitchen" />)
+
+      fireEvent.click(screen.getByRole('button', { name: 'Scan Item' }))
+      expect(await screen.findByRole('dialog', { name: 'Add Item' })).toBeInTheDocument()
+      expect(await screen.findByLabelText('Live item scan camera feed')).toBeInTheDocument()
+
+      fireEvent.click(screen.getByRole('button', { name: 'Manually Enter Name' }))
+      expect(screen.getByText('Enter Product Name · Step 1 of 3')).toBeInTheDocument()
+      expect(screen.getByText('Review or enter the product name before continuing.')).toBeInTheDocument()
+      expect(screen.queryByText('Center the barcode inside the camera window and hold steady.')).not.toBeInTheDocument()
+      expect(screen.queryByLabelText('Live item scan camera feed')).not.toBeInTheDocument()
+      expect(camera.stop).toHaveBeenCalled()
+      expect(screen.getByLabelText('Product name')).toHaveValue('')
+      expect(screen.getByRole('button', { name: 'Scan Barcode' })).toBeEnabled()
+      expect(screen.queryByRole('button', { name: 'Skip Barcode' })).not.toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled()
+      fireEvent.change(screen.getByLabelText('Product name'), { target: { value: 'Almond Milk' } })
+      expect(screen.getByRole('button', { name: 'Next' })).toBeEnabled()
+      fireEvent.click(screen.getByRole('button', { name: 'Next' }))
+
+      expect(screen.getByText('Expiration Date · Step 2 of 3')).toBeInTheDocument()
+      expect(screen.getByText('Enter the expiration date manually, or read it from the camera.')).toBeInTheDocument()
+      expect(screen.queryByText('Center the printed expiration date inside the camera window and keep the label flat.')).not.toBeInTheDocument()
+      expect(screen.queryByLabelText('Live expiration date camera feed')).not.toBeInTheDocument()
+      expect(screen.getByLabelText('Expiration date')).toHaveValue('')
+      expect(screen.getByText('Quick Expiration Dates')).toBeInTheDocument()
+      expect(screen.getByRole('radio', { name: 'In 3 Days' })).not.toBeChecked()
+      expect(screen.getByRole('radio', { name: 'In 1 Week' })).not.toBeChecked()
+      expect(screen.getByRole('button', { name: 'Read Expiration Date' })).toBeEnabled()
+      expect(screen.queryByRole('button', { name: 'Skip Expiration' })).not.toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled()
+      const inThreeDays = testQuickExpirationDateValue('3-days')
+      const inOneWeek = testQuickExpirationDateValue('1-week')
+      fireEvent.click(screen.getByRole('radio', { name: 'In 3 Days' }))
+      expect(screen.getByLabelText('Expiration date')).toHaveValue(inThreeDays)
+      expect(screen.getByRole('radio', { name: 'In 3 Days' })).toBeChecked()
+      fireEvent.change(screen.getByLabelText('Expiration date'), { target: { value: inOneWeek } })
+      expect(screen.getByRole('radio', { name: 'In 1 Week' })).toBeChecked()
+      expect(screen.getByRole('radio', { name: 'In 3 Days' })).not.toBeChecked()
+      expect(screen.getByRole('button', { name: 'Next' })).toBeEnabled()
+      fireEvent.click(screen.getByRole('button', { name: 'Next' }))
+
+      expect(screen.getByText('Review Item · Step 3 of 3')).toBeInTheDocument()
+      expect(screen.getByLabelText('Product name')).toHaveValue('Almond Milk')
+      expect(screen.getByLabelText('Expiration date')).toHaveValue(inOneWeek)
+    } finally {
+      camera.restore()
+    }
+  })
+
+  it('shows a blank processing spinner while Kitchen scan services are running', async () => {
+    const camera = setupMockCamera()
+    const canvas = setupMockCanvas()
+    const originalCallService = mockState.helpers.callService
+    let resolveBarcodeResponse!: (value: unknown) => void
+    let resolveExpiryResponse!: (value: unknown) => void
+
+    mockState.helpers.callService = (params) => {
+      if (params.domain === 'evershelf' && params.service === 'resolve_barcode' && params.returnResponse === true) {
+        mockCallServiceCalls.push(params)
+        return new Promise((resolve) => {
+          resolveBarcodeResponse = resolve
+        })
+      }
+      if (params.domain === 'evershelf' && params.service === 'read_expiry_image' && params.returnResponse === true) {
+        mockCallServiceCalls.push(params)
+        return new Promise((resolve) => {
+          resolveExpiryResponse = resolve
+        })
+      }
+      return originalCallService(params)
+    }
+
+    try {
+      render(<DashboardViewPage activePath="kitchen" onNavigate={() => undefined} path="kitchen" />)
+
+      fireEvent.click(screen.getByRole('button', { name: 'Scan Item' }))
+      expect(await screen.findByRole('dialog', { name: 'Add Item' })).toBeInTheDocument()
+      await waitFor(() => expect(zxingMock.latestCallback).toEqual(expect.any(Function)))
+
+      act(() => {
+        zxingMock.latestCallback?.({ getText: () => '3017620422003' }, undefined, { stop: zxingMock.scannerStop })
+      })
+
+      expect(await screen.findByRole('status')).toHaveTextContent('Processing...')
+      expect(screen.queryByText('Use the product barcode to look up item details')).not.toBeInTheDocument()
+      expect(screen.queryByLabelText('Live item scan camera feed')).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Skip Barcode' })).not.toBeInTheDocument()
+
+      await act(async () => {
+        resolveBarcodeResponse({
+          response: {
+            barcode: '3017620422003',
+            found: true,
+            product: { brand: 'Ferrero', image_url: 'https://example.test/nutella.jpg', name: 'Nutella' },
+            source: 'mock',
+          },
+        })
+      })
+
+      expect(await screen.findByLabelText('Product name')).toHaveValue('Nutella')
+      expect(screen.getByRole('button', { name: 'Scan Barcode Again' })).toBeEnabled()
+      expect(screen.queryByLabelText('Live item scan camera feed')).not.toBeInTheDocument()
+      fireEvent.click(screen.getByRole('button', { name: 'Next' }))
+      await startAndCaptureExpirationDate()
+
+      expect(await screen.findByRole('status')).toHaveTextContent('Processing...')
+      expect(screen.queryByText('Take a clear photo of the printed expiration date')).not.toBeInTheDocument()
+      expect(screen.queryByLabelText('Live expiration date camera feed')).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Read Expiration Date' })).not.toBeInTheDocument()
+      expect(screen.queryByAltText('Captured expiration date preview')).not.toBeInTheDocument()
+
+      await act(async () => {
+        resolveExpiryResponse({
+          response: {
+            expiry_date: '2026-06-30',
+            raw_text: 'EXP 06/30/2026',
+            source: 'mock_ocr',
+            success: true,
+          },
+        })
+      })
+
+      expect(await screen.findByText('Jun 30, 2026')).toBeInTheDocument()
+      expect(screen.getByLabelText('Expiration date')).toHaveValue('2026-06-30')
+      expect(screen.getByRole('button', { name: 'Read Expiration Date Again' })).toBeEnabled()
+      expect(screen.queryByLabelText('Live expiration date camera feed')).not.toBeInTheDocument()
+    } finally {
+      mockState.helpers.callService = originalCallService
+      canvas.restore()
       camera.restore()
     }
   })
@@ -367,29 +556,37 @@ describe('DashboardViewPage', () => {
       render(<DashboardViewPage activePath="kitchen" onNavigate={() => undefined} path="kitchen" />)
 
       fireEvent.click(screen.getByRole('button', { name: 'Scan Item' }))
-      expect(await screen.findByRole('dialog', { name: 'Scan Item' })).toBeInTheDocument()
+      expect(await screen.findByRole('dialog', { name: 'Add Item' })).toBeInTheDocument()
       expect(await screen.findByLabelText('Live item scan camera feed')).toBeInTheDocument()
       await waitFor(() => expect(zxingMock.decodeFromVideoElement).toHaveBeenCalledTimes(1))
       fireEvent.click(screen.getByRole('button', { name: 'Skip Barcode' }))
-      expect(screen.getByText('Expiration Date · Step 2 of 2')).toBeInTheDocument()
-      expect(screen.getByText('Take a clear photo of the printed expiration date')).toBeInTheDocument()
-      expect(screen.getByText('Center the printed expiration date inside the camera window and keep the label flat.')).toBeInTheDocument()
+      expect(screen.getByText('Expiration Date · Step 2 of 3')).toBeInTheDocument()
+      expect(screen.getByText('Enter the expiration date manually, or read it from the camera.')).toBeInTheDocument()
+      expect(screen.queryByText('Take a clear photo of the printed expiration date')).not.toBeInTheDocument()
+      expect(screen.queryByText('Center the printed expiration date inside the camera window and keep the label flat.')).not.toBeInTheDocument()
       expect(screen.getByRole('button', { name: 'Back to barcode scan' })).toBeInTheDocument()
-      expect(await screen.findByLabelText('Live expiration date camera feed')).toBeInTheDocument()
+      expect(screen.queryByLabelText('Live expiration date camera feed')).not.toBeInTheDocument()
+      expect(screen.getByText('Quick Expiration Dates')).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Manually Enter Expiration Date' })).not.toBeInTheDocument()
       expect(camera.getUserMedia).toHaveBeenCalledTimes(1)
       fireEvent.click(screen.getByRole('button', { name: 'Back to barcode scan' }))
-      expect(screen.getByText('Scan Barcode · Step 1 of 2')).toBeInTheDocument()
+      expect(screen.getByText('Scan Barcode · Step 1 of 3')).toBeInTheDocument()
       expect(await screen.findByLabelText('Live item scan camera feed')).toBeInTheDocument()
       await waitFor(() => expect(zxingMock.decodeFromVideoElement).toHaveBeenCalledTimes(2))
-      expect(camera.getUserMedia).toHaveBeenCalledTimes(1)
+      expect(camera.getUserMedia).toHaveBeenCalledTimes(2)
       fireEvent.click(screen.getByRole('button', { name: 'Skip Barcode' }))
 
+      expect(screen.queryByLabelText('Live expiration date camera feed')).not.toBeInTheDocument()
+      expect(camera.getUserMedia).toHaveBeenCalledTimes(2)
+      fireEvent.click(await screen.findByRole('button', { name: 'Read Expiration Date' }))
       expect(await screen.findByLabelText('Live expiration date camera feed')).toBeInTheDocument()
-      expect(camera.getUserMedia).toHaveBeenCalledTimes(1)
-      const readButton = await screen.findByRole('button', { name: 'Read Expiration Date' })
-      expect(readButton).toBeEnabled()
-      fireEvent.click(readButton)
+      expect(screen.getByText('Take a clear photo of the printed expiration date')).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Manually Enter Expiration Date' })).toBeEnabled()
+      expect(camera.getUserMedia).toHaveBeenCalledTimes(3)
+      fireEvent.click(await screen.findByRole('button', { name: 'Read Expiration Date' }))
 
+      expect(canvas.drawImage).toHaveBeenCalledWith(expect.any(HTMLVideoElement), 0, 0, 1024, 576)
+      expect(canvas.toDataUrl).toHaveBeenCalledWith('image/jpeg', 0.72)
       await waitFor(() => expect(mockCallServiceCalls).toContainEqual({
         domain: 'evershelf',
         returnResponse: true,
@@ -397,15 +594,221 @@ describe('DashboardViewPage', () => {
         serviceData: { image: canvas.dataUrl },
       }))
       expect(await screen.findByText('Jun 30, 2026')).toBeInTheDocument()
-      expect(screen.getByText('Source: mock_ocr')).toBeInTheDocument()
-      expect(screen.getByText('Read: EXP 06/30/2026')).toBeInTheDocument()
+      expect(screen.getByLabelText('Expiration date')).toHaveValue('2026-06-30')
+      expect(screen.queryByText('Source: mock_ocr')).not.toBeInTheDocument()
+      expect(screen.queryByText('Read: EXP 06/30/2026')).not.toBeInTheDocument()
+      expect(screen.queryByText(/EverShelf read/i)).not.toBeInTheDocument()
+      expect(screen.queryByText('Center the printed expiration date inside the camera window and keep the label flat.')).not.toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Read Expiration Date Again' })).toBeEnabled()
+      expect(screen.queryByLabelText('Live expiration date camera feed')).not.toBeInTheDocument()
+      expect(screen.getByText('Quick Expiration Dates')).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Next' })).toBeEnabled()
+      expect(screen.queryByAltText('Captured expiration date preview')).not.toBeInTheDocument()
+      const modalBody = document.querySelector('[data-modal-sheet-body="true"]') as HTMLElement
+      modalBody.scrollTop = 160
+      fireEvent.click(screen.getByRole('button', { name: 'Next' }))
+      expect(screen.getByText('Review Item · Step 3 of 3')).toBeInTheDocument()
+      expect(screen.getByText('Confirm the item details before adding it to your pantry.')).toBeInTheDocument()
+      expect(modalBody.scrollTop).toBe(0)
+      expect(camera.stop).toHaveBeenCalled()
+      fireEvent.click(screen.getByRole('button', { name: 'Back to expiration date' }))
+      expect(screen.getByText('Expiration Date · Step 2 of 3')).toBeInTheDocument()
+      expect(screen.getByLabelText('Expiration date')).toHaveValue('2026-06-30')
+      expect(screen.queryByLabelText('Live expiration date camera feed')).not.toBeInTheDocument()
+      expect(screen.getByText('Quick Expiration Dates')).toBeInTheDocument()
+      expect(camera.getUserMedia).toHaveBeenCalledTimes(3)
+      fireEvent.click(screen.getByRole('button', { name: 'Close' }))
+      await waitFor(() => expect(camera.stop).toHaveBeenCalled())
+    } finally {
+      canvas.restore()
+      camera.restore()
+    }
+  })
+
+  it('selects matching quick expiration dates returned from Kitchen image parsing', async () => {
+    const camera = setupMockCamera()
+    const canvas = setupMockCanvas()
+    const originalCallService = mockState.helpers.callService
+    const inOneMonth = testQuickExpirationDateValue('1-month')
+
+    mockState.helpers.callService = (params) => {
+      if (params.domain === 'evershelf' && params.service === 'read_expiry_image' && params.returnResponse === true) {
+        mockCallServiceCalls.push(params)
+        return Promise.resolve({
+          response: {
+            expiry_date: inOneMonth,
+            raw_text: 'BEST BY next month',
+            source: 'mock_ocr',
+            success: true,
+          },
+        })
+      }
+      return originalCallService(params)
+    }
+
+    try {
+      render(<DashboardViewPage activePath="kitchen" onNavigate={() => undefined} path="kitchen" />)
+
+      fireEvent.click(screen.getByRole('button', { name: 'Scan Item' }))
+      expect(await screen.findByRole('dialog', { name: 'Add Item' })).toBeInTheDocument()
+      fireEvent.click(await screen.findByRole('button', { name: 'Skip Barcode' }))
+      await startAndCaptureExpirationDate()
+
+      expect(await screen.findByLabelText('Expiration date')).toHaveValue(inOneMonth)
+      expect(screen.getByRole('radio', { name: 'In 1 Month' })).toBeChecked()
+      expect(screen.getByRole('radio', { name: 'In 3 Days' })).not.toBeChecked()
+      expect(screen.getByText('Quick Expiration Dates')).toBeInTheDocument()
+    } finally {
+      mockState.helpers.callService = originalCallService
+      canvas.restore()
+      camera.restore()
+    }
+  })
+
+  it('surfaces Gemini rate limits as a manual expiration entry prompt', async () => {
+    const camera = setupMockCamera()
+    const canvas = setupMockCanvas()
+    const originalCallService = mockState.helpers.callService
+
+    mockState.helpers.callService = (params) => {
+      if (params.domain === 'evershelf' && params.service === 'read_expiry_image' && params.returnResponse === true) {
+        mockCallServiceCalls.push(params)
+        return Promise.resolve({
+          response: {
+            error: 'Gemini API error: HTTP 429 too many requests',
+            http_code: 429,
+            success: false,
+          },
+        })
+      }
+      return originalCallService(params)
+    }
+
+    try {
+      render(<DashboardViewPage activePath="kitchen" onNavigate={() => undefined} path="kitchen" />)
+
+      fireEvent.click(screen.getByRole('button', { name: 'Scan Item' }))
+      expect(await screen.findByRole('dialog', { name: 'Add Item' })).toBeInTheDocument()
+      fireEvent.click(await screen.findByRole('button', { name: 'Skip Barcode' }))
+      await startAndCaptureExpirationDate()
+
+      expect(await screen.findByText('AI-based expiration date parsing is unavailable. Please enter the expiration date manually or try again later.')).toBeInTheDocument()
+      expect(screen.getByLabelText('Expiration date')).toHaveValue('')
+      expect(screen.getByRole('button', { name: 'Read Expiration Date' })).toBeEnabled()
+      expect(screen.queryByLabelText('Live expiration date camera feed')).not.toBeInTheDocument()
+      expect(screen.getByText('Quick Expiration Dates')).toBeInTheDocument()
+      await waitFor(() => expect(mockCallServiceCalls).toContainEqual({
+        domain: 'evershelf',
+        returnResponse: true,
+        service: 'read_expiry_image',
+        serviceData: { image: canvas.dataUrl },
+      }))
+    } finally {
+      mockState.helpers.callService = originalCallService
+      canvas.restore()
+      camera.restore()
+    }
+  })
+
+  it('adds scanned Kitchen items to EverShelf inventory', async () => {
+    const camera = setupMockCamera()
+    const canvas = setupMockCanvas()
+
+    try {
+      render(<DashboardViewPage activePath="kitchen" onNavigate={() => undefined} path="kitchen" />)
+
+      fireEvent.click(screen.getByRole('button', { name: 'Scan Item' }))
+      expect(await screen.findByRole('dialog', { name: 'Add Item' })).toBeInTheDocument()
+      await waitFor(() => expect(zxingMock.latestCallback).toEqual(expect.any(Function)))
+
+      act(() => {
+        zxingMock.latestCallback?.({ getText: () => '3017620422003' }, undefined, { stop: zxingMock.scannerStop })
+      })
+
+      expect(await screen.findByLabelText('Product name')).toHaveValue('Nutella')
+      fireEvent.click(screen.getByRole('button', { name: 'Next' }))
+      await startAndCaptureExpirationDate()
+      expect(await screen.findByText('Jun 30, 2026')).toBeInTheDocument()
+      expect(screen.getByLabelText('Expiration date')).toHaveValue('2026-06-30')
+      fireEvent.click(screen.getByRole('button', { name: 'Next' }))
+
+      expect(screen.getByText('Review Item · Step 3 of 3')).toBeInTheDocument()
+      expect(screen.getByText('Confirm the item details before adding it to your pantry.')).toBeInTheDocument()
+      expect(screen.getByLabelText('Product name')).toHaveValue('Nutella')
+      expect(screen.getByLabelText('Quantity')).toHaveValue(1)
+      fireEvent.change(screen.getByLabelText('Quantity'), { target: { value: '0' } })
+      expect(screen.getByLabelText('Quantity')).toHaveValue(1)
+      expect(screen.getByRole('radio', { name: 'Pantry' })).toBeChecked()
+      expect(screen.queryByText('Unit of measurement (optional)')).not.toBeInTheDocument()
+      expect(screen.getByLabelText('Expiration date')).toHaveValue('2026-06-30')
+      fireEvent.click(screen.getByRole('radio', { name: 'Freezer' }))
+      expect(screen.getByText('Confirm the item details before adding it to your freezer.')).toBeInTheDocument()
+      fireEvent.click(screen.getByRole('button', { name: 'Add' }))
+
+      expect(screen.getByText('Adding Item')).toBeInTheDocument()
+      expect(screen.getByText('Adding to EverShelf...')).toBeInTheDocument()
+
+      await waitFor(() => expect(mockCallServiceCalls).toContainEqual(expect.objectContaining({
+        domain: 'evershelf',
+        returnResponse: true,
+        service: 'add_scanned_item',
+        serviceData: expect.objectContaining({
+          barcode: '3017620422003',
+          brand: 'Ferrero',
+          expiry_date: '2026-06-30',
+          expiry_user_set: true,
+          image_url: 'https://example.test/nutella.jpg',
+          location: 'freezer',
+          name: 'Nutella',
+          quantity: 1,
+        }),
+      })))
+      const addCall = mockCallServiceCalls.find((call) => call.domain === 'evershelf' && call.service === 'add_scanned_item')
+      expect(addCall?.serviceData).not.toHaveProperty('unit')
+      expect(addCall?.serviceData).not.toHaveProperty('package_unit')
+      expect(await screen.findByText('Item Added')).toBeInTheDocument()
+      expect(screen.getByText('Added to Freezer')).toBeInTheDocument()
       expect(screen.getByRole('button', { name: 'Done' })).toBeEnabled()
-      expect(screen.getByAltText('Captured expiration date preview')).toHaveAttribute('src', canvas.dataUrl)
-      expect(camera.stop).not.toHaveBeenCalled()
       fireEvent.click(screen.getByRole('button', { name: 'Done' }))
       await waitFor(() => expect(camera.stop).toHaveBeenCalled())
     } finally {
       canvas.restore()
+      camera.restore()
+    }
+  })
+
+  it('returns to Kitchen scan review with an error when EverShelf add fails', async () => {
+    const camera = setupMockCamera()
+
+    try {
+      render(<DashboardViewPage activePath="kitchen" onNavigate={() => undefined} path="kitchen" />)
+
+      fireEvent.click(screen.getByRole('button', { name: 'Scan Item' }))
+      expect(await screen.findByRole('dialog', { name: 'Add Item' })).toBeInTheDocument()
+      await waitFor(() => expect(zxingMock.latestCallback).toEqual(expect.any(Function)))
+
+      act(() => {
+        zxingMock.latestCallback?.({ getText: () => '3017620422003' }, undefined, { stop: zxingMock.scannerStop })
+      })
+
+      expect(await screen.findByLabelText('Product name')).toHaveValue('Nutella')
+      fireEvent.click(screen.getByRole('button', { name: 'Next' }))
+      fireEvent.click(screen.getByRole('radio', { name: 'In 3 Days' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Next' }))
+      expect(screen.getByText('Review Item · Step 3 of 3')).toBeInTheDocument()
+      fireEvent.change(screen.getByLabelText('Product name'), { target: { value: 'Fail Item' } })
+      fireEvent.click(screen.getByRole('radio', { name: 'Freezer' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Add' }))
+
+      expect(screen.getByText('Adding Item')).toBeInTheDocument()
+      await waitFor(() => expect(screen.getByText('Review Item · Step 3 of 3')).toBeInTheDocument())
+      expect(screen.getByText('Confirm the item details before adding it to your freezer.')).toBeInTheDocument()
+      expect(screen.getByRole('alert')).toHaveTextContent('Mock add failure')
+      expect(screen.getByRole('button', { name: 'Add' })).toBeEnabled()
+      expect(camera.stop).toHaveBeenCalled()
+      fireEvent.click(screen.getByRole('button', { name: 'Close' }))
+      await waitFor(() => expect(camera.stop).toHaveBeenCalled())
+    } finally {
       camera.restore()
     }
   })
