@@ -6,10 +6,10 @@ import { CreateDonetickTaskSheet } from '../hass/CreateDonetickTaskSheet'
 import { CreateGroceryItemSheet } from '../hass/CreateGroceryItemSheet'
 import { EverShelfInventoryFloatingActions } from '../hass/EverShelfInventoryPanel'
 import type { EverShelfInventoryControls } from '../hass/EverShelfInventoryControls'
-import { ScanItemCameraSheet } from '../hass/ScanItemCameraSheet'
+import { ScanItemCameraSheet, type EverShelfLocation } from '../hass/ScanItemCameraSheet'
 import { RoomPickerButton } from '../../pages/AtAGlancePage'
 import { createTaskDefaultAssignee, dashboardRoomNameFromPath, isEverShelfInventoryRoute } from './dashboardFloatingAction'
-import { HOME_GROCERY_LIST_ROUTE_PATH } from '../../constants/routes'
+import { HOME_FREEZER_ROUTE_PATH, HOME_FRIDGE_ROUTE_PATH, HOME_GROCERY_LIST_ROUTE_PATH, HOME_PANTRY_ROUTE_PATH } from '../../constants/routes'
 
 interface DashboardFloatingActionProps {
   inventoryControls?: EverShelfInventoryControls
@@ -39,19 +39,31 @@ function CreateGroceryButton() {
   )
 }
 
-function ScanItemButton() {
+function scanItemDefaultLocation(path: string): EverShelfLocation | undefined {
+  if (path === HOME_PANTRY_ROUTE_PATH) return 'dispensa'
+  if (path === HOME_FRIDGE_ROUTE_PATH) return 'frigo'
+  if (path === HOME_FREEZER_ROUTE_PATH) return 'freezer'
+  return undefined
+}
+
+function ScanItemButton({ defaultLocation, iconOnly = false }: { defaultLocation?: EverShelfLocation; iconOnly?: boolean }) {
   const [modalOpen, setModalOpen] = useState(false)
+  const button = iconOnly
+    ? <FloatingActionButton ariaLabel="Scan Item" color={CHORE_BLUE} icon="mdi:barcode-scan" onClick={() => setModalOpen(true)} />
+    : <FloatingActionButton color={CHORE_BLUE} icon="mdi:barcode-scan" label="Scan Item" onClick={() => setModalOpen(true)} />
 
   return (
     <>
-      <FloatingActionButton color={CHORE_BLUE} icon="mdi:barcode-scan" label="Scan Item" onClick={() => setModalOpen(true)} />
-      <ScanItemCameraSheet onClose={() => setModalOpen(false)} open={modalOpen} />
+      {button}
+      <ScanItemCameraSheet defaultLocation={defaultLocation} onClose={() => setModalOpen(false)} open={modalOpen} />
     </>
   )
 }
 
 export function DashboardFloatingAction({ inventoryControls, onNavigate, path }: DashboardFloatingActionProps) {
   const createTaskAssignee = createTaskDefaultAssignee(path)
+  const defaultScanLocation = scanItemDefaultLocation(path)
+  const inventoryRoute = isEverShelfInventoryRoute(path)
   const primaryAction = (() => {
     if (path === 'kitchen') return <ScanItemButton key="scan-item" />
     if (path === 'overview' || dashboardRoomNameFromPath(path)) return <RoomPickerButton key="rooms" onNavigate={onNavigate} />
@@ -61,7 +73,9 @@ export function DashboardFloatingAction({ inventoryControls, onNavigate, path }:
   })()
   const secondaryActions: ReactNode[] = []
 
-  if (isEverShelfInventoryRoute(path) && inventoryControls) secondaryActions.push(<EverShelfInventoryFloatingActions controls={inventoryControls} key="inventory-controls" />)
+  if (path === 'kitchen') secondaryActions.push(<RoomPickerButton key="rooms" onNavigate={onNavigate} />)
+  if (inventoryRoute && inventoryControls) secondaryActions.push(<EverShelfInventoryFloatingActions controls={inventoryControls} key="inventory-controls" />)
+  if (inventoryRoute) secondaryActions.push(<ScanItemButton defaultLocation={defaultScanLocation} iconOnly key={`scan-item-${defaultScanLocation ?? 'default'}`} />)
   if (!primaryAction && secondaryActions.length === 0) return null
   return (
     <>

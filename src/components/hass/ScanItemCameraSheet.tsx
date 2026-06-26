@@ -9,6 +9,7 @@ import { RadioRow } from '../core/RadioRow'
 import styles from './ScanItemCameraSheet.module.css'
 
 interface ScanItemCameraSheetProps {
+  defaultLocation?: EverShelfLocation
   open: boolean
   onClose: () => void
 }
@@ -20,7 +21,7 @@ type CameraStatus = 'idle' | 'starting' | 'ready' | 'error'
 type LookupStatus = 'idle' | 'scanning' | 'resolving' | 'found' | 'not-found' | 'error'
 type ExpiryStatus = 'idle' | 'ready' | 'reading' | 'found' | 'not-found' | 'error'
 type AddItemStatus = 'idle' | 'adding' | 'added' | 'error'
-type EverShelfLocation = 'dispensa' | 'frigo' | 'freezer' | 'altro'
+export type EverShelfLocation = 'dispensa' | 'frigo' | 'freezer' | 'altro'
 type QuickExpirationValue = '3-days' | '1-week' | '1-month' | '6-months' | '1-year'
 type CallService = <Response extends object>(params: Record<string, unknown>) => Promise<{ response: Response }> | void
 type BarcodeFormatEnum = typeof import('@zxing/browser')['BarcodeFormat']
@@ -304,7 +305,7 @@ function expirationReadErrorMessage(message: string, httpCode?: unknown) {
   return message || 'Unable to read expiration date.'
 }
 
-export function ScanItemCameraSheet({ open, onClose }: ScanItemCameraSheetProps) {
+export function ScanItemCameraSheet({ defaultLocation = 'dispensa', open, onClose }: ScanItemCameraSheetProps) {
   const callService = useHass((state) => state.helpers.callService) as unknown as CallService
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
@@ -331,7 +332,7 @@ export function ScanItemCameraSheet({ open, onClose }: ScanItemCameraSheetProps)
   const [itemName, setItemName] = useState('')
   const [itemBrand, setItemBrand] = useState('')
   const [itemQuantity, setItemQuantity] = useState('1')
-  const [itemLocation, setItemLocation] = useState<EverShelfLocation>('dispensa')
+  const [itemLocation, setItemLocation] = useState<EverShelfLocation>(defaultLocation)
   const [itemExpiryDate, setItemExpiryDate] = useState('')
   const [addStatus, setAddStatus] = useState<AddItemStatus>('idle')
   const [addError, setAddError] = useState<string | null>(null)
@@ -379,11 +380,11 @@ export function ScanItemCameraSheet({ open, onClose }: ScanItemCameraSheetProps)
     setItemName('')
     setItemBrand('')
     setItemQuantity('1')
-    setItemLocation('dispensa')
+    setItemLocation(defaultLocation)
     setItemExpiryDate('')
     setAddStatus('idle')
     setAddError(null)
-  }, [])
+  }, [defaultLocation])
 
   const resolveBarcode = useCallback(async (barcode: string) => {
     const requestId = serviceRequestIdRef.current + 1

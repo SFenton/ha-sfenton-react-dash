@@ -281,8 +281,8 @@ function InventoryFilterSheet({ draftMode, onApply, onClose, onDraftModeChange, 
 export function EverShelfInventoryFloatingActions({ controls }: { controls: EverShelfInventoryControls }) {
   return (
     <>
-      <FloatingActionButton color={controls.sortActive ? SORT_FILTER_ACTIVE_COLOR : SORT_FILTER_COLOR} icon="mdi:swap-vertical" label="Sort" onClick={controls.openSortSheet} />
-      <FloatingActionButton color={controls.filterActive ? SORT_FILTER_ACTIVE_COLOR : SORT_FILTER_COLOR} icon="mdi:tune-vertical" label="Filter" onClick={controls.openFilterSheet} />
+      <FloatingActionButton ariaLabel="Sort" color={controls.sortActive ? SORT_FILTER_ACTIVE_COLOR : SORT_FILTER_COLOR} icon="mdi:swap-vertical" onClick={controls.openSortSheet} />
+      <FloatingActionButton ariaLabel="Filter" color={controls.filterActive ? SORT_FILTER_ACTIVE_COLOR : SORT_FILTER_COLOR} icon="mdi:tune-vertical" onClick={controls.openFilterSheet} />
       <InventorySortSheet
         draftDirection={controls.sortDraftDirection}
         draftMode={controls.sortDraftMode}

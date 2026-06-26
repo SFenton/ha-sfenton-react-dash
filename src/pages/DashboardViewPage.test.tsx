@@ -361,9 +361,12 @@ describe('DashboardViewPage', () => {
     try {
       render(<DashboardViewPage activePath="kitchen" onNavigate={() => undefined} path="kitchen" />)
 
-      expect(screen.queryByRole('button', { name: 'Rooms' })).not.toBeInTheDocument()
+      const floatingDock = document.querySelector('[data-floating-action-dock="true"]')
       const scanButton = screen.getByRole('button', { name: 'Scan Item' })
       expect(scanButton).toHaveTextContent('Scan Item')
+      expect(floatingDock).toContainElement(scanButton)
+      expect(floatingDock).toContainElement(screen.getByRole('button', { name: 'Rooms' }))
+      expect(within(floatingDock as HTMLElement).getAllByRole('button').map((button) => button.textContent?.trim())).toEqual(['Scan Item', 'Rooms'])
       fireEvent.click(scanButton)
 
       expect(await screen.findByRole('dialog', { name: 'Add Item' })).toBeInTheDocument()
@@ -3402,16 +3405,18 @@ describe('DashboardViewPage', () => {
     ])
     const floatingDock = document.querySelector('[data-floating-action-dock="true"]')
     expect(screen.queryByRole('button', { name: 'Rooms' })).not.toBeInTheDocument()
+    expect(floatingDock).toContainElement(screen.getByRole('button', { name: 'Scan Item' }))
     expect(floatingDock).toContainElement(screen.getByRole('button', { name: 'Sort' }))
     expect(floatingDock).toContainElement(screen.getByRole('button', { name: 'Filter' }))
-    expect(within(floatingDock as HTMLElement).getAllByRole('button').map((button) => button.textContent?.trim())).toEqual(['Sort', 'Filter'])
+    expect(within(floatingDock as HTMLElement).getAllByRole('button').map((button) => button.getAttribute('aria-label'))).toEqual(['Sort', 'Filter', 'Scan Item'])
+    expect(within(floatingDock as HTMLElement).getAllByRole('button').map((button) => button.textContent?.trim())).toEqual(['', '', ''])
     expect(screen.queryByLabelText('Fridge inventory controls')).not.toBeInTheDocument()
 
     const sortButton = screen.getByRole('button', { name: 'Sort' })
     const filterButton = screen.getByRole('button', { name: 'Filter' })
-    expect(sortButton).toHaveTextContent('Sort')
+    expect(sortButton).toHaveTextContent('')
     expect(sortButton).toHaveStyle({ '--card-rgb': '42 126 180' })
-    expect(filterButton).toHaveTextContent('Filter')
+    expect(filterButton).toHaveTextContent('')
     expect(filterButton).toHaveStyle({ '--card-rgb': '42 126 180' })
 
     fireEvent.click(sortButton)
@@ -3456,6 +3461,52 @@ describe('DashboardViewPage', () => {
     expect(within(fridgeList).getAllByRole('group', { name: /Expires|Expired|No expiration date/i }).map((row) => row.getAttribute('aria-label'))).toEqual([
       'Greek Yogurt Expires in 5 days',
     ])
+  })
+
+  it('defaults inventory Scan Item storage to the current inventory route', async () => {
+    for (const { destination, label, location, path } of [
+      { destination: 'pantry', label: 'Pantry', location: 'dispensa', path: 'pantry' },
+      { destination: 'fridge', label: 'Fridge', location: 'frigo', path: 'fridge' },
+      { destination: 'freezer', label: 'Freezer', location: 'freezer', path: 'freezer' },
+    ]) {
+      const camera = setupMockCamera()
+      const itemName = `${label} Test Item`
+
+      try {
+        const view = render(<DashboardViewPage activePath={path} onNavigate={() => undefined} path={path} />)
+        await screen.findByLabelText(`${label} inventory list`)
+
+        fireEvent.click(screen.getByRole('button', { name: 'Scan Item' }))
+        expect(await screen.findByRole('dialog', { name: 'Add Item' })).toBeInTheDocument()
+        expect(await screen.findByLabelText('Live item scan camera feed')).toBeInTheDocument()
+        fireEvent.click(screen.getByRole('button', { name: 'Manually Enter Name' }))
+        fireEvent.change(screen.getByLabelText('Product name'), { target: { value: itemName } })
+        fireEvent.click(screen.getByRole('button', { name: 'Next' }))
+        fireEvent.click(screen.getByRole('radio', { name: 'In 3 Days' }))
+        fireEvent.click(screen.getByRole('button', { name: 'Next' }))
+
+        expect(screen.getByText(`Confirm the item details before adding it to your ${destination}.`)).toBeInTheDocument()
+        expect(screen.getByRole('radio', { name: label })).toBeChecked()
+        fireEvent.click(screen.getByRole('button', { name: 'Add' }))
+
+        await waitFor(() => expect(mockCallServiceCalls).toContainEqual(expect.objectContaining({
+          domain: 'evershelf',
+          returnResponse: true,
+          service: 'add_scanned_item',
+          serviceData: expect.objectContaining({
+            location,
+            name: itemName,
+          }),
+        })))
+        expect(await screen.findByText(`Added to ${label}`)).toBeInTheDocument()
+
+        fireEvent.click(screen.getByRole('button', { name: 'Done' }))
+        await waitFor(() => expect(camera.stop).toHaveBeenCalled())
+        view.unmount()
+      } finally {
+        camera.restore()
+      }
+    }
   })
 
   it('renders chore tasks as Ecobee-style checkbox rows with optional subtitles', async () => {
