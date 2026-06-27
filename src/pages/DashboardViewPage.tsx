@@ -967,8 +967,8 @@ const EVERSHELF_FOOD_SPACES = [
   { title: 'Pantry', entityId: 'sensor.evershelf_items_in_pantry', location: 'dispensa', icon: 'mdi:food-fork-drink', color: { r: 155, g: 110, b: 64 }, routePath: HOME_PANTRY_ROUTE_PATH },
   { title: 'Fridge', entityId: 'sensor.evershelf_items_in_fridge', location: 'frigo', icon: 'mdi:fridge', color: { r: 42, g: 126, b: 180 }, routePath: HOME_FRIDGE_ROUTE_PATH },
   { title: 'Freezer', entityId: 'sensor.evershelf_items_in_freezer', location: 'freezer', icon: 'mdi:snowflake', color: { r: 52, g: 103, b: 176 }, routePath: HOME_FREEZER_ROUTE_PATH },
-  { title: 'Spice Rack', entityId: 'sensor.evershelf_items_in_spice_rack', location: 'spice_rack', icon: 'mdi:shaker-outline', color: { r: 183, g: 98, b: 56 }, routePath: HOME_SPICE_RACK_ROUTE_PATH },
-  { title: 'Cabinet', entityId: 'sensor.evershelf_items_in_cabinet', location: 'cabinet', icon: 'mdi:cupboard', color: { r: 118, g: 96, b: 72 }, routePath: HOME_CABINET_ROUTE_PATH },
+  { title: 'Spice Rack', entityId: 'sensor.kitchen_evershelf_items_in_spice_rack', location: 'spice_rack', icon: 'mdi:shaker-outline', color: { r: 183, g: 98, b: 56 }, routePath: HOME_SPICE_RACK_ROUTE_PATH },
+  { title: 'Cabinet', entityId: 'sensor.kitchen_evershelf_items_in_cabinet', location: 'cabinet', icon: 'mdi:cupboard', color: { r: 118, g: 96, b: 72 }, routePath: HOME_CABINET_ROUTE_PATH },
 ] as const
 
 const EVERSHELF_INVENTORY_PAGES: Record<string, { location: EverShelfInventoryLocation; title: string }> = {

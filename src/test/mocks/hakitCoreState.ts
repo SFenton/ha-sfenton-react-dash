@@ -663,8 +663,8 @@ export const mockEntities: Record<string, MockEntity> = {
   'sensor.evershelf_items_in_pantry': entity('sensor.evershelf_items_in_pantry', '12', { unit_of_measurement: 'items' }),
   'sensor.evershelf_items_in_fridge': entity('sensor.evershelf_items_in_fridge', '8', { unit_of_measurement: 'items' }),
   'sensor.evershelf_items_in_freezer': entity('sensor.evershelf_items_in_freezer', '5', { unit_of_measurement: 'items' }),
-  'sensor.evershelf_items_in_spice_rack': entity('sensor.evershelf_items_in_spice_rack', '6', { unit_of_measurement: 'items' }),
-  'sensor.evershelf_items_in_cabinet': entity('sensor.evershelf_items_in_cabinet', '4', { unit_of_measurement: 'items' }),
+  'sensor.kitchen_evershelf_items_in_spice_rack': entity('sensor.kitchen_evershelf_items_in_spice_rack', '6', { unit_of_measurement: 'items' }),
+  'sensor.kitchen_evershelf_items_in_cabinet': entity('sensor.kitchen_evershelf_items_in_cabinet', '4', { unit_of_measurement: 'items' }),
   'sensor.evershelf_total_items': entity('sensor.evershelf_total_items', '35', { unit_of_measurement: 'items' }),
   'sensor.evershelf_expiring_soon': entity('sensor.evershelf_expiring_soon', '6', {
     expiring_list: [
