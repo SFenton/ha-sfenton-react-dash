@@ -58,6 +58,8 @@ export interface TodoPageConfig {
   lists: TodoListConfig[]
   emptyTitle?: string
   emptyDescription?: string
+  hideListHeaders?: boolean
+  showEmptyStateWhenEmpty?: boolean
 }
 
 export interface ChoreQuickLinkConfig {
@@ -300,6 +302,8 @@ export const VACATION_MODE_ITEMS: EntityTileConfig[] = [
   { title: 'Vacation Mode', entityId: VACATION_MODE_ENTITY_ID, icon: 'mdi:airplane', color: SWITCH_ACTIVE_COLOR, action: { type: 'toggle' }, showSubtitle: true },
 ]
 
+export const ADMIN_TODO_ENTITY_ID = 'todo.groceries'
+
 export const TODO_PAGES: Record<string, TodoPageConfig> = {
   chores: {
     title: 'Chores',
@@ -321,7 +325,11 @@ export const TODO_PAGES: Record<string, TodoPageConfig> = {
   },
   'to-do': {
     title: 'To-Do',
-    lists: [{ title: 'Groceries', entityId: 'todo.groceries' }],
+    emptyTitle: 'No to-do tasks',
+    emptyDescription: 'Use Add Task to create an admin to-do.',
+    hideListHeaders: true,
+    lists: [{ title: 'Admin To-Do', entityId: ADMIN_TODO_ENTITY_ID }],
+    showEmptyStateWhenEmpty: true,
   },
   groceries: {
     title: 'Groceries',

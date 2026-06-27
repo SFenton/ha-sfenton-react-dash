@@ -838,7 +838,7 @@ function TodoPageContent({ config, configPath, onNavigate, onScrollLockChange, p
   const user = useUser()
   const entities = useHass((state) => state.entities) as unknown as EntityActionStateMap
   const [sectionStates, setSectionStates] = useState<Record<string, { loaded: boolean; visible: boolean } | undefined>>({})
-  const hideEmptyTodoSections = isChoreTodoPage(configPath)
+  const hideEmptyTodoSections = config.showEmptyStateWhenEmpty ?? isChoreTodoPage(configPath)
   const visibleLists = config.lists.filter((list) => todoListVisible(list, user?.id, entities))
   const visibleListKeys = visibleLists.map((list) => list.entityId)
   const loadedSectionStates = visibleListKeys.map((entityId) => sectionStates[entityId]).filter((state): state is { loaded: boolean; visible: boolean } => Boolean(state))
@@ -867,7 +867,7 @@ function TodoPageContent({ config, configPath, onNavigate, onScrollLockChange, p
       {visibleLists.map((list) => {
         const entity = entities[list.entityId] as (typeof entities)[string] & { last_changed?: string; last_updated?: string }
         const entityVersion = `${entity?.state ?? ''}:${entity?.last_changed ?? ''}:${entity?.last_updated ?? ''}`
-        return <TodoSection entityVersion={entityVersion} hideWhenEmpty={hideEmptyTodoSections} key={list.entityId} list={list} mayHaveItems={todoEntityMayHaveItems(entity)} onSectionStateChange={handleTodoSectionState} />
+        return <TodoSection entityVersion={entityVersion} hideListHeader={config.hideListHeaders} hideWhenEmpty={hideEmptyTodoSections} key={list.entityId} list={list} mayHaveItems={todoEntityMayHaveItems(entity)} onSectionStateChange={handleTodoSectionState} />
       })}
     </div>
   )
@@ -882,7 +882,7 @@ function todoEntityMayHaveItems(entity: EntityActionStateMap[string] & { state?:
   return Number(entity.state) > 0
 }
 
-function TodoSection({ entityVersion, hideWhenEmpty, list, mayHaveItems, onSectionStateChange }: { entityVersion: string; hideWhenEmpty: boolean | undefined; list: TodoListConfig; mayHaveItems: boolean; onSectionStateChange?: (entityId: string, state: { loaded: boolean; visible: boolean }) => void }) {
+function TodoSection({ entityVersion, hideListHeader = false, hideWhenEmpty, list, mayHaveItems, onSectionStateChange }: { entityVersion: string; hideListHeader?: boolean; hideWhenEmpty: boolean | undefined; list: TodoListConfig; mayHaveItems: boolean; onSectionStateChange?: (entityId: string, state: { loaded: boolean; visible: boolean }) => void }) {
   const [visibleItemCount, setVisibleItemCount] = useState<number | null>(hideWhenEmpty && !mayHaveItems ? 0 : null)
   const sectionVisible = !(hideWhenEmpty && visibleItemCount === 0)
 
@@ -899,7 +899,7 @@ function TodoSection({ entityVersion, hideWhenEmpty, list, mayHaveItems, onSecti
 
   return (
     <section className={styles.section}>
-      <SectionHeader title={list.title} />
+      {!hideListHeader && <SectionHeader title={list.title} />}
       <TodoListPanel entityId={list.entityId} hideCompleted={list.hideCompleted} onVisibleItemsChange={hideWhenEmpty ? setVisibleItemCount : undefined} title={list.title} />
     </section>
   )

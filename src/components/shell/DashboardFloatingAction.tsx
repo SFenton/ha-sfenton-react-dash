@@ -1,9 +1,10 @@
 import { useState } from 'react'
 import type { ReactNode } from 'react'
-import { CHORE_BLUE } from '../../constants/portedDashboard'
+import { ADMIN_TODO_ENTITY_ID, CHORE_BLUE } from '../../constants/portedDashboard'
 import { FloatingActionButton } from '../core/FloatingActionButton'
 import { CreateDonetickTaskSheet } from '../hass/CreateDonetickTaskSheet'
 import { CreateGroceryItemSheet } from '../hass/CreateGroceryItemSheet'
+import { CreateTodoItemSheet } from '../hass/CreateTodoItemSheet'
 import { EverShelfInventoryFloatingActions } from '../hass/EverShelfInventoryPanel'
 import type { EverShelfInventoryControls } from '../hass/EverShelfInventoryControls'
 import { ScanItemCameraSheet, type EverShelfLocation } from '../hass/ScanItemCameraSheet'
@@ -35,6 +36,17 @@ function CreateGroceryButton() {
     <>
       <FloatingActionButton color={CHORE_BLUE} icon="mdi:plus" label="Add Groceries" onClick={() => setModalOpen(true)} />
       <CreateGroceryItemSheet entityId="todo.shopping_list" onClose={() => setModalOpen(false)} open={modalOpen} />
+    </>
+  )
+}
+
+function CreateAdminTodoButton() {
+  const [modalOpen, setModalOpen] = useState(false)
+
+  return (
+    <>
+      <FloatingActionButton color={CHORE_BLUE} icon="mdi:plus" label="Add Task" onClick={() => setModalOpen(true)} />
+      <CreateTodoItemSheet entityId={ADMIN_TODO_ENTITY_ID} onClose={() => setModalOpen(false)} open={modalOpen} />
     </>
   )
 }
@@ -72,6 +84,7 @@ export function DashboardFloatingAction({ inventoryControls, onNavigate, path }:
     if (path === 'kitchen' || path === HOME_FOOD_ROUTE_PATH) return <ScanItemButton key="scan-item" />
     if (path === 'overview' || dashboardRoomNameFromPath(path)) return <RoomPickerButton key="rooms" onNavigate={onNavigate} />
     if (path === 'groceries' || path === HOME_GROCERY_LIST_ROUTE_PATH) return <CreateGroceryButton key="grocery" />
+    if (path === 'to-do') return <CreateAdminTodoButton key="admin-todo" />
     if (createTaskAssignee !== null) return <CreateChoreButton defaultAssignee={createTaskAssignee} key={`chore-${createTaskAssignee}`} />
     return null
   })()

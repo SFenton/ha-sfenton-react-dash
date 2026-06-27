@@ -4199,6 +4199,51 @@ describe('DashboardViewPage', () => {
     ]))
   })
 
+  it('renders the Settings To-Do list without a top section separator and adds tasks to the admin to-do', async () => {
+    mockTodoItemsByEntity['todo.groceries'] = [{ uid: 'admin-task-1', summary: 'Review reminders', status: 'needs_action' }]
+    render(<DashboardViewPage activePath="settings" onNavigate={() => undefined} path="to-do" />)
+
+    const list = await screen.findByLabelText('Admin To-Do todo list')
+    expect(screen.getByRole('heading', { name: 'To-Do' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Admin To-Do' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Groceries' })).not.toBeInTheDocument()
+    expect(within(list).getByRole('button', { name: /Review reminders/i })).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add Task' }))
+    const dialog = await screen.findByRole('dialog')
+
+    expect(within(dialog).getByRole('heading', { name: 'Add Task' })).toBeInTheDocument()
+    expect(within(dialog).getByLabelText('Task')).toBeRequired()
+    expect(within(dialog).queryByLabelText('Assignee')).not.toBeInTheDocument()
+    expect(within(dialog).queryByLabelText('Priority')).not.toBeInTheDocument()
+    expect(within(dialog).queryByLabelText('Recurrence')).not.toBeInTheDocument()
+
+    fireEvent.change(within(dialog).getByLabelText('Task'), { target: { value: 'Renew parking permit' } })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Add Task' }))
+
+    await waitFor(() => expect(mockCallServiceCalls).toEqual([
+      {
+        domain: 'todo',
+        service: 'add_item',
+        target: 'todo.groceries',
+        serviceData: { item: 'Renew parking permit' },
+      },
+    ]))
+  })
+
+  it('renders the shared empty state when the Settings To-Do list is empty', async () => {
+    mockTodoItemsByEntity['todo.groceries'] = []
+    mockEntities['todo.groceries'].state = '0'
+    render(<DashboardViewPage activePath="settings" onNavigate={() => undefined} path="to-do" />)
+
+    const emptyHeading = await screen.findByRole('heading', { name: 'No to-do tasks' })
+
+    expect(emptyHeading.parentElement).toHaveAttribute('data-empty-layout', 'centered')
+    expect(emptyHeading.parentElement).toHaveAttribute('data-empty-typography', 'festival')
+    expect(screen.getByText('Use Add Task to create an admin to-do.')).toBeInTheDocument()
+    expect(screen.queryByLabelText('Admin To-Do todo list')).not.toBeInTheDocument()
+  })
+
   it('renders the thermostat route as a dedicated Ecobee port', () => {
     render(<DashboardViewPage activePath="ecobee" onNavigate={() => undefined} path="ecobee" />)
 
