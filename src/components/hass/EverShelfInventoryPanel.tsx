@@ -224,6 +224,11 @@ function itemQuantity(item: EverShelfInventoryItem) {
   return Number.isFinite(quantity) && quantity > 1 ? quantity : null
 }
 
+function itemInstanceCount(item: EverShelfInventoryItem) {
+  const quantity = Number(item.quantity)
+  return Number.isInteger(quantity) && quantity > 1 ? quantity : 1
+}
+
 function formatQuantity(value: number) {
   return Number.isInteger(value) ? String(value) : String(value).replace(/(\.\d*?)0+$/, '$1').replace(/\.$/, '')
 }
@@ -239,7 +244,11 @@ function promptShoppingQuantity(title: string) {
   return Number.isFinite(parsedValue) && parsedValue >= 1 ? parsedValue : null
 }
 
-function PantryRow({ expiry, inventoryId, locationLabel, onDeleted, quantity, title }: { expiry: ExpiryInfo; inventoryId: number | null; locationLabel: string; onDeleted: (inventoryId: number) => void; quantity: number | null; title: string }) {
+function validExpiryInput(value: string) {
+  return value.trim() === '' || /^\d{4}-\d{2}-\d{2}$/.test(value.trim())
+}
+
+function PantryRow({ expiry, inventoryId, locationLabel, multiItem, onDeleted, onOpenDetails, quantity, title }: { expiry: ExpiryInfo; inventoryId: number | null; locationLabel: string; multiItem: boolean; onDeleted: (inventoryId: number) => void; onOpenDetails: () => void; quantity: number | null; title: string }) {
   const callService = useHass((state) => state.helpers.callService) as unknown as CallService
   const [deleteState, setDeleteState] = useState<PantryRowDeleteState>('idle')
   const [shoppingState, setShoppingState] = useState<PantryRowShoppingState>('idle')
@@ -268,7 +277,8 @@ function PantryRow({ expiry, inventoryId, locationLabel, onDeleted, quantity, ti
 
   useEffect(() => clearResetShoppingTimer, [clearResetShoppingTimer])
 
-  const addToShoppingList = () => {
+  const addToShoppingList = (event?: MouseEvent<HTMLButtonElement>) => {
+    event?.stopPropagation()
     if (shoppingButtonDisabled) return
 
     const shoppingQuantity = promptShoppingQuantity(title)
@@ -300,7 +310,8 @@ function PantryRow({ expiry, inventoryId, locationLabel, onDeleted, quantity, ti
       })
   }
 
-  const deleteFromEverShelf = () => {
+  const deleteFromEverShelf = (event?: MouseEvent<HTMLButtonElement>) => {
+    event?.stopPropagation()
     if (deleteButtonDisabled || inventoryId === null) return
     if (!window.confirm(`Delete ${title} from the ${locationLabel}?`)) return
 
@@ -320,8 +331,12 @@ function PantryRow({ expiry, inventoryId, locationLabel, onDeleted, quantity, ti
       })
   }
 
+  const openDetails = () => {
+    if (multiItem) onOpenDetails()
+  }
+
   return (
-    <div aria-label={`${title} ${subtitle}`} className={styles.pantryRow} data-expiry-tone={expiry.tone} role="group">
+    <div aria-label={`${title} ${subtitle}`} className={styles.pantryRow} data-clickable={multiItem ? 'true' : undefined} data-expiry-tone={expiry.tone} onClick={openDetails} role="group">
       <span className={styles.pantryRowCopy}>
         <strong>{title}</strong>
         <small>{subtitle}</small>
@@ -341,14 +356,114 @@ function PantryRow({ expiry, inventoryId, locationLabel, onDeleted, quantity, ti
             </span>
           </span>
         </button>
-        <button aria-label={`Edit ${title}`} className={styles.rowAction} disabled type="button">
-          <MaterialIcon name="mdi:pencil" size={22} />
-        </button>
-        <button aria-busy={deleteState === 'deleting' ? 'true' : undefined} aria-label={deleteButtonLabel} className={`${styles.rowAction} ${styles.deleteAction}`} data-delete-state={deleteState} disabled={deleteButtonDisabled} onClick={deleteFromEverShelf} type="button">
-          <MaterialIcon name="mdi:delete" size={22} />
-        </button>
+        {multiItem ? (
+          <button aria-label={`View ${title} individual items`} className={styles.rowAction} onClick={(event) => {
+            event.stopPropagation()
+            onOpenDetails()
+          }} type="button">
+            <MaterialIcon name="mdi:chevron-right" size={26} />
+          </button>
+        ) : (
+          <>
+            <button aria-label={`Edit ${title}`} className={styles.rowAction} disabled type="button">
+              <MaterialIcon name="mdi:pencil" size={22} />
+            </button>
+            <button aria-busy={deleteState === 'deleting' ? 'true' : undefined} aria-label={deleteButtonLabel} className={`${styles.rowAction} ${styles.deleteAction}`} data-delete-state={deleteState} disabled={deleteButtonDisabled} onClick={deleteFromEverShelf} type="button">
+              <MaterialIcon name="mdi:delete" size={22} />
+            </button>
+          </>
+        )}
       </span>
     </div>
+  )
+}
+
+function InventoryItemInstancesModal({ item, locationLabel, onClose, onInventoryChanged, open }: { item: EverShelfInventoryItem | null; locationLabel: string; onClose: () => void; onInventoryChanged: () => void; open: boolean }) {
+  const callService = useHass((state) => state.helpers.callService) as unknown as CallService
+  const [busyAction, setBusyAction] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const title = item ? itemName(item) : 'Inventory Item'
+  const inventoryId = item ? itemInventoryId(item) : null
+  const expiryDate = item ? itemExpiryDate(item) ?? '' : ''
+  const instanceCount = item ? itemInstanceCount(item) : 0
+  const instances = Array.from({ length: instanceCount }, (_, index) => index + 1)
+
+  useEffect(() => {
+    if (open) {
+      setBusyAction(null)
+      setError(null)
+    }
+  }, [open, item])
+
+  const finishAction = () => {
+    onInventoryChanged()
+    onClose()
+  }
+
+  const editInstance = (instanceNumber: number) => {
+    if (inventoryId === null) return
+    const value = window.prompt(`Expiration date for ${title} item ${instanceNumber} (YYYY-MM-DD)`, expiryDate)
+    if (value === null || !validExpiryInput(value)) return
+    setBusyAction(`edit-${instanceNumber}`)
+    setError(null)
+    void Promise.resolve(callService({
+      domain: 'evershelf',
+      service: 'update_inventory_item',
+      serviceData: { expiry_date: value.trim(), inventory_id: inventoryId },
+    }))
+      .then(finishAction)
+      .catch((caughtError: unknown) => {
+        setBusyAction(null)
+        setError(caughtError instanceof Error ? caughtError.message : 'Unable to update item')
+      })
+  }
+
+  const deleteInstance = (instanceNumber: number) => {
+    if (inventoryId === null) return
+    if (!window.confirm(`Delete ${title} item ${instanceNumber} from the ${locationLabel}?`)) return
+    setBusyAction(`delete-${instanceNumber}`)
+    setError(null)
+    void Promise.resolve(callService({
+      domain: 'evershelf',
+      service: 'delete_inventory_item',
+      serviceData: { inventory_id: inventoryId },
+    }))
+      .then(finishAction)
+      .catch((caughtError: unknown) => {
+        setBusyAction(null)
+        setError(caughtError instanceof Error ? caughtError.message : 'Unable to delete item')
+      })
+  }
+
+  return (
+    <ModalSheet onClose={onClose} open={open && item !== null} subtitle={`Individual ${locationLabel} items`} title={title}>
+      <div className={styles.instancesSheet}>
+        {error && <p className={styles.error} role="alert">{error}</p>}
+        <ul className={styles.instancesList}>
+          {instances.map((instanceNumber) => {
+            const editBusy = busyAction === `edit-${instanceNumber}`
+            const deleteBusy = busyAction === `delete-${instanceNumber}`
+            const disabled = busyAction !== null
+            return (
+              <li className={styles.instanceRow} key={instanceNumber}>
+                <span className={styles.instanceCopy}>
+                  <strong>{title} #{instanceNumber}</strong>
+                  <small>{expiryDate ? `Expires on ${formatDisplayDate(parseIsoDateOnly(expiryDate) ?? todayDateOnly())}` : 'No expiration date'}</small>
+                </span>
+                <span className={styles.instanceActions}>
+                  <button aria-busy={editBusy ? 'true' : undefined} aria-label={`Edit ${title} item ${instanceNumber}`} className={styles.rowAction} disabled={disabled} onClick={() => editInstance(instanceNumber)} type="button">
+                    <MaterialIcon name="mdi:pencil" size={22} />
+                  </button>
+                  <button aria-busy={deleteBusy ? 'true' : undefined} aria-label={`Delete ${title} item ${instanceNumber}`} className={`${styles.rowAction} ${styles.deleteAction}`} disabled={disabled} onClick={() => deleteInstance(instanceNumber)} type="button">
+                    <MaterialIcon name="mdi:delete" size={22} />
+                  </button>
+                </span>
+              </li>
+            )
+          })}
+        </ul>
+      </div>
+    </ModalSheet>
   )
 }
 
@@ -671,8 +786,10 @@ export function EverShelfInventoryFloatingActions({ controls }: { controls: Ever
 export function EverShelfInventoryPanel({ controls, location, title }: EverShelfInventoryPanelProps) {
   const callService = useHass((state) => state.helpers.callService) as unknown as CallService
   const { inventoryLoadPhase, setInventoryItemCount, setInventoryLoadPhase } = controls
+  const [detailsItem, setDetailsItem] = useState<EverShelfInventoryItem | null>(null)
   const [items, setItems] = useState<EverShelfInventoryItem[] | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [reloadNonce, setReloadNonce] = useState(0)
 
   useEffect(() => {
     let cancelled = false
@@ -718,9 +835,10 @@ export function EverShelfInventoryPanel({ controls, location, title }: EverShelf
       cancelled = true
       if (finishTimer !== null) window.clearTimeout(finishTimer)
     }
-  }, [callService, location, setInventoryItemCount, setInventoryLoadPhase])
+  }, [callService, location, reloadNonce, setInventoryItemCount, setInventoryLoadPhase])
 
   const loadedItems = useMemo(() => items ?? [], [items])
+  const reloadInventory = useCallback(() => setReloadNonce((current) => current + 1), [])
   const removeDeletedItem = useCallback((deletedInventoryId: number) => {
     setItems((currentItems) => {
       if (currentItems === null) return currentItems
@@ -752,10 +870,11 @@ export function EverShelfInventoryPanel({ controls, location, title }: EverShelf
                   const name = itemName(item)
                   const expiry = expiryInfo(itemExpiryDate(item))
                   const inventoryId = itemInventoryId(item)
+                  const multiItem = itemInstanceCount(item) > 1
                   const quantity = itemQuantity(item)
                   return (
                     <li className={styles.item} key={item.inventory_id ?? item.id ?? `${location}-${name}-${index}`}>
-                      <PantryRow expiry={expiry} inventoryId={inventoryId} locationLabel={LOCATION_DELETE_LABELS[location]} onDeleted={removeDeletedItem} quantity={quantity} title={name} />
+                      <PantryRow expiry={expiry} inventoryId={inventoryId} locationLabel={LOCATION_DELETE_LABELS[location]} multiItem={multiItem} onDeleted={removeDeletedItem} onOpenDetails={() => setDetailsItem(item)} quantity={quantity} title={name} />
                     </li>
                   )
                 })}
@@ -764,6 +883,7 @@ export function EverShelfInventoryPanel({ controls, location, title }: EverShelf
           </div>
         )}
       </article>
+      <InventoryItemInstancesModal item={detailsItem} locationLabel={LOCATION_DELETE_LABELS[location]} onClose={() => setDetailsItem(null)} onInventoryChanged={reloadInventory} open={detailsItem !== null} />
     </>
   )
 }

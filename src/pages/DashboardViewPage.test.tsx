@@ -3452,28 +3452,33 @@ describe('DashboardViewPage', () => {
       vi.useRealTimers()
       mockState.helpers.callService = originalCallService
     }
-    expect(within(cannedBeansRow).getByRole('button', { name: 'Edit Canned Beans' }).querySelector('path')).toHaveAttribute('d', materialIconPath('mdi:pencil'))
-    expect(within(cannedBeansRow).getByRole('button', { name: 'Delete Canned Beans' })).toHaveClass(/deleteAction/)
-    expect(within(cannedBeansRow).getByRole('button', { name: 'Delete Canned Beans' }).querySelector('path')).toHaveAttribute('d', materialIconPath('mdi:delete'))
+    expect(within(cannedBeansRow).queryByRole('button', { name: 'Edit Canned Beans' })).not.toBeInTheDocument()
+    expect(within(cannedBeansRow).queryByRole('button', { name: 'Delete Canned Beans' })).not.toBeInTheDocument()
+    const viewCannedBeansButton = within(cannedBeansRow).getByRole('button', { name: 'View Canned Beans individual items' })
+    expect(viewCannedBeansButton.querySelector('path')).toHaveAttribute('d', materialIconPath('mdi:chevron-right'))
+    fireEvent.click(viewCannedBeansButton)
+    expect(await screen.findByText('Individual pantry items')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Edit Canned Beans item 1' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Delete Canned Beans item 1' })).toHaveClass(/deleteAction/)
+
     const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false)
     const callCountBeforeDeniedDelete = mockCallServiceCalls.length
-    fireEvent.click(within(cannedBeansRow).getByRole('button', { name: 'Delete Canned Beans' }))
-    expect(confirmSpy).toHaveBeenCalledWith('Delete Canned Beans from the pantry?')
+    fireEvent.click(screen.getByRole('button', { name: 'Delete Canned Beans item 1' }))
+    expect(confirmSpy).toHaveBeenCalledWith('Delete Canned Beans item 1 from the pantry?')
     expect(mockCallServiceCalls).toHaveLength(callCountBeforeDeniedDelete)
-    expect(within(pantryList).getByRole('group', { name: `Canned Beans ${cannedBeansLabel}` })).toBeInTheDocument()
+    confirmSpy.mockRestore()
 
-    confirmSpy.mockReturnValue(true)
+    const instancePromptSpy = vi.spyOn(window, 'prompt').mockReturnValue('2026-09-30')
     await act(async () => {
-      fireEvent.click(within(cannedBeansRow).getByRole('button', { name: 'Delete Canned Beans' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Edit Canned Beans item 1' }))
       await Promise.resolve()
     })
     expect(mockCallServiceCalls).toContainEqual({
       domain: 'evershelf',
-      service: 'delete_inventory',
-      serviceData: { inventory_id: 102 },
+      service: 'update_inventory_item',
+      serviceData: { expiry_date: '2026-09-30', inventory_id: 102 },
     })
-    expect(within(pantryList).queryByRole('group', { name: `Canned Beans ${cannedBeansLabel}` })).not.toBeInTheDocument()
-    confirmSpy.mockRestore()
+    instancePromptSpy.mockRestore()
     expect(mockCallServiceCalls).toContainEqual({
       domain: 'evershelf',
       returnResponse: true,

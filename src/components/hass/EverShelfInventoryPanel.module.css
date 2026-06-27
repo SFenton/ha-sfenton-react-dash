@@ -36,6 +36,10 @@
   color: rgba(255, 255, 255, 0.88);
 }
 
+.pantryRow[data-clickable='true'] {
+  cursor: pointer;
+}
+
 .pantryRowCopy {
   display: grid;
   min-width: 0;
@@ -172,6 +176,63 @@
 
 .error {
   color: #ffb4b4;
+}
+
+.instancesSheet {
+  display: grid;
+  gap: 12px;
+}
+
+.instancesList {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.instanceRow {
+  display: grid;
+  min-height: 58px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  padding: 8px 8px 8px 12px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.instanceCopy {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.instanceCopy strong {
+  overflow: hidden;
+  color: white;
+  font-size: 0.9rem;
+  font-weight: 820;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.instanceCopy small {
+  overflow: hidden;
+  color: rgba(255, 255, 255, 0.62);
+  font-size: 0.76rem;
+  font-weight: 720;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.instanceActions {
+  display: inline-flex;
+  gap: 2px;
+  align-items: center;
 }
 
 .inventoryEmpty {
