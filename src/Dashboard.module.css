@@ -1,0 +1,7 @@
+.initialAppLoader {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  min-height: 100dvh;
+  pointer-events: none;
+}

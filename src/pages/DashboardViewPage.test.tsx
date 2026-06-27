@@ -785,7 +785,7 @@ describe('DashboardViewPage', () => {
       fireEvent.click(screen.getByRole('button', { name: 'Add' }))
 
       expect(screen.getByText('Adding Item')).toBeInTheDocument()
-      expect(screen.getByText('Adding to EverShelf...')).toBeInTheDocument()
+      expect(screen.getByText('Adding to Freezer...')).toBeInTheDocument()
 
       await waitFor(() => expect(mockCallServiceCalls).toContainEqual(expect.objectContaining({
         domain: 'evershelf',
@@ -3391,6 +3391,14 @@ describe('DashboardViewPage', () => {
       `Ziti ${zitiLabel}`,
     ])
     expect(within(pantryList).getByRole('group', { name: `Almond Flour ${almondFlourLabel}` })).toHaveAttribute('data-expiry-tone', 'expired')
+    const almondFlourRow = within(pantryList).getByRole('group', { name: `Almond Flour ${almondFlourLabel}` })
+    const editAlmondFlourButton = within(almondFlourRow).getByRole('button', { name: 'Edit Almond Flour' })
+    expect(editAlmondFlourButton).toBeEnabled()
+    fireEvent.click(editAlmondFlourButton)
+    expect(await screen.findByRole('dialog', { name: /Almond Flour/i })).toBeInTheDocument()
+    expect(screen.getByLabelText('Expiration date for Almond Flour item 1')).toHaveAttribute('type', 'date')
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }))
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: /Almond Flour/i })).not.toBeInTheDocument())
     const cannedBeansRow = within(pantryList).getByRole('group', { name: `Canned Beans ${cannedBeansLabel}` })
     expect(cannedBeansRow).toHaveAttribute('data-expiry-tone', 'soon')
     expect(within(cannedBeansRow).getByText(cannedBeansLabel)).toBeInTheDocument()
@@ -3457,8 +3465,12 @@ describe('DashboardViewPage', () => {
     const viewCannedBeansButton = within(cannedBeansRow).getByRole('button', { name: 'View Canned Beans individual items' })
     expect(viewCannedBeansButton.querySelector('path')).toHaveAttribute('d', materialIconPath('mdi:chevron-right'))
     fireEvent.click(viewCannedBeansButton)
-    expect(await screen.findByText('Individual pantry items')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Edit Canned Beans item 1' })).toBeInTheDocument()
+    expect(await screen.findByRole('dialog', { name: /Canned Beans/i })).toBeInTheDocument()
+    expect(screen.queryByText('Individual pantry items')).not.toBeInTheDocument()
+    const expirationInput = screen.getByLabelText('Expiration date for Canned Beans item 1')
+    expect(expirationInput).toHaveAttribute('type', 'date')
+    expect(screen.queryByRole('button', { name: 'Save Canned Beans item 1' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Reset' })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Delete Canned Beans item 1' })).toHaveClass(/deleteAction/)
 
     const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false)
@@ -3468,9 +3480,11 @@ describe('DashboardViewPage', () => {
     expect(mockCallServiceCalls).toHaveLength(callCountBeforeDeniedDelete)
     confirmSpy.mockRestore()
 
-    const instancePromptSpy = vi.spyOn(window, 'prompt').mockReturnValue('2026-09-30')
+    fireEvent.change(expirationInput, { target: { value: '2026-09-30' } })
+    expect(screen.getByRole('button', { name: 'Save Canned Beans item 1' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Reset' })).toBeInTheDocument()
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Edit Canned Beans item 1' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Save Canned Beans item 1' }))
       await Promise.resolve()
     })
     expect(mockCallServiceCalls).toContainEqual({
@@ -3478,7 +3492,6 @@ describe('DashboardViewPage', () => {
       service: 'update_inventory_item',
       serviceData: { expiry_date: '2026-09-30', inventory_id: 102 },
     })
-    instancePromptSpy.mockRestore()
     expect(mockCallServiceCalls).toContainEqual({
       domain: 'evershelf',
       returnResponse: true,
@@ -3574,7 +3587,7 @@ describe('DashboardViewPage', () => {
     try {
       render(<DashboardViewPage activePath="pantry" onNavigate={() => undefined} path="pantry" />)
 
-      const status = await screen.findByRole('status', { name: 'Loading Pantry inventory' })
+      const status = await screen.findByRole('status', { name: 'Loading Pantry' })
       expect(status).toHaveAttribute('data-state', 'loading')
       expect(status).toHaveClass(/inventoryLoading/)
       expect(screen.queryByRole('button', { name: 'Search inventory' })).not.toBeInTheDocument()
@@ -3590,7 +3603,7 @@ describe('DashboardViewPage', () => {
         })
       })
 
-      expect(await screen.findByRole('status', { name: 'Loading Pantry inventory' })).toHaveAttribute('data-state', 'exiting')
+      expect(await screen.findByRole('status', { name: 'Loading Pantry' })).toHaveAttribute('data-state', 'exiting')
       expect(screen.queryByRole('button', { name: 'Scan Item' })).not.toBeInTheDocument()
 
       const pantryList = await screen.findByLabelText('Pantry inventory list')
@@ -3777,9 +3790,9 @@ describe('DashboardViewPage', () => {
     try {
       render(<DashboardViewPage activePath="freezer" onNavigate={() => undefined} path="freezer" />)
 
-      expect(await screen.findByRole('heading', { name: 'Unable to load inventory' })).toBeInTheDocument()
-      expect(screen.getByText('EverShelf is unavailable')).toBeInTheDocument()
-      expect(screen.getByRole('heading', { name: 'Unable to load inventory' }).closest('[data-empty-layout]')).toHaveAttribute('data-empty-layout', 'centered')
+      expect(await screen.findByRole('heading', { name: 'Unable to load Freezer' })).toBeInTheDocument()
+      expect(screen.getByText('Freezer is unavailable')).toBeInTheDocument()
+      expect(screen.getByRole('heading', { name: 'Unable to load Freezer' }).closest('[data-empty-layout]')).toHaveAttribute('data-empty-layout', 'centered')
       expect(screen.queryByRole('button', { name: 'Search inventory' })).not.toBeInTheDocument()
       expect(screen.queryByRole('button', { name: 'Sort' })).not.toBeInTheDocument()
       expect(screen.queryByRole('button', { name: 'Filter' })).not.toBeInTheDocument()

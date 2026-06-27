@@ -29,6 +29,10 @@ interface EverShelfInventoryItem {
   quantity?: number | string | null
 }
 
+type EverShelfInventoryDisplayItem = EverShelfInventoryItem & {
+  groupedItems?: EverShelfInventoryItem[]
+}
+
 type CallService = (params: Record<string, unknown>) => Promise<unknown> | unknown
 
 interface ExpiryInfo {
@@ -96,6 +100,11 @@ function itemInventoryId(item: EverShelfInventoryItem) {
   return Number.isFinite(id) && id > 0 ? id : null
 }
 
+function itemRawQuantity(item: EverShelfInventoryItem) {
+  const quantity = Number(item.quantity)
+  return Number.isFinite(quantity) && quantity > 0 ? quantity : 1
+}
+
 function itemExpiryDate(item: EverShelfInventoryItem) {
   return compactText(item.expiry_date ?? item.expiration_date ?? item.expires_at ?? undefined)
 }
@@ -115,6 +124,35 @@ function itemExpiryTime(item: EverShelfInventoryItem) {
 
 function itemSearchText(item: EverShelfInventoryItem) {
   return itemName(item).toLocaleLowerCase()
+}
+
+function itemGroupingKey(item: EverShelfInventoryItem) {
+  return [
+    itemName(item).toLocaleLowerCase(),
+    compactText((item as { location?: string | null }).location) ?? '',
+    itemExpiryDate(item) ?? '',
+  ].join('\u0000')
+}
+
+function groupedInventoryItems(items: EverShelfInventoryItem[]): EverShelfInventoryDisplayItem[] {
+  const grouped = new Map<string, EverShelfInventoryDisplayItem>()
+  const order: string[] = []
+  for (const item of items) {
+    const key = itemGroupingKey(item)
+    const existing = grouped.get(key)
+    if (!existing) {
+      grouped.set(key, {
+        ...item,
+        groupedItems: [item],
+        quantity: itemRawQuantity(item),
+      })
+      order.push(key)
+      continue
+    }
+    existing.groupedItems = [...(existing.groupedItems ?? []), item]
+    existing.quantity = itemRawQuantity(existing) + itemRawQuantity(item)
+  }
+  return order.map((key) => grouped.get(key)).filter((item): item is EverShelfInventoryDisplayItem => Boolean(item))
 }
 
 function normalizedSearchQuery(query: string) {
@@ -215,18 +253,24 @@ function emptySearchDescription(filterActive: boolean) {
     : 'Try a different search or clear the search to show all items.'
 }
 
-function inventoryErrorDescription(error: string) {
-  return error === 'Unable to load inventory' ? 'Try again in a moment, or scan an item while inventory is unavailable.' : error
+function inventoryErrorDescription(error: string, spaceName: string) {
+  if (error === 'Unable to load inventory') return `Try again in a moment, or scan an item while ${spaceName.toLowerCase()} is unavailable.`
+  return error.replace(/EverShelf is unavailable/g, `${spaceName} is unavailable`)
 }
 
 function itemQuantity(item: EverShelfInventoryItem) {
-  const quantity = Number(item.quantity)
+  const quantity = itemRawQuantity(item)
   return Number.isFinite(quantity) && quantity > 1 ? quantity : null
 }
 
-function itemInstanceCount(item: EverShelfInventoryItem) {
-  const quantity = Number(item.quantity)
-  return Number.isInteger(quantity) && quantity > 1 ? quantity : 1
+function itemInstances(item: EverShelfInventoryDisplayItem): EverShelfInventoryItem[] {
+  if (item.groupedItems?.length) return item.groupedItems
+  return [item]
+}
+
+function itemInstancesKey(item: EverShelfInventoryDisplayItem | null) {
+  if (!item) return 'closed'
+  return itemInstances(item).map((instance) => itemInventoryId(instance) ?? itemGroupingKey(instance)).join('|')
 }
 
 function formatQuantity(value: number) {
@@ -238,7 +282,7 @@ function rowSubtitle(expiry: ExpiryInfo, quantity: number | null) {
 }
 
 function promptShoppingQuantity(title: string) {
-  const value = window.prompt(`Quantity of ${title} to add to EverShelf cart`, '1')
+  const value = window.prompt(`Quantity of ${title} to add to the grocery cart.`, '1')
   if (value === null) return null
   const parsedValue = Number(value.trim())
   return Number.isFinite(parsedValue) && parsedValue >= 1 ? parsedValue : null
@@ -246,6 +290,11 @@ function promptShoppingQuantity(title: string) {
 
 function validExpiryInput(value: string) {
   return value.trim() === '' || /^\d{4}-\d{2}-\d{2}$/.test(value.trim())
+}
+
+function formatExpiryInputDisplay(value: string) {
+  const date = parseIsoDateOnly(value)
+  return date ? formatDisplayDate(date) : 'No expiration date'
 }
 
 function PantryRow({ expiry, inventoryId, locationLabel, multiItem, onDeleted, onOpenDetails, quantity, title }: { expiry: ExpiryInfo; inventoryId: number | null; locationLabel: string; multiItem: boolean; onDeleted: (inventoryId: number) => void; onOpenDetails: () => void; quantity: number | null; title: string }) {
@@ -256,7 +305,7 @@ function PantryRow({ expiry, inventoryId, locationLabel, multiItem, onDeleted, o
   const resetShoppingTimerRef = useRef<number | null>(null)
   const subtitle = rowSubtitle(expiry, quantity)
   const deleteButtonDisabled = deleteState === 'deleting' || inventoryId === null
-  const deleteButtonLabel = deleteState === 'deleting' ? `Deleting ${title} from EverShelf` : `Delete ${title}`
+  const deleteButtonLabel = deleteState === 'deleting' ? `Deleting ${title}` : `Delete ${title}`
   const shoppingButtonDisabled = shoppingState === 'adding' || shoppingState === 'added'
   const shoppingButtonLabel = shoppingState === 'adding' ? `Adding ${title} to shopping list` : shoppingState === 'added' ? `Added ${title} to shopping list` : `Add ${title} to shopping list`
 
@@ -365,7 +414,10 @@ function PantryRow({ expiry, inventoryId, locationLabel, multiItem, onDeleted, o
           </button>
         ) : (
           <>
-            <button aria-label={`Edit ${title}`} className={styles.rowAction} disabled type="button">
+            <button aria-label={`Edit ${title}`} className={styles.rowAction} disabled={inventoryId === null} onClick={(event) => {
+              event.stopPropagation()
+              onOpenDetails()
+            }} type="button">
               <MaterialIcon name="mdi:pencil" size={22} />
             </button>
             <button aria-busy={deleteState === 'deleting' ? 'true' : undefined} aria-label={deleteButtonLabel} className={`${styles.rowAction} ${styles.deleteAction}`} data-delete-state={deleteState} disabled={deleteButtonDisabled} onClick={deleteFromEverShelf} type="button">
@@ -378,38 +430,41 @@ function PantryRow({ expiry, inventoryId, locationLabel, multiItem, onDeleted, o
   )
 }
 
-function InventoryItemInstancesModal({ item, locationLabel, onClose, onInventoryChanged, open }: { item: EverShelfInventoryItem | null; locationLabel: string; onClose: () => void; onInventoryChanged: () => void; open: boolean }) {
+function InventoryItemInstancesModal({ item, locationLabel, onClose, onInventoryChanged, open }: { item: EverShelfInventoryDisplayItem | null; locationLabel: string; onClose: () => void; onInventoryChanged: () => void; open: boolean }) {
   const callService = useHass((state) => state.helpers.callService) as unknown as CallService
   const [busyAction, setBusyAction] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const title = item ? itemName(item) : 'Inventory Item'
-  const inventoryId = item ? itemInventoryId(item) : null
-  const expiryDate = item ? itemExpiryDate(item) ?? '' : ''
-  const instanceCount = item ? itemInstanceCount(item) : 0
-  const instances = Array.from({ length: instanceCount }, (_, index) => index + 1)
-
-  useEffect(() => {
-    if (open) {
-      setBusyAction(null)
-      setError(null)
-    }
-  }, [open, item])
+  const instances = useMemo(() => (item ? itemInstances(item) : []), [item])
+  const [expiryDrafts, setExpiryDrafts] = useState<Record<number, string>>(() => (
+    Object.fromEntries(instances.map((instance, index) => [index + 1, itemExpiryDate(instance) ?? '']))
+  ))
 
   const finishAction = () => {
     onInventoryChanged()
     onClose()
   }
 
-  const editInstance = (instanceNumber: number) => {
+  const resetInstanceDraft = (instanceNumber: number) => {
+    const expiryDate = itemExpiryDate(instances[instanceNumber - 1]) ?? ''
+    setExpiryDrafts((current) => ({ ...current, [instanceNumber]: expiryDate }))
+    setError(null)
+  }
+
+  const saveInstance = (instanceNumber: number) => {
+    const inventoryId = itemInventoryId(instances[instanceNumber - 1])
     if (inventoryId === null) return
-    const value = window.prompt(`Expiration date for ${title} item ${instanceNumber} (YYYY-MM-DD)`, expiryDate)
-    if (value === null || !validExpiryInput(value)) return
+    const draft = expiryDrafts[instanceNumber] ?? ''
+    if (!validExpiryInput(draft)) {
+      setError('Use YYYY-MM-DD or clear the date.')
+      return
+    }
     setBusyAction(`edit-${instanceNumber}`)
     setError(null)
     void Promise.resolve(callService({
       domain: 'evershelf',
       service: 'update_inventory_item',
-      serviceData: { expiry_date: value.trim(), inventory_id: inventoryId },
+      serviceData: { expiry_date: draft.trim(), inventory_id: inventoryId },
     }))
       .then(finishAction)
       .catch((caughtError: unknown) => {
@@ -419,6 +474,7 @@ function InventoryItemInstancesModal({ item, locationLabel, onClose, onInventory
   }
 
   const deleteInstance = (instanceNumber: number) => {
+    const inventoryId = itemInventoryId(instances[instanceNumber - 1])
     if (inventoryId === null) return
     if (!window.confirm(`Delete ${title} item ${instanceNumber} from the ${locationLabel}?`)) return
     setBusyAction(`delete-${instanceNumber}`)
@@ -436,28 +492,43 @@ function InventoryItemInstancesModal({ item, locationLabel, onClose, onInventory
   }
 
   return (
-    <ModalSheet onClose={onClose} open={open && item !== null} subtitle={`Individual ${locationLabel} items`} title={title}>
+    <ModalSheet onClose={onClose} open={open && item !== null} title={title}>
       <div className={styles.instancesSheet}>
         {error && <p className={styles.error} role="alert">{error}</p>}
         <ul className={styles.instancesList}>
-          {instances.map((instanceNumber) => {
+          {instances.map((instance, index) => {
+            const instanceNumber = index + 1
             const editBusy = busyAction === `edit-${instanceNumber}`
             const deleteBusy = busyAction === `delete-${instanceNumber}`
+            const expiryDate = itemExpiryDate(instance) ?? ''
+            const draft = expiryDrafts[instanceNumber] ?? ''
+            const dateChanged = draft !== expiryDate
             const disabled = busyAction !== null
             return (
-              <li className={styles.instanceRow} key={instanceNumber}>
-                <span className={styles.instanceCopy}>
-                  <strong>{title} #{instanceNumber}</strong>
-                  <small>{expiryDate ? `Expires on ${formatDisplayDate(parseIsoDateOnly(expiryDate) ?? todayDateOnly())}` : 'No expiration date'}</small>
-                </span>
-                <span className={styles.instanceActions}>
-                  <button aria-busy={editBusy ? 'true' : undefined} aria-label={`Edit ${title} item ${instanceNumber}`} className={styles.rowAction} disabled={disabled} onClick={() => editInstance(instanceNumber)} type="button">
-                    <MaterialIcon name="mdi:pencil" size={22} />
-                  </button>
+              <li className={styles.instanceRow} key={itemInventoryId(instance) ?? instanceNumber}>
+                <div className={styles.instanceHeader}>
+                  <span className={styles.instanceCopy}>
+                    <strong>{title}</strong>
+                  </span>
                   <button aria-busy={deleteBusy ? 'true' : undefined} aria-label={`Delete ${title} item ${instanceNumber}`} className={`${styles.rowAction} ${styles.deleteAction}`} disabled={disabled} onClick={() => deleteInstance(instanceNumber)} type="button">
                     <MaterialIcon name="mdi:delete" size={22} />
                   </button>
-                </span>
+                </div>
+                <div className={styles.instanceEditPanel}>
+                  <label className={styles.instanceDateField}>
+                    <span>Expiration Date</span>
+                    <span className={styles.instanceDateInputShell}>
+                      <span aria-hidden="true" className={styles.instanceDateDisplay}>{formatExpiryInputDisplay(draft)}</span>
+                      <input aria-label={`Expiration date for ${title} item ${instanceNumber}`} onChange={(event) => setExpiryDrafts((current) => ({ ...current, [instanceNumber]: event.target.value }))} type="date" value={draft} />
+                    </span>
+                  </label>
+                  {dateChanged && (
+                    <span className={styles.instanceEditActions}>
+                      <button className={styles.secondaryAction} disabled={disabled} onClick={() => resetInstanceDraft(instanceNumber)} type="button">Reset</button>
+                      <button aria-busy={editBusy ? 'true' : undefined} aria-label={`Save ${title} item ${instanceNumber}`} className={styles.primaryAction} disabled={disabled} onClick={() => saveInstance(instanceNumber)} type="button">Save</button>
+                    </span>
+                  )}
+                </div>
               </li>
             )
           })}
@@ -786,7 +857,7 @@ export function EverShelfInventoryFloatingActions({ controls }: { controls: Ever
 export function EverShelfInventoryPanel({ controls, location, title }: EverShelfInventoryPanelProps) {
   const callService = useHass((state) => state.helpers.callService) as unknown as CallService
   const { inventoryLoadPhase, setInventoryItemCount, setInventoryLoadPhase } = controls
-  const [detailsItem, setDetailsItem] = useState<EverShelfInventoryItem | null>(null)
+  const [detailsItem, setDetailsItem] = useState<EverShelfInventoryDisplayItem | null>(null)
   const [items, setItems] = useState<EverShelfInventoryItem[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [reloadNonce, setReloadNonce] = useState(0)
@@ -838,6 +909,7 @@ export function EverShelfInventoryPanel({ controls, location, title }: EverShelf
   }, [callService, location, reloadNonce, setInventoryItemCount, setInventoryLoadPhase])
 
   const loadedItems = useMemo(() => items ?? [], [items])
+  const displayItems = useMemo(() => groupedInventoryItems(loadedItems), [loadedItems])
   const reloadInventory = useCallback(() => setReloadNonce((current) => current + 1), [])
   const removeDeletedItem = useCallback((deletedInventoryId: number) => {
     setItems((currentItems) => {
@@ -848,17 +920,17 @@ export function EverShelfInventoryPanel({ controls, location, title }: EverShelf
     })
   }, [setInventoryItemCount])
   const effectiveSearchQuery = controls.debouncedSearchQuery.trim()
-  const visibleItems = useMemo(() => visibleInventoryItems(loadedItems, controls.sortMode, controls.sortDirection, controls.filterMode, controls.debouncedSearchQuery), [controls.debouncedSearchQuery, controls.filterMode, controls.sortDirection, controls.sortMode, loadedItems])
+  const visibleItems = useMemo(() => visibleInventoryItems(displayItems, controls.sortMode, controls.sortDirection, controls.filterMode, controls.debouncedSearchQuery), [controls.debouncedSearchQuery, controls.filterMode, controls.sortDirection, controls.sortMode, displayItems])
 
   return (
     <>
       <article aria-label={`${title} inventory list`} className={styles.panel}>
         {inventoryLoadPhase !== 'content' ? (
-          <DashboardPageLoading className={styles.inventoryLoading} label={`Loading ${title} inventory`} phase={inventoryLoadPhase === 'exiting' ? 'exiting' : 'loading'} />
+          <DashboardPageLoading className={styles.inventoryLoading} label={`Loading ${title}`} phase={inventoryLoadPhase === 'exiting' ? 'exiting' : 'loading'} />
         ) : (
           <div className={styles.inventoryContent}>
             {error ? (
-              <EmptyState className={styles.inventoryEmpty} description={inventoryErrorDescription(error)} title="Unable to load inventory" />
+              <EmptyState className={styles.inventoryEmpty} description={inventoryErrorDescription(error, title)} title={`Unable to load ${title}`} />
             ) : items !== null && loadedItems.length === 0 ? (
               <EmptyState className={styles.inventoryEmpty} description={`Scan an item to add it to your ${title.toLowerCase()}.`} title="No items found" />
             ) : items !== null && loadedItems.length > 0 && visibleItems.length === 0 && (effectiveSearchQuery
@@ -870,7 +942,7 @@ export function EverShelfInventoryPanel({ controls, location, title }: EverShelf
                   const name = itemName(item)
                   const expiry = expiryInfo(itemExpiryDate(item))
                   const inventoryId = itemInventoryId(item)
-                  const multiItem = itemInstanceCount(item) > 1
+                  const multiItem = itemInstances(item).length > 1
                   const quantity = itemQuantity(item)
                   return (
                     <li className={styles.item} key={item.inventory_id ?? item.id ?? `${location}-${name}-${index}`}>
@@ -883,7 +955,7 @@ export function EverShelfInventoryPanel({ controls, location, title }: EverShelf
           </div>
         )}
       </article>
-      <InventoryItemInstancesModal item={detailsItem} locationLabel={LOCATION_DELETE_LABELS[location]} onClose={() => setDetailsItem(null)} onInventoryChanged={reloadInventory} open={detailsItem !== null} />
+      <InventoryItemInstancesModal key={itemInstancesKey(detailsItem)} item={detailsItem} locationLabel={LOCATION_DELETE_LABELS[location]} onClose={() => setDetailsItem(null)} onInventoryChanged={reloadInventory} open={detailsItem !== null} />
     </>
   )
 }

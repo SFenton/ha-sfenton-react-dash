@@ -809,7 +809,8 @@ export const mockState: MockHassState = {
                   ]
                 : [
                     { expiry_date: mockDateOffset(40), id: 103, location: 'dispensa', name: 'Ziti' },
-                    { expiry_date: mockDateOffset(3), id: 102, location: 'dispensa', name: 'Canned Beans', quantity: 2 },
+                    { expiry_date: mockDateOffset(3), id: 102, location: 'dispensa', name: 'Canned Beans', quantity: 1 },
+                    { expiry_date: mockDateOffset(3), id: 106, location: 'dispensa', name: 'Canned Beans', quantity: 1 },
                     { expiry_date: mockDateOffset(-10), id: 101, location: 'dispensa', name: 'Almond Flour' },
                   ]
         return Promise.resolve({ response: { inventory } })

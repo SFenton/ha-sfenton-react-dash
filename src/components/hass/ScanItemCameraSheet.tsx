@@ -104,7 +104,7 @@ const EVERSHELF_LOCATIONS: { label: string, value: EverShelfLocation }[] = [
   { label: 'Freezer', value: 'freezer' },
   { label: 'Spice Rack', value: 'spice_rack' },
   { label: 'Cabinet', value: 'cabinet' },
-  { label: 'Other', value: 'altro' },
+  { label: 'Library', value: 'altro' },
 ]
 const QUICK_EXPIRATION_OPTIONS: { label: string, value: QuickExpirationValue }[] = [
   { label: 'In 3 Days', value: '3-days' },
@@ -124,7 +124,7 @@ function locationDestination(value: EverShelfLocation) {
   if (value === 'freezer') return 'freezer'
   if (value === 'spice_rack') return 'spice rack'
   if (value === 'cabinet') return 'cabinet'
-  return 'storage'
+  return 'library'
 }
 
 function cameraAccessErrorMessage(error: unknown) {
@@ -409,7 +409,7 @@ export function ScanItemCameraSheet({ defaultLocation = 'dispensa', open, onClos
       )
       if (serviceRequestIdRef.current !== requestId) return
       const payload = serviceResponsePayload(response)
-      if (!payload) throw new Error('EverShelf did not return a barcode lookup response.')
+      if (!payload) throw new Error('Barcode lookup did not return a response.')
       setLookupResult(payload)
       setLookupStatus(payload.found ? 'found' : 'not-found')
       if (payload.found && payload.product) {
@@ -422,7 +422,7 @@ export function ScanItemCameraSheet({ defaultLocation = 'dispensa', open, onClos
     } catch (caughtError: unknown) {
       if (serviceRequestIdRef.current !== requestId) return
       setLookupStatus('error')
-      setLookupError(caughtError instanceof Error ? caughtError.message : 'Unable to resolve barcode with EverShelf.')
+      setLookupError(caughtError instanceof Error ? caughtError.message : 'Unable to resolve barcode.')
     } finally {
       if (serviceRequestIdRef.current === requestId) setProcessingMode(null)
     }
@@ -755,7 +755,7 @@ export function ScanItemCameraSheet({ defaultLocation = 'dispensa', open, onClos
       )
       if (serviceRequestIdRef.current !== requestId) return
       const payload = serviceResponsePayload(response)
-      if (!payload) throw new Error('EverShelf did not return an expiration image response.')
+      if (!payload) throw new Error('Expiration reader did not return a response.')
       setExpiryResult(payload)
       if (expiryResultFound(payload)) {
         setExpiryStatus('found')
@@ -772,7 +772,7 @@ export function ScanItemCameraSheet({ defaultLocation = 'dispensa', open, onClos
     } catch (caughtError: unknown) {
       if (serviceRequestIdRef.current !== requestId) return
       setExpiryStatus('error')
-      setExpiryError(expirationReadErrorMessage(caughtError instanceof Error ? caughtError.message : 'Unable to read expiration date with EverShelf.'))
+      setExpiryError(expirationReadErrorMessage(caughtError instanceof Error ? caughtError.message : 'Unable to read expiration date.'))
     } finally {
       if (serviceRequestIdRef.current === requestId) setProcessingMode(null)
     }
@@ -783,7 +783,7 @@ export function ScanItemCameraSheet({ defaultLocation = 'dispensa', open, onClos
     const quantity = Number(itemQuantity)
     if (!name) {
       setAddStatus('error')
-      setAddError('Product name is required before adding to EverShelf.')
+      setAddError(`Product name is required before adding to ${addedLocation}.`)
       return
     }
     if (!Number.isFinite(quantity) || quantity <= 0) {
@@ -834,20 +834,20 @@ export function ScanItemCameraSheet({ defaultLocation = 'dispensa', open, onClos
       )
       if (serviceRequestIdRef.current !== requestId) return
       const payload = serviceResponsePayload(response)
-      if (!payload || payload.success === false) throw new Error(payload?.message ?? payload?.error ?? 'EverShelf did not add this item.')
+      if (!payload || payload.success === false) throw new Error(payload?.message ?? payload?.error ?? `Could not add this item to ${addedLocation}.`)
       setAddStatus('added')
     } catch (caughtError: unknown) {
       if (serviceRequestIdRef.current !== requestId) return
       setAddStatus('error')
-      setAddError(caughtError instanceof Error ? caughtError.message : 'Unable to add this item to EverShelf.')
+      setAddError(caughtError instanceof Error ? caughtError.message : `Unable to add this item to ${addedLocation}.`)
       setStep('review')
     }
   }
 
   const barcodeStatusText = () => {
-    if (lookupStatus === 'resolving' && detectedBarcode) return `Looking up ${detectedBarcode} in EverShelf...`
-    if (lookupStatus === 'found' && detectedBarcode) return `EverShelf matched barcode ${detectedBarcode}.`
-    if (lookupStatus === 'not-found' && detectedBarcode) return `EverShelf did not find barcode ${detectedBarcode}.`
+    if (lookupStatus === 'resolving' && detectedBarcode) return `Looking up ${detectedBarcode}...`
+    if (lookupStatus === 'found' && detectedBarcode) return `Barcode matched ${detectedBarcode}.`
+    if (lookupStatus === 'not-found' && detectedBarcode) return `No barcode match found for ${detectedBarcode}.`
     if (lookupStatus === 'error') return lookupError ?? 'Unable to scan this barcode.'
     return 'Scanning for a barcode...'
   }
@@ -855,9 +855,9 @@ export function ScanItemCameraSheet({ defaultLocation = 'dispensa', open, onClos
   const expiryStatusText = () => {
     const expiryDate = expiryDateValue(expiryResult)
     if (expiryStatus === 'ready') return 'Camera ready. Capture the printed expiration date when it is readable.'
-    if (expiryStatus === 'reading') return 'Reading expiration date with EverShelf...'
-    if (expiryStatus === 'found' && expiryDate) return `EverShelf read ${formatExpiryDate(expiryDate)}.`
-    if (expiryStatus === 'not-found') return 'EverShelf did not find an expiration date in that image.'
+    if (expiryStatus === 'reading') return 'Reading expiration date...'
+    if (expiryStatus === 'found' && expiryDate) return `Expiration date found: ${formatExpiryDate(expiryDate)}.`
+    if (expiryStatus === 'not-found') return 'No expiration date found in that image.'
     if (expiryStatus === 'error') return expiryError ?? 'Unable to read expiration date.'
     return 'Frame the printed expiration date inside the camera window.'
   }
@@ -1058,7 +1058,7 @@ export function ScanItemCameraSheet({ defaultLocation = 'dispensa', open, onClos
               </div>
             </fieldset>
             <NativePickerField ariaLabel="Expiration date" label="When does it expire?" onChange={updateItemExpiryDate} type="date" value={itemExpiryDate} />
-            {addStatus === 'error' && <div className={styles.error} role="alert">{addError ?? 'Unable to add this item to EverShelf.'}</div>}
+            {addStatus === 'error' && <div className={styles.error} role="alert">{addError ?? `Unable to add this item to ${addedLocation}.`}</div>}
           </>
         )}
 
@@ -1074,7 +1074,7 @@ export function ScanItemCameraSheet({ defaultLocation = 'dispensa', open, onClos
             ) : (
               <>
                 <div className={styles.spinner} aria-hidden="true" />
-                <strong>Adding to EverShelf...</strong>
+                <strong>Adding to {addedLocation}...</strong>
               </>
             )}
           </section>
