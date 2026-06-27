@@ -3401,6 +3401,7 @@ describe('DashboardViewPage', () => {
       resolveAddToShopping = resolve
     })
     const originalCallService = mockState.helpers.callService
+    const promptSpy = vi.spyOn(window, 'prompt').mockReturnValue('2')
     mockState.helpers.callService = (params) => {
       if (params.domain === 'evershelf' && params.service === 'add_to_shopping') {
         mockCallServiceCalls.push(params)
@@ -3418,7 +3419,7 @@ describe('DashboardViewPage', () => {
       expect(mockCallServiceCalls).toContainEqual({
         domain: 'evershelf',
         service: 'add_to_shopping',
-        serviceData: { name: 'Canned Beans', quantity: 1 },
+        serviceData: { name: 'Canned Beans', quantity: 2 },
       })
       expect(mockCallServiceCalls).toContainEqual({
         domain: 'todo',
@@ -3441,7 +3442,13 @@ describe('DashboardViewPage', () => {
       })
       expect(within(cannedBeansRow).getByRole('button', { name: 'Add Canned Beans to shopping list' })).toBeEnabled()
       expect(within(cannedBeansRow).getByRole('button', { name: 'Add Canned Beans to shopping list' })).toHaveAttribute('data-shopping-state', 'idle')
+      const callCountAfterValidQuantity = mockCallServiceCalls.length
+      promptSpy.mockReturnValue('0')
+      fireEvent.click(within(cannedBeansRow).getByRole('button', { name: 'Add Canned Beans to shopping list' }))
+      expect(mockCallServiceCalls).toHaveLength(callCountAfterValidQuantity)
+      expect(within(cannedBeansRow).getByRole('button', { name: 'Add Canned Beans to shopping list' })).toHaveAttribute('data-shopping-state', 'idle')
     } finally {
+      promptSpy.mockRestore()
       vi.useRealTimers()
       mockState.helpers.callService = originalCallService
     }

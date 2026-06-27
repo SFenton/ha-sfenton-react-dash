@@ -218,6 +218,13 @@ function rowSubtitle(expiry: ExpiryInfo, quantity: number | null) {
   return quantity === null ? expiry.label : `Quantity ${formatQuantity(quantity)} - ${expiry.label}`
 }
 
+function promptShoppingQuantity(title: string) {
+  const value = window.prompt(`Quantity of ${title} to add to EverShelf cart`, '1')
+  if (value === null) return null
+  const parsedValue = Number(value.trim())
+  return Number.isFinite(parsedValue) && parsedValue >= 1 ? parsedValue : null
+}
+
 function PantryRow({ expiry, quantity, title }: { expiry: ExpiryInfo; quantity: number | null; title: string }) {
   const callService = useHass((state) => state.helpers.callService) as unknown as CallService
   const [shoppingState, setShoppingState] = useState<PantryRowShoppingState>('idle')
@@ -247,6 +254,9 @@ function PantryRow({ expiry, quantity, title }: { expiry: ExpiryInfo; quantity: 
   const addToShoppingList = () => {
     if (shoppingButtonDisabled) return
 
+    const shoppingQuantity = promptShoppingQuantity(title)
+    if (shoppingQuantity === null) return
+
     clearResetShoppingTimer()
     setShoppingState('adding')
     setShoppingError(null)
@@ -254,7 +264,7 @@ function PantryRow({ expiry, quantity, title }: { expiry: ExpiryInfo; quantity: 
       callService({
         domain: 'evershelf',
         service: 'add_to_shopping',
-        serviceData: { name: title, quantity: 1 },
+        serviceData: { name: title, quantity: shoppingQuantity },
       }),
       callService({
         domain: 'todo',
