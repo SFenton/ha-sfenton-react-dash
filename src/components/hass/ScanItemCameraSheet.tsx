@@ -631,7 +631,7 @@ export function ScanItemCameraSheet({ defaultLocation = 'dispensa', open, onClos
     stopBarcodeScanner()
     hideActiveCamera()
     setStep('expiry')
-    setExpiryCameraHidden(true)
+    setExpiryCameraHidden(Boolean(itemExpiryDate.trim() || expiryResultFound(expiryResult)))
     setError(null)
     setProcessingMode(null)
     if (!detectedBarcode) {

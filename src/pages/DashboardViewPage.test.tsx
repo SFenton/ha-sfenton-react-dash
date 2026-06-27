@@ -190,7 +190,6 @@ function testQuickExpirationDateValue(value: '3-days' | '1-week' | '1-month' | '
 }
 
 async function startAndCaptureExpirationDate(buttonName = 'Read Expiration Date') {
-  fireEvent.click(await screen.findByRole('button', { name: buttonName }))
   expect(await screen.findByLabelText('Live expiration date camera feed')).toBeInTheDocument()
   await act(async () => {
     fireEvent.click(await screen.findByRole('button', { name: buttonName }))
@@ -474,6 +473,13 @@ describe('DashboardViewPage', () => {
       fireEvent.click(screen.getByRole('button', { name: 'Next' }))
 
       expect(screen.getByText('Expiration Date · Step 2 of 3')).toBeInTheDocument()
+      expect(screen.getByText('Take a clear photo of the printed expiration date')).toBeInTheDocument()
+      expect(screen.getByText('Center the printed expiration date inside the camera window and keep the label flat.')).toBeInTheDocument()
+      expect(await screen.findByLabelText('Live expiration date camera feed')).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Manually Enter Expiration Date' })).toBeEnabled()
+      expect(await screen.findByRole('button', { name: 'Read Expiration Date' })).toBeEnabled()
+      expect(screen.getByRole('button', { name: 'Skip Expiration' })).toBeEnabled()
+      fireEvent.click(screen.getByRole('button', { name: 'Manually Enter Expiration Date' }))
       expect(screen.getByText('Enter the expiration date manually, or read it from the camera.')).toBeInTheDocument()
       expect(screen.queryByText('Center the printed expiration date inside the camera window and keep the label flat.')).not.toBeInTheDocument()
       expect(screen.queryByLabelText('Live expiration date camera feed')).not.toBeInTheDocument()
@@ -600,14 +606,14 @@ describe('DashboardViewPage', () => {
       await waitFor(() => expect(zxingMock.decodeFromVideoElement).toHaveBeenCalledTimes(1))
       fireEvent.click(screen.getByRole('button', { name: 'Skip Barcode' }))
       expect(screen.getByText('Expiration Date · Step 2 of 3')).toBeInTheDocument()
-      expect(screen.getByText('Enter the expiration date manually, or read it from the camera.')).toBeInTheDocument()
-      expect(screen.queryByText('Take a clear photo of the printed expiration date')).not.toBeInTheDocument()
-      expect(screen.queryByText('Center the printed expiration date inside the camera window and keep the label flat.')).not.toBeInTheDocument()
+      expect(screen.queryByText('Enter the expiration date manually, or read it from the camera.')).not.toBeInTheDocument()
+      expect(screen.getByText('Take a clear photo of the printed expiration date')).toBeInTheDocument()
+      expect(screen.getByText('Center the printed expiration date inside the camera window and keep the label flat.')).toBeInTheDocument()
       expect(screen.getByRole('button', { name: 'Back to barcode scan' })).toBeInTheDocument()
-      expect(screen.queryByLabelText('Live expiration date camera feed')).not.toBeInTheDocument()
-      expect(screen.getByText('Quick Expiration Dates')).toBeInTheDocument()
-      expect(screen.queryByRole('button', { name: 'Manually Enter Expiration Date' })).not.toBeInTheDocument()
-      expect(camera.getUserMedia).toHaveBeenCalledTimes(1)
+      expect(await screen.findByLabelText('Live expiration date camera feed')).toBeInTheDocument()
+      expect(screen.queryByText('Quick Expiration Dates')).not.toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Manually Enter Expiration Date' })).toBeEnabled()
+      await waitFor(() => expect(camera.getUserMedia).toHaveBeenCalledTimes(2))
       fireEvent.click(screen.getByRole('button', { name: 'Back to barcode scan' }))
       expect(screen.getByText('Scan Barcode · Step 1 of 3')).toBeInTheDocument()
       expect(await screen.findByLabelText('Live item scan camera feed')).toBeInTheDocument()
@@ -615,13 +621,10 @@ describe('DashboardViewPage', () => {
       expect(camera.getUserMedia).toHaveBeenCalledTimes(2)
       fireEvent.click(screen.getByRole('button', { name: 'Skip Barcode' }))
 
-      expect(screen.queryByLabelText('Live expiration date camera feed')).not.toBeInTheDocument()
-      expect(camera.getUserMedia).toHaveBeenCalledTimes(2)
-      fireEvent.click(await screen.findByRole('button', { name: 'Read Expiration Date' }))
       expect(await screen.findByLabelText('Live expiration date camera feed')).toBeInTheDocument()
       expect(screen.getByText('Take a clear photo of the printed expiration date')).toBeInTheDocument()
       expect(screen.getByRole('button', { name: 'Manually Enter Expiration Date' })).toBeEnabled()
-      expect(camera.getUserMedia).toHaveBeenCalledTimes(3)
+      await waitFor(() => expect(camera.getUserMedia).toHaveBeenCalledTimes(3))
       fireEvent.click(await screen.findByRole('button', { name: 'Read Expiration Date' }))
 
       expect(canvas.drawImage).toHaveBeenCalledWith(expect.any(HTMLVideoElement), 0, 120, 1280, 720, 0, 0, 1280, 720)
@@ -842,6 +845,8 @@ describe('DashboardViewPage', () => {
 
       expect(await screen.findByLabelText('Product name')).toHaveValue('Nutella')
       fireEvent.click(screen.getByRole('button', { name: 'Next' }))
+      expect(await screen.findByLabelText('Live expiration date camera feed')).toBeInTheDocument()
+      fireEvent.click(screen.getByRole('button', { name: 'Manually Enter Expiration Date' }))
       fireEvent.click(screen.getByRole('radio', { name: 'In 3 Days' }))
       fireEvent.click(screen.getByRole('button', { name: 'Next' }))
       expect(screen.getByText('Review Item · Step 3 of 3')).toBeInTheDocument()
@@ -3853,6 +3858,8 @@ describe('DashboardViewPage', () => {
         fireEvent.click(screen.getByRole('button', { name: 'Manually Enter Name' }))
         fireEvent.change(screen.getByLabelText('Product name'), { target: { value: itemName } })
         fireEvent.click(screen.getByRole('button', { name: 'Next' }))
+        expect(await screen.findByLabelText('Live expiration date camera feed')).toBeInTheDocument()
+        fireEvent.click(screen.getByRole('button', { name: 'Manually Enter Expiration Date' }))
         fireEvent.click(screen.getByRole('radio', { name: 'In 3 Days' }))
         fireEvent.click(screen.getByRole('button', { name: 'Next' }))
 
