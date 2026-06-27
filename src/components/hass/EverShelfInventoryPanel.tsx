@@ -37,6 +37,7 @@ interface ExpiryInfo {
 }
 
 type PantryRowShoppingState = 'added' | 'adding' | 'idle'
+type PantryRowDeleteState = 'deleting' | 'idle'
 
 const DAY_MS = 24 * 60 * 60 * 1000
 const SORT_FILTER_COLOR = { r: 42, g: 126, b: 180 }
@@ -73,6 +74,14 @@ const FILTER_OPTIONS: { label: string; subtitle: string; value: InventoryFilterM
   { label: 'No Expiration Date', subtitle: 'Items without a usable expiration date.', value: 'no-expiration' },
 ]
 
+const LOCATION_DELETE_LABELS: Record<EverShelfInventoryLocation, string> = {
+  cabinet: 'cabinet',
+  dispensa: 'pantry',
+  freezer: 'freezer',
+  frigo: 'fridge',
+  spice_rack: 'spice rack',
+}
+
 function compactText(value: string | null | undefined) {
   const trimmed = value?.trim()
   return trimmed ? trimmed : undefined
@@ -80,6 +89,11 @@ function compactText(value: string | null | undefined) {
 
 function itemName(item: EverShelfInventoryItem) {
   return compactText(item.name) ?? 'Untitled item'
+}
+
+function itemInventoryId(item: EverShelfInventoryItem) {
+  const id = Number(item.inventory_id ?? item.id)
+  return Number.isFinite(id) && id > 0 ? id : null
 }
 
 function itemExpiryDate(item: EverShelfInventoryItem) {
@@ -225,12 +239,15 @@ function promptShoppingQuantity(title: string) {
   return Number.isFinite(parsedValue) && parsedValue >= 1 ? parsedValue : null
 }
 
-function PantryRow({ expiry, quantity, title }: { expiry: ExpiryInfo; quantity: number | null; title: string }) {
+function PantryRow({ expiry, inventoryId, locationLabel, onDeleted, quantity, title }: { expiry: ExpiryInfo; inventoryId: number | null; locationLabel: string; onDeleted: (inventoryId: number) => void; quantity: number | null; title: string }) {
   const callService = useHass((state) => state.helpers.callService) as unknown as CallService
+  const [deleteState, setDeleteState] = useState<PantryRowDeleteState>('idle')
   const [shoppingState, setShoppingState] = useState<PantryRowShoppingState>('idle')
-  const [shoppingError, setShoppingError] = useState<string | null>(null)
+  const [rowError, setRowError] = useState<string | null>(null)
   const resetShoppingTimerRef = useRef<number | null>(null)
   const subtitle = rowSubtitle(expiry, quantity)
+  const deleteButtonDisabled = deleteState === 'deleting' || inventoryId === null
+  const deleteButtonLabel = deleteState === 'deleting' ? `Deleting ${title} from EverShelf` : `Delete ${title}`
   const shoppingButtonDisabled = shoppingState === 'adding' || shoppingState === 'added'
   const shoppingButtonLabel = shoppingState === 'adding' ? `Adding ${title} to shopping list` : shoppingState === 'added' ? `Added ${title} to shopping list` : `Add ${title} to shopping list`
 
@@ -259,7 +276,7 @@ function PantryRow({ expiry, quantity, title }: { expiry: ExpiryInfo; quantity: 
 
     clearResetShoppingTimer()
     setShoppingState('adding')
-    setShoppingError(null)
+    setRowError(null)
     void Promise.all([
       callService({
         domain: 'evershelf',
@@ -279,7 +296,27 @@ function PantryRow({ expiry, quantity, title }: { expiry: ExpiryInfo; quantity: 
       .catch((caughtError: unknown) => {
         clearResetShoppingTimer()
         setShoppingState('idle')
-        setShoppingError(caughtError instanceof Error ? caughtError.message : 'Unable to add to shopping list')
+        setRowError(caughtError instanceof Error ? caughtError.message : 'Unable to add to shopping list')
+      })
+  }
+
+  const deleteFromEverShelf = () => {
+    if (deleteButtonDisabled || inventoryId === null) return
+    if (!window.confirm(`Delete ${title} from the ${locationLabel}?`)) return
+
+    setDeleteState('deleting')
+    setRowError(null)
+    void Promise.resolve(callService({
+      domain: 'evershelf',
+      service: 'delete_inventory',
+      serviceData: { inventory_id: inventoryId },
+    }))
+      .then(() => {
+        onDeleted(inventoryId)
+      })
+      .catch((caughtError: unknown) => {
+        setDeleteState('idle')
+        setRowError(caughtError instanceof Error ? caughtError.message : 'Unable to delete item')
       })
   }
 
@@ -288,7 +325,7 @@ function PantryRow({ expiry, quantity, title }: { expiry: ExpiryInfo; quantity: 
       <span className={styles.pantryRowCopy}>
         <strong>{title}</strong>
         <small>{subtitle}</small>
-        {shoppingError && <small className={styles.error} role="alert">{shoppingError}</small>}
+        {rowError && <small className={styles.error} role="alert">{rowError}</small>}
       </span>
       <span aria-label={`${title} actions`} className={styles.pantryRowActions} role="group">
         <button aria-busy={shoppingState === 'adding' ? 'true' : undefined} aria-label={shoppingButtonLabel} className={styles.rowAction} data-shopping-state={shoppingState} disabled={shoppingButtonDisabled} onClick={addToShoppingList} type="button">
@@ -307,7 +344,7 @@ function PantryRow({ expiry, quantity, title }: { expiry: ExpiryInfo; quantity: 
         <button aria-label={`Edit ${title}`} className={styles.rowAction} disabled type="button">
           <MaterialIcon name="mdi:pencil" size={22} />
         </button>
-        <button aria-label={`Delete ${title}`} className={`${styles.rowAction} ${styles.deleteAction}`} disabled type="button">
+        <button aria-busy={deleteState === 'deleting' ? 'true' : undefined} aria-label={deleteButtonLabel} className={`${styles.rowAction} ${styles.deleteAction}`} data-delete-state={deleteState} disabled={deleteButtonDisabled} onClick={deleteFromEverShelf} type="button">
           <MaterialIcon name="mdi:delete" size={22} />
         </button>
       </span>
@@ -684,6 +721,14 @@ export function EverShelfInventoryPanel({ controls, location, title }: EverShelf
   }, [callService, location, setInventoryItemCount, setInventoryLoadPhase])
 
   const loadedItems = useMemo(() => items ?? [], [items])
+  const removeDeletedItem = useCallback((deletedInventoryId: number) => {
+    setItems((currentItems) => {
+      if (currentItems === null) return currentItems
+      const nextItems = currentItems.filter((item) => itemInventoryId(item) !== deletedInventoryId)
+      setInventoryItemCount(nextItems.length)
+      return nextItems
+    })
+  }, [setInventoryItemCount])
   const effectiveSearchQuery = controls.debouncedSearchQuery.trim()
   const visibleItems = useMemo(() => visibleInventoryItems(loadedItems, controls.sortMode, controls.sortDirection, controls.filterMode, controls.debouncedSearchQuery), [controls.debouncedSearchQuery, controls.filterMode, controls.sortDirection, controls.sortMode, loadedItems])
 
@@ -706,10 +751,11 @@ export function EverShelfInventoryPanel({ controls, location, title }: EverShelf
                 {visibleItems.map((item, index) => {
                   const name = itemName(item)
                   const expiry = expiryInfo(itemExpiryDate(item))
+                  const inventoryId = itemInventoryId(item)
                   const quantity = itemQuantity(item)
                   return (
                     <li className={styles.item} key={item.inventory_id ?? item.id ?? `${location}-${name}-${index}`}>
-                      <PantryRow expiry={expiry} quantity={quantity} title={name} />
+                      <PantryRow expiry={expiry} inventoryId={inventoryId} locationLabel={LOCATION_DELETE_LABELS[location]} onDeleted={removeDeletedItem} quantity={quantity} title={name} />
                     </li>
                   )
                 })}

@@ -3455,6 +3455,25 @@ describe('DashboardViewPage', () => {
     expect(within(cannedBeansRow).getByRole('button', { name: 'Edit Canned Beans' }).querySelector('path')).toHaveAttribute('d', materialIconPath('mdi:pencil'))
     expect(within(cannedBeansRow).getByRole('button', { name: 'Delete Canned Beans' })).toHaveClass(/deleteAction/)
     expect(within(cannedBeansRow).getByRole('button', { name: 'Delete Canned Beans' }).querySelector('path')).toHaveAttribute('d', materialIconPath('mdi:delete'))
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false)
+    const callCountBeforeDeniedDelete = mockCallServiceCalls.length
+    fireEvent.click(within(cannedBeansRow).getByRole('button', { name: 'Delete Canned Beans' }))
+    expect(confirmSpy).toHaveBeenCalledWith('Delete Canned Beans from the pantry?')
+    expect(mockCallServiceCalls).toHaveLength(callCountBeforeDeniedDelete)
+    expect(within(pantryList).getByRole('group', { name: `Canned Beans ${cannedBeansLabel}` })).toBeInTheDocument()
+
+    confirmSpy.mockReturnValue(true)
+    await act(async () => {
+      fireEvent.click(within(cannedBeansRow).getByRole('button', { name: 'Delete Canned Beans' }))
+      await Promise.resolve()
+    })
+    expect(mockCallServiceCalls).toContainEqual({
+      domain: 'evershelf',
+      service: 'delete_inventory',
+      serviceData: { inventory_id: 102 },
+    })
+    expect(within(pantryList).queryByRole('group', { name: `Canned Beans ${cannedBeansLabel}` })).not.toBeInTheDocument()
+    confirmSpy.mockRestore()
     expect(mockCallServiceCalls).toContainEqual({
       domain: 'evershelf',
       returnResponse: true,
