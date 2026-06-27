@@ -88,6 +88,10 @@
   -webkit-tap-highlight-color: transparent;
 }
 
+.rowAction:not(:disabled) {
+  cursor: pointer;
+}
+
 .rowAction:disabled {
   cursor: default;
   opacity: 1;
@@ -100,6 +104,51 @@
 
 .deleteAction {
   color: #ff6b6b;
+}
+
+.shoppingIconStack {
+  position: relative;
+  display: grid;
+  width: 22px;
+  height: 22px;
+  place-items: center;
+}
+
+.shoppingIconLayer {
+  grid-area: 1 / 1;
+  display: grid;
+  place-items: center;
+  opacity: 0;
+  transform: scale(0.9);
+  transition:
+    opacity 180ms ease,
+    transform 180ms ease;
+}
+
+.rowAction[data-shopping-state='idle'] .shoppingIconLayer[data-icon-state='cart'],
+.rowAction[data-shopping-state='adding'] .shoppingIconLayer[data-icon-state='spinner'],
+.rowAction[data-shopping-state='added'] .shoppingIconLayer[data-icon-state='check'] {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.shoppingIconLayer[data-icon-state='spinner'] {
+  color: white;
+}
+
+.shoppingIconLayer[data-icon-state='check'] {
+  color: rgba(104, 211, 145, 0.92);
+}
+
+.shoppingSpinner {
+  display: block;
+  width: 18px;
+  height: 18px;
+  border: 2px solid rgba(255, 255, 255, 0.34);
+  border-top-color: white;
+  border-radius: 999px;
+  animation: shoppingSpinnerSpin 720ms linear infinite;
+  box-sizing: border-box;
 }
 
 .pantryRow[data-expiry-tone='soon'] small {
@@ -272,9 +321,20 @@
   }
 }
 
+@keyframes shoppingSpinnerSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .inventoryContent {
+  .inventoryContent,
+  .shoppingSpinner {
     animation-duration: 1ms;
+  }
+
+  .shoppingIconLayer {
+    transition-duration: 1ms;
   }
 }
 

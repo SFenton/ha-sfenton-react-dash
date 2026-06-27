@@ -36,13 +36,17 @@ interface ExpiryInfo {
   tone?: 'expired' | 'soon'
 }
 
+type PantryRowShoppingState = 'added' | 'adding' | 'idle'
+
 const DAY_MS = 24 * 60 * 60 * 1000
 const SORT_FILTER_COLOR = { r: 42, g: 126, b: 180 }
 const SORT_FILTER_ACTIVE_COLOR = { r: 155, g: 110, b: 64 }
 const DASHBOARD_FAB_KEYBOARD_INSET_VAR = '--dashboard-fab-keyboard-inset'
 const INVENTORY_SEARCH_EXPANDED_ATTR = 'data-inventory-search-expanded'
 const INVENTORY_LOADING_EXIT_MS = 500
+const HASS_GROCERY_LIST_ENTITY_ID = 'todo.shopping_list'
 const KEYBOARD_STATE_CLEAR_MS = 150
+const SHOPPING_ADDED_VISIBLE_MS = 3000
 
 const SORT_OPTIONS: { label: string; subtitle: string; value: InventorySortMode }[] = [
   { label: 'Title', subtitle: 'Sort alphabetically by item name.', value: 'title' },
@@ -215,17 +219,80 @@ function rowSubtitle(expiry: ExpiryInfo, quantity: number | null) {
 }
 
 function PantryRow({ expiry, quantity, title }: { expiry: ExpiryInfo; quantity: number | null; title: string }) {
+  const callService = useHass((state) => state.helpers.callService) as unknown as CallService
+  const [shoppingState, setShoppingState] = useState<PantryRowShoppingState>('idle')
+  const [shoppingError, setShoppingError] = useState<string | null>(null)
+  const resetShoppingTimerRef = useRef<number | null>(null)
   const subtitle = rowSubtitle(expiry, quantity)
+  const shoppingButtonDisabled = shoppingState === 'adding' || shoppingState === 'added'
+  const shoppingButtonLabel = shoppingState === 'adding' ? `Adding ${title} to shopping list` : shoppingState === 'added' ? `Added ${title} to shopping list` : `Add ${title} to shopping list`
+
+  const clearResetShoppingTimer = useCallback(() => {
+    if (resetShoppingTimerRef.current === null) return
+    window.clearTimeout(resetShoppingTimerRef.current)
+    resetShoppingTimerRef.current = null
+  }, [])
+
+  const showAddedShoppingState = useCallback(() => {
+    clearResetShoppingTimer()
+    setShoppingState('added')
+    resetShoppingTimerRef.current = window.setTimeout(() => {
+      setShoppingState('idle')
+      resetShoppingTimerRef.current = null
+    }, SHOPPING_ADDED_VISIBLE_MS)
+  }, [clearResetShoppingTimer])
+
+  useEffect(() => clearResetShoppingTimer, [clearResetShoppingTimer])
+
+  const addToShoppingList = () => {
+    if (shoppingButtonDisabled) return
+
+    clearResetShoppingTimer()
+    setShoppingState('adding')
+    setShoppingError(null)
+    void Promise.all([
+      callService({
+        domain: 'evershelf',
+        service: 'add_to_shopping',
+        serviceData: { name: title, quantity: 1 },
+      }),
+      callService({
+        domain: 'todo',
+        service: 'add_item',
+        target: HASS_GROCERY_LIST_ENTITY_ID,
+        serviceData: { item: title },
+      }),
+    ])
+      .then(() => {
+        showAddedShoppingState()
+      })
+      .catch((caughtError: unknown) => {
+        clearResetShoppingTimer()
+        setShoppingState('idle')
+        setShoppingError(caughtError instanceof Error ? caughtError.message : 'Unable to add to shopping list')
+      })
+  }
 
   return (
     <div aria-label={`${title} ${subtitle}`} className={styles.pantryRow} data-expiry-tone={expiry.tone} role="group">
       <span className={styles.pantryRowCopy}>
         <strong>{title}</strong>
         <small>{subtitle}</small>
+        {shoppingError && <small className={styles.error} role="alert">{shoppingError}</small>}
       </span>
       <span aria-label={`${title} actions`} className={styles.pantryRowActions} role="group">
-        <button aria-label={`Add ${title} to shopping list`} className={styles.rowAction} disabled type="button">
-          <MaterialIcon name="mdi:cart-plus" size={22} />
+        <button aria-busy={shoppingState === 'adding' ? 'true' : undefined} aria-label={shoppingButtonLabel} className={styles.rowAction} data-shopping-state={shoppingState} disabled={shoppingButtonDisabled} onClick={addToShoppingList} type="button">
+          <span aria-hidden="true" className={styles.shoppingIconStack}>
+            <span className={styles.shoppingIconLayer} data-icon-state="cart">
+              <MaterialIcon name="mdi:cart-plus" size={22} />
+            </span>
+            <span className={styles.shoppingIconLayer} data-icon-state="spinner">
+              <span className={styles.shoppingSpinner} />
+            </span>
+            <span className={styles.shoppingIconLayer} data-icon-state="check">
+              <MaterialIcon name="mdi:check" size={22} />
+            </span>
+          </span>
         </button>
         <button aria-label={`Edit ${title}`} className={styles.rowAction} disabled type="button">
           <MaterialIcon name="mdi:pencil" size={22} />

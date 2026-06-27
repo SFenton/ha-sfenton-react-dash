@@ -3396,7 +3396,55 @@ describe('DashboardViewPage', () => {
     expect(within(cannedBeansRow).getByText(cannedBeansLabel)).toBeInTheDocument()
     expect(cannedBeansRow.querySelector('path')).toHaveAttribute('d', materialIconPath('mdi:cart-plus'))
     expect(cannedBeansRow.querySelector(`path[d="${materialIconPath('mdi:checkbox-blank-outline')}"]`)).toBeNull()
-    expect(within(cannedBeansRow).getByRole('button', { name: 'Add Canned Beans to shopping list' })).toBeDisabled()
+    let resolveAddToShopping: () => void = () => undefined
+    const addToShoppingPromise = new Promise<void>((resolve) => {
+      resolveAddToShopping = resolve
+    })
+    const originalCallService = mockState.helpers.callService
+    mockState.helpers.callService = (params) => {
+      if (params.domain === 'evershelf' && params.service === 'add_to_shopping') {
+        mockCallServiceCalls.push(params)
+        return addToShoppingPromise
+      }
+      return originalCallService(params)
+    }
+    vi.useFakeTimers()
+    try {
+      const addCannedBeansButton = within(cannedBeansRow).getByRole('button', { name: 'Add Canned Beans to shopping list' })
+      expect(addCannedBeansButton).toBeEnabled()
+      fireEvent.click(addCannedBeansButton)
+      expect(within(cannedBeansRow).getByRole('button', { name: 'Adding Canned Beans to shopping list' })).toHaveAttribute('aria-busy', 'true')
+      expect(within(cannedBeansRow).getByRole('button', { name: 'Adding Canned Beans to shopping list' })).toHaveAttribute('data-shopping-state', 'adding')
+      expect(mockCallServiceCalls).toContainEqual({
+        domain: 'evershelf',
+        service: 'add_to_shopping',
+        serviceData: { name: 'Canned Beans', quantity: 1 },
+      })
+      expect(mockCallServiceCalls).toContainEqual({
+        domain: 'todo',
+        service: 'add_item',
+        target: 'todo.shopping_list',
+        serviceData: { item: 'Canned Beans' },
+      })
+      await act(async () => {
+        resolveAddToShopping()
+        await addToShoppingPromise
+        await Promise.resolve()
+        await Promise.resolve()
+        await Promise.resolve()
+      })
+      expect(within(cannedBeansRow).getByRole('button', { name: 'Added Canned Beans to shopping list' })).toBeDisabled()
+      expect(within(cannedBeansRow).getByRole('button', { name: 'Added Canned Beans to shopping list' }).querySelector(`path[d="${materialIconPath('mdi:check')}"]`)).toBeInTheDocument()
+      expect(within(cannedBeansRow).getByRole('button', { name: 'Added Canned Beans to shopping list' })).toHaveAttribute('data-shopping-state', 'added')
+      act(() => {
+        vi.advanceTimersByTime(3000)
+      })
+      expect(within(cannedBeansRow).getByRole('button', { name: 'Add Canned Beans to shopping list' })).toBeEnabled()
+      expect(within(cannedBeansRow).getByRole('button', { name: 'Add Canned Beans to shopping list' })).toHaveAttribute('data-shopping-state', 'idle')
+    } finally {
+      vi.useRealTimers()
+      mockState.helpers.callService = originalCallService
+    }
     expect(within(cannedBeansRow).getByRole('button', { name: 'Edit Canned Beans' }).querySelector('path')).toHaveAttribute('d', materialIconPath('mdi:pencil'))
     expect(within(cannedBeansRow).getByRole('button', { name: 'Delete Canned Beans' })).toHaveClass(/deleteAction/)
     expect(within(cannedBeansRow).getByRole('button', { name: 'Delete Canned Beans' }).querySelector('path')).toHaveAttribute('d', materialIconPath('mdi:delete'))
