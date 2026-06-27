@@ -407,9 +407,9 @@
   min-height: 72px;
   grid-template-columns: 40px minmax(0, 1fr);
   gap: 14px;
-  align-items: center;
+  align-items: start;
   border: 0;
-  padding: 0;
+  padding: 16px 0;
   color: white;
   background: transparent;
   font: inherit;
@@ -453,14 +453,13 @@
 }
 
 .settingsLinkSubtitle {
-  overflow: hidden;
   color: rgba(255, 255, 255, 0.66);
   font-size: clamp(0.8rem, 3.4vw, 0.9rem);
   font-weight: 680;
   letter-spacing: 0;
   line-height: 1.2;
-  text-overflow: clip;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
+  white-space: normal;
 }
 
 .thermostatPage {
