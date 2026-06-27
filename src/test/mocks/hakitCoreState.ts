@@ -665,6 +665,7 @@ export const mockEntities: Record<string, MockEntity> = {
   'sensor.evershelf_items_in_freezer': entity('sensor.evershelf_items_in_freezer', '5', { unit_of_measurement: 'items' }),
   'sensor.evershelf_items_in_spice_rack': entity('sensor.evershelf_items_in_spice_rack', '6', { unit_of_measurement: 'items' }),
   'sensor.evershelf_items_in_cabinet': entity('sensor.evershelf_items_in_cabinet', '4', { unit_of_measurement: 'items' }),
+  'sensor.evershelf_total_items': entity('sensor.evershelf_total_items', '35', { unit_of_measurement: 'items' }),
   'sensor.evershelf_expiring_soon': entity('sensor.evershelf_expiring_soon', '6', {
     expiring_list: [
       { days_remaining: 2, expiry_date: '2026-06-27', location: 'dispensa', name: 'Rice' },
@@ -786,33 +787,40 @@ export const mockState: MockHassState = {
       }
       if (params.domain === 'evershelf' && params.service === 'list_inventory' && params.returnResponse === true) {
         const location = (params.serviceData as { location?: string } | undefined)?.location
+        const fridgeInventory = [
+          { expiry_date: mockDateOffset(370), id: 204, location: 'frigo', name: 'Salsa' },
+          { expiry_date: mockDateOffset(-400), id: 205, location: 'frigo', name: 'Milk' },
+          { expiry_date: mockDateOffset(5), id: 203, location: 'frigo', name: 'Greek Yogurt', quantity: 2 },
+        ]
+        const freezerInventory = [
+          { expiry_date: mockDateOffset(190), id: 304, location: 'freezer', name: 'Waffles' },
+          { expiry_date: mockDateOffset(20), id: 303, location: 'freezer', name: 'Frozen Peas' },
+        ]
+        const spiceRackInventory = [
+          { expiry_date: mockDateOffset(400), id: 404, location: 'spice_rack', name: 'Cumin' },
+          { expiry_date: mockDateOffset(4), id: 403, location: 'spice_rack', name: 'Paprika' },
+        ]
+        const cabinetInventory = [
+          { expiry_date: mockDateOffset(6), id: 503, location: 'cabinet', name: 'Tea Bags' },
+          { expiry_date: mockDateOffset(80), id: 504, location: 'cabinet', name: 'Paper Plates' },
+        ]
+        const pantryInventory = [
+          { expiry_date: mockDateOffset(40), id: 103, location: 'dispensa', name: 'Ziti' },
+          { expiry_date: mockDateOffset(3), id: 102, location: 'dispensa', name: 'Canned Beans', quantity: 1 },
+          { expiry_date: mockDateOffset(3), id: 106, location: 'dispensa', name: 'Canned Beans', quantity: 1 },
+          { expiry_date: mockDateOffset(-10), id: 101, location: 'dispensa', name: 'Almond Flour' },
+        ]
         const inventory = location === 'frigo'
-          ? [
-              { expiry_date: mockDateOffset(370), id: 204, location: 'frigo', name: 'Salsa' },
-              { expiry_date: mockDateOffset(-400), id: 205, location: 'frigo', name: 'Milk' },
-              { expiry_date: mockDateOffset(5), id: 203, location: 'frigo', name: 'Greek Yogurt', quantity: 2 },
-            ]
+          ? fridgeInventory
           : location === 'freezer'
-            ? [
-                { expiry_date: mockDateOffset(190), id: 304, location: 'freezer', name: 'Waffles' },
-                { expiry_date: mockDateOffset(20), id: 303, location: 'freezer', name: 'Frozen Peas' },
-              ]
+            ? freezerInventory
             : location === 'spice_rack'
-              ? [
-                  { expiry_date: mockDateOffset(400), id: 404, location: 'spice_rack', name: 'Cumin' },
-                  { expiry_date: mockDateOffset(4), id: 403, location: 'spice_rack', name: 'Paprika' },
-                ]
+              ? spiceRackInventory
               : location === 'cabinet'
-                ? [
-                    { expiry_date: mockDateOffset(6), id: 503, location: 'cabinet', name: 'Tea Bags' },
-                    { expiry_date: mockDateOffset(80), id: 504, location: 'cabinet', name: 'Paper Plates' },
-                  ]
-                : [
-                    { expiry_date: mockDateOffset(40), id: 103, location: 'dispensa', name: 'Ziti' },
-                    { expiry_date: mockDateOffset(3), id: 102, location: 'dispensa', name: 'Canned Beans', quantity: 1 },
-                    { expiry_date: mockDateOffset(3), id: 106, location: 'dispensa', name: 'Canned Beans', quantity: 1 },
-                    { expiry_date: mockDateOffset(-10), id: 101, location: 'dispensa', name: 'Almond Flour' },
-                  ]
+                ? cabinetInventory
+                : location
+                  ? pantryInventory
+                  : [...pantryInventory, ...fridgeInventory, ...freezerInventory, ...spiceRackInventory, ...cabinetInventory]
         return Promise.resolve({ response: { inventory } })
       }
       if (params.domain === 'evershelf' && params.service === 'add_scanned_item' && params.returnResponse === true) {

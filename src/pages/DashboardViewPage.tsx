@@ -47,7 +47,7 @@ import {
   OCCUPANCY_GROUPS,
   type EntityGroupConfig,
 } from '../constants/atAGlance'
-import { DASHBOARD_ROUTES, HOME_CABINET_ROUTE_PATH, HOME_FOOD_ROUTE_PATH, HOME_FREEZER_ROUTE_PATH, HOME_FRIDGE_ROUTE_PATH, HOME_GROCERY_LIST_ROUTE_PATH, HOME_PANTRY_ROUTE_PATH, HOME_SPICE_RACK_ROUTE_PATH, PRIMARY_NAV_ROUTES } from '../constants/routes'
+import { DASHBOARD_ROUTES, HOME_ALL_FOOD_ROUTE_PATH, HOME_CABINET_ROUTE_PATH, HOME_FOOD_ROUTE_PATH, HOME_FREEZER_ROUTE_PATH, HOME_FRIDGE_ROUTE_PATH, HOME_GROCERY_LIST_ROUTE_PATH, HOME_PANTRY_ROUTE_PATH, HOME_SPICE_RACK_ROUTE_PATH, PRIMARY_NAV_ROUTES } from '../constants/routes'
 import {
   ADMIN_AUTO_REENABLE_ITEMS,
   CHORE_QUICK_LINKS,
@@ -962,6 +962,7 @@ function groceryCountSubtitle(count: number) {
 }
 
 const EVERSHELF_EXPIRING_SOON_ENTITY_ID = 'sensor.evershelf_expiring_soon'
+const EVERSHELF_TOTAL_ITEMS_ENTITY_ID = 'sensor.evershelf_total_items'
 const EVERSHELF_FOOD_SPACES = [
   { title: 'Pantry', entityId: 'sensor.evershelf_items_in_pantry', location: 'dispensa', icon: 'mdi:food-fork-drink', color: { r: 155, g: 110, b: 64 }, routePath: HOME_PANTRY_ROUTE_PATH },
   { title: 'Fridge', entityId: 'sensor.evershelf_items_in_fridge', location: 'frigo', icon: 'mdi:fridge', color: { r: 42, g: 126, b: 180 }, routePath: HOME_FRIDGE_ROUTE_PATH },
@@ -971,6 +972,7 @@ const EVERSHELF_FOOD_SPACES = [
 ] as const
 
 const EVERSHELF_INVENTORY_PAGES: Record<string, { location: EverShelfInventoryLocation; title: string }> = {
+  [HOME_ALL_FOOD_ROUTE_PATH]: { location: 'all', title: 'All Food' },
   [HOME_PANTRY_ROUTE_PATH]: { location: 'dispensa', title: 'Pantry' },
   [HOME_FRIDGE_ROUTE_PATH]: { location: 'frigo', title: 'Fridge' },
   [HOME_FREEZER_ROUTE_PATH]: { location: 'freezer', title: 'Freezer' },
@@ -1037,6 +1039,12 @@ function foodSummarySubtitle(entities: EntityActionStateMap) {
   return `${itemCount} Items • ${expiringCount} Expiring Soon`
 }
 
+function allFoodSubtitle(entities: EntityActionStateMap) {
+  const itemCount = numericEntityState(entities[EVERSHELF_TOTAL_ITEMS_ENTITY_ID]) || EVERSHELF_FOOD_SPACES.reduce((total, place) => total + numericEntityState(entities[place.entityId]), 0)
+  const expiringCount = numericEntityState(entities[EVERSHELF_EXPIRING_SOON_ENTITY_ID])
+  return `${itemCount} Items • ${expiringCount} Expiring Soon`
+}
+
 function FoodSpacesGrid({ entities, onNavigate }: { entities: EntityActionStateMap; onNavigate: (path: string) => void }) {
   return (
     <Grid>
@@ -1087,6 +1095,18 @@ function FoodPage({ onNavigate }: { onNavigate: (path: string) => void }) {
 
   return (
     <div className={styles.stack}>
+      <section className={styles.section} id={sectionId('All Food')}>
+        <SectionHeader title="All Food" />
+        <Grid>
+          <GlassTile
+            backgroundColor="rgba(88, 128, 94, 0.72)"
+            icon="mdi:food-variant"
+            onClick={() => onNavigate(HOME_ALL_FOOD_ROUTE_PATH)}
+            subtitle={allFoodSubtitle(entities)}
+            title="All Food"
+          />
+        </Grid>
+      </section>
       <section className={styles.section} id={sectionId('Food Spaces')}>
         <SectionHeader title="Food Spaces" />
         <FoodSpacesGrid entities={entities} onNavigate={onNavigate} />

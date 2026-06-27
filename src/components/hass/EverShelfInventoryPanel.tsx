@@ -11,7 +11,7 @@ import { DashboardPageLoading } from '../shell/DashboardPageLoading'
 import type { EverShelfInventoryControls, InventoryFilterMode, InventorySortDirection, InventorySortMode } from './EverShelfInventoryControls'
 import styles from './EverShelfInventoryPanel.module.css'
 
-export type EverShelfInventoryLocation = 'dispensa' | 'frigo' | 'freezer' | 'spice_rack' | 'cabinet'
+export type EverShelfInventoryLocation = 'all' | 'dispensa' | 'frigo' | 'freezer' | 'spice_rack' | 'cabinet'
 
 interface EverShelfInventoryPanelProps {
   controls: EverShelfInventoryControls
@@ -79,6 +79,7 @@ const FILTER_OPTIONS: { label: string; subtitle: string; value: InventoryFilterM
 ]
 
 const LOCATION_DELETE_LABELS: Record<EverShelfInventoryLocation, string> = {
+  all: 'library',
   cabinet: 'cabinet',
   dispensa: 'pantry',
   freezer: 'freezer',
@@ -883,11 +884,12 @@ export function EverShelfInventoryPanel({ controls, location, title }: EverShelf
       }, INVENTORY_LOADING_EXIT_MS)
     }
 
+    const serviceData = location === 'all' ? {} : { location }
     void Promise.resolve(
       callService({
         domain: 'evershelf',
         service: 'list_inventory',
-        serviceData: { location },
+        serviceData,
         returnResponse: true,
       }),
     )

@@ -9,7 +9,7 @@ import type { EverShelfInventoryControls } from '../hass/EverShelfInventoryContr
 import { ScanItemCameraSheet, type EverShelfLocation } from '../hass/ScanItemCameraSheet'
 import { RoomPickerButton } from '../../pages/AtAGlancePage'
 import { createTaskDefaultAssignee, dashboardRoomNameFromPath, isEverShelfInventoryRoute } from './dashboardFloatingAction'
-import { HOME_CABINET_ROUTE_PATH, HOME_FOOD_ROUTE_PATH, HOME_FREEZER_ROUTE_PATH, HOME_FRIDGE_ROUTE_PATH, HOME_GROCERY_LIST_ROUTE_PATH, HOME_PANTRY_ROUTE_PATH, HOME_SPICE_RACK_ROUTE_PATH } from '../../constants/routes'
+import { HOME_ALL_FOOD_ROUTE_PATH, HOME_CABINET_ROUTE_PATH, HOME_FOOD_ROUTE_PATH, HOME_FREEZER_ROUTE_PATH, HOME_FRIDGE_ROUTE_PATH, HOME_GROCERY_LIST_ROUTE_PATH, HOME_PANTRY_ROUTE_PATH, HOME_SPICE_RACK_ROUTE_PATH } from '../../constants/routes'
 
 interface DashboardFloatingActionProps {
   inventoryControls?: EverShelfInventoryControls
@@ -40,6 +40,7 @@ function CreateGroceryButton() {
 }
 
 function scanItemDefaultLocation(path: string): EverShelfLocation | undefined {
+  if (path === HOME_ALL_FOOD_ROUTE_PATH) return 'frigo'
   if (path === HOME_PANTRY_ROUTE_PATH) return 'dispensa'
   if (path === HOME_FRIDGE_ROUTE_PATH) return 'frigo'
   if (path === HOME_FREEZER_ROUTE_PATH) return 'freezer'

@@ -10,7 +10,7 @@ import { DashboardFloatingAction } from './components/shell/DashboardFloatingAct
 import { useEverShelfInventoryControls, type EverShelfInventoryControls } from './components/hass/EverShelfInventoryControls'
 import { SmoothRouteOutlet } from './components/shell/SmoothRouteOutlet'
 import { hasDashboardFloatingAction } from './components/shell/dashboardFloatingAction'
-import { HOME_CABINET_ROUTE_PATH, HOME_FREEZER_ROUTE_PATH, HOME_FRIDGE_ROUTE_PATH, HOME_PANTRY_ROUTE_PATH, HOME_SPICE_RACK_ROUTE_PATH, PRIMARY_NAV_ROUTES, routeUrl } from './constants/routes'
+import { HOME_ALL_FOOD_ROUTE_PATH, HOME_CABINET_ROUTE_PATH, HOME_FREEZER_ROUTE_PATH, HOME_FRIDGE_ROUTE_PATH, HOME_PANTRY_ROUTE_PATH, HOME_SPICE_RACK_ROUTE_PATH, PRIMARY_NAV_ROUTES, routeUrl } from './constants/routes'
 import { dashboardHref } from './hooks/dashboardLocation'
 import { useDashboardRoute } from './hooks/useDashboardRoute'
 import { useSmoothDisplayedRoute } from './hooks/useSmoothDisplayedRoute'
@@ -26,6 +26,7 @@ let initialPreloadCompleted = false
 type InitialContentTransitionState = 'entering' | 'idle' | 'pre-entering'
 
 const FOOD_SPACE_ROUTE_PATHS = new Set([
+  HOME_ALL_FOOD_ROUTE_PATH,
   HOME_CABINET_ROUTE_PATH,
   HOME_FREEZER_ROUTE_PATH,
   HOME_FRIDGE_ROUTE_PATH,

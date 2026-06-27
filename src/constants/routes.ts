@@ -6,6 +6,7 @@ export interface DashboardRouteConfig {
 
 export const HOME_GROCERY_LIST_ROUTE_PATH = 'grocery-list'
 export const HOME_FOOD_ROUTE_PATH = 'food'
+export const HOME_ALL_FOOD_ROUTE_PATH = 'all-food'
 export const HOME_PANTRY_ROUTE_PATH = 'pantry'
 export const HOME_FRIDGE_ROUTE_PATH = 'fridge'
 export const HOME_FREEZER_ROUTE_PATH = 'freezer'
@@ -25,6 +26,7 @@ export const DASHBOARD_ROUTES: DashboardRouteConfig[] = [
   { title: 'Kitchen', path: 'kitchen', icon: 'mdi:stove' },
   { title: 'Groceries', path: HOME_GROCERY_LIST_ROUTE_PATH, icon: 'mdi:cart' },
   { title: 'Food', path: HOME_FOOD_ROUTE_PATH, icon: 'mdi:food-fork-drink' },
+  { title: 'All Food', path: HOME_ALL_FOOD_ROUTE_PATH, icon: 'mdi:food-variant' },
   { title: 'Pantry', path: HOME_PANTRY_ROUTE_PATH, icon: 'mdi:food-fork-drink' },
   { title: 'Fridge', path: HOME_FRIDGE_ROUTE_PATH, icon: 'mdi:fridge' },
   { title: 'Freezer', path: HOME_FREEZER_ROUTE_PATH, icon: 'mdi:snowflake' },
@@ -77,6 +79,7 @@ const HOME_SUB_ROUTE_PATHS = new Set([
   'hallway',
   HOME_GROCERY_LIST_ROUTE_PATH,
   HOME_FOOD_ROUTE_PATH,
+  HOME_ALL_FOOD_ROUTE_PATH,
   HOME_PANTRY_ROUTE_PATH,
   HOME_FRIDGE_ROUTE_PATH,
   HOME_FREEZER_ROUTE_PATH,

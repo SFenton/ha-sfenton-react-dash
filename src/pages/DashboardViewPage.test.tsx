@@ -3059,18 +3059,22 @@ describe('DashboardViewPage', () => {
     render(<DashboardViewPage activePath="food" onNavigate={navigate} path="food" />)
 
     expect(screen.getByRole('heading', { name: 'Food' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'All Food' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Food Spaces' })).toBeInTheDocument()
     const floatingDock = document.querySelector('[data-floating-action-dock="true"]')
     const scanButton = screen.getByRole('button', { name: 'Scan Item' })
     expect(scanButton).toHaveTextContent('Scan Item')
     expect(floatingDock).toContainElement(scanButton)
     expect(floatingDock).not.toContainElement(screen.queryByRole('button', { name: 'Rooms' }))
+    expect(screen.getByRole('button', { name: 'All Food 35 Items • 6 Expiring Soon' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Pantry 12 Items • 1 Expiring Soon' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Fridge 8 Items • 1 Expiring Soon' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Freezer 5 Items • 1 Expiring Soon' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Spice Rack 6 Items • 1 Expiring Soon' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Cabinet 4 Items • 1 Expiring Soon' })).toBeInTheDocument()
 
+    fireEvent.click(screen.getByRole('button', { name: 'All Food 35 Items • 6 Expiring Soon' }))
+    expect(navigate).toHaveBeenCalledWith('all-food')
     fireEvent.click(screen.getByRole('button', { name: 'Pantry 12 Items • 1 Expiring Soon' }))
     expect(navigate).toHaveBeenCalledWith('pantry')
     fireEvent.click(screen.getByRole('button', { name: 'Fridge 8 Items • 1 Expiring Soon' }))
@@ -3378,6 +3382,20 @@ describe('DashboardViewPage', () => {
     const paprikaLabel = testExpiryLabel(4)
     const paperPlatesLabel = testExpiryLabel(80)
     const teaBagsLabel = testExpiryLabel(6)
+    const allFoodView = render(<DashboardViewPage activePath="all-food" onNavigate={() => undefined} path="all-food" />)
+
+    expect(screen.getByRole('heading', { name: 'All Food' })).toBeInTheDocument()
+    const allFoodList = await screen.findByLabelText('All Food inventory list')
+    await waitFor(() => expect(within(allFoodList).getAllByRole('group', { name: /Expires|Expired|No expiration date/i })).toHaveLength(12))
+    expect(mockCallServiceCalls).toContainEqual({
+      domain: 'evershelf',
+      returnResponse: true,
+      service: 'list_inventory',
+      serviceData: {},
+    })
+
+    allFoodView.unmount()
+    mockCallServiceCalls.length = 0
     const pantryView = render(<DashboardViewPage activePath="pantry" onNavigate={() => undefined} path="pantry" />)
 
     expect(screen.getByRole('heading', { name: 'Pantry' })).toBeInTheDocument()
@@ -3804,6 +3822,7 @@ describe('DashboardViewPage', () => {
 
   it('defaults inventory Scan Item storage to the current inventory route', async () => {
     for (const { destination, label, location, path } of [
+      { destination: 'fridge', label: 'Fridge', location: 'frigo', path: 'all-food' },
       { destination: 'pantry', label: 'Pantry', location: 'dispensa', path: 'pantry' },
       { destination: 'fridge', label: 'Fridge', location: 'frigo', path: 'fridge' },
       { destination: 'freezer', label: 'Freezer', location: 'freezer', path: 'freezer' },
@@ -3815,7 +3834,7 @@ describe('DashboardViewPage', () => {
 
       try {
         const view = render(<DashboardViewPage activePath={path} onNavigate={() => undefined} path={path} />)
-        await screen.findByLabelText(`${label} inventory list`)
+        await screen.findByLabelText(`${path === 'all-food' ? 'All Food' : label} inventory list`)
         await screen.findByRole('button', { name: 'Scan Item' })
 
         fireEvent.click(screen.getByRole('button', { name: 'Scan Item' }))
