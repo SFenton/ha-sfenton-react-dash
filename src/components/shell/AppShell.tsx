@@ -16,7 +16,7 @@ export function AppShell({ children, bottomNav, chromeHidden = false, floatingAc
       <div className={styles.backdrop} aria-hidden="true" />
       <div className={styles.scrim} aria-hidden="true" />
       <div className={styles.content}>{children}</div>
-      {!chromeHidden && floatingAction && <div className={styles.floatingAction}>{floatingAction}</div>}
+      {!chromeHidden && floatingAction && <div className={styles.floatingAction} data-floating-action-dock="true">{floatingAction}</div>}
       {!chromeHidden && bottomNav}
     </div>
   )

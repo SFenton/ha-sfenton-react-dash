@@ -1,0 +1,698 @@
+.panel {
+  display: grid;
+  gap: 10px;
+  color: var(--color-text);
+}
+
+.items {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.item {
+  min-width: 0;
+}
+
+.inventoryContent {
+  opacity: 0;
+  animation: inventoryContentFadeIn 170ms ease-out forwards;
+}
+
+.inventoryLoading {
+  min-height: max(260px, calc(100dvh - var(--bottom-nav-height) - 80px - env(safe-area-inset-bottom, 0px)));
+}
+
+.pantryRow {
+  display: grid;
+  width: 100%;
+  min-height: 66px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 8px 0 8px 6px;
+  color: rgba(255, 255, 255, 0.88);
+}
+
+.pantryRow[data-clickable='true'] {
+  cursor: pointer;
+}
+
+.pantryRowCopy {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+}
+
+.pantryRowCopy strong {
+  overflow: hidden;
+  color: white;
+  font-size: 0.9rem;
+  font-weight: 820;
+  letter-spacing: 0;
+  line-height: 1.25;
+  padding-bottom: 2px;
+  text-overflow: clip;
+  white-space: nowrap;
+}
+
+.pantryRowCopy small {
+  overflow: hidden;
+  color: rgba(255, 255, 255, 0.66);
+  font-size: 0.78rem;
+  font-weight: 720;
+  letter-spacing: 0;
+  line-height: 1.2;
+  padding-bottom: 2px;
+  text-overflow: clip;
+  white-space: nowrap;
+}
+
+.pantryRowActions {
+  display: inline-flex;
+  flex: 0 0 auto;
+  gap: 2px;
+  align-items: center;
+  transform: translateX(5.5px);
+}
+
+.rowAction {
+  display: inline-grid;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  border: 0;
+  border-radius: 999px;
+  padding: 0;
+  color: rgba(255, 255, 255, 0.72);
+  background: transparent;
+  cursor: default;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.rowAction:not(:disabled) {
+  cursor: pointer;
+}
+
+.rowAction:disabled {
+  cursor: default;
+  opacity: 1;
+}
+
+.rowAction:focus,
+.rowAction:focus-visible {
+  outline: none;
+}
+
+.deleteAction {
+  color: #ff6b6b;
+}
+
+.shoppingIconStack {
+  position: relative;
+  display: grid;
+  width: 22px;
+  height: 22px;
+  place-items: center;
+}
+
+.shoppingIconLayer {
+  grid-area: 1 / 1;
+  display: grid;
+  place-items: center;
+  opacity: 0;
+  transform: scale(0.9);
+  transition:
+    opacity 180ms ease,
+    transform 180ms ease;
+}
+
+.rowAction[data-shopping-state='idle'] .shoppingIconLayer[data-icon-state='cart'],
+.rowAction[data-shopping-state='adding'] .shoppingIconLayer[data-icon-state='spinner'],
+.rowAction[data-shopping-state='added'] .shoppingIconLayer[data-icon-state='check'] {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.shoppingIconLayer[data-icon-state='spinner'] {
+  color: white;
+}
+
+.shoppingIconLayer[data-icon-state='check'] {
+  color: rgba(104, 211, 145, 0.92);
+}
+
+.shoppingSpinner {
+  display: block;
+  width: 18px;
+  height: 18px;
+  border: 2px solid rgba(255, 255, 255, 0.34);
+  border-top-color: white;
+  border-radius: 999px;
+  animation: shoppingSpinnerSpin 720ms linear infinite;
+  box-sizing: border-box;
+}
+
+.pantryRow[data-expiry-tone='soon'] small {
+  color: #ffd965;
+}
+
+.pantryRow[data-expiry-tone='expired'] small {
+  color: #ff6b6b;
+}
+
+.status,
+.error {
+  font-size: 0.82rem;
+  font-weight: 720;
+  line-height: 1.3;
+}
+
+.status {
+  color: var(--color-muted);
+}
+
+.error {
+  color: #ffb4b4;
+}
+
+.instancesSheet {
+  display: grid;
+  min-width: 0;
+  gap: 12px;
+  overflow: hidden;
+}
+
+.instancesList {
+  display: grid;
+  min-width: 0;
+  gap: 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.instanceRow {
+  display: grid;
+  min-width: 0;
+  max-width: 100%;
+  min-height: 58px;
+  gap: 10px;
+  overflow: hidden;
+  padding: 0 0 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.instanceRow:last-child {
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+
+.instanceHeader {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.instanceCopy {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.instanceCopy strong {
+  overflow: hidden;
+  color: white;
+  font-size: 0.9rem;
+  font-weight: 820;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.instanceCopy small {
+  overflow: hidden;
+  color: rgba(255, 255, 255, 0.62);
+  font-size: 0.76rem;
+  font-weight: 720;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.instanceActions {
+  display: inline-flex;
+  gap: 2px;
+  align-items: center;
+}
+
+.instanceEditPanel {
+  display: grid;
+  min-width: 0;
+  gap: 10px;
+}
+
+.instanceDateField {
+  display: grid;
+  min-width: 0;
+  max-width: 100%;
+  gap: 6px;
+  overflow: hidden;
+  color: white;
+  font-size: 0.75rem;
+  font-weight: 780;
+  letter-spacing: 0;
+}
+
+.instanceDateInputShell {
+  position: relative;
+  display: grid;
+  width: 100%;
+  inline-size: 100%;
+  min-width: 0;
+  min-inline-size: 0;
+  max-width: 100%;
+  max-inline-size: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 14px;
+  color: white;
+  background: rgba(8, 12, 20, 0.74);
+  color-scheme: dark;
+}
+
+.instanceDateDisplay {
+  overflow: hidden;
+  padding: 11px 44px 11px 12px;
+  font: inherit;
+  font-size: 0.94rem;
+  font-weight: 720;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.instanceDateInputShell::after {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  width: 18px;
+  height: 18px;
+  pointer-events: none;
+  content: '';
+  transform: translateY(-50%);
+  opacity: 0.72;
+  background: currentColor;
+  clip-path: path('M7 10H5V12H7V10M11 10H9V12H11V10M15 10H13V12H15V10M17 3H16V1H14V3H6V1H4V3H3C1.89 3 1 3.9 1 5V17C1 18.1 1.89 19 3 19H17C18.1 19 19 18.1 19 17V5C19 3.9 18.1 3 17 3M17 17H3V8H17V17Z');
+}
+
+.instanceDateField input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  border: 0;
+  padding: 0;
+  opacity: 0.01;
+  color: transparent;
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.94rem;
+  font-weight: 720;
+}
+
+.instanceDateField input::-webkit-date-and-time-value {
+  min-width: 0;
+  text-align: left;
+}
+
+.instanceDateField input::-webkit-calendar-picker-indicator {
+  margin-inline-start: 0;
+}
+
+.instanceEditActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.primaryAction,
+.secondaryAction {
+  border: 0;
+  border-radius: 999px;
+  padding: 10px 16px;
+  color: white;
+  font: inherit;
+  font-size: 0.86rem;
+  font-weight: 820;
+}
+
+.primaryAction {
+  flex: 3 1 0;
+  background: rgba(42, 126, 180, 0.95);
+}
+
+.secondaryAction {
+  flex: 1 1 0;
+  background: rgba(190, 56, 56, 0.9);
+}
+
+.inventoryEmpty {
+  --inventory-empty-keyboard-lift: max(0px, calc(var(--dashboard-fab-keyboard-inset, 0px) - var(--bottom-nav-height) + 14px - env(safe-area-inset-bottom, 0px)));
+  min-height: max(180px, calc(100dvh - var(--bottom-nav-height) - 160px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - var(--inventory-empty-keyboard-lift)));
+}
+
+.inventorySearchSlot {
+  display: flex;
+  height: var(--floating-action-size, 56px);
+  min-width: 0;
+  flex: 1 1 auto;
+  pointer-events: auto;
+  transition:
+    flex-basis 360ms ease,
+    opacity 280ms ease,
+    width 360ms ease;
+}
+
+.inventorySearchButton,
+.inventorySearchBar {
+  display: flex;
+  width: 100%;
+  height: var(--floating-action-size, 56px);
+  min-width: 0;
+  align-items: center;
+  box-sizing: border-box;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+  color: white;
+  background: rgba(18, 24, 38, 0.96);
+  box-shadow: var(--shadow-glass), inset 0 1px 0 rgba(255, 255, 255, 0.14);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.inventorySearchButton {
+  gap: 10px;
+  justify-content: flex-start;
+  padding: 0 18px;
+  font: inherit;
+  font-size: 0.92rem;
+  font-weight: 760;
+  letter-spacing: 0;
+  cursor: pointer;
+}
+
+.inventorySearchButton[data-active='true'],
+.inventorySearchBar:focus-within {
+  border-color: rgba(42, 126, 180, 0.86);
+  box-shadow: var(--shadow-glass), 0 0 0 1px rgba(42, 126, 180, 0.48), inset 0 1px 0 rgba(255, 255, 255, 0.14);
+}
+
+.inventorySearchButton span {
+  overflow: hidden;
+  min-width: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.inventorySearchButton:focus,
+.inventorySearchButton:focus-visible,
+.inventorySearchClear:focus,
+.inventorySearchClear:focus-visible,
+.inventorySearchInput:focus,
+.inventorySearchInput:focus-visible {
+  outline: none;
+}
+
+.inventorySearchBar {
+  gap: 10px;
+  padding: 0 14px 0 18px;
+  cursor: text;
+}
+
+.inventorySearchIcon {
+  display: inline-grid;
+  flex: 0 0 auto;
+  place-items: center;
+  color: rgba(255, 255, 255, 0.94);
+}
+
+.inventorySearchInput {
+  width: 100%;
+  min-width: 0;
+  flex: 1 1 auto;
+  border: 0;
+  padding: 0;
+  color: white;
+  background: transparent;
+  font: inherit;
+  font-size: 16px;
+  line-height: 1;
+}
+
+.inventorySearchInput::placeholder {
+  color: rgba(255, 255, 255, 0.58);
+}
+
+.inventorySearchInput::-webkit-search-cancel-button {
+  display: none;
+}
+
+.inventorySearchClear {
+  display: inline-grid;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 0;
+  border-radius: 999px;
+  padding: 0;
+  color: white;
+  background: rgba(255, 255, 255, 0.1);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.inventoryActionSlot {
+  display: inline-flex;
+  width: var(--floating-action-size, 56px);
+  min-width: 0;
+  flex: 0 0 var(--floating-action-size, 56px);
+  overflow: visible;
+  opacity: 1;
+  pointer-events: auto;
+  transition:
+    flex-basis 360ms ease,
+    opacity 280ms ease,
+    width 360ms ease;
+}
+
+.inventoryActionSlot[data-collapsed='true'] {
+  width: 0;
+  flex-basis: 0;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.inventoryActionSlot[data-collapsed='true'] > button {
+  pointer-events: none;
+}
+
+@keyframes inventoryContentFadeIn {
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes shoppingSpinnerSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .inventoryContent,
+  .shoppingSpinner {
+    animation-duration: 1ms;
+  }
+
+  .shoppingIconLayer {
+    transition-duration: 1ms;
+  }
+}
+
+.sheetStack,
+.fieldset,
+.radioGroup {
+  display: grid;
+  min-width: 0;
+}
+
+.sheetStack {
+  gap: 18px;
+}
+
+.fieldset {
+  gap: 8px;
+  border: 0;
+  margin: 0;
+  padding: 0;
+}
+
+.fieldset legend {
+  padding: 0;
+  margin-bottom: 1px;
+  color: white;
+  font-size: 0.9rem;
+  font-weight: 820;
+  line-height: 1.2;
+}
+
+.radioGroup {
+  gap: 4px;
+}
+
+.directionControl {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 14px;
+  align-items: center;
+  padding: 7px 6px 6px;
+}
+
+.directionCopy {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.directionCopy strong {
+  overflow: hidden;
+  color: white;
+  font-size: 0.9rem;
+  font-weight: 820;
+  line-height: 1.2;
+  text-overflow: clip;
+  white-space: nowrap;
+}
+
+.directionCopy small {
+  overflow: hidden;
+  color: rgba(255, 255, 255, 0.66);
+  font-size: 0.78rem;
+  font-weight: 720;
+  line-height: 1.16;
+  text-overflow: clip;
+  white-space: nowrap;
+}
+
+.directionButtons {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.directionButton {
+  position: relative;
+  display: inline-grid;
+  width: 40px;
+  height: 40px;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 0;
+  border-radius: 999px;
+  padding: 0;
+  color: rgba(255, 255, 255, 0.54);
+  background: transparent;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.directionButton:focus,
+.directionButton:focus-visible {
+  outline: none;
+}
+
+.directionButton[data-active='true'] {
+  color: white;
+}
+
+.directionButtonHalo {
+  position: absolute;
+  inset: 2px;
+  z-index: 0;
+  border-radius: inherit;
+  background: rgba(42, 126, 180, 0.95);
+  box-shadow: 0 8px 22px rgba(42, 126, 180, 0.32);
+  opacity: 0;
+  transform: scale(0.68);
+}
+
+.directionButton[data-active='true'] .directionButtonHalo {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.directionButton svg {
+  position: relative;
+  z-index: 1;
+}
+
+.sheetFooter {
+  display: grid;
+  grid-template-columns: minmax(0, 0.78fr) minmax(0, 1fr);
+  gap: 10px;
+}
+
+.primaryAction,
+.secondaryAction,
+.resetAction {
+  display: inline-flex;
+  min-height: 48px;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 16px;
+  padding: 0 14px;
+  color: white;
+  font: inherit;
+  font-size: 0.86rem;
+  font-weight: 850;
+  letter-spacing: 0;
+  cursor: pointer;
+}
+
+.primaryAction:focus,
+.primaryAction:focus-visible,
+.secondaryAction:focus,
+.secondaryAction:focus-visible,
+.resetAction:focus,
+.resetAction:focus-visible {
+  outline: none;
+}
+
+.primaryAction {
+  background: rgba(42, 126, 180, 0.86);
+  box-shadow: var(--shadow-glass), inset 0 1px 0 rgba(255, 255, 255, 0.18);
+}
+
+.secondaryAction {
+  background: rgba(255, 255, 255, 0.14);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+
+.resetAction {
+  border: 1px solid rgb(198, 40, 40);
+  background: rgb(198, 40, 40);
+  box-shadow: 0 10px 24px rgba(198, 40, 40, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.14);
+}

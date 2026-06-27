@@ -1,12 +1,47 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { act } from 'react'
+import { vi } from 'vitest'
 import { materialIconPath } from '../components/core/iconPaths'
+import { INVENTORY_SEARCH_DEBOUNCE_MS } from '../components/hass/EverShelfInventoryControls'
 import { MEDIA_REMOTE_MODAL_STYLE } from '../components/hass/mediaRemoteModalStyle'
 import { VACUUM_MODAL_STYLE } from '../components/hass/vacuumModalStyle'
 import { DashboardViewPage } from './DashboardViewPage'
 import { CONTACT_GROUPS } from '../constants/atAGlance'
 import { ROOM_PAGE_CONFIGS, ROOM_PAGE_ORDER } from '../constants/roomPages'
 import { entity, mockCallServiceCalls, mockEntities, mockFreeSleepScheduleAttributes, mockState, mockTodoItemsByEntity, resetMockHass } from '../test/mocks/hakitCoreState'
+
+type MockDecodeCallback = (
+  result: { getText: () => string } | undefined,
+  error: { message?: string, name?: string } | undefined,
+  controls: { stop: () => void },
+) => void
+
+const zxingMock = vi.hoisted(() => ({
+  decodeFromVideoElement: vi.fn(),
+  latestCallback: undefined as MockDecodeCallback | undefined,
+  possibleFormats: [] as unknown[],
+  scannerStop: vi.fn(),
+}))
+
+vi.mock('@zxing/browser', () => ({
+  BarcodeFormat: {
+    CODE_128: 'CODE_128',
+    CODE_39: 'CODE_39',
+    EAN_13: 'EAN_13',
+    EAN_8: 'EAN_8',
+    ITF: 'ITF',
+    UPC_A: 'UPC_A',
+    UPC_E: 'UPC_E',
+  },
+  BrowserMultiFormatReader: vi.fn(function BrowserMultiFormatReader() {
+    return {
+      set possibleFormats(formats: unknown[]) {
+        zxingMock.possibleFormats = formats
+      },
+      decodeFromVideoElement: zxingMock.decodeFromVideoElement,
+    }
+  }),
+}))
 
 const ROOM_SOURCE_SECURITY_SIZED_MODAL_STYLE = {
   '--modal-desktop-height': 'auto',
@@ -31,10 +66,149 @@ async function clickModalTab(scope: RoleScope, name: string) {
   return button
 }
 
+function restoreProperty(target: object, property: PropertyKey, descriptor: PropertyDescriptor | undefined) {
+  if (descriptor) {
+    Object.defineProperty(target, property, descriptor)
+  } else {
+    delete (target as Record<PropertyKey, unknown>)[property]
+  }
+}
+
+interface MockCameraOptions {
+  viewportHeight?: number
+  viewportWidth?: number
+  videoHeight?: number
+  videoWidth?: number
+}
+
+function setupMockCamera(options: MockCameraOptions = {}) {
+  const videoWidth = options.videoWidth ?? 1280
+  const videoHeight = options.videoHeight ?? 720
+  const viewportWidth = options.viewportWidth ?? 320
+  const viewportHeight = options.viewportHeight ?? 180
+  const stop = vi.fn()
+  const stream = { getTracks: () => [{ stop } as unknown as MediaStreamTrack] } as unknown as MediaStream
+  const getUserMedia = vi.fn(() => Promise.resolve(stream))
+  const originalMediaDevices = navigator.mediaDevices
+  const originalIsSecureContext = window.isSecureContext
+  const originalVideoWidth = Object.getOwnPropertyDescriptor(HTMLVideoElement.prototype, 'videoWidth')
+  const originalVideoHeight = Object.getOwnPropertyDescriptor(HTMLVideoElement.prototype, 'videoHeight')
+  const originalReadyState = Object.getOwnPropertyDescriptor(HTMLMediaElement.prototype, 'readyState')
+  const playSpy = vi.spyOn(HTMLMediaElement.prototype, 'play').mockResolvedValue(undefined)
+  const rectSpy = vi.spyOn(HTMLVideoElement.prototype, 'getBoundingClientRect').mockReturnValue({
+    bottom: viewportHeight,
+    height: viewportHeight,
+    left: 0,
+    right: viewportWidth,
+    toJSON: () => ({}),
+    top: 0,
+    width: viewportWidth,
+    x: 0,
+    y: 0,
+  } as DOMRect)
+  Object.defineProperty(window, 'isSecureContext', { configurable: true, value: true })
+  Object.defineProperty(navigator, 'mediaDevices', { configurable: true, value: { getUserMedia } })
+  Object.defineProperty(HTMLVideoElement.prototype, 'videoWidth', { configurable: true, value: videoWidth })
+  Object.defineProperty(HTMLVideoElement.prototype, 'videoHeight', { configurable: true, value: videoHeight })
+  Object.defineProperty(HTMLMediaElement.prototype, 'readyState', { configurable: true, value: 4 })
+
+  return {
+    getUserMedia,
+    restore: () => {
+      playSpy.mockRestore()
+      rectSpy.mockRestore()
+      Object.defineProperty(window, 'isSecureContext', { configurable: true, value: originalIsSecureContext })
+      Object.defineProperty(navigator, 'mediaDevices', { configurable: true, value: originalMediaDevices })
+      restoreProperty(HTMLVideoElement.prototype, 'videoWidth', originalVideoWidth)
+      restoreProperty(HTMLVideoElement.prototype, 'videoHeight', originalVideoHeight)
+      restoreProperty(HTMLMediaElement.prototype, 'readyState', originalReadyState)
+    },
+    stop,
+  }
+}
+
+function setupMockCanvas(dataUrl = 'data:image/jpeg;base64,expiry-image') {
+  const drawImage = vi.fn()
+  const getContextSpy = vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(() => ({ drawImage }) as unknown as CanvasRenderingContext2D)
+  const toDataUrlSpy = vi.spyOn(HTMLCanvasElement.prototype, 'toDataURL').mockReturnValue(dataUrl)
+
+  return {
+    dataUrl,
+    drawImage,
+    toDataUrl: toDataUrlSpy,
+    restore: () => {
+      getContextSpy.mockRestore()
+      toDataUrlSpy.mockRestore()
+    },
+  }
+}
+
+function testDateInputValue(date: Date) {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+function testDisplayDateValue(date: Date) {
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${month}/${day}/${date.getFullYear()}`
+}
+
+function testExpiryLabel(days: number, quantity?: number) {
+  const expiryDate = testAddDays(testTodayDate(), days)
+  const label = `${days < 0 ? 'Expired' : 'Expires'} on ${testDisplayDateValue(expiryDate)}`
+  return quantity && quantity > 1 ? `Quantity ${quantity} - ${label}` : label
+}
+
+function testTodayDate() {
+  const now = new Date()
+  return new Date(now.getFullYear(), now.getMonth(), now.getDate())
+}
+
+function testAddDays(date: Date, days: number) {
+  const nextDate = new Date(date)
+  nextDate.setDate(nextDate.getDate() + days)
+  return nextDate
+}
+
+function testAddMonths(date: Date, months: number) {
+  const nextDate = new Date(date.getFullYear(), date.getMonth() + months, 1)
+  const lastDay = new Date(nextDate.getFullYear(), nextDate.getMonth() + 1, 0).getDate()
+  nextDate.setDate(Math.min(date.getDate(), lastDay))
+  return nextDate
+}
+
+function testQuickExpirationDateValue(value: '3-days' | '1-week' | '1-month' | '6-months' | '1-year') {
+  const today = testTodayDate()
+  if (value === '3-days') return testDateInputValue(testAddDays(today, 3))
+  if (value === '1-week') return testDateInputValue(testAddDays(today, 7))
+  if (value === '1-month') return testDateInputValue(testAddMonths(today, 1))
+  if (value === '6-months') return testDateInputValue(testAddMonths(today, 6))
+  return testDateInputValue(testAddMonths(today, 12))
+}
+
+async function startAndCaptureExpirationDate(buttonName = 'Read Expiration Date') {
+  fireEvent.click(await screen.findByRole('button', { name: buttonName }))
+  expect(await screen.findByLabelText('Live expiration date camera feed')).toBeInTheDocument()
+  await act(async () => {
+    fireEvent.click(await screen.findByRole('button', { name: buttonName }))
+  })
+}
+
 describe('DashboardViewPage', () => {
   beforeEach(() => {
     window.history.replaceState(null, '', window.location.pathname)
     resetMockHass()
+    zxingMock.decodeFromVideoElement.mockReset()
+    zxingMock.latestCallback = undefined
+    zxingMock.possibleFormats = []
+    zxingMock.scannerStop.mockReset()
+    zxingMock.decodeFromVideoElement.mockImplementation(async (_video: HTMLVideoElement, callback: MockDecodeCallback) => {
+      zxingMock.latestCallback = callback
+      return { stop: zxingMock.scannerStop }
+    })
     delete mockEntities['climate.sleepypod_eight_pod_left_side']
     delete mockEntities['climate.sleepypod_eight_pod_right_side']
     delete mockEntities['number.master_bedroom_sleepypod_eight_pod_left_target_level']
@@ -165,7 +339,7 @@ describe('DashboardViewPage', () => {
     mockEntities['light.kitchen_sink_light'] = entity('light.kitchen_sink_light', 'off')
     render(<DashboardViewPage activePath="kitchen" onNavigate={() => undefined} path="kitchen" />)
 
-    expect(screen.getByRole('button', { name: 'Rooms' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Scan Item' })).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: /Lights/i }))
 
     const dialog = await screen.findByRole('dialog')
@@ -192,6 +366,490 @@ describe('DashboardViewPage', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: 'Living Room area' }))
 
     expect(navigate).toHaveBeenCalledWith('living-room')
+  })
+
+  it('opens the Kitchen scan item camera modal from the FAB', async () => {
+    const camera = setupMockCamera()
+
+    try {
+      render(<DashboardViewPage activePath="kitchen" onNavigate={() => undefined} path="kitchen" />)
+
+      const floatingDock = document.querySelector('[data-floating-action-dock="true"]')
+      const scanButton = screen.getByRole('button', { name: 'Scan Item' })
+      expect(scanButton).toHaveTextContent('Scan Item')
+      expect(floatingDock).toContainElement(scanButton)
+      expect(floatingDock).toContainElement(screen.getByRole('button', { name: 'Rooms' }))
+      expect(within(floatingDock as HTMLElement).getAllByRole('button').map((button) => button.textContent?.trim())).toEqual(['Scan Item', 'Rooms'])
+      fireEvent.click(scanButton)
+
+      expect(await screen.findByRole('dialog', { name: 'Add Item' })).toBeInTheDocument()
+      expect(screen.getByText('Scan Barcode · Step 1 of 3')).toBeInTheDocument()
+      expect(screen.getByText('Use the product barcode to look up item details')).toBeInTheDocument()
+      expect(screen.getByText('Center the barcode inside the camera window and hold steady.')).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Skip Barcode' })).toBeEnabled()
+      expect(screen.queryByText('Scanning for a barcode...')).not.toBeInTheDocument()
+      expect(await screen.findByLabelText('Live item scan camera feed')).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Manually Enter Name' })).toBeEnabled()
+      expect(screen.queryByRole('button', { name: 'Back to barcode scan' })).not.toBeInTheDocument()
+      await waitFor(() => expect(camera.getUserMedia).toHaveBeenCalledWith({
+        audio: false,
+        video: {
+          aspectRatio: { ideal: 16 / 9 },
+          facingMode: { ideal: 'environment' },
+          height: { ideal: 720 },
+          width: { ideal: 1280 },
+        },
+      }))
+      expect(await screen.findByRole('button', { name: 'Skip Barcode' })).toBeEnabled()
+      await waitFor(() => expect(zxingMock.decodeFromVideoElement).toHaveBeenCalled())
+      act(() => {
+        zxingMock.latestCallback?.(undefined, { message: 'No MultiFormat Readers were able to detect the code.', name: 'Error' }, { stop: zxingMock.scannerStop })
+      })
+      expect(screen.queryByText(/No MultiFormat Readers/i)).not.toBeInTheDocument()
+      expect(screen.queryByRole('status')).not.toBeInTheDocument()
+
+      fireEvent.click(screen.getByRole('button', { name: 'Close' }))
+      await waitFor(() => expect(camera.stop).toHaveBeenCalled())
+    } finally {
+      camera.restore()
+    }
+  })
+
+  it('resolves scanned Kitchen barcodes through EverShelf', async () => {
+    const camera = setupMockCamera()
+
+    try {
+      render(<DashboardViewPage activePath="kitchen" onNavigate={() => undefined} path="kitchen" />)
+
+      fireEvent.click(screen.getByRole('button', { name: 'Scan Item' }))
+      expect(await screen.findByRole('dialog', { name: 'Add Item' })).toBeInTheDocument()
+      await waitFor(() => expect(zxingMock.latestCallback).toEqual(expect.any(Function)))
+
+      act(() => {
+        zxingMock.latestCallback?.({ getText: () => '3017620422003' }, undefined, { stop: zxingMock.scannerStop })
+      })
+
+      await waitFor(() => expect(mockCallServiceCalls).toContainEqual({
+        domain: 'evershelf',
+        returnResponse: true,
+        service: 'resolve_barcode',
+        serviceData: { barcode: '3017620422003' },
+      }))
+      expect(await screen.findByLabelText('Product name')).toHaveValue('Nutella')
+      expect(screen.getByRole('button', { name: 'Scan Barcode Again' })).toBeEnabled()
+      expect(screen.queryByText('Source: mock')).not.toBeInTheDocument()
+      expect(screen.queryByLabelText('Live item scan camera feed')).not.toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Next' })).toBeEnabled()
+      expect(camera.stop).toHaveBeenCalled()
+
+      fireEvent.click(screen.getByRole('button', { name: 'Close' }))
+      await waitFor(() => expect(camera.stop).toHaveBeenCalled())
+    } finally {
+      camera.restore()
+    }
+  })
+
+  it('allows manual Kitchen item name and expiration date entry from scan pages', async () => {
+    const camera = setupMockCamera()
+
+    try {
+      render(<DashboardViewPage activePath="kitchen" onNavigate={() => undefined} path="kitchen" />)
+
+      fireEvent.click(screen.getByRole('button', { name: 'Scan Item' }))
+      expect(await screen.findByRole('dialog', { name: 'Add Item' })).toBeInTheDocument()
+      expect(await screen.findByLabelText('Live item scan camera feed')).toBeInTheDocument()
+
+      fireEvent.click(screen.getByRole('button', { name: 'Manually Enter Name' }))
+      expect(screen.getByText('Enter Product Name · Step 1 of 3')).toBeInTheDocument()
+      expect(screen.getByText('Review or enter the product name before continuing.')).toBeInTheDocument()
+      expect(screen.queryByText('Center the barcode inside the camera window and hold steady.')).not.toBeInTheDocument()
+      expect(screen.queryByLabelText('Live item scan camera feed')).not.toBeInTheDocument()
+      expect(camera.stop).toHaveBeenCalled()
+      expect(screen.getByLabelText('Product name')).toHaveValue('')
+      expect(screen.getByRole('button', { name: 'Scan Barcode' })).toBeEnabled()
+      expect(screen.queryByRole('button', { name: 'Skip Barcode' })).not.toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled()
+      fireEvent.change(screen.getByLabelText('Product name'), { target: { value: 'Almond Milk' } })
+      expect(screen.getByRole('button', { name: 'Next' })).toBeEnabled()
+      fireEvent.click(screen.getByRole('button', { name: 'Next' }))
+
+      expect(screen.getByText('Expiration Date · Step 2 of 3')).toBeInTheDocument()
+      expect(screen.getByText('Enter the expiration date manually, or read it from the camera.')).toBeInTheDocument()
+      expect(screen.queryByText('Center the printed expiration date inside the camera window and keep the label flat.')).not.toBeInTheDocument()
+      expect(screen.queryByLabelText('Live expiration date camera feed')).not.toBeInTheDocument()
+      expect(screen.getByLabelText('Expiration date')).toHaveValue('')
+      expect(screen.getByText('Quick Expiration Dates')).toBeInTheDocument()
+      expect(screen.getByRole('radio', { name: 'In 3 Days' })).not.toBeChecked()
+      expect(screen.getByRole('radio', { name: 'In 1 Week' })).not.toBeChecked()
+      expect(screen.getByRole('button', { name: 'Read Expiration Date' })).toBeEnabled()
+      expect(screen.queryByRole('button', { name: 'Skip Expiration' })).not.toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled()
+      const inThreeDays = testQuickExpirationDateValue('3-days')
+      const inOneWeek = testQuickExpirationDateValue('1-week')
+      fireEvent.click(screen.getByRole('radio', { name: 'In 3 Days' }))
+      expect(screen.getByLabelText('Expiration date')).toHaveValue(inThreeDays)
+      expect(screen.getByRole('radio', { name: 'In 3 Days' })).toBeChecked()
+      fireEvent.change(screen.getByLabelText('Expiration date'), { target: { value: inOneWeek } })
+      expect(screen.getByRole('radio', { name: 'In 1 Week' })).toBeChecked()
+      expect(screen.getByRole('radio', { name: 'In 3 Days' })).not.toBeChecked()
+      expect(screen.getByRole('button', { name: 'Next' })).toBeEnabled()
+      fireEvent.click(screen.getByRole('button', { name: 'Next' }))
+
+      expect(screen.getByText('Review Item · Step 3 of 3')).toBeInTheDocument()
+      expect(screen.getByLabelText('Product name')).toHaveValue('Almond Milk')
+      expect(screen.getByLabelText('Expiration date')).toHaveValue(inOneWeek)
+    } finally {
+      camera.restore()
+    }
+  })
+
+  it('shows a blank processing spinner while Kitchen scan services are running', async () => {
+    const camera = setupMockCamera()
+    const canvas = setupMockCanvas()
+    const originalCallService = mockState.helpers.callService
+    let resolveBarcodeResponse!: (value: unknown) => void
+    let resolveExpiryResponse!: (value: unknown) => void
+
+    mockState.helpers.callService = (params) => {
+      if (params.domain === 'evershelf' && params.service === 'resolve_barcode' && params.returnResponse === true) {
+        mockCallServiceCalls.push(params)
+        return new Promise((resolve) => {
+          resolveBarcodeResponse = resolve
+        })
+      }
+      if (params.domain === 'evershelf' && params.service === 'read_expiry_image' && params.returnResponse === true) {
+        mockCallServiceCalls.push(params)
+        return new Promise((resolve) => {
+          resolveExpiryResponse = resolve
+        })
+      }
+      return originalCallService(params)
+    }
+
+    try {
+      render(<DashboardViewPage activePath="kitchen" onNavigate={() => undefined} path="kitchen" />)
+
+      fireEvent.click(screen.getByRole('button', { name: 'Scan Item' }))
+      expect(await screen.findByRole('dialog', { name: 'Add Item' })).toBeInTheDocument()
+      await waitFor(() => expect(zxingMock.latestCallback).toEqual(expect.any(Function)))
+
+      act(() => {
+        zxingMock.latestCallback?.({ getText: () => '3017620422003' }, undefined, { stop: zxingMock.scannerStop })
+      })
+
+      expect(await screen.findByRole('status')).toHaveTextContent('Processing...')
+      expect(screen.queryByText('Use the product barcode to look up item details')).not.toBeInTheDocument()
+      expect(screen.queryByLabelText('Live item scan camera feed')).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Skip Barcode' })).not.toBeInTheDocument()
+
+      await act(async () => {
+        resolveBarcodeResponse({
+          response: {
+            barcode: '3017620422003',
+            found: true,
+            product: { brand: 'Ferrero', image_url: 'https://example.test/nutella.jpg', name: 'Nutella' },
+            source: 'mock',
+          },
+        })
+      })
+
+      expect(await screen.findByLabelText('Product name')).toHaveValue('Nutella')
+      expect(screen.getByRole('button', { name: 'Scan Barcode Again' })).toBeEnabled()
+      expect(screen.queryByLabelText('Live item scan camera feed')).not.toBeInTheDocument()
+      fireEvent.click(screen.getByRole('button', { name: 'Next' }))
+      await startAndCaptureExpirationDate()
+
+      expect(await screen.findByRole('status')).toHaveTextContent('Processing...')
+      expect(screen.queryByText('Take a clear photo of the printed expiration date')).not.toBeInTheDocument()
+      expect(screen.queryByLabelText('Live expiration date camera feed')).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Read Expiration Date' })).not.toBeInTheDocument()
+      expect(screen.queryByAltText('Captured expiration date preview')).not.toBeInTheDocument()
+
+      await act(async () => {
+        resolveExpiryResponse({
+          response: {
+            expiry_date: '2026-06-30',
+            raw_text: 'EXP 06/30/2026',
+            source: 'mock_ocr',
+            success: true,
+          },
+        })
+      })
+
+      expect(await screen.findByText('Jun 30, 2026')).toBeInTheDocument()
+      expect(screen.getByLabelText('Expiration date')).toHaveValue('2026-06-30')
+      expect(screen.getByRole('button', { name: 'Read Expiration Date Again' })).toBeEnabled()
+      expect(screen.queryByLabelText('Live expiration date camera feed')).not.toBeInTheDocument()
+    } finally {
+      mockState.helpers.callService = originalCallService
+      canvas.restore()
+      camera.restore()
+    }
+  })
+
+  it('reads expiration dates from Kitchen scan item photos through EverShelf', async () => {
+    const camera = setupMockCamera({ videoHeight: 960, videoWidth: 1280 })
+    const canvas = setupMockCanvas()
+
+    try {
+      render(<DashboardViewPage activePath="kitchen" onNavigate={() => undefined} path="kitchen" />)
+
+      fireEvent.click(screen.getByRole('button', { name: 'Scan Item' }))
+      expect(await screen.findByRole('dialog', { name: 'Add Item' })).toBeInTheDocument()
+      expect(await screen.findByLabelText('Live item scan camera feed')).toBeInTheDocument()
+      await waitFor(() => expect(zxingMock.decodeFromVideoElement).toHaveBeenCalledTimes(1))
+      fireEvent.click(screen.getByRole('button', { name: 'Skip Barcode' }))
+      expect(screen.getByText('Expiration Date · Step 2 of 3')).toBeInTheDocument()
+      expect(screen.getByText('Enter the expiration date manually, or read it from the camera.')).toBeInTheDocument()
+      expect(screen.queryByText('Take a clear photo of the printed expiration date')).not.toBeInTheDocument()
+      expect(screen.queryByText('Center the printed expiration date inside the camera window and keep the label flat.')).not.toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Back to barcode scan' })).toBeInTheDocument()
+      expect(screen.queryByLabelText('Live expiration date camera feed')).not.toBeInTheDocument()
+      expect(screen.getByText('Quick Expiration Dates')).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Manually Enter Expiration Date' })).not.toBeInTheDocument()
+      expect(camera.getUserMedia).toHaveBeenCalledTimes(1)
+      fireEvent.click(screen.getByRole('button', { name: 'Back to barcode scan' }))
+      expect(screen.getByText('Scan Barcode · Step 1 of 3')).toBeInTheDocument()
+      expect(await screen.findByLabelText('Live item scan camera feed')).toBeInTheDocument()
+      await waitFor(() => expect(zxingMock.decodeFromVideoElement).toHaveBeenCalledTimes(2))
+      expect(camera.getUserMedia).toHaveBeenCalledTimes(2)
+      fireEvent.click(screen.getByRole('button', { name: 'Skip Barcode' }))
+
+      expect(screen.queryByLabelText('Live expiration date camera feed')).not.toBeInTheDocument()
+      expect(camera.getUserMedia).toHaveBeenCalledTimes(2)
+      fireEvent.click(await screen.findByRole('button', { name: 'Read Expiration Date' }))
+      expect(await screen.findByLabelText('Live expiration date camera feed')).toBeInTheDocument()
+      expect(screen.getByText('Take a clear photo of the printed expiration date')).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Manually Enter Expiration Date' })).toBeEnabled()
+      expect(camera.getUserMedia).toHaveBeenCalledTimes(3)
+      fireEvent.click(await screen.findByRole('button', { name: 'Read Expiration Date' }))
+
+      expect(canvas.drawImage).toHaveBeenCalledWith(expect.any(HTMLVideoElement), 0, 120, 1280, 720, 0, 0, 1280, 720)
+      expect(canvas.toDataUrl).toHaveBeenCalledWith('image/jpeg')
+      await waitFor(() => expect(mockCallServiceCalls).toContainEqual({
+        domain: 'evershelf',
+        returnResponse: true,
+        service: 'read_expiry_image',
+        serviceData: { image: canvas.dataUrl },
+      }))
+      expect(await screen.findByText('Jun 30, 2026')).toBeInTheDocument()
+      expect(screen.getByLabelText('Expiration date')).toHaveValue('2026-06-30')
+      expect(screen.queryByText('Source: mock_ocr')).not.toBeInTheDocument()
+      expect(screen.queryByText('Read: EXP 06/30/2026')).not.toBeInTheDocument()
+      expect(screen.queryByText(/EverShelf read/i)).not.toBeInTheDocument()
+      expect(screen.queryByText('Center the printed expiration date inside the camera window and keep the label flat.')).not.toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Read Expiration Date Again' })).toBeEnabled()
+      expect(screen.queryByLabelText('Live expiration date camera feed')).not.toBeInTheDocument()
+      expect(screen.getByText('Quick Expiration Dates')).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Next' })).toBeEnabled()
+      expect(screen.queryByAltText('Captured expiration date preview')).not.toBeInTheDocument()
+      const modalBody = document.querySelector('[data-modal-sheet-body="true"]') as HTMLElement
+      modalBody.scrollTop = 160
+      fireEvent.click(screen.getByRole('button', { name: 'Next' }))
+      expect(screen.getByText('Review Item · Step 3 of 3')).toBeInTheDocument()
+      expect(screen.getByText('Confirm the item details before adding it to your pantry.')).toBeInTheDocument()
+      expect(modalBody.scrollTop).toBe(0)
+      expect(camera.stop).toHaveBeenCalled()
+      fireEvent.click(screen.getByRole('button', { name: 'Back to expiration date' }))
+      expect(screen.getByText('Expiration Date · Step 2 of 3')).toBeInTheDocument()
+      expect(screen.getByLabelText('Expiration date')).toHaveValue('2026-06-30')
+      expect(screen.queryByLabelText('Live expiration date camera feed')).not.toBeInTheDocument()
+      expect(screen.getByText('Quick Expiration Dates')).toBeInTheDocument()
+      expect(camera.getUserMedia).toHaveBeenCalledTimes(3)
+      fireEvent.click(screen.getByRole('button', { name: 'Close' }))
+      await waitFor(() => expect(camera.stop).toHaveBeenCalled())
+    } finally {
+      canvas.restore()
+      camera.restore()
+    }
+  })
+
+  it('selects matching quick expiration dates returned from Kitchen image parsing', async () => {
+    const camera = setupMockCamera()
+    const canvas = setupMockCanvas()
+    const originalCallService = mockState.helpers.callService
+    const inOneMonth = testQuickExpirationDateValue('1-month')
+
+    mockState.helpers.callService = (params) => {
+      if (params.domain === 'evershelf' && params.service === 'read_expiry_image' && params.returnResponse === true) {
+        mockCallServiceCalls.push(params)
+        return Promise.resolve({
+          response: {
+            expiry_date: inOneMonth,
+            raw_text: 'BEST BY next month',
+            source: 'mock_ocr',
+            success: true,
+          },
+        })
+      }
+      return originalCallService(params)
+    }
+
+    try {
+      render(<DashboardViewPage activePath="kitchen" onNavigate={() => undefined} path="kitchen" />)
+
+      fireEvent.click(screen.getByRole('button', { name: 'Scan Item' }))
+      expect(await screen.findByRole('dialog', { name: 'Add Item' })).toBeInTheDocument()
+      fireEvent.click(await screen.findByRole('button', { name: 'Skip Barcode' }))
+      await startAndCaptureExpirationDate()
+
+      expect(await screen.findByLabelText('Expiration date')).toHaveValue(inOneMonth)
+      expect(screen.getByRole('radio', { name: 'In 1 Month' })).toBeChecked()
+      expect(screen.getByRole('radio', { name: 'In 3 Days' })).not.toBeChecked()
+      expect(screen.getByText('Quick Expiration Dates')).toBeInTheDocument()
+    } finally {
+      mockState.helpers.callService = originalCallService
+      canvas.restore()
+      camera.restore()
+    }
+  })
+
+  it('surfaces Gemini rate limits as a manual expiration entry prompt', async () => {
+    const camera = setupMockCamera()
+    const canvas = setupMockCanvas()
+    const originalCallService = mockState.helpers.callService
+
+    mockState.helpers.callService = (params) => {
+      if (params.domain === 'evershelf' && params.service === 'read_expiry_image' && params.returnResponse === true) {
+        mockCallServiceCalls.push(params)
+        return Promise.resolve({
+          response: {
+            error: 'Gemini API error: HTTP 429 too many requests',
+            http_code: 429,
+            success: false,
+          },
+        })
+      }
+      return originalCallService(params)
+    }
+
+    try {
+      render(<DashboardViewPage activePath="kitchen" onNavigate={() => undefined} path="kitchen" />)
+
+      fireEvent.click(screen.getByRole('button', { name: 'Scan Item' }))
+      expect(await screen.findByRole('dialog', { name: 'Add Item' })).toBeInTheDocument()
+      fireEvent.click(await screen.findByRole('button', { name: 'Skip Barcode' }))
+      await startAndCaptureExpirationDate()
+
+      expect(await screen.findByText('AI-based expiration date parsing is unavailable. Please enter the expiration date manually or try again later.')).toBeInTheDocument()
+      expect(screen.getByLabelText('Expiration date')).toHaveValue('')
+      expect(screen.getByRole('button', { name: 'Read Expiration Date' })).toBeEnabled()
+      expect(screen.queryByLabelText('Live expiration date camera feed')).not.toBeInTheDocument()
+      expect(screen.getByText('Quick Expiration Dates')).toBeInTheDocument()
+      await waitFor(() => expect(mockCallServiceCalls).toContainEqual({
+        domain: 'evershelf',
+        returnResponse: true,
+        service: 'read_expiry_image',
+        serviceData: { image: canvas.dataUrl },
+      }))
+    } finally {
+      mockState.helpers.callService = originalCallService
+      canvas.restore()
+      camera.restore()
+    }
+  })
+
+  it('adds scanned Kitchen items to EverShelf inventory', async () => {
+    const camera = setupMockCamera()
+    const canvas = setupMockCanvas()
+
+    try {
+      render(<DashboardViewPage activePath="kitchen" onNavigate={() => undefined} path="kitchen" />)
+
+      fireEvent.click(screen.getByRole('button', { name: 'Scan Item' }))
+      expect(await screen.findByRole('dialog', { name: 'Add Item' })).toBeInTheDocument()
+      await waitFor(() => expect(zxingMock.latestCallback).toEqual(expect.any(Function)))
+
+      act(() => {
+        zxingMock.latestCallback?.({ getText: () => '3017620422003' }, undefined, { stop: zxingMock.scannerStop })
+      })
+
+      expect(await screen.findByLabelText('Product name')).toHaveValue('Nutella')
+      fireEvent.click(screen.getByRole('button', { name: 'Next' }))
+      await startAndCaptureExpirationDate()
+      expect(await screen.findByText('Jun 30, 2026')).toBeInTheDocument()
+      expect(screen.getByLabelText('Expiration date')).toHaveValue('2026-06-30')
+      fireEvent.click(screen.getByRole('button', { name: 'Next' }))
+
+      expect(screen.getByText('Review Item · Step 3 of 3')).toBeInTheDocument()
+      expect(screen.getByText('Confirm the item details before adding it to your pantry.')).toBeInTheDocument()
+      expect(screen.getByLabelText('Product name')).toHaveValue('Nutella')
+      expect(screen.getByLabelText('Quantity')).toHaveValue(1)
+      fireEvent.change(screen.getByLabelText('Quantity'), { target: { value: '0' } })
+      expect(screen.getByLabelText('Quantity')).toHaveValue(1)
+      expect(screen.getByRole('radio', { name: 'Pantry' })).toBeChecked()
+      expect(screen.queryByText('Unit of measurement (optional)')).not.toBeInTheDocument()
+      expect(screen.getByLabelText('Expiration date')).toHaveValue('2026-06-30')
+      fireEvent.click(screen.getByRole('radio', { name: 'Freezer' }))
+      expect(screen.getByText('Confirm the item details before adding it to your freezer.')).toBeInTheDocument()
+      fireEvent.click(screen.getByRole('button', { name: 'Add' }))
+
+      expect(screen.getByText('Adding Item')).toBeInTheDocument()
+      expect(screen.getByText('Adding to Freezer...')).toBeInTheDocument()
+
+      await waitFor(() => expect(mockCallServiceCalls).toContainEqual(expect.objectContaining({
+        domain: 'evershelf',
+        returnResponse: true,
+        service: 'add_scanned_item',
+        serviceData: expect.objectContaining({
+          barcode: '3017620422003',
+          brand: 'Ferrero',
+          expiry_date: '2026-06-30',
+          expiry_user_set: true,
+          image_url: 'https://example.test/nutella.jpg',
+          location: 'freezer',
+          name: 'Nutella',
+          quantity: 1,
+        }),
+      })))
+      const addCall = mockCallServiceCalls.find((call) => call.domain === 'evershelf' && call.service === 'add_scanned_item')
+      expect(addCall?.serviceData).not.toHaveProperty('unit')
+      expect(addCall?.serviceData).not.toHaveProperty('package_unit')
+      expect(await screen.findByText('Item Added')).toBeInTheDocument()
+      expect(screen.getByText('Added to Freezer')).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Done' })).toBeEnabled()
+      fireEvent.click(screen.getByRole('button', { name: 'Done' }))
+      await waitFor(() => expect(camera.stop).toHaveBeenCalled())
+    } finally {
+      canvas.restore()
+      camera.restore()
+    }
+  })
+
+  it('returns to Kitchen scan review with an error when EverShelf add fails', async () => {
+    const camera = setupMockCamera()
+
+    try {
+      render(<DashboardViewPage activePath="kitchen" onNavigate={() => undefined} path="kitchen" />)
+
+      fireEvent.click(screen.getByRole('button', { name: 'Scan Item' }))
+      expect(await screen.findByRole('dialog', { name: 'Add Item' })).toBeInTheDocument()
+      await waitFor(() => expect(zxingMock.latestCallback).toEqual(expect.any(Function)))
+
+      act(() => {
+        zxingMock.latestCallback?.({ getText: () => '3017620422003' }, undefined, { stop: zxingMock.scannerStop })
+      })
+
+      expect(await screen.findByLabelText('Product name')).toHaveValue('Nutella')
+      fireEvent.click(screen.getByRole('button', { name: 'Next' }))
+      fireEvent.click(screen.getByRole('radio', { name: 'In 3 Days' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Next' }))
+      expect(screen.getByText('Review Item · Step 3 of 3')).toBeInTheDocument()
+      fireEvent.change(screen.getByLabelText('Product name'), { target: { value: 'Fail Item' } })
+      fireEvent.click(screen.getByRole('radio', { name: 'Freezer' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Add' }))
+
+      expect(screen.getByText('Adding Item')).toBeInTheDocument()
+      await waitFor(() => expect(screen.getByText('Review Item · Step 3 of 3')).toBeInTheDocument())
+      expect(screen.getByText('Confirm the item details before adding it to your freezer.')).toBeInTheDocument()
+      expect(screen.getByRole('alert')).toHaveTextContent('Mock add failure')
+      expect(screen.getByRole('button', { name: 'Add' })).toBeEnabled()
+      expect(camera.stop).toHaveBeenCalled()
+      fireEvent.click(screen.getByRole('button', { name: 'Close' }))
+      await waitFor(() => expect(camera.stop).toHaveBeenCalled())
+    } finally {
+      camera.restore()
+    }
   })
 
   it('uses a singular active bulb icon for single-light room toggles', async () => {
@@ -2370,14 +3028,63 @@ describe('DashboardViewPage', () => {
     ])
   })
 
-  it('matches Kitchen section order and dishwasher subtitle', () => {
-    render(<DashboardViewPage activePath="kitchen" onNavigate={() => undefined} path="kitchen" />)
+  it('matches Kitchen section order, groceries summaries, and dishwasher subtitle', () => {
+    const navigate = vi.fn()
+    render(<DashboardViewPage activePath="kitchen" onNavigate={navigate} path="kitchen" />)
 
-    expect(screen.getByRole('heading', { name: 'Appliances' })).toBeInTheDocument()
+    const groceriesHeading = screen.getByRole('heading', { name: 'Groceries' })
+    const appliancesHeading = screen.getByRole('heading', { name: 'Appliances' })
+    expect(groceriesHeading).toBeInTheDocument()
+    expect(appliancesHeading).toBeInTheDocument()
+    expect(groceriesHeading.compareDocumentPosition(appliancesHeading)).toBe(Node.DOCUMENT_POSITION_FOLLOWING)
     expect(screen.getByRole('heading', { name: 'Climate' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Grocery List 2 items' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Food 35 Items • 5 Expiring Soon' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Pantry 12 Items • 1 Expiring Soon' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Fridge 8 Items • 1 Expiring Soon' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Freezer 5 Items • 1 Expiring Soon' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Spice Rack 6 Items • 1 Expiring Soon' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Cabinet 4 Items • 1 Expiring Soon' })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Grocery List 2 items' }))
+    expect(navigate).toHaveBeenCalledWith('grocery-list')
+    fireEvent.click(screen.getByRole('button', { name: 'Food 35 Items • 5 Expiring Soon' }))
+    expect(navigate).toHaveBeenCalledWith('food')
     expect(screen.getByLabelText(/Dishwasher Closed.*Eco 50/i)).toBeInTheDocument()
     expect(screen.queryByText('Dishwasher Program')).not.toBeInTheDocument()
     expect(screen.queryByText('Dishwasher Progress')).not.toBeInTheDocument()
+  })
+
+  it('renders the Food home sub-page with food spaces and a Scan Item FAB', () => {
+    const navigate = vi.fn()
+    render(<DashboardViewPage activePath="food" onNavigate={navigate} path="food" />)
+
+    expect(screen.getByRole('heading', { name: 'Food' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'All Food' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Food Spaces' })).toBeInTheDocument()
+    const floatingDock = document.querySelector('[data-floating-action-dock="true"]')
+    const scanButton = screen.getByRole('button', { name: 'Scan Item' })
+    expect(scanButton).toHaveTextContent('Scan Item')
+    expect(floatingDock).toContainElement(scanButton)
+    expect(floatingDock).not.toContainElement(screen.queryByRole('button', { name: 'Rooms' }))
+    expect(screen.getByRole('button', { name: 'All Food 35 Items • 6 Expiring Soon' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Pantry 12 Items • 1 Expiring Soon' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Fridge 8 Items • 1 Expiring Soon' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Freezer 5 Items • 1 Expiring Soon' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Spice Rack 6 Items • 1 Expiring Soon' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Cabinet 4 Items • 1 Expiring Soon' })).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'All Food 35 Items • 6 Expiring Soon' }))
+    expect(navigate).toHaveBeenCalledWith('all-food')
+    fireEvent.click(screen.getByRole('button', { name: 'Pantry 12 Items • 1 Expiring Soon' }))
+    expect(navigate).toHaveBeenCalledWith('pantry')
+    fireEvent.click(screen.getByRole('button', { name: 'Fridge 8 Items • 1 Expiring Soon' }))
+    expect(navigate).toHaveBeenCalledWith('fridge')
+    fireEvent.click(screen.getByRole('button', { name: 'Freezer 5 Items • 1 Expiring Soon' }))
+    expect(navigate).toHaveBeenCalledWith('freezer')
+    fireEvent.click(screen.getByRole('button', { name: 'Spice Rack 6 Items • 1 Expiring Soon' }))
+    expect(navigate).toHaveBeenCalledWith('spice-rack')
+    fireEvent.click(screen.getByRole('button', { name: 'Cabinet 4 Items • 1 Expiring Soon' }))
+    expect(navigate).toHaveBeenCalledWith('cabinet')
   })
 
   it('opens Kitchen vent as the exact vent popup rather than the full climate sheet', async () => {
@@ -2467,6 +3174,22 @@ describe('DashboardViewPage', () => {
     expect(screen.queryByRole('heading', { name: 'Mach-E' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Doors Locked/i })).not.toBeInTheDocument()
     expect(screen.queryByText(/not available in the React dashboard yet/i)).not.toBeInTheDocument()
+  })
+
+  it('does not open the Security modal for a Home-only URL hash', () => {
+    window.history.replaceState(null, '', `${window.location.pathname}#lights-overview`)
+    render(<DashboardViewPage activePath="security" onNavigate={() => undefined} path="security" />)
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(screen.getAllByRole('heading', { name: 'Security' }).length).toBeGreaterThanOrEqual(1)
+  })
+
+  it('preloads Security modal content without opening the live URL hash modal', () => {
+    window.history.replaceState(null, '', `${window.location.pathname}#lights-overview`)
+    const { container } = render(<DashboardViewPage activePath="security" onNavigate={() => undefined} path="security" preload preloadHashes={['#security-system']} />)
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(container.querySelector('[data-preload-modal="security#security-system"]')).toBeInTheDocument()
   })
 
   it('keeps Security header chips outside the page scroller', () => {
@@ -2636,6 +3359,515 @@ describe('DashboardViewPage', () => {
     expect(screen.getByRole('heading', { name: 'Groceries' })).toBeInTheDocument()
     expect(await screen.findByText('Mock task one')).toBeInTheDocument()
     expect(Array.from(screen.getByRole('main').children)[1]).not.toHaveAttribute('data-scroll-lock')
+  })
+
+  it('renders the Home grocery list route with the shared Chores grocery todo page', async () => {
+    render(<DashboardViewPage activePath="grocery-list" onNavigate={() => undefined} path="grocery-list" />)
+
+    expect(screen.getByRole('heading', { name: 'Groceries' })).toBeInTheDocument()
+    expect(await screen.findByLabelText('Grocery List todo list')).toBeInTheDocument()
+    expect(await screen.findByText('Mock task one')).toBeInTheDocument()
+  })
+
+  it('renders Pantry, Fridge, and Freezer inventory rows alphabetically with expiration subtitles', async () => {
+    const almondFlourLabel = testExpiryLabel(-10)
+    const cannedBeansLabel = testExpiryLabel(3, 2)
+    const zitiLabel = testExpiryLabel(40)
+    const greekYogurtLabel = testExpiryLabel(5, 2)
+    const milkLabel = testExpiryLabel(-400)
+    const salsaLabel = testExpiryLabel(370)
+    const frozenPeasLabel = testExpiryLabel(20)
+    const wafflesLabel = testExpiryLabel(190)
+    const cuminLabel = testExpiryLabel(400)
+    const paprikaLabel = testExpiryLabel(4)
+    const paperPlatesLabel = testExpiryLabel(80)
+    const teaBagsLabel = testExpiryLabel(6)
+    const allFoodView = render(<DashboardViewPage activePath="all-food" onNavigate={() => undefined} path="all-food" />)
+
+    expect(screen.getByRole('heading', { name: 'All Food' })).toBeInTheDocument()
+    const allFoodList = await screen.findByLabelText('All Food inventory list')
+    await waitFor(() => expect(within(allFoodList).getAllByRole('group', { name: /Expires|Expired|No expiration date/i })).toHaveLength(12))
+    expect(mockCallServiceCalls).toContainEqual({
+      domain: 'evershelf',
+      returnResponse: true,
+      service: 'list_inventory',
+      serviceData: {},
+    })
+
+    allFoodView.unmount()
+    mockCallServiceCalls.length = 0
+    const pantryView = render(<DashboardViewPage activePath="pantry" onNavigate={() => undefined} path="pantry" />)
+
+    expect(screen.getByRole('heading', { name: 'Pantry' })).toBeInTheDocument()
+    const pantryList = await screen.findByLabelText('Pantry inventory list')
+    await waitFor(() => expect(within(pantryList).getAllByRole('group', { name: /Expires|Expired|No expiration date/i })).toHaveLength(3))
+    expect(screen.getByRole('button', { name: 'Sort' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Filter' })).toBeInTheDocument()
+    expect(within(pantryList).getAllByRole('group', { name: /Expires|Expired|No expiration date/i }).map((row) => row.getAttribute('aria-label'))).toEqual([
+      `Almond Flour ${almondFlourLabel}`,
+      `Canned Beans ${cannedBeansLabel}`,
+      `Ziti ${zitiLabel}`,
+    ])
+    expect(within(pantryList).getByRole('group', { name: `Almond Flour ${almondFlourLabel}` })).toHaveAttribute('data-expiry-tone', 'expired')
+    const almondFlourRow = within(pantryList).getByRole('group', { name: `Almond Flour ${almondFlourLabel}` })
+    const editAlmondFlourButton = within(almondFlourRow).getByRole('button', { name: 'Edit Almond Flour' })
+    expect(editAlmondFlourButton).toBeEnabled()
+    fireEvent.click(editAlmondFlourButton)
+    expect(await screen.findByRole('dialog', { name: /Almond Flour/i })).toBeInTheDocument()
+    expect(screen.getByLabelText('Expiration date for Almond Flour item 1')).toHaveAttribute('type', 'date')
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }))
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: /Almond Flour/i })).not.toBeInTheDocument())
+    const cannedBeansRow = within(pantryList).getByRole('group', { name: `Canned Beans ${cannedBeansLabel}` })
+    expect(cannedBeansRow).toHaveAttribute('data-expiry-tone', 'soon')
+    expect(within(cannedBeansRow).getByText(cannedBeansLabel)).toBeInTheDocument()
+    expect(cannedBeansRow.querySelector('path')).toHaveAttribute('d', materialIconPath('mdi:cart-plus'))
+    expect(cannedBeansRow.querySelector(`path[d="${materialIconPath('mdi:checkbox-blank-outline')}"]`)).toBeNull()
+    let resolveAddToShopping: () => void = () => undefined
+    const addToShoppingPromise = new Promise<void>((resolve) => {
+      resolveAddToShopping = resolve
+    })
+    const originalCallService = mockState.helpers.callService
+    const promptSpy = vi.spyOn(window, 'prompt').mockReturnValue('2')
+    mockState.helpers.callService = (params) => {
+      if (params.domain === 'evershelf' && params.service === 'add_to_shopping') {
+        mockCallServiceCalls.push(params)
+        return addToShoppingPromise
+      }
+      return originalCallService(params)
+    }
+    vi.useFakeTimers()
+    try {
+      const addCannedBeansButton = within(cannedBeansRow).getByRole('button', { name: 'Add Canned Beans to shopping list' })
+      expect(addCannedBeansButton).toBeEnabled()
+      fireEvent.click(addCannedBeansButton)
+      expect(within(cannedBeansRow).getByRole('button', { name: 'Adding Canned Beans to shopping list' })).toHaveAttribute('aria-busy', 'true')
+      expect(within(cannedBeansRow).getByRole('button', { name: 'Adding Canned Beans to shopping list' })).toHaveAttribute('data-shopping-state', 'adding')
+      expect(mockCallServiceCalls).toContainEqual({
+        domain: 'evershelf',
+        service: 'add_to_shopping',
+        serviceData: { name: 'Canned Beans', quantity: 2 },
+      })
+      expect(mockCallServiceCalls).toContainEqual({
+        domain: 'todo',
+        service: 'add_item',
+        target: 'todo.shopping_list',
+        serviceData: { item: 'Canned Beans' },
+      })
+      await act(async () => {
+        resolveAddToShopping()
+        await addToShoppingPromise
+        await Promise.resolve()
+        await Promise.resolve()
+        await Promise.resolve()
+      })
+      expect(within(cannedBeansRow).getByRole('button', { name: 'Added Canned Beans to shopping list' })).toBeDisabled()
+      expect(within(cannedBeansRow).getByRole('button', { name: 'Added Canned Beans to shopping list' }).querySelector(`path[d="${materialIconPath('mdi:check')}"]`)).toBeInTheDocument()
+      expect(within(cannedBeansRow).getByRole('button', { name: 'Added Canned Beans to shopping list' })).toHaveAttribute('data-shopping-state', 'added')
+      act(() => {
+        vi.advanceTimersByTime(3000)
+      })
+      expect(within(cannedBeansRow).getByRole('button', { name: 'Add Canned Beans to shopping list' })).toBeEnabled()
+      expect(within(cannedBeansRow).getByRole('button', { name: 'Add Canned Beans to shopping list' })).toHaveAttribute('data-shopping-state', 'idle')
+      const callCountAfterValidQuantity = mockCallServiceCalls.length
+      promptSpy.mockReturnValue('0')
+      fireEvent.click(within(cannedBeansRow).getByRole('button', { name: 'Add Canned Beans to shopping list' }))
+      expect(mockCallServiceCalls).toHaveLength(callCountAfterValidQuantity)
+      expect(within(cannedBeansRow).getByRole('button', { name: 'Add Canned Beans to shopping list' })).toHaveAttribute('data-shopping-state', 'idle')
+    } finally {
+      promptSpy.mockRestore()
+      vi.useRealTimers()
+      mockState.helpers.callService = originalCallService
+    }
+    expect(within(cannedBeansRow).queryByRole('button', { name: 'Edit Canned Beans' })).not.toBeInTheDocument()
+    expect(within(cannedBeansRow).queryByRole('button', { name: 'Delete Canned Beans' })).not.toBeInTheDocument()
+    const viewCannedBeansButton = within(cannedBeansRow).getByRole('button', { name: 'View Canned Beans individual items' })
+    expect(viewCannedBeansButton.querySelector('path')).toHaveAttribute('d', materialIconPath('mdi:chevron-right'))
+    fireEvent.click(viewCannedBeansButton)
+    expect(await screen.findByRole('dialog', { name: /Canned Beans/i })).toBeInTheDocument()
+    expect(screen.queryByText('Individual pantry items')).not.toBeInTheDocument()
+    const expirationInput = screen.getByLabelText('Expiration date for Canned Beans item 1')
+    expect(expirationInput).toHaveAttribute('type', 'date')
+    expect(screen.queryByRole('button', { name: 'Save Canned Beans item 1' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Reset' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Delete Canned Beans item 1' })).toHaveClass(/deleteAction/)
+
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false)
+    const callCountBeforeDeniedDelete = mockCallServiceCalls.length
+    fireEvent.click(screen.getByRole('button', { name: 'Delete Canned Beans item 1' }))
+    expect(confirmSpy).toHaveBeenCalledWith('Delete Canned Beans item 1 from the pantry?')
+    expect(mockCallServiceCalls).toHaveLength(callCountBeforeDeniedDelete)
+    confirmSpy.mockRestore()
+
+    fireEvent.change(expirationInput, { target: { value: '2026-09-30' } })
+    expect(screen.getByRole('button', { name: 'Save Canned Beans item 1' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Reset' })).toBeInTheDocument()
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Save Canned Beans item 1' }))
+      await Promise.resolve()
+    })
+    expect(mockCallServiceCalls).toContainEqual({
+      domain: 'evershelf',
+      service: 'update_inventory_item',
+      serviceData: { expiry_date: '2026-09-30', inventory_id: 102 },
+    })
+    expect(mockCallServiceCalls).toContainEqual({
+      domain: 'evershelf',
+      returnResponse: true,
+      service: 'list_inventory',
+      serviceData: { location: 'dispensa' },
+    })
+
+    pantryView.unmount()
+    mockCallServiceCalls.length = 0
+    const fridgeView = render(<DashboardViewPage activePath="fridge" onNavigate={() => undefined} path="fridge" />)
+
+    expect(screen.getByRole('heading', { name: 'Fridge' })).toBeInTheDocument()
+    const fridgeList = await screen.findByLabelText('Fridge inventory list')
+    await waitFor(() => expect(within(fridgeList).getAllByRole('group', { name: /Expires|Expired|No expiration date/i })).toHaveLength(3))
+    expect(within(fridgeList).getAllByRole('group', { name: /Expires|Expired|No expiration date/i }).map((row) => row.getAttribute('aria-label'))).toEqual([
+      `Greek Yogurt ${greekYogurtLabel}`,
+      `Milk ${milkLabel}`,
+      `Salsa ${salsaLabel}`,
+    ])
+    expect(within(fridgeList).getByRole('group', { name: `Greek Yogurt ${greekYogurtLabel}` })).toHaveAttribute('data-expiry-tone', 'soon')
+    expect(within(fridgeList).getByRole('group', { name: `Milk ${milkLabel}` })).toHaveAttribute('data-expiry-tone', 'expired')
+    expect(mockCallServiceCalls).toContainEqual({
+      domain: 'evershelf',
+      returnResponse: true,
+      service: 'list_inventory',
+      serviceData: { location: 'frigo' },
+    })
+
+    mockCallServiceCalls.length = 0
+    fridgeView.unmount()
+    render(<DashboardViewPage activePath="freezer" onNavigate={() => undefined} path="freezer" />)
+
+    expect(screen.getByRole('heading', { name: 'Freezer' })).toBeInTheDocument()
+    const freezerList = await screen.findByLabelText('Freezer inventory list')
+    await waitFor(() => expect(within(freezerList).getAllByRole('group', { name: /Expires|Expired|No expiration date/i })).toHaveLength(2))
+    expect(within(freezerList).getAllByRole('group', { name: /Expires|Expired|No expiration date/i }).map((row) => row.getAttribute('aria-label'))).toEqual([
+      `Frozen Peas ${frozenPeasLabel}`,
+      `Waffles ${wafflesLabel}`,
+    ])
+    expect(mockCallServiceCalls).toContainEqual({
+      domain: 'evershelf',
+      returnResponse: true,
+      service: 'list_inventory',
+      serviceData: { location: 'freezer' },
+    })
+
+    mockCallServiceCalls.length = 0
+    render(<DashboardViewPage activePath="spice-rack" onNavigate={() => undefined} path="spice-rack" />)
+
+    expect(screen.getByRole('heading', { name: 'Spice Rack' })).toBeInTheDocument()
+    const spiceRackList = await screen.findByLabelText('Spice Rack inventory list')
+    await waitFor(() => expect(within(spiceRackList).getAllByRole('group', { name: /Expires|Expired|No expiration date/i })).toHaveLength(2))
+    expect(within(spiceRackList).getAllByRole('group', { name: /Expires|Expired|No expiration date/i }).map((row) => row.getAttribute('aria-label'))).toEqual([
+      `Cumin ${cuminLabel}`,
+      `Paprika ${paprikaLabel}`,
+    ])
+    expect(mockCallServiceCalls).toContainEqual({
+      domain: 'evershelf',
+      returnResponse: true,
+      service: 'list_inventory',
+      serviceData: { location: 'spice_rack' },
+    })
+
+    mockCallServiceCalls.length = 0
+    render(<DashboardViewPage activePath="cabinet" onNavigate={() => undefined} path="cabinet" />)
+
+    expect(screen.getByRole('heading', { name: 'Cabinet' })).toBeInTheDocument()
+    const cabinetList = await screen.findByLabelText('Cabinet inventory list')
+    await waitFor(() => expect(within(cabinetList).getAllByRole('group', { name: /Expires|Expired|No expiration date/i })).toHaveLength(2))
+    expect(within(cabinetList).getAllByRole('group', { name: /Expires|Expired|No expiration date/i }).map((row) => row.getAttribute('aria-label'))).toEqual([
+      `Paper Plates ${paperPlatesLabel}`,
+      `Tea Bags ${teaBagsLabel}`,
+    ])
+    expect(mockCallServiceCalls).toContainEqual({
+      domain: 'evershelf',
+      returnResponse: true,
+      service: 'list_inventory',
+      serviceData: { location: 'cabinet' },
+    })
+  })
+
+  it('shows a centered inventory spinner and hides inventory FABs until loading completes', async () => {
+    let resolveInventory: (value: unknown) => void = () => undefined
+    const inventoryPromise = new Promise((resolve) => {
+      resolveInventory = resolve
+    })
+    const originalCallService = mockState.helpers.callService
+    mockState.helpers.callService = (params) => {
+      if (params.domain === 'evershelf' && params.service === 'list_inventory') return inventoryPromise
+      return originalCallService(params)
+    }
+
+    try {
+      render(<DashboardViewPage activePath="pantry" onNavigate={() => undefined} path="pantry" />)
+
+      const status = await screen.findByRole('status', { name: 'Loading Pantry' })
+      expect(status).toHaveAttribute('data-state', 'loading')
+      expect(status).toHaveClass(/inventoryLoading/)
+      expect(screen.queryByRole('button', { name: 'Search inventory' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Sort' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Filter' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Scan Item' })).not.toBeInTheDocument()
+
+      await act(async () => {
+        resolveInventory({
+          response: {
+            inventory: [{ expiry_date: testDateInputValue(testAddDays(testTodayDate(), 2)), id: 901, location: 'dispensa', name: 'Loading Apples' }],
+          },
+        })
+      })
+
+      expect(await screen.findByRole('status', { name: 'Loading Pantry' })).toHaveAttribute('data-state', 'exiting')
+      expect(screen.queryByRole('button', { name: 'Scan Item' })).not.toBeInTheDocument()
+
+      const pantryList = await screen.findByLabelText('Pantry inventory list')
+      await waitFor(() => expect(within(pantryList).getByRole('group', { name: /Loading Apples Expires/i })).toBeInTheDocument())
+      expect(screen.getByRole('button', { name: 'Search inventory' })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Sort' })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Filter' })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Scan Item' })).toBeInTheDocument()
+    } finally {
+      mockState.helpers.callService = originalCallService
+    }
+  })
+
+  it('sorts and filters inventory from the floating action modals', async () => {
+    const greekYogurtLabel = testExpiryLabel(5, 2)
+    const milkLabel = testExpiryLabel(-400)
+    const salsaLabel = testExpiryLabel(370)
+    render(<DashboardViewPage activePath="fridge" onNavigate={() => undefined} path="fridge" />)
+
+    const fridgeList = await screen.findByLabelText('Fridge inventory list')
+    await waitFor(() => expect(within(fridgeList).getAllByRole('group', { name: /Expires|Expired|No expiration date/i })).toHaveLength(3))
+    expect(within(fridgeList).getAllByRole('group', { name: /Expires|Expired|No expiration date/i }).map((row) => row.getAttribute('aria-label'))).toEqual([
+      `Greek Yogurt ${greekYogurtLabel}`,
+      `Milk ${milkLabel}`,
+      `Salsa ${salsaLabel}`,
+    ])
+    const floatingDock = document.querySelector('[data-floating-action-dock="true"]')
+    expect(screen.queryByRole('button', { name: 'Rooms' })).not.toBeInTheDocument()
+    expect(floatingDock).toContainElement(screen.getByRole('button', { name: 'Search inventory' }))
+    expect(floatingDock).toContainElement(screen.getByRole('button', { name: 'Scan Item' }))
+    expect(floatingDock).toContainElement(screen.getByRole('button', { name: 'Sort' }))
+    expect(floatingDock).toContainElement(screen.getByRole('button', { name: 'Filter' }))
+    expect(within(floatingDock as HTMLElement).getAllByRole('button').map((button) => button.getAttribute('aria-label'))).toEqual(['Search inventory', 'Sort', 'Filter', 'Scan Item'])
+    expect(within(floatingDock as HTMLElement).getAllByRole('button').map((button) => button.textContent?.trim())).toEqual(['Search', '', '', ''])
+    expect(screen.queryByLabelText('Fridge inventory controls')).not.toBeInTheDocument()
+
+    const sortButton = screen.getByRole('button', { name: 'Sort' })
+    const filterButton = screen.getByRole('button', { name: 'Filter' })
+    expect(sortButton).toHaveTextContent('')
+    expect(sortButton).toHaveStyle({ '--card-rgb': '42 126 180' })
+    expect(filterButton).toHaveTextContent('')
+    expect(filterButton).toHaveStyle({ '--card-rgb': '42 126 180' })
+
+    fireEvent.click(sortButton)
+    expect(await screen.findByRole('heading', { name: 'Sort Inventory' })).toBeInTheDocument()
+    expect(screen.getByText('Ascending (A-Z, soonest first)')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Ascending' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: 'Descending' })).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.getByRole('button', { name: 'Reset' })).toHaveClass(/resetAction/)
+    fireEvent.click(screen.getByRole('radio', { name: /Expiration Date/i }))
+    fireEvent.click(screen.getByRole('button', { name: 'Apply' }))
+
+    await waitFor(() => expect(screen.queryByRole('heading', { name: 'Sort Inventory' })).not.toBeInTheDocument())
+    expect(sortButton).toHaveStyle({ '--card-rgb': '155 110 64' })
+    expect(within(fridgeList).getAllByRole('group', { name: /Expires|Expired|No expiration date/i }).map((row) => row.getAttribute('aria-label'))).toEqual([
+      `Milk ${milkLabel}`,
+      `Greek Yogurt ${greekYogurtLabel}`,
+      `Salsa ${salsaLabel}`,
+    ])
+
+    fireEvent.click(sortButton)
+    expect(await screen.findByRole('heading', { name: 'Sort Inventory' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Descending' }))
+    expect(screen.getByText('Descending (Z-A, latest first)')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Descending' })).toHaveAttribute('aria-pressed', 'true')
+    fireEvent.click(screen.getByRole('button', { name: 'Apply' }))
+
+    await waitFor(() => expect(screen.queryByRole('heading', { name: 'Sort Inventory' })).not.toBeInTheDocument())
+    expect(within(fridgeList).getAllByRole('group', { name: /Expires|Expired|No expiration date/i }).map((row) => row.getAttribute('aria-label'))).toEqual([
+      `Salsa ${salsaLabel}`,
+      `Greek Yogurt ${greekYogurtLabel}`,
+      `Milk ${milkLabel}`,
+    ])
+
+    fireEvent.click(filterButton)
+    expect(await screen.findByRole('heading', { name: 'Filter Inventory' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Reset' })).toHaveClass(/resetAction/)
+    fireEvent.click(screen.getByRole('radio', { name: /Expiring Within a Week/i }))
+    fireEvent.click(screen.getByRole('button', { name: 'Apply' }))
+
+    await waitFor(() => expect(screen.queryByRole('heading', { name: 'Filter Inventory' })).not.toBeInTheDocument())
+    expect(filterButton).toHaveStyle({ '--card-rgb': '155 110 64' })
+    expect(within(fridgeList).getAllByRole('group', { name: /Expires|Expired|No expiration date/i }).map((row) => row.getAttribute('aria-label'))).toEqual([
+      `Greek Yogurt ${greekYogurtLabel}`,
+    ])
+  })
+
+  it('searches inventory from the floating action dock with Festival-style debounce, clear, and collapse behavior', async () => {
+    const greekYogurtLabel = testExpiryLabel(5, 2)
+    const milkLabel = testExpiryLabel(-400)
+    const salsaLabel = testExpiryLabel(370)
+    render(<DashboardViewPage activePath="fridge" onNavigate={() => undefined} path="fridge" />)
+
+    const fridgeList = await screen.findByLabelText('Fridge inventory list')
+    await waitFor(() => expect(within(fridgeList).getAllByRole('group', { name: /Expires|Expired|No expiration date/i })).toHaveLength(3))
+    const floatingDock = document.querySelector('[data-floating-action-dock="true"]') as HTMLElement
+    const searchButton = within(floatingDock).getByRole('button', { name: 'Search inventory' })
+
+    fireEvent.click(searchButton)
+
+    const searchInput = await screen.findByLabelText('Search inventory')
+    await waitFor(() => expect(searchInput).toHaveFocus())
+    expect(screen.getByRole('button', { name: 'Sort' }).closest('span')).toHaveAttribute('data-collapsed', 'true')
+    expect(screen.getByRole('button', { name: 'Filter' }).closest('span')).toHaveAttribute('data-collapsed', 'true')
+
+    fireEvent.change(searchInput, { target: { value: 'milk' } })
+
+    expect(searchInput).toHaveValue('milk')
+    expect(screen.getByRole('button', { name: 'Clear Search' })).toBeInTheDocument()
+    expect(within(fridgeList).getAllByRole('group', { name: /Expires|Expired|No expiration date/i })).toHaveLength(3)
+
+    await waitFor(
+      () => expect(within(fridgeList).getAllByRole('group', { name: /Expires|Expired|No expiration date/i }).map((row) => row.getAttribute('aria-label'))).toEqual([
+        `Milk ${milkLabel}`,
+      ]),
+      { timeout: INVENTORY_SEARCH_DEBOUNCE_MS + 500 },
+    )
+
+    fireEvent.change(searchInput, { target: { value: 'dragonfruit' } })
+
+    await waitFor(
+      () => expect(screen.getByRole('heading', { name: 'No matching items' })).toBeInTheDocument(),
+      { timeout: INVENTORY_SEARCH_DEBOUNCE_MS + 500 },
+    )
+    expect(screen.getByText('Try a different search or clear the search to show all items.')).toBeInTheDocument()
+
+    fireEvent.blur(searchInput)
+
+    const collapsedSearchButton = await screen.findByRole('button', { name: 'Search inventory' })
+    expect(collapsedSearchButton).toHaveTextContent('dragonfruit')
+    expect(screen.getByRole('button', { name: 'Sort' }).closest('span')).not.toHaveAttribute('data-collapsed')
+    expect(screen.getByRole('button', { name: 'Filter' }).closest('span')).not.toHaveAttribute('data-collapsed')
+
+    fireEvent.click(collapsedSearchButton)
+    const reopenedInput = await screen.findByLabelText('Search inventory')
+    expect(reopenedInput).toHaveValue('dragonfruit')
+    fireEvent.click(screen.getByRole('button', { name: 'Clear Search' }))
+
+    expect(reopenedInput).toHaveValue('')
+    expect(reopenedInput).toHaveFocus()
+    await waitFor(
+      () => expect(within(fridgeList).getAllByRole('group', { name: /Expires|Expired|No expiration date/i }).map((row) => row.getAttribute('aria-label'))).toEqual([
+        `Greek Yogurt ${greekYogurtLabel}`,
+        `Milk ${milkLabel}`,
+        `Salsa ${salsaLabel}`,
+      ]),
+      { timeout: INVENTORY_SEARCH_DEBOUNCE_MS + 500 },
+    )
+  })
+
+  it('renders an inventory empty state when an inventory location has no items', async () => {
+    mockCallServiceCalls.length = 0
+    const listInventory = vi.fn(() => Promise.resolve({ response: { inventory: [] } }))
+    const originalCallService = mockState.helpers.callService
+    mockState.helpers.callService = (params) => {
+      if (params.domain === 'evershelf' && params.service === 'list_inventory') return listInventory(params)
+      return originalCallService(params)
+    }
+
+    try {
+      render(<DashboardViewPage activePath="pantry" onNavigate={() => undefined} path="pantry" />)
+
+      expect(await screen.findByRole('heading', { name: 'No items found' })).toBeInTheDocument()
+      expect(screen.getByText('Scan an item to add it to your pantry.')).toBeInTheDocument()
+      expect(screen.getByRole('heading', { name: 'No items found' }).closest('[data-empty-layout]')).toHaveAttribute('data-empty-layout', 'centered')
+      expect(screen.queryByRole('button', { name: 'Search inventory' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Sort' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Filter' })).not.toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Scan Item' })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Scan Item' })).toHaveTextContent('Scan Item')
+    } finally {
+      mockState.helpers.callService = originalCallService
+    }
+  })
+
+  it('renders an inventory error as an empty state when inventory cannot load', async () => {
+    mockCallServiceCalls.length = 0
+    const originalCallService = mockState.helpers.callService
+    mockState.helpers.callService = (params) => {
+      if (params.domain === 'evershelf' && params.service === 'list_inventory') return Promise.reject(new Error('EverShelf is unavailable'))
+      return originalCallService(params)
+    }
+
+    try {
+      render(<DashboardViewPage activePath="freezer" onNavigate={() => undefined} path="freezer" />)
+
+      expect(await screen.findByRole('heading', { name: 'Unable to load Freezer' })).toBeInTheDocument()
+      expect(screen.getByText('Freezer is unavailable')).toBeInTheDocument()
+      expect(screen.getByRole('heading', { name: 'Unable to load Freezer' }).closest('[data-empty-layout]')).toHaveAttribute('data-empty-layout', 'centered')
+      expect(screen.queryByRole('button', { name: 'Search inventory' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Sort' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Filter' })).not.toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Scan Item' })).toHaveTextContent('Scan Item')
+    } finally {
+      mockState.helpers.callService = originalCallService
+    }
+  })
+
+  it('defaults inventory Scan Item storage to the current inventory route', async () => {
+    for (const { destination, label, location, path } of [
+      { destination: 'fridge', label: 'Fridge', location: 'frigo', path: 'all-food' },
+      { destination: 'pantry', label: 'Pantry', location: 'dispensa', path: 'pantry' },
+      { destination: 'fridge', label: 'Fridge', location: 'frigo', path: 'fridge' },
+      { destination: 'freezer', label: 'Freezer', location: 'freezer', path: 'freezer' },
+      { destination: 'spice rack', label: 'Spice Rack', location: 'spice_rack', path: 'spice-rack' },
+      { destination: 'cabinet', label: 'Cabinet', location: 'cabinet', path: 'cabinet' },
+    ]) {
+      const camera = setupMockCamera()
+      const itemName = `${label} Test Item`
+
+      try {
+        const view = render(<DashboardViewPage activePath={path} onNavigate={() => undefined} path={path} />)
+        await screen.findByLabelText(`${path === 'all-food' ? 'All Food' : label} inventory list`)
+        await screen.findByRole('button', { name: 'Scan Item' })
+
+        fireEvent.click(screen.getByRole('button', { name: 'Scan Item' }))
+        expect(await screen.findByRole('dialog', { name: 'Add Item' })).toBeInTheDocument()
+        expect(await screen.findByLabelText('Live item scan camera feed')).toBeInTheDocument()
+        fireEvent.click(screen.getByRole('button', { name: 'Manually Enter Name' }))
+        fireEvent.change(screen.getByLabelText('Product name'), { target: { value: itemName } })
+        fireEvent.click(screen.getByRole('button', { name: 'Next' }))
+        fireEvent.click(screen.getByRole('radio', { name: 'In 3 Days' }))
+        fireEvent.click(screen.getByRole('button', { name: 'Next' }))
+
+        expect(screen.getByText(`Confirm the item details before adding it to your ${destination}.`)).toBeInTheDocument()
+        expect(screen.getByRole('radio', { name: label })).toBeChecked()
+        fireEvent.click(screen.getByRole('button', { name: 'Add' }))
+
+        await waitFor(() => expect(mockCallServiceCalls).toContainEqual(expect.objectContaining({
+          domain: 'evershelf',
+          returnResponse: true,
+          service: 'add_scanned_item',
+          serviceData: expect.objectContaining({
+            location,
+            name: itemName,
+          }),
+        })))
+        expect(await screen.findByText(`Added to ${label}`)).toBeInTheDocument()
+
+        fireEvent.click(screen.getByRole('button', { name: 'Done' }))
+        await waitFor(() => expect(camera.stop).toHaveBeenCalled())
+        view.unmount()
+      } finally {
+        camera.restore()
+      }
+    }
   })
 
   it('renders chore tasks as Ecobee-style checkbox rows with optional subtitles', async () => {
@@ -3112,5 +4344,21 @@ describe('DashboardViewPage', () => {
     await clickModalTab(within(dialog), 'Info')
     expect(within(controlsPane).getByRole('group', { name: 'Main Filter 54h left' })).toBeInTheDocument()
     expect(within(controlsPane).getByRole('group', { name: 'Detergent OK' })).toBeInTheDocument()
+  })
+
+  it('opens the real Vacuums route modal from a vacuum URL hash', async () => {
+    window.history.replaceState(null, '', `${window.location.pathname}#main-floor-robot-vacuum`)
+    render(<DashboardViewPage activePath="vacuums" onNavigate={() => undefined} path="vacuums" />)
+
+    expect(await screen.findByRole('dialog')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Main Floor Robot Vacuum' })).toBeInTheDocument()
+  })
+
+  it('preloads the Vacuums route without opening a vacuum URL hash modal', () => {
+    window.history.replaceState(null, '', `${window.location.pathname}#main-floor-robot-vacuum`)
+    render(<DashboardViewPage activePath="vacuums" onNavigate={() => undefined} path="vacuums" preload />)
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Robot Vacuums' })).toBeInTheDocument()
   })
 })

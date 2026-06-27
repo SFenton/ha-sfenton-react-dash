@@ -1,14 +1,20 @@
 import { useCallback, useEffect, useState } from 'react'
 import { DASHBOARD_ROUTE_CHANGE_EVENT, dashboardEventTargets, dashboardHash, dashboardPathWithSearch, pushDashboardUrl } from './dashboardLocation'
 
+interface UseHashModalOptions {
+  disabled?: boolean
+}
+
 function currentHash() {
   return dashboardHash()
 }
 
-export function useHashModal() {
-  const [hash, setHash] = useState(currentHash)
+export function useHashModal({ disabled = false }: UseHashModalOptions = {}) {
+  const [hash, setHash] = useState(() => disabled ? '' : currentHash())
 
   useEffect(() => {
+    if (disabled) return undefined
+
     const syncHash = () => setHash(currentHash())
     const targets = dashboardEventTargets()
 
@@ -25,19 +31,21 @@ export function useHashModal() {
         target.removeEventListener(DASHBOARD_ROUTE_CHANGE_EVENT, syncHash)
       })
     }
-  }, [])
+  }, [disabled])
 
   const openHash = useCallback((nextHash: string) => {
+    if (disabled) return
     if (currentHash() === nextHash) return
     pushDashboardUrl(nextHash)
     setHash(nextHash)
-  }, [])
+  }, [disabled])
 
   const closeHash = useCallback(() => {
+    if (disabled) return
     const nextUrl = dashboardPathWithSearch()
     pushDashboardUrl(nextUrl)
     setHash('')
-  }, [])
+  }, [disabled])
 
-  return { hash, openHash, closeHash }
+  return { hash: disabled ? '' : hash, openHash, closeHash }
 }

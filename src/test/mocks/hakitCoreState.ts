@@ -55,6 +55,15 @@ const mockHourlyWeatherForecast = Array.from({ length: 24 }, (_, index) => {
   }
 })
 
+function mockDateOffset(days: number) {
+  const date = new Date()
+  date.setDate(date.getDate() + days)
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
 interface MockTodoItem {
   description?: string
   due?: string
@@ -651,6 +660,23 @@ export const mockEntities: Record<string, MockEntity> = {
   'select.valetudo_exaltedsneakydeer_fan': entity('select.valetudo_exaltedsneakydeer_fan', 'balanced', { options: ['quiet', 'balanced', 'turbo', 'max'] }),
   'select.valetudo_exaltedsneakydeer_water': entity('select.valetudo_exaltedsneakydeer_water', 'medium', { options: ['low', 'medium', 'high'] }),
   'input_select.main_floor_vacuum_cleaning_passes': entity('input_select.main_floor_vacuum_cleaning_passes', '1', { options: ['1', '2', '3'] }),
+  'sensor.evershelf_items_in_pantry': entity('sensor.evershelf_items_in_pantry', '12', { unit_of_measurement: 'items' }),
+  'sensor.evershelf_items_in_fridge': entity('sensor.evershelf_items_in_fridge', '8', { unit_of_measurement: 'items' }),
+  'sensor.evershelf_items_in_freezer': entity('sensor.evershelf_items_in_freezer', '5', { unit_of_measurement: 'items' }),
+  'sensor.evershelf_items_in_spice_rack': entity('sensor.evershelf_items_in_spice_rack', '6', { unit_of_measurement: 'items' }),
+  'sensor.evershelf_items_in_cabinet': entity('sensor.evershelf_items_in_cabinet', '4', { unit_of_measurement: 'items' }),
+  'sensor.evershelf_total_items': entity('sensor.evershelf_total_items', '35', { unit_of_measurement: 'items' }),
+  'sensor.evershelf_expiring_soon': entity('sensor.evershelf_expiring_soon', '6', {
+    expiring_list: [
+      { days_remaining: 2, expiry_date: '2026-06-27', location: 'dispensa', name: 'Rice' },
+      { days_remaining: 7, expiry_date: '2026-07-02', location: 'frigo', name: 'Milk' },
+      { days_remaining: 8, expiry_date: '2026-07-03', location: 'frigo', name: 'Yogurt' },
+      { days_remaining: 5, expiry_date: '2026-06-30', location: 'freezer', name: 'Waffles' },
+      { days_remaining: 4, expiry_date: '2026-06-29', location: 'spice_rack', name: 'Paprika' },
+      { days_remaining: 6, expiry_date: '2026-07-01', location: 'cabinet', name: 'Tea Bags' },
+    ],
+    unit_of_measurement: 'items',
+  }),
   'input_boolean.roborock_living_room_toggle': entity('input_boolean.roborock_living_room_toggle', 'off'),
   'input_boolean.roborock_master_bedroom_toggle': entity('input_boolean.roborock_master_bedroom_toggle', 'off'),
   'input_boolean.roborock_kitchen_toggle': entity('input_boolean.roborock_kitchen_toggle', 'off'),
@@ -737,6 +763,87 @@ export const mockState: MockHassState = {
       if (params.domain === 'weather' && params.service === 'get_forecasts' && params.returnResponse === true) {
         const forecast = (params.serviceData as { type?: string } | undefined)?.type === 'hourly' ? mockHourlyWeatherForecast : mockDailyWeatherForecast
         return Promise.resolve({ response: { 'weather.pirate_weather': { forecast } } })
+      }
+      if (params.domain === 'evershelf' && params.service === 'resolve_barcode' && params.returnResponse === true) {
+        const barcode = (params.serviceData as { barcode?: string } | undefined)?.barcode
+        return Promise.resolve({
+          response: {
+            barcode,
+            found: true,
+            product: { brand: 'Ferrero', image_url: 'https://example.test/nutella.jpg', name: 'Nutella' },
+            source: 'mock',
+          },
+        })
+      }
+      if (params.domain === 'evershelf' && params.service === 'read_expiry_image' && params.returnResponse === true) {
+        return Promise.resolve({
+          response: {
+            expiry_date: '2026-06-30',
+            raw_text: 'EXP 06/30/2026',
+            source: 'mock_ocr',
+            success: true,
+          },
+        })
+      }
+      if (params.domain === 'evershelf' && params.service === 'list_inventory' && params.returnResponse === true) {
+        const location = (params.serviceData as { location?: string } | undefined)?.location
+        const fridgeInventory = [
+          { expiry_date: mockDateOffset(370), id: 204, location: 'frigo', name: 'Salsa' },
+          { expiry_date: mockDateOffset(-400), id: 205, location: 'frigo', name: 'Milk' },
+          { expiry_date: mockDateOffset(5), id: 203, location: 'frigo', name: 'Greek Yogurt', quantity: 2 },
+        ]
+        const freezerInventory = [
+          { expiry_date: mockDateOffset(190), id: 304, location: 'freezer', name: 'Waffles' },
+          { expiry_date: mockDateOffset(20), id: 303, location: 'freezer', name: 'Frozen Peas' },
+        ]
+        const spiceRackInventory = [
+          { expiry_date: mockDateOffset(400), id: 404, location: 'spice_rack', name: 'Cumin' },
+          { expiry_date: mockDateOffset(4), id: 403, location: 'spice_rack', name: 'Paprika' },
+        ]
+        const cabinetInventory = [
+          { expiry_date: mockDateOffset(6), id: 503, location: 'cabinet', name: 'Tea Bags' },
+          { expiry_date: mockDateOffset(80), id: 504, location: 'cabinet', name: 'Paper Plates' },
+        ]
+        const pantryInventory = [
+          { expiry_date: mockDateOffset(40), id: 103, location: 'dispensa', name: 'Ziti' },
+          { expiry_date: mockDateOffset(3), id: 102, location: 'dispensa', name: 'Canned Beans', quantity: 1 },
+          { expiry_date: mockDateOffset(3), id: 106, location: 'dispensa', name: 'Canned Beans', quantity: 1 },
+          { expiry_date: mockDateOffset(-10), id: 101, location: 'dispensa', name: 'Almond Flour' },
+        ]
+        const inventory = location === 'frigo'
+          ? fridgeInventory
+          : location === 'freezer'
+            ? freezerInventory
+            : location === 'spice_rack'
+              ? spiceRackInventory
+              : location === 'cabinet'
+                ? cabinetInventory
+                : location
+                  ? pantryInventory
+                  : [...pantryInventory, ...fridgeInventory, ...freezerInventory, ...spiceRackInventory, ...cabinetInventory]
+        return Promise.resolve({ response: { inventory } })
+      }
+      if (params.domain === 'evershelf' && params.service === 'add_scanned_item' && params.returnResponse === true) {
+        const serviceData = params.serviceData as { name?: string } | undefined
+        if (serviceData?.name === 'Fail Item') {
+          return Promise.resolve({
+            response: {
+              message: 'Mock add failure',
+              success: false,
+            },
+          })
+        }
+        return Promise.resolve({
+          response: {
+            inventory: {
+              new_qty: 1,
+              total_qty: 1,
+              unit: 'pz',
+            },
+            product_id: 123,
+            success: true,
+          },
+        })
       }
     },
     joinHassUrl: (path) => `http://mock-hass.local${path}`,

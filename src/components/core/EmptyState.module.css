@@ -1,0 +1,24 @@
+.emptyState {
+  display: grid;
+  min-height: calc(100vh - var(--bottom-nav-height) - 160px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+  align-content: center;
+  gap: 10px;
+  justify-items: center;
+  box-sizing: border-box;
+  padding: 24px 12px;
+  color: white;
+  text-align: center;
+}
+
+.emptyState h2 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 800;
+  line-height: 1.02;
+}
+
+.emptyState > div {
+  max-width: 680px;
+  margin: 0 auto;
+  font-size: 14px;
+}

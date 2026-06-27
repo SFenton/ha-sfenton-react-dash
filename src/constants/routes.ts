@@ -4,6 +4,15 @@ export interface DashboardRouteConfig {
   icon: string
 }
 
+export const HOME_GROCERY_LIST_ROUTE_PATH = 'grocery-list'
+export const HOME_FOOD_ROUTE_PATH = 'food'
+export const HOME_ALL_FOOD_ROUTE_PATH = 'all-food'
+export const HOME_PANTRY_ROUTE_PATH = 'pantry'
+export const HOME_FRIDGE_ROUTE_PATH = 'fridge'
+export const HOME_FREEZER_ROUTE_PATH = 'freezer'
+export const HOME_SPICE_RACK_ROUTE_PATH = 'spice-rack'
+export const HOME_CABINET_ROUTE_PATH = 'cabinet'
+
 export const DASHBOARD_ROUTES: DashboardRouteConfig[] = [
   { title: 'Overview', path: 'overview', icon: 'mdi:home' },
   { title: 'Security', path: 'security', icon: 'mdi:shield' },
@@ -15,6 +24,14 @@ export const DASHBOARD_ROUTES: DashboardRouteConfig[] = [
   { title: 'Hallway', path: 'hallway', icon: 'mdi:door-open' },
   { title: 'Office', path: 'office', icon: 'mdi:desktop-tower' },
   { title: 'Kitchen', path: 'kitchen', icon: 'mdi:stove' },
+  { title: 'Groceries', path: HOME_GROCERY_LIST_ROUTE_PATH, icon: 'mdi:cart' },
+  { title: 'Food', path: HOME_FOOD_ROUTE_PATH, icon: 'mdi:food-fork-drink' },
+  { title: 'All Food', path: HOME_ALL_FOOD_ROUTE_PATH, icon: 'mdi:food-variant' },
+  { title: 'Pantry', path: HOME_PANTRY_ROUTE_PATH, icon: 'mdi:food-fork-drink' },
+  { title: 'Fridge', path: HOME_FRIDGE_ROUTE_PATH, icon: 'mdi:fridge' },
+  { title: 'Freezer', path: HOME_FREEZER_ROUTE_PATH, icon: 'mdi:snowflake' },
+  { title: 'Spice Rack', path: HOME_SPICE_RACK_ROUTE_PATH, icon: 'mdi:shaker-outline' },
+  { title: 'Cabinet', path: HOME_CABINET_ROUTE_PATH, icon: 'mdi:cupboard' },
   { title: 'Dining Room', path: 'dining-room', icon: 'mdi:silverware-fork-knife' },
   { title: 'Back Deck', path: 'back-deck', icon: 'mdi:grill' },
   { title: 'Music Room', path: 'music-room', icon: 'mdi:music' },
@@ -60,6 +77,14 @@ const HOME_SUB_ROUTE_PATHS = new Set([
   'guest-room',
   'gym',
   'hallway',
+  HOME_GROCERY_LIST_ROUTE_PATH,
+  HOME_FOOD_ROUTE_PATH,
+  HOME_ALL_FOOD_ROUTE_PATH,
+  HOME_PANTRY_ROUTE_PATH,
+  HOME_FRIDGE_ROUTE_PATH,
+  HOME_FREEZER_ROUTE_PATH,
+  HOME_SPICE_RACK_ROUTE_PATH,
+  HOME_CABINET_ROUTE_PATH,
   'kitchen',
   'living-room',
   'master-bathroom',

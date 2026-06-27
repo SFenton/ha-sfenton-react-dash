@@ -5,8 +5,8 @@
   overflow: hidden;
   color: var(--color-text);
   background: #111723;
-  --floating-action-size: 62px;
-  --floating-action-gap: 8px;
+  --floating-action-size: 56px;
+  --floating-action-gap: 4px;
   --floating-action-content-gap: 20px;
   --page-bottom-extra-padding: 22px;
 }
@@ -44,9 +44,41 @@
 
 .floatingAction {
   position: fixed;
+  left: 20px;
   right: 22px;
-  bottom: calc(var(--bottom-nav-height) + var(--floating-action-gap) + env(safe-area-inset-bottom, 0px));
+  bottom: calc(var(--bottom-nav-height) - 2px + env(safe-area-inset-bottom, 0px));
   z-index: 35;
-  display: grid;
-  place-items: center;
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--floating-action-gap);
+  pointer-events: none;
+  --floating-action-keyboard-lift: min(0px, calc(var(--bottom-nav-height) - 14px + env(safe-area-inset-bottom, 0px) - var(--dashboard-fab-keyboard-inset, 0px)));
+  animation: floatingActionFadeIn 170ms ease-out;
+  transform: translate3d(0, var(--floating-action-keyboard-lift), 0);
+  transition: transform 150ms ease;
+}
+
+.floatingAction > * {
+  pointer-events: auto;
+}
+
+:global(html[data-inventory-search-expanded='true']) .floatingAction > button[aria-label='Scan Item'] {
+  width: 0;
+  min-width: 0;
+  overflow: hidden;
+  opacity: 0;
+  padding: 0;
+  pointer-events: none;
+}
+
+@keyframes floatingActionFadeIn {
+  from {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .floatingAction {
+    animation-duration: 1ms;
+  }
 }

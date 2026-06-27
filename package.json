@@ -5,6 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:https": "npm run dev:https:cert && vite --mode https --host 0.0.0.0",
+    "dev:https:cert": "tsx scripts/dev-https-cert.ts",
     "dev:mock": "vite --mode test",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
@@ -22,6 +24,7 @@
     "@hakit/components": "^6.0.2",
     "@hakit/core": "^6.0.2",
     "@mdi/js": "^7.4.47",
+    "@zxing/browser": "0.1.5",
     "chalk": "^5.6.2",
     "dotenv": "^17.4.2",
     "motion": "^12.38.0",
