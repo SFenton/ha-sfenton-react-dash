@@ -774,9 +774,19 @@ describe('DashboardViewPage', () => {
       expect(screen.getByText('Review Item · Step 3 of 3')).toBeInTheDocument()
       expect(screen.getByText('Confirm the item details before adding it to your pantry.')).toBeInTheDocument()
       expect(screen.getByLabelText('Product name')).toHaveValue('Nutella')
-      expect(screen.getByLabelText('Quantity')).toHaveValue(1)
-      fireEvent.change(screen.getByLabelText('Quantity'), { target: { value: '0' } })
-      expect(screen.getByLabelText('Quantity')).toHaveValue(1)
+      const quantityInput = screen.getByLabelText('Quantity') as HTMLInputElement
+      expect(quantityInput.value).toBe('1')
+      fireEvent.change(quantityInput, { target: { value: '' } })
+      expect(quantityInput.value).toBe('')
+      fireEvent.blur(quantityInput)
+      expect(screen.getByRole('alert')).toHaveTextContent('Quantity must be at least 1.')
+      expect(quantityInput).toHaveAttribute('aria-describedby', 'scan-item-quantity-error')
+      expect(quantityInput).toHaveAttribute('aria-invalid', 'true')
+      fireEvent.click(screen.getByRole('button', { name: 'Add' }))
+      expect(mockCallServiceCalls.some((call) => call.domain === 'evershelf' && call.service === 'add_scanned_item')).toBe(false)
+      fireEvent.change(quantityInput, { target: { value: '2' } })
+      expect(quantityInput.value).toBe('2')
+      expect(screen.queryByText('Quantity must be at least 1.')).not.toBeInTheDocument()
       expect(screen.getByRole('radio', { name: 'Pantry' })).toBeChecked()
       expect(screen.queryByText('Unit of measurement (optional)')).not.toBeInTheDocument()
       expect(screen.getByLabelText('Expiration date')).toHaveValue('2026-06-30')
@@ -799,7 +809,7 @@ describe('DashboardViewPage', () => {
           image_url: 'https://example.test/nutella.jpg',
           location: 'freezer',
           name: 'Nutella',
-          quantity: 1,
+          quantity: 2,
         }),
       })))
       const addCall = mockCallServiceCalls.find((call) => call.domain === 'evershelf' && call.service === 'add_scanned_item')

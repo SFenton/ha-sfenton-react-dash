@@ -97,6 +97,8 @@ const CAMERA_CONSTRAINTS: MediaStreamConstraints = {
 }
 const SECURE_CONTEXT_MESSAGE = 'Camera access requires a secure origin. Use HTTPS for the Home Assistant wrapper, or localhost/127.0.0.1 during local development.'
 const UNSUPPORTED_CAMERA_MESSAGE = 'This browser does not expose camera access to React Dash.'
+const QUANTITY_ERROR_MESSAGE = 'Quantity must be at least 1.'
+const QUANTITY_ERROR_ID = 'scan-item-quantity-error'
 const TRANSIENT_SCAN_ERRORS = new Set(['ChecksumException', 'FormatException', 'NotFoundException'])
 const EVERSHELF_LOCATIONS: { label: string, value: EverShelfLocation }[] = [
   { label: 'Pantry', value: 'dispensa' },
@@ -207,6 +209,11 @@ function productImage(product?: EverShelfProduct) {
 function productDefaultQuantity(product?: EverShelfProduct) {
   const quantity = Number(product?.default_quantity)
   return Number.isFinite(quantity) && quantity > 0 ? quantity : null
+}
+
+function scannedItemQuantity(value: string) {
+  const quantity = Number(value.trim())
+  return Number.isFinite(quantity) && quantity >= 1 ? Math.floor(quantity) : null
 }
 
 function serviceResponsePayload<T extends { service_response?: T }>(response: { response: T } | void) {
@@ -336,6 +343,7 @@ export function ScanItemCameraSheet({ defaultLocation = 'dispensa', open, onClos
   const [itemName, setItemName] = useState('')
   const [itemBrand, setItemBrand] = useState('')
   const [itemQuantity, setItemQuantity] = useState('1')
+  const [itemQuantityError, setItemQuantityError] = useState<string | null>(null)
   const [itemLocation, setItemLocation] = useState<EverShelfLocation>(defaultLocation)
   const [itemExpiryDate, setItemExpiryDate] = useState('')
   const [addStatus, setAddStatus] = useState<AddItemStatus>('idle')
@@ -384,6 +392,7 @@ export function ScanItemCameraSheet({ defaultLocation = 'dispensa', open, onClos
     setItemName('')
     setItemBrand('')
     setItemQuantity('1')
+    setItemQuantityError(null)
     setItemLocation(defaultLocation)
     setItemExpiryDate('')
     setAddStatus('idle')
@@ -689,12 +698,21 @@ export function ScanItemCameraSheet({ defaultLocation = 'dispensa', open, onClos
   }
 
   const updateItemQuantity = (value: string) => {
-    const nextQuantity = Number(value)
-    if (!Number.isFinite(nextQuantity)) {
-      setItemQuantity('1')
-      return
+    setItemQuantity(value)
+    setItemQuantityError(null)
+    setAddStatus('idle')
+    setAddError(null)
+  }
+
+  const validateItemQuantity = () => {
+    const quantity = scannedItemQuantity(itemQuantity)
+    if (quantity === null) {
+      setItemQuantityError(QUANTITY_ERROR_MESSAGE)
+      return null
     }
-    setItemQuantity(String(Math.max(1, Math.floor(nextQuantity))))
+    setItemQuantity(String(quantity))
+    setItemQuantityError(null)
+    return quantity
   }
 
   const updateItemExpiryDate = (value: string) => {
@@ -780,15 +798,15 @@ export function ScanItemCameraSheet({ defaultLocation = 'dispensa', open, onClos
 
   const addScannedItem = async () => {
     const name = itemName.trim()
-    const quantity = Number(itemQuantity)
+    const quantity = validateItemQuantity()
     if (!name) {
       setAddStatus('error')
       setAddError(`Product name is required before adding to ${addedLocation}.`)
       return
     }
-    if (!Number.isFinite(quantity) || quantity <= 0) {
-      setAddStatus('error')
-      setAddError('Quantity must be greater than zero.')
+    if (quantity === null) {
+      setAddStatus('idle')
+      setAddError(null)
       return
     }
 
@@ -871,8 +889,7 @@ export function ScanItemCameraSheet({ defaultLocation = 'dispensa', open, onClos
   const isProcessing = processingMode === step && (lookupStatus === 'resolving' || expiryStatus === 'reading')
   const showBarcodeScanStatus = step === 'barcode' && (lookupStatus === 'error' || lookupStatus === 'not-found')
   const showExpiryScanStatus = step === 'expiry' && (expiryStatus === 'error' || expiryStatus === 'not-found')
-  const itemQuantityValue = Number(itemQuantity)
-  const canAddItem = itemName.trim().length > 0 && Number.isFinite(itemQuantityValue) && itemQuantityValue >= 1 && addStatus !== 'adding' && expiryStatus !== 'reading'
+  const canAddItem = itemName.trim().length > 0 && addStatus !== 'adding' && expiryStatus !== 'reading'
   const canReadExpiry = addStatus !== 'added' && isExpiryCameraVisible && status === 'ready' && expiryStatus !== 'reading'
   const readExpiryLabel = hasSuccessfulExpiryRead ? 'Read Expiration Date Again' : 'Read Expiration Date'
   const hasBarcodeForwardValue = Boolean(itemName.trim() || detectedBarcode || lookupResult)
@@ -1045,9 +1062,10 @@ export function ScanItemCameraSheet({ defaultLocation = 'dispensa', open, onClos
               <span>What item are you adding?</span>
               <input aria-label="Product name" autoComplete="off" onChange={(event) => setItemName(event.target.value)} type="text" value={itemName} />
             </label>
+            {itemQuantityError && <div className={styles.error} id={QUANTITY_ERROR_ID} role="alert">{itemQuantityError}</div>}
             <label className={styles.field}>
               <span>How many are you adding?</span>
-              <input aria-label="Quantity" inputMode="numeric" min="1" onChange={(event) => updateItemQuantity(event.target.value)} step="1" type="number" value={itemQuantity} />
+              <input aria-describedby={itemQuantityError ? QUANTITY_ERROR_ID : undefined} aria-invalid={itemQuantityError ? 'true' : undefined} aria-label="Quantity" inputMode="numeric" min="1" onBlur={() => validateItemQuantity()} onChange={(event) => updateItemQuantity(event.target.value)} step="1" type="number" value={itemQuantity} />
             </label>
             <fieldset className={styles.locationFieldset}>
               <legend>Where should it be stored?</legend>
