@@ -257,85 +257,9 @@
 }
 
 .instanceDateField {
-  display: grid;
   min-width: 0;
   max-width: 100%;
-  gap: 6px;
   overflow: hidden;
-  color: white;
-  font-size: 0.75rem;
-  font-weight: 780;
-  letter-spacing: 0;
-}
-
-.instanceDateInputShell {
-  position: relative;
-  display: grid;
-  width: 100%;
-  inline-size: 100%;
-  min-width: 0;
-  min-inline-size: 0;
-  max-width: 100%;
-  max-inline-size: 100%;
-  box-sizing: border-box;
-  overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  border-radius: 14px;
-  color: white;
-  background: rgba(8, 12, 20, 0.74);
-  color-scheme: dark;
-}
-
-.instanceDateDisplay {
-  overflow: hidden;
-  padding: 11px 44px 11px 12px;
-  font: inherit;
-  font-size: 0.94rem;
-  font-weight: 720;
-  line-height: 1.2;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.instanceDateInputShell::after {
-  position: absolute;
-  right: 12px;
-  top: 50%;
-  width: 18px;
-  height: 18px;
-  pointer-events: none;
-  content: '';
-  transform: translateY(-50%);
-  opacity: 0.72;
-  background: currentColor;
-  clip-path: path('M7 10H5V12H7V10M11 10H9V12H11V10M15 10H13V12H15V10M17 3H16V1H14V3H6V1H4V3H3C1.89 3 1 3.9 1 5V17C1 18.1 1.89 19 3 19H17C18.1 19 19 18.1 19 17V5C19 3.9 18.1 3 17 3M17 17H3V8H17V17Z');
-}
-
-.instanceDateField input {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  min-width: 0;
-  box-sizing: border-box;
-  border: 0;
-  padding: 0;
-  opacity: 0.01;
-  color: transparent;
-  background: transparent;
-  cursor: pointer;
-  font: inherit;
-  font-size: 0.94rem;
-  font-weight: 720;
-}
-
-.instanceDateField input::-webkit-date-and-time-value {
-  min-width: 0;
-  text-align: left;
-}
-
-.instanceDateField input::-webkit-calendar-picker-indicator {
-  margin-inline-start: 0;
 }
 
 .instanceEditActions {

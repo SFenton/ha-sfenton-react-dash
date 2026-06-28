@@ -32,6 +32,7 @@ import { GlassTile } from '../components/core/GlassTile'
 import { MaterialIcon } from '../components/core/Icon'
 import { InlineAlert } from '../components/core/InlineAlert'
 import { ModalSheet, type ModalSheetStyle } from '../components/core/ModalSheet'
+import { NativePickerField } from '../components/core/NativePickerField'
 import { OptionPickerDialog, type PickerOption } from '../components/core/OptionPickerDialog'
 import { SectionHeader } from '../components/core/SectionHeader'
 import { derivedAirPurifierEntityIds, formatAirQualitySummary } from '../components/hass/airQualityState'
@@ -1303,26 +1304,6 @@ function openNativeTimePicker(input: HTMLInputElement | null) {
   input.click()
 }
 
-function VacationDateField({ label, onChange, type, value }: { label: string; onChange: (value: string) => void; type: 'date' | 'time'; value: string }) {
-  const inputRef = useRef<HTMLInputElement | null>(null)
-
-  const openPickerFromCard = (event: MouseEvent<HTMLLabelElement>) => {
-    const input = inputRef.current
-    if (!input || event.target === input) return
-    event.preventDefault()
-    input.focus({ preventScroll: true })
-    if (typeof input.showPicker === 'function') input.showPicker()
-    else input.click()
-  }
-
-  return (
-    <label className={styles.vacationDateField} onClick={openPickerFromCard}>
-      <span className={styles.vacationDateLabel}>{label}</span>
-      <input aria-label={label} className={styles.vacationDateInput} onChange={(event) => onChange(event.currentTarget.value)} ref={inputRef} type={type} value={value} />
-    </label>
-  )
-}
-
 function resetVacationChecklist(callService: (params: Record<string, unknown>) => void) {
   for (const item of VACATION_PRE_CHECKLIST_ITEMS) {
     callService({ domain: 'input_boolean', service: 'turn_off', target: item.entityId })
@@ -1462,10 +1443,10 @@ function VacationDatesSection({ dateRange, invalidDateRange, recoveringInvalidDa
       <Description>{VACATION_DATES_DESCRIPTION}</Description>
       {invalidDateRange && <Description className={styles.vacationDateError}>{VACATION_DATE_RANGE_ERROR}</Description>}
       <div className={styles.vacationDateGrid}>
-        <VacationDateField label="Start Date" onChange={(value) => updateDateTime(VACATION_START_ENTITY_ID, value, startTime, { ...dateRange, start: { date: value, time: startTime } })} type="date" value={startDate} />
-        <VacationDateField label="Start Time" onChange={(value) => updateDateTime(VACATION_START_ENTITY_ID, startDate, value, { ...dateRange, start: { date: startDate, time: value } })} type="time" value={startTime} />
-        <VacationDateField label="End Date" onChange={(value) => updateDateTime(VACATION_END_ENTITY_ID, value, endTime, { ...dateRange, end: { date: value, time: endTime } })} type="date" value={endDate} />
-        <VacationDateField label="End Time" onChange={(value) => updateDateTime(VACATION_END_ENTITY_ID, endDate, value, { ...dateRange, end: { date: endDate, time: value } })} type="time" value={endTime} />
+        <NativePickerField className={styles.vacationDatePicker} label="Start Date" onChange={(value) => updateDateTime(VACATION_START_ENTITY_ID, value, startTime, { ...dateRange, start: { date: value, time: startTime } })} type="date" value={startDate} />
+        <NativePickerField className={styles.vacationDatePicker} label="Start Time" onChange={(value) => updateDateTime(VACATION_START_ENTITY_ID, startDate, value, { ...dateRange, start: { date: startDate, time: value } })} type="time" value={startTime} />
+        <NativePickerField className={styles.vacationDatePicker} label="End Date" onChange={(value) => updateDateTime(VACATION_END_ENTITY_ID, value, endTime, { ...dateRange, end: { date: value, time: endTime } })} type="date" value={endDate} />
+        <NativePickerField className={styles.vacationDatePicker} label="End Time" onChange={(value) => updateDateTime(VACATION_END_ENTITY_ID, endDate, value, { ...dateRange, end: { date: endDate, time: value } })} type="time" value={endTime} />
       </div>
     </section>
   )

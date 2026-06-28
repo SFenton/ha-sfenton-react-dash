@@ -28,8 +28,7 @@
   line-height: 1.2;
 }
 
-.pickerShell[data-empty='true']::before {
-  content: 'Select';
+.pickerShell[data-empty='true'] .pickerValue {
   color: rgba(247, 251, 255, 0.48);
 }
 

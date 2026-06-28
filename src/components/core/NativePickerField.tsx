@@ -1,8 +1,10 @@
+import { useRef, type MouseEvent } from 'react'
 import styles from './NativePickerField.module.css'
 
 interface NativePickerFieldProps {
   ariaLabel?: string
   className?: string
+  emptyLabel?: string
   label: string
   name?: string
   onChange: (value: string) => void
@@ -26,19 +28,36 @@ function formatTime(value: string) {
   return new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' }).format(date)
 }
 
-function displayValue(type: NativePickerFieldProps['type'], value: string) {
+function displayValue(type: NativePickerFieldProps['type'], value: string, emptyLabel: string) {
+  if (!value) return emptyLabel
   return type === 'date' ? formatDate(value) : formatTime(value)
 }
 
-export function NativePickerField({ ariaLabel, className, label, name, onChange, type, value }: NativePickerFieldProps) {
+export function NativePickerField({ ariaLabel, className, emptyLabel = 'Select', label, name, onChange, type, value }: NativePickerFieldProps) {
+  const inputRef = useRef<HTMLInputElement | null>(null)
   const fieldClassName = className ? `${styles.field} ${className}` : styles.field
+  const openPickerFromField = (event: MouseEvent<HTMLLabelElement>) => {
+    const input = inputRef.current
+    if (!input || event.target === input) return
+    event.preventDefault()
+    input.focus({ preventScroll: true })
+    if (typeof input.showPicker === 'function') {
+      try {
+        input.showPicker()
+        return
+      } catch {
+        // Fall back to the native click path if the browser rejects programmatic picker opening.
+      }
+    }
+    input.click()
+  }
 
   return (
-    <label className={fieldClassName}>
+    <label className={fieldClassName} onClick={openPickerFromField}>
       <span>{label}</span>
       <span className={styles.pickerShell} data-empty={value ? 'false' : 'true'}>
-        <span className={styles.pickerValue} aria-hidden="true">{displayValue(type, value)}</span>
-        <input aria-label={ariaLabel ?? label} className={styles.nativePickerInput} name={name} onChange={(event) => onChange(event.target.value)} type={type} value={value} />
+        <span className={styles.pickerValue} aria-hidden="true">{displayValue(type, value, emptyLabel)}</span>
+        <input aria-label={ariaLabel ?? label} className={styles.nativePickerInput} name={name} onChange={(event) => onChange(event.target.value)} ref={inputRef} type={type} value={value} />
       </span>
     </label>
   )

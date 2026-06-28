@@ -6,6 +6,7 @@ import { EmptyState } from '../core/EmptyState'
 import { FloatingActionButton } from '../core/FloatingActionButton'
 import { MaterialIcon } from '../core/Icon'
 import { ModalSheet } from '../core/ModalSheet'
+import { NativePickerField } from '../core/NativePickerField'
 import { RadioRow } from '../core/RadioRow'
 import { DashboardPageLoading } from '../shell/DashboardPageLoading'
 import type { EverShelfInventoryControls, InventoryFilterMode, InventorySortDirection, InventorySortMode } from './EverShelfInventoryControls'
@@ -293,11 +294,6 @@ function validExpiryInput(value: string) {
   return value.trim() === '' || /^\d{4}-\d{2}-\d{2}$/.test(value.trim())
 }
 
-function formatExpiryInputDisplay(value: string) {
-  const date = parseIsoDateOnly(value)
-  return date ? formatDisplayDate(date) : 'No expiration date'
-}
-
 function PantryRow({ expiry, inventoryId, locationLabel, multiItem, onDeleted, onOpenDetails, quantity, title }: { expiry: ExpiryInfo; inventoryId: number | null; locationLabel: string; multiItem: boolean; onDeleted: (inventoryId: number) => void; onOpenDetails: () => void; quantity: number | null; title: string }) {
   const callService = useHass((state) => state.helpers.callService) as unknown as CallService
   const [deleteState, setDeleteState] = useState<PantryRowDeleteState>('idle')
@@ -516,13 +512,7 @@ function InventoryItemInstancesModal({ item, locationLabel, onClose, onInventory
                   </button>
                 </div>
                 <div className={styles.instanceEditPanel}>
-                  <label className={styles.instanceDateField}>
-                    <span>Expiration Date</span>
-                    <span className={styles.instanceDateInputShell}>
-                      <span aria-hidden="true" className={styles.instanceDateDisplay}>{formatExpiryInputDisplay(draft)}</span>
-                      <input aria-label={`Expiration date for ${title} item ${instanceNumber}`} onChange={(event) => setExpiryDrafts((current) => ({ ...current, [instanceNumber]: event.target.value }))} type="date" value={draft} />
-                    </span>
-                  </label>
+                  <NativePickerField ariaLabel={`Expiration date for ${title} item ${instanceNumber}`} className={styles.instanceDateField} emptyLabel="No expiration date" label="Expiration Date" onChange={(value) => setExpiryDrafts((current) => ({ ...current, [instanceNumber]: value }))} type="date" value={draft} />
                   {dateChanged && (
                     <span className={styles.instanceEditActions}>
                       <button className={styles.secondaryAction} disabled={disabled} onClick={() => resetInstanceDraft(instanceNumber)} type="button">Reset</button>
