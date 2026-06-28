@@ -266,6 +266,11 @@
   min-height: 0;
 }
 
+.vacationModalBody {
+  display: grid;
+  gap: 12px;
+}
+
 .vacationConfirmButton {
   width: 100%;
   min-height: 58px;

@@ -1206,18 +1206,19 @@ describe('DashboardViewPage', () => {
       fireEvent.click(vacationMode)
 
       expect(screen.queryByRole('alert')).not.toBeInTheDocument()
-      expect(screen.getByRole('button', { name: 'Vacation Mode Pending' })).toHaveStyle({ '--card-rgb': '30 136 229' })
-      expect(screen.getByRole('button', { name: 'Vacation Mode Pending' })).toHaveAttribute('aria-pressed', 'true')
-      expect(screen.getByRole('heading', { name: 'Vacation Dates' })).toBeInTheDocument()
-      expect(screen.getByLabelText('Start Date')).toHaveValue('2026-06-14')
-      expect(screen.getByLabelText('Start Time')).toHaveValue('10:01')
-      expect(screen.getByLabelText('End Date')).toHaveValue('2026-06-15')
-      expect(screen.getByLabelText('End Time')).toHaveValue('10:01')
+      expect(screen.getByRole('button', { hidden: true, name: 'Vacation Mode Pending' })).toHaveStyle({ '--card-rgb': '30 136 229' })
+      expect(screen.getByRole('button', { hidden: true, name: 'Vacation Mode Pending' })).toHaveAttribute('aria-pressed', 'true')
+      expect(screen.queryByRole('heading', { name: 'Vacation Dates' })).not.toBeInTheDocument()
+      const dialog = screen.getByRole('dialog', { name: 'Confirm Vacation' })
+      expect(within(dialog).getByLabelText('Start Date')).toHaveValue('2026-06-14')
+      expect(within(dialog).getByLabelText('Start Time')).toHaveValue('10:01')
+      expect(within(dialog).getByLabelText('End Date')).toHaveValue('2026-06-15')
+      expect(within(dialog).getByLabelText('End Time')).toHaveValue('10:01')
       expect(mockCallServiceCalls).toEqual([])
 
-      fireEvent.change(screen.getByLabelText('End Time'), { target: { value: '18:30' } })
+      fireEvent.change(within(dialog).getByLabelText('End Time'), { target: { value: '18:30' } })
       expect(mockCallServiceCalls).toEqual([])
-      fireEvent.click(screen.getByRole('button', { name: 'Confirm Vacation' }))
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Confirm Vacation' }))
 
       expect(mockCallServiceCalls).toEqual([
         { domain: 'input_datetime', service: 'set_datetime', target: 'input_datetime.vacation_start', serviceData: { date: '2026-06-14', time: '10:01:00' } },

@@ -1431,7 +1431,7 @@ function VacationChecklistSection({ onStateChange, states }: { onStateChange: (e
   )
 }
 
-function VacationDatesSection({ dateRange, invalidDateRange, onConfirm, onDateRangeChange, pending, recoveringInvalidDates }: { dateRange: VacationDateRange; invalidDateRange: boolean; onConfirm: () => void; onDateRangeChange: (dateRange: VacationDateRange) => void; pending: boolean; recoveringInvalidDates: boolean }) {
+function VacationDateControls({ dateRange, invalidDateRange, onConfirm, onDateRangeChange, pending, recoveringInvalidDates, showConfirm = false }: { dateRange: VacationDateRange; invalidDateRange: boolean; onConfirm?: () => void; onDateRangeChange: (dateRange: VacationDateRange) => void; pending: boolean; recoveringInvalidDates: boolean; showConfirm?: boolean }) {
   const callService = useCallService()
   const startDate = dateRange.start.date
   const startTime = dateRange.start.time
@@ -1451,8 +1451,7 @@ function VacationDatesSection({ dateRange, invalidDateRange, onConfirm, onDateRa
   }
 
   return (
-    <section className={styles.section}>
-      <SectionHeader title="Vacation Dates" />
+    <>
       <Description>{VACATION_DATES_DESCRIPTION}</Description>
       {invalidDateRange && <Description className={styles.vacationDateError}>{VACATION_DATE_RANGE_ERROR}</Description>}
       <div className={styles.vacationDateGrid}>
@@ -1461,12 +1460,31 @@ function VacationDatesSection({ dateRange, invalidDateRange, onConfirm, onDateRa
         <NativePickerField className={styles.vacationDatePicker} label="End Date" onChange={(value) => updateDateTime(VACATION_END_ENTITY_ID, value, endTime, { ...dateRange, end: { date: value, time: endTime } })} type="date" value={endDate} />
         <NativePickerField className={styles.vacationDatePicker} label="End Time" onChange={(value) => updateDateTime(VACATION_END_ENTITY_ID, endDate, value, { ...dateRange, end: { date: endDate, time: value } })} type="time" value={endTime} />
       </div>
-      {pending && !invalidDateRange && (
+      {showConfirm && !invalidDateRange && (
         <button className={styles.vacationConfirmButton} onClick={onConfirm} type="button">
           Confirm Vacation
         </button>
       )}
+    </>
+  )
+}
+
+function VacationDatesSection({ dateRange, invalidDateRange, onDateRangeChange, recoveringInvalidDates }: { dateRange: VacationDateRange; invalidDateRange: boolean; onDateRangeChange: (dateRange: VacationDateRange) => void; recoveringInvalidDates: boolean }) {
+  return (
+    <section className={styles.section}>
+      <SectionHeader title="Vacation Dates" />
+      <VacationDateControls dateRange={dateRange} invalidDateRange={invalidDateRange} onDateRangeChange={onDateRangeChange} pending={false} recoveringInvalidDates={recoveringInvalidDates} />
     </section>
+  )
+}
+
+function VacationConfirmationModal({ dateRange, invalidDateRange, onClose, onConfirm, onDateRangeChange, open }: { dateRange: VacationDateRange; invalidDateRange: boolean; onClose: () => void; onConfirm: () => void; onDateRangeChange: (dateRange: VacationDateRange) => void; open: boolean }) {
+  return (
+    <ModalSheet onClose={onClose} open={open} scrollResetKey={open ? 'open' : 'closed'} title="Confirm Vacation">
+      <div className={styles.vacationModalBody}>
+        <VacationDateControls dateRange={dateRange} invalidDateRange={invalidDateRange} onConfirm={onConfirm} onDateRangeChange={onDateRangeChange} pending={true} recoveringInvalidDates={false} showConfirm />
+      </div>
+    </ModalSheet>
   )
 }
 
@@ -1485,10 +1503,10 @@ function VacationPage() {
   const dateRange = pendingDateRange ?? vacationDateRangeFromStates(startEntity?.state, endEntity?.state)
   const invalidDateRange = isVacationDateRangeInvalid(dateRange)
   const recoveringInvalidDates = !pendingVacation && (invalidDateRange || isActiveState(invalidDatesPending))
-  const visibleEnabled = optimisticEnabled || recoveringInvalidDates || pendingVacation
+  const inlineDatesVisible = optimisticEnabled || recoveringInvalidDates
   const checklistStates = vacationChecklistStatesFromKey(checklistStateKey)
   const checklistComplete = isVacationChecklistComplete(checklistStateKey)
-  const showPreChecklistError = blockedEnableAttempted && !checklistComplete && !visibleEnabled
+  const showPreChecklistError = blockedEnableAttempted && !checklistComplete && !inlineDatesVisible && !pendingVacation
 
   const commitChecklistItemState = (entityId: string, nextState: string) => {
     const nextKey = vacationChecklistStateKeyWithItem(checklistStateKey, entityId, nextState)
@@ -1525,7 +1543,8 @@ function VacationPage() {
         {showPreChecklistError && <InlineAlert className={styles.vacationModeError}>{VACATION_PRE_CHECKLIST_ERROR}</InlineAlert>}
         <VacationModeCard disabled={recoveringInvalidDates && invalidDateRange} enabled={optimisticEnabled || recoveringInvalidDates} onBlockedEnable={() => setBlockedEnableAttempted(true)} onEnabledChange={commitVacationEnabled} onPendingChange={setVacationPending} pending={pendingVacation} preChecklistComplete={checklistComplete} />
       </section>
-      {visibleEnabled ? <VacationDatesSection dateRange={dateRange} invalidDateRange={invalidDateRange} onConfirm={confirmVacation} onDateRangeChange={setPendingDateRange} pending={pendingVacation} recoveringInvalidDates={recoveringInvalidDates} /> : <VacationChecklistSection onStateChange={commitChecklistItemState} states={checklistStates} />}
+      {inlineDatesVisible ? <VacationDatesSection dateRange={dateRange} invalidDateRange={invalidDateRange} onDateRangeChange={setPendingDateRange} recoveringInvalidDates={recoveringInvalidDates} /> : <VacationChecklistSection onStateChange={commitChecklistItemState} states={checklistStates} />}
+      <VacationConfirmationModal dateRange={pendingDateRange ?? dateRange} invalidDateRange={pendingVacation && invalidDateRange} onClose={() => setVacationPending(false)} onConfirm={confirmVacation} onDateRangeChange={setPendingDateRange} open={pendingVacation} />
     </div>
   )
 }
