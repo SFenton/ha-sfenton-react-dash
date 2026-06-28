@@ -297,6 +297,7 @@ export const GUEST_CONTROL_ITEMS: EntityTileConfig[] = [
 export const VACATION_MODE_DESCRIPTION = 'Enable or disable vacation mode for the house'
 export const VACATION_DATES_DESCRIPTION = 'Set the start and end time for your vacation. Vacation mode will automatically be turned off at the set end date and time.'
 export const VACATION_DATE_RANGE_ERROR = 'Start date and time must be before end date and time. Vacation mode is disabled until the dates are fixed.'
+export const VACATION_PRE_CHECKLIST_ERROR = 'All pre-vacation tasks must be checked off before Vacation Mode can be enabled.'
 
 export const VACATION_MODE_ENTITY_ID = 'input_boolean.vacation_mode'
 export const VACATION_INVALID_DATES_PENDING_ENTITY_ID = 'input_boolean.vacation_mode_invalid_dates_pending'

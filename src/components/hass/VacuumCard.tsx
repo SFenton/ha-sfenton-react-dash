@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, 
 import { useEntity, useHass } from '@hakit/core'
 import { GlassTile } from '../core/GlassTile'
 import { Description } from '../core/Description'
+import { InlineAlert } from '../core/InlineAlert'
 import { MaterialIcon } from '../core/Icon'
 import { ModalSheet } from '../core/ModalSheet'
 import { type VacuumAutoCleanDisabledRoomConfig, type VacuumConfig, type VacuumConsumableConfig, type VacuumZoneConfig } from '../../constants/portedDashboard'
@@ -604,10 +605,7 @@ function VacuumStatusSummary({ displayState, vacuum }: { displayState: string; v
       <InfoPill icon="mdi:robot-vacuum" label="Status" value={stateLabel} />
       <InfoPill icon="mdi:battery" label="Battery" value={batteryLabel} />
       {hasError ? (
-        <div className={styles.errorMessage} role="alert">
-          <MaterialIcon name="mdi:alert-circle" size={20} />
-          <span>{errorText}</span>
-        </div>
+        <InlineAlert className={styles.errorMessage}>{errorText}</InlineAlert>
       ) : null}
     </section>
   )

@@ -106,24 +106,8 @@
 }
 
 .errorMessage {
-  display: grid;
   grid-column: 1 / -1;
-  grid-template-columns: 22px minmax(0, 1fr);
-  align-items: start;
-  gap: 7px;
   padding: 0 3px;
-  color: rgb(255, 95, 87);
-  font-size: 0.78rem;
-  font-weight: 780;
-  line-height: 1.25;
-}
-
-.errorMessage > svg {
-  margin-top: 0;
-}
-
-.errorMessage > span {
-  padding-top: 2px;
 }
 
 .section {

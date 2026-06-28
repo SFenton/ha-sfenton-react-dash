@@ -30,6 +30,7 @@ import { Description } from '../components/core/Description'
 import { EmptyState } from '../components/core/EmptyState'
 import { GlassTile } from '../components/core/GlassTile'
 import { MaterialIcon } from '../components/core/Icon'
+import { InlineAlert } from '../components/core/InlineAlert'
 import { ModalSheet, type ModalSheetStyle } from '../components/core/ModalSheet'
 import { OptionPickerDialog, type PickerOption } from '../components/core/OptionPickerDialog'
 import { SectionHeader } from '../components/core/SectionHeader'
@@ -75,6 +76,7 @@ import {
   VACATION_MODE_DESCRIPTION,
   VACATION_MODE_ENTITY_ID,
   VACATION_MODE_ITEMS,
+  VACATION_PRE_CHECKLIST_ERROR,
   VACATION_PRE_CHECKLIST_ITEMS,
   VACATION_START_ENTITY_ID,
   VACUUM_COLOR,
@@ -1327,7 +1329,30 @@ function resetVacationChecklist(callService: (params: Record<string, unknown>) =
   }
 }
 
-function VacationModeCard({ disabled = false, enabled, onEnabledChange }: { disabled?: boolean; enabled: boolean; onEnabledChange: (enabled: boolean) => void }) {
+const VACATION_CHECKLIST_STATE_SEPARATOR = '\u001f'
+
+function vacationChecklistStateKeyFromEntities(entities: Record<string, HassEntity | undefined>) {
+  return VACATION_PRE_CHECKLIST_ITEMS.map((item) => entities[item.entityId]?.state ?? 'unavailable').join(VACATION_CHECKLIST_STATE_SEPARATOR)
+}
+
+function vacationChecklistStatesFromKey(stateKey: string) {
+  const states = stateKey.split(VACATION_CHECKLIST_STATE_SEPARATOR)
+  return Object.fromEntries(VACATION_PRE_CHECKLIST_ITEMS.map((item, index) => [item.entityId, states[index] ?? 'unavailable']))
+}
+
+function vacationChecklistStateKeyWithItem(stateKey: string, entityId: string, nextState: string) {
+  const states = stateKey.split(VACATION_CHECKLIST_STATE_SEPARATOR)
+  const index = VACATION_PRE_CHECKLIST_ITEMS.findIndex((item) => item.entityId === entityId)
+  if (index < 0) return stateKey
+  states[index] = nextState
+  return states.join(VACATION_CHECKLIST_STATE_SEPARATOR)
+}
+
+function isVacationChecklistComplete(stateKey: string) {
+  return stateKey.split(VACATION_CHECKLIST_STATE_SEPARATOR).every((state) => state === 'on')
+}
+
+function VacationModeCard({ disabled = false, enabled, onBlockedEnable, onEnabledChange, preChecklistComplete = true }: { disabled?: boolean; enabled: boolean; onBlockedEnable?: () => void; onEnabledChange: (enabled: boolean) => void; preChecklistComplete?: boolean }) {
   const entity = useEntity(asEntityName(VACATION_MODE_ENTITY_ID), { returnNullIfNotFound: true })
   const callService = useCallService()
   const entityUnavailable = !entity || entity.state === 'unavailable' || entity.state === 'unknown'
@@ -1349,6 +1374,10 @@ function VacationModeCard({ disabled = false, enabled, onEnabledChange }: { disa
       callService({ domain: 'input_boolean', service: 'turn_off', target: VACATION_MODE_ENTITY_ID })
       callService({ domain: 'input_boolean', service: 'turn_off', target: VACATION_INVALID_DATES_PENDING_ENTITY_ID })
       resetVacationChecklist(callService)
+      return
+    }
+    if (!preChecklistComplete) {
+      onBlockedEnable?.()
       return
     }
     initializeVacationDates()
@@ -1373,17 +1402,15 @@ function VacationModeCard({ disabled = false, enabled, onEnabledChange }: { disa
   )
 }
 
-function VacationChecklistRow({ item }: { item: typeof VACATION_PRE_CHECKLIST_ITEMS[number] }) {
-  const entity = useEntity(asEntityName(item.entityId), { returnNullIfNotFound: true })
+function VacationChecklistRow({ item, onStateChange, state }: { item: typeof VACATION_PRE_CHECKLIST_ITEMS[number]; onStateChange: (entityId: string, nextState: string) => void; state: string }) {
   const callService = useCallService()
-  const [state, commitState] = useOptimisticState(entity?.state ?? 'unavailable')
   const active = state === 'on'
-  const unavailable = !entity || state === 'unavailable' || state === 'unknown'
+  const unavailable = state === 'unavailable' || state === 'unknown'
 
   const toggle = () => {
     if (unavailable) return
     const nextState = active ? 'off' : 'on'
-    commitState(nextState)
+    onStateChange(item.entityId, nextState)
     callService({ domain: 'input_boolean', service: active ? 'turn_off' : 'turn_on', target: item.entityId })
   }
 
@@ -1401,13 +1428,13 @@ function VacationChecklistRow({ item }: { item: typeof VACATION_PRE_CHECKLIST_IT
   )
 }
 
-function VacationChecklistSection() {
+function VacationChecklistSection({ onStateChange, states }: { onStateChange: (entityId: string, nextState: string) => void; states: Record<string, string> }) {
   return (
     <section className={styles.section}>
       <SectionHeader title="Pre-Vacation Checklist" />
       <ul className={styles.vacationChecklist}>
         {VACATION_PRE_CHECKLIST_ITEMS.map((item) => (
-          <VacationChecklistRow item={item} key={item.entityId} />
+          <VacationChecklistRow item={item} key={item.entityId} onStateChange={onStateChange} state={states[item.entityId] ?? 'unavailable'} />
         ))}
       </ul>
     </section>
@@ -1445,24 +1472,42 @@ function VacationDatesSection({ dateRange, invalidDateRange, recoveringInvalidDa
 }
 
 function VacationPage() {
+  const entities = useHass((state) => state.entities) as unknown as Record<string, HassEntity | undefined>
   const vacationMode = useEntity(asEntityName(VACATION_MODE_ENTITY_ID), { returnNullIfNotFound: true })
   const invalidDatesPending = useEntity(asEntityName(VACATION_INVALID_DATES_PENDING_ENTITY_ID), { returnNullIfNotFound: true })
   const startEntity = useEntity(asEntityName(VACATION_START_ENTITY_ID), { returnNullIfNotFound: true })
   const endEntity = useEntity(asEntityName(VACATION_END_ENTITY_ID), { returnNullIfNotFound: true })
   const [optimisticEnabled, commitEnabled] = useOptimisticState(isActiveState(vacationMode))
+  const [checklistStateKey, commitChecklistStateKey] = useOptimisticState(vacationChecklistStateKeyFromEntities(entities))
+  const [blockedEnableAttempted, setBlockedEnableAttempted] = useState(false)
   const dateRange = vacationDateRangeFromStates(startEntity?.state, endEntity?.state)
   const invalidDateRange = isVacationDateRangeInvalid(dateRange)
   const recoveringInvalidDates = invalidDateRange || isActiveState(invalidDatesPending)
   const visibleEnabled = optimisticEnabled || recoveringInvalidDates
+  const checklistStates = vacationChecklistStatesFromKey(checklistStateKey)
+  const checklistComplete = isVacationChecklistComplete(checklistStateKey)
+  const showPreChecklistError = blockedEnableAttempted && !checklistComplete && !visibleEnabled
+
+  const commitChecklistItemState = (entityId: string, nextState: string) => {
+    const nextKey = vacationChecklistStateKeyWithItem(checklistStateKey, entityId, nextState)
+    commitChecklistStateKey(nextKey)
+    if (isVacationChecklistComplete(nextKey)) setBlockedEnableAttempted(false)
+  }
+
+  const commitVacationEnabled = (nextEnabled: boolean) => {
+    if (nextEnabled) setBlockedEnableAttempted(false)
+    commitEnabled(nextEnabled)
+  }
 
   return (
     <div className={styles.stack}>
       <section className={styles.section}>
         <SectionHeader title="Vacation Mode" />
         <Description>{VACATION_MODE_DESCRIPTION}</Description>
-        <VacationModeCard disabled={invalidDateRange} enabled={visibleEnabled} onEnabledChange={commitEnabled} />
+        {showPreChecklistError && <InlineAlert className={styles.vacationModeError}>{VACATION_PRE_CHECKLIST_ERROR}</InlineAlert>}
+        <VacationModeCard disabled={invalidDateRange} enabled={visibleEnabled} onBlockedEnable={() => setBlockedEnableAttempted(true)} onEnabledChange={commitVacationEnabled} preChecklistComplete={checklistComplete} />
       </section>
-      {visibleEnabled ? <VacationDatesSection dateRange={dateRange} invalidDateRange={invalidDateRange} recoveringInvalidDates={recoveringInvalidDates} /> : <VacationChecklistSection />}
+      {visibleEnabled ? <VacationDatesSection dateRange={dateRange} invalidDateRange={invalidDateRange} recoveringInvalidDates={recoveringInvalidDates} /> : <VacationChecklistSection onStateChange={commitChecklistItemState} states={checklistStates} />}
     </div>
   )
 }

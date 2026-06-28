@@ -189,6 +189,20 @@ function testQuickExpirationDateValue(value: '3-days' | '1-week' | '1-month' | '
   return testDateInputValue(testAddMonths(today, 12))
 }
 
+const VACATION_CHECKLIST_ENTITY_IDS = [
+  'input_boolean.vacation_checklist_turn_off_outdoor_sprinklers',
+  'input_boolean.vacation_checklist_pour_boiling_water_down_the_drain',
+  'input_boolean.vacation_checklist_make_the_bed',
+  'input_boolean.vacation_checklist_unload_and_check_dishwasher',
+  'input_boolean.vacation_checklist_trash_and_recycles_taken_out',
+]
+
+function setVacationChecklistMockState(state: string) {
+  for (const entityId of VACATION_CHECKLIST_ENTITY_IDS) {
+    mockEntities[entityId].state = state
+  }
+}
+
 async function startAndCaptureExpirationDate(buttonName = 'Read Expiration Date') {
   expect(await screen.findByLabelText('Live expiration date camera feed')).toBeInTheDocument()
   await act(async () => {
@@ -1144,7 +1158,7 @@ describe('DashboardViewPage', () => {
     expect(within(bottomNav).getByRole('button', { name: 'Settings' })).toHaveAttribute('aria-current', 'page')
   })
 
-  it('renders the Vacation page with the admin-sized Vacation Mode toggle', () => {
+  it('renders the Vacation page and blocks Vacation Mode until the checklist is complete', () => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date(2026, 5, 14, 10, 1, 0))
     const navigate = vi.fn()
@@ -1171,6 +1185,27 @@ describe('DashboardViewPage', () => {
       expect(vacationMode.querySelector('path')).toHaveAttribute('d', materialIconPath('mdi:airplane'))
 
       fireEvent.click(vacationMode)
+      const alert = screen.getByRole('alert')
+      expect(alert).toHaveTextContent('All pre-vacation tasks must be checked off before Vacation Mode can be enabled.')
+      expect(alert.querySelector('path')).toHaveAttribute('d', materialIconPath('mdi:alert-circle'))
+      expect(mockCallServiceCalls).toEqual([])
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('turns on Vacation Mode after all Pre-Vacation checklist tasks are checked', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date(2026, 5, 14, 10, 1, 0))
+    setVacationChecklistMockState('on')
+
+    try {
+      render(<DashboardViewPage activePath="settings" onNavigate={() => undefined} path="vacation" />)
+
+      const vacationMode = screen.getByRole('button', { name: 'Vacation Mode Off' })
+      fireEvent.click(vacationMode)
+
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument()
       expect(mockCallServiceCalls).toEqual([
         { domain: 'input_datetime', service: 'set_datetime', target: 'input_datetime.vacation_start', serviceData: { date: '2026-06-14', time: '10:01:00' } },
         { domain: 'input_datetime', service: 'set_datetime', target: 'input_datetime.vacation_end', serviceData: { date: '2026-06-15', time: '10:01:00' } },
