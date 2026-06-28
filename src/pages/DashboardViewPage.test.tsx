@@ -236,6 +236,11 @@ describe('DashboardViewPage', () => {
     mockEntities['input_boolean.guests_staying_in_music_room'].state = 'off'
     mockEntities['input_boolean.guests_staying_in_theater_room'].state = 'off'
     mockEntities['input_boolean.vacation_mode'].state = 'off'
+    mockEntities['input_boolean.vacation_checklist_turn_off_outdoor_sprinklers'].state = 'off'
+    mockEntities['input_boolean.vacation_checklist_pour_boiling_water_down_the_drain'].state = 'off'
+    mockEntities['input_boolean.vacation_checklist_make_the_bed'].state = 'off'
+    mockEntities['input_boolean.vacation_checklist_unload_and_check_dishwasher'].state = 'off'
+    mockEntities['input_boolean.vacation_checklist_trash_and_recycles_taken_out'].state = 'off'
     mockEntities['media_player.living_room_shield_2'].state = 'off'
     mockEntities['media_player.sonos'].state = 'playing'
     mockEntities['media_player.master_bedroom_apple_tv'].state = 'paused'
@@ -1151,6 +1156,12 @@ describe('DashboardViewPage', () => {
       expect(screen.getByRole('heading', { name: 'Vacation Mode' })).toBeInTheDocument()
       expect(screen.getByText('Enable or disable vacation mode for the house')).toBeInTheDocument()
       expect(screen.queryByRole('heading', { name: 'Vacation Dates' })).not.toBeInTheDocument()
+      expect(screen.getByRole('heading', { name: 'Pre-Vacation Checklist' })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Turn off outdoor sprinklers' })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Pour boiling water down the drain' })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Make the bed' })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Unload and Check Dishwasher' })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Trash and Recycles taken out' })).toBeInTheDocument()
 
       const vacationMode = screen.getByRole('button', { name: 'Vacation Mode Off' })
       expect(vacationMode).toHaveStyle({ '--card-rgb': '67 160 71' })
@@ -1171,10 +1182,33 @@ describe('DashboardViewPage', () => {
     }
   })
 
+  it('keeps the Pre-Vacation checklist visible while checked items toggle Home Assistant booleans', () => {
+    mockEntities['input_boolean.vacation_checklist_pour_boiling_water_down_the_drain'].state = 'on'
+    render(<DashboardViewPage activePath="settings" onNavigate={() => undefined} path="vacation" />)
+
+    expect(screen.getByRole('heading', { name: 'Pre-Vacation Checklist' })).toBeInTheDocument()
+    const sprinklers = screen.getByRole('button', { name: 'Turn off outdoor sprinklers' })
+    const drain = screen.getByRole('button', { name: 'Pour boiling water down the drain' })
+
+    fireEvent.click(sprinklers)
+    fireEvent.click(drain)
+
+    expect(sprinklers).toHaveAttribute('aria-pressed', 'true')
+    expect(drain).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.getByText('Make the bed')).toBeInTheDocument()
+    expect(screen.getByText('Unload and Check Dishwasher')).toBeInTheDocument()
+    expect(screen.getByText('Trash and Recycles taken out')).toBeInTheDocument()
+    expect(mockCallServiceCalls).toEqual([
+      { domain: 'input_boolean', service: 'turn_on', target: 'input_boolean.vacation_checklist_turn_off_outdoor_sprinklers' },
+      { domain: 'input_boolean', service: 'turn_off', target: 'input_boolean.vacation_checklist_pour_boiling_water_down_the_drain' },
+    ])
+  })
+
   it('shows Vacation date native inputs when Vacation Mode is on and updates HASS helpers', () => {
     mockEntities['input_boolean.vacation_mode'].state = 'on'
     render(<DashboardViewPage activePath="settings" onNavigate={() => undefined} path="vacation" />)
 
+    expect(screen.queryByRole('heading', { name: 'Pre-Vacation Checklist' })).not.toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Vacation Dates' })).toBeInTheDocument()
     expect(screen.getByText('Set the start and end time for your vacation. Vacation mode will automatically be turned off at the set end date and time.')).toBeInTheDocument()
     expect(screen.getByLabelText('Start Date')).toHaveAttribute('type', 'date')
@@ -1203,6 +1237,29 @@ describe('DashboardViewPage', () => {
     expect(mockCallServiceCalls).toEqual([
       { domain: 'input_datetime', service: 'set_datetime', target: 'input_datetime.vacation_start', serviceData: { date: '2026-06-20', time: '10:01:00' } },
       { domain: 'input_datetime', service: 'set_datetime', target: 'input_datetime.vacation_end', serviceData: { date: '2026-06-15', time: '18:30:00' } },
+    ])
+  })
+
+  it('resets the Pre-Vacation checklist when Vacation Mode turns off', () => {
+    mockEntities['input_boolean.vacation_mode'].state = 'on'
+    mockEntities['input_boolean.vacation_checklist_turn_off_outdoor_sprinklers'].state = 'on'
+    mockEntities['input_boolean.vacation_checklist_pour_boiling_water_down_the_drain'].state = 'on'
+    mockEntities['input_boolean.vacation_checklist_make_the_bed'].state = 'on'
+    mockEntities['input_boolean.vacation_checklist_unload_and_check_dishwasher'].state = 'on'
+    mockEntities['input_boolean.vacation_checklist_trash_and_recycles_taken_out'].state = 'on'
+    render(<DashboardViewPage activePath="settings" onNavigate={() => undefined} path="vacation" />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Vacation Mode On' }))
+
+    expect(screen.getByRole('heading', { name: 'Pre-Vacation Checklist' })).toBeInTheDocument()
+    expect(mockCallServiceCalls).toEqual([
+      { domain: 'input_boolean', service: 'turn_off', target: 'input_boolean.vacation_mode' },
+      { domain: 'input_boolean', service: 'turn_off', target: 'input_boolean.vacation_mode_invalid_dates_pending' },
+      { domain: 'input_boolean', service: 'turn_off', target: 'input_boolean.vacation_checklist_turn_off_outdoor_sprinklers' },
+      { domain: 'input_boolean', service: 'turn_off', target: 'input_boolean.vacation_checklist_pour_boiling_water_down_the_drain' },
+      { domain: 'input_boolean', service: 'turn_off', target: 'input_boolean.vacation_checklist_make_the_bed' },
+      { domain: 'input_boolean', service: 'turn_off', target: 'input_boolean.vacation_checklist_unload_and_check_dishwasher' },
+      { domain: 'input_boolean', service: 'turn_off', target: 'input_boolean.vacation_checklist_trash_and_recycles_taken_out' },
     ])
   })
 

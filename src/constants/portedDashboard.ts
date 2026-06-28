@@ -62,6 +62,11 @@ export interface TodoPageConfig {
   showEmptyStateWhenEmpty?: boolean
 }
 
+export interface VacationChecklistItemConfig {
+  title: string
+  entityId: string
+}
+
 export interface ChoreQuickLinkConfig {
   title: string
   path: string
@@ -300,6 +305,14 @@ export const VACATION_END_ENTITY_ID = 'input_datetime.vacation_end'
 
 export const VACATION_MODE_ITEMS: EntityTileConfig[] = [
   { title: 'Vacation Mode', entityId: VACATION_MODE_ENTITY_ID, icon: 'mdi:airplane', color: SWITCH_ACTIVE_COLOR, action: { type: 'toggle' }, showSubtitle: true },
+]
+
+export const VACATION_PRE_CHECKLIST_ITEMS: VacationChecklistItemConfig[] = [
+  { title: 'Turn off outdoor sprinklers', entityId: 'input_boolean.vacation_checklist_turn_off_outdoor_sprinklers' },
+  { title: 'Pour boiling water down the drain', entityId: 'input_boolean.vacation_checklist_pour_boiling_water_down_the_drain' },
+  { title: 'Make the bed', entityId: 'input_boolean.vacation_checklist_make_the_bed' },
+  { title: 'Unload and Check Dishwasher', entityId: 'input_boolean.vacation_checklist_unload_and_check_dishwasher' },
+  { title: 'Trash and Recycles taken out', entityId: 'input_boolean.vacation_checklist_trash_and_recycles_taken_out' },
 ]
 
 export const ADMIN_TODO_ENTITY_ID = 'todo.groceries'

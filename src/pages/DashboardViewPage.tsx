@@ -75,6 +75,7 @@ import {
   VACATION_MODE_DESCRIPTION,
   VACATION_MODE_ENTITY_ID,
   VACATION_MODE_ITEMS,
+  VACATION_PRE_CHECKLIST_ITEMS,
   VACATION_START_ENTITY_ID,
   VACUUM_COLOR,
   VACUUMS,
@@ -1320,6 +1321,12 @@ function VacationDateField({ label, onChange, type, value }: { label: string; on
   )
 }
 
+function resetVacationChecklist(callService: (params: Record<string, unknown>) => void) {
+  for (const item of VACATION_PRE_CHECKLIST_ITEMS) {
+    callService({ domain: 'input_boolean', service: 'turn_off', target: item.entityId })
+  }
+}
+
 function VacationModeCard({ disabled = false, enabled, onEnabledChange }: { disabled?: boolean; enabled: boolean; onEnabledChange: (enabled: boolean) => void }) {
   const entity = useEntity(asEntityName(VACATION_MODE_ENTITY_ID), { returnNullIfNotFound: true })
   const callService = useCallService()
@@ -1341,6 +1348,7 @@ function VacationModeCard({ disabled = false, enabled, onEnabledChange }: { disa
       onEnabledChange(false)
       callService({ domain: 'input_boolean', service: 'turn_off', target: VACATION_MODE_ENTITY_ID })
       callService({ domain: 'input_boolean', service: 'turn_off', target: VACATION_INVALID_DATES_PENDING_ENTITY_ID })
+      resetVacationChecklist(callService)
       return
     }
     initializeVacationDates()
@@ -1362,6 +1370,47 @@ function VacationModeCard({ disabled = false, enabled, onEnabledChange }: { disa
       subtitle={subtitle}
       title="Vacation Mode"
     />
+  )
+}
+
+function VacationChecklistRow({ item }: { item: typeof VACATION_PRE_CHECKLIST_ITEMS[number] }) {
+  const entity = useEntity(asEntityName(item.entityId), { returnNullIfNotFound: true })
+  const callService = useCallService()
+  const [state, commitState] = useOptimisticState(entity?.state ?? 'unavailable')
+  const active = state === 'on'
+  const unavailable = !entity || state === 'unavailable' || state === 'unknown'
+
+  const toggle = () => {
+    if (unavailable) return
+    const nextState = active ? 'off' : 'on'
+    commitState(nextState)
+    callService({ domain: 'input_boolean', service: active ? 'turn_off' : 'turn_on', target: item.entityId })
+  }
+
+  return (
+    <li className={styles.vacationChecklistRow}>
+      <CheckboxRow
+        active={active}
+        aria-label={item.title}
+        className={styles.vacationChecklistItem}
+        disabled={unavailable}
+        onClick={toggle}
+        title={item.title}
+      />
+    </li>
+  )
+}
+
+function VacationChecklistSection() {
+  return (
+    <section className={styles.section}>
+      <SectionHeader title="Pre-Vacation Checklist" />
+      <ul className={styles.vacationChecklist}>
+        {VACATION_PRE_CHECKLIST_ITEMS.map((item) => (
+          <VacationChecklistRow item={item} key={item.entityId} />
+        ))}
+      </ul>
+    </section>
   )
 }
 
@@ -1413,7 +1462,7 @@ function VacationPage() {
         <Description>{VACATION_MODE_DESCRIPTION}</Description>
         <VacationModeCard disabled={invalidDateRange} enabled={visibleEnabled} onEnabledChange={commitEnabled} />
       </section>
-      {visibleEnabled && <VacationDatesSection dateRange={dateRange} invalidDateRange={invalidDateRange} recoveringInvalidDates={recoveringInvalidDates} />}
+      {visibleEnabled ? <VacationDatesSection dateRange={dateRange} invalidDateRange={invalidDateRange} recoveringInvalidDates={recoveringInvalidDates} /> : <VacationChecklistSection />}
     </div>
   )
 }

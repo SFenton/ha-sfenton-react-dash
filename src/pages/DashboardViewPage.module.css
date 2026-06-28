@@ -227,6 +227,27 @@
   margin: 0;
 }
 
+.vacationChecklist {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.vacationChecklistRow {
+  min-width: 0;
+}
+
+.vacationChecklistItem {
+  min-height: 66px;
+}
+
+.vacationChecklistItem:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
 .vacationDateGrid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
