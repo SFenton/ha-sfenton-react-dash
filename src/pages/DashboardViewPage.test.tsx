@@ -1194,7 +1194,7 @@ describe('DashboardViewPage', () => {
     }
   })
 
-  it('turns on Vacation Mode after all Pre-Vacation checklist tasks are checked', () => {
+  it('shows Vacation Mode as pending until valid vacation dates are confirmed', () => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date(2026, 5, 14, 10, 1, 0))
     setVacationChecklistMockState('on')
@@ -1206,9 +1206,22 @@ describe('DashboardViewPage', () => {
       fireEvent.click(vacationMode)
 
       expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Vacation Mode Pending' })).toHaveStyle({ '--card-rgb': '30 136 229' })
+      expect(screen.getByRole('button', { name: 'Vacation Mode Pending' })).toHaveAttribute('aria-pressed', 'true')
+      expect(screen.getByRole('heading', { name: 'Vacation Dates' })).toBeInTheDocument()
+      expect(screen.getByLabelText('Start Date')).toHaveValue('2026-06-14')
+      expect(screen.getByLabelText('Start Time')).toHaveValue('10:01')
+      expect(screen.getByLabelText('End Date')).toHaveValue('2026-06-15')
+      expect(screen.getByLabelText('End Time')).toHaveValue('10:01')
+      expect(mockCallServiceCalls).toEqual([])
+
+      fireEvent.change(screen.getByLabelText('End Time'), { target: { value: '18:30' } })
+      expect(mockCallServiceCalls).toEqual([])
+      fireEvent.click(screen.getByRole('button', { name: 'Confirm Vacation' }))
+
       expect(mockCallServiceCalls).toEqual([
         { domain: 'input_datetime', service: 'set_datetime', target: 'input_datetime.vacation_start', serviceData: { date: '2026-06-14', time: '10:01:00' } },
-        { domain: 'input_datetime', service: 'set_datetime', target: 'input_datetime.vacation_end', serviceData: { date: '2026-06-15', time: '10:01:00' } },
+        { domain: 'input_datetime', service: 'set_datetime', target: 'input_datetime.vacation_end', serviceData: { date: '2026-06-15', time: '18:30:00' } },
         { domain: 'input_boolean', service: 'turn_off', target: 'input_boolean.vacation_mode_invalid_dates_pending' },
         { domain: 'input_boolean', service: 'turn_on', target: 'input_boolean.vacation_mode' },
       ])
@@ -1245,6 +1258,7 @@ describe('DashboardViewPage', () => {
 
     expect(screen.queryByRole('heading', { name: 'Pre-Vacation Checklist' })).not.toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Vacation Dates' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Confirm Vacation' })).not.toBeInTheDocument()
     expect(screen.getByText('Set the start and end time for your vacation. Vacation mode will automatically be turned off at the set end date and time.')).toBeInTheDocument()
     expect(screen.getByLabelText('Start Date')).toHaveAttribute('type', 'date')
     expect(screen.getByLabelText('Start Time')).toHaveAttribute('type', 'time')
@@ -1315,6 +1329,7 @@ describe('DashboardViewPage', () => {
       expect(vacationMode).toHaveAttribute('data-disabled', 'true')
       expect(vacationMode).toHaveAttribute('data-muted', 'true')
       expect(screen.getByRole('heading', { name: 'Vacation Dates' })).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Confirm Vacation' })).not.toBeInTheDocument()
       expect(screen.getByText('Start date and time must be before end date and time. Vacation mode is disabled until the dates are fixed.')).toBeInTheDocument()
       expect(screen.getByLabelText('Start Date')).toHaveValue('2026-06-14')
       expect(screen.getByLabelText('Start Time')).toHaveValue('10:01')

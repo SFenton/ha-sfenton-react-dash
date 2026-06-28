@@ -65,6 +65,7 @@ import {
   NEUTRAL_COLOR,
   MEDIA_SECTIONS,
   ROOM_EXTRA_SECTIONS,
+  SECURITY_COLOR,
   SETTINGS_PAGE_ITEMS,
   THERMOSTAT_ROOMS,
   TODO_PAGES,
@@ -1257,22 +1258,37 @@ function isVacationDateRangeFuture({ end }: VacationDateRange) {
   return endTimestamp !== null && endTimestamp > Date.now()
 }
 
-function vacationDateRangeFromStates(startState: string | undefined, endState: string | undefined): VacationDateRange {
+function defaultVacationDateRange(): VacationDateRange {
   const fallbackStart = dateTimeParts(new Date())
   const fallbackEndDate = new Date()
   fallbackEndDate.setDate(fallbackEndDate.getDate() + 1)
   const fallbackEnd = dateTimeParts(fallbackEndDate)
+
+  return {
+    start: {
+      date: fallbackStart.date,
+      time: fallbackStart.time.slice(0, 5),
+    },
+    end: {
+      date: fallbackEnd.date,
+      time: fallbackEnd.time.slice(0, 5),
+    },
+  }
+}
+
+function vacationDateRangeFromStates(startState: string | undefined, endState: string | undefined): VacationDateRange {
+  const fallback = defaultVacationDateRange()
   const start = parsedInputDateTime(startState)
   const end = parsedInputDateTime(endState)
 
   return {
     start: {
-      date: start.date || fallbackStart.date,
-      time: start.time || fallbackStart.time.slice(0, 5),
+      date: start.date || fallback.start.date,
+      time: start.time || fallback.start.time,
     },
     end: {
-      date: end.date || fallbackEnd.date,
-      time: end.time || fallbackEnd.time.slice(0, 5),
+      date: end.date || fallback.end.date,
+      time: end.time || fallback.end.time,
     },
   }
 }
@@ -1333,20 +1349,12 @@ function isVacationChecklistComplete(stateKey: string) {
   return stateKey.split(VACATION_CHECKLIST_STATE_SEPARATOR).every((state) => state === 'on')
 }
 
-function VacationModeCard({ disabled = false, enabled, onBlockedEnable, onEnabledChange, preChecklistComplete = true }: { disabled?: boolean; enabled: boolean; onBlockedEnable?: () => void; onEnabledChange: (enabled: boolean) => void; preChecklistComplete?: boolean }) {
+function VacationModeCard({ disabled = false, enabled, onBlockedEnable, onEnabledChange, onPendingChange, pending = false, preChecklistComplete = true }: { disabled?: boolean; enabled: boolean; onBlockedEnable?: () => void; onEnabledChange: (enabled: boolean) => void; onPendingChange: (pending: boolean) => void; pending?: boolean; preChecklistComplete?: boolean }) {
   const entity = useEntity(asEntityName(VACATION_MODE_ENTITY_ID), { returnNullIfNotFound: true })
   const callService = useCallService()
   const entityUnavailable = !entity || entity.state === 'unavailable' || entity.state === 'unknown'
   const cardDisabled = entityUnavailable || disabled
-  const subtitle = formatCompactEntityState(entity, 'Unavailable', !entityUnavailable ? (enabled ? 'on' : 'off') : undefined)
-
-  const initializeVacationDates = () => {
-    const start = new Date()
-    const end = new Date(start)
-    end.setDate(end.getDate() + 1)
-    callService({ domain: 'input_datetime', service: 'set_datetime', target: VACATION_START_ENTITY_ID, serviceData: dateTimeParts(start) })
-    callService({ domain: 'input_datetime', service: 'set_datetime', target: VACATION_END_ENTITY_ID, serviceData: dateTimeParts(end) })
-  }
+  const subtitle = pending ? 'Pending' : formatCompactEntityState(entity, 'Unavailable', !entityUnavailable ? (enabled ? 'on' : 'off') : undefined)
 
   const toggleVacationMode = () => {
     if (cardDisabled) return
@@ -1357,25 +1365,26 @@ function VacationModeCard({ disabled = false, enabled, onBlockedEnable, onEnable
       resetVacationChecklist(callService)
       return
     }
+    if (pending) {
+      onPendingChange(false)
+      return
+    }
     if (!preChecklistComplete) {
       onBlockedEnable?.()
       return
     }
-    initializeVacationDates()
-    onEnabledChange(true)
-    callService({ domain: 'input_boolean', service: 'turn_off', target: VACATION_INVALID_DATES_PENDING_ENTITY_ID })
-    callService({ domain: 'input_boolean', service: 'turn_on', target: VACATION_MODE_ENTITY_ID })
+    onPendingChange(true)
   }
 
   return (
     <Card
       ariaLabel={`Vacation Mode ${subtitle}`}
-      color={SWITCH_ACTIVE_COLOR}
+      color={pending ? SECURITY_COLOR : SWITCH_ACTIVE_COLOR}
       disabled={cardDisabled}
       icon={<MaterialIcon name={VACATION_MODE_ITEMS[0].icon} size={38} />}
-      muted={cardDisabled || !enabled}
+      muted={cardDisabled || (!enabled && !pending)}
       onClick={toggleVacationMode}
-      pressed={!entityUnavailable ? enabled : undefined}
+      pressed={!entityUnavailable ? enabled || pending : undefined}
       size="wide"
       subtitle={subtitle}
       title="Vacation Mode"
@@ -1422,7 +1431,7 @@ function VacationChecklistSection({ onStateChange, states }: { onStateChange: (e
   )
 }
 
-function VacationDatesSection({ dateRange, invalidDateRange, recoveringInvalidDates }: { dateRange: VacationDateRange; invalidDateRange: boolean; recoveringInvalidDates: boolean }) {
+function VacationDatesSection({ dateRange, invalidDateRange, onConfirm, onDateRangeChange, pending, recoveringInvalidDates }: { dateRange: VacationDateRange; invalidDateRange: boolean; onConfirm: () => void; onDateRangeChange: (dateRange: VacationDateRange) => void; pending: boolean; recoveringInvalidDates: boolean }) {
   const callService = useCallService()
   const startDate = dateRange.start.date
   const startTime = dateRange.start.time
@@ -1430,6 +1439,10 @@ function VacationDatesSection({ dateRange, invalidDateRange, recoveringInvalidDa
   const endTime = dateRange.end.time
 
   const updateDateTime = (entityId: string, date: string, time: string, nextRange: VacationDateRange) => {
+    if (pending) {
+      onDateRangeChange(nextRange)
+      return
+    }
     callService({ domain: 'input_datetime', service: 'set_datetime', target: entityId, serviceData: inputDateTimeServiceData(date, time) })
     if (recoveringInvalidDates && !isVacationDateRangeInvalid(nextRange) && isVacationDateRangeFuture(nextRange)) {
       callService({ domain: 'input_boolean', service: 'turn_on', target: VACATION_MODE_ENTITY_ID })
@@ -1448,6 +1461,11 @@ function VacationDatesSection({ dateRange, invalidDateRange, recoveringInvalidDa
         <NativePickerField className={styles.vacationDatePicker} label="End Date" onChange={(value) => updateDateTime(VACATION_END_ENTITY_ID, value, endTime, { ...dateRange, end: { date: value, time: endTime } })} type="date" value={endDate} />
         <NativePickerField className={styles.vacationDatePicker} label="End Time" onChange={(value) => updateDateTime(VACATION_END_ENTITY_ID, endDate, value, { ...dateRange, end: { date: endDate, time: value } })} type="time" value={endTime} />
       </div>
+      {pending && !invalidDateRange && (
+        <button className={styles.vacationConfirmButton} onClick={onConfirm} type="button">
+          Confirm Vacation
+        </button>
+      )}
     </section>
   )
 }
@@ -1458,13 +1476,16 @@ function VacationPage() {
   const invalidDatesPending = useEntity(asEntityName(VACATION_INVALID_DATES_PENDING_ENTITY_ID), { returnNullIfNotFound: true })
   const startEntity = useEntity(asEntityName(VACATION_START_ENTITY_ID), { returnNullIfNotFound: true })
   const endEntity = useEntity(asEntityName(VACATION_END_ENTITY_ID), { returnNullIfNotFound: true })
+  const callService = useCallService()
   const [optimisticEnabled, commitEnabled] = useOptimisticState(isActiveState(vacationMode))
   const [checklistStateKey, commitChecklistStateKey] = useOptimisticState(vacationChecklistStateKeyFromEntities(entities))
   const [blockedEnableAttempted, setBlockedEnableAttempted] = useState(false)
-  const dateRange = vacationDateRangeFromStates(startEntity?.state, endEntity?.state)
+  const [pendingDateRange, setPendingDateRange] = useState<VacationDateRange | null>(null)
+  const pendingVacation = pendingDateRange !== null
+  const dateRange = pendingDateRange ?? vacationDateRangeFromStates(startEntity?.state, endEntity?.state)
   const invalidDateRange = isVacationDateRangeInvalid(dateRange)
-  const recoveringInvalidDates = invalidDateRange || isActiveState(invalidDatesPending)
-  const visibleEnabled = optimisticEnabled || recoveringInvalidDates
+  const recoveringInvalidDates = !pendingVacation && (invalidDateRange || isActiveState(invalidDatesPending))
+  const visibleEnabled = optimisticEnabled || recoveringInvalidDates || pendingVacation
   const checklistStates = vacationChecklistStatesFromKey(checklistStateKey)
   const checklistComplete = isVacationChecklistComplete(checklistStateKey)
   const showPreChecklistError = blockedEnableAttempted && !checklistComplete && !visibleEnabled
@@ -1477,7 +1498,23 @@ function VacationPage() {
 
   const commitVacationEnabled = (nextEnabled: boolean) => {
     if (nextEnabled) setBlockedEnableAttempted(false)
+    if (!nextEnabled) setPendingDateRange(null)
     commitEnabled(nextEnabled)
+  }
+
+  const setVacationPending = (pending: boolean) => {
+    setPendingDateRange(pending ? defaultVacationDateRange() : null)
+    if (pending) setBlockedEnableAttempted(false)
+  }
+
+  const confirmVacation = () => {
+    const confirmedRange = pendingDateRange ?? dateRange
+    callService({ domain: 'input_datetime', service: 'set_datetime', target: VACATION_START_ENTITY_ID, serviceData: inputDateTimeServiceData(confirmedRange.start.date, confirmedRange.start.time) })
+    callService({ domain: 'input_datetime', service: 'set_datetime', target: VACATION_END_ENTITY_ID, serviceData: inputDateTimeServiceData(confirmedRange.end.date, confirmedRange.end.time) })
+    callService({ domain: 'input_boolean', service: 'turn_off', target: VACATION_INVALID_DATES_PENDING_ENTITY_ID })
+    callService({ domain: 'input_boolean', service: 'turn_on', target: VACATION_MODE_ENTITY_ID })
+    setPendingDateRange(null)
+    commitVacationEnabled(true)
   }
 
   return (
@@ -1486,9 +1523,9 @@ function VacationPage() {
         <SectionHeader title="Vacation Mode" />
         <Description>{VACATION_MODE_DESCRIPTION}</Description>
         {showPreChecklistError && <InlineAlert className={styles.vacationModeError}>{VACATION_PRE_CHECKLIST_ERROR}</InlineAlert>}
-        <VacationModeCard disabled={invalidDateRange} enabled={visibleEnabled} onBlockedEnable={() => setBlockedEnableAttempted(true)} onEnabledChange={commitVacationEnabled} preChecklistComplete={checklistComplete} />
+        <VacationModeCard disabled={recoveringInvalidDates && invalidDateRange} enabled={optimisticEnabled || recoveringInvalidDates} onBlockedEnable={() => setBlockedEnableAttempted(true)} onEnabledChange={commitVacationEnabled} onPendingChange={setVacationPending} pending={pendingVacation} preChecklistComplete={checklistComplete} />
       </section>
-      {visibleEnabled ? <VacationDatesSection dateRange={dateRange} invalidDateRange={invalidDateRange} recoveringInvalidDates={recoveringInvalidDates} /> : <VacationChecklistSection onStateChange={commitChecklistItemState} states={checklistStates} />}
+      {visibleEnabled ? <VacationDatesSection dateRange={dateRange} invalidDateRange={invalidDateRange} onConfirm={confirmVacation} onDateRangeChange={setPendingDateRange} pending={pendingVacation} recoveringInvalidDates={recoveringInvalidDates} /> : <VacationChecklistSection onStateChange={commitChecklistItemState} states={checklistStates} />}
     </div>
   )
 }

@@ -266,6 +266,33 @@
   min-height: 0;
 }
 
+.vacationConfirmButton {
+  width: 100%;
+  min-height: 58px;
+  border: 0;
+  border-radius: 22px;
+  padding: 0 18px;
+  color: white;
+  background: rgb(30 136 229 / 0.72);
+  box-shadow: var(--shadow-glass), inset 0 1px 0 rgba(255, 255, 255, 0.18), inset 0 -1px 0 rgba(0, 0, 0, 0.14);
+  font: inherit;
+  font-size: 0.96rem;
+  font-weight: 860;
+  line-height: 1.1;
+  text-align: center;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.vacationConfirmButton:focus {
+  outline: none;
+}
+
+.vacationConfirmButton:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.62);
+  outline-offset: 4px;
+}
+
 .roomRail {
   display: flex;
   gap: 8px;
