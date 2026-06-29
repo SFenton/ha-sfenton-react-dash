@@ -1364,6 +1364,7 @@ function VacationModeCard({ disabled = false, enabled, onBlockedEnable, onEnable
       onEnabledChange(false)
       callService({ domain: 'input_boolean', service: 'turn_off', target: VACATION_MODE_ENTITY_ID })
       callService({ domain: 'input_boolean', service: 'turn_off', target: VACATION_INVALID_DATES_PENDING_ENTITY_ID })
+      callService({ domain: 'input_boolean', service: 'turn_off', target: VACATION_DISABLE_HOME_TASKS_ENTITY_ID })
       resetVacationChecklist(callService)
       return
     }
@@ -1573,6 +1574,7 @@ function VacationPage() {
     callService({ domain: 'input_datetime', service: 'set_datetime', target: VACATION_START_ENTITY_ID, serviceData: inputDateTimeServiceData(confirmedRange.start.date, confirmedRange.start.time) })
     callService({ domain: 'input_datetime', service: 'set_datetime', target: VACATION_END_ENTITY_ID, serviceData: inputDateTimeServiceData(confirmedRange.end.date, confirmedRange.end.time) })
     callService({ domain: 'input_boolean', service: 'turn_off', target: VACATION_INVALID_DATES_PENDING_ENTITY_ID })
+    callService({ domain: 'input_boolean', service: 'turn_on', target: VACATION_DISABLE_HOME_TASKS_ENTITY_ID })
     callService({ domain: 'input_boolean', service: 'turn_on', target: VACATION_MODE_ENTITY_ID })
     setPendingDateRange(null)
     commitVacationEnabled(true)

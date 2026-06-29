@@ -1225,6 +1225,7 @@ describe('DashboardViewPage', () => {
         { domain: 'input_datetime', service: 'set_datetime', target: 'input_datetime.vacation_start', serviceData: { date: '2026-06-14', time: '10:01:00' } },
         { domain: 'input_datetime', service: 'set_datetime', target: 'input_datetime.vacation_end', serviceData: { date: '2026-06-15', time: '18:30:00' } },
         { domain: 'input_boolean', service: 'turn_off', target: 'input_boolean.vacation_mode_invalid_dates_pending' },
+        { domain: 'input_boolean', service: 'turn_on', target: 'input_boolean.vacation_disable_home_tasks' },
         { domain: 'input_boolean', service: 'turn_on', target: 'input_boolean.vacation_mode' },
       ])
     } finally {
@@ -1312,6 +1313,7 @@ describe('DashboardViewPage', () => {
     expect(mockCallServiceCalls).toEqual([
       { domain: 'input_boolean', service: 'turn_off', target: 'input_boolean.vacation_mode' },
       { domain: 'input_boolean', service: 'turn_off', target: 'input_boolean.vacation_mode_invalid_dates_pending' },
+      { domain: 'input_boolean', service: 'turn_off', target: 'input_boolean.vacation_disable_home_tasks' },
       { domain: 'input_boolean', service: 'turn_off', target: 'input_boolean.vacation_checklist_turn_off_outdoor_sprinklers' },
       { domain: 'input_boolean', service: 'turn_off', target: 'input_boolean.vacation_checklist_pour_boiling_water_down_the_drain' },
       { domain: 'input_boolean', service: 'turn_off', target: 'input_boolean.vacation_checklist_make_the_bed' },
