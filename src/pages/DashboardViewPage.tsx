@@ -71,6 +71,8 @@ import {
   TODO_PAGES,
   UNAVAILABLE_COLOR,
   SWITCH_ACTIVE_COLOR,
+  VACATION_DISABLE_HOME_TASKS_DESCRIPTION,
+  VACATION_DISABLE_HOME_TASKS_ENTITY_ID,
   VACATION_DATE_RANGE_ERROR,
   VACATION_DATES_DESCRIPTION,
   VACATION_END_ENTITY_ID,
@@ -1488,6 +1490,47 @@ function VacationConfirmationModal({ dateRange, invalidDateRange, onClose, onCon
   )
 }
 
+function VacationDisableHomeTasksCard() {
+  const entity = useEntity(asEntityName(VACATION_DISABLE_HOME_TASKS_ENTITY_ID), { returnNullIfNotFound: true })
+  const callService = useCallService()
+  const [state, commitState] = useOptimisticState(entity?.state ?? 'unavailable')
+  const active = state === 'on'
+  const unavailable = !entity || state === 'unavailable' || state === 'unknown'
+  const subtitle = formatCompactEntityState(entity, 'Unavailable', state)
+
+  const toggle = () => {
+    if (unavailable) return
+    const nextState = active ? 'off' : 'on'
+    commitState(nextState)
+    callService({ domain: 'input_boolean', service: active ? 'turn_off' : 'turn_on', target: VACATION_DISABLE_HOME_TASKS_ENTITY_ID })
+  }
+
+  return (
+    <Card
+      ariaLabel={`Disable Home Tasks ${subtitle}`}
+      color={SWITCH_ACTIVE_COLOR}
+      disabled={unavailable}
+      icon={<MaterialIcon name="mdi:clipboard-list" size={38} />}
+      muted={unavailable || !active}
+      onClick={toggle}
+      pressed={!unavailable ? active : undefined}
+      size="wide"
+      subtitle={subtitle}
+      title="Disable Home Tasks"
+    />
+  )
+}
+
+function VacationControlsSection() {
+  return (
+    <section className={styles.section}>
+      <SectionHeader title="Vacation Controls" />
+      <Description>{VACATION_DISABLE_HOME_TASKS_DESCRIPTION}</Description>
+      <VacationDisableHomeTasksCard />
+    </section>
+  )
+}
+
 function VacationPage() {
   const entities = useHass((state) => state.entities) as unknown as Record<string, HassEntity | undefined>
   const vacationMode = useEntity(asEntityName(VACATION_MODE_ENTITY_ID), { returnNullIfNotFound: true })
@@ -1543,7 +1586,12 @@ function VacationPage() {
         {showPreChecklistError && <InlineAlert className={styles.vacationModeError}>{VACATION_PRE_CHECKLIST_ERROR}</InlineAlert>}
         <VacationModeCard disabled={recoveringInvalidDates && invalidDateRange} enabled={optimisticEnabled || recoveringInvalidDates} onBlockedEnable={() => setBlockedEnableAttempted(true)} onEnabledChange={commitVacationEnabled} onPendingChange={setVacationPending} pending={pendingVacation} preChecklistComplete={checklistComplete} />
       </section>
-      {inlineDatesVisible ? <VacationDatesSection dateRange={dateRange} invalidDateRange={invalidDateRange} onDateRangeChange={setPendingDateRange} recoveringInvalidDates={recoveringInvalidDates} /> : <VacationChecklistSection onStateChange={commitChecklistItemState} states={checklistStates} />}
+      {inlineDatesVisible ? (
+        <>
+          <VacationDatesSection dateRange={dateRange} invalidDateRange={invalidDateRange} onDateRangeChange={setPendingDateRange} recoveringInvalidDates={recoveringInvalidDates} />
+          {optimisticEnabled && <VacationControlsSection />}
+        </>
+      ) : <VacationChecklistSection onStateChange={commitChecklistItemState} states={checklistStates} />}
       <VacationConfirmationModal dateRange={pendingDateRange ?? dateRange} invalidDateRange={pendingVacation && invalidDateRange} onClose={() => setVacationPending(false)} onConfirm={confirmVacation} onDateRangeChange={setPendingDateRange} open={pendingVacation} />
     </div>
   )

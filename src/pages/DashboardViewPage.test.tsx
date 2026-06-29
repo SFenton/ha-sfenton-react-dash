@@ -250,6 +250,7 @@ describe('DashboardViewPage', () => {
     mockEntities['input_boolean.guests_staying_in_music_room'].state = 'off'
     mockEntities['input_boolean.guests_staying_in_theater_room'].state = 'off'
     mockEntities['input_boolean.vacation_mode'].state = 'off'
+    mockEntities['input_boolean.vacation_disable_home_tasks'].state = 'off'
     mockEntities['input_boolean.vacation_checklist_turn_off_outdoor_sprinklers'].state = 'off'
     mockEntities['input_boolean.vacation_checklist_pour_boiling_water_down_the_drain'].state = 'off'
     mockEntities['input_boolean.vacation_checklist_make_the_bed'].state = 'off'
@@ -1260,6 +1261,10 @@ describe('DashboardViewPage', () => {
     expect(screen.queryByRole('heading', { name: 'Pre-Vacation Checklist' })).not.toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Vacation Dates' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Confirm Vacation' })).not.toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Vacation Controls' })).toBeInTheDocument()
+    expect(screen.getByText('Prevents selected recurring Donetick home task notifications while vacation mode is active.')).toBeInTheDocument()
+    const disableHomeTasks = screen.getByRole('button', { name: 'Disable Home Tasks Off' })
+    expect(disableHomeTasks).toHaveAttribute('aria-pressed', 'false')
     expect(screen.getByText('Set the start and end time for your vacation. Vacation mode will automatically be turned off at the set end date and time.')).toBeInTheDocument()
     expect(screen.getByLabelText('Start Date')).toHaveAttribute('type', 'date')
     expect(screen.getByLabelText('Start Time')).toHaveAttribute('type', 'time')
@@ -1283,10 +1288,12 @@ describe('DashboardViewPage', () => {
 
     fireEvent.change(screen.getByLabelText('Start Date'), { target: { value: '2026-06-20' } })
     fireEvent.change(screen.getByLabelText('End Time'), { target: { value: '18:30' } })
+    fireEvent.click(disableHomeTasks)
 
     expect(mockCallServiceCalls).toEqual([
       { domain: 'input_datetime', service: 'set_datetime', target: 'input_datetime.vacation_start', serviceData: { date: '2026-06-20', time: '10:01:00' } },
       { domain: 'input_datetime', service: 'set_datetime', target: 'input_datetime.vacation_end', serviceData: { date: '2026-06-15', time: '18:30:00' } },
+      { domain: 'input_boolean', service: 'turn_on', target: 'input_boolean.vacation_disable_home_tasks' },
     ])
   })
 
