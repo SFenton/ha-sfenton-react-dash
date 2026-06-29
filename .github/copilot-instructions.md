@@ -140,6 +140,9 @@ Do not recreate the Home Assistant sidebar or top bar for now. Focus on the dash
 
 - Use HAKit and `@hakit/core` for Home Assistant state, services, and connection management.
 - Controls must call real Home Assistant services.
+- Home Assistant must own actual data updates and cascading side effects. React Dash should only signal Home Assistant through services, scripts, helpers, or automations; do not duplicate Home Assistant-owned business logic or multi-entity side effects in React.
+- React Dash controls should optimistically display the user's intended state while Home Assistant catches up. Use the shared `useOptimisticState` hook from `src/hooks/useOptimisticState.ts` for entity-backed optimistic UI instead of ad hoc local state. The optimistic value should clear when the live HA state changes or confirms the value, and it should revert to real HA state if HA never confirms.
+- When one user action implies multiple Home Assistant changes, prefer one Home Assistant-owned script/automation/helper/service as the command target and have React optimistically update only the local UI for the expected HA result. Keep the source of truth in HA so non-dashboard changes, automations, and manual HA UI actions stay consistent.
 - Controls whose click behavior changes by entity state must encode and test that state-to-service mapping explicitly, such as on/off helpers that press different input buttons or scripts for startup versus shutdown.
 - Entity-aware components should be reusable and typed narrowly enough to prevent invalid service calls where practical.
 - Avoid hard-coded UI state if the corresponding Home Assistant entity state is available.
