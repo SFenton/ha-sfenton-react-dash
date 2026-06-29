@@ -17,8 +17,55 @@
 }
 
 .inventoryContent {
+  position: relative;
+  min-height: 180px;
   opacity: 0;
   animation: inventoryContentFadeIn 170ms ease-out forwards;
+}
+
+.inventoryResults {
+  transition:
+    filter 190ms ease,
+    opacity 190ms ease,
+    transform 190ms ease;
+}
+
+.inventoryContent[data-search-loading='true'] .inventoryResults {
+  opacity: 0;
+  filter: blur(1.5px);
+  pointer-events: none;
+  transform: translateY(4px);
+}
+
+.inventorySearchOverlay {
+  position: absolute;
+  top: clamp(64px, 18dvh, 142px);
+  right: 0;
+  left: 0;
+  z-index: 2;
+  display: grid;
+  height: 74px;
+  min-height: 74px;
+  place-items: center;
+  opacity: 1;
+  pointer-events: none;
+  transition: opacity 190ms ease;
+}
+
+.inventorySearchOverlay[data-phase='exiting'] {
+  opacity: 0;
+}
+
+.inventorySearchSpinner {
+  display: block;
+  width: 34px;
+  height: 34px;
+  border: 3px solid rgba(255, 255, 255, 0.28);
+  border-top-color: white;
+  border-radius: 999px;
+  box-sizing: border-box;
+  filter: drop-shadow(0 10px 20px rgba(0, 0, 0, 0.26));
+  animation: shoppingSpinnerSpin 720ms linear infinite;
 }
 
 .inventoryLoading {
@@ -444,8 +491,12 @@
 
 @media (prefers-reduced-motion: reduce) {
   .inventoryContent,
+  .inventoryResults,
+  .inventorySearchOverlay,
+  .inventorySearchSpinner,
   .shoppingSpinner {
     animation-duration: 1ms;
+    transition-duration: 1ms;
   }
 
   .shoppingIconLayer {

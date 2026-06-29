@@ -30,6 +30,12 @@ interface EverShelfInventoryItem {
   quantity?: number | string | null
 }
 
+interface EverShelfInventoryResponse {
+  inventory: EverShelfInventoryItem[]
+  search?: string
+  source?: string
+}
+
 type EverShelfInventoryDisplayItem = EverShelfInventoryItem & {
   groupedItems?: EverShelfInventoryItem[]
 }
@@ -43,6 +49,7 @@ interface ExpiryInfo {
 
 type PantryRowShoppingState = 'added' | 'adding' | 'idle'
 type PantryRowDeleteState = 'deleting' | 'idle'
+type InventorySearchLoadPhase = 'exiting' | 'loading' | 'idle'
 
 const DAY_MS = 24 * 60 * 60 * 1000
 const SORT_FILTER_COLOR = { r: 42, g: 126, b: 180 }
@@ -50,6 +57,7 @@ const SORT_FILTER_ACTIVE_COLOR = { r: 155, g: 110, b: 64 }
 const DASHBOARD_FAB_KEYBOARD_INSET_VAR = '--dashboard-fab-keyboard-inset'
 const INVENTORY_SEARCH_EXPANDED_ATTR = 'data-inventory-search-expanded'
 const INVENTORY_LOADING_EXIT_MS = 500
+const INVENTORY_SEARCH_LOG_PREFIX = '[EverShelfInventorySearch]'
 const HASS_GROCERY_LIST_ENTITY_ID = 'todo.shopping_list'
 const KEYBOARD_STATE_CLEAR_MS = 150
 const SHOPPING_ADDED_VISIBLE_MS = 3000
@@ -78,6 +86,10 @@ const FILTER_OPTIONS: { label: string; subtitle: string; value: InventoryFilterM
   { label: 'Expiring Within a Year', subtitle: 'Items expiring in the next year.', value: 'year' },
   { label: 'No Expiration Date', subtitle: 'Items without a usable expiration date.', value: 'no-expiration' },
 ]
+
+function logInventorySearch(event: string, details: Record<string, unknown>) {
+  console.debug(INVENTORY_SEARCH_LOG_PREFIX, event, details)
+}
 
 const LOCATION_DELETE_LABELS: Record<EverShelfInventoryLocation, string> = {
   all: 'library',
@@ -124,10 +136,6 @@ function itemExpiryTime(item: EverShelfInventoryItem) {
   return parseIsoDateOnly(value)?.getTime() ?? null
 }
 
-function itemSearchText(item: EverShelfInventoryItem) {
-  return itemName(item).toLocaleLowerCase()
-}
-
 function itemGroupingKey(item: EverShelfInventoryItem) {
   return [
     itemName(item).toLocaleLowerCase(),
@@ -155,10 +163,6 @@ function groupedInventoryItems(items: EverShelfInventoryItem[]): EverShelfInvent
     existing.quantity = itemRawQuantity(existing) + itemRawQuantity(item)
   }
   return order.map((key) => grouped.get(key)).filter((item): item is EverShelfInventoryDisplayItem => Boolean(item))
-}
-
-function normalizedSearchQuery(query: string) {
-  return query.trim().toLocaleLowerCase()
 }
 
 function todayDateOnly() {
@@ -198,17 +202,70 @@ function daysUntilExpiry(item: EverShelfInventoryItem) {
   return expiryDate ? daysUntilDate(expiryDate) : null
 }
 
-function inventoryFromResponse(result: unknown): EverShelfInventoryItem[] {
+function inventoryResponseFromResult(result: unknown): EverShelfInventoryResponse {
   const response = result && typeof result === 'object'
     ? (result as { response?: unknown; service_response?: unknown }).response ?? (result as { service_response?: unknown }).service_response ?? result
     : result
-  if (!response || typeof response !== 'object') return []
+  if (!response || typeof response !== 'object') return { inventory: [] }
   const inventory = (response as { inventory?: unknown }).inventory
-  return Array.isArray(inventory) ? inventory.filter((item): item is EverShelfInventoryItem => Boolean(item && typeof item === 'object')) : []
+  return {
+    inventory: Array.isArray(inventory) ? inventory.filter((item): item is EverShelfInventoryItem => Boolean(item && typeof item === 'object')) : [],
+    search: typeof (response as { search?: unknown }).search === 'string' ? (response as { search: string }).search : undefined,
+    source: typeof (response as { source?: unknown }).source === 'string' ? (response as { source: string }).source : undefined,
+  }
 }
 
-function filterInventoryItems(items: EverShelfInventoryItem[], filterMode: InventoryFilterMode, searchQuery: string) {
-  const filteredItems = filterMode === 'all' ? items : items.filter((item) => {
+function fallbackSearchText(item: EverShelfInventoryItem) {
+  const canonicalTerms = Array.isArray((item as { canonical_ingredients?: unknown }).canonical_ingredients)
+    ? ((item as { canonical_ingredients: Array<Record<string, unknown>> }).canonical_ingredients)
+      .flatMap((term) => [term.name, term.slug, term.role])
+      .filter((value): value is string => typeof value === 'string')
+    : []
+  return [
+    itemName(item),
+    (item as { brand?: string | null }).brand,
+    (item as { category?: string | null }).category,
+    (item as { shopping_name?: string | null }).shopping_name,
+    ...canonicalTerms,
+  ].filter((value): value is string => typeof value === 'string' && value.trim() !== '').join(' ').toLocaleLowerCase()
+}
+
+function fallbackSearchTokens(query: string) {
+  return query.toLocaleLowerCase().trim().split(/\s+/).filter((token) => token.length >= 2)
+}
+
+function fallbackFilterSearchResults(items: EverShelfInventoryItem[], query: string) {
+  const tokens = fallbackSearchTokens(query)
+  if (tokens.length === 0) return items
+  return items.filter((item) => {
+    const haystack = fallbackSearchText(item)
+    return tokens.every((token) => haystack.includes(token))
+  })
+}
+
+function inventorySearchResponseConfirmed(response: EverShelfInventoryResponse, query: string) {
+  if (!query) return true
+  return response.source === 'ha_sensor_product_search' && response.search?.trim() === query
+}
+
+function inventoryItemsFromSearchResponse(response: EverShelfInventoryResponse, query: string) {
+  if (inventorySearchResponseConfirmed(response, query)) {
+    return response.inventory
+  }
+  if (!query) {
+    return response.inventory
+  }
+  logInventorySearch('response-search-unconfirmed-fallback', {
+    itemCount: response.inventory.length,
+    responseSearch: response.search,
+    responseSource: response.source,
+    query,
+  })
+  return fallbackFilterSearchResults(response.inventory, query)
+}
+
+function filterInventoryItems(items: EverShelfInventoryItem[], filterMode: InventoryFilterMode) {
+  return filterMode === 'all' ? items : items.filter((item) => {
     const days = daysUntilExpiry(item)
     if (filterMode === 'no-expiration') return days === null
     if (days === null) return false
@@ -219,9 +276,6 @@ function filterInventoryItems(items: EverShelfInventoryItem[], filterMode: Inven
     if (filterMode === 'six-months') return days <= 183
     return days <= 365
   })
-  const query = normalizedSearchQuery(searchQuery)
-  if (!query) return filteredItems
-  return filteredItems.filter((item) => itemSearchText(item).includes(query))
 }
 
 function sortInventoryItems(items: EverShelfInventoryItem[], sortMode: InventorySortMode, sortDirection: InventorySortDirection) {
@@ -239,8 +293,8 @@ function sortInventoryItems(items: EverShelfInventoryItem[], sortMode: Inventory
   })
 }
 
-function visibleInventoryItems(items: EverShelfInventoryItem[], sortMode: InventorySortMode, sortDirection: InventorySortDirection, filterMode: InventoryFilterMode, searchQuery: string) {
-  return sortInventoryItems(filterInventoryItems(items, filterMode, searchQuery), sortMode, sortDirection)
+function visibleInventoryItems(items: EverShelfInventoryItem[], sortMode: InventorySortMode, sortDirection: InventorySortDirection, filterMode: InventoryFilterMode) {
+  return sortInventoryItems(filterInventoryItems(items, filterMode), sortMode, sortDirection)
 }
 
 function emptyMatchMessage(searchActive: boolean, filterActive: boolean) {
@@ -702,9 +756,14 @@ function useFloatingSearchKeyboardInset(active: boolean) {
 function InventorySearchAction({ controls, onExpandedChange }: { controls: EverShelfInventoryControls; onExpandedChange: (expanded: boolean) => void }) {
   const [expanded, setExpanded] = useState(false)
   const [searchFocused, setSearchFocused] = useState(false)
+  const [draftQuery, setDraftQuery] = useState(controls.searchQuery)
   const inputRef = useRef<HTMLInputElement>(null)
-  const hasQuery = controls.searchQuery.trim() !== ''
+  const hasQuery = draftQuery.trim() !== ''
   const { captureKeyboardBaseline, clearKeyboardStateSoon } = useFloatingSearchKeyboardInset(searchFocused)
+
+  useEffect(() => {
+    setDraftQuery(controls.searchQuery)
+  }, [controls.searchQuery])
 
   useEffect(() => {
     onExpandedChange(expanded)
@@ -724,7 +783,10 @@ function InventorySearchAction({ controls, onExpandedChange }: { controls: EverS
   }, [captureKeyboardBaseline, focusInput])
 
   const handleInputChange = useCallback((event: ChangeEvent<HTMLInputElement>) => {
-    controls.setSearchQuery(event.target.value)
+    const nextQuery = event.target.value
+    logInventorySearch('input-change', { value: nextQuery })
+    setDraftQuery(nextQuery)
+    controls.setSearchQuery(nextQuery)
   }, [controls])
 
   const handleInputKeyDown = useCallback((event: KeyboardEvent<HTMLInputElement>) => {
@@ -743,6 +805,8 @@ function InventorySearchAction({ controls, onExpandedChange }: { controls: EverS
   }, [clearKeyboardStateSoon])
 
   const clearSearch = useCallback(() => {
+    logInventorySearch('clear', {})
+    setDraftQuery('')
     controls.setSearchQuery('')
     focusInput()
   }, [controls, focusInput])
@@ -764,7 +828,7 @@ function InventorySearchAction({ controls, onExpandedChange }: { controls: EverS
       <div className={styles.inventorySearchSlot} data-expanded="false">
         <button aria-label="Search inventory" className={styles.inventorySearchButton} data-active={hasQuery ? 'true' : undefined} onClick={expandSearch} type="button">
           <MaterialIcon name="mdi:magnify" size={26} />
-          <span>{hasQuery ? controls.searchQuery : 'Search'}</span>
+          <span>{hasQuery ? draftQuery : 'Search'}</span>
         </button>
       </div>
     )
@@ -786,7 +850,7 @@ function InventorySearchAction({ controls, onExpandedChange }: { controls: EverS
           placeholder="Search items..."
           ref={inputRef}
           type="search"
-          value={controls.searchQuery}
+          value={draftQuery}
         />
         {hasQuery && (
           <button
@@ -810,7 +874,7 @@ function InventorySearchAction({ controls, onExpandedChange }: { controls: EverS
 
 export function EverShelfInventoryFloatingActions({ controls }: { controls: EverShelfInventoryControls }) {
   const [searchExpanded, setSearchExpanded] = useState(false)
-  if (controls.inventoryLoadPhase !== 'content' || controls.inventoryItemCount === 0) return null
+  if (controls.inventoryLoadPhase !== 'content' || (controls.inventoryItemCount === 0 && !controls.searchActive)) return null
 
   const actionsCollapsed = searchExpanded
 
@@ -852,29 +916,123 @@ export function EverShelfInventoryPanel({ controls, location, title }: EverShelf
   const [items, setItems] = useState<EverShelfInventoryItem[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [reloadNonce, setReloadNonce] = useState(0)
+  const [settledSearchQuery, setSettledSearchQuery] = useState('')
+  const [searchLoadPhase, setSearchLoadPhase] = useState<InventorySearchLoadPhase>('idle')
+  const itemsRef = useRef<EverShelfInventoryItem[] | null>(null)
+  const loadScopeRef = useRef({ location, reloadNonce })
+  const rawSearchQueryRef = useRef(controls.searchQuery.trim())
+  const requestIdRef = useRef(0)
+  const searchFinishTimerRef = useRef<number | null>(null)
+
+  useEffect(() => {
+    itemsRef.current = items
+  }, [items])
+
+  useEffect(() => {
+    rawSearchQueryRef.current = controls.searchQuery.trim()
+  }, [controls.searchQuery])
 
   useEffect(() => {
     let cancelled = false
     let finishTimer: number | null = null
+    const requestId = requestIdRef.current + 1
+    requestIdRef.current = requestId
+    const searchQuery = controls.debouncedSearchQuery.trim()
+    const previousScope = loadScopeRef.current
+    const searchOnlyLoad = itemsRef.current !== null && previousScope.location === location && previousScope.reloadNonce === reloadNonce
+    const initialLoad = !searchOnlyLoad
+    loadScopeRef.current = { location, reloadNonce }
 
-    queueMicrotask(() => {
-      if (cancelled) return
-      setInventoryItemCount(null)
-      setInventoryLoadPhase('loading')
+    if (searchFinishTimerRef.current !== null) {
+      window.clearTimeout(searchFinishTimerRef.current)
+      searchFinishTimerRef.current = null
+    }
+
+    logInventorySearch('request-start', {
+      id: requestId,
+      initialLoad,
+      location,
+      query: searchQuery,
+      reloadNonce,
     })
 
+    if (initialLoad) {
+      queueMicrotask(() => {
+        if (cancelled || requestIdRef.current !== requestId) return
+        setInventoryItemCount(null)
+        setInventoryLoadPhase('loading')
+      })
+    } else {
+      setSearchLoadPhase('loading')
+    }
+
     const finishLoading = (nextItems: EverShelfInventoryItem[], nextError: string | null = null) => {
+      logInventorySearch('initial-finish-scheduled', {
+        error: nextError,
+        id: requestId,
+        itemCount: nextItems.length,
+        query: searchQuery,
+      })
       setInventoryLoadPhase('exiting')
       finishTimer = window.setTimeout(() => {
-        if (cancelled) return
+        if (cancelled || requestIdRef.current !== requestId) {
+          logInventorySearch('initial-finish-stale', { id: requestId, query: searchQuery })
+          return
+        }
         setError(nextError)
         setItems(nextItems)
         setInventoryItemCount(nextError ? 0 : nextItems.length)
+        setSettledSearchQuery(searchQuery)
         setInventoryLoadPhase('content')
+        logInventorySearch('initial-finish-applied', {
+          error: nextError,
+          id: requestId,
+          itemCount: nextItems.length,
+          query: searchQuery,
+        })
       }, INVENTORY_LOADING_EXIT_MS)
     }
 
-    const serviceData = location === 'all' ? {} : { location }
+    const finishSearch = (nextItems: EverShelfInventoryItem[], nextError: string | null = null) => {
+      logInventorySearch('search-finish-scheduled', {
+        error: nextError,
+        id: requestId,
+        itemCount: nextItems.length,
+        query: searchQuery,
+      })
+      setSearchLoadPhase('exiting')
+      searchFinishTimerRef.current = window.setTimeout(() => {
+        if (cancelled || requestIdRef.current !== requestId) {
+          logInventorySearch('search-finish-stale', { id: requestId, query: searchQuery })
+          return
+        }
+        if (rawSearchQueryRef.current !== searchQuery) {
+          logInventorySearch('search-finish-superseded', {
+            id: requestId,
+            query: searchQuery,
+            rawQuery: rawSearchQueryRef.current,
+          })
+          return
+        }
+        setError(nextError)
+        setItems(nextItems)
+        setInventoryItemCount(nextError ? 0 : nextItems.length)
+        setSettledSearchQuery(searchQuery)
+        setSearchLoadPhase('idle')
+        searchFinishTimerRef.current = null
+        logInventorySearch('search-finish-applied', {
+          error: nextError,
+          id: requestId,
+          itemCount: nextItems.length,
+          query: searchQuery,
+        })
+      }, 190)
+    }
+
+    const serviceData = {
+      ...(location === 'all' ? {} : { location }),
+      ...(searchQuery ? { q: searchQuery } : {}),
+    }
     void Promise.resolve(
       callService({
         domain: 'evershelf',
@@ -884,12 +1042,31 @@ export function EverShelfInventoryPanel({ controls, location, title }: EverShelf
       }),
     )
       .then((result) => {
-        if (cancelled) return
-        const nextItems = inventoryFromResponse(result)
-        finishLoading(nextItems)
+        if (cancelled || requestIdRef.current !== requestId) {
+          logInventorySearch('response-stale', { id: requestId, query: searchQuery })
+          return
+        }
+        const response = inventoryResponseFromResult(result)
+        const nextItems = inventoryItemsFromSearchResponse(response, searchQuery)
+        logInventorySearch('response-received', {
+          id: requestId,
+          initialLoad,
+          itemCount: nextItems.length,
+          query: searchQuery,
+          responseSearch: response.search,
+          responseSource: response.source,
+        })
+        if (initialLoad) finishLoading(nextItems)
+        else finishSearch(nextItems)
       })
       .catch((caughtError: unknown) => {
-        if (!cancelled) {
+        if (!cancelled && requestIdRef.current === requestId) {
+          const message = caughtError instanceof Error ? caughtError.message : 'Unable to load inventory'
+          logInventorySearch('request-error', { id: requestId, message, query: searchQuery })
+          if (!initialLoad) {
+            finishSearch([], message)
+            return
+          }
           finishLoading([], caughtError instanceof Error ? caughtError.message : 'Unable to load inventory')
         }
       })
@@ -897,8 +1074,13 @@ export function EverShelfInventoryPanel({ controls, location, title }: EverShelf
     return () => {
       cancelled = true
       if (finishTimer !== null) window.clearTimeout(finishTimer)
+      if (searchFinishTimerRef.current !== null && requestIdRef.current === requestId) {
+        window.clearTimeout(searchFinishTimerRef.current)
+        searchFinishTimerRef.current = null
+      }
+      logInventorySearch('request-cleanup', { id: requestId, query: searchQuery })
     }
-  }, [callService, location, reloadNonce, setInventoryItemCount, setInventoryLoadPhase])
+  }, [callService, controls.debouncedSearchQuery, location, reloadNonce, setInventoryItemCount, setInventoryLoadPhase])
 
   const loadedItems = useMemo(() => items ?? [], [items])
   const displayItems = useMemo(() => groupedInventoryItems(loadedItems), [loadedItems])
@@ -912,7 +1094,10 @@ export function EverShelfInventoryPanel({ controls, location, title }: EverShelf
     })
   }, [setInventoryItemCount])
   const effectiveSearchQuery = controls.debouncedSearchQuery.trim()
-  const visibleItems = useMemo(() => visibleInventoryItems(displayItems, controls.sortMode, controls.sortDirection, controls.filterMode, controls.debouncedSearchQuery), [controls.debouncedSearchQuery, controls.filterMode, controls.sortDirection, controls.sortMode, displayItems])
+  const visibleItems = useMemo(() => visibleInventoryItems(displayItems, controls.sortMode, controls.sortDirection, controls.filterMode), [controls.filterMode, controls.sortDirection, controls.sortMode, displayItems])
+  const searchInputPending = controls.searchQuery.trim() !== controls.debouncedSearchQuery.trim()
+  const searchResultPending = items !== null && effectiveSearchQuery !== settledSearchQuery
+  const searchLoading = searchLoadPhase !== 'idle' || searchInputPending || searchResultPending
 
   return (
     <>
@@ -920,29 +1105,36 @@ export function EverShelfInventoryPanel({ controls, location, title }: EverShelf
         {inventoryLoadPhase !== 'content' ? (
           <DashboardPageLoading className={styles.inventoryLoading} label={`Loading ${title}`} phase={inventoryLoadPhase === 'exiting' ? 'exiting' : 'loading'} />
         ) : (
-          <div className={styles.inventoryContent}>
-            {error ? (
-              <EmptyState className={styles.inventoryEmpty} description={inventoryErrorDescription(error, title)} title={`Unable to load ${title}`} />
-            ) : items !== null && loadedItems.length === 0 ? (
-              <EmptyState className={styles.inventoryEmpty} description={`Scan an item to add it to your ${title.toLowerCase()}.`} title="No items found" />
-            ) : items !== null && loadedItems.length > 0 && visibleItems.length === 0 && (effectiveSearchQuery
-              ? <EmptyState className={styles.inventoryEmpty} description={emptySearchDescription(controls.filterActive)} title="No matching items" />
-              : <Description>{emptyMatchMessage(false, controls.filterActive)}</Description>)}
-            {visibleItems.length > 0 && (
-              <ul className={styles.items}>
-                {visibleItems.map((item, index) => {
-                  const name = itemName(item)
-                  const expiry = expiryInfo(itemExpiryDate(item))
-                  const inventoryId = itemInventoryId(item)
-                  const multiItem = itemInstances(item).length > 1
-                  const quantity = itemQuantity(item)
-                  return (
-                    <li className={styles.item} key={item.inventory_id ?? item.id ?? `${location}-${name}-${index}`}>
-                      <PantryRow expiry={expiry} inventoryId={inventoryId} locationLabel={LOCATION_DELETE_LABELS[location]} multiItem={multiItem} onDeleted={removeDeletedItem} onOpenDetails={() => setDetailsItem(item)} quantity={quantity} title={name} />
-                    </li>
-                  )
-                })}
-              </ul>
+          <div className={styles.inventoryContent} data-search-loading={searchLoading ? 'true' : undefined}>
+            <div className={styles.inventoryResults}>
+              {error ? (
+                <EmptyState className={styles.inventoryEmpty} description={inventoryErrorDescription(error, title)} title={`Unable to load ${title}`} />
+              ) : items !== null && loadedItems.length === 0 ? (
+                <EmptyState className={styles.inventoryEmpty} description={effectiveSearchQuery ? emptySearchDescription(controls.filterActive) : `Scan an item to add it to your ${title.toLowerCase()}.`} title={effectiveSearchQuery ? 'No matching items' : 'No items found'} />
+              ) : items !== null && loadedItems.length > 0 && visibleItems.length === 0 && (effectiveSearchQuery
+                ? <EmptyState className={styles.inventoryEmpty} description={emptySearchDescription(controls.filterActive)} title="No matching items" />
+                : <Description>{emptyMatchMessage(false, controls.filterActive)}</Description>)}
+              {visibleItems.length > 0 && (
+                <ul className={styles.items}>
+                  {visibleItems.map((item, index) => {
+                    const name = itemName(item)
+                    const expiry = expiryInfo(itemExpiryDate(item))
+                    const inventoryId = itemInventoryId(item)
+                    const multiItem = itemInstances(item).length > 1
+                    const quantity = itemQuantity(item)
+                    return (
+                      <li className={styles.item} key={item.inventory_id ?? item.id ?? `${location}-${name}-${index}`}>
+                        <PantryRow expiry={expiry} inventoryId={inventoryId} locationLabel={LOCATION_DELETE_LABELS[location]} multiItem={multiItem} onDeleted={removeDeletedItem} onOpenDetails={() => setDetailsItem(item)} quantity={quantity} title={name} />
+                      </li>
+                    )
+                  })}
+                </ul>
+              )}
+            </div>
+            {searchLoading && (
+              <div aria-live="polite" aria-label="Searching inventory" className={styles.inventorySearchOverlay} data-phase={searchLoadPhase}>
+                <span aria-hidden="true" className={styles.inventorySearchSpinner} />
+              </div>
             )}
           </div>
         )}

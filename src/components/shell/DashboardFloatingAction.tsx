@@ -92,7 +92,7 @@ export function DashboardFloatingAction({ inventoryControls, onNavigate, path }:
 
   if (path === 'kitchen') secondaryActions.push(<RoomPickerButton key="rooms" onNavigate={onNavigate} />)
   if (inventoryRoute && inventoryControls && inventoryReady) secondaryActions.push(<EverShelfInventoryFloatingActions controls={inventoryControls} key="inventory-controls" />)
-  if (inventoryRoute && inventoryReady) secondaryActions.push(<ScanItemButton defaultLocation={defaultScanLocation} iconOnly={inventoryControls?.inventoryItemCount !== 0} key={`scan-item-${defaultScanLocation ?? 'default'}`} />)
+  if (inventoryRoute && inventoryReady) secondaryActions.push(<ScanItemButton defaultLocation={defaultScanLocation} iconOnly={inventoryControls?.searchActive || inventoryControls?.inventoryItemCount !== 0} key={`scan-item-${defaultScanLocation ?? 'default'}`} />)
   if (!primaryAction && secondaryActions.length === 0) return null
   return (
     <>
