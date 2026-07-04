@@ -49,6 +49,7 @@ interface ExpiryInfo {
 
 type PantryRowShoppingState = 'added' | 'adding' | 'idle'
 type PantryRowDeleteState = 'deleting' | 'idle'
+type DeleteQuantityPromptResult = { status: 'cancelled' } | { status: 'invalid' } | { quantity: number; status: 'valid' }
 type InventorySearchLoadPhase = 'exiting' | 'loading' | 'idle'
 
 const DAY_MS = 24 * 60 * 60 * 1000
@@ -344,11 +345,22 @@ function promptShoppingQuantity(title: string) {
   return Number.isFinite(parsedValue) && parsedValue >= 1 ? parsedValue : null
 }
 
+function promptDeleteQuantity(title: string, quantity: number) {
+  const value = window.prompt(`Quantity of ${title} to delete (available: ${formatQuantity(quantity)}).`, '1')
+  if (value === null) return { status: 'cancelled' } satisfies DeleteQuantityPromptResult
+  const normalizedValue = value.trim().replace(',', '.')
+  if (!/^(?:\d+|\d*\.\d+)$/.test(normalizedValue)) return { status: 'invalid' } satisfies DeleteQuantityPromptResult
+  const parsedValue = Number(normalizedValue)
+  return Number.isFinite(parsedValue) && parsedValue >= 1 && parsedValue <= quantity
+    ? { quantity: parsedValue, status: 'valid' } satisfies DeleteQuantityPromptResult
+    : { status: 'invalid' } satisfies DeleteQuantityPromptResult
+}
+
 function validExpiryInput(value: string) {
   return value.trim() === '' || /^\d{4}-\d{2}-\d{2}$/.test(value.trim())
 }
 
-function PantryRow({ expiry, inventoryId, locationLabel, multiItem, onDeleted, onOpenDetails, quantity, title }: { expiry: ExpiryInfo; inventoryId: number | null; locationLabel: string; multiItem: boolean; onDeleted: (inventoryId: number) => void; onOpenDetails: () => void; quantity: number | null; title: string }) {
+function PantryRow({ expiry, inventoryId, locationLabel, multiItem, onDeleted, onOpenDetails, quantity, title }: { expiry: ExpiryInfo; inventoryId: number | null; locationLabel: string; multiItem: boolean; onDeleted: (inventoryId: number, quantity?: number) => void; onOpenDetails: () => void; quantity: number | null; title: string }) {
   const callService = useHass((state) => state.helpers.callService) as unknown as CallService
   const [deleteState, setDeleteState] = useState<PantryRowDeleteState>('idle')
   const [shoppingState, setShoppingState] = useState<PantryRowShoppingState>('idle')
@@ -413,17 +425,28 @@ function PantryRow({ expiry, inventoryId, locationLabel, multiItem, onDeleted, o
   const deleteFromEverShelf = (event?: MouseEvent<HTMLButtonElement>) => {
     event?.stopPropagation()
     if (deleteButtonDisabled || inventoryId === null) return
-    if (!window.confirm(`Delete ${title} from the ${locationLabel}?`)) return
+    let deleteQuantity: number | undefined
+    if (quantity !== null && quantity > 1) {
+      const promptResult = promptDeleteQuantity(title, quantity)
+      if (promptResult.status === 'cancelled') return
+      if (promptResult.status === 'invalid') {
+        setRowError(`Enter a number from 1 to ${formatQuantity(quantity)}.`)
+        return
+      }
+      deleteQuantity = promptResult.quantity
+    } else if (!window.confirm(`Delete ${title} from the ${locationLabel}?`)) return
 
     setDeleteState('deleting')
     setRowError(null)
+    const serviceData: { inventory_id: number; quantity?: number } = { inventory_id: inventoryId }
+    if (deleteQuantity !== undefined) serviceData.quantity = deleteQuantity
     void Promise.resolve(callService({
       domain: 'evershelf',
       service: 'delete_inventory',
-      serviceData: { inventory_id: inventoryId },
+      serviceData,
     }))
       .then(() => {
-        onDeleted(inventoryId)
+        onDeleted(inventoryId, deleteQuantity)
       })
       .catch((caughtError: unknown) => {
         setDeleteState('idle')
@@ -1079,10 +1102,15 @@ export function EverShelfInventoryPanel({ controls, location, title }: EverShelf
   const loadedItems = useMemo(() => items ?? [], [items])
   const displayItems = useMemo(() => groupedInventoryItems(loadedItems), [loadedItems])
   const reloadInventory = useCallback(() => setReloadNonce((current) => current + 1), [])
-  const removeDeletedItem = useCallback((deletedInventoryId: number) => {
+  const removeDeletedItem = useCallback((deletedInventoryId: number, deletedQuantity?: number) => {
     setItems((currentItems) => {
       if (currentItems === null) return currentItems
-      const nextItems = currentItems.filter((item) => itemInventoryId(item) !== deletedInventoryId)
+      const nextItems = currentItems.flatMap((item) => {
+        if (itemInventoryId(item) !== deletedInventoryId) return [item]
+        if (deletedQuantity === undefined) return []
+        const remainingQuantity = itemRawQuantity(item) - deletedQuantity
+        return remainingQuantity > 0 ? [{ ...item, quantity: remainingQuantity }] : []
+      })
       setInventoryItemCount(nextItems.length)
       return nextItems
     })

@@ -3753,7 +3753,8 @@ describe('DashboardViewPage', () => {
       `Milk ${milkLabel}`,
       `Salsa ${salsaLabel}`,
     ])
-    expect(within(fridgeList).getByRole('group', { name: `Greek Yogurt ${greekYogurtLabel}` })).toHaveAttribute('data-expiry-tone', 'soon')
+    const greekYogurtRow = within(fridgeList).getByRole('group', { name: `Greek Yogurt ${greekYogurtLabel}` })
+    expect(greekYogurtRow).toHaveAttribute('data-expiry-tone', 'soon')
     expect(within(fridgeList).getByRole('group', { name: `Milk ${milkLabel}` })).toHaveAttribute('data-expiry-tone', 'expired')
     expect(mockCallServiceCalls).toContainEqual({
       domain: 'evershelf',
@@ -3761,6 +3762,20 @@ describe('DashboardViewPage', () => {
       service: 'list_inventory',
       serviceData: { location: 'frigo' },
     })
+    mockCallServiceCalls.length = 0
+    const deleteQuantityPromptSpy = vi.spyOn(window, 'prompt').mockReturnValue('1')
+    const deleteConfirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true)
+    fireEvent.click(within(greekYogurtRow).getByRole('button', { name: 'Delete Greek Yogurt' }))
+    expect(deleteQuantityPromptSpy).toHaveBeenCalledWith('Quantity of Greek Yogurt to delete (available: 2).', '1')
+    expect(deleteConfirmSpy).not.toHaveBeenCalled()
+    expect(mockCallServiceCalls).toContainEqual({
+      domain: 'evershelf',
+      service: 'delete_inventory',
+      serviceData: { inventory_id: 203, quantity: 1 },
+    })
+    await waitFor(() => expect(within(fridgeList).getByRole('group', { name: `Greek Yogurt ${testExpiryLabel(5)}` })).toBeInTheDocument())
+    deleteQuantityPromptSpy.mockRestore()
+    deleteConfirmSpy.mockRestore()
 
     mockCallServiceCalls.length = 0
     fridgeView.unmount()
