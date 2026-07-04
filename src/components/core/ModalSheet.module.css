@@ -15,8 +15,8 @@
   left: 0;
   z-index: 41;
   display: flex;
-  width: 100vw;
-  max-width: 100vw;
+  width: var(--dashboard-viewport-width, 100vw);
+  max-width: var(--dashboard-viewport-width, 100vw);
   height: var(--modal-mobile-height, 90vh);
   max-height: var(--modal-mobile-max-height, 90vh);
   height: var(--modal-mobile-height, 90dvh);
@@ -53,8 +53,8 @@
   top: 0;
   height: 100vh;
   max-height: 100vh;
-  height: 100dvh;
-  max-height: 100dvh;
+  height: var(--dashboard-viewport-height, 100dvh);
+  max-height: var(--dashboard-viewport-height, 100dvh);
   border: 0;
   border-radius: 0;
   background: var(--color-modal-surface);
@@ -229,11 +229,11 @@
     bottom: auto;
     left: 50%;
     width: var(--modal-desktop-width, 90vw);
-    max-width: var(--modal-desktop-max-width, calc(100vw - 64px));
+    max-width: var(--modal-desktop-max-width, calc(var(--dashboard-viewport-width, 100vw) - 64px));
     height: var(--modal-desktop-height, 90vh);
     max-height: var(--modal-desktop-max-height, calc(100vh - 64px));
     height: var(--modal-desktop-height, 90dvh);
-    max-height: var(--modal-desktop-max-height, calc(100dvh - 64px));
+    max-height: var(--modal-desktop-max-height, calc(var(--dashboard-viewport-height, 100dvh) - 64px));
     border: 1px solid rgba(255, 255, 255, 0.12);
     border-radius: 34px;
     box-shadow: 0 26px 86px rgba(0, 0, 0, 0.48), inset 0 1px 0 rgba(255, 255, 255, 0.08);
@@ -289,11 +289,11 @@
     bottom: auto;
     left: 50%;
     width: var(--modal-desktop-width, 90vw);
-    max-width: var(--modal-desktop-max-width, calc(100vw - 64px));
+    max-width: var(--modal-desktop-max-width, calc(var(--dashboard-viewport-width, 100vw) - 64px));
     height: var(--modal-desktop-height, 90vh);
     max-height: var(--modal-desktop-max-height, calc(100vh - 64px));
     height: var(--modal-desktop-height, 90dvh);
-    max-height: var(--modal-desktop-max-height, calc(100dvh - 64px));
+    max-height: var(--modal-desktop-max-height, calc(var(--dashboard-viewport-height, 100dvh) - 64px));
     border-radius: 34px;
     transform: translate3d(-50%, -50%, 0);
   }

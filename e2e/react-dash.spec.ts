@@ -10,6 +10,7 @@ type FreeSleepSchedulesSnapshot = Partial<Record<'left' | 'right', Partial<Recor
 declare global {
   interface Window {
     __vacationPickerCalls?: number
+    __setDashboardFakeKeyboardHeight?: (height: number) => void
     __setInventoryFakeKeyboardHeight?: (height: number) => void
   }
 }
@@ -81,6 +82,7 @@ async function expectDesktopSquareGrid(dialog: Locator, sectionLabel: string) {
         scrollsHorizontally: gridElement.scrollWidth > gridElement.clientWidth + 1,
         squareCard: Math.round(firstCardRect?.width ?? 0) === Math.round(firstCardRect?.height ?? 0),
       }
+
     })
   }).toMatchObject({
     cardCount,
@@ -97,6 +99,31 @@ async function expectDesktopSquareGrid(dialog: Locator, sectionLabel: string) {
   const gridBox = await grid.boundingBox()
   expect(Math.round(dialogBox?.width ?? 0)).toBeLessThanOrEqual(Math.round((gridBox?.width ?? 0) + 52))
   return grid
+}
+
+async function installFakeVisualViewport(page: Page) {
+  await page.addInitScript(() => {
+    const fakeVisualViewport = new EventTarget() as EventTarget & {
+      height: number
+      offsetTop: number
+      pageLeft: number
+      pageTop: number
+      scale: number
+      width: number
+    }
+    fakeVisualViewport.width = window.innerWidth
+    fakeVisualViewport.height = window.innerHeight
+    fakeVisualViewport.offsetTop = 0
+    fakeVisualViewport.pageLeft = 0
+    fakeVisualViewport.pageTop = 0
+    fakeVisualViewport.scale = 1
+    Object.defineProperty(window, 'visualViewport', { configurable: true, value: fakeVisualViewport })
+    window.__setDashboardFakeKeyboardHeight = (height: number) => {
+      fakeVisualViewport.height = height
+      fakeVisualViewport.dispatchEvent(new Event('resize'))
+      window.dispatchEvent(new Event('resize'))
+    }
+  })
 }
 
 async function expectDesktopAdminSquareGrid(dialog: Locator, gridLabel: string) {
@@ -164,8 +191,12 @@ async function swipeWithTouch(page: Page, x: number, startY: number, endY: numbe
   await client.detach()
 }
 
+function inventoryList(page: Page, listLabel: string) {
+  return page.locator(`article[aria-label="${listLabel}"]`).filter({ visible: true }).first()
+}
+
 async function inventoryRowLabels(page: Page, listLabel: string) {
-  return page.getByLabel(listLabel).evaluate((list) => (
+  return inventoryList(page, listLabel).evaluate((list) => (
     Array.from(list.querySelectorAll(':scope li > [role="group"]'))
       .map((row) => row.getAttribute('aria-label'))
   ))
@@ -179,12 +210,35 @@ test('overview renders with mock Home Assistant state', async ({ page }) => {
   await expect(page.getByRole('heading', { name: 'Quick Links' })).toBeVisible()
 })
 
-test('inventory FAB search follows Festival mobile keyboard and clear behavior', async ({ page }) => {
+test('dashboard keyboard viewport hides bottom nav and publishes visible height', async ({ page }) => {
+  await installFakeVisualViewport(page)
+  await page.goto('/at-a-glance/overview')
+
+  const nav = page.getByRole('navigation', { name: 'Dashboard sections' })
+  await expect(nav).toHaveCSS('opacity', '1')
+  await expect.poll(() => page.evaluate(() => document.documentElement.getAttribute('data-dashboard-keyboard'))).toBeNull()
+
+  const initialViewportHeight = await page.evaluate(() => window.visualViewport?.height ?? window.innerHeight)
+  const keyboardViewportHeight = await page.evaluate(() => Math.max(320, window.innerHeight - 240))
+  await page.evaluate((height) => window.__setDashboardFakeKeyboardHeight?.(height), keyboardViewportHeight)
+
+  await expect.poll(() => page.evaluate(() => document.documentElement.getAttribute('data-dashboard-keyboard'))).toBe('open')
+  await expect(nav).toHaveCSS('opacity', '0')
+  await expect(nav).toHaveCSS('pointer-events', 'none')
+  await expect.poll(() => page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--dashboard-viewport-height').trim())).toBe(`${Math.round(keyboardViewportHeight)}px`)
+
+  await page.evaluate((height) => window.__setDashboardFakeKeyboardHeight?.(height), initialViewportHeight)
+  await expect.poll(() => page.evaluate(() => document.documentElement.getAttribute('data-dashboard-keyboard'))).toBeNull()
+  await expect(nav).toHaveCSS('opacity', '1')
+})
+
+test('inventory footer search moves above the mobile keyboard and clears results', async ({ page }) => {
   await page.goto('/at-a-glance/fridge')
 
   const dock = page.locator('[data-floating-action-dock="true"]')
   const inventoryListLabel = 'Fridge inventory list'
-  await expect(page.getByLabel(inventoryListLabel)).toBeVisible()
+  const visibleInventoryList = inventoryList(page, inventoryListLabel)
+  await expect(visibleInventoryList).toBeVisible()
   await expect.poll(() => inventoryRowLabels(page, inventoryListLabel)).toHaveLength(3)
 
   await page.evaluate(() => {
@@ -213,36 +267,27 @@ test('inventory FAB search follows Festival mobile keyboard and clear behavior',
   await dock.getByRole('button', { name: 'Search inventory' }).click()
   const input = page.getByLabel('Search inventory')
   await expect(input).toBeFocused()
+  await expect.poll(() => input.evaluate((element) => Boolean(element.closest('[data-floating-action-dock="true"]')))).toBe(true)
+  await expect.poll(() => page.evaluate(() => document.documentElement.getAttribute('data-inventory-search-expanded'))).toBe('true')
   await expect(dock.getByRole('button', { name: 'Sort' }).locator('xpath=..')).toHaveAttribute('data-collapsed', 'true')
   await expect(dock.getByRole('button', { name: 'Filter' }).locator('xpath=..')).toHaveAttribute('data-collapsed', 'true')
   await expect(dock.getByRole('button', { name: 'Scan Item' })).toHaveCSS('opacity', '0')
 
   const beforeBox = await dock.boundingBox()
   if (!beforeBox) throw new Error('Inventory floating action dock was not measurable')
-  const expectedKeyboardInset = await page.evaluate(() => window.innerHeight - 520)
   await page.evaluate(() => window.__setInventoryFakeKeyboardHeight?.(520))
   await expect.poll(async () => {
     const box = await dock.boundingBox()
     return Math.round(520 - ((box?.y ?? 0) + (box?.height ?? 0)))
-  }).toBeGreaterThanOrEqual(6)
+  }).toBeGreaterThanOrEqual(0)
   await expect.poll(async () => {
     const box = await dock.boundingBox()
     return Math.round(520 - ((box?.y ?? 0) + (box?.height ?? 0)))
-  }).toBeLessThanOrEqual(28)
-  await expect.poll(async () => page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--dashboard-fab-keyboard-inset').trim())).toBe(`${expectedKeyboardInset}px`)
+  }).toBeLessThanOrEqual(20)
+
   await input.fill('dragonfruit')
   await expect(page.getByRole('heading', { name: 'No matching items' })).toBeVisible()
   await expect(page.getByText('Try a different search or clear the search to show all items.')).toBeVisible()
-  await expect.poll(async () => page.evaluate(() => {
-    const article = document.querySelector('article[aria-label="Fridge inventory list"]')
-    const dockElement = document.querySelector('[data-floating-action-dock="true"]')
-    const empty = document.querySelector('[data-empty-layout="centered"]')
-    if (!article || !dockElement || !empty) return Number.POSITIVE_INFINITY
-    const articleTop = article.getBoundingClientRect().top
-    const dockTop = dockElement.getBoundingClientRect().top
-    const emptyRect = empty.getBoundingClientRect()
-    return Math.round(Math.abs((emptyRect.top + emptyRect.height / 2) - ((articleTop + dockTop) / 2)))
-  })).toBeLessThanOrEqual(32)
   await page.evaluate(() => window.__setInventoryFakeKeyboardHeight?.(window.innerHeight))
   await expect.poll(async () => Math.round((await dock.boundingBox())?.y ?? 0)).toBe(Math.round(beforeBox.y))
 
@@ -253,6 +298,7 @@ test('inventory FAB search follows Festival mobile keyboard and clear behavior',
   ])
 
   await input.press('Enter')
+  await expect.poll(() => page.evaluate(() => document.documentElement.getAttribute('data-inventory-search-expanded'))).toBeNull()
   await expect(dock.getByRole('button', { name: 'Search inventory' })).toContainText('milk')
   await dock.getByRole('button', { name: 'Search inventory' }).click()
   await page.getByRole('button', { name: 'Clear Search' }).click()

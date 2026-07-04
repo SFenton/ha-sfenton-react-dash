@@ -123,6 +123,30 @@ export function ModalSheet({ open, title, onClose, children, backLabel = 'Back',
     bodyRef.current.scrollTop = 0
   }, [open, scrollResetKey])
 
+  useLayoutEffect(() => {
+    if (!open) return undefined
+    const body = bodyRef.current
+    if (!body) return undefined
+
+    const syncVisibleHeight = () => {
+      body.style.setProperty('--modal-body-visible-height', `${body.clientHeight}px`)
+    }
+
+    syncVisibleHeight()
+    window.addEventListener('resize', syncVisibleHeight)
+
+    if (typeof ResizeObserver === 'undefined') {
+      return () => window.removeEventListener('resize', syncVisibleHeight)
+    }
+
+    const observer = new ResizeObserver(syncVisibleHeight)
+    observer.observe(body)
+    return () => {
+      observer.disconnect()
+      window.removeEventListener('resize', syncVisibleHeight)
+    }
+  }, [open, rendered.contentStyle, rendered.footer, rendered.subtitle])
+
   if (!shouldRender) return null
 
   return (

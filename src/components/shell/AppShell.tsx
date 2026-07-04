@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { useDashboardViewport } from '../../hooks/useDashboardViewport'
 import styles from './AppShell.module.css'
 
 interface AppShellProps {
@@ -9,6 +10,8 @@ interface AppShellProps {
 }
 
 export function AppShell({ children, bottomNav, chromeHidden = false, floatingAction }: AppShellProps) {
+  useDashboardViewport()
+
   const shellClassName = floatingAction && !chromeHidden ? `${styles.shell} ${styles.hasFloatingAction}` : styles.shell
 
   return (

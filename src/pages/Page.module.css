@@ -43,6 +43,10 @@
   will-change: opacity, transform;
 }
 
+:global(html[data-dashboard-keyboard='open']) .scroller {
+  padding-bottom: calc(var(--page-bottom-extra-padding, 22px) + 18px + env(safe-area-inset-bottom, 0px));
+}
+
 .scroller[data-chrome-hidden='true'] {
   padding: 0 var(--space-page-x);
 }

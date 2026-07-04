@@ -667,13 +667,13 @@ function InventoryFilterSheet({ draftMode, onApply, onClose, onDraftModeChange, 
   )
 }
 
-function updateFabKeyboardInset(inset: number) {
-  document.documentElement.style.setProperty(DASHBOARD_FAB_KEYBOARD_INSET_VAR, `${inset}px`)
-}
-
 function updateInventorySearchExpanded(expanded: boolean) {
   if (expanded) document.documentElement.setAttribute(INVENTORY_SEARCH_EXPANDED_ATTR, 'true')
   else document.documentElement.removeAttribute(INVENTORY_SEARCH_EXPANDED_ATTR)
+}
+
+function updateFabKeyboardInset(inset: number) {
+  document.documentElement.style.setProperty(DASHBOARD_FAB_KEYBOARD_INSET_VAR, `${inset}px`)
 }
 
 function useFloatingSearchKeyboardInset(active: boolean) {
@@ -756,14 +756,10 @@ function useFloatingSearchKeyboardInset(active: boolean) {
 function InventorySearchAction({ controls, onExpandedChange }: { controls: EverShelfInventoryControls; onExpandedChange: (expanded: boolean) => void }) {
   const [expanded, setExpanded] = useState(false)
   const [searchFocused, setSearchFocused] = useState(false)
-  const [draftQuery, setDraftQuery] = useState(controls.searchQuery)
+  const draftQuery = controls.searchQuery
   const inputRef = useRef<HTMLInputElement>(null)
   const hasQuery = draftQuery.trim() !== ''
   const { captureKeyboardBaseline, clearKeyboardStateSoon } = useFloatingSearchKeyboardInset(searchFocused)
-
-  useEffect(() => {
-    setDraftQuery(controls.searchQuery)
-  }, [controls.searchQuery])
 
   useEffect(() => {
     onExpandedChange(expanded)
@@ -778,6 +774,7 @@ function InventorySearchAction({ controls, onExpandedChange }: { controls: EverS
 
   const expandSearch = useCallback(() => {
     captureKeyboardBaseline()
+    updateInventorySearchExpanded(true)
     flushSync(() => setExpanded(true))
     focusInput()
   }, [captureKeyboardBaseline, focusInput])
@@ -785,7 +782,6 @@ function InventorySearchAction({ controls, onExpandedChange }: { controls: EverS
   const handleInputChange = useCallback((event: ChangeEvent<HTMLInputElement>) => {
     const nextQuery = event.target.value
     logInventorySearch('input-change', { value: nextQuery })
-    setDraftQuery(nextQuery)
     controls.setSearchQuery(nextQuery)
   }, [controls])
 
@@ -806,7 +802,6 @@ function InventorySearchAction({ controls, onExpandedChange }: { controls: EverS
 
   const clearSearch = useCallback(() => {
     logInventorySearch('clear', {})
-    setDraftQuery('')
     controls.setSearchQuery('')
     focusInput()
   }, [controls, focusInput])
@@ -875,7 +870,6 @@ function InventorySearchAction({ controls, onExpandedChange }: { controls: EverS
 export function EverShelfInventoryFloatingActions({ controls }: { controls: EverShelfInventoryControls }) {
   const [searchExpanded, setSearchExpanded] = useState(false)
   if (controls.inventoryLoadPhase !== 'content' || (controls.inventoryItemCount === 0 && !controls.searchActive)) return null
-
   const actionsCollapsed = searchExpanded
 
   return (
@@ -1105,38 +1099,40 @@ export function EverShelfInventoryPanel({ controls, location, title }: EverShelf
         {inventoryLoadPhase !== 'content' ? (
           <DashboardPageLoading className={styles.inventoryLoading} label={`Loading ${title}`} phase={inventoryLoadPhase === 'exiting' ? 'exiting' : 'loading'} />
         ) : (
-          <div className={styles.inventoryContent} data-search-loading={searchLoading ? 'true' : undefined}>
-            <div className={styles.inventoryResults}>
-              {error ? (
-                <EmptyState className={styles.inventoryEmpty} description={inventoryErrorDescription(error, title)} title={`Unable to load ${title}`} />
-              ) : items !== null && loadedItems.length === 0 ? (
-                <EmptyState className={styles.inventoryEmpty} description={effectiveSearchQuery ? emptySearchDescription(controls.filterActive) : `Scan an item to add it to your ${title.toLowerCase()}.`} title={effectiveSearchQuery ? 'No matching items' : 'No items found'} />
-              ) : items !== null && loadedItems.length > 0 && visibleItems.length === 0 && (effectiveSearchQuery
-                ? <EmptyState className={styles.inventoryEmpty} description={emptySearchDescription(controls.filterActive)} title="No matching items" />
-                : <Description>{emptyMatchMessage(false, controls.filterActive)}</Description>)}
-              {visibleItems.length > 0 && (
-                <ul className={styles.items}>
-                  {visibleItems.map((item, index) => {
-                    const name = itemName(item)
-                    const expiry = expiryInfo(itemExpiryDate(item))
-                    const inventoryId = itemInventoryId(item)
-                    const multiItem = itemInstances(item).length > 1
-                    const quantity = itemQuantity(item)
-                    return (
-                      <li className={styles.item} key={item.inventory_id ?? item.id ?? `${location}-${name}-${index}`}>
-                        <PantryRow expiry={expiry} inventoryId={inventoryId} locationLabel={LOCATION_DELETE_LABELS[location]} multiItem={multiItem} onDeleted={removeDeletedItem} onOpenDetails={() => setDetailsItem(item)} quantity={quantity} title={name} />
-                      </li>
-                    )
-                  })}
-                </ul>
+          <>
+            <div className={styles.inventoryContent} data-search-loading={searchLoading ? 'true' : undefined}>
+              <div className={styles.inventoryResults}>
+                {error ? (
+                  <EmptyState className={styles.inventoryEmpty} description={inventoryErrorDescription(error, title)} title={`Unable to load ${title}`} />
+                ) : items !== null && loadedItems.length === 0 ? (
+                  <EmptyState className={styles.inventoryEmpty} description={effectiveSearchQuery ? emptySearchDescription(controls.filterActive) : `Scan an item to add it to your ${title.toLowerCase()}.`} title={effectiveSearchQuery ? 'No matching items' : 'No items found'} />
+                ) : items !== null && loadedItems.length > 0 && visibleItems.length === 0 && (effectiveSearchQuery
+                  ? <EmptyState className={styles.inventoryEmpty} description={emptySearchDescription(controls.filterActive)} title="No matching items" />
+                  : <Description>{emptyMatchMessage(false, controls.filterActive)}</Description>)}
+                {visibleItems.length > 0 && (
+                  <ul className={styles.items}>
+                    {visibleItems.map((item, index) => {
+                      const name = itemName(item)
+                      const expiry = expiryInfo(itemExpiryDate(item))
+                      const inventoryId = itemInventoryId(item)
+                      const multiItem = itemInstances(item).length > 1
+                      const quantity = itemQuantity(item)
+                      return (
+                        <li className={styles.item} key={item.inventory_id ?? item.id ?? `${location}-${name}-${index}`}>
+                          <PantryRow expiry={expiry} inventoryId={inventoryId} locationLabel={LOCATION_DELETE_LABELS[location]} multiItem={multiItem} onDeleted={removeDeletedItem} onOpenDetails={() => setDetailsItem(item)} quantity={quantity} title={name} />
+                        </li>
+                      )
+                    })}
+                  </ul>
+                )}
+              </div>
+              {searchLoading && (
+                <div aria-live="polite" aria-label="Searching inventory" className={styles.inventorySearchOverlay} data-phase={searchLoadPhase}>
+                  <span aria-hidden="true" className={styles.inventorySearchSpinner} />
+                </div>
               )}
             </div>
-            {searchLoading && (
-              <div aria-live="polite" aria-label="Searching inventory" className={styles.inventorySearchOverlay} data-phase={searchLoadPhase}>
-                <span aria-hidden="true" className={styles.inventorySearchSpinner} />
-              </div>
-            )}
-          </div>
+          </>
         )}
       </article>
       <InventoryItemInstancesModal key={itemInstancesKey(detailsItem)} item={detailsItem} locationLabel={LOCATION_DELETE_LABELS[location]} onClose={() => setDetailsItem(null)} onInventoryChanged={reloadInventory} open={detailsItem !== null} />

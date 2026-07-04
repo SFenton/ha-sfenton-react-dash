@@ -3,14 +3,23 @@ import { useEntity, useHass } from '@hakit/core'
 import type { VacuumConfig } from '../../constants/portedDashboard'
 import { asEntityName } from './entityState'
 import { materialIconPath } from '../core/iconPaths'
-import { mapCameraEntityId, selectValetudoMapEntity, type ValetudoEntityLike } from './ValetudoMapCard.utils'
+import {
+  expandValetudoLayerPixels,
+  extractValetudoMapFromPngBytes,
+  mapCameraEntityId,
+  selectValetudoMapEntity,
+  valetudoMapBounds,
+  type ValetudoEntityLike,
+  type ValetudoMap,
+  type ValetudoMapBounds,
+  type ValetudoMapEntity,
+} from './ValetudoMapCard.utils'
 import styles from './ValetudoMapCard.module.css'
 
-const VALETUDO_MAP_RESOURCE_PATH = '/hacsfiles/lovelace-valetudo-map-card/valetudo-map-card.js'
-const VALETUDO_ELEMENT_NAME = 'valetudo-map-card'
-const VALETUDO_CHROME_STYLE_ID = 'sfenton-valetudo-map-card-chrome'
 const VALETUDO_HASS_PULSE_MS = 3_500
 const VALETUDO_LIVE_ENTITY_REFRESH_MS = 3_000
+const DOCK_ICON_PATH = materialIconPath('mdi:flash')
+const ROBOT_ICON_PATH = materialIconPath('mdi:robot-vacuum')
 
 type CallService = (params: Record<string, unknown>) => void
 type FetchWithAuth = (path: string, init?: RequestInit) => Promise<Response>
@@ -26,155 +35,6 @@ interface HassConnectionLike {
   options?: { auth?: { accessToken?: string } }
   sendMessagePromise?: <T>(message: Record<string, unknown>) => Promise<T>
   subscribeEvents?: <T>(callback: (event: T) => void, eventType?: string) => Promise<() => void> | (() => void)
-}
-
-let valetudoMapModulePromise: Promise<void> | null = null
-
-interface ValetudoElement extends HTMLElement {
-  drawingMap: boolean
-  lastMapPoll: Date
-  setConfig: (config: Record<string, unknown>) => void
-  hass: unknown
-}
-
-function ensureHomeAssistantRoot() {
-  const existingRoot = document.getElementsByTagName('home-assistant')[0] as HTMLElement | undefined
-  if (existingRoot) return existingRoot
-
-  const root = document.createElement('home-assistant')
-  root.setAttribute('aria-hidden', 'true')
-  root.style.setProperty('display', 'none')
-  root.style.setProperty('--secondary-background-color', 'rgba(148, 163, 184, 0.22)')
-  root.style.setProperty('--accent-color', '#38bdf8')
-  root.style.setProperty('--secondary-text-color', '#cbd5e1')
-  root.style.setProperty('--primary-text-color', '#f8fafc')
-  root.style.setProperty('--valetudo-map-floor-color', 'rgba(148, 163, 184, 0.24)')
-  root.style.setProperty('--valetudo-map-wall-color', '#e2e8f0')
-  root.style.setProperty('--valetudo-map-path-color', '#f8fafc')
-  document.body.appendChild(root)
-  return root
-}
-
-function ensureHaIconElement() {
-  if (customElements.get('ha-icon')) return
-
-  customElements.define(
-    'ha-icon',
-    class ReactDashHaIcon extends HTMLElement {
-      private iconName = ''
-
-      static get observedAttributes() {
-        return ['icon']
-      }
-
-      constructor() {
-        super()
-        this.attachShadow({ mode: 'open' })
-      }
-
-      get icon() {
-        return this.iconName
-      }
-
-      set icon(value: string) {
-        this.iconName = value
-        this.render()
-      }
-
-      attributeChangedCallback(_name: string, _oldValue: string | null, newValue: string | null) {
-        this.icon = newValue ?? ''
-      }
-
-      connectedCallback() {
-        this.render()
-      }
-
-      private render() {
-        if (!this.shadowRoot) return
-
-        const iconPath = this.iconName ? materialIconPath(this.iconName) : ''
-
-        this.shadowRoot.innerHTML = `
-          <style>
-            :host {
-              display: ${iconPath ? 'inline-grid' : 'none'};
-              width: 24px;
-              height: 24px;
-              place-items: center;
-              color: inherit;
-              line-height: 0;
-            }
-
-            svg {
-              width: 24px;
-              height: 24px;
-              fill: currentColor;
-            }
-          </style>
-          <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24">
-            <path d="${iconPath}"></path>
-          </svg>
-        `
-      }
-    },
-  )
-}
-
-function loadValetudoMapModule() {
-  if (customElements.get(VALETUDO_ELEMENT_NAME)) return Promise.resolve()
-
-  if (!valetudoMapModulePromise) {
-    valetudoMapModulePromise = import(/* @vite-ignore */ VALETUDO_MAP_RESOURCE_PATH).then(() => undefined)
-  }
-
-  return valetudoMapModulePromise
-}
-
-function hideValetudoChrome(element: HTMLElement) {
-  const applyStyle = () => {
-    const { shadowRoot } = element
-    if (!shadowRoot || shadowRoot.getElementById(VALETUDO_CHROME_STYLE_ID)) return
-
-    const style = document.createElement('style')
-    style.id = VALETUDO_CHROME_STYLE_ID
-    style.textContent = `
-      ha-card {
-        width: 100% !important;
-        height: 100% !important;
-        min-height: inherit !important;
-        border: none !important;
-        box-shadow: none !important;
-        background: transparent !important;
-      }
-
-      #valetudoMapCardMap {
-        min-height: inherit !important;
-      }
-    `
-    shadowRoot.appendChild(style)
-  }
-
-  applyStyle()
-  window.requestAnimationFrame(applyStyle)
-}
-
-function valetudoMapConfig(vacuumMapId: string, mapScale: number) {
-  return {
-    type: 'custom:valetudo-map-card',
-    vacuum: vacuumMapId,
-    title: '',
-    background_color: 'transparent',
-    show_status: false,
-    show_start_button: false,
-    show_pause_button: false,
-    show_stop_button: false,
-    show_home_button: false,
-    show_locate_button: false,
-    map_scale: mapScale,
-    card_mod: {
-      style: 'ha-card { border: none !important; box-shadow: none !important; background: transparent !important; }',
-    },
-  }
 }
 
 function selectLiveEntity(entityId: string, storeEntity: ValetudoEntityLike | null, liveEntity: ValetudoEntityLike | null) {
@@ -198,23 +58,154 @@ function createFetchWithAuth(connection: HassConnectionLike | null | undefined):
   }
 }
 
+function segmentColor(index: number) {
+  const colors = [
+    'rgba(61, 176, 145, 0.78)',
+    'rgba(73, 152, 220, 0.78)',
+    'rgba(158, 130, 226, 0.78)',
+    'rgba(235, 154, 87, 0.78)',
+    'rgba(106, 190, 92, 0.78)',
+    'rgba(226, 115, 141, 0.78)',
+    'rgba(88, 175, 205, 0.78)',
+  ]
+  return colors[index % colors.length]
+}
+
+function mapPointToCanvas(value: number, min: number, pixelSize: number, scale: number) {
+  return (value / pixelSize - min) * scale
+}
+
+function drawPolyline(ctx: CanvasRenderingContext2D, entity: ValetudoMapEntity, bounds: ValetudoMapBounds, pixelSize: number, scale: number) {
+  const points = entity.points ?? []
+  if (points.length < 4) return
+  ctx.beginPath()
+  ctx.moveTo(mapPointToCanvas(points[0] ?? 0, bounds.minX, pixelSize, scale), mapPointToCanvas(points[1] ?? 0, bounds.minY, pixelSize, scale))
+  for (let index = 2; index + 1 < points.length; index += 2) {
+    ctx.lineTo(mapPointToCanvas(points[index] ?? 0, bounds.minX, pixelSize, scale), mapPointToCanvas(points[index + 1] ?? 0, bounds.minY, pixelSize, scale))
+  }
+  ctx.stroke()
+}
+
+function drawPolygon(ctx: CanvasRenderingContext2D, entity: ValetudoMapEntity, bounds: ValetudoMapBounds, pixelSize: number, scale: number) {
+  const points = entity.points ?? []
+  if (points.length < 6) return
+  ctx.beginPath()
+  ctx.moveTo(mapPointToCanvas(points[0] ?? 0, bounds.minX, pixelSize, scale), mapPointToCanvas(points[1] ?? 0, bounds.minY, pixelSize, scale))
+  for (let index = 2; index + 1 < points.length; index += 2) {
+    ctx.lineTo(mapPointToCanvas(points[index] ?? 0, bounds.minX, pixelSize, scale), mapPointToCanvas(points[index + 1] ?? 0, bounds.minY, pixelSize, scale))
+  }
+  ctx.closePath()
+  ctx.fill()
+  ctx.stroke()
+}
+
+function drawMapIcon(ctx: CanvasRenderingContext2D, iconPath: string, x: number, y: number, size: number, color: string, rotationRadians = 0, haloColor = 'rgba(8, 16, 24, 0.72)') {
+  ctx.save()
+  ctx.translate(x, y)
+  ctx.beginPath()
+  ctx.fillStyle = haloColor
+  ctx.arc(0, 0, size * 0.62, 0, Math.PI * 2)
+  ctx.fill()
+  ctx.lineWidth = Math.max(1.5, size * 0.08)
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.86)'
+  ctx.stroke()
+  ctx.rotate(rotationRadians)
+  ctx.scale(size / 24, size / 24)
+  ctx.translate(-12, -12)
+  ctx.fillStyle = color
+  ctx.fill(new Path2D(iconPath))
+  ctx.restore()
+}
+
+function drawMapEntityIcon(ctx: CanvasRenderingContext2D, entity: ValetudoMapEntity, bounds: ValetudoMapBounds, pixelSize: number, scale: number, iconPath: string, color: string, rotationRadians = 0, haloColor?: string) {
+  const points = entity.points ?? []
+  if (points.length < 2) return
+  drawMapIcon(
+    ctx,
+    iconPath,
+    mapPointToCanvas(points[0] ?? 0, bounds.minX, pixelSize, scale),
+    mapPointToCanvas(points[1] ?? 0, bounds.minY, pixelSize, scale),
+    Math.max(18, scale * 8),
+    color,
+    rotationRadians,
+    haloColor,
+  )
+}
+
+function renderValetudoMap(canvas: HTMLCanvasElement, map: ValetudoMap, mapScale: number) {
+  const bounds = valetudoMapBounds(map)
+  const scale = Math.max(1, mapScale)
+  const width = Math.max(1, Math.ceil((bounds.maxX - bounds.minX + 2) * scale))
+  const height = Math.max(1, Math.ceil((bounds.maxY - bounds.minY + 2) * scale))
+  const dpr = window.devicePixelRatio || 1
+  canvas.width = Math.ceil(width * dpr)
+  canvas.height = Math.ceil(height * dpr)
+  canvas.style.aspectRatio = `${width} / ${height}`
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return
+
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+  ctx.clearRect(0, 0, width, height)
+  ctx.fillStyle = 'rgba(6, 12, 18, 0.56)'
+  ctx.fillRect(0, 0, width, height)
+
+  let segmentIndex = 0
+  for (const layer of map.layers) {
+    const pixels = expandValetudoLayerPixels(layer)
+    if (pixels.length === 0) continue
+    ctx.fillStyle = layer.type === 'wall' ? 'rgba(236, 244, 255, 0.82)' : segmentColor(segmentIndex)
+    if (layer.type === 'segment') segmentIndex += 1
+    for (let index = 0; index + 1 < pixels.length; index += 2) {
+      ctx.fillRect(((pixels[index] ?? 0) - bounds.minX) * scale, ((pixels[index + 1] ?? 0) - bounds.minY) * scale, scale, scale)
+    }
+  }
+
+  ctx.lineCap = 'round'
+  ctx.lineJoin = 'round'
+  for (const entity of map.entities) {
+    if (entity.type === 'path' || entity.type === 'predicted_path') {
+      ctx.lineWidth = Math.max(2, scale * 0.8)
+      ctx.strokeStyle = entity.type === 'path' ? 'rgba(255, 255, 255, 0.72)' : 'rgba(255, 255, 255, 0.36)'
+      drawPolyline(ctx, entity, bounds, map.pixelSize, scale)
+    }
+  }
+
+  for (const entity of map.entities) {
+    if (entity.type === 'no_go_area' || entity.type === 'no_mop_area') {
+      ctx.lineWidth = 2
+      ctx.fillStyle = entity.type === 'no_go_area' ? 'rgba(239, 83, 80, 0.22)' : 'rgba(33, 150, 243, 0.2)'
+      ctx.strokeStyle = entity.type === 'no_go_area' ? 'rgba(255, 138, 128, 0.76)' : 'rgba(144, 202, 249, 0.76)'
+      drawPolygon(ctx, entity, bounds, map.pixelSize, scale)
+    }
+  }
+
+  for (const entity of map.entities) {
+    if (entity.type === 'charger_location') {
+      drawMapEntityIcon(ctx, entity, bounds, map.pixelSize, scale, DOCK_ICON_PATH, '#66bb6a', 0, 'rgba(18, 56, 30, 0.76)')
+    }
+    if (entity.type === 'robot_position') {
+      const angle = typeof entity.metaData?.angle === 'number' ? entity.metaData.angle : 0
+      const radians = ((angle - 90) * Math.PI) / 180
+      drawMapEntityIcon(ctx, entity, bounds, map.pixelSize, scale, ROBOT_ICON_PATH, '#f8fafc', radians)
+    }
+  }
+}
+
 interface ValetudoMapCardProps {
   vacuum: VacuumConfig
 }
 
 export function ValetudoMapCard({ vacuum }: ValetudoMapCardProps) {
-  const hostRef = useRef<HTMLDivElement | null>(null)
-  const elementRef = useRef<ValetudoElement | null>(null)
+  const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [fetchedMapCameraEntity, setFetchedMapCameraEntity] = useState<ValetudoEntityLike | null>(null)
   const [fetchedVacuumEntity, setFetchedVacuumEntity] = useState<ValetudoEntityLike | null>(null)
   const [isLoaded, setIsLoaded] = useState(false)
-  const [showCameraFallback, setShowCameraFallback] = useState(false)
+  const [map, setMap] = useState<ValetudoMap | null>(null)
   const connection = useHass((state) => state.connection) as unknown as HassConnectionLike | null | undefined
   const entities = useHass((state) => state.entities)
   const config = useHass((state) => state.config)
   const services = useHass((state) => state.services)
-  const hassUrl = useHass((state) => state.hassUrl)
   const callService = useHass((state) => state.helpers.callService) as unknown as CallService
   const joinHassUrl = useHass((state) => state.helpers.joinHassUrl)
   const isMockMode = import.meta.env.MODE === 'test'
@@ -225,7 +216,6 @@ export function ValetudoMapCard({ vacuum }: ValetudoMapCardProps) {
   const liveVacuumEntity = fetchedVacuumEntity?.entity_id === vacuum.entityId ? fetchedVacuumEntity : null
   const injectedMapCameraEntity = selectValetudoMapEntity(cameraEntityId, mapCameraEntity, liveMapCameraEntity)
   const injectedVacuumEntity = selectLiveEntity(vacuum.entityId, vacuumEntity, liveVacuumEntity)
-  const hasMapCameraEntity = Boolean(injectedMapCameraEntity)
   const entityPicture = typeof injectedMapCameraEntity?.attributes.entity_picture === 'string' ? injectedMapCameraEntity.attributes.entity_picture : undefined
   const cameraImageUrl = entityPicture ?? `/api/camera_proxy/${cameraEntityId}`
   const states = useMemo(() => {
@@ -261,64 +251,99 @@ export function ValetudoMapCard({ vacuum }: ValetudoMapCardProps) {
 
   useEffect(() => {
     hassShimRef.current = hassShim
-    if (elementRef.current) {
-      ensureHomeAssistantRoot()
-      elementRef.current.hass = hassShim
-    }
   }, [hassShim])
 
   useEffect(() => {
-    const host = hostRef.current
-    if (!host) return undefined
-
-    if (isMockMode) {
-      host.textContent = ''
+    let cancelled = false
+    if (isMockMode || !connection || !injectedMapCameraEntity) {
+      setIsLoaded(false)
       return undefined
     }
 
-    if (!hassUrl || !connection) return undefined
-    if (!hasMapCameraEntity) return undefined
-    if (elementRef.current) return undefined
-
-    let cancelled = false
-
-    loadValetudoMapModule()
-      .then(() => {
-        if (cancelled || !hostRef.current) return
-
-        host.textContent = ''
-        ensureHomeAssistantRoot()
-        ensureHaIconElement()
-        const valetudoElement = document.createElement(VALETUDO_ELEMENT_NAME) as ValetudoElement
-        valetudoElement.style.display = 'block'
-        valetudoElement.style.width = '100%'
-        valetudoElement.style.height = '100%'
-        valetudoElement.setConfig(valetudoMapConfig(vacuum.vacuumMapId, vacuum.mapScale))
-        valetudoElement.drawingMap = false
-        valetudoElement.lastMapPoll = new Date(0)
-        valetudoElement.hass = hassShimRef.current
-        elementRef.current = valetudoElement
-        host.appendChild(valetudoElement)
-        hideValetudoChrome(valetudoElement)
-        setError(null)
-        setIsLoaded(true)
-      })
-      .catch((caughtError: unknown) => {
-        if (!cancelled) {
+    const fetchMap = () => {
+      createFetchWithAuth(connection)(cameraImageUrl)
+        .then(async (response) => {
+          if (!response.ok) throw new Error(`Camera image request failed (${response.status})`)
+          const bytes = new Uint8Array(await response.arrayBuffer())
+          const parsedMap = await extractValetudoMapFromPngBytes(bytes)
+          if (cancelled) return
+          setMap(parsedMap)
+          setError(null)
+          setIsLoaded(true)
+        })
+        .catch((caughtError: unknown) => {
+          if (cancelled) return
           setIsLoaded(false)
           setError(caughtError instanceof Error ? caughtError.message : 'Unable to load Valetudo map')
-        }
-      })
+        })
+    }
 
+    fetchMap()
+    const timer = window.setInterval(fetchMap, VALETUDO_HASS_PULSE_MS)
     return () => {
       cancelled = true
-      elementRef.current = null
-      if (host) host.textContent = ''
+      window.clearInterval(timer)
     }
-  }, [connection, hasMapCameraEntity, hassUrl, isMockMode, vacuum.mapScale, vacuum.vacuumMapId])
+  }, [cameraImageUrl, connection, injectedMapCameraEntity, isMockMode])
 
   useEffect(() => {
-    if (isMockMode || !connection) return undefined
+    if (!map || !canvasRef.current) return
+    renderValetudoMap(canvasRef.current, map, vacuum.mapScale)
+  }, [map, vacuum.mapScale])
+
+  useEffect(() => {
+    if (!map || !canvasRef.current) return undefined
+    const redraw = () => {
+      if (canvasRef.current) renderValetudoMap(canvasRef.current, map, vacuum.mapScale)
+    }
+    window.addEventListener('resize', redraw)
+    return () => window.removeEventListener('resize', redraw)
+  }, [map, vacuum.mapScale])
+
+  useEffect(() => {
+    if (!map || !canvasRef.current) return undefined
+    const canvas = canvasRef.current
+    const observer = new ResizeObserver(() => renderValetudoMap(canvas, map, vacuum.mapScale))
+    observer.observe(canvas)
+    return () => observer.disconnect()
+  }, [map, vacuum.mapScale])
+
+  useEffect(() => {
+    if (!isMockMode && map) return
+    if (!canvasRef.current) return
+    const canvas = canvasRef.current
+    canvas.width = 400
+    canvas.height = 260
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+    ctx.clearRect(0, 0, canvas.width, canvas.height)
+    ctx.fillStyle = 'rgba(6, 12, 18, 0.7)'
+    ctx.fillRect(0, 0, canvas.width, canvas.height)
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.22)'
+    for (let x = 0; x < canvas.width; x += 28) {
+      ctx.beginPath()
+      ctx.moveTo(x, 0)
+      ctx.lineTo(x, canvas.height)
+      ctx.stroke()
+    }
+    for (let y = 0; y < canvas.height; y += 28) {
+      ctx.beginPath()
+      ctx.moveTo(0, y)
+      ctx.lineTo(canvas.width, y)
+      ctx.stroke()
+    }
+  }, [isMockMode, map])
+
+  useEffect(() => {
+    if (!isMockMode) return undefined
+    const timer = window.setTimeout(() => {
+      setIsLoaded(true)
+    }, 0)
+    return () => window.clearTimeout(timer)
+  }, [isMockMode])
+
+  useEffect(() => {
+    if (!connection) return undefined
 
     let cancelled = false
     let unsubscribe: (() => void) | undefined
@@ -368,33 +393,9 @@ export function ValetudoMapCard({ vacuum }: ValetudoMapCardProps) {
       window.clearInterval(metadataRefreshTimer)
       unsubscribe?.()
     }
-  }, [cameraEntityId, connection, isMockMode, vacuum.entityId])
-
-  useEffect(() => {
-    if (isMockMode || !isLoaded) return undefined
-
-    const pulseValetudoHass = () => {
-      if (!elementRef.current) return
-      elementRef.current.hass = hassShimRef.current
-    }
-
-    const pulseTimer = window.setInterval(pulseValetudoHass, VALETUDO_HASS_PULSE_MS)
-    return () => window.clearInterval(pulseTimer)
-  }, [isLoaded, isMockMode])
-
-  useEffect(() => {
-    if (isMockMode || !isLoaded) return undefined
-
-    const timer = window.setTimeout(() => {
-      const warning = elementRef.current?.shadowRoot?.querySelector<HTMLElement>('#valetudoMapCardWarning1')
-      setShowCameraFallback(Boolean(warning?.textContent?.match(/Entity not available/i) && warning.style.display !== 'none'))
-    }, 700)
-
-    return () => window.clearTimeout(timer)
-  }, [injectedMapCameraEntity, isLoaded, isMockMode])
+  }, [cameraEntityId, connection, vacuum.entityId])
 
   const showFallback = isMockMode || Boolean(error)
-  const showImageFallback = !isMockMode && showCameraFallback
   const mapRotation = `${vacuum.mapRotationDegrees ?? 0}deg`
 
   return (
@@ -405,8 +406,9 @@ export function ValetudoMapCard({ vacuum }: ValetudoMapCardProps) {
       role="region"
       style={{ '--map-min-height': vacuum.mapScale > 2 ? '300px' : '340px', '--map-rotation': mapRotation } as CSSProperties}
     >
-      <div className={styles.host} ref={hostRef} />
-      {showImageFallback && <img alt="" className={styles.cameraFallback} src={cameraImageUrl} />}
+      <div className={styles.host}>
+        <canvas aria-hidden="true" className={styles.canvas} data-valetudo-map-canvas="true" ref={canvasRef} />
+      </div>
       {showFallback && (
         <div className={styles.fallback}>
           <span className={styles.fallbackTitle}>Valetudo map</span>

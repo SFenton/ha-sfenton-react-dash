@@ -1,23 +1,39 @@
 .frame {
   position: relative;
-  min-height: var(--map-min-height);
+  height: min(var(--map-min-height), calc(var(--modal-body-visible-height, var(--dashboard-viewport-height, 100dvh)) * 0.75));
+  min-height: 0;
+  max-height: calc(var(--modal-body-visible-height, var(--dashboard-viewport-height, 100dvh)) * 0.75);
   overflow: hidden;
   border-radius: 24px;
   background: rgba(6, 12, 18, 0.42);
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1);
 }
 
-.host,
-.host > * {
-  width: 100%;
-  height: 100%;
-  min-height: var(--map-min-height);
+.host {
+  display: grid;
+  place-items: center;
+  overflow: hidden;
 }
 
 .host,
-.cameraFallback {
+.canvas {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+}
+
+.host {
   transform: rotate(var(--map-rotation, 0deg));
   transform-origin: center;
+}
+
+.canvas {
+  display: block;
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
 }
 
 .cameraFallback {

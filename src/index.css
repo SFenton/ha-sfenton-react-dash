@@ -45,7 +45,7 @@ body::-webkit-scrollbar,
 body {
   margin: 0;
   min-width: 320px;
-  min-height: 100vh;
+  min-height: var(--dashboard-layout-height, 100vh);
 }
 
 button,

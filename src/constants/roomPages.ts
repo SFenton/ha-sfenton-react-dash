@@ -161,7 +161,7 @@ export const ROOM_PAGE_CONFIGS: Record<string, RoomPageSourceConfig> = {
     overviewCards: [
       { title: 'Light', entityId: 'light.gym_light', icon: 'mdi:lightbulb', kind: 'light', hash: '#lights-gym', showState: true },
       { title: 'Climate', entityId: 'input_text.gym_climate_range', icon: 'mdi:thermometer', kind: 'climate', hash: '#climate-gym', showState: true },
-      { title: 'Occupancy', entityId: 'binary_sensor.gym_presence_occupancy', icon: 'mdi:motion-sensor', kind: 'occupancy', hash: '#gym-occupancy', showState: true },
+      { title: 'Occupancy', entityId: 'binary_sensor.gym_presence_sensor_presence', icon: 'mdi:motion-sensor', kind: 'occupancy', hash: '#gym-occupancy', showState: true },
       { title: 'Window', entityId: 'binary_sensor.gym_window_contact_sensor_contact', icon: 'mdi:window-closed', kind: 'contact', hash: '#window-gym' },
     ],
     sourceSections: [{ title: 'Climate', cards: [{ title: 'Vent', entityId: 'cover.gym_vent_vent', icon: 'mdi:air-filter', kind: 'vent', hash: '#vents', showState: true, modalItems: [{ title: 'Vent', entityId: 'cover.gym_vent_vent', icon: 'mdi:air-filter' }] }] }],
@@ -206,12 +206,12 @@ export const ROOM_PAGE_CONFIGS: Record<string, RoomPageSourceConfig> = {
     overviewCards: [
       { title: 'Lights', entityId: 'light.kitchen', icon: 'mdi:lightbulb-group', kind: 'light', hash: '#lights-kitchen', showState: true },
       { title: 'Climate', entityId: 'input_text.kitchen_climate_range', icon: 'mdi:thermometer', kind: 'climate', hash: '#climate-kitchen', showState: true },
-      { title: 'Occupancy', entityId: 'binary_sensor.kitchen_wall_presence_occupancy', icon: 'mdi:motion-sensor', kind: 'occupancy', hash: '#kitchen-occupancy', showState: true },
+      { title: 'Occupancy', entityId: 'binary_sensor.kitchen_presence_sensor_presence', icon: 'mdi:motion-sensor', kind: 'occupancy', hash: '#kitchen-occupancy', showState: true },
       { title: 'Door', entityId: 'binary_sensor.kitchen_door_contact_sensor_contact', icon: 'mdi:door', kind: 'contact', hash: '#door-kitchen' },
     ],
     sourceSections: [
       { title: 'Appliances', cards: [
-        { title: 'Dishwasher', entityId: 'select.dishwasher_selected_program', icon: 'mdi:dishwasher', kind: 'appliance', subtitleEntityIds: ['sensor.dishwasher_door', 'select.dishwasher_selected_program'], alternate: { whenEntityId: 'sensor.dishwasher_operation_state', whenStates: ['run', 'pause'], entityId: 'sensor.dishwasher_program_progress', showState: true, subtitleEntityIds: ['select.dishwasher_selected_program', 'sensor.dishwasher_program_progress'] } },
+        { title: 'Dishwasher', entityId: 'select.dishwasher_selected_program', icon: 'mdi:dishwasher', kind: 'appliance', hash: '#dishwasher', span: 'full', subtitleEntityIds: ['sensor.dishwasher_door', 'select.dishwasher_selected_program'], alternate: { whenEntityId: 'sensor.dishwasher_operation_state', whenStates: ['run', 'pause'], entityId: 'sensor.dishwasher_program_progress', showState: true, subtitleEntityIds: ['select.dishwasher_selected_program', 'sensor.dishwasher_program_progress'] } },
       ] },
       { title: 'Climate', cards: [{ title: 'Vent', entityId: 'cover.kitchen_vent_vent', icon: 'mdi:air-filter', kind: 'vent', hash: '#vents', showState: true, modalItems: [{ title: 'Vent', entityId: 'cover.kitchen_vent_vent', icon: 'mdi:air-filter' }] }] },
     ],
@@ -223,7 +223,7 @@ export const ROOM_PAGE_CONFIGS: Record<string, RoomPageSourceConfig> = {
     overviewCards: [
       { title: 'Light', entityId: 'light.dining_room_dimmer_switch', icon: 'mdi:lightbulb', kind: 'light', hash: '#lights-dining-room', showState: true },
       { title: 'Climate', entityId: 'input_text.dining_room_climate_range', icon: 'mdi:thermometer', kind: 'climate', hash: '#climate-dining-room', showState: true },
-      { title: 'Occupancy', entityId: 'binary_sensor.dining_room_presence_occupancy', icon: 'mdi:motion-sensor', kind: 'occupancy', hash: '#dining-room-occupancy', showState: true },
+      { title: 'Occupancy', entityId: 'binary_sensor.dining_room_presence_sensor_presence', icon: 'mdi:motion-sensor', kind: 'occupancy', hash: '#dining-room-occupancy', showState: true },
       { title: 'Door', entityId: 'binary_sensor.dining_room_door_contact_sensor_contact', icon: 'mdi:door', kind: 'contact', hash: '#door-dining-room' },
     ],
     sourceSections: [{ title: 'Climate', cards: [{ title: 'Vent', entityId: 'cover.dining_room_vent_vent', icon: 'mdi:air-filter', kind: 'vent', hash: '#vents', showState: true, modalItems: [{ title: 'Vent', entityId: 'cover.dining_room_vent_vent', icon: 'mdi:air-filter' }] }] }],
@@ -266,8 +266,8 @@ export const ROOM_PAGE_CONFIGS: Record<string, RoomPageSourceConfig> = {
     path: 'theater-room',
     overviewCards: [
       { title: 'Lights', entityId: 'light.theater_room', icon: 'mdi:lightbulb-group', kind: 'light', hash: '#lights-theater-room', showState: true },
-      { title: 'Climate', entityId: 'input_text.music_room_climate_range', icon: 'mdi:thermometer', kind: 'climate', hash: '#climate-theater-room', showState: true },
-      { title: 'Occupancy', entityId: 'binary_sensor.theater_room_occupancy_sensors', icon: 'mdi:motion-sensor', kind: 'occupancy', hash: '#theater-room-occupancy', showState: true },
+      { title: 'Climate', entityId: 'input_text.theater_room_climate_range', icon: 'mdi:thermometer', kind: 'climate', hash: '#climate-theater-room', showState: true },
+      { title: 'Occupancy', entityId: 'binary_sensor.theater_room_presence_sensor_presence', icon: 'mdi:motion-sensor', kind: 'occupancy', hash: '#theater-room-occupancy', showState: true },
       { title: 'Door', entityId: 'binary_sensor.theater_room_door_contact_sensor_contact', icon: 'mdi:door', kind: 'contact', hash: '#door-theater-room' },
       { title: 'Air Quality', entityId: 'sensor.theater_room_air_purifier_pm2_5', icon: 'mdi:air-purifier', kind: 'air', hash: '#air-purifier', showState: true },
     ],
@@ -293,7 +293,7 @@ export const ROOM_PAGE_CONFIGS: Record<string, RoomPageSourceConfig> = {
     overviewCards: [
       { title: 'Light', entityId: 'light.downstairs_hallway_light', icon: 'mdi:lightbulb', kind: 'light', hash: '#door-downstairs-hallway', showState: true },
       { title: 'Climate', entityId: 'input_text.downstairs_hallway_climate_range', icon: 'mdi:thermometer', kind: 'climate', hash: '#climate-downstairs-hallway', showState: true },
-      { title: 'Occupancy', entityId: 'binary_sensor.downstairs_hallway_occupancy_sensors', icon: 'mdi:motion-sensor', kind: 'occupancy', hash: '#downstairs-hallway-occupancy', showState: true },
+      { title: 'Occupancy', entityId: 'binary_sensor.downstairs_hallway_presence_sensor_presence', icon: 'mdi:motion-sensor', kind: 'occupancy', hash: '#downstairs-hallway-occupancy', showState: true },
       { title: 'Door', entityId: 'binary_sensor.garage_door_contact_sensor_contact', icon: 'mdi:door', kind: 'contact', hash: '#door-downstairs-hallway' },
     ],
     sourceSections: [],
@@ -338,7 +338,7 @@ export const ROOM_PAGE_CONFIGS: Record<string, RoomPageSourceConfig> = {
     overviewCards: [
       { title: 'Light', entityId: 'light.master_bathroom_dimmer_switch', icon: 'mdi:lightbulb', kind: 'light', hash: '#lights-master-bathroom', showState: true },
       { title: 'Climate', entityId: 'input_text.all_climate_range', icon: 'mdi:thermometer', kind: 'climate', hash: '#climate-overview', showState: true },
-      { title: 'Occupancy', entityId: 'binary_sensor.master_bathroom_presence_occupancy', icon: 'mdi:motion-sensor', kind: 'occupancy', hash: '#master-bathroom-occupancy', showState: true },
+      { title: 'Occupancy', entityId: 'binary_sensor.master_bathroom_presence_sensor_presence', icon: 'mdi:motion-sensor', kind: 'occupancy', hash: '#master-bathroom-occupancy', showState: true },
     ],
     sourceSections: [{ title: 'Climate', cards: [
       { title: 'Vent', entityId: 'cover.master_bathroom_vent_vent', icon: 'mdi:air-filter', kind: 'vent', hash: '#vents', showState: true, modalItems: [{ title: 'Vent', entityId: 'cover.master_bathroom_vent_vent', icon: 'mdi:air-filter' }] },

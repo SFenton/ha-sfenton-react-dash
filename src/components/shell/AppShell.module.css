@@ -1,7 +1,7 @@
 .shell {
   position: relative;
-  height: 100dvh;
-  min-height: 100dvh;
+  height: var(--dashboard-viewport-height, 100dvh);
+  min-height: var(--dashboard-viewport-height, 100dvh);
   overflow: hidden;
   color: var(--color-text);
   background: #111723;
@@ -36,7 +36,7 @@
 .content {
   position: relative;
   z-index: 2;
-  height: 100dvh;
+  height: var(--dashboard-viewport-height, 100dvh);
   min-height: 0;
   overflow: hidden;
   box-sizing: border-box;
@@ -46,16 +46,38 @@
   position: fixed;
   left: 20px;
   right: 22px;
-  bottom: calc(var(--bottom-nav-height) - 2px + env(safe-area-inset-bottom, 0px));
+  bottom: var(--floating-action-bottom);
   z-index: 35;
   display: flex;
   justify-content: flex-end;
   gap: var(--floating-action-gap);
   pointer-events: none;
-  --floating-action-keyboard-lift: min(0px, calc(var(--bottom-nav-height) - 14px + env(safe-area-inset-bottom, 0px) - var(--dashboard-fab-keyboard-inset, 0px)));
+  --floating-action-bottom: calc(var(--bottom-nav-height) - 2px + env(safe-area-inset-bottom, 0px));
+  --floating-action-keyboard-gap: 14px;
+  --floating-action-requested-keyboard-inset: var(--dashboard-keyboard-inset, 0px);
+  --floating-action-settled-keyboard-inset: 0px;
+  --floating-action-effective-keyboard-inset: min(var(--floating-action-requested-keyboard-inset), var(--floating-action-settled-keyboard-inset));
+  --floating-action-keyboard-lift: min(0px, calc(var(--floating-action-bottom) - var(--floating-action-keyboard-gap) - var(--floating-action-effective-keyboard-inset)));
   animation: floatingActionFadeIn 170ms ease-out;
   transform: translate3d(0, var(--floating-action-keyboard-lift), 0);
   transition: transform 150ms ease;
+}
+
+:global(html[data-dashboard-keyboard='open']) .floatingAction {
+  transition: none;
+}
+
+:global(html[data-dashboard-keyboard-settled='open']) .floatingAction {
+  --floating-action-bottom: env(safe-area-inset-bottom, 0px);
+  --floating-action-keyboard-gap: 0px;
+  --floating-action-settled-keyboard-inset: var(--dashboard-keyboard-settled-overlay-inset, var(--dashboard-keyboard-overlay-inset, var(--floating-action-requested-keyboard-inset)));
+}
+
+:global(html[data-dashboard-embedded='true'][data-inventory-search-expanded='true']:not([data-dashboard-keyboard-settled='open'])) .floatingAction {
+  top: 42vh;
+  bottom: auto;
+  transform: none;
+  transition: none;
 }
 
 .floatingAction > * {

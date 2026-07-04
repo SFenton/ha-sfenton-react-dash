@@ -3160,7 +3160,7 @@ describe('DashboardViewPage', () => {
     ])
   })
 
-  it('matches Kitchen section order, groceries summaries, and dishwasher subtitle', () => {
+  it('matches Kitchen section order, groceries summaries, and dishwasher subtitle', async () => {
     const navigate = vi.fn()
     render(<DashboardViewPage activePath="kitchen" onNavigate={navigate} path="kitchen" />)
 
@@ -3181,9 +3181,70 @@ describe('DashboardViewPage', () => {
     expect(navigate).toHaveBeenCalledWith('grocery-list')
     fireEvent.click(screen.getByRole('button', { name: 'Food 35 Items • 5 Expiring Soon' }))
     expect(navigate).toHaveBeenCalledWith('food')
-    expect(screen.getByLabelText(/Dishwasher Closed.*Eco 50/i)).toBeInTheDocument()
+    const dishwasher = screen.getByRole('button', { name: 'Dishwasher Not Running' })
+    expect(dishwasher).toBeInTheDocument()
+    expect(dishwasher.parentElement).toHaveClass(/fullSpan/)
     expect(screen.queryByText('Dishwasher Program')).not.toBeInTheDocument()
     expect(screen.queryByText('Dishwasher Progress')).not.toBeInTheDocument()
+
+    fireEvent.click(dishwasher)
+    const dialog = await screen.findByRole('dialog')
+    expect(within(dialog).getByRole('heading', { name: 'Dishwasher' })).toBeInTheDocument()
+    const startDishwasher = within(dialog).getByRole('button', { name: 'Start Dishwasher' })
+    expect(startDishwasher).toBeInTheDocument()
+    expect(startDishwasher.parentElement).toHaveClass(/fullSpan/)
+    expect(within(dialog).queryByRole('button', { name: 'Stop Program' })).not.toBeInTheDocument()
+    expect(within(dialog).queryByRole('button', { name: 'Resume Program' })).not.toBeInTheDocument()
+    expect(within(dialog).getByRole('group', { name: 'Door Closed' })).toBeInTheDocument()
+
+    fireEvent.click(startDishwasher)
+    expect(mockCallServiceCalls).toContainEqual({ domain: 'input_button', service: 'press', target: 'input_button.start_dishwasher' })
+    expect(within(dialog).getByRole('group', { name: 'Operation Cleaning' })).toBeInTheDocument()
+    expect(within(dialog).getByRole('group', { name: 'Progress 0%' })).toBeInTheDocument()
+    expect(within(dialog).getByRole('button', { name: 'Stop Program' })).toBeInTheDocument()
+    expect(within(dialog).queryByRole('button', { name: 'Start Dishwasher' })).not.toBeInTheDocument()
+  })
+
+  it('fills the Kitchen dishwasher button from live progress and exposes dishwasher controls', async () => {
+    mockEntities['sensor.dishwasher_operation_state'].state = 'run'
+    mockEntities['sensor.dishwasher_program_progress'].state = '97'
+    mockEntities['sensor.dishwasher_program_finish_time'] = entity('sensor.dishwasher_program_finish_time', '2026-07-04T01:30:00+00:00')
+    mockEntities['select.dishwasher_active_program'].state = 'dishcare_dishwasher_program_eco_50'
+    mockEntities['select.dishwasher_selected_program'].state = 'dishcare_dishwasher_program_eco_50'
+    mockEntities['select.dishwasher_selected_program'].attributes.options = ['dishcare_dishwasher_program_eco_50', 'dishcare_dishwasher_program_glas_40']
+    mockEntities['switch.dishwasher_half_load'].state = 'off'
+    mockEntities['switch.dishwasher_zeolite_dry'].state = 'off'
+    mockEntities['switch.dishwasher_power'].state = 'off'
+
+    render(<DashboardViewPage activePath="kitchen" onNavigate={() => undefined} path="kitchen" />)
+
+    const dishwasher = screen.getByRole('button', { name: 'Dishwasher Cleaning • 97%' })
+    expect(dishwasher).toHaveAttribute('data-progress', '97')
+    expect(dishwasher.parentElement).toHaveClass(/fullSpan/)
+
+    fireEvent.click(dishwasher)
+    const dialog = await screen.findByRole('dialog')
+    expect(within(dialog).getByRole('heading', { name: 'Dishwasher' })).toBeInTheDocument()
+    expect(within(dialog).getByRole('group', { name: 'Operation Cleaning' })).toBeInTheDocument()
+    expect(within(dialog).getByRole('group', { name: 'Progress 97%' })).toBeInTheDocument()
+    expect(within(dialog).getByRole('button', { name: 'Stop Program' })).toBeInTheDocument()
+    expect(within(dialog).queryByRole('button', { name: 'Start Dishwasher' })).not.toBeInTheDocument()
+    expect(within(dialog).queryByRole('button', { name: 'Resume Program' })).not.toBeInTheDocument()
+    const programSelect = within(dialog).getByRole('combobox', { name: 'Program' })
+    expect(programSelect).toHaveValue('dishcare_dishwasher_program_eco_50')
+    expect(within(dialog).getByRole('group', { name: 'Rinse Aid OK' })).toBeInTheDocument()
+
+    fireEvent.change(programSelect, { target: { value: 'dishcare_dishwasher_program_glas_40' } })
+    expect(mockCallServiceCalls).toContainEqual({ domain: 'select', service: 'select_option', target: 'select.dishwasher_selected_program', serviceData: { option: 'dishcare_dishwasher_program_glas_40' } })
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Half Load Off' }))
+    expect(mockCallServiceCalls).toContainEqual({ domain: 'switch', service: 'turn_on', target: 'switch.dishwasher_half_load' })
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Stop Program' }))
+    expect(mockCallServiceCalls).toContainEqual({ domain: 'button', service: 'press', target: 'button.dishwasher_stop_program' })
+    expect(within(dialog).getAllByText('Stopping').length).toBeGreaterThan(0)
+    expect(within(dialog).queryByRole('button', { name: 'Stop Program' })).not.toBeInTheDocument()
+    expect(within(dialog).queryByRole('button', { name: 'Start Dishwasher' })).not.toBeInTheDocument()
   })
 
   it('renders the Food home sub-page with food spaces and a Scan Item FAB', () => {

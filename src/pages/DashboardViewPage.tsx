@@ -58,6 +58,7 @@ import {
   ADMIN_SECURITY_CONTROLS,
   ADMIN_SHOW_SPECIFIC_CONTROLS,
   CLIMATE_COLOR,
+  CONTROL_COLOR,
   CONTROL_PAGES,
   GUEST_CONTROLS_DESCRIPTION,
   GUEST_CONTROL_ITEMS,
@@ -149,6 +150,56 @@ const ROOM_SOURCE_SECURITY_SIZED_MODAL_STYLE: ModalSheetStyle = {
   '--modal-desktop-height': 'auto',
   '--modal-desktop-max-width': '500px',
   '--modal-desktop-width': '500px',
+}
+
+const DISHWASHER_ENTITY_IDS = {
+  activeProgram: 'select.dishwasher_active_program',
+  connectivity: 'binary_sensor.dishwasher_connectivity',
+  door: 'sensor.dishwasher_door',
+  halfLoad: 'switch.dishwasher_half_load',
+  hygiene: 'switch.dishwasher_hygiene',
+  operation: 'sensor.dishwasher_operation_state',
+  power: 'switch.dishwasher_power',
+  progress: 'sensor.dishwasher_program_progress',
+  programFinishTime: 'sensor.dishwasher_program_finish_time',
+  remoteControl: 'binary_sensor.dishwasher_remote_control',
+  remoteStart: 'binary_sensor.dishwasher_remote_start',
+  resumeProgram: 'button.dishwasher_resume_program',
+  rinseAid: 'sensor.dishwasher_rinse_aid_nearly_empty',
+  salt: 'sensor.dishwasher_salt_nearly_empty',
+  selectedProgram: 'select.dishwasher_selected_program',
+  startProgram: 'input_button.start_dishwasher',
+  stopProgram: 'button.dishwasher_stop_program',
+  zeoliteDry: 'switch.dishwasher_zeolite_dry',
+} as const
+
+const DISHWASHER_PROGRESS_COLOR = 'linear-gradient(90deg, rgba(0, 188, 174, 0.72), rgba(0, 150, 136, 0.58))'
+const DISHWASHER_OPTIMISTIC_REVERT_MS = 10000
+const DISHWASHER_PROGRESS_STATES = new Set(['run', 'pause', 'actionrequired', 'aborting', 'finished'])
+const DISHWASHER_RESUME_ACTION_STATES = new Set(['actionrequired', 'pause'])
+const DISHWASHER_STOP_ACTION_STATES = new Set(['actionrequired', 'delayedstart', 'pause', 'run'])
+
+const DISHWASHER_OPERATION_LABELS: Record<string, string> = {
+  aborting: 'Stopping',
+  actionrequired: 'Needs Attention',
+  delayedstart: 'Delayed Start',
+  error: 'Error',
+  finished: 'Clean',
+  inactive: 'Not Running',
+  pause: 'Paused',
+  ready: 'Not Running',
+  run: 'Cleaning',
+}
+
+const DISHWASHER_PROGRAM_LABELS: Record<string, string> = {
+  dishcare_dishwasher_program_auto_2: 'Auto',
+  dishcare_dishwasher_program_eco_50: 'Eco 50',
+  dishcare_dishwasher_program_glas_40: 'Glass 40',
+  dishcare_dishwasher_program_intensiv_70: 'Intensive 70',
+  dishcare_dishwasher_program_machine_care: 'Machine Care',
+  dishcare_dishwasher_program_pre_rinse: 'Pre-Rinse',
+  dishcare_dishwasher_program_quick_45: 'Quick 45',
+  dishcare_dishwasher_program_quick_65: 'Quick 65',
 }
 
 function Notice({ children }: { children: React.ReactNode }) {
@@ -361,14 +412,83 @@ function formatRoomSourceState(card: RoomSourceCardConfig, entity: ReturnType<ty
   return typeof temperature === 'number' || typeof temperature === 'string' ? `${actionLabel} • ${temperature} °F` : actionLabel
 }
 
-function formatRoomSourceSubtitleEntity(entity: ReturnType<typeof useEntity>) {
-  const value = formatCompactEntityState(entity, 'Unavailable')
+function formatRoomSourceSubtitleEntity(entity: HassEntity | null | undefined) {
+  const value = formatCompactEntityState(entity ?? null, 'Unavailable')
   const unit = typeof entity?.attributes.unit_of_measurement === 'string' ? entity.attributes.unit_of_measurement : ''
   if (!unit || value === 'Unavailable' || value === 'Unknown' || value.endsWith(unit)) return value
   return `${value}${unit}`
 }
 
-function roomSourceBackgroundColor(card: RoomSourceCardConfig, entity: ReturnType<typeof useEntity>, presenceEntity: ReturnType<typeof useEntity>) {
+function isDishwasherSourceCard(card: RoomSourceCardConfig) {
+  return card.entityId === DISHWASHER_ENTITY_IDS.selectedProgram
+}
+
+function dishwasherEntityUnavailable(entity: HassEntity | null | undefined) {
+  return !dishwasherEntityAvailable(entity)
+}
+
+function dishwasherEntityAvailable(entity: HassEntity | null | undefined): entity is HassEntity {
+  return Boolean(entity && entity.state !== 'unavailable' && entity.state !== 'unknown')
+}
+
+function dishwasherProgressPercent(entity: HassEntity | null | undefined) {
+  if (!dishwasherEntityAvailable(entity)) return undefined
+  const progress = Number.parseFloat(String(entity.state).replace('%', ''))
+  if (!Number.isFinite(progress)) return undefined
+  return Math.max(0, Math.min(100, progress))
+}
+
+function formatDishwasherOperation(entity: HassEntity | null | undefined) {
+  if (!dishwasherEntityAvailable(entity)) return 'Unavailable'
+  return formatDishwasherOperationState(entity.state)
+}
+
+function formatDishwasherOperationState(state: string | null | undefined) {
+  if (!state || state === 'unavailable' || state === 'unknown') return 'Unavailable'
+  return DISHWASHER_OPERATION_LABELS[state] ?? titleCaseState(state)
+}
+
+function dishwasherProgressFillPercent(operationEntity: HassEntity | null | undefined, progressEntity: HassEntity | null | undefined) {
+  return dishwasherProgressFillPercentForState(operationEntity?.state, progressEntity)
+}
+
+function dishwasherProgressFillPercentForState(operationState: string | null | undefined, progressEntity: HassEntity | null | undefined) {
+  if (!operationState || !DISHWASHER_PROGRESS_STATES.has(operationState)) return undefined
+  return dishwasherProgressPercent(progressEntity)
+}
+
+function formatDishwasherSummary(operationEntity: HassEntity | null | undefined, progressEntity: HassEntity | null | undefined) {
+  return formatDishwasherSummaryForState(operationEntity?.state, progressEntity)
+}
+
+function formatDishwasherSummaryForState(operationState: string | null | undefined, progressEntity: HassEntity | null | undefined) {
+  const operation = formatDishwasherOperationState(operationState)
+  const progress = dishwasherProgressFillPercentForState(operationState, progressEntity)
+  return progress === undefined ? operation : `${operation} • ${Math.round(progress)}%`
+}
+
+function formatDishwasherProgram(value: unknown) {
+  const rawValue = String(value ?? '')
+  if (!rawValue || rawValue === 'unknown' || rawValue === 'unavailable') return 'Unavailable'
+  const mapped = DISHWASHER_PROGRAM_LABELS[rawValue]
+  if (mapped) return mapped
+  if (rawValue.includes(' ')) return rawValue
+  return titleCaseState(rawValue.replace('dishcare_dishwasher_program_', ''))
+}
+
+function formatDishwasherSupplyState(entity: HassEntity | null | undefined) {
+  if (!dishwasherEntityAvailable(entity)) return 'Unavailable'
+  if (entity.state === 'off') return 'OK'
+  if (entity.state === 'present' || entity.state === 'confirmed') return 'Low'
+  return titleCaseState(entity.state)
+}
+
+function formatDishwasherEnumState(entity: HassEntity | null | undefined) {
+  if (!dishwasherEntityAvailable(entity)) return 'Unavailable'
+  return titleCaseState(entity.state)
+}
+
+function roomSourceBackgroundColor(card: RoomSourceCardConfig, entity: HassEntity | null | undefined, presenceEntity: HassEntity | null | undefined) {
   if (!entity) return undefined
   const sourceStateColor = card.stateColors?.[entity.state]
   if (sourceStateColor) return sourceStateColor
@@ -454,6 +574,8 @@ function SourceEntityModalContent({ card }: { card: RoomSourceCardConfig }) {
 
 function renderRoomReusableSheet(card: RoomSourceCardConfig, roomTitle: string): ReactNode {
   if (!card.hash) return null
+
+  if (isDishwasherSourceCard(card)) return <DishwasherModalContent key="dishwasher" />
 
   if (card.modalItems?.length) return <SourceEntityModalContent card={card} key={`${card.entityId}-items`} />
 
@@ -575,7 +697,42 @@ function useRoomSourceActionRunner() {
   }
 }
 
-function RoomSourceCard({ card, eightSleepModalState, onOpen }: { card: RoomSourceCardConfig; eightSleepModalState?: EightSleepBedModalState; onOpen: (card: RoomSourceCardConfig) => void }) {
+interface RoomSourceCardProps {
+  card: RoomSourceCardConfig
+  eightSleepModalState?: EightSleepBedModalState
+  onOpen: (card: RoomSourceCardConfig) => void
+}
+
+function RoomSourceCard(props: RoomSourceCardProps) {
+  if (isDishwasherSourceCard(props.card)) return <DishwasherRoomSourceCard {...props} />
+  return <DefaultRoomSourceCard {...props} />
+}
+
+function DishwasherRoomSourceCard({ card, onOpen }: RoomSourceCardProps) {
+  const selectedProgram = useEntity(asEntityName(DISHWASHER_ENTITY_IDS.selectedProgram), { returnNullIfNotFound: true })
+  const operation = useEntity(asEntityName(DISHWASHER_ENTITY_IDS.operation), { returnNullIfNotFound: true })
+  const progress = useEntity(asEntityName(DISHWASHER_ENTITY_IDS.progress), { returnNullIfNotFound: true })
+  const displayUnavailable = dishwasherEntityUnavailable(selectedProgram) && dishwasherEntityUnavailable(operation)
+  const disabledByState = Boolean(selectedProgram && card.disabledStates?.includes(selectedProgram.state))
+  const handleClick = card.hash && !displayUnavailable && !disabledByState ? () => onOpen(card) : undefined
+  const content = (
+    <GlassTile
+      icon={<SourceCardIcon card={card} size={24} />}
+      isOff={displayUnavailable || disabledByState}
+      onClick={handleClick}
+      progress={dishwasherProgressFillPercent(operation, progress)}
+      progressColor={DISHWASHER_PROGRESS_COLOR}
+      subtitle={formatDishwasherSummary(operation, progress)}
+      title={card.title}
+      tone="neutral"
+    />
+  )
+
+  if (card.span === 'full') return <div className={styles.fullSpan}>{content}</div>
+  return content
+}
+
+function DefaultRoomSourceCard({ card, eightSleepModalState, onOpen }: RoomSourceCardProps) {
   const alternateGate = useEntity(asEntityName(card.alternate?.whenEntityId ?? card.entityId), { returnNullIfNotFound: true })
   const runAction = useRoomSourceActionRunner()
   const useAlternate = Boolean(card.alternate && alternateGate && card.alternate.whenStates.includes(alternateGate.state))
@@ -636,8 +793,15 @@ function RoomSourceModal({ card, eightSleepModalState, onClose, preloadCard, roo
     : null
   const plainTitle = renderCard?.kind === 'air' || renderCard?.kind === 'climate' || renderCard?.kind === 'contact' || renderCard?.kind === 'humidifier' || renderCard?.kind === 'light' || renderCard?.kind === 'occupancy'
   const mediaTitle = mediaRemote?.remoteTitle
-  const title = renderCard ? mediaTitle ?? `${roomTitle}${plainTitle ? ' ' : ': '}${renderCard.modalTitle ?? renderCard.title}` : roomTitle
-  const subtitle = useHass((state) => (renderCard && plainTitle && renderCard.kind !== 'contact' && renderCard.kind !== 'light' ? roomSourceModalSubtitle(renderCard, roomTitle, state.entities) : undefined))
+  const title = renderCard
+    ? isDishwasherSourceCard(renderCard)
+      ? renderCard.modalTitle ?? renderCard.title
+      : mediaTitle ?? `${roomTitle}${plainTitle ? ' ' : ': '}${renderCard.modalTitle ?? renderCard.title}`
+    : roomTitle
+  const subtitle = useHass((state) => {
+    if (renderCard && isDishwasherSourceCard(renderCard)) return undefined
+    return renderCard && plainTitle && renderCard.kind !== 'contact' && renderCard.kind !== 'light' ? roomSourceModalSubtitle(renderCard, roomTitle, state.entities) : undefined
+  })
   const modalStyle = renderCard?.kind === 'media'
     ? MEDIA_REMOTE_MODAL_STYLE
     : renderCard?.kind === 'vacuum'
@@ -1861,7 +2025,7 @@ function formatTemperatureValue(value: unknown, unit = '°F') {
   return `${formatOneDecimal(value)}${unit}`
 }
 
-function temperatureUnit(entity: ReturnType<typeof useEntity>) {
+function temperatureUnit(entity: HassEntity | null | undefined) {
   if (typeof entity?.attributes.temperature_unit === 'string') return entity.attributes.temperature_unit
   if (typeof entity?.attributes.unit_of_measurement === 'string') return entity.attributes.unit_of_measurement
   return '°F'
@@ -1878,6 +2042,211 @@ function useCallService() {
 }
 
 type DashboardCallService = ReturnType<typeof useCallService>
+
+function formatDishwasherBinaryStatus(entity: HassEntity | null | undefined, onLabel = 'On', offLabel = 'Off') {
+  if (!dishwasherEntityAvailable(entity)) return 'Unavailable'
+  if (entity.state === 'on') return onLabel
+  if (entity.state === 'off') return offLabel
+  return titleCaseState(entity.state)
+}
+
+function formatDishwasherProgressStatus(entity: HassEntity | null | undefined) {
+  const progress = dishwasherProgressPercent(entity)
+  return progress === undefined ? 'No active cycle' : `${Math.round(progress)}%`
+}
+
+function formatDishwasherFinishTime(entity: HassEntity | null | undefined) {
+  if (!dishwasherEntityAvailable(entity)) return 'No active cycle'
+  const finishDate = new Date(entity.state)
+  if (Number.isNaN(finishDate.getTime())) return formatCompactEntityState(entity, 'Unavailable')
+  return finishDate.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+}
+
+type DishwasherInfoPillTone = 'danger' | 'ok' | 'warning'
+
+function DishwasherInfoPill({ label, tone, value }: { label: string; tone?: DishwasherInfoPillTone; value: string }) {
+  return (
+    <span aria-label={`${label} ${value}`} className={styles.dishwasherInfoPill} data-tone={tone} role="group">
+      <span className={styles.dishwasherInfoText}>
+        <span>{label}</span>
+        <strong>{value}</strong>
+      </span>
+    </span>
+  )
+}
+
+function DishwasherStatusChip({ entityId, formatter = (entity) => formatCompactEntityState(entity ?? null, 'Unavailable'), title, tone, valueOverride }: { entityId: string; formatter?: (entity: HassEntity | null | undefined) => string; title: string; tone?: DishwasherInfoPillTone; valueOverride?: string }) {
+  const entity = useEntity(asEntityName(entityId), { returnNullIfNotFound: true })
+  const value = valueOverride ?? formatter(entity)
+
+  return <DishwasherInfoPill label={title} tone={tone} value={value} />
+}
+
+function DishwasherSupplyStatusChip({ entityId, title }: { entityId: string; title: string }) {
+  const entity = useEntity(asEntityName(entityId), { returnNullIfNotFound: true })
+  const value = formatDishwasherSupplyState(entity)
+  const tone = value === 'Low' ? 'warning' : value === 'OK' ? 'ok' : undefined
+
+  return <DishwasherInfoPill label={title} tone={tone} value={value} />
+}
+
+function DishwasherActionButton({ domain, entityId, expectedOperationState, icon, onOptimisticOperationState, span, title, tone = 'switch' }: { domain: 'button' | 'input_button'; entityId: string; expectedOperationState: string; icon: string; onOptimisticOperationState: (state: string) => void; span?: 'full'; title: string; tone?: 'danger' | 'neutral' | 'switch' }) {
+  const entity = useEntity(asEntityName(entityId), { returnNullIfNotFound: true })
+  const callService = useCallService()
+  const disabled = !entity || entity.state === 'unavailable'
+  const handleClick = () => {
+    onOptimisticOperationState(expectedOperationState)
+    callService({ domain, service: 'press', target: entityId })
+  }
+  const tile = (
+    <GlassTile
+      icon={<MaterialIcon name={icon} size={24} />}
+      isOff={disabled}
+      onClick={disabled ? undefined : handleClick}
+      subtitle={disabled ? 'Unavailable' : undefined}
+      title={title}
+      tone={disabled ? 'neutral' : tone}
+    />
+  )
+
+  if (span === 'full') return <div className={styles.fullSpan}>{tile}</div>
+  return tile
+}
+
+function DishwasherSwitchOption({ entityId, icon, title }: { entityId: string; icon: string; title: string }) {
+  const entity = useEntity(asEntityName(entityId), { returnNullIfNotFound: true })
+  const callService = useCallService()
+  const liveState = entity?.state ?? 'unavailable'
+  const [displayState, commitState] = useOptimisticState(liveState)
+  const disabled = !entity || entity.state === 'unavailable' || entity.state === 'unknown'
+  const active = displayState === 'on'
+  const stateLabel = disabled ? 'Unavailable' : active ? 'On' : 'Off'
+  const toggle = () => {
+    const nextState = active ? 'off' : 'on'
+    commitState(nextState)
+    callService({ domain: 'switch', service: nextState === 'on' ? 'turn_on' : 'turn_off', target: entityId })
+  }
+
+  return <GlassTile icon={<MaterialIcon name={icon} size={24} />} isOff={disabled || !active} onClick={disabled ? undefined : toggle} pressed={active} subtitle={stateLabel} title={title} tone={active ? 'switch' : 'neutral'} />
+}
+
+function DishwasherProgramPicker() {
+  const entity = useEntity(asEntityName(DISHWASHER_ENTITY_IDS.selectedProgram), { returnNullIfNotFound: true })
+  const callService = useCallService()
+  const rawOptions = entity?.attributes.options
+  const options: PickerOption[] = Array.isArray(rawOptions)
+    ? rawOptions.map((option) => {
+        const value = String(option)
+        return { icon: 'mdi:dishwasher', label: formatDishwasherProgram(value), value }
+      })
+    : []
+  const liveValue = entity?.state ?? ''
+  const [displayValue, commitValue] = useOptimisticState(liveValue)
+  const disabled = dishwasherEntityUnavailable(entity) || options.length === 0
+  const displayLabel = formatDishwasherProgram(displayValue)
+  const selectOptions = displayValue && !options.some((option) => option.value === displayValue) ? [{ icon: 'mdi:dishwasher', label: displayLabel, value: displayValue }, ...options] : options
+  const selectProgram = (nextValue: string) => {
+    if (nextValue === displayValue) return
+
+    commitValue(nextValue)
+    callService({ domain: 'select', service: 'select_option', target: DISHWASHER_ENTITY_IDS.selectedProgram, serviceData: { option: nextValue } })
+  }
+
+  return (
+    <label className={styles.dishwasherProgramSelect} data-disabled={disabled ? 'true' : 'false'}>
+      <span aria-hidden="true" className={styles.dishwasherProgramIcon}>
+        <MaterialIcon name="mdi:dishwasher" size={30} />
+      </span>
+      <span className={styles.dishwasherProgramCopy}>
+        <span className={styles.dishwasherProgramLabel}>Program</span>
+        <span className={styles.dishwasherProgramValue}>{displayLabel}</span>
+      </span>
+      <select aria-label="Program" className={styles.dishwasherProgramNativeSelect} disabled={disabled} onChange={(event) => selectProgram(event.target.value)} value={displayValue}>
+        {selectOptions.length === 0 && <option value={displayValue}>{displayLabel}</option>}
+        {selectOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+      </select>
+      <span aria-hidden="true" className={styles.dishwasherProgramChevron}>
+        <MaterialIcon name="mdi:chevron-down" size={24} />
+      </span>
+    </label>
+  )
+}
+
+function DishwasherActionStatusCard({ icon, subtitle, title }: { icon: string; subtitle: string; title: string }) {
+  return (
+    <Card
+      ariaLabel={`${title} ${subtitle}`}
+      color={CONTROL_COLOR}
+      icon={<MaterialIcon name={icon} size={30} />}
+      muted={false}
+      size="compact"
+      subtitle={subtitle}
+      title={title}
+    />
+  )
+}
+
+function DishwasherActionsSection({ onOptimisticOperationState, operationState }: { onOptimisticOperationState: (state: string) => void; operationState: string }) {
+  const showStop = DISHWASHER_STOP_ACTION_STATES.has(operationState)
+  const showResume = DISHWASHER_RESUME_ACTION_STATES.has(operationState)
+  const showStopping = operationState === 'aborting'
+
+  return (
+    <section className={styles.section}>
+      <SectionHeader title="Actions" />
+      <Grid>
+        {!showStop && !showStopping && <DishwasherActionButton domain="input_button" entityId={DISHWASHER_ENTITY_IDS.startProgram} expectedOperationState="run" icon="mdi:play" onOptimisticOperationState={onOptimisticOperationState} span="full" title="Start Dishwasher" />}
+        {showResume && <DishwasherActionButton domain="button" entityId={DISHWASHER_ENTITY_IDS.resumeProgram} expectedOperationState="run" icon="mdi:play-pause" onOptimisticOperationState={onOptimisticOperationState} title="Resume Program" />}
+        {showStop && <DishwasherActionButton domain="button" entityId={DISHWASHER_ENTITY_IDS.stopProgram} expectedOperationState="aborting" icon="mdi:stop" onOptimisticOperationState={onOptimisticOperationState} title="Stop Program" tone="danger" />}
+        {showStopping && <DishwasherActionStatusCard icon="mdi:timer-sand" subtitle="Waiting for Home Assistant" title="Stopping" />}
+      </Grid>
+    </section>
+  )
+}
+
+function DishwasherModalContent() {
+  const operation = useEntity(asEntityName(DISHWASHER_ENTITY_IDS.operation), { returnNullIfNotFound: true })
+  const liveOperationState = operation?.state ?? 'unavailable'
+  const [displayOperationState, commitDisplayOperationState] = useOptimisticState(liveOperationState, { revertMs: DISHWASHER_OPTIMISTIC_REVERT_MS })
+
+  return (
+    <div className={styles.dishwasherModal}>
+      <section className={styles.section}>
+        <SectionHeader title="Program" />
+        <DishwasherProgramPicker />
+        <Description>Start uses the Home Assistant dishwasher helper so Home Assistant owns the Home Connect program and option command.</Description>
+      </section>
+
+      <DishwasherActionsSection onOptimisticOperationState={commitDisplayOperationState} operationState={displayOperationState} />
+
+      <section className={styles.section}>
+        <SectionHeader title="Options" />
+        <Grid>
+          <DishwasherSwitchOption entityId={DISHWASHER_ENTITY_IDS.power} icon="mdi:power" title="Power" />
+          <DishwasherSwitchOption entityId={DISHWASHER_ENTITY_IDS.halfLoad} icon="mdi:fraction-one-half" title="Half Load" />
+          <DishwasherSwitchOption entityId={DISHWASHER_ENTITY_IDS.zeoliteDry} icon="mdi:weather-windy" title="Zeolite Dry" />
+          <DishwasherSwitchOption entityId={DISHWASHER_ENTITY_IDS.hygiene} icon="mdi:shield-plus" title="Hygiene +" />
+        </Grid>
+      </section>
+
+      <section className={styles.section}>
+        <SectionHeader title="Status" />
+        <div className={styles.dishwasherStatusPanel}>
+          <DishwasherStatusChip entityId={DISHWASHER_ENTITY_IDS.operation} formatter={formatDishwasherOperation} title="Operation" valueOverride={formatDishwasherOperationState(displayOperationState)} />
+          <DishwasherStatusChip entityId={DISHWASHER_ENTITY_IDS.progress} formatter={formatDishwasherProgressStatus} title="Progress" />
+          <DishwasherStatusChip entityId={DISHWASHER_ENTITY_IDS.activeProgram} formatter={(entity) => formatDishwasherProgram(entity?.state)} title="Active Program" />
+          <DishwasherStatusChip entityId={DISHWASHER_ENTITY_IDS.door} formatter={formatDishwasherEnumState} title="Door" />
+          <DishwasherStatusChip entityId={DISHWASHER_ENTITY_IDS.connectivity} formatter={(entity) => formatDishwasherBinaryStatus(entity, 'Online', 'Offline')} title="Connectivity" />
+          <DishwasherStatusChip entityId={DISHWASHER_ENTITY_IDS.remoteControl} formatter={(entity) => formatDishwasherBinaryStatus(entity, 'Enabled', 'Disabled')} title="Remote Control" />
+          <DishwasherStatusChip entityId={DISHWASHER_ENTITY_IDS.remoteStart} formatter={(entity) => formatDishwasherBinaryStatus(entity, 'Enabled', 'Disabled')} title="Remote Start" />
+          <DishwasherStatusChip entityId={DISHWASHER_ENTITY_IDS.programFinishTime} formatter={formatDishwasherFinishTime} title="Finish Time" />
+          <DishwasherSupplyStatusChip entityId={DISHWASHER_ENTITY_IDS.rinseAid} title="Rinse Aid" />
+          <DishwasherSupplyStatusChip entityId={DISHWASHER_ENTITY_IDS.salt} title="Salt" />
+        </div>
+      </section>
+    </div>
+  )
+}
 
 type ThermostatSliderTarget = 'high' | 'low' | 'value'
 type ThermostatDisplayTargets = { high: number | null; low: number | null; sourceKey: string; target: number | null }

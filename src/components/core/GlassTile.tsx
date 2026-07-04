@@ -8,6 +8,8 @@ export type TileTone = 'air' | 'climate' | 'contact' | 'danger' | 'light' | 'med
 type GlassTileStyle = CSSProperties & {
   '--header-pill-color'?: string
   '--tile-color'?: string
+  '--tile-progress'?: string
+  '--tile-progress-color'?: string
 }
 
 interface GlassTileProps {
@@ -21,6 +23,8 @@ interface GlassTileProps {
   isOff?: boolean
   onClick?: () => void
   pressed?: boolean
+  progress?: number
+  progressColor?: string
   variant?: 'card' | 'header'
 }
 
@@ -35,9 +39,12 @@ export function GlassTile({
   isOff = false,
   onClick,
   pressed,
+  progress,
+  progressColor,
   variant = 'card',
 }: GlassTileProps) {
   const iconSize = variant === 'header' ? 26 : compact ? 18 : 24
+  const progressValue = typeof progress === 'number' && Number.isFinite(progress) ? Math.max(0, Math.min(100, progress)) : undefined
   const className = [
     styles.tile,
     onClick ? styles.button : '',
@@ -49,25 +56,30 @@ export function GlassTile({
     .filter(Boolean)
     .join(' ')
   const accessibleName = subtitle ? `${title} ${subtitle}` : title
-  const style: GlassTileStyle | undefined = backgroundColor
-    ? {
-        '--header-pill-color': backgroundColor,
-        '--tile-color': backgroundColor,
-      }
-    : undefined
+  const style: GlassTileStyle = {}
+  if (backgroundColor) {
+    style['--header-pill-color'] = backgroundColor
+    style['--tile-color'] = backgroundColor
+  }
+  if (progressValue !== undefined) style['--tile-progress'] = `${progressValue}%`
+  if (progressColor) style['--tile-progress-color'] = progressColor
+  const resolvedStyle = Object.keys(style).length ? style : undefined
   const iconName = typeof icon === 'string' ? icon : undefined
   const iconContent = isValidElement(icon) ? icon : <Icon name={iconName ?? 'mdi:help-circle-outline'} size={iconSize} />
 
   const content = (
-    <span className={styles.content}>
-      <span aria-hidden="true" className={styles.icon} style={iconColor ? { color: iconColor } : undefined}>
-        {iconContent}
+    <>
+      {progressValue !== undefined && <span aria-hidden="true" className={styles.progressFill} />}
+      <span className={styles.content}>
+        <span aria-hidden="true" className={styles.icon} style={iconColor ? { color: iconColor } : undefined}>
+          {iconContent}
+        </span>
+        <span className={styles.labelGroup}>
+          <span className={styles.title}>{title}</span>
+          {subtitle && <span className={styles.subtitle}>{subtitle}</span>}
+        </span>
       </span>
-      <span className={styles.labelGroup}>
-        <span className={styles.title}>{title}</span>
-        {subtitle && <span className={styles.subtitle}>{subtitle}</span>}
-      </span>
-    </span>
+    </>
   )
 
   if (onClick) {
@@ -79,9 +91,10 @@ export function GlassTile({
         data-icon={iconName}
         data-icon-color={iconColor}
         data-muted={isOff ? 'true' : 'false'}
+        data-progress={progressValue === undefined ? undefined : String(Math.round(progressValue))}
         data-tone={tone}
         onClick={onClick}
-        style={style}
+        style={resolvedStyle}
         type="button"
       >
         {content}
@@ -90,7 +103,7 @@ export function GlassTile({
   }
 
   return (
-    <div aria-label={accessibleName} className={className} data-icon={iconName} data-icon-color={iconColor} data-muted={isOff ? 'true' : 'false'} data-tone={tone} style={style}>
+    <div aria-label={accessibleName} className={className} data-icon={iconName} data-icon-color={iconColor} data-muted={isOff ? 'true' : 'false'} data-progress={progressValue === undefined ? undefined : String(Math.round(progressValue))} data-tone={tone} style={resolvedStyle}>
       {content}
     </div>
   )
