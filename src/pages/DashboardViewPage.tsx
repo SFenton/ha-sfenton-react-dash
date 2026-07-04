@@ -1939,19 +1939,18 @@ const THERMOSTAT_SECTION_DESCRIPTIONS = {
     'Track only a subset of monitored rooms for automated control. Monitored rooms can be configured in the integration settings.\n\nThis setting works in tandem with eco mode, but eco mode is not required to be enabled to use it.',
 } as const
 
-const THERMOSTAT_CONTACT_SENSORS = [
-  { entityId: 'binary_sensor.office_window_contact_sensor_contact', title: 'Office Window' },
-  { entityId: 'binary_sensor.office_pc_window_sensor_contact', title: 'Office PC Window' },
-  { entityId: 'binary_sensor.living_room_window_contact_sensor_contact', title: 'Living Room Window' },
-  { entityId: 'binary_sensor.front_door_contact_sensor_contact', title: 'Front Door' },
-  { entityId: 'binary_sensor.garage_door_contact_sensor_contact', title: 'Garage Door' },
-  { entityId: 'binary_sensor.theater_room_door_contact_sensor_contact', title: 'Theater Room Door' },
-  { entityId: 'binary_sensor.kitchen_door_contact_sensor_contact', title: 'Kitchen Door' },
-  { entityId: 'binary_sensor.guest_room_window_contact_sensor_contact', title: 'Guest Room Window' },
-  { entityId: 'binary_sensor.gym_window_contact_sensor_contact', title: 'Gym Window' },
-  { entityId: 'binary_sensor.dining_room_door_contact_sensor_contact', title: 'Dining Room Door' },
-  { entityId: 'binary_sensor.music_room_door_contact_sensor_contact', title: 'Music Room Door' },
-] as const
+function contactSensorTitle(group: EntityGroupConfig, item: EntityGroupConfig['items'][number]) {
+  const groupTitle = group.title.replace(/\s+Contact Sensors$/, '')
+  if (item.title.includes(groupTitle) || item.title === 'Front Door') return item.title
+  return `${groupTitle} ${item.title}`
+}
+
+const THERMOSTAT_CONTACT_SENSORS = CONTACT_GROUPS.flatMap((group) =>
+  group.items.map((item) => ({
+    entityId: item.entityId,
+    title: contactSensorTitle(group, item),
+  })),
+)
 
 type ThermostatRoomView = (typeof THERMOSTAT_ROOMS)[number] & {
   hash: string

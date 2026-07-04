@@ -1460,13 +1460,17 @@ describe('DashboardViewPage', () => {
   it('renders open Ecobee contact sensors as thermostat glass cards', () => {
     mockEntities['binary_sensor.contact_sensors'].state = 'on'
     mockEntities['binary_sensor.office_window_contact_sensor_contact'].state = 'on'
+    mockEntities['binary_sensor.master_bedroom_street_window_contact_sensor_contact'].state = 'on'
 
     render(<DashboardViewPage activePath="ecobee" onNavigate={() => undefined} path="ecobee" />)
 
     const openSensor = screen.getByLabelText(/^Office Window Open$/i)
+    const masterBedroomSensor = screen.getByLabelText(/^Master Bedroom Street Windows Open$/i)
     expect(screen.getByRole('heading', { name: 'Open Contact Sensors' })).toBeInTheDocument()
     expect(openSensor).toHaveAttribute('data-active', 'true')
     expect(openSensor).toHaveAttribute('data-tone', 'contact')
+    expect(masterBedroomSensor).toHaveAttribute('data-active', 'true')
+    expect(masterBedroomSensor).toHaveAttribute('data-tone', 'contact')
     expect(screen.queryByRole('article', { name: /^Office Window Open$/i })).not.toBeInTheDocument()
   })
 
