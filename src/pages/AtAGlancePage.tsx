@@ -1024,31 +1024,18 @@ function RoomContactDetailCards({ group }: { group: EntityGroupConfig }) {
   )
 }
 
-function RoomContactSection({ group }: { group: EntityGroupConfig }) {
-  return (
-    <section className={styles.roomStateSection}>
-      <div className={styles.lightSectionHeader}>
-        <h3 className={styles.lightSectionLabel}>{contactRoomTitle(group)}</h3>
-        <Separator className={styles.lightSectionSeparator} />
-      </div>
-      <RoomContactDetailCards group={group} />
-    </section>
-  )
-}
-
 export function ContactSheet({
   directGroup,
   hideDirectHeader = false,
   overviewGridRef,
   overviewGridStyle,
-  overviewMode = 'rooms',
-}: RoomOverviewSheetProps & { overviewMode?: 'grouped' | 'rooms' } = {}) {
+}: RoomOverviewSheetProps = {}) {
   const [selectedGroup, setSelectedGroup] = useState<EntityGroupConfig | null>(directGroup ?? null)
   const [roomCardsExiting, setRoomCardsExiting] = useState(false)
   const transitionTimer = useRef<number | null>(null)
   const roomGroups = ROOM_CONTACT_GROUPS
   const directMode = Boolean(directGroup)
-  const squareOverview = overviewMode === 'rooms' && !selectedGroup && Boolean(overviewGridStyle)
+  const squareOverview = !selectedGroup && Boolean(overviewGridStyle)
   const contactGridClassName = squareGridClassName(styles.roomContactGrid, squareOverview)
   const cardShellClassName = squareGridCellClassName(squareOverview)
 
@@ -1067,20 +1054,6 @@ export function ContactSheet({
     transitionTimer.current = null
     setRoomCardsExiting(false)
     setSelectedGroup(null)
-  }
-
-  if (!directGroup && overviewMode === 'grouped') {
-    return (
-      <div className={styles.contactSheet} data-square-overview={squareOverview ? 'true' : 'false'}>
-        <div className={styles.contactContent}>
-          <section className={styles.roomContactOverview}>
-            <div className={styles.roomStateStack}>
-              {roomGroups.map((group) => <RoomContactSection group={group} key={group.title} />)}
-            </div>
-          </section>
-        </div>
-      </div>
-    )
   }
 
   return (

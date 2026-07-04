@@ -597,7 +597,7 @@ function renderRoomReusableSheet(card: RoomSourceCardConfig, roomTitle: string):
   if (card.kind === 'contact') {
     const group = roomContactGroup(roomTitle)
     if (group) return <ContactSheet directGroup={group} hideDirectHeader key={group.title} />
-    return <ContactSheet key="contact-sensors-grouped" overviewMode="grouped" />
+    return <ContactSheet key="contact-sensors-overview" />
   }
 
   if (card.kind === 'vacuum') {

@@ -3508,19 +3508,22 @@ describe('DashboardViewPage', () => {
     expect(mockCallServiceCalls).toEqual([{ domain: 'lock', service: 'lock', target: 'lock.aqara_smart_lock_u400' }])
   })
 
-  it('opens the Security contact sensor overview grouped from the source popup', async () => {
+  it('opens the Security contact sensor overview with the same room flow as Home', async () => {
     render(<DashboardViewPage activePath="security" onNavigate={() => undefined} path="security" />)
 
     fireEvent.click(screen.getByRole('button', { name: /Contact Sensors\s*All Closed/i }))
 
-    expect(await screen.findByRole('dialog')).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Contact Sensors' })).toBeInTheDocument()
-    expect(screen.queryByRole('heading', { name: 'Rooms' })).not.toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Entryway' })).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Office' })).toBeInTheDocument()
-    expect(screen.getByLabelText('PC Window Closed')).toHaveClass(/sourceRow/)
-    expect(screen.getByLabelText('PC Window Closed')).not.toHaveClass(/bubble/)
-    expect(screen.getAllByLabelText('Window Closed').length).toBeGreaterThan(0)
+    const dialog = await screen.findByRole('dialog')
+    expect(within(dialog).getByRole('heading', { name: 'Contact Sensors' })).toBeInTheDocument()
+    expect(within(dialog).getByText('Rooms')).toBeInTheDocument()
+    expect(within(dialog).getByRole('button', { name: 'Open Entryway Contact Sensors' })).toBeInTheDocument()
+    expect(within(dialog).queryByLabelText('PC Window Closed')).not.toBeInTheDocument()
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Open Office Contact Sensors' }))
+
+    expect(within(dialog).getByRole('heading', { name: 'Office Contact Sensors' })).toBeInTheDocument()
+    expect(within(dialog).getByLabelText('PC Window Closed')).toHaveClass(/sourceRow/)
+    expect(within(dialog).getByLabelText('PC Window Closed')).not.toHaveClass(/bubble/)
   })
 
   it('opens Security camera popups with WebRTC actions and recording script payloads', async () => {

@@ -131,7 +131,7 @@ function SecurityModalContent({
 }) {
   if (hash === '#security-system') return <SecurityControls />
   if (hash === GUEST_PRESENCE_SECURITY_HASH) return <GuestPresenceSecurityModalContent />
-  if (hash === CONTACT_SENSORS_HASH) return <ContactSheet overviewGridRef={contactGridRef} overviewGridStyle={contactGridStyle} overviewMode="grouped" />
+  if (hash === CONTACT_SENSORS_HASH) return <ContactSheet overviewGridRef={contactGridRef} overviewGridStyle={contactGridStyle} />
   const camera = CAMERA_ITEMS.find((item) => item.hash === hash)
   if (camera) return <CameraModalContent camera={camera} live={live} />
   return null
