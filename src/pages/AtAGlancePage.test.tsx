@@ -166,6 +166,19 @@ describe('AtAGlancePage', () => {
     }
   })
 
+  it('renders contact sensor room details as occupancy-style source rows', async () => {
+    render(<AtAGlancePage />)
+
+    fireEvent.click(screen.getByRole('button', { name: /^Contact Sensors\b/i }))
+
+    const dialog = await screen.findByRole('dialog')
+    fireEvent.click(within(dialog).getByLabelText('Open Office Contact Sensors'))
+
+    const pcWindow = within(dialog).getByRole('article', { name: /PC Window Closed/i })
+    expect(pcWindow).toHaveClass(/sourceRow/)
+    expect(pcWindow).not.toHaveClass(/bubble/)
+  })
+
   it('shows Master Bedroom Closet as a top-level light card', async () => {
     render(<AtAGlancePage />)
 

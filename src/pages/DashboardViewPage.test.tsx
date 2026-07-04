@@ -3518,7 +3518,8 @@ describe('DashboardViewPage', () => {
     expect(screen.queryByRole('heading', { name: 'Rooms' })).not.toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Entryway' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Office' })).toBeInTheDocument()
-    expect(screen.getByLabelText('PC Window Closed')).toBeInTheDocument()
+    expect(screen.getByLabelText('PC Window Closed')).toHaveClass(/sourceRow/)
+    expect(screen.getByLabelText('PC Window Closed')).not.toHaveClass(/bubble/)
     expect(screen.getAllByLabelText('Window Closed').length).toBeGreaterThan(0)
   })
 

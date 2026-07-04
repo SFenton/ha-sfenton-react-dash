@@ -1008,7 +1008,7 @@ function RoomContactDetailHeader({ group, onBack }: { group: EntityGroupConfig; 
   )
 }
 
-function RoomContactDetailCards({ group, size = 'bubble' }: { group: EntityGroupConfig; size?: 'bubble' | 'source-row' }) {
+function RoomContactDetailCards({ group }: { group: EntityGroupConfig }) {
   const color = contactGroupColor(group)
 
   return (
@@ -1016,7 +1016,7 @@ function RoomContactDetailCards({ group, size = 'bubble' }: { group: EntityGroup
       <div className={styles.roomContactGrid}>
         {group.items.map((item) => (
           <div className={styles.roomLightCardShell} key={item.entityId}>
-            <ContactSensorCard color={color} entityId={item.entityId} size={size} title={item.title} />
+            <ContactSensorCard color={color} entityId={item.entityId} size="source-row" title={item.title} />
           </div>
         ))}
       </div>
@@ -1088,7 +1088,7 @@ export function ContactSheet({
       {selectedGroup ? (!hideDirectHeader && <RoomContactDetailHeader group={selectedGroup} onBack={directMode ? undefined : showRoomOverview} />) : <RoomsHeader />}
       <div className={styles.contactContent}>
         {selectedGroup ? (
-          <RoomContactDetailCards group={selectedGroup} size={directMode ? 'source-row' : 'bubble'} />
+          <RoomContactDetailCards group={selectedGroup} />
         ) : (
           <section aria-label="Contact sensors by room" className={styles.roomContactOverview} data-exiting={roomCardsExiting}>
             <div className={contactGridClassName} ref={overviewGridRef} style={overviewGridStyle}>
