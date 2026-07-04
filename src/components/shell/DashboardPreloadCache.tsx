@@ -5,6 +5,7 @@ import { CAMERA_ITEMS } from '../../constants/atAGlance'
 import { DASHBOARD_ROUTES } from '../../constants/routes'
 import { ROOM_PAGE_CONFIGS } from '../../constants/roomPages'
 import { THERMOSTAT_ROOMS } from '../../constants/portedDashboard'
+import { GUEST_PRESENCE_SECURITY_HASH } from '../hass/GuestPresenceSecurity'
 import styles from './DashboardPreloadCache.module.css'
 
 const TARGETS_PER_FRAME = 4
@@ -18,12 +19,14 @@ const HOME_PRELOAD_HASHES = [
   '#aqi-overview',
   '#chores-preview',
   '#settings-preview',
+  GUEST_PRESENCE_SECURITY_HASH,
   ...CAMERA_ITEMS.map((camera) => camera.hash),
 ]
 
 const SECURITY_PRELOAD_HASHES = [
   '#security-system',
   '#contact-sensors-overview',
+  GUEST_PRESENCE_SECURITY_HASH,
   ...CAMERA_ITEMS.map((camera) => camera.hash),
 ]
 

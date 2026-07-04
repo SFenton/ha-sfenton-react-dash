@@ -311,7 +311,7 @@ function thermostatMockEntities() {
     ['input_boolean.enable_disable_thermostat_contact_sensors_integration', entity('input_boolean.enable_disable_thermostat_contact_sensors_integration', 'on')],
     ['binary_sensor.thermostat_contact_sensors_away_mode_active', entity('binary_sensor.thermostat_contact_sensors_away_mode_active', 'off')],
     ['select.thermostat_contact_sensors_eco_mode_critical_tracking', entity('select.thermostat_contact_sensors_eco_mode_critical_tracking', 'Track Select Critical', { options: ['Track Select Critical', 'Track Select Active', 'Ignore Critical'] })],
-    ['select.thermostat_contact_sensors_eco_behavior_when_away', entity('select.thermostat_contact_sensors_eco_behavior_when_away', 'Keep Eco Active', { options: ['Keep Eco Active', 'Disable Eco Mode', 'Pause Integration'] })],
+    ['select.thermostat_contact_sensors_eco_behavior_when_away', entity('select.thermostat_contact_sensors_eco_behavior_when_away', 'Keep Eco Active', { options: ['Disable Eco When Away', 'Use Eco Away Targets', 'Keep Eco Active'] })],
   ]
 
   for (const room of thermostatRoomMockData) {
@@ -584,6 +584,8 @@ export const mockEntities: Record<string, MockEntity> = {
   'sensor.dishwasher_door': entity('sensor.dishwasher_door', 'closed'),
   'sensor.dishwasher_operation_state': entity('sensor.dishwasher_operation_state', 'ready'),
   'sensor.dishwasher_program_progress': entity('sensor.dishwasher_program_progress', '0'),
+  'automation.automatically_vacuum_or_mop_music_room': entity('automation.automatically_vacuum_or_mop_music_room', 'on'),
+  'automation.automatically_vacuum_theater_room_on_schedule': entity('automation.automatically_vacuum_theater_room_on_schedule', 'on'),
   'sensor.living_room_air_purifier_air_quality_index': entity('sensor.living_room_air_purifier_air_quality_index', '1'),
   'sensor.living_room_air_purifier_pm2_5': entity('sensor.living_room_air_purifier_pm2_5', '2', { unit_of_measurement: 'μg/m³' }),
   'sensor.air_purifier_air_quality_index': entity('sensor.air_purifier_air_quality_index', '1'),
@@ -600,6 +602,7 @@ export const mockEntities: Record<string, MockEntity> = {
   'switch.d8478fa2ad0a_super_smoke_enabled': entity('switch.d8478fa2ad0a_super_smoke_enabled', 'off'),
   'switch.guest_bathroom_fan_switch_top': entity('switch.guest_bathroom_fan_switch_top', 'off'),
   'switch.guest_bathroom_towel_rack_switch_top': entity('switch.guest_bathroom_towel_rack_switch_top', 'on'),
+  'switch.main_floor_vacuum_coordinator_pause': entity('switch.main_floor_vacuum_coordinator_pause', 'off'),
   'switch.master_bathroom_fan_switch_top': entity('switch.master_bathroom_fan_switch_top', 'off'),
   'switch.master_bathroom_towel_rack_switch_top': entity('switch.master_bathroom_towel_rack_switch_top', 'on'),
   ...mockSwitchEntities(adminPresenceSwitchEntityIds, { automation_paused: false }),
@@ -739,6 +742,13 @@ export function resetMockHass() {
   for (const roomId of mainFloorAutoCleanDisabledRoomIds) {
     mockEntities[mainFloorAutoCleanDisabledEntityId(roomId)].state = 'off'
   }
+  mockEntities['automation.automatically_vacuum_or_mop_music_room'].state = 'on'
+  mockEntities['automation.automatically_vacuum_theater_room_on_schedule'].state = 'on'
+  mockEntities['input_boolean.guests_staying_in_guest_room'].state = 'off'
+  mockEntities['input_boolean.guests_staying_in_music_room'].state = 'off'
+  mockEntities['input_boolean.guests_staying_in_theater_room'].state = 'off'
+  mockEntities['select.thermostat_contact_sensors_eco_behavior_when_away'].state = 'Keep Eco Active'
+  mockEntities['switch.main_floor_vacuum_coordinator_pause'].state = 'off'
   mockEntities['humidifier.master_bedroom_humidifier'].state = 'on'
   mockEntities['humidifier.master_bedroom_humidifier'].attributes = { available_modes: ['auto', 'normal'], current_humidity: 41, humidity: 45, max_humidity: 80, min_humidity: 30, mode: 'auto' }
   exposeMockHassDebugApi()

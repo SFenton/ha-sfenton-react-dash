@@ -14,7 +14,9 @@ import { ContactSheet } from '../../pages/AtAGlancePage'
 import { modalSquareGridModalStyleForHash, modalSquareGridStyle, useModalSquareGridLayout, type ModalSquareGridStyle } from '../../pages/modalSquareGrid'
 import { CameraModalContent } from './CameraModalContent'
 import { asEntityName, formatCompactEntityState, isActiveState, isContactOpen } from './entityState'
-import { SecurityControls, SECURITY_SYSTEM_MODAL_STYLE, securitySystemModalSubtitle } from './SecurityControls'
+import { SecurityControls } from './SecurityControls'
+import { SECURITY_SYSTEM_MODAL_STYLE, securitySystemModalSubtitle } from './securityControlsConfig'
+import { GuestPresenceSecurityModalContent, GuestPresenceSecuritySection, GUEST_PRESENCE_SECURITY_HASH } from './GuestPresenceSecurity'
 import { StatusRail } from './StatusRail'
 import styles from './SecurityDashboard.module.css'
 
@@ -103,6 +105,7 @@ export function SecurityStatusRail({ onOpenHash }: { onOpenHash: (hash: string) 
 
 function modalTitle(hash: string) {
   if (hash === '#security-system') return 'Security System'
+  if (hash === GUEST_PRESENCE_SECURITY_HASH) return 'Guest Presence Security'
   if (hash === '#contact-sensors-overview') return 'Contact Sensors'
   const camera = CAMERA_ITEMS.find((item) => item.hash === hash)
   if (camera) return `${camera.title} Camera`
@@ -112,7 +115,7 @@ function modalTitle(hash: string) {
 const CONTACT_SENSORS_HASH = '#contact-sensors-overview'
 
 function isSecurityModalHash(hash: string) {
-  return SECURITY_STATUS_CHIPS.some((chip) => chip.hash === hash) || CAMERA_ITEMS.some((item) => item.hash === hash)
+  return hash === GUEST_PRESENCE_SECURITY_HASH || SECURITY_STATUS_CHIPS.some((chip) => chip.hash === hash) || CAMERA_ITEMS.some((item) => item.hash === hash)
 }
 
 function SecurityModalContent({
@@ -127,6 +130,7 @@ function SecurityModalContent({
   live?: boolean
 }) {
   if (hash === '#security-system') return <SecurityControls />
+  if (hash === GUEST_PRESENCE_SECURITY_HASH) return <GuestPresenceSecurityModalContent />
   if (hash === CONTACT_SENSORS_HASH) return <ContactSheet overviewGridRef={contactGridRef} overviewGridStyle={contactGridStyle} overviewMode="grouped" />
   const camera = CAMERA_ITEMS.find((item) => item.hash === hash)
   if (camera) return <CameraModalContent camera={camera} live={live} />
@@ -164,6 +168,8 @@ export function SecurityDashboard({ closeHash, hash, onOpenHash, preload = false
             {SECURITY_CONTROL_TILES.map((item) => <SecurityTile item={item} key={item.entityId} onOpenHash={onOpenHash} />)}
           </div>
         </section>
+
+        <GuestPresenceSecuritySection onOpen={onOpenHash} />
 
         <section className={styles.section}>
           <SectionHeader title="Cameras" />

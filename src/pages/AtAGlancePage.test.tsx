@@ -2,8 +2,9 @@ import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import { AtAGlancePage } from './AtAGlancePage'
 import { materialIconPath } from '../components/core/iconPaths'
 import { CONTACT_GROUPS, LIGHT_GROUPS, OCCUPANCY_GROUPS, SECURITY_ENTITY } from '../constants/atAGlance'
-import { CHORE_BLUE } from '../constants/portedDashboard'
-import { entity, mockEntities, resetMockHass } from '../test/mocks/hakitCoreState'
+import { CHORE_BLUE, GUEST_CONTROLS_DESCRIPTION } from '../constants/portedDashboard'
+import { GUEST_PRESENCE_SECURITY_HASH, GUEST_PRESENCE_SECURITY_SUMMARY } from '../components/hass/GuestPresenceSecurity'
+import { entity, mockCallServiceCalls, mockEntities, resetMockHass } from '../test/mocks/hakitCoreState'
 import { resetDeferredRouteHydrationCache } from '../hooks/useDeferredRouteHydration'
 
 describe('AtAGlancePage', () => {
@@ -103,6 +104,52 @@ describe('AtAGlancePage', () => {
 
     expect(screen.getByRole('button', { name: /Contact Sensors\s*All Closed/i })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Contact Sensors\s*0 Sensors Active/i })).not.toBeInTheDocument()
+  })
+
+  it('shows Guest Presence Security below Quick Links only when a guest room is active', async () => {
+    const inactiveView = render(<AtAGlancePage />)
+    expect(screen.queryByRole('heading', { name: 'Guest Presence Security' })).not.toBeInTheDocument()
+    inactiveView.unmount()
+
+    mockEntities['input_boolean.guests_staying_in_guest_room'].state = 'on'
+    render(<AtAGlancePage />)
+
+    expect(screen.getByRole('heading', { name: 'Guest Presence Security' })).toBeInTheDocument()
+    expect(screen.getByText(GUEST_PRESENCE_SECURITY_SUMMARY)).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Guest Presence Security' }))
+
+    const dialog = await screen.findByRole('dialog')
+    expect(within(dialog).getByRole('heading', { name: 'Guest Presence Security' })).toBeInTheDocument()
+    expect(within(dialog).getByText(GUEST_CONTROLS_DESCRIPTION)).toBeInTheDocument()
+    expect(within(dialog).getByRole('heading', { name: 'Garage Doors' })).toBeInTheDocument()
+    expect(within(dialog).getByText(/guest mode skips that automatic close/i)).toBeInTheDocument()
+    expect(within(dialog).getByRole('heading', { name: 'Front Door' })).toBeInTheDocument()
+    expect(within(dialog).getByText(/auto-lock is also paused while guests are present/i)).toBeInTheDocument()
+    expect(within(dialog).getByRole('heading', { name: 'Security System' })).toBeInTheDocument()
+    expect(within(dialog).getByText(/leaves arming to you/i)).toBeInTheDocument()
+    expect(within(dialog).getByRole('heading', { name: 'Vacuum Auto-Clean' })).toBeInTheDocument()
+    expect(within(dialog).getByRole('heading', { name: 'Thermostat' })).toBeInTheDocument()
+    expect(within(dialog).getByRole('button', { name: /Guest Room On/i })).toBeInTheDocument()
+    expect(within(dialog).getByRole('button', { name: /Main Floor Enabled/i })).toBeInTheDocument()
+
+    fireEvent.click(within(dialog).getByRole('button', { name: /Enforce Home Temperatures Keep Eco Active/i }))
+
+    expect(mockCallServiceCalls.at(-1)).toEqual({
+      domain: 'select',
+      service: 'select_option',
+      serviceData: { option: 'Disable Eco When Away' },
+      target: 'select.thermostat_contact_sensors_eco_behavior_when_away',
+    })
+  })
+
+  it('opens Guest Presence Security from the Home deep-link hash', async () => {
+    window.history.replaceState(null, '', `${window.location.pathname}${GUEST_PRESENCE_SECURITY_HASH}`)
+    render(<AtAGlancePage />)
+
+    const dialog = await screen.findByRole('dialog')
+    expect(within(dialog).getByRole('heading', { name: 'Guest Presence Security' })).toBeInTheDocument()
+    expect(within(dialog).getByRole('button', { name: /Set security system to Away/i })).toBeInTheDocument()
   })
 
   it('shows open contact counts on the home contact sensor chip', () => {

@@ -17,7 +17,9 @@ import { ModalSheet } from '../components/core/ModalSheet'
 import { Separator } from '../components/core/Separator'
 import { SectionHeader } from '../components/core/SectionHeader'
 import { CameraTile } from '../components/hass/CameraTile'
-import { SecurityControls, SECURITY_SYSTEM_MODAL_STYLE, securitySystemModalSubtitle } from '../components/hass/SecurityControls'
+import { SecurityControls } from '../components/hass/SecurityControls'
+import { SECURITY_SYSTEM_MODAL_STYLE, securitySystemModalSubtitle } from '../components/hass/securityControlsConfig'
+import { GuestPresenceSecurityModalContent, GuestPresenceSecuritySection, GUEST_PRESENCE_SECURITY_HASH } from '../components/hass/GuestPresenceSecurity'
 import { StatusRail } from '../components/hass/StatusRail'
 import { WeatherSummary } from '../components/hass/WeatherSummary'
 import { formatAirMetricState } from '../components/hass/airQualityState'
@@ -63,6 +65,7 @@ const SHEET_TITLES: Record<string, string> = {
   '#aqi-overview': 'Air Quality',
   '#chores-preview': 'Chores',
   '#settings-preview': 'Settings',
+  [GUEST_PRESENCE_SECURITY_HASH]: 'Guest Presence Security',
 }
 
 const LIGHTS_SUFFIX = ' Lights'
@@ -1204,6 +1207,7 @@ function SheetContent({
   if (hash === '#chores-preview') return <ChoresPreviewSheet closeHash={closeHash} onNavigate={onNavigate} />
   if (hash === '#settings-preview') return <SettingsPreviewSheet closeHash={closeHash} onNavigate={onNavigate} />
   if (hash === '#security-system') return <SecurityControls />
+  if (hash === GUEST_PRESENCE_SECURITY_HASH) return <GuestPresenceSecurityModalContent />
 
   if (CAMERA_ITEMS.some((item) => item.hash === hash)) return <CameraSheet hash={hash} key={hash} live={!preload} />
 
@@ -1323,6 +1327,8 @@ export function AtAGlancePage({ activePath = 'overview', deferRouteContent = fal
                 </div>
               ))}
             </section>
+
+            <GuestPresenceSecuritySection onOpen={openHash} />
 
             <SectionHeader title="Cameras" />
             <section className={styles.cameraGrid}>

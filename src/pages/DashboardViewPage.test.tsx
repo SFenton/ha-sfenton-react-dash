@@ -3308,6 +3308,29 @@ describe('DashboardViewPage', () => {
     expect(screen.queryByText(/not available in the React dashboard yet/i)).not.toBeInTheDocument()
   })
 
+  it('shows Guest Presence Security on the Security page when a guest room is active', async () => {
+    mockEntities['input_boolean.guests_staying_in_music_room'].state = 'on'
+    render(<DashboardViewPage activePath="security" onNavigate={() => undefined} path="security" />)
+
+    expect(screen.getByRole('heading', { name: 'Guest Presence Security' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Guest Presence Security' }))
+
+    const dialog = await screen.findByRole('dialog')
+    expect(within(dialog).getByRole('heading', { name: 'Guest Presence Security' })).toBeInTheDocument()
+    expect(within(dialog).getByRole('button', { name: /Music Room On/i })).toBeInTheDocument()
+    expect(within(dialog).getByRole('button', { name: /Left Door Closed/i })).toBeInTheDocument()
+    expect(within(dialog).getByRole('button', { name: /Front Door Locked/i })).toBeInTheDocument()
+    expect(within(dialog).getByRole('button', { name: /Music Room Enabled/i })).toBeInTheDocument()
+
+    fireEvent.click(within(dialog).getByRole('button', { name: /Music Room Enabled/i }))
+
+    expect(mockCallServiceCalls.at(-1)).toEqual({
+      domain: 'automation',
+      service: 'turn_off',
+      target: 'automation.automatically_vacuum_or_mop_music_room',
+    })
+  })
+
   it('does not open the Security modal for a Home-only URL hash', () => {
     window.history.replaceState(null, '', `${window.location.pathname}#lights-overview`)
     render(<DashboardViewPage activePath="security" onNavigate={() => undefined} path="security" />)
