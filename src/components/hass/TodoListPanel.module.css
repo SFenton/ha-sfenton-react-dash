@@ -62,8 +62,40 @@
   list-style: none;
 }
 
+.panel[data-row-variant='settings'] .items {
+  gap: 8px;
+}
+
 .item {
   min-width: 0;
+}
+
+.panel[data-row-variant='settings'] .itemButton {
+  min-height: 72px;
+  grid-template-columns: 40px minmax(0, 1fr);
+  gap: 14px;
+  padding: 16px 0;
+}
+
+.panel[data-row-variant='settings'] .itemButton[data-copy-wrapped='true'] {
+  align-items: start;
+}
+
+.panel[data-row-variant='settings'] .itemButton > svg {
+  color: rgba(255, 255, 255, 0.86);
+}
+
+.panel[data-row-variant='settings'] .itemButton strong {
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.panel[data-row-variant='settings'] .itemButton small {
+  font-size: clamp(0.8rem, 3.4vw, 0.9rem);
+  font-weight: 680;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+  white-space: normal;
 }
 
 .itemButton[data-due-tone='overdue-hours'] small {

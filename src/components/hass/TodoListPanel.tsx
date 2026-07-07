@@ -18,6 +18,7 @@ interface TodoListPanelProps {
   entityId: string
   hideCompleted?: boolean
   onVisibleItemsChange?: (count: number) => void
+  rowVariant?: 'settings'
   title: string
 }
 
@@ -83,7 +84,7 @@ function sortByDueDate(items: TodoItem[]) {
   })
 }
 
-export function TodoListPanel({ entityId, hideCompleted = true, onVisibleItemsChange, title }: TodoListPanelProps) {
+export function TodoListPanel({ entityId, hideCompleted = true, onVisibleItemsChange, rowVariant, title }: TodoListPanelProps) {
   const entity = useEntity(asEntityName(entityId), { returnNullIfNotFound: true })
   const connection = useHass((state) => state.connection) as unknown as HassConnection | undefined
   const callService = useHass((state) => state.helpers.callService) as unknown as CallService
@@ -146,7 +147,7 @@ export function TodoListPanel({ entityId, hideCompleted = true, onVisibleItemsCh
   }
 
   return (
-    <article className={styles.panel} aria-label={`${title} todo list`}>
+    <article aria-label={`${title} todo list`} className={styles.panel} data-row-variant={rowVariant}>
       {error && <span className={styles.error}>{error}</span>}
       {visibleItems.length > 0 && (
         <ul className={styles.items}>
@@ -158,6 +159,7 @@ export function TodoListPanel({ entityId, hideCompleted = true, onVisibleItemsCh
               <li className={styles.item} key={item.uid ?? `${entityId}-${index}`}>
                 <CheckboxRow
                   active={item.status === 'completed'}
+                  alignWrappedToIconTop={rowVariant === 'settings'}
                   aria-label={subtitle ? `${titleText} ${subtitle}` : titleText}
                   className={styles.itemButton}
                   data-due-tone={due?.tone}

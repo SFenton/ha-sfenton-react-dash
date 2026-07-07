@@ -4448,6 +4448,7 @@ describe('DashboardViewPage', () => {
     expect(screen.getByRole('heading', { name: 'To-Do' })).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: 'Admin To-Do' })).not.toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: 'Groceries' })).not.toBeInTheDocument()
+    expect(list).toHaveAttribute('data-row-variant', 'settings')
     expect(within(list).getByRole('button', { name: /Review reminders/i })).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: 'Add Task' }))
