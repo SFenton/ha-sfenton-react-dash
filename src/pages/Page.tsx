@@ -10,13 +10,14 @@ interface PageProps {
   title: string
   headerQuickLinks?: ReactNode
   children: ReactNode
+  onBack?: (fallbackPath?: string) => void
   onNavigate?: (path: string) => void
   onProfile?: () => void
   onSettings?: () => void
   scrollLocked?: boolean
 }
 
-export function Page({ activePath, backPath, chromeHidden = false, contentTransitionState = 'idle', title, headerQuickLinks, children, onNavigate, onProfile, onSettings, scrollLocked = false }: PageProps) {
+export function Page({ activePath, backPath, chromeHidden = false, contentTransitionState = 'idle', title, headerQuickLinks, children, onBack, onNavigate, onProfile, onSettings, scrollLocked = false }: PageProps) {
   const actions: AppHeaderAction[] = [
     ...(onSettings ? [{ icon: 'mdi:cog', label: 'Settings', onClick: onSettings }] : []),
     ...(onProfile ? [{ icon: 'mdi:account-circle', label: 'Profile', onClick: onProfile }] : []),
@@ -26,7 +27,7 @@ export function Page({ activePath, backPath, chromeHidden = false, contentTransi
     <main className={styles.page} data-chrome-hidden={chromeHidden ? 'true' : undefined} data-content-transition-state={contentTransitionState === 'idle' ? undefined : contentTransitionState}>
       {!chromeHidden && (
         <div className={styles.headerDock}>
-          <AppHeader activePath={activePath} actions={actions} backPath={backPath} onNavigate={onNavigate} title={title} />
+          <AppHeader activePath={activePath} actions={actions} backPath={backPath} onBack={onBack} onNavigate={onNavigate} title={title} />
           {headerQuickLinks && <div className={styles.headerQuickLinks}>{headerQuickLinks}</div>}
         </div>
       )}

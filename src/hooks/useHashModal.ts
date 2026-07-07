@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { DASHBOARD_ROUTE_CHANGE_EVENT, dashboardEventTargets, dashboardHash, dashboardPathWithSearch, pushDashboardUrl } from './dashboardLocation'
+import { DASHBOARD_ROUTE_CHANGE_EVENT, dashboardEventTargets, dashboardHash, dashboardPathWithSearch, pushDashboardUrl, replaceDashboardUrl } from './dashboardLocation'
 
 interface UseHashModalOptions {
   disabled?: boolean
@@ -43,7 +43,7 @@ export function useHashModal({ disabled = false }: UseHashModalOptions = {}) {
   const closeHash = useCallback(() => {
     if (disabled) return
     const nextUrl = dashboardPathWithSearch()
-    pushDashboardUrl(nextUrl)
+    replaceDashboardUrl(nextUrl)
     setHash('')
   }, [disabled])
 

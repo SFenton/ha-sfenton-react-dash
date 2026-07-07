@@ -16,6 +16,7 @@ interface AppHeaderProps {
   actions?: AppHeaderAction[]
   backLabel?: string
   backPath?: string
+  onBack?: (fallbackPath?: string) => void
   onNavigate?: (path: string) => void
   title: ReactNode
 }
@@ -38,7 +39,7 @@ function MenuIcon() {
   )
 }
 
-export function AppHeader({ activePath, actions = [], backLabel = 'Go back', backPath, onNavigate, title }: AppHeaderProps) {
+export function AppHeader({ activePath, actions = [], backLabel = 'Go back', backPath, onBack, onNavigate, title }: AppHeaderProps) {
   const [sidebarState, setSidebarState] = useState<SidebarState>('closed')
   const [actionsOpen, setActionsOpen] = useState(false)
   const showBack = Boolean(backPath)
@@ -69,6 +70,14 @@ export function AppHeader({ activePath, actions = [], backLabel = 'Go back', bac
 
   const goBack = () => {
     closeMenus()
+    if (onBack) {
+      onBack(backPath)
+      return
+    }
+    if (backPath && onNavigate) {
+      onNavigate(backPath)
+      return
+    }
     window.history.back()
   }
   const sidebar = sidebarMounted ? (

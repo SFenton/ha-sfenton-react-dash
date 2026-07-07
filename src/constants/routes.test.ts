@@ -1,4 +1,4 @@
-import { primaryNavPathForRoute, primaryNavRouteActive, routePathFromUrl, routeUrl } from './routes'
+import { fallbackBackPathForRoute, primaryNavPathForRoute, primaryNavRouteActive, routePathFromUrl, routeUrl } from './routes'
 
 describe('routes', () => {
   it('extracts at-a-glance route paths', () => {
@@ -13,6 +13,7 @@ describe('routes', () => {
     expect(routePathFromUrl('/at-a-glance')).toBe('overview')
     expect(routePathFromUrl('/local/ha-sfenton-react-dash/index.html')).toBe('overview')
   })
+
 
 
   it('extracts wrapper and static app query route paths', () => {
@@ -84,5 +85,17 @@ describe('routes', () => {
     expect(primaryNavPathForRoute('vacation')).toBe('settings')
     expect(primaryNavRouteActive('vacation', 'settings')).toBe(true)
     expect(primaryNavRouteActive('admin', 'overview')).toBe(false)
+  })
+
+  it('returns page-level fallback back paths for secondary routes', () => {
+    expect(fallbackBackPathForRoute('to-do')).toBe('settings')
+    expect(fallbackBackPathForRoute('admin')).toBe('settings')
+    expect(fallbackBackPathForRoute('pantry')).toBe('food')
+    expect(fallbackBackPathForRoute('all-food')).toBe('food')
+    expect(fallbackBackPathForRoute('master-bedroom')).toBe('overview')
+    expect(fallbackBackPathForRoute('food')).toBe('overview')
+    expect(fallbackBackPathForRoute('stephs-chores')).toBe('chores')
+    expect(fallbackBackPathForRoute('settings')).toBeUndefined()
+    expect(fallbackBackPathForRoute('overview')).toBeUndefined()
   })
 })

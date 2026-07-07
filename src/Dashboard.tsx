@@ -34,12 +34,12 @@ const FOOD_SPACE_ROUTE_PATHS = new Set([
   HOME_SPICE_RACK_ROUTE_PATH,
 ])
 
-function pageForPath(path: string, activePath: string, onNavigate: (path: string) => void, transitionState: RouteTransitionState, inventoryControls: EverShelfInventoryControls, loadingPhase?: DashboardPageLoadingPhase, initialContentTransitionState: InitialContentTransitionState = 'idle') {
+function pageForPath(path: string, activePath: string, onNavigate: (path: string) => void, onBack: (fallbackPath?: string) => void, transitionState: RouteTransitionState, inventoryControls: EverShelfInventoryControls, loadingPhase?: DashboardPageLoadingPhase, initialContentTransitionState: InitialContentTransitionState = 'idle') {
   if (path === 'overview') {
     return <AtAGlancePage activePath={activePath} deferRouteContent loadingPhase={loadingPhase} onNavigate={onNavigate} routeTransitionState={transitionState} withShell={false} />
   }
 
-  return <DashboardViewPage activePath={activePath} initialContentTransitionState={initialContentTransitionState} inventoryControls={inventoryControls} loadingPhase={loadingPhase} onNavigate={onNavigate} path={path} withShell={false} />
+  return <DashboardViewPage activePath={activePath} initialContentTransitionState={initialContentTransitionState} inventoryControls={inventoryControls} loadingPhase={loadingPhase} onBack={onBack} onNavigate={onNavigate} path={path} withShell={false} />
 }
 
 function floatingActionForPath(path: string, onNavigate: (path: string) => void, inventoryControls: EverShelfInventoryControls): ReactNode {
@@ -51,7 +51,7 @@ function routeUsesMenuChrome(path: string) {
 }
 
 function Dashboard() {
-  const { path, navigate } = useDashboardRoute()
+  const { path, navigate, navigateBack } = useDashboardRoute()
   const { displayedPath, transitionSourcePath, transitionState } = useSmoothDisplayedRoute(path)
   const leadingChromeTransition = routeUsesMenuChrome(transitionSourcePath) === routeUsesMenuChrome(path) ? 'stable' : 'changing'
   const [preloadReady, setPreloadReady] = useState(initialPreloadCompleted)
@@ -139,7 +139,7 @@ function Dashboard() {
   return (
     <AppShell bottomNav={<BottomNav activePath={path} onNavigate={navigateToPath} />} chromeHidden={Boolean(routeLoadingPhase)} floatingAction={floatingActionForPath(displayedPath, navigateToPath, inventoryControls)}>
       <SmoothRouteOutlet leadingChromeTransition={leadingChromeTransition} routePath={displayedPath} transitionState={transitionState}>
-        {pageForPath(displayedPath, path, navigateToPath, transitionState, inventoryControls, pageLoadingPhase, pageInitialContentTransitionState)}
+        {pageForPath(displayedPath, path, navigateToPath, navigateBack, transitionState, inventoryControls, pageLoadingPhase, pageInitialContentTransitionState)}
       </SmoothRouteOutlet>
       {usesInitialInventoryAppGate && routeLoadingPhase && <DashboardPageLoading className={styles.initialAppLoader} phase={routeLoadingPhase} />}
       {!initialPreloadCompleted && <DashboardPreloadCache active onComplete={handlePreloadComplete} />}

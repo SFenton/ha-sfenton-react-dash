@@ -310,14 +310,11 @@ describe('DashboardViewPage', () => {
 
   it('renders a statically ported room page from React-owned config', () => {
     const navigate = vi.fn()
-    const back = vi.spyOn(window.history, 'back').mockImplementation(() => undefined)
     render(<DashboardViewPage activePath="living-room" onNavigate={navigate} path="living-room" />)
 
     expect(screen.getByRole('heading', { name: 'Living Room' })).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Go back' }))
-    expect(back).toHaveBeenCalled()
-    expect(navigate).not.toHaveBeenCalledWith('overview')
-    back.mockRestore()
+    expect(navigate).toHaveBeenCalledWith('overview')
     expect(screen.queryByRole('heading', { name: 'Room Status' })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Lights/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Window/i })).toBeInTheDocument()
@@ -1379,7 +1376,6 @@ describe('DashboardViewPage', () => {
     mockEntities['input_boolean.guests_staying_in_music_room'].state = 'on'
     mockEntities['input_boolean.guests_staying_in_theater_room'].state = 'off'
     const navigate = vi.fn()
-    const back = vi.spyOn(window.history, 'back').mockImplementation(() => undefined)
 
     render(<DashboardViewPage activePath="settings" onNavigate={navigate} path="guests-staying-over" />)
 
@@ -1398,9 +1394,7 @@ describe('DashboardViewPage', () => {
     expect(scroller).not.toContainElement(guestHeading)
 
     fireEvent.click(screen.getByRole('button', { name: 'Go back' }))
-    expect(back).toHaveBeenCalled()
-    expect(navigate).not.toHaveBeenCalledWith('overview')
-    back.mockRestore()
+    expect(navigate).toHaveBeenCalledWith('settings')
 
     const guestRoom = screen.getByRole('button', { name: /Guest Room Off/i })
     expect(guestRoom).toHaveAttribute('aria-pressed', 'false')

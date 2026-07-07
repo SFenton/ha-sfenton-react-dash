@@ -49,7 +49,7 @@ import {
   OCCUPANCY_GROUPS,
   type EntityGroupConfig,
 } from '../constants/atAGlance'
-import { DASHBOARD_ROUTES, HOME_ALL_FOOD_ROUTE_PATH, HOME_CABINET_ROUTE_PATH, HOME_FOOD_ROUTE_PATH, HOME_FREEZER_ROUTE_PATH, HOME_FRIDGE_ROUTE_PATH, HOME_GROCERY_LIST_ROUTE_PATH, HOME_PANTRY_ROUTE_PATH, HOME_SPICE_RACK_ROUTE_PATH, PRIMARY_NAV_ROUTES } from '../constants/routes'
+import { DASHBOARD_ROUTES, HOME_ALL_FOOD_ROUTE_PATH, HOME_CABINET_ROUTE_PATH, HOME_FOOD_ROUTE_PATH, HOME_FREEZER_ROUTE_PATH, HOME_FRIDGE_ROUTE_PATH, HOME_GROCERY_LIST_ROUTE_PATH, HOME_PANTRY_ROUTE_PATH, HOME_SPICE_RACK_ROUTE_PATH, fallbackBackPathForRoute } from '../constants/routes'
 import {
   ADMIN_AUTO_REENABLE_ITEMS,
   CHORE_QUICK_LINKS,
@@ -102,6 +102,7 @@ import styles from './DashboardViewPage.module.css'
 interface DashboardViewPageProps {
   activePath: string
   onNavigate: (path: string) => void
+  onBack?: (fallbackPath?: string) => void
   initialContentTransitionState?: 'entering' | 'idle' | 'pre-entering'
   inventoryControls?: EverShelfInventoryControls
   loadingPhase?: DashboardPageLoadingPhase
@@ -1312,10 +1313,10 @@ function VacuumPage({ preload = false }: { preload?: boolean }) {
   )
 }
 
-function SecurityPage({ activePath, backPath, contentTransitionState = 'idle', loadingPhase, onNavigate, preload = false, preloadHash, preloadHashes, title }: { activePath: string; backPath?: string; contentTransitionState?: 'entering' | 'idle' | 'pre-entering'; loadingPhase?: DashboardPageLoadingPhase; onNavigate: (path: string) => void; preload?: boolean; preloadHash?: string; preloadHashes?: string[]; title: string }) {
+function SecurityPage({ activePath, backPath, contentTransitionState = 'idle', loadingPhase, onBack, onNavigate, preload = false, preloadHash, preloadHashes, title }: { activePath: string; backPath?: string; contentTransitionState?: 'entering' | 'idle' | 'pre-entering'; loadingPhase?: DashboardPageLoadingPhase; onBack?: (fallbackPath?: string) => void; onNavigate: (path: string) => void; preload?: boolean; preloadHash?: string; preloadHashes?: string[]; title: string }) {
   const { closeHash, hash, openHash } = useHashModal({ disabled: preload })
   return (
-    <Page activePath={activePath} backPath={backPath} chromeHidden={Boolean(loadingPhase)} contentTransitionState={contentTransitionState} headerQuickLinks={<SecurityStatusRail onOpenHash={openHash} />} onNavigate={onNavigate} title={title}>
+    <Page activePath={activePath} backPath={backPath} chromeHidden={Boolean(loadingPhase)} contentTransitionState={contentTransitionState} headerQuickLinks={<SecurityStatusRail onOpenHash={openHash} />} onBack={onBack} onNavigate={onNavigate} title={title}>
       {loadingPhase ? <DashboardPageLoading phase={loadingPhase} /> : <SecurityDashboard closeHash={closeHash} hash={hash} onOpenHash={openHash} preload={preload} preloadHash={preloadHash} preloadHashes={preloadHashes} />}
     </Page>
   )
@@ -5036,11 +5037,11 @@ function Content({ inventoryControls, onNavigate, onScrollLockChange, path, prel
   return <FallbackPage title={routeTitle(path)} />
 }
 
-export function DashboardViewPage({ activePath, initialContentTransitionState = 'idle', inventoryControls: providedInventoryControls, loadingPhase, onNavigate, path, preload = false, preloadHash, preloadHashes, withShell = true }: DashboardViewPageProps) {
+export function DashboardViewPage({ activePath, initialContentTransitionState = 'idle', inventoryControls: providedInventoryControls, loadingPhase, onBack, onNavigate, path, preload = false, preloadHash, preloadHashes, withShell = true }: DashboardViewPageProps) {
   const roomTitle = dashboardRoomNameFromPath(path)
   const todoConfig = TODO_PAGES[todoPageConfigPath(path)]
   const title = path === 'guests-staying-over' ? 'Guest Controls' : roomTitle ?? todoConfig?.title ?? CONTROL_PAGES[path]?.title ?? routeTitle(path)
-  const showBack = !PRIMARY_NAV_ROUTES.some((route) => route.path === path)
+  const backPath = fallbackBackPathForRoute(path)
   const [pageScrollLock, setPageScrollLock] = useState<{ locked: boolean; path: string }>({ locked: false, path })
   const pageScrollLocked = pageScrollLock.path === path && pageScrollLock.locked
   const fallbackInventoryControls = useEverShelfInventoryControls(path)
@@ -5050,9 +5051,9 @@ export function DashboardViewPage({ activePath, initialContentTransitionState = 
   }, [path])
 
   const page = path === 'security' ? (
-    <SecurityPage activePath={activePath} backPath={showBack ? 'overview' : undefined} contentTransitionState={loadingPhase ? 'idle' : initialContentTransitionState} loadingPhase={loadingPhase} onNavigate={onNavigate} preload={preload} preloadHash={preloadHash} preloadHashes={preloadHashes} title={title} />
+    <SecurityPage activePath={activePath} backPath={backPath} contentTransitionState={loadingPhase ? 'idle' : initialContentTransitionState} loadingPhase={loadingPhase} onBack={onBack} onNavigate={onNavigate} preload={preload} preloadHash={preloadHash} preloadHashes={preloadHashes} title={title} />
   ) : (
-    <Page activePath={activePath} backPath={showBack ? 'overview' : undefined} chromeHidden={Boolean(loadingPhase)} contentTransitionState={loadingPhase ? 'idle' : initialContentTransitionState} headerQuickLinks={roomTitle ? <RoomSectionRail path={path} title={roomTitle} /> : undefined} onNavigate={onNavigate} scrollLocked={pageScrollLocked} title={title}>
+    <Page activePath={activePath} backPath={backPath} chromeHidden={Boolean(loadingPhase)} contentTransitionState={loadingPhase ? 'idle' : initialContentTransitionState} headerQuickLinks={roomTitle ? <RoomSectionRail path={path} title={roomTitle} /> : undefined} onBack={onBack} onNavigate={onNavigate} scrollLocked={pageScrollLocked} title={title}>
       {loadingPhase ? <DashboardPageLoading phase={loadingPhase} /> : <Content inventoryControls={inventoryControls} onNavigate={onNavigate} onScrollLockChange={handlePageScrollLockChange} path={path} preload={preload} preloadHash={preloadHash} preloadHashes={preloadHashes} />}
     </Page>
   )

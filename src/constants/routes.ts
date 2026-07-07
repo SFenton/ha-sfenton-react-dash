@@ -96,6 +96,15 @@ const HOME_SUB_ROUTE_PATHS = new Set([
   'vacuums',
 ])
 
+const HOME_FOOD_DETAIL_ROUTE_PATHS = new Set([
+  HOME_ALL_FOOD_ROUTE_PATH,
+  HOME_PANTRY_ROUTE_PATH,
+  HOME_FRIDGE_ROUTE_PATH,
+  HOME_FREEZER_ROUTE_PATH,
+  HOME_SPICE_RACK_ROUTE_PATH,
+  HOME_CABINET_ROUTE_PATH,
+])
+
 const SETTINGS_SUB_ROUTE_PATHS = new Set([
   'admin',
   'guests-staying-over',
@@ -104,12 +113,29 @@ const SETTINGS_SUB_ROUTE_PATHS = new Set([
   'vacation',
 ])
 
+const CHORES_SUB_ROUTE_PATHS = new Set([
+  'groceries',
+  'stephens-chores',
+  'stephs-chores',
+  'unassigned-chores',
+  'home-improvement-chores',
+])
+
 export function primaryNavPathForRoute(path: string | undefined) {
   if (!path) return 'overview'
   if (HOME_SUB_ROUTE_PATHS.has(path)) return 'overview'
   if (path === 'groceries' || path.endsWith('-chores')) return 'chores'
   if (SETTINGS_SUB_ROUTE_PATHS.has(path)) return 'settings'
   return path
+}
+
+export function fallbackBackPathForRoute(path: string | undefined) {
+  if (!path) return undefined
+  if (HOME_FOOD_DETAIL_ROUTE_PATHS.has(path)) return HOME_FOOD_ROUTE_PATH
+  if (HOME_SUB_ROUTE_PATHS.has(path)) return 'overview'
+  if (CHORES_SUB_ROUTE_PATHS.has(path)) return 'chores'
+  if (SETTINGS_SUB_ROUTE_PATHS.has(path)) return 'settings'
+  return undefined
 }
 
 export function primaryNavRouteActive(activePath: string | undefined, routePath: string) {
