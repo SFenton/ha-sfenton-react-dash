@@ -573,6 +573,7 @@ export const mockEntities: Record<string, MockEntity> = {
   'binary_sensor.dishwasher_remote_start': entity('binary_sensor.dishwasher_remote_start', 'off'),
   'button.dishwasher_resume_program': entity('button.dishwasher_resume_program', 'unavailable'),
   'button.dishwasher_stop_program': entity('button.dishwasher_stop_program', 'unknown'),
+  'input_boolean.dishwasher_clean_unopened': entity('input_boolean.dishwasher_clean_unopened', 'off'),
   'input_button.start_dishwasher': entity('input_button.start_dishwasher', '2026-01-07T18:54:25.606577+00:00'),
   'select.dishwasher_active_program': entity('select.dishwasher_active_program', 'unknown'),
   'select.dishwasher_selected_program': entity('select.dishwasher_selected_program', 'Eco 50', { options: ['Eco 50', 'Glass 40'] }),

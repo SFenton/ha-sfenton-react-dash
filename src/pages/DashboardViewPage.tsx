@@ -154,6 +154,7 @@ const ROOM_SOURCE_SECURITY_SIZED_MODAL_STYLE: ModalSheetStyle = {
 
 const DISHWASHER_ENTITY_IDS = {
   activeProgram: 'select.dishwasher_active_program',
+  cleanUnopened: 'input_boolean.dishwasher_clean_unopened',
   connectivity: 'binary_sensor.dishwasher_connectivity',
   door: 'sensor.dishwasher_door',
   halfLoad: 'switch.dishwasher_half_load',
@@ -457,13 +458,18 @@ function dishwasherProgressFillPercentForState(operationState: string | null | u
   return dishwasherProgressPercent(progressEntity)
 }
 
-function formatDishwasherSummary(operationEntity: HassEntity | null | undefined, progressEntity: HassEntity | null | undefined) {
-  return formatDishwasherSummaryForState(operationEntity?.state, progressEntity)
+function dishwasherCleanUnopened(entity: HassEntity | null | undefined) {
+  return entity?.state === 'on'
 }
 
-function formatDishwasherSummaryForState(operationState: string | null | undefined, progressEntity: HassEntity | null | undefined) {
+function formatDishwasherSummary(operationEntity: HassEntity | null | undefined, progressEntity: HassEntity | null | undefined, cleanUnopenedEntity?: HassEntity | null | undefined) {
+  return formatDishwasherSummaryForState(operationEntity?.state, progressEntity, dishwasherCleanUnopened(cleanUnopenedEntity))
+}
+
+function formatDishwasherSummaryForState(operationState: string | null | undefined, progressEntity: HassEntity | null | undefined, cleanUnopened = false) {
   const operation = formatDishwasherOperationState(operationState)
   const progress = dishwasherProgressFillPercentForState(operationState, progressEntity)
+  if (progress === undefined && cleanUnopened && operation !== 'Clean' && operation !== 'Unavailable') return `${operation} • Clean`
   return progress === undefined ? operation : `${operation} • ${Math.round(progress)}%`
 }
 
@@ -709,6 +715,7 @@ function RoomSourceCard(props: RoomSourceCardProps) {
 }
 
 function DishwasherRoomSourceCard({ card, onOpen }: RoomSourceCardProps) {
+  const cleanUnopened = useEntity(asEntityName(DISHWASHER_ENTITY_IDS.cleanUnopened), { returnNullIfNotFound: true })
   const selectedProgram = useEntity(asEntityName(DISHWASHER_ENTITY_IDS.selectedProgram), { returnNullIfNotFound: true })
   const operation = useEntity(asEntityName(DISHWASHER_ENTITY_IDS.operation), { returnNullIfNotFound: true })
   const progress = useEntity(asEntityName(DISHWASHER_ENTITY_IDS.progress), { returnNullIfNotFound: true })
@@ -722,7 +729,7 @@ function DishwasherRoomSourceCard({ card, onOpen }: RoomSourceCardProps) {
       onClick={handleClick}
       progress={dishwasherProgressFillPercent(operation, progress)}
       progressColor={DISHWASHER_PROGRESS_COLOR}
-      subtitle={formatDishwasherSummary(operation, progress)}
+      subtitle={formatDishwasherSummary(operation, progress, cleanUnopened)}
       title={card.title}
       tone="neutral"
     />
@@ -2232,6 +2239,7 @@ function DishwasherModalContent() {
         <SectionHeader title="Status" />
         <div className={styles.dishwasherStatusPanel}>
           <DishwasherStatusChip entityId={DISHWASHER_ENTITY_IDS.operation} formatter={formatDishwasherOperation} title="Operation" valueOverride={formatDishwasherOperationState(displayOperationState)} />
+          <DishwasherStatusChip entityId={DISHWASHER_ENTITY_IDS.cleanUnopened} formatter={(entity) => formatDishwasherBinaryStatus(entity, 'Clean', 'Cleared')} title="Clean Unopened" />
           <DishwasherStatusChip entityId={DISHWASHER_ENTITY_IDS.progress} formatter={formatDishwasherProgressStatus} title="Progress" />
           <DishwasherStatusChip entityId={DISHWASHER_ENTITY_IDS.activeProgram} formatter={(entity) => formatDishwasherProgram(entity?.state)} title="Active Program" />
           <DishwasherStatusChip entityId={DISHWASHER_ENTITY_IDS.door} formatter={formatDishwasherEnumState} title="Door" />

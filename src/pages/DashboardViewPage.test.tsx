@@ -3209,6 +3209,22 @@ describe('DashboardViewPage', () => {
     expect(within(dialog).queryByRole('button', { name: 'Start Dishwasher' })).not.toBeInTheDocument()
   })
 
+  it('flags the Kitchen dishwasher card as clean until the door opens', async () => {
+    mockEntities['input_boolean.dishwasher_clean_unopened'].state = 'on'
+    mockEntities['sensor.dishwasher_operation_state'].state = 'ready'
+    mockEntities['switch.dishwasher_power'].state = 'off'
+
+    render(<DashboardViewPage activePath="kitchen" onNavigate={() => undefined} path="kitchen" />)
+
+    const dishwasher = screen.getByRole('button', { name: 'Dishwasher Not Running • Clean' })
+    expect(dishwasher).toBeInTheDocument()
+
+    fireEvent.click(dishwasher)
+    const dialog = await screen.findByRole('dialog')
+    expect(within(dialog).getByRole('group', { name: 'Operation Not Running' })).toBeInTheDocument()
+    expect(within(dialog).getByRole('group', { name: 'Clean Unopened Clean' })).toBeInTheDocument()
+  })
+
   it('fills the Kitchen dishwasher button from live progress and exposes dishwasher controls', async () => {
     mockEntities['sensor.dishwasher_operation_state'].state = 'run'
     mockEntities['sensor.dishwasher_program_progress'].state = '97'
