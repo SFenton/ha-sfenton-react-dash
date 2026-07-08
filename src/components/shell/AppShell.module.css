@@ -8,6 +8,7 @@
   --floating-action-size: 56px;
   --floating-action-gap: 4px;
   --floating-action-content-gap: 20px;
+  --page-scroll-bottom-inset: calc(var(--bottom-nav-height) + env(safe-area-inset-bottom, 0px));
   --page-bottom-extra-padding: 22px;
 }
 
