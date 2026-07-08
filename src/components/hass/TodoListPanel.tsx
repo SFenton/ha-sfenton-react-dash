@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useEntity, useHass } from '@hakit/core'
 import { CheckboxRow } from '../core/CheckboxRow'
+import { useTodoOptimisticStatuses, type TodoOptimisticStatuses } from '../../hooks/useTodoOptimisticStatuses'
 import { asEntityName } from './entityState'
 import styles from './TodoListPanel.module.css'
 
@@ -18,6 +19,7 @@ interface TodoListPanelProps {
   entityId: string
   hideCompleted?: boolean
   onVisibleItemsChange?: (count: number) => void
+  optimisticStatuses?: TodoOptimisticStatuses
   rowVariant?: 'settings'
   title: string
 }
@@ -84,15 +86,34 @@ function sortByDueDate(items: TodoItem[]) {
   })
 }
 
-export function TodoListPanel({ entityId, hideCompleted = true, onVisibleItemsChange, rowVariant, title }: TodoListPanelProps) {
+function applyPendingTodoStatuses(items: TodoItem[], pendingStatuses: TodoOptimisticStatuses['pendingStatuses']) {
+  return items.map((item) => {
+    const identity = todoIdentity(item)
+    const pendingStatus = identity ? pendingStatuses[identity]?.status : undefined
+    return pendingStatus ? { ...item, status: pendingStatus } : item
+  })
+}
+
+export function TodoListPanel({ entityId, hideCompleted = true, onVisibleItemsChange, optimisticStatuses, rowVariant, title }: TodoListPanelProps) {
   const entity = useEntity(asEntityName(entityId), { returnNullIfNotFound: true })
   const connection = useHass((state) => state.connection) as unknown as HassConnection | undefined
   const callService = useHass((state) => state.helpers.callService) as unknown as CallService
   const [items, setItems] = useState<TodoItem[] | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const mountedRef = useRef(false)
+  const internalOptimisticStatuses = useTodoOptimisticStatuses()
+  const todoOptimisticStatuses = optimisticStatuses ?? internalOptimisticStatuses
+  const { clearStatus, commitStatus, confirmStatuses, pendingStatuses } = todoOptimisticStatuses
   const entityState = entity?.state
   const entityLastChanged = (entity as { last_changed?: string } | null)?.last_changed
   const entityLastUpdated = (entity as { last_updated?: string } | null)?.last_updated
+
+  useEffect(() => {
+    mountedRef.current = true
+    return () => {
+      mountedRef.current = false
+    }
+  }, [])
 
   useEffect(() => {
     let cancelled = false
@@ -118,8 +139,15 @@ export function TodoListPanel({ entityId, hideCompleted = true, onVisibleItemsCh
     }
   }, [connection, entityId, entityLastChanged, entityLastUpdated, entityState])
 
-  const loadedItems = items ?? []
-  const visibleItems = hideCompleted ? loadedItems.filter((item) => item.status !== 'completed') : loadedItems
+  useEffect(() => {
+    if (!items) return
+    const timer = window.setTimeout(() => confirmStatuses(items), 0)
+    return () => window.clearTimeout(timer)
+  }, [confirmStatuses, items])
+
+  const loadedItems = useMemo(() => items ?? [], [items])
+  const displayedItems = useMemo(() => applyPendingTodoStatuses(loadedItems, pendingStatuses), [loadedItems, pendingStatuses])
+  const visibleItems = hideCompleted ? displayedItems.filter((item) => item.status !== 'completed') : displayedItems
 
   useEffect(() => {
     if (!items || error) return
@@ -130,7 +158,7 @@ export function TodoListPanel({ entityId, hideCompleted = true, onVisibleItemsCh
     const identity = todoIdentity(item)
     if (!identity || !connection?.sendMessagePromise) return
     const nextStatus = item.status === 'completed' ? 'needs_action' : 'completed'
-    setItems((current) => (current ?? []).map((currentItem) => (todoIdentity(currentItem) === identity ? { ...currentItem, status: nextStatus } : currentItem)))
+    const requestId = commitStatus(identity, nextStatus)
     void Promise.resolve(
       callService({
         domain: 'todo',
@@ -139,10 +167,12 @@ export function TodoListPanel({ entityId, hideCompleted = true, onVisibleItemsCh
         serviceData: { item: identity, status: nextStatus },
       }),
     )
-      .then(() => setError(null))
+      .then(() => {
+        if (mountedRef.current) setError(null)
+      })
       .catch((caughtError: unknown) => {
-        setItems((current) => (current ?? []).map((currentItem) => (todoIdentity(currentItem) === identity ? { ...currentItem, status: item.status } : currentItem)))
-        setError(caughtError instanceof Error ? caughtError.message : 'Unable to update task')
+        clearStatus(identity, requestId)
+        if (mountedRef.current) setError(caughtError instanceof Error ? caughtError.message : 'Unable to update task')
       })
   }
 

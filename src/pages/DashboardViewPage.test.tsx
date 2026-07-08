@@ -4230,6 +4230,43 @@ describe('DashboardViewPage', () => {
     expect(within(screen.getByLabelText('Evening Tasks todo list')).getByText('Second visible task')).toBeInTheDocument()
   })
 
+  it('keeps recently checked chore rows hidden through stale DoneTick refreshes across sections', async () => {
+    mockTodoItemsByEntity['todo.stephen_s_past_due_with_unassigned'] = [
+      { uid: 'stale-past-due', summary: 'Stale past due task', status: 'needs_action' },
+    ]
+    mockTodoItemsByEntity['todo.stephen_s_evening_with_unassigned'] = [
+      { uid: 'stale-evening', summary: 'Stale evening task', status: 'needs_action' },
+    ]
+    const view = render(<DashboardViewPage activePath="chores" onNavigate={() => undefined} path="chores" />)
+
+    const pastDueList = await screen.findByLabelText('Past Due todo list')
+    const eveningList = await screen.findByLabelText('Evening Tasks todo list')
+    act(() => {
+      fireEvent.click(within(pastDueList).getByRole('button', { name: /Stale past due task/i }))
+      fireEvent.click(within(eveningList).getByRole('button', { name: /Stale evening task/i }))
+    })
+
+    expect(screen.queryByRole('button', { name: /Stale past due task/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Stale evening task/i })).not.toBeInTheDocument()
+
+    mockTodoItemsByEntity['todo.stephen_s_past_due_with_unassigned'] = [
+      { uid: 'stale-past-due', summary: 'Stale past due task', status: 'needs_action' },
+      { uid: 'fresh-past-due', summary: 'Fresh past due task', status: 'needs_action' },
+    ]
+    mockTodoItemsByEntity['todo.stephen_s_evening_with_unassigned'] = [
+      { uid: 'stale-evening', summary: 'Stale evening task', status: 'needs_action' },
+      { uid: 'fresh-evening', summary: 'Fresh evening task', status: 'needs_action' },
+    ]
+    Object.assign(mockEntities['todo.stephen_s_past_due_with_unassigned'], { last_updated: '2026-07-07T23:59:00.000Z', state: '2' })
+    Object.assign(mockEntities['todo.stephen_s_evening_with_unassigned'], { last_updated: '2026-07-07T23:59:01.000Z', state: '2' })
+    view.rerender(<DashboardViewPage activePath="chores" onNavigate={() => undefined} path="chores" />)
+
+    expect(await screen.findByRole('button', { name: /Fresh past due task/i })).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: /Fresh evening task/i })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Stale past due task/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Stale evening task/i })).not.toBeInTheDocument()
+  })
+
   it('does not render chore sections whose loaded todo list has no visible tasks', async () => {
     mockTodoItemsByEntity['todo.stephen_s_evening_with_unassigned'] = []
     mockEntities['todo.stephen_s_evening_with_unassigned'].state = '1'

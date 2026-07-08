@@ -42,6 +42,7 @@ import { DASHBOARD_ROUTE_CHANGE_EVENT, dashboardEventTargets, dashboardHash, das
 import { useHashModal } from '../hooks/useHashModal'
 import { useOptimisticState } from '../hooks/useOptimisticState'
 import { useImmediateVisualTab, useSmoothDisplayedModalTab } from '../hooks/useSmoothDisplayedModalTab'
+import { useTodoOptimisticStatuses } from '../hooks/useTodoOptimisticStatuses'
 import {
   CLIMATE_GROUPS,
   CONTACT_GROUPS,
@@ -1064,6 +1065,7 @@ function todoEntityMayHaveItems(entity: EntityActionStateMap[string] & { state?:
 function TodoSection({ entityVersion, hideListHeader = false, hideWhenEmpty, list, mayHaveItems, onSectionStateChange, rowVariant }: { entityVersion: string; hideListHeader?: boolean; hideWhenEmpty: boolean | undefined; list: TodoListConfig; mayHaveItems: boolean; onSectionStateChange?: (entityId: string, state: { loaded: boolean; visible: boolean }) => void; rowVariant?: 'settings' }) {
   const [visibleItemCount, setVisibleItemCount] = useState<number | null>(hideWhenEmpty && !mayHaveItems ? 0 : null)
   const sectionVisible = !(hideWhenEmpty && visibleItemCount === 0)
+  const todoOptimisticStatuses = useTodoOptimisticStatuses()
 
   useEffect(() => {
     if (!hideWhenEmpty || !mayHaveItems) return
@@ -1079,7 +1081,7 @@ function TodoSection({ entityVersion, hideListHeader = false, hideWhenEmpty, lis
   return (
     <section className={styles.section}>
       {!hideListHeader && <SectionHeader title={list.title} />}
-      <TodoListPanel entityId={list.entityId} hideCompleted={list.hideCompleted} onVisibleItemsChange={hideWhenEmpty ? setVisibleItemCount : undefined} rowVariant={rowVariant} title={list.title} />
+      <TodoListPanel entityId={list.entityId} hideCompleted={list.hideCompleted} onVisibleItemsChange={hideWhenEmpty ? setVisibleItemCount : undefined} optimisticStatuses={todoOptimisticStatuses} rowVariant={rowVariant} title={list.title} />
     </section>
   )
 }
