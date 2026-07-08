@@ -8,7 +8,7 @@ import { ModalSheet } from '../core/ModalSheet'
 import { type VacuumAutoCleanDisabledRoomConfig, type VacuumConfig, type VacuumConsumableConfig, type VacuumZoneConfig } from '../../constants/portedDashboard'
 import { DASHBOARD_ROUTE_CHANGE_EVENT, dashboardEventTargets, dashboardHash, dashboardPathWithSearch, replaceDashboardUrl } from '../../hooks/dashboardLocation'
 import { useImmediateVisualTab, useSmoothDisplayedModalTab } from '../../hooks/useSmoothDisplayedModalTab'
-import { useOptimisticState } from '../../hooks/useOptimisticState'
+import { useOptimisticState, type OptimisticCommitOptions } from '../../hooks/useOptimisticState'
 import { asEntityName, titleCaseState } from './entityState'
 import { ValetudoMapCard } from './ValetudoMapCard'
 import { VACUUM_MODAL_STYLE } from './vacuumModalStyle'
@@ -30,6 +30,7 @@ const MODE_DESCRIPTION = 'Choose whether the robot vacuums, mops, or combines bo
 const FAN_DESCRIPTION = 'Adjust suction strength for carpets, hard floors, and quieter cleaning.'
 const WATER_DESCRIPTION = 'Set mop water flow so floors get the right amount of moisture.'
 const VACUUM_OPTIMISTIC_REVERT_MS = 8000
+const VACUUM_CLEAN_START_REVERT_MS = 30000
 const VACUUM_CLEAN_SETTLE_QUIET_MS = 650
 
 type CallService = (params: Record<string, unknown>) => void
@@ -46,7 +47,7 @@ interface VacuumCardProps {
 }
 
 interface OptimisticVacuumState {
-  commitState: (nextState: string) => void
+  commitState: (nextState: string, options?: OptimisticCommitOptions) => void
   liveState: string
   state: string
 }
@@ -143,7 +144,7 @@ function nowMs() {
   return typeof window === 'undefined' ? Date.now() : window.performance.now()
 }
 
-function useVacuumCommandCoordinator(liveState: string, commitDisplayState: (nextState: string) => void): VacuumCommandCoordinator {
+function useVacuumCommandCoordinator(liveState: string, commitDisplayState: (nextState: string, options?: OptimisticCommitOptions) => void): VacuumCommandCoordinator {
   const callService = useHass((state) => state.helpers.callService) as unknown as CallService
   const [pendingIntents, setPendingIntents] = useState<Record<string, VacuumPendingIntent>>({})
   const [lastIntentAt, setLastIntentAt] = useState(Number.NEGATIVE_INFINITY)
@@ -179,7 +180,7 @@ function useVacuumCommandCoordinator(liveState: string, commitDisplayState: (nex
 
   const requestClean = useCallback(
     (action: string) => {
-      commitDisplayState('cleaning')
+      commitDisplayState('cleaning', { revertMs: VACUUM_CLEAN_START_REVERT_MS })
       setCleanStartPending(true)
       if (settingsSettled) {
         callServiceAction(callService, action)
@@ -234,7 +235,7 @@ function useVacuumCommandCoordinator(liveState: string, commitDisplayState: (nex
     const timeout = window.setTimeout(() => {
       setCleanStartPending(false)
       setQueuedCleanAction(null)
-    }, VACUUM_OPTIMISTIC_REVERT_MS)
+    }, VACUUM_CLEAN_START_REVERT_MS)
     return () => window.clearTimeout(timeout)
   }, [cleanStartPending, cleanStartRevision, liveState])
 

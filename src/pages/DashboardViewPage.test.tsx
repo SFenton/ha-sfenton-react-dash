@@ -4602,6 +4602,47 @@ describe('DashboardViewPage', () => {
     expect(within(controlsPane).getByRole('button', { name: 'Stop' })).toBeEnabled()
   })
 
+  it('keeps manual vacuum starts locked past the generic optimistic timeout', async () => {
+    const { rerender } = render(<DashboardViewPage activePath="theater-room" onNavigate={() => undefined} path="theater-room" />)
+
+    fireEvent.click(screen.getByRole('button', { name: /Theater Room Docked/i }))
+
+    const dialog = await screen.findByRole('dialog')
+    const controlsPane = within(dialog).getByRole('group', { name: 'Theater Room controls, actions, info' })
+    vi.useFakeTimers()
+    try {
+      fireEvent.click(screen.getByRole('button', { name: 'Clean' }))
+
+      expect(mockEntities['vacuum.valetudo_politefatherlykingfisher'].state).toBe('docked')
+      expect(within(controlsPane).getByRole('heading', { name: 'Cleaning' })).toBeInTheDocument()
+      expect(within(controlsPane).queryByRole('button', { name: 'Clean' })).not.toBeInTheDocument()
+      expect(within(controlsPane).getByRole('button', { name: 'Pause' })).toBeDisabled()
+      expect(within(controlsPane).getByRole('button', { name: 'Stop' })).toBeDisabled()
+
+      act(() => {
+        vi.advanceTimersByTime(8001)
+      })
+
+      expect(mockEntities['vacuum.valetudo_politefatherlykingfisher'].state).toBe('docked')
+      expect(within(controlsPane).getByRole('heading', { name: 'Cleaning' })).toBeInTheDocument()
+      expect(within(controlsPane).queryByRole('button', { name: 'Clean' })).not.toBeInTheDocument()
+      expect(within(controlsPane).getByRole('button', { name: 'Pause' })).toBeDisabled()
+      expect(within(controlsPane).getByRole('button', { name: 'Stop' })).toBeDisabled()
+
+      mockEntities['vacuum.valetudo_politefatherlykingfisher'].state = 'cleaning'
+      rerender(<DashboardViewPage activePath="theater-room" onNavigate={() => undefined} path="theater-room" />)
+      act(() => {
+        vi.advanceTimersByTime(0)
+      })
+
+      expect(within(controlsPane).getByRole('button', { name: 'Pause' })).toBeEnabled()
+      expect(within(controlsPane).getByRole('button', { name: 'Stop' })).toBeEnabled()
+    } finally {
+      vi.clearAllTimers()
+      vi.useRealTimers()
+    }
+  })
+
   it('does not steal focus from a vacuum dropdown reopened immediately after changing', async () => {
     render(<DashboardViewPage activePath="living-room" onNavigate={() => undefined} path="living-room" />)
 
