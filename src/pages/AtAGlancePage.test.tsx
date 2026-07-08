@@ -352,10 +352,10 @@ describe('AtAGlancePage', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Open navigation menu' }))
     expect(screen.getByText('Navigation')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Close navigation menu' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Close navigation menu' })).not.toBeInTheDocument()
     const sidebar = screen.getByLabelText('Navigation menu')
     expect(sidebar).toHaveAttribute('data-state', 'open')
-    fireEvent.click(screen.getByRole('button', { name: 'Close navigation menu' }))
+    fireEvent.click(sidebar.parentElement!)
     expect(sidebar).toHaveAttribute('data-state', 'closed')
 
     fireEvent.click(screen.getByRole('button', { name: 'Open navigation menu' }))

@@ -92,9 +92,6 @@ export function AppHeader({ activePath, actions = [], backLabel = 'Go back', bac
       <aside aria-label="Navigation menu" className={styles.sidebar} data-state={sidebarDataState} onClick={(event) => event.stopPropagation()}>
         <div className={styles.sidebarHeader}>
           <span>Navigation</span>
-          <button aria-label="Close navigation menu" className={styles.iconButton} onClick={closeMenus} type="button">
-            <MaterialIcon name="mdi:close" size={26} />
-          </button>
         </div>
         <nav className={styles.sidebarNav} role="menu">
           {PRIMARY_NAV_ROUTES.map((route) => {
