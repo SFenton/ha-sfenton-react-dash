@@ -6,11 +6,13 @@ import { Description } from '../core/Description'
 import { GlassTile } from '../core/GlassTile'
 import { MaterialIcon } from '../core/Icon'
 import { SectionHeader } from '../core/SectionHeader'
-import { GUEST_CONTROLS_DESCRIPTION, GUEST_CONTROL_ITEMS, SECURITY_COLOR, SWITCH_ACTIVE_COLOR, VACUUM_COLOR } from '../../constants/portedDashboard'
+import { GUEST_CONTROLS_DESCRIPTION, GUEST_CONTROL_ITEMS, SECURITY_COLOR, SWITCH_ACTIVE_COLOR } from '../../constants/portedDashboard'
 import { SECURITY_CONTROL_TILES } from '../../constants/securityPage'
+import { VACUUM_AUTO_CLEAN_CONTROLS } from '../../constants/vacuumAutoClean'
 import { useOptimisticState } from '../../hooks/useOptimisticState'
 import { asEntityName, formatCompactEntityState, titleCaseState } from './entityState'
 import { SecurityControls, type SecurityControlsProps } from './SecurityControls'
+import { VacuumAutoCleanControlCard } from './VacuumAutoCleanControls'
 import styles from './GuestPresenceSecurity.module.css'
 
 export const GUEST_PRESENCE_SECURITY_HASH = '#guest-presence-security'
@@ -24,7 +26,6 @@ const CONTROL_REVERT_MS = 8000
 const ECO_BEHAVIOR_ENTITY_ID = 'select.thermostat_contact_sensors_eco_behavior_when_away'
 const ECO_ENFORCE_HOME_OPTION = 'Disable Eco When Away'
 const ECO_ALLOW_AWAY_OPTION = 'Use Eco Away Targets'
-const MAIN_FLOOR_VACUUM_PAUSE_ENTITY_ID = 'switch.main_floor_vacuum_coordinator_pause'
 const GARAGE_DOORS_DESCRIPTION = 'The away routine normally closes both garage doors when residents leave. Check them here because guest mode skips that automatic close.'
 const FRONT_DOOR_DESCRIPTION = 'The away routine normally locks the front door, and auto-lock is also paused while guests are present. Use this if you still want the door secured.'
 const SECURITY_SYSTEM_DESCRIPTION = 'The away routine normally arms the security system to Away. Guest mode leaves arming to you so guests are not surprised by the alarm.'
@@ -65,12 +66,6 @@ const frontDoorControl = SECURITY_CONTROL_TILES.find((item) => item.tone === 'lo
 const towelRackControls = [
   { title: 'Guest Bathroom', entityId: 'switch.guest_bathroom_towel_rack_switch_top', icon: 'mdi:radiator' },
   { title: 'Master Bathroom', entityId: 'switch.master_bathroom_towel_rack_switch_top', icon: 'mdi:radiator' },
-]
-
-const vacuumAutoCleanControls = [
-  { title: 'Main Floor', entityId: MAIN_FLOOR_VACUUM_PAUSE_ENTITY_ID, icon: 'mdi:robot-vacuum' },
-  { title: 'Music Room', entityId: 'automation.automatically_vacuum_or_mop_music_room', icon: 'mdi:robot-vacuum' },
-  { title: 'Theater Room', entityId: 'automation.automatically_vacuum_theater_room_on_schedule', icon: 'mdi:robot-vacuum' },
 ]
 
 function isUnavailableState(state: string | undefined) {
@@ -193,36 +188,6 @@ function FrontDoorLockCard() {
   )
 }
 
-function VacuumAutoCleanCard({ entityId, icon, title }: { entityId: string; icon: string; title: string }) {
-  if (entityId === MAIN_FLOOR_VACUUM_PAUSE_ENTITY_ID) {
-    return (
-      <GuestServiceCard
-        activeStates={['off']}
-        color={VACUUM_COLOR}
-        entityId={entityId}
-        icon={icon}
-        nextStateForState={(state) => (state === 'on' ? 'off' : 'on')}
-        serviceForState={(state) => ({ domain: 'switch', service: state === 'on' ? 'turn_off' : 'turn_on' })}
-        subtitleForState={(state) => (state === 'on' ? 'Paused' : state === 'off' ? 'Enabled' : titleCaseState(state))}
-        title={title}
-      />
-    )
-  }
-
-  return (
-    <GuestServiceCard
-      activeStates={['on']}
-      color={VACUUM_COLOR}
-      entityId={entityId}
-      icon={icon}
-      nextStateForState={(state) => (state === 'on' ? 'off' : 'on')}
-      serviceForState={(state) => ({ domain: 'automation', service: state === 'on' ? 'turn_off' : 'turn_on' })}
-      subtitleForState={(state) => (state === 'on' ? 'Enabled' : state === 'off' ? 'Paused' : titleCaseState(state))}
-      title={title}
-    />
-  )
-}
-
 function ThermostatHomeTemperatureCard() {
   const entity = useEntity(asEntityName(ECO_BEHAVIOR_ENTITY_ID), { returnNullIfNotFound: true })
   const callService = useHass((state) => state.helpers.callService) as unknown as CallService
@@ -301,7 +266,7 @@ function VacuumAutoCleanSection() {
       <SectionHeader title="Vacuum Auto-Clean" />
       <Description className={styles.modalDescription}>{VACUUM_AUTO_CLEAN_DESCRIPTION}</Description>
       <div className={styles.controlGrid}>
-        {vacuumAutoCleanControls.map((item) => <VacuumAutoCleanCard entityId={item.entityId} icon={item.icon} key={item.entityId} title={item.title} />)}
+        {VACUUM_AUTO_CLEAN_CONTROLS.map((item) => <VacuumAutoCleanControlCard control={item} key={item.entityId} />)}
       </div>
     </section>
   )

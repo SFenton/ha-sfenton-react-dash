@@ -17,6 +17,7 @@ import { StatusRail, type StatusRailChip } from '../components/hass/StatusRail'
 import { TodoListPanel } from '../components/hass/TodoListPanel'
 import { EverShelfInventoryPanel, type EverShelfInventoryLocation } from '../components/hass/EverShelfInventoryPanel'
 import { useEverShelfInventoryControls, type EverShelfInventoryControls } from '../components/hass/EverShelfInventoryControls'
+import { VacuumAutoCleanControlCard } from '../components/hass/VacuumAutoCleanControls'
 import { VacuumCard, VacuumRoomSourceModalContent } from '../components/hass/VacuumCard'
 import { VACUUM_MODAL_STYLE } from '../components/hass/vacuumModalStyle'
 import { AirQualityModalContent } from '../components/hass/AirQualityModalContent'
@@ -95,6 +96,7 @@ import {
 import { modalSquareGridModalStyle, modalSquareGridStyle, type ModalSquareGridStyle, useModalSquareGridLayout } from './modalSquareGrid'
 import { ROOM_PAGE_CONFIGS, type RoomSourceCardAction, type RoomSourceCardConfig, type RoomSourceKind, type RoomSourceModalItem } from '../constants/roomPages'
 import { MEDIA_REMOTE_CONFIGS } from '../constants/mediaRemotes'
+import { VACUUM_AUTO_CLEAN_CONTROLS } from '../constants/vacuumAutoClean'
 import { Page } from './Page'
 import { ClimateSheet, ContactSheet, LightsSheet, OccupancySheet } from './AtAGlancePage'
 import { CustomLightsPage } from './CustomLightsPage'
@@ -145,6 +147,13 @@ function sectionHasItems(section: EntityGroupConfig | undefined) {
 function Grid({ children }: { children: ReactNode }) {
   return <div className={styles.grid}>{children}</div>
 }
+
+const VACUUM_AUTO_CLEAN_TITLE_ORDER = new Map(VACUUM_AUTO_CLEAN_CONTROLS.map((control, index) => [control.title, index]))
+const ORDERED_VACUUMS = [...VACUUMS].sort((first, second) => {
+  const firstOrder = VACUUM_AUTO_CLEAN_TITLE_ORDER.get(first.title) ?? Number.MAX_SAFE_INTEGER
+  const secondOrder = VACUUM_AUTO_CLEAN_TITLE_ORDER.get(second.title) ?? Number.MAX_SAFE_INTEGER
+  return firstOrder - secondOrder || first.title.localeCompare(second.title)
+})
 
 const SECURITY_SIZED_ROOM_SOURCE_KINDS = new Set<RoomSourceKind>(['air', 'climate', 'contact', 'light', 'occupancy', 'vent'])
 
@@ -1306,9 +1315,15 @@ function VacuumPage({ preload = false }: { preload?: boolean }) {
       <section className={styles.section}>
         <SectionHeader title="Robot Vacuums" />
         <Grid>
-          {VACUUMS.map((vacuum) => (
+          {ORDERED_VACUUMS.map((vacuum) => (
             <VacuumCard disableHashSync={preload} key={vacuum.entityId} vacuum={vacuum} />
           ))}
+        </Grid>
+      </section>
+      <section className={styles.section}>
+        <SectionHeader title="Auto-Clean" />
+        <Grid>
+          {VACUUM_AUTO_CLEAN_CONTROLS.map((item) => <VacuumAutoCleanControlCard control={item} key={item.entityId} />)}
         </Grid>
       </section>
     </div>

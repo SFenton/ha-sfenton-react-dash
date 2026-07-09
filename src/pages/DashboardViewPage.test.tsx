@@ -4721,6 +4721,37 @@ describe('DashboardViewPage', () => {
     expect(within(controlsPane).getByRole('group', { name: 'Detergent OK' })).toBeInTheDocument()
   })
 
+  it('shows robot vacuums and auto-clean controls in the same order on the Vacuums route', () => {
+    render(<DashboardViewPage activePath="vacuums" onNavigate={() => undefined} path="vacuums" />)
+
+    const robotSection = screen.getByRole('heading', { name: 'Robot Vacuums' }).closest('section')
+    expect(robotSection).toBeTruthy()
+    const mainFloorVacuum = within(robotSection as HTMLElement).getByLabelText(/Main Floor/)
+    const musicRoomVacuum = within(robotSection as HTMLElement).getByLabelText(/^Music Room/)
+    const theaterRoomVacuum = within(robotSection as HTMLElement).getByLabelText(/Theater Room/)
+    expect(mainFloorVacuum.compareDocumentPosition(musicRoomVacuum) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(musicRoomVacuum.compareDocumentPosition(theaterRoomVacuum) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+
+    const autoCleanSection = screen.getByRole('heading', { name: 'Auto-Clean' }).closest('section')
+    expect(autoCleanSection).toBeTruthy()
+    const buttons = within(autoCleanSection as HTMLElement).getAllByRole('button')
+    expect(buttons.map((button) => button.getAttribute('aria-label'))).toEqual([
+      'Main Floor Enabled',
+      'Music Room Enabled',
+      'Theater Room Enabled',
+    ])
+
+    fireEvent.click(buttons[0])
+    fireEvent.click(buttons[1])
+    fireEvent.click(buttons[2])
+
+    expect(mockCallServiceCalls).toEqual([
+      { domain: 'switch', service: 'turn_on', target: 'switch.main_floor_vacuum_coordinator_pause' },
+      { domain: 'automation', service: 'turn_off', target: 'automation.automatically_vacuum_or_mop_music_room' },
+      { domain: 'automation', service: 'turn_off', target: 'automation.automatically_vacuum_theater_room_on_schedule' },
+    ])
+  })
+
   it('opens the real Vacuums route modal from a vacuum URL hash', async () => {
     window.history.replaceState(null, '', `${window.location.pathname}#main-floor-robot-vacuum`)
     render(<DashboardViewPage activePath="vacuums" onNavigate={() => undefined} path="vacuums" />)
