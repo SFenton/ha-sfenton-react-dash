@@ -1,3 +1,27 @@
+# HASS React Dashboard
+
+## Autonomous Admin executor
+
+The repository includes an explicit `autonomous-hass-admin-executor` skill and a canonical 13-phase roadmap at `docs/autonomous-admin-roadmap.md`. Each phase maps to one immutable Home Assistant item UID from `todo.groceries`.
+
+The launcher fails closed unless Copilot runs with `gpt-5.6-sol`, `max` reasoning effort, and `long_context`. It holds an exclusive repository run lock, runs one phase per Copilot session, sends the phase report by SMTP, then calls the HA-owned `script.complete_admin_todo_item` for accepted work. Home Assistant completes the item, notifies `notify.stephen_s_phone`, and records the task UID in `input_text.admin_todo_completion_receipt`; the runner requires both completion and receipt before advancing. Rejected or blocked phases are emailed but remain open.
+
+```bash
+npm run autonomous:admin:audit
+npm run autonomous:admin:verify-hass
+npm run autonomous:admin:sync-descriptions
+npm run autonomous:admin:email:check
+npm run autonomous:admin:run
+```
+
+`VITE_HA_URL` and `VITE_HA_TOKEN` are loaded from `.env.development`/`.env`. Email settings use the `HASS_AUTONOMY_EMAIL_*` variables documented in `.env.example`; for this workstation, the tooling also imports only `DAY_TRADER_EMAIL_*` values from `../day-trader-agent/.env` without copying or printing unrelated secrets. Override that fallback with `--email-env <path>`.
+
+Runtime checkpoints, reports, and dry-run outbox files live under `.autonomous/` and are not committed. The runner never commits, pushes, or deploys phase changes.
+
+The exclusive lock is `.autonomous/admin-run.lock/owner.json`. If a process is killed before cleanup, confirm the recorded PID is no longer running before removing that lock directory.
+
+---
+
 # React + TypeScript + Vite
 
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.

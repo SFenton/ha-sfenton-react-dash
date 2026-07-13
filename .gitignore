@@ -13,6 +13,9 @@ dist-ssr
 .certs
 *.local
 .hass-porting/
+.playwright-mcp/
+.autonomous/
+.outbox/
 playwright-report
 test-results
 test-results.xml
