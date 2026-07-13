@@ -1,10 +1,10 @@
-import { act, fireEvent, render, screen, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { AtAGlancePage } from './AtAGlancePage'
 import { materialIconPath } from '../components/core/iconPaths'
-import { CONTACT_GROUPS, LIGHT_GROUPS, OCCUPANCY_GROUPS, SECURITY_ENTITY } from '../constants/atAGlance'
+import { AREA_ITEMS, CONTACT_GROUPS, LIGHT_GROUPS, OCCUPANCY_GROUPS, SECURITY_ENTITY } from '../constants/atAGlance'
 import { CHORE_BLUE, GUEST_CONTROLS_DESCRIPTION } from '../constants/portedDashboard'
 import { GUEST_PRESENCE_SECURITY_HASH, GUEST_PRESENCE_SECURITY_SUMMARY } from '../components/hass/GuestPresenceSecurity'
-import { entity, mockCallServiceCalls, mockEntities, resetMockHass } from '../test/mocks/hakitCoreState'
+import { entity, mockCallServiceCalls, mockEntities, mockState, resetMockHass } from '../test/mocks/hakitCoreState'
 import { resetDeferredRouteHydrationCache } from '../hooks/useDeferredRouteHydration'
 
 describe('AtAGlancePage', () => {
@@ -29,6 +29,22 @@ describe('AtAGlancePage', () => {
       }
     }
   }
+
+  it('uses the shared disclosure affordance across representative Home modal openers', () => {
+    render(<AtAGlancePage />)
+
+    const openers = [
+      screen.getByRole('button', { name: /Open seven-day weather forecast/i }),
+      screen.getByRole('button', { name: /^Lights /i }),
+      screen.getByRole('button', { name: /^Security System /i }),
+      screen.getByRole('button', { name: 'Open Front Door camera' }),
+    ]
+
+    for (const opener of openers) {
+      expect(opener.querySelector('[data-modal-disclosure="right-chevron"]')).toBeInTheDocument()
+    }
+    expect(screen.getByRole('button', { name: 'Vacuums' }).querySelector('[data-modal-disclosure]')).not.toBeInTheDocument()
+  })
 
   it('keeps cold Home content behind a centered spinner before fading content in', () => {
     vi.useFakeTimers()
@@ -395,5 +411,83 @@ describe('AtAGlancePage', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: 'Living Room area' }))
 
     expect(navigate).toHaveBeenCalledWith('living-room')
+    expect(mockCallServiceCalls.filter((call) => call.domain === 'script' && call.target === 'script.increment_room_access')).toEqual([
+      {
+        domain: 'script',
+        service: 'turn_on',
+        serviceData: { variables: { room: 'living-room' } },
+        target: 'script.increment_room_access',
+      },
+    ])
+  })
+
+  it('ranks room navigation from live HA counters with deterministic ties and unavailable fallbacks', async () => {
+    const originalEntities = mockState.entities
+    const counterStates = [
+      [AREA_ITEMS[0].accessCounterEntityId, '2'],
+      [AREA_ITEMS[1].accessCounterEntityId, '7'],
+      [AREA_ITEMS[2].accessCounterEntityId, '7'],
+      [AREA_ITEMS[4].accessCounterEntityId, 'unavailable'],
+    ] as const
+    mockState.entities = {
+      ...mockEntities,
+      ...Object.fromEntries(counterStates.map(([entityId, state]) => [entityId, entity(entityId, state)])),
+    }
+
+    try {
+      const view = render(<AtAGlancePage />)
+      fireEvent.click(screen.getByRole('button', { name: 'Rooms' }))
+
+      const dialog = await screen.findByRole('dialog')
+      const roomGrid = within(dialog).getByRole('region', { name: 'Rooms' })
+      expect(within(roomGrid).getAllByRole('button').slice(0, 5).map((button) => button.getAttribute('aria-label'))).toEqual([
+        'Guest Room area',
+        'Gym area',
+        'Living Room area',
+        'Master Bedroom area',
+        'Office area',
+      ])
+
+      mockState.entities = {
+        ...mockState.entities,
+        [AREA_ITEMS[4].accessCounterEntityId]: entity(AREA_ITEMS[4].accessCounterEntityId, '8'),
+      }
+      view.rerender(<AtAGlancePage />)
+      expect(within(roomGrid).getAllByRole('button').slice(0, 5).map((button) => button.getAttribute('aria-label'))).toEqual([
+        'Office area',
+        'Guest Room area',
+        'Gym area',
+        'Living Room area',
+        'Master Bedroom area',
+      ])
+    } finally {
+      mockState.entities = originalEntities
+    }
+  })
+
+  it('does not delay or cancel room navigation when the HA increment command is unavailable', async () => {
+    const originalCallService = mockState.helpers.callService
+    const commandError = new Error('Home Assistant unavailable')
+    const callService = vi.fn(() => Promise.reject(commandError))
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    mockState.helpers.callService = callService
+
+    try {
+      const navigate = vi.fn()
+      render(<AtAGlancePage onNavigate={navigate} />)
+      fireEvent.click(screen.getByRole('button', { name: 'Rooms' }))
+      fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Living Room area' }))
+
+      expect(navigate).toHaveBeenCalledTimes(1)
+      expect(navigate).toHaveBeenCalledWith('living-room')
+      expect(callService).toHaveBeenCalledTimes(1)
+      await waitFor(() => expect(consoleError).toHaveBeenCalledWith(
+        'Failed to increment room access for living-room.',
+        commandError,
+      ))
+    } finally {
+      mockState.helpers.callService = originalCallService
+      consoleError.mockRestore()
+    }
   })
 })

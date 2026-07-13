@@ -20,9 +20,13 @@
   flex: 0 0 auto;
 }
 
-.button:focus,
-.button:focus-visible {
+.button:focus {
   outline: none;
+}
+
+.button:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.58);
+  outline-offset: 3px;
 }
 
 .pill {

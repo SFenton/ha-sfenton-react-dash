@@ -98,36 +98,29 @@ function ModeToggleCard({ onOpenModePicker }: { onOpenModePicker: () => void }) 
   }
 
   return (
-    <button aria-label="Manually control front yard lights" aria-pressed={active} className={styles.modeCard} data-active={active} onClick={toggle} type="button">
-      <span aria-hidden="true" className={styles.modeIcon}>
-        <MaterialIcon name="mdi:lightbulb" size={26} />
-      </span>
-      <span className={styles.modeCopy}>
-        <span className={styles.modeTitle}>Manually Control Front Yard Lights</span>
-        <span className={styles.modeSubtitle}>{active ? 'On' : 'Off'}</span>
-      </span>
+    <div className={styles.modeCard} data-active={active}>
+      <button aria-label="Manually control front yard lights" aria-pressed={active} className={styles.modeToggle} onClick={toggle} type="button">
+        <span aria-hidden="true" className={styles.modeIcon}>
+          <MaterialIcon name="mdi:lightbulb" size={26} />
+        </span>
+        <span className={styles.modeCopy}>
+          <span className={styles.modeTitle}>Manually Control Front Yard Lights</span>
+          <span className={styles.modeSubtitle}>{active ? 'On' : 'Off'}</span>
+        </span>
+      </button>
       {active && (
-        <span
+        <button
           aria-label="Select lighting mode"
           className={styles.modeSelect}
-          onClick={(event) => {
-            event.stopPropagation()
-            onOpenModePicker()
-          }}
-          role="button"
-          tabIndex={0}
-          onKeyDown={(event) => {
-            if (event.key !== 'Enter' && event.key !== ' ') return
-            event.preventDefault()
-            event.stopPropagation()
-            onOpenModePicker()
-          }}
+          data-modal-opener-exception="option-picker"
+          onClick={onOpenModePicker}
+          type="button"
         >
           <MaterialIcon name="mdi:palette" size={20} />
           <MaterialIcon name="mdi:chevron-down" size={18} />
-        </span>
+        </button>
       )}
-    </button>
+    </div>
   )
 }
 

@@ -1,6 +1,7 @@
 import { useEntity, useHass } from '@hakit/core'
 import { useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import { MaterialIcon } from '../core/Icon'
+import { ModalDisclosureIcon } from '../core/ModalDisclosureIcon'
 import { useOptimisticState } from '../../hooks/useOptimisticState'
 import { asEntityName, isActiveState } from './entityState'
 import styles from './LightBrightnessCard.module.css'
@@ -54,6 +55,7 @@ export function LightBrightnessCard({ entityId, title, tapAction = 'toggle', sho
   const cardRef = useRef<HTMLDivElement | null>(null)
   const pointerStart = useRef<{ x: number; y: number; pointerId: number } | null>(null)
   const dragging = useRef(false)
+  const suppressDetailsClick = useRef(false)
 
   // While dragging the slider value is purely local; otherwise it follows the optimistic layer.
   const displayPct = dragPct ?? optimisticPct
@@ -90,6 +92,7 @@ export function LightBrightnessCard({ entityId, title, tapAction = 'toggle', sho
     if (!dragging.current && Math.abs(event.clientX - start.x) < DRAG_THRESHOLD_PX) return
     if (!dragging.current) {
       dragging.current = true
+      suppressDetailsClick.current = true
       cardRef.current?.setPointerCapture(event.pointerId)
     }
     event.preventDefault()
@@ -107,6 +110,9 @@ export function LightBrightnessCard({ entityId, title, tapAction = 'toggle', sho
       const finalPct = pctFromClientX(event.clientX)
       setDragPct(null)
       setBrightness(finalPct)
+      window.setTimeout(() => {
+        suppressDetailsClick.current = false
+      }, 0)
       return
     }
 
@@ -114,11 +120,16 @@ export function LightBrightnessCard({ entityId, title, tapAction = 'toggle', sho
     // direction past the slop) so swiping over a tile does not register as a tap.
     const movedX = Math.abs(event.clientX - start.x)
     const movedY = Math.abs(event.clientY - start.y)
-    if (movedX > TAP_SLOP_PX || movedY > TAP_SLOP_PX) return
+    if (movedX > TAP_SLOP_PX || movedY > TAP_SLOP_PX) {
+      suppressDetailsClick.current = true
+      window.setTimeout(() => {
+        suppressDetailsClick.current = false
+      }, 0)
+      return
+    }
 
     // Treated as a tap
-    if (tapAction === 'more-info') onMoreInfo?.(entityId, title)
-    else toggle()
+    if (tapAction !== 'more-info') toggle()
   }
 
   const handlePower = (event: ReactPointerEvent<HTMLButtonElement>) => {
@@ -136,6 +147,15 @@ export function LightBrightnessCard({ entityId, title, tapAction = 'toggle', sho
     toggle()
   }
 
+  const openMoreInfo = (event: React.MouseEvent<HTMLButtonElement>) => {
+    event.stopPropagation()
+    if (suppressDetailsClick.current) {
+      suppressDetailsClick.current = false
+      return
+    }
+    onMoreInfo?.(entityId, title)
+  }
+
   return (
     <div
       aria-label={title}
@@ -151,6 +171,9 @@ export function LightBrightnessCard({ entityId, title, tapAction = 'toggle', sho
       style={{ '--fill-color': fillColor, '--fill-pct': `${displayPct}%` } as React.CSSProperties}
     >
       <span aria-hidden="true" className={styles.fill} />
+      {tapAction === 'more-info' && (
+        <button aria-label={`Open ${title} details`} className={styles.details} onClick={openMoreInfo} type="button" />
+      )}
       <span aria-hidden="true" className={styles.icon}>
         <MaterialIcon name={icon} size={22} />
       </span>
@@ -158,6 +181,7 @@ export function LightBrightnessCard({ entityId, title, tapAction = 'toggle', sho
         <span className={styles.title}>{title}</span>
         {showStatus && isOn && <span className={styles.subtitle}>{`${Math.floor(displayPct)}%`}</span>}
       </span>
+      {tapAction === 'more-info' && <ModalDisclosureIcon className={styles.disclosure} size="compact" />}
       <button aria-label={`Toggle ${title}`} className={styles.power} onClick={togglePower} onPointerDown={handlePower} type="button">
         <MaterialIcon name="mdi:power" size={18} />
       </button>

@@ -24,14 +24,14 @@ interface ModalSheetProps {
 
 type ModalSheetSnapshot = Pick<ModalSheetProps, 'backLabel' | 'children' | 'chrome' | 'contentStyle' | 'footer' | 'onBack' | 'scrollResetKey' | 'subtitle' | 'title'>
 const RECENT_OPEN_INTERNAL_CLOSE_GUARD_MS = 450
-const EXIT_ANIMATION_UNMOUNT_MS = 260
+export const MODAL_SHEET_EXIT_ANIMATION_MS = 520
 
 function desktopModalLayoutMatches() {
   return typeof window !== 'undefined' && typeof window.matchMedia === 'function' && window.matchMedia('(min-width: 760px)').matches
 }
 
 function closeWasWithinExitAnimation(closeRequestedAt: number) {
-  return typeof window !== 'undefined' && window.performance.now() - closeRequestedAt <= EXIT_ANIMATION_UNMOUNT_MS
+  return typeof window !== 'undefined' && window.performance.now() - closeRequestedAt <= MODAL_SHEET_EXIT_ANIMATION_MS
 }
 
 function useDesktopModalLayout() {
@@ -58,8 +58,13 @@ export function ModalSheet({ open, title, onClose, children, backLabel = 'Back',
   const currentSnapshot: ModalSheetSnapshot = { backLabel, children, chrome, contentStyle, footer, onBack, scrollResetKey, subtitle, title }
   const [lastOpenSnapshot, setLastOpenSnapshot] = useState<ModalSheetSnapshot>(currentSnapshot)
   const [mounted, setMounted] = useState(open)
+  const [previousOpen, setPreviousOpen] = useState(open)
   const [rapidReopen, setRapidReopen] = useState(false)
   if (open && !mounted) setMounted(true)
+  if (open !== previousOpen) {
+    setPreviousOpen(open)
+    if (open) setLastOpenSnapshot(currentSnapshot)
+  }
   const rendered = open ? currentSnapshot : lastOpenSnapshot
   const closing = !open
   const shouldRender = open || mounted
@@ -91,7 +96,7 @@ export function ModalSheet({ open, title, onClose, children, backLabel = 'Back',
     const timeout = window.setTimeout(() => {
       setRapidReopen(false)
       setMounted(false)
-    }, EXIT_ANIMATION_UNMOUNT_MS)
+    }, MODAL_SHEET_EXIT_ANIMATION_MS)
     return () => window.clearTimeout(timeout)
   }, [open])
 

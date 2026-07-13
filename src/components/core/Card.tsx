@@ -1,4 +1,5 @@
 import type { CSSProperties, MouseEventHandler, ReactNode } from 'react'
+import { ModalDisclosureIcon } from './ModalDisclosureIcon'
 import styles from './Card.module.css'
 
 export interface CardColor {
@@ -11,6 +12,7 @@ interface CardProps {
   ariaLabel?: string
   color?: CardColor
   disabled?: boolean
+  disclosure?: boolean
   icon: ReactNode
   muted?: boolean
   onClick?: MouseEventHandler<HTMLButtonElement>
@@ -29,6 +31,7 @@ export function Card({
   ariaLabel,
   color = { r: 150, g: 80, b: 28 },
   disabled = false,
+  disclosure = false,
   icon,
   muted = false,
   onClick,
@@ -49,12 +52,14 @@ export function Card({
     size === 'source-row' ? styles.sourceRow : '',
     size === 'wide' ? styles.wide : '',
     size === 'admin-modal' ? styles.adminModal : '',
+    disclosure && onClick ? styles.hasDisclosure : '',
   ].filter(Boolean).join(' ')
   const content = (
     <>
       <span aria-hidden="true" className={styles.icon}>
         {icon}
       </span>
+      {disclosure && onClick && <ModalDisclosureIcon className={styles.disclosure} />}
       <span className={styles.copy}>
         <span className={styles.title}>{title}</span>
         {subtitle && <span className={styles.subtitle}>{subtitle}</span>}
@@ -71,6 +76,7 @@ export function Card({
         className={className}
         data-clickable="true"
         data-disabled={disabled}
+        data-modal-opener={disclosure ? 'true' : undefined}
         data-muted={muted}
         disabled={disabled}
         onClick={onClick}

@@ -1,10 +1,8 @@
 import { useEntity, useHass } from '@hakit/core'
 import type { HassEntity } from 'home-assistant-js-websocket'
-import type { ReactNode } from 'react'
 import type { CardColor } from '../core/Card'
 import { Description } from '../core/Description'
 import { GlassTile } from '../core/GlassTile'
-import { MaterialIcon } from '../core/Icon'
 import { SectionHeader } from '../core/SectionHeader'
 import { GUEST_CONTROLS_DESCRIPTION, GUEST_CONTROL_ITEMS, SECURITY_COLOR, SWITCH_ACTIVE_COLOR } from '../../constants/portedDashboard'
 import { SECURITY_CONTROL_TILES } from '../../constants/securityPage'
@@ -317,14 +315,6 @@ export function GuestPresenceSecurityModalContent() {
   )
 }
 
-function PromptButton({ children, onOpen }: { children: ReactNode; onOpen: () => void }) {
-  return (
-    <button aria-label="Guest Presence Security" className={styles.promptButton} onClick={onOpen} type="button">
-      {children}
-    </button>
-  )
-}
-
 export function GuestPresenceSecuritySection({ onOpen }: { onOpen: (hash: string) => void }) {
   const active = useGuestPresenceSecurityActive()
 
@@ -334,12 +324,7 @@ export function GuestPresenceSecuritySection({ onOpen }: { onOpen: (hash: string
     <section className={styles.promptSection}>
       <SectionHeader title="Guest Presence Security" />
       <Description>{GUEST_PRESENCE_SECURITY_SUMMARY}</Description>
-      <PromptButton onOpen={() => onOpen(GUEST_PRESENCE_SECURITY_HASH)}>
-        <GlassTile icon="mdi:shield" iconColor="white" title="Guest Presence Security" tone="switch" />
-        <span aria-hidden="true" className={styles.promptChevron}>
-          <MaterialIcon name="mdi:chevron-right" size={26} />
-        </span>
-      </PromptButton>
+      <GlassTile disclosure icon="mdi:shield" iconColor="white" onClick={() => onOpen(GUEST_PRESENCE_SECURITY_HASH)} title="Guest Presence Security" tone="switch" />
     </section>
   )
 }

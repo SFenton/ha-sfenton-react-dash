@@ -253,6 +253,8 @@ type MockHassDebugApi = {
   calls: Record<string, unknown>[]
   freeSleepSchedules: () => Record<string, unknown>
   reset: () => void
+  setEntityAttribute: (entityId: string, attribute: string, value: unknown) => void
+  setEntityState: (entityId: string, state: string) => void
 }
 
 function exposeMockHassDebugApi() {
@@ -260,7 +262,15 @@ function exposeMockHassDebugApi() {
   ;(window as unknown as { __mockHass?: MockHassDebugApi }).__mockHass = {
     calls: mockCallServiceCalls,
     freeSleepSchedules: () => cloneRecord(mockEntities['sensor.nightcanvasrestful_schedules'].attributes),
+    setEntityAttribute: (entityId, attribute, value) => {
+      const target = mockEntities[entityId]
+      if (target) target.attributes[attribute] = value
+    },
     reset: resetMockHass,
+    setEntityState: (entityId, state) => {
+      const target = mockEntities[entityId]
+      if (target) target.state = state
+    },
   }
 }
 
@@ -283,6 +293,10 @@ function thermostatMockEntities() {
     [
       'climate.thermostat_contact_sensors_global_virtual_thermostat',
       entity('climate.thermostat_contact_sensors_global_virtual_thermostat', 'off', { current_temperature: 71, hvac_action: 'idle', hvac_modes: ['off', 'heat', 'cool', 'heat_cool'], target_temp_high: 74, target_temp_low: 72, temperature_unit: '°F' }),
+    ],
+    [
+      'climate.thermostat_contact_sensors_eco_away_virtual_thermostat',
+      entity('climate.thermostat_contact_sensors_eco_away_virtual_thermostat', 'heat_cool', { current_temperature: 71, effective_cool_target: 81, effective_heat_target: 59, hvac_modes: ['heat_cool'], is_currently_active: false, max_temp: 95, min_temp: 45, target_temp_high: 78, target_temp_low: 62, target_temp_step: 0.5, temperature_unit: '°F' }),
     ],
     ['climate.thermostat_hub_w200', entity('climate.thermostat_hub_w200', 'off', { current_temperature: 73.4, hvac_action: 'idle', hvac_modes: ['off', 'heat', 'cool', 'heat_cool'], target_temp_high: 74, target_temp_low: 72, temperature_unit: '°F' })],
     ['sensor.thermostat_hub_w200_temperature', entity('sensor.thermostat_hub_w200_temperature', '73.4', { unit_of_measurement: '°F' })],
@@ -310,6 +324,8 @@ function thermostatMockEntities() {
     ],
     ['input_boolean.enable_disable_thermostat_contact_sensors_integration', entity('input_boolean.enable_disable_thermostat_contact_sensors_integration', 'on')],
     ['binary_sensor.thermostat_contact_sensors_away_mode_active', entity('binary_sensor.thermostat_contact_sensors_away_mode_active', 'off')],
+    ['sensor.thermostat_effective_home_away', entity('sensor.thermostat_effective_home_away', 'Home')],
+    ['sensor.thermostat_home_away_reason', entity('sensor.thermostat_home_away_reason', 'A resident is home, so TCS is using home behavior.')],
     ['select.thermostat_contact_sensors_eco_mode_critical_tracking', entity('select.thermostat_contact_sensors_eco_mode_critical_tracking', 'Track Select Critical', { options: ['Track Select Critical', 'Track Select Active', 'Ignore Critical'] })],
     ['select.thermostat_contact_sensors_eco_behavior_when_away', entity('select.thermostat_contact_sensors_eco_behavior_when_away', 'Keep Eco Active', { options: ['Disable Eco When Away', 'Use Eco Away Targets', 'Keep Eco Active'] })],
   ]
@@ -320,7 +336,7 @@ function thermostatMockEntities() {
     entries.push([`switch.thermostat_contact_sensors_track_${room.key}`, entity(`switch.thermostat_contact_sensors_track_${room.key}`, room.track)])
     entries.push([`switch.thermostat_contact_sensors_${room.key}_force_track_when_critical`, entity(`switch.thermostat_contact_sensors_${room.key}_force_track_when_critical`, room.force)])
     entries.push([`switch.living_room_thermostat_contact_sensors_${room.key}_track_only_when_occupied`, entity(`switch.living_room_thermostat_contact_sensors_${room.key}_track_only_when_occupied`, 'trackOnlyWhenOccupied' in room ? room.trackOnlyWhenOccupied : 'off')])
-    entries.push([room.climate, entity(room.climate, 'off', { current_temperature: Number(room.temperature), hvac_action: 'idle', hvac_modes: ['off', 'heat', 'cool', 'heat_cool'], target_temp_high: 74, target_temp_low: 72, temperature_unit: '°F' })])
+    entries.push([room.climate, entity(room.climate, 'off', { away_mode_active: false, current_temperature: Number(room.temperature), effective_cool_target: 77, effective_heat_target: 69, hvac_action: 'idle', hvac_modes: ['off', 'heat', 'cool', 'heat_cool'], target_temp_high: 74, target_temp_low: 72, temperature_unit: '°F' })])
     for (const [ventEntityId, ventState] of room.vents) {
       if (ventEntityId === 'cover.guest_room_vent_vent' || ventEntityId === 'cover.kitchen_vent_vent') continue
       entries.push([ventEntityId, entity(ventEntityId, ventState)])
@@ -400,6 +416,10 @@ export const mockEntities: Record<string, MockEntity> = {
   'climate.thermostat_hub_w200': entity('climate.thermostat_hub_w200', 'heat', { current_temperature: 70, temperature: 71, temperature_unit: '°F' }),
   'climate.stephen_s_eight_sleep_side_climate': entity('climate.stephen_s_eight_sleep_side_climate', 'heat_cool', { current_temperature: 86, temperature: 86, hvac_action: 'heating' }),
   'climate.steph_s_eight_sleep_side_climate': entity('climate.steph_s_eight_sleep_side_climate', 'off', { current_temperature: 72, temperature: 79, hvac_action: 'off' }),
+  'climate.sleepypod_eight_pod_left_side': entity('climate.sleepypod_eight_pod_left_side', 'unavailable', { current_temperature: 81, hvac_modes: ['off', 'heat'], max_temp: 110, min_temp: 55, target_temp_step: 1, temperature: 77 }),
+  'climate.sleepypod_eight_pod_right_side': entity('climate.sleepypod_eight_pod_right_side', 'unavailable', { current_temperature: 77, hvac_modes: ['off', 'heat'], max_temp: 110, min_temp: 55, target_temp_step: 1, temperature: null }),
+  'number.master_bedroom_sleepypod_eight_pod_left_target_level': entity('number.master_bedroom_sleepypod_eight_pod_left_target_level', 'unavailable', { max: 10, min: -10, step: 1 }),
+  'number.master_bedroom_sleepypod_eight_pod_right_target_level': entity('number.master_bedroom_sleepypod_eight_pod_right_target_level', 'unavailable', { max: 10, min: -10, step: 1 }),
   'number.nightcanvasrestful_left_target_temperature': entity('number.nightcanvasrestful_left_target_temperature', '-1', { ...freeSleepLevelAttributes }),
   'number.nightcanvasrestful_right_target_temperature': entity('number.nightcanvasrestful_right_target_temperature', '0', { ...freeSleepLevelAttributes }),
   'number.nightcanvasrestful_left_bedtime_temperature': entity('number.nightcanvasrestful_left_bedtime_temperature', '0', { ...freeSleepLevelAttributes }),
@@ -417,6 +437,8 @@ export const mockEntities: Record<string, MockEntity> = {
   'sensor.nightcanvasrestful_left_seconds_remaining': entity('sensor.nightcanvasrestful_left_seconds_remaining', '7200', { unit_of_measurement: 's' }),
   'sensor.nightcanvasrestful_right_seconds_remaining': entity('sensor.nightcanvasrestful_right_seconds_remaining', '0', { unit_of_measurement: 's' }),
   'sensor.nightcanvasrestful_schedules': entity('sensor.nightcanvasrestful_schedules', 'ready', mockFreeSleepScheduleAttributes()),
+  'sensor.sleepypod_stephen_schedule_phase': entity('sensor.sleepypod_stephen_schedule_phase', 'outside'),
+  'sensor.sleepypod_steph_schedule_phase': entity('sensor.sleepypod_steph_schedule_phase', 'outside'),
   'switch.nightcanvasrestful_left_power': entity('switch.nightcanvasrestful_left_power', 'on'),
   'switch.nightcanvasrestful_right_power': entity('switch.nightcanvasrestful_right_power', 'off'),
   'switch.nightcanvasrestful_left_away_mode': entity('switch.nightcanvasrestful_left_away_mode', 'off'),
@@ -520,10 +542,16 @@ export const mockEntities: Record<string, MockEntity> = {
   'sensor.living_room_bar_presence_temperature': entity('sensor.living_room_bar_presence_temperature', '70.4', { unit_of_measurement: '°F' }),
   'sensor.living_room_kitchen_wall_presence_temperature': entity('sensor.living_room_kitchen_wall_presence_temperature', '69.8', { unit_of_measurement: '°F' }),
   'sensor.living_room_fireplace_presence_temperature': entity('sensor.living_room_fireplace_presence_temperature', '71.2', { unit_of_measurement: '°F' }),
+  'sensor.living_room_presence_sensor_temperature': entity('sensor.living_room_presence_sensor_temperature', '70.1', { unit_of_measurement: '°F' }),
+  'sensor.living_room_bar_presence_sensor_temperature_2': entity('sensor.living_room_bar_presence_sensor_temperature_2', '70.4', { unit_of_measurement: '°F' }),
+  'sensor.living_room_kitchen_wall_presence_sensor_temperature_2': entity('sensor.living_room_kitchen_wall_presence_sensor_temperature_2', '69.8', { unit_of_measurement: '°F' }),
+  'sensor.living_room_fireplace_presence_sensor_temperature_2': entity('sensor.living_room_fireplace_presence_sensor_temperature_2', '71.2', { unit_of_measurement: '°F' }),
   'sensor.guest_room_closet_facing_presence_temperature': entity('sensor.guest_room_closet_facing_presence_temperature', '70.2', { unit_of_measurement: '°F' }),
   'sensor.guest_room_closet_facing_presence_sensor_temperature': entity('sensor.guest_room_closet_facing_presence_sensor_temperature', '70.2', { unit_of_measurement: '°F' }),
+  'sensor.guest_room_closet_facing_presence_sensor_temperature_2': entity('sensor.guest_room_closet_facing_presence_sensor_temperature_2', '70.2', { unit_of_measurement: '°F' }),
   'sensor.guest_room_presence_temperature': entity('sensor.guest_room_presence_temperature', '69.5', { unit_of_measurement: '°F' }),
   'sensor.guest_room_presence_sensor_temperature': entity('sensor.guest_room_presence_sensor_temperature', '69.5', { unit_of_measurement: '°F' }),
+  'sensor.guest_room_presence_sensor_temperature_2': entity('sensor.guest_room_presence_sensor_temperature_2', '69.5', { unit_of_measurement: '°F' }),
   'cover.guest_room_vent_vent': entity('cover.guest_room_vent_vent', 'open'),
   'cover.living_room_vents': entity('cover.living_room_vents', 'open'),
   'cover.kitchen_vent_vent': entity('cover.kitchen_vent_vent', 'open'),
@@ -536,6 +564,10 @@ export const mockEntities: Record<string, MockEntity> = {
   'binary_sensor.living_room_bar_presence_occupancy': entity('binary_sensor.living_room_bar_presence_occupancy', 'off'),
   'binary_sensor.living_room_kitchen_wall_presence_occupancy': entity('binary_sensor.living_room_kitchen_wall_presence_occupancy', 'off'),
   'binary_sensor.living_room_fireplace_presence_occupancy': entity('binary_sensor.living_room_fireplace_presence_occupancy', 'off'),
+  'binary_sensor.living_room_presence_sensor_presence': entity('binary_sensor.living_room_presence_sensor_presence', 'on'),
+  'binary_sensor.living_room_bar_presence_sensor_presence': entity('binary_sensor.living_room_bar_presence_sensor_presence', 'off'),
+  'binary_sensor.living_room_kitchen_wall_presence_sensor_presence': entity('binary_sensor.living_room_kitchen_wall_presence_sensor_presence', 'off'),
+  'binary_sensor.living_room_fireplace_presence_sensor_presence': entity('binary_sensor.living_room_fireplace_presence_sensor_presence', 'off'),
   'binary_sensor.living_room_occupancy_sensors': entity('binary_sensor.living_room_occupancy_sensors', 'on'),
   'binary_sensor.master_bedroom_closet_presence_occupancy': entity('binary_sensor.master_bedroom_closet_presence_occupancy', 'off'),
   'binary_sensor.master_bedroom_closet_presence_sensor_presence': entity('binary_sensor.master_bedroom_closet_presence_sensor_presence', 'off'),
@@ -746,6 +778,8 @@ export function resetMockHass() {
   for (const entityId of Object.keys(mockTodoItemsByEntity)) delete mockTodoItemsByEntity[entityId]
   mockState.user = { id: '64089b5683944c39b4f944c8f76830b0', name: 'Stephen' }
   mockEntities['sensor.nightcanvasrestful_schedules'].attributes = mockFreeSleepScheduleAttributes()
+  mockEntities['sensor.sleepypod_stephen_schedule_phase'].state = 'outside'
+  mockEntities['sensor.sleepypod_steph_schedule_phase'].state = 'outside'
   mockEntities['switch.nightcanvasrestful_left_alarms_enabled'].state = 'off'
   mockEntities['switch.nightcanvasrestful_right_alarms_enabled'].state = 'off'
   mockEntities['binary_sensor.nightcanvasrestful_left_alarm_vibrating'].state = 'off'
@@ -754,15 +788,35 @@ export function resetMockHass() {
   mockEntities['number.steph_s_eight_sleep_side_alarm_snooze_minutes'].state = '9'
   for (const room of thermostatRoomMockData) {
     mockEntities[`switch.living_room_thermostat_contact_sensors_${room.key}_track_only_when_occupied`].state = 'trackOnlyWhenOccupied' in room ? room.trackOnlyWhenOccupied : 'off'
+    mockEntities[room.climate].attributes.away_mode_active = false
   }
   for (const roomId of mainFloorAutoCleanDisabledRoomIds) {
     mockEntities[mainFloorAutoCleanDisabledEntityId(roomId)].state = 'off'
   }
   mockEntities['automation.automatically_vacuum_or_mop_music_room'].state = 'on'
   mockEntities['automation.automatically_vacuum_theater_room_on_schedule'].state = 'on'
+  mockEntities['vacuum.valetudo_elatedusedram'].state = 'unavailable'
+  mockEntities['vacuum.valetudo_politefatherlykingfisher'].state = 'docked'
+  mockEntities['vacuum.valetudo_exaltedsneakydeer'].state = 'docked'
+  mockEntities['sensor.valetudo_exaltedsneakydeer_battery_level'].state = '99'
+  mockEntities['sensor.valetudo_exaltedsneakydeer_status_flag'].state = 'ready'
+  mockEntities['sensor.valetudo_exaltedsneakydeer_error'].state = 'No error'
+  mockEntities['input_text.main_floor_vacuum_error_message'].state = ''
+  mockEntities['select.valetudo_exaltedsneakydeer_mode'].state = 'vacuum'
+  mockEntities['select.valetudo_exaltedsneakydeer_fan'].state = 'balanced'
+  mockEntities['select.valetudo_exaltedsneakydeer_water'].state = 'medium'
+  mockEntities['input_select.main_floor_vacuum_cleaning_passes'].state = '1'
+  mockEntities['sensor.valetudo_exaltedsneakydeer_main_brush'].state = '12240'
+  mockEntities['sensor.valetudo_exaltedsneakydeer_right_brush'].state = '6240'
+  mockEntities['sensor.valetudo_exaltedsneakydeer_main_filter'].state = '3240'
+  mockEntities['sensor.valetudo_exaltedsneakydeer_sensor_cleaning'].state = '120'
+  mockEntities['sensor.valetudo_exaltedsneakydeer_wheel_cleaning'].state = '120'
   mockEntities['input_boolean.guests_staying_in_guest_room'].state = 'off'
   mockEntities['input_boolean.guests_staying_in_music_room'].state = 'off'
   mockEntities['input_boolean.guests_staying_in_theater_room'].state = 'off'
+  mockEntities['binary_sensor.thermostat_contact_sensors_away_mode_active'].state = 'off'
+  mockEntities['sensor.thermostat_effective_home_away'].state = 'Home'
+  mockEntities['sensor.thermostat_home_away_reason'].state = 'A resident is home, so TCS is using home behavior.'
   mockEntities['select.thermostat_contact_sensors_eco_behavior_when_away'].state = 'Keep Eco Active'
   mockEntities['switch.main_floor_vacuum_coordinator_pause'].state = 'off'
   mockEntities['humidifier.master_bedroom_humidifier'].state = 'on'

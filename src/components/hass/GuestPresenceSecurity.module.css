@@ -3,44 +3,6 @@
   gap: 10px;
 }
 
-.promptButton {
-  position: relative;
-  display: block;
-  width: 100%;
-  border: 0;
-  border-radius: 32px;
-  padding: 0;
-  color: white;
-  background: transparent;
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
-}
-
-.promptButton:focus,
-.promptButton:focus-visible {
-  outline: none;
-}
-
-.promptButton > :first-child {
-  padding-right: 52px;
-}
-
-.promptChevron {
-  position: absolute;
-  z-index: 2;
-  top: 50%;
-  right: 18px;
-  display: grid;
-  width: 32px;
-  height: 32px;
-  place-items: center;
-  color: rgba(255, 255, 255, 0.82);
-  transform: translateY(-50%);
-  pointer-events: none;
-}
-
 .modalContent {
   display: grid;
   gap: 18px;

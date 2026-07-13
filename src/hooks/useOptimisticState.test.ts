@@ -68,6 +68,19 @@ describe('useOptimisticState', () => {
     expect(result.current[0]).toBe('off')
   })
 
+  it('can cancel an optimistic value and its revert timer explicitly', () => {
+    const { result } = renderHook(({ live }) => useOptimisticState(live, 1000), { initialProps: { live: 0 } })
+
+    act(() => result.current[1](5))
+    expect(result.current[0]).toBe(5)
+
+    act(() => result.current[2]())
+    expect(result.current[0]).toBe(0)
+
+    act(() => vi.advanceTimersByTime(1000))
+    expect(result.current[0]).toBe(0)
+  })
+
   it('can keep the optimistic value across stale live updates until confirmation', () => {
     const { result, rerender } = renderHook(({ live }) => useOptimisticState(live, { clearOn: 'confirmation', revertMs: 1000 }), { initialProps: { live: 0 } })
 

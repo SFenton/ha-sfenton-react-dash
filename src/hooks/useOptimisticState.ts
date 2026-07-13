@@ -28,7 +28,7 @@ type OptimisticPending<T> = {
  * confirms within `revertMs`, the override is discarded so the control falls back
  * to the real state instead of lying about it.
  */
-export function useOptimisticState<T>(liveValue: T, optionsOrRevertMs: OptimisticStateOptions | number = DEFAULT_OPTIMISTIC_REVERT_MS): [T, (next: T, commitOptions?: OptimisticCommitOptions) => void] {
+export function useOptimisticState<T>(liveValue: T, optionsOrRevertMs: OptimisticStateOptions | number = DEFAULT_OPTIMISTIC_REVERT_MS): [T, (next: T, commitOptions?: OptimisticCommitOptions) => void, () => void] {
   const options = typeof optionsOrRevertMs === 'number' ? { revertMs: optionsOrRevertMs } : optionsOrRevertMs
   const clearOn = options.clearOn ?? 'live-change'
   const confirmationHoldMs = options.confirmationHoldMs ?? 0
@@ -82,5 +82,10 @@ export function useOptimisticState<T>(liveValue: T, optionsOrRevertMs: Optimisti
     [clearTimer, revertMs],
   )
 
-  return [pending !== null ? pending.value : liveValue, commit]
+  const reset = useCallback(() => {
+    clearTimer()
+    setPending(null)
+  }, [clearTimer])
+
+  return [pending !== null ? pending.value : liveValue, commit, reset]
 }

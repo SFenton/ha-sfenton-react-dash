@@ -66,6 +66,13 @@ export interface AreaConfig {
   }
 }
 
+export interface RoomNavigationConfig extends AreaConfig {
+  accessCounterEntityId: `counter.${string}`
+  accessKey: string
+}
+
+export const ROOM_ACCESS_INCREMENT_SCRIPT_ENTITY_ID = 'script.increment_room_access'
+
 export interface EntityButtonConfig {
   title: string
   entityId: string
@@ -259,23 +266,23 @@ export const CAMERA_ITEMS: CameraConfig[] = [
   },
 ]
 
-export const AREA_ITEMS: AreaConfig[] = [
-  { title: 'Living Room', route: '/at-a-glance/living-room', icon: 'mdi:sofa', color: { r: 218, g: 206, b: 164 } },
-  { title: 'Guest Room', route: '/at-a-glance/guest-room', icon: 'mdi:bed', color: { r: 51, g: 193, b: 146 } },
-  { title: 'Gym', route: '/at-a-glance/gym', icon: 'mdi:dumbbell', color: { r: 213, g: 117, b: 26 } },
-  { title: 'Master Bedroom', route: '/at-a-glance/master-bedroom', icon: 'mdi:bed-king', color: { r: 20, g: 33, b: 215 } },
-  { title: 'Office', route: '/at-a-glance/office', icon: 'mdi:desktop-tower', color: { r: 20, g: 219, b: 206 } },
-  { title: 'Hallway', route: '/at-a-glance/hallway', icon: 'mdi:door-open', color: { r: 65, g: 49, b: 31 } },
-  { title: 'Kitchen', route: '/at-a-glance/kitchen', icon: 'mdi:stove', color: { r: 177, g: 200, b: 60 } },
-  { title: 'Music Room', route: '/at-a-glance/music-room', icon: 'mdi:music', color: { r: 183, g: 18, b: 186 } },
-  { title: 'Garage', route: '/at-a-glance/garage', icon: 'mdi:garage', color: { r: 223, g: 12, b: 12 } },
-  { title: 'Theater Room', route: '/at-a-glance/theater-room', icon: 'mdi:movie-open', color: { r: 0, g: 0, b: 1 } },
-  { title: 'Back Deck', route: '/at-a-glance/back-deck', icon: 'mdi:grill', color: { r: 5, g: 77, b: 6 } },
-  { title: 'Downstairs Hallway', route: '/at-a-glance/downstairs-hallway', icon: 'mdi:stairs', color: { r: 234, g: 236, b: 203 } },
-  { title: 'Guest Bathroom', route: '/at-a-glance/guest-bathroom', icon: 'mdi:shower', color: { r: 43, g: 227, b: 224 } },
-  { title: 'Master Bathroom', route: '/at-a-glance/master-bathroom', icon: 'mdi:bathtub', color: { r: 95, g: 93, b: 93 } },
-  { title: 'Dining Room', route: '/at-a-glance/dining-room', icon: 'mdi:silverware-fork-knife', color: { r: 217, g: 179, b: 115 } },
-  { title: 'Entryway', route: '/at-a-glance/entryway', icon: 'mdi:door', color: { r: 250, g: 217, b: 0 } },
+export const AREA_ITEMS: RoomNavigationConfig[] = [
+  { title: 'Living Room', route: '/at-a-glance/living-room', icon: 'mdi:sofa', color: { r: 218, g: 206, b: 164 }, accessKey: 'living-room', accessCounterEntityId: 'counter.room_access_living_room' },
+  { title: 'Guest Room', route: '/at-a-glance/guest-room', icon: 'mdi:bed', color: { r: 51, g: 193, b: 146 }, accessKey: 'guest-room', accessCounterEntityId: 'counter.room_access_guest_room' },
+  { title: 'Gym', route: '/at-a-glance/gym', icon: 'mdi:dumbbell', color: { r: 213, g: 117, b: 26 }, accessKey: 'gym', accessCounterEntityId: 'counter.room_access_gym' },
+  { title: 'Master Bedroom', route: '/at-a-glance/master-bedroom', icon: 'mdi:bed-king', color: { r: 20, g: 33, b: 215 }, accessKey: 'master-bedroom', accessCounterEntityId: 'counter.room_access_master_bedroom' },
+  { title: 'Office', route: '/at-a-glance/office', icon: 'mdi:desktop-tower', color: { r: 20, g: 219, b: 206 }, accessKey: 'office', accessCounterEntityId: 'counter.room_access_office' },
+  { title: 'Hallway', route: '/at-a-glance/hallway', icon: 'mdi:door-open', color: { r: 65, g: 49, b: 31 }, accessKey: 'hallway', accessCounterEntityId: 'counter.room_access_hallway' },
+  { title: 'Kitchen', route: '/at-a-glance/kitchen', icon: 'mdi:stove', color: { r: 177, g: 200, b: 60 }, accessKey: 'kitchen', accessCounterEntityId: 'counter.room_access_kitchen' },
+  { title: 'Music Room', route: '/at-a-glance/music-room', icon: 'mdi:music', color: { r: 183, g: 18, b: 186 }, accessKey: 'music-room', accessCounterEntityId: 'counter.room_access_music_room' },
+  { title: 'Garage', route: '/at-a-glance/garage', icon: 'mdi:garage', color: { r: 223, g: 12, b: 12 }, accessKey: 'garage', accessCounterEntityId: 'counter.room_access_garage' },
+  { title: 'Theater Room', route: '/at-a-glance/theater-room', icon: 'mdi:movie-open', color: { r: 0, g: 0, b: 1 }, accessKey: 'theater-room', accessCounterEntityId: 'counter.room_access_theater_room' },
+  { title: 'Back Deck', route: '/at-a-glance/back-deck', icon: 'mdi:grill', color: { r: 5, g: 77, b: 6 }, accessKey: 'back-deck', accessCounterEntityId: 'counter.room_access_back_deck' },
+  { title: 'Downstairs Hallway', route: '/at-a-glance/downstairs-hallway', icon: 'mdi:stairs', color: { r: 234, g: 236, b: 203 }, accessKey: 'downstairs-hallway', accessCounterEntityId: 'counter.room_access_downstairs_hallway' },
+  { title: 'Guest Bathroom', route: '/at-a-glance/guest-bathroom', icon: 'mdi:shower', color: { r: 43, g: 227, b: 224 }, accessKey: 'guest-bathroom', accessCounterEntityId: 'counter.room_access_guest_bathroom' },
+  { title: 'Master Bathroom', route: '/at-a-glance/master-bathroom', icon: 'mdi:bathtub', color: { r: 95, g: 93, b: 93 }, accessKey: 'master-bathroom', accessCounterEntityId: 'counter.room_access_master_bathroom' },
+  { title: 'Dining Room', route: '/at-a-glance/dining-room', icon: 'mdi:silverware-fork-knife', color: { r: 217, g: 179, b: 115 }, accessKey: 'dining-room', accessCounterEntityId: 'counter.room_access_dining_room' },
+  { title: 'Entryway', route: '/at-a-glance/entryway', icon: 'mdi:door', color: { r: 250, g: 217, b: 0 }, accessKey: 'entryway', accessCounterEntityId: 'counter.room_access_entryway' },
 ]
 
 export const LIGHT_GROUPS: EntityGroupConfig[] = [

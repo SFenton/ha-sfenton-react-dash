@@ -18,7 +18,7 @@
   -webkit-backdrop-filter: blur(15px) saturate(1.12);
   font: inherit;
   text-align: left;
-  transition: transform var(--duration-fast) ease, background var(--duration-fast) ease, filter var(--duration-fast) ease;
+  transition: background var(--duration-fast) ease, filter var(--duration-fast) ease;
 }
 
 .card[data-muted='true'] {
@@ -27,6 +27,16 @@
 
 .card[data-clickable='true'] {
   cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.card[data-clickable='true']:focus {
+  outline: none;
+}
+
+.card[data-clickable='true']:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.58);
+  outline-offset: 3px;
 }
 
 .card[data-disabled='true'] {
@@ -51,9 +61,21 @@
 }
 
 .icon,
-.copy {
+.copy,
+.disclosure {
   position: relative;
   z-index: 1;
+}
+
+.disclosure {
+  position: absolute;
+  top: 50%;
+  right: 12px;
+  transform: translateY(-50%);
+}
+
+.hasDisclosure {
+  padding-right: 52px;
 }
 
 .icon {

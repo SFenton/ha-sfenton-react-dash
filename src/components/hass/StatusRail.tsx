@@ -50,6 +50,7 @@ function StatusChip({ chip, onOpenHash, subtitleOverride }: { chip: StatusRailCh
       <GlassTile
         backgroundColor={securityBackgroundColor}
         compact
+        disclosure={Boolean(chip.hash)}
         icon={icon}
         iconColor={securityIcon ? 'white' : dynamicColor}
         isOff={isOff}

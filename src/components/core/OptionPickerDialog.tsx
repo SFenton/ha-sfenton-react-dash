@@ -38,7 +38,7 @@ export function OptionPickerDialog({ open, options, title, value, icon, selected
     return () => window.clearTimeout(timeout)
   }, [open])
 
-  if (!open) return null
+  if (!open && !isSheet) return null
 
   const optionList = (
     <div aria-label={`${title} options`} className={`${styles.options} ${isSheet ? styles.sheetOptions : ''} ${isSheet && sheetLayout === 'compact-grid' ? styles.compactSheetOptions : ''}`} data-layout={optionLayout} role="group">

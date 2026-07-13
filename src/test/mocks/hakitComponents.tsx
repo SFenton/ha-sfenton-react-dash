@@ -3,6 +3,7 @@ import type { CSSProperties, KeyboardEvent } from 'react'
 type SliderTarget = 'high' | 'low' | 'value'
 
 type ControlSliderCircularProps = {
+  'aria-hidden'?: boolean | 'false' | 'true'
   className?: string
   colors?: {
     color?: string
@@ -13,6 +14,7 @@ type ControlSliderCircularProps = {
   dual?: boolean
   high?: number | string
   inactive?: boolean
+  inert?: boolean
   label?: string
   low?: number | string
   max?: number
@@ -25,7 +27,7 @@ type ControlSliderCircularProps = {
   value?: number | string
 }
 
-export function ControlSliderCircular({ className, colors, disabled, dual, high, inactive, label, low, max, min, onChange, onChangeApplied, onPointerUpCapture, readonly, step, value }: ControlSliderCircularProps) {
+export function ControlSliderCircular({ 'aria-hidden': ariaHidden, className, colors, disabled, dual, high, inactive, inert, label, low, max, min, onChange, onChangeApplied, onPointerUpCapture, readonly, step, value }: ControlSliderCircularProps) {
   const values = dual ? [{ type: 'low' as const, value: low }, { type: 'high' as const, value: high }] : [{ type: 'value' as const, value }]
   const style = {
     '--ha-control-slider-color': colors?.color,
@@ -33,7 +35,7 @@ export function ControlSliderCircular({ className, colors, disabled, dual, high,
     '--ha-control-slider-low-color': colors?.lowColor,
   } as CSSProperties
   return (
-    <div className={className} data-inactive={inactive ? 'true' : 'false'} data-testid="control-slider-circular" style={style}>
+    <div aria-hidden={ariaHidden} className={className} data-inactive={inactive ? 'true' : 'false'} data-testid="control-slider-circular" inert={inert} style={style}>
       {values.map((slider) => (
         <input
           aria-label={label}

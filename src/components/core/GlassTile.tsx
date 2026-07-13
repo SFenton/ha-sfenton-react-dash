@@ -1,6 +1,7 @@
 import { Icon } from './Icon'
 import { isValidElement, type CSSProperties, type ReactNode } from 'react'
 import type { IconKey } from '../../constants/atAGlance'
+import { ModalDisclosureIcon } from './ModalDisclosureIcon'
 import styles from './GlassTile.module.css'
 
 export type TileTone = 'air' | 'climate' | 'contact' | 'danger' | 'light' | 'media' | 'neutral' | 'presence' | 'security' | 'switch' | 'vacuum' | 'warning'
@@ -12,7 +13,7 @@ type GlassTileStyle = CSSProperties & {
   '--tile-progress-color'?: string
 }
 
-interface GlassTileProps {
+export interface GlassTileProps {
   title: string
   icon: IconKey | string | ReactNode
   backgroundColor?: string
@@ -20,6 +21,7 @@ interface GlassTileProps {
   subtitle?: string
   tone?: TileTone
   compact?: boolean
+  disclosure?: boolean
   isOff?: boolean
   onClick?: () => void
   pressed?: boolean
@@ -36,6 +38,7 @@ export function GlassTile({
   subtitle,
   tone = 'neutral',
   compact = false,
+  disclosure = false,
   isOff = false,
   onClick,
   pressed,
@@ -49,6 +52,7 @@ export function GlassTile({
     styles.tile,
     onClick ? styles.button : '',
     compact ? styles.compact : '',
+    disclosure && onClick ? styles.hasDisclosure : '',
     variant === 'header' ? styles.headerPill : '',
     styles[tone],
     isOff ? styles.off : '',
@@ -79,6 +83,7 @@ export function GlassTile({
           {subtitle && <span className={styles.subtitle}>{subtitle}</span>}
         </span>
       </span>
+      {disclosure && onClick && <ModalDisclosureIcon size={variant === 'header' ? 'compact' : 'standard'} />}
     </>
   )
 
@@ -91,6 +96,7 @@ export function GlassTile({
         data-icon={iconName}
         data-icon-color={iconColor}
         data-muted={isOff ? 'true' : 'false'}
+        data-modal-opener={disclosure ? 'true' : undefined}
         data-progress={progressValue === undefined ? undefined : String(Math.round(progressValue))}
         data-tone={tone}
         onClick={onClick}

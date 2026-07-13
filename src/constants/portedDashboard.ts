@@ -46,6 +46,7 @@ export interface SettingsLinkConfig {
 }
 
 export interface TodoListConfig {
+  completionScript?: string
   title: string
   entityId: string
   hideCompleted?: boolean
@@ -337,6 +338,7 @@ export const VACATION_PRE_CHECKLIST_ITEMS: VacationChecklistItemConfig[] = [
 ]
 
 export const ADMIN_TODO_ENTITY_ID = 'todo.groceries'
+export const ADMIN_TODO_COMPLETION_SCRIPT = 'script.complete_admin_todo_item'
 
 export const TODO_PAGES: Record<string, TodoPageConfig> = {
   chores: {
@@ -362,7 +364,7 @@ export const TODO_PAGES: Record<string, TodoPageConfig> = {
     emptyTitle: 'No to-do tasks',
     emptyDescription: 'Use Add Task to create an admin to-do.',
     hideListHeaders: true,
-    lists: [{ title: 'Admin To-Do', entityId: ADMIN_TODO_ENTITY_ID }],
+    lists: [{ title: 'Admin To-Do', entityId: ADMIN_TODO_ENTITY_ID, completionScript: ADMIN_TODO_COMPLETION_SCRIPT }],
     showEmptyStateWhenEmpty: true,
   },
   groceries: {

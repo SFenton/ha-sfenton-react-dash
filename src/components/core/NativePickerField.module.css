@@ -60,3 +60,10 @@
   border-color: rgba(255, 255, 255, 0.42);
   outline: 3px solid rgba(255, 255, 255, 0.1);
 }
+
+@media (hover: none), (pointer: coarse) {
+  .pickerShell:focus-within {
+    border-color: rgba(255, 255, 255, 0.16);
+    outline: none;
+  }
+}

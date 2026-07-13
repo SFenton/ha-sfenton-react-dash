@@ -16,18 +16,44 @@
   align-items: center;
   border: 0;
   border-radius: 26px;
-  padding: 0 18px;
+  padding: 0 10px 0 0;
   color: white;
   background: rgba(255, 255, 255, 0.1);
   box-shadow: var(--shadow-glass), inset 0 1px 0 rgba(255, 255, 255, 0.18), inset 0 -1px 0 rgba(0, 0, 0, 0.14);
   backdrop-filter: blur(15px) saturate(1.12);
   -webkit-backdrop-filter: blur(15px) saturate(1.12);
-  cursor: pointer;
   transition: background var(--duration-fast) ease;
 }
 
 .modeCard[data-active='true'] {
   background: rgb(76 161 84 / 0.82);
+}
+
+.modeToggle {
+  display: flex;
+  min-width: 0;
+  min-height: 92px;
+  flex: 1 1 auto;
+  align-items: center;
+  border: 0;
+  padding: 0 8px 0 18px;
+  color: inherit;
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
+  text-align: left;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.modeToggle:focus,
+.modeSelect:focus {
+  outline: none;
+}
+
+.modeToggle:focus-visible,
+.modeSelect:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.58);
+  outline-offset: -3px;
 }
 
 .modeIcon {
@@ -69,9 +95,11 @@
   align-items: center;
   gap: 2px;
   margin-left: auto;
+  border: 0;
   padding: 8px;
   border-radius: 14px;
   color: white;
+  background: transparent;
   cursor: pointer;
 }
 

@@ -40,6 +40,27 @@
   transition: width var(--duration-fast) ease;
 }
 
+.details {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  border: 0;
+  border-radius: inherit;
+  padding: 0;
+  background: transparent;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.details:focus {
+  outline: none;
+}
+
+.details:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.58);
+  outline-offset: -4px;
+}
+
 .card[data-dragging='true'] .fill {
   transition: none;
 }
@@ -50,9 +71,10 @@
 
 .icon,
 .copy,
+.disclosure,
 .power {
   position: relative;
-  z-index: 1;
+  z-index: 2;
 }
 
 .icon {
@@ -63,6 +85,7 @@
   place-items: center;
   color: rgba(255, 255, 255, 0.96);
   filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.24));
+  pointer-events: none;
 }
 
 .copy {
@@ -70,6 +93,7 @@
   flex: 1 1 auto;
   min-width: 0;
   gap: 2px;
+  pointer-events: none;
 }
 
 .title {
@@ -107,4 +131,14 @@
   background: rgba(255, 255, 255, 0.14);
   cursor: pointer;
   touch-action: none;
+  z-index: 3;
+}
+
+.power:focus {
+  outline: none;
+}
+
+.power:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.58);
+  outline-offset: 2px;
 }

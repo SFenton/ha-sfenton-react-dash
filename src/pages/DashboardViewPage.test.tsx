@@ -4,6 +4,7 @@ import { vi } from 'vitest'
 import { materialIconPath } from '../components/core/iconPaths'
 import { INVENTORY_SEARCH_DEBOUNCE_MS } from '../components/hass/EverShelfInventoryControls'
 import { MEDIA_REMOTE_MODAL_STYLE } from '../components/hass/mediaRemoteModalStyle'
+import { valueToThermostatPoint } from '../components/hass/thermostatDialGeometry'
 import { VACUUM_MODAL_STYLE } from '../components/hass/vacuumModalStyle'
 import { DashboardViewPage } from './DashboardViewPage'
 import { CONTACT_GROUPS } from '../constants/atAGlance'
@@ -201,6 +202,23 @@ function setVacationChecklistMockState(state: string) {
   for (const entityId of VACATION_CHECKLIST_ENTITY_IDS) {
     mockEntities[entityId].state = state
   }
+}
+
+function setupStephenSleepypodLevelControl(phase: string) {
+  mockEntities['climate.sleepypod_eight_pod_left_side'] = entity('climate.sleepypod_eight_pod_left_side', 'heat', {
+    current_temperature: 81,
+    hvac_modes: ['off', 'heat'],
+    max_temp: 110,
+    min_temp: 55,
+    target_temp_step: 1,
+    temperature: 77,
+  })
+  mockEntities['number.master_bedroom_sleepypod_eight_pod_left_target_level'] = entity('number.master_bedroom_sleepypod_eight_pod_left_target_level', '-2', {
+    max: 10,
+    min: -10,
+    step: 1,
+  })
+  mockEntities['sensor.sleepypod_stephen_schedule_phase'].state = phase
 }
 
 async function startAndCaptureExpirationDate(buttonName = 'Read Expiration Date') {
@@ -1052,6 +1070,7 @@ describe('DashboardViewPage', () => {
     expect(screen.getByText('Enable or disable presence-based lighting in specific rooms. Useful for when we have company, or need to quickly keep lights on or off without using the voice commands.')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Open Presence-Based Overrides' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Open Presence-Based Overrides' })).toHaveAttribute('data-tone', 'switch-active')
+    expect(screen.getByRole('button', { name: 'Open Presence-Based Overrides' }).querySelector('[data-modal-disclosure="right-chevron"]')).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Show Specific Controls' })).toBeInTheDocument()
     expect(screen.getByText("Shows the outdoor faucets in our Home Assistant pages. Useful to disable during the winter, when we aren't using them.")).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Outdoor Faucets Off/i })).toBeInTheDocument()
@@ -1422,6 +1441,160 @@ describe('DashboardViewPage', () => {
     expect(screen.getAllByTestId('control-slider-circular')[0]).toHaveAttribute('data-inactive', 'false')
   })
 
+  it('renders HA-owned vacation, non-vacation, and guest home-away transitions without inferring from raw inputs', async () => {
+    const view = render(<DashboardViewPage activePath="ecobee" onNavigate={() => undefined} path="ecobee" />)
+
+    expect(screen.queryByLabelText(/Whole Home (?:Away|Vacation) Mode/)).not.toBeInTheDocument()
+    expect(screen.getByRole('region', { name: /Whole Home thermostat Idle 71.0°F 72.0 · 74.0/i })).toBeInTheDocument()
+
+    mockEntities['input_boolean.vacation_mode'].state = 'on'
+    mockEntities['binary_sensor.thermostat_contact_sensors_away_mode_active'].state = 'on'
+    mockEntities['sensor.thermostat_effective_home_away'].state = 'Away'
+    mockEntities['sensor.thermostat_home_away_reason'].state = 'Vacation Mode is active and everyone is away; TCS is using Eco Away targets.'
+    view.rerender(<DashboardViewPage activePath="ecobee" onNavigate={() => undefined} path="ecobee" />)
+
+    const hero = screen.getByRole('region', { name: /Whole Home thermostat Idle 71.0°F 62.0 · 78.0/i })
+    const hub = screen.getByLabelText('Thermostat Hub Off')
+    const vacationMode = screen.getByLabelText('Whole Home Vacation Mode')
+    expect(screen.getByText('Vacation Mode Active. The room may be cooler or warmer than your heat/cool targets to save energy while away.')).toBeInTheDocument()
+    expect(hero.compareDocumentPosition(hub) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(hub.compareDocumentPosition(vacationMode) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    const awayTargetSliders = screen.getAllByRole('slider', { name: 'Whole Home target temperature' })
+    fireEvent.change(awayTargetSliders[0], { target: { value: '63' } })
+    fireEvent.pointerUp(awayTargetSliders[0])
+    expect(mockCallServiceCalls).toEqual([{
+      domain: 'climate',
+      service: 'set_temperature',
+      serviceData: { target_temp_high: 78, target_temp_low: 63 },
+      target: 'climate.thermostat_contact_sensors_eco_away_virtual_thermostat',
+    }])
+    mockCallServiceCalls.length = 0
+
+    mockEntities['input_boolean.vacation_mode'].state = 'off'
+    mockEntities['sensor.thermostat_home_away_reason'].state = 'Everyone is away; TCS is keeping Eco active without heating or cooling.'
+    view.rerender(<DashboardViewPage activePath="ecobee" onNavigate={() => undefined} path="ecobee" />)
+
+    expect(screen.getByRole('region', { name: /Whole Home thermostat Idle 71.0°F 63.0 · 78.0/i })).toBeInTheDocument()
+    expect(screen.getByLabelText('Whole Home Away Mode')).toBeInTheDocument()
+    expect(screen.getByText('Away Mode Active. The room may be cooler or warmer than your heat/cool targets to save energy while away.')).toBeInTheDocument()
+
+    mockEntities['input_boolean.vacation_mode'].state = 'on'
+    mockEntities['sensor.thermostat_effective_home_away'].state = 'Home'
+    mockEntities['sensor.thermostat_home_away_reason'].state = 'Guest stay protection is active during Vacation Mode, so TCS is enforcing home-style temperatures.'
+    mockEntities['climate.thermostat_contact_sensors_living_room_virtual_thermostat'].attributes.away_mode_active = false
+    view.rerender(<DashboardViewPage activePath="ecobee" onNavigate={() => undefined} path="ecobee" />)
+
+    expect(screen.queryByLabelText(/Whole Home (?:Away|Vacation) Mode/)).not.toBeInTheDocument()
+    expect(screen.getByRole('region', { name: /Whole Home thermostat Idle 71.0°F 72.0 · 74.0/i })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Living Room 70.2°F · Inactive' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Living Room' })
+    expect(within(dialog).queryByLabelText(/effective thermostat mode Away/i)).not.toBeInTheDocument()
+    expect(within(dialog).queryByText(/(?:Away|Vacation) Mode/i)).not.toBeInTheDocument()
+  })
+
+  it('keeps main and room dial ranges and handle positions correct after Vacation Mode ends', async () => {
+    const expectRangeHandlePositions = (dial: HTMLElement, low: number, high: number) => {
+      const lowPoint = valueToThermostatPoint(low, 45, 95)
+      const highPoint = valueToThermostatPoint(high, 45, 95)
+      const lowHandle = dial.querySelector<HTMLElement>('[data-target="low"]')
+      const highHandle = dial.querySelector<HTMLElement>('[data-target="high"]')
+
+      expect(lowHandle).not.toBeNull()
+      expect(highHandle).not.toBeNull()
+      expect(lowHandle!).toHaveStyle({
+        '--thermostat-handle-x': `${lowPoint.x}%`,
+        '--thermostat-handle-y': `${lowPoint.y}%`,
+      })
+      expect(highHandle!).toHaveStyle({
+        '--thermostat-handle-x': `${highPoint.x}%`,
+        '--thermostat-handle-y': `${highPoint.y}%`,
+      })
+    }
+
+    mockEntities['input_boolean.vacation_mode'].state = 'on'
+    mockEntities['binary_sensor.thermostat_contact_sensors_away_mode_active'].state = 'on'
+    mockEntities['sensor.thermostat_effective_home_away'].state = 'Away'
+    mockEntities['sensor.thermostat_home_away_reason'].state = 'Vacation Mode is active and everyone is away; TCS is keeping Eco active without heating or cooling.'
+    mockEntities['climate.thermostat_contact_sensors_living_room_virtual_thermostat'].attributes.away_mode_active = true
+    const view = render(<DashboardViewPage activePath="ecobee" onNavigate={() => undefined} path="ecobee" />)
+
+    let wholeHomeDial = screen.getByRole('region', { name: /Whole Home thermostat Idle 71.0°F 62.0 · 78.0/i })
+    expectRangeHandlePositions(wholeHomeDial, 62, 78)
+    expect(screen.getByLabelText('Whole Home Vacation Mode')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Living Room 70.2°F · Inactive' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Living Room' })
+    let roomDial = within(dialog).getByRole('region', { name: /Living Room thermostat Idle 70.2°F 72.0 · 74.0/i })
+    expectRangeHandlePositions(roomDial, 72, 74)
+    expect(within(dialog).getByLabelText('Living Room Vacation Mode')).toBeInTheDocument()
+
+    mockEntities['input_boolean.vacation_mode'].state = 'off'
+    mockEntities['sensor.thermostat_home_away_reason'].state = 'Everyone is away; TCS is keeping Eco active without heating or cooling.'
+    view.rerender(<DashboardViewPage activePath="ecobee" onNavigate={() => undefined} path="ecobee" />)
+
+    wholeHomeDial = screen.getByRole('region', { hidden: true, name: /Whole Home thermostat Idle 71.0°F 62.0 · 78.0/i })
+    roomDial = within(dialog).getByRole('region', { name: /Living Room thermostat Idle 70.2°F 72.0 · 74.0/i })
+    expectRangeHandlePositions(wholeHomeDial, 62, 78)
+    expectRangeHandlePositions(roomDial, 72, 74)
+    expect(screen.getByLabelText('Whole Home Away Mode')).toBeInTheDocument()
+    expect(within(dialog).getByLabelText('Living Room Away Mode')).toBeInTheDocument()
+
+    mockEntities['binary_sensor.thermostat_contact_sensors_away_mode_active'].state = 'off'
+    mockEntities['sensor.thermostat_effective_home_away'].state = 'Home'
+    mockEntities['sensor.thermostat_home_away_reason'].state = 'A resident is home, so TCS is using home behavior.'
+    mockEntities['climate.thermostat_contact_sensors_living_room_virtual_thermostat'].attributes.away_mode_active = false
+    view.rerender(<DashboardViewPage activePath="ecobee" onNavigate={() => undefined} path="ecobee" />)
+
+    wholeHomeDial = screen.getByRole('region', { hidden: true, name: /Whole Home thermostat Idle 71.0°F 72.0 · 74.0/i })
+    roomDial = within(dialog).getByRole('region', { name: /Living Room thermostat Idle 70.2°F 72.0 · 74.0/i })
+    expectRangeHandlePositions(wholeHomeDial, 72, 74)
+    expectRangeHandlePositions(roomDial, 72, 74)
+    expect(screen.queryByLabelText(/Whole Home (?:Away|Vacation) Mode/)).not.toBeInTheDocument()
+    expect(within(dialog).queryByLabelText(/Living Room (?:Away|Vacation) Mode/)).not.toBeInTheDocument()
+  })
+
+  it('shows the room Vacation Mode tile without adding a React-owned action', async () => {
+    mockEntities['input_boolean.vacation_mode'].state = 'on'
+    mockEntities['binary_sensor.thermostat_contact_sensors_away_mode_active'].state = 'on'
+    mockEntities['sensor.thermostat_effective_home_away'].state = 'Away'
+    mockEntities['sensor.thermostat_home_away_reason'].state = 'Vacation Mode is active and everyone is away; TCS is keeping Eco active without heating or cooling.'
+    mockEntities['climate.thermostat_contact_sensors_living_room_virtual_thermostat'].attributes.away_mode_active = true
+    render(<DashboardViewPage activePath="ecobee" onNavigate={() => undefined} path="ecobee" />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Living Room 70.2°F · Inactive' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Living Room' })
+    const vacationMode = within(dialog).getByLabelText('Living Room Vacation Mode')
+
+    expect(within(dialog).queryByLabelText('Vacation Mode On')).not.toBeInTheDocument()
+    expect(within(dialog).getByText('Vacation Mode Active. The room may be cooler or warmer than your heat/cool targets to save energy while away.')).toBeInTheDocument()
+    fireEvent.click(vacationMode)
+    expect(mockCallServiceCalls).toEqual([])
+  })
+
+  it('renders the shared modal dial gutter when a heat marker occupies the top arc', async () => {
+    const climateEntity = mockEntities['climate.thermostat_contact_sensors_living_room_virtual_thermostat']
+    const previousLow = climateEntity.attributes.target_temp_low
+    const previousHigh = climateEntity.attributes.target_temp_high
+    climateEntity.attributes.target_temp_low = 70
+    climateEntity.attributes.target_temp_high = 72
+    window.history.replaceState(null, '', '/at-a-glance/ecobee#living-room')
+
+    const view = render(<DashboardViewPage activePath="ecobee" onNavigate={() => undefined} path="ecobee" />)
+
+    const dialog = await screen.findByRole('dialog', { name: 'Living Room' })
+    const shell = within(dialog).getByRole('region', { name: 'Living Room thermostat control' })
+    const dial = within(shell).getByRole('region', { name: /Living Room thermostat Idle 70.2°F 70.0 · 72.0/i })
+    const lowHandle = dial.querySelector('[data-target="low"]')
+
+    expect(shell).toHaveAttribute('data-thermostat-modal-dial-shell', 'true')
+    expect(shell).toHaveStyle({ '--thermostat-modal-dial-gutter': '20px' })
+    expect(lowHandle).toHaveStyle({ '--thermostat-handle-x': '50%', '--thermostat-handle-y': '4.6875%' })
+
+    view.unmount()
+    climateEntity.attributes.target_temp_low = previousLow
+    climateEntity.attributes.target_temp_high = previousHigh
+  })
+
   it('colors the Thermostat Hub glass card from active heat and cool status', () => {
     mockEntities['climate.thermostat_hub_w200'].attributes.hvac_action = 'cooling'
     const view = render(<DashboardViewPage activePath="ecobee" onNavigate={() => undefined} path="ecobee" />)
@@ -1485,6 +1658,7 @@ describe('DashboardViewPage', () => {
     expect(screen.getByRole('heading', { name: 'Thermostat' })).toBeInTheDocument()
     expect(screen.queryByText(/not available in the React dashboard yet/i)).not.toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Whole Home' })).toBeInTheDocument()
+    expect(screen.queryByLabelText(/Whole Home (?:Away|Vacation) Mode/)).not.toBeInTheDocument()
     expect(screen.getByRole('region', { name: /Whole Home thermostat Heating 71.0°F 72.0 · 74.0/i })).toBeInTheDocument()
     expect(screen.getAllByTestId('control-slider-circular')[0]).toHaveStyle({ '--ha-control-slider-color': '#cd5401', '--ha-control-slider-high-color': '#2c8e98', '--ha-control-slider-low-color': '#cd5401' })
     expect(screen.getAllByTestId('control-slider-circular')[0]).toHaveAttribute('data-inactive', 'false')
@@ -1532,7 +1706,8 @@ describe('DashboardViewPage', () => {
     expect(within(pickerSheet).getByRole('button', { name: 'Track Select Critical' }).querySelectorAll('path')).toHaveLength(1)
     expect(within(pickerSheet).getByRole('button', { name: 'Track Select Active' }).querySelector('path')).toHaveAttribute('d', materialIconPath('mdi:thermometer-alert'))
     fireEvent.click(within(pickerSheet).getByRole('button', { name: 'Track Select Critical' }))
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    await waitFor(() => expect(pickerSheet).toHaveAttribute('data-state', 'closed'))
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
     expect(screen.getByText(/Enable Eco Mode to only track active rooms/i)).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Predictive Comfort' })).toBeInTheDocument()
     expect(screen.getByText(/Use forecast weather, humidity, indoor sensors, and learned heat-load patterns/i)).toBeInTheDocument()
@@ -1569,7 +1744,9 @@ describe('DashboardViewPage', () => {
       { domain: 'homeassistant', service: 'toggle', target: 'input_boolean.enable_disable_thermostat_contact_sensors_integration' },
     ])
 
-    fireEvent.click(screen.getByRole('button', { name: 'Living Room 70.2°F · Inactive' }))
+    const roomOpener = screen.getByRole('button', { name: 'Living Room 70.2°F · Inactive' })
+    expect(roomOpener.querySelector('[data-modal-disclosure="right-chevron"]')).toBeInTheDocument()
+    fireEvent.click(roomOpener)
     expect(await screen.findByRole('dialog')).toHaveAttribute('data-surface', 'hass-popup')
     expect(screen.getByRole('heading', { name: 'Living Room' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Living Room Vents' })).toBeInTheDocument()
@@ -1624,6 +1801,7 @@ describe('DashboardViewPage', () => {
     expect(screen.getByRole('button', { name: 'Turn off Predictive Comfort' })).toBeInTheDocument()
     const predictiveControls = screen.getByRole('button', { name: 'Open Predictive Comfort controls' })
     expect(predictiveControls).toBeInTheDocument()
+    expect(predictiveControls.querySelector('[data-modal-disclosure="right-chevron"]')).toBeInTheDocument()
     expect(predictiveControls.querySelector('path')).toHaveAttribute('d', materialIconPath('mdi:chevron-right'))
 
     fireEvent.click(predictiveComfort)
@@ -1663,6 +1841,20 @@ describe('DashboardViewPage', () => {
       { domain: 'homeassistant', service: 'toggle', target: 'switch.thermostat_contact_sensors_predictive_hvac_mode_changes' },
       { domain: 'homeassistant', service: 'toggle', target: 'switch.thermostat_contact_sensors_predictive_allow_away' },
     ])
+  })
+
+  it('renders the Pre-Cool recommendation consistently from the HA state', async () => {
+    mockEntities['switch.thermostat_contact_sensors_predictive_comfort_mode'].state = 'on'
+    mockEntities['sensor.living_room_thermostat_contact_sensors_predictive_comfort_mode'].state = 'pre_cool'
+    render(<DashboardViewPage activePath="climate" onNavigate={() => undefined} path="ecobee" />)
+
+    const predictiveComfort = screen.getByRole('button', { name: 'Predictive Comfort On · Pre-Cool' })
+    expect(screen.queryByText('Pre Cool')).not.toBeInTheDocument()
+
+    fireEvent.click(predictiveComfort)
+    const dialog = await screen.findByRole('dialog')
+    expect(within(dialog).getByText('Pre-Cool')).toBeInTheDocument()
+    expect(within(dialog).queryByText('Pre Cool')).not.toBeInTheDocument()
   })
 
   it('turns Predictive Comfort off from the active card power action', () => {
@@ -1718,7 +1910,7 @@ describe('DashboardViewPage', () => {
     expect(screen.queryByRole('heading', { name: 'Master Bedroom Climate' })).not.toBeInTheDocument()
   })
 
-  it('uses SleepyPod climate controls when the MQTT climate entity is available', async () => {
+  it('fails closed instead of mixing SleepyPod and legacy controls when only one MQTT adapter entity is available', async () => {
     mockEntities['climate.sleepypod_eight_pod_left_side'] = entity('climate.sleepypod_eight_pod_left_side', 'heat', {
       current_temperature: 81,
       hvac_modes: ['off', 'heat'],
@@ -1727,39 +1919,34 @@ describe('DashboardViewPage', () => {
       target_temp_step: 1,
       temperature: 70,
     })
-    mockEntities['sensor.sleepypod_eight_pod_left_heart_rate'] = entity('sensor.sleepypod_eight_pod_left_heart_rate', 'unknown', { unit_of_measurement: 'bpm' })
+    const climateOnly = render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
+    const climateOnlyCard = screen.getByLabelText(/Stephen's Bed Off/i)
+    expect(climateOnlyCard).toHaveAttribute('data-muted', 'true')
+    expect(climateOnlyCard.tagName).toBe('DIV')
+    expect(screen.queryByRole('dialog', { name: "Stephen's Bed" })).not.toBeInTheDocument()
+
+    climateOnly.unmount()
+    window.history.replaceState(null, '', `${window.location.pathname}#stephens-bed`)
+    const climateOnlyDeepLink = render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
+    const unavailableDialog = await screen.findByRole('dialog', { name: "Stephen's Bed" })
+    expect(within(unavailableDialog).getByRole('alert')).toHaveTextContent('Bed controls are unavailable.')
+    expect(within(unavailableDialog).queryByRole('button', { name: "Increase Stephen's Bed Bedtime level" })).not.toBeInTheDocument()
+    expect(mockCallServiceCalls).toEqual([])
+
+    climateOnlyDeepLink.unmount()
+    window.history.replaceState(null, '', window.location.pathname)
+    delete mockEntities['climate.sleepypod_eight_pod_left_side']
+    mockEntities['number.master_bedroom_sleepypod_eight_pod_left_target_level'] = entity('number.master_bedroom_sleepypod_eight_pod_left_target_level', '-2', {
+      max: 10,
+      min: -10,
+      step: 1,
+    })
     render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
-
-    fireEvent.click(screen.getByRole('button', { name: /Stephen's Bed Cooling • 70°F/i }))
-
-    const dialog = await screen.findByRole('dialog', { name: "Stephen's Bed" })
-    expect(within(dialog).getByRole('button', { name: 'Alarms' })).toBeInTheDocument()
-    expect(within(dialog).getByRole('region', { name: /Stephen's Bed thermostat Cooling 70°F/i })).toBeInTheDocument()
-    const targetSlider = within(dialog).getByRole('slider', { name: "Stephen's Bed target temperature" })
-    fireEvent.change(targetSlider, { target: { value: '68' } })
-    fireEvent.pointerUp(targetSlider)
-
-    expect(within(dialog).getByRole('region', { name: /Stephen's Bed thermostat Cooling 68°F/i })).toBeInTheDocument()
-
-    await waitFor(() => expect(mockCallServiceCalls).toContainEqual({
-      domain: 'climate',
-      service: 'set_temperature',
-      target: 'climate.sleepypod_eight_pod_left_side',
-      serviceData: { temperature: 68 },
-    }))
-
-    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true)
-    try {
-      fireEvent.click(within(dialog).getByRole('button', { name: "Turn off Stephen's Bed" }))
-      expect(mockCallServiceCalls).toContainEqual({
-        domain: 'climate',
-        service: 'set_hvac_mode',
-        target: 'climate.sleepypod_eight_pod_left_side',
-        serviceData: { hvac_mode: 'off' },
-      })
-    } finally {
-      confirm.mockRestore()
-    }
+    const levelOnlyCard = screen.getByLabelText(/Stephen's Bed Off/i)
+    expect(levelOnlyCard).toHaveAttribute('data-muted', 'true')
+    expect(levelOnlyCard.tagName).toBe('DIV')
+    expect(screen.queryByRole('dialog', { name: "Stephen's Bed" })).not.toBeInTheDocument()
+    expect(mockCallServiceCalls).toEqual([])
   })
 
   it('uses SleepyPod target-level controls when the MQTT level adapter is available', async () => {
@@ -1806,17 +1993,331 @@ describe('DashboardViewPage', () => {
     expect(stagePayload.left.monday.temperatures).toEqual({ '01:00': 80, '05:00': 83 })
 
     const targetSlider = within(dialog).getByRole('slider', { name: "Stephen's Bed target level" })
-    fireEvent.change(targetSlider, { target: { value: '-3' } })
-    fireEvent.pointerUp(targetSlider)
+    fireEvent.keyDown(targetSlider, { key: 'ArrowLeft' })
 
     expect(within(dialog).getByRole('region', { name: /Stephen's Bed thermostat Cooling -3/i })).toBeInTheDocument()
+    expect(screen.queryByRole('dialog', { name: 'Set Bed Temperature' })).not.toBeInTheDocument()
 
     await waitFor(() => expect(mockCallServiceCalls).toContainEqual({
-      domain: 'number',
-      service: 'set_value',
-      target: 'number.master_bedroom_sleepypod_eight_pod_left_target_level',
-      serviceData: { value: -3 },
+      domain: 'script',
+      service: 'sleepypod_stephen_temperature_outside_schedule',
+      serviceData: { level: -3 },
     }))
+  })
+
+  it.each([
+    ['bedtime', 'Tonight', 'sleepypod_stephen_temperature_tonight'],
+    ['bedtime', 'All Nights', 'sleepypod_stephen_bedtime_temperature_all_nights'],
+    ['asleep', 'Tonight', 'sleepypod_stephen_temperature_tonight'],
+    ['asleep', 'All Nights', 'sleepypod_stephen_asleep_temperature_all_nights'],
+    ['dawn', 'Tonight', 'sleepypod_stephen_temperature_tonight'],
+    ['dawn', 'All Nights', 'sleepypod_stephen_dawn_temperature_all_nights'],
+  ])('prompts during %s and routes %s through %s', async (phase, choice, service) => {
+    setupStephenSleepypodLevelControl(phase)
+    render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
+
+    fireEvent.click(screen.getByRole('button', { name: /Stephen's Bed Cooling • -2/i }))
+    const bedDialog = await screen.findByRole('dialog', { name: "Stephen's Bed" })
+    fireEvent.keyDown(within(bedDialog).getByRole('slider', { name: "Stephen's Bed target level" }), { key: 'ArrowLeft' })
+
+    const scopeDialog = await screen.findByRole('dialog', { name: 'Set Bed Temperature' })
+    expect(scopeDialog).toHaveTextContent(new RegExp(`Stephen's Bed • ${phase} • -3`, 'i'))
+    await waitFor(() => expect(within(scopeDialog).getByRole('button', { name: 'Tonight' })).toHaveFocus())
+    expect(mockCallServiceCalls).toEqual([])
+
+    fireEvent.click(within(scopeDialog).getByRole('button', { name: choice }))
+
+    await waitFor(() => expect(mockCallServiceCalls).toEqual([{
+      domain: 'script',
+      service,
+      serviceData: { level: -3 },
+    }]))
+    await waitFor(() => expect(scopeDialog).toHaveAttribute('data-state', 'closed'))
+    expect(scopeDialog).toHaveAttribute('data-closing', 'true')
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Set Bed Temperature' })).not.toBeInTheDocument())
+    expect(within(bedDialog).getByRole('region', { name: /Stephen's Bed thermostat Cooling -3/i })).toBeInTheDocument()
+    await waitFor(() => expect(within(bedDialog).getByRole('slider', { name: "Stephen's Bed target level" })).toHaveFocus())
+    expect(mockCallServiceCalls.some((call) => call.domain === 'number')).toBe(false)
+  })
+
+  it('cancels active-phase temperature changes from the action, close button, and backdrop', async () => {
+    setupStephenSleepypodLevelControl('asleep')
+    render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
+
+    fireEvent.click(screen.getByRole('button', { name: /Stephen's Bed Cooling • -2/i }))
+    const bedDialog = await screen.findByRole('dialog', { name: "Stephen's Bed" })
+    const targetSlider = within(bedDialog).getByRole('slider', { name: "Stephen's Bed target level" })
+
+    const openScopePrompt = async () => {
+      fireEvent.keyDown(targetSlider, { key: 'ArrowLeft' })
+      return screen.findByRole('dialog', { name: 'Set Bed Temperature' })
+    }
+
+    let scopeDialog = await openScopePrompt()
+    fireEvent.click(within(scopeDialog).getByRole('button', { name: 'Cancel' }))
+    expect(scopeDialog).toHaveTextContent("Stephen's Bed • Asleep • -3")
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Set Bed Temperature' })).not.toBeInTheDocument())
+    await waitFor(() => expect(targetSlider).toHaveFocus())
+
+    scopeDialog = await openScopePrompt()
+    fireEvent.click(within(scopeDialog).getByRole('button', { name: 'Close' }))
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Set Bed Temperature' })).not.toBeInTheDocument())
+    await waitFor(() => expect(targetSlider).toHaveFocus())
+
+    scopeDialog = await openScopePrompt()
+    const overlays = document.querySelectorAll('[data-modal-sheet-overlay]')
+    fireEvent.pointerDown(overlays[overlays.length - 1])
+    await waitFor(() => expect(scopeDialog).toHaveAttribute('data-state', 'closed'))
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Set Bed Temperature' })).not.toBeInTheDocument())
+    await waitFor(() => expect(targetSlider).toHaveFocus())
+
+    expect(mockCallServiceCalls).toEqual([])
+    expect(within(bedDialog).getByRole('region', { name: /Stephen's Bed thermostat Cooling -2/i })).toBeInTheDocument()
+  })
+
+  it('does not steal a newer parent-modal focus choice after the scope prompt closes', async () => {
+    setupStephenSleepypodLevelControl('asleep')
+    render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
+
+    fireEvent.click(screen.getByRole('button', { name: /Stephen's Bed Cooling • -2/i }))
+    const bedDialog = await screen.findByRole('dialog', { name: "Stephen's Bed" })
+    fireEvent.keyDown(within(bedDialog).getByRole('slider', { name: "Stephen's Bed target level" }), { key: 'ArrowLeft' })
+    const scopeDialog = await screen.findByRole('dialog', { name: 'Set Bed Temperature' })
+    const parentClose = bedDialog.querySelector<HTMLButtonElement>('button[aria-label="Close"]')
+    if (!parentClose) throw new Error('Bed modal close button was not found')
+
+    fireEvent.click(within(scopeDialog).getByRole('button', { name: 'Cancel' }))
+    parentClose.focus()
+    await act(async () => {
+      await new Promise((resolve) => window.setTimeout(resolve, 600))
+    })
+
+    expect(parentClose).toHaveFocus()
+    expect(mockCallServiceCalls).toEqual([])
+  })
+
+  it('closes a stale scope prompt when HA advances the schedule phase', async () => {
+    setupStephenSleepypodLevelControl('bedtime')
+    const view = render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
+
+    fireEvent.click(screen.getByRole('button', { name: /Stephen's Bed Cooling • -2/i }))
+    const bedDialog = await screen.findByRole('dialog', { name: "Stephen's Bed" })
+    fireEvent.keyDown(within(bedDialog).getByRole('slider', { name: "Stephen's Bed target level" }), { key: 'ArrowLeft' })
+    const scopeDialog = await screen.findByRole('dialog', { name: 'Set Bed Temperature' })
+
+    act(() => {
+      mockEntities['sensor.sleepypod_stephen_schedule_phase'].state = 'asleep'
+      view.rerender(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
+    })
+
+    await waitFor(() => expect(scopeDialog).toHaveAttribute('data-state', 'closed'))
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Set Bed Temperature' })).not.toBeInTheDocument())
+    expect(mockCallServiceCalls).toEqual([])
+    expect(within(bedDialog).getByRole('region', { name: /Stephen's Bed thermostat Cooling -2/i })).toBeInTheDocument()
+  })
+
+  it('closes the scope prompt without a command when the SleepyPod adapter becomes unavailable', async () => {
+    setupStephenSleepypodLevelControl('bedtime')
+    const view = render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
+
+    fireEvent.click(screen.getByRole('button', { name: /Stephen's Bed Cooling • -2/i }))
+    const bedDialog = await screen.findByRole('dialog', { name: "Stephen's Bed" })
+    fireEvent.keyDown(within(bedDialog).getByRole('slider', { name: "Stephen's Bed target level" }), { key: 'ArrowLeft' })
+    const scopeDialog = await screen.findByRole('dialog', { name: 'Set Bed Temperature' })
+    const retainedTonightAction = within(scopeDialog).getByRole('button', { name: 'Tonight' })
+
+    vi.useFakeTimers()
+    try {
+      act(() => {
+        mockEntities['climate.sleepypod_eight_pod_left_side'].state = 'unavailable'
+        view.rerender(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
+      })
+      act(() => {
+        vi.advanceTimersByTime(10_001)
+      })
+
+      expect(scopeDialog).toHaveAttribute('data-state', 'closed')
+      fireEvent.click(retainedTonightAction)
+      expect(mockCallServiceCalls).toEqual([])
+    } finally {
+      vi.clearAllTimers()
+      vi.useRealTimers()
+    }
+  })
+
+  it('reverts optimistic feedback when HA leaves the phase used by a completed choice', async () => {
+    setupStephenSleepypodLevelControl('bedtime')
+    const view = render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
+
+    fireEvent.click(screen.getByRole('button', { name: /Stephen's Bed Cooling • -2/i }))
+    const bedDialog = await screen.findByRole('dialog', { name: "Stephen's Bed" })
+    fireEvent.keyDown(within(bedDialog).getByRole('slider', { name: "Stephen's Bed target level" }), { key: 'ArrowLeft' })
+    const scopeDialog = await screen.findByRole('dialog', { name: 'Set Bed Temperature' })
+    fireEvent.click(within(scopeDialog).getByRole('button', { name: 'Tonight' }))
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Set Bed Temperature' })).not.toBeInTheDocument())
+    expect(within(bedDialog).getByRole('region', { name: /Stephen's Bed thermostat Cooling -3/i })).toBeInTheDocument()
+
+    act(() => {
+      mockEntities['sensor.sleepypod_stephen_schedule_phase'].state = 'outside'
+      view.rerender(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
+    })
+
+    await waitFor(() => expect(within(bedDialog).getByRole('region', { name: /Stephen's Bed thermostat Cooling -2/i })).toBeInTheDocument())
+    expect(mockCallServiceCalls).toEqual([{
+      domain: 'script',
+      service: 'sleepypod_stephen_temperature_tonight',
+      serviceData: { level: -3 },
+    }])
+  })
+
+  it('cancels a queued outside-window command when HA enters an active phase', async () => {
+    setupStephenSleepypodLevelControl('outside')
+    const view = render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
+
+    fireEvent.click(screen.getByRole('button', { name: /Stephen's Bed Cooling • -2/i }))
+    const bedDialog = await screen.findByRole('dialog', { name: "Stephen's Bed" })
+    fireEvent.keyDown(within(bedDialog).getByRole('slider', { name: "Stephen's Bed target level" }), { key: 'ArrowLeft' })
+    expect(within(bedDialog).getByRole('region', { name: /Stephen's Bed thermostat Cooling -3/i })).toBeInTheDocument()
+
+    act(() => {
+      mockEntities['sensor.sleepypod_stephen_schedule_phase'].state = 'bedtime'
+      view.rerender(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
+    })
+    await act(async () => {
+      await new Promise((resolve) => window.setTimeout(resolve, 400))
+    })
+
+    expect(within(bedDialog).getByRole('region', { name: /Stephen's Bed thermostat Cooling -2/i })).toBeInTheDocument()
+    expect(mockCallServiceCalls).toEqual([])
+  })
+
+  it('fails closed when the HA schedule phase is unavailable', async () => {
+    setupStephenSleepypodLevelControl('unavailable')
+    render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
+
+    fireEvent.click(screen.getByRole('button', { name: /Stephen's Bed Cooling • -2/i }))
+    const dialog = await screen.findByRole('dialog', { name: "Stephen's Bed" })
+
+    expect(within(dialog).getByRole('region', { name: /Stephen's Bed thermostat Cooling -2/i })).toHaveAttribute('aria-disabled', 'true')
+    expect(within(dialog).queryByRole('slider', { name: "Stephen's Bed target level" })).not.toBeInTheDocument()
+    expect(within(dialog).getByText('Schedule phase is unavailable.')).toBeInTheDocument()
+    expect(screen.queryByRole('dialog', { name: 'Set Bed Temperature' })).not.toBeInTheDocument()
+    expect(mockCallServiceCalls).toEqual([])
+  })
+
+  it('maps bed dial taps to bounded targets without entering the off confirmation path', async () => {
+    mockEntities['climate.sleepypod_eight_pod_left_side'] = entity('climate.sleepypod_eight_pod_left_side', 'heat', {
+      current_temperature: 81,
+      hvac_modes: ['off', 'heat'],
+      max_temp: 110,
+      min_temp: 55,
+      target_temp_step: 1,
+      temperature: 77,
+    })
+    mockEntities['number.master_bedroom_sleepypod_eight_pod_left_target_level'] = entity('number.master_bedroom_sleepypod_eight_pod_left_target_level', '-2', {
+      max: 10,
+      min: -10,
+      step: 1,
+    })
+    render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
+
+    fireEvent.click(screen.getByRole('button', { name: /Stephen's Bed Cooling • -2/i }))
+
+    const dialog = await screen.findByRole('dialog', { name: "Stephen's Bed" })
+    const dial = within(dialog).getByRole('region', { name: /Stephen's Bed thermostat Cooling -2/i })
+    const dialRect = {
+      bottom: 500,
+      height: 300,
+      left: 100,
+      right: 400,
+      top: 200,
+      width: 300,
+      x: 100,
+      y: 200,
+      toJSON: () => ({}),
+    } as DOMRect
+    const maxPoint = valueToThermostatPoint(10, -10, 10)
+    const clientX = dialRect.left + (maxPoint.x / 100) * dialRect.width
+    const clientY = dialRect.top + (maxPoint.y / 100) * dialRect.height
+    const rectSpy = vi.spyOn(dial, 'getBoundingClientRect').mockReturnValue(dialRect)
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true)
+    try {
+      fireEvent.pointerDown(dial, { button: 0, clientX: 250, clientY: 350, pointerId: 5, pointerType: 'mouse' })
+      fireEvent.pointerUp(dial, { button: 0, clientX: 250, clientY: 350, pointerId: 5, pointerType: 'mouse' })
+      fireEvent.pointerDown(dial, { button: 0, clientX, clientY, pointerId: 6, pointerType: 'mouse' })
+      fireEvent.pointerMove(dial, { button: 0, clientX, clientY: clientY + 12, pointerId: 6, pointerType: 'mouse' })
+      fireEvent.pointerUp(dial, { button: 0, clientX, clientY: clientY + 12, pointerId: 6, pointerType: 'mouse' })
+      expect(mockCallServiceCalls).toEqual([])
+
+      fireEvent.pointerDown(dial, { button: 0, clientX, clientY, pointerId: 7, pointerType: 'mouse' })
+      fireEvent.pointerUp(dial, { button: 0, clientX, clientY, pointerId: 7, pointerType: 'mouse' })
+
+      expect(within(dialog).getByRole('region', { name: /Stephen's Bed thermostat Heating \+10/i })).toBeInTheDocument()
+      expect(confirm).not.toHaveBeenCalled()
+      await waitFor(() => expect(mockCallServiceCalls).toContainEqual({
+        domain: 'script',
+        service: 'sleepypod_stephen_temperature_outside_schedule',
+        serviceData: { level: 10 },
+      }))
+
+      const targetSlider = within(dialog).getByRole('slider', { name: "Stephen's Bed target level" })
+      expect(targetSlider).toHaveAttribute('aria-valuemin', '-10')
+      expect(targetSlider).toHaveAttribute('aria-valuemax', '10')
+      expect(targetSlider).toHaveAttribute('aria-valuenow', '10')
+      fireEvent.keyDown(targetSlider, { key: 'ArrowLeft' })
+      expect(within(dialog).getByRole('region', { name: /Stephen's Bed thermostat Heating \+9/i })).toBeInTheDocument()
+      await waitFor(() => expect(mockCallServiceCalls).toContainEqual({
+        domain: 'script',
+        service: 'sleepypod_stephen_temperature_outside_schedule',
+        serviceData: { level: 9 },
+      }))
+      expect(confirm).not.toHaveBeenCalled()
+    } finally {
+      confirm.mockRestore()
+      rectSpy.mockRestore()
+    }
+  })
+
+  it('keeps off and unavailable bed dials non-interactive while exposing power separately', async () => {
+    mockEntities['climate.sleepypod_eight_pod_left_side'] = entity('climate.sleepypod_eight_pod_left_side', 'off', {
+      current_temperature: 81,
+      hvac_modes: ['off', 'heat'],
+      max_temp: 110,
+      min_temp: 55,
+      target_temp_step: 1,
+      temperature: null,
+    })
+    mockEntities['number.master_bedroom_sleepypod_eight_pod_left_target_level'] = entity('number.master_bedroom_sleepypod_eight_pod_left_target_level', '0', {
+      max: 10,
+      min: -10,
+      step: 1,
+    })
+    const view = render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
+
+    fireEvent.click(screen.getByRole('button', { name: /Stephen's Bed Off/i }))
+    let dialog = await screen.findByRole('dialog', { name: "Stephen's Bed" })
+    const offDial = within(dialog).getByRole('region', { name: "Stephen's Bed thermostat Off" })
+    expect(offDial).toHaveAttribute('aria-disabled', 'true')
+    expect(within(dialog).queryByRole('slider', { name: "Stephen's Bed target level" })).not.toBeInTheDocument()
+    expect(within(dialog).getByRole('button', { name: "Turn on Stephen's Bed" })).toBeEnabled()
+    expect(within(dialog).getByText('Use the power control to turn on the Pod.')).toBeInTheDocument()
+    fireEvent.pointerDown(offDial, { button: 0, clientX: 150, clientY: 20, pointerId: 2, pointerType: 'mouse' })
+    fireEvent.pointerUp(offDial, { button: 0, clientX: 150, clientY: 20, pointerId: 2, pointerType: 'mouse' })
+    expect(mockCallServiceCalls).toEqual([])
+
+    view.unmount()
+    window.history.replaceState(null, '', `${window.location.pathname}#stephens-bed`)
+    mockEntities['climate.sleepypod_eight_pod_left_side'].state = 'unavailable'
+    mockEntities['number.master_bedroom_sleepypod_eight_pod_left_target_level'].state = 'unavailable'
+    mockEntities['number.nightcanvasrestful_left_target_temperature'].state = 'unavailable'
+    mockEntities['switch.nightcanvasrestful_left_power'].state = 'unavailable'
+    render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
+
+    dialog = await screen.findByRole('dialog', { name: "Stephen's Bed" })
+    expect(within(dialog).getByRole('region', { name: "Stephen's Bed thermostat unavailable" })).toHaveAttribute('aria-disabled', 'true')
+    expect(within(dialog).getByRole('button', { name: "Stephen's Bed unavailable" })).toBeDisabled()
+    expect(within(dialog).getByText('Bed controls are unavailable.')).toBeInTheDocument()
+    expect(mockCallServiceCalls).toEqual([])
   })
 
   it('keeps the SleepyPod target-level hero stable through stale confirmation echoes', async () => {
@@ -1841,8 +2342,7 @@ describe('DashboardViewPage', () => {
     vi.useFakeTimers()
     try {
       const targetSlider = within(dialog).getByRole('slider', { name: "Stephen's Bed target level" })
-      fireEvent.change(targetSlider, { target: { value: '2' } })
-      fireEvent.pointerUp(targetSlider)
+      for (let step = 0; step < 5; step += 1) fireEvent.keyDown(targetSlider, { key: 'ArrowRight' })
       expect(within(dialog).getByRole('region', { name: /Stephen's Bed thermostat Heating \+2/i })).toBeInTheDocument()
 
       act(() => {
@@ -1925,9 +2425,14 @@ describe('DashboardViewPage', () => {
       target_temp_step: 1,
       temperature: 70,
     })
+    mockEntities['number.master_bedroom_sleepypod_eight_pod_left_target_level'] = entity('number.master_bedroom_sleepypod_eight_pod_left_target_level', '-2', {
+      max: 10,
+      min: -10,
+      step: 1,
+    })
     render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
 
-    fireEvent.click(screen.getByRole('button', { name: /Stephen's Bed Cooling • 70°F/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Stephen's Bed Cooling • -2/i }))
 
     const dialog = await screen.findByRole('dialog', { name: "Stephen's Bed" })
 
@@ -2154,11 +2659,36 @@ describe('DashboardViewPage', () => {
 
     const dialog = await screen.findByRole('dialog')
     expect(within(dialog).getByText("Stephen's Bed: Hot Flash Mode")).toBeInTheDocument()
-    expect(within(dialog).getByRole('region', { name: /Stephen's Bed thermostat Cooling -10/i })).toBeInTheDocument()
-    expect(within(dialog).getByRole('slider', { name: "Stephen's Bed target level" })).toHaveAttribute('aria-readonly', 'false')
+    expect(within(dialog).getByRole('region', { name: /Stephen's Bed thermostat Cooling -10/i })).toHaveAttribute('aria-disabled', 'true')
+    expect(within(dialog).queryByRole('slider', { name: "Stephen's Bed target level" })).not.toBeInTheDocument()
+    expect(within(dialog).getByText('Hot Flash Mode controls the target.')).toBeInTheDocument()
     await clickModalTab(within(dialog), 'Special Modes')
     expect(within(dialog).getByRole('button', { name: 'Hot Flash Mode Active' })).toBeInTheDocument()
     expect(within(dialog).getByText('14:34')).toBeInTheDocument()
+  })
+
+  it('cancels an in-flight target edit when Hot Flash mode takes ownership', async () => {
+    render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
+
+    fireEvent.click(screen.getByRole('button', { name: /Stephen's Bed Cooling • -1/i }))
+    const dialog = await screen.findByRole('dialog')
+    await clickModalTab(within(dialog), 'Special Modes')
+    vi.useFakeTimers()
+    try {
+      fireEvent.keyDown(within(dialog).getByRole('slider', { name: "Stephen's Bed target level" }), { key: 'ArrowLeft' })
+      expect(within(dialog).getByRole('region', { name: /Stephen's Bed thermostat Cooling -2/i })).toBeInTheDocument()
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Hot Flash Mode Inactive' }))
+
+      expect(within(dialog).getByRole('region', { name: /Stephen's Bed thermostat Cooling -10/i })).toHaveAttribute('aria-disabled', 'true')
+      expect(within(dialog).queryByRole('slider', { name: "Stephen's Bed target level" })).not.toBeInTheDocument()
+      act(() => vi.advanceTimersByTime(300))
+      expect(mockCallServiceCalls).toEqual([
+        { domain: 'input_button', service: 'press', target: 'input_button.eight_sleep_stephen_hot_flash' },
+      ])
+    } finally {
+      vi.clearAllTimers()
+      vi.useRealTimers()
+    }
   })
 
   it('shows Free Sleep snooze and cancel actions while a side alarm is active', async () => {
@@ -2519,24 +3049,121 @@ describe('DashboardViewPage', () => {
     expect(within(dialog).getByRole('button', { name: "Turn off Stephen's Bed" })).toBeInTheDocument()
   })
 
+  it('clears active and queued Free Sleep target edits when HA turns the bed side off', async () => {
+    const view = render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
+
+    fireEvent.click(screen.getByRole('button', { name: /Stephen's Bed Cooling • -1/i }))
+    const dialog = await screen.findByRole('dialog')
+    const dial = within(dialog).getByRole('region', { name: /Stephen's Bed thermostat Cooling -1/i })
+    let slider = within(dialog).getByRole('slider', { name: "Stephen's Bed target level" })
+    const dialRect = {
+      bottom: 500,
+      height: 300,
+      left: 100,
+      right: 400,
+      top: 200,
+      width: 300,
+      x: 100,
+      y: 200,
+      toJSON: () => ({}),
+    } as DOMRect
+    const startPoint = valueToThermostatPoint(-1, -10, 10)
+    const targetPoint = valueToThermostatPoint(-2.2, -10, 10)
+    const clientPoint = (point: { x: number; y: number }) => ({
+      clientX: dialRect.left + (point.x / 100) * dialRect.width,
+      clientY: dialRect.top + (point.y / 100) * dialRect.height,
+    })
+    const rectSpy = vi.spyOn(dial, 'getBoundingClientRect').mockReturnValue(dialRect)
+    Object.defineProperty(slider, 'setPointerCapture', { configurable: true, value: () => undefined })
+    try {
+      fireEvent.pointerDown(slider, { ...clientPoint(startPoint), pointerId: 31 })
+      fireEvent.pointerMove(slider, { ...clientPoint(targetPoint), pointerId: 31 })
+      expect(within(dialog).getByRole('region', { name: /Stephen's Bed thermostat Cooling -2/i })).toBeInTheDocument()
+
+      act(() => {
+        mockEntities['switch.nightcanvasrestful_left_power'].state = 'off'
+        view.rerender(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
+      })
+      expect(within(dialog).getByRole('region', { name: /Stephen's Bed thermostat Off/i })).toHaveAttribute('aria-disabled', 'true')
+
+      act(() => {
+        mockEntities['switch.nightcanvasrestful_left_power'].state = 'on'
+        view.rerender(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
+      })
+      expect(within(dialog).getByRole('region', { name: /Stephen's Bed thermostat Cooling -1/i })).toBeInTheDocument()
+      slider = within(dialog).getByRole('slider', { name: "Stephen's Bed target level" })
+
+      vi.useFakeTimers()
+      fireEvent.keyDown(slider, { key: 'ArrowLeft' })
+      act(() => {
+        mockEntities['switch.nightcanvasrestful_left_power'].state = 'off'
+        view.rerender(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
+      })
+      act(() => vi.advanceTimersByTime(300))
+      expect(mockCallServiceCalls).toEqual([])
+      act(() => {
+        mockEntities['switch.nightcanvasrestful_left_power'].state = 'on'
+        view.rerender(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
+      })
+      expect(within(dialog).getByRole('region', { name: /Stephen's Bed thermostat Cooling -1/i })).toBeInTheDocument()
+    } finally {
+      vi.clearAllTimers()
+      vi.useRealTimers()
+      rectSpy.mockRestore()
+    }
+  })
+
   it('drags the Free Sleep hero dial as a target level control', async () => {
     render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
 
     fireEvent.click(screen.getByRole('button', { name: /Stephen's Bed Cooling • -1/i }))
     const dialog = await screen.findByRole('dialog')
+    const dial = within(dialog).getByRole('region', { name: /Stephen's Bed thermostat Cooling -1/i })
     const slider = within(dialog).getByRole('slider', { name: "Stephen's Bed target level" })
+    const dialRect = {
+      bottom: 500,
+      height: 300,
+      left: 100,
+      right: 400,
+      top: 200,
+      width: 300,
+      x: 100,
+      y: 200,
+      toJSON: () => ({}),
+    } as DOMRect
+    const startPoint = valueToThermostatPoint(-1, -10, 10)
+    const targetPoint = valueToThermostatPoint(-2.2, -10, 10)
+    const clientPoint = (point: { x: number; y: number }) => ({
+      clientX: dialRect.left + (point.x / 100) * dialRect.width,
+      clientY: dialRect.top + (point.y / 100) * dialRect.height,
+    })
+    const rectSpy = vi.spyOn(dial, 'getBoundingClientRect').mockReturnValue(dialRect)
+    Object.defineProperties(slider, {
+      hasPointerCapture: { configurable: true, value: () => false },
+      setPointerCapture: { configurable: true, value: () => undefined },
+    })
+    try {
+      fireEvent.pointerDown(slider, { ...clientPoint(startPoint), pointerId: 17 })
+      fireEvent.pointerMove(slider, { ...clientPoint(targetPoint), pointerId: 17 })
+      expect(within(dialog).getByRole('region', { name: /Stephen's Bed thermostat Cooling -2/i })).toBeInTheDocument()
+      expect(within(dialog).getByText("Stephen's Bed: Cooling • -1")).toBeInTheDocument()
+      fireEvent.pointerCancel(slider, { ...clientPoint(targetPoint), pointerId: 17 })
+      expect(within(dialog).getByRole('region', { name: /Stephen's Bed thermostat Cooling -1/i })).toBeInTheDocument()
+      expect(mockCallServiceCalls).toEqual([])
 
-    fireEvent.change(slider, { target: { value: '-2.2' } })
-    expect(within(dialog).getByRole('region', { name: /Stephen's Bed thermostat Cooling -2/i })).toBeInTheDocument()
-    expect(within(dialog).getByText("Stephen's Bed: Cooling • -1")).toBeInTheDocument()
-    fireEvent.pointerUp(slider)
+      fireEvent.pointerDown(slider, { ...clientPoint(startPoint), pointerId: 18 })
+      fireEvent.pointerMove(slider, { ...clientPoint(targetPoint), pointerId: 18 })
+      fireEvent.pointerUp(slider, { ...clientPoint(targetPoint), pointerId: 18 })
 
-    expect(within(dialog).getByText("Stephen's Bed: Cooling • -2")).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Stephen's Bed Cooling • -2/i, hidden: true })).toHaveAttribute('data-muted', 'false')
+      expect(within(dialog).getByText("Stephen's Bed: Cooling • -2")).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /Stephen's Bed Cooling • -2/i, hidden: true })).toHaveAttribute('data-muted', 'false')
 
-    await waitFor(() => expect(mockCallServiceCalls).toEqual([
-      { domain: 'number', service: 'set_value', target: 'number.nightcanvasrestful_left_target_temperature', serviceData: { value: -2 } },
-    ]))
+      await waitFor(() => expect(mockCallServiceCalls).toEqual([
+        { domain: 'number', service: 'set_value', target: 'number.nightcanvasrestful_left_target_temperature', serviceData: { value: -2 } },
+      ]))
+    } finally {
+      rectSpy.mockRestore()
+    }
   })
 
   it('updates Free Sleep schedule stage temperatures through preserved helpers', async () => {
@@ -2617,7 +3244,7 @@ describe('DashboardViewPage', () => {
     expect(within(offHero).getByText('OFF').parentElement).toHaveAttribute('data-readout-state', 'off')
     expect(within(offHero).queryByText('Idle')).not.toBeInTheDocument()
     expect(within(offHero).queryByText('-1')).not.toBeInTheDocument()
-    expect(within(dialog).getByText('Tap the thermostat to turn on the Pod.')).toBeInTheDocument()
+    expect(within(dialog).getByText('Use the power control to turn on the Pod.')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Stephen's Bed Off/i, hidden: true })).toHaveAttribute('data-muted', 'true')
 
     confirm.mockRestore()
@@ -2634,11 +3261,10 @@ describe('DashboardViewPage', () => {
     expect(within(offHero).getByText('OFF').parentElement).toHaveAttribute('data-readout-state', 'off')
     expect(within(offHero).queryByText('Idle')).not.toBeInTheDocument()
     expect(within(offHero).queryByText('0')).not.toBeInTheDocument()
-    expect(within(dialog).getByText('Tap the thermostat to turn on the Pod.')).toBeInTheDocument()
-    const slider = within(dialog).getByRole('slider', { name: "Steph's Bed target level" })
-    expect(slider).toHaveAttribute('aria-readonly', 'true')
-    fireEvent.change(slider, { target: { value: '1' } })
-    fireEvent.pointerUp(slider)
+    expect(within(dialog).getByText('Use the power control to turn on the Pod.')).toBeInTheDocument()
+    expect(within(dialog).queryByRole('slider', { name: "Steph's Bed target level" })).not.toBeInTheDocument()
+    fireEvent.pointerDown(offHero, { button: 0, clientX: 150, clientY: 20, pointerId: 21, pointerType: 'mouse' })
+    fireEvent.pointerUp(offHero, { button: 0, clientX: 150, clientY: 20, pointerId: 21, pointerType: 'mouse' })
 
     expect(mockCallServiceCalls).toEqual([])
   })
@@ -2649,8 +3275,7 @@ describe('DashboardViewPage', () => {
     fireEvent.click(screen.getByRole('button', { name: /Stephen's Bed Cooling • -1/i }))
     const dialog = await screen.findByRole('dialog')
     const slider = within(dialog).getByRole('slider', { name: "Stephen's Bed target level" })
-    fireEvent.change(slider, { target: { value: '-2' } })
-    fireEvent.pointerUp(slider)
+    fireEvent.keyDown(slider, { key: 'ArrowLeft' })
 
     expect(within(dialog).getByText("Stephen's Bed: Cooling • -2")).toBeInTheDocument()
 
@@ -2663,6 +3288,21 @@ describe('DashboardViewPage', () => {
     mockEntities['number.nightcanvasrestful_left_target_temperature'].state = '-1'
     view.rerender(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
     expect(within(screen.getByRole('dialog')).getByText("Stephen's Bed: Cooling • -1")).toBeInTheDocument()
+  })
+
+  it('flushes the final Free Sleep target when the bed modal unmounts before debounce', async () => {
+    const view = render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
+
+    fireEvent.click(screen.getByRole('button', { name: /Stephen's Bed Cooling • -1/i }))
+    const dialog = await screen.findByRole('dialog')
+    fireEvent.keyDown(within(dialog).getByRole('slider', { name: "Stephen's Bed target level" }), { key: 'ArrowLeft' })
+    expect(mockCallServiceCalls).toEqual([])
+
+    view.unmount()
+
+    expect(mockCallServiceCalls).toEqual([
+      { domain: 'number', service: 'set_value', target: 'number.nightcanvasrestful_left_target_temperature', serviceData: { value: -2 } },
+    ])
   })
 
   it('ports the Living Room SHIELD remote modal and only runs explicit controls', async () => {
@@ -3108,7 +3748,11 @@ describe('DashboardViewPage', () => {
     fireEvent.click(screen.getByRole('button', { name: /Main Floor Error/i }))
 
     const errorMessage = await screen.findByRole('alert')
+    const statusPill = screen.getByText('Status').closest('[data-icon]')
     expect(within(errorMessage).getByText('Main brush is stuck under the sofa')).toBeInTheDocument()
+    expect(statusPill).toHaveAttribute('data-icon', 'mdi:alert-circle')
+    expect(statusPill).toHaveAttribute('data-tone', 'danger')
+    expect(statusPill?.querySelector('path')).toHaveAttribute('d', materialIconPath('mdi:alert-circle'))
     expect(screen.getByRole('button', { name: 'Stop' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Dock' })).toBeInTheDocument()
   })
@@ -3715,6 +4359,7 @@ describe('DashboardViewPage', () => {
     expect(within(cannedBeansRow).queryByRole('button', { name: 'Edit Canned Beans' })).not.toBeInTheDocument()
     expect(within(cannedBeansRow).queryByRole('button', { name: 'Delete Canned Beans' })).not.toBeInTheDocument()
     const viewCannedBeansButton = within(cannedBeansRow).getByRole('button', { name: 'View Canned Beans individual items' })
+    expect(viewCannedBeansButton).toHaveAttribute('data-modal-disclosure-button', 'true')
     expect(viewCannedBeansButton.querySelector('path')).toHaveAttribute('d', materialIconPath('mdi:chevron-right'))
     fireEvent.click(viewCannedBeansButton)
     expect(await screen.findByRole('dialog', { name: /Canned Beans/i })).toBeInTheDocument()
@@ -4009,8 +4654,8 @@ describe('DashboardViewPage', () => {
     expect(reopenedInput).toHaveValue('dragonfruit')
     fireEvent.click(screen.getByRole('button', { name: 'Clear Search' }))
 
-    expect(reopenedInput).toHaveValue('')
-    expect(reopenedInput).toHaveFocus()
+    await waitFor(() => expect(screen.getByLabelText('Search inventory')).toHaveValue(''))
+    expect(screen.getByLabelText('Search inventory')).toHaveFocus()
     await waitFor(
       () => expect(within(fridgeList).getAllByRole('group', { name: /Expires|Expired|No expiration date/i }).map((row) => row.getAttribute('aria-label'))).toEqual([
         `Greek Yogurt ${greekYogurtLabel}`,
@@ -4586,6 +5231,9 @@ describe('DashboardViewPage', () => {
     mockEntities['select.valetudo_exaltedsneakydeer_mode'].state = 'mop'
     mockEntities['input_select.main_floor_vacuum_cleaning_passes'].state = '3'
     rerender(<DashboardViewPage activePath="living-room" onNavigate={() => undefined} path="living-room" />)
+    await act(async () => {
+      await new Promise((resolve) => window.setTimeout(resolve, 700))
+    })
 
     await waitFor(() => expect(mockCallServiceCalls).toEqual([
       { domain: 'select', service: 'select_option', target: 'select.valetudo_exaltedsneakydeer_mode', serviceData: { option: 'mop' } },
@@ -4687,9 +5335,10 @@ describe('DashboardViewPage', () => {
   it('opens available vacuum cards as modal controls and leaves unavailable cards inert', async () => {
     render(<DashboardViewPage activePath="vacuums" onNavigate={() => undefined} path="vacuums" />)
 
-    expect(screen.getByLabelText('Music Room')).not.toHaveAttribute('data-clickable')
+    expect(screen.getByLabelText('Music Room')).toHaveAttribute('data-icon', 'mdi:robot-vacuum-off')
     const mainFloorVacuum = screen.getByRole('button', { name: /main floor docked/i })
     expect(mainFloorVacuum).toHaveAttribute('data-tone', 'vacuum')
+    expect(mainFloorVacuum).toHaveAttribute('data-icon', 'mdi:home')
     fireEvent.click(mainFloorVacuum)
 
     const dialog = await screen.findByRole('dialog')
@@ -4717,8 +5366,31 @@ describe('DashboardViewPage', () => {
     await clickModalTab(within(dialog), 'Auto-Clean')
     expect(screen.getByRole('button', { name: 'Dining Room auto-clean enabled' })).toBeInTheDocument()
     await clickModalTab(within(dialog), 'Info')
-    expect(within(controlsPane).getByRole('group', { name: 'Main Filter 54h left' })).toBeInTheDocument()
-    expect(within(controlsPane).getByRole('group', { name: 'Detergent OK' })).toBeInTheDocument()
+    const mainFilter = within(controlsPane).getByRole('group', { name: 'Main Filter 54h left' })
+    const detergent = within(controlsPane).getByRole('group', { name: 'Detergent OK' })
+    const sensors = within(controlsPane).getByRole('group', { name: 'Sensors 2h left' })
+    expect(mainFilter).toHaveAttribute('data-icon', 'mdi:air-filter')
+    expect(detergent).toHaveAttribute('data-icon', 'mdi:bottle-tonic')
+    expect(sensors).toHaveAttribute('data-icon', 'mdi:timer-alert-outline')
+    expect(sensors).toHaveAttribute('data-tone', 'warning')
+  })
+
+  it.each([
+    ['docked', 'mdi:home', 'vacuum'],
+    ['idle', 'mdi:robot-vacuum', 'neutral'],
+    ['cleaning', 'mdi:broom', 'vacuum'],
+    ['paused', 'mdi:pause-circle', 'warning'],
+    ['returning', 'mdi:home-import-outline', 'vacuum'],
+    ['error', 'mdi:alert-circle', 'danger'],
+    ['unavailable', 'mdi:robot-vacuum-off', 'neutral'],
+  ])('renders the %s vacuum card with its reusable state icon and tone', (state, icon, tone) => {
+    mockEntities['vacuum.valetudo_exaltedsneakydeer'].state = state
+    render(<DashboardViewPage activePath="vacuums" onNavigate={() => undefined} path="vacuums" />)
+
+    const robotSection = screen.getByRole('heading', { name: 'Robot Vacuums' }).closest('section')
+    const card = within(robotSection as HTMLElement).getByLabelText(/^Main Floor/)
+    expect(card).toHaveAttribute('data-icon', icon)
+    expect(card).toHaveAttribute('data-tone', tone)
   })
 
   it('shows robot vacuums and auto-clean controls in the same order on the Vacuums route', () => {

@@ -6,6 +6,7 @@ import { WEATHER_ENTITY } from '../../constants/atAGlance'
 import { MaterialIcon } from '../core/Icon'
 import { materialIconPath } from '../core/iconPaths'
 import { ModalSheet } from '../core/ModalSheet'
+import { ModalDisclosureIcon } from '../core/ModalDisclosureIcon'
 import { asEntityName } from './entityState'
 import styles from './WeatherSummary.module.css'
 
@@ -1173,6 +1174,7 @@ export function WeatherSummary({ deferRefresh = false }: WeatherSummaryProps) {
                 <WeatherGlyph condition={weather?.state} size={40} />
               </span>
               <span className={styles.condition}>{condition.label}</span>
+              <ModalDisclosureIcon size="compact" />
             </span>
             <span className={styles.temperatureBlock}>
               <span className={styles.temperature}>{weatherDegree(weather)}</span>

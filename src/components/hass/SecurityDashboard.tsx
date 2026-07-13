@@ -80,6 +80,7 @@ function SecurityTile({ item, onOpenHash }: { item: SecurityTileConfig; onOpenHa
 
   return (
     <GlassTile
+      disclosure={item.action?.type === 'hash' && !unavailable}
       icon={tileIcon(item, entity?.state)}
       isOff={unavailable || (item.tone === 'vehicle' && !active)}
       onClick={item.action && !unavailable ? runAction : undefined}

@@ -1,6 +1,7 @@
 import { useEntity } from '@hakit/core'
 import type { CameraConfig } from '../../constants/atAGlance'
 import { MaterialIcon } from '../core/Icon'
+import { ModalDisclosureIcon } from '../core/ModalDisclosureIcon'
 import { asEntityName, titleCaseState } from './entityState'
 import { WebRtcCamera } from './WebRtcCamera'
 import styles from './CameraTile.module.css'
@@ -31,7 +32,10 @@ export function CameraTile({ camera, live = true, onOpen }: CameraTileProps) {
       <button className={styles.button} onClick={() => onOpen(camera.hash)} type="button" aria-label={`Open ${camera.title} camera`}>
         <span className={styles.label}>
           <span className={styles.title}>{camera.title}</span>
-          <span className={styles.state}>{titleCaseState(entity?.state)}</span>
+          <span className={styles.trailing}>
+            <span className={styles.state}>{titleCaseState(entity?.state)}</span>
+            <ModalDisclosureIcon size="compact" />
+          </span>
         </span>
       </button>
     </div>

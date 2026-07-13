@@ -16,6 +16,7 @@ interface TodoItem {
 }
 
 interface TodoListPanelProps {
+  completionScript?: string
   entityId: string
   hideCompleted?: boolean
   onVisibleItemsChange?: (count: number) => void
@@ -94,7 +95,7 @@ function applyPendingTodoStatuses(items: TodoItem[], pendingStatuses: TodoOptimi
   })
 }
 
-export function TodoListPanel({ entityId, hideCompleted = true, onVisibleItemsChange, optimisticStatuses, rowVariant, title }: TodoListPanelProps) {
+export function TodoListPanel({ completionScript, entityId, hideCompleted = true, onVisibleItemsChange, optimisticStatuses, rowVariant, title }: TodoListPanelProps) {
   const entity = useEntity(asEntityName(entityId), { returnNullIfNotFound: true })
   const connection = useHass((state) => state.connection) as unknown as HassConnection | undefined
   const callService = useHass((state) => state.helpers.callService) as unknown as CallService
@@ -159,13 +160,20 @@ export function TodoListPanel({ entityId, hideCompleted = true, onVisibleItemsCh
     if (!identity || !connection?.sendMessagePromise) return
     const nextStatus = item.status === 'completed' ? 'needs_action' : 'completed'
     const requestId = commitStatus(identity, nextStatus)
+    const serviceCall = nextStatus === 'completed' && completionScript
+      ? {
+          domain: 'script',
+          service: completionScript.replace(/^script\./, ''),
+          serviceData: { item: identity, task_name: compactText(item.summary) ?? identity },
+        }
+      : {
+          domain: 'todo',
+          service: 'update_item',
+          target: entityId,
+          serviceData: { item: identity, status: nextStatus },
+        }
     void Promise.resolve(
-      callService({
-        domain: 'todo',
-        service: 'update_item',
-        target: entityId,
-        serviceData: { item: identity, status: nextStatus },
-      }),
+      callService(serviceCall),
     )
       .then(() => {
         if (mountedRef.current) setError(null)

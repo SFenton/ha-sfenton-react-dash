@@ -105,6 +105,22 @@
   background: linear-gradient(135deg, rgba(229, 57, 53, 0.25), rgba(229, 57, 53, 0.1)), var(--color-glass-soft);
 }
 
+.settingPill[data-tone='active'] {
+  border-color: rgba(77, 208, 225, 0.36);
+  background: linear-gradient(135deg, rgba(0, 150, 136, 0.24), rgba(0, 150, 136, 0.09)), var(--color-glass-soft);
+}
+
+.settingPill[data-tone='returning'] {
+  border-color: rgba(100, 181, 246, 0.38);
+  background: linear-gradient(135deg, rgba(30, 136, 229, 0.24), rgba(30, 136, 229, 0.09)), var(--color-glass-soft);
+}
+
+.settingPill[data-tone='unavailable'] {
+  border-color: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.06);
+  opacity: 0.68;
+}
+
 .errorMessage {
   grid-column: 1 / -1;
   padding: 0 3px;

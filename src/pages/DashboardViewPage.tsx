@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type MouseEvent, type PointerEvent, type ReactNode } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type MouseEvent, type PointerEvent, type ReactNode } from 'react'
 import { useEntity, useHass, useUser } from '@hakit/core'
 import { ControlSliderCircular, ControlToggle } from '@hakit/components'
 import type { HassEntity } from 'home-assistant-js-websocket'
@@ -25,6 +25,16 @@ import { GrillModalContent } from '../components/hass/GrillModalContent'
 import { HumidifierModalContent } from '../components/hass/HumidifierModalContent'
 import { MediaRemoteModalContent, MediaRemoteModalNav, type MediaRemoteModalTab } from '../components/hass/MediaRemoteModalContent'
 import { MEDIA_REMOTE_MODAL_STYLE } from '../components/hass/mediaRemoteModalStyle'
+import { BedTemperatureScopePrompt } from '../components/hass/BedTemperatureScopePrompt'
+import {
+  SLEEPYPOD_SCHEDULE_PHASE_ENTITY_IDS,
+  sleepypodOutsideScheduleTemperatureService,
+  sleepypodSchedulePhase,
+  sleepypodSchedulePhaseAvailable,
+  sleepypodTemperatureScopeService,
+  type SleepypodSchedulePhase,
+  type SleepypodTemperatureScope,
+} from '../components/hass/bedTemperatureScope'
 import { Card, type CardColor } from '../components/core/Card'
 import { CheckboxRow } from '../components/core/CheckboxRow'
 import { Description } from '../components/core/Description'
@@ -33,6 +43,8 @@ import { GlassTile } from '../components/core/GlassTile'
 import { MaterialIcon } from '../components/core/Icon'
 import { InlineAlert } from '../components/core/InlineAlert'
 import { ModalSheet, type ModalSheetStyle } from '../components/core/ModalSheet'
+import { ModalDisclosureIcon } from '../components/core/ModalDisclosureIcon'
+import { ModalOpenerRow } from '../components/core/ModalOpenerRow'
 import { NativePickerField } from '../components/core/NativePickerField'
 import { OptionPickerDialog, type PickerOption } from '../components/core/OptionPickerDialog'
 import { SectionHeader } from '../components/core/SectionHeader'
@@ -97,6 +109,14 @@ import { modalSquareGridModalStyle, modalSquareGridStyle, type ModalSquareGridSt
 import { ROOM_PAGE_CONFIGS, type RoomSourceCardAction, type RoomSourceCardConfig, type RoomSourceKind, type RoomSourceModalItem } from '../constants/roomPages'
 import { MEDIA_REMOTE_CONFIGS } from '../constants/mediaRemotes'
 import { VACUUM_AUTO_CLEAN_CONTROLS } from '../constants/vacuumAutoClean'
+import {
+  THERMOSTAT_MODAL_DIAL_GUTTER_PX,
+  thermostatArcPath,
+  thermostatHandleStyle,
+  thermostatPointIsOnRing,
+  thermostatRawValueFromPoint,
+  thermostatValueFromPoint,
+} from '../components/hass/thermostatDialGeometry'
 import { Page } from './Page'
 import { ClimateSheet, ContactSheet, LightsSheet, OccupancySheet } from './AtAGlancePage'
 import { CustomLightsPage } from './CustomLightsPage'
@@ -244,11 +264,7 @@ function AdminModalGrid({ children, label, squareGridRef, squareGridStyle }: { c
 }
 
 function AdminHashButton({ hash, onOpen, title }: { hash: string; onOpen: (hash: string) => void; title: string }) {
-  return (
-    <button className={styles.adminHashButton} data-tone="switch-active" onClick={() => onOpen(hash)} type="button">
-      <span>{title}</span>
-    </button>
-  )
+  return <ModalOpenerRow onClick={() => onOpen(hash)} title={title} tone="switch-active" variant="wide" />
 }
 
 const LIVING_ROOM_POWER_RECOVERY_AUTOMATION = 'automation.attempt_to_turn_power_back_on_in_living_room'
@@ -735,6 +751,7 @@ function DishwasherRoomSourceCard({ card, onOpen }: RoomSourceCardProps) {
   const handleClick = card.hash && !displayUnavailable && !disabledByState ? () => onOpen(card) : undefined
   const content = (
     <GlassTile
+      disclosure={Boolean(handleClick)}
       icon={<SourceCardIcon card={card} size={24} />}
       isOff={displayUnavailable || disabledByState}
       onClick={handleClick}
@@ -780,6 +797,7 @@ function DefaultRoomSourceCard({ card, eightSleepModalState, onOpen }: RoomSourc
     <GlassTile
       icon={<SourceCardIcon card={card} size={24} />}
       backgroundColor={backgroundColor}
+      disclosure={Boolean(handleClick && card.hash && !card.action)}
       isOff={displayUnavailable || disabledByState || inactiveMuted}
       onClick={handleClick}
       subtitle={displaySubtitle}
@@ -1090,7 +1108,7 @@ function TodoSection({ entityVersion, hideListHeader = false, hideWhenEmpty, lis
   return (
     <section className={styles.section}>
       {!hideListHeader && <SectionHeader title={list.title} />}
-      <TodoListPanel entityId={list.entityId} hideCompleted={list.hideCompleted} onVisibleItemsChange={hideWhenEmpty ? setVisibleItemCount : undefined} optimisticStatuses={todoOptimisticStatuses} rowVariant={rowVariant} title={list.title} />
+      <TodoListPanel completionScript={list.completionScript} entityId={list.entityId} hideCompleted={list.hideCompleted} onVisibleItemsChange={hideWhenEmpty ? setVisibleItemCount : undefined} optimisticStatuses={todoOptimisticStatuses} rowVariant={rowVariant} title={list.title} />
     </section>
   )
 }
@@ -1573,6 +1591,7 @@ function VacationModeCard({ disabled = false, enabled, onBlockedEnable, onEnable
       ariaLabel={`Vacation Mode ${subtitle}`}
       color={pending ? SECURITY_COLOR : SWITCH_ACTIVE_COLOR}
       disabled={cardDisabled}
+      disclosure={!cardDisabled && !enabled && !pending && preChecklistComplete}
       icon={<MaterialIcon name={VACATION_MODE_ITEMS[0].icon} size={38} />}
       muted={cardDisabled || (!enabled && !pending)}
       onClick={toggleVacationMode}
@@ -1996,17 +2015,26 @@ const THERMOSTAT_ROOM_VIEWS: ThermostatRoomView[] = THERMOSTAT_ROOMS.map((room) 
   key: thermostatRoomKey(room.title),
 }))
 const GLOBAL_THERMOSTAT_ENTITY_ID = 'climate.thermostat_contact_sensors_global_virtual_thermostat'
+const ECO_AWAY_THERMOSTAT_ENTITY_ID = 'climate.thermostat_contact_sensors_eco_away_virtual_thermostat'
+const THERMOSTAT_AWAY_MODE_ENTITY_ID = 'binary_sensor.thermostat_contact_sensors_away_mode_active'
+const THERMOSTAT_HOME_AWAY_ENTITY_ID = 'sensor.thermostat_effective_home_away'
+const THERMOSTAT_HOME_AWAY_REASON_ENTITY_ID = 'sensor.thermostat_home_away_reason'
 const PREDICTIVE_COMFORT_SWITCH_ENTITY_ID = 'switch.thermostat_contact_sensors_predictive_comfort_mode'
 const PREDICTIVE_AUTO_ADJUST_SWITCH_ENTITY_ID = 'switch.thermostat_contact_sensors_predictive_auto_adjust'
 const PREDICTIVE_HVAC_MODE_CHANGE_SWITCH_ENTITY_ID = 'switch.thermostat_contact_sensors_predictive_hvac_mode_changes'
 const PREDICTIVE_ALLOW_AWAY_SWITCH_ENTITY_ID = 'switch.thermostat_contact_sensors_predictive_allow_away'
 const PREDICTIVE_COMFORT_SENSOR_ENTITY_ID = 'sensor.living_room_thermostat_contact_sensors_predictive_comfort_mode'
 const PREDICTIVE_COMFORT_HASH = '#predictive-comfort'
+const PREDICTIVE_STATE_LABELS: Readonly<Record<string, string>> = {
+  pre_cool: 'Pre-Cool',
+}
 const THERMOSTAT_ROOM_CLIMATE_ENTITY_IDS = THERMOSTAT_ROOM_VIEWS.map((room) => room.climateEntityId)
 const THERMOSTAT_HEAT_COLOR = '#cd5401'
 const THERMOSTAT_COOL_COLOR = '#2c8e98'
 const THERMOSTAT_NEUTRAL_COLOR = 'rgba(255, 255, 255, 0.78)'
-const THERMOSTAT_RING_RADIUS = (145 / 320) * 100
+const THERMOSTAT_MODAL_DIAL_SHELL_STYLE = {
+  '--thermostat-modal-dial-gutter': `${THERMOSTAT_MODAL_DIAL_GUTTER_PX}px`,
+} as CSSProperties
 const THERMOSTAT_ROOM_MODAL_STYLE: ModalSheetStyle = {
   '--modal-desktop-width': '600px',
   '--modal-desktop-max-width': '600px',
@@ -2346,6 +2374,8 @@ interface FreeSleepAlarmRecord extends FreeSleepAlarmSchedule {
 }
 
 interface EightSleepBedModalState {
+  activeSchedulePhase: SleepypodSchedulePhase | null
+  cancelTargetTemperature: () => void
   commitDisplaySideOn: (sideOn: boolean) => void
   commitHotFlashActive: (active: boolean) => void
   commitTargetTemperature: (value: number) => void
@@ -2356,6 +2386,7 @@ interface EightSleepBedModalState {
   heroAction: string
   hotFlashActive: boolean
   hotFlashAvailable: boolean
+  schedulePhaseAvailable: boolean
   sideAvailable: boolean
   subtitle: string
   targetMax: number
@@ -2364,11 +2395,20 @@ interface EightSleepBedModalState {
   targetStep: number
 }
 
+interface BedTemperatureScopeRequest {
+  open: boolean
+  phase: SleepypodSchedulePhase
+  returnFocus: HTMLElement | null
+  targetText: string
+  value: number
+}
+
 const FREE_SLEEP_TARGET_MIN = -10
 const FREE_SLEEP_TARGET_MAX = 10
 const FREE_SLEEP_TARGET_STEP = 1
 const FREE_SLEEP_TARGET_REVERT_MS = 30000
 const SLEEPYPOD_TARGET_CONFIRMATION_HOLD_MS = 3000
+const THERMOSTAT_DIAL_TAP_TOLERANCE_PX = 8
 const FREE_SLEEP_ALARM_SYNC_DEBOUNCE_MS = 450
 const FREE_SLEEP_NUMBER_SYNC_DEBOUNCE_MS = 300
 const EIGHT_SLEEP_LEVEL_ZERO_F = 82.5
@@ -2419,7 +2459,6 @@ const EIGHT_SLEEP_BED_MODAL_STYLE: ModalSheetStyle = {
   '--modal-desktop-max-width': '700px',
   '--modal-desktop-height': '70vh',
   '--modal-desktop-max-height': '70vh',
-  '--modal-desktop-body-overflow-y': 'hidden',
 }
 const DESKTOP_MODAL_QUERY = '(min-width: 760px)'
 const FREE_SLEEP_ALARM_DAYS: { key: FreeSleepAlarmDay; label: string }[] = [
@@ -2964,6 +3003,7 @@ function useEightSleepBedModalStates() {
 function useEightSleepBedModalState(side: EightSleepSideConfig | undefined): EightSleepBedModalState {
   const climateEntity = useEntity(asEntityName(side?.climateEntityId ?? 'climate.sleepypod_unselected_side'), { returnNullIfNotFound: true })
   const hotFlashActiveEntity = useEntity(asEntityName(side?.hotFlashActiveEntityId ?? 'input_boolean.free_sleep_unselected_hot_flash_active'), { returnNullIfNotFound: true })
+  const schedulePhaseEntity = useEntity(asEntityName(side ? SLEEPYPOD_SCHEDULE_PHASE_ENTITY_IDS[side.scheduleSide] : 'sensor.sleepypod_unselected_schedule_phase'), { returnNullIfNotFound: true })
   const targetLevelEntity = useEntity(asEntityName(side?.targetLevelEntityId ?? 'number.sleepypod_unselected_target_level'), { returnNullIfNotFound: true })
   const targetEntity = useEntity(asEntityName(side?.targetTemperatureEntityId ?? 'number.free_sleep_unselected_target_temperature'), { returnNullIfNotFound: true })
   const currentEntity = useEntity(asEntityName(side?.currentTemperatureEntityId ?? 'sensor.free_sleep_unselected_current_temperature'), { returnNullIfNotFound: true })
@@ -2975,54 +3015,70 @@ function useEightSleepBedModalState(side: EightSleepSideConfig | undefined): Eig
   const stableCurrentEntity = useRecentAvailableEntity(currentEntity, EIGHT_SLEEP_UNAVAILABLE_HOLD_MS)
   const useClimateEntity = Boolean(side?.climateEntityId && stableClimateEntity && !isUnavailable(stableClimateEntity))
   const useTargetLevelEntity = Boolean(side?.targetLevelEntityId && stableTargetLevelEntity && !isUnavailable(stableTargetLevelEntity))
-  const targetScale = useTargetLevelEntity ? 'level' : useClimateEntity ? 'temperature' : 'level'
-  const sideAvailable = useClimateEntity
+  const sleepypodAdapterConfigured = Boolean(side?.climateEntityId && side?.targetLevelEntityId)
+  const useSleepypodAdapter = Boolean(sleepypodAdapterConfigured && useClimateEntity && useTargetLevelEntity)
+  const sleepypodAdapterPartiallyAvailable = Boolean(sleepypodAdapterConfigured && useClimateEntity !== useTargetLevelEntity)
+  const targetScale: EightSleepBedModalState['targetScale'] = 'level'
+  const sideAvailable = sleepypodAdapterPartiallyAvailable
+    ? false
+    : useSleepypodAdapter
     ? Boolean(side && stableClimateEntity && !isUnavailable(stableClimateEntity))
     : Boolean(side && stableTargetEntity && stablePowerEntity && !isUnavailable(stableTargetEntity) && !isUnavailable(stablePowerEntity))
-  const liveSideOn = useClimateEntity
+  const liveSideOn = useSleepypodAdapter
     ? Boolean(stableClimateEntity && !isUnavailable(stableClimateEntity) && stableClimateEntity.state !== 'off')
     : Boolean(side && stablePowerEntity && !isUnavailable(stablePowerEntity) && stablePowerEntity.state === 'on')
   const climateCurrentTemperature = stableClimateEntity && !isUnavailable(stableClimateEntity) ? numberValue(stableClimateEntity.attributes.current_temperature) : null
-  const liveTargetTemperature = useTargetLevelEntity
+  const liveTargetTemperature = useSleepypodAdapter
     ? numberValue(stableTargetLevelEntity?.state)
-    : useClimateEntity
-    ? numberValue(stableClimateEntity?.attributes.temperature) ?? climateCurrentTemperature
     : stableTargetEntity && !isUnavailable(stableTargetEntity) ? numberValue(stableTargetEntity.state) : null
-  const currentTemperature = useClimateEntity
+  const currentTemperature = useSleepypodAdapter
     ? climateCurrentTemperature
     : stableCurrentEntity && !isUnavailable(stableCurrentEntity) ? numberValue(stableCurrentEntity.state) : null
-  const targetMin = useTargetLevelEntity
+  const targetMin = useSleepypodAdapter
     ? numberValue(stableTargetLevelEntity?.attributes.min) ?? FREE_SLEEP_TARGET_MIN
-    : useClimateEntity ? numberValue(stableClimateEntity?.attributes.min_temp) ?? 55 : numberValue(stableTargetEntity?.attributes.min) ?? FREE_SLEEP_TARGET_MIN
-  const targetMax = useTargetLevelEntity
+    : numberValue(stableTargetEntity?.attributes.min) ?? FREE_SLEEP_TARGET_MIN
+  const targetMax = useSleepypodAdapter
     ? numberValue(stableTargetLevelEntity?.attributes.max) ?? FREE_SLEEP_TARGET_MAX
-    : useClimateEntity ? numberValue(stableClimateEntity?.attributes.max_temp) ?? 110 : numberValue(stableTargetEntity?.attributes.max) ?? FREE_SLEEP_TARGET_MAX
-  const targetStep = useTargetLevelEntity
+    : numberValue(stableTargetEntity?.attributes.max) ?? FREE_SLEEP_TARGET_MAX
+  const targetStep = useSleepypodAdapter
     ? numberValue(stableTargetLevelEntity?.attributes.step) ?? FREE_SLEEP_TARGET_STEP
-    : useClimateEntity ? numberValue(stableClimateEntity?.attributes.target_temp_step) ?? 1 : numberValue(stableTargetEntity?.attributes.step) ?? FREE_SLEEP_TARGET_STEP
+    : numberValue(stableTargetEntity?.attributes.step) ?? FREE_SLEEP_TARGET_STEP
   const liveHotFlashActive = Boolean(side && hotFlashActiveEntity && !isUnavailable(hotFlashActiveEntity) && hotFlashActiveEntity.state === 'on')
   const hotFlashAvailable = Boolean(side && hotFlashActiveEntity && !isUnavailable(hotFlashActiveEntity))
+  const schedulePhaseState = schedulePhaseEntity?.state
+  const activeSchedulePhase = sleepypodSchedulePhase(schedulePhaseState)
+  const schedulePhaseIsAvailable = Boolean(side && schedulePhaseEntity && sleepypodSchedulePhaseAvailable(schedulePhaseState))
   const [displayHotFlashActive, commitHotFlashActive] = useOptimisticState(liveHotFlashActive, { clearOn: 'confirmation', revertMs: EIGHT_SLEEP_POWER_REVERT_MS })
-  const targetConfirmationHoldMs = useTargetLevelEntity ? SLEEPYPOD_TARGET_CONFIRMATION_HOLD_MS : 0
-  const [displayedTargetValueRaw, commitTargetTemperature] = useOptimisticState(liveTargetTemperature, { clearOn: 'confirmation', confirmationHoldMs: targetConfirmationHoldMs, revertMs: FREE_SLEEP_TARGET_REVERT_MS })
+  const targetConfirmationHoldMs = useSleepypodAdapter ? SLEEPYPOD_TARGET_CONFIRMATION_HOLD_MS : 0
+  const [displayedTargetValueRaw, commitTargetTemperature, cancelTargetTemperature] = useOptimisticState(liveTargetTemperature, { clearOn: 'confirmation', confirmationHoldMs: targetConfirmationHoldMs, revertMs: FREE_SLEEP_TARGET_REVERT_MS })
   const [displaySideOn, commitDisplaySideOn] = useOptimisticState(liveSideOn, { clearOn: 'confirmation', revertMs: EIGHT_SLEEP_POWER_REVERT_MS })
+  const previousSchedulePhaseStateRef = useRef(schedulePhaseState)
   const displayedTargetValue = displayHotFlashActive ? targetMin : displayedTargetValueRaw
   const controlsSideOn = sideAvailable && displaySideOn
-  const heroAction = targetScale === 'temperature' ? sleepypodTemperatureAction(displayedTargetValue, currentTemperature, controlsSideOn) : eightSleepTemperatureAction(displayedTargetValue, controlsSideOn)
-  const targetText = targetScale === 'temperature' ? formatTemperatureCompact(displayedTargetValue) : formatEightSleepTargetLevel(displayedTargetValue)
+  const heroAction = eightSleepTemperatureAction(displayedTargetValue, controlsSideOn)
+  const targetText = formatEightSleepTargetLevel(displayedTargetValue)
   const subtitle = displayHotFlashActive ? 'Hot Flash Mode' : controlsSideOn ? `${titleCaseState(heroAction)} • ${targetText}` : 'Off'
 
+  useEffect(() => {
+    if (previousSchedulePhaseStateRef.current === schedulePhaseState) return
+    previousSchedulePhaseStateRef.current = schedulePhaseState
+    cancelTargetTemperature()
+  }, [cancelTargetTemperature, schedulePhaseState])
+
   return {
+    activeSchedulePhase,
+    cancelTargetTemperature,
     commitDisplaySideOn,
     commitHotFlashActive,
     commitTargetTemperature,
-    controlMode: useClimateEntity ? 'climate' : 'legacy',
+    controlMode: useSleepypodAdapter ? 'climate' : 'legacy',
     controlsSideOn,
     currentTemperature,
     displayedTargetValue,
     heroAction,
     hotFlashActive: displayHotFlashActive,
     hotFlashAvailable,
+    schedulePhaseAvailable: schedulePhaseIsAvailable,
     sideAvailable,
     subtitle,
     targetMax,
@@ -3055,52 +3111,6 @@ function thermostatSliderColors(action: string) {
     highColor: THERMOSTAT_COOL_COLOR,
     lowColor: THERMOSTAT_HEAT_COLOR,
   }
-}
-
-function valueToThermostatPoint(value: number, min: number, max: number) {
-  const percentage = (value - min) / (max - min)
-  const angle = percentage * 270
-  const radians = ((angle - 225) * Math.PI) / 180
-  return {
-    x: 50 + Math.cos(radians) * THERMOSTAT_RING_RADIUS,
-    y: 50 + Math.sin(radians) * THERMOSTAT_RING_RADIUS,
-  }
-}
-
-function thermostatArcPath(from: number, to: number, min: number, max: number) {
-  const startValue = Math.max(Math.min(from, max), min)
-  const endValue = Math.max(Math.min(to, max), min)
-  const delta = endValue - startValue
-  if (delta <= 0) return null
-  const start = valueToThermostatPoint(startValue, min, max)
-  const end = valueToThermostatPoint(endValue, min, max)
-  const largeArcFlag = (delta / (max - min)) * 270 > 180 ? 1 : 0
-  return `M ${start.x} ${start.y} A ${THERMOSTAT_RING_RADIUS} ${THERMOSTAT_RING_RADIUS} 0 ${largeArcFlag} 1 ${end.x} ${end.y}`
-}
-
-function thermostatHandleStyle(value: number, min: number, max: number) {
-  const point = valueToThermostatPoint(value, min, max)
-  return {
-    '--thermostat-handle-x': `${point.x}%`,
-    '--thermostat-handle-y': `${point.y}%`,
-  } as CSSProperties
-}
-
-function thermostatRawValueFromPoint(rect: DOMRect, clientX: number, clientY: number, min: number, max: number) {
-  const x = (2 * (clientX - rect.left - rect.width / 2)) / rect.width
-  const y = (2 * (clientY - rect.top - rect.height / 2)) / rect.height
-  const phi = Math.atan2(y, x)
-  const degrees = (phi / Math.PI) * 180
-  const angle = ((degrees + 270) % 360) - 45
-  const percentage = Math.max(Math.min(angle / 270, 1), 0)
-  const raw = min + (max - min) * percentage
-  return Number(Math.max(Math.min(raw, max), min).toFixed(3))
-}
-
-function thermostatValueFromPoint(rect: DOMRect, clientX: number, clientY: number, min: number, max: number, step: number) {
-  const raw = thermostatRawValueFromPoint(rect, clientX, clientY, min, max)
-  const stepped = min + Math.round((raw - min) / step) * step
-  return Number(Math.max(Math.min(stepped, max), min).toFixed(3))
 }
 
 function ThermostatDial({ actionOverride, entityId, inactiveOverride, interactive = true, primaryUnitOverride, primaryValueOverride, rangeTextOverride, size = 'page', title }: { actionOverride?: string; entityId: string; inactiveOverride?: boolean; interactive?: boolean; primaryUnitOverride?: string | null; primaryValueOverride?: string; rangeTextOverride?: string | null; size?: 'modal' | 'page'; title: string }) {
@@ -3299,56 +3309,124 @@ function ThermostatDial({ actionOverride, entityId, inactiveOverride, interactiv
   )
 }
 
-function EightSleepThermostatHero({ modalState, side }: { modalState: EightSleepBedModalState; side: EightSleepSideConfig }) {
+function EightSleepThermostatHero({
+  modalState,
+  onRequestTemperatureScope,
+  side,
+}: {
+  modalState: EightSleepBedModalState
+  onRequestTemperatureScope?: (value: number, phase: SleepypodSchedulePhase, returnFocus: HTMLElement | null) => void
+  side: EightSleepSideConfig
+}) {
   const callService = useCallService()
   const dialRef = useRef<HTMLDivElement>(null)
+  const dialTapCandidateRef = useRef<{ moved: boolean; pointerId: number; startX: number; startY: number } | null>(null)
   const activeHandle = useRef<number | null>(null)
+  const previousActiveSchedulePhaseRef = useRef<SleepypodSchedulePhase | null>(modalState.activeSchedulePhase)
   const targetSyncTimerRef = useRef<number | null>(null)
   const pendingTargetValueRef = useRef<number | null>(null)
   const controlsSideOnRef = useRef(false)
+  const targetSliderRef = useRef<HTMLSpanElement>(null)
   const [dragValue, setDragValue] = useState<number | null>(null)
   const [targetDragging, setTargetDragging] = useState(false)
-  const { commitDisplaySideOn, commitTargetTemperature, controlMode, controlsSideOn, currentTemperature, displayedTargetValue: sourceTargetValue, sideAvailable, targetMax, targetMin, targetScale, targetStep } = modalState
+  const { activeSchedulePhase, cancelTargetTemperature, commitDisplaySideOn, commitTargetTemperature, controlMode, controlsSideOn, currentTemperature, displayedTargetValue: sourceTargetValue, schedulePhaseAvailable, sideAvailable, targetMax, targetMin, targetScale, targetStep } = modalState
   const targetConfirmationHoldMs = controlMode === 'climate' && targetScale === 'level' ? SLEEPYPOD_TARGET_CONFIRMATION_HOLD_MS : 0
-  const [optimisticTargetValue, commitHeroTargetValue] = useOptimisticState(sourceTargetValue, { clearOn: 'confirmation', confirmationHoldMs: targetConfirmationHoldMs, revertMs: FREE_SLEEP_TARGET_REVERT_MS })
-  const displayedTargetValue = dragValue ?? (modalState.hotFlashActive ? sourceTargetValue : optimisticTargetValue)
+  const [optimisticTargetValue, commitHeroTargetValue, cancelHeroTargetValue] = useOptimisticState(sourceTargetValue, { clearOn: 'confirmation', confirmationHoldMs: targetConfirmationHoldMs, revertMs: FREE_SLEEP_TARGET_REVERT_MS })
+  const displayedTargetValue = modalState.hotFlashActive ? sourceTargetValue : dragValue ?? optimisticTargetValue
+  const scopedSleepypodTarget = controlMode === 'climate' && targetScale === 'level'
+  const canSetTarget = sideAvailable && controlsSideOn && !modalState.hotFlashActive && displayedTargetValue !== null && (!scopedSleepypodTarget || schedulePhaseAvailable)
+  const [previousCanSetTarget, setPreviousCanSetTarget] = useState(canSetTarget)
+  if (previousCanSetTarget !== canSetTarget) {
+    setPreviousCanSetTarget(canSetTarget)
+    if (!canSetTarget) {
+      setDragValue(null)
+      setTargetDragging(false)
+    }
+  }
   const heroAction = targetScale === 'temperature' ? sleepypodTemperatureAction(displayedTargetValue, currentTemperature, controlsSideOn) : eightSleepTemperatureAction(displayedTargetValue, controlsSideOn)
   const heroTargetText = displayedTargetValue === null ? '--' : formatBedTargetValue(displayedTargetValue, modalState)
   const heroReadoutAction = controlsSideOn ? titleCaseState(heroAction) : null
   const heroReadoutText = controlsSideOn ? heroTargetText : 'OFF'
-  const heroLabel = controlsSideOn ? `${side.title} thermostat ${heroReadoutAction} ${heroTargetText}` : `${side.title} thermostat Off`
-  const heroHintText = `Tap the thermostat to turn ${controlsSideOn ? 'off' : 'on'} the Pod.`
+  const heroLabel = !sideAvailable
+    ? `${side.title} thermostat unavailable`
+    : controlsSideOn ? `${side.title} thermostat ${heroReadoutAction} ${heroTargetText}` : `${side.title} thermostat Off`
+  const heroHintText = !sideAvailable
+    ? 'Bed controls are unavailable.'
+    : !controlsSideOn
+      ? 'Use the power control to turn on the Pod.'
+      : scopedSleepypodTarget && !schedulePhaseAvailable
+        ? 'Schedule phase is unavailable.'
+        : modalState.hotFlashActive ? 'Hot Flash Mode controls the target.' : 'Tap or drag the dial to set the target.'
+  const powerButtonLabel = sideAvailable ? `${controlsSideOn ? 'Turn off' : 'Turn on'} ${side.title}` : `${side.title} unavailable`
+  const powerButtonText = sideAvailable ? (controlsSideOn ? 'Turn Off' : 'Turn On') : 'Unavailable'
+  const targetSliderLabel = `${side.title} target ${targetScale === 'temperature' ? 'temperature' : 'level'}`
   const sliderValue = displayedTargetValue ?? (targetScale === 'temperature' ? targetMin : 0)
-  const canDragTarget = sideAvailable && controlsSideOn && displayedTargetValue !== null
 
   useEffect(() => {
     controlsSideOnRef.current = controlsSideOn
   }, [controlsSideOn])
 
-  useEffect(() => () => {
+  const sendTargetTemperatureToHass = useCallback((pendingValue: number) => {
+    if (controlMode === 'climate' && targetScale === 'level') {
+      callService({ domain: 'script', service: sleepypodOutsideScheduleTemperatureService(side.scheduleSide), serviceData: { level: pendingValue } })
+      return
+    }
+    if (controlMode === 'climate' && targetScale === 'temperature' && side.climateEntityId) {
+      callService({ domain: 'climate', service: 'set_temperature', target: side.climateEntityId, serviceData: { temperature: pendingValue } })
+      return
+    }
+    callService({ domain: 'number', service: 'set_value', target: controlMode === 'climate' && side.targetLevelEntityId ? side.targetLevelEntityId : side.targetTemperatureEntityId, serviceData: { value: pendingValue } })
+  }, [callService, controlMode, side.climateEntityId, side.scheduleSide, side.targetLevelEntityId, side.targetTemperatureEntityId, targetScale])
+
+  const flushTargetTemperatureSync = useCallback(() => {
     if (targetSyncTimerRef.current !== null) window.clearTimeout(targetSyncTimerRef.current)
-  }, [])
+    targetSyncTimerRef.current = null
+    const pendingValue = pendingTargetValueRef.current
+    pendingTargetValueRef.current = null
+    if (pendingValue !== null) sendTargetTemperatureToHass(pendingValue)
+  }, [sendTargetTemperatureToHass])
+
+  useEffect(() => () => flushTargetTemperatureSync(), [flushTargetTemperatureSync])
+
+  useEffect(() => {
+    if (canSetTarget) return
+    if (targetSyncTimerRef.current !== null) window.clearTimeout(targetSyncTimerRef.current)
+    targetSyncTimerRef.current = null
+    pendingTargetValueRef.current = null
+    activeHandle.current = null
+    dialTapCandidateRef.current = null
+    cancelHeroTargetValue()
+    cancelTargetTemperature()
+  }, [canSetTarget, cancelHeroTargetValue, cancelTargetTemperature])
+
+  useEffect(() => {
+    if (previousActiveSchedulePhaseRef.current === activeSchedulePhase) return
+    previousActiveSchedulePhaseRef.current = activeSchedulePhase
+    if (!scopedSleepypodTarget) return
+    if (targetSyncTimerRef.current !== null) window.clearTimeout(targetSyncTimerRef.current)
+    targetSyncTimerRef.current = null
+    pendingTargetValueRef.current = null
+    cancelHeroTargetValue()
+    cancelTargetTemperature()
+  }, [activeSchedulePhase, cancelHeroTargetValue, cancelTargetTemperature, scopedSleepypodTarget])
 
   const queueTargetTemperatureSync = (clampedValue: number) => {
     pendingTargetValueRef.current = clampedValue
     if (targetSyncTimerRef.current !== null) window.clearTimeout(targetSyncTimerRef.current)
-    targetSyncTimerRef.current = window.setTimeout(() => {
-      const pendingValue = pendingTargetValueRef.current
-      pendingTargetValueRef.current = null
-      targetSyncTimerRef.current = null
-      if (pendingValue === null) return
-      if (controlMode === 'climate' && targetScale === 'temperature' && side.climateEntityId) {
-        callService({ domain: 'climate', service: 'set_temperature', target: side.climateEntityId, serviceData: { temperature: pendingValue } })
-        return
-      }
-      callService({ domain: 'number', service: 'set_value', target: controlMode === 'climate' && side.targetLevelEntityId ? side.targetLevelEntityId : side.targetTemperatureEntityId, serviceData: { value: pendingValue } })
-    }, FREE_SLEEP_NUMBER_SYNC_DEBOUNCE_MS)
+    targetSyncTimerRef.current = window.setTimeout(flushTargetTemperatureSync, FREE_SLEEP_NUMBER_SYNC_DEBOUNCE_MS)
   }
 
   const setTargetTemperature = (nextValue: number) => {
-    if (!canDragTarget) return
+    if (!canSetTarget) return
     const clampedValue = snapNumberToStep(nextValue, targetMin, targetMax, targetStep)
     setDragValue(null)
+    if (scopedSleepypodTarget && activeSchedulePhase) {
+      if (targetSyncTimerRef.current !== null) window.clearTimeout(targetSyncTimerRef.current)
+      targetSyncTimerRef.current = null
+      pendingTargetValueRef.current = null
+      onRequestTemperatureScope?.(clampedValue, activeSchedulePhase, targetSliderRef.current)
+      return
+    }
     commitHeroTargetValue(clampedValue)
     commitTargetTemperature(clampedValue)
     queueTargetTemperatureSync(clampedValue)
@@ -3366,7 +3444,7 @@ function EightSleepThermostatHero({ modalState, side }: { modalState: EightSleep
   }
 
   const startTargetDrag = (event: PointerEvent<HTMLElement>) => {
-    if (!canDragTarget) return
+    if (!canSetTarget) return
     const nextValue = targetValueFromPointer(event)
     if (nextValue === null) return
     event.preventDefault()
@@ -3394,12 +3472,77 @@ function EightSleepThermostatHero({ modalState, side }: { modalState: EightSleep
     const nextValue = targetValueFromPointer(event)
     activeHandle.current = null
     setTargetDragging(false)
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId)
+    if (typeof event.currentTarget.hasPointerCapture === 'function' && event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId)
+    }
     if (nextValue === null) return
     event.preventDefault()
     event.stopPropagation()
     const clampedValue = snapNumberToStep(nextValue, targetMin, targetMax, targetStep)
     setTargetTemperature(clampedValue)
+  }
+
+  const cancelTargetDrag = (event: PointerEvent<HTMLElement>) => {
+    if (activeHandle.current !== event.pointerId) return
+    activeHandle.current = null
+    setTargetDragging(false)
+    setDragValue(null)
+    if (typeof event.currentTarget.hasPointerCapture === 'function' && event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId)
+    }
+    event.preventDefault()
+    event.stopPropagation()
+  }
+
+  const startDialTap = (event: PointerEvent<HTMLDivElement>) => {
+    if (!canSetTarget || (event.pointerType === 'mouse' && event.button !== 0)) return
+    dialTapCandidateRef.current = {
+      moved: false,
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+    }
+  }
+
+  const moveDialTap = (event: PointerEvent<HTMLDivElement>) => {
+    const candidate = dialTapCandidateRef.current
+    if (!candidate || candidate.pointerId !== event.pointerId || candidate.moved) return
+    if (Math.hypot(event.clientX - candidate.startX, event.clientY - candidate.startY) > THERMOSTAT_DIAL_TAP_TOLERANCE_PX) {
+      candidate.moved = true
+    }
+  }
+
+  const cancelDialTap = (event: PointerEvent<HTMLDivElement>) => {
+    if (dialTapCandidateRef.current?.pointerId === event.pointerId) dialTapCandidateRef.current = null
+  }
+
+  const endDialTap = (event: PointerEvent<HTMLDivElement>) => {
+    const candidate = dialTapCandidateRef.current
+    if (!candidate || candidate.pointerId !== event.pointerId) return
+    dialTapCandidateRef.current = null
+    if (candidate.moved) return
+    const rect = dialRef.current?.getBoundingClientRect()
+    if (!rect || !thermostatPointIsOnRing(rect, event.clientX, event.clientY)) return
+    const nextValue = targetValueFromPointer(event)
+    if (nextValue === null) return
+    event.preventDefault()
+    event.stopPropagation()
+    setTargetTemperature(nextValue)
+  }
+
+  const adjustTargetFromKeyboard = (event: KeyboardEvent<HTMLElement>) => {
+    if (!canSetTarget || displayedTargetValue === null) return
+    let nextValue: number | null = null
+    if (event.key === 'ArrowUp' || event.key === 'ArrowRight') nextValue = displayedTargetValue + targetStep
+    if (event.key === 'ArrowDown' || event.key === 'ArrowLeft') nextValue = displayedTargetValue - targetStep
+    if (event.key === 'Home') nextValue = targetMin
+    if (event.key === 'End') nextValue = targetMax
+    if (event.key === 'PageUp') nextValue = displayedTargetValue + targetStep * 10
+    if (event.key === 'PageDown') nextValue = displayedTargetValue - targetStep * 10
+    if (nextValue === null) return
+    event.preventDefault()
+    event.stopPropagation()
+    setTargetTemperature(nextValue)
   }
 
   const toggleSidePower = () => {
@@ -3423,34 +3566,59 @@ function EightSleepThermostatHero({ modalState, side }: { modalState: EightSleep
   return (
     <div className={styles.eightSleepThermostatHero}>
       <div className={styles.eightSleepThermostatControl}>
-        <div aria-label={heroLabel} className={styles.thermostatDial} data-hvac-action={heroAction} data-size="modal" ref={dialRef} role="region">
+        <div
+          aria-disabled={!canSetTarget}
+          aria-label={heroLabel}
+          className={styles.thermostatDial}
+          data-hvac-action={heroAction}
+          data-size="modal"
+          data-target-interactive={canSetTarget ? 'true' : 'false'}
+          onPointerCancel={cancelDialTap}
+          onPointerDown={startDialTap}
+          onPointerMove={moveDialTap}
+          onPointerUp={endDialTap}
+          ref={dialRef}
+          role="region"
+        >
           <ControlSliderCircular
+            aria-hidden="true"
             className={styles.thermostatCircularSlider}
             colors={thermostatSliderColors(heroAction)}
             current={0}
-            disabled={!canDragTarget}
+            disabled={!canSetTarget}
+            inert
             inactive={!controlsSideOn}
-            label={`${side.title} target ${targetScale === 'temperature' ? 'temperature' : 'level'}`}
+            label={targetSliderLabel}
             max={targetMax}
             min={targetMin}
             mode="full"
             onChange={updateDragValue}
             onChangeApplied={setTargetTemperature}
-            readonly={!canDragTarget}
+            readonly={!canSetTarget}
             step={targetStep}
             value={sliderValue}
           />
-          {canDragTarget && (
-            <div aria-hidden="true" className={styles.thermostatHandleLayer}>
+          {canSetTarget && (
+            <div className={styles.thermostatHandleLayer}>
               <span
+                aria-label={targetSliderLabel}
+                aria-valuemax={targetMax}
+                aria-valuemin={targetMin}
+                aria-valuenow={sliderValue}
+                aria-valuetext={heroTargetText}
+                aria-readonly="false"
                 className={styles.thermostatHandleHitTarget}
                 data-dragging={targetDragging ? 'true' : undefined}
                 data-target="value"
-                onPointerCancel={endTargetDrag}
+                onKeyDown={adjustTargetFromKeyboard}
+                onPointerCancel={cancelTargetDrag}
                 onPointerDown={startTargetDrag}
                 onPointerMove={moveTargetDrag}
                 onPointerUp={endTargetDrag}
+                ref={targetSliderRef}
+                role="slider"
                 style={thermostatHandleStyle(sliderValue, targetMin, targetMax)}
+                tabIndex={0}
               />
             </div>
           )}
@@ -3459,9 +3627,14 @@ function EightSleepThermostatHero({ modalState, side }: { modalState: EightSleep
             <span className={styles.thermostatPrimaryValue}>{heroReadoutText}</span>
           </div>
         </div>
-        <button aria-label={`${controlsSideOn ? 'Turn off' : 'Turn on'} ${side.title}`} className={styles.eightSleepThermostatButton} disabled={!sideAvailable} onClick={toggleSidePower} type="button" />
       </div>
-      <Description className={styles.eightSleepThermostatHint}>{heroHintText}</Description>
+      <div className={styles.eightSleepThermostatActions}>
+        <button aria-label={powerButtonLabel} className={styles.eightSleepPowerButton} data-active={controlsSideOn ? 'true' : 'false'} disabled={!sideAvailable} onClick={toggleSidePower} type="button">
+          <MaterialIcon name="mdi:power" size={20} />
+          <span>{powerButtonText}</span>
+        </button>
+        <Description className={styles.eightSleepThermostatHint}>{heroHintText}</Description>
+      </div>
     </div>
   )
 }
@@ -4278,22 +4451,96 @@ function EightSleepHotFlashButton({ modalState, side }: { modalState: EightSleep
 }
 
 function EightSleepBedModal({ modalState, onClose, open, side }: { modalState: EightSleepBedModalState; onClose: () => void; open: boolean; side: EightSleepSideConfig }) {
+  const callService = useCallService()
   const [activeTab, setActiveTab] = useState<EightSleepModalTab>('schedule')
+  const [scopeRequest, setScopeRequest] = useState<BedTemperatureScopeRequest>({
+    open: false,
+    phase: 'bedtime',
+    returnFocus: null,
+    targetText: '--',
+    value: 0,
+  })
+  const scopeCommandStateRef = useRef({
+    activeSchedulePhase: modalState.activeSchedulePhase,
+    request: scopeRequest,
+    sideAvailable: modalState.sideAvailable,
+  })
+  const [previousOpen, setPreviousOpen] = useState(open)
   const tabs = modalState.controlMode === 'climate' ? SLEEPYPOD_MODAL_TABS : EIGHT_SLEEP_MODAL_TABS
   const renderedActiveTab = tabs.some((tab) => tab.tab === activeTab) ? activeTab : tabs[0].tab
+  const scopeRequestInvalid = scopeRequest.open && (!modalState.sideAvailable || modalState.activeSchedulePhase !== scopeRequest.phase)
+  if (previousOpen !== open) {
+    setPreviousOpen(open)
+    if (!open && scopeRequest.open) setScopeRequest((current) => ({ ...current, open: false }))
+  } else if (scopeRequestInvalid) {
+    setScopeRequest((current) => ({ ...current, open: false }))
+  }
+
+  useLayoutEffect(() => {
+    scopeCommandStateRef.current = {
+      activeSchedulePhase: modalState.activeSchedulePhase,
+      request: scopeRequest,
+      sideAvailable: modalState.sideAvailable,
+    }
+  }, [modalState.activeSchedulePhase, modalState.sideAvailable, scopeRequest])
+
+  const closeScopePrompt = () => {
+    setScopeRequest((current) => ({ ...current, open: false }))
+  }
+
+  const closeBedModal = () => {
+    closeScopePrompt()
+    onClose()
+  }
+
+  const requestTemperatureScope = (value: number, phase: SleepypodSchedulePhase, returnFocus: HTMLElement | null) => {
+    setScopeRequest({
+      open: true,
+      phase,
+      returnFocus,
+      targetText: formatBedTargetValue(value, modalState),
+      value,
+    })
+  }
+
+  const chooseTemperatureScope = (scope: SleepypodTemperatureScope) => {
+    const current = scopeCommandStateRef.current
+    if (!current.request.open || !current.sideAvailable || current.activeSchedulePhase !== current.request.phase) {
+      closeScopePrompt()
+      return
+    }
+    closeScopePrompt()
+    modalState.commitTargetTemperature(current.request.value)
+    callService({
+      domain: 'script',
+      service: sleepypodTemperatureScopeService(side.scheduleSide, scope, current.request.phase),
+      serviceData: { level: current.request.value },
+    })
+  }
 
   return (
-    <ModalSheet
-      contentStyle={EIGHT_SLEEP_BED_MODAL_STYLE}
-      footer={<EightSleepModalNav activeTab={renderedActiveTab} onTabChange={setActiveTab} sideTitle={side.title} tabs={tabs} />}
-      onClose={onClose}
-      open={open}
-      subtitle={modalState.subtitle}
-      surface="hass-popup"
-      title={side.title}
-    >
-      <EightSleepBedModalContent activeTab={renderedActiveTab} modalState={modalState} side={side} tabs={tabs} />
-    </ModalSheet>
+    <>
+      <ModalSheet
+        contentStyle={EIGHT_SLEEP_BED_MODAL_STYLE}
+        footer={<EightSleepModalNav activeTab={renderedActiveTab} onTabChange={setActiveTab} sideTitle={side.title} tabs={tabs} />}
+        onClose={closeBedModal}
+        open={open}
+        subtitle={modalState.subtitle}
+        surface="hass-popup"
+        title={side.title}
+      >
+        <EightSleepBedModalContent activeTab={renderedActiveTab} modalState={modalState} onRequestTemperatureScope={requestTemperatureScope} side={side} tabs={tabs} />
+      </ModalSheet>
+      <BedTemperatureScopePrompt
+        onChoose={chooseTemperatureScope}
+        onClose={closeScopePrompt}
+        open={open && scopeRequest.open && modalState.sideAvailable && modalState.activeSchedulePhase === scopeRequest.phase}
+        phase={scopeRequest.phase}
+        returnFocus={scopeRequest.returnFocus}
+        sideTitle={side.title}
+        targetText={scopeRequest.targetText}
+      />
+    </>
   )
 }
 
@@ -4358,7 +4605,19 @@ function SleepypodStatusSection({ modalState, side }: { modalState: EightSleepBe
   )
 }
 
-function EightSleepBedModalContent({ activeTab, modalState, side, tabs }: { activeTab: EightSleepModalTab; modalState: EightSleepBedModalState; side: EightSleepSideConfig; tabs?: typeof EIGHT_SLEEP_MODAL_TABS }) {
+function EightSleepBedModalContent({
+  activeTab,
+  modalState,
+  onRequestTemperatureScope,
+  side,
+  tabs,
+}: {
+  activeTab: EightSleepModalTab
+  modalState: EightSleepBedModalState
+  onRequestTemperatureScope?: (value: number, phase: SleepypodSchedulePhase, returnFocus: HTMLElement | null) => void
+  side: EightSleepSideConfig
+  tabs?: typeof EIGHT_SLEEP_MODAL_TABS
+}) {
   const modalBodyRef = useRef<HTMLDivElement | null>(null)
   const modalPanelRef = useRef<HTMLDivElement | null>(null)
   const { displayedTab: effectiveActiveTab, transitionState } = useSmoothDisplayedModalTab(activeTab)
@@ -4384,19 +4643,24 @@ function EightSleepBedModalContent({ activeTab, modalState, side, tabs }: { acti
 
   return (
     <div className={`${styles.thermostatModalBody} ${styles.eightSleepModalBody}`} data-layout="eight-sleep-modal-body" ref={modalBodyRef}>
-      <div className={styles.eightSleepModalHeroShell} data-section="eight-sleep-hero">
-        <EightSleepThermostatHero modalState={modalState} side={side} />
+      <div className={`${styles.eightSleepModalHeroShell} ${styles.thermostatModalDialShell}`} data-section="eight-sleep-hero" data-thermostat-modal-dial-shell="true" style={THERMOSTAT_MODAL_DIAL_SHELL_STYLE}>
+        <EightSleepThermostatHero modalState={modalState} onRequestTemperatureScope={onRequestTemperatureScope} side={side} />
       </div>
       <div aria-label={`${side.title} ${selectedTabLabel}`} className={styles.eightSleepModalPanel} data-modal-tab-transition-state={transitionState} data-scroll-region="eight-sleep-panel" ref={modalPanelRef}>
-        {effectiveActiveTab === 'schedule' && <EightSleepScheduleSection modalState={modalState} side={side} />}
-        {effectiveActiveTab === 'modes' && (
+        {!modalState.sideAvailable && (
+          <section className={styles.section}>
+            <InlineAlert>Bed controls are unavailable. No changes can be made until the active bed connection recovers.</InlineAlert>
+          </section>
+        )}
+        {modalState.sideAvailable && effectiveActiveTab === 'schedule' && <EightSleepScheduleSection modalState={modalState} side={side} />}
+        {modalState.sideAvailable && effectiveActiveTab === 'modes' && (
           <section className={styles.section}>
             <SectionHeader title="Special Modes" />
             <Description className={styles.thermostatDescription}>Activating hot flash mode will set the bed to {modalState.targetScale === 'temperature' ? '55°F' : '-10'} for fifteen minutes.</Description>
             <EightSleepHotFlashButton modalState={modalState} side={side} />
           </section>
         )}
-        {effectiveActiveTab === 'alarms' && (
+        {modalState.sideAvailable && effectiveActiveTab === 'alarms' && (
           <>
             {alarmActive && <EightSleepAlarmActiveActions side={side} />}
             <EightSleepAlarmsSection
@@ -4407,8 +4671,8 @@ function EightSleepBedModalContent({ activeTab, modalState, side, tabs }: { acti
             />
           </>
         )}
-        {effectiveActiveTab === 'status' && modalState.controlMode === 'climate' && <SleepypodStatusSection modalState={modalState} side={side} />}
-        {effectiveActiveTab === 'status' && modalState.controlMode === 'legacy' && (
+        {modalState.sideAvailable && effectiveActiveTab === 'status' && modalState.controlMode === 'climate' && <SleepypodStatusSection modalState={modalState} side={side} />}
+        {modalState.sideAvailable && effectiveActiveTab === 'status' && modalState.controlMode === 'legacy' && (
           <section className={styles.section}>
             <SectionHeader title="Status" />
             <div className={styles.eightSleepStageGrid}>
@@ -4419,7 +4683,7 @@ function EightSleepBedModalContent({ activeTab, modalState, side, tabs }: { acti
             </div>
           </section>
         )}
-        {effectiveActiveTab === 'settings' && modalState.controlMode === 'legacy' && (
+        {modalState.sideAvailable && effectiveActiveTab === 'settings' && modalState.controlMode === 'legacy' && (
           <>
             <section className={styles.section}>
               <SectionHeader title="Bedtime" />
@@ -4524,7 +4788,7 @@ function ThermostatSelectButton({
 
   return (
     <>
-      <button aria-label={`${title} ${formatSelectOption(displayValue)}`} className={styles.thermostatSubButton} disabled={disabled} onClick={() => setOpen(true)} type="button">
+      <button aria-label={`${title} ${formatSelectOption(displayValue)}`} className={styles.thermostatSubButton} data-modal-opener-exception="option-picker" disabled={disabled} onClick={() => setOpen(true)} type="button">
         <MaterialIcon name={icon} size={22} />
         <MaterialIcon name="mdi:chevron-down" size={22} />
       </button>
@@ -4540,13 +4804,13 @@ function ThermostatRoomRow({ onOpen, room }: { onOpen: (hash: string) => void; r
   const subtitle = `${formatTemperatureValue(temperature?.state, temperatureUnit(temperature))} · ${titleCaseState(occupancy?.state)}`
 
   return (
-    <button aria-label={`${room.title} ${subtitle}`} className={styles.thermostatRoomRow} onClick={() => onOpen(room.hash)} type="button">
-      <MaterialIcon name={active ? 'mdi:thermometer-check' : 'mdi:thermometer-off'} size={32} />
-      <span>
-        <strong>{room.title}</strong>
-        <small>{subtitle}</small>
-      </span>
-    </button>
+    <ModalOpenerRow
+      ariaLabel={`${room.title} ${subtitle}`}
+      icon={<MaterialIcon name={active ? 'mdi:thermometer-check' : 'mdi:thermometer-off'} size={32} />}
+      onClick={() => onOpen(room.hash)}
+      subtitle={subtitle}
+      title={room.title}
+    />
   )
 }
 
@@ -4572,6 +4836,32 @@ function ThermostatGlassCard({ active = false, ariaLabel, children, hvacAction, 
       )}
       {children && <div className={styles.thermostatGlassActions}>{children}</div>}
     </div>
+  )
+}
+
+function useThermostatHomeAwayStatus() {
+  const statusEntity = useEntity(asEntityName(THERMOSTAT_HOME_AWAY_ENTITY_ID), { returnNullIfNotFound: true })
+  const reasonEntity = useEntity(asEntityName(THERMOSTAT_HOME_AWAY_REASON_ENTITY_ID), { returnNullIfNotFound: true })
+  const state = formatCompactEntityState(statusEntity, 'Unavailable')
+  const reason = reasonEntity && !isUnavailable(reasonEntity) && reasonEntity.state.trim()
+    ? reasonEntity.state
+    : 'Home Assistant has not provided an effective-mode reason.'
+
+  return { reason, state }
+}
+
+function WholeHomeThermostatDial() {
+  const { state } = useThermostatHomeAwayStatus()
+  const globalThermostat = useEntity(asEntityName(GLOBAL_THERMOSTAT_ENTITY_ID), { returnNullIfNotFound: true })
+  const awayMode = useEntity(asEntityName(THERMOSTAT_AWAY_MODE_ENTITY_ID), { returnNullIfNotFound: true })
+  const effectiveAway = thermostatEffectiveAway(state, awayMode?.state === 'on')
+
+  return (
+    <ThermostatDial
+      actionOverride={rawThermostatAction(globalThermostat)}
+      entityId={effectiveAway ? ECO_AWAY_THERMOSTAT_ENTITY_ID : GLOBAL_THERMOSTAT_ENTITY_ID}
+      title="Whole Home"
+    />
   )
 }
 
@@ -4646,7 +4936,7 @@ function PredictiveComfortCard({ onOpen }: { onOpen: () => void }) {
             <MaterialIcon name="mdi:power" size={22} />
           </button>
           <button aria-label="Open Predictive Comfort controls" className={styles.thermostatBareIconButton} onClick={openControls} type="button">
-            <MaterialIcon name="mdi:chevron-right" size={24} />
+            <ModalDisclosureIcon />
           </button>
         </>
       )}
@@ -4660,7 +4950,8 @@ function predictiveAttribute(entity: ReturnType<typeof useEntity>, key: string) 
 
 function formatPredictiveState(value: unknown) {
   if (typeof value !== 'string' || value === '') return 'Unknown'
-  return formatSelectOption(value)
+  const stateKey = value.trim().toLowerCase().replace(/[\s-]+/g, '_')
+  return PREDICTIVE_STATE_LABELS[stateKey] ?? formatSelectOption(value)
 }
 
 function formatPredictiveEntityLabel(value: unknown) {
@@ -4915,13 +5206,43 @@ function OpenContactSensorsSection() {
   )
 }
 
+function useThermostatRoomAwayMode(climateEntityId: string) {
+  const climateEntity = useEntity(asEntityName(climateEntityId), { returnNullIfNotFound: true })
+  const awayMode = useEntity(asEntityName(THERMOSTAT_AWAY_MODE_ENTITY_ID), { returnNullIfNotFound: true })
+  const roomAwayMode = climateEntity?.attributes.away_mode_active
+  return typeof roomAwayMode === 'boolean' ? roomAwayMode : awayMode?.state === 'on'
+}
+
+function thermostatEffectiveAway(state: string, fallbackAwayMode: boolean) {
+  return state === 'Away' || ((state === 'Unknown' || state === 'Unavailable') && fallbackAwayMode)
+}
+
+function ThermostatAwayModeDetails({ climateEntityId, label, useEffectiveMode = false }: { climateEntityId: string; label: string; useEffectiveMode?: boolean }) {
+  const { reason, state } = useThermostatHomeAwayStatus()
+  const vacationMode = useEntity(asEntityName(VACATION_MODE_ENTITY_ID), { returnNullIfNotFound: true })
+  const entityAwayModeActive = useThermostatRoomAwayMode(climateEntityId)
+  const awayModeActive = useEffectiveMode ? thermostatEffectiveAway(state, entityAwayModeActive) : entityAwayModeActive
+  const showStatusNotice = state === 'Away' || state === 'Unknown' || state === 'Unavailable'
+  const modeTitle = vacationMode?.state === 'on' ? 'Vacation Mode' : 'Away Mode'
+  const statusNotice = state === 'Away' || awayModeActive
+    ? `${modeTitle} Active. The room may be cooler or warmer than your heat/cool targets to save energy while away.`
+    : `${state} Mode. ${reason}`
+
+  if (!awayModeActive && !showStatusNotice) return null
+
+  return (
+    <section aria-label={`${label} ${modeTitle}`} className={styles.thermostatModalAway}>
+      <Notice>{statusNotice}</Notice>
+    </section>
+  )
+}
+
 function ThermostatRoomModalContent({ room }: { room: ThermostatRoomView }) {
-  const awayMode = useEntity(asEntityName('binary_sensor.thermostat_contact_sensors_away_mode_active'), { returnNullIfNotFound: true })
   const ventTitle = `${room.title} ${room.ventEntityIds.length > 1 ? 'Vents' : 'Vent'}`
 
   return (
     <div className={styles.thermostatModalBody}>
-      <section aria-label={`${room.title} thermostat control`} className={styles.thermostatModalHero}>
+      <section aria-label={`${room.title} thermostat control`} className={`${styles.thermostatModalHero} ${styles.thermostatModalDialShell}`} data-thermostat-modal-dial-shell="true" style={THERMOSTAT_MODAL_DIAL_SHELL_STYLE}>
         <ThermostatDial entityId={room.climateEntityId} size="modal" title={room.title} />
       </section>
       <section aria-label={ventTitle} className={`${styles.section} ${styles.thermostatModalVents}`}>
@@ -4930,11 +5251,7 @@ function ThermostatRoomModalContent({ room }: { room: ThermostatRoomView }) {
           {room.ventEntityIds.map((entityId, index) => <ClimateCard entityId={entityId} icon="vent" key={entityId} size="compact" title={room.ventEntityIds.length > 1 ? `Vent ${index + 1}` : 'Vent'} />)}
         </Grid>
       </section>
-      {awayMode?.state === 'on' && (
-        <section aria-label={`${room.title} away mode`} className={styles.thermostatModalAway}>
-          <Notice>Away Mode Active. The room may be cooler or warmer than your heat/cool targets to save energy while away.</Notice>
-        </section>
-      )}
+      <ThermostatAwayModeDetails climateEntityId={room.climateEntityId} label={room.title} />
     </div>
   )
 }
@@ -4973,8 +5290,9 @@ function ThermostatPage({ preload = false, preloadHash, preloadHashes = [] }: { 
     <div className={`${styles.stack} ${styles.thermostatPage}`}>
       <section className={styles.section}>
         <SectionHeader title="Whole Home" />
-        <ThermostatDial entityId={GLOBAL_THERMOSTAT_ENTITY_ID} title="Whole Home" />
+        <WholeHomeThermostatDial />
         <ThermostatHubPill />
+        <ThermostatAwayModeDetails climateEntityId={GLOBAL_THERMOSTAT_ENTITY_ID} label="Whole Home" useEffectiveMode />
       </section>
       <OpenContactSensorsSection />
       <section className={styles.section}>

@@ -5,6 +5,7 @@ import { Description } from '../core/Description'
 import { EmptyState } from '../core/EmptyState'
 import { FloatingActionButton } from '../core/FloatingActionButton'
 import { MaterialIcon } from '../core/Icon'
+import { ModalDisclosureIcon } from '../core/ModalDisclosureIcon'
 import { ModalSheet } from '../core/ModalSheet'
 import { NativePickerField } from '../core/NativePickerField'
 import { RadioRow } from '../core/RadioRow'
@@ -480,15 +481,15 @@ function PantryRow({ expiry, inventoryId, locationLabel, multiItem, onDeleted, o
           </span>
         </button>
         {multiItem ? (
-          <button aria-label={`View ${title} individual items`} className={styles.rowAction} onClick={(event) => {
+          <button aria-label={`View ${title} individual items`} className={styles.rowAction} data-modal-disclosure-button="true" onClick={(event) => {
             event.stopPropagation()
             onOpenDetails()
           }} type="button">
-            <MaterialIcon name="mdi:chevron-right" size={26} />
+            <ModalDisclosureIcon />
           </button>
         ) : (
           <>
-            <button aria-label={`Edit ${title}`} className={styles.rowAction} disabled={inventoryId === null} onClick={(event) => {
+            <button aria-label={`Edit ${title}`} className={styles.rowAction} data-modal-opener-exception="edit-action" disabled={inventoryId === null} onClick={(event) => {
               event.stopPropagation()
               onOpenDetails()
             }} type="button">
@@ -825,7 +826,7 @@ function InventorySearchAction({ controls, onExpandedChange }: { controls: EverS
 
   const clearSearch = useCallback(() => {
     logInventorySearch('clear', {})
-    controls.setSearchQuery('')
+    flushSync(() => controls.setSearchQuery(''))
     focusInput()
   }, [controls, focusInput])
 
@@ -892,7 +893,7 @@ function InventorySearchAction({ controls, onExpandedChange }: { controls: EverS
 
 export function EverShelfInventoryFloatingActions({ controls }: { controls: EverShelfInventoryControls }) {
   const [searchExpanded, setSearchExpanded] = useState(false)
-  if (controls.inventoryLoadPhase !== 'content' || (controls.inventoryItemCount === 0 && !controls.searchActive)) return null
+  if (controls.inventoryLoadPhase !== 'content' || (controls.inventoryItemCount === 0 && !controls.searchActive && !searchExpanded)) return null
   const actionsCollapsed = searchExpanded
 
   return (
@@ -930,6 +931,7 @@ export function EverShelfInventoryPanel({ controls, location, title }: EverShelf
   const callService = useHass((state) => state.helpers.callService) as unknown as CallService
   const { inventoryLoadPhase, setInventoryItemCount, setInventoryLoadPhase } = controls
   const [detailsItem, setDetailsItem] = useState<EverShelfInventoryDisplayItem | null>(null)
+  const [detailsOpen, setDetailsOpen] = useState(false)
   const [items, setItems] = useState<EverShelfInventoryItem[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [reloadNonce, setReloadNonce] = useState(0)
@@ -1147,7 +1149,10 @@ export function EverShelfInventoryPanel({ controls, location, title }: EverShelf
                       const quantity = itemQuantity(item)
                       return (
                         <li className={styles.item} key={item.inventory_id ?? item.id ?? `${location}-${name}-${index}`}>
-                          <PantryRow expiry={expiry} inventoryId={inventoryId} locationLabel={LOCATION_DELETE_LABELS[location]} multiItem={multiItem} onDeleted={removeDeletedItem} onOpenDetails={() => setDetailsItem(item)} quantity={quantity} title={name} />
+                          <PantryRow expiry={expiry} inventoryId={inventoryId} locationLabel={LOCATION_DELETE_LABELS[location]} multiItem={multiItem} onDeleted={removeDeletedItem} onOpenDetails={() => {
+                            setDetailsItem(item)
+                            setDetailsOpen(true)
+                          }} quantity={quantity} title={name} />
                         </li>
                       )
                     })}
@@ -1163,7 +1168,7 @@ export function EverShelfInventoryPanel({ controls, location, title }: EverShelf
           </>
         )}
       </article>
-      <InventoryItemInstancesModal key={itemInstancesKey(detailsItem)} item={detailsItem} locationLabel={LOCATION_DELETE_LABELS[location]} onClose={() => setDetailsItem(null)} onInventoryChanged={reloadInventory} open={detailsItem !== null} />
+      <InventoryItemInstancesModal key={itemInstancesKey(detailsItem)} item={detailsItem} locationLabel={LOCATION_DELETE_LABELS[location]} onClose={() => setDetailsOpen(false)} onInventoryChanged={reloadInventory} open={detailsOpen} />
     </>
   )
 }

@@ -12,6 +12,7 @@ import { useOptimisticState, type OptimisticCommitOptions } from '../../hooks/us
 import { asEntityName, titleCaseState } from './entityState'
 import { ValetudoMapCard } from './ValetudoMapCard'
 import { VACUUM_MODAL_STYLE } from './vacuumModalStyle'
+import { isUnavailableVacuumState, vacuumConsumableVisual, vacuumStateVisual, type VacuumVisualTone } from './vacuumVisualState'
 import styles from './VacuumCard.module.css'
 
 type VacuumModalTab = 'controls' | 'zones' | 'autoClean' | 'more' | 'info'
@@ -68,7 +69,7 @@ interface VacuumCommandCoordinator {
 }
 
 function isUnavailableState(state: string | undefined) {
-  return !state || state === 'unavailable' || state === 'unknown'
+  return isUnavailableVacuumState(state)
 }
 
 function isResumable(statusFlag: string | undefined) {
@@ -347,13 +348,11 @@ function ActionButton({
   )
 }
 
-type InfoPillTone = 'danger' | 'ok' | 'warning'
-
-function InfoPill({ grouped = false, icon, label, tone, value }: { grouped?: boolean; icon: string; label: string; tone?: InfoPillTone; value: string }) {
+function InfoPill({ grouped = false, icon, label, tone, value }: { grouped?: boolean; icon: string; label: string; tone?: VacuumVisualTone; value: string }) {
   const accessibilityProps = grouped ? { 'aria-label': `${label} ${value}`, role: 'group' as const } : {}
 
   return (
-    <span {...accessibilityProps} className={styles.settingPill} data-tone={tone}>
+    <span {...accessibilityProps} className={styles.settingPill} data-icon={icon} data-tone={tone}>
       <MaterialIcon name={icon} size={18} />
       <span className={styles.settingText}>
         <span>{label}</span>
@@ -380,31 +379,17 @@ function formatConsumableDuration(entity: EntityLike) {
 }
 
 function formatConsumableValue(consumable: VacuumConsumableConfig, entity: EntityLike | null | undefined) {
-  if (!entity || isUnavailableState(entity.state)) return undefined
+  if (!entity || isUnavailableState(entity.state)) return 'Unavailable'
   if (consumable.valueKind === 'duration') return formatConsumableDuration(entity)
   const value = formatStateValue(entity.state)
   return value.toLowerCase() === 'ok' ? 'OK' : value
 }
 
-function consumableTone(consumable: VacuumConsumableConfig, entity: EntityLike | null | undefined): InfoPillTone | undefined {
-  if (!entity || isUnavailableState(entity.state)) return undefined
-  if (consumable.valueKind === 'duration') {
-    const minutes = Number(entity.state)
-    if (!Number.isFinite(minutes)) return undefined
-    if (minutes <= 0) return 'danger'
-    if (minutes <= 600) return 'warning'
-    return undefined
-  }
-  return entity.state.trim().toLowerCase() === 'ok' ? 'ok' : 'warning'
-}
-
 function VacuumConsumablePill({ consumable }: { consumable: VacuumConsumableConfig }) {
   const entity = useOptionalEntity(consumable.entityId)
   const value = formatConsumableValue(consumable, entity)
-
-  if (!value) return null
-
-  return <InfoPill grouped icon={consumable.icon} label={consumable.title} tone={consumableTone(consumable, entity)} value={value} />
+  const visual = vacuumConsumableVisual(consumable.icon, consumable.valueKind, entity?.state)
+  return <InfoPill grouped icon={visual.icon} label={consumable.title} tone={visual.tone} value={value} />
 }
 
 function ControlSection({ children, title }: { children: ReactNode; title: string }) {
@@ -600,10 +585,11 @@ function VacuumStatusSummary({ displayState, vacuum }: { displayState: string; v
   const rawErrorText = isErrorText(error?.state) ? error?.state : undefined
   const errorText = mappedErrorText ?? rawErrorText ?? 'No error'
   const hasError = isErrorText(errorText)
+  const visual = vacuumStateVisual(state)
 
   return (
     <section className={styles.statusPanel}>
-      <InfoPill icon="mdi:robot-vacuum" label="Status" value={stateLabel} />
+      <InfoPill icon={visual.icon} label="Status" tone={visual.tone} value={stateLabel} />
       <InfoPill icon="mdi:battery" label="Battery" value={batteryLabel} />
       {hasError ? (
         <InlineAlert className={styles.errorMessage}>{errorText}</InlineAlert>
@@ -946,6 +932,7 @@ export function VacuumCard({ disableHashSync = false, vacuum }: VacuumCardProps)
   const state = entity?.state
   const unavailable = isUnavailableState(state)
   const subtitle = vacuumSubtitle(state, battery?.state)
+  const visual = vacuumStateVisual(state)
 
   useEffect(() => {
     if (disableHashSync) return undefined
@@ -984,11 +971,14 @@ export function VacuumCard({ disableHashSync = false, vacuum }: VacuumCardProps)
   return (
     <>
       <GlassTile
-        icon="mdi:robot-vacuum"
+        backgroundColor={visual.backgroundColor}
+        disclosure={!unavailable}
+        icon={visual.icon}
+        iconColor={visual.iconColor}
         isOff={unavailable}
         onClick={unavailable ? undefined : openModal}
         subtitle={subtitle}
-        tone="vacuum"
+        tone={visual.tileTone}
         title={vacuum.title}
       />
       {modal}

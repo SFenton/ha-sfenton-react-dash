@@ -19,6 +19,16 @@
   font: inherit;
   cursor: pointer;
   text-align: left;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.button:focus {
+  outline: none;
+}
+
+.button:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.58);
+  outline-offset: -4px;
 }
 
 .camera {
@@ -69,4 +79,11 @@
   color: rgba(255, 255, 255, 0.7);
   font-size: 0.7rem;
   font-weight: 700;
+}
+
+.trailing {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 2px;
 }

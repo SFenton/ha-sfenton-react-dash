@@ -10,7 +10,7 @@ type FreeSleepSchedulesSnapshot = Partial<Record<'left' | 'right', Partial<Recor
 declare global {
   interface Window {
     __vacationPickerCalls?: number
-    __setDashboardFakeKeyboardHeight?: (height: number) => void
+    __setDashboardFakeKeyboardHeight?: (height: number, notify?: boolean) => void
     __setInventoryFakeKeyboardHeight?: (height: number) => void
   }
 }
@@ -20,6 +20,8 @@ async function openBedAlarmDialog(page: Page, bedButtonName: RegExp) {
   await page.getByRole('button', { name: bedButtonName }).click()
   const dialog = page.getByRole('dialog')
   await expect(dialog).toBeVisible()
+  await dialog.getByRole('button', { name: 'Alarms', exact: true }).click()
+  await expect(dialog.getByRole('heading', { name: 'Alarms' })).toBeVisible()
   await dialog.getByRole('button', { name: 'Alarm Schedule Disabled' }).click()
   await expect(dialog.getByRole('button', { name: 'Alarm Schedule Enabled' })).toBeVisible()
   return dialog
@@ -51,6 +53,13 @@ async function freeSleepSchedules(page: Page) {
   return page.evaluate(() => (window as unknown as { __mockHass: { freeSleepSchedules: () => FreeSleepSchedulesSnapshot } }).__mockHass.freeSleepSchedules())
 }
 
+async function roomAccessServiceCalls(page: Page) {
+  return page.evaluate(() => (
+    (window as unknown as { __mockHass: { calls: Record<string, unknown>[] } }).__mockHass.calls
+      .filter((call) => call.domain === 'script' && call.target === 'script.increment_room_access')
+  ))
+}
+
 async function expectFreeSleepAlarms(page: Page, side: 'left' | 'right', day: string, expected: FreeSleepAlarmSnapshot[]) {
   await expect.poll(async () => {
     const schedules = await freeSleepSchedules(page)
@@ -59,46 +68,34 @@ async function expectFreeSleepAlarms(page: Page, side: 'left' | 'right', day: st
 }
 
 async function expectDesktopSquareGrid(dialog: Locator, sectionLabel: string) {
-  const grid = dialog.locator(`section[aria-label="${sectionLabel}"] > div`)
-  await expect(grid).toBeVisible()
-  const cardCount = await grid.locator('> div').count()
-  const expectedColumns = Math.max(1, Math.ceil(Math.sqrt(cardCount)))
-  const expectedRows = Math.ceil(cardCount / expectedColumns)
+  const section = dialog.getByRole('region', { name: sectionLabel })
+  await expect(section).toBeVisible()
+  const openerCards = section.getByRole('button', { name: /^Open / })
+  const cards = await openerCards.count() > 0 ? openerCards : section.getByRole('article')
+  const cardCount = await cards.count()
+  expect(cardCount).toBeGreaterThan(0)
 
   await expect.poll(async () => {
-    return grid.evaluate((gridElement) => {
-      const firstCard = gridElement.firstElementChild?.firstElementChild
-      const firstCardRect = firstCard?.getBoundingClientRect()
-      const gridStyle = window.getComputedStyle(gridElement)
-      const columns = gridStyle.gridTemplateColumns.split(' ').filter(Boolean).length
-      const rows = gridStyle.gridTemplateRows.split(' ').filter(Boolean).length
+    return cards.evaluateAll((elements) => {
+      const rects = elements.map((element) => element.getBoundingClientRect())
       return {
-        cardCount: gridElement.children.length,
-        cardHeight: Math.round(firstCardRect?.height ?? 0),
-        cardWidth: Math.round(firstCardRect?.width ?? 0),
-        columns,
-        fitsAllRooms: columns * rows >= gridElement.children.length,
-        rows,
-        scrollsHorizontally: gridElement.scrollWidth > gridElement.clientWidth + 1,
-        squareCard: Math.round(firstCardRect?.width ?? 0) === Math.round(firstCardRect?.height ?? 0),
+        allFixedHeight: rects.every((rect) => Math.round(rect.height) === 168),
+        allFixedWidth: rects.every((rect) => Math.round(rect.width) === 168),
+        cardCount: rects.length,
+        squareCards: rects.every((rect) => Math.round(rect.width) === Math.round(rect.height)),
       }
-
     })
   }).toMatchObject({
+    allFixedHeight: true,
+    allFixedWidth: true,
     cardCount,
-    cardHeight: 168,
-    cardWidth: 168,
-    columns: expectedColumns,
-    fitsAllRooms: true,
-    rows: expectedRows,
-    scrollsHorizontally: false,
-    squareCard: true,
+    squareCards: true,
   })
 
   const dialogBox = await dialog.boundingBox()
-  const gridBox = await grid.boundingBox()
-  expect(Math.round(dialogBox?.width ?? 0)).toBeLessThanOrEqual(Math.round((gridBox?.width ?? 0) + 52))
-  return grid
+  const sectionBox = await section.boundingBox()
+  expect(Math.round(dialogBox?.width ?? 0)).toBeLessThanOrEqual(Math.round((sectionBox?.width ?? 0) + 52))
+  return section
 }
 
 async function installFakeVisualViewport(page: Page) {
@@ -118,8 +115,9 @@ async function installFakeVisualViewport(page: Page) {
     fakeVisualViewport.pageTop = 0
     fakeVisualViewport.scale = 1
     Object.defineProperty(window, 'visualViewport', { configurable: true, value: fakeVisualViewport })
-    window.__setDashboardFakeKeyboardHeight = (height: number) => {
+    window.__setDashboardFakeKeyboardHeight = (height: number, notify = true) => {
       fakeVisualViewport.height = height
+      if (!notify) return
       fakeVisualViewport.dispatchEvent(new Event('resize'))
       window.dispatchEvent(new Event('resize'))
     }
@@ -180,6 +178,10 @@ async function clickWithPointerJitter(page: Page, target: Locator) {
   await page.mouse.up()
 }
 
+async function expectRightChevron(opener: Locator) {
+  await expect(opener.locator('[data-modal-disclosure="right-chevron"]')).toHaveCount(1)
+}
+
 async function swipeWithTouch(page: Page, x: number, startY: number, endY: number) {
   const client = await page.context().newCDPSession(page)
   await client.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ id: 1, radiusX: 4, radiusY: 4, x, y: startY }] })
@@ -210,6 +212,49 @@ test('overview renders with mock Home Assistant state', async ({ page }) => {
   await expect(page.getByRole('heading', { name: 'Quick Links' })).toBeVisible()
 })
 
+test('room keyboard navigation signals one HA-owned increment without delaying the route', async ({ page }) => {
+  await page.goto('/at-a-glance/overview')
+  await page.getByRole('button', { name: 'Rooms' }).click()
+
+  const livingRoom = page.getByRole('dialog', { name: 'Rooms' }).getByRole('button', { name: 'Living Room area' })
+  await livingRoom.focus()
+  await livingRoom.press('Enter')
+
+  await expect.poll(() => page.evaluate(() => new URL(window.location.href).searchParams.get('path'))).toBe('living-room')
+  await expect.poll(() => roomAccessServiceCalls(page)).toEqual([
+    {
+      domain: 'script',
+      service: 'turn_on',
+      serviceData: { variables: { room: 'living-room' } },
+      target: 'script.increment_room_access',
+    },
+  ])
+})
+
+test('mobile modal opener families use shared disclosures and explicit action exceptions', async ({ page }) => {
+  await page.setViewportSize({ width: 393, height: 852 })
+  await page.goto('/at-a-glance/overview')
+
+  await expectRightChevron(page.getByRole('button', { name: /Open seven-day weather forecast/i }))
+  await expectRightChevron(page.getByRole('button', { name: /^Lights /i }).first())
+  await expectRightChevron(page.getByRole('button', { name: /^Security System /i }))
+  await expectRightChevron(page.getByRole('button', { name: 'Open Front Door camera' }))
+  await expect(page.getByRole('button', { name: 'Rooms' })).toHaveAttribute('data-modal-opener-exception', 'floating-action')
+
+  await page.goto('/at-a-glance/living-room')
+  await expectRightChevron(page.getByRole('button', { name: /^Climate /i }).first())
+  await expectRightChevron(page.getByRole('button', { name: /^Vents /i }))
+
+  await page.goto('/at-a-glance/admin')
+  await expectRightChevron(page.getByRole('button', { name: 'Open Presence-Based Overrides' }))
+
+  await page.goto('/at-a-glance/ecobee')
+  await expectRightChevron(page.getByRole('button', { name: 'Living Room 70.2°F · Inactive' }))
+
+  await page.goto('/at-a-glance/pantry')
+  await expectRightChevron(page.getByRole('button', { name: 'View Canned Beans individual items' }))
+})
+
 test('dashboard keyboard viewport hides bottom nav and publishes visible height', async ({ page }) => {
   await installFakeVisualViewport(page)
   await page.goto('/at-a-glance/overview')
@@ -220,6 +265,14 @@ test('dashboard keyboard viewport hides bottom nav and publishes visible height'
 
   const initialViewportHeight = await page.evaluate(() => window.visualViewport?.height ?? window.innerHeight)
   const keyboardViewportHeight = await page.evaluate(() => Math.max(320, window.innerHeight - 240))
+  await page.evaluate(() => {
+    const input = document.createElement('input')
+    input.setAttribute('data-keyboard-test-input', 'true')
+    input.style.position = 'fixed'
+    input.style.opacity = '0'
+    document.body.append(input)
+    input.focus()
+  })
   await page.evaluate((height) => window.__setDashboardFakeKeyboardHeight?.(height), keyboardViewportHeight)
 
   await expect.poll(() => page.evaluate(() => document.documentElement.getAttribute('data-dashboard-keyboard'))).toBe('open')
@@ -230,6 +283,99 @@ test('dashboard keyboard viewport hides bottom nav and publishes visible height'
   await page.evaluate((height) => window.__setDashboardFakeKeyboardHeight?.(height), initialViewportHeight)
   await expect.poll(() => page.evaluate(() => document.documentElement.getAttribute('data-dashboard-keyboard'))).toBeNull()
   await expect(nav).toHaveCSS('opacity', '1')
+  await page.evaluate(() => document.querySelector('[data-keyboard-test-input]')?.remove())
+})
+
+test('kitchen restores full height after closing the keyboard and reopening by touch navigation', async ({ page }) => {
+  await installFakeVisualViewport(page)
+  await page.goto('/sfenton-react-dash/home?path=kitchen')
+  await page.evaluate(() => {
+    const iframe = document.createElement('iframe')
+    iframe.dataset.dashboardWrapperTest = 'true'
+    iframe.src = '/at-a-glance/kitchen'
+    Object.assign(iframe.style, {
+      border: '0',
+      height: '100%',
+      inset: '0',
+      position: 'fixed',
+      width: '100%',
+      zIndex: '100',
+    })
+    document.body.append(iframe)
+  })
+  const app = page.frameLocator('iframe[data-dashboard-wrapper-test="true"]')
+  await expect(app.getByRole('heading', { name: 'Kitchen' })).toBeVisible()
+
+  const initialViewportHeight = await page.evaluate(() => window.innerHeight)
+  const keyboardViewportHeight = Math.max(320, initialViewportHeight - 300)
+  const shellMetrics = () => app.locator('html').evaluate(() => {
+    const shell = document.querySelector<HTMLElement>('[class*="_shell_"]')
+    return {
+      cssHeight: getComputedStyle(document.documentElement).getPropertyValue('--dashboard-viewport-height').trim(),
+      height: Math.round(shell?.getBoundingClientRect().height ?? 0),
+      keyboard: document.documentElement.getAttribute('data-dashboard-keyboard'),
+    }
+  })
+
+  await app.getByRole('button', { name: 'Scan Item' }).click()
+  const dialog = app.getByRole('dialog', { name: /Add Item/i })
+  await dialog.getByRole('button', { name: 'Manually Enter Name' }).click()
+  const productName = dialog.getByRole('textbox', { name: 'Product name' })
+  await productName.click()
+  await page.evaluate((height) => window.__setDashboardFakeKeyboardHeight?.(height), keyboardViewportHeight)
+
+  await expect.poll(shellMetrics).toEqual({
+    cssHeight: `${keyboardViewportHeight}px`,
+    height: keyboardViewportHeight,
+    keyboard: 'open',
+  })
+  await page.waitForTimeout(160)
+
+  await productName.press('Escape')
+  await expect(dialog).toHaveAttribute('data-state', 'closed')
+  await page.waitForTimeout(80)
+  await page.evaluate((height) => window.__setDashboardFakeKeyboardHeight?.(height, false), initialViewportHeight)
+
+  await expect.poll(shellMetrics).toEqual({
+    cssHeight: `${initialViewportHeight}px`,
+    height: initialViewportHeight,
+    keyboard: null,
+  })
+
+  await app.getByRole('button', { name: 'Scan Item' }).click()
+  const routeDialog = app.getByRole('dialog', { name: /Add Item/i })
+  await routeDialog.getByRole('button', { name: 'Manually Enter Name' }).click()
+  const routeProductName = routeDialog.getByRole('textbox', { name: 'Product name' })
+  await routeProductName.click()
+  await page.evaluate((height) => window.__setDashboardFakeKeyboardHeight?.(height), keyboardViewportHeight)
+  await expect.poll(shellMetrics).toEqual({
+    cssHeight: `${keyboardViewportHeight}px`,
+    height: keyboardViewportHeight,
+    keyboard: 'open',
+  })
+  await page.waitForTimeout(160)
+  await routeProductName.press('Escape')
+  await expect(routeDialog).toHaveAttribute('data-state', 'closed')
+  await page.waitForTimeout(80)
+  await page.evaluate((height) => window.__setDashboardFakeKeyboardHeight?.(height, false), initialViewportHeight)
+  await app.getByRole('button', { name: 'Go back' }).evaluate((button) => button.click())
+  await page.waitForTimeout(50)
+  expect(await shellMetrics()).toEqual({
+    cssHeight: `${initialViewportHeight}px`,
+    height: initialViewportHeight,
+    keyboard: null,
+  })
+  await expect(app.getByRole('heading', { name: 'Home' })).toBeVisible()
+  await app.getByRole('button', { name: 'Rooms' }).evaluate((button) => button.click())
+  const roomsDialog = app.getByRole('dialog', { name: 'Rooms' })
+  await roomsDialog.getByRole('button', { name: /Kitchen/i }).evaluate((button) => button.click())
+  await expect(app.getByRole('heading', { name: 'Kitchen' })).toBeVisible()
+
+  await expect.poll(shellMetrics).toEqual({
+    cssHeight: `${initialViewportHeight}px`,
+    height: initialViewportHeight,
+    keyboard: null,
+  })
 })
 
 test('inventory footer search moves above the mobile keyboard and clears results', async ({ page }) => {
@@ -465,7 +611,7 @@ test.describe('desktop modal layout', () => {
     }).toBe(90)
   })
 
-  test('bed modal uses fixed desktop hero with 700px width and 70vh height', async ({ page }) => {
+  test('bed modal keeps its short-desktop footer fixed while the unclipped hero scrolls with content', async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 500 })
     await page.goto('/at-a-glance/master-bedroom')
     await page.getByRole('button', { name: /Steph's Bed Off/i }).click()
@@ -492,43 +638,51 @@ test.describe('desktop modal layout', () => {
 
     await dialog.getByRole('button', { name: 'Alarms' }).click()
     const body = dialog.locator('[data-layout="eight-sleep-modal-body"]')
+    const modalBody = dialog.locator('[data-modal-sheet-body="true"]')
     const hero = dialog.locator('[data-section="eight-sleep-hero"]')
     const panel = dialog.locator('[data-scroll-region="eight-sleep-panel"]')
-    await expect(hero.getByText('Tap the thermostat to turn on the Pod.')).toBeVisible()
+    const footer = dialog.getByRole('navigation', { name: "Steph's Bed modal sections" }).locator('..')
+    await expect(hero.getByText('Use the power control to turn on the Pod.')).toBeVisible()
     const offHeroBox = await hero.boundingBox()
     await hero.getByRole('button', { name: "Turn on Steph's Bed" }).click()
-    await expect(hero.getByText('Tap the thermostat to turn off the Pod.')).toBeVisible()
+    await expect(hero.getByText('Tap or drag the dial to set the target.')).toBeVisible()
+    await modalBody.evaluate((element) => {
+      element.scrollTop = 0
+    })
     const onHeroBox = await hero.boundingBox()
     if (!offHeroBox) throw new Error('Eight Sleep hero was not measurable before toggling on')
     if (!onHeroBox) throw new Error('Eight Sleep hero was not measurable after toggling on')
     expect(Math.abs(Math.round(onHeroBox.height) - Math.round(offHeroBox.height))).toBeLessThanOrEqual(1)
     expect(Math.abs(Math.round(onHeroBox.y) - Math.round(offHeroBox.y))).toBeLessThanOrEqual(1)
     await expect(panel).toHaveAttribute('aria-label', "Steph's Bed Alarms")
-    await expect.poll(async () => {
-      return { alignContent: await hero.evaluate((element) => getComputedStyle(element).alignContent), alignSelf: await hero.evaluate((element) => getComputedStyle(element).alignSelf) }
-    }).toEqual({ alignContent: 'center', alignSelf: 'center' })
-    const bodyBox = await body.boundingBox()
+    await expect(body).toHaveCSS('overflow', 'visible')
+    const modalBodyBox = await modalBody.boundingBox()
+    const markerBox = await hero.locator('[data-target="value"]').boundingBox()
     const beforeScrollHeroBox = await hero.boundingBox()
-    if (!bodyBox) throw new Error('Eight Sleep modal body was not measurable')
-    if (!beforeScrollHeroBox) throw new Error('Eight Sleep hero was not measurable before panel scroll')
-    const heroCenterY = beforeScrollHeroBox.y + beforeScrollHeroBox.height / 2
-    const bodyCenterY = bodyBox.y + bodyBox.height / 2
-    expect(Math.abs(Math.round(heroCenterY) - Math.round(bodyCenterY))).toBeLessThanOrEqual(8)
+    const beforeScrollFooterBox = await footer.boundingBox()
+    if (!modalBodyBox || !markerBox) throw new Error('Eight Sleep marker clearance was not measurable')
+    if (!beforeScrollHeroBox || !beforeScrollFooterBox) throw new Error('Eight Sleep scroll layout was not measurable')
+    expect(markerBox.y).toBeGreaterThanOrEqual(modalBodyBox.y)
+    expect(Math.round(markerBox.width)).toBe(64)
+    expect(Math.round(markerBox.height)).toBe(64)
 
-    await panel.evaluate((element) => {
+    await modalBody.evaluate((element) => {
       element.scrollTop = element.scrollHeight
     })
-    await expect.poll(async () => panel.evaluate((element) => Math.round(element.scrollTop))).toBeGreaterThan(0)
+    await expect.poll(async () => modalBody.evaluate((element) => Math.round(element.scrollTop))).toBeGreaterThan(0)
 
     const afterScrollHeroBox = await hero.boundingBox()
-    expect(Math.abs(Math.round(afterScrollHeroBox?.y ?? 0) - Math.round(beforeScrollHeroBox.y))).toBeLessThanOrEqual(1)
+    const afterScrollFooterBox = await footer.boundingBox()
+    expect(Math.round(afterScrollHeroBox?.y ?? 0)).toBeLessThan(Math.round(beforeScrollHeroBox.y))
+    expect(Math.abs(Math.round(afterScrollFooterBox?.y ?? 0) - Math.round(beforeScrollFooterBox.y))).toBeLessThanOrEqual(1)
 
     await dialog.getByRole('button', { name: 'Special Modes' }).click()
     await expect(panel).toHaveAttribute('aria-label', "Steph's Bed Special Modes")
+    await expect.poll(async () => modalBody.evaluate((element) => Math.round(element.scrollTop))).toBe(0)
     await expect.poll(async () => {
       return panel.evaluate((element) => {
         const heading = element.querySelector('h2')
-        const description = element.querySelector('p')
+        const description = Array.from(element.querySelectorAll('div')).find((candidate) => candidate.textContent?.startsWith('Activating hot flash mode'))
         const button = element.querySelector('button')
         const headingBox = heading?.getBoundingClientRect()
         const descriptionBox = description?.getBoundingClientRect()
@@ -612,42 +766,33 @@ test.describe('desktop modal layout', () => {
     const dialog = page.getByRole('dialog', { name: /Lights/ })
     await expect(dialog).toBeVisible()
 
-    const grid = dialog.locator('section[aria-label="Lights by room"] > div')
+    const section = dialog.getByRole('region', { name: 'Lights by room' })
+    const roomButtons = section.getByRole('button', { name: /^Open / })
     await expect.poll(async () => {
-      return grid.evaluate((gridElement) => {
-        const firstCard = gridElement.firstElementChild?.firstElementChild
-        const firstCardRect = firstCard?.getBoundingClientRect()
-        const gridStyle = window.getComputedStyle(gridElement)
-        const columns = gridStyle.gridTemplateColumns.split(' ').filter(Boolean).length
-        const rows = gridStyle.gridTemplateRows.split(' ').filter(Boolean).length
+      return roomButtons.evaluateAll((elements) => {
+        const rects = elements.map((element) => element.getBoundingClientRect())
         return {
-          cardCount: gridElement.children.length,
-          cardHeight: Math.round(firstCardRect?.height ?? 0),
-          cardWidth: Math.round(firstCardRect?.width ?? 0),
-          columns,
-          fitsAllRooms: columns * rows >= gridElement.children.length,
-          rows,
-          scrollsHorizontally: gridElement.scrollWidth > gridElement.clientWidth + 1,
+          allFixedHeight: rects.every((rect) => Math.round(rect.height) === 168),
+          allFixedWidth: rects.every((rect) => Math.round(rect.width) === 168),
+          cardCount: rects.length,
+          squareCards: rects.every((rect) => Math.round(rect.width) === Math.round(rect.height)),
         }
       })
     }).toMatchObject({
-      cardCount: 16,
-      cardHeight: 168,
-      cardWidth: 168,
-      columns: 4,
-      fitsAllRooms: true,
-      rows: 4,
-      scrollsHorizontally: false,
+      allFixedHeight: true,
+      allFixedWidth: true,
+      cardCount: 17,
+      squareCards: true,
     })
-    const firstCard = grid.locator('> div').first()
+    const firstCard = roomButtons.first()
     const box = await firstCard.boundingBox()
     expect(Math.round(box?.width ?? 0)).toBe(Math.round(box?.height ?? 0))
     const dialogBox = await dialog.boundingBox()
-    const gridBox = await grid.boundingBox()
-    expect(Math.round(dialogBox?.width ?? 0)).toBeLessThan(900)
+    const gridBox = await section.boundingBox()
+    expect(Math.round(dialogBox?.width ?? 0)).toBeLessThanOrEqual(940)
     expect(Math.round(dialogBox?.width ?? 0)).toBeLessThanOrEqual(Math.round((gridBox?.width ?? 0) + 52))
 
-    const livingRoomButton = grid.getByRole('button', { name: /Open Living Room Lights/i })
+    const livingRoomButton = section.getByRole('button', { name: /Open Living Room Lights/i })
     const livingRoomBox = await livingRoomButton.boundingBox()
     if (!livingRoomBox) throw new Error('Living Room Lights button was not measurable')
     const clickX = livingRoomBox.x + livingRoomBox.width / 2
@@ -733,12 +878,12 @@ test.describe('desktop modal layout', () => {
   test('eco mode pickers use security-style desktop layout without separators', async ({ page }) => {
     await page.goto('/at-a-glance/ecobee')
 
-    const assertCompactPicker = async (triggerName: RegExp, dialogName: string) => {
+    const assertCardPicker = async (triggerName: RegExp, dialogName: string) => {
       await page.getByLabel(triggerName).click()
       const dialog = page.getByRole('dialog', { name: dialogName })
       await expect(dialog).toBeVisible()
       const options = dialog.getByRole('group', { name: `${dialogName} options` })
-      await expect(options).toHaveAttribute('data-layout', 'compact-grid')
+      await expect(options).toHaveAttribute('data-layout', 'card-grid')
       await expect(dialog.locator('span[aria-hidden="true"][class*="separator"]')).toHaveCount(0)
 
       await expect.poll(async () => Math.round((await dialog.boundingBox())?.width ?? 0)).toBeGreaterThanOrEqual(495)
@@ -751,13 +896,13 @@ test.describe('desktop modal layout', () => {
           columns: style.gridTemplateColumns.split(' ').filter(Boolean).length,
           optionHeight: Math.round(firstOption?.height ?? 0),
         }
-      })).toEqual({ columns: 2, optionHeight: 74 })
+      })).toEqual({ columns: 1, optionHeight: 120 })
       await dialog.getByRole('button', { name: 'Close' }).click()
       await expect(dialog).toBeHidden()
     }
 
-    await assertCompactPicker(/Eco Mode Critical Tracking Track Select Critical/i, 'Eco Mode Critical Tracking')
-    await assertCompactPicker(/Eco Behavior When Away Keep Eco Active/i, 'Eco Behavior When Away')
+    await assertCardPicker(/Eco Mode Critical Tracking Track Select Critical/i, 'Eco Mode Critical Tracking')
+    await assertCardPicker(/Eco Behavior When Away Keep Eco Active/i, 'Eco Behavior When Away')
   })
 
   const squareOverviewCases = [
@@ -864,6 +1009,10 @@ test.describe('desktop modal layout', () => {
 
 test('settings links to Vacation mode controls', async ({ page }) => {
   await page.goto('/at-a-glance/settings')
+  await page.evaluate(() => {
+    const mock = (window as unknown as { __mockHass: { setEntityState: (entityId: string, state: string) => void } }).__mockHass
+    mock.setEntityState('input_boolean.vacation_mode', 'on')
+  })
 
   await expect(page.getByRole('button', { name: /Vacation Set away dates and prepare the house for vacation\./i })).toBeVisible()
   await page.getByRole('button', { name: /Vacation Set away dates and prepare the house for vacation\./i }).click()
@@ -871,16 +1020,14 @@ test('settings links to Vacation mode controls', async ({ page }) => {
   await expect(page).toHaveURL(/\/at-a-glance\/settings\?path=vacation/)
   await expect(page.getByRole('heading', { name: 'Vacation Mode', exact: true })).toBeVisible()
   await expect(page.getByText('Enable or disable vacation mode for the house')).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Vacation Mode Off' })).toHaveCSS('min-height', '116px')
-  await page.getByRole('button', { name: 'Vacation Mode Off' }).click()
   await expect(page.getByRole('button', { name: 'Vacation Mode On' })).toHaveCSS('outline-style', 'none')
   await expect(page.getByRole('heading', { name: 'Vacation Dates' })).toBeVisible()
   await expect(page.getByText('Set the start and end time for your vacation. Vacation mode will automatically be turned off at the set end date and time.')).toBeVisible()
   await expect(page.getByLabel('Start Date')).toHaveAttribute('type', 'date')
   await expect(page.getByLabel('End Time')).toHaveAttribute('type', 'time')
   for (const label of ['Start Date', 'Start Time', 'End Date', 'End Time']) {
-    await expect(page.getByText(label, { exact: true })).toHaveCSS('text-align', 'left')
-    await expect(page.getByLabel(label)).toHaveCSS('text-align', 'left')
+    await expect(page.getByText(label, { exact: true })).toHaveCSS('text-align', 'start')
+    await expect(page.getByLabel(label)).toHaveCSS('text-align', 'start')
   }
   await page.evaluate(() => {
     window.__vacationPickerCalls = 0
@@ -892,7 +1039,7 @@ test('settings links to Vacation mode controls', async ({ page }) => {
     })
   })
   const endDateCard = page.getByText('End Date', { exact: true }).locator('..')
-  await expect(endDateCard).toHaveCSS('cursor', 'pointer')
+  await expect(endDateCard).toHaveCSS('cursor', 'default')
   await endDateCard.click({ position: { x: 8, y: 8 } })
   await expect.poll(() => page.evaluate(() => window.__vacationPickerCalls ?? 0)).toBe(1)
   await page.getByLabel('Start Date').click()
@@ -903,10 +1050,11 @@ test('chores page shows source sections and checkbox todo rows for the logged-in
   await page.goto('/at-a-glance/chores')
 
   await expect(page.getByRole('heading', { name: 'Chores' })).toBeVisible()
-  await expect(page.getByRole('heading', { name: 'House Calendar' })).toBeVisible()
-  await expect(page.getByText('No events to display')).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Quick Links' })).toBeVisible()
-  await expect(page.getByRole('button', { name: /Groceries Off/i })).toBeVisible()
+  await expect(page.getByRole('button', { name: /Groceries 2 items/i })).toBeVisible()
+  for (const heading of ['Past Due', 'Evening Tasks', 'No Due Date', 'Upcoming']) {
+    await expect(page.getByRole('heading', { name: heading })).toBeVisible()
+  }
   await expect(page.getByRole('heading', { name: 'Past Due' })).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Evening Tasks' })).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Afternoon Tasks' })).toHaveCount(0)
@@ -984,7 +1132,7 @@ test('groceries page opens a shopping-list add item modal', async ({ page }) => 
 test('room pages are statically ported React pages', async ({ page }) => {
   await page.goto('/at-a-glance/living-room')
 
-  await expect(page.getByRole('heading', { name: 'Living Room' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Living Room', exact: true })).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Room Status' })).toHaveCount(0)
   await expect(page.getByRole('button', { name: /Window/i }).first()).toBeVisible()
   await expect(page.getByRole('button', { name: /Air Quality/i }).first()).toBeVisible()
@@ -1030,8 +1178,8 @@ test('living room header chips open climate occupancy and air quality popups', a
   await expect(page.getByRole('button', { name: 'Auto' })).toHaveAttribute('aria-pressed', 'true')
   await expect(page.getByText('Auto Modes')).toBeVisible()
   await expect(page.getByRole('button', { name: 'Default' })).toHaveAttribute('aria-pressed', 'true')
-  await expect(page.getByText('PM2.5')).toBeVisible()
-  await expect(page.getByText('AQI')).toBeVisible()
+  await expect(page.getByText('PM2.5')).toHaveCount(0)
+  await expect(page.getByText('AQI')).toHaveCount(0)
 })
 
 test('guest room page opens source-aligned header popups', async ({ page }) => {
@@ -1060,7 +1208,7 @@ test('guest room page opens source-aligned header popups', async ({ page }) => {
   await expect(page.getByText('70.2°F')).toBeVisible()
   await page.getByRole('button', { name: 'Close' }).click()
 
-  await page.getByRole('button', { name: /^Air Quality 2$/i }).click()
+  await page.getByRole('button', { name: /^Air Quality 1 • 2 μg\/m³$/i }).click()
   await expect(page.getByRole('heading', { name: 'Guest Room Air Quality' })).toBeVisible()
   await expect(page.getByText('Fan Modes')).toBeVisible()
   await expect(page.getByRole('button', { name: 'Auto' })).toHaveAttribute('aria-pressed', 'true')
@@ -1291,10 +1439,11 @@ test('vacuums page renders without live HASS backend', async ({ page }) => {
   await page.goto('/at-a-glance/vacuums')
 
   await expect(page.getByRole('heading', { level: 1, name: 'Vacuums' })).toBeVisible()
-  await expect(page.getByLabel('Music Room')).toBeVisible()
+  await expect(page.getByLabel('Music Room', { exact: true })).toHaveAttribute('data-icon', 'mdi:robot-vacuum-off')
   const mainFloorVacuum = page.getByRole('button', { name: /Main Floor Docked/i })
   await expect(mainFloorVacuum).toBeVisible()
   await expect(mainFloorVacuum).toHaveAttribute('data-tone', 'vacuum')
+  await expect(mainFloorVacuum).toHaveAttribute('data-icon', 'mdi:home')
 })
 
 test('available vacuum cards open source-style modal controls', async ({ page }) => {
@@ -1317,8 +1466,13 @@ test('available vacuum cards open source-style modal controls', async ({ page })
   await page.getByRole('button', { name: 'Actions' }).click()
   await expect(page.getByRole('button', { name: 'Empty Dock' })).toBeVisible()
   await page.getByRole('button', { name: 'Info' }).click()
-  await expect(page.getByRole('group', { name: 'Main Filter 54h left' })).toBeVisible()
-  await expect(page.getByRole('group', { name: 'Detergent OK' })).toBeVisible()
+  await expect(page.getByRole('group', { name: 'Main Filter 54h left' })).toHaveAttribute('data-icon', 'mdi:air-filter')
+  await expect(page.getByRole('group', { name: 'Detergent OK' })).toHaveAttribute('data-icon', 'mdi:bottle-tonic')
+  await expect(page.getByRole('group', { name: 'Sensors 2h left' })).toHaveAttribute('data-icon', 'mdi:timer-alert-outline')
+  const mapCanvas = page.locator('[data-valetudo-map-canvas="true"]')
+  await expect(mapCanvas).toBeVisible()
+  expect(await mapCanvas.getAttribute('width')).not.toBe('0')
+  expect(await mapCanvas.getAttribute('height')).not.toBe('0')
 })
 
 test('vacuum native dropdown stays aligned after rapid close and reopen', async ({ page }) => {
@@ -1428,6 +1582,368 @@ test('vacuum clean start shows disabled optimistic controls while backend is sta
   await expect(page.getByRole('button', { name: 'Stop' })).toBeDisabled()
 })
 
+test('thermostat modal contains full-size heat and cool markers at all mobile target extremes', async ({ page }) => {
+  const viewportCases = [
+    { width: 320, height: 568 },
+    { width: 393, height: 852 },
+  ]
+  const targetCases = [
+    { high: 95, low: 45 },
+    { high: 72, low: 70 },
+    { high: 70, low: 68 },
+  ]
+
+  for (const viewport of viewportCases) {
+    await page.setViewportSize(viewport)
+    await page.goto('/at-a-glance/ecobee#living-room')
+
+    const dialog = page.getByRole('dialog', { name: 'Living Room' })
+    const body = dialog.locator('[data-modal-sheet-body="true"]')
+    const shell = dialog.locator('[data-thermostat-modal-dial-shell="true"]')
+    const dial = dialog.locator('[role="region"][data-size="modal"]')
+    const inputs = dial.locator('input[type="range"]')
+    await expect(dialog).toBeVisible()
+    await expect(shell).toHaveCSS('padding-top', '20px')
+
+    for (const targets of targetCases) {
+      await inputs.nth(0).fill(String(targets.low))
+      await inputs.nth(1).fill(String(targets.high))
+      await expect(dial).toHaveAttribute('aria-label', new RegExp(`${targets.low}\\.0 · ${targets.high}\\.0`))
+
+      const metrics = await dial.evaluate((dialElement) => {
+        const modalBody = dialElement.closest('[role="dialog"]')?.querySelector('[data-modal-sheet-body="true"]')
+        const bodyRect = modalBody?.getBoundingClientRect()
+        const handles = Array.from(dialElement.querySelectorAll<HTMLElement>('span[data-target="low"], span[data-target="high"]')).map((handle) => {
+          const handleRect = handle.getBoundingClientRect()
+          const markerStyle = getComputedStyle(handle, '::before')
+          const markerOuterSize = Number.parseFloat(markerStyle.width) + 2 * Number.parseFloat(markerStyle.borderWidth)
+          const markerTop = handleRect.top + handleRect.height / 2 - markerOuterSize / 2
+          return {
+            bottom: handleRect.bottom,
+            height: handleRect.height,
+            left: handleRect.left,
+            markerTop,
+            right: handleRect.right,
+            target: handle.dataset.target,
+            top: handleRect.top,
+            width: handleRect.width,
+          }
+        })
+        return {
+          body: bodyRect && { bottom: bodyRect.bottom, left: bodyRect.left, right: bodyRect.right, top: bodyRect.top },
+          handles,
+        }
+      })
+
+      expect(metrics.body).not.toBeNull()
+      for (const handle of metrics.handles) {
+        expect(Math.round(handle.width)).toBe(64)
+        expect(Math.round(handle.height)).toBe(64)
+        expect(handle.top).toBeGreaterThanOrEqual(metrics.body!.top)
+        expect(handle.markerTop).toBeGreaterThanOrEqual(metrics.body!.top)
+        expect(handle.left).toBeGreaterThanOrEqual(metrics.body!.left)
+        expect(handle.right).toBeLessThanOrEqual(metrics.body!.right)
+        expect(handle.bottom).toBeLessThanOrEqual(metrics.body!.bottom)
+      }
+    }
+
+    const maxScrollTop = await body.evaluate((element) => {
+      element.scrollTop = element.scrollHeight
+      return element.scrollHeight - element.clientHeight
+    })
+    await expect.poll(async () => body.evaluate((element) => Math.round(element.scrollTop))).toBe(Math.round(maxScrollTop))
+    const closeButton = dialog.getByRole('button', { name: 'Close' })
+    await expect(closeButton).toBeVisible()
+    await closeButton.click()
+    await expect(dialog).toHaveAttribute('data-state', 'closed')
+  }
+})
+
+test('mobile bed thermostat keeps its top-arc hit target inside the scroller and its footer fixed', async ({ page }) => {
+  await page.setViewportSize({ width: 393, height: 852 })
+  await page.goto('/at-a-glance/master-bedroom')
+  await page.getByRole('button', { name: /Steph's Bed Off/i }).click()
+
+  const dialog = page.getByRole('dialog', { name: "Steph's Bed" })
+  const body = dialog.locator('[data-modal-sheet-body="true"]')
+  const hero = dialog.locator('[data-section="eight-sleep-hero"]')
+  const footer = dialog.getByRole('navigation', { name: "Steph's Bed modal sections" }).locator('..')
+  await hero.getByRole('button', { name: "Turn on Steph's Bed" }).click()
+  const marker = hero.locator('[data-target="value"]')
+  await expect(marker).toBeVisible()
+
+  const bodyBox = await body.boundingBox()
+  const markerBox = await marker.boundingBox()
+  const footerBefore = await footer.boundingBox()
+  if (!bodyBox || !markerBox || !footerBefore) throw new Error('Mobile bed thermostat geometry was not measurable')
+  expect(Math.round(markerBox.width)).toBe(64)
+  expect(Math.round(markerBox.height)).toBe(64)
+  expect(markerBox.y).toBeGreaterThanOrEqual(bodyBox.y)
+
+  const maxScrollTop = await body.evaluate((element) => {
+    element.scrollTop = element.scrollHeight
+    return element.scrollHeight - element.clientHeight
+  })
+  await expect.poll(async () => body.evaluate((element) => Math.round(element.scrollTop))).toBe(Math.round(maxScrollTop))
+  const footerAfter = await footer.boundingBox()
+  expect(Math.abs(Math.round(footerAfter?.y ?? 0) - Math.round(footerBefore.y))).toBeLessThanOrEqual(1)
+  expect(Math.abs(Math.round((footerAfter?.y ?? 0) + (footerAfter?.height ?? 0)) - Math.round(footerBefore.y + footerBefore.height))).toBeLessThanOrEqual(1)
+})
+
+test('mobile bed dial maps taps, drag, and keyboard to targets without invoking power confirmation', async ({ page }) => {
+  await page.setViewportSize({ width: 393, height: 852 })
+  let confirmationCount = 0
+  page.on('dialog', async (dialog) => {
+    confirmationCount += 1
+    await dialog.dismiss()
+  })
+  await page.goto('/at-a-glance/master-bedroom')
+  await page.getByRole('button', { name: /Stephen's Bed (?:Cooling|Heating)/i }).click()
+
+  const dialog = page.getByRole('dialog', { name: "Stephen's Bed" })
+  const dial = dialog.locator('[role="region"][data-size="modal"]')
+  const powerButton = dialog.getByRole('button', { name: "Turn off Stephen's Bed" })
+  await expect(dialog).toBeVisible()
+  await expect(dialog).toHaveAttribute('data-state', 'open')
+  await expect(powerButton).toBeVisible()
+  await expect(dialog.getByText('Tap or drag the dial to set the target.')).toBeVisible()
+
+  const dialBox = await dial.boundingBox()
+  if (!dialBox) throw new Error('Bed dial was not measurable')
+  await dial.click({ position: { x: dialBox.width * 0.8203, y: dialBox.height * 0.8203 } })
+
+  await expect(dial).toHaveAttribute('aria-label', /Stephen's Bed thermostat Heating \+10/i)
+  await expect.poll(async () => page.evaluate(() => (
+    (window as unknown as { __mockHass: { calls: Record<string, unknown>[] } }).__mockHass.calls
+      .filter((call) => call.domain === 'number' && call.service === 'set_value' && call.target === 'number.nightcanvasrestful_left_target_temperature')
+      .at(-1)
+  ))).toMatchObject({ serviceData: { value: 10 } })
+  expect(confirmationCount).toBe(0)
+
+  const slider = dialog.getByRole('slider', { name: "Stephen's Bed target level" })
+  await expect(dial.locator('[aria-hidden="true"][inert]')).toHaveCount(1)
+  await expect(slider).toHaveAttribute('aria-valuenow', '10')
+  await powerButton.focus()
+  await page.keyboard.press('Shift+Tab')
+  await expect(slider).toBeFocused()
+  await page.keyboard.press('Shift+Tab')
+  await expect(dialog.getByRole('button', { name: 'Close' })).toBeFocused()
+  await slider.focus()
+  await slider.press('ArrowLeft')
+  await expect(slider).toHaveAttribute('aria-valuenow', '9')
+  await expect.poll(async () => page.evaluate(() => (
+    (window as unknown as { __mockHass: { calls: Record<string, unknown>[] } }).__mockHass.calls
+      .filter((call) => call.domain === 'number' && call.service === 'set_value' && call.target === 'number.nightcanvasrestful_left_target_temperature')
+      .at(-1)
+  ))).toMatchObject({ serviceData: { value: 9 } })
+  expect(confirmationCount).toBe(0)
+
+  const markerBox = await slider.boundingBox()
+  const dragDialBox = await dial.boundingBox()
+  if (!markerBox || !dragDialBox) throw new Error('Bed target drag geometry was not measurable')
+  await page.mouse.move(markerBox.x + markerBox.width / 2, markerBox.y + markerBox.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(dragDialBox.x + dragDialBox.width / 2, dragDialBox.y + dragDialBox.height * 0.0469, { steps: 8 })
+  await page.mouse.up()
+
+  await expect(slider).toHaveAttribute('aria-valuenow', '0')
+  await expect.poll(async () => page.evaluate(() => (
+    (window as unknown as { __mockHass: { calls: Record<string, unknown>[] } }).__mockHass.calls
+      .filter((call) => call.domain === 'number' && call.service === 'set_value' && call.target === 'number.nightcanvasrestful_left_target_temperature')
+      .at(-1)
+  ))).toMatchObject({ serviceData: { value: 0 } })
+  expect(confirmationCount).toBe(0)
+
+  await powerButton.click()
+  expect(confirmationCount).toBe(1)
+  const powerOffCalls = await page.evaluate(() => (
+    (window as unknown as { __mockHass: { calls: Record<string, unknown>[] } }).__mockHass.calls
+      .filter((call) => call.domain === 'switch' && call.service === 'turn_off' && call.target === 'switch.nightcanvasrestful_left_power')
+  ))
+  expect(powerOffCalls).toHaveLength(0)
+})
+
+test('mobile SleepyPod target prompt routes Tonight and swipes closed without a second command', async ({ page }) => {
+  await page.setViewportSize({ width: 393, height: 852 })
+  await page.goto('/at-a-glance/master-bedroom')
+  await page.evaluate(() => {
+    const mock = (window as unknown as { __mockHass: { setEntityState: (entityId: string, state: string) => void } }).__mockHass
+    mock.setEntityState('climate.sleepypod_eight_pod_left_side', 'heat')
+    mock.setEntityState('number.master_bedroom_sleepypod_eight_pod_left_target_level', '-2')
+    mock.setEntityState('sensor.sleepypod_stephen_schedule_phase', 'bedtime')
+  })
+
+  await page.getByRole('button', { name: /Stephen's Bed Cooling/i }).click()
+  const bedDialog = page.getByRole('dialog', { name: "Stephen's Bed" })
+  const targetSlider = bedDialog.getByRole('slider', { name: "Stephen's Bed target level" })
+  await expect(targetSlider).toHaveAttribute('aria-valuenow', '-2')
+  await targetSlider.press('ArrowLeft')
+
+  const scopeDialog = page.getByRole('dialog', { name: 'Set Bed Temperature' })
+  await expect(scopeDialog).toBeVisible()
+  await expect(scopeDialog).toHaveAttribute('data-surface', 'hass-popup')
+  await expect(scopeDialog).toContainText("Stephen's Bed • Bedtime • -3")
+  await expect(scopeDialog.getByRole('button', { name: 'Tonight' })).toBeFocused()
+  await expect.poll(async () => scopeDialog.evaluate((element) => Math.round(window.innerHeight - element.getBoundingClientRect().bottom))).toBe(0)
+  const promptLayout = await scopeDialog.evaluate((element) => {
+    const rect = element.getBoundingClientRect()
+    const choices = [...element.querySelectorAll('button[aria-label="Tonight"], button[aria-label="All Nights"]')]
+    return {
+      backgroundColor: getComputedStyle(element).backgroundColor,
+      bottomGap: Math.round(window.innerHeight - rect.bottom),
+      borderRadius: getComputedStyle(element).borderRadius,
+      choiceHeights: choices.map((choice) => Math.round(choice.getBoundingClientRect().height)),
+      height: Math.round(rect.height),
+      width: Math.round(rect.width),
+    }
+  })
+  expect(promptLayout).toMatchObject({
+    bottomGap: 0,
+    borderRadius: '30px 30px 0px 0px',
+    height: 430,
+    width: 393,
+  })
+  expect(promptLayout.backgroundColor).not.toBe('rgba(0, 0, 0, 0)')
+  expect(promptLayout.choiceHeights.every((height) => height >= 78)).toBe(true)
+
+  await scopeDialog.getByRole('button', { name: 'Tonight' }).click()
+  await expect(scopeDialog).toHaveAttribute('data-state', 'closed')
+  await expect(scopeDialog).toHaveAttribute('data-closing', 'true')
+  await expect(scopeDialog).toBeHidden()
+  await expect(targetSlider).toHaveAttribute('aria-valuenow', '-3')
+  await expect(targetSlider).toBeFocused()
+  await expect.poll(async () => page.evaluate(() => (
+    (window as unknown as { __mockHass: { calls: Record<string, unknown>[] } }).__mockHass.calls
+      .filter((call) => call.domain === 'script')
+  ))).toEqual([{
+    domain: 'script',
+    service: 'sleepypod_stephen_temperature_tonight',
+    serviceData: { level: -3 },
+  }])
+
+  await targetSlider.press('ArrowLeft')
+  await expect(scopeDialog).toBeVisible()
+  await expect(scopeDialog).toContainText("Stephen's Bed • Bedtime • -4")
+  await page.waitForTimeout(500)
+  const handle = scopeDialog.locator('[data-mobile-drag-handle="true"]')
+  const handleBox = await handle.boundingBox()
+  if (!handleBox) throw new Error('SleepyPod scope prompt drag handle was not measurable')
+  await page.mouse.move(handleBox.x + handleBox.width / 2, handleBox.y + handleBox.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(handleBox.x + handleBox.width / 2, handleBox.y + 320, { steps: 10 })
+  await page.mouse.up()
+
+  await expect(scopeDialog).toHaveAttribute('data-state', 'closed')
+  await expect(scopeDialog).toHaveAttribute('data-closing', 'true')
+  await page.waitForTimeout(350)
+  await expect(scopeDialog).toHaveCount(1)
+  await page.waitForTimeout(250)
+  await expect(scopeDialog).toHaveCount(0)
+  await expect(targetSlider).toBeFocused()
+  await expect.poll(async () => page.evaluate(() => (
+    (window as unknown as { __mockHass: { calls: Record<string, unknown>[] } }).__mockHass.calls
+      .filter((call) => call.domain === 'script')
+  ))).toHaveLength(1)
+  await expect(targetSlider).toHaveAttribute('aria-valuenow', '-3')
+})
+
+test('thermostat Vacation end transitions to Away or Home with correct dial ranges on mobile', async ({ page }) => {
+  const expectRangeValues = async (dial: Locator, low: number, high: number) => {
+    const sliders = dial.locator('input[type="range"]')
+    await expect(sliders).toHaveCount(2)
+    await expect(sliders.nth(0)).toHaveValue(String(low))
+    await expect(sliders.nth(1)).toHaveValue(String(high))
+  }
+
+  await page.setViewportSize({ width: 393, height: 852 })
+  await page.goto('/at-a-glance/ecobee')
+  await page.evaluate(() => {
+    const mock = (window as unknown as { __mockHass: {
+      calls: Record<string, unknown>[]
+      setEntityAttribute: (entityId: string, attribute: string, value: unknown) => void
+      setEntityState: (entityId: string, state: string) => void
+    } }).__mockHass
+    mock.setEntityState('input_boolean.vacation_mode', 'on')
+    mock.setEntityState('binary_sensor.thermostat_contact_sensors_away_mode_active', 'on')
+    mock.setEntityState('sensor.thermostat_effective_home_away', 'Away')
+    mock.setEntityState('sensor.thermostat_home_away_reason', 'Vacation Mode is active and everyone is away; TCS is keeping Eco active without heating or cooling.')
+    mock.setEntityAttribute('climate.thermostat_contact_sensors_living_room_virtual_thermostat', 'away_mode_active', true)
+  })
+  await page.getByRole('button', { name: 'Open navigation menu' }).click()
+  await page.mouse.click(390, 500)
+
+  const hero = page.getByRole('region', { name: /Whole Home thermostat Idle 71.0°F 62.0 · 78.0/ })
+  const wholeHomeVacationMode = page.getByRole('region', { name: 'Whole Home Vacation Mode' })
+  await expect(hero).toBeVisible()
+  await expectRangeValues(hero, 62, 78)
+  await expect(wholeHomeVacationMode).toBeVisible()
+  await expect(page.getByLabel('Vacation Mode On')).toHaveCount(0)
+  await expect(page.getByText('Vacation Mode Active. The room may be cooler or warmer than your heat/cool targets to save energy while away.')).toBeVisible()
+  await expect.poll(async () => page.evaluate(() => {
+    const heroElement = document.querySelector('[aria-label^="Whole Home thermostat"]')
+    const hubElement = document.querySelector('[aria-label="Thermostat Hub Off"]')
+    const awayElement = document.querySelector('[aria-label="Whole Home Vacation Mode"]')
+    return Boolean(
+      heroElement
+      && hubElement
+      && awayElement
+      && (heroElement.compareDocumentPosition(hubElement) & Node.DOCUMENT_POSITION_FOLLOWING)
+      && (hubElement.compareDocumentPosition(awayElement) & Node.DOCUMENT_POSITION_FOLLOWING),
+    )
+  })).toBe(true)
+  await page.getByRole('button', { name: 'Living Room 70.2°F · Inactive' }).click()
+  const dialog = page.getByRole('dialog', { name: 'Living Room' })
+  const roomDial = dialog.getByRole('region', { name: /Living Room thermostat Idle 70.2°F 72.0 · 74.0/ })
+  await expectRangeValues(roomDial, 72, 74)
+  await expect(dialog.getByRole('region', { name: 'Living Room Vacation Mode' })).toBeVisible()
+  await expect(dialog.getByLabel('Vacation Mode On')).toHaveCount(0)
+
+  await page.evaluate(() => {
+    const mock = (window as unknown as { __mockHass: {
+      setEntityState: (entityId: string, state: string) => void
+    } }).__mockHass
+    mock.setEntityState('input_boolean.vacation_mode', 'off')
+    mock.setEntityState('sensor.thermostat_home_away_reason', 'Everyone is away; TCS is keeping Eco active without heating or cooling.')
+  })
+  await dialog.getByRole('button', { name: 'Close' }).click()
+  await expect(dialog).toHaveCount(0)
+  const awayHero = page.getByRole('region', { name: /Whole Home thermostat Idle 71.0°F 62.0 · 78.0/ })
+  await expectRangeValues(awayHero, 62, 78)
+  await expect(page.getByRole('region', { name: 'Whole Home Away Mode' })).toBeVisible()
+
+  await page.getByRole('button', { name: 'Living Room 70.2°F · Inactive' }).click()
+  const awayDialog = page.getByRole('dialog', { name: 'Living Room' })
+  const awayRoomDial = awayDialog.getByRole('region', { name: /Living Room thermostat Idle 70.2°F 72.0 · 74.0/ })
+  await expectRangeValues(awayRoomDial, 72, 74)
+  await expect(awayDialog.getByRole('region', { name: 'Living Room Away Mode' })).toBeVisible()
+  await expect(awayDialog.getByText('Away Mode Active. The room may be cooler or warmer than your heat/cool targets to save energy while away.')).toBeVisible()
+  await awayDialog.getByRole('button', { name: 'Close' }).click()
+  await expect(awayDialog).toHaveCount(0)
+
+  await page.evaluate(() => {
+    const mock = (window as unknown as { __mockHass: {
+      setEntityAttribute: (entityId: string, attribute: string, value: unknown) => void
+      setEntityState: (entityId: string, state: string) => void
+    } }).__mockHass
+    mock.setEntityState('binary_sensor.thermostat_contact_sensors_away_mode_active', 'off')
+    mock.setEntityState('sensor.thermostat_effective_home_away', 'Home')
+    mock.setEntityState('sensor.thermostat_home_away_reason', 'A resident is home, so TCS is using home behavior.')
+    mock.setEntityAttribute('climate.thermostat_contact_sensors_living_room_virtual_thermostat', 'away_mode_active', false)
+  })
+  await page.getByRole('button', { name: 'Living Room 70.2°F · Inactive' }).click()
+  const homeDialog = page.getByRole('dialog', { name: 'Living Room' })
+  const homeRoomDial = homeDialog.getByRole('region', { name: /Living Room thermostat Idle 70.2°F 72.0 · 74.0/ })
+  await expectRangeValues(homeRoomDial, 72, 74)
+  await expect(homeDialog.getByRole('region', { name: /Living Room (?:Away|Vacation) Mode/ })).toHaveCount(0)
+  await homeDialog.getByRole('button', { name: 'Close' }).click()
+  await expect(homeDialog).toHaveCount(0)
+
+  const homeHero = page.getByRole('region', { name: /Whole Home thermostat Idle 71.0°F 72.0 · 74.0/ })
+  await expectRangeValues(homeHero, 72, 74)
+  await expect(page.getByRole('region', { name: /Whole Home (?:Away|Vacation) Mode/ })).toHaveCount(0)
+  await expect.poll(async () => page.evaluate(() => (window as unknown as { __mockHass: { calls: Record<string, unknown>[] } }).__mockHass.calls.filter((call) => call.domain === 'climate' && call.service === 'set_temperature'))).toEqual([])
+})
+
 test('thermostat hero dial allows vertical swipe scrolling', async ({ page, browserName }) => {
   await page.goto('/at-a-glance/ecobee')
 
@@ -1501,9 +2017,9 @@ test('thermostat hero dial allows vertical swipe scrolling', async ({ page, brow
   const highHandleEnd = pointForTemperature(box!, 78)
   await mouseDrag(highHandleBox!.x + highHandleBox!.width / 2, highHandleBox!.y + highHandleBox!.height / 2, highHandleEnd.x, highHandleEnd.y)
   await expect(heroDial).not.toHaveAttribute('aria-label', beforeLabel!)
+  await expect.poll(async () => (await highHandle.boundingBox())?.x ?? 0).toBeGreaterThan(highHandleBox!.x + 20)
   const highHandleBoxAfter = await highHandle.boundingBox()
   expect(highHandleBoxAfter).not.toBeNull()
-  expect(highHandleBoxAfter!.x).toBeGreaterThan(highHandleBox!.x + 20)
   await expect(highArc).not.toHaveAttribute('d', highArcBefore!)
   const lowHandle = heroDial.locator('[data-target="low"]')
   await expect(lowHandle).toHaveCount(1)

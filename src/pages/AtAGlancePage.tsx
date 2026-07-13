@@ -24,6 +24,7 @@ import { StatusRail } from '../components/hass/StatusRail'
 import { WeatherSummary } from '../components/hass/WeatherSummary'
 import { formatAirMetricState } from '../components/hass/airQualityState'
 import { asEntityName, formatCompactEntityState, isActiveState, isContactOpen, isOccupancyActive } from '../components/hass/entityState'
+import { rankRoomsByAccess } from '../components/hass/roomAccessRanking'
 import { securityStateCssColor, securityStateIconName } from '../components/hass/securityState'
 import { WebRtcCamera } from '../components/hass/WebRtcCamera'
 import {
@@ -36,11 +37,13 @@ import {
   OCCUPANCY_GROUPS,
   OVERVIEW_STATUS_CHIPS,
   QUICK_ACCESS_ITEMS,
+  ROOM_ACCESS_INCREMENT_SCRIPT_ENTITY_ID,
   SECURITY_ENTITY,
   type AirQualityRoomConfig,
   type AreaConfig,
   type EntityGroupConfig,
   type QuickAccessConfig,
+  type RoomNavigationConfig,
 } from '../constants/atAGlance'
 import { CHORE_BLUE, CHORE_QUICK_LINKS, SETTINGS_PAGE_ITEMS, TODO_PAGES, type ChoreQuickLinkConfig, type SettingsLinkConfig } from '../constants/portedDashboard'
 import { useHashModal } from '../hooks/useHashModal'
@@ -363,6 +366,7 @@ function QuickAccessTile({ item, onNavigate, onOpenHash }: { item: QuickAccessCo
   return (
     <GlassTile
       backgroundColor={isSecurityTile ? securityStateCssColor(entity?.state, 0.5) : undefined}
+      disclosure={Boolean(itemHash)}
       icon={isSecurityTile ? securityStateIconName(entity?.state) : item.icon}
       iconColor={isSecurityTile ? 'white' : undefined}
       onClick={itemHash || item.route ? handleClick : undefined}
@@ -1190,12 +1194,27 @@ function SheetContent({
 export function RoomPickerButton({ onNavigate }: { onNavigate: (path: string) => void }) {
   const [modalOpen, setModalOpen] = useState(false)
   const [gridRef, gridLayout] = useModalSquareGridLayout(modalOpen, AREA_ITEMS.length)
+  const callService = useHass((state) => state.helpers.callService)
+  const entities = useHass((state) => state.entities)
+  const rankedAreas = useMemo(() => rankRoomsByAccess(AREA_ITEMS, entities), [entities])
   const modalStyle = modalSquareGridModalStyle(gridLayout)
   const gridStyle = modalSquareGridStyle(gridLayout)
 
-  const handleNavigate = (path: string) => {
+  const handleNavigate = (area: RoomNavigationConfig, path: string) => {
     setModalOpen(false)
     onNavigate(path)
+    try {
+      void Promise.resolve(callService({
+        domain: 'script',
+        service: 'turn_on',
+        target: ROOM_ACCESS_INCREMENT_SCRIPT_ENTITY_ID,
+        serviceData: { variables: { room: area.accessKey } },
+      })).catch((error: unknown) => {
+        console.error(`Failed to increment room access for ${area.accessKey}.`, error)
+      })
+    } catch (error) {
+      console.error(`Failed to increment room access for ${area.accessKey}.`, error)
+    }
   }
 
   return (
@@ -1203,9 +1222,9 @@ export function RoomPickerButton({ onNavigate }: { onNavigate: (path: string) =>
       <FloatingActionButton color={CHORE_BLUE} icon="mdi:floor-plan" label="Rooms" onClick={() => setModalOpen(true)} />
       <ModalSheet contentStyle={modalStyle} open={modalOpen} title="Rooms" onClose={() => setModalOpen(false)}>
         <section className={styles.roomPickerGrid} aria-label="Rooms" ref={gridRef} style={gridStyle}>
-          {AREA_ITEMS.map((area) => (
+          {rankedAreas.map((area) => (
             <div className={styles.roomPickerCell} key={area.title}>
-              <RoomCard area={area} onNavigate={handleNavigate} />
+              <RoomCard area={area} onNavigate={(path) => handleNavigate(area, path)} />
             </div>
           ))}
         </section>
