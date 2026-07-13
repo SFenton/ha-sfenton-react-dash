@@ -1718,8 +1718,13 @@ describe('DashboardViewPage', () => {
     expect(screen.queryByRole('button', { name: 'Open Predictive Comfort controls' })).not.toBeInTheDocument()
 
     expect(screen.getByRole('heading', { name: 'Track Selected Rooms' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /^Living Room On$/i })).toHaveAttribute('aria-pressed', 'true')
-    expect(screen.getByRole('button', { name: /^Office Off$/i })).toHaveAttribute('aria-pressed', 'false')
+    const trackSelectedSection = screen.getByRole('heading', { name: 'Track Selected Rooms' }).closest('section') as HTMLElement
+    const livingRoomTrack = within(trackSelectedSection).getByRole('button', { name: 'Living Room' })
+    const officeTrack = within(trackSelectedSection).getByRole('button', { name: 'Office' })
+    expect(livingRoomTrack).toHaveAttribute('aria-pressed', 'true')
+    expect(officeTrack).toHaveAttribute('aria-pressed', 'false')
+    expect(within(livingRoomTrack).queryByText('On')).not.toBeInTheDocument()
+    expect(within(officeTrack).queryByText('Off')).not.toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Force Track Critical Temperature' })).toBeInTheDocument()
     const forceCriticalSection = screen.getByRole('heading', { name: 'Force Track Critical Temperature' }).closest('section') as HTMLElement
     expect(within(forceCriticalSection).getByRole('button', { name: 'Music Room' })).toHaveAttribute('aria-pressed', 'true')

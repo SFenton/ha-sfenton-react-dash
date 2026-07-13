@@ -5128,7 +5128,7 @@ function ThermostatCheckbox({ entityId, showState = true, title }: { entityId: s
 }
 
 function ThermostatTrackCheckbox({ room }: { room: ThermostatRoomView }) {
-  return <ThermostatCheckbox entityId={thermostatTrackEntityId(room)} title={room.title} />
+  return <ThermostatCheckbox entityId={thermostatTrackEntityId(room)} showState={false} title={room.title} />
 }
 
 function ThermostatForceCheckbox({ room }: { room: ThermostatRoomView }) {
