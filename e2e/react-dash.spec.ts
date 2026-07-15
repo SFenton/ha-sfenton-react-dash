@@ -1067,7 +1067,70 @@ test('chores page shows source sections and checkbox todo rows for the logged-in
   await expect(page.getByText('Unable to update task')).toHaveCount(0)
 })
 
+test('chores render HA-supplied vacation lists exactly and omit empty sections on mobile', async ({ page }) => {
+  await page.setViewportSize({ width: 393, height: 852 })
+  await page.goto('/at-a-glance/overview')
+  await page.evaluate(() => {
+    const mock = (window as unknown as {
+      __mockHass: {
+        reset: () => void
+        setEntityState: (entityId: string, state: string) => void
+        setTodoItems: (entityId: string, items: { status: string; summary: string; uid: string }[]) => void
+      }
+    }).__mockHass
+    mock.reset()
+    mock.setEntityState('input_boolean.vacation_mode', 'on')
+
+    const mainLists = [
+      'todo.stephen_s_past_due_with_unassigned',
+      'todo.stephen_s_evening_with_unassigned',
+      'todo.stephen_s_afternoon_with_unassigned',
+      'todo.stephen_s_morning_with_unassigned',
+      'todo.stephen_s_all_day_with_unassigned',
+      'todo.stephen_s_no_due_date_with_unassigned',
+      'todo.stephen_s_upcoming_today_by_time_and_future_with_unassigned',
+    ]
+    for (const entityId of mainLists) {
+      mock.setEntityState(entityId, '0')
+      mock.setTodoItems(entityId, [])
+    }
+    mock.setEntityState('todo.stephen_s_no_due_date_with_unassigned', '2')
+    mock.setTodoItems('todo.stephen_s_no_due_date_with_unassigned', [
+      { uid: 'ha-alpha', summary: 'HA supplied vacation task alpha', status: 'needs_action' },
+      { uid: 'ha-beta', summary: 'HA supplied vacation task beta', status: 'needs_action' },
+    ])
+
+    for (const entityId of [
+      'todo.stephen_s_past_due',
+      'todo.stephen_s_due_today',
+      'todo.stephen_s_upcoming',
+      'todo.stephen_s_no_due_date',
+    ]) {
+      mock.setEntityState(entityId, '0')
+      mock.setTodoItems(entityId, [])
+    }
+  })
+
+  await page.getByRole('navigation', { name: 'Dashboard sections' }).getByRole('button', { name: 'Chores' }).click()
+
+  const noDueDateList = page.getByLabel('No Due Date todo list')
+  await expect(noDueDateList.getByRole('button')).toHaveCount(2)
+  await expect(noDueDateList.getByRole('button', { name: 'HA supplied vacation task alpha' })).toBeVisible()
+  await expect(noDueDateList.getByRole('button', { name: 'HA supplied vacation task beta' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Past Due' })).toHaveCount(0)
+  await expect(page.getByRole('heading', { name: 'No Due Date' })).toBeVisible()
+
+  await page.getByRole('button', { name: /Stephen's Tasks/i }).click()
+
+  await expect(page.getByRole('heading', { name: "Stephen's Chores" })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'No Tasks!' })).toBeVisible()
+  await expect(page.getByText('You have no tasks due- nice job!')).toBeVisible()
+  await expect(page.locator('[data-empty-layout="centered"]')).toBeVisible()
+  await expect(page.getByLabel(/todo list$/)).toHaveCount(0)
+})
+
 test('chores create task FAB opens the source-shaped task modal', async ({ page }) => {
+  await page.setViewportSize({ width: 393, height: 852 })
   await page.goto('/at-a-glance/chores')
 
   await expect(page.getByRole('heading', { name: 'Chores' })).toBeVisible()
@@ -1085,6 +1148,14 @@ test('chores create task FAB opens the source-shaped task modal', async ({ page 
   await expect(dialog.getByLabel('Due Date')).toHaveAttribute('type', 'date')
   await expect(dialog.getByLabel('Due Time')).toHaveAttribute('type', 'time')
   await expect(dialog.getByLabel('Assignee')).toHaveValue('')
+  await expect(dialog.getByText('Hide On Vacation', { exact: true })).toBeVisible()
+  await expect(dialog.getByText('Hide While On Vacation', { exact: true })).toBeVisible()
+  await expect(dialog.getByText('This task will not show up in your chores lists while Vacation Mode is active.', { exact: true })).toBeVisible()
+  const hideOnVacation = dialog.getByRole('button', { name: 'Hide While On Vacation' })
+  await expect(hideOnVacation).toHaveAttribute('aria-pressed', 'true')
+  await expect(hideOnVacation).toHaveCSS('outline-style', 'none')
+  await hideOnVacation.click()
+  await expect(hideOnVacation).toHaveAttribute('aria-pressed', 'false')
   await expect(dialog.getByLabel('Priority')).toHaveValue('critical')
   await expect(dialog.getByLabel('Recurrence')).toHaveValue('no_repeat')
   await expect(dialog.getByRole('option', { name: /Adaptive/i })).toHaveCount(0)
@@ -1100,6 +1171,7 @@ test('chores create task FAB opens the source-shaped task modal', async ({ page 
   await dialog.getByRole('button', { name: 'Close' }).click()
   await expect(dialog).toHaveAttribute('data-state', 'closed')
   await page.getByRole('button', { name: 'Add Task' }).click()
+  await expect(dialog.getByRole('button', { name: 'Hide While On Vacation' })).toHaveAttribute('aria-pressed', 'true')
   await expect(dialog.getByLabel('Recurrence')).toHaveValue('no_repeat')
   await expect(dialog.getByLabel('Repeat Every')).toHaveCount(0)
 })

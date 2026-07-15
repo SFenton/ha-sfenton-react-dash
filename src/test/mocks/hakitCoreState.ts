@@ -255,6 +255,7 @@ type MockHassDebugApi = {
   reset: () => void
   setEntityAttribute: (entityId: string, attribute: string, value: unknown) => void
   setEntityState: (entityId: string, state: string) => void
+  setTodoItems: (entityId: string, items: MockTodoItem[]) => void
 }
 
 function exposeMockHassDebugApi() {
@@ -270,6 +271,9 @@ function exposeMockHassDebugApi() {
     setEntityState: (entityId, state) => {
       const target = mockEntities[entityId]
       if (target) target.state = state
+    },
+    setTodoItems: (entityId, items) => {
+      mockTodoItemsByEntity[entityId] = items
     },
   }
 }
@@ -498,7 +502,6 @@ export const mockEntities: Record<string, MockEntity> = {
   'input_boolean.guests_staying_in_theater_room': entity('input_boolean.guests_staying_in_theater_room', 'off'),
   'input_boolean.vacation_mode': entity('input_boolean.vacation_mode', 'off'),
   'input_boolean.vacation_mode_invalid_dates_pending': entity('input_boolean.vacation_mode_invalid_dates_pending', 'off'),
-  'input_boolean.vacation_disable_home_tasks': entity('input_boolean.vacation_disable_home_tasks', 'off'),
   'input_boolean.vacation_checklist_turn_off_outdoor_sprinklers': entity('input_boolean.vacation_checklist_turn_off_outdoor_sprinklers', 'off'),
   'input_boolean.vacation_checklist_pour_boiling_water_down_the_drain': entity('input_boolean.vacation_checklist_pour_boiling_water_down_the_drain', 'off'),
   'input_boolean.vacation_checklist_make_the_bed': entity('input_boolean.vacation_checklist_make_the_bed', 'off'),

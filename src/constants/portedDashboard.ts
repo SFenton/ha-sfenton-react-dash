@@ -299,32 +299,11 @@ export const VACATION_MODE_DESCRIPTION = 'Enable or disable vacation mode for th
 export const VACATION_DATES_DESCRIPTION = 'Set the start and end time for your vacation. Vacation mode will automatically be turned off at the set end date and time.'
 export const VACATION_DATE_RANGE_ERROR = 'Start date and time must be before end date and time. Vacation mode is disabled until the dates are fixed.'
 export const VACATION_PRE_CHECKLIST_ERROR = 'All pre-vacation tasks must be checked off before Vacation Mode can be enabled.'
-export const VACATION_DISABLE_HOME_TASKS_DESCRIPTION = 'Prevents selected recurring Donetick home task notifications while vacation mode is active.'
 
 export const VACATION_MODE_ENTITY_ID = 'input_boolean.vacation_mode'
 export const VACATION_INVALID_DATES_PENDING_ENTITY_ID = 'input_boolean.vacation_mode_invalid_dates_pending'
 export const VACATION_START_ENTITY_ID = 'input_datetime.vacation_start'
 export const VACATION_END_ENTITY_ID = 'input_datetime.vacation_end'
-export const VACATION_DISABLE_HOME_TASKS_ENTITY_ID = 'input_boolean.vacation_disable_home_tasks'
-
-export const VACATION_HOME_TASK_NOTIFICATION_IDS = [
-  1, // Take Out Trash and Recycles
-  144, // Wipe Shower Doors
-  146, // Pick Up Clothes
-  147, // Pick Up Clothes
-  148, // Brush Teeth
-  149, // Brush Teeth
-  150, // Shave
-  160, // Make Master Bed
-  169, // Fridge Clean
-  170, // Pantry Clean
-  180, // Clean Guest Bathroom
-  181, // Clean Master Bathroom
-  240, // Wash Water Bottles
-  253, // Clean shower drain
-  441, // Unload Dishwasher
-]
-
 export const VACATION_MODE_ITEMS: EntityTileConfig[] = [
   { title: 'Vacation Mode', entityId: VACATION_MODE_ENTITY_ID, icon: 'mdi:airplane', color: SWITCH_ACTIVE_COLOR, action: { type: 'toggle' }, showSubtitle: true },
 ]

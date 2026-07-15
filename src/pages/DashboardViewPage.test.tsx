@@ -268,7 +268,6 @@ describe('DashboardViewPage', () => {
     mockEntities['input_boolean.guests_staying_in_music_room'].state = 'off'
     mockEntities['input_boolean.guests_staying_in_theater_room'].state = 'off'
     mockEntities['input_boolean.vacation_mode'].state = 'off'
-    mockEntities['input_boolean.vacation_disable_home_tasks'].state = 'off'
     mockEntities['input_boolean.vacation_checklist_turn_off_outdoor_sprinklers'].state = 'off'
     mockEntities['input_boolean.vacation_checklist_pour_boiling_water_down_the_drain'].state = 'off'
     mockEntities['input_boolean.vacation_checklist_make_the_bed'].state = 'off'
@@ -1241,7 +1240,6 @@ describe('DashboardViewPage', () => {
         { domain: 'input_datetime', service: 'set_datetime', target: 'input_datetime.vacation_start', serviceData: { date: '2026-06-14', time: '10:01:00' } },
         { domain: 'input_datetime', service: 'set_datetime', target: 'input_datetime.vacation_end', serviceData: { date: '2026-06-15', time: '18:30:00' } },
         { domain: 'input_boolean', service: 'turn_off', target: 'input_boolean.vacation_mode_invalid_dates_pending' },
-        { domain: 'input_boolean', service: 'turn_on', target: 'input_boolean.vacation_disable_home_tasks' },
         { domain: 'input_boolean', service: 'turn_on', target: 'input_boolean.vacation_mode' },
       ])
     } finally {
@@ -1278,10 +1276,8 @@ describe('DashboardViewPage', () => {
     expect(screen.queryByRole('heading', { name: 'Pre-Vacation Checklist' })).not.toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Vacation Dates' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Confirm Vacation' })).not.toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Vacation Controls' })).toBeInTheDocument()
-    expect(screen.getByText('Prevents selected recurring Donetick home task notifications while vacation mode is active.')).toBeInTheDocument()
-    const disableHomeTasks = screen.getByRole('button', { name: 'Disable Home Tasks Off' })
-    expect(disableHomeTasks).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.queryByRole('heading', { name: 'Vacation Controls' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Disable Home Tasks/i })).not.toBeInTheDocument()
     expect(screen.getByText('Set the start and end time for your vacation. Vacation mode will automatically be turned off at the set end date and time.')).toBeInTheDocument()
     expect(screen.getByLabelText('Start Date')).toHaveAttribute('type', 'date')
     expect(screen.getByLabelText('Start Time')).toHaveAttribute('type', 'time')
@@ -1305,12 +1301,10 @@ describe('DashboardViewPage', () => {
 
     fireEvent.change(screen.getByLabelText('Start Date'), { target: { value: '2026-06-20' } })
     fireEvent.change(screen.getByLabelText('End Time'), { target: { value: '18:30' } })
-    fireEvent.click(disableHomeTasks)
 
     expect(mockCallServiceCalls).toEqual([
       { domain: 'input_datetime', service: 'set_datetime', target: 'input_datetime.vacation_start', serviceData: { date: '2026-06-20', time: '10:01:00' } },
       { domain: 'input_datetime', service: 'set_datetime', target: 'input_datetime.vacation_end', serviceData: { date: '2026-06-15', time: '18:30:00' } },
-      { domain: 'input_boolean', service: 'turn_on', target: 'input_boolean.vacation_disable_home_tasks' },
     ])
   })
 
@@ -1329,7 +1323,6 @@ describe('DashboardViewPage', () => {
     expect(mockCallServiceCalls).toEqual([
       { domain: 'input_boolean', service: 'turn_off', target: 'input_boolean.vacation_mode' },
       { domain: 'input_boolean', service: 'turn_off', target: 'input_boolean.vacation_mode_invalid_dates_pending' },
-      { domain: 'input_boolean', service: 'turn_off', target: 'input_boolean.vacation_disable_home_tasks' },
       { domain: 'input_boolean', service: 'turn_off', target: 'input_boolean.vacation_checklist_turn_off_outdoor_sprinklers' },
       { domain: 'input_boolean', service: 'turn_off', target: 'input_boolean.vacation_checklist_pour_boiling_water_down_the_drain' },
       { domain: 'input_boolean', service: 'turn_off', target: 'input_boolean.vacation_checklist_make_the_bed' },
@@ -4824,6 +4817,28 @@ describe('DashboardViewPage', () => {
     expect(within(screen.getByLabelText('Past Due todo list')).queryByText('Active')).not.toBeInTheDocument()
   })
 
+  it.each([
+    ['chores', 'todo.stephen_s_no_due_date_with_unassigned', 'No Due Date'],
+    ['stephens-chores', 'todo.stephen_s_no_due_date', 'No Due Date'],
+    ['stephs-chores', 'todo.steph_s_no_due_date', 'No Due Date'],
+    ['unassigned-chores', 'todo.unassigned_no_due_date', 'No Due Date'],
+    ['home-improvement-chores', 'todo.home_improvement_s_no_due_date', 'No Due Date'],
+  ])('renders exactly the tasks supplied by HA on the %s page while Vacation Mode is on', async (path, entityId, title) => {
+    mockEntities['input_boolean.vacation_mode'].state = 'on'
+    mockEntities[entityId] = entity(entityId, '2')
+    mockTodoItemsByEntity[entityId] = [
+      { uid: 'ha-item-alpha', summary: 'HA supplied task alpha ' + path, status: 'needs_action' },
+      { uid: 'ha-item-beta', summary: 'HA supplied task beta ' + path, status: 'needs_action' },
+    ]
+
+    render(<DashboardViewPage activePath={path} onNavigate={() => undefined} path={path} />)
+
+    const list = await screen.findByLabelText(title + ' todo list')
+    expect(within(list).getByRole('button', { name: 'HA supplied task alpha ' + path })).toBeInTheDocument()
+    expect(within(list).getByRole('button', { name: 'HA supplied task beta ' + path })).toBeInTheDocument()
+    expect(within(list).getAllByRole('button')).toHaveLength(2)
+  })
+
   it('switches Chores user-gated todo sections for Steph and updates the Steph list', async () => {
     mockState.user = { id: '43cb71bbd1cb4860b2a7de4c829020f0', name: 'Steph' }
     render(<DashboardViewPage activePath="chores" onNavigate={() => undefined} path="chores" />)
@@ -5041,6 +5056,7 @@ describe('DashboardViewPage', () => {
           assignees: '3',
           description: 'Use the tall ladder',
           due_date: '2026-06-07T08:30:00',
+          hide_on_vacation: true,
           name: 'Clean the gutters',
           priority: 'high',
           recurrence: 'interval',

@@ -31,6 +31,25 @@
   font-weight: 800;
 }
 
+.hideOnVacationRow {
+  min-height: 76px;
+  align-items: start;
+  padding-inline: 0;
+}
+
+.hideOnVacationRow strong,
+.hideOnVacationRow small {
+  overflow: visible;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.fieldset .hideOnVacationRow:focus-visible {
+  border-radius: 14px;
+  outline: 2px solid rgba(255, 255, 255, 0.42);
+  outline-offset: 2px;
+}
+
 .field input,
 .field select,
 .field textarea {

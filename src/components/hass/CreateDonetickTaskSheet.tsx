@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { useHass } from '@hakit/core'
+import { CheckboxRow } from '../core/CheckboxRow'
 import { MaterialIcon } from '../core/Icon'
 import { ModalSheet } from '../core/ModalSheet'
 import { NativePickerField } from '../core/NativePickerField'
@@ -64,6 +65,7 @@ function initialFormState(defaultAssignee = '') {
     description: '',
     dueDate: '',
     dueTime: '',
+    hideOnVacation: true,
     name: '',
     priority: 'critical',
     recurrence: 'no_repeat',
@@ -94,12 +96,20 @@ export function CreateDonetickTaskSheet({ defaultAssignee = '', open, onClose }:
   const callService = useHass((state) => state.helpers.callService) as unknown as CallService
   const [form, setForm] = useState(() => initialFormState(defaultAssignee))
   const [error, setError] = useState<string | null>(null)
+  const formResetKey = defaultAssignee + '\u001f' + String(open)
+  const [appliedFormResetKey, setAppliedFormResetKey] = useState(formResetKey)
   const [submitting, setSubmitting] = useState(false)
   const taskName = form.name.trim()
   const showCustomInterval = form.recurrence === 'interval'
   const showRecurrenceDays = form.recurrence === 'days_of_the_week'
 
-  const updateField = (field: keyof FormState, value: string | string[]) => {
+  if (appliedFormResetKey !== formResetKey) {
+    setAppliedFormResetKey(formResetKey)
+    setForm(initialFormState(defaultAssignee))
+    setError(null)
+  }
+
+  const updateField = (field: keyof FormState, value: FormState[keyof FormState]) => {
     setForm((current) => ({ ...current, [field]: value }))
   }
 
@@ -140,6 +150,7 @@ export function CreateDonetickTaskSheet({ defaultAssignee = '', open, onClose }:
           assignees: form.assignee || '',
           description: form.description,
           due_date: sourceDueValue(form.dueDate, form.dueTime),
+          hide_on_vacation: form.hideOnVacation,
           name: taskName,
           priority: form.priority || 'none',
           recurrence: form.recurrence || 'no_repeat',
@@ -182,6 +193,18 @@ export function CreateDonetickTaskSheet({ defaultAssignee = '', open, onClose }:
             {ASSIGNEE_OPTIONS.map((option) => <option key={option.value || 'anyone'} value={option.value}>{option.label}</option>)}
           </select>
         </label>
+        <fieldset className={styles.fieldset}>
+          <legend>Hide On Vacation</legend>
+          <CheckboxRow
+            active={form.hideOnVacation}
+            alignWrappedToIconTop
+            aria-label="Hide While On Vacation"
+            className={styles.hideOnVacationRow}
+            onClick={() => updateField('hideOnVacation', !form.hideOnVacation)}
+            subtitle="This task will not show up in your chores lists while Vacation Mode is active."
+            title="Hide While On Vacation"
+          />
+        </fieldset>
         <label className={styles.field}>
           <span>Description</span>
           <textarea name="description" onChange={(event) => updateField('description', event.target.value)} rows={4} value={form.description} />
