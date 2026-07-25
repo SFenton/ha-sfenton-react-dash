@@ -1174,7 +1174,6 @@ export function WeatherSummary({ deferRefresh = false }: WeatherSummaryProps) {
                 <WeatherGlyph condition={weather?.state} size={40} />
               </span>
               <span className={styles.condition}>{condition.label}</span>
-              <ModalDisclosureIcon size="compact" />
             </span>
             <span className={styles.temperatureBlock}>
               <span className={styles.temperature}>{weatherDegree(weather)}</span>
@@ -1183,6 +1182,7 @@ export function WeatherSummary({ deferRefresh = false }: WeatherSummaryProps) {
           <HeroDayForecast entity={weather} forecast={today} />
           <HeroHourlyStrip entity={weather} forecasts={hourlyForecasts} />
         </span>
+        <ModalDisclosureIcon className={styles.disclosure} />
       </button>
 
       <ModalSheet open={open} title="Weather" subtitle="Pirate Weather · 7-day forecast" onClose={() => setOpen(false)}>

@@ -1,4 +1,4 @@
-export type ModalOpenerAffordance = 'action-icon' | 'down-chevron' | 'edit-icon' | 'native-control' | 'right-chevron'
+export type ModalOpenerAffordance = 'action-icon' | 'down-chevron' | 'edit-icon' | 'header-chip' | 'native-control' | 'right-chevron' | 'stream-pill'
 
 export interface ModalOpenerInventoryItem {
   affordance: ModalOpenerAffordance
@@ -24,25 +24,31 @@ export const MODAL_OPENER_INVENTORY: ModalOpenerInventoryItem[] = [
     id: 'overview-status-chips',
     label: 'Home status chips',
     instances: 6,
-    affordance: 'right-chevron',
+    affordance: 'header-chip',
     implementation: 'StatusRail with OVERVIEW_STATUS_CHIPS',
     behavior: 'Opens the matching hash-backed overview sheet.',
+    exceptionReason: 'Header chips are compact summary pills where the icon, title, and live state are the whole affordance; a chevron crowds the pill at mobile widths.',
+    sourceReference: 'Mobile header rail coverage in e2e/react-dash.spec.ts.',
   },
   {
     id: 'security-status-chips',
     label: 'Security status chips',
     instances: 2,
-    affordance: 'right-chevron',
+    affordance: 'header-chip',
     implementation: 'StatusRail with SECURITY_STATUS_CHIPS',
     behavior: 'Opens Security System or Contact Sensors.',
+    exceptionReason: 'Header chips are compact summary pills where the icon, title, and live state are the whole affordance; a chevron crowds the pill at mobile widths.',
+    sourceReference: 'Mobile header rail coverage in e2e/react-dash.spec.ts.',
   },
   {
     id: 'room-status-chips',
     label: 'Room header status chips',
     instances: 62,
-    affordance: 'right-chevron',
+    affordance: 'header-chip',
     implementation: 'StatusRail generated from ROOM_PAGE_CONFIGS.overviewCards',
     behavior: 'Opens the configured room hash sheet.',
+    exceptionReason: 'Header chips are compact summary pills where the icon, title, and live state are the whole affordance; a chevron crowds the pill at mobile widths.',
+    sourceReference: 'Mobile header rail coverage in e2e/react-dash.spec.ts.',
   },
   {
     id: 'overview-security-tile',
@@ -50,7 +56,15 @@ export const MODAL_OPENER_INVENTORY: ModalOpenerInventoryItem[] = [
     instances: 1,
     affordance: 'right-chevron',
     implementation: 'QuickAccessTile',
-    behavior: 'Opens Security System; route-only quick links do not use modal disclosure.',
+    behavior: 'Opens Security System.',
+  },
+  {
+    id: 'overview-route-quick-links',
+    label: 'Home route quick links',
+    instances: 3,
+    affordance: 'right-chevron',
+    implementation: 'QuickAccessTile with QUICK_ACCESS_ITEMS route entries',
+    behavior: 'Navigates to Vacuums, Media, or Custom Lights; marked data-navigation-opener rather than data-modal-opener.',
   },
   {
     id: 'security-system-tile',
@@ -72,9 +86,11 @@ export const MODAL_OPENER_INVENTORY: ModalOpenerInventoryItem[] = [
     id: 'camera-tiles',
     label: 'Home and Security camera tiles',
     instances: 8,
-    affordance: 'right-chevron',
+    affordance: 'stream-pill',
     implementation: 'CameraTile',
     behavior: 'Opens the matching camera sheet; stream state remains HA-owned.',
+    exceptionReason: 'The live stream thumbnail plus its title and state pill is the affordance; a chevron competes with the stream and crowds the overlay pill.',
+    sourceReference: 'Camera tile and camera sheet coverage in e2e/react-dash.spec.ts.',
   },
   {
     id: 'room-source-cards',

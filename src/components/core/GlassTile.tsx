@@ -22,6 +22,7 @@ export interface GlassTileProps {
   tone?: TileTone
   compact?: boolean
   disclosure?: boolean
+  disclosureKind?: 'modal' | 'navigation'
   isOff?: boolean
   onClick?: () => void
   pressed?: boolean
@@ -39,6 +40,7 @@ export function GlassTile({
   tone = 'neutral',
   compact = false,
   disclosure = false,
+  disclosureKind = 'modal',
   isOff = false,
   onClick,
   pressed,
@@ -96,9 +98,11 @@ export function GlassTile({
         data-icon={iconName}
         data-icon-color={iconColor}
         data-muted={isOff ? 'true' : 'false'}
-        data-modal-opener={disclosure ? 'true' : undefined}
+        data-modal-opener={disclosure && disclosureKind === 'modal' ? 'true' : undefined}
+        data-navigation-opener={disclosure && disclosureKind === 'navigation' ? 'true' : undefined}
         data-progress={progressValue === undefined ? undefined : String(Math.round(progressValue))}
         data-tone={tone}
+        data-variant={variant}
         onClick={onClick}
         style={resolvedStyle}
         type="button"
@@ -109,7 +113,7 @@ export function GlassTile({
   }
 
   return (
-    <div aria-label={accessibleName} className={className} data-icon={iconName} data-icon-color={iconColor} data-muted={isOff ? 'true' : 'false'} data-progress={progressValue === undefined ? undefined : String(Math.round(progressValue))} data-tone={tone} style={resolvedStyle}>
+    <div aria-label={accessibleName} className={className} data-icon={iconName} data-icon-color={iconColor} data-muted={isOff ? 'true' : 'false'} data-progress={progressValue === undefined ? undefined : String(Math.round(progressValue))} data-tone={tone} data-variant={variant} style={resolvedStyle}>
       {content}
     </div>
   )

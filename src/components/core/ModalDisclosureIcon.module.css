@@ -4,6 +4,7 @@
   height: 32px;
   flex: 0 0 32px;
   place-items: center;
+  align-self: center;
   color: rgba(255, 255, 255, 0.82);
   pointer-events: none;
 }

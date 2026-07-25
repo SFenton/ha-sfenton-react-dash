@@ -179,7 +179,28 @@ async function clickWithPointerJitter(page: Page, target: Locator) {
 }
 
 async function expectRightChevron(opener: Locator) {
-  await expect(opener.locator('[data-modal-disclosure="right-chevron"]')).toHaveCount(1)
+  const chevron = opener.locator('[data-modal-disclosure="right-chevron"]')
+  await expect(chevron).toHaveCount(1)
+  await expectVerticallyCenteredChevrons(chevron)
+}
+
+async function expectNoChevron(opener: Locator) {
+  await expect(opener.locator('[data-modal-disclosure]')).toHaveCount(0)
+}
+
+async function expectVerticallyCenteredChevrons(chevrons: Locator) {
+  const offCenter = await chevrons.evaluateAll((nodes) => nodes.flatMap((node) => {
+    const parent = node.parentElement
+    if (!parent) return []
+    const parentBox = parent.getBoundingClientRect()
+    const box = node.getBoundingClientRect()
+    if (!parentBox.height || !box.height) return []
+    const drift = Math.abs((box.top - parentBox.top) - (parentBox.bottom - box.bottom))
+    if (drift <= 1) return []
+    return [{ drift: Math.round(drift), owner: parent.getAttribute('aria-label') ?? parent.className }]
+  }))
+
+  expect(offCenter).toEqual([])
 }
 
 async function swipeWithTouch(page: Page, x: number, startY: number, endY: number) {
@@ -236,13 +257,18 @@ test('mobile modal opener families use shared disclosures and explicit action ex
   await page.goto('/at-a-glance/overview')
 
   await expectRightChevron(page.getByRole('button', { name: /Open seven-day weather forecast/i }))
-  await expectRightChevron(page.getByRole('button', { name: /^Lights /i }).first())
+  await expectNoChevron(page.getByRole('button', { name: /^Lights /i }).first())
   await expectRightChevron(page.getByRole('button', { name: /^Security System /i }))
-  await expectRightChevron(page.getByRole('button', { name: 'Open Front Door camera' }))
+  await expectNoChevron(page.getByRole('button', { name: 'Open Front Door camera' }))
+  for (const quickLink of ['Vacuums', 'Media', 'Custom Lights']) {
+    const opener = page.getByRole('button', { exact: true, name: quickLink })
+    await expectRightChevron(opener)
+    await expect(opener).toHaveAttribute('data-navigation-opener', 'true')
+  }
   await expect(page.getByRole('button', { name: 'Rooms' })).toHaveAttribute('data-modal-opener-exception', 'floating-action')
 
   await page.goto('/at-a-glance/living-room')
-  await expectRightChevron(page.getByRole('button', { name: /^Climate /i }).first())
+  await expectNoChevron(page.getByRole('button', { name: /^Climate /i }).first())
   await expectRightChevron(page.getByRole('button', { name: /^Vents /i }))
 
   await page.goto('/at-a-glance/admin')
@@ -253,6 +279,28 @@ test('mobile modal opener families use shared disclosures and explicit action ex
 
   await page.goto('/at-a-glance/pantry')
   await expectRightChevron(page.getByRole('button', { name: 'View Canned Beans individual items' }))
+})
+
+test('mobile navigation chevrons stay vertically centered in their opener', async ({ page }) => {
+  await page.setViewportSize({ width: 393, height: 852 })
+
+  for (const path of ['overview', 'security', 'living-room', 'master-bedroom', 'ecobee', 'vacuums', 'admin', 'pantry']) {
+    await page.goto(`/at-a-glance/${path}`)
+    const chevrons = page.locator('[data-modal-disclosure="right-chevron"]')
+    await expect.poll(() => chevrons.count()).toBeGreaterThan(0)
+    await expectVerticallyCenteredChevrons(chevrons)
+  }
+})
+
+test('mobile header status chips never render a disclosure chevron', async ({ page }) => {
+  await page.setViewportSize({ width: 393, height: 852 })
+
+  for (const path of ['overview', 'security', 'living-room', 'master-bedroom', 'kitchen', 'office']) {
+    await page.goto(`/at-a-glance/${path}`)
+    const chips = page.locator('[data-variant="header"]')
+    await expect.poll(() => chips.count(), { message: `${path} header chips` }).toBeGreaterThan(0)
+    await expect(chips.locator('[data-modal-disclosure]'), `${path} header chip chevrons`).toHaveCount(0)
+  }
 })
 
 test('dashboard keyboard viewport hides bottom nav and publishes visible height', async ({ page }) => {
