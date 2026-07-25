@@ -35,15 +35,38 @@ describe('AtAGlancePage', () => {
 
     const openers = [
       screen.getByRole('button', { name: /Open seven-day weather forecast/i }),
-      screen.getByRole('button', { name: /^Lights /i }),
       screen.getByRole('button', { name: /^Security System /i }),
-      screen.getByRole('button', { name: 'Open Front Door camera' }),
     ]
 
     for (const opener of openers) {
       expect(opener.querySelector('[data-modal-disclosure="right-chevron"]')).toBeInTheDocument()
     }
-    expect(screen.getByRole('button', { name: 'Vacuums' }).querySelector('[data-modal-disclosure]')).not.toBeInTheDocument()
+  })
+
+  it('keeps header status chips and camera pills free of disclosure chevrons', () => {
+    render(<AtAGlancePage />)
+
+    const chip = screen.getByRole('button', { name: /^Lights / })
+    expect(chip).toHaveAttribute('data-tone', 'light')
+    expect(chip.querySelector('[data-modal-disclosure]')).not.toBeInTheDocument()
+    expect(chip).not.toHaveAttribute('data-modal-opener')
+
+    expect(screen.getByRole('button', { name: 'Open Front Door camera' }).querySelector('[data-modal-disclosure]')).not.toBeInTheDocument()
+  })
+
+  it('gives Home route quick links the shared chevron without marking them modal openers', () => {
+    render(<AtAGlancePage />)
+
+    for (const name of ['Vacuums', 'Media', 'Custom Lights']) {
+      const quickLink = screen.getByRole('button', { name })
+      expect(quickLink.querySelector('[data-modal-disclosure="right-chevron"]'), name).toBeInTheDocument()
+      expect(quickLink, name).toHaveAttribute('data-navigation-opener', 'true')
+      expect(quickLink, name).not.toHaveAttribute('data-modal-opener')
+    }
+
+    const securityQuickLink = screen.getByRole('button', { name: /^Security System / })
+    expect(securityQuickLink).toHaveAttribute('data-modal-opener', 'true')
+    expect(securityQuickLink).not.toHaveAttribute('data-navigation-opener')
   })
 
   it('keeps cold Home content behind a centered spinner before fading content in', () => {

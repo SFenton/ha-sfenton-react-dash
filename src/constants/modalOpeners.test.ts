@@ -3,7 +3,7 @@ import { ROOM_PAGE_CONFIGS } from './roomPages'
 
 describe('modal opener inventory', () => {
   it('keeps every audited opener family uniquely documented', () => {
-    expect(MODAL_OPENER_INVENTORY).toHaveLength(29)
+    expect(MODAL_OPENER_INVENTORY).toHaveLength(30)
     expect(new Set(MODAL_OPENER_INVENTORY.map((item) => item.id)).size).toBe(MODAL_OPENER_INVENTORY.length)
   })
 
@@ -18,13 +18,10 @@ describe('modal opener inventory', () => {
   it('keeps all content disclosure families on the shared right-chevron affordance', () => {
     const contentFamilies = [
       'weather-hero',
-      'overview-status-chips',
-      'security-status-chips',
-      'room-status-chips',
       'overview-security-tile',
+      'overview-route-quick-links',
       'security-system-tile',
       'guest-presence-security',
-      'camera-tiles',
       'room-source-cards',
       'media-page-remotes',
       'vacuum-page-cards',

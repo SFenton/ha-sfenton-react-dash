@@ -366,7 +366,8 @@ function QuickAccessTile({ item, onNavigate, onOpenHash }: { item: QuickAccessCo
   return (
     <GlassTile
       backgroundColor={isSecurityTile ? securityStateCssColor(entity?.state, 0.5) : undefined}
-      disclosure={Boolean(itemHash)}
+      disclosure={Boolean(itemHash || item.route)}
+      disclosureKind={itemHash ? 'modal' : 'navigation'}
       icon={isSecurityTile ? securityStateIconName(entity?.state) : item.icon}
       iconColor={isSecurityTile ? 'white' : undefined}
       onClick={itemHash || item.route ? handleClick : undefined}
