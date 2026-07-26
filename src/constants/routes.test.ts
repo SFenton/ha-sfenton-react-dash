@@ -47,6 +47,13 @@ describe('routes', () => {
     expect(primaryNavRouteActive('stephs-chores', 'overview')).toBe(false)
   })
 
+  it('keeps the summary user param only while targeting the summary modal hash', () => {
+    expect(routeUrl('overview', '/sfenton-react-dash/home?path=security', '#daily-report')).toBe('/sfenton-react-dash/home?path=overview#daily-report')
+    expect(routeUrl('overview', '/sfenton-react-dash/home?path=overview&user=stephen', '#daily-report')).toBe('/sfenton-react-dash/home?path=overview&user=stephen#daily-report')
+    expect(routeUrl('overview', '/sfenton-react-dash/home?path=overview&user=stephen')).toBe('/sfenton-react-dash/home?path=overview')
+    expect(routeUrl('chores', '/sfenton-react-dash/home?path=overview&user=stephen')).toBe('/sfenton-react-dash/home?path=chores')
+  })
+
   it('groups home subpages under the Home primary nav route', () => {
     expect(primaryNavPathForRoute('living-room')).toBe('overview')
     expect(primaryNavPathForRoute('guest-room')).toBe('overview')

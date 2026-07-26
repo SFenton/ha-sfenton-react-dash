@@ -1,21 +1,36 @@
 import { useCallback, useEffect, useState } from 'react'
+import { DAILY_REPORT_HASH } from '../constants/routes'
 import { DASHBOARD_ROUTE_CHANGE_EVENT, dashboardEventTargets, dashboardHash, dashboardPathWithSearch, pushDashboardUrl, replaceDashboardUrl } from './dashboardLocation'
 
 interface UseHashModalOptions {
+  /** App chrome hosts the modal for every route instead of a single page. */
+  appLevel?: boolean
   disabled?: boolean
 }
+
+/** Hashes owned by app-level chrome. Page hash-modal hosts must ignore them so both sheets never open at once. */
+const APP_LEVEL_HASHES = new Set<string>([DAILY_REPORT_HASH])
 
 function currentHash() {
   return dashboardHash()
 }
 
-export function useHashModal({ disabled = false }: UseHashModalOptions = {}) {
-  const [hash, setHash] = useState(() => disabled ? '' : currentHash())
+function hashInScope(hash: string, appLevel: boolean) {
+  if (!hash) return false
+  return APP_LEVEL_HASHES.has(hash) === appLevel
+}
+
+function scopedHash(hash: string, appLevel: boolean) {
+  return hashInScope(hash, appLevel) ? hash : ''
+}
+
+export function useHashModal({ appLevel = false, disabled = false }: UseHashModalOptions = {}) {
+  const [hash, setHash] = useState(() => disabled ? '' : scopedHash(currentHash(), appLevel))
 
   useEffect(() => {
     if (disabled) return undefined
 
-    const syncHash = () => setHash(currentHash())
+    const syncHash = () => setHash(scopedHash(currentHash(), appLevel))
     const targets = dashboardEventTargets()
 
     targets.forEach((target) => {
@@ -31,14 +46,14 @@ export function useHashModal({ disabled = false }: UseHashModalOptions = {}) {
         target.removeEventListener(DASHBOARD_ROUTE_CHANGE_EVENT, syncHash)
       })
     }
-  }, [disabled])
+  }, [appLevel, disabled])
 
   const openHash = useCallback((nextHash: string) => {
     if (disabled) return
     if (currentHash() === nextHash) return
     pushDashboardUrl(nextHash)
-    setHash(nextHash)
-  }, [disabled])
+    setHash(scopedHash(nextHash, appLevel))
+  }, [appLevel, disabled])
 
   const closeHash = useCallback(() => {
     if (disabled) return

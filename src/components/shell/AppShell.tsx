@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { DailyReportModal } from '../hass/DailyReportModal'
 import { useDashboardViewport } from '../../hooks/useDashboardViewport'
 import styles from './AppShell.module.css'
 
@@ -21,6 +22,7 @@ export function AppShell({ children, bottomNav, chromeHidden = false, floatingAc
       <div className={styles.content}>{children}</div>
       {!chromeHidden && floatingAction && <div className={styles.floatingAction} data-floating-action-dock="true">{floatingAction}</div>}
       {!chromeHidden && bottomNav}
+      <DailyReportModal />
     </div>
   )
 }
