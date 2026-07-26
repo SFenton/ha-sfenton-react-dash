@@ -13,6 +13,7 @@ interface ModalSheetProps {
   onClose: () => void
   children: ReactNode
   backLabel?: string
+  bodyHeader?: ReactNode
   chrome?: 'default' | 'source-popup'
   contentStyle?: ModalSheetStyle
   footer?: ReactNode
@@ -22,7 +23,7 @@ interface ModalSheetProps {
   surface?: 'hass-popup'
 }
 
-type ModalSheetSnapshot = Pick<ModalSheetProps, 'backLabel' | 'children' | 'chrome' | 'contentStyle' | 'footer' | 'onBack' | 'scrollResetKey' | 'subtitle' | 'title'>
+type ModalSheetSnapshot = Pick<ModalSheetProps, 'backLabel' | 'bodyHeader' | 'children' | 'chrome' | 'contentStyle' | 'footer' | 'onBack' | 'scrollResetKey' | 'subtitle' | 'title'>
 const RECENT_OPEN_INTERNAL_CLOSE_GUARD_MS = 450
 export const MODAL_SHEET_EXIT_ANIMATION_MS = 520
 
@@ -50,12 +51,12 @@ function useDesktopModalLayout() {
   return isDesktopModalLayout
 }
 
-export function ModalSheet({ open, title, onClose, children, backLabel = 'Back', chrome = 'default', contentStyle, footer, onBack, scrollResetKey, subtitle }: ModalSheetProps) {
+export function ModalSheet({ open, title, onClose, children, backLabel = 'Back', bodyHeader, chrome = 'default', contentStyle, footer, onBack, scrollResetKey, subtitle }: ModalSheetProps) {
   const contentRef = useRef<HTMLDivElement | null>(null)
   const bodyRef = useRef<HTMLDivElement | null>(null)
   const closeRequestedAtRef = useRef(Number.NEGATIVE_INFINITY)
   const ignoreInternalCloseUntilRef = useRef(0)
-  const currentSnapshot: ModalSheetSnapshot = { backLabel, children, chrome, contentStyle, footer, onBack, scrollResetKey, subtitle, title }
+  const currentSnapshot: ModalSheetSnapshot = { backLabel, bodyHeader, children, chrome, contentStyle, footer, onBack, scrollResetKey, subtitle, title }
   const [lastOpenSnapshot, setLastOpenSnapshot] = useState<ModalSheetSnapshot>(currentSnapshot)
   const [mounted, setMounted] = useState(open)
   const [previousOpen, setPreviousOpen] = useState(open)
@@ -166,6 +167,7 @@ export function ModalSheet({ open, title, onClose, children, backLabel = 'Back',
           data-chrome={rendered.chrome}
           data-closing={closing ? 'true' : 'false'}
           data-has-footer={rendered.footer ? 'true' : 'false'}
+          data-has-body-header={rendered.bodyHeader ? 'true' : 'false'}
           data-has-subtitle={rendered.subtitle ? 'true' : 'false'}
           data-rapid-reopen={rapidReopen ? 'true' : 'false'}
           data-surface="hass-popup"
@@ -190,6 +192,7 @@ export function ModalSheet({ open, title, onClose, children, backLabel = 'Back',
               <MaterialIcon name="mdi:close" size={sourcePopup ? 30 : 19} />
             </button>
           </div>
+          {rendered.bodyHeader && <div className={styles.bodyHeader} data-modal-sheet-body-header="true">{rendered.bodyHeader}</div>}
           <div className={styles.body} data-modal-sheet-body="true" ref={bodyRef}>{rendered.children}</div>
           {rendered.footer && <div className={styles.footer}>{rendered.footer}</div>}
         </Drawer.Content>

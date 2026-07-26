@@ -1,4 +1,5 @@
 import {
+  mdiAccount,
   mdiAccountCheck,
   mdiAccountCog,
   mdiAccountCircle,
@@ -49,6 +50,7 @@ import {
   mdiChevronUp,
   mdiCircle,
   mdiClipboardList,
+  mdiClipboardTextClock,
   mdiCloud,
   mdiClose,
   mdiClockOutline,
@@ -75,6 +77,8 @@ import {
   mdiFloorPlan,
   mdiFlash,
   mdiFoodForkDrink,
+  mdiFoodOffOutline,
+  mdiFoodVariant,
   mdiFormDropdown,
   mdiFormatListCheckbox,
   mdiFridge,
@@ -251,6 +255,7 @@ const ICON_PATHS = {
 } satisfies Record<IconKey, string>
 
 const MATERIAL_ICON_PATHS: Record<string, string> = {
+  'mdi:account': mdiAccount,
   'mdi:account-check': mdiAccountCheck,
   'mdi:account-cog': mdiAccountCog,
   'mdi:account-circle': mdiAccountCircle,
@@ -301,6 +306,7 @@ const MATERIAL_ICON_PATHS: Record<string, string> = {
   'mdi:chevron-up': mdiChevronUp,
   'mdi:circle': mdiCircle,
   'mdi:clipboard-list': mdiClipboardList,
+  'mdi:clipboard-text-clock': mdiClipboardTextClock,
   'mdi:cloud': mdiCloud,
   'mdi:close': mdiClose,
   'mdi:clock-outline': mdiClockOutline,
@@ -328,6 +334,8 @@ const MATERIAL_ICON_PATHS: Record<string, string> = {
   'mdi:flash': mdiFlash,
   'mdi:filter-variant': mdiFilterVariant,
   'mdi:food-fork-drink': mdiFoodForkDrink,
+  'mdi:food-off-outline': mdiFoodOffOutline,
+  'mdi:food-variant': mdiFoodVariant,
   'mdi:form-dropdown': mdiFormDropdown,
   'mdi:format-list-checkbox': mdiFormatListCheckbox,
   'mdi:fridge': mdiFridge,

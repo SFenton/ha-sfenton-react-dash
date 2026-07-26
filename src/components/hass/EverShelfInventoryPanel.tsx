@@ -17,6 +17,7 @@ export type EverShelfInventoryLocation = 'all' | 'dispensa' | 'frigo' | 'freezer
 
 interface EverShelfInventoryPanelProps {
   controls: EverShelfInventoryControls
+  emptyFilteredMessage?: string
   location: EverShelfInventoryLocation
   title: string
 }
@@ -927,7 +928,7 @@ export function EverShelfInventoryFloatingActions({ controls }: { controls: Ever
   )
 }
 
-export function EverShelfInventoryPanel({ controls, location, title }: EverShelfInventoryPanelProps) {
+export function EverShelfInventoryPanel({ controls, emptyFilteredMessage, location, title }: EverShelfInventoryPanelProps) {
   const callService = useHass((state) => state.helpers.callService) as unknown as CallService
   const { inventoryLoadPhase, setInventoryItemCount, setInventoryLoadPhase } = controls
   const [detailsItem, setDetailsItem] = useState<EverShelfInventoryDisplayItem | null>(null)
@@ -1138,7 +1139,7 @@ export function EverShelfInventoryPanel({ controls, location, title }: EverShelf
                   <EmptyState className={styles.inventoryEmpty} description={effectiveSearchQuery ? emptySearchDescription(controls.filterActive) : `Scan an item to add it to your ${title.toLowerCase()}.`} title={effectiveSearchQuery ? 'No matching items' : 'No items found'} />
                 ) : items !== null && loadedItems.length > 0 && visibleItems.length === 0 && (effectiveSearchQuery
                   ? <EmptyState className={styles.inventoryEmpty} description={emptySearchDescription(controls.filterActive)} title="No matching items" />
-                  : <Description>{emptyMatchMessage(false, controls.filterActive)}</Description>)}
+                  : <Description>{emptyFilteredMessage ?? emptyMatchMessage(false, controls.filterActive)}</Description>)}
                 {visibleItems.length > 0 && (
                   <ul className={styles.items}>
                     {visibleItems.map((item, index) => {

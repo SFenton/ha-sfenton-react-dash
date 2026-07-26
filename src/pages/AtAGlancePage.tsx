@@ -1186,7 +1186,6 @@ function SheetContent({
   if (hash === '#settings-preview') return <SettingsPreviewSheet closeHash={closeHash} onNavigate={onNavigate} />
   if (hash === '#security-system') return <SecurityControls />
   if (hash === GUEST_PRESENCE_SECURITY_HASH) return <GuestPresenceSecurityModalContent />
-
   if (CAMERA_ITEMS.some((item) => item.hash === hash)) return <CameraSheet hash={hash} key={hash} live={!preload} />
 
   return <p className={styles.sheetText}>This overview section is not available from Home.</p>

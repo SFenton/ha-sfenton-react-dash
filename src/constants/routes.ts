@@ -4,6 +4,9 @@ export interface DashboardRouteConfig {
   icon: string
 }
 
+export const DAILY_REPORT_HASH = '#daily-report'
+export const DAILY_REPORT_USER_QUERY_KEY = 'user'
+export const DAILY_REPORT_QUERY_KEYS = [DAILY_REPORT_USER_QUERY_KEY] as const
 export const HOME_GROCERY_LIST_ROUTE_PATH = 'grocery-list'
 export const HOME_FOOD_ROUTE_PATH = 'food'
 export const HOME_ALL_FOOD_ROUTE_PATH = 'all-food'
@@ -124,7 +127,7 @@ const CHORES_SUB_ROUTE_PATHS = new Set([
 export function primaryNavPathForRoute(path: string | undefined) {
   if (!path) return 'overview'
   if (HOME_SUB_ROUTE_PATHS.has(path)) return 'overview'
-  if (path === 'groceries' || path.endsWith('-chores')) return 'chores'
+  if (CHORES_SUB_ROUTE_PATHS.has(path) || path.endsWith('-chores')) return 'chores'
   if (SETTINGS_SUB_ROUTE_PATHS.has(path)) return 'settings'
   return path
 }
@@ -234,6 +237,10 @@ export function routeUrl(path: string, currentUrl?: string, hash?: string) {
   if (!shouldUseQueryRoute(parsedUrl)) return `/at-a-glance/${routePath}${normalizedHash(hash)}`
 
   parsedUrl.searchParams.set('path', routePath)
-  parsedUrl.hash = normalizedHash(hash)
+  const nextHash = normalizedHash(hash)
+  if (nextHash !== DAILY_REPORT_HASH) {
+    for (const key of DAILY_REPORT_QUERY_KEYS) parsedUrl.searchParams.delete(key)
+  }
+  parsedUrl.hash = nextHash
   return relativeUrl(parsedUrl)
 }

@@ -189,6 +189,12 @@
   cursor: pointer;
 }
 
+.bodyHeader {
+  flex: 0 0 auto;
+  box-sizing: border-box;
+  padding: 0 16px;
+}
+
 .body {
   flex: 1 1 auto;
   min-height: 0;
@@ -199,6 +205,10 @@
   scrollbar-width: none;
   -ms-overflow-style: none;
   -webkit-overflow-scrolling: touch;
+}
+
+.content[data-has-body-header='true'] .body {
+  padding-top: 0;
 }
 
 .content[data-has-subtitle='true'] .body {

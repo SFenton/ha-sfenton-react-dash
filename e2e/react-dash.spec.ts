@@ -2162,3 +2162,85 @@ test('thermostat hero dial allows vertical swipe scrolling', async ({ page, brow
   await expect.poll(scrollTop).toBeGreaterThan(before + 40)
   await expect(heroDial).toHaveAttribute('aria-label', labelBeforeRingSwipe)
 })
+
+test('daily summary deep link opens the tabbed modal for the requested user', async ({ page }) => {
+  await page.goto('/index.html?path=overview&user=stephen#daily-report')
+
+  const dialog = page.getByRole('dialog')
+  await expect(dialog.getByRole('heading', { name: "Stephen's Summary" })).toBeVisible()
+  await expect(dialog).toHaveAttribute('data-has-subtitle', 'false')
+
+  const nav = dialog.getByRole('navigation', { name: 'Daily report sections' })
+  const tabs = nav.getByRole('button')
+  await expect(tabs).toHaveCount(3)
+  for (const tab of await tabs.all()) await expect(tab).toHaveText('')
+
+  await expect(dialog.getByRole('region', { name: 'Overdue Chores' })).toBeVisible()
+
+  const bodyHeader = dialog.locator('[data-modal-sheet-body-header="true"]')
+  await expect(bodyHeader.getByRole('heading', { level: 2, name: 'Overdue Chores' })).toBeVisible()
+
+  await nav.getByRole('button', { name: 'Upcoming Chores' }).click()
+  await expect(dialog.getByRole('region', { name: 'Upcoming Chores' })).toBeVisible()
+  await expect(dialog.getByRole('region', { name: 'Overdue Chores' })).toHaveCount(0)
+
+  await expect(bodyHeader.getByRole('heading', { level: 2, name: 'Upcoming Chores' })).toBeVisible()
+
+  await nav.getByRole('button', { name: 'Expired Food' }).click()
+  await expect(bodyHeader.getByRole('heading', { level: 2, name: 'Expired Food' })).toBeVisible()
+  await expect(dialog.getByLabel('Expired Food inventory list')).toBeVisible()
+  const expiredRow = dialog.locator('[data-expiry-tone="expired"]').first()
+  await expect(expiredRow).toBeVisible()
+  await expect(expiredRow.getByRole('button', { name: /^Edit / })).toBeVisible()
+  await expect(expiredRow.getByRole('button', { name: /^Delete / })).toBeVisible()
+})
+
+test('daily summary deep link titles the modal for the other household user', async ({ page }) => {
+  await page.goto('/index.html?path=overview&user=steph#daily-report')
+
+  await expect(page.getByRole('dialog').getByRole('heading', { name: "Steph's Summary" })).toBeVisible()
+})
+
+test('daily summary modal closes back to the home dashboard', async ({ page }) => {
+  await page.goto('/index.html?path=overview&user=stephen#daily-report')
+
+  const dialog = page.getByRole('dialog')
+  await expect(dialog).toBeVisible()
+  await dialog.getByRole('button', { name: 'Close' }).click()
+
+  await expect(page.getByRole('heading', { level: 1, name: 'Home' })).toBeVisible()
+  await expect.poll(() => new URL(page.url()).hash).toBe('')
+})
+
+test('header profile button opens the summary modal from any page', async ({ page }) => {
+  await page.goto('/index.html?path=vacuums')
+
+  const profileButton = page.getByRole('button', { name: /^Open .+'s Summary$/ })
+  await expect(profileButton).toBeVisible()
+  await profileButton.click()
+
+  const dialog = page.getByRole('dialog')
+  await expect(dialog.getByRole('heading', { name: "Stephen's Summary" })).toBeVisible()
+  await expect(dialog.getByRole('navigation', { name: 'Daily report sections' })).toBeVisible()
+  await expect.poll(() => new URL(page.url()).hash).toBe('#daily-report')
+
+  await dialog.getByRole('button', { name: 'Close' }).click()
+  await expect(page.getByRole('heading', { level: 1, name: 'Vacuums' })).toBeVisible()
+})
+
+test('header profile button stays visible and opaque across route changes', async ({ page }) => {
+  await page.goto('/index.html?path=overview')
+
+  const profileButton = page.getByRole('button', { name: /^Open .+'s Summary$/ })
+  await expect(profileButton).toBeVisible()
+
+  await page.getByRole('navigation', { name: 'Dashboard sections' }).getByRole('button', { name: 'Security' }).click()
+
+  // The profile button is persistent chrome, so it must never fade during the route transition.
+  for (let sample = 0; sample < 6; sample += 1) {
+    await expect(profileButton).toHaveCSS('opacity', '1')
+    await page.waitForTimeout(40)
+  }
+  await expect(page.getByRole('heading', { level: 1, name: 'Security' })).toBeVisible()
+  await expect(profileButton).toHaveCSS('opacity', '1')
+})

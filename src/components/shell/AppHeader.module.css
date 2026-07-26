@@ -79,6 +79,36 @@
   place-items: center;
 }
 
+.trailing {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+}
+
+.profileButton {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  flex: 0 0 38px;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 999px;
+  padding: 0;
+  color: rgba(255, 255, 255, 0.92);
+  background: rgba(255, 255, 255, 0.12);
+  font: inherit;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  backdrop-filter: blur(18px) saturate(1.18);
+  -webkit-backdrop-filter: blur(18px) saturate(1.18);
+}
+
+.profileButton:focus,
+.profileButton:focus-visible {
+  outline: none;
+}
+
 .leading {
   transition:
     opacity 170ms ease-out,
@@ -94,7 +124,7 @@
   will-change: opacity, transform;
 }
 
-.trailing {
+.iconButton {
   transition:
     opacity 170ms ease-out,
     transform 170ms ease-out;
@@ -160,7 +190,7 @@
 
 :global([data-route-transition-state='exiting']) .backTitle,
 :global([data-route-transition-state='exiting']) .titleWrap,
-:global([data-route-transition-state='exiting']) .trailing {
+:global([data-route-transition-state='exiting']) .iconButton {
   opacity: 0;
   transform: translate3d(0, 5px, 0);
   transition-duration: 130ms;
@@ -177,7 +207,7 @@
 
 :global([data-route-transition-state='pre-entering']) .backTitle,
 :global([data-route-transition-state='pre-entering']) .titleWrap,
-:global([data-route-transition-state='pre-entering']) .trailing {
+:global([data-route-transition-state='pre-entering']) .iconButton {
   opacity: 0;
   transform: translate3d(0, 5px, 0);
   transition: none;
@@ -195,7 +225,7 @@
   .backIconSlot,
   .backTitle,
   .titleWrap,
-  .trailing {
+  .iconButton {
     transition: none;
   }
 }
