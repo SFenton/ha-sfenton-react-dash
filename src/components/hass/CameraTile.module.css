@@ -44,6 +44,13 @@
   background: linear-gradient(140deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.05));
 }
 
+.streamError {
+  position: absolute;
+  z-index: 2;
+  inset: 0;
+  height: auto;
+}
+
 .warming {
   color: rgba(255, 255, 255, 0.48);
   background:
