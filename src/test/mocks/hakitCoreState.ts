@@ -510,6 +510,7 @@ export const mockEntities: Record<string, MockEntity> = {
   'input_datetime.vacation_start': entity('input_datetime.vacation_start', '2026-06-14 10:01:00', { has_date: true, has_time: true }),
   'input_datetime.vacation_end': entity('input_datetime.vacation_end', '2026-06-15 10:01:00', { has_date: true, has_time: true }),
   'input_boolean.is_front_door_auto_lock_enabled': entity('input_boolean.is_front_door_auto_lock_enabled', 'on'),
+  'input_boolean.relay_control_mode': entity('input_boolean.relay_control_mode', 'off'),
   'input_boolean.show_outdoor_faucets': entity('input_boolean.show_outdoor_faucets', 'off'),
   'input_boolean.show_christmas_lights': entity('input_boolean.show_christmas_lights', 'off'),
   'input_boolean.is_driveway_recording': entity('input_boolean.is_driveway_recording', 'on'),
