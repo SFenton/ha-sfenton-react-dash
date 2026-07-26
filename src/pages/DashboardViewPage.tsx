@@ -69,6 +69,7 @@ import {
   CHORE_QUICK_LINKS,
   ADMIN_DESCRIPTIONS,
   ADMIN_PRESENCE_OVERRIDE_ITEMS,
+  ADMIN_RELAY_CONTROL_ITEMS,
   ADMIN_SECURITY_CONTROLS,
   ADMIN_SHOW_SPECIFIC_CONTROLS,
   CLIMATE_COLOR,
@@ -1872,6 +1873,12 @@ function AdminPage({ onNavigate, preload = false, preloadHash, preloadHashes = [
         <SectionHeader title="Living Room Power Recovery" />
         <Description>{ADMIN_DESCRIPTIONS.livingRoomPowerRecovery}</Description>
         <LivingRoomPowerRecoveryButton />
+      </section>
+
+      <section className={styles.section}>
+        <SectionHeader title="Relay Control Mode" />
+        <Description>{ADMIN_DESCRIPTIONS.relayControlMode}</Description>
+        <AdminTileGrid items={ADMIN_RELAY_CONTROL_ITEMS} onNavigate={onNavigate} />
       </section>
 
       <section className={styles.section}>

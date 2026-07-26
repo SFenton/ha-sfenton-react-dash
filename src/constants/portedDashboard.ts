@@ -154,6 +154,8 @@ export const ADMIN_DESCRIPTIONS = {
   livingRoomPowerRecovery:
     'If the living room switch loses power and comes back with the relay off, run this to temporarily couple the top paddle, unlock the relay, turn power back on, relock it, and return the paddle to decoupled mode.',
   presenceOverrides: 'Enable or disable presence-based lighting in specific rooms. Useful for when we have company, or need to quickly keep lights on or off without using the voice commands.',
+  relayControlMode:
+    "Couples every smart-bulb wall switch to its own relay, so the paddles keep working even if Home Assistant, Zigbee2MQTT, or the host is down. This turns on automatically while Vacation Mode is active, so house-sitters always have a way to get light.\n\nWhile this is on, turning lights off at the wall cuts power to those bulbs, so presence-based lighting can't bring them back until the paddle is switched on again.",
   showSpecific: "Shows the outdoor faucets in our Home Assistant pages. Useful to disable during the winter, when we aren't using them.",
   autoReset:
     "Sometimes, we disable automatic presence-based lighting in rooms that we'd otherwise want to wake up and have that presence-based lighting active.\n\nIf a toggle here is enabled, it means that in the morning, before we usually wake up, if the room has been cleared for a sufficient amount of time during the night, we'll re-enable presence-based lighting in that room.",
@@ -161,6 +163,12 @@ export const ADMIN_DESCRIPTIONS = {
 
 export const ADMIN_SECURITY_CONTROLS: EntityTileConfig[] = [
   { title: 'Front Door Auto-Lock', entityId: 'input_boolean.is_front_door_auto_lock_enabled', icon: 'mdi:lock-clock', color: SWITCH_ACTIVE_COLOR, action: { type: 'toggle' }, showSubtitle: true },
+]
+
+export const RELAY_CONTROL_MODE_ENTITY_ID = 'input_boolean.relay_control_mode'
+
+export const ADMIN_RELAY_CONTROL_ITEMS: EntityTileConfig[] = [
+  { title: 'Relay Control Mode', entityId: RELAY_CONTROL_MODE_ENTITY_ID, icon: 'mdi:toggle-switch', color: SWITCH_ACTIVE_COLOR, action: { type: 'toggle' }, showSubtitle: true },
 ]
 
 export const ADMIN_SHOW_SPECIFIC_CONTROLS: EntityTileConfig[] = [
