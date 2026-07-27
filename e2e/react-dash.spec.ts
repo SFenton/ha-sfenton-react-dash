@@ -60,6 +60,20 @@ async function roomAccessServiceCalls(page: Page) {
   ))
 }
 
+async function clearMockHassCalls(page: Page) {
+  await page.evaluate(() => {
+    const calls = (window as unknown as { __mockHass: { calls: Record<string, unknown>[] } }).__mockHass.calls
+    calls.splice(0, calls.length)
+  })
+}
+
+async function everShelfInventoryCalls(page: Page) {
+  return page.evaluate(() => (
+    (window as unknown as { __mockHass: { calls: Record<string, unknown>[] } }).__mockHass.calls
+      .filter((call) => call.domain === 'evershelf' && call.service !== 'list_inventory')
+  ))
+}
+
 async function expectFreeSleepAlarms(page: Page, side: 'left' | 'right', day: string, expected: FreeSleepAlarmSnapshot[]) {
   await expect.poll(async () => {
     const schedules = await freeSleepSchedules(page)
@@ -278,7 +292,7 @@ test('mobile modal opener families use shared disclosures and explicit action ex
   await expectRightChevron(page.getByRole('button', { name: 'Living Room 70.2°F · Inactive' }))
 
   await page.goto('/at-a-glance/pantry')
-  await expectRightChevron(page.getByRole('button', { name: 'View Canned Beans individual items' }))
+  await expectRightChevron(page.getByRole('button', { name: 'Edit Canned Beans' }))
 })
 
 test('mobile navigation chevrons stay vertically centered in their opener', async ({ page }) => {
@@ -498,6 +512,57 @@ test('inventory footer search moves above the mobile keyboard and clears results
   await page.getByRole('button', { name: 'Clear Search' }).click()
   await expect(input).toHaveValue('')
   await expect.poll(() => inventoryRowLabels(page, inventoryListLabel)).toHaveLength(3)
+})
+
+test('inventory item edit modal adds and removes EverShelf stock from the quantity stepper', async ({ page }) => {
+  await page.setViewportSize({ width: 393, height: 852 })
+  await page.goto('/at-a-glance/fridge')
+
+  const inventoryListLabel = 'Fridge inventory list'
+  await expect.poll(() => inventoryRowLabels(page, inventoryListLabel)).toHaveLength(3)
+  const yogurtRow = inventoryList(page, inventoryListLabel).getByRole('group', { name: /Greek Yogurt Quantity 2/i })
+  await yogurtRow.getByRole('button', { name: 'Edit Greek Yogurt' }).click()
+
+  const dialog = page.getByRole('dialog', { name: /Greek Yogurt/i })
+  const quantity = dialog.getByRole('spinbutton', { name: 'Quantity for Greek Yogurt' })
+  await expect(quantity).toHaveText('2')
+  await expect(dialog.getByRole('button', { name: 'Save Greek Yogurt' })).toHaveCount(0)
+
+  await dialog.getByRole('button', { name: 'Add one Greek Yogurt' }).click()
+  await dialog.getByRole('button', { name: 'Add one Greek Yogurt' }).click()
+  await expect(quantity).toHaveText('4')
+  await expect(dialog.getByText('Saving adds 2 items to the fridge.')).toBeVisible()
+
+  await clearMockHassCalls(page)
+  await dialog.getByRole('button', { name: 'Save Greek Yogurt' }).click()
+  await expect.poll(() => everShelfInventoryCalls(page)).toContainEqual({
+    domain: 'evershelf',
+    service: 'add_scanned_item',
+    serviceData: {
+      expiry_date: expect.any(String),
+      location: 'frigo',
+      name: 'Greek Yogurt',
+      product_id: 2003,
+      quantity: 2,
+      unit: 'pz',
+      vacuum_sealed: false,
+    },
+  })
+  await expect(dialog).toHaveCount(0)
+
+  await yogurtRow.getByRole('button', { name: 'Edit Greek Yogurt' }).click()
+  await dialog.getByRole('button', { name: 'Remove one Greek Yogurt' }).click()
+  await expect(quantity).toHaveText('1')
+  await expect(dialog.getByRole('button', { name: 'Remove one Greek Yogurt' })).toBeDisabled()
+  await expect(dialog.getByText('Saving removes 1 item from the fridge.')).toBeVisible()
+
+  await clearMockHassCalls(page)
+  await dialog.getByRole('button', { name: 'Save Greek Yogurt' }).click()
+  await expect.poll(() => everShelfInventoryCalls(page)).toContainEqual({
+    domain: 'evershelf',
+    service: 'delete_inventory',
+    serviceData: { inventory_id: 203, quantity: 1 },
+  })
 })
 
 test('thermostat page accepts the first mobile scroll gesture after closing a room modal', async ({ page }) => {

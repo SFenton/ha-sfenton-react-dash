@@ -4295,7 +4295,7 @@ describe('DashboardViewPage', () => {
     expect(editAlmondFlourButton).toBeEnabled()
     fireEvent.click(editAlmondFlourButton)
     expect(await screen.findByRole('dialog', { name: /Almond Flour/i })).toBeInTheDocument()
-    expect(screen.getByLabelText('Expiration date for Almond Flour item 1')).toHaveAttribute('type', 'date')
+    expect(screen.getByLabelText('Expiration date for Almond Flour')).toHaveAttribute('type', 'date')
     fireEvent.click(screen.getByRole('button', { name: 'Close' }))
     await waitFor(() => expect(screen.queryByRole('dialog', { name: /Almond Flour/i })).not.toBeInTheDocument())
     const cannedBeansRow = within(pantryList).getByRole('group', { name: `Canned Beans ${cannedBeansLabel}` })
@@ -4359,38 +4359,48 @@ describe('DashboardViewPage', () => {
       vi.useRealTimers()
       mockState.helpers.callService = originalCallService
     }
-    expect(within(cannedBeansRow).queryByRole('button', { name: 'Edit Canned Beans' })).not.toBeInTheDocument()
     expect(within(cannedBeansRow).queryByRole('button', { name: 'Delete Canned Beans' })).not.toBeInTheDocument()
-    const viewCannedBeansButton = within(cannedBeansRow).getByRole('button', { name: 'View Canned Beans individual items' })
-    expect(viewCannedBeansButton).toHaveAttribute('data-modal-disclosure-button', 'true')
-    expect(viewCannedBeansButton.querySelector('path')).toHaveAttribute('d', materialIconPath('mdi:chevron-right'))
-    fireEvent.click(viewCannedBeansButton)
+    const editCannedBeansButton = within(cannedBeansRow).getByRole('button', { name: 'Edit Canned Beans' })
+    expect(editCannedBeansButton).toHaveAttribute('data-modal-disclosure-button', 'true')
+    expect(editCannedBeansButton.querySelector('path')).toHaveAttribute('d', materialIconPath('mdi:chevron-right'))
+    fireEvent.click(editCannedBeansButton)
     expect(await screen.findByRole('dialog', { name: /Canned Beans/i })).toBeInTheDocument()
     expect(screen.queryByText('Individual pantry items')).not.toBeInTheDocument()
-    const expirationInput = screen.getByLabelText('Expiration date for Canned Beans item 1')
+    const expirationInput = screen.getByLabelText('Expiration date for Canned Beans')
     expect(expirationInput).toHaveAttribute('type', 'date')
-    expect(screen.queryByRole('button', { name: 'Save Canned Beans item 1' })).not.toBeInTheDocument()
+    expect(screen.getByRole('spinbutton', { name: 'Quantity for Canned Beans' })).toHaveTextContent('2')
+    expect(screen.queryByRole('button', { name: 'Save Canned Beans' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Reset' })).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Delete Canned Beans item 1' })).toHaveClass(/deleteAction/)
+    expect(screen.getByRole('button', { name: 'Delete Canned Beans' })).toHaveClass(/deleteAction/)
 
     const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false)
+    const deletePromptSpy = vi.spyOn(window, 'prompt').mockReturnValue(null)
     const callCountBeforeDeniedDelete = mockCallServiceCalls.length
-    fireEvent.click(screen.getByRole('button', { name: 'Delete Canned Beans item 1' }))
-    expect(confirmSpy).toHaveBeenCalledWith('Delete Canned Beans item 1 from the pantry?')
+    fireEvent.click(screen.getByRole('button', { name: 'Delete Canned Beans' }))
+    expect(deletePromptSpy).toHaveBeenCalledWith('Quantity of Canned Beans to delete (available: 2).', '1')
+    expect(confirmSpy).not.toHaveBeenCalled()
     expect(mockCallServiceCalls).toHaveLength(callCountBeforeDeniedDelete)
+    deletePromptSpy.mockRestore()
     confirmSpy.mockRestore()
 
     fireEvent.change(expirationInput, { target: { value: '2026-09-30' } })
-    expect(screen.getByRole('button', { name: 'Save Canned Beans item 1' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Save Canned Beans' })).toBeEnabled()
     expect(screen.getByRole('button', { name: 'Reset' })).toBeInTheDocument()
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Save Canned Beans item 1' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Save Canned Beans' }))
+      await Promise.resolve()
+      await Promise.resolve()
       await Promise.resolve()
     })
     expect(mockCallServiceCalls).toContainEqual({
       domain: 'evershelf',
       service: 'update_inventory_item',
       serviceData: { expiry_date: '2026-09-30', inventory_id: 102 },
+    })
+    expect(mockCallServiceCalls).toContainEqual({
+      domain: 'evershelf',
+      service: 'update_inventory_item',
+      serviceData: { expiry_date: '2026-09-30', inventory_id: 106 },
     })
     expect(mockCallServiceCalls).toContainEqual({
       domain: 'evershelf',
