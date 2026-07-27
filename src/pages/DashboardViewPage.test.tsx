@@ -160,7 +160,7 @@ function testDisplayDateValue(date: Date) {
 function testExpiryLabel(days: number, quantity?: number) {
   const expiryDate = testAddDays(testTodayDate(), days)
   const label = `${days < 0 ? 'Expired' : 'Expires'} on ${testDisplayDateValue(expiryDate)}`
-  return quantity && quantity > 1 ? `Quantity ${quantity} - ${label}` : label
+  return quantity && quantity > 1 ? `Quantity ${quantity} · ${label}` : label
 }
 
 function testTodayDate() {

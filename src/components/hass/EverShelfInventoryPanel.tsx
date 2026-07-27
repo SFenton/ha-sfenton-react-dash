@@ -420,8 +420,8 @@ function rowSubtitle(expiry: ExpiryInfo, quantity: number | null, extraBatchCoun
   const stock = quantity === null ? null : `Quantity ${formatQuantity(quantity)}`
   // Several expiration batches have no single date to show, so the card summarises the stock and
   // leaves the per-date detail to the modal.
-  if (extraBatchCount > 0) return [stock, MULTIPLE_EXPIRATION_DATES_LABEL].filter(Boolean).join(' · ')
-  return stock === null ? expiry.label : `${stock} - ${expiry.label}`
+  const expiryLabel = extraBatchCount > 0 ? MULTIPLE_EXPIRATION_DATES_LABEL : expiry.label
+  return [stock, expiryLabel].filter(Boolean).join(' · ')
 }
 
 function batchExpiryLabel(expiryDate: string) {
