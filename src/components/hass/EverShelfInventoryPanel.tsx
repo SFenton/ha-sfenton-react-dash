@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, ty
 import { flushSync } from 'react-dom'
 import { useHass } from '@hakit/core'
 import { EmptyState } from '../core/EmptyState'
+import { CheckboxRow } from '../core/CheckboxRow'
 import { Description } from '../core/Description'
 import { FloatingActionButton } from '../core/FloatingActionButton'
 import { MaterialIcon } from '../core/Icon'
@@ -184,8 +185,15 @@ function itemGroupingKey(item: EverShelfInventoryItem) {
   return itemName(item).toLocaleLowerCase()
 }
 
+// Prepared units are stored as their own inventory rows, so they form their own batch rather
+// than merging with unprepared stock that happens to share an expiration date.
+function itemPreparedFood(item: EverShelfInventoryItem) {
+  const value = (item as { prepared_food?: unknown }).prepared_food
+  return value === true || value === 1 || value === '1'
+}
+
 function itemBatchKey(item: EverShelfInventoryItem) {
-  return [itemLocation(item) ?? '', itemExpiryDate(item) ?? ''].join('\u0000')
+  return [itemLocation(item) ?? '', itemExpiryDate(item) ?? '', itemPreparedFood(item) ? '1' : '0'].join('\u0000')
 }
 
 // A food item is shown once per page even when EverShelf stores it as several rows with different
@@ -468,6 +476,32 @@ function promptDeleteQuantity(title: string, quantity: number) {
     : { status: 'invalid' } satisfies DeleteQuantityPromptResult
 }
 
+function promptPreparedQuantity(title: string, quantity: number, enabling: boolean) {
+  const verb = enabling ? 'mark as prepared' : 'unmark as prepared'
+  const value = window.prompt(`How many of ${title} to ${verb}? (available: ${formatQuantity(quantity)})`, formatQuantity(quantity))
+  if (value === null) return { status: 'cancelled' } satisfies DeleteQuantityPromptResult
+  const normalizedValue = value.trim().replace(',', '.')
+  if (!/^(?:\d+|\d*\.\d+)$/.test(normalizedValue)) return { status: 'invalid' } satisfies DeleteQuantityPromptResult
+  const parsedValue = Number(normalizedValue)
+  return Number.isFinite(parsedValue) && parsedValue >= 1 && parsedValue <= quantity
+    ? { quantity: parsedValue, status: 'valid' } satisfies DeleteQuantityPromptResult
+    : { status: 'invalid' } satisfies DeleteQuantityPromptResult
+}
+
+// Spreads the requested unit count across the rows backing a batch, smallest row first so whole
+// rows are consumed before one gets split.
+function inventoryPreparedSteps(rows: InventoryBatchRow[], amount: number) {
+  const steps: { inventoryId: number; quantity: number }[] = []
+  let remaining = amount
+  for (const row of [...rows].sort((left, right) => left.quantity - right.quantity)) {
+    if (remaining <= 0) break
+    const take = Math.min(row.quantity, remaining)
+    steps.push({ inventoryId: row.inventoryId, quantity: take })
+    remaining -= take
+  }
+  return steps
+}
+
 function validExpiryInput(value: string) {
   return value.trim() === '' || /^\d{4}-\d{2}-\d{2}$/.test(value.trim())
 }
@@ -631,6 +665,7 @@ type InventoryBatch = {
   expiryDate: string
   key: string
   locationLabel: string
+  preparedFood: boolean
   quantity: number
   rows: InventoryBatchRow[]
   sample: EverShelfInventoryItem
@@ -661,6 +696,7 @@ function inventoryBatches(item: EverShelfInventoryDisplayItem | null, fallbackLo
         expiryDate: itemExpiryDate(row) ?? '',
         key,
         locationLabel: instanceLocationLabel(row, fallbackLocationLabel),
+        preparedFood: itemPreparedFood(row),
         quantity,
         rows: inventoryId === null ? [] : [{ inventoryId, quantity }],
         sample: row,
@@ -809,8 +845,43 @@ function InventoryItemDetailsModal({ item, locationLabel, onClose, onInventoryCh
       })
   }
 
-  const deleteBatch = (batch: InventoryBatch) => {
+  // Home Assistant owns the split: EverShelf moves the chosen number of units onto their own
+  // inventory row and regroups the product's taxonomy from there.
+  const togglePreparedFood = (batch: InventoryBatch) => {
     if (!batch.addressable) return
+    const nextPrepared = !batch.preparedFood
+    const qualifier = batchQualifier(batch.expiryDate, multipleBatches)
+    let quantity = batch.quantity
+    if (batch.quantity > 1) {
+      const promptResult = promptPreparedQuantity(`${title}${qualifier}`, batch.quantity, nextPrepared)
+      if (promptResult.status === 'cancelled') return
+      if (promptResult.status === 'invalid') {
+        setError(`Enter a number from 1 to ${formatQuantity(batch.quantity)}.`)
+        return
+      }
+      quantity = promptResult.quantity
+    }
+
+    setBusyAction(`prepared-${batch.key}`)
+    setError(null)
+    const steps = inventoryPreparedSteps(batch.rows, quantity)
+    void steps
+      .reduce(
+        (chain, step) => chain.then(() => Promise.resolve(callService({
+          domain: 'evershelf',
+          service: 'set_inventory_prepared_food',
+          serviceData: { inventory_id: step.inventoryId, prepared_food: nextPrepared, quantity: step.quantity },
+        }))).then(() => undefined),
+        Promise.resolve(),
+      )
+      .then(finishAction)
+      .catch((caughtError: unknown) => {
+        setBusyAction(null)
+        setError(caughtError instanceof Error ? caughtError.message : 'Unable to update prepared food')
+      })
+  }
+
+  const deleteBatch = (batch: InventoryBatch) => {    if (!batch.addressable) return
     const qualifier = batchQualifier(batch.expiryDate, multipleBatches)
     let deleteSteps: InventoryDeleteStep[] = batch.rows.map((row) => ({ inventoryId: row.inventoryId }))
     if (batch.quantity > 1) {
@@ -870,6 +941,17 @@ function InventoryItemDetailsModal({ item, locationLabel, onClose, onInventoryCh
                     value={quantityDraft}
                   />
                   <NativePickerField ariaLabel={`Expiration date for ${title}${qualifier}`} className={styles.instanceDateField} emptyLabel="No expiration date" label="Expiration Date" onChange={(value) => setExpiryDrafts((current) => ({ ...current, [batch.key]: value }))} type="date" value={expiryDraft} />
+                  <CheckboxRow
+                    active={batch.preparedFood}
+                    alignWrappedToIconTop
+                    aria-busy={busyAction === `prepared-${batch.key}` ? 'true' : undefined}
+                    aria-label={`Prepared Food Item for ${title}${qualifier}`}
+                    className={styles.instancePreparedRow}
+                    disabled={disabled}
+                    onClick={() => togglePreparedFood(batch)}
+                    subtitle="Indicates this is a prepared food item and does not need classification."
+                    title="Prepared Food Item"
+                  />
                   {quantityDelta !== 0 && <Description className={styles.instanceHint}>{quantityChangeHint(quantityDelta, batch.locationLabel)}</Description>}
                   {(expiryChanged || quantityDelta !== 0) && (
                     <span className={styles.instanceEditActions}>

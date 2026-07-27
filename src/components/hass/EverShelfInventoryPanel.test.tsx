@@ -329,3 +329,71 @@ describe('EverShelfInventoryPanel item edit modal', () => {
     expect(mockCallServiceCalls).toEqual([])
   })
 })
+
+describe('EverShelfInventoryPanel prepared food toggle', () => {
+  beforeEach(() => {
+    resetMockHass()
+    vi.restoreAllMocks()
+  })
+
+  it('renders an unchecked toggle with the expected copy', async () => {
+    const dialog = await openGreekYogurtEditModal()
+
+    const toggle = within(dialog).getByRole('button', { name: 'Prepared Food Item for Greek Yogurt' })
+    expect(toggle).toHaveAttribute('aria-pressed', 'false')
+    expect(within(dialog).getByText('Prepared Food Item', { selector: 'strong' })).toBeInTheDocument()
+    expect(within(dialog).getByText('Indicates this is a prepared food item and does not need classification.', { selector: 'small' })).toBeInTheDocument()
+  })
+
+  it('asks how many to mark and sends only that many', async () => {
+    const prompt = vi.spyOn(window, 'prompt').mockReturnValue('1')
+    const dialog = await openGreekYogurtEditModal()
+
+    mockCallServiceCalls.length = 0
+    await clickAndFlush(within(dialog).getByRole('button', { name: 'Prepared Food Item for Greek Yogurt' }))
+
+    expect(prompt).toHaveBeenCalledWith(expect.stringContaining('How many of Greek Yogurt to mark as prepared?'), '2')
+    expect(inventoryServiceCalls()).toEqual([
+      {
+        domain: 'evershelf',
+        service: 'set_inventory_prepared_food',
+        serviceData: { inventory_id: 203, prepared_food: true, quantity: 1 },
+      },
+    ])
+  })
+
+  it('spreads the requested count across the rows backing one batch', async () => {
+    vi.spyOn(window, 'prompt').mockReturnValue('2')
+    const dialog = await openCannedBeansEditModal()
+
+    mockCallServiceCalls.length = 0
+    await clickAndFlush(within(dialog).getByRole('button', { name: `Prepared Food Item for Canned Beans ${SOON_BATCH}` }))
+
+    // The soon batch is stored as two single-item rows, so both are flagged.
+    expect(inventoryServiceCalls()).toEqual([
+      { domain: 'evershelf', service: 'set_inventory_prepared_food', serviceData: { inventory_id: 102, prepared_food: true, quantity: 1 } },
+      { domain: 'evershelf', service: 'set_inventory_prepared_food', serviceData: { inventory_id: 106, prepared_food: true, quantity: 1 } },
+    ])
+  })
+
+  it('does nothing when the prompt is cancelled', async () => {
+    vi.spyOn(window, 'prompt').mockReturnValue(null)
+    const dialog = await openGreekYogurtEditModal()
+
+    mockCallServiceCalls.length = 0
+    await clickAndFlush(within(dialog).getByRole('button', { name: 'Prepared Food Item for Greek Yogurt' }))
+
+    expect(inventoryServiceCalls()).toEqual([])
+  })
+
+  it('rejects a count outside the available quantity', async () => {
+    vi.spyOn(window, 'prompt').mockReturnValue('7')
+    const dialog = await openGreekYogurtEditModal()
+
+    mockCallServiceCalls.length = 0
+    await clickAndFlush(within(dialog).getByRole('button', { name: 'Prepared Food Item for Greek Yogurt' }))
+
+    expect(inventoryServiceCalls()).toEqual([])
+    expect(within(dialog).getByRole('alert')).toHaveTextContent('Enter a number from 1 to 2.')
+  })
+})

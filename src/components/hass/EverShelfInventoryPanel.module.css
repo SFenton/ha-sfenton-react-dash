@@ -313,6 +313,14 @@
   overflow: hidden;
 }
 
+.instancePreparedRow {
+  padding-left: 0;
+}
+
+.instancePreparedRow small {
+  white-space: normal;
+}
+
 .instanceEditActions {
   display: flex;
   justify-content: flex-end;
