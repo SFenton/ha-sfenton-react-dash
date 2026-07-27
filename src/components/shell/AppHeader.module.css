@@ -87,6 +87,7 @@
 }
 
 .profileButton {
+  position: relative;
   display: grid;
   width: 38px;
   height: 38px;
@@ -107,6 +108,12 @@
 .profileButton:focus,
 .profileButton:focus-visible {
   outline: none;
+}
+
+.profileBadge {
+  position: absolute;
+  top: -3px;
+  right: -3px;
 }
 
 .leading {

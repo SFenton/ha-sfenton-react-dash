@@ -10,6 +10,7 @@ import { NativePickerField } from '../core/NativePickerField'
 import { RadioRow } from '../core/RadioRow'
 import { DashboardPageLoading } from '../shell/DashboardPageLoading'
 import type { EverShelfInventoryControls, InventoryFilterMode, InventorySortDirection, InventorySortMode } from './EverShelfInventoryControls'
+import { daysUntilDate, parseIsoDateOnly } from './expiryDate'
 import styles from './EverShelfInventoryPanel.module.css'
 
 export type EverShelfInventoryLocation = 'all' | 'dispensa' | 'frigo' | 'freezer' | 'spice_rack' | 'cabinet'
@@ -52,7 +53,6 @@ type PantryRowDeleteState = 'deleting' | 'idle'
 type DeleteQuantityPromptResult = { status: 'cancelled' } | { status: 'invalid' } | { quantity: number; status: 'valid' }
 type InventorySearchLoadPhase = 'exiting' | 'loading' | 'idle'
 
-const DAY_MS = 24 * 60 * 60 * 1000
 const SORT_FILTER_COLOR = { r: 42, g: 126, b: 180 }
 const SORT_FILTER_ACTIVE_COLOR = { r: 155, g: 110, b: 64 }
 const DASHBOARD_FAB_KEYBOARD_INSET_VAR = '--dashboard-fab-keyboard-inset'
@@ -124,13 +124,6 @@ function itemExpiryDate(item: EverShelfInventoryItem) {
   return compactText(item.expiry_date ?? item.expiration_date ?? item.expires_at ?? undefined)
 }
 
-function parseIsoDateOnly(value: string) {
-  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(value)
-  if (!match) return null
-  const [, year, month, day] = match
-  return new Date(Number(year), Number(month) - 1, Number(day))
-}
-
 function itemExpiryTime(item: EverShelfInventoryItem) {
   const value = itemExpiryDate(item)
   if (!value) return null
@@ -166,11 +159,6 @@ function groupedInventoryItems(items: EverShelfInventoryItem[]): EverShelfInvent
   return order.map((key) => grouped.get(key)).filter((item): item is EverShelfInventoryDisplayItem => Boolean(item))
 }
 
-function todayDateOnly() {
-  const now = new Date()
-  return new Date(now.getFullYear(), now.getMonth(), now.getDate())
-}
-
 function formatDisplayDate(value: Date) {
   const month = String(value.getMonth() + 1).padStart(2, '0')
   const day = String(value.getDate()).padStart(2, '0')
@@ -190,10 +178,6 @@ function expiryInfo(value: string | undefined): ExpiryInfo {
 
   const label = `Expires on ${formatDisplayDate(expiryDate)}`
   return daysUntilExpiry < 7 ? { label, tone: 'soon' } : { label }
-}
-
-function daysUntilDate(value: Date) {
-  return Math.ceil((value.getTime() - todayDateOnly().getTime()) / DAY_MS)
 }
 
 function daysUntilExpiry(item: EverShelfInventoryItem) {

@@ -17,7 +17,7 @@ export function DailyReportModal() {
     <ModalSheet
       bodyHeader={context.user ? <SectionHeader title={dailyReportTabLabel(activeTab)} /> : undefined}
       contentStyle={DAILY_REPORT_MODAL_STYLE}
-      footer={context.user ? <DailyReportModalNav activeTab={activeTab} onTabChange={setActiveTab} /> : undefined}
+      footer={context.user ? <DailyReportModalNav activeTab={activeTab} counts={{ 'expired-food': context.expiredFoodCount, overdue: context.overdueCount }} onTabChange={setActiveTab} /> : undefined}
       onClose={closeHash}
       open={open}
       scrollResetKey={activeTab}

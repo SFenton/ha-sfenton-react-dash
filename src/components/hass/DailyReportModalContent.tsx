@@ -1,4 +1,5 @@
 import { useMemo, useState, type CSSProperties } from 'react'
+import { CountBadge } from '../core/CountBadge'
 import { EmptyState } from '../core/EmptyState'
 import { GlassTile } from '../core/GlassTile'
 import { MaterialIcon } from '../core/Icon'
@@ -12,7 +13,8 @@ import { useImmediateVisualTab, useSmoothDisplayedModalTab } from '../../hooks/u
 import { VACATION_EMPTY_DESCRIPTION } from '../../constants/portedDashboard'
 import styles from './DailyReportModalContent.module.css'
 
-export function DailyReportModalNav({ activeTab, onTabChange }: { activeTab: DailyReportTab; onTabChange: (tab: DailyReportTab) => void }) {
+/** Only actionable tabs badge; upcoming chores are informational so they never get one. */
+export function DailyReportModalNav({ activeTab, counts, onTabChange }: { activeTab: DailyReportTab; counts?: Partial<Record<DailyReportTab, number>>; onTabChange: (tab: DailyReportTab) => void }) {
   const { clearVisualTab, setVisualTabNow, visualActiveTab } = useImmediateVisualTab(activeTab)
   const navStyle = { '--daily-report-nav-cols': DAILY_REPORT_TABS.length } as CSSProperties
 
@@ -20,10 +22,11 @@ export function DailyReportModalNav({ activeTab, onTabChange }: { activeTab: Dai
     <nav aria-label="Daily report sections" className={styles.nav} style={navStyle}>
       {DAILY_REPORT_TABS.map((item) => {
         const isActive = visualActiveTab === item.tab
+        const count = counts?.[item.tab] ?? 0
         return (
           <button
             aria-current={activeTab === item.tab ? 'page' : undefined}
-            aria-label={item.label}
+            aria-label={count > 0 ? `${item.label}, ${count} ${count === 1 ? 'item' : 'items'}` : item.label}
             className={styles.navButton}
             data-active={isActive}
             key={item.tab}
@@ -36,7 +39,10 @@ export function DailyReportModalNav({ activeTab, onTabChange }: { activeTab: Dai
             onPointerDown={() => setVisualTabNow(item.tab)}
             type="button"
           >
-            <MaterialIcon name={item.icon} size={22} />
+            <span className={styles.navIcon}>
+              <MaterialIcon name={item.icon} size={22} />
+              <CountBadge className={styles.navBadge} count={count} />
+            </span>
           </button>
         )
       })}

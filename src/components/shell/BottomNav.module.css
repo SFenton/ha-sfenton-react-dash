@@ -47,6 +47,18 @@
   cursor: pointer;
 }
 
+.tabIcon {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+}
+
+.tabBadge {
+  position: absolute;
+  top: -8px;
+  right: -13px;
+}
+
 .active {
   color: white;
   background: rgba(255, 255, 255, 0.16);

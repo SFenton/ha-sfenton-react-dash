@@ -1,0 +1,17 @@
+.badge {
+  display: grid;
+  min-width: 18px;
+  height: 18px;
+  box-sizing: border-box;
+  place-items: center;
+  border-radius: 999px;
+  padding: 0 5px;
+  color: white;
+  background: #e53935;
+  font-size: 0.66rem;
+  font-weight: 850;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
+  line-height: 1;
+  pointer-events: none;
+}
