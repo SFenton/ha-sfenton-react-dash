@@ -2175,20 +2175,23 @@ test('daily summary deep link opens the tabbed modal for the requested user', as
   const nav = dialog.getByRole('navigation', { name: 'Daily report sections' })
   const tabs = nav.getByRole('button')
   await expect(tabs).toHaveCount(3)
-  for (const tab of await tabs.all()) await expect(tab).toHaveText('')
+  // Icon-only: the only permitted text is a badge count such as "3" or "9+".
+  for (const tab of await tabs.all()) await expect(tab).toHaveText(/^(\d+\+?)?$/)
+  await expect(nav.getByRole('button', { name: /^Overdue Chores/ }).locator('[data-count]')).toHaveText('1')
+  await expect(nav.getByRole('button', { name: 'Upcoming Chores' }).locator('[data-count]')).toHaveCount(0)
 
   await expect(dialog.getByRole('region', { name: 'Overdue Chores' })).toBeVisible()
 
   const bodyHeader = dialog.locator('[data-modal-sheet-body-header="true"]')
   await expect(bodyHeader.getByRole('heading', { level: 2, name: 'Overdue Chores' })).toBeVisible()
 
-  await nav.getByRole('button', { name: 'Upcoming Chores' }).click()
+  await nav.getByRole('button', { name: /^Upcoming Chores/ }).click()
   await expect(dialog.getByRole('region', { name: 'Upcoming Chores' })).toBeVisible()
   await expect(dialog.getByRole('region', { name: 'Overdue Chores' })).toHaveCount(0)
 
   await expect(bodyHeader.getByRole('heading', { level: 2, name: 'Upcoming Chores' })).toBeVisible()
 
-  await nav.getByRole('button', { name: 'Expired Food' }).click()
+  await nav.getByRole('button', { name: /^Expired Food/ }).click()
   await expect(bodyHeader.getByRole('heading', { level: 2, name: 'Expired Food' })).toBeVisible()
   await expect(dialog.getByLabel('Expired Food inventory list')).toBeVisible()
   const expiredRow = dialog.locator('[data-expiry-tone="expired"]').first()
@@ -2217,7 +2220,7 @@ test('daily summary modal closes back to the home dashboard', async ({ page }) =
 test('header profile button opens the summary modal from any page', async ({ page }) => {
   await page.goto('/index.html?path=vacuums')
 
-  const profileButton = page.getByRole('button', { name: /^Open .+'s Summary$/ })
+  const profileButton = page.getByRole('button', { name: /^Open .+'s Summary/ })
   await expect(profileButton).toBeVisible()
   await profileButton.click()
 
@@ -2233,7 +2236,7 @@ test('header profile button opens the summary modal from any page', async ({ pag
 test('header profile button stays visible and opaque across route changes', async ({ page }) => {
   await page.goto('/index.html?path=overview')
 
-  const profileButton = page.getByRole('button', { name: /^Open .+'s Summary$/ })
+  const profileButton = page.getByRole('button', { name: /^Open .+'s Summary/ })
   await expect(profileButton).toBeVisible()
 
   await page.getByRole('navigation', { name: 'Dashboard sections' }).getByRole('button', { name: 'Security' }).click()
@@ -2257,7 +2260,7 @@ test('daily summary empty tabs centre without scrolling the sheet', async ({ pag
     api.setEntityState('input_boolean.vacation_mode', 'on')
   })
 
-  await page.getByRole('button', { name: /^Open .+'s Summary$/ }).click()
+  await page.getByRole('button', { name: /^Open .+'s Summary/ }).click()
   const dialog = page.getByRole('dialog')
 
   await expect(dialog.getByRole('heading', { level: 2, name: 'No Chores Due' })).toBeVisible()
@@ -2267,8 +2270,81 @@ test('daily summary empty tabs centre without scrolling the sheet', async ({ pag
   const body = dialog.locator('[data-modal-sheet-body="true"]')
   await expect.poll(() => body.evaluate((e) => e.scrollHeight - e.clientHeight)).toBeLessThanOrEqual(0)
 
-  await dialog.getByRole('navigation', { name: 'Daily report sections' }).getByRole('button', { name: 'Expired Food' }).click()
+  await dialog.getByRole('navigation', { name: 'Daily report sections' }).getByRole('button', { name: /^Expired Food/ }).click()
   await expect(dialog.getByRole('heading', { level: 2, name: 'Expired Food Hidden' })).toBeVisible()
   await expect(dialog.getByLabel('Expired Food inventory list')).toHaveCount(0)
   await expect.poll(() => body.evaluate((e) => e.scrollHeight - e.clientHeight)).toBeLessThanOrEqual(0)
+})
+
+test('profile button badges overdue chores plus expired food, capped at 9+', async ({ page }) => {
+  await page.goto('/index.html?path=overview')
+
+  const profile = page.getByRole('button', { name: /^Open .+'s Summary/ })
+  const badge = profile.locator('[data-count]')
+
+  const setCounts = async (overdue: number, expired: number, upcoming: number) => {
+    await page.evaluate(([o, e, u]) => {
+      const api = (window as unknown as {
+        __mockHass: {
+          setEntityState: (id: string, state: string) => void
+          setEntityAttribute: (id: string, attribute: string, value: unknown) => void
+        }
+      }).__mockHass
+      api.setEntityState('todo.stephen_s_past_due_with_unassigned', String(o))
+      api.setEntityState('todo.stephen_s_due_today_with_unassigned', String(u))
+      // Expired food is counted from the list on the local calendar, not the UTC-derived state.
+      const past = new Date()
+      past.setDate(past.getDate() - 5)
+      const expiryDate = `${past.getFullYear()}-${String(past.getMonth() + 1).padStart(2, '0')}-${String(past.getDate()).padStart(2, '0')}`
+      api.setEntityAttribute('sensor.evershelf_expired_items', 'expired_list', Array.from({ length: e }, (_, index) => ({
+        expiry_date: expiryDate,
+        inventory_id: 900 + index,
+        name: `Expired Item ${index + 1}`,
+      })))
+      api.setEntityState('sensor.evershelf_expired_items', String(e))
+    }, [overdue, expired, upcoming])
+    const nav = page.getByRole('navigation', { name: 'Dashboard sections' })
+    await nav.getByRole('button', { name: 'Security' }).click()
+    await expect(page.getByRole('heading', { level: 1, name: 'Security' })).toBeVisible()
+    await nav.getByRole('button', { name: 'Home' }).click()
+    await expect(page.getByRole('heading', { level: 1, name: 'Home' })).toBeVisible()
+  }
+
+  // Upcoming chores are deliberately excluded from the count.
+  await setCounts(2, 1, 6)
+  await expect(badge).toHaveText('3')
+  await expect(profile).toHaveAttribute('aria-label', /3 items need attention$/)
+
+  await setCounts(4, 32, 0)
+  await expect(badge).toHaveText('9+')
+
+  await setCounts(0, 0, 4)
+  await expect(badge).toHaveCount(0)
+  await expect(profile).toHaveAttribute('aria-label', /Summary$/)
+})
+
+test('bottom nav badges the Chores tab with overdue chores only', async ({ page }) => {
+  await page.goto('/index.html?path=overview')
+
+  const nav = page.getByRole('navigation', { name: 'Dashboard sections' })
+  const setOverdue = async (count: number) => {
+    await page.evaluate((value) => {
+      const api = (window as unknown as { __mockHass: { setEntityState: (id: string, state: string) => void } }).__mockHass
+      api.setEntityState('todo.stephen_s_past_due_with_unassigned', String(value))
+    }, count)
+    await nav.getByRole('button', { name: 'Security' }).click()
+    await expect(page.getByRole('heading', { level: 1, name: 'Security' })).toBeVisible()
+    await nav.getByRole('button', { name: 'Home' }).click()
+    await expect(page.getByRole('heading', { level: 1, name: 'Home' })).toBeVisible()
+  }
+
+  await setOverdue(3)
+  await expect(nav.getByRole('button', { name: /^Chores/ }).locator('[data-count]')).toHaveText('3')
+  // Expired food feeds the summary badge, not this one.
+  for (const label of ['Home', 'Security', 'Climate', 'Settings']) {
+    await expect(nav.getByRole('button', { name: label }).locator('[data-count]')).toHaveCount(0)
+  }
+
+  await setOverdue(0)
+  await expect(nav.getByRole('button', { name: 'Chores' }).locator('[data-count]')).toHaveCount(0)
 })

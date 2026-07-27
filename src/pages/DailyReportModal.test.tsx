@@ -8,7 +8,25 @@ const OVERDUE_ENTITY_ID = 'todo.stephen_s_past_due_with_unassigned'
 const UPCOMING_ENTITY_ID = 'todo.stephen_s_due_today_with_unassigned'
 const EXPIRED_ITEMS_ENTITY_ID = 'sensor.evershelf_expired_items'
 const VACATION_MODE_ENTITY_ID = 'input_boolean.vacation_mode'
-const EXPIRED_ITEMS_STATE = mockEntities[EXPIRED_ITEMS_ENTITY_ID].state
+const DEFAULT_EXPIRED_LIST = mockEntities[EXPIRED_ITEMS_ENTITY_ID].attributes.expired_list
+
+// The badge and the Expired Food tab count the sensor's expired_list on the local calendar rather
+// than trusting its UTC-derived state, so tests have to seed the list, not the state.
+function setExpiredFood(count: number) {
+  const past = new Date()
+  past.setDate(past.getDate() - 5)
+  const expiryDate = `${past.getFullYear()}-${String(past.getMonth() + 1).padStart(2, '0')}-${String(past.getDate()).padStart(2, '0')}`
+  mockEntities[EXPIRED_ITEMS_ENTITY_ID].attributes.expired_list = Array.from({ length: count }, (_, index) => ({
+    brand: '',
+    days_remaining: -5,
+    expiry_date: expiryDate,
+    inventory_id: 900 + index,
+    location: 'frigo',
+    name: `Expired Item ${index + 1}`,
+    quantity: 1,
+  }))
+  mockEntities[EXPIRED_ITEMS_ENTITY_ID].state = String(count)
+}
 
 function setDashboardUrl(url: string) {
   window.history.replaceState(null, '', url)
@@ -25,7 +43,7 @@ function renderHome() {
 describe('Daily summary modal', () => {
   beforeEach(() => {
     resetMockHass()
-    mockEntities[EXPIRED_ITEMS_ENTITY_ID].state = EXPIRED_ITEMS_STATE
+    mockEntities[EXPIRED_ITEMS_ENTITY_ID].attributes.expired_list = DEFAULT_EXPIRED_LIST
     mockEntities[VACATION_MODE_ENTITY_ID].state = 'off'
     mockTodoItemsByEntity[OVERDUE_ENTITY_ID] = [
       { uid: 'overdue-1', summary: 'Take out the trash', status: 'needs_action', due: '2026-07-24T17:30:00+00:00' },
@@ -58,6 +76,8 @@ describe('Daily summary modal', () => {
   })
 
   it('uses icon-only tabs for overdue, upcoming, and expired food', async () => {
+    mockEntities[OVERDUE_ENTITY_ID].state = '0'
+    setExpiredFood(0)
     renderHome()
 
     const dialog = await screen.findByRole('dialog')
@@ -65,6 +85,48 @@ describe('Daily summary modal', () => {
     const tabButtons = within(nav).getAllByRole('button')
     expect(tabButtons.map((button) => button.getAttribute('aria-label'))).toEqual(['Overdue Chores', 'Upcoming Chores', 'Expired Food'])
     for (const button of tabButtons) expect(button).toHaveTextContent('')
+  })
+
+  it('badges the overdue and expired food tabs but never upcoming', async () => {
+    mockEntities[OVERDUE_ENTITY_ID].state = '2'
+    mockEntities[UPCOMING_ENTITY_ID].state = '7'
+    setExpiredFood(4)
+    renderHome()
+
+    const dialog = await screen.findByRole('dialog')
+    const nav = within(dialog).getByRole('navigation', { name: 'Daily report sections' })
+
+    expect(within(within(nav).getByRole('button', { name: /^Overdue Chores/ })).getByText('2')).toBeInTheDocument()
+    expect(within(within(nav).getByRole('button', { name: /^Expired Food/ })).getByText('4')).toBeInTheDocument()
+
+    const upcoming = within(nav).getByRole('button', { name: /^Upcoming Chores/ })
+    expect(upcoming.querySelector('[data-count]')).toBeNull()
+    expect(upcoming).toHaveAccessibleName('Upcoming Chores')
+  })
+
+  it('caps modal nav badges at 9+ and hides them at zero', async () => {
+    mockEntities[OVERDUE_ENTITY_ID].state = '0'
+    setExpiredFood(32)
+    renderHome()
+
+    const dialog = await screen.findByRole('dialog')
+    const nav = within(dialog).getByRole('navigation', { name: 'Daily report sections' })
+
+    expect(within(within(nav).getByRole('button', { name: /^Expired Food/ })).getByText('9+')).toBeInTheDocument()
+    expect(within(nav).getByRole('button', { name: 'Overdue Chores' }).querySelector('[data-count]')).toBeNull()
+  })
+
+  it('drops the expired food nav badge while Vacation Mode is on', async () => {
+    mockEntities[VACATION_MODE_ENTITY_ID].state = 'on'
+    mockEntities[OVERDUE_ENTITY_ID].state = '2'
+    setExpiredFood(32)
+    renderHome()
+
+    const dialog = await screen.findByRole('dialog')
+    const nav = within(dialog).getByRole('navigation', { name: 'Daily report sections' })
+
+    expect(within(within(nav).getByRole('button', { name: /^Overdue Chores/ })).getByText('2')).toBeInTheDocument()
+    expect(within(nav).getByRole('button', { name: 'Expired Food' }).querySelector('[data-count]')).toBeNull()
   })
 
   it('keeps a section header for the active tab outside the modal scroller', async () => {
@@ -77,7 +139,7 @@ describe('Daily summary modal', () => {
     expect(within(bodyHeader as HTMLElement).getByRole('heading', { level: 2, name: 'Overdue Chores' })).toBeInTheDocument()
 
     const nav = within(dialog).getByRole('navigation', { name: 'Daily report sections' })
-    fireEvent.click(within(nav).getByRole('button', { name: 'Expired Food' }))
+    fireEvent.click(within(nav).getByRole('button', { name: /^Expired Food/ }))
     expect(within(bodyHeader as HTMLElement).getByRole('heading', { level: 2, name: 'Expired Food' })).toBeInTheDocument()
   })
 
@@ -88,11 +150,11 @@ describe('Daily summary modal', () => {
     const nav = within(dialog).getByRole('navigation', { name: 'Daily report sections' })
     expect(await within(dialog).findByText('Take out the trash')).toBeInTheDocument()
 
-    fireEvent.click(within(nav).getByRole('button', { name: 'Upcoming Chores' }))
+    fireEvent.click(within(nav).getByRole('button', { name: /^Upcoming Chores/ }))
     expect(await within(dialog).findByText('Water the plants')).toBeInTheDocument()
     expect(within(dialog).queryByText('Take out the trash')).not.toBeInTheDocument()
 
-    fireEvent.click(within(nav).getByRole('button', { name: 'Expired Food' }))
+    fireEvent.click(within(nav).getByRole('button', { name: /^Expired Food/ }))
     await waitFor(() => expect(within(dialog).getByLabelText('Expired Food inventory list')).toBeInTheDocument())
     expect(within(dialog).queryByText('Water the plants')).not.toBeInTheDocument()
   })
@@ -102,7 +164,7 @@ describe('Daily summary modal', () => {
 
     const dialog = await screen.findByRole('dialog')
     const nav = within(dialog).getByRole('navigation', { name: 'Daily report sections' })
-    fireEvent.click(within(nav).getByRole('button', { name: 'Expired Food' }))
+    fireEvent.click(within(nav).getByRole('button', { name: /^Expired Food/ }))
 
     const [expiredRow] = await within(dialog).findAllByLabelText(/^Milk Expired on /, {}, { timeout: 3000 })
     expect(expiredRow).toHaveAttribute('data-expiry-tone', 'expired')
@@ -125,17 +187,17 @@ describe('Daily summary modal', () => {
   // Titles stay identical across vacation and non-vacation; only the supporting line changes.
   it('keeps empty state titles consistent between vacation and non-vacation', async () => {
     mockTodoItemsByEntity[UPCOMING_ENTITY_ID] = []
-    mockEntities[EXPIRED_ITEMS_ENTITY_ID].state = '0'
+    setExpiredFood(0)
     renderHome()
 
     const dialog = await screen.findByRole('dialog')
     const nav = within(dialog).getByRole('navigation', { name: 'Daily report sections' })
 
-    fireEvent.click(within(nav).getByRole('button', { name: 'Upcoming Chores' }))
+    fireEvent.click(within(nav).getByRole('button', { name: /^Upcoming Chores/ }))
     expect(await within(dialog).findByRole('heading', { level: 2, name: 'No Chores Upcoming' })).toBeInTheDocument()
     expect(within(dialog).getByText('There is nothing else on your schedule for the rest of today.')).toBeInTheDocument()
 
-    fireEvent.click(within(nav).getByRole('button', { name: 'Expired Food' }))
+    fireEvent.click(within(nav).getByRole('button', { name: /^Expired Food/ }))
     expect(await within(dialog).findByRole('heading', { level: 2, name: 'No Expired Food' })).toBeInTheDocument()
     expect(within(dialog).getByText('Everything in the kitchen is still within date.')).toBeInTheDocument()
   })
@@ -151,7 +213,7 @@ describe('Daily summary modal', () => {
     expect(within(dialog).getByText('Enjoy vacation!')).toBeInTheDocument()
 
     const nav = within(dialog).getByRole('navigation', { name: 'Daily report sections' })
-    fireEvent.click(within(nav).getByRole('button', { name: 'Upcoming Chores' }))
+    fireEvent.click(within(nav).getByRole('button', { name: /^Upcoming Chores/ }))
     expect(await within(dialog).findByRole('heading', { level: 2, name: 'No Chores Upcoming' })).toBeInTheDocument()
     expect(within(dialog).getByText('Enjoy vacation!')).toBeInTheDocument()
   })
@@ -162,7 +224,7 @@ describe('Daily summary modal', () => {
 
     const dialog = await screen.findByRole('dialog')
     const nav = within(dialog).getByRole('navigation', { name: 'Daily report sections' })
-    fireEvent.click(within(nav).getByRole('button', { name: 'Expired Food' }))
+    fireEvent.click(within(nav).getByRole('button', { name: /^Expired Food/ }))
 
     expect(await within(dialog).findByRole('heading', { level: 2, name: 'Expired Food Hidden' })).toBeInTheDocument()
     expect(within(dialog).getByText('Enjoy vacation!')).toBeInTheDocument()
@@ -171,24 +233,24 @@ describe('Daily summary modal', () => {
 
   it('reports no expired food on vacation only when the count is a confirmed zero', async () => {
     mockEntities[VACATION_MODE_ENTITY_ID].state = 'on'
-    mockEntities[EXPIRED_ITEMS_ENTITY_ID].state = '0'
+    setExpiredFood(0)
     renderHome()
 
     const dialog = await screen.findByRole('dialog')
     const nav = within(dialog).getByRole('navigation', { name: 'Daily report sections' })
-    fireEvent.click(within(nav).getByRole('button', { name: 'Expired Food' }))
+    fireEvent.click(within(nav).getByRole('button', { name: /^Expired Food/ }))
 
     expect(await within(dialog).findByRole('heading', { level: 2, name: 'No Expired Food' })).toBeInTheDocument()
     expect(within(dialog).getByText('Enjoy vacation!')).toBeInTheDocument()
   })
 
   it('shows a modal empty state when nothing has expired', async () => {
-    mockEntities[EXPIRED_ITEMS_ENTITY_ID].state = '0'
+    setExpiredFood(0)
     renderHome()
 
     const dialog = await screen.findByRole('dialog')
     const nav = within(dialog).getByRole('navigation', { name: 'Daily report sections' })
-    fireEvent.click(within(nav).getByRole('button', { name: 'Expired Food' }))
+    fireEvent.click(within(nav).getByRole('button', { name: /^Expired Food/ }))
 
     const empty = await within(dialog).findByRole('heading', { level: 2, name: 'No Expired Food' })
     expect(empty.closest('section')).toHaveAttribute('data-empty-layout', 'modal')
@@ -216,6 +278,58 @@ describe('Daily summary modal', () => {
     expect(within(dialog).queryByRole('navigation', { name: 'Daily report sections' })).not.toBeInTheDocument()
   })
 
+  it('badges the profile button with overdue chores plus expired food', async () => {
+    setDashboardUrl('/sfenton-react-dash/home?path=overview')
+    mockEntities[OVERDUE_ENTITY_ID].state = '4'
+    setExpiredFood(3)
+    renderHome()
+
+    const profile = screen.getByRole('button', { name: /^Open Stephen's Summary/ })
+    expect(within(profile).getByText('7')).toBeInTheDocument()
+    expect(profile).toHaveAccessibleName("Open Stephen's Summary, 7 items need attention")
+  })
+
+  it('excludes upcoming chores from the profile badge', async () => {
+    setDashboardUrl('/sfenton-react-dash/home?path=overview')
+    mockEntities[OVERDUE_ENTITY_ID].state = '1'
+    mockEntities[UPCOMING_ENTITY_ID].state = '5'
+    setExpiredFood(0)
+    renderHome()
+
+    const profile = screen.getByRole('button', { name: /^Open Stephen's Summary/ })
+    expect(within(profile).getByText('1')).toBeInTheDocument()
+    expect(profile).toHaveAccessibleName("Open Stephen's Summary, 1 item needs attention")
+  })
+
+  it('caps the profile badge at 9+', async () => {
+    setDashboardUrl('/sfenton-react-dash/home?path=overview')
+    mockEntities[OVERDUE_ENTITY_ID].state = '4'
+    setExpiredFood(32)
+    renderHome()
+
+    expect(within(screen.getByRole('button', { name: /^Open Stephen's Summary/ })).getByText('9+')).toBeInTheDocument()
+  })
+
+  it('drops the profile badge when nothing needs attention', async () => {
+    setDashboardUrl('/sfenton-react-dash/home?path=overview')
+    mockEntities[OVERDUE_ENTITY_ID].state = '0'
+    setExpiredFood(0)
+    renderHome()
+
+    const profile = screen.getByRole('button', { name: "Open Stephen's Summary" })
+    expect(profile.querySelector('[data-count]')).toBeNull()
+  })
+
+  it('leaves expired food out of the badge while Vacation Mode is on', async () => {
+    setDashboardUrl('/sfenton-react-dash/home?path=overview')
+    mockEntities[VACATION_MODE_ENTITY_ID].state = 'on'
+    mockEntities[OVERDUE_ENTITY_ID].state = '2'
+    setExpiredFood(32)
+    renderHome()
+
+    expect(within(screen.getByRole('button', { name: /^Open Stephen's Summary/ })).getByText('2')).toBeInTheDocument()
+  })
+
   it('stays closed when no summary hash is present', () => {
     setDashboardUrl('/sfenton-react-dash/home?path=overview')
     renderHome()
@@ -228,7 +342,7 @@ describe('Daily summary modal', () => {
     renderHome()
 
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: "Open Stephen's Summary" }))
+    fireEvent.click(screen.getByRole('button', { name: /^Open Stephen's Summary/ }))
 
     const dialog = await screen.findByRole('dialog')
     expect(within(dialog).getByRole('heading', { level: 2, name: "Stephen's Summary" })).toBeInTheDocument()
@@ -239,7 +353,7 @@ describe('Daily summary modal', () => {
     render(<DashboardViewPage activePath="vacuums" onNavigate={() => {}} path="vacuums" />)
 
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: "Open Stephen's Summary" }))
+    fireEvent.click(screen.getByRole('button', { name: /^Open Stephen's Summary/ }))
 
     const dialog = await screen.findByRole('dialog')
     expect(within(dialog).getByRole('heading', { level: 2, name: "Stephen's Summary" })).toBeInTheDocument()

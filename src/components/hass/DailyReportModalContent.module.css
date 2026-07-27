@@ -46,6 +46,18 @@
   -webkit-tap-highlight-color: transparent;
 }
 
+.navIcon {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+}
+
+.navBadge {
+  position: absolute;
+  top: -8px;
+  right: -13px;
+}
+
 .navButton[data-active='true'] {
   color: #111;
   background: rgba(255, 255, 255, 0.92);

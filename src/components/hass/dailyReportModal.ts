@@ -9,6 +9,7 @@ import {
   dailyReportUserKeyFromUrl,
   type DailyReportUserConfig,
 } from '../../constants/dailyReport'
+import { countLocallyExpired } from './expiryDate'
 import { VACATION_MODE_ENTITY_ID } from '../../constants/portedDashboard'
 import { useDashboardUrl } from '../../hooks/useDashboardUrl'
 
@@ -20,6 +21,10 @@ export const DAILY_REPORT_MODAL_STYLE: ModalSheetStyle = {
 }
 
 export interface DailyReportContext {
+  /** Overdue chores plus expired food; upcoming chores are deliberately excluded. */
+  badgeCount: number
+  expiredFoodCount: number
+  overdueCount: number
   title: string
   user: DailyReportUserConfig | undefined
   vacationMode: boolean
@@ -41,9 +46,15 @@ export function dailyReportExpiredFoodControls(controls: EverShelfInventoryContr
 
 export function useExpiredFoodCount() {
   return useHass((state) => {
-    const count = Number(state.entities[EVERSHELF_EXPIRED_ITEMS_ENTITY_ID]?.state)
-    return Number.isFinite(count) ? count : null
+    const entity = state.entities[EVERSHELF_EXPIRED_ITEMS_ENTITY_ID]
+    if (!entity) return null
+    return countLocallyExpired(entity.attributes?.expired_list)
   })
+}
+
+function actionableCount(state: string | undefined) {
+  const count = Number(state)
+  return Number.isFinite(count) && count > 0 ? count : 0
 }
 
 export function useDailyReportContext(): DailyReportContext {
@@ -51,6 +62,19 @@ export function useDailyReportContext(): DailyReportContext {
   const haUser = useUser()
   const vacationMode = useHass((state) => state.entities[VACATION_MODE_ENTITY_ID]?.state === 'on')
   const user = dailyReportUserConfig(dailyReportUserKeyFromUrl(dashboardUrl)) ?? dailyReportUserConfigForHaUserId(haUser?.id)
+  const overdueCount = useHass((state) => actionableCount(user ? state.entities[user.todoEntityIds.overdue]?.state : undefined))
+  // Vacation puts expired food on hold, so it must not nag from the badge either.
+  const expiredFoodCount = useHass((state) => (vacationMode ? 0 : countLocallyExpired(state.entities[EVERSHELF_EXPIRED_ITEMS_ENTITY_ID]?.attributes?.expired_list)))
 
-  return { title: dailyReportTitle(user), user, vacationMode }
+  const scopedOverdueCount = user ? overdueCount : 0
+  const scopedExpiredFoodCount = user ? expiredFoodCount : 0
+
+  return {
+    badgeCount: scopedOverdueCount + scopedExpiredFoodCount,
+    expiredFoodCount: scopedExpiredFoodCount,
+    overdueCount: scopedOverdueCount,
+    title: dailyReportTitle(user),
+    user,
+    vacationMode,
+  }
 }

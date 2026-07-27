@@ -4,6 +4,7 @@ import { useDailyReportContext } from '../hass/dailyReportModal'
 import { DAILY_REPORT_HASH, PRIMARY_NAV_ROUTES, primaryNavRouteActive } from '../../constants/routes'
 import { dispatchDashboardRouteChange, pushDashboardUrl } from '../../hooks/dashboardLocation'
 import { IconSize } from '../../constants/theme'
+import { CountBadge } from '../core/CountBadge'
 import { MaterialIcon } from '../core/Icon'
 import styles from './AppHeader.module.css'
 
@@ -44,8 +45,8 @@ function MenuIcon() {
 export function AppHeader({ activePath, actions = [], backLabel = 'Go back', backPath, onBack, onNavigate, title }: AppHeaderProps) {
   const [sidebarState, setSidebarState] = useState<SidebarState>('closed')
   const [actionsOpen, setActionsOpen] = useState(false)
-  const { title: profileTitle } = useDailyReportContext()
-  const profileLabel = `Open ${profileTitle}`
+  const { badgeCount, title: profileTitle } = useDailyReportContext()
+  const profileLabel = badgeCount > 0 ? `Open ${profileTitle}, ${badgeCount} ${badgeCount === 1 ? 'item needs' : 'items need'} attention` : `Open ${profileTitle}`
   const showBack = Boolean(backPath)
   const showMenu = Boolean(!showBack && onNavigate)
   const showActions = actions.length > 0
@@ -150,6 +151,7 @@ export function AppHeader({ activePath, actions = [], backLabel = 'Go back', bac
         )}
         <button aria-label={profileLabel} className={styles.profileButton} onClick={openProfile} type="button">
           <MaterialIcon name="mdi:account" size={22} />
+          <CountBadge className={styles.profileBadge} count={badgeCount} />
         </button>
       </div>
 
