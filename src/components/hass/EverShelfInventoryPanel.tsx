@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type KeyboardEvent, type MouseEvent, type PointerEvent, type TouchEvent } from 'react'
 import { flushSync } from 'react-dom'
 import { useHass } from '@hakit/core'
-import { Description } from '../core/Description'
 import { EmptyState } from '../core/EmptyState'
 import { FloatingActionButton } from '../core/FloatingActionButton'
 import { MaterialIcon } from '../core/Icon'
@@ -17,7 +16,6 @@ export type EverShelfInventoryLocation = 'all' | 'dispensa' | 'frigo' | 'freezer
 
 interface EverShelfInventoryPanelProps {
   controls: EverShelfInventoryControls
-  emptyFilteredMessage?: string
   location: EverShelfInventoryLocation
   title: string
 }
@@ -298,12 +296,6 @@ function sortInventoryItems(items: EverShelfInventoryItem[], sortMode: Inventory
 
 function visibleInventoryItems(items: EverShelfInventoryItem[], sortMode: InventorySortMode, sortDirection: InventorySortDirection, filterMode: InventoryFilterMode) {
   return sortInventoryItems(filterInventoryItems(items, filterMode), sortMode, sortDirection)
-}
-
-function emptyMatchMessage(searchActive: boolean, filterActive: boolean) {
-  if (searchActive && filterActive) return 'No items match the current search and selected filter.'
-  if (searchActive) return 'No items match the current search.'
-  return 'No items match the selected filter.'
 }
 
 function emptySearchDescription(filterActive: boolean) {
@@ -928,7 +920,7 @@ export function EverShelfInventoryFloatingActions({ controls }: { controls: Ever
   )
 }
 
-export function EverShelfInventoryPanel({ controls, emptyFilteredMessage, location, title }: EverShelfInventoryPanelProps) {
+export function EverShelfInventoryPanel({ controls, location, title }: EverShelfInventoryPanelProps) {
   const callService = useHass((state) => state.helpers.callService) as unknown as CallService
   const { inventoryLoadPhase, setInventoryItemCount, setInventoryLoadPhase } = controls
   const [detailsItem, setDetailsItem] = useState<EverShelfInventoryDisplayItem | null>(null)
@@ -1134,12 +1126,12 @@ export function EverShelfInventoryPanel({ controls, emptyFilteredMessage, locati
             <div className={styles.inventoryContent} data-search-loading={searchLoading ? 'true' : undefined}>
               <div className={styles.inventoryResults}>
                 {error ? (
-                  <EmptyState className={styles.inventoryEmpty} description={inventoryErrorDescription(error, title)} title={`Unable to load ${title}`} />
+                  <EmptyState className={styles.inventoryEmpty} description={inventoryErrorDescription(error, title)} title={`Unable to Load ${title}`} />
                 ) : items !== null && loadedItems.length === 0 ? (
-                  <EmptyState className={styles.inventoryEmpty} description={effectiveSearchQuery ? emptySearchDescription(controls.filterActive) : `Scan an item to add it to your ${title.toLowerCase()}.`} title={effectiveSearchQuery ? 'No matching items' : 'No items found'} />
+                  <EmptyState className={styles.inventoryEmpty} description={effectiveSearchQuery ? emptySearchDescription(controls.filterActive) : `Scan an item to add it to your ${title.toLowerCase()}.`} title={effectiveSearchQuery ? 'No Matching Items' : 'No Items Found'} />
                 ) : items !== null && loadedItems.length > 0 && visibleItems.length === 0 && (effectiveSearchQuery
-                  ? <EmptyState className={styles.inventoryEmpty} description={emptySearchDescription(controls.filterActive)} title="No matching items" />
-                  : <Description>{emptyFilteredMessage ?? emptyMatchMessage(false, controls.filterActive)}</Description>)}
+                  ? <EmptyState className={styles.inventoryEmpty} description={emptySearchDescription(controls.filterActive)} title="No Matching Items" />
+                  : <EmptyState className={styles.inventoryEmpty} description="Try a different filter, or clear it to show all items." title="No Matching Items" />)}
                 {visibleItems.length > 0 && (
                   <ul className={styles.items}>
                     {visibleItems.map((item, index) => {

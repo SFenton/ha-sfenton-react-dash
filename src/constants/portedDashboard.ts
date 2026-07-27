@@ -59,6 +59,7 @@ export interface TodoPageConfig {
   lists: TodoListConfig[]
   emptyTitle?: string
   emptyDescription?: string
+  hiddenByVacation?: boolean
   hideListHeaders?: boolean
   showEmptyStateWhenEmpty?: boolean
 }
@@ -309,6 +310,8 @@ export const VACATION_DATE_RANGE_ERROR = 'Start date and time must be before end
 export const VACATION_PRE_CHECKLIST_ERROR = 'All pre-vacation tasks must be checked off before Vacation Mode can be enabled.'
 
 export const VACATION_MODE_ENTITY_ID = 'input_boolean.vacation_mode'
+/** Shared empty-state description for lists Donetick hides while vacation mode is active. */
+export const VACATION_EMPTY_DESCRIPTION = 'Enjoy vacation!'
 export const VACATION_INVALID_DATES_PENDING_ENTITY_ID = 'input_boolean.vacation_mode_invalid_dates_pending'
 export const VACATION_START_ENTITY_ID = 'input_datetime.vacation_start'
 export const VACATION_END_ENTITY_ID = 'input_datetime.vacation_end'
@@ -330,6 +333,9 @@ export const ADMIN_TODO_COMPLETION_SCRIPT = 'script.complete_admin_todo_item'
 export const TODO_PAGES: Record<string, TodoPageConfig> = {
   chores: {
     title: 'Chores',
+    emptyTitle: 'No Chores Due',
+    emptyDescription: 'You have no chores due- nice job!',
+    hiddenByVacation: true,
     lists: [
       { title: 'Past Due', entityId: 'todo.stephen_s_past_due_with_unassigned', hideCompleted: true, hideWhenNoOpenItems: true, userIds: [CHORE_USER_IDS.stephen] },
       { title: 'Evening Tasks', entityId: 'todo.stephen_s_evening_with_unassigned', hideCompleted: true, hideWhenNoOpenItems: true, userIds: [CHORE_USER_IDS.stephen] },
@@ -348,7 +354,7 @@ export const TODO_PAGES: Record<string, TodoPageConfig> = {
   },
   'to-do': {
     title: 'To-Do',
-    emptyTitle: 'No to-do tasks',
+    emptyTitle: 'No To-Do Tasks',
     emptyDescription: 'Use Add Task to create an admin to-do.',
     hideListHeaders: true,
     lists: [{ title: 'Admin To-Do', entityId: ADMIN_TODO_ENTITY_ID, completionScript: ADMIN_TODO_COMPLETION_SCRIPT }],
@@ -356,12 +362,15 @@ export const TODO_PAGES: Record<string, TodoPageConfig> = {
   },
   groceries: {
     title: 'Groceries',
-    emptyTitle: 'No groceries listed',
+    emptyTitle: 'No Groceries Listed',
     emptyDescription: 'Add some groceries via the YAML app for now to see them appear here.',
     lists: [{ title: 'Grocery List', entityId: 'todo.shopping_list' }],
   },
   'stephens-chores': {
     title: "Stephen's Chores",
+    emptyTitle: 'No Chores Due',
+    emptyDescription: 'Stephen has no chores due- nice job!',
+    hiddenByVacation: true,
     lists: [
       { title: 'Past Due', entityId: 'todo.stephen_s_past_due' },
       { title: 'Due Today', entityId: 'todo.stephen_s_due_today' },
@@ -371,6 +380,9 @@ export const TODO_PAGES: Record<string, TodoPageConfig> = {
   },
   'stephs-chores': {
     title: "Steph's Chores",
+    emptyTitle: 'No Chores Due',
+    emptyDescription: 'Steph has no chores due- nice job!',
+    hiddenByVacation: true,
     lists: [
       { title: 'Past Due', entityId: 'todo.steph_s_past_due' },
       { title: 'Due Today', entityId: 'todo.steph_s_due_today' },
@@ -380,6 +392,9 @@ export const TODO_PAGES: Record<string, TodoPageConfig> = {
   },
   'unassigned-chores': {
     title: 'Unassigned Chores',
+    emptyTitle: 'No Chores Due',
+    emptyDescription: 'There are no unassigned chores due- nice job!',
+    hiddenByVacation: true,
     lists: [
       { title: 'Past Due', entityId: 'todo.unassigned_past_due' },
       { title: 'Due Today', entityId: 'todo.unassigned_due_today' },
@@ -389,6 +404,9 @@ export const TODO_PAGES: Record<string, TodoPageConfig> = {
   },
   'home-improvement-chores': {
     title: 'Home Improvement Tasks',
+    emptyTitle: 'No Tasks Due',
+    emptyDescription: 'There are no home improvement tasks due- nice job!',
+    hiddenByVacation: true,
     lists: [
       { title: 'Past Due', entityId: 'todo.home_improvement_s_past_due' },
       { title: 'Due Today', entityId: 'todo.home_improvement_s_due_today' },

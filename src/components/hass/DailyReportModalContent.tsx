@@ -1,15 +1,15 @@
 import { useMemo, useState, type CSSProperties } from 'react'
-import { Description } from '../core/Description'
 import { EmptyState } from '../core/EmptyState'
 import { GlassTile } from '../core/GlassTile'
 import { MaterialIcon } from '../core/Icon'
 import { EverShelfInventoryPanel } from './EverShelfInventoryPanel'
 import { useEverShelfInventoryControls } from './EverShelfInventoryControls'
 import { TodoListPanel } from './TodoListPanel'
-import { DAILY_REPORT_EXPIRED_FOOD_SCOPE, dailyReportExpiredFoodControls, type DailyReportContext } from './dailyReportModal'
+import { DAILY_REPORT_EXPIRED_FOOD_SCOPE, dailyReportExpiredFoodControls, useExpiredFoodCount, type DailyReportContext } from './dailyReportModal'
 import { DAILY_REPORT_TABS, DAILY_REPORT_USERS, dailyReportRouteUrl, type DailyReportTab } from '../../constants/dailyReport'
 import { dashboardHref, pushDashboardUrl } from '../../hooks/dashboardLocation'
 import { useImmediateVisualTab, useSmoothDisplayedModalTab } from '../../hooks/useSmoothDisplayedModalTab'
+import { VACATION_EMPTY_DESCRIPTION } from '../../constants/portedDashboard'
 import styles from './DailyReportModalContent.module.css'
 
 export function DailyReportModalNav({ activeTab, onTabChange }: { activeTab: DailyReportTab; onTabChange: (tab: DailyReportTab) => void }) {
@@ -44,24 +44,45 @@ export function DailyReportModalNav({ activeTab, onTabChange }: { activeTab: Dai
   )
 }
 
-function DailyReportTodoTab({ emptyLabel, entityId, title }: { emptyLabel: string; entityId: string; title: string }) {
+function DailyReportTodoTab({ emptyDescription, emptyTitle, entityId, title, vacationMode }: { emptyDescription: string; emptyTitle: string; entityId: string; title: string; vacationMode: boolean }) {
   const [visibleItemCount, setVisibleItemCount] = useState<number | null>(null)
 
   return (
     <section aria-label={title} className={styles.tabSection}>
       <TodoListPanel entityId={entityId} hideCompleted onVisibleItemsChange={setVisibleItemCount} title={title} />
-      {visibleItemCount === 0 && <Description className={styles.tabEmpty}>{emptyLabel}</Description>}
+      {visibleItemCount === 0 && (
+        <EmptyState description={vacationMode ? VACATION_EMPTY_DESCRIPTION : emptyDescription} layout="modal" title={emptyTitle} />
+      )}
     </section>
   )
 }
 
-function DailyReportExpiredFoodTab() {
+function DailyReportExpiredFoodTab({ vacationMode }: { vacationMode: boolean }) {
   const controls = useEverShelfInventoryControls(DAILY_REPORT_EXPIRED_FOOD_SCOPE)
   const lockedControls = useMemo(() => dailyReportExpiredFoodControls(controls), [controls])
+  const expiredCount = useExpiredFoodCount()
+
+  // Nothing in the kitchen can be dealt with from away, so vacation suppresses the list entirely.
+  // Only claim there is none when the count is a confirmed zero; an unavailable sensor stays "hidden".
+  if (vacationMode) {
+    return (
+      <section aria-label="Expired Food" className={styles.tabSection}>
+        <EmptyState description={VACATION_EMPTY_DESCRIPTION} layout="modal" title={expiredCount === 0 ? 'No Expired Food' : 'Expired Food Hidden'} />
+      </section>
+    )
+  }
+
+  if (expiredCount === 0) {
+    return (
+      <section aria-label="Expired Food" className={styles.tabSection}>
+        <EmptyState description="Everything in the kitchen is still within date." layout="modal" title="No Expired Food" />
+      </section>
+    )
+  }
 
   return (
     <section aria-label="Expired Food" className={styles.tabSection}>
-      <EverShelfInventoryPanel controls={lockedControls} emptyFilteredMessage="Nothing has passed its expiration date." location="all" title="Expired Food" />
+      <EverShelfInventoryPanel controls={lockedControls} location="all" title="Expired Food" />
     </section>
   )
 }
@@ -69,7 +90,7 @@ function DailyReportExpiredFoodTab() {
 function DailyReportUserPicker() {
   return (
     <div className={styles.picker}>
-      <EmptyState description="This summary is personalized. Pick whose summary to open, or use the deep link from the morning or evening summary notification." title="Whose summary?" />
+      <EmptyState description="This summary is personalized. Pick whose summary to open, or use the deep link from the morning or evening summary notification." layout="compact" title="Whose Summary?" />
       <div className={styles.pickerGrid}>
         {DAILY_REPORT_USERS.map((user) => (
           <GlassTile
@@ -86,16 +107,16 @@ function DailyReportUserPicker() {
 }
 
 export function DailyReportModalContent({ activeTab, context }: { activeTab: DailyReportTab; context: DailyReportContext }) {
-  const { user } = context
+  const { user, vacationMode } = context
   const { displayedTab, transitionState } = useSmoothDisplayedModalTab(activeTab)
 
   if (!user) return <DailyReportUserPicker />
 
   return (
     <div className={styles.panel} data-modal-tab-transition-state={transitionState} data-tab={displayedTab}>
-      {displayedTab === 'overdue' && <DailyReportTodoTab emptyLabel="Nothing is overdue. Nice work." entityId={user.todoEntityIds.overdue} title="Overdue Chores" />}
-      {displayedTab === 'upcoming' && <DailyReportTodoTab emptyLabel="Nothing else is scheduled for today." entityId={user.todoEntityIds.upcoming} title="Upcoming Chores" />}
-      {displayedTab === 'expired-food' && <DailyReportExpiredFoodTab />}
+      {displayedTab === 'overdue' && <DailyReportTodoTab emptyDescription="You are all caught up on chores that slipped past their due date." emptyTitle="No Chores Due" entityId={user.todoEntityIds.overdue} title="Overdue Chores" vacationMode={vacationMode} />}
+      {displayedTab === 'upcoming' && <DailyReportTodoTab emptyDescription="There is nothing else on your schedule for the rest of today." emptyTitle="No Chores Upcoming" entityId={user.todoEntityIds.upcoming} title="Upcoming Chores" vacationMode={vacationMode} />}
+      {displayedTab === 'expired-food' && <DailyReportExpiredFoodTab vacationMode={vacationMode} />}
     </div>
   )
 }

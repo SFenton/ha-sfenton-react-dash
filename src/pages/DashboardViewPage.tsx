@@ -92,6 +92,7 @@ import {
   VACATION_END_ENTITY_ID,
   VACATION_INVALID_DATES_PENDING_ENTITY_ID,
   VACATION_MODE_DESCRIPTION,
+  VACATION_EMPTY_DESCRIPTION,
   VACATION_MODE_ENTITY_ID,
   VACATION_MODE_ITEMS,
   VACATION_PRE_CHECKLIST_ERROR,
@@ -1045,6 +1046,8 @@ function TodoPageContent({ config, configPath, onNavigate, onScrollLockChange, p
   const entities = useHass((state) => state.entities) as unknown as EntityActionStateMap
   const [sectionStates, setSectionStates] = useState<Record<string, { loaded: boolean; visible: boolean } | undefined>>({})
   const hideEmptyTodoSections = config.showEmptyStateWhenEmpty ?? isChoreTodoPage(configPath)
+  // Donetick empties these lists during vacation, so "nice job" would take credit for hidden chores.
+  const hiddenByVacation = Boolean(config.hiddenByVacation) && entities[VACATION_MODE_ENTITY_ID]?.state === 'on'
   const visibleLists = config.lists.filter((list) => todoListVisible(list, user?.id, entities))
   const visibleListKeys = visibleLists.map((list) => list.entityId)
   const loadedSectionStates = visibleListKeys.map((entityId) => sectionStates[entityId]).filter((state): state is { loaded: boolean; visible: boolean } => Boolean(state))
@@ -1069,7 +1072,7 @@ function TodoPageContent({ config, configPath, onNavigate, onScrollLockChange, p
   return (
     <div className={styles.stack} data-empty-todo-page={lockPageScroll ? 'true' : undefined}>
       {configPath === 'chores' && <ChoresIntro onNavigate={onNavigate} />}
-      {showTodoEmptyState && <TodoEmptyState description={config.emptyDescription} title={config.emptyTitle} />}
+      {showTodoEmptyState && <TodoEmptyState description={hiddenByVacation ? VACATION_EMPTY_DESCRIPTION : config.emptyDescription} title={config.emptyTitle} />}
       {visibleLists.map((list) => {
         const entity = entities[list.entityId] as (typeof entities)[string] & { last_changed?: string; last_updated?: string }
         const entityVersion = `${entity?.state ?? ''}:${entity?.last_changed ?? ''}:${entity?.last_updated ?? ''}`
@@ -1322,7 +1325,7 @@ function FoodPage({ onNavigate }: { onNavigate: (path: string) => void }) {
   )
 }
 
-function TodoEmptyState({ description = 'You have no tasks due- nice job!', title = 'No Tasks!' }: { description?: string; title?: string }) {
+function TodoEmptyState({ description = 'You have no chores due- nice job!', title = 'No Chores Due' }: { description?: string; title?: string }) {
   return <EmptyState className={styles.choresEmpty} description={description} title={title} />
 }
 
