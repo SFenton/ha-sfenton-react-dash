@@ -911,6 +911,7 @@ export const mockState: MockHassState = {
           { expiry_date: mockDateOffset(40), id: 103, location: 'dispensa', name: 'Ziti', product_id: 1003, unit: 'pz', vacuum_sealed: false },
           { expiry_date: mockDateOffset(3), id: 102, location: 'dispensa', name: 'Canned Beans', product_id: 1002, quantity: 1, unit: 'pz', vacuum_sealed: false },
           { expiry_date: mockDateOffset(3), id: 106, location: 'dispensa', name: 'Canned Beans', product_id: 1002, quantity: 1, unit: 'pz', vacuum_sealed: false },
+          { expiry_date: mockDateOffset(200), id: 107, location: 'dispensa', name: 'Canned Beans', product_id: 1002, quantity: 3, unit: 'pz', vacuum_sealed: false },
           { expiry_date: mockDateOffset(-10), id: 101, location: 'dispensa', name: 'Almond Flour', product_id: 1001, unit: 'pz', vacuum_sealed: false },
         ]
         const inventory = location === 'frigo'
@@ -932,13 +933,13 @@ export const mockState: MockHassState = {
               inventory: [
                 {
                   expiry_date: mockDateOffset(3),
-                  inventory_count: 2,
+                  inventory_count: 3,
                   inventory_id: null,
-                  inventory_ids: [102, 106],
+                  inventory_ids: [102, 106, 107],
                   location: 'dispensa',
                   name: 'Canned Beans',
                   product_id: 1002,
-                  quantity: 2,
+                  quantity: 5,
                   unit: 'pz',
                   vacuum_sealed: false,
                 },
