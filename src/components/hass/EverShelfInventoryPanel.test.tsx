@@ -268,35 +268,33 @@ describe('EverShelfInventoryPanel item edit modal', () => {
     render(<InventoryPanelHarness location="dispensa" title="Pantry" />)
     const list = await screen.findByLabelText('Pantry inventory list')
 
-    const rows = await within(list).findAllByRole('group', { name: /Expires|Expired|No expiration date/i })
+    const rows = await within(list).findAllByRole('group', { name: /Expires|Expired|No expiration date|Multiple Expiration Dates/i })
     expect(rows.map((row) => row.getAttribute('aria-label'))).toEqual([
       `Almond Flour Expired on ${offsetDisplayDate(-10)}`,
-      `Canned Beans Quantity 5 - Expires on ${offsetDisplayDate(3)} (+1 more date)`,
+      'Canned Beans Quantity 5 · Multiple Expiration Dates',
       `Ziti Expires on ${offsetDisplayDate(40)}`,
     ])
   })
 
-  it('switches between the expiration batches of one food item inside the modal', async () => {
+  it('lists every expiration batch of a food item as its own modal section', async () => {
     const dialog = await openCannedBeansEditModal()
 
-    const batches = within(dialog).getByRole('radiogroup', { name: 'Canned Beans expiration batches' })
-    expect(within(batches).getAllByRole('radio').map((option) => option.textContent)).toEqual([
-      `Expires on ${offsetDisplayDate(3)}Quantity 2 - In the pantry`,
-      `Expires on ${offsetDisplayDate(200)}Quantity 3 - In the pantry`,
+    const sections = within(dialog).getAllByRole('listitem')
+    expect(sections).toHaveLength(2)
+    expect(sections.map((section) => section.querySelector('strong')?.textContent)).toEqual([
+      `Expires on ${offsetDisplayDate(3)}`,
+      `Expires on ${offsetDisplayDate(200)}`,
     ])
-    expect(within(batches).getAllByRole('radio')[0]).toHaveAttribute('aria-checked', 'true')
-
-    fireEvent.click(within(batches).getAllByRole('radio')[1])
-
-    expect(within(batches).getAllByRole('radio')[1]).toHaveAttribute('aria-checked', 'true')
-    expect(within(dialog).getByRole('spinbutton', { name: `Quantity for Canned Beans ${LATER_BATCH}` })).toHaveTextContent('3')
-    expect(within(dialog).getByLabelText(`Expiration date for Canned Beans ${LATER_BATCH}`)).toHaveValue(offsetIsoDate(200))
+    expect(within(sections[0]).getByRole('spinbutton', { name: `Quantity for Canned Beans ${SOON_BATCH}` })).toHaveTextContent('2')
+    expect(within(sections[0]).getByLabelText(`Expiration date for Canned Beans ${SOON_BATCH}`)).toHaveValue(offsetIsoDate(3))
+    expect(within(sections[1]).getByRole('spinbutton', { name: `Quantity for Canned Beans ${LATER_BATCH}` })).toHaveTextContent('3')
+    expect(within(sections[1]).getByLabelText(`Expiration date for Canned Beans ${LATER_BATCH}`)).toHaveValue(offsetIsoDate(200))
+    expect(within(dialog).queryByRole('radiogroup')).not.toBeInTheDocument()
   })
 
-  it('adds stock to the selected expiration batch only', async () => {
+  it('adds stock to the edited expiration batch only', async () => {
     const dialog = await openCannedBeansEditModal()
 
-    fireEvent.click(within(dialog).getAllByRole('radio')[1])
     fireEvent.click(within(dialog).getByRole('button', { name: `Add one Canned Beans ${LATER_BATCH}` }))
 
     mockCallServiceCalls.length = 0

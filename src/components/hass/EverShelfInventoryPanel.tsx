@@ -68,6 +68,7 @@ const INVENTORY_LOADING_EXIT_MS = 500
 const INVENTORY_SEARCH_LOG_PREFIX = '[EverShelfInventorySearch]'
 const HASS_GROCERY_LIST_ENTITY_ID = 'todo.shopping_list'
 const INVENTORY_QUANTITY_MAX = 999
+const MULTIPLE_EXPIRATION_DATES_LABEL = 'Multiple Expiration Dates'
 const KEYBOARD_STATE_CLEAR_MS = 150
 const SHOPPING_ADDED_VISIBLE_MS = 3000
 
@@ -416,9 +417,11 @@ function formatQuantity(value: number) {
 }
 
 function rowSubtitle(expiry: ExpiryInfo, quantity: number | null, extraBatchCount = 0) {
-  const stock = quantity === null ? expiry.label : `Quantity ${formatQuantity(quantity)} - ${expiry.label}`
-  if (extraBatchCount <= 0) return stock
-  return `${stock} (+${extraBatchCount} more ${extraBatchCount === 1 ? 'date' : 'dates'})`
+  const stock = quantity === null ? null : `Quantity ${formatQuantity(quantity)}`
+  // Several expiration batches have no single date to show, so the card summarises the stock and
+  // leaves the per-date detail to the modal.
+  if (extraBatchCount > 0) return [stock, MULTIPLE_EXPIRATION_DATES_LABEL].filter(Boolean).join(' · ')
+  return stock === null ? expiry.label : `${stock} - ${expiry.label}`
 }
 
 function batchExpiryLabel(expiryDate: string) {
@@ -709,37 +712,28 @@ function inventoryDecreaseSteps(rows: InventoryBatchRow[], amount: number) {
 
 function InventoryItemDetailsModal({ item, locationLabel, onClose, onInventoryChanged, open }: { item: EverShelfInventoryDisplayItem | null; locationLabel: string; onClose: () => void; onInventoryChanged: () => void; open: boolean }) {
   const callService = useHass((state) => state.helpers.callService) as unknown as CallService
-  const [busyAction, setBusyAction] = useState<'delete' | 'edit' | null>(null)
+  const [busyAction, setBusyAction] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const title = item ? itemName(item) : 'Inventory Item'
   const batches = useMemo(() => inventoryBatches(item, locationLabel), [item, locationLabel])
-  const [selectedBatchKey, setSelectedBatchKey] = useState(batches[0]?.key ?? '')
-  const selectedBatch = batches.find((batch) => batch.key === selectedBatchKey) ?? batches[0]
   const multipleBatches = batches.length > 1
-  const qualifier = selectedBatch ? batchQualifier(selectedBatch.expiryDate, multipleBatches) : ''
-  const editable = Boolean(selectedBatch?.addressable)
-  const savedQuantity = selectedBatch?.quantity ?? 0
-  const savedExpiryDate = selectedBatch?.expiryDate ?? ''
-  const batchLocationLabel = selectedBatch?.locationLabel ?? locationLabel
-  const [expiryDraft, setExpiryDraft] = useState(savedExpiryDate)
-  const [quantityDraft, setQuantityDraft] = useState(savedQuantity)
+  const [expiryDrafts, setExpiryDrafts] = useState<Record<string, string>>({})
+  const [quantityDrafts, setQuantityDrafts] = useState<Record<string, number>>({})
 
-  // Reopening the same item keeps this component mounted, and switching batches swaps which stock
-  // is being edited, so the drafts and the busy/error state are rebuilt from the latest data.
-  const draftKey = open ? `${itemInstancesKey(item)}|${selectedBatch?.key ?? ''}|${savedQuantity}|${savedExpiryDate}` : 'closed'
+  // Reopening the same item keeps this component mounted, so every batch draft and the busy/error
+  // state is rebuilt from the latest Home Assistant data whenever the sheet opens.
+  const draftKey = open ? `${itemInstancesKey(item)}|${batches.map((batch) => `${batch.key}:${batch.quantity}`).join('|')}` : 'closed'
   const [appliedDraftKey, setAppliedDraftKey] = useState(draftKey)
   if (appliedDraftKey !== draftKey) {
     setAppliedDraftKey(draftKey)
     if (open) {
       setBusyAction(null)
       setError(null)
-      setExpiryDraft(savedExpiryDate)
-      setQuantityDraft(savedQuantity)
+      setExpiryDrafts(Object.fromEntries(batches.map((batch) => [batch.key, batch.expiryDate])))
+      setQuantityDrafts(Object.fromEntries(batches.map((batch) => [batch.key, batch.quantity])))
     }
   }
 
-  const quantityDelta = quantityDraft - savedQuantity
-  const expiryChanged = expiryDraft !== savedExpiryDate
   const busy = busyAction !== null
 
   const finishAction = () => {
@@ -747,9 +741,9 @@ function InventoryItemDetailsModal({ item, locationLabel, onClose, onInventoryCh
     onClose()
   }
 
-  const resetDraft = () => {
-    setExpiryDraft(savedExpiryDate)
-    setQuantityDraft(savedQuantity)
+  const resetDraft = (batch: InventoryBatch) => {
+    setExpiryDrafts((current) => ({ ...current, [batch.key]: batch.expiryDate }))
+    setQuantityDrafts((current) => ({ ...current, [batch.key]: batch.quantity }))
     setError(null)
   }
 
@@ -761,13 +755,16 @@ function InventoryItemDetailsModal({ item, locationLabel, onClose, onInventoryCh
       : { inventory_id: step.inventoryId, quantity: step.quantity },
   }))
 
+  const runDeleteSteps = (steps: InventoryDeleteStep[]) => steps.reduce(
+    (chain, step) => chain.then(() => deleteInventoryRow(step)).then(() => undefined),
+    Promise.resolve(),
+  )
+
   // Home Assistant owns the stock change: EverShelf adds the extra items to the batch and removes
   // reduced items row by row, and the expiration move is applied one item at a time.
-  const applyInventoryChanges = async (batch: InventoryBatch, expiryDate: string) => {
+  const applyInventoryChanges = async (batch: InventoryBatch, quantityDelta: number, expiryChanged: boolean, expiryDate: string) => {
     const decrease = quantityDelta < 0 ? inventoryDecreaseSteps(batch.rows, -quantityDelta) : { remainingRows: batch.rows, steps: [] as InventoryDeleteStep[] }
-    for (const step of decrease.steps) {
-      await deleteInventoryRow(step)
-    }
+    await runDeleteSteps(decrease.steps)
     if (expiryChanged) {
       for (const row of decrease.remainingRows) {
         for (let moved = 0; moved < Math.ceil(row.quantity); moved += 1) {
@@ -788,20 +785,23 @@ function InventoryItemDetailsModal({ item, locationLabel, onClose, onInventoryCh
     }
   }
 
-  const saveItem = () => {
-    if (!selectedBatch || !editable) return
+  const saveBatch = (batch: InventoryBatch) => {
+    if (!batch.addressable) return
+    const expiryDraft = expiryDrafts[batch.key] ?? batch.expiryDate
     if (!validExpiryInput(expiryDraft)) {
       setError('Use YYYY-MM-DD or clear the date.')
       return
     }
+    const quantityDelta = (quantityDrafts[batch.key] ?? batch.quantity) - batch.quantity
+    const expiryChanged = expiryDraft !== batch.expiryDate
     if (quantityDelta === 0 && !expiryChanged) return
-    if (quantityDelta > 0 && itemLocation(selectedBatch.sample) === null) {
+    if (quantityDelta > 0 && itemLocation(batch.sample) === null) {
       setError(`Home Assistant did not report a storage location for ${title}, so more cannot be added.`)
       return
     }
-    setBusyAction('edit')
+    setBusyAction(`edit-${batch.key}`)
     setError(null)
-    void applyInventoryChanges(selectedBatch, expiryDraft.trim())
+    void applyInventoryChanges(batch, quantityDelta, expiryChanged, expiryDraft.trim())
       .then(finishAction)
       .catch((caughtError: unknown) => {
         setBusyAction(null)
@@ -809,26 +809,23 @@ function InventoryItemDetailsModal({ item, locationLabel, onClose, onInventoryCh
       })
   }
 
-  const deleteItem = () => {
-    if (!selectedBatch || !editable) return
-    let deleteSteps: InventoryDeleteStep[] = selectedBatch.rows.map((row) => ({ inventoryId: row.inventoryId }))
-    if (savedQuantity > 1) {
-      const promptResult = promptDeleteQuantity(`${title}${qualifier}`, savedQuantity)
+  const deleteBatch = (batch: InventoryBatch) => {
+    if (!batch.addressable) return
+    const qualifier = batchQualifier(batch.expiryDate, multipleBatches)
+    let deleteSteps: InventoryDeleteStep[] = batch.rows.map((row) => ({ inventoryId: row.inventoryId }))
+    if (batch.quantity > 1) {
+      const promptResult = promptDeleteQuantity(`${title}${qualifier}`, batch.quantity)
       if (promptResult.status === 'cancelled') return
       if (promptResult.status === 'invalid') {
-        setError(`Enter a number from 1 to ${formatQuantity(savedQuantity)}.`)
+        setError(`Enter a number from 1 to ${formatQuantity(batch.quantity)}.`)
         return
       }
-      if (promptResult.quantity < savedQuantity) deleteSteps = inventoryDecreaseSteps(selectedBatch.rows, promptResult.quantity).steps
-    } else if (!window.confirm(`Delete ${title}${qualifier} from the ${batchLocationLabel}?`)) return
+      if (promptResult.quantity < batch.quantity) deleteSteps = inventoryDecreaseSteps(batch.rows, promptResult.quantity).steps
+    } else if (!window.confirm(`Delete ${title}${qualifier} from the ${batch.locationLabel}?`)) return
 
-    setBusyAction('delete')
+    setBusyAction(`delete-${batch.key}`)
     setError(null)
-    void deleteSteps
-      .reduce(
-        (chain, step) => chain.then(() => deleteInventoryRow(step)).then(() => undefined),
-        Promise.resolve(),
-      )
+    void runDeleteSteps(deleteSteps)
       .then(finishAction)
       .catch((caughtError: unknown) => {
         setBusyAction(null)
@@ -840,56 +837,51 @@ function InventoryItemDetailsModal({ item, locationLabel, onClose, onInventoryCh
     <ModalSheet onClose={onClose} open={open && item !== null} title={title}>
       <div className={styles.instancesSheet}>
         {error && <p className={styles.error} role="alert">{error}</p>}
-        {multipleBatches && (
-          <fieldset className={styles.fieldset}>
-            <legend>{`Expiration Batches (${batches.length})`}</legend>
-            <div aria-label={`${title} expiration batches`} className={styles.radioGroup} role="radiogroup">
-              {batches.map((batch) => (
-                <RadioRow
-                  active={batch.key === selectedBatch?.key}
-                  disabled={busy}
-                  key={batch.key}
-                  onClick={() => setSelectedBatchKey(batch.key)}
-                  subtitle={`Quantity ${formatQuantity(batch.quantity)} - In the ${batch.locationLabel}`}
-                  title={expiryInfo(batch.expiryDate || undefined).label}
-                />
-              ))}
-            </div>
-          </fieldset>
-        )}
-        <div className={styles.instanceRow}>
-          <div className={styles.instanceHeader}>
-            <span className={styles.instanceCopy}>
-              <strong>{multipleBatches ? expiryInfo(selectedBatch?.expiryDate || undefined).label : title}</strong>
-              <small>{`In the ${batchLocationLabel}`}</small>
-            </span>
-            <button aria-busy={busyAction === 'delete' ? 'true' : undefined} aria-label={`Delete ${title}${qualifier}`} className={`${styles.rowAction} ${styles.deleteAction}`} disabled={busy || !editable} onClick={deleteItem} type="button">
-              <MaterialIcon name="mdi:delete" size={22} />
-            </button>
-          </div>
-          <div className={styles.instanceEditPanel}>
-            <NumberStepper
-              ariaLabel={`Quantity for ${title}${qualifier}`}
-              decrementLabel={`Remove one ${title}${qualifier}`}
-              disabled={busy || !editable}
-              formatValue={formatQuantity}
-              incrementLabel={`Add one ${title}${qualifier}`}
-              label="Quantity"
-              max={INVENTORY_QUANTITY_MAX}
-              min={Math.min(1, savedQuantity)}
-              onChange={setQuantityDraft}
-              value={quantityDraft}
-            />
-            <NativePickerField ariaLabel={`Expiration date for ${title}${qualifier}`} className={styles.instanceDateField} emptyLabel="No expiration date" label="Expiration Date" onChange={setExpiryDraft} type="date" value={expiryDraft} />
-            {quantityDelta !== 0 && <Description className={styles.instanceHint}>{quantityChangeHint(quantityDelta, batchLocationLabel)}</Description>}
-            {(expiryChanged || quantityDelta !== 0) && (
-              <span className={styles.instanceEditActions}>
-                <button className={styles.secondaryAction} disabled={busy} onClick={resetDraft} type="button">Reset</button>
-                <button aria-busy={busyAction === 'edit' ? 'true' : undefined} aria-label={`Save ${title}${qualifier}`} className={styles.primaryAction} disabled={busy} onClick={saveItem} type="button">Save</button>
-              </span>
-            )}
-          </div>
-        </div>
+        <ul className={styles.instancesList}>
+          {batches.map((batch) => {
+            const qualifier = batchQualifier(batch.expiryDate, multipleBatches)
+            const expiryDraft = expiryDrafts[batch.key] ?? batch.expiryDate
+            const quantityDraft = quantityDrafts[batch.key] ?? batch.quantity
+            const quantityDelta = quantityDraft - batch.quantity
+            const expiryChanged = expiryDraft !== batch.expiryDate
+            const disabled = busy || !batch.addressable
+            return (
+              <li className={styles.instanceRow} key={batch.key}>
+                <div className={styles.instanceHeader}>
+                  <span className={styles.instanceCopy}>
+                    <strong>{multipleBatches ? expiryInfo(batch.expiryDate || undefined).label : title}</strong>
+                    <small>{`In the ${batch.locationLabel}`}</small>
+                  </span>
+                  <button aria-busy={busyAction === `delete-${batch.key}` ? 'true' : undefined} aria-label={`Delete ${title}${qualifier}`} className={`${styles.rowAction} ${styles.deleteAction}`} disabled={disabled} onClick={() => deleteBatch(batch)} type="button">
+                    <MaterialIcon name="mdi:delete" size={22} />
+                  </button>
+                </div>
+                <div className={styles.instanceEditPanel}>
+                  <NumberStepper
+                    ariaLabel={`Quantity for ${title}${qualifier}`}
+                    decrementLabel={`Remove one ${title}${qualifier}`}
+                    disabled={disabled}
+                    formatValue={formatQuantity}
+                    incrementLabel={`Add one ${title}${qualifier}`}
+                    label="Quantity"
+                    max={INVENTORY_QUANTITY_MAX}
+                    min={Math.min(1, batch.quantity)}
+                    onChange={(value) => setQuantityDrafts((current) => ({ ...current, [batch.key]: value }))}
+                    value={quantityDraft}
+                  />
+                  <NativePickerField ariaLabel={`Expiration date for ${title}${qualifier}`} className={styles.instanceDateField} emptyLabel="No expiration date" label="Expiration Date" onChange={(value) => setExpiryDrafts((current) => ({ ...current, [batch.key]: value }))} type="date" value={expiryDraft} />
+                  {quantityDelta !== 0 && <Description className={styles.instanceHint}>{quantityChangeHint(quantityDelta, batch.locationLabel)}</Description>}
+                  {(expiryChanged || quantityDelta !== 0) && (
+                    <span className={styles.instanceEditActions}>
+                      <button className={styles.secondaryAction} disabled={busy} onClick={() => resetDraft(batch)} type="button">Reset</button>
+                      <button aria-busy={busyAction === `edit-${batch.key}` ? 'true' : undefined} aria-label={`Save ${title}${qualifier}`} className={styles.primaryAction} disabled={busy} onClick={() => saveBatch(batch)} type="button">Save</button>
+                    </span>
+                  )}
+                </div>
+              </li>
+            )
+          })}
+        </ul>
       </div>
     </ModalSheet>
   )
