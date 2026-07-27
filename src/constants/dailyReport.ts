@@ -1,10 +1,18 @@
-import { DAILY_REPORT_HASH, DAILY_REPORT_USER_QUERY_KEY, routeUrl } from './routes'
+import { DAILY_REPORT_HASH, DAILY_REPORT_TAB_QUERY_KEY, DAILY_REPORT_USER_QUERY_KEY, routeUrl } from './routes'
 
-export { DAILY_REPORT_HASH, DAILY_REPORT_QUERY_KEYS, DAILY_REPORT_USER_QUERY_KEY } from './routes'
+export { DAILY_REPORT_HASH, DAILY_REPORT_QUERY_KEYS, DAILY_REPORT_TAB_QUERY_KEY, DAILY_REPORT_USER_QUERY_KEY } from './routes'
 
 export const DAILY_REPORT_HOST_ROUTE_PATH = 'overview'
 
 export type DailyReportTab = 'expired-food' | 'overdue' | 'upcoming'
+
+/** `auto` asks the modal to pick the tab from live counts when a notification link is opened. */
+export type DailyReportTabRequest = DailyReportTab | 'auto'
+
+export const DAILY_REPORT_AUTO_TAB = 'auto'
+
+/** Priority when auto-selecting: overdue first, then expired food, then upcoming. */
+export const DAILY_REPORT_AUTO_TAB_ORDER: DailyReportTab[] = ['overdue', 'expired-food', 'upcoming']
 
 export interface DailyReportTabConfig {
   icon: string
@@ -100,13 +108,33 @@ function parseReportUrl(url: string | undefined) {
   }
 }
 
+export function dailyReportTabRequestFromUrl(url: string | undefined): DailyReportTabRequest | undefined {
+  const value = normalizedKey(parseReportUrl(url)?.searchParams.get(DAILY_REPORT_TAB_QUERY_KEY))
+  if (value === DAILY_REPORT_AUTO_TAB) return DAILY_REPORT_AUTO_TAB
+  return DAILY_REPORT_TABS.some((tab) => tab.tab === value) ? (value as DailyReportTab) : undefined
+}
+
+/**
+ * Picks the tab a notification should land on. Counts are read live at open time rather than baked
+ * into the link, so a report tapped hours later still opens on something that still needs doing.
+ */
+export function dailyReportAutoTab(counts: { expiredFood: number; overdue: number; upcoming: number }): DailyReportTab {
+  const available: Record<DailyReportTab, number> = {
+    'expired-food': counts.expiredFood,
+    overdue: counts.overdue,
+    upcoming: counts.upcoming,
+  }
+  return DAILY_REPORT_AUTO_TAB_ORDER.find((tab) => available[tab] > 0) ?? DAILY_REPORT_AUTO_TAB_ORDER[0]
+}
+
 export function dailyReportUserKeyFromUrl(url: string | undefined) {
   const value = parseReportUrl(url)?.searchParams.get(DAILY_REPORT_USER_QUERY_KEY)
   return dailyReportUserConfig(value)?.key
 }
 
-export function dailyReportUrl(userKey: string, basePath = '/sfenton-react-dash/home') {
+export function dailyReportUrl(userKey: string, basePath = '/sfenton-react-dash/home', tab?: DailyReportTabRequest) {
   const params = new URLSearchParams({ path: DAILY_REPORT_HOST_ROUTE_PATH, [DAILY_REPORT_USER_QUERY_KEY]: userKey })
+  if (tab) params.set(DAILY_REPORT_TAB_QUERY_KEY, tab)
   return `${basePath}?${params.toString()}${DAILY_REPORT_HASH}`
 }
 

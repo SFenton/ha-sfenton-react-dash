@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import {
+  DAILY_REPORT_AUTO_TAB,
   DAILY_REPORT_HASH,
   DAILY_REPORT_TABS,
   DAILY_REPORT_USERS,
+  dailyReportAutoTab,
   dailyReportRouteUrl,
+  dailyReportTabRequestFromUrl,
   dailyReportTitle,
   dailyReportUrl,
   dailyReportUserConfig,
@@ -68,6 +71,31 @@ describe('dailyReport constants', () => {
     expect(dailyReportRouteUrl('stephen', '/sfenton-react-dash/home?path=security')).toBe(`/sfenton-react-dash/home?path=overview&user=stephen${DAILY_REPORT_HASH}`)
     expect(dailyReportRouteUrl('steph', '/sfenton-react-dash/home?path=overview&user=stephen')).toBe(`/sfenton-react-dash/home?path=overview&user=steph${DAILY_REPORT_HASH}`)
     expect(dailyReportRouteUrl('stephen')).toBe(`/at-a-glance/overview?user=stephen${DAILY_REPORT_HASH}`)
+  })
+
+  it('reads the requested tab from a notification link', () => {
+    expect(dailyReportTabRequestFromUrl('/x?user=stephen&tab=auto#daily-report')).toBe(DAILY_REPORT_AUTO_TAB)
+    expect(dailyReportTabRequestFromUrl('/x?user=stephen&tab=expired-food#daily-report')).toBe('expired-food')
+    expect(dailyReportTabRequestFromUrl('/x?user=stephen&tab=OVERDUE#daily-report')).toBe('overdue')
+    expect(dailyReportTabRequestFromUrl('/x?user=stephen&tab=nonsense#daily-report')).toBeUndefined()
+    expect(dailyReportTabRequestFromUrl('/x?user=stephen#daily-report')).toBeUndefined()
+    expect(dailyReportTabRequestFromUrl(undefined)).toBeUndefined()
+  })
+
+  it('auto-selects overdue, then expired food, then upcoming', () => {
+    expect(dailyReportAutoTab({ expiredFood: 5, overdue: 2, upcoming: 9 })).toBe('overdue')
+    expect(dailyReportAutoTab({ expiredFood: 5, overdue: 0, upcoming: 9 })).toBe('expired-food')
+    expect(dailyReportAutoTab({ expiredFood: 0, overdue: 0, upcoming: 9 })).toBe('upcoming')
+    // Overdue wins even when it is the smallest pile.
+    expect(dailyReportAutoTab({ expiredFood: 40, overdue: 1, upcoming: 40 })).toBe('overdue')
+    // Nothing outstanding falls back to the first tab.
+    expect(dailyReportAutoTab({ expiredFood: 0, overdue: 0, upcoming: 0 })).toBe('overdue')
+  })
+
+  it('builds notification links that request auto tab selection', () => {
+    expect(dailyReportUrl('stephen', '/sfenton-react-dash/home', DAILY_REPORT_AUTO_TAB))
+      .toBe(`/sfenton-react-dash/home?path=overview&user=stephen&tab=auto${DAILY_REPORT_HASH}`)
+    expect(dailyReportUrl('stephen')).toBe(`/sfenton-react-dash/home?path=overview&user=stephen${DAILY_REPORT_HASH}`)
   })
 
   it('lists the summary tabs without an upcoming expirations tab', () => {

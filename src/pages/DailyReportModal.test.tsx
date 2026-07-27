@@ -330,6 +330,74 @@ describe('Daily summary modal', () => {
     expect(within(screen.getByRole('button', { name: /^Open Stephen's Summary/ })).getByText('2')).toBeInTheDocument()
   })
 
+  it('opens on the overdue tab when a notification link asks for auto selection', async () => {
+    mockEntities[OVERDUE_ENTITY_ID].state = '2'
+    setExpiredFood(5)
+    setDashboardUrl(summaryUrl('?path=overview&user=stephen&tab=auto'))
+    renderHome()
+
+    const dialog = await screen.findByRole('dialog')
+    const header = dialog.querySelector('[data-modal-sheet-body-header="true"]') as HTMLElement
+    expect(within(header).getByRole('heading', { level: 2, name: 'Overdue Chores' })).toBeInTheDocument()
+  })
+
+  it('falls through to expired food when nothing is overdue', async () => {
+    mockEntities[OVERDUE_ENTITY_ID].state = '0'
+    mockEntities[UPCOMING_ENTITY_ID].state = '4'
+    setExpiredFood(5)
+    setDashboardUrl(summaryUrl('?path=overview&user=stephen&tab=auto'))
+    renderHome()
+
+    const dialog = await screen.findByRole('dialog')
+    const header = dialog.querySelector('[data-modal-sheet-body-header="true"]') as HTMLElement
+    expect(within(header).getByRole('heading', { level: 2, name: 'Expired Food' })).toBeInTheDocument()
+  })
+
+  it('falls through to upcoming when only upcoming chores remain', async () => {
+    mockEntities[OVERDUE_ENTITY_ID].state = '0'
+    mockEntities[UPCOMING_ENTITY_ID].state = '4'
+    setExpiredFood(0)
+    setDashboardUrl(summaryUrl('?path=overview&user=stephen&tab=auto'))
+    renderHome()
+
+    const dialog = await screen.findByRole('dialog')
+    const header = dialog.querySelector('[data-modal-sheet-body-header="true"]') as HTMLElement
+    expect(within(header).getByRole('heading', { level: 2, name: 'Upcoming Chores' })).toBeInTheDocument()
+  })
+
+  it('honours an explicit tab request from a link', async () => {
+    mockEntities[OVERDUE_ENTITY_ID].state = '9'
+    setDashboardUrl(summaryUrl('?path=overview&user=stephen&tab=upcoming'))
+    renderHome()
+
+    const dialog = await screen.findByRole('dialog')
+    const header = dialog.querySelector('[data-modal-sheet-body-header="true"]') as HTMLElement
+    expect(within(header).getByRole('heading', { level: 2, name: 'Upcoming Chores' })).toBeInTheDocument()
+  })
+
+  it('consumes the tab request so a later manual open keeps the chosen tab', async () => {
+    mockEntities[OVERDUE_ENTITY_ID].state = '0'
+    setExpiredFood(5)
+    setDashboardUrl(summaryUrl('?path=overview&user=stephen&tab=auto'))
+    renderHome()
+
+    const dialog = await screen.findByRole('dialog')
+    const header = dialog.querySelector('[data-modal-sheet-body-header="true"]') as HTMLElement
+    expect(within(header).getByRole('heading', { level: 2, name: 'Expired Food' })).toBeInTheDocument()
+    await waitFor(() => expect(window.location.search).not.toContain('tab=auto'))
+  })
+
+  it('leaves the tab alone when the link makes no request', async () => {
+    mockEntities[OVERDUE_ENTITY_ID].state = '0'
+    setExpiredFood(5)
+    setDashboardUrl(summaryUrl('?path=overview&user=stephen'))
+    renderHome()
+
+    const dialog = await screen.findByRole('dialog')
+    const header = dialog.querySelector('[data-modal-sheet-body-header="true"]') as HTMLElement
+    expect(within(header).getByRole('heading', { level: 2, name: 'Overdue Chores' })).toBeInTheDocument()
+  })
+
   it('stays closed when no summary hash is present', () => {
     setDashboardUrl('/sfenton-react-dash/home?path=overview')
     renderHome()
