@@ -6,7 +6,8 @@ export interface DashboardRouteConfig {
 
 export const DAILY_REPORT_HASH = '#daily-report'
 export const DAILY_REPORT_USER_QUERY_KEY = 'user'
-export const DAILY_REPORT_QUERY_KEYS = [DAILY_REPORT_USER_QUERY_KEY] as const
+export const DAILY_REPORT_TAB_QUERY_KEY = 'tab'
+export const DAILY_REPORT_QUERY_KEYS = [DAILY_REPORT_USER_QUERY_KEY, DAILY_REPORT_TAB_QUERY_KEY] as const
 export const HOME_GROCERY_LIST_ROUTE_PATH = 'grocery-list'
 export const HOME_FOOD_ROUTE_PATH = 'food'
 export const HOME_ALL_FOOD_ROUTE_PATH = 'all-food'

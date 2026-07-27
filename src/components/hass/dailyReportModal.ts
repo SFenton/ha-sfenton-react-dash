@@ -25,6 +25,7 @@ export interface DailyReportContext {
   badgeCount: number
   expiredFoodCount: number
   overdueCount: number
+  upcomingCount: number
   title: string
   user: DailyReportUserConfig | undefined
   vacationMode: boolean
@@ -63,6 +64,7 @@ export function useDailyReportContext(): DailyReportContext {
   const vacationMode = useHass((state) => state.entities[VACATION_MODE_ENTITY_ID]?.state === 'on')
   const user = dailyReportUserConfig(dailyReportUserKeyFromUrl(dashboardUrl)) ?? dailyReportUserConfigForHaUserId(haUser?.id)
   const overdueCount = useHass((state) => actionableCount(user ? state.entities[user.todoEntityIds.overdue]?.state : undefined))
+  const upcomingCount = useHass((state) => actionableCount(user ? state.entities[user.todoEntityIds.upcoming]?.state : undefined))
   // Vacation puts expired food on hold, so it must not nag from the badge either.
   const expiredFoodCount = useHass((state) => (vacationMode ? 0 : countLocallyExpired(state.entities[EVERSHELF_EXPIRED_ITEMS_ENTITY_ID]?.attributes?.expired_list)))
 
@@ -74,6 +76,7 @@ export function useDailyReportContext(): DailyReportContext {
     expiredFoodCount: scopedExpiredFoodCount,
     overdueCount: scopedOverdueCount,
     title: dailyReportTitle(user),
+    upcomingCount: user ? upcomingCount : 0,
     user,
     vacationMode,
   }
