@@ -2,10 +2,13 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { AtAGlancePage } from './AtAGlancePage'
 import { DashboardViewPage } from './DashboardViewPage'
-import { mockState, mockTodoItemsByEntity, resetMockHass } from '../test/mocks/hakitCoreState'
+import { mockEntities, mockState, mockTodoItemsByEntity, resetMockHass } from '../test/mocks/hakitCoreState'
 
 const OVERDUE_ENTITY_ID = 'todo.stephen_s_past_due_with_unassigned'
 const UPCOMING_ENTITY_ID = 'todo.stephen_s_due_today_with_unassigned'
+const EXPIRED_ITEMS_ENTITY_ID = 'sensor.evershelf_expired_items'
+const VACATION_MODE_ENTITY_ID = 'input_boolean.vacation_mode'
+const EXPIRED_ITEMS_STATE = mockEntities[EXPIRED_ITEMS_ENTITY_ID].state
 
 function setDashboardUrl(url: string) {
   window.history.replaceState(null, '', url)
@@ -22,6 +25,8 @@ function renderHome() {
 describe('Daily summary modal', () => {
   beforeEach(() => {
     resetMockHass()
+    mockEntities[EXPIRED_ITEMS_ENTITY_ID].state = EXPIRED_ITEMS_STATE
+    mockEntities[VACATION_MODE_ENTITY_ID].state = 'off'
     mockTodoItemsByEntity[OVERDUE_ENTITY_ID] = [
       { uid: 'overdue-1', summary: 'Take out the trash', status: 'needs_action', due: '2026-07-24T17:30:00+00:00' },
     ]
@@ -106,12 +111,88 @@ describe('Daily summary modal', () => {
     expect(within(expiredRow).getByRole('button', { name: 'Add Milk to shopping list' })).toBeInTheDocument()
   })
 
-  it('shows empty copy when a tab has nothing to report', async () => {
+  it('shows a centred modal empty state when a tab has nothing to report', async () => {
     mockTodoItemsByEntity[OVERDUE_ENTITY_ID] = []
     renderHome()
 
     const dialog = await screen.findByRole('dialog')
-    expect(await within(dialog).findByText('Nothing is overdue. Nice work.')).toBeInTheDocument()
+    const empty = await within(dialog).findByRole('heading', { level: 2, name: 'No Chores Due' })
+    const emptySection = empty.closest('section')
+    expect(emptySection).toHaveAttribute('data-empty-layout', 'modal')
+    expect(within(emptySection as HTMLElement).getByText('You are all caught up on chores that slipped past their due date.')).toBeInTheDocument()
+  })
+
+  // Titles stay identical across vacation and non-vacation; only the supporting line changes.
+  it('keeps empty state titles consistent between vacation and non-vacation', async () => {
+    mockTodoItemsByEntity[UPCOMING_ENTITY_ID] = []
+    mockEntities[EXPIRED_ITEMS_ENTITY_ID].state = '0'
+    renderHome()
+
+    const dialog = await screen.findByRole('dialog')
+    const nav = within(dialog).getByRole('navigation', { name: 'Daily report sections' })
+
+    fireEvent.click(within(nav).getByRole('button', { name: 'Upcoming Chores' }))
+    expect(await within(dialog).findByRole('heading', { level: 2, name: 'No Chores Upcoming' })).toBeInTheDocument()
+    expect(within(dialog).getByText('There is nothing else on your schedule for the rest of today.')).toBeInTheDocument()
+
+    fireEvent.click(within(nav).getByRole('button', { name: 'Expired Food' }))
+    expect(await within(dialog).findByRole('heading', { level: 2, name: 'No Expired Food' })).toBeInTheDocument()
+    expect(within(dialog).getByText('Everything in the kitchen is still within date.')).toBeInTheDocument()
+  })
+
+  it('uses vacation copy for the empty chore tabs while Vacation Mode is on', async () => {
+    mockEntities[VACATION_MODE_ENTITY_ID].state = 'on'
+    mockTodoItemsByEntity[OVERDUE_ENTITY_ID] = []
+    mockTodoItemsByEntity[UPCOMING_ENTITY_ID] = []
+    renderHome()
+
+    const dialog = await screen.findByRole('dialog')
+    expect(await within(dialog).findByRole('heading', { level: 2, name: 'No Chores Due' })).toBeInTheDocument()
+    expect(within(dialog).getByText('Enjoy vacation!')).toBeInTheDocument()
+
+    const nav = within(dialog).getByRole('navigation', { name: 'Daily report sections' })
+    fireEvent.click(within(nav).getByRole('button', { name: 'Upcoming Chores' }))
+    expect(await within(dialog).findByRole('heading', { level: 2, name: 'No Chores Upcoming' })).toBeInTheDocument()
+    expect(within(dialog).getByText('Enjoy vacation!')).toBeInTheDocument()
+  })
+
+  it('hides expired food behind vacation copy when items are still expired', async () => {
+    mockEntities[VACATION_MODE_ENTITY_ID].state = 'on'
+    renderHome()
+
+    const dialog = await screen.findByRole('dialog')
+    const nav = within(dialog).getByRole('navigation', { name: 'Daily report sections' })
+    fireEvent.click(within(nav).getByRole('button', { name: 'Expired Food' }))
+
+    expect(await within(dialog).findByRole('heading', { level: 2, name: 'Expired Food Hidden' })).toBeInTheDocument()
+    expect(within(dialog).getByText('Enjoy vacation!')).toBeInTheDocument()
+    expect(within(dialog).queryByLabelText('Expired Food inventory list')).not.toBeInTheDocument()
+  })
+
+  it('reports no expired food on vacation only when the count is a confirmed zero', async () => {
+    mockEntities[VACATION_MODE_ENTITY_ID].state = 'on'
+    mockEntities[EXPIRED_ITEMS_ENTITY_ID].state = '0'
+    renderHome()
+
+    const dialog = await screen.findByRole('dialog')
+    const nav = within(dialog).getByRole('navigation', { name: 'Daily report sections' })
+    fireEvent.click(within(nav).getByRole('button', { name: 'Expired Food' }))
+
+    expect(await within(dialog).findByRole('heading', { level: 2, name: 'No Expired Food' })).toBeInTheDocument()
+    expect(within(dialog).getByText('Enjoy vacation!')).toBeInTheDocument()
+  })
+
+  it('shows a modal empty state when nothing has expired', async () => {
+    mockEntities[EXPIRED_ITEMS_ENTITY_ID].state = '0'
+    renderHome()
+
+    const dialog = await screen.findByRole('dialog')
+    const nav = within(dialog).getByRole('navigation', { name: 'Daily report sections' })
+    fireEvent.click(within(nav).getByRole('button', { name: 'Expired Food' }))
+
+    const empty = await within(dialog).findByRole('heading', { level: 2, name: 'No Expired Food' })
+    expect(empty.closest('section')).toHaveAttribute('data-empty-layout', 'modal')
+    expect(within(dialog).queryByLabelText('Expired Food inventory list')).not.toBeInTheDocument()
   })
 
   it('falls back to the signed-in Home Assistant user when no user param is present', async () => {
@@ -129,7 +210,7 @@ describe('Daily summary modal', () => {
 
     const dialog = await screen.findByRole('dialog')
     expect(within(dialog).getByText('Summary')).toBeInTheDocument()
-    expect(within(dialog).getByRole('heading', { name: 'Whose summary?' })).toBeInTheDocument()
+    expect(within(dialog).getByRole('heading', { name: 'Whose Summary?' })).toBeInTheDocument()
     expect(within(dialog).getByRole('button', { name: 'Stephen' })).toBeInTheDocument()
     expect(within(dialog).getByRole('button', { name: 'Steph' })).toBeInTheDocument()
     expect(within(dialog).queryByRole('navigation', { name: 'Daily report sections' })).not.toBeInTheDocument()

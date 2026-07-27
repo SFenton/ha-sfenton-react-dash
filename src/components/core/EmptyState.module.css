@@ -17,6 +17,17 @@
   line-height: 1.02;
 }
 
+/* Fills the visible modal body so the copy centres without the sheet scrolling. */
+.emptyState[data-empty-layout='modal'] {
+  min-height: var(--modal-body-content-height, var(--modal-body-visible-height, 260px));
+  padding-block: 0;
+}
+
+.emptyState[data-empty-layout='compact'] {
+  min-height: 0;
+  padding-block: 4px 12px;
+}
+
 .emptyState > div {
   max-width: 680px;
   margin: 0 auto;

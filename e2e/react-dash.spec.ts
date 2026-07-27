@@ -480,7 +480,7 @@ test('inventory footer search moves above the mobile keyboard and clears results
   }).toBeLessThanOrEqual(20)
 
   await input.fill('dragonfruit')
-  await expect(page.getByRole('heading', { name: 'No matching items' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'No Matching Items' })).toBeVisible()
   await expect(page.getByText('Try a different search or clear the search to show all items.')).toBeVisible()
   await page.evaluate(() => window.__setInventoryFakeKeyboardHeight?.(window.innerHeight))
   await expect.poll(async () => Math.round((await dock.boundingBox())?.y ?? 0)).toBe(Math.round(beforeBox.y))
@@ -1171,8 +1171,10 @@ test('chores render HA-supplied vacation lists exactly and omit empty sections o
   await page.getByRole('button', { name: /Stephen's Tasks/i }).click()
 
   await expect(page.getByRole('heading', { name: "Stephen's Chores" })).toBeVisible()
-  await expect(page.getByRole('heading', { name: 'No Tasks!' })).toBeVisible()
-  await expect(page.getByText('You have no tasks due- nice job!')).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'No Chores Due' })).toBeVisible()
+  // Vacation mode is on for this scenario, so the copy must credit vacation, not Stephen.
+  await expect(page.getByText('Enjoy vacation!')).toBeVisible()
+  await expect(page.getByText('Stephen has no chores due- nice job!')).toHaveCount(0)
   await expect(page.locator('[data-empty-layout="centered"]')).toBeVisible()
   await expect(page.getByLabel(/todo list$/)).toHaveCount(0)
 })
@@ -2243,4 +2245,30 @@ test('header profile button stays visible and opaque across route changes', asyn
   }
   await expect(page.getByRole('heading', { level: 1, name: 'Security' })).toBeVisible()
   await expect(profileButton).toHaveCSS('opacity', '1')
+})
+
+test('daily summary empty tabs centre without scrolling the sheet', async ({ page }) => {
+  await page.goto('/index.html?path=overview&user=stephen')
+
+  await page.evaluate(() => {
+    const api = (window as unknown as { __mockHass: { setTodoItems: (id: string, items: unknown[]) => void; setEntityState: (id: string, state: string) => void } }).__mockHass
+    api.setTodoItems('todo.stephen_s_past_due_with_unassigned', [])
+    api.setEntityState('todo.stephen_s_past_due_with_unassigned', '0')
+    api.setEntityState('input_boolean.vacation_mode', 'on')
+  })
+
+  await page.getByRole('button', { name: /^Open .+'s Summary$/ }).click()
+  const dialog = page.getByRole('dialog')
+
+  await expect(dialog.getByRole('heading', { level: 2, name: 'No Chores Due' })).toBeVisible()
+  await expect(dialog.locator('[data-empty-layout="modal"]')).toHaveCount(1)
+  await expect(dialog.getByText('Enjoy vacation!')).toBeVisible()
+
+  const body = dialog.locator('[data-modal-sheet-body="true"]')
+  await expect.poll(() => body.evaluate((e) => e.scrollHeight - e.clientHeight)).toBeLessThanOrEqual(0)
+
+  await dialog.getByRole('navigation', { name: 'Daily report sections' }).getByRole('button', { name: 'Expired Food' }).click()
+  await expect(dialog.getByRole('heading', { level: 2, name: 'Expired Food Hidden' })).toBeVisible()
+  await expect(dialog.getByLabel('Expired Food inventory list')).toHaveCount(0)
+  await expect.poll(() => body.evaluate((e) => e.scrollHeight - e.clientHeight)).toBeLessThanOrEqual(0)
 })

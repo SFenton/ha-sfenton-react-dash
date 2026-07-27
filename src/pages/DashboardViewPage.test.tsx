@@ -4606,6 +4606,25 @@ describe('DashboardViewPage', () => {
     ])
   })
 
+  it('shows a centred empty state when a filter hides every inventory item', async () => {
+    render(<DashboardViewPage activePath="fridge" onNavigate={() => undefined} path="fridge" />)
+
+    const fridgeList = await screen.findByLabelText('Fridge inventory list')
+    await waitFor(() => expect(within(fridgeList).getAllByRole('group', { name: /Expires|Expired|No expiration date/i })).toHaveLength(3))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Filter' }))
+    expect(await screen.findByRole('heading', { name: 'Filter Inventory' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('radio', { name: /No Expiration Date/i }))
+    fireEvent.click(screen.getByRole('button', { name: 'Apply' }))
+
+    await waitFor(() => expect(screen.queryByRole('heading', { name: 'Filter Inventory' })).not.toBeInTheDocument())
+
+    const heading = await screen.findByRole('heading', { name: 'No Matching Items' })
+    expect(heading.parentElement).toHaveAttribute('data-empty-layout', 'centered')
+    expect(screen.getByText('Try a different filter, or clear it to show all items.')).toBeInTheDocument()
+    expect(within(fridgeList).queryAllByRole('group', { name: /Expires|Expired|No expiration date/i })).toHaveLength(0)
+  })
+
   it('searches inventory from the floating action dock with Festival-style debounce, clear, and collapse behavior', async () => {
     const greekYogurtLabel = testExpiryLabel(5, 2)
     const milkLabel = testExpiryLabel(-400)
@@ -4640,7 +4659,7 @@ describe('DashboardViewPage', () => {
     fireEvent.change(searchInput, { target: { value: 'dragonfruit' } })
 
     await waitFor(
-      () => expect(screen.getByRole('heading', { name: 'No matching items' })).toBeInTheDocument(),
+      () => expect(screen.getByRole('heading', { name: 'No Matching Items' })).toBeInTheDocument(),
       { timeout: INVENTORY_SEARCH_DEBOUNCE_MS + 500 },
     )
     expect(screen.getByText('Try a different search or clear the search to show all items.')).toBeInTheDocument()
@@ -4681,9 +4700,9 @@ describe('DashboardViewPage', () => {
     try {
       render(<DashboardViewPage activePath="pantry" onNavigate={() => undefined} path="pantry" />)
 
-      expect(await screen.findByRole('heading', { name: 'No items found' })).toBeInTheDocument()
+      expect(await screen.findByRole('heading', { name: 'No Items Found' })).toBeInTheDocument()
       expect(screen.getByText('Scan an item to add it to your pantry.')).toBeInTheDocument()
-      expect(screen.getByRole('heading', { name: 'No items found' }).closest('[data-empty-layout]')).toHaveAttribute('data-empty-layout', 'centered')
+      expect(screen.getByRole('heading', { name: 'No Items Found' }).closest('[data-empty-layout]')).toHaveAttribute('data-empty-layout', 'centered')
       expect(screen.queryByRole('button', { name: 'Search inventory' })).not.toBeInTheDocument()
       expect(screen.queryByRole('button', { name: 'Sort' })).not.toBeInTheDocument()
       expect(screen.queryByRole('button', { name: 'Filter' })).not.toBeInTheDocument()
@@ -4705,9 +4724,9 @@ describe('DashboardViewPage', () => {
     try {
       render(<DashboardViewPage activePath="freezer" onNavigate={() => undefined} path="freezer" />)
 
-      expect(await screen.findByRole('heading', { name: 'Unable to load Freezer' })).toBeInTheDocument()
+      expect(await screen.findByRole('heading', { name: 'Unable to Load Freezer' })).toBeInTheDocument()
       expect(screen.getByText('Freezer is unavailable')).toBeInTheDocument()
-      expect(screen.getByRole('heading', { name: 'Unable to load Freezer' }).closest('[data-empty-layout]')).toHaveAttribute('data-empty-layout', 'centered')
+      expect(screen.getByRole('heading', { name: 'Unable to Load Freezer' }).closest('[data-empty-layout]')).toHaveAttribute('data-empty-layout', 'centered')
       expect(screen.queryByRole('button', { name: 'Search inventory' })).not.toBeInTheDocument()
       expect(screen.queryByRole('button', { name: 'Sort' })).not.toBeInTheDocument()
       expect(screen.queryByRole('button', { name: 'Filter' })).not.toBeInTheDocument()
@@ -4971,10 +4990,10 @@ describe('DashboardViewPage', () => {
     expect(screen.getByRole('heading', { name: 'Grocery List' })).toBeInTheDocument()
 
     await waitFor(() => expect(screen.queryByRole('heading', { name: 'Grocery List' })).not.toBeInTheDocument())
-    expect(await screen.findByRole('heading', { name: 'No groceries listed' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'No Groceries Listed' })).toBeInTheDocument()
     expect(screen.getByText('Add some groceries via the YAML app for now to see them appear here.')).toBeInTheDocument()
     await waitFor(() => expect(scroller).toHaveAttribute('data-scroll-lock', 'true'))
-    expect(screen.getByRole('heading', { name: 'No groceries listed' }).closest('[data-empty-todo-page]')).toHaveAttribute('data-empty-todo-page', 'true')
+    expect(screen.getByRole('heading', { name: 'No Groceries Listed' }).closest('[data-empty-todo-page]')).toHaveAttribute('data-empty-todo-page', 'true')
   })
 
   it('renders an empty task state when a todo page has no visible task sections', async () => {
@@ -4985,12 +5004,37 @@ describe('DashboardViewPage', () => {
 
     render(<DashboardViewPage activePath="stephs-chores" onNavigate={() => undefined} path="stephs-chores" />)
 
-    expect(await screen.findByRole('heading', { name: 'No Tasks!' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'No Chores Due' })).toBeInTheDocument()
     await waitFor(() => expect(screen.queryByLabelText(/todo list$/)).not.toBeInTheDocument())
-    expect(screen.getByRole('heading', { name: 'No Tasks!' }).parentElement).toHaveAttribute('data-empty-layout', 'centered')
-    expect(screen.getByRole('heading', { name: 'No Tasks!' }).parentElement).toHaveAttribute('data-empty-typography', 'festival')
+    expect(screen.getByRole('heading', { name: 'No Chores Due' }).parentElement).toHaveAttribute('data-empty-layout', 'centered')
+    expect(screen.getByRole('heading', { name: 'No Chores Due' }).parentElement).toHaveAttribute('data-empty-typography', 'festival')
     expect(Array.from(screen.getByRole('main').children)[1]).toHaveAttribute('data-scroll-lock', 'true')
-    expect(screen.getByText('You have no tasks due- nice job!')).toBeInTheDocument()
+    expect(screen.getByText('Steph has no chores due- nice job!')).toBeInTheDocument()
+  })
+
+  it('credits vacation instead of the user when Donetick hides the chores', async () => {
+    for (const entityId of ['todo.steph_s_past_due', 'todo.steph_s_due_today', 'todo.steph_s_upcoming', 'todo.steph_s_no_due_date']) {
+      mockTodoItemsByEntity[entityId] = []
+      mockEntities[entityId] = entity(entityId, '1')
+    }
+    mockEntities['input_boolean.vacation_mode'].state = 'on'
+
+    render(<DashboardViewPage activePath="stephs-chores" onNavigate={() => undefined} path="stephs-chores" />)
+
+    expect(await screen.findByRole('heading', { name: 'No Chores Due' })).toBeInTheDocument()
+    expect(screen.getByText('Enjoy vacation!')).toBeInTheDocument()
+    expect(screen.queryByText('Steph has no chores due- nice job!')).not.toBeInTheDocument()
+  })
+
+  it('keeps the normal empty copy on lists vacation does not hide', async () => {
+    mockTodoItemsByEntity['todo.shopping_list'] = []
+    mockEntities['todo.shopping_list'] = entity('todo.shopping_list', '0')
+    mockEntities['input_boolean.vacation_mode'].state = 'on'
+
+    render(<DashboardViewPage activePath="groceries" onNavigate={() => undefined} path="groceries" />)
+
+    expect(await screen.findByRole('heading', { name: 'No Groceries Listed' })).toBeInTheDocument()
+    expect(screen.queryByText('Enjoy vacation!')).not.toBeInTheDocument()
   })
 
   it('renders chore due dates as explicit overdue durations instead of calendar phrases', async () => {
@@ -5196,7 +5240,7 @@ describe('DashboardViewPage', () => {
     mockEntities['todo.groceries'].state = '0'
     render(<DashboardViewPage activePath="settings" onNavigate={() => undefined} path="to-do" />)
 
-    const emptyHeading = await screen.findByRole('heading', { name: 'No to-do tasks' })
+    const emptyHeading = await screen.findByRole('heading', { name: 'No To-Do Tasks' })
 
     expect(emptyHeading.parentElement).toHaveAttribute('data-empty-layout', 'centered')
     expect(emptyHeading.parentElement).toHaveAttribute('data-empty-typography', 'festival')

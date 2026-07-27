@@ -135,7 +135,10 @@ export function ModalSheet({ open, title, onClose, children, backLabel = 'Back',
     if (!body) return undefined
 
     const syncVisibleHeight = () => {
+      const computed = window.getComputedStyle(body)
+      const verticalPadding = parseFloat(computed.paddingTop || '0') + parseFloat(computed.paddingBottom || '0')
       body.style.setProperty('--modal-body-visible-height', `${body.clientHeight}px`)
+      body.style.setProperty('--modal-body-content-height', `${Math.max(0, body.clientHeight - (Number.isFinite(verticalPadding) ? verticalPadding : 0))}px`)
     }
 
     syncVisibleHeight()
