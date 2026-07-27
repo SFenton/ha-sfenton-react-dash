@@ -4252,7 +4252,7 @@ describe('DashboardViewPage', () => {
 
   it('renders Pantry, Fridge, and Freezer inventory rows alphabetically with expiration subtitles', async () => {
     const almondFlourLabel = testExpiryLabel(-10)
-    const cannedBeansLabel = `${testExpiryLabel(3, 5)} (+1 more date)`
+    const cannedBeansLabel = 'Quantity 5 · Multiple Expiration Dates'
     const zitiLabel = testExpiryLabel(40)
     const greekYogurtLabel = testExpiryLabel(5, 2)
     const milkLabel = testExpiryLabel(-400)
@@ -4267,7 +4267,7 @@ describe('DashboardViewPage', () => {
 
     expect(screen.getByRole('heading', { name: 'All Food' })).toBeInTheDocument()
     const allFoodList = await screen.findByLabelText('All Food inventory list')
-    await waitFor(() => expect(within(allFoodList).getAllByRole('group', { name: /Expires|Expired|No expiration date/i })).toHaveLength(12))
+    await waitFor(() => expect(within(allFoodList).getAllByRole('group', { name: /Expires|Expired|No expiration date|Multiple Expiration Dates/i })).toHaveLength(12))
     expect(mockCallServiceCalls).toContainEqual({
       domain: 'evershelf',
       returnResponse: true,
@@ -4281,10 +4281,10 @@ describe('DashboardViewPage', () => {
 
     expect(screen.getByRole('heading', { name: 'Pantry' })).toBeInTheDocument()
     const pantryList = await screen.findByLabelText('Pantry inventory list')
-    await waitFor(() => expect(within(pantryList).getAllByRole('group', { name: /Expires|Expired|No expiration date/i })).toHaveLength(3))
+    await waitFor(() => expect(within(pantryList).getAllByRole('group', { name: /Expires|Expired|No expiration date|Multiple Expiration Dates/i })).toHaveLength(3))
     expect(screen.getByRole('button', { name: 'Sort' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Filter' })).toBeInTheDocument()
-    expect(within(pantryList).getAllByRole('group', { name: /Expires|Expired|No expiration date/i }).map((row) => row.getAttribute('aria-label'))).toEqual([
+    expect(within(pantryList).getAllByRole('group', { name: /Expires|Expired|No expiration date|Multiple Expiration Dates/i }).map((row) => row.getAttribute('aria-label'))).toEqual([
       `Almond Flour ${almondFlourLabel}`,
       `Canned Beans ${cannedBeansLabel}`,
       `Ziti ${zitiLabel}`,
@@ -4367,7 +4367,8 @@ describe('DashboardViewPage', () => {
     expect(await screen.findByRole('dialog', { name: /Canned Beans/i })).toBeInTheDocument()
     expect(screen.queryByText('Individual pantry items')).not.toBeInTheDocument()
     const cannedBeansBatch = `expiring ${testDisplayDateValue(testAddDays(testTodayDate(), 3))}`
-    expect(screen.getByRole('radiogroup', { name: 'Canned Beans expiration batches' })).toBeInTheDocument()
+    const cannedBeansLaterBatch = `expiring ${testDisplayDateValue(testAddDays(testTodayDate(), 200))}`
+    expect(screen.getByRole('spinbutton', { name: `Quantity for Canned Beans ${cannedBeansLaterBatch}` })).toHaveTextContent('3')
     const expirationInput = screen.getByLabelText(`Expiration date for Canned Beans ${cannedBeansBatch}`)
     expect(expirationInput).toHaveAttribute('type', 'date')
     expect(screen.getByRole('spinbutton', { name: `Quantity for Canned Beans ${cannedBeansBatch}` })).toHaveTextContent('2')
@@ -4417,8 +4418,8 @@ describe('DashboardViewPage', () => {
 
     expect(screen.getByRole('heading', { name: 'Fridge' })).toBeInTheDocument()
     const fridgeList = await screen.findByLabelText('Fridge inventory list')
-    await waitFor(() => expect(within(fridgeList).getAllByRole('group', { name: /Expires|Expired|No expiration date/i })).toHaveLength(3))
-    expect(within(fridgeList).getAllByRole('group', { name: /Expires|Expired|No expiration date/i }).map((row) => row.getAttribute('aria-label'))).toEqual([
+    await waitFor(() => expect(within(fridgeList).getAllByRole('group', { name: /Expires|Expired|No expiration date|Multiple Expiration Dates/i })).toHaveLength(3))
+    expect(within(fridgeList).getAllByRole('group', { name: /Expires|Expired|No expiration date|Multiple Expiration Dates/i }).map((row) => row.getAttribute('aria-label'))).toEqual([
       `Greek Yogurt ${greekYogurtLabel}`,
       `Milk ${milkLabel}`,
       `Salsa ${salsaLabel}`,
@@ -4453,8 +4454,8 @@ describe('DashboardViewPage', () => {
 
     expect(screen.getByRole('heading', { name: 'Freezer' })).toBeInTheDocument()
     const freezerList = await screen.findByLabelText('Freezer inventory list')
-    await waitFor(() => expect(within(freezerList).getAllByRole('group', { name: /Expires|Expired|No expiration date/i })).toHaveLength(2))
-    expect(within(freezerList).getAllByRole('group', { name: /Expires|Expired|No expiration date/i }).map((row) => row.getAttribute('aria-label'))).toEqual([
+    await waitFor(() => expect(within(freezerList).getAllByRole('group', { name: /Expires|Expired|No expiration date|Multiple Expiration Dates/i })).toHaveLength(2))
+    expect(within(freezerList).getAllByRole('group', { name: /Expires|Expired|No expiration date|Multiple Expiration Dates/i }).map((row) => row.getAttribute('aria-label'))).toEqual([
       `Frozen Peas ${frozenPeasLabel}`,
       `Waffles ${wafflesLabel}`,
     ])
@@ -4470,8 +4471,8 @@ describe('DashboardViewPage', () => {
 
     expect(screen.getByRole('heading', { name: 'Spice Rack' })).toBeInTheDocument()
     const spiceRackList = await screen.findByLabelText('Spice Rack inventory list')
-    await waitFor(() => expect(within(spiceRackList).getAllByRole('group', { name: /Expires|Expired|No expiration date/i })).toHaveLength(2))
-    expect(within(spiceRackList).getAllByRole('group', { name: /Expires|Expired|No expiration date/i }).map((row) => row.getAttribute('aria-label'))).toEqual([
+    await waitFor(() => expect(within(spiceRackList).getAllByRole('group', { name: /Expires|Expired|No expiration date|Multiple Expiration Dates/i })).toHaveLength(2))
+    expect(within(spiceRackList).getAllByRole('group', { name: /Expires|Expired|No expiration date|Multiple Expiration Dates/i }).map((row) => row.getAttribute('aria-label'))).toEqual([
       `Cumin ${cuminLabel}`,
       `Paprika ${paprikaLabel}`,
     ])
@@ -4487,8 +4488,8 @@ describe('DashboardViewPage', () => {
 
     expect(screen.getByRole('heading', { name: 'Cabinet' })).toBeInTheDocument()
     const cabinetList = await screen.findByLabelText('Cabinet inventory list')
-    await waitFor(() => expect(within(cabinetList).getAllByRole('group', { name: /Expires|Expired|No expiration date/i })).toHaveLength(2))
-    expect(within(cabinetList).getAllByRole('group', { name: /Expires|Expired|No expiration date/i }).map((row) => row.getAttribute('aria-label'))).toEqual([
+    await waitFor(() => expect(within(cabinetList).getAllByRole('group', { name: /Expires|Expired|No expiration date|Multiple Expiration Dates/i })).toHaveLength(2))
+    expect(within(cabinetList).getAllByRole('group', { name: /Expires|Expired|No expiration date|Multiple Expiration Dates/i }).map((row) => row.getAttribute('aria-label'))).toEqual([
       `Paper Plates ${paperPlatesLabel}`,
       `Tea Bags ${teaBagsLabel}`,
     ])
@@ -4551,8 +4552,8 @@ describe('DashboardViewPage', () => {
     render(<DashboardViewPage activePath="fridge" onNavigate={() => undefined} path="fridge" />)
 
     const fridgeList = await screen.findByLabelText('Fridge inventory list')
-    await waitFor(() => expect(within(fridgeList).getAllByRole('group', { name: /Expires|Expired|No expiration date/i })).toHaveLength(3))
-    expect(within(fridgeList).getAllByRole('group', { name: /Expires|Expired|No expiration date/i }).map((row) => row.getAttribute('aria-label'))).toEqual([
+    await waitFor(() => expect(within(fridgeList).getAllByRole('group', { name: /Expires|Expired|No expiration date|Multiple Expiration Dates/i })).toHaveLength(3))
+    expect(within(fridgeList).getAllByRole('group', { name: /Expires|Expired|No expiration date|Multiple Expiration Dates/i }).map((row) => row.getAttribute('aria-label'))).toEqual([
       `Greek Yogurt ${greekYogurtLabel}`,
       `Milk ${milkLabel}`,
       `Salsa ${salsaLabel}`,
@@ -4585,7 +4586,7 @@ describe('DashboardViewPage', () => {
 
     await waitFor(() => expect(screen.queryByRole('heading', { name: 'Sort Inventory' })).not.toBeInTheDocument())
     expect(sortButton).toHaveStyle({ '--card-rgb': '155 110 64' })
-    expect(within(fridgeList).getAllByRole('group', { name: /Expires|Expired|No expiration date/i }).map((row) => row.getAttribute('aria-label'))).toEqual([
+    expect(within(fridgeList).getAllByRole('group', { name: /Expires|Expired|No expiration date|Multiple Expiration Dates/i }).map((row) => row.getAttribute('aria-label'))).toEqual([
       `Milk ${milkLabel}`,
       `Greek Yogurt ${greekYogurtLabel}`,
       `Salsa ${salsaLabel}`,
@@ -4599,7 +4600,7 @@ describe('DashboardViewPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Apply' }))
 
     await waitFor(() => expect(screen.queryByRole('heading', { name: 'Sort Inventory' })).not.toBeInTheDocument())
-    expect(within(fridgeList).getAllByRole('group', { name: /Expires|Expired|No expiration date/i }).map((row) => row.getAttribute('aria-label'))).toEqual([
+    expect(within(fridgeList).getAllByRole('group', { name: /Expires|Expired|No expiration date|Multiple Expiration Dates/i }).map((row) => row.getAttribute('aria-label'))).toEqual([
       `Salsa ${salsaLabel}`,
       `Greek Yogurt ${greekYogurtLabel}`,
       `Milk ${milkLabel}`,
@@ -4613,7 +4614,7 @@ describe('DashboardViewPage', () => {
 
     await waitFor(() => expect(screen.queryByRole('heading', { name: 'Filter Inventory' })).not.toBeInTheDocument())
     expect(filterButton).toHaveStyle({ '--card-rgb': '155 110 64' })
-    expect(within(fridgeList).getAllByRole('group', { name: /Expires|Expired|No expiration date/i }).map((row) => row.getAttribute('aria-label'))).toEqual([
+    expect(within(fridgeList).getAllByRole('group', { name: /Expires|Expired|No expiration date|Multiple Expiration Dates/i }).map((row) => row.getAttribute('aria-label'))).toEqual([
       `Greek Yogurt ${greekYogurtLabel}`,
     ])
   })
@@ -4622,7 +4623,7 @@ describe('DashboardViewPage', () => {
     render(<DashboardViewPage activePath="fridge" onNavigate={() => undefined} path="fridge" />)
 
     const fridgeList = await screen.findByLabelText('Fridge inventory list')
-    await waitFor(() => expect(within(fridgeList).getAllByRole('group', { name: /Expires|Expired|No expiration date/i })).toHaveLength(3))
+    await waitFor(() => expect(within(fridgeList).getAllByRole('group', { name: /Expires|Expired|No expiration date|Multiple Expiration Dates/i })).toHaveLength(3))
 
     fireEvent.click(screen.getByRole('button', { name: 'Filter' }))
     expect(await screen.findByRole('heading', { name: 'Filter Inventory' })).toBeInTheDocument()
@@ -4634,7 +4635,7 @@ describe('DashboardViewPage', () => {
     const heading = await screen.findByRole('heading', { name: 'No Matching Items' })
     expect(heading.parentElement).toHaveAttribute('data-empty-layout', 'centered')
     expect(screen.getByText('Try a different filter, or clear it to show all items.')).toBeInTheDocument()
-    expect(within(fridgeList).queryAllByRole('group', { name: /Expires|Expired|No expiration date/i })).toHaveLength(0)
+    expect(within(fridgeList).queryAllByRole('group', { name: /Expires|Expired|No expiration date|Multiple Expiration Dates/i })).toHaveLength(0)
   })
 
   it('searches inventory from the floating action dock with Festival-style debounce, clear, and collapse behavior', async () => {
@@ -4644,7 +4645,7 @@ describe('DashboardViewPage', () => {
     render(<DashboardViewPage activePath="fridge" onNavigate={() => undefined} path="fridge" />)
 
     const fridgeList = await screen.findByLabelText('Fridge inventory list')
-    await waitFor(() => expect(within(fridgeList).getAllByRole('group', { name: /Expires|Expired|No expiration date/i })).toHaveLength(3))
+    await waitFor(() => expect(within(fridgeList).getAllByRole('group', { name: /Expires|Expired|No expiration date|Multiple Expiration Dates/i })).toHaveLength(3))
     const floatingDock = document.querySelector('[data-floating-action-dock="true"]') as HTMLElement
     const searchButton = within(floatingDock).getByRole('button', { name: 'Search inventory' })
 
@@ -4659,10 +4660,10 @@ describe('DashboardViewPage', () => {
 
     expect(searchInput).toHaveValue('milk')
     expect(screen.getByRole('button', { name: 'Clear Search' })).toBeInTheDocument()
-    expect(within(fridgeList).getAllByRole('group', { name: /Expires|Expired|No expiration date/i })).toHaveLength(3)
+    expect(within(fridgeList).getAllByRole('group', { name: /Expires|Expired|No expiration date|Multiple Expiration Dates/i })).toHaveLength(3)
 
     await waitFor(
-      () => expect(within(fridgeList).getAllByRole('group', { name: /Expires|Expired|No expiration date/i }).map((row) => row.getAttribute('aria-label'))).toEqual([
+      () => expect(within(fridgeList).getAllByRole('group', { name: /Expires|Expired|No expiration date|Multiple Expiration Dates/i }).map((row) => row.getAttribute('aria-label'))).toEqual([
         `Milk ${milkLabel}`,
       ]),
       { timeout: INVENTORY_SEARCH_DEBOUNCE_MS + 500 },
@@ -4691,7 +4692,7 @@ describe('DashboardViewPage', () => {
     await waitFor(() => expect(screen.getByLabelText('Search inventory')).toHaveValue(''))
     expect(screen.getByLabelText('Search inventory')).toHaveFocus()
     await waitFor(
-      () => expect(within(fridgeList).getAllByRole('group', { name: /Expires|Expired|No expiration date/i }).map((row) => row.getAttribute('aria-label'))).toEqual([
+      () => expect(within(fridgeList).getAllByRole('group', { name: /Expires|Expired|No expiration date|Multiple Expiration Dates/i }).map((row) => row.getAttribute('aria-label'))).toEqual([
         `Greek Yogurt ${greekYogurtLabel}`,
         `Milk ${milkLabel}`,
         `Salsa ${salsaLabel}`,
