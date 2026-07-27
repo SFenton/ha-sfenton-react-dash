@@ -243,6 +243,30 @@
   color: rgba(247, 251, 255, 0.9);
 }
 
+.preparedFoodFieldset {
+  display: grid;
+  min-width: 0;
+  gap: 8px;
+  border: 0;
+  margin: 0;
+  padding: 0;
+  color: rgba(247, 251, 255, 0.9);
+}
+
+.preparedFoodFieldset legend {
+  padding: 0;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.preparedFoodRow {
+  padding-left: 0;
+}
+
+.preparedFoodRow small {
+  white-space: normal;
+}
+
 .quickExpirationFieldset legend {
   display: flex;
   width: 100%;

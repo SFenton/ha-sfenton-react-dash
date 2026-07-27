@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { IScannerControls } from '@zxing/browser'
 import { useHass } from '@hakit/core'
 import { Description } from '../core/Description'
+import { CheckboxRow } from '../core/CheckboxRow'
 import { MaterialIcon } from '../core/Icon'
 import { ModalSheet, type ModalSheetStyle } from '../core/ModalSheet'
 import { NativePickerField } from '../core/NativePickerField'
@@ -346,6 +347,7 @@ export function ScanItemCameraSheet({ defaultLocation = 'dispensa', open, onClos
   const [itemQuantityError, setItemQuantityError] = useState<string | null>(null)
   const [itemLocation, setItemLocation] = useState<EverShelfLocation>(defaultLocation)
   const [itemExpiryDate, setItemExpiryDate] = useState('')
+  const [itemPreparedFood, setItemPreparedFood] = useState(false)
   const [addStatus, setAddStatus] = useState<AddItemStatus>('idle')
   const [addError, setAddError] = useState<string | null>(null)
 
@@ -395,6 +397,7 @@ export function ScanItemCameraSheet({ defaultLocation = 'dispensa', open, onClos
     setItemQuantityError(null)
     setItemLocation(defaultLocation)
     setItemExpiryDate('')
+    setItemPreparedFood(false)
     setAddStatus('idle')
     setAddError(null)
   }, [defaultLocation])
@@ -834,6 +837,7 @@ export function ScanItemCameraSheet({ defaultLocation = 'dispensa', open, onClos
       serviceData.expiry_date = expiryDate
       serviceData.expiry_user_set = true
     }
+    if (itemPreparedFood) serviceData.prepared_food = true
 
     const requestId = serviceRequestIdRef.current + 1
     serviceRequestIdRef.current = requestId
@@ -1076,6 +1080,18 @@ export function ScanItemCameraSheet({ defaultLocation = 'dispensa', open, onClos
               </div>
             </fieldset>
             <NativePickerField ariaLabel="Expiration date" label="When does it expire?" onChange={updateItemExpiryDate} type="date" value={itemExpiryDate} />
+            <fieldset className={styles.preparedFoodFieldset}>
+              <legend>Prepared Food</legend>
+              <CheckboxRow
+                active={itemPreparedFood}
+                alignWrappedToIconTop
+                aria-label="Prepared Food Item"
+                className={styles.preparedFoodRow}
+                onClick={() => setItemPreparedFood((current) => !current)}
+                subtitle="Indicates this is a prepared food item and does not need classification."
+                title="Prepared Food Item"
+              />
+            </fieldset>
             {addStatus === 'error' && <div className={styles.error} role="alert">{addError ?? `Unable to add this item to ${addedLocation}.`}</div>}
           </>
         )}
