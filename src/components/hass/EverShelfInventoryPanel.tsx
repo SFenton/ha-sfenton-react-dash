@@ -2,11 +2,13 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, ty
 import { flushSync } from 'react-dom'
 import { useHass } from '@hakit/core'
 import { EmptyState } from '../core/EmptyState'
+import { Description } from '../core/Description'
 import { FloatingActionButton } from '../core/FloatingActionButton'
 import { MaterialIcon } from '../core/Icon'
 import { ModalDisclosureIcon } from '../core/ModalDisclosureIcon'
 import { ModalSheet } from '../core/ModalSheet'
 import { NativePickerField } from '../core/NativePickerField'
+import { NumberStepper } from '../core/Stepper'
 import { RadioRow } from '../core/RadioRow'
 import { DashboardPageLoading } from '../shell/DashboardPageLoading'
 import type { EverShelfInventoryControls, InventoryFilterMode, InventorySortDirection, InventorySortMode } from './EverShelfInventoryControls'
@@ -27,8 +29,13 @@ interface EverShelfInventoryItem {
   expires_at?: string | null
   id?: number | string
   inventory_id?: number | string
+  inventory_ids?: (number | string)[] | null
+  location?: string | null
   name?: string | null
+  product_id?: number | string | null
   quantity?: number | string | null
+  unit?: string | null
+  vacuum_sealed?: boolean | number | string | null
 }
 
 interface EverShelfInventoryResponse {
@@ -60,6 +67,7 @@ const INVENTORY_SEARCH_EXPANDED_ATTR = 'data-inventory-search-expanded'
 const INVENTORY_LOADING_EXIT_MS = 500
 const INVENTORY_SEARCH_LOG_PREFIX = '[EverShelfInventorySearch]'
 const HASS_GROCERY_LIST_ENTITY_ID = 'todo.shopping_list'
+const INVENTORY_QUANTITY_MAX = 999
 const KEYBOARD_STATE_CLEAR_MS = 150
 const SHOPPING_ADDED_VISIBLE_MS = 3000
 
@@ -92,6 +100,8 @@ function logInventorySearch(event: string, details: Record<string, unknown>) {
   console.debug(INVENTORY_SEARCH_LOG_PREFIX, event, details)
 }
 
+const EVERSHELF_ADD_LOCATIONS: Exclude<EverShelfInventoryLocation, 'all'>[] = ['dispensa', 'frigo', 'freezer', 'spice_rack', 'cabinet']
+
 const LOCATION_DELETE_LABELS: Record<EverShelfInventoryLocation, string> = {
   all: 'library',
   cabinet: 'cabinet',
@@ -115,9 +125,48 @@ function itemInventoryId(item: EverShelfInventoryItem) {
   return Number.isFinite(id) && id > 0 ? id : null
 }
 
+function itemInventoryIds(item: EverShelfInventoryItem) {
+  if (!Array.isArray(item.inventory_ids)) return []
+  return item.inventory_ids.map((id) => Number(id)).filter((id) => Number.isFinite(id) && id > 0)
+}
+
 function itemRawQuantity(item: EverShelfInventoryItem) {
   const quantity = Number(item.quantity)
   return Number.isFinite(quantity) && quantity > 0 ? quantity : 1
+}
+
+function itemProductId(item: EverShelfInventoryItem) {
+  const productId = Number(item.product_id)
+  return Number.isFinite(productId) && productId > 0 ? productId : null
+}
+
+function itemLocation(item: EverShelfInventoryItem) {
+  const location = compactText(item.location)
+  return EVERSHELF_ADD_LOCATIONS.find((candidate) => candidate === location) ?? null
+}
+
+function itemVacuumSealed(item: EverShelfInventoryItem) {
+  const value = item.vacuum_sealed
+  if (typeof value === 'string') return value.trim() !== '' && value.trim() !== '0' && value.trim().toLowerCase() !== 'false'
+  return Boolean(value)
+}
+
+// EverShelf merges added stock into an existing batch only when product, location, expiry date,
+// and sealed state all match, so quantity increases have to repeat the batch identity.
+function inventoryAddServiceData(item: EverShelfInventoryItem, quantity: number, expiryDate: string) {
+  const productId = itemProductId(item)
+  const location = itemLocation(item)
+  const unit = compactText(item.unit)
+  const serviceData: Record<string, unknown> = {
+    name: itemName(item),
+    quantity,
+    vacuum_sealed: itemVacuumSealed(item),
+  }
+  if (productId !== null) serviceData.product_id = productId
+  if (location) serviceData.location = location
+  if (expiryDate) serviceData.expiry_date = expiryDate
+  if (unit) serviceData.unit = unit
+  return serviceData
 }
 
 function itemExpiryDate(item: EverShelfInventoryItem) {
@@ -133,7 +182,7 @@ function itemExpiryTime(item: EverShelfInventoryItem) {
 function itemGroupingKey(item: EverShelfInventoryItem) {
   return [
     itemName(item).toLocaleLowerCase(),
-    compactText((item as { location?: string | null }).location) ?? '',
+    compactText(item.location) ?? '',
     itemExpiryDate(item) ?? '',
   ].join('\u0000')
 }
@@ -249,6 +298,41 @@ function inventoryItemsFromSearchResponse(response: EverShelfInventoryResponse, 
   return fallbackFilterSearchResults(response.inventory, query)
 }
 
+// EverShelf's taxonomy search collapses every inventory row of a product into one response entry
+// without per-row detail, so those entries are expanded back into the real rows the row actions and
+// the edit modal need. Without this, searched items render with inert controls.
+async function resolvedInventoryItems(items: EverShelfInventoryItem[], callService: CallService, location: EverShelfInventoryLocation) {
+  const aggregated = items.filter((item) => itemInventoryId(item) === null && itemInventoryIds(item).length > 0)
+  if (aggregated.length === 0) return items
+
+  try {
+    const result = await Promise.resolve(callService({
+      domain: 'evershelf',
+      service: 'list_inventory',
+      serviceData: location === 'all' ? {} : { location },
+      returnResponse: true,
+    }))
+    const rowsById = new Map(inventoryResponseFromResult(result).inventory.flatMap((row) => {
+      const inventoryId = itemInventoryId(row)
+      return inventoryId === null ? [] : [[inventoryId, row] as const]
+    }))
+    return items.flatMap((item) => {
+      if (itemInventoryId(item) !== null) return [item]
+      const rows = itemInventoryIds(item).flatMap((inventoryId) => {
+        const row = rowsById.get(inventoryId)
+        return row ? [row] : []
+      })
+      return rows.length > 0 ? rows : [item]
+    })
+  } catch (caughtError: unknown) {
+    logInventorySearch('aggregated-rows-unresolved', {
+      itemCount: aggregated.length,
+      message: caughtError instanceof Error ? caughtError.message : 'Unable to load inventory rows',
+    })
+    return items
+  }
+}
+
 function filterInventoryItems(items: EverShelfInventoryItem[], filterMode: InventoryFilterMode) {
   return filterMode === 'all' ? items : items.filter((item) => {
     const days = daysUntilExpiry(item)
@@ -314,6 +398,19 @@ function formatQuantity(value: number) {
 
 function rowSubtitle(expiry: ExpiryInfo, quantity: number | null) {
   return quantity === null ? expiry.label : `Quantity ${formatQuantity(quantity)} - ${expiry.label}`
+}
+
+function quantityChangeHint(quantityDelta: number, locationLabel: string) {
+  const amount = formatQuantity(Math.abs(quantityDelta))
+  const itemLabel = Math.abs(quantityDelta) === 1 ? 'item' : 'items'
+  return quantityDelta > 0
+    ? `Saving adds ${amount} ${itemLabel} to the ${locationLabel}.`
+    : `Saving removes ${amount} ${itemLabel} from the ${locationLabel}.`
+}
+
+function instanceLocationLabel(item: EverShelfInventoryItem, fallbackLabel: string) {
+  const location = itemLocation(item)
+  return location ? LOCATION_DELETE_LABELS[location] : fallbackLabel
 }
 
 function promptShoppingQuantity(title: string) {
@@ -458,7 +555,7 @@ function PantryRow({ expiry, inventoryId, locationLabel, multiItem, onDeleted, o
           </span>
         </button>
         {multiItem ? (
-          <button aria-label={`View ${title} individual items`} className={styles.rowAction} data-modal-disclosure-button="true" onClick={(event) => {
+          <button aria-label={`Edit ${title}`} className={styles.rowAction} data-modal-disclosure-button="true" onClick={(event) => {
             event.stopPropagation()
             onOpenDetails()
           }} type="button">
@@ -482,42 +579,133 @@ function PantryRow({ expiry, inventoryId, locationLabel, multiItem, onDeleted, o
   )
 }
 
-function InventoryItemInstancesModal({ item, locationLabel, onClose, onInventoryChanged, open }: { item: EverShelfInventoryDisplayItem | null; locationLabel: string; onClose: () => void; onInventoryChanged: () => void; open: boolean }) {
+type InventoryBatchRow = { inventoryId: number; quantity: number }
+type InventoryDeleteStep = { inventoryId: number; quantity?: number }
+
+function inventoryBatchRows(item: EverShelfInventoryDisplayItem | null) {
+  if (!item) return []
+  return itemInstances(item).map((instance) => {
+    const inventoryId = itemInventoryId(instance)
+    return inventoryId === null ? null : { inventoryId, quantity: itemRawQuantity(instance) }
+  })
+}
+
+// EverShelf stores a food item as one or more inventory rows, so removing stock is spread across
+// them: whole rows go first so repeat scans of the same batch get consolidated.
+function inventoryDecreaseSteps(rows: InventoryBatchRow[], amount: number) {
+  const steps: InventoryDeleteStep[] = []
+  const remainingRows: InventoryBatchRow[] = []
+  let remaining = amount
+  for (const row of [...rows].sort((left, right) => left.quantity - right.quantity)) {
+    if (remaining <= 0) {
+      remainingRows.push(row)
+      continue
+    }
+    if (row.quantity <= remaining) {
+      steps.push({ inventoryId: row.inventoryId })
+      remaining -= row.quantity
+      continue
+    }
+    steps.push({ inventoryId: row.inventoryId, quantity: remaining })
+    remainingRows.push({ inventoryId: row.inventoryId, quantity: row.quantity - remaining })
+    remaining = 0
+  }
+  return { remainingRows, steps }
+}
+
+function InventoryItemDetailsModal({ item, locationLabel, onClose, onInventoryChanged, open }: { item: EverShelfInventoryDisplayItem | null; locationLabel: string; onClose: () => void; onInventoryChanged: () => void; open: boolean }) {
   const callService = useHass((state) => state.helpers.callService) as unknown as CallService
-  const [busyAction, setBusyAction] = useState<string | null>(null)
+  const [busyAction, setBusyAction] = useState<'delete' | 'edit' | null>(null)
   const [error, setError] = useState<string | null>(null)
   const title = item ? itemName(item) : 'Inventory Item'
   const instances = useMemo(() => (item ? itemInstances(item) : []), [item])
-  const [expiryDrafts, setExpiryDrafts] = useState<Record<number, string>>(() => (
-    Object.fromEntries(instances.map((instance, index) => [index + 1, itemExpiryDate(instance) ?? '']))
-  ))
+  const batchRows = useMemo(() => inventoryBatchRows(item), [item])
+  const editableRows = useMemo(() => batchRows.filter((row): row is InventoryBatchRow => row !== null), [batchRows])
+  const editable = batchRows.length > 0 && editableRows.length === batchRows.length
+  const savedQuantity = useMemo(() => instances.reduce((total, instance) => total + itemRawQuantity(instance), 0), [instances])
+  const savedExpiryDate = item ? itemExpiryDate(item) ?? '' : ''
+  const itemLocationLabel = item ? instanceLocationLabel(item, locationLabel) : locationLabel
+  const [expiryDraft, setExpiryDraft] = useState(savedExpiryDate)
+  const [quantityDraft, setQuantityDraft] = useState(savedQuantity)
+
+  // Reopening the same item keeps this component mounted, so the drafts and the busy/error state
+  // are rebuilt from the latest Home Assistant data every time the sheet opens.
+  const draftKey = open ? `${itemInstancesKey(item)}|${savedQuantity}|${savedExpiryDate}` : 'closed'
+  const [appliedDraftKey, setAppliedDraftKey] = useState(draftKey)
+  if (appliedDraftKey !== draftKey) {
+    setAppliedDraftKey(draftKey)
+    if (open) {
+      setBusyAction(null)
+      setError(null)
+      setExpiryDraft(savedExpiryDate)
+      setQuantityDraft(savedQuantity)
+    }
+  }
+
+  const quantityDelta = quantityDraft - savedQuantity
+  const expiryChanged = expiryDraft !== savedExpiryDate
+  const busy = busyAction !== null
 
   const finishAction = () => {
     onInventoryChanged()
     onClose()
   }
 
-  const resetInstanceDraft = (instanceNumber: number) => {
-    const expiryDate = itemExpiryDate(instances[instanceNumber - 1]) ?? ''
-    setExpiryDrafts((current) => ({ ...current, [instanceNumber]: expiryDate }))
+  const resetDraft = () => {
+    setExpiryDraft(savedExpiryDate)
+    setQuantityDraft(savedQuantity)
     setError(null)
   }
 
-  const saveInstance = (instanceNumber: number) => {
-    const inventoryId = itemInventoryId(instances[instanceNumber - 1])
-    if (inventoryId === null) return
-    const draft = expiryDrafts[instanceNumber] ?? ''
-    if (!validExpiryInput(draft)) {
+  const deleteInventoryRow = (step: InventoryDeleteStep) => Promise.resolve(callService({
+    domain: 'evershelf',
+    service: 'delete_inventory',
+    serviceData: step.quantity === undefined
+      ? { inventory_id: step.inventoryId }
+      : { inventory_id: step.inventoryId, quantity: step.quantity },
+  }))
+
+  // Home Assistant owns the stock change: EverShelf adds the extra items to a matching batch and
+  // removes reduced items row by row, and the expiration move is applied one item at a time.
+  const applyInventoryChanges = async (rows: InventoryBatchRow[], expiryDate: string) => {
+    const decrease = quantityDelta < 0 ? inventoryDecreaseSteps(rows, -quantityDelta) : { remainingRows: rows, steps: [] as InventoryDeleteStep[] }
+    for (const step of decrease.steps) {
+      await deleteInventoryRow(step)
+    }
+    if (expiryChanged) {
+      for (const row of decrease.remainingRows) {
+        for (let moved = 0; moved < Math.ceil(row.quantity); moved += 1) {
+          await Promise.resolve(callService({
+            domain: 'evershelf',
+            service: 'update_inventory_item',
+            serviceData: { expiry_date: expiryDate, inventory_id: row.inventoryId },
+          }))
+        }
+      }
+    }
+    if (quantityDelta > 0 && item) {
+      await Promise.resolve(callService({
+        domain: 'evershelf',
+        service: 'add_scanned_item',
+        serviceData: inventoryAddServiceData(item, quantityDelta, expiryDate),
+      }))
+    }
+  }
+
+  const saveItem = () => {
+    if (!editable) return
+    if (!validExpiryInput(expiryDraft)) {
       setError('Use YYYY-MM-DD or clear the date.')
       return
     }
-    setBusyAction(`edit-${instanceNumber}`)
+    if (quantityDelta === 0 && !expiryChanged) return
+    if (quantityDelta > 0 && itemLocation(item ?? {}) === null) {
+      setError(`Home Assistant did not report a storage location for ${title}, so more cannot be added.`)
+      return
+    }
+    setBusyAction('edit')
     setError(null)
-    void Promise.resolve(callService({
-      domain: 'evershelf',
-      service: 'update_inventory_item',
-      serviceData: { expiry_date: draft.trim(), inventory_id: inventoryId },
-    }))
+    void applyInventoryChanges(editableRows, expiryDraft.trim())
       .then(finishAction)
       .catch((caughtError: unknown) => {
         setBusyAction(null)
@@ -525,17 +713,26 @@ function InventoryItemInstancesModal({ item, locationLabel, onClose, onInventory
       })
   }
 
-  const deleteInstance = (instanceNumber: number) => {
-    const inventoryId = itemInventoryId(instances[instanceNumber - 1])
-    if (inventoryId === null) return
-    if (!window.confirm(`Delete ${title} item ${instanceNumber} from the ${locationLabel}?`)) return
-    setBusyAction(`delete-${instanceNumber}`)
+  const deleteItem = () => {
+    if (!editable) return
+    let deleteSteps = editableRows.map((row) => ({ inventoryId: row.inventoryId } satisfies InventoryDeleteStep))
+    if (savedQuantity > 1) {
+      const promptResult = promptDeleteQuantity(title, savedQuantity)
+      if (promptResult.status === 'cancelled') return
+      if (promptResult.status === 'invalid') {
+        setError(`Enter a number from 1 to ${formatQuantity(savedQuantity)}.`)
+        return
+      }
+      if (promptResult.quantity < savedQuantity) deleteSteps = inventoryDecreaseSteps(editableRows, promptResult.quantity).steps
+    } else if (!window.confirm(`Delete ${title} from the ${itemLocationLabel}?`)) return
+
+    setBusyAction('delete')
     setError(null)
-    void Promise.resolve(callService({
-      domain: 'evershelf',
-      service: 'delete_inventory_item',
-      serviceData: { inventory_id: inventoryId },
-    }))
+    void deleteSteps
+      .reduce(
+        (chain, step) => chain.then(() => deleteInventoryRow(step)).then(() => undefined),
+        Promise.resolve(),
+      )
       .then(finishAction)
       .catch((caughtError: unknown) => {
         setBusyAction(null)
@@ -547,38 +744,39 @@ function InventoryItemInstancesModal({ item, locationLabel, onClose, onInventory
     <ModalSheet onClose={onClose} open={open && item !== null} title={title}>
       <div className={styles.instancesSheet}>
         {error && <p className={styles.error} role="alert">{error}</p>}
-        <ul className={styles.instancesList}>
-          {instances.map((instance, index) => {
-            const instanceNumber = index + 1
-            const editBusy = busyAction === `edit-${instanceNumber}`
-            const deleteBusy = busyAction === `delete-${instanceNumber}`
-            const expiryDate = itemExpiryDate(instance) ?? ''
-            const draft = expiryDrafts[instanceNumber] ?? ''
-            const dateChanged = draft !== expiryDate
-            const disabled = busyAction !== null
-            return (
-              <li className={styles.instanceRow} key={itemInventoryId(instance) ?? instanceNumber}>
-                <div className={styles.instanceHeader}>
-                  <span className={styles.instanceCopy}>
-                    <strong>{title}</strong>
-                  </span>
-                  <button aria-busy={deleteBusy ? 'true' : undefined} aria-label={`Delete ${title} item ${instanceNumber}`} className={`${styles.rowAction} ${styles.deleteAction}`} disabled={disabled} onClick={() => deleteInstance(instanceNumber)} type="button">
-                    <MaterialIcon name="mdi:delete" size={22} />
-                  </button>
-                </div>
-                <div className={styles.instanceEditPanel}>
-                  <NativePickerField ariaLabel={`Expiration date for ${title} item ${instanceNumber}`} className={styles.instanceDateField} emptyLabel="No expiration date" label="Expiration Date" onChange={(value) => setExpiryDrafts((current) => ({ ...current, [instanceNumber]: value }))} type="date" value={draft} />
-                  {dateChanged && (
-                    <span className={styles.instanceEditActions}>
-                      <button className={styles.secondaryAction} disabled={disabled} onClick={() => resetInstanceDraft(instanceNumber)} type="button">Reset</button>
-                      <button aria-busy={editBusy ? 'true' : undefined} aria-label={`Save ${title} item ${instanceNumber}`} className={styles.primaryAction} disabled={disabled} onClick={() => saveInstance(instanceNumber)} type="button">Save</button>
-                    </span>
-                  )}
-                </div>
-              </li>
-            )
-          })}
-        </ul>
+        <div className={styles.instanceRow}>
+          <div className={styles.instanceHeader}>
+            <span className={styles.instanceCopy}>
+              <strong>{title}</strong>
+              <small>{`In the ${itemLocationLabel}`}</small>
+            </span>
+            <button aria-busy={busyAction === 'delete' ? 'true' : undefined} aria-label={`Delete ${title}`} className={`${styles.rowAction} ${styles.deleteAction}`} disabled={busy || !editable} onClick={deleteItem} type="button">
+              <MaterialIcon name="mdi:delete" size={22} />
+            </button>
+          </div>
+          <div className={styles.instanceEditPanel}>
+            <NumberStepper
+              ariaLabel={`Quantity for ${title}`}
+              decrementLabel={`Remove one ${title}`}
+              disabled={busy || !editable}
+              formatValue={formatQuantity}
+              incrementLabel={`Add one ${title}`}
+              label="Quantity"
+              max={INVENTORY_QUANTITY_MAX}
+              min={Math.min(1, savedQuantity)}
+              onChange={setQuantityDraft}
+              value={quantityDraft}
+            />
+            <NativePickerField ariaLabel={`Expiration date for ${title}`} className={styles.instanceDateField} emptyLabel="No expiration date" label="Expiration Date" onChange={setExpiryDraft} type="date" value={expiryDraft} />
+            {quantityDelta !== 0 && <Description className={styles.instanceHint}>{quantityChangeHint(quantityDelta, itemLocationLabel)}</Description>}
+            {(expiryChanged || quantityDelta !== 0) && (
+              <span className={styles.instanceEditActions}>
+                <button className={styles.secondaryAction} disabled={busy} onClick={resetDraft} type="button">Reset</button>
+                <button aria-busy={busyAction === 'edit' ? 'true' : undefined} aria-label={`Save ${title}`} className={styles.primaryAction} disabled={busy} onClick={saveItem} type="button">Save</button>
+              </span>
+            )}
+          </div>
+        </div>
       </div>
     </ModalSheet>
   )
@@ -1037,13 +1235,18 @@ export function EverShelfInventoryPanel({ controls, location, title }: EverShelf
         returnResponse: true,
       }),
     )
-      .then((result) => {
+      .then(async (result) => {
         if (cancelled || requestIdRef.current !== requestId) {
           logInventorySearch('response-stale', { id: requestId, query: searchQuery })
           return
         }
         const response = inventoryResponseFromResult(result)
-        const nextItems = inventoryItemsFromSearchResponse(response, searchQuery)
+        const searchItems = inventoryItemsFromSearchResponse(response, searchQuery)
+        const nextItems = await resolvedInventoryItems(searchItems, callService, location)
+        if (cancelled || requestIdRef.current !== requestId) {
+          logInventorySearch('response-stale', { id: requestId, query: searchQuery })
+          return
+        }
         logInventorySearch('response-received', {
           id: requestId,
           initialLoad,
@@ -1145,7 +1348,7 @@ export function EverShelfInventoryPanel({ controls, location, title }: EverShelf
           </>
         )}
       </article>
-      <InventoryItemInstancesModal key={itemInstancesKey(detailsItem)} item={detailsItem} locationLabel={LOCATION_DELETE_LABELS[location]} onClose={() => setDetailsOpen(false)} onInventoryChanged={reloadInventory} open={detailsOpen} />
+      <InventoryItemDetailsModal key={itemInstancesKey(detailsItem)} item={detailsItem} locationLabel={LOCATION_DELETE_LABELS[location]} onClose={() => setDetailsOpen(false)} onInventoryChanged={reloadInventory} open={detailsOpen} />
     </>
   )
 }

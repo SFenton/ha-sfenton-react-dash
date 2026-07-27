@@ -48,6 +48,7 @@ import { ModalOpenerRow } from '../components/core/ModalOpenerRow'
 import { NativePickerField } from '../components/core/NativePickerField'
 import { OptionPickerDialog, type PickerOption } from '../components/core/OptionPickerDialog'
 import { SectionHeader } from '../components/core/SectionHeader'
+import { Stepper } from '../components/core/Stepper'
 import { derivedAirPurifierEntityIds, formatAirQualitySummary } from '../components/hass/airQualityState'
 import { resolveEntityAction, type EntityActionStateMap } from '../components/hass/entityActions'
 import { asEntityName, formatCompactEntityState, formatContactEntityState, isActiveState, isContactOpen, isOccupancyActive, titleCaseState } from '../components/hass/entityState'
@@ -4331,21 +4332,16 @@ function EightSleepScheduleTemperatureControl({
   }
 
   return (
-    <div className={styles.eightSleepStageControl}>
-      <span className={styles.eightSleepStageLabel}>
-        <MaterialIcon name={icon} size={15} />
-        {label}
-      </span>
-      <div className={styles.eightSleepStepper}>
-        <button aria-label={`Decrease ${sideTitle} ${label} level`} className={styles.eightSleepStepperButton} disabled={!canChange} onClick={() => applyDelta(-step)} type="button">
-          <MaterialIcon name="mdi:minus" size={20} />
-        </button>
-        <span className={styles.eightSleepStageValue}>{stateText}</span>
-        <button aria-label={`Increase ${sideTitle} ${label} level`} className={styles.eightSleepStepperButton} disabled={!canChange} onClick={() => applyDelta(step)} type="button">
-          <MaterialIcon name="mdi:plus" size={20} />
-        </button>
-      </div>
-    </div>
+    <Stepper
+      decrementLabel={`Decrease ${sideTitle} ${label} level`}
+      disabled={!canChange}
+      displayValue={stateText}
+      icon={icon}
+      incrementLabel={`Increase ${sideTitle} ${label} level`}
+      label={label}
+      onDecrement={() => applyDelta(-step)}
+      onIncrement={() => applyDelta(step)}
+    />
   )
 }
 

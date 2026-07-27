@@ -889,10 +889,11 @@ export const mockState: MockHassState = {
       }
       if (params.domain === 'evershelf' && params.service === 'list_inventory' && params.returnResponse === true) {
         const location = (params.serviceData as { location?: string } | undefined)?.location
+        const search = (params.serviceData as { q?: string } | undefined)?.q
         const fridgeInventory = [
-          { expiry_date: mockDateOffset(370), id: 204, location: 'frigo', name: 'Salsa' },
-          { expiry_date: mockDateOffset(-400), id: 205, location: 'frigo', name: 'Milk' },
-          { expiry_date: mockDateOffset(5), id: 203, location: 'frigo', name: 'Greek Yogurt', quantity: 2 },
+          { expiry_date: mockDateOffset(370), id: 204, location: 'frigo', name: 'Salsa', product_id: 2004, unit: 'pz', vacuum_sealed: false },
+          { expiry_date: mockDateOffset(-400), id: 205, location: 'frigo', name: 'Milk', product_id: 2005, unit: 'pz', vacuum_sealed: false },
+          { expiry_date: mockDateOffset(5), id: 203, location: 'frigo', name: 'Greek Yogurt', product_id: 2003, quantity: 2, unit: 'pz', vacuum_sealed: false },
         ]
         const freezerInventory = [
           { expiry_date: mockDateOffset(190), id: 304, location: 'freezer', name: 'Waffles' },
@@ -907,10 +908,10 @@ export const mockState: MockHassState = {
           { expiry_date: mockDateOffset(80), id: 504, location: 'cabinet', name: 'Paper Plates' },
         ]
         const pantryInventory = [
-          { expiry_date: mockDateOffset(40), id: 103, location: 'dispensa', name: 'Ziti' },
-          { expiry_date: mockDateOffset(3), id: 102, location: 'dispensa', name: 'Canned Beans', quantity: 1 },
-          { expiry_date: mockDateOffset(3), id: 106, location: 'dispensa', name: 'Canned Beans', quantity: 1 },
-          { expiry_date: mockDateOffset(-10), id: 101, location: 'dispensa', name: 'Almond Flour' },
+          { expiry_date: mockDateOffset(40), id: 103, location: 'dispensa', name: 'Ziti', product_id: 1003, unit: 'pz', vacuum_sealed: false },
+          { expiry_date: mockDateOffset(3), id: 102, location: 'dispensa', name: 'Canned Beans', product_id: 1002, quantity: 1, unit: 'pz', vacuum_sealed: false },
+          { expiry_date: mockDateOffset(3), id: 106, location: 'dispensa', name: 'Canned Beans', product_id: 1002, quantity: 1, unit: 'pz', vacuum_sealed: false },
+          { expiry_date: mockDateOffset(-10), id: 101, location: 'dispensa', name: 'Almond Flour', product_id: 1001, unit: 'pz', vacuum_sealed: false },
         ]
         const inventory = location === 'frigo'
           ? fridgeInventory
@@ -923,6 +924,30 @@ export const mockState: MockHassState = {
                 : location
                   ? pantryInventory
                   : [...pantryInventory, ...fridgeInventory, ...freezerInventory, ...spiceRackInventory, ...cabinetInventory]
+        // EverShelf's taxonomy search collapses a product's inventory rows into one aggregated entry
+        // that only carries inventory_ids, so searches mirror that shape instead of returning rows.
+        if (search?.trim().toLocaleLowerCase().includes('beans')) {
+          return Promise.resolve({
+            response: {
+              inventory: [
+                {
+                  expiry_date: mockDateOffset(3),
+                  inventory_count: 2,
+                  inventory_id: null,
+                  inventory_ids: [102, 106],
+                  location: 'dispensa',
+                  name: 'Canned Beans',
+                  product_id: 1002,
+                  quantity: 2,
+                  unit: 'pz',
+                  vacuum_sealed: false,
+                },
+              ],
+              search: search.trim(),
+              source: 'ha_sensor_product_search',
+            },
+          })
+        }
         return Promise.resolve({ response: { inventory } })
       }
       if (params.domain === 'evershelf' && params.service === 'add_scanned_item' && params.returnResponse === true) {
