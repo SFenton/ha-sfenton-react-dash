@@ -439,10 +439,13 @@ function batchExpiryLabel(expiryDate: string) {
 
 // Batches with more than one item read better when the action copy says which date it applies to,
 // but a single-batch item does not need the qualifier.
-function batchQualifier(expiryDate: string, multipleBatches: boolean) {
-  if (!multipleBatches) return ''
+// Prepared units split into their own batch that can share an expiration date with the rest of
+// the stock, so the prepared state is part of what makes a batch label unique.
+function batchQualifier(expiryDate: string, multipleBatches: boolean, preparedFood = false) {
+  if (!multipleBatches) return preparedFood ? ' prepared' : ''
   const label = batchExpiryLabel(expiryDate)
-  return label ? ` expiring ${label}` : ' without an expiration date'
+  const expiry = label ? ` expiring ${label}` : ' without an expiration date'
+  return preparedFood ? `${expiry} prepared` : expiry
 }
 
 function quantityChangeHint(quantityDelta: number, locationLabel: string) {
@@ -850,7 +853,7 @@ function InventoryItemDetailsModal({ item, locationLabel, onClose, onInventoryCh
   const togglePreparedFood = (batch: InventoryBatch) => {
     if (!batch.addressable) return
     const nextPrepared = !batch.preparedFood
-    const qualifier = batchQualifier(batch.expiryDate, multipleBatches)
+    const qualifier = batchQualifier(batch.expiryDate, multipleBatches, batch.preparedFood)
     let quantity = batch.quantity
     if (batch.quantity > 1) {
       const promptResult = promptPreparedQuantity(`${title}${qualifier}`, batch.quantity, nextPrepared)
@@ -882,7 +885,7 @@ function InventoryItemDetailsModal({ item, locationLabel, onClose, onInventoryCh
   }
 
   const deleteBatch = (batch: InventoryBatch) => {    if (!batch.addressable) return
-    const qualifier = batchQualifier(batch.expiryDate, multipleBatches)
+    const qualifier = batchQualifier(batch.expiryDate, multipleBatches, batch.preparedFood)
     let deleteSteps: InventoryDeleteStep[] = batch.rows.map((row) => ({ inventoryId: row.inventoryId }))
     if (batch.quantity > 1) {
       const promptResult = promptDeleteQuantity(`${title}${qualifier}`, batch.quantity)
@@ -910,7 +913,7 @@ function InventoryItemDetailsModal({ item, locationLabel, onClose, onInventoryCh
         {error && <p className={styles.error} role="alert">{error}</p>}
         <ul className={styles.instancesList}>
           {batches.map((batch) => {
-            const qualifier = batchQualifier(batch.expiryDate, multipleBatches)
+            const qualifier = batchQualifier(batch.expiryDate, multipleBatches, batch.preparedFood)
             const expiryDraft = expiryDrafts[batch.key] ?? batch.expiryDate
             const quantityDraft = quantityDrafts[batch.key] ?? batch.quantity
             const quantityDelta = quantityDraft - batch.quantity
@@ -921,7 +924,7 @@ function InventoryItemDetailsModal({ item, locationLabel, onClose, onInventoryCh
                 <div className={styles.instanceHeader}>
                   <span className={styles.instanceCopy}>
                     <strong>{multipleBatches ? expiryInfo(batch.expiryDate || undefined).label : title}</strong>
-                    <small>{`In the ${batch.locationLabel}`}</small>
+                    <small>{batch.preparedFood ? `In the ${batch.locationLabel} · Prepared` : `In the ${batch.locationLabel}`}</small>
                   </span>
                   <button aria-busy={busyAction === `delete-${batch.key}` ? 'true' : undefined} aria-label={`Delete ${title}${qualifier}`} className={`${styles.rowAction} ${styles.deleteAction}`} disabled={disabled} onClick={() => deleteBatch(batch)} type="button">
                     <MaterialIcon name="mdi:delete" size={22} />
