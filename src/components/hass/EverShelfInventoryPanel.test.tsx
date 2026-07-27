@@ -26,7 +26,7 @@ function openGreekYogurtEditModal() {
 }
 
 function openCannedBeansEditModal() {
-  return openEditModal({ itemName: 'Canned Beans', listLabel: 'Pantry inventory list', location: 'dispensa', title: 'Pantry' })
+  return openEditModal({ itemName: 'Canned Beans', listLabel: 'Pantry inventory list', location: 'dispensa', quantityLabel: 'Quantity 5', title: 'Pantry' })
 }
 
 async function clickAndFlush(button: HTMLElement) {
@@ -38,6 +38,27 @@ async function clickAndFlush(button: HTMLElement) {
     await Promise.resolve()
   })
 }
+
+function offsetDisplayDate(days: number) {
+  const date = new Date()
+  date.setDate(date.getDate() + days)
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${month}/${day}/${date.getFullYear()}`
+}
+
+function offsetIsoDate(days: number) {
+  const date = new Date()
+  date.setDate(date.getDate() + days)
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${date.getFullYear()}-${month}-${day}`
+}
+
+// The pantry mock stocks Canned Beans as two expiration batches: 2 items expiring in three days and
+// 3 items expiring in 200 days.
+const SOON_BATCH = `expiring ${offsetDisplayDate(3)}`
+const LATER_BATCH = `expiring ${offsetDisplayDate(200)}`
 
 function inventoryServiceCalls() {
   return mockCallServiceCalls.filter((call) => call.domain === 'evershelf' && call.service !== 'list_inventory')
@@ -107,14 +128,14 @@ describe('EverShelfInventoryPanel item edit modal', () => {
     ])
   })
 
-  it('spreads a reduced quantity across the EverShelf rows behind one food item', async () => {
+  it('spreads a reduced quantity across the EverShelf rows behind one expiration batch', async () => {
     const dialog = await openCannedBeansEditModal()
 
-    expect(within(dialog).getByRole('spinbutton', { name: 'Quantity for Canned Beans' })).toHaveTextContent('2')
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Remove one Canned Beans' }))
+    expect(within(dialog).getByRole('spinbutton', { name: `Quantity for Canned Beans ${SOON_BATCH}` })).toHaveTextContent('2')
+    fireEvent.click(within(dialog).getByRole('button', { name: `Remove one Canned Beans ${SOON_BATCH}` }))
 
     mockCallServiceCalls.length = 0
-    await clickAndFlush(within(dialog).getByRole('button', { name: 'Save Canned Beans' }))
+    await clickAndFlush(within(dialog).getByRole('button', { name: `Save Canned Beans ${SOON_BATCH}` }))
 
     expect(inventoryServiceCalls()).toEqual([
       {
@@ -125,15 +146,15 @@ describe('EverShelfInventoryPanel item edit modal', () => {
     ])
   })
 
-  it('asks how many items to delete when the food item holds more than one', async () => {
+  it('asks how many items to delete when the batch holds more than one', async () => {
     const dialog = await openCannedBeansEditModal()
     const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true)
     const promptSpy = vi.spyOn(window, 'prompt').mockReturnValue('1')
 
     mockCallServiceCalls.length = 0
-    await clickAndFlush(within(dialog).getByRole('button', { name: 'Delete Canned Beans' }))
+    await clickAndFlush(within(dialog).getByRole('button', { name: `Delete Canned Beans ${SOON_BATCH}` }))
 
-    expect(promptSpy).toHaveBeenCalledWith('Quantity of Canned Beans to delete (available: 2).', '1')
+    expect(promptSpy).toHaveBeenCalledWith(`Quantity of Canned Beans ${SOON_BATCH} to delete (available: 2).`, '1')
     expect(confirmSpy).not.toHaveBeenCalled()
     expect(inventoryServiceCalls()).toEqual([
       { domain: 'evershelf', service: 'delete_inventory', serviceData: { inventory_id: 102 } },
@@ -142,12 +163,12 @@ describe('EverShelfInventoryPanel item edit modal', () => {
     confirmSpy.mockRestore()
   })
 
-  it('deletes every EverShelf row behind the food item when the full quantity is confirmed', async () => {
+  it('deletes only the selected batch when its full quantity is confirmed', async () => {
     const dialog = await openCannedBeansEditModal()
     const promptSpy = vi.spyOn(window, 'prompt').mockReturnValue('2')
 
     mockCallServiceCalls.length = 0
-    await clickAndFlush(within(dialog).getByRole('button', { name: 'Delete Canned Beans' }))
+    await clickAndFlush(within(dialog).getByRole('button', { name: `Delete Canned Beans ${SOON_BATCH}` }))
 
     expect(inventoryServiceCalls()).toEqual([
       { domain: 'evershelf', service: 'delete_inventory', serviceData: { inventory_id: 102 } },
@@ -156,12 +177,12 @@ describe('EverShelfInventoryPanel item edit modal', () => {
     promptSpy.mockRestore()
   })
 
-  it('rejects a delete quantity outside the stocked amount', async () => {
+  it('rejects a delete quantity outside the batch amount', async () => {
     const dialog = await openCannedBeansEditModal()
     const promptSpy = vi.spyOn(window, 'prompt').mockReturnValue('5')
 
     mockCallServiceCalls.length = 0
-    await clickAndFlush(within(dialog).getByRole('button', { name: 'Delete Canned Beans' }))
+    await clickAndFlush(within(dialog).getByRole('button', { name: `Delete Canned Beans ${SOON_BATCH}` }))
 
     expect(inventoryServiceCalls()).toEqual([])
     expect(within(dialog).getByRole('alert')).toHaveTextContent('Enter a number from 1 to 2.')
@@ -212,13 +233,13 @@ describe('EverShelfInventoryPanel item edit modal', () => {
 
   it('keeps searched items editable by expanding aggregated EverShelf search results into rows', async () => {
     render(<InventoryPanelHarness location="dispensa" title="Pantry" />)
-    await screen.findByRole('group', { name: /Canned Beans Quantity 2/i })
+    await screen.findByRole('group', { name: /Canned Beans Quantity 5/i })
 
     fireEvent.click(await screen.findByRole('button', { name: 'Search inventory' }))
     fireEvent.change(screen.getByLabelText('Search inventory'), { target: { value: 'beans' } })
 
     await waitFor(() => expect(screen.getAllByRole('group', { name: /Quantity|Expires|Expired/i })).toHaveLength(1))
-    const row = screen.getByRole('group', { name: /Canned Beans Quantity 2/i })
+    const row = screen.getByRole('group', { name: /Canned Beans Quantity 5/i })
     await waitFor(() => expect(mockCallServiceCalls).toContainEqual({
       domain: 'evershelf',
       returnResponse: true,
@@ -232,14 +253,69 @@ describe('EverShelfInventoryPanel item edit modal', () => {
 
     fireEvent.click(editButton)
     const dialog = await screen.findByRole('dialog', { name: /Canned Beans/i })
-    expect(within(dialog).getByRole('spinbutton', { name: 'Quantity for Canned Beans' })).toHaveTextContent('2')
+    expect(within(dialog).getByRole('spinbutton', { name: `Quantity for Canned Beans ${SOON_BATCH}` })).toHaveTextContent('2')
 
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Remove one Canned Beans' }))
+    fireEvent.click(within(dialog).getByRole('button', { name: `Remove one Canned Beans ${SOON_BATCH}` }))
     mockCallServiceCalls.length = 0
-    await clickAndFlush(within(dialog).getByRole('button', { name: 'Save Canned Beans' }))
+    await clickAndFlush(within(dialog).getByRole('button', { name: `Save Canned Beans ${SOON_BATCH}` }))
 
     expect(inventoryServiceCalls()).toEqual([
       { domain: 'evershelf', service: 'delete_inventory', serviceData: { inventory_id: 102 } },
+    ])
+  })
+
+  it('collapses every expiration batch of a food item into one row', async () => {
+    render(<InventoryPanelHarness location="dispensa" title="Pantry" />)
+    const list = await screen.findByLabelText('Pantry inventory list')
+
+    const rows = await within(list).findAllByRole('group', { name: /Expires|Expired|No expiration date/i })
+    expect(rows.map((row) => row.getAttribute('aria-label'))).toEqual([
+      `Almond Flour Expired on ${offsetDisplayDate(-10)}`,
+      `Canned Beans Quantity 5 - Expires on ${offsetDisplayDate(3)} (+1 more date)`,
+      `Ziti Expires on ${offsetDisplayDate(40)}`,
+    ])
+  })
+
+  it('switches between the expiration batches of one food item inside the modal', async () => {
+    const dialog = await openCannedBeansEditModal()
+
+    const batches = within(dialog).getByRole('radiogroup', { name: 'Canned Beans expiration batches' })
+    expect(within(batches).getAllByRole('radio').map((option) => option.textContent)).toEqual([
+      `Expires on ${offsetDisplayDate(3)}Quantity 2 - In the pantry`,
+      `Expires on ${offsetDisplayDate(200)}Quantity 3 - In the pantry`,
+    ])
+    expect(within(batches).getAllByRole('radio')[0]).toHaveAttribute('aria-checked', 'true')
+
+    fireEvent.click(within(batches).getAllByRole('radio')[1])
+
+    expect(within(batches).getAllByRole('radio')[1]).toHaveAttribute('aria-checked', 'true')
+    expect(within(dialog).getByRole('spinbutton', { name: `Quantity for Canned Beans ${LATER_BATCH}` })).toHaveTextContent('3')
+    expect(within(dialog).getByLabelText(`Expiration date for Canned Beans ${LATER_BATCH}`)).toHaveValue(offsetIsoDate(200))
+  })
+
+  it('adds stock to the selected expiration batch only', async () => {
+    const dialog = await openCannedBeansEditModal()
+
+    fireEvent.click(within(dialog).getAllByRole('radio')[1])
+    fireEvent.click(within(dialog).getByRole('button', { name: `Add one Canned Beans ${LATER_BATCH}` }))
+
+    mockCallServiceCalls.length = 0
+    await clickAndFlush(within(dialog).getByRole('button', { name: `Save Canned Beans ${LATER_BATCH}` }))
+
+    expect(inventoryServiceCalls()).toEqual([
+      {
+        domain: 'evershelf',
+        service: 'add_scanned_item',
+        serviceData: {
+          expiry_date: offsetIsoDate(200),
+          location: 'dispensa',
+          name: 'Canned Beans',
+          product_id: 1002,
+          quantity: 1,
+          unit: 'pz',
+          vacuum_sealed: false,
+        },
+      },
     ])
   })
 

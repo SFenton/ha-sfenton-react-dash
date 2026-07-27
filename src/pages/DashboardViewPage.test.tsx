@@ -4252,7 +4252,7 @@ describe('DashboardViewPage', () => {
 
   it('renders Pantry, Fridge, and Freezer inventory rows alphabetically with expiration subtitles', async () => {
     const almondFlourLabel = testExpiryLabel(-10)
-    const cannedBeansLabel = testExpiryLabel(3, 2)
+    const cannedBeansLabel = `${testExpiryLabel(3, 5)} (+1 more date)`
     const zitiLabel = testExpiryLabel(40)
     const greekYogurtLabel = testExpiryLabel(5, 2)
     const milkLabel = testExpiryLabel(-400)
@@ -4366,28 +4366,30 @@ describe('DashboardViewPage', () => {
     fireEvent.click(editCannedBeansButton)
     expect(await screen.findByRole('dialog', { name: /Canned Beans/i })).toBeInTheDocument()
     expect(screen.queryByText('Individual pantry items')).not.toBeInTheDocument()
-    const expirationInput = screen.getByLabelText('Expiration date for Canned Beans')
+    const cannedBeansBatch = `expiring ${testDisplayDateValue(testAddDays(testTodayDate(), 3))}`
+    expect(screen.getByRole('radiogroup', { name: 'Canned Beans expiration batches' })).toBeInTheDocument()
+    const expirationInput = screen.getByLabelText(`Expiration date for Canned Beans ${cannedBeansBatch}`)
     expect(expirationInput).toHaveAttribute('type', 'date')
-    expect(screen.getByRole('spinbutton', { name: 'Quantity for Canned Beans' })).toHaveTextContent('2')
-    expect(screen.queryByRole('button', { name: 'Save Canned Beans' })).not.toBeInTheDocument()
+    expect(screen.getByRole('spinbutton', { name: `Quantity for Canned Beans ${cannedBeansBatch}` })).toHaveTextContent('2')
+    expect(screen.queryByRole('button', { name: `Save Canned Beans ${cannedBeansBatch}` })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Reset' })).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Delete Canned Beans' })).toHaveClass(/deleteAction/)
+    expect(screen.getByRole('button', { name: `Delete Canned Beans ${cannedBeansBatch}` })).toHaveClass(/deleteAction/)
 
     const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false)
     const deletePromptSpy = vi.spyOn(window, 'prompt').mockReturnValue(null)
     const callCountBeforeDeniedDelete = mockCallServiceCalls.length
-    fireEvent.click(screen.getByRole('button', { name: 'Delete Canned Beans' }))
-    expect(deletePromptSpy).toHaveBeenCalledWith('Quantity of Canned Beans to delete (available: 2).', '1')
+    fireEvent.click(screen.getByRole('button', { name: `Delete Canned Beans ${cannedBeansBatch}` }))
+    expect(deletePromptSpy).toHaveBeenCalledWith(`Quantity of Canned Beans ${cannedBeansBatch} to delete (available: 2).`, '1')
     expect(confirmSpy).not.toHaveBeenCalled()
     expect(mockCallServiceCalls).toHaveLength(callCountBeforeDeniedDelete)
     deletePromptSpy.mockRestore()
     confirmSpy.mockRestore()
 
     fireEvent.change(expirationInput, { target: { value: '2026-09-30' } })
-    expect(screen.getByRole('button', { name: 'Save Canned Beans' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: `Save Canned Beans ${cannedBeansBatch}` })).toBeEnabled()
     expect(screen.getByRole('button', { name: 'Reset' })).toBeInTheDocument()
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Save Canned Beans' }))
+      fireEvent.click(screen.getByRole('button', { name: `Save Canned Beans ${cannedBeansBatch}` }))
       await Promise.resolve()
       await Promise.resolve()
       await Promise.resolve()
@@ -4436,11 +4438,11 @@ describe('DashboardViewPage', () => {
     fireEvent.click(within(greekYogurtRow).getByRole('button', { name: 'Delete Greek Yogurt' }))
     expect(deleteQuantityPromptSpy).toHaveBeenCalledWith('Quantity of Greek Yogurt to delete (available: 2).', '1')
     expect(deleteConfirmSpy).not.toHaveBeenCalled()
-    expect(mockCallServiceCalls).toContainEqual({
+    await waitFor(() => expect(mockCallServiceCalls).toContainEqual({
       domain: 'evershelf',
       service: 'delete_inventory',
       serviceData: { inventory_id: 203, quantity: 1 },
-    })
+    }))
     await waitFor(() => expect(within(fridgeList).getByRole('group', { name: `Greek Yogurt ${testExpiryLabel(5)}` })).toBeInTheDocument())
     deleteQuantityPromptSpy.mockRestore()
     deleteConfirmSpy.mockRestore()

@@ -180,11 +180,24 @@ function itemExpiryTime(item: EverShelfInventoryItem) {
 }
 
 function itemGroupingKey(item: EverShelfInventoryItem) {
-  return [
-    itemName(item).toLocaleLowerCase(),
-    compactText(item.location) ?? '',
-    itemExpiryDate(item) ?? '',
-  ].join('\u0000')
+  return itemName(item).toLocaleLowerCase()
+}
+
+function itemBatchKey(item: EverShelfInventoryItem) {
+  return [itemLocation(item) ?? '', itemExpiryDate(item) ?? ''].join('\u0000')
+}
+
+// A food item is shown once per page even when EverShelf stores it as several rows with different
+// expiration dates, so the card carries the total stock and the soonest date of its batches.
+function soonestExpiryDate(items: EverShelfInventoryItem[]) {
+  let soonest: { date: string; time: number } | null = null
+  for (const item of items) {
+    const date = itemExpiryDate(item)
+    const time = itemExpiryTime(item)
+    if (!date || time === null) continue
+    if (!soonest || time < soonest.time) soonest = { date, time }
+  }
+  return soonest?.date
 }
 
 function groupedInventoryItems(items: EverShelfInventoryItem[]): EverShelfInventoryDisplayItem[] {
@@ -205,7 +218,13 @@ function groupedInventoryItems(items: EverShelfInventoryItem[]): EverShelfInvent
     existing.groupedItems = [...(existing.groupedItems ?? []), item]
     existing.quantity = itemRawQuantity(existing) + itemRawQuantity(item)
   }
-  return order.map((key) => grouped.get(key)).filter((item): item is EverShelfInventoryDisplayItem => Boolean(item))
+  return order.flatMap((key) => {
+    const item = grouped.get(key)
+    if (!item) return []
+    const rows = item.groupedItems ?? [item]
+    const expiryDate = soonestExpiryDate(rows)
+    return [{ ...item, expiration_date: null, expires_at: null, expiry_date: expiryDate ?? null }]
+  })
 }
 
 function formatDisplayDate(value: Date) {
@@ -396,8 +415,23 @@ function formatQuantity(value: number) {
   return Number.isInteger(value) ? String(value) : String(value).replace(/(\.\d*?)0+$/, '$1').replace(/\.$/, '')
 }
 
-function rowSubtitle(expiry: ExpiryInfo, quantity: number | null) {
-  return quantity === null ? expiry.label : `Quantity ${formatQuantity(quantity)} - ${expiry.label}`
+function rowSubtitle(expiry: ExpiryInfo, quantity: number | null, extraBatchCount = 0) {
+  const stock = quantity === null ? expiry.label : `Quantity ${formatQuantity(quantity)} - ${expiry.label}`
+  if (extraBatchCount <= 0) return stock
+  return `${stock} (+${extraBatchCount} more ${extraBatchCount === 1 ? 'date' : 'dates'})`
+}
+
+function batchExpiryLabel(expiryDate: string) {
+  const parsed = expiryDate ? parseIsoDateOnly(expiryDate) : null
+  return parsed ? formatDisplayDate(parsed) : null
+}
+
+// Batches with more than one item read better when the action copy says which date it applies to,
+// but a single-batch item does not need the qualifier.
+function batchQualifier(expiryDate: string, multipleBatches: boolean) {
+  if (!multipleBatches) return ''
+  const label = batchExpiryLabel(expiryDate)
+  return label ? ` expiring ${label}` : ' without an expiration date'
 }
 
 function quantityChangeHint(quantityDelta: number, locationLabel: string) {
@@ -435,14 +469,17 @@ function validExpiryInput(value: string) {
   return value.trim() === '' || /^\d{4}-\d{2}-\d{2}$/.test(value.trim())
 }
 
-function PantryRow({ expiry, inventoryId, locationLabel, multiItem, onDeleted, onOpenDetails, quantity, title }: { expiry: ExpiryInfo; inventoryId: number | null; locationLabel: string; multiItem: boolean; onDeleted: (inventoryId: number, quantity?: number) => void; onOpenDetails: () => void; quantity: number | null; title: string }) {
+function PantryRow({ expiry, extraBatchCount, locationLabel, multiItem, onDeleted, onOpenDetails, quantity, rows, title }: { expiry: ExpiryInfo; extraBatchCount: number; locationLabel: string; multiItem: boolean; onDeleted: (steps: InventoryDeleteStep[]) => void; onOpenDetails: () => void; quantity: number | null; rows: (InventoryBatchRow | null)[]; title: string }) {
   const callService = useHass((state) => state.helpers.callService) as unknown as CallService
   const [deleteState, setDeleteState] = useState<PantryRowDeleteState>('idle')
   const [shoppingState, setShoppingState] = useState<PantryRowShoppingState>('idle')
   const [rowError, setRowError] = useState<string | null>(null)
   const resetShoppingTimerRef = useRef<number | null>(null)
-  const subtitle = rowSubtitle(expiry, quantity)
-  const deleteButtonDisabled = deleteState === 'deleting' || inventoryId === null
+  const subtitle = rowSubtitle(expiry, quantity, extraBatchCount)
+  const deletableRows = rows.filter((row): row is InventoryBatchRow => row !== null)
+  const deletable = rows.length > 0 && deletableRows.length === rows.length
+  const stockedQuantity = deletableRows.reduce((total, row) => total + row.quantity, 0)
+  const deleteButtonDisabled = deleteState === 'deleting' || !deletable
   const deleteButtonLabel = deleteState === 'deleting' ? `Deleting ${title}` : `Delete ${title}`
   const shoppingButtonDisabled = shoppingState === 'adding' || shoppingState === 'added'
   const shoppingButtonLabel = shoppingState === 'adding' ? `Adding ${title} to shopping list` : shoppingState === 'added' ? `Added ${title} to shopping list` : `Add ${title} to shopping list`
@@ -499,29 +536,33 @@ function PantryRow({ expiry, inventoryId, locationLabel, multiItem, onDeleted, o
 
   const deleteFromEverShelf = (event?: MouseEvent<HTMLButtonElement>) => {
     event?.stopPropagation()
-    if (deleteButtonDisabled || inventoryId === null) return
-    let deleteQuantity: number | undefined
-    if (quantity !== null && quantity > 1) {
-      const promptResult = promptDeleteQuantity(title, quantity)
+    if (deleteButtonDisabled || !deletable) return
+    let deleteSteps: InventoryDeleteStep[] = deletableRows.map((row) => ({ inventoryId: row.inventoryId }))
+    if (stockedQuantity > 1) {
+      const promptResult = promptDeleteQuantity(title, stockedQuantity)
       if (promptResult.status === 'cancelled') return
       if (promptResult.status === 'invalid') {
-        setRowError(`Enter a number from 1 to ${formatQuantity(quantity)}.`)
+        setRowError(`Enter a number from 1 to ${formatQuantity(stockedQuantity)}.`)
         return
       }
-      deleteQuantity = promptResult.quantity
+      if (promptResult.quantity < stockedQuantity) deleteSteps = inventoryDecreaseSteps(deletableRows, promptResult.quantity).steps
     } else if (!window.confirm(`Delete ${title} from the ${locationLabel}?`)) return
 
     setDeleteState('deleting')
     setRowError(null)
-    const serviceData: { inventory_id: number; quantity?: number } = { inventory_id: inventoryId }
-    if (deleteQuantity !== undefined) serviceData.quantity = deleteQuantity
-    void Promise.resolve(callService({
-      domain: 'evershelf',
-      service: 'delete_inventory',
-      serviceData,
-    }))
+    void deleteSteps
+      .reduce(
+        (chain, step) => chain.then(() => Promise.resolve(callService({
+          domain: 'evershelf',
+          service: 'delete_inventory',
+          serviceData: step.quantity === undefined
+            ? { inventory_id: step.inventoryId }
+            : { inventory_id: step.inventoryId, quantity: step.quantity },
+        }))).then(() => undefined),
+        Promise.resolve(),
+      )
       .then(() => {
-        onDeleted(inventoryId, deleteQuantity)
+        onDeleted(deleteSteps)
       })
       .catch((caughtError: unknown) => {
         setDeleteState('idle')
@@ -563,7 +604,7 @@ function PantryRow({ expiry, inventoryId, locationLabel, multiItem, onDeleted, o
           </button>
         ) : (
           <>
-            <button aria-label={`Edit ${title}`} className={styles.rowAction} data-modal-opener-exception="edit-action" disabled={inventoryId === null} onClick={(event) => {
+            <button aria-label={`Edit ${title}`} className={styles.rowAction} data-modal-opener-exception="edit-action" disabled={!deletable} onClick={(event) => {
               event.stopPropagation()
               onOpenDetails()
             }} type="button">
@@ -582,12 +623,65 @@ function PantryRow({ expiry, inventoryId, locationLabel, multiItem, onDeleted, o
 type InventoryBatchRow = { inventoryId: number; quantity: number }
 type InventoryDeleteStep = { inventoryId: number; quantity?: number }
 
+type InventoryBatch = {
+  addressable: boolean
+  expiryDate: string
+  key: string
+  locationLabel: string
+  quantity: number
+  rows: InventoryBatchRow[]
+  sample: EverShelfInventoryItem
+}
+
 function inventoryBatchRows(item: EverShelfInventoryDisplayItem | null) {
   if (!item) return []
   return itemInstances(item).map((instance) => {
     const inventoryId = itemInventoryId(instance)
     return inventoryId === null ? null : { inventoryId, quantity: itemRawQuantity(instance) }
   })
+}
+
+// EverShelf keeps a separate row per expiration batch (and creates extra rows for repeat adds), so
+// the modal works in batches: rows that share a location and expiry date are one editable batch.
+function inventoryBatches(item: EverShelfInventoryDisplayItem | null, fallbackLocationLabel: string): InventoryBatch[] {
+  if (!item) return []
+  const batches = new Map<string, InventoryBatch>()
+  const order: string[] = []
+  for (const row of itemInstances(item)) {
+    const key = itemBatchKey(row)
+    const inventoryId = itemInventoryId(row)
+    const quantity = itemRawQuantity(row)
+    const existing = batches.get(key)
+    if (!existing) {
+      batches.set(key, {
+        addressable: inventoryId !== null,
+        expiryDate: itemExpiryDate(row) ?? '',
+        key,
+        locationLabel: instanceLocationLabel(row, fallbackLocationLabel),
+        quantity,
+        rows: inventoryId === null ? [] : [{ inventoryId, quantity }],
+        sample: row,
+      })
+      order.push(key)
+      continue
+    }
+    existing.addressable = existing.addressable && inventoryId !== null
+    existing.quantity += quantity
+    if (inventoryId !== null) existing.rows = [...existing.rows, { inventoryId, quantity }]
+  }
+  return order
+    .flatMap((key) => {
+      const batch = batches.get(key)
+      return batch ? [batch] : []
+    })
+    .sort((left, right) => {
+      const leftTime = left.expiryDate ? parseIsoDateOnly(left.expiryDate)?.getTime() ?? null : null
+      const rightTime = right.expiryDate ? parseIsoDateOnly(right.expiryDate)?.getTime() ?? null : null
+      if (leftTime === rightTime) return left.locationLabel.localeCompare(right.locationLabel)
+      if (leftTime === null) return 1
+      if (rightTime === null) return -1
+      return leftTime - rightTime
+    })
 }
 
 // EverShelf stores a food item as one or more inventory rows, so removing stock is spread across
@@ -618,19 +712,21 @@ function InventoryItemDetailsModal({ item, locationLabel, onClose, onInventoryCh
   const [busyAction, setBusyAction] = useState<'delete' | 'edit' | null>(null)
   const [error, setError] = useState<string | null>(null)
   const title = item ? itemName(item) : 'Inventory Item'
-  const instances = useMemo(() => (item ? itemInstances(item) : []), [item])
-  const batchRows = useMemo(() => inventoryBatchRows(item), [item])
-  const editableRows = useMemo(() => batchRows.filter((row): row is InventoryBatchRow => row !== null), [batchRows])
-  const editable = batchRows.length > 0 && editableRows.length === batchRows.length
-  const savedQuantity = useMemo(() => instances.reduce((total, instance) => total + itemRawQuantity(instance), 0), [instances])
-  const savedExpiryDate = item ? itemExpiryDate(item) ?? '' : ''
-  const itemLocationLabel = item ? instanceLocationLabel(item, locationLabel) : locationLabel
+  const batches = useMemo(() => inventoryBatches(item, locationLabel), [item, locationLabel])
+  const [selectedBatchKey, setSelectedBatchKey] = useState(batches[0]?.key ?? '')
+  const selectedBatch = batches.find((batch) => batch.key === selectedBatchKey) ?? batches[0]
+  const multipleBatches = batches.length > 1
+  const qualifier = selectedBatch ? batchQualifier(selectedBatch.expiryDate, multipleBatches) : ''
+  const editable = Boolean(selectedBatch?.addressable)
+  const savedQuantity = selectedBatch?.quantity ?? 0
+  const savedExpiryDate = selectedBatch?.expiryDate ?? ''
+  const batchLocationLabel = selectedBatch?.locationLabel ?? locationLabel
   const [expiryDraft, setExpiryDraft] = useState(savedExpiryDate)
   const [quantityDraft, setQuantityDraft] = useState(savedQuantity)
 
-  // Reopening the same item keeps this component mounted, so the drafts and the busy/error state
-  // are rebuilt from the latest Home Assistant data every time the sheet opens.
-  const draftKey = open ? `${itemInstancesKey(item)}|${savedQuantity}|${savedExpiryDate}` : 'closed'
+  // Reopening the same item keeps this component mounted, and switching batches swaps which stock
+  // is being edited, so the drafts and the busy/error state are rebuilt from the latest data.
+  const draftKey = open ? `${itemInstancesKey(item)}|${selectedBatch?.key ?? ''}|${savedQuantity}|${savedExpiryDate}` : 'closed'
   const [appliedDraftKey, setAppliedDraftKey] = useState(draftKey)
   if (appliedDraftKey !== draftKey) {
     setAppliedDraftKey(draftKey)
@@ -665,10 +761,10 @@ function InventoryItemDetailsModal({ item, locationLabel, onClose, onInventoryCh
       : { inventory_id: step.inventoryId, quantity: step.quantity },
   }))
 
-  // Home Assistant owns the stock change: EverShelf adds the extra items to a matching batch and
-  // removes reduced items row by row, and the expiration move is applied one item at a time.
-  const applyInventoryChanges = async (rows: InventoryBatchRow[], expiryDate: string) => {
-    const decrease = quantityDelta < 0 ? inventoryDecreaseSteps(rows, -quantityDelta) : { remainingRows: rows, steps: [] as InventoryDeleteStep[] }
+  // Home Assistant owns the stock change: EverShelf adds the extra items to the batch and removes
+  // reduced items row by row, and the expiration move is applied one item at a time.
+  const applyInventoryChanges = async (batch: InventoryBatch, expiryDate: string) => {
+    const decrease = quantityDelta < 0 ? inventoryDecreaseSteps(batch.rows, -quantityDelta) : { remainingRows: batch.rows, steps: [] as InventoryDeleteStep[] }
     for (const step of decrease.steps) {
       await deleteInventoryRow(step)
     }
@@ -683,29 +779,29 @@ function InventoryItemDetailsModal({ item, locationLabel, onClose, onInventoryCh
         }
       }
     }
-    if (quantityDelta > 0 && item) {
+    if (quantityDelta > 0) {
       await Promise.resolve(callService({
         domain: 'evershelf',
         service: 'add_scanned_item',
-        serviceData: inventoryAddServiceData(item, quantityDelta, expiryDate),
+        serviceData: inventoryAddServiceData(batch.sample, quantityDelta, expiryDate),
       }))
     }
   }
 
   const saveItem = () => {
-    if (!editable) return
+    if (!selectedBatch || !editable) return
     if (!validExpiryInput(expiryDraft)) {
       setError('Use YYYY-MM-DD or clear the date.')
       return
     }
     if (quantityDelta === 0 && !expiryChanged) return
-    if (quantityDelta > 0 && itemLocation(item ?? {}) === null) {
+    if (quantityDelta > 0 && itemLocation(selectedBatch.sample) === null) {
       setError(`Home Assistant did not report a storage location for ${title}, so more cannot be added.`)
       return
     }
     setBusyAction('edit')
     setError(null)
-    void applyInventoryChanges(editableRows, expiryDraft.trim())
+    void applyInventoryChanges(selectedBatch, expiryDraft.trim())
       .then(finishAction)
       .catch((caughtError: unknown) => {
         setBusyAction(null)
@@ -714,17 +810,17 @@ function InventoryItemDetailsModal({ item, locationLabel, onClose, onInventoryCh
   }
 
   const deleteItem = () => {
-    if (!editable) return
-    let deleteSteps = editableRows.map((row) => ({ inventoryId: row.inventoryId } satisfies InventoryDeleteStep))
+    if (!selectedBatch || !editable) return
+    let deleteSteps: InventoryDeleteStep[] = selectedBatch.rows.map((row) => ({ inventoryId: row.inventoryId }))
     if (savedQuantity > 1) {
-      const promptResult = promptDeleteQuantity(title, savedQuantity)
+      const promptResult = promptDeleteQuantity(`${title}${qualifier}`, savedQuantity)
       if (promptResult.status === 'cancelled') return
       if (promptResult.status === 'invalid') {
         setError(`Enter a number from 1 to ${formatQuantity(savedQuantity)}.`)
         return
       }
-      if (promptResult.quantity < savedQuantity) deleteSteps = inventoryDecreaseSteps(editableRows, promptResult.quantity).steps
-    } else if (!window.confirm(`Delete ${title} from the ${itemLocationLabel}?`)) return
+      if (promptResult.quantity < savedQuantity) deleteSteps = inventoryDecreaseSteps(selectedBatch.rows, promptResult.quantity).steps
+    } else if (!window.confirm(`Delete ${title}${qualifier} from the ${batchLocationLabel}?`)) return
 
     setBusyAction('delete')
     setError(null)
@@ -744,35 +840,52 @@ function InventoryItemDetailsModal({ item, locationLabel, onClose, onInventoryCh
     <ModalSheet onClose={onClose} open={open && item !== null} title={title}>
       <div className={styles.instancesSheet}>
         {error && <p className={styles.error} role="alert">{error}</p>}
+        {multipleBatches && (
+          <fieldset className={styles.fieldset}>
+            <legend>{`Expiration Batches (${batches.length})`}</legend>
+            <div aria-label={`${title} expiration batches`} className={styles.radioGroup} role="radiogroup">
+              {batches.map((batch) => (
+                <RadioRow
+                  active={batch.key === selectedBatch?.key}
+                  disabled={busy}
+                  key={batch.key}
+                  onClick={() => setSelectedBatchKey(batch.key)}
+                  subtitle={`Quantity ${formatQuantity(batch.quantity)} - In the ${batch.locationLabel}`}
+                  title={expiryInfo(batch.expiryDate || undefined).label}
+                />
+              ))}
+            </div>
+          </fieldset>
+        )}
         <div className={styles.instanceRow}>
           <div className={styles.instanceHeader}>
             <span className={styles.instanceCopy}>
-              <strong>{title}</strong>
-              <small>{`In the ${itemLocationLabel}`}</small>
+              <strong>{multipleBatches ? expiryInfo(selectedBatch?.expiryDate || undefined).label : title}</strong>
+              <small>{`In the ${batchLocationLabel}`}</small>
             </span>
-            <button aria-busy={busyAction === 'delete' ? 'true' : undefined} aria-label={`Delete ${title}`} className={`${styles.rowAction} ${styles.deleteAction}`} disabled={busy || !editable} onClick={deleteItem} type="button">
+            <button aria-busy={busyAction === 'delete' ? 'true' : undefined} aria-label={`Delete ${title}${qualifier}`} className={`${styles.rowAction} ${styles.deleteAction}`} disabled={busy || !editable} onClick={deleteItem} type="button">
               <MaterialIcon name="mdi:delete" size={22} />
             </button>
           </div>
           <div className={styles.instanceEditPanel}>
             <NumberStepper
-              ariaLabel={`Quantity for ${title}`}
-              decrementLabel={`Remove one ${title}`}
+              ariaLabel={`Quantity for ${title}${qualifier}`}
+              decrementLabel={`Remove one ${title}${qualifier}`}
               disabled={busy || !editable}
               formatValue={formatQuantity}
-              incrementLabel={`Add one ${title}`}
+              incrementLabel={`Add one ${title}${qualifier}`}
               label="Quantity"
               max={INVENTORY_QUANTITY_MAX}
               min={Math.min(1, savedQuantity)}
               onChange={setQuantityDraft}
               value={quantityDraft}
             />
-            <NativePickerField ariaLabel={`Expiration date for ${title}`} className={styles.instanceDateField} emptyLabel="No expiration date" label="Expiration Date" onChange={setExpiryDraft} type="date" value={expiryDraft} />
-            {quantityDelta !== 0 && <Description className={styles.instanceHint}>{quantityChangeHint(quantityDelta, itemLocationLabel)}</Description>}
+            <NativePickerField ariaLabel={`Expiration date for ${title}${qualifier}`} className={styles.instanceDateField} emptyLabel="No expiration date" label="Expiration Date" onChange={setExpiryDraft} type="date" value={expiryDraft} />
+            {quantityDelta !== 0 && <Description className={styles.instanceHint}>{quantityChangeHint(quantityDelta, batchLocationLabel)}</Description>}
             {(expiryChanged || quantityDelta !== 0) && (
               <span className={styles.instanceEditActions}>
                 <button className={styles.secondaryAction} disabled={busy} onClick={resetDraft} type="button">Reset</button>
-                <button aria-busy={busyAction === 'edit' ? 'true' : undefined} aria-label={`Save ${title}`} className={styles.primaryAction} disabled={busy} onClick={saveItem} type="button">Save</button>
+                <button aria-busy={busyAction === 'edit' ? 'true' : undefined} aria-label={`Save ${title}${qualifier}`} className={styles.primaryAction} disabled={busy} onClick={saveItem} type="button">Save</button>
               </span>
             )}
           </div>
@@ -1284,13 +1397,16 @@ export function EverShelfInventoryPanel({ controls, location, title }: EverShelf
   const loadedItems = useMemo(() => items ?? [], [items])
   const displayItems = useMemo(() => groupedInventoryItems(loadedItems), [loadedItems])
   const reloadInventory = useCallback(() => setReloadNonce((current) => current + 1), [])
-  const removeDeletedItem = useCallback((deletedInventoryId: number, deletedQuantity?: number) => {
+  const removeDeletedItems = useCallback((steps: InventoryDeleteStep[]) => {
     setItems((currentItems) => {
       if (currentItems === null) return currentItems
+      const stepsById = new Map(steps.map((step) => [step.inventoryId, step]))
       const nextItems = currentItems.flatMap((item) => {
-        if (itemInventoryId(item) !== deletedInventoryId) return [item]
-        if (deletedQuantity === undefined) return []
-        const remainingQuantity = itemRawQuantity(item) - deletedQuantity
+        const inventoryId = itemInventoryId(item)
+        const step = inventoryId === null ? undefined : stepsById.get(inventoryId)
+        if (!step) return [item]
+        if (step.quantity === undefined) return []
+        const remainingQuantity = itemRawQuantity(item) - step.quantity
         return remainingQuantity > 0 ? [{ ...item, quantity: remainingQuantity }] : []
       })
       setInventoryItemCount(nextItems.length)
@@ -1324,15 +1440,15 @@ export function EverShelfInventoryPanel({ controls, location, title }: EverShelf
                     {visibleItems.map((item, index) => {
                       const name = itemName(item)
                       const expiry = expiryInfo(itemExpiryDate(item))
-                      const inventoryId = itemInventoryId(item)
-                      const multiItem = itemInstances(item).length > 1
+                      const batchCount = inventoryBatches(item, LOCATION_DELETE_LABELS[location]).length
+                      const multiItem = batchCount > 1
                       const quantity = itemQuantity(item)
                       return (
                         <li className={styles.item} key={item.inventory_id ?? item.id ?? `${location}-${name}-${index}`}>
-                          <PantryRow expiry={expiry} inventoryId={inventoryId} locationLabel={LOCATION_DELETE_LABELS[location]} multiItem={multiItem} onDeleted={removeDeletedItem} onOpenDetails={() => {
+                          <PantryRow expiry={expiry} extraBatchCount={batchCount - 1} locationLabel={LOCATION_DELETE_LABELS[location]} multiItem={multiItem} onDeleted={removeDeletedItems} onOpenDetails={() => {
                             setDetailsItem(item)
                             setDetailsOpen(true)
-                          }} quantity={quantity} title={name} />
+                          }} quantity={quantity} rows={inventoryBatchRows(item)} title={name} />
                         </li>
                       )
                     })}
