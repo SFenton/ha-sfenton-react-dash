@@ -4839,9 +4839,9 @@ describe('DashboardViewPage', () => {
   expect(screen.queryByText('No events to display')).not.toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Quick Links' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Groceries 2 items/i })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Stephen's Tasks 5 active tasks/i })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Steph's Tasks No active tasks/i })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Unassigned Tasks 17 active tasks/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Stephen's Tasks 4 upcoming tasks · 1 task listed/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Steph's Tasks No tasks listed/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Unassigned Tasks 17 tasks listed/i })).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: /Groceries 2 items/i }))
     expect(navigate).toHaveBeenCalledWith('groceries')
 
@@ -4852,6 +4852,21 @@ describe('DashboardViewPage', () => {
     expect(screen.getByRole('heading', { name: 'Upcoming' })).toBeInTheDocument()
     expect(screen.getAllByLabelText(/todo list$/)).toHaveLength(4)
     expect(within(screen.getByLabelText('Past Due todo list')).queryByText('Active')).not.toBeInTheDocument()
+  })
+
+  it('summarizes chore quick links by overdue and undated counts instead of a raw total', async () => {
+    mockEntities['todo.unassigned_past_due'] = entity('todo.unassigned_past_due', '1')
+    mockEntities['todo.unassigned_due_today'] = entity('todo.unassigned_due_today', '2')
+    mockEntities['todo.unassigned_upcoming'] = entity('todo.unassigned_upcoming', '4')
+    mockEntities['todo.unassigned_no_due_date'] = entity('todo.unassigned_no_due_date', '6')
+    mockEntities['todo.home_improvement_s_no_due_date'] = entity('todo.home_improvement_s_no_due_date', '2')
+
+    render(<DashboardViewPage activePath="chores" onNavigate={() => undefined} path="chores" />)
+
+    // Overdue outranks the 6 upcoming tasks, and the total (13) is never shown.
+    expect(screen.getByRole('button', { name: /Unassigned Tasks 1 overdue task · 6 tasks listed/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Home Tasks 2 tasks listed/i })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /13 active tasks/i })).not.toBeInTheDocument()
   })
 
   it.each([

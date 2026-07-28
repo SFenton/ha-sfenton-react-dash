@@ -45,8 +45,12 @@ export interface SettingsLinkConfig {
   path?: string
 }
 
+/** Groups a todo list into the bucket its count contributes to in chore quick-link subtitles. */
+export type TodoCountBucket = 'overdue' | 'upcoming' | 'no-due-date'
+
 export interface TodoListConfig {
   completionScript?: string
+  countBucket?: TodoCountBucket
   title: string
   entityId: string
   hideCompleted?: boolean
@@ -372,10 +376,10 @@ export const TODO_PAGES: Record<string, TodoPageConfig> = {
     emptyDescription: 'Stephen has no chores due- nice job!',
     hiddenByVacation: true,
     lists: [
-      { title: 'Past Due', entityId: 'todo.stephen_s_past_due' },
-      { title: 'Due Today', entityId: 'todo.stephen_s_due_today' },
-      { title: 'Upcoming', entityId: 'todo.stephen_s_upcoming' },
-      { title: 'No Due Date', entityId: 'todo.stephen_s_no_due_date' },
+      { title: 'Past Due', entityId: 'todo.stephen_s_past_due', countBucket: 'overdue' },
+      { title: 'Due Today', entityId: 'todo.stephen_s_due_today', countBucket: 'upcoming' },
+      { title: 'Upcoming', entityId: 'todo.stephen_s_upcoming', countBucket: 'upcoming' },
+      { title: 'No Due Date', entityId: 'todo.stephen_s_no_due_date', countBucket: 'no-due-date' },
     ],
   },
   'stephs-chores': {
@@ -384,10 +388,10 @@ export const TODO_PAGES: Record<string, TodoPageConfig> = {
     emptyDescription: 'Steph has no chores due- nice job!',
     hiddenByVacation: true,
     lists: [
-      { title: 'Past Due', entityId: 'todo.steph_s_past_due' },
-      { title: 'Due Today', entityId: 'todo.steph_s_due_today' },
-      { title: 'Upcoming', entityId: 'todo.steph_s_upcoming' },
-      { title: 'No Due Date', entityId: 'todo.steph_s_no_due_date' },
+      { title: 'Past Due', entityId: 'todo.steph_s_past_due', countBucket: 'overdue' },
+      { title: 'Due Today', entityId: 'todo.steph_s_due_today', countBucket: 'upcoming' },
+      { title: 'Upcoming', entityId: 'todo.steph_s_upcoming', countBucket: 'upcoming' },
+      { title: 'No Due Date', entityId: 'todo.steph_s_no_due_date', countBucket: 'no-due-date' },
     ],
   },
   'unassigned-chores': {
@@ -396,10 +400,10 @@ export const TODO_PAGES: Record<string, TodoPageConfig> = {
     emptyDescription: 'There are no unassigned chores due- nice job!',
     hiddenByVacation: true,
     lists: [
-      { title: 'Past Due', entityId: 'todo.unassigned_past_due' },
-      { title: 'Due Today', entityId: 'todo.unassigned_due_today' },
-      { title: 'Upcoming', entityId: 'todo.unassigned_upcoming' },
-      { title: 'No Due Date', entityId: 'todo.unassigned_no_due_date' },
+      { title: 'Past Due', entityId: 'todo.unassigned_past_due', countBucket: 'overdue' },
+      { title: 'Due Today', entityId: 'todo.unassigned_due_today', countBucket: 'upcoming' },
+      { title: 'Upcoming', entityId: 'todo.unassigned_upcoming', countBucket: 'upcoming' },
+      { title: 'No Due Date', entityId: 'todo.unassigned_no_due_date', countBucket: 'no-due-date' },
     ],
   },
   'home-improvement-chores': {
@@ -408,10 +412,10 @@ export const TODO_PAGES: Record<string, TodoPageConfig> = {
     emptyDescription: 'There are no home improvement tasks due- nice job!',
     hiddenByVacation: true,
     lists: [
-      { title: 'Past Due', entityId: 'todo.home_improvement_s_past_due' },
-      { title: 'Due Today', entityId: 'todo.home_improvement_s_due_today' },
-      { title: 'Upcoming', entityId: 'todo.home_improvement_s_upcoming' },
-      { title: 'No Due Date', entityId: 'todo.home_improvement_s_no_due_date' },
+      { title: 'Past Due', entityId: 'todo.home_improvement_s_past_due', countBucket: 'overdue' },
+      { title: 'Due Today', entityId: 'todo.home_improvement_s_due_today', countBucket: 'upcoming' },
+      { title: 'Upcoming', entityId: 'todo.home_improvement_s_upcoming', countBucket: 'upcoming' },
+      { title: 'No Due Date', entityId: 'todo.home_improvement_s_no_due_date', countBucket: 'no-due-date' },
     ],
   },
 }

@@ -45,7 +45,8 @@ import {
   type QuickAccessConfig,
   type RoomNavigationConfig,
 } from '../constants/atAGlance'
-import { CHORE_BLUE, CHORE_QUICK_LINKS, SETTINGS_PAGE_ITEMS, TODO_PAGES, type ChoreQuickLinkConfig, type SettingsLinkConfig } from '../constants/portedDashboard'
+import { CHORE_BLUE, CHORE_QUICK_LINKS, SETTINGS_PAGE_ITEMS, type ChoreQuickLinkConfig, type SettingsLinkConfig } from '../constants/portedDashboard'
+import { choreQuickLinkCounts, choreQuickLinkSubtitle, groceryCountSubtitle } from '../constants/choreQuickLinkCounts'
 import { useHashModal } from '../hooks/useHashModal'
 import { markDeferredRouteHydrated, useDeferredRouteHydration, type DeferredRouteHydrationPhase } from '../hooks/useDeferredRouteHydration'
 import type { RouteTransitionState } from '../components/shell/SmoothRouteOutlet'
@@ -378,31 +379,10 @@ function QuickAccessTile({ item, onNavigate, onOpenHash }: { item: QuickAccessCo
   )
 }
 
-function todoCountForChoreLink(item: ChoreQuickLinkConfig, entities: Record<string, HassEntity | undefined>) {
-  const page = TODO_PAGES[item.path]
-  if (!page) return 0
-  return page.lists.reduce((total, list) => {
-    const value = Number(entities[list.entityId]?.state ?? 0)
-    return total + (Number.isFinite(value) && value > 0 ? value : 0)
-  }, 0)
-}
-
-function taskCountSubtitle(count: number) {
-  if (!Number.isFinite(count) || count <= 0) return 'No active tasks'
-  if (count === 1) return '1 active task'
-  return `${count} active tasks`
-}
-
-function groceryCountSubtitle(count: number) {
-  if (!Number.isFinite(count) || count <= 0) return 'No groceries listed'
-  if (count === 1) return '1 item'
-  return `${count} items`
-}
-
 function ChorePreviewTile({ closeHash, item, onNavigate }: { closeHash: () => void; item: ChoreQuickLinkConfig; onNavigate: (path: string) => void }) {
   const entities = useHass((state) => state.entities)
-  const count = todoCountForChoreLink(item, entities)
-  const subtitle = item.countType === 'groceries' ? groceryCountSubtitle(count) : taskCountSubtitle(count)
+  const counts = choreQuickLinkCounts(item.path, entities)
+  const subtitle = item.countType === 'groceries' ? groceryCountSubtitle(counts.total) : choreQuickLinkSubtitle(counts)
 
   const openPage = () => {
     closeHash()
