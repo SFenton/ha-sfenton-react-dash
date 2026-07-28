@@ -19,7 +19,7 @@ const BUCKET_KEYS: Record<TodoCountBucket, keyof Omit<ChoreQuickLinkCounts, 'tot
   'no-due-date': 'noDueDate',
 }
 
-type EntityStateLookup = Record<string, { state?: string | number } | undefined>
+type EntityStateLookup = Record<string, { state?: string | number } | null | undefined>
 
 function openItemCount(entities: EntityStateLookup, entityId: string) {
   const value = Number(entities[entityId]?.state ?? 0)
