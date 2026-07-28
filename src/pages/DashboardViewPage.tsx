@@ -106,6 +106,7 @@ import {
   type EntitySectionConfig,
   type SettingsLinkConfig,
 } from '../constants/portedDashboard'
+import { choreQuickLinkCounts, choreQuickLinkSubtitle, groceryCountSubtitle } from '../constants/choreQuickLinkCounts'
 import { modalSquareGridModalStyle, modalSquareGridStyle, type ModalSquareGridStyle, useModalSquareGridLayout } from './modalSquareGrid'
 import { ROOM_PAGE_CONFIGS, type RoomSourceCardAction, type RoomSourceCardConfig, type RoomSourceKind, type RoomSourceModalItem } from '../constants/roomPages'
 import { MEDIA_REMOTE_CONFIGS } from '../constants/mediaRemotes'
@@ -1137,8 +1138,8 @@ function ChoresIntro({ onNavigate }: { onNavigate: (path: string) => void }) {
 
 function ChoreQuickLink({ item, onNavigate }: { item: (typeof CHORE_QUICK_LINKS)[number]; onNavigate: (path: string) => void }) {
   const entities = useHass((state) => state.entities) as unknown as EntityActionStateMap
-  const count = quickLinkTodoCount(item.path, entities)
-  const subtitle = item.countType === 'groceries' ? groceryCountSubtitle(count) : taskCountSubtitle(count)
+  const counts = choreQuickLinkCounts(item.path, entities)
+  const subtitle = item.countType === 'groceries' ? groceryCountSubtitle(counts.total) : choreQuickLinkSubtitle(counts)
 
   return (
     <GlassTile
@@ -1149,27 +1150,6 @@ function ChoreQuickLink({ item, onNavigate }: { item: (typeof CHORE_QUICK_LINKS)
       title={item.title}
     />
   )
-}
-
-function quickLinkTodoCount(path: string, entities: EntityActionStateMap) {
-  const page = TODO_PAGES[path]
-  if (!page) return 0
-  return page.lists.reduce((total, list) => {
-    const value = Number(entities[list.entityId]?.state ?? 0)
-    return total + (Number.isFinite(value) && value > 0 ? value : 0)
-  }, 0)
-}
-
-function taskCountSubtitle(count: number) {
-  if (!Number.isFinite(count) || count <= 0) return 'No active tasks'
-  if (count === 1) return '1 active task'
-  return `${count} active tasks`
-}
-
-function groceryCountSubtitle(count: number) {
-  if (!Number.isFinite(count) || count <= 0) return 'No groceries listed'
-  if (count === 1) return '1 item'
-  return `${count} items`
 }
 
 const EVERSHELF_EXPIRING_SOON_ENTITY_ID = 'sensor.evershelf_expiring_soon'
@@ -1276,7 +1256,7 @@ function FoodSpacesGrid({ entities, onNavigate }: { entities: EntityActionStateM
 function KitchenGroceriesSection({ onNavigate }: { onNavigate: (path: string) => void }) {
   const entities = useHass((state) => state.entities) as unknown as EntityActionStateMap
   const groceryList = TODO_PAGES.groceries?.lists[0]
-  const groceryCount = quickLinkTodoCount('groceries', entities)
+  const groceryCount = choreQuickLinkCounts('groceries', entities).total
 
   return (
     <section className={styles.section} id={sectionId('Groceries')}>
