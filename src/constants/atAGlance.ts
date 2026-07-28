@@ -208,6 +208,12 @@ export const QUICK_ACCESS_ITEMS: QuickAccessConfig[] = [
     tone: 'security',
   },
   {
+    title: 'Food',
+    icon: 'mdi:food-fork-drink',
+    route: '/at-a-glance/food',
+    tone: 'neutral',
+  },
+  {
     title: 'Vacuums',
     icon: 'mdi:robot-vacuum',
     route: '/at-a-glance/vacuums',

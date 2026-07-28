@@ -61,10 +61,10 @@ export const MODAL_OPENER_INVENTORY: ModalOpenerInventoryItem[] = [
   {
     id: 'overview-route-quick-links',
     label: 'Home route quick links',
-    instances: 3,
+    instances: 4,
     affordance: 'right-chevron',
     implementation: 'QuickAccessTile with QUICK_ACCESS_ITEMS route entries',
-    behavior: 'Navigates to Vacuums, Media, or Custom Lights; marked data-navigation-opener rather than data-modal-opener.',
+    behavior: 'Navigates to Food, Vacuums, Media, or Custom Lights; marked data-navigation-opener rather than data-modal-opener.',
   },
   {
     id: 'security-system-tile',

@@ -274,7 +274,7 @@ test('mobile modal opener families use shared disclosures and explicit action ex
   await expectNoChevron(page.getByRole('button', { name: /^Lights /i }).first())
   await expectRightChevron(page.getByRole('button', { name: /^Security System /i }))
   await expectNoChevron(page.getByRole('button', { name: 'Open Front Door camera' }))
-  for (const quickLink of ['Vacuums', 'Media', 'Custom Lights']) {
+  for (const quickLink of ['Food', 'Vacuums', 'Media', 'Custom Lights']) {
     const opener = page.getByRole('button', { exact: true, name: quickLink })
     await expectRightChevron(opener)
     await expect(opener).toHaveAttribute('data-navigation-opener', 'true')
