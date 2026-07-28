@@ -308,9 +308,11 @@ describe('DashboardViewPage', () => {
     mockEntities['timer.eight_sleep_stephen_hot_flash'].state = 'idle'
     mockEntities['timer.eight_sleep_steph_hot_flash'].state = 'idle'
     mockEntities['sensor.nightcanvasrestful_schedules'].attributes = mockFreeSleepScheduleAttributes()
-    mockEntities['binary_sensor.nightcanvasrestful_left_alarm_vibrating'].state = 'off'
+    mockEntities['sensor.master_bedroom_sleepypod_eight_pod_left_alarm_state'].state = 'idle'
+    mockEntities['sensor.master_bedroom_sleepypod_eight_pod_left_alarm_state'].attributes.snoozed_until = null
     mockEntities['binary_sensor.nightcanvasrestful_left_presence'].state = 'on'
-    mockEntities['binary_sensor.nightcanvasrestful_right_alarm_vibrating'].state = 'off'
+    mockEntities['sensor.master_bedroom_sleepypod_eight_pod_right_alarm_state'].state = 'idle'
+    mockEntities['sensor.master_bedroom_sleepypod_eight_pod_right_alarm_state'].attributes.snoozed_until = null
     mockEntities['binary_sensor.nightcanvasrestful_right_presence'].state = 'off'
     mockEntities['media_player.theater_room_shield'].state = 'off'
     mockEntities['media_player.theater'].state = 'off'
@@ -2533,7 +2535,7 @@ describe('DashboardViewPage', () => {
     expect(within(dialog).getByText('Time Remaining')).toBeInTheDocument()
     expect(within(dialog).getByText('2h')).toBeInTheDocument()
     expect(within(dialog).getByText('Alarm')).toBeInTheDocument()
-    expect(within(dialog).getByText('Quiet')).toBeInTheDocument()
+    expect(within(dialog).getByText('Idle')).toBeInTheDocument()
 
     await clickModalTab(within(dialog), 'Settings')
     expect(within(dialog).getByRole('heading', { name: 'Bedtime' })).toBeInTheDocument()
@@ -2702,46 +2704,26 @@ describe('DashboardViewPage', () => {
     }
   })
 
-  it('shows Free Sleep snooze and cancel actions while a side alarm is active', async () => {
-    mockEntities['binary_sensor.nightcanvasrestful_right_alarm_vibrating'].state = 'on'
-    const { rerender } = render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
+  it.each([
+    ["left", /Stephen.s Bed Cooling/, "Stephen\u0027s Bed", "Steph\u0027s Bed"],
+    ["right", /Steph.s Bed Off/, "Steph\u0027s Bed", "Stephen\u0027s Bed"],
+  ] as const)("shows only the opened %s active alarm directly below its hero", async (_side, bedButtonName, sideTitle, otherSideTitle) => {
+    mockEntities["sensor.master_bedroom_sleepypod_eight_pod_left_alarm_state"].state = "ringing"
+    mockEntities["sensor.master_bedroom_sleepypod_eight_pod_right_alarm_state"].state = "ringing"
+    render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
 
-    fireEvent.click(screen.getByRole('button', { name: /Steph's Bed Off/i }))
+    fireEvent.click(screen.getByRole("button", { name: bedButtonName }))
 
-    let dialog = await screen.findByRole('dialog')
-    await clickModalTab(within(dialog), 'Alarms')
-    expect(within(dialog).getByRole('group', { name: "Steph's Bed active alarm actions" })).toBeInTheDocument()
-    expect(within(dialog).getByRole('button', { name: /Snooze Alarm/i })).toBeInTheDocument()
-    expect(within(dialog).getByRole('button', { name: /Cancel Alarm/i })).toBeInTheDocument()
-    await clickModalTab(within(dialog), 'Status')
-    expect(within(dialog).getByText('Vibrating')).toBeInTheDocument()
-    await clickModalTab(within(dialog), 'Alarms')
-
-    fireEvent.click(within(dialog).getByRole('button', { name: /Snooze Alarm/i }))
-
-    expect(mockCallServiceCalls).toEqual([
-      { domain: 'number', service: 'set_value', target: 'number.steph_s_eight_sleep_side_alarm_snooze_minutes', serviceData: { value: 10 } },
-      { domain: 'button', service: 'press', target: 'button.steph_s_eight_sleep_side_alarm_snooze' },
-      { domain: 'button', service: 'press', target: 'button.nightcanvasrestful_clear_alarm' },
-    ])
-    expect(mockEntities['binary_sensor.nightcanvasrestful_right_alarm_vibrating'].state).toBe('off')
-
-    act(() => {
-      rerender(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
-    })
-    dialog = screen.getByRole('dialog')
-    expect(within(dialog).queryByRole('button', { name: /Snooze Alarm/i })).not.toBeInTheDocument()
-    expect(within(dialog).queryByRole('button', { name: /Cancel Alarm/i })).not.toBeInTheDocument()
-
-    mockEntities['binary_sensor.nightcanvasrestful_right_alarm_vibrating'].state = 'on'
-    act(() => {
-      rerender(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
-    })
-
-    dialog = screen.getByRole('dialog')
-    expect(within(dialog).getByRole('button', { name: /Snooze Alarm/i })).toBeInTheDocument()
-    fireEvent.click(within(dialog).getByRole('button', { name: /Cancel Alarm/i }))
-    expect(mockCallServiceCalls[mockCallServiceCalls.length - 1]).toEqual({ domain: 'button', service: 'press', target: 'button.nightcanvasrestful_clear_alarm' })
+    const dialog = await screen.findByRole("dialog", { name: sideTitle })
+    const heading = within(dialog).getByRole("heading", { name: "Alarm Active" })
+    const section = heading.closest("section")
+    const heroColumn = section?.parentElement
+    expect(within(dialog).getByRole("group", { name: `${sideTitle} active alarm controls` })).toBeInTheDocument()
+    expect(within(dialog).queryByRole("group", { name: `${otherSideTitle} active alarm controls` })).not.toBeInTheDocument()
+    expect(within(dialog).getByRole("heading", { name: "Sleep Schedule" })).toBeInTheDocument()
+    expect(heroColumn?.firstElementChild).toHaveAttribute("data-section", "eight-sleep-hero")
+    expect(heroColumn?.lastElementChild).toBe(section)
+    expect(heroColumn?.nextElementSibling).toHaveAttribute("data-scroll-region", "eight-sleep-panel")
   })
 
   it('adds and controls configured Free Sleep alarms from the bed modal', async () => {

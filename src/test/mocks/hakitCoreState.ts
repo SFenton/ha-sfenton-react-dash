@@ -224,11 +224,6 @@ function applyMockCallServiceSideEffects(params: Record<string, unknown>) {
     if (textEntity && value !== undefined) textEntity.state = String(value)
   }
 
-  if (params.domain === 'button' && params.service === 'press' && params.target === 'button.nightcanvasrestful_clear_alarm') {
-    mockEntities['binary_sensor.nightcanvasrestful_left_alarm_vibrating'].state = 'off'
-    mockEntities['binary_sensor.nightcanvasrestful_right_alarm_vibrating'].state = 'off'
-  }
-
   if (params.domain !== 'mqtt' || params.service !== 'publish') return
   const serviceData = isRecord(params.serviceData) ? params.serviceData : {}
   if (typeof serviceData.payload !== 'string') return
@@ -409,9 +404,10 @@ export const mockEntities: Record<string, MockEntity> = {
   'binary_sensor.contact_sensors': entity('binary_sensor.contact_sensors', 'off'),
   'binary_sensor.occupancy_sensors': entity('binary_sensor.occupancy_sensors', 'on'),
   'button.theater_pc_theaterroom_pc_shutdown': entity('button.theater_pc_theaterroom_pc_shutdown', 'unavailable'),
-  'button.nightcanvasrestful_clear_alarm': entity('button.nightcanvasrestful_clear_alarm', 'unknown'),
-  'button.stephen_s_eight_sleep_side_alarm_snooze': entity('button.stephen_s_eight_sleep_side_alarm_snooze', 'unknown'),
-  'button.steph_s_eight_sleep_side_alarm_snooze': entity('button.steph_s_eight_sleep_side_alarm_snooze', 'unknown'),
+  'button.master_bedroom_sleepypod_eight_pod_left_alarm_snooze': entity('button.master_bedroom_sleepypod_eight_pod_left_alarm_snooze', 'unknown'),
+  'button.master_bedroom_sleepypod_eight_pod_left_alarm_stop': entity('button.master_bedroom_sleepypod_eight_pod_left_alarm_stop', 'unknown'),
+  'button.master_bedroom_sleepypod_eight_pod_right_alarm_snooze': entity('button.master_bedroom_sleepypod_eight_pod_right_alarm_snooze', 'unknown'),
+  'button.master_bedroom_sleepypod_eight_pod_right_alarm_stop': entity('button.master_bedroom_sleepypod_eight_pod_right_alarm_stop', 'unknown'),
   'camera.doorbell_camera': entity('camera.doorbell_camera', 'idle'),
   'camera.garage_camera': entity('camera.garage_camera', 'recording'),
   'camera.lower_deck_camera': entity('camera.lower_deck_camera', 'recording'),
@@ -434,8 +430,6 @@ export const mockEntities: Record<string, MockEntity> = {
   'number.nightcanvasrestful_right_dawn_temperature': entity('number.nightcanvasrestful_right_dawn_temperature', '0', { ...freeSleepLevelAttributes }),
   'text.master_bedroom_eight_sleep_pod_5_left_bedtime': entity('text.master_bedroom_eight_sleep_pod_5_left_bedtime', '21:30', { icon: 'mdi:bed-clock', mode: 'text' }),
   'text.master_bedroom_eight_sleep_pod_5_right_bedtime': entity('text.master_bedroom_eight_sleep_pod_5_right_bedtime', '22:00', { icon: 'mdi:bed-clock', mode: 'text' }),
-  'number.stephen_s_eight_sleep_side_alarm_snooze_minutes': entity('number.stephen_s_eight_sleep_side_alarm_snooze_minutes', '9', { max: 30, min: 5, step: 1, unit_of_measurement: 'min' }),
-  'number.steph_s_eight_sleep_side_alarm_snooze_minutes': entity('number.steph_s_eight_sleep_side_alarm_snooze_minutes', '9', { max: 30, min: 5, step: 1, unit_of_measurement: 'min' }),
   'sensor.nightcanvasrestful_left_current_temperature': entity('sensor.nightcanvasrestful_left_current_temperature', '86', { unit_of_measurement: '°F', device_class: 'temperature' }),
   'sensor.nightcanvasrestful_right_current_temperature': entity('sensor.nightcanvasrestful_right_current_temperature', '72', { unit_of_measurement: '°F', device_class: 'temperature' }),
   'sensor.nightcanvasrestful_left_seconds_remaining': entity('sensor.nightcanvasrestful_left_seconds_remaining', '7200', { unit_of_measurement: 's' }),
@@ -586,9 +580,9 @@ export const mockEntities: Record<string, MockEntity> = {
   'binary_sensor.music_room_door_contact_sensor_contact': entity('binary_sensor.music_room_door_contact_sensor_contact', 'off'),
   'binary_sensor.office_pc_window_sensor_contact': entity('binary_sensor.office_pc_window_sensor_contact', 'off'),
   'binary_sensor.office_window_contact_sensor_contact': entity('binary_sensor.office_window_contact_sensor_contact', 'off'),
-  'binary_sensor.nightcanvasrestful_left_alarm_vibrating': entity('binary_sensor.nightcanvasrestful_left_alarm_vibrating', 'off'),
+  'sensor.master_bedroom_sleepypod_eight_pod_left_alarm_state': entity('sensor.master_bedroom_sleepypod_eight_pod_left_alarm_state', 'idle', { snoozed_until: null }),
   'binary_sensor.nightcanvasrestful_left_presence': entity('binary_sensor.nightcanvasrestful_left_presence', 'on'),
-  'binary_sensor.nightcanvasrestful_right_alarm_vibrating': entity('binary_sensor.nightcanvasrestful_right_alarm_vibrating', 'off'),
+  'sensor.master_bedroom_sleepypod_eight_pod_right_alarm_state': entity('sensor.master_bedroom_sleepypod_eight_pod_right_alarm_state', 'idle', { snoozed_until: null }),
   'binary_sensor.nightcanvasrestful_right_presence': entity('binary_sensor.nightcanvasrestful_right_presence', 'off'),
   'binary_sensor.stephen_s_eight_sleep_side_bed_presence': entity('binary_sensor.stephen_s_eight_sleep_side_bed_presence', 'on'),
   'binary_sensor.steph_s_eight_sleep_side_bed_presence': entity('binary_sensor.steph_s_eight_sleep_side_bed_presence', 'off'),
@@ -798,10 +792,10 @@ export function resetMockHass() {
   mockEntities['sensor.sleepypod_steph_schedule_phase'].state = 'outside'
   mockEntities['switch.nightcanvasrestful_left_alarms_enabled'].state = 'off'
   mockEntities['switch.nightcanvasrestful_right_alarms_enabled'].state = 'off'
-  mockEntities['binary_sensor.nightcanvasrestful_left_alarm_vibrating'].state = 'off'
-  mockEntities['binary_sensor.nightcanvasrestful_right_alarm_vibrating'].state = 'off'
-  mockEntities['number.stephen_s_eight_sleep_side_alarm_snooze_minutes'].state = '9'
-  mockEntities['number.steph_s_eight_sleep_side_alarm_snooze_minutes'].state = '9'
+  mockEntities['sensor.master_bedroom_sleepypod_eight_pod_left_alarm_state'].state = 'idle'
+  mockEntities['sensor.master_bedroom_sleepypod_eight_pod_left_alarm_state'].attributes.snoozed_until = null
+  mockEntities['sensor.master_bedroom_sleepypod_eight_pod_right_alarm_state'].state = 'idle'
+  mockEntities['sensor.master_bedroom_sleepypod_eight_pod_right_alarm_state'].attributes.snoozed_until = null
   for (const room of thermostatRoomMockData) {
     mockEntities[`switch.living_room_thermostat_contact_sensors_${room.key}_track_only_when_occupied`].state = 'trackOnlyWhenOccupied' in room ? room.trackOnlyWhenOccupied : 'off'
     mockEntities[room.climate].attributes.away_mode_active = false

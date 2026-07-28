@@ -1134,6 +1134,23 @@ button.thermostatGlassMain {
     overflow: hidden;
   }
 
+  .eightSleepModalBody .eightSleepHeroColumn {
+    min-height: 0;
+    max-height: 100%;
+    align-self: stretch;
+    align-content: safe center;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: none;
+  }
+
+  .eightSleepModalBody .eightSleepHeroColumn::-webkit-scrollbar {
+    display: none;
+    width: 0;
+    height: 0;
+  }
+
   .eightSleepModalBody .eightSleepModalHeroShell {
     min-height: 0;
     align-self: center;
@@ -1173,6 +1190,13 @@ button.thermostatGlassMain {
     overflow: visible;
   }
 
+  .eightSleepModalBody .eightSleepHeroColumn {
+    max-height: none;
+    align-self: start;
+    align-content: start;
+    overflow: visible;
+  }
+
   .eightSleepModalBody .eightSleepModalHeroShell {
     align-self: start;
     align-content: start;
@@ -1182,6 +1206,14 @@ button.thermostatGlassMain {
     max-height: none;
     overflow: visible;
   }
+}
+
+.eightSleepHeroColumn {
+  display: grid;
+  min-width: 0;
+  align-content: safe center;
+  grid-auto-rows: max-content;
+  gap: 18px;
 }
 
 .eightSleepModalHeroShell {
@@ -1414,18 +1446,6 @@ button.thermostatGlassMain {
   color: rgba(255, 255, 255, 0.48);
   background: rgba(255, 255, 255, 0.12);
   cursor: default;
-}
-
-.eightSleepAlarmActiveActions {
-  display: grid;
-  gap: 10px;
-  margin-top: -6px;
-}
-
-.eightSleepAlarmActiveActions .thermostatGlassCard {
-  min-height: 92px;
-  border-radius: 26px;
-  padding: 14px;
 }
 
 .eightSleepAddAlarmCard {

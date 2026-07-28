@@ -607,8 +607,103 @@ test('thermostat page accepts the first mobile scroll gesture after closing a ro
   }
 })
 
+test("SleepyPod active alarm actions stay per-side and optimistic", async ({ page }) => {
+  await page.goto("/at-a-glance/master-bedroom")
+  await page.evaluate(() => {
+    const mock = (window as unknown as { __mockHass: { setEntityState: (entityId: string, state: string) => void } }).__mockHass
+    mock.setEntityState("sensor.master_bedroom_sleepypod_eight_pod_left_alarm_state", "ringing")
+    mock.setEntityState("sensor.master_bedroom_sleepypod_eight_pod_right_alarm_state", "ringing")
+  })
+  await page.getByRole("button", { name: /Steph.s Bed Off/i }).click()
+
+  const dialog = page.getByRole("dialog", { name: /Steph.s Bed/ })
+  const section = dialog.locator("[data-sleepypod-side=\"right\"]")
+  const hero = dialog.locator("[data-section=\"eight-sleep-hero\"]")
+  const panel = dialog.locator("[data-scroll-region=\"eight-sleep-panel\"]")
+  await expect(section.getByRole("heading", { name: "Alarm Active" })).toBeVisible()
+  await expect(section.getByText("Ringing")).toBeVisible()
+  await expect(dialog.getByRole("group", { name: /Steph.s Bed active alarm controls/ })).toBeVisible()
+  await expect(dialog.getByRole("group", { name: /Stephen.s Bed active alarm controls/ })).toHaveCount(0)
+  await expect(panel.getByRole("heading", { name: "Sleep Schedule" })).toBeVisible()
+  await expect(hero).toBeVisible()
+  await expect.poll(() => section.evaluate((element) => ({
+    followsHero: element.previousElementSibling?.getAttribute("data-section") === "eight-sleep-hero",
+    panelFollowsSectionColumn: element.parentElement?.nextElementSibling?.getAttribute("data-scroll-region") === "eight-sleep-panel",
+  }))).toEqual({ followsHero: true, panelFollowsSectionColumn: true })
+
+  const snooze = section.getByRole("button", { name: "Snooze" })
+  const stop = section.getByRole("button", { name: "Stop Alarm" })
+  await expect.poll(() => snooze.evaluate((element) => getComputedStyle(element).getPropertyValue("--card-rgb").trim())).toBe("10 132 255")
+  await expect.poll(() => stop.evaluate((element) => getComputedStyle(element).getPropertyValue("--card-rgb").trim())).toBe("229 57 53")
+
+  await snooze.click()
+  await expect(section).toHaveAttribute("data-alarm-state", "snoozed")
+  const snoozing = section.getByRole("button", { name: /Snoozing, 5:00 Remaining/ })
+  await expect(snoozing).toBeVisible()
+  await expect(snoozing).toBeDisabled()
+  await expect.poll(() => snoozing.evaluate((element) => getComputedStyle(element).getPropertyValue("--card-rgb").trim())).toBe("122 122 128")
+  await expect(section.getByText("Snoozing")).toBeVisible()
+  await expect(section.getByText("5:00 Remaining")).toBeVisible()
+  await expect(section.getByText(/Snoozed until/i)).toHaveCount(0)
+  await expect(section.getByText("Ringing")).toHaveCount(0)
+  await expect.poll(() => section.evaluate((element) => {
+    const actions = element.querySelector('[role="group"]')
+    const heading = element.querySelector("h2")
+    if (!actions || !heading) return null
+    return Math.round(actions.getBoundingClientRect().top - heading.getBoundingClientRect().bottom)
+  })).toBeLessThanOrEqual(24)
+  await expect.poll(() => page.evaluate(() => (window as unknown as { __mockHass: { calls: Record<string, unknown>[] } }).__mockHass.calls.filter((call) => call.domain === "button" && typeof call.target === "string" && call.target.includes("sleepypod_eight_pod_right_alarm_")))).toEqual([
+    { domain: "button", service: "press", target: "button.master_bedroom_sleepypod_eight_pod_right_alarm_snooze" },
+  ])
+
+  await stop.click()
+  await expect(dialog.getByRole("heading", { name: "Alarm Active" })).toHaveCount(0)
+  await expect.poll(() => page.evaluate(() => (window as unknown as { __mockHass: { calls: Record<string, unknown>[] } }).__mockHass.calls.filter((call) => call.domain === "button" && typeof call.target === "string" && call.target.includes("sleepypod_eight_pod_right_alarm_")))).toEqual([
+    { domain: "button", service: "press", target: "button.master_bedroom_sleepypod_eight_pod_right_alarm_snooze" },
+    { domain: "button", service: "press", target: "button.master_bedroom_sleepypod_eight_pod_right_alarm_stop" },
+  ])
+})
+
+
 test.describe('desktop modal layout', () => {
   test.use({ hasTouch: false, isMobile: false, viewport: { width: 1280, height: 900 } })
+
+  test("desktop SleepyPod active alarm controls scroll fully into view below the hero", async ({ page }) => {
+    await page.goto("/at-a-glance/master-bedroom")
+    await page.evaluate(() => {
+      const mock = (window as unknown as { __mockHass: { setEntityState: (entityId: string, state: string) => void } }).__mockHass
+      mock.setEntityState("sensor.master_bedroom_sleepypod_eight_pod_right_alarm_state", "ringing")
+    })
+    await page.getByRole("button", { name: /Steph.s Bed Off/i }).click()
+
+    const dialog = page.getByRole("dialog", { name: /Steph.s Bed/ })
+    const heroColumn = dialog.locator("[data-scroll-region=\"eight-sleep-hero-column\"]")
+    const section = heroColumn.locator("[data-sleepypod-side=\"right\"]")
+    const controls = section.getByRole("group", { name: /Steph.s Bed active alarm controls/ })
+    await expect(section.getByRole("heading", { name: "Alarm Active" })).toBeAttached()
+    await expect.poll(() => heroColumn.evaluate((element) => ({
+      boundedByBody: element.clientHeight <= (element.parentElement?.clientHeight ?? 0) + 1,
+      overflowY: getComputedStyle(element).overflowY,
+      overflows: element.scrollHeight > element.clientHeight + 1,
+    }))).toEqual({ boundedByBody: true, overflowY: "auto", overflows: true })
+    await expect.poll(() => section.evaluate((element) => element.previousElementSibling?.getAttribute("data-section"))).toBe("eight-sleep-hero")
+
+    await heroColumn.evaluate((element) => {
+      element.scrollTop = element.scrollHeight
+    })
+    await expect.poll(() => heroColumn.evaluate((element) => element.scrollTop)).toBeGreaterThan(0)
+    await expect.poll(() => controls.evaluate((element) => {
+      const column = element.closest("[data-scroll-region=\"eight-sleep-hero-column\"]")
+      const columnBox = column?.getBoundingClientRect()
+      const buttons = Array.from(element.querySelectorAll("button"))
+      return Boolean(columnBox && buttons.length === 2 && buttons.every((button) => {
+        const box = button.getBoundingClientRect()
+        return box.top >= columnBox.top - 1 && box.bottom <= columnBox.bottom + 1
+      }))
+    })).toBe(true)
+    await expect(controls.getByRole("button", { name: "Snooze" })).toBeVisible()
+    await expect(controls.getByRole("button", { name: "Stop Alarm" })).toBeVisible()
+  })
 
   test('rooms modal uses fixed 168px square room cards on desktop', async ({ page }) => {
     await page.goto('/at-a-glance/overview')

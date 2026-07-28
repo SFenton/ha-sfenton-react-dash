@@ -26,6 +26,8 @@ import { HumidifierModalContent } from '../components/hass/HumidifierModalConten
 import { MediaRemoteModalContent, MediaRemoteModalNav, type MediaRemoteModalTab } from '../components/hass/MediaRemoteModalContent'
 import { MEDIA_REMOTE_MODAL_STYLE } from '../components/hass/mediaRemoteModalStyle'
 import { BedTemperatureScopePrompt } from '../components/hass/BedTemperatureScopePrompt'
+import { SleepypodActiveAlarmSection } from '../components/hass/SleepypodActiveAlarmSection'
+import { isSleepypodAlarmActive, sleepypodAlarmState, sleepypodAlarmStatusText } from '../components/hass/sleepypodAlarmState'
 import {
   SLEEPYPOD_SCHEDULE_PHASE_ENTITY_IDS,
   sleepypodOutsideScheduleTemperatureService,
@@ -2259,8 +2261,8 @@ interface EightSleepSideConfig {
   alarmOwner: FreeSleepAlarmOwner
   alarmsEnabledEntityId: string
   alarmSnoozeButtonEntityId: string
-  alarmSnoozeMinutesEntityId: string
-  alarmVibratingEntityId: string
+  alarmStateEntityId: string
+  alarmStopButtonEntityId: string
   awayModeEntityId: string
   bedtimeEntityId: string
   breathingRateEntityId?: string
@@ -2419,16 +2421,14 @@ function shouldResetScrollOnTabChange() {
   return typeof window.matchMedia !== 'function' || window.matchMedia(DESKTOP_MODAL_QUERY).matches
 }
 const FREE_SLEEP_ALARM_DAY_KEYS = FREE_SLEEP_ALARM_DAYS.map((day) => day.key)
-const FREE_SLEEP_ALARM_SNOOZE_MINUTES = 10
-const FREE_SLEEP_CLEAR_ALARM_ENTITY_ID = 'button.nightcanvasrestful_clear_alarm'
 
 const EIGHT_SLEEP_SIDE_CONFIGS: EightSleepSideConfig[] = [
   {
     alarmOwner: 'stephen',
     alarmsEnabledEntityId: 'switch.nightcanvasrestful_left_alarms_enabled',
-    alarmSnoozeButtonEntityId: 'button.stephen_s_eight_sleep_side_alarm_snooze',
-    alarmSnoozeMinutesEntityId: 'number.stephen_s_eight_sleep_side_alarm_snooze_minutes',
-    alarmVibratingEntityId: 'binary_sensor.nightcanvasrestful_left_alarm_vibrating',
+    alarmSnoozeButtonEntityId: 'button.master_bedroom_sleepypod_eight_pod_left_alarm_snooze',
+    alarmStateEntityId: 'sensor.master_bedroom_sleepypod_eight_pod_left_alarm_state',
+    alarmStopButtonEntityId: 'button.master_bedroom_sleepypod_eight_pod_left_alarm_stop',
     awayModeEntityId: 'switch.nightcanvasrestful_left_away_mode',
     bedtimeEntityId: 'text.master_bedroom_eight_sleep_pod_5_left_bedtime',
     breathingRateEntityId: 'sensor.sleepypod_eight_pod_left_breathing_rate',
@@ -2462,9 +2462,9 @@ const EIGHT_SLEEP_SIDE_CONFIGS: EightSleepSideConfig[] = [
   {
     alarmOwner: 'steph',
     alarmsEnabledEntityId: 'switch.nightcanvasrestful_right_alarms_enabled',
-    alarmSnoozeButtonEntityId: 'button.steph_s_eight_sleep_side_alarm_snooze',
-    alarmSnoozeMinutesEntityId: 'number.steph_s_eight_sleep_side_alarm_snooze_minutes',
-    alarmVibratingEntityId: 'binary_sensor.nightcanvasrestful_right_alarm_vibrating',
+    alarmSnoozeButtonEntityId: 'button.master_bedroom_sleepypod_eight_pod_right_alarm_snooze',
+    alarmStateEntityId: 'sensor.master_bedroom_sleepypod_eight_pod_right_alarm_state',
+    alarmStopButtonEntityId: 'button.master_bedroom_sleepypod_eight_pod_right_alarm_stop',
     awayModeEntityId: 'switch.nightcanvasrestful_right_away_mode',
     bedtimeEntityId: 'text.master_bedroom_eight_sleep_pod_5_right_bedtime',
     breathingRateEntityId: 'sensor.sleepypod_eight_pod_right_breathing_rate',
@@ -4326,27 +4326,6 @@ function EightSleepScheduleTemperatureControl({
   )
 }
 
-function EightSleepAlarmActiveActions({ side }: { side: EightSleepSideConfig }) {
-  const callService = useCallService()
-
-  const cancelAlarm = () => {
-    callService({ domain: 'button', service: 'press', target: FREE_SLEEP_CLEAR_ALARM_ENTITY_ID })
-  }
-
-  const snoozeAlarm = () => {
-    callService({ domain: 'number', service: 'set_value', target: side.alarmSnoozeMinutesEntityId, serviceData: { value: FREE_SLEEP_ALARM_SNOOZE_MINUTES } })
-    callService({ domain: 'button', service: 'press', target: side.alarmSnoozeButtonEntityId })
-    cancelAlarm()
-  }
-
-  return (
-    <div aria-label={`${side.title} active alarm actions`} className={styles.eightSleepAlarmActiveActions} role="group">
-      <ThermostatGlassCard active icon="mdi:timer-cog" onMainClick={snoozeAlarm} stateText={`${FREE_SLEEP_ALARM_SNOOZE_MINUTES} min`} title="Snooze Alarm" />
-      <ThermostatGlassCard icon="mdi:close" onMainClick={cancelAlarm} stateText="Stop now" title="Cancel Alarm" />
-    </div>
-  )
-}
-
 function EightSleepHotFlashButton({ modalState, side }: { modalState: EightSleepBedModalState; side: EightSleepSideConfig }) {
   const restoreAtEntity = useEntity(asEntityName(side.hotFlashRestoreAtEntityId), { returnNullIfNotFound: true })
   const timerEntity = useEntity(asEntityName(side.hotFlashTimerEntityId), { returnNullIfNotFound: true })
@@ -4563,11 +4542,12 @@ function EightSleepBedModalContent({
   const currentTemperature = useEntity(asEntityName(side.currentTemperatureEntityId), { returnNullIfNotFound: true })
   const presence = useEntity(asEntityName(side.presenceEntityId), { returnNullIfNotFound: true })
   const secondsRemaining = useEntity(asEntityName(side.secondsRemainingEntityId), { returnNullIfNotFound: true })
-  const alarmVibrating = useEntity(asEntityName(side.alarmVibratingEntityId), { returnNullIfNotFound: true })
+  const alarmStateEntity = useEntity(asEntityName(side.alarmStateEntityId), { returnNullIfNotFound: true })
   const currentTemperatureText = formatTemperatureCompact(currentTemperature?.state, temperatureUnit(currentTemperature))
   const presenceText = presence?.state === 'on' ? 'In Bed' : presence?.state === 'off' ? 'Away' : titleCaseState(presence?.state ?? 'unavailable')
   const timeRemainingText = formatSecondsRemaining(secondsRemaining?.state)
-  const alarmActive = alarmVibrating?.state === 'on'
+  const alarmState = sleepypodAlarmState(alarmStateEntity?.state)
+  const alarmActive = isSleepypodAlarmActive(alarmState)
   const selectedTabLabel = (tabs ?? EIGHT_SLEEP_MODAL_TABS).find((tab) => tab.tab === effectiveActiveTab)?.label ?? 'Sleep Schedule'
 
   useEffect(() => {
@@ -4582,8 +4562,17 @@ function EightSleepBedModalContent({
 
   return (
     <div className={`${styles.thermostatModalBody} ${styles.eightSleepModalBody}`} data-layout="eight-sleep-modal-body" ref={modalBodyRef}>
-      <div className={`${styles.eightSleepModalHeroShell} ${styles.thermostatModalDialShell}`} data-section="eight-sleep-hero" data-thermostat-modal-dial-shell="true" style={THERMOSTAT_MODAL_DIAL_SHELL_STYLE}>
-        <EightSleepThermostatHero modalState={modalState} onRequestTemperatureScope={onRequestTemperatureScope} side={side} />
+      <div className={styles.eightSleepHeroColumn} data-scroll-region="eight-sleep-hero-column">
+        <div className={`${styles.eightSleepModalHeroShell} ${styles.thermostatModalDialShell}`} data-section="eight-sleep-hero" data-thermostat-modal-dial-shell="true" style={THERMOSTAT_MODAL_DIAL_SHELL_STYLE}>
+          <EightSleepThermostatHero modalState={modalState} onRequestTemperatureScope={onRequestTemperatureScope} side={side} />
+        </div>
+        <SleepypodActiveAlarmSection
+          side={side.scheduleSide}
+          sideTitle={side.title}
+          snoozeButtonEntityId={side.alarmSnoozeButtonEntityId}
+          stateEntityId={side.alarmStateEntityId}
+          stopButtonEntityId={side.alarmStopButtonEntityId}
+        />
       </div>
       <div aria-label={`${side.title} ${selectedTabLabel}`} className={styles.eightSleepModalPanel} data-modal-tab-transition-state={transitionState} data-scroll-region="eight-sleep-panel" ref={modalPanelRef}>
         {!modalState.sideAvailable && (
@@ -4601,7 +4590,6 @@ function EightSleepBedModalContent({
         )}
         {modalState.sideAvailable && effectiveActiveTab === 'alarms' && (
           <>
-            {alarmActive && <EightSleepAlarmActiveActions side={side} />}
             <EightSleepAlarmsSection
               alwaysEnabled={modalState.controlMode === 'climate'}
               scheduleEntityId={modalState.controlMode === 'climate' ? SLEEPYPOD_SCHEDULE_SENSOR_ENTITY_ID : FREE_SLEEP_SCHEDULE_SENSOR_ENTITY_ID}
@@ -4618,7 +4606,7 @@ function EightSleepBedModalContent({
               <ThermostatGlassCard active={modalState.controlsSideOn} hvacAction={modalState.heroAction} icon="mdi:thermometer" stateText={currentTemperatureText} thermalStatus={thermostatThermalStatus(modalState.heroAction)} title="Current Temp" />
               <ThermostatGlassCard active={presence?.state === 'on'} icon={presence?.state === 'on' ? 'mdi:bed' : 'mdi:bed-empty'} stateText={presenceText} title="Presence" />
               <ThermostatGlassCard icon="mdi:timer-outline" stateText={timeRemainingText} title="Time Remaining" />
-              <ThermostatGlassCard active={alarmActive} icon={alarmActive ? 'mdi:vibrate' : 'mdi:alarm-check'} stateText={alarmActive ? 'Vibrating' : 'Quiet'} title="Alarm" />
+              <ThermostatGlassCard active={alarmActive} icon={alarmState === 'ringing' ? 'mdi:alarm-bell' : alarmState === 'snoozed' ? 'mdi:alarm-snooze' : 'mdi:alarm-check'} stateText={sleepypodAlarmStatusText(alarmState)} title="Alarm" />
             </div>
           </section>
         )}
