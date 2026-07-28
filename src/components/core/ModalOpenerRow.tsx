@@ -37,8 +37,8 @@ export function ModalOpenerRow({
       type="button"
     >
       {icon && <span aria-hidden="true" className={styles.icon}>{icon}</span>}
-      <span className={styles.copy}>
-        <strong>{title}</strong>
+      <span className={styles.copy} data-dynamic-grid-label-container="true">
+        <strong data-dynamic-grid-label="true">{title}</strong>
         {subtitle && <small>{subtitle}</small>}
       </span>
       <ModalDisclosureIcon size={variant === 'compact' ? 'compact' : 'standard'} />

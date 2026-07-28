@@ -25,9 +25,7 @@
 }
 
 .choreQuickGrid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
+  --dynamic-grid-columns: 2;
 }
 
 .choreQuickGrid > * {
@@ -998,7 +996,10 @@ button.thermostatGlassMain {
   justify-content: flex-end;
 }
 
-.thermostatRoomGrid,
+.thermostatRoomGrid {
+  --dynamic-grid-columns: 2;
+}
+
 .thermostatCheckboxGrid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1852,9 +1853,12 @@ button.thermostatGlassMain {
 @media (max-width: 340px) {
   .grid,
   .cameraGrid,
-  .thermostatRoomGrid,
   .thermostatCheckboxGrid {
     grid-template-columns: 1fr;
+  }
+
+  .thermostatRoomGrid {
+    --dynamic-grid-columns: 1;
   }
 
   .settingsPage {

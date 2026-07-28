@@ -57,6 +57,8 @@ describe('AtAGlancePage', () => {
   it('gives Home route quick links the shared chevron without marking them modal openers', () => {
     render(<AtAGlancePage />)
 
+    expect(screen.getByRole('group', { name: 'Home quick links' })).toHaveAttribute('data-dynamic-grid', 'true')
+
     for (const name of ['Vacuums', 'Media', 'Custom Lights']) {
       const quickLink = screen.getByRole('button', { name })
       expect(quickLink.querySelector('[data-modal-disclosure="right-chevron"]'), name).toBeInTheDocument()

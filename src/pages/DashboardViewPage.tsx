@@ -38,6 +38,7 @@ import {
 import { Card, type CardColor } from '../components/core/Card'
 import { CheckboxRow } from '../components/core/CheckboxRow'
 import { Description } from '../components/core/Description'
+import { DynamicGrid } from '../components/core/DynamicGrid'
 import { EmptyState } from '../components/core/EmptyState'
 import { GlassTile } from '../components/core/GlassTile'
 import { MaterialIcon } from '../components/core/Icon'
@@ -1127,11 +1128,11 @@ function ChoresIntro({ onNavigate }: { onNavigate: (path: string) => void }) {
   return (
     <section className={styles.section}>
       <SectionHeader title="Quick Links" />
-      <div className={styles.choreQuickGrid}>
+      <DynamicGrid ariaLabel="Chore quick links" className={styles.choreQuickGrid} columns={2}>
         {CHORE_QUICK_LINKS.map((item) => (
           <ChoreQuickLink item={item} key={item.path} onNavigate={onNavigate} />
         ))}
-      </div>
+      </DynamicGrid>
     </section>
   )
 }
@@ -5235,9 +5236,9 @@ function ThermostatPage({ preload = false, preloadHash, preloadHashes = [] }: { 
       <OpenContactSensorsSection />
       <section className={styles.section}>
         <SectionHeader title="Rooms" />
-        <div className={styles.thermostatRoomGrid}>
+        <DynamicGrid ariaLabel="Thermostat rooms" className={styles.thermostatRoomGrid} columns={2} gap={8}>
           {THERMOSTAT_ROOM_VIEWS.map((room) => <ThermostatRoomRow key={room.key} onOpen={openThermostatRoom} room={room} />)}
-        </div>
+        </DynamicGrid>
       </section>
       <section className={styles.section}>
         <SectionHeader title="Eco Mode" />

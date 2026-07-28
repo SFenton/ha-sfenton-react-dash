@@ -80,9 +80,9 @@ export function GlassTile({
         <span aria-hidden="true" className={styles.icon} style={iconColor ? { color: iconColor } : undefined}>
           {iconContent}
         </span>
-        <span className={styles.labelGroup}>
-          <span className={styles.title}>{title}</span>
-          {subtitle && <span className={styles.subtitle}>{subtitle}</span>}
+        <span className={styles.labelGroup} data-dynamic-grid-label-container="true">
+          <span className={styles.title} data-dynamic-grid-label="true">{title}</span>
+          {subtitle && <span className={styles.subtitle} data-dynamic-grid-label="true">{subtitle}</span>}
         </span>
       </span>
       {disclosure && onClick && <ModalDisclosureIcon size={variant === 'header' ? 'compact' : 'standard'} />}

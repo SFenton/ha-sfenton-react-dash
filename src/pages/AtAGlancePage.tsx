@@ -10,6 +10,7 @@ import { AppShell } from '../components/shell/AppShell'
 import { BottomNav } from '../components/shell/BottomNav'
 import { DashboardPageLoading, type DashboardPageLoadingPhase } from '../components/shell/DashboardPageLoading'
 import { ActionPill } from '../components/core/ActionPill'
+import { DynamicGrid } from '../components/core/DynamicGrid'
 import { FloatingActionButton } from '../components/core/FloatingActionButton'
 import { GlassTile } from '../components/core/GlassTile'
 import { Icon, MaterialIcon } from '../components/core/Icon'
@@ -1292,13 +1293,11 @@ export function AtAGlancePage({ activePath = 'overview', deferRouteContent = fal
             </div>
 
             <SectionHeader title="Quick Links" />
-            <section className={styles.quickGrid}>
+            <DynamicGrid ariaLabel="Home quick links" className={styles.quickGrid} columns={2}>
               {QUICK_ACCESS_ITEMS.map((item) => (
-                <div key={item.title}>
-                  <QuickAccessTile item={item} onNavigate={onNavigate} onOpenHash={openHash} />
-                </div>
+                <QuickAccessTile item={item} key={item.title} onNavigate={onNavigate} onOpenHash={openHash} />
               ))}
-            </section>
+            </DynamicGrid>
 
             <GuestPresenceSecuritySection onOpen={openHash} />
 
