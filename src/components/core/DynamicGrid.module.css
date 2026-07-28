@@ -1,0 +1,33 @@
+.grid {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: repeat(var(--dynamic-grid-columns, var(--dynamic-grid-base-columns, 1)), minmax(0, 1fr));
+  gap: var(--dynamic-grid-gap, 10px);
+}
+
+.cell {
+  min-width: 0;
+  grid-column: span var(--dynamic-grid-span, 1);
+}
+
+.cell > * {
+  min-width: 0;
+}
+
+.grid [data-dynamic-grid-label-container='true'] {
+  min-width: 0;
+  width: 100%;
+}
+
+.grid [data-dynamic-grid-label='true'] {
+  display: block;
+  width: max-content;
+  max-width: 100%;
+  white-space: nowrap;
+}
+
+.cell[data-dynamic-grid-wrap='true'] [data-dynamic-grid-label='true'] {
+  width: auto;
+  max-width: 100%;
+  white-space: normal;
+}

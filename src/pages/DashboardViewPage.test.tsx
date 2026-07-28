@@ -1431,6 +1431,14 @@ describe('DashboardViewPage', () => {
     ])
   })
 
+  it('uses the no-gap dynamic grid for thermostat room selection', () => {
+    render(<DashboardViewPage activePath="ecobee" onNavigate={() => undefined} path="ecobee" />)
+
+    const roomGrid = screen.getByRole('group', { name: 'Thermostat rooms' })
+    expect(roomGrid.children).toHaveLength(11)
+    expect(roomGrid.lastElementChild).toHaveAttribute('data-dynamic-grid-span', '2')
+  })
+
   it('keeps the Whole Home thermostat range colors visible while the aggregate climate is off', () => {
     render(<DashboardViewPage activePath="ecobee" onNavigate={() => undefined} path="ecobee" />)
 
@@ -4838,6 +4846,9 @@ describe('DashboardViewPage', () => {
   expect(screen.queryByRole('heading', { name: 'House Calendar' })).not.toBeInTheDocument()
   expect(screen.queryByText('No events to display')).not.toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Quick Links' })).toBeInTheDocument()
+    const quickLinks = screen.getByRole('group', { name: 'Chore quick links' })
+    expect(quickLinks).toHaveAttribute('data-dynamic-grid', 'true')
+    expect(quickLinks.lastElementChild).toHaveAttribute('data-dynamic-grid-span', '2')
     expect(screen.getByRole('button', { name: /Groceries 2 items/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Stephen's Tasks 4 upcoming tasks · 1 task listed/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Steph's Tasks No tasks listed/i })).toBeInTheDocument()
