@@ -48,6 +48,7 @@ import {
 } from '../constants/atAGlance'
 import { CHORE_BLUE, CHORE_QUICK_LINKS, SETTINGS_PAGE_ITEMS, type ChoreQuickLinkConfig, type SettingsLinkConfig } from '../constants/portedDashboard'
 import { choreQuickLinkCounts, choreQuickLinkSubtitle, groceryCountSubtitle } from '../constants/choreQuickLinkCounts'
+import { allFoodSubtitle } from '../constants/everShelfFood'
 import { useHashModal } from '../hooks/useHashModal'
 import { markDeferredRouteHydrated, useDeferredRouteHydration, type DeferredRouteHydrationPhase } from '../hooks/useDeferredRouteHydration'
 import type { RouteTransitionState } from '../components/shell/SmoothRouteOutlet'
@@ -353,7 +354,8 @@ function roomTitleFromLightGroup(group: EntityGroupConfig) {
 
 function QuickAccessTile({ item, onNavigate, onOpenHash }: { item: QuickAccessConfig; onNavigate: (path: string) => void; onOpenHash: (hash: string) => void }) {
   const entity = useEntity(asEntityName(item.entityId ?? 'sensor.unavailable'), { returnNullIfNotFound: true })
-  const subtitle = item.status === 'entity_state' ? formatCompactEntityState(entity) : undefined
+  const foodSubtitle = useHass((state) => item.status === 'all_food' ? allFoodSubtitle(state.entities) : undefined)
+  const subtitle = item.status === 'entity_state' ? formatCompactEntityState(entity) : foodSubtitle
   const itemHash = item.hash
   const isSecurityTile = item.tone === 'security' && item.entityId?.startsWith('alarm_control_panel.')
 
@@ -367,7 +369,7 @@ function QuickAccessTile({ item, onNavigate, onOpenHash }: { item: QuickAccessCo
 
   return (
     <GlassTile
-      backgroundColor={isSecurityTile ? securityStateCssColor(entity?.state, 0.5) : undefined}
+      backgroundColor={isSecurityTile ? securityStateCssColor(entity?.state, 0.5) : item.backgroundColor}
       disclosure={Boolean(itemHash || item.route)}
       disclosureKind={itemHash ? 'modal' : 'navigation'}
       icon={isSecurityTile ? securityStateIconName(entity?.state) : item.icon}

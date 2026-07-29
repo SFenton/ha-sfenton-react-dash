@@ -247,6 +247,20 @@ test('overview renders with mock Home Assistant state', async ({ page }) => {
   await expect(page.getByRole('heading', { name: 'Quick Links' })).toBeVisible()
 })
 
+test('Food quick link mirrors the All Food summary with the Kitchen Food orange', async ({ page }) => {
+  await page.setViewportSize({ width: 393, height: 852 })
+  await page.goto('/at-a-glance/overview')
+
+  const foodQuickLink = page.getByRole('button', { name: 'Food 35 Items • 6 Expiring Soon' })
+  await expect(foodQuickLink).toContainText('Food')
+  await expect(foodQuickLink).toContainText('35 Items • 6 Expiring Soon')
+  await expect(foodQuickLink).toHaveCSS('background-color', 'rgba(155, 110, 64, 0.72)')
+
+  await foodQuickLink.click()
+  await expect(page.getByRole('heading', { exact: true, name: 'Food' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'All Food 35 Items • 6 Expiring Soon' })).toBeVisible()
+})
+
 test('room keyboard navigation signals one HA-owned increment without delaying the route', async ({ page }) => {
   await page.goto('/at-a-glance/overview')
   await page.getByRole('button', { name: 'Rooms' }).click()
@@ -274,7 +288,7 @@ test('mobile modal opener families use shared disclosures and explicit action ex
   await expectNoChevron(page.getByRole('button', { name: /^Lights /i }).first())
   await expectRightChevron(page.getByRole('button', { name: /^Security System /i }))
   await expectNoChevron(page.getByRole('button', { name: 'Open Front Door camera' }))
-  for (const quickLink of ['Food', 'Vacuums', 'Media', 'Custom Lights']) {
+  for (const quickLink of ['Food 35 Items • 6 Expiring Soon', 'Vacuums', 'Media', 'Custom Lights']) {
     const opener = page.getByRole('button', { exact: true, name: quickLink })
     await expectRightChevron(opener)
     await expect(opener).toHaveAttribute('data-navigation-opener', 'true')
