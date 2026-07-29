@@ -5489,6 +5489,9 @@ describe('DashboardViewPage', () => {
 
     const robotSection = screen.getByRole('heading', { name: 'Robot Vacuums' }).closest('section')
     expect(robotSection).toBeTruthy()
+    const robotGrid = within(robotSection as HTMLElement).getByRole('group', { name: 'Robot vacuums' })
+    expect(robotGrid).toHaveAttribute('data-dynamic-grid', 'true')
+    expect(robotGrid.lastElementChild).toHaveAttribute('data-dynamic-grid-span', '2')
     const mainFloorVacuum = within(robotSection as HTMLElement).getByLabelText(/Main Floor/)
     const musicRoomVacuum = within(robotSection as HTMLElement).getByLabelText(/^Music Room/)
     const theaterRoomVacuum = within(robotSection as HTMLElement).getByLabelText(/Theater Room/)
@@ -5497,6 +5500,9 @@ describe('DashboardViewPage', () => {
 
     const autoCleanSection = screen.getByRole('heading', { name: 'Auto-Clean' }).closest('section')
     expect(autoCleanSection).toBeTruthy()
+    const autoCleanGrid = within(autoCleanSection as HTMLElement).getByRole('group', { name: 'Vacuum auto-clean controls' })
+    expect(autoCleanGrid).toHaveAttribute('data-dynamic-grid', 'true')
+    expect(autoCleanGrid.lastElementChild).toHaveAttribute('data-dynamic-grid-span', '2')
     const buttons = within(autoCleanSection as HTMLElement).getAllByRole('button')
     expect(buttons.map((button) => button.getAttribute('aria-label'))).toEqual([
       'Main Floor Enabled',
