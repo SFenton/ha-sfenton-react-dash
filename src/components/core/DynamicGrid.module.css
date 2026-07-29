@@ -1,7 +1,7 @@
 .grid {
   display: grid;
   min-width: 0;
-  grid-template-columns: repeat(var(--dynamic-grid-columns, var(--dynamic-grid-base-columns, 1)), minmax(0, 1fr));
+  grid-template-columns: repeat(var(--dynamic-grid-rendered-columns, var(--dynamic-grid-columns, var(--dynamic-grid-base-columns, 1))), minmax(0, 1fr));
   gap: var(--dynamic-grid-gap, 10px);
 }
 
