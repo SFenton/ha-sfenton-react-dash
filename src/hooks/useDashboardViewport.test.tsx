@@ -1,7 +1,7 @@
 import { act, cleanup, render, screen } from '@testing-library/react'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { DASHBOARD_ROUTE_CHANGE_EVENT } from './dashboardLocation'
-import { useDashboardViewport } from './useDashboardViewport'
+import { armDashboardKeyboardPrediction, clearDashboardKeyboardPrediction, useDashboardViewport } from './useDashboardViewport'
 
 type FakeVisualViewport = EventTarget & {
   height: number
@@ -44,12 +44,6 @@ async function flushViewportUpdate() {
   })
 }
 
-async function waitForKeyboardSettle() {
-  await act(async () => {
-    await new Promise((resolve) => window.setTimeout(resolve, 420))
-  })
-}
-
 async function waitForViewportRecovery() {
   await act(async () => {
     await new Promise((resolve) => window.setTimeout(resolve, 400))
@@ -66,15 +60,20 @@ describe('useDashboardViewport', () => {
     setMaxTouchPoints(1)
     createVisualViewport(390, 800)
     document.documentElement.removeAttribute('data-dashboard-keyboard')
-    document.documentElement.removeAttribute('data-dashboard-keyboard-settled')
+    document.documentElement.removeAttribute('data-dashboard-kb-arming')
+    document.documentElement.removeAttribute('data-dashboard-kb-masked')
     document.documentElement.removeAttribute('style')
+    window.localStorage.clear()
   })
 
   afterEach(() => {
     cleanup()
     document.documentElement.removeAttribute('data-dashboard-keyboard')
-    document.documentElement.removeAttribute('data-dashboard-keyboard-settled')
+    document.documentElement.removeAttribute('data-dashboard-kb-arming')
+    document.documentElement.removeAttribute('data-dashboard-kb-masked')
     document.documentElement.removeAttribute('style')
+    clearDashboardKeyboardPrediction()
+    window.localStorage.clear()
     setMaxTouchPoints(0)
   })
 
@@ -84,14 +83,35 @@ describe('useDashboardViewport', () => {
     expect(document.documentElement.style.getPropertyValue('--dashboard-layout-height')).toBe('800px')
     expect(document.documentElement.style.getPropertyValue('--dashboard-layout-width')).toBe('390px')
     expect(document.documentElement.style.getPropertyValue('--dashboard-viewport-height')).toBe('800px')
+    expect(document.documentElement.style.getPropertyValue('--dashboard-visible-height')).toBe('800px')
     expect(document.documentElement.style.getPropertyValue('--dashboard-viewport-width')).toBe('390px')
     expect(document.documentElement.style.getPropertyValue('--dashboard-keyboard-inset')).toBe('0px')
     expect(document.documentElement.style.getPropertyValue('--dashboard-keyboard-overlay-inset')).toBe('0px')
     expect(document.documentElement).not.toHaveAttribute('data-dashboard-keyboard')
-    expect(document.documentElement).not.toHaveAttribute('data-dashboard-keyboard-settled')
   })
 
-  it('marks the dashboard keyboard state and shrinks the visible viewport when the visual viewport contracts', async () => {
+  it('uses a masked conservative prediction until the first keyboard measurement is cached', () => {
+    const prediction = armDashboardKeyboardPrediction()
+
+    expect(prediction.fromCache).toBe(false)
+    expect(prediction.predictedInset).toBe(440)
+    expect(document.documentElement).toHaveAttribute('data-dashboard-kb-arming', 'true')
+    expect(document.documentElement).toHaveAttribute('data-dashboard-kb-masked', 'true')
+    expect(document.documentElement.style.getPropertyValue('--dashboard-keyboard-predicted-inset')).toBe('440px')
+  })
+
+  it('uses a valid cached prediction without masking the search field', () => {
+    window.localStorage.setItem('react-dash-keyboard-v1:portrait:800', '280')
+
+    const prediction = armDashboardKeyboardPrediction()
+
+    expect(prediction).toEqual({ fromCache: true, predictedInset: 280 })
+    expect(document.documentElement).toHaveAttribute('data-dashboard-kb-arming', 'true')
+    expect(document.documentElement).not.toHaveAttribute('data-dashboard-kb-masked')
+    expect(document.documentElement.style.getPropertyValue('--dashboard-keyboard-predicted-inset')).toBe('280px')
+  })
+
+  it('marks the dashboard keyboard state without shrinking the child shell when the visual viewport contracts', async () => {
     const viewport = createVisualViewport(390, 800)
     render(<DashboardViewportHarness />)
     focusKeyboardInput()
@@ -104,22 +124,18 @@ describe('useDashboardViewport', () => {
     expect(document.documentElement).toHaveAttribute('data-dashboard-keyboard', 'open')
     expect(document.documentElement.style.getPropertyValue('--dashboard-keyboard-inset')).toBe('280px')
     expect(document.documentElement.style.getPropertyValue('--dashboard-keyboard-overlay-inset')).toBe('280px')
-    expect(document.documentElement.style.getPropertyValue('--dashboard-viewport-height')).toBe('520px')
-    expect(document.documentElement).not.toHaveAttribute('data-dashboard-keyboard-settled')
-
-    await waitForKeyboardSettle()
-    expect(document.documentElement).toHaveAttribute('data-dashboard-keyboard-settled', 'open')
+    expect(document.documentElement.style.getPropertyValue('--dashboard-viewport-height')).toBe('800px')
+    expect(document.documentElement.style.getPropertyValue('--dashboard-visible-height')).toBe('520px')
 
     viewport.height = 800
     viewport.dispatchEvent(new Event('resize'))
     window.dispatchEvent(new Event('resize'))
     await flushViewportUpdate()
-
     expect(document.documentElement).not.toHaveAttribute('data-dashboard-keyboard')
-    expect(document.documentElement).not.toHaveAttribute('data-dashboard-keyboard-settled')
     expect(document.documentElement.style.getPropertyValue('--dashboard-keyboard-inset')).toBe('0px')
     expect(document.documentElement.style.getPropertyValue('--dashboard-keyboard-overlay-inset')).toBe('0px')
     expect(document.documentElement.style.getPropertyValue('--dashboard-viewport-height')).toBe('800px')
+    expect(document.documentElement.style.getPropertyValue('--dashboard-visible-height')).toBe('800px')
   })
 
   it('does not lift overlay controls again when the iframe layout has already resized', async () => {
@@ -137,6 +153,84 @@ describe('useDashboardViewport', () => {
     expect(document.documentElement.style.getPropertyValue('--dashboard-keyboard-inset')).toBe('280px')
     expect(document.documentElement.style.getPropertyValue('--dashboard-keyboard-overlay-inset')).toBe('0px')
     expect(document.documentElement.style.getPropertyValue('--dashboard-viewport-height')).toBe('520px')
+    expect(document.documentElement.style.getPropertyValue('--dashboard-visible-height')).toBe('520px')
+  })
+
+  it('keeps the remaining overlay inset while an overlay keyboard is nearly closed', async () => {
+    const viewport = createVisualViewport(390, 800)
+    render(<DashboardViewportHarness />)
+    focusKeyboardInput()
+
+    viewport.height = 520
+    viewport.dispatchEvent(new Event('resize'))
+    await flushViewportUpdate()
+
+    viewport.height = 750
+    viewport.dispatchEvent(new Event('resize'))
+    await flushViewportUpdate()
+
+    expect(document.documentElement).toHaveAttribute('data-dashboard-keyboard', 'open')
+    expect(document.documentElement.style.getPropertyValue('--dashboard-keyboard-inset')).toBe('50px')
+    expect(document.documentElement.style.getPropertyValue('--dashboard-keyboard-overlay-inset')).toBe('50px')
+    expect(document.documentElement.style.getPropertyValue('--dashboard-visible-height')).toBe('750px')
+  })
+
+  it('detects keyboard contraction independently of a matching visual viewport pan', async () => {
+    const viewport = createVisualViewport(390, 800)
+    render(<DashboardViewportHarness />)
+    focusKeyboardInput()
+
+    viewport.height = 520
+    viewport.offsetTop = 280
+    viewport.dispatchEvent(new Event('resize'))
+    viewport.dispatchEvent(new Event('scroll'))
+    await flushViewportUpdate()
+
+    expect(document.documentElement).toHaveAttribute('data-dashboard-keyboard', 'open')
+    expect(document.documentElement.style.getPropertyValue('--dashboard-keyboard-inset')).toBe('280px')
+    expect(document.documentElement.style.getPropertyValue('--dashboard-keyboard-overlay-inset')).toBe('280px')
+    expect(document.documentElement.style.getPropertyValue('--dashboard-viewport-height')).toBe('800px')
+    expect(document.documentElement.style.getPropertyValue('--dashboard-visible-height')).toBe('520px')
+  })
+
+  it('subtracts frame shrink from the keyboard overlay length', async () => {
+    const viewport = createVisualViewport(390, 800)
+    render(<DashboardViewportHarness />)
+    focusKeyboardInput()
+
+    setWindowSize(390, 650)
+    viewport.height = 520
+    viewport.dispatchEvent(new Event('resize'))
+    window.dispatchEvent(new Event('resize'))
+    await flushViewportUpdate()
+
+    expect(document.documentElement).toHaveAttribute('data-dashboard-keyboard', 'open')
+    expect(document.documentElement.style.getPropertyValue('--dashboard-keyboard-inset')).toBe('280px')
+    expect(document.documentElement.style.getPropertyValue('--dashboard-keyboard-overlay-inset')).toBe('130px')
+    expect(document.documentElement.style.getPropertyValue('--dashboard-viewport-height')).toBe('650px')
+    expect(document.documentElement.style.getPropertyValue('--dashboard-visible-height')).toBe('520px')
+  })
+
+  it('coalesces viewport event bursts into one animation-frame update using the latest metrics', async () => {
+    const viewport = createVisualViewport(390, 800)
+    const requestFrame = vi.spyOn(window, 'requestAnimationFrame')
+    render(<DashboardViewportHarness />)
+    focusKeyboardInput()
+    await flushViewportUpdate()
+    requestFrame.mockClear()
+
+    viewport.height = 700
+    viewport.dispatchEvent(new Event('resize'))
+    viewport.height = 620
+    viewport.dispatchEvent(new Event('scroll'))
+    viewport.height = 520
+    window.dispatchEvent(new Event('resize'))
+
+    expect(requestFrame).toHaveBeenCalledTimes(1)
+    await flushViewportUpdate()
+    expect(document.documentElement.style.getPropertyValue('--dashboard-visible-height')).toBe('520px')
+
+    requestFrame.mockRestore()
   })
 
   it('recovers after focus leaves an input when the visual viewport restores without a resize event', async () => {
@@ -147,7 +241,7 @@ describe('useDashboardViewport', () => {
     viewport.height = 520
     viewport.dispatchEvent(new Event('resize'))
     await flushViewportUpdate()
-    expect(document.documentElement.style.getPropertyValue('--dashboard-viewport-height')).toBe('520px')
+    expect(document.documentElement.style.getPropertyValue('--dashboard-visible-height')).toBe('520px')
 
     act(() => screen.getByRole('textbox', { name: 'Keyboard input' }).blur())
     await flushViewportUpdate()
@@ -156,6 +250,7 @@ describe('useDashboardViewport', () => {
 
     expect(document.documentElement).not.toHaveAttribute('data-dashboard-keyboard')
     expect(document.documentElement.style.getPropertyValue('--dashboard-viewport-height')).toBe('800px')
+    expect(document.documentElement.style.getPropertyValue('--dashboard-visible-height')).toBe('800px')
     expect(document.documentElement.style.getPropertyValue('--dashboard-keyboard-inset')).toBe('0px')
   })
 
@@ -220,6 +315,7 @@ describe('useDashboardViewport', () => {
     expect(document.documentElement).not.toHaveAttribute('data-dashboard-keyboard')
     expect(document.documentElement.style.getPropertyValue('--dashboard-layout-height')).toBe('650px')
     expect(document.documentElement.style.getPropertyValue('--dashboard-viewport-height')).toBe('650px')
+    expect(document.documentElement.style.getPropertyValue('--dashboard-visible-height')).toBe('650px')
   })
 
   it('treats a focused desktop height resize as a layout resize', async () => {
@@ -238,6 +334,7 @@ describe('useDashboardViewport', () => {
     expect(document.documentElement).not.toHaveAttribute('data-dashboard-keyboard')
     expect(document.documentElement.style.getPropertyValue('--dashboard-layout-height')).toBe('650px')
     expect(document.documentElement.style.getPropertyValue('--dashboard-viewport-height')).toBe('650px')
+    expect(document.documentElement.style.getPropertyValue('--dashboard-visible-height')).toBe('650px')
   })
 
   it('treats a focused narrow desktop height resize as a layout resize', async () => {
@@ -256,35 +353,30 @@ describe('useDashboardViewport', () => {
     expect(document.documentElement).not.toHaveAttribute('data-dashboard-keyboard')
     expect(document.documentElement.style.getPropertyValue('--dashboard-layout-height')).toBe('650px')
     expect(document.documentElement.style.getPropertyValue('--dashboard-viewport-height')).toBe('650px')
+    expect(document.documentElement.style.getPropertyValue('--dashboard-visible-height')).toBe('650px')
   })
 
-  it('uses the resized layout inset when orientation changes with the keyboard open', async () => {
+  it('keeps a cached keyboard prediction monotone while the keyboard opens', async () => {
     const viewport = createVisualViewport(390, 800)
     render(<DashboardViewportHarness />)
+    window.localStorage.setItem('react-dash-keyboard-v1:portrait:800', '280')
+    armDashboardKeyboardPrediction()
     focusKeyboardInput()
 
-    setWindowSize(390, 520)
+    viewport.height = 700
+    viewport.dispatchEvent(new Event('resize'))
+    await flushViewportUpdate()
+    expect(document.documentElement.style.getPropertyValue('--dashboard-keyboard-overlay-inset')).toBe('280px')
+
+    viewport.height = 600
+    viewport.dispatchEvent(new Event('resize'))
+    await flushViewportUpdate()
+    expect(document.documentElement.style.getPropertyValue('--dashboard-keyboard-overlay-inset')).toBe('280px')
+
     viewport.height = 520
     viewport.dispatchEvent(new Event('resize'))
     await flushViewportUpdate()
-    expect(document.documentElement.style.getPropertyValue('--dashboard-keyboard-inset')).toBe('280px')
-
-    setWindowSize(800, 390)
-    viewport.width = 800
-    viewport.height = 320
-    window.dispatchEvent(new Event('orientationchange'))
-    await flushViewportUpdate()
-
-    expect(document.documentElement).toHaveAttribute('data-dashboard-keyboard', 'open')
-    expect(document.documentElement.style.getPropertyValue('--dashboard-keyboard-inset')).toBe('70px')
-    expect(document.documentElement.style.getPropertyValue('--dashboard-viewport-height')).toBe('320px')
-
-    act(() => screen.getByRole('textbox', { name: 'Keyboard input' }).blur())
-    viewport.height = 390
-    await waitForViewportRecovery()
-
-    expect(document.documentElement).not.toHaveAttribute('data-dashboard-keyboard')
-    expect(document.documentElement.style.getPropertyValue('--dashboard-viewport-height')).toBe('390px')
+    expect(document.documentElement.style.getPropertyValue('--dashboard-keyboard-overlay-inset')).toBe('280px')
   })
 
   it('resets its baseline when orientation changes', async () => {

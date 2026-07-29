@@ -11,6 +11,7 @@ declare global {
   interface Window {
     __vacationPickerCalls?: number
     __setDashboardFakeKeyboardHeight?: (height: number, notify?: boolean) => void
+    __setDashboardFakeViewport?: (height: number, offsetTop?: number, notify?: boolean) => void
     __setInventoryFakeKeyboardHeight?: (height: number) => void
   }
 }
@@ -129,11 +130,17 @@ async function installFakeVisualViewport(page: Page) {
     fakeVisualViewport.pageTop = 0
     fakeVisualViewport.scale = 1
     Object.defineProperty(window, 'visualViewport', { configurable: true, value: fakeVisualViewport })
-    window.__setDashboardFakeKeyboardHeight = (height: number, notify = true) => {
+    window.__setDashboardFakeViewport = (height: number, offsetTop = 0, notify = true) => {
+      fakeVisualViewport.width = window.innerWidth
       fakeVisualViewport.height = height
+      fakeVisualViewport.offsetTop = offsetTop
       if (!notify) return
       fakeVisualViewport.dispatchEvent(new Event('resize'))
+      fakeVisualViewport.dispatchEvent(new Event('scroll'))
       window.dispatchEvent(new Event('resize'))
+    }
+    window.__setDashboardFakeKeyboardHeight = (height: number, notify = true) => {
+      window.__setDashboardFakeViewport?.(height, 0, notify)
     }
   })
 }
@@ -334,12 +341,13 @@ test('mobile header status chips never render a disclosure chevron', async ({ pa
 test('dashboard keyboard viewport hides bottom nav and publishes visible height', async ({ page }) => {
   await installFakeVisualViewport(page)
   await page.goto('/at-a-glance/overview')
+  const initialViewportHeight = await page.evaluate(() => window.innerHeight)
+  await page.evaluate((height) => window.__setDashboardFakeViewport?.(height, 0), initialViewportHeight)
 
   const nav = page.getByRole('navigation', { name: 'Dashboard sections' })
   await expect(nav).toHaveCSS('opacity', '1')
   await expect.poll(() => page.evaluate(() => document.documentElement.getAttribute('data-dashboard-keyboard'))).toBeNull()
 
-  const initialViewportHeight = await page.evaluate(() => window.visualViewport?.height ?? window.innerHeight)
   const keyboardViewportHeight = await page.evaluate(() => Math.max(320, window.innerHeight - 240))
   await page.evaluate(() => {
     const input = document.createElement('input')
@@ -354,7 +362,8 @@ test('dashboard keyboard viewport hides bottom nav and publishes visible height'
   await expect.poll(() => page.evaluate(() => document.documentElement.getAttribute('data-dashboard-keyboard'))).toBe('open')
   await expect(nav).toHaveCSS('opacity', '0')
   await expect(nav).toHaveCSS('pointer-events', 'none')
-  await expect.poll(() => page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--dashboard-viewport-height').trim())).toBe(`${Math.round(keyboardViewportHeight)}px`)
+  await expect.poll(() => page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--dashboard-viewport-height').trim())).toBe(`${Math.round(initialViewportHeight)}px`)
+  await expect.poll(() => page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--dashboard-visible-height').trim())).toBe(`${Math.round(keyboardViewportHeight)}px`)
 
   await page.evaluate((height) => window.__setDashboardFakeKeyboardHeight?.(height), initialViewportHeight)
   await expect.poll(() => page.evaluate(() => document.documentElement.getAttribute('data-dashboard-keyboard'))).toBeNull()
@@ -365,6 +374,8 @@ test('dashboard keyboard viewport hides bottom nav and publishes visible height'
 test('kitchen restores full height after closing the keyboard and reopening by touch navigation', async ({ page }) => {
   await installFakeVisualViewport(page)
   await page.goto('/sfenton-react-dash/home?path=kitchen')
+  const initialViewportHeight = await page.evaluate(() => window.innerHeight)
+  await page.evaluate((height) => window.__setDashboardFakeViewport?.(height, 0), initialViewportHeight)
   await page.evaluate(() => {
     const iframe = document.createElement('iframe')
     iframe.dataset.dashboardWrapperTest = 'true'
@@ -382,7 +393,6 @@ test('kitchen restores full height after closing the keyboard and reopening by t
   const app = page.frameLocator('iframe[data-dashboard-wrapper-test="true"]')
   await expect(app.getByRole('heading', { name: 'Kitchen' })).toBeVisible()
 
-  const initialViewportHeight = await page.evaluate(() => window.innerHeight)
   const keyboardViewportHeight = Math.max(320, initialViewportHeight - 300)
   const shellMetrics = () => app.locator('html').evaluate(() => {
     const shell = document.querySelector<HTMLElement>('[class*="_shell_"]')
@@ -390,6 +400,7 @@ test('kitchen restores full height after closing the keyboard and reopening by t
       cssHeight: getComputedStyle(document.documentElement).getPropertyValue('--dashboard-viewport-height').trim(),
       height: Math.round(shell?.getBoundingClientRect().height ?? 0),
       keyboard: document.documentElement.getAttribute('data-dashboard-keyboard'),
+      visibleCssHeight: getComputedStyle(document.documentElement).getPropertyValue('--dashboard-visible-height').trim(),
     }
   })
 
@@ -401,9 +412,10 @@ test('kitchen restores full height after closing the keyboard and reopening by t
   await page.evaluate((height) => window.__setDashboardFakeKeyboardHeight?.(height), keyboardViewportHeight)
 
   await expect.poll(shellMetrics).toEqual({
-    cssHeight: `${keyboardViewportHeight}px`,
-    height: keyboardViewportHeight,
+    cssHeight: `${initialViewportHeight}px`,
+    height: initialViewportHeight,
     keyboard: 'open',
+    visibleCssHeight: `${keyboardViewportHeight}px`,
   })
   await page.waitForTimeout(160)
 
@@ -416,6 +428,7 @@ test('kitchen restores full height after closing the keyboard and reopening by t
     cssHeight: `${initialViewportHeight}px`,
     height: initialViewportHeight,
     keyboard: null,
+    visibleCssHeight: `${initialViewportHeight}px`,
   })
 
   await app.getByRole('button', { name: 'Scan Item' }).click()
@@ -425,9 +438,10 @@ test('kitchen restores full height after closing the keyboard and reopening by t
   await routeProductName.click()
   await page.evaluate((height) => window.__setDashboardFakeKeyboardHeight?.(height), keyboardViewportHeight)
   await expect.poll(shellMetrics).toEqual({
-    cssHeight: `${keyboardViewportHeight}px`,
-    height: keyboardViewportHeight,
+    cssHeight: `${initialViewportHeight}px`,
+    height: initialViewportHeight,
     keyboard: 'open',
+    visibleCssHeight: `${keyboardViewportHeight}px`,
   })
   await page.waitForTimeout(160)
   await routeProductName.press('Escape')
@@ -440,6 +454,7 @@ test('kitchen restores full height after closing the keyboard and reopening by t
     cssHeight: `${initialViewportHeight}px`,
     height: initialViewportHeight,
     keyboard: null,
+    visibleCssHeight: `${initialViewportHeight}px`,
   })
   await expect(app.getByRole('heading', { name: 'Home' })).toBeVisible()
   await app.getByRole('button', { name: 'Rooms' }).evaluate((button) => button.click())
@@ -451,7 +466,78 @@ test('kitchen restores full height after closing the keyboard and reopening by t
     cssHeight: `${initialViewportHeight}px`,
     height: initialViewportHeight,
     keyboard: null,
+    visibleCssHeight: `${initialViewportHeight}px`,
   })
+})
+
+test('embedded inventory search follows the top visual viewport without a guessed-position jump', async ({ page }) => {
+  await installFakeVisualViewport(page)
+  await page.goto('/sfenton-react-dash/home?path=fridge')
+  const topViewportHeight = await page.evaluate(() => window.innerHeight)
+  await page.evaluate((height) => window.__setDashboardFakeViewport?.(height, 0), topViewportHeight)
+  await page.evaluate(() => {
+    const iframe = document.createElement('iframe')
+    iframe.dataset.inventoryWrapperTest = 'true'
+    iframe.src = '/at-a-glance/fridge'
+    Object.assign(iframe.style, {
+      border: '0',
+      height: '100%',
+      inset: '0',
+      position: 'fixed',
+      width: '100%',
+      zIndex: '100',
+    })
+    document.body.append(iframe)
+  })
+
+  const app = page.frameLocator('iframe[data-inventory-wrapper-test="true"]')
+  await expect(app.getByRole('heading', { name: 'Fridge' })).toBeVisible()
+  const dock = app.locator('[data-floating-action-dock="true"]')
+  const searchButton = dock.getByRole('button', { name: 'Search inventory' })
+  await expect(searchButton).toBeVisible()
+  const initialViewportHeight = topViewportHeight
+  const keyboardViewportHeight = Math.max(320, initialViewportHeight - 240)
+  await app.locator('html').evaluate((_, { keyboardViewportHeight, viewportHeight }) => {
+    const bucket = Math.round(viewportHeight / 25) * 25
+    window.localStorage.setItem(`react-dash-keyboard-v1:portrait:${bucket}`, String(viewportHeight - keyboardViewportHeight))
+  }, { keyboardViewportHeight, viewportHeight: initialViewportHeight })
+
+  const dockMetrics = () => dock.evaluate((element) => {
+    const dockRect = element.getBoundingClientRect()
+    const frameRect = window.frameElement?.getBoundingClientRect()
+    const viewport = window.top?.visualViewport
+    const frameTop = frameRect?.top ?? 0
+    const frameBottom = frameRect?.bottom ?? window.innerHeight
+    const visibleBottom = viewport?.height ?? window.innerHeight
+    const targetBottom = Math.min(frameBottom, visibleBottom) - 14
+    return {
+      bottom: frameTop + dockRect.bottom,
+      keyboard: document.documentElement.getAttribute('data-dashboard-keyboard'),
+      targetBottom,
+      y: frameTop + dockRect.y,
+    }
+  })
+
+  const before = await dockMetrics()
+  await searchButton.click()
+  await expect(app.getByLabel('Search inventory')).toBeFocused()
+  const armed = await dockMetrics()
+  expect(Math.abs(armed.y - before.y)).toBeGreaterThan(20)
+
+  const input = app.getByLabel('Search inventory')
+  await page.evaluate((height) => window.__setDashboardFakeViewport?.(height, 0), keyboardViewportHeight)
+  await input.type('m')
+  await expect(input).toHaveValue('m')
+  await expect.poll(async () => {
+    const metrics = await dockMetrics()
+    return Math.abs(metrics.bottom - metrics.targetBottom)
+  }, { timeout: 500 }).toBeLessThanOrEqual(4)
+  await expect.poll(async () => Math.abs((await dockMetrics()).y - armed.y), { timeout: 500 }).toBeLessThanOrEqual(1)
+
+  await input.press('Enter')
+  await page.evaluate(() => window.__setDashboardFakeViewport?.(window.innerHeight, 0))
+  await expect.poll(async () => (await dockMetrics()).keyboard).toBeNull()
+  await expect.poll(async () => Math.round((await dockMetrics()).y)).toBe(Math.round(before.y))
 })
 
 test('inventory footer search moves above the mobile keyboard and clears results', async ({ page }) => {
@@ -462,6 +548,8 @@ test('inventory footer search moves above the mobile keyboard and clears results
   const visibleInventoryList = inventoryList(page, inventoryListLabel)
   await expect(visibleInventoryList).toBeVisible()
   await expect.poll(() => inventoryRowLabels(page, inventoryListLabel)).toHaveLength(3)
+  const restBox = await dock.boundingBox()
+  if (!restBox) throw new Error('Inventory floating action dock was not measurable')
 
   await page.evaluate(() => {
     const fakeVisualViewport = new EventTarget() as EventTarget & {
@@ -486,6 +574,12 @@ test('inventory footer search moves above the mobile keyboard and clears results
     }
   })
 
+  await page.evaluate(() => {
+    const viewportHeight = window.innerHeight
+    const keyboardViewportHeight = 520
+    const bucket = Math.round(viewportHeight / 25) * 25
+    window.localStorage.setItem(`react-dash-keyboard-v1:portrait:${bucket}`, String(viewportHeight - keyboardViewportHeight))
+  })
   await dock.getByRole('button', { name: 'Search inventory' }).click()
   const input = page.getByLabel('Search inventory')
   await expect(input).toBeFocused()
@@ -495,8 +589,6 @@ test('inventory footer search moves above the mobile keyboard and clears results
   await expect(dock.getByRole('button', { name: 'Filter' }).locator('xpath=..')).toHaveAttribute('data-collapsed', 'true')
   await expect(dock.getByRole('button', { name: 'Scan Item' })).toHaveCSS('opacity', '0')
 
-  const beforeBox = await dock.boundingBox()
-  if (!beforeBox) throw new Error('Inventory floating action dock was not measurable')
   await page.evaluate(() => window.__setInventoryFakeKeyboardHeight?.(520))
   await expect.poll(async () => {
     const box = await dock.boundingBox()
@@ -510,21 +602,25 @@ test('inventory footer search moves above the mobile keyboard and clears results
   await input.fill('dragonfruit')
   await expect(page.getByRole('heading', { name: 'No Matching Items' })).toBeVisible()
   await expect(page.getByText('Try a different search or clear the search to show all items.')).toBeVisible()
+  await input.press('Enter')
   await page.evaluate(() => window.__setInventoryFakeKeyboardHeight?.(window.innerHeight))
-  await expect.poll(async () => Math.round((await dock.boundingBox())?.y ?? 0)).toBe(Math.round(beforeBox.y))
+  await expect.poll(async () => Math.round((await dock.boundingBox())?.y ?? 0)).toBe(Math.round(restBox.y))
 
-  await input.fill('milk')
+  await dock.getByRole('button', { name: 'Search inventory' }).click()
+  const reopenedInput = page.getByLabel('Search inventory')
+  await reopenedInput.fill('milk')
   await expect(page.getByRole('button', { name: 'Clear Search' })).toBeVisible()
   await expect.poll(() => inventoryRowLabels(page, inventoryListLabel)).toEqual([
     expect.stringContaining('Milk'),
   ])
 
-  await input.press('Enter')
+  await reopenedInput.press('Enter')
   await expect.poll(() => page.evaluate(() => document.documentElement.getAttribute('data-inventory-search-expanded'))).toBeNull()
   await expect(dock.getByRole('button', { name: 'Search inventory' })).toContainText('milk')
   await dock.getByRole('button', { name: 'Search inventory' }).click()
+  const clearInput = page.getByLabel('Search inventory')
   await page.getByRole('button', { name: 'Clear Search' }).click()
-  await expect(input).toHaveValue('')
+  await expect(clearInput).toHaveValue('')
   await expect.poll(() => inventoryRowLabels(page, inventoryListLabel)).toHaveLength(3)
 })
 
