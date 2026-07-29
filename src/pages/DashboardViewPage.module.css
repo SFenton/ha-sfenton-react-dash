@@ -28,6 +28,10 @@
   --dynamic-grid-columns: 2;
 }
 
+.vacuumGrid {
+  --dynamic-grid-columns: 2;
+}
+
 .choreQuickGrid > * {
   min-height: 120px;
 }
@@ -1878,6 +1882,10 @@ button.thermostatGlassMain {
   }
 
   .thermostatRoomGrid {
+    --dynamic-grid-columns: 1;
+  }
+
+  .vacuumGrid {
     --dynamic-grid-columns: 1;
   }
 

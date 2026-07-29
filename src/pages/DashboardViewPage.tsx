@@ -1318,17 +1318,17 @@ function VacuumPage({ preload = false }: { preload?: boolean }) {
     <div className={styles.stack}>
       <section className={styles.section}>
         <SectionHeader title="Robot Vacuums" />
-        <Grid>
+        <DynamicGrid ariaLabel="Robot vacuums" className={styles.vacuumGrid} columns={2}>
           {ORDERED_VACUUMS.map((vacuum) => (
             <VacuumCard disableHashSync={preload} key={vacuum.entityId} vacuum={vacuum} />
           ))}
-        </Grid>
+        </DynamicGrid>
       </section>
       <section className={styles.section}>
         <SectionHeader title="Auto-Clean" />
-        <Grid>
+        <DynamicGrid ariaLabel="Vacuum auto-clean controls" className={styles.vacuumGrid} columns={2}>
           {VACUUM_AUTO_CLEAN_CONTROLS.map((item) => <VacuumAutoCleanControlCard control={item} key={item.entityId} />)}
-        </Grid>
+        </DynamicGrid>
       </section>
     </div>
   )

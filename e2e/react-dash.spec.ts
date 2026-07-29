@@ -1721,6 +1721,12 @@ test('vacuums page renders without live HASS backend', async ({ page }) => {
   await page.goto('/at-a-glance/vacuums')
 
   await expect(page.getByRole('heading', { level: 1, name: 'Vacuums' })).toBeVisible()
+  const robotGrid = page.getByRole('group', { name: 'Robot vacuums' })
+  await expect(robotGrid).toHaveAttribute('data-dynamic-grid', 'true')
+  await expect(robotGrid.locator('[data-dynamic-grid-cell="true"]').last()).toHaveAttribute('data-dynamic-grid-span', '2')
+  const autoCleanGrid = page.getByRole('group', { name: 'Vacuum auto-clean controls' })
+  await expect(autoCleanGrid).toHaveAttribute('data-dynamic-grid', 'true')
+  await expect(autoCleanGrid.locator('[data-dynamic-grid-cell="true"]').last()).toHaveAttribute('data-dynamic-grid-span', '2')
   await expect(page.getByLabel('Music Room', { exact: true })).toHaveAttribute('data-icon', 'mdi:robot-vacuum-off')
   const mainFloorVacuum = page.getByRole('button', { name: /Main Floor Docked/i })
   await expect(mainFloorVacuum).toBeVisible()
