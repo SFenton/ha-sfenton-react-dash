@@ -356,8 +356,12 @@
 }
 
 .inventoryEmpty {
-  --inventory-empty-keyboard-lift: max(0px, calc(var(--dashboard-fab-keyboard-inset, 0px) - var(--bottom-nav-height) + 14px - env(safe-area-inset-bottom, 0px)));
-  min-height: max(180px, calc(100dvh - var(--bottom-nav-height) - 160px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - var(--inventory-empty-keyboard-lift)));
+  --inventory-empty-bottom-reserve: calc(var(--bottom-nav-height) + env(safe-area-inset-bottom, 0px));
+  min-height: max(180px, calc(var(--dashboard-visible-height, var(--dashboard-viewport-height, 100dvh)) - 160px - env(safe-area-inset-top, 0px) - var(--inventory-empty-bottom-reserve)));
+}
+
+:global(html[data-dashboard-keyboard='open']) .inventoryEmpty {
+  --inventory-empty-bottom-reserve: 14px;
 }
 
 .inventorySearchSlot {
@@ -366,10 +370,12 @@
   min-width: 0;
   flex: 1 1 auto;
   pointer-events: auto;
-  transition:
-    flex-basis 360ms ease,
-    opacity 280ms ease,
-    width 360ms ease;
+  transition: opacity 100ms ease-out;
+}
+
+:global(html[data-dashboard-kb-masked='true']) .inventorySearchSlot {
+  opacity: 0;
+  transition: none;
 }
 
 .inventorySearchButton,
@@ -478,10 +484,6 @@
   overflow: visible;
   opacity: 1;
   pointer-events: auto;
-  transition:
-    flex-basis 360ms ease,
-    opacity 280ms ease,
-    width 360ms ease;
 }
 
 .inventoryActionSlot[data-collapsed='true'] {

@@ -46,7 +46,7 @@
 
 :global(html[data-dashboard-keyboard='open']) .scroller {
   margin-bottom: 0;
-  padding-bottom: calc(var(--page-bottom-extra-padding, 22px) + 18px + env(safe-area-inset-bottom, 0px));
+  padding-bottom: calc(var(--page-bottom-extra-padding, 22px) + 18px + env(safe-area-inset-bottom, 0px) + var(--dashboard-keyboard-overlay-inset, 0px));
 }
 
 .scroller[data-chrome-hidden='true'] {

@@ -12,6 +12,7 @@ import { NativePickerField } from '../core/NativePickerField'
 import { NumberStepper } from '../core/Stepper'
 import { RadioRow } from '../core/RadioRow'
 import { DashboardPageLoading } from '../shell/DashboardPageLoading'
+import { armDashboardKeyboardPrediction, clearDashboardKeyboardPrediction, DASHBOARD_KEYBOARD_STATE_EVENT, type DashboardKeyboardStateDetail } from '../../hooks/useDashboardViewport'
 import type { EverShelfInventoryControls, InventoryFilterMode, InventorySortDirection, InventorySortMode } from './EverShelfInventoryControls'
 import { daysUntilDate, parseIsoDateOnly } from './expiryDate'
 import styles from './EverShelfInventoryPanel.module.css'
@@ -63,14 +64,12 @@ type InventorySearchLoadPhase = 'exiting' | 'loading' | 'idle'
 
 const SORT_FILTER_COLOR = { r: 42, g: 126, b: 180 }
 const SORT_FILTER_ACTIVE_COLOR = { r: 155, g: 110, b: 64 }
-const DASHBOARD_FAB_KEYBOARD_INSET_VAR = '--dashboard-fab-keyboard-inset'
 const INVENTORY_SEARCH_EXPANDED_ATTR = 'data-inventory-search-expanded'
 const INVENTORY_LOADING_EXIT_MS = 500
 const INVENTORY_SEARCH_LOG_PREFIX = '[EverShelfInventorySearch]'
 const HASS_GROCERY_LIST_ENTITY_ID = 'todo.shopping_list'
 const INVENTORY_QUANTITY_MAX = 999
 const MULTIPLE_EXPIRATION_DATES_LABEL = 'Multiple Expiration Dates'
-const KEYBOARD_STATE_CLEAR_MS = 150
 const SHOPPING_ADDED_VISIBLE_MS = 3000
 
 const SORT_OPTIONS: { label: string; subtitle: string; value: InventorySortMode }[] = [
@@ -99,7 +98,7 @@ const FILTER_OPTIONS: { label: string; subtitle: string; value: InventoryFilterM
 ]
 
 function logInventorySearch(event: string, details: Record<string, unknown>) {
-  console.debug(INVENTORY_SEARCH_LOG_PREFIX, event, details)
+  if (import.meta.env.DEV) console.debug(INVENTORY_SEARCH_LOG_PREFIX, event, details)
 }
 
 const EVERSHELF_ADD_LOCATIONS: Exclude<EverShelfInventoryLocation, 'all'>[] = ['dispensa', 'frigo', 'freezer', 'spice_rack', 'cabinet']
@@ -1061,112 +1060,54 @@ function updateInventorySearchExpanded(expanded: boolean) {
   else document.documentElement.removeAttribute(INVENTORY_SEARCH_EXPANDED_ATTR)
 }
 
-function updateFabKeyboardInset(inset: number) {
-  document.documentElement.style.setProperty(DASHBOARD_FAB_KEYBOARD_INSET_VAR, `${inset}px`)
-}
-
-function useFloatingSearchKeyboardInset(active: boolean) {
-  const [keyboardInset, setKeyboardInset] = useState(0)
-  const baselineRef = useRef<number | null>(null)
-  const clearTimerRef = useRef<number | null>(null)
-
-  const clearTimer = useCallback(() => {
-    if (clearTimerRef.current === null) return
-    window.clearTimeout(clearTimerRef.current)
-    clearTimerRef.current = null
-  }, [])
-
-  const captureKeyboardBaseline = useCallback(() => {
-    clearTimer()
-    const visualViewport = window.visualViewport
-    const visualViewportBottom = visualViewport ? visualViewport.height + visualViewport.offsetTop : 0
-    baselineRef.current = Math.max(
-      baselineRef.current ?? 0,
-      window.innerHeight || 0,
-      document.documentElement.clientHeight || 0,
-      visualViewportBottom,
-    )
-  }, [clearTimer])
-
-  const clearKeyboardStateSoon = useCallback(() => {
-    clearTimer()
-    clearTimerRef.current = window.setTimeout(() => {
-      baselineRef.current = null
-      setKeyboardInset(0)
-      clearTimerRef.current = null
-    }, KEYBOARD_STATE_CLEAR_MS)
-  }, [clearTimer])
-
-  const updateKeyboardInset = useCallback(() => {
-    if (!active) {
-      setKeyboardInset(0)
-      return
-    }
-    const visualViewport = window.visualViewport
-    if (!visualViewport) {
-      setKeyboardInset(0)
-      return
-    }
-    captureKeyboardBaseline()
-    const baseline = baselineRef.current ?? window.innerHeight
-    const visibleBottom = visualViewport.height + visualViewport.offsetTop
-    const visualViewportLoss = baseline - visibleBottom
-    const innerHeightLoss = baseline - window.innerHeight
-    setKeyboardInset(Math.max(0, Math.round(visualViewportLoss), Math.round(innerHeightLoss)))
-  }, [active, captureKeyboardBaseline])
-
-  useEffect(() => {
-    updateFabKeyboardInset(keyboardInset)
-  }, [keyboardInset])
-
-  useEffect(() => {
-    if (!active) return undefined
-    const frameId = window.requestAnimationFrame(updateKeyboardInset)
-    const visualViewport = window.visualViewport
-    visualViewport?.addEventListener('resize', updateKeyboardInset)
-    visualViewport?.addEventListener('scroll', updateKeyboardInset)
-    window.addEventListener('resize', updateKeyboardInset)
-    return () => {
-      window.cancelAnimationFrame(frameId)
-      visualViewport?.removeEventListener('resize', updateKeyboardInset)
-      visualViewport?.removeEventListener('scroll', updateKeyboardInset)
-      window.removeEventListener('resize', updateKeyboardInset)
-    }
-  }, [active, updateKeyboardInset])
-
-  useEffect(() => () => {
-    clearTimer()
-    document.documentElement.style.removeProperty(DASHBOARD_FAB_KEYBOARD_INSET_VAR)
-  }, [clearTimer])
-
-  return { captureKeyboardBaseline, clearKeyboardStateSoon }
-}
-
 function InventorySearchAction({ controls, onExpandedChange }: { controls: EverShelfInventoryControls; onExpandedChange: (expanded: boolean) => void }) {
   const [expanded, setExpanded] = useState(false)
-  const [searchFocused, setSearchFocused] = useState(false)
   const draftQuery = controls.searchQuery
   const inputRef = useRef<HTMLInputElement>(null)
+  const collapseTimerRef = useRef<number | null>(null)
+  const pendingCollapseRef = useRef(false)
   const hasQuery = draftQuery.trim() !== ''
-  const { captureKeyboardBaseline, clearKeyboardStateSoon } = useFloatingSearchKeyboardInset(searchFocused)
+
+  const collapseSearch = useCallback(() => {
+    if (collapseTimerRef.current !== null) window.clearTimeout(collapseTimerRef.current)
+    collapseTimerRef.current = null
+    pendingCollapseRef.current = false
+    updateInventorySearchExpanded(false)
+    clearDashboardKeyboardPrediction()
+    onExpandedChange(false)
+    setExpanded(false)
+  }, [onExpandedChange])
 
   useEffect(() => {
-    onExpandedChange(expanded)
-    updateInventorySearchExpanded(expanded)
-    return () => updateInventorySearchExpanded(false)
-  }, [expanded, onExpandedChange])
+    const handleKeyboardState = (event: Event) => {
+      const keyboardEvent = event as CustomEvent<DashboardKeyboardStateDetail>
+      if (!keyboardEvent.detail.open && pendingCollapseRef.current) collapseSearch()
+    }
+    window.addEventListener(DASHBOARD_KEYBOARD_STATE_EVENT, handleKeyboardState)
+    return () => {
+      window.removeEventListener(DASHBOARD_KEYBOARD_STATE_EVENT, handleKeyboardState)
+      if (collapseTimerRef.current !== null) window.clearTimeout(collapseTimerRef.current)
+      updateInventorySearchExpanded(false)
+      clearDashboardKeyboardPrediction()
+    }
+  }, [collapseSearch])
 
   const focusInput = useCallback(() => {
-    captureKeyboardBaseline()
     inputRef.current?.focus({ preventScroll: true })
-  }, [captureKeyboardBaseline])
+  }, [])
 
   const expandSearch = useCallback(() => {
-    captureKeyboardBaseline()
+    if (collapseTimerRef.current !== null) window.clearTimeout(collapseTimerRef.current)
+    collapseTimerRef.current = null
+    pendingCollapseRef.current = false
+    armDashboardKeyboardPrediction()
     updateInventorySearchExpanded(true)
-    flushSync(() => setExpanded(true))
+    flushSync(() => {
+      onExpandedChange(true)
+      setExpanded(true)
+    })
     focusInput()
-  }, [captureKeyboardBaseline, focusInput])
+  }, [focusInput, onExpandedChange])
 
   const handleInputChange = useCallback((event: ChangeEvent<HTMLInputElement>) => {
     const nextQuery = event.target.value
@@ -1178,16 +1119,11 @@ function InventorySearchAction({ controls, onExpandedChange }: { controls: EverS
     if (event.key === 'Enter') event.currentTarget.blur()
   }, [])
 
-  const handleInputFocus = useCallback(() => {
-    captureKeyboardBaseline()
-    setSearchFocused(true)
-  }, [captureKeyboardBaseline])
-
   const handleInputBlur = useCallback(() => {
-    setSearchFocused(false)
-    setExpanded(false)
-    clearKeyboardStateSoon()
-  }, [clearKeyboardStateSoon])
+    pendingCollapseRef.current = true
+    if (collapseTimerRef.current !== null) window.clearTimeout(collapseTimerRef.current)
+    collapseTimerRef.current = window.setTimeout(collapseSearch, 400)
+  }, [collapseSearch])
 
   const clearSearch = useCallback(() => {
     logInventorySearch('clear', {})
@@ -1229,7 +1165,6 @@ function InventorySearchAction({ controls, onExpandedChange }: { controls: EverS
           enterKeyHint="search"
           onBlur={handleInputBlur}
           onChange={handleInputChange}
-          onFocus={handleInputFocus}
           onKeyDown={handleInputKeyDown}
           placeholder="Search items..."
           ref={inputRef}
