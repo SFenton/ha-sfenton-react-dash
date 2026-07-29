@@ -1,3 +1,5 @@
+import { FOOD_CARD_BACKGROUND_COLOR } from './everShelfFood'
+
 export type IconKey =
   | 'air'
   | 'bath'
@@ -48,10 +50,11 @@ export interface StatusChipConfig {
 export interface QuickAccessConfig {
   title: string
   icon: DashboardIcon
+  backgroundColor?: string
   hash?: string
   route?: string
   entityId?: string
-  status?: 'entity_state'
+  status?: 'all_food' | 'entity_state'
   tone: 'security' | 'climate' | 'neutral' | 'light' | 'vacuum' | 'media'
 }
 
@@ -210,7 +213,9 @@ export const QUICK_ACCESS_ITEMS: QuickAccessConfig[] = [
   {
     title: 'Food',
     icon: 'mdi:food-fork-drink',
+    backgroundColor: FOOD_CARD_BACKGROUND_COLOR,
     route: '/at-a-glance/food',
+    status: 'all_food',
     tone: 'neutral',
   },
   {
