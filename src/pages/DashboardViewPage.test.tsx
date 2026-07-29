@@ -1408,6 +1408,8 @@ describe('DashboardViewPage', () => {
     const guestSection = guestSectionHeading.closest('section')
     expect(guestSection).toHaveClass(/section/)
     expect(guestSection?.parentElement).toHaveClass(/stack/)
+    const guestGrid = screen.getByRole('group', { name: 'Guest controls' })
+    expect(Array.from(guestGrid.children).map((cell) => cell.getAttribute('data-dynamic-grid-span'))).toEqual(['1', '1', '2'])
     const [, scroller] = Array.from(page.children)
     expect(page.firstElementChild).toContainElement(guestHeading)
     expect(scroller).not.toContainElement(guestHeading)
@@ -1438,6 +1440,7 @@ describe('DashboardViewPage', () => {
 
     const roomGrid = screen.getByRole('group', { name: 'Thermostat rooms' })
     expect(roomGrid.children).toHaveLength(11)
+    expect(roomGrid).toHaveAttribute('data-dynamic-grid-force-equivalent-column-count', 'true')
     expect(roomGrid.lastElementChild).toHaveAttribute('data-dynamic-grid-span', '2')
   })
 

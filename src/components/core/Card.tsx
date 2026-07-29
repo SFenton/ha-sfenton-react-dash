@@ -60,10 +60,10 @@ export function Card({
         {icon}
       </span>
       {disclosure && onClick && <ModalDisclosureIcon className={styles.disclosure} />}
-      <span className={styles.copy}>
-        <span className={styles.title}>{title}</span>
-        {subtitle && <span className={styles.subtitle}>{subtitle}</span>}
-        {secondarySubtitle && <span className={styles.secondarySubtitle}>{secondarySubtitle}</span>}
+      <span className={styles.copy} data-dynamic-grid-label-container="true">
+        <span className={styles.title} data-dynamic-grid-label="true">{title}</span>
+        {subtitle && <span className={styles.subtitle} data-dynamic-grid-label="true">{subtitle}</span>}
+        {secondarySubtitle && <span className={styles.secondarySubtitle} data-dynamic-grid-label="true">{secondarySubtitle}</span>}
       </span>
     </>
   )

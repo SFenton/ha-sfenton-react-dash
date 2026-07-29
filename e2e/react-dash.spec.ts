@@ -579,6 +579,28 @@ test('inventory item edit modal adds and removes EverShelf stock from the quanti
   })
 })
 
+test('thermostat room grid uses one equivalent column when any room label overflows', async ({ page }) => {
+  await page.setViewportSize({ width: 393, height: 852 })
+  await page.goto('/at-a-glance/ecobee')
+
+  const grid = page.getByRole('group', { name: 'Thermostat rooms' })
+  const cells = grid.locator('[data-dynamic-grid-cell="true"]')
+  await expect(grid).toHaveAttribute('data-dynamic-grid-columns', '1')
+  await expect(cells).toHaveCount(11)
+
+  const layout = await cells.evaluateAll((elements) => elements.map((element) => {
+    const bounds = element.getBoundingClientRect()
+    return {
+      left: Math.round(bounds.left),
+      span: element.getAttribute('data-dynamic-grid-span'),
+      width: Math.round(bounds.width),
+    }
+  }))
+  expect(new Set(layout.map(({ left }) => left)).size).toBe(1)
+  expect(new Set(layout.map(({ width }) => width)).size).toBe(1)
+  expect(layout.every(({ span }) => span === '1')).toBe(true)
+})
+
 test('thermostat page accepts the first mobile scroll gesture after closing a room modal', async ({ page }) => {
   await page.goto('/at-a-glance/ecobee')
 
@@ -1227,6 +1249,29 @@ test.describe('desktop modal layout', () => {
     const detailDialogBox = await dialog.boundingBox()
     expect(Math.abs(Math.round(detailDialogBox?.height ?? 0) - Math.round(overviewDialogBox?.height ?? 0))).toBeLessThanOrEqual(2)
   })
+})
+
+test('Guest Controls settings uses a dynamic two-column grid with a full-width final control', async ({ page }) => {
+  await page.setViewportSize({ width: 393, height: 852 })
+  await page.goto('/at-a-glance/settings?path=guests-staying-over')
+
+  const grid = page.getByRole('group', { name: 'Guest controls' })
+  const cells = grid.locator('[data-dynamic-grid-cell="true"]')
+  await expect(cells).toHaveCount(3)
+  await expect.poll(async () => cells.evaluateAll((elements) => elements.map((element) => element.getAttribute('data-dynamic-grid-span')))).toEqual(['1', '1', '2'])
+
+  const layout = await cells.evaluateAll((elements) => elements.map((element) => {
+    const bounds = element.getBoundingClientRect()
+    return {
+      left: Math.round(bounds.left),
+      top: Math.round(bounds.top),
+      width: Math.round(bounds.width),
+    }
+  }))
+  expect(layout[0].top).toBe(layout[1].top)
+  expect(layout[0].width).toBe(layout[1].width)
+  expect(layout[2].left).toBe(layout[0].left)
+  expect(layout[2].width).toBeGreaterThan(layout[0].width)
 })
 
 test('settings links to Vacation mode controls', async ({ page }) => {

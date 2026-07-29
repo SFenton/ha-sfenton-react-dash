@@ -6,6 +6,16 @@ function normalizedSpan(span: number, columns: number) {
   return Math.min(columns, Math.max(1, Math.ceil(span)))
 }
 
+export function equivalentDynamicGridColumnCount(minimumSpans: readonly number[], columnCount: number) {
+  const columns = normalizedDynamicGridColumns(columnCount)
+  const widestSpan = minimumSpans.reduce(
+    (widest, span) => Math.max(widest, normalizedSpan(span, columns)),
+    1,
+  )
+
+  return Math.max(1, Math.floor(columns / widestSpan))
+}
+
 export function packDynamicGridSpans(minimumSpans: readonly number[], columnCount: number) {
   const columns = normalizedDynamicGridColumns(columnCount)
   const spans: number[] = []

@@ -1313,7 +1313,11 @@ function GuestControlsPage({ onNavigate }: { onNavigate: (path: string) => void 
       <section className={styles.section}>
         <SectionHeader title="Guest Controls" />
         <Description>{GUEST_CONTROLS_DESCRIPTION}</Description>
-        <AdminTileGrid items={GUEST_CONTROL_ITEMS} onNavigate={onNavigate} variant="admin-modal" />
+        <DynamicGrid ariaLabel="Guest controls" columns={2} gap={8}>
+          {GUEST_CONTROL_ITEMS.map((item) => (
+            <EntityActionCard item={item} key={`${item.entityId}-${item.title}`} onNavigate={onNavigate} size="admin-modal" />
+          ))}
+        </DynamicGrid>
       </section>
     </div>
   )
@@ -5150,7 +5154,7 @@ function ThermostatPage({ preload = false, preloadHash, preloadHashes = [] }: { 
       <OpenContactSensorsSection />
       <section className={styles.section}>
         <SectionHeader title="Rooms" />
-        <DynamicGrid ariaLabel="Thermostat rooms" className={styles.thermostatRoomGrid} columns={2} gap={8}>
+        <DynamicGrid ariaLabel="Thermostat rooms" className={styles.thermostatRoomGrid} columns={2} forceEquivalentColumnCount gap={8}>
           {THERMOSTAT_ROOM_VIEWS.map((room) => <ThermostatRoomRow key={room.key} onOpen={openThermostatRoom} room={room} />)}
         </DynamicGrid>
       </section>
