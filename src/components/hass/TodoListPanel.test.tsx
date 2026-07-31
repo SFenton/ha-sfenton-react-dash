@@ -63,4 +63,27 @@ describe('TodoListPanel', () => {
       },
     ]))
   })
+
+  it('adds a separate edit action only when the caller enables DoneTick editing', async () => {
+    mockTodoItemsByEntity[ENTITY_ID] = [
+      { uid: '240--2026-08-03 16:30:00+00:00', summary: 'Editable chore', status: 'needs_action' },
+    ]
+    const onEditTask = vi.fn()
+
+    const view = render(<TodoListPanel entityId={ENTITY_ID} onEditTask={onEditTask} title="Optimistic Chores" />)
+
+    const editButton = await screen.findByRole('button', { name: 'Edit Editable chore' })
+    fireEvent.click(editButton)
+
+    expect(onEditTask).toHaveBeenCalledWith({
+      itemUid: '240--2026-08-03 16:30:00+00:00',
+      taskId: 240,
+      todoEntityId: ENTITY_ID,
+    })
+    expect(mockCallServiceCalls).toEqual([])
+    expect(screen.getByRole('button', { name: 'Editable chore' })).toHaveAttribute('aria-pressed', 'false')
+
+    view.rerender(<TodoListPanel entityId={ENTITY_ID} title="Optimistic Chores" />)
+    expect(screen.queryByRole('button', { name: 'Edit Editable chore' })).not.toBeInTheDocument()
+  })
 })

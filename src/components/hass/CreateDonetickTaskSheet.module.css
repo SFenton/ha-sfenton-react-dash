@@ -100,7 +100,18 @@
   gap: 10px;
 }
 
-.primaryAction {
+.loading {
+  min-height: 240px;
+}
+
+.sheetFooter {
+  display: grid;
+  grid-template-columns: minmax(0, 0.78fr) minmax(0, 1fr);
+  gap: 10px;
+}
+
+.primaryAction,
+.deleteAction {
   display: inline-flex;
   width: 100%;
   min-height: 48px;
@@ -116,11 +127,31 @@
   font-weight: 850;
   letter-spacing: 0;
   cursor: pointer;
+}
+
+.primaryAction {
   background: rgba(0, 154, 199, 0.78);
   box-shadow: var(--shadow-glass), inset 0 1px 0 rgba(255, 255, 255, 0.18);
 }
 
-.primaryAction:disabled {
+.deleteAction {
+  background: rgb(198, 40, 40);
+  box-shadow: var(--shadow-glass), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+
+.primaryAction:focus,
+.deleteAction:focus {
+  outline: none;
+}
+
+.primaryAction:focus-visible,
+.deleteAction:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.58);
+  outline-offset: 2px;
+}
+
+.primaryAction:disabled,
+.deleteAction:disabled {
   cursor: default;
   opacity: 0.48;
 }
@@ -134,6 +165,13 @@
   background: rgba(180, 35, 35, 0.34);
   font-size: 0.84rem;
   font-weight: 760;
+}
+
+@media (hover: none), (pointer: coarse) {
+  .primaryAction:focus-visible,
+  .deleteAction:focus-visible {
+    outline: none;
+  }
 }
 
 @media (max-width: 420px) {
