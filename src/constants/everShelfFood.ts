@@ -9,6 +9,7 @@ import {
 export const FOOD_CARD_BACKGROUND_COLOR = 'rgba(155, 110, 64, 0.72)'
 export const EVERSHELF_EXPIRING_SOON_ENTITY_ID = 'sensor.evershelf_expiring_soon'
 export const EVERSHELF_TOTAL_ITEMS_ENTITY_ID = 'sensor.evershelf_total_items'
+export const EVERSHELF_DEFAULT_LOCATION = 'dispensa'
 
 export const EVERSHELF_FOOD_SPACES = [
   { title: 'Pantry', entityId: 'sensor.evershelf_items_in_pantry', location: 'dispensa', icon: 'mdi:food-fork-drink', color: { r: 155, g: 110, b: 64 }, routePath: HOME_PANTRY_ROUTE_PATH },

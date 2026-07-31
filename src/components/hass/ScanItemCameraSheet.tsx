@@ -7,6 +7,7 @@ import { MaterialIcon } from '../core/Icon'
 import { ModalSheet, type ModalSheetStyle } from '../core/ModalSheet'
 import { NativePickerField } from '../core/NativePickerField'
 import { RadioRow } from '../core/RadioRow'
+import { EVERSHELF_DEFAULT_LOCATION } from '../../constants/everShelfFood'
 import styles from './ScanItemCameraSheet.module.css'
 
 interface ScanItemCameraSheetProps {
@@ -23,6 +24,9 @@ type LookupStatus = 'idle' | 'scanning' | 'resolving' | 'found' | 'not-found' | 
 type ExpiryStatus = 'idle' | 'ready' | 'reading' | 'found' | 'not-found' | 'error'
 type AddItemStatus = 'idle' | 'adding' | 'added' | 'error'
 export type EverShelfLocation = 'dispensa' | 'frigo' | 'freezer' | 'spice_rack' | 'cabinet' | 'altro'
+type EverShelfSuggestedLocation = EverShelfLocation | 'unknown'
+type LocationLookupMode = 'barcode' | 'manual' | null
+type LocationSuggestionStatus = 'default' | 'checking' | 'history' | 'suggested' | 'unknown' | 'error' | 'manual'
 type QuickExpirationValue = '3-days' | '1-week' | '1-month' | '6-months' | '1-year'
 type CallService = <Response extends object>(params: Record<string, unknown>) => Promise<{ response: Response }> | void
 type BarcodeFormatEnum = typeof import('@zxing/browser')['BarcodeFormat']
@@ -49,8 +53,22 @@ interface EverShelfBarcodeResult {
   found?: boolean
   message?: string
   product?: EverShelfProduct
+  location_suggestion?: EverShelfLocationSuggestionResult
   service_response?: EverShelfBarcodeResult
   source?: string
+  [key: string]: unknown
+}
+
+interface EverShelfLocationSuggestionResult {
+  confidence?: number
+  error?: string
+  error_kind?: string
+  location?: EverShelfSuggestedLocation
+  model?: string
+  reason?: string
+  service_response?: EverShelfLocationSuggestionResult
+  source?: string
+  success?: boolean
   [key: string]: unknown
 }
 
@@ -100,6 +118,7 @@ const SECURE_CONTEXT_MESSAGE = 'Camera access requires a secure origin. Use HTTP
 const UNSUPPORTED_CAMERA_MESSAGE = 'This browser does not expose camera access to React Dash.'
 const QUANTITY_ERROR_MESSAGE = 'Quantity must be at least 1.'
 const QUANTITY_ERROR_ID = 'scan-item-quantity-error'
+export const LOCATION_SUGGESTION_DEBOUNCE_MS = 300
 const TRANSIENT_SCAN_ERRORS = new Set(['ChecksumException', 'FormatException', 'NotFoundException'])
 const EVERSHELF_LOCATIONS: { label: string, value: EverShelfLocation }[] = [
   { label: 'Pantry', value: 'dispensa' },
@@ -128,6 +147,14 @@ function locationDestination(value: EverShelfLocation) {
   if (value === 'spice_rack') return 'spice rack'
   if (value === 'cabinet') return 'cabinet'
   return 'library'
+}
+
+function isEverShelfLocation(value: unknown): value is EverShelfLocation {
+  return EVERSHELF_LOCATIONS.some((location) => location.value === value)
+}
+
+function locationSuggestionIsHistory(source: string | undefined) {
+  return source === 'history_barcode' || source === 'history_name'
 }
 
 function cameraAccessErrorMessage(error: unknown) {
@@ -317,7 +344,8 @@ function expirationReadErrorMessage(message: string, httpCode?: unknown) {
   return message || 'Unable to read expiration date.'
 }
 
-export function ScanItemCameraSheet({ defaultLocation = 'dispensa', open, onClose }: ScanItemCameraSheetProps) {
+export function ScanItemCameraSheet({ defaultLocation, open, onClose }: ScanItemCameraSheetProps) {
+  const fallbackLocation = defaultLocation ?? EVERSHELF_DEFAULT_LOCATION
   const callService = useHass((state) => state.helpers.callService) as unknown as CallService
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
@@ -325,6 +353,9 @@ export function ScanItemCameraSheet({ defaultLocation = 'dispensa', open, onClos
   const scanSessionIdRef = useRef(0)
   const cameraRequestIdRef = useRef(0)
   const serviceRequestIdRef = useRef(0)
+  const locationRequestIdRef = useRef(0)
+  const locationRequestIdentityRef = useRef('')
+  const userSelectedLocationRef = useRef(false)
   const lastScannedBarcodeRef = useRef<string | null>(null)
   const [step, setStep] = useState<ScanStep>('barcode')
   const [activeMode, setActiveMode] = useState<CameraMode | null>(null)
@@ -345,7 +376,9 @@ export function ScanItemCameraSheet({ defaultLocation = 'dispensa', open, onClos
   const [itemBrand, setItemBrand] = useState('')
   const [itemQuantity, setItemQuantity] = useState('1')
   const [itemQuantityError, setItemQuantityError] = useState<string | null>(null)
-  const [itemLocation, setItemLocation] = useState<EverShelfLocation>(defaultLocation)
+  const [itemLocation, setItemLocation] = useState<EverShelfLocation>(fallbackLocation)
+  const [locationLookupMode, setLocationLookupMode] = useState<LocationLookupMode>(null)
+  const [locationSuggestionStatus, setLocationSuggestionStatus] = useState<LocationSuggestionStatus>('default')
   const [itemExpiryDate, setItemExpiryDate] = useState('')
   const [itemPreparedFood, setItemPreparedFood] = useState(false)
   const [addStatus, setAddStatus] = useState<AddItemStatus>('idle')
@@ -373,6 +406,15 @@ export function ScanItemCameraSheet({ defaultLocation = 'dispensa', open, onClos
     setStatus('idle')
   }, [stopActiveStream])
 
+  const resetLocationSelection = useCallback(() => {
+    locationRequestIdRef.current += 1
+    locationRequestIdentityRef.current = ''
+    userSelectedLocationRef.current = false
+    setItemLocation(fallbackLocation)
+    setLocationLookupMode(null)
+    setLocationSuggestionStatus('default')
+  }, [fallbackLocation])
+
   const resetAll = useCallback(() => {
     serviceRequestIdRef.current += 1
     lastScannedBarcodeRef.current = null
@@ -395,14 +437,76 @@ export function ScanItemCameraSheet({ defaultLocation = 'dispensa', open, onClos
     setItemBrand('')
     setItemQuantity('1')
     setItemQuantityError(null)
-    setItemLocation(defaultLocation)
+    resetLocationSelection()
     setItemExpiryDate('')
     setItemPreparedFood(false)
     setAddStatus('idle')
     setAddError(null)
-  }, [defaultLocation])
+  }, [resetLocationSelection])
+
+  const applyLocationSuggestion = useCallback((suggestion: EverShelfLocationSuggestionResult, requestId?: number) => {
+    if (requestId !== undefined && locationRequestIdRef.current !== requestId) return
+    if (userSelectedLocationRef.current) return
+    if (suggestion.success === false) {
+      setLocationSuggestionStatus('error')
+      return
+    }
+    if (suggestion.location === 'unknown') {
+      setItemLocation(fallbackLocation)
+      setLocationSuggestionStatus('unknown')
+      return
+    }
+    if (!isEverShelfLocation(suggestion.location)) {
+      setLocationSuggestionStatus('error')
+      return
+    }
+
+    setItemLocation(suggestion.location)
+    setLocationSuggestionStatus(locationSuggestionIsHistory(suggestion.source) ? 'history' : 'suggested')
+  }, [fallbackLocation])
+
+  const requestLocationSuggestion = useCallback(async ({ barcode, category, mode, name }: { barcode?: string; category?: string; mode: Exclude<LocationLookupMode, null>; name: string }) => {
+    if (userSelectedLocationRef.current) return
+    const normalizedName = name.trim().toLocaleLowerCase()
+    if (!normalizedName) return
+    const identity = [mode, barcode?.trim() ?? '', normalizedName, category?.trim().toLocaleLowerCase() ?? ''].join('\u0000')
+    if (locationRequestIdentityRef.current === identity) return
+    locationRequestIdentityRef.current = identity
+
+    const requestId = locationRequestIdRef.current + 1
+    locationRequestIdRef.current = requestId
+    if (!userSelectedLocationRef.current) {
+      setItemLocation(fallbackLocation)
+      setLocationSuggestionStatus('checking')
+    }
+
+    const serviceData: Record<string, unknown> = { mode, name: name.trim() }
+    if (barcode?.trim()) serviceData.barcode = barcode.trim()
+    if (category?.trim()) serviceData.category = category.trim()
+
+    try {
+      const response = await Promise.resolve(
+        callService<EverShelfLocationSuggestionResult>({
+          domain: 'evershelf',
+          service: 'suggest_location',
+          serviceData,
+          returnResponse: true,
+        }),
+      )
+      if (locationRequestIdRef.current !== requestId || userSelectedLocationRef.current) return
+      const payload = serviceResponsePayload(response)
+      if (!payload) throw new Error('Storage suggestion did not return a response.')
+      applyLocationSuggestion(payload, requestId)
+    } catch {
+      if (locationRequestIdRef.current !== requestId || userSelectedLocationRef.current) return
+      setItemLocation(fallbackLocation)
+      setLocationSuggestionStatus('error')
+    }
+  }, [applyLocationSuggestion, callService, fallbackLocation])
 
   const resolveBarcode = useCallback(async (barcode: string) => {
+    resetLocationSelection()
+    setLocationLookupMode('barcode')
     const requestId = serviceRequestIdRef.current + 1
     serviceRequestIdRef.current = requestId
     setDetectedBarcode(barcode)
@@ -430,6 +534,16 @@ export function ScanItemCameraSheet({ defaultLocation = 'dispensa', open, onClos
         setItemBrand(productBrand(payload.product))
         setAddStatus('idle')
         setAddError(null)
+        if (payload.location_suggestion) {
+          applyLocationSuggestion(payload.location_suggestion)
+        } else if (nextName) {
+          void requestLocationSuggestion({
+            barcode,
+            category: productCategory(payload.product),
+            mode: 'barcode',
+            name: nextName,
+          })
+        }
       }
     } catch (caughtError: unknown) {
       if (serviceRequestIdRef.current !== requestId) return
@@ -438,7 +552,7 @@ export function ScanItemCameraSheet({ defaultLocation = 'dispensa', open, onClos
     } finally {
       if (serviceRequestIdRef.current === requestId) setProcessingMode(null)
     }
-  }, [callService])
+  }, [applyLocationSuggestion, callService, requestLocationSuggestion, resetLocationSelection])
 
   const startBarcodeScanner = useCallback(async (video: HTMLVideoElement) => {
     const scanSessionId = scanSessionIdRef.current + 1
@@ -598,6 +712,19 @@ export function ScanItemCameraSheet({ defaultLocation = 'dispensa', open, onClos
     void videoRef.current.play()
   }, [activeMode, open, processingMode, status, step])
 
+  useEffect(() => {
+    if (!open || locationLookupMode !== 'manual' || !itemName.trim()) return
+    const timeout = window.setTimeout(() => {
+      void requestLocationSuggestion({
+        barcode: detectedBarcode ?? undefined,
+        category: productCategory(lookupResult?.product),
+        mode: 'manual',
+        name: itemName,
+      })
+    }, LOCATION_SUGGESTION_DEBOUNCE_MS)
+    return () => window.clearTimeout(timeout)
+  }, [detectedBarcode, itemName, locationLookupMode, lookupResult?.product, open, requestLocationSuggestion])
+
   const handleClose = () => {
     stopActiveStream()
     resetAll()
@@ -659,6 +786,8 @@ export function ScanItemCameraSheet({ defaultLocation = 'dispensa', open, onClos
   }
 
   const manuallyEnterName = () => {
+    resetLocationSelection()
+    setLocationLookupMode('manual')
     setBarcodeCameraHidden(true)
     hideActiveCamera()
     setError(null)
@@ -671,6 +800,7 @@ export function ScanItemCameraSheet({ defaultLocation = 'dispensa', open, onClos
 
   const scanBarcodeAgain = () => {
     serviceRequestIdRef.current += 1
+    resetLocationSelection()
     lastScannedBarcodeRef.current = null
     setBarcodeCameraHidden(false)
     setDetectedBarcode(null)
@@ -705,6 +835,40 @@ export function ScanItemCameraSheet({ defaultLocation = 'dispensa', open, onClos
     setItemQuantityError(null)
     setAddStatus('idle')
     setAddError(null)
+  }
+
+  const updateItemName = (value: string) => {
+    const normalizedCurrent = itemName.trim().toLocaleLowerCase()
+    const normalizedNext = value.trim().toLocaleLowerCase()
+    if (normalizedNext !== normalizedCurrent && locationLookupMode === 'manual') {
+      locationRequestIdRef.current += 1
+      locationRequestIdentityRef.current = ''
+      if (!userSelectedLocationRef.current) {
+        setItemLocation(fallbackLocation)
+        setLocationSuggestionStatus('default')
+      }
+    }
+    setItemName(value)
+    setAddStatus('idle')
+    setAddError(null)
+    if (!lookupResult?.location_suggestion) {
+      if (locationLookupMode !== 'manual') {
+        locationRequestIdRef.current += 1
+        locationRequestIdentityRef.current = ''
+        if (!userSelectedLocationRef.current) {
+          setItemLocation(fallbackLocation)
+          setLocationSuggestionStatus('default')
+        }
+      }
+      setLocationLookupMode('manual')
+    }
+  }
+
+  const selectItemLocation = (location: EverShelfLocation) => {
+    locationRequestIdRef.current += 1
+    userSelectedLocationRef.current = true
+    setItemLocation(location)
+    setLocationSuggestionStatus('manual')
   }
 
   const validateItemQuantity = () => {
@@ -813,6 +977,8 @@ export function ScanItemCameraSheet({ defaultLocation = 'dispensa', open, onClos
       return
     }
 
+    locationRequestIdRef.current += 1
+    setLocationLookupMode(null)
     const product = lookupResult?.found ? lookupResult.product : undefined
     const serviceData: Record<string, unknown> = {
       location: itemLocation,
@@ -907,6 +1073,16 @@ export function ScanItemCameraSheet({ defaultLocation = 'dispensa', open, onClos
   const expiryForwardDisabled = expiryStatus === 'reading' || (expiryCameraHidden && !hasExpiryForwardValue)
   const addedLocation = locationLabel(itemLocation)
   const reviewDestination = locationDestination(itemLocation)
+  const fallbackDescription = defaultLocation ? 'current page default' : 'app default'
+  const locationSuggestionHint = (() => {
+    if (locationSuggestionStatus === 'checking') return 'Checking previous items and the best storage location...'
+    if (locationSuggestionStatus === 'history') return 'Selected from your previous EverShelf entries.'
+    if (locationSuggestionStatus === 'suggested') return 'Suggested for this product by EverShelf.'
+    if (locationSuggestionStatus === 'unknown') return `No confident match; using the ${fallbackDescription}.`
+    if (locationSuggestionStatus === 'error') return `Storage suggestion unavailable; using the ${fallbackDescription}.`
+    if (locationSuggestionStatus === 'manual') return 'Location selected manually.'
+    return `Using the ${fallbackDescription} until EverShelf finds a better match.`
+  })()
   const backLabel = step === 'expiry' ? 'Back to barcode scan' : step === 'review' ? 'Back to expiration date' : undefined
   const onBack = step === 'expiry' ? goToBarcodeStep : step === 'review' ? goToExpiryStep : undefined
   const subtitle = step === 'barcode'
@@ -1035,7 +1211,7 @@ export function ScanItemCameraSheet({ defaultLocation = 'dispensa', open, onClos
           <>
             <label className={styles.field}>
               <span>What item are you adding?</span>
-              <input aria-label="Product name" autoComplete="off" onChange={(event) => setItemName(event.target.value)} type="text" value={itemName} />
+              <input aria-label="Product name" autoComplete="off" onChange={(event) => updateItemName(event.target.value)} type="text" value={itemName} />
             </label>
             <button className={`${styles.primaryAction} ${styles.fieldAction}`} onClick={scanBarcodeAgain} type="button">
               {barcodeScanButtonLabel}
@@ -1064,7 +1240,7 @@ export function ScanItemCameraSheet({ defaultLocation = 'dispensa', open, onClos
           <>
             <label className={styles.field}>
               <span>What item are you adding?</span>
-              <input aria-label="Product name" autoComplete="off" onChange={(event) => setItemName(event.target.value)} type="text" value={itemName} />
+              <input aria-label="Product name" autoComplete="off" onChange={(event) => updateItemName(event.target.value)} type="text" value={itemName} />
             </label>
             {itemQuantityError && <div className={styles.error} id={QUANTITY_ERROR_ID} role="alert">{itemQuantityError}</div>}
             <label className={styles.field}>
@@ -1075,9 +1251,10 @@ export function ScanItemCameraSheet({ defaultLocation = 'dispensa', open, onClos
               <legend>Where should it be stored?</legend>
               <div className={styles.locationOptions} role="radiogroup">
                 {EVERSHELF_LOCATIONS.map((location) => (
-                  <RadioRow active={itemLocation === location.value} key={location.value} onClick={() => setItemLocation(location.value)} title={location.label} />
+                  <RadioRow active={itemLocation === location.value} key={location.value} onClick={() => selectItemLocation(location.value)} title={location.label} />
                 ))}
               </div>
+              <Description className={styles.locationHint}>{locationSuggestionHint}</Description>
             </fieldset>
             <NativePickerField ariaLabel="Expiration date" label="When does it expire?" onChange={updateItemExpiryDate} type="date" value={itemExpiryDate} />
             <fieldset className={styles.preparedFoodFieldset}>

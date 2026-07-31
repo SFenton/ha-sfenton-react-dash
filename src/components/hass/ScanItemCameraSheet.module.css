@@ -233,6 +233,14 @@
   gap: 2px;
 }
 
+.locationHint {
+  min-height: 1.35rem;
+  padding-inline: 2px;
+  color: rgba(255, 255, 255, 0.62);
+  font-size: 0.72rem;
+  line-height: 1.35;
+}
+
 .quickExpirationFieldset {
   display: grid;
   min-width: 0;

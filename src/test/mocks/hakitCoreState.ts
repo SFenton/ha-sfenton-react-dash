@@ -871,6 +871,16 @@ export const mockState: MockHassState = {
           },
         })
       }
+      if (params.domain === 'evershelf' && params.service === 'suggest_location' && params.returnResponse === true) {
+        return Promise.resolve({
+          response: {
+            confidence: 0.4,
+            location: 'unknown',
+            source: 'gemini',
+            success: true,
+          },
+        })
+      }
       if (params.domain === 'evershelf' && params.service === 'read_expiry_image' && params.returnResponse === true) {
         return Promise.resolve({
           response: {
