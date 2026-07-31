@@ -471,6 +471,16 @@ describe('DashboardViewPage', () => {
         serviceData: { barcode: '3017620422003' },
       }))
       expect(await screen.findByLabelText('Product name')).toHaveValue('Nutella')
+      await waitFor(() => expect(mockCallServiceCalls).toContainEqual({
+        domain: 'evershelf',
+        returnResponse: true,
+        service: 'suggest_location',
+        serviceData: {
+          barcode: '3017620422003',
+          mode: 'barcode',
+          name: 'Nutella',
+        },
+      }))
       expect(screen.getByRole('button', { name: 'Scan Barcode Again' })).toBeEnabled()
       expect(screen.queryByText('Source: mock')).not.toBeInTheDocument()
       expect(screen.queryByLabelText('Live item scan camera feed')).not.toBeInTheDocument()
@@ -480,6 +490,55 @@ describe('DashboardViewPage', () => {
       fireEvent.click(screen.getByRole('button', { name: 'Close' }))
       await waitFor(() => expect(camera.stop).toHaveBeenCalled())
     } finally {
+      camera.restore()
+    }
+  })
+
+  it('keeps exact barcode history ahead of the location-page fallback', async () => {
+    const camera = setupMockCamera()
+    const originalCallService = mockState.helpers.callService
+    mockState.helpers.callService = (params) => {
+      if (params.domain === 'evershelf' && params.service === 'resolve_barcode' && params.returnResponse === true) {
+        mockCallServiceCalls.push(params)
+        return Promise.resolve({
+          response: {
+            barcode: '196633809865',
+            found: true,
+            location_suggestion: {
+              confidence: 1,
+              location: 'frigo',
+              source: 'history_barcode',
+              success: true,
+            },
+            product: { brand: 'Costco', name: 'Costco Dairy-Free Reduced fat milk' },
+            source: 'local',
+          },
+        })
+      }
+      return originalCallService(params)
+    }
+
+    try {
+      render(<DashboardViewPage activePath="freezer" onNavigate={() => undefined} path="freezer" />)
+      fireEvent.click(await screen.findByRole('button', { name: 'Scan Item' }))
+      await waitFor(() => expect(zxingMock.latestCallback).toEqual(expect.any(Function)))
+
+      act(() => {
+        zxingMock.latestCallback?.({ getText: () => '196633809865' }, undefined, { stop: zxingMock.scannerStop })
+      })
+
+      expect(await screen.findByLabelText('Product name')).toHaveValue('Costco Dairy-Free Reduced fat milk')
+      fireEvent.click(screen.getByRole('button', { name: 'Next' }))
+      expect(await screen.findByLabelText('Live expiration date camera feed')).toBeInTheDocument()
+      fireEvent.click(screen.getByRole('button', { name: 'Manually Enter Expiration Date' }))
+      fireEvent.click(screen.getByRole('radio', { name: 'In 3 Days' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Next' }))
+
+      expect(screen.getByRole('radio', { name: 'Fridge' })).toBeChecked()
+      expect(screen.getByText('Selected from your previous EverShelf entries.')).toBeInTheDocument()
+      expect(mockCallServiceCalls.some((call) => call.domain === 'evershelf' && call.service === 'suggest_location')).toBe(false)
+    } finally {
+      mockState.helpers.callService = originalCallService
       camera.restore()
     }
   })
@@ -4744,7 +4803,7 @@ describe('DashboardViewPage', () => {
 
   it('defaults inventory Scan Item storage to the current inventory route', async () => {
     for (const { destination, label, location, path } of [
-      { destination: 'fridge', label: 'Fridge', location: 'frigo', path: 'all-food' },
+      { destination: 'pantry', label: 'Pantry', location: 'dispensa', path: 'all-food' },
       { destination: 'pantry', label: 'Pantry', location: 'dispensa', path: 'pantry' },
       { destination: 'fridge', label: 'Fridge', location: 'frigo', path: 'fridge' },
       { destination: 'freezer', label: 'Freezer', location: 'freezer', path: 'freezer' },
