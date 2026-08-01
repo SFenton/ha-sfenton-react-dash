@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
 import { ModalSheet } from '../core/ModalSheet'
 import { SectionHeader } from '../core/SectionHeader'
-import { CreateDonetickTaskSheet } from './CreateDonetickTaskSheet'
 import { DailyReportModalContent, DailyReportModalNav } from './DailyReportModalContent'
 import { DAILY_REPORT_MODAL_STYLE, useDailyReportContext } from './dailyReportModal'
+import { DonetickTaskFormBody, DonetickTaskFormFooter } from './DonetickTaskFormPage'
+import { useDonetickTaskForm } from './useDonetickTaskForm'
 import type { DonetickTaskEditTarget } from './donetickTaskForm'
 import {
   DAILY_REPORT_AUTO_TAB,
@@ -40,8 +41,6 @@ export function DailyReportModal() {
   const [previousOpen, setPreviousOpen] = useState(false)
   const [consumedTabUrl, setConsumedTabUrl] = useState<string | undefined>()
   const [editingTask, setEditingTask] = useState<DonetickTaskEditTarget | null>(null)
-  const [editSheetOpen, setEditSheetOpen] = useState(false)
-  const [editSheetBusy, setEditSheetBusy] = useState(false)
   const [todoReloadVersion, setTodoReloadVersion] = useState(0)
   const open = hash === DAILY_REPORT_HASH
 
@@ -57,7 +56,6 @@ export function DailyReportModal() {
         setConsumedTabUrl(dashboardUrl)
       }
     }
-    if (!open && editSheetOpen && !editSheetBusy) setEditSheetOpen(false)
   }
 
   useEffect(() => {
@@ -65,39 +63,60 @@ export function DailyReportModal() {
     clearTabRequest()
   }, [consumedTabUrl])
 
-  const openTaskEditor = (target: DonetickTaskEditTarget) => {
-    setEditingTask(target)
-    setEditSheetBusy(false)
-    setEditSheetOpen(true)
-  }
-
   const refreshTodoLists = () => {
     setTodoReloadVersion((current) => current + 1)
   }
 
+  const finishEditing = () => {
+    setEditingTask(null)
+  }
+
+  const taskForm = useDonetickTaskForm({
+    active: Boolean(editingTask),
+    editTarget: editingTask ?? undefined,
+    onComplete: finishEditing,
+    onDeleted: refreshTodoLists,
+    onSaved: refreshTodoLists,
+  })
+
+  if (!open && editingTask && !taskForm.busy && !taskForm.error) setEditingTask(null)
+
+  const openTaskEditor = (target: DonetickTaskEditTarget) => {
+    setEditingTask(target)
+  }
+
+  const showSummary = () => {
+    if (!taskForm.busy) setEditingTask(null)
+  }
+
+  const editing = Boolean(editingTask)
+  const modalOpen = open || Boolean(editingTask && (taskForm.busy || taskForm.error))
+
   return (
-    <>
-      <ModalSheet
-        bodyHeader={context.user ? <SectionHeader title={dailyReportTabLabel(activeTab)} /> : undefined}
-        contentStyle={DAILY_REPORT_MODAL_STYLE}
-        footer={context.user ? <DailyReportModalNav activeTab={activeTab} counts={{ 'expired-food': context.expiredFoodCount, overdue: context.overdueCount }} onTabChange={setActiveTab} /> : undefined}
-        onClose={closeHash}
-        open={open}
-        scrollResetKey={activeTab}
-        title={context.title}
-      >
+    <ModalSheet
+      backLabel="Back to daily summary"
+      bodyHeader={!editing && context.user ? <SectionHeader title={dailyReportTabLabel(activeTab)} /> : undefined}
+      contentStyle={DAILY_REPORT_MODAL_STYLE}
+      footer={editing
+        ? <DonetickTaskFormFooter controller={taskForm} />
+        : context.user
+          ? <DailyReportModalNav activeTab={activeTab} counts={{ 'expired-food': context.expiredFoodCount, overdue: context.overdueCount }} onTabChange={setActiveTab} />
+          : undefined}
+      onBack={editing ? showSummary : undefined}
+      onClose={() => {
+        if (taskForm.busy) return
+        setEditingTask(null)
+        closeHash()
+      }}
+      open={modalOpen}
+      scrollResetKey={editing ? `task-${editingTask?.taskId ?? ''}` : activeTab}
+      title={editing ? 'Edit Task' : context.title}
+    >
+      {editing
+        ? <DonetickTaskFormBody controller={taskForm} />
+        : (
         <DailyReportModalContent activeTab={activeTab} context={context} onEditTask={openTaskEditor} reloadVersion={todoReloadVersion} />
-      </ModalSheet>
-      {editingTask && (
-        <CreateDonetickTaskSheet
-          editTarget={editingTask}
-          onBusyChange={setEditSheetBusy}
-          onClose={() => setEditSheetOpen(false)}
-          onDeleted={refreshTodoLists}
-          onSaved={refreshTodoLists}
-          open={editSheetOpen}
-        />
-      )}
-    </>
+          )}
+    </ModalSheet>
   )
 }

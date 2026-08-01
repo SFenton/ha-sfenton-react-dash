@@ -1,5 +1,5 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { AtAGlancePage } from './AtAGlancePage'
 import { DashboardViewPage } from './DashboardViewPage'
 import { mockDonetickTasksById, mockEntities, mockState, mockTodoItemsByEntity, resetMockHass } from '../test/mocks/hakitCoreState'
@@ -81,6 +81,7 @@ describe('Daily summary modal', () => {
   })
 
   afterEach(() => {
+    vi.restoreAllMocks()
     setDashboardUrl('/')
   })
 
@@ -192,20 +193,60 @@ describe('Daily summary modal', () => {
     const overdueRegion = within(summaryDialog).getByRole('region', { name: 'Overdue Chores' })
     fireEvent.click(within(overdueRegion).getByRole('button', { name: 'Edit Take out the trash' }))
 
-    const editDialog = await screen.findByRole('dialog', { name: 'Edit Task' })
-    await waitFor(() => expect(within(editDialog).getByLabelText('Task Name')).toHaveValue('Take out the trash'))
-    expect(within(editDialog).getByLabelText('Description')).toHaveValue('Use both bins')
-    expect(within(editDialog).getByRole('button', { name: 'Save Task' })).toBeInTheDocument()
+    const editPage = await screen.findByRole('dialog', { name: 'Edit Task' })
+    expect(editPage).toBe(summaryDialog)
+    expect(screen.getAllByRole('dialog')).toHaveLength(1)
+    await waitFor(() => expect(within(editPage).getByLabelText('Task Name')).toHaveValue('Take out the trash'))
+    expect(within(editPage).getByLabelText('Description')).toHaveValue('Use both bins')
+    expect(within(editPage).getByRole('button', { name: 'Save Task' })).toBeInTheDocument()
+    expect(within(editPage).queryByRole('navigation', { name: 'Daily report sections' })).not.toBeInTheDocument()
 
-    fireEvent.click(within(editDialog).getByRole('button', { name: 'Close' }))
-    await waitFor(() => expect(editDialog).toHaveAttribute('data-state', 'closed'))
+    fireEvent.click(within(editPage).getByRole('button', { name: 'Back to daily summary' }))
+    await waitFor(() => expect(within(summaryDialog).getByRole('heading', { name: "Stephen's Summary" })).toBeInTheDocument())
     expect(summaryDialog).toHaveAttribute('data-state', 'open')
 
-    const nav = summaryDialog.querySelector('nav[aria-label="Daily report sections"]')
-    expect(nav).not.toBeNull()
-    fireEvent.click(within(nav as HTMLElement).getByRole('button', { name: /^Upcoming Chores/, hidden: true }))
+    const nav = within(summaryDialog).getByRole('navigation', { name: 'Daily report sections' })
+    fireEvent.click(within(nav).getByRole('button', { name: /^Upcoming Chores/ }))
     const upcomingRegion = await within(summaryDialog).findByRole('region', { name: 'Upcoming Chores' })
-    expect(within(upcomingRegion).getByRole('button', { name: 'Edit Water the plants' })).toBeInTheDocument()
+    expect(await within(upcomingRegion).findByRole('button', { name: 'Edit Water the plants' })).toBeInTheDocument()
+  })
+
+  it('keeps a failed in-flight save visible after external summary dismissal', async () => {
+    const originalCallService = mockState.helpers.callService
+    let rejectSave: ((error: Error) => void) | undefined
+    vi.spyOn(mockState.helpers, 'callService').mockImplementation((params) => {
+      if (params.domain === 'donetick' && params.service === 'update_task_form') {
+        return new Promise((_, reject) => {
+          rejectSave = reject
+        })
+      }
+      return originalCallService(params)
+    })
+    renderHome()
+
+    const summaryDialog = await screen.findByRole('dialog', { name: "Stephen's Summary" })
+    fireEvent.click(within(summaryDialog).getByRole('button', { name: 'Edit Take out the trash' }))
+    const editPage = await screen.findByRole('dialog', { name: 'Edit Task' })
+    await waitFor(() => expect(within(editPage).getByRole('button', { name: 'Save Task' })).toBeEnabled())
+
+    fireEvent.click(within(editPage).getByRole('button', { name: 'Save Task' }))
+    await waitFor(() => expect(within(editPage).getByRole('button', { name: 'Saving...' })).toBeInTheDocument())
+
+    act(() => {
+      setDashboardUrl(summaryUrl('?path=overview&user=stephen', ''))
+      window.dispatchEvent(new HashChangeEvent('hashchange'))
+    })
+    expect(screen.getByRole('dialog', { name: 'Edit Task' })).toBeInTheDocument()
+
+    await act(async () => {
+      rejectSave?.(new Error('Unable to save test task'))
+      await Promise.resolve()
+    })
+    expect(await within(editPage).findByText('Unable to save test task')).toBeInTheDocument()
+    expect(editPage).toHaveAttribute('data-state', 'open')
+
+    fireEvent.click(within(editPage).getByRole('button', { name: 'Close' }))
+    await waitFor(() => expect(editPage).toHaveAttribute('data-state', 'closed'))
   })
 
   it('renders expired food rows with the food page row UX', async () => {
