@@ -2607,11 +2607,13 @@ test('daily summary deep link opens the tabbed modal for the requested user', as
   await expect(dialog.getByRole('button', { name: 'Edit Mock task one' })).toBeVisible()
 
   await dialog.getByRole('button', { name: 'Edit Mock task one' }).click()
-  const editDialog = page.getByRole('dialog', { name: 'Edit Task' })
-  await expect(editDialog).toBeVisible()
-  await expect(editDialog.getByLabel('Task Name')).toHaveValue('Mock task one')
-  await editDialog.getByRole('button', { name: 'Close' }).click()
-  await expect(editDialog).toHaveAttribute('data-state', 'closed')
+  const editPage = page.getByRole('dialog', { name: 'Edit Task' })
+  await expect(editPage).toBeVisible()
+  await expect(page.getByRole('dialog')).toHaveCount(1)
+  await expect(editPage.getByLabel('Task Name')).toHaveValue('Mock task one')
+  await expect(editPage.getByRole('button', { name: 'Back to daily summary' })).toBeVisible()
+  await expect(editPage.getByRole('navigation', { name: 'Daily report sections' })).toHaveCount(0)
+  await editPage.getByRole('button', { name: 'Back to daily summary' }).click()
   await expect(dialog).toBeVisible()
 
   const bodyHeader = dialog.locator('[data-modal-sheet-body-header="true"]')
