@@ -1,20 +1,36 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { useHass } from '@hakit/core'
 import { CheckboxRow } from '../core/CheckboxRow'
 import { MaterialIcon } from '../core/Icon'
 import { ModalSheet } from '../core/ModalSheet'
 import { NativePickerField } from '../core/NativePickerField'
+import { DashboardPageLoading } from '../shell/DashboardPageLoading'
+import {
+  donetickRepeatEveryValue,
+  donetickTaskFormServiceData,
+  donetickTaskFormState,
+  donetickTaskFromServiceResult,
+  initialDonetickTaskFormState,
+  type DonetickAssigneeOption,
+  type DonetickTaskEditTarget,
+  type DonetickTaskFormRecord,
+  type DonetickTaskFormState,
+} from './donetickTaskForm'
 import styles from './CreateDonetickTaskSheet.module.css'
 
-type CallService = (params: Record<string, unknown>) => Promise<unknown> | void
+type CallService = (params: Record<string, unknown>) => Promise<unknown> | unknown
 
 interface CreateDonetickTaskSheetProps {
+  assigneeOptions?: readonly DonetickAssigneeOption[]
   defaultAssignee?: string
+  editTarget?: DonetickTaskEditTarget
   open: boolean
   onClose: () => void
+  onDeleted?: () => void
+  onSaved?: () => void
 }
 
-const ASSIGNEE_OPTIONS = [
+const DEFAULT_ASSIGNEE_OPTIONS = [
   { label: 'Anyone', value: '' },
   { label: 'Stephen', value: '1' },
   { label: 'Steph', value: '2' },
@@ -22,6 +38,7 @@ const ASSIGNEE_OPTIONS = [
 ] as const
 
 const PRIORITY_OPTIONS = [
+  { label: 'None', value: 'none' },
   { label: 'P1', value: 'low' },
   { label: 'P2', value: 'medium' },
   { label: 'P3', value: 'high' },
@@ -38,7 +55,12 @@ const RECURRENCE_OPTIONS = [
   { label: 'Specific Days of Week', value: 'days_of_the_week' },
 ] as const
 
-const CREATE_TASK_FORM_ID = 'create-donetick-task-form'
+const EDIT_RECURRENCE_OPTIONS = [
+  ...RECURRENCE_OPTIONS,
+  { label: 'Adaptive', value: 'adaptive' },
+] as const
+
+const TASK_FORM_ID = 'create-donetick-task-form'
 
 const RECURRENCE_UNIT_OPTIONS = [
   { label: 'Days', value: 'days' },
@@ -57,59 +79,90 @@ const RECURRENCE_DAY_OPTIONS = [
   { label: 'Sunday', value: 'sunday' },
 ] as const
 
-type FormState = ReturnType<typeof initialFormState>
-
-function initialFormState(defaultAssignee = '') {
-  return {
-    assignee: defaultAssignee,
-    description: '',
-    dueDate: '',
-    dueTime: '',
-    hideOnVacation: true,
-    name: '',
-    priority: 'critical',
-    recurrence: 'no_repeat',
-    recurrenceDays: [] as string[],
-    recurrenceInterval: '1',
-    recurrenceUnit: 'days',
-  }
-}
-
-function normalizeTime(value: string) {
-  if (!value) return ''
-  return value.length === 5 ? `${value}:00` : value
-}
-
-function sourceDueValue(dueDate: string, dueTime: string) {
-  const normalizedDueTime = normalizeTime(dueTime)
-  if (dueDate) return `${dueDate}T${normalizedDueTime || '12:00:00'}`
-  return normalizedDueTime
-}
-
-function repeatEveryValue(value: string) {
-  const amount = Number.parseInt(value, 10)
-  if (!Number.isFinite(amount) || amount < 1) return '1'
-  return String(Math.min(amount, 365))
-}
-
-export function CreateDonetickTaskSheet({ defaultAssignee = '', open, onClose }: CreateDonetickTaskSheetProps) {
+export function CreateDonetickTaskSheet({
+  assigneeOptions,
+  defaultAssignee = '',
+  editTarget,
+  open,
+  onClose,
+  onDeleted,
+  onSaved,
+}: CreateDonetickTaskSheetProps) {
   const callService = useHass((state) => state.helpers.callService) as unknown as CallService
-  const [form, setForm] = useState(() => initialFormState(defaultAssignee))
+  const timeZone = useHass((state) => (state.config as { time_zone?: string }).time_zone)
+  const [form, setForm] = useState(() => initialDonetickTaskFormState(defaultAssignee))
+  const [initialForm, setInitialForm] = useState(() => initialDonetickTaskFormState(defaultAssignee))
+  const [task, setTask] = useState<DonetickTaskFormRecord | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const formResetKey = defaultAssignee + '\u001f' + String(open)
-  const [appliedFormResetKey, setAppliedFormResetKey] = useState(formResetKey)
+  const [loading, setLoading] = useState(Boolean(open && editTarget))
+  const [deleting, setDeleting] = useState(false)
   const [submitting, setSubmitting] = useState(false)
+  const requestIdRef = useRef(0)
+  const formSessionKey = `${String(open)}\u001f${defaultAssignee}\u001f${editTarget?.todoEntityId ?? ''}\u001f${editTarget?.taskId ?? ''}`
+  const [appliedFormSessionKey, setAppliedFormSessionKey] = useState(formSessionKey)
+  const editMode = Boolean(editTarget)
+  const busy = deleting || submitting
   const taskName = form.name.trim()
   const showCustomInterval = form.recurrence === 'interval'
   const showRecurrenceDays = form.recurrence === 'days_of_the_week'
+  const recurrenceOptions = editMode ? EDIT_RECURRENCE_OPTIONS : RECURRENCE_OPTIONS
+  const availableAssignees = useMemo(() => {
+    const configured = assigneeOptions?.length
+      ? [{ label: 'Anyone', value: '' }, ...assigneeOptions.filter((option) => option.value)]
+      : [...DEFAULT_ASSIGNEE_OPTIONS]
+    if (!form.assignee || configured.some((option) => option.value === form.assignee)) return configured
+    return [...configured, { label: `User ${form.assignee}`, value: form.assignee }]
+  }, [assigneeOptions, form.assignee])
 
-  if (appliedFormResetKey !== formResetKey) {
-    setAppliedFormResetKey(formResetKey)
-    setForm(initialFormState(defaultAssignee))
+  if (appliedFormSessionKey !== formSessionKey) {
+    const nextForm = initialDonetickTaskFormState(editTarget ? '' : defaultAssignee)
+    setAppliedFormSessionKey(formSessionKey)
+    setForm(nextForm)
+    setInitialForm(nextForm)
+    setTask(null)
     setError(null)
+    setLoading(Boolean(open && editTarget))
+    setDeleting(false)
+    setSubmitting(false)
   }
 
-  const updateField = (field: keyof FormState, value: FormState[keyof FormState]) => {
+  useEffect(() => {
+    if (!open || !editTarget) return undefined
+
+    const requestId = ++requestIdRef.current
+    void Promise.resolve(
+      callService({
+        domain: 'donetick',
+        returnResponse: true,
+        service: 'get_task',
+        serviceData: {
+          config_entry_id: editTarget.todoEntityId,
+          task_id: editTarget.taskId,
+        },
+      }),
+    )
+      .then((result) => {
+        if (requestIdRef.current !== requestId) return
+        const loadedTask = donetickTaskFromServiceResult(result)
+        const nextForm = donetickTaskFormState(loadedTask, timeZone)
+        setTask(loadedTask)
+        setForm(nextForm)
+        setInitialForm(nextForm)
+      })
+      .catch((caughtError: unknown) => {
+        if (requestIdRef.current !== requestId) return
+        setError(caughtError instanceof Error ? caughtError.message : 'Unable to load task')
+      })
+      .finally(() => {
+        if (requestIdRef.current === requestId) setLoading(false)
+      })
+
+    return () => {
+      if (requestIdRef.current === requestId) requestIdRef.current += 1
+    }
+  }, [callService, defaultAssignee, editTarget, open, timeZone])
+
+  const updateField = (field: keyof DonetickTaskFormState, value: DonetickTaskFormState[keyof DonetickTaskFormState]) => {
     setForm((current) => ({ ...current, [field]: value }))
   }
 
@@ -126,62 +179,94 @@ export function CreateDonetickTaskSheet({ defaultAssignee = '', open, onClose }:
   }
 
   const normalizeRepeatEvery = () => {
-    setForm((current) => ({ ...current, recurrenceInterval: repeatEveryValue(current.recurrenceInterval) }))
+    setForm((current) => ({ ...current, recurrenceInterval: donetickRepeatEveryValue(current.recurrenceInterval) }))
   }
 
   const handleClose = () => {
-    if (submitting) return
-    setForm(initialFormState(defaultAssignee))
-    setError(null)
+    if (busy) return
     onClose()
   }
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    if (!taskName || submitting) return
+    if (!taskName || busy || loading || (editMode && !task)) return
 
     setSubmitting(true)
     setError(null)
     void Promise.resolve(
       callService({
         domain: 'donetick',
-        service: 'create_task_form',
-        serviceData: {
-          assignees: form.assignee || '',
-          description: form.description,
-          due_date: sourceDueValue(form.dueDate, form.dueTime),
-          hide_on_vacation: form.hideOnVacation,
-          name: taskName,
-          priority: form.priority || 'none',
-          recurrence: form.recurrence || 'no_repeat',
-          recurrence_days: showRecurrenceDays ? form.recurrenceDays : [],
-          recurrence_interval: showCustomInterval ? Number(form.recurrenceInterval) || 1 : 1,
-          recurrence_unit: showCustomInterval ? form.recurrenceUnit || 'days' : 'days',
-        },
+        service: editMode ? 'update_task_form' : 'create_task_form',
+        serviceData: donetickTaskFormServiceData(form, editTarget ? {
+          configEntryId: editTarget.todoEntityId,
+          initialForm,
+          taskId: editTarget.taskId,
+        } : undefined),
       }),
     )
       .then(() => {
-        handleClose()
+        onSaved?.()
+        onClose()
       })
       .catch((caughtError: unknown) => {
-        setError(caughtError instanceof Error ? caughtError.message : 'Unable to create task')
+        setError(caughtError instanceof Error ? caughtError.message : editMode ? 'Unable to save task' : 'Unable to create task')
       })
       .finally(() => setSubmitting(false))
   }
 
+  const handleDelete = () => {
+    if (!editTarget || !task || busy || loading) return
+    if (!window.confirm(`Delete ${task.name}?`)) return
+
+    setDeleting(true)
+    setError(null)
+    void Promise.resolve(
+      callService({
+        domain: 'todo',
+        service: 'remove_item',
+        serviceData: { item: editTarget.itemUid },
+        target: editTarget.todoEntityId,
+      }),
+    )
+      .then(() => {
+        onDeleted?.()
+        onClose()
+      })
+      .catch((caughtError: unknown) => {
+        setError(caughtError instanceof Error ? caughtError.message : 'Unable to delete task')
+      })
+      .finally(() => setDeleting(false))
+  }
+
+  const footer = editMode ? (
+    <div className={styles.sheetFooter}>
+      <button className={styles.deleteAction} disabled={busy || loading || !task} onClick={handleDelete} type="button">
+        <MaterialIcon name="mdi:delete" size={20} />
+        <span>{deleting ? 'Deleting...' : 'Delete Task'}</span>
+      </button>
+      <button className={styles.primaryAction} disabled={!taskName || busy || loading || !task} form={TASK_FORM_ID} type="submit">
+        <MaterialIcon name="mdi:content-save" size={20} />
+        <span>{submitting ? 'Saving...' : 'Save Task'}</span>
+      </button>
+    </div>
+  ) : (
+    <button className={styles.primaryAction} disabled={!taskName || busy || loading} form={TASK_FORM_ID} type="submit">
+      <MaterialIcon name="mdi:checkbox-marked-circle" size={20} />
+      <span>{submitting ? 'Creating...' : 'Create Task'}</span>
+    </button>
+  )
+
   return (
     <ModalSheet
-      footer={(
-        <button className={styles.primaryAction} disabled={!taskName || submitting} form={CREATE_TASK_FORM_ID} type="submit">
-          <MaterialIcon name="mdi:checkbox-marked-circle" size={20} />
-          <span>{submitting ? 'Creating...' : 'Create Task'}</span>
-        </button>
-      )}
+      footer={footer}
       onClose={handleClose}
       open={open}
-      title="Create Task"
+      title={editMode ? 'Edit Task' : 'Create Task'}
     >
-      <form className={styles.form} id={CREATE_TASK_FORM_ID} onSubmit={handleSubmit}>
+      {loading ? (
+        <DashboardPageLoading className={styles.loading} label="Loading task" phase="loading" />
+      ) : (
+      <form aria-busy={busy ? 'true' : undefined} className={styles.form} id={TASK_FORM_ID} onSubmit={handleSubmit}>
         {error && <p className={styles.error}>{error}</p>}
         <label className={styles.field}>
           <span>Task Name</span>
@@ -190,7 +275,7 @@ export function CreateDonetickTaskSheet({ defaultAssignee = '', open, onClose }:
         <label className={styles.field}>
           <span>Assignee</span>
           <select name="assignee" onChange={(event) => updateField('assignee', event.target.value)} value={form.assignee}>
-            {ASSIGNEE_OPTIONS.map((option) => <option key={option.value || 'anyone'} value={option.value}>{option.label}</option>)}
+            {availableAssignees.map((option) => <option key={option.value || 'anyone'} value={option.value}>{option.label}</option>)}
           </select>
         </label>
         <fieldset className={styles.fieldset}>
@@ -222,7 +307,7 @@ export function CreateDonetickTaskSheet({ defaultAssignee = '', open, onClose }:
         <label className={styles.field}>
           <span>Recurrence</span>
           <select name="recurrence" onChange={(event) => updateRecurrence(event.target.value)} required value={form.recurrence}>
-            {RECURRENCE_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+            {recurrenceOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
           </select>
         </label>
         {showCustomInterval && (
@@ -258,6 +343,7 @@ export function CreateDonetickTaskSheet({ defaultAssignee = '', open, onClose }:
           </div>
         )}
       </form>
+      )}
     </ModalSheet>
   )
 }

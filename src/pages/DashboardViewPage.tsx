@@ -15,6 +15,8 @@ import { EntityActionCard } from '../components/hass/EntityActionCard'
 import { SecurityDashboard, SecurityStatusRail } from '../components/hass/SecurityDashboard'
 import { StatusRail, type StatusRailChip } from '../components/hass/StatusRail'
 import { TodoListPanel } from '../components/hass/TodoListPanel'
+import { CreateDonetickTaskSheet } from '../components/hass/CreateDonetickTaskSheet'
+import type { DonetickTaskEditTarget } from '../components/hass/donetickTaskForm'
 import { EverShelfInventoryPanel, type EverShelfInventoryLocation } from '../components/hass/EverShelfInventoryPanel'
 import { useEverShelfInventoryControls, type EverShelfInventoryControls } from '../components/hass/EverShelfInventoryControls'
 import { VacuumAutoCleanControlCard } from '../components/hass/VacuumAutoCleanControls'
@@ -1051,6 +1053,9 @@ function TodoPageContent({ config, configPath, onNavigate, onScrollLockChange, p
   const user = useUser()
   const entities = useHass((state) => state.entities) as unknown as EntityActionStateMap
   const [sectionStates, setSectionStates] = useState<Record<string, { loaded: boolean; visible: boolean } | undefined>>({})
+  const [editingTask, setEditingTask] = useState<DonetickTaskEditTarget | null>(null)
+  const [editSheetOpen, setEditSheetOpen] = useState(false)
+  const [todoReloadVersion, setTodoReloadVersion] = useState(0)
   const hideEmptyTodoSections = config.showEmptyStateWhenEmpty ?? isChoreTodoPage(configPath)
   // Donetick empties these lists during vacation, so "nice job" would take credit for hidden chores.
   const hiddenByVacation = Boolean(config.hiddenByVacation) && entities[VACATION_MODE_ENTITY_ID]?.state === 'on'
@@ -1061,6 +1066,7 @@ function TodoPageContent({ config, configPath, onNavigate, onScrollLockChange, p
   const hasRenderedTaskSection = hideEmptyTodoSections ? loadedSectionStates.some((state) => state.visible) : visibleLists.length > 0
   const showTodoEmptyState = hideEmptyTodoSections && (visibleLists.length === 0 || (allSectionsLoaded && !hasRenderedTaskSection))
   const lockPageScroll = path !== 'chores' && showTodoEmptyState
+  const editableDonetickTasks = config.taskSource === 'donetick'
 
   const handleTodoSectionState = (entityId: string, state: { loaded: boolean; visible: boolean }) => {
     setSectionStates((current) => {
@@ -1075,6 +1081,15 @@ function TodoPageContent({ config, configPath, onNavigate, onScrollLockChange, p
     return () => onScrollLockChange?.(false)
   }, [lockPageScroll, onScrollLockChange])
 
+  const openTaskEditor = (target: DonetickTaskEditTarget) => {
+    setEditingTask(target)
+    setEditSheetOpen(true)
+  }
+
+  const refreshTodoLists = () => {
+    setTodoReloadVersion((current) => current + 1)
+  }
+
   return (
     <div className={styles.stack} data-empty-todo-page={lockPageScroll ? 'true' : undefined}>
       {configPath === 'chores' && <ChoresIntro onNavigate={onNavigate} />}
@@ -1082,8 +1097,17 @@ function TodoPageContent({ config, configPath, onNavigate, onScrollLockChange, p
       {visibleLists.map((list) => {
         const entity = entities[list.entityId] as (typeof entities)[string] & { last_changed?: string; last_updated?: string }
         const entityVersion = `${entity?.state ?? ''}:${entity?.last_changed ?? ''}:${entity?.last_updated ?? ''}`
-        return <TodoSection entityVersion={entityVersion} hideListHeader={config.hideListHeaders} hideWhenEmpty={hideEmptyTodoSections} key={list.entityId} list={list} mayHaveItems={todoEntityMayHaveItems(entity)} onSectionStateChange={handleTodoSectionState} rowVariant={configPath === 'to-do' ? 'settings' : undefined} />
+        return <TodoSection entityVersion={entityVersion} hideListHeader={config.hideListHeaders} hideWhenEmpty={hideEmptyTodoSections} key={list.entityId} list={list} mayHaveItems={todoEntityMayHaveItems(entity)} onEditTask={editableDonetickTasks ? openTaskEditor : undefined} onSectionStateChange={handleTodoSectionState} reloadVersion={todoReloadVersion} rowVariant={configPath === 'to-do' ? 'settings' : undefined} />
       })}
+      {editingTask && (
+        <CreateDonetickTaskSheet
+          editTarget={editingTask}
+          onClose={() => setEditSheetOpen(false)}
+          onDeleted={refreshTodoLists}
+          onSaved={refreshTodoLists}
+          open={editSheetOpen}
+        />
+      )}
     </div>
   )
 }
@@ -1097,7 +1121,7 @@ function todoEntityMayHaveItems(entity: EntityActionStateMap[string] & { state?:
   return Number(entity.state) > 0
 }
 
-function TodoSection({ entityVersion, hideListHeader = false, hideWhenEmpty, list, mayHaveItems, onSectionStateChange, rowVariant }: { entityVersion: string; hideListHeader?: boolean; hideWhenEmpty: boolean | undefined; list: TodoListConfig; mayHaveItems: boolean; onSectionStateChange?: (entityId: string, state: { loaded: boolean; visible: boolean }) => void; rowVariant?: 'settings' }) {
+function TodoSection({ entityVersion, hideListHeader = false, hideWhenEmpty, list, mayHaveItems, onEditTask, onSectionStateChange, reloadVersion, rowVariant }: { entityVersion: string; hideListHeader?: boolean; hideWhenEmpty: boolean | undefined; list: TodoListConfig; mayHaveItems: boolean; onEditTask?: (target: DonetickTaskEditTarget) => void; onSectionStateChange?: (entityId: string, state: { loaded: boolean; visible: boolean }) => void; reloadVersion?: number; rowVariant?: 'settings' }) {
   const [visibleItemCount, setVisibleItemCount] = useState<number | null>(hideWhenEmpty && !mayHaveItems ? 0 : null)
   const sectionVisible = !(hideWhenEmpty && visibleItemCount === 0)
   const todoOptimisticStatuses = useTodoOptimisticStatuses()
@@ -1116,7 +1140,7 @@ function TodoSection({ entityVersion, hideListHeader = false, hideWhenEmpty, lis
   return (
     <section className={styles.section}>
       {!hideListHeader && <SectionHeader title={list.title} />}
-      <TodoListPanel completionScript={list.completionScript} entityId={list.entityId} hideCompleted={list.hideCompleted} onVisibleItemsChange={hideWhenEmpty ? setVisibleItemCount : undefined} optimisticStatuses={todoOptimisticStatuses} rowVariant={rowVariant} title={list.title} />
+      <TodoListPanel completionScript={list.completionScript} entityId={list.entityId} hideCompleted={list.hideCompleted} onEditTask={onEditTask} onVisibleItemsChange={hideWhenEmpty ? setVisibleItemCount : undefined} optimisticStatuses={todoOptimisticStatuses} reloadVersion={reloadVersion} rowVariant={rowVariant} title={list.title} />
     </section>
   )
 }

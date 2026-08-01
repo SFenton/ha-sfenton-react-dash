@@ -28,6 +28,7 @@ const freeSleepLevelAttributes = { icon: 'mdi:thermometer-lines', max: 10, min: 
 export const mockCallServiceCalls: Record<string, unknown>[] = []
 export const mockTodoUpdateMessages: Record<string, unknown>[] = []
 export const mockTodoItemsByEntity: Record<string, MockTodoItem[] | undefined> = {}
+export const mockDonetickTasksById: Record<number, MockDonetickTask | undefined> = {}
 
 const mockDailyWeatherForecast = [
   { datetime: '2026-06-10T07:00:00+00:00', condition: 'sunny', temperature: 65, templow: 48, precipitation_probability: 0, precipitation: 0, humidity: 74, dew_point: 48, cloud_coverage: 57, wind_speed: 3.56, wind_gust_speed: 7.97, wind_bearing: 185, uv_index: 6.7 },
@@ -70,6 +71,20 @@ interface MockTodoItem {
   status: string
   summary: string
   uid: string
+}
+
+interface MockDonetickTask {
+  assignees: number[]
+  assigned_to: number | null
+  description: string
+  frequency: number
+  frequency_metadata: Record<string, unknown>
+  frequency_type: string
+  hide_on_vacation: boolean
+  id: number
+  name: string
+  next_due_date: string | null
+  priority: number
 }
 
 const adminPresenceSwitchEntityIds = [
@@ -224,6 +239,20 @@ function applyMockCallServiceSideEffects(params: Record<string, unknown>) {
     if (textEntity && value !== undefined) textEntity.state = String(value)
   }
 
+  if (params.domain === 'todo' && params.service === 'remove_item' && typeof params.target === 'string') {
+    const item = isRecord(params.serviceData) ? params.serviceData.item : undefined
+    const currentItems = mockTodoItemsByEntity[params.target]
+    if (typeof item === 'string' && currentItems) {
+      const nextItems = currentItems.filter((todoItem) => todoItem.uid !== item && todoItem.summary !== item)
+      mockTodoItemsByEntity[params.target] = nextItems
+      const todoEntity = mockEntities[params.target]
+      if (todoEntity) {
+        todoEntity.state = String(nextItems.filter((todoItem) => todoItem.status !== 'completed').length)
+        Object.assign(todoEntity, { last_updated: new Date().toISOString() })
+      }
+    }
+  }
+
   if (params.domain !== 'mqtt' || params.service !== 'publish') return
   const serviceData = isRecord(params.serviceData) ? params.serviceData : {}
   if (typeof serviceData.payload !== 'string') return
@@ -250,6 +279,7 @@ type MockHassDebugApi = {
   reset: () => void
   setEntityAttribute: (entityId: string, attribute: string, value: unknown) => void
   setEntityState: (entityId: string, state: string) => void
+  setDonetickTask: (taskId: number, task: MockDonetickTask) => void
   setTodoItems: (entityId: string, items: MockTodoItem[]) => void
 }
 
@@ -266,6 +296,9 @@ function exposeMockHassDebugApi() {
     setEntityState: (entityId, state) => {
       const target = mockEntities[entityId]
       if (target) target.state = state
+    },
+    setDonetickTask: (taskId, task) => {
+      mockDonetickTasksById[taskId] = task
     },
     setTodoItems: (entityId, items) => {
       mockTodoItemsByEntity[entityId] = items
@@ -776,8 +809,8 @@ function todoItems(entityId: unknown) {
   const entityKey = String(entityId)
   return {
     items: mockTodoItemsByEntity[entityKey] ?? [
-      { uid: `${entityKey}-1`, summary: 'Mock task one', status: 'needs_action', due: '2026-06-04T17:30:00+00:00' },
-      { uid: `${entityKey}-2`, summary: 'Mock task two', status: 'needs_action' },
+      { uid: '1001--2026-06-04 17:30:00+00:00', summary: 'Mock task one', status: 'needs_action', due: '2026-06-04T17:30:00+00:00' },
+      { uid: '1002--None', summary: 'Mock task two', status: 'needs_action' },
     ],
   }
 }
@@ -786,6 +819,7 @@ export function resetMockHass() {
   mockCallServiceCalls.length = 0
   mockTodoUpdateMessages.length = 0
   for (const entityId of Object.keys(mockTodoItemsByEntity)) delete mockTodoItemsByEntity[entityId]
+  for (const taskId of Object.keys(mockDonetickTasksById)) delete mockDonetickTasksById[Number(taskId)]
   mockState.user = { id: '64089b5683944c39b4f944c8f76830b0', name: 'Stephen' }
   mockEntities['sensor.nightcanvasrestful_schedules'].attributes = mockFreeSleepScheduleAttributes()
   mockEntities['sensor.sleepypod_stephen_schedule_phase'].state = 'outside'
@@ -859,6 +893,23 @@ export const mockState: MockHassState = {
       if (params.domain === 'weather' && params.service === 'get_forecasts' && params.returnResponse === true) {
         const forecast = (params.serviceData as { type?: string } | undefined)?.type === 'hourly' ? mockHourlyWeatherForecast : mockDailyWeatherForecast
         return Promise.resolve({ response: { 'weather.pirate_weather': { forecast } } })
+      }
+      if (params.domain === 'donetick' && params.service === 'get_task' && params.returnResponse === true) {
+        const taskId = Number((params.serviceData as { task_id?: unknown } | undefined)?.task_id)
+        const defaultTask: MockDonetickTask = {
+          assignees: [1],
+          assigned_to: 1,
+          description: taskId === 1001 ? 'Mock task description' : '',
+          frequency: 1,
+          frequency_metadata: {},
+          frequency_type: 'once',
+          hide_on_vacation: true,
+          id: taskId,
+          name: taskId === 1002 ? 'Mock task two' : 'Mock task one',
+          next_due_date: taskId === 1001 ? '2026-06-04T17:30:00+00:00' : null,
+          priority: 4,
+        }
+        return Promise.resolve({ response: mockDonetickTasksById[taskId] ?? defaultTask })
       }
       if (params.domain === 'evershelf' && params.service === 'resolve_barcode' && params.returnResponse === true) {
         const barcode = (params.serviceData as { barcode?: string } | undefined)?.barcode

@@ -1422,11 +1422,12 @@ test('chores page shows source sections and checkbox todo rows for the logged-in
   await expect(page.getByRole('heading', { name: 'Evening Tasks' })).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Afternoon Tasks' })).toHaveCount(0)
   const pastDueList = page.getByLabel('Past Due todo list')
-  await expect(pastDueList.getByRole('button', { name: /Mock task one/i })).toHaveAttribute('aria-pressed', 'false')
+  const firstTask = pastDueList.locator('button[aria-pressed]').filter({ hasText: 'Mock task one' })
+  await expect(firstTask).toHaveAttribute('aria-pressed', 'false')
 
-  await pastDueList.getByRole('button', { name: /Mock task one/i }).click()
+  await firstTask.click()
 
-  await expect(pastDueList.getByRole('button', { name: /Mock task one/i })).toHaveCount(0)
+  await expect(firstTask).toHaveCount(0)
   await expect(page.getByText('Unable to update task')).toHaveCount(0)
 })
 
@@ -1477,7 +1478,7 @@ test('chores render HA-supplied vacation lists exactly and omit empty sections o
   await page.getByRole('navigation', { name: 'Dashboard sections' }).getByRole('button', { name: 'Chores' }).click()
 
   const noDueDateList = page.getByLabel('No Due Date todo list')
-  await expect(noDueDateList.getByRole('button')).toHaveCount(2)
+  await expect(noDueDateList.locator('button[aria-pressed]')).toHaveCount(2)
   await expect(noDueDateList.getByRole('button', { name: 'HA supplied vacation task alpha' })).toBeVisible()
   await expect(noDueDateList.getByRole('button', { name: 'HA supplied vacation task beta' })).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Past Due' })).toHaveCount(0)
@@ -1549,6 +1550,107 @@ test('chore subpages keep the Chores bottom nav item active', async ({ page }) =
   await expect(page.getByRole('button', { name: 'Add Task' })).toBeVisible()
   await page.getByRole('button', { name: 'Add Task' }).click()
   await expect(page.getByRole('dialog').getByLabel('Assignee')).toHaveValue('2')
+})
+
+test('chore rows edit, save, and delete through the shared task sheet', async ({ page }) => {
+  await page.setViewportSize({ width: 393, height: 852 })
+  await page.goto('/at-a-glance/overview')
+  await page.evaluate(() => {
+    const mock = (window as unknown as {
+      __mockHass: {
+        reset: () => void
+        setDonetickTask: (taskId: number, task: {
+          assignees: number[]
+          assigned_to: number | null
+          description: string
+          frequency: number
+          frequency_metadata: Record<string, unknown>
+          frequency_type: string
+          hide_on_vacation: boolean
+          id: number
+          name: string
+          next_due_date: string | null
+          priority: number
+        }) => void
+        setEntityState: (entityId: string, state: string) => void
+        setTodoItems: (entityId: string, items: { due?: string; status: string; summary: string; uid: string }[]) => void
+      }
+    }).__mockHass
+    mock.reset()
+    for (const entityId of [
+      'todo.stephen_s_past_due_with_unassigned',
+      'todo.stephen_s_evening_with_unassigned',
+      'todo.stephen_s_afternoon_with_unassigned',
+      'todo.stephen_s_morning_with_unassigned',
+      'todo.stephen_s_all_day_with_unassigned',
+      'todo.stephen_s_no_due_date_with_unassigned',
+      'todo.stephen_s_upcoming_today_by_time_and_future_with_unassigned',
+    ]) {
+      mock.setEntityState(entityId, '0')
+      mock.setTodoItems(entityId, [])
+    }
+    mock.setEntityState('todo.stephen_s_past_due_with_unassigned', '1')
+    mock.setTodoItems('todo.stephen_s_past_due_with_unassigned', [
+      { uid: '240--None', summary: 'Clean the gutters', status: 'needs_action' },
+    ])
+    mock.setDonetickTask(240, {
+      assignees: [1],
+      assigned_to: 1,
+      description: 'Use the tall ladder',
+      frequency: 1,
+      frequency_metadata: {},
+      frequency_type: 'once',
+      hide_on_vacation: true,
+      id: 240,
+      name: 'Clean the gutters',
+      next_due_date: null,
+      priority: 2,
+    })
+  })
+
+  await page.getByRole('navigation', { name: 'Dashboard sections' }).getByRole('button', { name: 'Chores' }).click()
+  const pastDueList = page.getByLabel('Past Due todo list')
+  const editButton = pastDueList.getByRole('button', { name: 'Edit Clean the gutters' })
+  await expect(editButton).toBeVisible()
+  await editButton.click()
+
+  const dialog = page.getByRole('dialog', { name: 'Edit Task' })
+  await expect(dialog).toBeVisible()
+  await expect(dialog.getByLabel('Task Name')).toHaveValue('Clean the gutters')
+  await expect(dialog.getByLabel('Assignee')).toHaveValue('1')
+  await expect(dialog.getByLabel('Description')).toHaveValue('Use the tall ladder')
+  const deleteButton = dialog.getByRole('button', { name: 'Delete Task' })
+  const saveButton = dialog.getByRole('button', { name: 'Save Task' })
+  await expect(deleteButton).toBeVisible()
+  await expect(saveButton).toBeVisible()
+  await expect(deleteButton.locator('..')).toHaveCSS('display', 'grid')
+  await expect(deleteButton.locator('..')).toHaveCSS('grid-template-columns', /.+ .+/)
+
+  await dialog.getByLabel('Assignee').selectOption('3')
+  await dialog.getByLabel('Recurrence').selectOption('interval')
+  await dialog.getByLabel('Repeat Every').fill('2')
+  await dialog.getByLabel('Interval Unit').selectOption('weeks')
+  await saveButton.click()
+
+  await expect(dialog).toHaveAttribute('data-state', 'closed')
+  await expect.poll(() => page.evaluate(() => {
+    const calls = (window as unknown as { __mockHass: { calls: Array<Record<string, unknown>> } }).__mockHass.calls
+    return calls.some((call) => call.domain === 'donetick' && call.service === 'update_task_form'
+      && (call.serviceData as { assignees?: string; recurrence?: string } | undefined)?.assignees === '3'
+      && (call.serviceData as { recurrence?: string } | undefined)?.recurrence === 'interval')
+  })).toBe(true)
+
+  await editButton.click()
+  await expect(dialog).toBeVisible()
+  page.once('dialog', (confirmation) => confirmation.accept())
+  await dialog.getByRole('button', { name: 'Delete Task' }).click()
+
+  await expect(dialog).toHaveAttribute('data-state', 'closed')
+  await expect(pastDueList.getByRole('button', { name: 'Edit Clean the gutters' })).toHaveCount(0)
+  await expect.poll(() => page.evaluate(() => {
+    const calls = (window as unknown as { __mockHass: { calls: Array<Record<string, unknown>> } }).__mockHass.calls
+    return calls.some((call) => call.domain === 'todo' && call.service === 'remove_item')
+  })).toBe(true)
 })
 
 test('groceries page opens a shopping-list add item modal', async ({ page }) => {

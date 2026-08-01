@@ -265,6 +265,16 @@ export const MODAL_OPENER_INVENTORY: ModalOpenerInventoryItem[] = [
     sourceReference: 'EverShelf row action mapping and source-shaped inventory behavior tests.',
   },
   {
+    id: 'chore-row-edit',
+    label: 'DoneTick chore row edit buttons',
+    instances: 'dynamic',
+    affordance: 'edit-icon',
+    implementation: 'TodoListPanel',
+    behavior: 'Loads the full DoneTick task and opens the shared task sheet in edit mode.',
+    exceptionReason: 'The pencil communicates editing a task while the sibling checkbox remains the completion action.',
+    sourceReference: 'Existing Create Task modal, pantry row edit treatment, and live DoneTick todo UID mapping.',
+  },
+  {
     id: 'native-date-time-controls',
     label: 'Native date and time picker controls',
     instances: 'dynamic',

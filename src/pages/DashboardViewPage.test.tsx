@@ -9,7 +9,7 @@ import { VACUUM_MODAL_STYLE } from '../components/hass/vacuumModalStyle'
 import { DashboardViewPage } from './DashboardViewPage'
 import { CONTACT_GROUPS } from '../constants/atAGlance'
 import { ROOM_PAGE_CONFIGS, ROOM_PAGE_ORDER } from '../constants/roomPages'
-import { entity, mockCallServiceCalls, mockEntities, mockFreeSleepScheduleAttributes, mockState, mockTodoItemsByEntity, resetMockHass } from '../test/mocks/hakitCoreState'
+import { entity, mockCallServiceCalls, mockDonetickTasksById, mockEntities, mockFreeSleepScheduleAttributes, mockState, mockTodoItemsByEntity, resetMockHass } from '../test/mocks/hakitCoreState'
 
 type MockDecodeCallback = (
   result: { getText: () => string } | undefined,
@@ -4951,13 +4951,13 @@ describe('DashboardViewPage', () => {
     render(<DashboardViewPage activePath="chores" onNavigate={() => undefined} path="chores" />)
 
     const eveningList = await screen.findByLabelText('Evening Tasks todo list')
-    fireEvent.click(within(eveningList).getByRole('button', { name: /Mock task one/i }))
+    fireEvent.click(within(eveningList).getByRole('button', { name: /Mock task one/i, pressed: false }))
 
     expect(mockCallServiceCalls).toContainEqual({
       domain: 'todo',
       service: 'update_item',
       target: 'todo.steph_s_evening_with_unassigned',
-      serviceData: { item: 'todo.steph_s_evening_with_unassigned-1', status: 'completed' },
+      serviceData: { item: '1001--2026-06-04 17:30:00+00:00', status: 'completed' },
     })
   })
 
@@ -5199,6 +5199,75 @@ describe('DashboardViewPage', () => {
       },
     ]))
     await waitFor(() => expect(screen.getByRole('dialog')).toHaveAttribute('data-state', 'closed'))
+  })
+
+  it('opens a chore row in the prefilled edit modal and saves through DoneTick', async () => {
+    for (const entityId of [
+      'todo.stephen_s_past_due_with_unassigned',
+      'todo.stephen_s_evening_with_unassigned',
+      'todo.stephen_s_afternoon_with_unassigned',
+      'todo.stephen_s_morning_with_unassigned',
+      'todo.stephen_s_all_day_with_unassigned',
+      'todo.stephen_s_no_due_date_with_unassigned',
+      'todo.stephen_s_upcoming_today_by_time_and_future_with_unassigned',
+    ]) {
+      mockTodoItemsByEntity[entityId] = []
+      mockEntities[entityId].state = '0'
+    }
+    mockTodoItemsByEntity['todo.stephen_s_past_due_with_unassigned'] = [
+      { uid: '240--None', summary: 'Clean the gutters', status: 'needs_action' },
+    ]
+    mockEntities['todo.stephen_s_past_due_with_unassigned'].state = '1'
+    mockDonetickTasksById[240] = {
+      assignees: [1],
+      assigned_to: 1,
+      description: 'Use the tall ladder',
+      frequency: 1,
+      frequency_metadata: {},
+      frequency_type: 'once',
+      hide_on_vacation: true,
+      id: 240,
+      name: 'Clean the gutters',
+      next_due_date: null,
+      priority: 2,
+    }
+
+    render(<DashboardViewPage activePath="chores" onNavigate={() => undefined} path="chores" />)
+
+    const pastDueList = await screen.findByLabelText('Past Due todo list')
+    fireEvent.click(within(pastDueList).getByRole('button', { name: 'Edit Clean the gutters' }))
+
+    const dialog = await screen.findByRole('dialog', { name: 'Edit Task' })
+    await waitFor(() => expect(within(dialog).getByLabelText('Task Name')).toHaveValue('Clean the gutters'))
+    expect(within(dialog).getByLabelText('Assignee')).toHaveValue('1')
+    expect(within(dialog).getByLabelText('Description')).toHaveValue('Use the tall ladder')
+    expect(within(dialog).getByRole('button', { name: 'Delete Task' })).toBeInTheDocument()
+
+    fireEvent.change(within(dialog).getByLabelText('Task Name'), { target: { value: 'Clean and inspect the gutters' } })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Save Task' }))
+
+    await waitFor(() => expect(mockCallServiceCalls.at(-1)).toMatchObject({
+      domain: 'donetick',
+      service: 'update_task_form',
+      serviceData: {
+        config_entry_id: 'todo.stephen_s_past_due_with_unassigned',
+        name: 'Clean and inspect the gutters',
+        task_id: 240,
+      },
+    }))
+    await waitFor(() => expect(dialog).toHaveAttribute('data-state', 'closed'))
+  })
+
+  it('does not add DoneTick edit buttons to Home Assistant todo lists', async () => {
+    mockTodoItemsByEntity['todo.shopping_list'] = [
+      { uid: 'shopping-1', summary: 'Milk', status: 'needs_action' },
+    ]
+    mockEntities['todo.shopping_list'].state = '1'
+
+    render(<DashboardViewPage activePath="groceries" onNavigate={() => undefined} path="groceries" />)
+
+    expect(await screen.findByRole('button', { name: 'Milk' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Edit Milk' })).not.toBeInTheDocument()
   })
 
   it('only shows recurrence days for the specific days recurrence option', async () => {

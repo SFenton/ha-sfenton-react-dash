@@ -66,6 +66,7 @@ export interface TodoPageConfig {
   hiddenByVacation?: boolean
   hideListHeaders?: boolean
   showEmptyStateWhenEmpty?: boolean
+  taskSource?: 'donetick'
 }
 
 export interface VacationChecklistItemConfig {
@@ -340,6 +341,7 @@ export const TODO_PAGES: Record<string, TodoPageConfig> = {
     emptyTitle: 'No Chores Due',
     emptyDescription: 'You have no chores due- nice job!',
     hiddenByVacation: true,
+    taskSource: 'donetick',
     lists: [
       { title: 'Past Due', entityId: 'todo.stephen_s_past_due_with_unassigned', hideCompleted: true, hideWhenNoOpenItems: true, userIds: [CHORE_USER_IDS.stephen] },
       { title: 'Evening Tasks', entityId: 'todo.stephen_s_evening_with_unassigned', hideCompleted: true, hideWhenNoOpenItems: true, userIds: [CHORE_USER_IDS.stephen] },
@@ -375,6 +377,7 @@ export const TODO_PAGES: Record<string, TodoPageConfig> = {
     emptyTitle: 'No Chores Due',
     emptyDescription: 'Stephen has no chores due- nice job!',
     hiddenByVacation: true,
+    taskSource: 'donetick',
     lists: [
       { title: 'Past Due', entityId: 'todo.stephen_s_past_due', countBucket: 'overdue' },
       { title: 'Due Today', entityId: 'todo.stephen_s_due_today', countBucket: 'upcoming' },
@@ -387,6 +390,7 @@ export const TODO_PAGES: Record<string, TodoPageConfig> = {
     emptyTitle: 'No Chores Due',
     emptyDescription: 'Steph has no chores due- nice job!',
     hiddenByVacation: true,
+    taskSource: 'donetick',
     lists: [
       { title: 'Past Due', entityId: 'todo.steph_s_past_due', countBucket: 'overdue' },
       { title: 'Due Today', entityId: 'todo.steph_s_due_today', countBucket: 'upcoming' },
@@ -399,6 +403,7 @@ export const TODO_PAGES: Record<string, TodoPageConfig> = {
     emptyTitle: 'No Chores Due',
     emptyDescription: 'There are no unassigned chores due- nice job!',
     hiddenByVacation: true,
+    taskSource: 'donetick',
     lists: [
       { title: 'Past Due', entityId: 'todo.unassigned_past_due', countBucket: 'overdue' },
       { title: 'Due Today', entityId: 'todo.unassigned_due_today', countBucket: 'upcoming' },
@@ -411,6 +416,7 @@ export const TODO_PAGES: Record<string, TodoPageConfig> = {
     emptyTitle: 'No Tasks Due',
     emptyDescription: 'There are no home improvement tasks due- nice job!',
     hiddenByVacation: true,
+    taskSource: 'donetick',
     lists: [
       { title: 'Past Due', entityId: 'todo.home_improvement_s_past_due', countBucket: 'overdue' },
       { title: 'Due Today', entityId: 'todo.home_improvement_s_due_today', countBucket: 'upcoming' },

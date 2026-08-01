@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useEntity, useHass } from '@hakit/core'
 import { CheckboxRow } from '../core/CheckboxRow'
+import { MaterialIcon } from '../core/Icon'
 import { useTodoOptimisticStatuses, type TodoOptimisticStatuses } from '../../hooks/useTodoOptimisticStatuses'
+import { donetickTaskIdFromUid, type DonetickTaskEditTarget } from './donetickTaskForm'
 import { asEntityName } from './entityState'
 import styles from './TodoListPanel.module.css'
 
@@ -19,8 +21,10 @@ interface TodoListPanelProps {
   completionScript?: string
   entityId: string
   hideCompleted?: boolean
+  onEditTask?: (target: DonetickTaskEditTarget) => void
   onVisibleItemsChange?: (count: number) => void
   optimisticStatuses?: TodoOptimisticStatuses
+  reloadVersion?: number
   rowVariant?: 'settings'
   title: string
 }
@@ -95,7 +99,7 @@ function applyPendingTodoStatuses(items: TodoItem[], pendingStatuses: TodoOptimi
   })
 }
 
-export function TodoListPanel({ completionScript, entityId, hideCompleted = true, onVisibleItemsChange, optimisticStatuses, rowVariant, title }: TodoListPanelProps) {
+export function TodoListPanel({ completionScript, entityId, hideCompleted = true, onEditTask, onVisibleItemsChange, optimisticStatuses, reloadVersion = 0, rowVariant, title }: TodoListPanelProps) {
   const entity = useEntity(asEntityName(entityId), { returnNullIfNotFound: true })
   const connection = useHass((state) => state.connection) as unknown as HassConnection | undefined
   const callService = useHass((state) => state.helpers.callService) as unknown as CallService
@@ -138,7 +142,7 @@ export function TodoListPanel({ completionScript, entityId, hideCompleted = true
     return () => {
       cancelled = true
     }
-  }, [connection, entityId, entityLastChanged, entityLastUpdated, entityState])
+  }, [connection, entityId, entityLastChanged, entityLastUpdated, entityState, reloadVersion])
 
   useEffect(() => {
     if (!items) return
@@ -193,18 +197,35 @@ export function TodoListPanel({ completionScript, entityId, hideCompleted = true
             const due = relativeDueInfo(todoDue(item))
             const titleText = compactText(item.summary) ?? 'Untitled task'
             const subtitle = todoSubtitle(item, due)
+            const taskId = donetickTaskIdFromUid(item.uid)
+            const editTarget = onEditTask && taskId && item.uid
+              ? { itemUid: item.uid, taskId, todoEntityId: entityId }
+              : null
             return (
               <li className={styles.item} key={item.uid ?? `${entityId}-${index}`}>
-                <CheckboxRow
-                  active={item.status === 'completed'}
-                  alignWrappedToIconTop={rowVariant === 'settings'}
-                  aria-label={subtitle ? `${titleText} ${subtitle}` : titleText}
-                  className={styles.itemButton}
-                  data-due-tone={due?.tone}
-                  onClick={() => toggleItem(item)}
-                  subtitle={subtitle}
-                  title={titleText}
-                />
+                <div aria-label={`${titleText} task`} className={styles.itemRow} data-editable={editTarget ? 'true' : 'false'} role="group">
+                  <CheckboxRow
+                    active={item.status === 'completed'}
+                    alignWrappedToIconTop={rowVariant === 'settings'}
+                    aria-label={subtitle ? `${titleText} ${subtitle}` : titleText}
+                    className={styles.itemButton}
+                    data-due-tone={due?.tone}
+                    onClick={() => toggleItem(item)}
+                    subtitle={subtitle}
+                    title={titleText}
+                  />
+                  {editTarget && (
+                    <button
+                      aria-label={`Edit ${titleText}`}
+                      className={styles.editAction}
+                      data-modal-opener-exception="edit-action"
+                      onClick={() => onEditTask?.(editTarget)}
+                      type="button"
+                    >
+                      <MaterialIcon name="mdi:pencil" size={22} />
+                    </button>
+                  )}
+                </div>
               </li>
             )
           })}

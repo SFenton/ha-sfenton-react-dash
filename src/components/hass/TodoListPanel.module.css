@@ -70,6 +70,45 @@
   min-width: 0;
 }
 
+.itemRow {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: center;
+}
+
+.itemRow[data-editable='true'] {
+  grid-template-columns: minmax(0, 1fr) 44px;
+  gap: 4px;
+}
+
+.itemButton {
+  min-width: 0;
+}
+
+.editAction {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  border: 0;
+  border-radius: 999px;
+  padding: 0;
+  color: rgba(255, 255, 255, 0.72);
+  background: transparent;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.editAction:focus {
+  outline: none;
+}
+
+.editAction:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.58);
+  outline-offset: 1px;
+}
+
 .panel[data-row-variant='settings'] .itemButton {
   min-height: 72px;
   grid-template-columns: 40px minmax(0, 1fr);
@@ -104,4 +143,10 @@
 
 .itemButton[data-due-tone='overdue-long'] small {
   color: #ff6b6b;
+}
+
+@media (hover: none), (pointer: coarse) {
+  .editAction:focus-visible {
+    outline: none;
+  }
 }
