@@ -29,6 +29,7 @@ export const mockCallServiceCalls: Record<string, unknown>[] = []
 export const mockTodoUpdateMessages: Record<string, unknown>[] = []
 export const mockTodoItemsByEntity: Record<string, MockTodoItem[] | undefined> = {}
 export const mockDonetickTasksById: Record<number, MockDonetickTask | undefined> = {}
+let mockDonetickTaskLoadDelayMs = 0
 
 const mockDailyWeatherForecast = [
   { datetime: '2026-06-10T07:00:00+00:00', condition: 'sunny', temperature: 65, templow: 48, precipitation_probability: 0, precipitation: 0, humidity: 74, dew_point: 48, cloud_coverage: 57, wind_speed: 3.56, wind_gust_speed: 7.97, wind_bearing: 185, uv_index: 6.7 },
@@ -280,6 +281,7 @@ type MockHassDebugApi = {
   setEntityAttribute: (entityId: string, attribute: string, value: unknown) => void
   setEntityState: (entityId: string, state: string) => void
   setDonetickTask: (taskId: number, task: MockDonetickTask) => void
+  setDonetickTaskLoadDelay: (delayMs: number) => void
   setTodoItems: (entityId: string, items: MockTodoItem[]) => void
 }
 
@@ -299,6 +301,9 @@ function exposeMockHassDebugApi() {
     },
     setDonetickTask: (taskId, task) => {
       mockDonetickTasksById[taskId] = task
+    },
+    setDonetickTaskLoadDelay: (delayMs) => {
+      mockDonetickTaskLoadDelayMs = Math.max(0, delayMs)
     },
     setTodoItems: (entityId, items) => {
       mockTodoItemsByEntity[entityId] = items
@@ -820,6 +825,7 @@ export function resetMockHass() {
   mockTodoUpdateMessages.length = 0
   for (const entityId of Object.keys(mockTodoItemsByEntity)) delete mockTodoItemsByEntity[entityId]
   for (const taskId of Object.keys(mockDonetickTasksById)) delete mockDonetickTasksById[Number(taskId)]
+  mockDonetickTaskLoadDelayMs = 0
   mockState.user = { id: '64089b5683944c39b4f944c8f76830b0', name: 'Stephen' }
   mockEntities['sensor.nightcanvasrestful_schedules'].attributes = mockFreeSleepScheduleAttributes()
   mockEntities['sensor.sleepypod_stephen_schedule_phase'].state = 'outside'
@@ -909,7 +915,10 @@ export const mockState: MockHassState = {
           next_due_date: taskId === 1001 ? '2026-06-04T17:30:00+00:00' : null,
           priority: 4,
         }
-        return Promise.resolve({ response: mockDonetickTasksById[taskId] ?? defaultTask })
+        const response = { response: mockDonetickTasksById[taskId] ?? defaultTask }
+        return mockDonetickTaskLoadDelayMs > 0
+          ? new Promise((resolve) => window.setTimeout(() => resolve(response), mockDonetickTaskLoadDelayMs))
+          : Promise.resolve(response)
       }
       if (params.domain === 'evershelf' && params.service === 'resolve_barcode' && params.returnResponse === true) {
         const barcode = (params.serviceData as { barcode?: string } | undefined)?.barcode

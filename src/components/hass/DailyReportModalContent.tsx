@@ -3,7 +3,7 @@ import { CountBadge } from '../core/CountBadge'
 import { EmptyState } from '../core/EmptyState'
 import { GlassTile } from '../core/GlassTile'
 import { MaterialIcon } from '../core/Icon'
-import { EverShelfInventoryPanel } from './EverShelfInventoryPanel'
+import { EverShelfInventoryPanel, type EverShelfInventoryDetailsTarget } from './EverShelfInventoryPanel'
 import { useEverShelfInventoryControls } from './EverShelfInventoryControls'
 import { TodoListPanel } from './TodoListPanel'
 import { DAILY_REPORT_EXPIRED_FOOD_SCOPE, dailyReportExpiredFoodControls, useExpiredFoodCount, type DailyReportContext } from './dailyReportModal'
@@ -64,7 +64,7 @@ function DailyReportTodoTab({ emptyDescription, emptyTitle, entityId, onEditTask
   )
 }
 
-function DailyReportExpiredFoodTab({ vacationMode }: { vacationMode: boolean }) {
+function DailyReportExpiredFoodTab({ onOpenDetails, vacationMode }: { onOpenDetails: (target: EverShelfInventoryDetailsTarget) => void; vacationMode: boolean }) {
   const controls = useEverShelfInventoryControls(DAILY_REPORT_EXPIRED_FOOD_SCOPE)
   const lockedControls = useMemo(() => dailyReportExpiredFoodControls(controls), [controls])
   const expiredCount = useExpiredFoodCount()
@@ -89,7 +89,7 @@ function DailyReportExpiredFoodTab({ vacationMode }: { vacationMode: boolean }) 
 
   return (
     <section aria-label="Expired Food" className={styles.tabSection}>
-      <EverShelfInventoryPanel controls={lockedControls} location="all" title="Expired Food" />
+      <EverShelfInventoryPanel controls={lockedControls} location="all" onOpenDetails={onOpenDetails} title="Expired Food" />
     </section>
   )
 }
@@ -113,7 +113,7 @@ function DailyReportUserPicker() {
   )
 }
 
-export function DailyReportModalContent({ activeTab, context, onEditTask, reloadVersion }: { activeTab: DailyReportTab; context: DailyReportContext; onEditTask: (target: DonetickTaskEditTarget) => void; reloadVersion: number }) {
+export function DailyReportModalContent({ activeTab, context, onEditTask, onOpenInventoryDetails, reloadVersion }: { activeTab: DailyReportTab; context: DailyReportContext; onEditTask: (target: DonetickTaskEditTarget) => void; onOpenInventoryDetails: (target: EverShelfInventoryDetailsTarget) => void; reloadVersion: number }) {
   const { user, vacationMode } = context
   const { displayedTab, transitionState } = useSmoothDisplayedModalTab(activeTab)
 
@@ -123,7 +123,7 @@ export function DailyReportModalContent({ activeTab, context, onEditTask, reload
     <div className={styles.panel} data-modal-tab-transition-state={transitionState} data-tab={displayedTab}>
       {displayedTab === 'overdue' && <DailyReportTodoTab emptyDescription="You are all caught up on chores that slipped past their due date." emptyTitle="No Chores Due" entityId={user.todoEntityIds.overdue} onEditTask={onEditTask} reloadVersion={reloadVersion} title="Overdue Chores" vacationMode={vacationMode} />}
       {displayedTab === 'upcoming' && <DailyReportTodoTab emptyDescription="There is nothing else on your schedule for the rest of today." emptyTitle="No Chores Upcoming" entityId={user.todoEntityIds.upcoming} onEditTask={onEditTask} reloadVersion={reloadVersion} title="Upcoming Chores" vacationMode={vacationMode} />}
-      {displayedTab === 'expired-food' && <DailyReportExpiredFoodTab vacationMode={vacationMode} />}
+      {displayedTab === 'expired-food' && <DailyReportExpiredFoodTab onOpenDetails={onOpenInventoryDetails} vacationMode={vacationMode} />}
     </div>
   )
 }

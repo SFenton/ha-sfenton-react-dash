@@ -2606,10 +2606,33 @@ test('daily summary deep link opens the tabbed modal for the requested user', as
   await expect(dialog.getByRole('region', { name: 'Overdue Chores' })).toBeVisible()
   await expect(dialog.getByRole('button', { name: 'Edit Mock task one' })).toBeVisible()
 
+  await page.evaluate(() => {
+    const mock = (window as unknown as { __mockHass: { setDonetickTaskLoadDelay: (delayMs: number) => void } }).__mockHass
+    mock.setDonetickTaskLoadDelay(800)
+  })
   await dialog.getByRole('button', { name: 'Edit Mock task one' }).click()
   const editPage = page.getByRole('dialog', { name: 'Edit Task' })
   await expect(editPage).toBeVisible()
   await expect(page.getByRole('dialog')).toHaveCount(1)
+  const loadingTask = editPage.getByRole('status', { name: 'Loading task' })
+  await expect(loadingTask).toBeVisible()
+  const loadingAlignment = await loadingTask.evaluate((element) => {
+    const body = element.closest('[data-modal-sheet-body="true"]')
+    const spinner = element.querySelector('span')
+    if (!(body instanceof HTMLElement) || !(spinner instanceof HTMLElement)) return null
+    const bodyBox = body.getBoundingClientRect()
+    const spinnerBox = spinner.getBoundingClientRect()
+    const bodyStyle = window.getComputedStyle(body)
+    const paddingTop = Number.parseFloat(bodyStyle.paddingTop) || 0
+    const paddingBottom = Number.parseFloat(bodyStyle.paddingBottom) || 0
+    const expectedCenter = bodyBox.top + paddingTop + (bodyBox.height - paddingTop - paddingBottom) / 2
+    return {
+      actualCenter: spinnerBox.top + spinnerBox.height / 2,
+      expectedCenter,
+    }
+  })
+  expect(loadingAlignment).not.toBeNull()
+  expect(Math.abs((loadingAlignment?.actualCenter ?? 0) - (loadingAlignment?.expectedCenter ?? 0))).toBeLessThanOrEqual(2)
   await expect(editPage.getByLabel('Task Name')).toHaveValue('Mock task one')
   await expect(editPage.getByRole('button', { name: 'Back to daily summary' })).toBeVisible()
   await expect(editPage.getByRole('navigation', { name: 'Daily report sections' })).toHaveCount(0)
@@ -2633,6 +2656,18 @@ test('daily summary deep link opens the tabbed modal for the requested user', as
   await expect(expiredRow).toBeVisible()
   await expect(expiredRow.getByRole('button', { name: /^Edit / })).toBeVisible()
   await expect(expiredRow.getByRole('button', { name: /^Delete / })).toBeVisible()
+
+  await expiredRow.getByRole('button', { name: 'Edit Milk' }).click()
+  const inventoryPage = page.getByRole('dialog', { name: 'Milk' })
+  await expect(inventoryPage).toBeVisible()
+  await expect(page.getByRole('dialog')).toHaveCount(1)
+  await expect(inventoryPage.getByRole('button', { name: 'Back to expired food' })).toBeVisible()
+  await expect(inventoryPage.getByRole('button', { name: 'Delete Milk' })).toBeVisible()
+  await expect(inventoryPage.getByRole('navigation', { name: 'Daily report sections' })).toHaveCount(0)
+
+  await inventoryPage.getByRole('button', { name: 'Back to expired food' }).click()
+  await expect(dialog).toBeVisible()
+  await expect(dialog.getByLabel('Expired Food inventory list')).toBeVisible()
 })
 
 test('daily summary deep link titles the modal for the other household user', async ({ page }) => {

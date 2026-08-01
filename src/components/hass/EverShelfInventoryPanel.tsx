@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type KeyboardEvent, type MouseEvent, type PointerEvent, type TouchEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type KeyboardEvent, type MouseEvent, type PointerEvent, type ReactNode, type TouchEvent } from 'react'
 import { flushSync } from 'react-dom'
 import { useHass } from '@hakit/core'
 import { EmptyState } from '../core/EmptyState'
@@ -22,10 +22,11 @@ export type EverShelfInventoryLocation = 'all' | 'dispensa' | 'frigo' | 'freezer
 interface EverShelfInventoryPanelProps {
   controls: EverShelfInventoryControls
   location: EverShelfInventoryLocation
+  onOpenDetails?: (target: EverShelfInventoryDetailsTarget) => void
   title: string
 }
 
-interface EverShelfInventoryItem {
+export interface EverShelfInventoryItem {
   expiration_date?: string | null
   expiry_date?: string | null
   expires_at?: string | null
@@ -46,8 +47,13 @@ interface EverShelfInventoryResponse {
   source?: string
 }
 
-type EverShelfInventoryDisplayItem = EverShelfInventoryItem & {
+export type EverShelfInventoryDisplayItem = EverShelfInventoryItem & {
   groupedItems?: EverShelfInventoryItem[]
+}
+
+export interface EverShelfInventoryDetailsTarget {
+  item: EverShelfInventoryDisplayItem
+  locationLabel: string
 }
 
 type CallService = (params: Record<string, unknown>) => Promise<unknown> | unknown
@@ -662,7 +668,7 @@ function PantryRow({ expiry, extraBatchCount, locationLabel, multiItem, onDelete
 type InventoryBatchRow = { inventoryId: number; quantity: number }
 type InventoryDeleteStep = { inventoryId: number; quantity?: number }
 
-type InventoryBatch = {
+export type InventoryBatch = {
   addressable: boolean
   expiryDate: string
   key: string
@@ -671,6 +677,23 @@ type InventoryBatch = {
   quantity: number
   rows: InventoryBatchRow[]
   sample: EverShelfInventoryItem
+}
+
+export interface EverShelfInventoryDetailsController {
+  batches: InventoryBatch[]
+  busy: boolean
+  busyAction: string | null
+  deleteBatch: (batch: InventoryBatch) => void
+  error: string | null
+  expiryDrafts: Record<string, string>
+  multipleBatches: boolean
+  quantityDrafts: Record<string, number>
+  resetDraft: (batch: InventoryBatch) => void
+  saveBatch: (batch: InventoryBatch) => void
+  setExpiryDraft: (batchKey: string, value: string) => void
+  setQuantityDraft: (batchKey: string, value: number) => void
+  title: string
+  togglePreparedFood: (batch: InventoryBatch) => void
 }
 
 function inventoryBatchRows(item: EverShelfInventoryDisplayItem | null) {
@@ -748,7 +771,7 @@ function inventoryDecreaseSteps(rows: InventoryBatchRow[], amount: number) {
   return { remainingRows, steps }
 }
 
-function InventoryItemDetailsModal({ item, locationLabel, onClose, onInventoryChanged, open }: { item: EverShelfInventoryDisplayItem | null; locationLabel: string; onClose: () => void; onInventoryChanged: () => void; open: boolean }) {
+function useInventoryItemDetails({ active, item, locationLabel, onBusyChange, onComplete, onErrorChange, onInventoryChanged }: { active: boolean; item: EverShelfInventoryDisplayItem | null; locationLabel: string; onBusyChange?: (busy: boolean) => void; onComplete: () => void; onErrorChange?: (error: string | null) => void; onInventoryChanged: () => void }): EverShelfInventoryDetailsController {
   const callService = useHass((state) => state.helpers.callService) as unknown as CallService
   const [busyAction, setBusyAction] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -757,14 +780,18 @@ function InventoryItemDetailsModal({ item, locationLabel, onClose, onInventoryCh
   const multipleBatches = batches.length > 1
   const [expiryDrafts, setExpiryDrafts] = useState<Record<string, string>>({})
   const [quantityDrafts, setQuantityDrafts] = useState<Record<string, number>>({})
+  const updateError = (nextError: string | null) => {
+    setError(nextError)
+    onErrorChange?.(nextError)
+  }
 
   // Reopening the same item keeps this component mounted, so every batch draft and the busy/error
   // state is rebuilt from the latest Home Assistant data whenever the sheet opens.
-  const draftKey = open ? `${itemInstancesKey(item)}|${batches.map((batch) => `${batch.key}:${batch.quantity}`).join('|')}` : 'closed'
+  const draftKey = active ? `${itemInstancesKey(item)}|${batches.map((batch) => `${batch.key}:${batch.quantity}`).join('|')}` : 'closed'
   const [appliedDraftKey, setAppliedDraftKey] = useState(draftKey)
   if (appliedDraftKey !== draftKey) {
     setAppliedDraftKey(draftKey)
-    if (open) {
+    if (active) {
       setBusyAction(null)
       setError(null)
       setExpiryDrafts(Object.fromEntries(batches.map((batch) => [batch.key, batch.expiryDate])))
@@ -776,13 +803,13 @@ function InventoryItemDetailsModal({ item, locationLabel, onClose, onInventoryCh
 
   const finishAction = () => {
     onInventoryChanged()
-    onClose()
+    onComplete()
   }
 
   const resetDraft = (batch: InventoryBatch) => {
     setExpiryDrafts((current) => ({ ...current, [batch.key]: batch.expiryDate }))
     setQuantityDrafts((current) => ({ ...current, [batch.key]: batch.quantity }))
-    setError(null)
+    updateError(null)
   }
 
   const deleteInventoryRow = (step: InventoryDeleteStep) => Promise.resolve(callService({
@@ -827,24 +854,26 @@ function InventoryItemDetailsModal({ item, locationLabel, onClose, onInventoryCh
     if (!batch.addressable) return
     const expiryDraft = expiryDrafts[batch.key] ?? batch.expiryDate
     if (!validExpiryInput(expiryDraft)) {
-      setError('Use YYYY-MM-DD or clear the date.')
+      updateError('Use YYYY-MM-DD or clear the date.')
       return
     }
     const quantityDelta = (quantityDrafts[batch.key] ?? batch.quantity) - batch.quantity
     const expiryChanged = expiryDraft !== batch.expiryDate
     if (quantityDelta === 0 && !expiryChanged) return
     if (quantityDelta > 0 && itemLocation(batch.sample) === null) {
-      setError(`Home Assistant did not report a storage location for ${title}, so more cannot be added.`)
+      updateError(`Home Assistant did not report a storage location for ${title}, so more cannot be added.`)
       return
     }
     setBusyAction(`edit-${batch.key}`)
-    setError(null)
+    onBusyChange?.(true)
+    updateError(null)
     void applyInventoryChanges(batch, quantityDelta, expiryChanged, expiryDraft.trim())
       .then(finishAction)
       .catch((caughtError: unknown) => {
         setBusyAction(null)
-        setError(caughtError instanceof Error ? caughtError.message : 'Unable to update item')
+        updateError(caughtError instanceof Error ? caughtError.message : 'Unable to update item')
       })
+      .finally(() => onBusyChange?.(false))
   }
 
   // Home Assistant owns the split: EverShelf moves the chosen number of units onto their own
@@ -858,14 +887,15 @@ function InventoryItemDetailsModal({ item, locationLabel, onClose, onInventoryCh
       const promptResult = promptPreparedQuantity(`${title}${qualifier}`, batch.quantity, nextPrepared)
       if (promptResult.status === 'cancelled') return
       if (promptResult.status === 'invalid') {
-        setError(`Enter a number from 1 to ${formatQuantity(batch.quantity)}.`)
+        updateError(`Enter a number from 1 to ${formatQuantity(batch.quantity)}.`)
         return
       }
       quantity = promptResult.quantity
     }
 
     setBusyAction(`prepared-${batch.key}`)
-    setError(null)
+    onBusyChange?.(true)
+    updateError(null)
     const steps = inventoryPreparedSteps(batch.rows, quantity)
     void steps
       .reduce(
@@ -879,8 +909,9 @@ function InventoryItemDetailsModal({ item, locationLabel, onClose, onInventoryCh
       .then(finishAction)
       .catch((caughtError: unknown) => {
         setBusyAction(null)
-        setError(caughtError instanceof Error ? caughtError.message : 'Unable to update prepared food')
+        updateError(caughtError instanceof Error ? caughtError.message : 'Unable to update prepared food')
       })
+      .finally(() => onBusyChange?.(false))
   }
 
   const deleteBatch = (batch: InventoryBatch) => {    if (!batch.addressable) return
@@ -890,83 +921,150 @@ function InventoryItemDetailsModal({ item, locationLabel, onClose, onInventoryCh
       const promptResult = promptDeleteQuantity(`${title}${qualifier}`, batch.quantity)
       if (promptResult.status === 'cancelled') return
       if (promptResult.status === 'invalid') {
-        setError(`Enter a number from 1 to ${formatQuantity(batch.quantity)}.`)
+        updateError(`Enter a number from 1 to ${formatQuantity(batch.quantity)}.`)
         return
       }
       if (promptResult.quantity < batch.quantity) deleteSteps = inventoryDecreaseSteps(batch.rows, promptResult.quantity).steps
     } else if (!window.confirm(`Delete ${title}${qualifier} from the ${batch.locationLabel}?`)) return
 
     setBusyAction(`delete-${batch.key}`)
-    setError(null)
+    onBusyChange?.(true)
+    updateError(null)
     void runDeleteSteps(deleteSteps)
       .then(finishAction)
       .catch((caughtError: unknown) => {
         setBusyAction(null)
-        setError(caughtError instanceof Error ? caughtError.message : 'Unable to delete item')
+        updateError(caughtError instanceof Error ? caughtError.message : 'Unable to delete item')
       })
+      .finally(() => onBusyChange?.(false))
   }
 
+  return {
+    batches,
+    busy,
+    busyAction,
+    deleteBatch,
+    error,
+    expiryDrafts,
+    multipleBatches,
+    quantityDrafts,
+    resetDraft,
+    saveBatch,
+    setExpiryDraft: (batchKey, value) => setExpiryDrafts((current) => ({ ...current, [batchKey]: value })),
+    setQuantityDraft: (batchKey, value) => setQuantityDrafts((current) => ({ ...current, [batchKey]: value })),
+    title,
+    togglePreparedFood,
+  }
+}
+
+export function EverShelfInventoryDetailsPage({ controller }: { controller: EverShelfInventoryDetailsController }) {
+  const {
+    batches,
+    busy,
+    busyAction,
+    deleteBatch,
+    error,
+    expiryDrafts,
+    multipleBatches,
+    quantityDrafts,
+    resetDraft,
+    saveBatch,
+    setExpiryDraft,
+    setQuantityDraft,
+    title,
+    togglePreparedFood,
+  } = controller
+
   return (
-    <ModalSheet onClose={onClose} open={open && item !== null} title={title}>
-      <div className={styles.instancesSheet}>
-        {error && <p className={styles.error} role="alert">{error}</p>}
-        <ul className={styles.instancesList}>
-          {batches.map((batch) => {
-            const qualifier = batchQualifier(batch.expiryDate, multipleBatches, batch.preparedFood)
-            const expiryDraft = expiryDrafts[batch.key] ?? batch.expiryDate
-            const quantityDraft = quantityDrafts[batch.key] ?? batch.quantity
-            const quantityDelta = quantityDraft - batch.quantity
-            const expiryChanged = expiryDraft !== batch.expiryDate
-            const disabled = busy || !batch.addressable
-            return (
-              <li className={styles.instanceRow} key={batch.key}>
-                <div className={styles.instanceHeader}>
-                  <span className={styles.instanceCopy}>
-                    <strong>{multipleBatches ? expiryInfo(batch.expiryDate || undefined).label : title}</strong>
-                    <small>{batch.preparedFood ? `In the ${batch.locationLabel} · Prepared` : `In the ${batch.locationLabel}`}</small>
+    <div className={styles.instancesSheet}>
+      {error && <p className={styles.error} role="alert">{error}</p>}
+      <ul className={styles.instancesList}>
+        {batches.map((batch) => {
+          const qualifier = batchQualifier(batch.expiryDate, multipleBatches, batch.preparedFood)
+          const expiryDraft = expiryDrafts[batch.key] ?? batch.expiryDate
+          const quantityDraft = quantityDrafts[batch.key] ?? batch.quantity
+          const quantityDelta = quantityDraft - batch.quantity
+          const expiryChanged = expiryDraft !== batch.expiryDate
+          const disabled = busy || !batch.addressable
+          return (
+            <li className={styles.instanceRow} key={batch.key}>
+              <div className={styles.instanceHeader}>
+                <span className={styles.instanceCopy}>
+                  <strong>{multipleBatches ? expiryInfo(batch.expiryDate || undefined).label : title}</strong>
+                  <small>{batch.preparedFood ? `In the ${batch.locationLabel} · Prepared` : `In the ${batch.locationLabel}`}</small>
+                </span>
+                <button aria-busy={busyAction === `delete-${batch.key}` ? 'true' : undefined} aria-label={`Delete ${title}${qualifier}`} className={`${styles.rowAction} ${styles.deleteAction}`} disabled={disabled} onClick={() => deleteBatch(batch)} type="button">
+                  <MaterialIcon name="mdi:delete" size={22} />
+                </button>
+              </div>
+              <div className={styles.instanceEditPanel}>
+                <NumberStepper
+                  ariaLabel={`Quantity for ${title}${qualifier}`}
+                  decrementLabel={`Remove one ${title}${qualifier}`}
+                  disabled={disabled}
+                  formatValue={formatQuantity}
+                  incrementLabel={`Add one ${title}${qualifier}`}
+                  label="Quantity"
+                  max={INVENTORY_QUANTITY_MAX}
+                  min={Math.min(1, batch.quantity)}
+                  onChange={(value) => setQuantityDraft(batch.key, value)}
+                  value={quantityDraft}
+                />
+                <NativePickerField ariaLabel={`Expiration date for ${title}${qualifier}`} className={styles.instanceDateField} emptyLabel="No expiration date" label="Expiration Date" onChange={(value) => setExpiryDraft(batch.key, value)} type="date" value={expiryDraft} />
+                <CheckboxRow
+                  active={batch.preparedFood}
+                  alignWrappedToIconTop
+                  aria-busy={busyAction === `prepared-${batch.key}` ? 'true' : undefined}
+                  aria-label={`Prepared Food Item for ${title}${qualifier}`}
+                  className={styles.instancePreparedRow}
+                  disabled={disabled}
+                  onClick={() => togglePreparedFood(batch)}
+                  subtitle="Indicates this is a prepared food item and does not need classification."
+                  title="Prepared Food Item"
+                />
+                {quantityDelta !== 0 && <Description className={styles.instanceHint}>{quantityChangeHint(quantityDelta, batch.locationLabel)}</Description>}
+                {(expiryChanged || quantityDelta !== 0) && (
+                  <span className={styles.instanceEditActions}>
+                    <button className={styles.secondaryAction} disabled={busy} onClick={() => resetDraft(batch)} type="button">Reset</button>
+                    <button aria-busy={busyAction === `edit-${batch.key}` ? 'true' : undefined} aria-label={`Save ${title}${qualifier}`} className={styles.primaryAction} disabled={busy} onClick={() => saveBatch(batch)} type="button">Save</button>
                   </span>
-                  <button aria-busy={busyAction === `delete-${batch.key}` ? 'true' : undefined} aria-label={`Delete ${title}${qualifier}`} className={`${styles.rowAction} ${styles.deleteAction}`} disabled={disabled} onClick={() => deleteBatch(batch)} type="button">
-                    <MaterialIcon name="mdi:delete" size={22} />
-                  </button>
-                </div>
-                <div className={styles.instanceEditPanel}>
-                  <NumberStepper
-                    ariaLabel={`Quantity for ${title}${qualifier}`}
-                    decrementLabel={`Remove one ${title}${qualifier}`}
-                    disabled={disabled}
-                    formatValue={formatQuantity}
-                    incrementLabel={`Add one ${title}${qualifier}`}
-                    label="Quantity"
-                    max={INVENTORY_QUANTITY_MAX}
-                    min={Math.min(1, batch.quantity)}
-                    onChange={(value) => setQuantityDrafts((current) => ({ ...current, [batch.key]: value }))}
-                    value={quantityDraft}
-                  />
-                  <NativePickerField ariaLabel={`Expiration date for ${title}${qualifier}`} className={styles.instanceDateField} emptyLabel="No expiration date" label="Expiration Date" onChange={(value) => setExpiryDrafts((current) => ({ ...current, [batch.key]: value }))} type="date" value={expiryDraft} />
-                  <CheckboxRow
-                    active={batch.preparedFood}
-                    alignWrappedToIconTop
-                    aria-busy={busyAction === `prepared-${batch.key}` ? 'true' : undefined}
-                    aria-label={`Prepared Food Item for ${title}${qualifier}`}
-                    className={styles.instancePreparedRow}
-                    disabled={disabled}
-                    onClick={() => togglePreparedFood(batch)}
-                    subtitle="Indicates this is a prepared food item and does not need classification."
-                    title="Prepared Food Item"
-                  />
-                  {quantityDelta !== 0 && <Description className={styles.instanceHint}>{quantityChangeHint(quantityDelta, batch.locationLabel)}</Description>}
-                  {(expiryChanged || quantityDelta !== 0) && (
-                    <span className={styles.instanceEditActions}>
-                      <button className={styles.secondaryAction} disabled={busy} onClick={() => resetDraft(batch)} type="button">Reset</button>
-                      <button aria-busy={busyAction === `edit-${batch.key}` ? 'true' : undefined} aria-label={`Save ${title}${qualifier}`} className={styles.primaryAction} disabled={busy} onClick={() => saveBatch(batch)} type="button">Save</button>
-                    </span>
-                  )}
-                </div>
-              </li>
-            )
-          })}
-        </ul>
-      </div>
+                )}
+              </div>
+            </li>
+          )
+        })}
+      </ul>
+    </div>
+  )
+}
+
+export function EverShelfInventoryDetailsPageHost({ active, children, target, onBusyChange, onComplete, onErrorChange, onInventoryChanged = () => undefined }: { active: boolean; children: (controller: EverShelfInventoryDetailsController) => ReactNode; target: EverShelfInventoryDetailsTarget | null; onBusyChange?: (busy: boolean) => void; onComplete: () => void; onErrorChange?: (error: string | null) => void; onInventoryChanged?: () => void }) {
+  const controller = useInventoryItemDetails({
+    active,
+    item: target?.item ?? null,
+    locationLabel: target?.locationLabel ?? 'inventory',
+    onBusyChange,
+    onComplete,
+    onErrorChange,
+    onInventoryChanged,
+  })
+  return children(controller)
+}
+
+function InventoryItemDetailsModal({ item, locationLabel, onClose, onInventoryChanged, open }: { item: EverShelfInventoryDisplayItem | null; locationLabel: string; onClose: () => void; onInventoryChanged: () => void; open: boolean }) {
+  const controller = useInventoryItemDetails({
+    active: open && item !== null,
+    item,
+    locationLabel,
+    onComplete: onClose,
+    onInventoryChanged,
+  })
+
+  return (
+    <ModalSheet onClose={() => {
+      if (!controller.busy) onClose()
+    }} open={open && item !== null} title={controller.title}>
+      <EverShelfInventoryDetailsPage controller={controller} />
     </ModalSheet>
   )
 }
@@ -1227,7 +1325,7 @@ export function EverShelfInventoryFloatingActions({ controls }: { controls: Ever
   )
 }
 
-export function EverShelfInventoryPanel({ controls, location, title }: EverShelfInventoryPanelProps) {
+export function EverShelfInventoryPanel({ controls, location, onOpenDetails, title }: EverShelfInventoryPanelProps) {
   const callService = useHass((state) => state.helpers.callService) as unknown as CallService
   const { inventoryLoadPhase, setInventoryItemCount, setInventoryLoadPhase } = controls
   const [detailsItem, setDetailsItem] = useState<EverShelfInventoryDisplayItem | null>(null)
@@ -1430,6 +1528,14 @@ export function EverShelfInventoryPanel({ controls, location, title }: EverShelf
   const searchInputPending = controls.searchQuery.trim() !== controls.debouncedSearchQuery.trim()
   const searchResultPending = items !== null && effectiveSearchQuery !== settledSearchQuery
   const searchLoading = searchLoadPhase !== 'idle' || searchInputPending || searchResultPending
+  const openItemDetails = (item: EverShelfInventoryDisplayItem) => {
+    if (onOpenDetails) {
+      onOpenDetails({ item, locationLabel: LOCATION_DELETE_LABELS[location] })
+      return
+    }
+    setDetailsItem(item)
+    setDetailsOpen(true)
+  }
 
   return (
     <>
@@ -1457,10 +1563,7 @@ export function EverShelfInventoryPanel({ controls, location, title }: EverShelf
                       const quantity = itemQuantity(item)
                       return (
                         <li className={styles.item} key={item.inventory_id ?? item.id ?? `${location}-${name}-${index}`}>
-                          <PantryRow expiry={expiry} extraBatchCount={batchCount - 1} locationLabel={LOCATION_DELETE_LABELS[location]} multiItem={multiItem} onDeleted={removeDeletedItems} onOpenDetails={() => {
-                            setDetailsItem(item)
-                            setDetailsOpen(true)
-                          }} quantity={quantity} rows={inventoryBatchRows(item)} title={name} />
+                          <PantryRow expiry={expiry} extraBatchCount={batchCount - 1} locationLabel={LOCATION_DELETE_LABELS[location]} multiItem={multiItem} onDeleted={removeDeletedItems} onOpenDetails={() => openItemDetails(item)} quantity={quantity} rows={inventoryBatchRows(item)} title={name} />
                         </li>
                       )
                     })}
@@ -1476,7 +1579,7 @@ export function EverShelfInventoryPanel({ controls, location, title }: EverShelf
           </>
         )}
       </article>
-      <InventoryItemDetailsModal key={itemInstancesKey(detailsItem)} item={detailsItem} locationLabel={LOCATION_DELETE_LABELS[location]} onClose={() => setDetailsOpen(false)} onInventoryChanged={reloadInventory} open={detailsOpen} />
+      {!onOpenDetails && <InventoryItemDetailsModal key={itemInstancesKey(detailsItem)} item={detailsItem} locationLabel={LOCATION_DELETE_LABELS[location]} onClose={() => setDetailsOpen(false)} onInventoryChanged={reloadInventory} open={detailsOpen} />}
     </>
   )
 }
