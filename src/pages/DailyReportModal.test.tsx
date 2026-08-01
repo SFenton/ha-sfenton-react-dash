@@ -263,6 +263,68 @@ describe('Daily summary modal', () => {
     expect(within(expiredRow).getByRole('button', { name: 'Add Milk to shopping list' })).toBeInTheDocument()
   })
 
+  it('opens expired food details as a page in the same summary modal', async () => {
+    renderHome()
+
+    const summaryDialog = await screen.findByRole('dialog', { name: "Stephen's Summary" })
+    const nav = within(summaryDialog).getByRole('navigation', { name: 'Daily report sections' })
+    fireEvent.click(within(nav).getByRole('button', { name: /^Expired Food/ }))
+    const [expiredRow] = await within(summaryDialog).findAllByLabelText(/^Milk Expired on /, {}, { timeout: 3000 })
+
+    fireEvent.click(within(expiredRow).getByRole('button', { name: 'Edit Milk' }))
+
+    const inventoryPage = await screen.findByRole('dialog', { name: 'Milk' })
+    expect(inventoryPage).toBe(summaryDialog)
+    expect(screen.getAllByRole('dialog')).toHaveLength(1)
+    expect(within(inventoryPage).getByRole('button', { name: 'Back to expired food' })).toBeInTheDocument()
+    expect(within(inventoryPage).getByRole('button', { name: 'Delete Milk' })).toBeInTheDocument()
+    expect(within(inventoryPage).queryByRole('navigation', { name: 'Daily report sections' })).not.toBeInTheDocument()
+
+    fireEvent.click(within(inventoryPage).getByRole('button', { name: 'Back to expired food' }))
+    await waitFor(() => expect(within(summaryDialog).getByRole('heading', { name: "Stephen's Summary" })).toBeInTheDocument())
+    expect(await within(summaryDialog).findByLabelText('Expired Food inventory list')).toBeInTheDocument()
+  })
+
+  it('keeps a failed expired-food save visible after external summary dismissal', async () => {
+    const originalCallService = mockState.helpers.callService
+    let rejectSave: ((error: Error) => void) | undefined
+    vi.spyOn(mockState.helpers, 'callService').mockImplementation((params) => {
+      if (params.domain === 'evershelf' && params.service === 'add_scanned_item') {
+        return new Promise((_, reject) => {
+          rejectSave = reject
+        })
+      }
+      return originalCallService(params)
+    })
+    renderHome()
+
+    const summaryDialog = await screen.findByRole('dialog', { name: "Stephen's Summary" })
+    const nav = within(summaryDialog).getByRole('navigation', { name: 'Daily report sections' })
+    fireEvent.click(within(nav).getByRole('button', { name: /^Expired Food/ }))
+    const [expiredRow] = await within(summaryDialog).findAllByLabelText(/^Milk Expired on /, {}, { timeout: 3000 })
+    fireEvent.click(within(expiredRow).getByRole('button', { name: 'Edit Milk' }))
+    const inventoryPage = await screen.findByRole('dialog', { name: 'Milk' })
+    fireEvent.click(within(inventoryPage).getByRole('button', { name: 'Add one Milk' }))
+    fireEvent.click(within(inventoryPage).getByRole('button', { name: 'Save Milk' }))
+    await waitFor(() => expect(rejectSave).toBeTypeOf('function'))
+
+    act(() => {
+      setDashboardUrl(summaryUrl('?path=overview&user=stephen', ''))
+      window.dispatchEvent(new HashChangeEvent('hashchange'))
+    })
+    expect(screen.getByRole('dialog', { name: 'Milk' })).toBeInTheDocument()
+
+    await act(async () => {
+      rejectSave?.(new Error('Unable to save expired food'))
+      await Promise.resolve()
+    })
+    expect(await within(inventoryPage).findByText('Unable to save expired food')).toBeInTheDocument()
+    expect(inventoryPage).toHaveAttribute('data-state', 'open')
+
+    fireEvent.click(within(inventoryPage).getByRole('button', { name: 'Close' }))
+    await waitFor(() => expect(inventoryPage).toHaveAttribute('data-state', 'closed'))
+  })
+
   it('shows a centred modal empty state when a tab has nothing to report', async () => {
     mockTodoItemsByEntity[OVERDUE_ENTITY_ID] = []
     renderHome()

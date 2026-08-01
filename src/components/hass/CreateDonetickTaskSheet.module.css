@@ -101,7 +101,8 @@
 }
 
 .loading {
-  min-height: 240px;
+  width: 100%;
+  min-height: var(--modal-body-content-height, 240px);
 }
 
 .sheetFooter {
