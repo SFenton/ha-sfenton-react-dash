@@ -16,7 +16,7 @@ const EDIT_TARGET = {
   todoEntityId: 'todo.stephen_s_upcoming',
 }
 
-function renderEditSheet(onClose = vi.fn(), onDeleted = vi.fn(), onSaved = vi.fn()) {
+function renderEditSheet(onClose = vi.fn(), onDeleted = vi.fn(), onSaved = vi.fn(), onBusyChange = vi.fn()) {
   mockDonetickTasksById[240] = {
     assignees: [2],
     assigned_to: 2,
@@ -32,9 +32,10 @@ function renderEditSheet(onClose = vi.fn(), onDeleted = vi.fn(), onSaved = vi.fn
   }
   return {
     onClose,
+    onBusyChange,
     onDeleted,
     onSaved,
-    view: render(<CreateDonetickTaskSheet editTarget={EDIT_TARGET} onClose={onClose} onDeleted={onDeleted} onSaved={onSaved} open />),
+    view: render(<CreateDonetickTaskSheet editTarget={EDIT_TARGET} onBusyChange={onBusyChange} onClose={onClose} onDeleted={onDeleted} onSaved={onSaved} open />),
   }
 }
 
@@ -139,7 +140,7 @@ describe('CreateDonetickTaskSheet edit mode', () => {
   })
 
   it('saves changed assignment, due date, and recurrence through update_task_form', async () => {
-    const { onClose, onSaved } = renderEditSheet()
+    const { onBusyChange, onClose, onSaved } = renderEditSheet()
     await waitFor(() => expect(screen.getByLabelText('Task Name')).toHaveValue('Clean the gutters'))
 
     fireEvent.change(screen.getByLabelText('Assignee'), { target: { value: '3' } })
@@ -171,6 +172,7 @@ describe('CreateDonetickTaskSheet edit mode', () => {
     }))
     expect(onSaved).toHaveBeenCalledTimes(1)
     expect(onClose).toHaveBeenCalledTimes(1)
+    expect(onBusyChange.mock.calls).toEqual([[true], [false]])
   })
 
   it('confirms and deletes through the source todo entity', async () => {

@@ -2,7 +2,7 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { AtAGlancePage } from './AtAGlancePage'
 import { DashboardViewPage } from './DashboardViewPage'
-import { mockEntities, mockState, mockTodoItemsByEntity, resetMockHass } from '../test/mocks/hakitCoreState'
+import { mockDonetickTasksById, mockEntities, mockState, mockTodoItemsByEntity, resetMockHass } from '../test/mocks/hakitCoreState'
 
 const OVERDUE_ENTITY_ID = 'todo.stephen_s_past_due_with_unassigned'
 const UPCOMING_ENTITY_ID = 'todo.stephen_s_due_today_with_unassigned'
@@ -46,11 +46,37 @@ describe('Daily summary modal', () => {
     mockEntities[EXPIRED_ITEMS_ENTITY_ID].attributes.expired_list = DEFAULT_EXPIRED_LIST
     mockEntities[VACATION_MODE_ENTITY_ID].state = 'off'
     mockTodoItemsByEntity[OVERDUE_ENTITY_ID] = [
-      { uid: 'overdue-1', summary: 'Take out the trash', status: 'needs_action', due: '2026-07-24T17:30:00+00:00' },
+      { uid: '240--2026-07-24 17:30:00+00:00', summary: 'Take out the trash', status: 'needs_action', due: '2026-07-24T17:30:00+00:00' },
     ]
     mockTodoItemsByEntity[UPCOMING_ENTITY_ID] = [
-      { uid: 'upcoming-1', summary: 'Water the plants', status: 'needs_action', due: '2026-12-31T23:30:00+00:00' },
+      { uid: '222--2026-12-31 23:30:00+00:00', summary: 'Water the plants', status: 'needs_action', due: '2026-12-31T23:30:00+00:00' },
     ]
+    mockDonetickTasksById[240] = {
+      assignees: [1],
+      assigned_to: 1,
+      description: 'Use both bins',
+      frequency: 1,
+      frequency_metadata: {},
+      frequency_type: 'once',
+      hide_on_vacation: true,
+      id: 240,
+      name: 'Take out the trash',
+      next_due_date: '2026-07-24T17:30:00+00:00',
+      priority: 3,
+    }
+    mockDonetickTasksById[222] = {
+      assignees: [1],
+      assigned_to: 1,
+      description: 'Soak the porch planters',
+      frequency: 1,
+      frequency_metadata: {},
+      frequency_type: 'weekly',
+      hide_on_vacation: true,
+      id: 222,
+      name: 'Water the plants',
+      next_due_date: '2026-12-31T23:30:00+00:00',
+      priority: 1,
+    }
     setDashboardUrl(summaryUrl('?path=overview&user=stephen'))
   })
 
@@ -157,6 +183,29 @@ describe('Daily summary modal', () => {
     fireEvent.click(within(nav).getByRole('button', { name: /^Expired Food/ }))
     await waitFor(() => expect(within(dialog).getByLabelText('Expired Food inventory list')).toBeInTheDocument())
     expect(within(dialog).queryByText('Water the plants')).not.toBeInTheDocument()
+  })
+
+  it('opens the shared task editor from overdue and upcoming chore rows', async () => {
+    renderHome()
+
+    const summaryDialog = await screen.findByRole('dialog', { name: "Stephen's Summary" })
+    const overdueRegion = within(summaryDialog).getByRole('region', { name: 'Overdue Chores' })
+    fireEvent.click(within(overdueRegion).getByRole('button', { name: 'Edit Take out the trash' }))
+
+    const editDialog = await screen.findByRole('dialog', { name: 'Edit Task' })
+    await waitFor(() => expect(within(editDialog).getByLabelText('Task Name')).toHaveValue('Take out the trash'))
+    expect(within(editDialog).getByLabelText('Description')).toHaveValue('Use both bins')
+    expect(within(editDialog).getByRole('button', { name: 'Save Task' })).toBeInTheDocument()
+
+    fireEvent.click(within(editDialog).getByRole('button', { name: 'Close' }))
+    await waitFor(() => expect(editDialog).toHaveAttribute('data-state', 'closed'))
+    expect(summaryDialog).toHaveAttribute('data-state', 'open')
+
+    const nav = summaryDialog.querySelector('nav[aria-label="Daily report sections"]')
+    expect(nav).not.toBeNull()
+    fireEvent.click(within(nav as HTMLElement).getByRole('button', { name: /^Upcoming Chores/, hidden: true }))
+    const upcomingRegion = await within(summaryDialog).findByRole('region', { name: 'Upcoming Chores' })
+    expect(within(upcomingRegion).getByRole('button', { name: 'Edit Water the plants' })).toBeInTheDocument()
   })
 
   it('renders expired food rows with the food page row UX', async () => {

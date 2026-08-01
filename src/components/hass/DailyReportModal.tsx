@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react'
 import { ModalSheet } from '../core/ModalSheet'
 import { SectionHeader } from '../core/SectionHeader'
+import { CreateDonetickTaskSheet } from './CreateDonetickTaskSheet'
 import { DailyReportModalContent, DailyReportModalNav } from './DailyReportModalContent'
 import { DAILY_REPORT_MODAL_STYLE, useDailyReportContext } from './dailyReportModal'
+import type { DonetickTaskEditTarget } from './donetickTaskForm'
 import {
   DAILY_REPORT_AUTO_TAB,
   DAILY_REPORT_HASH,
@@ -37,6 +39,10 @@ export function DailyReportModal() {
   const [activeTab, setActiveTab] = useState<DailyReportTab>('overdue')
   const [previousOpen, setPreviousOpen] = useState(false)
   const [consumedTabUrl, setConsumedTabUrl] = useState<string | undefined>()
+  const [editingTask, setEditingTask] = useState<DonetickTaskEditTarget | null>(null)
+  const [editSheetOpen, setEditSheetOpen] = useState(false)
+  const [editSheetBusy, setEditSheetBusy] = useState(false)
+  const [todoReloadVersion, setTodoReloadVersion] = useState(0)
   const open = hash === DAILY_REPORT_HASH
 
   // Honour the requested tab only on the transition into open, so a manual tab change sticks.
@@ -51,6 +57,7 @@ export function DailyReportModal() {
         setConsumedTabUrl(dashboardUrl)
       }
     }
+    if (!open && editSheetOpen && !editSheetBusy) setEditSheetOpen(false)
   }
 
   useEffect(() => {
@@ -58,17 +65,39 @@ export function DailyReportModal() {
     clearTabRequest()
   }, [consumedTabUrl])
 
+  const openTaskEditor = (target: DonetickTaskEditTarget) => {
+    setEditingTask(target)
+    setEditSheetBusy(false)
+    setEditSheetOpen(true)
+  }
+
+  const refreshTodoLists = () => {
+    setTodoReloadVersion((current) => current + 1)
+  }
+
   return (
-    <ModalSheet
-      bodyHeader={context.user ? <SectionHeader title={dailyReportTabLabel(activeTab)} /> : undefined}
-      contentStyle={DAILY_REPORT_MODAL_STYLE}
-      footer={context.user ? <DailyReportModalNav activeTab={activeTab} counts={{ 'expired-food': context.expiredFoodCount, overdue: context.overdueCount }} onTabChange={setActiveTab} /> : undefined}
-      onClose={closeHash}
-      open={open}
-      scrollResetKey={activeTab}
-      title={context.title}
-    >
-      <DailyReportModalContent activeTab={activeTab} context={context} />
-    </ModalSheet>
+    <>
+      <ModalSheet
+        bodyHeader={context.user ? <SectionHeader title={dailyReportTabLabel(activeTab)} /> : undefined}
+        contentStyle={DAILY_REPORT_MODAL_STYLE}
+        footer={context.user ? <DailyReportModalNav activeTab={activeTab} counts={{ 'expired-food': context.expiredFoodCount, overdue: context.overdueCount }} onTabChange={setActiveTab} /> : undefined}
+        onClose={closeHash}
+        open={open}
+        scrollResetKey={activeTab}
+        title={context.title}
+      >
+        <DailyReportModalContent activeTab={activeTab} context={context} onEditTask={openTaskEditor} reloadVersion={todoReloadVersion} />
+      </ModalSheet>
+      {editingTask && (
+        <CreateDonetickTaskSheet
+          editTarget={editingTask}
+          onBusyChange={setEditSheetBusy}
+          onClose={() => setEditSheetOpen(false)}
+          onDeleted={refreshTodoLists}
+          onSaved={refreshTodoLists}
+          open={editSheetOpen}
+        />
+      )}
+    </>
   )
 }

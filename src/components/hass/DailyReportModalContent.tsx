@@ -11,6 +11,7 @@ import { DAILY_REPORT_TABS, DAILY_REPORT_USERS, dailyReportRouteUrl, type DailyR
 import { dashboardHref, pushDashboardUrl } from '../../hooks/dashboardLocation'
 import { useImmediateVisualTab, useSmoothDisplayedModalTab } from '../../hooks/useSmoothDisplayedModalTab'
 import { VACATION_EMPTY_DESCRIPTION } from '../../constants/portedDashboard'
+import type { DonetickTaskEditTarget } from './donetickTaskForm'
 import styles from './DailyReportModalContent.module.css'
 
 /** Only actionable tabs badge; upcoming chores are informational so they never get one. */
@@ -50,12 +51,12 @@ export function DailyReportModalNav({ activeTab, counts, onTabChange }: { active
   )
 }
 
-function DailyReportTodoTab({ emptyDescription, emptyTitle, entityId, title, vacationMode }: { emptyDescription: string; emptyTitle: string; entityId: string; title: string; vacationMode: boolean }) {
+function DailyReportTodoTab({ emptyDescription, emptyTitle, entityId, onEditTask, reloadVersion, title, vacationMode }: { emptyDescription: string; emptyTitle: string; entityId: string; onEditTask: (target: DonetickTaskEditTarget) => void; reloadVersion: number; title: string; vacationMode: boolean }) {
   const [visibleItemCount, setVisibleItemCount] = useState<number | null>(null)
 
   return (
     <section aria-label={title} className={styles.tabSection}>
-      <TodoListPanel entityId={entityId} hideCompleted onVisibleItemsChange={setVisibleItemCount} title={title} />
+      <TodoListPanel entityId={entityId} hideCompleted onEditTask={onEditTask} onVisibleItemsChange={setVisibleItemCount} reloadVersion={reloadVersion} title={title} />
       {visibleItemCount === 0 && (
         <EmptyState description={vacationMode ? VACATION_EMPTY_DESCRIPTION : emptyDescription} layout="modal" title={emptyTitle} />
       )}
@@ -112,7 +113,7 @@ function DailyReportUserPicker() {
   )
 }
 
-export function DailyReportModalContent({ activeTab, context }: { activeTab: DailyReportTab; context: DailyReportContext }) {
+export function DailyReportModalContent({ activeTab, context, onEditTask, reloadVersion }: { activeTab: DailyReportTab; context: DailyReportContext; onEditTask: (target: DonetickTaskEditTarget) => void; reloadVersion: number }) {
   const { user, vacationMode } = context
   const { displayedTab, transitionState } = useSmoothDisplayedModalTab(activeTab)
 
@@ -120,8 +121,8 @@ export function DailyReportModalContent({ activeTab, context }: { activeTab: Dai
 
   return (
     <div className={styles.panel} data-modal-tab-transition-state={transitionState} data-tab={displayedTab}>
-      {displayedTab === 'overdue' && <DailyReportTodoTab emptyDescription="You are all caught up on chores that slipped past their due date." emptyTitle="No Chores Due" entityId={user.todoEntityIds.overdue} title="Overdue Chores" vacationMode={vacationMode} />}
-      {displayedTab === 'upcoming' && <DailyReportTodoTab emptyDescription="There is nothing else on your schedule for the rest of today." emptyTitle="No Chores Upcoming" entityId={user.todoEntityIds.upcoming} title="Upcoming Chores" vacationMode={vacationMode} />}
+      {displayedTab === 'overdue' && <DailyReportTodoTab emptyDescription="You are all caught up on chores that slipped past their due date." emptyTitle="No Chores Due" entityId={user.todoEntityIds.overdue} onEditTask={onEditTask} reloadVersion={reloadVersion} title="Overdue Chores" vacationMode={vacationMode} />}
+      {displayedTab === 'upcoming' && <DailyReportTodoTab emptyDescription="There is nothing else on your schedule for the rest of today." emptyTitle="No Chores Upcoming" entityId={user.todoEntityIds.upcoming} onEditTask={onEditTask} reloadVersion={reloadVersion} title="Upcoming Chores" vacationMode={vacationMode} />}
       {displayedTab === 'expired-food' && <DailyReportExpiredFoodTab vacationMode={vacationMode} />}
     </div>
   )

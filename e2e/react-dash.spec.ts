@@ -2591,7 +2591,7 @@ test('thermostat hero dial allows vertical swipe scrolling', async ({ page, brow
 test('daily summary deep link opens the tabbed modal for the requested user', async ({ page }) => {
   await page.goto('/index.html?path=overview&user=stephen#daily-report')
 
-  const dialog = page.getByRole('dialog')
+  const dialog = page.getByRole('dialog', { name: "Stephen's Summary" })
   await expect(dialog.getByRole('heading', { name: "Stephen's Summary" })).toBeVisible()
   await expect(dialog).toHaveAttribute('data-has-subtitle', 'false')
 
@@ -2604,12 +2604,22 @@ test('daily summary deep link opens the tabbed modal for the requested user', as
   await expect(nav.getByRole('button', { name: 'Upcoming Chores' }).locator('[data-count]')).toHaveCount(0)
 
   await expect(dialog.getByRole('region', { name: 'Overdue Chores' })).toBeVisible()
+  await expect(dialog.getByRole('button', { name: 'Edit Mock task one' })).toBeVisible()
+
+  await dialog.getByRole('button', { name: 'Edit Mock task one' }).click()
+  const editDialog = page.getByRole('dialog', { name: 'Edit Task' })
+  await expect(editDialog).toBeVisible()
+  await expect(editDialog.getByLabel('Task Name')).toHaveValue('Mock task one')
+  await editDialog.getByRole('button', { name: 'Close' }).click()
+  await expect(editDialog).toHaveAttribute('data-state', 'closed')
+  await expect(dialog).toBeVisible()
 
   const bodyHeader = dialog.locator('[data-modal-sheet-body-header="true"]')
   await expect(bodyHeader.getByRole('heading', { level: 2, name: 'Overdue Chores' })).toBeVisible()
 
   await nav.getByRole('button', { name: /^Upcoming Chores/ }).click()
   await expect(dialog.getByRole('region', { name: 'Upcoming Chores' })).toBeVisible()
+  await expect(dialog.getByRole('region', { name: 'Upcoming Chores' }).getByRole('button', { name: 'Edit Mock task one' })).toBeVisible()
   await expect(dialog.getByRole('region', { name: 'Overdue Chores' })).toHaveCount(0)
 
   await expect(bodyHeader.getByRole('heading', { level: 2, name: 'Upcoming Chores' })).toBeVisible()
