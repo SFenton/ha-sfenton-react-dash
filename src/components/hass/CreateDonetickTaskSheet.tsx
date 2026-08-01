@@ -25,6 +25,7 @@ interface CreateDonetickTaskSheetProps {
   defaultAssignee?: string
   editTarget?: DonetickTaskEditTarget
   open: boolean
+  onBusyChange?: (busy: boolean) => void
   onClose: () => void
   onDeleted?: () => void
   onSaved?: () => void
@@ -84,6 +85,7 @@ export function CreateDonetickTaskSheet({
   defaultAssignee = '',
   editTarget,
   open,
+  onBusyChange,
   onClose,
   onDeleted,
   onSaved,
@@ -192,6 +194,7 @@ export function CreateDonetickTaskSheet({
     if (!taskName || busy || loading || (editMode && !task)) return
 
     setSubmitting(true)
+    onBusyChange?.(true)
     setError(null)
     void Promise.resolve(
       callService({
@@ -211,7 +214,10 @@ export function CreateDonetickTaskSheet({
       .catch((caughtError: unknown) => {
         setError(caughtError instanceof Error ? caughtError.message : editMode ? 'Unable to save task' : 'Unable to create task')
       })
-      .finally(() => setSubmitting(false))
+      .finally(() => {
+        setSubmitting(false)
+        onBusyChange?.(false)
+      })
   }
 
   const handleDelete = () => {
@@ -219,6 +225,7 @@ export function CreateDonetickTaskSheet({
     if (!window.confirm(`Delete ${task.name}?`)) return
 
     setDeleting(true)
+    onBusyChange?.(true)
     setError(null)
     void Promise.resolve(
       callService({
@@ -235,7 +242,10 @@ export function CreateDonetickTaskSheet({
       .catch((caughtError: unknown) => {
         setError(caughtError instanceof Error ? caughtError.message : 'Unable to delete task')
       })
-      .finally(() => setDeleting(false))
+      .finally(() => {
+        setDeleting(false)
+        onBusyChange?.(false)
+      })
   }
 
   const footer = editMode ? (
