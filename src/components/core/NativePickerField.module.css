@@ -7,13 +7,29 @@
   font-weight: 800;
 }
 
+.field[data-disabled='true'] {
+  opacity: 0.64;
+}
+
+.label {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 7px;
+}
+
+.label > svg {
+  flex: 0 0 auto;
+  color: rgba(247, 251, 255, 0.72);
+}
+
 .pickerShell {
   position: relative;
   display: grid;
   width: 100%;
   min-width: 0;
   max-width: 100%;
-  min-height: 48px;
+  min-height: var(--native-picker-min-height, 48px);
   align-items: center;
   border: 1px solid rgba(255, 255, 255, 0.16);
   border-radius: 16px;
@@ -37,6 +53,15 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.selectShell {
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+}
+
+.selectShell > svg {
+  color: rgba(247, 251, 255, 0.64);
 }
 
 .nativePickerInput {

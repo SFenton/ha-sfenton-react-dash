@@ -1,0 +1,80 @@
+.pill {
+  display: grid;
+  min-width: 0;
+  min-height: 54px;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 9px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 18px;
+  padding: 9px 10px;
+  color: white;
+  background: var(--color-glass-soft);
+  box-shadow: var(--shadow-glass), inset 0 -1px 0 rgba(0, 0, 0, 0.12);
+  backdrop-filter: blur(15px) saturate(1.08);
+  -webkit-backdrop-filter: blur(15px) saturate(1.08);
+}
+
+.pill > svg {
+  width: 28px;
+  height: 28px;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.text {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.text span,
+.text strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.text span {
+  color: rgba(232, 240, 255, 0.62);
+  font-size: 0.68rem;
+  font-weight: 760;
+  line-height: 1.05;
+}
+
+.text strong {
+  color: rgba(255, 255, 255, 0.95);
+  font-size: 0.8rem;
+  font-weight: 840;
+  line-height: 1.12;
+}
+
+.pill[data-tone='ok'] {
+  border-color: rgba(129, 199, 132, 0.34);
+  background: linear-gradient(135deg, rgba(67, 160, 71, 0.2), rgba(67, 160, 71, 0.08)), var(--color-glass-soft);
+}
+
+.pill[data-tone='warning'] {
+  border-color: rgba(255, 183, 77, 0.38);
+  background: linear-gradient(135deg, rgba(251, 140, 0, 0.22), rgba(251, 140, 0, 0.09)), var(--color-glass-soft);
+}
+
+.pill[data-tone='danger'] {
+  border-color: rgba(255, 95, 87, 0.42);
+  background: linear-gradient(135deg, rgba(229, 57, 53, 0.25), rgba(229, 57, 53, 0.1)), var(--color-glass-soft);
+}
+
+.pill[data-tone='active'] {
+  border-color: rgba(77, 208, 225, 0.36);
+  background: linear-gradient(135deg, rgba(0, 150, 136, 0.24), rgba(0, 150, 136, 0.09)), var(--color-glass-soft);
+}
+
+.pill[data-tone='returning'] {
+  border-color: rgba(100, 181, 246, 0.38);
+  background: linear-gradient(135deg, rgba(30, 136, 229, 0.24), rgba(30, 136, 229, 0.09)), var(--color-glass-soft);
+}
+
+.pill[data-tone='unavailable'] {
+  border-color: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.06);
+  opacity: 0.68;
+}

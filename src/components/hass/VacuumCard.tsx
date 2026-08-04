@@ -4,7 +4,10 @@ import { GlassTile } from '../core/GlassTile'
 import { Description } from '../core/Description'
 import { InlineAlert } from '../core/InlineAlert'
 import { MaterialIcon } from '../core/Icon'
+import { ModalActionButton, type ModalActionTone } from '../core/ModalActionFooter'
 import { ModalSheet } from '../core/ModalSheet'
+import { NativeSelectField } from '../core/NativeSelectField'
+import { StatusPill } from '../core/StatusPill'
 import { type VacuumAutoCleanDisabledRoomConfig, type VacuumConfig, type VacuumConsumableConfig, type VacuumZoneConfig } from '../../constants/portedDashboard'
 import { DASHBOARD_ROUTE_CHANGE_EVENT, dashboardEventTargets, dashboardHash, dashboardPathWithSearch, replaceDashboardUrl } from '../../hooks/dashboardLocation'
 import { useImmediateVisualTab, useSmoothDisplayedModalTab } from '../../hooks/useSmoothDisplayedModalTab'
@@ -328,7 +331,6 @@ function ActionButton({
   label,
   onClick,
   tone = 'neutral',
-  variant = 'default',
 }: {
   description?: string
   disabled?: boolean
@@ -336,30 +338,18 @@ function ActionButton({
   label: string
   onClick: () => void
   tone?: 'danger' | 'neutral' | 'primary' | 'warning'
-  variant?: 'default' | 'sub'
 }) {
+  const actionTone: ModalActionTone = tone === 'danger' ? 'destructive' : tone
+
   return (
     <ControlItem description={description}>
-      <button aria-label={label} className={styles.actionButton} data-icon={icon} data-tone={tone} data-variant={variant} disabled={disabled} onClick={onClick} type="button">
-        <MaterialIcon name={icon} size={18} />
-        <span className={styles.actionButtonText}>{label}</span>
-      </button>
+      <ModalActionButton action={{ disabled, icon, label, onClick }} tone={actionTone} />
     </ControlItem>
   )
 }
 
 function InfoPill({ grouped = false, icon, label, tone, value }: { grouped?: boolean; icon: string; label: string; tone?: VacuumVisualTone; value: string }) {
-  const accessibilityProps = grouped ? { 'aria-label': `${label} ${value}`, role: 'group' as const } : {}
-
-  return (
-    <span {...accessibilityProps} className={styles.settingPill} data-icon={icon} data-tone={tone}>
-      <MaterialIcon name={icon} size={18} />
-      <span className={styles.settingText}>
-        <span>{label}</span>
-        <strong>{value}</strong>
-      </span>
-    </span>
-  )
+  return <StatusPill grouped={grouped} icon={icon} label={label} tone={tone} value={value} />
 }
 
 function formatHours(hours: number) {
@@ -413,7 +403,6 @@ function SelectSetting({
   onIntent,
   onOptimisticValueChange,
   optimisticValue,
-  showIcon = true,
   valueLabel,
   variant = 'setting',
 }: {
@@ -428,7 +417,6 @@ function SelectSetting({
   onIntent?: (entityId: string, expectedState: string) => void
   onOptimisticValueChange?: (value: string) => void
   optimisticValue?: string
-  showIcon?: boolean
   valueLabel?: string
   variant?: 'setting' | 'sub'
 }) {
@@ -464,54 +452,22 @@ function SelectSetting({
 
   const renderedOptions = options.includes(value) ? options : [value, ...options].filter(Boolean)
   const selectOptions = renderedOptions.map((option) => ({ value: option, label: formatOptionLabel ? formatOptionLabel(option) : formatStateValue(option) }))
-  const nativeSelect = (
-    <select
-      aria-label={`${label} ${displayValue}`}
-      className={styles.nativeSelect}
-      disabled={disabled}
-      onChange={(event) => {
-        const select = event.currentTarget
-        const option = select.value
-        select.blur()
-        selectOption(option)
-      }}
-      value={value}
-    >
-      {selectOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-    </select>
-  )
-
-  if (variant === 'sub') {
-    return (
-      <ControlItem description={description}>
-        <span className={styles.subSelectButton} data-disabled={disabled ? 'true' : 'false'} data-has-icon={showIcon ? 'true' : 'false'} data-label-hidden={hideLabel ? 'true' : 'false'} data-native-select="true">
-          {showIcon && <MaterialIcon name={icon} size={17} />}
-          <span aria-hidden="true" className={styles.subSelectText}>
-            {!hideLabel && <span>{label}</span>}
-            <strong>{displayValue}</strong>
-          </span>
-          <MaterialIcon name="mdi:chevron-down" size={17} />
-          {nativeSelect}
-        </span>
-      </ControlItem>
-    )
-  }
 
   return (
     <ControlItem description={description}>
-      <span className={`${styles.settingPill} ${styles.settingButton}`} data-disabled={disabled ? 'true' : 'false'} data-native-select="true">
-        <span className={styles.settingIcon}>
-          <MaterialIcon name={icon} size={18} />
-        </span>
-        <span aria-hidden="true" className={styles.settingText}>
-          <span>{label}</span>
-          <strong>{displayValue}</strong>
-        </span>
-        <span className={styles.settingChevron}>
-          <MaterialIcon name="mdi:chevron-down" size={18} />
-        </span>
-        {nativeSelect}
-      </span>
+      <NativeSelectField
+        ariaLabel={`${label} ${displayValue}`}
+        blurOnChange
+        className={hideLabel ? undefined : styles.powerSelectField}
+        disabled={disabled}
+        hideLabel={hideLabel}
+        icon={hideLabel ? undefined : icon}
+        label={label}
+        onChange={selectOption}
+        options={selectOptions}
+        selectedLabel={displayValue}
+        value={value}
+      />
     </ControlItem>
   )
 }
@@ -673,8 +629,8 @@ function VacuumStateActions({ coordinator, optimisticState, vacuum }: { coordina
     <>
       <Description>{CLEANING_SETUP_DESCRIPTION}</Description>
       <div className={styles.cleaningActionGrid} data-layout="cleaning">
-        <SelectSetting disabled={coordinator.controlsDisabled} entity={passes} entityId={vacuum.passesEntityId} formatOptionLabel={formatPassCount} hideLabel icon="mdi:numeric" label="Cleaning Passes" onIntent={coordinator.registerIntent} showIcon={false} valueLabel={formatPassCount(passes?.state)} variant="sub" />
-        <ActionButton icon="mdi:play" label="Clean" onClick={clean} tone="primary" variant="sub" />
+        <SelectSetting disabled={coordinator.controlsDisabled} entity={passes} entityId={vacuum.passesEntityId} formatOptionLabel={formatPassCount} hideLabel icon="mdi:numeric" label="Cleaning Passes" onIntent={coordinator.registerIntent} valueLabel={formatPassCount(passes?.state)} variant="sub" />
+        <ActionButton icon="mdi:play" label="Clean" onClick={clean} tone="primary" />
       </div>
     </>
   ) : null
@@ -684,16 +640,16 @@ function VacuumStateActions({ coordinator, optimisticState, vacuum }: { coordina
   return (
     <ControlSection title={sectionTitle}>
       {cleaningSetupControls}
-      {state === 'idle' && <ActionButton description="Send the robot back to the dock." disabled={coordinator.controlsDisabled} icon="mdi:home" label="Dock" onClick={dock} variant="sub" />}
-      {state === 'error' && !resumable && !lowBattery && <ActionButton description="Stop the current vacuum task." disabled={coordinator.controlsDisabled} icon="mdi:stop" label="Stop" onClick={stop} tone="danger" variant="sub" />}
-      {state === 'error' && !resumable && !lowBattery && <ActionButton description="Send the robot back to the dock." disabled={coordinator.controlsDisabled} icon="mdi:home" label="Dock" onClick={dock} variant="sub" />}
-      {chargingBeforeResume && <ActionButton description="Continue the interrupted cleaning run." disabled={coordinator.controlsDisabled} icon="mdi:play" label="Resume" onClick={start} tone="primary" variant="sub" />}
-      {chargingBeforeResume && <ActionButton description="Cancel the pending cleaning resume." disabled={coordinator.controlsDisabled} icon="mdi:stop" label="Cancel" onClick={stop} tone="danger" variant="sub" />}
-      {state === 'cleaning' && <ActionButton description="Pause the current cleaning run." disabled={coordinator.controlsDisabled} icon="mdi:pause" label="Pause" onClick={pause} tone="warning" variant="sub" />}
-      {state === 'cleaning' && <ActionButton description="Stop the current cleaning run." disabled={coordinator.controlsDisabled} icon="mdi:stop" label="Stop" onClick={stop} tone="danger" variant="sub" />}
-      {state === 'paused' && <ActionButton description="Continue the paused cleaning run." disabled={coordinator.controlsDisabled} icon="mdi:play" label="Resume" onClick={start} tone="primary" variant="sub" />}
-      {state === 'paused' && <ActionButton description="Stop the paused cleaning run." disabled={coordinator.controlsDisabled} icon="mdi:stop" label="Stop" onClick={stop} tone="danger" variant="sub" />}
-      {state === 'returning' && <ActionButton description="Pause the return-to-dock action." disabled={coordinator.controlsDisabled} icon="mdi:pause" label="Pause" onClick={pause} tone="warning" variant="sub" />}
+      {state === 'idle' && <ActionButton description="Send the robot back to the dock." disabled={coordinator.controlsDisabled} icon="mdi:home" label="Dock" onClick={dock} />}
+      {state === 'error' && !resumable && !lowBattery && <ActionButton description="Stop the current vacuum task." disabled={coordinator.controlsDisabled} icon="mdi:stop" label="Stop" onClick={stop} tone="danger" />}
+      {state === 'error' && !resumable && !lowBattery && <ActionButton description="Send the robot back to the dock." disabled={coordinator.controlsDisabled} icon="mdi:home" label="Dock" onClick={dock} />}
+      {chargingBeforeResume && <ActionButton description="Continue the interrupted cleaning run." disabled={coordinator.controlsDisabled} icon="mdi:play" label="Resume" onClick={start} tone="primary" />}
+      {chargingBeforeResume && <ActionButton description="Cancel the pending cleaning resume." disabled={coordinator.controlsDisabled} icon="mdi:stop" label="Cancel" onClick={stop} tone="danger" />}
+      {state === 'cleaning' && <ActionButton description="Pause the current cleaning run." disabled={coordinator.controlsDisabled} icon="mdi:pause" label="Pause" onClick={pause} tone="warning" />}
+      {state === 'cleaning' && <ActionButton description="Stop the current cleaning run." disabled={coordinator.controlsDisabled} icon="mdi:stop" label="Stop" onClick={stop} tone="danger" />}
+      {state === 'paused' && <ActionButton description="Continue the paused cleaning run." disabled={coordinator.controlsDisabled} icon="mdi:play" label="Resume" onClick={start} tone="primary" />}
+      {state === 'paused' && <ActionButton description="Stop the paused cleaning run." disabled={coordinator.controlsDisabled} icon="mdi:stop" label="Stop" onClick={stop} tone="danger" />}
+      {state === 'returning' && <ActionButton description="Pause the return-to-dock action." disabled={coordinator.controlsDisabled} icon="mdi:pause" label="Pause" onClick={pause} tone="warning" />}
     </ControlSection>
   )
 }
@@ -712,7 +668,7 @@ function VacuumEmptyDockSection({ optimisticState, vacuum }: { optimisticState: 
     <section className={styles.section}>
       <SectionHeader title="Additional Controls" />
       <div className={styles.singleAction}>
-        <ActionButton description="Trigger the auto-empty dock now." icon="mdi:delete-restore" label="Empty Dock" onClick={emptyDock} variant="sub" />
+        <ActionButton description="Trigger the auto-empty dock now." icon="mdi:delete-restore" label="Empty Dock" onClick={emptyDock} />
       </div>
     </section>
   )
@@ -886,7 +842,7 @@ function VacuumMapAndStatus({ optimisticState, vacuum }: { optimisticState: Opti
     <>
       <div className={styles.mapStage}>
         <ValetudoMapCard vacuum={vacuum} />
-        <button className={`${styles.actionButton} ${styles.locateButton}`} data-icon="mdi:map-marker" data-tone="neutral" onClick={locate} type="button">
+        <button className={styles.locateButton} data-icon="mdi:map-marker" data-tone="neutral" onClick={locate} type="button">
           <MaterialIcon name="mdi:map-marker" size={18} />
           Locate
         </button>
