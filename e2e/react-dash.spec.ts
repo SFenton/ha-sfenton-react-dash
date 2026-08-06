@@ -23,31 +23,25 @@ async function openBedAlarmDialog(page: Page, bedButtonName: RegExp) {
   await expect(dialog).toBeVisible()
   await dialog.getByRole('button', { name: 'Alarms', exact: true }).click()
   await expect(dialog.getByRole('heading', { name: 'Alarms' })).toBeVisible()
-  await dialog.getByRole('button', { name: 'Alarm Schedule Disabled' }).click()
-  await expect(dialog.getByRole('button', { name: 'Alarm Schedule Enabled' })).toBeVisible()
+  await expect(dialog.getByRole('heading', { name: 'Schedule Control' })).toHaveCount(0)
   return dialog
 }
 
 async function openAddAlarmForm(dialog: Locator, sideTitle: string) {
   const addAlarmButton = dialog.getByRole('button', { exact: true, name: 'Add Alarm' })
-  await expect(addAlarmButton).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)')
-  await expect(addAlarmButton).toHaveCSS('border-top-style', 'none')
+  await expect(addAlarmButton).toHaveCSS('background-color', 'rgba(0, 150, 136, 0.2)')
   await addAlarmButton.click()
-  const addAlarm = dialog.getByRole('group', { name: `Add ${sideTitle} alarm` })
-  await expect(addAlarm).toBeVisible()
-  await expect(addAlarm.getByRole('button', { name: 'New alarm time 7:00 AM' }).locator('svg')).toHaveCount(1)
-  return addAlarm
-}
-
-async function selectAlarmDays(addAlarm: Locator, days: string[]) {
-  await addAlarm.getByRole('button', { name: /Alarm days Choose days/i }).click()
-  for (const day of days) {
-    const option = addAlarm.getByRole('option', { name: day })
-    await option.click()
-    await expect(option).toHaveAttribute('aria-selected', 'true')
-    await expect(option).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)')
-    await expect(option.locator('svg')).toHaveCount(0)
+  await expect(dialog).toHaveAccessibleName(`Add ${sideTitle} Alarm`)
+  await expect.poll(() => dialog.evaluate((element) => element.scrollTop)).toBe(0)
+  await expect(dialog.getByRole('button', { name: 'Back to alarms' })).toBeVisible()
+  await expect(dialog.getByRole('button', { exact: true, name: 'Add Alarm' })).toBeEnabled()
+  await expect(dialog.getByRole('switch')).toHaveCount(0)
+  for (const day of ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']) {
+    await expect(dialog.getByRole('button', { exact: true, name: day })).toHaveAttribute('aria-pressed', 'true')
   }
+  await expect(dialog.getByRole('button', { exact: true, name: 'Sunday' })).toHaveAttribute('aria-pressed', 'false')
+  await expect(dialog.getByRole('button', { exact: true, name: 'Saturday' })).toHaveAttribute('aria-pressed', 'false')
+  return dialog
 }
 
 async function freeSleepSchedules(page: Page) {
@@ -80,6 +74,52 @@ async function expectFreeSleepAlarms(page: Page, side: 'left' | 'right', day: st
     const schedules = await freeSleepSchedules(page)
     return (schedules[side]?.[day]?.alarms ?? []).map((alarm) => ({ enabled: alarm.enabled, time: alarm.time }))
   }).toEqual(expected)
+}
+
+async function setMockFreeSleepWakeDayAlarms(page: Page, side: 'left' | 'right', wakeDay: string, alarms: FreeSleepAlarmSnapshot[]) {
+  const days: string[] = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']
+  const scheduleDay = days[(days.indexOf(wakeDay) + days.length - 1) % days.length]
+  await page.evaluate(({ alarms: nextAlarms, scheduleDay: targetDay, side: targetSide }) => {
+    const mock = (window as unknown as {
+      __mockHass: {
+        freeSleepSchedules: () => FreeSleepSchedulesSnapshot
+        setEntityAttribute: (entityId: string, attribute: string, value: unknown) => void
+      }
+    }).__mockHass
+    const schedules = mock.freeSleepSchedules()
+    const sideSchedule = (schedules[targetSide] ?? {}) as Record<string, Record<string, unknown>>
+    const daySchedule = sideSchedule[targetDay] ?? {}
+    mock.setEntityAttribute('sensor.nightcanvasrestful_schedules', targetSide, {
+      ...sideSchedule,
+      [targetDay]: {
+        ...daySchedule,
+        alarm: nextAlarms[0],
+        alarms: nextAlarms,
+      },
+    })
+  }, { alarms, scheduleDay, side })
+}
+
+async function expectInlineToggleBeforeChevron(toggle: Locator) {
+  const rowShell = toggle.locator('xpath=ancestor::*[@data-schedule-list-row][1]')
+  const controlSlot = rowShell.locator('[data-schedule-list-row-control]')
+  const chevron = rowShell.locator('[data-schedule-list-row-chevron]')
+  await expect(controlSlot).toHaveCount(1)
+  await expect(chevron).toHaveCount(1)
+  const toggleBox = await toggle.boundingBox()
+  const controlBox = await controlSlot.boundingBox()
+  const chevronBox = await chevron.boundingBox()
+  if (!toggleBox || !controlBox || !chevronBox) throw new Error('Inline alarm toggle geometry is unavailable')
+  expect(Math.round(toggleBox.width)).toBe(56)
+  expect(Math.round(toggleBox.height)).toBe(34)
+  expect(controlBox.x + controlBox.width).toBeLessThan(chevronBox.x)
+  expect(Math.abs((controlBox.y + controlBox.height / 2) - (chevronBox.y + chevronBox.height / 2))).toBeLessThanOrEqual(2)
+}
+
+async function expectToggleChrome(toggle: Locator) {
+  await expect(toggle).toHaveCSS('box-shadow', 'none')
+  await expect(toggle).toHaveCSS('outline-style', 'none')
+  await expect.poll(() => toggle.evaluate((element) => getComputedStyle(element).getPropertyValue('--ha-control-switch-padding').trim())).toBe('4px')
 }
 
 async function expectDesktopSquareGrid(dialog: Locator, sectionLabel: string) {
@@ -1790,96 +1830,243 @@ test('room media cards open ported remote modals', async ({ page }) => {
   await expect(page.getByRole('button', { name: /Projector Off/i })).toBeVisible()
 })
 
-test('Free Sleep Add Alarm writes the expected alarm into the backend schedule', async ({ page }) => {
-  const dialog = await openBedAlarmDialog(page, /Steph's Bed Off/i)
+test('Free Sleep global Add Alarm defaults to weekdays and writes enabled backend records', async ({ page }) => {
+  await page.setViewportSize({ width: 393, height: 852 })
+  const dialog = await openBedAlarmDialog(page, /Steph.s Bed Off/i)
   const addAlarm = await openAddAlarmForm(dialog, "Steph's Bed")
 
-  await selectAlarmDays(addAlarm, ['Sunday'])
-  await addAlarm.getByRole('textbox', { name: 'New alarm time' }).fill('08:00', { force: true })
+  await addAlarm.getByLabel('Alarm time').fill('08:00')
   await addAlarm.getByRole('button', { exact: true, name: 'Add Alarm' }).click()
 
-  const sundaySection = dialog.getByRole('region', { name: "Steph's Bed Sunday alarms" })
-  await expect(sundaySection.getByText('3 alarms')).toBeVisible()
-  await expect(sundaySection.getByRole('article', { name: /Steph's Bed Sunday alarm 3 enabled/i })).toBeVisible()
+  await expect(dialog).toHaveAccessibleName("Steph's Bed")
+  for (const day of ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']) {
+    await expect(dialog.getByRole('button', { name: new RegExp(`Steph.s Bed ${day} Alarm Enabled`, 'i') })).toBeVisible()
+  }
+  for (const scheduleDay of ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday']) {
+    await expectFreeSleepAlarms(page, 'right', scheduleDay, [{ enabled: true, time: '08:00' }])
+  }
+})
+
+test('schedule detail pages keep the outer modal sheet anchored', async ({ page }) => {
+  await page.setViewportSize({ width: 393, height: 852 })
+  await page.goto('/at-a-glance/master-bedroom')
+  await page.getByRole('button', { name: /Humidifier Humidifying.*46%/i }).click()
+  const dialog = page.getByRole('dialog')
+  await expect(dialog).toBeVisible()
+  await dialog.getByRole('button', { name: 'Schedules', exact: true }).click()
+  await dialog.getByRole('button', { name: 'Add Scheduled Activity' }).click()
+
+  await expect(dialog).toHaveAccessibleName('Add Master Bedroom Humidifier Schedule')
+  await expect.poll(() => dialog.evaluate((element) => element.scrollTop)).toBe(0)
+  await expect(dialog.getByLabel('Name')).toBeVisible()
+  await expect(dialog.getByRole('button', { name: 'Back to schedules' })).toBeVisible()
+})
+
+test('Free Sleep day Add Alarm is locked to that day and returns to day management', async ({ page }) => {
+  await page.setViewportSize({ width: 393, height: 852 })
+  const dialog = await openBedAlarmDialog(page, /Steph.s Bed Off/i)
+  await dialog.getByRole('button', { name: /Steph.s Bed Sunday Alarms 2 Enabled/i }).click()
+  await expect(dialog).toHaveAccessibleName("Steph's Bed Sunday Alarms")
+
+  await dialog.getByRole('button', { exact: true, name: 'Add Alarm' }).click()
+  await expect(dialog).toHaveAccessibleName("Add Steph's Bed Sunday Alarm")
+  await expect(dialog.getByText('Days')).toHaveCount(0)
+  await expect(dialog.getByRole('button', { exact: true, name: 'Sunday' })).toHaveCount(0)
+  await expect(dialog.getByRole('switch')).toHaveCount(0)
+  await dialog.getByLabel('Alarm time').fill('08:10')
+  await dialog.getByRole('button', { exact: true, name: 'Add Alarm' }).click()
+
+  await expect(dialog).toHaveAccessibleName("Steph's Bed Sunday Alarms")
+  await expect(dialog.getByRole('button', { name: /Steph.s Bed Sunday alarm at 8:10 AM, Enabled/i })).toBeVisible()
   await expectFreeSleepAlarms(page, 'right', 'saturday', [
     { enabled: true, time: '06:30' },
     { enabled: true, time: '07:15' },
-    { enabled: true, time: '08:00' },
+    { enabled: true, time: '08:10' },
   ])
 })
 
-test('Free Sleep individual alarm toggle only disables that alarm in the backend schedule', async ({ page }) => {
-  const dialog = await openBedAlarmDialog(page, /Steph's Bed Off/i)
-  const sundaySection = dialog.getByRole('region', { name: "Steph's Bed Sunday alarms" })
+test('SleepyPod inline toggle updates a single main row without opening edit', async ({ page }) => {
+  await page.setViewportSize({ width: 393, height: 852 })
+  await page.goto('/at-a-glance/master-bedroom')
+  await setMockFreeSleepWakeDayAlarms(page, 'right', 'sunday', [{ enabled: true, time: '06:30' }])
+  await page.getByRole('button', { name: /Steph.s Bed Off/i }).click()
+  const dialog = page.getByRole('dialog')
+  await expect(dialog).toBeVisible()
+  await dialog.getByRole('button', { name: 'Alarms', exact: true }).click()
 
-  await sundaySection.getByRole('switch', { exact: true, name: "Disable Steph's Bed Sunday alarm" }).click()
+  const row = dialog.getByRole('button', { name: 'Steph\u0027s Bed Sunday Alarm Enabled' })
+  const toggle = dialog.getByRole('switch', { name: 'Turn off Steph\u0027s Bed Sunday alarm at 6:30 AM' })
+  await expect(row).toBeVisible()
+  await expect(toggle).toHaveAttribute('aria-checked', 'true')
+  await expectInlineToggleBeforeChevron(toggle)
+  await expectToggleChrome(toggle)
+  const rowBoxBefore = await row.boundingBox()
 
-  await expect(sundaySection.getByRole('switch', { exact: true, name: "Enable Steph's Bed Sunday alarm" })).toHaveAttribute('aria-checked', 'false')
-  await expect(sundaySection.getByRole('switch', { exact: true, name: "Disable Steph's Bed Sunday alarm 2" })).toHaveAttribute('aria-checked', 'true')
+  await toggle.click()
+
+  await expect(dialog).toHaveAccessibleName('Steph\u0027s Bed')
+  const disabledRow = dialog.getByRole('button', { name: 'Steph\u0027s Bed Sunday Alarm Disabled' })
+  await expect(disabledRow).toHaveAttribute('data-active', 'false')
+  const disabledToggle = dialog.getByRole('switch', { name: 'Turn on Steph\u0027s Bed Sunday alarm at 6:30 AM' })
+  await expect(disabledToggle).toHaveAttribute('aria-checked', 'false')
+  await expectToggleChrome(disabledToggle)
+  await expect(dialog.getByLabel('Alarm time')).toHaveCount(0)
+  await expectFreeSleepAlarms(page, 'right', 'saturday', [{ enabled: false, time: '06:30' }])
+  const rowBoxAfter = await disabledRow.boundingBox()
+  if (!rowBoxBefore || !rowBoxAfter) throw new Error('Single alarm row geometry is unavailable')
+  expect(Math.round(rowBoxAfter.width)).toBe(Math.round(rowBoxBefore.width))
+  expect(Math.round(rowBoxAfter.height)).toBe(Math.round(rowBoxBefore.height))
+})
+
+test('SleepyPod inline toggle updates one multi-alarm day row without opening edit', async ({ page }) => {
+  await page.setViewportSize({ width: 393, height: 852 })
+  const dialog = await openBedAlarmDialog(page, /Steph.s Bed Off/i)
+  const dayGroup = dialog.getByRole('button', { name: 'Steph\u0027s Bed Sunday Alarms 2 Enabled' })
+  await expect(dialog.getByRole('switch', { name: /Sunday alarm/i })).toHaveCount(0)
+  await dayGroup.click()
+  await expect(dialog).toHaveAccessibleName('Steph\u0027s Bed Sunday Alarms')
+
+  const firstRow = dialog.getByRole('button', { name: /Steph.s Bed Sunday alarm at 6:30 AM, Enabled/i })
+  const toggle = dialog.getByRole('switch', { name: 'Turn off Steph\u0027s Bed Sunday alarm at 6:30 AM' })
+  await expect(dialog.getByRole('switch')).toHaveCount(2)
+  await expectInlineToggleBeforeChevron(toggle)
+  await expectToggleChrome(toggle)
+  const rowBoxBefore = await firstRow.boundingBox()
+
+  await toggle.click()
+
+  await expect(dialog).toHaveAccessibleName('Steph\u0027s Bed Sunday Alarms')
+  const disabledRow = dialog.getByRole('button', { name: /Steph.s Bed Sunday alarm at 6:30 AM, Disabled/i })
+  await expect(disabledRow).toHaveAttribute('data-active', 'false')
+  await expectToggleChrome(dialog.getByRole('switch', { name: 'Turn on Steph\u0027s Bed Sunday alarm at 6:30 AM' }))
+  await expect(dialog.getByLabel('Alarm time')).toHaveCount(0)
+  await expectFreeSleepAlarms(page, 'right', 'saturday', [
+    { enabled: false, time: '06:30' },
+    { enabled: true, time: '07:15' },
+  ])
+  const rowBoxAfter = await disabledRow.boundingBox()
+  if (!rowBoxBefore || !rowBoxAfter) throw new Error('Day alarm row geometry is unavailable')
+  expect(Math.round(rowBoxAfter.width)).toBe(Math.round(rowBoxBefore.width))
+  expect(Math.round(rowBoxAfter.height)).toBe(Math.round(rowBoxBefore.height))
+})
+
+test('Free Sleep alarm active state is edited from its day page', async ({ page }) => {
+  const dialog = await openBedAlarmDialog(page, /Steph.s Bed Off/i)
+  await dialog.getByRole('button', { name: /Steph.s Bed Sunday Alarms 2 Enabled/i }).click()
+  await dialog.getByRole('button', { name: /Steph.s Bed Sunday alarm at 6:30 AM, Enabled/i }).click()
+
+  await expect(dialog).toHaveAccessibleName("Steph's Bed Sunday Alarm")
+  await expect(dialog.getByText('Alarm Enabled')).toBeVisible()
+  await expect(dialog.getByRole('button', { exact: true, name: 'Sunday' })).toHaveCount(0)
+  await dialog.getByRole('switch', { name: 'Turn off Alarm Enabled' }).click()
+  await dialog.getByRole('button', { exact: true, name: 'Save Alarm' }).click()
+
+  await expect(dialog).toHaveAccessibleName("Steph's Bed Sunday Alarms")
+  const disabledAlarm = dialog.getByRole('button', { name: /Steph.s Bed Sunday alarm at 6:30 AM, Disabled/i })
+  await expect(disabledAlarm).toBeVisible()
+  await expect(disabledAlarm).toHaveAttribute('data-active', 'false')
   await expectFreeSleepAlarms(page, 'right', 'saturday', [
     { enabled: false, time: '06:30' },
     { enabled: true, time: '07:15' },
   ])
 })
 
-test('Free Sleep alarm time edit keeps the alarm enabled in the UI and backend schedule', async ({ page }) => {
-  const dialog = await openBedAlarmDialog(page, /Steph's Bed Off/i)
-  const sundaySection = dialog.getByRole('region', { name: "Steph's Bed Sunday alarms" })
+test('Free Sleep alarm time edit preserves enabled state and payload fields', async ({ page }) => {
+  const dialog = await openBedAlarmDialog(page, /Steph.s Bed Off/i)
+  await dialog.getByRole('button', { name: /Steph.s Bed Sunday Alarms 2 Enabled/i }).click()
+  await dialog.getByRole('button', { name: /Steph.s Bed Sunday alarm at 6:30 AM, Enabled/i }).click()
 
-  await expect(sundaySection.getByRole('switch', { exact: true, name: "Disable Steph's Bed Sunday alarm" })).toHaveAttribute('aria-checked', 'true')
-  await sundaySection.getByRole('textbox', { name: "Steph's Bed Sunday alarm time" }).fill('06:35', { force: true })
+  await dialog.getByLabel('Alarm time').fill('06:35')
+  await dialog.getByRole('button', { exact: true, name: 'Save Alarm' }).click()
 
-  await expect(sundaySection.getByRole('switch', { exact: true, name: "Disable Steph's Bed Sunday alarm" })).toHaveAttribute('aria-checked', 'true')
+  await expect(dialog).toHaveAccessibleName("Steph's Bed Sunday Alarms")
+  await expect(dialog.getByRole('button', { name: /Steph.s Bed Sunday alarm at 6:35 AM, Enabled/i })).toBeVisible()
   await expectFreeSleepAlarms(page, 'right', 'saturday', [
     { enabled: true, time: '06:35' },
     { enabled: true, time: '07:15' },
   ])
 })
 
-test('Free Sleep alarm delete confirms and removes only that alarm from the backend schedule', async ({ page }) => {
-  const dialog = await openBedAlarmDialog(page, /Steph's Bed Off/i)
-  const sundaySection = dialog.getByRole('region', { name: "Steph's Bed Sunday alarms" })
-  const deleteFirstAlarm = sundaySection.getByRole('button', { exact: true, name: "Delete Steph's Bed Sunday alarm" })
+test('Free Sleep alarm delete returns to the day page and keeps the remaining alarm normalized', async ({ page }) => {
+  const dialog = await openBedAlarmDialog(page, /Steph.s Bed Off/i)
+  await dialog.getByRole('button', { name: /Steph.s Bed Sunday Alarms 2 Enabled/i }).click()
+  await dialog.getByRole('button', { name: /Steph.s Bed Sunday alarm at 6:30 AM, Enabled/i }).click()
 
-  page.once('dialog', async (confirmDialog) => {
-    expect(confirmDialog.type()).toBe('confirm')
-    expect(confirmDialog.message()).toBe("Delete Steph's Bed Sunday alarm at 6:30 AM?")
-    await confirmDialog.dismiss()
-  })
-  await deleteFirstAlarm.click()
+  const deleteAlarm = dialog.getByRole('button', { exact: true, name: 'Delete Alarm' })
+  await expect(deleteAlarm.locator('xpath=ancestor::*[@data-modal-sheet-footer="true"]')).toHaveCount(1)
+  await dialog.getByLabel('Alarm time').fill('06:40')
+  const dismissPrompt = page.waitForEvent('dialog')
+  const dismissClick = deleteAlarm.click()
+  const dismissedDialog = await dismissPrompt
+  expect(dismissedDialog.type()).toBe('confirm')
+  expect(dismissedDialog.message()).toBe('Delete alarm set for 6:30 AM on Sunday?')
+  await dismissedDialog.dismiss()
+  await dismissClick
 
-  await expect(sundaySection.getByText('2 alarms')).toBeVisible()
+  await expect(dialog).toHaveAccessibleName("Steph's Bed Sunday Alarm")
+  await expect(deleteAlarm).toBeVisible()
+  await expect(dialog.getByLabel('Alarm time')).toHaveValue('06:40')
   await expectFreeSleepAlarms(page, 'right', 'saturday', [
     { enabled: true, time: '06:30' },
     { enabled: true, time: '07:15' },
   ])
 
-  page.once('dialog', async (confirmDialog) => {
-    expect(confirmDialog.message()).toBe("Delete Steph's Bed Sunday alarm at 6:30 AM?")
-    await confirmDialog.accept()
-  })
-  await deleteFirstAlarm.click()
+  const acceptPrompt = page.waitForEvent('dialog')
+  const acceptClick = deleteAlarm.click()
+  const acceptedDialog = await acceptPrompt
+  expect(acceptedDialog.type()).toBe('confirm')
+  expect(acceptedDialog.message()).toBe('Delete alarm set for 6:30 AM on Sunday?')
+  await acceptedDialog.accept()
+  await acceptClick
 
-  await expect(sundaySection.getByText('1 alarm')).toBeVisible()
+  await expect(dialog).toHaveAccessibleName("Steph's Bed Sunday Alarm")
+  await expect(dialog.getByRole('button', { name: /Steph.s Bed Sunday alarm at 6:30 AM, Enabled/i })).toHaveCount(0)
+  await expect(dialog.getByRole('button', { name: /Steph.s Bed Sunday alarm at 7:15 AM, Enabled/i })).toBeVisible()
   await expectFreeSleepAlarms(page, 'right', 'saturday', [
     { enabled: true, time: '07:15' },
   ])
 })
 
-test('Free Sleep day toggle disables every alarm for that day in the backend schedule', async ({ page }) => {
-  const dialog = await openBedAlarmDialog(page, /Steph's Bed Off/i)
-  const sundaySection = dialog.getByRole('region', { name: "Steph's Bed Sunday alarms" })
+test('Free Sleep grouped day navigation restores nested scroll and focus in one mobile sheet', async ({ page }) => {
+  await page.setViewportSize({ width: 393, height: 852 })
+  const dialog = await openBedAlarmDialog(page, /Steph.s Bed Off/i)
+  const modalBody = dialog.locator('[data-modal-sheet-body="true"]')
+  await modalBody.evaluate((element) => {
+    element.style.height = '160px'
+    element.style.maxHeight = '160px'
+    element.style.overflowY = 'auto'
+    element.scrollTop = 80
+  })
+  const dayGroup = dialog.getByRole('button', { name: "Steph's Bed Sunday Alarms 2 Enabled" })
+  await expect(dayGroup).toBeVisible()
+  await expect(dialog.getByText('Sunday Alarm 2')).toHaveCount(0)
+  await dayGroup.scrollIntoViewIfNeeded()
+  const mainScrollBeforeOpen = await modalBody.evaluate((element) => element.scrollTop)
+  await dayGroup.click()
 
-  await sundaySection.getByRole('switch', { name: "Disable Steph's Bed Sunday alarms" }).click()
+  await expect(dialog).toHaveAccessibleName("Steph's Bed Sunday Alarms")
+  await expect(page.getByRole('dialog')).toHaveCount(1)
+  const firstAlarm = dialog.getByRole('button', { name: /Steph.s Bed Sunday alarm at 6:30 AM, Enabled/i })
+  await expect(firstAlarm).toBeFocused()
+  const dayAdd = dialog.getByRole('button', { exact: true, name: 'Add Alarm' })
+  await dayAdd.scrollIntoViewIfNeeded()
+  const dayScrollBeforeOpen = await modalBody.evaluate((element) => element.scrollTop)
+  await dayAdd.click()
 
-  await expect(sundaySection.getByRole('switch', { name: "Enable Steph's Bed Sunday alarms" })).toHaveAttribute('aria-checked', 'false')
-  await expect(sundaySection.getByRole('switch', { exact: true, name: "Enable Steph's Bed Sunday alarm" })).toHaveAttribute('aria-checked', 'false')
-  await expect(sundaySection.getByRole('switch', { exact: true, name: "Enable Steph's Bed Sunday alarm 2" })).toHaveAttribute('aria-checked', 'false')
-  await expectFreeSleepAlarms(page, 'right', 'saturday', [
-    { enabled: false, time: '06:30' },
-    { enabled: false, time: '07:15' },
-  ])
+  await expect(dialog).toHaveAccessibleName("Add Steph's Bed Sunday Alarm")
+  await expect(dialog.getByLabel('Alarm time')).toBeFocused()
+  await dialog.getByRole('button', { name: 'Back to Sunday alarms' }).click()
+  await expect(dialog).toHaveAccessibleName("Steph's Bed Sunday Alarms")
+  await expect(dayAdd).toBeFocused()
+  await expect.poll(() => modalBody.evaluate((element) => element.scrollTop)).toBe(dayScrollBeforeOpen)
+
+  await dialog.getByRole('button', { name: 'Back to alarms' }).click()
+  await expect(dialog).toHaveAccessibleName("Steph's Bed")
+  await expect(dayGroup).toBeFocused()
+  await expect.poll(() => modalBody.evaluate((element) => element.scrollTop)).toBe(mainScrollBeforeOpen)
+  await expect(dialog.getByText(/Alarm Schedule (Enabled|Disabled)/)).toHaveCount(0)
 })
+
 
 test('security page opens ported security, contact, and camera modals', async ({ page }) => {
   await page.goto('/at-a-glance/security')

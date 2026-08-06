@@ -4,6 +4,8 @@ import styles from './NativePickerField.module.css'
 interface NativePickerFieldProps {
   ariaLabel?: string
   className?: string
+  detailAutoFocus?: boolean
+  disabled?: boolean
   emptyLabel?: string
   label: string
   name?: string
@@ -33,12 +35,12 @@ function displayValue(type: NativePickerFieldProps['type'], value: string, empty
   return type === 'date' ? formatDate(value) : formatTime(value)
 }
 
-export function NativePickerField({ ariaLabel, className, emptyLabel = 'Select', label, name, onChange, type, value }: NativePickerFieldProps) {
+export function NativePickerField({ ariaLabel, className, detailAutoFocus = false, disabled = false, emptyLabel = 'Select', label, name, onChange, type, value }: NativePickerFieldProps) {
   const inputRef = useRef<HTMLInputElement | null>(null)
   const fieldClassName = className ? `${styles.field} ${className}` : styles.field
   const openPickerFromField = (event: MouseEvent<HTMLLabelElement>) => {
     const input = inputRef.current
-    if (!input || event.target === input) return
+    if (disabled || !input || event.target === input) return
     event.preventDefault()
     input.focus({ preventScroll: true })
     if (typeof input.showPicker === 'function') {
@@ -53,11 +55,11 @@ export function NativePickerField({ ariaLabel, className, emptyLabel = 'Select',
   }
 
   return (
-    <label className={fieldClassName} onClick={openPickerFromField}>
+    <label className={fieldClassName} data-disabled={disabled ? 'true' : 'false'} onClick={openPickerFromField}>
       <span>{label}</span>
       <span className={styles.pickerShell} data-empty={value ? 'false' : 'true'}>
         <span className={styles.pickerValue} aria-hidden="true">{displayValue(type, value, emptyLabel)}</span>
-        <input aria-label={ariaLabel ?? label} className={styles.nativePickerInput} name={name} onChange={(event) => onChange(event.target.value)} ref={inputRef} type={type} value={value} />
+        <input aria-label={ariaLabel ?? label} className={styles.nativePickerInput} data-modal-detail-autofocus={detailAutoFocus ? 'true' : undefined} disabled={disabled} name={name} onChange={(event) => onChange(event.target.value)} ref={inputRef} type={type} value={value} />
       </span>
     </label>
   )

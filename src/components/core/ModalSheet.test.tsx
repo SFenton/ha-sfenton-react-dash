@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { useState } from 'react'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { ModalSheet } from './ModalSheet'
 
 function ModalSheetHarness() {
@@ -16,7 +16,58 @@ function ModalSheetHarness() {
   )
 }
 
+function ModalSheetObserverHarness() {
+  const [contentVersion, setContentVersion] = useState(0)
+  const [footerVisible, setFooterVisible] = useState(true)
+
+  return (
+    <ModalSheet
+      footer={footerVisible ? <span>Footer {contentVersion}</span> : undefined}
+      onClose={() => undefined}
+      open
+      subtitle={`Status ${contentVersion}`}
+      title="Observer controls"
+    >
+      <button onClick={() => setContentVersion((current) => current + 1)} type="button">Update content</button>
+      <button onClick={() => setFooterVisible((current) => !current)} type="button">Toggle footer</button>
+    </ModalSheet>
+  )
+}
+
 describe('ModalSheet', () => {
+  it('keeps its body observer stable when footer and subtitle content change without changing layout presence', async () => {
+    const originalWindowResizeObserver = window.ResizeObserver
+    window.ResizeObserver = globalThis.ResizeObserver
+    const observeSpy = vi.spyOn(window.ResizeObserver.prototype, 'observe')
+    const disconnectSpy = vi.spyOn(window.ResizeObserver.prototype, 'disconnect')
+    const { unmount } = render(<ModalSheetObserverHarness />)
+
+    try {
+      fireEvent.click(screen.getByRole('button', { name: 'Toggle footer' }))
+      await waitFor(() => expect(screen.queryByText('Footer 0')).not.toBeInTheDocument())
+      await waitFor(() => expect(observeSpy).toHaveBeenCalled())
+      fireEvent.click(screen.getByRole('button', { name: 'Toggle footer' }))
+      await waitFor(() => expect(screen.getByText('Footer 0')).toBeInTheDocument())
+      const initialObservations = observeSpy.mock.calls.length
+      const initialDisconnects = disconnectSpy.mock.calls.length
+
+      fireEvent.click(screen.getByRole('button', { name: 'Update content' }))
+      await waitFor(() => expect(screen.getByText('Footer 1')).toBeInTheDocument())
+      expect(observeSpy).toHaveBeenCalledTimes(initialObservations)
+      expect(disconnectSpy).toHaveBeenCalledTimes(initialDisconnects)
+
+      fireEvent.click(screen.getByRole('button', { name: 'Toggle footer' }))
+      await waitFor(() => expect(screen.queryByText('Footer 1')).not.toBeInTheDocument())
+      expect(observeSpy).toHaveBeenCalledTimes(initialObservations + 1)
+      expect(disconnectSpy).toHaveBeenCalledTimes(initialDisconnects + 1)
+    } finally {
+      unmount()
+      observeSpy.mockRestore()
+      disconnectSpy.mockRestore()
+      window.ResizeObserver = originalWindowResizeObserver
+    }
+  })
+
   it('makes the closing sheet inert and releases background pointer locking during exit animation', async () => {
     render(<ModalSheetHarness />)
 

@@ -1,4 +1,4 @@
-import type { CSSProperties, KeyboardEvent } from 'react'
+import type { CSSProperties, FocusEvent, KeyboardEvent, PointerEvent } from 'react'
 
 type SliderTarget = 'high' | 'low' | 'value'
 
@@ -64,17 +64,21 @@ type ControlToggleProps = {
   checked?: boolean
   className?: string
   color?: string
+  'data-keyboard-focus'?: string
   disabled?: boolean
   offIcon?: string
+  onBlur?: (event: FocusEvent<HTMLDivElement>) => void
   onChange?: (checked: boolean) => void
+  onFocus?: (event: FocusEvent<HTMLDivElement>) => void
   onIcon?: string
   onKeyDown?: (event: KeyboardEvent<HTMLDivElement>) => void
+  onPointerDown?: (event: PointerEvent<HTMLDivElement>) => void
   style?: CSSProperties
   thickness?: number
   vertical?: boolean
 }
 
-export function ControlToggle({ checked = false, className, disabled, onChange, onKeyDown, style, ...props }: ControlToggleProps) {
+export function ControlToggle({ checked = false, className, disabled, onBlur, onChange, onFocus, onKeyDown, onPointerDown, style, ...props }: ControlToggleProps) {
   return (
     <div
       aria-checked={checked}
@@ -82,10 +86,14 @@ export function ControlToggle({ checked = false, className, disabled, onChange, 
       aria-label={props['aria-label']}
       className={className}
       data-disabled={disabled ? 'true' : 'false'}
+      data-keyboard-focus={props['data-keyboard-focus']}
+      onBlur={onBlur}
       onClick={() => {
         if (!disabled) onChange?.(!checked)
       }}
+      onFocus={onFocus}
       onKeyDown={onKeyDown}
+      onPointerDown={onPointerDown}
       role="switch"
       style={style}
       tabIndex={disabled ? -1 : 0}
