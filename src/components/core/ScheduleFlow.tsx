@@ -46,13 +46,16 @@ interface ScheduleListRowProps {
   autoFocus?: boolean
   active?: boolean
   disabled?: boolean
+  disclosure?: boolean
   focusKey: string
   icon?: string
+  iconSurface?: boolean
   onClick: () => void
   primary: ReactNode
   secondary?: ReactNode
   tertiary?: ReactNode
   trailingControl?: ReactNode
+  wrapText?: boolean
 }
 
 interface ScheduleDetailFooterProps {
@@ -139,13 +142,16 @@ export function ScheduleListRow({
   active = false,
   autoFocus = false,
   disabled = false,
+  disclosure = true,
   focusKey,
   icon = 'mdi:calendar',
+  iconSurface = true,
   onClick,
   primary,
   secondary,
   tertiary,
   trailingControl,
+  wrapText = false,
 }: ScheduleListRowProps) {
   return (
     <div className={styles.rowShell} data-schedule-list-row={true}>
@@ -154,8 +160,10 @@ export function ScheduleListRow({
         className={styles.row}
         data-active={active ? 'true' : 'false'}
         data-has-trailing-control={trailingControl ? 'true' : 'false'}
+        data-icon-surface={iconSurface ? 'true' : 'false'}
         data-modal-detail-autofocus={autoFocus ? 'true' : undefined}
         data-modal-detail-trigger={focusKey}
+        data-wrap-text={wrapText ? 'true' : undefined}
         disabled={disabled}
         onClick={onClick}
         type='button'
@@ -169,7 +177,7 @@ export function ScheduleListRow({
           {tertiary && <small>{tertiary}</small>}
         </span>
         {trailingControl && <span aria-hidden className={styles.rowTrailingSpacer} />}
-        {!disabled && (
+        {!disabled && disclosure && (
           <span className={styles.rowChevron} data-schedule-list-row-chevron>
             <MaterialIcon name='mdi:chevron-right' size={20} />
           </span>

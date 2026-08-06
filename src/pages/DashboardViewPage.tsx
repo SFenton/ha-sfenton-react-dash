@@ -11,7 +11,7 @@ import { DashboardPageLoading, type DashboardPageLoadingPhase } from '../compone
 import { DashboardFloatingAction } from '../components/shell/DashboardFloatingAction'
 import { dashboardRoomNameFromPath, hasDashboardFloatingAction } from '../components/shell/dashboardFloatingAction'
 import { EntityActionCard } from '../components/hass/EntityActionCard'
-import { PresenceOverrideCard } from '../components/hass/PresenceOverrideCard'
+import { PresenceOverrideCard, PresenceOverrideDetailPage } from '../components/hass/PresenceOverrideCard'
 import { SecurityDashboard, SecurityStatusRail } from '../components/hass/SecurityDashboard'
 import { StatusRail, type StatusRailChip } from '../components/hass/StatusRail'
 import { TodoListPanel } from '../components/hass/TodoListPanel'
@@ -66,6 +66,7 @@ import { resolveEntityAction, type EntityActionStateMap } from '../components/ha
 import { asEntityName, formatCompactEntityState, formatContactEntityState, isActiveState, isContactOpen, isOccupancyActive, titleCaseState } from '../components/hass/entityState'
 import { DASHBOARD_ROUTE_CHANGE_EVENT, dashboardEventTargets, dashboardHash, dashboardPathWithSearch, replaceDashboardUrl } from '../hooks/dashboardLocation'
 import { useHashModal } from '../hooks/useHashModal'
+import { useModalDetailPageScroll } from '../hooks/useModalDetailPageScroll'
 import { useOptimisticState } from '../hooks/useOptimisticState'
 import { useScheduleDetailPage } from '../hooks/useScheduleDetailPage'
 import { useImmediateVisualTab, useSmoothDisplayedModalTab } from '../hooks/useSmoothDisplayedModalTab'
@@ -329,10 +330,10 @@ function AdminTileGrid({ gridLabel, items, onNavigate, squareGridRef, squareGrid
   return <Grid>{cards}</Grid>
 }
 
-function AdminPresenceOverrideGrid({ gridLabel, items, squareGridRef, squareGridStyle }: { gridLabel: string; items: PresenceOverrideConfig[]; squareGridRef?: (node: HTMLElement | null) => void; squareGridStyle?: ModalSquareGridStyle }) {
+function AdminPresenceOverrideGrid({ gridLabel, items, onSelect, squareGridRef, squareGridStyle }: { gridLabel: string; items: PresenceOverrideConfig[]; onSelect: (item: PresenceOverrideConfig) => void; squareGridRef?: (node: HTMLElement | null) => void; squareGridStyle?: ModalSquareGridStyle }) {
   return (
     <AdminModalGrid label={gridLabel} squareGridRef={squareGridRef} squareGridStyle={squareGridStyle}>
-      {items.map((item) => <PresenceOverrideCard item={item} key={`${item.entityId}-${item.title}`} />)}
+      {items.map((item) => <PresenceOverrideCard item={item} key={`${item.entityId}-${item.title}`} onSelect={onSelect} />)}
     </AdminModalGrid>
   )
 }
@@ -1910,6 +1911,9 @@ function MediaPage({ preload = false, preloadHash, preloadHashes = [] }: { prelo
 
 function AdminPage({ onNavigate, preload = false, preloadHash, preloadHashes = [] }: { onNavigate: (path: string) => void; preload?: boolean; preloadHash?: string; preloadHashes?: string[] }) {
   const { closeHash, hash, openHash } = useHashModal({ disabled: preload })
+  const [selectedPresenceOverride, setSelectedPresenceOverride] = useState<PresenceOverrideConfig | null>(null)
+  const presenceDetailPageKey = selectedPresenceOverride?.entityId ?? 'overview'
+  const { bodyElementRef, enterDetailPage, leaveDetailPage, resetDetailPageScroll } = useModalDetailPageScroll(presenceDetailPageKey)
   const contentHash = hash || preloadHash || ''
   const presenceModalOpen = hash === '#presence-based-overrides'
   const autoResetModalOpen = hash === '#presence-based-overrides-auto'
@@ -1917,6 +1921,19 @@ function AdminPage({ onNavigate, preload = false, preloadHash, preloadHashes = [
   const autoResetModalContentActive = contentHash === '#presence-based-overrides-auto'
   const [presenceGridRef, presenceGridLayout] = useModalSquareGridLayout(presenceModalOpen, ADMIN_PRESENCE_OVERRIDE_ITEMS.length)
   const [autoResetGridRef, autoResetGridLayout] = useModalSquareGridLayout(autoResetModalOpen, ADMIN_AUTO_REENABLE_ITEMS.length)
+  const openPresenceModal = (nextHash: string) => {
+    resetDetailPageScroll()
+    setSelectedPresenceOverride(null)
+    openHash(nextHash)
+  }
+  const openPresenceDetail = (item: PresenceOverrideConfig) => {
+    enterDetailPage(item.entityId)
+    setSelectedPresenceOverride(item)
+  }
+  const closePresenceDetail = () => {
+    leaveDetailPage()
+    setSelectedPresenceOverride(null)
+  }
 
   return (
     <div className={styles.stack}>
@@ -1941,7 +1958,7 @@ function AdminPage({ onNavigate, preload = false, preloadHash, preloadHashes = [
       <section className={styles.section}>
         <SectionHeader title="Presence-Based Light Overrides" />
         <Description>{ADMIN_DESCRIPTIONS.presenceOverrides}</Description>
-        <AdminHashButton hash="#presence-based-overrides" onOpen={openHash} title="Open Presence-Based Overrides" />
+        <AdminHashButton hash="#presence-based-overrides" onOpen={openPresenceModal} title="Open Presence-Based Overrides" />
       </section>
 
       <section className={styles.section}>
@@ -1956,9 +1973,23 @@ function AdminPage({ onNavigate, preload = false, preloadHash, preloadHashes = [
         <AdminHashButton hash="#presence-based-overrides-auto" onOpen={openHash} title="Open Presence-Based Auto-Reset Configuration" />
       </section>
 
-      <ModalSheet contentStyle={presenceModalContentActive ? modalSquareGridModalStyle(presenceGridLayout) : undefined} onClose={closeHash} open={presenceModalOpen} surface="hass-popup" title="Presence-Based Overrides">
+      <ModalSheet
+        backLabel="Back to presence overrides"
+        bodyElementRef={bodyElementRef}
+        contentStyle={presenceModalContentActive ? modalSquareGridModalStyle(presenceGridLayout) : undefined}
+        onBack={selectedPresenceOverride ? closePresenceDetail : undefined}
+        onClose={closeHash}
+        open={presenceModalOpen}
+        scrollResetKey={presenceDetailPageKey}
+        surface="hass-popup"
+        title={selectedPresenceOverride ? `${selectedPresenceOverride.title} Presence Lighting` : 'Presence-Based Overrides'}
+      >
         <div className={styles.adminModalBody}>
-          {presenceModalContentActive && <AdminPresenceOverrideGrid gridLabel="Presence-Based Overrides by room" items={ADMIN_PRESENCE_OVERRIDE_ITEMS} squareGridRef={presenceGridRef} squareGridStyle={modalSquareGridStyle(presenceGridLayout)} />}
+          {presenceModalContentActive && (
+            selectedPresenceOverride
+              ? <PresenceOverrideDetailPage item={selectedPresenceOverride} />
+              : <AdminPresenceOverrideGrid gridLabel="Presence-Based Overrides by room" items={ADMIN_PRESENCE_OVERRIDE_ITEMS} onSelect={openPresenceDetail} squareGridRef={presenceGridRef} squareGridStyle={modalSquareGridStyle(presenceGridLayout)} />
+          )}
         </div>
       </ModalSheet>
 
@@ -1970,7 +2001,7 @@ function AdminPage({ onNavigate, preload = false, preloadHash, preloadHashes = [
       {preloadHashes.includes('#presence-based-overrides') && (
         <div data-preload-modal="admin#presence-based-overrides">
           <div className={styles.adminModalBody}>
-            <AdminPresenceOverrideGrid gridLabel="Presence-Based Overrides by room" items={ADMIN_PRESENCE_OVERRIDE_ITEMS} />
+            <AdminPresenceOverrideGrid gridLabel="Presence-Based Overrides by room" items={ADMIN_PRESENCE_OVERRIDE_ITEMS} onSelect={() => undefined} />
           </div>
         </div>
       )}

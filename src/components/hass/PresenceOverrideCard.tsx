@@ -1,124 +1,93 @@
 import { useEntity, useHass } from '@hakit/core'
-import { useState } from 'react'
 import { Card, type CardColor } from '../core/Card'
+import { DynamicGrid } from '../core/DynamicGrid'
 import { MaterialIcon } from '../core/Icon'
-import { OptionPickerDialog, type PickerOption } from '../core/OptionPickerDialog'
-import type { ModalSheetStyle } from '../core/ModalSheet'
+import { ScheduleListRow } from '../core/ScheduleFlow'
 import type { PresenceOverrideConfig } from '../../constants/portedDashboard'
 import { useOptimisticState } from '../../hooks/useOptimisticState'
 import { asEntityName } from './entityState'
-import { isPresenceOverrideState, PRESENCE_OVERRIDE_STATES, presenceOverrideDisplayState, type PresenceOverrideDisplayState } from './presenceOverrideState'
+import { PRESENCE_OVERRIDE_STATES, presenceOverrideDisplayState, presenceOverrideServiceState, type PresenceOverrideDisplayState, type PresenceOverrideState } from './presenceOverrideState'
+import styles from './PresenceOverrideCard.module.css'
 
 interface PresenceStatePresentation {
-  activeBackground: string
   color: CardColor
+  description: string
   icon: string
   label: string
-}
-
-const PRESENCE_OVERRIDE_PICKER_STYLE: ModalSheetStyle = {
-  '--modal-desktop-height': 'auto',
-  '--modal-desktop-max-width': '500px',
-  '--modal-desktop-width': '500px',
+  summaryLabel: string
 }
 
 const PRESENCE_STATE_PRESENTATION: Record<PresenceOverrideDisplayState, PresenceStatePresentation> = {
-  on: {
-    activeBackground: 'rgba(67, 160, 71, 0.72)',
-    color: { r: 67, g: 160, b: 71 },
-    icon: 'mdi:lightbulb-auto',
-    label: 'On',
-  },
-  off: {
-    activeBackground: 'rgba(84, 110, 122, 0.78)',
-    color: { r: 84, g: 110, b: 122 },
-    icon: 'mdi:lightbulb-off',
-    label: 'Off',
-  },
-  paused: {
-    activeBackground: 'rgba(230, 154, 37, 0.76)',
-    color: { r: 230, g: 154, b: 37 },
-    icon: 'mdi:pause-circle',
-    label: 'Paused',
-  },
-  quieted: {
-    activeBackground: 'rgba(117, 91, 180, 0.76)',
-    color: { r: 117, g: 91, b: 180 },
-    icon: 'mdi:volume-mute',
-    label: 'Quieted',
-  },
-  active: {
-    activeBackground: 'rgba(30, 136, 229, 0.72)',
-    color: { r: 30, g: 136, b: 229 },
-    icon: 'mdi:motion-sensor',
-    label: 'Active',
-  },
-  unavailable: {
-    activeBackground: 'rgba(84, 110, 122, 0.58)',
-    color: { r: 84, g: 110, b: 122 },
-    icon: 'mdi:alert-circle',
-    label: 'Unavailable',
-  },
+  enabled: { color: { r: 67, g: 160, b: 71 }, description: 'Presence and occupancy can control the lights.', icon: 'mdi:lightbulb-auto', label: 'Enable Presence-Based Lighting', summaryLabel: 'Enabled' },
+  off: { color: { r: 84, g: 110, b: 122 }, description: 'Presence-Based Lighting is disabled for this room.', icon: 'mdi:lightbulb-off', label: 'Disable Presence-Based Lighting', summaryLabel: 'Disabled' },
+  paused: { color: { r: 230, g: 154, b: 37 }, description: 'Lights stay in their current state until explicitly resumed.', icon: 'mdi:pause-circle', label: 'Paused', summaryLabel: 'Paused' },
+  quieted: { color: { r: 117, g: 91, b: 180 }, description: 'Stay dark, then rearm after the room clears.', icon: 'mdi:volume-mute', label: 'Quieted', summaryLabel: 'Quieted' },
+  unavailable: { color: { r: 84, g: 110, b: 122 }, description: 'Home Assistant state is unavailable.', icon: 'mdi:alert-circle', label: 'Unavailable', summaryLabel: 'Unavailable' },
 }
 
-const PRESENCE_OVERRIDE_OPTIONS: PickerOption[] = PRESENCE_OVERRIDE_STATES.map((state) => ({
-  activeBackground: PRESENCE_STATE_PRESENTATION[state].activeBackground,
-  icon: PRESENCE_STATE_PRESENTATION[state].icon,
-  label: PRESENCE_STATE_PRESENTATION[state].label,
-  value: state,
-}))
-
-export function PresenceOverrideCard({ item }: { item: PresenceOverrideConfig }) {
+export function PresenceOverrideCard({ item, onSelect }: { item: PresenceOverrideConfig; onSelect: (item: PresenceOverrideConfig) => void }) {
   const entity = useEntity(asEntityName(item.entityId), { returnNullIfNotFound: true })
-  const callService = useHass((state) => state.helpers.callService) as unknown as (params: Record<string, unknown>) => void
-  const [pickerOpen, setPickerOpen] = useState(false)
-  const liveState = presenceOverrideDisplayState(entity)
-  const [displayState, commitDisplayState] = useOptimisticState(liveState, { clearOn: 'confirmation' })
+  const displayState = presenceOverrideDisplayState(entity)
   const presentation = PRESENCE_STATE_PRESENTATION[displayState]
   const disabled = displayState === 'unavailable'
-
-  const selectState = (nextState: string) => {
-    if (!isPresenceOverrideState(nextState) || disabled) {
-      setPickerOpen(false)
-      return
-    }
-
-    commitDisplayState(nextState)
-    callService({
-      domain: 'presence_based_lighting',
-      service: 'set_automation_state',
-      target: item.entityId,
-      serviceData: { state: nextState },
-    })
-    setPickerOpen(false)
-  }
-
   return (
-    <>
+    <div className={styles.detailMarker} data-modal-detail-trigger={item.entityId}>
       <Card
-        ariaLabel={`${item.title} ${presentation.label}`}
+        ariaLabel={`${item.title} ${presentation.summaryLabel}`}
         color={presentation.color}
         disabled={disabled}
         disclosure
         icon={<MaterialIcon name="mdi:lightbulb-auto" size={38} />}
         muted={disabled}
-        onClick={() => setPickerOpen(true)}
+        onClick={() => onSelect(item)}
         size="admin-modal"
-        subtitle={presentation.label}
+        subtitle={presentation.summaryLabel}
         title={item.title}
       />
-      <OptionPickerDialog
-        icon="mdi:lightbulb-auto"
-        onClose={() => setPickerOpen(false)}
-        onSelect={selectState}
-        open={pickerOpen}
-        options={PRESENCE_OVERRIDE_OPTIONS}
-        presentation="sheet"
-        sheetLayout="compact-grid"
-        sheetStyle={PRESENCE_OVERRIDE_PICKER_STYLE}
-        title={`${item.title} Presence Lighting`}
-        value={displayState}
-      />
-    </>
+    </div>
+  )
+}
+
+export function PresenceOverrideDetailPage({ item }: { item: PresenceOverrideConfig }) {
+  const entity = useEntity(asEntityName(item.entityId), { returnNullIfNotFound: true })
+  const callService = useHass((state) => state.helpers.callService) as unknown as (params: Record<string, unknown>) => void
+  const liveState = presenceOverrideDisplayState(entity)
+  const [displayState, commitDisplayState] = useOptimisticState(liveState, { clearOn: 'confirmation' })
+  const disabled = displayState === 'unavailable'
+  const selectState = (nextState: PresenceOverrideState) => {
+    if (disabled) return
+    commitDisplayState(nextState)
+    callService({
+      domain: 'presence_based_lighting',
+      service: 'set_automation_state',
+      target: item.entityId,
+      serviceData: { state: presenceOverrideServiceState(nextState) },
+    })
+  }
+  return (
+    <section aria-label={`${item.title} presence lighting controls`} className={styles.detailPage}>
+      <DynamicGrid ariaLabel={`${item.title} presence lighting states`} className={styles.stateGrid} columns={2} gap={8}>
+        {PRESENCE_OVERRIDE_STATES.map((state, index) => {
+          const presentation = PRESENCE_STATE_PRESENTATION[state]
+          return (
+            <ScheduleListRow
+              accessibleLabel={`Set ${item.title} presence lighting to ${presentation.label}`}
+              active={displayState === state}
+              autoFocus={index === 0}
+              disabled={disabled}
+              disclosure={false}
+              focusKey={state}
+              icon={presentation.icon}
+              iconSurface={false}
+              key={state}
+              onClick={() => selectState(state)}
+              primary={presentation.label}
+              secondary={presentation.description}
+              wrapText
+            />
+          )
+        })}
+      </DynamicGrid>
+    </section>
   )
 }

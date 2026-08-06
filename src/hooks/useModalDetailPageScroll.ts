@@ -9,6 +9,12 @@ interface DetailPageSnapshot {
   focusKey?: string
 }
 
+function modalDetailFocusTarget(element: HTMLElement | null | undefined) {
+  if (!element) return null
+  if (element.matches('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])')) return element
+  return element.querySelector<HTMLElement>('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])') ?? element
+}
+
 export function useModalDetailPageScroll(pageKey: DetailPageKey, additionalScrollRef?: RefObject<HTMLElement | null>) {
   const bodyElementRef = useRef<HTMLDivElement | null>(null)
   const pageSnapshotsRef = useRef<DetailPageSnapshot[]>([])
@@ -24,7 +30,8 @@ export function useModalDetailPageScroll(pageKey: DetailPageKey, additionalScrol
       const returnTarget = pendingRestore.focusKey
         ? detailTriggers.find((element) => element.dataset.modalDetailTrigger === pendingRestore.focusKey) ?? detailTriggers.at(-1)
         : pendingRestore.focusElement
-      if (returnTarget?.isConnected) returnTarget.focus({ preventScroll: true })
+      const focusTarget = modalDetailFocusTarget(returnTarget)
+      if (focusTarget?.isConnected) focusTarget.focus({ preventScroll: true })
       pendingRestoreRef.current = null
       return
     }
@@ -32,7 +39,7 @@ export function useModalDetailPageScroll(pageKey: DetailPageKey, additionalScrol
     if (!pendingEnterRef.current) return
     if (bodyElementRef.current) bodyElementRef.current.scrollTop = 0
     if (additionalScrollRef?.current) additionalScrollRef.current.scrollTop = 0
-    bodyElementRef.current?.querySelector<HTMLElement>('[data-modal-detail-autofocus="true"]')?.focus({ preventScroll: true })
+    modalDetailFocusTarget(bodyElementRef.current?.querySelector<HTMLElement>('[data-modal-detail-autofocus="true"]'))?.focus({ preventScroll: true })
     pendingEnterRef.current = false
   }, [additionalScrollRef, pageKey])
 
