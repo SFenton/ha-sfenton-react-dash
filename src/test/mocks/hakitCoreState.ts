@@ -16,7 +16,7 @@ export interface MockHassState {
     joinHassUrl: (path: string) => string
   }
   services: Record<string, unknown>
-  user: { id: string; name: string } | null
+  user: { id: string; is_admin?: boolean; name: string } | null
 }
 
 export function entity(entityId: string, state: string, attributes: Record<string, unknown> = {}): MockEntity {
@@ -26,10 +26,28 @@ export function entity(entityId: string, state: string, attributes: Record<strin
 const freeSleepLevelAttributes = { icon: 'mdi:thermometer-lines', max: 10, min: -10, step: 1, unit_of_measurement: '°' }
 
 export const mockCallServiceCalls: Record<string, unknown>[] = []
+export const mockScheduleMessages: Record<string, unknown>[] = []
 export const mockTodoUpdateMessages: Record<string, unknown>[] = []
 export const mockTodoItemsByEntity: Record<string, MockTodoItem[] | undefined> = {}
 export const mockDonetickTasksById: Record<number, MockDonetickTask | undefined> = {}
 let mockDonetickTaskLoadDelayMs = 0
+
+function emptyHumidifierSchedule() {
+  return {
+    id: 'master_bedroom_humidifier',
+    name: 'Master Bedroom Humidifier',
+    icon: 'mdi:calendar-clock',
+    sunday: [],
+    monday: [],
+    tuesday: [],
+    wednesday: [],
+    thursday: [],
+    friday: [],
+    saturday: [],
+  }
+}
+
+let mockHumidifierSchedule = emptyHumidifierSchedule()
 
 const mockDailyWeatherForecast = [
   { datetime: '2026-06-10T07:00:00+00:00', condition: 'sunny', temperature: 65, templow: 48, precipitation_probability: 0, precipitation: 0, humidity: 74, dew_point: 48, cloud_coverage: 57, wind_speed: 3.56, wind_gust_speed: 7.97, wind_bearing: 185, uv_index: 6.7 },
@@ -633,7 +651,23 @@ export const mockEntities: Record<string, MockEntity> = {
   'fan.master_bedroom_air_purifier_levoit_purifier': entity('fan.master_bedroom_air_purifier_levoit_purifier', 'on', { percentage: 33 }),
   'fan.office_air_purifier_levoit_purifier': entity('fan.office_air_purifier_levoit_purifier', 'on', { percentage: 33 }),
   'fan.theater_room_air_purifier_levoit_purifier': entity('fan.theater_room_air_purifier_levoit_purifier', 'on', { percentage: 33 }),
-  'humidifier.master_bedroom_humidifier': entity('humidifier.master_bedroom_humidifier', 'on', { available_modes: ['auto', 'normal'], current_humidity: 41, humidity: 45, max_humidity: 80, min_humidity: 30, mode: 'auto' }),
+  'switch.lv600s_humidifier_power': entity('switch.lv600s_humidifier_power', 'on'),
+  'switch.lv600s_humidifier_display': entity('switch.lv600s_humidifier_display', 'on'),
+  'select.lv600s_humidifier_mode': entity('select.lv600s_humidifier_mode', 'Manual', { options: ['Manual', 'Target Humidity', 'Sleep'] }),
+  'number.lv600s_humidifier_target_humidity': entity('number.lv600s_humidifier_target_humidity', '100', { max: 80, min: 40, mode: 'slider', step: 5 }),
+  'number.lv600s_humidifier_mist_level': entity('number.lv600s_humidifier_mist_level', '5', { max: 9, min: 1, mode: 'slider', step: 1 }),
+  'number.lv600s_humidifier_warm_level': entity('number.lv600s_humidifier_warm_level', '1', { max: 3, min: 0, mode: 'slider', step: 1 }),
+  'number.lv600s_humidifier_timer_minutes': entity('number.lv600s_humidifier_timer_minutes', '0', { max: 720, min: 0, mode: 'box', step: 30 }),
+  'sensor.lv600s_humidifier_current_humidity': entity('sensor.lv600s_humidifier_current_humidity', '46', { unit_of_measurement: '%' }),
+  'sensor.lv600s_humidifier_current_temperature': entity('sensor.lv600s_humidifier_current_temperature', '71.6', { unit_of_measurement: '°F' }),
+  'sensor.lv600s_humidifier_timer_remaining': entity('sensor.lv600s_humidifier_timer_remaining', '0', { unit_of_measurement: 's' }),
+  'binary_sensor.lv600s_humidifier_water_low': entity('binary_sensor.lv600s_humidifier_water_low', 'off'),
+  'binary_sensor.lv600s_humidifier_tank_removed': entity('binary_sensor.lv600s_humidifier_tank_removed', 'off'),
+  'binary_sensor.lv600s_humidifier_humidifying': entity('binary_sensor.lv600s_humidifier_humidifying', 'on'),
+  'schedule.master_bedroom_humidifier': entity('schedule.master_bedroom_humidifier', 'off', { next_event: null }),
+  'input_boolean.master_bedroom_humidifier_schedule_enabled': entity('input_boolean.master_bedroom_humidifier_schedule_enabled', 'off'),
+  'script.master_bedroom_humidifier_set_level': entity('script.master_bedroom_humidifier_set_level', 'off'),
+  'script.master_bedroom_humidifier_apply_profile': entity('script.master_bedroom_humidifier_apply_profile', 'off'),
   'select.air_purifier_auto_mode': entity('select.air_purifier_auto_mode', 'Default'),
   'select.air_purifier_fan_mode': entity('select.air_purifier_fan_mode', 'Auto'),
   'binary_sensor.dishwasher_connectivity': entity('binary_sensor.dishwasher_connectivity', 'on'),
@@ -822,16 +856,25 @@ function todoItems(entityId: unknown) {
 
 export function resetMockHass() {
   mockCallServiceCalls.length = 0
+  mockScheduleMessages.length = 0
   mockTodoUpdateMessages.length = 0
   for (const entityId of Object.keys(mockTodoItemsByEntity)) delete mockTodoItemsByEntity[entityId]
   for (const taskId of Object.keys(mockDonetickTasksById)) delete mockDonetickTasksById[Number(taskId)]
   mockDonetickTaskLoadDelayMs = 0
-  mockState.user = { id: '64089b5683944c39b4f944c8f76830b0', name: 'Stephen' }
+  mockState.user = { id: '64089b5683944c39b4f944c8f76830b0', is_admin: true, name: 'Stephen' }
   mockEntities['sensor.nightcanvasrestful_schedules'].attributes = mockFreeSleepScheduleAttributes()
   mockEntities['sensor.sleepypod_stephen_schedule_phase'].state = 'outside'
   mockEntities['sensor.sleepypod_steph_schedule_phase'].state = 'outside'
   mockEntities['switch.nightcanvasrestful_left_alarms_enabled'].state = 'off'
   mockEntities['switch.nightcanvasrestful_right_alarms_enabled'].state = 'off'
+  for (const owner of freeSleepAlarmOwners) {
+    mockEntities[`input_boolean.${owner}_alarms_enabled`].state = 'off'
+    for (const day of freeSleepAlarmDays) {
+      mockEntities[`input_boolean.${owner}_${day}_alarm_configured`].state = 'off'
+      mockEntities[`input_boolean.${owner}_${day}_alarm_enabled`].state = 'off'
+      mockEntities[`input_datetime.${owner}_${day}_alarm_time`].state = '07:00:00'
+    }
+  }
   mockEntities['sensor.master_bedroom_sleepypod_eight_pod_left_alarm_state'].state = 'idle'
   mockEntities['sensor.master_bedroom_sleepypod_eight_pod_left_alarm_state'].attributes.snoozed_until = null
   mockEntities['sensor.master_bedroom_sleepypod_eight_pod_right_alarm_state'].state = 'idle'
@@ -869,8 +912,21 @@ export function resetMockHass() {
   mockEntities['sensor.thermostat_home_away_reason'].state = 'A resident is home, so TCS is using home behavior.'
   mockEntities['select.thermostat_contact_sensors_eco_behavior_when_away'].state = 'Keep Eco Active'
   mockEntities['switch.main_floor_vacuum_coordinator_pause'].state = 'off'
-  mockEntities['humidifier.master_bedroom_humidifier'].state = 'on'
-  mockEntities['humidifier.master_bedroom_humidifier'].attributes = { available_modes: ['auto', 'normal'], current_humidity: 41, humidity: 45, max_humidity: 80, min_humidity: 30, mode: 'auto' }
+  mockEntities['switch.lv600s_humidifier_power'].state = 'on'
+  mockEntities['switch.lv600s_humidifier_display'].state = 'on'
+  mockEntities['select.lv600s_humidifier_mode'].state = 'Manual'
+  mockEntities['number.lv600s_humidifier_target_humidity'].state = '100'
+  mockEntities['number.lv600s_humidifier_mist_level'].state = '5'
+  mockEntities['number.lv600s_humidifier_warm_level'].state = '1'
+  mockEntities['number.lv600s_humidifier_timer_minutes'].state = '0'
+  mockEntities['sensor.lv600s_humidifier_current_humidity'].state = '46'
+  mockEntities['sensor.lv600s_humidifier_current_temperature'].state = '71.6'
+  mockEntities['sensor.lv600s_humidifier_timer_remaining'].state = '0'
+  mockEntities['binary_sensor.lv600s_humidifier_water_low'].state = 'off'
+  mockEntities['binary_sensor.lv600s_humidifier_tank_removed'].state = 'off'
+  mockEntities['binary_sensor.lv600s_humidifier_humidifying'].state = 'on'
+  mockEntities['input_boolean.master_bedroom_humidifier_schedule_enabled'].state = 'off'
+  mockHumidifierSchedule = emptyHumidifierSchedule()
   exposeMockHassDebugApi()
 }
 
@@ -878,6 +934,23 @@ export const mockState: MockHassState = {
   config: {},
   connection: {
     sendMessagePromise: async <T,>(message: Record<string, unknown>) => {
+      if (message.type === 'schedule/list') return [cloneRecord(mockHumidifierSchedule)] as T
+      if (message.type === 'schedule/update') {
+        mockScheduleMessages.push(cloneRecord(message))
+        mockHumidifierSchedule = {
+          id: String(message.schedule_id),
+          name: String(message.name),
+          icon: typeof message.icon === 'string' ? message.icon : undefined,
+          sunday: cloneRecord(Array.isArray(message.sunday) ? message.sunday : []),
+          monday: cloneRecord(Array.isArray(message.monday) ? message.monday : []),
+          tuesday: cloneRecord(Array.isArray(message.tuesday) ? message.tuesday : []),
+          wednesday: cloneRecord(Array.isArray(message.wednesday) ? message.wednesday : []),
+          thursday: cloneRecord(Array.isArray(message.thursday) ? message.thursday : []),
+          friday: cloneRecord(Array.isArray(message.friday) ? message.friday : []),
+          saturday: cloneRecord(Array.isArray(message.saturday) ? message.saturday : []),
+        }
+        return cloneRecord(mockHumidifierSchedule) as T
+      }
       if (message.type === 'todo/item/list') return todoItems(message.entity_id) as T
       if (message.type === 'todo/item/update') {
         mockTodoUpdateMessages.push(message)
@@ -1041,7 +1114,7 @@ export const mockState: MockHassState = {
     joinHassUrl: (path) => `http://mock-hass.local${path}`,
   },
   services: {},
-  user: { id: '64089b5683944c39b4f944c8f76830b0', name: 'Stephen' },
+  user: { id: '64089b5683944c39b4f944c8f76830b0', is_admin: true, name: 'Stephen' },
 }
 
 exposeMockHassDebugApi()

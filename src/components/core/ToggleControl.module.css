@@ -1,0 +1,36 @@
+.control {
+  --ha-control-switch-off-color: rgba(120, 120, 128, 0.32);
+  --ha-control-switch-background-opacity: 1;
+  --ha-control-switch-border-radius: 999px;
+  --ha-control-switch-padding: 4px;
+  flex: 0 0 auto;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.18));
+}
+
+.control :global(.switch),
+.control :global(.background) {
+  border-radius: 999px !important;
+}
+
+.control :global(.button) {
+  border-radius: 999px !important;
+  background: #fff !important;
+  color: transparent;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.32), 0 0 0 0.5px rgba(0, 0, 0, 0.08);
+}
+
+.control :global(.button svg) {
+  display: none;
+}
+
+.control:focus,
+.control:focus-visible,
+.control[checked='true']:focus-visible {
+  outline: none;
+  box-shadow: none !important;
+}
+
+.control[data-keyboard-focus='true'] {
+  outline: 2px solid rgba(111, 225, 185, 0.95);
+  outline-offset: 2px;
+}

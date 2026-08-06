@@ -1,4 +1,5 @@
 import type { CardColor } from '../components/core/Card'
+import { MASTER_BEDROOM_HUMIDIFIER } from './humidifiers'
 
 export type EntityBasicAction =
   | { type: 'navigate'; path: string }
@@ -615,7 +616,7 @@ export const ROOM_EXTRA_SECTIONS: Record<string, EntitySectionConfig[]> = {
     {
       title: 'Bedroom Climate',
       items: [
-        { title: 'Humidifier', entityId: 'humidifier.master_bedroom_humidifier', icon: 'mdi:air-humidifier', color: CLIMATE_COLOR, showSubtitle: true },
+        { title: 'Humidifier', entityId: MASTER_BEDROOM_HUMIDIFIER.powerEntityId, icon: 'mdi:air-humidifier', color: CLIMATE_COLOR, showSubtitle: true },
         { title: "Stephen's Bed", entityId: 'climate.sleepypod_eight_pod_left_side', icon: 'mdi:bed', color: CLIMATE_COLOR, showSubtitle: true },
         { title: "Steph's Bed", entityId: 'climate.sleepypod_eight_pod_right_side', icon: 'mdi:bed', color: CLIMATE_COLOR, showSubtitle: true },
       ],

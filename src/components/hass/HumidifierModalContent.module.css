@@ -1,45 +1,138 @@
-.sheet {
-  display: flex;
-  flex-direction: column;
-  gap: 28px;
-  padding: 0 0 18px;
-}
-
-.summaryGrid {
+.modalSheetPage {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
+  min-height: 0;
 }
 
-.wideTile {
-  grid-column: 1 / -1;
-}
-
-.controlSection {
+.modalBody {
   display: grid;
+  min-height: 0;
+  gap: 18px;
+  padding-top: 2px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+}
+
+.modalBody::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+.heroColumn,
+.modalPanel,
+.panelStack,
+.hero,
+.section {
+  display: grid;
+  min-width: 0;
+  align-content: start;
+}
+
+.heroColumn {
+  gap: 14px;
+}
+
+.hero {
+  justify-items: center;
   gap: 10px;
 }
 
-.separator {
-  display: flex;
-  align-items: center;
-  gap: 10px;
+.powerButton,
+.secondaryAction {
+  border: 1px solid rgba(255, 255, 255, 0.14);
   color: white;
-  font-size: 0.86rem;
-  font-weight: 800;
+  background: rgba(255, 255, 255, 0.1);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  font: inherit;
+  -webkit-tap-highlight-color: transparent;
 }
 
-.separator::after {
-  flex: 1 1 auto;
-  height: 1px;
-  background: rgba(255, 255, 255, 0.12);
-  content: '';
+.powerButton {
+  display: inline-flex;
+  min-width: 150px;
+  min-height: 48px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border-radius: 999px;
+  cursor: pointer;
+  font-size: 0.82rem;
+  font-weight: 840;
 }
 
+.powerButton[data-active='true'] {
+  border-color: rgba(255, 95, 87, 0.32);
+  background: rgba(229, 57, 53, 0.28);
+}
+
+.powerButton:disabled,
+.secondaryAction:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.powerButton:focus,
+.secondaryAction:focus {
+  outline: none;
+}
+
+.powerButton:focus-visible,
+.secondaryAction:focus-visible {
+  outline: 2px solid rgba(111, 225, 185, 0.95);
+  outline-offset: 2px;
+}
+
+.heroHint {
+  max-width: 320px;
+  text-align: center;
+}
+
+.heroStatusGrid,
+.infoGrid,
 .modeGrid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.modalPanel {
+  min-height: 220px;
+  gap: 18px;
+  opacity: 1;
+  transform: translate3d(0, 0, 0);
+  transition:
+    opacity 170ms ease,
+    transform 170ms ease;
+}
+
+.modalPanel[data-modal-tab-transition-state='exiting'] {
+  opacity: 0;
+  transform: translate3d(0, 5px, 0);
+  transition-duration: 130ms;
+}
+
+.modalPanel[data-modal-tab-transition-state='pre-entering'] {
+  opacity: 0;
+  transform: translate3d(0, 5px, 0);
+  transition: none;
+}
+
+.panelStack {
+  gap: 22px;
+}
+
+.section {
   gap: 10px;
+}
+
+.displaySection {
+  gap: 4px;
+}
+
+.displaySection > :first-child {
+  margin-bottom: 4px;
 }
 
 .modeTile {
@@ -48,4 +141,125 @@
 
 .modeTile[data-disabled='true'] {
   opacity: 0.48;
+}
+
+.targetDial {
+  display: grid;
+  justify-items: center;
+  padding: 2px 0 4px;
+}
+
+.secondaryAction {
+  display: inline-flex;
+  min-height: 48px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border-radius: 18px;
+  padding: 0 14px;
+  cursor: pointer;
+  font-size: 0.78rem;
+  font-weight: 820;
+}
+
+.activityDialGrid {
+  display: grid;
+  grid-template-columns: repeat(var(--activity-dial-cols, 1), minmax(0, 1fr));
+  align-items: start;
+  gap: 16px;
+}
+
+.activityDialGrid[data-count='2'] {
+  --activity-dial-cols: 2;
+}
+
+.scheduleSelectField {
+  --native-picker-min-height: 58px;
+}
+
+.modalNav {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: center;
+  gap: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  padding: 7px;
+  background: rgba(20, 20, 20, 0.72);
+  box-shadow: 0 16px 34px rgba(0, 0, 0, 0.34), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+.modalNavButton {
+  display: grid;
+  width: 100%;
+  min-height: 48px;
+  place-items: center;
+  border: 0;
+  border-radius: 999px;
+  color: rgba(255, 255, 255, 0.68);
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.modalNavButtonActive {
+  color: #111;
+  background: rgba(255, 255, 255, 0.92);
+}
+
+.modalNavButton:focus {
+  outline: none;
+}
+
+.modalNavButton:focus-visible {
+  outline: 2px solid rgba(111, 225, 185, 0.95);
+  outline-offset: -4px;
+}
+
+@media (max-width: 420px) {
+  .activityDialGrid[data-count='2'] {
+    --activity-dial-cols: 1;
+  }
+}
+
+@media (min-width: 760px) {
+  .modalSheetPage {
+    height: min(720px, calc(100dvh - 150px));
+    max-height: 100%;
+  }
+
+  .modalBody {
+    grid-template-columns: minmax(0, 1.05fr) minmax(340px, 0.95fr);
+    overflow: hidden;
+  }
+
+  .heroColumn,
+  .modalPanel {
+    min-height: 0;
+    max-height: min(580px, calc(100dvh - 220px));
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: none;
+  }
+
+  .heroColumn {
+    align-content: start;
+  }
+
+  .heroColumn::-webkit-scrollbar,
+  .modalPanel::-webkit-scrollbar {
+    display: none;
+    width: 0;
+    height: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .modalPanel {
+    transition: none;
+  }
 }

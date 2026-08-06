@@ -31,7 +31,7 @@
   backdrop-filter: var(--blur-modal);
   -webkit-backdrop-filter: var(--blur-modal);
   box-sizing: border-box;
-  overflow: hidden;
+  overflow: clip;
   pointer-events: auto;
 }
 
@@ -216,7 +216,7 @@
 }
 
 .content[data-has-footer='true'] .body {
-  padding-bottom: 12px;
+  padding-bottom: var(--modal-body-footer-padding-bottom, 12px);
 }
 
 .body::-webkit-scrollbar {
