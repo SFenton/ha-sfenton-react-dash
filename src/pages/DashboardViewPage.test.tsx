@@ -1191,7 +1191,7 @@ describe('DashboardViewPage', () => {
     expect(screen.getByRole('button', { name: /Relay Control Mode Off/i }).querySelector('path')).toHaveAttribute('d', materialIconPath('mdi:toggle-switch'))
     expect(materialIconPath('mdi:toggle-switch')).not.toBe(materialIconPath('mdi:unregistered-icon-fallback-probe'))
     expect(screen.getByRole('heading', { name: 'Presence-Based Light Overrides' })).toBeInTheDocument()
-    expect(screen.getByText('Enable or disable presence-based lighting in specific rooms. Useful for when we have company, or need to quickly keep lights on or off without using the voice commands.')).toBeInTheDocument()
+    expect(screen.getByText("Choose whether each room's presence lighting is On, Off, Paused, Quieted, or Active. Paused stays fail-dark until resumed; Quieted rearms after the room clears.")).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Open Presence-Based Overrides' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Open Presence-Based Overrides' })).toHaveAttribute('data-tone', 'switch-active')
     expect(screen.getByRole('button', { name: 'Open Presence-Based Overrides' }).querySelector('[data-modal-disclosure="right-chevron"]')).toBeInTheDocument()
@@ -1205,15 +1205,21 @@ describe('DashboardViewPage', () => {
     expect(screen.getByRole('button', { name: 'Open Presence-Based Auto-Reset Configuration' })).toHaveAttribute('data-tone', 'switch-active')
 
     fireEvent.click(screen.getByRole('button', { name: 'Open Presence-Based Overrides' }))
-    expect(await screen.findByRole('dialog')).toBeInTheDocument()
-    expect(screen.getByRole('dialog')).toHaveAttribute('data-surface', 'hass-popup')
+    const presenceDialog = await screen.findByRole('dialog', { name: 'Presence-Based Overrides' })
+    expect(presenceDialog).toHaveAttribute('data-surface', 'hass-popup')
     expect(screen.getByRole('heading', { name: 'Presence-Based Overrides' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Living Room On · Active/i })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Living Room On · Active/i })).toHaveStyle({ '--card-rgb': '67 160 71' })
-    expect(screen.getByRole('button', { name: /Living Room On · Active/i }).querySelector('path')).toHaveAttribute('d', materialIconPath('mdi:lightbulb-auto'))
-    expect(screen.getByRole('button', { name: /Upper Deck On · Active/i })).toBeInTheDocument()
+    const livingRoomPresence = within(presenceDialog).getByRole('button', { name: 'Living Room On' })
+    expect(livingRoomPresence).toHaveStyle({ '--card-rgb': '67 160 71' })
+    expect(livingRoomPresence.querySelector('path')).toHaveAttribute('d', materialIconPath('mdi:lightbulb-auto'))
+    expect(within(presenceDialog).getByRole('button', { name: 'Upper Deck On' })).toBeInTheDocument()
     fireEvent.click(recoveryButton)
-    fireEvent.click(screen.getByRole('button', { name: /Living Room On · Active/i }))
+    fireEvent.click(livingRoomPresence)
+
+    const picker = await screen.findByRole('dialog', { name: 'Living Room Presence Lighting' })
+    const pickerOptions = within(picker).getByRole('group', { name: 'Living Room Presence Lighting options' })
+    expect(within(pickerOptions).getAllByRole('button').map((option) => option.textContent)).toEqual(['On', 'Off', 'Paused', 'Quieted', 'Active'])
+    fireEvent.click(within(pickerOptions).getByRole('button', { name: 'Paused' }))
+    expect(within(presenceDialog).getByRole('button', { name: 'Living Room Paused', hidden: true })).toBeInTheDocument()
 
     expect(mockCallServiceCalls).toEqual([
       {
@@ -1222,9 +1228,10 @@ describe('DashboardViewPage', () => {
         target: 'automation.attempt_to_turn_power_back_on_in_living_room',
       },
       {
-        domain: 'script',
-        service: 'toggle_presence_lighting_override',
-        serviceData: { presence_switch: 'switch.living_room_presence_living_room_lights_presence_allowed' },
+        domain: 'presence_based_lighting',
+        service: 'set_automation_state',
+        target: 'switch.living_room_presence_living_room_lights_presence_allowed',
+        serviceData: { state: 'paused' },
       },
     ])
   })

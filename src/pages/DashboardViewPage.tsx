@@ -11,6 +11,7 @@ import { DashboardPageLoading, type DashboardPageLoadingPhase } from '../compone
 import { DashboardFloatingAction } from '../components/shell/DashboardFloatingAction'
 import { dashboardRoomNameFromPath, hasDashboardFloatingAction } from '../components/shell/dashboardFloatingAction'
 import { EntityActionCard } from '../components/hass/EntityActionCard'
+import { PresenceOverrideCard } from '../components/hass/PresenceOverrideCard'
 import { SecurityDashboard, SecurityStatusRail } from '../components/hass/SecurityDashboard'
 import { StatusRail, type StatusRailChip } from '../components/hass/StatusRail'
 import { TodoListPanel } from '../components/hass/TodoListPanel'
@@ -116,6 +117,7 @@ import {
   type TodoListConfig,
   type TodoPageConfig,
   type EntitySectionConfig,
+  type PresenceOverrideConfig,
   type SettingsLinkConfig,
 } from '../constants/portedDashboard'
 import { choreQuickLinkCounts, choreQuickLinkSubtitle, groceryCountSubtitle } from '../constants/choreQuickLinkCounts'
@@ -325,6 +327,14 @@ function AdminTileGrid({ gridLabel, items, onNavigate, squareGridRef, squareGrid
   if (variant === 'wide') return <AdminWideGrid>{cards}</AdminWideGrid>
   if (variant === 'admin-modal') return <AdminModalGrid label={gridLabel} squareGridRef={squareGridRef} squareGridStyle={squareGridStyle}>{cards}</AdminModalGrid>
   return <Grid>{cards}</Grid>
+}
+
+function AdminPresenceOverrideGrid({ gridLabel, items, squareGridRef, squareGridStyle }: { gridLabel: string; items: PresenceOverrideConfig[]; squareGridRef?: (node: HTMLElement | null) => void; squareGridStyle?: ModalSquareGridStyle }) {
+  return (
+    <AdminModalGrid label={gridLabel} squareGridRef={squareGridRef} squareGridStyle={squareGridStyle}>
+      {items.map((item) => <PresenceOverrideCard item={item} key={`${item.entityId}-${item.title}`} />)}
+    </AdminModalGrid>
+  )
 }
 
 function sectionId(title: string) {
@@ -1948,7 +1958,7 @@ function AdminPage({ onNavigate, preload = false, preloadHash, preloadHashes = [
 
       <ModalSheet contentStyle={presenceModalContentActive ? modalSquareGridModalStyle(presenceGridLayout) : undefined} onClose={closeHash} open={presenceModalOpen} surface="hass-popup" title="Presence-Based Overrides">
         <div className={styles.adminModalBody}>
-          {presenceModalContentActive && <AdminTileGrid gridLabel="Presence-Based Overrides by room" items={ADMIN_PRESENCE_OVERRIDE_ITEMS} onNavigate={onNavigate} squareGridRef={presenceGridRef} squareGridStyle={modalSquareGridStyle(presenceGridLayout)} variant="admin-modal" />}
+          {presenceModalContentActive && <AdminPresenceOverrideGrid gridLabel="Presence-Based Overrides by room" items={ADMIN_PRESENCE_OVERRIDE_ITEMS} squareGridRef={presenceGridRef} squareGridStyle={modalSquareGridStyle(presenceGridLayout)} />}
         </div>
       </ModalSheet>
 
@@ -1960,7 +1970,7 @@ function AdminPage({ onNavigate, preload = false, preloadHash, preloadHashes = [
       {preloadHashes.includes('#presence-based-overrides') && (
         <div data-preload-modal="admin#presence-based-overrides">
           <div className={styles.adminModalBody}>
-            <AdminTileGrid gridLabel="Presence-Based Overrides by room" items={ADMIN_PRESENCE_OVERRIDE_ITEMS} onNavigate={onNavigate} variant="admin-modal" />
+            <AdminPresenceOverrideGrid gridLabel="Presence-Based Overrides by room" items={ADMIN_PRESENCE_OVERRIDE_ITEMS} />
           </div>
         </div>
       )}
