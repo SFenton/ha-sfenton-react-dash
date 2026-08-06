@@ -1191,7 +1191,7 @@ describe('DashboardViewPage', () => {
     expect(screen.getByRole('button', { name: /Relay Control Mode Off/i }).querySelector('path')).toHaveAttribute('d', materialIconPath('mdi:toggle-switch'))
     expect(materialIconPath('mdi:toggle-switch')).not.toBe(materialIconPath('mdi:unregistered-icon-fallback-probe'))
     expect(screen.getByRole('heading', { name: 'Presence-Based Light Overrides' })).toBeInTheDocument()
-    expect(screen.getByText("Choose whether each room's presence lighting is On, Off, Paused, Quieted, or Active. Paused stays fail-dark until resumed; Quieted rearms after the room clears.")).toBeInTheDocument()
+    expect(screen.getByText("Choose whether each room's presence lighting is Enabled, Disabled, Paused, or Quieted. Paused stays fail-dark until resumed; Quieted rearms after the room clears.")).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Open Presence-Based Overrides' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Open Presence-Based Overrides' })).toHaveAttribute('data-tone', 'switch-active')
     expect(screen.getByRole('button', { name: 'Open Presence-Based Overrides' }).querySelector('[data-modal-disclosure="right-chevron"]')).toBeInTheDocument()
@@ -1208,18 +1208,22 @@ describe('DashboardViewPage', () => {
     const presenceDialog = await screen.findByRole('dialog', { name: 'Presence-Based Overrides' })
     expect(presenceDialog).toHaveAttribute('data-surface', 'hass-popup')
     expect(screen.getByRole('heading', { name: 'Presence-Based Overrides' })).toBeInTheDocument()
-    const livingRoomPresence = within(presenceDialog).getByRole('button', { name: 'Living Room On' })
+    const livingRoomPresence = within(presenceDialog).getByRole('button', { name: 'Living Room Enabled' })
     expect(livingRoomPresence).toHaveStyle({ '--card-rgb': '67 160 71' })
     expect(livingRoomPresence.querySelector('path')).toHaveAttribute('d', materialIconPath('mdi:lightbulb-auto'))
-    expect(within(presenceDialog).getByRole('button', { name: 'Upper Deck On' })).toBeInTheDocument()
+    expect(within(presenceDialog).getByRole('button', { name: 'Upper Deck Enabled' })).toBeInTheDocument()
     fireEvent.click(recoveryButton)
     fireEvent.click(livingRoomPresence)
 
-    const picker = await screen.findByRole('dialog', { name: 'Living Room Presence Lighting' })
-    const pickerOptions = within(picker).getByRole('group', { name: 'Living Room Presence Lighting options' })
-    expect(within(pickerOptions).getAllByRole('button').map((option) => option.textContent)).toEqual(['On', 'Off', 'Paused', 'Quieted', 'Active'])
-    fireEvent.click(within(pickerOptions).getByRole('button', { name: 'Paused' }))
-    expect(within(presenceDialog).getByRole('button', { name: 'Living Room Paused', hidden: true })).toBeInTheDocument()
+    const detailPage = await screen.findByRole('dialog', { name: 'Living Room Presence Lighting' })
+    expect(detailPage).toBe(presenceDialog)
+    expect(screen.getAllByRole('dialog')).toHaveLength(1)
+    expect(within(detailPage).getAllByRole('button', { name: /Set Living Room presence lighting to/i })).toHaveLength(4)
+    fireEvent.click(within(detailPage).getByRole('button', { name: 'Set Living Room presence lighting to Paused' }))
+    expect(within(detailPage).getByRole('button', { name: 'Set Living Room presence lighting to Paused' })).toHaveAttribute('data-active', 'true')
+    fireEvent.click(within(detailPage).getByRole('button', { name: 'Back to presence overrides' }))
+    await waitFor(() => expect(presenceDialog).toHaveAccessibleName('Presence-Based Overrides'))
+    expect(within(presenceDialog).getByRole('button', { name: 'Living Room Enabled' })).toHaveFocus()
 
     expect(mockCallServiceCalls).toEqual([
       {
@@ -1234,6 +1238,20 @@ describe('DashboardViewPage', () => {
         serviceData: { state: 'paused' },
       },
     ])
+  })
+
+  it('keeps the Presence Override detail page stable while closing and resets on reopen', async () => {
+    render(<DashboardViewPage activePath="admin" onNavigate={() => undefined} path="admin" />)
+    fireEvent.click(screen.getByRole('button', { name: 'Open Presence-Based Overrides' }))
+    let dialog = await screen.findByRole('dialog', { name: 'Presence-Based Overrides' })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Master Bedroom Enabled' }))
+    dialog = await screen.findByRole('dialog', { name: 'Master Bedroom Presence Lighting' })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Close' }))
+    expect(dialog).toHaveAttribute('data-state', 'closed')
+    expect(within(dialog).getByRole('heading', { name: 'Master Bedroom Presence Lighting' })).toBeInTheDocument()
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Master Bedroom Presence Lighting' })).not.toBeInTheDocument())
+    fireEvent.click(screen.getByRole('button', { name: 'Open Presence-Based Overrides' }))
+    expect(await screen.findByRole('dialog', { name: 'Presence-Based Overrides' })).toBeInTheDocument()
   })
 
   it('opens the Admin auto-reset modal and toggles room auto re-enable switches', async () => {

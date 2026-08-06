@@ -111,6 +111,10 @@
   background: rgba(0, 150, 136, 0.24);
 }
 
+.row[data-icon-surface='false'] .rowIcon {
+  background: transparent;
+}
+
 .rowText {
   display: grid;
   min-width: 0;
@@ -140,6 +144,12 @@
   color: rgba(255, 255, 255, 0.5);
   font-size: 0.66rem;
   font-weight: 700;
+}
+
+.row[data-wrap-text='true'] .rowText strong,
+.row[data-wrap-text='true'] .rowText span,
+.row[data-wrap-text='true'] .rowText small {
+  white-space: normal;
 }
 
 .add:disabled,
