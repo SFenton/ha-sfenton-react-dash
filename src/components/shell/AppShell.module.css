@@ -60,7 +60,7 @@
   transition: transform 150ms ease;
 }
 
-:global(html[data-dashboard-kb-arming='true'][data-inventory-search-expanded='true']:not([data-dashboard-keyboard='open'])) .floatingAction {
+:global(html[data-dashboard-kb-arming='true'][data-dashboard-search-expanded='true']:not([data-dashboard-keyboard='open'])) .floatingAction {
   transform: translate3d(
     0,
     calc(var(--floating-action-bottom) - var(--floating-action-keyboard-gap) - var(--dashboard-keyboard-predicted-inset, 0px)),
@@ -82,7 +82,7 @@
   pointer-events: auto;
 }
 
-:global(html[data-inventory-search-expanded='true']) .floatingAction > button[aria-label='Scan Item'] {
+:global(html[data-dashboard-search-expanded='true']) .floatingAction > button[aria-label='Scan Item'] {
   width: 0;
   min-width: 0;
   overflow: hidden;

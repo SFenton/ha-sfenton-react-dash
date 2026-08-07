@@ -7,15 +7,18 @@ import { CreateGroceryItemSheet } from '../hass/CreateGroceryItemSheet'
 import { CreateTodoItemSheet } from '../hass/CreateTodoItemSheet'
 import { EverShelfInventoryFloatingActions } from '../hass/EverShelfInventoryPanel'
 import type { EverShelfInventoryControls } from '../hass/EverShelfInventoryControls'
+import { RecipeFloatingActions } from '../hass/recipes/RecipeFloatingActions'
+import type { RecipeControls } from '../hass/recipes/useRecipeControls'
 import { ScanItemCameraSheet, type EverShelfLocation } from '../hass/ScanItemCameraSheet'
 import { RoomPickerButton } from '../../pages/AtAGlancePage'
 import { createTaskDefaultAssignee, dashboardRoomNameFromPath, isEverShelfInventoryRoute } from './dashboardFloatingAction'
-import { HOME_CABINET_ROUTE_PATH, HOME_FOOD_ROUTE_PATH, HOME_FREEZER_ROUTE_PATH, HOME_FRIDGE_ROUTE_PATH, HOME_GROCERY_LIST_ROUTE_PATH, HOME_PANTRY_ROUTE_PATH, HOME_SPICE_RACK_ROUTE_PATH } from '../../constants/routes'
+import { HOME_CABINET_ROUTE_PATH, HOME_FOOD_ROUTE_PATH, HOME_FREEZER_ROUTE_PATH, HOME_FRIDGE_ROUTE_PATH, HOME_GROCERY_LIST_ROUTE_PATH, HOME_PANTRY_ROUTE_PATH, HOME_RECIPES_ROUTE_PATH, HOME_SPICE_RACK_ROUTE_PATH } from '../../constants/routes'
 
 interface DashboardFloatingActionProps {
   inventoryControls?: EverShelfInventoryControls
   onNavigate: (path: string) => void
   path: string
+  recipeControls?: RecipeControls
 }
 
 function CreateChoreButton({ defaultAssignee }: { defaultAssignee: string }) {
@@ -74,7 +77,8 @@ function ScanItemButton({ defaultLocation, iconOnly = false }: { defaultLocation
   )
 }
 
-export function DashboardFloatingAction({ inventoryControls, onNavigate, path }: DashboardFloatingActionProps) {
+export function DashboardFloatingAction({ inventoryControls, onNavigate, path, recipeControls }: DashboardFloatingActionProps) {
+  if (path === HOME_RECIPES_ROUTE_PATH) return recipeControls ? <RecipeFloatingActions controls={recipeControls} /> : null
   const createTaskAssignee = createTaskDefaultAssignee(path)
   const defaultScanLocation = scanItemDefaultLocation(path)
   const inventoryRoute = isEverShelfInventoryRoute(path)

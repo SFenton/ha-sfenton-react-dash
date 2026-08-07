@@ -1221,6 +1221,7 @@ describe('DashboardViewPage', () => {
     expect(within(detailPage).getAllByRole('button', { name: /Set Living Room presence lighting to/i })).toHaveLength(4)
     fireEvent.click(within(detailPage).getByRole('button', { name: 'Set Living Room presence lighting to Paused' }))
     expect(within(detailPage).getByRole('button', { name: 'Set Living Room presence lighting to Paused' })).toHaveAttribute('data-active', 'true')
+
     fireEvent.click(within(detailPage).getByRole('button', { name: 'Back to presence overrides' }))
     await waitFor(() => expect(presenceDialog).toHaveAccessibleName('Presence-Based Overrides'))
     expect(within(presenceDialog).getByRole('button', { name: 'Living Room Enabled' })).toHaveFocus()
@@ -1242,13 +1243,16 @@ describe('DashboardViewPage', () => {
 
   it('keeps the Presence Override detail page stable while closing and resets on reopen', async () => {
     render(<DashboardViewPage activePath="admin" onNavigate={() => undefined} path="admin" />)
+
     fireEvent.click(screen.getByRole('button', { name: 'Open Presence-Based Overrides' }))
     let dialog = await screen.findByRole('dialog', { name: 'Presence-Based Overrides' })
     fireEvent.click(within(dialog).getByRole('button', { name: 'Master Bedroom Enabled' }))
+
     dialog = await screen.findByRole('dialog', { name: 'Master Bedroom Presence Lighting' })
     fireEvent.click(within(dialog).getByRole('button', { name: 'Close' }))
     expect(dialog).toHaveAttribute('data-state', 'closed')
     expect(within(dialog).getByRole('heading', { name: 'Master Bedroom Presence Lighting' })).toBeInTheDocument()
+
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Master Bedroom Presence Lighting' })).not.toBeInTheDocument())
     fireEvent.click(screen.getByRole('button', { name: 'Open Presence-Based Overrides' }))
     expect(await screen.findByRole('dialog', { name: 'Presence-Based Overrides' })).toBeInTheDocument()
@@ -4907,13 +4911,18 @@ describe('DashboardViewPage', () => {
     expect(within(dialog).queryByRole('button', { name: 'Start Dishwasher' })).not.toBeInTheDocument()
   })
 
-  it('renders the Food home sub-page with food spaces and a Scan Item FAB', () => {
+  it('renders the Food & Recipes hub in approved order with food spaces and a Scan Item FAB', async () => {
     const navigate = vi.fn()
     render(<DashboardViewPage activePath="food" onNavigate={navigate} path="food" />)
 
-    expect(screen.getByRole('heading', { name: 'Food' })).toBeInTheDocument()
+    await screen.findByRole('article', { name: 'Ang Chow Chicken (Red Fermented Rice Wine Chicken)' })
+    expect(screen.getByRole('heading', { name: 'Food & Recipes' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Suggested Recipes' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'All Food' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Food Spaces' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Recipes' })).not.toBeInTheDocument()
+    expect(document.querySelectorAll('[data-carousel-page]')).toHaveLength(5)
+    expect(document.querySelectorAll('[data-carousel-card]')).toHaveLength(30)
     const floatingDock = document.querySelector('[data-floating-action-dock="true"]')
     const scanButton = screen.getByRole('button', { name: 'Scan Item' })
     expect(scanButton).toHaveTextContent('Scan Item')
@@ -4926,6 +4935,8 @@ describe('DashboardViewPage', () => {
     expect(screen.getByRole('button', { name: 'Spice Rack 6 Items • 1 Expiring Soon' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Cabinet 4 Items • 1 Expiring Soon' })).toBeInTheDocument()
 
+    fireEvent.click(screen.getByRole('button', { name: 'All Recipes Browse the complete recipe catalog' }))
+    expect(navigate).toHaveBeenCalledWith('recipes')
     fireEvent.click(screen.getByRole('button', { name: 'All Food 35 Items • 6 Expiring Soon' }))
     expect(navigate).toHaveBeenCalledWith('all-food')
     fireEvent.click(screen.getByRole('button', { name: 'Pantry 12 Items • 1 Expiring Soon' }))
@@ -4938,6 +4949,35 @@ describe('DashboardViewPage', () => {
     expect(navigate).toHaveBeenCalledWith('spice-rack')
     fireEvent.click(screen.getByRole('button', { name: 'Cabinet 4 Items • 1 Expiring Soon' }))
     expect(navigate).toHaveBeenCalledWith('cabinet')
+  })
+
+  it('preloads Food and Recipes with no recipe service calls or images', () => {
+    const originalCallService = mockState.helpers.callService
+    const callService = vi.fn(originalCallService)
+    mockState.helpers.callService = callService
+    try {
+      const food = render(<DashboardViewPage activePath="food" onNavigate={() => undefined} path="food" preload />)
+      const recipes = render(<DashboardViewPage activePath="recipes" onNavigate={() => undefined} path="recipes" preload />)
+
+      expect(callService.mock.calls.flatMap(([params]) => params).filter((params) => params.domain === 'evershelf' && (params.service === 'recipe_query' || params.service === 'recipe_hydration'))).toHaveLength(0)
+      expect(food.container.querySelector('img')).toBeNull()
+      expect(recipes.container.querySelector('img')).toBeNull()
+      expect(document.querySelector('[data-floating-action-dock="true"]')).toBeNull()
+    } finally {
+      mockState.helpers.callService = originalCallService
+    }
+  })
+
+  it('renders Recipes with search, sort, and filter controls instead of Scan Item', async () => {
+    render(<DashboardViewPage activePath="recipes" onNavigate={() => undefined} path="recipes" />)
+
+    expect(screen.getByRole('heading', { name: 'Recipes' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Search recipes' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Sort' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Filter' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Scan Item' })).not.toBeInTheDocument()
+    expect(await screen.findByRole('article', { name: 'Catalog Recipe 1' })).toBeInTheDocument()
+    expect(screen.getAllByRole('article')).toHaveLength(50)
   })
 
   it('opens Kitchen vent as the exact vent popup rather than the full climate sheet', async () => {
@@ -5652,8 +5692,12 @@ describe('DashboardViewPage', () => {
 
     const searchInput = await screen.findByLabelText('Search inventory')
     await waitFor(() => expect(searchInput).toHaveFocus())
-    expect(screen.getByRole('button', { name: 'Sort' }).closest('span')).toHaveAttribute('data-collapsed', 'true')
-    expect(screen.getByRole('button', { name: 'Filter' }).closest('span')).toHaveAttribute('data-collapsed', 'true')
+    const collapsedSort = within(floatingDock).getByRole('button', { name: 'Sort', hidden: true }).closest('span')
+    const collapsedFilter = within(floatingDock).getByRole('button', { name: 'Filter', hidden: true }).closest('span')
+    expect(collapsedSort).toHaveAttribute('data-collapsed', 'true')
+    expect(collapsedSort).toHaveAttribute('inert')
+    expect(collapsedFilter).toHaveAttribute('data-collapsed', 'true')
+    expect(collapsedFilter).toHaveAttribute('aria-hidden', 'true')
 
     fireEvent.change(searchInput, { target: { value: 'milk' } })
 

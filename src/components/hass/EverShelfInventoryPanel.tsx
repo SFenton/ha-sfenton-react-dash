@@ -1,9 +1,9 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type KeyboardEvent, type MouseEvent, type PointerEvent, type ReactNode, type TouchEvent } from 'react'
-import { flushSync } from 'react-dom'
+import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from 'react'
 import { useHass } from '@hakit/core'
-import { EmptyState } from '../core/EmptyState'
+import { EmptyState, type EmptyStateLayout } from '../core/EmptyState'
 import { CheckboxRow } from '../core/CheckboxRow'
 import { Description } from '../core/Description'
+import { ExpandingSearchAction } from '../core/ExpandingSearchAction'
 import { FloatingActionButton } from '../core/FloatingActionButton'
 import { MaterialIcon } from '../core/Icon'
 import { ModalDisclosureIcon } from '../core/ModalDisclosureIcon'
@@ -12,7 +12,6 @@ import { NativePickerField } from '../core/NativePickerField'
 import { NumberStepper } from '../core/Stepper'
 import { RadioRow } from '../core/RadioRow'
 import { DashboardPageLoading } from '../shell/DashboardPageLoading'
-import { armDashboardKeyboardPrediction, clearDashboardKeyboardPrediction, DASHBOARD_KEYBOARD_STATE_EVENT, type DashboardKeyboardStateDetail } from '../../hooks/useDashboardViewport'
 import type { EverShelfInventoryControls, InventoryFilterMode, InventorySortDirection, InventorySortMode } from './EverShelfInventoryControls'
 import { daysUntilDate, parseIsoDateOnly } from './expiryDate'
 import styles from './EverShelfInventoryPanel.module.css'
@@ -21,6 +20,11 @@ export type EverShelfInventoryLocation = 'all' | 'dispensa' | 'frigo' | 'freezer
 
 interface EverShelfInventoryPanelProps {
   controls: EverShelfInventoryControls
+  emptyState?: {
+    description: string
+    layout?: EmptyStateLayout
+    title: string
+  }
   location: EverShelfInventoryLocation
   onOpenDetails?: (target: EverShelfInventoryDetailsTarget) => void
   title: string
@@ -70,7 +74,6 @@ type InventorySearchLoadPhase = 'exiting' | 'loading' | 'idle'
 
 const SORT_FILTER_COLOR = { r: 42, g: 126, b: 180 }
 const SORT_FILTER_ACTIVE_COLOR = { r: 155, g: 110, b: 64 }
-const INVENTORY_SEARCH_EXPANDED_ATTR = 'data-inventory-search-expanded'
 const INVENTORY_LOADING_EXIT_MS = 500
 const INVENTORY_SEARCH_LOG_PREFIX = '[EverShelfInventorySearch]'
 const HASS_GROCERY_LIST_ENTITY_ID = 'todo.shopping_list'
@@ -1153,139 +1156,18 @@ function InventoryFilterSheet({ draftMode, onApply, onClose, onDraftModeChange, 
   )
 }
 
-function updateInventorySearchExpanded(expanded: boolean) {
-  if (expanded) document.documentElement.setAttribute(INVENTORY_SEARCH_EXPANDED_ATTR, 'true')
-  else document.documentElement.removeAttribute(INVENTORY_SEARCH_EXPANDED_ATTR)
-}
-
 function InventorySearchAction({ controls, onExpandedChange }: { controls: EverShelfInventoryControls; onExpandedChange: (expanded: boolean) => void }) {
-  const [expanded, setExpanded] = useState(false)
-  const draftQuery = controls.searchQuery
-  const inputRef = useRef<HTMLInputElement>(null)
-  const collapseTimerRef = useRef<number | null>(null)
-  const pendingCollapseRef = useRef(false)
-  const hasQuery = draftQuery.trim() !== ''
-
-  const collapseSearch = useCallback(() => {
-    if (collapseTimerRef.current !== null) window.clearTimeout(collapseTimerRef.current)
-    collapseTimerRef.current = null
-    pendingCollapseRef.current = false
-    updateInventorySearchExpanded(false)
-    clearDashboardKeyboardPrediction()
-    onExpandedChange(false)
-    setExpanded(false)
-  }, [onExpandedChange])
-
-  useEffect(() => {
-    const handleKeyboardState = (event: Event) => {
-      const keyboardEvent = event as CustomEvent<DashboardKeyboardStateDetail>
-      if (!keyboardEvent.detail.open && pendingCollapseRef.current) collapseSearch()
-    }
-    window.addEventListener(DASHBOARD_KEYBOARD_STATE_EVENT, handleKeyboardState)
-    return () => {
-      window.removeEventListener(DASHBOARD_KEYBOARD_STATE_EVENT, handleKeyboardState)
-      if (collapseTimerRef.current !== null) window.clearTimeout(collapseTimerRef.current)
-      updateInventorySearchExpanded(false)
-      clearDashboardKeyboardPrediction()
-    }
-  }, [collapseSearch])
-
-  const focusInput = useCallback(() => {
-    inputRef.current?.focus({ preventScroll: true })
-  }, [])
-
-  const expandSearch = useCallback(() => {
-    if (collapseTimerRef.current !== null) window.clearTimeout(collapseTimerRef.current)
-    collapseTimerRef.current = null
-    pendingCollapseRef.current = false
-    armDashboardKeyboardPrediction()
-    updateInventorySearchExpanded(true)
-    flushSync(() => {
-      onExpandedChange(true)
-      setExpanded(true)
-    })
-    focusInput()
-  }, [focusInput, onExpandedChange])
-
-  const handleInputChange = useCallback((event: ChangeEvent<HTMLInputElement>) => {
-    const nextQuery = event.target.value
-    logInventorySearch('input-change', { value: nextQuery })
-    controls.setSearchQuery(nextQuery)
-  }, [controls])
-
-  const handleInputKeyDown = useCallback((event: KeyboardEvent<HTMLInputElement>) => {
-    if (event.key === 'Enter') event.currentTarget.blur()
-  }, [])
-
-  const handleInputBlur = useCallback(() => {
-    pendingCollapseRef.current = true
-    if (collapseTimerRef.current !== null) window.clearTimeout(collapseTimerRef.current)
-    collapseTimerRef.current = window.setTimeout(collapseSearch, 400)
-  }, [collapseSearch])
-
-  const clearSearch = useCallback(() => {
-    logInventorySearch('clear', {})
-    flushSync(() => controls.setSearchQuery(''))
-    focusInput()
-  }, [controls, focusInput])
-
-  const handleClearSearchPressStart = useCallback((event: MouseEvent<HTMLButtonElement> | PointerEvent<HTMLButtonElement> | TouchEvent<HTMLButtonElement>) => {
-    event.preventDefault()
-    event.stopPropagation()
-    clearSearch()
-  }, [clearSearch])
-
-  const handleClearSearchClick = useCallback((event: MouseEvent<HTMLButtonElement>) => {
-    event.preventDefault()
-    event.stopPropagation()
-    clearSearch()
-  }, [clearSearch])
-
-  if (!expanded) {
-    return (
-      <div className={styles.inventorySearchSlot} data-expanded="false">
-        <button aria-label="Search inventory" className={styles.inventorySearchButton} data-active={hasQuery ? 'true' : undefined} onClick={expandSearch} type="button">
-          <MaterialIcon name="mdi:magnify" size={26} />
-          <span>{hasQuery ? draftQuery : 'Search'}</span>
-        </button>
-      </div>
-    )
-  }
-
   return (
-    <div className={styles.inventorySearchSlot} data-expanded="true">
-      <label className={styles.inventorySearchBar}>
-        <span className={styles.inventorySearchIcon} aria-hidden="true"><MaterialIcon name="mdi:magnify" size={26} /></span>
-        <input
-          aria-label="Search inventory"
-          autoComplete="off"
-          className={styles.inventorySearchInput}
-          enterKeyHint="search"
-          onBlur={handleInputBlur}
-          onChange={handleInputChange}
-          onKeyDown={handleInputKeyDown}
-          placeholder="Search items..."
-          ref={inputRef}
-          type="search"
-          value={draftQuery}
-        />
-        {hasQuery && (
-          <button
-            aria-label="Clear Search"
-            className={styles.inventorySearchClear}
-            data-inventory-search-clear="true"
-            onClick={handleClearSearchClick}
-            onMouseDown={handleClearSearchPressStart}
-            onPointerDown={handleClearSearchPressStart}
-            onTouchStart={handleClearSearchPressStart}
-            title="Clear Search"
-            type="button"
-          >
-            <MaterialIcon name="mdi:close" size={20} />
-          </button>
-        )}
-      </label>
-    </div>
+    <ExpandingSearchAction
+      ariaLabel="Search inventory"
+      onExpandedChange={onExpandedChange}
+      onQueryChange={(query) => {
+        logInventorySearch('input-change', { value: query })
+        controls.setSearchQuery(query)
+      }}
+      placeholder="Search items..."
+      query={controls.searchQuery}
+    />
   )
 }
 
@@ -1297,10 +1179,10 @@ export function EverShelfInventoryFloatingActions({ controls }: { controls: Ever
   return (
     <>
       <InventorySearchAction controls={controls} onExpandedChange={setSearchExpanded} />
-      <span className={styles.inventoryActionSlot} data-collapsed={actionsCollapsed ? 'true' : undefined}>
+      <span aria-hidden={actionsCollapsed ? 'true' : undefined} className={styles.inventoryActionSlot} data-collapsed={actionsCollapsed ? 'true' : undefined} inert={actionsCollapsed}>
         <FloatingActionButton ariaLabel="Sort" color={controls.sortActive ? SORT_FILTER_ACTIVE_COLOR : SORT_FILTER_COLOR} icon="mdi:swap-vertical" onClick={controls.openSortSheet} />
       </span>
-      <span className={styles.inventoryActionSlot} data-collapsed={actionsCollapsed ? 'true' : undefined}>
+      <span aria-hidden={actionsCollapsed ? 'true' : undefined} className={styles.inventoryActionSlot} data-collapsed={actionsCollapsed ? 'true' : undefined} inert={actionsCollapsed}>
         <FloatingActionButton ariaLabel="Filter" color={controls.filterActive ? SORT_FILTER_ACTIVE_COLOR : SORT_FILTER_COLOR} icon="mdi:tune-vertical" onClick={controls.openFilterSheet} />
       </span>
       <InventorySortSheet
@@ -1325,7 +1207,7 @@ export function EverShelfInventoryFloatingActions({ controls }: { controls: Ever
   )
 }
 
-export function EverShelfInventoryPanel({ controls, location, onOpenDetails, title }: EverShelfInventoryPanelProps) {
+export function EverShelfInventoryPanel({ controls, emptyState, location, onOpenDetails, title }: EverShelfInventoryPanelProps) {
   const callService = useHass((state) => state.helpers.callService) as unknown as CallService
   const { inventoryLoadPhase, setInventoryItemCount, setInventoryLoadPhase } = controls
   const [detailsItem, setDetailsItem] = useState<EverShelfInventoryDisplayItem | null>(null)
@@ -1528,6 +1410,15 @@ export function EverShelfInventoryPanel({ controls, location, onOpenDetails, tit
   const searchInputPending = controls.searchQuery.trim() !== controls.debouncedSearchQuery.trim()
   const searchResultPending = items !== null && effectiveSearchQuery !== settledSearchQuery
   const searchLoading = searchLoadPhase !== 'idle' || searchInputPending || searchResultPending
+  const configuredEmptyState = effectiveSearchQuery ? undefined : emptyState
+  const renderEmptyState = (fallbackTitle: string, fallbackDescription: string) => (
+    <EmptyState
+      className={styles.inventoryEmpty}
+      description={configuredEmptyState?.description ?? fallbackDescription}
+      layout={configuredEmptyState?.layout}
+      title={configuredEmptyState?.title ?? fallbackTitle}
+    />
+  )
   const openItemDetails = (item: EverShelfInventoryDisplayItem) => {
     if (onOpenDetails) {
       onOpenDetails({ item, locationLabel: LOCATION_DELETE_LABELS[location] })
@@ -1549,10 +1440,10 @@ export function EverShelfInventoryPanel({ controls, location, onOpenDetails, tit
                 {error ? (
                   <EmptyState className={styles.inventoryEmpty} description={inventoryErrorDescription(error, title)} title={`Unable to Load ${title}`} />
                 ) : items !== null && loadedItems.length === 0 ? (
-                  <EmptyState className={styles.inventoryEmpty} description={effectiveSearchQuery ? emptySearchDescription(controls.filterActive) : `Scan an item to add it to your ${title.toLowerCase()}.`} title={effectiveSearchQuery ? 'No Matching Items' : 'No Items Found'} />
+                  renderEmptyState(effectiveSearchQuery ? 'No Matching Items' : 'No Items Found', effectiveSearchQuery ? emptySearchDescription(controls.filterActive) : `Scan an item to add it to your ${title.toLowerCase()}.`)
                 ) : items !== null && loadedItems.length > 0 && visibleItems.length === 0 && (effectiveSearchQuery
-                  ? <EmptyState className={styles.inventoryEmpty} description={emptySearchDescription(controls.filterActive)} title="No Matching Items" />
-                  : <EmptyState className={styles.inventoryEmpty} description="Try a different filter, or clear it to show all items." title="No Matching Items" />)}
+                  ? renderEmptyState('No Matching Items', emptySearchDescription(controls.filterActive))
+                  : renderEmptyState('No Matching Items', 'Try a different filter, or clear it to show all items.'))}
                 {visibleItems.length > 0 && (
                   <ul className={styles.items}>
                     {visibleItems.map((item, index) => {

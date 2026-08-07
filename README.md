@@ -4,7 +4,7 @@
 
 The repository includes an explicit `autonomous-hass-admin-executor` skill and a canonical 13-phase roadmap at `docs/autonomous-admin-roadmap.md`. Each phase maps to one immutable Home Assistant item UID from `todo.groceries`.
 
-The launcher fails closed unless Copilot runs with `gpt-5.6-sol`, `max` reasoning effort, and `long_context`. It holds an exclusive repository run lock, runs one phase per Copilot session, sends the phase report by SMTP, then calls the HA-owned `script.complete_admin_todo_item` for accepted work. Home Assistant completes the item, notifies `notify.stephen_s_phone`, and records the task UID in `input_text.admin_todo_completion_receipt`; the runner requires both completion and receipt before advancing. Rejected or blocked phases are emailed but remain open.
+The launcher fails closed unless Copilot runs with `gpt-5.6-sol`, `max` reasoning effort, and `long_context`. It holds an exclusive repository run lock, runs one phase per Copilot session, sends the phase report by SMTP, then calls the HA-owned `script.complete_admin_todo_item` for accepted work. Home Assistant completes the item without a phone notification and records the task UID in `input_text.admin_todo_completion_receipt`; the runner requires both completion and receipt before advancing. Rejected or blocked phases are emailed but remain open.
 
 ```bash
 npm run autonomous:admin:audit
@@ -19,6 +19,14 @@ npm run autonomous:admin:run
 Runtime checkpoints, reports, and dry-run outbox files live under `.autonomous/` and are not committed. The runner never commits, pushes, or deploys phase changes.
 
 The exclusive lock is `.autonomous/admin-run.lock/owner.json`. If a process is killed before cleanup, confirm the recorded PID is no longer running before removing that lock directory.
+
+## Local recipe development
+
+Recipe pages normally use `evershelf.recipe_query` through Home Assistant. When
+HA has not installed that integration release yet, the Vite development server
+falls back to its same-origin `EVERSHELF_DEV_URL` proxy. The browser never
+receives an EverShelf API token; run an isolated updated EverShelf instance at
+that URL. Production builds never use this fallback.
 
 ---
 

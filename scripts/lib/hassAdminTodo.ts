@@ -57,9 +57,9 @@ export class HassAdminTodoClient {
     }
   }
 
-  async completeItem(completionScript: string, item: string, taskName: string) {
+  async completeItem(completionScript: string, item: string) {
     const service = completionScript.replace(/^script\./, '')
-    await this.callService('script', service, { item, task_name: taskName })
+    await this.callService('script', service, { item })
   }
 
   async updateDescription(entityId: string, item: string, description: string) {

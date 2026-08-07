@@ -1,0 +1,105 @@
+.carousel {
+  display: grid;
+  width: calc(100% + var(--space-page-x) + var(--space-page-x));
+  gap: 2px;
+  margin-inline: calc(0px - var(--space-page-x));
+}
+
+.carousel[data-columns='5'] {
+  max-width: 1160px;
+}
+
+.track {
+  display: flex;
+  width: 100%;
+  gap: 10px;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  padding: 0 32px 4px 16px;
+  box-sizing: border-box;
+  scroll-padding-inline: 16px;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.track::-webkit-scrollbar {
+  display: none;
+}
+
+.track:focus {
+  outline: none;
+}
+
+.track:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.54);
+  outline-offset: -2px;
+}
+
+.page {
+  display: grid;
+  width: 100%;
+  min-width: 100%;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
+}
+
+.carousel[data-columns='5'] .page {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.dots {
+  display: flex;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+}
+
+.dotButton {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  border: 0;
+  padding: 0;
+  color: white;
+  background: transparent;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.dotButton:focus {
+  outline: none;
+}
+
+.dotButton:focus-visible {
+  outline: none;
+  border-radius: 999px;
+  box-shadow: inset 0 0 0 3px rgba(255, 255, 255, 0.62);
+}
+
+.dot {
+  display: block;
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.36);
+  transition: width 150ms ease, background-color 150ms ease;
+}
+
+.dotButton[aria-current='page'] .dot {
+  width: 18px;
+  background: white;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .track {
+    scroll-behavior: auto;
+  }
+
+  .dot {
+    transition: none;
+  }
+}

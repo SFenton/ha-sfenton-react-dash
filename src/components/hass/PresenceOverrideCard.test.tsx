@@ -13,7 +13,11 @@ describe('presenceOverrideDisplayState', () => {
     expect(presenceOverrideDisplayState(entity(ENTITY_ID, 'on', { automation_state: 'quieted', automation_paused: true }))).toBe('paused')
     expect(presenceOverrideDisplayState(entity(ENTITY_ID, 'on', { automation_state: 'paused' }))).toBe('paused')
     expect(presenceOverrideDisplayState(entity(ENTITY_ID, 'on', { automation_quieted: true }))).toBe('quieted')
+    expect(presenceOverrideDisplayState(entity(ENTITY_ID, 'on', { automation_state: 'quieted' }))).toBe('quieted')
     expect(presenceOverrideDisplayState(entity(ENTITY_ID, 'on'))).toBe('enabled')
+    expect(presenceOverrideDisplayState(entity(ENTITY_ID, 'on', { automation_state: 'occupied' }))).toBe('enabled')
+    expect(presenceOverrideDisplayState(entity(ENTITY_ID, 'unknown', { automation_paused: true }))).toBe('unavailable')
+    expect(presenceOverrideDisplayState(entity(ENTITY_ID, 'unavailable'))).toBe('unavailable')
     expect(presenceOverrideDisplayState(null)).toBe('unavailable')
   })
 
@@ -27,7 +31,10 @@ describe('PresenceOverrideCard', () => {
     resetMockHass()
     mockEntities[ENTITY_ID] = entity(ENTITY_ID, 'on', { automation_state: 'occupied' })
   })
-  afterEach(() => delete mockEntities[ENTITY_ID])
+
+  afterEach(() => {
+    delete mockEntities[ENTITY_ID]
+  })
 
   it('opens its room detail page through the shared modal trigger contract', () => {
     const onSelect = vi.fn()
@@ -40,17 +47,20 @@ describe('PresenceOverrideCard', () => {
     expect(onSelect).toHaveBeenCalledWith(ITEM)
   })
 
-  it('uses a dynamic Alarm-style two-column grid without icon surfaces', () => {
+  it('uses a dynamic Alarm-style two-column grid and optimistically applies state', () => {
     render(<PresenceOverrideDetailPage item={ITEM} />)
+    expect(screen.queryByText(/currently/i)).not.toBeInTheDocument()
     const stateGrid = screen.getByRole('group', { name: 'Test Room presence lighting states' })
+    expect(stateGrid).toHaveAttribute('data-dynamic-grid', 'true')
     expect(stateGrid).toHaveAttribute('data-dynamic-grid-columns', '2')
     expect(screen.getAllByRole('button')).toHaveLength(4)
-    const enabled = screen.getByRole('button', { name: 'Set Test Room presence lighting to Enable Presence-Based Lighting' })
-    expect(enabled).toHaveAttribute('data-active', 'true')
-    expect(enabled).toHaveAttribute('data-icon-surface', 'false')
+    expect(screen.getByRole('button', { name: 'Set Test Room presence lighting to Enable Presence-Based Lighting' })).toHaveAttribute('data-modal-detail-autofocus', 'true')
+    expect(screen.getByRole('button', { name: 'Set Test Room presence lighting to Enable Presence-Based Lighting' })).toHaveAttribute('data-active', 'true')
+    expect(screen.getByRole('button', { name: 'Set Test Room presence lighting to Enable Presence-Based Lighting' })).toHaveAttribute('data-icon-surface', 'false')
     expect(screen.queryByText('Selected')).not.toBeInTheDocument()
     expect(screen.getByText('Lights stay in their current state until explicitly resumed.')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Set Test Room presence lighting to Quieted' }))
+    expect(screen.getByRole('button', { name: 'Set Test Room presence lighting to Quieted' })).toHaveAttribute('data-active', 'true')
     expect(mockCallServiceCalls).toEqual([{
       domain: 'presence_based_lighting',
       service: 'set_automation_state',
@@ -63,8 +73,12 @@ describe('PresenceOverrideCard', () => {
     mockEntities[ENTITY_ID] = entity(ENTITY_ID, 'unknown', { automation_paused: true })
     const onSelect = vi.fn()
     const { rerender } = render(<PresenceOverrideCard item={ITEM} onSelect={onSelect} />)
-    expect(screen.getByRole('button', { name: 'Test Room Unavailable' })).toBeDisabled()
+    const tile = screen.getByRole('button', { name: 'Test Room Unavailable' })
+    expect(tile).toBeDisabled()
+    fireEvent.click(tile)
+    expect(onSelect).not.toHaveBeenCalled()
     rerender(<PresenceOverrideDetailPage item={ITEM} />)
+    expect(screen.getAllByRole('button')).toHaveLength(4)
     screen.getAllByRole('button').forEach((button) => expect(button).toBeDisabled())
   })
 })

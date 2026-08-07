@@ -14,6 +14,12 @@ import { VACATION_EMPTY_DESCRIPTION } from '../../constants/portedDashboard'
 import type { DonetickTaskEditTarget } from './donetickTaskForm'
 import styles from './DailyReportModalContent.module.css'
 
+const NO_EXPIRED_FOOD_EMPTY_STATE = {
+  description: 'Everything in the kitchen is still within date.',
+  layout: 'modal',
+  title: 'No Expired Food',
+} as const
+
 /** Only actionable tabs badge; upcoming chores are informational so they never get one. */
 export function DailyReportModalNav({ activeTab, counts, onTabChange }: { activeTab: DailyReportTab; counts?: Partial<Record<DailyReportTab, number>>; onTabChange: (tab: DailyReportTab) => void }) {
   const { clearVisualTab, setVisualTabNow, visualActiveTab } = useImmediateVisualTab(activeTab)
@@ -55,7 +61,7 @@ function DailyReportTodoTab({ emptyDescription, emptyTitle, entityId, onEditTask
   const [visibleItemCount, setVisibleItemCount] = useState<number | null>(null)
 
   return (
-    <section aria-label={title} className={styles.tabSection}>
+    <section aria-label={title} className={styles.tabSection} data-empty={visibleItemCount === 0 ? 'true' : undefined}>
       <TodoListPanel entityId={entityId} hideCompleted onEditTask={onEditTask} onVisibleItemsChange={setVisibleItemCount} reloadVersion={reloadVersion} title={title} />
       {visibleItemCount === 0 && (
         <EmptyState description={vacationMode ? VACATION_EMPTY_DESCRIPTION : emptyDescription} layout="modal" title={emptyTitle} />
@@ -82,14 +88,14 @@ function DailyReportExpiredFoodTab({ onOpenDetails, vacationMode }: { onOpenDeta
   if (expiredCount === 0) {
     return (
       <section aria-label="Expired Food" className={styles.tabSection}>
-        <EmptyState description="Everything in the kitchen is still within date." layout="modal" title="No Expired Food" />
+        <EmptyState {...NO_EXPIRED_FOOD_EMPTY_STATE} />
       </section>
     )
   }
 
   return (
     <section aria-label="Expired Food" className={styles.tabSection}>
-      <EverShelfInventoryPanel controls={lockedControls} location="all" onOpenDetails={onOpenDetails} title="Expired Food" />
+      <EverShelfInventoryPanel controls={lockedControls} emptyState={NO_EXPIRED_FOOD_EMPTY_STATE} location="all" onOpenDetails={onOpenDetails} title="Expired Food" />
     </section>
   )
 }

@@ -19,9 +19,11 @@ function attributeIsTrue(value: unknown) {
 
 export function presenceOverrideDisplayState(entity: PresenceEntityState | null | undefined): PresenceOverrideDisplayState {
   if (!entity) return 'unavailable'
+
   const switchState = normalizedString(entity.state)
   if (switchState === 'off') return 'off'
   if (switchState === 'unavailable' || switchState === 'unknown') return 'unavailable'
+
   const automationState = normalizedString(entity.attributes.automation_state)
   if (automationState === 'paused' || attributeIsTrue(entity.attributes.automation_paused)) return 'paused'
   if (automationState === 'quieted' || attributeIsTrue(entity.attributes.automation_quieted)) return 'quieted'

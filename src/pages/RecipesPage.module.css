@@ -1,0 +1,137 @@
+.page {
+  display: grid;
+  min-height: 100%;
+}
+
+.resultsRegion {
+  position: relative;
+  min-height: 180px;
+}
+
+.resultsRegion[data-height-frozen='true'] {
+  height: var(--recipe-results-frozen-height);
+}
+
+.resultsRegion[data-criteria-phase='exiting'] {
+  opacity: 0;
+  transform: translateY(4px);
+  transition: opacity 170ms ease, transform 170ms ease;
+}
+
+.resultsRegion[data-criteria-phase='entering'] {
+  animation: recipeResultsEnter 170ms ease-out both;
+}
+
+.criteriaLoading {
+  position: sticky;
+  top: 0;
+  display: grid;
+  width: 100%;
+  height: min(100%, calc(100dvh - var(--bottom-nav-height) - 122px));
+  min-height: 180px;
+  place-items: center;
+  opacity: 1;
+  z-index: 1;
+}
+
+.resultsRegion[data-criteria-phase='spinner-exiting'] .criteriaLoading {
+  opacity: 0;
+  transition: opacity 140ms ease;
+}
+
+.spinner {
+  display: block;
+  width: 34px;
+  height: 34px;
+  border: 3px solid rgba(255, 255, 255, 0.26);
+  border-top-color: white;
+  border-radius: 999px;
+  box-sizing: border-box;
+  filter: drop-shadow(0 10px 20px rgba(0, 0, 0, 0.26));
+  animation: recipeSpinner 720ms linear infinite;
+}
+
+.errorState {
+  display: grid;
+  min-height: 240px;
+  align-content: center;
+  justify-items: center;
+  gap: 14px;
+}
+
+.errorState button {
+  min-height: 44px;
+  border: 0;
+  border-radius: 999px;
+  padding: 0 20px;
+  color: white;
+  background: rgba(42, 126, 180, 0.82);
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.errorState button:focus {
+  outline: none;
+}
+
+.errorState button:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.62);
+}
+
+.announcement {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.preloadGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.preloadGrid span {
+  aspect-ratio: 1 / 0.78;
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+@keyframes recipeSpinner {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes recipeResultsEnter {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .resultsRegion[data-criteria-phase='exiting'],
+  .resultsRegion[data-criteria-phase='spinner-exiting'] .criteriaLoading {
+    transition: none;
+  }
+
+  .resultsRegion[data-criteria-phase='entering'] {
+    animation: none;
+  }
+
+  .spinner {
+    animation: none;
+  }
+}

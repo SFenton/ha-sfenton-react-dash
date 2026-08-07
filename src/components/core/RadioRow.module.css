@@ -15,9 +15,14 @@
   -webkit-tap-highlight-color: transparent;
 }
 
-.radioRow:focus,
+.radioRow:focus {
+  outline: none;
+}
+
 .radioRow:focus-visible {
   outline: none;
+  border-radius: 14px;
+  box-shadow: inset 0 0 0 3px rgba(255, 255, 255, 0.58);
 }
 
 .copy {

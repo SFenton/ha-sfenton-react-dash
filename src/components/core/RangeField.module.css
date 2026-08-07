@@ -1,0 +1,49 @@
+.field {
+  display: grid;
+  min-width: 0;
+  gap: 9px;
+  padding: 9px 6px;
+  color: white;
+}
+
+.field[data-disabled='true'] {
+  opacity: 0.42;
+}
+
+.header {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.header strong {
+  font-size: 0.88rem;
+  font-weight: 810;
+}
+
+.header output {
+  min-width: 3ch;
+  color: rgba(255, 255, 255, 0.76);
+  font-size: 0.8rem;
+  font-weight: 760;
+  text-align: right;
+}
+
+.field input {
+  width: 100%;
+  height: 24px;
+  margin: 0;
+  accent-color: rgb(42, 126, 180);
+}
+
+.field input:focus {
+  outline: none;
+}
+
+.field input:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.52);
+  outline-offset: 4px;
+  border-radius: 999px;
+}

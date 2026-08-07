@@ -18,11 +18,41 @@ interface PresenceStatePresentation {
 }
 
 const PRESENCE_STATE_PRESENTATION: Record<PresenceOverrideDisplayState, PresenceStatePresentation> = {
-  enabled: { color: { r: 67, g: 160, b: 71 }, description: 'Presence and occupancy can control the lights.', icon: 'mdi:lightbulb-auto', label: 'Enable Presence-Based Lighting', summaryLabel: 'Enabled' },
-  off: { color: { r: 84, g: 110, b: 122 }, description: 'Presence-Based Lighting is disabled for this room.', icon: 'mdi:lightbulb-off', label: 'Disable Presence-Based Lighting', summaryLabel: 'Disabled' },
-  paused: { color: { r: 230, g: 154, b: 37 }, description: 'Lights stay in their current state until explicitly resumed.', icon: 'mdi:pause-circle', label: 'Paused', summaryLabel: 'Paused' },
-  quieted: { color: { r: 117, g: 91, b: 180 }, description: 'Stay dark, then rearm after the room clears.', icon: 'mdi:volume-mute', label: 'Quieted', summaryLabel: 'Quieted' },
-  unavailable: { color: { r: 84, g: 110, b: 122 }, description: 'Home Assistant state is unavailable.', icon: 'mdi:alert-circle', label: 'Unavailable', summaryLabel: 'Unavailable' },
+  enabled: {
+    color: { r: 67, g: 160, b: 71 },
+    description: 'Presence and occupancy can control the lights.',
+    icon: 'mdi:lightbulb-auto',
+    label: 'Enable Presence-Based Lighting',
+    summaryLabel: 'Enabled',
+  },
+  off: {
+    color: { r: 84, g: 110, b: 122 },
+    description: 'Presence-Based Lighting is disabled for this room.',
+    icon: 'mdi:lightbulb-off',
+    label: 'Disable Presence-Based Lighting',
+    summaryLabel: 'Disabled',
+  },
+  paused: {
+    color: { r: 230, g: 154, b: 37 },
+    description: 'Lights stay in their current state until explicitly resumed.',
+    icon: 'mdi:pause-circle',
+    label: 'Paused',
+    summaryLabel: 'Paused',
+  },
+  quieted: {
+    color: { r: 117, g: 91, b: 180 },
+    description: 'Stay dark, then rearm after the room clears.',
+    icon: 'mdi:volume-mute',
+    label: 'Quieted',
+    summaryLabel: 'Quieted',
+  },
+  unavailable: {
+    color: { r: 84, g: 110, b: 122 },
+    description: 'Home Assistant state is unavailable.',
+    icon: 'mdi:alert-circle',
+    label: 'Unavailable',
+    summaryLabel: 'Unavailable',
+  },
 }
 
 export function PresenceOverrideCard({ item, onSelect }: { item: PresenceOverrideConfig; onSelect: (item: PresenceOverrideConfig) => void }) {
@@ -69,10 +99,11 @@ export function PresenceOverrideDetailPage({ item }: { item: PresenceOverrideCon
       <DynamicGrid ariaLabel={`${item.title} presence lighting states`} className={styles.stateGrid} columns={2} gap={8}>
         {PRESENCE_OVERRIDE_STATES.map((state, index) => {
           const presentation = PRESENCE_STATE_PRESENTATION[state]
+          const selected = displayState === state
           return (
             <ScheduleListRow
               accessibleLabel={`Set ${item.title} presence lighting to ${presentation.label}`}
-              active={displayState === state}
+              active={selected}
               autoFocus={index === 0}
               disabled={disabled}
               disclosure={false}

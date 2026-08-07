@@ -1,0 +1,103 @@
+.collection {
+  display: grid;
+  gap: 8px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 10px;
+  row-gap: 12px;
+}
+
+.spacer {
+  grid-column: 1 / -1;
+  pointer-events: none;
+}
+
+.sentinel {
+  width: 100%;
+  height: 1px;
+  pointer-events: none;
+}
+
+.nextPageRow {
+  display: grid;
+  min-height: 68px;
+  place-items: center;
+}
+
+.nextPageStatus {
+  display: grid;
+  width: 48px;
+  height: 48px;
+  place-items: center;
+}
+
+.spinner {
+  display: block;
+  width: 30px;
+  height: 30px;
+  border: 3px solid rgba(255, 255, 255, 0.26);
+  border-top-color: white;
+  border-radius: 999px;
+  box-sizing: border-box;
+  animation: recipeSpinner 720ms linear infinite;
+}
+
+.pageError {
+  display: flex;
+  min-height: 48px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: #ffb4b4;
+  font-size: 0.82rem;
+  font-weight: 720;
+}
+
+.pageError button,
+.loadMore {
+  min-height: 44px;
+  border: 0;
+  border-radius: 999px;
+  padding: 0 18px;
+  color: white;
+  background: rgba(42, 126, 180, 0.82);
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.loadMore {
+  justify-self: center;
+}
+
+.loadMore:disabled {
+  cursor: default;
+  opacity: 0.66;
+}
+
+.pageError button:focus,
+.loadMore:focus {
+  outline: none;
+}
+
+.pageError button:focus-visible,
+.loadMore:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.62);
+}
+
+@keyframes recipeSpinner {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spinner {
+    animation: none;
+  }
+}

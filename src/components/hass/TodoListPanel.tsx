@@ -168,7 +168,7 @@ export function TodoListPanel({ completionScript, entityId, hideCompleted = true
       ? {
           domain: 'script',
           service: completionScript.replace(/^script\./, ''),
-          serviceData: { item: identity, task_name: compactText(item.summary) ?? identity },
+          serviceData: { item: identity },
         }
       : {
           domain: 'todo',

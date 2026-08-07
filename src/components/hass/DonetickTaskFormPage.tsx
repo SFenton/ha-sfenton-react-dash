@@ -1,5 +1,5 @@
 import { CheckboxRow } from '../core/CheckboxRow'
-import { MaterialIcon } from '../core/Icon'
+import { ModalActionFooter } from '../core/ModalActionFooter'
 import { NativePickerField } from '../core/NativePickerField'
 import { DashboardPageLoading } from '../shell/DashboardPageLoading'
 import type { DonetickTaskFormController } from './useDonetickTaskForm'
@@ -37,24 +37,15 @@ export function DonetickTaskFormFooter({ controller }: { controller: DonetickTas
 
   if (!editMode) {
     return (
-      <button className={styles.primaryAction} disabled={!taskName || busy || loading} form={TASK_FORM_ID} type="submit">
-        <MaterialIcon name="mdi:checkbox-marked-circle" size={20} />
-        <span>{submitting ? 'Creating...' : 'Create Task'}</span>
-      </button>
+      <ModalActionFooter primary={{ disabled: !taskName || busy || loading, form: TASK_FORM_ID, icon: 'mdi:checkbox-marked-circle', label: submitting ? 'Creating...' : 'Create Task', type: 'submit' }} />
     )
   }
 
   return (
-    <div className={styles.sheetFooter}>
-      <button className={styles.deleteAction} disabled={busy || loading || !task} onClick={handleDelete} type="button">
-        <MaterialIcon name="mdi:delete" size={20} />
-        <span>{deleting ? 'Deleting...' : 'Delete Task'}</span>
-      </button>
-      <button className={styles.primaryAction} disabled={!taskName || busy || loading || !task} form={TASK_FORM_ID} type="submit">
-        <MaterialIcon name="mdi:content-save" size={20} />
-        <span>{submitting ? 'Saving...' : 'Save Task'}</span>
-      </button>
-    </div>
+    <ModalActionFooter
+      destructive={{ disabled: busy || loading || !task, icon: 'mdi:delete', label: deleting ? 'Deleting...' : 'Delete Task', onClick: handleDelete }}
+      primary={{ disabled: !taskName || busy || loading || !task, form: TASK_FORM_ID, icon: 'mdi:content-save', label: submitting ? 'Saving...' : 'Save Task', type: 'submit' }}
+    />
   )
 }
 

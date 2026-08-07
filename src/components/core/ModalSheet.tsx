@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode, type Ref } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode, type Ref } from 'react'
 import { Drawer } from 'vaul'
 import { MaterialIcon } from './Icon'
 import styles from './ModalSheet.module.css'
@@ -60,6 +60,7 @@ function assignRef<T>(ref: Ref<T> | undefined, value: T | null) {
 export function ModalSheet({ open, title, onClose, children, backLabel = 'Back', bodyElementRef, bodyHeader, chrome = 'default', contentStyle, footer, onBack, scrollResetKey, subtitle }: ModalSheetProps) {
   const contentRef = useRef<HTMLDivElement | null>(null)
   const bodyRef = useRef<HTMLDivElement | null>(null)
+  const [bodyElement, setBodyElement] = useState<HTMLDivElement | null>(null)
   const closeRequestedAtRef = useRef(Number.NEGATIVE_INFINITY)
   const ignoreInternalCloseUntilRef = useRef(0)
   const currentSnapshot: ModalSheetSnapshot = { backLabel, bodyHeader, children, chrome, contentStyle, footer, onBack, scrollResetKey, subtitle, title }
@@ -81,6 +82,11 @@ export function ModalSheet({ open, title, onClose, children, backLabel = 'Back',
   const sourcePopup = rendered.chrome === 'source-popup'
   const isDesktopModalLayout = useDesktopModalLayout()
   const showDragHandle = !sourcePopup && !isDesktopModalLayout
+  const setBodyRefs = useCallback((node: HTMLDivElement | null) => {
+    bodyRef.current = node
+    setBodyElement(node)
+    assignRef(bodyElementRef, node)
+  }, [bodyElementRef])
 
   const requestClose = () => {
     closeRequestedAtRef.current = window.performance.now()
@@ -139,7 +145,7 @@ export function ModalSheet({ open, title, onClose, children, backLabel = 'Back',
 
   useLayoutEffect(() => {
     if (!open) return undefined
-    const body = bodyRef.current
+    const body = bodyElement
     if (!body) return undefined
 
     const syncVisibleHeight = () => {
@@ -163,7 +169,7 @@ export function ModalSheet({ open, title, onClose, children, backLabel = 'Back',
       observer.disconnect()
       window.removeEventListener('resize', syncVisibleHeight)
     }
-  }, [open, rendered.contentStyle, renderedHasFooter, renderedHasSubtitle])
+  }, [bodyElement, open, rendered.contentStyle, renderedHasFooter, renderedHasSubtitle])
 
   if (!shouldRender) return null
 
@@ -205,10 +211,7 @@ export function ModalSheet({ open, title, onClose, children, backLabel = 'Back',
             </button>
           </div>
           {rendered.bodyHeader && <div className={styles.bodyHeader} data-modal-sheet-body-header="true">{rendered.bodyHeader}</div>}
-          <div className={styles.body} data-modal-sheet-body="true" ref={(node) => {
-            bodyRef.current = node
-            assignRef(bodyElementRef, node)
-          }}>{rendered.children}</div>
+          <div className={styles.body} data-modal-sheet-body="true" ref={setBodyRefs}>{rendered.children}</div>
           {rendered.footer && <div className={styles.footer} data-modal-sheet-footer="true">{rendered.footer}</div>}
         </Drawer.Content>
       </Drawer.Portal>

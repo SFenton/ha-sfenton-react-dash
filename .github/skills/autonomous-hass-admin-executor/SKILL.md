@@ -36,7 +36,7 @@ If any profile value differs, stop before making changes.
 5. Keep Home Assistant as the source of truth for state and multi-entity side effects. React only signals HA and uses existing optimistic-state patterns.
 6. For React UX changes, complete the repository's code/config comparison and Playwright live HASS-versus-React comparison, mobile first. If the visual comparison cannot run, report the blocker and do not claim visual acceptance.
 7. Add focused tests for changed behavior and run the smallest existing validation commands that prove the phase gate.
-8. Do not commit, push, deploy, complete the HA todo item, send phase email, or notify Stephen's phone. The parent runner owns those boundaries.
+8. Do not commit, push, deploy, complete the HA todo item, send phase email, or send phone notifications. The parent runner owns completion and email; phone notifications are disabled.
 9. Transition the canonical task from `in_progress` to `accepted`, `rejected`, or `hard_blocked` with `npm run autonomous:admin:transition`. Never edit queue status text by hand.
 10. Return a human-readable Markdown phase report with: Outcome, Work Completed, Home Assistant Changes, React Dashboard Changes, Validation Evidence, Files and Artifacts, Remaining Risks, and Up Next.
 
@@ -56,7 +56,7 @@ After the phase process exits, the parent runner:
 1. validates the terminal roadmap decision;
 2. sends and receipts the phase email;
 3. for accepted phases only, calls `script.complete_admin_todo_item`;
-4. lets Home Assistant mark the item complete, notify `notify.stephen_s_phone`, and write the task UID to `input_text.admin_todo_completion_receipt`;
-5. finalizes only after both the todo state and post-notification receipt are confirmed.
+4. lets Home Assistant mark the item complete and write the task UID to `input_text.admin_todo_completion_receipt`;
+5. finalizes only after both the todo state and completion receipt are confirmed.
 
 Rejected or blocked phases still receive phase email, but their Home Assistant todo item remains open.
