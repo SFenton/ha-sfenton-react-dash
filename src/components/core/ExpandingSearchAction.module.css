@@ -1,0 +1,115 @@
+.slot {
+  display: flex;
+  min-width: 0;
+  justify-content: flex-end;
+  transition: opacity 100ms ease-out;
+}
+
+:global(html[data-dashboard-kb-masked='true']) .slot {
+  opacity: 0;
+  transition: none;
+}
+
+.slot[data-expanded='true'] {
+  flex: 1 1 auto;
+}
+
+.button,
+.bar {
+  height: var(--floating-action-size, 56px);
+  border-radius: 999px;
+  color: white;
+  background: rgb(42, 126, 180);
+  box-shadow: var(--shadow-glass), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  box-sizing: border-box;
+}
+
+.button {
+  display: inline-flex;
+  min-width: var(--floating-action-size, 56px);
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 0;
+  padding: 0 17px;
+  font: inherit;
+  font-weight: 740;
+  cursor: pointer;
+}
+
+.button[data-active='true'] {
+  background: rgb(155, 110, 64);
+}
+
+.button:focus,
+.bar:focus-within {
+  outline: none;
+}
+
+.button:focus-visible,
+.bar:has(.input:focus-visible) {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.62), var(--shadow-glass), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+.bar {
+  display: grid;
+  width: min(100%, 330px);
+  min-width: 190px;
+  grid-template-columns: 42px minmax(0, 1fr) 42px;
+  align-items: center;
+  padding: 0 7px;
+}
+
+.icon {
+  display: grid;
+  place-items: center;
+}
+
+.input {
+  min-width: 0;
+  border: 0;
+  padding: 0 3px;
+  color: white;
+  background: transparent;
+  font: inherit;
+  font-size: 16px;
+  font-weight: 700;
+  outline: none;
+}
+
+.input::placeholder {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.input::-webkit-search-cancel-button {
+  display: none;
+}
+
+.clear {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  border: 0;
+  border-radius: 999px;
+  padding: 0;
+  color: white;
+  background: rgba(0, 0, 0, 0.18);
+  cursor: pointer;
+}
+
+.clear:focus {
+  outline: none;
+}
+
+.clear:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.62);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .slot {
+    transition: none;
+  }
+}

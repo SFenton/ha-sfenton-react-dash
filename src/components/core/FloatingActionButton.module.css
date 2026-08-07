@@ -25,8 +25,8 @@
 }
 
 .button:focus-visible {
-  outline: 2px solid rgba(255, 255, 255, 0.58);
-  outline-offset: 3px;
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.62), var(--shadow-glass), inset 0 1px 0 rgba(255, 255, 255, 0.2);
 }
 
 .pill {

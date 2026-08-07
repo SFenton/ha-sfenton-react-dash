@@ -59,7 +59,7 @@ describe('TodoListPanel', () => {
       {
         domain: 'script',
         service: 'complete_admin_todo_item',
-        serviceData: { item: 'first-chore', task_name: 'First chore' },
+        serviceData: { item: 'first-chore' },
       },
     ]))
   })

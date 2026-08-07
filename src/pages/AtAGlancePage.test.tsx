@@ -60,14 +60,14 @@ describe('AtAGlancePage', () => {
 
     expect(screen.getByRole('group', { name: 'Home quick links' })).toHaveAttribute('data-dynamic-grid', 'true')
 
-    for (const name of ['Food 35 Items • 6 Expiring Soon', 'Vacuums', 'Media', 'Custom Lights']) {
+    for (const name of ['Food & Recipes 35 Items • 6 Expiring Soon', 'Vacuums', 'Media', 'Custom Lights']) {
       const quickLink = screen.getByRole('button', { name })
       expect(quickLink.querySelector('[data-modal-disclosure="right-chevron"]'), name).toBeInTheDocument()
       expect(quickLink, name).toHaveAttribute('data-navigation-opener', 'true')
       expect(quickLink, name).not.toHaveAttribute('data-modal-opener')
     }
 
-    fireEvent.click(screen.getByRole('button', { name: 'Food 35 Items • 6 Expiring Soon' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Food & Recipes 35 Items • 6 Expiring Soon' }))
     expect(navigate).toHaveBeenCalledWith('food')
 
     const securityQuickLink = screen.getByRole('button', { name: /^Security System / })
@@ -75,11 +75,11 @@ describe('AtAGlancePage', () => {
     expect(securityQuickLink).not.toHaveAttribute('data-navigation-opener')
   })
 
-  it('shows the All Food HA summary on Food with the shared Kitchen Food orange', () => {
+  it('shows the All Food HA summary on Food & Recipes with the shared Kitchen Food orange', () => {
     render(<AtAGlancePage />)
 
-    const foodQuickLink = screen.getByRole('button', { name: 'Food 35 Items • 6 Expiring Soon' })
-    expect(within(foodQuickLink).getByText('Food')).toBeInTheDocument()
+    const foodQuickLink = screen.getByRole('button', { name: 'Food & Recipes 35 Items • 6 Expiring Soon' })
+    expect(within(foodQuickLink).getByText('Food & Recipes')).toBeInTheDocument()
     expect(within(foodQuickLink).getByText('35 Items • 6 Expiring Soon')).toBeInTheDocument()
     expect(foodQuickLink).toHaveStyle('--tile-color: rgba(155, 110, 64, 0.72)')
   })

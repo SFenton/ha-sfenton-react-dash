@@ -1,0 +1,17 @@
+.detailPage {
+  display: grid;
+  padding-bottom: 16px;
+}
+
+.stateGrid [data-schedule-list-row],
+.stateGrid [data-schedule-list-row] > button {
+  height: 100%;
+}
+
+.stateGrid [data-schedule-list-row] > button {
+  min-height: 112px;
+}
+
+.detailMarker {
+  display: contents;
+}

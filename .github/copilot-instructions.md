@@ -140,6 +140,9 @@ Do not recreate the Home Assistant sidebar or top bar for now. Focus on the dash
 ## Home Assistant Integration
 
 - Use HAKit and `@hakit/core` for Home Assistant state, services, and connection management.
+- EverShelf access must go through Home Assistant's `ha-evershelf` integration and its `evershelf.*` services; React must not call EverShelf storage, providers, or catalog APIs directly.
+- The server owns recipe catalog ranking, filtering, deduplication, mixing, and pagination. React sends criteria, preserves returned order, and only deduplicates repeated response items by the server-provided key.
+- Dashboard preload renders must perform no service calls, network/image loads, timers, polling, observers, or other runtime I/O. Pass an explicit preload mode through route content and render inert geometry only.
 - Controls must call real Home Assistant services.
 - Home Assistant must own actual data updates and cascading side effects. React Dash should only signal Home Assistant through services, scripts, helpers, or automations; do not duplicate Home Assistant-owned business logic or multi-entity side effects in React.
 - React Dash controls should optimistically display the user's intended state while Home Assistant catches up. Use the shared `useOptimisticState` hook from `src/hooks/useOptimisticState.ts` for entity-backed optimistic UI instead of ad hoc local state. The optimistic value should clear when the live HA state changes or confirms the value, and it should revert to real HA state if HA never confirms.

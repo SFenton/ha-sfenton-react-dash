@@ -35,7 +35,7 @@ interface PhaseRunState {
   hass?: {
     alreadyCompleted: boolean
     completedAt: string
-    notified: boolean
+    receiptConfirmed: boolean
   }
   reportHash?: string
   reportPath?: string
@@ -241,7 +241,7 @@ async function finalizePhaseBoundary(
     const alreadyCompleted = item.status === 'completed'
     const receipt = await hassClient.getState(currentAudit.profile!.completionReceiptEntityId)
     if (!adminCompletionBoundarySatisfied(item.status, receipt.state, task.todoUid)) {
-      await hassClient.completeItem(currentAudit.profile!.completionScript, task.todoUid, task.adminTask)
+      await hassClient.completeItem(currentAudit.profile!.completionScript, task.todoUid)
       await waitForCompletionReceipt(
         hassClient,
         currentAudit.profile!.todoEntityId,
@@ -252,7 +252,7 @@ async function finalizePhaseBoundary(
     currentState.phases[task.id].hass = {
       alreadyCompleted,
       completedAt: new Date().toISOString(),
-      notified: true,
+      receiptConfirmed: true,
     }
     await writeState(path, currentState)
   }
@@ -349,7 +349,7 @@ Requirements:
 2. Work only this phase. Diagnose first, then implement the complete safe solution.
 3. Home Assistant owns state and side effects. Use HA MCP and its best-practices skill before editing HA config.
 4. For React UX work, perform the required live HASS and React Playwright comparison before acceptance; if browser comparison is blocked, do not mark visual parity accepted.
-5. Do not commit, push, deploy, complete the HA todo item, send email, or notify the phone. The parent runner owns those phase boundaries.
+5. Do not commit, push, deploy, complete the HA todo item, send email, or send phone notifications. The parent runner owns completion and email; phone notifications are disabled.
 6. Before exiting, transition ${input.task.id} from in_progress to exactly one of accepted, rejected, or hard_blocked:
    npm run autonomous:admin:transition -- --roadmap "${roadmap}" --task-id "${input.task.id}" --status <accepted|rejected|hard_blocked> --expect-plan-hash "${input.audit.planHash}" --reason "<evidence-based decision>"
 7. Your final response is the phase email body. Use these Markdown sections: Outcome, Work Completed, Home Assistant Changes, React Dashboard Changes, Validation Evidence, Files and Artifacts, Remaining Risks, Up Next. Be concrete and human-readable.`
@@ -382,7 +382,7 @@ async function waitForCompletionReceipt(
     if (items.find((item) => item.uid === uid)?.status === 'completed' && receipt.state === uid) return
     await new Promise((resolvePromise) => setTimeout(resolvePromise, 750))
   }
-  throw new Error(`HASS did not confirm completion and notification receipt for ${uid}.`)
+  throw new Error(`HASS did not confirm completion and receipt for ${uid}.`)
 }
 
 async function readAudit(path: string) {

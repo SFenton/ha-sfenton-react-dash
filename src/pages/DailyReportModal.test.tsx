@@ -263,6 +263,25 @@ describe('Daily summary modal', () => {
     expect(within(expiredRow).getByRole('button', { name: 'Add Milk to shopping list' })).toBeInTheDocument()
   })
 
+  it('keeps the modal empty state stable while the expired sensor catches up after the last delete', async () => {
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true)
+    renderHome()
+
+    const dialog = await screen.findByRole('dialog')
+    const nav = within(dialog).getByRole('navigation', { name: 'Daily report sections' })
+    fireEvent.click(within(nav).getByRole('button', { name: /^Expired Food/ }))
+
+    fireEvent.click(await within(dialog).findByRole('button', { name: 'Delete Almond Flour' }, { timeout: 3000 }))
+    await waitFor(() => expect(within(dialog).queryByRole('button', { name: 'Delete Almond Flour' })).not.toBeInTheDocument())
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Delete Milk' }))
+
+    const empty = await within(dialog).findByRole('heading', { level: 2, name: 'No Expired Food' })
+    expect(empty.closest('section')).toHaveAttribute('data-empty-layout', 'modal')
+    expect(within(dialog).getByText('Everything in the kitchen is still within date.')).toBeInTheDocument()
+    expect(within(dialog).getByLabelText('Expired Food inventory list')).toBeInTheDocument()
+    confirmSpy.mockRestore()
+  })
+
   it('opens expired food details as a page in the same summary modal', async () => {
     renderHome()
 

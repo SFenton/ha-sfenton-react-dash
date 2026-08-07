@@ -373,11 +373,6 @@
   transition: opacity 100ms ease-out;
 }
 
-:global(html[data-dashboard-kb-masked='true']) .inventorySearchSlot {
-  opacity: 0;
-  transition: none;
-}
-
 .inventorySearchButton,
 .inventorySearchBar {
   display: flex;

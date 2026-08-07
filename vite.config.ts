@@ -27,6 +27,7 @@ function devHttpsOptions(mode: string, env: Record<string, string>): HttpsServer
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
   const hassTarget = env.VITE_HA_URL || 'http://homeassistant.local:8123'
+  const everShelfDevTarget = env.EVERSHELF_DEV_URL || 'http://127.0.0.1:8083'
   const https = devHttpsOptions(mode, env)
 
   return {
@@ -44,6 +45,15 @@ export default defineConfig(({ mode }) => {
       host: '0.0.0.0',
       https,
       proxy: {
+        '/__evershelf': {
+          target: everShelfDevTarget,
+          changeOrigin: true,
+          headers: {
+            'X-Forwarded-Proto': 'https',
+          },
+          rewrite: (path) => path.replace(/^\/__evershelf/, ''),
+          secure: false,
+        },
         '/assets/valetudo': {
           target: hassTarget,
           changeOrigin: true,

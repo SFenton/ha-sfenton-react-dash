@@ -1,10 +1,11 @@
-import { fallbackBackPathForRoute, primaryNavPathForRoute, primaryNavRouteActive, routePathFromUrl, routeUrl } from './routes'
+import { HOME_RECIPES_ROUTE_PATH, fallbackBackPathForRoute, primaryNavPathForRoute, primaryNavRouteActive, routePathFromUrl, routeUrl } from './routes'
 
 describe('routes', () => {
   it('extracts at-a-glance route paths', () => {
     expect(routePathFromUrl('/at-a-glance/living-room')).toBe('living-room')
     expect(routePathFromUrl('/at-a-glance/grocery-list')).toBe('grocery-list')
     expect(routePathFromUrl('/at-a-glance/food')).toBe('food')
+    expect(routePathFromUrl('/at-a-glance/recipes')).toBe(HOME_RECIPES_ROUTE_PATH)
     expect(routePathFromUrl('/at-a-glance/pantry')).toBe('pantry')
     expect(routePathFromUrl('/at-a-glance/fridge')).toBe('fridge')
     expect(routePathFromUrl('/at-a-glance/freezer')).toBe('freezer')
@@ -64,6 +65,7 @@ describe('routes', () => {
     expect(primaryNavPathForRoute('custom-lights')).toBe('overview')
     expect(primaryNavPathForRoute('grocery-list')).toBe('overview')
     expect(primaryNavPathForRoute('food')).toBe('overview')
+    expect(primaryNavPathForRoute('recipes')).toBe('overview')
     expect(primaryNavPathForRoute('pantry')).toBe('overview')
     expect(primaryNavPathForRoute('fridge')).toBe('overview')
     expect(primaryNavPathForRoute('freezer')).toBe('overview')
@@ -72,6 +74,7 @@ describe('routes', () => {
     expect(primaryNavRouteActive('living-room', 'overview')).toBe(true)
     expect(primaryNavRouteActive('grocery-list', 'overview')).toBe(true)
     expect(primaryNavRouteActive('food', 'overview')).toBe(true)
+    expect(primaryNavRouteActive('recipes', 'overview')).toBe(true)
     expect(primaryNavRouteActive('pantry', 'overview')).toBe(true)
     expect(primaryNavRouteActive('fridge', 'overview')).toBe(true)
     expect(primaryNavRouteActive('freezer', 'overview')).toBe(true)
@@ -99,6 +102,7 @@ describe('routes', () => {
     expect(fallbackBackPathForRoute('admin')).toBe('settings')
     expect(fallbackBackPathForRoute('pantry')).toBe('food')
     expect(fallbackBackPathForRoute('all-food')).toBe('food')
+    expect(fallbackBackPathForRoute('recipes')).toBe('food')
     expect(fallbackBackPathForRoute('master-bedroom')).toBe('overview')
     expect(fallbackBackPathForRoute('food')).toBe('overview')
     expect(fallbackBackPathForRoute('stephs-chores')).toBe('chores')

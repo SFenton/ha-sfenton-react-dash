@@ -249,6 +249,144 @@ async function expectNoChevron(opener: Locator) {
   await expect(opener.locator('[data-modal-disclosure]')).toHaveCount(0)
 }
 
+test('Food & Recipes hub and recipe browse use approved 393px mobile geometry', async ({ page }) => {
+  await page.setViewportSize({ width: 393, height: 852 })
+  await page.goto('/at-a-glance/food')
+
+  await expect(page.getByRole('heading', { name: 'Food & Recipes' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Suggested Recipes' })).toBeVisible()
+  const carousel = page.getByRole('region', { name: 'Suggested recipes' })
+  await expect(carousel).toBeVisible()
+  await expect(carousel.locator('[data-carousel-page]')).toHaveCount(5)
+  await expect(carousel.locator('[data-carousel-card]')).toHaveCount(30)
+  await expect(page.getByRole('group', { name: 'Suggested recipes pages' }).getByRole('button')).toHaveCount(5)
+
+  const firstPage = carousel.locator('[data-carousel-page="1"]')
+  await expect.poll(async () => firstPage.evaluate((element) => {
+    const rect = element.getBoundingClientRect()
+    const track = element.parentElement?.getBoundingClientRect()
+    return {
+      cardCount: element.querySelectorAll('[data-carousel-card]').length,
+      pageWidth: Math.round(rect.width),
+      trackWidth: Math.round(track?.width ?? 0),
+    }
+  })).toMatchObject({
+    cardCount: 6,
+    pageWidth: 345,
+    trackWidth: 393,
+  })
+  await expect.poll(async () => carousel.evaluate((element) => {
+    const trackRect = element.getBoundingClientRect()
+    const secondPage = element.querySelector('[data-carousel-page="2"]')
+    const secondPageRect = secondPage?.getBoundingClientRect()
+    return Math.round(Math.max(0, trackRect.right - (secondPageRect?.left ?? trackRect.right)))
+  })).toBeGreaterThanOrEqual(12)
+  const longTitle = firstPage.getByText('Ang Chow Chicken (Red Fermented Rice Wine Chicken)')
+  await expect(longTitle).toBeVisible()
+  await expect(firstPage.locator('img')).toHaveCount(6)
+  await expect.poll(async () => longTitle.evaluate((element) => {
+    const titleRect = element.getBoundingClientRect()
+    const cardRect = element.closest('[data-image-card]')?.getBoundingClientRect()
+    const lineHeight = Number.parseFloat(getComputedStyle(element).lineHeight)
+    return Boolean(
+      cardRect
+      && titleRect.left >= cardRect.left
+      && titleRect.right <= cardRect.right
+      && titleRect.bottom <= cardRect.bottom
+      && titleRect.height <= (lineHeight * 2) + 1,
+    )
+  })).toBe(true)
+  const pageScroller = page.locator('[class*="_scroller_"]').first()
+  const initialScrollTop = await pageScroller.evaluate((element) => element.scrollTop)
+  await page.getByRole('button', { name: 'Go to page 3' }).click()
+  await expect(page.getByRole('button', { name: 'Go to page 3' })).toHaveAttribute('aria-current', 'page')
+  expect(await pageScroller.evaluate((element) => element.scrollTop)).toBe(initialScrollTop)
+
+  const allRecipes = page.getByRole('button', { name: 'All Recipes Browse the complete recipe catalog' })
+  await expect(allRecipes).toBeVisible()
+  const scanItem = page.getByRole('button', { name: 'Scan Item' })
+  const allRecipesBox = await allRecipes.boundingBox()
+  const scanItemBox = await scanItem.boundingBox()
+  expect((allRecipesBox?.y ?? 0) + (allRecipesBox?.height ?? 0)).toBeLessThanOrEqual(scanItemBox?.y ?? 0)
+  await allRecipes.click()
+  await expect(page.getByRole('heading', { name: 'Recipes', exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Search recipes' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Sort' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Filter' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Scan Item' })).toHaveCount(0)
+  await expect(page.locator('[data-recipe-grid="true"] [data-recipe-card]')).toHaveCount(50)
+  await page.getByRole('button', { name: 'Load More' }).scrollIntoViewIfNeeded()
+  const nextPageSpinner = page.getByRole('status', { name: 'Loading more recipes' })
+  await expect(nextPageSpinner).toBeVisible()
+  const spinnerBox = await nextPageSpinner.boundingBox()
+  const searchBox = await page.getByRole('button', { name: 'Search recipes' }).boundingBox()
+  expect((spinnerBox?.y ?? 0) + (spinnerBox?.height ?? 0)).toBeLessThanOrEqual(searchBox?.y ?? 0)
+  await expect(page.locator('[data-recipe-grid="true"] [data-recipe-card]')).toHaveCount(100)
+  await page.getByRole('button', { name: 'Sort' }).click()
+  const sortDialog = page.getByRole('dialog', { name: 'Sort Recipes' })
+  await sortDialog.getByRole('radio', { name: /Expiring Soon/i }).click()
+  await sortDialog.getByRole('button', { name: 'Apply' }).click()
+  await expect.poll(() => pageScroller.evaluate((element) => Math.round(element.scrollTop))).toBe(0)
+  const criteriaSpinner = page.getByRole('status', { name: 'Loading recipes' })
+  await expect(criteriaSpinner).toBeVisible()
+  const criteriaSpinnerBox = await criteriaSpinner.boundingBox()
+  const scrollerBox = await pageScroller.boundingBox()
+  expect((criteriaSpinnerBox?.y ?? 0) + ((criteriaSpinnerBox?.height ?? 0) / 2)).toBeGreaterThanOrEqual(scrollerBox?.y ?? 0)
+  expect((criteriaSpinnerBox?.y ?? 0) + ((criteriaSpinnerBox?.height ?? 0) / 2)).toBeLessThanOrEqual(searchBox?.y ?? 0)
+  await expect(page.locator('[data-recipe-grid="true"] [data-recipe-card]')).toHaveCount(50)
+
+  const firstRecipe = page.locator('[data-recipe-card]').first()
+  await expect(firstRecipe).toHaveCSS('cursor', 'default')
+  await expect(firstRecipe.locator('button, a')).toHaveCount(0)
+  const sortAction = page.getByRole('button', { name: 'Sort' })
+  await sortAction.focus()
+  await expect.poll(() => sortAction.evaluate((element) => getComputedStyle(element).boxShadow)).not.toBe('none')
+  await page.getByRole('button', { name: 'Search recipes' }).click()
+  await expect(page.locator('button[aria-label="Sort"]').locator('xpath=..')).toHaveAttribute('inert', '')
+  await expect(page.locator('button[aria-label="Filter"]').locator('xpath=..')).toHaveAttribute('aria-hidden', 'true')
+})
+
+test('desktop suggested recipes use distinct five-by-two carousel pages', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await page.goto('/at-a-glance/food')
+
+  const carousel = page.getByRole('region', { name: 'Suggested recipes' })
+  const pages = carousel.locator('[data-carousel-page]')
+  await expect(pages).toHaveCount(3)
+  await expect(carousel.locator('[data-carousel-card]')).toHaveCount(30)
+  for (let pageIndex = 0; pageIndex < 3; pageIndex += 1) {
+    await expect(pages.nth(pageIndex).locator('[data-carousel-card]')).toHaveCount(10)
+  }
+  await expect(page.getByRole('group', { name: 'Suggested recipes pages' }).getByRole('button')).toHaveCount(3)
+
+  const geometry = await pages.first().evaluate((element) => {
+    const pageRect = element.getBoundingClientRect()
+    const trackRect = element.parentElement?.getBoundingClientRect()
+    const cards = Array.from(element.querySelectorAll('[data-carousel-card]')).map((card) => {
+      const rect = card.getBoundingClientRect()
+      return { x: Math.round(rect.x), y: Math.round(rect.y) }
+    })
+    return {
+      cardColumns: new Set(cards.slice(0, 5).map((card) => card.x)).size,
+      firstRowY: new Set(cards.slice(0, 5).map((card) => card.y)).size,
+      pageWidth: Math.round(pageRect.width),
+      secondRowBelowFirst: cards[5].y > cards[0].y,
+      trackWidth: Math.round(trackRect?.width ?? 0),
+    }
+  })
+  expect(geometry).toMatchObject({
+    cardColumns: 5,
+    firstRowY: 1,
+    secondRowBelowFirst: true,
+    trackWidth: 1160,
+  })
+  expect(geometry.pageWidth).toBeGreaterThan(1100)
+
+  await page.getByRole('button', { name: 'Go to page 2' }).click()
+  await expect(page.getByRole('button', { name: 'Go to page 2' })).toHaveAttribute('aria-current', 'page')
+  await expect.poll(() => carousel.evaluate((element) => Math.round(element.scrollLeft))).toBeGreaterThan(1000)
+})
+
 async function expectVerticallyCenteredChevrons(chevrons: Locator) {
   const offCenter = await chevrons.evaluateAll((nodes) => nodes.flatMap((node) => {
     const parent = node.parentElement
@@ -624,9 +762,9 @@ test('inventory footer search moves above the mobile keyboard and clears results
   const input = page.getByLabel('Search inventory')
   await expect(input).toBeFocused()
   await expect.poll(() => input.evaluate((element) => Boolean(element.closest('[data-floating-action-dock="true"]')))).toBe(true)
-  await expect.poll(() => page.evaluate(() => document.documentElement.getAttribute('data-inventory-search-expanded'))).toBe('true')
-  await expect(dock.getByRole('button', { name: 'Sort' }).locator('xpath=..')).toHaveAttribute('data-collapsed', 'true')
-  await expect(dock.getByRole('button', { name: 'Filter' }).locator('xpath=..')).toHaveAttribute('data-collapsed', 'true')
+  await expect.poll(() => page.evaluate(() => document.documentElement.getAttribute('data-dashboard-search-expanded'))).toBe('true')
+  await expect(dock.locator('button[aria-label="Sort"]').locator('xpath=..')).toHaveAttribute('data-collapsed', 'true')
+  await expect(dock.locator('button[aria-label="Filter"]').locator('xpath=..')).toHaveAttribute('data-collapsed', 'true')
   await expect(dock.getByRole('button', { name: 'Scan Item' })).toHaveCSS('opacity', '0')
 
   await page.evaluate(() => window.__setInventoryFakeKeyboardHeight?.(520))
@@ -2931,6 +3069,70 @@ test('daily summary empty tabs centre without scrolling the sheet', async ({ pag
   await expect(dialog.getByRole('heading', { level: 2, name: 'Expired Food Hidden' })).toBeVisible()
   await expect(dialog.getByLabel('Expired Food inventory list')).toHaveCount(0)
   await expect.poll(() => body.evaluate((e) => e.scrollHeight - e.clientHeight)).toBeLessThanOrEqual(0)
+})
+
+test('daily summary keeps the last expired-food empty state centred while the sensor catches up', async ({ page }) => {
+  await page.setViewportSize({ width: 393, height: 852 })
+  await page.goto('/index.html?path=overview&user=stephen')
+
+  await page.getByRole('button', { name: /^Open .+'s Summary/ }).click()
+  const dialog = page.getByRole('dialog')
+  await dialog.getByRole('navigation', { name: 'Daily report sections' }).getByRole('button', { name: /^Expired Food/ }).click()
+
+  page.once('dialog', (confirmation) => void confirmation.accept())
+  await dialog.getByRole('button', { name: 'Delete Almond Flour' }).click()
+  await expect(dialog.getByRole('button', { name: 'Delete Almond Flour' })).toHaveCount(0)
+
+  page.once('dialog', (confirmation) => void confirmation.accept())
+  await dialog.getByRole('button', { name: 'Delete Milk' }).click()
+  await expect(dialog.getByLabel('Expired Food inventory list')).toBeVisible()
+  await expect(dialog.getByRole('heading', { level: 2, name: 'No Expired Food' })).toBeVisible()
+
+  const measureEmptyCopy = () => dialog.getByRole('heading', { level: 2, name: 'No Expired Food' }).evaluate((heading) => {
+    const emptyState = heading.closest('[data-empty-layout="modal"]')
+    const modalBody = heading.closest('[role="dialog"]')?.querySelector('[data-modal-sheet-body="true"]')
+    if (!(emptyState instanceof HTMLElement) || !(modalBody instanceof HTMLElement)) return null
+
+    const copyBoxes = [...emptyState.children]
+      .filter((child): child is HTMLElement => child instanceof HTMLElement)
+      .map((child) => child.getBoundingClientRect())
+    const bodyBox = modalBody.getBoundingClientRect()
+    const bodyStyle = getComputedStyle(modalBody)
+    const paddingTop = Number.parseFloat(bodyStyle.paddingTop) || 0
+    const paddingBottom = Number.parseFloat(bodyStyle.paddingBottom) || 0
+    const copyTop = Math.min(...copyBoxes.map((box) => box.top))
+    const copyBottom = Math.max(...copyBoxes.map((box) => box.bottom))
+
+    return {
+      actualCenter: (copyTop + copyBottom) / 2,
+      expectedCenter: bodyBox.top + paddingTop + (bodyBox.height - paddingTop - paddingBottom) / 2,
+    }
+  })
+
+  const optimisticAlignment = await measureEmptyCopy()
+  expect(optimisticAlignment).not.toBeNull()
+  expect(Math.abs((optimisticAlignment?.actualCenter ?? 0) - (optimisticAlignment?.expectedCenter ?? 0))).toBeLessThanOrEqual(2)
+
+  await page.evaluate(() => {
+    const api = (window as unknown as {
+      __mockHass: {
+        setEntityAttribute: (entityId: string, attribute: string, value: unknown) => void
+        setEntityState: (entityId: string, state: string) => void
+      }
+    }).__mockHass
+    api.setEntityAttribute('sensor.evershelf_expired_items', 'expired_list', [])
+    api.setEntityState('sensor.evershelf_expired_items', '0')
+    const url = new URL(window.location.href)
+    url.searchParams.set('refresh', 'expired-food-empty')
+    window.history.replaceState(null, '', url)
+    window.dispatchEvent(new PopStateEvent('popstate'))
+  })
+
+  await expect(dialog.getByLabel('Expired Food inventory list')).toHaveCount(0)
+  const confirmedAlignment = await measureEmptyCopy()
+  expect(confirmedAlignment).not.toBeNull()
+  expect(Math.abs((confirmedAlignment?.actualCenter ?? 0) - (confirmedAlignment?.expectedCenter ?? 0))).toBeLessThanOrEqual(2)
+  expect(Math.abs((confirmedAlignment?.actualCenter ?? 0) - (optimisticAlignment?.actualCenter ?? 0))).toBeLessThanOrEqual(2)
 })
 
 test('profile button badges overdue chores plus expired food, capped at 9+', async ({ page }) => {

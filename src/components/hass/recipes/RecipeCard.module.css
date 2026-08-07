@@ -1,0 +1,5 @@
+.item {
+  display: grid;
+  min-width: 0;
+  cursor: default;
+}

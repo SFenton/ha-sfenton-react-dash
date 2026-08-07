@@ -1,0 +1,118 @@
+.actionSlot {
+  display: inline-flex;
+  width: var(--floating-action-size, 56px);
+  max-width: var(--floating-action-size, 56px);
+  overflow: hidden;
+  opacity: 1;
+  transition: max-width 150ms ease, opacity 120ms ease;
+}
+
+.actionSlot[data-collapsed='true'] {
+  max-width: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.sheetStack,
+.fieldset,
+.radioGroup {
+  display: grid;
+  min-width: 0;
+}
+
+.sheetStack {
+  gap: 14px;
+}
+
+.fieldset {
+  gap: 8px;
+  border: 0;
+  margin: 0;
+  padding: 0;
+}
+
+.fieldset legend {
+  margin-bottom: 2px;
+  padding: 0;
+  color: white;
+  font-size: 0.9rem;
+  font-weight: 820;
+}
+
+.radioGroup {
+  gap: 4px;
+}
+
+.horizonGroup {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.horizonGroup > button {
+  min-height: 54px;
+  grid-template-columns: 24px minmax(0, 1fr);
+  padding-inline: 7px;
+}
+
+.horizonGroup > button svg {
+  width: 24px;
+}
+
+.weightExplanation {
+  margin: -2px 6px 0;
+}
+
+.sheetFooter {
+  display: grid;
+  grid-template-columns: minmax(0, 0.78fr) minmax(0, 1fr);
+  gap: 10px;
+}
+
+.primaryAction,
+.resetAction {
+  display: inline-flex;
+  min-height: 48px;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 16px;
+  padding: 0 14px;
+  color: white;
+  font: inherit;
+  font-size: 0.86rem;
+  font-weight: 850;
+  cursor: pointer;
+}
+
+.primaryAction:focus,
+.resetAction:focus {
+  outline: none;
+}
+
+.primaryAction {
+  background: rgba(42, 126, 180, 0.86);
+  box-shadow: var(--shadow-glass), inset 0 1px 0 rgba(255, 255, 255, 0.18);
+}
+
+.resetAction {
+  border: 1px solid rgb(198, 40, 40);
+  background: rgb(198, 40, 40);
+  box-shadow: 0 10px 24px rgba(198, 40, 40, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.14);
+}
+
+.primaryAction:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.62), var(--shadow-glass), inset 0 1px 0 rgba(255, 255, 255, 0.18);
+}
+
+.resetAction:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.62), 0 10px 24px rgba(198, 40, 40, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.14);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .actionSlot {
+    transition: none;
+  }
+}

@@ -38,6 +38,11 @@ export interface EntitySectionConfig {
   items: EntityTileConfig[]
 }
 
+export interface PresenceOverrideConfig {
+  title: string
+  entityId: string
+}
+
 export interface SettingsLinkConfig {
   title: string
   subtitle: string
@@ -160,7 +165,7 @@ export const ADMIN_DESCRIPTIONS = {
   autoLock: 'Disables automatic locking of the front door. Useful for when contractors are over, or we have people frequently entering/leaving the home.',
   livingRoomPowerRecovery:
     'If the living room switch loses power and comes back with the relay off, run this to temporarily couple the top paddle, unlock the relay, turn power back on, relock it, and return the paddle to decoupled mode.',
-  presenceOverrides: 'Enable or disable presence-based lighting in specific rooms. Useful for when we have company, or need to quickly keep lights on or off without using the voice commands.',
+  presenceOverrides: "Choose whether each room's presence lighting is Enabled, Disabled, Paused, or Quieted. Paused stays fail-dark until resumed; Quieted rearms after the room clears.",
   relayControlMode:
     "Couples every smart-bulb wall switch to its own relay, so the paddles keep working even if Home Assistant, Zigbee2MQTT, or the host is down. This turns on automatically while Vacation Mode is active, so house-sitters always have a way to get light.\n\nWhile this is on, turning lights off at the wall cuts power to those bulbs, so presence-based lighting can't bring them back until the paddle is switched on again.",
   showSpecific: "Shows the outdoor faucets in our Home Assistant pages. Useful to disable during the winter, when we aren't using them.",
@@ -183,26 +188,17 @@ export const ADMIN_SHOW_SPECIFIC_CONTROLS: EntityTileConfig[] = [
   { title: 'Christmas Lights', entityId: 'input_boolean.show_christmas_lights', icon: 'mdi:string-lights', color: SWITCH_ACTIVE_COLOR, action: { type: 'toggle' }, showSubtitle: true },
 ]
 
-const ADMIN_PRESENCE_ICON = 'mdi:lightbulb-auto'
 const ADMIN_AUTO_REENABLE_ICON = 'mdi:autorenew'
-const PRESENCE_STATE_LABEL: EntityStateLabelConfig = { attribute: 'automation_paused', falseLabel: 'Active', includeState: true, trueLabel: 'Paused' }
 
-function presenceOverride(title: string, entityId: string): EntityTileConfig {
-  return {
-    title,
-    entityId,
-    icon: ADMIN_PRESENCE_ICON,
-    color: SWITCH_ACTIVE_COLOR,
-    action: { type: 'service', domain: 'script', service: 'toggle_presence_lighting_override', target: null, serviceData: { presence_switch: entityId } },
-    stateLabel: PRESENCE_STATE_LABEL,
-  }
+function presenceOverride(title: string, entityId: string): PresenceOverrideConfig {
+  return { title, entityId }
 }
 
 function autoReenable(title: string, entityId: string): EntityTileConfig {
   return { title, entityId, icon: ADMIN_AUTO_REENABLE_ICON, color: SWITCH_ACTIVE_COLOR, action: { type: 'toggle' }, showSubtitle: true }
 }
 
-export const ADMIN_PRESENCE_OVERRIDE_ITEMS: EntityTileConfig[] = [
+export const ADMIN_PRESENCE_OVERRIDE_ITEMS: PresenceOverrideConfig[] = [
   presenceOverride('Living Room', 'switch.living_room_presence_living_room_lights_presence_allowed'),
   presenceOverride('Kitchen', 'switch.kitchen_presence_kitchen_lights_presence_allowed'),
   presenceOverride('Hallway', 'switch.hallway_presence_hallway_lights_presence_allowed'),

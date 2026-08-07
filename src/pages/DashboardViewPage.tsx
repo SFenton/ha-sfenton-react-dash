@@ -11,6 +11,7 @@ import { DashboardPageLoading, type DashboardPageLoadingPhase } from '../compone
 import { DashboardFloatingAction } from '../components/shell/DashboardFloatingAction'
 import { dashboardRoomNameFromPath, hasDashboardFloatingAction } from '../components/shell/dashboardFloatingAction'
 import { EntityActionCard } from '../components/hass/EntityActionCard'
+import { PresenceOverrideCard, PresenceOverrideDetailPage } from '../components/hass/PresenceOverrideCard'
 import { SecurityDashboard, SecurityStatusRail } from '../components/hass/SecurityDashboard'
 import { StatusRail, type StatusRailChip } from '../components/hass/StatusRail'
 import { TodoListPanel } from '../components/hass/TodoListPanel'
@@ -18,6 +19,8 @@ import { CreateDonetickTaskSheet } from '../components/hass/CreateDonetickTaskSh
 import type { DonetickTaskEditTarget } from '../components/hass/donetickTaskForm'
 import { EverShelfInventoryPanel, type EverShelfInventoryLocation } from '../components/hass/EverShelfInventoryPanel'
 import { useEverShelfInventoryControls, type EverShelfInventoryControls } from '../components/hass/EverShelfInventoryControls'
+import type { RecipeControls } from '../components/hass/recipes/useRecipeControls'
+import { useRecipeControls } from '../components/hass/recipes/useRecipeControls'
 import { VacuumAutoCleanControlCard } from '../components/hass/VacuumAutoCleanControls'
 import { VacuumCard, VacuumRoomSourceModalContent } from '../components/hass/VacuumCard'
 import { VACUUM_MODAL_STYLE } from '../components/hass/vacuumModalStyle'
@@ -65,6 +68,7 @@ import { resolveEntityAction, type EntityActionStateMap } from '../components/ha
 import { asEntityName, formatCompactEntityState, formatContactEntityState, isActiveState, isContactOpen, isOccupancyActive, titleCaseState } from '../components/hass/entityState'
 import { DASHBOARD_ROUTE_CHANGE_EVENT, dashboardEventTargets, dashboardHash, dashboardPathWithSearch, replaceDashboardUrl } from '../hooks/dashboardLocation'
 import { useHashModal } from '../hooks/useHashModal'
+import { useModalDetailPageScroll } from '../hooks/useModalDetailPageScroll'
 import { useOptimisticState } from '../hooks/useOptimisticState'
 import { useScheduleDetailPage } from '../hooks/useScheduleDetailPage'
 import { useImmediateVisualTab, useSmoothDisplayedModalTab } from '../hooks/useSmoothDisplayedModalTab'
@@ -76,7 +80,7 @@ import {
   OCCUPANCY_GROUPS,
   type EntityGroupConfig,
 } from '../constants/atAGlance'
-import { DASHBOARD_ROUTES, HOME_ALL_FOOD_ROUTE_PATH, HOME_CABINET_ROUTE_PATH, HOME_FOOD_ROUTE_PATH, HOME_FREEZER_ROUTE_PATH, HOME_FRIDGE_ROUTE_PATH, HOME_GROCERY_LIST_ROUTE_PATH, HOME_PANTRY_ROUTE_PATH, HOME_SPICE_RACK_ROUTE_PATH, fallbackBackPathForRoute } from '../constants/routes'
+import { DASHBOARD_ROUTES, HOME_ALL_FOOD_ROUTE_PATH, HOME_CABINET_ROUTE_PATH, HOME_FOOD_ROUTE_PATH, HOME_FREEZER_ROUTE_PATH, HOME_FRIDGE_ROUTE_PATH, HOME_GROCERY_LIST_ROUTE_PATH, HOME_PANTRY_ROUTE_PATH, HOME_RECIPES_ROUTE_PATH, HOME_SPICE_RACK_ROUTE_PATH, fallbackBackPathForRoute } from '../constants/routes'
 import {
   ADMIN_AUTO_REENABLE_ITEMS,
   CHORE_QUICK_LINKS,
@@ -116,10 +120,11 @@ import {
   type TodoListConfig,
   type TodoPageConfig,
   type EntitySectionConfig,
+  type PresenceOverrideConfig,
   type SettingsLinkConfig,
 } from '../constants/portedDashboard'
 import { choreQuickLinkCounts, choreQuickLinkSubtitle, groceryCountSubtitle } from '../constants/choreQuickLinkCounts'
-import { EVERSHELF_FOOD_SPACES, FOOD_CARD_BACKGROUND_COLOR, allFoodSubtitle, foodSummarySubtitle, groceryPlaceSubtitle } from '../constants/everShelfFood'
+import { FOOD_CARD_BACKGROUND_COLOR, foodSummarySubtitle } from '../constants/everShelfFood'
 import { modalSquareGridModalStyle, modalSquareGridStyle, type ModalSquareGridStyle, useModalSquareGridLayout } from './modalSquareGrid'
 import { ROOM_PAGE_CONFIGS, type RoomSourceCardAction, type RoomSourceCardConfig, type RoomSourceKind, type RoomSourceModalItem } from '../constants/roomPages'
 import { humidifierForPowerEntity, type HumidifierConfig } from '../constants/humidifiers'
@@ -134,6 +139,8 @@ import {
 import { Page } from './Page'
 import { ClimateSheet, ContactSheet, LightsSheet, OccupancySheet } from './AtAGlancePage'
 import { CustomLightsPage } from './CustomLightsPage'
+import { FoodHubPage } from './FoodHubPage'
+import { RecipesPage } from './RecipesPage'
 import styles from './DashboardViewPage.module.css'
 
 interface DashboardViewPageProps {
@@ -147,6 +154,7 @@ interface DashboardViewPageProps {
   preload?: boolean
   preloadHash?: string
   preloadHashes?: string[]
+  recipeControls?: RecipeControls
   withShell?: boolean
 }
 
@@ -325,6 +333,14 @@ function AdminTileGrid({ gridLabel, items, onNavigate, squareGridRef, squareGrid
   if (variant === 'wide') return <AdminWideGrid>{cards}</AdminWideGrid>
   if (variant === 'admin-modal') return <AdminModalGrid label={gridLabel} squareGridRef={squareGridRef} squareGridStyle={squareGridStyle}>{cards}</AdminModalGrid>
   return <Grid>{cards}</Grid>
+}
+
+function AdminPresenceOverrideGrid({ gridLabel, items, onSelect, squareGridRef, squareGridStyle }: { gridLabel: string; items: PresenceOverrideConfig[]; onSelect: (item: PresenceOverrideConfig) => void; squareGridRef?: (node: HTMLElement | null) => void; squareGridStyle?: ModalSquareGridStyle }) {
+  return (
+    <AdminModalGrid label={gridLabel} squareGridRef={squareGridRef} squareGridStyle={squareGridStyle}>
+      {items.map((item) => <PresenceOverrideCard item={item} key={`${item.entityId}-${item.title}`} onSelect={onSelect} />)}
+    </AdminModalGrid>
+  )
 }
 
 function sectionId(title: string) {
@@ -1295,23 +1311,6 @@ const EVERSHELF_INVENTORY_PAGES: Record<string, { location: EverShelfInventoryLo
   [HOME_CABINET_ROUTE_PATH]: { location: 'cabinet', title: 'Cabinet' },
 }
 
-function FoodSpacesGrid({ entities, onNavigate }: { entities: EntityActionStateMap; onNavigate: (path: string) => void }) {
-  return (
-    <Grid>
-      {EVERSHELF_FOOD_SPACES.map((place) => (
-        <GlassTile
-          backgroundColor={`rgba(${place.color.r}, ${place.color.g}, ${place.color.b}, 0.72)`}
-          icon={place.icon}
-          key={place.location}
-          onClick={() => onNavigate(place.routePath)}
-          subtitle={groceryPlaceSubtitle(entities, place.entityId, place.location)}
-          title={place.title}
-        />
-      ))}
-    </Grid>
-  )
-}
-
 function KitchenGroceriesSection({ onNavigate }: { onNavigate: (path: string) => void }) {
   const entities = useHass((state) => state.entities) as unknown as EntityActionStateMap
   const groceryList = TODO_PAGES.groceries?.lists[0]
@@ -1337,31 +1336,6 @@ function KitchenGroceriesSection({ onNavigate }: { onNavigate: (path: string) =>
         />
       </RoomGrid>
     </section>
-  )
-}
-
-function FoodPage({ onNavigate }: { onNavigate: (path: string) => void }) {
-  const entities = useHass((state) => state.entities) as unknown as EntityActionStateMap
-
-  return (
-    <div className={styles.stack}>
-      <section className={styles.section} id={sectionId('All Food')}>
-        <SectionHeader title="All Food" />
-        <Grid>
-          <GlassTile
-            backgroundColor="rgba(88, 128, 94, 0.72)"
-            icon="mdi:food-variant"
-            onClick={() => onNavigate(HOME_ALL_FOOD_ROUTE_PATH)}
-            subtitle={allFoodSubtitle(entities)}
-            title="All Food"
-          />
-        </Grid>
-      </section>
-      <section className={styles.section} id={sectionId('Food Spaces')}>
-        <SectionHeader title="Food Spaces" />
-        <FoodSpacesGrid entities={entities} onNavigate={onNavigate} />
-      </section>
-    </div>
   )
 }
 
@@ -1900,6 +1874,9 @@ function MediaPage({ preload = false, preloadHash, preloadHashes = [] }: { prelo
 
 function AdminPage({ onNavigate, preload = false, preloadHash, preloadHashes = [] }: { onNavigate: (path: string) => void; preload?: boolean; preloadHash?: string; preloadHashes?: string[] }) {
   const { closeHash, hash, openHash } = useHashModal({ disabled: preload })
+  const [selectedPresenceOverride, setSelectedPresenceOverride] = useState<PresenceOverrideConfig | null>(null)
+  const presenceDetailPageKey = selectedPresenceOverride?.entityId ?? 'overview'
+  const { bodyElementRef, enterDetailPage, leaveDetailPage, resetDetailPageScroll } = useModalDetailPageScroll(presenceDetailPageKey)
   const contentHash = hash || preloadHash || ''
   const presenceModalOpen = hash === '#presence-based-overrides'
   const autoResetModalOpen = hash === '#presence-based-overrides-auto'
@@ -1907,6 +1884,19 @@ function AdminPage({ onNavigate, preload = false, preloadHash, preloadHashes = [
   const autoResetModalContentActive = contentHash === '#presence-based-overrides-auto'
   const [presenceGridRef, presenceGridLayout] = useModalSquareGridLayout(presenceModalOpen, ADMIN_PRESENCE_OVERRIDE_ITEMS.length)
   const [autoResetGridRef, autoResetGridLayout] = useModalSquareGridLayout(autoResetModalOpen, ADMIN_AUTO_REENABLE_ITEMS.length)
+  const openPresenceModal = (nextHash: string) => {
+    resetDetailPageScroll()
+    setSelectedPresenceOverride(null)
+    openHash(nextHash)
+  }
+  const openPresenceDetail = (item: PresenceOverrideConfig) => {
+    enterDetailPage(item.entityId)
+    setSelectedPresenceOverride(item)
+  }
+  const closePresenceDetail = () => {
+    leaveDetailPage()
+    setSelectedPresenceOverride(null)
+  }
 
   return (
     <div className={styles.stack}>
@@ -1931,7 +1921,7 @@ function AdminPage({ onNavigate, preload = false, preloadHash, preloadHashes = [
       <section className={styles.section}>
         <SectionHeader title="Presence-Based Light Overrides" />
         <Description>{ADMIN_DESCRIPTIONS.presenceOverrides}</Description>
-        <AdminHashButton hash="#presence-based-overrides" onOpen={openHash} title="Open Presence-Based Overrides" />
+        <AdminHashButton hash="#presence-based-overrides" onOpen={openPresenceModal} title="Open Presence-Based Overrides" />
       </section>
 
       <section className={styles.section}>
@@ -1946,9 +1936,23 @@ function AdminPage({ onNavigate, preload = false, preloadHash, preloadHashes = [
         <AdminHashButton hash="#presence-based-overrides-auto" onOpen={openHash} title="Open Presence-Based Auto-Reset Configuration" />
       </section>
 
-      <ModalSheet contentStyle={presenceModalContentActive ? modalSquareGridModalStyle(presenceGridLayout) : undefined} onClose={closeHash} open={presenceModalOpen} surface="hass-popup" title="Presence-Based Overrides">
+      <ModalSheet
+        backLabel="Back to presence overrides"
+        bodyElementRef={bodyElementRef}
+        contentStyle={presenceModalContentActive ? modalSquareGridModalStyle(presenceGridLayout) : undefined}
+        onBack={selectedPresenceOverride ? closePresenceDetail : undefined}
+        onClose={closeHash}
+        open={presenceModalOpen}
+        scrollResetKey={presenceDetailPageKey}
+        surface="hass-popup"
+        title={selectedPresenceOverride ? `${selectedPresenceOverride.title} Presence Lighting` : 'Presence-Based Overrides'}
+      >
         <div className={styles.adminModalBody}>
-          {presenceModalContentActive && <AdminTileGrid gridLabel="Presence-Based Overrides by room" items={ADMIN_PRESENCE_OVERRIDE_ITEMS} onNavigate={onNavigate} squareGridRef={presenceGridRef} squareGridStyle={modalSquareGridStyle(presenceGridLayout)} variant="admin-modal" />}
+          {presenceModalContentActive && (
+            selectedPresenceOverride
+              ? <PresenceOverrideDetailPage item={selectedPresenceOverride} />
+              : <AdminPresenceOverrideGrid gridLabel="Presence-Based Overrides by room" items={ADMIN_PRESENCE_OVERRIDE_ITEMS} onSelect={openPresenceDetail} squareGridRef={presenceGridRef} squareGridStyle={modalSquareGridStyle(presenceGridLayout)} />
+          )}
         </div>
       </ModalSheet>
 
@@ -1960,7 +1964,7 @@ function AdminPage({ onNavigate, preload = false, preloadHash, preloadHashes = [
       {preloadHashes.includes('#presence-based-overrides') && (
         <div data-preload-modal="admin#presence-based-overrides">
           <div className={styles.adminModalBody}>
-            <AdminTileGrid gridLabel="Presence-Based Overrides by room" items={ADMIN_PRESENCE_OVERRIDE_ITEMS} onNavigate={onNavigate} variant="admin-modal" />
+            <AdminPresenceOverrideGrid gridLabel="Presence-Based Overrides by room" items={ADMIN_PRESENCE_OVERRIDE_ITEMS} onSelect={() => undefined} />
           </div>
         </div>
       )}
@@ -5461,7 +5465,7 @@ function FallbackPage({ title }: { title: string }) {
   return <Notice>{title} is not available in the React dashboard yet.</Notice>
 }
 
-function Content({ inventoryControls, onNavigate, onScrollLockChange, path, preload = false, preloadHash, preloadHashes }: { inventoryControls: EverShelfInventoryControls; onNavigate: (path: string) => void; onScrollLockChange?: (locked: boolean) => void; path: string; preload?: boolean; preloadHash?: string; preloadHashes?: string[] }) {
+function Content({ inventoryControls, onNavigate, onScrollLockChange, path, preload = false, preloadHash, preloadHashes, recipeControls }: { inventoryControls: EverShelfInventoryControls; onNavigate: (path: string) => void; onScrollLockChange?: (locked: boolean) => void; path: string; preload?: boolean; preloadHash?: string; preloadHashes?: string[]; recipeControls: RecipeControls }) {
   const roomTitle = dashboardRoomNameFromPath(path)
   if (roomTitle) return <RoomPage onNavigate={onNavigate} path={path} preload={preload} preloadHash={preloadHash} preloadHashes={preloadHashes} title={roomTitle} />
   const todoConfigPath = todoPageConfigPath(path)
@@ -5474,21 +5478,24 @@ function Content({ inventoryControls, onNavigate, onScrollLockChange, path, prel
   if (path === 'admin') return <AdminPage onNavigate={onNavigate} preload={preload} preloadHash={preloadHash} preloadHashes={preloadHashes} />
   if (path === 'ecobee') return <ThermostatPage preload={preload} preloadHash={preloadHash} preloadHashes={preloadHashes} />
   if (path === 'custom-lights') return <CustomLightsPage />
-  if (path === HOME_FOOD_ROUTE_PATH) return <FoodPage onNavigate={onNavigate} />
+  if (path === HOME_FOOD_ROUTE_PATH) return <FoodHubPage onNavigate={onNavigate} preload={preload} />
+  if (path === HOME_RECIPES_ROUTE_PATH) return <RecipesPage controls={recipeControls} preload={preload} />
   if (EVERSHELF_INVENTORY_PAGES[path]) return <EverShelfInventoryPage controls={inventoryControls} path={path} />
   if (CONTROL_PAGES[path]) return <ControlPage onNavigate={onNavigate} path={path} />
   return <FallbackPage title={routeTitle(path)} />
 }
 
-export function DashboardViewPage({ activePath, initialContentTransitionState = 'idle', inventoryControls: providedInventoryControls, loadingPhase, onBack, onNavigate, path, preload = false, preloadHash, preloadHashes, withShell = true }: DashboardViewPageProps) {
+export function DashboardViewPage({ activePath, initialContentTransitionState = 'idle', inventoryControls: providedInventoryControls, loadingPhase, onBack, onNavigate, path, preload = false, preloadHash, preloadHashes, recipeControls: providedRecipeControls, withShell = true }: DashboardViewPageProps) {
   const roomTitle = dashboardRoomNameFromPath(path)
   const todoConfig = TODO_PAGES[todoPageConfigPath(path)]
   const title = path === 'guests-staying-over' ? 'Guest Controls' : roomTitle ?? todoConfig?.title ?? CONTROL_PAGES[path]?.title ?? routeTitle(path)
   const backPath = fallbackBackPathForRoute(path)
   const [pageScrollLock, setPageScrollLock] = useState<{ locked: boolean; path: string }>({ locked: false, path })
   const pageScrollLocked = pageScrollLock.path === path && pageScrollLock.locked
-  const fallbackInventoryControls = useEverShelfInventoryControls(path)
+  const fallbackInventoryControls = useEverShelfInventoryControls(path, !preload && Boolean(EVERSHELF_INVENTORY_PAGES[path]))
   const inventoryControls = providedInventoryControls ?? fallbackInventoryControls
+  const fallbackRecipeControls = useRecipeControls(path, !preload && path === HOME_RECIPES_ROUTE_PATH)
+  const recipeControls = providedRecipeControls ?? fallbackRecipeControls
   const handlePageScrollLockChange = useCallback((locked: boolean) => {
     setPageScrollLock((current) => (current.path === path && current.locked === locked ? current : { locked, path }))
   }, [path])
@@ -5497,14 +5504,14 @@ export function DashboardViewPage({ activePath, initialContentTransitionState = 
     <SecurityPage activePath={activePath} backPath={backPath} contentTransitionState={loadingPhase ? 'idle' : initialContentTransitionState} loadingPhase={loadingPhase} onBack={onBack} onNavigate={onNavigate} preload={preload} preloadHash={preloadHash} preloadHashes={preloadHashes} title={title} />
   ) : (
     <Page activePath={activePath} backPath={backPath} chromeHidden={Boolean(loadingPhase)} contentTransitionState={loadingPhase ? 'idle' : initialContentTransitionState} headerQuickLinks={roomTitle ? <RoomSectionRail path={path} title={roomTitle} /> : undefined} onBack={onBack} onNavigate={onNavigate} scrollLocked={pageScrollLocked} title={title}>
-      {loadingPhase ? <DashboardPageLoading phase={loadingPhase} /> : <Content inventoryControls={inventoryControls} onNavigate={onNavigate} onScrollLockChange={handlePageScrollLockChange} path={path} preload={preload} preloadHash={preloadHash} preloadHashes={preloadHashes} />}
+      {loadingPhase ? <DashboardPageLoading phase={loadingPhase} /> : <Content inventoryControls={inventoryControls} onNavigate={onNavigate} onScrollLockChange={handlePageScrollLockChange} path={path} preload={preload} preloadHash={preloadHash} preloadHashes={preloadHashes} recipeControls={recipeControls} />}
     </Page>
   )
 
-  if (!withShell) return page
+  if (!withShell || preload) return page
 
   return (
-    <AppShell bottomNav={<BottomNav activePath={activePath} onNavigate={onNavigate} />} chromeHidden={Boolean(loadingPhase)} floatingAction={hasDashboardFloatingAction(path) ? <DashboardFloatingAction inventoryControls={inventoryControls} onNavigate={onNavigate} path={path} /> : undefined}>
+    <AppShell bottomNav={<BottomNav activePath={activePath} onNavigate={onNavigate} />} chromeHidden={Boolean(loadingPhase)} floatingAction={!preload && hasDashboardFloatingAction(path) ? <DashboardFloatingAction inventoryControls={inventoryControls} onNavigate={onNavigate} path={path} recipeControls={recipeControls} /> : undefined}>
       {page}
     </AppShell>
   )

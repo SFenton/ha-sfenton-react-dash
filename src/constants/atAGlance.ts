@@ -211,7 +211,7 @@ export const QUICK_ACCESS_ITEMS: QuickAccessConfig[] = [
     tone: 'security',
   },
   {
-    title: 'Food',
+    title: 'Food & Recipes',
     icon: 'mdi:food-fork-drink',
     backgroundColor: FOOD_CARD_BACKGROUND_COLOR,
     route: '/at-a-glance/food',

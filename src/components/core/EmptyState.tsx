@@ -1,10 +1,12 @@
 import { Description } from './Description'
 import styles from './EmptyState.module.css'
 
+export type EmptyStateLayout = 'centered' | 'compact' | 'modal'
+
 interface EmptyStateProps {
   className?: string
   description: string
-  layout?: 'centered' | 'compact' | 'modal'
+  layout?: EmptyStateLayout
   title: string
 }
 

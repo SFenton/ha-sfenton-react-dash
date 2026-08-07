@@ -18,6 +18,10 @@
   min-height: 96px;
 }
 
+.tabSection[data-empty='true'] {
+  gap: 0;
+}
+
 .nav {
   display: grid;
   grid-template-columns: repeat(var(--daily-report-nav-cols, 3), minmax(0, 1fr));

@@ -84,6 +84,25 @@ function mockDateOffset(days: number) {
   return `${year}-${month}-${day}`
 }
 
+function mockRecipeCard(id: number, title = `Recipe ${id}`) {
+  return {
+    id,
+    dedupe_key: `mock-recipe:${id}`,
+    title,
+    image_url: 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22584%22 height=%22480%22%3E%3Crect width=%22584%22 height=%22480%22 fill=%22%23f7f3eb%22/%3E%3C/svg%3E',
+    thumbnail_url: null,
+    source: 'Mock Kitchen',
+    source_url: null,
+    coverage: 82,
+    matched_required: 9,
+    required_total: 11,
+    expiry_score: 14,
+    soonest_expiry_days: 4,
+    score: 91,
+    cookable: true,
+  }
+}
+
 interface MockTodoItem {
   description?: string
   due?: string
@@ -1021,6 +1040,67 @@ export const mockState: MockHassState = {
             raw_text: 'EXP 06/30/2026',
             source: 'mock_ocr',
             success: true,
+          },
+        })
+      }
+      if (params.domain === 'evershelf' && params.service === 'recipe_query' && params.returnResponse === true) {
+        const serviceData = params.serviceData as { cursor?: string; kind?: string; q?: string; sort?: string } | undefined
+        if (serviceData?.kind === 'recommendations') {
+          return Promise.resolve({
+            response: {
+              kind: 'recommendations',
+              recommendation_id: 'mock-recommendations',
+              items: Array.from({ length: 30 }, (_, index) => mockRecipeCard(
+                index + 1,
+                index === 0
+                  ? 'Ang Chow Chicken (Red Fermented Rice Wine Chicken)'
+                  : `Suggested Recipe ${index + 1}`,
+              )),
+            },
+          })
+        }
+        const offset = Number(serviceData?.cursor ?? 0)
+        const query = serviceData?.q?.trim()
+        const items = Array.from({ length: 50 }, (_, index) => {
+          const id = 1_000 + offset + index
+          return mockRecipeCard(id, query ? `${query} Recipe ${offset + index + 1}` : `Catalog Recipe ${offset + index + 1}`)
+        })
+        const nextOffset = offset + items.length
+        const response = {
+          response: {
+            kind: 'browse',
+            criteria_hash: `mock-criteria-${query ?? 'all'}`,
+            snapshot_id: 'mock-snapshot',
+            items,
+            next_cursor: nextOffset < 150 ? String(nextOffset) : null,
+            has_more: nextOffset < 150,
+            total: 150,
+            ranking_status: 'ready',
+            catalog_revision: 1,
+            inventory_revision: 1,
+          },
+        }
+        const delay = serviceData?.cursor
+          ? 250
+          : serviceData?.sort && serviceData.sort !== 'availability'
+            ? 1_200
+            : 0
+        return delay > 0
+          ? new Promise((resolve) => window.setTimeout(() => resolve(response), delay))
+          : Promise.resolve(response)
+      }
+      if (params.domain === 'evershelf' && params.service === 'recipe_hydration' && params.returnResponse === true) {
+        const query = (params.serviceData as { query?: string } | undefined)?.query ?? 'Search'
+        return Promise.resolve({
+          response: {
+            search_id: 'mock-search',
+            status: 'complete',
+            processed_count: 1,
+            total_count: 1,
+            progress: 100,
+            exhausted: true,
+            next_poll_ms: null,
+            new_items: [mockRecipeCard(9_000, `${query} Remote Recipe`)],
           },
         })
       }

@@ -65,7 +65,7 @@ function updateScopedInventoryControls(setState: Dispatch<SetStateAction<Record<
   })
 }
 
-export function useEverShelfInventoryControls(scopeKey: string): EverShelfInventoryControls {
+export function useEverShelfInventoryControls(scopeKey: string, enabled = true): EverShelfInventoryControls {
   const [controlsByScope, setControlsByScope] = useState<Record<string, InventoryControlState>>({})
   const state = controlsByScope[scopeKey] ?? DEFAULT_INVENTORY_CONTROL_STATE
   const update = useCallback((updater: (state: InventoryControlState) => InventoryControlState) => updateScopedInventoryControls(setControlsByScope, scopeKey, updater), [scopeKey])
@@ -73,13 +73,14 @@ export function useEverShelfInventoryControls(scopeKey: string): EverShelfInvent
   const setInventoryLoadPhase = useCallback((phase: InventoryLoadPhase) => update((current) => (current.inventoryLoadPhase === phase ? current : { ...current, inventoryLoadPhase: phase })), [update])
 
   useEffect(() => {
+    if (!enabled) return undefined
     const timer = window.setTimeout(() => {
       updateScopedInventoryControls(setControlsByScope, scopeKey, (current) => (
         current.debouncedSearchQuery === current.searchQuery ? current : { ...current, debouncedSearchQuery: current.searchQuery }
       ))
     }, INVENTORY_SEARCH_DEBOUNCE_MS)
     return () => window.clearTimeout(timer)
-  }, [scopeKey, state.searchQuery])
+  }, [enabled, scopeKey, state.searchQuery])
 
   return {
     ...state,
