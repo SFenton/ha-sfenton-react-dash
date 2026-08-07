@@ -60,7 +60,6 @@ export function PresenceOverrideCard({ item, onSelect }: { item: PresenceOverrid
   const displayState = presenceOverrideDisplayState(entity)
   const presentation = PRESENCE_STATE_PRESENTATION[displayState]
   const disabled = displayState === 'unavailable'
-
   return (
     <div className={styles.detailMarker} data-modal-detail-trigger={item.entityId}>
       <Card
@@ -95,7 +94,6 @@ export function PresenceOverrideDetailPage({ item }: { item: PresenceOverrideCon
       serviceData: { state: presenceOverrideServiceState(nextState) },
     })
   }
-
   return (
     <section aria-label={`${item.title} presence lighting controls`} className={styles.detailPage}>
       <DynamicGrid ariaLabel={`${item.title} presence lighting states`} className={styles.stateGrid} columns={2} gap={8}>
