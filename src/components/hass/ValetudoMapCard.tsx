@@ -1,27 +1,60 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type PointerEvent as ReactPointerEvent,
+} from 'react'
 import { useEntity, useHass } from '@hakit/core'
 import type { VacuumConfig } from '../../constants/portedDashboard'
-import { asEntityName } from './entityState'
 import { materialIconPath } from '../core/iconPaths'
+import { asEntityName } from './entityState'
 import {
+  affineScale,
+  affineToCssMatrix,
+  applyAffine,
+  clampMapViewport,
+  invertAffine,
+  localPointToGlobalGrid,
+  mapGridRectFromPoints,
+  mapViewportMatrix,
+  resizeMapGridRectCorner,
+  translateMapGridRect,
+  valetudoMapStageGeometry,
+  viewportForAnchor,
+  zoomViewportAt,
+  type AffineMatrix,
+  type MapFrameSize,
+  type MapGridPoint,
+  type MapGridRect,
+  type MapGridRectCorner,
+  type MapViewport,
+  type ValetudoMapStageGeometry,
+} from './ValetudoMapGeometry'
+import {
+  createMockValetudoMap,
   expandValetudoLayerPixels,
   extractValetudoMapFromPngBytes,
   mapCameraEntityId,
   selectValetudoMapEntity,
-  valetudoMapBounds,
   type ValetudoEntityLike,
   type ValetudoMap,
-  type ValetudoMapBounds,
   type ValetudoMapEntity,
 } from './ValetudoMapCard.utils'
 import styles from './ValetudoMapCard.module.css'
 
 const VALETUDO_HASS_PULSE_MS = 3_500
 const VALETUDO_LIVE_ENTITY_REFRESH_MS = 3_000
+const MAP_ZOOM_MIN = 1
+const MAP_ZOOM_MAX = 10
 const DOCK_ICON_PATH = materialIconPath('mdi:flash')
 const ROBOT_ICON_PATH = materialIconPath('mdi:robot-vacuum')
+const INITIAL_VIEWPORT: MapViewport = { panX: 0, panY: 0, zoom: 1 }
+const IDENTITY_MATRIX: AffineMatrix = { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 }
 
-type CallService = (params: Record<string, unknown>) => void
 type FetchWithAuth = (path: string, init?: RequestInit) => Promise<Response>
 
 interface HassStateChangedEvent {
@@ -37,9 +70,45 @@ interface HassConnectionLike {
   subscribeEvents?: <T>(callback: (event: T) => void, eventType?: string) => Promise<() => void> | (() => void)
 }
 
-function selectLiveEntity(entityId: string, storeEntity: ValetudoEntityLike | null, liveEntity: ValetudoEntityLike | null) {
-  return liveEntity?.entity_id === entityId ? liveEntity : storeEntity
+export interface ValetudoMapEditorMeta {
+  error: string | null
+  geometry: ValetudoMapStageGeometry | null
+  isLoaded: boolean
 }
+
+interface ValetudoMapCardProps {
+  drawMode?: boolean
+  expanded?: boolean
+  frozenGeometry?: ValetudoMapStageGeometry | null
+  interactive?: boolean
+  minimumSizeCm?: number
+  onDrawModeChange?: (drawMode: boolean) => void
+  onEditorMetaChange?: (meta: ValetudoMapEditorMeta) => void
+  onSelectionChange?: (selection: MapGridRect | null) => void
+  resetViewRevision?: number
+  selection?: MapGridRect | null
+  vacuum: VacuumConfig
+}
+
+type MapGesture =
+  | { anchor: MapGridPoint; type: 'draw' }
+  | { origin: MapGridRect; startPoint: MapGridPoint; type: 'move' }
+  | { corner: MapGridRectCorner; origin: MapGridRect; type: 'resize' }
+  | { origin: MapViewport; startPoint: MapGridPoint; type: 'pan' }
+  | { anchor: MapGridPoint; startDistance: number; startZoom: number; type: 'pinch' }
+
+const RESIZE_HANDLES: {
+  corner: MapGridRectCorner
+  diagonal: 'nwse' | 'nesw'
+  label: string
+  x: 'x0' | 'x1'
+  y: 'y0' | 'y1'
+}[] = [
+  { corner: 'pA', diagonal: 'nwse', label: 'corner A', x: 'x0', y: 'y0' },
+  { corner: 'pB', diagonal: 'nesw', label: 'corner B', x: 'x1', y: 'y0' },
+  { corner: 'pC', diagonal: 'nwse', label: 'corner C', x: 'x1', y: 'y1' },
+  { corner: 'pD', diagonal: 'nesw', label: 'corner D', x: 'x0', y: 'y1' },
+]
 
 function authToken(connection: HassConnectionLike | null | undefined) {
   return connection?.options?.auth?.accessToken
@@ -50,10 +119,7 @@ function createFetchWithAuth(connection: HassConnectionLike | null | undefined):
     const headers = new Headers(init?.headers)
     const token = authToken(connection)
 
-    if (token && !headers.has('Authorization')) {
-      headers.set('Authorization', `Bearer ${token}`)
-    }
-
+    if (token && !headers.has('Authorization')) headers.set('Authorization', `Bearer ${token}`)
     return fetch(path, { ...init, credentials: init?.credentials ?? 'same-origin', headers })
   }
 }
@@ -71,35 +137,44 @@ function segmentColor(index: number) {
   return colors[index % colors.length]
 }
 
-function mapPointToCanvas(value: number, min: number, pixelSize: number, scale: number) {
-  return (value / pixelSize - min) * scale
+function mapPointToLocal(value: number, minimum: number, pixelSize: number) {
+  return value / pixelSize - minimum
 }
 
-function drawPolyline(ctx: CanvasRenderingContext2D, entity: ValetudoMapEntity, bounds: ValetudoMapBounds, pixelSize: number, scale: number) {
+function drawPolyline(ctx: CanvasRenderingContext2D, entity: ValetudoMapEntity, geometry: ValetudoMapStageGeometry) {
   const points = entity.points ?? []
   if (points.length < 4) return
   ctx.beginPath()
-  ctx.moveTo(mapPointToCanvas(points[0] ?? 0, bounds.minX, pixelSize, scale), mapPointToCanvas(points[1] ?? 0, bounds.minY, pixelSize, scale))
+  ctx.moveTo(mapPointToLocal(points[0] ?? 0, geometry.minGridX, geometry.pixelSize), mapPointToLocal(points[1] ?? 0, geometry.minGridY, geometry.pixelSize))
   for (let index = 2; index + 1 < points.length; index += 2) {
-    ctx.lineTo(mapPointToCanvas(points[index] ?? 0, bounds.minX, pixelSize, scale), mapPointToCanvas(points[index + 1] ?? 0, bounds.minY, pixelSize, scale))
+    ctx.lineTo(mapPointToLocal(points[index] ?? 0, geometry.minGridX, geometry.pixelSize), mapPointToLocal(points[index + 1] ?? 0, geometry.minGridY, geometry.pixelSize))
   }
   ctx.stroke()
 }
 
-function drawPolygon(ctx: CanvasRenderingContext2D, entity: ValetudoMapEntity, bounds: ValetudoMapBounds, pixelSize: number, scale: number) {
+function drawPolygon(ctx: CanvasRenderingContext2D, entity: ValetudoMapEntity, geometry: ValetudoMapStageGeometry) {
   const points = entity.points ?? []
   if (points.length < 6) return
   ctx.beginPath()
-  ctx.moveTo(mapPointToCanvas(points[0] ?? 0, bounds.minX, pixelSize, scale), mapPointToCanvas(points[1] ?? 0, bounds.minY, pixelSize, scale))
+  ctx.moveTo(mapPointToLocal(points[0] ?? 0, geometry.minGridX, geometry.pixelSize), mapPointToLocal(points[1] ?? 0, geometry.minGridY, geometry.pixelSize))
   for (let index = 2; index + 1 < points.length; index += 2) {
-    ctx.lineTo(mapPointToCanvas(points[index] ?? 0, bounds.minX, pixelSize, scale), mapPointToCanvas(points[index + 1] ?? 0, bounds.minY, pixelSize, scale))
+    ctx.lineTo(mapPointToLocal(points[index] ?? 0, geometry.minGridX, geometry.pixelSize), mapPointToLocal(points[index + 1] ?? 0, geometry.minGridY, geometry.pixelSize))
   }
   ctx.closePath()
   ctx.fill()
   ctx.stroke()
 }
 
-function drawMapIcon(ctx: CanvasRenderingContext2D, iconPath: string, x: number, y: number, size: number, color: string, rotationRadians = 0, haloColor = 'rgba(8, 16, 24, 0.72)') {
+function drawMapIcon(
+  ctx: CanvasRenderingContext2D,
+  iconPath: string,
+  x: number,
+  y: number,
+  size: number,
+  color: string,
+  rotationRadians = 0,
+  haloColor = 'rgba(8, 16, 24, 0.72)',
+) {
   ctx.save()
   ctx.translate(x, y)
   ctx.beginPath()
@@ -117,30 +192,62 @@ function drawMapIcon(ctx: CanvasRenderingContext2D, iconPath: string, x: number,
   ctx.restore()
 }
 
-function drawMapEntityIcon(ctx: CanvasRenderingContext2D, entity: ValetudoMapEntity, bounds: ValetudoMapBounds, pixelSize: number, scale: number, iconPath: string, color: string, rotationRadians = 0, haloColor?: string) {
+function drawMapEntityIcon(
+  ctx: CanvasRenderingContext2D,
+  entity: ValetudoMapEntity,
+  geometry: ValetudoMapStageGeometry,
+  iconPath: string,
+  color: string,
+  screenScale: number,
+  rotationRadians = 0,
+  haloColor?: string,
+) {
   const points = entity.points ?? []
   if (points.length < 2) return
   drawMapIcon(
     ctx,
     iconPath,
-    mapPointToCanvas(points[0] ?? 0, bounds.minX, pixelSize, scale),
-    mapPointToCanvas(points[1] ?? 0, bounds.minY, pixelSize, scale),
-    Math.max(18, scale * 8),
+    mapPointToLocal(points[0] ?? 0, geometry.minGridX, geometry.pixelSize),
+    mapPointToLocal(points[1] ?? 0, geometry.minGridY, geometry.pixelSize),
+    Math.max(4, 22 / Math.max(screenScale, 0.01)),
     color,
     rotationRadians,
     haloColor,
   )
 }
 
-function renderValetudoMap(canvas: HTMLCanvasElement, map: ValetudoMap, mapScale: number) {
-  const bounds = valetudoMapBounds(map)
-  const scale = Math.max(1, mapScale)
-  const width = Math.max(1, Math.ceil((bounds.maxX - bounds.minX + 2) * scale))
-  const height = Math.max(1, Math.ceil((bounds.maxY - bounds.minY + 2) * scale))
+function localVisibleBounds(matrix: AffineMatrix, frame: MapFrameSize) {
+  const inverse = invertAffine(matrix)
+  const corners = [
+    applyAffine(inverse, { x: 0, y: 0 }),
+    applyAffine(inverse, { x: frame.width, y: 0 }),
+    applyAffine(inverse, { x: frame.width, y: frame.height }),
+    applyAffine(inverse, { x: 0, y: frame.height }),
+  ]
+  return {
+    maxX: Math.max(...corners.map((point) => point.x)) + 2,
+    maxY: Math.max(...corners.map((point) => point.y)) + 2,
+    minX: Math.min(...corners.map((point) => point.x)) - 2,
+    minY: Math.min(...corners.map((point) => point.y)) - 2,
+  }
+}
+
+function renderValetudoMap(
+  canvas: HTMLCanvasElement,
+  map: ValetudoMap,
+  geometry: ValetudoMapStageGeometry,
+  frame: MapFrameSize,
+  matrix: AffineMatrix,
+) {
   const dpr = window.devicePixelRatio || 1
-  canvas.width = Math.ceil(width * dpr)
-  canvas.height = Math.ceil(height * dpr)
-  canvas.style.aspectRatio = `${width} / ${height}`
+  const width = Math.max(1, Math.round(frame.width))
+  const height = Math.max(1, Math.round(frame.height))
+  const canvasWidth = Math.ceil(width * dpr)
+  const canvasHeight = Math.ceil(height * dpr)
+  if (canvas.width !== canvasWidth) canvas.width = canvasWidth
+  if (canvas.height !== canvasHeight) canvas.height = canvasHeight
+  canvas.style.width = `${width}px`
+  canvas.style.height = `${height}px`
   const ctx = canvas.getContext('2d')
   if (!ctx) return
 
@@ -148,7 +255,9 @@ function renderValetudoMap(canvas: HTMLCanvasElement, map: ValetudoMap, mapScale
   ctx.clearRect(0, 0, width, height)
   ctx.fillStyle = 'rgba(6, 12, 18, 0.56)'
   ctx.fillRect(0, 0, width, height)
+  ctx.setTransform(dpr * matrix.a, dpr * matrix.b, dpr * matrix.c, dpr * matrix.d, dpr * matrix.e, dpr * matrix.f)
 
+  const visible = localVisibleBounds(matrix, frame)
   let segmentIndex = 0
   for (const layer of map.layers) {
     const pixels = expandValetudoLayerPixels(layer)
@@ -156,109 +265,160 @@ function renderValetudoMap(canvas: HTMLCanvasElement, map: ValetudoMap, mapScale
     ctx.fillStyle = layer.type === 'wall' ? 'rgba(236, 244, 255, 0.82)' : segmentColor(segmentIndex)
     if (layer.type === 'segment') segmentIndex += 1
     for (let index = 0; index + 1 < pixels.length; index += 2) {
-      ctx.fillRect(((pixels[index] ?? 0) - bounds.minX) * scale, ((pixels[index + 1] ?? 0) - bounds.minY) * scale, scale, scale)
+      const x = (pixels[index] ?? 0) - geometry.minGridX
+      const y = (pixels[index + 1] ?? 0) - geometry.minGridY
+      if (x < visible.minX || x > visible.maxX || y < visible.minY || y > visible.maxY) continue
+      ctx.fillRect(x, y, 1.02, 1.02)
     }
   }
 
+  const screenScale = affineScale(matrix)
   ctx.lineCap = 'round'
   ctx.lineJoin = 'round'
   for (const entity of map.entities) {
     if (entity.type === 'path' || entity.type === 'predicted_path') {
-      ctx.lineWidth = Math.max(2, scale * 0.8)
+      ctx.lineWidth = Math.max(0.25, 2 / Math.max(screenScale, 0.01))
       ctx.strokeStyle = entity.type === 'path' ? 'rgba(255, 255, 255, 0.72)' : 'rgba(255, 255, 255, 0.36)'
-      drawPolyline(ctx, entity, bounds, map.pixelSize, scale)
+      drawPolyline(ctx, entity, geometry)
     }
   }
 
   for (const entity of map.entities) {
     if (entity.type === 'no_go_area' || entity.type === 'no_mop_area') {
-      ctx.lineWidth = 2
+      ctx.lineWidth = Math.max(0.2, 2 / Math.max(screenScale, 0.01))
       ctx.fillStyle = entity.type === 'no_go_area' ? 'rgba(239, 83, 80, 0.22)' : 'rgba(33, 150, 243, 0.2)'
       ctx.strokeStyle = entity.type === 'no_go_area' ? 'rgba(255, 138, 128, 0.76)' : 'rgba(144, 202, 249, 0.76)'
-      drawPolygon(ctx, entity, bounds, map.pixelSize, scale)
+      drawPolygon(ctx, entity, geometry)
     }
   }
 
   for (const entity of map.entities) {
     if (entity.type === 'charger_location') {
-      drawMapEntityIcon(ctx, entity, bounds, map.pixelSize, scale, DOCK_ICON_PATH, '#66bb6a', 0, 'rgba(18, 56, 30, 0.76)')
+      drawMapEntityIcon(ctx, entity, geometry, DOCK_ICON_PATH, '#66bb6a', screenScale, 0, 'rgba(18, 56, 30, 0.76)')
     }
     if (entity.type === 'robot_position') {
       const angle = typeof entity.metaData?.angle === 'number' ? entity.metaData.angle : 0
       const radians = ((angle - 90) * Math.PI) / 180
-      drawMapEntityIcon(ctx, entity, bounds, map.pixelSize, scale, ROBOT_ICON_PATH, '#f8fafc', radians)
+      drawMapEntityIcon(ctx, entity, geometry, ROBOT_ICON_PATH, '#f8fafc', screenScale, radians)
     }
   }
 }
 
-interface ValetudoMapCardProps {
-  vacuum: VacuumConfig
+function renderFallbackGrid(canvas: HTMLCanvasElement, frame: MapFrameSize) {
+  const dpr = window.devicePixelRatio || 1
+  const width = Math.max(1, Math.round(frame.width))
+  const height = Math.max(1, Math.round(frame.height))
+  const canvasWidth = Math.ceil(width * dpr)
+  const canvasHeight = Math.ceil(height * dpr)
+  if (canvas.width !== canvasWidth) canvas.width = canvasWidth
+  if (canvas.height !== canvasHeight) canvas.height = canvasHeight
+  canvas.style.width = `${width}px`
+  canvas.style.height = `${height}px`
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+  ctx.clearRect(0, 0, width, height)
+  ctx.fillStyle = 'rgba(6, 12, 18, 0.7)'
+  ctx.fillRect(0, 0, width, height)
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)'
+  for (let x = 0; x < width; x += 28) {
+    ctx.beginPath()
+    ctx.moveTo(x, 0)
+    ctx.lineTo(x, height)
+    ctx.stroke()
+  }
+  for (let y = 0; y < height; y += 28) {
+    ctx.beginPath()
+    ctx.moveTo(0, y)
+    ctx.lineTo(width, y)
+    ctx.stroke()
+  }
 }
 
-export function ValetudoMapCard({ vacuum }: ValetudoMapCardProps) {
+function pointerDistance(first: MapGridPoint, second: MapGridPoint) {
+  return Math.hypot(second.x - first.x, second.y - first.y)
+}
+
+function pointerMidpoint(first: MapGridPoint, second: MapGridPoint): MapGridPoint {
+  return { x: (first.x + second.x) / 2, y: (first.y + second.y) / 2 }
+}
+
+function keyboardDelta(event: ReactKeyboardEvent<SVGElement>) {
+  const step = event.shiftKey ? 10 : 1
+  if (event.key === 'ArrowLeft') return { x: -step, y: 0 }
+  if (event.key === 'ArrowRight') return { x: step, y: 0 }
+  if (event.key === 'ArrowUp') return { x: 0, y: -step }
+  if (event.key === 'ArrowDown') return { x: 0, y: step }
+  return null
+}
+
+export function ValetudoMapCard({
+  drawMode = false,
+  expanded = false,
+  frozenGeometry = null,
+  interactive = false,
+  minimumSizeCm = 25,
+  onDrawModeChange,
+  onEditorMetaChange,
+  onSelectionChange,
+  resetViewRevision = 0,
+  selection = null,
+  vacuum,
+}: ValetudoMapCardProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
+  const frameRef = useRef<HTMLDivElement | null>(null)
+  const overlayRef = useRef<SVGSVGElement | null>(null)
+  const pointersRef = useRef(new Map<number, MapGridPoint>())
+  const gestureRef = useRef<MapGesture | null>(null)
+  const draftRectRef = useRef<MapGridRect | null>(null)
+  const viewportRef = useRef<MapViewport>(INITIAL_VIEWPORT)
+  const matrixRef = useRef<AffineMatrix>(IDENTITY_MATRIX)
+  const [draftRect, setDraftRectState] = useState<MapGridRect | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [fetchedMapCameraEntity, setFetchedMapCameraEntity] = useState<ValetudoEntityLike | null>(null)
-  const [fetchedVacuumEntity, setFetchedVacuumEntity] = useState<ValetudoEntityLike | null>(null)
-  const [isLoaded, setIsLoaded] = useState(false)
-  const [map, setMap] = useState<ValetudoMap | null>(null)
+  const [frame, setFrame] = useState<MapFrameSize>({ height: 0, width: 0 })
+  const [isLoaded, setIsLoaded] = useState(import.meta.env.MODE === 'test')
+  const [map, setMap] = useState<ValetudoMap | null>(() => import.meta.env.MODE === 'test' ? createMockValetudoMap(vacuum.vacuumMapId) : null)
+  const [storedViewport, setStoredViewport] = useState<{ revision: number; value: MapViewport }>({
+    revision: resetViewRevision,
+    value: INITIAL_VIEWPORT,
+  })
   const connection = useHass((state) => state.connection) as unknown as HassConnectionLike | null | undefined
-  const entities = useHass((state) => state.entities)
-  const config = useHass((state) => state.config)
-  const services = useHass((state) => state.services)
-  const callService = useHass((state) => state.helpers.callService) as unknown as CallService
-  const joinHassUrl = useHass((state) => state.helpers.joinHassUrl)
   const isMockMode = import.meta.env.MODE === 'test'
   const cameraEntityId = mapCameraEntityId(vacuum.vacuumMapId)
   const mapCameraEntity = useEntity(asEntityName(cameraEntityId), { returnNullIfNotFound: true }) as ValetudoEntityLike | null
-  const vacuumEntity = useEntity(asEntityName(vacuum.entityId), { returnNullIfNotFound: true }) as ValetudoEntityLike | null
   const liveMapCameraEntity = fetchedMapCameraEntity?.entity_id === cameraEntityId ? fetchedMapCameraEntity : null
-  const liveVacuumEntity = fetchedVacuumEntity?.entity_id === vacuum.entityId ? fetchedVacuumEntity : null
   const injectedMapCameraEntity = selectValetudoMapEntity(cameraEntityId, mapCameraEntity, liveMapCameraEntity)
-  const injectedVacuumEntity = selectLiveEntity(vacuum.entityId, vacuumEntity, liveVacuumEntity)
   const entityPicture = typeof injectedMapCameraEntity?.attributes.entity_picture === 'string' ? injectedMapCameraEntity.attributes.entity_picture : undefined
   const cameraImageUrl = entityPicture ?? `/api/camera_proxy/${cameraEntityId}`
-  const states = useMemo(() => {
-    if (!injectedMapCameraEntity && !injectedVacuumEntity) return entities
-
-    return {
-      ...entities,
-      ...(injectedMapCameraEntity ? { [cameraEntityId]: injectedMapCameraEntity } : {}),
-      ...(injectedVacuumEntity ? { [vacuum.entityId]: injectedVacuumEntity } : {}),
-    }
-  }, [cameraEntityId, entities, injectedMapCameraEntity, injectedVacuumEntity, vacuum.entityId])
-
-  const hassShim = useMemo(
-    () => ({
-      connection,
-      states,
-      config,
-      services,
-      fetchWithAuth: createFetchWithAuth(connection),
-      localize: (key: string) => key,
-      hassUrl: joinHassUrl,
-      callService: (domain: string, service: string, serviceData?: Record<string, unknown>, target?: unknown) => {
-        callService({ domain, service, serviceData, target })
-      },
-      callWS: (message: { type: string } & Record<string, unknown>) => {
-        if (!connection?.sendMessagePromise) return Promise.reject(new Error('Home Assistant connection is not ready'))
-        return connection.sendMessagePromise(message)
-      },
-    }),
-    [callService, config, connection, joinHassUrl, services, states],
+  const liveGeometry = useMemo(() => map ? valetudoMapStageGeometry(map, vacuum.mapScale) : null, [map, vacuum.mapScale])
+  const geometry = interactive ? frozenGeometry ?? liveGeometry : liveGeometry
+  const viewport = storedViewport.revision === resetViewRevision ? storedViewport.value : INITIAL_VIEWPORT
+  const rotationDegrees = vacuum.mapRotationDegrees ?? 0
+  const matrix = useMemo(
+    () => geometry ? mapViewportMatrix(geometry, frame, viewport, rotationDegrees) : IDENTITY_MATRIX,
+    [frame, geometry, rotationDegrees, viewport],
   )
-  const hassShimRef = useRef(hassShim)
+  const displayedRect = interactive ? draftRect ?? selection : selection
+  const setDraftRect = useCallback((rect: MapGridRect | null) => {
+    draftRectRef.current = rect
+    setDraftRectState(rect)
+  }, [])
+  const setViewport = useCallback((nextViewport: MapViewport) => {
+    viewportRef.current = nextViewport
+    setStoredViewport({ revision: resetViewRevision, value: nextViewport })
+  }, [resetViewRevision])
 
   useEffect(() => {
-    hassShimRef.current = hassShim
-  }, [hassShim])
+    matrixRef.current = matrix
+    viewportRef.current = viewport
+  }, [matrix, viewport])
 
   useEffect(() => {
+    if (isMockMode) return undefined
+
     let cancelled = false
-    if (isMockMode || !connection || !injectedMapCameraEntity) {
-      setIsLoaded(false)
-      return undefined
-    }
+    if (!connection || !injectedMapCameraEntity) return undefined
 
     const fetchMap = () => {
       createFetchWithAuth(connection)(cameraImageUrl)
@@ -284,66 +444,10 @@ export function ValetudoMapCard({ vacuum }: ValetudoMapCardProps) {
       cancelled = true
       window.clearInterval(timer)
     }
-  }, [cameraImageUrl, connection, injectedMapCameraEntity, isMockMode])
+  }, [cameraImageUrl, connection, injectedMapCameraEntity, isMockMode, vacuum.vacuumMapId])
 
   useEffect(() => {
-    if (!map || !canvasRef.current) return
-    renderValetudoMap(canvasRef.current, map, vacuum.mapScale)
-  }, [map, vacuum.mapScale])
-
-  useEffect(() => {
-    if (!map || !canvasRef.current) return undefined
-    const redraw = () => {
-      if (canvasRef.current) renderValetudoMap(canvasRef.current, map, vacuum.mapScale)
-    }
-    window.addEventListener('resize', redraw)
-    return () => window.removeEventListener('resize', redraw)
-  }, [map, vacuum.mapScale])
-
-  useEffect(() => {
-    if (!map || !canvasRef.current) return undefined
-    const canvas = canvasRef.current
-    const observer = new ResizeObserver(() => renderValetudoMap(canvas, map, vacuum.mapScale))
-    observer.observe(canvas)
-    return () => observer.disconnect()
-  }, [map, vacuum.mapScale])
-
-  useEffect(() => {
-    if (!isMockMode && map) return
-    if (!canvasRef.current) return
-    const canvas = canvasRef.current
-    canvas.width = 400
-    canvas.height = 260
-    const ctx = canvas.getContext('2d')
-    if (!ctx) return
-    ctx.clearRect(0, 0, canvas.width, canvas.height)
-    ctx.fillStyle = 'rgba(6, 12, 18, 0.7)'
-    ctx.fillRect(0, 0, canvas.width, canvas.height)
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.22)'
-    for (let x = 0; x < canvas.width; x += 28) {
-      ctx.beginPath()
-      ctx.moveTo(x, 0)
-      ctx.lineTo(x, canvas.height)
-      ctx.stroke()
-    }
-    for (let y = 0; y < canvas.height; y += 28) {
-      ctx.beginPath()
-      ctx.moveTo(0, y)
-      ctx.lineTo(canvas.width, y)
-      ctx.stroke()
-    }
-  }, [isMockMode, map])
-
-  useEffect(() => {
-    if (!isMockMode) return undefined
-    const timer = window.setTimeout(() => {
-      setIsLoaded(true)
-    }, 0)
-    return () => window.clearTimeout(timer)
-  }, [isMockMode])
-
-  useEffect(() => {
-    if (!connection) return undefined
+    if (!connection || isMockMode) return undefined
 
     let cancelled = false
     let unsubscribe: (() => void) | undefined
@@ -351,7 +455,6 @@ export function ValetudoMapCard({ vacuum }: ValetudoMapCardProps) {
     const fetchEntityState = async (entityId: string) => {
       const entityResponse = await createFetchWithAuth(connection)(`/api/states/${entityId}`)
       if (entityResponse.ok) return entityResponse.json() as Promise<ValetudoEntityLike>
-
       if (!connection.sendMessagePromise) return null
       const statesList = await connection.sendMessagePromise<ValetudoEntityLike[]>({ type: 'get_states' })
       return statesList.find((entity) => entity.entity_id === entityId) ?? null
@@ -360,19 +463,18 @@ export function ValetudoMapCard({ vacuum }: ValetudoMapCardProps) {
     const updateLiveEntity = (entity: ValetudoEntityLike | null | undefined) => {
       if (cancelled) return
       if (entity?.entity_id === cameraEntityId) setFetchedMapCameraEntity(entity)
-      if (entity?.entity_id === vacuum.entityId) setFetchedVacuumEntity(entity)
     }
 
     const refreshLiveEntities = () => {
-      void Promise.all([fetchEntityState(cameraEntityId), fetchEntityState(vacuum.entityId)])
-        .then((liveEntities) => liveEntities.forEach(updateLiveEntity))
+      void fetchEntityState(cameraEntityId)
+        .then(updateLiveEntity)
         .catch(() => undefined)
     }
 
     refreshLiveEntities()
     const metadataRefreshTimer = window.setInterval(refreshLiveEntities, VALETUDO_LIVE_ENTITY_REFRESH_MS)
     const subscription = connection.subscribeEvents?.<HassStateChangedEvent>((event) => {
-      if (event.data?.entity_id !== cameraEntityId && event.data?.entity_id !== vacuum.entityId) return
+      if (event.data?.entity_id !== cameraEntityId) return
       updateLiveEntity(event.data.new_state)
     }, 'state_changed')
 
@@ -393,22 +495,336 @@ export function ValetudoMapCard({ vacuum }: ValetudoMapCardProps) {
       window.clearInterval(metadataRefreshTimer)
       unsubscribe?.()
     }
-  }, [cameraEntityId, connection, vacuum.entityId])
+  }, [cameraEntityId, connection, isMockMode])
 
-  const showFallback = isMockMode || Boolean(error)
-  const mapRotation = `${vacuum.mapRotationDegrees ?? 0}deg`
+  useEffect(() => {
+    const element = frameRef.current
+    if (!element) return undefined
+
+    const syncFrame = () => {
+      const rect = element.getBoundingClientRect()
+      setFrame({ height: rect.height || element.clientHeight, width: rect.width || element.clientWidth })
+    }
+
+    syncFrame()
+    window.addEventListener('resize', syncFrame)
+    if (typeof ResizeObserver === 'undefined') return () => window.removeEventListener('resize', syncFrame)
+    const observer = new ResizeObserver(syncFrame)
+    observer.observe(element)
+    return () => {
+      observer.disconnect()
+      window.removeEventListener('resize', syncFrame)
+    }
+  }, [])
+
+  useEffect(() => {
+    pointersRef.current.clear()
+    gestureRef.current = null
+  }, [interactive, resetViewRevision])
+
+  useEffect(() => {
+    onEditorMetaChange?.({ error, geometry, isLoaded })
+  }, [error, geometry, isLoaded, onEditorMetaChange])
+
+  useEffect(() => {
+    const canvas = canvasRef.current
+    if (!canvas || frame.width <= 0 || frame.height <= 0) return undefined
+    const frameId = window.requestAnimationFrame(() => {
+      if (map && geometry) renderValetudoMap(canvas, map, geometry, frame, matrix)
+      else renderFallbackGrid(canvas, frame)
+    })
+    return () => window.cancelAnimationFrame(frameId)
+  }, [frame, geometry, map, matrix])
+
+  const clientPoint = useCallback((event: { clientX: number; clientY: number }): MapGridPoint => {
+    const rect = frameRef.current?.getBoundingClientRect()
+    return { x: event.clientX - (rect?.left ?? 0), y: event.clientY - (rect?.top ?? 0) }
+  }, [])
+
+  const clientToGlobalGrid = useCallback((point: MapGridPoint) => {
+    if (!geometry) return null
+    return localPointToGlobalGrid(geometry, applyAffine(invertAffine(matrixRef.current), point))
+  }, [geometry])
+
+  const startPinch = useCallback(() => {
+    const points = [...pointersRef.current.values()]
+    if (points.length < 2 || !geometry) return
+    const midpoint = pointerMidpoint(points[0], points[1])
+    const anchor = applyAffine(invertAffine(matrixRef.current), midpoint)
+    gestureRef.current = {
+      anchor,
+      startDistance: Math.max(1, pointerDistance(points[0], points[1])),
+      startZoom: viewportRef.current.zoom,
+      type: 'pinch',
+    }
+    setDraftRect(null)
+  }, [geometry, setDraftRect])
+
+  const handlePointerDown = useCallback((event: ReactPointerEvent<SVGSVGElement>) => {
+    if (!interactive || !geometry) return
+    event.preventDefault()
+    event.stopPropagation()
+    event.currentTarget.setPointerCapture(event.pointerId)
+    const point = clientPoint(event)
+    pointersRef.current.set(event.pointerId, point)
+
+    if (pointersRef.current.size >= 2) {
+      startPinch()
+      return
+    }
+
+    const globalPoint = clientToGlobalGrid(point)
+    if (!globalPoint) return
+    const target = event.target instanceof Element ? event.target.closest<SVGElement>('[data-editor-action]') : null
+    const action = target?.dataset.editorAction
+
+    if (action === 'resize' && selection) {
+      const corner = target?.dataset.editorCorner as MapGridRectCorner | undefined
+      if (!corner || !RESIZE_HANDLES.some((handle) => handle.corner === corner)) return
+      gestureRef.current = { corner, origin: selection, type: 'resize' }
+      return
+    }
+    if (action === 'move' && selection) {
+      gestureRef.current = { origin: selection, startPoint: globalPoint, type: 'move' }
+      return
+    }
+    if (drawMode) {
+      gestureRef.current = { anchor: globalPoint, type: 'draw' }
+      setDraftRect(mapGridRectFromPoints(geometry, globalPoint, globalPoint, Math.ceil(minimumSizeCm / geometry.pixelSize)))
+      return
+    }
+
+    gestureRef.current = { origin: viewportRef.current, startPoint: point, type: 'pan' }
+  }, [clientPoint, clientToGlobalGrid, drawMode, geometry, interactive, minimumSizeCm, selection, setDraftRect, startPinch])
+
+  const handlePointerMove = useCallback((event: ReactPointerEvent<SVGSVGElement>) => {
+    if (!interactive || !geometry || !pointersRef.current.has(event.pointerId)) return
+    event.preventDefault()
+    event.stopPropagation()
+    const point = clientPoint(event)
+    pointersRef.current.set(event.pointerId, point)
+    const gesture = gestureRef.current
+    if (!gesture) return
+
+    if (gesture.type === 'pinch') {
+      const points = [...pointersRef.current.values()]
+      if (points.length < 2) return
+      const midpoint = pointerMidpoint(points[0], points[1])
+      const distance = pointerDistance(points[0], points[1])
+      const zoom = Math.min(MAP_ZOOM_MAX, Math.max(MAP_ZOOM_MIN, gesture.startZoom * distance / gesture.startDistance))
+      setViewport(viewportForAnchor(geometry, frame, gesture.anchor, midpoint, zoom, rotationDegrees))
+      return
+    }
+
+    if (gesture.type === 'pan') {
+      setViewport(clampMapViewport(
+        geometry,
+        frame,
+        {
+          ...gesture.origin,
+          panX: gesture.origin.panX + point.x - gesture.startPoint.x,
+          panY: gesture.origin.panY + point.y - gesture.startPoint.y,
+        },
+        rotationDegrees,
+      ))
+      return
+    }
+
+    const globalPoint = clientToGlobalGrid(point)
+    if (!globalPoint) return
+    const minimumGridSize = Math.ceil(minimumSizeCm / geometry.pixelSize)
+    if (gesture.type === 'draw') {
+      setDraftRect(mapGridRectFromPoints(geometry, gesture.anchor, globalPoint, minimumGridSize))
+    } else if (gesture.type === 'move') {
+      setDraftRect(translateMapGridRect(geometry, gesture.origin, {
+        x: globalPoint.x - gesture.startPoint.x,
+        y: globalPoint.y - gesture.startPoint.y,
+      }))
+    } else {
+      setDraftRect(resizeMapGridRectCorner(geometry, gesture.origin, globalPoint, minimumGridSize, gesture.corner))
+    }
+  }, [clientPoint, clientToGlobalGrid, frame, geometry, interactive, minimumSizeCm, rotationDegrees, setDraftRect, setViewport])
+
+  const finishPointerGesture = useCallback((event: ReactPointerEvent<SVGSVGElement>, cancelled: boolean) => {
+    if (!pointersRef.current.has(event.pointerId)) return
+    event.preventDefault()
+    event.stopPropagation()
+    pointersRef.current.delete(event.pointerId)
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId)
+
+    if (pointersRef.current.size > 0) {
+      if (gestureRef.current?.type === 'pinch') gestureRef.current = null
+      return
+    }
+
+    const gesture = gestureRef.current
+    if (!cancelled && gesture && gesture.type !== 'pan' && gesture.type !== 'pinch' && draftRectRef.current) {
+      onSelectionChange?.(draftRectRef.current)
+      if (gesture.type === 'draw') onDrawModeChange?.(false)
+    }
+    gestureRef.current = null
+    setDraftRect(null)
+  }, [onDrawModeChange, onSelectionChange, setDraftRect])
+
+  const handleWheel = useCallback((event: WheelEvent) => {
+    if (!interactive || !geometry) return
+    event.preventDefault()
+    const point = clientPoint(event)
+    const zoom = Math.min(MAP_ZOOM_MAX, Math.max(MAP_ZOOM_MIN, viewportRef.current.zoom * Math.exp(-event.deltaY * 0.0015)))
+    setViewport(zoomViewportAt(geometry, frame, viewportRef.current, point, zoom, rotationDegrees))
+  }, [clientPoint, frame, geometry, interactive, rotationDegrees, setViewport])
+
+  useEffect(() => {
+    const overlay = overlayRef.current
+    if (!interactive || !overlay) return undefined
+    const listener = (event: Event) => handleWheel(event as WheelEvent)
+    overlay.addEventListener('wheel', listener, { passive: false })
+    return () => overlay.removeEventListener('wheel', listener)
+  }, [handleWheel, interactive])
+
+  const handleMoveKeyDown = useCallback((event: ReactKeyboardEvent<SVGRectElement>) => {
+    if (!selection || !geometry) return
+    if (event.key === 'Delete' || event.key === 'Backspace') {
+      event.preventDefault()
+      onSelectionChange?.(null)
+      return
+    }
+    const delta = keyboardDelta(event)
+    if (!delta) return
+    event.preventDefault()
+    onSelectionChange?.(translateMapGridRect(geometry, selection, delta))
+  }, [geometry, onSelectionChange, selection])
+
+  const handleResizeKeyDown = useCallback((event: ReactKeyboardEvent<SVGCircleElement>, corner: MapGridRectCorner) => {
+    if (!selection || !geometry) return
+    const delta = keyboardDelta(event)
+    if (!delta) return
+    event.preventDefault()
+    const handle = RESIZE_HANDLES.find((candidate) => candidate.corner === corner)
+    if (!handle) return
+    onSelectionChange?.(resizeMapGridRectCorner(
+      geometry,
+      selection,
+      { x: selection[handle.x] + delta.x, y: selection[handle.y] + delta.y },
+      Math.ceil(minimumSizeCm / geometry.pixelSize),
+      corner,
+    ))
+  }, [geometry, minimumSizeCm, onSelectionChange, selection])
+
+  const showFallback = Boolean(error) || !map
+  const effectiveScale = geometry ? Math.max(affineScale(matrix), 0.01) : 1
+  const localRect = displayedRect && geometry
+    ? {
+        x0: displayedRect.x0 - geometry.minGridX,
+        x1: displayedRect.x1 - geometry.minGridX,
+        y0: displayedRect.y0 - geometry.minGridY,
+        y1: displayedRect.y1 - geometry.minGridY,
+      }
+    : null
+  const showOverlay = Boolean(geometry && frame.width > 0 && frame.height > 0 && (interactive || localRect))
+  const mapStyle = {
+    '--map-min-height': vacuum.mapScale > 2 ? '300px' : '340px',
+  } as CSSProperties
 
   return (
     <div
       aria-label={`${vacuum.title} Valetudo map`}
       className={styles.frame}
+      data-draw-mode={drawMode ? 'true' : 'false'}
+      data-expanded={expanded ? 'true' : 'false'}
+      data-interactive={interactive ? 'true' : 'false'}
       data-loaded={isLoaded ? 'true' : 'false'}
+      ref={frameRef}
       role="region"
-      style={{ '--map-min-height': vacuum.mapScale > 2 ? '300px' : '340px', '--map-rotation': mapRotation } as CSSProperties}
+      style={mapStyle}
     >
-      <div className={styles.host}>
-        <canvas aria-hidden="true" className={styles.canvas} data-valetudo-map-canvas="true" ref={canvasRef} />
-      </div>
+      <canvas aria-hidden="true" className={styles.canvas} data-valetudo-map-canvas="true" ref={canvasRef} />
+      {showOverlay && geometry && (
+        <svg
+          aria-hidden={interactive ? undefined : true}
+          aria-label={interactive ? `${vacuum.title} cleaning area editor` : undefined}
+          className={styles.overlay}
+          data-interactive={interactive ? 'true' : 'false'}
+          data-map-editor-overlay="true"
+          onPointerCancel={interactive ? (event) => finishPointerGesture(event, true) : undefined}
+          onPointerDown={interactive ? handlePointerDown : undefined}
+          onPointerMove={interactive ? handlePointerMove : undefined}
+          onPointerUp={interactive ? (event) => finishPointerGesture(event, false) : undefined}
+          ref={overlayRef}
+          role={interactive ? 'application' : undefined}
+          viewBox={`0 0 ${frame.width} ${frame.height}`}
+        >
+          <g transform={affineToCssMatrix(matrix)}>
+            {localRect && interactive && (
+              <>
+                <rect
+                  aria-label="Move cleaning area"
+                  className={styles.selection}
+                  data-editor-action="move"
+                  data-map-rect="true"
+                  data-x0={displayedRect?.x0}
+                  data-x1={displayedRect?.x1}
+                  data-y0={displayedRect?.y0}
+                  data-y1={displayedRect?.y1}
+                  height={localRect.y1 - localRect.y0}
+                  onKeyDown={handleMoveKeyDown}
+                  role="button"
+                  tabIndex={0}
+                  vectorEffect="non-scaling-stroke"
+                  width={localRect.x1 - localRect.x0}
+                  x={localRect.x0}
+                  y={localRect.y0}
+                />
+                {RESIZE_HANDLES.map((handle) => {
+                  const cx = localRect[handle.x]
+                  const cy = localRect[handle.y]
+                  return (
+                    <g key={handle.corner}>
+                      <circle
+                        aria-hidden="true"
+                        className={styles.resizeHandleVisual}
+                        cx={cx}
+                        cy={cy}
+                        r={8 / effectiveScale}
+                        vectorEffect="non-scaling-stroke"
+                      />
+                      <circle
+                        aria-label={`Resize cleaning area ${handle.label}`}
+                        className={styles.resizeHandleHit}
+                        cx={cx}
+                        cy={cy}
+                        data-editor-action="resize"
+                        data-editor-corner={handle.corner}
+                        data-resize-diagonal={handle.diagonal}
+                        onKeyDown={(event) => handleResizeKeyDown(event, handle.corner)}
+                        r={22 / effectiveScale}
+                        role="button"
+                        tabIndex={0}
+                      />
+                    </g>
+                  )
+                })}
+              </>
+            )}
+            {localRect && !interactive && (
+              <rect
+                aria-hidden="true"
+                className={[styles.selection, styles.staticSelection].join(' ')}
+                data-map-rect="true"
+                data-x0={displayedRect?.x0}
+                data-x1={displayedRect?.x1}
+                data-y0={displayedRect?.y0}
+                data-y1={displayedRect?.y1}
+                height={localRect.y1 - localRect.y0}
+                vectorEffect="non-scaling-stroke"
+                width={localRect.x1 - localRect.x0}
+                x={localRect.x0}
+                y={localRect.y0}
+              />
+            )}
+          </g>
+        </svg>
+      )}
       {showFallback && (
         <div className={styles.fallback}>
           <span className={styles.fallbackTitle}>Valetudo map</span>

@@ -50,8 +50,76 @@ export interface ValetudoMapBounds {
   minY: number
 }
 
+const MOCK_MAP_BOUNDS: Record<string, ValetudoMapBounds> = {
+  valetudo_elatedusedram: { minX: 638, maxX: 782, minY: 555, maxY: 722 },
+  valetudo_exaltedsneakydeer: { minX: 558, maxX: 728, minY: 639, maxY: 1027 },
+  valetudo_politefatherlykingfisher: { minX: 637, maxX: 735, minY: 535, maxY: 688 },
+}
+const EXPANDED_PIXEL_CACHE = new WeakMap<ValetudoMapLayer, number[]>()
+
 export function mapCameraEntityId(vacuumMapId: string) {
   return `camera.${vacuumMapId}_map_data`
+}
+
+function mockCompressedRows(minX: number, maxX: number, minY: number, maxY: number, step = 1) {
+  const rows: number[] = []
+  for (let y = minY; y <= maxY; y += step) rows.push(minX, y, maxX - minX + 1)
+  return rows
+}
+
+export function createMockValetudoMap(vacuumMapId: string): ValetudoMap {
+  const bounds = MOCK_MAP_BOUNDS[vacuumMapId] ?? MOCK_MAP_BOUNDS.valetudo_exaltedsneakydeer
+  const width = bounds.maxX - bounds.minX
+  const height = bounds.maxY - bounds.minY
+  const splitX = Math.round(bounds.minX + width * 0.54)
+  const splitY = Math.round(bounds.minY + height * 0.48)
+  const inset = Math.max(3, Math.round(Math.min(width, height) * 0.04))
+  const segmentBounds = [
+    { minX: bounds.minX + inset, maxX: splitX - 1, minY: bounds.minY + inset, maxY: splitY - 1 },
+    { minX: splitX, maxX: bounds.maxX - inset, minY: bounds.minY + inset, maxY: splitY - 1 },
+    { minX: bounds.minX + inset, maxX: bounds.maxX - inset, minY: splitY, maxY: bounds.maxY - inset },
+  ]
+
+  return {
+    __class: 'ValetudoMap',
+    entities: [
+      {
+        type: 'charger_location',
+        points: [(bounds.minX + inset + 4) * 5, (bounds.minY + inset + 4) * 5],
+      },
+      {
+        type: 'robot_position',
+        points: [Math.round((bounds.minX + bounds.maxX) * 2.5), Math.round((bounds.minY + bounds.maxY) * 2.5)],
+        metaData: { angle: 90 },
+      },
+    ],
+    layers: [
+      ...segmentBounds.map((segment) => ({
+        type: 'segment',
+        dimensions: {
+          x: { min: segment.minX, max: segment.maxX },
+          y: { min: segment.minY, max: segment.maxY },
+        },
+        compressedPixels: mockCompressedRows(segment.minX, segment.maxX, segment.minY, segment.maxY),
+      })),
+      {
+        type: 'wall',
+        dimensions: {
+          x: { min: bounds.minX, max: bounds.maxX },
+          y: { min: bounds.minY, max: bounds.maxY },
+        },
+        compressedPixels: [
+          ...mockCompressedRows(bounds.minX, bounds.maxX, bounds.minY, bounds.minY),
+          ...mockCompressedRows(bounds.minX, bounds.maxX, bounds.maxY, bounds.maxY),
+          ...mockCompressedRows(bounds.minX, bounds.minX, bounds.minY, bounds.maxY),
+          ...mockCompressedRows(bounds.maxX, bounds.maxX, bounds.minY, bounds.maxY),
+        ],
+      },
+    ],
+    metaData: { version: 2 },
+    pixelSize: 5,
+    size: { x: 6554, y: 6554 },
+  }
 }
 
 export function selectValetudoMapEntity(cameraEntityId: string, storeEntity: ValetudoEntityLike | null, liveEntity: ValetudoEntityLike | null) {
@@ -89,6 +157,8 @@ async function inflateZlibText(data: Uint8Array) {
 
 export function expandValetudoLayerPixels(layer: ValetudoMapLayer) {
   if (layer.pixels?.length) return layer.pixels
+  const cached = EXPANDED_PIXEL_CACHE.get(layer)
+  if (cached) return cached
   const compressed = layer.compressedPixels ?? []
   const pixels: number[] = []
 
@@ -101,6 +171,7 @@ export function expandValetudoLayerPixels(layer: ValetudoMapLayer) {
     }
   }
 
+  EXPANDED_PIXEL_CACHE.set(layer, pixels)
   return pixels
 }
 

@@ -779,6 +779,8 @@ export const mockEntities: Record<string, MockEntity> = {
   'select.valetudo_elatedusedram_fan': entity('select.valetudo_elatedusedram_fan', 'unavailable', { options: ['quiet', 'balanced', 'turbo', 'max'] }),
   'select.valetudo_elatedusedram_water': entity('select.valetudo_elatedusedram_water', 'unavailable', { options: ['low', 'medium', 'high'] }),
   'input_select.music_room_vacuum_cleaning_passes': entity('input_select.music_room_vacuum_cleaning_passes', '1', { options: ['1', '2', '3'] }),
+  'binary_sensor.valetudo_elatedusedram_mop_attachment': entity('binary_sensor.valetudo_elatedusedram_mop_attachment', 'on'),
+  'sensor.valetudo_elatedusedram_dock_status': entity('sensor.valetudo_elatedusedram_dock_status', 'idle'),
   'camera.valetudo_elatedusedram_map_data': entity('camera.valetudo_elatedusedram_map_data', 'idle'),
   'input_boolean.clean_music_room': entity('input_boolean.clean_music_room', 'off'),
   'input_boolean.clean_downstairs_hallway': entity('input_boolean.clean_downstairs_hallway', 'off'),
@@ -798,6 +800,8 @@ export const mockEntities: Record<string, MockEntity> = {
   'select.valetudo_politefatherlykingfisher_fan': entity('select.valetudo_politefatherlykingfisher_fan', 'balanced', { options: ['quiet', 'balanced', 'turbo', 'max'] }),
   'select.valetudo_politefatherlykingfisher_water': entity('select.valetudo_politefatherlykingfisher_water', 'medium', { options: ['min', 'low', 'medium', 'high', 'max'] }),
   'input_select.theater_room_vacuum_cleaning_passes': entity('input_select.theater_room_vacuum_cleaning_passes', '1', { options: ['1', '2', '3'] }),
+  'binary_sensor.valetudo_politefatherlykingfisher_mop_attachment': entity('binary_sensor.valetudo_politefatherlykingfisher_mop_attachment', 'on'),
+  'sensor.valetudo_politefatherlykingfisher_dock_status': entity('sensor.valetudo_politefatherlykingfisher_dock_status', 'idle'),
   'button.valetudo_politefatherlykingfisher_trigger_auto_empty_dock': entity('button.valetudo_politefatherlykingfisher_trigger_auto_empty_dock', 'unknown'),
   'camera.valetudo_politefatherlykingfisher_map_data': entity('camera.valetudo_politefatherlykingfisher_map_data', 'idle'),
   'vacuum.valetudo_exaltedsneakydeer': entity('vacuum.valetudo_exaltedsneakydeer', 'docked'),
@@ -811,6 +815,8 @@ export const mockEntities: Record<string, MockEntity> = {
   'select.valetudo_exaltedsneakydeer_fan': entity('select.valetudo_exaltedsneakydeer_fan', 'balanced', { options: ['quiet', 'balanced', 'turbo', 'max'] }),
   'select.valetudo_exaltedsneakydeer_water': entity('select.valetudo_exaltedsneakydeer_water', 'medium', { options: ['low', 'medium', 'high'] }),
   'input_select.main_floor_vacuum_cleaning_passes': entity('input_select.main_floor_vacuum_cleaning_passes', '1', { options: ['1', '2', '3'] }),
+  'binary_sensor.valetudo_exaltedsneakydeer_mop_attachment': entity('binary_sensor.valetudo_exaltedsneakydeer_mop_attachment', 'on'),
+  'sensor.valetudo_exaltedsneakydeer_dock_status': entity('sensor.valetudo_exaltedsneakydeer_dock_status', 'idle'),
   'sensor.evershelf_items_in_pantry': entity('sensor.evershelf_items_in_pantry', '12', { unit_of_measurement: 'items' }),
   'sensor.evershelf_items_in_fridge': entity('sensor.evershelf_items_in_fridge', '8', { unit_of_measurement: 'items' }),
   'sensor.evershelf_items_in_freezer': entity('sensor.evershelf_items_in_freezer', '5', { unit_of_measurement: 'items' }),
@@ -910,6 +916,12 @@ export function resetMockHass() {
   mockEntities['vacuum.valetudo_elatedusedram'].state = 'unavailable'
   mockEntities['vacuum.valetudo_politefatherlykingfisher'].state = 'docked'
   mockEntities['vacuum.valetudo_exaltedsneakydeer'].state = 'docked'
+  mockEntities['binary_sensor.valetudo_elatedusedram_mop_attachment'].state = 'on'
+  mockEntities['binary_sensor.valetudo_politefatherlykingfisher_mop_attachment'].state = 'on'
+  mockEntities['binary_sensor.valetudo_exaltedsneakydeer_mop_attachment'].state = 'on'
+  mockEntities['sensor.valetudo_elatedusedram_dock_status'].state = 'idle'
+  mockEntities['sensor.valetudo_politefatherlykingfisher_dock_status'].state = 'idle'
+  mockEntities['sensor.valetudo_exaltedsneakydeer_dock_status'].state = 'idle'
   mockEntities['sensor.valetudo_exaltedsneakydeer_battery_level'].state = '99'
   mockEntities['sensor.valetudo_exaltedsneakydeer_status_flag'].state = 'ready'
   mockEntities['sensor.valetudo_exaltedsneakydeer_error'].state = 'No error'
@@ -1193,7 +1205,22 @@ export const mockState: MockHassState = {
     },
     joinHassUrl: (path) => `http://mock-hass.local${path}`,
   },
-  services: {},
+  services: {
+    script: {
+      main_floor_vacuum_clean_zone: {},
+      main_floor_vacuum_mop_dock_clean: {},
+      main_floor_vacuum_mop_dock_dry: {},
+      music_room_vacuum_clean_zone: {},
+      music_room_vacuum_mop_dock_clean: {},
+      music_room_vacuum_mop_dock_dry: {},
+      theater_room_vacuum_clean_zone: {},
+      theater_room_vacuum_mop_dock_clean: {},
+      theater_room_vacuum_mop_dock_dry: {},
+    },
+    valetudo_vacuum_coordinator: {
+      dock_action: {},
+    },
+  },
   user: { id: '64089b5683944c39b4f944c8f76830b0', is_admin: true, name: 'Stephen' },
 }
 
