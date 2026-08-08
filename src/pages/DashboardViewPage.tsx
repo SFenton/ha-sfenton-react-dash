@@ -22,7 +22,7 @@ import { useEverShelfInventoryControls, type EverShelfInventoryControls } from '
 import type { RecipeControls } from '../components/hass/recipes/useRecipeControls'
 import { useRecipeControls } from '../components/hass/recipes/useRecipeControls'
 import { VacuumAutoCleanControlCard } from '../components/hass/VacuumAutoCleanControls'
-import { VacuumCard, VacuumRoomSourceModalContent } from '../components/hass/VacuumCard'
+import { VacuumCard, VacuumModal, VacuumRoomSourceModalContent } from '../components/hass/VacuumCard'
 import { VACUUM_MODAL_STYLE } from '../components/hass/vacuumModalStyle'
 import { AirQualityModalContent } from '../components/hass/AirQualityModalContent'
 import { GrillModalContent } from '../components/hass/GrillModalContent'
@@ -982,6 +982,11 @@ function RoomSourceModal({ card, eightSleepModalState, onClose, preloadCard, roo
   const humidifier = renderCard?.kind === 'humidifier' ? humidifierForPowerEntity(renderCard.entityId) : undefined
   if (humidifier) {
     return <HumidifierModal config={humidifier} onClose={onClose} open={Boolean(card)} roomTitle={roomTitle} />
+  }
+
+  const vacuum = renderCard?.kind === 'vacuum' ? VACUUMS.find((candidate) => candidate.entityId === renderCard.entityId) : undefined
+  if (vacuum) {
+    return <VacuumModal onClose={onClose} open={Boolean(card)} subtitle={subtitle} title={title} vacuum={vacuum} />
   }
 
   return (

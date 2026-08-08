@@ -89,6 +89,7 @@ export interface ChoreQuickLinkConfig {
 }
 
 export interface VacuumConfig {
+  areaCleaning?: VacuumAreaCleaningConfig
   autoCleanDisabledRooms?: VacuumAutoCleanDisabledRoomConfig[]
   title: string
   entityId: string
@@ -97,6 +98,7 @@ export interface VacuumConfig {
   consumables: VacuumConsumableConfig[]
   coordinatorSessionEntityId?: string
   dockButtonEntityId?: string
+  dockControls?: VacuumDockControlsConfig
   errorEntityId: string
   errorMessageEntityId: string
   fanEntityId?: string
@@ -111,6 +113,18 @@ export interface VacuumConfig {
   waterEntityId?: string
   zoneDescription?: string[]
   zones: VacuumZoneConfig[]
+}
+
+export interface VacuumDockControlsConfig {
+  cleanScript: string
+  dockStatusEntityId: string
+  dryScript: string
+  mopAttachmentEntityId: string
+}
+
+export interface VacuumAreaCleaningConfig {
+  minimumSizeCm: number
+  script: string
 }
 
 export interface VacuumConsumableConfig {
@@ -425,12 +439,22 @@ export const TODO_PAGES: Record<string, TodoPageConfig> = {
 
 export const VACUUMS: VacuumConfig[] = [
   {
+    areaCleaning: {
+      minimumSizeCm: 25,
+      script: 'script.music_room_vacuum_clean_zone',
+    },
     title: 'Music Room',
     entityId: 'vacuum.valetudo_elatedusedram',
     batteryEntityId: 'sensor.valetudo_elatedusedram_battery_level',
     cleanScript: 'script.music_room_vacuum_clean_selected_segments',
     consumables: valetudoConsumables('valetudo_elatedusedram'),
     dockButtonEntityId: 'button.valetudo_elatedusedram_trigger_auto_empty_dock',
+    dockControls: {
+      cleanScript: 'script.music_room_vacuum_mop_dock_clean',
+      dockStatusEntityId: 'sensor.valetudo_elatedusedram_dock_status',
+      dryScript: 'script.music_room_vacuum_mop_dock_dry',
+      mopAttachmentEntityId: 'binary_sensor.valetudo_elatedusedram_mop_attachment',
+    },
     errorEntityId: 'sensor.valetudo_elatedusedram_error',
     errorMessageEntityId: 'input_text.music_room_vacuum_error_message',
     fanEntityId: 'select.valetudo_elatedusedram_fan',
@@ -453,12 +477,22 @@ export const VACUUMS: VacuumConfig[] = [
     ],
   },
   {
+    areaCleaning: {
+      minimumSizeCm: 25,
+      script: 'script.theater_room_vacuum_clean_zone',
+    },
     title: 'Theater Room',
     entityId: 'vacuum.valetudo_politefatherlykingfisher',
     batteryEntityId: 'sensor.valetudo_politefatherlykingfisher_battery_level',
     cleanScript: 'script.theater_room_vacuum_clean_selected_segments',
     consumables: valetudoConsumables('valetudo_politefatherlykingfisher'),
     dockButtonEntityId: 'button.valetudo_politefatherlykingfisher_trigger_auto_empty_dock',
+    dockControls: {
+      cleanScript: 'script.theater_room_vacuum_mop_dock_clean',
+      dockStatusEntityId: 'sensor.valetudo_politefatherlykingfisher_dock_status',
+      dryScript: 'script.theater_room_vacuum_mop_dock_dry',
+      mopAttachmentEntityId: 'binary_sensor.valetudo_politefatherlykingfisher_mop_attachment',
+    },
     errorEntityId: 'sensor.valetudo_politefatherlykingfisher_error',
     errorMessageEntityId: 'input_text.theater_room_vacuum_error_message',
     fanEntityId: 'select.valetudo_politefatherlykingfisher_fan',
@@ -472,6 +506,10 @@ export const VACUUMS: VacuumConfig[] = [
     zones: [],
   },
   {
+    areaCleaning: {
+      minimumSizeCm: 25,
+      script: 'script.main_floor_vacuum_clean_zone',
+    },
     title: 'Main Floor',
     entityId: 'vacuum.valetudo_exaltedsneakydeer',
     batteryEntityId: 'sensor.valetudo_exaltedsneakydeer_battery_level',
@@ -479,6 +517,12 @@ export const VACUUMS: VacuumConfig[] = [
     consumables: valetudoConsumables('valetudo_exaltedsneakydeer'),
     coordinatorSessionEntityId: 'sensor.main_floor_vacuum_coordinator_session_state',
     dockButtonEntityId: 'button.valetudo_exaltedsneakydeer_trigger_auto_empty_dock',
+    dockControls: {
+      cleanScript: 'script.main_floor_vacuum_mop_dock_clean',
+      dockStatusEntityId: 'sensor.valetudo_exaltedsneakydeer_dock_status',
+      dryScript: 'script.main_floor_vacuum_mop_dock_dry',
+      mopAttachmentEntityId: 'binary_sensor.valetudo_exaltedsneakydeer_mop_attachment',
+    },
     errorEntityId: 'sensor.valetudo_exaltedsneakydeer_error',
     errorMessageEntityId: 'input_text.main_floor_vacuum_error_message',
     fanEntityId: 'select.valetudo_exaltedsneakydeer_fan',

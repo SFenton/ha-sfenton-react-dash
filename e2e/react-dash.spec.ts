@@ -2251,11 +2251,13 @@ test('room vacuum cards open reusable vacuum modal controls', async ({ page }) =
   await expect(page.getByText('No error')).toHaveCount(0)
   await expect(page.getByRole('heading', { name: 'Vacuum Controls' })).toHaveCount(0)
   await expect(page.getByRole('heading', { name: 'Docked' })).toBeVisible()
+  await expect(page.getByRole('group', { name: 'Dock Status Idle' })).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Power Settings' })).toBeVisible()
   await expect(page.getByText('Choose whether the robot vacuums, mops, or combines both for the next run.')).toBeVisible()
   await expect(page.getByText('Adjust suction strength for carpets, hard floors, and quieter cleaning.')).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Empty Dock' })).toHaveCount(0)
-  await expect(page.getByText('Choose how many passes the vacuum should make, then start cleaning with the selected zones.')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Empty Bin' })).toHaveCount(0)
+  await expect(page.getByText('Choose how many passes the vacuum should make, then start cleaning with the selected rooms.')).toBeVisible()
+  await expect(page.getByText('No rooms are selected. If you begin cleaning, the robot vacuum will attempt to clean every mapped area.')).toBeVisible()
   await expect(page.getByRole('combobox', { name: /Cleaning Passes 1x/i })).toHaveValue('1')
   await expect(page.getByRole('button', { name: 'Clean', exact: true })).toHaveAttribute('data-icon', 'mdi:play')
   await expect(page.getByRole('button', { name: 'Info' })).toBeVisible()
@@ -2266,14 +2268,25 @@ test('room vacuum cards open reusable vacuum modal controls', async ({ page }) =
   await expect(page.getByRole('combobox', { name: /Fan Balanced/i })).toHaveValue('balanced')
   await expect(page.getByRole('dialog', { name: 'Fan' })).toHaveCount(0)
   await page.getByRole('button', { name: 'Zones' }).click()
-  await expect(page.getByRole('button', { name: /living room/i })).toBeVisible()
+  await expect(page.getByText('Rooms are cleaned in the order you select them. The numbered badges show the current cleaning sequence.')).toBeVisible()
+  const kitchenZone = page.getByRole('button', { name: /^Kitchen/ })
+  const livingRoomZone = page.getByRole('button', { name: /^Living Room/ })
+  await kitchenZone.click()
+  await livingRoomZone.click()
+  await expect(kitchenZone).toHaveAccessibleName('Kitchen, cleaning order 1')
+  await expect(livingRoomZone).toHaveAccessibleName('Living Room, cleaning order 2')
+  await expect(kitchenZone.getByText('1')).toBeVisible()
+  await expect(livingRoomZone.getByText('2')).toBeVisible()
   await page.getByRole('button', { name: 'Auto-Clean' }).click()
   await expect(page.getByRole('heading', { name: 'Disabled Auto-Clean Rooms' })).toBeVisible()
   await expect(page.getByText('Check rooms that should be skipped when the coordinator starts an automatic away clean.')).toBeVisible()
   await expect(page.getByRole('button', { name: 'Living Room auto-clean enabled' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Closet auto-clean enabled' })).toBeVisible()
   await page.getByRole('button', { name: 'Actions' }).click()
-  await expect(page.getByRole('button', { name: 'Empty Dock' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Dock Controls' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Clean Mop Dock' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Dry Mops' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Empty Bin' })).toBeVisible()
   await page.getByRole('button', { name: 'Info' }).click()
   await expect(page.getByRole('heading', { name: 'Consumables' })).toBeVisible()
   await expect(page.getByRole('group', { name: 'Main Brush 204h left' })).toBeVisible()
@@ -2289,7 +2302,9 @@ test('theater room vacuum opens with map and Valetudo power controls', async ({ 
   await expect(page.getByRole('heading', { name: 'Theater Room: Robot Vacuum' })).toBeVisible()
   await expect(page.getByRole('region', { name: 'Theater Room Valetudo map' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Info' })).toBeVisible()
+  await expect(page.getByRole('group', { name: 'Cleaning target' }).getByRole('button', { name: 'Area' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Zones' })).toHaveCount(0)
+  await expect(page.getByText('No rooms are selected. If you begin cleaning, the robot vacuum will attempt to clean every mapped area.')).toHaveCount(0)
   await expect(page.getByRole('combobox', { name: /Mode Vacuum/i })).toHaveValue('vacuum')
   await expect(page.getByRole('dialog', { name: 'Mode' })).toHaveCount(0)
   await expect(page.getByRole('combobox', { name: /Fan Balanced/i })).toHaveValue('balanced')
@@ -2334,7 +2349,9 @@ test('available vacuum cards open source-style modal controls', async ({ page })
   await officeAutoClean.click()
   await expect(page.getByRole('button', { name: 'Office auto-clean disabled' })).toHaveAttribute('aria-pressed', 'true')
   await page.getByRole('button', { name: 'Actions' }).click()
-  await expect(page.getByRole('button', { name: 'Empty Dock' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Clean Mop Dock' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Dry Mops' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Empty Bin' })).toBeVisible()
   await page.getByRole('button', { name: 'Info' }).click()
   await expect(page.getByRole('group', { name: 'Main Filter 54h left' })).toHaveAttribute('data-icon', 'mdi:air-filter')
   await expect(page.getByRole('group', { name: 'Detergent OK' })).toHaveAttribute('data-icon', 'mdi:bottle-tonic')
@@ -2343,6 +2360,221 @@ test('available vacuum cards open source-style modal controls', async ({ page })
   await expect(mapCanvas).toBeVisible()
   expect(await mapCanvas.getAttribute('width')).not.toBe('0')
   expect(await mapCanvas.getAttribute('height')).not.toBe('0')
+})
+
+test('vacuum area editor draws, moves, resizes, zooms, and sends exact script geometry', async ({ page }) => {
+  const consoleErrors: string[] = []
+  page.on('console', (message) => {
+    if (message.type() === 'error') consoleErrors.push(message.text())
+  })
+  await page.goto('/at-a-glance/vacuums')
+  await page.getByRole('button', { name: /Main Floor Docked/i }).click()
+  const dialog = page.getByRole('dialog')
+  await expect(dialog).toBeVisible()
+
+  await dialog.getByRole('group', { name: 'Cleaning target' }).getByRole('button', { name: 'Area' }).click()
+  await expect(dialog.getByText('No area selected')).toHaveCount(0)
+  await dialog.getByRole('button', { name: 'Draw Area' }).click()
+  await expect(dialog.getByRole('heading', { name: 'Main Floor Cleaning Area' })).toBeVisible()
+
+  const overlay = dialog.locator('[data-map-editor-overlay="true"]')
+  await expect(overlay).toBeVisible()
+  const overlayBox = await overlay.boundingBox()
+  if (!overlayBox) throw new Error('Vacuum map editor overlay was not measurable')
+  const modalBody = dialog.locator('[data-modal-sheet-body="true"]')
+  const initialScrollTop = await modalBody.evaluate((element) => element.scrollTop)
+
+  await page.mouse.move(overlayBox.x + overlayBox.width * 0.34, overlayBox.y + overlayBox.height * 0.32)
+  await page.mouse.down()
+  await page.mouse.move(overlayBox.x + overlayBox.width * 0.68, overlayBox.y + overlayBox.height * 0.62, { steps: 8 })
+  await page.mouse.up()
+
+  const selection = dialog.locator('[data-map-rect="true"]')
+  await expect(selection).toBeVisible()
+  const initialRect = await selection.evaluate((element) => ({
+    x0: Number(element.getAttribute('data-x0')),
+    x1: Number(element.getAttribute('data-x1')),
+    y0: Number(element.getAttribute('data-y0')),
+    y1: Number(element.getAttribute('data-y1')),
+  }))
+  expect(initialRect.x1 - initialRect.x0).toBeGreaterThanOrEqual(5)
+  expect(initialRect.y1 - initialRect.y0).toBeGreaterThanOrEqual(5)
+  expect(await modalBody.evaluate((element) => element.scrollTop)).toBe(initialScrollTop)
+
+  const selectionBox = await selection.boundingBox()
+  if (!selectionBox) throw new Error('Vacuum area selection was not measurable')
+  await page.mouse.move(selectionBox.x + selectionBox.width / 2, selectionBox.y + selectionBox.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(selectionBox.x + selectionBox.width / 2 + 28, selectionBox.y + selectionBox.height / 2 + 18, { steps: 6 })
+  await page.mouse.up()
+
+  const movedRect = await selection.evaluate((element) => ({
+    x0: Number(element.getAttribute('data-x0')),
+    x1: Number(element.getAttribute('data-x1')),
+    y0: Number(element.getAttribute('data-y0')),
+    y1: Number(element.getAttribute('data-y1')),
+  }))
+  expect(movedRect.x1 - movedRect.x0).toBe(initialRect.x1 - initialRect.x0)
+  expect(movedRect.y1 - movedRect.y0).toBe(initialRect.y1 - initialRect.y0)
+  expect(`${movedRect.x0},${movedRect.y0}`).not.toBe(`${initialRect.x0},${initialRect.y0}`)
+
+  const resizeHandles = dialog.getByRole('button', { name: /Resize cleaning area corner/ })
+  await expect(resizeHandles).toHaveCount(4)
+  await expect(dialog.getByRole('button', { name: 'Resize cleaning area corner A' })).toBeVisible()
+  await expect(dialog.getByRole('button', { name: 'Resize cleaning area corner B' })).toBeVisible()
+  await expect(dialog.getByRole('button', { name: 'Resize cleaning area corner C' })).toBeVisible()
+  await expect(dialog.getByRole('button', { name: 'Resize cleaning area corner D' })).toBeVisible()
+  const resizeHandle = dialog.getByRole('button', { name: 'Resize cleaning area corner C' })
+  const handleBox = await resizeHandle.boundingBox()
+  if (!handleBox) throw new Error('Vacuum area resize handle was not measurable')
+  await page.mouse.move(handleBox.x + handleBox.width / 2, handleBox.y + handleBox.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(handleBox.x + handleBox.width / 2 - 34, handleBox.y + handleBox.height / 2 - 24, { steps: 6 })
+  await page.mouse.up()
+
+  const resizedRect = await selection.evaluate((element) => ({
+    x0: Number(element.getAttribute('data-x0')),
+    x1: Number(element.getAttribute('data-x1')),
+    y0: Number(element.getAttribute('data-y0')),
+    y1: Number(element.getAttribute('data-y1')),
+  }))
+  expect(resizedRect.x1 - resizedRect.x0).toBeGreaterThanOrEqual(5)
+  expect(resizedRect.y1 - resizedRect.y0).toBeGreaterThanOrEqual(5)
+  expect(`${resizedRect.x1},${resizedRect.y1}`).not.toBe(`${movedRect.x1},${movedRect.y1}`)
+
+  const beforeZoomBox = await selection.boundingBox()
+  await page.mouse.move(overlayBox.x + overlayBox.width / 2, overlayBox.y + overlayBox.height / 2)
+  await page.mouse.wheel(0, -700)
+  await expect.poll(async () => {
+    const afterZoomBox = await selection.boundingBox()
+    return Math.round(afterZoomBox?.width ?? 0)
+  }).not.toBe(Math.round(beforeZoomBox?.width ?? 0))
+  await expect(selection).toHaveAttribute('data-x0', String(resizedRect.x0))
+  await expect(selection).toHaveAttribute('data-x1', String(resizedRect.x1))
+  await expect(selection).toHaveAttribute('data-y0', String(resizedRect.y0))
+  await expect(selection).toHaveAttribute('data-y1', String(resizedRect.y1))
+  expect(consoleErrors.some((message) => message.includes('passive event listener'))).toBe(false)
+
+  await dialog.getByRole('button', { name: 'Use This Area' }).click()
+  await expect(dialog.getByRole('group', { name: 'Cleaning target' }).getByRole('button', { name: 'Area' })).toHaveAttribute('aria-pressed', 'true')
+  await expect(dialog.getByRole('button', { name: 'Edit Area' })).toBeVisible()
+  const mainMapOverlay = dialog.locator('[data-map-editor-overlay="true"][data-interactive="false"]')
+  await expect(mainMapOverlay).toBeVisible()
+  await expect(mainMapOverlay.locator('[data-map-rect="true"]')).toHaveAttribute('data-x0', String(resizedRect.x0))
+  await expect(mainMapOverlay.locator('[data-map-rect="true"]')).toHaveAttribute('data-y1', String(resizedRect.y1))
+  await dialog.getByRole('group', { name: 'Cleaning target' }).getByRole('button', { name: 'Rooms' }).click()
+  await expect(dialog.locator('[data-map-editor-overlay="true"][data-interactive="false"]')).toHaveCount(0)
+  await dialog.getByRole('group', { name: 'Cleaning target' }).getByRole('button', { name: 'Area' }).click()
+  await expect(dialog.locator('[data-map-editor-overlay="true"][data-interactive="false"] [data-map-rect="true"]')).toBeVisible()
+  const startButton = dialog.getByRole('button', { name: 'Start Area Clean' })
+  await expect(startButton).toBeEnabled()
+  await startButton.click()
+
+  const areaCalls = await page.evaluate(() => {
+    const debug = (window as unknown as { __mockHass?: { calls: Record<string, unknown>[] } }).__mockHass
+    return debug?.calls.filter((call) => call.domain === 'script' && call.service === 'main_floor_vacuum_clean_zone') ?? []
+  })
+  expect(areaCalls).toEqual([
+    {
+      domain: 'script',
+      service: 'main_floor_vacuum_clean_zone',
+      serviceData: {
+        x_min_cm: resizedRect.x0 * 5,
+        x_max_cm: resizedRect.x1 * 5,
+        y_min_cm: resizedRect.y0 * 5,
+        y_max_cm: resizedRect.y1 * 5,
+      },
+    },
+  ])
+})
+
+test('vacuum area controls remain usable at the narrow mobile target', async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 568 })
+  await page.goto('/at-a-glance/vacuums')
+  await page.getByRole('button', { name: /Main Floor Docked/i }).click()
+  const dialog = page.getByRole('dialog')
+  await expect(dialog).toBeVisible()
+
+  const modalNavButtons = dialog.getByRole('navigation', { name: 'Main Floor modal sections' }).getByRole('button')
+  const navWidths = await modalNavButtons.evaluateAll((buttons) => buttons.map((button) => button.getBoundingClientRect().width))
+  expect(Math.min(...navWidths)).toBeGreaterThanOrEqual(44)
+
+  await dialog.getByRole('group', { name: 'Cleaning target' }).getByRole('button', { name: 'Area' }).click()
+  await dialog.getByRole('button', { name: 'Draw Area' }).click()
+  await expect(dialog.getByRole('heading', { name: 'Main Floor Cleaning Area' })).toBeVisible()
+  await expect(dialog.getByRole('button', { name: 'Draw an Area to Continue' })).toBeVisible()
+  const overlay = dialog.locator('[data-map-editor-overlay="true"]')
+  const overlayBox = await overlay.boundingBox()
+  if (!overlayBox) throw new Error('Narrow vacuum map editor overlay was not measurable')
+  await page.mouse.move(overlayBox.x + overlayBox.width * 0.35, overlayBox.y + overlayBox.height * 0.35)
+  await page.mouse.down()
+  await page.mouse.move(overlayBox.x + overlayBox.width * 0.62, overlayBox.y + overlayBox.height * 0.58, { steps: 6 })
+  await page.mouse.up()
+  await expect(dialog.locator('[data-map-rect="true"]')).toBeVisible()
+  await dialog.getByRole('button', { name: 'Clear' }).click()
+  await expect(dialog.locator('[data-map-rect="true"]')).toHaveCount(0)
+  await page.mouse.move(overlayBox.x + overlayBox.width * 0.45, overlayBox.y + overlayBox.height * 0.45)
+  await page.mouse.down()
+  await page.mouse.move(overlayBox.x + overlayBox.width * 0.65, overlayBox.y + overlayBox.height * 0.55, { steps: 6 })
+  await page.mouse.up()
+  await expect(dialog.locator('[data-map-rect="true"]')).toHaveCount(0)
+  const editorGeometry = await dialog.evaluate((element) => {
+    const map = element.querySelector<HTMLElement>('[aria-label="Main Floor Valetudo map"]')
+    const body = element.querySelector<HTMLElement>('[data-modal-sheet-body="true"]')
+    const mapRect = map?.getBoundingClientRect()
+    return {
+      bodyOverflowY: body ? getComputedStyle(body).overflowY : null,
+      mapHeight: Math.round(mapRect?.height ?? 0),
+      mapWidth: Math.round(mapRect?.width ?? 0),
+    }
+  })
+  expect(editorGeometry.bodyOverflowY).toBe('hidden')
+  expect(editorGeometry.mapWidth).toBeGreaterThanOrEqual(280)
+  expect(editorGeometry.mapHeight).toBeGreaterThanOrEqual(200)
+})
+
+test('vacuum map keeps stable desktop dimensions across targets and tabs', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 760 })
+  await page.goto('/at-a-glance/vacuums')
+  await page.getByRole('button', { name: /Main Floor Docked/i }).click()
+  const dialog = page.getByRole('dialog')
+  const map = dialog.getByRole('region', { name: 'Main Floor Valetudo map' })
+  await expect(map).toBeVisible()
+  const roomsBox = await map.boundingBox()
+
+  await dialog.getByRole('group', { name: 'Cleaning target' }).getByRole('button', { name: 'Area' }).click()
+  const areaBox = await map.boundingBox()
+  await dialog.getByRole('button', { name: 'Zones' }).click()
+  const zonesBox = await map.boundingBox()
+
+  expect(Math.abs((areaBox?.width ?? 0) - (roomsBox?.width ?? 0))).toBeLessThanOrEqual(1)
+  expect(Math.abs((areaBox?.height ?? 0) - (roomsBox?.height ?? 0))).toBeLessThanOrEqual(1)
+  expect(Math.abs((zonesBox?.width ?? 0) - (roomsBox?.width ?? 0))).toBeLessThanOrEqual(1)
+  expect(Math.abs((zonesBox?.height ?? 0) - (roomsBox?.height ?? 0))).toBeLessThanOrEqual(1)
+})
+
+test('vacuum modal navigation stays pinned while mobile content scrolls', async ({ page }) => {
+  await page.setViewportSize({ width: 393, height: 568 })
+  await page.goto('/at-a-glance/vacuums')
+  await page.getByRole('button', { name: /Main Floor Docked/i }).click()
+  const dialog = page.getByRole('dialog')
+  await dialog.getByRole('button', { name: 'Zones' }).click()
+  const body = dialog.locator('[data-modal-sheet-body="true"]')
+  const nav = dialog.getByRole('navigation', { name: 'Main Floor modal sections' })
+  const before = await nav.boundingBox()
+
+  await body.evaluate((element) => {
+    element.scrollTop = element.scrollHeight
+  })
+
+  const after = await nav.boundingBox()
+  const viewportHeight = await page.evaluate(() => window.visualViewport?.height ?? window.innerHeight)
+  expect(Math.abs((after?.y ?? 0) - (before?.y ?? 0))).toBeLessThanOrEqual(1)
+  expect((after?.y ?? 0) + (after?.height ?? 0)).toBeLessThanOrEqual(viewportHeight + 1)
+  expect(await body.evaluate((element) => element.scrollTop)).toBeGreaterThan(0)
+
+  await dialog.getByRole('button', { name: 'Controls' }).click()
+  await expect.poll(() => body.evaluate((element) => element.scrollTop)).toBe(0)
 })
 
 test('vacuum native dropdown stays aligned after rapid close and reopen', async ({ page }) => {
@@ -2363,6 +2595,7 @@ test('vacuum native dropdown stays aligned after rapid close and reopen', async 
   await page.mouse.click(closeBox.x + closeBox.width / 2, closeBox.y + closeBox.height / 2)
   await page.waitForTimeout(50)
   await page.mouse.click(cardBox.x + cardBox.width / 2, cardBox.y + cardBox.height / 2)
+  await page.getByRole('combobox', { name: /Cleaning Passes/i }).scrollIntoViewIfNeeded()
 
   const rapidReopenState = await page.evaluate(() => {
     const dialog = document.querySelector<HTMLElement>('[role="dialog"]')
