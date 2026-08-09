@@ -190,17 +190,8 @@ function Grid({ children }: { children: ReactNode }) {
   return <div className={styles.grid}>{children}</div>
 }
 
-function RoomGrid({ ariaLabel, children, dynamic = true }: { ariaLabel: string; children: ReactNode; dynamic?: boolean }) {
-  if (!dynamic) {
-    return <div aria-label={ariaLabel} className={styles.grid} role="group">{children}</div>
-  }
-
+function RoomGrid({ ariaLabel, children }: { ariaLabel: string; children: ReactNode }) {
   return <DynamicGrid ariaLabel={ariaLabel} className={styles.roomGrid} columns={2}>{children}</DynamicGrid>
-}
-
-function roomSectionUsesDynamicGrid(path: string, sectionTitle: string) {
-  return !(path === 'living-room' && sectionTitle === 'Living Room SHIELD')
-    && !(path === 'theater-room' && sectionTitle === 'Media Controls')
 }
 
 const VACUUM_AUTO_CLEAN_TITLE_ORDER = new Map(VACUUM_AUTO_CLEAN_CONTROLS.map((control, index) => [control.title, index]))
@@ -1072,14 +1063,28 @@ function SourceRoomPage({ onNavigate, preload = false, preloadHash, preloadHashe
 
       {room.path === 'kitchen' && <KitchenGroceriesSection onNavigate={onNavigate} />}
 
-      {room.sourceSections.map((section) => (
-        <section className={styles.section} id={sectionId(section.title)} key={`${room.path}-${section.title}`}>
-          <SectionHeader title={section.title} />
-          <RoomGrid ariaLabel={`${room.title} ${section.title}`} dynamic={roomSectionUsesDynamicGrid(room.path, section.title)}>
-            {section.cards.map((card) => <RoomSourceCard card={card} eightSleepModalState={card.hash ? eightSleepModalStates[card.hash] : undefined} key={`${room.path}-${section.title}-${card.title}-${card.entityId}`} onOpen={openSourceCard} />)}
-          </RoomGrid>
-        </section>
-      ))}
+      {room.sourceSections.map((section) => {
+        const leadRow = section.layout === 'lead-row'
+        const leadCards = leadRow ? section.cards.slice(0, 1) : section.cards
+        const followUpCards = leadRow ? section.cards.slice(1) : []
+        const renderCard = (card: RoomSourceCardConfig) => (
+          <RoomSourceCard card={card} eightSleepModalState={card.hash ? eightSleepModalStates[card.hash] : undefined} key={`${room.path}-${section.title}-${card.title}-${card.entityId}`} onOpen={openSourceCard} />
+        )
+
+        return (
+          <section className={styles.section} id={sectionId(section.title)} key={`${room.path}-${section.title}`}>
+            <SectionHeader title={section.title} />
+            <RoomGrid ariaLabel={`${room.title} ${section.title}`}>
+              {leadCards.map(renderCard)}
+            </RoomGrid>
+            {followUpCards.length > 0 && (
+              <RoomGrid ariaLabel={`${room.title} ${section.title} Controls`}>
+                {followUpCards.map(renderCard)}
+              </RoomGrid>
+            )}
+          </section>
+        )
+      })}
 
       <RoomSourceModal card={selectedCard} eightSleepModalState={selectedCard?.hash ? eightSleepModalStates[selectedCard.hash] : preloadCard?.hash ? eightSleepModalStates[preloadCard.hash] : undefined} onClose={closeSourceCard} preloadCard={preloadCard} roomTitle={room.title} />
       {preloadCards.map((card) => (

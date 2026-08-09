@@ -1959,13 +1959,46 @@ test('room media cards open ported remote modals', async ({ page }) => {
   await page.getByRole('button', { name: 'Close' }).click()
 
   await page.goto('/at-a-glance/theater-room')
-  await page.getByRole('button', { name: /^Theater Room Off$/i }).click()
+  await page.getByRole('button', { name: /^Theater Remote Off$/i }).click()
   await expect(page.getByRole('heading', { name: 'Theater Room SHIELD Remote' })).toBeVisible()
   await page.getByRole('dialog').getByRole('button', { name: 'Apps' }).click()
   await expect(page.getByRole('button', { name: 'Prime Video' })).toBeVisible()
   await page.getByRole('dialog').getByRole('button', { name: 'Devices' }).click()
   await expect(page.getByRole('heading', { name: 'Devices' })).toBeVisible()
   await expect(page.getByRole('button', { name: /Projector Off/i })).toBeVisible()
+})
+
+test('theater remote leads a full-width row above its source control grid', async ({ page }) => {
+  await page.goto('/at-a-glance/theater-room')
+
+  const opener = page.getByRole('group', { exact: true, name: 'Theater Room Remote' })
+  const controls = page.getByRole('group', { exact: true, name: 'Theater Room Remote Controls' })
+  await expect(opener.getByRole('button', { name: /^Theater Remote/ })).toBeVisible()
+  await expect(opener.getByRole('button', { name: /^Nintendo Switch/ })).toHaveCount(0)
+  await expect(controls.getByRole('button', { name: /^Nintendo Switch/ })).toBeVisible()
+  await expect(controls.getByRole('button', { name: /^Theater SHIELD/ })).toBeVisible()
+  await expect(page.getByRole('group', { exact: true, name: 'Theater Room Quick App Launch' }).getByRole('button')).toHaveCount(6)
+
+  await page.setViewportSize({ width: 1280, height: 900 })
+  const remoteCell = opener.locator('[data-dynamic-grid-cell="true"]').first()
+  const switchCell = controls.locator('[data-dynamic-grid-cell="true"]').first()
+  const shieldCell = controls.locator('[data-dynamic-grid-cell="true"]').last()
+
+  await expect.poll(async () => {
+    const remoteBox = await remoteCell.boundingBox()
+    const switchBox = await switchCell.boundingBox()
+    const shieldBox = await shieldCell.boundingBox()
+    if (!remoteBox || !switchBox || !shieldBox) return null
+    return {
+      remoteWiderThanSource: remoteBox.width > switchBox.width * 1.8,
+      sourcesBelowRemote: switchBox.y >= remoteBox.y + remoteBox.height - 1,
+      sourcesShareRow: Math.round(switchBox.y) === Math.round(shieldBox.y),
+    }
+  }).toEqual({
+    remoteWiderThanSource: true,
+    sourcesBelowRemote: true,
+    sourcesShareRow: true,
+  })
 })
 
 test('Free Sleep global Add Alarm defaults to weekdays and writes enabled backend records', async ({ page }) => {
