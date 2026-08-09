@@ -46,7 +46,7 @@ function StatusChip({ chip, onOpenHash, subtitleOverride }: { chip: StatusRailCh
   const icon = securityIcon ?? (stateKind === 'presence' ? (presenceActive ? 'mdi:motion-sensor' : 'mdi:motion-sensor-off') : stateKind === 'contact' && isContactOpen(entity) ? 'mdi:door-open' : chip.icon)
 
   return (
-    <div className={styles.chip} style={{ '--chip-width': `${chip.width ?? 150}px` } as CSSProperties}>
+    <div className={styles.chip} data-status-chip={chip.title} style={{ '--chip-width': `${chip.width ?? 150}px` } as CSSProperties}>
       <GlassTile
         backgroundColor={securityBackgroundColor}
         compact
@@ -65,7 +65,7 @@ function StatusChip({ chip, onOpenHash, subtitleOverride }: { chip: StatusRailCh
 
 export function StatusRail({ chips, onOpenHash, subtitleByHash }: StatusRailProps) {
   return (
-    <div className={styles.rail}>
+    <div className={styles.rail} data-status-rail="true">
       {chips.map((chip) => (
         <StatusChip chip={chip} key={chip.title} onOpenHash={onOpenHash} subtitleOverride={chip.hash ? subtitleByHash?.[chip.hash] : undefined} />
       ))}

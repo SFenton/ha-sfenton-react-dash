@@ -1,6 +1,7 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { mockState, resetMockHass } from '../test/mocks/hakitCoreState'
 import { useRecipeControls } from '../components/hass/recipes/useRecipeControls'
+import { DASHBOARD_LOADING_EXIT_MS, DASHBOARD_MIN_LOADING_MS, DASHBOARD_PAGE_LOAD_TIMEOUT_MS } from '../constants/loading'
 import { RecipesPage } from './RecipesPage'
 
 function rawCard(id: number) {
@@ -18,9 +19,9 @@ function rawCard(id: number) {
   }
 }
 
-function Harness({ preload = false }: { preload?: boolean }) {
+function Harness({ initiallyAppGated = false, onInitialResolved, preload = false }: { initiallyAppGated?: boolean; onInitialResolved?: () => void; preload?: boolean }) {
   const controls = useRecipeControls('recipes-test', !preload)
-  return <RecipesPage controls={controls} preload={preload} />
+  return <RecipesPage controls={controls} initiallyAppGated={initiallyAppGated} onInitialResolved={onInitialResolved} preload={preload} />
 }
 
 describe('RecipesPage', () => {
@@ -38,6 +39,134 @@ describe('RecipesPage', () => {
       expect(container.querySelector('img')).toBeNull()
       expect(callService).not.toHaveBeenCalled()
     } finally {
+      mockState.helpers.callService = originalCallService
+    }
+  })
+
+  it('reports readiness without mounting a second page gate when the app gate owns initial loading', async () => {
+    const onInitialResolved = vi.fn()
+    const originalCallService = mockState.helpers.callService
+    mockState.helpers.callService = (params) => (
+      params.domain === 'evershelf' && params.service === 'recipe_query'
+        ? Promise.resolve({ response: { items: [rawCard(1)], total: 1 } })
+        : originalCallService(params)
+    )
+
+    try {
+      render(<Harness initiallyAppGated onInitialResolved={onInitialResolved} />)
+      expect(screen.queryByRole('status', { name: 'Loading Recipes' })).not.toBeInTheDocument()
+      expect(screen.getByRole('status', { name: 'Loading recipes' })).toBeInTheDocument()
+      await screen.findByRole('button', { name: 'Open Recipe 1 recipe details' })
+      await waitFor(() => expect(onInitialResolved).toHaveBeenCalledTimes(1))
+    } finally {
+      mockState.helpers.callService = originalCallService
+    }
+  })
+
+  it('keeps the page gate visible until the initial recipes resolve', async () => {
+    vi.useFakeTimers()
+    let resolveInitial: ((value: unknown) => void) | undefined
+    const originalCallService = mockState.helpers.callService
+    mockState.helpers.callService = (params) => {
+      if (params.domain === 'evershelf' && params.service === 'recipe_query') {
+        return new Promise((resolve) => {
+          resolveInitial = resolve
+        })
+      }
+      return originalCallService(params)
+    }
+
+    try {
+      const { container } = render(<Harness />)
+      expect(screen.getByRole('status', { name: 'Loading Recipes' })).toBeInTheDocument()
+      expect(container.querySelector('[data-content-visible="false"]')).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Open Recipe 1 recipe details' })).not.toBeInTheDocument()
+
+      await act(async () => {
+        await Promise.resolve()
+      })
+      await act(async () => {
+        resolveInitial?.({ response: { items: [rawCard(1)], total: 1 } })
+      })
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(200)
+      })
+      expect(screen.getByRole('status', { name: 'Loading Recipes' })).toBeInTheDocument()
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(400)
+      })
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(DASHBOARD_MIN_LOADING_MS + DASHBOARD_LOADING_EXIT_MS)
+      })
+
+      expect(screen.queryByRole('status', { name: 'Loading Recipes' })).not.toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Open Recipe 1 recipe details' })).toBeInTheDocument()
+    } finally {
+      vi.useRealTimers()
+      mockState.helpers.callService = originalCallService
+    }
+  })
+
+  it('reveals a handled initial error only after the page gate exits', async () => {
+    vi.useFakeTimers()
+    let rejectInitial: ((reason?: unknown) => void) | undefined
+    const originalCallService = mockState.helpers.callService
+    mockState.helpers.callService = (params) => {
+      if (params.domain === 'evershelf' && params.service === 'recipe_query') {
+        return new Promise((_, reject) => {
+          rejectInitial = reject
+        })
+      }
+      return originalCallService(params)
+    }
+
+    try {
+      render(<Harness />)
+      expect(screen.queryByText('Initial recipe failure')).not.toBeInTheDocument()
+
+      await act(async () => {
+        await Promise.resolve()
+      })
+      await act(async () => {
+        rejectInitial?.(new Error('Initial recipe failure'))
+      })
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(200)
+      })
+      expect(screen.getByRole('status', { name: 'Loading Recipes' })).toBeInTheDocument()
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(DASHBOARD_MIN_LOADING_MS + DASHBOARD_LOADING_EXIT_MS)
+      })
+
+      expect(screen.queryByRole('status', { name: 'Loading Recipes' })).not.toBeInTheDocument()
+      expect(screen.getByText('Initial recipe failure')).toBeInTheDocument()
+    } finally {
+      vi.useRealTimers()
+      mockState.helpers.callService = originalCallService
+    }
+  })
+
+  it('reveals the recipes results spinner after the default page timeout', async () => {
+    vi.useFakeTimers()
+    const originalCallService = mockState.helpers.callService
+    mockState.helpers.callService = (params) => (
+      params.domain === 'evershelf' && params.service === 'recipe_query'
+        ? new Promise(() => undefined)
+        : originalCallService(params)
+    )
+
+    try {
+      render(<Harness />)
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(
+          DASHBOARD_PAGE_LOAD_TIMEOUT_MS + DASHBOARD_LOADING_EXIT_MS + 1,
+        )
+      })
+
+      expect(screen.queryByRole('status', { name: 'Loading Recipes' })).not.toBeInTheDocument()
+      expect(screen.getByRole('status', { name: 'Loading recipes' })).toBeInTheDocument()
+    } finally {
+      vi.useRealTimers()
       mockState.helpers.callService = originalCallService
     }
   })
@@ -69,7 +198,7 @@ describe('RecipesPage', () => {
 
     try {
       const { container } = render(<SearchHarness />)
-      await screen.findByRole('article', { name: 'Recipe 1' })
+      await screen.findByRole('button', { name: 'Open Recipe 1 recipe details' })
       await act(async () => {
         fireEvent.click(screen.getByRole('button', { name: 'Search tomato' }))
         await new Promise((resolve) => window.setTimeout(resolve, 270))
@@ -82,7 +211,7 @@ describe('RecipesPage', () => {
       await act(async () => resolveSecond?.({ response: { items: [rawCard(2)], total: 1 } }))
       await waitFor(() => expect(container.querySelector('[data-criteria-phase="spinner-exiting"]')).toBeInTheDocument())
       await waitFor(() => expect(container.querySelector('[data-criteria-phase="entering"]')).toBeInTheDocument())
-      await screen.findByRole('article', { name: 'Recipe 2' })
+      await screen.findByRole('button', { name: 'Open Recipe 2 recipe details' })
       await waitFor(() => expect(container.querySelector('[data-criteria-phase="idle"]')).toBeInTheDocument())
     } finally {
       mockState.helpers.callService = originalCallService

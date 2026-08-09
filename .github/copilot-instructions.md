@@ -206,6 +206,23 @@ Add tests as features are implemented.
 - Do not rely on live Home Assistant for unit tests; mock HAKit/HA state and services there.
 - Use the live Home Assistant browser tab for planning and manual verification.
 
+## App Manual Completion Gate
+
+The in-app App Manual is a release contract for user-visible behavior and Home Assistant-backed behavior.
+
+When adding or changing routes, pages, controls, state-to-service mappings, automations, scripts, helpers, schedules, integrations, device behavior, or known limitations:
+
+1. Update the owning capability/article under `src/manual/`.
+2. Run `npm run manual:sync:app`.
+3. Run `npm run manual:sync:ha` after Home Assistant changes.
+4. Recapture affected phone and desktop screenshots with `npm run manual:capture`.
+5. Run the complete `npm run manual:capture:check`.
+6. Run `npm run manual:screenshots:review` and inspect every generated phone and desktop contact-sheet page.
+7. After visual review, run `npm run manual:screenshots:approve`; it records the completed review and does not capture or inspect screenshots.
+8. Run `npm run manual:check` and `npm run manual:check:ha`.
+
+Do not call the change complete while a manual gate or screenshot approval is stale or failing. Visible source, screenshot metadata, fixture, and capture-harness changes all require a new capture check, full contact-sheet review, and explicit approval. Keep generated facts out of household prose, keep screenshots privacy-safe, and use only expiring scoped exceptions.
+
 ## Implementation Order
 
 1. Build shell, route structure, shared Page shell, mobile bottom nav, and shared styling tokens.

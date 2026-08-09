@@ -105,15 +105,20 @@ export function AppHeader({ activePath, actions = [], backLabel = 'Go back', bac
           <span>Navigation</span>
         </div>
         <nav className={styles.sidebarNav} role="menu">
-          {PRIMARY_NAV_ROUTES.map((route) => {
-            const className = route.path === 'settings' ? `${styles.menuItem} ${styles.sidebarSettingsItem}` : styles.menuItem
-            return (
-              <button aria-current={primaryNavRouteActive(activePath, route.path) ? 'page' : undefined} className={className} key={route.path} onClick={() => navigate(route.path)} role="menuitem" type="button">
+          <div className={styles.primaryNavigation} data-primary-navigation="true">
+            {PRIMARY_NAV_ROUTES.filter((route) => route.path !== 'settings').map((route) => (
+              <button aria-current={primaryNavRouteActive(activePath, route.path) ? 'page' : undefined} className={styles.menuItem} key={route.path} onClick={() => navigate(route.path)} role="menuitem" type="button">
                 <MaterialIcon name={route.icon} size={22} />
                 <span>{route.label}</span>
               </button>
-            )
-          })}
+            ))}
+          </div>
+          {PRIMARY_NAV_ROUTES.filter((route) => route.path === 'settings').map((route) => (
+            <button aria-current={primaryNavRouteActive(activePath, route.path) ? 'page' : undefined} className={`${styles.menuItem} ${styles.sidebarSettingsItem}`} key={route.path} onClick={() => navigate(route.path)} role="menuitem" type="button">
+              <MaterialIcon name={route.icon} size={22} />
+              <span>{route.label}</span>
+            </button>
+          ))}
         </nav>
       </aside>
     </div>

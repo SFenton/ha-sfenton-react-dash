@@ -9,39 +9,37 @@ import { ModalSheet } from '../core/ModalSheet'
 import { NativeSelectField } from '../core/NativeSelectField'
 import { StatusPill } from '../core/StatusPill'
 import { type VacuumAutoCleanDisabledRoomConfig, type VacuumConfig, type VacuumConsumableConfig, type VacuumZoneConfig } from '../../constants/portedDashboard'
+import { VACUUM_MODAL_TABS, type VacuumModalTab } from '../../constants/surfaceSemantics'
 import { DASHBOARD_ROUTE_CHANGE_EVENT, dashboardEventTargets, dashboardHash, dashboardPathWithSearch, replaceDashboardUrl } from '../../hooks/dashboardLocation'
+import { useModalDetailPageScroll } from '../../hooks/useModalDetailPageScroll'
 import { useImmediateVisualTab, useSmoothDisplayedModalTab } from '../../hooks/useSmoothDisplayedModalTab'
 import { useOptimisticState, type OptimisticCommitOptions } from '../../hooks/useOptimisticState'
 import { asEntityName, titleCaseState } from './entityState'
-import { ValetudoMapCard } from './ValetudoMapCard'
-import { VACUUM_MODAL_STYLE } from './vacuumModalStyle'
+import { mapGridRectDimensionsCm, mapGridRectToServiceData, type MapGridRect } from './ValetudoMapGeometry'
+import { ValetudoMapCard, type ValetudoMapEditorMeta } from './ValetudoMapCard'
+import { VACUUM_AREA_EDITOR_MODAL_STYLE, VACUUM_MODAL_STYLE } from './vacuumModalStyle'
 import { isUnavailableVacuumState, vacuumConsumableVisual, vacuumStateVisual, type VacuumVisualTone } from './vacuumVisualState'
 import styles from './VacuumCard.module.css'
 
-type VacuumModalTab = 'controls' | 'zones' | 'autoClean' | 'more' | 'info'
-
-const VACUUM_MODAL_TABS: { icon: string; label: string; tab: VacuumModalTab }[] = [
-  { icon: 'mdi:robot-vacuum', label: 'Controls', tab: 'controls' },
-  { icon: 'mdi:floor-plan', label: 'Zones', tab: 'zones' },
-  { icon: 'mdi:robot-vacuum-off', label: 'Auto-Clean', tab: 'autoClean' },
-  { icon: 'mdi:flash', label: 'Actions', tab: 'more' },
-  { icon: 'mdi:information-outline', label: 'Info', tab: 'info' },
-]
-const DESKTOP_MODAL_QUERY = '(min-width: 760px)'
-const CLEANING_SETUP_DESCRIPTION = 'Choose how many passes the vacuum should make, then start cleaning with the selected zones.'
+type VacuumCleanTarget = 'rooms' | 'area'
+const CLEANING_SETUP_DESCRIPTION = 'Choose how many passes the vacuum should make, then start cleaning with the selected rooms.'
 const AUTO_CLEAN_DISABLED_DESCRIPTION = 'Check rooms that should be skipped when the coordinator starts an automatic away clean. Use this for closed doors, guests, or projects on the floor; manual selected-room cleans still use the Zones tab.'
 const MODE_DESCRIPTION = 'Choose whether the robot vacuums, mops, or combines both for the next run.'
 const FAN_DESCRIPTION = 'Adjust suction strength for carpets, hard floors, and quieter cleaning.'
 const WATER_DESCRIPTION = 'Set mop water flow so floors get the right amount of moisture.'
+const AREA_DESCRIPTION = 'Draw one rectangular cleaning area on the map. The vacuum will use the mode, suction, water, and pass settings shown below.'
+const AREA_EDITOR_DESCRIPTION = 'Drag to draw an area, drag inside it to move it, and drag any round corner handle to resize it. Pinch or scroll to zoom.'
+const ROOM_ORDER_DESCRIPTION = 'Rooms are cleaned in the order you select them. The numbered badges show the current cleaning sequence.'
 const VACUUM_OPTIMISTIC_REVERT_MS = 8000
 const VACUUM_CLEAN_START_REVERT_MS = 30000
 const VACUUM_CLEAN_SETTLE_QUIET_MS = 650
 
-type CallService = (params: Record<string, unknown>) => void
+type CallService = (params: Record<string, unknown>) => unknown
 
 interface EntityLike {
   attributes: Record<string, unknown>
   entity_id: string
+  last_changed?: string
   state: string
 }
 
@@ -59,16 +57,25 @@ interface OptimisticVacuumState {
 interface VacuumPendingIntent {
   expectedState: string
   issuedAt: number
+  orderAt: number
+}
+
+interface VacuumCleanCommand {
+  action: string
+  serviceData?: Record<string, unknown>
 }
 
 interface VacuumCommandCoordinator {
+  cleanError: string | null
   cleanQueued: boolean
   controlsDisabled: boolean
   confirmIntent: (entityId: string, liveState: string | undefined) => void
   intentRevision: number
   pendingIntentCount: number
+  pendingIntentOrderAt: (entityId: string) => number | undefined
+  pendingIntentState: (entityId: string) => string | undefined
   registerIntent: (entityId: string, expectedState: string) => void
-  requestClean: (action: string) => void
+  requestClean: (action: string, serviceData?: Record<string, unknown>) => void
 }
 
 function isUnavailableState(state: string | undefined) {
@@ -79,8 +86,10 @@ function isResumable(statusFlag: string | undefined) {
   return statusFlag === 'resumable'
 }
 
-function shouldResetScrollOnTabChange() {
-  return typeof window.matchMedia !== 'function' || window.matchMedia(DESKTOP_MODAL_QUERY).matches
+function canStartVacuumCleaning(state: string, statusFlag: string | undefined, error: string | undefined) {
+  const resumable = isResumable(statusFlag)
+  const lowBattery = error === 'Low battery'
+  return (state === 'docked' && !resumable) || state === 'idle' || (state === 'error' && !resumable && !lowBattery)
 }
 
 function vacuumModalTabs(vacuum: VacuumConfig) {
@@ -138,14 +147,48 @@ function domainFromEntity(entityId: string) {
   return entityId.split('.', 1)[0]
 }
 
-function callServiceAction(callService: CallService, action: string, target?: string) {
+function callServiceAction(callService: CallService, action: string, target?: string, serviceData?: Record<string, unknown>) {
   const [domain, service] = action.split('.', 2)
-  if (!domain || !service) return
-  callService({ domain, service, target })
+  if (!domain || !service) throw new Error(`Invalid Home Assistant action: ${action}`)
+  const params: Record<string, unknown> = { domain, service }
+  if (target) params.target = target
+  if (serviceData) params.serviceData = serviceData
+  return callService(params)
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value)
+}
+
+function hassServiceAvailable(services: unknown, action: string) {
+  if (!isRecord(services)) return false
+  const [domain, service] = action.split('.', 2)
+  if (!domain || !service) return false
+  const domainServices = services[domain]
+  return (isRecord(domainServices) && service in domainServices) || action in services
+}
+
+function formatAreaLength(centimetres: number) {
+  const metres = centimetres / 100
+  return `${Number.isInteger(metres) ? metres.toFixed(0) : metres.toFixed(2).replace(/0$/, '')} m`
+}
+
+function dockStatusVisual(state: string | undefined): { icon: string; tone: VacuumVisualTone } {
+  if (state === 'cleaning') return { icon: 'mdi:water', tone: 'active' }
+  if (state === 'drying') return { icon: 'mdi:weather-windy', tone: 'active' }
+  if (state === 'emptying') return { icon: 'mdi:delete-restore', tone: 'warning' }
+  if (state === 'pause') return { icon: 'mdi:pause', tone: 'warning' }
+  if (state === 'error') return { icon: 'mdi:alert-circle', tone: 'danger' }
+  if (isUnavailableState(state)) return { icon: 'mdi:home', tone: 'unavailable' }
+  return { icon: 'mdi:home', tone: 'neutral' }
 }
 
 function nowMs() {
   return typeof window === 'undefined' ? Date.now() : window.performance.now()
+}
+
+function wallClockNowMs() {
+  return typeof window === 'undefined' ? Date.now() : window.performance.timeOrigin + window.performance.now()
 }
 
 function useVacuumCommandCoordinator(liveState: string, commitDisplayState: (nextState: string, options?: OptimisticCommitOptions) => void): VacuumCommandCoordinator {
@@ -153,21 +196,44 @@ function useVacuumCommandCoordinator(liveState: string, commitDisplayState: (nex
   const [pendingIntents, setPendingIntents] = useState<Record<string, VacuumPendingIntent>>({})
   const [lastIntentAt, setLastIntentAt] = useState(Number.NEGATIVE_INFINITY)
   const [settleTick, setSettleTick] = useState(0)
-  const [queuedCleanAction, setQueuedCleanAction] = useState<string | null>(null)
+  const [queuedCleanCommand, setQueuedCleanCommand] = useState<VacuumCleanCommand | null>(null)
   const [cleanStartPending, setCleanStartPending] = useState(false)
   const [cleanStartRevision, setCleanStartRevision] = useState(0)
   const [intentRevision, setIntentRevision] = useState(0)
+  const [cleanError, setCleanError] = useState<string | null>(null)
   const pendingIntentCount = Object.keys(pendingIntents).length
   const settingsSettled = pendingIntentCount === 0 && nowMs() >= lastIntentAt + VACUUM_CLEAN_SETTLE_QUIET_MS
   const controlsDisabled = cleanStartPending
 
+  const failClean = useCallback((message: string) => {
+    setCleanError(message)
+    setQueuedCleanCommand(null)
+    setCleanStartPending(false)
+    commitDisplayState(liveState)
+  }, [commitDisplayState, liveState])
+
+  const invokeClean = useCallback((command: VacuumCleanCommand) => {
+    try {
+      const result = callServiceAction(callService, command.action, undefined, command.serviceData)
+      if (result && typeof (result as PromiseLike<unknown>).then === 'function') {
+        void Promise.resolve(result).catch((caughtError: unknown) => {
+          failClean(caughtError instanceof Error ? caughtError.message : 'Home Assistant rejected the cleaning request.')
+        })
+      }
+      setCleanStartRevision((revision) => revision + 1)
+    } catch (caughtError) {
+      failClean(caughtError instanceof Error ? caughtError.message : 'Home Assistant rejected the cleaning request.')
+    }
+  }, [callService, failClean])
+
   const registerIntent = useCallback((entityId: string, expectedState: string) => {
     const issuedAt = nowMs()
+    const orderAt = wallClockNowMs()
     setLastIntentAt(issuedAt)
     setIntentRevision((revision) => revision + 1)
     setPendingIntents((current) => ({
       ...current,
-      [entityId]: { expectedState, issuedAt },
+      [entityId]: { expectedState, issuedAt, orderAt },
     }))
   }, [])
 
@@ -182,18 +248,22 @@ function useVacuumCommandCoordinator(liveState: string, commitDisplayState: (nex
     setSettleTick((tick) => tick + 1)
   }, [])
 
+  const pendingIntentState = useCallback((entityId: string) => pendingIntents[entityId]?.expectedState, [pendingIntents])
+  const pendingIntentOrderAt = useCallback((entityId: string) => pendingIntents[entityId]?.orderAt, [pendingIntents])
+
   const requestClean = useCallback(
-    (action: string) => {
+    (action: string, serviceData?: Record<string, unknown>) => {
+      const command = { action, serviceData }
+      setCleanError(null)
       commitDisplayState('cleaning', { revertMs: VACUUM_CLEAN_START_REVERT_MS })
       setCleanStartPending(true)
       if (settingsSettled) {
-        callServiceAction(callService, action)
-        setCleanStartRevision((revision) => revision + 1)
+        invokeClean(command)
         return
       }
-      setQueuedCleanAction(action)
+      setQueuedCleanCommand(command)
     },
-    [callService, commitDisplayState, settingsSettled],
+    [commitDisplayState, invokeClean, settingsSettled],
   )
 
   useEffect(() => {
@@ -210,52 +280,55 @@ function useVacuumCommandCoordinator(liveState: string, commitDisplayState: (nex
     const timeout = window.setTimeout(() => {
       const currentTime = nowMs()
       setPendingIntents((current) => Object.fromEntries(Object.entries(current).filter(([, intent]) => currentTime < intent.issuedAt + VACUUM_OPTIMISTIC_REVERT_MS)))
-      setQueuedCleanAction(null)
-      setCleanStartPending(false)
+      if (cleanStartPending || queuedCleanCommand) {
+        failClean('The vacuum settings did not confirm before cleaning could start.')
+      }
     }, Math.max(0, nextExpiryMs - nowMs()))
     return () => window.clearTimeout(timeout)
-  }, [pendingIntentCount, pendingIntents])
+  }, [cleanStartPending, failClean, pendingIntentCount, pendingIntents, queuedCleanCommand])
 
   useEffect(() => {
-    if (!queuedCleanAction || !settingsSettled) return undefined
+    if (!queuedCleanCommand || !settingsSettled) return undefined
     const timeout = window.setTimeout(() => {
-      callServiceAction(callService, queuedCleanAction)
-      setQueuedCleanAction(null)
-      setCleanStartRevision((revision) => revision + 1)
+      invokeClean(queuedCleanCommand)
+      setQueuedCleanCommand(null)
     }, 0)
     return () => window.clearTimeout(timeout)
-  }, [callService, queuedCleanAction, settingsSettled])
+  }, [invokeClean, queuedCleanCommand, settingsSettled])
 
   useEffect(() => {
     if (!cleanStartPending) return undefined
     if (liveState === 'cleaning') {
       const timeout = window.setTimeout(() => {
         setCleanStartPending(false)
-        setQueuedCleanAction(null)
+        setQueuedCleanCommand(null)
+        setCleanError(null)
       }, 0)
       return () => window.clearTimeout(timeout)
     }
 
     const timeout = window.setTimeout(() => {
-      setCleanStartPending(false)
-      setQueuedCleanAction(null)
+      failClean('The vacuum did not begin cleaning within 30 seconds.')
     }, VACUUM_CLEAN_START_REVERT_MS)
     return () => window.clearTimeout(timeout)
-  }, [cleanStartPending, cleanStartRevision, liveState])
+  }, [cleanStartPending, cleanStartRevision, failClean, liveState])
 
   return {
-    cleanQueued: queuedCleanAction !== null,
+    cleanError,
+    cleanQueued: queuedCleanCommand !== null,
     controlsDisabled,
     confirmIntent,
     intentRevision,
     pendingIntentCount,
+    pendingIntentOrderAt,
+    pendingIntentState,
     registerIntent,
     requestClean,
   }
 }
 
 function useOptionalEntity(entityId: string | undefined) {
-  return useEntity(asEntityName(entityId ?? 'sensor.unavailable'), { returnNullIfNotFound: true }) as EntityLike | null
+  return useEntity(asEntityName(entityId ?? 'sensor.react_dash_optional_entity_not_configured'), { returnNullIfNotFound: true }) as EntityLike | null
 }
 
 function useVacuumSettingIntentConfirmations(vacuum: VacuumConfig, onLiveState: (entityId: string, liveState: string | undefined) => void) {
@@ -315,9 +388,9 @@ function stringListAttribute(entity: EntityLike | null | undefined, name: string
   return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string' && item.trim().length > 0) : []
 }
 
-function ControlItem({ children, description }: { children: ReactNode; description?: string }) {
+function ControlItem({ children, description, detailTrigger }: { children: ReactNode; description?: string; detailTrigger?: string }) {
   return (
-    <div className={styles.controlItem} data-has-description={description ? 'true' : 'false'}>
+    <div className={styles.controlItem} data-has-description={description ? 'true' : 'false'} data-modal-detail-trigger={detailTrigger}>
       {description && <Description>{description}</Description>}
       {children}
     </div>
@@ -330,9 +403,11 @@ function ActionButton({
   icon,
   label,
   onClick,
+  detailTrigger,
   tone = 'neutral',
 }: {
   description?: string
+  detailTrigger?: string
   disabled?: boolean
   icon: string
   label: string
@@ -342,9 +417,41 @@ function ActionButton({
   const actionTone: ModalActionTone = tone === 'danger' ? 'destructive' : tone
 
   return (
-    <ControlItem description={description}>
+    <ControlItem description={description} detailTrigger={detailTrigger}>
       <ModalActionButton action={{ disabled, icon, label, onClick }} tone={actionTone} />
     </ControlItem>
+  )
+}
+
+function VacuumCleanTargetSelector({
+  disabled,
+  onChange,
+  value,
+}: {
+  disabled: boolean
+  onChange: (target: VacuumCleanTarget) => void
+  value: VacuumCleanTarget
+}) {
+  return (
+    <div aria-label="Cleaning target" className={styles.cleanTargetSelector} role="group">
+      {([
+        { icon: 'mdi:floor-plan', label: 'Rooms', value: 'rooms' },
+        { icon: 'mdi:selection-drag', label: 'Area', value: 'area' },
+      ] as const).map((option) => (
+        <button
+          aria-pressed={value === option.value}
+          className={styles.cleanTargetButton}
+          data-active={value === option.value ? 'true' : 'false'}
+          disabled={disabled}
+          key={option.value}
+          onClick={() => onChange(option.value)}
+          type="button"
+        >
+          <MaterialIcon name={option.icon} size={20} />
+          <span>{option.label}</span>
+        </button>
+      ))}
+    </div>
   )
 }
 
@@ -472,7 +579,7 @@ function SelectSetting({
   )
 }
 
-function ZoneButton({ disabled, onIntent, zone }: { disabled: boolean; onIntent: (entityId: string, expectedState: string) => void; zone: VacuumZoneConfig }) {
+function ZoneButton({ disabled, onIntent, order, zone }: { disabled: boolean; onIntent: (entityId: string, expectedState: string) => void; order?: number; zone: VacuumZoneConfig }) {
   const callService = useHass((state) => state.helpers.callService) as unknown as CallService
   const entity = useEntity(asEntityName(zone.entityId), { returnNullIfNotFound: true })
   const liveActive = entity?.state === 'on'
@@ -481,6 +588,7 @@ function ZoneButton({ disabled, onIntent, zone }: { disabled: boolean; onIntent:
 
   return (
     <button
+      aria-label={order ? `${zone.title}, cleaning order ${order}` : zone.title}
       className={styles.zoneButton}
       data-active={active}
       disabled={disabled}
@@ -492,7 +600,8 @@ function ZoneButton({ disabled, onIntent, zone }: { disabled: boolean; onIntent:
       type="button"
     >
       <MaterialIcon name={zone.icon} size={22} />
-      <span>{zone.title}</span>
+      <span className={styles.zoneLabel}>{zone.title}</span>
+      {order && <span aria-hidden="true" className={styles.zoneOrder}>{order}</span>}
     </button>
   )
 }
@@ -529,6 +638,7 @@ function AutoCleanDisabledRoomCheckbox({ room }: { room: VacuumAutoCleanDisabled
 
 function VacuumStatusSummary({ displayState, vacuum }: { displayState: string; vacuum: VacuumConfig }) {
   const battery = useEntity(asEntityName(vacuum.batteryEntityId), { returnNullIfNotFound: true })
+  const dockStatus = useOptionalEntity(vacuum.dockControls?.dockStatusEntityId)
   const statusFlag = useEntity(asEntityName(vacuum.statusFlagEntityId), { returnNullIfNotFound: true })
   const error = useEntity(asEntityName(vacuum.errorEntityId), { returnNullIfNotFound: true })
   const mappedError = useEntity(asEntityName(vacuum.errorMessageEntityId), { returnNullIfNotFound: true })
@@ -542,11 +652,17 @@ function VacuumStatusSummary({ displayState, vacuum }: { displayState: string; v
   const errorText = mappedErrorText ?? rawErrorText ?? 'No error'
   const hasError = isErrorText(errorText)
   const visual = vacuumStateVisual(state)
+  const dockVisual = dockStatusVisual(dockStatus?.state)
 
   return (
     <section className={styles.statusPanel}>
       <InfoPill icon={visual.icon} label="Status" tone={visual.tone} value={stateLabel} />
       <InfoPill icon="mdi:battery" label="Battery" value={batteryLabel} />
+      {vacuum.dockControls && (
+        <div className={styles.dockStatusChip}>
+          <InfoPill grouped icon={dockVisual.icon} label="Dock Status" tone={dockVisual.tone} value={formatStateValue(dockStatus?.state)} />
+        </div>
+      )}
       {hasError ? (
         <InlineAlert className={styles.errorMessage}>{errorText}</InlineAlert>
       ) : null}
@@ -605,35 +721,142 @@ function VacuumPowerSettings({ coordinator, vacuum }: { coordinator: VacuumComma
   )
 }
 
-function VacuumStateActions({ coordinator, optimisticState, vacuum }: { coordinator: VacuumCommandCoordinator; optimisticState: OptimisticVacuumState; vacuum: VacuumConfig }) {
+function orderedSelectedVacuumZones(zones: VacuumZoneConfig[], entities: Record<string, EntityLike | undefined>, coordinator: VacuumCommandCoordinator) {
+  return zones
+    .map((zone, index) => {
+      const pendingState = coordinator.pendingIntentState(zone.entityId)
+      const entity = entities[zone.entityId]
+      const state = pendingState ?? entity?.state
+      if (state !== 'on') return null
+      const liveChangedAt = Date.parse(entity?.last_changed ?? '')
+      return {
+        index,
+        orderAt: pendingState ? coordinator.pendingIntentOrderAt(zone.entityId) ?? Number.MAX_SAFE_INTEGER : Number.isFinite(liveChangedAt) ? liveChangedAt : index,
+        zone,
+      }
+    })
+    .filter((item): item is NonNullable<typeof item> => Boolean(item))
+    .sort((left, right) => left.orderAt - right.orderAt || left.index - right.index)
+}
+
+function VacuumSelectedRoomsSummary({ coordinator, vacuum }: { coordinator: VacuumCommandCoordinator; vacuum: VacuumConfig }) {
+  const entities = useHass((state) => state.entities) as unknown as Record<string, EntityLike | undefined>
+  if (vacuum.zones.length === 0) return null
+
+  const selectedRooms = orderedSelectedVacuumZones(vacuum.zones, entities, coordinator)
+
+  return (
+    <div className={styles.awaySummary}>
+      <div className={styles.awayGroup} data-tone={selectedRooms.length > 0 ? 'selected' : 'neutral'}>
+        <h4>Selected Rooms</h4>
+        {selectedRooms.length > 0 ? (
+          <ol>
+            {selectedRooms.map(({ zone }) => <li key={zone.entityId}>{zone.title}</li>)}
+          </ol>
+        ) : (
+          <Description className={styles.selectedRoomsEmpty}>
+            No rooms are selected. If you begin cleaning, the robot vacuum will attempt to clean every mapped area.
+          </Description>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function VacuumStateActions({
+  areaEditorMeta,
+  areaSelection,
+  cleanTarget,
+  coordinator,
+  onAreaSelectionChange,
+  onCleanTargetChange,
+  onEditArea,
+  optimisticState,
+  vacuum,
+}: {
+  areaEditorMeta: ValetudoMapEditorMeta
+  areaSelection: MapGridRect | null
+  cleanTarget: VacuumCleanTarget
+  coordinator: VacuumCommandCoordinator
+  onAreaSelectionChange: (selection: MapGridRect | null) => void
+  onCleanTargetChange: (target: VacuumCleanTarget) => void
+  onEditArea?: () => void
+  optimisticState: OptimisticVacuumState
+  vacuum: VacuumConfig
+}) {
   const callService = useHass((state) => state.helpers.callService) as unknown as CallService
+  const services = useHass((state) => state.services)
   const statusFlag = useEntity(asEntityName(vacuum.statusFlagEntityId), { returnNullIfNotFound: true })
   const error = useEntity(asEntityName(vacuum.errorEntityId), { returnNullIfNotFound: true })
   const passes = useEntity(asEntityName(vacuum.passesEntityId), { returnNullIfNotFound: true }) as EntityLike | null
+  const areaCleaning = vacuum.areaCleaning
   const state = optimisticState.state
   const resumable = isResumable(statusFlag?.state)
   const lowBattery = error?.state === 'Low battery'
   const chargingBeforeResume = (state === 'docked' && resumable) || (state === 'error' && lowBattery)
-  const showCleaningSetup = (state === 'docked' && !resumable) || state === 'idle' || (state === 'error' && !resumable && !lowBattery)
+  const showCleaningSetup = canStartVacuumCleaning(state, statusFlag?.state, error?.state)
   const sectionTitle = chargingBeforeResume ? 'Charging Before Resuming' : formatStateValue(state, 'Vacuum')
+  const mapReady = areaEditorMeta.isLoaded && Boolean(areaEditorMeta.geometry) && !areaEditorMeta.error
+  const servicesLoaded = isRecord(services) && Object.keys(services).length > 0
+  const areaServiceReady = Boolean(areaCleaning && hassServiceAvailable(services, areaCleaning.script))
+  const areaStartDisabled = !showCleaningSetup || !areaSelection || !areaEditorMeta.geometry || !mapReady || !areaServiceReady || coordinator.controlsDisabled
   const commitAndCall = (nextState: string, action: string, target?: string) => {
     optimisticState.commitState(nextState)
     callServiceAction(callService, action, target)
   }
   const clean = () => coordinator.requestClean(vacuum.cleanScript)
+  const cleanArea = () => {
+    if (!areaCleaning || !areaSelection || !areaEditorMeta.geometry || areaStartDisabled) return
+    coordinator.requestClean(areaCleaning.script, mapGridRectToServiceData(areaSelection, areaEditorMeta.geometry.pixelSize))
+  }
   const dock = () => commitAndCall('returning', 'vacuum.return_to_base', vacuum.entityId)
   const stop = () => commitAndCall(state === 'error' ? 'idle' : chargingBeforeResume ? 'docked' : 'returning', state === 'error' || chargingBeforeResume ? 'vacuum.stop' : 'vacuum.return_to_base', vacuum.entityId)
   const pause = () => commitAndCall('paused', 'vacuum.pause', vacuum.entityId)
   const start = () => commitAndCall('cleaning', 'vacuum.start', vacuum.entityId)
-  const cleaningSetupControls = showCleaningSetup ? (
+  const roomsCleaningSetup = (
     <>
       <Description>{CLEANING_SETUP_DESCRIPTION}</Description>
+      <VacuumSelectedRoomsSummary coordinator={coordinator} vacuum={vacuum} />
       <div className={styles.cleaningActionGrid} data-layout="cleaning">
         <SelectSetting disabled={coordinator.controlsDisabled} entity={passes} entityId={vacuum.passesEntityId} formatOptionLabel={formatPassCount} hideLabel icon="mdi:numeric" label="Cleaning Passes" onIntent={coordinator.registerIntent} valueLabel={formatPassCount(passes?.state)} variant="sub" />
         <ActionButton icon="mdi:play" label="Clean" onClick={clean} tone="primary" />
       </div>
     </>
-  ) : null
+  )
+  const areaCleaningSetup = areaCleaning ? (
+    <>
+      <Description>{AREA_DESCRIPTION}</Description>
+      <div className={styles.areaActionGrid}>
+        <ActionButton
+          detailTrigger="vacuum-area-editor"
+          disabled={!mapReady || !onEditArea}
+          icon={areaSelection ? 'mdi:pencil' : 'mdi:selection-drag'}
+          label={areaSelection ? 'Edit Area' : 'Draw Area'}
+          onClick={() => onEditArea?.()}
+          tone="primary"
+        />
+        {areaSelection && <ActionButton icon="mdi:delete-outline" label="Clear Area" onClick={() => onAreaSelectionChange(null)} />}
+      </div>
+      {areaEditorMeta.error && <InlineAlert>{areaEditorMeta.error}</InlineAlert>}
+      {servicesLoaded && !areaServiceReady && (
+        <Description className={styles.areaBackendNote}>
+          Local preview only: {areaCleaning.script} is not installed in Home Assistant, so starting an area clean is disabled.
+        </Description>
+      )}
+      <Description>These settings are confirmed in Home Assistant before the area-cleaning command is sent.</Description>
+      <div className={styles.cleaningActionGrid} data-layout="cleaning">
+        <SelectSetting disabled={!showCleaningSetup || coordinator.controlsDisabled} entity={passes} entityId={vacuum.passesEntityId} formatOptionLabel={formatPassCount} hideLabel icon="mdi:numeric" label="Cleaning Passes" onIntent={coordinator.registerIntent} valueLabel={formatPassCount(passes?.state)} variant="sub" />
+        <ActionButton disabled={areaStartDisabled} icon="mdi:play" label="Start Area Clean" onClick={cleanArea} tone="primary" />
+      </div>
+      {coordinator.cleanError && <InlineAlert>{coordinator.cleanError}</InlineAlert>}
+    </>
+  ) : roomsCleaningSetup
+  const cleaningSetupControls = areaCleaning ? (
+    <>
+      <VacuumCleanTargetSelector disabled={coordinator.controlsDisabled} onChange={onCleanTargetChange} value={cleanTarget} />
+      {cleanTarget === 'area' ? areaCleaningSetup : showCleaningSetup ? roomsCleaningSetup : null}
+    </>
+  ) : showCleaningSetup ? roomsCleaningSetup : null
 
   if (isUnavailableState(state)) return null
 
@@ -654,30 +877,118 @@ function VacuumStateActions({ coordinator, optimisticState, vacuum }: { coordina
   )
 }
 
-function VacuumEmptyDockSection({ optimisticState, vacuum }: { optimisticState: OptimisticVacuumState; vacuum: VacuumConfig }) {
+function VacuumDockControlsSection({
+  coordinator,
+  optimisticState,
+  vacuum,
+}: {
+  coordinator: VacuumCommandCoordinator
+  optimisticState: OptimisticVacuumState
+  vacuum: VacuumConfig
+}) {
   const callService = useHass((state) => state.helpers.callService) as unknown as CallService
-  const statusFlag = useEntity(asEntityName(vacuum.statusFlagEntityId), { returnNullIfNotFound: true })
+  const services = useHass((state) => state.services)
+  const dockStatus = useOptionalEntity(vacuum.dockControls?.dockStatusEntityId)
+  const mopAttachment = useOptionalEntity(vacuum.dockControls?.mopAttachmentEntityId)
   const state = optimisticState.state
-  const resumable = isResumable(statusFlag?.state)
+  const liveDockState = dockStatus?.state ?? 'unknown'
+  const [displayDockState, commitDockState] = useOptimisticState(liveDockState, { clearOn: 'confirmation', revertMs: VACUUM_OPTIMISTIC_REVERT_MS })
+  const docked = state === 'docked'
+  const mopAttached = mopAttachment?.state === 'on'
+  const cleanActive = displayDockState === 'cleaning'
+  const dryActive = displayDockState === 'drying'
+  const dockBridgeAvailable = hassServiceAvailable(services, 'valetudo_vacuum_coordinator.dock_action')
+  const cleanScriptAvailable = Boolean(vacuum.dockControls && dockBridgeAvailable && hassServiceAvailable(services, vacuum.dockControls.cleanScript))
+  const dryScriptAvailable = Boolean(vacuum.dockControls && dockBridgeAvailable && hassServiceAvailable(services, vacuum.dockControls.dryScript))
+  const cleanAllowed = docked && mopAttached && cleanScriptAvailable && ['idle', 'cleaning', 'pause'].includes(displayDockState) && !coordinator.controlsDisabled
+  const dryAllowed = docked && mopAttached && dryScriptAvailable && ['idle', 'drying', 'pause'].includes(displayDockState) && !coordinator.controlsDisabled
+  const emptyAllowed = Boolean(vacuum.dockButtonEntityId && docked && ['idle', 'pause'].includes(displayDockState) && !coordinator.controlsDisabled)
   const emptyDock = () => vacuum.dockButtonEntityId && callServiceAction(callService, 'button.press', vacuum.dockButtonEntityId)
-  const showEmptyDock = Boolean(vacuum.dockButtonEntityId && state === 'docked' && !resumable)
+  const cleanDock = () => {
+    if (!vacuum.dockControls || !cleanAllowed) return
+    commitDockState(cleanActive ? 'idle' : 'cleaning')
+    callServiceAction(callService, vacuum.dockControls.cleanScript)
+  }
+  const dryMops = () => {
+    if (!vacuum.dockControls || !dryAllowed) return
+    commitDockState(dryActive ? 'idle' : 'drying')
+    callServiceAction(callService, vacuum.dockControls.dryScript)
+  }
 
-  if (!showEmptyDock) return null
+  if (!vacuum.dockButtonEntityId && !vacuum.dockControls) return null
 
   return (
-    <section className={styles.section}>
-      <SectionHeader title="Additional Controls" />
-      <div className={styles.singleAction}>
-        <ActionButton description="Trigger the auto-empty dock now." icon="mdi:delete-restore" label="Empty Dock" onClick={emptyDock} />
+    <ControlSection title="Dock Controls">
+      <div className={styles.dockActionGrid}>
+        {vacuum.dockControls && (
+          <ActionButton
+            description={cleanActive ? 'Finish the dock-cleaning phase and drain the wash tray into the dirty-water tank.' : 'Start the mop-dock cleaning phase. Use Stop Dock Clean when finished so the dock drains the wash tray.'}
+            disabled={!cleanAllowed}
+            icon={cleanActive ? 'mdi:stop' : 'mdi:water'}
+            label={cleanActive ? 'Stop Dock Clean' : 'Clean Mop Dock'}
+            onClick={cleanDock}
+            tone={cleanActive ? 'warning' : 'neutral'}
+          />
+        )}
+        {vacuum.dockControls && (
+          <ActionButton
+            description={dryActive ? 'Stop the current mop-drying cycle.' : 'Start drying the attached mop pads.'}
+            disabled={!dryAllowed}
+            icon={dryActive ? 'mdi:stop' : 'mdi:weather-windy'}
+            label={dryActive ? 'Stop Mop Drying' : 'Dry Mops'}
+            onClick={dryMops}
+          />
+        )}
+        {vacuum.dockButtonEntityId && (
+          <ActionButton
+            description="Trigger the dock to empty the robot dustbin into its dust bag."
+            disabled={!emptyAllowed}
+            icon="mdi:delete-restore"
+            label="Empty Bin"
+            onClick={emptyDock}
+          />
+        )}
       </div>
-    </section>
+      {vacuum.dockControls && !mopAttached && <InlineAlert>Attach the mop pads before cleaning or drying them at the dock.</InlineAlert>}
+      {vacuum.dockControls && !dockBridgeAvailable && <InlineAlert>Dock cleaning and drying controls will be available after Home Assistant restarts.</InlineAlert>}
+    </ControlSection>
   )
 }
 
-function VacuumControlsSection({ coordinator, optimisticState, vacuum }: { coordinator: VacuumCommandCoordinator; optimisticState: OptimisticVacuumState; vacuum: VacuumConfig }) {
+function VacuumControlsSection({
+  areaEditorMeta,
+  areaSelection,
+  cleanTarget,
+  coordinator,
+  onAreaSelectionChange,
+  onCleanTargetChange,
+  onEditArea,
+  optimisticState,
+  vacuum,
+}: {
+  areaEditorMeta: ValetudoMapEditorMeta
+  areaSelection: MapGridRect | null
+  cleanTarget: VacuumCleanTarget
+  coordinator: VacuumCommandCoordinator
+  onAreaSelectionChange: (selection: MapGridRect | null) => void
+  onCleanTargetChange: (target: VacuumCleanTarget) => void
+  onEditArea?: () => void
+  optimisticState: OptimisticVacuumState
+  vacuum: VacuumConfig
+}) {
   return (
     <div className={styles.controlStack}>
-      <VacuumStateActions coordinator={coordinator} optimisticState={optimisticState} vacuum={vacuum} />
+      <VacuumStateActions
+        areaEditorMeta={areaEditorMeta}
+        areaSelection={areaSelection}
+        cleanTarget={cleanTarget}
+        coordinator={coordinator}
+        onAreaSelectionChange={onAreaSelectionChange}
+        onCleanTargetChange={onCleanTargetChange}
+        onEditArea={onEditArea}
+        optimisticState={optimisticState}
+        vacuum={vacuum}
+      />
       <VacuumPowerSettings coordinator={coordinator} vacuum={vacuum} />
     </div>
   )
@@ -716,21 +1027,22 @@ function VacuumWhileAwaySection({ vacuum }: { vacuum: VacuumConfig }) {
 }
 
 function VacuumZones({ coordinator, optimisticState, vacuum }: { coordinator: VacuumCommandCoordinator; optimisticState: OptimisticVacuumState; vacuum: VacuumConfig }) {
+  const entities = useHass((hass) => hass.entities) as unknown as Record<string, EntityLike | undefined>
   const statusFlag = useEntity(asEntityName(vacuum.statusFlagEntityId), { returnNullIfNotFound: true })
   const error = useEntity(asEntityName(vacuum.errorEntityId), { returnNullIfNotFound: true })
   const state = optimisticState.state
-  const resumable = isResumable(statusFlag?.state)
-  const lowBattery = error?.state === 'Low battery'
-  const editableZones = (state === 'docked' && !resumable) || state === 'idle' || (state === 'error' && !resumable && !lowBattery)
+  const editableZones = canStartVacuumCleaning(state, statusFlag?.state, error?.state)
 
   if (vacuum.zones.length === 0) return null
+  const cleaningOrder = new Map(orderedSelectedVacuumZones(vacuum.zones, entities, coordinator).map(({ zone }, index) => [zone.entityId, index + 1]))
 
   return (
     <section className={styles.section}>
       <SectionHeader title="Zones" />
       <SectionText lines={vacuum.zoneDescription} />
+      <Description>{ROOM_ORDER_DESCRIPTION}</Description>
       <div className={styles.zones}>
-        {vacuum.zones.map((zone) => <ZoneButton disabled={!editableZones || coordinator.controlsDisabled} key={zone.entityId} onIntent={coordinator.registerIntent} zone={zone} />)}
+        {vacuum.zones.map((zone) => <ZoneButton disabled={!editableZones || coordinator.controlsDisabled} key={zone.entityId} onIntent={coordinator.registerIntent} order={cleaningOrder.get(zone.entityId)} zone={zone} />)}
       </div>
     </section>
   )
@@ -758,7 +1070,7 @@ function VacuumModalNav({ activeTab, onTabChange, vacuum }: { activeTab: VacuumM
   const { clearVisualTab, setVisualTabNow, visualActiveTab } = useImmediateVisualTab(effectiveActiveTab)
 
   return (
-    <nav aria-label={`${vacuum.title} modal sections`} className={styles.vacuumModalNav} style={{ '--vacuum-nav-tab-count': tabs.length } as CSSProperties}>
+    <nav aria-label={`${vacuum.title} modal sections`} className={styles.vacuumModalNav} data-tab-count={tabs.length} style={{ '--vacuum-nav-tab-count': tabs.length } as CSSProperties}>
       {tabs.map((item) => {
         const isActive = visualActiveTab === item.tab
         const isCurrent = effectiveActiveTab === item.tab
@@ -786,7 +1098,39 @@ function VacuumModalNav({ activeTab, onTabChange, vacuum }: { activeTab: VacuumM
   )
 }
 
-function VacuumModalTabContent({ activeTab, vacuum }: { activeTab: VacuumModalTab; vacuum: VacuumConfig }) {
+function VacuumModalTabContent({
+  activeTab,
+  areaEditorMeta,
+  areaEditorOpen,
+  areaSelection,
+  cleanTarget,
+  drawMode,
+  onAreaEditorMetaChange,
+  onAreaSelectionChange,
+  onCleanTargetChange,
+  onDrawModeChange,
+  onEditArea,
+  onFinishAreaEditing,
+  onResetAreaView,
+  resetAreaViewRevision,
+  vacuum,
+}: {
+  activeTab: VacuumModalTab
+  areaEditorMeta: ValetudoMapEditorMeta
+  areaEditorOpen: boolean
+  areaSelection: MapGridRect | null
+  cleanTarget: VacuumCleanTarget
+  drawMode: boolean
+  onAreaEditorMetaChange: (meta: ValetudoMapEditorMeta) => void
+  onAreaSelectionChange: (selection: MapGridRect | null) => void
+  onCleanTargetChange: (target: VacuumCleanTarget) => void
+  onDrawModeChange: (drawMode: boolean) => void
+  onEditArea?: () => void
+  onFinishAreaEditing: () => void
+  onResetAreaView: () => void
+  resetAreaViewRevision: number
+  vacuum: VacuumConfig
+}) {
   const entity = useEntity(asEntityName(vacuum.entityId), { returnNullIfNotFound: true })
   const liveState = entity?.state ?? 'unavailable'
   const [displayState, commitDisplayState] = useOptimisticState(liveState, { clearOn: 'confirmation', revertMs: VACUUM_OPTIMISTIC_REVERT_MS })
@@ -808,8 +1152,6 @@ function VacuumModalTabContent({ activeTab, vacuum }: { activeTab: VacuumModalTa
   useVacuumSettingIntentConfirmations(vacuum, coordinator.confirmIntent)
 
   useEffect(() => {
-    if (!shouldResetScrollOnTabChange()) return
-
     const scrollContainers = [modalPanelRef.current, modalBodyRef.current?.parentElement]
     for (const scrollContainer of scrollContainers) {
       if (!scrollContainer || typeof scrollContainer.scrollTo !== 'function') continue
@@ -818,65 +1160,293 @@ function VacuumModalTabContent({ activeTab, vacuum }: { activeTab: VacuumModalTa
   }, [effectiveActiveTab])
 
   return (
-    <div className={styles.modalBody} ref={modalBodyRef}>
+    <div className={[styles.modalBody, areaEditorOpen ? styles.areaEditorModalBody : ''].filter(Boolean).join(' ')} data-area-editor={areaEditorOpen ? 'true' : 'false'} ref={modalBodyRef}>
       <VacuumIntentConfirmationTrackers coordinator={coordinator} vacuum={vacuum} />
-      <div aria-label={`${vacuum.title} map and status`} className={styles.leftPane} role="group">
-        <VacuumMapAndStatus optimisticState={optimisticState} vacuum={vacuum} />
+      <div aria-label={`${vacuum.title} map and status`} className={[styles.leftPane, areaEditorOpen ? styles.areaEditorPane : ''].filter(Boolean).join(' ')} role="group">
+        <VacuumMapAndStatus
+          areaEditorOpen={areaEditorOpen}
+          areaSelection={areaSelection}
+          drawMode={drawMode}
+          editorMetaChange={onAreaEditorMetaChange}
+          onAreaSelectionChange={onAreaSelectionChange}
+          onDrawModeChange={onDrawModeChange}
+          onFinishAreaEditing={onFinishAreaEditing}
+          onResetAreaView={onResetAreaView}
+          optimisticState={optimisticState}
+          resetAreaViewRevision={resetAreaViewRevision}
+          showAreaSelection={cleanTarget === 'area'}
+          vacuum={vacuum}
+        />
       </div>
-      <div aria-label={panelLabel} className={styles.rightPane} data-modal-tab-transition-state={transitionState} data-scroll-region="vacuum-panel" data-tab={effectiveActiveTab} ref={modalPanelRef} role="group">
-        {effectiveActiveTab === 'controls' && <VacuumControlsSection coordinator={coordinator} optimisticState={optimisticState} vacuum={vacuum} />}
-        {effectiveActiveTab === 'zones' && <VacuumZones coordinator={coordinator} optimisticState={optimisticState} vacuum={vacuum} />}
-        {effectiveActiveTab === 'autoClean' && <VacuumAutoCleanDisabledRooms vacuum={vacuum} />}
-        {effectiveActiveTab === 'more' && <VacuumEmptyDockSection optimisticState={optimisticState} vacuum={vacuum} />}
-        {effectiveActiveTab === 'info' && <VacuumInfoSection vacuum={vacuum} />}
-      </div>
+      {!areaEditorOpen && (
+        <div aria-label={panelLabel} className={styles.rightPane} data-modal-tab-transition-state={transitionState} data-scroll-region="vacuum-panel" data-tab={effectiveActiveTab} ref={modalPanelRef} role="group">
+          {effectiveActiveTab === 'controls' && (
+            <VacuumControlsSection
+              areaEditorMeta={areaEditorMeta}
+              areaSelection={areaSelection}
+              cleanTarget={cleanTarget}
+              coordinator={coordinator}
+              onAreaSelectionChange={onAreaSelectionChange}
+              onCleanTargetChange={onCleanTargetChange}
+              onEditArea={onEditArea}
+              optimisticState={optimisticState}
+              vacuum={vacuum}
+            />
+          )}
+          {effectiveActiveTab === 'zones' && <VacuumZones coordinator={coordinator} optimisticState={optimisticState} vacuum={vacuum} />}
+          {effectiveActiveTab === 'autoClean' && <VacuumAutoCleanDisabledRooms vacuum={vacuum} />}
+          {effectiveActiveTab === 'more' && <VacuumDockControlsSection coordinator={coordinator} optimisticState={optimisticState} vacuum={vacuum} />}
+          {effectiveActiveTab === 'info' && <VacuumInfoSection vacuum={vacuum} />}
+        </div>
+      )}
     </div>
   )
 }
 
-function VacuumMapAndStatus({ optimisticState, vacuum }: { optimisticState: OptimisticVacuumState; vacuum: VacuumConfig }) {
+function VacuumMapAndStatus({
+  areaEditorOpen,
+  areaSelection,
+  drawMode,
+  editorMetaChange,
+  onAreaSelectionChange,
+  onDrawModeChange,
+  onFinishAreaEditing,
+  onResetAreaView,
+  optimisticState,
+  resetAreaViewRevision,
+  showAreaSelection,
+  vacuum,
+}: {
+  areaEditorOpen: boolean
+  areaSelection: MapGridRect | null
+  drawMode: boolean
+  editorMetaChange: (meta: ValetudoMapEditorMeta) => void
+  onAreaSelectionChange: (selection: MapGridRect | null) => void
+  onDrawModeChange: (drawMode: boolean) => void
+  onFinishAreaEditing: () => void
+  onResetAreaView: () => void
+  optimisticState: OptimisticVacuumState
+  resetAreaViewRevision: number
+  showAreaSelection: boolean
+  vacuum: VacuumConfig
+}) {
   const callService = useHass((state) => state.helpers.callService) as unknown as CallService
   const locate = useCallback(() => callServiceAction(callService, 'vacuum.locate', vacuum.entityId), [callService, vacuum.entityId])
+  const [editorMeta, setEditorMeta] = useState<ValetudoMapEditorMeta>({ error: null, geometry: null, isLoaded: false })
+  const handleEditorMetaChange = useCallback((meta: ValetudoMapEditorMeta) => {
+    setEditorMeta(meta)
+    editorMetaChange(meta)
+  }, [editorMetaChange])
+  const dimensions = areaSelection && editorMeta.geometry
+    ? mapGridRectDimensionsCm(areaSelection, editorMeta.geometry.pixelSize)
+    : null
+  const beginDrawing = () => {
+    if (areaSelection) onAreaSelectionChange(null)
+    onDrawModeChange(true)
+  }
 
   return (
     <>
-      <div className={styles.mapStage}>
-        <ValetudoMapCard vacuum={vacuum} />
-        <button className={styles.locateButton} data-icon="mdi:map-marker" data-tone="neutral" onClick={locate} type="button">
-          <MaterialIcon name="mdi:map-marker" size={18} />
-          Locate
-        </button>
+      {areaEditorOpen && (
+        <div className={styles.areaEditorToolbar}>
+          <button
+            className={styles.areaEditorTool}
+            data-active={drawMode ? 'true' : 'false'}
+            data-modal-detail-autofocus="true"
+            onClick={beginDrawing}
+            type="button"
+          >
+            <MaterialIcon name="mdi:selection-drag" size={19} />
+            {areaSelection ? 'Redraw' : 'Draw'}
+          </button>
+          <button className={styles.areaEditorTool} onClick={onResetAreaView} type="button">
+            <MaterialIcon name="mdi:fit-to-screen-outline" size={19} />
+            Reset View
+          </button>
+          <button className={styles.areaEditorTool} disabled={!areaSelection} onClick={() => onAreaSelectionChange(null)} type="button">
+            <MaterialIcon name="mdi:delete-outline" size={19} />
+            Clear
+          </button>
+        </div>
+      )}
+      <div className={[styles.mapStage, areaEditorOpen ? styles.areaEditorMapStage : ''].filter(Boolean).join(' ')} key="vacuum-map">
+        <ValetudoMapCard
+          drawMode={drawMode}
+          expanded={areaEditorOpen}
+          frozenGeometry={areaEditorOpen ? editorMeta.geometry : null}
+          interactive={areaEditorOpen}
+          minimumSizeCm={vacuum.areaCleaning?.minimumSizeCm}
+          onDrawModeChange={onDrawModeChange}
+          onEditorMetaChange={handleEditorMetaChange}
+          onSelectionChange={onAreaSelectionChange}
+          resetViewRevision={resetAreaViewRevision}
+          selection={areaEditorOpen || showAreaSelection ? areaSelection : null}
+          vacuum={vacuum}
+        />
+        {!areaEditorOpen && (
+          <button className={styles.locateButton} data-icon="mdi:map-marker" data-tone="neutral" onClick={locate} type="button">
+            <MaterialIcon name="mdi:map-marker" size={18} />
+            Locate
+          </button>
+        )}
+        {areaEditorOpen && (
+          <div className={styles.areaEditorHint} data-draw-mode={drawMode ? 'true' : 'false'}>
+            {drawMode ? 'Drag on the map to draw the cleaning area.' : areaSelection ? 'Drag the area to move it or use any round corner handle to resize.' : 'Choose Draw, then drag on the map.'}
+          </div>
+        )}
       </div>
-      <VacuumStatusSummary displayState={optimisticState.state} vacuum={vacuum} />
-      <VacuumWhileAwaySection vacuum={vacuum} />
+      {areaEditorOpen ? (
+        <div className={styles.areaEditorSummary}>
+          <span>
+            <strong>{dimensions ? `${formatAreaLength(dimensions.width)} × ${formatAreaLength(dimensions.height)}` : 'No area selected'}</strong>
+            <small>{dimensions ? `${((dimensions.width * dimensions.height) / 10_000).toFixed(2)} m² selected` : 'Draw a rectangle to continue.'}</small>
+          </span>
+          <Description>{AREA_EDITOR_DESCRIPTION}</Description>
+          {editorMeta.error && <InlineAlert>{editorMeta.error}</InlineAlert>}
+          <ModalActionButton
+            action={{
+              disabled: !areaSelection,
+              icon: 'mdi:check',
+              label: areaSelection ? 'Use This Area' : 'Draw an Area to Continue',
+              onClick: onFinishAreaEditing,
+            }}
+          />
+        </div>
+      ) : (
+        <>
+          <VacuumStatusSummary displayState={optimisticState.state} vacuum={vacuum} />
+          <VacuumWhileAwaySection vacuum={vacuum} />
+        </>
+      )}
     </>
   )
 }
 
 export function VacuumRoomSourceModalContent({ vacuum }: VacuumCardProps) {
   const [activeTab, setActiveTab] = useState<VacuumModalTab>('controls')
+  const [areaEditorOpen, setAreaEditorOpen] = useState(false)
+  const [areaSelection, setAreaSelection] = useState<MapGridRect | null>(null)
+  const [cleanTarget, setCleanTarget] = useState<VacuumCleanTarget>('rooms')
+  const [drawMode, setDrawMode] = useState(false)
+  const [editorMeta, setEditorMeta] = useState<ValetudoMapEditorMeta>({ error: null, geometry: null, isLoaded: false })
+  const [resetAreaViewRevision, setResetAreaViewRevision] = useState(0)
 
   return (
     <div className={styles.roomSourceModalShell}>
-      <VacuumModalTabContent activeTab={activeTab} vacuum={vacuum} />
-      <VacuumModalNav activeTab={activeTab} onTabChange={setActiveTab} vacuum={vacuum} />
+      <VacuumModalTabContent
+        activeTab={activeTab}
+        areaEditorMeta={editorMeta}
+        areaEditorOpen={areaEditorOpen}
+        areaSelection={areaSelection}
+        cleanTarget={cleanTarget}
+        drawMode={drawMode}
+        onAreaEditorMetaChange={setEditorMeta}
+        onAreaSelectionChange={setAreaSelection}
+        onCleanTargetChange={setCleanTarget}
+        onDrawModeChange={setDrawMode}
+        onEditArea={() => {
+          setCleanTarget('area')
+          setDrawMode(!areaSelection)
+          setAreaEditorOpen(true)
+        }}
+        onFinishAreaEditing={() => setAreaEditorOpen(false)}
+        onResetAreaView={() => setResetAreaViewRevision((revision) => revision + 1)}
+        resetAreaViewRevision={resetAreaViewRevision}
+        vacuum={vacuum}
+      />
+      {!areaEditorOpen && <VacuumModalNav activeTab={activeTab} onTabChange={(tab) => {
+        if (tab === 'zones') setCleanTarget('rooms')
+        setActiveTab(tab)
+      }} vacuum={vacuum} />}
     </div>
   )
 }
 
-function VacuumModal({ onClose, open, vacuum }: { onClose: () => void; open: boolean; vacuum: VacuumConfig }) {
+export function VacuumModal({
+  onClose,
+  open,
+  subtitle,
+  title: titleOverride,
+  vacuum,
+}: {
+  onClose: () => void
+  open: boolean
+  subtitle?: string
+  title?: string
+  vacuum: VacuumConfig
+}) {
   const [activeTab, setActiveTab] = useState<VacuumModalTab>('controls')
-  const title = `${vacuum.title} Robot Vacuum`
+  const [areaEditorOpen, setAreaEditorOpen] = useState(false)
+  const [areaSelection, setAreaSelection] = useState<MapGridRect | null>(null)
+  const [cleanTarget, setCleanTarget] = useState<VacuumCleanTarget>('rooms')
+  const [drawMode, setDrawMode] = useState(false)
+  const [editorMeta, setEditorMeta] = useState<ValetudoMapEditorMeta>({ error: null, geometry: null, isLoaded: false })
+  const [resetAreaViewRevision, setResetAreaViewRevision] = useState(0)
+  const previousOpenRef = useRef(open)
+  const detailPageKey = areaEditorOpen ? 'vacuum-area-editor' : activeTab
+  const { bodyElementRef, enterDetailPage, leaveDetailPage, resetDetailPageScroll } = useModalDetailPageScroll(detailPageKey)
+  const title = areaEditorOpen ? `${vacuum.title} Cleaning Area` : titleOverride ?? `${vacuum.title} Robot Vacuum`
+  const closeAreaEditor = useCallback(() => {
+    leaveDetailPage()
+    setDrawMode(false)
+    setAreaEditorOpen(false)
+  }, [leaveDetailPage])
+  const openAreaEditor = useCallback(() => {
+    enterDetailPage('vacuum-area-editor')
+    setActiveTab('controls')
+    setCleanTarget('area')
+    setDrawMode(!areaSelection)
+    setAreaEditorOpen(true)
+  }, [areaSelection, enterDetailPage])
+
+  useEffect(() => {
+    const wasOpen = previousOpenRef.current
+    if (open && !wasOpen) {
+      setActiveTab('controls')
+      setAreaEditorOpen(false)
+      setAreaSelection(null)
+      setCleanTarget('rooms')
+      setDrawMode(false)
+      setEditorMeta({ error: null, geometry: null, isLoaded: false })
+      setResetAreaViewRevision((revision) => revision + 1)
+      resetDetailPageScroll()
+    }
+    previousOpenRef.current = open
+  }, [open, resetDetailPageScroll])
 
   return (
     <ModalSheet
-      contentStyle={VACUUM_MODAL_STYLE}
-      footer={<VacuumModalNav activeTab={activeTab} onTabChange={setActiveTab} vacuum={vacuum} />}
+      backLabel="Back to controls"
+      bodyElementRef={bodyElementRef}
+      contentStyle={areaEditorOpen ? VACUUM_AREA_EDITOR_MODAL_STYLE : VACUUM_MODAL_STYLE}
+      footer={areaEditorOpen ? undefined : <VacuumModalNav activeTab={activeTab} onTabChange={(tab) => {
+        if (tab === 'zones') setCleanTarget('rooms')
+        setActiveTab(tab)
+      }} vacuum={vacuum} />}
+      onBack={areaEditorOpen ? closeAreaEditor : undefined}
       onClose={onClose}
       open={open}
+      scrollResetKey={detailPageKey}
+      subtitle={areaEditorOpen ? undefined : subtitle}
       title={title}
     >
-      <VacuumModalTabContent activeTab={activeTab} vacuum={vacuum} />
+      <VacuumModalTabContent
+        activeTab={activeTab}
+        areaEditorMeta={editorMeta}
+        areaEditorOpen={areaEditorOpen}
+        areaSelection={areaSelection}
+        cleanTarget={cleanTarget}
+        drawMode={drawMode}
+        onAreaEditorMetaChange={setEditorMeta}
+        onAreaSelectionChange={setAreaSelection}
+        onCleanTargetChange={setCleanTarget}
+        onDrawModeChange={setDrawMode}
+        onEditArea={openAreaEditor}
+        onFinishAreaEditing={closeAreaEditor}
+        onResetAreaView={() => setResetAreaViewRevision((revision) => revision + 1)}
+        resetAreaViewRevision={resetAreaViewRevision}
+        vacuum={vacuum}
+      />
     </ModalSheet>
   )
 }

@@ -1,8 +1,9 @@
-import { useEffect, useState, type CSSProperties } from 'react'
+import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import { useEntity, useHass } from '@hakit/core'
 import type { HassEntity } from 'home-assistant-js-websocket'
 import effects from '../../styles/effects.module.css'
 import { WEATHER_ENTITY } from '../../constants/atAGlance'
+import { WEATHER_HOURLY_MODES, type WeatherHourlyMode } from '../../constants/surfaceSemantics'
 import { MaterialIcon } from '../core/Icon'
 import { materialIconPath } from '../core/iconPaths'
 import { ModalSheet } from '../core/ModalSheet'
@@ -64,14 +65,8 @@ interface WeatherHighlightData {
   value: string
 }
 
-type HourlyMode = 'condition' | 'precipitation' | 'wind'
+type HourlyMode = WeatherHourlyMode
 type ModeTransitionPhase = 'idle' | 'out' | 'in'
-
-const HOURLY_MODES: { icon: string; label: string; mode: HourlyMode }[] = [
-  { icon: 'mdi:cloud', label: 'Conditions', mode: 'condition' },
-  { icon: 'mdi:water', label: 'Precipitation', mode: 'precipitation' },
-  { icon: 'mdi:weather-windy', label: 'Wind', mode: 'wind' },
-]
 
 const WEATHER_CONDITIONS: Record<string, { icon: string; label: string }> = {
   'clear-night': { icon: 'mdi:weather-night', label: 'Clear Night' },
@@ -906,13 +901,13 @@ function HourlyConditionsPanel({
       <div className={styles.hourlyHeader}>
         <span className={styles.sectionLabel}>Conditions</span>
         <span className={styles.hourlyModes}>
-          {HOURLY_MODES.map((option) => (
+          {WEATHER_HOURLY_MODES.map((option) => (
             <button
               aria-label={`${option.label} conditions`}
-              aria-pressed={activeMode === option.mode}
-              className={activeMode === option.mode ? styles.hourlyModeActive : undefined}
-              key={option.mode}
-              onClick={() => onModeChange(option.mode)}
+              aria-pressed={activeMode === option.tab}
+              className={activeMode === option.tab ? styles.hourlyModeActive : undefined}
+              key={option.tab}
+              onClick={() => onModeChange(option.tab)}
               type="button"
             >
               <MaterialIcon name={option.icon} size={18} />
@@ -976,9 +971,11 @@ function WeatherForecastSheet({
   const [selectedMode, setSelectedMode] = useState<HourlyMode>('condition')
   const [displayMode, setDisplayMode] = useState<HourlyMode>('condition')
   const [transitionPhase, setTransitionPhase] = useState<ModeTransitionPhase>('idle')
+  const previousSelectedModeRef = useRef(selectedMode)
 
   useEffect(() => {
-    if (selectedMode === displayMode) return undefined
+    if (selectedMode === previousSelectedModeRef.current) return undefined
+    previousSelectedModeRef.current = selectedMode
 
     let animationFrame = 0
     const exitTimer = window.setTimeout(() => setTransitionPhase('out'), 0)
@@ -996,7 +993,7 @@ function WeatherForecastSheet({
       window.clearTimeout(settleTimer)
       if (animationFrame) window.cancelAnimationFrame(animationFrame)
     }
-  }, [displayMode, selectedMode])
+  }, [selectedMode])
 
   return (
     <div className={styles.sheet}>

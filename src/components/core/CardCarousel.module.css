@@ -5,49 +5,37 @@
   margin-inline: calc(0px - var(--space-page-x));
 }
 
-.carousel[data-columns='5'] {
-  max-width: 1160px;
+.viewport {
+  width: 100%;
+  overflow: hidden;
+  touch-action: pan-y;
+  box-sizing: border-box;
+}
+
+.viewport:focus {
+  outline: none;
+}
+
+.viewport:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.54);
+  outline-offset: -2px;
 }
 
 .track {
   display: flex;
   width: 100%;
-  gap: 10px;
-  overflow-x: auto;
-  overscroll-behavior-x: contain;
-  padding: 0 32px 4px 16px;
-  box-sizing: border-box;
-  scroll-padding-inline: 16px;
-  scroll-snap-type: x mandatory;
-  scrollbar-width: none;
-  -webkit-overflow-scrolling: touch;
-}
-
-.track::-webkit-scrollbar {
-  display: none;
-}
-
-.track:focus {
-  outline: none;
-}
-
-.track:focus-visible {
-  outline: 2px solid rgba(255, 255, 255, 0.54);
-  outline-offset: -2px;
+  transition: transform 220ms ease-out;
+  will-change: transform;
 }
 
 .page {
   display: grid;
   width: 100%;
   min-width: 100%;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(var(--carousel-columns, 2), minmax(0, 1fr));
   gap: 10px;
-  scroll-snap-align: start;
-  scroll-snap-stop: always;
-}
-
-.carousel[data-columns='5'] .page {
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  padding: 0 32px 4px 16px;
+  box-sizing: border-box;
 }
 
 .dots {
@@ -59,7 +47,7 @@
 
 .dotButton {
   display: grid;
-  width: 44px;
+  width: 30px;
   height: 44px;
   place-items: center;
   border: 0;
@@ -81,25 +69,45 @@
 }
 
 .dot {
+  position: relative;
   display: block;
-  width: 7px;
+  width: 18px;
   height: 7px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.36);
-  transition: width 150ms ease, background-color 150ms ease;
 }
 
-.dotButton[aria-current='page'] .dot {
+.dot::before,
+.dot::after {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  height: 7px;
+  border-radius: 999px;
+  content: '';
+  transform: translateX(-50%);
+}
+
+.dot::before {
+  width: 7px;
+  visibility: visible;
+  background: rgba(255, 255, 255, 0.36);
+}
+
+.dot::after {
   width: 18px;
+  visibility: hidden;
   background: white;
+}
+
+.dotButton[aria-current='page'] .dot::before {
+  visibility: hidden;
+}
+
+.dotButton[aria-current='page'] .dot::after {
+  visibility: visible;
 }
 
 @media (prefers-reduced-motion: reduce) {
   .track {
-    scroll-behavior: auto;
-  }
-
-  .dot {
     transition: none;
   }
 }

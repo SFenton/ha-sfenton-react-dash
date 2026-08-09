@@ -20,6 +20,17 @@
   outline: none;
 }
 
+.checkboxRow[data-read-only='true'] {
+  cursor: default;
+}
+
+.checkboxRow[data-read-only='true'] .copy strong,
+.checkboxRow[data-read-only='true'] .copy small {
+  overflow: visible;
+  text-overflow: initial;
+  white-space: normal;
+}
+
 .copy {
   display: grid;
   min-width: 0;

@@ -23,6 +23,7 @@ function recommendationCard(id: number) {
 describe('SuggestedRecipeCarousel', () => {
   beforeEach(() => {
     resetMockHass()
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: 393 })
   })
 
   it('preloads exactly five by six inert slots with no service calls or images', () => {
@@ -41,8 +42,9 @@ describe('SuggestedRecipeCarousel', () => {
     }
   })
 
-  it('preserves five-page geometry when the backend returns too few items and keeps cards inert', async () => {
+  it('preserves five-page geometry and exposes accessible card activation when the backend returns too few items', async () => {
     const originalCallService = mockState.helpers.callService
+    const onOpenRecipe = vi.fn()
     mockState.helpers.callService = (params) => {
       if (params.domain === 'evershelf' && params.service === 'recipe_query') {
         return Promise.resolve({ response: { kind: 'recommendations', items: Array.from({ length: 4 }, (_, index) => recommendationCard(index + 1)) } })
@@ -50,25 +52,60 @@ describe('SuggestedRecipeCarousel', () => {
       return originalCallService(params)
     }
     try {
-      const { container } = render(<SuggestedRecipeCarousel />)
-      await screen.findByRole('article', { name: 'Test Recipe 1' })
+      const { container } = render(<SuggestedRecipeCarousel onOpenRecipe={onOpenRecipe} />)
+      const firstCard = await screen.findByRole('button', { name: 'Open Test Recipe 1 recipe details' })
       expect(container.querySelectorAll('[data-carousel-page]')).toHaveLength(5)
       expect(container.querySelectorAll('[data-carousel-card]')).toHaveLength(30)
       expect(container.querySelectorAll('[data-recipe-placeholder]')).toHaveLength(26)
-      expect(screen.getAllByRole('article')).toHaveLength(4)
+      expect(screen.getAllByRole('button', { name: /Open Test Recipe \d recipe details/ })).toHaveLength(4)
       expect(screen.queryByText(/% match/)).not.toBeInTheDocument()
       expect(container.querySelectorAll('button [data-recipe-card], a [data-recipe-card]')).toHaveLength(0)
-      for (const article of screen.getAllByRole('article')) {
-        expect(article).not.toHaveAttribute('tabindex')
-      }
+      fireEvent.click(firstCard)
+      expect(onOpenRecipe).toHaveBeenCalledWith(expect.objectContaining({ id: 1 }))
     } finally {
       mockState.helpers.callService = originalCallService
     }
   })
 
-  it('exposes five dot buttons, keyboard navigation, and reduced-motion auto scrolling', async () => {
+  it('does not report ready until every carousel image has settled', async () => {
+    const originalCallService = mockState.helpers.callService
+    const onLoadStateChange = vi.fn()
+    mockState.helpers.callService = (params) => {
+      if (params.domain === 'evershelf' && params.service === 'recipe_query') {
+        return Promise.resolve({
+          response: {
+            kind: 'recommendations',
+            items: [1, 2].map((id) => ({
+              ...recommendationCard(id),
+              image_url: `https://example.test/recipe-${id}.jpg`,
+            })),
+          },
+        })
+      }
+      return originalCallService(params)
+    }
+
+    try {
+      const { container } = render(
+        <SuggestedRecipeCarousel onLoadStateChange={onLoadStateChange} />,
+      )
+      await screen.findByRole('button', { name: 'Open Test Recipe 1 recipe details' })
+      expect(onLoadStateChange).not.toHaveBeenCalledWith('ready')
+      const images = Array.from(container.querySelectorAll('img'))
+      expect(images).toHaveLength(2)
+      images.forEach((image) => {
+        Object.defineProperty(image, 'complete', { configurable: true, value: true })
+        Object.defineProperty(image, 'naturalWidth', { configurable: true, value: 584 })
+        fireEvent.load(image)
+      })
+      await waitFor(() => expect(onLoadStateChange).toHaveBeenCalledWith('ready'))
+    } finally {
+      mockState.helpers.callService = originalCallService
+    }
+  })
+
+  it('exposes compact dots and wraps keyboard and touch navigation at both boundaries', async () => {
     const originalMatchMedia = window.matchMedia
-    const scrollTo = vi.fn()
     window.matchMedia = vi.fn().mockReturnValue({
       matches: true,
       media: '(prefers-reduced-motion: reduce)',
@@ -79,31 +116,46 @@ describe('SuggestedRecipeCarousel', () => {
       removeListener: vi.fn(),
       dispatchEvent: vi.fn(),
     })
-    Object.defineProperty(HTMLElement.prototype, 'scrollTo', { configurable: true, value: scrollTo })
     try {
       const { container } = render(<SuggestedRecipeCarousel preload />)
       const track = screen.getByRole('region', { name: 'Suggested recipes' })
-      const pages = Array.from(container.querySelectorAll<HTMLElement>('[data-carousel-page]'))
-      pages.forEach((page, index) => Object.defineProperty(page, 'offsetLeft', { configurable: true, value: index * 345 }))
+      const carousel = container.querySelector('[data-card-carousel]')
       const dots = within(screen.getByRole('group', { name: 'Suggested recipes pages' })).getAllByRole('button')
       expect(dots).toHaveLength(5)
       expect(dots[0]).toHaveAttribute('aria-current', 'page')
+      dots[0].focus()
+      fireEvent.pointerUp(dots[0])
+      expect(dots[0]).not.toHaveFocus()
+
+      fireEvent.keyDown(track, { key: 'ArrowLeft' })
+      expect(dots[4]).toHaveAttribute('aria-current', 'page')
+      expect(carousel).toHaveAttribute('data-active-page', '5')
 
       fireEvent.keyDown(track, { key: 'ArrowRight' })
-      expect(scrollTo).toHaveBeenLastCalledWith({ behavior: 'auto', left: 345, top: 0 })
+      expect(dots[0]).toHaveAttribute('aria-current', 'page')
+
+      fireEvent.keyDown(track, { key: 'ArrowRight' })
       expect(dots[1]).toHaveAttribute('aria-current', 'page')
 
       fireEvent.click(dots[4])
-      await waitFor(() => expect(scrollTo).toHaveBeenLastCalledWith({ behavior: 'auto', left: 1_380, top: 0 }))
+      await waitFor(() => expect(carousel).toHaveAttribute('data-active-page', '5'))
+      expect(dots[4]).toHaveAttribute('aria-current', 'page')
+
+      fireEvent.touchStart(track, { touches: [{ clientX: 180 }] })
+      fireEvent.touchEnd(track, { changedTouches: [{ clientX: 80 }] })
+      expect(dots[0]).toHaveAttribute('aria-current', 'page')
+
+      fireEvent.touchStart(track, { touches: [{ clientX: 80 }] })
+      fireEvent.touchEnd(track, { changedTouches: [{ clientX: 180 }] })
       expect(dots[4]).toHaveAttribute('aria-current', 'page')
     } finally {
       window.matchMedia = originalMatchMedia
-      delete (HTMLElement.prototype as { scrollTo?: unknown }).scrollTo
     }
   })
 
-  it('uses three desktop pages with five columns and two rows', async () => {
+  it('uses five responsive desktop pages with bounded card widths', async () => {
     const originalMatchMedia = window.matchMedia
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: 1_440 })
     window.matchMedia = vi.fn().mockImplementation((query: string) => ({
       matches: query === '(min-width: 900px)',
       media: query,
@@ -117,14 +169,15 @@ describe('SuggestedRecipeCarousel', () => {
 
     try {
       const { container } = render(<SuggestedRecipeCarousel />)
-      await screen.findByRole('article', { name: 'Ang Chow Chicken (Red Fermented Rice Wine Chicken)' })
+      await screen.findByRole('button', { name: 'Open Suggested Citrus Pantry Bowl with Roasted Garden Vegetables recipe details' })
       const pages = Array.from(container.querySelectorAll('[data-carousel-page]'))
-      expect(pages).toHaveLength(3)
-      pages.forEach((page) => expect(page.querySelectorAll('[data-carousel-card]')).toHaveLength(10))
-      expect(container.querySelector('[data-card-carousel]')).toHaveAttribute('data-columns', '5')
-      expect(within(screen.getByRole('group', { name: 'Suggested recipes pages' })).getAllByRole('button')).toHaveLength(3)
+      expect(pages).toHaveLength(5)
+      pages.forEach((page) => expect(page.querySelectorAll('[data-carousel-card]')).toHaveLength(14))
+      expect(container.querySelector('[data-card-carousel]')).toHaveAttribute('data-columns', '7')
+      expect(within(screen.getByRole('group', { name: 'Suggested recipes pages' })).getAllByRole('button')).toHaveLength(5)
     } finally {
       window.matchMedia = originalMatchMedia
+      Object.defineProperty(window, 'innerWidth', { configurable: true, value: 393 })
     }
   })
 })

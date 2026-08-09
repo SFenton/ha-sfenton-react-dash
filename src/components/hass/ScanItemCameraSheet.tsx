@@ -8,6 +8,7 @@ import { ModalSheet, type ModalSheetStyle } from '../core/ModalSheet'
 import { NativePickerField } from '../core/NativePickerField'
 import { RadioRow } from '../core/RadioRow'
 import { EVERSHELF_DEFAULT_LOCATION } from '../../constants/everShelfFood'
+import type { ScanItemStep } from '../../constants/surfaceSemantics'
 import styles from './ScanItemCameraSheet.module.css'
 
 interface ScanItemCameraSheetProps {
@@ -17,7 +18,7 @@ interface ScanItemCameraSheetProps {
 }
 
 type CameraMode = 'barcode' | 'expiry'
-type ScanStep = CameraMode | 'review' | 'adding'
+type ScanStep = ScanItemStep
 type ProcessingMode = 'barcode' | 'expiry' | null
 type CameraStatus = 'idle' | 'starting' | 'ready' | 'error'
 type LookupStatus = 'idle' | 'scanning' | 'resolving' | 'found' | 'not-found' | 'error'

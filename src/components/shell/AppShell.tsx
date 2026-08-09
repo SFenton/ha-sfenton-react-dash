@@ -16,7 +16,7 @@ export function AppShell({ children, bottomNav, chromeHidden = false, floatingAc
   const shellClassName = floatingAction && !chromeHidden ? `${styles.shell} ${styles.hasFloatingAction}` : styles.shell
 
   return (
-    <div className={shellClassName}>
+    <div className={shellClassName} data-app-shell="true">
       <div className={styles.backdrop} aria-hidden="true" />
       <div className={styles.scrim} aria-hidden="true" />
       <div className={styles.content}>{children}</div>

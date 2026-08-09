@@ -7,6 +7,7 @@ interface PageProps {
   activePath?: string
   backPath?: string
   chromeHidden?: boolean
+  contentHidden?: boolean
   contentTransitionState?: 'entering' | 'idle' | 'pre-entering'
   title: string
   headerQuickLinks?: ReactNode
@@ -18,7 +19,7 @@ interface PageProps {
   scrollLocked?: boolean
 }
 
-export function Page({ activePath, backPath, chromeHidden = false, contentTransitionState = 'idle', title, headerQuickLinks, children, onBack, onNavigate, onProfile, onSettings, scrollLocked = false }: PageProps) {
+export function Page({ activePath, backPath, chromeHidden = false, contentHidden = false, contentTransitionState = 'idle', title, headerQuickLinks, children, onBack, onNavigate, onProfile, onSettings, scrollLocked = false }: PageProps) {
   const scrollerRef = useRef<HTMLDivElement>(null)
   const scrollToTop = useCallback(() => {
     const scroller = scrollerRef.current
@@ -45,7 +46,7 @@ export function Page({ activePath, backPath, chromeHidden = false, contentTransi
           </div>
         )}
         <div className={styles.scroller} data-chrome-hidden={chromeHidden ? 'true' : undefined} data-scroll-lock={scrollLocked ? 'true' : undefined} ref={scrollerRef}>
-          <div className={styles.scrollContent} data-chrome-hidden={chromeHidden ? 'true' : undefined} data-scroll-lock={scrollLocked ? 'true' : undefined}>{children}</div>
+          <div aria-hidden={contentHidden ? true : undefined} className={styles.scrollContent} data-chrome-hidden={chromeHidden ? 'true' : undefined} data-scroll-lock={scrollLocked ? 'true' : undefined} inert={contentHidden ? true : undefined}>{children}</div>
         </div>
         </main>
       </PageScrollToTopContext.Provider>

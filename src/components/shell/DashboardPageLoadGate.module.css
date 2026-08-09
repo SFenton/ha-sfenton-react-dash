@@ -1,0 +1,49 @@
+.gate {
+  position: relative;
+  --page-gate-visible-height: max(
+    260px,
+    calc(
+      var(--dashboard-visible-height, var(--dashboard-viewport-height, 100dvh))
+      - 80px
+      - env(safe-area-inset-top, 0px)
+      - var(--page-scroll-bottom-inset, var(--bottom-nav-height))
+    )
+  );
+  min-height: var(--page-gate-visible-height);
+}
+
+.content[data-content-visible='false'] {
+  position: absolute;
+  inset: 0;
+  visibility: hidden;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.content[data-content-visible='true'] {
+  animation: dashboardGateContentEnter 170ms ease-out both;
+}
+
+.loading {
+  position: relative;
+  z-index: 1;
+  min-height: var(--page-gate-visible-height);
+}
+
+@keyframes dashboardGateContentEnter {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .content[data-content-visible='true'] {
+    animation: none;
+  }
+}

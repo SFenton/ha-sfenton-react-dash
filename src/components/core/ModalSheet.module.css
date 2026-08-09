@@ -173,8 +173,7 @@
 
 .back:focus-visible,
 .close:focus-visible {
-  outline: 2px solid rgba(255, 255, 255, 0.56);
-  outline-offset: 3px;
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.56);
 }
 
 .close {

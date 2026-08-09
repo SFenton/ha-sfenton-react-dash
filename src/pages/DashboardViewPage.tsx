@@ -22,14 +22,23 @@ import { useEverShelfInventoryControls, type EverShelfInventoryControls } from '
 import type { RecipeControls } from '../components/hass/recipes/useRecipeControls'
 import { useRecipeControls } from '../components/hass/recipes/useRecipeControls'
 import { VacuumAutoCleanControlCard } from '../components/hass/VacuumAutoCleanControls'
-import { VacuumCard, VacuumRoomSourceModalContent } from '../components/hass/VacuumCard'
+import { VacuumCard, VacuumModal, VacuumRoomSourceModalContent } from '../components/hass/VacuumCard'
 import { VACUUM_MODAL_STYLE } from '../components/hass/vacuumModalStyle'
 import { AirQualityModalContent } from '../components/hass/AirQualityModalContent'
 import { GrillModalContent } from '../components/hass/GrillModalContent'
 import { HumidifierModal, HumidifierModalContent } from '../components/hass/HumidifierModalContent'
-import { MediaRemoteModalContent, MediaRemoteModalNav, type MediaRemoteModalTab } from '../components/hass/MediaRemoteModalContent'
+import { MediaRemoteModalContent, MediaRemoteModalNav } from '../components/hass/MediaRemoteModalContent'
 import { MEDIA_REMOTE_MODAL_STYLE } from '../components/hass/mediaRemoteModalStyle'
 import { BedTemperatureScopePrompt } from '../components/hass/BedTemperatureScopePrompt'
+import {
+  EIGHT_SLEEP_MODAL_TABS,
+  MEDIA_PAGE_REMOTE_HASH_BY_ENTITY_ID,
+  SLEEPYPOD_MODAL_TABS,
+  THERMOSTAT_MODAL_TABS,
+  type EightSleepModalTab,
+  type MediaRemoteModalTab,
+  type ThermostatModalTab,
+} from '../constants/surfaceSemantics'
 import { CircularControlDial } from '../components/hass/CircularControlDial'
 import { SleepypodActiveAlarmSection } from '../components/hass/SleepypodActiveAlarmSection'
 import { isSleepypodAlarmActive, sleepypodAlarmState, sleepypodAlarmStatusText } from '../components/hass/sleepypodAlarmState'
@@ -50,11 +59,13 @@ import { EmptyState } from '../components/core/EmptyState'
 import { GlassTile } from '../components/core/GlassTile'
 import { MaterialIcon } from '../components/core/Icon'
 import { InlineAlert } from '../components/core/InlineAlert'
+import { ModalIconTabNav } from '../components/core/ModalTabNav'
+import { modalTabId, modalTabPanelId } from '../components/core/modalTabIds'
 import { ModalSheet, type ModalSheetStyle } from '../components/core/ModalSheet'
 import { ModalDisclosureIcon } from '../components/core/ModalDisclosureIcon'
 import { ModalOpenerRow } from '../components/core/ModalOpenerRow'
 import { NativePickerField } from '../components/core/NativePickerField'
-import { OptionPickerDialog, type PickerOption } from '../components/core/OptionPickerDialog'
+import { OptionPickerDialog, OptionPickerPanel, type PickerOption } from '../components/core/OptionPickerDialog'
 import { ScheduleEditorFields } from '../components/core/ScheduleEditorFields'
 import { resolveScheduleDefaultDays } from '../components/core/scheduleDays'
 import { ScheduleCollection, ScheduleDetailFooter, ScheduleListRow } from '../components/core/ScheduleFlow'
@@ -126,7 +137,7 @@ import {
 import { choreQuickLinkCounts, choreQuickLinkSubtitle, groceryCountSubtitle } from '../constants/choreQuickLinkCounts'
 import { FOOD_CARD_BACKGROUND_COLOR, foodSummarySubtitle } from '../constants/everShelfFood'
 import { modalSquareGridModalStyle, modalSquareGridStyle, type ModalSquareGridStyle, useModalSquareGridLayout } from './modalSquareGrid'
-import { ROOM_PAGE_CONFIGS, type RoomSourceCardAction, type RoomSourceCardConfig, type RoomSourceKind, type RoomSourceModalItem } from '../constants/roomPages'
+import { ROOM_PAGE_CONFIGS, type RoomSourceCardAction, type RoomSourceCardConfig, type RoomSourceKind, type RoomSourceModalItem, type RoomSourceSectionLayout } from '../constants/roomPages'
 import { humidifierForPowerEntity, type HumidifierConfig } from '../constants/humidifiers'
 import { MEDIA_REMOTE_CONFIGS } from '../constants/mediaRemotes'
 import { VACUUM_AUTO_CLEAN_CONTROLS } from '../constants/vacuumAutoClean'
@@ -141,20 +152,24 @@ import { ClimateSheet, ContactSheet, LightsSheet, OccupancySheet } from './AtAGl
 import { CustomLightsPage } from './CustomLightsPage'
 import { FoodHubPage } from './FoodHubPage'
 import { RecipesPage } from './RecipesPage'
+import { AppManualPage } from './AppManualPage'
 import styles from './DashboardViewPage.module.css'
 
 interface DashboardViewPageProps {
   activePath: string
+  appChromeHidden?: boolean
   onNavigate: (path: string) => void
   onBack?: (fallbackPath?: string) => void
   initialContentTransitionState?: 'entering' | 'idle' | 'pre-entering'
   inventoryControls?: EverShelfInventoryControls
   loadingPhase?: DashboardPageLoadingPhase
+  onRecipesInitialResolved?: () => void
   path: string
   preload?: boolean
   preloadHash?: string
   preloadHashes?: string[]
   recipeControls?: RecipeControls
+  recipesInitiallyAppGated?: boolean
   withShell?: boolean
 }
 
@@ -190,17 +205,31 @@ function Grid({ children }: { children: ReactNode }) {
   return <div className={styles.grid}>{children}</div>
 }
 
-function RoomGrid({ ariaLabel, children, dynamic = true }: { ariaLabel: string; children: ReactNode; dynamic?: boolean }) {
-  if (!dynamic) {
-    return <div aria-label={ariaLabel} className={styles.grid} role="group">{children}</div>
+// App launch tiles stay square, so they widen by column count instead of stretching the last row.
+const APP_LAUNCH_TILE_MAX_WIDTH_PX = 200
+const APP_LAUNCH_MAX_COLUMNS = 6
+
+// `lead-row` sections render their first card in its own full-width grid, so the follow-up
+// controls keep the standard responsive room grid underneath it.
+const LEAD_ROW_GRID_LABEL_SUFFIX = 'Controls'
+
+function RoomGrid({ ariaLabel, children, layout }: { ariaLabel: string; children: ReactNode; layout?: RoomSourceSectionLayout }) {
+  if (layout === 'app-launch') {
+    return (
+      <DynamicGrid
+        ariaLabel={ariaLabel}
+        className={styles.appLaunchGrid}
+        columns={2}
+        fillRows={false}
+        maxCellWidth={APP_LAUNCH_TILE_MAX_WIDTH_PX}
+        maxColumns={APP_LAUNCH_MAX_COLUMNS}
+      >
+        {children}
+      </DynamicGrid>
+    )
   }
 
   return <DynamicGrid ariaLabel={ariaLabel} className={styles.roomGrid} columns={2}>{children}</DynamicGrid>
-}
-
-function roomSectionUsesDynamicGrid(path: string, sectionTitle: string) {
-  return !(path === 'living-room' && sectionTitle === 'Living Room SHIELD')
-    && !(path === 'theater-room' && sectionTitle === 'Media Controls')
 }
 
 const VACUUM_AUTO_CLEAN_TITLE_ORDER = new Map(VACUUM_AUTO_CLEAN_CONTROLS.map((control, index) => [control.title, index]))
@@ -984,6 +1013,11 @@ function RoomSourceModal({ card, eightSleepModalState, onClose, preloadCard, roo
     return <HumidifierModal config={humidifier} onClose={onClose} open={Boolean(card)} roomTitle={roomTitle} />
   }
 
+  const vacuum = renderCard?.kind === 'vacuum' ? VACUUMS.find((candidate) => candidate.entityId === renderCard.entityId) : undefined
+  if (vacuum) {
+    return <VacuumModal onClose={onClose} open={Boolean(card)} subtitle={subtitle} title={title} vacuum={vacuum} />
+  }
+
   return (
     <ModalSheet
       contentStyle={modalStyle}
@@ -1011,7 +1045,7 @@ function RoomSourcePreloadContent({ card, eightSleepModalState, roomTitle }: { c
 
 function EmptyRoomState() {
   return (
-    <div className={styles.emptyRoomState} data-empty-layout="centered" data-empty-typography="festival">
+    <div className={styles.emptyRoomState} data-empty-layout="centered" data-empty-typography="festival" data-manual-visible-section="Nothing Here Yet!">
       <h2>Nothing Here Yet!</h2>
       <Description>Once some devices are added to this room, we can display them here.</Description>
     </div>
@@ -1067,14 +1101,28 @@ function SourceRoomPage({ onNavigate, preload = false, preloadHash, preloadHashe
 
       {room.path === 'kitchen' && <KitchenGroceriesSection onNavigate={onNavigate} />}
 
-      {room.sourceSections.map((section) => (
-        <section className={styles.section} id={sectionId(section.title)} key={`${room.path}-${section.title}`}>
-          <SectionHeader title={section.title} />
-          <RoomGrid ariaLabel={`${room.title} ${section.title}`} dynamic={roomSectionUsesDynamicGrid(room.path, section.title)}>
-            {section.cards.map((card) => <RoomSourceCard card={card} eightSleepModalState={card.hash ? eightSleepModalStates[card.hash] : undefined} key={`${room.path}-${section.title}-${card.title}-${card.entityId}`} onOpen={openSourceCard} />)}
-          </RoomGrid>
-        </section>
-      ))}
+      {room.sourceSections.map((section) => {
+        const leadRow = section.layout === 'lead-row'
+        const leadCards = leadRow ? section.cards.slice(0, 1) : section.cards
+        const followUpCards = leadRow ? section.cards.slice(1) : []
+        const renderCard = (card: RoomSourceCardConfig) => (
+          <RoomSourceCard card={card} eightSleepModalState={card.hash ? eightSleepModalStates[card.hash] : undefined} key={`${room.path}-${section.title}-${card.title}-${card.entityId}`} onOpen={openSourceCard} />
+        )
+
+        return (
+          <section className={styles.section} data-manual-rooms-context={room.path === 'living-room' && section.title === 'Climate' ? 'true' : undefined} id={sectionId(section.title)} key={`${room.path}-${section.title}`}>
+            <SectionHeader title={section.title} />
+            <RoomGrid ariaLabel={`${room.title} ${section.title}`} layout={leadRow ? undefined : section.layout}>
+              {leadCards.map(renderCard)}
+            </RoomGrid>
+            {followUpCards.length > 0 && (
+              <RoomGrid ariaLabel={`${room.title} ${section.title} ${LEAD_ROW_GRID_LABEL_SUFFIX}`}>
+                {followUpCards.map(renderCard)}
+              </RoomGrid>
+            )}
+          </section>
+        )
+      })}
 
       <RoomSourceModal card={selectedCard} eightSleepModalState={selectedCard?.hash ? eightSleepModalStates[selectedCard.hash] : preloadCard?.hash ? eightSleepModalStates[preloadCard.hash] : undefined} onClose={closeSourceCard} preloadCard={preloadCard} roomTitle={room.title} />
       {preloadCards.map((card) => (
@@ -1346,7 +1394,7 @@ function TodoEmptyState({ description = 'You have no chores due- nice job!', tit
 function VacuumPage({ preload = false }: { preload?: boolean }) {
   return (
     <div className={styles.stack}>
-      <section className={styles.section}>
+      <section className={styles.section} data-manual-route-context="vacuums">
         <SectionHeader title="Robot Vacuums" />
         <DynamicGrid ariaLabel="Robot vacuums" className={styles.vacuumGrid} columns={2}>
           {ORDERED_VACUUMS.map((vacuum) => (
@@ -1389,7 +1437,7 @@ function SettingsLink({ item, onNavigate }: { item: SettingsLinkConfig; onNaviga
   }
 
   return (
-    <button aria-label={`${item.title} ${item.subtitle}`} className={styles.settingsLink} data-external-path={item.externalPath} data-navigation-path={item.path} onClick={activate} type="button">
+    <button aria-label={`${item.title} ${item.subtitle}`} className={styles.settingsLink} data-external-path={item.externalPath} data-manual-visible-section={item.title} data-navigation-path={item.path} onClick={activate} type="button">
       <span aria-hidden="true" className={styles.settingsLinkIcon}>
         <MaterialIcon name={item.icon} size={28} />
       </span>
@@ -1403,7 +1451,7 @@ function SettingsLink({ item, onNavigate }: { item: SettingsLinkConfig; onNaviga
 
 function SettingsPage({ onNavigate }: { onNavigate: (path: string) => void }) {
   return (
-    <nav aria-label="Settings pages" className={styles.settingsList}>
+    <nav aria-label="Settings pages" className={styles.settingsList} data-manual-settings-context="true">
       {SETTINGS_PAGE_ITEMS.map((item) => (
         <SettingsLink item={item} key={item.title} onNavigate={onNavigate} />
       ))}
@@ -1413,7 +1461,7 @@ function SettingsPage({ onNavigate }: { onNavigate: (path: string) => void }) {
 
 function GuestControlsPage({ onNavigate }: { onNavigate: (path: string) => void }) {
   return (
-    <div className={styles.stack}>
+    <div className={styles.stack} data-manual-route-context="guests-staying-over">
       <section className={styles.section}>
         <SectionHeader title="Guest Controls" />
         <Description>{GUEST_CONTROLS_DESCRIPTION}</Description>
@@ -1635,7 +1683,7 @@ function VacationChecklistRow({ item, onStateChange, state }: { item: typeof VAC
   }
 
   return (
-    <li className={styles.vacationChecklistRow}>
+    <li className={styles.vacationChecklistRow} data-manual-private-checklist-row="true">
       <CheckboxRow
         active={active}
         aria-label={item.title}
@@ -1650,7 +1698,7 @@ function VacationChecklistRow({ item, onStateChange, state }: { item: typeof VAC
 
 function VacationChecklistSection({ onStateChange, states }: { onStateChange: (entityId: string, nextState: string) => void; states: Record<string, string> }) {
   return (
-    <section className={styles.section}>
+    <section className={styles.section} data-manual-vacation-checklist="true">
       <SectionHeader title="Pre-Vacation Checklist" />
       <ul className={styles.vacationChecklist}>
         {VACATION_PRE_CHECKLIST_ITEMS.map((item) => (
@@ -1766,7 +1814,7 @@ function VacationPage() {
   }
 
   return (
-    <div className={styles.stack}>
+    <div className={styles.stack} data-manual-route-context="vacation">
       <section className={styles.section}>
         <SectionHeader title="Vacation Mode" />
         <Description>{VACATION_MODE_DESCRIPTION}</Description>
@@ -1779,13 +1827,6 @@ function VacationPage() {
       <VacationConfirmationModal dateRange={pendingDateRange ?? dateRange} invalidDateRange={pendingVacation && invalidDateRange} onClose={() => setVacationPending(false)} onConfirm={confirmVacation} onDateRangeChange={setPendingDateRange} open={pendingVacation} />
     </div>
   )
-}
-
-const MEDIA_PAGE_REMOTE_HASH_BY_ENTITY_ID: Record<string, string> = {
-  'media_player.living_room_shield': '#living-room-shield',
-  'media_player.living_room_shield_2': '#living-room-shield',
-  'media_player.sony_projector': '#theater-room-shield',
-  'media_player.theater_room_shield': '#theater-room-shield',
 }
 
 function mediaPageCardFromItem(item: EntitySectionConfig['items'][number]): RoomSourceCardConfig {
@@ -1853,7 +1894,7 @@ function MediaPage({ preload = false, preloadHash, preloadHashes = [] }: { prelo
   }, [preload])
 
   return (
-    <div className={styles.stack}>
+    <div className={styles.stack} data-manual-route-context="media">
       {MEDIA_SOURCE_SECTIONS.map((section) => (
         <section className={styles.section} key={section.title}>
           <SectionHeader title={section.title} />
@@ -1899,7 +1940,7 @@ function AdminPage({ onNavigate, preload = false, preloadHash, preloadHashes = [
   }
 
   return (
-    <div className={styles.stack}>
+    <div className={styles.stack} data-manual-route-context="admin">
       <section className={styles.section}>
         <SectionHeader title="Security Controls" />
         <Description>{ADMIN_DESCRIPTIONS.autoLock}</Description>
@@ -2011,6 +2052,15 @@ type ThermostatRoomView = (typeof THERMOSTAT_ROOMS)[number] & {
   key: string
 }
 
+type ThermostatModalDetail =
+  | { type: 'critical-protection' }
+  | { type: 'eco-away' }
+  | { type: 'eco-critical' }
+  | { type: 'occupied-only' }
+  | { type: 'predictive' }
+  | { room: ThermostatRoomView; type: 'room' }
+  | { type: 'selected-rooms' }
+
 function thermostatRoomKey(title: string) {
   return title.toLowerCase().replaceAll(' ', '_')
 }
@@ -2035,6 +2085,9 @@ const PREDICTIVE_HVAC_MODE_CHANGE_SWITCH_ENTITY_ID = 'switch.thermostat_contact_
 const PREDICTIVE_ALLOW_AWAY_SWITCH_ENTITY_ID = 'switch.thermostat_contact_sensors_predictive_allow_away'
 const PREDICTIVE_COMFORT_SENSOR_ENTITY_ID = 'sensor.living_room_thermostat_contact_sensors_predictive_comfort_mode'
 const PREDICTIVE_COMFORT_HASH = '#predictive-comfort'
+const THERMOSTAT_MODAL_HASH = '#thermostat-controls'
+const THERMOSTAT_MODAL_TAB_ID_PREFIX = 'thermostat-controls'
+const THERMOSTAT_MODAL_TAB_PANEL_ID = modalTabPanelId(THERMOSTAT_MODAL_TAB_ID_PREFIX, 'content')
 const PREDICTIVE_STATE_LABELS: Readonly<Record<string, string>> = {
   pre_cool: 'Pre-Cool',
 }
@@ -2045,10 +2098,10 @@ const THERMOSTAT_NEUTRAL_COLOR = 'rgba(255, 255, 255, 0.78)'
 const THERMOSTAT_MODAL_DIAL_SHELL_STYLE = {
   '--thermostat-modal-dial-gutter': `${THERMOSTAT_MODAL_DIAL_GUTTER_PX}px`,
 } as CSSProperties
-const THERMOSTAT_ROOM_MODAL_STYLE: ModalSheetStyle = {
-  '--modal-desktop-width': '600px',
-  '--modal-desktop-max-width': '600px',
-  '--modal-desktop-height': 'auto',
+const THERMOSTAT_MODAL_STYLE: ModalSheetStyle = {
+  '--modal-desktop-width': '720px',
+  '--modal-desktop-max-width': '720px',
+  '--modal-desktop-height': 'min(780px, calc(var(--dashboard-visible-height, 100dvh) - 64px))',
 }
 
 function thermostatTemperatureEntityId(room: ThermostatRoomView) {
@@ -2469,20 +2522,6 @@ const FREE_SLEEP_SCHEDULE_STAGES: { icon: string; key: FreeSleepScheduleStage; l
   { icon: 'mdi:bed', key: 'bedtime', label: 'Bedtime' },
   { icon: 'mdi:moon-waning-crescent', key: 'asleep', label: 'Asleep' },
   { icon: 'mdi:weather-sunny', key: 'dawn', label: 'Dawn' },
-]
-type EightSleepModalTab = 'schedule' | 'modes' | 'alarms' | 'status' | 'settings'
-const EIGHT_SLEEP_MODAL_TABS: { icon: string; label: string; tab: EightSleepModalTab }[] = [
-  { icon: 'mdi:thermostat', label: 'Sleep Schedule', tab: 'schedule' },
-  { icon: 'mdi:snowflake', label: 'Special Modes', tab: 'modes' },
-  { icon: 'mdi:alarm', label: 'Alarms', tab: 'alarms' },
-  { icon: 'mdi:information-outline', label: 'Status', tab: 'status' },
-  { icon: 'mdi:cog', label: 'Settings', tab: 'settings' },
-]
-const SLEEPYPOD_MODAL_TABS: { icon: string; label: string; tab: EightSleepModalTab }[] = [
-  { icon: 'mdi:thermostat', label: 'Temperature', tab: 'schedule' },
-  { icon: 'mdi:snowflake', label: 'Special Modes', tab: 'modes' },
-  { icon: 'mdi:alarm', label: 'Alarms', tab: 'alarms' },
-  { icon: 'mdi:information-outline', label: 'Status', tab: 'status' },
 ]
 const EIGHT_SLEEP_BED_MODAL_STYLE: ModalSheetStyle = {
   '--modal-desktop-width': '700px',
@@ -4561,7 +4600,7 @@ function EightSleepBedModal({ modalState, onClose, open, side }: { modalState: E
   )
 }
 
-function EightSleepModalNav({ activeTab, onTabChange, sideTitle, tabs }: { activeTab: EightSleepModalTab; onTabChange: (tab: EightSleepModalTab) => void; sideTitle: string; tabs: typeof EIGHT_SLEEP_MODAL_TABS }) {
+function EightSleepModalNav({ activeTab, onTabChange, sideTitle, tabs }: { activeTab: EightSleepModalTab; onTabChange: (tab: EightSleepModalTab) => void; sideTitle: string; tabs: readonly typeof EIGHT_SLEEP_MODAL_TABS[number][] }) {
   const { clearVisualTab, setVisualTabNow, visualActiveTab } = useImmediateVisualTab(activeTab)
   const navStyle = { '--eight-sleep-modal-nav-cols': tabs.length } as CSSProperties
 
@@ -4838,22 +4877,7 @@ const THERMOSTAT_COMPACT_PICKER_MODAL_STYLE: ModalSheetStyle = {
   '--modal-desktop-width': '500px',
 }
 
-function ThermostatSelectButton({
-  entityId,
-  hideWhenEmpty = false,
-  icon,
-  keepOpenOnSelect = false,
-  optionActiveColors,
-  optionIcons,
-  optionLabels,
-  optionsAttribute = 'options',
-  pickerSheetLayout,
-  pickerSheetStyle,
-  selectedIcon = 'mdi:thermometer-check',
-  serviceKind = 'select',
-  title,
-  valueAttribute,
-}: {
+interface ThermostatSelectControlConfig {
   entityId: string
   hideWhenEmpty?: boolean
   icon: string
@@ -4868,8 +4892,17 @@ function ThermostatSelectButton({
   serviceKind?: 'climate' | 'climate-fan' | 'select'
   title: string
   valueAttribute?: string
-}) {
-  const [open, setOpen] = useState(false)
+}
+
+function useThermostatSelectControl({
+  entityId,
+  optionActiveColors,
+  optionIcons,
+  optionLabels,
+  optionsAttribute = 'options',
+  serviceKind = 'select',
+  valueAttribute,
+}: ThermostatSelectControlConfig) {
   const entity = useEntity(asEntityName(entityId), { returnNullIfNotFound: true })
   const callService = useCallService()
   const rawOptions = entity?.attributes[optionsAttribute]
@@ -4883,46 +4916,127 @@ function ThermostatSelectButton({
   const [displayValue, commitValue] = useOptimisticState(value)
   const disabled = options.length === 0
 
-  if (hideWhenEmpty && disabled) return null
-
   const selectOption = (nextValue: string) => {
-    if (nextValue === displayValue) {
-      if (!keepOpenOnSelect) setOpen(false)
-      return
-    }
+    if (nextValue === displayValue) return
 
     commitValue(nextValue)
     if (serviceKind === 'climate') callService({ domain: 'climate', service: 'set_hvac_mode', target: entityId, serviceData: { hvac_mode: nextValue } })
     else if (serviceKind === 'climate-fan') callService({ domain: 'climate', service: 'set_fan_mode', target: entityId, serviceData: { fan_mode: nextValue } })
     else callService({ domain: 'select', service: 'select_option', target: entityId, serviceData: { option: nextValue } })
+  }
+
+  return { disabled, displayValue, options, selectOption }
+}
+
+function ThermostatSelectButton(config: ThermostatSelectControlConfig) {
+  const {
+    hideWhenEmpty = false,
+    icon,
+    keepOpenOnSelect = false,
+    pickerSheetLayout,
+    pickerSheetStyle,
+    selectedIcon = 'mdi:thermometer-check',
+    title,
+  } = config
+  const [open, setOpen] = useState(false)
+  const control = useThermostatSelectControl(config)
+
+  if (hideWhenEmpty && control.disabled) return null
+
+  const selectOption = (nextValue: string) => {
+    control.selectOption(nextValue)
     if (!keepOpenOnSelect) setOpen(false)
   }
 
   return (
     <>
-      <button aria-label={`${title} ${formatSelectOption(displayValue)}`} className={styles.thermostatSubButton} data-modal-opener-exception="option-picker" disabled={disabled} onClick={() => setOpen(true)} type="button">
+      <button aria-label={`${title} ${formatSelectOption(control.displayValue)}`} className={styles.thermostatSubButton} data-modal-opener-exception="option-picker" disabled={control.disabled} onClick={() => setOpen(true)} type="button">
         <MaterialIcon name={icon} size={22} />
         <MaterialIcon name="mdi:chevron-down" size={22} />
       </button>
-      <OptionPickerDialog icon={icon} onClose={() => setOpen(false)} onSelect={selectOption} open={open} options={options} presentation="sheet" selectedIcon={selectedIcon} sheetLayout={pickerSheetLayout} sheetStyle={pickerSheetStyle} title={title} value={displayValue} />
+      <OptionPickerDialog icon={icon} onClose={() => setOpen(false)} onSelect={selectOption} open={open} options={control.options} presentation="sheet" selectedIcon={selectedIcon} sheetLayout={pickerSheetLayout} sheetStyle={pickerSheetStyle} title={title} value={control.displayValue} />
     </>
+  )
+}
+
+const THERMOSTAT_ECO_CRITICAL_CONFIG: ThermostatSelectControlConfig = {
+  entityId: 'select.thermostat_contact_sensors_eco_mode_critical_tracking',
+  icon: 'mdi:thermometer-alert',
+  pickerSheetLayout: 'card-grid',
+  pickerSheetStyle: THERMOSTAT_COMPACT_PICKER_MODAL_STYLE,
+  title: 'Eco Mode Critical Tracking',
+}
+
+const THERMOSTAT_ECO_AWAY_CONFIG: ThermostatSelectControlConfig = {
+  entityId: 'select.thermostat_contact_sensors_eco_behavior_when_away',
+  icon: 'mdi:leaf-circle',
+  pickerSheetLayout: 'card-grid',
+  pickerSheetStyle: THERMOSTAT_COMPACT_PICKER_MODAL_STYLE,
+  title: 'Eco Behavior When Away',
+}
+
+function thermostatOptionConfig(detailType: 'eco-away' | 'eco-critical') {
+  return detailType === 'eco-critical' ? THERMOSTAT_ECO_CRITICAL_CONFIG : THERMOSTAT_ECO_AWAY_CONFIG
+}
+
+function ThermostatOptionOpener({ detailType, onOpen }: { detailType: 'eco-away' | 'eco-critical'; onOpen: () => void }) {
+  const config = thermostatOptionConfig(detailType)
+  const control = useThermostatSelectControl(config)
+
+  return (
+    <div data-modal-detail-trigger={detailType}>
+      <ModalOpenerRow
+        disabled={control.disabled}
+        icon={<MaterialIcon name={config.icon} size={28} />}
+        onClick={onOpen}
+        subtitle={formatSelectOption(control.displayValue)}
+        title={config.title}
+        variant="wide"
+      />
+    </div>
+  )
+}
+
+function ThermostatOptionDetailPage({ detailType, onSelected }: { detailType: 'eco-away' | 'eco-critical'; onSelected: () => void }) {
+  const config = thermostatOptionConfig(detailType)
+  const control = useThermostatSelectControl(config)
+
+  if (control.disabled) {
+    return <InlineAlert>{config.title} is unavailable until Home Assistant supplies supported options.</InlineAlert>
+  }
+
+  return (
+    <OptionPickerPanel
+      icon={config.icon}
+      layout={config.pickerSheetLayout ?? 'card-grid'}
+      onSelect={(nextValue) => {
+        control.selectOption(nextValue)
+        onSelected()
+      }}
+      options={control.options}
+      selectedIcon={config.selectedIcon}
+      title={config.title}
+      value={control.displayValue}
+    />
   )
 }
 
 function ThermostatRoomRow({ onOpen, room }: { onOpen: (hash: string) => void; room: ThermostatRoomView }) {
   const temperature = useEntity(asEntityName(thermostatTemperatureEntityId(room)), { returnNullIfNotFound: true })
   const occupancy = useEntity(asEntityName(thermostatOccupancyEntityId(room)), { returnNullIfNotFound: true })
-  const active = occupancy?.state === 'active'
+  const active = isOccupancyActive(occupancy)
   const subtitle = `${formatTemperatureValue(temperature?.state, temperatureUnit(temperature))} · ${titleCaseState(occupancy?.state)}`
 
   return (
-    <ModalOpenerRow
-      ariaLabel={`${room.title} ${subtitle}`}
-      icon={<MaterialIcon name={active ? 'mdi:thermometer-check' : 'mdi:thermometer-off'} size={32} />}
-      onClick={() => onOpen(room.hash)}
-      subtitle={subtitle}
-      title={room.title}
-    />
+    <div data-modal-detail-trigger={room.hash}>
+      <ModalOpenerRow
+        ariaLabel={`${room.title} ${subtitle}`}
+        icon={<MaterialIcon name={active ? 'mdi:thermometer-check' : 'mdi:thermometer-off'} size={32} />}
+        onClick={() => onOpen(room.hash)}
+        subtitle={subtitle}
+        title={room.title}
+      />
+    </div>
   )
 }
 
@@ -5206,17 +5320,7 @@ function PredictiveComfortModalContent() {
   )
 }
 
-function PredictiveComfortModal({ onClose, open }: { onClose: () => void; open: boolean }) {
-  const { currentRecommendation } = usePredictiveComfortData()
-
-  return (
-    <ModalSheet onClose={onClose} open={open} subtitle={formatPredictiveState(currentRecommendation)} surface="hass-popup" title="Predictive Comfort">
-      <PredictiveComfortModalContent />
-    </ModalSheet>
-  )
-}
-
-function ThermostatCheckbox({ entityId, showState = true, title }: { entityId: string; showState?: boolean; title: string }) {
+function ThermostatCheckbox({ detailAutoFocus = false, entityId, showState = true, title }: { detailAutoFocus?: boolean; entityId: string; showState?: boolean; title: string }) {
   const entity = useEntity(asEntityName(entityId), { returnNullIfNotFound: true })
   const callService = useCallService()
   const [state, commitState] = useOptimisticState(entity?.state ?? 'unavailable')
@@ -5232,6 +5336,7 @@ function ThermostatCheckbox({ entityId, showState = true, title }: { entityId: s
       active={active}
       aria-label={showState ? `${title} ${formatCompactEntityState(entity, 'Unavailable', state)}` : title}
       className={styles.thermostatCheckbox}
+      data-modal-detail-autofocus={detailAutoFocus ? 'true' : undefined}
       onClick={toggle}
       subtitle={showState ? formatCompactEntityState(entity, 'Unavailable', state) : undefined}
       title={title}
@@ -5239,58 +5344,152 @@ function ThermostatCheckbox({ entityId, showState = true, title }: { entityId: s
   )
 }
 
-function ThermostatTrackCheckbox({ room }: { room: ThermostatRoomView }) {
-  return <ThermostatCheckbox entityId={thermostatTrackEntityId(room)} showState={false} title={room.title} />
+function ThermostatTrackCheckbox({ detailAutoFocus = false, room }: { detailAutoFocus?: boolean; room: ThermostatRoomView }) {
+  return <ThermostatCheckbox detailAutoFocus={detailAutoFocus} entityId={thermostatTrackEntityId(room)} showState={false} title={room.title} />
 }
 
-function ThermostatForceCheckbox({ room }: { room: ThermostatRoomView }) {
+function ThermostatForceCheckbox({ detailAutoFocus = false, room }: { detailAutoFocus?: boolean; room: ThermostatRoomView }) {
   const trackEntity = useEntity(asEntityName(thermostatTrackEntityId(room)), { returnNullIfNotFound: true })
   if (trackEntity?.state === 'on') return null
-  return <ThermostatCheckbox entityId={thermostatForceCriticalEntityId(room)} showState={false} title={room.title} />
+  return <ThermostatCheckbox detailAutoFocus={detailAutoFocus} entityId={thermostatForceCriticalEntityId(room)} showState={false} title={room.title} />
 }
 
-function ThermostatTrackOnlyWhenOccupiedCheckbox({ room }: { room: ThermostatRoomView }) {
-  return <ThermostatCheckbox entityId={thermostatTrackOnlyWhenOccupiedEntityId(room)} showState={false} title={room.title} />
+function ThermostatTrackOnlyWhenOccupiedCheckbox({ detailAutoFocus = false, room }: { detailAutoFocus?: boolean; room: ThermostatRoomView }) {
+  return <ThermostatCheckbox detailAutoFocus={detailAutoFocus} entityId={thermostatTrackOnlyWhenOccupiedEntityId(room)} showState={false} title={room.title} />
 }
 
-function ThermostatTrackSection() {
-  const trackSelected = useEntity(asEntityName('switch.thermostat_contact_sensors_only_track_selected_rooms'), { returnNullIfNotFound: true })
-  const criticalTracking = useEntity(asEntityName('select.thermostat_contact_sensors_eco_mode_critical_tracking'), { returnNullIfNotFound: true })
-  const showSelectedRooms = trackSelected?.state === 'on'
-  const showCriticalRooms = showSelectedRooms && criticalTracking?.state === 'Track Select Critical'
+function useThermostatTrackingSummary() {
+  const entities = useHass((state) => state.entities)
+  const trackSelectedState = entities['switch.thermostat_contact_sensors_only_track_selected_rooms']?.state
+  const criticalPolicy = entities['select.thermostat_contact_sensors_eco_mode_critical_tracking']?.state
+  const selectedCount = THERMOSTAT_ROOM_VIEWS.filter((room) => entities[thermostatTrackEntityId(room)]?.state === 'on').length
+  const occupiedOnlyCount = THERMOSTAT_ROOM_VIEWS.filter((room) => entities[thermostatTrackOnlyWhenOccupiedEntityId(room)]?.state === 'on').length
+  const criticalCount = THERMOSTAT_ROOM_VIEWS.filter((room) => (
+    entities[thermostatTrackEntityId(room)]?.state !== 'on'
+    && entities[thermostatForceCriticalEntityId(room)]?.state === 'on'
+  )).length
+  const selectedEnabled = trackSelectedState === 'on'
+  const criticalEnabled = selectedEnabled && criticalPolicy === 'Track Select Critical'
 
+  return {
+    criticalCount,
+    criticalEnabled,
+    criticalPolicy: criticalPolicy ?? 'Unavailable',
+    occupiedOnlyCount,
+    selectedCount,
+    selectedEnabled,
+  }
+}
+
+function ThermostatTrackingOpener({
+  disabled = false,
+  focusKey,
+  icon,
+  onOpen,
+  subtitle,
+  title,
+}: {
+  disabled?: boolean
+  focusKey: string
+  icon: string
+  onOpen: () => void
+  subtitle: string
+  title: string
+}) {
   return (
-    <>
-      <section className={styles.section}>
-        <SectionHeader title="Track Selected Rooms" />
-        <Description className={styles.thermostatDescription}>{THERMOSTAT_SECTION_DESCRIPTIONS.trackSelected}</Description>
-        <ThermostatSwitchCard entityId="switch.thermostat_contact_sensors_only_track_selected_rooms" icon="mdi:home-thermometer" title="Track Selected Rooms" />
-        {showSelectedRooms && (
-          <div className={styles.thermostatCheckboxGrid}>
-            {THERMOSTAT_ROOM_VIEWS.map((room) => <ThermostatTrackCheckbox key={room.key} room={room} />)}
-          </div>
-        )}
-      </section>
-      {showCriticalRooms && (
-        <section className={styles.section}>
-          <SectionHeader title="Force Track Critical Temperature" />
-          <Description className={styles.thermostatDescription}>{THERMOSTAT_SECTION_DESCRIPTIONS.forceCritical}</Description>
-          <div className={styles.thermostatCheckboxGrid}>
-            {THERMOSTAT_ROOM_VIEWS.map((room) => <ThermostatForceCheckbox key={room.key} room={room} />)}
-          </div>
-        </section>
-      )}
-    </>
+    <div data-modal-detail-trigger={focusKey}>
+      <ModalOpenerRow
+        disabled={disabled}
+        icon={<MaterialIcon name={icon} size={28} />}
+        onClick={onOpen}
+        subtitle={subtitle}
+        title={title}
+        variant="wide"
+      />
+    </div>
   )
 }
 
-function ThermostatTrackOnlyWhenOccupiedSection() {
+function ThermostatTrackingRoot({ onOpenDetail }: { onOpenDetail: (detail: ThermostatModalDetail, focusKey: string) => void }) {
+  const summary = useThermostatTrackingSummary()
+  const totalRooms = THERMOSTAT_ROOM_VIEWS.length
+
+  return (
+    <div className={styles.thermostatModalStack}>
+      <section className={styles.section}>
+        <SectionHeader title="Room Tracking" />
+        <Description className={styles.thermostatDescription}>{THERMOSTAT_SECTION_DESCRIPTIONS.trackSelected}</Description>
+        <ThermostatSwitchCard entityId="switch.thermostat_contact_sensors_only_track_selected_rooms" icon="mdi:home-thermometer" title="Track Selected Rooms" />
+      </section>
+      <section className={styles.section}>
+        <SectionHeader title="Room Rules" />
+        <div className={styles.thermostatModalList}>
+          <ThermostatTrackingOpener
+            disabled={!summary.selectedEnabled}
+            focusKey="selected-rooms"
+            icon="mdi:home-check"
+            onOpen={() => onOpenDetail({ type: 'selected-rooms' }, 'selected-rooms')}
+            subtitle={summary.selectedEnabled ? `${summary.selectedCount} of ${totalRooms} selected` : 'Enable Track Selected Rooms first'}
+            title="Selected Rooms"
+          />
+          <ThermostatTrackingOpener
+            disabled={!summary.criticalEnabled}
+            focusKey="critical-protection"
+            icon="mdi:thermometer-alert"
+            onOpen={() => onOpenDetail({ type: 'critical-protection' }, 'critical-protection')}
+            subtitle={summary.criticalEnabled ? `${summary.criticalCount} rooms forced` : summary.selectedEnabled ? summary.criticalPolicy : 'Enable Track Selected Rooms first'}
+            title="Critical Protection"
+          />
+          <ThermostatTrackingOpener
+            focusKey="occupied-only"
+            icon="mdi:motion-sensor"
+            onOpen={() => onOpenDetail({ type: 'occupied-only' }, 'occupied-only')}
+            subtitle={`${summary.occupiedOnlyCount} of ${totalRooms} occupied only`}
+            title="Occupied Only"
+          />
+        </div>
+      </section>
+    </div>
+  )
+}
+
+function ThermostatTrackingDetailPage({ detailType }: { detailType: 'critical-protection' | 'occupied-only' | 'selected-rooms' }) {
+  const summary = useThermostatTrackingSummary()
+  const entities = useHass((state) => state.entities)
+
+  if (detailType === 'selected-rooms') {
+    if (!summary.selectedEnabled) return <InlineAlert>Enable Track Selected Rooms before choosing participating rooms.</InlineAlert>
+    return (
+      <section className={styles.section}>
+        <Description className={styles.thermostatDescription}>{THERMOSTAT_SECTION_DESCRIPTIONS.trackSelected}</Description>
+        <div className={styles.thermostatCheckboxGrid}>
+          {THERMOSTAT_ROOM_VIEWS.map((room, index) => <ThermostatTrackCheckbox detailAutoFocus={index === 0} key={room.key} room={room} />)}
+        </div>
+      </section>
+    )
+  }
+
+  if (detailType === 'critical-protection') {
+    if (!summary.criticalEnabled) {
+      return <InlineAlert>Set Eco Mode Critical Tracking to Track Select Critical before choosing protected unselected rooms.</InlineAlert>
+    }
+    return (
+      <section className={styles.section}>
+        <Description className={styles.thermostatDescription}>{THERMOSTAT_SECTION_DESCRIPTIONS.forceCritical}</Description>
+        <div className={styles.thermostatCheckboxGrid}>
+          {THERMOSTAT_ROOM_VIEWS
+            .filter((room) => entities[thermostatTrackEntityId(room)]?.state !== 'on')
+            .map((room, index) => <ThermostatForceCheckbox detailAutoFocus={index === 0} key={room.key} room={room} />)}
+        </div>
+      </section>
+    )
+  }
+
   return (
     <section className={styles.section}>
-      <SectionHeader title="Track Only When Occupied" />
       <Description className={styles.thermostatDescription}>{THERMOSTAT_SECTION_DESCRIPTIONS.trackOnlyWhenOccupied}</Description>
       <div className={styles.thermostatCheckboxGrid}>
-        {THERMOSTAT_ROOM_VIEWS.map((room) => <ThermostatTrackOnlyWhenOccupiedCheckbox key={room.key} room={room} />)}
+        {THERMOSTAT_ROOM_VIEWS.map((room, index) => <ThermostatTrackOnlyWhenOccupiedCheckbox detailAutoFocus={index === 0} key={room.key} room={room} />)}
       </div>
     </section>
   )
@@ -5354,7 +5553,7 @@ function ThermostatRoomModalContent({ room }: { room: ThermostatRoomView }) {
 
   return (
     <div className={styles.thermostatModalBody}>
-      <section aria-label={`${room.title} thermostat control`} className={`${styles.thermostatModalHero} ${styles.thermostatModalDialShell}`} data-thermostat-modal-dial-shell="true" style={THERMOSTAT_MODAL_DIAL_SHELL_STYLE}>
+      <section aria-label={`${room.title} thermostat control`} className={`${styles.thermostatModalHero} ${styles.thermostatModalDialShell}`} data-modal-detail-autofocus="true" data-thermostat-modal-dial-shell="true" style={THERMOSTAT_MODAL_DIAL_SHELL_STYLE}>
         <ThermostatDial entityId={room.climateEntityId} size="modal" title={room.title} />
       </section>
       <section aria-label={ventTitle} className={`${styles.section} ${styles.thermostatModalVents}`}>
@@ -5368,35 +5567,233 @@ function ThermostatRoomModalContent({ room }: { room: ThermostatRoomView }) {
   )
 }
 
-function ThermostatRoomModal({ onClose, open, room }: { onClose: () => void; open: boolean; room: ThermostatRoomView | null }) {
-  const title = room?.title ?? 'Thermostat'
+function ThermostatRoomsRoot({ onOpenRoom }: { onOpenRoom: (room: ThermostatRoomView) => void }) {
+  return (
+    <section className={styles.section}>
+      <SectionHeader title="Rooms" />
+      <DynamicGrid ariaLabel="Thermostat rooms" className={styles.thermostatRoomGrid} columns={2} forceEquivalentColumnCount gap={8}>
+        {THERMOSTAT_ROOM_VIEWS.map((room) => <ThermostatRoomRow key={room.key} onOpen={() => onOpenRoom(room)} room={room} />)}
+      </DynamicGrid>
+    </section>
+  )
+}
+
+function ThermostatAutomationRoot({ onOpenDetail }: { onOpenDetail: (detail: ThermostatModalDetail, focusKey: string) => void }) {
+  return (
+    <div className={styles.thermostatModalStack}>
+      <section className={styles.section}>
+        <SectionHeader title="Automatic Thermostat" />
+        <Description className={styles.thermostatDescription}>{THERMOSTAT_SECTION_DESCRIPTIONS.integration}</Description>
+        <ThermostatSwitchCard entityId="input_boolean.enable_disable_thermostat_contact_sensors_integration" icon="mdi:thermostat" title="Automatic Thermostat" />
+      </section>
+      <section className={styles.section}>
+        <SectionHeader title="Eco Mode" />
+        <Description className={styles.thermostatDescription}>{THERMOSTAT_SECTION_DESCRIPTIONS.ecoMode}</Description>
+        <ThermostatSwitchCard entityId="switch.thermostat_contact_sensors_eco_mode" icon="mdi:leaf" title="Eco Mode" />
+        <div className={styles.thermostatModalList}>
+          <ThermostatOptionOpener detailType="eco-critical" onOpen={() => onOpenDetail({ type: 'eco-critical' }, 'eco-critical')} />
+          <ThermostatOptionOpener detailType="eco-away" onOpen={() => onOpenDetail({ type: 'eco-away' }, 'eco-away')} />
+        </div>
+      </section>
+      <section className={styles.section}>
+        <SectionHeader title="Predictive Comfort" />
+        <Description className={styles.thermostatDescription}>{THERMOSTAT_SECTION_DESCRIPTIONS.predictiveComfort}</Description>
+        <div data-modal-detail-trigger="predictive">
+          <PredictiveComfortCard onOpen={() => onOpenDetail({ type: 'predictive' }, 'predictive')} />
+        </div>
+      </section>
+    </div>
+  )
+}
+
+function ThermostatModalRootContent({
+  displayedTab,
+  onOpenDetail,
+  onOpenRoom,
+  transitionState = 'idle',
+}: {
+  displayedTab: ThermostatModalTab
+  onOpenDetail: (detail: ThermostatModalDetail, focusKey: string) => void
+  onOpenRoom: (room: ThermostatRoomView) => void
+  transitionState?: 'entering' | 'exiting' | 'idle' | 'pre-entering'
+}) {
+  return (
+    <div
+      aria-labelledby={modalTabId(THERMOSTAT_MODAL_TAB_ID_PREFIX, displayedTab)}
+      className={styles.thermostatModalPanel}
+      data-modal-tab-transition-state={transitionState}
+      id={THERMOSTAT_MODAL_TAB_PANEL_ID}
+      role="tabpanel"
+    >
+      {displayedTab === 'rooms' && <ThermostatRoomsRoot onOpenRoom={onOpenRoom} />}
+      {displayedTab === 'automation' && <ThermostatAutomationRoot onOpenDetail={onOpenDetail} />}
+      {displayedTab === 'tracking' && <ThermostatTrackingRoot onOpenDetail={onOpenDetail} />}
+    </div>
+  )
+}
+
+function thermostatModalEntry(hash: string): { activeTab: ThermostatModalTab; detail: ThermostatModalDetail | null } {
+  const room = THERMOSTAT_ROOM_VIEWS.find((candidate) => candidate.hash === hash)
+  if (room) return { activeTab: 'rooms', detail: { room, type: 'room' } }
+  if (hash === PREDICTIVE_COMFORT_HASH) return { activeTab: 'automation', detail: { type: 'predictive' } }
+  return { activeTab: 'rooms', detail: null }
+}
+
+function thermostatModalDetailKey(activeTab: ThermostatModalTab, detail: ThermostatModalDetail | null) {
+  if (!detail) return activeTab
+  return detail.type === 'room' ? `room-${detail.room.key}` : detail.type
+}
+
+function thermostatModalDetailTitle(detail: ThermostatModalDetail | null) {
+  if (!detail) return 'Thermostat'
+  if (detail.type === 'room') return detail.room.title
+  if (detail.type === 'predictive') return 'Predictive Comfort'
+  if (detail.type === 'eco-critical') return THERMOSTAT_ECO_CRITICAL_CONFIG.title
+  if (detail.type === 'eco-away') return THERMOSTAT_ECO_AWAY_CONFIG.title
+  if (detail.type === 'selected-rooms') return 'Selected Rooms'
+  if (detail.type === 'critical-protection') return 'Critical Protection'
+  return 'Occupied Only'
+}
+
+function thermostatModalBackLabel(detail: ThermostatModalDetail) {
+  if (detail.type === 'room') return 'Back to rooms'
+  if (detail.type === 'predictive' || detail.type === 'eco-critical' || detail.type === 'eco-away') return 'Back to automation'
+  return 'Back to tracking'
+}
+
+function ThermostatModal({
+  hash,
+  onClose,
+  open,
+}: {
+  hash: string
+  onClose: () => void
+  open: boolean
+}) {
+  const initialEntry = thermostatModalEntry(hash)
+  const [activeTab, setActiveTab] = useState<ThermostatModalTab>(initialEntry.activeTab)
+  const [detail, setDetail] = useState<ThermostatModalDetail | null>(initialEntry.detail)
+  const previousOpenRef = useRef(open)
+  const previousHashRef = useRef(hash)
+  const internalHashRef = useRef<string | null>(null)
+  const detailKey = thermostatModalDetailKey(activeTab, detail)
+  const { bodyElementRef, enterDetailPage, leaveDetailPage, resetDetailPageScroll } = useModalDetailPageScroll(detailKey)
+  const { displayedTab, transitionState } = useSmoothDisplayedModalTab(activeTab)
+  const { currentRecommendation } = usePredictiveComfortData()
+  const rangeEntity = useEntity(asEntityName('input_text.all_climate_range'), { returnNullIfNotFound: true })
+  const rangeSummary = formatCompactEntityState(rangeEntity, 'Range unavailable')
+
+  useLayoutEffect(() => {
+    const wasOpen = previousOpenRef.current
+    const previousHash = previousHashRef.current
+    previousOpenRef.current = open
+    previousHashRef.current = hash
+    if (!open) return
+    if (internalHashRef.current === hash) {
+      internalHashRef.current = null
+      return
+    }
+    if (wasOpen && previousHash === hash) return
+    const entry = thermostatModalEntry(hash)
+    resetDetailPageScroll()
+    setActiveTab(entry.activeTab)
+    setDetail(entry.detail)
+  }, [hash, open, resetDetailPageScroll])
+
+  const openDetail = (nextDetail: ThermostatModalDetail, focusKey: string) => {
+    enterDetailPage(focusKey)
+    setDetail(nextDetail)
+  }
+
+  const openRoom = (room: ThermostatRoomView) => openDetail({ room, type: 'room' }, room.hash)
+
+  const closeDetail = () => {
+    leaveDetailPage()
+    setDetail(null)
+    if (hash !== THERMOSTAT_MODAL_HASH) {
+      internalHashRef.current = THERMOSTAT_MODAL_HASH
+      replaceDashboardUrl(THERMOSTAT_MODAL_HASH)
+    }
+  }
+
+  const subtitle = detail?.type === 'predictive'
+    ? formatPredictiveState(currentRecommendation)
+    : detail
+      ? undefined
+      : `${THERMOSTAT_ROOM_VIEWS.length} rooms · ${rangeSummary}`
+  const footer = detail
+    ? undefined
+    : (
+        <ModalIconTabNav
+          activeTab={activeTab}
+          idPrefix={THERMOSTAT_MODAL_TAB_ID_PREFIX}
+          label="Thermostat sections"
+          onTabChange={setActiveTab}
+          panelId={THERMOSTAT_MODAL_TAB_PANEL_ID}
+          tabs={THERMOSTAT_MODAL_TABS}
+        />
+      )
 
   return (
-    <ModalSheet contentStyle={THERMOSTAT_ROOM_MODAL_STYLE} onClose={onClose} open={open} surface="hass-popup" title={title}>
-      {room && <ThermostatRoomModalContent room={room} />}
+    <ModalSheet
+      backLabel={detail ? thermostatModalBackLabel(detail) : undefined}
+      bodyElementRef={bodyElementRef}
+      contentStyle={THERMOSTAT_MODAL_STYLE}
+      footer={footer}
+      onBack={detail ? closeDetail : undefined}
+      onClose={onClose}
+      open={open}
+      scrollResetKey={detailKey}
+      subtitle={subtitle}
+      surface="hass-popup"
+      title={thermostatModalDetailTitle(detail)}
+    >
+      {detail?.type === 'room' && <ThermostatRoomModalContent room={detail.room} />}
+      {detail?.type === 'predictive' && <div data-modal-detail-autofocus="true"><PredictiveComfortModalContent /></div>}
+      {(detail?.type === 'eco-away' || detail?.type === 'eco-critical') && <ThermostatOptionDetailPage detailType={detail.type} onSelected={closeDetail} />}
+      {(detail?.type === 'selected-rooms' || detail?.type === 'critical-protection' || detail?.type === 'occupied-only') && <ThermostatTrackingDetailPage detailType={detail.type} />}
+      {!detail && (
+        <ThermostatModalRootContent
+          displayedTab={displayedTab}
+          onOpenDetail={openDetail}
+          onOpenRoom={openRoom}
+          transitionState={transitionState}
+        />
+      )}
     </ModalSheet>
+  )
+}
+
+function AutomaticThermostatWarning() {
+  const entity = useEntity(asEntityName('input_boolean.enable_disable_thermostat_contact_sensors_integration'), { returnNullIfNotFound: true })
+  if (entity?.state !== 'off') return null
+  return <Notice>Automatic Thermostat is off. Open Rooms &amp; Settings to resume Home Assistant-owned climate control.</Notice>
+}
+
+function ThermostatModalOpener({ onOpen }: { onOpen: () => void }) {
+  const rangeEntity = useEntity(asEntityName('input_text.all_climate_range'), { returnNullIfNotFound: true })
+  const rangeSummary = formatCompactEntityState(rangeEntity, 'Range unavailable')
+
+  return (
+    <section className={styles.section}>
+      <SectionHeader title="Rooms & Settings" />
+      <ModalOpenerRow
+        icon={<MaterialIcon name="mdi:home-thermometer" size={32} />}
+        onClick={onOpen}
+        subtitle={`${THERMOSTAT_ROOM_VIEWS.length} rooms · ${rangeSummary}`}
+        title="Thermostat Controls"
+        variant="wide"
+      />
+    </section>
   )
 }
 
 function ThermostatPage({ preload = false, preloadHash, preloadHashes = [] }: { preload?: boolean; preloadHash?: string; preloadHashes?: string[] }) {
   const { closeHash, hash, openHash } = useHashModal({ disabled: preload })
   const selectedRoom = THERMOSTAT_ROOM_VIEWS.find((room) => room.hash === hash) ?? null
-  const preloadRoom = preloadHash ? THERMOSTAT_ROOM_VIEWS.find((room) => room.hash === preloadHash) ?? null : null
-  const preloadRooms = useMemo(() => preloadHashes.map((preloadTargetHash) => THERMOSTAT_ROOM_VIEWS.find((room) => room.hash === preloadTargetHash)).filter((room): room is ThermostatRoomView => Boolean(room)), [preloadHashes])
-  const [renderedRoom, setRenderedRoom] = useState<ThermostatRoomView | null>(selectedRoom)
-  const roomModalOpen = Boolean(selectedRoom)
-  const modalRoom = selectedRoom ?? preloadRoom ?? renderedRoom
-
-  const openThermostatRoom = (nextHash: string) => {
-    const nextRoom = THERMOSTAT_ROOM_VIEWS.find((room) => room.hash === nextHash) ?? null
-    if (nextRoom) setRenderedRoom(nextRoom)
-    openHash(nextHash)
-  }
-
-  const closeThermostatRoom = () => {
-    if (selectedRoom) setRenderedRoom(selectedRoom)
-    closeHash()
-  }
+  const modalOpen = hash === THERMOSTAT_MODAL_HASH || hash === PREDICTIVE_COMFORT_HASH || Boolean(selectedRoom)
+  const preloadTargets = useMemo(() => [...new Set([preloadHash, ...preloadHashes].filter((target): target is string => Boolean(target)))], [preloadHash, preloadHashes])
+  const preloadRooms = useMemo(() => preloadTargets.map((preloadTargetHash) => THERMOSTAT_ROOM_VIEWS.find((room) => room.hash === preloadTargetHash)).filter((room): room is ThermostatRoomView => Boolean(room)), [preloadTargets])
 
   return (
     <div className={`${styles.stack} ${styles.thermostatPage}`}>
@@ -5406,36 +5803,16 @@ function ThermostatPage({ preload = false, preloadHash, preloadHashes = [] }: { 
         <ThermostatHubPill />
         <ThermostatAwayModeDetails climateEntityId={GLOBAL_THERMOSTAT_ENTITY_ID} label="Whole Home" useEffectiveMode />
       </section>
+      <AutomaticThermostatWarning />
       <OpenContactSensorsSection />
-      <section className={styles.section}>
-        <SectionHeader title="Rooms" />
-        <DynamicGrid ariaLabel="Thermostat rooms" className={styles.thermostatRoomGrid} columns={2} forceEquivalentColumnCount gap={8}>
-          {THERMOSTAT_ROOM_VIEWS.map((room) => <ThermostatRoomRow key={room.key} onOpen={openThermostatRoom} room={room} />)}
-        </DynamicGrid>
-      </section>
-      <section className={styles.section}>
-        <SectionHeader title="Eco Mode" />
-        <Description className={styles.thermostatDescription}>{THERMOSTAT_SECTION_DESCRIPTIONS.ecoMode}</Description>
-        <ThermostatSwitchCard entityId="switch.thermostat_contact_sensors_eco_mode" icon="mdi:leaf" title="Eco Mode">
-          <ThermostatSelectButton entityId="select.thermostat_contact_sensors_eco_mode_critical_tracking" icon="mdi:thermometer-alert" pickerSheetLayout="card-grid" pickerSheetStyle={THERMOSTAT_COMPACT_PICKER_MODAL_STYLE} title="Eco Mode Critical Tracking" />
-          <ThermostatSelectButton entityId="select.thermostat_contact_sensors_eco_behavior_when_away" icon="mdi:leaf-circle" pickerSheetLayout="card-grid" pickerSheetStyle={THERMOSTAT_COMPACT_PICKER_MODAL_STYLE} title="Eco Behavior When Away" />
-        </ThermostatSwitchCard>
-      </section>
-      <section className={styles.section}>
-        <SectionHeader title="Predictive Comfort" />
-        <Description className={styles.thermostatDescription}>{THERMOSTAT_SECTION_DESCRIPTIONS.predictiveComfort}</Description>
-        <PredictiveComfortCard onOpen={() => openHash(PREDICTIVE_COMFORT_HASH)} />
-      </section>
-      <ThermostatTrackSection />
-      <ThermostatTrackOnlyWhenOccupiedSection />
-      <section className={styles.section}>
-        <SectionHeader title="Automatic Thermostat" />
-        <Description className={styles.thermostatDescription}>{THERMOSTAT_SECTION_DESCRIPTIONS.integration}</Description>
-        <ThermostatSwitchCard entityId="input_boolean.enable_disable_thermostat_contact_sensors_integration" icon="mdi:thermostat" title="Automatic Thermostat" />
-      </section>
-      <PredictiveComfortModal onClose={closeHash} open={hash === PREDICTIVE_COMFORT_HASH} />
-      <ThermostatRoomModal onClose={closeThermostatRoom} open={roomModalOpen} room={modalRoom} />
-      {preloadHashes.includes(PREDICTIVE_COMFORT_HASH) && (
+      <ThermostatModalOpener onOpen={() => openHash(THERMOSTAT_MODAL_HASH)} />
+      {!preload && <ThermostatModal hash={hash} onClose={closeHash} open={modalOpen} />}
+      {preloadTargets.includes(THERMOSTAT_MODAL_HASH) && (
+        <div data-preload-modal={`ecobee${THERMOSTAT_MODAL_HASH}`}>
+          <ThermostatModalRootContent displayedTab="rooms" onOpenDetail={() => undefined} onOpenRoom={() => undefined} />
+        </div>
+      )}
+      {preloadTargets.includes(PREDICTIVE_COMFORT_HASH) && (
         <div data-preload-modal={`ecobee${PREDICTIVE_COMFORT_HASH}`}>
           <PredictiveComfortModalContent />
         </div>
@@ -5452,7 +5829,7 @@ function ThermostatPage({ preload = false, preloadHash, preloadHashes = [] }: { 
 function ControlPage({ onNavigate, path }: { onNavigate: (path: string) => void; path: string }) {
   const config = CONTROL_PAGES[path]
   if (!config) return null
-  return <EntitySections onNavigate={onNavigate} sections={config.sections} />
+  return <div data-manual-route-context={path}><EntitySections onNavigate={onNavigate} sections={config.sections} /></div>
 }
 
 function EverShelfInventoryPage({ controls, path }: { controls: EverShelfInventoryControls; path: string }) {
@@ -5465,12 +5842,13 @@ function FallbackPage({ title }: { title: string }) {
   return <Notice>{title} is not available in the React dashboard yet.</Notice>
 }
 
-function Content({ inventoryControls, onNavigate, onScrollLockChange, path, preload = false, preloadHash, preloadHashes, recipeControls }: { inventoryControls: EverShelfInventoryControls; onNavigate: (path: string) => void; onScrollLockChange?: (locked: boolean) => void; path: string; preload?: boolean; preloadHash?: string; preloadHashes?: string[]; recipeControls: RecipeControls }) {
+function Content({ inventoryControls, onNavigate, onRecipesInitialResolved, onScrollLockChange, path, preload = false, preloadHash, preloadHashes, recipeControls, recipesInitiallyAppGated = false }: { inventoryControls: EverShelfInventoryControls; onNavigate: (path: string) => void; onRecipesInitialResolved?: () => void; onScrollLockChange?: (locked: boolean) => void; path: string; preload?: boolean; preloadHash?: string; preloadHashes?: string[]; recipeControls: RecipeControls; recipesInitiallyAppGated?: boolean }) {
   const roomTitle = dashboardRoomNameFromPath(path)
   if (roomTitle) return <RoomPage onNavigate={onNavigate} path={path} preload={preload} preloadHash={preloadHash} preloadHashes={preloadHashes} title={roomTitle} />
   const todoConfigPath = todoPageConfigPath(path)
   if (TODO_PAGES[todoConfigPath]) return <TodoPage configPath={todoConfigPath} onNavigate={onNavigate} onScrollLockChange={onScrollLockChange} path={path} />
   if (path === 'settings') return <SettingsPage onNavigate={onNavigate} />
+  if (path === 'manual') return <AppManualPage preload={preload} />
   if (path === 'guests-staying-over') return <GuestControlsPage onNavigate={onNavigate} />
   if (path === 'vacation') return <VacationPage />
   if (path === 'vacuums') return <VacuumPage preload={preload} />
@@ -5479,13 +5857,13 @@ function Content({ inventoryControls, onNavigate, onScrollLockChange, path, prel
   if (path === 'ecobee') return <ThermostatPage preload={preload} preloadHash={preloadHash} preloadHashes={preloadHashes} />
   if (path === 'custom-lights') return <CustomLightsPage />
   if (path === HOME_FOOD_ROUTE_PATH) return <FoodHubPage onNavigate={onNavigate} preload={preload} />
-  if (path === HOME_RECIPES_ROUTE_PATH) return <RecipesPage controls={recipeControls} preload={preload} />
+  if (path === HOME_RECIPES_ROUTE_PATH) return <RecipesPage controls={recipeControls} initiallyAppGated={recipesInitiallyAppGated} onInitialResolved={onRecipesInitialResolved} preload={preload} />
   if (EVERSHELF_INVENTORY_PAGES[path]) return <EverShelfInventoryPage controls={inventoryControls} path={path} />
   if (CONTROL_PAGES[path]) return <ControlPage onNavigate={onNavigate} path={path} />
   return <FallbackPage title={routeTitle(path)} />
 }
 
-export function DashboardViewPage({ activePath, initialContentTransitionState = 'idle', inventoryControls: providedInventoryControls, loadingPhase, onBack, onNavigate, path, preload = false, preloadHash, preloadHashes, recipeControls: providedRecipeControls, withShell = true }: DashboardViewPageProps) {
+export function DashboardViewPage({ activePath, appChromeHidden = false, initialContentTransitionState = 'idle', inventoryControls: providedInventoryControls, loadingPhase, onBack, onNavigate, onRecipesInitialResolved, path, preload = false, preloadHash, preloadHashes, recipeControls: providedRecipeControls, recipesInitiallyAppGated = false, withShell = true }: DashboardViewPageProps) {
   const roomTitle = dashboardRoomNameFromPath(path)
   const todoConfig = TODO_PAGES[todoPageConfigPath(path)]
   const title = path === 'guests-staying-over' ? 'Guest Controls' : roomTitle ?? todoConfig?.title ?? CONTROL_PAGES[path]?.title ?? routeTitle(path)
@@ -5496,6 +5874,7 @@ export function DashboardViewPage({ activePath, initialContentTransitionState = 
   const inventoryControls = providedInventoryControls ?? fallbackInventoryControls
   const fallbackRecipeControls = useRecipeControls(path, !preload && path === HOME_RECIPES_ROUTE_PATH)
   const recipeControls = providedRecipeControls ?? fallbackRecipeControls
+  const pageChromeHidden = appChromeHidden || Boolean(loadingPhase)
   const handlePageScrollLockChange = useCallback((locked: boolean) => {
     setPageScrollLock((current) => (current.path === path && current.locked === locked ? current : { locked, path }))
   }, [path])
@@ -5503,15 +5882,15 @@ export function DashboardViewPage({ activePath, initialContentTransitionState = 
   const page = path === 'security' ? (
     <SecurityPage activePath={activePath} backPath={backPath} contentTransitionState={loadingPhase ? 'idle' : initialContentTransitionState} loadingPhase={loadingPhase} onBack={onBack} onNavigate={onNavigate} preload={preload} preloadHash={preloadHash} preloadHashes={preloadHashes} title={title} />
   ) : (
-    <Page activePath={activePath} backPath={backPath} chromeHidden={Boolean(loadingPhase)} contentTransitionState={loadingPhase ? 'idle' : initialContentTransitionState} headerQuickLinks={roomTitle ? <RoomSectionRail path={path} title={roomTitle} /> : undefined} onBack={onBack} onNavigate={onNavigate} scrollLocked={pageScrollLocked} title={title}>
-      {loadingPhase ? <DashboardPageLoading phase={loadingPhase} /> : <Content inventoryControls={inventoryControls} onNavigate={onNavigate} onScrollLockChange={handlePageScrollLockChange} path={path} preload={preload} preloadHash={preloadHash} preloadHashes={preloadHashes} recipeControls={recipeControls} />}
+    <Page activePath={activePath} backPath={backPath} chromeHidden={pageChromeHidden} contentHidden={appChromeHidden} contentTransitionState={loadingPhase ? 'idle' : initialContentTransitionState} headerQuickLinks={roomTitle ? <RoomSectionRail path={path} title={roomTitle} /> : undefined} onBack={onBack} onNavigate={onNavigate} scrollLocked={pageScrollLocked} title={title}>
+      {loadingPhase ? <DashboardPageLoading phase={loadingPhase} /> : <Content inventoryControls={inventoryControls} onNavigate={onNavigate} onRecipesInitialResolved={onRecipesInitialResolved} onScrollLockChange={handlePageScrollLockChange} path={path} preload={preload} preloadHash={preloadHash} preloadHashes={preloadHashes} recipeControls={recipeControls} recipesInitiallyAppGated={recipesInitiallyAppGated} />}
     </Page>
   )
 
   if (!withShell || preload) return page
 
   return (
-    <AppShell bottomNav={<BottomNav activePath={activePath} onNavigate={onNavigate} />} chromeHidden={Boolean(loadingPhase)} floatingAction={!preload && hasDashboardFloatingAction(path) ? <DashboardFloatingAction inventoryControls={inventoryControls} onNavigate={onNavigate} path={path} recipeControls={recipeControls} /> : undefined}>
+    <AppShell bottomNav={<BottomNav activePath={activePath} onNavigate={onNavigate} />} chromeHidden={pageChromeHidden} floatingAction={!preload && hasDashboardFloatingAction(path) ? <DashboardFloatingAction inventoryControls={inventoryControls} onNavigate={onNavigate} path={path} recipeControls={recipeControls} /> : undefined}>
       {page}
     </AppShell>
   )

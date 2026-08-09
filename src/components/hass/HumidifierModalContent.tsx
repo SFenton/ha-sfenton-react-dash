@@ -1,6 +1,7 @@
 import { useEntity, useHass, useUser } from '@hakit/core'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { HUMIDIFIER_MIST_PRESETS, HUMIDIFIER_MODES, HUMIDIFIER_WARM_LEVELS, type HumidifierConfig, type HumidifierMode } from '../../constants/humidifiers'
+import { HUMIDIFIER_MODAL_TABS, type HumidifierModalTab } from '../../constants/surfaceSemantics'
 import { useImmediateVisualTab, useSmoothDisplayedModalTab } from '../../hooks/useSmoothDisplayedModalTab'
 import { useOptimisticState } from '../../hooks/useOptimisticState'
 import { useScheduleDetailPage } from '../../hooks/useScheduleDetailPage'
@@ -37,7 +38,6 @@ import {
 import styles from './HumidifierModalContent.module.css'
 
 type CallService = (params: Record<string, unknown>) => void
-type HumidifierModalTab = 'controls' | 'schedules' | 'info'
 type Entity = ReturnType<typeof useEntity>
 
 interface HassConnection {
@@ -77,11 +77,6 @@ interface HumidifierActions {
   togglePower: () => void
 }
 
-const HUMIDIFIER_MODAL_TABS: { icon: string; label: string; tab: HumidifierModalTab }[] = [
-  { icon: 'mdi:air-humidifier', label: 'Controls', tab: 'controls' },
-  { icon: 'mdi:calendar', label: 'Schedules', tab: 'schedules' },
-  { icon: 'mdi:information-outline', label: 'Info', tab: 'info' },
-]
 const DEFAULT_TARGET_HUMIDITY = 50
 const HUMIDIFIER_OPTIMISTIC_REVERT_MS = 8000
 const DIAL_MIN = 0
@@ -582,7 +577,7 @@ function SchedulesPanel({ controller, onAdd, onEdit }: { controller: HumidifierS
       addAction={canEdit ? { disabled: loading || saving || !ready, focusKey: 'add-scheduled-activity', label: 'Add Scheduled Activity', onClick: onAdd } : undefined}
       control={{
         active: enabled,
-        description: 'Schedules run on Home Assistant. Manual changes remain in effect until the next activity starts.',
+        description: 'Schedules run on Home Assistant. Manual changes last until the next activity or restart/reconnect recovery.',
         disabled: !masterAvailable || rules.length === 0 || vacationActive,
         icon: 'mdi:calendar',
         label: !masterAvailable ? 'Scheduling Unavailable' : vacationActive ? 'Paused for Vacation' : enabled ? 'Scheduling On' : 'Scheduling Paused',

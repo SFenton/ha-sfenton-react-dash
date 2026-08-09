@@ -1,13 +1,24 @@
 .modalBody {
   display: grid;
+  min-height: 0;
   gap: 16px;
   padding-top: 2px;
 }
 
 .roomSourceModalShell {
   display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  height: 100%;
+  max-height: 100%;
   min-height: 0;
   gap: 12px;
+  overflow: hidden;
+}
+
+.roomSourceModalShell > .modalBody {
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .leftPane,
@@ -41,6 +52,121 @@
 .mapStage {
   position: relative;
   min-width: 0;
+}
+
+.areaEditorModalBody {
+  height: var(--modal-body-content-height, 100%);
+  min-height: 0;
+  padding-top: 0;
+}
+
+.areaEditorPane {
+  grid-template-rows: auto minmax(320px, 1fr) auto;
+  height: 100%;
+  min-height: 0;
+  align-content: stretch;
+}
+
+.areaEditorToolbar {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.areaEditorTool {
+  display: inline-flex;
+  min-width: 0;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 14px;
+  padding: 0 10px;
+  color: rgba(255, 255, 255, 0.84);
+  background: rgba(255, 255, 255, 0.07);
+  font: inherit;
+  font-size: 0.76rem;
+  font-weight: 820;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.areaEditorTool[data-active='true'] {
+  border-color: rgba(143, 214, 255, 0.5);
+  color: #f5fbff;
+  background: rgba(48, 137, 194, 0.34);
+}
+
+.areaEditorTool:disabled {
+  cursor: default;
+  opacity: 0.46;
+}
+
+.areaEditorTool:focus {
+  outline: none;
+}
+
+.areaEditorTool:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.58);
+  outline-offset: 2px;
+}
+
+.areaEditorMapStage {
+  height: 100%;
+  min-height: 320px;
+}
+
+.areaEditorHint {
+  position: absolute;
+  z-index: 6;
+  top: 12px;
+  left: 50%;
+  width: max-content;
+  max-width: calc(100% - 24px);
+  transform: translateX(-50%);
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  border-radius: 999px;
+  padding: 7px 11px;
+  color: rgba(255, 255, 255, 0.82);
+  background: rgba(13, 20, 28, 0.78);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.24);
+  font-size: 0.7rem;
+  font-weight: 760;
+  line-height: 1.25;
+  text-align: center;
+  pointer-events: none;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.areaEditorHint[data-draw-mode='true'] {
+  border-color: rgba(143, 214, 255, 0.38);
+  color: #e6f7ff;
+}
+
+.areaEditorSummary {
+  display: grid;
+  gap: 8px;
+}
+
+.areaEditorSummary > span {
+  display: grid;
+  gap: 2px;
+}
+
+.areaEditorSummary strong {
+  color: white;
+  font-size: 0.96rem;
+  font-weight: 860;
+  font-variant-numeric: tabular-nums;
+}
+
+.areaEditorSummary small {
+  color: var(--color-text-muted);
+  font-size: 0.76rem;
+  font-weight: 720;
+  font-variant-numeric: tabular-nums;
 }
 
 .locateButton {
@@ -80,7 +206,9 @@
 }
 
 @media (hover: none), (pointer: coarse) {
-  .locateButton:focus-visible {
+  .locateButton:focus-visible,
+  .areaEditorTool:focus-visible,
+  .cleanTargetButton:focus-visible {
     outline: none;
   }
 }
@@ -89,6 +217,11 @@
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
+}
+
+.dockStatusChip {
+  min-width: 0;
+  grid-column: 1 / -1;
 }
 
 .statusPanel .settingPill {
@@ -165,6 +298,61 @@
   gap: 10px;
 }
 
+.cleanTargetSelector {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.cleanTargetButton {
+  display: inline-flex;
+  min-width: 0;
+  min-height: 48px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  border-radius: 16px;
+  padding: 0 12px;
+  color: rgba(255, 255, 255, 0.68);
+  background: rgba(255, 255, 255, 0.06);
+  font: inherit;
+  font-size: 0.84rem;
+  font-weight: 820;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.cleanTargetButton[data-active='true'] {
+  border-color: rgba(143, 214, 255, 0.42);
+  color: white;
+  background: rgba(48, 137, 194, 0.3);
+}
+
+.cleanTargetButton:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.cleanTargetButton:focus {
+  outline: none;
+}
+
+.cleanTargetButton:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.58);
+  outline-offset: 2px;
+}
+
+.areaActionGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 8px;
+}
+
+.areaBackendNote {
+  overflow-wrap: anywhere;
+}
+
 .sectionHeader {
   display: flex;
   align-items: center;
@@ -221,6 +409,11 @@
   background: rgba(251, 140, 0, 0.15);
 }
 
+.awayGroup[data-tone='neutral'] {
+  border-color: rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.06);
+}
+
 .awayGroup h4 {
   margin: 0;
   color: rgba(232, 240, 255, 0.68);
@@ -231,7 +424,8 @@
   text-transform: uppercase;
 }
 
-.awayGroup ul {
+.awayGroup ul,
+.awayGroup ol {
   display: grid;
   gap: 5px;
   margin: 0;
@@ -244,6 +438,10 @@
 
 .awayGroup li::marker {
   color: rgba(232, 240, 255, 0.5);
+}
+
+.selectedRoomsEmpty {
+  color: rgba(255, 255, 255, 0.82);
 }
 
 .settingGrid {
@@ -312,6 +510,12 @@
   display: grid;
   grid-template-columns: 1fr;
   gap: 14px;
+}
+
+.dockActionGrid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
 }
 
 .zoneButton {
@@ -498,12 +702,30 @@
   text-align: left;
 }
 
-.zoneButton > span {
+.zoneLabel {
+  flex: 1 1 auto;
   min-width: 0;
 }
 
 .zoneButton > svg {
   flex: 0 0 auto;
+}
+
+.zoneOrder {
+  display: grid;
+  width: 26px;
+  height: 26px;
+  flex: 0 0 26px;
+  place-items: center;
+  margin-left: auto;
+  border: 1px solid rgba(255, 255, 255, 0.42);
+  border-radius: 50%;
+  color: #15331d;
+  background: rgba(235, 255, 238, 0.92);
+  font-size: 0.72rem;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
 }
 
 .zoneButton[data-active='true'] {
@@ -593,12 +815,23 @@
     overflow: hidden;
   }
 
+  .areaEditorModalBody {
+    display: block;
+    height: var(--modal-body-content-height, 100%);
+    overflow: visible;
+  }
+
+  .areaEditorPane {
+    height: 100%;
+  }
+
   .leftPane,
   .rightPane {
     gap: 14px;
   }
 
   .rightPane {
+    box-sizing: border-box;
     min-height: 0;
     max-height: min(560px, calc(100vh - 220px));
     max-height: min(560px, calc(100dvh - 220px));
@@ -608,6 +841,7 @@
     grid-auto-rows: max-content;
     overflow-x: hidden;
     overflow-y: auto;
+    padding-bottom: 12px;
     overscroll-behavior: contain;
     scrollbar-width: none;
   }
@@ -620,6 +854,9 @@
 }
 
 .vacuumModalNav {
+  position: sticky;
+  bottom: 0;
+  z-index: 8;
   display: grid;
   grid-template-columns: repeat(var(--vacuum-nav-tab-count, 3), minmax(0, 1fr));
   align-items: center;

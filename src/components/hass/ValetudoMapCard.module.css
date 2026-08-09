@@ -9,44 +9,100 @@
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1);
 }
 
-.host {
-  display: grid;
-  place-items: center;
-  overflow: hidden;
-}
-
-.host,
-.canvas {
-  width: 100%;
+.frame[data-expanded='true'] {
   height: 100%;
-  min-height: 0;
+  min-height: 320px;
+  max-height: none;
+  border-radius: 20px;
 }
 
-.host {
-  transform: rotate(var(--map-rotation, 0deg));
-  transform-origin: center;
-}
-
-.canvas {
-  display: block;
-  width: auto;
-  height: auto;
-  max-width: 100%;
-  max-height: 100%;
-  object-fit: contain;
-}
-
-.cameraFallback {
+.canvas,
+.overlay {
   position: absolute;
   inset: 0;
+  display: block;
   width: 100%;
   height: 100%;
-  object-fit: contain;
-  background: rgba(6, 12, 18, 0.72);
+}
+
+.overlay {
+  z-index: 2;
+  overflow: visible;
+  touch-action: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+}
+
+.overlay[data-interactive='false'] {
+  pointer-events: none;
+}
+
+.frame[data-draw-mode='true'] .overlay {
+  cursor: crosshair;
+}
+
+.selection {
+  cursor: grab;
+  fill: rgba(80, 180, 255, 0.24);
+  stroke: rgba(143, 214, 255, 0.98);
+  stroke-width: 2.5;
+}
+
+.selection:focus {
+  outline: none;
+}
+
+.selection:focus-visible {
+  stroke: white;
+  stroke-width: 3;
+}
+
+.staticSelection {
+  cursor: default;
+  fill: rgba(80, 180, 255, 0.2);
+  stroke-dasharray: 7 5;
+}
+
+.resizeHandleVisual {
+  pointer-events: none;
+  fill: #e9f7ff;
+  stroke: rgba(17, 72, 107, 0.96);
+  stroke-width: 2;
+}
+
+.resizeHandleHit {
+  fill: transparent;
+  stroke: transparent;
+}
+
+.resizeHandleHit[data-resize-diagonal='nwse'] {
+  cursor: nwse-resize;
+}
+
+.resizeHandleHit[data-resize-diagonal='nesw'] {
+  cursor: nesw-resize;
+}
+
+.resizeHandleHit:focus {
+  outline: none;
+}
+
+.resizeHandleHit:focus-visible {
+  stroke: rgba(255, 255, 255, 0.8);
+  stroke-width: 2;
+}
+
+@media (hover: none), (pointer: coarse) {
+  .selection:focus-visible,
+  .resizeHandleHit:focus-visible {
+    stroke: rgba(143, 214, 255, 0.98);
+  }
 }
 
 .fallback {
   position: absolute;
+  z-index: 3;
   inset: 0;
   display: grid;
   place-content: center;
@@ -75,6 +131,7 @@
 
 .message {
   position: absolute;
+  z-index: 4;
   right: 12px;
   bottom: 12px;
   left: 12px;

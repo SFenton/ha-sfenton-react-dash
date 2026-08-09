@@ -36,9 +36,10 @@ If any profile value differs, stop before making changes.
 5. Keep Home Assistant as the source of truth for state and multi-entity side effects. React only signals HA and uses existing optimistic-state patterns.
 6. For React UX changes, complete the repository's code/config comparison and Playwright live HASS-versus-React comparison, mobile first. If the visual comparison cannot run, report the blocker and do not claim visual acceptance.
 7. Add focused tests for changed behavior and run the smallest existing validation commands that prove the phase gate.
-8. Do not commit, push, deploy, complete the HA todo item, send phase email, or send phone notifications. The parent runner owns completion and email; phone notifications are disabled.
-9. Transition the canonical task from `in_progress` to `accepted`, `rejected`, or `hard_blocked` with `npm run autonomous:admin:transition`. Never edit queue status text by hand.
-10. Return a human-readable Markdown phase report with: Outcome, Work Completed, Home Assistant Changes, React Dashboard Changes, Validation Evidence, Files and Artifacts, Remaining Risks, and Up Next.
+8. Reconcile App Manual impact for every user-visible or Home Assistant behavior change. Refresh app/HA inventories, update articles/status/screenshots, and run all manual gates.
+9. Do not commit, push, deploy, complete the HA todo item, send phase email, or send phone notifications. The parent runner owns completion and email; phone notifications are disabled.
+10. Transition the canonical task from `in_progress` to `accepted`, `rejected`, or `hard_blocked` with `npm run autonomous:admin:transition`. Never edit queue status text by hand.
+11. Return a human-readable Markdown phase report with: Outcome, Work Completed, Home Assistant Changes, React Dashboard Changes, App Manual Impact, Validation Evidence, Files and Artifacts, Remaining Risks, and Up Next.
 
 ## Decision rules
 
@@ -46,6 +47,7 @@ If any profile value differs, stop before making changes.
 - `rejected`: a tested hypothesis or proposed change was intentionally not kept, with evidence explaining why.
 - `hard_blocked`: the remaining step requires unavailable credentials, privileged access, unsafe live action, external approval, hardware access, or another true operator boundary.
 - A failed test, incomplete visual comparison, missing evidence, or repairable configuration gap is not acceptance.
+- Stale App Manual content, inventory, status, or screenshots are not acceptance.
 - Taskization is not completion. Insert and execute necessary subtasks inside the active phase before deciding its outcome.
 - Do not silently continue through missing HA entities, failed service calls, stale source config, or incomplete browser evidence.
 

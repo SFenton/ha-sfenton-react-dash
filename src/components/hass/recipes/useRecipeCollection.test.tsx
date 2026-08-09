@@ -65,17 +65,65 @@ describe('useRecipeCollection', () => {
     try {
       const { result, rerender } = renderHook(({ value }) => useRecipeCollection(value), { initialProps: { value: criteria('old') } })
       await waitFor(() => expect(result.current.criteriaPhase).toBe('loading'))
+      expect(result.current.initialResolved).toBe(false)
       rerender({ value: criteria('new') })
 
       await waitFor(() => expect(pending.has('new')).toBe(true))
+      expect(result.current.initialResolved).toBe(false)
       await act(async () => pending.get('new')?.(browse([rawCard(2)])))
       await waitFor(() => expect(result.current.criteriaPhase).toBe('idle'))
+      expect(result.current.initialResolved).toBe(true)
       expect(result.current.items.map((item) => item.title)).toEqual(['Recipe 2'])
 
       if (pending.has('old')) {
         await act(async () => pending.get('old')?.(browse([rawCard(1)])))
       }
       expect(result.current.items.map((item) => item.title)).toEqual(['Recipe 2'])
+    } finally {
+      mockState.helpers.callService = originalCallService
+    }
+  })
+
+  it('keeps initial resolution pending until the first active request settles', async () => {
+    const originalCallService = mockState.helpers.callService
+    mockState.helpers.callService = (params) => (
+      params.domain === 'evershelf' && params.service === 'recipe_query'
+        ? new Promise(() => undefined)
+        : originalCallService(params)
+    )
+
+    try {
+      const { result } = renderHook(() => useRecipeCollection(criteria()))
+      await waitFor(() => expect(result.current.criteriaPhase).toBe('loading'))
+      expect(result.current.initialResolved).toBe(false)
+    } finally {
+      mockState.helpers.callService = originalCallService
+    }
+  })
+
+  it('marks the initial request resolved after a handled error and keeps it resolved on retry', async () => {
+    const originalCallService = mockState.helpers.callService
+    let rejectRequest = true
+    mockState.helpers.callService = (params) => {
+      if (params.domain === 'evershelf' && params.service === 'recipe_query') {
+        return rejectRequest
+          ? Promise.reject(new Error('Initial failure'))
+          : Promise.resolve(browse([rawCard(1)]))
+      }
+      return originalCallService(params)
+    }
+
+    try {
+      const { result } = renderHook(() => useRecipeCollection(criteria()))
+      await waitFor(() => expect(result.current.error).toBe('Initial failure'))
+      expect(result.current.initialResolved).toBe(true)
+
+      rejectRequest = false
+      act(() => result.current.retryCriteria())
+      expect(result.current.initialResolved).toBe(true)
+      await waitFor(() => expect(result.current.criteriaPhase).toBe('idle'))
+      expect(result.current.items.map((item) => item.id)).toEqual([1])
+      expect(result.current.initialResolved).toBe(true)
     } finally {
       mockState.helpers.callService = originalCallService
     }
@@ -114,6 +162,7 @@ describe('useRecipeCollection', () => {
       await act(async () => rejectPage?.(new Error('Page failed')))
       await waitFor(() => expect(result.current.nextPageError).toBe('Page failed'))
       expect(result.current.items).toHaveLength(50)
+      expect(result.current.nextPageRevision).toBe(1)
 
       act(() => result.current.retryNextPage())
       expect(pageAttempts).toBe(2)
@@ -121,6 +170,7 @@ describe('useRecipeCollection', () => {
       await waitFor(() => expect(result.current.nextPageLoading).toBe(false))
       expect(result.current.items).toHaveLength(99)
       expect(result.current.hasMore).toBe(false)
+      expect(result.current.nextPageRevision).toBe(2)
       expect(result.current.announcement).toContain('49 more recipes loaded; 99 total.')
     } finally {
       mockState.helpers.callService = originalCallService

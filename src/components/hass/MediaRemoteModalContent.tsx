@@ -4,21 +4,16 @@ import { useEntity, useHass } from '@hakit/core'
 import { MaterialIcon } from '../core/Icon'
 import { GlassTile, type TileTone } from '../core/GlassTile'
 import type { MediaRemoteAction, MediaRemoteAppConfig, MediaRemoteButtonConfig, MediaRemoteConfig, MediaRemoteDeviceConfig, MediaRemoteIconColorRule } from '../../constants/mediaRemotes'
+import { mediaRemoteModalTabs, type MediaRemoteModalTab } from '../../constants/surfaceSemantics'
 import { useImmediateVisualTab, useSmoothDisplayedModalTab } from '../../hooks/useSmoothDisplayedModalTab'
 import { asEntityName, titleCaseState } from './entityState'
 import styles from './MediaRemoteModalContent.module.css'
 
 type CallService = (params: Record<string, unknown>) => void
 type TextPromptAction = Extract<MediaRemoteAction, { type: 'textPrompt' }>
-export type MediaRemoteModalTab = 'controls' | 'apps' | 'devices'
 
 const VOLUME_OPTIMISTIC_REVERT_MS = 2500
 const REMOTE_ACCORDION_DEBUG_KEY = 'haDash.remoteAccordionDebug'
-const BASE_MEDIA_REMOTE_MODAL_TABS: { icon: string; label: string; tab: MediaRemoteModalTab }[] = [
-  { icon: 'mdi:remote', label: 'Controls', tab: 'controls' },
-  { icon: 'mdi:play-box', label: 'Apps', tab: 'apps' },
-]
-const DEVICES_MEDIA_REMOTE_MODAL_TAB: { icon: string; label: string; tab: MediaRemoteModalTab } = { icon: 'mdi:projector', label: 'Devices', tab: 'devices' }
 const DESKTOP_MODAL_QUERY = '(min-width: 760px)'
 
 interface EntityLike {
@@ -40,10 +35,6 @@ function formatMediaState(entity: EntityLike | null | undefined, fallback = 'Una
   if (entity.state === 'unavailable') return 'Unavailable'
   if (entity.state === 'unknown') return 'Unknown'
   return titleCaseState(entity.state)
-}
-
-function mediaRemoteModalTabs(showDevices: boolean) {
-  return showDevices ? [...BASE_MEDIA_REMOTE_MODAL_TABS, DEVICES_MEDIA_REMOTE_MODAL_TAB] : BASE_MEDIA_REMOTE_MODAL_TABS
 }
 
 function shouldResetScrollOnTabChange() {

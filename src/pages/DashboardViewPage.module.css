@@ -28,6 +28,10 @@
   --dynamic-grid-columns: 2;
 }
 
+.appLaunchGrid {
+  --dynamic-grid-columns: 2;
+}
+
 .choreQuickGrid {
   --dynamic-grid-columns: 2;
 }
@@ -1027,6 +1031,25 @@ button.thermostatGlassMain {
   min-height: 66px;
 }
 
+.thermostatModalStack,
+.thermostatModalPanel {
+  display: grid;
+  min-width: 0;
+  gap: 18px;
+}
+
+.thermostatModalPanel {
+  align-content: start;
+  transition:
+    opacity 170ms ease,
+    transform 170ms ease;
+}
+
+.thermostatModalList {
+  display: grid;
+  gap: 8px;
+}
+
 .thermostatModalBody {
   display: grid;
   gap: 18px;
@@ -1245,13 +1268,15 @@ button.thermostatGlassMain {
     transform 170ms ease;
 }
 
-.eightSleepModalPanel[data-modal-tab-transition-state='exiting'] {
+.eightSleepModalPanel[data-modal-tab-transition-state='exiting'],
+.thermostatModalPanel[data-modal-tab-transition-state='exiting'] {
   opacity: 0;
   transform: translate3d(0, 5px, 0);
   transition-duration: 130ms;
 }
 
-.eightSleepModalPanel[data-modal-tab-transition-state='pre-entering'] {
+.eightSleepModalPanel[data-modal-tab-transition-state='pre-entering'],
+.thermostatModalPanel[data-modal-tab-transition-state='pre-entering'] {
   opacity: 0;
   transform: translate3d(0, 5px, 0);
   transition: none;
@@ -1361,12 +1386,14 @@ button.thermostatGlassMain {
 }
 
 .predictiveMetric strong {
+  display: -webkit-box;
   overflow: hidden;
   font-size: 0.88rem;
   font-weight: 840;
   line-height: 1.15;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .predictiveReasonCard {

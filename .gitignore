@@ -14,8 +14,10 @@ dist-ssr
 *.local
 .hass-porting/
 .playwright-mcp/
+.playwright-dist/
 .autonomous/
 .outbox/
+artifacts/
 playwright-report
 test-results
 test-results.xml
