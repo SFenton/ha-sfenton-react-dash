@@ -375,7 +375,7 @@ describe('DashboardViewPage', () => {
     expect(screen.getByRole('heading', { name: 'Devices' })).toBeInTheDocument()
   })
 
-  it('uses dynamic grids for room sections except the living room and theater media controls', () => {
+  it('uses dynamic grids for every room section and splits lead rows into their own grids', () => {
     for (const path of ROOM_PAGE_ORDER) {
       const room = ROOM_PAGE_CONFIGS[path]
       const view = render(<DashboardViewPage activePath={path} onNavigate={() => undefined} path={path} />)
@@ -386,18 +386,52 @@ describe('DashboardViewPage', () => {
 
       for (const section of room.sourceSections) {
         const grid = screen.getByRole('group', { name: `${room.title} ${section.title}` })
-        const fixedMediaControls = (path === 'living-room' && section.title === 'Living Room SHIELD')
-          || (path === 'theater-room' && section.title === 'Media Controls')
+        expect(grid).toHaveAttribute('data-dynamic-grid', 'true')
 
-        if (fixedMediaControls) {
-          expect(grid).not.toHaveAttribute('data-dynamic-grid')
-        } else {
-          expect(grid).toHaveAttribute('data-dynamic-grid', 'true')
+        if (section.layout === 'lead-row') {
+          expect(grid.querySelectorAll('[data-dynamic-grid-cell="true"]')).toHaveLength(1)
+          expect(grid.querySelector('[data-dynamic-grid-cell="true"]')).toHaveAttribute('data-dynamic-grid-span', '2')
+          const controls = screen.getByRole('group', { name: `${room.title} ${section.title} Controls` })
+          expect(controls).toHaveAttribute('data-dynamic-grid', 'true')
+          expect(controls.querySelectorAll('[data-dynamic-grid-cell="true"]')).toHaveLength(section.cards.length - 1)
         }
       }
 
       view.unmount()
     }
+  })
+
+  it('separates room remotes, device controls, and quick app launch grids', () => {
+    const theaterView = render(<DashboardViewPage activePath="theater-room" onNavigate={() => undefined} path="theater-room" />)
+
+    expect(ROOM_PAGE_CONFIGS['theater-room'].sourceSections.map((section) => section.title)).toEqual([
+      'Climate',
+      'Remote',
+      'Quick App Launch',
+      'Theater Room PCs',
+      'Devices',
+    ])
+    const theaterRemote = screen.getByRole('group', { name: 'Theater Room Remote' })
+    expect(within(theaterRemote).getByRole('button', { name: /^Theater Remote/ })).toBeInTheDocument()
+    expect(within(theaterRemote).queryByRole('button', { name: /^Nintendo Switch/ })).not.toBeInTheDocument()
+    const theaterControls = screen.getByRole('group', { name: 'Theater Room Remote Controls' })
+    expect(within(theaterControls).getAllByRole('button').map((button) => button.getAttribute('aria-label'))).toEqual([
+      'Nintendo Switch Off',
+      'Theater SHIELD Off',
+    ])
+    expect(within(screen.getByRole('group', { name: 'Theater Room Quick App Launch' })).getAllByRole('button')).toHaveLength(6)
+    theaterView.unmount()
+
+    render(<DashboardViewPage activePath="living-room" onNavigate={() => undefined} path="living-room" />)
+
+    expect(ROOM_PAGE_CONFIGS['living-room'].sourceSections.map((section) => section.title)).toEqual([
+      'Climate',
+      'Devices',
+      'Remote',
+      'Quick App Launch',
+    ])
+    expect(within(screen.getByRole('group', { name: 'Living Room Remote' })).getByRole('button', { name: /^Living Room SHIELD/ })).toBeInTheDocument()
+    expect(within(screen.getByRole('group', { name: 'Living Room Quick App Launch' })).getAllByRole('button')).toHaveLength(6)
   })
 
   it('renders the source empty room state for room pages without body cards', () => {
@@ -4426,7 +4460,7 @@ describe('DashboardViewPage', () => {
     window.history.replaceState(null, '', window.location.pathname)
 
     render(<DashboardViewPage activePath="theater-room" onNavigate={() => undefined} path="theater-room" />)
-    fireEvent.click(screen.getByRole('button', { name: /^Theater Room Off$/i }))
+    fireEvent.click(screen.getByRole('button', { name: /^Theater Remote Off$/i }))
     await clickModalTab(within(await screen.findByRole('dialog')), 'Apps')
     fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Disney+' }))
     expect(mockCallServiceCalls).toEqual([
@@ -4556,7 +4590,7 @@ describe('DashboardViewPage', () => {
     mockEntities['input_boolean.theater_pc_power'].state = 'on'
     render(<DashboardViewPage activePath="theater-room" onNavigate={() => undefined} path="theater-room" />)
 
-    fireEvent.click(screen.getByRole('button', { name: /^Theater Room Off$/i }))
+    fireEvent.click(screen.getByRole('button', { name: /^Theater Remote Off$/i }))
 
     expect(await screen.findByRole('dialog')).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Theater Room SHIELD Remote' })).toBeInTheDocument()
@@ -4605,7 +4639,7 @@ describe('DashboardViewPage', () => {
     mockEntities['media_player.theater'].state = 'off'
     render(<DashboardViewPage activePath="theater-room" onNavigate={() => undefined} path="theater-room" />)
 
-    fireEvent.click(screen.getByRole('button', { name: /^Theater Room Off$/i }))
+    fireEvent.click(screen.getByRole('button', { name: /^Theater Remote Off$/i }))
 
     expect(await screen.findByRole('heading', { name: 'Theater Room SHIELD Remote' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Yamaha Volume' })).toBeInTheDocument()

@@ -48,6 +48,7 @@ export interface RoomSourceModalItem {
 
 export interface RoomSourceSectionConfig {
   cards: RoomSourceCardConfig[]
+  layout?: 'lead-row'
   title: string
 }
 
@@ -112,7 +113,8 @@ export const ROOM_PAGE_CONFIGS: Record<string, RoomPageSourceConfig> = {
         { title: 'Air Purifier', entityId: 'select.living_room_air_purifier_fan_mode', icon: 'mdi:fan', kind: 'air', hash: '#air-purifier', modalEntityId: 'sensor.living_room_air_purifier_pm2_5', subtitleEntityIds: ['select.living_room_air_purifier_fan_mode', 'fan.living_room_air_purifier_levoit_purifier'] },
       ] },
       { title: 'Devices', cards: [{ title: 'Main Floor', modalTitle: 'Robot Vacuum', entityId: 'vacuum.valetudo_exaltedsneakydeer', icon: 'mdi:robot-vacuum', kind: 'vacuum', hash: '#robot-vacuum', subtitleEntityIds: ['vacuum.valetudo_exaltedsneakydeer', 'sensor.valetudo_exaltedsneakydeer_battery_level'], span: 'full' }] },
-      { title: 'Living Room SHIELD', cards: [{ title: 'Living Room SHIELD', entityId: 'media_player.living_room_shield', icon: 'mdi:remote', kind: 'media', hash: '#living-room-shield', showState: true, span: 'full' }, ...livingRoomShieldAppShortcuts] },
+      { title: 'Remote', cards: [{ title: 'Living Room SHIELD', entityId: 'media_player.living_room_shield', icon: 'mdi:remote', kind: 'media', hash: '#living-room-shield', showState: true }] },
+      { title: 'Quick App Launch', cards: livingRoomShieldAppShortcuts },
     ],
     popupTemplates: ['light-slider-toggle', 'window-popup-single', 'air-purifier-popup', 'vent-popup-2', 'vacuum-*', 'media-player-popup'],
   },
@@ -285,12 +287,12 @@ export const ROOM_PAGE_CONFIGS: Record<string, RoomPageSourceConfig> = {
         { title: 'Vents', entityId: 'cover.theater_room_vents', icon: 'mdi:air-filter', kind: 'vent', hash: '#vents', showState: true, modalItems: [{ title: 'Vent 1', entityId: 'cover.theater_room_vent_1_vent', icon: 'mdi:air-filter' }, { title: 'Vent 2', entityId: 'cover.theater_room_vent_2_vent', icon: 'mdi:air-filter' }] },
         { title: 'Air Purifier', entityId: 'select.theater_room_air_purifier_fan_mode', icon: 'mdi:fan', kind: 'air', hash: '#air-purifier', modalEntityId: 'sensor.theater_room_air_purifier_pm2_5', subtitleEntityIds: ['select.theater_room_air_purifier_fan_mode', 'fan.theater_room_air_purifier_levoit_purifier'] },
       ] },
-      { title: 'Media Controls', cards: [
-        { title: 'Theater Room', entityId: 'media_player.sony_projector', icon: 'mdi:projector', kind: 'media', hash: '#theater-room-shield', showState: true },
-        { title: 'Theater SHIELD', entityId: 'input_boolean.is_theater_shield_active', icon: 'mdi:television', kind: 'media', showState: true, action: scriptAction('theater_room_tv_movie') },
+      { title: 'Remote', layout: 'lead-row', cards: [
+        { title: 'Theater Remote', entityId: 'media_player.sony_projector', icon: 'mdi:projector', kind: 'media', hash: '#theater-room-shield', showState: true },
         { title: 'Nintendo Switch', entityId: 'input_boolean.is_nintendo_switch_active', icon: 'mdi:gamepad', kind: 'media', showState: true, action: scriptAction('theater_room_nintendo_switch') },
-        ...theaterAppShortcuts,
+        { title: 'Theater SHIELD', entityId: 'input_boolean.is_theater_shield_active', icon: 'mdi:television', kind: 'media', showState: true, action: scriptAction('theater_room_tv_movie') },
       ] },
+      { title: 'Quick App Launch', cards: theaterAppShortcuts },
       { title: 'Theater Room PCs', cards: [{ title: 'Theater Room PC', entityId: 'input_boolean.theater_pc_power', icon: 'mdi:projector', kind: 'power', subtitleEntityIds: ['input_text.theater_pc_power_state'], action: pcPowerAction('input_button.theater_pc_on', 'input_button.theater_pc_off') }] },
       { title: 'Devices', cards: [{ title: 'Theater Room', modalTitle: 'Robot Vacuum', entityId: 'vacuum.valetudo_politefatherlykingfisher', icon: 'mdi:robot-vacuum', kind: 'vacuum', hash: '#robot-vacuum', subtitleEntityIds: ['vacuum.valetudo_politefatherlykingfisher', 'sensor.valetudo_politefatherlykingfisher_battery_level'], span: 'full' }] },
     ],
