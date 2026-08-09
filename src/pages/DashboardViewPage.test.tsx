@@ -388,7 +388,7 @@ describe('DashboardViewPage', () => {
     expect(screen.getByRole('heading', { name: 'Devices' })).toBeInTheDocument()
   })
 
-  it('uses dynamic grids for every room section and sizes app launch grids by tile width', () => {
+  it('uses dynamic grids for every room section, splits lead rows, and sizes app launch grids by tile width', () => {
     for (const path of ROOM_PAGE_ORDER) {
       const room = ROOM_PAGE_CONFIGS[path]
       const view = render(<DashboardViewPage activePath={path} onNavigate={() => undefined} path={path} />)
@@ -421,7 +421,7 @@ describe('DashboardViewPage', () => {
     }
   })
 
-  it('splits the theater and living room media sections into Remote and Quick App Launch groups', () => {
+  it('separates room remotes, device controls, and quick app launch grids', () => {
     const theaterView = render(<DashboardViewPage activePath="theater-room" onNavigate={() => undefined} path="theater-room" />)
 
     expect(ROOM_PAGE_CONFIGS['theater-room'].sourceSections.map((section) => section.title)).toEqual([

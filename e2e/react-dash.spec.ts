@@ -2452,21 +2452,21 @@ test('room media cards open ported remote modals', async ({ page }) => {
   await expect(page.getByRole('button', { name: /Projector Off/i })).toBeVisible()
 })
 
-test('theater remote leads a full-width row above its own source button grid', async ({ page }) => {
+test('theater remote leads a full-width row above its source control grid', async ({ page }) => {
   await page.goto('/at-a-glance/theater-room')
 
   const opener = page.getByRole('group', { exact: true, name: 'Theater Room Remote' })
-  const sources = page.getByRole('group', { exact: true, name: 'Theater Room Remote Controls' })
+  const controls = page.getByRole('group', { exact: true, name: 'Theater Room Remote Controls' })
   await expect(opener.getByRole('button', { name: /^Theater Remote/ })).toBeVisible()
   await expect(opener.getByRole('button', { name: /^Nintendo Switch/ })).toHaveCount(0)
-  await expect(sources.getByRole('button', { name: /^Nintendo Switch/ })).toBeVisible()
-  await expect(sources.getByRole('button', { name: /^Theater SHIELD/ })).toBeVisible()
+  await expect(controls.getByRole('button', { name: /^Nintendo Switch/ })).toBeVisible()
+  await expect(controls.getByRole('button', { name: /^Theater SHIELD/ })).toBeVisible()
   await expect(page.getByRole('group', { exact: true, name: 'Theater Room Quick App Launch' }).getByRole('button')).toHaveCount(6)
 
   await page.setViewportSize({ width: 1280, height: 900 })
   const remoteCell = opener.locator('[data-dynamic-grid-cell="true"]').first()
-  const switchCell = sources.locator('[data-dynamic-grid-cell="true"]').first()
-  const shieldCell = sources.locator('[data-dynamic-grid-cell="true"]').last()
+  const switchCell = controls.locator('[data-dynamic-grid-cell="true"]').first()
+  const shieldCell = controls.locator('[data-dynamic-grid-cell="true"]').last()
   await expect(remoteCell).toHaveAttribute('data-dynamic-grid-span', '2')
   await expect(switchCell).toHaveAttribute('data-dynamic-grid-span', '1')
   await expect(shieldCell).toHaveAttribute('data-dynamic-grid-span', '1')
