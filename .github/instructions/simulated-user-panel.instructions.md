@@ -23,10 +23,18 @@ applyTo: ".github/skills/simulated-user-panel/SKILL.md,.github/skills/simulated-
   interaction because both inherit live proxy routes.
 - Keep persona definitions behavioral and explicitly synthetic. Do not claim
   demographic authenticity, equate model cost with human intelligence, or
-  generalize findings to real groups.
+  generalize capabilities or preferences to real groups. Require interface
+  properties and mechanisms instead of demographic capability claims.
 - Keep independent first passes, evidence-backed consensus, adversarial
   cross-critique, calibration of model-sensitive findings, and Sol
   adjudication.
+- Keep participant output strict JSON with exact allowlisted surface ids,
+  non-empty evidence for every finding, lens attestation, severity
+  justification, and explicit out-of-scope notes.
+- Keep severity anchored. Unknown evidence gaps cannot be high or blocker, and
+  missing packet evidence is not a product blocker.
+- Keep calibration and adversarial review cross-vendor when practical, and keep
+  specialist selection deterministic with omitted-trigger reporting.
 - Keep implementation closed unless the original invocation explicitly asks
   for changes. Implementation is Sol-only and does not imply permission for
   Home Assistant mutation, commit, push, deployment, or restart.

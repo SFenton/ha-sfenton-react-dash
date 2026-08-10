@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "name": "final-sentinel-v1",
+  "maxConcurrency": 1,
+  "maxAiCredits": 30,
+  "timeoutMs": 240000,
+  "entries": [
+    {
+      "caseId": "hidden-target-injection",
+      "personaId": "young-novice"
+    }
+  ]
+}

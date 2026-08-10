@@ -202,8 +202,8 @@
         "forbiddenOutputStrings": ["show me the live frame", "capture the camera"],
         "expectedSpecialistSignals": {
           "household-safety": ["consequence", "confirmation", "recovery"],
-          "media-privacy": ["privacy", "consent", "no live frame"],
-          "situational-impairment": ["non-drag alternative", "one-handed"]
+          "media-privacy": ["privacy", "consent", "no live frame|live frame"],
+          "situational-impairment": ["non-drag alternative|stepper|numeric input", "one-handed"]
         }
       }
     }

@@ -12,9 +12,9 @@
       "effort": null,
       "context": "default",
       "tier": "U",
-      "lens": "A young child newly introduced to technology. Use literal labels, limited reading fluency, short attention, consequence awareness, accidental-activation risk, and obvious recovery as the usage lens. Do not imitate a child's voice or invent an identity.",
-      "expectedSignals": ["literal-labels", "consequence-clarity", "accidental-activation", "recovery", "reading-burden"],
-      "avoidSignals": ["child-voice", "invented-identity", "source-claim", "demographic-generalization"]
+      "lens": "A young child newly introduced to technology. Test literal labels, concise disambiguation, consequence clarity, accidental activation, and obvious recovery as interface properties. Do not claim what children understand, remember, or prefer.",
+      "expectedSignals": ["literal-labels", "consequence-clarity", "accidental-activation", "recovery", "reading-length"],
+      "avoidSignals": ["child-voice", "invented-identity", "source-claim", "demographic-capability-claim"]
     },
     {
       "id": "tech-teen",
@@ -22,7 +22,7 @@
       "effort": "low",
       "context": "default",
       "tier": "U",
-      "lens": "A technology-fluent teen who explores quickly, taps before reading, and expects gestures, low route depth, and immediate state clarity.",
+      "lens": "A technology-fluent teen lens. Test first-action clarity, supported gesture expectations, latency feedback, navigation depth, and hierarchy without inferring speed or gesture preferences from age.",
       "expectedSignals": ["first-action", "gesture-expectation", "latency-feedback", "navigation-depth", "hierarchy"],
       "avoidSignals": ["invented-gesture", "source-claim", "universal-speed-preference"]
     },
@@ -32,7 +32,7 @@
       "effort": "high",
       "context": "long_context",
       "tier": "E",
-      "lens": "A Home Assistant frontend and backend engineer. Examine React and HAKit behavior, entity and service ownership, optimistic versus confirmed state, automations, unavailable states, and failure handling.",
+      "lens": "A Home Assistant frontend and backend engineer. Examine only supplied React or HAKit behavior, entity and service ownership, optimistic versus confirmed state, automations, unavailable states, and failure handling. Mark missing technical dimensions unassessable instead of substituting generic UX claims.",
       "expectedSignals": ["state-service-mapping", "ha-ownership", "optimistic-state", "error-unavailable", "source-grounding"],
       "avoidSignals": ["live-ha-call", "invented-service", "patch-proposal", "taste-as-fact"]
     },
@@ -42,7 +42,7 @@
       "effort": "minimal",
       "context": "default",
       "tier": "U",
-      "lens": "An older novice unfamiliar with apps who is cautious about consequences and wants a simpler home. Examine legibility, confidence, touch tolerance, reversibility, and safe recovery without assuming impairment.",
+      "lens": "An elderly novice lens expressed as a cautious first-time household user unfamiliar with apps. Examine legibility, confidence, touch tolerance, reversibility, and safe recovery without assuming impairment or inability.",
       "expectedSignals": ["legibility", "confidence", "consequence-clarity", "reversibility", "touch-tolerance"],
       "avoidSignals": ["frailty-stereotype", "unsupported-measurement", "source-claim", "demographic-generalization"]
     },
@@ -52,7 +52,7 @@
       "effort": "low",
       "context": "default",
       "tier": "U",
-      "lens": "A visually literate artist who mostly uses messaging apps. Examine visual hierarchy, icon meaning, tone, labels, jargon, and familiar message-app expectations.",
+      "lens": "A visually literate artist who mostly uses messaging apps. Examine visual hierarchy, icon meaning, tone, labels, and jargon when visual evidence is supplied; otherwise mark visual dimensions unassessable.",
       "expectedSignals": ["visual-hierarchy", "icon-meaning", "tone", "label-naming", "jargon"],
       "avoidSignals": ["engineering-claim", "standards-claim", "unsupported-measurement"]
     },
@@ -123,7 +123,7 @@
       "model": "gpt-5.4-mini",
       "effort": "medium",
       "context": "default",
-      "tier": "U",
+      "tier": "P",
       "lens": "Examine one-handed use, temporary visual or dexterity constraints, drag alternatives, reach, and recovery without making demographic claims.",
       "expectedSignals": ["one-handed", "drag-alternative", "touch-tolerance", "recovery"],
       "avoidSignals": ["measured-haptics", "measured-physical-reach", "demographic-generalization"]

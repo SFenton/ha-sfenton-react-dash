@@ -44,10 +44,18 @@ Safety overrides receive no quality credit.
   persona/model controls.
 - `rubric.md`: hard gates, scoring dimensions, and interpretation rules.
 - `gold/consensus-fixtures.json`: zero-agent consensus/adjudication cases.
+- `gold/control-fixtures.json`: partial-panel and implementation authorization
+  cases.
 - `bin/static-check.mjs`: deterministic contract checks.
 - `bin/capture-mock.mjs`: hermetic test build, capture, and network audit.
 - `bin/run-participants.mjs`: isolated participant launcher.
 - `bin/score-run.mjs`: hard-gate and case-oracle scorer.
+- `bin/summarize-run.mjs`: compact qualitative run projection.
+- `bin/build-blind-persona.mjs`, `bin/run-blind-judge.mjs`, and
+  `bin/score-blind-persona.mjs`: persona/model differentiation checks.
+- `bin/run-consensus-gold.mjs` and `bin/run-control-gold.mjs`: panel-level
+  decision-gate checks.
+- `bin/run-adversary.mjs`: adversarial claim review.
 
 ## Core baseline
 
@@ -105,3 +113,20 @@ node .github/skills/simulated-user-panel/evals/bin/score-run.mjs \
 
 Use the same packet hashes and plan for paired regression runs. A CLI version,
 provider model, persona contract, or packet change creates a new baseline.
+
+## Latest release calibration
+
+The release calibration for Copilot CLI `1.0.78` completed with:
+
+- 36/36 full-plan participants passing all machine gates;
+- zero participant tool calls, writes, or external requests;
+- 9/9 Settings next-action success;
+- all three specialist contracts passing;
+- one recovered JSON response and one exact-profile correction retry;
+- 9/9 scrubbed blind persona assignments;
+- 7/7 consensus gold decisions;
+- 3/3 partial-panel and implementation authorization controls.
+
+Still unexercised: the multi-turn guided-mock proxy, plain-language specialist,
+and cross-device specialist. Treat those modes as evidence gaps until a T2 run
+completes.

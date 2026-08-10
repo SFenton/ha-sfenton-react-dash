@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "name": "baseline-calibration-v1",
+  "maxConcurrency": 1,
+  "maxAiCredits": 30,
+  "timeoutMs": 240000,
+  "entries": [
+    {
+      "caseId": "grounding-control",
+      "personaId": "young-novice",
+      "variant": "calibration-reference",
+      "modelOverride": {
+        "model": "claude-opus-4.6",
+        "effort": "high",
+        "context": "long_context"
+      }
+    }
+  ]
+}
