@@ -6,30 +6,30 @@
   "fingerprints": {
     "captureHarness": {
       "algorithm": "sha256",
-      "digest": "691a72921446a26b0c2f16f480508622f03e08639795712f5d15f41880352bad",
+      "digest": "a4bfcb1212306a181f557869791e756d7cd07dd0a023d975c858504909a92592",
       "fileCount": 5,
       "scope": "manual-capture-harness-v1"
     },
     "screenshotMetadata": {
       "algorithm": "sha256",
-      "digest": "df765e710d76cdc07a6175bd86495736e0230674da2885efc0dc2d981de5988b",
+      "digest": "2180c1c00e172f9ac022a1c08885bc7423f9217e0b0f9ccefc25643f7cfcf931",
       "scope": "manual-screenshot-metadata-v1",
       "subjectCount": 138
     },
     "uiSource": {
       "algorithm": "sha256",
-      "digest": "12be49c020e07a309ac07ce8606d2ab697539086ede89927b44b5d960e560b1a",
+      "digest": "9073132d9b0faacace08edef15bfb105bd0c77d6f74fc94f08c6b5acf3ed0c66",
       "fileCount": 281,
       "scope": "app-visual-source-v1"
     }
   },
   "library": {
-    "maxFileBytes": 588007,
-    "maxFilePath": "public/manual/manual-desktop/thermostat-options.png",
-    "totalBytes": 24770724
+    "maxFileBytes": 537073,
+    "maxFilePath": "public/manual/manual-desktop/downstairs-hallway-page-context.png",
+    "totalBytes": 24944161
   },
-  "reviewedAt": "2026-08-09T21:19:27.938Z",
-  "reviewStateSha256": "50c6d38043d3475a94fab1f309522bf7699e866bde22de86f51781eefeed0a32",
+  "reviewedAt": "2026-08-10T03:15:34.364Z",
+  "reviewStateSha256": "0be78ba41565793901e05c3a92e419a47a2c2f9689a1cd07c13a0118173bcf6e",
   "schemaVersion": 1,
   "subjectCount": 138,
   "subjects": [
@@ -132,17 +132,17 @@
       "id": "section-climate-context",
       "variants": {
         "desktop": {
-          "bytes": 128765,
-          "height": 150,
+          "bytes": 253283,
+          "height": 561,
           "path": "public/manual/manual-desktop/section-climate-context.png",
-          "sha256": "88fbca27a47092a398b512ab7a492a0cd8cbb15c1a0aedb142c7f50745282935",
-          "width": 1248
+          "sha256": "e4d3deb5d21f6fa01d4ed8e042143d853caf43e192b570606a44ed44879c1aff",
+          "width": 588
         },
         "mobile": {
-          "bytes": 44341,
-          "height": 150,
+          "bytes": 170813,
+          "height": 560,
           "path": "public/manual/manual-mobile/section-climate-context.png",
-          "sha256": "0c9da6f3aa30d1516478b39531b07433951a51855d8d0335f16e7016e02ae179",
+          "sha256": "b5acc2625a62fdc54f8036e0edf89c4a5ba983b9c77d11aac8888e122a1a6323",
           "width": 361
         }
       }
@@ -151,11 +151,11 @@
       "id": "section-chores-context",
       "variants": {
         "desktop": {
-          "bytes": 85056,
+          "bytes": 70140,
           "height": 260,
           "path": "public/manual/manual-desktop/section-chores-context.png",
-          "sha256": "6c3820edd99e47dff6d0da24abea0578d19b1d3e259233ae5d51957caeb99dfc",
-          "width": 788
+          "sha256": "28d18ff6294abad66ae7f14de7a5464b51a1e1197193fc0ddd563f086cf77354",
+          "width": 668
         },
         "mobile": {
           "bytes": 33307,
@@ -930,10 +930,10 @@
       "id": "app-layout-home",
       "variants": {
         "desktop": {
-          "bytes": 401193,
+          "bytes": 476586,
           "height": 900,
           "path": "public/manual/manual-desktop/app-layout-home.png",
-          "sha256": "d00c666d6913a37df97f448404fb427b6d7773929bf22a2c193786ad7a1b7367",
+          "sha256": "0d9b075025368c783ba080bb16ef44ca7c5ac4f6c2e62699933e0d2c7b3a6898",
           "width": 820
         },
         "mobile": {
@@ -1196,17 +1196,17 @@
       "id": "thermostat-options",
       "variants": {
         "desktop": {
-          "bytes": 588007,
-          "height": 900,
+          "bytes": 306257,
+          "height": 610,
           "path": "public/manual/manual-desktop/thermostat-options.png",
-          "sha256": "c1a7de86f54f33e9dadcb1a3695f273099605c31535e19520c12401ac9f860ed",
-          "width": 1280
+          "sha256": "1720b0a481cb41d3fb072c983d2e737d26c5272ae5a7cbbbf1f0c259c1161c1a",
+          "width": 820
         },
         "mobile": {
-          "bytes": 173967,
-          "height": 852,
+          "bytes": 149160,
+          "height": 610,
           "path": "public/manual/manual-mobile/thermostat-options.png",
-          "sha256": "c02956dae325754a484d2f87a3f176b0f6accf9ff87f57d9c560d4f96f85f062",
+          "sha256": "a90c7c21398c632d571f09799041310fecc813c05faac661a026603381757a5b",
           "width": 393
         }
       }
@@ -2051,17 +2051,17 @@
       "id": "thermostat-controls-rooms",
       "variants": {
         "desktop": {
-          "bytes": 65133,
+          "bytes": 72958,
           "height": 780,
           "path": "public/manual/manual-desktop/thermostat-controls-rooms.png",
-          "sha256": "1104cbbf55e4861d5ac830972e964c6f03d45f03366b5ddf2b0d11519ff32c86",
+          "sha256": "f369a4024faf44494a36087e897555f3fdc727c27c3a810ca346508ba6416b3e",
           "width": 720
         },
         "mobile": {
-          "bytes": 53536,
+          "bytes": 62113,
           "height": 767,
           "path": "public/manual/manual-mobile/thermostat-controls-rooms.png",
-          "sha256": "c17ac4ce7ad48a772c2deb7f5e2a366f269020e96572d995f4ba1c18f913cd41",
+          "sha256": "cd836aa9af3b7b9d07e8ba4671df00b0206e4de81128bcdf6ae8bca6c2aaefc7",
           "width": 393
         }
       }
@@ -2070,17 +2070,17 @@
       "id": "thermostat-controls-automation",
       "variants": {
         "desktop": {
-          "bytes": 109407,
+          "bytes": 99945,
           "height": 1200,
           "path": "public/manual/manual-desktop/thermostat-controls-automation.png",
-          "sha256": "430add7924cf7d88d2741c32c2fe031c34f9ef244e04d2a0bccec19ec1735321",
+          "sha256": "05d88df13bd20ab6458ecefef1f707c074005e7cef9e01cf30f4483fe5d4c00c",
           "width": 720
         },
         "mobile": {
-          "bytes": 91687,
+          "bytes": 101039,
           "height": 1200,
           "path": "public/manual/manual-mobile/thermostat-controls-automation.png",
-          "sha256": "023a1a6ba15394cdbec33f145f7e971f546ce1675ad5bf9198ca885cc2e45202",
+          "sha256": "04c3be3033a5cf83b0e4e270085fe6eecf6438873269dc5abe34b18cd5845a91",
           "width": 393
         }
       }
@@ -2089,17 +2089,17 @@
       "id": "thermostat-controls-tracking",
       "variants": {
         "desktop": {
-          "bytes": 62112,
+          "bytes": 77451,
           "height": 780,
           "path": "public/manual/manual-desktop/thermostat-controls-tracking.png",
-          "sha256": "4293b73a60f91f91d51796a6bf8517a7ee9bfcb2586c068a1f55d30b774c202d",
+          "sha256": "0ab681754f3efceb3f7709c18d937b7ce06e8dd3a6ed1f9efccf9821754af73c",
           "width": 720
         },
         "mobile": {
-          "bytes": 56696,
+          "bytes": 73465,
           "height": 767,
           "path": "public/manual/manual-mobile/thermostat-controls-tracking.png",
-          "sha256": "7289256c30273822a1ca85cb5900674f4d625523083677a979b599e885a6e54c",
+          "sha256": "bab06a88971386bf1e0c5d2369e97abeca8752888dcce2a2c8f9bcb22b42ba46",
           "width": 393
         }
       }
@@ -2127,17 +2127,17 @@
       "id": "predictive-comfort",
       "variants": {
         "desktop": {
-          "bytes": 116881,
+          "bytes": 113540,
           "height": 780,
           "path": "public/manual/manual-desktop/predictive-comfort.png",
-          "sha256": "6fd3769d44bf64a6630d2d36ef84e05bfb22814eb1d24a32752bfc05bfaef105",
+          "sha256": "1b90ada46006d75b2a9449eb91a5874838230d05d5be0a245313f2ddee7e77f5",
           "width": 720
         },
         "mobile": {
-          "bytes": 50083,
+          "bytes": 64187,
           "height": 700,
           "path": "public/manual/manual-mobile/predictive-comfort.png",
-          "sha256": "f9b450d610c04cab76141d87d4febb16993bd7e2c323eda71e44fa61d31edc3e",
+          "sha256": "d2586d63495670e6877611ff959cffd4386bc8bf9920295256946555e3c0c07b",
           "width": 393
         }
       }
@@ -2146,17 +2146,17 @@
       "id": "thermostat-selected-rooms",
       "variants": {
         "desktop": {
-          "bytes": 58507,
+          "bytes": 52751,
           "height": 780,
           "path": "public/manual/manual-desktop/thermostat-selected-rooms.png",
-          "sha256": "891e7272fc1b0252fd0010c681155ad0237c39fb122bdff93a05bc37fd9128fe",
+          "sha256": "92e81bff2b4351e95044f0fea18063df40a2276d056fdacd736fff60593dbb99",
           "width": 720
         },
         "mobile": {
-          "bytes": 52729,
+          "bytes": 52908,
           "height": 767,
           "path": "public/manual/manual-mobile/thermostat-selected-rooms.png",
-          "sha256": "c2c41ac4a68fcd717be3dfeac3cf8e59fe671e405c0c337137bac8508a25b165",
+          "sha256": "1c60fe8f81b6996352cf1a03e83685273bad7e92b055f93417dfc78df10a90f0",
           "width": 393
         }
       }
@@ -2165,17 +2165,17 @@
       "id": "thermostat-critical-protection",
       "variants": {
         "desktop": {
-          "bytes": 54988,
+          "bytes": 41237,
           "height": 780,
           "path": "public/manual/manual-desktop/thermostat-critical-protection.png",
-          "sha256": "efba056828bece97bdaf6475051e49c37f153b0732e8ef85ff9bf03f601f3173",
+          "sha256": "7771eaaeccbc9b2829f8b1cfda0d57e22555c7fc667b9369bfa5872311b50b96",
           "width": 720
         },
         "mobile": {
-          "bytes": 49421,
+          "bytes": 38525,
           "height": 767,
           "path": "public/manual/manual-mobile/thermostat-critical-protection.png",
-          "sha256": "797677f4fa12d0c9f1a162d6067af3d83b7b7ad7613d9fb6cff06820e803ee0f",
+          "sha256": "b157db1b8b6498b02b3c0ecbaa803b38da77dab3c4b743b0375b340121eaf6af",
           "width": 393
         }
       }
@@ -2184,17 +2184,17 @@
       "id": "thermostat-occupied-only",
       "variants": {
         "desktop": {
-          "bytes": 58367,
+          "bytes": 51941,
           "height": 780,
           "path": "public/manual/manual-desktop/thermostat-occupied-only.png",
-          "sha256": "21b4e61396358ff9cf038bad91069f8ecb4765dedfefbd8b70179cc268d1f6bd",
+          "sha256": "6f6566ee4a9fbdd8a890dcacdf1335f7f90d96ebd79ee39ed43e9a7865ecfcab",
           "width": 720
         },
         "mobile": {
-          "bytes": 53122,
+          "bytes": 52152,
           "height": 767,
           "path": "public/manual/manual-mobile/thermostat-occupied-only.png",
-          "sha256": "b4268e77829b5782a267c0575fcdf02dd1b35095508b65076f2abaa5d88a5ccc",
+          "sha256": "f99cc4e03adc92b472fb0a3d8d6fd37f26eda57189e6eb02af2320e7aca8efb5",
           "width": 393
         }
       }
@@ -2564,17 +2564,17 @@
       "id": "eco-critical-tracking-picker",
       "variants": {
         "desktop": {
-          "bytes": 29896,
+          "bytes": 66285,
           "height": 500,
           "path": "public/manual/manual-desktop/eco-critical-tracking-picker.png",
-          "sha256": "1cc23c3ca8d13ede089a00051cd42c15169e7017b22f1c066fda5e7f16c0175d",
+          "sha256": "fb3c570e18bab81f022a0f0d7e24ef3a89218b0611475e769e6c9f6ec207b9c6",
           "width": 720
         },
         "mobile": {
-          "bytes": 27847,
+          "bytes": 58735,
           "height": 500,
           "path": "public/manual/manual-mobile/eco-critical-tracking-picker.png",
-          "sha256": "f4cc79e059c0c101b14288757a0dc6f14c91cb6dec37b23fa1b26e06c3ac3d94",
+          "sha256": "23fddf0af985e52f4db178f0bd3eda984d09916e7bdd969f00c2b220893f746e",
           "width": 393
         }
       }
@@ -2583,17 +2583,17 @@
       "id": "eco-away-behavior-picker",
       "variants": {
         "desktop": {
-          "bytes": 32498,
+          "bytes": 79410,
           "height": 500,
           "path": "public/manual/manual-desktop/eco-away-behavior-picker.png",
-          "sha256": "557d73e9a8184090a4ae1e1bb30f6851360ad91d7acbcccbd02af225e7090a51",
+          "sha256": "c69a56201f038136506e28ddbc538fd33dfb58c2c3fb04d9a49a084e947e72e6",
           "width": 720
         },
         "mobile": {
-          "bytes": 22590,
+          "bytes": 55385,
           "height": 500,
           "path": "public/manual/manual-mobile/eco-away-behavior-picker.png",
-          "sha256": "852773d3e59edbeb7f6c0d74710f4267735a688a62fe71771f7beead4802ab26",
+          "sha256": "ff8eaaedd213b749c80717f212943d101984f7dba18b7e009fcd0f5972ad0f31",
           "width": 393
         }
       }
