@@ -360,6 +360,7 @@ const MANUAL_WORKFLOW_SCREENSHOT_DEFINITIONS: ManualScreenshotConfig[] = [
     desktopMaxWidth: 700,
     cropHeight: 660,
     desktopCropHeight: 630,
+    maxDiffPixelRatio: 0.025,
     alt: 'SleepyPod climate-adapter Status tab showing deterministic pump health, loop temperature, and pump speed.',
     caption: 'What does SleepyPod Status show? The adapter keeps current pump-health evidence together without changing it.',
   },
