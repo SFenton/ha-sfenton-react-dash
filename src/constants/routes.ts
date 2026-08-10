@@ -166,7 +166,7 @@ export const DASHBOARD_ROUTES: DashboardRouteConfig[] = [
     path: 'ecobee',
     icon: 'mdi:thermostat',
     manualArticleId: 'thermostat-page-guide',
-    manualVisibleSectionNames: ['Whole Home', 'Open Contact Sensors', 'Rooms & Settings'],
+    manualVisibleSectionNames: ['Whole Home', 'Open Contact Sensors', 'Rooms', 'Automation', 'Tracking'],
   },
   {
     title: 'Groceries',

@@ -51,6 +51,7 @@ interface ScheduleListRowProps {
   icon?: string
   iconSurface?: boolean
   onClick: () => void
+  pressed?: boolean
   primary: ReactNode
   secondary?: ReactNode
   tertiary?: ReactNode
@@ -147,6 +148,7 @@ export function ScheduleListRow({
   icon = 'mdi:calendar',
   iconSurface = true,
   onClick,
+  pressed,
   primary,
   secondary,
   tertiary,
@@ -157,6 +159,7 @@ export function ScheduleListRow({
     <div className={styles.rowShell} data-schedule-list-row={true}>
       <button
         aria-label={accessibleLabel}
+        aria-pressed={pressed}
         className={styles.row}
         data-active={active ? 'true' : 'false'}
         data-has-trailing-control={trailingControl ? 'true' : 'false'}

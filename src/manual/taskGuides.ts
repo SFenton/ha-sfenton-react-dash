@@ -255,7 +255,7 @@ export const MANUAL_TASK_GUIDE_ARTICLES: ManualTaskGuideArticle[] = [
       ],
       steps: [
         'For the house target, use the Whole Home thermostat controls and keep both sides of the comfort range in a valid order.',
-        'For one room, open Rooms & Settings, choose the room from the Rooms tab, and confirm the room name, temperature, occupancy, and current action.',
+        'For one room, open Room Thermostats, choose the room from the Rooms tab, and confirm the room name, temperature, occupancy, and current action.',
         'Adjust the supported target or mode once, then leave the control open while Home Assistant reports the intended value.',
         'Review vent state and tracking options if the room still does not influence demand after the target confirms.',
       ],
@@ -352,7 +352,7 @@ export const MANUAL_TASK_GUIDE_ARTICLES: ManualTaskGuideArticle[] = [
         'Decide separately whether forecast logic may change targets, change HVAC mode, or act while the house is Away.',
       ],
       steps: [
-        'Open Rooms & Settings, choose Automation, open Predictive Comfort, and read the recommendation, reason, and any rate-limit or eligibility explanation.',
+        'Open Automation, open Predictive Comfort, and read the recommendation, reason, and any rate-limit or eligibility explanation.',
         'Enable or disable Auto Setpoint Adjustments according to whether automatic target changes are acceptable.',
         'Set HVAC Mode Changes independently; leaving it off allows recommendations or target work without granting mode changes.',
         'Set Predictive Comfort While Away only if automatic changes are appropriate during Away behavior, then close and review the summary.',

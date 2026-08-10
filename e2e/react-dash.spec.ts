@@ -62,10 +62,17 @@ async function clearMockHassCalls(page: Page) {
   })
 }
 
-async function openThermostatControls(page: Page) {
-  await page.getByRole('button', { name: /Thermostat Controls 11 rooms/i }).click()
+async function openThermostatControls(page: Page, tab: 'Automation' | 'Rooms' | 'Tracking' = 'Rooms') {
+  const openerName = tab === 'Automation'
+    ? /Open Automation /
+    : tab === 'Tracking'
+      ? /Open Room Tracking /
+      : /Open Room Thermostats 11 rooms/
+  await page.getByRole('button', { name: openerName }).click()
   await expect(page.getByRole('dialog', { name: 'Thermostat' })).toBeVisible()
-  return page.getByRole('dialog')
+  const dialog = page.getByRole('dialog')
+  await expect(dialog.getByRole('tab', { name: tab })).toHaveAttribute('aria-selected', 'true')
+  return dialog
 }
 
 async function everShelfInventoryCalls(page: Page) {
@@ -928,7 +935,9 @@ test('mobile modal opener families use shared disclosures and explicit action ex
   await expectRightChevron(page.getByRole('button', { name: 'Open Presence-Based Overrides' }))
 
   await page.goto('/at-a-glance/ecobee')
-  await expectRightChevron(page.getByRole('button', { name: /Thermostat Controls 11 rooms/i }))
+  await expectRightChevron(page.getByRole('button', { name: /Open Room Thermostats 11 rooms/i }))
+  await expectRightChevron(page.getByRole('button', { name: /Open Automation /i }))
+  await expectRightChevron(page.getByRole('button', { name: /Open Room Tracking /i }))
   const thermostatDialog = await openThermostatControls(page)
   await expectRightChevron(thermostatDialog.getByRole('button', { name: 'Living Room 70.2°F · Inactive' }))
 
@@ -1318,7 +1327,7 @@ test('thermostat room grid uses one equivalent column when any room label overfl
   expect(layout.every(({ span }) => span === '1')).toBe(true)
 })
 
-test('thermostat page keeps primary controls within 1.3 mobile scroller heights', async ({ page }) => {
+test('thermostat page keeps primary controls and three explained modal entry points compact', async ({ page }) => {
   await page.setViewportSize({ width: 393, height: 852 })
   await page.goto('/at-a-glance/ecobee')
 
@@ -1327,10 +1336,32 @@ test('thermostat page keeps primary controls within 1.3 mobile scroller heights'
     clientHeight: element.clientHeight,
     scrollHeight: element.scrollHeight,
   }))
-  expect(dimensions.scrollHeight / dimensions.clientHeight).toBeLessThanOrEqual(1.3)
+  expect(dimensions.scrollHeight / dimensions.clientHeight).toBeLessThanOrEqual(2)
   await expect(page.getByRole('region', { name: /Whole Home thermostat/i })).toBeVisible()
-  await expect(page.getByRole('button', { name: /Thermostat Controls 11 rooms/i })).toBeVisible()
+  await expect(page.getByText(/View each room's temperature and occupancy/i)).toBeVisible()
+  await expect(page.getByRole('button', { name: /Open Room Thermostats 11 rooms/i })).toBeVisible()
+  await expect(page.getByText(/Manage the master thermostat, Eco behavior/i)).toBeVisible()
+  await expect(page.getByRole('button', { name: /Open Automation /i })).toBeVisible()
+  await expect(page.getByText(/Choose which rooms participate in normal comfort/i)).toBeVisible()
+  await expect(page.getByRole('button', { name: /Open Room Tracking /i })).toBeVisible()
   await expect(page.getByRole('group', { name: 'Thermostat rooms' })).toHaveCount(0)
+})
+
+test('thermostat page entry points deep link to their matching modal tabs', async ({ page }) => {
+  const cases = [
+    { hash: '#thermostat-rooms', tab: 'Rooms' as const },
+    { hash: '#thermostat-automation', tab: 'Automation' as const },
+    { hash: '#thermostat-tracking', tab: 'Tracking' as const },
+  ]
+
+  for (const entry of cases) {
+    await page.goto('/at-a-glance/ecobee')
+    const dialog = await openThermostatControls(page, entry.tab)
+    await expect(page).toHaveURL(new RegExp(`${entry.hash}$`))
+    await expect(dialog.getByRole('tab', { name: entry.tab })).toHaveAttribute('aria-selected', 'true')
+    await dialog.getByRole('button', { name: 'Close' }).click()
+    await expect(dialog).toHaveCount(0)
+  }
 })
 
 test('thermostat modal uses root tabs and same-sheet detail pages', async ({ page }) => {
@@ -1347,6 +1378,7 @@ test('thermostat modal uses root tabs and same-sheet detail pages', async ({ pag
   await dialog.getByRole('button', { name: /Eco Mode Critical Tracking Track Select Critical/i }).click()
   await expect(page.getByRole('dialog')).toHaveCount(1)
   await expect(dialog).toHaveAccessibleName('Eco Mode Critical Tracking')
+  await expect(dialog.getByRole('group', { name: 'Eco Mode Critical Tracking options' })).toHaveAttribute('data-dynamic-grid', 'true')
   await dialog.getByRole('button', { name: 'Back to automation' }).click()
 
   await dialog.getByRole('tab', { name: 'Tracking' }).click()
@@ -1885,7 +1917,7 @@ test.describe('desktop modal layout', () => {
       await dialog.getByLabel(triggerName).click()
       await expect(dialog).toHaveAccessibleName(dialogName)
       const options = dialog.getByRole('group', { name: `${dialogName} options` })
-      await expect(options).toHaveAttribute('data-layout', 'card-grid')
+      await expect(options).toHaveAttribute('data-dynamic-grid', 'true')
       await expect(dialog.locator('span[aria-hidden="true"][class*="separator"]')).toHaveCount(0)
 
       await expect.poll(async () => Math.round((await dialog.boundingBox())?.width ?? 0)).toBeGreaterThanOrEqual(715)
@@ -1898,7 +1930,7 @@ test.describe('desktop modal layout', () => {
           columns: style.gridTemplateColumns.split(' ').filter(Boolean).length,
           optionHeight: Math.round(firstOption?.height ?? 0),
         }
-      })).toEqual({ columns: 1, optionHeight: 120 })
+      })).toEqual({ columns: 2, optionHeight: 112 })
       await dialog.getByRole('button', { name: 'Back to automation' }).click()
       await expect(dialog).toHaveAccessibleName('Thermostat')
     }

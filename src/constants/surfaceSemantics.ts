@@ -153,19 +153,19 @@ export type ThermostatModalTab = 'rooms' | 'automation' | 'tracking'
 
 export const THERMOSTAT_MODAL_TABS: readonly ModalTabDefinition<ThermostatModalTab>[] = [
   {
-    description: 'Lists every room thermostat and opens the selected room dial, vent status, and effective away notice.',
+    description: "View each room's temperature and occupancy, then open a room to adjust its target and check vent position.",
     icon: 'mdi:home-thermometer',
     label: 'Rooms',
     tab: 'rooms',
   },
   {
-    description: 'Contains the master automatic thermostat control, Eco policy, and Predictive Comfort settings and explanation.',
+    description: 'Manage the master thermostat, Eco behavior, and Predictive Comfort permissions.',
     icon: 'mdi:cog',
     label: 'Automation',
     tab: 'automation',
   },
   {
-    description: 'Configures selected-room participation, critical protection, and occupancy-only room tracking.',
+    description: 'Choose which rooms participate in normal comfort, critical protection, or occupancy-only tracking.',
     icon: 'mdi:motion-sensor',
     label: 'Tracking',
     tab: 'tracking',

@@ -138,11 +138,11 @@ export const MODAL_OPENER_INVENTORY = [
   },
   {
     id: 'thermostat-controls',
-    label: 'Thermostat Rooms & Settings row',
-    instances: 1,
+    label: 'Thermostat tab entry rows',
+    instances: 3,
     affordance: 'right-chevron',
-    implementation: 'ThermostatModalOpener through ModalOpenerRow',
-    behavior: 'Opens the shared Thermostat sheet on the Rooms tab without changing Home Assistant state.',
+    implementation: 'ThermostatPageEntry through ModalOpenerRow',
+    behavior: 'Opens the shared Thermostat sheet directly on Rooms, Automation, or Tracking without changing Home Assistant state.',
   },
   {
     id: 'thermostat-room-rows',

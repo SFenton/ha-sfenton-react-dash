@@ -603,7 +603,7 @@ test('section-climate-context', async ({ page }) => {
   await pageMain(page, 'Thermostat')
   const subject = configuredCrop(page, 'section-climate-context')
   await subject.scrollIntoViewIfNeeded()
-  await expect(subject.getByRole('button', { name: /Thermostat Controls 11 rooms/i })).toBeVisible()
+  await expect(subject.getByRole('button', { name: /Open Room Thermostats 11 rooms/i })).toBeVisible()
   await expectManualSubject('section-climate-context', subject)
   await captureManualSubject(page, 'section-climate-context', subject)
 })
@@ -1828,19 +1828,18 @@ test('presence-auto-reset', async ({ page }) => {
   await captureSyntheticWorkflowSubject(page, 'presence-auto-reset', dialog)
 })
 
-async function openThermostatManualDialog(page: Page) {
+async function openThermostatManualDialog(page: Page, tab: 'Automation' | 'Rooms' | 'Tracking' = 'Rooms') {
   await openRouteWithSyntheticFixture(page, 'ecobee', 'Thermostat', {})
-  await page.getByRole('button', { name: /Thermostat Controls 11 rooms/i }).click()
+  const openerName = tab === 'Automation'
+    ? /Open Automation /
+    : tab === 'Tracking'
+      ? /Open Room Tracking /
+      : /Open Room Thermostats 11 rooms/
+  await page.getByRole('button', { name: openerName }).click()
   const dialog = page.getByRole('dialog')
   await expect(dialog).toHaveAccessibleName('Thermostat')
+  await expect(dialog.getByRole('tab', { name: tab })).toHaveAttribute('aria-selected', 'true')
   return dialog
-}
-
-async function selectThermostatManualTab(dialog: Locator, name: 'Automation' | 'Rooms' | 'Tracking') {
-  const tab = dialog.getByRole('tab', { name })
-  await tab.click()
-  await expect(tab).toHaveAttribute('aria-selected', 'true')
-  await new Promise((resolve) => setTimeout(resolve, 400))
 }
 
 test('thermostat-controls-rooms', async ({ page }) => {
@@ -1850,38 +1849,33 @@ test('thermostat-controls-rooms', async ({ page }) => {
 })
 
 test('thermostat-controls-automation', async ({ page }) => {
-  const dialog = await openThermostatManualDialog(page)
-  await selectThermostatManualTab(dialog, 'Automation')
+  const dialog = await openThermostatManualDialog(page, 'Automation')
   await expect(dialog.getByRole('heading', { name: 'Automatic Thermostat' })).toBeVisible()
   await captureSyntheticWorkflowSubject(page, 'thermostat-controls-automation', dialog)
 })
 
 test('thermostat-controls-tracking', async ({ page }) => {
-  const dialog = await openThermostatManualDialog(page)
-  await selectThermostatManualTab(dialog, 'Tracking')
+  const dialog = await openThermostatManualDialog(page, 'Tracking')
   await expect(dialog.getByRole('button', { name: /Selected Rooms \d+ of 11 selected/i })).toBeVisible()
   await captureSyntheticWorkflowSubject(page, 'thermostat-controls-tracking', dialog)
 })
 
 test('thermostat-selected-rooms', async ({ page }) => {
-  const dialog = await openThermostatManualDialog(page)
-  await selectThermostatManualTab(dialog, 'Tracking')
+  const dialog = await openThermostatManualDialog(page, 'Tracking')
   await dialog.getByRole('button', { name: /Selected Rooms \d+ of 11 selected/i }).click()
   await expect(dialog).toHaveAccessibleName('Selected Rooms')
   await captureSyntheticWorkflowSubject(page, 'thermostat-selected-rooms', dialog)
 })
 
 test('thermostat-critical-protection', async ({ page }) => {
-  const dialog = await openThermostatManualDialog(page)
-  await selectThermostatManualTab(dialog, 'Tracking')
+  const dialog = await openThermostatManualDialog(page, 'Tracking')
   await dialog.getByRole('button', { name: /Critical Protection \d+ rooms forced/i }).click()
   await expect(dialog).toHaveAccessibleName('Critical Protection')
   await captureSyntheticWorkflowSubject(page, 'thermostat-critical-protection', dialog)
 })
 
 test('thermostat-occupied-only', async ({ page }) => {
-  const dialog = await openThermostatManualDialog(page)
-  await selectThermostatManualTab(dialog, 'Tracking')
+  const dialog = await openThermostatManualDialog(page, 'Tracking')
   await dialog.getByRole('button', { name: /Occupied Only \d+ of 11 occupied only/i }).click()
   await expect(dialog).toHaveAccessibleName('Occupied Only')
   await captureSyntheticWorkflowSubject(page, 'thermostat-occupied-only', dialog)
@@ -1909,7 +1903,7 @@ test('thermostat-room', async ({ page }) => {
       },
     },
   })
-  await page.getByRole('button', { name: /Thermostat Controls 11 rooms/i }).click()
+  await page.getByRole('button', { name: /Open Room Thermostats 11 rooms/i }).click()
   const dialog = page.getByRole('dialog')
   await dialog.getByRole('button', { name: /Living Room 70.2°F/i }).click()
   await expect(dialog).toHaveAccessibleName('Living Room')
@@ -1946,10 +1940,9 @@ test('predictive-comfort', async ({ page }) => {
       },
     },
   })
-  await page.getByRole('button', { name: /Thermostat Controls 11 rooms/i }).click()
+  await page.getByRole('button', { name: /Open Automation /i }).click()
   const dialog = page.getByRole('dialog')
-  await selectThermostatManualTab(dialog, 'Automation')
-  const openControls = dialog.getByRole('button', { name: 'Open Predictive Comfort controls' })
+  const openControls = dialog.getByRole('button', { name: /Open Predictive Comfort controls/i })
   await expect(openControls).toBeVisible({ timeout: 120000 })
   await openControls.scrollIntoViewIfNeeded()
   await openControls.click()
@@ -2252,9 +2245,8 @@ async function openThermostatOptionPicker(page: Page, buttonName: RegExp, title:
   await openRouteWithSyntheticFixture(page, 'ecobee', 'Thermostat', THERMOSTAT_PICKER_FIXTURE)
   let scope: Page | Locator = page
   if (title.startsWith('Eco ')) {
-    await page.getByRole('button', { name: /Thermostat Controls 11 rooms/i }).click()
+    await page.getByRole('button', { name: /Open Automation /i }).click()
     scope = page.getByRole('dialog')
-    await selectThermostatManualTab(scope, 'Automation')
   }
   const opener = scope.getByRole('button', { name: buttonName })
   await opener.scrollIntoViewIfNeeded()

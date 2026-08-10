@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type MouseEvent, type PointerEvent, type ReactNode } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent, type ReactNode } from 'react'
 import { useEntity, useHass, useUser } from '@hakit/core'
 import type { HassEntity } from 'home-assistant-js-websocket'
 import { ClimateCard } from '../components/cards/ClimateCard'
@@ -62,10 +62,9 @@ import { InlineAlert } from '../components/core/InlineAlert'
 import { ModalIconTabNav } from '../components/core/ModalTabNav'
 import { modalTabId, modalTabPanelId } from '../components/core/modalTabIds'
 import { ModalSheet, type ModalSheetStyle } from '../components/core/ModalSheet'
-import { ModalDisclosureIcon } from '../components/core/ModalDisclosureIcon'
 import { ModalOpenerRow } from '../components/core/ModalOpenerRow'
 import { NativePickerField } from '../components/core/NativePickerField'
-import { OptionPickerDialog, OptionPickerPanel, type PickerOption } from '../components/core/OptionPickerDialog'
+import { OptionPickerDialog, type PickerOption } from '../components/core/OptionPickerDialog'
 import { ScheduleEditorFields } from '../components/core/ScheduleEditorFields'
 import { resolveScheduleDefaultDays } from '../components/core/scheduleDays'
 import { ScheduleCollection, ScheduleDetailFooter, ScheduleListRow } from '../components/core/ScheduleFlow'
@@ -2022,16 +2021,16 @@ function AdminPage({ onNavigate, preload = false, preloadHash, preloadHashes = [
 
 const THERMOSTAT_SECTION_DESCRIPTIONS = {
   ecoMode:
-    "Enable Eco Mode to only track active rooms, and disable heating/cooling inactive, but critical temperature, rooms.\n\nUse the dropdown on the right side of the button to configure Eco Mode's behavior when everyone is out of the house.\n\nTo have specific rooms override Eco mode, enable Track Selected Rooms, and select the rooms you'd like to enable critical monitoring for.",
+    'Eco Mode reduces heating and cooling in inactive rooms. Use the options below to choose critical-temperature protection and what happens when everyone is away.',
   forceCritical:
-    "For rooms that are not selected above, you can select rooms here that we should still monitor for critical temperatures.\n\nA good example is the theater room, which sits below rooms we want heated or cooled, or the music room, which sits below the living room; even if we aren't actively monitoring them, those rooms being around temp mean more comfortable conditions upstairs.",
-  integration: 'Enable or disable automatic thermostat control.',
+    'Choose unselected rooms that should still be monitored for unsafe temperatures.',
+  integration: "Turn Home Assistant's automatic thermostat control on or off.",
   predictiveComfort:
-    'Use forecast weather, humidity, indoor sensors, and learned heat-load patterns to prepare the house before it drifts out of the comfort band.\n\nThis enables predictive recommendations. Thermostat setpoint changes still require the separate auto-adjust option in the integration settings.',
+    'Predictive Comfort uses forecast and indoor conditions to recommend earlier changes. Open it to review the recommendation and choose which automatic changes are allowed.',
   trackOnlyWhenOccupied:
-    'Choose which rooms should stay out of thermostat decisions until they are occupied. When enabled, the room is ignored for temperature demand and minimum-vent balancing while empty, and its vent closes; once occupied, it participates normally.',
+    'Choose rooms that should stop contributing demand while empty and rejoin when occupied.',
   trackSelected:
-    'Track only a subset of monitored rooms for automated control. Monitored rooms can be configured in the integration settings.\n\nThis setting works in tandem with eco mode, but eco mode is not required to be enabled to use it.',
+    'Track only the rooms that should participate in normal automatic heating and cooling.',
 } as const
 
 function contactSensorTitle(group: EntityGroupConfig, item: EntityGroupConfig['items'][number]) {
@@ -2086,6 +2085,9 @@ const PREDICTIVE_ALLOW_AWAY_SWITCH_ENTITY_ID = 'switch.thermostat_contact_sensor
 const PREDICTIVE_COMFORT_SENSOR_ENTITY_ID = 'sensor.living_room_thermostat_contact_sensors_predictive_comfort_mode'
 const PREDICTIVE_COMFORT_HASH = '#predictive-comfort'
 const THERMOSTAT_MODAL_HASH = '#thermostat-controls'
+const THERMOSTAT_ROOMS_HASH = '#thermostat-rooms'
+const THERMOSTAT_AUTOMATION_HASH = '#thermostat-automation'
+const THERMOSTAT_TRACKING_HASH = '#thermostat-tracking'
 const THERMOSTAT_MODAL_TAB_ID_PREFIX = 'thermostat-controls'
 const THERMOSTAT_MODAL_TAB_PANEL_ID = modalTabPanelId(THERMOSTAT_MODAL_TAB_ID_PREFIX, 'content')
 const PREDICTIVE_STATE_LABELS: Readonly<Record<string, string>> = {
@@ -4979,45 +4981,105 @@ function thermostatOptionConfig(detailType: 'eco-away' | 'eco-critical') {
   return detailType === 'eco-critical' ? THERMOSTAT_ECO_CRITICAL_CONFIG : THERMOSTAT_ECO_AWAY_CONFIG
 }
 
+const THERMOSTAT_OPTION_PRESENTATION: Readonly<Record<string, { description: string; icon: string }>> = {
+  'Disable Eco When Away': {
+    description: 'Turn Eco Mode off while everyone is away.',
+    icon: 'mdi:home-export-outline',
+  },
+  'Do Not Track Critical': {
+    description: 'Do not add temperature-only protection for unselected rooms.',
+    icon: 'mdi:thermometer-off',
+  },
+  'Keep Eco Active': {
+    description: 'Keep normal Eco Mode behavior active while everyone is away.',
+    icon: 'mdi:leaf',
+  },
+  'Track All Critical': {
+    description: 'Protect every room from unsafe temperatures, even when it is not selected.',
+    icon: 'mdi:thermometer-alert',
+  },
+  'Track Select Critical': {
+    description: 'Protect only the unselected rooms chosen in Critical Protection.',
+    icon: 'mdi:thermometer-check',
+  },
+  'Use Eco Away Targets': {
+    description: 'Use the wider away temperature range while everyone is away.',
+    icon: 'mdi:home-thermometer',
+  },
+}
+
+function ThermostatModalControl({ children, description, focusKey }: { children: ReactNode; description: string; focusKey?: string }) {
+  return (
+    <div className={styles.thermostatModalControl} data-modal-detail-trigger={focusKey}>
+      <Description>{description}</Description>
+      {children}
+    </div>
+  )
+}
+
 function ThermostatOptionOpener({ detailType, onOpen }: { detailType: 'eco-away' | 'eco-critical'; onOpen: () => void }) {
   const config = thermostatOptionConfig(detailType)
   const control = useThermostatSelectControl(config)
+  const description = detailType === 'eco-critical'
+    ? 'Choose how Eco Mode protects rooms from unsafe temperatures.'
+    : 'Choose whether Eco Mode turns off, uses away targets, or stays active when everyone leaves.'
 
   return (
-    <div data-modal-detail-trigger={detailType}>
-      <ModalOpenerRow
+    <ThermostatModalControl description={description} focusKey={detailType}>
+      <ScheduleListRow
+        accessibleLabel={`${config.title} ${formatSelectOption(control.displayValue)}`}
         disabled={control.disabled}
-        icon={<MaterialIcon name={config.icon} size={28} />}
+        focusKey={detailType}
+        icon={config.icon}
+        iconSurface={false}
         onClick={onOpen}
-        subtitle={formatSelectOption(control.displayValue)}
-        title={config.title}
-        variant="wide"
+        primary={config.title}
+        secondary={formatSelectOption(control.displayValue)}
       />
-    </div>
+    </ThermostatModalControl>
   )
 }
 
 function ThermostatOptionDetailPage({ detailType, onSelected }: { detailType: 'eco-away' | 'eco-critical'; onSelected: () => void }) {
   const config = thermostatOptionConfig(detailType)
   const control = useThermostatSelectControl(config)
+  const description = detailType === 'eco-critical'
+    ? 'Choose how Eco Mode protects rooms that are not participating in normal heating and cooling.'
+    : 'Choose what Eco Mode should do when everyone is away.'
 
   if (control.disabled) {
     return <InlineAlert>{config.title} is unavailable until Home Assistant supplies supported options.</InlineAlert>
   }
 
   return (
-    <OptionPickerPanel
-      icon={config.icon}
-      layout={config.pickerSheetLayout ?? 'card-grid'}
-      onSelect={(nextValue) => {
-        control.selectOption(nextValue)
-        onSelected()
-      }}
-      options={control.options}
-      selectedIcon={config.selectedIcon}
-      title={config.title}
-      value={control.displayValue}
-    />
+    <section className={styles.section}>
+      <Description>{description}</Description>
+      <DynamicGrid ariaLabel={`${config.title} options`} className={styles.thermostatChoiceGrid} columns={2} gap={8}>
+        {control.options.map((option, index) => {
+          const presentation = THERMOSTAT_OPTION_PRESENTATION[option.value]
+          return (
+            <ScheduleListRow
+              accessibleLabel={`Set ${config.title} to ${String(option.label)}`}
+              active={option.value === control.displayValue}
+              autoFocus={option.value === control.displayValue || (!control.displayValue && index === 0)}
+              disclosure={false}
+              focusKey={option.value}
+              icon={presentation?.icon ?? config.icon}
+              iconSurface={false}
+              key={option.value}
+              onClick={() => {
+                control.selectOption(option.value)
+                onSelected()
+              }}
+              pressed={option.value === control.displayValue}
+              primary={option.label}
+              secondary={presentation?.description}
+              wrapText
+            />
+          )
+        })}
+      </DynamicGrid>
+    </section>
   )
 }
 
@@ -5104,31 +5166,29 @@ function ThermostatHubPill() {
   )
 }
 
-function ThermostatSwitchCard({ children, entityId, icon, title }: { children?: ReactNode; entityId: string; icon: string; title: string }) {
+function ThermostatToggleSetting({ entityId, icon, title }: { entityId: string; icon: string; title: string }) {
   const entity = useEntity(asEntityName(entityId), { returnNullIfNotFound: true })
   const callService = useCallService()
   const [state, commitState] = useOptimisticState(entity?.state ?? 'unavailable')
   const active = state === 'on'
-  const stateText = formatCompactEntityState(entity, 'Unavailable', state)
+  const disabled = !entity || isUnavailable(entity)
 
-  const toggle = () => {
-    commitState(active ? 'off' : 'on')
+  const toggle = (checked: boolean) => {
+    if (disabled || checked === active) return
+    commitState(checked ? 'on' : 'off')
     callService({ domain: 'homeassistant', service: 'toggle', target: entityId })
   }
 
-  return (
-    <ThermostatGlassCard active={active} icon={icon} onMainClick={toggle} stateText={stateText} title={title}>
-      {children}
-    </ThermostatGlassCard>
-  )
+  return <ToggleSetting checked={active} disabled={disabled} icon={icon} label={title} onChange={toggle} />
 }
 
-function PredictiveComfortCard({ onOpen }: { onOpen: () => void }) {
+function PredictiveComfortSetting({ onOpen }: { onOpen: () => void }) {
   const entity = useEntity(asEntityName(PREDICTIVE_COMFORT_SWITCH_ENTITY_ID), { returnNullIfNotFound: true })
   const sensor = useEntity(asEntityName(PREDICTIVE_COMFORT_SENSOR_ENTITY_ID), { returnNullIfNotFound: true })
   const callService = useCallService()
   const [state, commitState] = useOptimisticState(entity?.state ?? 'unavailable')
   const active = state === 'on'
+  const disabled = !entity || isUnavailable(entity)
   const currentRecommendation = predictiveAttribute(entity, 'current_recommendation') ?? sensor?.state
   const stateText = active
     ? `${formatCompactEntityState(entity, 'Unavailable', state)} · ${formatPredictiveState(currentRecommendation)}`
@@ -5143,30 +5203,30 @@ function PredictiveComfortCard({ onOpen }: { onOpen: () => void }) {
     callService({ domain: 'switch', service: 'turn_on', target: PREDICTIVE_COMFORT_SWITCH_ENTITY_ID })
   }
 
-  const turnOff = (event: MouseEvent<HTMLButtonElement>) => {
-    event.stopPropagation()
-    commitState('off')
-    callService({ domain: 'switch', service: 'turn_off', target: PREDICTIVE_COMFORT_SWITCH_ENTITY_ID })
-  }
-
-  const openControls = (event: MouseEvent<HTMLButtonElement>) => {
-    event.stopPropagation()
-    onOpen()
+  const toggle = (checked: boolean) => {
+    if (disabled || checked === active) return
+    commitState(checked ? 'on' : 'off')
+    callService({
+      domain: 'switch',
+      service: checked ? 'turn_on' : 'turn_off',
+      target: PREDICTIVE_COMFORT_SWITCH_ENTITY_ID,
+    })
   }
 
   return (
-    <ThermostatGlassCard active={active} icon="mdi:home-thermometer-outline" onMainClick={handleMainClick} pressed={active} stateText={stateText} title="Predictive Comfort">
-      {active && (
-        <>
-          <button aria-label="Turn off Predictive Comfort" className={styles.thermostatIconButton} onClick={turnOff} type="button">
-            <MaterialIcon name="mdi:power" size={22} />
-          </button>
-          <button aria-label="Open Predictive Comfort controls" className={styles.thermostatBareIconButton} onClick={openControls} type="button">
-            <ModalDisclosureIcon />
-          </button>
-        </>
-      )}
-    </ThermostatGlassCard>
+    <ScheduleListRow
+      accessibleLabel={active ? `Open Predictive Comfort controls, ${stateText}` : 'Turn on Predictive Comfort'}
+      active={active}
+      disabled={disabled}
+      disclosure={active}
+      focusKey="predictive"
+      icon="mdi:home-thermometer-outline"
+      iconSurface={false}
+      onClick={handleMainClick}
+      primary="Predictive Comfort"
+      secondary={stateText}
+      trailingControl={<ToggleControl checked={active} disabled={disabled} label="Predictive Comfort" onChange={toggle} />}
+    />
   )
 }
 
@@ -5284,16 +5344,16 @@ function PredictiveComfortModalContent() {
         <SectionHeader title="Controls" />
         <div className={styles.predictiveControlGrid}>
           <div className={styles.predictiveControlGroup}>
-            <Description>Lets Predictive Comfort nudge the thermostat target before the house drifts out of range.</Description>
-            <ThermostatSwitchCard entityId={PREDICTIVE_AUTO_ADJUST_SWITCH_ENTITY_ID} icon="mdi:thermostat-auto" title="Auto Setpoint Adjustments" />
+            <Description>Allow Predictive Comfort to adjust the thermostat target before the house leaves the comfort range.</Description>
+            <ThermostatToggleSetting entityId={PREDICTIVE_AUTO_ADJUST_SWITCH_ENTITY_ID} icon="mdi:thermostat-auto" title="Auto Setpoint Adjustments" />
           </div>
           <div className={styles.predictiveControlGroup}>
-            <Description>Allows Predictive Comfort to switch between heat and cool when a proactive correction needs it.</Description>
-            <ThermostatSwitchCard entityId={PREDICTIVE_HVAC_MODE_CHANGE_SWITCH_ENTITY_ID} icon="mdi:hvac" title="HVAC Mode Changes" />
+            <Description>Allow Predictive Comfort to switch between heating and cooling when the recommendation requires it.</Description>
+            <ThermostatToggleSetting entityId={PREDICTIVE_HVAC_MODE_CHANGE_SWITCH_ENTITY_ID} icon="mdi:hvac" title="HVAC Mode Changes" />
           </div>
           <div className={styles.predictiveControlGroup}>
-            <Description>Allows proactive thermostat changes while everyone is away; leave off to only act when someone is home.</Description>
-            <ThermostatSwitchCard entityId={PREDICTIVE_ALLOW_AWAY_SWITCH_ENTITY_ID} icon="mdi:home-export-outline" title="Predictive Comfort While Away" />
+            <Description>Allow predictive thermostat changes while everyone is away. Leave this off to act only while someone is home.</Description>
+            <ThermostatToggleSetting entityId={PREDICTIVE_ALLOW_AWAY_SWITCH_ENTITY_ID} icon="mdi:home-export-outline" title="Predictive Comfort While Away" />
           </div>
         </div>
       </section>
@@ -5382,6 +5442,7 @@ function useThermostatTrackingSummary() {
 }
 
 function ThermostatTrackingOpener({
+  description,
   disabled = false,
   focusKey,
   icon,
@@ -5389,6 +5450,7 @@ function ThermostatTrackingOpener({
   subtitle,
   title,
 }: {
+  description: string
   disabled?: boolean
   focusKey: string
   icon: string
@@ -5397,16 +5459,18 @@ function ThermostatTrackingOpener({
   title: string
 }) {
   return (
-    <div data-modal-detail-trigger={focusKey}>
-      <ModalOpenerRow
+    <ThermostatModalControl description={description} focusKey={focusKey}>
+      <ScheduleListRow
+        accessibleLabel={`${title} ${subtitle}`}
         disabled={disabled}
-        icon={<MaterialIcon name={icon} size={28} />}
+        focusKey={focusKey}
+        icon={icon}
+        iconSurface={false}
         onClick={onOpen}
-        subtitle={subtitle}
-        title={title}
-        variant="wide"
+        primary={title}
+        secondary={subtitle}
       />
-    </div>
+    </ThermostatModalControl>
   )
 }
 
@@ -5418,13 +5482,16 @@ function ThermostatTrackingRoot({ onOpenDetail }: { onOpenDetail: (detail: Therm
     <div className={styles.thermostatModalStack}>
       <section className={styles.section}>
         <SectionHeader title="Room Tracking" />
-        <Description className={styles.thermostatDescription}>{THERMOSTAT_SECTION_DESCRIPTIONS.trackSelected}</Description>
-        <ThermostatSwitchCard entityId="switch.thermostat_contact_sensors_only_track_selected_rooms" icon="mdi:home-thermometer" title="Track Selected Rooms" />
+        <Description>{THERMOSTAT_MODAL_TABS.find((tab) => tab.tab === 'tracking')?.description}</Description>
+        <ThermostatModalControl description={THERMOSTAT_SECTION_DESCRIPTIONS.trackSelected}>
+          <ThermostatToggleSetting entityId="switch.thermostat_contact_sensors_only_track_selected_rooms" icon="mdi:home-thermometer" title="Track Selected Rooms" />
+        </ThermostatModalControl>
       </section>
       <section className={styles.section}>
         <SectionHeader title="Room Rules" />
         <div className={styles.thermostatModalList}>
           <ThermostatTrackingOpener
+            description="Choose the rooms used for normal automatic heating and cooling when selected-room tracking is on."
             disabled={!summary.selectedEnabled}
             focusKey="selected-rooms"
             icon="mdi:home-check"
@@ -5433,6 +5500,7 @@ function ThermostatTrackingRoot({ onOpenDetail }: { onOpenDetail: (detail: Therm
             title="Selected Rooms"
           />
           <ThermostatTrackingOpener
+            description="Choose unselected rooms that should still be monitored for unsafe temperatures."
             disabled={!summary.criticalEnabled}
             focusKey="critical-protection"
             icon="mdi:thermometer-alert"
@@ -5441,6 +5509,7 @@ function ThermostatTrackingRoot({ onOpenDetail }: { onOpenDetail: (detail: Therm
             title="Critical Protection"
           />
           <ThermostatTrackingOpener
+            description="Choose rooms that should stop contributing demand while empty and rejoin when occupied."
             focusKey="occupied-only"
             icon="mdi:motion-sensor"
             onOpen={() => onOpenDetail({ type: 'occupied-only' }, 'occupied-only')}
@@ -5461,10 +5530,10 @@ function ThermostatTrackingDetailPage({ detailType }: { detailType: 'critical-pr
     if (!summary.selectedEnabled) return <InlineAlert>Enable Track Selected Rooms before choosing participating rooms.</InlineAlert>
     return (
       <section className={styles.section}>
-        <Description className={styles.thermostatDescription}>{THERMOSTAT_SECTION_DESCRIPTIONS.trackSelected}</Description>
-        <div className={styles.thermostatCheckboxGrid}>
+        <Description>{THERMOSTAT_SECTION_DESCRIPTIONS.trackSelected}</Description>
+        <DynamicGrid ariaLabel="Selected thermostat rooms" className={styles.thermostatTrackingGrid} columns={2} gap={8}>
           {THERMOSTAT_ROOM_VIEWS.map((room, index) => <ThermostatTrackCheckbox detailAutoFocus={index === 0} key={room.key} room={room} />)}
-        </div>
+        </DynamicGrid>
       </section>
     )
   }
@@ -5475,22 +5544,22 @@ function ThermostatTrackingDetailPage({ detailType }: { detailType: 'critical-pr
     }
     return (
       <section className={styles.section}>
-        <Description className={styles.thermostatDescription}>{THERMOSTAT_SECTION_DESCRIPTIONS.forceCritical}</Description>
-        <div className={styles.thermostatCheckboxGrid}>
+        <Description>{THERMOSTAT_SECTION_DESCRIPTIONS.forceCritical}</Description>
+        <DynamicGrid ariaLabel="Critical protection thermostat rooms" className={styles.thermostatTrackingGrid} columns={2} gap={8}>
           {THERMOSTAT_ROOM_VIEWS
             .filter((room) => entities[thermostatTrackEntityId(room)]?.state !== 'on')
             .map((room, index) => <ThermostatForceCheckbox detailAutoFocus={index === 0} key={room.key} room={room} />)}
-        </div>
+        </DynamicGrid>
       </section>
     )
   }
 
   return (
     <section className={styles.section}>
-      <Description className={styles.thermostatDescription}>{THERMOSTAT_SECTION_DESCRIPTIONS.trackOnlyWhenOccupied}</Description>
-      <div className={styles.thermostatCheckboxGrid}>
+      <Description>{THERMOSTAT_SECTION_DESCRIPTIONS.trackOnlyWhenOccupied}</Description>
+      <DynamicGrid ariaLabel="Occupied-only thermostat rooms" className={styles.thermostatTrackingGrid} columns={2} gap={8}>
         {THERMOSTAT_ROOM_VIEWS.map((room, index) => <ThermostatTrackOnlyWhenOccupiedCheckbox detailAutoFocus={index === 0} key={room.key} room={room} />)}
-      </div>
+      </DynamicGrid>
     </section>
   )
 }
@@ -5571,6 +5640,7 @@ function ThermostatRoomsRoot({ onOpenRoom }: { onOpenRoom: (room: ThermostatRoom
   return (
     <section className={styles.section}>
       <SectionHeader title="Rooms" />
+      <Description>{THERMOSTAT_MODAL_TABS.find((tab) => tab.tab === 'rooms')?.description}</Description>
       <DynamicGrid ariaLabel="Thermostat rooms" className={styles.thermostatRoomGrid} columns={2} forceEquivalentColumnCount gap={8}>
         {THERMOSTAT_ROOM_VIEWS.map((room) => <ThermostatRoomRow key={room.key} onOpen={() => onOpenRoom(room)} room={room} />)}
       </DynamicGrid>
@@ -5583,13 +5653,15 @@ function ThermostatAutomationRoot({ onOpenDetail }: { onOpenDetail: (detail: The
     <div className={styles.thermostatModalStack}>
       <section className={styles.section}>
         <SectionHeader title="Automatic Thermostat" />
-        <Description className={styles.thermostatDescription}>{THERMOSTAT_SECTION_DESCRIPTIONS.integration}</Description>
-        <ThermostatSwitchCard entityId="input_boolean.enable_disable_thermostat_contact_sensors_integration" icon="mdi:thermostat" title="Automatic Thermostat" />
+        <ThermostatModalControl description={THERMOSTAT_SECTION_DESCRIPTIONS.integration}>
+          <ThermostatToggleSetting entityId="input_boolean.enable_disable_thermostat_contact_sensors_integration" icon="mdi:thermostat" title="Automatic Thermostat" />
+        </ThermostatModalControl>
       </section>
       <section className={styles.section}>
         <SectionHeader title="Eco Mode" />
-        <Description className={styles.thermostatDescription}>{THERMOSTAT_SECTION_DESCRIPTIONS.ecoMode}</Description>
-        <ThermostatSwitchCard entityId="switch.thermostat_contact_sensors_eco_mode" icon="mdi:leaf" title="Eco Mode" />
+        <ThermostatModalControl description={THERMOSTAT_SECTION_DESCRIPTIONS.ecoMode}>
+          <ThermostatToggleSetting entityId="switch.thermostat_contact_sensors_eco_mode" icon="mdi:leaf" title="Eco Mode" />
+        </ThermostatModalControl>
         <div className={styles.thermostatModalList}>
           <ThermostatOptionOpener detailType="eco-critical" onOpen={() => onOpenDetail({ type: 'eco-critical' }, 'eco-critical')} />
           <ThermostatOptionOpener detailType="eco-away" onOpen={() => onOpenDetail({ type: 'eco-away' }, 'eco-away')} />
@@ -5597,10 +5669,9 @@ function ThermostatAutomationRoot({ onOpenDetail }: { onOpenDetail: (detail: The
       </section>
       <section className={styles.section}>
         <SectionHeader title="Predictive Comfort" />
-        <Description className={styles.thermostatDescription}>{THERMOSTAT_SECTION_DESCRIPTIONS.predictiveComfort}</Description>
-        <div data-modal-detail-trigger="predictive">
-          <PredictiveComfortCard onOpen={() => onOpenDetail({ type: 'predictive' }, 'predictive')} />
-        </div>
+        <ThermostatModalControl description={THERMOSTAT_SECTION_DESCRIPTIONS.predictiveComfort} focusKey="predictive">
+          <PredictiveComfortSetting onOpen={() => onOpenDetail({ type: 'predictive' }, 'predictive')} />
+        </ThermostatModalControl>
       </section>
     </div>
   )
@@ -5636,7 +5707,22 @@ function thermostatModalEntry(hash: string): { activeTab: ThermostatModalTab; de
   const room = THERMOSTAT_ROOM_VIEWS.find((candidate) => candidate.hash === hash)
   if (room) return { activeTab: 'rooms', detail: { room, type: 'room' } }
   if (hash === PREDICTIVE_COMFORT_HASH) return { activeTab: 'automation', detail: { type: 'predictive' } }
+  if (hash === THERMOSTAT_AUTOMATION_HASH) return { activeTab: 'automation', detail: null }
+  if (hash === THERMOSTAT_TRACKING_HASH) return { activeTab: 'tracking', detail: null }
   return { activeTab: 'rooms', detail: null }
+}
+
+function thermostatModalRootHash(tab: ThermostatModalTab) {
+  if (tab === 'automation') return THERMOSTAT_AUTOMATION_HASH
+  if (tab === 'tracking') return THERMOSTAT_TRACKING_HASH
+  return THERMOSTAT_ROOMS_HASH
+}
+
+function thermostatModalRootHashMatches(hash: string) {
+  return hash === THERMOSTAT_MODAL_HASH
+    || hash === THERMOSTAT_ROOMS_HASH
+    || hash === THERMOSTAT_AUTOMATION_HASH
+    || hash === THERMOSTAT_TRACKING_HASH
 }
 
 function thermostatModalDetailKey(activeTab: ThermostatModalTab, detail: ThermostatModalDetail | null) {
@@ -5710,10 +5796,19 @@ function ThermostatModal({
   const closeDetail = () => {
     leaveDetailPage()
     setDetail(null)
-    if (hash !== THERMOSTAT_MODAL_HASH) {
-      internalHashRef.current = THERMOSTAT_MODAL_HASH
-      replaceDashboardUrl(THERMOSTAT_MODAL_HASH)
+    const rootHash = thermostatModalRootHash(activeTab)
+    if (!thermostatModalRootHashMatches(hash) || hash !== rootHash) {
+      internalHashRef.current = rootHash
+      replaceDashboardUrl(rootHash)
     }
+  }
+
+  const changeTab = (tab: ThermostatModalTab) => {
+    setActiveTab(tab)
+    const rootHash = thermostatModalRootHash(tab)
+    if (hash === rootHash) return
+    internalHashRef.current = rootHash
+    replaceDashboardUrl(rootHash)
   }
 
   const subtitle = detail?.type === 'predictive'
@@ -5728,7 +5823,7 @@ function ThermostatModal({
           activeTab={activeTab}
           idPrefix={THERMOSTAT_MODAL_TAB_ID_PREFIX}
           label="Thermostat sections"
-          onTabChange={setActiveTab}
+          onTabChange={changeTab}
           panelId={THERMOSTAT_MODAL_TAB_PANEL_ID}
           tabs={THERMOSTAT_MODAL_TABS}
         />
@@ -5767,36 +5862,100 @@ function ThermostatModal({
 function AutomaticThermostatWarning() {
   const entity = useEntity(asEntityName('input_boolean.enable_disable_thermostat_contact_sensors_integration'), { returnNullIfNotFound: true })
   if (entity?.state !== 'off') return null
-  return <Notice>Automatic Thermostat is off. Open Rooms &amp; Settings to resume Home Assistant-owned climate control.</Notice>
+  return <Notice>Automatic Thermostat is off. Open Automation to turn Home Assistant&apos;s thermostat control back on.</Notice>
 }
 
-function ThermostatModalOpener({ onOpen }: { onOpen: () => void }) {
-  const rangeEntity = useEntity(asEntityName('input_text.all_climate_range'), { returnNullIfNotFound: true })
-  const rangeSummary = formatCompactEntityState(rangeEntity, 'Range unavailable')
+function thermostatTabDescription(tab: ThermostatModalTab) {
+  return THERMOSTAT_MODAL_TABS.find((item) => item.tab === tab)?.description ?? ''
+}
 
+function useThermostatAutomationSummary() {
+  const automatic = useEntity(asEntityName('input_boolean.enable_disable_thermostat_contact_sensors_integration'), { returnNullIfNotFound: true })
+  const eco = useEntity(asEntityName('switch.thermostat_contact_sensors_eco_mode'), { returnNullIfNotFound: true })
+  const predictive = useEntity(asEntityName(PREDICTIVE_COMFORT_SWITCH_ENTITY_ID), { returnNullIfNotFound: true })
+  return `Automatic ${formatCompactEntityState(automatic, 'Unavailable')} · Eco ${formatCompactEntityState(eco, 'Unavailable')} · Predictive ${formatCompactEntityState(predictive, 'Unavailable')}`
+}
+
+function ThermostatPageEntry({
+  description,
+  hash,
+  icon,
+  onOpen,
+  sectionTitle,
+  subtitle,
+  title,
+}: {
+  description: string
+  hash: string
+  icon: string
+  onOpen: (hash: string) => void
+  sectionTitle: string
+  subtitle: string
+  title: string
+}) {
   return (
     <section className={styles.section}>
-      <SectionHeader title="Rooms & Settings" />
+      <SectionHeader title={sectionTitle} />
+      <Description>{description}</Description>
       <ModalOpenerRow
-        icon={<MaterialIcon name="mdi:home-thermometer" size={32} />}
-        onClick={onOpen}
-        subtitle={`${THERMOSTAT_ROOM_VIEWS.length} rooms · ${rangeSummary}`}
-        title="Thermostat Controls"
+        icon={<MaterialIcon name={icon} size={32} />}
+        onClick={() => onOpen(hash)}
+        subtitle={subtitle}
+        title={title}
         variant="wide"
       />
     </section>
   )
 }
 
+function ThermostatPageEntries({ onOpen }: { onOpen: (hash: string) => void }) {
+  const rangeEntity = useEntity(asEntityName('input_text.all_climate_range'), { returnNullIfNotFound: true })
+  const rangeSummary = formatCompactEntityState(rangeEntity, 'Range unavailable')
+  const automationSummary = useThermostatAutomationSummary()
+  const trackingSummary = useThermostatTrackingSummary()
+
+  return (
+    <div className={styles.thermostatPageEntries} data-thermostat-page-entrypoints="true">
+      <ThermostatPageEntry
+        description={thermostatTabDescription('rooms')}
+        hash={THERMOSTAT_ROOMS_HASH}
+        icon="mdi:home-thermometer"
+        onOpen={onOpen}
+        sectionTitle="Rooms"
+        subtitle={`${THERMOSTAT_ROOM_VIEWS.length} rooms · ${rangeSummary}`}
+        title="Open Room Thermostats"
+      />
+      <ThermostatPageEntry
+        description={thermostatTabDescription('automation')}
+        hash={THERMOSTAT_AUTOMATION_HASH}
+        icon="mdi:cog"
+        onOpen={onOpen}
+        sectionTitle="Automation"
+        subtitle={automationSummary}
+        title="Open Automation"
+      />
+      <ThermostatPageEntry
+        description={thermostatTabDescription('tracking')}
+        hash={THERMOSTAT_TRACKING_HASH}
+        icon="mdi:motion-sensor"
+        onOpen={onOpen}
+        sectionTitle="Tracking"
+        subtitle={`${trackingSummary.selectedCount} selected · ${trackingSummary.criticalCount} critical · ${trackingSummary.occupiedOnlyCount} occupied`}
+        title="Open Room Tracking"
+      />
+    </div>
+  )
+}
+
 function ThermostatPage({ preload = false, preloadHash, preloadHashes = [] }: { preload?: boolean; preloadHash?: string; preloadHashes?: string[] }) {
   const { closeHash, hash, openHash } = useHashModal({ disabled: preload })
   const selectedRoom = THERMOSTAT_ROOM_VIEWS.find((room) => room.hash === hash) ?? null
-  const modalOpen = hash === THERMOSTAT_MODAL_HASH || hash === PREDICTIVE_COMFORT_HASH || Boolean(selectedRoom)
+  const modalOpen = thermostatModalRootHashMatches(hash) || hash === PREDICTIVE_COMFORT_HASH || Boolean(selectedRoom)
   const preloadTargets = useMemo(() => [...new Set([preloadHash, ...preloadHashes].filter((target): target is string => Boolean(target)))], [preloadHash, preloadHashes])
   const preloadRooms = useMemo(() => preloadTargets.map((preloadTargetHash) => THERMOSTAT_ROOM_VIEWS.find((room) => room.hash === preloadTargetHash)).filter((room): room is ThermostatRoomView => Boolean(room)), [preloadTargets])
 
   return (
-    <div className={`${styles.stack} ${styles.thermostatPage}`}>
+    <div className={`${styles.stack} ${styles.thermostatPage}`} data-manual-route-context="ecobee">
       <section className={styles.section}>
         <SectionHeader title="Whole Home" />
         <WholeHomeThermostatDial />
@@ -5805,11 +5964,21 @@ function ThermostatPage({ preload = false, preloadHash, preloadHashes = [] }: { 
       </section>
       <AutomaticThermostatWarning />
       <OpenContactSensorsSection />
-      <ThermostatModalOpener onOpen={() => openHash(THERMOSTAT_MODAL_HASH)} />
+      <ThermostatPageEntries onOpen={openHash} />
       {!preload && <ThermostatModal hash={hash} onClose={closeHash} open={modalOpen} />}
-      {preloadTargets.includes(THERMOSTAT_MODAL_HASH) && (
-        <div data-preload-modal={`ecobee${THERMOSTAT_MODAL_HASH}`}>
+      {(preloadTargets.includes(THERMOSTAT_MODAL_HASH) || preloadTargets.includes(THERMOSTAT_ROOMS_HASH)) && (
+        <div data-preload-modal={`ecobee${preloadTargets.includes(THERMOSTAT_ROOMS_HASH) ? THERMOSTAT_ROOMS_HASH : THERMOSTAT_MODAL_HASH}`}>
           <ThermostatModalRootContent displayedTab="rooms" onOpenDetail={() => undefined} onOpenRoom={() => undefined} />
+        </div>
+      )}
+      {preloadTargets.includes(THERMOSTAT_AUTOMATION_HASH) && (
+        <div data-preload-modal={`ecobee${THERMOSTAT_AUTOMATION_HASH}`}>
+          <ThermostatModalRootContent displayedTab="automation" onOpenDetail={() => undefined} onOpenRoom={() => undefined} />
+        </div>
+      )}
+      {preloadTargets.includes(THERMOSTAT_TRACKING_HASH) && (
+        <div data-preload-modal={`ecobee${THERMOSTAT_TRACKING_HASH}`}>
+          <ThermostatModalRootContent displayedTab="tracking" onOpenDetail={() => undefined} onOpenRoom={() => undefined} />
         </div>
       )}
       {preloadTargets.includes(PREDICTIVE_COMFORT_HASH) && (

@@ -613,6 +613,11 @@
   gap: 16px;
 }
 
+.thermostatPageEntries {
+  display: grid;
+  gap: 16px;
+}
+
 .thermostatDial {
   position: relative;
   display: grid;
@@ -1012,19 +1017,9 @@ button.thermostatGlassMain {
   --dynamic-grid-columns: 2;
 }
 
-.thermostatCheckboxGrid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-}
-
 .thermostatDescription {
   margin-bottom: 10px;
   white-space: pre-line;
-}
-
-.thermostatCheckboxGrid {
-  margin-top: 8px;
 }
 
 .thermostatCheckbox {
@@ -1047,7 +1042,23 @@ button.thermostatGlassMain {
 
 .thermostatModalList {
   display: grid;
+  gap: 14px;
+}
+
+.thermostatModalControl {
+  display: grid;
+  min-width: 0;
   gap: 8px;
+}
+
+.thermostatChoiceGrid [data-schedule-list-row],
+.thermostatChoiceGrid [data-schedule-list-row] > button,
+.thermostatTrackingGrid > [data-dynamic-grid-cell='true'] > button {
+  height: 100%;
+}
+
+.thermostatChoiceGrid [data-schedule-list-row] > button {
+  min-height: 112px;
 }
 
 .thermostatModalBody {
@@ -1479,8 +1490,7 @@ button.thermostatGlassMain {
 
 @media (max-width: 340px) {
   .grid,
-  .cameraGrid,
-  .thermostatCheckboxGrid {
+  .cameraGrid {
     grid-template-columns: 1fr;
   }
 

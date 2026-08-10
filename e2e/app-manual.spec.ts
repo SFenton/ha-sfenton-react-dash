@@ -209,7 +209,7 @@ test('five foundational route guides open from their landings and render the str
     { articleId: 'home-overview', question: /^What is on the Home screen\?/, sectionId: 'home', title: 'Home page guide', visibleSection: 'Quick Links' },
     { articleId: 'custom-lights-page-guide', question: /^How do I use Custom Lights\?/, sectionId: 'home', title: 'Custom Lights page guide', visibleSection: 'Reset All Lights' },
     { articleId: 'security-page-guide', question: /^What is on the Security page\?/, sectionId: 'security', title: 'Security page guide', visibleSection: 'Guest Presence Security' },
-    { articleId: 'thermostat-page-guide', question: /Thermostat page guide/i, sectionId: 'climate', title: 'Thermostat page guide', visibleSection: 'Rooms & Settings' },
+    { articleId: 'thermostat-page-guide', question: /Thermostat page guide/i, sectionId: 'climate', title: 'Thermostat page guide', visibleSection: 'Automation' },
   ]
 
   for (const routeGuide of cases) {

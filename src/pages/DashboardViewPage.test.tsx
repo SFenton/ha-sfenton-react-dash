@@ -76,7 +76,7 @@ async function clickIconModalTab(scope: RoleScope, name: string) {
 }
 
 async function openThermostatControls() {
-  fireEvent.click(screen.getByRole('button', { name: /Thermostat Controls 11 rooms/i }))
+  fireEvent.click(screen.getByRole('button', { name: /Open Room Thermostats 11 rooms/i }))
   return screen.findByRole('dialog', { name: 'Thermostat' })
 }
 
@@ -1969,8 +1969,9 @@ describe('DashboardViewPage', () => {
     expect(screen.getByLabelText(/Thermostat Hub Mode Off/i)).toBeInTheDocument()
     expect(screen.queryByText('73.4 °F')).not.toBeInTheDocument()
     expect(screen.queryByText('38.0%')).not.toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Rooms & Settings' })).toBeInTheDocument()
-    expect(screen.queryByRole('heading', { name: 'Rooms' })).not.toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Rooms' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Automation' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Tracking' })).toBeInTheDocument()
 
     const dialog = await openThermostatControls()
     const tabs = within(dialog).getAllByRole('tab')
@@ -1993,16 +1994,19 @@ describe('DashboardViewPage', () => {
 
     fireEvent.click(within(dialog).getByRole('button', { name: 'Back to rooms' }))
     await clickIconModalTab(within(dialog), 'Automation')
-    expect(within(dialog).getByRole('button', { name: /^Automatic Thermostat On$/i })).toBeInTheDocument()
-    expect(within(dialog).getByRole('button', { name: /^Eco Mode On$/i })).toBeInTheDocument()
-    expect(within(dialog).getByRole('button', { name: /^Predictive Comfort Off$/i })).toBeInTheDocument()
+    expect(within(dialog).getByRole('switch', { name: 'Turn off Automatic Thermostat' })).toBeInTheDocument()
+    expect(within(dialog).getByRole('switch', { name: 'Turn off Eco Mode' })).toBeInTheDocument()
+    expect(within(dialog).getByRole('button', { name: 'Turn on Predictive Comfort' })).toBeInTheDocument()
     expect(within(dialog).getByRole('button', { name: /Eco Mode Critical Tracking Track Select Critical/i })).toBeInTheDocument()
     expect(within(dialog).getByRole('button', { name: /Eco Behavior When Away Keep Eco Active/i })).toBeInTheDocument()
 
     fireEvent.click(within(dialog).getByRole('button', { name: /Eco Mode Critical Tracking Track Select Critical/i }))
     expect(screen.getAllByRole('dialog')).toHaveLength(1)
-    expect(within(dialog).getByRole('group', { name: 'Eco Mode Critical Tracking options' })).toHaveAttribute('data-layout', 'card-grid')
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Track All Critical' }))
+    expect(within(dialog).getByRole('group', { name: 'Eco Mode Critical Tracking options' })).toHaveAttribute('data-dynamic-grid', 'true')
+    expect(within(dialog).getByRole('button', { name: 'Set Eco Mode Critical Tracking to Track Select Critical' })).toHaveAttribute('aria-pressed', 'true')
+    expect(within(dialog).getByRole('button', { name: 'Set Eco Mode Critical Tracking to Track Select Critical' })).toHaveAttribute('data-modal-detail-autofocus', 'true')
+    expect(within(dialog).getByRole('button', { name: 'Set Eco Mode Critical Tracking to Track All Critical' })).toHaveAttribute('aria-pressed', 'false')
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Set Eco Mode Critical Tracking to Track All Critical' }))
     expect(mockCallServiceCalls).toContainEqual({
       domain: 'select',
       service: 'select_option',
@@ -2010,9 +2014,9 @@ describe('DashboardViewPage', () => {
       target: 'select.thermostat_contact_sensors_eco_mode_critical_tracking',
     })
 
-    fireEvent.click(within(dialog).getByRole('button', { name: /^Eco Mode On$/i }))
-    fireEvent.click(within(dialog).getByRole('button', { name: /^Predictive Comfort Off$/i }))
-    fireEvent.click(within(dialog).getByRole('button', { name: /^Automatic Thermostat On$/i }))
+    fireEvent.click(within(dialog).getByRole('switch', { name: 'Turn off Eco Mode' }))
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Turn on Predictive Comfort' }))
+    fireEvent.click(within(dialog).getByRole('switch', { name: 'Turn off Automatic Thermostat' }))
     expect(mockCallServiceCalls).toEqual(expect.arrayContaining([
       { domain: 'homeassistant', service: 'toggle', target: 'switch.thermostat_contact_sensors_eco_mode' },
       { domain: 'switch', service: 'turn_on', target: 'switch.thermostat_contact_sensors_predictive_comfort_mode' },
@@ -2064,24 +2068,23 @@ describe('DashboardViewPage', () => {
 
     const dialog = await openThermostatControls()
     await clickIconModalTab(within(dialog), 'Automation')
-    const predictiveComfort = within(dialog).getByRole('button', { name: /^Predictive Comfort On · Idle$/i })
-    expect(within(dialog).getByRole('button', { name: 'Turn off Predictive Comfort' })).toBeInTheDocument()
-    const predictiveControls = within(dialog).getByRole('button', { name: 'Open Predictive Comfort controls' })
+    const predictiveComfort = within(dialog).getByRole('button', { name: /Open Predictive Comfort controls, On · Idle/i })
+    expect(within(dialog).getByRole('switch', { name: 'Turn off Predictive Comfort' })).toBeInTheDocument()
+    const predictiveControls = predictiveComfort
     expect(predictiveControls).toBeInTheDocument()
-    expect(predictiveControls.querySelector('[data-modal-disclosure="right-chevron"]')).toBeInTheDocument()
-    expect(predictiveControls.querySelector('path')).toHaveAttribute('d', materialIconPath('mdi:chevron-right'))
-    fireEvent.click(predictiveComfort)
+    expect(predictiveControls.querySelector('[data-schedule-list-row-chevron]')).toBeInTheDocument()
+    expect(predictiveControls.querySelector('[data-schedule-list-row-chevron] path')).toHaveAttribute('d', materialIconPath('mdi:chevron-right'))
     fireEvent.click(predictiveComfort)
     expect(dialog).toHaveAttribute('data-surface', 'hass-popup')
     expect(within(dialog).getByRole('heading', { name: 'Predictive Comfort' })).toBeInTheDocument()
     expect(within(dialog).getByText(/^Idle$/i)).toBeInTheDocument()
     expect(within(dialog).getByRole('heading', { name: 'Controls' })).toBeInTheDocument()
-    const autoAdjustDescription = within(dialog).getByText(/nudge the thermostat target before the house drifts out of range/i)
-    const autoAdjustButton = within(dialog).getByRole('button', { name: /^Auto Setpoint Adjustments Off$/i })
-    const hvacModeDescription = within(dialog).getByText(/switch between heat and cool when a proactive correction needs it/i)
-    const hvacModeButton = within(dialog).getByRole('button', { name: /^HVAC Mode Changes Off$/i })
-    const awayDescription = within(dialog).getByText(/only act when someone is home/i)
-    const awayButton = within(dialog).getByRole('button', { name: /^Predictive Comfort While Away Off$/i })
+    const autoAdjustDescription = within(dialog).getByText(/adjust the thermostat target before the house leaves the comfort range/i)
+    const autoAdjustButton = within(dialog).getByRole('switch', { name: 'Turn on Auto Setpoint Adjustments' })
+    const hvacModeDescription = within(dialog).getByText(/switch between heating and cooling when the recommendation requires it/i)
+    const hvacModeButton = within(dialog).getByRole('switch', { name: 'Turn on HVAC Mode Changes' })
+    const awayDescription = within(dialog).getByText(/act only while someone is home/i)
+    const awayButton = within(dialog).getByRole('switch', { name: 'Turn on Predictive Comfort While Away' })
     expect(autoAdjustDescription.closest('button')).toBeNull()
     expect(hvacModeDescription.closest('button')).toBeNull()
     expect(awayDescription.closest('button')).toBeNull()
@@ -2116,7 +2119,7 @@ describe('DashboardViewPage', () => {
 
     const dialog = await openThermostatControls()
     await clickIconModalTab(within(dialog), 'Automation')
-    const predictiveComfort = within(dialog).getByRole('button', { name: 'Predictive Comfort On · Pre-Cool' })
+    const predictiveComfort = within(dialog).getByRole('button', { name: /Open Predictive Comfort controls, On · Pre-Cool/i })
     expect(within(dialog).queryByText('Pre Cool')).not.toBeInTheDocument()
 
     fireEvent.click(predictiveComfort)
@@ -2130,16 +2133,16 @@ describe('DashboardViewPage', () => {
 
     const dialog = await openThermostatControls()
     await clickIconModalTab(within(dialog), 'Automation')
-    expect(within(dialog).getByRole('button', { name: 'Turn off Predictive Comfort' })).toBeInTheDocument()
-    expect(within(dialog).getByRole('button', { name: 'Open Predictive Comfort controls' })).toBeInTheDocument()
+    expect(within(dialog).getByRole('switch', { name: 'Turn off Predictive Comfort' })).toBeInTheDocument()
+    expect(within(dialog).getByRole('button', { name: /Open Predictive Comfort controls/i })).toBeInTheDocument()
 
     mockCallServiceCalls.length = 0
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Turn off Predictive Comfort' }))
+    fireEvent.click(within(dialog).getByRole('switch', { name: 'Turn off Predictive Comfort' }))
     expect(mockCallServiceCalls).toEqual([
       { domain: 'switch', service: 'turn_off', target: 'switch.thermostat_contact_sensors_predictive_comfort_mode' },
     ])
-    expect(within(dialog).queryByRole('button', { name: 'Turn off Predictive Comfort' })).not.toBeInTheDocument()
-    expect(within(dialog).queryByRole('button', { name: 'Open Predictive Comfort controls' })).not.toBeInTheDocument()
+    expect(within(dialog).queryByRole('switch', { name: 'Turn off Predictive Comfort' })).not.toBeInTheDocument()
+    expect(within(dialog).getByRole('button', { name: 'Turn on Predictive Comfort' })).toBeInTheDocument()
   })
 
   it('shows manual air purifier fan speeds and runs fan percentage services', async () => {
@@ -6573,7 +6576,9 @@ describe('DashboardViewPage', () => {
 
     expect(screen.getByRole('heading', { name: 'Thermostat' })).toBeInTheDocument()
     expect(screen.queryByText(/not available in the React dashboard yet/i)).not.toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Rooms & Settings' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Rooms' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Automation' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Tracking' })).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: 'Eco Mode' })).not.toBeInTheDocument()
   })
 
