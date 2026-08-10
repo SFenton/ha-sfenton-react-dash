@@ -389,6 +389,7 @@ async function openHomeStatusSheet(
   const dialog = page.getByRole('dialog', { name: sheetName })
   await expect(dialog).toBeVisible({ timeout: 15000 })
   await expect(dialog.locator(`[data-manual-sheet="${sheetKind}"][data-manual-sheet-view="overview"]`)).toBeVisible()
+  if (await dialog.getAttribute('data-state') === 'open') await page.waitForTimeout(600)
   return dialog
 }
 
