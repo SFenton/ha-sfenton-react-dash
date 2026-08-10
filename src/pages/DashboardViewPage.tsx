@@ -138,7 +138,7 @@ import { FOOD_CARD_BACKGROUND_COLOR, foodSummarySubtitle } from '../constants/ev
 import { modalSquareGridModalStyle, modalSquareGridStyle, type ModalSquareGridStyle, useModalSquareGridLayout } from './modalSquareGrid'
 import { ROOM_PAGE_CONFIGS, type RoomSourceCardAction, type RoomSourceCardConfig, type RoomSourceKind, type RoomSourceModalItem, type RoomSourceSectionLayout } from '../constants/roomPages'
 import { humidifierForPowerEntity, type HumidifierConfig } from '../constants/humidifiers'
-import { MEDIA_REMOTE_CONFIGS } from '../constants/mediaRemotes'
+import { MEDIA_REMOTE_CONFIGS, type MediaRemoteConfig } from '../constants/mediaRemotes'
 import { VACUUM_AUTO_CLEAN_CONTROLS } from '../constants/vacuumAutoClean'
 import {
   THERMOSTAT_MODAL_DIAL_GUTTER_PX,
@@ -963,22 +963,33 @@ function DefaultRoomSourceCard({ card, eightSleepModalState, onOpen }: RoomSourc
   return content
 }
 
-function RoomSourceModal({ card, eightSleepModalState, onClose, preloadCard, roomTitle }: { card: RoomSourceCardConfig | null; eightSleepModalState?: EightSleepBedModalState; onClose: () => void; preloadCard?: RoomSourceCardConfig | null; roomTitle: string }) {
-  const lastCardRef = useRef<RoomSourceCardConfig | null>(null)
-  const lastEightSleepModalStateRef = useRef<EightSleepBedModalState | null>(null)
+function MediaRoomSourceModal({ config, onClose, open, title }: { config: MediaRemoteConfig; onClose: () => void; open: boolean; title: string }) {
   const [mediaActiveTab, setMediaActiveTab] = useState<MediaRemoteModalTab>('controls')
-  if (card) lastCardRef.current = card
 
-  const renderCard = card ?? preloadCard ?? lastCardRef.current
+  return (
+    <ModalSheet
+      contentStyle={MEDIA_REMOTE_MODAL_STYLE}
+      footer={<MediaRemoteModalNav activeTab={mediaActiveTab} onTabChange={setMediaActiveTab} remoteTitle={config.title} showDevices={Boolean(config.devices?.length)} />}
+      onClose={onClose}
+      open={open}
+      title={title}
+    >
+      <MediaRemoteModalContent activeTab={mediaActiveTab} config={config} onTabChange={setMediaActiveTab} />
+    </ModalSheet>
+  )
+}
+
+function RoomSourceModal({ card, eightSleepModalStates, onClose, preloadCard, roomTitle }: { card: RoomSourceCardConfig | null; eightSleepModalStates?: Partial<Record<string, EightSleepBedModalState>>; onClose: () => void; preloadCard?: RoomSourceCardConfig | null; roomTitle: string }) {
+  const currentRenderCard = card ?? preloadCard ?? null
+  const [retainedCard, setRetainedCard] = useState(currentRenderCard)
+  if (currentRenderCard && currentRenderCard !== retainedCard) setRetainedCard(currentRenderCard)
+
+  const renderCard = currentRenderCard ?? retainedCard
   const eightSleepSide = renderCard ? eightSleepSideForHash(renderCard.hash) : undefined
-  if (card && eightSleepSide && eightSleepModalState) lastEightSleepModalStateRef.current = eightSleepModalState
-
-  const renderedEightSleepModalState = card ? eightSleepModalState : lastEightSleepModalStateRef.current
+  const eightSleepModalState = eightSleepSide ? eightSleepModalStates?.[eightSleepSide.hash] : undefined
   const mediaRemote = renderCard?.kind === 'media' && renderCard.hash ? MEDIA_REMOTE_CONFIGS[renderCard.hash] : undefined
-  const content = renderCard && !eightSleepSide
-    ? mediaRemote
-      ? <MediaRemoteModalContent activeTab={mediaActiveTab} config={mediaRemote} key={mediaRemote.hash} onTabChange={setMediaActiveTab} />
-      : renderRoomReusableSheet(renderCard, roomTitle)
+  const content = renderCard && !eightSleepSide && !mediaRemote
+    ? renderRoomReusableSheet(renderCard, roomTitle)
     : null
   const plainTitle = renderCard?.kind === 'air' || renderCard?.kind === 'climate' || renderCard?.kind === 'contact' || renderCard?.kind === 'humidifier' || renderCard?.kind === 'light' || renderCard?.kind === 'occupancy'
   const mediaTitle = mediaRemote?.remoteTitle
@@ -991,20 +1002,18 @@ function RoomSourceModal({ card, eightSleepModalState, onClose, preloadCard, roo
     if (renderCard && isDishwasherSourceCard(renderCard)) return undefined
     return renderCard && plainTitle && renderCard.kind !== 'contact' && renderCard.kind !== 'light' ? roomSourceModalSubtitle(renderCard, roomTitle, state.entities) : undefined
   })
-  const modalStyle = renderCard?.kind === 'media'
-    ? MEDIA_REMOTE_MODAL_STYLE
-    : renderCard?.kind === 'vacuum'
-      ? VACUUM_MODAL_STYLE
+  const modalStyle = renderCard?.kind === 'vacuum'
+    ? VACUUM_MODAL_STYLE
     : renderCard && SECURITY_SIZED_ROOM_SOURCE_KINDS.has(renderCard.kind) ? ROOM_SOURCE_SECURITY_SIZED_MODAL_STYLE : undefined
 
-  useEffect(() => {
-    setMediaActiveTab('controls')
-  }, [mediaRemote?.hash])
-
-  if (renderCard && eightSleepSide && renderedEightSleepModalState) {
+  if (renderCard && eightSleepSide && eightSleepModalState) {
     return (
-      <EightSleepBedModal key={eightSleepSide.hash} modalState={renderedEightSleepModalState} onClose={onClose} open={Boolean(card)} side={eightSleepSide} />
+      <EightSleepBedModal key={eightSleepSide.hash} modalState={eightSleepModalState} onClose={onClose} open={Boolean(card)} side={eightSleepSide} />
     )
+  }
+
+  if (mediaRemote) {
+    return <MediaRoomSourceModal config={mediaRemote} key={mediaRemote.hash} onClose={onClose} open={Boolean(card)} title={title} />
   }
 
   const humidifier = renderCard?.kind === 'humidifier' ? humidifierForPowerEntity(renderCard.entityId) : undefined
@@ -1020,7 +1029,6 @@ function RoomSourceModal({ card, eightSleepModalState, onClose, preloadCard, roo
   return (
     <ModalSheet
       contentStyle={modalStyle}
-      footer={mediaRemote ? <MediaRemoteModalNav activeTab={mediaActiveTab} onTabChange={setMediaActiveTab} remoteTitle={mediaRemote.title} showDevices={Boolean(mediaRemote.devices?.length)} /> : undefined}
       onClose={onClose}
       open={Boolean(card)}
       subtitle={subtitle}
@@ -1123,7 +1131,7 @@ function SourceRoomPage({ onNavigate, preload = false, preloadHash, preloadHashe
         )
       })}
 
-      <RoomSourceModal card={selectedCard} eightSleepModalState={selectedCard?.hash ? eightSleepModalStates[selectedCard.hash] : preloadCard?.hash ? eightSleepModalStates[preloadCard.hash] : undefined} onClose={closeSourceCard} preloadCard={preloadCard} roomTitle={room.title} />
+      <RoomSourceModal card={selectedCard} eightSleepModalStates={eightSleepModalStates} onClose={closeSourceCard} preloadCard={preloadCard} roomTitle={room.title} />
       {preloadCards.map((card) => (
         <div data-preload-modal={`${room.path}${card.hash}`} key={`${room.path}-preload-${card.hash}`}>
           <RoomSourcePreloadContent card={card} eightSleepModalState={card.hash ? eightSleepModalStates[card.hash] : undefined} roomTitle={room.title} />
@@ -1291,14 +1299,15 @@ function todoEntityMayHaveItems(entity: EntityActionStateMap[string] & { state?:
 }
 
 function TodoSection({ entityVersion, hideListHeader = false, hideWhenEmpty, list, mayHaveItems, onEditTask, onSectionStateChange, reloadVersion, rowVariant }: { entityVersion: string; hideListHeader?: boolean; hideWhenEmpty: boolean | undefined; list: TodoListConfig; mayHaveItems: boolean; onEditTask?: (target: DonetickTaskEditTarget) => void; onSectionStateChange?: (entityId: string, state: { loaded: boolean; visible: boolean }) => void; reloadVersion?: number; rowVariant?: 'settings' }) {
-  const [visibleItemCount, setVisibleItemCount] = useState<number | null>(hideWhenEmpty && !mayHaveItems ? 0 : null)
+  const [visibleItemState, setVisibleItemState] = useState<{ entityVersion: string; value: number | null }>({ entityVersion, value: hideWhenEmpty && !mayHaveItems ? 0 : null })
+  const visibleItemCount = visibleItemState.entityVersion !== entityVersion && hideWhenEmpty && mayHaveItems && visibleItemState.value === 0
+    ? null
+    : visibleItemState.value
   const sectionVisible = !(hideWhenEmpty && visibleItemCount === 0)
   const todoOptimisticStatuses = useTodoOptimisticStatuses()
-
-  useEffect(() => {
-    if (!hideWhenEmpty || !mayHaveItems) return
-    setVisibleItemCount((current) => (current === 0 ? null : current))
-  }, [entityVersion, hideWhenEmpty, mayHaveItems])
+  const handleVisibleItemsChange = useCallback((value: number) => {
+    setVisibleItemState((current) => current.entityVersion === entityVersion && current.value === value ? current : { entityVersion, value })
+  }, [entityVersion])
 
   useEffect(() => {
     onSectionStateChange?.(list.entityId, { loaded: visibleItemCount !== null, visible: sectionVisible })
@@ -1309,7 +1318,7 @@ function TodoSection({ entityVersion, hideListHeader = false, hideWhenEmpty, lis
   return (
     <section className={styles.section}>
       {!hideListHeader && <SectionHeader title={list.title} />}
-      <TodoListPanel completionScript={list.completionScript} entityId={list.entityId} hideCompleted={list.hideCompleted} onEditTask={onEditTask} onVisibleItemsChange={hideWhenEmpty ? setVisibleItemCount : undefined} optimisticStatuses={todoOptimisticStatuses} reloadVersion={reloadVersion} rowVariant={rowVariant} title={list.title} />
+      <TodoListPanel completionScript={list.completionScript} entityId={list.entityId} hideCompleted={list.hideCompleted} onEditTask={onEditTask} onVisibleItemsChange={hideWhenEmpty ? handleVisibleItemsChange : undefined} optimisticStatuses={todoOptimisticStatuses} reloadVersion={reloadVersion} rowVariant={rowVariant} title={list.title} />
     </section>
   )
 }
@@ -3140,11 +3149,33 @@ function thermostatSliderColors(action: string) {
   }
 }
 
+function useCommitThermostatTemperature(entityId: string) {
+  const callService = useCallService()
+  const lastTemperatureCommit = useRef<string | null>(null)
+  const lastTemperatureCommitReset = useRef<number | null>(null)
+
+  useEffect(() => () => {
+    if (lastTemperatureCommitReset.current !== null) window.clearTimeout(lastTemperatureCommitReset.current)
+  }, [])
+
+  return useCallback((serviceData: Record<string, number>) => {
+    const commitKey = JSON.stringify(serviceData)
+    if (lastTemperatureCommit.current === commitKey) return
+    lastTemperatureCommit.current = commitKey
+    if (lastTemperatureCommitReset.current !== null) window.clearTimeout(lastTemperatureCommitReset.current)
+    lastTemperatureCommitReset.current = window.setTimeout(() => {
+      if (lastTemperatureCommit.current === commitKey) lastTemperatureCommit.current = null
+      lastTemperatureCommitReset.current = null
+    }, 400)
+    const target = entityId === GLOBAL_THERMOSTAT_ENTITY_ID && 'target_temp_low' in serviceData && 'target_temp_high' in serviceData ? THERMOSTAT_ROOM_CLIMATE_ENTITY_IDS : entityId
+    callService({ domain: 'climate', service: 'set_temperature', target, serviceData })
+  }, [callService, entityId])
+}
+
 function ThermostatDial({ actionOverride, entityId, inactiveOverride, interactive = true, primaryUnitOverride, primaryValueOverride, rangeTextOverride, size = 'page', title }: { actionOverride?: string; entityId: string; inactiveOverride?: boolean; interactive?: boolean; primaryUnitOverride?: string | null; primaryValueOverride?: string; rangeTextOverride?: string | null; size?: 'modal' | 'page'; title: string }) {
   const entity = useEntity(asEntityName(entityId), { returnNullIfNotFound: true })
-  const callService = useCallService()
-  const dialRef = useRef<HTMLDivElement>(null)
-  const activeHandle = useRef<{ pointerId: number; type: ThermostatSliderTarget } | null>(null)
+  const commitTemperature = useCommitThermostatTemperature(entityId)
+  const [activeHandle, setActiveHandle] = useState<{ pointerId: number; type: ThermostatSliderTarget } | null>(null)
   const unit = temperatureUnit(entity)
   const currentTemperature = entity?.attributes.current_temperature
   const targetLow = entity?.attributes.target_temp_low
@@ -3161,8 +3192,6 @@ function ThermostatDial({ actionOverride, entityId, inactiveOverride, interactiv
   const sourceTargetKey = `${low ?? 'none'}-${high ?? 'none'}-${target ?? 'none'}`
   const sourceTargets: ThermostatDisplayTargets = { high, low, sourceKey: sourceTargetKey, target }
   const [pendingTargets, setPendingTargets] = useState<ThermostatDisplayTargets | null>(null)
-  const lastTemperatureCommit = useRef<string | null>(null)
-  const lastTemperatureCommitReset = useRef<number | null>(null)
   const displayTargets = pendingTargets?.sourceKey === sourceTargetKey ? pendingTargets : sourceTargets
   const displayLow = displayTargets.low
   const displayHigh = displayTargets.high
@@ -3189,23 +3218,6 @@ function ThermostatDial({ actionOverride, entityId, inactiveOverride, interactiv
     })
   }
 
-  const commitTemperature = (serviceData: Record<string, number>) => {
-    const commitKey = JSON.stringify(serviceData)
-    if (lastTemperatureCommit.current === commitKey) return
-    lastTemperatureCommit.current = commitKey
-    if (lastTemperatureCommitReset.current !== null) window.clearTimeout(lastTemperatureCommitReset.current)
-    lastTemperatureCommitReset.current = window.setTimeout(() => {
-      if (lastTemperatureCommit.current === commitKey) lastTemperatureCommit.current = null
-      lastTemperatureCommitReset.current = null
-    }, 400)
-    const target = entityId === GLOBAL_THERMOSTAT_ENTITY_ID && 'target_temp_low' in serviceData && 'target_temp_high' in serviceData ? THERMOSTAT_ROOM_CLIMATE_ENTITY_IDS : entityId
-    callService({ domain: 'climate', service: 'set_temperature', target, serviceData })
-  }
-
-  useEffect(() => () => {
-    if (lastTemperatureCommitReset.current !== null) window.clearTimeout(lastTemperatureCommitReset.current)
-  }, [])
-
   const commitDisplayedTargets = () => {
     if (!entity) return
     if (hasRange && displayLow !== null && displayHigh !== null) {
@@ -3229,7 +3241,7 @@ function ThermostatDial({ actionOverride, entityId, inactiveOverride, interactiv
   }
 
   const nextValueFromHandleEvent = (event: PointerEvent<HTMLElement>, type: ThermostatSliderTarget) => {
-    const rect = dialRef.current?.getBoundingClientRect()
+    const rect = event.currentTarget.closest<HTMLElement>('[role="region"]')?.getBoundingClientRect()
     if (!rect) return null
     const rawValue = thermostatValueFromPoint(rect, event.clientX, event.clientY, minTemperature, maxTemperature, targetStep)
     if (hasRange && type === 'low' && displayHigh !== null) return Math.min(rawValue, displayHigh)
@@ -3243,12 +3255,12 @@ function ThermostatDial({ actionOverride, entityId, inactiveOverride, interactiv
     event.preventDefault()
     event.stopPropagation()
     event.currentTarget.setPointerCapture(event.pointerId)
-    activeHandle.current = { pointerId: event.pointerId, type }
+    setActiveHandle({ pointerId: event.pointerId, type })
     updateDisplayedTarget(nextValue, type)
   }
 
   const moveHandleDrag = (event: PointerEvent<HTMLElement>) => {
-    const active = activeHandle.current
+    const active = activeHandle
     if (!active || active.pointerId !== event.pointerId) return
     const nextValue = nextValueFromHandleEvent(event, active.type)
     if (nextValue === null) return
@@ -3257,10 +3269,10 @@ function ThermostatDial({ actionOverride, entityId, inactiveOverride, interactiv
   }
 
   const endHandleDrag = (event: PointerEvent<HTMLElement>) => {
-    const active = activeHandle.current
+    const active = activeHandle
     if (!active || active.pointerId !== event.pointerId) return
     const nextValue = nextValueFromHandleEvent(event, active.type)
-    activeHandle.current = null
+    setActiveHandle(null)
     if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId)
     if (nextValue === null) return
     event.preventDefault()
@@ -3291,7 +3303,7 @@ function ThermostatDial({ actionOverride, entityId, inactiveOverride, interactiv
         ariaValueText: formatTemperatureValue(handle.value, unit),
         color: handle.type === 'low' ? THERMOSTAT_HEAT_COLOR : handle.type === 'high' ? THERMOSTAT_COOL_COLOR : actionColor ?? THERMOSTAT_NEUTRAL_COLOR,
         dataTarget: handle.type,
-        dragging: activeHandle.current?.type === handle.type,
+        dragging: activeHandle?.type === handle.type,
         id: handle.type,
         onPointerCancel: endHandleDrag,
         onPointerDown: startHandleDrag(handle.type),
@@ -3311,7 +3323,6 @@ function ThermostatDial({ actionOverride, entityId, inactiveOverride, interactiv
       primaryText={primaryValueText}
       primaryUnit={primaryUnitText}
       readonly={!interactive}
-      ref={dialRef}
       secondaryText={displayRangeText !== null ? (
         <>
           <MaterialIcon name="mdi:thermostat" size={17} />
@@ -3854,7 +3865,6 @@ function useEightSleepAlarmsController({
       lastSourceRecordKeyRef.current = sourceRecordKey
     }
     // Reconcile the optimistic list only when Home Assistant confirms a serialized record state.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setOptimisticRecords((currentRecords) => {
       const sourceWasLocalAcknowledgement = rebaseLocalAlarmAcknowledgement(sourceRecordKey, alarmSyncSourceKey)
       if (!currentRecords) {

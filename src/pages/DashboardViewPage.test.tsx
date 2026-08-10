@@ -1719,6 +1719,50 @@ describe('DashboardViewPage', () => {
     expect(screen.getAllByTestId('control-slider-circular')[0]).toHaveAttribute('data-inactive', 'false')
   })
 
+  it('drags a thermostat range handle and commits the final value once', () => {
+    render(<DashboardViewPage activePath="ecobee" onNavigate={() => undefined} path="ecobee" />)
+
+    const dial = screen.getByRole('region', { name: /Whole Home thermostat Idle 71.0°F 72.0 · 74.0/i })
+    const lowHandle = dial.querySelector<HTMLElement>('[data-target="low"]')
+    const dialRect = {
+      bottom: 500,
+      height: 300,
+      left: 100,
+      right: 400,
+      top: 200,
+      width: 300,
+      x: 100,
+      y: 200,
+      toJSON: () => ({}),
+    } as DOMRect
+    const clientPoint = (value: number) => {
+      const point = valueToThermostatPoint(value, 45, 95)
+      return {
+        clientX: dialRect.left + (point.x / 100) * dialRect.width,
+        clientY: dialRect.top + (point.y / 100) * dialRect.height,
+      }
+    }
+    const rectSpy = vi.spyOn(dial, 'getBoundingClientRect').mockReturnValue(dialRect)
+
+    try {
+      fireEvent.pointerDown(lowHandle!, { ...clientPoint(72), pointerId: 41 })
+      expect(lowHandle).toHaveAttribute('data-dragging', 'true')
+
+      fireEvent.pointerMove(lowHandle!, { ...clientPoint(70), pointerId: 41 })
+      fireEvent.pointerUp(lowHandle!, { ...clientPoint(70), pointerId: 41 })
+
+      expect(lowHandle).not.toHaveAttribute('data-dragging')
+      expect(mockCallServiceCalls).toHaveLength(1)
+      expect(mockCallServiceCalls[0]).toMatchObject({
+        domain: 'climate',
+        service: 'set_temperature',
+        serviceData: { target_temp_high: 74, target_temp_low: 70 },
+      })
+    } finally {
+      rectSpy.mockRestore()
+    }
+  })
+
   it('renders HA-owned vacation, non-vacation, and guest home-away transitions without inferring from raw inputs', async () => {
     const view = render(<DashboardViewPage activePath="ecobee" onNavigate={() => undefined} path="ecobee" />)
 
@@ -6705,7 +6749,7 @@ describe('DashboardViewPage', () => {
       })
 
       expect(screen.queryByText('The vacuum settings did not confirm before cleaning could start.')).not.toBeInTheDocument()
-      expect(screen.getByRole('combobox', { name: /Mode Mop/i })).toHaveValue('mop')
+      expect(screen.getByRole('combobox', { name: /Mode Vacuum/i })).toHaveValue('vacuum')
     } finally {
       vi.clearAllTimers()
       vi.useRealTimers()

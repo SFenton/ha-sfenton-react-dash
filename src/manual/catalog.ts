@@ -892,7 +892,7 @@ const CORE_ARTICLES: ManualArticleInput[] = [
     keywords: ['climate', 'thermostat', 'comfort', 'vents', 'contacts', 'sleepypod', 'humidifier'],
     tasks: ['What is the Climate area for?', 'How do room and whole-home comfort controls fit together?', 'Where are comfort schedules?'],
     blocks: [
-      overviewPurpose('Climate & Comfort starts with the whole-home thermostat, then shows open doors or windows, room controls, Eco Mode, Predictive Comfort, tracking choices, and the automatic-thermostat switch. Room pages add vents, air purifiers, SleepyPod controls, and humidifier activities. Read the effective mode and visible sensor state before changing a target.'),
+      overviewPurpose('Climate & Comfort starts with the whole-home thermostat and any open-door or window warning. Rooms, Automation, and Tracking explain their purpose before opening the matching tab in the shared Thermostat sheet. Room pages add vents, air purifiers, SleepyPod controls, and humidifier activities. Read the effective mode and visible sensor state before changing a target.'),
       screenshot('section-climate-context'),
       overviewActions([
         'Adjust the whole-home target or open a room for its thermostat and vents.',

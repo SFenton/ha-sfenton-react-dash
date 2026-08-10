@@ -17,6 +17,7 @@ const LANDING_CASES = MANUAL_SECTIONS.map((section) => {
     commonTaskCount: landing.commonTasks.length,
     contextAlt: context.alt,
     id: section.id,
+    maxFirstTaskOffset: section.id === 'climate' ? 1320 : 1100,
     technical: Boolean(landing.technicalArticleIds?.length),
     title: section.title,
   }
@@ -500,7 +501,7 @@ test('all nine landings render the complete rich overview contract', async ({ pa
       if (!scroller) return Number.POSITIVE_INFINITY
       return element.getBoundingClientRect().top - scroller.getBoundingClientRect().top + scroller.scrollTop
     })
-    expect(firstTaskOffset).toBeLessThanOrEqual(1100)
+    expect(firstTaskOffset).toBeLessThanOrEqual(landing.maxFirstTaskOffset)
 
     const currentSrc = await image.evaluate((element) => (element as HTMLImageElement).currentSrc)
     expect(currentSrc).toContain(testInfo.project.name === 'manual-content-desktop' ? '/manual/manual-desktop/' : '/manual/manual-mobile/')

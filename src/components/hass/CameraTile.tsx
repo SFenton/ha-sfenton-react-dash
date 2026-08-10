@@ -3,7 +3,8 @@ import { useEntity } from '@hakit/core'
 import type { CameraConfig } from '../../constants/atAGlance'
 import { MaterialIcon } from '../core/Icon'
 import { asEntityName, titleCaseState } from './entityState'
-import { WebRtcCamera, type WebRtcStatus } from './WebRtcCamera'
+import { WebRtcCamera } from './WebRtcCamera'
+import type { WebRtcStatus } from './webRtcStatus'
 import styles from './CameraTile.module.css'
 
 interface CameraTileProps {
