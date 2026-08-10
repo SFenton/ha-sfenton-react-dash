@@ -556,6 +556,7 @@ const MANUAL_WORKFLOW_SCREENSHOT_DEFINITIONS: ManualScreenshotConfig[] = [
     privacyClass: 'synthetic',
     desktopMaxWidth: 820,
     desktopCaptureWidth: 1280,
+    maxDiffPixelRatio: 0.025,
     alsoUsedByArticleIds: ['task-clean-vacuum-rooms'],
     alt: 'Main Floor vacuum Zones tab showing Kitchen first and Living Room second in a synthetic cleaning order.',
     caption: 'How do I order vacuum rooms? Numbered zone badges preserve the synthetic order selected in the real sheet.',
