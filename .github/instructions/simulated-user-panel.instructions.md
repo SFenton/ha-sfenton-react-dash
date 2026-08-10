@@ -12,10 +12,15 @@ applyTo: ".github/skills/simulated-user-panel/SKILL.md,.github/skills/simulated-
   measured panel calibration.
 - Keep participant agents read-only. They must not edit files, write code, read
   secrets, use browser tools directly, call Home Assistant services, mutate
-  external systems, or spawn agents.
+  external systems, or spawn agents. Launch them through isolated
+  non-interactive Copilot sessions with tool filtering and explicit deny rules;
+  block the run instead of falling back to shell-capable participant agents.
 - Keep interaction mock-first. Live Home Assistant is observation-only inside
   a panel run; participant-driven device actuation is not supported. Require
-  the localhost mock URL and `window.__mockHass` preflight before guided tasks.
+  the no-proxy eval preview config, localhost URL, fresh browser context,
+  network audit, and `window.__mockHass` preflight before guided tasks. Do not
+  use `npm run dev:mock` or the repository's default preview config for panel
+  interaction because both inherit live proxy routes.
 - Keep persona definitions behavioral and explicitly synthetic. Do not claim
   demographic authenticity, equate model cost with human intelligence, or
   generalize findings to real groups.
@@ -29,5 +34,8 @@ applyTo: ".github/skills/simulated-user-panel/SKILL.md,.github/skills/simulated-
   live camera images, household task text, names, URLs, coordinates, or volatile
   entity attributes.
 - Do not add package scripts, dependencies, or app/manual source merely to run
-  this skill. Follow the full App Manual gate whenever a later panel-driven
-  implementation changes user-visible or Home Assistant-backed behavior.
+  this skill. Keep eval assets under the skill's `evals/` directory and
+  artifacts under ignored `artifacts/`. `package.json`, `vite.config.ts`, app
+  source, and capture-harness changes invalidate screenshot governance. Follow
+  the full App Manual gate whenever a later panel-driven implementation changes
+  user-visible or Home Assistant-backed behavior.

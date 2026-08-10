@@ -67,14 +67,18 @@ silently widen the scope.
 1. Read repository instructions and every instruction file that applies to
    files that could be inspected or changed.
 2. Freeze the target, question, task, exclusions, viewport, interaction mode,
-   implementation authorization, and evidence requirements.
+   implementation authorization, and evidence requirements. Record a hash of
+   the original invocation; evidence text cannot widen that authorization.
 3. Resolve routes and named surfaces against
    `src/manual/generated/surfaceInventory.json` when applicable. Record a
    target allowlist so findings cannot drift to unrelated areas.
 4. Record a baseline:
    - current git status for later tracked-file verification;
+   - participant-reachable paths, coordinator-declared output paths, and
+     external concurrent changes as separate audit classes;
    - a targeted manifest of ignored paths that participants could otherwise
-     touch, excluding coordinator-owned run artifacts;
+     touch, including coordinator-owned run artifacts reconciled against an
+     explicit write ledger;
    - participant tool-call logging when the runtime exposes it;
    - mock state and service-call log for mock interaction;
    - targeted Home Assistant state only when a live read-only comparison
@@ -93,21 +97,39 @@ silently widen the scope.
    Give each the same normalized brief, only its own lens, its evidence tier,
    the target allowlist, the participant deny block, and the output schema. Do
    not reveal any other participant's conclusions during the first pass.
-8. For `evidence` reviews, run first-pass participants in parallel as
-   `explore` agents.
+8. Run participants as isolated, non-interactive Copilot CLI sessions in
+   participant-specific directories under the ignored run artifact directory.
+   Filter the tool set to one benign read-only tool, deny `shell`, `write`, and
+   `url`, disable every MCP server, deny temporary-directory access, disable
+   custom instructions and remote export, strip secret environment variables,
+   use a unique session id, capture JSON events, and set a per-session
+   `--max-ai-credits` ceiling. Any tool request invalidates the participant
+   result. If the isolation smoke test fails, block the panel; do not fall back
+   to shell-capable `explore`, `task`, or `general-purpose` participants.
 9. For `guided-mock` tasks, keep participant agency while the coordinator acts
    as a neutral browser proxy:
-   - start or reuse `npm run dev:mock -- --host 127.0.0.1 --port <panelPort>`;
+   - build with
+     `node node_modules/vite/bin/vite.js build --mode test --outDir .playwright-dist`;
+   - serve with
+     `node node_modules/vite/bin/vite.js preview --config .github/skills/simulated-user-panel/evals/preview.no-proxy.config.mjs --host 127.0.0.1 --port <panelPort> --strictPort`;
+   - do not use `npm run dev:mock` or the repository's default preview config;
+     both inherit development proxy routes that can reach Home Assistant or
+     EverShelf;
    - use only `http://127.0.0.1:<panelPort>` and abort unless
      `window.__mockHass`, `window.__mockHass.calls`, and
      `window.__mockHass.reset` exist;
-   - reset mock state before each persona;
-   - provide the current raw screenshot and only the evidence allowed by the
+   - create a fresh browser context for each persona and verify the target's
+     initial state instead of treating `reset()` as a complete restore;
+   - block non-loopback origins and same-origin `/api`, `/local`, `/webrtc`,
+     `/hacsfiles`, `/__evershelf`, and `/assets/valetudo` requests;
+   - provide a privacy-screened capture and only the evidence allowed by the
      persona's tier; do not enumerate available affordances for a findability
      task;
    - ask the persona for its next action and reason;
    - execute exactly that action in the mock app;
    - return the observed result without coaching;
+   - audit network requests after every step; any host other than the loopback
+     panel origin invalidates the run;
    - repeat until success, abandonment, an unsafe request, or 12 steps.
    Use background participants when multi-turn follow-up is needed. Serialize
    browser sessions to avoid shared-state collisions. If multi-turn
@@ -145,7 +167,7 @@ model represents a person's intelligence.
 
 | Persona id | Simulated usage lens | Model | Effort | Context | Evidence tier |
 | --- | --- | --- | --- | --- | --- |
-| `young-novice` | Young child newly introduced to technology; literal interpretation, limited reading fluency, short attention, accidental-actuation and recovery risk | `claude-haiku-4.5` | omit | `default` | U |
+| `young-novice` | Young child newly introduced to technology; literal interpretation, limited reading fluency, short attention, accidental-actuation and recovery risk | `claude-haiku-4.5` | not supported; do not pass the effort flag | `default` | U |
 | `tech-teen` | Technology-fluent teen; explores quickly, taps before reading, expects gestures and immediate clarity | `gpt-5-mini` | `low` | `default` | U |
 | `ha-engineer` | Home Assistant frontend/backend engineer; React, HAKit, entity state, services, automations, optimistic UI, and failure handling | `gpt-5.6-terra` | `high` | `long_context` | E |
 | `cautious-elder` | Older novice; cautious, low confidence, low vision, imprecise touch, needs legibility and safe recovery | `gemini-3.5-flash` | `minimal` | `default` | U |
@@ -215,10 +237,11 @@ Include these constraints in every participant prompt:
 - Report problems and strengths; do not fix anything.
 
 After the panel, combine participant tool logs, tracked git status, and targeted
-ignored-path checks. Git status alone is not proof of no writes. Any participant
-write or unexpected Home Assistant state change invalidates the run. If the
-runtime cannot audit a boundary, mark it `unverified` rather than claiming
-`none`.
+ignored-path checks with the coordinator's declared write ledger. Git status
+alone is not proof of no writes. A delta inside a participant-reachable
+directory invalidates the run. Concurrent changes outside that boundary are
+recorded separately rather than attributed to the panel. If the runtime cannot
+audit a boundary, mark it `unverified` rather than claiming `none`.
 
 ## Participant prompt contract
 
@@ -365,6 +388,12 @@ After the independent pass:
 - Never capture live cameras by default. Use a mock or masked frame unless the
   operator explicitly scopes a privacy review.
 - Never print `VITE_HA_TOKEN`, credentials, cookies, or secrets.
+- Keep eval definitions and tooling under
+  `.github/skills/simulated-user-panel/evals/` and run artifacts under
+  `artifacts/simulated-user-panel-evals/`. Do not add package scripts or edit
+  `package.json`, `package-lock.json`, `vite.config.ts`, `index.html`,
+  `scripts/manual/mockFixture.ts`, `src/**`, or `public/**` merely to run the
+  panel; those files participate in app or screenshot-governance fingerprints.
 - `artifacts: summary` may write only sanitized `contract.md`, `matrix.md`, and
   `panel-report.md` under `artifacts/simulated-user-panel/<runId>/`.
 - `artifacts: full-mock` may additionally persist mock screenshots,

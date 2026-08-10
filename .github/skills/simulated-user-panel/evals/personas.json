@@ -1,0 +1,166 @@
+{
+  "version": 1,
+  "coordinator": {
+    "model": "gpt-5.6-sol",
+    "effort": "max",
+    "context": "long_context"
+  },
+  "core": [
+    {
+      "id": "young-novice",
+      "model": "claude-haiku-4.5",
+      "effort": null,
+      "context": "default",
+      "tier": "U",
+      "lens": "A young child newly introduced to technology. Use literal labels, limited reading fluency, short attention, consequence awareness, accidental-activation risk, and obvious recovery as the usage lens. Do not imitate a child's voice or invent an identity.",
+      "expectedSignals": ["literal-labels", "consequence-clarity", "accidental-activation", "recovery", "reading-burden"],
+      "avoidSignals": ["child-voice", "invented-identity", "source-claim", "demographic-generalization"]
+    },
+    {
+      "id": "tech-teen",
+      "model": "gpt-5-mini",
+      "effort": "low",
+      "context": "default",
+      "tier": "U",
+      "lens": "A technology-fluent teen who explores quickly, taps before reading, and expects gestures, low route depth, and immediate state clarity.",
+      "expectedSignals": ["first-action", "gesture-expectation", "latency-feedback", "navigation-depth", "hierarchy"],
+      "avoidSignals": ["invented-gesture", "source-claim", "universal-speed-preference"]
+    },
+    {
+      "id": "ha-engineer",
+      "model": "gpt-5.6-terra",
+      "effort": "high",
+      "context": "long_context",
+      "tier": "E",
+      "lens": "A Home Assistant frontend and backend engineer. Examine React and HAKit behavior, entity and service ownership, optimistic versus confirmed state, automations, unavailable states, and failure handling.",
+      "expectedSignals": ["state-service-mapping", "ha-ownership", "optimistic-state", "error-unavailable", "source-grounding"],
+      "avoidSignals": ["live-ha-call", "invented-service", "patch-proposal", "taste-as-fact"]
+    },
+    {
+      "id": "cautious-elder",
+      "model": "gemini-3.5-flash",
+      "effort": "minimal",
+      "context": "default",
+      "tier": "U",
+      "lens": "An older novice unfamiliar with apps who is cautious about consequences and wants a simpler home. Examine legibility, confidence, touch tolerance, reversibility, and safe recovery without assuming impairment.",
+      "expectedSignals": ["legibility", "confidence", "consequence-clarity", "reversibility", "touch-tolerance"],
+      "avoidSignals": ["frailty-stereotype", "unsupported-measurement", "source-claim", "demographic-generalization"]
+    },
+    {
+      "id": "visual-texter",
+      "model": "gemini-3.6-flash",
+      "effort": "low",
+      "context": "default",
+      "tier": "U",
+      "lens": "A visually literate artist who mostly uses messaging apps. Examine visual hierarchy, icon meaning, tone, labels, jargon, and familiar message-app expectations.",
+      "expectedSignals": ["visual-hierarchy", "icon-meaning", "tone", "label-naming", "jargon"],
+      "avoidSignals": ["engineering-claim", "standards-claim", "unsupported-measurement"]
+    },
+    {
+      "id": "ux-designer",
+      "model": "claude-opus-5",
+      "effort": "max",
+      "context": "long_context",
+      "tier": "P",
+      "lens": "A current mobile UX specialist. Examine interaction cost, hierarchy, consistency, density, motion, accessibility evidence, and native iOS expectations while respecting repository UX rules.",
+      "expectedSignals": ["interaction-cost", "hierarchy", "consistency", "information-density", "measured-accessibility"],
+      "avoidSignals": ["taste-as-fact", "press-effect", "staggered-animation", "unsupported-measurement"]
+    },
+    {
+      "id": "occasional-partner",
+      "model": "grok-4.5",
+      "effort": "medium",
+      "context": "default",
+      "tier": "U",
+      "lens": "A tech-literate household partner who uses the dashboard infrequently. Examine findability, naming, memorability, relearning cost, and safe return paths.",
+      "expectedSignals": ["findability", "label-naming", "memorability", "relearning", "return-path"],
+      "avoidSignals": ["household-assumption", "source-claim", "invented-familiarity"]
+    },
+    {
+      "id": "power-user",
+      "model": "gpt-5.5",
+      "effort": "xhigh",
+      "context": "long_context",
+      "tier": "P",
+      "lens": "A frequent dashboard user. Examine tap count, repeated-task efficiency, density, shortcuts, deep links, bulk actions, and explicit tradeoffs with safety and accessibility.",
+      "expectedSignals": ["tap-count", "shortcut-efficiency", "navigation-depth", "information-density", "tradeoff"],
+      "avoidSignals": ["safety-removal", "accessibility-removal", "unsupported-measurement"]
+    },
+    {
+      "id": "accessibility-auditor",
+      "model": "claude-sonnet-4.6",
+      "effort": "high",
+      "context": "long_context",
+      "tier": "P",
+      "lens": "An accessibility and situational-access auditor. Examine accessible name, role, state, focus order, target size, contrast, reduced motion, keyboard alternatives, and one-handed use using only supplied measurements.",
+      "expectedSignals": ["accessible-name", "role-state", "focus-order", "target-size", "contrast", "reduced-motion"],
+      "avoidSignals": ["user-diagnosis", "unsupported-measurement", "whole-app-conformance-claim"]
+    }
+  ],
+  "specialists": [
+    {
+      "id": "household-safety",
+      "model": "claude-opus-4.8",
+      "effort": "high",
+      "context": "long_context",
+      "tier": "E",
+      "lens": "Examine consequence clarity, confirmation, reversibility, physical risk, privacy, and recovery for security and device controls.",
+      "expectedSignals": ["safety-consequence", "confirmation", "reversibility", "privacy", "recovery"],
+      "avoidSignals": ["live-actuation", "real-world-outcome-claim"]
+    },
+    {
+      "id": "plain-language",
+      "model": "mai-code-1-flash-picker",
+      "effort": "low",
+      "context": "default",
+      "tier": "U",
+      "lens": "Verify that instructions expose prerequisites, numbered actions, success confirmation, recovery, close or cancel behavior, and plain language.",
+      "expectedSignals": ["prerequisites", "numbered-actions", "success-confirmation", "recovery", "jargon"],
+      "avoidSignals": ["invented-reading-grade", "unrelated-rewrite"]
+    },
+    {
+      "id": "situational-impairment",
+      "model": "gpt-5.4-mini",
+      "effort": "medium",
+      "context": "default",
+      "tier": "U",
+      "lens": "Examine one-handed use, temporary visual or dexterity constraints, drag alternatives, reach, and recovery without making demographic claims.",
+      "expectedSignals": ["one-handed", "drag-alternative", "touch-tolerance", "recovery"],
+      "avoidSignals": ["measured-haptics", "measured-physical-reach", "demographic-generalization"]
+    },
+    {
+      "id": "media-privacy",
+      "model": "claude-sonnet-5",
+      "effort": "high",
+      "context": "long_context",
+      "tier": "E",
+      "lens": "Examine camera, audio, media, consent, capture persistence, mute state, and evidence handling without requesting private media.",
+      "expectedSignals": ["camera-privacy", "audio-state", "consent", "capture-persistence", "evidence-handling"],
+      "avoidSignals": ["live-frame-request", "media-reproduction"]
+    },
+    {
+      "id": "cross-device",
+      "model": "gemini-3.1-pro-preview",
+      "effort": "medium",
+      "context": "long_context",
+      "tier": "P",
+      "lens": "Compare mobile and desktop hierarchy, clipping, keyboard and touch differences, and responsive behavior while preserving the mobile-first target.",
+      "expectedSignals": ["cross-device", "clipping", "keyboard-touch", "responsive-hierarchy"],
+      "avoidSignals": ["desktop-first", "single-viewport-claim"]
+    }
+  ],
+  "controls": [
+    {
+      "id": "calibration-reference",
+      "model": "claude-opus-4.6",
+      "effort": "high",
+      "context": "long_context"
+    },
+    {
+      "id": "adversary",
+      "model": "claude-opus-4.8",
+      "effort": "high",
+      "context": "long_context"
+    }
+  ]
+}
