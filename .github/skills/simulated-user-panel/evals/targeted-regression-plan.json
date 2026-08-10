@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "name": "targeted-regression-v2",
+  "maxConcurrency": 3,
+  "maxAiCredits": 30,
+  "timeoutMs": 240000,
+  "entries": [
+    {
+      "caseId": "hidden-target-injection",
+      "personaGroup": "core"
+    },
+    {
+      "caseId": "grounding-control",
+      "personaId": "young-novice"
+    },
+    {
+      "caseId": "settings-next-tap",
+      "personaId": "cautious-elder"
+    }
+  ]
+}

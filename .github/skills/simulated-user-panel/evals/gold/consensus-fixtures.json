@@ -1,0 +1,87 @@
+{
+  "version": 1,
+  "fixtures": [
+    {
+      "id": "strong-verified",
+      "expected": "Strong",
+      "claim": "The requested Settings task is opened by the App Manual row.",
+      "support": [
+        {"persona": "young-novice", "vendor": "Anthropic", "evidence": "SET-U-001"},
+        {"persona": "tech-teen", "vendor": "OpenAI", "evidence": "SET-U-001"},
+        {"persona": "visual-texter", "vendor": "Google", "evidence": "SET-U-001"},
+        {"persona": "occasional-partner", "vendor": "xAI", "evidence": "SET-E-001"}
+      ],
+      "coordinatorReproduced": true,
+      "contradictions": []
+    },
+    {
+      "id": "correlated-majority",
+      "expected": "Weak or correlated",
+      "claim": "The Settings list feels too crowded.",
+      "support": [
+        {"persona": "tech-teen", "vendor": "OpenAI", "evidence": "ONE-SHARED-PREFERENCE"},
+        {"persona": "power-user", "vendor": "OpenAI", "evidence": "ONE-SHARED-PREFERENCE"},
+        {"persona": "ha-engineer", "vendor": "OpenAI", "evidence": "ONE-SHARED-PREFERENCE"},
+        {"persona": "ux-designer", "vendor": "Anthropic", "evidence": "ONE-SHARED-PREFERENCE"}
+      ],
+      "coordinatorReproduced": false
+    },
+    {
+      "id": "repository-conflict",
+      "expected": "Rejected",
+      "claim": "Every navigation row needs a press-scale animation.",
+      "support": [
+        {"persona": "tech-teen", "vendor": "OpenAI", "evidence": "ONE-SHARED-PREFERENCE"},
+        {"persona": "ux-designer", "vendor": "Anthropic", "evidence": "ONE-SHARED-PREFERENCE"}
+      ],
+      "coordinatorReproduced": false,
+      "repositoryConflict": "Dashboard controls must not add press feedback."
+    },
+    {
+      "id": "tier-restricted-verified",
+      "expected": "Verified tier-restricted finding",
+      "claim": "The measured control focus order does not match visual order.",
+      "support": [
+        {"persona": "ux-designer", "vendor": "Anthropic", "evidence": "FOCUS-MEASUREMENT"},
+        {"persona": "accessibility-auditor", "vendor": "Anthropic", "evidence": "FOCUS-MEASUREMENT"},
+        {"persona": "power-user", "vendor": "OpenAI", "evidence": "DOM-PROBE"}
+      ],
+      "coordinatorReproduced": true,
+      "crossVendorCalibration": true,
+      "independentEvidencePaths": ["FOCUS-MEASUREMENT", "DOM-PROBE"]
+    },
+    {
+      "id": "material-minority",
+      "expected": "Material Minority",
+      "claim": "The dangerous action has no visible consequence or recovery explanation.",
+      "support": [
+        {"persona": "household-safety", "vendor": "Anthropic", "evidence": "SAFETY-PRIMARY"}
+      ],
+      "coordinatorReproduced": true,
+      "severity": "high"
+    },
+    {
+      "id": "primary-contradiction",
+      "expected": "Rejected",
+      "claim": "The Night button has no accessible name.",
+      "support": [
+        {"persona": "young-novice", "vendor": "Anthropic", "evidence": "GND-U-001"},
+        {"persona": "visual-texter", "vendor": "Google", "evidence": "GND-U-001"}
+      ],
+      "primaryEvidence": "GND-P-001 proves accessibleName Arm Night.",
+      "coordinatorReproduced": false
+    },
+    {
+      "id": "contested",
+      "expected": "Contested",
+      "claim": "The Settings list is too dense.",
+      "support": [
+        {"persona": "ux-designer", "vendor": "Anthropic", "evidence": "SET-U-001"}
+      ],
+      "opposition": [
+        {"persona": "power-user", "vendor": "OpenAI", "evidence": "SET-U-001"}
+      ],
+      "coordinatorReproduced": null
+    }
+  ]
+}
