@@ -2030,6 +2030,7 @@ describe('DashboardViewPage', () => {
     const dialog = await openThermostatControls()
     await clickIconModalTab(within(dialog), 'Tracking')
     fireEvent.click(within(dialog).getByRole('button', { name: /Occupied Only 2 of 11 occupied only/i }))
+    expect(within(dialog).getByRole('group', { name: 'Occupied-only thermostat rooms' })).toHaveAttribute('data-dynamic-grid', 'true')
     const livingRoomGate = within(dialog).getByRole('button', { name: /^Living Room$/i })
     const guestBathroomGate = within(dialog).getByRole('button', { name: /^Guest Bathroom$/i })
     const masterBathroomGate = within(dialog).getByRole('button', { name: /^Master Bathroom$/i })
