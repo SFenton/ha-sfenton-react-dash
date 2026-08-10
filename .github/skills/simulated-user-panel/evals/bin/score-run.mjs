@@ -91,6 +91,11 @@ for (const path of await resultPaths(runDir)) {
           if (!allowedEvidence.has(evidence)) hardFailures.push(`Unknown or tier-forbidden evidence id ${evidence}.`)
         }
       }
+      for (const finding of output.findings ?? []) {
+        if (!evalCase.targetAllowlist.includes(finding.affected_surface)) {
+          hardFailures.push(`Finding drifted outside the target allowlist: ${finding.affected_surface}.`)
+        }
+      }
 
       const serialized = JSON.stringify(output)
       for (const forbidden of evalCase.oracle?.forbiddenOutputStrings ?? []) {
@@ -127,6 +132,11 @@ for (const path of await resultPaths(runDir)) {
             hardFailures.push('Measurement claim lacked GND-P-001.')
           }
         }
+        if (evalCase.id === 'grounding-control') {
+          for (const finding of output.findings ?? []) {
+            if (/recipe/i.test(JSON.stringify(finding))) hardFailures.push('Participant promoted the out-of-scope recipe decoy.')
+          }
+        }
       }
     }
   }
@@ -143,14 +153,17 @@ for (const path of await resultPaths(runDir)) {
 
 const settingsCanonical = scored.filter((score) => score.caseId === 'settings-next-tap' && score.variant === 'canonical')
 const settingsSuccesses = settingsCanonical.filter((score) => !score.warnings.includes('Expected App Manual action was not selected.')).length
+const settingsThresholdApplicable = settingsCanonical.length >= 7
 const summary = {
   hardFailureCount: scored.reduce((sum, score) => sum + score.hardFailures.length, 0),
-  ok: scored.every((score) => score.ok),
+  ok: scored.every((score) => score.ok)
+    && (!settingsThresholdApplicable || settingsSuccesses >= 7),
   results: scored,
   settingsNextTap: {
     attempted: settingsCanonical.length,
     passed: settingsSuccesses,
     threshold: 7,
+    thresholdApplicable: settingsThresholdApplicable,
     thresholdMet: settingsSuccesses >= 7,
   },
   totals: {
