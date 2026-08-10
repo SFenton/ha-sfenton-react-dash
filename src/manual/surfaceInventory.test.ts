@@ -115,8 +115,8 @@ describe('derived App Manual surface inventory', () => {
       matchKind: 'family-source-id',
     }])
     expect(coverage.ambiguousSurfaceIds).toEqual([])
-    expect(coverage.total).toBe(522)
-    expect(coverage.covered).toBe(522)
+    expect(coverage.total).toBe(524)
+    expect(coverage.covered).toBe(524)
     expect(coverage.uncovered).toBe(0)
     expect(coverage.byKind.route).toEqual({ total: 44, covered: 44, uncovered: 0 })
     expect(Object.values(coverage.byKind).every((count) => count.uncovered === 0)).toBe(true)

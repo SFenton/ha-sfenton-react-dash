@@ -601,6 +601,9 @@ test('security-camera-controls', async ({ page }) => {
 test('section-climate-context', async ({ page }) => {
   await page.goto('/index.html?path=ecobee')
   await pageMain(page, 'Thermostat')
+  await page.getByRole('navigation', { name: 'Dashboard sections' }).evaluate((element) => {
+    element.style.display = 'none'
+  })
   const subject = configuredCrop(page, 'section-climate-context')
   await subject.scrollIntoViewIfNeeded()
   await expect(subject.getByRole('button', { name: /Open Room Thermostats 11 rooms/i })).toBeVisible()

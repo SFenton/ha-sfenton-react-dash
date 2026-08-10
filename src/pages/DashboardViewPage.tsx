@@ -5054,15 +5054,16 @@ function ThermostatOptionDetailPage({ detailType, onSelected }: { detailType: 'e
   return (
     <section className={styles.section}>
       <Description>{description}</Description>
-      <DynamicGrid ariaLabel={`${config.title} options`} className={styles.thermostatChoiceGrid} columns={2} gap={8}>
+      <DynamicGrid ariaLabel={`${config.title} options`} className={styles.thermostatChoiceGrid} columns={2} forceEquivalentColumnCount gap={8}>
         {control.options.map((option, index) => {
           const presentation = THERMOSTAT_OPTION_PRESENTATION[option.value]
           return (
             <ScheduleListRow
-              accessibleLabel={`Set ${config.title} to ${String(option.label)}`}
+              accessibleLabel={`Set ${config.title} to ${String(option.label)}: ${presentation?.description ?? ''}`.trim()}
               active={option.value === control.displayValue}
               autoFocus={option.value === control.displayValue || (!control.displayValue && index === 0)}
               disclosure={false}
+              dynamicGridLabel
               focusKey={option.value}
               icon={presentation?.icon ?? config.icon}
               iconSurface={false}
@@ -5428,6 +5429,7 @@ function useThermostatTrackingSummary() {
     entities[thermostatTrackEntityId(room)]?.state !== 'on'
     && entities[thermostatForceCriticalEntityId(room)]?.state === 'on'
   )).length
+  const selectedAvailable = trackSelectedState === 'on' || trackSelectedState === 'off'
   const selectedEnabled = trackSelectedState === 'on'
   const criticalEnabled = selectedEnabled && criticalPolicy === 'Track Select Critical'
 
@@ -5436,9 +5438,21 @@ function useThermostatTrackingSummary() {
     criticalEnabled,
     criticalPolicy: criticalPolicy ?? 'Unavailable',
     occupiedOnlyCount,
+    selectedAvailable,
     selectedCount,
     selectedEnabled,
   }
+}
+
+function thermostatTrackingPageSummary(summary: ReturnType<typeof useThermostatTrackingSummary>) {
+  const selected = !summary.selectedAvailable
+    ? 'Selected tracking unavailable'
+    : summary.selectedEnabled
+      ? `${summary.selectedCount} selected`
+      : 'Selected tracking off'
+  const occupied = `${summary.occupiedOnlyCount} occupied`
+  if (!summary.selectedAvailable || !summary.selectedEnabled || !summary.criticalEnabled) return `${selected} · ${occupied}`
+  return `${selected} · ${summary.criticalCount} critical · ${occupied}`
 }
 
 function ThermostatTrackingOpener({
@@ -5844,7 +5858,7 @@ function ThermostatModal({
       title={thermostatModalDetailTitle(detail)}
     >
       {detail?.type === 'room' && <ThermostatRoomModalContent room={detail.room} />}
-      {detail?.type === 'predictive' && <div data-modal-detail-autofocus="true"><PredictiveComfortModalContent /></div>}
+      {detail?.type === 'predictive' && <div className={styles.thermostatDetailPage} data-modal-detail-autofocus="true" tabIndex={-1}><PredictiveComfortModalContent /></div>}
       {(detail?.type === 'eco-away' || detail?.type === 'eco-critical') && <ThermostatOptionDetailPage detailType={detail.type} onSelected={closeDetail} />}
       {(detail?.type === 'selected-rooms' || detail?.type === 'critical-protection' || detail?.type === 'occupied-only') && <ThermostatTrackingDetailPage detailType={detail.type} />}
       {!detail && (
@@ -5902,7 +5916,7 @@ function ThermostatPageEntry({
         onClick={() => onOpen(hash)}
         subtitle={subtitle}
         title={title}
-        variant="wide"
+        variant="compact"
       />
     </section>
   )
@@ -5940,7 +5954,7 @@ function ThermostatPageEntries({ onOpen }: { onOpen: (hash: string) => void }) {
         icon="mdi:motion-sensor"
         onOpen={onOpen}
         sectionTitle="Tracking"
-        subtitle={`${trackingSummary.selectedCount} selected · ${trackingSummary.criticalCount} critical · ${trackingSummary.occupiedOnlyCount} occupied`}
+        subtitle={thermostatTrackingPageSummary(trackingSummary)}
         title="Open Room Tracking"
       />
     </div>

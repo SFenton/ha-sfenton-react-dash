@@ -1362,6 +1362,24 @@ test('thermostat page entry points deep link to their matching modal tabs', asyn
     await dialog.getByRole('button', { name: 'Close' }).click()
     await expect(dialog).toHaveCount(0)
   }
+
+  for (const entry of cases) {
+    await page.goto(`/at-a-glance/ecobee${entry.hash}`)
+    const dialog = page.getByRole('dialog', { name: 'Thermostat' })
+    await expect(dialog).toBeVisible()
+    await expect(dialog.getByRole('tab', { name: entry.tab })).toHaveAttribute('aria-selected', 'true')
+  }
+
+  await page.goto('/at-a-glance/ecobee')
+  const dialog = await openThermostatControls(page, 'Automation')
+  await dialog.getByRole('tab', { name: 'Tracking' }).click()
+  await expect(page).toHaveURL(/#thermostat-tracking$/)
+  await page.goBack()
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+  await expect(page).toHaveURL(/\/at-a-glance\/ecobee$/)
+  await page.goForward()
+  await expect(page.getByRole('dialog', { name: 'Thermostat' })).toBeVisible()
+  await expect(page.getByRole('tab', { name: 'Tracking' })).toHaveAttribute('aria-selected', 'true')
 })
 
 test('thermostat modal uses root tabs and same-sheet detail pages', async ({ page }) => {
@@ -1380,6 +1398,7 @@ test('thermostat modal uses root tabs and same-sheet detail pages', async ({ pag
   await expect(dialog).toHaveAccessibleName('Eco Mode Critical Tracking')
   await expect(dialog.getByRole('group', { name: 'Eco Mode Critical Tracking options' })).toHaveAttribute('data-dynamic-grid', 'true')
   await dialog.getByRole('button', { name: 'Back to automation' }).click()
+  await expect(dialog.getByRole('button', { name: /Eco Mode Critical Tracking Track Select Critical/i })).toBeFocused()
 
   await dialog.getByRole('tab', { name: 'Tracking' }).click()
   await dialog.getByRole('button', { name: /Occupied Only 2 of 11 occupied only/i }).click()

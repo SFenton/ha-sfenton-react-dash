@@ -1,7 +1,7 @@
 {
   "schemaVersion": 3,
   "counts": {
-    "total": 522,
+    "total": 524,
     "byKind": {
       "automatic-behavior": 25,
       "camera": 4,
@@ -14,7 +14,7 @@
       "modal-tab": 32,
       "native-prompt": 13,
       "option-picker": 3,
-      "page-section": 142,
+      "page-section": 144,
       "quick-link": 5,
       "room-card": 116,
       "route": 44,
@@ -28,7 +28,7 @@
       "open": 167,
       "direct-action": 31,
       "status-only": 10,
-      "display": 265
+      "display": 267
     }
   },
   "surfaces": [
@@ -3042,9 +3042,9 @@
     {
       "id": "modal-opener-family:thermostat-controls",
       "kind": "modal-opener-family",
-      "visibleName": "Thermostat Rooms & Settings row",
+      "visibleName": "Thermostat tab entry rows",
       "routes": [],
-      "implementation": "ThermostatModalOpener through ModalOpenerRow",
+      "implementation": "ThermostatPageEntry through ModalOpenerRow",
       "sourceReference": "src/constants/modalOpeners.ts#MODAL_OPENER_INVENTORY.thermostat-controls",
       "sourceId": "modal:thermostat-controls",
       "openerId": "opener:modal-opener-family:thermostat-controls",
@@ -7119,6 +7119,22 @@
       "interaction": "display"
     },
     {
+      "id": "route-section:ecobee:automation",
+      "kind": "page-section",
+      "visibleName": "Automation",
+      "routes": [
+        "ecobee"
+      ],
+      "parentId": "route:ecobee",
+      "implementation": "DASHBOARD_ROUTES.ecobee.manualVisibleSectionNames",
+      "sourceReference": "src/constants/routes.ts#DASHBOARD_ROUTES.ecobee.manualVisibleSectionNames",
+      "sourceId": "route-section:ecobee:automation",
+      "familySourceIds": [
+        "route:ecobee"
+      ],
+      "interaction": "display"
+    },
+    {
       "id": "route-section:ecobee:open-contact-sensors",
       "kind": "page-section",
       "visibleName": "Open Contact Sensors",
@@ -7135,16 +7151,32 @@
       "interaction": "display"
     },
     {
-      "id": "route-section:ecobee:rooms-and-settings",
+      "id": "route-section:ecobee:rooms",
       "kind": "page-section",
-      "visibleName": "Rooms & Settings",
+      "visibleName": "Rooms",
       "routes": [
         "ecobee"
       ],
       "parentId": "route:ecobee",
       "implementation": "DASHBOARD_ROUTES.ecobee.manualVisibleSectionNames",
       "sourceReference": "src/constants/routes.ts#DASHBOARD_ROUTES.ecobee.manualVisibleSectionNames",
-      "sourceId": "route-section:ecobee:rooms-and-settings",
+      "sourceId": "route-section:ecobee:rooms",
+      "familySourceIds": [
+        "route:ecobee"
+      ],
+      "interaction": "display"
+    },
+    {
+      "id": "route-section:ecobee:tracking",
+      "kind": "page-section",
+      "visibleName": "Tracking",
+      "routes": [
+        "ecobee"
+      ],
+      "parentId": "route:ecobee",
+      "implementation": "DASHBOARD_ROUTES.ecobee.manualVisibleSectionNames",
+      "sourceReference": "src/constants/routes.ts#DASHBOARD_ROUTES.ecobee.manualVisibleSectionNames",
+      "sourceId": "route-section:ecobee:tracking",
       "familySourceIds": [
         "route:ecobee"
       ],

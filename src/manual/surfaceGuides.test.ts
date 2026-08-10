@@ -24,7 +24,7 @@ const EXPECTED_COUNTS = {
   'modal-tab': 32,
   'native-prompt': 13,
   'option-picker': 3,
-  'page-section': 142,
+  'page-section': 144,
   'quick-link': 5,
   'room-card': 116,
   route: 44,
@@ -39,15 +39,15 @@ describe('surface guide ownership contract', () => {
 
   it('keeps the expanded semantic inventory exact and fully owned', () => {
     expect(inventory.schemaVersion).toBe(3)
-    expect(inventory.counts.total).toBe(522)
+    expect(inventory.counts.total).toBe(524)
     expect(inventory.counts.byKind).toEqual(EXPECTED_COUNTS)
     expect(new Set(inventory.surfaces.map((surface) => surface.id)).size).toBe(inventory.surfaces.length)
     expect(inventory.surfaces.some((surface) => surface.id.includes('#'))).toBe(false)
 
     const coverage = deriveSurfaceCoverage(inventory, MANUAL_SURFACES)
     expect(coverage).toMatchObject({
-      total: 522,
-      covered: 522,
+      total: 524,
+      covered: 524,
       uncovered: 0,
       uncoveredSurfaceIds: [],
       ambiguousSurfaceIds: [],

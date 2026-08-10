@@ -2003,10 +2003,10 @@ describe('DashboardViewPage', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: /Eco Mode Critical Tracking Track Select Critical/i }))
     expect(screen.getAllByRole('dialog')).toHaveLength(1)
     expect(within(dialog).getByRole('group', { name: 'Eco Mode Critical Tracking options' })).toHaveAttribute('data-dynamic-grid', 'true')
-    expect(within(dialog).getByRole('button', { name: 'Set Eco Mode Critical Tracking to Track Select Critical' })).toHaveAttribute('aria-pressed', 'true')
-    expect(within(dialog).getByRole('button', { name: 'Set Eco Mode Critical Tracking to Track Select Critical' })).toHaveAttribute('data-modal-detail-autofocus', 'true')
-    expect(within(dialog).getByRole('button', { name: 'Set Eco Mode Critical Tracking to Track All Critical' })).toHaveAttribute('aria-pressed', 'false')
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Set Eco Mode Critical Tracking to Track All Critical' }))
+    expect(within(dialog).getByRole('button', { name: /^Set Eco Mode Critical Tracking to Track Select Critical:/ })).toHaveAttribute('aria-pressed', 'true')
+    expect(within(dialog).getByRole('button', { name: /^Set Eco Mode Critical Tracking to Track Select Critical:/ })).toHaveAttribute('data-modal-detail-autofocus', 'true')
+    expect(within(dialog).getByRole('button', { name: /^Set Eco Mode Critical Tracking to Track All Critical:/ })).toHaveAttribute('aria-pressed', 'false')
+    fireEvent.click(within(dialog).getByRole('button', { name: /^Set Eco Mode Critical Tracking to Track All Critical:/ }))
     expect(mockCallServiceCalls).toContainEqual({
       domain: 'select',
       service: 'select_option',
@@ -2047,6 +2047,30 @@ describe('DashboardViewPage', () => {
     ])
   })
 
+  it('keeps selected-room and critical-protection controls mapped to their HA switches', async () => {
+    render(<DashboardViewPage activePath="ecobee" onNavigate={() => undefined} path="ecobee" />)
+
+    const dialog = await openThermostatControls()
+    await clickIconModalTab(within(dialog), 'Tracking')
+    mockCallServiceCalls.length = 0
+
+    fireEvent.click(within(dialog).getByRole('button', { name: /Selected Rooms \d+ of 11 selected/i }))
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Office' }))
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Back to tracking' }))
+
+    fireEvent.click(within(dialog).getByRole('button', { name: /Critical Protection \d+ rooms forced/i }))
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Music Room' }))
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Back to tracking' }))
+
+    fireEvent.click(within(dialog).getByRole('switch', { name: 'Turn off Track Selected Rooms' }))
+
+    expect(mockCallServiceCalls).toEqual([
+      { domain: 'homeassistant', service: 'toggle', target: 'switch.thermostat_contact_sensors_track_office' },
+      { domain: 'homeassistant', service: 'toggle', target: 'switch.thermostat_contact_sensors_music_room_force_track_when_critical' },
+      { domain: 'homeassistant', service: 'toggle', target: 'switch.thermostat_contact_sensors_only_track_selected_rooms' },
+    ])
+  })
+
   it('keeps the Ecobee room modal title stable while closing', async () => {
     render(<DashboardViewPage activePath="ecobee" onNavigate={() => undefined} path="ecobee" />)
 
@@ -2060,6 +2084,19 @@ describe('DashboardViewPage', () => {
     if (closingDialog) {
       expect(within(closingDialog).getByRole('heading', { name: 'Living Room' })).toBeInTheDocument()
       expect(within(closingDialog).queryByRole('heading', { name: 'Thermostat' })).not.toBeInTheDocument()
+    }
+  })
+
+  it('reports unavailable selected-room tracking distinctly from off', () => {
+    const tracking = mockEntities['switch.thermostat_contact_sensors_only_track_selected_rooms']
+    const previousState = tracking.state
+    tracking.state = 'unavailable'
+
+    try {
+      render(<DashboardViewPage activePath="ecobee" onNavigate={() => undefined} path="ecobee" />)
+      expect(screen.getByRole('button', { name: /Open Room Tracking Selected tracking unavailable/i })).toBeInTheDocument()
+    } finally {
+      tracking.state = previousState
     }
   })
 
@@ -2078,6 +2115,7 @@ describe('DashboardViewPage', () => {
     fireEvent.click(predictiveComfort)
     expect(dialog).toHaveAttribute('data-surface', 'hass-popup')
     expect(within(dialog).getByRole('heading', { name: 'Predictive Comfort' })).toBeInTheDocument()
+    await waitFor(() => expect(dialog.querySelector('[data-modal-detail-autofocus="true"]')).toHaveFocus())
     expect(within(dialog).getByText(/^Idle$/i)).toBeInTheDocument()
     expect(within(dialog).getByRole('heading', { name: 'Controls' })).toBeInTheDocument()
     const autoAdjustDescription = within(dialog).getByText(/adjust the thermostat target before the house leaves the comfort range/i)

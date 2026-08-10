@@ -1051,6 +1051,10 @@ button.thermostatGlassMain {
   gap: 8px;
 }
 
+.thermostatDetailPage:focus {
+  outline: none;
+}
+
 .thermostatChoiceGrid [data-schedule-list-row],
 .thermostatChoiceGrid [data-schedule-list-row] > button,
 .thermostatTrackingGrid > [data-dynamic-grid-cell='true'] > button {

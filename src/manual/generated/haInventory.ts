@@ -1,7 +1,7 @@
 import type { ManualHaSummary } from '../types'
 
 export const MANUAL_HA_SUMMARY = {
-  "generatedAt": "2026-08-09T00:00:00.000Z",
+  "generatedAt": "2026-08-10T00:00:00.000Z",
   "counts": {
     "automations": 146,
     "integrationDomains": 62,

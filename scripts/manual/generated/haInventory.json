@@ -1,9 +1,9 @@
 {
-  "generatedAt": "2026-08-09T19:48:30.599Z",
+  "generatedAt": "2026-08-10T02:20:02.706Z",
   "homeAssistantVersion": "2026.7.4",
   "counts": {
     "automations": 146,
-    "entities": 4274,
+    "entities": 4275,
     "integrationDomains": 62,
     "integrationInstances": 277,
     "scripts": 62,
