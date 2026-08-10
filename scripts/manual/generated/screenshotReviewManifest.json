@@ -6,19 +6,19 @@
   "fingerprints": {
     "captureHarness": {
       "algorithm": "sha256",
-      "digest": "ac5c6e0486aeed9755c9059270795313a42ab5424ba250d56cd3a96e3bb6073f",
+      "digest": "38efcaccf8dad140e9152c8639ce9a8ce7d9e665ea5f2132ec02ac31f7676c1a",
       "fileCount": 5,
       "scope": "manual-capture-harness-v1"
     },
     "screenshotMetadata": {
       "algorithm": "sha256",
-      "digest": "e77b239df7101267f2dd0710fef60066b7a1bab23775fadf3cb1e651be149fb3",
+      "digest": "ba773eb78301b38a39848c54264f64b809ec0545a5d15b98042996caa424bca7",
       "scope": "manual-screenshot-metadata-v1",
       "subjectCount": 138
     },
     "uiSource": {
       "algorithm": "sha256",
-      "digest": "6462475755da451478f7c65a044ab2f0763b7a73cbba73e802836b97216a2507",
+      "digest": "a121bafb0a6cd5ae3c77005d5dec8d2a0a517a4676561f1c2cb9f39d7cc07717",
       "fileCount": 282,
       "scope": "app-visual-source-v1"
     }
@@ -26,10 +26,10 @@
   "library": {
     "maxFileBytes": 537073,
     "maxFilePath": "public/manual/manual-desktop/downstairs-hallway-page-context.png",
-    "totalBytes": 24944161
+    "totalBytes": 24932439
   },
-  "reviewedAt": "2026-08-10T06:46:58.164Z",
-  "reviewStateSha256": "c39c458ec3e9c801a39ba603fce9cfeaa0049a277175ad6b3b6f60346a70dea2",
+  "reviewedAt": "2026-08-10T08:15:30.273Z",
+  "reviewStateSha256": "c82ac730b38802e262031a5ae63e6c3258a673d9dcd8da906b7807a246bc6d0d",
   "schemaVersion": 1,
   "subjectCount": 138,
   "subjects": [
@@ -132,17 +132,17 @@
       "id": "section-climate-context",
       "variants": {
         "desktop": {
-          "bytes": 253283,
-          "height": 561,
+          "bytes": 240374,
+          "height": 705,
           "path": "public/manual/manual-desktop/section-climate-context.png",
-          "sha256": "e4d3deb5d21f6fa01d4ed8e042143d853caf43e192b570606a44ed44879c1aff",
+          "sha256": "8f2a841a1188431d2917b7527e9ad287f11043528b64287a87ddb25b254645a1",
           "width": 588
         },
         "mobile": {
-          "bytes": 170813,
-          "height": 560,
+          "bytes": 172000,
+          "height": 723,
           "path": "public/manual/manual-mobile/section-climate-context.png",
-          "sha256": "b5acc2625a62fdc54f8036e0edf89c4a5ba983b9c77d11aac8888e122a1a6323",
+          "sha256": "11223cfde4eab4b318d213799a2b0ea4ad67b9e28fcdb19b1fd9160544033e43",
           "width": 361
         }
       }
