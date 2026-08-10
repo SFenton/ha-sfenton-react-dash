@@ -471,28 +471,6 @@
   -webkit-tap-highlight-color: transparent;
 }
 
-.inventoryActionSlot {
-  display: inline-flex;
-  width: var(--floating-action-size, 56px);
-  min-width: 0;
-  flex: 0 0 var(--floating-action-size, 56px);
-  overflow: visible;
-  opacity: 1;
-  pointer-events: auto;
-}
-
-.inventoryActionSlot[data-collapsed='true'] {
-  width: 0;
-  flex-basis: 0;
-  overflow: hidden;
-  opacity: 0;
-  pointer-events: none;
-}
-
-.inventoryActionSlot[data-collapsed='true'] > button {
-  pointer-events: none;
-}
-
 @keyframes inventoryContentFadeIn {
   to {
     opacity: 1;
@@ -639,15 +617,8 @@
   z-index: 1;
 }
 
-.sheetFooter {
-  display: grid;
-  grid-template-columns: minmax(0, 0.78fr) minmax(0, 1fr);
-  gap: 10px;
-}
-
 .primaryAction,
-.secondaryAction,
-.resetAction {
+.secondaryAction {
   display: inline-flex;
   min-height: 48px;
   align-items: center;
@@ -666,9 +637,7 @@
 .primaryAction:focus,
 .primaryAction:focus-visible,
 .secondaryAction:focus,
-.secondaryAction:focus-visible,
-.resetAction:focus,
-.resetAction:focus-visible {
+.secondaryAction:focus-visible {
   outline: none;
 }
 
@@ -680,10 +649,4 @@
 .secondaryAction {
   background: rgba(255, 255, 255, 0.14);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12);
-}
-
-.resetAction {
-  border: 1px solid rgb(198, 40, 40);
-  background: rgb(198, 40, 40);
-  box-shadow: 0 10px 24px rgba(198, 40, 40, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.14);
 }

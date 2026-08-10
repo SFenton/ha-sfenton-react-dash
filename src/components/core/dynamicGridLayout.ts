@@ -2,6 +2,23 @@ export function normalizedDynamicGridColumns(columns: number) {
   return Math.max(1, Math.floor(columns))
 }
 
+export function responsiveDynamicGridColumnCount(
+  containerWidth: number,
+  gap: number,
+  minimumColumns: number,
+  maximumCellWidth: number,
+  maximumColumns = 12,
+) {
+  const minimum = normalizedDynamicGridColumns(minimumColumns)
+  const maximum = Math.max(minimum, normalizedDynamicGridColumns(maximumColumns))
+  if (containerWidth <= 0 || maximumCellWidth <= 0) return minimum
+  const requested = Math.ceil(
+    (containerWidth + Math.max(0, gap))
+      / (maximumCellWidth + Math.max(0, gap)),
+  )
+  return Math.max(minimum, Math.min(maximum, requested))
+}
+
 function normalizedSpan(span: number, columns: number) {
   return Math.min(columns, Math.max(1, Math.ceil(span)))
 }

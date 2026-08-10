@@ -13,6 +13,7 @@ import { SmoothRouteOutlet } from './components/shell/SmoothRouteOutlet'
 import { hasDashboardFloatingAction } from './components/shell/dashboardFloatingAction'
 import { HOME_ALL_FOOD_ROUTE_PATH, HOME_CABINET_ROUTE_PATH, HOME_FREEZER_ROUTE_PATH, HOME_FRIDGE_ROUTE_PATH, HOME_PANTRY_ROUTE_PATH, HOME_RECIPES_ROUTE_PATH, HOME_SPICE_RACK_ROUTE_PATH, PRIMARY_NAV_ROUTES, routeUrl } from './constants/routes'
 import { dashboardHref } from './hooks/dashboardLocation'
+import { DASHBOARD_PAGE_LOAD_TIMEOUT_MS } from './constants/loading'
 import { useDashboardRoute } from './hooks/useDashboardRoute'
 import { useSmoothDisplayedRoute } from './hooks/useSmoothDisplayedRoute'
 import styles from './Dashboard.module.css'
@@ -20,7 +21,6 @@ import styles from './Dashboard.module.css'
 const INITIAL_PRELOAD_MIN_MS = 1000
 const INITIAL_PRELOAD_EXIT_MS = 500
 const INITIAL_CONTENT_ENTER_MS = 170
-const INITIAL_INVENTORY_GATE_TIMEOUT_MS = 10000
 const INITIAL_INVENTORY_CONTENT_ENTER_DELAY_MS = 430
 let initialPreloadCompleted = false
 
@@ -35,12 +35,12 @@ const FOOD_SPACE_ROUTE_PATHS = new Set([
   HOME_SPICE_RACK_ROUTE_PATH,
 ])
 
-function pageForPath(path: string, activePath: string, onNavigate: (path: string) => void, onBack: (fallbackPath?: string) => void, transitionState: RouteTransitionState, inventoryControls: EverShelfInventoryControls, recipeControls: RecipeControls, loadingPhase?: DashboardPageLoadingPhase, initialContentTransitionState: InitialContentTransitionState = 'idle') {
+function pageForPath(path: string, activePath: string, onNavigate: (path: string) => void, onBack: (fallbackPath?: string) => void, transitionState: RouteTransitionState, inventoryControls: EverShelfInventoryControls, recipeControls: RecipeControls, appChromeHidden: boolean, onRecipesInitialResolved: () => void, recipesInitiallyAppGated: boolean, loadingPhase?: DashboardPageLoadingPhase, initialContentTransitionState: InitialContentTransitionState = 'idle') {
   if (path === 'overview') {
     return <AtAGlancePage activePath={activePath} deferRouteContent loadingPhase={loadingPhase} onNavigate={onNavigate} routeTransitionState={transitionState} withShell={false} />
   }
 
-  return <DashboardViewPage activePath={activePath} initialContentTransitionState={initialContentTransitionState} inventoryControls={inventoryControls} loadingPhase={loadingPhase} onBack={onBack} onNavigate={onNavigate} path={path} recipeControls={recipeControls} withShell={false} />
+  return <DashboardViewPage activePath={activePath} appChromeHidden={appChromeHidden} initialContentTransitionState={initialContentTransitionState} inventoryControls={inventoryControls} loadingPhase={loadingPhase} onBack={onBack} onNavigate={onNavigate} onRecipesInitialResolved={onRecipesInitialResolved} path={path} recipeControls={recipeControls} recipesInitiallyAppGated={recipesInitiallyAppGated} withShell={false} />
 }
 
 function floatingActionForPath(path: string, onNavigate: (path: string) => void, inventoryControls: EverShelfInventoryControls, recipeControls: RecipeControls): ReactNode {
@@ -53,11 +53,16 @@ function routeUsesMenuChrome(path: string) {
 
 function Dashboard() {
   const { path, navigate, navigateBack } = useDashboardRoute()
+  const [initialRoute] = useState(() => ({
+    path,
+    preloadCompleted: initialPreloadCompleted,
+  }))
   const { displayedPath, transitionSourcePath, transitionState } = useSmoothDisplayedRoute(path)
   const leadingChromeTransition = routeUsesMenuChrome(transitionSourcePath) === routeUsesMenuChrome(path) ? 'stable' : 'changing'
   const [preloadReady, setPreloadReady] = useState(initialPreloadCompleted)
   const [preloadGatePhase, setPreloadGatePhase] = useState<DashboardPageLoadingPhase | 'content'>(() => (initialPreloadCompleted ? 'content' : 'loading'))
-  const [initialInventoryGateTimedOut, setInitialInventoryGateTimedOut] = useState(false)
+  const [initialDataGateTimedOut, setInitialDataGateTimedOut] = useState(false)
+  const [initialRecipesResolved, setInitialRecipesResolved] = useState(false)
   const [initialContentTransitionState, setInitialContentTransitionState] = useState<InitialContentTransitionState>(() => (initialPreloadCompleted ? 'idle' : 'pre-entering'))
   const contentEnterFrameRef = useRef<number | null>(null)
   const contentEnterSettleTimerRef = useRef<number | null>(null)
@@ -69,13 +74,25 @@ function Dashboard() {
     displayedPath === HOME_RECIPES_ROUTE_PATH,
   )
   const waitsForInitialInventory = !initialPreloadCompleted && FOOD_SPACE_ROUTE_PATHS.has(path)
-  const usesInitialInventoryAppGate = Boolean(routeLoadingPhase && FOOD_SPACE_ROUTE_PATHS.has(displayedPath))
-  const initialInventoryGateReady = !waitsForInitialInventory || inventoryControls.inventoryLoadPhase === 'content' || initialInventoryGateTimedOut
-  const pageLoadingPhase = usesInitialInventoryAppGate ? undefined : routeLoadingPhase
+  const waitsForInitialRecipes = !initialRoute.preloadCompleted
+    && initialRoute.path === HOME_RECIPES_ROUTE_PATH
+  const waitsForInitialData = waitsForInitialInventory || waitsForInitialRecipes
+  const usesInitialDataAppGate = Boolean(
+    routeLoadingPhase
+    && (FOOD_SPACE_ROUTE_PATHS.has(displayedPath) || displayedPath === HOME_RECIPES_ROUTE_PATH),
+  )
+  const initialDataGateReady = (
+    (!waitsForInitialInventory || inventoryControls.inventoryLoadPhase === 'content')
+    && (!waitsForInitialRecipes || initialRecipesResolved)
+  ) || initialDataGateTimedOut
+  const pageLoadingPhase = usesInitialDataAppGate ? undefined : routeLoadingPhase
   const pageInitialContentTransitionState = initialContentTransitionState
 
   const handlePreloadComplete = useCallback(() => {
     setPreloadReady(true)
+  }, [])
+  const handleRecipesInitialResolved = useCallback(() => {
+    setInitialRecipesResolved(true)
   }, [])
 
   const clearInitialContentEnterTimers = useCallback(() => {
@@ -107,35 +124,35 @@ function Dashboard() {
   }, [clearInitialContentEnterTimers])
 
   useEffect(() => {
-    if (!preloadReady || preloadGatePhase !== 'loading' || !initialInventoryGateReady) return undefined
+    if (!preloadReady || preloadGatePhase !== 'loading' || !initialDataGateReady) return undefined
     const preloadStartedAt = preloadStartedAtRef.current ?? Date.now()
     preloadStartedAtRef.current = preloadStartedAt
     const remainingLoadingMs = Math.max(0, INITIAL_PRELOAD_MIN_MS - (Date.now() - preloadStartedAt))
     const timer = window.setTimeout(() => setPreloadGatePhase('exiting'), remainingLoadingMs)
     return () => window.clearTimeout(timer)
-  }, [initialInventoryGateReady, initialInventoryGateTimedOut, inventoryControls.inventoryLoadPhase, preloadGatePhase, preloadReady, waitsForInitialInventory])
+  }, [initialDataGateReady, preloadGatePhase, preloadReady])
 
   useEffect(() => {
-    if (!waitsForInitialInventory || preloadGatePhase !== 'loading') return undefined
-    const timer = window.setTimeout(() => setInitialInventoryGateTimedOut(true), INITIAL_INVENTORY_GATE_TIMEOUT_MS)
+    if (!waitsForInitialData || preloadGatePhase !== 'loading') return undefined
+    const timer = window.setTimeout(() => setInitialDataGateTimedOut(true), DASHBOARD_PAGE_LOAD_TIMEOUT_MS)
     return () => window.clearTimeout(timer)
-  }, [preloadGatePhase, waitsForInitialInventory])
+  }, [preloadGatePhase, waitsForInitialData])
 
   useEffect(() => {
     if (preloadGatePhase !== 'exiting') return undefined
-    const enterTimer = waitsForInitialInventory
+    const enterTimer = waitsForInitialData
       ? window.setTimeout(startInitialContentEnter, INITIAL_INVENTORY_CONTENT_ENTER_DELAY_MS)
       : null
     const timer = window.setTimeout(() => {
       initialPreloadCompleted = true
-      if (!waitsForInitialInventory) startInitialContentEnter()
+      if (!waitsForInitialData) startInitialContentEnter()
       setPreloadGatePhase('content')
     }, INITIAL_PRELOAD_EXIT_MS)
     return () => {
       if (enterTimer !== null) window.clearTimeout(enterTimer)
       window.clearTimeout(timer)
     }
-  }, [preloadGatePhase, startInitialContentEnter, waitsForInitialInventory])
+  }, [preloadGatePhase, startInitialContentEnter, waitsForInitialData])
 
   const navigateToPath = (nextPath: string) => {
     navigate(routeUrl(nextPath, dashboardHref()))
@@ -144,9 +161,9 @@ function Dashboard() {
   return (
     <AppShell bottomNav={<BottomNav activePath={path} onNavigate={navigateToPath} />} chromeHidden={Boolean(routeLoadingPhase)} floatingAction={floatingActionForPath(displayedPath, navigateToPath, inventoryControls, recipeControls)}>
       <SmoothRouteOutlet leadingChromeTransition={leadingChromeTransition} routePath={displayedPath} transitionState={transitionState}>
-        {pageForPath(displayedPath, path, navigateToPath, navigateBack, transitionState, inventoryControls, recipeControls, pageLoadingPhase, pageInitialContentTransitionState)}
+        {pageForPath(displayedPath, path, navigateToPath, navigateBack, transitionState, inventoryControls, recipeControls, usesInitialDataAppGate, handleRecipesInitialResolved, waitsForInitialRecipes, pageLoadingPhase, pageInitialContentTransitionState)}
       </SmoothRouteOutlet>
-      {usesInitialInventoryAppGate && routeLoadingPhase && <DashboardPageLoading className={styles.initialAppLoader} phase={routeLoadingPhase} />}
+      {usesInitialDataAppGate && routeLoadingPhase && <DashboardPageLoading className={styles.initialAppLoader} phase={routeLoadingPhase} />}
       {!initialPreloadCompleted && <DashboardPreloadCache active onComplete={handlePreloadComplete} />}
     </AppShell>
   )

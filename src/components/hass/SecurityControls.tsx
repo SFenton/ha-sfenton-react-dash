@@ -67,7 +67,7 @@ export function SecurityControls({ description, sectionTitle = 'Security System 
       </div>
       {description && <Description>{description}</Description>}
 
-      <div className={styles.actions}>
+      <div className={styles.actions} data-security-mode-grid="true">
         {SECURITY_MODES.map((mode) => {
           const active = alarmState === mode.state
 

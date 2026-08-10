@@ -35,9 +35,9 @@ const CUSTOM_LIGHTS: CustomLight[] = [
 ]
 
 // Source colors come from the HA automations that drive each mode:
-// - Seahawks Front Yard Lighting: green rgb(0,255,0) + blue rgb(0,0,255)
-// - Valentine's Day Front Yard Lights: red rgb(255,0,0) + pink rgb(255,0,234)
-// - Default Front Yard Lights: warm white (color_temp), shown as the default green selected state.
+// - Seahawks mode: green rgb(0,255,0) + blue rgb(0,0,255)
+// - Valentine's Day mode: red rgb(255,0,0) + pink rgb(255,0,234)
+// - Default mode: warm white (color_temp), shown as the default green selected state.
 const SEAHAWKS_GRADIENT = 'linear-gradient(90deg, rgb(0 255 0), rgb(0 0 255))'
 const VALENTINES_GRADIENT = 'linear-gradient(90deg, rgb(255 0 0), rgb(255 0 234))'
 
@@ -148,7 +148,7 @@ export function CustomLightsPage() {
     callService({ domain: 'input_select', service: 'select_option', target: MODE_SELECT_ENTITY, serviceData: { option } })
   }
 
-  // Mirrors automation.front_yard_default_lights: warm white (2000K) at full brightness.
+  // Matches the default front-yard warm-white scene at full brightness.
   const resetAllLights = () => {
     callService({ domain: 'light', service: 'turn_on', target: 'light.front_yard_lights', serviceData: { color_temp_kelvin: 2000, brightness: 255, transition: 1 } })
   }

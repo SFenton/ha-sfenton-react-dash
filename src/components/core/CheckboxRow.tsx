@@ -2,12 +2,30 @@ import { useCallback, useLayoutEffect, useRef, useState, type ButtonHTMLAttribut
 import { MaterialIcon } from './Icon'
 import styles from './CheckboxRow.module.css'
 
-interface CheckboxRowProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'children' | 'title'> {
+interface CheckboxRowSharedProps {
   active: boolean
   alignWrappedToIconTop?: boolean
+  className?: string
   subtitle?: ReactNode
   title: ReactNode
 }
+
+type CheckboxRowControlProps = CheckboxRowSharedProps
+  & Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'children' | 'className' | 'title'>
+  & {
+    mode?: 'control'
+    status?: never
+  }
+
+type CheckboxRowStatusProps = CheckboxRowSharedProps
+  & {
+    'aria-label'?: string
+    id?: string
+    mode: 'status'
+    status?: 'checked' | 'mixed' | 'unchecked'
+  }
+
+type CheckboxRowProps = CheckboxRowControlProps | CheckboxRowStatusProps
 
 function hasSubtitle(subtitle: ReactNode) {
   if (typeof subtitle === 'string') return subtitle.trim().length > 0
@@ -20,7 +38,26 @@ function lineHeightPx(element: HTMLElement) {
   return Number.parseFloat(lineHeight)
 }
 
-export function CheckboxRow({ active, alignWrappedToIconTop = false, className, subtitle, title, type = 'button', ...buttonProps }: CheckboxRowProps) {
+function checkboxControlAttributes(props: CheckboxRowControlProps) {
+  const attributes = { ...props } as ButtonHTMLAttributes<HTMLButtonElement> & Record<string, unknown>
+  delete attributes.active
+  delete attributes.alignWrappedToIconTop
+  delete attributes.className
+  delete attributes.mode
+  delete attributes.status
+  delete attributes.subtitle
+  delete attributes.title
+  return attributes
+}
+
+export function CheckboxRow(props: CheckboxRowProps) {
+  const {
+    active,
+    alignWrappedToIconTop = false,
+    className,
+    subtitle,
+    title,
+  } = props
   const titleRef = useRef<HTMLElement | null>(null)
   const subtitleVisible = hasSubtitle(subtitle)
   const [copyWrapped, setCopyWrapped] = useState(false)
@@ -42,33 +79,81 @@ export function CheckboxRow({ active, alignWrappedToIconTop = false, className, 
   }, [alignWrappedToIconTop, subtitleVisible])
 
   useLayoutEffect(() => {
-    measureCopy()
+    let frame: number | null = null
+    const scheduleMeasure = () => {
+      if (frame !== null) window.cancelAnimationFrame(frame)
+      frame = window.requestAnimationFrame(() => {
+        frame = null
+        measureCopy()
+      })
+    }
+    scheduleMeasure()
     const titleElement = titleRef.current
-    if (!alignWrappedToIconTop || !titleElement) return undefined
-
-    if (typeof ResizeObserver === 'undefined') {
-      window.addEventListener('resize', measureCopy)
-      return () => window.removeEventListener('resize', measureCopy)
+    if (!alignWrappedToIconTop || !titleElement) {
+      return () => {
+        if (frame !== null) window.cancelAnimationFrame(frame)
+      }
     }
 
-    const observer = new ResizeObserver(measureCopy)
+    if (typeof ResizeObserver === 'undefined') {
+      window.addEventListener('resize', scheduleMeasure)
+      return () => {
+        if (frame !== null) window.cancelAnimationFrame(frame)
+        window.removeEventListener('resize', scheduleMeasure)
+      }
+    }
+
+    const observer = new ResizeObserver(scheduleMeasure)
     observer.observe(titleElement)
-    return () => observer.disconnect()
+    return () => {
+      if (frame !== null) window.cancelAnimationFrame(frame)
+      observer.disconnect()
+    }
   }, [alignWrappedToIconTop, measureCopy, title, subtitle])
 
+  const status = props.mode === 'status' ? (props.status ?? (active ? 'checked' : 'unchecked')) : undefined
+  const icon = status === 'mixed'
+    ? 'mdi:minus-box-outline'
+    : active
+      ? 'mdi:checkbox-marked-outline'
+      : 'mdi:checkbox-blank-outline'
+  const content = (
+    <>
+      <MaterialIcon name={icon} size={34} />
+      <span className={styles.copy}>
+        <strong ref={titleRef}>{title}</strong>
+        {subtitleVisible && <small>{subtitle}</small>}
+      </span>
+    </>
+  )
+
+  if (props.mode === 'status') {
+    return (
+      <div
+        aria-checked={status === 'mixed' ? 'mixed' : status === 'checked'}
+        aria-label={props['aria-label']}
+        aria-readonly="true"
+        className={[styles.checkboxRow, className].filter(Boolean).join(' ')}
+        data-copy-wrapped={alignWrappedToIconTop && copyWrapped ? 'true' : undefined}
+        data-read-only="true"
+        id={props.id}
+        role="checkbox"
+      >
+        {content}
+      </div>
+    )
+  }
+
+  const buttonProps = checkboxControlAttributes(props)
   return (
     <button
       {...buttonProps}
       aria-pressed={active}
       className={[styles.checkboxRow, className].filter(Boolean).join(' ')}
       data-copy-wrapped={alignWrappedToIconTop && copyWrapped ? 'true' : undefined}
-      type={type}
+      type={buttonProps.type ?? 'button'}
     >
-      <MaterialIcon name={active ? 'mdi:checkbox-marked-outline' : 'mdi:checkbox-blank-outline'} size={34} />
-      <span className={styles.copy}>
-        <strong ref={titleRef}>{title}</strong>
-        {subtitleVisible && <small>{subtitle}</small>}
-      </span>
+      {content}
     </button>
   )
 }

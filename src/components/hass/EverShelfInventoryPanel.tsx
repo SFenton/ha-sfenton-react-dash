@@ -4,6 +4,8 @@ import { EmptyState, type EmptyStateLayout } from '../core/EmptyState'
 import { CheckboxRow } from '../core/CheckboxRow'
 import { Description } from '../core/Description'
 import { ExpandingSearchAction } from '../core/ExpandingSearchAction'
+import { FilterSheetFooter } from '../core/FilterSheetFooter'
+import { FloatingActionSlot } from '../core/FloatingActionSlot'
 import { FloatingActionButton } from '../core/FloatingActionButton'
 import { MaterialIcon } from '../core/Icon'
 import { ModalDisclosureIcon } from '../core/ModalDisclosureIcon'
@@ -1076,13 +1078,13 @@ function InventorySortSheet({ draftDirection, draftMode, onApply, onClose, onDra
   return (
     <ModalSheet
       footer={(
-        <div className={styles.sheetFooter}>
-          <button className={styles.resetAction} onClick={onReset} type="button">Reset</button>
-          <button className={styles.primaryAction} onClick={() => {
+        <FilterSheetFooter
+          onApply={() => {
             onApply()
             onClose()
-          }} type="button">Apply</button>
-        </div>
+          }}
+          onReset={onReset}
+        />
       )}
       onClose={onClose}
       open={open}
@@ -1132,13 +1134,13 @@ function InventoryFilterSheet({ draftMode, onApply, onClose, onDraftModeChange, 
   return (
     <ModalSheet
       footer={(
-        <div className={styles.sheetFooter}>
-          <button className={styles.resetAction} onClick={onReset} type="button">Reset</button>
-          <button className={styles.primaryAction} onClick={() => {
+        <FilterSheetFooter
+          onApply={() => {
             onApply()
             onClose()
-          }} type="button">Apply</button>
-        </div>
+          }}
+          onReset={onReset}
+        />
       )}
       onClose={onClose}
       open={open}
@@ -1179,12 +1181,12 @@ export function EverShelfInventoryFloatingActions({ controls }: { controls: Ever
   return (
     <>
       <InventorySearchAction controls={controls} onExpandedChange={setSearchExpanded} />
-      <span aria-hidden={actionsCollapsed ? 'true' : undefined} className={styles.inventoryActionSlot} data-collapsed={actionsCollapsed ? 'true' : undefined} inert={actionsCollapsed}>
+      <FloatingActionSlot collapsed={actionsCollapsed}>
         <FloatingActionButton ariaLabel="Sort" color={controls.sortActive ? SORT_FILTER_ACTIVE_COLOR : SORT_FILTER_COLOR} icon="mdi:swap-vertical" onClick={controls.openSortSheet} />
-      </span>
-      <span aria-hidden={actionsCollapsed ? 'true' : undefined} className={styles.inventoryActionSlot} data-collapsed={actionsCollapsed ? 'true' : undefined} inert={actionsCollapsed}>
+      </FloatingActionSlot>
+      <FloatingActionSlot collapsed={actionsCollapsed}>
         <FloatingActionButton ariaLabel="Filter" color={controls.filterActive ? SORT_FILTER_ACTIVE_COLOR : SORT_FILTER_COLOR} icon="mdi:tune-vertical" onClick={controls.openFilterSheet} />
-      </span>
+      </FloatingActionSlot>
       <InventorySortSheet
         draftDirection={controls.sortDraftDirection}
         draftMode={controls.sortDraftMode}

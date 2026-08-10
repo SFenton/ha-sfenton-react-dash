@@ -4,21 +4,19 @@ import { useEntity, useHass } from '@hakit/core'
 import { MaterialIcon } from '../core/Icon'
 import { GlassTile, type TileTone } from '../core/GlassTile'
 import type { MediaRemoteAction, MediaRemoteAppConfig, MediaRemoteButtonConfig, MediaRemoteConfig, MediaRemoteDeviceConfig, MediaRemoteIconColorRule } from '../../constants/mediaRemotes'
+import { mediaRemoteModalTabs, type MediaRemoteModalTab } from '../../constants/surfaceSemantics'
+import { useOptimisticState } from '../../hooks/useOptimisticState'
 import { useImmediateVisualTab, useSmoothDisplayedModalTab } from '../../hooks/useSmoothDisplayedModalTab'
 import { asEntityName, titleCaseState } from './entityState'
 import styles from './MediaRemoteModalContent.module.css'
 
 type CallService = (params: Record<string, unknown>) => void
 type TextPromptAction = Extract<MediaRemoteAction, { type: 'textPrompt' }>
-export type MediaRemoteModalTab = 'controls' | 'apps' | 'devices'
+type TextPromptAccordionState = 'closed' | 'closing' | 'open' | 'opening'
+type TextPromptState = { accordionState: TextPromptAccordionState; action: TextPromptAction }
 
 const VOLUME_OPTIMISTIC_REVERT_MS = 2500
 const REMOTE_ACCORDION_DEBUG_KEY = 'haDash.remoteAccordionDebug'
-const BASE_MEDIA_REMOTE_MODAL_TABS: { icon: string; label: string; tab: MediaRemoteModalTab }[] = [
-  { icon: 'mdi:remote', label: 'Controls', tab: 'controls' },
-  { icon: 'mdi:play-box', label: 'Apps', tab: 'apps' },
-]
-const DEVICES_MEDIA_REMOTE_MODAL_TAB: { icon: string; label: string; tab: MediaRemoteModalTab } = { icon: 'mdi:projector', label: 'Devices', tab: 'devices' }
 const DESKTOP_MODAL_QUERY = '(min-width: 760px)'
 
 interface EntityLike {
@@ -40,10 +38,6 @@ function formatMediaState(entity: EntityLike | null | undefined, fallback = 'Una
   if (entity.state === 'unavailable') return 'Unavailable'
   if (entity.state === 'unknown') return 'Unknown'
   return titleCaseState(entity.state)
-}
-
-function mediaRemoteModalTabs(showDevices: boolean) {
-  return showDevices ? [...BASE_MEDIA_REMOTE_MODAL_TABS, DEVICES_MEDIA_REMOTE_MODAL_TAB] : BASE_MEDIA_REMOTE_MODAL_TABS
 }
 
 function shouldResetScrollOnTabChange() {
@@ -241,6 +235,7 @@ function RemoteShortcutSection({
   onTextPrompt,
   onTextPromptCancel,
   onTextPromptExited,
+  onTextPromptOpened,
   onTextPromptSubmit,
   textPrompt,
   textPromptInputRef,
@@ -251,8 +246,9 @@ function RemoteShortcutSection({
   onTextPrompt: (action: TextPromptAction) => void
   onTextPromptCancel: () => void
   onTextPromptExited: () => void
+  onTextPromptOpened: () => void
   onTextPromptSubmit: (action: TextPromptAction, text: string) => void
-  textPrompt: { action: TextPromptAction; open: boolean } | null
+  textPrompt: TextPromptState | null
   textPromptInputRef: RefObject<HTMLInputElement | null>
 }) {
   const keyboardButton = hideKeyboard ? undefined : config.keyboardButton
@@ -261,29 +257,16 @@ function RemoteShortcutSection({
     <section className={styles.section} data-section="remote-shortcuts">
       <SectionHeader title="Navigation" />
       <ButtonRow buttons={[config.backButton, config.homeButton, keyboardButton]} disabled={controlsDisabled} onTextPrompt={onTextPrompt} size="round" />
-      {textPrompt ? <TextPromptForm action={textPrompt.action} inputRef={textPromptInputRef} onCancel={onTextPromptCancel} onExited={onTextPromptExited} onSubmit={onTextPromptSubmit} open={textPrompt.open} /> : null}
+      {textPrompt ? <TextPromptForm accordionState={textPrompt.accordionState} action={textPrompt.action} inputRef={textPromptInputRef} key={textPrompt.action.targetEntityId} onCancel={onTextPromptCancel} onExited={onTextPromptExited} onOpened={onTextPromptOpened} onSubmit={onTextPromptSubmit} /> : null}
     </section>
   )
 }
 
-function TextPromptForm({ action, inputRef, onCancel, onExited, onSubmit, open }: { action: TextPromptAction; inputRef: RefObject<HTMLInputElement | null>; onCancel: () => void; onExited: () => void; onSubmit: (action: TextPromptAction, text: string) => void; open: boolean }) {
+function TextPromptForm({ accordionState, action, inputRef, onCancel, onExited, onOpened, onSubmit }: { accordionState: TextPromptAccordionState; action: TextPromptAction; inputRef: RefObject<HTMLInputElement | null>; onCancel: () => void; onExited: () => void; onOpened: () => void; onSubmit: (action: TextPromptAction, text: string) => void }) {
   const [text, setText] = useState('')
-  const [accordionState, setAccordionState] = useState<'closed' | 'closing' | 'open' | 'opening'>('closed')
   const accordionRef = useRef<HTMLDivElement | null>(null)
   const interactive = accordionState !== 'closed'
-
-  useEffect(() => {
-    if (!open) {
-      logRemoteAccordion('close-request', { state: accordionState })
-      setAccordionState('closing')
-      return undefined
-    }
-
-    logRemoteAccordion('open-request', { state: accordionState })
-    setAccordionState('closed')
-    const frame = window.requestAnimationFrame(() => setAccordionState('opening'))
-    return () => window.cancelAnimationFrame(frame)
-  }, [open])
+  const open = accordionState !== 'closing'
 
   useEffect(() => {
     if (!remoteAccordionDebugEnabled()) return undefined
@@ -329,22 +312,19 @@ function TextPromptForm({ action, inputRef, onCancel, onExited, onSubmit, open }
   }, [accordionState, open])
 
   useEffect(() => {
-    setText('')
-  }, [action])
-
-  useEffect(() => {
     if (!open) return undefined
     const viewport = window.visualViewport
+    const input = inputRef.current
     const handleViewportChange = () => scheduleTextPromptVisibility(inputRef.current, 'visual-viewport')
     const handleFocus = () => scheduleTextPromptVisibility(inputRef.current, 'input-focus')
 
-    inputRef.current?.addEventListener('focus', handleFocus)
+    input?.addEventListener('focus', handleFocus)
     viewport?.addEventListener('resize', handleViewportChange)
     viewport?.addEventListener('scroll', handleViewportChange)
     window.addEventListener('resize', handleViewportChange)
 
     return () => {
-      inputRef.current?.removeEventListener('focus', handleFocus)
+      input?.removeEventListener('focus', handleFocus)
       viewport?.removeEventListener('resize', handleViewportChange)
       viewport?.removeEventListener('scroll', handleViewportChange)
       window.removeEventListener('resize', handleViewportChange)
@@ -362,12 +342,11 @@ function TextPromptForm({ action, inputRef, onCancel, onExited, onSubmit, open }
         if (event.propertyName !== 'height') return
         logRemoteAccordion('transition-end', { state: accordionState })
         if (accordionState === 'opening') {
-          setAccordionState('open')
+          onOpened()
           inputRef.current?.focus()
           scheduleTextPromptVisibility(inputRef.current, 'transition-focus')
           logRemoteAccordion('focus-after-open', { activeElement: document.activeElement instanceof HTMLElement ? document.activeElement.id || document.activeElement.tagName : null })
         } else if (accordionState === 'closing') {
-          setAccordionState('closed')
           onExited()
         }
       }}
@@ -404,35 +383,14 @@ function TextPromptForm({ action, inputRef, onCancel, onExited, onSubmit, open }
 function VolumeSlider({ entityId, title }: { entityId: string; title: string }) {
   const callService = useHass((state) => state.helpers.callService) as unknown as CallService
   const entity = useEntity(asEntityName(entityId), { returnNullIfNotFound: true }) as EntityLike | null
-  const [optimisticPercent, setOptimisticPercent] = useState<number | null>(null)
-  const revertTimerRef = useRef<number | null>(null)
   const disabled = isOff(entity)
   const volumeLevel = typeof entity?.attributes.volume_level === 'number' ? entity.attributes.volume_level : 0
   const volumePercent = Math.round(volumeLevel * 100)
-  const displayedPercent = optimisticPercent ?? volumePercent
+  const [displayedPercent, commitDisplayedPercent] = useOptimisticState(volumePercent, { clearOn: 'confirmation', revertMs: VOLUME_OPTIMISTIC_REVERT_MS })
   const sliderStyle = { '--volume-percent': `${displayedPercent}%` } as CSSProperties
 
-  useEffect(() => {
-    if (optimisticPercent === null) return
-    if (Math.abs(volumePercent - optimisticPercent) > 1) return
-    if (revertTimerRef.current !== null) {
-      window.clearTimeout(revertTimerRef.current)
-      revertTimerRef.current = null
-    }
-    setOptimisticPercent(null)
-  }, [optimisticPercent, volumePercent])
-
-  useEffect(() => () => {
-    if (revertTimerRef.current !== null) window.clearTimeout(revertTimerRef.current)
-  }, [])
-
   const commitVolume = (nextPercent: number) => {
-    setOptimisticPercent(nextPercent)
-    if (revertTimerRef.current !== null) window.clearTimeout(revertTimerRef.current)
-    revertTimerRef.current = window.setTimeout(() => {
-      revertTimerRef.current = null
-      setOptimisticPercent(null)
-    }, VOLUME_OPTIMISTIC_REVERT_MS)
+    commitDisplayedPercent(nextPercent)
     callService({ domain: 'media_player', service: 'volume_set', target: entityId, serviceData: { volume_level: nextPercent / 100 } })
   }
 
@@ -526,6 +484,7 @@ function MediaRemoteModalTabContent({
   textPromptInputRef,
   onTextPromptCancel,
   onTextPromptExited,
+  onTextPromptOpened,
   onTextPromptSubmit,
 }: {
   activeTab: MediaRemoteModalTab
@@ -536,10 +495,11 @@ function MediaRemoteModalTabContent({
   showMediaControls: boolean
   showVolumeControls: boolean
   volumeControlsDisabled: boolean
-  textPrompt: { action: TextPromptAction; open: boolean } | null
+  textPrompt: TextPromptState | null
   textPromptInputRef: RefObject<HTMLInputElement | null>
   onTextPromptCancel: () => void
   onTextPromptExited: () => void
+  onTextPromptOpened: () => void
   onTextPromptSubmit: (action: TextPromptAction, text: string) => void
 }) {
   const controlEntity = useEntity(asEntityName(config.controlEntityId), { returnNullIfNotFound: true }) as EntityLike | null
@@ -594,6 +554,7 @@ function MediaRemoteModalTabContent({
                   onTextPrompt={onTextPrompt}
                   onTextPromptCancel={onTextPromptCancel}
                   onTextPromptExited={onTextPromptExited}
+                  onTextPromptOpened={onTextPromptOpened}
                   onTextPromptSubmit={onTextPromptSubmit}
                   textPrompt={textPrompt}
                   textPromptInputRef={textPromptInputRef}
@@ -635,8 +596,9 @@ export function MediaRemoteModalContent({ activeTab: controlledActiveTab, config
   const controlEntity = useEntity(asEntityName(config.controlEntityId), { returnNullIfNotFound: true }) as EntityLike | null
   const volumeEntity = useEntity(asEntityName(config.volumeEntityId), { returnNullIfNotFound: true }) as EntityLike | null
   const [localActiveTab, setLocalActiveTab] = useState<MediaRemoteModalTab>('controls')
-  const [textPrompt, setTextPrompt] = useState<{ action: TextPromptAction; open: boolean } | null>(null)
+  const [textPrompt, setTextPrompt] = useState<TextPromptState | null>(null)
   const textPromptInputRef = useRef<HTMLInputElement | null>(null)
+  const textPromptAnimationFrameRef = useRef<number | null>(null)
   const activeTab = controlledActiveTab ?? localActiveTab
   const setActiveTab = onTabChange ?? setLocalActiveTab
   const hasExternalNav = Boolean(onTabChange)
@@ -647,22 +609,55 @@ export function MediaRemoteModalContent({ activeTab: controlledActiveTab, config
   const showVolumeControls = config.showVolumeWhenOff ? Boolean(volumeEntity) : !volumeControlsDisabled
   const showMediaControls = !isOff(controlEntity)
 
+  useEffect(() => () => {
+    if (textPromptAnimationFrameRef.current !== null) window.cancelAnimationFrame(textPromptAnimationFrameRef.current)
+  }, [])
+
+  const cancelTextPromptAnimationFrame = () => {
+    if (textPromptAnimationFrameRef.current === null) return
+    window.cancelAnimationFrame(textPromptAnimationFrameRef.current)
+    textPromptAnimationFrameRef.current = null
+  }
+
   const openTextPrompt = (action: TextPromptAction) => {
+    cancelTextPromptAnimationFrame()
     let shouldFocus = false
+    let shouldAnimateOpen = false
     flushSync(() => {
       setTextPrompt((current) => {
-        if (current?.open && current.action.targetEntityId === action.targetEntityId) return { ...current, open: false }
+        if (current?.action.targetEntityId === action.targetEntityId && current.accordionState !== 'closing') {
+          logRemoteAccordion('close-request', { state: current.accordionState })
+          return current.accordionState === 'closed' ? null : { ...current, accordionState: 'closing' }
+        }
         shouldFocus = true
-        return { action, open: true }
+        if (current && current.accordionState !== 'closed' && current.accordionState !== 'closing') {
+          return { accordionState: current.accordionState, action }
+        }
+        shouldAnimateOpen = true
+        logRemoteAccordion('open-request', { state: current?.accordionState ?? 'unmounted' })
+        return { accordionState: 'closed', action }
       })
     })
+    if (shouldAnimateOpen) {
+      textPromptAnimationFrameRef.current = window.requestAnimationFrame(() => {
+        textPromptAnimationFrameRef.current = null
+        setTextPrompt((current) => current?.action.targetEntityId === action.targetEntityId && current.accordionState === 'closed'
+          ? { ...current, accordionState: 'opening' }
+          : current)
+      })
+    }
     if (shouldFocus) textPromptInputRef.current?.focus()
     if (shouldFocus) scheduleTextPromptVisibility(textPromptInputRef.current, 'sync-focus')
     else textPromptInputRef.current?.blur()
   }
   const closeTextPrompt = () => {
+    cancelTextPromptAnimationFrame()
     textPromptInputRef.current?.blur()
-    setTextPrompt((current) => current ? { ...current, open: false } : null)
+    setTextPrompt((current) => {
+      if (!current || current.accordionState === 'closed') return null
+      logRemoteAccordion('close-request', { state: current.accordionState })
+      return { ...current, accordionState: 'closing' }
+    })
   }
 
   const submitTextPrompt = (action: TextPromptAction, text: string) => {
@@ -679,7 +674,8 @@ export function MediaRemoteModalContent({ activeTab: controlledActiveTab, config
         hideKeyboard={hideKeyboard}
         onTextPrompt={openTextPrompt}
         onTextPromptCancel={closeTextPrompt}
-        onTextPromptExited={() => setTextPrompt(null)}
+        onTextPromptExited={() => setTextPrompt((current) => current?.accordionState === 'closing' ? null : current)}
+        onTextPromptOpened={() => setTextPrompt((current) => current?.accordionState === 'opening' ? { ...current, accordionState: 'open' } : current)}
         onTextPromptSubmit={submitTextPrompt}
         showMediaControls={showMediaControls}
         showVolumeControls={showVolumeControls}

@@ -67,6 +67,19 @@ async function clickModalTab(scope: RoleScope, name: string) {
   return button
 }
 
+async function clickIconModalTab(scope: RoleScope, name: string) {
+  const tab = scope.getByRole('tab', { name })
+  fireEvent.pointerDown(tab)
+  fireEvent.click(tab)
+  await settleModalTabTransition()
+  return tab
+}
+
+async function openThermostatControls() {
+  fireEvent.click(screen.getByRole('button', { name: 'Room Thermostats' }))
+  return screen.findByRole('dialog', { name: 'Thermostat' })
+}
+
 function restoreProperty(target: object, property: PropertyKey, descriptor: PropertyDescriptor | undefined) {
   if (descriptor) {
     Object.defineProperty(target, property, descriptor)
@@ -375,7 +388,7 @@ describe('DashboardViewPage', () => {
     expect(screen.getByRole('heading', { name: 'Devices' })).toBeInTheDocument()
   })
 
-  it('uses dynamic grids for every room section and splits lead rows into their own grids', () => {
+  it('uses dynamic grids for every room section, splits lead rows, and sizes app launch grids by tile width', () => {
     for (const path of ROOM_PAGE_ORDER) {
       const room = ROOM_PAGE_CONFIGS[path]
       const view = render(<DashboardViewPage activePath={path} onNavigate={() => undefined} path={path} />)
@@ -388,12 +401,19 @@ describe('DashboardViewPage', () => {
         const grid = screen.getByRole('group', { name: `${room.title} ${section.title}` })
         expect(grid).toHaveAttribute('data-dynamic-grid', 'true')
 
+        if (section.layout === 'app-launch') {
+          expect(grid).toHaveAttribute('data-dynamic-grid-max-cell-width', '200')
+        } else {
+          expect(grid).not.toHaveAttribute('data-dynamic-grid-max-cell-width')
+        }
+
         if (section.layout === 'lead-row') {
           expect(grid.querySelectorAll('[data-dynamic-grid-cell="true"]')).toHaveLength(1)
           expect(grid.querySelector('[data-dynamic-grid-cell="true"]')).toHaveAttribute('data-dynamic-grid-span', '2')
-          const controls = screen.getByRole('group', { name: `${room.title} ${section.title} Controls` })
-          expect(controls).toHaveAttribute('data-dynamic-grid', 'true')
-          expect(controls.querySelectorAll('[data-dynamic-grid-cell="true"]')).toHaveLength(section.cards.length - 1)
+          const followUpGrid = screen.getByRole('group', { name: `${room.title} ${section.title} Controls` })
+          expect(followUpGrid).toHaveAttribute('data-dynamic-grid', 'true')
+          expect(followUpGrid).not.toHaveAttribute('data-dynamic-grid-max-cell-width')
+          expect(followUpGrid.querySelectorAll('[data-dynamic-grid-cell="true"]')).toHaveLength(section.cards.length - 1)
         }
       }
 
@@ -414,12 +434,26 @@ describe('DashboardViewPage', () => {
     const theaterRemote = screen.getByRole('group', { name: 'Theater Room Remote' })
     expect(within(theaterRemote).getByRole('button', { name: /^Theater Remote/ })).toBeInTheDocument()
     expect(within(theaterRemote).queryByRole('button', { name: /^Nintendo Switch/ })).not.toBeInTheDocument()
-    const theaterControls = screen.getByRole('group', { name: 'Theater Room Remote Controls' })
-    expect(within(theaterControls).getAllByRole('button').map((button) => button.getAttribute('aria-label'))).toEqual([
+    expect(within(theaterRemote).queryByRole('button', { name: /^Theater SHIELD/ })).not.toBeInTheDocument()
+
+    const theaterRemoteControls = screen.getByRole('group', { name: 'Theater Room Remote Controls' })
+    expect(within(theaterRemoteControls).getAllByRole('button').map((button) => button.getAttribute('aria-label'))).toEqual([
       'Nintendo Switch Off',
       'Theater SHIELD Off',
     ])
-    expect(within(screen.getByRole('group', { name: 'Theater Room Quick App Launch' })).getAllByRole('button')).toHaveLength(6)
+    expect(theaterRemote.compareDocumentPosition(theaterRemoteControls) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(screen.queryByRole('heading', { name: 'Media Controls' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^Theater Room Off$/ })).not.toBeInTheDocument()
+
+    const theaterApps = screen.getByRole('group', { name: 'Theater Room Quick App Launch' })
+    expect(within(theaterApps).getAllByRole('button').map((button) => button.getAttribute('aria-label'))).toEqual([
+      'Plex',
+      'YouTube',
+      'Netflix',
+      'Prime Video',
+      'Paramount+',
+      'Disney+',
+    ])
     theaterView.unmount()
 
     render(<DashboardViewPage activePath="living-room" onNavigate={() => undefined} path="living-room" />)
@@ -430,8 +464,26 @@ describe('DashboardViewPage', () => {
       'Remote',
       'Quick App Launch',
     ])
-    expect(within(screen.getByRole('group', { name: 'Living Room Remote' })).getByRole('button', { name: /^Living Room SHIELD/ })).toBeInTheDocument()
-    expect(within(screen.getByRole('group', { name: 'Living Room Quick App Launch' })).getAllByRole('button')).toHaveLength(6)
+    const livingRemote = screen.getByRole('group', { name: 'Living Room Remote' })
+    expect(within(livingRemote).getByRole('button', { name: /^Living Room SHIELD/ })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Living Room SHIELD' })).not.toBeInTheDocument()
+    const livingApps = screen.getByRole('group', { name: 'Living Room Quick App Launch' })
+    expect(within(livingApps).getAllByRole('button')).toHaveLength(6)
+  })
+
+  it('keeps the theater remote opener and source scripts wired after the section split', async () => {
+    render(<DashboardViewPage activePath="theater-room" onNavigate={() => undefined} path="theater-room" />)
+
+    fireEvent.click(screen.getByRole('button', { name: /^Nintendo Switch/ }))
+    fireEvent.click(screen.getByRole('button', { name: /^Theater SHIELD/ }))
+    expect(mockCallServiceCalls).toEqual([
+      { domain: 'script', service: 'theater_room_nintendo_switch', serviceData: undefined },
+      { domain: 'script', service: 'theater_room_tv_movie', serviceData: undefined },
+    ])
+
+    fireEvent.click(screen.getByRole('button', { name: /^Theater Remote/ }))
+    const dialog = await screen.findByRole('dialog')
+    expect(within(dialog).getByRole('heading', { name: 'Theater Room SHIELD Remote' })).toBeInTheDocument()
   })
 
   it('renders the source empty room state for room pages without body cards', () => {
@@ -1211,7 +1263,7 @@ describe('DashboardViewPage', () => {
 
     expect(screen.getByRole('heading', { name: 'Admin' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Security Controls' })).toBeInTheDocument()
-    expect(screen.getByText('Disables automatic locking of the front door. Useful for when contractors are over, or we have people frequently entering/leaving the home.')).toBeInTheDocument()
+    expect(screen.getByText('Enables automatic locking of the front door. Turn this off temporarily when contractors are over or people are frequently entering and leaving the home.')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Front Door Auto-Lock On/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Front Door Auto-Lock On/i })).toHaveStyle({ '--card-rgb': '67 160 71' })
     expect(screen.getByRole('heading', { name: 'Living Room Power Recovery' })).toBeInTheDocument()
@@ -1330,6 +1382,12 @@ describe('DashboardViewPage', () => {
     fireEvent.click(screen.getByRole('menuitem', { name: 'Security' }))
     expect(navigate).toHaveBeenLastCalledWith('security')
 
+    const manual = screen.getByRole('button', { name: 'App Manual Access guides, instructions, and details on how our Home Assistant instance and app work.' })
+    expect(manual.querySelector('path')).toHaveAttribute('d', materialIconPath('mdi:book-open-page-variant'))
+    expect(screen.getByRole('navigation', { name: 'Settings pages' }).firstElementChild).toBe(manual)
+    fireEvent.click(manual)
+    expect(navigate).toHaveBeenLastCalledWith('manual')
+
     const admin = screen.getByRole('button', { name: /Admin Controls Presence-Based Toggles, Automation Overrides, and More/i })
     expect(admin.querySelector('path')).toHaveAttribute('d', materialIconPath('mdi:shield-account'))
     fireEvent.click(admin)
@@ -1360,6 +1418,20 @@ describe('DashboardViewPage', () => {
 
     const bottomNav = screen.getByRole('navigation', { name: 'Dashboard sections' })
     expect(within(bottomNav).getByRole('button', { name: 'Settings' })).toHaveAttribute('aria-current', 'page')
+  })
+
+  it('renders the App Manual route as a Settings subpage with preload-safe content', () => {
+    const { container, rerender } = render(<DashboardViewPage activePath="manual" onNavigate={() => undefined} path="manual" />)
+
+    expect(screen.getByRole('heading', { name: 'App Manual' })).toBeInTheDocument()
+    expect(screen.getByLabelText('Search the App Manual')).toBeInTheDocument()
+    expect(screen.getByRole('group', { name: 'App Manual sections' })).toBeInTheDocument()
+    const bottomNav = screen.getByRole('navigation', { name: 'Dashboard sections' })
+    expect(within(bottomNav).getByRole('button', { name: 'Settings' })).toHaveAttribute('aria-current', 'page')
+
+    rerender(<DashboardViewPage activePath="manual" onNavigate={() => undefined} path="manual" preload withShell={false} />)
+    expect(container.querySelector('[data-manual-preload="true"]')).toBeInTheDocument()
+    expect(container.querySelector('img')).toBeNull()
   })
 
   it('renders the Vacation page and blocks Vacation Mode until the checklist is complete', () => {
@@ -1616,13 +1688,27 @@ describe('DashboardViewPage', () => {
     ])
   })
 
-  it('uses the no-gap dynamic grid for thermostat room selection', () => {
+  it('uses the no-gap dynamic grid for thermostat room selection', async () => {
     render(<DashboardViewPage activePath="ecobee" onNavigate={() => undefined} path="ecobee" />)
 
-    const roomGrid = screen.getByRole('group', { name: 'Thermostat rooms' })
+    const dialog = await openThermostatControls()
+    const roomGrid = within(dialog).getByRole('group', { name: 'Thermostat rooms' })
     expect(roomGrid.children).toHaveLength(11)
     expect(roomGrid).toHaveAttribute('data-dynamic-grid-force-equivalent-column-count', 'true')
     expect(roomGrid.lastElementChild).toHaveAttribute('data-dynamic-grid-span', '2')
+  })
+
+  it('uses the active thermostat icon for occupied rooms', async () => {
+    const occupancy = mockEntities['sensor.thermostat_contact_sensors_living_room_occupancy']
+    const previousState = occupancy.state
+    occupancy.state = 'occupied'
+    const view = render(<DashboardViewPage activePath="ecobee" onNavigate={() => undefined} path="ecobee" />)
+
+    const dialog = await openThermostatControls()
+    const livingRoom = within(dialog).getByRole('button', { name: 'Living Room 70.2°F · Occupied' })
+    expect(livingRoom.querySelector('path')).toHaveAttribute('d', materialIconPath('mdi:thermometer-check'))
+    view.unmount()
+    occupancy.state = previousState
   })
 
   it('keeps the Whole Home thermostat range colors visible while the aggregate climate is off', () => {
@@ -1631,6 +1717,50 @@ describe('DashboardViewPage', () => {
     expect(screen.getByRole('region', { name: /Whole Home thermostat Idle 71.0°F 72.0 · 74.0/i })).toBeInTheDocument()
     expect(screen.getAllByTestId('control-slider-circular')[0]).toHaveStyle({ '--ha-control-slider-color': 'rgba(255, 255, 255, 0.78)', '--ha-control-slider-high-color': '#2c8e98', '--ha-control-slider-low-color': '#cd5401' })
     expect(screen.getAllByTestId('control-slider-circular')[0]).toHaveAttribute('data-inactive', 'false')
+  })
+
+  it('drags a thermostat range handle and commits the final value once', () => {
+    render(<DashboardViewPage activePath="ecobee" onNavigate={() => undefined} path="ecobee" />)
+
+    const dial = screen.getByRole('region', { name: /Whole Home thermostat Idle 71.0°F 72.0 · 74.0/i })
+    const lowHandle = dial.querySelector<HTMLElement>('[data-target="low"]')
+    const dialRect = {
+      bottom: 500,
+      height: 300,
+      left: 100,
+      right: 400,
+      top: 200,
+      width: 300,
+      x: 100,
+      y: 200,
+      toJSON: () => ({}),
+    } as DOMRect
+    const clientPoint = (value: number) => {
+      const point = valueToThermostatPoint(value, 45, 95)
+      return {
+        clientX: dialRect.left + (point.x / 100) * dialRect.width,
+        clientY: dialRect.top + (point.y / 100) * dialRect.height,
+      }
+    }
+    const rectSpy = vi.spyOn(dial, 'getBoundingClientRect').mockReturnValue(dialRect)
+
+    try {
+      fireEvent.pointerDown(lowHandle!, { ...clientPoint(72), pointerId: 41 })
+      expect(lowHandle).toHaveAttribute('data-dragging', 'true')
+
+      fireEvent.pointerMove(lowHandle!, { ...clientPoint(70), pointerId: 41 })
+      fireEvent.pointerUp(lowHandle!, { ...clientPoint(70), pointerId: 41 })
+
+      expect(lowHandle).not.toHaveAttribute('data-dragging')
+      expect(mockCallServiceCalls).toHaveLength(1)
+      expect(mockCallServiceCalls[0]).toMatchObject({
+        domain: 'climate',
+        service: 'set_temperature',
+        serviceData: { target_temp_high: 74, target_temp_low: 70 },
+      })
+    } finally {
+      rectSpy.mockRestore()
+    }
   })
 
   it('renders HA-owned vacation, non-vacation, and guest home-away transitions without inferring from raw inputs', async () => {
@@ -1678,7 +1808,8 @@ describe('DashboardViewPage', () => {
 
     expect(screen.queryByLabelText(/Whole Home (?:Away|Vacation) Mode/)).not.toBeInTheDocument()
     expect(screen.getByRole('region', { name: /Whole Home thermostat Idle 71.0°F 72.0 · 74.0/i })).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: 'Living Room 70.2°F · Inactive' }))
+    const thermostatDialog = await openThermostatControls()
+    fireEvent.click(within(thermostatDialog).getByRole('button', { name: 'Living Room 70.2°F · Inactive' }))
     const dialog = await screen.findByRole('dialog', { name: 'Living Room' })
     expect(within(dialog).queryByLabelText(/effective thermostat mode Away/i)).not.toBeInTheDocument()
     expect(within(dialog).queryByText(/(?:Away|Vacation) Mode/i)).not.toBeInTheDocument()
@@ -1714,7 +1845,8 @@ describe('DashboardViewPage', () => {
     expectRangeHandlePositions(wholeHomeDial, 62, 78)
     expect(screen.getByLabelText('Whole Home Vacation Mode')).toBeInTheDocument()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Living Room 70.2°F · Inactive' }))
+    const thermostatDialog = await openThermostatControls()
+    fireEvent.click(within(thermostatDialog).getByRole('button', { name: 'Living Room 70.2°F · Inactive' }))
     const dialog = await screen.findByRole('dialog', { name: 'Living Room' })
     let roomDial = within(dialog).getByRole('region', { name: /Living Room thermostat Idle 70.2°F 72.0 · 74.0/i })
     expectRangeHandlePositions(roomDial, 72, 74)
@@ -1753,7 +1885,8 @@ describe('DashboardViewPage', () => {
     mockEntities['climate.thermostat_contact_sensors_living_room_virtual_thermostat'].attributes.away_mode_active = true
     render(<DashboardViewPage activePath="ecobee" onNavigate={() => undefined} path="ecobee" />)
 
-    fireEvent.click(screen.getByRole('button', { name: 'Living Room 70.2°F · Inactive' }))
+    const thermostatDialog = await openThermostatControls()
+    fireEvent.click(within(thermostatDialog).getByRole('button', { name: 'Living Room 70.2°F · Inactive' }))
     const dialog = await screen.findByRole('dialog', { name: 'Living Room' })
     const vacationMode = within(dialog).getByLabelText('Living Room Vacation Mode')
 
@@ -1880,88 +2013,71 @@ describe('DashboardViewPage', () => {
     expect(screen.getByLabelText(/Thermostat Hub Mode Off/i)).toBeInTheDocument()
     expect(screen.queryByText('73.4 °F')).not.toBeInTheDocument()
     expect(screen.queryByText('38.0%')).not.toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Room Thermostats' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Advanced Configuration' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Room Tracking' })).toBeInTheDocument()
 
-    expect(screen.getByRole('button', { name: 'Living Room 70.2°F · Inactive' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Office 71.6°F · Active' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Master Bedroom 71.0°F · Active' })).toBeInTheDocument()
+    const dialog = await openThermostatControls()
+    const tabs = within(dialog).getAllByRole('tab')
+    expect(tabs.map((tab) => tab.getAttribute('aria-label'))).toEqual(['Rooms', 'Automation', 'Tracking'])
+    expect(within(dialog).getByRole('tab', { name: 'Rooms' })).toHaveAttribute('aria-selected', 'true')
+    expect(within(dialog).getByRole('button', { name: 'Living Room 70.2°F · Inactive' })).toBeInTheDocument()
+    expect(within(dialog).getByRole('button', { name: 'Office 71.6°F · Active' })).toBeInTheDocument()
+    expect(within(dialog).getByRole('button', { name: 'Master Bedroom 71.0°F · Active' })).toBeInTheDocument()
 
-    const ecoMode = screen.getByRole('button', { name: /^Eco Mode On$/i })
-    expect(ecoMode).toHaveAttribute('aria-pressed', 'true')
-    expect(ecoMode.closest('[data-active]')).toHaveAttribute('data-active', 'true')
-    expect(screen.getByLabelText(/Eco Mode Critical Tracking Track Select Critical/i)).toBeInTheDocument()
-    expect(screen.getByLabelText(/Eco Behavior When Away Keep Eco Active/i)).toBeInTheDocument()
-    fireEvent.click(screen.getByLabelText(/Eco Mode Critical Tracking Track Select Critical/i))
-    const pickerSheet = await screen.findByRole('dialog')
-    expect(pickerSheet).toHaveAttribute('data-surface', 'hass-popup')
-    expect(within(pickerSheet).getByRole('group', { name: 'Eco Mode Critical Tracking options' })).toHaveAttribute('data-layout', 'card-grid')
-    expect(within(pickerSheet).getByRole('button', { name: 'Track Select Critical' }).querySelector('path')).toHaveAttribute('d', materialIconPath('mdi:thermometer-check'))
-    expect(within(pickerSheet).getByRole('button', { name: 'Track Select Critical' }).querySelectorAll('path')).toHaveLength(1)
-    expect(within(pickerSheet).getByRole('button', { name: 'Track Select Active' }).querySelector('path')).toHaveAttribute('d', materialIconPath('mdi:thermometer-alert'))
-    fireEvent.click(within(pickerSheet).getByRole('button', { name: 'Track Select Critical' }))
-    await waitFor(() => expect(pickerSheet).toHaveAttribute('data-state', 'closed'))
-    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
-    expect(screen.getByText(/Enable Eco Mode to only track active rooms/i)).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Predictive Comfort' })).toBeInTheDocument()
-    expect(screen.getByText(/Use forecast weather, humidity, indoor sensors, and learned heat-load patterns/i)).toBeInTheDocument()
-    const predictiveComfort = screen.getByRole('button', { name: /^Predictive Comfort Off$/i })
-    expect(predictiveComfort).toHaveAttribute('aria-pressed', 'false')
-    expect(predictiveComfort.closest('[data-active]')).toHaveAttribute('data-active', 'false')
-    expect(screen.queryByRole('button', { name: 'Turn off Predictive Comfort' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Open Predictive Comfort controls' })).not.toBeInTheDocument()
+    const roomOpener = within(dialog).getByRole('button', { name: 'Living Room 70.2°F · Inactive' })
+    expect(roomOpener.querySelector('[data-modal-disclosure="right-chevron"]')).toBeInTheDocument()
+    fireEvent.click(roomOpener)
+    expect(dialog).toHaveAttribute('data-surface', 'hass-popup')
+    expect(within(dialog).getByRole('heading', { name: 'Living Room' })).toBeInTheDocument()
+    expect(within(dialog).getByRole('heading', { name: 'Living Room Vents' })).toBeInTheDocument()
+    expect(within(dialog).getByRole('region', { name: /Living Room thermostat Idle --°F 72.0 · 74.0/i })).toBeInTheDocument()
+    expect(within(dialog).queryByRole('region', { name: /Living Room thermostat Idle 0.0°F/i })).not.toBeInTheDocument()
+    expect(within(dialog).getByRole('article', { name: /^Vent 1 Open$/i })).toBeInTheDocument()
+    expect(within(dialog).getByRole('article', { name: /^Vent 2 Open$/i })).toBeInTheDocument()
 
-    expect(screen.getByRole('heading', { name: 'Track Selected Rooms' })).toBeInTheDocument()
-    const trackSelectedSection = screen.getByRole('heading', { name: 'Track Selected Rooms' }).closest('section') as HTMLElement
-    const livingRoomTrack = within(trackSelectedSection).getByRole('button', { name: 'Living Room' })
-    const officeTrack = within(trackSelectedSection).getByRole('button', { name: 'Office' })
-    expect(livingRoomTrack).toHaveAttribute('aria-pressed', 'true')
-    expect(officeTrack).toHaveAttribute('aria-pressed', 'false')
-    expect(within(livingRoomTrack).queryByText('On')).not.toBeInTheDocument()
-    expect(within(officeTrack).queryByText('Off')).not.toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Force Track Critical Temperature' })).toBeInTheDocument()
-    const forceCriticalSection = screen.getByRole('heading', { name: 'Force Track Critical Temperature' }).closest('section') as HTMLElement
-    expect(within(forceCriticalSection).getByRole('button', { name: 'Music Room' })).toHaveAttribute('aria-pressed', 'true')
-    expect(within(forceCriticalSection).getByRole('button', { name: 'Theater Room' })).toHaveAttribute('aria-pressed', 'true')
-    expect(within(forceCriticalSection).queryByRole('button', { name: /^Master Bedroom$/i })).not.toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Track Only When Occupied' })).toBeInTheDocument()
-    const trackOnlyWhenOccupiedSection = screen.getByRole('heading', { name: 'Track Only When Occupied' }).closest('section') as HTMLElement
-    expect(screen.getByText(/Choose which rooms should stay out of thermostat decisions until they are occupied/i)).toBeInTheDocument()
-    expect(within(trackOnlyWhenOccupiedSection).getByRole('button', { name: /^Living Room$/i })).toHaveAttribute('aria-pressed', 'false')
-    expect(within(trackOnlyWhenOccupiedSection).getByRole('button', { name: /^Office$/i })).toHaveAttribute('aria-pressed', 'false')
-    expect(within(trackOnlyWhenOccupiedSection).getByRole('button', { name: /^Master Bedroom$/i })).toHaveAttribute('aria-pressed', 'false')
-    expect(within(trackOnlyWhenOccupiedSection).getByRole('button', { name: /^Guest Bathroom$/i })).toHaveAttribute('aria-pressed', 'true')
-    expect(within(trackOnlyWhenOccupiedSection).getByRole('button', { name: /^Master Bathroom$/i })).toHaveAttribute('aria-pressed', 'true')
-    expect(within(trackOnlyWhenOccupiedSection).queryByRole('button', { name: /Occupied Only/i })).not.toBeInTheDocument()
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Back to rooms' }))
+    await clickIconModalTab(within(dialog), 'Automation')
+    expect(within(dialog).getByRole('switch', { name: 'Turn off Automatic Thermostat' })).toBeInTheDocument()
+    expect(within(dialog).getByRole('switch', { name: 'Turn off Eco Mode' })).toBeInTheDocument()
+    expect(within(dialog).getByRole('button', { name: 'Turn on Predictive Comfort' })).toBeInTheDocument()
+    expect(within(dialog).getByRole('button', { name: /Eco Mode Critical Tracking Track Select Critical/i })).toBeInTheDocument()
+    expect(within(dialog).getByRole('button', { name: /Eco Behavior When Away Keep Eco Active/i })).toBeInTheDocument()
 
-    fireEvent.click(ecoMode)
-    fireEvent.click(predictiveComfort)
-    fireEvent.click(screen.getByRole('button', { name: /^Automatic Thermostat On$/i }))
-    expect(mockCallServiceCalls).toEqual([
+    fireEvent.click(within(dialog).getByRole('button', { name: /Eco Mode Critical Tracking Track Select Critical/i }))
+    expect(screen.getAllByRole('dialog')).toHaveLength(1)
+    expect(within(dialog).getByRole('group', { name: 'Eco Mode Critical Tracking options' })).toHaveAttribute('data-dynamic-grid', 'true')
+    expect(within(dialog).getByRole('button', { name: /^Set Eco Mode Critical Tracking to Track Select Critical:/ })).toHaveAttribute('aria-pressed', 'true')
+    expect(within(dialog).getByRole('button', { name: /^Set Eco Mode Critical Tracking to Track Select Critical:/ })).toHaveAttribute('data-modal-detail-autofocus', 'true')
+    expect(within(dialog).getByRole('button', { name: /^Set Eco Mode Critical Tracking to Track All Critical:/ })).toHaveAttribute('aria-pressed', 'false')
+    fireEvent.click(within(dialog).getByRole('button', { name: /^Set Eco Mode Critical Tracking to Track All Critical:/ }))
+    expect(mockCallServiceCalls).toContainEqual({
+      domain: 'select',
+      service: 'select_option',
+      serviceData: { option: 'Track All Critical' },
+      target: 'select.thermostat_contact_sensors_eco_mode_critical_tracking',
+    })
+
+    fireEvent.click(within(dialog).getByRole('switch', { name: 'Turn off Eco Mode' }))
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Turn on Predictive Comfort' }))
+    fireEvent.click(within(dialog).getByRole('switch', { name: 'Turn off Automatic Thermostat' }))
+    expect(mockCallServiceCalls).toEqual(expect.arrayContaining([
       { domain: 'homeassistant', service: 'toggle', target: 'switch.thermostat_contact_sensors_eco_mode' },
       { domain: 'switch', service: 'turn_on', target: 'switch.thermostat_contact_sensors_predictive_comfort_mode' },
       { domain: 'homeassistant', service: 'toggle', target: 'input_boolean.enable_disable_thermostat_contact_sensors_integration' },
-    ])
-
-    const roomOpener = screen.getByRole('button', { name: 'Living Room 70.2°F · Inactive' })
-    expect(roomOpener.querySelector('[data-modal-disclosure="right-chevron"]')).toBeInTheDocument()
-    fireEvent.click(roomOpener)
-    expect(await screen.findByRole('dialog')).toHaveAttribute('data-surface', 'hass-popup')
-    expect(screen.getByRole('heading', { name: 'Living Room' })).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Living Room Vents' })).toBeInTheDocument()
-    expect(screen.getByRole('region', { name: /Living Room thermostat Idle --°F 72.0 · 74.0/i })).toBeInTheDocument()
-    expect(screen.queryByRole('region', { name: /Living Room thermostat Idle 0.0°F/i })).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /Decrease Living Room target temperature/i })).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /Increase Living Room target temperature/i })).not.toBeInTheDocument()
-    expect(screen.getByRole('article', { name: /^Vent 1 Open$/i })).toBeInTheDocument()
-    expect(screen.getByRole('article', { name: /^Vent 2 Open$/i })).toBeInTheDocument()
+    ]))
   })
 
-  it('toggles occupancy-only thermostat rooms from the Ecobee page', () => {
+  it('toggles occupancy-only thermostat rooms from the Thermostat tracking page', async () => {
     render(<DashboardViewPage activePath="ecobee" onNavigate={() => undefined} path="ecobee" />)
 
-    const trackOnlyWhenOccupiedSection = screen.getByRole('heading', { name: 'Track Only When Occupied' }).closest('section') as HTMLElement
-    const livingRoomGate = within(trackOnlyWhenOccupiedSection).getByRole('button', { name: /^Living Room$/i })
-    const guestBathroomGate = within(trackOnlyWhenOccupiedSection).getByRole('button', { name: /^Guest Bathroom$/i })
-    const masterBathroomGate = within(trackOnlyWhenOccupiedSection).getByRole('button', { name: /^Master Bathroom$/i })
+    const dialog = await openThermostatControls()
+    await clickIconModalTab(within(dialog), 'Tracking')
+    fireEvent.click(within(dialog).getByRole('button', { name: /Occupied Only 2 of 11 occupied only/i }))
+    expect(within(dialog).getByRole('group', { name: 'Occupied-only thermostat rooms' })).toHaveAttribute('data-dynamic-grid', 'true')
+    const livingRoomGate = within(dialog).getByRole('button', { name: /^Living Room$/i })
+    const guestBathroomGate = within(dialog).getByRole('button', { name: /^Guest Bathroom$/i })
+    const masterBathroomGate = within(dialog).getByRole('button', { name: /^Master Bathroom$/i })
 
     fireEvent.click(livingRoomGate)
     fireEvent.click(guestBathroomGate)
@@ -1975,10 +2091,35 @@ describe('DashboardViewPage', () => {
     ])
   })
 
+  it('keeps selected-room and critical-protection controls mapped to their HA switches', async () => {
+    render(<DashboardViewPage activePath="ecobee" onNavigate={() => undefined} path="ecobee" />)
+
+    const dialog = await openThermostatControls()
+    await clickIconModalTab(within(dialog), 'Tracking')
+    mockCallServiceCalls.length = 0
+
+    fireEvent.click(within(dialog).getByRole('button', { name: /Selected Rooms \d+ of 11 selected/i }))
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Office' }))
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Back to tracking' }))
+
+    fireEvent.click(within(dialog).getByRole('button', { name: /Critical Protection \d+ rooms forced/i }))
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Music Room' }))
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Back to tracking' }))
+
+    fireEvent.click(within(dialog).getByRole('switch', { name: 'Turn off Track Selected Rooms' }))
+
+    expect(mockCallServiceCalls).toEqual([
+      { domain: 'homeassistant', service: 'toggle', target: 'switch.thermostat_contact_sensors_track_office' },
+      { domain: 'homeassistant', service: 'toggle', target: 'switch.thermostat_contact_sensors_music_room_force_track_when_critical' },
+      { domain: 'homeassistant', service: 'toggle', target: 'switch.thermostat_contact_sensors_only_track_selected_rooms' },
+    ])
+  })
+
   it('keeps the Ecobee room modal title stable while closing', async () => {
     render(<DashboardViewPage activePath="ecobee" onNavigate={() => undefined} path="ecobee" />)
 
-    fireEvent.click(screen.getByRole('button', { name: 'Living Room 70.2°F · Inactive' }))
+    const thermostatDialog = await openThermostatControls()
+    fireEvent.click(within(thermostatDialog).getByRole('button', { name: 'Living Room 70.2°F · Inactive' }))
     const dialog = await screen.findByRole('dialog')
     expect(within(dialog).getByRole('heading', { name: 'Living Room' })).toBeInTheDocument()
 
@@ -1990,29 +2131,49 @@ describe('DashboardViewPage', () => {
     }
   })
 
+  it('uses green thermostat entry tiles without live-state subtitles', () => {
+    const tracking = mockEntities['switch.thermostat_contact_sensors_only_track_selected_rooms']
+    const previousState = tracking.state
+    tracking.state = 'unavailable'
+
+    try {
+      render(<DashboardViewPage activePath="ecobee" onNavigate={() => undefined} path="ecobee" />)
+      for (const label of ['Room Thermostats', 'Advanced Configuration', 'Room Tracking']) {
+        const tile = screen.getByRole('button', { name: label })
+        expect(tile).toHaveAttribute('data-tone', 'switch')
+        expect(tile).toHaveAttribute('data-modal-opener', 'true')
+        expect(tile.querySelectorAll('[data-dynamic-grid-label]')).toHaveLength(1)
+      }
+      expect(screen.queryByText(/Selected tracking unavailable/i)).not.toBeInTheDocument()
+    } finally {
+      tracking.state = previousState
+    }
+  })
+
   it('opens Predictive Comfort controls when active and powers it off from the card action', async () => {
     mockEntities['switch.thermostat_contact_sensors_predictive_comfort_mode'].state = 'on'
     render(<DashboardViewPage activePath="climate" onNavigate={() => undefined} path="ecobee" />)
 
-    const predictiveComfort = screen.getByRole('button', { name: /^Predictive Comfort On · Idle$/i })
-    expect(screen.getByRole('button', { name: 'Turn off Predictive Comfort' })).toBeInTheDocument()
-    const predictiveControls = screen.getByRole('button', { name: 'Open Predictive Comfort controls' })
+    const dialog = await openThermostatControls()
+    await clickIconModalTab(within(dialog), 'Automation')
+    const predictiveComfort = within(dialog).getByRole('button', { name: /Open Predictive Comfort controls, On · Idle/i })
+    expect(within(dialog).getByRole('switch', { name: 'Turn off Predictive Comfort' })).toBeInTheDocument()
+    const predictiveControls = predictiveComfort
     expect(predictiveControls).toBeInTheDocument()
-    expect(predictiveControls.querySelector('[data-modal-disclosure="right-chevron"]')).toBeInTheDocument()
-    expect(predictiveControls.querySelector('path')).toHaveAttribute('d', materialIconPath('mdi:chevron-right'))
-
+    expect(predictiveControls.querySelector('[data-schedule-list-row-chevron]')).toBeInTheDocument()
+    expect(predictiveControls.querySelector('[data-schedule-list-row-chevron] path')).toHaveAttribute('d', materialIconPath('mdi:chevron-right'))
     fireEvent.click(predictiveComfort)
-    const dialog = await screen.findByRole('dialog')
     expect(dialog).toHaveAttribute('data-surface', 'hass-popup')
     expect(within(dialog).getByRole('heading', { name: 'Predictive Comfort' })).toBeInTheDocument()
+    await waitFor(() => expect(dialog.querySelector('[data-modal-detail-autofocus="true"]')).toHaveFocus())
     expect(within(dialog).getByText(/^Idle$/i)).toBeInTheDocument()
     expect(within(dialog).getByRole('heading', { name: 'Controls' })).toBeInTheDocument()
-    const autoAdjustDescription = within(dialog).getByText(/nudge the thermostat target before the house drifts out of range/i)
-    const autoAdjustButton = within(dialog).getByRole('button', { name: /^Auto Setpoint Adjustments Off$/i })
-    const hvacModeDescription = within(dialog).getByText(/switch between heat and cool when a proactive correction needs it/i)
-    const hvacModeButton = within(dialog).getByRole('button', { name: /^HVAC Mode Changes Off$/i })
-    const awayDescription = within(dialog).getByText(/only act when someone is home/i)
-    const awayButton = within(dialog).getByRole('button', { name: /^Predictive Comfort While Away Off$/i })
+    const autoAdjustDescription = within(dialog).getByText(/adjust the thermostat target before the house leaves the comfort range/i)
+    const autoAdjustButton = within(dialog).getByRole('switch', { name: 'Turn on Auto Setpoint Adjustments' })
+    const hvacModeDescription = within(dialog).getByText(/switch between heating and cooling when the recommendation requires it/i)
+    const hvacModeButton = within(dialog).getByRole('switch', { name: 'Turn on HVAC Mode Changes' })
+    const awayDescription = within(dialog).getByText(/act only while someone is home/i)
+    const awayButton = within(dialog).getByRole('switch', { name: 'Turn on Predictive Comfort While Away' })
     expect(autoAdjustDescription.closest('button')).toBeNull()
     expect(hvacModeDescription.closest('button')).toBeNull()
     expect(awayDescription.closest('button')).toBeNull()
@@ -2045,29 +2206,32 @@ describe('DashboardViewPage', () => {
     mockEntities['sensor.living_room_thermostat_contact_sensors_predictive_comfort_mode'].state = 'pre_cool'
     render(<DashboardViewPage activePath="climate" onNavigate={() => undefined} path="ecobee" />)
 
-    const predictiveComfort = screen.getByRole('button', { name: 'Predictive Comfort On · Pre-Cool' })
-    expect(screen.queryByText('Pre Cool')).not.toBeInTheDocument()
+    const dialog = await openThermostatControls()
+    await clickIconModalTab(within(dialog), 'Automation')
+    const predictiveComfort = within(dialog).getByRole('button', { name: /Open Predictive Comfort controls, On · Pre-Cool/i })
+    expect(within(dialog).queryByText('Pre Cool')).not.toBeInTheDocument()
 
     fireEvent.click(predictiveComfort)
-    const dialog = await screen.findByRole('dialog')
     expect(within(dialog).getByText('Pre-Cool')).toBeInTheDocument()
     expect(within(dialog).queryByText('Pre Cool')).not.toBeInTheDocument()
   })
 
-  it('turns Predictive Comfort off from the active card power action', () => {
+  it('turns Predictive Comfort off from the active card power action', async () => {
     mockEntities['switch.thermostat_contact_sensors_predictive_comfort_mode'].state = 'on'
     render(<DashboardViewPage activePath="climate" onNavigate={() => undefined} path="ecobee" />)
 
-    expect(screen.getByRole('button', { name: 'Turn off Predictive Comfort' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Open Predictive Comfort controls' })).toBeInTheDocument()
+    const dialog = await openThermostatControls()
+    await clickIconModalTab(within(dialog), 'Automation')
+    expect(within(dialog).getByRole('switch', { name: 'Turn off Predictive Comfort' })).toBeInTheDocument()
+    expect(within(dialog).getByRole('button', { name: /Open Predictive Comfort controls/i })).toBeInTheDocument()
 
     mockCallServiceCalls.length = 0
-    fireEvent.click(screen.getByRole('button', { name: 'Turn off Predictive Comfort' }))
+    fireEvent.click(within(dialog).getByRole('switch', { name: 'Turn off Predictive Comfort' }))
     expect(mockCallServiceCalls).toEqual([
       { domain: 'switch', service: 'turn_off', target: 'switch.thermostat_contact_sensors_predictive_comfort_mode' },
     ])
-    expect(screen.queryByRole('button', { name: 'Turn off Predictive Comfort' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Open Predictive Comfort controls' })).not.toBeInTheDocument()
+    expect(within(dialog).queryByRole('switch', { name: 'Turn off Predictive Comfort' })).not.toBeInTheDocument()
+    expect(within(dialog).getByRole('button', { name: 'Turn on Predictive Comfort' })).toBeInTheDocument()
   })
 
   it('shows manual air purifier fan speeds and runs fan percentage services', async () => {
@@ -5015,14 +5179,17 @@ describe('DashboardViewPage', () => {
     const navigate = vi.fn()
     render(<DashboardViewPage activePath="food" onNavigate={navigate} path="food" />)
 
-    await screen.findByRole('article', { name: 'Ang Chow Chicken (Red Fermented Rice Wine Chicken)' })
+    await screen.findByRole('button', { name: 'Open Suggested Citrus Pantry Bowl with Roasted Garden Vegetables recipe details' })
     expect(screen.getByRole('heading', { name: 'Food & Recipes' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Suggested Recipes' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'All Food' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Food Spaces' })).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: 'Recipes' })).not.toBeInTheDocument()
-    expect(document.querySelectorAll('[data-carousel-page]')).toHaveLength(5)
-    expect(document.querySelectorAll('[data-carousel-card]')).toHaveLength(30)
+    const carouselPages = Array.from(document.querySelectorAll('[data-carousel-page]'))
+    expect(carouselPages).toHaveLength(5)
+    const carouselPageSize = carouselPages[0].querySelectorAll('[data-carousel-card]').length
+    expect(carouselPageSize).toBeGreaterThanOrEqual(6)
+    expect(document.querySelectorAll('[data-carousel-card]')).toHaveLength(carouselPageSize * 5)
     const floatingDock = document.querySelector('[data-floating-action-dock="true"]')
     const scanButton = screen.getByRole('button', { name: 'Scan Item' })
     expect(scanButton).toHaveTextContent('Scan Item')
@@ -5035,7 +5202,9 @@ describe('DashboardViewPage', () => {
     expect(screen.getByRole('button', { name: 'Spice Rack 6 Items • 1 Expiring Soon' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Cabinet 4 Items • 1 Expiring Soon' })).toBeInTheDocument()
 
-    fireEvent.click(screen.getByRole('button', { name: 'All Recipes Browse the complete recipe catalog' }))
+    const allRecipes = screen.getByRole('button', { name: 'All Recipes' })
+    expect(allRecipes).toHaveAttribute('data-icon', 'mdi:book-open-page-variant')
+    fireEvent.click(allRecipes)
     expect(navigate).toHaveBeenCalledWith('recipes')
     fireEvent.click(screen.getByRole('button', { name: 'All Food 35 Items • 6 Expiring Soon' }))
     expect(navigate).toHaveBeenCalledWith('all-food')
@@ -5076,8 +5245,8 @@ describe('DashboardViewPage', () => {
     expect(screen.getByRole('button', { name: 'Sort' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Filter' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Scan Item' })).not.toBeInTheDocument()
-    expect(await screen.findByRole('article', { name: 'Catalog Recipe 1' })).toBeInTheDocument()
-    expect(screen.getAllByRole('article')).toHaveLength(50)
+    expect(await screen.findByRole('button', { name: 'Open Catalog Recipe 1 recipe details' })).toBeInTheDocument()
+    expect(screen.getAllByRole('button', { name: /Open Catalog Recipe \d+ recipe details/ })).toHaveLength(50)
   })
 
   it('opens Kitchen vent as the exact vent popup rather than the full climate sheet', async () => {
@@ -6496,7 +6665,10 @@ describe('DashboardViewPage', () => {
 
     expect(screen.getByRole('heading', { name: 'Thermostat' })).toBeInTheDocument()
     expect(screen.queryByText(/not available in the React dashboard yet/i)).not.toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Eco Mode' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Room Thermostats' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Advanced Configuration' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Room Tracking' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Eco Mode' })).not.toBeInTheDocument()
   })
 
   it('keeps vacuum modal controls optimistic while Valetudo state is still stale', async () => {
@@ -6583,7 +6755,7 @@ describe('DashboardViewPage', () => {
       })
 
       expect(screen.queryByText('The vacuum settings did not confirm before cleaning could start.')).not.toBeInTheDocument()
-      expect(screen.getByRole('combobox', { name: /Mode Mop/i })).toHaveValue('mop')
+      expect(screen.getByRole('combobox', { name: /Mode Vacuum/i })).toHaveValue('vacuum')
     } finally {
       vi.clearAllTimers()
       vi.useRealTimers()

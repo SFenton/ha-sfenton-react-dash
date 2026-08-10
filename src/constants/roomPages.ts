@@ -46,9 +46,13 @@ export interface RoomSourceModalItem {
   title: string
 }
 
+// `app-launch` keeps square branded tiles in a responsive grid.
+// `lead-row` renders the first card as a full-width row above a responsive grid of the remaining cards.
+export type RoomSourceSectionLayout = 'app-launch' | 'lead-row'
+
 export interface RoomSourceSectionConfig {
   cards: RoomSourceCardConfig[]
-  layout?: 'lead-row'
+  layout?: RoomSourceSectionLayout
   title: string
 }
 
@@ -114,7 +118,7 @@ export const ROOM_PAGE_CONFIGS: Record<string, RoomPageSourceConfig> = {
       ] },
       { title: 'Devices', cards: [{ title: 'Main Floor', modalTitle: 'Robot Vacuum', entityId: 'vacuum.valetudo_exaltedsneakydeer', icon: 'mdi:robot-vacuum', kind: 'vacuum', hash: '#robot-vacuum', subtitleEntityIds: ['vacuum.valetudo_exaltedsneakydeer', 'sensor.valetudo_exaltedsneakydeer_battery_level'], span: 'full' }] },
       { title: 'Remote', cards: [{ title: 'Living Room SHIELD', entityId: 'media_player.living_room_shield', icon: 'mdi:remote', kind: 'media', hash: '#living-room-shield', showState: true }] },
-      { title: 'Quick App Launch', cards: livingRoomShieldAppShortcuts },
+      { title: 'Quick App Launch', layout: 'app-launch', cards: livingRoomShieldAppShortcuts },
     ],
     popupTemplates: ['light-slider-toggle', 'window-popup-single', 'air-purifier-popup', 'vent-popup-2', 'vacuum-*', 'media-player-popup'],
   },
@@ -292,7 +296,7 @@ export const ROOM_PAGE_CONFIGS: Record<string, RoomPageSourceConfig> = {
         { title: 'Nintendo Switch', entityId: 'input_boolean.is_nintendo_switch_active', icon: 'mdi:gamepad', kind: 'media', showState: true, action: scriptAction('theater_room_nintendo_switch') },
         { title: 'Theater SHIELD', entityId: 'input_boolean.is_theater_shield_active', icon: 'mdi:television', kind: 'media', showState: true, action: scriptAction('theater_room_tv_movie') },
       ] },
-      { title: 'Quick App Launch', cards: theaterAppShortcuts },
+      { title: 'Quick App Launch', layout: 'app-launch', cards: theaterAppShortcuts },
       { title: 'Theater Room PCs', cards: [{ title: 'Theater Room PC', entityId: 'input_boolean.theater_pc_power', icon: 'mdi:projector', kind: 'power', subtitleEntityIds: ['input_text.theater_pc_power_state'], action: pcPowerAction('input_button.theater_pc_on', 'input_button.theater_pc_off') }] },
       { title: 'Devices', cards: [{ title: 'Theater Room', modalTitle: 'Robot Vacuum', entityId: 'vacuum.valetudo_politefatherlykingfisher', icon: 'mdi:robot-vacuum', kind: 'vacuum', hash: '#robot-vacuum', subtitleEntityIds: ['vacuum.valetudo_politefatherlykingfisher', 'sensor.valetudo_politefatherlykingfisher_battery_level'], span: 'full' }] },
     ],
@@ -302,7 +306,7 @@ export const ROOM_PAGE_CONFIGS: Record<string, RoomPageSourceConfig> = {
     title: 'Downstairs Hallway',
     path: 'downstairs-hallway',
     overviewCards: [
-      { title: 'Light', entityId: 'light.downstairs_hallway_light', icon: 'mdi:lightbulb', kind: 'light', hash: '#door-downstairs-hallway', showState: true },
+      { title: 'Light', entityId: 'light.downstairs_hallway_light', icon: 'mdi:lightbulb', kind: 'light', hash: '#light-downstairs-hallway', showState: true },
       { title: 'Climate', entityId: 'input_text.downstairs_hallway_climate_range', icon: 'mdi:thermometer', kind: 'climate', hash: '#climate-downstairs-hallway', showState: true },
       { title: 'Occupancy', entityId: 'binary_sensor.downstairs_hallway_presence_sensor_presence', icon: 'mdi:motion-sensor', kind: 'occupancy', hash: '#downstairs-hallway-occupancy', showState: true },
       { title: 'Door', entityId: 'binary_sensor.garage_door_contact_sensor_contact', icon: 'mdi:door', kind: 'contact', hash: '#door-downstairs-hallway' },

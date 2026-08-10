@@ -1,9 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import type { RouteTransitionState } from '../components/shell/SmoothRouteOutlet'
+import { DASHBOARD_LOADING_EXIT_MS, DASHBOARD_MIN_LOADING_MS } from '../constants/loading'
 
 const hydratedRouteKeys = new Set<string>()
-const MIN_LOADING_MS = 1000
-const LOADING_EXIT_MS = 500
 
 export type DeferredRouteHydrationPhase = 'content' | 'loading' | 'loading-exiting'
 
@@ -31,8 +30,8 @@ export function useDeferredRouteHydration({
   coldContentDelayMs = 120,
   enabled = true,
   heavyContentDelayMs = 220,
-  loadingExitMs = LOADING_EXIT_MS,
-  minLoadingMs = MIN_LOADING_MS,
+  loadingExitMs = DASHBOARD_LOADING_EXIT_MS,
+  minLoadingMs = DASHBOARD_MIN_LOADING_MS,
   transitionState,
   warmHeavyDelayMs = 90,
 }: DeferredRouteHydrationOptions) {

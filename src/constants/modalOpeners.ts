@@ -1,4 +1,4 @@
-export type ModalOpenerAffordance = 'action-icon' | 'down-chevron' | 'edit-icon' | 'header-chip' | 'native-control' | 'right-chevron' | 'stream-pill'
+export type ModalOpenerAffordance = 'action-icon' | 'down-chevron' | 'edit-icon' | 'header-chip' | 'image-card' | 'native-control' | 'right-chevron' | 'stream-pill'
 
 export interface ModalOpenerInventoryItem {
   affordance: ModalOpenerAffordance
@@ -11,7 +11,9 @@ export interface ModalOpenerInventoryItem {
   sourceReference?: string
 }
 
-export const MODAL_OPENER_INVENTORY: ModalOpenerInventoryItem[] = [
+export const EXPECTED_MODAL_OPENER_FAMILY_COUNT = 37
+
+export const MODAL_OPENER_INVENTORY = [
   {
     id: 'weather-hero',
     label: 'Home weather hero',
@@ -19,6 +21,16 @@ export const MODAL_OPENER_INVENTORY: ModalOpenerInventoryItem[] = [
     affordance: 'right-chevron',
     implementation: 'WeatherSummary',
     behavior: 'Opens the local Weather ModalSheet without changing Home Assistant state.',
+  },
+  {
+    id: 'daily-report-profile',
+    label: 'Daily Report profile button',
+    instances: 1,
+    affordance: 'action-icon',
+    implementation: 'AppHeader profile button',
+    behavior: 'Opens the app-level Daily Report sheet for the current or requested Home Assistant user.',
+    exceptionReason: 'The profile avatar and attention badge identify the personalized global report; a disclosure chevron would compete with the compact header action.',
+    sourceReference: 'AppHeader and DailyReportModal focused tests.',
   },
   {
     id: 'overview-status-chips',
@@ -125,12 +137,20 @@ export const MODAL_OPENER_INVENTORY: ModalOpenerInventoryItem[] = [
     behavior: 'Opens Presence-Based Overrides or Auto-Reset.',
   },
   {
+    id: 'thermostat-controls',
+    label: 'Thermostat tab entry tiles',
+    instances: 3,
+    affordance: 'right-chevron',
+    implementation: 'ThermostatPageEntry through GlassTile',
+    behavior: 'Opens the shared Thermostat sheet directly on Rooms, Automation, or Tracking without changing Home Assistant state.',
+  },
+  {
     id: 'thermostat-room-rows',
     label: 'Thermostat room rows',
     instances: 11,
     affordance: 'right-chevron',
     implementation: 'ThermostatRoomRow through ModalOpenerRow',
-    behavior: 'Opens the selected room thermostat sheet.',
+    behavior: 'Opens the selected room detail inside the existing Thermostat sheet.',
   },
   {
     id: 'predictive-comfort',
@@ -138,7 +158,7 @@ export const MODAL_OPENER_INVENTORY: ModalOpenerInventoryItem[] = [
     instances: 1,
     affordance: 'right-chevron',
     implementation: 'PredictiveComfortCard',
-    behavior: 'When active, main/disclosure opens details and power turns off; when inactive, main turns on.',
+    behavior: 'When active, main/disclosure opens the Predictive Comfort page inside the Thermostat sheet and power turns off; when inactive, main turns on.',
   },
   {
     id: 'custom-light-details',
@@ -163,6 +183,26 @@ export const MODAL_OPENER_INVENTORY: ModalOpenerInventoryItem[] = [
     affordance: 'right-chevron',
     implementation: 'PantryRow',
     behavior: 'Row/disclosure opens individual inventory instances.',
+  },
+  {
+    id: 'recipe-cards',
+    label: 'Suggested and browse recipe cards',
+    instances: 'dynamic',
+    affordance: 'image-card',
+    implementation: 'RecipeCard through ImageCard',
+    behavior: 'Opens the shared Recipe Detail sheet without changing Home Assistant state.',
+    exceptionReason: 'The recipe image, title, and ingredient coverage are the complete card affordance; an overlaid chevron would compete with the compact image copy.',
+    sourceReference: 'Recipe card activation and detail-modal coverage in focused Vitest and Playwright tests.',
+  },
+  {
+    id: 'recipe-sort-filter-floating-actions',
+    label: 'Recipe Sort and Filter floating actions',
+    instances: 2,
+    affordance: 'action-icon',
+    implementation: 'RecipeFloatingActions',
+    behavior: 'Opens the Sort Recipes or Filter Recipes sheet without changing the applied query until Apply is selected.',
+    exceptionReason: 'The sort and filter glyphs are compact floating commands with persistent active colors; adding a chevron would imply route navigation.',
+    sourceReference: 'RecipeFloatingActions focused tests and Recipes route Playwright coverage.',
   },
   {
     id: 'rooms-floating-action',
@@ -237,12 +277,28 @@ export const MODAL_OPENER_INVENTORY: ModalOpenerInventoryItem[] = [
   {
     id: 'thermostat-option-pickers',
     label: 'Thermostat option picker buttons',
-    instances: 4,
+    instances: 2,
     affordance: 'down-chevron',
     implementation: 'ThermostatSelectButton',
-    behavior: 'Opens an option-selection sheet and calls the selected HA climate/select service.',
+    behavior: 'Opens the Thermostat Hub mode or fan selection sheet and calls the selected HA climate service.',
     exceptionReason: 'A down chevron is the established select/menu affordance and distinguishes option expansion from detail navigation.',
-    sourceReference: 'Thermostat picker configuration and source-shaped option-sheet Playwright coverage.',
+    sourceReference: 'Thermostat Hub picker configuration and source-shaped option-sheet Playwright coverage.',
+  },
+  {
+    id: 'thermostat-option-pages',
+    label: 'Thermostat Eco option rows',
+    instances: 2,
+    affordance: 'right-chevron',
+    implementation: 'ThermostatOptionOpener through ModalOpenerRow',
+    behavior: 'Opens Critical Tracking or Away Behavior as a same-sheet Thermostat detail page.',
+  },
+  {
+    id: 'thermostat-tracking-rows',
+    label: 'Thermostat tracking policy rows',
+    instances: 3,
+    affordance: 'right-chevron',
+    implementation: 'ThermostatTrackingOpener through ModalOpenerRow',
+    behavior: 'Opens Selected Rooms, Critical Protection, or Occupied Only inside the existing Thermostat sheet.',
   },
   {
     id: 'custom-light-mode-picker',
@@ -294,6 +350,6 @@ export const MODAL_OPENER_INVENTORY: ModalOpenerInventoryItem[] = [
     exceptionReason: 'The visible power/delete/cart action icon describes the command; the native dialog is a safety step, not a navigation destination.',
     sourceReference: 'Explicit state-to-service matrices and native-dialog tests.',
   },
-]
+] as const satisfies readonly ModalOpenerInventoryItem[]
 
 export const MODAL_OPENER_EXCEPTIONS = MODAL_OPENER_INVENTORY.filter((item) => item.affordance !== 'right-chevron')

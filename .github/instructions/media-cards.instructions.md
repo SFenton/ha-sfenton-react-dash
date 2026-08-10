@@ -9,6 +9,10 @@ applyTo: "src/components/core/*Card*.tsx,src/components/core/*Card*.module.css,s
 - Clamp overlong overlay titles to two lines and preserve readability with a bottom scrim and restrained text shadow.
 - Eager-load only initially visible media. Offscreen images use lazy loading and asynchronous decoding.
 - Generic display cards are noninteractive unless a real destination or action exists. Do not add no-op click handlers, buttons, links, tab stops, pointer cursors, press feedback, or selected styling.
-- Horizontal carousels use native overflow and CSS scroll snap. Do not add autoplay, looping, or a carousel dependency.
-- Carousel page controls need large touch targets, an accessible current-page state, keyboard navigation, and reduced-motion-aware programmatic scrolling.
+- Horizontal card carousels use the shared clipped transform track, not a native
+  overflow scrollbar; Safari can expose transient scroll indicators even when
+  scrollbar CSS is present.
+- Carousel page controls need accessible current-page state, keyboard navigation,
+  boundary-wrapping touch swipes, compact visual spacing, and reduced-motion-safe
+  transforms. Do not add autoplay or a carousel dependency.
 - Preload mode renders inert geometry without `<img>` elements, effects, timers, observers, or service calls.

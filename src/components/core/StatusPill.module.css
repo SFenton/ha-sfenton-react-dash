@@ -27,25 +27,33 @@
   gap: 2px;
 }
 
-.text span,
-.text strong {
+.label,
+.value,
+.detail {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.text span {
+.label {
   color: rgba(232, 240, 255, 0.62);
   font-size: 0.68rem;
   font-weight: 760;
   line-height: 1.05;
 }
 
-.text strong {
+.value {
   color: rgba(255, 255, 255, 0.95);
   font-size: 0.8rem;
   font-weight: 840;
   line-height: 1.12;
+}
+
+.detail {
+  color: rgba(232, 240, 255, 0.7);
+  font-size: 0.66rem;
+  font-weight: 700;
+  line-height: 1.08;
 }
 
 .pill[data-tone='ok'] {

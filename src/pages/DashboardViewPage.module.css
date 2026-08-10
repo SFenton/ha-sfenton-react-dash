@@ -28,6 +28,10 @@
   --dynamic-grid-columns: 2;
 }
 
+.appLaunchGrid {
+  --dynamic-grid-columns: 2;
+}
+
 .choreQuickGrid {
   --dynamic-grid-columns: 2;
 }
@@ -609,6 +613,11 @@
   gap: 16px;
 }
 
+.thermostatPageEntries {
+  display: grid;
+  gap: 16px;
+}
+
 .thermostatDial {
   position: relative;
   display: grid;
@@ -1008,23 +1017,52 @@ button.thermostatGlassMain {
   --dynamic-grid-columns: 2;
 }
 
-.thermostatCheckboxGrid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-}
-
 .thermostatDescription {
   margin-bottom: 10px;
   white-space: pre-line;
 }
 
-.thermostatCheckboxGrid {
-  margin-top: 8px;
-}
-
 .thermostatCheckbox {
   min-height: 66px;
+}
+
+.thermostatModalStack,
+.thermostatModalPanel {
+  display: grid;
+  min-width: 0;
+  gap: 18px;
+}
+
+.thermostatModalPanel {
+  align-content: start;
+  transition:
+    opacity 170ms ease,
+    transform 170ms ease;
+}
+
+.thermostatModalList {
+  display: grid;
+  gap: 14px;
+}
+
+.thermostatModalControl {
+  display: grid;
+  min-width: 0;
+  gap: 8px;
+}
+
+.thermostatDetailPage:focus {
+  outline: none;
+}
+
+.thermostatChoiceGrid [data-schedule-list-row],
+.thermostatChoiceGrid [data-schedule-list-row] > button,
+.thermostatTrackingGrid > [data-dynamic-grid-cell='true'] > button {
+  height: 100%;
+}
+
+.thermostatChoiceGrid [data-schedule-list-row] > button {
+  min-height: 112px;
 }
 
 .thermostatModalBody {
@@ -1245,13 +1283,15 @@ button.thermostatGlassMain {
     transform 170ms ease;
 }
 
-.eightSleepModalPanel[data-modal-tab-transition-state='exiting'] {
+.eightSleepModalPanel[data-modal-tab-transition-state='exiting'],
+.thermostatModalPanel[data-modal-tab-transition-state='exiting'] {
   opacity: 0;
   transform: translate3d(0, 5px, 0);
   transition-duration: 130ms;
 }
 
-.eightSleepModalPanel[data-modal-tab-transition-state='pre-entering'] {
+.eightSleepModalPanel[data-modal-tab-transition-state='pre-entering'],
+.thermostatModalPanel[data-modal-tab-transition-state='pre-entering'] {
   opacity: 0;
   transform: translate3d(0, 5px, 0);
   transition: none;
@@ -1361,12 +1401,14 @@ button.thermostatGlassMain {
 }
 
 .predictiveMetric strong {
+  display: -webkit-box;
   overflow: hidden;
   font-size: 0.88rem;
   font-weight: 840;
   line-height: 1.15;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .predictiveReasonCard {
@@ -1452,8 +1494,7 @@ button.thermostatGlassMain {
 
 @media (max-width: 340px) {
   .grid,
-  .cameraGrid,
-  .thermostatCheckboxGrid {
+  .cameraGrid {
     grid-template-columns: 1fr;
   }
 

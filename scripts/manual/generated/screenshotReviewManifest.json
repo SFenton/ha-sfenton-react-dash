@@ -1,0 +1,2660 @@
+{
+  "budgets": {
+    "perFileBytes": 786432,
+    "totalLibraryBytes": 25000000
+  },
+  "fingerprints": {
+    "captureHarness": {
+      "algorithm": "sha256",
+      "digest": "38efcaccf8dad140e9152c8639ce9a8ce7d9e665ea5f2132ec02ac31f7676c1a",
+      "fileCount": 5,
+      "scope": "manual-capture-harness-v1"
+    },
+    "screenshotMetadata": {
+      "algorithm": "sha256",
+      "digest": "ba773eb78301b38a39848c54264f64b809ec0545a5d15b98042996caa424bca7",
+      "scope": "manual-screenshot-metadata-v1",
+      "subjectCount": 138
+    },
+    "uiSource": {
+      "algorithm": "sha256",
+      "digest": "a121bafb0a6cd5ae3c77005d5dec8d2a0a517a4676561f1c2cb9f39d7cc07717",
+      "fileCount": 282,
+      "scope": "app-visual-source-v1"
+    }
+  },
+  "library": {
+    "maxFileBytes": 537073,
+    "maxFilePath": "public/manual/manual-desktop/downstairs-hallway-page-context.png",
+    "totalBytes": 24932439
+  },
+  "reviewedAt": "2026-08-10T08:15:30.273Z",
+  "reviewStateSha256": "c82ac730b38802e262031a5ae63e6c3258a673d9dcd8da906b7807a246bc6d0d",
+  "schemaVersion": 1,
+  "subjectCount": 138,
+  "subjects": [
+    {
+      "id": "section-start-navigation",
+      "variants": {
+        "desktop": {
+          "bytes": 4735,
+          "height": 205,
+          "path": "public/manual/manual-desktop/section-start-navigation.png",
+          "sha256": "0a142d00444126a126ee0f6c107e62a5808ebf7e05a79954387792949ff6dc90",
+          "width": 291
+        },
+        "mobile": {
+          "bytes": 4899,
+          "height": 205,
+          "path": "public/manual/manual-mobile/section-start-navigation.png",
+          "sha256": "03ce77b35736896c01a3a16822ecf9d76a163de47cdcf1e08b77bcc9a4865af6",
+          "width": 291
+        }
+      }
+    },
+    {
+      "id": "section-home-context",
+      "variants": {
+        "desktop": {
+          "bytes": 223673,
+          "height": 202,
+          "path": "public/manual/manual-desktop/section-home-context.png",
+          "sha256": "0e443a4eb0de60e1321bcac62d1b4c415329b05b3f23c13a7ed95a88920ba9f5",
+          "width": 1248
+        },
+        "mobile": {
+          "bytes": 70632,
+          "height": 202,
+          "path": "public/manual/manual-mobile/section-home-context.png",
+          "sha256": "46d121aa04ae882f080ec8f2ad85e62aaa2947baac4b08ff5dcded0e75b9f238",
+          "width": 361
+        }
+      }
+    },
+    {
+      "id": "section-security-context",
+      "variants": {
+        "desktop": {
+          "bytes": 165219,
+          "height": 250,
+          "path": "public/manual/manual-desktop/section-security-context.png",
+          "sha256": "2d490c024314e31bea9c519dd3ecf62ae03324fd23beeebc4a57d1ce7f2b43f1",
+          "width": 1248
+        },
+        "mobile": {
+          "bytes": 53096,
+          "height": 250,
+          "path": "public/manual/manual-mobile/section-security-context.png",
+          "sha256": "86fea114526c3d753799dc1f3e11e0cb1c4b758ab0e2d11585bedc32543cbda1",
+          "width": 361
+        }
+      }
+    },
+    {
+      "id": "section-security-modes",
+      "variants": {
+        "desktop": {
+          "bytes": 16768,
+          "height": 159,
+          "path": "public/manual/manual-desktop/section-security-modes.png",
+          "sha256": "a16a9161499a9acd197c9311cc38610702185d537c315aa5e09519de6b74d8b3",
+          "width": 450
+        },
+        "mobile": {
+          "bytes": 17007,
+          "height": 159,
+          "path": "public/manual/manual-mobile/section-security-modes.png",
+          "sha256": "71e40b5962c34914c3833f1af29075e6f2c111006cd0cf970787537508c396c6",
+          "width": 359
+        }
+      }
+    },
+    {
+      "id": "security-camera-controls",
+      "variants": {
+        "desktop": {
+          "bytes": 16646,
+          "height": 96,
+          "path": "public/manual/manual-desktop/security-camera-controls.png",
+          "sha256": "31d0d2b41f53eb6acc04e7e856efe15f922eec8d15e263e443d9c653090b082e",
+          "width": 688
+        },
+        "mobile": {
+          "bytes": 16602,
+          "height": 229,
+          "path": "public/manual/manual-mobile/security-camera-controls.png",
+          "sha256": "02655a7f40bf2f26748fb0b5af72a60107367d0d85ed97dc96d3d47cf183a461",
+          "width": 359
+        }
+      }
+    },
+    {
+      "id": "section-climate-context",
+      "variants": {
+        "desktop": {
+          "bytes": 240374,
+          "height": 705,
+          "path": "public/manual/manual-desktop/section-climate-context.png",
+          "sha256": "8f2a841a1188431d2917b7527e9ad287f11043528b64287a87ddb25b254645a1",
+          "width": 588
+        },
+        "mobile": {
+          "bytes": 172000,
+          "height": 723,
+          "path": "public/manual/manual-mobile/section-climate-context.png",
+          "sha256": "11223cfde4eab4b318d213799a2b0ea4ad67b9e28fcdb19b1fd9160544033e43",
+          "width": 361
+        }
+      }
+    },
+    {
+      "id": "section-chores-context",
+      "variants": {
+        "desktop": {
+          "bytes": 70140,
+          "height": 260,
+          "path": "public/manual/manual-desktop/section-chores-context.png",
+          "sha256": "28d18ff6294abad66ae7f14de7a5464b51a1e1197193fc0ddd563f086cf77354",
+          "width": 668
+        },
+        "mobile": {
+          "bytes": 33307,
+          "height": 260,
+          "path": "public/manual/manual-mobile/section-chores-context.png",
+          "sha256": "ff4418ab3ed2a70f412e99c0d1fda18234d4a78c2d38255b11ffdc76c9d2daed",
+          "width": 361
+        }
+      }
+    },
+    {
+      "id": "section-food-context",
+      "variants": {
+        "desktop": {
+          "bytes": 103291,
+          "height": 185,
+          "path": "public/manual/manual-desktop/section-food-context.png",
+          "sha256": "5b274ffd583d5ec97552c85d9c0b48319cdcf2c904141eb9a2819d4a5704c531",
+          "width": 1248
+        },
+        "mobile": {
+          "bytes": 37524,
+          "height": 185,
+          "path": "public/manual/manual-mobile/section-food-context.png",
+          "sha256": "9ec34736d10220a68c4ecbe35354b54c5bc78fab4e9601af599180618c24fc8f",
+          "width": 361
+        }
+      }
+    },
+    {
+      "id": "section-rooms-context",
+      "variants": {
+        "desktop": {
+          "bytes": 112168,
+          "height": 184,
+          "path": "public/manual/manual-desktop/section-rooms-context.png",
+          "sha256": "c99dffbc543a9cd53ad164c211053a3741c94f27d0eaa5ed03ce374003990df8",
+          "width": 1248
+        },
+        "mobile": {
+          "bytes": 44675,
+          "height": 314,
+          "path": "public/manual/manual-mobile/section-rooms-context.png",
+          "sha256": "d0f572d2511a12da40090c6690eaaa607972f0551e1b038122515335dd1b4a21",
+          "width": 361
+        }
+      }
+    },
+    {
+      "id": "all-food-page-context",
+      "variants": {
+        "desktop": {
+          "bytes": 337487,
+          "height": 900,
+          "path": "public/manual/manual-desktop/all-food-page-context.png",
+          "sha256": "5005bdb0981dd4008f571a986322736acd6685ad30200d531af09f578ed452a3",
+          "width": 820
+        },
+        "mobile": {
+          "bytes": 160157,
+          "height": 852,
+          "path": "public/manual/manual-mobile/all-food-page-context.png",
+          "sha256": "b3f13c1800267969701938a92fddf4303cbb6ffea2ad8c1073d236a7ff4412fc",
+          "width": 393
+        }
+      }
+    },
+    {
+      "id": "back-deck-page-context",
+      "variants": {
+        "desktop": {
+          "bytes": 174512,
+          "height": 330,
+          "path": "public/manual/manual-desktop/back-deck-page-context.png",
+          "sha256": "dadc3ace089d7dae0b6de2f75067a342f37aabea09c0489dcb248c55b23a982a",
+          "width": 1280
+        },
+        "mobile": {
+          "bytes": 48426,
+          "height": 320,
+          "path": "public/manual/manual-mobile/back-deck-page-context.png",
+          "sha256": "02bcf070a65f8c8ca75921a468b43a098405b82e38573c172f3351071a0ecb34",
+          "width": 393
+        }
+      }
+    },
+    {
+      "id": "cabinet-page-context",
+      "variants": {
+        "desktop": {
+          "bytes": 99876,
+          "height": 180,
+          "path": "public/manual/manual-desktop/cabinet-page-context.png",
+          "sha256": "ab0c0f5300b119e566bd6abcc95479b8ff76c05fc10cd40765ef706161ea54bd",
+          "width": 1280
+        },
+        "mobile": {
+          "bytes": 29632,
+          "height": 180,
+          "path": "public/manual/manual-mobile/cabinet-page-context.png",
+          "sha256": "d22d4db0d3d92a722ea2c6196c2075759d1ac12e5f19c7fac42751bb00dc6fef",
+          "width": 393
+        }
+      }
+    },
+    {
+      "id": "custom-lights-page-context",
+      "variants": {
+        "desktop": {
+          "bytes": 478411,
+          "height": 720,
+          "path": "public/manual/manual-desktop/custom-lights-page-context.png",
+          "sha256": "d94af1484b744e5cec1354ff69547a7a69bcc4885b1dd45adf20babe17d73597",
+          "width": 1280
+        },
+        "mobile": {
+          "bytes": 173718,
+          "height": 720,
+          "path": "public/manual/manual-mobile/custom-lights-page-context.png",
+          "sha256": "d61313bf8ff98c46ea6c03faf52a843589eb33af03da7c07c4c8636fae2e5937",
+          "width": 393
+        }
+      }
+    },
+    {
+      "id": "dining-room-page-context",
+      "variants": {
+        "desktop": {
+          "bytes": 200842,
+          "height": 360,
+          "path": "public/manual/manual-desktop/dining-room-page-context.png",
+          "sha256": "034d9d7591735e1ee6f3f507feab1fee53f7832f7362a59084ed3f3dacab762c",
+          "width": 1280
+        },
+        "mobile": {
+          "bytes": 52772,
+          "height": 340,
+          "path": "public/manual/manual-mobile/dining-room-page-context.png",
+          "sha256": "e35ecd3339f229a82ece2fddcebdae4b3ef91699e19e0813c9b7739fe7c8f138",
+          "width": 393
+        }
+      }
+    },
+    {
+      "id": "downstairs-hallway-page-context",
+      "variants": {
+        "desktop": {
+          "bytes": 537073,
+          "height": 660,
+          "path": "public/manual/manual-desktop/downstairs-hallway-page-context.png",
+          "sha256": "89b3f1c6f16a4169fe2967a53ac2a57eff96b476738e29cf67bc66145192ff47",
+          "width": 1280
+        },
+        "mobile": {
+          "bytes": 164261,
+          "height": 660,
+          "path": "public/manual/manual-mobile/downstairs-hallway-page-context.png",
+          "sha256": "04d81329465489fe97dfcb31b248e32858ce481a15b4964ae725384a84e16db9",
+          "width": 393
+        }
+      }
+    },
+    {
+      "id": "entryway-page-context",
+      "variants": {
+        "desktop": {
+          "bytes": 535362,
+          "height": 660,
+          "path": "public/manual/manual-desktop/entryway-page-context.png",
+          "sha256": "1d8cef45804f1f4d4f386bc90dbed98e4dd554229a9f1a7415bd05aa515adb55",
+          "width": 1280
+        },
+        "mobile": {
+          "bytes": 162471,
+          "height": 660,
+          "path": "public/manual/manual-mobile/entryway-page-context.png",
+          "sha256": "a00341c22e458ca311718f75e995dea7476a8124fa3d76d31a30e0085a033f39",
+          "width": 393
+        }
+      }
+    },
+    {
+      "id": "freezer-page-context",
+      "variants": {
+        "desktop": {
+          "bytes": 99156,
+          "height": 180,
+          "path": "public/manual/manual-desktop/freezer-page-context.png",
+          "sha256": "3deaf22358a05264121e68340c7e906cb87db2519bf13f3841b417a4bfb242c8",
+          "width": 1280
+        },
+        "mobile": {
+          "bytes": 28864,
+          "height": 180,
+          "path": "public/manual/manual-mobile/freezer-page-context.png",
+          "sha256": "c3414b721a672badd3c07d229c49508c1100f07f4f6b440970894d9ed3efd016",
+          "width": 393
+        }
+      }
+    },
+    {
+      "id": "fridge-page-context",
+      "variants": {
+        "desktop": {
+          "bytes": 99435,
+          "height": 180,
+          "path": "public/manual/manual-desktop/fridge-page-context.png",
+          "sha256": "6976a120e5679ef5a32576471db7bde4856833cb667f96b78024b8a46ffc0646",
+          "width": 1280
+        },
+        "mobile": {
+          "bytes": 29115,
+          "height": 180,
+          "path": "public/manual/manual-mobile/fridge-page-context.png",
+          "sha256": "dc99fcfcbb1470fc9cc961cb57a26f1887cc0d4ebf8a8339de657e6885285544",
+          "width": 393
+        }
+      }
+    },
+    {
+      "id": "garage-page-context",
+      "variants": {
+        "desktop": {
+          "bytes": 372557,
+          "height": 570,
+          "path": "public/manual/manual-desktop/garage-page-context.png",
+          "sha256": "5575758064da1a0eb86f6d796468538a1cd15ba050fe629e1c56cceb5cd2e154",
+          "width": 1280
+        },
+        "mobile": {
+          "bytes": 131326,
+          "height": 680,
+          "path": "public/manual/manual-mobile/garage-page-context.png",
+          "sha256": "cc1a0c2f19ca2efaa944d9e055cb9e572bbba1b7ca12f2ddf2756c4955875e0c",
+          "width": 393
+        }
+      }
+    },
+    {
+      "id": "groceries-page-context",
+      "variants": {
+        "desktop": {
+          "bytes": 335883,
+          "height": 900,
+          "path": "public/manual/manual-desktop/groceries-page-context.png",
+          "sha256": "846ba60b83b45fb1fce83c6523be2f086abcee4db74d0421a3201ce86b5356fa",
+          "width": 820
+        },
+        "mobile": {
+          "bytes": 148218,
+          "height": 852,
+          "path": "public/manual/manual-mobile/groceries-page-context.png",
+          "sha256": "22b92bb84c39ae939a166213a3b0448a054d35a97a56282e016d553355438cea",
+          "width": 393
+        }
+      }
+    },
+    {
+      "id": "grocery-list-page-context",
+      "variants": {
+        "desktop": {
+          "bytes": 110786,
+          "height": 200,
+          "path": "public/manual/manual-desktop/grocery-list-page-context.png",
+          "sha256": "01c48752d03a98e45b5e4dc694e76c7611cff7b0f33017bf93fc81cbb6c0ae32",
+          "width": 1280
+        },
+        "mobile": {
+          "bytes": 29895,
+          "height": 200,
+          "path": "public/manual/manual-mobile/grocery-list-page-context.png",
+          "sha256": "8eb19668b2a9e624cb17e4d6a589d741a643965195fbf112b0509c17a9af957e",
+          "width": 393
+        }
+      }
+    },
+    {
+      "id": "guest-bathroom-page-context",
+      "variants": {
+        "desktop": {
+          "bytes": 301380,
+          "height": 500,
+          "path": "public/manual/manual-desktop/guest-bathroom-page-context.png",
+          "sha256": "dbbe748b8666215a88ff0d417ce5ad7911d4a49b2f01c7a5807d7a6f874736f4",
+          "width": 1280
+        },
+        "mobile": {
+          "bytes": 105917,
+          "height": 580,
+          "path": "public/manual/manual-mobile/guest-bathroom-page-context.png",
+          "sha256": "90ce0a115a7f7fc4f768add768feaac9f7486716a2a74ff4d37ffedc5f72077b",
+          "width": 393
+        }
+      }
+    },
+    {
+      "id": "guest-room-page-context",
+      "variants": {
+        "desktop": {
+          "bytes": 249186,
+          "height": 400,
+          "path": "public/manual/manual-desktop/guest-room-page-context.png",
+          "sha256": "f64cd0db2c2aa50a7c8217eb9c2c352793896cfae11ef009919358f9da37a1c3",
+          "width": 1280
+        },
+        "mobile": {
+          "bytes": 91602,
+          "height": 540,
+          "path": "public/manual/manual-mobile/guest-room-page-context.png",
+          "sha256": "bcb8706b01d67b293c073a02b28adc3879c3757d6161b4b2b88d2b2a2711a151",
+          "width": 393
+        }
+      }
+    },
+    {
+      "id": "gym-page-context",
+      "variants": {
+        "desktop": {
+          "bytes": 200009,
+          "height": 360,
+          "path": "public/manual/manual-desktop/gym-page-context.png",
+          "sha256": "f9e94034c0e147f03ca84d2bd791406638cced2810d5077f2b1f2225824a3933",
+          "width": 1280
+        },
+        "mobile": {
+          "bytes": 56067,
+          "height": 370,
+          "path": "public/manual/manual-mobile/gym-page-context.png",
+          "sha256": "cd2d132e724254c7a15187f2203595005bb4bd911d981825fb863318521eed65",
+          "width": 393
+        }
+      }
+    },
+    {
+      "id": "hallway-page-context",
+      "variants": {
+        "desktop": {
+          "bytes": 534230,
+          "height": 660,
+          "path": "public/manual/manual-desktop/hallway-page-context.png",
+          "sha256": "4a5d30dd42e5229a0eec68a9b82bca4604faaff606672b5a1f874ce66c74d474",
+          "width": 1280
+        },
+        "mobile": {
+          "bytes": 161825,
+          "height": 660,
+          "path": "public/manual/manual-mobile/hallway-page-context.png",
+          "sha256": "3ff93ec3bce401bc9274c5f3a826f64af2e0bae96e77006eb8f1c3da5de07116",
+          "width": 393
+        }
+      }
+    },
+    {
+      "id": "home-improvement-chores-page-context",
+      "variants": {
+        "desktop": {
+          "bytes": 113688,
+          "height": 200,
+          "path": "public/manual/manual-desktop/home-improvement-chores-page-context.png",
+          "sha256": "9902b97fbcfc0d32e332b43c06f4738b63855f4d177fb6d3274b769c345abed5",
+          "width": 1280
+        },
+        "mobile": {
+          "bytes": 32447,
+          "height": 200,
+          "path": "public/manual/manual-mobile/home-improvement-chores-page-context.png",
+          "sha256": "02aaff34799236213484ae2e388764d817bbf6f34f915d871246e3205839867a",
+          "width": 393
+        }
+      }
+    },
+    {
+      "id": "kitchen-page-context",
+      "variants": {
+        "desktop": {
+          "bytes": 327643,
+          "height": 540,
+          "path": "public/manual/manual-desktop/kitchen-page-context.png",
+          "sha256": "c757642f62240e17c24cd79ebe469265151a324b3241f33ddb7100bc4b252be4",
+          "width": 1280
+        },
+        "mobile": {
+          "bytes": 91895,
+          "height": 500,
+          "path": "public/manual/manual-mobile/kitchen-page-context.png",
+          "sha256": "571783901411c18fda38b071974e08d0ea6c445432b489dc13156ec556557895",
+          "width": 393
+        }
+      }
+    },
+    {
+      "id": "master-bathroom-page-context",
+      "variants": {
+        "desktop": {
+          "bytes": 290773,
+          "height": 500,
+          "path": "public/manual/manual-desktop/master-bathroom-page-context.png",
+          "sha256": "a069d7211f3e3ef36c6b1f0622270adaa230363193dcbba15fa483e5a420c949",
+          "width": 1280
+        },
+        "mobile": {
+          "bytes": 100420,
+          "height": 570,
+          "path": "public/manual/manual-mobile/master-bathroom-page-context.png",
+          "sha256": "9089c64e8184702bf704c15bdf4e4a9760caea4987badb24700f1f7fc9acb0ce",
+          "width": 393
+        }
+      }
+    },
+    {
+      "id": "master-bedroom-page-context",
+      "variants": {
+        "desktop": {
+          "bytes": 403055,
+          "height": 700,
+          "path": "public/manual/manual-desktop/master-bedroom-page-context.png",
+          "sha256": "634fe077b1fa93a8d21d55158a567eb4973878a346e6863728a5ed6c34f6ffa2",
+          "width": 1280
+        },
+        "mobile": {
+          "bytes": 133507,
+          "height": 750,
+          "path": "public/manual/manual-mobile/master-bedroom-page-context.png",
+          "sha256": "7962a523f229d0ee33cd1c375b4aa1535d841e5902b9e5781c657173ac70a399",
+          "width": 393
+        }
+      }
+    },
+    {
+      "id": "music-room-page-context",
+      "variants": {
+        "desktop": {
+          "bytes": 330698,
+          "height": 560,
+          "path": "public/manual/manual-desktop/music-room-page-context.png",
+          "sha256": "b79574da17a478db6d053e94aa457885bbfd614ba2c053868b1ea03182f5c557",
+          "width": 1280
+        },
+        "mobile": {
+          "bytes": 124693,
+          "height": 700,
+          "path": "public/manual/manual-mobile/music-room-page-context.png",
+          "sha256": "f8e0a4e84695f6c35dfa44b758609e716012c4cb72a345381d476a7a7f183d9f",
+          "width": 393
+        }
+      }
+    },
+    {
+      "id": "office-page-context",
+      "variants": {
+        "desktop": {
+          "bytes": 349331,
+          "height": 560,
+          "path": "public/manual/manual-desktop/office-page-context.png",
+          "sha256": "bc072be4f9a43e87d6e128d72ea77954753b072f8767abaa1f4ebe3c5b3d7a4d",
+          "width": 1280
+        },
+        "mobile": {
+          "bytes": 129646,
+          "height": 700,
+          "path": "public/manual/manual-mobile/office-page-context.png",
+          "sha256": "1683edc413be4e68014e31c5e20956648aa1b53d070416c08ce9bfacdd19e02d",
+          "width": 393
+        }
+      }
+    },
+    {
+      "id": "pantry-page-context",
+      "variants": {
+        "desktop": {
+          "bytes": 99417,
+          "height": 180,
+          "path": "public/manual/manual-desktop/pantry-page-context.png",
+          "sha256": "b373d0326c32f12b9f77cc5f1b164620d81f471458953a61a9d4db93940fa13e",
+          "width": 1280
+        },
+        "mobile": {
+          "bytes": 29122,
+          "height": 180,
+          "path": "public/manual/manual-mobile/pantry-page-context.png",
+          "sha256": "51f4863fe9eb2edd8d88961aa74dc9e723fe2d0a13ca0a52788bf9373458c486",
+          "width": 393
+        }
+      }
+    },
+    {
+      "id": "spice-rack-page-context",
+      "variants": {
+        "desktop": {
+          "bytes": 101051,
+          "height": 180,
+          "path": "public/manual/manual-desktop/spice-rack-page-context.png",
+          "sha256": "1cd08fab66fa5ac39275db5de438c36545464e738fce751348343581f88f0a79",
+          "width": 1280
+        },
+        "mobile": {
+          "bytes": 30684,
+          "height": 180,
+          "path": "public/manual/manual-mobile/spice-rack-page-context.png",
+          "sha256": "c15cc12aa2ae5488fc10d8bfff5f94acfd22b7fb912efe312af1920b9f57bfe2",
+          "width": 393
+        }
+      }
+    },
+    {
+      "id": "stephens-chores-page-context",
+      "variants": {
+        "desktop": {
+          "bytes": 112664,
+          "height": 200,
+          "path": "public/manual/manual-desktop/stephens-chores-page-context.png",
+          "sha256": "1be95aac5828d932600b605df4d89e7d6e76a581a1249817f8230c6e278abd0b",
+          "width": 1280
+        },
+        "mobile": {
+          "bytes": 31687,
+          "height": 200,
+          "path": "public/manual/manual-mobile/stephens-chores-page-context.png",
+          "sha256": "c2a08aeebc23a430601f0cda0614c1c084e1fb6f3b3009f28c75f4d8a35f43f4",
+          "width": 393
+        }
+      }
+    },
+    {
+      "id": "stephs-chores-page-context",
+      "variants": {
+        "desktop": {
+          "bytes": 111959,
+          "height": 200,
+          "path": "public/manual/manual-desktop/stephs-chores-page-context.png",
+          "sha256": "5d4641db3546e34b16b17e82d45eacf797350a8939849fd01195e5d94e9b439a",
+          "width": 1280
+        },
+        "mobile": {
+          "bytes": 31013,
+          "height": 200,
+          "path": "public/manual/manual-mobile/stephs-chores-page-context.png",
+          "sha256": "c6d5dea4359a01c498861daeeea786ddd6f5dd2e609f869315863dd6bbb29631",
+          "width": 393
+        }
+      }
+    },
+    {
+      "id": "theater-room-page-context",
+      "variants": {
+        "desktop": {
+          "bytes": 480943,
+          "height": 660,
+          "path": "public/manual/manual-desktop/theater-room-page-context.png",
+          "sha256": "263c60c74471015a03db0ce2740a939ef7c040efef4e7641de948cf840140fce",
+          "width": 1280
+        },
+        "mobile": {
+          "bytes": 170553,
+          "height": 740,
+          "path": "public/manual/manual-mobile/theater-room-page-context.png",
+          "sha256": "8213e5ca9ae9ddd1c67c0c8acb5df2a31b6423c9177f1b17c147d76f666eea1e",
+          "width": 393
+        }
+      }
+    },
+    {
+      "id": "to-do-page-context",
+      "variants": {
+        "desktop": {
+          "bytes": 338921,
+          "height": 900,
+          "path": "public/manual/manual-desktop/to-do-page-context.png",
+          "sha256": "d66373bb83a03426ca78b58c2044a09e0f292197c79212c8f0d1a366f86b5176",
+          "width": 820
+        },
+        "mobile": {
+          "bytes": 151481,
+          "height": 852,
+          "path": "public/manual/manual-mobile/to-do-page-context.png",
+          "sha256": "70e2205d10cfbcca7c5f9324f3e551c971f801e7448d173b2a732cc90ef394a8",
+          "width": 393
+        }
+      }
+    },
+    {
+      "id": "unassigned-chores-page-context",
+      "variants": {
+        "desktop": {
+          "bytes": 112789,
+          "height": 200,
+          "path": "public/manual/manual-desktop/unassigned-chores-page-context.png",
+          "sha256": "69d214b5189b0b1f618cb53a77f36146a623d36bcd6a0a9ab59a703f2c14d381",
+          "width": 1280
+        },
+        "mobile": {
+          "bytes": 31856,
+          "height": 200,
+          "path": "public/manual/manual-mobile/unassigned-chores-page-context.png",
+          "sha256": "637b821fea5f8fb7c741df0c3d80bec3e9efc9210c237be26dd80966f1f28b78",
+          "width": 393
+        }
+      }
+    },
+    {
+      "id": "mach-e-page-context",
+      "variants": {
+        "desktop": {
+          "bytes": 235724,
+          "height": 306,
+          "path": "public/manual/manual-desktop/mach-e-page-context.png",
+          "sha256": "7958e14abbb2353d509b52f43162b5e7de89f2a11490a618f4fd5c5ccfb08b75",
+          "width": 1248
+        },
+        "mobile": {
+          "bytes": 74630,
+          "height": 306,
+          "path": "public/manual/manual-mobile/mach-e-page-context.png",
+          "sha256": "1f23e337a294f46d0af78b9a7420923b25c2b4efdcec7d9a6a331c818f471764",
+          "width": 361
+        }
+      }
+    },
+    {
+      "id": "vacuums-page-context",
+      "variants": {
+        "desktop": {
+          "bytes": 168977,
+          "height": 314,
+          "path": "public/manual/manual-desktop/vacuums-page-context.png",
+          "sha256": "b4ab1d1d672b1146d20e0f28d4eab845442f5cdad58dc6a3b17222efd2c326ba",
+          "width": 1248
+        },
+        "mobile": {
+          "bytes": 66101,
+          "height": 444,
+          "path": "public/manual/manual-mobile/vacuums-page-context.png",
+          "sha256": "be3ff0e16edbfca90ab2059f0d74076bd622fa3613fb177f9886203a6f0318e8",
+          "width": 361
+        }
+      }
+    },
+    {
+      "id": "media-page-context",
+      "variants": {
+        "desktop": {
+          "bytes": 272634,
+          "height": 516,
+          "path": "public/manual/manual-desktop/media-page-context.png",
+          "sha256": "389790c3819f24d396e5b0312ab18c057966e017eee05e1b747b90cf3c18d622",
+          "width": 1248
+        },
+        "mobile": {
+          "bytes": 79996,
+          "height": 516,
+          "path": "public/manual/manual-mobile/media-page-context.png",
+          "sha256": "9352910f42306d7c36745a4f92203996ff28632f53b05c399b21b9f9edbc2c3c",
+          "width": 361
+        }
+      }
+    },
+    {
+      "id": "section-settings-context",
+      "variants": {
+        "desktop": {
+          "bytes": 181402,
+          "height": 235,
+          "path": "public/manual/manual-desktop/section-settings-context.png",
+          "sha256": "a4f40cccf5a6997cbfc81b714333795e53055cad0bf7cb490c2c8f5987fe2234",
+          "width": 1248
+        },
+        "mobile": {
+          "bytes": 59280,
+          "height": 250,
+          "path": "public/manual/manual-mobile/section-settings-context.png",
+          "sha256": "40868321f980da476b0f8a4bfd0c69c180878c56aa6056aca7d9faa865d457cb",
+          "width": 361
+        }
+      }
+    },
+    {
+      "id": "admin-page-context",
+      "variants": {
+        "desktop": {
+          "bytes": 475731,
+          "height": 650,
+          "path": "public/manual/manual-desktop/admin-page-context.png",
+          "sha256": "33ac7ce9826fbc353fb52a9fb453a2afed31cf44db5291b4a280d32366143281",
+          "width": 1248
+        },
+        "mobile": {
+          "bytes": 147000,
+          "height": 600,
+          "path": "public/manual/manual-mobile/admin-page-context.png",
+          "sha256": "79247f237e29cf5aa6f5a929fb8ef6056d58ec2a1fb552ca6819a8756d6571c3",
+          "width": 361
+        }
+      }
+    },
+    {
+      "id": "guest-controls-page-context",
+      "variants": {
+        "desktop": {
+          "bytes": 237972,
+          "height": 330,
+          "path": "public/manual/manual-desktop/guest-controls-page-context.png",
+          "sha256": "cae28d881b668a1a4e92b622cdc50876965c7ebb3d7782d4a15a7d02400bd2ef",
+          "width": 1248
+        },
+        "mobile": {
+          "bytes": 102346,
+          "height": 413,
+          "path": "public/manual/manual-mobile/guest-controls-page-context.png",
+          "sha256": "609d3602596ddf22c0fdee9dca6c091d0772b81dbc448ab32d6a06dc79bfd4b1",
+          "width": 361
+        }
+      }
+    },
+    {
+      "id": "vacation-page-context",
+      "variants": {
+        "desktop": {
+          "bytes": 299734,
+          "height": 420,
+          "path": "public/manual/manual-desktop/vacation-page-context.png",
+          "sha256": "0f5fef65da2e920d7680ccd98ca45f478f64294adc34edb6d9ca36603b170b81",
+          "width": 1248
+        },
+        "mobile": {
+          "bytes": 104741,
+          "height": 490,
+          "path": "public/manual/manual-mobile/vacation-page-context.png",
+          "sha256": "c8a097f3a7a3fc7c62ea41b890d35cea5d7af3e606372afa33106ce15a73e3d4",
+          "width": 361
+        }
+      }
+    },
+    {
+      "id": "vacation-confirmation",
+      "variants": {
+        "desktop": {
+          "bytes": 26170,
+          "height": 360,
+          "path": "public/manual/manual-desktop/vacation-confirmation.png",
+          "sha256": "96cae19f02945155d69dcc8ee70d8b65f2567be8198f134ed3f73f2b20f43298",
+          "width": 738
+        },
+        "mobile": {
+          "bytes": 34515,
+          "height": 767,
+          "path": "public/manual/manual-mobile/vacation-confirmation.png",
+          "sha256": "b30d91568b8c761125bed09d9eba4ae3b2d8e1996c4a730e82df29dd74059e78",
+          "width": 393
+        }
+      }
+    },
+    {
+      "id": "section-help-context",
+      "variants": {
+        "desktop": {
+          "bytes": 254400,
+          "height": 304,
+          "path": "public/manual/manual-desktop/section-help-context.png",
+          "sha256": "9d8e1734df8ee07c9f53dbbeae15110860f349cc4a74402528725a5826b450f1",
+          "width": 1080
+        },
+        "mobile": {
+          "bytes": 124640,
+          "height": 381,
+          "path": "public/manual/manual-mobile/section-help-context.png",
+          "sha256": "5048459993e70a0b4a3546e8c01f1c07e5b8573f2615b46d49baabc2ab66b23f",
+          "width": 361
+        }
+      }
+    },
+    {
+      "id": "app-layout-home",
+      "variants": {
+        "desktop": {
+          "bytes": 476586,
+          "height": 900,
+          "path": "public/manual/manual-desktop/app-layout-home.png",
+          "sha256": "0d9b075025368c783ba080bb16ef44ca7c5ac4f6c2e62699933e0d2c7b3a6898",
+          "width": 820
+        },
+        "mobile": {
+          "bytes": 198144,
+          "height": 852,
+          "path": "public/manual/manual-mobile/app-layout-home.png",
+          "sha256": "dccde528054a6b14174cbbd6bda17beb1ec266f65d145c2000abbe969624ff8b",
+          "width": 393
+        }
+      }
+    },
+    {
+      "id": "home-status-rail-start",
+      "variants": {
+        "desktop": {
+          "bytes": 20141,
+          "height": 56,
+          "path": "public/manual/manual-desktop/home-status-rail-start.png",
+          "sha256": "eb0d506167a30b3771a0edca7aa71e385084df5b8ae2f70a1bb9ae66ce73d0b6",
+          "width": 560
+        },
+        "mobile": {
+          "bytes": 13930,
+          "height": 56,
+          "path": "public/manual/manual-mobile/home-status-rail-start.png",
+          "sha256": "bd66cc8cd1b80d53ba9dfc107b42d42dde1c92c5862541b96404c4f0bb6f8b56",
+          "width": 361
+        }
+      }
+    },
+    {
+      "id": "home-status-rail-end",
+      "variants": {
+        "desktop": {
+          "bytes": 19216,
+          "height": 56,
+          "path": "public/manual/manual-desktop/home-status-rail-end.png",
+          "sha256": "5fb04b643c4551803c86e9b2c1c96fd993ead6d80386c98572bf6788d827fab5",
+          "width": 560
+        },
+        "mobile": {
+          "bytes": 12960,
+          "height": 56,
+          "path": "public/manual/manual-mobile/home-status-rail-end.png",
+          "sha256": "9350f3ba352edc37934489a4f32faa333ad003cd16ff8f471afe84c4f9615511",
+          "width": 361
+        }
+      }
+    },
+    {
+      "id": "food-suggested-recipes",
+      "variants": {
+        "desktop": {
+          "bytes": 141854,
+          "height": 405,
+          "path": "public/manual/manual-desktop/food-suggested-recipes.png",
+          "sha256": "060604cb2d0c9e34a34d964fc83a9cdf52062c93565cf82a95524a8c51374c26",
+          "width": 1248
+        },
+        "mobile": {
+          "bytes": 68978,
+          "height": 500,
+          "path": "public/manual/manual-mobile/food-suggested-recipes.png",
+          "sha256": "c0a170b613de8ac51c3265aa5cdb1794409696b0edd572d8baf7c30391320382",
+          "width": 361
+        }
+      }
+    },
+    {
+      "id": "home-climate-overview",
+      "variants": {
+        "desktop": {
+          "bytes": 30555,
+          "height": 280,
+          "path": "public/manual/manual-desktop/home-climate-overview.png",
+          "sha256": "5cc216173345c512438f9389499fc44717c5efa43b3c5eadb0ea23832a6f9bfc",
+          "width": 584
+        },
+        "mobile": {
+          "bytes": 64386,
+          "height": 580,
+          "path": "public/manual/manual-mobile/home-climate-overview.png",
+          "sha256": "a3b7631059ada449aa0e073d2b1c8ffafe07358333efdebf1b2d138f0b72fd73",
+          "width": 393
+        }
+      }
+    },
+    {
+      "id": "home-climate-room-detail",
+      "variants": {
+        "desktop": {
+          "bytes": 33937,
+          "height": 380,
+          "path": "public/manual/manual-desktop/home-climate-room-detail.png",
+          "sha256": "c5f1de925bd3452706b7800f6d4d252ecbc448d230e2aed8f224435b61b60158",
+          "width": 584
+        },
+        "mobile": {
+          "bytes": 34750,
+          "height": 400,
+          "path": "public/manual/manual-mobile/home-climate-room-detail.png",
+          "sha256": "3ecfd95d7a2f1ebfabbab8f48f0697f87b7371e7b5b8700c9a9eb4d579dd3b29",
+          "width": 393
+        }
+      }
+    },
+    {
+      "id": "home-occupancy-overview",
+      "variants": {
+        "desktop": {
+          "bytes": 30333,
+          "height": 490,
+          "path": "public/manual/manual-desktop/home-occupancy-overview.png",
+          "sha256": "1fbb3a3bc2947c32f79306d3eeb84eca478e62e7821e5eee3e319075293bf090",
+          "width": 584
+        },
+        "mobile": {
+          "bytes": 33952,
+          "height": 450,
+          "path": "public/manual/manual-mobile/home-occupancy-overview.png",
+          "sha256": "9e9784357b7ae4d19ea71bcd6a485fc73657d3c0356f3f7c87e521f733352d1c",
+          "width": 393
+        }
+      }
+    },
+    {
+      "id": "home-occupancy-room-detail",
+      "variants": {
+        "desktop": {
+          "bytes": 13372,
+          "height": 250,
+          "path": "public/manual/manual-desktop/home-occupancy-room-detail.png",
+          "sha256": "8c04e76629c3e0388265fe69bc6384d6e49083442b80b60c50e2f79f9e274192",
+          "width": 584
+        },
+        "mobile": {
+          "bytes": 15151,
+          "height": 250,
+          "path": "public/manual/manual-mobile/home-occupancy-room-detail.png",
+          "sha256": "04ba66b9cad2e9ee0f87cf50db74f5da1c381b616b79a00ddaafb6441a9aebac",
+          "width": 393
+        }
+      }
+    },
+    {
+      "id": "home-contact-overview",
+      "variants": {
+        "desktop": {
+          "bytes": 27947,
+          "height": 280,
+          "path": "public/manual/manual-desktop/home-contact-overview.png",
+          "sha256": "4494b45e82e1e287984731a21ffc18052dba20218e1c5759b661eec3f990b696",
+          "width": 584
+        },
+        "mobile": {
+          "bytes": 53117,
+          "height": 580,
+          "path": "public/manual/manual-mobile/home-contact-overview.png",
+          "sha256": "aef43b08359c127fce50b476cbf337c9812b6475e539011a22825d43446b98c0",
+          "width": 393
+        }
+      }
+    },
+    {
+      "id": "home-contact-room-detail",
+      "variants": {
+        "desktop": {
+          "bytes": 13388,
+          "height": 250,
+          "path": "public/manual/manual-desktop/home-contact-room-detail.png",
+          "sha256": "332dc93647bd19f9c4e92fe727fe1bcc5d6933706d81264515d0e94c839cd6d6",
+          "width": 584
+        },
+        "mobile": {
+          "bytes": 15313,
+          "height": 250,
+          "path": "public/manual/manual-mobile/home-contact-room-detail.png",
+          "sha256": "f48c3afb84f7cbda3d12ef9e0c5f1bf07a9336f43d803c9a3912c5c1ccaa5525",
+          "width": 393
+        }
+      }
+    },
+    {
+      "id": "home-air-quality-overview",
+      "variants": {
+        "desktop": {
+          "bytes": 42451,
+          "height": 480,
+          "path": "public/manual/manual-desktop/home-air-quality-overview.png",
+          "sha256": "26f8ae2fffb62de840bdf4d3b8e1a42d85682968f59699e69f75cf270711ad92",
+          "width": 584
+        },
+        "mobile": {
+          "bytes": 70935,
+          "height": 600,
+          "path": "public/manual/manual-mobile/home-air-quality-overview.png",
+          "sha256": "8b8eb076821bb9c87f2cdfdbeb611b2d2fc4fe421180502eb0ae693a858b0937",
+          "width": 393
+        }
+      }
+    },
+    {
+      "id": "status-lights-overview",
+      "variants": {
+        "desktop": {
+          "bytes": 49654,
+          "height": 836,
+          "path": "public/manual/manual-desktop/status-lights-overview.png",
+          "sha256": "8e04ba2eeb745882d5bf6c7de5c821663ba688cf25cf24818560cb79238c49fa",
+          "width": 584
+        },
+        "mobile": {
+          "bytes": 57438,
+          "height": 767,
+          "path": "public/manual/manual-mobile/status-lights-overview.png",
+          "sha256": "901a3a35f8727addb9acf9aff80132a8c0428772d19dd9f770a91b409024fff1",
+          "width": 393
+        }
+      }
+    },
+    {
+      "id": "status-lights-detail",
+      "variants": {
+        "desktop": {
+          "bytes": 43636,
+          "height": 836,
+          "path": "public/manual/manual-desktop/status-lights-detail.png",
+          "sha256": "860bfa8a80a88a7fa8b60d9f7e2234e86a31bcc804b31b5b3b8dbe2bd7dbcf35",
+          "width": 584
+        },
+        "mobile": {
+          "bytes": 35633,
+          "height": 767,
+          "path": "public/manual/manual-mobile/status-lights-detail.png",
+          "sha256": "8b85c10dee8686882ab59b815eddb650b99b5f5c6b5e88b15a7d8c9ffbf3615e",
+          "width": 393
+        }
+      }
+    },
+    {
+      "id": "presence-lighting-states",
+      "variants": {
+        "desktop": {
+          "bytes": 42031,
+          "height": 836,
+          "path": "public/manual/manual-desktop/presence-lighting-states.png",
+          "sha256": "0b212c62401a45e0648232c141a99a5a2305b9db9dd5df6bf071457ed9533013",
+          "width": 762
+        },
+        "mobile": {
+          "bytes": 39429,
+          "height": 767,
+          "path": "public/manual/manual-mobile/presence-lighting-states.png",
+          "sha256": "5c762df4ab4992e4ba8ed6cfed68441c8faa4ddcc7b7fb150f22d1ea705a089e",
+          "width": 393
+        }
+      }
+    },
+    {
+      "id": "thermostat-options",
+      "variants": {
+        "desktop": {
+          "bytes": 306257,
+          "height": 610,
+          "path": "public/manual/manual-desktop/thermostat-options.png",
+          "sha256": "1720b0a481cb41d3fb072c983d2e737d26c5272ae5a7cbbbf1f0c259c1161c1a",
+          "width": 820
+        },
+        "mobile": {
+          "bytes": 149160,
+          "height": 610,
+          "path": "public/manual/manual-mobile/thermostat-options.png",
+          "sha256": "a90c7c21398c632d571f09799041310fecc813c05faac661a026603381757a5b",
+          "width": 393
+        }
+      }
+    },
+    {
+      "id": "chore-schedule",
+      "variants": {
+        "desktop": {
+          "bytes": 42599,
+          "height": 810,
+          "path": "public/manual/manual-desktop/chore-schedule.png",
+          "sha256": "a3a27dc70843d94de5e305a953bdfdd737cc22db3d138a39687319c2a1b03301",
+          "width": 738
+        },
+        "mobile": {
+          "bytes": 37099,
+          "height": 767,
+          "path": "public/manual/manual-mobile/chore-schedule.png",
+          "sha256": "3c7caa5bfea414672d64ce183b387c8057977165610b76500a048e9a1f2e82a8",
+          "width": 393
+        }
+      }
+    },
+    {
+      "id": "food-scan-review",
+      "variants": {
+        "desktop": {
+          "bytes": 37040,
+          "height": 810,
+          "path": "public/manual/manual-desktop/food-scan-review.png",
+          "sha256": "41816fdd2178ba70b614946d9fdeb96512443e0cfe0ebe0ba4e6c3ca5dc328b2",
+          "width": 560
+        },
+        "mobile": {
+          "bytes": 45526,
+          "height": 767,
+          "path": "public/manual/manual-mobile/food-scan-review.png",
+          "sha256": "7774a5b58dc52399a172694eaa35fab40faa821a8f6dd078fe81332e4bc97aab",
+          "width": 393
+        }
+      }
+    },
+    {
+      "id": "humidifier-schedule",
+      "variants": {
+        "desktop": {
+          "bytes": 39623,
+          "height": 836,
+          "path": "public/manual/manual-desktop/humidifier-schedule.png",
+          "sha256": "72e3307e13d6f57cbf388541322492a70e7bcc05d29abd8cf6722a24f67f88e5",
+          "width": 980
+        },
+        "mobile": {
+          "bytes": 32653,
+          "height": 767,
+          "path": "public/manual/manual-mobile/humidifier-schedule.png",
+          "sha256": "eaa51c7b9740e2435809872793556af42696b3438cdd097e7550ce33c1370829",
+          "width": 393
+        }
+      }
+    },
+    {
+      "id": "vacuum-area-editor",
+      "variants": {
+        "desktop": {
+          "bytes": 116322,
+          "height": 760,
+          "path": "public/manual/manual-desktop/vacuum-area-editor.png",
+          "sha256": "d6365881893813943f56f7970c6ec26995ebd2f25567264f313f123a9e1b4b11",
+          "width": 980
+        },
+        "mobile": {
+          "bytes": 88187,
+          "height": 767,
+          "path": "public/manual/manual-mobile/vacuum-area-editor.png",
+          "sha256": "8a838bd23d4cd9db263d3d96719635876bc5622a7369342a975d99e371db4e54",
+          "width": 393
+        }
+      }
+    },
+    {
+      "id": "recipes-browse",
+      "variants": {
+        "desktop": {
+          "bytes": 263474,
+          "height": 900,
+          "path": "public/manual/manual-desktop/recipes-browse.png",
+          "sha256": "5fbcb1a4f3df57350588d9b409317861631a603d61a68dcc4b9f7f960736bc0d",
+          "width": 1280
+        },
+        "mobile": {
+          "bytes": 125783,
+          "height": 852,
+          "path": "public/manual/manual-mobile/recipes-browse.png",
+          "sha256": "5e1cd659645331d44b354a9429d0795382cfc1bdeb4b31d7ed00f05ffebb832e",
+          "width": 393
+        }
+      }
+    },
+    {
+      "id": "recipe-detail",
+      "variants": {
+        "desktop": {
+          "bytes": 32340,
+          "height": 810,
+          "path": "public/manual/manual-desktop/recipe-detail.png",
+          "sha256": "4ccc2915cc5ee8192d54711acddef21d82205900a3e34de939fc190cc5259370",
+          "width": 720
+        },
+        "mobile": {
+          "bytes": 33412,
+          "height": 784,
+          "path": "public/manual/manual-mobile/recipe-detail.png",
+          "sha256": "552ac629df5f71cd932285adc54e072955abf0f37b2e7cbcaa0fb163bfab5faf",
+          "width": 393
+        }
+      }
+    },
+    {
+      "id": "weather-sheet",
+      "variants": {
+        "desktop": {
+          "bytes": 87527,
+          "height": 810,
+          "path": "public/manual/manual-desktop/weather-sheet.png",
+          "sha256": "8b772f7bc5aba85b0eb5fec987217ccb46a77eb024e8244b1c4662e96f65f442",
+          "width": 738
+        },
+        "mobile": {
+          "bytes": 71304,
+          "height": 767,
+          "path": "public/manual/manual-mobile/weather-sheet.png",
+          "sha256": "b7e7648f7bbb30596e086491b00fbe9270efe715fa26ceaa3049d9f907174190",
+          "width": 393
+        }
+      }
+    },
+    {
+      "id": "weather-precipitation",
+      "variants": {
+        "desktop": {
+          "bytes": 86232,
+          "height": 810,
+          "path": "public/manual/manual-desktop/weather-precipitation.png",
+          "sha256": "8f7ea18b287ded0fd9f278ea52d7913ae5ec7c1e1dfb9d849b5ac52903c0cf94",
+          "width": 738
+        },
+        "mobile": {
+          "bytes": 70572,
+          "height": 767,
+          "path": "public/manual/manual-mobile/weather-precipitation.png",
+          "sha256": "7e9a39b45f55846a45c3f9bad7de925e410435db49f6959eaf70ef3b74f32aee",
+          "width": 393
+        }
+      }
+    },
+    {
+      "id": "weather-wind",
+      "variants": {
+        "desktop": {
+          "bytes": 91355,
+          "height": 810,
+          "path": "public/manual/manual-desktop/weather-wind.png",
+          "sha256": "3ecc99b34eb987bf12483dfcd3e7c72562016db99836a2b89f3f4fbc7c6b205e",
+          "width": 738
+        },
+        "mobile": {
+          "bytes": 72534,
+          "height": 767,
+          "path": "public/manual/manual-mobile/weather-wind.png",
+          "sha256": "802d86f8b093e6cbada1d871099f99ae824d919432577e20a756ba2706a35894",
+          "width": 393
+        }
+      }
+    },
+    {
+      "id": "guest-presence-security",
+      "variants": {
+        "desktop": {
+          "bytes": 48424,
+          "height": 720,
+          "path": "public/manual/manual-desktop/guest-presence-security.png",
+          "sha256": "1627e833815acbce8bf7cc5ee1e926cdca9de3794399120308fcd8b7b0f7855f",
+          "width": 1152
+        },
+        "mobile": {
+          "bytes": 33691,
+          "height": 510,
+          "path": "public/manual/manual-mobile/guest-presence-security.png",
+          "sha256": "50151c1aa6334857f2188abe915d97e61a95eddd8b0ae7071eaa99444202b310",
+          "width": 393
+        }
+      }
+    },
+    {
+      "id": "rooms-picker",
+      "variants": {
+        "desktop": {
+          "bytes": 149619,
+          "height": 820,
+          "path": "public/manual/manual-desktop/rooms-picker.png",
+          "sha256": "0fc9e72b7624866ede5b9305f1e16b5b35691ed80430569ac8195dfd635615a9",
+          "width": 762
+        },
+        "mobile": {
+          "bytes": 44017,
+          "height": 380,
+          "path": "public/manual/manual-mobile/rooms-picker.png",
+          "sha256": "670a23daae6576af54c86624eb8a5c93d469d8581594561c60d0230aea24cb8b",
+          "width": 393
+        }
+      }
+    },
+    {
+      "id": "room-air-sheet",
+      "variants": {
+        "desktop": {
+          "bytes": 22725,
+          "height": 510,
+          "path": "public/manual/manual-desktop/room-air-sheet.png",
+          "sha256": "9c519b01d1f51eff4cc9e5c41c103e36ba97eb572dca69ad79c5edf5f09584bd",
+          "width": 500
+        },
+        "mobile": {
+          "bytes": 26651,
+          "height": 500,
+          "path": "public/manual/manual-mobile/room-air-sheet.png",
+          "sha256": "ff1ba9faace036da96178713c49a12860b967942be0cca451355df6c20802204",
+          "width": 393
+        }
+      }
+    },
+    {
+      "id": "room-dishwasher-sheet",
+      "variants": {
+        "desktop": {
+          "bytes": 45551,
+          "height": 810,
+          "path": "public/manual/manual-desktop/room-dishwasher-sheet.png",
+          "sha256": "31674f8ea3fdf4b9d730885c200009d0b20cf081cb61cc717b8bc55edafdb788",
+          "width": 738
+        },
+        "mobile": {
+          "bytes": 42633,
+          "height": 767,
+          "path": "public/manual/manual-mobile/room-dishwasher-sheet.png",
+          "sha256": "f9843c0b082d6c073a581faec33185ea679411c1c68d4b0745b707cd82b53ac2",
+          "width": 393
+        }
+      }
+    },
+    {
+      "id": "room-climate-sheet",
+      "variants": {
+        "desktop": {
+          "bytes": 32021,
+          "height": 340,
+          "path": "public/manual/manual-desktop/room-climate-sheet.png",
+          "sha256": "ebab8452e363136dc18f7773d36090b9771b851c0900c932d640abfc9732bd56",
+          "width": 500
+        },
+        "mobile": {
+          "bytes": 32342,
+          "height": 340,
+          "path": "public/manual/manual-mobile/room-climate-sheet.png",
+          "sha256": "54324f3c17e8ca0e61888ff96e7b90a7df694d21f0aa025ef63b3d1c370a3a50",
+          "width": 393
+        }
+      }
+    },
+    {
+      "id": "room-contact-sheet",
+      "variants": {
+        "desktop": {
+          "bytes": 10415,
+          "height": 250,
+          "path": "public/manual/manual-desktop/room-contact-sheet.png",
+          "sha256": "97a2a972bcdd30d6a6f8662806c430b622975fa806e77a27d722d2a0c1a83ee1",
+          "width": 500
+        },
+        "mobile": {
+          "bytes": 10906,
+          "height": 250,
+          "path": "public/manual/manual-mobile/room-contact-sheet.png",
+          "sha256": "baeb3e5630de39e1ad2696a68202ea116b84fc61352a3f7841410fbcdefd394a",
+          "width": 393
+        }
+      }
+    },
+    {
+      "id": "room-grill-sheet",
+      "variants": {
+        "desktop": {
+          "bytes": 37880,
+          "height": 330,
+          "path": "public/manual/manual-desktop/room-grill-sheet.png",
+          "sha256": "285b8ae4a137df84c22ebccc53c1ddeb2a3856f0d5989396367f6eeb1e36e497",
+          "width": 738
+        },
+        "mobile": {
+          "bytes": 31371,
+          "height": 330,
+          "path": "public/manual/manual-mobile/room-grill-sheet.png",
+          "sha256": "fb21f82d98cb8eedf1f1d1510b51766a6969803a1d6a15d163f1c4915c68b25a",
+          "width": 393
+        }
+      }
+    },
+    {
+      "id": "room-humidifier-sheet",
+      "variants": {
+        "desktop": {
+          "bytes": 47571,
+          "height": 590,
+          "path": "public/manual/manual-desktop/room-humidifier-sheet.png",
+          "sha256": "e8f0946ab8e17d24187589fc98656ab2f9486421ce2e93f9c2d27b899e6db954",
+          "width": 980
+        },
+        "mobile": {
+          "bytes": 32392,
+          "height": 600,
+          "path": "public/manual/manual-mobile/room-humidifier-sheet.png",
+          "sha256": "d2ab53f02d2f14021e1978b69300e94c704331f8b69b642a84a2e91f71f9e2d5",
+          "width": 393
+        }
+      }
+    },
+    {
+      "id": "humidifier-schedules",
+      "variants": {
+        "desktop": {
+          "bytes": 48943,
+          "height": 600,
+          "path": "public/manual/manual-desktop/humidifier-schedules.png",
+          "sha256": "1ff69a49d727c192495724955cf6c56741e229907bc5e2fd805fb2ab808c0529",
+          "width": 980
+        },
+        "mobile": {
+          "bytes": 45081,
+          "height": 780,
+          "path": "public/manual/manual-mobile/humidifier-schedules.png",
+          "sha256": "ba3cacbce674957a7c728cd4e0cf3a8bf3d8bace2378c442e4a797b76f142da5",
+          "width": 393
+        }
+      }
+    },
+    {
+      "id": "humidifier-info",
+      "variants": {
+        "desktop": {
+          "bytes": 66533,
+          "height": 780,
+          "path": "public/manual/manual-desktop/humidifier-info.png",
+          "sha256": "6be21466fddcb81356c438e5c64878cae0b6b21397c5c7391173b07c995d6622",
+          "width": 980
+        },
+        "mobile": {
+          "bytes": 53057,
+          "height": 780,
+          "path": "public/manual/manual-mobile/humidifier-info.png",
+          "sha256": "adbf7ad4be96b6040b1877bea9a1182c6360bef73819e966053ded7079783c3f",
+          "width": 393
+        }
+      }
+    },
+    {
+      "id": "room-occupancy-sheet",
+      "variants": {
+        "desktop": {
+          "bytes": 14101,
+          "height": 250,
+          "path": "public/manual/manual-desktop/room-occupancy-sheet.png",
+          "sha256": "04bc14641cc95c9cb1b2f183f441db218cc22362fcc6cba5c44e8104b2b7a88e",
+          "width": 500
+        },
+        "mobile": {
+          "bytes": 13738,
+          "height": 250,
+          "path": "public/manual/manual-mobile/room-occupancy-sheet.png",
+          "sha256": "5e48bdda1ebd8a53c46f7bfcb94eb5256ad8a0921de80c6636b40035203f24d1",
+          "width": 393
+        }
+      }
+    },
+    {
+      "id": "room-vent-sheet",
+      "variants": {
+        "desktop": {
+          "bytes": 19987,
+          "height": 250,
+          "path": "public/manual/manual-desktop/room-vent-sheet.png",
+          "sha256": "fe44eb935fdf42e941de85e25974ee41fcba48e5f87ff411e4a73474bc9a0370",
+          "width": 500
+        },
+        "mobile": {
+          "bytes": 20110,
+          "height": 250,
+          "path": "public/manual/manual-mobile/room-vent-sheet.png",
+          "sha256": "71d06a28ca74e909baa94c89014279360f8184dd27cfa53e4d1fd7498d4cb03b",
+          "width": 393
+        }
+      }
+    },
+    {
+      "id": "sleepypod-main",
+      "variants": {
+        "desktop": {
+          "bytes": 35200,
+          "height": 630,
+          "path": "public/manual/manual-desktop/sleepypod-main.png",
+          "sha256": "49cada83b0df85703a39256bee77e65644ae81b778f012104721cfc17db4627d",
+          "width": 700
+        },
+        "mobile": {
+          "bytes": 35515,
+          "height": 767,
+          "path": "public/manual/manual-mobile/sleepypod-main.png",
+          "sha256": "0daf25b143b096afaca41dce01ff1fdefd9d1b5bff4ee9837eb614ea909fb56e",
+          "width": 393
+        }
+      }
+    },
+    {
+      "id": "sleepypod-modes",
+      "variants": {
+        "desktop": {
+          "bytes": 34499,
+          "height": 630,
+          "path": "public/manual/manual-desktop/sleepypod-modes.png",
+          "sha256": "21d2c882978810e297dc81dd59a3d79baf8674686071278018a4fa616a23f2a8",
+          "width": 700
+        },
+        "mobile": {
+          "bytes": 33175,
+          "height": 767,
+          "path": "public/manual/manual-mobile/sleepypod-modes.png",
+          "sha256": "00fc1f4300ffaeb16da72f7633ed3125ed95a771962113b488eef88645a10d9a",
+          "width": 393
+        }
+      }
+    },
+    {
+      "id": "sleepypod-alarms",
+      "variants": {
+        "desktop": {
+          "bytes": 35657,
+          "height": 630,
+          "path": "public/manual/manual-desktop/sleepypod-alarms.png",
+          "sha256": "0ed82d0a2724399e9e1358bfe2637d3e5d48d51b473535c095bda1a1719cf263",
+          "width": 700
+        },
+        "mobile": {
+          "bytes": 38687,
+          "height": 767,
+          "path": "public/manual/manual-mobile/sleepypod-alarms.png",
+          "sha256": "73ba694a00b71ad266170749333218c445bcfbd5df50281d8a686d864ede87ea",
+          "width": 393
+        }
+      }
+    },
+    {
+      "id": "sleepypod-status",
+      "variants": {
+        "desktop": {
+          "bytes": 34805,
+          "height": 630,
+          "path": "public/manual/manual-desktop/sleepypod-status.png",
+          "sha256": "201052ddc8844a6a7f00849b6ad924c3c60500f32167ecae0ca79a5f394cde2a",
+          "width": 700
+        },
+        "mobile": {
+          "bytes": 38473,
+          "height": 660,
+          "path": "public/manual/manual-mobile/sleepypod-status.png",
+          "sha256": "2340a75a407660f07c9584c88d6198d7486253a0a87a670083f96369e680479a",
+          "width": 393
+        }
+      }
+    },
+    {
+      "id": "eight-sleep-schedule",
+      "variants": {
+        "desktop": {
+          "bytes": 35083,
+          "height": 630,
+          "path": "public/manual/manual-desktop/eight-sleep-schedule.png",
+          "sha256": "a11b2c1be35e0fcd0be03e3806fe5e891e0dfce1472a6487373b303d53b092e6",
+          "width": 700
+        },
+        "mobile": {
+          "bytes": 34890,
+          "height": 767,
+          "path": "public/manual/manual-mobile/eight-sleep-schedule.png",
+          "sha256": "50219431ebd07980368f69ef03d6d844fd6ab8d51ab5d60723df937e100c4d8f",
+          "width": 393
+        }
+      }
+    },
+    {
+      "id": "eight-sleep-modes",
+      "variants": {
+        "desktop": {
+          "bytes": 34000,
+          "height": 630,
+          "path": "public/manual/manual-desktop/eight-sleep-modes.png",
+          "sha256": "bbcd8bdbec0d77748ed1925934197427a3b0793e3cfa783e0abe718dd17691e0",
+          "width": 700
+        },
+        "mobile": {
+          "bytes": 32043,
+          "height": 767,
+          "path": "public/manual/manual-mobile/eight-sleep-modes.png",
+          "sha256": "e7e4cbeb23f532b273425af6eed77940ea1635966308bc5f885ed8a1bae73427",
+          "width": 393
+        }
+      }
+    },
+    {
+      "id": "eight-sleep-alarms",
+      "variants": {
+        "desktop": {
+          "bytes": 35193,
+          "height": 630,
+          "path": "public/manual/manual-desktop/eight-sleep-alarms.png",
+          "sha256": "04554dba5bca205da7f64c7e45bfb6a331ad6067eac46f6cb831e5694176d55f",
+          "width": 700
+        },
+        "mobile": {
+          "bytes": 37560,
+          "height": 767,
+          "path": "public/manual/manual-mobile/eight-sleep-alarms.png",
+          "sha256": "f8e6fa02b05975143f8cdee7f0cdaea447e9d0e7700ec908462185d7023f4374",
+          "width": 393
+        }
+      }
+    },
+    {
+      "id": "eight-sleep-status",
+      "variants": {
+        "desktop": {
+          "bytes": 35231,
+          "height": 630,
+          "path": "public/manual/manual-desktop/eight-sleep-status.png",
+          "sha256": "1c910b96f27f9d9a9488df53912de8d9e724327d4c8653b0b9762daadff1aa4e",
+          "width": 700
+        },
+        "mobile": {
+          "bytes": 33910,
+          "height": 767,
+          "path": "public/manual/manual-mobile/eight-sleep-status.png",
+          "sha256": "b32ec526cb7ece47b10b489c348dc6146a562620f67b6c364bd33ada1770d1b4",
+          "width": 393
+        }
+      }
+    },
+    {
+      "id": "eight-sleep-settings",
+      "variants": {
+        "desktop": {
+          "bytes": 38765,
+          "height": 630,
+          "path": "public/manual/manual-desktop/eight-sleep-settings.png",
+          "sha256": "d983d61aecba8927f0d57c918334b5c8fd607e7a838301681918b3e1e355d6dc",
+          "width": 700
+        },
+        "mobile": {
+          "bytes": 34874,
+          "height": 767,
+          "path": "public/manual/manual-mobile/eight-sleep-settings.png",
+          "sha256": "586cce6ba60aa64846f21433c6d1e19eb1dd3c684fb994357e3ea03229bddb39",
+          "width": 393
+        }
+      }
+    },
+    {
+      "id": "sleepypod-temperature-scope",
+      "variants": {
+        "desktop": {
+          "bytes": 25901,
+          "height": 360,
+          "path": "public/manual/manual-desktop/sleepypod-temperature-scope.png",
+          "sha256": "bd190df5c88ef45c4180615ad2ad712a091fa8f7172b36dcb9256af801219877",
+          "width": 440
+        },
+        "mobile": {
+          "bytes": 25546,
+          "height": 430,
+          "path": "public/manual/manual-mobile/sleepypod-temperature-scope.png",
+          "sha256": "7a9e7eaa5d1c082bb5c70e309fac41d5ad1093e6e6bfd53eb480dad6cb04319b",
+          "width": 393
+        }
+      }
+    },
+    {
+      "id": "sleepypod-alarm-day",
+      "variants": {
+        "desktop": {
+          "bytes": 35606,
+          "height": 390,
+          "path": "public/manual/manual-desktop/sleepypod-alarm-day.png",
+          "sha256": "142de218a0c1c4daf9b4bb9ff5e595757eb6f31b3ee4e4616326c1f585eacc23",
+          "width": 700
+        },
+        "mobile": {
+          "bytes": 32269,
+          "height": 767,
+          "path": "public/manual/manual-mobile/sleepypod-alarm-day.png",
+          "sha256": "acb8e5abb003c5718d2ce24cd676cb3c89568950aec39807a030db383bc630b9",
+          "width": 393
+        }
+      }
+    },
+    {
+      "id": "sleepypod-alarm-editor",
+      "variants": {
+        "desktop": {
+          "bytes": 23404,
+          "height": 330,
+          "path": "public/manual/manual-desktop/sleepypod-alarm-editor.png",
+          "sha256": "cee2e0983b15ea2c3f3f797114f57bae526f17027aab59544aace5f3734cca2d",
+          "width": 700
+        },
+        "mobile": {
+          "bytes": 20949,
+          "height": 767,
+          "path": "public/manual/manual-mobile/sleepypod-alarm-editor.png",
+          "sha256": "2cac46b8088b23d2036e838e7ab134eb915b916f02d590943e71b9700a926e04",
+          "width": 393
+        }
+      }
+    },
+    {
+      "id": "media-remote-controls",
+      "variants": {
+        "desktop": {
+          "bytes": 52558,
+          "height": 810,
+          "path": "public/manual/manual-desktop/media-remote-controls.png",
+          "sha256": "1e822d0f85cd8362f655f5793f38bb20cdf46f136acf945506ae1a4de6b8299c",
+          "width": 980
+        },
+        "mobile": {
+          "bytes": 39664,
+          "height": 767,
+          "path": "public/manual/manual-mobile/media-remote-controls.png",
+          "sha256": "a40ad56218663f419806a1bf6390c6efd0d7adca8e91896744d849e2344cecfc",
+          "width": 393
+        }
+      }
+    },
+    {
+      "id": "media-remote-apps",
+      "variants": {
+        "desktop": {
+          "bytes": 110975,
+          "height": 810,
+          "path": "public/manual/manual-desktop/media-remote-apps.png",
+          "sha256": "fc414a88e6d9fc44d1a86e29c2f13bb34789f938d3640a6d539d0dc32748f985",
+          "width": 980
+        },
+        "mobile": {
+          "bytes": 38300,
+          "height": 767,
+          "path": "public/manual/manual-mobile/media-remote-apps.png",
+          "sha256": "c3e798a69b175de9aa137c8c57e8c22fb0764768ae4a497abd904700b971b2a7",
+          "width": 393
+        }
+      }
+    },
+    {
+      "id": "media-remote-devices",
+      "variants": {
+        "desktop": {
+          "bytes": 45284,
+          "height": 810,
+          "path": "public/manual/manual-desktop/media-remote-devices.png",
+          "sha256": "2ed001c1339ae38d0c695e3eb312dac6747719c4a8f35f9d8642840dbb7b225b",
+          "width": 980
+        },
+        "mobile": {
+          "bytes": 34705,
+          "height": 767,
+          "path": "public/manual/manual-mobile/media-remote-devices.png",
+          "sha256": "dc07990cb6bd1dfd9e839f3e1c154946abb927c28a28b6599859f3f15739b9e3",
+          "width": 393
+        }
+      }
+    },
+    {
+      "id": "media-remote-text",
+      "variants": {
+        "desktop": {
+          "bytes": 57059,
+          "height": 810,
+          "path": "public/manual/manual-desktop/media-remote-text.png",
+          "sha256": "c40e16a9bc81f7c0061a10af933613842a2f6a61e64afdd32374f2db09967223",
+          "width": 980
+        },
+        "mobile": {
+          "bytes": 44002,
+          "height": 767,
+          "path": "public/manual/manual-mobile/media-remote-text.png",
+          "sha256": "89cf223ead07f5c4043e5559bd8346d9e9ef5633e7c1f16bc037872de1f2de5b",
+          "width": 393
+        }
+      }
+    },
+    {
+      "id": "vacuum-controls",
+      "variants": {
+        "desktop": {
+          "bytes": 34921,
+          "height": 620,
+          "path": "public/manual/manual-desktop/vacuum-controls.png",
+          "sha256": "ac0dd2e0c080af8483853577216d50dd4f88257fb1accd1af7f99d6e3a299545",
+          "width": 388
+        },
+        "mobile": {
+          "bytes": 50683,
+          "height": 681,
+          "path": "public/manual/manual-mobile/vacuum-controls.png",
+          "sha256": "beb34c1fa779168b1d608857e72967c0161fa095fe5208a4d5f717f1a2e5ef81",
+          "width": 359
+        }
+      }
+    },
+    {
+      "id": "vacuum-zones",
+      "variants": {
+        "desktop": {
+          "bytes": 119359,
+          "height": 746,
+          "path": "public/manual/manual-desktop/vacuum-zones.png",
+          "sha256": "7cc2587c9cef611b85e01211711ad812df0e1b4821e8fc2e6081cf8f1a2f170f",
+          "width": 980
+        },
+        "mobile": {
+          "bytes": 54446,
+          "height": 767,
+          "path": "public/manual/manual-mobile/vacuum-zones.png",
+          "sha256": "cc75d4e9b3b242935a004175e3cb0a20091839898aab27b325cae726ab73da2d",
+          "width": 393
+        }
+      }
+    },
+    {
+      "id": "vacuum-auto-clean",
+      "variants": {
+        "desktop": {
+          "bytes": 66429,
+          "height": 700,
+          "path": "public/manual/manual-desktop/vacuum-auto-clean.png",
+          "sha256": "aa1fa22f31bfd210677ff5eda55b5448177638ad9122afe99cb6c23ecb9c4ae7",
+          "width": 980
+        },
+        "mobile": {
+          "bytes": 30436,
+          "height": 720,
+          "path": "public/manual/manual-mobile/vacuum-auto-clean.png",
+          "sha256": "9d4fe1e27b333b0b4c0b1a15a36397a23122504e64a789ce01589733986a2d27",
+          "width": 393
+        }
+      }
+    },
+    {
+      "id": "vacuum-actions",
+      "variants": {
+        "desktop": {
+          "bytes": 83301,
+          "height": 656,
+          "path": "public/manual/manual-desktop/vacuum-actions.png",
+          "sha256": "af518e541afdd7453660ef8f67a1ebd9084e7d3b1933af6ea0b94cb2e923f2ca",
+          "width": 980
+        },
+        "mobile": {
+          "bytes": 63446,
+          "height": 767,
+          "path": "public/manual/manual-mobile/vacuum-actions.png",
+          "sha256": "ee2f4f5a13439af25c6457c1c0a425c6d6f2475df0eb56b5a686b9bb6df0b83c",
+          "width": 393
+        }
+      }
+    },
+    {
+      "id": "vacuum-info-recovery",
+      "variants": {
+        "desktop": {
+          "bytes": 108750,
+          "height": 684,
+          "path": "public/manual/manual-desktop/vacuum-info-recovery.png",
+          "sha256": "bb2ef86f4fc128e52e483bce8acd7a9e2562fcf13e51141fd35c8460438e03d7",
+          "width": 980
+        },
+        "mobile": {
+          "bytes": 69366,
+          "height": 767,
+          "path": "public/manual/manual-mobile/vacuum-info-recovery.png",
+          "sha256": "e0d5eb54a0d37b879f89e2cd81150b3893329f65299b73b11805105c00a2fb7e",
+          "width": 393
+        }
+      }
+    },
+    {
+      "id": "presence-overrides-overview",
+      "variants": {
+        "desktop": {
+          "bytes": 90451,
+          "height": 836,
+          "path": "public/manual/manual-desktop/presence-overrides-overview.png",
+          "sha256": "0c9868d31cfac3e689f6c99dd69fc2e985e722e31c09d89da89656947e16048a",
+          "width": 584
+        },
+        "mobile": {
+          "bytes": 103485,
+          "height": 767,
+          "path": "public/manual/manual-mobile/presence-overrides-overview.png",
+          "sha256": "a718cea9eadfde674e6efd4939aa6612d734bc51c2400c943ce5cfe1ba4699b9",
+          "width": 393
+        }
+      }
+    },
+    {
+      "id": "presence-auto-reset",
+      "variants": {
+        "desktop": {
+          "bytes": 71336,
+          "height": 836,
+          "path": "public/manual/manual-desktop/presence-auto-reset.png",
+          "sha256": "b36205998c11893d0c6191ccf7e245ff614c9885605ba93c5c2a950cc32764e5",
+          "width": 584
+        },
+        "mobile": {
+          "bytes": 90692,
+          "height": 767,
+          "path": "public/manual/manual-mobile/presence-auto-reset.png",
+          "sha256": "b44e29bbd34852416138077e76414c3eaebae5105391de1bc4a8c007b5ad28f9",
+          "width": 393
+        }
+      }
+    },
+    {
+      "id": "thermostat-controls-rooms",
+      "variants": {
+        "desktop": {
+          "bytes": 72958,
+          "height": 780,
+          "path": "public/manual/manual-desktop/thermostat-controls-rooms.png",
+          "sha256": "f369a4024faf44494a36087e897555f3fdc727c27c3a810ca346508ba6416b3e",
+          "width": 720
+        },
+        "mobile": {
+          "bytes": 62113,
+          "height": 767,
+          "path": "public/manual/manual-mobile/thermostat-controls-rooms.png",
+          "sha256": "cd836aa9af3b7b9d07e8ba4671df00b0206e4de81128bcdf6ae8bca6c2aaefc7",
+          "width": 393
+        }
+      }
+    },
+    {
+      "id": "thermostat-controls-automation",
+      "variants": {
+        "desktop": {
+          "bytes": 99945,
+          "height": 1200,
+          "path": "public/manual/manual-desktop/thermostat-controls-automation.png",
+          "sha256": "05d88df13bd20ab6458ecefef1f707c074005e7cef9e01cf30f4483fe5d4c00c",
+          "width": 720
+        },
+        "mobile": {
+          "bytes": 101039,
+          "height": 1200,
+          "path": "public/manual/manual-mobile/thermostat-controls-automation.png",
+          "sha256": "04c3be3033a5cf83b0e4e270085fe6eecf6438873269dc5abe34b18cd5845a91",
+          "width": 393
+        }
+      }
+    },
+    {
+      "id": "thermostat-controls-tracking",
+      "variants": {
+        "desktop": {
+          "bytes": 77451,
+          "height": 780,
+          "path": "public/manual/manual-desktop/thermostat-controls-tracking.png",
+          "sha256": "0ab681754f3efceb3f7709c18d937b7ce06e8dd3a6ed1f9efccf9821754af73c",
+          "width": 720
+        },
+        "mobile": {
+          "bytes": 73465,
+          "height": 767,
+          "path": "public/manual/manual-mobile/thermostat-controls-tracking.png",
+          "sha256": "bab06a88971386bf1e0c5d2369e97abeca8752888dcce2a2c8f9bcb22b42ba46",
+          "width": 393
+        }
+      }
+    },
+    {
+      "id": "thermostat-room",
+      "variants": {
+        "desktop": {
+          "bytes": 61525,
+          "height": 780,
+          "path": "public/manual/manual-desktop/thermostat-room.png",
+          "sha256": "f9d17583bf65b7ae3d8eab22f881cc63f2ff327abd317338939cbcd8daa92de3",
+          "width": 720
+        },
+        "mobile": {
+          "bytes": 43956,
+          "height": 767,
+          "path": "public/manual/manual-mobile/thermostat-room.png",
+          "sha256": "aa9f2555828d1d4c7be3551c18bb9286f905222607731afc93ef7d5f109e5afb",
+          "width": 393
+        }
+      }
+    },
+    {
+      "id": "predictive-comfort",
+      "variants": {
+        "desktop": {
+          "bytes": 113540,
+          "height": 780,
+          "path": "public/manual/manual-desktop/predictive-comfort.png",
+          "sha256": "1b90ada46006d75b2a9449eb91a5874838230d05d5be0a245313f2ddee7e77f5",
+          "width": 720
+        },
+        "mobile": {
+          "bytes": 64187,
+          "height": 700,
+          "path": "public/manual/manual-mobile/predictive-comfort.png",
+          "sha256": "d2586d63495670e6877611ff959cffd4386bc8bf9920295256946555e3c0c07b",
+          "width": 393
+        }
+      }
+    },
+    {
+      "id": "thermostat-selected-rooms",
+      "variants": {
+        "desktop": {
+          "bytes": 52751,
+          "height": 780,
+          "path": "public/manual/manual-desktop/thermostat-selected-rooms.png",
+          "sha256": "92e81bff2b4351e95044f0fea18063df40a2276d056fdacd736fff60593dbb99",
+          "width": 720
+        },
+        "mobile": {
+          "bytes": 52908,
+          "height": 767,
+          "path": "public/manual/manual-mobile/thermostat-selected-rooms.png",
+          "sha256": "1c60fe8f81b6996352cf1a03e83685273bad7e92b055f93417dfc78df10a90f0",
+          "width": 393
+        }
+      }
+    },
+    {
+      "id": "thermostat-critical-protection",
+      "variants": {
+        "desktop": {
+          "bytes": 41237,
+          "height": 780,
+          "path": "public/manual/manual-desktop/thermostat-critical-protection.png",
+          "sha256": "7771eaaeccbc9b2829f8b1cfda0d57e22555c7fc667b9369bfa5872311b50b96",
+          "width": 720
+        },
+        "mobile": {
+          "bytes": 38525,
+          "height": 767,
+          "path": "public/manual/manual-mobile/thermostat-critical-protection.png",
+          "sha256": "b157db1b8b6498b02b3c0ecbaa803b38da77dab3c4b743b0375b340121eaf6af",
+          "width": 393
+        }
+      }
+    },
+    {
+      "id": "thermostat-occupied-only",
+      "variants": {
+        "desktop": {
+          "bytes": 51941,
+          "height": 780,
+          "path": "public/manual/manual-desktop/thermostat-occupied-only.png",
+          "sha256": "6f6566ee4a9fbdd8a890dcacdf1335f7f90d96ebd79ee39ed43e9a7865ecfcab",
+          "width": 720
+        },
+        "mobile": {
+          "bytes": 52152,
+          "height": 767,
+          "path": "public/manual/manual-mobile/thermostat-occupied-only.png",
+          "sha256": "f99cc4e03adc92b472fb0a3d8d6fd37f26eda57189e6eb02af2320e7aca8efb5",
+          "width": 393
+        }
+      }
+    },
+    {
+      "id": "custom-light-detail",
+      "variants": {
+        "desktop": {
+          "bytes": 87785,
+          "height": 836,
+          "path": "public/manual/manual-desktop/custom-light-detail.png",
+          "sha256": "91f61cdeee796e4602b354505897006ac9e6affbebc38e291962da3bd18a74be",
+          "width": 700
+        },
+        "mobile": {
+          "bytes": 63661,
+          "height": 680,
+          "path": "public/manual/manual-mobile/custom-light-detail.png",
+          "sha256": "294e023600f3cca97c4a19a97dbb1708df8fdd7e07e73ace8fa2ca5fe1d550ef",
+          "width": 393
+        }
+      }
+    },
+    {
+      "id": "vacation-active-cancel",
+      "variants": {
+        "desktop": {
+          "bytes": 303363,
+          "height": 430,
+          "path": "public/manual/manual-desktop/vacation-active-cancel.png",
+          "sha256": "f53c8e146f06c6e6283fcb6a7b6b542ab81a0cc5fec38eff997340694f564507",
+          "width": 1248
+        },
+        "mobile": {
+          "bytes": 120030,
+          "height": 502,
+          "path": "public/manual/manual-mobile/vacation-active-cancel.png",
+          "sha256": "9908a6f29847c7e041635f205fe4383561a956570778c2eca991a891b82a78f0",
+          "width": 361
+        }
+      }
+    },
+    {
+      "id": "inventory-grouped-detail",
+      "variants": {
+        "desktop": {
+          "bytes": 42192,
+          "height": 810,
+          "path": "public/manual/manual-desktop/inventory-grouped-detail.png",
+          "sha256": "ed983b3fd04ec58e428433e20c9fe3f71da92aa576740def8618fff235909034",
+          "width": 738
+        },
+        "mobile": {
+          "bytes": 45602,
+          "height": 767,
+          "path": "public/manual/manual-mobile/inventory-grouped-detail.png",
+          "sha256": "e901e60fc3323a0911ec80a1c49cebd5ff3638dffd8f2b890d4a18656f7ed0a1",
+          "width": 393
+        }
+      }
+    },
+    {
+      "id": "inventory-single-detail",
+      "variants": {
+        "desktop": {
+          "bytes": 23558,
+          "height": 480,
+          "path": "public/manual/manual-desktop/inventory-single-detail.png",
+          "sha256": "452c2ba70d583723946e882b2ec1c701b485bff7b505aa6b3150e4feb7cab17a",
+          "width": 738
+        },
+        "mobile": {
+          "bytes": 26372,
+          "height": 480,
+          "path": "public/manual/manual-mobile/inventory-single-detail.png",
+          "sha256": "85a96c3a748a4073824bcd80655f1fc4f52b3a2f8233fb58cbb786fc7729041a",
+          "width": 393
+        }
+      }
+    },
+    {
+      "id": "inventory-sort",
+      "variants": {
+        "desktop": {
+          "bytes": 31452,
+          "height": 810,
+          "path": "public/manual/manual-desktop/inventory-sort.png",
+          "sha256": "c9182f1cf505b66e9a7f724956d09f0bce5ba520b915fd70aaf30e0ad8c942fe",
+          "width": 738
+        },
+        "mobile": {
+          "bytes": 31698,
+          "height": 767,
+          "path": "public/manual/manual-mobile/inventory-sort.png",
+          "sha256": "5dc6c52906a1d13a74f1cae25c936c6e320b378a3ee6d738806c5a083c8ac828",
+          "width": 393
+        }
+      }
+    },
+    {
+      "id": "inventory-filter",
+      "variants": {
+        "desktop": {
+          "bytes": 46540,
+          "height": 810,
+          "path": "public/manual/manual-desktop/inventory-filter.png",
+          "sha256": "468cf7411ae17f3e05695a862290b2830685234da0a47c444e1ab4b5a362db6b",
+          "width": 738
+        },
+        "mobile": {
+          "bytes": 49908,
+          "height": 767,
+          "path": "public/manual/manual-mobile/inventory-filter.png",
+          "sha256": "a9383324ee9817f5267f0ded56e0495d4ac6620d54b7d7644256eebf63f7ef30",
+          "width": 393
+        }
+      }
+    },
+    {
+      "id": "daily-report-overview",
+      "variants": {
+        "desktop": {
+          "bytes": 22058,
+          "height": 810,
+          "path": "public/manual/manual-desktop/daily-report-overview.png",
+          "sha256": "70e12e26e7b006b6fc529e96332aefc5724ea141f496050b56edfa9853fc7e7e",
+          "width": 620
+        },
+        "mobile": {
+          "bytes": 22990,
+          "height": 767,
+          "path": "public/manual/manual-mobile/daily-report-overview.png",
+          "sha256": "1ee92ed136a673197a820134c0aa958c3c8a47b18c4a7bee35a1eb9896bfe0eb",
+          "width": 393
+        }
+      }
+    },
+    {
+      "id": "daily-report-upcoming",
+      "variants": {
+        "desktop": {
+          "bytes": 23579,
+          "height": 810,
+          "path": "public/manual/manual-desktop/daily-report-upcoming.png",
+          "sha256": "a10e68a585547e2d44115c3eea055d6f93b72f3f6a14ba84b4096993edc9037e",
+          "width": 620
+        },
+        "mobile": {
+          "bytes": 22778,
+          "height": 767,
+          "path": "public/manual/manual-mobile/daily-report-upcoming.png",
+          "sha256": "4dd8d62edfcc6a058e63039043b23e4d7ea67646c6851fcbfd335d47c15c5635",
+          "width": 393
+        }
+      }
+    },
+    {
+      "id": "daily-report-expired-food",
+      "variants": {
+        "desktop": {
+          "bytes": 26185,
+          "height": 810,
+          "path": "public/manual/manual-desktop/daily-report-expired-food.png",
+          "sha256": "9f0dbf786914c6ad714b340184595432993f98edb1d4921afb3259c5079e6f63",
+          "width": 620
+        },
+        "mobile": {
+          "bytes": 25106,
+          "height": 767,
+          "path": "public/manual/manual-mobile/daily-report-expired-food.png",
+          "sha256": "50b3603d3b0255f7bbd78751317149fba7aed76b4f0f88dc84483de738eb57ff",
+          "width": 393
+        }
+      }
+    },
+    {
+      "id": "daily-report-task-detail",
+      "variants": {
+        "desktop": {
+          "bytes": 43199,
+          "height": 810,
+          "path": "public/manual/manual-desktop/daily-report-task-detail.png",
+          "sha256": "b48f22c31f825ba1e83d2203de78f005314fc32313dd4cf5bda363af81b8735a",
+          "width": 620
+        },
+        "mobile": {
+          "bytes": 45248,
+          "height": 767,
+          "path": "public/manual/manual-mobile/daily-report-task-detail.png",
+          "sha256": "3add4719e766505335bbd46ac5596619b1271358e71b745b76c9fc9eb7019344",
+          "width": 393
+        }
+      }
+    },
+    {
+      "id": "daily-report-inventory-detail",
+      "variants": {
+        "desktop": {
+          "bytes": 27484,
+          "height": 480,
+          "path": "public/manual/manual-desktop/daily-report-inventory-detail.png",
+          "sha256": "9cc9d08a0ff8e5ced888e4736dff05ff69ab1668e4e76c2e91f57c331bf31f8f",
+          "width": 620
+        },
+        "mobile": {
+          "bytes": 26585,
+          "height": 480,
+          "path": "public/manual/manual-mobile/daily-report-inventory-detail.png",
+          "sha256": "a289edc207103ac8318f10e607ca26c98ed81dbb35aeb47d2869e4bc616ec51b",
+          "width": 393
+        }
+      }
+    },
+    {
+      "id": "recipe-detail-general",
+      "variants": {
+        "desktop": {
+          "bytes": 66858,
+          "height": 810,
+          "path": "public/manual/manual-desktop/recipe-detail-general.png",
+          "sha256": "8117d0cef3bc603edf24854a84c310f3d0b4d78bfe20ce8e70722d112d5eb38f",
+          "width": 720
+        },
+        "mobile": {
+          "bytes": 68076,
+          "height": 784,
+          "path": "public/manual/manual-mobile/recipe-detail-general.png",
+          "sha256": "8f8851ab2790ecf7dac25c3ef4deb22c871f727f69e5b51a67833cf001476675",
+          "width": 393
+        }
+      }
+    },
+    {
+      "id": "recipe-detail-ingredients",
+      "variants": {
+        "desktop": {
+          "bytes": 89562,
+          "height": 810,
+          "path": "public/manual/manual-desktop/recipe-detail-ingredients.png",
+          "sha256": "3b5f4d2823d0a269d4f0062baf97ea9fe2962120aa0831d1ec90f2581ea6d640",
+          "width": 720
+        },
+        "mobile": {
+          "bytes": 75662,
+          "height": 784,
+          "path": "public/manual/manual-mobile/recipe-detail-ingredients.png",
+          "sha256": "98c4255c7d0e150b7470b298a9ee362db0c5d0087987a4ab532606c0fd2f15da",
+          "width": 393
+        }
+      }
+    },
+    {
+      "id": "recipe-detail-instructions",
+      "variants": {
+        "desktop": {
+          "bytes": 42614,
+          "height": 810,
+          "path": "public/manual/manual-desktop/recipe-detail-instructions.png",
+          "sha256": "dc9ef0bd116dcfeebd51023e2bf278ec84fa1f91fdc1aae1a1142439061018aa",
+          "width": 720
+        },
+        "mobile": {
+          "bytes": 42645,
+          "height": 784,
+          "path": "public/manual/manual-mobile/recipe-detail-instructions.png",
+          "sha256": "c00ecea887407b254eca5075e824648fc66beefd75e0181f68430fbbbc49ff5f",
+          "width": 393
+        }
+      }
+    },
+    {
+      "id": "recipe-sort",
+      "variants": {
+        "desktop": {
+          "bytes": 36256,
+          "height": 810,
+          "path": "public/manual/manual-desktop/recipe-sort.png",
+          "sha256": "aff01d257c0eacba7b55561e1753624a7eb6fefbcf71f20ccbfb0f6e8d88403c",
+          "width": 738
+        },
+        "mobile": {
+          "bytes": 36789,
+          "height": 767,
+          "path": "public/manual/manual-mobile/recipe-sort.png",
+          "sha256": "768ecfad07de06419a3e8b95f9858fd38ef4fd50661ddbf689f9c51f429c8084",
+          "width": 393
+        }
+      }
+    },
+    {
+      "id": "recipe-filter",
+      "variants": {
+        "desktop": {
+          "bytes": 57695,
+          "height": 810,
+          "path": "public/manual/manual-desktop/recipe-filter.png",
+          "sha256": "4bdde81f7047448a376bda149adbb8eef7a91ca7143ddb0d6b20ad48251a2852",
+          "width": 738
+        },
+        "mobile": {
+          "bytes": 64309,
+          "height": 767,
+          "path": "public/manual/manual-mobile/recipe-filter.png",
+          "sha256": "4f125f6699867b9a24b7940ca5eac9fd8042c565df1795f891cb2e2a2a7c8750",
+          "width": 393
+        }
+      }
+    },
+    {
+      "id": "custom-light-mode-picker",
+      "variants": {
+        "desktop": {
+          "bytes": 17459,
+          "height": 266,
+          "path": "public/manual/manual-desktop/custom-light-mode-picker.png",
+          "sha256": "8ff42c8e1e9c70c86259064131671c8ad7dbb1179d22045781dd2e10f0074a19",
+          "width": 500
+        },
+        "mobile": {
+          "bytes": 25802,
+          "height": 500,
+          "path": "public/manual/manual-mobile/custom-light-mode-picker.png",
+          "sha256": "78e4002dd184e3963354c428520e917de9f09e98dd5acca27ad1632dc69a3a17",
+          "width": 393
+        }
+      }
+    },
+    {
+      "id": "thermostat-hub-mode-picker",
+      "variants": {
+        "desktop": {
+          "bytes": 13950,
+          "height": 266,
+          "path": "public/manual/manual-desktop/thermostat-hub-mode-picker.png",
+          "sha256": "2ce115154413c3dc0851149f91b567a49b8f60e2dbe58b5a0dc82b8b82fe4e17",
+          "width": 500
+        },
+        "mobile": {
+          "bytes": 19267,
+          "height": 500,
+          "path": "public/manual/manual-mobile/thermostat-hub-mode-picker.png",
+          "sha256": "696163b550c4c1210aa431137e85d5c3cbf258fcd29494cc6f1abe8b7cc4b028",
+          "width": 393
+        }
+      }
+    },
+    {
+      "id": "thermostat-hub-fan-picker",
+      "variants": {
+        "desktop": {
+          "bytes": 14365,
+          "height": 500,
+          "path": "public/manual/manual-desktop/thermostat-hub-fan-picker.png",
+          "sha256": "034a343601503cd827415bc25146a56d2f863db922a461c0b595c09894a58ed0",
+          "width": 738
+        },
+        "mobile": {
+          "bytes": 16213,
+          "height": 500,
+          "path": "public/manual/manual-mobile/thermostat-hub-fan-picker.png",
+          "sha256": "9ca0d96c01dbf43de016e43ea2cfc9471a0ba5206b606af8435dcbc0eb78a79b",
+          "width": 393
+        }
+      }
+    },
+    {
+      "id": "eco-critical-tracking-picker",
+      "variants": {
+        "desktop": {
+          "bytes": 66285,
+          "height": 500,
+          "path": "public/manual/manual-desktop/eco-critical-tracking-picker.png",
+          "sha256": "fb3c570e18bab81f022a0f0d7e24ef3a89218b0611475e769e6c9f6ec207b9c6",
+          "width": 720
+        },
+        "mobile": {
+          "bytes": 58735,
+          "height": 500,
+          "path": "public/manual/manual-mobile/eco-critical-tracking-picker.png",
+          "sha256": "23fddf0af985e52f4db178f0bd3eda984d09916e7bdd969f00c2b220893f746e",
+          "width": 393
+        }
+      }
+    },
+    {
+      "id": "eco-away-behavior-picker",
+      "variants": {
+        "desktop": {
+          "bytes": 79410,
+          "height": 500,
+          "path": "public/manual/manual-desktop/eco-away-behavior-picker.png",
+          "sha256": "c69a56201f038136506e28ddbc538fd33dfb58c2c3fb04d9a49a084e947e72e6",
+          "width": 720
+        },
+        "mobile": {
+          "bytes": 55385,
+          "height": 500,
+          "path": "public/manual/manual-mobile/eco-away-behavior-picker.png",
+          "sha256": "ff8eaaedd213b749c80717f212943d101984f7dba18b7e009fcd0f5972ad0f31",
+          "width": 393
+        }
+      }
+    },
+    {
+      "id": "create-task-floating-action",
+      "variants": {
+        "desktop": {
+          "bytes": 91723,
+          "height": 220,
+          "path": "public/manual/manual-desktop/create-task-floating-action.png",
+          "sha256": "47e5b8ee6ea3df6a378f402c412d2baa5d5d6d843b568cdc0cabaf28bc70fe05",
+          "width": 760
+        },
+        "mobile": {
+          "bytes": 55090,
+          "height": 220,
+          "path": "public/manual/manual-mobile/create-task-floating-action.png",
+          "sha256": "382962d75f12e6b2d7e3d9fb16006b0ce60fc1768f8f5f6cf4fe1066038bd415",
+          "width": 393
+        }
+      }
+    },
+    {
+      "id": "grocery-add",
+      "variants": {
+        "desktop": {
+          "bytes": 13210,
+          "height": 250,
+          "path": "public/manual/manual-desktop/grocery-add.png",
+          "sha256": "4c13d7c5e1f6e00ca8e679ae86d9c7306073b210335dba4f9b46c7de8589b7d5",
+          "width": 738
+        },
+        "mobile": {
+          "bytes": 13839,
+          "height": 250,
+          "path": "public/manual/manual-mobile/grocery-add.png",
+          "sha256": "5801663b18361ea858a594d6350168aef5167dcc0fdf7064d1b00c49d2082667",
+          "width": 393
+        }
+      }
+    },
+    {
+      "id": "admin-todo-add",
+      "variants": {
+        "desktop": {
+          "bytes": 12169,
+          "height": 250,
+          "path": "public/manual/manual-desktop/admin-todo-add.png",
+          "sha256": "51b8753fc8bce9b852b099853f2e9a780d5ae93a8ad64ab7d8c6a4090b6ec390",
+          "width": 738
+        },
+        "mobile": {
+          "bytes": 12011,
+          "height": 250,
+          "path": "public/manual/manual-mobile/admin-todo-add.png",
+          "sha256": "d18cf6e2d1263932c85b12c5f2815e9e999c4a4371fa0063dcc1d7ff333ea3ba",
+          "width": 393
+        }
+      }
+    }
+  ],
+  "variantCount": 276
+}

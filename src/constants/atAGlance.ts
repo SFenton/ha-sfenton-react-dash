@@ -379,7 +379,7 @@ export const LIGHT_GROUPS: EntityGroupConfig[] = [
     title: 'Music Room Lights',
     toggleEntityId: 'light.music_room',
     items: [
-      { title: 'Fireplace Light', entityId: 'light.hue_color_downlight_2', tone: 'light' },
+      { title: 'Fireplace Light', entityId: 'light.music_room_fireplace_light_2', tone: 'light' },
       { title: 'Window Light', entityId: 'light.hue_color_downlight_4', tone: 'light' },
       { title: 'Entry Light', entityId: 'light.hue_color_downlight_1', tone: 'light' },
       { title: 'Drums Light', entityId: 'light.hue_color_downlight_3', tone: 'light' },

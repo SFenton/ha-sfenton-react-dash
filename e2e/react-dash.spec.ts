@@ -62,6 +62,19 @@ async function clearMockHassCalls(page: Page) {
   })
 }
 
+async function openThermostatControls(page: Page, tab: 'Automation' | 'Rooms' | 'Tracking' = 'Rooms') {
+  const openerName = tab === 'Automation'
+    ? 'Advanced Configuration'
+    : tab === 'Tracking'
+      ? 'Room Tracking'
+      : 'Room Thermostats'
+  await page.getByRole('button', { exact: true, name: openerName }).click()
+  await expect(page.getByRole('dialog', { name: 'Thermostat' })).toBeVisible()
+  const dialog = page.getByRole('dialog')
+  await expect(dialog.getByRole('tab', { name: tab })).toHaveAttribute('aria-selected', 'true')
+  return dialog
+}
+
 async function everShelfInventoryCalls(page: Page) {
   return page.evaluate(() => (
     (window as unknown as { __mockHass: { calls: Record<string, unknown>[] } }).__mockHass.calls
@@ -239,6 +252,16 @@ async function clickWithPointerJitter(page: Page, target: Locator) {
   await page.mouse.up()
 }
 
+async function swipeHorizontallyWithTouch(page: Page, startX: number, endX: number, y: number) {
+  const client = await page.context().newCDPSession(page)
+  await client.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ id: 1, radiusX: 4, radiusY: 4, x: startX, y }] })
+  for (let step = 1; step <= 8; step += 1) {
+    const x = startX + ((endX - startX) * step) / 8
+    await client.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ id: 1, radiusX: 4, radiusY: 4, x, y }] })
+  }
+  await client.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
+}
+
 async function expectRightChevron(opener: Locator) {
   const chevron = opener.locator('[data-modal-disclosure="right-chevron"]')
   await expect(chevron).toHaveCount(1)
@@ -249,10 +272,278 @@ async function expectNoChevron(opener: Locator) {
   await expect(opener.locator('[data-modal-disclosure]')).toHaveCount(0)
 }
 
+test('cold Recipes refresh keeps the full app gate until the initial catalog resolves', async ({ page }) => {
+  await page.setViewportSize({ width: 393, height: 852 })
+  await page.goto('/at-a-glance/recipes?__mockRecipeQueryDelayMs=3000')
+
+  const appLoader = page.getByRole('status', { name: 'Loading dashboard' })
+  const recipesHeader = page.getByRole('button', { name: 'Go back' })
+  await expect(appLoader).toBeVisible()
+  await expect(recipesHeader).toHaveCount(0)
+  await expect(page.getByRole('navigation', { name: 'Dashboard sections' })).toHaveCount(0)
+  await expect(page.getByRole('status', { name: 'Loading Recipes', exact: true })).toHaveCount(0)
+  await expect(page.getByRole('status', { name: 'Loading recipes', exact: true })).toHaveCount(0)
+
+  await page.waitForTimeout(1_800)
+  await expect(appLoader).toBeVisible()
+  await expect(recipesHeader).toHaveCount(0)
+  await expect(page.locator('[data-recipe-card]')).toHaveCount(0)
+
+  await expect(appLoader).toHaveAttribute('data-state', 'exiting', { timeout: 4_000 })
+  await expect(appLoader).not.toBeVisible()
+  await expect(recipesHeader).toBeVisible()
+  await expect(page.getByRole('navigation', { name: 'Dashboard sections' })).toBeVisible()
+  await expect(page.getByRole('status', { name: 'Loading Recipes', exact: true })).toHaveCount(0)
+  await expect(page.locator('[data-recipe-grid="true"] [data-recipe-card]')).toHaveCount(50)
+})
+
+test('tall desktop Recipes primes enough rows for automatic infinite scrolling', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1400 })
+  await page.goto('/at-a-glance/recipes?__mockRecipeTotal=350')
+
+  const appLoader = page.getByRole('status', { name: 'Loading dashboard' })
+  await expect(appLoader).toBeVisible()
+  await expect(appLoader).not.toBeVisible({ timeout: 8_000 })
+  await expect(page.locator('[data-recipe-grid="true"] [data-recipe-card]')).toHaveCount(100)
+
+  const pageScroller = page.locator('[class*="_scroller_"]').first()
+  const preloadDistance = await pageScroller.evaluate((root) => {
+    const sentinel = document.querySelector<HTMLElement>('[data-recipe-grid-sentinel="true"]')
+    if (!sentinel) return -1
+    return Math.round(sentinel.getBoundingClientRect().top - root.getBoundingClientRect().bottom)
+  })
+  expect(preloadDistance).toBeGreaterThan(240)
+
+  const initialCursors = await page.evaluate(() => (
+    (window as unknown as { __mockHass: { calls: Record<string, unknown>[] } }).__mockHass.calls
+      .filter((call) => call.domain === 'evershelf' && call.service === 'recipe_query')
+      .map((call) => (call.serviceData as { cursor?: string } | undefined)?.cursor ?? null)
+  ))
+  expect(initialCursors.filter((cursor) => cursor === null).length).toBeGreaterThanOrEqual(1)
+  expect(initialCursors.filter((cursor) => cursor === '50')).toHaveLength(1)
+
+  await pageScroller.evaluate((element) => {
+    element.scrollTo({ behavior: 'auto', top: element.scrollHeight })
+  })
+  await expect(page.locator('[data-recipe-grid="true"] [data-recipe-card]')).toHaveCount(150)
+  await page.waitForTimeout(1_000)
+  await expect(page.locator('[data-recipe-grid="true"] [data-recipe-card]')).toHaveCount(150)
+  await expect(page.getByRole('button', { name: 'Load More' })).toBeVisible()
+
+  await pageScroller.evaluate((element) => {
+    element.scrollTo({ behavior: 'auto', top: 0 })
+  })
+  await pageScroller.evaluate((element) => {
+    element.scrollTo({ behavior: 'auto', top: element.scrollHeight })
+  })
+  await expect(page.locator('[data-recipe-grid="true"] [data-recipe-card]')).toHaveCount(200)
+  await page.waitForTimeout(1_000)
+  await expect(page.locator('[data-recipe-grid="true"] [data-recipe-card]')).toHaveCount(200)
+})
+
+test('mobile suggested recipe opens the shared external-only detail sheet and keeps close content mounted', async ({ page }) => {
+  await page.setViewportSize({ width: 393, height: 852 })
+  await page.goto('/at-a-glance/food?__mockRecipeDetailDelayMs=350')
+  await expect(page.getByRole('heading', { name: 'Food & Recipes' })).toBeVisible({ timeout: 12_000 })
+
+  const recipeButton = page.getByRole('button', {
+    name: 'Open Suggested Citrus Pantry Bowl with Roasted Garden Vegetables recipe details',
+  })
+  await recipeButton.click()
+  const dialog = page.getByRole('dialog', {
+    name: 'Suggested Citrus Pantry Bowl with Roasted Garden Vegetables',
+  })
+  await expect(dialog).toBeVisible()
+  await expect(dialog.getByRole('status', { name: 'Loading recipe details' })).toBeVisible()
+  await expect(dialog.getByText('Serves 4')).toBeVisible()
+  await expect(dialog.getByRole('group', { name: 'Yield Serves 4' })).toBeVisible()
+  await expect(dialog.getByRole('group', { name: 'Freshness Current Aug 7, 2026' })).toHaveAttribute('data-tone', 'ok')
+  await expect(dialog.locator('img')).toHaveAttribute('referrerpolicy', 'no-referrer')
+  await expect(dialog.getByRole('heading', { name: 'Additional Equipment' })).toBeVisible()
+  await expect(dialog.getByText(/Required Equipment/i)).toHaveCount(0)
+  const footer = dialog.locator('[data-modal-sheet-footer="true"]')
+  const tabList = footer.getByRole('tablist', {
+    name: 'Suggested Citrus Pantry Bowl with Roasted Garden Vegetables sections',
+  })
+  await expect(tabList).toBeVisible()
+  const tabs = tabList.getByRole('tab')
+  await expect(tabs).toHaveCount(3)
+  expect(await tabs.evaluateAll((items) => items.map((item) => (item as HTMLElement).innerText))).toEqual(['', '', ''])
+  expect(await tabs.evaluateAll((items) => items.map((item) => item.getAttribute('aria-label')))).toEqual([
+    'General',
+    'Ingredients',
+    'Instructions',
+  ])
+  const anchoredFooter = await Promise.all([dialog.boundingBox(), footer.boundingBox()])
+  expect(Math.abs(
+    ((anchoredFooter[1]?.y ?? 0) + (anchoredFooter[1]?.height ?? 0))
+      - ((anchoredFooter[0]?.y ?? 0) + (anchoredFooter[0]?.height ?? 0)),
+  )).toBeLessThanOrEqual(1)
+
+  await dialog.getByRole('tab', { name: 'Ingredients' }).click()
+  await expect(dialog.getByRole('tabpanel', { name: 'Ingredients' })).toBeVisible()
+  await expect(dialog.getByRole('heading', { name: 'Section 1' })).toBeVisible()
+  await expect(dialog.getByRole('heading', { name: 'Section 2' })).toBeVisible()
+  await expect(dialog.getByText('Canned tomatoes · 1 can', { exact: true })).toBeVisible()
+  await expect(dialog.getByRole('checkbox', { name: /Canned tomatoes · 1 can: Missing from inventory/ })).toHaveAttribute('aria-checked', 'false')
+  await expect(dialog.getByRole('checkbox', { name: /Long-grain rice · 2 cups: Exact inventory match/ })).toHaveAttribute('aria-checked', 'true')
+  await expect(dialog.getByRole('checkbox', { name: /Fresh herbs: Inventory match uncertain/ })).toHaveAttribute('aria-checked', 'mixed')
+  await expect(dialog.getByText('Optional', { exact: true })).toBeVisible()
+  await expect(dialog.getByText('Source: diced tomatoes, drained')).toBeVisible()
+  await expect(dialog.getByText('Matched as Italian parsley')).toBeVisible()
+  const modalBody = dialog.locator('[data-modal-sheet-body="true"]')
+  const footerTopBeforeScroll = await footer.evaluate((element) => element.getBoundingClientRect().top)
+  await modalBody.evaluate((element) => element.scrollTo({ behavior: 'auto', top: element.scrollHeight }))
+  await expect.poll(() => modalBody.evaluate((element) => element.scrollTop)).toBeGreaterThan(0)
+  await expect.poll(() => footer.evaluate((element) => Math.round(element.getBoundingClientRect().top))).toBe(
+    Math.round(footerTopBeforeScroll),
+  )
+
+  await dialog.getByRole('tab', { name: 'Instructions' }).click()
+  await expect(dialog.getByRole('tabpanel', { name: 'Instructions' })).toBeVisible()
+  await expect(dialog.getByRole('heading', { name: 'Instructions are on Cookidoo' })).toBeVisible()
+  await expect(dialog.getByRole('link', { name: 'Open in Cookidoo' })).toHaveAttribute(
+    'href',
+    'https://cookidoo.example.test/recipes/mock-1',
+  )
+  await expect(dialog.locator('ol')).toHaveCount(0)
+  await expect(dialog.getByText(/Prohibited Cookidoo/)).toHaveCount(0)
+
+  await dialog.getByRole('button', { name: 'Close' }).click()
+  await expect(dialog).toHaveAttribute('data-closing', 'true')
+  await expect(dialog.getByRole('link', { name: 'Open in Cookidoo' })).toBeAttached()
+  await expect(dialog).not.toBeVisible({ timeout: 1_200 })
+  await expect(recipeButton).toBeFocused()
+})
+
+test('recipe detail never renders a high-confidence taxonomy-rule closest match', async ({ page }) => {
+  await page.setViewportSize({ width: 393, height: 852 })
+  await page.goto('/at-a-glance/food?__mockRecipeClosestMatchSource=taxonomy_rule')
+  await expect(page.getByRole('heading', { name: 'Food & Recipes' })).toBeVisible({ timeout: 12_000 })
+
+  await page.getByRole('button', {
+    name: 'Open Suggested Citrus Pantry Bowl with Roasted Garden Vegetables recipe details',
+  }).click()
+  const dialog = page.getByRole('dialog', {
+    name: 'Suggested Citrus Pantry Bowl with Roasted Garden Vegetables',
+  })
+  await expect(dialog.getByText('Serves 4')).toBeVisible()
+  await dialog.getByRole('tab', { name: 'Ingredients' }).click()
+  await expect(dialog.getByRole('checkbox', { name: /Fresh herbs: Inventory match uncertain/ })).toBeVisible()
+  await expect(dialog.getByText(/^Matched as /)).toHaveCount(0)
+})
+
+test('desktop browse recipe navigates all detail tabs and submits one missing-only grocery service call', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 })
+  await page.goto('/at-a-glance/recipes')
+  await expect(page.getByRole('button', { name: 'Open Catalog Recipe 1 recipe details' })).toBeVisible({ timeout: 12_000 })
+  await clearMockHassCalls(page)
+
+  await page.getByRole('button', { name: 'Open Catalog Recipe 1 recipe details' }).focus()
+  await page.keyboard.press('Enter')
+  const dialog = page.getByRole('dialog', { name: 'Catalog Recipe 1' })
+  await expect(dialog).toBeVisible()
+  await expect(dialog.getByText('Makes 2 bowls')).toBeVisible()
+  await expect(dialog.getByRole('group', { name: 'Yield Makes 2 bowls' })).toBeVisible()
+  const dialogBox = await dialog.boundingBox()
+  expect(Math.round(dialogBox?.width ?? 0)).toBeLessThanOrEqual(722)
+  const footer = dialog.locator('[data-modal-sheet-footer="true"]')
+  const footerBox = await footer.boundingBox()
+  expect(Math.abs(
+    ((footerBox?.y ?? 0) + (footerBox?.height ?? 0))
+      - ((dialogBox?.y ?? 0) + (dialogBox?.height ?? 0)),
+  )).toBeLessThanOrEqual(1)
+
+  await dialog.getByRole('tab', { name: 'Ingredients' }).click()
+  await expect(dialog.getByRole('tabpanel', { name: 'Ingredients' })).toBeVisible()
+  await expect(dialog.getByRole('heading', { name: 'Bowl Ingredients' })).toBeVisible()
+  await expect(dialog.getByRole('heading', { name: 'Finishing Ingredients' })).toBeVisible()
+  await expect(dialog.getByText('Canned tomatoes · 1 can', { exact: true })).toBeVisible()
+  await dialog.getByRole('button', { name: 'Add Missing Ingredients to Groceries' }).click()
+  await expect(dialog.getByText(/EverShelf: 2 added\./)).toBeVisible()
+
+  const groceryCalls = await page.evaluate(() => (
+    (window as unknown as { __mockHass: { calls: Record<string, unknown>[] } }).__mockHass.calls
+      .filter((call) => call.domain === 'evershelf' && call.service === 'recipe_grocery_add')
+  ))
+  expect(groceryCalls).toHaveLength(1)
+  expect(groceryCalls[0]).toMatchObject({
+    returnResponse: true,
+    serviceData: {
+      recipe_id: 1000,
+      selections: [
+        { key: 'ri:0:0000000000000001', position: 0 },
+        { key: 'ri:5:0000000000000006', position: 5 },
+      ],
+      todo_entity_id: 'todo.shopping_list',
+    },
+  })
+  expect((groceryCalls[0].serviceData as { idempotency_key: string }).idempotency_key).toMatch(
+    /^[A-Za-z0-9._:-]{1,128}$/,
+  )
+
+  await dialog.getByRole('tab', { name: 'Instructions' }).click()
+  const instructionsPanel = dialog.getByRole('tabpanel', { name: 'Instructions' })
+  await expect(instructionsPanel).toBeVisible()
+  await expect(instructionsPanel.getByRole('heading', { name: 'Prepare' })).toBeVisible()
+  await expect(instructionsPanel.getByRole('heading', { name: 'Serve' })).toBeVisible()
+  await expect(dialog.getByText('Combine the prepared ingredients in a large bowl.')).toBeVisible()
+  await expect(dialog.getByText('Divide into bowls and serve.')).toBeVisible()
+  await expect(instructionsPanel.getByText('1.', { exact: true })).toBeVisible()
+  await expect(instructionsPanel.getByText('2.', { exact: true })).toBeVisible()
+  await expect(instructionsPanel.getByText('3.', { exact: true })).toBeVisible()
+  await expect(instructionsPanel.getByRole('listitem')).toHaveCount(3)
+  await expect(instructionsPanel.getByRole('button')).toHaveCount(0)
+  await expect(instructionsPanel.getByRole('checkbox')).toHaveCount(0)
+  await expect(instructionsPanel.locator('[aria-pressed]')).toHaveCount(0)
+  await expect(dialog.getByRole('link', { name: 'Open in Cookidoo' })).toHaveCount(0)
+  await dialog.getByRole('button', { name: 'Close' }).click()
+  await expect(dialog).not.toBeVisible({ timeout: 1_200 })
+  await expect(page.getByRole('button', { name: 'Open Catalog Recipe 1 recipe details' })).toBeFocused()
+})
+
+test('recipe grocery empty and uncertain-only states use distinct reachable copy', async ({ page }) => {
+  await page.setViewportSize({ width: 393, height: 852 })
+
+  for (const state of [
+    {
+      query: 'uncertain-only',
+      message: "EverShelf can't yet tell which of these 2 ingredients you're missing.",
+    },
+    {
+      query: 'none',
+      message: 'No missing ingredients to add.',
+    },
+  ]) {
+    await page.goto(`/at-a-glance/food?__mockRecipeGroceryState=${state.query}`)
+    await expect(page.getByRole('heading', { name: 'Food & Recipes' })).toBeVisible({ timeout: 12_000 })
+    await page.getByRole('button', {
+      name: 'Open Suggested Citrus Pantry Bowl with Roasted Garden Vegetables recipe details',
+    }).click()
+    const dialog = page.getByRole('dialog', {
+      name: 'Suggested Citrus Pantry Bowl with Roasted Garden Vegetables',
+    })
+    await expect(dialog.getByText('Serves 4')).toBeVisible()
+    await dialog.getByRole('tab', { name: 'Ingredients' }).click()
+    await expect(dialog.getByRole('button', { name: 'Add Missing Ingredients to Groceries' })).toBeDisabled()
+    await expect(dialog.getByText(state.message)).toBeVisible()
+  }
+})
+
 test('Food & Recipes hub and recipe browse use approved 393px mobile geometry', async ({ page }) => {
   await page.setViewportSize({ width: 393, height: 852 })
   await page.goto('/at-a-glance/food')
 
+  const foodHubLoader = page.getByRole('status', { name: 'Loading Food & Recipes' })
+  await expect(foodHubLoader).toBeVisible({ timeout: 8_000 })
+  await expect(page.locator('[data-content-visible="false"]').last()).toBeAttached()
+  const loaderBox = await foodHubLoader.boundingBox()
+  const headerBox = await page.locator('main [class*="headerDock"]').last().boundingBox()
+  const bottomNavBox = await page.getByRole('navigation', { name: 'Dashboard sections' }).boundingBox()
+  const loaderCenter = (loaderBox?.y ?? 0) + ((loaderBox?.height ?? 0) / 2)
+  const availableCenter = ((headerBox?.y ?? 0) + (headerBox?.height ?? 0) + (bottomNavBox?.y ?? 0)) / 2
+  expect(Math.abs(loaderCenter - availableCenter)).toBeLessThanOrEqual(1)
+  await expect(foodHubLoader).not.toBeVisible({ timeout: 12_000 })
   await expect(page.getByRole('heading', { name: 'Food & Recipes' })).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Suggested Recipes' })).toBeVisible()
   const carousel = page.getByRole('region', { name: 'Suggested recipes' })
@@ -272,7 +563,7 @@ test('Food & Recipes hub and recipe browse use approved 393px mobile geometry', 
     }
   })).toMatchObject({
     cardCount: 6,
-    pageWidth: 345,
+    pageWidth: 393,
     trackWidth: 393,
   })
   await expect.poll(async () => carousel.evaluate((element) => {
@@ -280,8 +571,14 @@ test('Food & Recipes hub and recipe browse use approved 393px mobile geometry', 
     const secondPage = element.querySelector('[data-carousel-page="2"]')
     const secondPageRect = secondPage?.getBoundingClientRect()
     return Math.round(Math.max(0, trackRect.right - (secondPageRect?.left ?? trackRect.right)))
-  })).toBeGreaterThanOrEqual(12)
-  const longTitle = firstPage.getByText('Ang Chow Chicken (Red Fermented Rice Wine Chicken)')
+  })).toBe(0)
+  const dotButtons = page.getByRole('group', { name: 'Suggested recipes pages' }).getByRole('button')
+  const dotCenters = await dotButtons.evaluateAll((buttons) => buttons.slice(0, 2).map((button) => {
+    const rect = button.getBoundingClientRect()
+    return rect.x + (rect.width / 2)
+  }))
+  expect(Math.round(dotCenters[1] - dotCenters[0])).toBeLessThanOrEqual(32)
+  const longTitle = firstPage.getByText('Suggested Citrus Pantry Bowl with Roasted Garden Vegetables')
   await expect(longTitle).toBeVisible()
   await expect(firstPage.locator('img')).toHaveCount(6)
   await expect.poll(async () => longTitle.evaluate((element) => {
@@ -298,23 +595,121 @@ test('Food & Recipes hub and recipe browse use approved 393px mobile geometry', 
   })).toBe(true)
   const pageScroller = page.locator('[class*="_scroller_"]').first()
   const initialScrollTop = await pageScroller.evaluate((element) => element.scrollTop)
-  await page.getByRole('button', { name: 'Go to page 3' }).click()
-  await expect(page.getByRole('button', { name: 'Go to page 3' })).toHaveAttribute('aria-current', 'page')
+  const carouselBox = await carousel.boundingBox()
+  const swipeY = (carouselBox?.y ?? 144) + Math.min(180, (carouselBox?.height ?? 360) / 2)
+  await swipeHorizontallyWithTouch(page, 90, 300, swipeY)
+  await expect(page.getByRole('button', { name: 'Go to page 5' })).toHaveAttribute('aria-current', 'page')
+  await swipeHorizontallyWithTouch(page, 300, 90, swipeY)
+  await expect(page.getByRole('button', { name: 'Go to page 1' })).toHaveAttribute('aria-current', 'page')
+  const page2Dot = page.getByRole('button', { name: 'Go to page 2' })
+  const page3Dot = page.getByRole('button', { name: 'Go to page 3' })
+  await page.evaluate(async () => {
+    const probeWindow = window as typeof window & {
+      __carouselDotResizeProbe?: {
+        count: number
+        observers: ResizeObserver[]
+      }
+    }
+    const probe = { count: 0, observers: [] as ResizeObserver[] }
+    for (const dot of document.querySelectorAll('[aria-label="Suggested recipes pages"] button span')) {
+      const observer = new ResizeObserver((entries) => {
+        probe.count += entries.length
+      })
+      observer.observe(dot)
+      probe.observers.push(observer)
+    }
+    probeWindow.__carouselDotResizeProbe = probe
+    await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())))
+    probe.count = 0
+  })
+  await page2Dot.click()
+  await page3Dot.click()
+  await expect(page2Dot).not.toBeFocused()
+  await expect.poll(() => page2Dot.evaluate((button) => {
+    const dot = button.querySelector('span')
+    const before = dot ? getComputedStyle(dot, '::before') : null
+    const after = dot ? getComputedStyle(dot, '::after') : null
+    return {
+      afterVisibility: after?.visibility,
+      beforeVisibility: before?.visibility,
+      beforeWidth: before?.width,
+      boxShadow: getComputedStyle(button).boxShadow,
+      dotWidth: Math.round(dot?.getBoundingClientRect().width ?? 0),
+    }
+  })).toEqual({
+    afterVisibility: 'hidden',
+    beforeVisibility: 'visible',
+    beforeWidth: '7px',
+    boxShadow: 'none',
+    dotWidth: 18,
+  })
+  expect(await page.evaluate(() => (
+    (window as typeof window & {
+      __carouselDotResizeProbe?: { count: number }
+    }).__carouselDotResizeProbe?.count ?? -1
+  ))).toBe(0)
+  await page.evaluate(() => {
+    const probeWindow = window as typeof window & {
+      __carouselDotResizeProbe?: { observers: ResizeObserver[] }
+    }
+    probeWindow.__carouselDotResizeProbe?.observers.forEach((observer) => observer.disconnect())
+    delete probeWindow.__carouselDotResizeProbe
+  })
+  await expect(page3Dot).toHaveAttribute('aria-current', 'page')
   expect(await pageScroller.evaluate((element) => element.scrollTop)).toBe(initialScrollTop)
 
-  const allRecipes = page.getByRole('button', { name: 'All Recipes Browse the complete recipe catalog' })
+  const allRecipes = page.getByRole('button', { exact: true, name: 'All Recipes' })
   await expect(allRecipes).toBeVisible()
+  const allFood = page.getByRole('button', { name: /^All Food / })
   const scanItem = page.getByRole('button', { name: 'Scan Item' })
   const allRecipesBox = await allRecipes.boundingBox()
+  const allFoodBox = await allFood.boundingBox()
   const scanItemBox = await scanItem.boundingBox()
+  expect(Math.round(allRecipesBox?.height ?? 0)).toBe(Math.round(allFoodBox?.height ?? 0))
   expect((allRecipesBox?.y ?? 0) + (allRecipesBox?.height ?? 0)).toBeLessThanOrEqual(scanItemBox?.y ?? 0)
+  await page.evaluate(() => {
+    (window as unknown as {
+      __mockHass: { setRecipeQueryDelay: (delayMs: number) => void }
+    }).__mockHass.setRecipeQueryDelay(1_600)
+  })
   await allRecipes.click()
   await expect(page.getByRole('heading', { name: 'Recipes', exact: true })).toBeVisible()
+  const recipesLoader = page.getByRole('status', { name: 'Loading Recipes', exact: true })
+  await expect(recipesLoader).toBeVisible()
+  await expect(page.locator('[data-content-visible="false"]').last()).toBeAttached()
+  await expect(page.locator('[data-recipe-grid="true"]')).toHaveCount(0)
+  await expect(page.getByText('No Recipes Found')).toHaveCount(0)
+  await expect.poll(async () => {
+    const recipesLoaderBox = await recipesLoader.boundingBox()
+    const recipesHeaderBox = await page.locator('main [class*="headerDock"]').last().boundingBox()
+    const recipesBottomNavBox = await page.getByRole('navigation', { name: 'Dashboard sections' }).boundingBox()
+    const recipesLoaderCenter = (recipesLoaderBox?.y ?? 0) + ((recipesLoaderBox?.height ?? 0) / 2)
+    const recipesAvailableCenter = (
+      (recipesHeaderBox?.y ?? 0)
+      + (recipesHeaderBox?.height ?? 0)
+      + (recipesBottomNavBox?.y ?? 0)
+    ) / 2
+    return Math.abs(recipesLoaderCenter - recipesAvailableCenter)
+  }).toBeLessThanOrEqual(1)
+  await expect(recipesLoader).toHaveAttribute('data-state', 'exiting', { timeout: 4_000 })
+  await expect(recipesLoader).not.toBeVisible()
+  await expect(page.locator('[data-content-visible="true"]').last()).toBeAttached()
   await expect(page.getByRole('button', { name: 'Search recipes' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Sort' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Filter' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Scan Item' })).toHaveCount(0)
   await expect(page.locator('[data-recipe-grid="true"] [data-recipe-card]')).toHaveCount(50)
+  const floatingDockBox = await page.locator('[data-floating-action-dock="true"]').boundingBox()
+  const collapsedSearchBox = await page.getByRole('button', { name: 'Search recipes' }).boundingBox()
+  expect(Math.round(collapsedSearchBox?.x ?? 0)).toBe(Math.round(floatingDockBox?.x ?? 0))
+  expect(Math.round(collapsedSearchBox?.width ?? 0)).toBeGreaterThanOrEqual(220)
+  await expect(page.getByRole('button', { name: 'Search recipes' })).toHaveCSS('background-color', 'rgba(18, 24, 38, 0.96)')
+  await expect(page.getByRole('button', { name: 'Search recipes' })).toHaveCSS('border-top-color', 'rgba(255, 255, 255, 0.16)')
+  await page.evaluate(() => {
+    (window as unknown as {
+      __mockHass: { setRecipeQueryDelay: (delayMs: number) => void }
+    }).__mockHass.setRecipeQueryDelay(0)
+  })
   await page.getByRole('button', { name: 'Load More' }).scrollIntoViewIfNeeded()
   const nextPageSpinner = page.getByRole('status', { name: 'Loading more recipes' })
   await expect(nextPageSpinner).toBeVisible()
@@ -337,27 +732,38 @@ test('Food & Recipes hub and recipe browse use approved 393px mobile geometry', 
 
   const firstRecipe = page.locator('[data-recipe-card]').first()
   await expect(firstRecipe).toHaveCSS('cursor', 'default')
-  await expect(firstRecipe.locator('button, a')).toHaveCount(0)
+  const firstRecipeButton = firstRecipe.getByRole('button', { name: /Open Catalog Recipe 1 recipe details/ })
+  await expect(firstRecipeButton).toHaveCount(1)
+  await expect(firstRecipeButton).toHaveCSS('transform', 'none')
+  await expect(firstRecipeButton).toHaveCSS('transition-duration', '0s')
   const sortAction = page.getByRole('button', { name: 'Sort' })
   await sortAction.focus()
   await expect.poll(() => sortAction.evaluate((element) => getComputedStyle(element).boxShadow)).not.toBe('none')
   await page.getByRole('button', { name: 'Search recipes' }).click()
+  const recipeSearchInput = page.getByRole('searchbox', { name: 'Search recipes' })
+  await expect(recipeSearchInput).toBeFocused()
+  const expandedSearchBox = await recipeSearchInput.locator('xpath=..').boundingBox()
+  expect(Math.round(expandedSearchBox?.x ?? 0)).toBe(Math.round(floatingDockBox?.x ?? 0))
+  expect(Math.round(expandedSearchBox?.width ?? 0)).toBe(Math.round(floatingDockBox?.width ?? 0))
+  await expect(recipeSearchInput.locator('xpath=..')).toHaveCSS('background-color', 'rgba(18, 24, 38, 0.96)')
+  await recipeSearchInput.fill('chicken')
+  await expect(recipeSearchInput).toHaveValue('chicken')
   await expect(page.locator('button[aria-label="Sort"]').locator('xpath=..')).toHaveAttribute('inert', '')
   await expect(page.locator('button[aria-label="Filter"]').locator('xpath=..')).toHaveAttribute('aria-hidden', 'true')
 })
 
-test('desktop suggested recipes use distinct five-by-two carousel pages', async ({ page }) => {
+test('desktop recipes use responsive bounded cards and five full-width carousel pages', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 })
   await page.goto('/at-a-glance/food')
 
   const carousel = page.getByRole('region', { name: 'Suggested recipes' })
   const pages = carousel.locator('[data-carousel-page]')
-  await expect(pages).toHaveCount(3)
-  await expect(carousel.locator('[data-carousel-card]')).toHaveCount(30)
-  for (let pageIndex = 0; pageIndex < 3; pageIndex += 1) {
-    await expect(pages.nth(pageIndex).locator('[data-carousel-card]')).toHaveCount(10)
+  await expect(pages).toHaveCount(5)
+  await expect(carousel.locator('[data-carousel-card]')).toHaveCount(70)
+  for (let pageIndex = 0; pageIndex < 5; pageIndex += 1) {
+    await expect(pages.nth(pageIndex).locator('[data-carousel-card]')).toHaveCount(14)
   }
-  await expect(page.getByRole('group', { name: 'Suggested recipes pages' }).getByRole('button')).toHaveCount(3)
+  await expect(page.getByRole('group', { name: 'Suggested recipes pages' }).getByRole('button')).toHaveCount(5)
 
   const geometry = await pages.first().evaluate((element) => {
     const pageRect = element.getBoundingClientRect()
@@ -367,24 +773,65 @@ test('desktop suggested recipes use distinct five-by-two carousel pages', async 
       return { x: Math.round(rect.x), y: Math.round(rect.y) }
     })
     return {
-      cardColumns: new Set(cards.slice(0, 5).map((card) => card.x)).size,
-      firstRowY: new Set(cards.slice(0, 5).map((card) => card.y)).size,
+      cardColumns: new Set(cards.slice(0, 7).map((card) => card.x)).size,
+      cardMaxWidth: Math.max(...Array.from(element.querySelectorAll('[data-carousel-card]')).map((card) => card.getBoundingClientRect().width)),
+      firstRowY: new Set(cards.slice(0, 7).map((card) => card.y)).size,
       pageWidth: Math.round(pageRect.width),
-      secondRowBelowFirst: cards[5].y > cards[0].y,
+      rightDeadSpace: Math.round((trackRect?.right ?? 0) - pageRect.right),
+      secondRowBelowFirst: cards[7].y > cards[0].y,
       trackWidth: Math.round(trackRect?.width ?? 0),
+      nextPageLeak: Math.max(0, Math.round(trackRect?.right ?? 0) - Math.round(element.nextElementSibling?.getBoundingClientRect().left ?? 0)),
     }
   })
   expect(geometry).toMatchObject({
-    cardColumns: 5,
+    cardColumns: 7,
     firstRowY: 1,
+    rightDeadSpace: 0,
     secondRowBelowFirst: true,
-    trackWidth: 1160,
+    trackWidth: 1440,
+    nextPageLeak: 0,
   })
-  expect(geometry.pageWidth).toBeGreaterThan(1100)
+  expect(geometry.pageWidth).toBe(1440)
+  expect(geometry.cardMaxWidth).toBeLessThanOrEqual(220)
+
+  const desktopAllRecipesBox = await page.getByRole('button', { exact: true, name: 'All Recipes' }).boundingBox()
+  const desktopAllFoodBox = await page.getByRole('button', { name: /^All Food / }).boundingBox()
+  expect(Math.round(desktopAllRecipesBox?.height ?? 0)).toBe(Math.round(desktopAllFoodBox?.height ?? 0))
 
   await page.getByRole('button', { name: 'Go to page 2' }).click()
   await expect(page.getByRole('button', { name: 'Go to page 2' })).toHaveAttribute('aria-current', 'page')
-  await expect.poll(() => carousel.evaluate((element) => Math.round(element.scrollLeft))).toBeGreaterThan(1000)
+  await expect(page.locator('[data-card-carousel]')).toHaveAttribute('data-active-page', '2')
+  await expect.poll(() => carousel.locator(':scope > div').evaluate((element) => getComputedStyle(element).transform)).not.toBe('none')
+
+  await page.getByRole('button', { exact: true, name: 'All Recipes' }).click()
+  await expect(page.locator('[data-recipe-grid="true"] [data-recipe-card]')).toHaveCount(50)
+  const recipeGridGeometry = await page.locator('[data-recipe-grid="true"]').evaluate((wrapper) => {
+    const grid = wrapper.querySelector('[data-dynamic-grid="true"]')
+    const firstCard = grid?.querySelector('[data-recipe-card]')
+    return {
+      cardWidth: Math.round(firstCard?.getBoundingClientRect().width ?? 0),
+      columns: Number(wrapper.getAttribute('data-recipe-grid-columns')),
+      dynamicColumns: Number(grid?.getAttribute('data-dynamic-grid-columns')),
+      gridWidth: Math.round(grid?.getBoundingClientRect().width ?? 0),
+    }
+  })
+  expect(recipeGridGeometry).toMatchObject({
+    columns: 7,
+    dynamicColumns: 7,
+    gridWidth: 1408,
+  })
+  expect(recipeGridGeometry.cardWidth).toBeLessThanOrEqual(220)
+
+  const desktopFloatingDockBox = await page.locator('[data-floating-action-dock="true"]').boundingBox()
+  const desktopSearchButton = page.getByRole('button', { name: 'Search recipes' })
+  const desktopSearchButtonBox = await desktopSearchButton.boundingBox()
+  expect(Math.round(desktopSearchButtonBox?.x ?? 0)).toBe(Math.round(desktopFloatingDockBox?.x ?? 0))
+  expect(Math.round(desktopSearchButtonBox?.width ?? 0)).toBeGreaterThan(1_200)
+  await desktopSearchButton.click()
+  const desktopSearchInput = page.getByRole('searchbox', { name: 'Search recipes' })
+  await expect(desktopSearchInput).toBeFocused()
+  const desktopSearchBarBox = await desktopSearchInput.locator('xpath=..').boundingBox()
+  expect(Math.round(desktopSearchBarBox?.width ?? 0)).toBe(Math.round(desktopFloatingDockBox?.width ?? 0))
 })
 
 async function expectVerticallyCenteredChevrons(chevrons: Locator) {
@@ -436,13 +883,13 @@ test('Food quick link mirrors the All Food summary with the Kitchen Food orange'
   await page.setViewportSize({ width: 393, height: 852 })
   await page.goto('/at-a-glance/overview')
 
-  const foodQuickLink = page.getByRole('button', { name: 'Food 35 Items • 6 Expiring Soon' })
-  await expect(foodQuickLink).toContainText('Food')
+  const foodQuickLink = page.getByRole('button', { name: 'Food & Recipes 35 Items • 6 Expiring Soon' })
+  await expect(foodQuickLink).toContainText('Food & Recipes')
   await expect(foodQuickLink).toContainText('35 Items • 6 Expiring Soon')
   await expect(foodQuickLink).toHaveCSS('background-color', 'rgba(155, 110, 64, 0.72)')
 
   await foodQuickLink.click()
-  await expect(page.getByRole('heading', { exact: true, name: 'Food' })).toBeVisible()
+  await expect(page.getByRole('heading', { exact: true, name: 'Food & Recipes' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'All Food 35 Items • 6 Expiring Soon' })).toBeVisible()
 })
 
@@ -473,7 +920,7 @@ test('mobile modal opener families use shared disclosures and explicit action ex
   await expectNoChevron(page.getByRole('button', { name: /^Lights /i }).first())
   await expectRightChevron(page.getByRole('button', { name: /^Security System /i }))
   await expectNoChevron(page.getByRole('button', { name: 'Open Front Door camera' }))
-  for (const quickLink of ['Food 35 Items • 6 Expiring Soon', 'Vacuums', 'Media', 'Custom Lights']) {
+  for (const quickLink of ['Food & Recipes 35 Items • 6 Expiring Soon', 'Vacuums', 'Media', 'Custom Lights']) {
     const opener = page.getByRole('button', { exact: true, name: quickLink })
     await expectRightChevron(opener)
     await expect(opener).toHaveAttribute('data-navigation-opener', 'true')
@@ -488,7 +935,11 @@ test('mobile modal opener families use shared disclosures and explicit action ex
   await expectRightChevron(page.getByRole('button', { name: 'Open Presence-Based Overrides' }))
 
   await page.goto('/at-a-glance/ecobee')
-  await expectRightChevron(page.getByRole('button', { name: 'Living Room 70.2°F · Inactive' }))
+  await expectRightChevron(page.getByRole('button', { exact: true, name: 'Room Thermostats' }))
+  await expectRightChevron(page.getByRole('button', { exact: true, name: 'Advanced Configuration' }))
+  await expectRightChevron(page.getByRole('button', { exact: true, name: 'Room Tracking' }))
+  const thermostatDialog = await openThermostatControls(page)
+  await expectRightChevron(thermostatDialog.getByRole('button', { name: 'Living Room 70.2°F · Inactive' }))
 
   await page.goto('/at-a-glance/pantry')
   await expectRightChevron(page.getByRole('button', { name: 'Edit Canned Beans' }))
@@ -857,7 +1308,8 @@ test('thermostat room grid uses one equivalent column when any room label overfl
   await page.setViewportSize({ width: 393, height: 852 })
   await page.goto('/at-a-glance/ecobee')
 
-  const grid = page.getByRole('group', { name: 'Thermostat rooms' })
+  const dialog = await openThermostatControls(page)
+  const grid = dialog.getByRole('group', { name: 'Thermostat rooms' })
   const cells = grid.locator('[data-dynamic-grid-cell="true"]')
   await expect(grid).toHaveAttribute('data-dynamic-grid-columns', '1')
   await expect(cells).toHaveCount(11)
@@ -875,11 +1327,97 @@ test('thermostat room grid uses one equivalent column when any room label overfl
   expect(layout.every(({ span }) => span === '1')).toBe(true)
 })
 
+test('thermostat page keeps primary controls and three explained modal entry points compact', async ({ page }) => {
+  await page.setViewportSize({ width: 393, height: 852 })
+  await page.goto('/at-a-glance/ecobee')
+
+  const scroller = page.locator('main > div').nth(1)
+  const dimensions = await scroller.evaluate((element) => ({
+    clientHeight: element.clientHeight,
+    scrollHeight: element.scrollHeight,
+  }))
+  expect(dimensions.scrollHeight / dimensions.clientHeight).toBeLessThanOrEqual(2)
+  await expect(page.getByRole('region', { name: /Whole Home thermostat/i })).toBeVisible()
+  await expect(page.getByText(/View each room's temperature and occupancy/i)).toBeVisible()
+  await expect(page.getByText('Manage Automatic Thermostat, Eco Mode, and Predictive Comfort settings.')).toBeVisible()
+  await expect(page.getByText(/Choose which rooms participate in normal comfort/i)).toBeVisible()
+  for (const label of ['Room Thermostats', 'Advanced Configuration', 'Room Tracking']) {
+    const tile = page.getByRole('button', { exact: true, name: label })
+    await expect(tile).toBeVisible()
+    await expect(tile).toHaveAttribute('data-tone', 'switch')
+    await expect(tile).toHaveAttribute('data-modal-opener', 'true')
+    await expect(tile.locator('[data-dynamic-grid-label]')).toHaveCount(1)
+  }
+  await expect(page.getByRole('group', { name: 'Thermostat rooms' })).toHaveCount(0)
+})
+
+test('thermostat page entry points deep link to their matching modal tabs', async ({ page }) => {
+  const cases = [
+    { hash: '#thermostat-rooms', tab: 'Rooms' as const },
+    { hash: '#thermostat-automation', tab: 'Automation' as const },
+    { hash: '#thermostat-tracking', tab: 'Tracking' as const },
+  ]
+
+  for (const entry of cases) {
+    await page.goto('/at-a-glance/ecobee')
+    const dialog = await openThermostatControls(page, entry.tab)
+    await expect(page).toHaveURL(new RegExp(`${entry.hash}$`))
+    await expect(dialog.getByRole('tab', { name: entry.tab })).toHaveAttribute('aria-selected', 'true')
+    await dialog.getByRole('button', { name: 'Close' }).click()
+    await expect(dialog).toHaveCount(0)
+  }
+
+  for (const entry of cases) {
+    await page.goto(`/at-a-glance/ecobee${entry.hash}`)
+    const dialog = page.getByRole('dialog', { name: 'Thermostat' })
+    await expect(dialog).toBeVisible()
+    await expect(dialog.getByRole('tab', { name: entry.tab })).toHaveAttribute('aria-selected', 'true')
+  }
+
+  await page.goto('/at-a-glance/ecobee')
+  const dialog = await openThermostatControls(page, 'Automation')
+  await dialog.getByRole('tab', { name: 'Tracking' }).click()
+  await expect(page).toHaveURL(/#thermostat-tracking$/)
+  await page.goBack()
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+  await expect(page).toHaveURL(/\/at-a-glance\/ecobee$/)
+  await page.goForward()
+  await expect(page.getByRole('dialog', { name: 'Thermostat' })).toBeVisible()
+  await expect(page.getByRole('tab', { name: 'Tracking' })).toHaveAttribute('aria-selected', 'true')
+})
+
+test('thermostat modal uses root tabs and same-sheet detail pages', async ({ page }) => {
+  await page.setViewportSize({ width: 393, height: 852 })
+  await page.goto('/at-a-glance/ecobee')
+
+  const dialog = await openThermostatControls(page)
+  await expect(dialog.getByRole('tab', { name: 'Rooms' })).toHaveAttribute('aria-selected', 'true')
+  await dialog.getByRole('button', { name: 'Living Room 70.2°F · Inactive' }).click()
+  await expect(dialog).toHaveAccessibleName('Living Room')
+  await dialog.getByRole('button', { name: 'Back to rooms' }).click()
+
+  await dialog.getByRole('tab', { name: 'Automation' }).click()
+  await dialog.getByRole('button', { name: /Eco Mode Critical Tracking Track Select Critical/i }).click()
+  await expect(page.getByRole('dialog')).toHaveCount(1)
+  await expect(dialog).toHaveAccessibleName('Eco Mode Critical Tracking')
+  await expect(dialog.getByRole('group', { name: 'Eco Mode Critical Tracking options' })).toHaveAttribute('data-dynamic-grid', 'true')
+  await dialog.getByRole('button', { name: 'Back to automation' }).click()
+  await expect(dialog.getByRole('button', { name: /Eco Mode Critical Tracking Track Select Critical/i })).toBeFocused()
+
+  await dialog.getByRole('tab', { name: 'Tracking' }).click()
+  await dialog.getByRole('button', { name: /Occupied Only 2 of 11 occupied only/i }).click()
+  await expect(dialog).toHaveAccessibleName('Occupied Only')
+  await expect(dialog.getByRole('button', { name: 'Guest Bathroom' })).toHaveAttribute('aria-pressed', 'true')
+  await dialog.getByRole('button', { name: 'Back to tracking' }).click()
+  await expect(dialog.getByRole('tab', { name: 'Tracking' })).toHaveAttribute('aria-selected', 'true')
+})
+
 test('thermostat page accepts the first mobile scroll gesture after closing a room modal', async ({ page }) => {
   await page.goto('/at-a-glance/ecobee')
 
-  await page.getByRole('button', { name: 'Living Room 70.2°F · Inactive' }).click()
-  const dialog = page.getByRole('dialog', { name: 'Living Room' })
+  const dialog = await openThermostatControls(page)
+  await dialog.getByRole('button', { name: 'Living Room 70.2°F · Inactive' }).click()
+  await expect(dialog).toHaveAccessibleName('Living Room')
   await expect(dialog).toBeVisible()
   await dialog.getByRole('button', { name: 'Close' }).click()
   await expect(dialog).toHaveAttribute('data-state', 'closed')
@@ -1338,7 +1876,7 @@ test.describe('desktop modal layout', () => {
     expect(Math.round(box?.height ?? 0)).toBeLessThan(720)
   })
 
-  test('thermostat room modal uses 600px desktop split layout', async ({ page }) => {
+  test('thermostat room modal uses the unified 720px desktop split layout', async ({ page }) => {
     await page.goto('/at-a-glance/ecobee#living-room')
 
     const dialog = page.getByRole('dialog', { name: 'Living Room' })
@@ -1349,13 +1887,13 @@ test.describe('desktop modal layout', () => {
     await expect(vents).toBeVisible()
     const ventGrid = vents.locator(':scope > div').nth(1)
 
-    await expect.poll(async () => Math.round((await dialog.boundingBox())?.width ?? 0)).toBeGreaterThanOrEqual(595)
+    await expect.poll(async () => Math.round((await dialog.boundingBox())?.width ?? 0)).toBeGreaterThanOrEqual(715)
     const dialogBox = await dialog.boundingBox()
     const heroBox = await thermostatHero.boundingBox()
     const ventsBox = await vents.boundingBox()
     if (!dialogBox || !heroBox || !ventsBox) throw new Error('Thermostat modal layout was not measurable')
 
-    expect(Math.round(dialogBox.width)).toBeLessThanOrEqual(600)
+    expect(Math.round(dialogBox.width)).toBeLessThanOrEqual(720)
     expect(heroBox.x).toBeLessThan(ventsBox.x)
     expect(Math.abs(heroBox.y - ventsBox.y)).toBeLessThanOrEqual(24)
     expect(heroBox.y + heroBox.height).toBeGreaterThan(ventsBox.y)
@@ -1395,18 +1933,19 @@ test.describe('desktop modal layout', () => {
 
   test('eco mode pickers use security-style desktop layout without separators', async ({ page }) => {
     await page.goto('/at-a-glance/ecobee')
+    const dialog = await openThermostatControls(page)
+    await dialog.getByRole('tab', { name: 'Automation' }).click()
 
     const assertCardPicker = async (triggerName: RegExp, dialogName: string) => {
-      await page.getByLabel(triggerName).click()
-      const dialog = page.getByRole('dialog', { name: dialogName })
-      await expect(dialog).toBeVisible()
+      await dialog.getByLabel(triggerName).click()
+      await expect(dialog).toHaveAccessibleName(dialogName)
       const options = dialog.getByRole('group', { name: `${dialogName} options` })
-      await expect(options).toHaveAttribute('data-layout', 'card-grid')
+      await expect(options).toHaveAttribute('data-dynamic-grid', 'true')
       await expect(dialog.locator('span[aria-hidden="true"][class*="separator"]')).toHaveCount(0)
 
-      await expect.poll(async () => Math.round((await dialog.boundingBox())?.width ?? 0)).toBeGreaterThanOrEqual(495)
+      await expect.poll(async () => Math.round((await dialog.boundingBox())?.width ?? 0)).toBeGreaterThanOrEqual(715)
       const dialogBox = await dialog.boundingBox()
-      expect(Math.round(dialogBox?.width ?? 0)).toBeLessThanOrEqual(500)
+      expect(Math.round(dialogBox?.width ?? 0)).toBeLessThanOrEqual(720)
       await expect.poll(async () => options.evaluate((optionsElement) => {
         const firstOption = optionsElement.firstElementChild?.getBoundingClientRect()
         const style = window.getComputedStyle(optionsElement)
@@ -1414,9 +1953,9 @@ test.describe('desktop modal layout', () => {
           columns: style.gridTemplateColumns.split(' ').filter(Boolean).length,
           optionHeight: Math.round(firstOption?.height ?? 0),
         }
-      })).toEqual({ columns: 1, optionHeight: 120 })
-      await dialog.getByRole('button', { name: 'Close' }).click()
-      await expect(dialog).toBeHidden()
+      })).toEqual({ columns: 2, optionHeight: 112 })
+      await dialog.getByRole('button', { name: 'Back to automation' }).click()
+      await expect(dialog).toHaveAccessibleName('Thermostat')
     }
 
     await assertCardPicker(/Eco Mode Critical Tracking Track Select Critical/i, 'Eco Mode Critical Tracking')
@@ -1983,18 +2522,24 @@ test('theater remote leads a full-width row above its source control grid', asyn
   const remoteCell = opener.locator('[data-dynamic-grid-cell="true"]').first()
   const switchCell = controls.locator('[data-dynamic-grid-cell="true"]').first()
   const shieldCell = controls.locator('[data-dynamic-grid-cell="true"]').last()
+  await expect(remoteCell).toHaveAttribute('data-dynamic-grid-span', '2')
+  await expect(switchCell).toHaveAttribute('data-dynamic-grid-span', '1')
+  await expect(shieldCell).toHaveAttribute('data-dynamic-grid-span', '1')
 
+  // The dynamic grid remeasures asynchronously after the viewport change, so poll the geometry.
   await expect.poll(async () => {
     const remoteBox = await remoteCell.boundingBox()
     const switchBox = await switchCell.boundingBox()
     const shieldBox = await shieldCell.boundingBox()
     if (!remoteBox || !switchBox || !shieldBox) return null
     return {
+      shieldAfterSwitch: shieldBox.x > switchBox.x + switchBox.width - 1,
       remoteWiderThanSource: remoteBox.width > switchBox.width * 1.8,
       sourcesBelowRemote: switchBox.y >= remoteBox.y + remoteBox.height - 1,
       sourcesShareRow: Math.round(switchBox.y) === Math.round(shieldBox.y),
     }
   }).toEqual({
+    shieldAfterSwitch: true,
     remoteWiderThanSource: true,
     sourcesBelowRemote: true,
     sourcesShareRow: true,
@@ -3027,7 +3572,8 @@ test('thermostat Vacation end transitions to Away or Home with correct dial rang
       && (hubElement.compareDocumentPosition(awayElement) & Node.DOCUMENT_POSITION_FOLLOWING),
     )
   })).toBe(true)
-  await page.getByRole('button', { name: 'Living Room 70.2°F · Inactive' }).click()
+  const vacationControls = await openThermostatControls(page)
+  await vacationControls.getByRole('button', { name: 'Living Room 70.2°F · Inactive' }).click()
   const dialog = page.getByRole('dialog', { name: 'Living Room' })
   const roomDial = dialog.getByRole('region', { name: /Living Room thermostat Idle 70.2°F 72.0 · 74.0/ })
   await expectRangeValues(roomDial, 72, 74)
@@ -3047,7 +3593,8 @@ test('thermostat Vacation end transitions to Away or Home with correct dial rang
   await expectRangeValues(awayHero, 62, 78)
   await expect(page.getByRole('region', { name: 'Whole Home Away Mode' })).toBeVisible()
 
-  await page.getByRole('button', { name: 'Living Room 70.2°F · Inactive' }).click()
+  const awayControls = await openThermostatControls(page)
+  await awayControls.getByRole('button', { name: 'Living Room 70.2°F · Inactive' }).click()
   const awayDialog = page.getByRole('dialog', { name: 'Living Room' })
   const awayRoomDial = awayDialog.getByRole('region', { name: /Living Room thermostat Idle 70.2°F 72.0 · 74.0/ })
   await expectRangeValues(awayRoomDial, 72, 74)
@@ -3066,7 +3613,8 @@ test('thermostat Vacation end transitions to Away or Home with correct dial rang
     mock.setEntityState('sensor.thermostat_home_away_reason', 'A resident is home, so TCS is using home behavior.')
     mock.setEntityAttribute('climate.thermostat_contact_sensors_living_room_virtual_thermostat', 'away_mode_active', false)
   })
-  await page.getByRole('button', { name: 'Living Room 70.2°F · Inactive' }).click()
+  const homeControls = await openThermostatControls(page)
+  await homeControls.getByRole('button', { name: 'Living Room 70.2°F · Inactive' }).click()
   const homeDialog = page.getByRole('dialog', { name: 'Living Room' })
   const homeRoomDial = homeDialog.getByRole('region', { name: /Living Room thermostat Idle 70.2°F 72.0 · 74.0/ })
   await expectRangeValues(homeRoomDial, 72, 74)

@@ -17,3 +17,10 @@
   gap: 10px;
   padding: 28px 6px 6px;
 }
+
+@media (max-width: 520px) {
+  .cameraControls {
+    grid-template-columns: minmax(0, 1fr);
+    padding-top: 16px;
+  }
+}

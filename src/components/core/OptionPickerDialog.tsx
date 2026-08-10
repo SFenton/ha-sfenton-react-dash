@@ -11,6 +11,17 @@ export interface PickerOption {
   activeBackground?: string
 }
 
+interface OptionPickerPanelProps {
+  autoFocus?: boolean
+  icon?: string
+  layout?: 'card-grid' | 'compact-grid' | 'list'
+  onSelect: (value: string) => void
+  options: PickerOption[]
+  selectedIcon?: string
+  title: string
+  value: string
+}
+
 interface OptionPickerDialogProps {
   open: boolean
   options: PickerOption[]
@@ -25,31 +36,37 @@ interface OptionPickerDialogProps {
   onSelect: (value: string) => void
 }
 
-export function OptionPickerDialog({ open, options, title, value, icon, selectedIcon, presentation = 'dialog', sheetLayout = 'card-grid', sheetStyle, onClose, onSelect }: OptionPickerDialogProps) {
-  const titleId = useId()
+export function OptionPickerPanel({
+  autoFocus = true,
+  icon,
+  layout = 'list',
+  onSelect,
+  options,
+  selectedIcon,
+  title,
+  value,
+}: OptionPickerPanelProps) {
   const firstActiveRef = useRef<HTMLButtonElement | null>(null)
-  const isSheet = presentation === 'sheet'
-  const optionLayout = isSheet ? sheetLayout : 'list'
+  const isSheet = layout !== 'list'
 
   useEffect(() => {
-    if (!open) return undefined
+    if (!autoFocus) return undefined
 
     const timeout = window.setTimeout(() => firstActiveRef.current?.focus(), 0)
     return () => window.clearTimeout(timeout)
-  }, [open])
+  }, [autoFocus])
 
-  if (!open && !isSheet) return null
-
-  const optionList = (
-    <div aria-label={`${title} options`} className={`${styles.options} ${isSheet ? styles.sheetOptions : ''} ${isSheet && sheetLayout === 'compact-grid' ? styles.compactSheetOptions : ''}`} data-layout={optionLayout} role="group">
+  return (
+    <div aria-label={`${title} options`} className={`${styles.options} ${isSheet ? styles.sheetOptions : ''} ${layout === 'compact-grid' ? styles.compactSheetOptions : ''}`} data-layout={layout} role="group">
       {options.map((option) => {
         const active = option.value === value
         const sheetIcon = option.icon ?? (active ? (selectedIcon ?? icon) : icon)
         return (
           <button
             aria-pressed={active}
-            className={isSheet ? `${glassTileStyles.tile} ${styles.sheetOption} ${sheetLayout === 'compact-grid' ? styles.compactSheetOption : ''}` : styles.option}
+            className={isSheet ? `${glassTileStyles.tile} ${styles.sheetOption} ${layout === 'compact-grid' ? styles.compactSheetOption : ''}` : styles.option}
             data-active={active}
+            data-modal-detail-autofocus={active ? 'true' : undefined}
             key={option.value}
             onClick={() => onSelect(option.value)}
             ref={active ? firstActiveRef : undefined}
@@ -72,11 +89,30 @@ export function OptionPickerDialog({ open, options, title, value, icon, selected
       })}
     </div>
   )
+}
+
+export function OptionPickerDialog({ open, options, title, value, icon, selectedIcon, presentation = 'dialog', sheetLayout = 'card-grid', sheetStyle, onClose, onSelect }: OptionPickerDialogProps) {
+  const titleId = useId()
+  const isSheet = presentation === 'sheet'
+  const optionPanel = (
+    <OptionPickerPanel
+      autoFocus={open}
+      icon={icon}
+      layout={isSheet ? sheetLayout : 'list'}
+      onSelect={onSelect}
+      options={options}
+      selectedIcon={selectedIcon}
+      title={title}
+      value={value}
+    />
+  )
+
+  if (!open && !isSheet) return null
 
   if (isSheet) {
     return (
       <ModalSheet contentStyle={sheetStyle} onClose={onClose} open={open} title={title}>
-        {optionList}
+        {optionPanel}
       </ModalSheet>
     )
   }
@@ -103,7 +139,7 @@ export function OptionPickerDialog({ open, options, title, value, icon, selected
             <MaterialIcon name="mdi:close" size={19} />
           </button>
         </header>
-        {optionList}
+        {optionPanel}
       </section>
     </div>
   )

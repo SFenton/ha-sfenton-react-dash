@@ -16,4 +16,5 @@ applyTo: ".github/skills/autonomous-hass-admin-executor/SKILL.md,scripts/autonom
 - After each Copilot phase, require the roadmap content to equal exactly one allowed terminal status transition for the selected task.
 - Never print HA tokens or SMTP credentials. Child Copilot processes must not receive SMTP passwords.
 - Do not add automatic commit, push, deployment, or destructive HA behavior.
+- Require an App Manual Impact report section and successful manual app/HA/screenshot gates before an accepted phase can transition.
 - Add focused tests for parser, transition, HA request, sender, or React completion-path changes.

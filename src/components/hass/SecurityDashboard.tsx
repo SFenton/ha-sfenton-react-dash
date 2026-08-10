@@ -165,7 +165,7 @@ export function SecurityDashboard({ closeHash, hash, onOpenHash, preload = false
       <div className={styles.dashboard}>
         <section className={styles.section}>
           <SectionHeader title="Security" />
-          <div className={styles.grid}>
+          <div className={styles.grid} data-security-control-grid="true">
             {SECURITY_CONTROL_TILES.map((item) => <SecurityTile item={item} key={item.entityId} onOpenHash={onOpenHash} />)}
           </div>
         </section>

@@ -1,23 +1,18 @@
 import { render, screen } from '@testing-library/react'
 import { act } from 'react'
 import { CameraTile } from './CameraTile'
-import type { WebRtcStatus } from './WebRtcCamera'
-import { readStatusFromMode } from './WebRtcCamera'
+import { readStatusFromMode, type WebRtcStatus } from './webRtcStatus'
 import { CAMERA_ITEMS } from '../../constants/atAGlance'
 import { mockEntities, resetMockHass } from '../../test/mocks/hakitCoreState'
 
 const statusCallbacks: ((status: WebRtcStatus) => void)[] = []
 
-vi.mock('./WebRtcCamera', async () => {
-  const actual = await vi.importActual<typeof import('./WebRtcCamera')>('./WebRtcCamera')
-  return {
-    ...actual,
-    WebRtcCamera: ({ onStatusChange }: { onStatusChange?: (status: WebRtcStatus) => void }) => {
-      if (onStatusChange && !statusCallbacks.includes(onStatusChange)) statusCallbacks.push(onStatusChange)
-      return <div data-testid="webrtc-camera" />
-    },
-  }
-})
+vi.mock('./WebRtcCamera', () => ({
+  WebRtcCamera: ({ onStatusChange }: { onStatusChange?: (status: WebRtcStatus) => void }) => {
+    if (onStatusChange && !statusCallbacks.includes(onStatusChange)) statusCallbacks.push(onStatusChange)
+    return <div data-testid="webrtc-camera" />
+  },
+}))
 
 const driveway = CAMERA_ITEMS.find((camera) => camera.entityId === 'camera.garage_camera')!
 

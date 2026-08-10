@@ -3,14 +3,16 @@ import { MaterialIcon } from './Icon'
 import styles from './ImageCard.module.css'
 
 interface ImageCardProps {
+  ariaLabel?: string
   fallbackImageUrl?: string | null
   imageUrl: string | null
   loading?: 'eager' | 'lazy'
+  onActivate?: () => void
   subtitle?: string
   title: string
 }
 
-export function ImageCard({ fallbackImageUrl, imageUrl, loading = 'lazy', subtitle, title }: ImageCardProps) {
+export function ImageCard({ ariaLabel, fallbackImageUrl, imageUrl, loading = 'lazy', onActivate, subtitle, title }: ImageCardProps) {
   const [failedUrls, setFailedUrls] = useState<ReadonlySet<string>>(() => new Set())
   const resolvedImageUrl = [imageUrl, fallbackImageUrl]
     .find((candidate, index, candidates): candidate is string => (
@@ -20,8 +22,8 @@ export function ImageCard({ fallbackImageUrl, imageUrl, loading = 'lazy', subtit
     )) ?? null
   const showImage = Boolean(resolvedImageUrl)
 
-  return (
-    <article aria-label={title} className={styles.card} data-image-card="true" data-image-state={showImage ? 'loaded' : 'fallback'}>
+  const content = (
+    <>
       <div className={styles.imageBox}>
         {showImage ? (
           <img
@@ -32,6 +34,7 @@ export function ImageCard({ fallbackImageUrl, imageUrl, loading = 'lazy', subtit
               if (!resolvedImageUrl) return
               setFailedUrls((current) => new Set(current).add(resolvedImageUrl))
             }}
+            referrerPolicy="no-referrer"
             src={resolvedImageUrl ?? undefined}
           />
         ) : (
@@ -45,6 +48,28 @@ export function ImageCard({ fallbackImageUrl, imageUrl, loading = 'lazy', subtit
           {subtitle && <small>{subtitle}</small>}
         </span>
       </div>
+    </>
+  )
+
+  if (onActivate) {
+    return (
+      <button
+        aria-label={ariaLabel ?? `Open ${title}`}
+        className={styles.card}
+        data-image-card="true"
+        data-image-state={showImage ? 'loaded' : 'fallback'}
+        data-interactive="true"
+        onClick={onActivate}
+        type="button"
+      >
+        {content}
+      </button>
+    )
+  }
+
+  return (
+    <article aria-label={ariaLabel ?? title} className={styles.card} data-image-card="true" data-image-state={showImage ? 'loaded' : 'fallback'}>
+      {content}
     </article>
   )
 }

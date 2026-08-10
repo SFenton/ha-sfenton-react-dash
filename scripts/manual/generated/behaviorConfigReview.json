@@ -1,0 +1,151 @@
+{
+  "reviewedAt": "2026-08-08",
+  "readOnly": true,
+  "items": [
+    {
+      "id": "automation.presence_all_home_members_away",
+      "result": "resolved",
+      "finding": "Confirmed delayed all-away trigger, guest fail-closed stop, alarm/access/load actions, presence-lighting resume, and linked completion notification."
+    },
+    {
+      "id": "automation.presence_any_home_members_home",
+      "result": "resolved",
+      "finding": "Confirmed delayed return-home trigger, home alarm mode, and towel-rack restoration."
+    },
+    {
+      "id": "automation.is_master_bedroom_presence_lighting_enabled",
+      "result": "not-resolved-by-config-api",
+      "finding": "State inventory entry exists, but the automation config endpoint did not resolve it; guide claims remain limited to visible eligibility and reset behavior."
+    },
+    {
+      "id": "automation.presence_lighting_status_tracker",
+      "result": "resolved",
+      "finding": "Confirmed room presence integration state is translated into paired enabled/disabled display helpers."
+    },
+    {
+      "id": "automation.mqtt_occupancy_automation",
+      "result": "resolved",
+      "finding": "Confirmed camera review start/end events set and clear a deck occupancy helper only for relevant person evidence."
+    },
+    {
+      "id": "automation.new_automation_2_2",
+      "result": "resolved",
+      "finding": "Confirmed configured contact changes send replacing open/closed notifications linked to the relevant app route."
+    },
+    {
+      "id": "automation.climate_range_calculation",
+      "result": "resolved",
+      "finding": "Confirmed available temperature sources produce whole-home, room, and sensor range/color display helpers."
+    },
+    {
+      "id": "automation.disable_guest_room_temperature_regulation_during_sleep",
+      "result": "resolved",
+      "finding": "Confirmed guest sleep/presence state changes direct room tracking while global guest critical protection remains separately synchronized."
+    },
+    {
+      "id": "automation.main_floor_vacuum_mode",
+      "result": "resolved",
+      "finding": "Confirmed robot mode values are translated into stable household display text after changes and startup."
+    },
+    {
+      "id": "automation.front_entry_journey_classifier_shadow",
+      "result": "resolved",
+      "finding": "Confirmed a staged front-entry coordinator correlates recent evidence and keeps detailed evidence out of short household notification copy."
+    },
+    {
+      "id": "script.front_entry_shadow_summary_unused",
+      "result": "resolved",
+      "finding": "Confirmed the script is intentionally inert and immediately stops, supporting explicit internal classification."
+    },
+    {
+      "id": "script.increment_room_access",
+      "result": "resolved",
+      "finding": "Confirmed one validated room key increments one durable ranking counter and unsupported values stop without device changes."
+    },
+    {
+      "id": "automation.daily_summary_recall_report_when_nothing_left",
+      "result": "resolved",
+      "finding": "Confirmed debounced notification recall after live overdue, today, and locally expired counts all clear."
+    },
+    {
+      "id": "automation.daily_summary_morning_and_evening_reports",
+      "result": "resolved",
+      "finding": "Confirmed twice-daily per-person summaries, Vacation suppression, local-date expiry, live-tab deep links, and replacing notification tags."
+    },
+    {
+      "id": "automation.aqara_arm_notification",
+      "result": "resolved",
+      "finding": "Confirmed manual alarm mode changes notify while the presence-owned Away transition avoids a duplicate status push."
+    },
+    {
+      "id": "automation.auto_lock_front_door_after_30_seconds",
+      "result": "resolved",
+      "finding": "Confirmed stable-close waiting, reopen restart behavior, guest blocking, in-progress state, lock command, and completion notification."
+    },
+    {
+      "id": "automation.perimeter_camera_notification_coordinator",
+      "result": "resolved",
+      "finding": "Confirmed recent deck evidence and recognized people are correlated into logbook summaries while camera blueprints retain media-push ownership."
+    },
+    {
+      "id": "automation.front_yard_visibility_override_activate",
+      "result": "resolved",
+      "finding": "Confirmed evening or overnight door and camera demand snapshots the current look and forces bright cool-white walkway visibility."
+    },
+    {
+      "id": "automation.attempt_to_turn_power_back_on_in_living_room",
+      "result": "resolved",
+      "finding": "Confirmed the manual recovery stages coupling, relay unlock, power-on, relock, and return to decoupled operation."
+    },
+    {
+      "id": "automation.weekly_browser_mod_cleanup",
+      "result": "resolved",
+      "finding": "Confirmed a nightly cleanup deregisters only stale unavailable browser sessions."
+    },
+    {
+      "id": "automation.food_inventory_debounce_critical_cleanup",
+      "result": "resolved",
+      "finding": "Confirmed inventory mutation events collapse into one delayed refresh and clear-only critical cleanup without new per-item pushes."
+    },
+    {
+      "id": "automation.guests_staying_in_guest_room_toggled",
+      "result": "resolved",
+      "finding": "Confirmed the room toggle changes bathroom lighting, relay behavior, thermostat tracking, presence display state, vacuum exclusion, and shared vacuum guard sync."
+    },
+    {
+      "id": "automation.vacation_mode_auto_disable",
+      "result": "resolved",
+      "finding": "Confirmed automatic end, invalid-range fail-off, recoverable intent, startup reconciliation, and no reactivation after an expired corrected end."
+    },
+    {
+      "id": "automation.get_ready_for_bed",
+      "result": "resolved",
+      "finding": "Confirmed a one-shot bedtime preparation scene changes selected lights and clears its request helper."
+    },
+    {
+      "id": "automation.free_sleep_steph_bed_alarms_to_mqtt",
+      "result": "resolved",
+      "finding": "Confirmed user-visible wake days are translated to prior sleep-session schedule days and published to one bed side."
+    },
+    {
+      "id": "automation.change_avr_input_when_dropdown_changed",
+      "result": "resolved",
+      "finding": "Confirmed friendly receiver source choices map to equipment inputs only while the Theater media source is on."
+    },
+    {
+      "id": "automation.control_theater_room_pc",
+      "result": "resolved",
+      "finding": "Confirmed state-dependent wake and shutdown branches, confirmation waits, timeout labels, and helper reconciliation."
+    },
+    {
+      "id": "automation.update_mach_e_charge",
+      "result": "resolved",
+      "finding": "Confirmed a backend battery-range update refreshes only the formatted household charge label."
+    },
+    {
+      "id": "automation.valetudo_dock_component_task_auto_clear",
+      "result": "resolved",
+      "finding": "Confirmed recovered dock components or stable docking clear matching room-scoped maintenance tasks and resolved transient dock errors."
+    }
+  ]
+}

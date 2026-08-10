@@ -9,6 +9,7 @@ import { ModalSheet } from '../core/ModalSheet'
 import { NativeSelectField } from '../core/NativeSelectField'
 import { StatusPill } from '../core/StatusPill'
 import { type VacuumAutoCleanDisabledRoomConfig, type VacuumConfig, type VacuumConsumableConfig, type VacuumZoneConfig } from '../../constants/portedDashboard'
+import { VACUUM_MODAL_TABS, type VacuumModalTab } from '../../constants/surfaceSemantics'
 import { DASHBOARD_ROUTE_CHANGE_EVENT, dashboardEventTargets, dashboardHash, dashboardPathWithSearch, replaceDashboardUrl } from '../../hooks/dashboardLocation'
 import { useModalDetailPageScroll } from '../../hooks/useModalDetailPageScroll'
 import { useImmediateVisualTab, useSmoothDisplayedModalTab } from '../../hooks/useSmoothDisplayedModalTab'
@@ -20,15 +21,7 @@ import { VACUUM_AREA_EDITOR_MODAL_STYLE, VACUUM_MODAL_STYLE } from './vacuumModa
 import { isUnavailableVacuumState, vacuumConsumableVisual, vacuumStateVisual, type VacuumVisualTone } from './vacuumVisualState'
 import styles from './VacuumCard.module.css'
 
-type VacuumModalTab = 'controls' | 'zones' | 'autoClean' | 'more' | 'info'
 type VacuumCleanTarget = 'rooms' | 'area'
-const VACUUM_MODAL_TABS: { icon: string; label: string; tab: VacuumModalTab }[] = [
-  { icon: 'mdi:robot-vacuum', label: 'Controls', tab: 'controls' },
-  { icon: 'mdi:floor-plan', label: 'Zones', tab: 'zones' },
-  { icon: 'mdi:robot-vacuum-off', label: 'Auto-Clean', tab: 'autoClean' },
-  { icon: 'mdi:flash', label: 'Actions', tab: 'more' },
-  { icon: 'mdi:information-outline', label: 'Info', tab: 'info' },
-]
 const CLEANING_SETUP_DESCRIPTION = 'Choose how many passes the vacuum should make, then start cleaning with the selected rooms.'
 const AUTO_CLEAN_DISABLED_DESCRIPTION = 'Check rooms that should be skipped when the coordinator starts an automatic away clean. Use this for closed doors, guests, or projects on the floor; manual selected-room cleans still use the Zones tab.'
 const MODE_DESCRIPTION = 'Choose whether the robot vacuums, mops, or combines both for the next run.'

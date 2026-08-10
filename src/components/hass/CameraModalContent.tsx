@@ -74,7 +74,7 @@ export function CameraModalContent({ camera, live = true }: { camera: CameraConf
       <div className={styles.cameraFocus}>
         {live ? <WebRtcCamera camera={camera} controls minHeight={310} variant="modal" /> : <div style={{ minHeight: 310 }} />}
       </div>
-      <div className={styles.cameraControls} aria-label={`${camera.title} camera controls`}>
+      <div className={styles.cameraControls} aria-label={`${camera.title} camera controls`} data-security-camera-controls="true">
         <ActionPill active={snapshotPulse} label="Snapshot" onClick={takeSnapshot} pulse={snapshotPulse}>
           <MaterialIcon name="mdi:camera" size={24} />
         </ActionPill>

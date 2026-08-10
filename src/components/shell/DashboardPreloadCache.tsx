@@ -33,6 +33,10 @@ const SECURITY_PRELOAD_HASHES = [
 const ADMIN_PRELOAD_HASHES = ['#presence-based-overrides', '#presence-based-overrides-auto']
 const MEDIA_PRELOAD_HASHES = ['#living-room-shield', '#theater-room-shield']
 const THERMOSTAT_PRELOAD_HASHES = [
+  '#thermostat-controls',
+  '#thermostat-rooms',
+  '#thermostat-automation',
+  '#thermostat-tracking',
   '#predictive-comfort',
   ...THERMOSTAT_ROOMS.map((room) => `#${room.title.toLowerCase().replaceAll(' ', '-')}`),
 ]

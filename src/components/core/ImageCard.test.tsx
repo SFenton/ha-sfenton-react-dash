@@ -1,7 +1,27 @@
 import { fireEvent, render, screen } from '@testing-library/react'
+import { vi } from 'vitest'
 import { ImageCard } from './ImageCard'
 
 describe('ImageCard', () => {
+  it('keeps interactive recipe cards keyboard-focusable and activates through the button control', () => {
+    const onActivate = vi.fn()
+    render(
+      <ImageCard
+        imageUrl={null}
+        onActivate={onActivate}
+        title="Focus Recipe"
+      />,
+    )
+
+    const card = screen.getByRole('button', { name: 'Open Focus Recipe' })
+    card.focus()
+
+    expect(card).toHaveFocus()
+    expect(card).toHaveAttribute('data-interactive', 'true')
+    fireEvent.click(card)
+    expect(onActivate).toHaveBeenCalledOnce()
+  })
+
   it('falls back from a thumbnail to the original image and then to stable artwork', () => {
     const { container } = render(
       <ImageCard

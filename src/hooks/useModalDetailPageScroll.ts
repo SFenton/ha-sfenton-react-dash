@@ -11,6 +11,7 @@ interface DetailPageSnapshot {
 
 function modalDetailFocusTarget(element: HTMLElement | null | undefined) {
   if (!element) return null
+  if (element.hasAttribute('data-modal-detail-autofocus') && element.hasAttribute('tabindex')) return element
   if (element.matches('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])')) return element
   return element.querySelector<HTMLElement>('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])') ?? element
 }

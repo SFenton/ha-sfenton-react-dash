@@ -1,3 +1,5 @@
+import { generatedMockEntities } from './generated/appEntities'
+
 export interface MockEntity {
   attributes: Record<string, unknown>
   entity_id: string
@@ -30,7 +32,42 @@ export const mockScheduleMessages: Record<string, unknown>[] = []
 export const mockTodoUpdateMessages: Record<string, unknown>[] = []
 export const mockTodoItemsByEntity: Record<string, MockTodoItem[] | undefined> = {}
 export const mockDonetickTasksById: Record<number, MockDonetickTask | undefined> = {}
+const mockInventoryItemsByLocation: Record<string, Record<string, unknown>[] | undefined> = {}
 let mockDonetickTaskLoadDelayMs = 0
+let mockRecipeQueryDelayMs = 0
+
+function configuredRecipeQueryDelayMs() {
+  if (typeof window === 'undefined') return 0
+  const configured = Number(new URLSearchParams(window.location.search).get('__mockRecipeQueryDelayMs') ?? 0)
+  return Number.isFinite(configured) ? Math.max(0, configured) : 0
+}
+
+function configuredRecipeDetailDelayMs() {
+  if (typeof window === 'undefined') return 0
+  const configured = Number(new URLSearchParams(window.location.search).get('__mockRecipeDetailDelayMs') ?? 0)
+  return Number.isFinite(configured) ? Math.max(0, configured) : 0
+}
+
+function configuredRecipeTotal() {
+  if (typeof window === 'undefined') return 150
+  const configured = Number(new URLSearchParams(window.location.search).get('__mockRecipeTotal') ?? 150)
+  return Number.isFinite(configured) ? Math.max(0, Math.floor(configured)) : 150
+}
+
+function configuredRecipeGroceryState() {
+  if (typeof window === 'undefined') return 'default'
+  const configured = new URLSearchParams(window.location.search).get('__mockRecipeGroceryState')
+  return configured === 'none' || configured === 'uncertain-only' || configured === 'unsupported'
+    ? configured
+    : 'default'
+}
+
+function configuredRecipeClosestMatchSource() {
+  if (typeof window === 'undefined') return 'taxonomy_alias'
+  return new URLSearchParams(window.location.search).get('__mockRecipeClosestMatchSource') === 'taxonomy_rule'
+    ? 'taxonomy_rule'
+    : 'taxonomy_alias'
+}
 
 function emptyHumidifierSchedule() {
   return {
@@ -100,6 +137,309 @@ function mockRecipeCard(id: number, title = `Recipe ${id}`) {
     soonest_expiry_days: 4,
     score: 91,
     cookable: true,
+  }
+}
+
+function mockRecipeIngredient(
+  position: number,
+  name: string,
+  state: 'in_stock' | 'missing' | 'staple' | 'uncertain',
+  options: {
+    amountText?: string | null
+    closestMatch?: string | null
+    displayName?: string | null
+    matchedProduct?: string | null
+    optional?: boolean | null
+    quantityState?: 'display_only' | 'known' | 'unknown'
+    relation?: string | null
+    sourceText?: string | null
+  } = {},
+) {
+  const closestMatchSource = configuredRecipeClosestMatchSource()
+  return {
+    key: `ri:${position}:${String(position + 1).padStart(16, '0')}`,
+    position,
+    name,
+    ...(options.displayName ? { display_name: options.displayName } : {}),
+    ...(options.sourceText ? { source_text: options.sourceText } : {}),
+    ...(options.optional === undefined ? {} : { source_optional: options.optional }),
+    ...(options.closestMatch
+      ? {
+          closest_match: {
+            label: options.closestMatch,
+            canonical_ingredient_id: 4_000 + position,
+            taxonomy_node_id: 5_000 + position,
+            mapping_source: closestMatchSource,
+            confidence: closestMatchSource === 'taxonomy_rule' ? 1 : 0.86,
+          },
+        }
+      : {}),
+    amount: {
+      quantity: null,
+      quantity_max: null,
+      unit: null,
+      text: options.amountText ?? null,
+    },
+    inventory: {
+      state,
+      relation: options.relation ?? null,
+      confidence: state === 'uncertain' ? 0.35 : 0.96,
+      matched_product: options.matchedProduct
+        ? { id: 2_000 + position, name: options.matchedProduct }
+        : null,
+      quantity_state: options.quantityState ?? 'unknown',
+      quantity_sufficiency: 'unknown',
+    },
+  }
+}
+
+function mockRecipeDetail(recipeId: number) {
+  const externalOnly = recipeId < 1_000
+  const groceryState = configuredRecipeGroceryState()
+  const missingState = groceryState === 'none' || groceryState === 'uncertain-only' ? 'in_stock' : 'missing'
+  const uncertainState = groceryState === 'none' ? 'in_stock' : 'uncertain'
+  const title = externalOnly
+    ? recipeId === 1
+      ? 'Suggested Citrus Pantry Bowl with Roasted Garden Vegetables'
+      : `Suggested Recipe ${recipeId}`
+    : `Catalog Recipe ${recipeId - 999}`
+  return {
+    success: true,
+    detail: {
+      schema_version: 'recipe_detail_v1',
+      id: recipeId,
+      title,
+      source: {
+        connector: externalOnly ? 'cookidoo' : 'manual',
+        label: externalOnly ? 'Cookidoo' : 'Manual',
+        attribution: externalOnly ? 'Cookidoo' : 'Household recipe',
+        external_id: externalOnly ? `mock-${recipeId}` : null,
+        canonical_url: externalOnly
+          ? `https://cookidoo.example.test/recipes/mock-${recipeId}`
+          : `https://recipes.example.test/catalog/${recipeId}`,
+        locale: 'en-US',
+        rights_basis: externalOnly ? 'provider_metadata_v2' : 'user_authorized',
+      },
+      images: {
+        primary: null,
+        thumbnail: null,
+      },
+      general: {
+        yield: { quantity: externalOnly ? 4 : 2, unit: externalOnly ? 'portions' : 'bowls' },
+        active_time_seconds: 1_500,
+        total_time_seconds: 3_600,
+        difficulty: 'Easy',
+        primary_category: 'Dinner',
+        equipment: ['Large bowl', 'Sheet pan'],
+      },
+      ingredients: [
+        mockRecipeIngredient(0, 'tomato', missingState, {
+          amountText: '1 can',
+          displayName: 'Canned tomatoes',
+          quantityState: externalOnly ? 'display_only' : 'known',
+          sourceText: '1 can diced tomatoes, drained',
+        }),
+        mockRecipeIngredient(1, 'Rice', 'in_stock', {
+          amountText: '2 cups',
+          displayName: 'Long-grain rice',
+          matchedProduct: 'Long grain rice',
+          quantityState: externalOnly ? 'display_only' : 'known',
+          relation: 'exact',
+          sourceText: '2 cups long-grain rice',
+        }),
+        mockRecipeIngredient(2, 'Salt', 'staple', {
+          amountText: 'to taste',
+          quantityState: 'display_only',
+          sourceText: 'Salt',
+        }),
+        mockRecipeIngredient(3, 'Fresh herbs', uncertainState, {
+          amountText: null,
+          closestMatch: uncertainState === 'uncertain' ? 'Italian parsley' : null,
+          matchedProduct: 'Dried herbs',
+          optional: true,
+          quantityState: 'unknown',
+          relation: 'taxonomy_ancestor',
+          sourceText: 'A handful of fresh Italian parsley',
+        }),
+        mockRecipeIngredient(4, 'Olive oil', 'in_stock', {
+          amountText: '1 tablespoon',
+          displayName: 'Extra-virgin olive oil',
+          matchedProduct: 'Extra virgin olive oil',
+          quantityState: externalOnly ? 'display_only' : 'known',
+          relation: 'exact',
+          sourceText: '1 tbsp extra-virgin olive oil',
+        }),
+        mockRecipeIngredient(5, 'onion', missingState, {
+          amountText: '1 small',
+          closestMatch: 'Yellow onion',
+          displayName: 'Yellow Onion',
+          quantityState: externalOnly ? 'display_only' : 'known',
+          sourceText: '1 small yellow onion, diced',
+        }),
+        mockRecipeIngredient(6, 'Lemon', uncertainState, {
+          amountText: '1',
+          closestMatch: uncertainState === 'uncertain' ? 'Fresh lemon' : null,
+          matchedProduct: 'Lemon juice',
+          quantityState: 'unknown',
+          relation: 'taxonomy_ancestor',
+        }),
+        mockRecipeIngredient(7, 'Black pepper', 'staple', {
+          amountText: 'to taste',
+          quantityState: 'display_only',
+        }),
+      ],
+      ingredient_groups: externalOnly
+        ? [
+            {
+              key: 'ingredient-group:one',
+              index: 0,
+              label: null,
+              ingredient_keys: [
+                'ri:0:0000000000000001',
+                'ri:1:0000000000000002',
+                'ri:2:0000000000000003',
+                'ri:3:0000000000000004',
+                'ri:4:0000000000000005',
+              ],
+              positions: [0, 1, 2, 3, 4],
+            },
+            {
+              key: 'ingredient-group:two',
+              index: 1,
+              label: '',
+              ingredient_keys: [
+                'ri:5:0000000000000006',
+                'ri:6:0000000000000007',
+                'ri:7:0000000000000008',
+              ],
+              positions: [5, 6, 7],
+            },
+          ]
+        : [
+            {
+              key: 'ingredient-group:bowl',
+              index: 0,
+              label: 'Bowl Ingredients',
+              ingredient_keys: [
+                'ri:0:0000000000000001',
+                'ri:1:0000000000000002',
+                'ri:2:0000000000000003',
+                'ri:3:0000000000000004',
+                'ri:4:0000000000000005',
+              ],
+            },
+            {
+              key: 'ingredient-group:finish',
+              index: 1,
+              label: 'Finishing Ingredients',
+              ingredient_keys: [
+                'ri:5:0000000000000006',
+                'ri:6:0000000000000007',
+                'ri:7:0000000000000008',
+              ],
+            },
+          ],
+      ingredients_truncated: false,
+      grocery: {
+        confirmed_missing_count: missingState === 'missing' ? 2 : 0,
+        uncertain_count: uncertainState === 'uncertain' ? 2 : 0,
+        blocked_reason: groceryState === 'uncertain-only'
+          ? 'uncertain_only'
+          : groceryState === 'none'
+            ? 'no_missing'
+            : groceryState === 'unsupported'
+              ? 'unsupported'
+              : null,
+      },
+      instructions: externalOnly
+        ? {
+            available: false,
+            reason: 'provider_external_only',
+            steps: ['Prohibited Cookidoo step text'],
+            instruction_groups: [{
+              key: 'instruction-group:prohibited',
+              index: 0,
+              label: 'Prohibited',
+              steps: [{
+                key: 'instruction-step:prohibited',
+                index: 0,
+                number: 1,
+                text: 'Prohibited Cookidoo grouped step text',
+              }],
+            }],
+            fallback_url: `https://cookidoo.example.test/recipes/mock-${recipeId}`,
+            truncated: false,
+          }
+        : {
+            available: true,
+            reason: null,
+            steps: [
+              'Combine the prepared ingredients in a large bowl.',
+              'Cook until the ingredients reach the intended texture.',
+              'Divide into bowls and serve.',
+            ],
+            instruction_groups: [
+              {
+                key: 'instruction-group:prepare',
+                index: 0,
+                label: 'Prepare',
+                steps: [
+                  {
+                    key: 'instruction-step:prepare-one',
+                    index: 0,
+                    number: 1,
+                    text: 'Combine the prepared ingredients in a large bowl.',
+                  },
+                  {
+                    key: 'instruction-step:prepare-two',
+                    index: 1,
+                    number: 2,
+                    text: 'Cook until the ingredients reach the intended texture.',
+                  },
+                ],
+              },
+              {
+                key: 'instruction-group:serve',
+                index: 1,
+                label: 'Serve',
+                steps: [{
+                  key: 'instruction-step:serve-one',
+                  index: 0,
+                  number: 3,
+                  text: 'Divide into bowls and serve.',
+                }],
+              },
+            ],
+            fallback_url: null,
+            truncated: false,
+          },
+      user_state: {
+        favorite: false,
+        hidden: false,
+        rating: null,
+        note: '',
+        cooked_count: 0,
+        last_cooked: null,
+      },
+      freshness: {
+        retrieved_at: '2026-08-07T18:00:00Z',
+        stale_at: '2026-08-14T18:00:00Z',
+        updated_at: '2026-08-07T18:00:00Z',
+        is_stale: false,
+      },
+      revision: {
+        inventory: 12,
+        ranking: 21,
+        catalog: 34,
+      },
+      capabilities: {
+        general: 'full',
+        ingredients: 'checklist',
+        instructions: externalOnly ? 'external_link' : 'local',
+        quantities: externalOnly ? 'display_only' : 'known',
+        grocery_add: groceryState !== 'unsupported',
+      },
+    },
   }
 }
 
@@ -315,10 +655,13 @@ type MockHassDebugApi = {
   calls: Record<string, unknown>[]
   freeSleepSchedules: () => Record<string, unknown>
   reset: () => void
+  setHumidifierSchedule: (schedule: Record<string, unknown>) => void
   setEntityAttribute: (entityId: string, attribute: string, value: unknown) => void
   setEntityState: (entityId: string, state: string) => void
   setDonetickTask: (taskId: number, task: MockDonetickTask) => void
   setDonetickTaskLoadDelay: (delayMs: number) => void
+  setRecipeQueryDelay: (delayMs: number) => void
+  setInventoryItems: (location: string, items: Record<string, unknown>[]) => void
   setTodoItems: (entityId: string, items: MockTodoItem[]) => void
 }
 
@@ -327,9 +670,12 @@ function exposeMockHassDebugApi() {
   ;(window as unknown as { __mockHass?: MockHassDebugApi }).__mockHass = {
     calls: mockCallServiceCalls,
     freeSleepSchedules: () => cloneRecord(mockEntities['sensor.nightcanvasrestful_schedules'].attributes),
+    setHumidifierSchedule: (schedule) => {
+      mockHumidifierSchedule = cloneRecord(schedule) as unknown as typeof mockHumidifierSchedule
+    },
     setEntityAttribute: (entityId, attribute, value) => {
       const target = mockEntities[entityId]
-      if (target) target.attributes[attribute] = value
+      if (target) target.attributes = { ...target.attributes, [attribute]: value }
     },
     reset: resetMockHass,
     setEntityState: (entityId, state) => {
@@ -341,6 +687,12 @@ function exposeMockHassDebugApi() {
     },
     setDonetickTaskLoadDelay: (delayMs) => {
       mockDonetickTaskLoadDelayMs = Math.max(0, delayMs)
+    },
+    setRecipeQueryDelay: (delayMs) => {
+      mockRecipeQueryDelayMs = Math.max(0, delayMs)
+    },
+    setInventoryItems: (location, items) => {
+      mockInventoryItemsByLocation[location] = cloneRecord(items)
     },
     setTodoItems: (entityId, items) => {
       mockTodoItemsByEntity[entityId] = items
@@ -400,7 +752,7 @@ function thermostatMockEntities() {
     ['binary_sensor.thermostat_contact_sensors_away_mode_active', entity('binary_sensor.thermostat_contact_sensors_away_mode_active', 'off')],
     ['sensor.thermostat_effective_home_away', entity('sensor.thermostat_effective_home_away', 'Home')],
     ['sensor.thermostat_home_away_reason', entity('sensor.thermostat_home_away_reason', 'A resident is home, so TCS is using home behavior.')],
-    ['select.thermostat_contact_sensors_eco_mode_critical_tracking', entity('select.thermostat_contact_sensors_eco_mode_critical_tracking', 'Track Select Critical', { options: ['Track Select Critical', 'Track Select Active', 'Ignore Critical'] })],
+    ['select.thermostat_contact_sensors_eco_mode_critical_tracking', entity('select.thermostat_contact_sensors_eco_mode_critical_tracking', 'Track Select Critical', { options: ['Do Not Track Critical', 'Track Select Critical', 'Track All Critical'] })],
     ['select.thermostat_contact_sensors_eco_behavior_when_away', entity('select.thermostat_contact_sensors_eco_behavior_when_away', 'Keep Eco Active', { options: ['Disable Eco When Away', 'Use Eco Away Targets', 'Keep Eco Active'] })],
   ]
 
@@ -473,7 +825,39 @@ function mainFloorAutoCleanDisabledMockEntities() {
   }))
 }
 
-export const mockEntities: Record<string, MockEntity> = {
+// The source inventory also sees typed fallback IDs and service-shaped strings.
+// Keep those inert and explicit instead of deriving fixture values from live HA.
+function nonLiveReferenceMockEntities() {
+  return {
+    'binary_sensor.contact': entity('binary_sensor.contact', 'off'),
+    'binary_sensor.sleepypod_unselected_pump_clog': entity('binary_sensor.sleepypod_unselected_pump_clog', 'off'),
+    'binary_sensor.sleepypod_unselected_pump_stall': entity('binary_sensor.sleepypod_unselected_pump_stall', 'off'),
+    'binary_sensor.unavailable': entity('binary_sensor.unavailable', 'off'),
+    'button.press': entity('button.press', 'idle'),
+    'climate.overview': entity('climate.overview', 'off', { current_temperature: 70, hvac_action: 'idle', hvac_modes: ['off', 'heat', 'cool'], temperature: 70, temperature_unit: '°F' }),
+    'climate.sleepypod_unselected_side': entity('climate.sleepypod_unselected_side', 'off', { current_temperature: 70, hvac_action: 'idle', hvac_modes: ['off', 'heat'], temperature: 70, temperature_unit: '°F' }),
+    'input_boolean.free_sleep_unselected_hot_flash_active': entity('input_boolean.free_sleep_unselected_hot_flash_active', 'off'),
+    'input_boolean.unknown': entity('input_boolean.unknown', 'off'),
+    'input_text.unavailable': entity('input_text.unavailable', ''),
+    'light.unavailable': entity('light.unavailable', 'off'),
+    'number.free_sleep_unselected_target_temperature': entity('number.free_sleep_unselected_target_temperature', '0', { max: 10, min: -10, step: 1 }),
+    'number.sleepypod_unselected_target_level': entity('number.sleepypod_unselected_target_level', '0', { max: 10, min: -10, step: 1 }),
+    'sensor.free_sleep_unselected_current_temperature': entity('sensor.free_sleep_unselected_current_temperature', '70', { device_class: 'temperature', unit_of_measurement: '°F' }),
+    'sensor.sleepypod_unselected_metric': entity('sensor.sleepypod_unselected_metric', 'idle'),
+    'sensor.sleepypod_unselected_schedule_phase': entity('sensor.sleepypod_unselected_schedule_phase', 'idle'),
+    'sensor.unavailable': entity('sensor.unavailable', 'idle'),
+    'switch.free_sleep_unselected_power': entity('switch.free_sleep_unselected_power', 'off'),
+    'switch.office_pc': entity('switch.office_pc', 'off'),
+    'vacuum.locate': entity('vacuum.locate', 'docked'),
+    'vacuum.pause': entity('vacuum.pause', 'docked'),
+    'vacuum.return_to_base': entity('vacuum.return_to_base', 'docked'),
+    'vacuum.start': entity('vacuum.start', 'docked'),
+    'vacuum.stop': entity('vacuum.stop', 'docked'),
+  }
+}
+
+export const explicitMockEntities: Record<string, MockEntity> = {
+  ...nonLiveReferenceMockEntities(),
   'alarm_control_panel.aqara_hub_m3_0056_security_system_2': entity('alarm_control_panel.aqara_hub_m3_0056_security_system_2', 'armed_home'),
   'binary_sensor.all_contact_sensors': entity('binary_sensor.all_contact_sensors', 'off'),
   'binary_sensor.contact_sensors': entity('binary_sensor.contact_sensors', 'off'),
@@ -869,6 +1253,15 @@ export const mockEntities: Record<string, MockEntity> = {
   'weather.pirate_weather': entity('weather.pirate_weather', 'partlycloudy', { temperature: 45, temperature_unit: '°F' }),
 }
 
+export function mergeMockEntityMaps(
+  generated: Record<string, MockEntity>,
+  explicit: Record<string, MockEntity>,
+) {
+  return { ...generated, ...explicit }
+}
+
+export const mockEntities: Record<string, MockEntity> = mergeMockEntityMaps(generatedMockEntities, explicitMockEntities)
+
 function todoItems(entityId: unknown) {
   const entityKey = String(entityId)
   return {
@@ -885,7 +1278,9 @@ export function resetMockHass() {
   mockTodoUpdateMessages.length = 0
   for (const entityId of Object.keys(mockTodoItemsByEntity)) delete mockTodoItemsByEntity[entityId]
   for (const taskId of Object.keys(mockDonetickTasksById)) delete mockDonetickTasksById[Number(taskId)]
+  for (const location of Object.keys(mockInventoryItemsByLocation)) delete mockInventoryItemsByLocation[location]
   mockDonetickTaskLoadDelayMs = 0
+  mockRecipeQueryDelayMs = 0
   mockState.user = { id: '64089b5683944c39b4f944c8f76830b0', is_admin: true, name: 'Stephen' }
   mockEntities['sensor.nightcanvasrestful_schedules'].attributes = mockFreeSleepScheduleAttributes()
   mockEntities['sensor.sleepypod_stephen_schedule_phase'].state = 'outside'
@@ -1056,16 +1451,17 @@ export const mockState: MockHassState = {
         })
       }
       if (params.domain === 'evershelf' && params.service === 'recipe_query' && params.returnResponse === true) {
-        const serviceData = params.serviceData as { cursor?: string; kind?: string; q?: string; sort?: string } | undefined
+        const serviceData = params.serviceData as { cursor?: string; kind?: string; limit?: number; q?: string; sort?: string } | undefined
         if (serviceData?.kind === 'recommendations') {
+          const recommendationCount = Math.max(1, Math.min(100, Number(serviceData.limit ?? 30)))
           return Promise.resolve({
             response: {
               kind: 'recommendations',
               recommendation_id: 'mock-recommendations',
-              items: Array.from({ length: 30 }, (_, index) => mockRecipeCard(
+              items: Array.from({ length: recommendationCount }, (_, index) => mockRecipeCard(
                 index + 1,
                 index === 0
-                  ? 'Ang Chow Chicken (Red Fermented Rice Wine Chicken)'
+                  ? 'Suggested Citrus Pantry Bowl with Roasted Garden Vegetables'
                   : `Suggested Recipe ${index + 1}`,
               )),
             },
@@ -1073,7 +1469,9 @@ export const mockState: MockHassState = {
         }
         const offset = Number(serviceData?.cursor ?? 0)
         const query = serviceData?.q?.trim()
-        const items = Array.from({ length: 50 }, (_, index) => {
+        const catalogTotal = configuredRecipeTotal()
+        const pageSize = Math.max(0, Math.min(50, catalogTotal - offset))
+        const items = Array.from({ length: pageSize }, (_, index) => {
           const id = 1_000 + offset + index
           return mockRecipeCard(id, query ? `${query} Recipe ${offset + index + 1}` : `Catalog Recipe ${offset + index + 1}`)
         })
@@ -1084,19 +1482,23 @@ export const mockState: MockHassState = {
             criteria_hash: `mock-criteria-${query ?? 'all'}`,
             snapshot_id: 'mock-snapshot',
             items,
-            next_cursor: nextOffset < 150 ? String(nextOffset) : null,
-            has_more: nextOffset < 150,
-            total: 150,
+            next_cursor: nextOffset < catalogTotal ? String(nextOffset) : null,
+            has_more: nextOffset < catalogTotal,
+            total: catalogTotal,
             ranking_status: 'ready',
             catalog_revision: 1,
             inventory_revision: 1,
           },
         }
-        const delay = serviceData?.cursor
-          ? 250
-          : serviceData?.sort && serviceData.sort !== 'availability'
-            ? 1_200
-            : 0
+        const delay = Math.max(
+          mockRecipeQueryDelayMs,
+          configuredRecipeQueryDelayMs(),
+          serviceData?.cursor
+            ? 250
+            : serviceData?.sort && serviceData.sort !== 'availability'
+              ? 1_200
+              : 0,
+        )
         return delay > 0
           ? new Promise((resolve) => window.setTimeout(() => resolve(response), delay))
           : Promise.resolve(response)
@@ -1116,9 +1518,89 @@ export const mockState: MockHassState = {
           },
         })
       }
+      if (params.domain === 'evershelf' && params.service === 'recipe_detail' && params.returnResponse === true) {
+        const recipeId = Number((params.serviceData as { recipe_id?: unknown } | undefined)?.recipe_id)
+        const response = { response: mockRecipeDetail(recipeId) }
+        const delay = configuredRecipeDetailDelayMs()
+        return delay > 0
+          ? new Promise((resolve) => window.setTimeout(() => resolve(response), delay))
+          : Promise.resolve(response)
+      }
+      if (params.domain === 'evershelf' && params.service === 'recipe_grocery_add' && params.returnResponse === true) {
+        const serviceData = params.serviceData as {
+          idempotency_key?: string
+          recipe_id?: number
+          selections?: { key?: string; position?: number }[]
+        } | undefined
+        const selections = Array.isArray(serviceData?.selections) ? serviceData.selections : []
+        const partialFailure = typeof window !== 'undefined'
+          && new URLSearchParams(window.location.search).get('__mockRecipeGroceryPartial') === 'true'
+        const outcomes = selections.map((selection, index) => ({
+          key: String(selection.key ?? ''),
+          position: Number(selection.position ?? index),
+          outcome: 'added',
+          normalized_name: `Synthetic ingredient ${index + 1}`,
+          amount_text: null,
+        }))
+        return Promise.resolve({
+          response: {
+            success: !partialFailure,
+            partial_failure: partialFailure || undefined,
+            recipe_id: serviceData?.recipe_id,
+            idempotency_key: serviceData?.idempotency_key,
+            replayed: false,
+            outcomes,
+            ha_mirror: {
+              success: !partialFailure,
+              todo_entity_id: 'todo.shopping_list',
+              outcomes: outcomes.map((outcome, index) => ({
+                key: outcome.key,
+                position: outcome.position,
+                name: outcome.normalized_name,
+                backend_outcome: outcome.outcome,
+                outcome: partialFailure && index === 0 ? 'failed' : 'added',
+              })),
+              summary: {
+                added: partialFailure ? Math.max(0, outcomes.length - 1) : outcomes.length,
+                already_present: 0,
+                skipped: 0,
+                failed: partialFailure && outcomes.length > 0 ? 1 : 0,
+              },
+            },
+            summary: {
+              backend: {
+                added: outcomes.length,
+                already_listed: 0,
+                now_in_stock: 0,
+                unresolved: 0,
+                failed: 0,
+              },
+              ha_mirror: {
+                added: partialFailure ? Math.max(0, outcomes.length - 1) : outcomes.length,
+                already_present: 0,
+                skipped: 0,
+                failed: partialFailure && outcomes.length > 0 ? 1 : 0,
+              },
+            },
+          },
+        })
+      }
       if (params.domain === 'evershelf' && params.service === 'list_inventory' && params.returnResponse === true) {
         const location = (params.serviceData as { location?: string } | undefined)?.location
         const search = (params.serviceData as { q?: string } | undefined)?.q
+        const fixtureInventory = mockInventoryItemsByLocation[location ?? 'all']
+        if (fixtureInventory) {
+          const normalizedSearch = search?.trim().toLocaleLowerCase()
+          const inventory = normalizedSearch
+            ? fixtureInventory.filter((item) => String(item.name ?? '').toLocaleLowerCase().includes(normalizedSearch))
+            : fixtureInventory
+          return Promise.resolve({
+            response: {
+              inventory: cloneRecord(inventory),
+              ...(normalizedSearch ? { search: search?.trim(), source: 'ha_sensor_product_search' } : {}),
+            },
+          })
+        }
         const fridgeInventory = [
           { expiry_date: mockDateOffset(370), id: 204, location: 'frigo', name: 'Salsa', product_id: 2004, unit: 'pz', vacuum_sealed: false },
           { expiry_date: mockDateOffset(-400), id: 205, location: 'frigo', name: 'Milk', product_id: 2005, unit: 'pz', vacuum_sealed: false },

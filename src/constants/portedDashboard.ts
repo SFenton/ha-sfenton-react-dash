@@ -176,7 +176,7 @@ export const CHORE_QUICK_LINKS: ChoreQuickLinkConfig[] = [
 ]
 
 export const ADMIN_DESCRIPTIONS = {
-  autoLock: 'Disables automatic locking of the front door. Useful for when contractors are over, or we have people frequently entering/leaving the home.',
+  autoLock: 'Enables automatic locking of the front door. Turn this off temporarily when contractors are over or people are frequently entering and leaving the home.',
   livingRoomPowerRecovery:
     'If the living room switch loses power and comes back with the relay off, run this to temporarily couple the top paddle, unlock the relay, turn power back on, relock it, and return the paddle to decoupled mode.',
   presenceOverrides: "Choose whether each room's presence lighting is Enabled, Disabled, Paused, or Quieted. Paused stays fail-dark until resumed; Quieted rearms after the room clears.",
@@ -247,6 +247,12 @@ export const ADMIN_AUTO_REENABLE_ITEMS: EntityTileConfig[] = [
 ]
 
 export const SETTINGS_PAGE_ITEMS: SettingsLinkConfig[] = [
+  {
+    title: 'App Manual',
+    subtitle: 'Access guides, instructions, and details on how our Home Assistant instance and app work.',
+    icon: 'mdi:book-open-page-variant',
+    path: 'manual',
+  },
   {
     title: 'Admin Controls',
     subtitle: 'Presence-Based Toggles, Automation Overrides, and More',

@@ -1,6 +1,8 @@
 import { useRef, useState } from 'react'
 import { Description } from '../../core/Description'
 import { ExpandingSearchAction } from '../../core/ExpandingSearchAction'
+import { FilterSheetFooter } from '../../core/FilterSheetFooter'
+import { FloatingActionSlot } from '../../core/FloatingActionSlot'
 import { FloatingActionButton } from '../../core/FloatingActionButton'
 import { ModalSheet } from '../../core/ModalSheet'
 import { RadioRow } from '../../core/RadioRow'
@@ -19,33 +21,29 @@ const SORT_OPTIONS: Array<{ label: string; subtitle: string; value: RecipeSort }
   { label: 'Alphabetical', subtitle: 'Sort recipe titles from A to Z.', value: 'alphabetical' },
 ]
 
-const EXPIRY_HORIZONS: Array<{ label: string; value: 7 | 30 | 90 }> = [
-  { label: '7 Days', value: 7 },
-  { label: '30 Days', value: 30 },
-  { label: '90 Days', value: 90 },
+const EXPIRY_HORIZONS: Array<{ label: string; subtitle: string; value: 7 | 30 | 90 }> = [
+  { label: '7 Days', subtitle: 'Use ingredients expiring within the next week.', value: 7 },
+  { label: '30 Days', subtitle: 'Use ingredients expiring within the next month.', value: 30 },
+  { label: '90 Days', subtitle: 'Use ingredients expiring within the next three months.', value: 90 },
 ]
 
 function focusSlotButton(slot: HTMLSpanElement | null) {
   window.requestAnimationFrame(() => slot?.querySelector('button')?.focus({ preventScroll: true }))
 }
 
-function SheetFooter({ onApply, onReset }: { onApply: () => void; onReset: () => void }) {
-  return (
-    <div className={styles.sheetFooter}>
-      <button className={styles.resetAction} onClick={onReset} type="button">Reset</button>
-      <button className={styles.primaryAction} onClick={onApply} type="button">Apply</button>
-    </div>
-  )
-}
-
 function RecipeSortSheet({ controls, onApplied }: { controls: RecipeControls; onApplied: () => void }) {
   return (
     <ModalSheet
-      footer={<SheetFooter onApply={() => {
-        controls.applySort()
-        controls.closeSortSheet()
-        onApplied()
-      }} onReset={controls.resetSortDraft} />}
+      footer={(
+        <FilterSheetFooter
+          onApply={() => {
+            controls.applySort()
+            controls.closeSortSheet()
+            onApplied()
+          }}
+          onReset={controls.resetSortDraft}
+        />
+      )}
       onClose={controls.closeSortSheet}
       open={controls.sortOpen}
       title="Sort Recipes"
@@ -76,63 +74,79 @@ function RecipeFilterSheet({ controls, onApplied }: { controls: RecipeControls; 
   const alphabetical = controls.sort === 'alphabetical'
   return (
     <ModalSheet
-      footer={<SheetFooter onApply={() => {
-        controls.applyFilter()
-        controls.closeFilterSheet()
-        onApplied()
-      }} onReset={controls.resetFilterDraft} />}
+      footer={(
+        <FilterSheetFooter
+          onApply={() => {
+            controls.applyFilter()
+            controls.closeFilterSheet()
+            onApplied()
+          }}
+          onReset={controls.resetFilterDraft}
+        />
+      )}
       onClose={controls.closeFilterSheet}
       open={controls.filterOpen}
       title="Filter Recipes"
     >
       <div className={styles.sheetStack}>
-        <ToggleSetting
-          checked={controls.filterDraft.expiringOnly}
-          icon="mdi:clock-alert-outline"
-          label="Expiring ingredients only"
-          onChange={(expiringOnly) => updateFilterDraft(controls, { expiringOnly })}
-        />
         <fieldset className={styles.fieldset}>
-          <legend>Expiring Within</legend>
-          <div className={styles.horizonGroup} role="radiogroup" aria-label="Expiring within">
+          <legend>Ingredient Coverage</legend>
+          <Description className={styles.groupDescription}>Only show recipes where at least this percentage of required ingredients is currently available.</Description>
+          <RangeField
+            label="Minimum Ingredients Available"
+            max={100}
+            min={0}
+            onChange={(minimumCoverage) => updateFilterDraft(controls, { minimumCoverage })}
+            step={5}
+            value={controls.filterDraft.minimumCoverage}
+          />
+        </fieldset>
+        <fieldset className={styles.fieldset}>
+          <legend>Expiring Ingredients</legend>
+          <ToggleSetting
+            checked={controls.filterDraft.expiringOnly}
+            icon="mdi:clock-outline"
+            label="Use expiring ingredients only"
+            onChange={(expiringOnly) => updateFilterDraft(controls, { expiringOnly })}
+          />
+          <div className={styles.radioGroup} role="radiogroup" aria-label="Expiring within">
             {EXPIRY_HORIZONS.map((option) => (
               <RadioRow
                 active={controls.filterDraft.expiringWithinDays === option.value}
                 disabled={!controls.filterDraft.expiringOnly}
                 key={option.value}
                 onClick={() => updateFilterDraft(controls, { expiringWithinDays: option.value })}
+                subtitle={option.subtitle}
                 title={option.label}
               />
             ))}
           </div>
         </fieldset>
-        <RangeField
-          label="Minimum Coverage"
-          max={100}
-          min={0}
-          onChange={(minimumCoverage) => updateFilterDraft(controls, { minimumCoverage })}
-          step={5}
-          value={controls.filterDraft.minimumCoverage}
-        />
-        {alphabetical && <Description className={styles.weightExplanation}>Weights are not used while recipes are sorted alphabetically.</Description>}
-        <RangeField
-          disabled={alphabetical}
-          label="Availability Weight"
-          max={100}
-          min={0}
-          onChange={(availabilityWeight) => updateFilterDraft(controls, { availabilityWeight })}
-          step={5}
-          value={controls.filterDraft.availabilityWeight}
-        />
-        <RangeField
-          disabled={alphabetical}
-          label="Expiry Weight"
-          max={100}
-          min={0}
-          onChange={(expiryWeight) => updateFilterDraft(controls, { expiryWeight })}
-          step={5}
-          value={controls.filterDraft.expiryWeight}
-        />
+        <fieldset className={styles.fieldset}>
+          <legend>Ranking Strength</legend>
+          <Description className={styles.groupDescription}>Tune how strongly available and expiring ingredients influence ranked recipe results.</Description>
+          {alphabetical && <Description className={styles.weightExplanation}>Weights are unavailable while recipes are sorted alphabetically.</Description>}
+          <div className={styles.rangeGroup}>
+            <RangeField
+              disabled={alphabetical}
+              label="Availability Weight"
+              max={100}
+              min={0}
+              onChange={(availabilityWeight) => updateFilterDraft(controls, { availabilityWeight })}
+              step={5}
+              value={controls.filterDraft.availabilityWeight}
+            />
+            <RangeField
+              disabled={alphabetical}
+              label="Expiry Weight"
+              max={100}
+              min={0}
+              onChange={(expiryWeight) => updateFilterDraft(controls, { expiryWeight })}
+              step={5}
+              value={controls.filterDraft.expiryWeight}
+            />
+          </div>
+        </fieldset>
       </div>
     </ModalSheet>
   )
@@ -152,12 +166,12 @@ export function RecipeFloatingActions({ controls }: { controls: RecipeControls }
         placeholder="Search titles and ingredients..."
         query={controls.searchQuery}
       />
-      <span aria-hidden={searchExpanded ? 'true' : undefined} className={styles.actionSlot} data-collapsed={searchExpanded ? 'true' : undefined} inert={searchExpanded} ref={sortSlotRef}>
+      <FloatingActionSlot collapsed={searchExpanded} ref={sortSlotRef}>
         <FloatingActionButton ariaLabel="Sort" color={controls.sortActive ? ACTIVE_ACTION_COLOR : ACTION_COLOR} icon="mdi:swap-vertical" onClick={controls.openSortSheet} />
-      </span>
-      <span aria-hidden={searchExpanded ? 'true' : undefined} className={styles.actionSlot} data-collapsed={searchExpanded ? 'true' : undefined} inert={searchExpanded} ref={filterSlotRef}>
+      </FloatingActionSlot>
+      <FloatingActionSlot collapsed={searchExpanded} ref={filterSlotRef}>
         <FloatingActionButton ariaLabel="Filter" color={controls.filterActive ? ACTIVE_ACTION_COLOR : ACTION_COLOR} icon="mdi:tune-vertical" onClick={controls.openFilterSheet} />
-      </span>
+      </FloatingActionSlot>
       <RecipeSortSheet controls={controls} onApplied={() => focusSlotButton(sortSlotRef.current)} />
       <RecipeFilterSheet controls={controls} onApplied={() => focusSlotButton(filterSlotRef.current)} />
     </>

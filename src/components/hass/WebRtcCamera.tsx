@@ -1,24 +1,13 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { useHass } from '@hakit/core'
 import type { CameraConfig } from '../../constants/atAGlance'
+import { readStatusFromMode, type WebRtcStatus } from './webRtcStatus'
 import styles from './WebRtcCamera.module.css'
 
 const WEBRTC_RESOURCE_PATH = '/webrtc/webrtc-camera.js?v=v3.10.1'
 const WEBRTC_MODES = 'webrtc,webrtc/tcp,mse,hls,mjpeg'
 const WEBRTC_CHROME_STYLE_ID = 'sfenton-webrtc-camera-chrome'
 const WEBRTC_STATUS_POLL_MS = 400
-
-export type WebRtcStatus = 'loading' | 'live' | 'error'
-
-// The card reports its transport in a shadow-DOM `.mode` node rather than an event, so the
-// only reliable "is the stream actually playing" signal is that node's text.
-export function readStatusFromMode(mode: string | null | undefined): WebRtcStatus {
-  const normalized = (mode ?? '').trim().toLowerCase()
-  if (normalized === '') return 'loading'
-  if (normalized === 'error') return 'error'
-  if (normalized.startsWith('loading') || normalized.startsWith('waiting') || normalized.startsWith('reconnecting')) return 'loading'
-  return 'live'
-}
 
 let webRtcModulePromise: Promise<void> | null = null
 

@@ -1,0 +1,17 @@
+.slot {
+  display: inline-flex;
+  width: var(--floating-action-size, 56px);
+  min-width: 0;
+  flex: 0 0 var(--floating-action-size, 56px);
+  overflow: visible;
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.slot[data-collapsed='true'] {
+  display: none;
+}
+
+.slot[data-collapsed='true'] > button {
+  pointer-events: none;
+}

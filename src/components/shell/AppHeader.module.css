@@ -309,6 +309,11 @@
   display: none;
 }
 
+.primaryNavigation {
+  display: grid;
+  gap: 7px;
+}
+
 .sidebarSettingsItem {
   margin-top: auto;
 }

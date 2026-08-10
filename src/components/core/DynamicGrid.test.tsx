@@ -1,6 +1,6 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import { DynamicGrid } from './DynamicGrid'
-import { equivalentDynamicGridColumnCount, packDynamicGridSpans } from './dynamicGridLayout'
+import { equivalentDynamicGridColumnCount, packDynamicGridSpans, responsiveDynamicGridColumnCount } from './dynamicGridLayout'
 
 describe('packDynamicGridSpans', () => {
   it('fills partial and final rows without changing item order', () => {
@@ -19,6 +19,14 @@ describe('equivalentDynamicGridColumnCount', () => {
     expect(equivalentDynamicGridColumnCount([1, 1, 1], 3)).toBe(3)
     expect(equivalentDynamicGridColumnCount([1, 2, 1], 4)).toBe(2)
     expect(equivalentDynamicGridColumnCount([1, 2, 1], 2)).toBe(1)
+  })
+
+  describe('responsiveDynamicGridColumnCount', () => {
+    it('adds columns until cards fit the requested maximum width', () => {
+      expect(responsiveDynamicGridColumnCount(361, 12, 2, 220, 10)).toBe(2)
+      expect(responsiveDynamicGridColumnCount(1_408, 12, 2, 220, 10)).toBe(7)
+      expect(responsiveDynamicGridColumnCount(4_000, 12, 2, 220, 10)).toBe(10)
+    })
   })
 })
 
@@ -127,5 +135,30 @@ describe('DynamicGrid', () => {
       expect(grid).toHaveAttribute('data-dynamic-grid-columns', '1')
       expect(Array.from(grid.children).map((cell) => cell.getAttribute('data-dynamic-grid-span'))).toEqual(['1', '1', '1', '1'])
     })
+  })
+
+  it('inserts responsive columns without stretching cards past a requested max width', async () => {
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockImplementation(function () {
+      if (this.dataset.dynamicGrid === 'true') return 1_408
+      return 0
+    })
+
+    render(
+      <DynamicGrid
+        ariaLabel="Responsive recipes"
+        columns={2}
+        fillRows={false}
+        gap={12}
+        maxCellWidth={220}
+        maxColumns={10}
+      >
+        {Array.from({ length: 14 }, (_, index) => <div key={index}>Recipe {index + 1}</div>)}
+      </DynamicGrid>,
+    )
+
+    const grid = screen.getByRole('group', { name: 'Responsive recipes' })
+    await waitFor(() => expect(grid).toHaveAttribute('data-dynamic-grid-columns', '7'))
+    expect(Array.from(grid.children).every((cell) => cell.getAttribute('data-dynamic-grid-span') === '1')).toBe(true)
+    expect(grid.style.getPropertyValue('--dynamic-grid-rendered-columns')).toBe('7')
   })
 })

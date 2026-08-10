@@ -1,4 +1,5 @@
 type CallService = (params: Record<string, unknown>) => Promise<unknown> | unknown
+export type RecipeServiceName = 'recipe_detail' | 'recipe_grocery_add' | 'recipe_hydration' | 'recipe_query'
 
 function appendParam(params: URLSearchParams, key: string, value: unknown) {
   if (value === undefined || value === null || value === '') return
@@ -28,6 +29,34 @@ async function devRecipeQuery(serviceData: Record<string, unknown>) {
   return result
 }
 
+async function devRecipeDetail(serviceData: Record<string, unknown>) {
+  const params = new URLSearchParams({ action: 'recipe_catalog_detail' })
+  appendParam(params, 'id', serviceData.recipe_id)
+  return devRecipeFetch(`/__evershelf/api/index.php?${params.toString()}`)
+}
+
+async function devRecipeGroceryAdd(serviceData: Record<string, unknown>) {
+  const payload = {
+    recipe_id: serviceData.recipe_id,
+    selections: serviceData.selections,
+    idempotency_key: serviceData.idempotency_key,
+  }
+  return devRecipeFetch('/__evershelf/api/index.php?action=recipe_catalog_grocery_add', {
+    body: JSON.stringify(payload),
+    headers: { 'Content-Type': 'application/json' },
+    method: 'POST',
+  })
+}
+
+async function devRecipeFetch(input: RequestInfo | URL, init?: RequestInit) {
+  const response = await fetch(input, init)
+  const result = await response.json() as Record<string, unknown>
+  if (!response.ok || result.success === false) {
+    throw new Error(String(result.message ?? result.error ?? `EverShelf HTTP ${response.status}`))
+  }
+  return result
+}
+
 function devHydrationResult() {
   return {
     success: true,
@@ -45,24 +74,48 @@ function devHydrationResult() {
   }
 }
 
-function isUnavailableRecipeService(
+export function recipeServiceErrorIsUnavailable(
   error: unknown,
-  service: 'recipe_hydration' | 'recipe_query',
+  service: RecipeServiceName,
 ) {
+  const record = error && typeof error === 'object'
+    ? (
+        'response' in error && error.response && typeof error.response === 'object'
+          ? error.response as Record<string, unknown>
+          : 'service_response' in error && error.service_response && typeof error.service_response === 'object'
+            ? error.service_response as Record<string, unknown>
+            : error as Record<string, unknown>
+      )
+    : null
+  const errorKindValue = record?.error_kind ?? record?.errorKind
+  const errorKind = typeof errorKindValue === 'string' ? errorKindValue.trim() : ''
+  const errorCodeValue = record?.error
+  const errorCode = typeof errorCodeValue === 'string' ? errorCodeValue.trim() : ''
+  if (errorKind) return errorKind === 'unsupported'
+  if (errorCode === 'unsupported_capability') return true
+
   const message = error instanceof Error
     ? error.message.toLowerCase()
     : error && typeof error === 'object'
       ? `${String((error as { code?: unknown }).code ?? '')} ${String((error as { message?: unknown }).message ?? '')}`.toLowerCase()
       : String(error).toLowerCase()
-  return message.includes(service)
-    || message.includes('recipe_catalog_v2')
+  const serviceMentioned = message.includes(service) || message.includes(`evershelf.${service}`)
+  const namedServiceNotFound = message.includes(`service evershelf.${service} not found`)
+    || message.includes(`service ${service} not found`)
+    || message.includes(`evershelf.${service} service not found`)
+    || message.includes(`${service} service not found`)
+  const unavailableLanguage = message.includes('does not exist')
+    || message.includes('unknown service')
+    || message.includes('unsupported service')
+  return namedServiceNotFound
+    || (serviceMentioned && unavailableLanguage)
     || message.includes('service not found')
     || message.includes('unknown service')
 }
 
 export async function callRecipeService(
   callService: CallService,
-  service: 'recipe_hydration' | 'recipe_query',
+  service: RecipeServiceName,
   serviceData: Record<string, unknown>,
 ) {
   try {
@@ -73,11 +126,12 @@ export async function callRecipeService(
       returnResponse: true,
     })
   } catch (error) {
-    if (!import.meta.env.DEV || !isUnavailableRecipeService(error, service)) {
+    if (!import.meta.env.DEV || !recipeServiceErrorIsUnavailable(error, service)) {
       throw error
     }
-    return service === 'recipe_query'
-      ? devRecipeQuery(serviceData)
-      : devHydrationResult()
+    if (service === 'recipe_query') return devRecipeQuery(serviceData)
+    if (service === 'recipe_hydration') return devHydrationResult()
+    if (service === 'recipe_detail') return devRecipeDetail(serviceData)
+    return devRecipeGroceryAdd(serviceData)
   }
 }

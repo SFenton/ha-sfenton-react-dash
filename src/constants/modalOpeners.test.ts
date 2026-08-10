@@ -1,9 +1,9 @@
-import { MODAL_OPENER_EXCEPTIONS, MODAL_OPENER_INVENTORY } from './modalOpeners'
+import { EXPECTED_MODAL_OPENER_FAMILY_COUNT, MODAL_OPENER_EXCEPTIONS, MODAL_OPENER_INVENTORY } from './modalOpeners'
 import { ROOM_PAGE_CONFIGS } from './roomPages'
 
 describe('modal opener inventory', () => {
   it('keeps every audited opener family uniquely documented', () => {
-    expect(MODAL_OPENER_INVENTORY).toHaveLength(31)
+    expect(MODAL_OPENER_INVENTORY).toHaveLength(EXPECTED_MODAL_OPENER_FAMILY_COUNT)
     expect(new Set(MODAL_OPENER_INVENTORY.map((item) => item.id)).size).toBe(MODAL_OPENER_INVENTORY.length)
   })
 
@@ -43,5 +43,14 @@ describe('modal opener inventory', () => {
 
     expect(MODAL_OPENER_INVENTORY.find((item) => item.id === 'room-status-chips')?.instances).toBe(headerCount)
     expect(MODAL_OPENER_INVENTORY.find((item) => item.id === 'room-source-cards')?.instances).toBe(bodyCount)
+  })
+
+  it('keeps the Downstairs Hallway light and door on distinct destinations', () => {
+    const cards = ROOM_PAGE_CONFIGS['downstairs-hallway'].overviewCards
+    const light = cards.find((card) => card.title === 'Light')
+    const door = cards.find((card) => card.title === 'Door')
+
+    expect(light?.hash).toBe('#light-downstairs-hallway')
+    expect(door?.hash).toBe('#door-downstairs-hallway')
   })
 })

@@ -31,7 +31,7 @@ export default defineConfig(({ mode }) => {
   const https = devHttpsOptions(mode, env)
 
   return {
-    base: './',
+    base: mode === 'test' ? '/' : './',
     plugins: [react()],
     resolve: {
       alias: mode === 'test'

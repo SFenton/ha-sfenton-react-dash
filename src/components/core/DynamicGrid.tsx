@@ -5,6 +5,7 @@ import {
   useLayoutEffect,
   useRef,
   useState,
+  type AriaRole,
   type CSSProperties,
   type ReactNode,
 } from 'react'
@@ -12,6 +13,7 @@ import {
   equivalentDynamicGridColumnCount,
   normalizedDynamicGridColumns,
   packDynamicGridSpans,
+  responsiveDynamicGridColumnCount,
 } from './dynamicGridLayout'
 import styles from './DynamicGrid.module.css'
 
@@ -40,8 +42,13 @@ interface DynamicGridProps {
   children: ReactNode
   className?: string
   columns: number
+  fillRows?: boolean
   forceEquivalentColumnCount?: boolean
   gap?: number
+  maxCellWidth?: number
+  maxColumns?: number
+  onColumnsChange?: (columns: number) => void
+  role?: AriaRole
 }
 
 function layoutsMatch(current: DynamicGridLayout, next: DynamicGridLayout) {
@@ -63,10 +70,12 @@ function configuredColumns(element: HTMLElement, fallbackColumns: number) {
   return normalizedDynamicGridColumns(fallbackColumns)
 }
 
-function initialLayout(itemCount: number, columns: number): DynamicGridLayout {
+function initialLayout(itemCount: number, columns: number, fillRows: boolean): DynamicGridLayout {
   return {
     columns,
-    spans: packDynamicGridSpans(Array.from({ length: itemCount }, () => 1), columns),
+    spans: fillRows
+      ? packDynamicGridSpans(Array.from({ length: itemCount }, () => 1), columns)
+      : Array.from({ length: itemCount }, () => 1),
     wrapLabels: Array.from({ length: itemCount }, () => false),
   }
 }
@@ -75,18 +84,30 @@ function measuredLayout(
   grid: HTMLElement,
   fallbackColumns: number,
   forceEquivalentColumnCount: boolean,
+  fillRows: boolean,
   gap: number,
+  maxCellWidth?: number,
+  maxColumns?: number,
 ): DynamicGridLayout {
-  const columns = configuredColumns(grid, fallbackColumns)
+  const configured = configuredColumns(grid, fallbackColumns)
   const cells = Array.from(grid.children).filter((child): child is HTMLElement =>
     child instanceof HTMLElement && child.dataset.dynamicGridCell === 'true',
   )
   const gridWidth = grid.clientWidth
+  const columns = maxCellWidth
+    ? responsiveDynamicGridColumnCount(
+      gridWidth,
+      gap,
+      configured,
+      maxCellWidth,
+      maxColumns,
+    )
+    : configured
 
-  if (gridWidth <= 0 || cells.length === 0) return initialLayout(cells.length, columns)
+  if (gridWidth <= 0 || cells.length === 0) return initialLayout(cells.length, columns, fillRows)
 
   const columnWidth = (gridWidth - gap * (columns - 1)) / columns
-  if (columnWidth <= 0) return initialLayout(cells.length, columns)
+  if (columnWidth <= 0) return initialLayout(cells.length, columns, fillRows)
 
   const minimumSpans = cells.map((cell) => {
     const cellWidth = cell.clientWidth
@@ -122,8 +143,12 @@ function measuredLayout(
     ? equivalentDynamicGridColumnCount(minimumSpans, columns)
     : columns
   const spans = forceEquivalentColumnCount
-    ? packDynamicGridSpans(Array.from({ length: cells.length }, () => 1), renderedColumns)
-    : packDynamicGridSpans(minimumSpans, columns)
+    ? (
+      fillRows
+        ? packDynamicGridSpans(Array.from({ length: cells.length }, () => 1), renderedColumns)
+        : Array.from({ length: cells.length }, () => 1)
+    )
+    : (fillRows ? packDynamicGridSpans(minimumSpans, columns) : minimumSpans)
   const wrapLabels = cells.map((cell, index) => {
     if (minimumSpans[index] < columns) return false
 
@@ -146,19 +171,32 @@ export function DynamicGrid({
   children,
   className,
   columns,
+  fillRows = true,
   forceEquivalentColumnCount = false,
   gap = 10,
+  maxCellWidth,
+  maxColumns,
+  onColumnsChange,
+  role,
 }: DynamicGridProps) {
   const items = Children.toArray(children)
   const baseColumns = normalizedDynamicGridColumns(columns)
   const gridRef = useRef<HTMLDivElement | null>(null)
-  const [layout, setLayout] = useState<DynamicGridLayout>(() => initialLayout(items.length, baseColumns))
+  const [layout, setLayout] = useState<DynamicGridLayout>(() => initialLayout(items.length, baseColumns, fillRows))
   const measure = useCallback(() => {
     const grid = gridRef.current
     if (!grid) return
-    const nextLayout = measuredLayout(grid, baseColumns, forceEquivalentColumnCount, gap)
+    const nextLayout = measuredLayout(
+      grid,
+      baseColumns,
+      forceEquivalentColumnCount,
+      fillRows,
+      gap,
+      maxCellWidth,
+      maxColumns,
+    )
     setLayout((currentLayout) => layoutsMatch(currentLayout, nextLayout) ? currentLayout : nextLayout)
-  }, [baseColumns, forceEquivalentColumnCount, gap])
+  }, [baseColumns, fillRows, forceEquivalentColumnCount, gap, maxCellWidth, maxColumns])
 
   useLayoutEffect(() => {
     const grid = gridRef.current
@@ -193,11 +231,16 @@ export function DynamicGrid({
 
   const activeLayout = layout.spans.length === items.length
     ? layout
-    : initialLayout(items.length, layout.columns)
+    : initialLayout(items.length, layout.columns, fillRows)
+  useLayoutEffect(() => {
+    onColumnsChange?.(activeLayout.columns)
+  }, [activeLayout.columns, onColumnsChange])
   const gridStyle: DynamicGridStyle = {
     '--dynamic-grid-base-columns': String(baseColumns),
     '--dynamic-grid-gap': `${gap}px`,
-    '--dynamic-grid-rendered-columns': forceEquivalentColumnCount ? String(activeLayout.columns) : undefined,
+    '--dynamic-grid-rendered-columns': forceEquivalentColumnCount || maxCellWidth
+      ? String(activeLayout.columns)
+      : undefined,
   }
 
   return (
@@ -207,8 +250,9 @@ export function DynamicGrid({
       data-dynamic-grid="true"
       data-dynamic-grid-columns={activeLayout.columns}
       data-dynamic-grid-force-equivalent-column-count={forceEquivalentColumnCount ? 'true' : undefined}
+      data-dynamic-grid-max-cell-width={maxCellWidth}
       ref={gridRef}
-      role={ariaLabel ? 'group' : undefined}
+      role={role ?? (ariaLabel ? 'group' : undefined)}
       style={gridStyle}
     >
       {items.map((child, index) => {

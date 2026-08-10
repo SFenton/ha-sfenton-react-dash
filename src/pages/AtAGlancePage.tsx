@@ -829,7 +829,12 @@ export function ClimateSheet({ directGroup, hideDirectHeader = false, overviewGr
   }
 
   return (
-    <div className={styles.climateSheet} data-square-overview={squareOverview ? 'true' : 'false'}>
+    <div
+      className={styles.climateSheet}
+      data-manual-sheet="climate"
+      data-manual-sheet-view={selectedGroup ? 'detail' : 'overview'}
+      data-square-overview={squareOverview ? 'true' : 'false'}
+    >
       {selectedGroup ? (!hideDirectHeader && <RoomClimateDetailHeader group={selectedGroup} onBack={directMode ? undefined : showRoomOverview} />) : <RoomsHeader />}
       <div className={styles.climateContent}>
         {selectedGroup ? (
@@ -933,7 +938,12 @@ export function OccupancySheet({ directGroup, hideDirectHeader = false, overview
   }
 
   return (
-    <div className={styles.occupancySheet} data-square-overview="false">
+    <div
+      className={styles.occupancySheet}
+      data-manual-sheet="occupancy"
+      data-manual-sheet-view={selectedGroup ? 'detail' : 'overview'}
+      data-square-overview="false"
+    >
       {selectedGroup && !hideDirectHeader && <RoomOccupancyDetailHeader group={selectedGroup} onBack={directMode ? undefined : showRoomOverview} />}
       <div className={styles.occupancyContent}>
         {selectedGroup ? (
@@ -1045,7 +1055,11 @@ export function ContactSheet({
   }
 
   return (
-    <div className={styles.contactSheet}>
+    <div
+      className={styles.contactSheet}
+      data-manual-sheet="contact"
+      data-manual-sheet-view={selectedGroup ? 'detail' : 'overview'}
+    >
       {selectedGroup ? (!hideDirectHeader && <RoomContactDetailHeader group={selectedGroup} onBack={directMode ? undefined : showRoomOverview} />) : <RoomsHeader />}
       <div className={styles.contactContent}>
         {selectedGroup ? (
@@ -1104,7 +1118,12 @@ export function AirQualitySheet({ overviewGridRef, overviewGridStyle }: AirQuali
   const cardShellClassName = squareGridCellClassName(squareOverview)
 
   return (
-    <div className={styles.airQualitySheet} data-square-overview={squareOverview ? 'true' : 'false'}>
+    <div
+      className={styles.airQualitySheet}
+      data-manual-sheet="air-quality"
+      data-manual-sheet-view="overview"
+      data-square-overview={squareOverview ? 'true' : 'false'}
+    >
       <RoomsHeader />
       <div className={styles.airQualityContent}>
         <section aria-label="AQI by room" className={styles.roomAirQualityOverview}>
@@ -1290,7 +1309,7 @@ export function AtAGlancePage({ activePath = 'overview', deferRouteContent = fal
           <DashboardPageLoading label="Loading Home dashboard content" phase={activeLoadingPhase} />
         ) : (
           <div className={styles.homeContent}>
-            <div className={styles.weatherWrap}>
+            <div className={styles.weatherWrap} data-manual-home-context="true">
               <WeatherSummary deferRefresh={!hydrateHeavyContent} />
             </div>
 

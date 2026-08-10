@@ -31,10 +31,12 @@ export interface RecipeCollection {
   generation: number
   hasMore: boolean
   hydrationState: RecipeHydrationState
+  initialResolved: boolean
   items: RecipeCardSummary[]
   loadNextPage: () => void
   nextPageError: string | null
   nextPageLoading: boolean
+  nextPageRevision: number
   retryCriteria: () => void
   retryNextPage: () => void
   total: number
@@ -75,9 +77,11 @@ export function useRecipeCollection(criteria: RecipeBrowseCriteria, { preload = 
   const [generation, setGeneration] = useState(0)
   const [hasMore, setHasMore] = useState(false)
   const [hydrationState, setHydrationState] = useState<RecipeHydrationState>('idle')
+  const [initialResolved, setInitialResolved] = useState(preload)
   const [items, setItems] = useState<RecipeCardSummary[]>([])
   const [nextPageError, setNextPageError] = useState<string | null>(null)
   const [nextPageLoading, setNextPageLoading] = useState(false)
+  const [nextPageRevision, setNextPageRevision] = useState(0)
   const [retryNonce, setRetryNonce] = useState(0)
   const [total, setTotal] = useState(0)
 
@@ -115,6 +119,7 @@ export function useRecipeCollection(criteria: RecipeBrowseCriteria, { preload = 
     setGeneration(activeGeneration)
     nextPageFlightRef.current = null
     setNextPageLoading(false)
+    setNextPageRevision(0)
     setNextPageError(null)
     setHydrationState('idle')
     setError(null)
@@ -170,6 +175,7 @@ export function useRecipeCollection(criteria: RecipeBrowseCriteria, { preload = 
         updateHasMore(response.hasMore, response.nextCursor)
         setTotal(response.total)
         setError(null)
+        setInitialResolved(true)
         announce(`${unique.length} recipes loaded.`)
       } catch (caughtError: unknown) {
         if (stale || generationRef.current !== activeGeneration) return
@@ -179,6 +185,7 @@ export function useRecipeCollection(criteria: RecipeBrowseCriteria, { preload = 
         updateHasMore(false, null)
         setTotal(0)
         setError(errorMessage(caughtError, 'Unable to load recipes'))
+        setInitialResolved(true)
       }
 
       setPhase('entering')
@@ -228,6 +235,7 @@ export function useRecipeCollection(criteria: RecipeBrowseCriteria, { preload = 
     }).finally(() => {
       if (generationRef.current !== activeGeneration || nextPageFlightRef.current !== flight) return
       nextPageFlightRef.current = null
+      setNextPageRevision((current) => current + 1)
       setNextPageLoading(false)
     })
   }, [announce, callService, preload, replaceItems, updateHasMore])
@@ -305,10 +313,12 @@ export function useRecipeCollection(criteria: RecipeBrowseCriteria, { preload = 
     generation,
     hasMore,
     hydrationState,
+    initialResolved,
     items,
     loadNextPage,
     nextPageError,
     nextPageLoading,
+    nextPageRevision,
     retryCriteria: () => setRetryNonce((current) => current + 1),
     retryNextPage: loadNextPage,
     total,
