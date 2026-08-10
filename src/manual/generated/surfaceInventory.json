@@ -3042,9 +3042,9 @@
     {
       "id": "modal-opener-family:thermostat-controls",
       "kind": "modal-opener-family",
-      "visibleName": "Thermostat tab entry rows",
+      "visibleName": "Thermostat tab entry tiles",
       "routes": [],
-      "implementation": "ThermostatPageEntry through ModalOpenerRow",
+      "implementation": "ThermostatPageEntry through GlassTile",
       "sourceReference": "src/constants/modalOpeners.ts#MODAL_OPENER_INVENTORY.thermostat-controls",
       "sourceId": "modal:thermostat-controls",
       "openerId": "opener:modal-opener-family:thermostat-controls",
@@ -7119,16 +7119,16 @@
       "interaction": "display"
     },
     {
-      "id": "route-section:ecobee:automation",
+      "id": "route-section:ecobee:advanced-configuration",
       "kind": "page-section",
-      "visibleName": "Automation",
+      "visibleName": "Advanced Configuration",
       "routes": [
         "ecobee"
       ],
       "parentId": "route:ecobee",
       "implementation": "DASHBOARD_ROUTES.ecobee.manualVisibleSectionNames",
       "sourceReference": "src/constants/routes.ts#DASHBOARD_ROUTES.ecobee.manualVisibleSectionNames",
-      "sourceId": "route-section:ecobee:automation",
+      "sourceId": "route-section:ecobee:advanced-configuration",
       "familySourceIds": [
         "route:ecobee"
       ],
@@ -7151,32 +7151,32 @@
       "interaction": "display"
     },
     {
-      "id": "route-section:ecobee:rooms",
+      "id": "route-section:ecobee:room-thermostats",
       "kind": "page-section",
-      "visibleName": "Rooms",
+      "visibleName": "Room Thermostats",
       "routes": [
         "ecobee"
       ],
       "parentId": "route:ecobee",
       "implementation": "DASHBOARD_ROUTES.ecobee.manualVisibleSectionNames",
       "sourceReference": "src/constants/routes.ts#DASHBOARD_ROUTES.ecobee.manualVisibleSectionNames",
-      "sourceId": "route-section:ecobee:rooms",
+      "sourceId": "route-section:ecobee:room-thermostats",
       "familySourceIds": [
         "route:ecobee"
       ],
       "interaction": "display"
     },
     {
-      "id": "route-section:ecobee:tracking",
+      "id": "route-section:ecobee:room-tracking",
       "kind": "page-section",
-      "visibleName": "Tracking",
+      "visibleName": "Room Tracking",
       "routes": [
         "ecobee"
       ],
       "parentId": "route:ecobee",
       "implementation": "DASHBOARD_ROUTES.ecobee.manualVisibleSectionNames",
       "sourceReference": "src/constants/routes.ts#DASHBOARD_ROUTES.ecobee.manualVisibleSectionNames",
-      "sourceId": "route-section:ecobee:tracking",
+      "sourceId": "route-section:ecobee:room-tracking",
       "familySourceIds": [
         "route:ecobee"
       ],

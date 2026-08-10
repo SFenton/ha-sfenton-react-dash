@@ -5454,17 +5454,6 @@ function useThermostatTrackingSummary() {
   }
 }
 
-function thermostatTrackingPageSummary(summary: ReturnType<typeof useThermostatTrackingSummary>) {
-  const selected = !summary.selectedAvailable
-    ? 'Selected tracking unavailable'
-    : summary.selectedEnabled
-      ? `${summary.selectedCount} selected`
-      : 'Selected tracking off'
-  const occupied = `${summary.occupiedOnlyCount} occupied`
-  if (!summary.selectedAvailable || !summary.selectedEnabled || !summary.criticalEnabled) return `${selected} · ${occupied}`
-  return `${selected} · ${summary.criticalCount} critical · ${occupied}`
-}
-
 function ThermostatTrackingOpener({
   description,
   disabled = false,
@@ -5886,18 +5875,11 @@ function ThermostatModal({
 function AutomaticThermostatWarning() {
   const entity = useEntity(asEntityName('input_boolean.enable_disable_thermostat_contact_sensors_integration'), { returnNullIfNotFound: true })
   if (entity?.state !== 'off') return null
-  return <Notice>Automatic Thermostat is off. Open Automation to turn Home Assistant&apos;s thermostat control back on.</Notice>
+  return <Notice>Automatic Thermostat is off. Open Advanced Configuration to turn Home Assistant&apos;s thermostat control back on.</Notice>
 }
 
 function thermostatTabDescription(tab: ThermostatModalTab) {
   return THERMOSTAT_MODAL_TABS.find((item) => item.tab === tab)?.description ?? ''
-}
-
-function useThermostatAutomationSummary() {
-  const automatic = useEntity(asEntityName('input_boolean.enable_disable_thermostat_contact_sensors_integration'), { returnNullIfNotFound: true })
-  const eco = useEntity(asEntityName('switch.thermostat_contact_sensors_eco_mode'), { returnNullIfNotFound: true })
-  const predictive = useEntity(asEntityName(PREDICTIVE_COMFORT_SWITCH_ENTITY_ID), { returnNullIfNotFound: true })
-  return `Automatic ${formatCompactEntityState(automatic, 'Unavailable')} · Eco ${formatCompactEntityState(eco, 'Unavailable')} · Predictive ${formatCompactEntityState(predictive, 'Unavailable')}`
 }
 
 function ThermostatPageEntry({
@@ -5906,7 +5888,6 @@ function ThermostatPageEntry({
   icon,
   onOpen,
   sectionTitle,
-  subtitle,
   title,
 }: {
   description: string
@@ -5914,30 +5895,25 @@ function ThermostatPageEntry({
   icon: string
   onOpen: (hash: string) => void
   sectionTitle: string
-  subtitle: string
   title: string
 }) {
   return (
     <section className={styles.section}>
       <SectionHeader title={sectionTitle} />
       <Description>{description}</Description>
-      <ModalOpenerRow
-        icon={<MaterialIcon name={icon} size={32} />}
+      <GlassTile
+        disclosure
+        icon={icon}
+        iconColor="white"
         onClick={() => onOpen(hash)}
-        subtitle={subtitle}
         title={title}
-        variant="compact"
+        tone="switch"
       />
     </section>
   )
 }
 
 function ThermostatPageEntries({ onOpen }: { onOpen: (hash: string) => void }) {
-  const rangeEntity = useEntity(asEntityName('input_text.all_climate_range'), { returnNullIfNotFound: true })
-  const rangeSummary = formatCompactEntityState(rangeEntity, 'Range unavailable')
-  const automationSummary = useThermostatAutomationSummary()
-  const trackingSummary = useThermostatTrackingSummary()
-
   return (
     <div className={styles.thermostatPageEntries} data-thermostat-page-entrypoints="true">
       <ThermostatPageEntry
@@ -5945,27 +5921,24 @@ function ThermostatPageEntries({ onOpen }: { onOpen: (hash: string) => void }) {
         hash={THERMOSTAT_ROOMS_HASH}
         icon="mdi:home-thermometer"
         onOpen={onOpen}
-        sectionTitle="Rooms"
-        subtitle={`${THERMOSTAT_ROOM_VIEWS.length} rooms · ${rangeSummary}`}
-        title="Open Room Thermostats"
+        sectionTitle="Room Thermostats"
+        title="Room Thermostats"
       />
       <ThermostatPageEntry
         description={thermostatTabDescription('automation')}
         hash={THERMOSTAT_AUTOMATION_HASH}
         icon="mdi:cog"
         onOpen={onOpen}
-        sectionTitle="Automation"
-        subtitle={automationSummary}
-        title="Open Automation"
+        sectionTitle="Advanced Configuration"
+        title="Advanced Configuration"
       />
       <ThermostatPageEntry
         description={thermostatTabDescription('tracking')}
         hash={THERMOSTAT_TRACKING_HASH}
         icon="mdi:motion-sensor"
         onOpen={onOpen}
-        sectionTitle="Tracking"
-        subtitle={thermostatTrackingPageSummary(trackingSummary)}
-        title="Open Room Tracking"
+        sectionTitle="Room Tracking"
+        title="Room Tracking"
       />
     </div>
   )

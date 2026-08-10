@@ -352,7 +352,7 @@ export const MANUAL_TASK_GUIDE_ARTICLES: ManualTaskGuideArticle[] = [
         'Decide separately whether forecast logic may change targets, change HVAC mode, or act while the house is Away.',
       ],
       steps: [
-        'Open Automation, open Predictive Comfort, and read the recommendation, reason, and any rate-limit or eligibility explanation.',
+        'Open Advanced Configuration, open Predictive Comfort, and read the recommendation, reason, and any rate-limit or eligibility explanation.',
         'Enable or disable Auto Setpoint Adjustments according to whether automatic target changes are acceptable.',
         'Set HVAC Mode Changes independently; leaving it off allows recommendations or target work without granting mode changes.',
         'Set Predictive Comfort While Away only if automatic changes are appropriate during Away behavior, then close and review the summary.',

@@ -64,11 +64,11 @@ async function clearMockHassCalls(page: Page) {
 
 async function openThermostatControls(page: Page, tab: 'Automation' | 'Rooms' | 'Tracking' = 'Rooms') {
   const openerName = tab === 'Automation'
-    ? /Open Automation /
+    ? 'Advanced Configuration'
     : tab === 'Tracking'
-      ? /Open Room Tracking /
-      : /Open Room Thermostats 11 rooms/
-  await page.getByRole('button', { name: openerName }).click()
+      ? 'Room Tracking'
+      : 'Room Thermostats'
+  await page.getByRole('button', { exact: true, name: openerName }).click()
   await expect(page.getByRole('dialog', { name: 'Thermostat' })).toBeVisible()
   const dialog = page.getByRole('dialog')
   await expect(dialog.getByRole('tab', { name: tab })).toHaveAttribute('aria-selected', 'true')
@@ -883,13 +883,13 @@ test('Food quick link mirrors the All Food summary with the Kitchen Food orange'
   await page.setViewportSize({ width: 393, height: 852 })
   await page.goto('/at-a-glance/overview')
 
-  const foodQuickLink = page.getByRole('button', { name: 'Food 35 Items • 6 Expiring Soon' })
-  await expect(foodQuickLink).toContainText('Food')
+  const foodQuickLink = page.getByRole('button', { name: 'Food & Recipes 35 Items • 6 Expiring Soon' })
+  await expect(foodQuickLink).toContainText('Food & Recipes')
   await expect(foodQuickLink).toContainText('35 Items • 6 Expiring Soon')
   await expect(foodQuickLink).toHaveCSS('background-color', 'rgba(155, 110, 64, 0.72)')
 
   await foodQuickLink.click()
-  await expect(page.getByRole('heading', { exact: true, name: 'Food' })).toBeVisible()
+  await expect(page.getByRole('heading', { exact: true, name: 'Food & Recipes' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'All Food 35 Items • 6 Expiring Soon' })).toBeVisible()
 })
 
@@ -920,7 +920,7 @@ test('mobile modal opener families use shared disclosures and explicit action ex
   await expectNoChevron(page.getByRole('button', { name: /^Lights /i }).first())
   await expectRightChevron(page.getByRole('button', { name: /^Security System /i }))
   await expectNoChevron(page.getByRole('button', { name: 'Open Front Door camera' }))
-  for (const quickLink of ['Food 35 Items • 6 Expiring Soon', 'Vacuums', 'Media', 'Custom Lights']) {
+  for (const quickLink of ['Food & Recipes 35 Items • 6 Expiring Soon', 'Vacuums', 'Media', 'Custom Lights']) {
     const opener = page.getByRole('button', { exact: true, name: quickLink })
     await expectRightChevron(opener)
     await expect(opener).toHaveAttribute('data-navigation-opener', 'true')
@@ -935,9 +935,9 @@ test('mobile modal opener families use shared disclosures and explicit action ex
   await expectRightChevron(page.getByRole('button', { name: 'Open Presence-Based Overrides' }))
 
   await page.goto('/at-a-glance/ecobee')
-  await expectRightChevron(page.getByRole('button', { name: /Open Room Thermostats 11 rooms/i }))
-  await expectRightChevron(page.getByRole('button', { name: /Open Automation /i }))
-  await expectRightChevron(page.getByRole('button', { name: /Open Room Tracking /i }))
+  await expectRightChevron(page.getByRole('button', { exact: true, name: 'Room Thermostats' }))
+  await expectRightChevron(page.getByRole('button', { exact: true, name: 'Advanced Configuration' }))
+  await expectRightChevron(page.getByRole('button', { exact: true, name: 'Room Tracking' }))
   const thermostatDialog = await openThermostatControls(page)
   await expectRightChevron(thermostatDialog.getByRole('button', { name: 'Living Room 70.2°F · Inactive' }))
 
@@ -1339,11 +1339,15 @@ test('thermostat page keeps primary controls and three explained modal entry poi
   expect(dimensions.scrollHeight / dimensions.clientHeight).toBeLessThanOrEqual(2)
   await expect(page.getByRole('region', { name: /Whole Home thermostat/i })).toBeVisible()
   await expect(page.getByText(/View each room's temperature and occupancy/i)).toBeVisible()
-  await expect(page.getByRole('button', { name: /Open Room Thermostats 11 rooms/i })).toBeVisible()
-  await expect(page.getByText(/Manage the master thermostat, Eco behavior/i)).toBeVisible()
-  await expect(page.getByRole('button', { name: /Open Automation /i })).toBeVisible()
+  await expect(page.getByText('Manage Automatic Thermostat, Eco Mode, and Predictive Comfort settings.')).toBeVisible()
   await expect(page.getByText(/Choose which rooms participate in normal comfort/i)).toBeVisible()
-  await expect(page.getByRole('button', { name: /Open Room Tracking /i })).toBeVisible()
+  for (const label of ['Room Thermostats', 'Advanced Configuration', 'Room Tracking']) {
+    const tile = page.getByRole('button', { exact: true, name: label })
+    await expect(tile).toBeVisible()
+    await expect(tile).toHaveAttribute('data-tone', 'switch')
+    await expect(tile).toHaveAttribute('data-modal-opener', 'true')
+    await expect(tile.locator('[data-dynamic-grid-label]')).toHaveCount(1)
+  }
   await expect(page.getByRole('group', { name: 'Thermostat rooms' })).toHaveCount(0)
 })
 

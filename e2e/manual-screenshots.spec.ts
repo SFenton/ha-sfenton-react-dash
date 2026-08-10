@@ -607,7 +607,7 @@ test('section-climate-context', async ({ page }) => {
   })
   const subject = configuredCrop(page, 'section-climate-context')
   await subject.scrollIntoViewIfNeeded()
-  await expect(subject.getByRole('button', { name: /Open Room Thermostats 11 rooms/i })).toBeVisible()
+  await expect(subject.getByRole('button', { exact: true, name: 'Room Thermostats' })).toBeVisible()
   await expectManualSubject('section-climate-context', subject)
   await captureManualSubject(page, 'section-climate-context', subject)
 })
@@ -1835,11 +1835,11 @@ test('presence-auto-reset', async ({ page }) => {
 async function openThermostatManualDialog(page: Page, tab: 'Automation' | 'Rooms' | 'Tracking' = 'Rooms') {
   await openRouteWithSyntheticFixture(page, 'ecobee', 'Thermostat', {})
   const openerName = tab === 'Automation'
-    ? /Open Automation /
+    ? 'Advanced Configuration'
     : tab === 'Tracking'
-      ? /Open Room Tracking /
-      : /Open Room Thermostats 11 rooms/
-  await page.getByRole('button', { name: openerName }).click()
+      ? 'Room Tracking'
+      : 'Room Thermostats'
+  await page.getByRole('button', { exact: true, name: openerName }).click()
   const dialog = page.getByRole('dialog')
   await expect(dialog).toHaveAccessibleName('Thermostat')
   await expect(dialog.getByRole('tab', { name: tab })).toHaveAttribute('aria-selected', 'true')
@@ -1907,7 +1907,7 @@ test('thermostat-room', async ({ page }) => {
       },
     },
   })
-  await page.getByRole('button', { name: /Open Room Thermostats 11 rooms/i }).click()
+  await page.getByRole('button', { exact: true, name: 'Room Thermostats' }).click()
   const dialog = page.getByRole('dialog')
   await dialog.getByRole('button', { name: /Living Room 70.2°F/i }).click()
   await expect(dialog).toHaveAccessibleName('Living Room')
@@ -1944,7 +1944,7 @@ test('predictive-comfort', async ({ page }) => {
       },
     },
   })
-  await page.getByRole('button', { name: /Open Automation /i }).click()
+  await page.getByRole('button', { exact: true, name: 'Advanced Configuration' }).click()
   const dialog = page.getByRole('dialog')
   const openControls = dialog.getByRole('button', { name: /Open Predictive Comfort controls/i })
   await expect(openControls).toBeVisible({ timeout: 120000 })
@@ -2249,7 +2249,7 @@ async function openThermostatOptionPicker(page: Page, buttonName: RegExp, title:
   await openRouteWithSyntheticFixture(page, 'ecobee', 'Thermostat', THERMOSTAT_PICKER_FIXTURE)
   let scope: Page | Locator = page
   if (title.startsWith('Eco ')) {
-    await page.getByRole('button', { name: /Open Automation /i }).click()
+    await page.getByRole('button', { exact: true, name: 'Advanced Configuration' }).click()
     scope = page.getByRole('dialog')
   }
   const opener = scope.getByRole('button', { name: buttonName })

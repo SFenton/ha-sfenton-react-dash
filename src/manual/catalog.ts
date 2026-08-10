@@ -892,7 +892,7 @@ const CORE_ARTICLES: ManualArticleInput[] = [
     keywords: ['climate', 'thermostat', 'comfort', 'vents', 'contacts', 'sleepypod', 'humidifier'],
     tasks: ['What is the Climate area for?', 'How do room and whole-home comfort controls fit together?', 'Where are comfort schedules?'],
     blocks: [
-      overviewPurpose('Climate & Comfort starts with the whole-home thermostat and any open-door or window warning. Rooms, Automation, and Tracking explain their purpose before opening the matching tab in the shared Thermostat sheet. Room pages add vents, air purifiers, SleepyPod controls, and humidifier activities. Read the effective mode and visible sensor state before changing a target.'),
+      overviewPurpose('Climate & Comfort starts with the whole-home thermostat and any open-door or window warning. Room Thermostats, Advanced Configuration, and Room Tracking explain their purpose before opening the matching tab in the shared Thermostat sheet. Room pages add vents, air purifiers, SleepyPod controls, and humidifier activities. Read the effective mode and visible sensor state before changing a target.'),
       screenshot('section-climate-context'),
       overviewActions([
         'Adjust the whole-home target or open a room for its thermostat and vents.',
@@ -2488,7 +2488,7 @@ const CORE_ARTICLES: ManualArticleInput[] = [
     icon: 'mdi:thermostat',
     status: 'current',
     aliases: ['ecobee page', 'climate route', 'whole home thermostat', 'automatic thermostat'],
-    visibleLabels: ['Whole Home', 'Open Contact Sensors', 'Rooms', 'Automation', 'Tracking', 'Open Room Thermostats', 'Open Automation', 'Open Room Tracking'],
+    visibleLabels: ['Whole Home', 'Open Contact Sensors', 'Room Thermostats', 'Advanced Configuration', 'Room Tracking'],
     ownsSurfaceIds: ['route:ecobee'],
     stateMatrixIds: ['climate'],
     keywords: ['thermostat page', 'whole home', 'contacts', 'rooms', 'eco mode', 'predictive comfort', 'tracking', 'automatic thermostat'],
@@ -2498,16 +2498,16 @@ const CORE_ARTICLES: ManualArticleInput[] = [
     pageGuide: {
       routePath: 'ecobee',
       complexity: 'complex',
-      orientation: 'Thermostat keeps the primary Whole Home dial, physical Hub controls, effective Home, Away, or Vacation notice, and any open-contact warning on the page. Rooms, Automation, and Tracking each explain their purpose and open the matching tab in one shared sheet.',
-      visiblePageSectionNames: ['Whole Home', 'Open Contact Sensors', 'Rooms', 'Automation', 'Tracking'],
+      orientation: 'Thermostat keeps the primary Whole Home dial, physical Hub controls, effective Home, Away, or Vacation notice, and any open-contact warning on the page. Room Thermostats, Advanced Configuration, and Room Tracking each explain their purpose and open the matching tab in one shared sheet.',
+      visiblePageSectionNames: ['Whole Home', 'Open Contact Sensors', 'Room Thermostats', 'Advanced Configuration', 'Room Tracking'],
       whatYouCanDo: [
         'Adjust the Whole Home thermostat target and use the Thermostat Hub controls for the physical hub mode and supported fan setting.',
         'Read the effective Home, Away, or Vacation notice so you know whether the displayed target is the normal comfort target or an energy-saving target.',
         'Review Open Contact Sensors before changing temperatures, because an open door or window can intentionally pause automatic heating or cooling control.',
-        'Open Room Thermostats and select any room to adjust its virtual thermostat, inspect climate action, and read the configured vent position.',
-        'Open Automation to use the Automatic Thermostat master, enable Eco Mode, configure critical and away policy, or review Predictive Comfort.',
+        'Use Room Thermostats and select any room to adjust its virtual thermostat, inspect climate action, and read the configured vent position.',
+        'Use Advanced Configuration to manage the Automatic Thermostat master, enable Eco Mode, configure critical and away policy, or review Predictive Comfort.',
         'Open Predictive Comfort and separately decide whether it may adjust setpoints, change HVAC mode, or act while away.',
-        'Open Room Tracking to enable Track Selected Rooms and open the Selected Rooms, Critical Protection, or Occupied Only batch checklist.',
+        'Use Room Tracking to enable Track Selected Rooms and open the Selected Rooms, Critical Protection, or Occupied Only batch checklist.',
       ],
       whatHappensAutomatically: {
         mode: 'automatic',
@@ -2524,7 +2524,7 @@ const CORE_ARTICLES: ManualArticleInput[] = [
         { label: 'Whole Home action and targets', explanation: 'Heating, Cooling, or Idle shows current equipment behavior. Read both heat and cool targets before moving either side of the range.' },
         { label: 'Home, Away, or Vacation notice', explanation: 'This explains why the effective target may differ from the normal comfort range.' },
         { label: 'Open Contact Sensors', explanation: 'This section appears only when the aggregate contact state reports an opening. Resolve the physical opening before troubleshooting automatic control.' },
-        { label: 'Rooms, Automation, and Tracking', explanation: 'Each section explains the destination before opening the matching tab in the shared Thermostat sheet.' },
+        { label: 'Room Thermostats, Advanced Configuration, and Room Tracking', explanation: 'Each section explains the destination before opening the matching tab in the shared Thermostat sheet.' },
         { label: 'Room temperature and occupancy', explanation: 'The Rooms tab shows each room summary before its focused dial and vent-status detail.' },
         { label: 'Predictive recommendation', explanation: 'A recommendation is not proof that an automatic change was made. Check the separate setpoint, HVAC-mode, and away permissions.' },
         { label: 'Automatic Thermostat', explanation: 'If this master switch is off, lower-level tracking choices may remain visible but automatic thermostat control is disabled.' },

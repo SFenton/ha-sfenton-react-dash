@@ -76,7 +76,7 @@ async function clickIconModalTab(scope: RoleScope, name: string) {
 }
 
 async function openThermostatControls() {
-  fireEvent.click(screen.getByRole('button', { name: /Open Room Thermostats 11 rooms/i }))
+  fireEvent.click(screen.getByRole('button', { name: 'Room Thermostats' }))
   return screen.findByRole('dialog', { name: 'Thermostat' })
 }
 
@@ -2013,9 +2013,9 @@ describe('DashboardViewPage', () => {
     expect(screen.getByLabelText(/Thermostat Hub Mode Off/i)).toBeInTheDocument()
     expect(screen.queryByText('73.4 °F')).not.toBeInTheDocument()
     expect(screen.queryByText('38.0%')).not.toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Rooms' })).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Automation' })).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Tracking' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Room Thermostats' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Advanced Configuration' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Room Tracking' })).toBeInTheDocument()
 
     const dialog = await openThermostatControls()
     const tabs = within(dialog).getAllByRole('tab')
@@ -2131,14 +2131,20 @@ describe('DashboardViewPage', () => {
     }
   })
 
-  it('reports unavailable selected-room tracking distinctly from off', () => {
+  it('uses green thermostat entry tiles without live-state subtitles', () => {
     const tracking = mockEntities['switch.thermostat_contact_sensors_only_track_selected_rooms']
     const previousState = tracking.state
     tracking.state = 'unavailable'
 
     try {
       render(<DashboardViewPage activePath="ecobee" onNavigate={() => undefined} path="ecobee" />)
-      expect(screen.getByRole('button', { name: /Open Room Tracking Selected tracking unavailable/i })).toBeInTheDocument()
+      for (const label of ['Room Thermostats', 'Advanced Configuration', 'Room Tracking']) {
+        const tile = screen.getByRole('button', { name: label })
+        expect(tile).toHaveAttribute('data-tone', 'switch')
+        expect(tile).toHaveAttribute('data-modal-opener', 'true')
+        expect(tile.querySelectorAll('[data-dynamic-grid-label]')).toHaveLength(1)
+      }
+      expect(screen.queryByText(/Selected tracking unavailable/i)).not.toBeInTheDocument()
     } finally {
       tracking.state = previousState
     }
@@ -6659,9 +6665,9 @@ describe('DashboardViewPage', () => {
 
     expect(screen.getByRole('heading', { name: 'Thermostat' })).toBeInTheDocument()
     expect(screen.queryByText(/not available in the React dashboard yet/i)).not.toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Rooms' })).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Automation' })).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Tracking' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Room Thermostats' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Advanced Configuration' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Room Tracking' })).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: 'Eco Mode' })).not.toBeInTheDocument()
   })
 

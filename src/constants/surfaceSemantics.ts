@@ -159,7 +159,7 @@ export const THERMOSTAT_MODAL_TABS: readonly ModalTabDefinition<ThermostatModalT
     tab: 'rooms',
   },
   {
-    description: 'Manage the master thermostat, Eco behavior, and Predictive Comfort permissions.',
+    description: 'Manage Automatic Thermostat, Eco Mode, and Predictive Comfort settings.',
     icon: 'mdi:cog',
     label: 'Automation',
     tab: 'automation',

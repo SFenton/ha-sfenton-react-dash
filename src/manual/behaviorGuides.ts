@@ -270,7 +270,7 @@ export const MANUAL_BEHAVIOR_GUIDE_ARTICLES: ManualBehaviorGuideArticle[] = [
         'Eco can reduce conditioning while retaining configured critical limits; empty-room tracking can remove demand and minimum-vent participation; predictive behavior can act earlier when explicitly allowed.',
       ],
       visibleAppSigns: [
-        'The Thermostat page explains the effective Home, Away, Vacation, paused, or automatic reason and shows open contacts. Rooms, Automation, and Tracking each open the matching part of the shared Thermostat sheet.',
+        'The Thermostat page explains the effective Home, Away, Vacation, paused, or automatic reason and shows open contacts. Room Thermostats, Advanced Configuration, and Room Tracking each open the matching part of the shared Thermostat sheet.',
         'Home and room climate summaries display confirmed ranges, action colors, occupancy context, and vent state. A recommendation card does not prove an adjustment was applied.',
       ],
       exceptionsGuestVacationAway: 'Guest mode can force home-style away behavior and critical tracking for guest-capable rooms. Vacation can use away policy, while an active guest guard can intentionally override it. Sleep-related room logic may pause direct tracking without removing critical protection. Open contacts remain safety gates in every mode.',

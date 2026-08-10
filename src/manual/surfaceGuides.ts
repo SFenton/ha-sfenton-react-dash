@@ -517,14 +517,14 @@ export const MANUAL_NEW_SURFACE_GUIDE_ARTICLES: ManualSurfaceGuideArticle[] = [
     icon: 'mdi:home-thermometer',
     status: 'current',
     aliases: ['thermostat settings', 'room thermostats', 'eco mode settings', 'room tracking'],
-    visibleLabels: ['Rooms', 'Automation', 'Tracking', 'Selected Rooms', 'Critical Protection', 'Occupied Only'],
+    visibleLabels: ['Room Thermostats', 'Advanced Configuration', 'Room Tracking', 'Rooms', 'Automation', 'Tracking', 'Selected Rooms', 'Critical Protection', 'Occupied Only'],
     keywords: ['thermostat modal', 'rooms', 'automation', 'eco', 'predictive comfort', 'tracking'],
     tasks: ['How do I open a room thermostat?', 'Where are Eco and Predictive Comfort settings?', 'How do I choose tracked or occupied-only rooms?'],
     coversRoutes: ['ecobee'],
     blocks: [],
     surfaceGuide: {
       howToOpen: [
-        'Open Climate, review the Whole Home dial and Thermostat Hub, then use Room Thermostats, Automation, or Room Tracking to open the matching tab.',
+        'Open Climate, review the Whole Home dial and Thermostat Hub, then use Room Thermostats, Advanced Configuration, or Room Tracking to open the matching tab.',
         'An existing room hash or Predictive Comfort link opens the same sheet directly on its matching detail page instead of creating another modal.',
       ],
       contents: [
