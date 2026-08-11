@@ -1,0 +1,41 @@
+{
+  "version": 1,
+  "status": "provisional",
+  "model": "gpt-5.6-terra",
+  "effort": "low",
+  "context": "default",
+  "candidateId": "gpt-5.6-terra-low",
+  "selectionBasis": "No evaluated profile passed the final hash-bound qualification, holdout, and latency quality gate. GPT-5.6 Terra had the lowest p95 latency among the final two, so it is retained only for explicit provisional testing; normal skill generation and pinned execution remain blocked.",
+  "evalRun": "artifacts/house-style-copy-evals/release-qualification-20260811,artifacts/house-style-copy-evals/release-holdout-20260811,artifacts/house-style-copy-evals/release-latency-20260811",
+  "pricingAsOf": "2026-08-11",
+  "expiresAfterDays": 90,
+  "autoSelectionAllowed": false,
+  "evidence": {
+    "decision": "no-qualified-profile",
+    "publicQualification": {
+      "passRate": 0.9523809523809523,
+      "meanScore": 99.66666666666667,
+      "hardFailureCount": 2,
+      "contextFloor": 96
+    },
+    "holdout": {
+      "passRate": 0.6666666666666666,
+      "meanScore": 90.07407407407408,
+      "hardFailureCount": 6,
+      "contextFloor": 66
+    },
+    "latency": {
+      "passRate": 1,
+      "meanScore": 94.5,
+      "hardFailureCount": 0,
+      "p95Milliseconds": 6368
+    },
+    "gateFailures": [
+      "hard failures",
+      "pass rate below 95%",
+      "context floor below 88",
+      "notification/safety pass rate below 95%",
+      "holdout drop above 3"
+    ]
+  }
+}

@@ -1,0 +1,300 @@
+{
+  "version": 1,
+  "name": "public-calibration-v1",
+  "cases": [
+    {
+      "id": "button-view-details-rewrite",
+      "title": "Replace vague detail button",
+      "input": "Rewrite the button text \"Click Here\" for a recipe card opener. The intent is to view details. React owns it. Maximum 14 characters and 2 words. Do not use Click.",
+      "expectedRequest": {"mode":"rewrite","contextClass":"button","surface":"Recipe card opener","intent":"View recipe details","ownership":"react","maxCharacters":14,"maxWords":2,"requiredPlaceholders":[],"forbiddenTerms":["Click"],"stateMatrix":[],"outputCount":1},
+      "oracle": {"expectedStatus":"ok","acceptedTexts":["View Details"],"requiredCandidateCount":1,"requiredKeyPrefix":"recipes.","forbiddenPatterns":["click here"]}
+    },
+    {
+      "id": "button-open-cameras",
+      "title": "Create camera navigation button",
+      "input": {"mode":"create","contextClass":"button","surface":"Security page","intent":"Open the camera section","ownership":"react","maxCharacters":14,"maxWords":2,"requiredPlaceholders":[],"forbiddenTerms":["Click"],"stateMatrix":[],"outputCount":1},
+      "expectedRequest": {"mode":"create","contextClass":"button","surface":"Security page","intent":"Open the camera section","ownership":"react","maxCharacters":14,"maxWords":2,"requiredPlaceholders":[],"forbiddenTerms":["Click"],"stateMatrix":[],"outputCount":1},
+      "oracle": {"expectedStatus":"ok","acceptedTexts":["Open Cameras","View Cameras"],"requiredCandidateCount":1,"requiredKeyPrefix":"security.","forbiddenPatterns":["click"]}
+    },
+    {
+      "id": "action-start-area-clean",
+      "title": "Start area-clean action",
+      "input": {"mode":"create","contextClass":"action","surface":"Vacuum controls","intent":"Start cleaning the drawn map area","ownership":"react","maxCharacters":18,"maxWords":3,"requiredPlaceholders":[],"forbiddenTerms":["Submit"],"stateMatrix":[],"outputCount":1},
+      "expectedRequest": {"mode":"create","contextClass":"action","surface":"Vacuum controls","intent":"Start cleaning the drawn map area","ownership":"react","maxCharacters":18,"maxWords":3,"requiredPlaceholders":[],"forbiddenTerms":["Submit"],"stateMatrix":[],"outputCount":1},
+      "oracle": {"expectedStatus":"ok","acceptedTexts":["Start Area Clean"],"requiredCandidateCount":1,"requiredKeyPrefix":"vacuum.","forbiddenPatterns":["submit"]}
+    },
+    {
+      "id": "action-apply-filters-variants",
+      "title": "Filter apply variants",
+      "input": "Give three action-label variants for committing recipe filter drafts. React owns the action. Use at most 18 characters and 3 words. Do not use Submit.",
+      "expectedRequest": {"mode":"variants","contextClass":"action","surface":"Recipe filter footer","intent":"Commit the current recipe filter draft","ownership":"react","maxCharacters":18,"maxWords":3,"requiredPlaceholders":[],"forbiddenTerms":["Submit"],"stateMatrix":[],"outputCount":3},
+      "oracle": {"expectedStatus":"ok","acceptedTexts":["Apply Filters","Apply Changes","Update Results"],"requiredCandidateCount":3,"requiredKeyPrefix":"recipes.","forbiddenPatterns":["submit"]}
+    },
+    {
+      "id": "destructive-delete-task",
+      "title": "Explicit task deletion",
+      "input": {"mode":"create","contextClass":"destructive-action","surface":"Task editor","intent":"Permanently delete the current task","ownership":"react","maxCharacters":12,"maxWords":2,"requiredPlaceholders":[],"forbiddenTerms":["Remove"],"stateMatrix":[],"outputCount":1},
+      "expectedRequest": {"mode":"create","contextClass":"destructive-action","surface":"Task editor","intent":"Permanently delete the current task","ownership":"react","maxCharacters":12,"maxWords":2,"requiredPlaceholders":[],"forbiddenTerms":["Remove"],"stateMatrix":[],"outputCount":1},
+      "oracle": {"expectedStatus":"ok","acceptedTexts":["Delete Task"],"requiredCandidateCount":1,"requiredKeyPrefix":"tasks.","forbiddenPatterns":["^delete$","remove"]}
+    },
+    {
+      "id": "destructive-cancel-vacation",
+      "title": "Explicit vacation cancellation",
+      "input": {"mode":"create","contextClass":"destructive-action","surface":"Vacation confirmation","intent":"Cancel the active vacation period","ownership":"react","maxCharacters":18,"maxWords":2,"requiredPlaceholders":[],"forbiddenTerms":["Stop"],"stateMatrix":[],"outputCount":1},
+      "expectedRequest": {"mode":"create","contextClass":"destructive-action","surface":"Vacation confirmation","intent":"Cancel the active vacation period","ownership":"react","maxCharacters":18,"maxWords":2,"requiredPlaceholders":[],"forbiddenTerms":["Stop"],"stateMatrix":[],"outputCount":1},
+      "oracle": {"expectedStatus":"ok","acceptedTexts":["Cancel Vacation"],"requiredCandidateCount":1,"requiredKeyPrefix":"vacation.","forbiddenPatterns":["^cancel$","stop"]}
+    },
+    {
+      "id": "chip-door-count",
+      "title": "Door-count status chip",
+      "input": {"mode":"create","contextClass":"chip","surface":"Security status rail","intent":"Show how many doors are open","ownership":"react","maxCharacters":24,"maxWords":3,"requiredPlaceholders":["{{count}}"],"forbiddenTerms":["sensor"],"stateMatrix":[],"outputCount":1},
+      "expectedRequest": {"mode":"create","contextClass":"chip","surface":"Security status rail","intent":"Show how many doors are open","ownership":"react","maxCharacters":24,"maxWords":3,"requiredPlaceholders":["{{count}}"],"forbiddenTerms":["sensor"],"stateMatrix":[],"outputCount":1},
+      "oracle": {"expectedStatus":"ok","acceptedTexts":["{{count}} Doors Open"],"requiredCandidateCount":1,"requiredKeyPrefix":"security.","forbiddenPatterns":["sensor\\.","binary_sensor"]}
+    },
+    {
+      "id": "status-unavailable-audit",
+      "title": "Unavailable state audit",
+      "input": {"mode":"audit","contextClass":"status","surface":"Entity card","intent":"Represent an entity whose state cannot be read","ownership":"react","maxCharacters":16,"maxWords":1,"requiredPlaceholders":[],"forbiddenTerms":["Unknown Error"],"stateMatrix":[],"outputCount":1},
+      "expectedRequest": {"mode":"audit","contextClass":"status","surface":"Entity card","intent":"Represent an entity whose state cannot be read","ownership":"react","maxCharacters":16,"maxWords":1,"requiredPlaceholders":[],"forbiddenTerms":["Unknown Error"],"stateMatrix":[],"outputCount":1},
+      "oracle": {"expectedStatus":"ok","acceptedTexts":["Unavailable"],"requiredCandidateCount":1,"requiredKeyPrefix":"common.","forbiddenPatterns":["unknown error"]}
+    },
+    {
+      "id": "tab-ingredients",
+      "title": "Recipe ingredients tab",
+      "input": {"mode":"create","contextClass":"tab","surface":"Recipe detail modal","intent":"Open the recipe ingredient inventory tab","ownership":"react","maxCharacters":14,"maxWords":1,"requiredPlaceholders":[],"forbiddenTerms":["View"],"stateMatrix":[],"outputCount":1},
+      "expectedRequest": {"mode":"create","contextClass":"tab","surface":"Recipe detail modal","intent":"Open the recipe ingredient inventory tab","ownership":"react","maxCharacters":14,"maxWords":1,"requiredPlaceholders":[],"forbiddenTerms":["View"],"stateMatrix":[],"outputCount":1},
+      "oracle": {"expectedStatus":"ok","acceptedTexts":["Ingredients"],"requiredCandidateCount":1,"requiredKeyPrefix":"recipes.","forbiddenPatterns":["view"]}
+    },
+    {
+      "id": "section-quick-links",
+      "title": "Home quick-links heading",
+      "input": {"mode":"create","contextClass":"section-title","surface":"Home page","intent":"Name the section containing high-priority destinations","ownership":"react","maxCharacters":14,"maxWords":2,"requiredPlaceholders":[],"forbiddenTerms":["Shortcuts"],"stateMatrix":[],"outputCount":1},
+      "expectedRequest": {"mode":"create","contextClass":"section-title","surface":"Home page","intent":"Name the section containing high-priority destinations","ownership":"react","maxCharacters":14,"maxWords":2,"requiredPlaceholders":[],"forbiddenTerms":["Shortcuts"],"stateMatrix":[],"outputCount":1},
+      "oracle": {"expectedStatus":"ok","acceptedTexts":["Quick Links"],"requiredCandidateCount":1,"requiredKeyPrefix":"home.","forbiddenPatterns":["shortcuts"]}
+    },
+    {
+      "id": "card-security-system",
+      "title": "Security card title",
+      "input": {"mode":"create","contextClass":"card-title","surface":"Security page","intent":"Name the card that opens alarm controls","ownership":"react","maxCharacters":18,"maxWords":2,"requiredPlaceholders":[],"forbiddenTerms":["alarm_control_panel"],"stateMatrix":[],"outputCount":1},
+      "expectedRequest": {"mode":"create","contextClass":"card-title","surface":"Security page","intent":"Name the card that opens alarm controls","ownership":"react","maxCharacters":18,"maxWords":2,"requiredPlaceholders":[],"forbiddenTerms":["alarm_control_panel"],"stateMatrix":[],"outputCount":1},
+      "oracle": {"expectedStatus":"ok","acceptedTexts":["Security System"],"requiredCandidateCount":1,"requiredKeyPrefix":"security.","forbiddenPatterns":["alarm_control_panel"]}
+    },
+    {
+      "id": "page-food-recipes",
+      "title": "Food hub page title",
+      "input": {"mode":"audit","contextClass":"page-title","surface":"Food hub","intent":"Name the combined food inventory and recipe hub","ownership":"react","maxCharacters":18,"maxWords":3,"requiredPlaceholders":[],"forbiddenTerms":[],"stateMatrix":[],"outputCount":1},
+      "expectedRequest": {"mode":"audit","contextClass":"page-title","surface":"Food hub","intent":"Name the combined food inventory and recipe hub","ownership":"react","maxCharacters":18,"maxWords":3,"requiredPlaceholders":[],"forbiddenTerms":[],"stateMatrix":[],"outputCount":1},
+      "oracle": {"expectedStatus":"ok","acceptedTexts":["Food & Recipes"],"requiredCandidateCount":1,"requiredKeyPrefix":"food.","forbiddenPatterns":[]}
+    },
+    {
+      "id": "modal-title-add-grocery",
+      "title": "Grocery modal title",
+      "input": {"mode":"create","contextClass":"modal-title","surface":"Grocery item sheet","intent":"Name the sheet for adding one grocery item","ownership":"react","maxCharacters":18,"maxWords":3,"requiredPlaceholders":[],"forbiddenTerms":["Create"],"stateMatrix":[],"outputCount":1},
+      "expectedRequest": {"mode":"create","contextClass":"modal-title","surface":"Grocery item sheet","intent":"Name the sheet for adding one grocery item","ownership":"react","maxCharacters":18,"maxWords":3,"requiredPlaceholders":[],"forbiddenTerms":["Create"],"stateMatrix":[],"outputCount":1},
+      "oracle": {"expectedStatus":"ok","acceptedTexts":["Add Grocery Item"],"requiredCandidateCount":1,"requiredKeyPrefix":"food.","forbiddenPatterns":["create"]}
+    },
+    {
+      "id": "modal-title-recipe-rewrite",
+      "title": "Shorten recipe modal title",
+      "input": "Rewrite the modal title \"Recipe Information Details\" to name the recipe details sheet. React owns it. Maximum 16 characters and 2 words.",
+      "expectedRequest": {"mode":"rewrite","contextClass":"modal-title","surface":"Recipe detail sheet","intent":"Name the recipe detail sheet","ownership":"react","maxCharacters":16,"maxWords":2,"requiredPlaceholders":[],"forbiddenTerms":[],"stateMatrix":[],"outputCount":1},
+      "oracle": {"expectedStatus":"ok","acceptedTexts":["Recipe Details"],"requiredCandidateCount":1,"requiredKeyPrefix":"recipes.","forbiddenPatterns":["information details"]}
+    },
+    {
+      "id": "modal-description-vacuum",
+      "title": "Vacuum setup description",
+      "input": {"mode":"create","contextClass":"modal-description","surface":"Vacuum controls modal","intent":"Explain that rooms and settings are chosen before cleaning starts","ownership":"react","maxCharacters":82,"maxWords":12,"requiredPlaceholders":[],"forbiddenTerms":["service"],"stateMatrix":[],"outputCount":1},
+      "expectedRequest": {"mode":"create","contextClass":"modal-description","surface":"Vacuum controls modal","intent":"Explain that rooms and settings are chosen before cleaning starts","ownership":"react","maxCharacters":82,"maxWords":12,"requiredPlaceholders":[],"forbiddenTerms":["service"],"stateMatrix":[],"outputCount":1},
+      "oracle": {"expectedStatus":"ok","acceptedTexts":["Choose the rooms and cleaning settings before starting the vacuum.","Choose rooms and settings before starting the vacuum."],"requiredCandidateCount":1,"requiredKeyPrefix":"vacuum.","requiredTerms":["rooms","settings","before"],"forbiddenPatterns":["service"]}
+    },
+    {
+      "id": "modal-action-save-task",
+      "title": "Task-save modal action",
+      "input": {"mode":"create","contextClass":"modal-action","surface":"Task editor footer","intent":"Save edits to the current task","ownership":"react","maxCharacters":10,"maxWords":2,"requiredPlaceholders":[],"forbiddenTerms":["Submit"],"stateMatrix":[],"outputCount":1},
+      "expectedRequest": {"mode":"create","contextClass":"modal-action","surface":"Task editor footer","intent":"Save edits to the current task","ownership":"react","maxCharacters":10,"maxWords":2,"requiredPlaceholders":[],"forbiddenTerms":["Submit"],"stateMatrix":[],"outputCount":1},
+      "oracle": {"expectedStatus":"ok","acceptedTexts":["Save Task"],"requiredCandidateCount":1,"requiredKeyPrefix":"tasks.","forbiddenPatterns":["submit"]}
+    },
+    {
+      "id": "description-presence-pause",
+      "title": "Presence pause explanation",
+      "input": {"mode":"create","contextClass":"description","surface":"Admin presence controls","intent":"Explain that paused lighting stays dark until resumed","ownership":"react","maxCharacters":72,"maxWords":12,"requiredPlaceholders":[],"forbiddenTerms":["switch."],"stateMatrix":[{"state":"paused","effect":"Lighting remains dark until resumed."}],"outputCount":1},
+      "expectedRequest": {"mode":"create","contextClass":"description","surface":"Admin presence controls","intent":"Explain that paused lighting stays dark until resumed","ownership":"react","maxCharacters":72,"maxWords":12,"requiredPlaceholders":[],"forbiddenTerms":["switch."],"stateMatrix":[{"state":"paused","effect":"Lighting remains dark until resumed."}],"outputCount":1},
+      "oracle": {"expectedStatus":"ok","acceptedTexts":["Paused keeps the room dark until presence lighting is resumed."],"requiredCandidateCount":1,"requiredKeyPrefix":"admin.","requiredTerms":["paused","dark","resumed"],"forbiddenPatterns":["switch\\."]}
+    },
+    {
+      "id": "description-vacation-rewrite",
+      "title": "Vacation description sentence case",
+      "input": "Rewrite \"Set Away Dates And Prepare The House For Vacation\" as a sentence-case description. It explains the Vacation page, is React-owned, and must stay under 70 characters and 12 words.",
+      "expectedRequest": {"mode":"rewrite","contextClass":"description","surface":"Settings Vacation row","intent":"Explain that the page sets away dates and prepares the house","ownership":"react","maxCharacters":70,"maxWords":12,"requiredPlaceholders":[],"forbiddenTerms":[],"stateMatrix":[],"outputCount":1},
+      "oracle": {"expectedStatus":"ok","acceptedTexts":["Set away dates and prepare the house for vacation.","Set vacation dates and prepare the house for your time away."],"requiredCandidateCount":1,"requiredKeyPrefix":"settings.","requiredTerms":["away dates","prepare","vacation"],"forbiddenPatterns":[]}
+    },
+    {
+      "id": "help-area-confirm",
+      "title": "HA confirmation help",
+      "input": {"mode":"create","contextClass":"help","surface":"Vacuum area cleaning","intent":"Explain that Home Assistant confirms settings before sending the command","ownership":"react","maxCharacters":90,"maxWords":13,"requiredPlaceholders":[],"forbiddenTerms":["script."],"stateMatrix":[],"outputCount":1},
+      "expectedRequest": {"mode":"create","contextClass":"help","surface":"Vacuum area cleaning","intent":"Explain that Home Assistant confirms settings before sending the command","ownership":"react","maxCharacters":90,"maxWords":13,"requiredPlaceholders":[],"forbiddenTerms":["script."],"stateMatrix":[],"outputCount":1},
+      "oracle": {"expectedStatus":"ok","acceptedTexts":["Home Assistant confirms these settings before the area-cleaning command is sent."],"requiredCandidateCount":1,"requiredKeyPrefix":"vacuum.","requiredTerms":["Home Assistant","confirms","before"],"forbiddenPatterns":["script\\."]}
+    },
+    {
+      "id": "help-filter-drafts",
+      "title": "Filter draft help",
+      "input": {"mode":"create","contextClass":"help","surface":"Recipe filter sheet","intent":"Explain that changes do not affect results until Apply is selected","ownership":"react","maxCharacters":82,"maxWords":14,"requiredPlaceholders":[],"forbiddenTerms":["commit"],"stateMatrix":[],"outputCount":1},
+      "expectedRequest": {"mode":"create","contextClass":"help","surface":"Recipe filter sheet","intent":"Explain that changes do not affect results until Apply is selected","ownership":"react","maxCharacters":82,"maxWords":14,"requiredPlaceholders":[],"forbiddenTerms":["commit"],"stateMatrix":[],"outputCount":1},
+      "oracle": {"expectedStatus":"ok","acceptedTexts":["Changes take effect after you select Apply.","Changes affect results after you select Apply."],"requiredCandidateCount":1,"requiredKeyPrefix":"recipes.","requiredTerms":["after","Apply"],"forbiddenPatterns":["commit"]}
+    },
+    {
+      "id": "empty-title-no-items",
+      "title": "Inventory empty title",
+      "input": {"mode":"create","contextClass":"empty-title","surface":"Food inventory","intent":"State that no inventory items match the current view","ownership":"react","maxCharacters":16,"maxWords":3,"requiredPlaceholders":[],"forbiddenTerms":["Empty"],"stateMatrix":[],"outputCount":1},
+      "expectedRequest": {"mode":"create","contextClass":"empty-title","surface":"Food inventory","intent":"State that no inventory items match the current view","ownership":"react","maxCharacters":16,"maxWords":3,"requiredPlaceholders":[],"forbiddenTerms":["Empty"],"stateMatrix":[],"outputCount":1},
+      "oracle": {"expectedStatus":"ok","acceptedTexts":["No Items Found"],"requiredCandidateCount":1,"requiredKeyPrefix":"food.","forbiddenPatterns":["empty"]}
+    },
+    {
+      "id": "empty-body-scan-item",
+      "title": "Inventory empty next action",
+      "input": {"mode":"create","contextClass":"empty-body","surface":"Food inventory","intent":"Explain that scanning adds the first item","ownership":"react","maxCharacters":52,"maxWords":11,"requiredPlaceholders":[],"forbiddenTerms":["Click"],"stateMatrix":[],"outputCount":1},
+      "expectedRequest": {"mode":"create","contextClass":"empty-body","surface":"Food inventory","intent":"Explain that scanning adds the first item","ownership":"react","maxCharacters":52,"maxWords":11,"requiredPlaceholders":[],"forbiddenTerms":["Click"],"stateMatrix":[],"outputCount":1},
+      "oracle": {"expectedStatus":"ok","acceptedTexts":["Scan an item to add it to this food space."],"requiredCandidateCount":1,"requiredKeyPrefix":"food.","requiredTerms":["Scan","add","food space"],"forbiddenPatterns":["click"]}
+    },
+    {
+      "id": "error-recipe-load",
+      "title": "Recipe load recovery",
+      "input": {"mode":"create","contextClass":"error","surface":"Recipe detail modal","intent":"Say recipe details failed to load and offer a safe retry","ownership":"react","maxCharacters":60,"maxWords":11,"requiredPlaceholders":[],"forbiddenTerms":["exception","evershelf.recipe_detail"],"stateMatrix":[],"outputCount":1},
+      "expectedRequest": {"mode":"create","contextClass":"error","surface":"Recipe detail modal","intent":"Say recipe details failed to load and offer a safe retry","ownership":"react","maxCharacters":60,"maxWords":11,"requiredPlaceholders":[],"forbiddenTerms":["evershelf.recipe_detail","exception"],"stateMatrix":[],"outputCount":1},
+      "oracle": {"expectedStatus":"ok","acceptedTexts":["Unable to load recipe details. Try again in a moment."],"requiredCandidateCount":1,"requiredKeyPrefix":"recipes.","requiredTerms":["Unable","recipe details","Try again"],"forbiddenPatterns":["exception","evershelf\\."]}
+    },
+    {
+      "id": "error-inventory-recovery",
+      "title": "Inventory error without blame",
+      "input": "Create an error sentence for an inventory list that could not load. Tell the user to try again. React owns it. Maximum 64 characters and 12 words. Do not mention an API or blame the user.",
+      "expectedRequest": {"mode":"create","contextClass":"error","surface":"Food inventory","intent":"State that inventory failed to load and suggest trying again","ownership":"react","maxCharacters":64,"maxWords":12,"requiredPlaceholders":[],"forbiddenTerms":["API","you caused"],"stateMatrix":[],"outputCount":1},
+      "oracle": {"expectedStatus":"ok","acceptedTexts":["Unable to load inventory. Try again in a moment."],"requiredCandidateCount":1,"requiredKeyPrefix":"food.","requiredTerms":["Unable","inventory","Try again"],"forbiddenPatterns":["api","you caused"]}
+    },
+    {
+      "id": "loading-recipe-details",
+      "title": "Recipe loading label",
+      "input": {"mode":"create","contextClass":"loading","surface":"Recipe detail modal","intent":"Announce that recipe details are actively loading","ownership":"react","maxCharacters":24,"maxWords":3,"requiredPlaceholders":[],"forbiddenTerms":["..."],"stateMatrix":[],"outputCount":1},
+      "expectedRequest": {"mode":"create","contextClass":"loading","surface":"Recipe detail modal","intent":"Announce that recipe details are actively loading","ownership":"react","maxCharacters":24,"maxWords":3,"requiredPlaceholders":[],"forbiddenTerms":["..."],"stateMatrix":[],"outputCount":1},
+      "oracle": {"expectedStatus":"ok","acceptedTexts":["Loading Recipe Details…"],"requiredCandidateCount":1,"requiredKeyPrefix":"recipes.","forbiddenPatterns":["\\.\\.\\."]}
+    },
+    {
+      "id": "success-task-saved",
+      "title": "Confirmed task save",
+      "input": {"mode":"create","contextClass":"success","surface":"Task editor","intent":"Confirm that Home Assistant has saved the task","ownership":"react","maxCharacters":14,"maxWords":2,"requiredPlaceholders":[],"forbiddenTerms":["Saving"],"stateMatrix":[{"state":"confirmed","effect":"The task is saved."}],"outputCount":1},
+      "expectedRequest": {"mode":"create","contextClass":"success","surface":"Task editor","intent":"Confirm that Home Assistant has saved the task","ownership":"react","maxCharacters":14,"maxWords":2,"requiredPlaceholders":[],"forbiddenTerms":["Saving"],"stateMatrix":[{"state":"confirmed","effect":"The task is saved."}],"outputCount":1},
+      "oracle": {"expectedStatus":"ok","acceptedTexts":["Task saved."],"requiredCandidateCount":1,"requiredKeyPrefix":"tasks.","forbiddenPatterns":["saving"]}
+    },
+    {
+      "id": "form-label-due-date",
+      "title": "Due-date field label",
+      "input": {"mode":"create","contextClass":"form-label","surface":"Task form","intent":"Label the task due-date picker","ownership":"react","maxCharacters":10,"maxWords":2,"requiredPlaceholders":[],"forbiddenTerms":["Choose"],"stateMatrix":[],"outputCount":1},
+      "expectedRequest": {"mode":"create","contextClass":"form-label","surface":"Task form","intent":"Label the task due-date picker","ownership":"react","maxCharacters":10,"maxWords":2,"requiredPlaceholders":[],"forbiddenTerms":["Choose"],"stateMatrix":[],"outputCount":1},
+      "oracle": {"expectedStatus":"ok","acceptedTexts":["Due Date"],"requiredCandidateCount":1,"requiredKeyPrefix":"tasks.","forbiddenPatterns":["choose"]}
+    },
+    {
+      "id": "form-placeholder-search-recipes",
+      "title": "Recipe search placeholder",
+      "input": {"mode":"create","contextClass":"form-placeholder","surface":"Recipe search","intent":"Hint that the search field searches recipes","ownership":"react","maxCharacters":16,"maxWords":2,"requiredPlaceholders":[],"forbiddenTerms":["Type Here"],"stateMatrix":[],"outputCount":1},
+      "expectedRequest": {"mode":"create","contextClass":"form-placeholder","surface":"Recipe search","intent":"Hint that the search field searches recipes","ownership":"react","maxCharacters":16,"maxWords":2,"requiredPlaceholders":[],"forbiddenTerms":["Type Here"],"stateMatrix":[],"outputCount":1},
+      "oracle": {"expectedStatus":"ok","acceptedTexts":["Search Recipes"],"requiredCandidateCount":1,"requiredKeyPrefix":"recipes.","forbiddenPatterns":["type here"]}
+    },
+    {
+      "id": "form-hint-custom-interval",
+      "title": "Task recurrence hint",
+      "input": {"mode":"create","contextClass":"form-hint","surface":"Task form","intent":"Explain that the interval controls how often a task repeats","ownership":"react","maxCharacters":44,"maxWords":8,"requiredPlaceholders":[],"forbiddenTerms":["frequency_metadata"],"stateMatrix":[],"outputCount":1},
+      "expectedRequest": {"mode":"create","contextClass":"form-hint","surface":"Task form","intent":"Explain that the interval controls how often a task repeats","ownership":"react","maxCharacters":44,"maxWords":8,"requiredPlaceholders":[],"forbiddenTerms":["frequency_metadata"],"stateMatrix":[],"outputCount":1},
+      "oracle": {"expectedStatus":"ok","acceptedTexts":["Choose how often this task repeats."],"requiredCandidateCount":1,"requiredKeyPrefix":"tasks.","requiredTerms":["often","task repeats"],"forbiddenPatterns":["frequency_metadata"]}
+    },
+    {
+      "id": "form-validation-quantity",
+      "title": "Quantity minimum validation",
+      "input": {"mode":"create","contextClass":"form-validation","surface":"Scan item form","intent":"Explain that quantity must be one or greater","ownership":"react","maxCharacters":32,"maxWords":7,"requiredPlaceholders":[],"forbiddenTerms":["You entered"],"stateMatrix":[],"outputCount":1},
+      "expectedRequest": {"mode":"create","contextClass":"form-validation","surface":"Scan item form","intent":"Explain that quantity must be one or greater","ownership":"react","maxCharacters":32,"maxWords":7,"requiredPlaceholders":[],"forbiddenTerms":["You entered"],"stateMatrix":[],"outputCount":1},
+      "oracle": {"expectedStatus":"ok","acceptedTexts":["Quantity must be at least 1."],"requiredCandidateCount":1,"requiredKeyPrefix":"food.","requiredTerms":["Quantity","at least 1"],"forbiddenPatterns":["you entered"]}
+    },
+    {
+      "id": "a11y-back-alarms",
+      "title": "Alarm back-button accessible name",
+      "input": {"mode":"create","contextClass":"a11y","surface":"Sleep alarm detail","intent":"Name the control that returns to the alarm list","ownership":"react","maxCharacters":16,"maxWords":3,"requiredPlaceholders":[],"forbiddenTerms":["button"],"stateMatrix":[],"outputCount":1},
+      "expectedRequest": {"mode":"create","contextClass":"a11y","surface":"Sleep alarm detail","intent":"Name the control that returns to the alarm list","ownership":"react","maxCharacters":16,"maxWords":3,"requiredPlaceholders":[],"forbiddenTerms":["button"],"stateMatrix":[],"outputCount":1},
+      "oracle": {"expectedStatus":"ok","acceptedTexts":["Back to Alarms"],"requiredCandidateCount":1,"requiredKeyPrefix":"sleepypod.","forbiddenPatterns":["button$"]}
+    },
+    {
+      "id": "a11y-open-room",
+      "title": "Room opener accessible name",
+      "input": "Create an accessible name for a control that opens {{roomName}} controls. Preserve {{roomName}} exactly. React owns it. Maximum 34 characters and 4 words. Do not append button.",
+      "expectedRequest": {"mode":"create","contextClass":"a11y","surface":"Room card","intent":"Open the named room controls","ownership":"react","maxCharacters":34,"maxWords":4,"requiredPlaceholders":["{{roomName}}"],"forbiddenTerms":["button"],"stateMatrix":[],"outputCount":1},
+      "oracle": {"expectedStatus":"ok","acceptedTexts":["Open {{roomName}} Controls"],"requiredCandidateCount":1,"requiredKeyPrefix":"rooms.","requiredTerms":["Open","Controls"],"forbiddenPatterns":["button$"]}
+    },
+    {
+      "id": "confirmation-delete-task",
+      "title": "Task deletion confirmation",
+      "input": {"mode":"create","contextClass":"confirmation","surface":"Task editor","intent":"Confirm permanent deletion and state that it cannot be undone","ownership":"react","maxCharacters":48,"maxWords":9,"requiredPlaceholders":[],"forbiddenTerms":["Are you sure"],"stateMatrix":[{"state":"confirmed","effect":"The task is permanently deleted."}],"outputCount":1},
+      "expectedRequest": {"mode":"create","contextClass":"confirmation","surface":"Task editor","intent":"Confirm permanent deletion and state that it cannot be undone","ownership":"react","maxCharacters":48,"maxWords":9,"requiredPlaceholders":[],"forbiddenTerms":["Are you sure"],"stateMatrix":[{"state":"confirmed","effect":"The task is permanently deleted."}],"outputCount":1},
+      "oracle": {"expectedStatus":"ok","acceptedTexts":["Delete this task? This cannot be undone."],"requiredCandidateCount":1,"requiredKeyPrefix":"tasks.","requiredTerms":["Delete","cannot be undone"],"forbiddenPatterns":["are you sure"]}
+    },
+    {
+      "id": "separator-topic-state",
+      "title": "Topic and state separator",
+      "input": {"mode":"create","contextClass":"separator","surface":"Compact status title","intent":"Separate a topic from its state or event","ownership":"react","maxCharacters":1,"maxWords":null,"requiredPlaceholders":[],"forbiddenTerms":[],"stateMatrix":[],"outputCount":1},
+      "expectedRequest": {"mode":"create","contextClass":"separator","surface":"Compact status title","intent":"Separate a topic from its state or event","ownership":"react","maxCharacters":1,"maxWords":null,"requiredPlaceholders":[],"forbiddenTerms":[],"stateMatrix":[],"outputCount":1},
+      "oracle": {"expectedStatus":"ok","acceptedTexts":["·"],"requiredCandidateCount":1,"requiredKeyPrefix":"common.","forbiddenPatterns":["—"]}
+    },
+    {
+      "id": "compound-inventory-counts",
+      "title": "Inventory count plural pair",
+      "input": {"mode":"create","contextClass":"compound-metric","surface":"Food summary card","intent":"Provide one and other plural variants for the inventory item count","ownership":"react","maxCharacters":20,"maxWords":3,"requiredPlaceholders":["{{count}}"],"forbiddenTerms":[],"stateMatrix":[{"variant":"one","meaning":"Exactly one item."},{"variant":"other","meaning":"Any other item count."}],"outputCount":2},
+      "expectedRequest": {"mode":"create","contextClass":"compound-metric","surface":"Food summary card","intent":"Provide one and other plural variants for the inventory item count","ownership":"react","maxCharacters":20,"maxWords":3,"requiredPlaceholders":["{{count}}"],"forbiddenTerms":[],"stateMatrix":[{"variant":"one","meaning":"Exactly one item."},{"variant":"other","meaning":"Any other item count."}],"outputCount":2},
+      "oracle": {"expectedStatus":"ok","acceptedTexts":["{{count}} Item","{{count}} Items"],"requiredCandidateCount":2,"requiredKeyPrefix":"food.","requiredTerms":["Item"],"forbiddenPatterns":["—"]}
+    },
+    {
+      "id": "compound-time-range",
+      "title": "Schedule time range",
+      "input": "Create a compact time range from {{start}} to {{end}}. Preserve both placeholders exactly, use an en dash, and return one compound metric owned by React. Maximum 24 characters.",
+      "expectedRequest": {"mode":"create","contextClass":"compound-metric","surface":"Schedule summary","intent":"Show a start and end time as a compact range","ownership":"react","maxCharacters":24,"maxWords":null,"requiredPlaceholders":["{{end}}","{{start}}"],"forbiddenTerms":["to"],"stateMatrix":[],"outputCount":1},
+      "oracle": {"expectedStatus":"ok","acceptedTexts":["{{start}}–{{end}}"],"requiredCandidateCount":1,"requiredKeyPrefix":"common.","requiredTerms":["–"],"forbiddenPatterns":[" - ","—"," to "]}
+    },
+    {
+      "id": "notification-title-dishwasher",
+      "title": "Dishwasher completion notification title",
+      "input": {"mode":"create","contextClass":"notification-title","surface":"Dishwasher notification","intent":"State that the dishwasher load is clean","ownership":"home-assistant-reference","maxCharacters":24,"maxWords":3,"requiredPlaceholders":[],"forbiddenTerms":["notify."],"stateMatrix":[],"outputCount":1},
+      "expectedRequest": {"mode":"create","contextClass":"notification-title","surface":"Dishwasher notification","intent":"State that the dishwasher load is clean","ownership":"home-assistant-reference","maxCharacters":24,"maxWords":3,"requiredPlaceholders":[],"forbiddenTerms":["notify."],"stateMatrix":[],"outputCount":1},
+      "oracle": {"expectedStatus":"ok","acceptedTexts":["Dishwasher · Clean"],"requiredCandidateCount":1,"requiredKeyPrefix":"notifications.","forbiddenPatterns":["notify\\."]}
+    },
+    {
+      "id": "notification-title-vacuum-jinja",
+      "title": "Templated vacuum completion title",
+      "input": {"mode":"create","contextClass":"notification-title","surface":"Vacuum notification","intent":"State that the named vacuum completed cleaning","ownership":"home-assistant-reference","maxCharacters":48,"maxWords":4,"requiredPlaceholders":["{{vacuumName}}"],"forbiddenTerms":["entity_id"],"stateMatrix":[],"outputCount":1},
+      "expectedRequest": {"mode":"create","contextClass":"notification-title","surface":"Vacuum notification","intent":"State that the named vacuum completed cleaning","ownership":"home-assistant-reference","maxCharacters":48,"maxWords":4,"requiredPlaceholders":["{{vacuumName}}"],"forbiddenTerms":["entity_id"],"stateMatrix":[],"outputCount":1},
+      "oracle": {"expectedStatus":"ok","acceptedTexts":["{{vacuumName}} · Cleaning Complete"],"requiredCandidateCount":1,"requiredKeyPrefix":"notifications.","forbiddenPatterns":["entity_id"]}
+    },
+    {
+      "id": "notification-body-security",
+      "title": "Security notification body",
+      "input": {"mode":"create","contextClass":"notification-body","surface":"Security notification","intent":"State that the security system triggered and direct the user to Security for review","ownership":"home-assistant-reference","maxCharacters":120,"maxWords":18,"requiredPlaceholders":[],"forbiddenTerms":["click here","alarm_control_panel"],"stateMatrix":[],"outputCount":1},
+      "expectedRequest": {"mode":"create","contextClass":"notification-body","surface":"Security notification","intent":"State that the security system triggered and direct the user to Security for review","ownership":"home-assistant-reference","maxCharacters":120,"maxWords":18,"requiredPlaceholders":[],"forbiddenTerms":["alarm_control_panel","click here"],"stateMatrix":[],"outputCount":1},
+      "oracle": {"expectedStatus":"ok","acceptedTexts":["The security system has been triggered. Open Security to review the system and available actions."],"requiredCandidateCount":1,"requiredKeyPrefix":"notifications.","requiredTerms":["triggered","Open Security","review"],"forbiddenPatterns":["click here","alarm_control_panel"]}
+    },
+    {
+      "id": "notification-body-vacuum-jinja",
+      "title": "Templated vacuum error body",
+      "input": "Write Home Assistant reference notification body copy: {{vacuumName}} stopped because {{reason}}. Give the next action of opening vacuum controls to review recovery options. Preserve placeholders exactly, stay under 130 characters and 19 words, and do not invent a service or entity.",
+      "expectedRequest": {"mode":"create","contextClass":"notification-body","surface":"Vacuum notification","intent":"State why the vacuum stopped and direct the user to recovery controls","ownership":"home-assistant-reference","maxCharacters":130,"maxWords":19,"requiredPlaceholders":["{{reason}}","{{vacuumName}}"],"forbiddenTerms":["entity_id","service"],"stateMatrix":[],"outputCount":1},
+      "oracle": {"expectedStatus":"ok","acceptedTexts":["{{vacuumName}} stopped because {{reason}}. Open the vacuum controls to review recovery options."],"requiredCandidateCount":1,"requiredKeyPrefix":"notifications.","requiredTerms":["stopped because","Open","recovery options"],"forbiddenPatterns":["service","entity_id"]}
+    },
+    {
+      "id": "notification-action-disarm",
+      "title": "Security notification action",
+      "input": {"mode":"create","contextClass":"notification-action","surface":"Security notification","intent":"Request disarming the security system","ownership":"home-assistant-reference","maxCharacters":16,"maxWords":2,"requiredPlaceholders":[],"forbiddenTerms":["alarm_control_panel"],"stateMatrix":[],"outputCount":1},
+      "expectedRequest": {"mode":"create","contextClass":"notification-action","surface":"Security notification","intent":"Request disarming the security system","ownership":"home-assistant-reference","maxCharacters":16,"maxWords":2,"requiredPlaceholders":[],"forbiddenTerms":["alarm_control_panel"],"stateMatrix":[],"outputCount":1},
+      "oracle": {"expectedStatus":"ok","acceptedTexts":["Disarm System"],"requiredCandidateCount":1,"requiredKeyPrefix":"notifications.","forbiddenPatterns":["alarm_control_panel"]}
+    },
+    {
+      "id": "refuse-app-manual",
+      "title": "Refuse App Manual rewrite",
+      "input": "Rewrite the App Manual article that explains thermostat automation. Make it warmer and shorter.",
+      "expectedRequest": {"mode":"rewrite","contextClass":"description","surface":"App Manual thermostat article","intent":"Restyle the App Manual thermostat explanation","ownership":"react","maxCharacters":null,"maxWords":null,"requiredPlaceholders":[],"forbiddenTerms":[],"stateMatrix":[],"outputCount":1},
+      "oracle": {"expectedStatus":"refused","requiredRefusalCode":"app-manual","requiredCandidateCount":0,"forbiddenPatterns":["rankedCandidates.+text"]}
+    }
+  ]
+}

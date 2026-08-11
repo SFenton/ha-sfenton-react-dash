@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "name": "finalist-public-qualification-v1",
+  "caseFile": "cases.public.json",
+  "candidateIds": [],
+  "expectedCandidateCount": 3,
+  "requiresModelsArgument": true,
+  "projectionCandidateIds": [
+    "gpt-5.6-luna-low",
+    "grok-4.5-low",
+    "gpt-5.6-terra-low"
+  ],
+  "repeats": 1,
+  "batchSize": 6,
+  "packBatches": true,
+  "shuffle": true,
+  "singletonCaseIds": [
+    "destructive-delete-task",
+    "loading-recipe-details",
+    "notification-title-vacuum-jinja",
+    "refuse-app-manual"
+  ],
+  "maxConcurrency": 3,
+  "maxAiCredits": 30,
+  "timeoutMs": 240000,
+  "preflight": true
+}

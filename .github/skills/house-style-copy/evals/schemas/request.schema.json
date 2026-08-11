@@ -1,0 +1,101 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "HouseStyleCopyRequest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "mode",
+    "contextClass",
+    "surface",
+    "intent",
+    "ownership",
+    "maxCharacters",
+    "maxWords",
+    "requiredPlaceholders",
+    "forbiddenTerms",
+    "stateMatrix",
+    "outputCount"
+  ],
+  "properties": {
+    "mode": {
+      "enum": ["create", "rewrite", "audit", "variants"]
+    },
+    "contextClass": {
+      "type": "string"
+    },
+    "surface": {
+      "type": "string",
+      "minLength": 1
+    },
+    "intent": {
+      "type": "string",
+      "minLength": 1
+    },
+    "ownership": {
+      "enum": ["react", "home-assistant-reference"]
+    },
+    "maxCharacters": {
+      "type": ["integer", "null"],
+      "minimum": 1
+    },
+    "maxWords": {
+      "type": ["integer", "null"],
+      "minimum": 1
+    },
+    "requiredPlaceholders": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^\\{\\{[^{}]+\\}\\}$"
+      }
+    },
+    "forbiddenTerms": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string"
+      }
+    },
+    "stateMatrix": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "oneOf": [
+          {
+            "required": ["variant"],
+            "properties": {
+              "variant": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          },
+          {
+            "required": ["state"],
+            "properties": {
+              "state": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          },
+          {
+            "required": ["id"],
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        ]
+      }
+    },
+    "outputCount": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 5
+    }
+  }
+}

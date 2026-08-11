@@ -241,11 +241,11 @@ export const DASHBOARD_ROUTES: DashboardRouteConfig[] = [
 ]
 
 export const PRIMARY_NAV_ROUTES = [
-  { label: 'Home', path: 'overview', icon: 'mdi:home' },
-  { label: 'Security', path: 'security', icon: 'mdi:shield' },
-  { label: 'Climate', path: 'ecobee', icon: 'mdi:thermostat' },
-  { label: 'Chores', path: 'chores', icon: 'mdi:clipboard-list' },
-  { label: 'Settings', path: 'settings', icon: 'mdi:cog' },
+  { label: copy('shell', 'navigation.items.home'), path: 'overview', icon: 'mdi:home' },
+  { label: copy('shell', 'navigation.items.security'), path: 'security', icon: 'mdi:shield' },
+  { label: copy('shell', 'navigation.items.climate'), path: 'ecobee', icon: 'mdi:thermostat' },
+  { label: copy('shell', 'navigation.items.chores'), path: 'chores', icon: 'mdi:clipboard-list' },
+  { label: copy('shell', 'navigation.items.settings'), path: 'settings', icon: 'mdi:cog' },
 ]
 
 const HOME_SUB_ROUTE_PATHS = new Set([
@@ -429,3 +429,4 @@ export function routeUrl(path: string, currentUrl?: string, hash?: string) {
   parsedUrl.hash = nextHash
   return relativeUrl(parsedUrl)
 }
+import { copy } from '../i18n'

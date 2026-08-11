@@ -1,0 +1,24 @@
+{
+  "carousel": {
+    "goToPage": "Go to page {{page}}",
+    "pageOf": "Page {{page}} of {{count}}",
+    "pages": "{{label}} pages"
+  },
+  "filter": {
+    "apply": "Apply",
+    "reset": "Reset"
+  },
+  "modal": {
+    "back": "Back",
+    "close": "Close",
+    "description": "{{title}} controls and status details",
+    "descriptionWithSubtitle": "{{title}}: {{subtitle}}"
+  },
+  "fields": {
+    "days": "Days"
+  },
+  "search": {
+    "clear": "Clear Search",
+    "collapsed": "Search"
+  }
+}

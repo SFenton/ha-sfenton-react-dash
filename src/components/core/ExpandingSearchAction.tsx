@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type ChangeEvent, type KeyboardEvent, type MouseEvent, type PointerEvent, type TouchEvent } from 'react'
 import { flushSync } from 'react-dom'
 import { armDashboardKeyboardPrediction, clearDashboardKeyboardPrediction, DASHBOARD_KEYBOARD_STATE_EVENT, type DashboardKeyboardStateDetail } from '../../hooks/useDashboardViewport'
+import { useCopy } from '../../i18n'
 import { MaterialIcon } from './Icon'
 import styles from './ExpandingSearchAction.module.css'
 
@@ -20,7 +21,8 @@ function updateSearchExpanded(expanded: boolean) {
   else document.documentElement.removeAttribute(SEARCH_EXPANDED_ATTR)
 }
 
-export function ExpandingSearchAction({ ariaLabel, collapsedLabel = 'Search', onExpandedChange, onQueryChange, placeholder, query }: ExpandingSearchActionProps) {
+export function ExpandingSearchAction({ ariaLabel, collapsedLabel, onExpandedChange, onQueryChange, placeholder, query }: ExpandingSearchActionProps) {
+  const copy = useCopy('core')
   const [expanded, setExpanded] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
   const collapseTimerRef = useRef<number | null>(null)
@@ -104,7 +106,7 @@ export function ExpandingSearchAction({ ariaLabel, collapsedLabel = 'Search', on
       <div className={styles.slot} data-expanded="false">
         <button aria-label={ariaLabel} className={styles.button} data-active={hasQuery ? 'true' : undefined} onClick={expandSearch} type="button">
           <MaterialIcon name="mdi:magnify" size={26} />
-          <span>{hasQuery ? query : collapsedLabel}</span>
+          <span>{hasQuery ? query : collapsedLabel ?? copy('search.collapsed')}</span>
         </button>
       </div>
     )
@@ -129,13 +131,13 @@ export function ExpandingSearchAction({ ariaLabel, collapsedLabel = 'Search', on
         />
         {hasQuery && (
           <button
-            aria-label="Clear Search"
+            aria-label={copy('search.clear')}
             className={styles.clear}
             onClick={handleClearSearchClick}
             onMouseDown={handleClearSearchPressStart}
             onPointerDown={handleClearSearchPressStart}
             onTouchStart={handleClearSearchPressStart}
-            title="Clear Search"
+            title={copy('search.clear')}
             type="button"
           >
             <MaterialIcon name="mdi:close" size={20} />

@@ -1,11 +1,11 @@
 import type { ManualHaSummary } from '../types'
 
 export const MANUAL_HA_SUMMARY = {
-  "generatedAt": "2026-08-10T00:00:00.000Z",
+  "generatedAt": "2026-08-11T00:00:00.000Z",
   "counts": {
     "automations": 146,
-    "integrationDomains": 62,
-    "integrationInstances": 277,
+    "integrationDomains": 63,
+    "integrationInstances": 278,
     "scripts": 62,
     "todoLists": 92
   },
@@ -74,8 +74,8 @@ export const MANUAL_HA_SUMMARY = {
     },
     {
       "category": "Home Assistant & Infrastructure",
-      "count": 28,
-      "instances": 184
+      "count": 29,
+      "instances": 185
     },
     {
       "category": "Lighting & Presence",

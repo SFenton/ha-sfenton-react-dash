@@ -1,8 +1,6 @@
 import { useHass } from '@hakit/core'
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { DynamicGrid } from '../components/core/DynamicGrid'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { Description } from '../components/core/Description'
-import { GlassTile } from '../components/core/GlassTile'
 import { MaterialIcon } from '../components/core/Icon'
 import { SectionHeader } from '../components/core/SectionHeader'
 import { ManualScreenshot } from '../components/manual/ManualScreenshot'
@@ -106,6 +104,39 @@ function statusLabel(article: ManualArticle) {
   return null
 }
 
+function manualDisplayText(value: string) {
+  return value
+    .replace(/\bDonetick\b/gi, 'the household task system')
+    .replace(/\bEverShelf\b/gi, 'the food inventory service')
+}
+
+function articleKindLabel(article: ManualArticle) {
+  if (article.kind === 'task-guide') return 'Step-by-step'
+  if (article.kind === 'page-guide') return 'Page tour'
+  if (article.kind === 'surface-guide') return 'Screen guide'
+  if (article.kind === 'family-guide') return 'Control guide'
+  if (article.kind === 'behavior-guide') return 'How the house works'
+  if (article.kind === 'technical-reference') return 'Technical reference'
+  return 'Guide'
+}
+
+function manualArticleOutlineLabels(article: ManualArticle) {
+  if (article.kind === 'page-guide') return ['What this page is for', "What you'll find", 'What you can do', 'What happens automatically', 'Look here first', 'Troubleshooting']
+  if (article.kind === 'family-guide') return ['What this card does', "Where you'll see it", 'What tapping it does', 'What each label means', 'When it is unavailable', 'After you tap', 'Troubleshooting']
+  if (article.kind === 'surface-guide') return ['How to open', "What you'll find", 'Moving around inside', 'Close, back, or cancel', 'Behind the scenes', 'When controls are unavailable', 'Troubleshooting']
+  if (article.kind === 'behavior-guide') return ['What this does', 'How it works', 'Pause, override, or recover', 'Troubleshooting', 'Behind the scenes']
+  if (article.kind === 'task-guide') return ['Task at a glance', 'Before you start', 'Steps', 'What success looks like', 'Back, cancel, or close', 'If it does not work', 'What happens automatically']
+  return article.blocks.flatMap((block) => (
+    block.type === 'steps' || block.type === 'bullets' || block.type === 'fact'
+      ? [block.title]
+      : []
+  ))
+}
+
+function firstSentence(value: string) {
+  return value.match(/^.*?[.!?](?:\s|$)/)?.[0]?.trim() ?? value
+}
+
 function ManualRow({
   article,
   onClick,
@@ -123,7 +154,7 @@ function ManualRow({
       </span>
       <span className={styles.rowCopy}>
         <strong>{article.title}</strong>
-        <small>{secondary ?? article.summary}</small>
+        <small>{manualDisplayText(secondary ?? article.summary)}</small>
         {status && <span className={styles.status}>{status}</span>}
       </span>
       <MaterialIcon name="mdi:chevron-right" size={22} />
@@ -137,6 +168,107 @@ function ManualBackButton({ label, onClick }: { label: string; onClick: () => vo
       <MaterialIcon name="mdi:chevron-left" size={20} />
       {label}
     </button>
+  )
+}
+
+function ManualArticleOutline({ article, getArticleElement }: { article: ManualArticle; getArticleElement: () => HTMLElement | null }) {
+  const labels = manualArticleOutlineLabels(article)
+  if (labels.length < 2) return null
+
+  const jumpTo = (label: string) => {
+    const heading = [...(getArticleElement()?.querySelectorAll<HTMLElement>('[data-manual-visible-section]') ?? [])]
+      .find((element) => element.textContent?.trim() === label)
+    heading?.scrollIntoView({ behavior: 'auto', block: 'start' })
+  }
+
+  return (
+    <nav aria-label="In this guide" className={styles.articleOutline}>
+      <strong>In this guide</strong>
+      <div className={styles.articleOutlineScroller}>
+        {labels.map((label) => <button key={label} onClick={() => jumpTo(label)} type="button">{label}</button>)}
+      </div>
+    </nav>
+  )
+}
+
+function ManualEndNavigation({
+  article,
+  navigate,
+}: {
+  article: ManualArticle
+  navigate: (selection: ManualSelection, replace?: boolean) => void
+}) {
+  const canonicalIds = new Set(MANUAL_SECTIONS.flatMap((section) => section.landing ? [section.landing.canonicalArticleId] : []))
+  const siblings = manualArticlesForSection(article.sectionId)
+    .filter((candidate) => !canonicalIds.has(candidate.id) && candidate.kind === article.kind)
+  const index = siblings.findIndex((candidate) => candidate.id === article.id)
+  const previous = index > 0 ? siblings[index - 1] : undefined
+  const next = index >= 0 && index < siblings.length - 1 ? siblings[index + 1] : undefined
+  const section = MANUAL_SECTIONS_BY_ID.get(article.sectionId)
+
+  return (
+    <footer className={styles.endNavigation}>
+      <div className={styles.endMarker}><span>End of guide</span></div>
+      <nav aria-label="Guide navigation" className={styles.guidePager}>
+        {previous
+          ? <button onClick={() => navigate({ articleId: previous.id, sectionId: previous.sectionId })} type="button"><small><MaterialIcon name="mdi:chevron-left" size={15} />Previous</small><strong>{previous.title}</strong></button>
+          : <button aria-label={`No previous ${articleKindLabel(article).toLowerCase()} guide`} disabled type="button"><small><MaterialIcon name="mdi:chevron-left" size={15} />Previous</small><strong>First {articleKindLabel(article).toLowerCase()}</strong></button>}
+        <button onClick={() => navigate({ sectionId: article.sectionId })} type="button"><small><MaterialIcon name="mdi:arrow-up" size={15} />Section</small><strong>{section?.title ?? 'App Manual'}</strong></button>
+        {next
+          ? <button onClick={() => navigate({ articleId: next.id, sectionId: next.sectionId })} type="button"><small>Next<MaterialIcon name="mdi:chevron-right" size={15} /></small><strong>{next.title}</strong></button>
+          : <button aria-label={`No next ${articleKindLabel(article).toLowerCase()} guide`} disabled type="button"><small>Next<MaterialIcon name="mdi:chevron-right" size={15} /></small><strong>Last {articleKindLabel(article).toLowerCase()}</strong></button>}
+      </nav>
+    </footer>
+  )
+}
+
+function ManualBehaviorFlow({ article }: { article: ManualBehaviorGuideArticle }) {
+  const guide = article.behaviorGuide
+  const stages = [
+    { label: 'When', text: firstSentence(guide.whenAndTriggers[0]) },
+    { label: 'Checks', text: firstSentence(guide.conditionsAndPreconditions[0]) },
+    { label: 'Changes', text: firstSentence(guide.householdEffects[0]) },
+    { label: 'You see', text: firstSentence(guide.visibleAppSigns[0]) },
+  ]
+
+  return (
+    <section className={styles.block} data-manual-behavior-guide-block="flow">
+      <SectionHeader title="How it works" />
+      <ol className={styles.behaviorFlow}>
+        {stages.map((stage, index) => (
+          <li key={stage.label}>
+            <span>{index + 1}</span>
+            <strong>{stage.label}</strong>
+            <p>{manualDisplayText(stage.text)}</p>
+          </li>
+        ))}
+      </ol>
+    </section>
+  )
+}
+
+function ManualTaskPath({ article }: { article: ManualTaskGuideArticle }) {
+  const guide = article.taskGuide
+  const items = [
+    { label: 'Prepare', text: guide.prerequisites[0] },
+    { label: 'Do', text: guide.steps[0] },
+    { label: 'Confirm', text: guide.successConfirmation[0] },
+    { label: 'Recover', text: guide.failureAndRecovery[0] },
+  ]
+
+  return (
+    <section className={styles.block} data-manual-task-guide-block="at-a-glance">
+      <SectionHeader title="Task at a glance" />
+      <div className={styles.taskPath}>
+        {items.map((item, index) => (
+          <div key={item.label}>
+            <span>{index + 1}</span>
+            <strong>{item.label}</strong>
+            <p>{manualDisplayText(firstSentence(item.text))}</p>
+          </div>
+        ))}
+      </div>
+    </section>
   )
 }
 
@@ -238,7 +370,7 @@ function ManualFact({ factId }: { factId: ManualFactId }) {
 
   if (factId === 'schedule-types') {
     const rows = [
-      ['Chores and tasks', 'Donetick recurrence and due-date fields', 'Chores or person-specific task pages'],
+      ['Chores and tasks', 'Task recurrence and due-date fields', 'Chores or person-specific task pages'],
       ['Wake alarms', 'SleepyPod schedules sent through the configured device connection', 'Master Bedroom bed sheets'],
       ['Humidifier activities', 'Home Assistant schedule helper with device profile data', 'Humidifier Schedules tab'],
       ['Vacuum auto-clean', 'Automations and cleaning-controller switches', 'Vacuums and Guest Controls'],
@@ -256,7 +388,7 @@ function ManualFact({ factId }: { factId: ManualFactId }) {
   if (factId === 'food-spaces') {
     return (
       <table className={styles.factTable}>
-        <thead><tr><th>App label</th><th>EverShelf location key</th></tr></thead>
+        <thead><tr><th>App label</th><th>Inventory storage key</th></tr></thead>
         <tbody>
           {EVERSHELF_FOOD_SPACES.map((space) => <tr key={space.location}><td>{space.title}</td><td>{space.location}</td></tr>)}
         </tbody>
@@ -396,9 +528,9 @@ function RoomReference({ navigate, roomPath }: { navigate: (selection: ManualSel
 }
 
 function ManualBlockView({ block, eagerScreenshot, navigate }: { block: ManualBlock; eagerScreenshot: boolean; navigate: (selection: ManualSelection, replace?: boolean) => void }) {
-  if (block.type === 'paragraph') return <Description>{block.text}</Description>
+  if (block.type === 'paragraph') return <Description>{manualDisplayText(block.text)}</Description>
   if (block.type === 'screenshot') return <ManualScreenshot eager={eagerScreenshot} id={block.screenshotId} />
-  if (block.type === 'callout') return <div className={styles.callout} data-tone={block.tone} role="note"><strong>{block.title}</strong><span>{block.text}</span></div>
+  if (block.type === 'callout') return <div className={styles.callout} data-tone={block.tone} role="note"><strong>{block.title}</strong><span>{manualDisplayText(block.text)}</span></div>
   if (block.type === 'fact') return <section className={styles.factGroup}><SectionHeader title={block.title} /><ManualFact factId={block.factId} /></section>
   if (block.type === 'room-reference') return <RoomReference navigate={navigate} roomPath={block.roomPath} />
   if (block.type === 'overview-purpose' || block.type === 'overview-actions' || block.type === 'overview-automation' || block.type === 'overview-first-look' || block.type === 'overview-safety') return null
@@ -406,8 +538,8 @@ function ManualBlockView({ block, eagerScreenshot, navigate }: { block: ManualBl
     <section className={styles.block}>
       <SectionHeader title={block.title} />
       {block.type === 'steps'
-        ? <ol className={styles.steps}>{block.items.map((item) => <li key={item}>{item}</li>)}</ol>
-        : <ul className={styles.bullets}>{block.items.map((item) => <li key={item}>{item}</li>)}</ul>}
+        ? <ol className={styles.steps}>{block.items.map((item) => <li key={item}>{manualDisplayText(item)}</li>)}</ol>
+        : <ul className={styles.bullets}>{block.items.map((item) => <li key={item}>{manualDisplayText(item)}</li>)}</ul>}
     </section>
   )
 }
@@ -418,31 +550,31 @@ function ManualPageGuideContent({ article, navigate }: { article: ManualPageGuid
   return (
     <div className={styles.articleBlocks} data-manual-page-guide={guide.routePath}>
       <section className={styles.block} data-manual-page-guide-block="orientation">
-        <SectionHeader title="Page Orientation" />
-        <Description>{guide.orientation}</Description>
+        <SectionHeader title="What this page is for" />
+        <Description>{manualDisplayText(guide.orientation)}</Description>
       </section>
       <ManualScreenshot eager id={orientationScreenshot} />
       <section className={styles.block} data-manual-page-guide-block="visible-sections">
-        <SectionHeader title="Visible Page Sections" />
-        <ul className={styles.bullets}>{guide.visiblePageSectionNames.map((name) => <li key={name}>{name}</li>)}</ul>
+        <SectionHeader title="What you'll find" />
+        <ul className={styles.bullets}>{guide.visiblePageSectionNames.map((name) => <li key={name}>{manualDisplayText(name)}</li>)}</ul>
       </section>
       <section className={styles.block} data-manual-page-guide-block="actions">
-        <SectionHeader title="What You Can Do" />
-        <ul className={styles.bullets}>{guide.whatYouCanDo.map((item) => <li key={item}>{item}</li>)}</ul>
+        <SectionHeader title="What you can do" />
+        <ul className={styles.bullets}>{guide.whatYouCanDo.map((item) => <li key={item}>{manualDisplayText(item)}</li>)}</ul>
       </section>
       <section className={styles.block} data-manual-page-guide-block="automation">
-        <SectionHeader title="What Happens Automatically" />
+        <SectionHeader title="What happens automatically" />
         {guide.whatHappensAutomatically.mode === 'automatic'
-          ? <ul className={styles.bullets}>{guide.whatHappensAutomatically.items.map((item) => <li key={item}>{item}</li>)}</ul>
-          : <Description>{guide.whatHappensAutomatically.explanation}</Description>}
+          ? <ul className={styles.bullets}>{guide.whatHappensAutomatically.items.map((item) => <li key={item}>{manualDisplayText(item)}</li>)}</ul>
+          : <Description>{manualDisplayText(guide.whatHappensAutomatically.explanation)}</Description>}
       </section>
       <section className={styles.block} data-manual-page-guide-block="first-look">
-        <SectionHeader title="Look Here First" />
+        <SectionHeader title="Look here first" />
         <div className={styles.overviewCards}>
           {guide.lookHereFirst.map((item) => (
             <div className={styles.overviewCard} data-manual-page-guide-first-look="true" key={item.label}>
               <strong>{item.label}</strong>
-              <span>{item.explanation}</span>
+              <span>{manualDisplayText(item.explanation)}</span>
             </div>
           ))}
         </div>
@@ -450,11 +582,11 @@ function ManualPageGuideContent({ article, navigate }: { article: ManualPageGuid
       {supportingScreenshots.map((id) => <ManualScreenshot id={id} key={id} />)}
       <div className={styles.callout} data-manual-page-guide-block="safety" data-tone="warning" role="note">
         <strong>{guide.safetyAndLimitations.title}</strong>
-        <span>{guide.safetyAndLimitations.text}</span>
+        <span>{manualDisplayText(guide.safetyAndLimitations.text)}</span>
       </div>
       <section className={styles.block} data-manual-page-guide-block="troubleshooting">
         <SectionHeader title="Troubleshooting" />
-        <ol className={styles.steps}>{guide.troubleshootingChecks.map((item) => <li key={item}>{item}</li>)}</ol>
+        <ol className={styles.steps}>{guide.troubleshootingChecks.map((item) => <li key={item}>{manualDisplayText(item)}</li>)}</ol>
       </section>
       {guide.generatedRoomPath && (
         <section className={styles.roomAppendix} data-manual-page-guide-block="configured-controls-reference">
@@ -472,46 +604,46 @@ function ManualFamilyGuideContent({ article }: { article: ManualFamilyGuideArtic
   return (
     <div className={styles.articleBlocks} data-manual-family-guide={guide.cardKind}>
       <section className={styles.block} data-manual-family-guide-block="purpose">
-        <SectionHeader title="Purpose" />
-        <Description>{guide.purpose}</Description>
+        <SectionHeader title="What this card does" />
+        <Description>{manualDisplayText(guide.purpose)}</Description>
       </section>
       <section className={styles.block} data-manual-family-guide-block="appears-on">
-        <SectionHeader title="Where It Appears" />
+        <SectionHeader title="Where you'll see it" />
         <ul className={styles.bullets}>{guide.appearsOn.routeTypes.map((routeType) => <li key={routeType}>{routeType}</li>)}</ul>
-        <Description>{guide.appearsOn.explanation}</Description>
+        <Description>{manualDisplayText(guide.appearsOn.explanation)}</Description>
       </section>
       <ManualScreenshot eager id={orientationScreenshot} />
       <section className={styles.block} data-manual-family-guide-block="actions">
-        <SectionHeader title="Action Semantics" />
-        <ul className={styles.bullets}>{guide.actionSemantics.map((item) => <li key={item}>{item}</li>)}</ul>
+        <SectionHeader title="What tapping it does" />
+        <ul className={styles.bullets}>{guide.actionSemantics.map((item) => <li key={item}>{manualDisplayText(item)}</li>)}</ul>
       </section>
       <section className={styles.block} data-manual-family-guide-block="states">
-        <SectionHeader title="Persistent State Meanings" />
+        <SectionHeader title="What each label means" />
         <div className={styles.overviewCards}>
           {guide.persistentStateMeanings.map((item) => (
             <div className={styles.overviewCard} data-manual-family-state="true" key={item.label}>
               <strong>{item.label}</strong>
-              <span>{item.meaning}</span>
+              <span>{manualDisplayText(item.meaning)}</span>
             </div>
           ))}
         </div>
       </section>
       {supportingScreenshots.map((id) => <ManualScreenshot id={id} key={id} />)}
       <section className={styles.block} data-manual-family-guide-block="unavailable">
-        <SectionHeader title="Unavailable and Disabled Behavior" />
-        <Description>{guide.unavailableAndDisabledBehavior}</Description>
+        <SectionHeader title="When it is unavailable" />
+        <Description>{manualDisplayText(guide.unavailableAndDisabledBehavior)}</Description>
       </section>
       <section className={styles.block} data-manual-family-guide-block="optimistic">
-        <SectionHeader title="Requested State and Confirmation" />
-        <Description>{guide.optimisticAndConfirmationBehavior}</Description>
+        <SectionHeader title="After you tap" />
+        <Description>{manualDisplayText(guide.optimisticAndConfirmationBehavior)}</Description>
       </section>
       <div className={styles.callout} data-manual-family-guide-block="safety" data-tone="warning" role="note">
         <strong>{guide.safetyAndLimitations.title}</strong>
-        <span>{guide.safetyAndLimitations.text}</span>
+        <span>{manualDisplayText(guide.safetyAndLimitations.text)}</span>
       </div>
       <section className={styles.block} data-manual-family-guide-block="troubleshooting">
         <SectionHeader title="Troubleshooting" />
-        <ol className={styles.steps}>{guide.troubleshootingChecks.map((item) => <li key={item}>{item}</li>)}</ol>
+        <ol className={styles.steps}>{guide.troubleshootingChecks.map((item) => <li key={item}>{manualDisplayText(item)}</li>)}</ol>
       </section>
     </div>
   )
@@ -526,7 +658,7 @@ function ManualSurfaceNavigationItems({ items, title }: { items: readonly Manual
         {items.map((entry) => (
           <div className={styles.overviewCard} data-manual-surface-navigation-item={entry.surfaceId} key={entry.surfaceId}>
             <strong>{entry.label}</strong>
-            <span>{entry.explanation}</span>
+            <span>{manualDisplayText(entry.explanation)}</span>
           </div>
         ))}
       </div>
@@ -540,42 +672,42 @@ function ManualSurfaceGuideContent({ article }: { article: ManualSurfaceGuideArt
   return (
     <div className={styles.articleBlocks} data-manual-surface-guide={article.id}>
       <section className={styles.block} data-manual-surface-guide-block="open">
-        <SectionHeader title="How to Open" />
-        <ol className={styles.steps}>{guide.howToOpen.map((entry) => <li key={entry}>{entry}</li>)}</ol>
+        <SectionHeader title="How to open" />
+        <ol className={styles.steps}>{guide.howToOpen.map((entry) => <li key={entry}>{manualDisplayText(entry)}</li>)}</ol>
       </section>
       <ManualScreenshot eager id={orientationScreenshot} />
       <section className={styles.block} data-manual-surface-guide-block="contents">
-        <SectionHeader title="What It Contains" />
-        <ul className={styles.bullets}>{guide.contents.map((entry) => <li key={entry}>{entry}</li>)}</ul>
+        <SectionHeader title="What you'll find" />
+        <ul className={styles.bullets}>{guide.contents.map((entry) => <li key={entry}>{manualDisplayText(entry)}</li>)}</ul>
       </section>
       <section className={styles.block} data-manual-surface-guide-block="navigation">
-        <SectionHeader title="Tabs, Details, and Wizard Navigation" />
-        <Description>{guide.navigation.explanation}</Description>
+        <SectionHeader title="Moving around inside" />
+        <Description>{manualDisplayText(guide.navigation.explanation)}</Description>
       </section>
       <ManualSurfaceNavigationItems items={guide.navigation.tabs} title="Tabs" />
       <ManualSurfaceNavigationItems items={guide.navigation.detailPages} title="Detail Pages" />
       <ManualSurfaceNavigationItems items={guide.navigation.wizardSteps} title="Wizard Steps" />
       {supportingScreenshots.map((id) => <ManualScreenshot id={id} key={id} />)}
       <section className={styles.block} data-manual-surface-guide-block="close-back-cancel">
-        <SectionHeader title="Close, Back, and Cancel" />
-        <Description>{guide.closeBackCancelBehavior}</Description>
-      </section>
-      <section className={styles.block} data-manual-surface-guide-block="home-assistant-ownership">
-        <SectionHeader title="What Home Assistant Owns" />
-        <Description>{guide.homeAssistantOwnership}</Description>
+        <SectionHeader title="Close, back, or cancel" />
+        <Description>{manualDisplayText(guide.closeBackCancelBehavior)}</Description>
       </section>
       <section className={styles.block} data-manual-surface-guide-block="state-disabled">
-        <SectionHeader title="State and Disabled Behavior" />
-        <Description>{guide.stateAndDisabledBehavior}</Description>
+        <SectionHeader title="When controls are unavailable" />
+        <Description>{manualDisplayText(guide.stateAndDisabledBehavior)}</Description>
       </section>
       <div className={styles.callout} data-manual-surface-guide-block="safety" data-tone="warning" role="note">
         <strong>{guide.safetyAndLimitations.title}</strong>
-        <span>{guide.safetyAndLimitations.text}</span>
+        <span>{manualDisplayText(guide.safetyAndLimitations.text)}</span>
       </div>
       <section className={styles.block} data-manual-surface-guide-block="troubleshooting">
         <SectionHeader title="Troubleshooting" />
-        <ol className={styles.steps}>{guide.troubleshootingChecks.map((entry) => <li key={entry}>{entry}</li>)}</ol>
+        <ol className={styles.steps}>{guide.troubleshootingChecks.map((entry) => <li key={entry}>{manualDisplayText(entry)}</li>)}</ol>
       </section>
+      <details className={styles.details} data-manual-surface-guide-block="home-assistant-ownership">
+        <summary data-manual-visible-section="Behind the scenes">Behind the scenes</summary>
+        <Description>{manualDisplayText(guide.homeAssistantOwnership)}</Description>
+      </details>
     </div>
   )
 }
@@ -585,52 +717,56 @@ function ManualBehaviorGuideContent({ article }: { article: ManualBehaviorGuideA
   return (
     <div className={styles.articleBlocks} data-manual-behavior-guide={article.id}>
       <section className={styles.block} data-manual-behavior-guide-block="capability">
-        <SectionHeader title="What This Capability Does" />
-        <Description>{guide.capability}</Description>
+        <SectionHeader title="What this does" />
+        <Description>{manualDisplayText(guide.capability)}</Description>
       </section>
-      <section className={styles.block} data-manual-behavior-guide-block="triggers">
-        <SectionHeader title="When It Runs" />
-        <ul className={styles.bullets}>{guide.whenAndTriggers.map((entry) => <li key={entry}>{entry}</li>)}</ul>
-      </section>
-      <section className={styles.block} data-manual-behavior-guide-block="conditions">
-        <SectionHeader title="Conditions and Preconditions" />
-        <ul className={styles.bullets}>{guide.conditionsAndPreconditions.map((entry) => <li key={entry}>{entry}</li>)}</ul>
-      </section>
-      <section className={styles.block} data-manual-behavior-guide-block="effects">
-        <SectionHeader title="Household Effects" />
-        <ul className={styles.bullets}>{guide.householdEffects.map((entry) => <li key={entry}>{entry}</li>)}</ul>
-      </section>
-      <section className={styles.block} data-manual-behavior-guide-block="visible-signs">
-        <SectionHeader title="What You See in the App" />
-        <ul className={styles.bullets}>{guide.visibleAppSigns.map((entry) => <li key={entry}>{entry}</li>)}</ul>
-      </section>
-      <section className={styles.block} data-manual-behavior-guide-block="exceptions">
-        <SectionHeader title="Guests, Vacation, and Away" />
-        <Description>{guide.exceptionsGuestVacationAway}</Description>
-      </section>
+      <ManualBehaviorFlow article={article} />
       <section className={styles.block} data-manual-behavior-guide-block="override">
-        <SectionHeader title="Override, Pause, or Recover" />
-        <ol className={styles.steps}>{guide.overridePauseRecover.map((entry) => <li key={entry}>{entry}</li>)}</ol>
-      </section>
-      <section className={styles.block} data-manual-behavior-guide-block="notifications">
-        <SectionHeader title="Notifications" />
-        <Description>{guide.notifications}</Description>
+        <SectionHeader title="Pause, override, or recover" />
+        <ol className={styles.steps}>{guide.overridePauseRecover.map((entry) => <li key={entry}>{manualDisplayText(entry)}</li>)}</ol>
       </section>
       {guide.screenshotIds.map((id) => <ManualScreenshot id={id} key={id} />)}
       <div className={styles.callout} data-manual-behavior-guide-block="safety" data-tone="warning" role="note">
         <strong>{guide.safetyAndLimitations.title}</strong>
-        <span>{guide.safetyAndLimitations.text}</span>
+        <span>{manualDisplayText(guide.safetyAndLimitations.text)}</span>
       </div>
       <section className={styles.block} data-manual-behavior-guide-block="troubleshooting">
         <SectionHeader title="Troubleshooting" />
-        <ol className={styles.steps}>{guide.troubleshootingChecks.map((entry) => <li key={entry}>{entry}</li>)}</ol>
+        <ol className={styles.steps}>{guide.troubleshootingChecks.map((entry) => <li key={entry}>{manualDisplayText(entry)}</li>)}</ol>
       </section>
-      <section className={styles.block} data-manual-behavior-guide-block="affected-routes">
-        <SectionHeader title="Affected App Areas" />
-        <ul className={styles.bullets}>
-          {guide.affectedRoutes.map((path) => <li key={path}>{DASHBOARD_ROUTES.find((route) => route.path === path)?.title ?? path}</li>)}
-        </ul>
-      </section>
+      <details className={styles.behindScenes} data-manual-behavior-guide-block="behind-scenes">
+        <summary data-manual-visible-section="Behind the scenes">Behind the scenes</summary>
+        <section className={styles.block} data-manual-behavior-guide-block="triggers">
+          <SectionHeader title="When it happens" />
+          <ul className={styles.bullets}>{guide.whenAndTriggers.map((entry) => <li key={entry}>{manualDisplayText(entry)}</li>)}</ul>
+        </section>
+        <section className={styles.block} data-manual-behavior-guide-block="conditions">
+          <SectionHeader title="What must be true" />
+          <ul className={styles.bullets}>{guide.conditionsAndPreconditions.map((entry) => <li key={entry}>{manualDisplayText(entry)}</li>)}</ul>
+        </section>
+        <section className={styles.block} data-manual-behavior-guide-block="effects">
+          <SectionHeader title="What changes" />
+          <ul className={styles.bullets}>{guide.householdEffects.map((entry) => <li key={entry}>{manualDisplayText(entry)}</li>)}</ul>
+        </section>
+        <section className={styles.block} data-manual-behavior-guide-block="visible-signs">
+          <SectionHeader title="What you'll notice" />
+          <ul className={styles.bullets}>{guide.visibleAppSigns.map((entry) => <li key={entry}>{manualDisplayText(entry)}</li>)}</ul>
+        </section>
+        <section className={styles.block} data-manual-behavior-guide-block="exceptions">
+          <SectionHeader title="When house modes change the result" />
+          <Description>{manualDisplayText(guide.exceptionsGuestVacationAway)}</Description>
+        </section>
+        <section className={styles.block} data-manual-behavior-guide-block="notifications">
+          <SectionHeader title="Alerts you may see" />
+          <Description>{manualDisplayText(guide.notifications)}</Description>
+        </section>
+        <section className={styles.block} data-manual-behavior-guide-block="affected-routes">
+          <SectionHeader title="Where you'll notice it" />
+          <ul className={styles.bullets}>
+            {guide.affectedRoutes.map((path) => <li key={path}>{DASHBOARD_ROUTES.find((route) => route.path === path)?.title ?? path}</li>)}
+          </ul>
+        </section>
+      </details>
     </div>
   )
 }
@@ -639,33 +775,31 @@ function ManualTaskGuideContent({ article }: { article: ManualTaskGuideArticle }
   const guide = article.taskGuide
   return (
     <div className={styles.articleBlocks} data-manual-task-guide={article.id}>
-      <section className={styles.block} data-manual-task-guide-block="question">
-        <SectionHeader title="Question" />
-        <Description>{guide.canonicalQuestion}</Description>
-      </section>
+      <div className={styles.taskQuestion}>{manualDisplayText(guide.canonicalQuestion)}</div>
+      <ManualTaskPath article={article} />
       <section className={styles.block} data-manual-task-guide-block="prerequisites">
-        <SectionHeader title="Before You Start" />
-        <ul className={styles.bullets}>{guide.prerequisites.map((entry) => <li key={entry}>{entry}</li>)}</ul>
+        <SectionHeader title="Before you start" />
+        <ul className={styles.bullets}>{guide.prerequisites.map((entry) => <li key={entry}>{manualDisplayText(entry)}</li>)}</ul>
       </section>
       <section className={styles.block} data-manual-task-guide-block="steps">
         <SectionHeader title="Steps" />
-        <ol className={styles.steps}>{guide.steps.map((entry) => <li key={entry}>{entry}</li>)}</ol>
+        <ol className={styles.steps}>{guide.steps.map((entry) => <li key={entry}>{manualDisplayText(entry)}</li>)}</ol>
       </section>
       <section className={styles.block} data-manual-task-guide-block="success">
-        <SectionHeader title="What Success Looks Like" />
-        <ul className={styles.bullets}>{guide.successConfirmation.map((entry) => <li key={entry}>{entry}</li>)}</ul>
+        <SectionHeader title="What success looks like" />
+        <ul className={styles.bullets}>{guide.successConfirmation.map((entry) => <li key={entry}>{manualDisplayText(entry)}</li>)}</ul>
       </section>
       <section className={styles.block} data-manual-task-guide-block="back-cancel-close">
-        <SectionHeader title="Back, Cancel, or Close" />
-        <Description>{guide.backCancelClosePath}</Description>
+        <SectionHeader title="Back, cancel, or close" />
+        <Description>{manualDisplayText(guide.backCancelClosePath)}</Description>
       </section>
       <section className={styles.block} data-manual-task-guide-block="failure">
-        <SectionHeader title="If It Does Not Work" />
-        <ol className={styles.steps}>{guide.failureAndRecovery.map((entry) => <li key={entry}>{entry}</li>)}</ol>
+        <SectionHeader title="If it does not work" />
+        <ol className={styles.steps}>{guide.failureAndRecovery.map((entry) => <li key={entry}>{manualDisplayText(entry)}</li>)}</ol>
       </section>
       <section className={styles.block} data-manual-task-guide-block="automatic">
-        <SectionHeader title="What Happens Automatically" />
-        <ul className={styles.bullets}>{guide.automaticBehaviorAndSideEffects.map((entry) => <li key={entry}>{entry}</li>)}</ul>
+        <SectionHeader title="What happens automatically" />
+        <ul className={styles.bullets}>{guide.automaticBehaviorAndSideEffects.map((entry) => <li key={entry}>{manualDisplayText(entry)}</li>)}</ul>
       </section>
       {guide.screenshotEvidence.screenshotIds.map((id) => <ManualScreenshot id={id} key={id} />)}
       {guide.screenshotEvidence.missingDedicatedScreenshot && (
@@ -682,13 +816,14 @@ function ManualTaskGuideContent({ article }: { article: ManualTaskGuideArticle }
       )}
       <div className={styles.callout} data-manual-task-guide-block="safety" data-tone="warning" role="note">
         <strong>{guide.safetyAndLimitations.title}</strong>
-        <span>{guide.safetyAndLimitations.text}</span>
+        <span>{manualDisplayText(guide.safetyAndLimitations.text)}</span>
       </div>
     </div>
   )
 }
 
 function ManualArticleView({ article, navigate }: { article: ManualArticle; navigate: (selection: ManualSelection, replace?: boolean) => void }) {
+  const articleRef = useRef<HTMLElement>(null)
   const section = MANUAL_SECTIONS_BY_ID.get(article.sectionId)
   const firstScreenshotIndex = article.blocks.findIndex((block) => block.type === 'screenshot')
   const relatedArticleIds = article.kind === 'page-guide'
@@ -703,14 +838,15 @@ function ManualArticleView({ article, navigate }: { article: ManualArticle; navi
             ? article.taskGuide.relatedArticleIds
       : article.relatedArticleIds
   return (
-    <article className={styles.stack} data-manual-article={article.id}>
+    <article className={styles.stack} data-manual-article={article.id} ref={articleRef}>
       <ManualBackButton label={`Back to ${section?.title ?? 'App Manual'}`} onClick={() => navigate({ sectionId: article.sectionId }, true)} />
       <header className={styles.articleHeader}>
-        <span className={styles.eyebrow}>{section?.title}</span>
+        <span className={styles.eyebrow}>{section?.title} · {articleKindLabel(article)}</span>
         <h2 data-manual-view-heading="true" tabIndex={-1}>{article.title}</h2>
-        <Description>{article.summary}</Description>
+        <Description>{manualDisplayText(article.summary)}</Description>
         {statusLabel(article) && <span className={styles.status}>{statusLabel(article)}</span>}
       </header>
+      <ManualArticleOutline article={article} getArticleElement={() => articleRef.current} />
       {article.kind === 'page-guide'
         ? <ManualPageGuideContent article={article} navigate={navigate} />
         : article.kind === 'family-guide'
@@ -735,6 +871,7 @@ function ManualArticleView({ article, navigate }: { article: ManualArticle; navi
           })}
         </section>
       )}
+      <ManualEndNavigation article={article} navigate={navigate} />
     </article>
   )
 }
@@ -757,16 +894,17 @@ function ManualSectionOverview({ navigate, section }: { navigate: (selection: Ma
 
   return (
     <div className={styles.sectionOverview} data-manual-section-overview={section.id}>
-      {purpose?.type === 'overview-purpose' && <Description>{purpose.text}</Description>}
+      {purpose?.type === 'overview-purpose' && <Description>{manualDisplayText(purpose.text)}</Description>}
       {contextScreenshot && <ManualScreenshot eager id={contextScreenshot} />}
       {actions?.type === 'overview-actions' && (
         <section className={styles.block} data-manual-block="actions">
           <SectionHeader title="What You Can Do" />
-          <ul className={styles.bullets}>{actions.items.map((item) => <li key={item}>{item}</li>)}</ul>
+          <ul className={styles.bullets}>{actions.items.map((item) => <li key={item}>{manualDisplayText(item)}</li>)}</ul>
         </section>
       )}
       <section className={styles.block} data-manual-block="common-tasks">
         <SectionHeader title="Common Tasks" />
+        <Description className={styles.navigationHint}>These are shortcuts, not the end of the overview. Choose one now or keep reading below.</Description>
         <div className={styles.list}>
           {landing.commonTasks.map((task) => {
             const article = MANUAL_ARTICLES_BY_ID.get(task.articleId)
@@ -784,23 +922,24 @@ function ManualSectionOverview({ navigate, section }: { navigate: (selection: Ma
             <MaterialIcon name="mdi:chevron-right" size={22} />
           </button>
         </div>
+        <div className={styles.continueCue}>Continue for automatic behavior, first places to look, safety notes, and every guide.</div>
       </section>
       {automation?.type === 'overview-automation' && (
         <section className={styles.block} data-manual-block="automation">
           <SectionHeader title="What Happens Automatically" />
-          <ul className={styles.bullets}>{automation.items.map((item) => <li key={item}>{item}</li>)}</ul>
+          <ul className={styles.bullets}>{automation.items.map((item) => <li key={item}>{manualDisplayText(item)}</li>)}</ul>
         </section>
       )}
       {firstLook?.type === 'overview-first-look' && (
         <section className={styles.block} data-manual-block="first-look">
           <SectionHeader title="Look Here First" />
           <div className={styles.overviewCards}>
-            {firstLook.items.map((item) => <div className={styles.overviewCard} data-manual-first-look="true" key={item.label}><strong>{item.label}</strong><span>{item.text}</span></div>)}
+            {firstLook.items.map((item) => <div className={styles.overviewCard} data-manual-first-look="true" key={item.label}><strong>{item.label}</strong><span>{manualDisplayText(item.text)}</span></div>)}
           </div>
         </section>
       )}
       {stateScreenshots.map((id) => <ManualScreenshot id={id} key={id} />)}
-      {safety?.type === 'overview-safety' && <div className={styles.callout} data-manual-block="safety" data-tone="warning" role="note"><strong>{safety.title}</strong><span>{safety.text}</span></div>}
+      {safety?.type === 'overview-safety' && <div className={styles.callout} data-manual-block="safety" data-tone="warning" role="note"><strong>{safety.title}</strong><span>{manualDisplayText(safety.text)}</span></div>}
       {(guideGroups.length > 0 || ungrouped.length > 0) && (
         <section className={styles.block} data-manual-block="guides" data-manual-guide-browser={section.id}>
           <SectionHeader title="Browse Guides" />
@@ -938,6 +1077,23 @@ function ManualHome({ navigate }: { navigate: (selection: ManualSelection, repla
         </section>
       ) : (
         <>
+          <section className={styles.stack}>
+            <SectionHeader title="Browse the Manual" />
+            <div aria-label="App Manual sections" className={styles.sectionShortcutGrid} role="group">
+              {MANUAL_SECTIONS.map((section) => (
+                <button
+                  aria-label={`${section.title}. ${section.summary}`}
+                  key={section.id}
+                  onClick={() => navigate({ sectionId: section.id })}
+                  style={{ '--manual-section-color': section.backgroundColor } as CSSProperties}
+                  type="button"
+                >
+                  <MaterialIcon name={section.icon} size={24} />
+                  <strong>{section.title}</strong>
+                </button>
+              ))}
+            </div>
+          </section>
           <section className={styles.stack} aria-label="Popular questions">
             <SectionHeader title="Popular Questions" />
             <div className={styles.pinnedGrid}>
@@ -961,23 +1117,6 @@ function ManualHome({ navigate }: { navigate: (selection: ManualSelection, repla
                 <MaterialIcon name="mdi:chevron-right" size={22} />
               </button>
             </div>
-          </section>
-          <section className={styles.stack}>
-            <SectionHeader title="Browse the Manual" />
-            <DynamicGrid ariaLabel="App Manual sections" className={styles.sectionGrid} columns={2} fillRows={false} gap={10}>
-              {MANUAL_SECTIONS.map((section) => (
-                <GlassTile
-                  backgroundColor={section.backgroundColor}
-                  disclosure
-                  disclosureKind="navigation"
-                  icon={section.icon}
-                  key={section.id}
-                  onClick={() => navigate({ sectionId: section.id })}
-                  subtitle={section.summary}
-                  title={section.title}
-                />
-              ))}
-            </DynamicGrid>
           </section>
         </>
       )}

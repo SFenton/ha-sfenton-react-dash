@@ -1,6 +1,7 @@
 import type { CSSProperties, ReactNode } from 'react'
 import { NativePickerField } from './NativePickerField'
 import type { ScheduleDayValueOption } from './scheduleDays'
+import { useCopy } from '../../i18n'
 import styles from './ScheduleEditorFields.module.css'
 
 export interface ScheduleDayOption<TDay extends string> extends ScheduleDayValueOption<TDay> {
@@ -44,6 +45,7 @@ export function ScheduleEditorFields<TDay extends string>({
   showDays = true,
   timeFields,
 }: ScheduleEditorFieldsProps<TDay>) {
+  const copy = useCopy('core')
   const toggleDay = (day: TDay) => {
     if (dayOptions.find((option) => option.value === day)?.disabled) return
     const nextDays = days.includes(day)
@@ -65,7 +67,7 @@ export function ScheduleEditorFields<TDay extends string>({
 
       {showDays && (
         <div className={styles.field}>
-          <span>Days</span>
+          <span>{copy('fields.days')}</span>
           <div className={styles.dayGrid} style={dayGridStyle}>
             {dayOptions.map((option) => (
               <button

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode, type Ref } from 'react'
 import { Drawer } from 'vaul'
 import { MaterialIcon } from './Icon'
+import { useCopy } from '../../i18n'
 import styles from './ModalSheet.module.css'
 
 export type ModalSheetStyle = CSSProperties & {
@@ -57,13 +58,14 @@ function assignRef<T>(ref: Ref<T> | undefined, value: T | null) {
   else if (ref) ref.current = value
 }
 
-export function ModalSheet({ open, title, onClose, children, backLabel = 'Back', bodyElementRef, bodyHeader, chrome = 'default', contentStyle, footer, onBack, scrollResetKey, subtitle }: ModalSheetProps) {
+export function ModalSheet({ open, title, onClose, children, backLabel, bodyElementRef, bodyHeader, chrome = 'default', contentStyle, footer, onBack, scrollResetKey, subtitle }: ModalSheetProps) {
+  const copy = useCopy('core')
   const contentRef = useRef<HTMLDivElement | null>(null)
   const bodyRef = useRef<HTMLDivElement | null>(null)
   const [bodyElement, setBodyElement] = useState<HTMLDivElement | null>(null)
   const closeRequestedAtRef = useRef(Number.NEGATIVE_INFINITY)
   const ignoreInternalCloseUntilRef = useRef(0)
-  const currentSnapshot: ModalSheetSnapshot = { backLabel, bodyHeader, children, chrome, contentStyle, footer, onBack, scrollResetKey, subtitle, title }
+  const currentSnapshot: ModalSheetSnapshot = { backLabel: backLabel ?? copy('modal.back'), bodyHeader, children, chrome, contentStyle, footer, onBack, scrollResetKey, subtitle, title }
   const [lastOpenSnapshot, setLastOpenSnapshot] = useState<ModalSheetSnapshot>(currentSnapshot)
   const [mounted, setMounted] = useState(open)
   const [previousOpen, setPreviousOpen] = useState(open)
@@ -205,8 +207,10 @@ export function ModalSheet({ open, title, onClose, children, backLabel = 'Back',
                 {rendered.subtitle && <p className={styles.subtitle}>{rendered.subtitle}</p>}
               </div>
             </div>
-            <Drawer.Description className={styles.description}>{rendered.subtitle ? `${rendered.title}: ${rendered.subtitle}` : `${rendered.title} controls and status details`}</Drawer.Description>
-            <button className={styles.close} aria-label="Close" onClick={requestClose} type="button">
+            <Drawer.Description className={styles.description}>{rendered.subtitle
+              ? copy('modal.descriptionWithSubtitle', { subtitle: rendered.subtitle, title: rendered.title })
+              : copy('modal.description', { title: rendered.title })}</Drawer.Description>
+            <button className={styles.close} aria-label={copy('modal.close')} onClick={requestClose} type="button">
               <MaterialIcon name="mdi:close" size={sourcePopup ? 30 : 19} />
             </button>
           </div>

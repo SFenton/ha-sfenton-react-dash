@@ -1,4 +1,5 @@
 import '@testing-library/jest-dom/vitest'
+import '../i18n/init'
 
 class MockIntersectionObserver implements IntersectionObserver {
 	readonly root = null
@@ -39,4 +40,3 @@ if (!HTMLElement.prototype.releasePointerCapture) {
 if (!HTMLElement.prototype.hasPointerCapture) {
 	HTMLElement.prototype.hasPointerCapture = () => false
 }
-

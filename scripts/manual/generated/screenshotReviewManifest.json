@@ -12,14 +12,14 @@
     },
     "screenshotMetadata": {
       "algorithm": "sha256",
-      "digest": "7514cfc4a51c285fe9cfe24734a869a468d72b18f46eb6611f73b7eed0b7753f",
+      "digest": "1ca956082b7c5b34470087cd8ac735544e01b218cfa112cde4985aa56760ebd7",
       "scope": "manual-screenshot-metadata-v1",
       "subjectCount": 138
     },
     "uiSource": {
       "algorithm": "sha256",
-      "digest": "cf118dd5172ce85fa7d97d977373a45bc08a0e9d66e19dd75932f6aaec59aab6",
-      "fileCount": 282,
+      "digest": "bf8fec7400165a71647885793c4ad0cc9d34be56c7f52bc20a7580a1be2c6eaf",
+      "fileCount": 300,
       "scope": "app-visual-source-v1"
     }
   },
@@ -28,8 +28,8 @@
     "maxFilePath": "public/manual/manual-desktop/downstairs-hallway-page-context.png",
     "totalBytes": 24949405
   },
-  "reviewedAt": "2026-08-11T15:17:07.719Z",
-  "reviewStateSha256": "fc42387fc96298b11ef17d29e3c7742a6d7d00a2492ec5eb6920115269f48dde",
+  "reviewedAt": "2026-08-11T22:39:55.095Z",
+  "reviewStateSha256": "429d52b246f1b7b652d14ee62cea7a223b39ef1f58edd213914ef5517ed653a2",
   "schemaVersion": 1,
   "subjectCount": 138,
   "subjects": [

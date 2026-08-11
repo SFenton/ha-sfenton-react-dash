@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "name": "top-three-holdout-v1",
+  "caseFile": "cases.holdout.json",
+  "candidateIds": [],
+  "expectedCandidateCount": 3,
+  "requiresModelsArgument": true,
+  "projectionCandidateIds": [
+    "gpt-5.6-luna-low",
+    "grok-4.5-low",
+    "gpt-5.6-terra-low"
+  ],
+  "repeats": 3,
+  "batchSize": 6,
+  "packBatches": true,
+  "shuffle": true,
+  "singletonCaseIds": [
+    "holdout-placeholder-chip",
+    "holdout-notification-jinja",
+    "holdout-injection-privacy"
+  ],
+  "maxConcurrency": 3,
+  "maxAiCredits": 30,
+  "timeoutMs": 240000,
+  "preflight": true
+}

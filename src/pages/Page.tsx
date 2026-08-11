@@ -1,6 +1,7 @@
 import { useCallback, useRef, type ReactNode } from 'react'
 import { AppHeader, type AppHeaderAction } from '../components/shell/AppHeader'
 import { PageScrollerContext, PageScrollToTopContext } from '../hooks/usePageScroller'
+import { useCopy } from '../i18n'
 import styles from './Page.module.css'
 
 interface PageProps {
@@ -20,6 +21,7 @@ interface PageProps {
 }
 
 export function Page({ activePath, backPath, chromeHidden = false, contentHidden = false, contentTransitionState = 'idle', title, headerQuickLinks, children, onBack, onNavigate, onProfile, onSettings, scrollLocked = false }: PageProps) {
+  const copy = useCopy('common')
   const scrollerRef = useRef<HTMLDivElement>(null)
   const scrollToTop = useCallback(() => {
     const scroller = scrollerRef.current
@@ -31,8 +33,8 @@ export function Page({ activePath, backPath, chromeHidden = false, contentHidden
     scroller.scrollTop = 0
   }, [])
   const actions: AppHeaderAction[] = [
-    ...(onSettings ? [{ icon: 'mdi:cog', label: 'Settings', onClick: onSettings }] : []),
-    ...(onProfile ? [{ icon: 'mdi:account-circle', label: 'Profile', onClick: onProfile }] : []),
+    ...(onSettings ? [{ icon: 'mdi:cog', label: copy('actions.settings'), onClick: onSettings }] : []),
+    ...(onProfile ? [{ icon: 'mdi:account-circle', label: copy('actions.profile'), onClick: onProfile }] : []),
   ]
 
   return (

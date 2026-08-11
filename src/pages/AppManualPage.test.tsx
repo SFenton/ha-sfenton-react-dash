@@ -59,6 +59,9 @@ describe('AppManualPage', () => {
     render(<AppManualPage />)
 
     expect(screen.getByRole('group', { name: 'App Manual sections' }).children).toHaveLength(9)
+    const browseHeading = screen.getByText('Browse the Manual')
+    const popularHeading = screen.getByText('Popular Questions')
+    expect(browseHeading.compareDocumentPosition(popularHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     const search = screen.getByLabelText('Search the App Manual')
     fireEvent.change(search, { target: { value: 'schedule the humidifier' } })
     expect(screen.getByRole('heading', { name: /Search Results/ })).toBeInTheDocument()
@@ -90,14 +93,17 @@ describe('AppManualPage', () => {
   })
 
   it('opens a section and article through query-backed navigation', () => {
-    render(<AppManualPage />)
+    const { container } = render(<AppManualPage />)
 
-    fireEvent.click(screen.getByRole('button', { name: /^Home Learn the Home screen/i }))
+    fireEvent.click(screen.getByRole('button', { name: /^Home\. Learn the Home screen/i }))
     expect(window.location.search).toContain('manual-section=home')
     fireEvent.click(screen.getByRole('button', { name: /How do I read or scroll the status chips/i }))
     expect(window.location.search).toContain('manual-article=status-chips')
     expect(screen.getByText(/compact header summaries/i)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Back to Home/i })).toBeInTheDocument()
+    expect(screen.getByRole('navigation', { name: 'In this guide' })).toBeInTheDocument()
+    expect(screen.getByText('End of guide')).toBeInTheDocument()
+    expect(container.querySelector('[aria-label="Guide navigation"]')).toBeInTheDocument()
   })
 
   it.each(PAGE_GUIDE_CASES)('opens the $title from its landing without a Common Task self-link', ({ articleId, question, sectionId, title, ...routeGuide }) => {
@@ -119,11 +125,11 @@ describe('AppManualPage', () => {
     const guide = container.querySelector(`[data-manual-page-guide="${article.pageGuide.routePath}"]`) as HTMLElement
 
     expect(screen.getByRole('heading', { level: 2, name: title })).toBeInTheDocument()
-    expect(within(guide).getByText('Page Orientation')).toBeInTheDocument()
-    expect(within(guide).getByText('Visible Page Sections')).toBeInTheDocument()
-    expect(within(guide).getByText('What You Can Do')).toBeInTheDocument()
-    expect(within(guide).getByText('What Happens Automatically')).toBeInTheDocument()
-    expect(within(guide).getByText('Look Here First')).toBeInTheDocument()
+    expect(within(guide).getByText('What this page is for')).toBeInTheDocument()
+    expect(within(guide).getByText("What you'll find")).toBeInTheDocument()
+    expect(within(guide).getByText('What you can do')).toBeInTheDocument()
+    expect(within(guide).getByText('What happens automatically')).toBeInTheDocument()
+    expect(within(guide).getByText('Look here first')).toBeInTheDocument()
     expect(within(guide).getByText('Troubleshooting')).toBeInTheDocument()
     expect(guide.querySelectorAll('[data-manual-page-guide-first-look="true"]')).toHaveLength(article.pageGuide.lookHereFirst.length)
     expect(guide.querySelectorAll('[data-manual-screenshot]')).toHaveLength(article.pageGuide.screenshotIds.length)
@@ -138,12 +144,12 @@ describe('AppManualPage', () => {
     const guide = container.querySelector(`[data-manual-family-guide="${article.familyGuide.cardKind}"]`) as HTMLElement
 
     expect(screen.getByRole('heading', { level: 2, name: article.title })).toBeInTheDocument()
-    expect(within(guide).getByText('Purpose')).toBeInTheDocument()
-    expect(within(guide).getByText('Where It Appears')).toBeInTheDocument()
-    expect(within(guide).getByText('Action Semantics')).toBeInTheDocument()
-    expect(within(guide).getByText('Persistent State Meanings')).toBeInTheDocument()
-    expect(within(guide).getByText('Unavailable and Disabled Behavior')).toBeInTheDocument()
-    expect(within(guide).getByText('Requested State and Confirmation')).toBeInTheDocument()
+    expect(within(guide).getByText('What this card does')).toBeInTheDocument()
+    expect(within(guide).getByText("Where you'll see it")).toBeInTheDocument()
+    expect(within(guide).getByText('What tapping it does')).toBeInTheDocument()
+    expect(within(guide).getByText('What each label means')).toBeInTheDocument()
+    expect(within(guide).getByText('When it is unavailable')).toBeInTheDocument()
+    expect(within(guide).getByText('After you tap')).toBeInTheDocument()
     expect(within(guide).getByText('Troubleshooting')).toBeInTheDocument()
     expect(guide.querySelectorAll('[data-manual-family-state="true"]')).toHaveLength(article.familyGuide.persistentStateMeanings.length)
     expect(guide.querySelectorAll('[data-manual-screenshot]')).toHaveLength(article.familyGuide.screenshotIds.length)
@@ -157,12 +163,12 @@ describe('AppManualPage', () => {
     const guide = container.querySelector(`[data-manual-surface-guide="${article.id}"]`) as HTMLElement
 
     expect(screen.getByRole('heading', { level: 2, name: article.title })).toBeInTheDocument()
-    expect(within(guide).getByText('How to Open')).toBeInTheDocument()
-    expect(within(guide).getByText('What It Contains')).toBeInTheDocument()
-    expect(within(guide).getByText('Tabs, Details, and Wizard Navigation')).toBeInTheDocument()
-    expect(within(guide).getByText('Close, Back, and Cancel')).toBeInTheDocument()
-    expect(within(guide).getByText('What Home Assistant Owns')).toBeInTheDocument()
-    expect(within(guide).getByText('State and Disabled Behavior')).toBeInTheDocument()
+    expect(within(guide).getByText('How to open')).toBeInTheDocument()
+    expect(within(guide).getByText("What you'll find")).toBeInTheDocument()
+    expect(within(guide).getByText('Moving around inside')).toBeInTheDocument()
+    expect(within(guide).getByText('Close, back, or cancel')).toBeInTheDocument()
+    expect(within(guide).getByText('Behind the scenes')).toBeInTheDocument()
+    expect(within(guide).getByText('When controls are unavailable')).toBeInTheDocument()
     expect(within(guide).getByText('Troubleshooting')).toBeInTheDocument()
     expect(guide.querySelectorAll('[data-manual-surface-navigation-item]')).toHaveLength(
       article.surfaceGuide.navigation.tabs.length
@@ -181,19 +187,22 @@ describe('AppManualPage', () => {
 
     expect(screen.getByRole('heading', { level: 2, name: article.title })).toBeInTheDocument()
     for (const heading of [
-      'What This Capability Does',
-      'When It Runs',
-      'Conditions and Preconditions',
-      'Household Effects',
-      'What You See in the App',
-      'Guests, Vacation, and Away',
-      'Override, Pause, or Recover',
-      'Notifications',
+      'What this does',
+      'How it works',
+      'When it happens',
+      'What must be true',
+      'What changes',
+      "What you'll notice",
+      'When house modes change the result',
+      'Pause, override, or recover',
+      'Alerts you may see',
       'Troubleshooting',
-      'Affected App Areas',
+      "Where you'll notice it",
+      'Behind the scenes',
     ]) expect(within(guide).getByText(heading)).toBeInTheDocument()
     expect(screen.getByText(article.behaviorGuide.safetyAndLimitations.title)).toBeInTheDocument()
     expect(screen.getByText('Related Guides')).toBeInTheDocument()
+    expect(guide.querySelector('[data-manual-behavior-guide-block="flow"]')).toBeInTheDocument()
   })
 
   it.each(MANUAL_TASK_GUIDE_ARTICLES)('renders the complete structured task contract for $title', (article) => {
@@ -203,13 +212,13 @@ describe('AppManualPage', () => {
 
     expect(screen.getByRole('heading', { level: 2, name: article.title })).toBeInTheDocument()
     for (const heading of [
-      'Question',
-      'Before You Start',
+      'Task at a glance',
+      'Before you start',
       'Steps',
-      'What Success Looks Like',
-      'Back, Cancel, or Close',
-      'If It Does Not Work',
-      'What Happens Automatically',
+      'What success looks like',
+      'Back, cancel, or close',
+      'If it does not work',
+      'What happens automatically',
     ]) expect(within(guide).getByText(heading)).toBeInTheDocument()
     expect(guide.querySelector('[data-manual-task-guide-block="steps"] ol')?.children).toHaveLength(article.taskGuide.steps.length)
     expect(guide.querySelectorAll('[data-manual-screenshot]')).toHaveLength(article.taskGuide.screenshotEvidence.screenshotIds.length)
@@ -251,7 +260,7 @@ describe('AppManualPage', () => {
       const referenceCards = [...reference.querySelectorAll<HTMLButtonElement>('button[data-manual-room-reference-card="true"]')]
 
       expect(screen.getByRole('heading', { level: 2, name: article.title })).toBeInTheDocument()
-      expect(within(guide).getByText('Page Orientation')).toBeInTheDocument()
+      expect(within(guide).getByText('What this page is for')).toBeInTheDocument()
       expect(within(guide).getByText('Configured Controls Reference')).toBeInTheDocument()
       expect(troubleshooting.compareDocumentPosition(appendix) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
       expect(reference.querySelectorAll('[data-manual-room-reference-card="true"]')).toHaveLength(

@@ -1,0 +1,58 @@
+{
+  "app": {
+    "title": "Home Assistant"
+  },
+  "actions": {
+    "apply": "Apply",
+    "back": "Back",
+    "cancel": "Cancel",
+    "close": "Close",
+    "goBack": "Go back",
+    "profile": "Profile",
+    "reset": "Reset",
+    "search": "Search",
+    "settings": "Settings"
+  },
+  "fields": {
+    "days": "Days"
+  },
+  "states": {
+    "active": "Active",
+    "armedAway": "Armed Away",
+    "armedHome": "Armed Home",
+    "armedNight": "Armed Night",
+    "clear": "Clear",
+    "closed": "Closed",
+    "closing": "Closing",
+    "cool": "Cool",
+    "cooling": "Cooling",
+    "detected": "Detected",
+    "disarmed": "Disarmed",
+    "docked": "Docked",
+    "drying": "Drying",
+    "error": "Error",
+    "heating": "Heating",
+    "heat": "Heat",
+    "home": "Home",
+    "idle": "Idle",
+    "locked": "Locked",
+    "locking": "Locking",
+    "off": "Off",
+    "on": "On",
+    "open": "Open",
+    "opening": "Opening",
+    "paused": "Paused",
+    "pending": "Pending",
+    "playing": "Playing",
+    "recording": "Recording",
+    "ringing": "Ringing",
+    "running": "Running",
+    "snoozed": "Snoozed",
+    "stopped": "Stopped",
+    "triggered": "Triggered",
+    "unavailable": "Unavailable",
+    "unlocked": "Unlocked",
+    "unlocking": "Unlocking",
+    "unknown": "Unknown"
+  }
+}

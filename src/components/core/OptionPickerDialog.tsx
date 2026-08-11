@@ -2,6 +2,7 @@ import { useEffect, useId, useRef, type ReactNode } from 'react'
 import { MaterialIcon } from './Icon'
 import glassTileStyles from './GlassTile.module.css'
 import { ModalSheet, type ModalSheetStyle } from './ModalSheet'
+import { useCopy } from '../../i18n'
 import styles from './OptionPickerDialog.module.css'
 
 export interface PickerOption {
@@ -92,6 +93,7 @@ export function OptionPickerPanel({
 }
 
 export function OptionPickerDialog({ open, options, title, value, icon, selectedIcon, presentation = 'dialog', sheetLayout = 'card-grid', sheetStyle, onClose, onSelect }: OptionPickerDialogProps) {
+  const copy = useCopy('common')
   const titleId = useId()
   const isSheet = presentation === 'sheet'
   const optionPanel = (
@@ -135,7 +137,7 @@ export function OptionPickerDialog({ open, options, title, value, icon, selected
       <section aria-labelledby={titleId} aria-modal="true" className={styles.dialog} role="dialog">
         <header className={styles.header}>
           <h2 id={titleId}>{title}</h2>
-          <button aria-label="Close" className={styles.close} onClick={onClose} type="button">
+          <button aria-label={copy('actions.close')} className={styles.close} onClick={onClose} type="button">
             <MaterialIcon name="mdi:close" size={19} />
           </button>
         </header>

@@ -1,0 +1,86 @@
+{
+  "version": 1,
+  "fixtures": [
+    {
+      "id": "valid-button",
+      "request": {"mode":"create","contextClass":"button","surface":"Recipe card","intent":"Open recipe details","ownership":"react","maxCharacters":14,"maxWords":2,"requiredPlaceholders":[],"forbiddenTerms":["Click"],"stateMatrix":[],"outputCount":1},
+      "response": {
+        "status": "ok",
+        "normalizedRequest": {"mode":"create","contextClass":"button","surface":"Recipe card","intent":"Open recipe details","ownership":"react","maxCharacters":14,"maxWords":2,"requiredPlaceholders":[],"forbiddenTerms":["Click"],"stateMatrix":[],"outputCount":1},
+        "proposedKey": "recipes.actions.viewDetails",
+        "rankedCandidates": [{"rank":1,"text":"View Details","rationale":"Names the action and destination."}],
+        "exemplarsUsed": ["curated.button.view-details"],
+        "checks": {"maxCharacters":true,"maxWords":true,"placeholders":true,"forbiddenTerms":true,"ownership":true,"style":true,"retrieval":true},
+        "warnings": [],
+        "refusal": null,
+        "confidence": "high"
+      },
+      "valid": true
+    },
+    {
+      "id": "invalid-placeholder-drift",
+      "request": {"mode":"create","contextClass":"chip","surface":"Security rail","intent":"Show open-door count","ownership":"react","maxCharacters":24,"maxWords":3,"requiredPlaceholders":["{{count}}"],"forbiddenTerms":[],"stateMatrix":[],"outputCount":1},
+      "response": {
+        "status": "ok",
+        "normalizedRequest": {"mode":"create","contextClass":"chip","surface":"Security rail","intent":"Show open-door count","ownership":"react","maxCharacters":24,"maxWords":3,"requiredPlaceholders":["{{count}}"],"forbiddenTerms":[],"stateMatrix":[],"outputCount":1},
+        "proposedKey": "security.status.openDoors",
+        "rankedCandidates": [{"rank":1,"text":"{{doorCount}} Doors Open","rationale":"Shows the count."}],
+        "exemplarsUsed": ["curated.chip.doors-open"],
+        "checks": {"maxCharacters":true,"maxWords":true,"placeholders":true,"forbiddenTerms":true,"ownership":true,"style":true,"retrieval":true},
+        "warnings": [],
+        "refusal": null,
+        "confidence": "high"
+      },
+      "valid": false,
+      "expectedError": "placeholders"
+    },
+    {
+      "id": "valid-app-manual-refusal",
+      "request": {"mode":"rewrite","contextClass":"description","surface":"App Manual article","intent":"Rewrite manual prose","ownership":"react","maxCharacters":null,"maxWords":null,"requiredPlaceholders":[],"forbiddenTerms":[],"stateMatrix":[],"outputCount":1},
+      "response": {
+        "status": "refused",
+        "normalizedRequest": {"mode":"rewrite","contextClass":"description","surface":"App Manual article","intent":"Rewrite manual prose","ownership":"react","maxCharacters":null,"maxWords":null,"requiredPlaceholders":[],"forbiddenTerms":[],"stateMatrix":[],"outputCount":1},
+        "proposedKey": null,
+        "rankedCandidates": [],
+        "exemplarsUsed": [],
+        "checks": {"maxCharacters":true,"maxWords":true,"placeholders":true,"forbiddenTerms":true,"ownership":true,"style":true,"retrieval":true},
+        "warnings": [],
+        "refusal": {"code":"app-manual","reason":"App Manual prose is outside this skill."},
+        "confidence": "high"
+      },
+      "valid": true
+    },
+    {
+      "id": "valid-multiple-requests",
+      "request": [
+        {"mode":"create","contextClass":"button","surface":"Recipe card","intent":"Open recipe details","ownership":"react","maxCharacters":14,"maxWords":2,"requiredPlaceholders":[],"forbiddenTerms":["Click"],"stateMatrix":[],"outputCount":1},
+        {"mode":"create","contextClass":"status","surface":"Entity card","intent":"Show unavailable state","ownership":"react","maxCharacters":16,"maxWords":1,"requiredPlaceholders":[],"forbiddenTerms":[],"stateMatrix":[],"outputCount":1}
+      ],
+      "response": [
+        {
+          "status": "ok",
+          "normalizedRequest": {"mode":"create","contextClass":"button","surface":"Recipe card","intent":"Open recipe details","ownership":"react","maxCharacters":14,"maxWords":2,"requiredPlaceholders":[],"forbiddenTerms":["Click"],"stateMatrix":[],"outputCount":1},
+          "proposedKey": "recipes.actions.viewDetails",
+          "rankedCandidates": [{"rank":1,"text":"View Details","rationale":"Names the action and destination."}],
+          "exemplarsUsed": ["curated.button.view-details"],
+          "checks": {"maxCharacters":true,"maxWords":true,"placeholders":true,"forbiddenTerms":true,"ownership":true,"style":true,"retrieval":true},
+          "warnings": [],
+          "refusal": null,
+          "confidence": "high"
+        },
+        {
+          "status": "ok",
+          "normalizedRequest": {"mode":"create","contextClass":"status","surface":"Entity card","intent":"Show unavailable state","ownership":"react","maxCharacters":16,"maxWords":1,"requiredPlaceholders":[],"forbiddenTerms":[],"stateMatrix":[],"outputCount":1},
+          "proposedKey": "common.status.unavailable",
+          "rankedCandidates": [{"rank":1,"text":"Unavailable","rationale":"Uses the established unavailable state."}],
+          "exemplarsUsed": ["curated.status.unavailable"],
+          "checks": {"maxCharacters":true,"maxWords":true,"placeholders":true,"forbiddenTerms":true,"ownership":true,"style":true,"retrieval":true},
+          "warnings": [],
+          "refusal": null,
+          "confidence": "high"
+        }
+      ],
+      "valid": true
+    }
+  ]
+}

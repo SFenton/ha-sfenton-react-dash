@@ -7,15 +7,16 @@ import { MaterialIcon } from '../core/Icon'
 import { Separator } from '../core/Separator'
 import { asEntityName } from './entityState'
 import { securityStateColor } from './securityState'
+import { useCopy } from '../../i18n'
 import styles from './SecurityControls.module.css'
 
 const SECURITY_ICON_SIZE = 30
 
 const SECURITY_MODES = [
-  { title: 'Home', service: 'alarm_arm_home', state: 'armed_home', icon: <MaterialIcon name="mdi:shield-home" size={SECURITY_ICON_SIZE} /> },
-  { title: 'Away', service: 'alarm_arm_away', state: 'armed_away', icon: <MaterialIcon name="mdi:shield" size={SECURITY_ICON_SIZE} /> },
-  { title: 'Night', service: 'alarm_arm_night', state: 'armed_night', icon: <MaterialIcon name="mdi:shield-moon" size={SECURITY_ICON_SIZE} /> },
-  { title: 'Disarmed', service: 'alarm_disarm', state: 'disarmed', icon: <MaterialIcon name="mdi:shield-off" size={SECURITY_ICON_SIZE} /> },
+  { titleKey: 'controls.modes.home', service: 'alarm_arm_home', state: 'armed_home', icon: <MaterialIcon name="mdi:shield-home" size={SECURITY_ICON_SIZE} /> },
+  { titleKey: 'controls.modes.away', service: 'alarm_arm_away', state: 'armed_away', icon: <MaterialIcon name="mdi:shield" size={SECURITY_ICON_SIZE} /> },
+  { titleKey: 'controls.modes.night', service: 'alarm_arm_night', state: 'armed_night', icon: <MaterialIcon name="mdi:shield-moon" size={SECURITY_ICON_SIZE} /> },
+  { titleKey: 'controls.modes.disarmed', service: 'alarm_disarm', state: 'disarmed', icon: <MaterialIcon name="mdi:shield-off" size={SECURITY_ICON_SIZE} /> },
 ] as const
 
 export interface SecurityControlsProps {
@@ -50,7 +51,8 @@ function SecurityCard({ active = true, ariaLabel, color, icon, onClick, size = '
   )
 }
 
-export function SecurityControls({ description, sectionTitle = 'Security System States' }: SecurityControlsProps = {}) {
+export function SecurityControls({ description, sectionTitle }: SecurityControlsProps = {}) {
+  const copy = useCopy('pageSecurity')
   const alarm = useEntity(asEntityName(SECURITY_ENTITY), { returnNullIfNotFound: true })
   const callService = useHass((state) => state.helpers.callService)
   const alarmState = alarm?.state
@@ -62,7 +64,7 @@ export function SecurityControls({ description, sectionTitle = 'Security System 
   return (
     <div className={styles.controls}>
       <div className={styles.sectionHeader}>
-        <h3 className={styles.sectionLabel}>{sectionTitle}</h3>
+        <h3 className={styles.sectionLabel}>{sectionTitle ?? copy('controls.sectionTitle')}</h3>
         <Separator className={styles.sectionSeparator} />
       </div>
       {description && <Description>{description}</Description>}
@@ -70,17 +72,18 @@ export function SecurityControls({ description, sectionTitle = 'Security System 
       <div className={styles.actions} data-security-mode-grid="true">
         {SECURITY_MODES.map((mode) => {
           const active = alarmState === mode.state
+          const title = copy(mode.titleKey)
 
           return (
             <SecurityCard
               active={active}
-              ariaLabel={`Set security system to ${mode.title}`}
+              ariaLabel={copy('controls.setMode', { mode: title })}
               color={securityStateColor(mode.state)}
               icon={mode.icon}
               key={mode.service}
               onClick={() => callAlarmService(mode.service)}
               size="compact"
-              title={mode.title}
+              title={title}
             />
           )
         })}

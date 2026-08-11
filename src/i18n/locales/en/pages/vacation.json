@@ -1,0 +1,13 @@
+{
+  "dates": {
+    "description": "Set the start and end time for your vacation. Vacation mode will automatically be turned off at the set end date and time.",
+    "rangeError": "Start date and time must be before end date and time. Vacation mode is disabled until the dates are fixed."
+  },
+  "empty": {
+    "description": "Enjoy vacation!"
+  },
+  "mode": {
+    "description": "Enable or disable vacation mode for the house",
+    "preChecklistError": "All pre-vacation tasks must be checked off before Vacation Mode can be enabled."
+  }
+}

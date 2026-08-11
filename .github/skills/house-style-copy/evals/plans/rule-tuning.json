@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "name": "rule-tuning-v1",
+  "caseFile": "cases.public.json",
+  "candidateIds": [],
+  "expectedCandidateCount": 2,
+  "requiresModelsArgument": true,
+  "projectionCandidateIds": [
+    "gpt-5.6-luna-low",
+    "gpt-5-mini-low"
+  ],
+  "repeats": 1,
+  "batchSize": 6,
+  "packBatches": true,
+  "shuffle": true,
+  "singletonCaseIds": [
+    "destructive-delete-task",
+    "loading-recipe-details",
+    "notification-title-vacuum-jinja",
+    "refuse-app-manual"
+  ],
+  "maxConcurrency": 3,
+  "maxAiCredits": 30,
+  "timeoutMs": 240000,
+  "preflight": true
+}

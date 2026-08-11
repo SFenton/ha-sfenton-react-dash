@@ -398,7 +398,7 @@ export const MANUAL_BEHAVIOR_OWNERSHIP_RULES: readonly ManualBehaviorOwnershipRu
   {
     ownerArticleId: 'behavior-device-health',
     category: 'Device health',
-    rationale: 'Detects a missing or stale household sensor, attempts bounded recovery, or creates the corresponding battery or maintenance alert.',
+    rationale: 'Detects a missing or stale household sensor, attempts bounded recovery, or reconciles the corresponding battery and maintenance task.',
     itemIds: [
       'automation.back_deck_motion_sensor_illuminance_health_creates_donetick_task',
       'automation.back_deck_motion_sensor_illuminance_numeric_change_tracker',

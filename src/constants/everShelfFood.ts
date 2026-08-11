@@ -5,6 +5,7 @@ import {
   HOME_PANTRY_ROUTE_PATH,
   HOME_SPICE_RACK_ROUTE_PATH,
 } from './routes'
+import { copy } from '../i18n'
 
 export const FOOD_CARD_BACKGROUND_COLOR = 'rgba(155, 110, 64, 0.72)'
 export const EVERSHELF_EXPIRING_SOON_ENTITY_ID = 'sensor.evershelf_expiring_soon'
@@ -75,13 +76,13 @@ function expiringSoonCountForLocation(entities: EverShelfEntityLookup, location:
 export function groceryPlaceSubtitle(entities: EverShelfEntityLookup, entityId: string, location: string) {
   const itemCount = numericEntityState(entities[entityId])
   const expiringCount = expiringSoonCountForLocation(entities, location)
-  return itemCount + ' Items • ' + expiringCount + ' Expiring Soon'
+  return inventorySummary(itemCount, expiringCount)
 }
 
 export function foodSummarySubtitle(entities: EverShelfEntityLookup) {
   const itemCount = EVERSHELF_FOOD_SPACES.reduce((total, place) => total + numericEntityState(entities[place.entityId]), 0)
   const expiringCount = EVERSHELF_FOOD_SPACES.reduce((total, place) => total + expiringSoonCountForLocation(entities, place.location), 0)
-  return itemCount + ' Items • ' + expiringCount + ' Expiring Soon'
+  return inventorySummary(itemCount, expiringCount)
 }
 
 /** The shared HA-derived subtitle used anywhere that represents the complete EverShelf inventory. */
@@ -89,5 +90,11 @@ export function allFoodSubtitle(entities: EverShelfEntityLookup) {
   const fallbackItemCount = EVERSHELF_FOOD_SPACES.reduce((total, place) => total + numericEntityState(entities[place.entityId]), 0)
   const itemCount = numericEntityState(entities[EVERSHELF_TOTAL_ITEMS_ENTITY_ID]) || fallbackItemCount
   const expiringCount = numericEntityState(entities[EVERSHELF_EXPIRING_SOON_ENTITY_ID])
-  return itemCount + ' Items • ' + expiringCount + ' Expiring Soon'
+  return inventorySummary(itemCount, expiringCount)
+}
+
+function inventorySummary(itemCount: number, expiringCount: number) {
+  const items = copy('pageFood', 'inventory.items', { count: itemCount })
+  const expiring = copy('pageFood', 'inventory.expiringSoon', { count: expiringCount })
+  return copy('pageFood', 'inventory.summary', { expiring, items })
 }
