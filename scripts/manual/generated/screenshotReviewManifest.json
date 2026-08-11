@@ -6,19 +6,19 @@
   "fingerprints": {
     "captureHarness": {
       "algorithm": "sha256",
-      "digest": "38efcaccf8dad140e9152c8639ce9a8ce7d9e665ea5f2132ec02ac31f7676c1a",
+      "digest": "4ed9772426accb63e7f045b498d30cbf7a5d95d22a2030d5db689914214c635f",
       "fileCount": 5,
       "scope": "manual-capture-harness-v1"
     },
     "screenshotMetadata": {
       "algorithm": "sha256",
-      "digest": "ba773eb78301b38a39848c54264f64b809ec0545a5d15b98042996caa424bca7",
+      "digest": "7514cfc4a51c285fe9cfe24734a869a468d72b18f46eb6611f73b7eed0b7753f",
       "scope": "manual-screenshot-metadata-v1",
       "subjectCount": 138
     },
     "uiSource": {
       "algorithm": "sha256",
-      "digest": "a121bafb0a6cd5ae3c77005d5dec8d2a0a517a4676561f1c2cb9f39d7cc07717",
+      "digest": "cf118dd5172ce85fa7d97d977373a45bc08a0e9d66e19dd75932f6aaec59aab6",
       "fileCount": 282,
       "scope": "app-visual-source-v1"
     }
@@ -26,10 +26,10 @@
   "library": {
     "maxFileBytes": 537073,
     "maxFilePath": "public/manual/manual-desktop/downstairs-hallway-page-context.png",
-    "totalBytes": 24932439
+    "totalBytes": 24949405
   },
-  "reviewedAt": "2026-08-10T08:15:30.273Z",
-  "reviewStateSha256": "c82ac730b38802e262031a5ae63e6c3258a673d9dcd8da906b7807a246bc6d0d",
+  "reviewedAt": "2026-08-11T15:17:07.719Z",
+  "reviewStateSha256": "fc42387fc96298b11ef17d29e3c7742a6d7d00a2492ec5eb6920115269f48dde",
   "schemaVersion": 1,
   "subjectCount": 138,
   "subjects": [
@@ -2051,17 +2051,17 @@
       "id": "thermostat-controls-rooms",
       "variants": {
         "desktop": {
-          "bytes": 72958,
+          "bytes": 71829,
           "height": 780,
           "path": "public/manual/manual-desktop/thermostat-controls-rooms.png",
-          "sha256": "f369a4024faf44494a36087e897555f3fdc727c27c3a810ca346508ba6416b3e",
+          "sha256": "235582c88d58d262e5c4526f4431d2bebb688a4e0d1791201feb292dc6509854",
           "width": 720
         },
         "mobile": {
-          "bytes": 62113,
+          "bytes": 57798,
           "height": 767,
           "path": "public/manual/manual-mobile/thermostat-controls-rooms.png",
-          "sha256": "cd836aa9af3b7b9d07e8ba4671df00b0206e4de81128bcdf6ae8bca6c2aaefc7",
+          "sha256": "c63246938902bfff8fa11827c22fef473f6873142170606a762e38927cd48c0d",
           "width": 393
         }
       }
@@ -2070,17 +2070,17 @@
       "id": "thermostat-controls-automation",
       "variants": {
         "desktop": {
-          "bytes": 99945,
+          "bytes": 104951,
           "height": 1200,
           "path": "public/manual/manual-desktop/thermostat-controls-automation.png",
-          "sha256": "05d88df13bd20ab6458ecefef1f707c074005e7cef9e01cf30f4483fe5d4c00c",
+          "sha256": "751179cc2c24641a706d61262f824701b6e393a24cff54640df9ec3a5ba02b55",
           "width": 720
         },
         "mobile": {
-          "bytes": 101039,
-          "height": 1200,
+          "bytes": 111455,
+          "height": 1400,
           "path": "public/manual/manual-mobile/thermostat-controls-automation.png",
-          "sha256": "04c3be3033a5cf83b0e4e270085fe6eecf6438873269dc5abe34b18cd5845a91",
+          "sha256": "ccc1a50e487d7d3b7529fddbaa41dd41432d4110c2ada34b6431c12c7c12d8f0",
           "width": 393
         }
       }
@@ -2089,17 +2089,17 @@
       "id": "thermostat-controls-tracking",
       "variants": {
         "desktop": {
-          "bytes": 77451,
-          "height": 780,
+          "bytes": 85294,
+          "height": 1000,
           "path": "public/manual/manual-desktop/thermostat-controls-tracking.png",
-          "sha256": "0ab681754f3efceb3f7709c18d937b7ce06e8dd3a6ed1f9efccf9821754af73c",
+          "sha256": "cb1ce61fef3743ad42c7baaabeac037dc040fc8cf8eb1dd0ef2e22d824f69ce3",
           "width": 720
         },
         "mobile": {
-          "bytes": 73465,
-          "height": 767,
+          "bytes": 94816,
+          "height": 1200,
           "path": "public/manual/manual-mobile/thermostat-controls-tracking.png",
-          "sha256": "bab06a88971386bf1e0c5d2369e97abeca8752888dcce2a2c8f9bcb22b42ba46",
+          "sha256": "964233e264400112bc689d6f15382e0120c083c45353232d22fa1a7ed61a8717",
           "width": 393
         }
       }
@@ -2127,17 +2127,17 @@
       "id": "predictive-comfort",
       "variants": {
         "desktop": {
-          "bytes": 113540,
+          "bytes": 120218,
           "height": 780,
           "path": "public/manual/manual-desktop/predictive-comfort.png",
-          "sha256": "1b90ada46006d75b2a9449eb91a5874838230d05d5be0a245313f2ddee7e77f5",
+          "sha256": "d85fe77dddebf4e20f2fedcfc356e1f914ee4eac172f093398c3664189ae6061",
           "width": 720
         },
         "mobile": {
-          "bytes": 64187,
+          "bytes": 67276,
           "height": 700,
           "path": "public/manual/manual-mobile/predictive-comfort.png",
-          "sha256": "d2586d63495670e6877611ff959cffd4386bc8bf9920295256946555e3c0c07b",
+          "sha256": "cda2f7a687ccd84ddbbac35f1b8e5d5f0dc0b1d618a0804fa4e2183f3f9aab2b",
           "width": 393
         }
       }
@@ -2564,17 +2564,17 @@
       "id": "eco-critical-tracking-picker",
       "variants": {
         "desktop": {
-          "bytes": 66285,
-          "height": 500,
+          "bytes": 53689,
+          "height": 680,
           "path": "public/manual/manual-desktop/eco-critical-tracking-picker.png",
-          "sha256": "fb3c570e18bab81f022a0f0d7e24ef3a89218b0611475e769e6c9f6ec207b9c6",
+          "sha256": "e8873cb0b7c3f64d8190b488be3e567f4fcfa0129c7c5f46b660e50e2e312d6f",
           "width": 720
         },
         "mobile": {
-          "bytes": 58735,
-          "height": 500,
+          "bytes": 60064,
+          "height": 680,
           "path": "public/manual/manual-mobile/eco-critical-tracking-picker.png",
-          "sha256": "23fddf0af985e52f4db178f0bd3eda984d09916e7bdd969f00c2b220893f746e",
+          "sha256": "c3be0983a627accf882b72ee8f2a69c23d57e313ce8d654ff8c8a9794f2ec31a",
           "width": 393
         }
       }
@@ -2583,17 +2583,17 @@
       "id": "eco-away-behavior-picker",
       "variants": {
         "desktop": {
-          "bytes": 79410,
-          "height": 500,
+          "bytes": 55015,
+          "height": 680,
           "path": "public/manual/manual-desktop/eco-away-behavior-picker.png",
-          "sha256": "c69a56201f038136506e28ddbc538fd33dfb58c2c3fb04d9a49a084e947e72e6",
+          "sha256": "770700f403805643ed1f8ecc5be54010dad16785f3e43fae9b6ec2b113d4b4a2",
           "width": 720
         },
         "mobile": {
-          "bytes": 55385,
-          "height": 500,
+          "bytes": 59074,
+          "height": 680,
           "path": "public/manual/manual-mobile/eco-away-behavior-picker.png",
-          "sha256": "ff8eaaedd213b749c80717f212943d101984f7dba18b7e009fcd0f5972ad0f31",
+          "sha256": "62765b222205d8853e71d09fee78759ab360195dc43ddc68e54f433b87bc2192",
           "width": 393
         }
       }

@@ -2094,6 +2094,7 @@ const PREDICTIVE_ALLOW_AWAY_SWITCH_ENTITY_ID = 'switch.thermostat_contact_sensor
 const PREDICTIVE_COMFORT_SENSOR_ENTITY_ID = 'sensor.living_room_thermostat_contact_sensors_predictive_comfort_mode'
 const PREDICTIVE_COMFORT_HASH = '#predictive-comfort'
 const THERMOSTAT_MODAL_HASH = '#thermostat-controls'
+const THERMOSTAT_MODAL_TITLE = 'Thermostat · Advanced Controls'
 const THERMOSTAT_ROOMS_HASH = '#thermostat-rooms'
 const THERMOSTAT_AUTOMATION_HASH = '#thermostat-automation'
 const THERMOSTAT_TRACKING_HASH = '#thermostat-tracking'
@@ -5036,21 +5037,22 @@ function ThermostatOptionOpener({ detailType, onOpen }: { detailType: 'eco-away'
 
   return (
     <ThermostatModalControl description={description} focusKey={detailType}>
-      <ScheduleListRow
-        accessibleLabel={`${config.title} ${formatSelectOption(control.displayValue)}`}
+      <GlassTile
+        ariaLabel={`${config.title} ${formatSelectOption(control.displayValue)}`}
+        disclosure
         disabled={control.disabled}
-        focusKey={detailType}
         icon={config.icon}
-        iconSurface={false}
+        isOff={control.disabled}
         onClick={onOpen}
-        primary={config.title}
-        secondary={formatSelectOption(control.displayValue)}
+        subtitle={formatSelectOption(control.displayValue)}
+        title={config.title}
+        tone="switch"
       />
     </ThermostatModalControl>
   )
 }
 
-function ThermostatOptionDetailPage({ detailType, onSelected }: { detailType: 'eco-away' | 'eco-critical'; onSelected: () => void }) {
+function ThermostatOptionDetailPage({ detailType }: { detailType: 'eco-away' | 'eco-critical' }) {
   const config = thermostatOptionConfig(detailType)
   const control = useThermostatSelectControl(config)
   const description = detailType === 'eco-critical'
@@ -5064,32 +5066,27 @@ function ThermostatOptionDetailPage({ detailType, onSelected }: { detailType: 'e
   return (
     <section className={styles.section}>
       <Description>{description}</Description>
-      <DynamicGrid ariaLabel={`${config.title} options`} className={styles.thermostatChoiceGrid} columns={2} forceEquivalentColumnCount gap={8}>
+      <div aria-label={`${config.title} options`} className={styles.thermostatChoiceStack} role="group">
         {control.options.map((option, index) => {
           const presentation = THERMOSTAT_OPTION_PRESENTATION[option.value]
+          const selected = option.value === control.displayValue
           return (
-            <ScheduleListRow
-              accessibleLabel={`Set ${config.title} to ${String(option.label)}: ${presentation?.description ?? ''}`.trim()}
-              active={option.value === control.displayValue}
-              autoFocus={option.value === control.displayValue || (!control.displayValue && index === 0)}
-              disclosure={false}
-              dynamicGridLabel
-              focusKey={option.value}
-              icon={presentation?.icon ?? config.icon}
-              iconSurface={false}
-              key={option.value}
-              onClick={() => {
-                control.selectOption(option.value)
-                onSelected()
-              }}
-              pressed={option.value === control.displayValue}
-              primary={option.label}
-              secondary={presentation?.description}
-              wrapText
-            />
+            <div className={styles.thermostatChoiceOption} key={option.value}>
+              {presentation?.description && <Description>{presentation.description}</Description>}
+              <GlassTile
+                ariaLabel={`Set ${config.title} to ${String(option.label)}: ${presentation?.description ?? ''}`.trim()}
+                detailAutoFocus={selected || (!control.displayValue && index === 0)}
+                icon={presentation?.icon ?? config.icon}
+                isOff={!selected}
+                onClick={() => control.selectOption(option.value)}
+                pressed={selected}
+                title={String(option.label)}
+                tone="switch"
+              />
+            </div>
           )
         })}
-      </DynamicGrid>
+      </div>
     </section>
   )
 }
@@ -5102,12 +5099,15 @@ function ThermostatRoomRow({ onOpen, room }: { onOpen: (hash: string) => void; r
 
   return (
     <div data-modal-detail-trigger={room.hash}>
-      <ModalOpenerRow
+      <GlassTile
         ariaLabel={`${room.title} ${subtitle}`}
-        icon={<MaterialIcon name={active ? 'mdi:thermometer-check' : 'mdi:thermometer-off'} size={32} />}
+        disclosure
+        icon={active ? 'mdi:thermometer-check' : 'mdi:thermometer-off'}
+        isOff={!active}
         onClick={() => onOpen(room.hash)}
         subtitle={subtitle}
         title={room.title}
+        tone="switch"
       />
     </div>
   )
@@ -5183,6 +5183,7 @@ function ThermostatToggleSetting({ entityId, icon, title }: { entityId: string; 
   const [state, commitState] = useOptimisticState(entity?.state ?? 'unavailable')
   const active = state === 'on'
   const disabled = !entity || isUnavailable(entity)
+  const stateText = formatCompactEntityState(entity, 'Unavailable', state)
 
   const toggle = (checked: boolean) => {
     if (disabled || checked === active) return
@@ -5190,7 +5191,20 @@ function ThermostatToggleSetting({ entityId, icon, title }: { entityId: string; 
     callService({ domain: 'homeassistant', service: 'toggle', target: entityId })
   }
 
-  return <ToggleSetting checked={active} disabled={disabled} icon={icon} label={title} onChange={toggle} />
+  return (
+    <GlassTile
+      ariaLabel={disabled ? `${title} Unavailable` : `${active ? 'Turn off' : 'Turn on'} ${title}`}
+      controlRole="switch"
+      disabled={disabled}
+      icon={icon}
+      isOff={!active || disabled}
+      onClick={() => toggle(!active)}
+      pressed={active}
+      subtitle={stateText}
+      title={title}
+      tone="switch"
+    />
+  )
 }
 
 function PredictiveComfortSetting({ onOpen }: { onOpen: () => void }) {
@@ -5225,18 +5239,30 @@ function PredictiveComfortSetting({ onOpen }: { onOpen: () => void }) {
   }
 
   return (
-    <ScheduleListRow
-      accessibleLabel={active ? `Open Predictive Comfort controls, ${stateText}` : 'Turn on Predictive Comfort'}
-      active={active}
+    <GlassTile
+      ariaLabel={active ? `Open Predictive Comfort controls, ${stateText}` : 'Turn on Predictive Comfort'}
       disabled={disabled}
       disclosure={active}
-      focusKey="predictive"
       icon="mdi:home-thermometer-outline"
-      iconSurface={false}
+      isOff={!active || disabled}
       onClick={handleMainClick}
-      primary="Predictive Comfort"
-      secondary={stateText}
-      trailingControl={<ToggleControl checked={active} disabled={disabled} label="Predictive Comfort" onChange={toggle} />}
+      pressed={active}
+      subtitle={stateText}
+      title="Predictive Comfort"
+      tone="switch"
+      trailingControl={active ? (
+        <button
+          aria-checked="true"
+          aria-label="Turn off Predictive Comfort"
+          className={styles.thermostatTilePowerButton}
+          disabled={disabled}
+          onClick={() => toggle(false)}
+          role="switch"
+          type="button"
+        >
+          <MaterialIcon name="mdi:power" size={20} />
+        </button>
+      ) : undefined}
     />
   )
 }
@@ -5473,15 +5499,16 @@ function ThermostatTrackingOpener({
 }) {
   return (
     <ThermostatModalControl description={description} focusKey={focusKey}>
-      <ScheduleListRow
-        accessibleLabel={`${title} ${subtitle}`}
+      <GlassTile
+        ariaLabel={`${title} ${subtitle}`}
+        disclosure
         disabled={disabled}
-        focusKey={focusKey}
         icon={icon}
-        iconSurface={false}
+        isOff={disabled}
         onClick={onOpen}
-        primary={title}
-        secondary={subtitle}
+        subtitle={subtitle}
+        title={title}
+        tone="switch"
       />
     </ThermostatModalControl>
   )
@@ -5744,7 +5771,7 @@ function thermostatModalDetailKey(activeTab: ThermostatModalTab, detail: Thermos
 }
 
 function thermostatModalDetailTitle(detail: ThermostatModalDetail | null) {
-  if (!detail) return 'Thermostat'
+  if (!detail) return THERMOSTAT_MODAL_TITLE
   if (detail.type === 'room') return detail.room.title
   if (detail.type === 'predictive') return 'Predictive Comfort'
   if (detail.type === 'eco-critical') return THERMOSTAT_ECO_CRITICAL_CONFIG.title
@@ -5779,8 +5806,6 @@ function ThermostatModal({
   const { bodyElementRef, enterDetailPage, leaveDetailPage, resetDetailPageScroll } = useModalDetailPageScroll(detailKey)
   const { displayedTab, transitionState } = useSmoothDisplayedModalTab(activeTab)
   const { currentRecommendation } = usePredictiveComfortData()
-  const rangeEntity = useEntity(asEntityName('input_text.all_climate_range'), { returnNullIfNotFound: true })
-  const rangeSummary = formatCompactEntityState(rangeEntity, 'Range unavailable')
 
   useLayoutEffect(() => {
     const wasOpen = previousOpenRef.current
@@ -5824,11 +5849,7 @@ function ThermostatModal({
     replaceDashboardUrl(rootHash)
   }
 
-  const subtitle = detail?.type === 'predictive'
-    ? formatPredictiveState(currentRecommendation)
-    : detail
-      ? undefined
-      : `${THERMOSTAT_ROOM_VIEWS.length} rooms · ${rangeSummary}`
+  const subtitle = detail?.type === 'predictive' ? formatPredictiveState(currentRecommendation) : undefined
   const footer = detail
     ? undefined
     : (
@@ -5858,7 +5879,7 @@ function ThermostatModal({
     >
       {detail?.type === 'room' && <ThermostatRoomModalContent room={detail.room} />}
       {detail?.type === 'predictive' && <div className={styles.thermostatDetailPage} data-modal-detail-autofocus="true" tabIndex={-1}><PredictiveComfortModalContent /></div>}
-      {(detail?.type === 'eco-away' || detail?.type === 'eco-critical') && <ThermostatOptionDetailPage detailType={detail.type} onSelected={closeDetail} />}
+      {(detail?.type === 'eco-away' || detail?.type === 'eco-critical') && <ThermostatOptionDetailPage detailType={detail.type} />}
       {(detail?.type === 'selected-rooms' || detail?.type === 'critical-protection' || detail?.type === 'occupied-only') && <ThermostatTrackingDetailPage detailType={detail.type} />}
       {!detail && (
         <ThermostatModalRootContent
