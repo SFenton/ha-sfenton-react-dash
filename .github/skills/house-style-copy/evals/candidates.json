@@ -1,0 +1,127 @@
+{
+  "version": 1,
+  "pricingAsOf": "2026-08-11",
+  "pricingUnit": "USD per 1 million tokens",
+  "candidates": [
+    {
+      "id": "gpt-5.6-luna-low",
+      "model": "gpt-5.6-luna",
+      "effort": "low",
+      "context": "default",
+      "pricing": {
+        "input": 0.2,
+        "cachedInput": 0.02,
+        "cacheWrite": 0.25,
+        "output": 1.2
+      }
+    },
+    {
+      "id": "gpt-5-mini-low",
+      "model": "gpt-5-mini",
+      "effort": "low",
+      "context": "default",
+      "pricing": {
+        "input": 0.25,
+        "cachedInput": 0.025,
+        "cacheWrite": 0,
+        "output": 2
+      }
+    },
+    {
+      "id": "gpt-5.4-mini-low",
+      "model": "gpt-5.4-mini",
+      "effort": "low",
+      "context": "default",
+      "pricing": {
+        "input": 0.75,
+        "cachedInput": 0.075,
+        "cacheWrite": 0,
+        "output": 4.5
+      }
+    },
+    {
+      "id": "mai-code-1-flash-low",
+      "model": "mai-code-1-flash-picker",
+      "effort": "low",
+      "context": "default",
+      "pricing": {
+        "input": 0.75,
+        "cachedInput": 0.075,
+        "cacheWrite": 0,
+        "output": 4.5
+      }
+    },
+    {
+      "id": "claude-haiku-4.5",
+      "model": "claude-haiku-4.5",
+      "effort": null,
+      "context": "default",
+      "pricing": {
+        "input": 1,
+        "cachedInput": 0.1,
+        "cacheWrite": 1.25,
+        "output": 5
+      }
+    },
+    {
+      "id": "gemini-3.6-flash-minimal",
+      "model": "gemini-3.6-flash",
+      "effort": "minimal",
+      "context": "default",
+      "pricing": {
+        "input": 1.5,
+        "cachedInput": 0.15,
+        "cacheWrite": 0,
+        "output": 7.5
+      }
+    },
+    {
+      "id": "gemini-3.5-flash-minimal",
+      "model": "gemini-3.5-flash",
+      "effort": "minimal",
+      "context": "default",
+      "pricing": {
+        "input": 1.5,
+        "cachedInput": 0.15,
+        "cacheWrite": 0,
+        "output": 9
+      }
+    },
+    {
+      "id": "grok-4.5-low",
+      "model": "grok-4.5",
+      "effort": "low",
+      "context": "default",
+      "pricing": {
+        "input": 2,
+        "cachedInput": 0.5,
+        "cacheWrite": 0,
+        "output": 6
+      }
+    },
+    {
+      "id": "claude-sonnet-5-low",
+      "model": "claude-sonnet-5",
+      "effort": "low",
+      "context": "default",
+      "pricing": {
+        "input": 2,
+        "cachedInput": 0.2,
+        "cacheWrite": 2.5,
+        "output": 10
+      }
+    },
+    {
+      "id": "gpt-5.6-terra-low",
+      "model": "gpt-5.6-terra",
+      "effort": "low",
+      "context": "default",
+      "pricing": {
+        "input": 2,
+        "cachedInput": 0.2,
+        "cacheWrite": 2.5,
+        "output": 12
+      }
+    }
+  ]
+}

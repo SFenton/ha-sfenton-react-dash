@@ -1,5 +1,6 @@
 import type { CardColor } from '../components/core/Card'
 import { MASTER_BEDROOM_HUMIDIFIER } from './humidifiers'
+import { copy } from '../i18n'
 
 export type EntityBasicAction =
   | { type: 'navigate'; path: string }
@@ -176,15 +177,12 @@ export const CHORE_QUICK_LINKS: ChoreQuickLinkConfig[] = [
 ]
 
 export const ADMIN_DESCRIPTIONS = {
-  autoLock: 'Enables automatic locking of the front door. Turn this off temporarily when contractors are over or people are frequently entering and leaving the home.',
-  livingRoomPowerRecovery:
-    'If the living room switch loses power and comes back with the relay off, run this to temporarily couple the top paddle, unlock the relay, turn power back on, relock it, and return the paddle to decoupled mode.',
-  presenceOverrides: "Choose whether each room's presence lighting is Enabled, Disabled, Paused, or Quieted. Paused stays fail-dark until resumed; Quieted rearms after the room clears.",
-  relayControlMode:
-    "Couples every smart-bulb wall switch to its own relay, so the paddles keep working even if Home Assistant, Zigbee2MQTT, or the host is down. This turns on automatically while Vacation Mode is active, so house-sitters always have a way to get light.\n\nWhile this is on, turning lights off at the wall cuts power to those bulbs, so presence-based lighting can't bring them back until the paddle is switched on again.",
-  showSpecific: "Shows the outdoor faucets in our Home Assistant pages. Useful to disable during the winter, when we aren't using them.",
-  autoReset:
-    "Sometimes, we disable automatic presence-based lighting in rooms that we'd otherwise want to wake up and have that presence-based lighting active.\n\nIf a toggle here is enabled, it means that in the morning, before we usually wake up, if the room has been cleared for a sufficient amount of time during the night, we'll re-enable presence-based lighting in that room.",
+  autoLock: copy('pageAdmin', 'descriptions.autoLock'),
+  livingRoomPowerRecovery: copy('pageAdmin', 'descriptions.livingRoomPowerRecovery'),
+  presenceOverrides: copy('pageAdmin', 'descriptions.presenceOverrides'),
+  relayControlMode: copy('pageAdmin', 'descriptions.relayControlMode'),
+  showSpecific: copy('pageAdmin', 'descriptions.showSpecific'),
+  autoReset: copy('pageAdmin', 'descriptions.autoReset'),
 } as const
 
 export const ADMIN_SECURITY_CONTROLS: EntityTileConfig[] = [
@@ -248,50 +246,50 @@ export const ADMIN_AUTO_REENABLE_ITEMS: EntityTileConfig[] = [
 
 export const SETTINGS_PAGE_ITEMS: SettingsLinkConfig[] = [
   {
-    title: 'App Manual',
-    subtitle: 'Access guides, instructions, and details on how our Home Assistant instance and app work.',
+    title: copy('pageSettings', 'items.manual.title'),
+    subtitle: copy('pageSettings', 'items.manual.subtitle'),
     icon: 'mdi:book-open-page-variant',
     path: 'manual',
   },
   {
-    title: 'Admin Controls',
-    subtitle: 'Presence-Based Toggles, Automation Overrides, and More',
+    title: copy('pageSettings', 'items.admin.title'),
+    subtitle: copy('pageSettings', 'items.admin.subtitle'),
     icon: 'mdi:shield-account',
     path: 'admin',
   },
   {
-    title: 'Guest Controls',
-    subtitle: 'Toggle automations when guests stay over.',
+    title: copy('pageSettings', 'items.guest.title'),
+    subtitle: copy('pageSettings', 'items.guest.subtitle'),
     icon: 'mdi:account-multiple',
     path: 'guests-staying-over',
   },
   {
-    title: 'Vacation',
-    subtitle: 'Set away dates and prepare the house for vacation.',
+    title: copy('pageSettings', 'items.vacation.title'),
+    subtitle: copy('pageSettings', 'items.vacation.subtitle'),
     icon: 'mdi:airplane',
     path: 'vacation',
   },
   {
-    title: 'To-Do',
-    subtitle: 'An admin panel for to-do tasks.',
+    title: copy('pageSettings', 'items.todo.title'),
+    subtitle: copy('pageSettings', 'items.todo.subtitle'),
     icon: 'mdi:clipboard-list',
     path: 'to-do',
   },
   {
-    title: 'Mach-E',
-    subtitle: 'Controls for the Mustang Mach-E.',
+    title: copy('pageSettings', 'items.machE.title'),
+    subtitle: copy('pageSettings', 'items.machE.subtitle'),
     icon: 'mdi:car-estate',
     path: 'mach-e',
   },
   {
-    title: 'Home Assistant Settings',
-    subtitle: 'Access more in-depth Home Assistant details and settings.',
+    title: copy('pageSettings', 'items.homeAssistant.title'),
+    subtitle: copy('pageSettings', 'items.homeAssistant.subtitle'),
     icon: 'mdi:cog',
     externalPath: '/config',
   },
 ]
 
-export const GUEST_CONTROLS_DESCRIPTION = "When guests stay over, toggle these controls on based on the rooms they're staying in to disable automations (like automatic vacuuming in the music room) and ensure that rooms are tracked for temperature monitoring and vent control."
+export const GUEST_CONTROLS_DESCRIPTION = copy('pageGuests', 'description')
 
 const VALETUDO_CONSUMABLES: (Omit<VacuumConsumableConfig, 'entityId'> & { entitySuffix: string })[] = [
   { title: 'Main Brush', entitySuffix: 'main_brush', icon: 'mdi:brush', valueKind: 'duration' },
@@ -326,14 +324,14 @@ export const GUEST_CONTROL_ITEMS: EntityTileConfig[] = [
   { title: 'Theater Room', entityId: 'input_boolean.guests_staying_in_theater_room', icon: 'mdi:projector', color: SWITCH_ACTIVE_COLOR, action: { type: 'toggle' }, showSubtitle: true },
 ]
 
-export const VACATION_MODE_DESCRIPTION = 'Enable or disable vacation mode for the house'
-export const VACATION_DATES_DESCRIPTION = 'Set the start and end time for your vacation. Vacation mode will automatically be turned off at the set end date and time.'
-export const VACATION_DATE_RANGE_ERROR = 'Start date and time must be before end date and time. Vacation mode is disabled until the dates are fixed.'
-export const VACATION_PRE_CHECKLIST_ERROR = 'All pre-vacation tasks must be checked off before Vacation Mode can be enabled.'
+export const VACATION_MODE_DESCRIPTION = copy('pageVacation', 'mode.description')
+export const VACATION_DATES_DESCRIPTION = copy('pageVacation', 'dates.description')
+export const VACATION_DATE_RANGE_ERROR = copy('pageVacation', 'dates.rangeError')
+export const VACATION_PRE_CHECKLIST_ERROR = copy('pageVacation', 'mode.preChecklistError')
 
 export const VACATION_MODE_ENTITY_ID = 'input_boolean.vacation_mode'
 /** Shared empty-state description for lists Donetick hides while vacation mode is active. */
-export const VACATION_EMPTY_DESCRIPTION = 'Enjoy vacation!'
+export const VACATION_EMPTY_DESCRIPTION = copy('pageVacation', 'empty.description')
 export const VACATION_INVALID_DATES_PENDING_ENTITY_ID = 'input_boolean.vacation_mode_invalid_dates_pending'
 export const VACATION_START_ENTITY_ID = 'input_datetime.vacation_start'
 export const VACATION_END_ENTITY_ID = 'input_datetime.vacation_end'

@@ -1,5 +1,7 @@
+import { copy } from '../i18n'
+
 export const DASHBOARD_ROUTE_CHANGE_EVENT = 'dashboard-route-change'
-export const DASHBOARD_DOCUMENT_TITLE = 'Home Assistant'
+export const DASHBOARD_DOCUMENT_TITLE = copy('common', 'app.title')
 
 function canReadWindow(candidate: Window) {
   try {

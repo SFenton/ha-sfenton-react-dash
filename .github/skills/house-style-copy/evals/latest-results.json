@@ -1,0 +1,65 @@
+{
+  "version": 1,
+  "evaluatedAt": "2026-08-11",
+  "status": "no-qualified-profile",
+  "runs": [
+    "artifacts/house-style-copy-evals/release-qualification-20260811",
+    "artifacts/house-style-copy-evals/release-holdout-20260811",
+    "artifacts/house-style-copy-evals/release-latency-20260811"
+  ],
+  "finalists": [
+    {
+      "candidateId": "gpt-5.6-terra-low",
+      "public": {
+        "passRate": 0.9523809523809523,
+        "meanScore": 99.66666666666667,
+        "hardFailureCount": 2
+      },
+      "holdout": {
+        "passRate": 0.6666666666666666,
+        "meanScore": 90.07407407407408,
+        "hardFailureCount": 6
+      },
+      "latency": {
+        "passRate": 1,
+        "meanScore": 94.5,
+        "hardFailureCount": 0,
+        "p95Milliseconds": 6368
+      }
+    },
+    {
+      "candidateId": "grok-4.5-low",
+      "public": {
+        "passRate": 0.9523809523809523,
+        "meanScore": 99.47619047619048,
+        "hardFailureCount": 2
+      },
+      "holdout": {
+        "passRate": 0.6851851851851852,
+        "meanScore": 90.33333333333333,
+        "hardFailureCount": 6
+      },
+      "latency": {
+        "passRate": 1,
+        "meanScore": 94.5,
+        "hardFailureCount": 0,
+        "p95Milliseconds": 16542
+      }
+    },
+    {
+      "candidateId": "gpt-5.6-luna-low",
+      "public": {
+        "passRate": 0.9047619047619048,
+        "meanScore": 98.78571428571429,
+        "hardFailureCount": 3
+      },
+      "holdout": {
+        "passRate": 0.5555555555555556,
+        "meanScore": 87.85185185185185,
+        "hardFailureCount": 10
+      },
+      "latency": null
+    }
+  ],
+  "decision": "No profile passed the frozen quality gate. Keep normal skill generation and pinned execution disabled."
+}

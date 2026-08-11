@@ -71,13 +71,43 @@
   color: var(--color-subtle);
 }
 
-.sectionGrid {
-  --dynamic-grid-columns: 2;
-}
-
 .pinnedGrid {
   display: grid;
   gap: 10px;
+}
+
+.sectionShortcutGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.sectionShortcutGrid button {
+  display: grid;
+  min-width: 0;
+  min-height: 76px;
+  place-items: center;
+  gap: 6px;
+  border: 1px solid color-mix(in srgb, var(--manual-section-color) 72%, white 12%);
+  border-radius: 20px;
+  padding: 10px 6px;
+  color: var(--color-text);
+  background: color-mix(in srgb, var(--manual-section-color) 58%, rgba(15, 20, 32, 0.72));
+  box-shadow: var(--shadow-glass);
+  text-align: center;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.sectionShortcutGrid strong {
+  overflow: hidden;
+  font-size: 0.72rem;
+  line-height: 1.15;
+  text-wrap: balance;
+}
+
+.sectionShortcutGrid button:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.58);
+  outline-offset: 2px;
 }
 
 .pinnedCard,
@@ -191,6 +221,45 @@
   gap: 22px;
 }
 
+.articleOutline {
+  display: grid;
+  gap: 9px;
+  border: 1px solid rgba(125, 211, 252, 0.2);
+  border-radius: 22px;
+  padding: 12px;
+  background: rgba(42, 126, 180, 0.12);
+}
+
+.articleOutline > strong {
+  font-size: 0.78rem;
+}
+
+.articleOutlineScroller {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.articleOutlineScroller button {
+  width: 100%;
+  min-height: 44px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  padding: 8px 12px;
+  color: var(--color-text);
+  background: rgba(255, 255, 255, 0.08);
+  font-size: 0.73rem;
+  font-weight: 720;
+  line-height: 1.2;
+  text-align: left;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.articleOutlineScroller button:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.58);
+  outline-offset: 2px;
+}
+
 .sectionOverview {
   display: grid;
   gap: 22px;
@@ -292,6 +361,187 @@
   font-size: 0.82rem;
   font-weight: 590;
   line-height: 1.45;
+}
+
+.navigationHint {
+  padding: 0 2px;
+}
+
+.continueCue {
+  border-left: 2px solid rgba(125, 211, 252, 0.48);
+  padding-left: 10px;
+  color: var(--color-muted);
+  font-size: 0.76rem;
+  font-weight: 650;
+  line-height: 1.4;
+}
+
+.behaviorFlow,
+.taskPath {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.behaviorFlow li,
+.taskPath > div {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  gap: 3px 9px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 20px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.behaviorFlow li > span,
+.taskPath > div > span {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  grid-row: 1 / span 2;
+  place-items: center;
+  border-radius: 50%;
+  color: white;
+  background: rgba(42, 126, 180, 0.72);
+  font-size: 0.72rem;
+  font-weight: 780;
+}
+
+.behaviorFlow strong,
+.taskPath strong {
+  font-size: 0.78rem;
+}
+
+.behaviorFlow p,
+.taskPath p {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: 0.75rem;
+  font-weight: 590;
+  line-height: 1.4;
+}
+
+.taskQuestion {
+  border-left: 3px solid rgba(125, 211, 252, 0.62);
+  padding: 4px 0 4px 12px;
+  color: rgba(247, 251, 255, 0.9);
+  font-size: 0.92rem;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+.behindScenes {
+  display: grid;
+  gap: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 22px;
+  padding: 12px 14px;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.behindScenes summary {
+  cursor: pointer;
+  color: var(--color-muted);
+  font-size: 0.82rem;
+  font-weight: 760;
+}
+
+.behindScenes[open] summary {
+  margin-bottom: 14px;
+}
+
+.endNavigation {
+  display: grid;
+  gap: 14px;
+  padding-top: 4px;
+}
+
+.endMarker {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--color-subtle);
+  font-size: 0.72rem;
+  font-weight: 760;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.endMarker::before,
+.endMarker::after {
+  height: 1px;
+  flex: 1;
+  background: rgba(255, 255, 255, 0.12);
+  content: '';
+}
+
+.guidePager {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.guidePager button {
+  display: grid;
+  min-width: 0;
+  min-height: 70px;
+  align-content: center;
+  gap: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 20px;
+  padding: 10px;
+  color: var(--color-text);
+  background: rgba(255, 255, 255, 0.08);
+  text-align: left;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.guidePager small {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  color: var(--color-subtle);
+  font-size: 0.64rem;
+  font-weight: 760;
+  text-transform: uppercase;
+}
+
+.guidePager button:nth-child(3) small {
+  justify-content: flex-end;
+}
+
+.guidePager button:disabled {
+  color: var(--color-subtle);
+  opacity: 0.56;
+}
+
+.guidePager strong {
+  overflow: hidden;
+  font-size: 0.72rem;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+}
+
+.guidePager button:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.58);
+  outline-offset: 2px;
+}
+
+.title:focus,
+.articleHeader h2:focus,
+.sectionIntro h2:focus {
+  outline: none;
+}
+
+@media (hover: none) and (pointer: coarse) {
+  .sectionShortcutGrid button:focus,
+  .articleOutlineScroller button:focus,
+  .guidePager button:focus {
+    outline: none;
+  }
 }
 
 .factGroup {
@@ -411,8 +661,8 @@
     margin: 0 auto;
   }
 
-  .sectionGrid {
-    --dynamic-grid-columns: 4;
+  .sectionShortcutGrid {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
   }
 
   .pinnedGrid {
@@ -429,5 +679,14 @@
 
   .overviewCards {
     grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .behaviorFlow,
+  .taskPath {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .articleOutlineScroller {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }

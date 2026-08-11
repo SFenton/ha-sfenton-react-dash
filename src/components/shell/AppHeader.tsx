@@ -6,6 +6,7 @@ import { dispatchDashboardRouteChange, pushDashboardUrl } from '../../hooks/dash
 import { IconSize } from '../../constants/theme'
 import { CountBadge } from '../core/CountBadge'
 import { MaterialIcon } from '../core/Icon'
+import { useCopy } from '../../i18n'
 import styles from './AppHeader.module.css'
 
 export interface AppHeaderAction {
@@ -42,11 +43,16 @@ function MenuIcon() {
   )
 }
 
-export function AppHeader({ activePath, actions = [], backLabel = 'Go back', backPath, onBack, onNavigate, title }: AppHeaderProps) {
+export function AppHeader({ activePath, actions = [], backLabel, backPath, onBack, onNavigate, title }: AppHeaderProps) {
   const [sidebarState, setSidebarState] = useState<SidebarState>('closed')
   const [actionsOpen, setActionsOpen] = useState(false)
+  const commonCopy = useCopy('common')
+  const shellCopy = useCopy('shell')
   const { badgeCount, title: profileTitle } = useDailyReportContext()
-  const profileLabel = badgeCount > 0 ? `Open ${profileTitle}, ${badgeCount} ${badgeCount === 1 ? 'item needs' : 'items need'} attention` : `Open ${profileTitle}`
+  const profileLabel = badgeCount > 0
+    ? shellCopy('profile.openWithAttention', { count: badgeCount, title: profileTitle })
+    : shellCopy('profile.open', { title: profileTitle })
+  const resolvedBackLabel = backLabel ?? commonCopy('actions.goBack')
   const showBack = Boolean(backPath)
   const showMenu = Boolean(!showBack && onNavigate)
   const showActions = actions.length > 0
@@ -100,9 +106,9 @@ export function AppHeader({ activePath, actions = [], backLabel = 'Go back', bac
       }}
       onClick={closeMenus}
     >
-      <aside aria-label="Navigation menu" className={styles.sidebar} data-state={sidebarDataState} onClick={(event) => event.stopPropagation()}>
+      <aside aria-label={shellCopy('navigation.menu')} className={styles.sidebar} data-state={sidebarDataState} onClick={(event) => event.stopPropagation()}>
         <div className={styles.sidebarHeader}>
-          <span>Navigation</span>
+          <span>{shellCopy('navigation.heading')}</span>
         </div>
         <nav className={styles.sidebarNav} role="menu">
           <div className={styles.primaryNavigation} data-primary-navigation="true">
@@ -128,7 +134,7 @@ export function AppHeader({ activePath, actions = [], backLabel = 'Go back', bac
     <header className={`${styles.header} ${showBack ? styles.headerWithBack : ''} ${showMenu ? styles.headerWithMenu : ''}`}>
       {showBack ? (
         <>
-          <button aria-label={backLabel} className={styles.backButton} onClick={goBack} type="button">
+          <button aria-label={resolvedBackLabel} className={styles.backButton} onClick={goBack} type="button">
             <span className={styles.backIconSlot}><BackChevron /></span>
             <span className={styles.backTitle}>{title}</span>
           </button>
@@ -138,7 +144,7 @@ export function AppHeader({ activePath, actions = [], backLabel = 'Go back', bac
         <>
           <div className={styles.leading}>
             {showMenu && (
-              <button aria-expanded={menuOpen} aria-label="Open navigation menu" className={styles.menuButton} onClick={toggleSidebar} type="button">
+              <button aria-expanded={menuOpen} aria-label={shellCopy('navigation.openMenu')} className={styles.menuButton} onClick={toggleSidebar} type="button">
                 <MenuIcon />
               </button>
             )}
@@ -150,7 +156,7 @@ export function AppHeader({ activePath, actions = [], backLabel = 'Go back', bac
 
       <div className={styles.trailing}>
         {showActions && (
-          <button aria-expanded={actionsOpen} aria-label="More actions" className={styles.iconButton} onClick={() => { setActionsOpen((open) => !open); closeSidebar() }} type="button">
+          <button aria-expanded={actionsOpen} aria-label={shellCopy('navigation.moreActions')} className={styles.iconButton} onClick={() => { setActionsOpen((open) => !open); closeSidebar() }} type="button">
             <MaterialIcon name="mdi:dots-horizontal" size={28} />
           </button>
         )}
@@ -163,7 +169,7 @@ export function AppHeader({ activePath, actions = [], backLabel = 'Go back', bac
       {sidebar && createPortal(sidebar, document.body)}
 
       {actionsOpen && (
-        <div aria-label="Page actions" className={`${styles.menu} ${styles.actionsMenu}`} role="menu">
+        <div aria-label={shellCopy('navigation.pageActions')} className={`${styles.menu} ${styles.actionsMenu}`} role="menu">
           {actions.map((action) => (
             <button className={styles.menuItem} key={action.label} onClick={() => { closeMenus(); action.onClick() }} role="menuitem" type="button">
               <MaterialIcon name={action.icon} size={20} />

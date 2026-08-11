@@ -18,6 +18,7 @@ import { SecurityControls } from './SecurityControls'
 import { SECURITY_SYSTEM_MODAL_STYLE, securitySystemModalSubtitle } from './securityControlsConfig'
 import { GuestPresenceSecurityModalContent, GuestPresenceSecuritySection, GUEST_PRESENCE_SECURITY_HASH } from './GuestPresenceSecurity'
 import { StatusRail } from './StatusRail'
+import { copy as translate, useCopy } from '../../i18n'
 import styles from './SecurityDashboard.module.css'
 
 const SHOW_MACHE_SECTION = false
@@ -62,7 +63,7 @@ function SecurityTile({ item, onOpenHash }: { item: SecurityTileConfig; onOpenHa
   const entity = useEntity(asEntityName(item.entityId), { returnNullIfNotFound: true })
   const callService = useHass((state) => state.helpers.callService) as unknown as CallService
   const unavailable = !entity || entity.state === 'unavailable' || entity.state === 'unknown'
-  const stateText = formatCompactEntityState(entity, 'Unavailable')
+  const stateText = formatCompactEntityState(entity)
   const active = isActiveState(entity)
 
   const runAction = () => {
@@ -92,10 +93,13 @@ function SecurityTile({ item, onOpenHash }: { item: SecurityTileConfig; onOpenHa
 }
 
 export function SecurityStatusRail({ onOpenHash }: { onOpenHash: (hash: string) => void }) {
+  const copy = useCopy('pageSecurity')
   const openContactCount = useHass((state) =>
     CONTACT_GROUPS.flatMap((group) => group.items).reduce((count, sensor) => count + (isContactOpen(state.entities[sensor.entityId]) ? 1 : 0), 0),
   )
-  const contactSubtitle = openContactCount === 0 ? 'All Closed' : `${openContactCount} Open`
+  const contactSubtitle = openContactCount === 0
+    ? copy('status.allClosed')
+    : copy('status.openCount', { count: openContactCount })
 
   return (
     <div className={styles.statusRailWrap}>
@@ -105,12 +109,12 @@ export function SecurityStatusRail({ onOpenHash }: { onOpenHash: (hash: string) 
 }
 
 function modalTitle(hash: string) {
-  if (hash === '#security-system') return 'Security System'
-  if (hash === GUEST_PRESENCE_SECURITY_HASH) return 'Guest Presence Security'
-  if (hash === '#contact-sensors-overview') return 'Contact Sensors'
+  if (hash === '#security-system') return translate('pageSecurity', 'modal.securitySystem')
+  if (hash === GUEST_PRESENCE_SECURITY_HASH) return translate('pageSecurity', 'modal.guestPresence')
+  if (hash === '#contact-sensors-overview') return translate('pageSecurity', 'modal.contactSensors')
   const camera = CAMERA_ITEMS.find((item) => item.hash === hash)
-  if (camera) return `${camera.title} Camera`
-  return 'Security'
+  if (camera) return translate('pageSecurity', 'modal.camera', { title: camera.title })
+  return translate('pageSecurity', 'modal.fallback')
 }
 
 const CONTACT_SENSORS_HASH = '#contact-sensors-overview'
@@ -148,6 +152,7 @@ interface SecurityDashboardProps {
 }
 
 export function SecurityDashboard({ closeHash, hash, onOpenHash, preload = false, preloadHash, preloadHashes = [] }: SecurityDashboardProps) {
+  const copy = useCopy('pageSecurity')
   const securitySubtitle = useHass((state) => securitySystemModalSubtitle(state.entities[SECURITY_ENTITY]?.state))
   const activeHash = isSecurityModalHash(hash) ? hash : ''
   const preloadContentHash = preloadHash && isSecurityModalHash(preloadHash) ? preloadHash : ''
@@ -164,7 +169,7 @@ export function SecurityDashboard({ closeHash, hash, onOpenHash, preload = false
     <>
       <div className={styles.dashboard}>
         <section className={styles.section}>
-          <SectionHeader title="Security" />
+          <SectionHeader title={copy('sections.security')} />
           <div className={styles.grid} data-security-control-grid="true">
             {SECURITY_CONTROL_TILES.map((item) => <SecurityTile item={item} key={item.entityId} onOpenHash={onOpenHash} />)}
           </div>
@@ -173,7 +178,7 @@ export function SecurityDashboard({ closeHash, hash, onOpenHash, preload = false
         <GuestPresenceSecuritySection onOpen={onOpenHash} />
 
         <section className={styles.section}>
-          <SectionHeader title="Cameras" />
+          <SectionHeader title={copy('sections.cameras')} />
           <div className={styles.cameraGrid}>
             {CAMERA_ITEMS.map((camera) => <CameraTile camera={camera} key={camera.entityId} live={!preload} onOpen={onOpenHash} />)}
           </div>
@@ -181,7 +186,7 @@ export function SecurityDashboard({ closeHash, hash, onOpenHash, preload = false
 
         {SHOW_MACHE_SECTION && (
           <section className={styles.section}>
-            <SectionHeader title="Mach-E" />
+            <SectionHeader title={copy('sections.vehicle')} />
             <div className={styles.grid}>
               {SECURITY_MACHE_TILES.map((item) => <SecurityTile item={item} key={item.entityId} onOpenHash={onOpenHash} />)}
             </div>

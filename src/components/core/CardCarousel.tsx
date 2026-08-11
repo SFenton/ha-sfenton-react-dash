@@ -1,4 +1,5 @@
 import { useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNode, type TouchEvent } from 'react'
+import { useCopy } from '../../i18n'
 import styles from './CardCarousel.module.css'
 
 interface CardCarouselProps {
@@ -12,6 +13,7 @@ type CardCarouselStyle = CSSProperties & {
 }
 
 export function CardCarousel({ ariaLabel, columns = 2, pages }: CardCarouselProps) {
+  const copy = useCopy('core')
   const touchStartXRef = useRef<number | null>(null)
   const [activePage, setActivePage] = useState(0)
   const currentPage = Math.max(0, Math.min(pages.length - 1, activePage))
@@ -68,7 +70,7 @@ export function CardCarousel({ ariaLabel, columns = 2, pages }: CardCarouselProp
             return (
               <div
                 aria-hidden={active ? undefined : 'true'}
-                aria-label={`Page ${pageIndex + 1} of ${pages.length}`}
+                aria-label={copy('carousel.pageOf', { count: pages.length, page: pageIndex + 1 })}
                 aria-roledescription="slide"
                 className={styles.page}
                 data-carousel-page={pageIndex + 1}
@@ -84,11 +86,11 @@ export function CardCarousel({ ariaLabel, columns = 2, pages }: CardCarouselProp
           })}
         </div>
       </div>
-      <div aria-label={`${ariaLabel} pages`} className={styles.dots} role="group">
+      <div aria-label={copy('carousel.pages', { label: ariaLabel })} className={styles.dots} role="group">
         {pages.map((_, index) => (
           <button
             aria-current={currentPage === index ? 'page' : undefined}
-            aria-label={`Go to page ${index + 1}`}
+            aria-label={copy('carousel.goToPage', { page: index + 1 })}
             className={styles.dotButton}
             key={`carousel-dot-${index}`}
             onClick={() => goToPage(index)}

@@ -1,0 +1,29 @@
+{
+  "controls": {
+    "modes": {
+      "away": "Away",
+      "disarmed": "Disarmed",
+      "home": "Home",
+      "night": "Night"
+    },
+    "sectionTitle": "Security System States",
+    "setMode": "Set security system to {{mode}}"
+  },
+  "modal": {
+    "camera": "{{title}} Camera",
+    "contactSensors": "Contact Sensors",
+    "fallback": "Security",
+    "guestPresence": "Guest Presence Security",
+    "securitySystem": "Security System"
+  },
+  "sections": {
+    "cameras": "Cameras",
+    "security": "Security",
+    "vehicle": "Mach-E"
+  },
+  "status": {
+    "allClosed": "All Closed",
+    "openCount_one": "{{count}} Open",
+    "openCount_other": "{{count}} Open"
+  }
+}

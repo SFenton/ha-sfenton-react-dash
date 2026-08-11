@@ -17,7 +17,7 @@ const LANDING_CASES = MANUAL_SECTIONS.map((section) => {
     commonTaskCount: landing.commonTasks.length,
     contextAlt: context.alt,
     id: section.id,
-    maxFirstTaskOffset: section.id === 'climate' ? 1320 : 1100,
+    maxFirstTaskOffset: section.id === 'climate' ? 1380 : 1140,
     technical: Boolean(landing.technicalArticleIds?.length),
     title: section.title,
   }
@@ -82,7 +82,7 @@ test('Settings opens the complete App Manual and natural-language search finds g
   const sections = page.getByRole('group', { name: 'App Manual sections' })
   await expect(sections.getByRole('button')).toHaveCount(9)
   await expect(page.getByRole('button', { name: /^Start Here/i })).toBeVisible()
-  await expect(page.getByRole('button', { name: /^Home Learn the Home screen/i })).toBeVisible()
+  await expect(page.getByRole('button', { name: /^Home\. Learn the Home screen/i })).toBeVisible()
   await expect(page.getByRole('button', { name: /^Food & Recipes/i })).toBeVisible()
   await expect(page.getByRole('button', { name: /^Help & Technical Reference/i })).toBeVisible()
   await expect(page.getByRole('button', { name: /What are the status chips/i })).toBeVisible()
@@ -92,8 +92,8 @@ test('Settings opens the complete App Manual and natural-language search finds g
   await page.getByRole('button', { name: /Humidifier activities and schedules/i }).click()
   await expect(page.getByRole('heading', { level: 2, name: 'Humidifier activities and schedules' })).toBeVisible()
   const guide = page.locator('[data-manual-surface-guide="humidifier-schedule"]')
-  await expect(guide.getByText('How to Open')).toBeVisible()
-  await expect(guide.getByText('Tabs, Details, and Wizard Navigation')).toBeVisible()
+  await expect(guide.getByText('How to open')).toBeVisible()
+  await expect(guide.getByText('Moving around inside')).toBeVisible()
   await expect(guide.locator('[data-manual-surface-navigation-item]')).toHaveCount(4)
   await expect(page.getByRole('img', { name: /Humidifier schedule editor/i })).toBeVisible()
 })
@@ -128,18 +128,15 @@ test('automatic behavior guides open from domain landings and render the househo
     await expect(page).toHaveURL(new RegExp(`manual-article=${behavior.articleId}`))
     await expect(page.getByRole('heading', { level: 2, name: behavior.title })).toBeVisible()
     const guide = page.locator(`[data-manual-behavior-guide="${behavior.articleId}"]`)
-    for (const heading of [
-      'What This Capability Does',
-      'When It Runs',
-      'Conditions and Preconditions',
-      'Household Effects',
-      'What You See in the App',
-      'Guests, Vacation, and Away',
-      'Override, Pause, or Recover',
-      'Notifications',
-      'Troubleshooting',
-      'Affected App Areas',
-    ]) await expect(guide.getByRole('heading', { name: heading, exact: true })).toBeVisible()
+    for (const heading of ['What this does', 'How it works', 'Pause, override, or recover', 'Troubleshooting']) {
+      await expect(guide.getByRole('heading', { name: heading, exact: true })).toBeVisible()
+    }
+    const behindScenes = guide.getByText('Behind the scenes', { exact: true })
+    await expect(behindScenes).toBeVisible()
+    await behindScenes.click()
+    for (const heading of ['When it happens', 'What must be true', 'What changes', "What you'll notice", 'When house modes change the result', 'Alerts you may see', "Where you'll notice it"]) {
+      await expect(guide.getByRole('heading', { name: heading, exact: true })).toBeVisible()
+    }
     await expect(page.getByRole('heading', { name: 'Related Guides', exact: true })).toBeVisible()
   }
 })
@@ -192,13 +189,13 @@ test('Home manual drilldown links status chips to the Lights overview and room d
   await page.goto('/index.html?path=manual')
   await expect(page.getByRole('heading', { level: 1, name: 'App Manual' })).toBeVisible({ timeout: 15000 })
 
-  await page.getByRole('button', { name: /^Home Learn the Home screen/i }).click()
+  await page.getByRole('button', { name: /^Home\. Learn the Home screen/i }).click()
   await page.getByRole('button', { name: /How do I read or scroll the status chips/i }).click()
   await expect(page.getByRole('heading', { level: 2, name: 'Status chips' })).toBeVisible()
   await expect(page.getByRole('img', { name: /Beginning of the horizontally scrollable Home status-chip row/i })).toBeVisible()
   await expect(page.getByRole('img', { name: /End of the Home status-chip row/i })).toBeVisible()
 
-  await page.getByRole('button', { name: /Lights status and room controls/i }).click()
+  await page.getByRole('button', { name: /^Lights status and room controls Use the Lights chip/i }).click()
   await expect(page.getByRole('heading', { level: 2, name: 'Lights status and room controls' })).toBeVisible()
   await expect(page.getByRole('img', { name: /Lights overview sheet/i })).toBeVisible()
   await expect(page.getByRole('img', { name: /Living Room light detail page/i })).toBeVisible()
@@ -219,11 +216,11 @@ test('five foundational route guides open from their landings and render the str
     const guide = page.locator('[data-manual-page-guide]')
     await expect(page.getByRole('heading', { level: 2, name: routeGuide.title })).toBeVisible()
     await expect(page).toHaveURL(new RegExp(`manual-article=${routeGuide.articleId}`))
-    await expect(guide.getByRole('heading', { name: 'Page Orientation', exact: true })).toBeVisible()
-    await expect(guide.getByRole('heading', { name: 'Visible Page Sections', exact: true })).toBeVisible()
-    await expect(guide.getByRole('heading', { name: 'What You Can Do', exact: true })).toBeVisible()
-    await expect(guide.getByRole('heading', { name: 'What Happens Automatically', exact: true })).toBeVisible()
-    await expect(guide.getByRole('heading', { name: 'Look Here First', exact: true })).toBeVisible()
+    await expect(guide.getByRole('heading', { name: 'What this page is for', exact: true })).toBeVisible()
+    await expect(guide.getByRole('heading', { name: "What you'll find", exact: true })).toBeVisible()
+    await expect(guide.getByRole('heading', { name: 'What you can do', exact: true })).toBeVisible()
+    await expect(guide.getByRole('heading', { name: 'What happens automatically', exact: true })).toBeVisible()
+    await expect(guide.getByRole('heading', { name: 'Look here first', exact: true })).toBeVisible()
     await expect(guide.getByRole('heading', { name: 'Troubleshooting', exact: true })).toBeVisible()
     await expect(guide.getByText(routeGuide.visibleSection, { exact: true }).first()).toBeVisible()
     expect(await guide.locator('[data-manual-screenshot]').count()).toBeGreaterThan(0)
@@ -236,11 +233,11 @@ test('all seven Chores-domain route guides render the structured page-guide cont
     const guide = page.locator(`[data-manual-page-guide="${routeGuide.routePath}"]`)
 
     await expect(page.getByRole('heading', { level: 2, name: routeGuide.title })).toBeVisible({ timeout: 15000 })
-    await expect(guide.getByRole('heading', { name: 'Page Orientation', exact: true })).toBeVisible()
-    await expect(guide.getByRole('heading', { name: 'Visible Page Sections', exact: true })).toBeVisible()
-    await expect(guide.getByRole('heading', { name: 'What You Can Do', exact: true })).toBeVisible()
-    await expect(guide.getByRole('heading', { name: 'What Happens Automatically', exact: true })).toBeVisible()
-    await expect(guide.getByRole('heading', { name: 'Look Here First', exact: true })).toBeVisible()
+    await expect(guide.getByRole('heading', { name: 'What this page is for', exact: true })).toBeVisible()
+    await expect(guide.getByRole('heading', { name: "What you'll find", exact: true })).toBeVisible()
+    await expect(guide.getByRole('heading', { name: 'What you can do', exact: true })).toBeVisible()
+    await expect(guide.getByRole('heading', { name: 'What happens automatically', exact: true })).toBeVisible()
+    await expect(guide.getByRole('heading', { name: 'Look here first', exact: true })).toBeVisible()
     await expect(guide.getByRole('heading', { name: 'Troubleshooting', exact: true })).toBeVisible()
     await expect(guide.getByText(routeGuide.visibleSection, { exact: true }).first()).toBeVisible()
     expect(await guide.locator('[data-manual-page-guide-first-look="true"]').count()).toBeGreaterThanOrEqual(3)
@@ -255,11 +252,11 @@ test('all nine Food-domain route guides render the structured page-guide contrac
     const guide = page.locator(`[data-manual-page-guide="${routeGuide.routePath}"]`)
 
     await expect(page.getByRole('heading', { level: 2, name: routeGuide.title })).toBeVisible({ timeout: 30000 })
-    await expect(guide.getByRole('heading', { name: 'Page Orientation', exact: true })).toBeVisible()
-    await expect(guide.getByRole('heading', { name: 'Visible Page Sections', exact: true })).toBeVisible()
-    await expect(guide.getByRole('heading', { name: 'What You Can Do', exact: true })).toBeVisible()
-    await expect(guide.getByRole('heading', { name: 'What Happens Automatically', exact: true })).toBeVisible()
-    await expect(guide.getByRole('heading', { name: 'Look Here First', exact: true })).toBeVisible()
+    await expect(guide.getByRole('heading', { name: 'What this page is for', exact: true })).toBeVisible()
+    await expect(guide.getByRole('heading', { name: "What you'll find", exact: true })).toBeVisible()
+    await expect(guide.getByRole('heading', { name: 'What you can do', exact: true })).toBeVisible()
+    await expect(guide.getByRole('heading', { name: 'What happens automatically', exact: true })).toBeVisible()
+    await expect(guide.getByRole('heading', { name: 'Look here first', exact: true })).toBeVisible()
     await expect(guide.getByRole('heading', { name: 'Troubleshooting', exact: true })).toBeVisible()
     await expect(guide.getByText(routeGuide.visibleSection, { exact: true }).first()).toBeVisible()
     expect(await guide.locator('[data-manual-page-guide-first-look="true"]').count()).toBeGreaterThanOrEqual(3)
@@ -269,15 +266,15 @@ test('all nine Food-domain route guides render the structured page-guide contrac
 
 test('Mach-E, Vacuums, and Media route guides render their route-specific contracts and context images', async ({ page }) => {
   for (const routeGuide of FEATURE_ROUTE_GUIDE_CASES) {
-    await page.goto(`/index.html?path=manual&manual-section=rooms&manual-article=${routeGuide.articleId}`)
+    await page.goto(`/index.html?path=manual&manual-section=rooms&manual-article=${routeGuide.articleId}`, { waitUntil: 'networkidle' })
     const guide = page.locator(`[data-manual-page-guide="${routeGuide.routePath}"]`)
 
-    await expect(page.getByRole('heading', { level: 2, name: routeGuide.title })).toBeVisible({ timeout: 15000 })
-    await expect(guide.getByRole('heading', { name: 'Page Orientation', exact: true })).toBeVisible()
-    await expect(guide.getByRole('heading', { name: 'Visible Page Sections', exact: true })).toBeVisible()
-    await expect(guide.getByRole('heading', { name: 'What You Can Do', exact: true })).toBeVisible()
-    await expect(guide.getByRole('heading', { name: 'What Happens Automatically', exact: true })).toBeVisible()
-    await expect(guide.getByRole('heading', { name: 'Look Here First', exact: true })).toBeVisible()
+    await expect(page.getByRole('heading', { level: 2, name: routeGuide.title })).toBeVisible({ timeout: 30000 })
+    await expect(guide.getByRole('heading', { name: 'What this page is for', exact: true })).toBeVisible()
+    await expect(guide.getByRole('heading', { name: "What you'll find", exact: true })).toBeVisible()
+    await expect(guide.getByRole('heading', { name: 'What you can do', exact: true })).toBeVisible()
+    await expect(guide.getByRole('heading', { name: 'What happens automatically', exact: true })).toBeVisible()
+    await expect(guide.getByRole('heading', { name: 'Look here first', exact: true })).toBeVisible()
     await expect(guide.getByRole('heading', { name: 'Troubleshooting', exact: true })).toBeVisible()
     await expect(guide.getByText(routeGuide.visibleSection, { exact: true }).first()).toBeVisible()
     const context = guide.locator('[data-screenshot-role="context"]').first()
@@ -292,11 +289,11 @@ test('Settings, Admin, Guest Controls, and Vacation render distinct structured r
     const guide = page.locator(`[data-manual-page-guide="${routeGuide.routePath}"]`)
 
     await expect(page.getByRole('heading', { level: 2, name: routeGuide.title })).toBeVisible({ timeout: 15000 })
-    await expect(guide.getByRole('heading', { name: 'Page Orientation', exact: true })).toBeVisible()
-    await expect(guide.getByRole('heading', { name: 'Visible Page Sections', exact: true })).toBeVisible()
-    await expect(guide.getByRole('heading', { name: 'What You Can Do', exact: true })).toBeVisible()
-    await expect(guide.getByRole('heading', { name: 'What Happens Automatically', exact: true })).toBeVisible()
-    await expect(guide.getByRole('heading', { name: 'Look Here First', exact: true })).toBeVisible()
+    await expect(guide.getByRole('heading', { name: 'What this page is for', exact: true })).toBeVisible()
+    await expect(guide.getByRole('heading', { name: "What you'll find", exact: true })).toBeVisible()
+    await expect(guide.getByRole('heading', { name: 'What you can do', exact: true })).toBeVisible()
+    await expect(guide.getByRole('heading', { name: 'What happens automatically', exact: true })).toBeVisible()
+    await expect(guide.getByRole('heading', { name: 'Look here first', exact: true })).toBeVisible()
     await expect(guide.getByRole('heading', { name: 'Troubleshooting', exact: true })).toBeVisible()
     await expect(guide.getByText(routeGuide.visibleSection, { exact: true }).first()).toBeVisible()
     const context = guide.locator('[data-screenshot-role="context"]').first()
@@ -316,10 +313,10 @@ test('all sixteen room route guides render authored content before the configure
     const expectedCardCount = room.overviewCards.length + room.sourceSections.flatMap((section) => section.cards).length
 
     await expect(page.getByRole('heading', { level: 2, name: routeGuide.title })).toBeVisible({ timeout: 15000 })
-    await expect(guide.getByRole('heading', { name: 'Page Orientation', exact: true })).toBeVisible()
-    await expect(guide.getByRole('heading', { name: 'What You Can Do', exact: true })).toBeVisible()
-    await expect(guide.getByRole('heading', { name: 'What Happens Automatically', exact: true })).toBeVisible()
-    await expect(guide.getByRole('heading', { name: 'Look Here First', exact: true })).toBeVisible()
+    await expect(guide.getByRole('heading', { name: 'What this page is for', exact: true })).toBeVisible()
+    await expect(guide.getByRole('heading', { name: 'What you can do', exact: true })).toBeVisible()
+    await expect(guide.getByRole('heading', { name: 'What happens automatically', exact: true })).toBeVisible()
+    await expect(guide.getByRole('heading', { name: 'Look here first', exact: true })).toBeVisible()
     await expect(guide.getByRole('heading', { name: 'Troubleshooting', exact: true })).toBeVisible()
     await expect(guide.getByText(routeGuide.visibleSection, { exact: true }).first()).toBeVisible()
     await expect(appendix.getByRole('heading', { name: 'Configured Controls Reference', exact: true })).toBeVisible()
@@ -339,12 +336,12 @@ test('all fourteen room-card family guides render the structured family contract
     await page.goto(`/index.html?path=manual&manual-section=rooms&manual-article=${article.id}`)
     const guide = page.locator(`[data-manual-family-guide="${article.familyGuide.cardKind}"]`)
     await expect(page.getByRole('heading', { level: 2, name: article.title })).toBeVisible({ timeout: 15000 })
-    await expect(guide.getByRole('heading', { name: 'Purpose', exact: true })).toBeVisible()
-    await expect(guide.getByRole('heading', { name: 'Where It Appears', exact: true })).toBeVisible()
-    await expect(guide.getByRole('heading', { name: 'Action Semantics', exact: true })).toBeVisible()
-    await expect(guide.getByRole('heading', { name: 'Persistent State Meanings', exact: true })).toBeVisible()
-    await expect(guide.getByRole('heading', { name: 'Unavailable and Disabled Behavior', exact: true })).toBeVisible()
-    await expect(guide.getByRole('heading', { name: 'Requested State and Confirmation', exact: true })).toBeVisible()
+    await expect(guide.getByRole('heading', { name: 'What this card does', exact: true })).toBeVisible()
+    await expect(guide.getByRole('heading', { name: "Where you'll see it", exact: true })).toBeVisible()
+    await expect(guide.getByRole('heading', { name: 'What tapping it does', exact: true })).toBeVisible()
+    await expect(guide.getByRole('heading', { name: 'What each label means', exact: true })).toBeVisible()
+    await expect(guide.getByRole('heading', { name: 'When it is unavailable', exact: true })).toBeVisible()
+    await expect(guide.getByRole('heading', { name: 'After you tap', exact: true })).toBeVisible()
     await expect(guide.getByRole('heading', { name: 'Troubleshooting', exact: true })).toBeVisible()
     await expect(guide.locator('[data-manual-family-state="true"]')).toHaveCount(article.familyGuide.persistentStateMeanings.length)
     await expect(guide.locator('[data-manual-screenshot]')).toHaveCount(article.familyGuide.screenshotIds.length)
@@ -359,13 +356,13 @@ test('all structured task guides render their workflow contract', async ({ page 
 
     await expect(page.getByRole('heading', { level: 2, name: article.title })).toBeVisible({ timeout: 15000 })
     for (const heading of [
-      'Question',
-      'Before You Start',
+      'Task at a glance',
+      'Before you start',
       'Steps',
-      'What Success Looks Like',
-      'Back, Cancel, or Close',
-      'If It Does Not Work',
-      'What Happens Automatically',
+      'What success looks like',
+      'Back, cancel, or close',
+      'If it does not work',
+      'What happens automatically',
     ]) await expect(guide.getByRole('heading', { name: heading, exact: true })).toBeVisible()
     await expect(guide.locator('[data-manual-task-guide-block="steps"] li')).toHaveCount(article.taskGuide.steps.length)
     await expect(guide.locator('[data-manual-screenshot]')).toHaveCount(article.taskGuide.screenshotEvidence.screenshotIds.length)

@@ -1,0 +1,16 @@
+{
+  "inventory": {
+    "expiringSoon_one": "{{count}} Expiring Soon",
+    "expiringSoon_other": "{{count}} Expiring Soon",
+    "items_one": "{{count}} Item",
+    "items_other": "{{count}} Items",
+    "summary": "{{items}} • {{expiring}}"
+  },
+  "loading": "Loading Food & Recipes",
+  "sections": {
+    "allFood": "All Food",
+    "allRecipes": "All Recipes",
+    "foodSpaces": "Food Spaces",
+    "suggestedRecipes": "Suggested Recipes"
+  }
+}

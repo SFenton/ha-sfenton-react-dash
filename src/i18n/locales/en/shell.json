@@ -1,0 +1,28 @@
+{
+  "loading": {
+    "dashboard": "Loading dashboard"
+  },
+  "navigation": {
+    "dashboardSections": "Dashboard sections",
+    "heading": "Navigation",
+    "items": {
+      "chores": "Chores",
+      "climate": "Climate",
+      "home": "Home",
+      "security": "Security",
+      "settings": "Settings"
+    },
+    "menu": "Navigation menu",
+    "moreActions": "More actions",
+    "openMenu": "Open navigation menu",
+    "pageActions": "Page actions"
+  },
+  "profile": {
+    "open": "Open {{title}}",
+    "openWithAttention_one": "Open {{title}}, {{count}} item needs attention",
+    "openWithAttention_other": "Open {{title}}, {{count}} items need attention"
+  },
+  "tabs": {
+    "overdue": "{{label}}, {{count}} overdue"
+  }
+}

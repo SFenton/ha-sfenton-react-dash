@@ -778,7 +778,7 @@ export const MANUAL_SCREENSHOTS: ManualScreenshotConfig[] = [
       'task-manage-repeating-chore',
     ],
     alt: 'Create Task sheet showing priority and repeating-task controls.',
-    caption: 'Chore recurrence belongs to Donetick tasks and is separate from wake alarms or device schedules.',
+    caption: 'Chore recurrence belongs to household tasks and is separate from wake alarms or device schedules.',
   },
   {
     id: 'food-scan-review',

@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "capturedAt": "2026-08-11",
+  "bounded": true,
+  "payloadRecords": 47,
+  "owners": 34,
+  "titleMessageOccurrences": 95,
+  "uniqueTitleMessages": 78,
+  "unreadableConfigs": 7,
+  "scope": "Sanitized title, body, and action-label reference only. Delivery metadata and live household content are excluded.",
+  "sanitization": [
+    "Removed household and phone names.",
+    "Removed entity IDs, service names, URLs, tags, groups, and notification targets.",
+    "Removed live task, recipe, device-attribute, and private-state values.",
+    "Normalized dynamic values to explicit placeholders."
+  ]
+}

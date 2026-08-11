@@ -1,0 +1,113 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "HouseStyleCopyResponse",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "status",
+    "normalizedRequest",
+    "proposedKey",
+    "rankedCandidates",
+    "exemplarsUsed",
+    "checks",
+    "warnings",
+    "refusal",
+    "confidence"
+  ],
+  "properties": {
+    "status": {
+      "enum": ["ok", "needs-context", "refused"]
+    },
+    "normalizedRequest": {
+      "$ref": "request.schema.json"
+    },
+    "proposedKey": {
+      "type": ["string", "null"]
+    },
+    "rankedCandidates": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["rank", "text", "rationale"],
+        "properties": {
+          "rank": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 5
+          },
+          "text": {
+            "type": "string",
+            "minLength": 1
+          },
+          "rationale": {
+            "type": "string",
+            "minLength": 1
+          },
+          "variant": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "exemplarsUsed": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "checks": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "maxCharacters",
+        "maxWords",
+        "placeholders",
+        "forbiddenTerms",
+        "ownership",
+        "style",
+        "retrieval"
+      ],
+      "properties": {
+        "maxCharacters": { "const": true },
+        "maxWords": { "const": true },
+        "placeholders": { "const": true },
+        "forbiddenTerms": { "const": true },
+        "ownership": { "const": true },
+        "style": { "const": true },
+        "retrieval": { "const": true }
+      }
+    },
+    "warnings": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "refusal": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["code", "reason"],
+          "properties": {
+            "code": {
+              "enum": ["app-manual", "proper-noun", "react-notification", "privacy", "injection", "unsafe"]
+            },
+            "reason": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      ]
+    },
+    "confidence": {
+      "enum": ["high", "medium", "low"]
+    }
+  }
+}

@@ -4,6 +4,7 @@ import { CountBadge } from '../core/CountBadge'
 import { MaterialIcon } from '../core/Icon'
 import { useDailyReportContext } from '../hass/dailyReportModal'
 import { PRIMARY_NAV_ROUTES, primaryNavRouteActive } from '../../constants/routes'
+import { useCopy } from '../../i18n'
 import styles from './BottomNav.module.css'
 
 /** Only Chores badges, and only with overdue chores - expired food belongs to the summary, not here. */
@@ -16,6 +17,7 @@ interface BottomNavProps {
 
 export function BottomNav({ activePath, onNavigate }: BottomNavProps) {
   const { overdueCount } = useDailyReportContext()
+  const copy = useCopy('shell')
   const [visualOverride, setVisualOverride] = useState<{ activePath: string, path: string } | undefined>()
   const visualActivePath = visualOverride?.activePath === activePath ? visualOverride.path : activePath
   const setVisualPathNow = (path: string) => {
@@ -23,7 +25,7 @@ export function BottomNav({ activePath, onNavigate }: BottomNavProps) {
   }
 
   return (
-    <nav className={styles.nav} aria-label="Dashboard sections">
+    <nav className={styles.nav} aria-label={copy('navigation.dashboardSections')}>
       {PRIMARY_NAV_ROUTES.map((tab) => {
         const isCurrent = primaryNavRouteActive(activePath, tab.path)
         const isActive = primaryNavRouteActive(visualActivePath, tab.path)
@@ -41,7 +43,7 @@ export function BottomNav({ activePath, onNavigate }: BottomNavProps) {
             onPointerCancel={() => setVisualOverride(undefined)}
             onPointerDown={() => setVisualPathNow(tab.path)}
             type="button"
-            aria-label={badgeCount > 0 ? `${tab.label}, ${badgeCount} overdue` : tab.label}
+            aria-label={badgeCount > 0 ? copy('tabs.overdue', { count: badgeCount, label: tab.label }) : tab.label}
             aria-current={isCurrent ? 'page' : undefined}
           >
             <span className={styles.tabIcon}>

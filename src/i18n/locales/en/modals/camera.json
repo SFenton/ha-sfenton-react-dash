@@ -1,0 +1,10 @@
+{
+  "actions": {
+    "audio": "Audio",
+    "muted": "Muted",
+    "record": "Record",
+    "recording": "Recording",
+    "snapshot": "Snapshot"
+  },
+  "controls": "{{title}} camera controls"
+}

@@ -1,0 +1,32 @@
+{
+  "items": {
+    "admin": {
+      "subtitle": "Presence-Based Toggles, Automation Overrides, and More",
+      "title": "Admin Controls"
+    },
+    "guest": {
+      "subtitle": "Toggle automations when guests stay over.",
+      "title": "Guest Controls"
+    },
+    "homeAssistant": {
+      "subtitle": "Access more in-depth Home Assistant details and settings.",
+      "title": "Home Assistant Settings"
+    },
+    "machE": {
+      "subtitle": "Controls for the Mustang Mach-E.",
+      "title": "Mach-E"
+    },
+    "manual": {
+      "subtitle": "Access guides, instructions, and details on how our Home Assistant instance and app work.",
+      "title": "App Manual"
+    },
+    "todo": {
+      "subtitle": "An admin panel for to-do tasks.",
+      "title": "To-Do"
+    },
+    "vacation": {
+      "subtitle": "Set away dates and prepare the house for vacation.",
+      "title": "Vacation"
+    }
+  }
+}

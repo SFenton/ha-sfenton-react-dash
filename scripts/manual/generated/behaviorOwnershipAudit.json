@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-08-10T07:57:39.048Z",
+  "generatedAt": "2026-08-11T21:47:07.194Z",
   "inventoryFingerprint": "028635c74be929bfdc4259d46e8767ebb339e6eaabefaa67e452bfbd614d9af8",
   "counts": {
     "total": 208,
@@ -99,7 +99,7 @@
       "classification": "background-user-facing",
       "ownerArticleId": "behavior-device-health",
       "ownershipCategory": "Device health",
-      "rationale": "Detects a missing or stale household sensor, attempts bounded recovery, or creates the corresponding battery or maintenance alert."
+      "rationale": "Detects a missing or stale household sensor, attempts bounded recovery, or reconciles the corresponding battery and maintenance task."
     },
     {
       "id": "automation.back_deck_motion_sensor_illuminance_numeric_change_tracker",
@@ -109,7 +109,7 @@
       "classification": "background-user-facing",
       "ownerArticleId": "behavior-device-health",
       "ownershipCategory": "Device health",
-      "rationale": "Detects a missing or stale household sensor, attempts bounded recovery, or creates the corresponding battery or maintenance alert."
+      "rationale": "Detects a missing or stale household sensor, attempts bounded recovery, or reconciles the corresponding battery and maintenance task."
     },
     {
       "id": "automation.change_avr_input_when_dropdown_changed",
@@ -789,7 +789,7 @@
       "classification": "background-user-facing",
       "ownerArticleId": "behavior-device-health",
       "ownershipCategory": "Device health",
-      "rationale": "Detects a missing or stale household sensor, attempts bounded recovery, or creates the corresponding battery or maintenance alert."
+      "rationale": "Detects a missing or stale household sensor, attempts bounded recovery, or reconciles the corresponding battery and maintenance task."
     },
     {
       "id": "automation.main_floor_vacuum_mode",
@@ -989,7 +989,7 @@
       "classification": "background-user-facing",
       "ownerArticleId": "behavior-device-health",
       "ownershipCategory": "Device health",
-      "rationale": "Detects a missing or stale household sensor, attempts bounded recovery, or creates the corresponding battery or maintenance alert."
+      "rationale": "Detects a missing or stale household sensor, attempts bounded recovery, or reconciles the corresponding battery and maintenance task."
     },
     {
       "id": "automation.resume_the_selected_lights_automation",
@@ -1279,7 +1279,7 @@
       "classification": "background-user-facing",
       "ownerArticleId": "behavior-device-health",
       "ownershipCategory": "Device health",
-      "rationale": "Detects a missing or stale household sensor, attempts bounded recovery, or creates the corresponding battery or maintenance alert."
+      "rationale": "Detects a missing or stale household sensor, attempts bounded recovery, or reconciles the corresponding battery and maintenance task."
     },
     {
       "id": "automation.turn_off_dryer_boolean_on_vibration_cleared",
@@ -1469,7 +1469,7 @@
       "classification": "background-user-facing",
       "ownerArticleId": "behavior-device-health",
       "ownershipCategory": "Device health",
-      "rationale": "Detects a missing or stale household sensor, attempts bounded recovery, or creates the corresponding battery or maintenance alert."
+      "rationale": "Detects a missing or stale household sensor, attempts bounded recovery, or reconciles the corresponding battery and maintenance task."
     },
     {
       "id": "script.apple_tv_power_on_off",

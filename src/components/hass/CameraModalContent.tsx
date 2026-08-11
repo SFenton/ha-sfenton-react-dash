@@ -5,6 +5,7 @@ import { ActionPill } from '../core/ActionPill'
 import { MaterialIcon } from '../core/Icon'
 import { asEntityName } from './entityState'
 import { WebRtcCamera } from './WebRtcCamera'
+import { useCopy } from '../../i18n'
 import styles from './CameraModalContent.module.css'
 
 declare global {
@@ -25,6 +26,7 @@ function getMuteState(targetId: string) {
 }
 
 export function CameraModalContent({ camera, live = true }: { camera: CameraConfig; live?: boolean }) {
+  const copy = useCopy('modalCamera')
   const recordingEntity = useEntity(asEntityName(camera.recordingEntityId ?? 'input_boolean.unknown'), { returnNullIfNotFound: true })
   const callService = useHass((state) => state.helpers.callService) as unknown as CallService
   const [isMuted, setIsMuted] = useState(() => getMuteState(camera.popupCardId))
@@ -74,15 +76,15 @@ export function CameraModalContent({ camera, live = true }: { camera: CameraConf
       <div className={styles.cameraFocus}>
         {live ? <WebRtcCamera camera={camera} controls minHeight={310} variant="modal" /> : <div style={{ minHeight: 310 }} />}
       </div>
-      <div className={styles.cameraControls} aria-label={`${camera.title} camera controls`} data-security-camera-controls="true">
-        <ActionPill active={snapshotPulse} label="Snapshot" onClick={takeSnapshot} pulse={snapshotPulse}>
+      <div className={styles.cameraControls} aria-label={copy('controls', { title: camera.title })} data-security-camera-controls="true">
+        <ActionPill active={snapshotPulse} label={copy('actions.snapshot')} onClick={takeSnapshot} pulse={snapshotPulse}>
           <MaterialIcon name="mdi:camera" size={24} />
         </ActionPill>
-        <ActionPill active={isMuted} label={isMuted ? 'Muted' : 'Audio'} onClick={toggleMute}>
+        <ActionPill active={isMuted} label={isMuted ? copy('actions.muted') : copy('actions.audio')} onClick={toggleMute}>
           <MaterialIcon name={isMuted ? 'mdi:volume-off' : 'mdi:volume-high'} size={24} />
         </ActionPill>
         {camera.recordingScriptEntityId && (
-          <ActionPill active={isRecording} danger label={isRecording ? 'Recording' : 'Record'} onClick={toggleRecording} pulse={isRecording}>
+          <ActionPill active={isRecording} danger label={isRecording ? copy('actions.recording') : copy('actions.record')} onClick={toggleRecording} pulse={isRecording}>
             <MaterialIcon name="mdi:record-circle" size={25} />
           </ActionPill>
         )}

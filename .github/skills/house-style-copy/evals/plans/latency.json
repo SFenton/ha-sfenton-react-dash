@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "name": "top-two-singleton-latency-v1",
+  "caseFile": "cases.holdout.json",
+  "candidateIds": [],
+  "expectedCandidateCount": 2,
+  "requiresModelsArgument": true,
+  "projectionCandidateIds": [
+    "grok-4.5-low",
+    "gpt-5.6-terra-low"
+  ],
+  "repeats": 2,
+  "batchSize": 1,
+  "packBatches": false,
+  "shuffle": true,
+  "caseIds": [
+    "holdout-button-save",
+    "holdout-notification-jinja"
+  ],
+  "singletonCaseIds": [],
+  "maxConcurrency": 2,
+  "maxAiCredits": 30,
+  "timeoutMs": 240000,
+  "preflight": true
+}
