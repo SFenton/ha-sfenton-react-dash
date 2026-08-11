@@ -77,7 +77,7 @@ async function clickIconModalTab(scope: RoleScope, name: string) {
 
 async function openThermostatControls() {
   fireEvent.click(screen.getByRole('button', { name: 'Room Thermostats' }))
-  return screen.findByRole('dialog', { name: 'Thermostat' })
+  return screen.findByRole('dialog', { name: 'Thermostat · Advanced Controls' })
 }
 
 function restoreProperty(target: object, property: PropertyKey, descriptor: PropertyDescriptor | undefined) {
@@ -1692,6 +1692,8 @@ describe('DashboardViewPage', () => {
     render(<DashboardViewPage activePath="ecobee" onNavigate={() => undefined} path="ecobee" />)
 
     const dialog = await openThermostatControls()
+    expect(within(dialog).getByRole('heading', { name: 'Thermostat · Advanced Controls' })).toBeInTheDocument()
+    expect(within(dialog).queryByText(/11 rooms/i)).not.toBeInTheDocument()
     const roomGrid = within(dialog).getByRole('group', { name: 'Thermostat rooms' })
     expect(roomGrid.children).toHaveLength(11)
     expect(roomGrid).toHaveAttribute('data-dynamic-grid-force-equivalent-column-count', 'true')
@@ -2022,10 +2024,15 @@ describe('DashboardViewPage', () => {
     expect(tabs.map((tab) => tab.getAttribute('aria-label'))).toEqual(['Rooms', 'Automation', 'Tracking'])
     expect(within(dialog).getByRole('tab', { name: 'Rooms' })).toHaveAttribute('aria-selected', 'true')
     expect(within(dialog).getByRole('button', { name: 'Living Room 70.2°F · Inactive' })).toBeInTheDocument()
-    expect(within(dialog).getByRole('button', { name: 'Office 71.6°F · Active' })).toBeInTheDocument()
+    const officeOpener = within(dialog).getByRole('button', { name: 'Office 71.6°F · Active' })
+    expect(officeOpener).toBeInTheDocument()
     expect(within(dialog).getByRole('button', { name: 'Master Bedroom 71.0°F · Active' })).toBeInTheDocument()
 
     const roomOpener = within(dialog).getByRole('button', { name: 'Living Room 70.2°F · Inactive' })
+    expect(roomOpener).toHaveAttribute('data-tone', 'switch')
+    expect(roomOpener).toHaveAttribute('data-muted', 'true')
+    expect(officeOpener).toHaveAttribute('data-tone', 'switch')
+    expect(officeOpener).toHaveAttribute('data-muted', 'false')
     expect(roomOpener.querySelector('[data-modal-disclosure="right-chevron"]')).toBeInTheDocument()
     fireEvent.click(roomOpener)
     expect(dialog).toHaveAttribute('data-surface', 'hass-popup')
@@ -2038,19 +2045,43 @@ describe('DashboardViewPage', () => {
 
     fireEvent.click(within(dialog).getByRole('button', { name: 'Back to rooms' }))
     await clickIconModalTab(within(dialog), 'Automation')
-    expect(within(dialog).getByRole('switch', { name: 'Turn off Automatic Thermostat' })).toBeInTheDocument()
-    expect(within(dialog).getByRole('switch', { name: 'Turn off Eco Mode' })).toBeInTheDocument()
-    expect(within(dialog).getByRole('button', { name: 'Turn on Predictive Comfort' })).toBeInTheDocument()
-    expect(within(dialog).getByRole('button', { name: /Eco Mode Critical Tracking Track Select Critical/i })).toBeInTheDocument()
-    expect(within(dialog).getByRole('button', { name: /Eco Behavior When Away Keep Eco Active/i })).toBeInTheDocument()
+    const automaticToggle = within(dialog).getByRole('switch', { name: 'Turn off Automatic Thermostat' })
+    const ecoToggle = within(dialog).getByRole('switch', { name: 'Turn off Eco Mode' })
+    const predictiveToggle = within(dialog).getByRole('button', { name: 'Turn on Predictive Comfort' })
+    const criticalTracking = within(dialog).getByRole('button', { name: /Eco Mode Critical Tracking Track Select Critical/i })
+    const awayBehavior = within(dialog).getByRole('button', { name: /Eco Behavior When Away Keep Eco Active/i })
+    for (const tile of [automaticToggle, ecoToggle, criticalTracking, awayBehavior]) {
+      expect(tile).toHaveAttribute('data-tone', 'switch')
+      expect(tile).toHaveAttribute('data-muted', 'false')
+    }
+    expect(automaticToggle).toHaveAttribute('aria-checked', 'true')
+    expect(ecoToggle).toHaveAttribute('aria-checked', 'true')
+    expect(predictiveToggle).toHaveAttribute('data-tone', 'switch')
+    expect(predictiveToggle).toHaveAttribute('data-muted', 'true')
+    expect(criticalTracking).toHaveAttribute('data-modal-opener', 'true')
+    expect(awayBehavior).toHaveAttribute('data-modal-opener', 'true')
 
-    fireEvent.click(within(dialog).getByRole('button', { name: /Eco Mode Critical Tracking Track Select Critical/i }))
+    fireEvent.click(criticalTracking)
     expect(screen.getAllByRole('dialog')).toHaveLength(1)
-    expect(within(dialog).getByRole('group', { name: 'Eco Mode Critical Tracking options' })).toHaveAttribute('data-dynamic-grid', 'true')
-    expect(within(dialog).getByRole('button', { name: /^Set Eco Mode Critical Tracking to Track Select Critical:/ })).toHaveAttribute('aria-pressed', 'true')
-    expect(within(dialog).getByRole('button', { name: /^Set Eco Mode Critical Tracking to Track Select Critical:/ })).toHaveAttribute('data-modal-detail-autofocus', 'true')
-    expect(within(dialog).getByRole('button', { name: /^Set Eco Mode Critical Tracking to Track All Critical:/ })).toHaveAttribute('aria-pressed', 'false')
-    fireEvent.click(within(dialog).getByRole('button', { name: /^Set Eco Mode Critical Tracking to Track All Critical:/ }))
+    expect(within(dialog).getByRole('group', { name: 'Eco Mode Critical Tracking options' })).not.toHaveAttribute('data-dynamic-grid')
+    const selectedCriticalOption = within(dialog).getByRole('button', { name: /^Set Eco Mode Critical Tracking to Track Select Critical:/ })
+    const unselectedCriticalOption = within(dialog).getByRole('button', { name: /^Set Eco Mode Critical Tracking to Track All Critical:/ })
+    expect(selectedCriticalOption).toHaveAttribute('aria-pressed', 'true')
+    expect(selectedCriticalOption).toHaveAttribute('data-modal-detail-autofocus', 'true')
+    expect(selectedCriticalOption).toHaveAttribute('data-tone', 'switch')
+    expect(selectedCriticalOption).toHaveAttribute('data-muted', 'false')
+    expect(selectedCriticalOption.querySelectorAll('[data-dynamic-grid-label]')).toHaveLength(1)
+    expect(unselectedCriticalOption).toHaveAttribute('aria-pressed', 'false')
+    expect(unselectedCriticalOption).toHaveAttribute('data-tone', 'switch')
+    expect(unselectedCriticalOption).toHaveAttribute('data-muted', 'true')
+    expect(unselectedCriticalOption.querySelectorAll('[data-dynamic-grid-label]')).toHaveLength(1)
+    const selectedCriticalDescription = within(dialog).getByText('Protect only the unselected rooms chosen in Critical Protection.')
+    expect(selectedCriticalDescription.closest('button')).toBeNull()
+    expect(selectedCriticalDescription.compareDocumentPosition(selectedCriticalOption) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    fireEvent.click(unselectedCriticalOption)
+    await waitFor(() => expect(within(dialog).getByRole('button', { name: /^Set Eco Mode Critical Tracking to Track All Critical:/ })).toHaveAttribute('aria-pressed', 'true'))
+    expect(within(dialog).getByRole('heading', { name: 'Eco Mode Critical Tracking' })).toBeInTheDocument()
+    expect(within(dialog).getByRole('button', { name: 'Back to automation' })).toBeInTheDocument()
     expect(mockCallServiceCalls).toContainEqual({
       domain: 'select',
       service: 'select_option',
@@ -2058,6 +2089,7 @@ describe('DashboardViewPage', () => {
       target: 'select.thermostat_contact_sensors_eco_mode_critical_tracking',
     })
 
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Back to automation' }))
     fireEvent.click(within(dialog).getByRole('switch', { name: 'Turn off Eco Mode' }))
     fireEvent.click(within(dialog).getByRole('button', { name: 'Turn on Predictive Comfort' }))
     fireEvent.click(within(dialog).getByRole('switch', { name: 'Turn off Automatic Thermostat' }))
@@ -2127,7 +2159,7 @@ describe('DashboardViewPage', () => {
     const closingDialog = screen.queryByRole('dialog')
     if (closingDialog) {
       expect(within(closingDialog).getByRole('heading', { name: 'Living Room' })).toBeInTheDocument()
-      expect(within(closingDialog).queryByRole('heading', { name: 'Thermostat' })).not.toBeInTheDocument()
+      expect(within(closingDialog).queryByRole('heading', { name: 'Thermostat · Advanced Controls' })).not.toBeInTheDocument()
     }
   })
 
@@ -2160,8 +2192,10 @@ describe('DashboardViewPage', () => {
     expect(within(dialog).getByRole('switch', { name: 'Turn off Predictive Comfort' })).toBeInTheDocument()
     const predictiveControls = predictiveComfort
     expect(predictiveControls).toBeInTheDocument()
-    expect(predictiveControls.querySelector('[data-schedule-list-row-chevron]')).toBeInTheDocument()
-    expect(predictiveControls.querySelector('[data-schedule-list-row-chevron] path')).toHaveAttribute('d', materialIconPath('mdi:chevron-right'))
+    expect(predictiveControls).toHaveAttribute('data-tone', 'switch')
+    expect(predictiveControls).toHaveAttribute('data-muted', 'false')
+    expect(predictiveControls.querySelector('[data-modal-disclosure="right-chevron"]')).toBeInTheDocument()
+    expect(predictiveControls.querySelector('[data-modal-disclosure="right-chevron"] path')).toHaveAttribute('d', materialIconPath('mdi:chevron-right'))
     fireEvent.click(predictiveComfort)
     expect(dialog).toHaveAttribute('data-surface', 'hass-popup')
     expect(within(dialog).getByRole('heading', { name: 'Predictive Comfort' })).toBeInTheDocument()

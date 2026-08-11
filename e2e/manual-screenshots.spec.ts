@@ -1841,7 +1841,7 @@ async function openThermostatManualDialog(page: Page, tab: 'Automation' | 'Rooms
       : 'Room Thermostats'
   await page.getByRole('button', { exact: true, name: openerName }).click()
   const dialog = page.getByRole('dialog')
-  await expect(dialog).toHaveAccessibleName('Thermostat')
+  await expect(dialog).toHaveAccessibleName('Thermostat · Advanced Controls')
   await expect(dialog.getByRole('tab', { name: tab })).toHaveAttribute('aria-selected', 'true')
   return dialog
 }

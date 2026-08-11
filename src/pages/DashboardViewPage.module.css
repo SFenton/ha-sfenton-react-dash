@@ -1017,6 +1017,11 @@ button.thermostatGlassMain {
   --dynamic-grid-columns: 2;
 }
 
+.thermostatRoomGrid > [data-dynamic-grid-cell='true'] > [data-modal-detail-trigger],
+.thermostatRoomGrid > [data-dynamic-grid-cell='true'] > [data-modal-detail-trigger] > button {
+  height: 100%;
+}
+
 .thermostatDescription {
   margin-bottom: 10px;
   white-space: pre-line;
@@ -1051,18 +1056,51 @@ button.thermostatGlassMain {
   gap: 8px;
 }
 
+.thermostatTilePowerButton {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  border: 0;
+  border-radius: 50%;
+  place-items: center;
+  color: white;
+  background: rgba(0, 0, 0, 0.22);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.thermostatTilePowerButton:focus {
+  outline: none;
+}
+
+.thermostatTilePowerButton:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.58);
+  outline-offset: 2px;
+}
+
+.thermostatTilePowerButton:disabled {
+  cursor: default;
+}
+
 .thermostatDetailPage:focus {
   outline: none;
 }
 
-.thermostatChoiceGrid [data-schedule-list-row],
-.thermostatChoiceGrid [data-schedule-list-row] > button,
 .thermostatTrackingGrid > [data-dynamic-grid-cell='true'] > button {
   height: 100%;
 }
 
-.thermostatChoiceGrid [data-schedule-list-row] > button {
-  min-height: 112px;
+.thermostatChoiceStack {
+  display: grid;
+  gap: 14px;
+}
+
+.thermostatChoiceOption {
+  display: grid;
+  min-width: 0;
+  grid-template-rows: auto 120px;
+  align-content: start;
+  gap: 8px;
 }
 
 .thermostatModalBody {

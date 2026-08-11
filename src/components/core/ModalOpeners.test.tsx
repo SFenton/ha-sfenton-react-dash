@@ -38,6 +38,22 @@ describe('shared modal opener primitives', () => {
     expect(action.querySelector('[data-modal-disclosure]')).not.toBeInTheDocument()
   })
 
+  it('supports GlassTile switches and hides disabled disclosure', () => {
+    const { rerender } = render(
+      <GlassTile ariaLabel="Turn off Test Control" compact controlRole="switch" icon="mdi:power" onClick={() => undefined} pressed title="Test Control" tone="switch" />,
+    )
+
+    const toggle = screen.getByRole('switch', { name: 'Turn off Test Control' })
+    expect(toggle).toHaveAttribute('aria-checked', 'true')
+    expect(toggle).toHaveAttribute('data-tone', 'switch')
+
+    rerender(<GlassTile ariaLabel="Unavailable Details" compact disclosure disabled icon="mdi:cog" onClick={() => undefined} title="Details" tone="switch" />)
+    const disabled = screen.getByRole('button', { name: 'Unavailable Details' })
+    expect(disabled).toBeDisabled()
+    expect(disabled).not.toHaveAttribute('data-modal-opener')
+    expect(disabled.querySelector('[data-modal-disclosure]')).not.toBeInTheDocument()
+  })
+
   it('supports state-dependent Card disclosure', () => {
     const { rerender } = render(
       <Card disclosure icon={<MaterialIcon name="mdi:airplane" />} onClick={() => undefined} subtitle="Off" title="Vacation Mode" />,

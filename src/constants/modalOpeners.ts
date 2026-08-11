@@ -146,10 +146,10 @@ export const MODAL_OPENER_INVENTORY = [
   },
   {
     id: 'thermostat-room-rows',
-    label: 'Thermostat room rows',
+    label: 'Thermostat room tiles',
     instances: 11,
     affordance: 'right-chevron',
-    implementation: 'ThermostatRoomRow through ModalOpenerRow',
+    implementation: 'ThermostatRoomRow through GlassTile',
     behavior: 'Opens the selected room detail inside the existing Thermostat sheet.',
   },
   {
@@ -157,7 +157,7 @@ export const MODAL_OPENER_INVENTORY = [
     label: 'Predictive Comfort active disclosure',
     instances: 1,
     affordance: 'right-chevron',
-    implementation: 'PredictiveComfortCard',
+    implementation: 'PredictiveComfortSetting through GlassTile',
     behavior: 'When active, main/disclosure opens the Predictive Comfort page inside the Thermostat sheet and power turns off; when inactive, main turns on.',
   },
   {
@@ -286,18 +286,18 @@ export const MODAL_OPENER_INVENTORY = [
   },
   {
     id: 'thermostat-option-pages',
-    label: 'Thermostat Eco option rows',
+    label: 'Thermostat Eco option tiles',
     instances: 2,
     affordance: 'right-chevron',
-    implementation: 'ThermostatOptionOpener through ModalOpenerRow',
+    implementation: 'ThermostatOptionOpener through GlassTile',
     behavior: 'Opens Critical Tracking or Away Behavior as a same-sheet Thermostat detail page.',
   },
   {
     id: 'thermostat-tracking-rows',
-    label: 'Thermostat tracking policy rows',
+    label: 'Thermostat tracking policy tiles',
     instances: 3,
     affordance: 'right-chevron',
-    implementation: 'ThermostatTrackingOpener through ModalOpenerRow',
+    implementation: 'ThermostatTrackingOpener through GlassTile',
     behavior: 'Opens Selected Rooms, Critical Protection, or Occupied Only inside the existing Thermostat sheet.',
   },
   {

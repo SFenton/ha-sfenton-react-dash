@@ -16,7 +16,11 @@ type GlassTileStyle = CSSProperties & {
 export interface GlassTileProps {
   title: string
   icon: IconKey | string | ReactNode
+  ariaLabel?: string
   backgroundColor?: string
+  controlRole?: 'switch'
+  detailAutoFocus?: boolean
+  disabled?: boolean
   iconColor?: string
   subtitle?: string
   tone?: TileTone
@@ -28,13 +32,18 @@ export interface GlassTileProps {
   pressed?: boolean
   progress?: number
   progressColor?: string
+  trailingControl?: ReactNode
   variant?: 'card' | 'header'
 }
 
 export function GlassTile({
   title,
   icon,
+  ariaLabel,
   backgroundColor,
+  controlRole,
+  detailAutoFocus = false,
+  disabled = false,
   iconColor,
   subtitle,
   tone = 'neutral',
@@ -46,15 +55,18 @@ export function GlassTile({
   pressed,
   progress,
   progressColor,
+  trailingControl,
   variant = 'card',
 }: GlassTileProps) {
   const iconSize = variant === 'header' ? 26 : compact ? 18 : 24
   const progressValue = typeof progress === 'number' && Number.isFinite(progress) ? Math.max(0, Math.min(100, progress)) : undefined
+  const showDisclosure = disclosure && Boolean(onClick) && !disabled
   const className = [
     styles.tile,
     onClick ? styles.button : '',
     compact ? styles.compact : '',
-    disclosure && onClick ? styles.hasDisclosure : '',
+    showDisclosure ? styles.hasDisclosure : '',
+    trailingControl ? styles.hasTrailingControl : '',
     variant === 'header' ? styles.headerPill : '',
     styles[tone],
     isOff ? styles.off : '',
@@ -62,6 +74,7 @@ export function GlassTile({
     .filter(Boolean)
     .join(' ')
   const accessibleName = subtitle ? `${title} ${subtitle}` : title
+  const resolvedAccessibleName = ariaLabel ?? accessibleName
   const style: GlassTileStyle = {}
   if (backgroundColor) {
     style['--header-pill-color'] = backgroundColor
@@ -85,35 +98,51 @@ export function GlassTile({
           {subtitle && <span className={styles.subtitle} data-dynamic-grid-label="true">{subtitle}</span>}
         </span>
       </span>
-      {disclosure && onClick && <ModalDisclosureIcon size={variant === 'header' ? 'compact' : 'standard'} />}
+      {showDisclosure && <ModalDisclosureIcon size={variant === 'header' ? 'compact' : 'standard'} />}
     </>
   )
 
   if (onClick) {
-    return (
+    const button = (
       <button
-        aria-label={accessibleName}
-        aria-pressed={pressed}
+        aria-checked={controlRole === 'switch' ? pressed : undefined}
+        aria-label={resolvedAccessibleName}
+        aria-pressed={controlRole === 'switch' ? undefined : pressed}
         className={className}
+        data-disabled={disabled ? 'true' : 'false'}
         data-icon={iconName}
         data-icon-color={iconColor}
         data-muted={isOff ? 'true' : 'false'}
-        data-modal-opener={disclosure && disclosureKind === 'modal' ? 'true' : undefined}
-        data-navigation-opener={disclosure && disclosureKind === 'navigation' ? 'true' : undefined}
+        data-modal-detail-autofocus={detailAutoFocus ? 'true' : undefined}
+        data-modal-opener={showDisclosure && disclosureKind === 'modal' ? 'true' : undefined}
+        data-navigation-opener={showDisclosure && disclosureKind === 'navigation' ? 'true' : undefined}
         data-progress={progressValue === undefined ? undefined : String(Math.round(progressValue))}
         data-tone={tone}
         data-variant={variant}
+        disabled={disabled}
         onClick={onClick}
+        role={controlRole}
         style={resolvedStyle}
         type="button"
       >
         {content}
       </button>
     )
+
+    if (trailingControl) {
+      return (
+        <div className={styles.controlShell} data-disclosure={showDisclosure ? 'true' : 'false'}>
+          {button}
+          <div className={styles.trailingControl}>{trailingControl}</div>
+        </div>
+      )
+    }
+
+    return button
   }
 
   return (
-    <div aria-label={accessibleName} className={className} data-icon={iconName} data-icon-color={iconColor} data-muted={isOff ? 'true' : 'false'} data-progress={progressValue === undefined ? undefined : String(Math.round(progressValue))} data-tone={tone} data-variant={variant} style={resolvedStyle}>
+    <div aria-label={resolvedAccessibleName} className={className} data-icon={iconName} data-icon-color={iconColor} data-muted={isOff ? 'true' : 'false'} data-progress={progressValue === undefined ? undefined : String(Math.round(progressValue))} data-tone={tone} data-variant={variant} style={resolvedStyle}>
       {content}
     </div>
   )
