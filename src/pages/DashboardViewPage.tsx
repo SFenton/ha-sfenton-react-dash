@@ -71,6 +71,7 @@ import { ScheduleCollection, ScheduleDetailFooter, ScheduleListRow } from '../co
 import { isValidScheduleTime } from '../components/core/scheduleTime'
 import { SectionHeader } from '../components/core/SectionHeader'
 import { Stepper } from '../components/core/Stepper'
+import { SurfaceAccessory } from '../components/core/SurfaceAccessory'
 import { ToggleControl } from '../components/core/ToggleControl'
 import { ToggleSetting } from '../components/core/ToggleSetting'
 import { derivedAirPurifierEntityIds, formatAirQualitySummary } from '../components/hass/airQualityState'
@@ -339,6 +340,7 @@ function LivingRoomPowerRecoveryButton() {
     <button
       aria-label={`${title} in Living Room`}
       className={styles.adminAutomationButton}
+      data-action-kind="command"
       data-automation-target={LIVING_ROOM_POWER_RECOVERY_AUTOMATION}
       onClick={() => callService({ domain: 'automation', service: 'trigger', target: LIVING_ROOM_POWER_RECOVERY_AUTOMATION })}
       type="button"
@@ -1351,6 +1353,7 @@ function ChoreQuickLink({ item, onNavigate }: { item: (typeof CHORE_QUICK_LINKS)
       backgroundColor={`rgba(${item.color.r}, ${item.color.g}, ${item.color.b}, 0.72)`}
       icon={item.icon}
       onClick={() => onNavigate(item.path)}
+      semantics={{ kind: 'navigate' }}
       subtitle={subtitle}
       title={item.title}
     />
@@ -1379,6 +1382,7 @@ function KitchenGroceriesSection({ onNavigate }: { onNavigate: (path: string) =>
           backgroundColor="rgba(155, 67, 72, 0.72)"
           icon="mdi:clipboard-list"
           onClick={() => onNavigate(HOME_GROCERY_LIST_ROUTE_PATH)}
+          semantics={{ kind: 'navigate' }}
           subtitle={groceryCountSubtitle(groceryCount)}
           title={groceryList?.title ?? 'Grocery List'}
         />
@@ -1386,6 +1390,7 @@ function KitchenGroceriesSection({ onNavigate }: { onNavigate: (path: string) =>
           backgroundColor={FOOD_CARD_BACKGROUND_COLOR}
           icon="mdi:food-fork-drink"
           onClick={() => onNavigate(HOME_FOOD_ROUTE_PATH)}
+          semantics={{ kind: 'navigate' }}
           subtitle={foodSummarySubtitle(entities)}
           title="Food"
         />
@@ -1438,13 +1443,23 @@ function navigateExternal(path: string) {
 }
 
 function SettingsLink({ item, onNavigate }: { item: SettingsLinkConfig; onNavigate: (path: string) => void }) {
+  const semantics = item.path ? { kind: 'navigate' } as const : { kind: 'external' } as const
   const activate = () => {
     if (item.path) onNavigate(item.path)
     else if (item.externalPath) navigateExternal(item.externalPath)
   }
 
   return (
-    <button aria-label={`${item.title} ${item.subtitle}`} className={styles.settingsLink} data-external-path={item.externalPath} data-navigation-path={item.path} onClick={activate} type="button">
+    <button
+      aria-label={`${item.title} ${item.subtitle}`}
+      className={styles.settingsLink}
+      data-action-kind={semantics.kind}
+      data-external-path={item.externalPath}
+      data-navigation-opener={semantics.kind === 'navigate' ? 'true' : undefined}
+      data-navigation-path={item.path}
+      onClick={activate}
+      type="button"
+    >
       <span aria-hidden="true" className={styles.settingsLinkIcon}>
         <MaterialIcon name={item.icon} size={28} />
       </span>
@@ -1452,6 +1467,7 @@ function SettingsLink({ item, onNavigate }: { item: SettingsLinkConfig; onNaviga
         <span className={styles.settingsLinkTitle}>{item.title}</span>
         <span className={styles.settingsLinkSubtitle}>{item.subtitle}</span>
       </span>
+      <SurfaceAccessory semantics={semantics} size="compact" />
     </button>
   )
 }
@@ -1992,7 +2008,6 @@ function AdminPage({ onNavigate, preload = false, preloadHash, preloadHashes = [
         onClose={closeHash}
         open={presenceModalOpen}
         scrollResetKey={presenceDetailPageKey}
-        surface="hass-popup"
         title={selectedPresenceOverride ? `${selectedPresenceOverride.title} Presence Lighting` : 'Presence-Based Overrides'}
       >
         <div className={styles.adminModalBody}>
@@ -2004,7 +2019,7 @@ function AdminPage({ onNavigate, preload = false, preloadHash, preloadHashes = [
         </div>
       </ModalSheet>
 
-      <ModalSheet contentStyle={autoResetModalContentActive ? modalSquareGridModalStyle(autoResetGridLayout) : undefined} onClose={closeHash} open={autoResetModalOpen} surface="hass-popup" title="Presence-Based Overrides Auto-Reset">
+      <ModalSheet contentStyle={autoResetModalContentActive ? modalSquareGridModalStyle(autoResetGridLayout) : undefined} onClose={closeHash} open={autoResetModalOpen} title="Presence-Based Overrides Auto-Reset">
         <div className={styles.adminModalBody}>
           {autoResetModalContentActive && <AdminTileGrid gridLabel="Presence-Based Auto-Reset by room" items={ADMIN_AUTO_REENABLE_ITEMS} onNavigate={onNavigate} squareGridRef={autoResetGridRef} squareGridStyle={modalSquareGridStyle(autoResetGridLayout)} variant="admin-modal" />}
         </div>
@@ -4566,7 +4581,6 @@ function EightSleepBedModal({ modalState, onClose, open, side }: { modalState: E
         onClose={closeBedModal}
         open={open}
         subtitle={alarmDetailPage ? undefined : modalState.subtitle}
-        surface="hass-popup"
         title={modalTitle}
       >
         {renderedActiveTab === 'alarms' || alarmDetailPage ? (
@@ -5873,7 +5887,6 @@ function ThermostatModal({
       open={open}
       scrollResetKey={detailKey}
       subtitle={subtitle}
-      surface="hass-popup"
       title={thermostatModalDetailTitle(detail)}
     >
       {detail?.type === 'room' && <ThermostatRoomModalContent room={detail.room} />}

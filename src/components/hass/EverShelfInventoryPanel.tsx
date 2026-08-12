@@ -8,11 +8,11 @@ import { FilterSheetFooter } from '../core/FilterSheetFooter'
 import { FloatingActionSlot } from '../core/FloatingActionSlot'
 import { FloatingActionButton } from '../core/FloatingActionButton'
 import { MaterialIcon } from '../core/Icon'
-import { ModalDisclosureIcon } from '../core/ModalDisclosureIcon'
 import { ModalSheet } from '../core/ModalSheet'
 import { NativePickerField } from '../core/NativePickerField'
 import { NumberStepper } from '../core/Stepper'
 import { RadioRow } from '../core/RadioRow'
+import { SurfaceAccessory } from '../core/SurfaceAccessory'
 import { DashboardPageLoading } from '../shell/DashboardPageLoading'
 import type { EverShelfInventoryControls, InventoryFilterMode, InventorySortDirection, InventorySortMode } from './EverShelfInventoryControls'
 import { daysUntilDate, parseIsoDateOnly } from './expiryDate'
@@ -650,7 +650,7 @@ function PantryRow({ expiry, extraBatchCount, locationLabel, multiItem, onDelete
             event.stopPropagation()
             onOpenDetails()
           }} type="button">
-            <ModalDisclosureIcon />
+            <SurfaceAccessory semantics={{ kind: 'modal' }} />
           </button>
         ) : (
           <>

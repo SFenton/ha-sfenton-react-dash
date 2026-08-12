@@ -552,7 +552,7 @@
   display: grid;
   width: 100%;
   min-height: 72px;
-  grid-template-columns: 40px minmax(0, 1fr);
+  grid-template-columns: 40px minmax(0, 1fr) 22px;
   gap: 14px;
   align-items: start;
   border: 0;
@@ -726,12 +726,10 @@
   border-radius: 999px;
   box-shadow: 0 8px 18px rgba(0, 0, 0, 0.24), inset 0 1px 2px rgba(255, 255, 255, 0.24);
   transform: translate(-50%, -50%);
-  transition: transform var(--duration-fast) ease, box-shadow var(--duration-fast) ease;
 }
 
-.thermostatHandleHitTarget[data-dragging='true']::before,
-.thermostatHandleHitTarget:active::before {
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.3), 0 0 0 8px rgba(255, 255, 255, 0.08), inset 0 1px 2px rgba(255, 255, 255, 0.24);
+.thermostatHandleHitTarget[data-dragging='true']::before {
+  box-shadow: var(--rd-direct-manipulation-shadow);
   transform: translate(-50%, -50%) scale(1.08);
 }
 

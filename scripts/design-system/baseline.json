@@ -1,0 +1,5486 @@
+{
+  "rules": [
+    "raw-color-literal",
+    "undefined-rd-variable",
+    "modal-disclosure-import",
+    "visual-active-rule"
+  ],
+  "scanner": "scripts/design-system/check.ts",
+  "version": 1,
+  "violations": [
+    {
+      "file": "src/components/core/ActionPill.module.css",
+      "id": "f574a282426502a9",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgb(229, 57, 53)"
+    },
+    {
+      "file": "src/components/core/ActionPill.module.css",
+      "id": "6e4f0b1aeb35457e",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(0, 0, 0, 0.25)"
+    },
+    {
+      "file": "src/components/core/ActionPill.module.css",
+      "id": "d3923be4b3cf17c8",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(0, 0, 0, 0.3)"
+    },
+    {
+      "file": "src/components/core/ActionPill.module.css",
+      "id": "9885fc308d288cfd",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(229, 57, 53, 0.16)"
+    },
+    {
+      "file": "src/components/core/ActionPill.module.css",
+      "id": "204517824b0ebe1f",
+      "maxOccurrences": 2,
+      "rule": "raw-color-literal",
+      "subject": "rgba(229, 57, 53, 0.28)"
+    },
+    {
+      "file": "src/components/core/ActionPill.module.css",
+      "id": "20da6fd62b6d885e",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(229, 57, 53, 0.58)"
+    },
+    {
+      "file": "src/components/core/ActionPill.module.css",
+      "id": "c2d061b33501ee6d",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(229, 57, 53, 0.62)"
+    },
+    {
+      "file": "src/components/core/ActionPill.module.css",
+      "id": "695f3571b593b77c",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(229, 57, 53, 0.74)"
+    },
+    {
+      "file": "src/components/core/ActionPill.module.css",
+      "id": "50a72b755ca4f637",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 112, 108, 0.54)"
+    },
+    {
+      "file": "src/components/core/ActionPill.module.css",
+      "id": "ad0b11609af7fecd",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.13)"
+    },
+    {
+      "file": "src/components/core/ActionPill.module.css",
+      "id": "d71a24a4966980e0",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.14)"
+    },
+    {
+      "file": "src/components/core/ActionPill.module.css",
+      "id": "0a3c2163c2f85d7e",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.17)"
+    },
+    {
+      "file": "src/components/core/ActionPill.module.css",
+      "id": "dc9b076c00221344",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.18)"
+    },
+    {
+      "file": "src/components/core/ActionPill.module.css",
+      "id": "fb50643fe719d319",
+      "maxOccurrences": 2,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.2)"
+    },
+    {
+      "file": "src/components/core/ActionPill.module.css",
+      "id": "35a262055d609bec",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.22)"
+    },
+    {
+      "file": "src/components/core/ActionPill.module.css",
+      "id": "983b8038e00eb4c4",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.25)"
+    },
+    {
+      "file": "src/components/core/ActionPill.module.css",
+      "id": "8ea0e19386667a66",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.26)"
+    },
+    {
+      "file": "src/components/core/ActionPill.module.css",
+      "id": "04ad4c5c4f9a8277",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.28)"
+    },
+    {
+      "file": "src/components/core/ActionPill.module.css",
+      "id": "45eb5dc916e59858",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.42)"
+    },
+    {
+      "file": "src/components/core/ActionPill.module.css",
+      "id": "0c8974857d176ebf",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.9)"
+    },
+    {
+      "file": "src/components/core/ActionPill.module.css",
+      "id": "308575248b8adb95",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "white"
+    },
+    {
+      "file": "src/components/core/Card.module.css",
+      "id": "7c4cb5e4dccd862b",
+      "maxOccurrences": 2,
+      "rule": "raw-color-literal",
+      "subject": "rgb(var(--card-rgb)"
+    },
+    {
+      "file": "src/components/core/Card.module.css",
+      "id": "f6a137a2871d8503",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(0, 0, 0, 0.12)"
+    },
+    {
+      "file": "src/components/core/Card.module.css",
+      "id": "5b300b9c0c82c90c",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(0, 0, 0, 0.14)"
+    },
+    {
+      "file": "src/components/core/Card.module.css",
+      "id": "8b9f1bff2f52ae5a",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(0, 0, 0, 0.2)"
+    },
+    {
+      "file": "src/components/core/Card.module.css",
+      "id": "2976099e9ce4f589",
+      "maxOccurrences": 2,
+      "rule": "raw-color-literal",
+      "subject": "rgba(0, 0, 0, 0.24)"
+    },
+    {
+      "file": "src/components/core/Card.module.css",
+      "id": "f104d9e94cf09007",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(0, 0, 0, 0.28)"
+    },
+    {
+      "file": "src/components/core/Card.module.css",
+      "id": "7b5326c0db768656",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(0, 0, 0, 0.34)"
+    },
+    {
+      "file": "src/components/core/Card.module.css",
+      "id": "71bf0662696f3311",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.02)"
+    },
+    {
+      "file": "src/components/core/Card.module.css",
+      "id": "d908e138efaa02bf",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.1)"
+    },
+    {
+      "file": "src/components/core/Card.module.css",
+      "id": "f04c559f9d18d9d3",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.13)"
+    },
+    {
+      "file": "src/components/core/Card.module.css",
+      "id": "53193b68e9e2a81c",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.16)"
+    },
+    {
+      "file": "src/components/core/Card.module.css",
+      "id": "c324593546b49823",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.18)"
+    },
+    {
+      "file": "src/components/core/Card.module.css",
+      "id": "9d82a9940ae2b2a6",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.22)"
+    },
+    {
+      "file": "src/components/core/Card.module.css",
+      "id": "612ef9ccf30a5f8b",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.42)"
+    },
+    {
+      "file": "src/components/core/Card.module.css",
+      "id": "8ce57bd8e2c3e152",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.58)"
+    },
+    {
+      "file": "src/components/core/Card.module.css",
+      "id": "e12b98594c479174",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.64)"
+    },
+    {
+      "file": "src/components/core/Card.module.css",
+      "id": "c6820f3c1f38a95b",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.76)"
+    },
+    {
+      "file": "src/components/core/Card.module.css",
+      "id": "6e91abfad58f6fc3",
+      "maxOccurrences": 2,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.9)"
+    },
+    {
+      "file": "src/components/core/Card.module.css",
+      "id": "a2fb7c35ed73182b",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.94)"
+    },
+    {
+      "file": "src/components/core/Card.module.css",
+      "id": "0ce5f29e7dabf562",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0)"
+    },
+    {
+      "file": "src/components/core/Card.module.css",
+      "id": "346b10d0ea194895",
+      "maxOccurrences": 3,
+      "rule": "raw-color-literal",
+      "subject": "transparent"
+    },
+    {
+      "file": "src/components/core/Card.module.css",
+      "id": "5f85dac4b8324f5b",
+      "maxOccurrences": 2,
+      "rule": "raw-color-literal",
+      "subject": "white"
+    },
+    {
+      "file": "src/components/core/CardCarousel.module.css",
+      "id": "0cbc44af2dd83690",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.36)"
+    },
+    {
+      "file": "src/components/core/CardCarousel.module.css",
+      "id": "7a67d484fd76f555",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.54)"
+    },
+    {
+      "file": "src/components/core/CardCarousel.module.css",
+      "id": "63ff0f11255fb5bc",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.62)"
+    },
+    {
+      "file": "src/components/core/CardCarousel.module.css",
+      "id": "56545f0ff6cf8315",
+      "maxOccurrences": 2,
+      "rule": "raw-color-literal",
+      "subject": "transparent"
+    },
+    {
+      "file": "src/components/core/CardCarousel.module.css",
+      "id": "995d19858fa6c93f",
+      "maxOccurrences": 2,
+      "rule": "raw-color-literal",
+      "subject": "white"
+    },
+    {
+      "file": "src/components/core/CheckboxRow.module.css",
+      "id": "d150b9b86d195aa6",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.66)"
+    },
+    {
+      "file": "src/components/core/CheckboxRow.module.css",
+      "id": "23a91c9a416686ea",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.88)"
+    },
+    {
+      "file": "src/components/core/CheckboxRow.module.css",
+      "id": "ddbaa9e9f775db15",
+      "maxOccurrences": 2,
+      "rule": "raw-color-literal",
+      "subject": "transparent"
+    },
+    {
+      "file": "src/components/core/CheckboxRow.module.css",
+      "id": "542fd9738b94a66a",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "white"
+    },
+    {
+      "file": "src/components/core/CountBadge.module.css",
+      "id": "23373423b6f420b5",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "#e53935"
+    },
+    {
+      "file": "src/components/core/CountBadge.module.css",
+      "id": "b08604777eb9008b",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "white"
+    },
+    {
+      "file": "src/components/core/Description.module.css",
+      "id": "00247f4417181d19",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "#fff"
+    },
+    {
+      "file": "src/components/core/Description.module.css",
+      "id": "9a77299c9491acec",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "transparent"
+    },
+    {
+      "file": "src/components/core/EmptyState.module.css",
+      "id": "3c7564589c7aa6d6",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "white"
+    },
+    {
+      "file": "src/components/core/ExpandingSearchAction.module.css",
+      "id": "96503b04c9fc2b4a",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(18, 24, 38, 0.96)"
+    },
+    {
+      "file": "src/components/core/ExpandingSearchAction.module.css",
+      "id": "37bb9ba89f1cc311",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.1)"
+    },
+    {
+      "file": "src/components/core/ExpandingSearchAction.module.css",
+      "id": "b26ba7e7e9603e17",
+      "maxOccurrences": 3,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.14)"
+    },
+    {
+      "file": "src/components/core/ExpandingSearchAction.module.css",
+      "id": "297c1b1c563b39d1",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.16)"
+    },
+    {
+      "file": "src/components/core/ExpandingSearchAction.module.css",
+      "id": "a53afc63d5d31b28",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.58)"
+    },
+    {
+      "file": "src/components/core/ExpandingSearchAction.module.css",
+      "id": "a4c0a56e1abfbcbb",
+      "maxOccurrences": 2,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.62)"
+    },
+    {
+      "file": "src/components/core/ExpandingSearchAction.module.css",
+      "id": "73bb12b0cc4f24e8",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.94)"
+    },
+    {
+      "file": "src/components/core/ExpandingSearchAction.module.css",
+      "id": "c78aa9506a226589",
+      "maxOccurrences": 2,
+      "rule": "raw-color-literal",
+      "subject": "rgba(42, 126, 180, 0.48)"
+    },
+    {
+      "file": "src/components/core/ExpandingSearchAction.module.css",
+      "id": "5d16b53ab081f166",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(42, 126, 180, 0.86)"
+    },
+    {
+      "file": "src/components/core/ExpandingSearchAction.module.css",
+      "id": "81537458718c683c",
+      "maxOccurrences": 3,
+      "rule": "raw-color-literal",
+      "subject": "transparent"
+    },
+    {
+      "file": "src/components/core/ExpandingSearchAction.module.css",
+      "id": "c7dd5d46ce0c857f",
+      "maxOccurrences": 3,
+      "rule": "raw-color-literal",
+      "subject": "white"
+    },
+    {
+      "file": "src/components/core/FilterSheetFooter.module.css",
+      "id": "cd737eac9ff898a7",
+      "maxOccurrences": 2,
+      "rule": "raw-color-literal",
+      "subject": "rgb(198, 40, 40)"
+    },
+    {
+      "file": "src/components/core/FilterSheetFooter.module.css",
+      "id": "50355ca13bc3f1c1",
+      "maxOccurrences": 2,
+      "rule": "raw-color-literal",
+      "subject": "rgba(198, 40, 40, 0.22)"
+    },
+    {
+      "file": "src/components/core/FilterSheetFooter.module.css",
+      "id": "5ae3c3b997509384",
+      "maxOccurrences": 2,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.14)"
+    },
+    {
+      "file": "src/components/core/FilterSheetFooter.module.css",
+      "id": "a8bff8fdad0f1171",
+      "maxOccurrences": 2,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.18)"
+    },
+    {
+      "file": "src/components/core/FilterSheetFooter.module.css",
+      "id": "a94fb464b34906b6",
+      "maxOccurrences": 2,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.62)"
+    },
+    {
+      "file": "src/components/core/FilterSheetFooter.module.css",
+      "id": "79a1ca240f1b389d",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(42, 126, 180, 0.86)"
+    },
+    {
+      "file": "src/components/core/FilterSheetFooter.module.css",
+      "id": "aacaa39e586fc99a",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "white"
+    },
+    {
+      "file": "src/components/core/FloatingActionButton.module.css",
+      "id": "d483aa96d6f9499c",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgb(var(--card-rgb)"
+    },
+    {
+      "file": "src/components/core/FloatingActionButton.module.css",
+      "id": "0c3e4d115a0a05f3",
+      "maxOccurrences": 2,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.2)"
+    },
+    {
+      "file": "src/components/core/FloatingActionButton.module.css",
+      "id": "2be5f6c607fdc071",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.62)"
+    },
+    {
+      "file": "src/components/core/FloatingActionButton.module.css",
+      "id": "e569b028451704fc",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "white"
+    },
+    {
+      "file": "src/components/core/GlassTile.module.css",
+      "id": "0791660bf105cd36",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgb(0, 150, 136)"
+    },
+    {
+      "file": "src/components/core/GlassTile.module.css",
+      "id": "dcb6d7895f9a98cd",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgb(255, 150, 48)"
+    },
+    {
+      "file": "src/components/core/GlassTile.module.css",
+      "id": "af4f892b90aba8be",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgb(255, 204, 0)"
+    },
+    {
+      "file": "src/components/core/GlassTile.module.css",
+      "id": "52a42bf0dfbd0163",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgb(30, 136, 229)"
+    },
+    {
+      "file": "src/components/core/GlassTile.module.css",
+      "id": "5157ea750ca324ff",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(0, 0, 0, 0.08)"
+    },
+    {
+      "file": "src/components/core/GlassTile.module.css",
+      "id": "406f2277a75fea55",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(0, 0, 0, 0.1)"
+    },
+    {
+      "file": "src/components/core/GlassTile.module.css",
+      "id": "68e5d1bc92b69cd8",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(0, 0, 255, 0.22)"
+    },
+    {
+      "file": "src/components/core/GlassTile.module.css",
+      "id": "2204b7f759cee53c",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(0, 150, 136, 0.34)"
+    },
+    {
+      "file": "src/components/core/GlassTile.module.css",
+      "id": "baadc1cd7292fe7f",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(0, 150, 136, 0.58)"
+    },
+    {
+      "file": "src/components/core/GlassTile.module.css",
+      "id": "40928ee1ae97cb2a",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(0, 188, 174, 0.72)"
+    },
+    {
+      "file": "src/components/core/GlassTile.module.css",
+      "id": "71d1d35656ef735d",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(229, 57, 53, 0.34)"
+    },
+    {
+      "file": "src/components/core/GlassTile.module.css",
+      "id": "63c6cd2aef95cb5f",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(25, 84, 130, 0.6)"
+    },
+    {
+      "file": "src/components/core/GlassTile.module.css",
+      "id": "fd8026aa94a44b1a",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 100, 150, 0.6)"
+    },
+    {
+      "file": "src/components/core/GlassTile.module.css",
+      "id": "6a5ae7dc1daf80c1",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.08)"
+    },
+    {
+      "file": "src/components/core/GlassTile.module.css",
+      "id": "6309ec5dab02a188",
+      "maxOccurrences": 2,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.1)"
+    },
+    {
+      "file": "src/components/core/GlassTile.module.css",
+      "id": "947f401ca7844b00",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.12)"
+    },
+    {
+      "file": "src/components/core/GlassTile.module.css",
+      "id": "0c310310e150ba5d",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.18)"
+    },
+    {
+      "file": "src/components/core/GlassTile.module.css",
+      "id": "3bd8ff1912c3b154",
+      "maxOccurrences": 2,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.22)"
+    },
+    {
+      "file": "src/components/core/GlassTile.module.css",
+      "id": "5021f608f5dd7b57",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.46)"
+    },
+    {
+      "file": "src/components/core/GlassTile.module.css",
+      "id": "8d66eb1988f2d30a",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.58)"
+    },
+    {
+      "file": "src/components/core/GlassTile.module.css",
+      "id": "ac9578e8d8b6bbfa",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.76)"
+    },
+    {
+      "file": "src/components/core/GlassTile.module.css",
+      "id": "a0d5f8a86aec75ac",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(30, 136, 229, 0.32)"
+    },
+    {
+      "file": "src/components/core/GlassTile.module.css",
+      "id": "9f9d04eac494842c",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(67, 160, 71, 0.3)"
+    },
+    {
+      "file": "src/components/core/GlassTile.module.css",
+      "id": "66f0402a34a40955",
+      "maxOccurrences": 4,
+      "rule": "raw-color-literal",
+      "subject": "rgba(67, 160, 71, 0.6)"
+    },
+    {
+      "file": "src/components/core/GlassTile.module.css",
+      "id": "78108ffd2163e7b8",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(67, 160, 71, 0.8)"
+    },
+    {
+      "file": "src/components/core/GlassTile.module.css",
+      "id": "69fcf45ab55e5ce5",
+      "maxOccurrences": 2,
+      "rule": "raw-color-literal",
+      "subject": "transparent"
+    },
+    {
+      "file": "src/components/core/GlassTile.module.css",
+      "id": "9b87926d54d6b93f",
+      "maxOccurrences": 3,
+      "rule": "raw-color-literal",
+      "subject": "white"
+    },
+    {
+      "file": "src/components/core/ImageCard.module.css",
+      "id": "0e3b16add3750fca",
+      "maxOccurrences": 2,
+      "rule": "raw-color-literal",
+      "subject": "rgba(0, 0, 0, 0.16)"
+    },
+    {
+      "file": "src/components/core/ImageCard.module.css",
+      "id": "c291f81119886d36",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(0, 0, 0, 0.72)"
+    },
+    {
+      "file": "src/components/core/ImageCard.module.css",
+      "id": "728122181fe79992",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(0, 0, 0, 0.82)"
+    },
+    {
+      "file": "src/components/core/ImageCard.module.css",
+      "id": "130d597087487dee",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(0, 0, 0, 0.9)"
+    },
+    {
+      "file": "src/components/core/ImageCard.module.css",
+      "id": "c99f95f331fa7e83",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(155, 110, 64, 0.76)"
+    },
+    {
+      "file": "src/components/core/ImageCard.module.css",
+      "id": "1eb2e5e26869eedb",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.15)"
+    },
+    {
+      "file": "src/components/core/ImageCard.module.css",
+      "id": "3e49a19093f17425",
+      "maxOccurrences": 2,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.18)"
+    },
+    {
+      "file": "src/components/core/ImageCard.module.css",
+      "id": "6632f967f04dac66",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.58)"
+    },
+    {
+      "file": "src/components/core/ImageCard.module.css",
+      "id": "5bfd800903b666ab",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.72)"
+    },
+    {
+      "file": "src/components/core/ImageCard.module.css",
+      "id": "e1fa8ca8d8b8a193",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.8)"
+    },
+    {
+      "file": "src/components/core/ImageCard.module.css",
+      "id": "fd6f3194a6d20156",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(42, 74, 92, 0.82)"
+    },
+    {
+      "file": "src/components/core/ImageCard.module.css",
+      "id": "9e5248b9786266e9",
+      "maxOccurrences": 4,
+      "rule": "raw-color-literal",
+      "subject": "transparent"
+    },
+    {
+      "file": "src/components/core/ImageCard.module.css",
+      "id": "c4d2f4aba5598ada",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "white"
+    },
+    {
+      "file": "src/components/core/InlineAlert.module.css",
+      "id": "0f01053ab38545af",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgb(255, 95, 87)"
+    },
+    {
+      "file": "src/components/core/ModalActionFooter.module.css",
+      "id": "70912925ee12a17e",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgb(198, 40, 40)"
+    },
+    {
+      "file": "src/components/core/ModalActionFooter.module.css",
+      "id": "dcfb281d665646bc",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(0, 154, 199, 0.78)"
+    },
+    {
+      "file": "src/components/core/ModalActionFooter.module.css",
+      "id": "b37ae99600676347",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(251, 140, 0, 0.78)"
+    },
+    {
+      "file": "src/components/core/ModalActionFooter.module.css",
+      "id": "e94b0ceb53c557ff",
+      "maxOccurrences": 2,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.12)"
+    },
+    {
+      "file": "src/components/core/ModalActionFooter.module.css",
+      "id": "23727d2f100b6ea5",
+      "maxOccurrences": 2,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.16)"
+    },
+    {
+      "file": "src/components/core/ModalActionFooter.module.css",
+      "id": "9753e6f9f8379ee6",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.18)"
+    },
+    {
+      "file": "src/components/core/ModalActionFooter.module.css",
+      "id": "b5d3ebd270af13d0",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.58)"
+    },
+    {
+      "file": "src/components/core/ModalActionFooter.module.css",
+      "id": "9461f4f418b24e8e",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "white"
+    },
+    {
+      "file": "src/components/core/ModalDisclosureIcon.module.css",
+      "id": "74f3f3badd5490a1",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.82)"
+    },
+    {
+      "file": "src/components/core/ModalOpenerRow.module.css",
+      "id": "f68d480e399c207a",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgb(67 160 71 / 0.6)"
+    },
+    {
+      "file": "src/components/core/ModalOpenerRow.module.css",
+      "id": "4187a4df6e8dd11d",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(0, 0, 0, 0.14)"
+    },
+    {
+      "file": "src/components/core/ModalOpenerRow.module.css",
+      "id": "535e15ee40859eda",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.18)"
+    },
+    {
+      "file": "src/components/core/ModalOpenerRow.module.css",
+      "id": "588d157e71edc396",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.58)"
+    },
+    {
+      "file": "src/components/core/ModalOpenerRow.module.css",
+      "id": "0946b73d6bcb3f2b",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.66)"
+    },
+    {
+      "file": "src/components/core/ModalOpenerRow.module.css",
+      "id": "439069f232907a32",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.88)"
+    },
+    {
+      "file": "src/components/core/ModalOpenerRow.module.css",
+      "id": "ec2a7454894ba66f",
+      "maxOccurrences": 2,
+      "rule": "raw-color-literal",
+      "subject": "transparent"
+    },
+    {
+      "file": "src/components/core/ModalOpenerRow.module.css",
+      "id": "3606d45fed633e9e",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "white"
+    },
+    {
+      "file": "src/components/core/ModalSheet.module.css",
+      "id": "03f0671765ab9e86",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "#e1e1e1"
+    },
+    {
+      "file": "src/components/core/ModalSheet.module.css",
+      "id": "692d5484defa6343",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "#fff"
+    },
+    {
+      "file": "src/components/core/ModalSheet.module.css",
+      "id": "409550ec5cc8299c",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(0, 0, 0, 0.48)"
+    },
+    {
+      "file": "src/components/core/ModalSheet.module.css",
+      "id": "fbc5bf381dd7199c",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(0, 0, 0, 0)"
+    },
+    {
+      "file": "src/components/core/ModalSheet.module.css",
+      "id": "f3e946e7be5f01ba",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.08)"
+    },
+    {
+      "file": "src/components/core/ModalSheet.module.css",
+      "id": "39eb89c2e11bad91",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.12)"
+    },
+    {
+      "file": "src/components/core/ModalSheet.module.css",
+      "id": "7024ec7aa024f194",
+      "maxOccurrences": 2,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.14)"
+    },
+    {
+      "file": "src/components/core/ModalSheet.module.css",
+      "id": "32377bf9ea2181a5",
+      "maxOccurrences": 2,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.16)"
+    },
+    {
+      "file": "src/components/core/ModalSheet.module.css",
+      "id": "9849160b794e6dd0",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.38)"
+    },
+    {
+      "file": "src/components/core/ModalSheet.module.css",
+      "id": "ef5f2cbbffde04c9",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.56)"
+    },
+    {
+      "file": "src/components/core/ModalSheet.module.css",
+      "id": "a781b9addfff4007",
+      "maxOccurrences": 2,
+      "rule": "raw-color-literal",
+      "subject": "white"
+    },
+    {
+      "file": "src/components/core/ModalTabNav.module.css",
+      "id": "f818372ffa2f5458",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "#111"
+    },
+    {
+      "file": "src/components/core/ModalTabNav.module.css",
+      "id": "bd46b3066bfaf752",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(0, 0, 0, 0.34)"
+    },
+    {
+      "file": "src/components/core/ModalTabNav.module.css",
+      "id": "3813f2ef6070c4a0",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(20, 20, 20, 0.72)"
+    },
+    {
+      "file": "src/components/core/ModalTabNav.module.css",
+      "id": "a2dc6a35a40f719d",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.1)"
+    },
+    {
+      "file": "src/components/core/ModalTabNav.module.css",
+      "id": "6ddbaea18d56c7c3",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.12)"
+    },
+    {
+      "file": "src/components/core/ModalTabNav.module.css",
+      "id": "269491800f510c6d",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.68)"
+    },
+    {
+      "file": "src/components/core/ModalTabNav.module.css",
+      "id": "a4f9972b1ef9652b",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.72)"
+    },
+    {
+      "file": "src/components/core/ModalTabNav.module.css",
+      "id": "7f3c7870580f0052",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.92)"
+    },
+    {
+      "file": "src/components/core/ModalTabNav.module.css",
+      "id": "6796d9129d5b089d",
+      "maxOccurrences": 2,
+      "rule": "raw-color-literal",
+      "subject": "transparent"
+    },
+    {
+      "file": "src/components/core/NativePickerField.module.css",
+      "id": "ec426bc5c8da6f17",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(247, 251, 255, 0.48)"
+    },
+    {
+      "file": "src/components/core/NativePickerField.module.css",
+      "id": "d1e6e5026bb98ab1",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(247, 251, 255, 0.64)"
+    },
+    {
+      "file": "src/components/core/NativePickerField.module.css",
+      "id": "b08ff02b2033034c",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(247, 251, 255, 0.72)"
+    },
+    {
+      "file": "src/components/core/NativePickerField.module.css",
+      "id": "f7973b9bed24741b",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(247, 251, 255, 0.9)"
+    },
+    {
+      "file": "src/components/core/NativePickerField.module.css",
+      "id": "d56519b27685052a",
+      "maxOccurrences": 2,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.1)"
+    },
+    {
+      "file": "src/components/core/NativePickerField.module.css",
+      "id": "052e1413ba8ea1f2",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.12)"
+    },
+    {
+      "file": "src/components/core/NativePickerField.module.css",
+      "id": "64a04e8a3e7e902a",
+      "maxOccurrences": 2,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.16)"
+    },
+    {
+      "file": "src/components/core/NativePickerField.module.css",
+      "id": "79a606964086aeff",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.42)"
+    },
+    {
+      "file": "src/components/core/NativePickerField.module.css",
+      "id": "8bfebad32c0eaf14",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "transparent"
+    },
+    {
+      "file": "src/components/core/NativePickerField.module.css",
+      "id": "24ecef5342154ef3",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "white"
+    },
+    {
+      "file": "src/components/core/OptionPickerDialog.module.css",
+      "id": "c5f8d9a1a4bdb4c3",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "#e1e1e1"
+    },
+    {
+      "file": "src/components/core/OptionPickerDialog.module.css",
+      "id": "13cd2f6bb24edd06",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "#fff"
+    },
+    {
+      "file": "src/components/core/OptionPickerDialog.module.css",
+      "id": "f063cfb1133fe45b",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(0, 0, 0, 0)"
+    },
+    {
+      "file": "src/components/core/OptionPickerDialog.module.css",
+      "id": "c26be8376fd03018",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.1)"
+    },
+    {
+      "file": "src/components/core/OptionPickerDialog.module.css",
+      "id": "164322f52377a038",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.12)"
+    },
+    {
+      "file": "src/components/core/OptionPickerDialog.module.css",
+      "id": "036b4e07723cbd8a",
+      "maxOccurrences": 2,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.14)"
+    },
+    {
+      "file": "src/components/core/OptionPickerDialog.module.css",
+      "id": "3ac55393a733e318",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.16)"
+    },
+    {
+      "file": "src/components/core/OptionPickerDialog.module.css",
+      "id": "0e77feed50ceb456",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(67, 160, 71, 0.5)"
+    },
+    {
+      "file": "src/components/core/OptionPickerDialog.module.css",
+      "id": "1d1fedb4cde7d0f7",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(67, 160, 71, 0.6)"
+    },
+    {
+      "file": "src/components/core/OptionPickerDialog.module.css",
+      "id": "d1409d84f5571941",
+      "maxOccurrences": 3,
+      "rule": "raw-color-literal",
+      "subject": "white"
+    },
+    {
+      "file": "src/components/core/RadioRow.module.css",
+      "id": "576693c0a087cdba",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.58)"
+    },
+    {
+      "file": "src/components/core/RadioRow.module.css",
+      "id": "96d2c6c7ba7d7b9c",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.66)"
+    },
+    {
+      "file": "src/components/core/RadioRow.module.css",
+      "id": "0ac2cc59f4553c94",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.88)"
+    },
+    {
+      "file": "src/components/core/RadioRow.module.css",
+      "id": "59840660403a5f12",
+      "maxOccurrences": 2,
+      "rule": "raw-color-literal",
+      "subject": "transparent"
+    },
+    {
+      "file": "src/components/core/RadioRow.module.css",
+      "id": "11fe9c647bbb01e8",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "white"
+    },
+    {
+      "file": "src/components/core/RangeField.module.css",
+      "id": "2020e9490f31a374",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgb(42, 126, 180)"
+    },
+    {
+      "file": "src/components/core/RangeField.module.css",
+      "id": "ebc8d5dc3eb487ff",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.52)"
+    },
+    {
+      "file": "src/components/core/RangeField.module.css",
+      "id": "8031257c623a13a0",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.76)"
+    },
+    {
+      "file": "src/components/core/RangeField.module.css",
+      "id": "021717b0e84fb91c",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "white"
+    },
+    {
+      "file": "src/components/core/ScheduleEditorFields.module.css",
+      "id": "32947f41272b68c1",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "#10231e"
+    },
+    {
+      "file": "src/components/core/ScheduleEditorFields.module.css",
+      "id": "02e7e18a1963e007",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(111, 225, 185, 0.9)"
+    },
+    {
+      "file": "src/components/core/ScheduleEditorFields.module.css",
+      "id": "2453db4267c46047",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(111, 225, 185, 0.95)"
+    },
+    {
+      "file": "src/components/core/ScheduleEditorFields.module.css",
+      "id": "76ab254cf14b3162",
+      "maxOccurrences": 2,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.1)"
+    },
+    {
+      "file": "src/components/core/ScheduleEditorFields.module.css",
+      "id": "ffb744ae915c513f",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.12)"
+    },
+    {
+      "file": "src/components/core/ScheduleEditorFields.module.css",
+      "id": "f9906d1918f83a0c",
+      "maxOccurrences": 2,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.14)"
+    },
+    {
+      "file": "src/components/core/ScheduleEditorFields.module.css",
+      "id": "5e09b05389e4ae23",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "transparent"
+    },
+    {
+      "file": "src/components/core/ScheduleEditorFields.module.css",
+      "id": "3faeeddf340f6b5c",
+      "maxOccurrences": 3,
+      "rule": "raw-color-literal",
+      "subject": "white"
+    },
+    {
+      "file": "src/components/core/ScheduleFlow.module.css",
+      "id": "f5e5dfb69712a1d0",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(0, 150, 136, 0.2)"
+    },
+    {
+      "file": "src/components/core/ScheduleFlow.module.css",
+      "id": "2bd0480d2009a136",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(0, 150, 136, 0.24)"
+    },
+    {
+      "file": "src/components/core/ScheduleFlow.module.css",
+      "id": "3eeac8cee8a4f1be",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(111, 225, 185, 0.95)"
+    },
+    {
+      "file": "src/components/core/ScheduleFlow.module.css",
+      "id": "706d3adecdd01526",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(129, 199, 132, 0.42)"
+    },
+    {
+      "file": "src/components/core/ScheduleFlow.module.css",
+      "id": "005c56dcf5e5dbf8",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.1)"
+    },
+    {
+      "file": "src/components/core/ScheduleFlow.module.css",
+      "id": "fd46c2bc9c98ef05",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.12)"
+    },
+    {
+      "file": "src/components/core/ScheduleFlow.module.css",
+      "id": "e7590a5020fbb983",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.14)"
+    },
+    {
+      "file": "src/components/core/ScheduleFlow.module.css",
+      "id": "cac574e7778975d7",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.5)"
+    },
+    {
+      "file": "src/components/core/ScheduleFlow.module.css",
+      "id": "cbe4c83c499d711f",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.72)"
+    },
+    {
+      "file": "src/components/core/ScheduleFlow.module.css",
+      "id": "f5fab934cc448e7d",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(67, 160, 71, 0.1)"
+    },
+    {
+      "file": "src/components/core/ScheduleFlow.module.css",
+      "id": "ccb0cff5a9210854",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(67, 160, 71, 0.28)"
+    },
+    {
+      "file": "src/components/core/ScheduleFlow.module.css",
+      "id": "0a701a84cda8f167",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(77, 208, 225, 0.3)"
+    },
+    {
+      "file": "src/components/core/ScheduleFlow.module.css",
+      "id": "96020a1b0d1c364a",
+      "maxOccurrences": 2,
+      "rule": "raw-color-literal",
+      "subject": "transparent"
+    },
+    {
+      "file": "src/components/core/ScheduleFlow.module.css",
+      "id": "2a95d8fa0d256920",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "white"
+    },
+    {
+      "file": "src/components/core/Separator.module.css",
+      "id": "c384d474bab980d8",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.08)"
+    },
+    {
+      "file": "src/components/core/StatusPill.module.css",
+      "id": "611c31ca954ac421",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(0, 0, 0, 0.12)"
+    },
+    {
+      "file": "src/components/core/StatusPill.module.css",
+      "id": "0bbfe5fd87d185b4",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(0, 150, 136, 0.09)"
+    },
+    {
+      "file": "src/components/core/StatusPill.module.css",
+      "id": "e4a2b70d16519428",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(0, 150, 136, 0.24)"
+    },
+    {
+      "file": "src/components/core/StatusPill.module.css",
+      "id": "45ec4a8a6584c12d",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(100, 181, 246, 0.38)"
+    },
+    {
+      "file": "src/components/core/StatusPill.module.css",
+      "id": "4b07fc96706c0344",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(129, 199, 132, 0.34)"
+    },
+    {
+      "file": "src/components/core/StatusPill.module.css",
+      "id": "dc06f2399a1b205a",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(229, 57, 53, 0.1)"
+    },
+    {
+      "file": "src/components/core/StatusPill.module.css",
+      "id": "f7e1fc5cff996bf3",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(229, 57, 53, 0.25)"
+    },
+    {
+      "file": "src/components/core/StatusPill.module.css",
+      "id": "66c1e4680945c56b",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(232, 240, 255, 0.62)"
+    },
+    {
+      "file": "src/components/core/StatusPill.module.css",
+      "id": "8f32b4d99317b171",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(232, 240, 255, 0.7)"
+    },
+    {
+      "file": "src/components/core/StatusPill.module.css",
+      "id": "cede7d26ba21d84d",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(251, 140, 0, 0.09)"
+    },
+    {
+      "file": "src/components/core/StatusPill.module.css",
+      "id": "91d35e0f3e7d1d40",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(251, 140, 0, 0.22)"
+    },
+    {
+      "file": "src/components/core/StatusPill.module.css",
+      "id": "c5ebcbb1f4307363",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 183, 77, 0.38)"
+    },
+    {
+      "file": "src/components/core/StatusPill.module.css",
+      "id": "c7220443651106de",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.06)"
+    },
+    {
+      "file": "src/components/core/StatusPill.module.css",
+      "id": "83ff34dc00351c5b",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.1)"
+    },
+    {
+      "file": "src/components/core/StatusPill.module.css",
+      "id": "0b0a7e469a705754",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.16)"
+    },
+    {
+      "file": "src/components/core/StatusPill.module.css",
+      "id": "bca773efa45ac9f0",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.9)"
+    },
+    {
+      "file": "src/components/core/StatusPill.module.css",
+      "id": "360b2105ff0ab52e",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.95)"
+    },
+    {
+      "file": "src/components/core/StatusPill.module.css",
+      "id": "cd1d6b3bb307492d",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 95, 87, 0.42)"
+    },
+    {
+      "file": "src/components/core/StatusPill.module.css",
+      "id": "1f3f9413353e4b7b",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(30, 136, 229, 0.09)"
+    },
+    {
+      "file": "src/components/core/StatusPill.module.css",
+      "id": "ef3d6180d11620ae",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(30, 136, 229, 0.24)"
+    },
+    {
+      "file": "src/components/core/StatusPill.module.css",
+      "id": "c52df688cba6b9b8",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(67, 160, 71, 0.08)"
+    },
+    {
+      "file": "src/components/core/StatusPill.module.css",
+      "id": "4507719bd0839448",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(67, 160, 71, 0.2)"
+    },
+    {
+      "file": "src/components/core/StatusPill.module.css",
+      "id": "d1f81a93e26139b2",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(77, 208, 225, 0.36)"
+    },
+    {
+      "file": "src/components/core/StatusPill.module.css",
+      "id": "da8d49544a2be3cb",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "white"
+    },
+    {
+      "file": "src/components/core/Stepper.module.css",
+      "id": "e66b986591be0b5c",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(0, 0, 0, 0.14)"
+    },
+    {
+      "file": "src/components/core/Stepper.module.css",
+      "id": "cac45f37ec5086a3",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.1)"
+    },
+    {
+      "file": "src/components/core/Stepper.module.css",
+      "id": "d1ebb27a8d92893f",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.13)"
+    },
+    {
+      "file": "src/components/core/Stepper.module.css",
+      "id": "b4e202e59b7f2b0d",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.14)"
+    },
+    {
+      "file": "src/components/core/Stepper.module.css",
+      "id": "e2321af99b16ee87",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.28)"
+    },
+    {
+      "file": "src/components/core/Stepper.module.css",
+      "id": "5b0edb513fe7b6cc",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.92)"
+    },
+    {
+      "file": "src/components/core/Stepper.module.css",
+      "id": "81e9615812f216d7",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "transparent"
+    },
+    {
+      "file": "src/components/core/Stepper.module.css",
+      "id": "110e163649bfbea7",
+      "maxOccurrences": 2,
+      "rule": "raw-color-literal",
+      "subject": "white"
+    },
+    {
+      "file": "src/components/core/ToggleControl.module.css",
+      "id": "501a4feb85c490de",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "#fff"
+    },
+    {
+      "file": "src/components/core/ToggleControl.module.css",
+      "id": "3f627173bf51476c",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(0, 0, 0, 0.08)"
+    },
+    {
+      "file": "src/components/core/ToggleControl.module.css",
+      "id": "36b131eb79c09dc0",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(0, 0, 0, 0.18)"
+    },
+    {
+      "file": "src/components/core/ToggleControl.module.css",
+      "id": "2aaf5d49d2442d36",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(0, 0, 0, 0.32)"
+    },
+    {
+      "file": "src/components/core/ToggleControl.module.css",
+      "id": "e113f768a57c5a87",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(111, 225, 185, 0.95)"
+    },
+    {
+      "file": "src/components/core/ToggleControl.module.css",
+      "id": "dc45120026a4be8a",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(120, 120, 128, 0.32)"
+    },
+    {
+      "file": "src/components/core/ToggleControl.module.css",
+      "id": "912246445add52a8",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "transparent"
+    },
+    {
+      "file": "src/components/core/ToggleSetting.module.css",
+      "id": "bcaa65af2d2fdcc3",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.9)"
+    },
+    {
+      "file": "src/components/core/ToggleSetting.module.css",
+      "id": "f9040e934c57d6d1",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "white"
+    },
+    {
+      "file": "src/components/hass/AirQualityModalContent.module.css",
+      "id": "4538ac3a8d69f252",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.12)"
+    },
+    {
+      "file": "src/components/hass/AirQualityModalContent.module.css",
+      "id": "4cb9155e58f3fa4e",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "white"
+    },
+    {
+      "file": "src/components/hass/BedTemperatureScopePrompt.module.css",
+      "id": "cf081140e00b03ce",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "#fff"
+    },
+    {
+      "file": "src/components/hass/BedTemperatureScopePrompt.module.css",
+      "id": "0dc325f0f270c155",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(187, 218, 255, 0.96)"
+    },
+    {
+      "file": "src/components/hass/BedTemperatureScopePrompt.module.css",
+      "id": "b5ec0ad26231555e",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.075)"
+    },
+    {
+      "file": "src/components/hass/BedTemperatureScopePrompt.module.css",
+      "id": "80d94e4a4fd713de",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.13)"
+    },
+    {
+      "file": "src/components/hass/BedTemperatureScopePrompt.module.css",
+      "id": "42c1c32c40f2c3e4",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.58)"
+    },
+    {
+      "file": "src/components/hass/BedTemperatureScopePrompt.module.css",
+      "id": "98d8616fc5da8581",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.62)"
+    },
+    {
+      "file": "src/components/hass/BedTemperatureScopePrompt.module.css",
+      "id": "be3c52f9c4a90cf2",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.7)"
+    },
+    {
+      "file": "src/components/hass/BedTemperatureScopePrompt.module.css",
+      "id": "c1e3da2a5da59c93",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.74)"
+    },
+    {
+      "file": "src/components/hass/BedTemperatureScopePrompt.module.css",
+      "id": "883f6a42ce674ec6",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.92)"
+    },
+    {
+      "file": "src/components/hass/BedTemperatureScopePrompt.module.css",
+      "id": "f753048a68cee924",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(80, 142, 205, 0.2)"
+    },
+    {
+      "file": "src/components/hass/BedTemperatureScopePrompt.module.css",
+      "id": "122f227ac72d7240",
+      "maxOccurrences": 3,
+      "rule": "raw-color-literal",
+      "subject": "transparent"
+    },
+    {
+      "file": "src/components/hass/CameraModalContent.module.css",
+      "id": "d87b3c6d27296d11",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(0, 0, 0, 0.28)"
+    },
+    {
+      "file": "src/components/hass/CameraTile.module.css",
+      "id": "5a5118cf65308e8f",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(0, 0, 0, 0.14)"
+    },
+    {
+      "file": "src/components/hass/CameraTile.module.css",
+      "id": "a707bcfcce37bc08",
+      "maxOccurrences": 2,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.05)"
+    },
+    {
+      "file": "src/components/hass/CameraTile.module.css",
+      "id": "99840c5c2a3fe141",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.12)"
+    },
+    {
+      "file": "src/components/hass/CameraTile.module.css",
+      "id": "da9cc07c01656ef2",
+      "maxOccurrences": 2,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.13)"
+    },
+    {
+      "file": "src/components/hass/CameraTile.module.css",
+      "id": "b70ad2fc564daaf1",
+      "maxOccurrences": 2,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.14)"
+    },
+    {
+      "file": "src/components/hass/CameraTile.module.css",
+      "id": "e0734efa68b24673",
+      "maxOccurrences": 2,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.16)"
+    },
+    {
+      "file": "src/components/hass/CameraTile.module.css",
+      "id": "4434c4a4876ccb64",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.48)"
+    },
+    {
+      "file": "src/components/hass/CameraTile.module.css",
+      "id": "1d428304a63fa6a1",
+      "maxOccurrences": 2,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.58)"
+    },
+    {
+      "file": "src/components/hass/CameraTile.module.css",
+      "id": "70fae39e7a940b26",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.7)"
+    },
+    {
+      "file": "src/components/hass/CameraTile.module.css",
+      "id": "847dd8126a9e6cf9",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(8, 12, 19, 0.48)"
+    },
+    {
+      "file": "src/components/hass/CameraTile.module.css",
+      "id": "7b028d0e43b139f1",
+      "maxOccurrences": 3,
+      "rule": "raw-color-literal",
+      "subject": "transparent"
+    },
+    {
+      "file": "src/components/hass/CameraTile.module.css",
+      "id": "53cacca4314d17e4",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "white"
+    },
+    {
+      "file": "src/components/hass/CircularControlDial.module.css",
+      "id": "767411e6c73797f1",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(0, 0, 0, 0.18)"
+    },
+    {
+      "file": "src/components/hass/CircularControlDial.module.css",
+      "id": "1ed4015193c0768e",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(0, 0, 0, 0.24)"
+    },
+    {
+      "file": "src/components/hass/CircularControlDial.module.css",
+      "id": "00d058bbdf34b9b4",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(0, 0, 0, 0.3)"
+    },
+    {
+      "file": "src/components/hass/CircularControlDial.module.css",
+      "id": "52f921d069508f0e",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(14, 14, 14, 0.82)"
+    },
+    {
+      "file": "src/components/hass/CircularControlDial.module.css",
+      "id": "3093df0ad3914009",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.08)"
+    },
+    {
+      "file": "src/components/hass/CircularControlDial.module.css",
+      "id": "b1047c92f972c846",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.66)"
+    },
+    {
+      "file": "src/components/hass/CircularControlDial.module.css",
+      "id": "70c8c3e134466e31",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.72)"
+    },
+    {
+      "file": "src/components/hass/CircularControlDial.module.css",
+      "id": "34860bf133370bc2",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.76)"
+    },
+    {
+      "file": "src/components/hass/CircularControlDial.module.css",
+      "id": "3a5ff36a263cf517",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.78)"
+    },
+    {
+      "file": "src/components/hass/CircularControlDial.module.css",
+      "id": "812a520a1d431274",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.96)"
+    },
+    {
+      "file": "src/components/hass/CircularControlDial.module.css",
+      "id": "956b2aadc440113e",
+      "maxOccurrences": 2,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.98)"
+    },
+    {
+      "file": "src/components/hass/CircularControlDial.module.css",
+      "id": "c50016dc06061b4e",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "white"
+    },
+    {
+      "file": "src/components/hass/CreateDonetickTaskSheet.module.css",
+      "id": "8cf15ae088d7ee89",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgb(198, 40, 40)"
+    },
+    {
+      "file": "src/components/hass/CreateDonetickTaskSheet.module.css",
+      "id": "d2412a30824be0ef",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(0, 154, 199, 0.78)"
+    },
+    {
+      "file": "src/components/hass/CreateDonetickTaskSheet.module.css",
+      "id": "50d2fc9372710932",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(180, 35, 35, 0.34)"
+    },
+    {
+      "file": "src/components/hass/CreateDonetickTaskSheet.module.css",
+      "id": "cce6fe469c083001",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(247, 251, 255, 0.62)"
+    },
+    {
+      "file": "src/components/hass/CreateDonetickTaskSheet.module.css",
+      "id": "17e32823d98d5fc2",
+      "maxOccurrences": 2,
+      "rule": "raw-color-literal",
+      "subject": "rgba(247, 251, 255, 0.9)"
+    },
+    {
+      "file": "src/components/hass/CreateDonetickTaskSheet.module.css",
+      "id": "67f6989fa9a41889",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 120, 120, 0.28)"
+    },
+    {
+      "file": "src/components/hass/CreateDonetickTaskSheet.module.css",
+      "id": "4f5468dda14b5af0",
+      "maxOccurrences": 2,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.1)"
+    },
+    {
+      "file": "src/components/hass/CreateDonetickTaskSheet.module.css",
+      "id": "fd0ecc718a60bc96",
+      "maxOccurrences": 2,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.12)"
+    },
+    {
+      "file": "src/components/hass/CreateDonetickTaskSheet.module.css",
+      "id": "17900c5de6689685",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.16)"
+    },
+    {
+      "file": "src/components/hass/CreateDonetickTaskSheet.module.css",
+      "id": "58f715c0419a95d7",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.18)"
+    },
+    {
+      "file": "src/components/hass/CreateDonetickTaskSheet.module.css",
+      "id": "334a564c92caeb5c",
+      "maxOccurrences": 2,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.42)"
+    },
+    {
+      "file": "src/components/hass/CreateDonetickTaskSheet.module.css",
+      "id": "edfaf7e71c49675e",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.58)"
+    },
+    {
+      "file": "src/components/hass/CreateDonetickTaskSheet.module.css",
+      "id": "fc15faa1d2b34c73",
+      "maxOccurrences": 3,
+      "rule": "raw-color-literal",
+      "subject": "white"
+    },
+    {
+      "file": "src/components/hass/DailyReportModalContent.module.css",
+      "id": "fb7b62148306c101",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "#111"
+    },
+    {
+      "file": "src/components/hass/DailyReportModalContent.module.css",
+      "id": "cd9f3f0dede24e8d",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(0, 0, 0, 0.34)"
+    },
+    {
+      "file": "src/components/hass/DailyReportModalContent.module.css",
+      "id": "e8d0e27fdab84df8",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(20, 20, 20, 0.72)"
+    },
+    {
+      "file": "src/components/hass/DailyReportModalContent.module.css",
+      "id": "b7d27cba575bc540",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.1)"
+    },
+    {
+      "file": "src/components/hass/DailyReportModalContent.module.css",
+      "id": "a5a9cd98abc84ba3",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.12)"
+    },
+    {
+      "file": "src/components/hass/DailyReportModalContent.module.css",
+      "id": "face9a314cb5fcdf",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.68)"
+    },
+    {
+      "file": "src/components/hass/DailyReportModalContent.module.css",
+      "id": "544b2c740b8c0770",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.92)"
+    },
+    {
+      "file": "src/components/hass/DailyReportModalContent.module.css",
+      "id": "41193df9d7f99f72",
+      "maxOccurrences": 2,
+      "rule": "raw-color-literal",
+      "subject": "transparent"
+    },
+    {
+      "file": "src/components/hass/EntityGroup.module.css",
+      "id": "1230077bfd483c8e",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(150, 80, 28, 0.66)"
+    },
+    {
+      "file": "src/components/hass/EntityGroup.module.css",
+      "id": "1d7f10f7d33110d6",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.12)"
+    },
+    {
+      "file": "src/components/hass/EntityGroup.module.css",
+      "id": "9feb32797b26a384",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.14)"
+    },
+    {
+      "file": "src/components/hass/EntityGroup.module.css",
+      "id": "d2ad98ad5af62274",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.16)"
+    },
+    {
+      "file": "src/components/hass/EntityGroup.module.css",
+      "id": "2ead6e335232465e",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "white"
+    },
+    {
+      "file": "src/components/hass/EverShelfInventoryPanel.module.css",
+      "id": "03c0573ce47d9ef2",
+      "maxOccurrences": 2,
+      "rule": "raw-color-literal",
+      "subject": "#ff6b6b"
+    },
+    {
+      "file": "src/components/hass/EverShelfInventoryPanel.module.css",
+      "id": "92a7aa992b2f8e88",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "#ffb4b4"
+    },
+    {
+      "file": "src/components/hass/EverShelfInventoryPanel.module.css",
+      "id": "94fafb8642ff4057",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "#ffd965"
+    },
+    {
+      "file": "src/components/hass/EverShelfInventoryPanel.module.css",
+      "id": "c12cedb9a454e967",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(0, 0, 0, 0.26)"
+    },
+    {
+      "file": "src/components/hass/EverShelfInventoryPanel.module.css",
+      "id": "34bef6a41cac2863",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(104, 211, 145, 0.92)"
+    },
+    {
+      "file": "src/components/hass/EverShelfInventoryPanel.module.css",
+      "id": "1fb2e1033db4a1b1",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(18, 24, 38, 0.96)"
+    },
+    {
+      "file": "src/components/hass/EverShelfInventoryPanel.module.css",
+      "id": "412bd082851b6b01",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(190, 56, 56, 0.9)"
+    },
+    {
+      "file": "src/components/hass/EverShelfInventoryPanel.module.css",
+      "id": "dce9924f08299340",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.08)"
+    },
+    {
+      "file": "src/components/hass/EverShelfInventoryPanel.module.css",
+      "id": "a9965627a6cd2fdb",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.1)"
+    },
+    {
+      "file": "src/components/hass/EverShelfInventoryPanel.module.css",
+      "id": "7b35b81351703faf",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.12)"
+    },
+    {
+      "file": "src/components/hass/EverShelfInventoryPanel.module.css",
+      "id": "090818d13b9d7f94",
+      "maxOccurrences": 3,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.14)"
+    },
+    {
+      "file": "src/components/hass/EverShelfInventoryPanel.module.css",
+      "id": "6788b284eaa422dd",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.16)"
+    },
+    {
+      "file": "src/components/hass/EverShelfInventoryPanel.module.css",
+      "id": "04ac40f2151de0b0",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.18)"
+    },
+    {
+      "file": "src/components/hass/EverShelfInventoryPanel.module.css",
+      "id": "8754753e8108e074",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.28)"
+    },
+    {
+      "file": "src/components/hass/EverShelfInventoryPanel.module.css",
+      "id": "5b44743ce65f649d",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.34)"
+    },
+    {
+      "file": "src/components/hass/EverShelfInventoryPanel.module.css",
+      "id": "76f845d2d7de364a",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.54)"
+    },
+    {
+      "file": "src/components/hass/EverShelfInventoryPanel.module.css",
+      "id": "939368b3d44308e5",
+      "maxOccurrences": 2,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.58)"
+    },
+    {
+      "file": "src/components/hass/EverShelfInventoryPanel.module.css",
+      "id": "c040623a0e3155e0",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.62)"
+    },
+    {
+      "file": "src/components/hass/EverShelfInventoryPanel.module.css",
+      "id": "634c203da6121a1b",
+      "maxOccurrences": 2,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.66)"
+    },
+    {
+      "file": "src/components/hass/EverShelfInventoryPanel.module.css",
+      "id": "af99bf03a3f4307b",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.68)"
+    },
+    {
+      "file": "src/components/hass/EverShelfInventoryPanel.module.css",
+      "id": "2346b6e67ba52fbd",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.72)"
+    },
+    {
+      "file": "src/components/hass/EverShelfInventoryPanel.module.css",
+      "id": "0e39df42c41b5f7d",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.88)"
+    },
+    {
+      "file": "src/components/hass/EverShelfInventoryPanel.module.css",
+      "id": "2a8f6015ad5e93c4",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.94)"
+    },
+    {
+      "file": "src/components/hass/EverShelfInventoryPanel.module.css",
+      "id": "6eaa537b2c5ed694",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(42, 126, 180, 0.32)"
+    },
+    {
+      "file": "src/components/hass/EverShelfInventoryPanel.module.css",
+      "id": "340a4bd237fc5c00",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(42, 126, 180, 0.48)"
+    },
+    {
+      "file": "src/components/hass/EverShelfInventoryPanel.module.css",
+      "id": "db2029ffeb07c322",
+      "maxOccurrences": 2,
+      "rule": "raw-color-literal",
+      "subject": "rgba(42, 126, 180, 0.86)"
+    },
+    {
+      "file": "src/components/hass/EverShelfInventoryPanel.module.css",
+      "id": "e432e5c32e875f41",
+      "maxOccurrences": 2,
+      "rule": "raw-color-literal",
+      "subject": "rgba(42, 126, 180, 0.95)"
+    },
+    {
+      "file": "src/components/hass/EverShelfInventoryPanel.module.css",
+      "id": "96c623ab05b52f46",
+      "maxOccurrences": 7,
+      "rule": "raw-color-literal",
+      "subject": "transparent"
+    },
+    {
+      "file": "src/components/hass/EverShelfInventoryPanel.module.css",
+      "id": "6b7545b96b29a704",
+      "maxOccurrences": 13,
+      "rule": "raw-color-literal",
+      "subject": "white"
+    },
+    {
+      "file": "src/components/hass/GrillModalContent.module.css",
+      "id": "edf01a9632e0f651",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgb(255, 221, 185)"
+    },
+    {
+      "file": "src/components/hass/GrillModalContent.module.css",
+      "id": "1a27c87c27aa5a47",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(206, 114, 38, 0.22)"
+    },
+    {
+      "file": "src/components/hass/GrillModalContent.module.css",
+      "id": "b7e2565699c81f71",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.16)"
+    },
+    {
+      "file": "src/components/hass/GrillModalContent.module.css",
+      "id": "08115907e9064bf9",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.18)"
+    },
+    {
+      "file": "src/components/hass/HumidifierModalContent.module.css",
+      "id": "010b52f12271a169",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "#111"
+    },
+    {
+      "file": "src/components/hass/HumidifierModalContent.module.css",
+      "id": "c3936041706b725b",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(0, 0, 0, 0.34)"
+    },
+    {
+      "file": "src/components/hass/HumidifierModalContent.module.css",
+      "id": "2dac67ffe1a00a09",
+      "maxOccurrences": 2,
+      "rule": "raw-color-literal",
+      "subject": "rgba(111, 225, 185, 0.95)"
+    },
+    {
+      "file": "src/components/hass/HumidifierModalContent.module.css",
+      "id": "67289a1dfa1d048e",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(20, 20, 20, 0.72)"
+    },
+    {
+      "file": "src/components/hass/HumidifierModalContent.module.css",
+      "id": "41996e034af30670",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(229, 57, 53, 0.28)"
+    },
+    {
+      "file": "src/components/hass/HumidifierModalContent.module.css",
+      "id": "82c87340d2b7a7ff",
+      "maxOccurrences": 2,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.1)"
+    },
+    {
+      "file": "src/components/hass/HumidifierModalContent.module.css",
+      "id": "60acfa5cc7479a25",
+      "maxOccurrences": 2,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.12)"
+    },
+    {
+      "file": "src/components/hass/HumidifierModalContent.module.css",
+      "id": "6d5a2a15d2905647",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.14)"
+    },
+    {
+      "file": "src/components/hass/HumidifierModalContent.module.css",
+      "id": "3381ea282a217f49",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.68)"
+    },
+    {
+      "file": "src/components/hass/HumidifierModalContent.module.css",
+      "id": "6f3f1c5e5a06a796",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.92)"
+    },
+    {
+      "file": "src/components/hass/HumidifierModalContent.module.css",
+      "id": "4f4f7159e5031dc3",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 95, 87, 0.32)"
+    },
+    {
+      "file": "src/components/hass/HumidifierModalContent.module.css",
+      "id": "330443fcb5b9da5d",
+      "maxOccurrences": 3,
+      "rule": "raw-color-literal",
+      "subject": "transparent"
+    },
+    {
+      "file": "src/components/hass/HumidifierModalContent.module.css",
+      "id": "7f4056ed2f9190ab",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "white"
+    },
+    {
+      "file": "src/components/hass/LightBrightnessCard.module.css",
+      "id": "de05aa13711c8131",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgb(150 80 28)"
+    },
+    {
+      "file": "src/components/hass/LightBrightnessCard.module.css",
+      "id": "576e505076aa5491",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(0, 0, 0, 0.14)"
+    },
+    {
+      "file": "src/components/hass/LightBrightnessCard.module.css",
+      "id": "df82cf00df57499f",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(0, 0, 0, 0.24)"
+    },
+    {
+      "file": "src/components/hass/LightBrightnessCard.module.css",
+      "id": "1410c97a3b4e3147",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(0, 0, 0, 0.3)"
+    },
+    {
+      "file": "src/components/hass/LightBrightnessCard.module.css",
+      "id": "4d70d32a4396edf4",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(0, 0, 0, 0.34)"
+    },
+    {
+      "file": "src/components/hass/LightBrightnessCard.module.css",
+      "id": "6bb6cd7f1f998994",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.1)"
+    },
+    {
+      "file": "src/components/hass/LightBrightnessCard.module.css",
+      "id": "750cbb14d341aace",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.14)"
+    },
+    {
+      "file": "src/components/hass/LightBrightnessCard.module.css",
+      "id": "521287f6ce2025e1",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.18)"
+    },
+    {
+      "file": "src/components/hass/LightBrightnessCard.module.css",
+      "id": "fdc3b9cb845f20ac",
+      "maxOccurrences": 2,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.58)"
+    },
+    {
+      "file": "src/components/hass/LightBrightnessCard.module.css",
+      "id": "e5eb774bb4384082",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.82)"
+    },
+    {
+      "file": "src/components/hass/LightBrightnessCard.module.css",
+      "id": "9475858dc72f0013",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.92)"
+    },
+    {
+      "file": "src/components/hass/LightBrightnessCard.module.css",
+      "id": "09ed78a1505e82b6",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.96)"
+    },
+    {
+      "file": "src/components/hass/LightBrightnessCard.module.css",
+      "id": "de15b197354016cd",
+      "maxOccurrences": 4,
+      "rule": "raw-color-literal",
+      "subject": "transparent"
+    },
+    {
+      "file": "src/components/hass/LightBrightnessCard.module.css",
+      "id": "2732d27474b421ad",
+      "maxOccurrences": 2,
+      "rule": "raw-color-literal",
+      "subject": "white"
+    },
+    {
+      "file": "src/components/hass/LightMoreInfoSheet.module.css",
+      "id": "9fc44844b14f8331",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "#ffffff"
+    },
+    {
+      "file": "src/components/hass/LightMoreInfoSheet.module.css",
+      "id": "a19c0bb9fee5537a",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgb(0 0 255)"
+    },
+    {
+      "file": "src/components/hass/LightMoreInfoSheet.module.css",
+      "id": "81d2ae9f4fa14a68",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgb(0 255 0)"
+    },
+    {
+      "file": "src/components/hass/LightMoreInfoSheet.module.css",
+      "id": "8aee31ac2f2d4e81",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgb(0 255 255)"
+    },
+    {
+      "file": "src/components/hass/LightMoreInfoSheet.module.css",
+      "id": "2f29da411bfba497",
+      "maxOccurrences": 2,
+      "rule": "raw-color-literal",
+      "subject": "rgb(255 0 0)"
+    },
+    {
+      "file": "src/components/hass/LightMoreInfoSheet.module.css",
+      "id": "165c71ab3373f63c",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgb(255 0 255)"
+    },
+    {
+      "file": "src/components/hass/LightMoreInfoSheet.module.css",
+      "id": "df96f586805f6c5c",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgb(255 255 0)"
+    },
+    {
+      "file": "src/components/hass/LightMoreInfoSheet.module.css",
+      "id": "daaf9f4fd7aaa8b6",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgb(255 255 255 / 0%)"
+    },
+    {
+      "file": "src/components/hass/LightMoreInfoSheet.module.css",
+      "id": "08c6b24c22dc2da6",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgb(255 255 255)"
+    },
+    {
+      "file": "src/components/hass/LightMoreInfoSheet.module.css",
+      "id": "a5342f5f6028ee66",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(0, 0, 0, 0.001)"
+    },
+    {
+      "file": "src/components/hass/LightMoreInfoSheet.module.css",
+      "id": "c20e1f0659d563d4",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(0, 0, 0, 0.08)"
+    },
+    {
+      "file": "src/components/hass/LightMoreInfoSheet.module.css",
+      "id": "27cccd4d541b8f05",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(0, 0, 0, 0.15)"
+    },
+    {
+      "file": "src/components/hass/LightMoreInfoSheet.module.css",
+      "id": "6ec2dece075cd77a",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(0, 0, 0, 0.28)"
+    },
+    {
+      "file": "src/components/hass/LightMoreInfoSheet.module.css",
+      "id": "df70524b76f46c4a",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(0, 0, 0, 0.3)"
+    },
+    {
+      "file": "src/components/hass/LightMoreInfoSheet.module.css",
+      "id": "1ef7e9f9c4f4bbaf",
+      "maxOccurrences": 2,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.1)"
+    },
+    {
+      "file": "src/components/hass/LightMoreInfoSheet.module.css",
+      "id": "97def4185b40fd4f",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.12)"
+    },
+    {
+      "file": "src/components/hass/LightMoreInfoSheet.module.css",
+      "id": "2fb5a264e51d2aea",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.22)"
+    },
+    {
+      "file": "src/components/hass/LightMoreInfoSheet.module.css",
+      "id": "f576366922fc67d7",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.32)"
+    },
+    {
+      "file": "src/components/hass/LightMoreInfoSheet.module.css",
+      "id": "e01cad997043c84a",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.74)"
+    },
+    {
+      "file": "src/components/hass/LightMoreInfoSheet.module.css",
+      "id": "bf897228ec1a4b06",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "transparent"
+    },
+    {
+      "file": "src/components/hass/LightMoreInfoSheet.module.css",
+      "id": "4076e74aacfe2a2e",
+      "maxOccurrences": 3,
+      "rule": "raw-color-literal",
+      "subject": "white"
+    },
+    {
+      "file": "src/components/hass/MediaRemoteModalContent.module.css",
+      "id": "da589009c8b3193e",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "#111"
+    },
+    {
+      "file": "src/components/hass/MediaRemoteModalContent.module.css",
+      "id": "f1c53f662541808c",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "#fff"
+    },
+    {
+      "file": "src/components/hass/MediaRemoteModalContent.module.css",
+      "id": "cc193c2e2313c919",
+      "maxOccurrences": 4,
+      "rule": "raw-color-literal",
+      "subject": "rgb(244, 139, 220)"
+    },
+    {
+      "file": "src/components/hass/MediaRemoteModalContent.module.css",
+      "id": "6e0aa597c9d9d443",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(0, 0, 0, 0.14)"
+    },
+    {
+      "file": "src/components/hass/MediaRemoteModalContent.module.css",
+      "id": "3c890822f627ee5d",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(0, 0, 0, 0.18)"
+    },
+    {
+      "file": "src/components/hass/MediaRemoteModalContent.module.css",
+      "id": "29046091ddd563b1",
+      "maxOccurrences": 2,
+      "rule": "raw-color-literal",
+      "subject": "rgba(0, 0, 0, 0.28)"
+    },
+    {
+      "file": "src/components/hass/MediaRemoteModalContent.module.css",
+      "id": "1e92ae889f014e14",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(0, 0, 0, 0.34)"
+    },
+    {
+      "file": "src/components/hass/MediaRemoteModalContent.module.css",
+      "id": "a3714670a61869bf",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(20, 20, 20, 0.72)"
+    },
+    {
+      "file": "src/components/hass/MediaRemoteModalContent.module.css",
+      "id": "00989136ad03d4bd",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(20, 22, 24, 0.66)"
+    },
+    {
+      "file": "src/components/hass/MediaRemoteModalContent.module.css",
+      "id": "590fd5e9d8c4cd2c",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.1)"
+    },
+    {
+      "file": "src/components/hass/MediaRemoteModalContent.module.css",
+      "id": "b9d95afeea626fa6",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.11)"
+    },
+    {
+      "file": "src/components/hass/MediaRemoteModalContent.module.css",
+      "id": "6d7d9eb2ed09c9b8",
+      "maxOccurrences": 8,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.12)"
+    },
+    {
+      "file": "src/components/hass/MediaRemoteModalContent.module.css",
+      "id": "4730e6f1d41b72ea",
+      "maxOccurrences": 2,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.13)"
+    },
+    {
+      "file": "src/components/hass/MediaRemoteModalContent.module.css",
+      "id": "1849b7f6da4ff324",
+      "maxOccurrences": 2,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.14)"
+    },
+    {
+      "file": "src/components/hass/MediaRemoteModalContent.module.css",
+      "id": "0df2fd9864f52c37",
+      "maxOccurrences": 3,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.16)"
+    },
+    {
+      "file": "src/components/hass/MediaRemoteModalContent.module.css",
+      "id": "57b2904e7c18e123",
+      "maxOccurrences": 2,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.56)"
+    },
+    {
+      "file": "src/components/hass/MediaRemoteModalContent.module.css",
+      "id": "02b115c078d885e5",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.62)"
+    },
+    {
+      "file": "src/components/hass/MediaRemoteModalContent.module.css",
+      "id": "1412a2607bec2638",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.68)"
+    },
+    {
+      "file": "src/components/hass/MediaRemoteModalContent.module.css",
+      "id": "82ddb4a981f66ab2",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.82)"
+    },
+    {
+      "file": "src/components/hass/MediaRemoteModalContent.module.css",
+      "id": "04f0ab83b61d7ff5",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.88)"
+    },
+    {
+      "file": "src/components/hass/MediaRemoteModalContent.module.css",
+      "id": "de83eb2ad2909760",
+      "maxOccurrences": 2,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.9)"
+    },
+    {
+      "file": "src/components/hass/MediaRemoteModalContent.module.css",
+      "id": "ff50665872338163",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.92)"
+    },
+    {
+      "file": "src/components/hass/MediaRemoteModalContent.module.css",
+      "id": "43a1145e9a752f7b",
+      "maxOccurrences": 2,
+      "rule": "raw-color-literal",
+      "subject": "transparent"
+    },
+    {
+      "file": "src/components/hass/MediaRemoteModalContent.module.css",
+      "id": "4c9e9ce213462869",
+      "maxOccurrences": 8,
+      "rule": "raw-color-literal",
+      "subject": "white"
+    },
+    {
+      "file": "src/components/hass/recipes/RecipeDetailModal.module.css",
+      "id": "0497eecf82876d49",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(147, 226, 168, 0.94)"
+    },
+    {
+      "file": "src/components/hass/recipes/RecipeDetailModal.module.css",
+      "id": "cc6368eb5bda4131",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(155, 110, 64, 0.76)"
+    },
+    {
+      "file": "src/components/hass/recipes/RecipeDetailModal.module.css",
+      "id": "2f12651526600d58",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(202, 216, 231, 0.62)"
+    },
+    {
+      "file": "src/components/hass/recipes/RecipeDetailModal.module.css",
+      "id": "fdfaa30ccd10e3b6",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 166, 166, 0.96)"
+    },
+    {
+      "file": "src/components/hass/recipes/RecipeDetailModal.module.css",
+      "id": "ee8d828a139adeb8",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.055)"
+    },
+    {
+      "file": "src/components/hass/recipes/RecipeDetailModal.module.css",
+      "id": "8ca95fb29b354248",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.06)"
+    },
+    {
+      "file": "src/components/hass/recipes/RecipeDetailModal.module.css",
+      "id": "5b2a55015f688f2c",
+      "maxOccurrences": 3,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.08)"
+    },
+    {
+      "file": "src/components/hass/recipes/RecipeDetailModal.module.css",
+      "id": "db0c699c3afc3996",
+      "maxOccurrences": 2,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.1)"
+    },
+    {
+      "file": "src/components/hass/recipes/RecipeDetailModal.module.css",
+      "id": "700559f7dcb41a29",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.12)"
+    },
+    {
+      "file": "src/components/hass/recipes/RecipeDetailModal.module.css",
+      "id": "42149301dac1a932",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.15)"
+    },
+    {
+      "file": "src/components/hass/recipes/RecipeDetailModal.module.css",
+      "id": "e3360fb76808a548",
+      "maxOccurrences": 3,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.18)"
+    },
+    {
+      "file": "src/components/hass/recipes/RecipeDetailModal.module.css",
+      "id": "1c78d0b305e22ca3",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.55)"
+    },
+    {
+      "file": "src/components/hass/recipes/RecipeDetailModal.module.css",
+      "id": "a046cfdc66cf2fab",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.56)"
+    },
+    {
+      "file": "src/components/hass/recipes/RecipeDetailModal.module.css",
+      "id": "eb4d9fd1d676e935",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.57)"
+    },
+    {
+      "file": "src/components/hass/recipes/RecipeDetailModal.module.css",
+      "id": "c6af89d873577c19",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.58)"
+    },
+    {
+      "file": "src/components/hass/recipes/RecipeDetailModal.module.css",
+      "id": "bb0ad48e64ecda97",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.62)"
+    },
+    {
+      "file": "src/components/hass/recipes/RecipeDetailModal.module.css",
+      "id": "4e274e44ab6b99f8",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.66)"
+    },
+    {
+      "file": "src/components/hass/recipes/RecipeDetailModal.module.css",
+      "id": "b3c58e6237273581",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.68)"
+    },
+    {
+      "file": "src/components/hass/recipes/RecipeDetailModal.module.css",
+      "id": "f6847d398001f142",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.72)"
+    },
+    {
+      "file": "src/components/hass/recipes/RecipeDetailModal.module.css",
+      "id": "9c89c2b95a25f6d3",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.74)"
+    },
+    {
+      "file": "src/components/hass/recipes/RecipeDetailModal.module.css",
+      "id": "b54c02fc7bc197eb",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.76)"
+    },
+    {
+      "file": "src/components/hass/recipes/RecipeDetailModal.module.css",
+      "id": "ad929614c5962358",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.82)"
+    },
+    {
+      "file": "src/components/hass/recipes/RecipeDetailModal.module.css",
+      "id": "ad10d22f1aae3df6",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.86)"
+    },
+    {
+      "file": "src/components/hass/recipes/RecipeDetailModal.module.css",
+      "id": "ff4d9bbc24b52923",
+      "maxOccurrences": 2,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.88)"
+    },
+    {
+      "file": "src/components/hass/recipes/RecipeDetailModal.module.css",
+      "id": "c92cd1b7f1c02eb9",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.9)"
+    },
+    {
+      "file": "src/components/hass/recipes/RecipeDetailModal.module.css",
+      "id": "ffaa1227052633fa",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(42, 126, 180, 0.9)"
+    },
+    {
+      "file": "src/components/hass/recipes/RecipeDetailModal.module.css",
+      "id": "3349c6a01670a3fa",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(42, 74, 92, 0.82)"
+    },
+    {
+      "file": "src/components/hass/recipes/RecipeDetailModal.module.css",
+      "id": "28968ea7dc7cad96",
+      "maxOccurrences": 2,
+      "rule": "raw-color-literal",
+      "subject": "transparent"
+    },
+    {
+      "file": "src/components/hass/recipes/RecipeDetailModal.module.css",
+      "id": "998bc2f09752b13c",
+      "maxOccurrences": 3,
+      "rule": "raw-color-literal",
+      "subject": "white"
+    },
+    {
+      "file": "src/components/hass/recipes/RecipeFloatingActions.module.css",
+      "id": "4e5a90f2ab30365e",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "#ffd965"
+    },
+    {
+      "file": "src/components/hass/recipes/RecipeFloatingActions.module.css",
+      "id": "f77a1ba896c39694",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "white"
+    },
+    {
+      "file": "src/components/hass/recipes/RecipeGrid.module.css",
+      "id": "5f8c33ebe689a606",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "#ffb4b4"
+    },
+    {
+      "file": "src/components/hass/recipes/RecipeGrid.module.css",
+      "id": "3dec6058e4160bf2",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.26)"
+    },
+    {
+      "file": "src/components/hass/recipes/RecipeGrid.module.css",
+      "id": "c63f7236e5f183b7",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.62)"
+    },
+    {
+      "file": "src/components/hass/recipes/RecipeGrid.module.css",
+      "id": "dcdcc57d702d83e1",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(42, 126, 180, 0.82)"
+    },
+    {
+      "file": "src/components/hass/recipes/RecipeGrid.module.css",
+      "id": "e04d512329addab1",
+      "maxOccurrences": 2,
+      "rule": "raw-color-literal",
+      "subject": "white"
+    },
+    {
+      "file": "src/components/hass/recipes/SuggestedRecipeCarousel.module.css",
+      "id": "56747aaaebc3e998",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.08)"
+    },
+    {
+      "file": "src/components/hass/recipes/SuggestedRecipeCarousel.module.css",
+      "id": "cd2f2a8cea08e327",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.09)"
+    },
+    {
+      "file": "src/components/hass/recipes/SuggestedRecipeCarousel.module.css",
+      "id": "a8b9855f5366067c",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.12)"
+    },
+    {
+      "file": "src/components/hass/recipes/SuggestedRecipeCarousel.module.css",
+      "id": "52cc793c5738df70",
+      "maxOccurrences": 2,
+      "rule": "raw-color-literal",
+      "subject": "transparent"
+    },
+    {
+      "file": "src/components/hass/ScanItemCameraSheet.module.css",
+      "id": "9fa8cf31d5f99cd3",
+      "maxOccurrences": 2,
+      "rule": "raw-color-literal",
+      "subject": "#040608"
+    },
+    {
+      "file": "src/components/hass/ScanItemCameraSheet.module.css",
+      "id": "6cc604d455ed13e1",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(0, 0, 0, 0.12)"
+    },
+    {
+      "file": "src/components/hass/ScanItemCameraSheet.module.css",
+      "id": "b38aff690b69175d",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(0, 0, 0, 0.6)"
+    },
+    {
+      "file": "src/components/hass/ScanItemCameraSheet.module.css",
+      "id": "f8b69eb821b2707a",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(0, 154, 199, 0.78)"
+    },
+    {
+      "file": "src/components/hass/ScanItemCameraSheet.module.css",
+      "id": "16466eef749e70ce",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(172, 115, 18, 0.24)"
+    },
+    {
+      "file": "src/components/hass/ScanItemCameraSheet.module.css",
+      "id": "9e2231953f8b35e5",
+      "maxOccurrences": 2,
+      "rule": "raw-color-literal",
+      "subject": "rgba(180, 35, 35, 0.34)"
+    },
+    {
+      "file": "src/components/hass/ScanItemCameraSheet.module.css",
+      "id": "130e39aed3ad92e2",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(21, 154, 73, 0.34)"
+    },
+    {
+      "file": "src/components/hass/ScanItemCameraSheet.module.css",
+      "id": "c7a37bdd924ab4c0",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(23, 154, 72, 0.98)"
+    },
+    {
+      "file": "src/components/hass/ScanItemCameraSheet.module.css",
+      "id": "b7570667e29f8222",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(236, 255, 240, 0.94)"
+    },
+    {
+      "file": "src/components/hass/ScanItemCameraSheet.module.css",
+      "id": "7fa837153e37904a",
+      "maxOccurrences": 4,
+      "rule": "raw-color-literal",
+      "subject": "rgba(247, 251, 255, 0.9)"
+    },
+    {
+      "file": "src/components/hass/ScanItemCameraSheet.module.css",
+      "id": "57c7290f046fe741",
+      "maxOccurrences": 2,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 120, 120, 0.28)"
+    },
+    {
+      "file": "src/components/hass/ScanItemCameraSheet.module.css",
+      "id": "331c5b93bd849c9c",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 207, 105, 0.26)"
+    },
+    {
+      "file": "src/components/hass/ScanItemCameraSheet.module.css",
+      "id": "0421ae4e6fd603f5",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 246, 224, 0.94)"
+    },
+    {
+      "file": "src/components/hass/ScanItemCameraSheet.module.css",
+      "id": "58685ec1bc50a985",
+      "maxOccurrences": 4,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.08)"
+    },
+    {
+      "file": "src/components/hass/ScanItemCameraSheet.module.css",
+      "id": "7799892453e9ead4",
+      "maxOccurrences": 6,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.1)"
+    },
+    {
+      "file": "src/components/hass/ScanItemCameraSheet.module.css",
+      "id": "3e67addf9ed15a43",
+      "maxOccurrences": 5,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.12)"
+    },
+    {
+      "file": "src/components/hass/ScanItemCameraSheet.module.css",
+      "id": "828b7dd7e5924aab",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.16)"
+    },
+    {
+      "file": "src/components/hass/ScanItemCameraSheet.module.css",
+      "id": "36538f73a70a8574",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.18)"
+    },
+    {
+      "file": "src/components/hass/ScanItemCameraSheet.module.css",
+      "id": "37e222ca019a5cfc",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.22)"
+    },
+    {
+      "file": "src/components/hass/ScanItemCameraSheet.module.css",
+      "id": "f0923c09eacc2561",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.32)"
+    },
+    {
+      "file": "src/components/hass/ScanItemCameraSheet.module.css",
+      "id": "1d19b9b72622867d",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.42)"
+    },
+    {
+      "file": "src/components/hass/ScanItemCameraSheet.module.css",
+      "id": "b26c9bf96a06ab49",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.56)"
+    },
+    {
+      "file": "src/components/hass/ScanItemCameraSheet.module.css",
+      "id": "b8148f53eb3df05a",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.58)"
+    },
+    {
+      "file": "src/components/hass/ScanItemCameraSheet.module.css",
+      "id": "d9600b61a5c43ed3",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.62)"
+    },
+    {
+      "file": "src/components/hass/ScanItemCameraSheet.module.css",
+      "id": "9a649312a737df71",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.68)"
+    },
+    {
+      "file": "src/components/hass/ScanItemCameraSheet.module.css",
+      "id": "2c0fdbc3c14586b8",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.74)"
+    },
+    {
+      "file": "src/components/hass/ScanItemCameraSheet.module.css",
+      "id": "da0dc03052066b0d",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.82)"
+    },
+    {
+      "file": "src/components/hass/ScanItemCameraSheet.module.css",
+      "id": "8cfcc0b126ad0dcd",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.88)"
+    },
+    {
+      "file": "src/components/hass/ScanItemCameraSheet.module.css",
+      "id": "0b101fbeb831a330",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(37, 128, 68, 0.26)"
+    },
+    {
+      "file": "src/components/hass/ScanItemCameraSheet.module.css",
+      "id": "90430d0985555f61",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(80, 220, 120, 0.98)"
+    },
+    {
+      "file": "src/components/hass/ScanItemCameraSheet.module.css",
+      "id": "9c4824005debe457",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(86, 214, 122, 0.28)"
+    },
+    {
+      "file": "src/components/hass/ScanItemCameraSheet.module.css",
+      "id": "796625f325dcaa54",
+      "maxOccurrences": 11,
+      "rule": "raw-color-literal",
+      "subject": "white"
+    },
+    {
+      "file": "src/components/hass/TodoListPanel.module.css",
+      "id": "7adbfada7467ca6e",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "#ff6b6b"
+    },
+    {
+      "file": "src/components/hass/TodoListPanel.module.css",
+      "id": "68383bcfa2abff50",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "#ffb4b4"
+    },
+    {
+      "file": "src/components/hass/TodoListPanel.module.css",
+      "id": "0d30507fedaf9858",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "#ffd965"
+    },
+    {
+      "file": "src/components/hass/TodoListPanel.module.css",
+      "id": "d131b0dfef22cd53",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.58)"
+    },
+    {
+      "file": "src/components/hass/TodoListPanel.module.css",
+      "id": "845e987bbc6fb5da",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.72)"
+    },
+    {
+      "file": "src/components/hass/TodoListPanel.module.css",
+      "id": "f404cde39e6519f6",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.86)"
+    },
+    {
+      "file": "src/components/hass/TodoListPanel.module.css",
+      "id": "0531dd60291217c9",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(75, 126, 210, 0.36)"
+    },
+    {
+      "file": "src/components/hass/TodoListPanel.module.css",
+      "id": "a09d3a3e6c5f8828",
+      "maxOccurrences": 2,
+      "rule": "raw-color-literal",
+      "subject": "transparent"
+    },
+    {
+      "file": "src/components/hass/TodoListPanel.module.css",
+      "id": "e609cc0008fc498c",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "white"
+    },
+    {
+      "file": "src/components/hass/VacuumCard.module.css",
+      "id": "67682942bb4484ed",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "#111"
+    },
+    {
+      "file": "src/components/hass/VacuumCard.module.css",
+      "id": "216bbea5d4683db2",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "#15331d"
+    },
+    {
+      "file": "src/components/hass/VacuumCard.module.css",
+      "id": "412565548d54daa4",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "#e6f7ff"
+    },
+    {
+      "file": "src/components/hass/VacuumCard.module.css",
+      "id": "63bc2ccae29316f5",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "#f5fbff"
+    },
+    {
+      "file": "src/components/hass/VacuumCard.module.css",
+      "id": "8e46caa6e6fe4942",
+      "maxOccurrences": 3,
+      "rule": "raw-color-literal",
+      "subject": "rgba(0, 0, 0, 0.12)"
+    },
+    {
+      "file": "src/components/hass/VacuumCard.module.css",
+      "id": "1d049a8adb2bba52",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(0, 0, 0, 0.24)"
+    },
+    {
+      "file": "src/components/hass/VacuumCard.module.css",
+      "id": "7df1f796346cd4b2",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(0, 0, 0, 0.34)"
+    },
+    {
+      "file": "src/components/hass/VacuumCard.module.css",
+      "id": "ec15ece38413a862",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(0, 150, 136, 0.09)"
+    },
+    {
+      "file": "src/components/hass/VacuumCard.module.css",
+      "id": "75289226f13b579d",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(0, 150, 136, 0.24)"
+    },
+    {
+      "file": "src/components/hass/VacuumCard.module.css",
+      "id": "f5413d18c512228f",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(100, 181, 246, 0.38)"
+    },
+    {
+      "file": "src/components/hass/VacuumCard.module.css",
+      "id": "f22b1820c4168e27",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(129, 199, 132, 0.2)"
+    },
+    {
+      "file": "src/components/hass/VacuumCard.module.css",
+      "id": "26bd8a0fc27306db",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(129, 199, 132, 0.34)"
+    },
+    {
+      "file": "src/components/hass/VacuumCard.module.css",
+      "id": "c2e378b88f56587b",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(129, 199, 132, 0.48)"
+    },
+    {
+      "file": "src/components/hass/VacuumCard.module.css",
+      "id": "6f2cc5729030a337",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(13, 20, 28, 0.78)"
+    },
+    {
+      "file": "src/components/hass/VacuumCard.module.css",
+      "id": "0554873af176cff5",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(143, 214, 255, 0.38)"
+    },
+    {
+      "file": "src/components/hass/VacuumCard.module.css",
+      "id": "4c83d7444e7f1998",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(143, 214, 255, 0.42)"
+    },
+    {
+      "file": "src/components/hass/VacuumCard.module.css",
+      "id": "6184d8ddf34023a8",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(143, 214, 255, 0.5)"
+    },
+    {
+      "file": "src/components/hass/VacuumCard.module.css",
+      "id": "39511955f518bfb7",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(20, 20, 20, 0.72)"
+    },
+    {
+      "file": "src/components/hass/VacuumCard.module.css",
+      "id": "aff75bf9ec75dab3",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(229, 57, 53, 0.1)"
+    },
+    {
+      "file": "src/components/hass/VacuumCard.module.css",
+      "id": "b026a39d885a2b65",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(229, 57, 53, 0.25)"
+    },
+    {
+      "file": "src/components/hass/VacuumCard.module.css",
+      "id": "a7a5d774ac0761d7",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(232, 240, 255, 0.5)"
+    },
+    {
+      "file": "src/components/hass/VacuumCard.module.css",
+      "id": "23ab5003ca0fdf6d",
+      "maxOccurrences": 2,
+      "rule": "raw-color-literal",
+      "subject": "rgba(232, 240, 255, 0.62)"
+    },
+    {
+      "file": "src/components/hass/VacuumCard.module.css",
+      "id": "a7257d7565748d06",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(232, 240, 255, 0.68)"
+    },
+    {
+      "file": "src/components/hass/VacuumCard.module.css",
+      "id": "d19df571d69edc80",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(235, 255, 238, 0.92)"
+    },
+    {
+      "file": "src/components/hass/VacuumCard.module.css",
+      "id": "7a86e4bf33c153ec",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(25, 36, 54, 0.76)"
+    },
+    {
+      "file": "src/components/hass/VacuumCard.module.css",
+      "id": "4f6c06a0b6cc8a1a",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(251, 140, 0, 0.09)"
+    },
+    {
+      "file": "src/components/hass/VacuumCard.module.css",
+      "id": "4fc299d432795f2c",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(251, 140, 0, 0.15)"
+    },
+    {
+      "file": "src/components/hass/VacuumCard.module.css",
+      "id": "d2c9e71f97d07742",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(251, 140, 0, 0.22)"
+    },
+    {
+      "file": "src/components/hass/VacuumCard.module.css",
+      "id": "41f3b7307269f3e9",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 183, 77, 0.22)"
+    },
+    {
+      "file": "src/components/hass/VacuumCard.module.css",
+      "id": "2e00ab175377d465",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 183, 77, 0.38)"
+    },
+    {
+      "file": "src/components/hass/VacuumCard.module.css",
+      "id": "c2758f8ec038ee90",
+      "maxOccurrences": 3,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.06)"
+    },
+    {
+      "file": "src/components/hass/VacuumCard.module.css",
+      "id": "f1b19b87b2fe1fb0",
+      "maxOccurrences": 2,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.07)"
+    },
+    {
+      "file": "src/components/hass/VacuumCard.module.css",
+      "id": "92058d058eec38dd",
+      "maxOccurrences": 3,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.1)"
+    },
+    {
+      "file": "src/components/hass/VacuumCard.module.css",
+      "id": "8740f85074574788",
+      "maxOccurrences": 3,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.12)"
+    },
+    {
+      "file": "src/components/hass/VacuumCard.module.css",
+      "id": "08e3b14c682ef5a3",
+      "maxOccurrences": 2,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.13)"
+    },
+    {
+      "file": "src/components/hass/VacuumCard.module.css",
+      "id": "e07cc3908fa17193",
+      "maxOccurrences": 4,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.14)"
+    },
+    {
+      "file": "src/components/hass/VacuumCard.module.css",
+      "id": "62ea03bb887b4669",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.16)"
+    },
+    {
+      "file": "src/components/hass/VacuumCard.module.css",
+      "id": "9470eca4ad361233",
+      "maxOccurrences": 2,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.18)"
+    },
+    {
+      "file": "src/components/hass/VacuumCard.module.css",
+      "id": "5137129d2090e96a",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.28)"
+    },
+    {
+      "file": "src/components/hass/VacuumCard.module.css",
+      "id": "4db1a8f9789868ce",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.42)"
+    },
+    {
+      "file": "src/components/hass/VacuumCard.module.css",
+      "id": "b5ecd14d9113e0eb",
+      "maxOccurrences": 3,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.58)"
+    },
+    {
+      "file": "src/components/hass/VacuumCard.module.css",
+      "id": "7246ca481cf8a576",
+      "maxOccurrences": 2,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.68)"
+    },
+    {
+      "file": "src/components/hass/VacuumCard.module.css",
+      "id": "90b8e7c6ccfa5de0",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.72)"
+    },
+    {
+      "file": "src/components/hass/VacuumCard.module.css",
+      "id": "bf59b16fe4b7eeb3",
+      "maxOccurrences": 2,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.82)"
+    },
+    {
+      "file": "src/components/hass/VacuumCard.module.css",
+      "id": "7c49c38fff031203",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.84)"
+    },
+    {
+      "file": "src/components/hass/VacuumCard.module.css",
+      "id": "f13a99af797193ff",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.88)"
+    },
+    {
+      "file": "src/components/hass/VacuumCard.module.css",
+      "id": "c7f3de275199a0a1",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.9)"
+    },
+    {
+      "file": "src/components/hass/VacuumCard.module.css",
+      "id": "20090e4e6ab5a6ab",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.92)"
+    },
+    {
+      "file": "src/components/hass/VacuumCard.module.css",
+      "id": "612e4f2e378f4e2d",
+      "maxOccurrences": 2,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.95)"
+    },
+    {
+      "file": "src/components/hass/VacuumCard.module.css",
+      "id": "d8c2b7f2dc55791a",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 95, 87, 0.42)"
+    },
+    {
+      "file": "src/components/hass/VacuumCard.module.css",
+      "id": "3e0d72fb30effda5",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(30, 136, 229, 0.09)"
+    },
+    {
+      "file": "src/components/hass/VacuumCard.module.css",
+      "id": "63e65345954b95f1",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(30, 136, 229, 0.24)"
+    },
+    {
+      "file": "src/components/hass/VacuumCard.module.css",
+      "id": "a4dba2e76083ea60",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(48, 137, 194, 0.3)"
+    },
+    {
+      "file": "src/components/hass/VacuumCard.module.css",
+      "id": "8ef3dad2bf7406e6",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(48, 137, 194, 0.34)"
+    },
+    {
+      "file": "src/components/hass/VacuumCard.module.css",
+      "id": "76adf3ed4a87a202",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(67, 160, 71, 0.08)"
+    },
+    {
+      "file": "src/components/hass/VacuumCard.module.css",
+      "id": "6892ae85d73e8318",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(67, 160, 71, 0.16)"
+    },
+    {
+      "file": "src/components/hass/VacuumCard.module.css",
+      "id": "87b2db853eaabfae",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(67, 160, 71, 0.2)"
+    },
+    {
+      "file": "src/components/hass/VacuumCard.module.css",
+      "id": "77884e535d29c09f",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(67, 160, 71, 0.34)"
+    },
+    {
+      "file": "src/components/hass/VacuumCard.module.css",
+      "id": "82f867e498f4b709",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(67, 160, 71, 0.62)"
+    },
+    {
+      "file": "src/components/hass/VacuumCard.module.css",
+      "id": "8cec2975966a239e",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(77, 208, 225, 0.36)"
+    },
+    {
+      "file": "src/components/hass/VacuumCard.module.css",
+      "id": "5d50549ddf779299",
+      "maxOccurrences": 9,
+      "rule": "raw-color-literal",
+      "subject": "transparent"
+    },
+    {
+      "file": "src/components/hass/VacuumCard.module.css",
+      "id": "4e9db13c0e0824fb",
+      "maxOccurrences": 7,
+      "rule": "raw-color-literal",
+      "subject": "white"
+    },
+    {
+      "file": "src/components/hass/ValetudoMapCard.module.css",
+      "id": "f00e9d3b89b8ed86",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "#e9f7ff"
+    },
+    {
+      "file": "src/components/hass/ValetudoMapCard.module.css",
+      "id": "9407eac477373dbd",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "#ffdad6"
+    },
+    {
+      "file": "src/components/hass/ValetudoMapCard.module.css",
+      "id": "19045920c09d337e",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(13, 20, 28, 0.72)"
+    },
+    {
+      "file": "src/components/hass/ValetudoMapCard.module.css",
+      "id": "a73972f496a861e7",
+      "maxOccurrences": 2,
+      "rule": "raw-color-literal",
+      "subject": "rgba(143, 214, 255, 0.98)"
+    },
+    {
+      "file": "src/components/hass/ValetudoMapCard.module.css",
+      "id": "4cc57b46d626673c",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(17, 72, 107, 0.96)"
+    },
+    {
+      "file": "src/components/hass/ValetudoMapCard.module.css",
+      "id": "b89d28066e2b83ee",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(238, 245, 255, 0.58)"
+    },
+    {
+      "file": "src/components/hass/ValetudoMapCard.module.css",
+      "id": "6c4d0208239b04a4",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(238, 245, 255, 0.88)"
+    },
+    {
+      "file": "src/components/hass/ValetudoMapCard.module.css",
+      "id": "052fd8fced45f05e",
+      "maxOccurrences": 2,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.05)"
+    },
+    {
+      "file": "src/components/hass/ValetudoMapCard.module.css",
+      "id": "20a389b9e3fe2c9d",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.1)"
+    },
+    {
+      "file": "src/components/hass/ValetudoMapCard.module.css",
+      "id": "7b929d0b437f33c3",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.8)"
+    },
+    {
+      "file": "src/components/hass/ValetudoMapCard.module.css",
+      "id": "a72f85fe86eb2710",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(6, 12, 18, 0.42)"
+    },
+    {
+      "file": "src/components/hass/ValetudoMapCard.module.css",
+      "id": "946228dcc474a494",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(67, 160, 71, 0.18)"
+    },
+    {
+      "file": "src/components/hass/ValetudoMapCard.module.css",
+      "id": "d5cb4144f28cb0ff",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(80, 180, 255, 0.2)"
+    },
+    {
+      "file": "src/components/hass/ValetudoMapCard.module.css",
+      "id": "d038d40de222f009",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(80, 180, 255, 0.24)"
+    },
+    {
+      "file": "src/components/hass/ValetudoMapCard.module.css",
+      "id": "7f84a99d9225e74b",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(93, 32, 26, 0.82)"
+    },
+    {
+      "file": "src/components/hass/ValetudoMapCard.module.css",
+      "id": "a5e79d497f20de2d",
+      "maxOccurrences": 6,
+      "rule": "raw-color-literal",
+      "subject": "transparent"
+    },
+    {
+      "file": "src/components/hass/ValetudoMapCard.module.css",
+      "id": "7b9681daa9e7bf72",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "white"
+    },
+    {
+      "file": "src/components/hass/WeatherSummary.module.css",
+      "id": "8d421c86d4711672",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "#56d7ff"
+    },
+    {
+      "file": "src/components/hass/WeatherSummary.module.css",
+      "id": "827b2aff265c6be5",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "#5fca7a"
+    },
+    {
+      "file": "src/components/hass/WeatherSummary.module.css",
+      "id": "badcbb99287d9513",
+      "maxOccurrences": 3,
+      "rule": "raw-color-literal",
+      "subject": "#64d8ff"
+    },
+    {
+      "file": "src/components/hass/WeatherSummary.module.css",
+      "id": "9a8d967299d52bad",
+      "maxOccurrences": 3,
+      "rule": "raw-color-literal",
+      "subject": "#a8df85"
+    },
+    {
+      "file": "src/components/hass/WeatherSummary.module.css",
+      "id": "1f42a58b2eea200d",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "#d9568b"
+    },
+    {
+      "file": "src/components/hass/WeatherSummary.module.css",
+      "id": "666a052843261a0b",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "#f28b30"
+    },
+    {
+      "file": "src/components/hass/WeatherSummary.module.css",
+      "id": "61a6a84c7e7771bf",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "#f5d94a"
+    },
+    {
+      "file": "src/components/hass/WeatherSummary.module.css",
+      "id": "7175fb3d637b8adc",
+      "maxOccurrences": 3,
+      "rule": "raw-color-literal",
+      "subject": "#ff8a1f"
+    },
+    {
+      "file": "src/components/hass/WeatherSummary.module.css",
+      "id": "5143dabed77cf549",
+      "maxOccurrences": 3,
+      "rule": "raw-color-literal",
+      "subject": "#ffd34d"
+    },
+    {
+      "file": "src/components/hass/WeatherSummary.module.css",
+      "id": "290da9e4ab743ed9",
+      "maxOccurrences": 2,
+      "rule": "raw-color-literal",
+      "subject": "#fff"
+    },
+    {
+      "file": "src/components/hass/WeatherSummary.module.css",
+      "id": "4d1298eb2a475974",
+      "maxOccurrences": 2,
+      "rule": "raw-color-literal",
+      "subject": "rgba(0, 0, 0, 0.14)"
+    },
+    {
+      "file": "src/components/hass/WeatherSummary.module.css",
+      "id": "2ac12b0acaa44014",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(0, 0, 0, 0.18)"
+    },
+    {
+      "file": "src/components/hass/WeatherSummary.module.css",
+      "id": "064067bc6c002006",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(0, 0, 0, 0.22)"
+    },
+    {
+      "file": "src/components/hass/WeatherSummary.module.css",
+      "id": "6f9886c78ca70cb2",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(0, 0, 0, 0.24)"
+    },
+    {
+      "file": "src/components/hass/WeatherSummary.module.css",
+      "id": "f1df13d9b22513ef",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(0, 0, 0, 0.28)"
+    },
+    {
+      "file": "src/components/hass/WeatherSummary.module.css",
+      "id": "41030af8ed99eb5f",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(0, 0, 0, 0.34)"
+    },
+    {
+      "file": "src/components/hass/WeatherSummary.module.css",
+      "id": "7c38a5e078d73ebf",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(0, 0, 0, 0.35)"
+    },
+    {
+      "file": "src/components/hass/WeatherSummary.module.css",
+      "id": "b5507752d91fcccd",
+      "maxOccurrences": 2,
+      "rule": "raw-color-literal",
+      "subject": "rgba(112, 119, 128, 0.9)"
+    },
+    {
+      "file": "src/components/hass/WeatherSummary.module.css",
+      "id": "402898e365fb8063",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(17, 27, 42, 0.7)"
+    },
+    {
+      "file": "src/components/hass/WeatherSummary.module.css",
+      "id": "3fd6646381281eb1",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(180, 215, 245, 0.2)"
+    },
+    {
+      "file": "src/components/hass/WeatherSummary.module.css",
+      "id": "7c8ff64a2f43abcb",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(180, 215, 245, 0)"
+    },
+    {
+      "file": "src/components/hass/WeatherSummary.module.css",
+      "id": "d0abcf8dce430e24",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(196, 226, 255, 0.62)"
+    },
+    {
+      "file": "src/components/hass/WeatherSummary.module.css",
+      "id": "b4fc0a1ee2869714",
+      "maxOccurrences": 3,
+      "rule": "raw-color-literal",
+      "subject": "rgba(22, 36, 52, 0.42)"
+    },
+    {
+      "file": "src/components/hass/WeatherSummary.module.css",
+      "id": "33227dd4e4ecf1fd",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(24, 36, 52, 0.28)"
+    },
+    {
+      "file": "src/components/hass/WeatherSummary.module.css",
+      "id": "f8f41d6386712c07",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 235, 150, 0.96)"
+    },
+    {
+      "file": "src/components/hass/WeatherSummary.module.css",
+      "id": "d5cf72e1349e6ce7",
+      "maxOccurrences": 2,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.04)"
+    },
+    {
+      "file": "src/components/hass/WeatherSummary.module.css",
+      "id": "19d207140eaef012",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.05)"
+    },
+    {
+      "file": "src/components/hass/WeatherSummary.module.css",
+      "id": "aae3a52eb7d7616f",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.06)"
+    },
+    {
+      "file": "src/components/hass/WeatherSummary.module.css",
+      "id": "8030c8d1794c0a0a",
+      "maxOccurrences": 3,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.08)"
+    },
+    {
+      "file": "src/components/hass/WeatherSummary.module.css",
+      "id": "c8f0cf5976e09918",
+      "maxOccurrences": 3,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.1)"
+    },
+    {
+      "file": "src/components/hass/WeatherSummary.module.css",
+      "id": "2c52a41bf9e39422",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.11)"
+    },
+    {
+      "file": "src/components/hass/WeatherSummary.module.css",
+      "id": "c1f593a7a7b436cf",
+      "maxOccurrences": 2,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.12)"
+    },
+    {
+      "file": "src/components/hass/WeatherSummary.module.css",
+      "id": "6d0dc1756c3f22d3",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.13)"
+    },
+    {
+      "file": "src/components/hass/WeatherSummary.module.css",
+      "id": "320e636d677736c7",
+      "maxOccurrences": 3,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.14)"
+    },
+    {
+      "file": "src/components/hass/WeatherSummary.module.css",
+      "id": "6a23df7e7c4901a1",
+      "maxOccurrences": 2,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.16)"
+    },
+    {
+      "file": "src/components/hass/WeatherSummary.module.css",
+      "id": "66e84c32570e1081",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.2)"
+    },
+    {
+      "file": "src/components/hass/WeatherSummary.module.css",
+      "id": "f917e36c3bfaa8fc",
+      "maxOccurrences": 2,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.22)"
+    },
+    {
+      "file": "src/components/hass/WeatherSummary.module.css",
+      "id": "8bcada9d2362e9d4",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.24)"
+    },
+    {
+      "file": "src/components/hass/WeatherSummary.module.css",
+      "id": "935dc50ec2fd0581",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.42)"
+    },
+    {
+      "file": "src/components/hass/WeatherSummary.module.css",
+      "id": "33c54b5a4cf29be9",
+      "maxOccurrences": 2,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.48)"
+    },
+    {
+      "file": "src/components/hass/WeatherSummary.module.css",
+      "id": "2141927644ae67c1",
+      "maxOccurrences": 2,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.5)"
+    },
+    {
+      "file": "src/components/hass/WeatherSummary.module.css",
+      "id": "002f30a460d16493",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.52)"
+    },
+    {
+      "file": "src/components/hass/WeatherSummary.module.css",
+      "id": "e278f5b8c79e8b00",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.54)"
+    },
+    {
+      "file": "src/components/hass/WeatherSummary.module.css",
+      "id": "7262486adc7a3ccf",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.56)"
+    },
+    {
+      "file": "src/components/hass/WeatherSummary.module.css",
+      "id": "152885d749619274",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.62)"
+    },
+    {
+      "file": "src/components/hass/WeatherSummary.module.css",
+      "id": "27cf7ed0f6e035c0",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.68)"
+    },
+    {
+      "file": "src/components/hass/WeatherSummary.module.css",
+      "id": "8fee406de147e41b",
+      "maxOccurrences": 4,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.72)"
+    },
+    {
+      "file": "src/components/hass/WeatherSummary.module.css",
+      "id": "61b7dff58619c1fc",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.76)"
+    },
+    {
+      "file": "src/components/hass/WeatherSummary.module.css",
+      "id": "a078617dee0dfa55",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.78)"
+    },
+    {
+      "file": "src/components/hass/WeatherSummary.module.css",
+      "id": "7d7d3c36c93111b6",
+      "maxOccurrences": 2,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.82)"
+    },
+    {
+      "file": "src/components/hass/WeatherSummary.module.css",
+      "id": "0597ec52d10ed9bd",
+      "maxOccurrences": 2,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.84)"
+    },
+    {
+      "file": "src/components/hass/WeatherSummary.module.css",
+      "id": "a23ffb7c54fade8d",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.86)"
+    },
+    {
+      "file": "src/components/hass/WeatherSummary.module.css",
+      "id": "9926aa45ff2429b0",
+      "maxOccurrences": 2,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.88)"
+    },
+    {
+      "file": "src/components/hass/WeatherSummary.module.css",
+      "id": "89b5e6b5f06a7ccf",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.92)"
+    },
+    {
+      "file": "src/components/hass/WeatherSummary.module.css",
+      "id": "bbce46681040819a",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.94)"
+    },
+    {
+      "file": "src/components/hass/WeatherSummary.module.css",
+      "id": "52c59d9a69ea7415",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0)"
+    },
+    {
+      "file": "src/components/hass/WeatherSummary.module.css",
+      "id": "87825dad71ede41c",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(30, 55, 78, 0.4)"
+    },
+    {
+      "file": "src/components/hass/WeatherSummary.module.css",
+      "id": "0d4e963a1c24496f",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(32, 44, 62, 0.44)"
+    },
+    {
+      "file": "src/components/hass/WeatherSummary.module.css",
+      "id": "4a509f9b1e0bb581",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(32, 44, 62, 0.72)"
+    },
+    {
+      "file": "src/components/hass/WeatherSummary.module.css",
+      "id": "2f6430d51b6b2d7e",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(38, 64, 97, 0.48)"
+    },
+    {
+      "file": "src/components/hass/WeatherSummary.module.css",
+      "id": "e3036a31bcab5994",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(56, 211, 224, 0.22)"
+    },
+    {
+      "file": "src/components/hass/WeatherSummary.module.css",
+      "id": "7f3059a2e95cd4a6",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(56, 211, 224, 0.65)"
+    },
+    {
+      "file": "src/components/hass/WeatherSummary.module.css",
+      "id": "d4f4a07115452cd0",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(56, 211, 224, 0.96)"
+    },
+    {
+      "file": "src/components/hass/WeatherSummary.module.css",
+      "id": "00c9ae3155e5fbad",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(69, 137, 206, 0.4)"
+    },
+    {
+      "file": "src/components/hass/WeatherSummary.module.css",
+      "id": "b6cde53169c00edb",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(80, 208, 232, 0.32)"
+    },
+    {
+      "file": "src/components/hass/WeatherSummary.module.css",
+      "id": "29a38af5d0f0ec74",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(80, 208, 232, 0.62)"
+    },
+    {
+      "file": "src/components/hass/WeatherSummary.module.css",
+      "id": "275a76572c816bd8",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(80, 208, 232, 0.9)"
+    },
+    {
+      "file": "src/components/hass/WeatherSummary.module.css",
+      "id": "a2f9e55e159070d2",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(80, 208, 232, 0.96)"
+    },
+    {
+      "file": "src/components/hass/WeatherSummary.module.css",
+      "id": "5db747ac116bcf9c",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(85, 160, 214, 0.46)"
+    },
+    {
+      "file": "src/components/hass/WeatherSummary.module.css",
+      "id": "ce25607fe9b55a2d",
+      "maxOccurrences": 3,
+      "rule": "raw-color-literal",
+      "subject": "transparent"
+    },
+    {
+      "file": "src/components/hass/WeatherSummary.module.css",
+      "id": "e4c8604c0e2d9e75",
+      "maxOccurrences": 21,
+      "rule": "raw-color-literal",
+      "subject": "white"
+    },
+    {
+      "file": "src/components/hass/WebRtcCamera.module.css",
+      "id": "21de3816e91bede4",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(0, 0, 0, 0.32)"
+    },
+    {
+      "file": "src/components/hass/WebRtcCamera.module.css",
+      "id": "c5f205b62364dfcb",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.72)"
+    },
+    {
+      "file": "src/components/shell/AppHeader.module.css",
+      "id": "6639d6360bdb6ed2",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "#192436"
+    },
+    {
+      "file": "src/components/shell/AppHeader.module.css",
+      "id": "26d10230bd63c2fe",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(0, 0, 0, 0.22)"
+    },
+    {
+      "file": "src/components/shell/AppHeader.module.css",
+      "id": "fd67e646f7f3a810",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(0, 0, 0, 0.34)"
+    },
+    {
+      "file": "src/components/shell/AppHeader.module.css",
+      "id": "305a066ccd14d73f",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(0, 0, 0, 0.46)"
+    },
+    {
+      "file": "src/components/shell/AppHeader.module.css",
+      "id": "5b3d4738d814cd79",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(25, 36, 54, 0.82)"
+    },
+    {
+      "file": "src/components/shell/AppHeader.module.css",
+      "id": "cb406e5ebd6cd81b",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.1)"
+    },
+    {
+      "file": "src/components/shell/AppHeader.module.css",
+      "id": "3ea1ec4350bf6a66",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.12)"
+    },
+    {
+      "file": "src/components/shell/AppHeader.module.css",
+      "id": "86287d3bed34a3dd",
+      "maxOccurrences": 2,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.14)"
+    },
+    {
+      "file": "src/components/shell/AppHeader.module.css",
+      "id": "d3f3dd1bd20f2ba4",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.15)"
+    },
+    {
+      "file": "src/components/shell/AppHeader.module.css",
+      "id": "c170d76b2a642af7",
+      "maxOccurrences": 2,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.16)"
+    },
+    {
+      "file": "src/components/shell/AppHeader.module.css",
+      "id": "11bc953f0e537b52",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.62)"
+    },
+    {
+      "file": "src/components/shell/AppHeader.module.css",
+      "id": "8b2e4b854c031e1f",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.88)"
+    },
+    {
+      "file": "src/components/shell/AppHeader.module.css",
+      "id": "c4b8f102f7f1bfc5",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.92)"
+    },
+    {
+      "file": "src/components/shell/AppHeader.module.css",
+      "id": "f28625068d1eeee1",
+      "maxOccurrences": 8,
+      "rule": "raw-color-literal",
+      "subject": "transparent"
+    },
+    {
+      "file": "src/components/shell/AppHeader.module.css",
+      "id": "71d2d737d8cad4ff",
+      "maxOccurrences": 3,
+      "rule": "raw-color-literal",
+      "subject": "white"
+    },
+    {
+      "file": "src/components/shell/AppShell.module.css",
+      "id": "ca2182feab29d215",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "#111723"
+    },
+    {
+      "file": "src/components/shell/AppShell.module.css",
+      "id": "fad3d390fe107ce5",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(3, 6, 10, 0.08)"
+    },
+    {
+      "file": "src/components/shell/AppShell.module.css",
+      "id": "ba594950c58e2656",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(3, 6, 10, 0.42)"
+    },
+    {
+      "file": "src/components/shell/AppShell.module.css",
+      "id": "406df703b61e089b",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(6, 10, 16, 0.12)"
+    },
+    {
+      "file": "src/components/shell/BottomNav.module.css",
+      "id": "81aad7299c072a63",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(0, 0, 0, 0.18)"
+    },
+    {
+      "file": "src/components/shell/BottomNav.module.css",
+      "id": "268115a8d63af630",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(247, 251, 255, 0.62)"
+    },
+    {
+      "file": "src/components/shell/BottomNav.module.css",
+      "id": "c84c9ac841f65126",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(25, 36, 54, 0.64)"
+    },
+    {
+      "file": "src/components/shell/BottomNav.module.css",
+      "id": "5cb42dbf6a57ee2b",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.14)"
+    },
+    {
+      "file": "src/components/shell/BottomNav.module.css",
+      "id": "86ab2bacdf61eb26",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.16)"
+    },
+    {
+      "file": "src/components/shell/BottomNav.module.css",
+      "id": "616e2e88e2e347d6",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.18)"
+    },
+    {
+      "file": "src/components/shell/BottomNav.module.css",
+      "id": "4cb1b36aa38b2627",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "transparent"
+    },
+    {
+      "file": "src/components/shell/BottomNav.module.css",
+      "id": "08b5fd281b99e812",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "white"
+    },
+    {
+      "file": "src/components/shell/DashboardPageLoading.module.css",
+      "id": "63abd27df235d358",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.22)"
+    },
+    {
+      "file": "src/components/shell/DashboardPageLoading.module.css",
+      "id": "22684ed7c6d288f7",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.72)"
+    },
+    {
+      "file": "src/components/shell/DashboardPageLoading.module.css",
+      "id": "439e38440241e55e",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.96)"
+    },
+    {
+      "file": "src/index.css",
+      "id": "43fd94045256ef94",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "#111723"
+    },
+    {
+      "file": "src/index.css",
+      "id": "ce76909f5357ff5b",
+      "maxOccurrences": 2,
+      "rule": "raw-color-literal",
+      "subject": "transparent"
+    },
+    {
+      "file": "src/pages/AtAGlancePage.module.css",
+      "id": "9cc78b7f46f976a6",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgb(231, 242, 255)"
+    },
+    {
+      "file": "src/pages/AtAGlancePage.module.css",
+      "id": "a8db6bc76692e5c7",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(0, 0, 0, 0.28)"
+    },
+    {
+      "file": "src/pages/AtAGlancePage.module.css",
+      "id": "6ba34546460f6e6a",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.08)"
+    },
+    {
+      "file": "src/pages/AtAGlancePage.module.css",
+      "id": "ee6077e900fab330",
+      "maxOccurrences": 2,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.12)"
+    },
+    {
+      "file": "src/pages/AtAGlancePage.module.css",
+      "id": "dec628cb43169517",
+      "maxOccurrences": 3,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.14)"
+    },
+    {
+      "file": "src/pages/AtAGlancePage.module.css",
+      "id": "7c7e6066b362c413",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "white"
+    },
+    {
+      "file": "src/pages/CustomLightsPage.module.css",
+      "id": "e03b45f2d2012856",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgb(76 161 84 / 0.82)"
+    },
+    {
+      "file": "src/pages/CustomLightsPage.module.css",
+      "id": "0dc41de044bdfe84",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(0, 0, 0, 0.14)"
+    },
+    {
+      "file": "src/pages/CustomLightsPage.module.css",
+      "id": "ae69ab00753bc78a",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(0, 0, 0, 0.24)"
+    },
+    {
+      "file": "src/pages/CustomLightsPage.module.css",
+      "id": "ab9cb98c28e3eb6b",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(0, 0, 0, 0.26)"
+    },
+    {
+      "file": "src/pages/CustomLightsPage.module.css",
+      "id": "f3870bc4121e95d5",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(0, 0, 0, 0.32)"
+    },
+    {
+      "file": "src/pages/CustomLightsPage.module.css",
+      "id": "5a6887b615bf3f78",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.1)"
+    },
+    {
+      "file": "src/pages/CustomLightsPage.module.css",
+      "id": "c03d25730ec4e176",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.12)"
+    },
+    {
+      "file": "src/pages/CustomLightsPage.module.css",
+      "id": "05227dfac60dc33b",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.18)"
+    },
+    {
+      "file": "src/pages/CustomLightsPage.module.css",
+      "id": "8e4edd7dac9bbaec",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.58)"
+    },
+    {
+      "file": "src/pages/CustomLightsPage.module.css",
+      "id": "cb6b33ea38debd78",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.86)"
+    },
+    {
+      "file": "src/pages/CustomLightsPage.module.css",
+      "id": "2dfea5c300016e6e",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.98)"
+    },
+    {
+      "file": "src/pages/CustomLightsPage.module.css",
+      "id": "b8ca17af81461cc7",
+      "maxOccurrences": 3,
+      "rule": "raw-color-literal",
+      "subject": "transparent"
+    },
+    {
+      "file": "src/pages/CustomLightsPage.module.css",
+      "id": "ea7a36e19d40ccea",
+      "maxOccurrences": 4,
+      "rule": "raw-color-literal",
+      "subject": "white"
+    },
+    {
+      "file": "src/pages/DashboardViewPage.module.css",
+      "id": "8cb210936bef4a3c",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "#050505"
+    },
+    {
+      "file": "src/pages/DashboardViewPage.module.css",
+      "id": "f3603833b990677a",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "#111"
+    },
+    {
+      "file": "src/pages/DashboardViewPage.module.css",
+      "id": "654fed8519701ea6",
+      "maxOccurrences": 2,
+      "rule": "raw-color-literal",
+      "subject": "#2c8e98"
+    },
+    {
+      "file": "src/pages/DashboardViewPage.module.css",
+      "id": "8c65f7215bd90508",
+      "maxOccurrences": 2,
+      "rule": "raw-color-literal",
+      "subject": "#cd5401"
+    },
+    {
+      "file": "src/pages/DashboardViewPage.module.css",
+      "id": "5d3e2f59682c1484",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "#ffb4b4"
+    },
+    {
+      "file": "src/pages/DashboardViewPage.module.css",
+      "id": "9225803f6ea0b5d6",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "#fff"
+    },
+    {
+      "file": "src/pages/DashboardViewPage.module.css",
+      "id": "ea205c31a59aa67a",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgb(30 136 229 / 0.72)"
+    },
+    {
+      "file": "src/pages/DashboardViewPage.module.css",
+      "id": "e23dfb3e17771679",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgb(67 160 71 / 0.6)"
+    },
+    {
+      "file": "src/pages/DashboardViewPage.module.css",
+      "id": "22e2a82277d97d9f",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgb(75 126 210 / 0.6)"
+    },
+    {
+      "file": "src/pages/DashboardViewPage.module.css",
+      "id": "daf1419629cc0615",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(0, 0, 0, 0.1)"
+    },
+    {
+      "file": "src/pages/DashboardViewPage.module.css",
+      "id": "2bbe8c7336d5a89b",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(0, 0, 0, 0.12)"
+    },
+    {
+      "file": "src/pages/DashboardViewPage.module.css",
+      "id": "2fbce652bada2613",
+      "maxOccurrences": 3,
+      "rule": "raw-color-literal",
+      "subject": "rgba(0, 0, 0, 0.14)"
+    },
+    {
+      "file": "src/pages/DashboardViewPage.module.css",
+      "id": "257511e8315cd966",
+      "maxOccurrences": 5,
+      "rule": "raw-color-literal",
+      "subject": "rgba(0, 0, 0, 0.16)"
+    },
+    {
+      "file": "src/pages/DashboardViewPage.module.css",
+      "id": "4ce84f9306142817",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(0, 0, 0, 0.18)"
+    },
+    {
+      "file": "src/pages/DashboardViewPage.module.css",
+      "id": "b8a4cf7044b7ec21",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(0, 0, 0, 0.22)"
+    },
+    {
+      "file": "src/pages/DashboardViewPage.module.css",
+      "id": "d61e693aa476b123",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(0, 0, 0, 0.24)"
+    },
+    {
+      "file": "src/pages/DashboardViewPage.module.css",
+      "id": "7fb09cc79f6f724c",
+      "maxOccurrences": 2,
+      "rule": "raw-color-literal",
+      "subject": "rgba(0, 0, 0, 0.34)"
+    },
+    {
+      "file": "src/pages/DashboardViewPage.module.css",
+      "id": "f2b28e7b8f9c8d02",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(121, 217, 226, 0.34)"
+    },
+    {
+      "file": "src/pages/DashboardViewPage.module.css",
+      "id": "924928ae338c4136",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(129, 199, 132, 0.34)"
+    },
+    {
+      "file": "src/pages/DashboardViewPage.module.css",
+      "id": "9c4e18fa1c4d066d",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(14, 14, 14, 0.82)"
+    },
+    {
+      "file": "src/pages/DashboardViewPage.module.css",
+      "id": "3a061d6c7da3f85c",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(20, 20, 20, 0.72)"
+    },
+    {
+      "file": "src/pages/DashboardViewPage.module.css",
+      "id": "446f9ec9189ec9b1",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(205, 84, 1, 0.2)"
+    },
+    {
+      "file": "src/pages/DashboardViewPage.module.css",
+      "id": "67c35677b5a7c77f",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(205, 84, 1, 0.42)"
+    },
+    {
+      "file": "src/pages/DashboardViewPage.module.css",
+      "id": "690d9028b8690226",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(220, 92, 68, 0.18)"
+    },
+    {
+      "file": "src/pages/DashboardViewPage.module.css",
+      "id": "5c63881195b32193",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(220, 92, 68, 0.52)"
+    },
+    {
+      "file": "src/pages/DashboardViewPage.module.css",
+      "id": "913d031f0130cd2b",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(229, 57, 53, 0.1)"
+    },
+    {
+      "file": "src/pages/DashboardViewPage.module.css",
+      "id": "87c76dfa308d7be7",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(229, 57, 53, 0.25)"
+    },
+    {
+      "file": "src/pages/DashboardViewPage.module.css",
+      "id": "244b42b4c57616ee",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(251, 140, 0, 0.09)"
+    },
+    {
+      "file": "src/pages/DashboardViewPage.module.css",
+      "id": "0e3e04c473c6ae04",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(251, 140, 0, 0.22)"
+    },
+    {
+      "file": "src/pages/DashboardViewPage.module.css",
+      "id": "2f98e9b6340fea2c",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 120, 92, 0.32)"
+    },
+    {
+      "file": "src/pages/DashboardViewPage.module.css",
+      "id": "614d2e49236419e9",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 183, 154, 0.34)"
+    },
+    {
+      "file": "src/pages/DashboardViewPage.module.css",
+      "id": "efb457bdeac7baf4",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 183, 77, 0.38)"
+    },
+    {
+      "file": "src/pages/DashboardViewPage.module.css",
+      "id": "253423fb8c083b2d",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 183, 96, 0.34)"
+    },
+    {
+      "file": "src/pages/DashboardViewPage.module.css",
+      "id": "43fcd06f907e5ff1",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 186, 170, 0.96)"
+    },
+    {
+      "file": "src/pages/DashboardViewPage.module.css",
+      "id": "b6e4bc351aed6757",
+      "maxOccurrences": 4,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.08)"
+    },
+    {
+      "file": "src/pages/DashboardViewPage.module.css",
+      "id": "cfb6cf8692200396",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.09)"
+    },
+    {
+      "file": "src/pages/DashboardViewPage.module.css",
+      "id": "02fc7cee1028c209",
+      "maxOccurrences": 5,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.1)"
+    },
+    {
+      "file": "src/pages/DashboardViewPage.module.css",
+      "id": "0cacf7f24d9cf72f",
+      "maxOccurrences": 2,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.11)"
+    },
+    {
+      "file": "src/pages/DashboardViewPage.module.css",
+      "id": "87891e7d4551e67c",
+      "maxOccurrences": 4,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.12)"
+    },
+    {
+      "file": "src/pages/DashboardViewPage.module.css",
+      "id": "06d2d518b68d403c",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.13)"
+    },
+    {
+      "file": "src/pages/DashboardViewPage.module.css",
+      "id": "b146a0a4ee5cb730",
+      "maxOccurrences": 4,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.14)"
+    },
+    {
+      "file": "src/pages/DashboardViewPage.module.css",
+      "id": "8edd569a292bd95a",
+      "maxOccurrences": 2,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.16)"
+    },
+    {
+      "file": "src/pages/DashboardViewPage.module.css",
+      "id": "1f1f3745a255fb73",
+      "maxOccurrences": 5,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.18)"
+    },
+    {
+      "file": "src/pages/DashboardViewPage.module.css",
+      "id": "ad840f71934adc8c",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.22)"
+    },
+    {
+      "file": "src/pages/DashboardViewPage.module.css",
+      "id": "4d47d134a5757180",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.24)"
+    },
+    {
+      "file": "src/pages/DashboardViewPage.module.css",
+      "id": "ca457779f3ef668f",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.42)"
+    },
+    {
+      "file": "src/pages/DashboardViewPage.module.css",
+      "id": "d9f79da271aec23c",
+      "maxOccurrences": 2,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.58)"
+    },
+    {
+      "file": "src/pages/DashboardViewPage.module.css",
+      "id": "0867dfe8296544af",
+      "maxOccurrences": 3,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.62)"
+    },
+    {
+      "file": "src/pages/DashboardViewPage.module.css",
+      "id": "c0712d4246a2713d",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.64)"
+    },
+    {
+      "file": "src/pages/DashboardViewPage.module.css",
+      "id": "80dd54fdeb18c9ce",
+      "maxOccurrences": 3,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.66)"
+    },
+    {
+      "file": "src/pages/DashboardViewPage.module.css",
+      "id": "0822d207038bca11",
+      "maxOccurrences": 2,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.68)"
+    },
+    {
+      "file": "src/pages/DashboardViewPage.module.css",
+      "id": "430a8d4907fb8b5d",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.72)"
+    },
+    {
+      "file": "src/pages/DashboardViewPage.module.css",
+      "id": "405af0ab79adfbf6",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.74)"
+    },
+    {
+      "file": "src/pages/DashboardViewPage.module.css",
+      "id": "d47be0e73ad4fa16",
+      "maxOccurrences": 2,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.76)"
+    },
+    {
+      "file": "src/pages/DashboardViewPage.module.css",
+      "id": "79614d89bd789801",
+      "maxOccurrences": 3,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.78)"
+    },
+    {
+      "file": "src/pages/DashboardViewPage.module.css",
+      "id": "9ac21a781372367a",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.82)"
+    },
+    {
+      "file": "src/pages/DashboardViewPage.module.css",
+      "id": "858c4c3792a1d4f0",
+      "maxOccurrences": 2,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.86)"
+    },
+    {
+      "file": "src/pages/DashboardViewPage.module.css",
+      "id": "429b67332bc0db49",
+      "maxOccurrences": 5,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.9)"
+    },
+    {
+      "file": "src/pages/DashboardViewPage.module.css",
+      "id": "69ce48795ac75934",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.92)"
+    },
+    {
+      "file": "src/pages/DashboardViewPage.module.css",
+      "id": "b3aade927c462ba2",
+      "maxOccurrences": 2,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.94)"
+    },
+    {
+      "file": "src/pages/DashboardViewPage.module.css",
+      "id": "dc358fb1585ffe7f",
+      "maxOccurrences": 2,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.96)"
+    },
+    {
+      "file": "src/pages/DashboardViewPage.module.css",
+      "id": "907d1a980df3abb4",
+      "maxOccurrences": 2,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.98)"
+    },
+    {
+      "file": "src/pages/DashboardViewPage.module.css",
+      "id": "384e6d5ae51f8a41",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 95, 87, 0.42)"
+    },
+    {
+      "file": "src/pages/DashboardViewPage.module.css",
+      "id": "d467097165600167",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(44, 142, 152, 0.22)"
+    },
+    {
+      "file": "src/pages/DashboardViewPage.module.css",
+      "id": "270e4c6d1140f04a",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(44, 142, 152, 0.44)"
+    },
+    {
+      "file": "src/pages/DashboardViewPage.module.css",
+      "id": "1e5a9979afa2fcf2",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(67, 160, 71, 0.08)"
+    },
+    {
+      "file": "src/pages/DashboardViewPage.module.css",
+      "id": "a48f6fd718ee7259",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(67, 160, 71, 0.2)"
+    },
+    {
+      "file": "src/pages/DashboardViewPage.module.css",
+      "id": "972cba59b6992959",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(67, 160, 71, 0.6)"
+    },
+    {
+      "file": "src/pages/DashboardViewPage.module.css",
+      "id": "6a743008f6bc667b",
+      "maxOccurrences": 16,
+      "rule": "raw-color-literal",
+      "subject": "transparent"
+    },
+    {
+      "file": "src/pages/DashboardViewPage.module.css",
+      "id": "08c18914ecfff14d",
+      "maxOccurrences": 21,
+      "rule": "raw-color-literal",
+      "subject": "white"
+    },
+    {
+      "file": "src/pages/RecipesPage.module.css",
+      "id": "f3055bf3f7b17ff9",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(0, 0, 0, 0.26)"
+    },
+    {
+      "file": "src/pages/RecipesPage.module.css",
+      "id": "cc0f3fc67e7a1d98",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.08)"
+    },
+    {
+      "file": "src/pages/RecipesPage.module.css",
+      "id": "e138cbd2c2cf3021",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.26)"
+    },
+    {
+      "file": "src/pages/RecipesPage.module.css",
+      "id": "56480dd106d3d051",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.62)"
+    },
+    {
+      "file": "src/pages/RecipesPage.module.css",
+      "id": "55bffc71f534c807",
+      "maxOccurrences": 1,
+      "rule": "raw-color-literal",
+      "subject": "rgba(42, 126, 180, 0.82)"
+    },
+    {
+      "file": "src/pages/RecipesPage.module.css",
+      "id": "b02c895fb1ad88df",
+      "maxOccurrences": 2,
+      "rule": "raw-color-literal",
+      "subject": "white"
+    },
+    {
+      "file": "src/styles/effects.module.css",
+      "id": "b28c4209567cbf8f",
+      "maxOccurrences": 2,
+      "rule": "raw-color-literal",
+      "subject": "black"
+    },
+    {
+      "file": "src/styles/effects.module.css",
+      "id": "ffb15ae7b717d3bd",
+      "maxOccurrences": 2,
+      "rule": "raw-color-literal",
+      "subject": "rgba(255, 255, 255, 0.14)"
+    },
+    {
+      "file": "src/styles/effects.module.css",
+      "id": "862639156b5b2929",
+      "maxOccurrences": 2,
+      "rule": "raw-color-literal",
+      "subject": "transparent"
+    }
+  ]
+}

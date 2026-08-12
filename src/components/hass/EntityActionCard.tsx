@@ -1,6 +1,7 @@
 import { useEntity, useHass } from '@hakit/core'
 import { Card } from '../core/Card'
 import { MaterialIcon } from '../core/Icon'
+import type { ControlSemantics } from '../core/controlSemantics'
 import type { EntityAction, EntityTileConfig } from '../../constants/portedDashboard'
 import { resolveEntityAction, type EntityActionStateMap } from './entityActions'
 import { asEntityName, formatCompactEntityState, isActiveState } from './entityState'
@@ -75,6 +76,11 @@ export function EntityActionCard({ item, onNavigate, size = 'compact' }: EntityA
   const active = isActiveState(entity)
   const disabled = Boolean(item.disabledWhenUnavailable && entityUnavailable)
   const clickable = Boolean(item.action) && !disabled
+  const semantics: ControlSemantics | undefined = resolvedAction?.type === 'navigate'
+    ? { kind: 'navigate' }
+    : resolvedAction?.type === 'service'
+      ? { kind: 'command' }
+      : undefined
 
   return (
     <Card
@@ -84,7 +90,8 @@ export function EntityActionCard({ item, onNavigate, size = 'compact' }: EntityA
       icon={<MaterialIcon name={item.icon ?? defaultIcon(item.entityId)} size={38} />}
       muted={disabled || (!active && resolvedAction?.type !== 'navigate')}
       onClick={clickable ? () => runAction(item.entityId, item.action) : undefined}
-      pressed={clickable && resolvedAction?.type !== 'navigate' ? active : undefined}
+      pressed={clickable && resolvedAction?.type === 'toggle' ? active : undefined}
+      semantics={semantics}
       size={size}
       subtitle={subtitle}
       title={item.title}

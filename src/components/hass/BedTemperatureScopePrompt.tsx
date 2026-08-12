@@ -74,7 +74,6 @@ export function BedTemperatureScopePrompt({
       onClose={onClose}
       open={open}
       subtitle={`${sideTitle} • ${phaseLabel} • ${targetText}`}
-      surface="hass-popup"
       title="Set Bed Temperature"
     >
       <div className={styles.content}>
@@ -88,7 +87,6 @@ export function BedTemperatureScopePrompt({
               <strong>Tonight</strong>
               <span>Change the current Pod target only.</span>
             </span>
-            <MaterialIcon name="mdi:chevron-right" size={22} />
           </button>
           <button aria-label="All Nights" className={styles.choice} onClick={() => onChoose('all-nights')} type="button">
             <span aria-hidden="true" className={styles.icon}><MaterialIcon name="mdi:calendar-refresh" size={24} /></span>
@@ -96,7 +94,6 @@ export function BedTemperatureScopePrompt({
               <strong>All Nights</strong>
               <span>Update this schedule stage and tonight&apos;s target.</span>
             </span>
-            <MaterialIcon name="mdi:chevron-right" size={22} />
           </button>
         </div>
         <button className={styles.cancel} onClick={onClose} type="button">Cancel</button>

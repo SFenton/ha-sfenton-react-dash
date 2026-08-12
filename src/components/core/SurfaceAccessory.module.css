@@ -1,0 +1,15 @@
+.accessory {
+  display: grid;
+  align-self: center;
+  place-items: center;
+  color: var(--color-text-muted);
+}
+
+.text {
+  overflow: hidden;
+  color: var(--color-text-muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

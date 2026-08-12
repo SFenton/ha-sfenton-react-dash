@@ -938,6 +938,16 @@ test('mobile modal opener families use shared disclosures and explicit action ex
   await page.goto('/at-a-glance/admin')
   await expectRightChevron(page.getByRole('button', { name: 'Open Presence-Based Overrides' }))
 
+  await page.goto('/at-a-glance/settings')
+  const adminSettings = page.getByRole('button', { name: /Admin Controls/i })
+  await expectRightChevron(adminSettings)
+  await expect(adminSettings).toHaveAttribute('data-action-kind', 'navigate')
+  await expect(adminSettings).toHaveAttribute('data-navigation-opener', 'true')
+  const homeAssistantSettings = page.getByRole('button', { name: /Home Assistant Settings/i })
+  await expectNoChevron(homeAssistantSettings)
+  await expect(homeAssistantSettings).toHaveAttribute('data-action-kind', 'external')
+  await expect(homeAssistantSettings.locator('[data-surface-accessory="external"]')).toHaveCount(1)
+
   await page.goto('/at-a-glance/ecobee')
   await expectRightChevron(page.getByRole('button', { exact: true, name: 'Room Thermostats' }))
   await expectRightChevron(page.getByRole('button', { exact: true, name: 'Advanced Configuration' }))
@@ -3550,6 +3560,7 @@ test('mobile SleepyPod target prompt routes Tonight and swipes closed without a 
   await expect(scopeDialog).toHaveAttribute('data-surface', 'hass-popup')
   await expect(scopeDialog).toContainText("Stephen's Bed • Bedtime • -3")
   await expect(scopeDialog.getByRole('button', { name: 'Tonight' })).toBeFocused()
+  await expect(scopeDialog.locator('[data-modal-disclosure]')).toHaveCount(0)
   await expect.poll(async () => scopeDialog.evaluate((element) => Math.round(window.innerHeight - element.getBoundingClientRect().bottom))).toBe(0)
   const promptLayout = await scopeDialog.evaluate((element) => {
     const rect = element.getBoundingClientRect()

@@ -1,7 +1,7 @@
 import { useEntity, useHass } from '@hakit/core'
 import { useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import { MaterialIcon } from '../core/Icon'
-import { ModalDisclosureIcon } from '../core/ModalDisclosureIcon'
+import { SurfaceAccessory } from '../core/SurfaceAccessory'
 import { useOptimisticState } from '../../hooks/useOptimisticState'
 import { asEntityName, isActiveState } from './entityState'
 import styles from './LightBrightnessCard.module.css'
@@ -181,7 +181,7 @@ export function LightBrightnessCard({ entityId, title, tapAction = 'toggle', sho
         <span className={styles.title}>{title}</span>
         {showStatus && isOn && <span className={styles.subtitle}>{`${Math.floor(displayPct)}%`}</span>}
       </span>
-      {tapAction === 'more-info' && <ModalDisclosureIcon className={styles.disclosure} size="compact" />}
+      {tapAction === 'more-info' && <SurfaceAccessory className={styles.disclosure} semantics={{ kind: 'modal' }} size="compact" />}
       <button aria-label={`Toggle ${title}`} className={styles.power} onClick={togglePower} onPointerDown={handlePower} type="button">
         <MaterialIcon name="mdi:power" size={18} />
       </button>

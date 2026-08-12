@@ -17,6 +17,7 @@ import { Icon, MaterialIcon } from '../components/core/Icon'
 import { ModalSheet } from '../components/core/ModalSheet'
 import { Separator } from '../components/core/Separator'
 import { SectionHeader } from '../components/core/SectionHeader'
+import { SurfaceAccessory } from '../components/core/SurfaceAccessory'
 import { CameraTile } from '../components/hass/CameraTile'
 import { SecurityControls } from '../components/hass/SecurityControls'
 import { SECURITY_SYSTEM_MODAL_STYLE, securitySystemModalSubtitle } from '../components/hass/securityControlsConfig'
@@ -424,6 +425,7 @@ function navigateExternal(path: string) {
 }
 
 function SettingsPreviewLink({ closeHash, item, onNavigate }: { closeHash: () => void; item: SettingsLinkConfig; onNavigate: (path: string) => void }) {
+  const semantics = item.path ? { kind: 'navigate' } as const : { kind: 'external' } as const
   const activate = () => {
     closeHash()
     if (item.path) onNavigate(item.path)
@@ -431,7 +433,16 @@ function SettingsPreviewLink({ closeHash, item, onNavigate }: { closeHash: () =>
   }
 
   return (
-    <button aria-label={`${item.title} ${item.subtitle}`} className={styles.previewLink} data-external-path={item.externalPath} data-navigation-path={item.path} onClick={activate} type="button">
+    <button
+      aria-label={`${item.title} ${item.subtitle}`}
+      className={styles.previewLink}
+      data-action-kind={semantics.kind}
+      data-external-path={item.externalPath}
+      data-navigation-opener={semantics.kind === 'navigate' ? 'true' : undefined}
+      data-navigation-path={item.path}
+      onClick={activate}
+      type="button"
+    >
       <span aria-hidden="true" className={styles.previewLinkIcon}>
         <MaterialIcon name={item.icon} size={28} />
       </span>
@@ -439,7 +450,7 @@ function SettingsPreviewLink({ closeHash, item, onNavigate }: { closeHash: () =>
         <strong>{item.title}</strong>
         <small>{item.subtitle}</small>
       </span>
-      <MaterialIcon name="mdi:chevron-right" size={24} />
+      <SurfaceAccessory semantics={semantics} />
     </button>
   )
 }
@@ -1213,7 +1224,7 @@ export function RoomPickerButton({ onNavigate }: { onNavigate: (path: string) =>
 
   return (
     <>
-      <FloatingActionButton color={CHORE_BLUE} icon="mdi:floor-plan" label="Rooms" onClick={() => setModalOpen(true)} />
+      <FloatingActionButton color={CHORE_BLUE} icon="mdi:floor-plan" label="Rooms" onClick={() => setModalOpen(true)} semantics={{ kind: 'modal' }} />
       <ModalSheet contentStyle={modalStyle} open={modalOpen} title="Rooms" onClose={() => setModalOpen(false)}>
         <section className={styles.roomPickerGrid} aria-label="Rooms" ref={gridRef} style={gridStyle}>
           {rankedAreas.map((area) => (
