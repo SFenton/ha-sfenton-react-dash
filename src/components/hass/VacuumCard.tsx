@@ -89,7 +89,7 @@ function isResumable(statusFlag: string | undefined) {
 function canStartVacuumCleaning(state: string, statusFlag: string | undefined, error: string | undefined) {
   const resumable = isResumable(statusFlag)
   const lowBattery = error === 'Low battery'
-  return (state === 'docked' && !resumable) || state === 'idle' || (state === 'error' && !resumable && !lowBattery)
+  return !resumable && (state === 'docked' || state === 'idle' || (state === 'error' && !lowBattery))
 }
 
 function vacuumModalTabs(vacuum: VacuumConfig) {
@@ -791,9 +791,14 @@ function VacuumStateActions({
   const passes = useEntity(asEntityName(vacuum.passesEntityId), { returnNullIfNotFound: true }) as EntityLike | null
   const areaCleaning = vacuum.areaCleaning
   const state = optimisticState.state
-  const resumable = isResumable(statusFlag?.state)
+  const liveStatusFlag = statusFlag?.state ?? 'none'
+  const [displayStatusFlag, commitDisplayStatusFlag] = useOptimisticState(liveStatusFlag, { clearOn: 'confirmation', revertMs: VACUUM_OPTIMISTIC_REVERT_MS })
+  const resumable = isResumable(liveStatusFlag)
+  const cancelResumePending = resumable && !isResumable(displayStatusFlag)
   const lowBattery = error?.state === 'Low battery'
   const chargingBeforeResume = (state === 'docked' && resumable) || (state === 'error' && lowBattery)
+  const resumeReady = chargingBeforeResume || (state === 'idle' && resumable)
+  const cancelResumeVisible = chargingBeforeResume || (resumable && (state === 'idle' || state === 'returning'))
   const showCleaningSetup = canStartVacuumCleaning(state, statusFlag?.state, error?.state)
   const sectionTitle = chargingBeforeResume ? 'Charging Before Resuming' : formatStateValue(state, 'Vacuum')
   const mapReady = areaEditorMeta.isLoaded && Boolean(areaEditorMeta.geometry) && !areaEditorMeta.error
@@ -811,6 +816,10 @@ function VacuumStateActions({
   }
   const dock = () => commitAndCall('returning', 'vacuum.return_to_base', vacuum.entityId)
   const stop = () => commitAndCall(state === 'error' ? 'idle' : chargingBeforeResume ? 'docked' : 'returning', state === 'error' || chargingBeforeResume ? 'vacuum.stop' : 'vacuum.return_to_base', vacuum.entityId)
+  const cancelResume = () => {
+    commitDisplayStatusFlag('none')
+    commitAndCall(state === 'docked' ? 'docked' : 'idle', 'vacuum.stop', vacuum.entityId)
+  }
   const pause = () => commitAndCall('paused', 'vacuum.pause', vacuum.entityId)
   const start = () => commitAndCall('cleaning', 'vacuum.start', vacuum.entityId)
   const roomsCleaningSetup = (
@@ -857,22 +866,23 @@ function VacuumStateActions({
       {cleanTarget === 'area' ? areaCleaningSetup : showCleaningSetup ? roomsCleaningSetup : null}
     </>
   ) : showCleaningSetup ? roomsCleaningSetup : null
+  const visibleCleaningSetupControls = resumable || chargingBeforeResume ? null : cleaningSetupControls
 
   if (isUnavailableState(state)) return null
 
   return (
     <ControlSection title={sectionTitle}>
-      {cleaningSetupControls}
-      {state === 'idle' && <ActionButton description="Send the robot back to the dock." disabled={coordinator.controlsDisabled} icon="mdi:home" label="Dock" onClick={dock} />}
+      {visibleCleaningSetupControls}
+      {state === 'idle' && <ActionButton description="Send the robot back to the dock." disabled={coordinator.controlsDisabled || cancelResumePending} icon="mdi:home" label="Dock" onClick={dock} />}
       {state === 'error' && !resumable && !lowBattery && <ActionButton description="Stop the current vacuum task." disabled={coordinator.controlsDisabled} icon="mdi:stop" label="Stop" onClick={stop} tone="danger" />}
       {state === 'error' && !resumable && !lowBattery && <ActionButton description="Send the robot back to the dock." disabled={coordinator.controlsDisabled} icon="mdi:home" label="Dock" onClick={dock} />}
-      {chargingBeforeResume && <ActionButton description="Continue the interrupted cleaning run." disabled={coordinator.controlsDisabled} icon="mdi:play" label="Resume" onClick={start} tone="primary" />}
-      {chargingBeforeResume && <ActionButton description="Cancel the pending cleaning resume." disabled={coordinator.controlsDisabled} icon="mdi:stop" label="Cancel" onClick={stop} tone="danger" />}
+      {resumeReady && <ActionButton description="Continue the interrupted cleaning run." disabled={coordinator.controlsDisabled || cancelResumePending} icon="mdi:play" label="Resume" onClick={start} tone="primary" />}
+      {cancelResumeVisible && <ActionButton description="Cancel the pending cleaning resume." disabled={coordinator.controlsDisabled || cancelResumePending} icon="mdi:stop" label="Cancel" onClick={cancelResume} tone="danger" />}
       {state === 'cleaning' && <ActionButton description="Pause the current cleaning run." disabled={coordinator.controlsDisabled} icon="mdi:pause" label="Pause" onClick={pause} tone="warning" />}
       {state === 'cleaning' && <ActionButton description="Stop the current cleaning run." disabled={coordinator.controlsDisabled} icon="mdi:stop" label="Stop" onClick={stop} tone="danger" />}
       {state === 'paused' && <ActionButton description="Continue the paused cleaning run." disabled={coordinator.controlsDisabled} icon="mdi:play" label="Resume" onClick={start} tone="primary" />}
       {state === 'paused' && <ActionButton description="Stop the paused cleaning run." disabled={coordinator.controlsDisabled} icon="mdi:stop" label="Stop" onClick={stop} tone="danger" />}
-      {state === 'returning' && <ActionButton description="Pause the return-to-dock action." disabled={coordinator.controlsDisabled} icon="mdi:pause" label="Pause" onClick={pause} tone="warning" />}
+      {state === 'returning' && <ActionButton description="Pause the return-to-dock action." disabled={coordinator.controlsDisabled || cancelResumePending} icon="mdi:pause" label="Pause" onClick={pause} tone="warning" />}
     </ControlSection>
   )
 }

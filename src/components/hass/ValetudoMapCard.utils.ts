@@ -13,6 +13,24 @@ export interface ValetudoMapDimensionAxis {
   min: number
 }
 
+export type ValetudoMapLayerMaterial =
+  | 'carpet'
+  | 'carpet_high'
+  | 'carpet_low'
+  | 'generic'
+  | 'tile'
+  | 'wood'
+  | 'wood_horizontal'
+  | 'wood_vertical'
+
+export interface ValetudoMapLayerMetaData extends Record<string, unknown> {
+  active?: boolean
+  area?: number
+  material?: ValetudoMapLayerMaterial
+  name?: string
+  segmentId?: string
+}
+
 export interface ValetudoMapLayer {
   __class?: string
   compressedPixels?: number[]
@@ -20,6 +38,7 @@ export interface ValetudoMapLayer {
     x: ValetudoMapDimensionAxis
     y: ValetudoMapDimensionAxis
   }
+  metaData?: ValetudoMapLayerMetaData
   pixels?: number[]
   type: string
 }
@@ -48,6 +67,98 @@ export interface ValetudoMapBounds {
   maxY: number
   minX: number
   minY: number
+}
+
+export type ValetudoMapMaterialAccent = 'dark' | 'light'
+
+export interface ValetudoMapEntityRenderStyle {
+  fillStyle?: string
+  haloColor?: string
+  icon?: 'obstacle' | 'target'
+  lineDash?: number[]
+  shape: 'line' | 'point' | 'polygon'
+  strokeStyle: string
+}
+
+const ENTITY_RENDER_STYLES: Record<string, ValetudoMapEntityRenderStyle> = {
+  active_zone: {
+    fillStyle: 'rgba(77, 208, 225, 0.16)',
+    shape: 'polygon',
+    strokeStyle: 'rgba(128, 222, 234, 0.72)',
+  },
+  carpet: {
+    fillStyle: 'rgba(255, 193, 7, 0.12)',
+    lineDash: [3, 3],
+    shape: 'polygon',
+    strokeStyle: 'rgba(255, 213, 79, 0.62)',
+  },
+  curtain: {
+    lineDash: [2, 3],
+    shape: 'line',
+    strokeStyle: 'rgba(128, 222, 234, 0.86)',
+  },
+  go_to_target: {
+    haloColor: 'rgba(16, 54, 68, 0.78)',
+    icon: 'target',
+    shape: 'point',
+    strokeStyle: '#80deea',
+  },
+  no_go_area: {
+    fillStyle: 'rgba(239, 83, 80, 0.22)',
+    shape: 'polygon',
+    strokeStyle: 'rgba(255, 138, 128, 0.76)',
+  },
+  no_mop_area: {
+    fillStyle: 'rgba(33, 150, 243, 0.2)',
+    shape: 'polygon',
+    strokeStyle: 'rgba(144, 202, 249, 0.76)',
+  },
+  obstacle: {
+    haloColor: 'rgba(80, 48, 8, 0.8)',
+    icon: 'obstacle',
+    shape: 'point',
+    strokeStyle: '#ffca6b',
+  },
+  ramp: {
+    fillStyle: 'rgba(171, 71, 188, 0.16)',
+    lineDash: [5, 3],
+    shape: 'polygon',
+    strokeStyle: 'rgba(206, 147, 216, 0.78)',
+  },
+  threshold: {
+    lineDash: [6, 4],
+    shape: 'line',
+    strokeStyle: 'rgba(255, 183, 77, 0.9)',
+  },
+  virtual_wall: {
+    shape: 'line',
+    strokeStyle: 'rgba(255, 112, 103, 0.9)',
+  },
+}
+
+export function valetudoMapEntityRenderStyle(type: string) {
+  return ENTITY_RENDER_STYLES[type] ?? null
+}
+
+export function valetudoMapMaterialAccent(material: ValetudoMapLayerMaterial | undefined, x: number, y: number): ValetudoMapMaterialAccent | null {
+  switch (material) {
+    case 'tile':
+      return x % 6 === 0 || y % 6 === 0 ? 'dark' : null
+    case 'wood':
+      return (x + y) % 8 === 0 ? 'dark' : null
+    case 'wood_horizontal':
+      return y % 5 === 0 || (y % 10 === 2 && x % 12 === 0) ? 'dark' : null
+    case 'wood_vertical':
+      return x % 5 === 0 || (x % 10 === 2 && y % 12 === 0) ? 'dark' : null
+    case 'carpet':
+      return (Math.floor(x / 2) + y) % 4 === 0 ? 'light' : null
+    case 'carpet_low':
+      return x % 4 === 0 && y % 4 === 0 ? 'light' : null
+    case 'carpet_high':
+      return (x + y) % 4 === 0 || (x - y) % 7 === 0 ? 'light' : null
+    default:
+      return null
+  }
 }
 
 const MOCK_MAP_BOUNDS: Record<string, ValetudoMapBounds> = {

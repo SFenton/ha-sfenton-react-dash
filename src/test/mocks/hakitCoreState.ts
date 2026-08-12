@@ -1172,7 +1172,7 @@ export const explicitMockEntities: Record<string, MockEntity> = {
   'button.valetudo_elatedusedram_trigger_auto_empty_dock': entity('button.valetudo_elatedusedram_trigger_auto_empty_dock', 'unknown'),
   'vacuum.valetudo_politefatherlykingfisher': entity('vacuum.valetudo_politefatherlykingfisher', 'docked'),
   'sensor.valetudo_politefatherlykingfisher_battery_level': entity('sensor.valetudo_politefatherlykingfisher_battery_level', '99', { unit_of_measurement: '%' }),
-  'sensor.valetudo_politefatherlykingfisher_status_flag': entity('sensor.valetudo_politefatherlykingfisher_status_flag', 'ready'),
+  'sensor.valetudo_politefatherlykingfisher_status_flag': entity('sensor.valetudo_politefatherlykingfisher_status_flag', 'none'),
   'sensor.valetudo_politefatherlykingfisher_error': entity('sensor.valetudo_politefatherlykingfisher_error', 'No error'),
   ...valetudoConsumableMockEntities('valetudo_politefatherlykingfisher', {
     main_brush: '14700',
@@ -1190,7 +1190,7 @@ export const explicitMockEntities: Record<string, MockEntity> = {
   'camera.valetudo_politefatherlykingfisher_map_data': entity('camera.valetudo_politefatherlykingfisher_map_data', 'idle'),
   'vacuum.valetudo_exaltedsneakydeer': entity('vacuum.valetudo_exaltedsneakydeer', 'docked'),
   'sensor.valetudo_exaltedsneakydeer_battery_level': entity('sensor.valetudo_exaltedsneakydeer_battery_level', '99', { unit_of_measurement: '%' }),
-  'sensor.valetudo_exaltedsneakydeer_status_flag': entity('sensor.valetudo_exaltedsneakydeer_status_flag', 'ready'),
+  'sensor.valetudo_exaltedsneakydeer_status_flag': entity('sensor.valetudo_exaltedsneakydeer_status_flag', 'none'),
   'sensor.valetudo_exaltedsneakydeer_error': entity('sensor.valetudo_exaltedsneakydeer_error', 'No error'),
   ...valetudoConsumableMockEntities('valetudo_exaltedsneakydeer'),
   'input_text.main_floor_vacuum_error_message': entity('input_text.main_floor_vacuum_error_message', ''),
@@ -1318,7 +1318,7 @@ export function resetMockHass() {
   mockEntities['sensor.valetudo_politefatherlykingfisher_dock_status'].state = 'idle'
   mockEntities['sensor.valetudo_exaltedsneakydeer_dock_status'].state = 'idle'
   mockEntities['sensor.valetudo_exaltedsneakydeer_battery_level'].state = '99'
-  mockEntities['sensor.valetudo_exaltedsneakydeer_status_flag'].state = 'ready'
+  mockEntities['sensor.valetudo_exaltedsneakydeer_status_flag'].state = 'none'
   mockEntities['sensor.valetudo_exaltedsneakydeer_error'].state = 'No error'
   mockEntities['input_text.main_floor_vacuum_error_message'].state = ''
   mockEntities['select.valetudo_exaltedsneakydeer_mode'].state = 'vacuum'

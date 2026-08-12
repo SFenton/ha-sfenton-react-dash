@@ -1,5 +1,13 @@
 import { deflateSync, inflateSync } from 'node:zlib'
-import { expandValetudoLayerPixels, extractValetudoMapFromPngBytes, mapCameraEntityId, selectValetudoMapEntity, valetudoMapBounds } from './ValetudoMapCard.utils'
+import {
+  expandValetudoLayerPixels,
+  extractValetudoMapFromPngBytes,
+  mapCameraEntityId,
+  selectValetudoMapEntity,
+  valetudoMapBounds,
+  valetudoMapEntityRenderStyle,
+  valetudoMapMaterialAccent,
+} from './ValetudoMapCard.utils'
 import { materialIconPath } from '../core/iconPaths'
 
 function chunk(type: string, data = Buffer.alloc(0)) {
@@ -61,6 +69,38 @@ describe('ValetudoMapCard helpers', () => {
     expect(materialIconPath('mdi:pin')).not.toBe(materialIconPath('mdi:home'))
   })
 
+  it.each([
+    ['virtual_wall', 'line'],
+    ['threshold', 'line'],
+    ['curtain', 'line'],
+    ['active_zone', 'polygon'],
+    ['no_go_area', 'polygon'],
+    ['no_mop_area', 'polygon'],
+    ['carpet', 'polygon'],
+    ['ramp', 'polygon'],
+    ['go_to_target', 'point'],
+    ['obstacle', 'point'],
+  ] as const)('maps %s entities to %s rendering', (type, shape) => {
+    expect(valetudoMapEntityRenderStyle(type)).toMatchObject({ shape })
+  })
+
+  it('ignores map entity types without a supported visual', () => {
+    expect(valetudoMapEntityRenderStyle('vendor_specific_unknown')).toBeNull()
+  })
+
+  it.each([
+    ['tile', 6, 5, 'dark'],
+    ['wood', 4, 4, 'dark'],
+    ['wood_horizontal', 7, 5, 'dark'],
+    ['wood_vertical', 5, 7, 'dark'],
+    ['carpet', 4, 2, 'light'],
+    ['carpet_low', 4, 4, 'light'],
+    ['carpet_high', 2, 2, 'light'],
+    ['generic', 4, 4, null],
+  ] as const)('maps %s material coordinates to %s accents', (material, x, y, accent) => {
+    expect(valetudoMapMaterialAccent(material, x, y)).toBe(accent)
+  })
+
   it('extracts ValetudoMap JSON from a zTXt PNG chunk', async () => {
     const sourceMap = {
       __class: 'ValetudoMap',
@@ -72,6 +112,7 @@ describe('ValetudoMapCard helpers', () => {
           type: 'segment',
           dimensions: { x: { min: 1, max: 3 }, y: { min: 2, max: 2 } },
           compressedPixels: [1, 2, 3],
+          metaData: { material: 'carpet_high', name: 'Music Room', segmentId: '3' },
         },
       ],
       entities: [{ type: 'robot_position', points: [10, 10], metaData: { angle: 90 } }],
@@ -81,6 +122,7 @@ describe('ValetudoMapCard helpers', () => {
 
     expect(parsed.__class).toBe('ValetudoMap')
     expect(parsed.entities[0]?.type).toBe('robot_position')
+    expect(parsed.layers[0]?.metaData).toEqual({ material: 'carpet_high', name: 'Music Room', segmentId: '3' })
     expect(expandValetudoLayerPixels(parsed.layers[0]!)).toEqual([1, 2, 2, 2, 3, 2])
     expect(valetudoMapBounds(parsed)).toEqual({ minX: 1, maxX: 3, minY: 2, maxY: 2 })
   })

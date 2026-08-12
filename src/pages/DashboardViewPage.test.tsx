@@ -301,7 +301,7 @@ describe('DashboardViewPage', () => {
     mockEntities['select.living_room_air_purifier_auto_mode'].state = 'Default'
     mockEntities['fan.living_room_air_purifier_levoit_purifier'].attributes.percentage = 33
     mockEntities['vacuum.valetudo_exaltedsneakydeer'].state = 'docked'
-    mockEntities['sensor.valetudo_exaltedsneakydeer_status_flag'].state = 'ready'
+    mockEntities['sensor.valetudo_exaltedsneakydeer_status_flag'].state = 'none'
     mockEntities['sensor.valetudo_exaltedsneakydeer_error'].state = 'No error'
     mockEntities['input_text.main_floor_vacuum_error_message'].state = ''
     mockEntities['input_text.main_floor_vacuum_mode'].state = 'Vacuum'
@@ -4930,6 +4930,78 @@ describe('DashboardViewPage', () => {
     expect(within(controlsPane).getByRole('heading', { name: 'Consumables' })).toBeInTheDocument()
     expect(within(controlsPane).getByRole('group', { name: 'Main Brush 204h left' })).toBeInTheDocument()
     expect(within(controlsPane).getByRole('group', { name: 'Dustbag OK' })).toBeInTheDocument()
+  })
+
+  it.each([
+    { state: 'docked', stateLabel: 'Docked', heading: 'Charging Before Resuming', actions: ['Resume', 'Cancel'] },
+    { state: 'idle', stateLabel: 'Idle', heading: 'Idle', actions: ['Resume', 'Cancel'] },
+    { state: 'paused', stateLabel: 'Paused', heading: 'Paused', actions: ['Resume', 'Stop'] },
+    { state: 'returning', stateLabel: 'Returning', heading: 'Returning', actions: ['Pause', 'Cancel'] },
+  ])('uses the resumable action matrix while $state', async ({ actions, heading, state, stateLabel }) => {
+    mockEntities['vacuum.valetudo_exaltedsneakydeer'].state = state
+    mockEntities['sensor.valetudo_exaltedsneakydeer_status_flag'].state = 'resumable'
+    render(<DashboardViewPage activePath="living-room" onNavigate={() => undefined} path="living-room" />)
+
+    fireEvent.click(screen.getByRole('button', { name: new RegExp(`Main Floor ${stateLabel}`, 'i') }))
+
+    const dialog = await screen.findByRole('dialog')
+    const controlsPane = within(dialog).getByRole('group', { name: 'Main Floor controls, zones, auto-clean, actions, info' })
+    expect(within(controlsPane).getByRole('heading', { name: heading })).toBeInTheDocument()
+    expect(within(controlsPane).queryByRole('button', { name: 'Clean' })).not.toBeInTheDocument()
+    expect(within(controlsPane).queryByRole('group', { name: 'Cleaning target' })).not.toBeInTheDocument()
+    if (state === 'idle') {
+      expect(within(controlsPane).getByRole('button', { name: 'Dock' })).toBeEnabled()
+    } else {
+      expect(within(controlsPane).queryByRole('button', { name: 'Dock' })).not.toBeInTheDocument()
+    }
+    for (const action of actions) expect(within(controlsPane).getByRole('button', { name: action })).toBeEnabled()
+
+    if (state === 'idle') {
+      await clickModalTab(within(dialog), 'Zones')
+      expect(within(controlsPane).getByRole('button', { name: 'Living Room' })).toBeDisabled()
+    }
+  })
+
+  it.each(['docked', 'idle', 'returning'])('cancels a %s resumable run with vacuum.stop', async (state) => {
+    mockEntities['vacuum.valetudo_exaltedsneakydeer'].state = state
+    mockEntities['sensor.valetudo_exaltedsneakydeer_status_flag'].state = 'resumable'
+    const { rerender } = render(<DashboardViewPage activePath="living-room" onNavigate={() => undefined} path="living-room" />)
+
+    const stateLabel = state[0].toUpperCase() + state.slice(1)
+    fireEvent.click(screen.getByRole('button', { name: new RegExp(`Main Floor ${stateLabel}`, 'i') }))
+    const dialog = await screen.findByRole('dialog')
+    const controlsPane = within(dialog).getByRole('group', { name: 'Main Floor controls, zones, auto-clean, actions, info' })
+    fireEvent.click(within(controlsPane).getByRole('button', { name: 'Cancel' }))
+
+    expect(mockCallServiceCalls).toEqual([
+      { domain: 'vacuum', service: 'stop', target: 'vacuum.valetudo_exaltedsneakydeer' },
+    ])
+    expect(within(controlsPane).getByRole('button', { name: 'Cancel' })).toBeDisabled()
+    expect(within(controlsPane).queryByRole('button', { name: 'Clean' })).not.toBeInTheDocument()
+
+    mockEntities['sensor.valetudo_exaltedsneakydeer_status_flag'].state = 'none'
+    rerender(<DashboardViewPage activePath="living-room" onNavigate={() => undefined} path="living-room" />)
+
+    await waitFor(() => expect(within(controlsPane).getByRole('button', { name: 'Clean' })).toBeEnabled())
+    expect(within(controlsPane).queryByRole('button', { name: 'Cancel' })).not.toBeInTheDocument()
+  })
+
+  it.each([
+    { state: 'idle', stateLabel: 'Idle', actions: ['Clean', 'Dock'] },
+    { state: 'paused', stateLabel: 'Paused', actions: ['Resume', 'Stop'] },
+    { state: 'returning', stateLabel: 'Returning', actions: ['Pause'] },
+  ])('keeps ordinary $state controls when the status flag is none', async ({ actions, state, stateLabel }) => {
+    mockEntities['vacuum.valetudo_exaltedsneakydeer'].state = state
+    mockEntities['sensor.valetudo_exaltedsneakydeer_status_flag'].state = 'none'
+    render(<DashboardViewPage activePath="living-room" onNavigate={() => undefined} path="living-room" />)
+
+    fireEvent.click(screen.getByRole('button', { name: new RegExp(`Main Floor ${stateLabel}`, 'i') }))
+
+    const dialog = await screen.findByRole('dialog')
+    const controlsPane = within(dialog).getByRole('group', { name: 'Main Floor controls, zones, auto-clean, actions, info' })
+    expect(within(controlsPane).getByRole('group', { name: 'Cleaning target' })).toBeInTheDocument()
+    expect(within(controlsPane).queryByRole('button', { name: 'Cancel' })).not.toBeInTheDocument()
+    for (const action of actions) expect(within(controlsPane).getByRole('button', { name: action })).toBeEnabled()
   })
 
   it('opens the vacuum area editor as a same-sheet detail page', async () => {

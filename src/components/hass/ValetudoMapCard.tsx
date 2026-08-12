@@ -40,6 +40,8 @@ import {
   extractValetudoMapFromPngBytes,
   mapCameraEntityId,
   selectValetudoMapEntity,
+  valetudoMapEntityRenderStyle,
+  valetudoMapMaterialAccent,
   type ValetudoEntityLike,
   type ValetudoMap,
   type ValetudoMapEntity,
@@ -51,7 +53,10 @@ const VALETUDO_LIVE_ENTITY_REFRESH_MS = 3_000
 const MAP_ZOOM_MIN = 1
 const MAP_ZOOM_MAX = 10
 const DOCK_ICON_PATH = materialIconPath('mdi:flash')
+const GO_TO_ICON_PATH = materialIconPath('mdi:pin')
+const OBSTACLE_ICON_PATH = materialIconPath('mdi:alert-circle')
 const ROBOT_ICON_PATH = materialIconPath('mdi:robot-vacuum')
+const MAP_ICON_PATH_CACHE = new Map<string, Path2D>()
 const INITIAL_VIEWPORT: MapViewport = { panX: 0, panY: 0, zoom: 1 }
 const IDENTITY_MATRIX: AffineMatrix = { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 }
 
@@ -137,6 +142,14 @@ function segmentColor(index: number) {
   return colors[index % colors.length]
 }
 
+function mapIconCanvasPath(iconPath: string) {
+  const cached = MAP_ICON_PATH_CACHE.get(iconPath)
+  if (cached) return cached
+  const path = new Path2D(iconPath)
+  MAP_ICON_PATH_CACHE.set(iconPath, path)
+  return path
+}
+
 function mapPointToLocal(value: number, minimum: number, pixelSize: number) {
   return value / pixelSize - minimum
 }
@@ -188,7 +201,7 @@ function drawMapIcon(
   ctx.scale(size / 24, size / 24)
   ctx.translate(-12, -12)
   ctx.fillStyle = color
-  ctx.fill(new Path2D(iconPath))
+  ctx.fill(mapIconCanvasPath(iconPath))
   ctx.restore()
 }
 
@@ -201,6 +214,7 @@ function drawMapEntityIcon(
   screenScale: number,
   rotationRadians = 0,
   haloColor?: string,
+  screenSize = 22,
 ) {
   const points = entity.points ?? []
   if (points.length < 2) return
@@ -209,7 +223,7 @@ function drawMapEntityIcon(
     iconPath,
     mapPointToLocal(points[0] ?? 0, geometry.minGridX, geometry.pixelSize),
     mapPointToLocal(points[1] ?? 0, geometry.minGridY, geometry.pixelSize),
-    Math.max(4, 22 / Math.max(screenScale, 0.01)),
+    Math.max(4, screenSize / Math.max(screenScale, 0.01)),
     color,
     rotationRadians,
     haloColor,
@@ -262,13 +276,25 @@ function renderValetudoMap(
   for (const layer of map.layers) {
     const pixels = expandValetudoLayerPixels(layer)
     if (pixels.length === 0) continue
+    const isSegment = layer.type === 'segment'
+    const material = isSegment ? layer.metaData?.material : undefined
+    const accentPixels: number[] = []
     ctx.fillStyle = layer.type === 'wall' ? 'rgba(236, 244, 255, 0.82)' : segmentColor(segmentIndex)
-    if (layer.type === 'segment') segmentIndex += 1
+    if (isSegment) segmentIndex += 1
     for (let index = 0; index + 1 < pixels.length; index += 2) {
-      const x = (pixels[index] ?? 0) - geometry.minGridX
-      const y = (pixels[index + 1] ?? 0) - geometry.minGridY
+      const sourceX = pixels[index] ?? 0
+      const sourceY = pixels[index + 1] ?? 0
+      const x = sourceX - geometry.minGridX
+      const y = sourceY - geometry.minGridY
       if (x < visible.minX || x > visible.maxX || y < visible.minY || y > visible.maxY) continue
       ctx.fillRect(x, y, 1.02, 1.02)
+      if (material && valetudoMapMaterialAccent(material, sourceX, sourceY)) accentPixels.push(x, y)
+    }
+
+    if (!material || accentPixels.length === 0) continue
+    ctx.fillStyle = material.startsWith('carpet') ? 'rgba(255, 255, 255, 0.17)' : 'rgba(5, 12, 18, 0.24)'
+    for (let index = 0; index + 1 < accentPixels.length; index += 2) {
+      ctx.fillRect(accentPixels[index] ?? 0, accentPixels[index + 1] ?? 0, 1.02, 1.02)
     }
   }
 
@@ -284,12 +310,36 @@ function renderValetudoMap(
   }
 
   for (const entity of map.entities) {
-    if (entity.type === 'no_go_area' || entity.type === 'no_mop_area') {
+    const style = valetudoMapEntityRenderStyle(entity.type)
+    if (!style || style.shape === 'point') continue
+    ctx.save()
+    if (style.lineDash?.length) ctx.setLineDash(style.lineDash.map((length) => length / Math.max(screenScale, 0.01)))
+    ctx.strokeStyle = style.strokeStyle
+    ctx.fillStyle = style.fillStyle ?? 'rgba(0, 0, 0, 0)'
+    if (style.shape === 'polygon') {
       ctx.lineWidth = Math.max(0.2, 2 / Math.max(screenScale, 0.01))
-      ctx.fillStyle = entity.type === 'no_go_area' ? 'rgba(239, 83, 80, 0.22)' : 'rgba(33, 150, 243, 0.2)'
-      ctx.strokeStyle = entity.type === 'no_go_area' ? 'rgba(255, 138, 128, 0.76)' : 'rgba(144, 202, 249, 0.76)'
       drawPolygon(ctx, entity, geometry)
+    } else {
+      ctx.lineWidth = Math.max(0.3, 3 / Math.max(screenScale, 0.01))
+      drawPolyline(ctx, entity, geometry)
     }
+    ctx.restore()
+  }
+
+  for (const entity of map.entities) {
+    const style = valetudoMapEntityRenderStyle(entity.type)
+    if (!style || style.shape !== 'point' || !style.icon) continue
+    drawMapEntityIcon(
+      ctx,
+      entity,
+      geometry,
+      style.icon === 'obstacle' ? OBSTACLE_ICON_PATH : GO_TO_ICON_PATH,
+      style.strokeStyle,
+      screenScale,
+      0,
+      style.haloColor,
+      style.icon === 'obstacle' ? 15 : 18,
+    )
   }
 
   for (const entity of map.entities) {
