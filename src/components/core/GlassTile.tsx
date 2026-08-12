@@ -1,7 +1,8 @@
 import { Icon } from './Icon'
 import { isValidElement, type CSSProperties, type ReactNode } from 'react'
 import type { IconKey } from '../../constants/atAGlance'
-import { ModalDisclosureIcon } from './ModalDisclosureIcon'
+import { SurfaceAccessory } from './SurfaceAccessory'
+import { controlDisclosureTarget, type ControlSemantics } from './controlSemantics'
 import styles from './GlassTile.module.css'
 
 export type TileTone = 'air' | 'climate' | 'contact' | 'danger' | 'light' | 'media' | 'neutral' | 'presence' | 'security' | 'switch' | 'vacuum' | 'warning'
@@ -23,6 +24,7 @@ export interface GlassTileProps {
   disabled?: boolean
   iconColor?: string
   subtitle?: string
+  semantics?: ControlSemantics
   tone?: TileTone
   compact?: boolean
   disclosure?: boolean
@@ -46,6 +48,7 @@ export function GlassTile({
   disabled = false,
   iconColor,
   subtitle,
+  semantics,
   tone = 'neutral',
   compact = false,
   disclosure = false,
@@ -60,7 +63,18 @@ export function GlassTile({
 }: GlassTileProps) {
   const iconSize = variant === 'header' ? 26 : compact ? 18 : 24
   const progressValue = typeof progress === 'number' && Number.isFinite(progress) ? Math.max(0, Math.min(100, progress)) : undefined
-  const showDisclosure = disclosure && Boolean(onClick) && !disabled
+  const semanticDisclosureTarget = controlDisclosureTarget(semantics)
+  const legacyDisclosureTarget = disclosure ? disclosureKind : null
+  const disclosureTarget = semantics ? semanticDisclosureTarget : legacyDisclosureTarget
+  const showDisclosure = Boolean(disclosureTarget && onClick && !disabled)
+  const accessorySemantics: ControlSemantics | null = disclosureTarget === 'modal'
+    ? { kind: 'modal' }
+    : disclosureTarget === 'navigation'
+      ? { kind: 'navigate' }
+      : null
+  const resolvedControlRole = semantics?.kind === 'toggle' ? 'switch' : controlRole
+  const semanticChecked = semantics?.kind === 'toggle' ? semantics.checked : undefined
+  const semanticPressed = semantics?.kind === 'selection' ? semantics.selected : undefined
   const className = [
     styles.tile,
     onClick ? styles.button : '',
@@ -98,30 +112,31 @@ export function GlassTile({
           {subtitle && <span className={styles.subtitle} data-dynamic-grid-label="true">{subtitle}</span>}
         </span>
       </span>
-      {showDisclosure && <ModalDisclosureIcon size={variant === 'header' ? 'compact' : 'standard'} />}
+      {showDisclosure && accessorySemantics && <SurfaceAccessory semantics={accessorySemantics} size={variant === 'header' ? 'compact' : 'standard'} />}
     </>
   )
 
   if (onClick) {
     const button = (
       <button
-        aria-checked={controlRole === 'switch' ? pressed : undefined}
+        aria-checked={semantics ? semanticChecked : controlRole === 'switch' ? pressed : undefined}
         aria-label={resolvedAccessibleName}
-        aria-pressed={controlRole === 'switch' ? undefined : pressed}
+        aria-pressed={semantics ? semanticPressed : controlRole === 'switch' ? undefined : pressed}
         className={className}
+        data-action-kind={semantics?.kind}
         data-disabled={disabled ? 'true' : 'false'}
         data-icon={iconName}
         data-icon-color={iconColor}
         data-muted={isOff ? 'true' : 'false'}
         data-modal-detail-autofocus={detailAutoFocus ? 'true' : undefined}
-        data-modal-opener={showDisclosure && disclosureKind === 'modal' ? 'true' : undefined}
-        data-navigation-opener={showDisclosure && disclosureKind === 'navigation' ? 'true' : undefined}
+        data-modal-opener={showDisclosure && disclosureTarget === 'modal' ? 'true' : undefined}
+        data-navigation-opener={showDisclosure && disclosureTarget === 'navigation' ? 'true' : undefined}
         data-progress={progressValue === undefined ? undefined : String(Math.round(progressValue))}
         data-tone={tone}
         data-variant={variant}
         disabled={disabled}
         onClick={onClick}
-        role={controlRole}
+        role={resolvedControlRole}
         style={resolvedStyle}
         type="button"
       >

@@ -16,16 +16,14 @@ interface ModalSheetProps {
   backLabel?: string
   bodyElementRef?: Ref<HTMLDivElement>
   bodyHeader?: ReactNode
-  chrome?: 'default' | 'source-popup'
   contentStyle?: ModalSheetStyle
   footer?: ReactNode
   onBack?: () => void
   scrollResetKey?: string | number | boolean
   subtitle?: string
-  surface?: 'hass-popup'
 }
 
-type ModalSheetSnapshot = Pick<ModalSheetProps, 'backLabel' | 'bodyHeader' | 'children' | 'chrome' | 'contentStyle' | 'footer' | 'onBack' | 'scrollResetKey' | 'subtitle' | 'title'>
+type ModalSheetSnapshot = Pick<ModalSheetProps, 'backLabel' | 'bodyHeader' | 'children' | 'contentStyle' | 'footer' | 'onBack' | 'scrollResetKey' | 'subtitle' | 'title'>
 const RECENT_OPEN_INTERNAL_CLOSE_GUARD_MS = 450
 export const MODAL_SHEET_EXIT_ANIMATION_MS = 520
 
@@ -58,14 +56,14 @@ function assignRef<T>(ref: Ref<T> | undefined, value: T | null) {
   else if (ref) ref.current = value
 }
 
-export function ModalSheet({ open, title, onClose, children, backLabel, bodyElementRef, bodyHeader, chrome = 'default', contentStyle, footer, onBack, scrollResetKey, subtitle }: ModalSheetProps) {
+export function ModalSheet({ open, title, onClose, children, backLabel, bodyElementRef, bodyHeader, contentStyle, footer, onBack, scrollResetKey, subtitle }: ModalSheetProps) {
   const copy = useCopy('core')
   const contentRef = useRef<HTMLDivElement | null>(null)
   const bodyRef = useRef<HTMLDivElement | null>(null)
   const [bodyElement, setBodyElement] = useState<HTMLDivElement | null>(null)
   const closeRequestedAtRef = useRef(Number.NEGATIVE_INFINITY)
   const ignoreInternalCloseUntilRef = useRef(0)
-  const currentSnapshot: ModalSheetSnapshot = { backLabel: backLabel ?? copy('modal.back'), bodyHeader, children, chrome, contentStyle, footer, onBack, scrollResetKey, subtitle, title }
+  const currentSnapshot: ModalSheetSnapshot = { backLabel: backLabel ?? copy('modal.back'), bodyHeader, children, contentStyle, footer, onBack, scrollResetKey, subtitle, title }
   const [lastOpenSnapshot, setLastOpenSnapshot] = useState<ModalSheetSnapshot>(currentSnapshot)
   const [mounted, setMounted] = useState(open)
   const [previousOpen, setPreviousOpen] = useState(open)
@@ -81,9 +79,8 @@ export function ModalSheet({ open, title, onClose, children, backLabel, bodyElem
   const closing = !open
   const shouldRender = open || mounted
   const renderedContentStyle: ModalSheetStyle | undefined = closing ? { ...rendered.contentStyle, pointerEvents: 'none' } : rendered.contentStyle
-  const sourcePopup = rendered.chrome === 'source-popup'
   const isDesktopModalLayout = useDesktopModalLayout()
-  const showDragHandle = !sourcePopup && !isDesktopModalLayout
+  const showDragHandle = !isDesktopModalLayout
   const setBodyRefs = useCallback((node: HTMLDivElement | null) => {
     bodyRef.current = node
     setBodyElement(node)
@@ -184,7 +181,6 @@ export function ModalSheet({ open, title, onClose, children, backLabel, bodyElem
         <Drawer.Content
           ref={contentRef}
           className={styles.content}
-          data-chrome={rendered.chrome}
           data-closing={closing ? 'true' : 'false'}
           data-has-footer={renderedHasFooter ? 'true' : 'false'}
           data-has-body-header={rendered.bodyHeader ? 'true' : 'false'}
@@ -211,7 +207,7 @@ export function ModalSheet({ open, title, onClose, children, backLabel, bodyElem
               ? copy('modal.descriptionWithSubtitle', { subtitle: rendered.subtitle, title: rendered.title })
               : copy('modal.description', { title: rendered.title })}</Drawer.Description>
             <button className={styles.close} aria-label={copy('modal.close')} onClick={requestClose} type="button">
-              <MaterialIcon name="mdi:close" size={sourcePopup ? 30 : 19} />
+              <MaterialIcon name="mdi:close" size={19} />
             </button>
           </div>
           {rendered.bodyHeader && <div className={styles.bodyHeader} data-modal-sheet-body-header="true">{rendered.bodyHeader}</div>}

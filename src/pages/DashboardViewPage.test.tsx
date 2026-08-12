@@ -1270,6 +1270,8 @@ describe('DashboardViewPage', () => {
     expect(screen.getByText('If the living room switch loses power and comes back with the relay off, run this to temporarily couple the top paddle, unlock the relay, turn power back on, relock it, and return the paddle to decoupled mode.')).toBeInTheDocument()
     const recoveryButton = screen.getByRole('button', { name: 'Attempt to turn power back on in Living Room' })
     expect(recoveryButton).toHaveAttribute('data-automation-target', 'automation.attempt_to_turn_power_back_on_in_living_room')
+    expect(recoveryButton).toHaveAttribute('data-action-kind', 'command')
+    expect(recoveryButton).not.toHaveAttribute('aria-pressed')
     expect(recoveryButton.querySelector('path')).toHaveAttribute('d', materialIconPath('mdi:flash'))
     expect(screen.getByRole('heading', { name: 'Relay Control Mode' })).toBeInTheDocument()
     expect(screen.getByText(/Couples every smart-bulb wall switch to its own relay/)).toBeInTheDocument()
@@ -1384,6 +1386,9 @@ describe('DashboardViewPage', () => {
 
     const admin = screen.getByRole('button', { name: /Admin Controls Presence-Based Toggles, Automation Overrides, and More/i })
     expect(admin.querySelector('path')).toHaveAttribute('d', materialIconPath('mdi:shield-account'))
+    expect(admin).toHaveAttribute('data-action-kind', 'navigate')
+    expect(admin).toHaveAttribute('data-navigation-opener', 'true')
+    expect(admin.querySelector('[data-modal-disclosure="right-chevron"]')).toBeInTheDocument()
     expect(screen.getByRole('navigation', { name: 'Settings pages' }).firstElementChild).toBe(admin)
     fireEvent.click(admin)
     expect(navigate).toHaveBeenLastCalledWith('admin')
@@ -1405,7 +1410,10 @@ describe('DashboardViewPage', () => {
     expect(navigate).toHaveBeenLastCalledWith('mach-e')
 
     const hassSettings = screen.getByRole('button', { name: /Home Assistant Settings Access more in-depth Home Assistant details and settings\./i })
+    expect(hassSettings).toHaveAttribute('data-action-kind', 'external')
     expect(hassSettings).toHaveAttribute('data-external-path', '/config')
+    expect(hassSettings.querySelector('[data-surface-accessory="external"]')).toBeInTheDocument()
+    expect(hassSettings.querySelector('[data-modal-disclosure]')).not.toBeInTheDocument()
   })
 
   it('keeps the Settings bottom nav item active on settings subpages', () => {
@@ -2399,6 +2407,8 @@ describe('DashboardViewPage', () => {
     const scopeDialog = await screen.findByRole('dialog', { name: 'Set Bed Temperature' })
     expect(scopeDialog).toHaveTextContent(new RegExp(`Stephen's Bed • ${phase} • -3`, 'i'))
     await waitFor(() => expect(within(scopeDialog).getByRole('button', { name: 'Tonight' })).toHaveFocus())
+    expect(within(scopeDialog).getByRole('button', { name: 'Tonight' }).querySelector('[data-modal-disclosure]')).not.toBeInTheDocument()
+    expect(within(scopeDialog).getByRole('button', { name: 'All Nights' }).querySelector('[data-modal-disclosure]')).not.toBeInTheDocument()
     expect(mockCallServiceCalls).toEqual([])
 
     fireEvent.click(within(scopeDialog).getByRole('button', { name: choice }))

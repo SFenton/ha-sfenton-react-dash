@@ -1,5 +1,19 @@
 # HASS React Dashboard
 
+## UX review and governance
+
+Run the review workspace on the fixed local port:
+
+```bash
+npm run dev:review
+```
+
+Then open `http://127.0.0.1:5176/at-a-glance/overview`. See
+`docs/ux/current-ux-contract.md`,
+`.github/instructions/interaction-semantics.instructions.md`, and
+`docs/ux/validation-matrix.md` before changing shared UX. Run `npm run check`
+for the design, lint, unit, i18n, and build gates.
+
 ## Autonomous Admin executor
 
 The repository includes an explicit `autonomous-hass-admin-executor` skill and a canonical 13-phase roadmap at `docs/autonomous-admin-roadmap.md`. Each phase maps to one immutable Home Assistant item UID from `todo.groceries`.

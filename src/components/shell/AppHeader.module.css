@@ -362,10 +362,6 @@
   background: rgba(255, 255, 255, 0.15);
 }
 
-.menuItem:active {
-  transform: scale(0.98);
-}
-
 @keyframes sidebarScrimIn {
   from {
     opacity: 0;
