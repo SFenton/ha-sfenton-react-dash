@@ -43,7 +43,7 @@ export const CONTEXT_CLASSES = [
 export const REQUEST_MODES = ['create', 'rewrite', 'audit', 'variants']
 export const OWNERSHIPS = ['react', 'home-assistant-reference']
 export const RESPONSE_STATUSES = ['ok', 'needs-context', 'refused']
-const REFUSAL_CODES = ['app-manual', 'proper-noun', 'react-notification', 'privacy', 'injection', 'unsafe']
+const REFUSAL_CODES = ['proper-noun', 'react-notification', 'privacy', 'injection', 'unsafe']
 export const RESPONSE_CHECKS = [
   'maxCharacters',
   'maxWords',
@@ -226,10 +226,6 @@ const GITHUB_ACCESS_TOKEN = /\b(?:gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0
 const SENSITIVE_OUTPUT = new RegExp(`(?:\\b(?:VITE_HA_TOKEN|HASS_PORTING_HA_PASSWORD)\\b|Bearer\\s+[A-Za-z0-9._~+/-]+=*|\\b(?:api[_ -]?key|password|secret[_ -]?(?:key|token))\\s*[:=]\\s*\\S+|\\.env(?:\\.development)?|${BARE_ACCESS_TOKEN.source}|${GITHUB_ACCESS_TOKEN.source})`, 'i')
 const SENSITIVE_REQUEST = new RegExp(`(?:\\b(?:VITE_HA_TOKEN|HASS_PORTING_HA_PASSWORD)\\b|Bearer\\s+\\S+|\\b(?:api[_ -]?key|password|secret|token)\\b|\\.env(?:\\.development)?|\\*{6,}|${BARE_ACCESS_TOKEN.source}|${GITHUB_ACCESS_TOKEN.source})`, 'i')
 const PLACEHOLDER = /{{[^{}]+}}/g
-const APP_MANUAL_SOURCE_TEXT = new Set([
-  'App Manual',
-  'Access guides, instructions, and details on how our Home Assistant instance and app work.',
-])
 const PROTECTED_NAME = /\b(?:Apple TV|Back Deck|Back Yard|Cookidoo|Dining Room|Disney\+|Downstairs Bathroom|Downstairs Hallway|Entryway|EverShelf|Freezer|Fridge|Front Door|Front Yard|Garage|Guest Bathroom|Guest Room|Gym|Hallway|Home Assistant|Kitchen|Left Door|Living Room|Lower Deck|Mach-E|Main Floor|Master Bathroom|Master Bedroom|Music Room|Netflix|Office|Pantry|Paramount\+|Plex|Prime Video|Right Door|SHIELD|SleepyPod|Spice Rack|Steph|Stephen|Theater Room|Upper Deck|Valetudo|Whole Home|YouTube)\b/i
 
 export function valueHash(value) {
@@ -346,12 +342,8 @@ function sourceExcluded(path) {
   return (
     !/\.(?:ts|tsx)$/.test(path)
     || /\.test\.(?:ts|tsx)$/.test(path)
-    || path.includes('/src/manual/')
-    || path.includes('/src/components/manual/')
     || path.includes('/src/i18n/')
     || path.includes('/src/test/')
-    || /\/src\/pages\/AppManualPage\.tsx$/.test(path)
-    || /\/src\/constants\/modalOpeners\.ts$/.test(path)
   )
 }
 
@@ -380,18 +372,18 @@ function inventoryNamespace(file) {
 }
 
 async function scanCatalogCorpus(root = repositoryRoot) {
-  const inventoryPath = resolve(root, 'scripts/i18n/generated/non-manual-copy-inventory.json')
+  const inventoryPath = resolve(root, 'scripts/i18n/generated/copy-inventory.json')
   const inventory = JSON.parse(await readFile(inventoryPath, 'utf8'))
   if (inventory?.version !== 1 || !Array.isArray(inventory.records)) {
-    throw new Error('Non-manual copy inventory is missing or malformed.')
+    throw new Error('Copy inventory is missing or malformed.')
   }
   const inventoryModule = await import(pathToFileURL(resolve(root, 'scripts/i18n/inventory.ts')).href)
   const currentInventory = inventoryModule.buildCopyInventory(root)
   if (valueHash(inventory) !== valueHash(currentInventory)) {
-    throw new Error('Non-manual copy inventory is stale. Run npm run i18n:sync.')
+    throw new Error('Copy inventory is stale. Run npm run i18n:sync.')
   }
   return inventory.records
-    .filter((record) => record.origin === 'catalog' && !APP_MANUAL_SOURCE_TEXT.has(record.value))
+    .filter((record) => record.origin === 'catalog')
     .map((record) => {
       const contextClass = inventoryContextToSkillContext(record.context)
       const provenance = `${record.file}#catalog`
@@ -556,7 +548,6 @@ export async function scanSourceCorpus(root = repositoryRoot) {
       if (!usableSourceText(value)) return
       const position = sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile))
       const relativePath = relative(root, file).replaceAll('\\', '/')
-      if (APP_MANUAL_SOURCE_TEXT.has(value)) return
       const owner = ownerName(node, sourceFile)
       const contextClass = inferContext({ field, file: relativePath, owner, value })
       const provenance = `${relativePath}:${position.line + 1}`
@@ -590,7 +581,7 @@ export async function scanSourceCorpus(root = repositoryRoot) {
         }
       } else if (ts.isPropertyAssignment(node)) {
         const field = node.name.getText(sourceFile).replace(/^['"]|['"]$/g, '')
-        if (field !== 'manualVisibleSectionNames' && isVisibleField(field)) {
+        if (isVisibleField(field)) {
           const value = sourceValue(node.initializer, sourceFile)
           if (value) add(node.initializer, value, field)
           if (field === 'stateLabels' && ts.isObjectLiteralExpression(node.initializer)) {
@@ -640,8 +631,6 @@ export function validateCorpusRecord(record) {
   if (!Array.isArray(record.placeholders)) errors.push('Corpus placeholders must be an array.')
   if (!Array.isArray(record.intentTags)) errors.push('Corpus intentTags must be an array.')
   if (record.text && record.band !== measureBand(record.text)) errors.push('Corpus band does not match measured text.')
-  if (String(record.provenance ?? '').includes('src/manual/')) errors.push('App Manual provenance is forbidden.')
-  if (String(record.provenance ?? '').includes('AppManualPage')) errors.push('App Manual page provenance is forbidden.')
   return errors
 }
 
@@ -801,13 +790,6 @@ export function normalizeRequestEntries(input) {
 export function detectRefusal(request, rawInput = '') {
   const combinedRaw = `${rawInput} ${request.surface} ${request.intent}`
   const combined = combinedRaw.toLowerCase()
-  const surface = String(request.surface ?? '').trim().toLowerCase()
-  if (
-    surface === 'manual'
-    || /app manual|appmanualpage|src\/pages\/appmanual|manual article|manual screenshot|[?&#]path=manual\b|\/manual(?:[/?#]|$)/.test(combined)
-  ) {
-    return { code: 'app-manual', reason: 'App Manual prose is outside this skill.' }
-  }
   if (/(?:restyle|rename|rewrite).*(?:household name|proper noun|friendly name|person name|device name)/.test(combined)) {
     return { code: 'proper-noun', reason: 'Household and HA-mirrored proper nouns are preserved, not restyled.' }
   }

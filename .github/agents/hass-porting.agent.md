@@ -69,11 +69,7 @@ HASS_PORTING_REACT_URL=http://127.0.0.1:5173
 13. Add or update focused unit tests for rendering, state formatting, service-call behavior, state-dependent service-call branches, modal behavior, navigation logic, and source-derived color/state mappings.
 14. Add or update Playwright coverage for the ported page/control where the behavior is user-visible or regression-prone.
 15. Compare Home Assistant and React in Playwright at the same viewport after implementation. Capture screenshots of both and use DOM/style/pixel checks when visual fidelity matters. Also compare the React rendered text, subtitles, attribute-derived strings, and accessible names against the source text/state content matrix; iterate until the result is close enough to defend.
-16. Reconcile App Manual impact: update the owning capability/article, generated app/HA inventories, WIP status, and affected phone/desktop manual screenshots.
-17. Run the complete `npm run manual:capture:check`, then `npm run manual:screenshots:review` and inspect every labeled phone and desktop contact-sheet page.
-18. After visual review, run `npm run manual:screenshots:approve`; it records an already completed review and does not perform capture or inspection.
-19. Run `npm run manual:check` and `npm run manual:check:ha`.
-20. Run focused validation first, then broader validation as needed: targeted Vitest, targeted Playwright, `npm run lint`, and `npm run build` when the change warrants it.
+16. Run focused validation first, then broader validation as needed: targeted Vitest, targeted Playwright, `npm run lint`, and `npm run build` when the change warrants it.
 
 ## Porting Completion Gate
 

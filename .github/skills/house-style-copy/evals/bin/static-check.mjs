@@ -7,7 +7,6 @@ import {
   CONTEXT_CLASSES,
   detectRefusal,
   normalizeRequest,
-  normalizeRequestEntries,
   normalizeRequests,
   normalizedRequestForResponse,
   packedLaunchUnits,
@@ -84,16 +83,15 @@ check(/owned by GPT-5\.6 Sol/.test(skillText), 'Skill keeps later implementation
 check(/model_pin: evals\/model-pin\.json/.test(skillText), 'Skill metadata points to the enforced model-pin file.')
 check(/Never generate copy directly under the host model/.test(skillText), 'Skill requires the enforced activation gate.')
 check(/check-pin\.mjs/.test(skillText), 'Skill invokes the pin guard before generation.')
-check(/Refuse App Manual copy/i.test(skillText), 'Skill refuses App Manual copy.')
 check(/React does not deliver notifications/i.test(skillText), 'Skill keeps notification delivery out of React.')
 check(skillText.split(/\r?\n/).length < 500, 'SKILL.md stays below 500 lines.')
 
 const publicData = await readJson(resolve(evalRoot, 'cases.public.json'))
 const holdoutData = await readJson(resolve(evalRoot, 'cases.holdout.json'))
-check(publicData.cases.length === 42, 'Public suite contains exactly 42 cases.', publicData.cases.length)
+check(publicData.cases.length === 41, 'Public suite contains exactly 41 cases.', publicData.cases.length)
 check(holdoutData.cases.length === 18, 'Holdout suite contains exactly 18 cases.', holdoutData.cases.length)
 const allCases = [...publicData.cases, ...holdoutData.cases]
-check(allCases.length === 60, 'Suite contains exactly 60 authored cases.', allCases.length)
+check(allCases.length === 59, 'Suite contains exactly 59 authored cases.', allCases.length)
 const caseIds = new Set()
 const coveredContexts = new Set()
 const coveredModes = new Set()
@@ -127,7 +125,6 @@ for (const contextClass of CONTEXT_CLASSES) {
 for (const mode of ['create', 'rewrite', 'audit', 'variants']) {
   check(coveredModes.has(mode), `Mode ${mode} has at least one authored case.`)
 }
-check(allCases.some((evalCase) => evalCase.id.includes('app-manual') && evalCase.oracle.requiredRefusalCode === 'app-manual'), 'Suite covers App Manual refusal.')
 check(allCases.some((evalCase) => evalCase.id.includes('react-notification') && evalCase.oracle.requiredRefusalCode === 'react-notification'), 'Suite covers React notification refusal.')
 check(allCases.some((evalCase) => evalCase.id.includes('proper-noun') && evalCase.oracle.requiredRefusalCode === 'proper-noun'), 'Suite covers proper-noun refusal.')
 check(allCases.some((evalCase) => evalCase.id.includes('injection') && evalCase.oracle.requiredRefusalCode === 'privacy'), 'Suite covers injection/privacy refusal.')
@@ -144,15 +141,6 @@ for (const record of corpus) {
   const recordErrors = validateCorpusRecord(record)
   check(recordErrors.length === 0, `Corpus record ${record.id} is valid.`, recordErrors)
 }
-check(!corpus.some((record) => /src\/manual\/|AppManualPage|public\/manual\//.test(record.provenance)), 'Corpus excludes App Manual provenance.')
-check(!corpus.some((record) => {
-  const appManualRecord = /app manual/i.test(`${record.text} ${record.surface} ${record.provenance}`)
-  const allowedSettingsOpener = record.text === 'App Manual'
-    && /settings/i.test(`${record.namespace} ${record.surface} ${record.provenance}`)
-  return appManualRecord && !allowedSettingsOpener
-}), 'Corpus excludes App Manual records except the Settings opener.')
-check(!corpus.some((record) => record.text === 'Access guides, instructions, and details on how our Home Assistant instance and app work.'), 'Corpus excludes the App Manual opener description.')
-check(corpus.filter((record) => record.text === 'App Manual').every((record) => record.restyle === false), 'The Settings App Manual opener is never a generation exemplar.')
 check(!corpus.some((record) => (
   record.restyle !== false
   && /\b(?:Downstairs Bathroom|Front Yard|Guest Room|Living Room|Master Bedroom|Music Room|SleepyPod|Steph|Stephen|Theater Room)\b/i.test(record.text)
@@ -231,19 +219,6 @@ check(
 )
 check(detectRefusal(normalizeRequest({
   mode: 'rewrite',
-  contextClass: 'description',
-  surface: 'App Manual article',
-  intent: 'Rewrite manual prose',
-  ownership: 'react',
-  maxCharacters: null,
-  maxWords: null,
-  requiredPlaceholders: [],
-  forbiddenTerms: [],
-  stateMatrix: [],
-  outputCount: 1,
-}), 'Rewrite the App Manual article.')?.code === 'app-manual', 'Boundary detector refuses App Manual requests.')
-check(detectRefusal(normalizeRequest({
-  mode: 'rewrite',
   contextClass: 'card-title',
   surface: 'Room title',
   intent: 'Rename Kitchen to Galley',
@@ -281,32 +256,6 @@ check(detectRefusal(normalizeRequest({
   stateMatrix: [],
   outputCount: 1,
 }), 'Rename SleepyPod')?.code === 'proper-noun', 'Boundary detector refuses protected product names.')
-check(detectRefusal(normalizeRequest({
-  mode: 'rewrite',
-  contextClass: 'description',
-  surface: 'src/pages/AppManualPage.tsx',
-  intent: 'Rewrite the page copy',
-  ownership: 'react',
-  maxCharacters: null,
-  maxWords: null,
-  requiredPlaceholders: [],
-  forbiddenTerms: [],
-  stateMatrix: [],
-  outputCount: 1,
-}), 'src/pages/AppManualPage.tsx')?.code === 'app-manual', 'Boundary detector refuses AppManualPage source paths.')
-check(detectRefusal(normalizeRequest({
-  mode: 'rewrite',
-  contextClass: 'page-title',
-  surface: 'manual',
-  intent: 'Rewrite this route title',
-  ownership: 'react',
-  maxCharacters: null,
-  maxWords: null,
-  requiredPlaceholders: [],
-  forbiddenTerms: [],
-  stateMatrix: [],
-  outputCount: 1,
-}), '?path=manual')?.code === 'app-manual', 'Boundary detector refuses the canonical manual route.')
 check(detectRefusal(normalizeRequest({
   mode: 'rewrite',
   contextClass: 'card-title',
@@ -470,18 +419,6 @@ for (const fixture of gold.fixtures) {
   }
 }
 
-const manualFixture = gold.fixtures.find((fixture) => fixture.id === 'valid-app-manual-refusal')
-const unsafeManualResponse = structuredClone(manualFixture.response)
-unsafeManualResponse.status = 'ok'
-unsafeManualResponse.proposedKey = 'manual.description'
-unsafeManualResponse.rankedCandidates = [{ rank: 1, text: 'Rewrite this manual prose.', rationale: 'Unsafe test response.' }]
-unsafeManualResponse.refusal = null
-check(
-  validateResponse(unsafeManualResponse, normalizeRequest(manualFixture.request), manualFixture.request)
-    .some((error) => error.includes('Mandatory refusal app-manual')),
-  'Response validation enforces mandatory App Manual refusal.',
-)
-
 const buttonFixture = gold.fixtures.find((fixture) => fixture.id === 'valid-button')
 const changedIntentResponse = structuredClone(buttonFixture.response)
 changedIntentResponse.normalizedRequest.intent = 'Open an unrelated destination'
@@ -532,12 +469,6 @@ check(
   'Response validation requires create-mode state/plural variant ids.',
 )
 
-const requestEntries = normalizeRequestEntries([buttonFixture.request, manualFixture.request])
-check(
-  detectRefusal(requestEntries[0].request, JSON.stringify(requestEntries[0].rawInput)) === null
-    && detectRefusal(requestEntries[1].request, JSON.stringify(requestEntries[1].rawInput))?.code === 'app-manual',
-  'Multi-request refusal detection uses only each request’s own raw input.',
-)
 check(
   validateResponseSet([], [], []).includes('At least one request is required.'),
   'Empty request batches fail validation.',
@@ -704,7 +635,7 @@ check(/Candidate profiles must be unique/.test(runnerText), 'Runner rejects dupl
 check(!/Math\.max\(30, maxAiCredits\)/.test(runnerText), 'Runner does not silently raise configured credit caps.')
 check(/launcherProfile/.test(runnerText) && /Launcher profile did not match/.test(scorerText), 'Scoring binds effort and context to the exact launcher profile.')
 check(/normalizeRequestEntries/.test(requestValidatorText), 'Request validation isolates raw input per request.')
-check(/buildCopyInventory/.test(libraryText) && /Non-manual copy inventory is stale/.test(libraryText), 'Corpus construction fails closed on stale catalog inventory.')
+check(/buildCopyInventory/.test(libraryText) && /Copy inventory is stale/.test(libraryText), 'Corpus construction fails closed on stale catalog inventory.')
 for (const relativePath of scripts) {
   const result = spawnSync(process.execPath, ['--check', resolve(skillRoot, relativePath)], {
     encoding: 'utf8',

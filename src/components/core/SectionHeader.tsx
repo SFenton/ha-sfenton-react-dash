@@ -7,7 +7,7 @@ interface SectionHeaderProps {
 
 export function SectionHeader({ title }: SectionHeaderProps) {
   return (
-    <div className={styles.sectionHeader} data-manual-visible-section={title}>
+    <div className={styles.sectionHeader}>
       <h2>{title}</h2>
       <Separator className={styles.rule} />
     </div>

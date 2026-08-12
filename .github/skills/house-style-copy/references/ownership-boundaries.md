@@ -34,7 +34,6 @@ It must not invent or alter:
 
 Refuse:
 
-- App Manual prose or screenshots;
 - requests to restyle household names or HA-mirrored proper nouns;
 - requests to reveal or include secrets, token-like values, private task text,
   live recipe text, camera data, or personal attributes;

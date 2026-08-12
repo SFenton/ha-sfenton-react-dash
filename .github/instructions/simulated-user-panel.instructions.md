@@ -41,9 +41,6 @@ applyTo: ".github/skills/simulated-user-panel/SKILL.md,.github/skills/simulated-
 - Keep reports privacy-sanitized. Never print or persist tokens, credentials,
   live camera images, household task text, names, URLs, coordinates, or volatile
   entity attributes.
-- Do not add package scripts, dependencies, or app/manual source merely to run
+- Do not add package scripts, dependencies, or app source merely to run
   this skill. Keep eval assets under the skill's `evals/` directory and
-  artifacts under ignored `artifacts/`. `package.json`, `vite.config.ts`, app
-  source, and capture-harness changes invalidate screenshot governance. Follow
-  the full App Manual gate whenever a later panel-driven implementation changes
-  user-visible or Home Assistant-backed behavior.
+  artifacts under ignored `artifacts/`.

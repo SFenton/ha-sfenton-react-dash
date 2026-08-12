@@ -4,7 +4,7 @@
     {
       "id": "strong-verified",
       "expected": "Strong",
-      "claim": "The requested Settings task is opened by the App Manual row.",
+      "claim": "The requested Settings task is opened by the Vacation row.",
       "support": [
         {"persona": "young-novice", "vendor": "Anthropic", "evidence": "SET-U-001"},
         {"persona": "tech-teen", "vendor": "OpenAI", "evidence": "SET-U-001"},

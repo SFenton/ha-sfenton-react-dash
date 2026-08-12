@@ -51,8 +51,8 @@ Interpretation:
 
 ### Settings next action
 
-- At least 7 of 9 core personas choose `App Manual`.
-- No persona chooses `Home Assistant Settings` as the requested household guide.
+- At least 7 of 9 core personas choose `Vacation`.
+- No persona chooses `Home Assistant Settings` or `Admin Controls`.
 - Differences in explanation should reflect the assigned lens without changing
   the factual target.
 

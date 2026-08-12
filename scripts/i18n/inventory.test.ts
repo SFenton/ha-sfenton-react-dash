@@ -3,18 +3,16 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { assertNoNewLegacy, buildCopyInventory, currentBaseline } from './inventory'
 
-describe('non-manual copy inventory', () => {
+describe('copy inventory', () => {
   let repositoryInventory: ReturnType<typeof buildCopyInventory>
 
   beforeAll(() => {
     repositoryInventory = buildCopyInventory()
   }, 30_000)
 
-  it('excludes App Manual sources and tracks migrated catalogs separately', () => {
+  it('tracks migrated catalogs separately', () => {
     const inventory = repositoryInventory
 
-    expect(inventory.records.some((record) => record.file.includes('/manual/'))).toBe(false)
-    expect(inventory.records.some((record) => record.file.includes('AppManualPage'))).toBe(false)
     expect(inventory.summary.catalogRecords).toBeGreaterThan(0)
     expect(inventory.summary.legacyRecords).toBeGreaterThan(0)
   })

@@ -1382,14 +1382,9 @@ describe('DashboardViewPage', () => {
     fireEvent.click(screen.getByRole('menuitem', { name: 'Security' }))
     expect(navigate).toHaveBeenLastCalledWith('security')
 
-    const manual = screen.getByRole('button', { name: 'App Manual Access guides, instructions, and details on how our Home Assistant instance and app work.' })
-    expect(manual.querySelector('path')).toHaveAttribute('d', materialIconPath('mdi:book-open-page-variant'))
-    expect(screen.getByRole('navigation', { name: 'Settings pages' }).firstElementChild).toBe(manual)
-    fireEvent.click(manual)
-    expect(navigate).toHaveBeenLastCalledWith('manual')
-
     const admin = screen.getByRole('button', { name: /Admin Controls Presence-Based Toggles, Automation Overrides, and More/i })
     expect(admin.querySelector('path')).toHaveAttribute('d', materialIconPath('mdi:shield-account'))
+    expect(screen.getByRole('navigation', { name: 'Settings pages' }).firstElementChild).toBe(admin)
     fireEvent.click(admin)
     expect(navigate).toHaveBeenLastCalledWith('admin')
 
@@ -1418,20 +1413,6 @@ describe('DashboardViewPage', () => {
 
     const bottomNav = screen.getByRole('navigation', { name: 'Dashboard sections' })
     expect(within(bottomNav).getByRole('button', { name: 'Settings' })).toHaveAttribute('aria-current', 'page')
-  })
-
-  it('renders the App Manual route as a Settings subpage with preload-safe content', () => {
-    const { container, rerender } = render(<DashboardViewPage activePath="manual" onNavigate={() => undefined} path="manual" />)
-
-    expect(screen.getByRole('heading', { name: 'App Manual' })).toBeInTheDocument()
-    expect(screen.getByLabelText('Search the App Manual')).toBeInTheDocument()
-    expect(screen.getByRole('group', { name: 'App Manual sections' })).toBeInTheDocument()
-    const bottomNav = screen.getByRole('navigation', { name: 'Dashboard sections' })
-    expect(within(bottomNav).getByRole('button', { name: 'Settings' })).toHaveAttribute('aria-current', 'page')
-
-    rerender(<DashboardViewPage activePath="manual" onNavigate={() => undefined} path="manual" preload withShell={false} />)
-    expect(container.querySelector('[data-manual-preload="true"]')).toBeInTheDocument()
-    expect(container.querySelector('img')).toBeNull()
   })
 
   it('renders the Vacation page and blocks Vacation Mode until the checklist is complete', () => {

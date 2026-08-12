@@ -19,7 +19,7 @@ export function FloatingActionButton({ ariaLabel, color, icon, label, onClick }:
   const className = label ? `${styles.button} ${styles.pill}` : styles.button
 
   return (
-    <button aria-label={ariaLabel} className={className} data-modal-opener-exception="floating-action" onClick={onClick} style={style} type="button">
+    <button aria-label={ariaLabel} className={className} onClick={onClick} style={style} type="button">
       <MaterialIcon name={icon} size={32} />
       {label && <span className={styles.label}>{label}</span>}
     </button>

@@ -3,10 +3,10 @@
   "cases": [
     {
       "id": "settings-next-tap",
-      "title": "Settings App Manual next action",
-      "targetAllowlist": ["route:settings", "route:manual", "route-section:settings:app-manual"],
-      "question": "Can this persona identify the safest and clearest next action for opening household guides and instructions?",
-      "task": "From the Settings page, choose the next control that opens the app's guides and instructions. Then note any clarity or confidence issue visible in the supplied evidence.",
+      "title": "Settings vacation next action",
+      "targetAllowlist": ["route:settings", "route:vacation", "route-section:settings:vacation"],
+      "question": "Can this persona identify the safest and clearest next action for setting away dates and preparing the house for vacation?",
+      "task": "From the Settings page, choose the next control that opens vacation setup. Then note any clarity or confidence issue visible in the supplied evidence.",
       "projections": {
         "U": [
           {
@@ -15,7 +15,6 @@
             "content": {
               "heading": "Settings",
               "controls": [
-                "App Manual - Access guides, instructions, and details on how our Home Assistant instance and app work.",
                 "Admin Controls - Presence-Based Toggles, Automation Overrides, and More",
                 "Guest Controls - Toggle automations when guests stay over.",
                 "Vacation - Set away dates and prepare the house for vacation.",
@@ -32,8 +31,8 @@
             "kind": "surface-map",
             "content": {
               "currentSurface": "route:settings",
-              "targetSurface": "route:manual",
-              "openerSurface": "route-section:settings:app-manual",
+              "targetSurface": "route:vacation",
+              "openerSurface": "route-section:settings:vacation",
               "interaction": "navigate"
             }
           }
@@ -43,14 +42,14 @@
             "id": "SET-E-001",
             "kind": "source-extract",
             "content": {
-              "reference": "src/constants/portedDashboard.ts:249-256",
-              "behavior": "The App Manual settings row navigates to path manual."
+              "reference": "src/constants/portedDashboard.ts#SETTINGS_PAGE_ITEMS",
+              "behavior": "The Vacation settings row navigates to path vacation."
             }
           }
         ]
       },
       "oracle": {
-        "expectedActionTargets": ["App Manual"],
+        "expectedActionTargets": ["Vacation"],
         "forbiddenActionTargets": ["Home Assistant Settings", "Admin Controls"],
         "forbiddenOutputStrings": [],
         "minimumPanelSuccess": 7
@@ -70,7 +69,7 @@
             "content": {
               "heading": "Settings",
               "visiblePrimaryNavigation": ["Home", "Security", "Chores", "Settings"],
-              "visibleSettingsRows": ["App Manual", "Admin Controls", "Guest Controls", "Vacation", "To-Do", "Mach-E", "Home Assistant Settings"]
+              "visibleSettingsRows": ["Admin Controls", "Guest Controls", "Vacation", "To-Do", "Mach-E", "Home Assistant Settings"]
             }
           },
           {

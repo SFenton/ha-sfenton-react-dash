@@ -141,8 +141,8 @@ for (const path of await resultPaths(runDir)) {
       }
 
       if (evalCase.id === 'settings-next-tap') {
-        if (!targets.some((target) => /app[- ]manual/i.test(target) || target === 'route-section:settings:app-manual')) {
-          warnings.push('Expected App Manual action was not selected.')
+        if (!targets.some((target) => /vacation/i.test(target) || target === 'route-section:settings:vacation')) {
+          warnings.push('Expected Vacation action was not selected.')
         }
       }
 
@@ -201,7 +201,7 @@ for (const path of await resultPaths(runDir)) {
 }
 
 const settingsCanonical = scored.filter((score) => score.caseId === 'settings-next-tap' && score.variant === 'canonical')
-const settingsSuccesses = settingsCanonical.filter((score) => !score.warnings.includes('Expected App Manual action was not selected.')).length
+const settingsSuccesses = settingsCanonical.filter((score) => !score.warnings.includes('Expected Vacation action was not selected.')).length
 const settingsThresholdApplicable = settingsCanonical.length >= 7
 const summary = {
   hardFailureCount: scored.reduce((sum, score) => sum + score.hardFailures.length, 0),

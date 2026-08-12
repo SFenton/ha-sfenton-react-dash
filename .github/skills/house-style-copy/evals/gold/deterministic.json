@@ -35,22 +35,6 @@
       "expectedError": "placeholders"
     },
     {
-      "id": "valid-app-manual-refusal",
-      "request": {"mode":"rewrite","contextClass":"description","surface":"App Manual article","intent":"Rewrite manual prose","ownership":"react","maxCharacters":null,"maxWords":null,"requiredPlaceholders":[],"forbiddenTerms":[],"stateMatrix":[],"outputCount":1},
-      "response": {
-        "status": "refused",
-        "normalizedRequest": {"mode":"rewrite","contextClass":"description","surface":"App Manual article","intent":"Rewrite manual prose","ownership":"react","maxCharacters":null,"maxWords":null,"requiredPlaceholders":[],"forbiddenTerms":[],"stateMatrix":[],"outputCount":1},
-        "proposedKey": null,
-        "rankedCandidates": [],
-        "exemplarsUsed": [],
-        "checks": {"maxCharacters":true,"maxWords":true,"placeholders":true,"forbiddenTerms":true,"ownership":true,"style":true,"retrieval":true},
-        "warnings": [],
-        "refusal": {"code":"app-manual","reason":"App Manual prose is outside this skill."},
-        "confidence": "high"
-      },
-      "valid": true
-    },
-    {
       "id": "valid-multiple-requests",
       "request": [
         {"mode":"create","contextClass":"button","surface":"Recipe card","intent":"Open recipe details","ownership":"react","maxCharacters":14,"maxWords":2,"requiredPlaceholders":[],"forbiddenTerms":["Click"],"stateMatrix":[],"outputCount":1},

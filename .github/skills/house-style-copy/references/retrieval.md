@@ -24,9 +24,8 @@ audit, or variant exemplars.
 
 Filter before scoring:
 
-1. Exclude App Manual provenance.
-2. Exclude `restyle: false` records for rewrite/create requests.
-3. Notification contexts keep only the identical notification context.
+1. Exclude `restyle: false` records for rewrite/create requests.
+2. Notification contexts keep only the identical notification context.
 4. Positive examples use `canonical` or `current`; negative examples use
    `avoid`.
 5. Prefer the same measured length band. Never mix `long` and `micro`.

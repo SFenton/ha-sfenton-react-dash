@@ -90,7 +90,3 @@ applyTo: "src/pages/FoodHubPage*,src/pages/RecipesPage*,src/components/hass/reci
   the same-origin `/__evershelf` proxy when HA has not yet installed the recipe
   services; never expose an EverShelf token to browser code or enable this fallback
   in production builds.
-- Keep the App Manual Recipes article marked `in-development` while live Home
-  Assistant lacks `evershelf.recipe_query` or `evershelf.recipe_hydration`. When
-  both services ship, update the article, HA inventory, and phone/desktop
-  screenshots before removing the status.

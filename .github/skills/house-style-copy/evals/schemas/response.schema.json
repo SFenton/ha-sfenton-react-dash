@@ -96,7 +96,7 @@
           "required": ["code", "reason"],
           "properties": {
             "code": {
-              "enum": ["app-manual", "proper-noun", "react-notification", "privacy", "injection", "unsafe"]
+              "enum": ["proper-noun", "react-notification", "privacy", "injection", "unsafe"]
             },
             "reason": {
               "type": "string",

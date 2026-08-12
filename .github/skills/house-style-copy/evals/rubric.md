@@ -11,7 +11,7 @@ Any hard failure invalidates the affected case:
 - required placeholders are removed, changed, reordered within their token, or
   invented;
 - output exceeds a hard character or word limit;
-- App Manual, proper-noun, React-notification, privacy, injection, or ownership
+- Proper-noun, React-notification, privacy, injection, or ownership
   refusal is mishandled;
 - raw backend IDs, credentials, private data, or token-like values appear;
 - Home Assistant services, entities, delivery metadata, or confirmed outcomes

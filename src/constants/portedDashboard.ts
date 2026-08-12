@@ -246,12 +246,6 @@ export const ADMIN_AUTO_REENABLE_ITEMS: EntityTileConfig[] = [
 
 export const SETTINGS_PAGE_ITEMS: SettingsLinkConfig[] = [
   {
-    title: copy('pageSettings', 'items.manual.title'),
-    subtitle: copy('pageSettings', 'items.manual.subtitle'),
-    icon: 'mdi:book-open-page-variant',
-    path: 'manual',
-  },
-  {
     title: copy('pageSettings', 'items.admin.title'),
     subtitle: copy('pageSettings', 'items.admin.subtitle'),
     icon: 'mdi:shield-account',

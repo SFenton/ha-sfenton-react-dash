@@ -6,7 +6,6 @@ applyTo: ".github/skills/house-style-copy/**"
 
 - Keep the skill read-only by default. It generates, rewrites, audits, or ranks copy; it never edits app, catalog, Home Assistant, or external-system files.
 - Keep implementation authorization separate and Sol-owned. A copy response is not permission to modify repository or Home Assistant state.
-- Exclude App Manual prose, pages, generated data, screenshots, and governance content from corpus generation and positive examples. Requests to rewrite App Manual copy must be refused.
 - Keep Home Assistant notification delivery HA-owned. Notification requests may return sanitized `home-assistant-reference` wording only and must never instruct React to send notifications.
 - Keep household names, HA-mirrored proper nouns, live entity friendly names, task text, recipe text, identifiers, tokens, and private attributes out of the corpus. Proper-noun restyling requests must be refused.
 - Preserve required placeholders byte-for-byte. Never invent placeholders, services, entities, state transitions, delivery behavior, or confirmed outcomes.

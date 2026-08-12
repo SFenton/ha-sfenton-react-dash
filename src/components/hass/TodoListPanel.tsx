@@ -218,7 +218,6 @@ export function TodoListPanel({ completionScript, entityId, hideCompleted = true
                     <button
                       aria-label={`Edit ${titleText}`}
                       className={styles.editAction}
-                      data-modal-opener-exception="edit-action"
                       onClick={() => onEditTask?.(editTarget)}
                       type="button"
                     >

@@ -1,4 +1,4 @@
-import { generatedMockEntities } from './generated/appEntities'
+import { mockEntitiesFixture } from './appEntities'
 
 export interface MockEntity {
   attributes: Record<string, unknown>
@@ -1260,7 +1260,7 @@ export function mergeMockEntityMaps(
   return { ...generated, ...explicit }
 }
 
-export const mockEntities: Record<string, MockEntity> = mergeMockEntityMaps(generatedMockEntities, explicitMockEntities)
+export const mockEntities: Record<string, MockEntity> = mergeMockEntityMaps(mockEntitiesFixture, explicitMockEntities)
 
 function todoItems(entityId: unknown) {
   const entityKey = String(entityId)

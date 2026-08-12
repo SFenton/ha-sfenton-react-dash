@@ -288,13 +288,6 @@
       "input": {"mode":"create","contextClass":"notification-action","surface":"Security notification","intent":"Request disarming the security system","ownership":"home-assistant-reference","maxCharacters":16,"maxWords":2,"requiredPlaceholders":[],"forbiddenTerms":["alarm_control_panel"],"stateMatrix":[],"outputCount":1},
       "expectedRequest": {"mode":"create","contextClass":"notification-action","surface":"Security notification","intent":"Request disarming the security system","ownership":"home-assistant-reference","maxCharacters":16,"maxWords":2,"requiredPlaceholders":[],"forbiddenTerms":["alarm_control_panel"],"stateMatrix":[],"outputCount":1},
       "oracle": {"expectedStatus":"ok","acceptedTexts":["Disarm System"],"requiredCandidateCount":1,"requiredKeyPrefix":"notifications.","forbiddenPatterns":["alarm_control_panel"]}
-    },
-    {
-      "id": "refuse-app-manual",
-      "title": "Refuse App Manual rewrite",
-      "input": "Rewrite the App Manual article that explains thermostat automation. Make it warmer and shorter.",
-      "expectedRequest": {"mode":"rewrite","contextClass":"description","surface":"App Manual thermostat article","intent":"Restyle the App Manual thermostat explanation","ownership":"react","maxCharacters":null,"maxWords":null,"requiredPlaceholders":[],"forbiddenTerms":[],"stateMatrix":[],"outputCount":1},
-      "oracle": {"expectedStatus":"refused","requiredRefusalCode":"app-manual","requiredCandidateCount":0,"forbiddenPatterns":["rankedCandidates.+text"]}
     }
   ]
 }

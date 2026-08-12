@@ -19,8 +19,7 @@
   "singletonCaseIds": [
     "button-view-details-rewrite",
     "error-recipe-load",
-    "notification-body-security",
-    "refuse-app-manual"
+    "notification-body-security"
   ],
   "maxConcurrency": 3,
   "maxAiCredits": 30,

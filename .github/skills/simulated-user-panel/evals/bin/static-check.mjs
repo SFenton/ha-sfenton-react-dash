@@ -8,7 +8,6 @@ const readJson = async (path) => JSON.parse(await readFile(resolve(root, path), 
 const personas = await readJson('.github/skills/simulated-user-panel/evals/personas.json')
 const cases = await readJson('.github/skills/simulated-user-panel/evals/cases.json')
 const plan = await readJson('.github/skills/simulated-user-panel/evals/baseline-plan.json')
-const packageJson = await readJson('package.json')
 const skillText = await readFile(resolve(root, '.github/skills/simulated-user-panel/SKILL.md'), 'utf8')
 const previewText = await readFile(resolve(evalRoot, 'preview.no-proxy.config.mjs'), 'utf8')
 
@@ -46,21 +45,6 @@ for (const [id, model, effort, context, tier] of expectedCore) {
     `Core persona ${id} uses the expected profile.`,
     { expected: { model, effort, context, tier }, actual },
   )
-}
-
-const scriptNames = [
-  'manual:screenshots:check',
-  'manual:sync:app',
-  'manual:sync:ha',
-  'manual:capture',
-  'manual:capture:check',
-  'manual:screenshots:review',
-  'manual:screenshots:approve',
-  'manual:check',
-  'manual:check:ha',
-]
-for (const scriptName of scriptNames) {
-  check(Boolean(packageJson.scripts?.[scriptName]), `Package script ${scriptName} exists.`)
 }
 
 check(

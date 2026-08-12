@@ -37,7 +37,7 @@ export function FoodHubPage({ onNavigate, preload = false }: FoodHubPageProps) {
         preload={preload}
         settled={carouselLoadState !== 'loading'}
       >
-        <section className={`${styles.section} ${styles.leadingSection}`} data-manual-surface="food-suggested-recipes" id="section-suggested-recipes">
+        <section className={`${styles.section} ${styles.leadingSection}`} id="section-suggested-recipes">
           <SectionHeader title={copy('sections.suggestedRecipes')} />
           <SuggestedRecipeCarousel onLoadStateChange={handleCarouselLoadState} onOpenRecipe={recipeDetail.openRecipe} preload={preload} />
         </section>

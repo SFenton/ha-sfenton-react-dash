@@ -151,7 +151,6 @@ import { ClimateSheet, ContactSheet, LightsSheet, OccupancySheet } from './AtAGl
 import { CustomLightsPage } from './CustomLightsPage'
 import { FoodHubPage } from './FoodHubPage'
 import { RecipesPage } from './RecipesPage'
-import { AppManualPage } from './AppManualPage'
 import styles from './DashboardViewPage.module.css'
 
 interface DashboardViewPageProps {
@@ -1052,7 +1051,7 @@ function RoomSourcePreloadContent({ card, eightSleepModalState, roomTitle }: { c
 
 function EmptyRoomState() {
   return (
-    <div className={styles.emptyRoomState} data-empty-layout="centered" data-empty-typography="festival" data-manual-visible-section="Nothing Here Yet!">
+    <div className={styles.emptyRoomState} data-empty-layout="centered" data-empty-typography="festival">
       <h2>Nothing Here Yet!</h2>
       <Description>Once some devices are added to this room, we can display them here.</Description>
     </div>
@@ -1117,7 +1116,7 @@ function SourceRoomPage({ onNavigate, preload = false, preloadHash, preloadHashe
         )
 
         return (
-          <section className={styles.section} data-manual-rooms-context={room.path === 'living-room' && section.title === 'Climate' ? 'true' : undefined} id={sectionId(section.title)} key={`${room.path}-${section.title}`}>
+          <section className={styles.section} id={sectionId(section.title)} key={`${room.path}-${section.title}`}>
             <SectionHeader title={section.title} />
             <RoomGrid ariaLabel={`${room.title} ${section.title}`} layout={leadRow ? undefined : section.layout}>
               {leadCards.map(renderCard)}
@@ -1402,7 +1401,7 @@ function TodoEmptyState({ description = 'You have no chores due- nice job!', tit
 function VacuumPage({ preload = false }: { preload?: boolean }) {
   return (
     <div className={styles.stack}>
-      <section className={styles.section} data-manual-route-context="vacuums">
+      <section className={styles.section}>
         <SectionHeader title="Robot Vacuums" />
         <DynamicGrid ariaLabel="Robot vacuums" className={styles.vacuumGrid} columns={2}>
           {ORDERED_VACUUMS.map((vacuum) => (
@@ -1445,7 +1444,7 @@ function SettingsLink({ item, onNavigate }: { item: SettingsLinkConfig; onNaviga
   }
 
   return (
-    <button aria-label={`${item.title} ${item.subtitle}`} className={styles.settingsLink} data-external-path={item.externalPath} data-manual-visible-section={item.title} data-navigation-path={item.path} onClick={activate} type="button">
+    <button aria-label={`${item.title} ${item.subtitle}`} className={styles.settingsLink} data-external-path={item.externalPath} data-navigation-path={item.path} onClick={activate} type="button">
       <span aria-hidden="true" className={styles.settingsLinkIcon}>
         <MaterialIcon name={item.icon} size={28} />
       </span>
@@ -1459,7 +1458,7 @@ function SettingsLink({ item, onNavigate }: { item: SettingsLinkConfig; onNaviga
 
 function SettingsPage({ onNavigate }: { onNavigate: (path: string) => void }) {
   return (
-    <nav aria-label="Settings pages" className={styles.settingsList} data-manual-settings-context="true">
+    <nav aria-label="Settings pages" className={styles.settingsList}>
       {SETTINGS_PAGE_ITEMS.map((item) => (
         <SettingsLink item={item} key={item.title} onNavigate={onNavigate} />
       ))}
@@ -1469,7 +1468,7 @@ function SettingsPage({ onNavigate }: { onNavigate: (path: string) => void }) {
 
 function GuestControlsPage({ onNavigate }: { onNavigate: (path: string) => void }) {
   return (
-    <div className={styles.stack} data-manual-route-context="guests-staying-over">
+    <div className={styles.stack}>
       <section className={styles.section}>
         <SectionHeader title="Guest Controls" />
         <Description>{GUEST_CONTROLS_DESCRIPTION}</Description>
@@ -1691,7 +1690,7 @@ function VacationChecklistRow({ item, onStateChange, state }: { item: typeof VAC
   }
 
   return (
-    <li className={styles.vacationChecklistRow} data-manual-private-checklist-row="true">
+    <li className={styles.vacationChecklistRow}>
       <CheckboxRow
         active={active}
         aria-label={item.title}
@@ -1706,7 +1705,7 @@ function VacationChecklistRow({ item, onStateChange, state }: { item: typeof VAC
 
 function VacationChecklistSection({ onStateChange, states }: { onStateChange: (entityId: string, nextState: string) => void; states: Record<string, string> }) {
   return (
-    <section className={styles.section} data-manual-vacation-checklist="true">
+    <section className={styles.section}>
       <SectionHeader title="Pre-Vacation Checklist" />
       <ul className={styles.vacationChecklist}>
         {VACATION_PRE_CHECKLIST_ITEMS.map((item) => (
@@ -1822,7 +1821,7 @@ function VacationPage() {
   }
 
   return (
-    <div className={styles.stack} data-manual-route-context="vacation">
+    <div className={styles.stack}>
       <section className={styles.section}>
         <SectionHeader title="Vacation Mode" />
         <Description>{VACATION_MODE_DESCRIPTION}</Description>
@@ -1902,7 +1901,7 @@ function MediaPage({ preload = false, preloadHash, preloadHashes = [] }: { prelo
   }, [preload])
 
   return (
-    <div className={styles.stack} data-manual-route-context="media">
+    <div className={styles.stack}>
       {MEDIA_SOURCE_SECTIONS.map((section) => (
         <section className={styles.section} key={section.title}>
           <SectionHeader title={section.title} />
@@ -1948,7 +1947,7 @@ function AdminPage({ onNavigate, preload = false, preloadHash, preloadHashes = [
   }
 
   return (
-    <div className={styles.stack} data-manual-route-context="admin">
+    <div className={styles.stack}>
       <section className={styles.section}>
         <SectionHeader title="Security Controls" />
         <Description>{ADMIN_DESCRIPTIONS.autoLock}</Description>
@@ -4963,7 +4962,7 @@ function ThermostatSelectButton(config: ThermostatSelectControlConfig) {
 
   return (
     <>
-      <button aria-label={`${title} ${formatSelectOption(control.displayValue)}`} className={styles.thermostatSubButton} data-modal-opener-exception="option-picker" disabled={control.disabled} onClick={() => setOpen(true)} type="button">
+      <button aria-label={`${title} ${formatSelectOption(control.displayValue)}`} className={styles.thermostatSubButton} disabled={control.disabled} onClick={() => setOpen(true)} type="button">
         <MaterialIcon name={icon} size={22} />
         <MaterialIcon name="mdi:chevron-down" size={22} />
       </button>
@@ -5973,7 +5972,7 @@ function ThermostatPage({ preload = false, preloadHash, preloadHashes = [] }: { 
   const preloadRooms = useMemo(() => preloadTargets.map((preloadTargetHash) => THERMOSTAT_ROOM_VIEWS.find((room) => room.hash === preloadTargetHash)).filter((room): room is ThermostatRoomView => Boolean(room)), [preloadTargets])
 
   return (
-    <div className={`${styles.stack} ${styles.thermostatPage}`} data-manual-route-context="ecobee">
+    <div className={`${styles.stack} ${styles.thermostatPage}`}>
       <section className={styles.section}>
         <SectionHeader title="Whole Home" />
         <WholeHomeThermostatDial />
@@ -6016,7 +6015,7 @@ function ThermostatPage({ preload = false, preloadHash, preloadHashes = [] }: { 
 function ControlPage({ onNavigate, path }: { onNavigate: (path: string) => void; path: string }) {
   const config = CONTROL_PAGES[path]
   if (!config) return null
-  return <div data-manual-route-context={path}><EntitySections onNavigate={onNavigate} sections={config.sections} /></div>
+  return <div><EntitySections onNavigate={onNavigate} sections={config.sections} /></div>
 }
 
 function EverShelfInventoryPage({ controls, path }: { controls: EverShelfInventoryControls; path: string }) {
@@ -6035,7 +6034,6 @@ function Content({ inventoryControls, onNavigate, onRecipesInitialResolved, onSc
   const todoConfigPath = todoPageConfigPath(path)
   if (TODO_PAGES[todoConfigPath]) return <TodoPage configPath={todoConfigPath} onNavigate={onNavigate} onScrollLockChange={onScrollLockChange} path={path} />
   if (path === 'settings') return <SettingsPage onNavigate={onNavigate} />
-  if (path === 'manual') return <AppManualPage preload={preload} />
   if (path === 'guests-staying-over') return <GuestControlsPage onNavigate={onNavigate} />
   if (path === 'vacation') return <VacationPage />
   if (path === 'vacuums') return <VacuumPage preload={preload} />

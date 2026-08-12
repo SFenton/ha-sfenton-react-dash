@@ -7,13 +7,10 @@ import ts from 'typescript'
 const INVENTORY_VERSION = 1
 const BASELINE_VERSION = 2
 const ROOT = process.cwd()
-const INVENTORY_PATH = 'scripts/i18n/generated/non-manual-copy-inventory.json'
+const INVENTORY_PATH = 'scripts/i18n/generated/copy-inventory.json'
 const BASELINE_PATH = 'scripts/i18n/generated/legacy-copy-baseline.json'
 
 const EXCLUDED_FILE_PARTS = [
-  '/src/manual/',
-  '/src/components/manual/',
-  '/src/pages/AppManualPage',
   '/src/i18n/',
 ] as const
 
@@ -29,8 +26,6 @@ const EXCLUDED_PROPERTY_NAMES = new Set([
   'id',
   'implementation',
   'kind',
-  'manualArticleId',
-  'manualVisibleSectionNames',
   'path',
   'route',
   'routePath',
@@ -164,7 +159,6 @@ export interface CopyInventoryRecord {
 
 interface CopyInventory {
   exclusions: {
-    appManual: true
     dynamicBackendText: true
     tests: true
   }
@@ -565,7 +559,6 @@ export function buildCopyInventory(root = ROOT): CopyInventory {
   const records = [...catalog, ...documents, ...legacy]
   return {
     exclusions: {
-      appManual: true,
       dynamicBackendText: true,
       tests: true,
     },

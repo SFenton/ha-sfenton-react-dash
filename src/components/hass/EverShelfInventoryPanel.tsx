@@ -654,7 +654,7 @@ function PantryRow({ expiry, extraBatchCount, locationLabel, multiItem, onDelete
           </button>
         ) : (
           <>
-            <button aria-label={`Edit ${title}`} className={styles.rowAction} data-modal-opener-exception="edit-action" disabled={!deletable} onClick={(event) => {
+            <button aria-label={`Edit ${title}`} className={styles.rowAction} disabled={!deletable} onClick={(event) => {
               event.stopPropagation()
               onOpenDetails()
             }} type="button">

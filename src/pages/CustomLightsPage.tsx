@@ -112,7 +112,6 @@ function ModeToggleCard({ onOpenModePicker }: { onOpenModePicker: () => void }) 
         <button
           aria-label="Select lighting mode"
           className={styles.modeSelect}
-          data-modal-opener-exception="option-picker"
           onClick={onOpenModePicker}
           type="button"
         >

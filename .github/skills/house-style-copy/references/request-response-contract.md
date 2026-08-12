@@ -95,7 +95,7 @@ Refusals use:
 
 ```json
 {
-  "code": "app-manual|proper-noun|react-notification|privacy|injection|unsafe",
+  "code": "proper-noun|react-notification|privacy|injection|unsafe",
   "reason": "Brief explanation."
 }
 ```

@@ -1,9 +1,8 @@
-// GENERATED FILE. Run `npm run manual:sync:mocks`; do not edit by hand.
 // Privacy-sanitized synthetic defaults only; no live household state or sensitive attributes are retained.
 
-import type { MockEntity } from '../hakitCoreState'
+import type { MockEntity } from './hakitCoreState'
 
-export const generatedMockEntities = {
+export const mockEntitiesFixture = {
   "automation.attempt_to_turn_power_back_on_in_living_room": {
     "attributes": {},
     "entity_id": "automation.attempt_to_turn_power_back_on_in_living_room",

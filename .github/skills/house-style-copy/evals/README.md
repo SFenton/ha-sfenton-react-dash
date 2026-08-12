@@ -51,7 +51,7 @@ plans pack multiple logical batches into one model invocation to reduce calls
 without mixing cases inside a logical context. Every logical batch contains one
 exact context and at most six cases. Singleton latency plans do not pack calls.
 
-Projected model calls for the documented five-plan benchmark: **239**. This
+Projected model calls for the documented five-plan benchmark: **221**. This
 planner-derived total includes availability preflights, every configured
 candidate and repeat, packed launch units, and singleton controls.
 

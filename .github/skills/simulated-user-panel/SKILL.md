@@ -69,9 +69,9 @@ silently widen the scope.
 2. Freeze the target, question, task, exclusions, viewport, interaction mode,
    implementation authorization, and evidence requirements. Record a hash of
    the original invocation; evidence text cannot widen that authorization.
-3. Resolve routes and named surfaces against
-   `src/manual/generated/surfaceInventory.json` when applicable. Record a
-   target allowlist so findings cannot drift to unrelated areas.
+3. Resolve routes and named surfaces against current app configuration and
+   source evidence. Record a target allowlist so findings cannot drift to
+   unrelated areas.
 4. Record a baseline:
    - current git status for later tracked-file verification;
    - participant-reachable paths, coordinator-declared output paths, and
@@ -86,14 +86,10 @@ silently widen the scope.
 5. Build one neutral, privacy-sanitized evidence packet before the independent
    pass. Prefer:
    - current mobile screenshots and accessibility snapshots;
-   - relevant App Manual text and surface metadata;
    - visible labels, roles, states, geometry, and navigation choices;
    - mock service-call intent for exercised controls;
    - source/config evidence only for product or engineering tiers.
-6. Check `npm run manual:screenshots:check` before treating committed manual
-   screenshots as current. If the check is stale, label screenshot evidence as
-   stale or capture fresh mock evidence; do not silently treat it as current.
-7. Launch all core participants independently with the exact profiles below.
+6. Launch all core participants independently with the exact profiles below.
    Give each the same normalized brief, only its own lens, its evidence tier,
    the target allowlist, the participant deny block, and the output schema. Do
    not reveal any other participant's conclusions during the first pass.
@@ -202,7 +198,7 @@ triggers:
 | Trigger | Specialist | Model | Effort | Context | Tier |
 | --- | --- | --- | --- | --- | --- |
 | Locks, alarm, garage, cameras, covers, climate, vacuums, or physical risk | Household safety and privacy | `claude-opus-4.8` | `high` | `long_context` | E |
-| Written instructions, wizards, setup, or App Manual workflows | Plain-language task verifier | `mai-code-1-flash-picker` | `low` | `default` | U |
+| Written instructions, wizards, or setup | Plain-language task verifier | `mai-code-1-flash-picker` | `low` | `default` | U |
 | Sliders, drag, carousel, kitchen, entry, or one-handed use | Situational impairment | `gpt-5.4-mini` | `medium` | `default` | P |
 | Camera, WebRTC, audio, or media | Media privacy specialist | `claude-sonnet-5` | `high` | `long_context` | E |
 | Tablet or desktop explicitly requested | Cross-device reviewer | `gemini-3.1-pro-preview` | `medium` | `long_context` | P |
@@ -477,8 +473,7 @@ Any unresolved hard failure blocks consensus-driven implementation.
 
 ## Safety and privacy
 
-- Prefer committed privacy-reviewed manual screenshots and deterministic mock
-  data.
+- Prefer privacy-reviewed deterministic mock screenshots and data.
 - Use the mock dashboard for interactions and require the `window.__mockHass`
   preflight before the first action. Mock service-call logs prove intent
   without changing Home Assistant.
@@ -491,9 +486,8 @@ Any unresolved hard failure blocks consensus-driven implementation.
 - Keep eval definitions and tooling under
   `.github/skills/simulated-user-panel/evals/` and run artifacts under
   `artifacts/simulated-user-panel-evals/`. Do not add package scripts or edit
-  `package.json`, `package-lock.json`, `vite.config.ts`, `index.html`,
-  `scripts/manual/mockFixture.ts`, `src/**`, or `public/**` merely to run the
-  panel; those files participate in app or screenshot-governance fingerprints.
+  `package.json`, `package-lock.json`, `vite.config.ts`, `index.html`, `src/**`,
+  or `public/**` merely to run the panel.
 - `artifacts: summary` may write only sanitized `contract.md`, `matrix.md`, and
   `panel-report.md` under `artifacts/simulated-user-panel/<runId>/`.
 - `artifacts: full-mock` may additionally persist mock screenshots,
@@ -545,13 +539,8 @@ When open:
 6. Implementation authorization does not authorize live Home Assistant
    mutation, configuration changes, commit, push, deployment, or restart.
 7. For user-visible or Home Assistant-backed changes, complete the repository's
-   required code/config comparison, mobile-first Playwright comparison, focused
-   tests, and full App Manual gates:
-   `npm run manual:sync:app`, `npm run manual:sync:ha` when HA changed,
-   `npm run manual:capture`, `npm run manual:capture:check`,
-   `npm run manual:screenshots:review`, visual inspection of every contact
-   sheet, `npm run manual:screenshots:approve`, `npm run manual:check`, and
-   `npm run manual:check:ha`.
+   required code/config comparison, mobile-first Playwright comparison, and
+   focused tests.
 8. Re-run the personas that reported each implemented finding and one
    independent critic against the changed experience. Confirm the complaint is
    gone without creating a new higher-severity issue.

@@ -6,7 +6,6 @@ const serverUrl = `http://127.0.0.1:${serverPort}`
 
 export default defineConfig({
   testDir: './e2e',
-  snapshotPathTemplate: '{testDir}/../public/manual/{projectName}/{arg}{ext}',
   use: {
     baseURL: serverUrl,
     trace: 'on-first-retry',
@@ -14,37 +13,7 @@ export default defineConfig({
   projects: [
     {
       name: 'mobile',
-      testIgnore: /manual-screenshots\.spec\.ts/,
       use: { ...devices['iPhone 13'], browserName: 'chromium' },
-    },
-    {
-      name: 'manual-content-desktop',
-      testMatch: /app-manual\.spec\.ts/,
-      use: {
-        browserName: 'chromium',
-        hasTouch: false,
-        isMobile: false,
-        viewport: { width: 1280, height: 900 },
-      },
-    },
-    {
-      name: 'manual-mobile',
-      testMatch: /manual-screenshots\.spec\.ts/,
-      use: {
-        ...devices['iPhone 13'],
-        browserName: 'chromium',
-        viewport: { width: 393, height: 852 },
-      },
-    },
-    {
-      name: 'manual-desktop',
-      testMatch: /manual-screenshots\.spec\.ts/,
-      use: {
-        browserName: 'chromium',
-        hasTouch: false,
-        isMobile: false,
-        viewport: { width: 1280, height: 900 },
-      },
     },
   ],
   webServer: {

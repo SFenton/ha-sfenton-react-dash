@@ -831,8 +831,6 @@ export function ClimateSheet({ directGroup, hideDirectHeader = false, overviewGr
   return (
     <div
       className={styles.climateSheet}
-      data-manual-sheet="climate"
-      data-manual-sheet-view={selectedGroup ? 'detail' : 'overview'}
       data-square-overview={squareOverview ? 'true' : 'false'}
     >
       {selectedGroup ? (!hideDirectHeader && <RoomClimateDetailHeader group={selectedGroup} onBack={directMode ? undefined : showRoomOverview} />) : <RoomsHeader />}
@@ -940,8 +938,6 @@ export function OccupancySheet({ directGroup, hideDirectHeader = false, overview
   return (
     <div
       className={styles.occupancySheet}
-      data-manual-sheet="occupancy"
-      data-manual-sheet-view={selectedGroup ? 'detail' : 'overview'}
       data-square-overview="false"
     >
       {selectedGroup && !hideDirectHeader && <RoomOccupancyDetailHeader group={selectedGroup} onBack={directMode ? undefined : showRoomOverview} />}
@@ -1057,8 +1053,6 @@ export function ContactSheet({
   return (
     <div
       className={styles.contactSheet}
-      data-manual-sheet="contact"
-      data-manual-sheet-view={selectedGroup ? 'detail' : 'overview'}
     >
       {selectedGroup ? (!hideDirectHeader && <RoomContactDetailHeader group={selectedGroup} onBack={directMode ? undefined : showRoomOverview} />) : <RoomsHeader />}
       <div className={styles.contactContent}>
@@ -1120,8 +1114,6 @@ export function AirQualitySheet({ overviewGridRef, overviewGridStyle }: AirQuali
   return (
     <div
       className={styles.airQualitySheet}
-      data-manual-sheet="air-quality"
-      data-manual-sheet-view="overview"
       data-square-overview={squareOverview ? 'true' : 'false'}
     >
       <RoomsHeader />
@@ -1309,7 +1301,7 @@ export function AtAGlancePage({ activePath = 'overview', deferRouteContent = fal
           <DashboardPageLoading label="Loading Home dashboard content" phase={activeLoadingPhase} />
         ) : (
           <div className={styles.homeContent}>
-            <div className={styles.weatherWrap} data-manual-home-context="true">
+            <div className={styles.weatherWrap}>
               <WeatherSummary deferRefresh={!hydrateHeavyContent} />
             </div>
 
