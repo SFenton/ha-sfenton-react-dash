@@ -7,7 +7,7 @@ import { WEATHER_HOURLY_MODES, type WeatherHourlyMode } from '../../constants/su
 import { MaterialIcon } from '../core/Icon'
 import { materialIconPath } from '../core/iconPaths'
 import { ModalSheet } from '../core/ModalSheet'
-import { ModalDisclosureIcon } from '../core/ModalDisclosureIcon'
+import { SurfaceAccessory } from '../core/SurfaceAccessory'
 import { asEntityName } from './entityState'
 import styles from './WeatherSummary.module.css'
 
@@ -1179,7 +1179,7 @@ export function WeatherSummary({ deferRefresh = false }: WeatherSummaryProps) {
           <HeroDayForecast entity={weather} forecast={today} />
           <HeroHourlyStrip entity={weather} forecasts={hourlyForecasts} />
         </span>
-        <ModalDisclosureIcon className={styles.disclosure} />
+        <SurfaceAccessory className={styles.disclosure} semantics={{ kind: 'modal' }} />
       </button>
 
       <ModalSheet open={open} title="Weather" subtitle="Pirate Weather · 7-day forecast" onClose={() => setOpen(false)}>

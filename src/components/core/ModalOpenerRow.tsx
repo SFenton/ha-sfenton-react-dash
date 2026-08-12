@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { ModalDisclosureIcon } from './ModalDisclosureIcon'
+import { SurfaceAccessory } from './SurfaceAccessory'
 import styles from './ModalOpenerRow.module.css'
 
 interface ModalOpenerRowProps {
@@ -41,7 +41,7 @@ export function ModalOpenerRow({
         <strong data-dynamic-grid-label="true">{title}</strong>
         {subtitle && <small>{subtitle}</small>}
       </span>
-      <ModalDisclosureIcon size={variant === 'compact' ? 'compact' : 'standard'} />
+      <SurfaceAccessory semantics={{ kind: 'modal' }} size={variant === 'compact' ? 'compact' : 'standard'} />
     </button>
   )
 }

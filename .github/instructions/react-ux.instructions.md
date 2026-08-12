@@ -4,6 +4,16 @@ applyTo: "src/pages/**/*.tsx,src/components/**/*.tsx,src/pages/**/*.module.css,s
 ---
 # React UX Instructions
 
+- All changed dashboard surfaces must honor the single-experience
+  [Current UX Contract](../../docs/ux/current-ux-contract.md). Preserve one
+  React tree, one established visual system, and one Home Assistant
+  state/service path; do not add switchable experience modes or root
+  mode-specific selectors.
+- Interactive surfaces must use the explicit typed semantics and shared
+  accessory path defined in
+  [Interaction Semantics](interaction-semantics.instructions.md). Use
+  `ControlSemantics` and `SurfaceAccessory`; reserve chevrons for modal and
+  in-app navigation disclosure.
 - Use the shared `<Description />` control from `src/components/core/Description.tsx` for descriptive UX copy in React components and page files.
 - Do not add page-local paragraph wrappers or ad hoc description CSS when `<Description />` can represent the copy.
 - Keep descriptive text close to the source configuration or page constants when it is source-derived, but render it through `<Description />`.

@@ -44,13 +44,16 @@ export interface PresenceOverrideConfig {
   entityId: string
 }
 
-export interface SettingsLinkConfig {
+interface SettingsLinkBase {
   title: string
   subtitle: string
   icon: string
-  externalPath?: string
-  path?: string
 }
+
+export type SettingsLinkConfig = SettingsLinkBase & (
+  | { externalPath: string; path?: never }
+  | { externalPath?: never; path: string }
+)
 
 /** Groups a todo list into the bucket its count contributes to in chore quick-link subtitles. */
 export type TodoCountBucket = 'overdue' | 'upcoming' | 'no-due-date'

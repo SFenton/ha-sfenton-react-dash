@@ -607,7 +607,6 @@ export function RecipeDetailModal({ controller }: { controller: RecipeDetailModa
       onClose={controller.close}
       open={controller.open && controller.selectedRecipe !== null}
       scrollResetKey={`${controller.selectedRecipe?.id ?? 'none'}:${controller.activeTab}`}
-      surface="hass-popup"
       title={title}
     >
       {content}

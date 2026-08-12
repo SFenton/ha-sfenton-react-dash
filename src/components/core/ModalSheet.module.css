@@ -49,54 +49,6 @@
   outline: none;
 }
 
-.content[data-chrome='source-popup'] {
-  top: 0;
-  height: 100vh;
-  max-height: 100vh;
-  height: var(--dashboard-visible-height, var(--dashboard-viewport-height, 100dvh));
-  max-height: var(--dashboard-visible-height, var(--dashboard-viewport-height, 100dvh));
-  border: 0;
-  border-radius: 0;
-  background: var(--color-modal-surface);
-}
-
-.content[data-chrome='source-popup'] .header {
-  position: absolute;
-  top: calc(46px + env(safe-area-inset-top, 0px));
-  right: 32px;
-  left: 32px;
-  z-index: 2;
-  padding: 0;
-}
-
-.content[data-chrome='source-popup'] .title {
-  color: white;
-  font-size: 1.08rem;
-  font-weight: 820;
-  line-height: 1.05;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.content[data-chrome='source-popup'] .subtitle {
-  display: none;
-}
-
-.content[data-chrome='source-popup'] .close {
-  width: 60px;
-  height: 60px;
-  border-color: rgba(255, 255, 255, 0.1);
-  color: white;
-  background: rgba(31, 31, 31, 0.78);
-}
-
-.content[data-chrome='source-popup'] .body {
-  padding-right: 18px;
-  padding-top: calc(92px + env(safe-area-inset-top, 0px));
-  padding-left: 18px;
-}
-
 .handle {
   flex: 0 0 5px;
   width: 42px;
@@ -292,32 +244,6 @@
     padding: 12px 24px 20px;
   }
 
-  .content[data-chrome='source-popup'] {
-    top: 50%;
-    right: auto;
-    bottom: auto;
-    left: 50%;
-    width: var(--modal-desktop-width, 90vw);
-    max-width: var(--modal-desktop-max-width, calc(var(--dashboard-viewport-width, 100vw) - 64px));
-    height: var(--modal-desktop-height, 90vh);
-    max-height: var(--modal-desktop-max-height, calc(100vh - 64px));
-    height: var(--modal-desktop-height, 90dvh);
-    max-height: var(--modal-desktop-max-height, calc(var(--dashboard-visible-height, var(--dashboard-viewport-height, 100dvh)) - 64px));
-    border-radius: 34px;
-    transform: translate3d(-50%, -50%, 0);
-  }
-
-  .content[data-chrome='source-popup'] .header {
-    position: relative;
-    top: auto;
-    right: auto;
-    left: auto;
-    padding: 20px 24px 16px;
-  }
-
-  .content[data-chrome='source-popup'] .body {
-    padding: 0 24px 26px;
-  }
 }
 
 @keyframes desktopModalIn {
