@@ -190,6 +190,19 @@ function mockRecipeIngredient(
       quantity_state: options.quantityState ?? 'unknown',
       quantity_sufficiency: 'unknown',
     },
+    feedback_token: String(position + 1).padStart(64, 'a').slice(-64),
+    user_override: null,
+    identity_feedback: null,
+    feedback_capabilities: {
+      availability_override: true,
+      identity: Boolean(options.closestMatch || options.matchedProduct),
+      decision: true,
+      assume_have: true,
+      select_inventory_product: state !== 'staple',
+      reject_current_match: state === 'in_stock' || state === 'staple',
+      positive_identity: state !== 'staple',
+      negative_identity: Boolean(options.matchedProduct),
+    },
   }
 }
 
@@ -218,6 +231,7 @@ function mockRecipeDetail(recipeId: number) {
           ? `https://cookidoo.example.test/recipes/mock-${recipeId}`
           : `https://recipes.example.test/catalog/${recipeId}`,
         locale: 'en-US',
+        content_language: externalOnly ? 'en' : null,
         rights_basis: externalOnly ? 'provider_metadata_v2' : 'user_authorized',
       },
       images: {
@@ -226,11 +240,24 @@ function mockRecipeDetail(recipeId: number) {
       },
       general: {
         yield: { quantity: externalOnly ? 4 : 2, unit: externalOnly ? 'portions' : 'bowls' },
+        prep_time_seconds: 600,
+        cook_time_seconds: 1_200,
         active_time_seconds: 1_500,
+        inactive_time_seconds: 300,
         total_time_seconds: 3_600,
         difficulty: 'Easy',
         primary_category: 'Dinner',
+        devices: ['TM6', 'Oven'],
+        optional_devices: ['Slow cooker'],
         equipment: ['Large bowl', 'Sheet pan'],
+      },
+      planner: {
+        available: externalOnly,
+        account_scope: 'configured_account',
+        minimum_date: '2026-08-12',
+        maximum_date: '2027-08-12',
+        provider_action_token: externalOnly ? 'b'.repeat(64) : null,
+        reason: externalOnly ? null : 'not_cookidoo',
       },
       ingredients: [
         mockRecipeIngredient(0, 'tomato', missingState, {
@@ -438,6 +465,9 @@ function mockRecipeDetail(recipeId: number) {
         instructions: externalOnly ? 'external_link' : 'local',
         quantities: externalOnly ? 'display_only' : 'known',
         grocery_add: groceryState !== 'unsupported',
+        ingredient_feedback: true,
+        ingredient_feedback_v2: true,
+        planner: externalOnly,
       },
     },
   }
@@ -1584,6 +1614,23 @@ export const mockState: MockHassState = {
                 failed: partialFailure && outcomes.length > 0 ? 1 : 0,
               },
             },
+          },
+        })
+      }
+      if (
+        params.domain === 'evershelf'
+        && (
+          params.service === 'recipe_ingredient_override'
+          || params.service === 'recipe_identity_feedback'
+          || params.service === 'recipe_ingredient_decision'
+          || params.service === 'recipe_planner_add'
+        )
+        && params.returnResponse === true
+      ) {
+        return Promise.resolve({
+          response: {
+            success: true,
+            ...(params.serviceData as Record<string, unknown>),
           },
         })
       }

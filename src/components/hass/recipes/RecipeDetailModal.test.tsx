@@ -32,6 +32,7 @@ function ingredient(
     closestMatchConfidence?: number
     closestMatchSource?: string
     displayName?: string
+    feedback?: boolean
     matched?: string
     optional?: boolean | null
     providerMetadata?: Record<string, unknown>
@@ -51,7 +52,7 @@ function ingredient(
     ...(options.displayName ? { display_name: options.displayName } : {}),
     ...(options.sourceText ? { source_text: options.sourceText } : {}),
     ...(options.optional === undefined ? {} : { source_optional: options.optional }),
-    ...(options.providerMetadata ? { provider_metadata: options.providerMetadata } : {}),
+    ...(options.providerMetadata ? { provider: options.providerMetadata } : {}),
     ...(options.closestMatch
       ? {
           closest_match: {
@@ -77,6 +78,23 @@ function ingredient(
       quantity_state: options.quantityState ?? 'unknown',
       quantity_sufficiency: 'unknown',
     },
+    ...(options.feedback
+      ? {
+          feedback_token: String(position + 1).padStart(64, 'a').slice(-64),
+          user_override: null,
+          identity_feedback: null,
+          feedback_capabilities: {
+            availability_override: true,
+            identity: Boolean(options.closestMatch || options.matched),
+            decision: true,
+            assume_have: true,
+            select_inventory_product: state !== 'staple',
+            reject_current_match: state === 'in_stock' || state === 'staple',
+            positive_identity: state !== 'staple',
+            negative_identity: Boolean(options.matched),
+          },
+        }
+      : {}),
   }
 }
 
@@ -85,6 +103,7 @@ interface DetailResponseOptions {
   closestMatchSource?: string
   confirmedMissingCount?: number
   externalOnly?: boolean
+  feedbackEnabled?: boolean
   freshnessIsStale?: boolean | null
   groceryAdd?: boolean
   groceryAddReason?: string
@@ -97,6 +116,7 @@ interface DetailResponseOptions {
   missingIngredients?: boolean
   noIngredients?: boolean
   optionalTomatoes?: boolean | null
+  plannerEnabled?: boolean
   tomatoAmount?: {
     quantity: number | null
     quantityMax: number | null
@@ -112,6 +132,7 @@ function detailResponse({
   closestMatchSource = 'taxonomy_alias',
   confirmedMissingCount,
   externalOnly = false,
+  feedbackEnabled = false,
   freshnessIsStale = false,
   groceryAdd = true,
   groceryAddReason,
@@ -124,6 +145,7 @@ function detailResponse({
   missingIngredients = true,
   noIngredients = false,
   optionalTomatoes,
+  plannerEnabled = false,
   tomatoAmount = { quantity: null, quantityMax: null, text: '1 can', unit: null },
   uncertainCount,
   uncertainIngredients = true,
@@ -136,6 +158,7 @@ function detailResponse({
           quantityState: 'display_only',
           sourceText: '1 can diced tomatoes, drained',
           optional: optionalTomatoes,
+          feedback: feedbackEnabled,
           quantity: tomatoAmount.quantity,
           quantityMax: tomatoAmount.quantityMax,
           text: tomatoAmount.text,
@@ -143,16 +166,18 @@ function detailResponse({
         }),
         ingredient(1, 'Rice', 'in_stock', {
           matched: 'Long grain rice',
+          feedback: feedbackEnabled,
           quantityState: 'known',
           relation: 'exact',
           sourceText: '2 c Rice',
           text: '2 cups',
         }),
-        ingredient(2, 'Salt', 'staple', { quantityState: 'display_only', sourceText: 'Salt', text: 'to taste' }),
+        ingredient(2, 'Salt', 'staple', { feedback: feedbackEnabled, quantityState: 'display_only', sourceText: 'Salt', text: 'to taste' }),
         ingredient(3, 'Fresh herbs', uncertainIngredients ? 'uncertain' : 'in_stock', {
           closestMatch: uncertainIngredients ? 'Italian parsley' : undefined,
           closestMatchConfidence,
           closestMatchSource,
+          feedback: feedbackEnabled,
           matched: uncertainIngredients ? 'Dried herbs' : undefined,
           relation: uncertainIngredients ? 'taxonomy_ancestor' : 'exact',
         }),
@@ -174,6 +199,7 @@ function detailResponse({
             ? 'https://cookidoo.example.test/recipes/mock-42'
             : 'https://recipes.example.test/42',
           locale: 'en-US',
+          content_language: externalOnly ? 'en' : null,
           rights_basis: externalOnly ? 'provider_metadata_v2' : 'user_authorized',
         },
         images: {
@@ -182,11 +208,24 @@ function detailResponse({
         },
         general: {
           yield: { quantity: 4, unit: 'servings' },
+          prep_time_seconds: 600,
+          cook_time_seconds: 1_200,
           active_time_seconds: 1_500,
+          inactive_time_seconds: 300,
           total_time_seconds: 3_600,
           difficulty: 'Easy',
           primary_category: 'Dinner',
+          devices: ['TM6', 'Oven'],
+          optional_devices: ['Slow cooker'],
           equipment: ['Large bowl'],
+        },
+        planner: {
+          available: plannerEnabled,
+          account_scope: 'configured_account',
+          minimum_date: '2026-08-12',
+          maximum_date: '2027-08-12',
+          provider_action_token: plannerEnabled ? 'b'.repeat(64) : null,
+          reason: plannerEnabled ? null : 'planner_app_disabled',
         },
         ingredients,
         ...(ingredientGroups === undefined ? {} : { ingredient_groups: ingredientGroups }),
@@ -234,6 +273,9 @@ function detailResponse({
           instructions: externalOnly ? 'external_link' : 'local',
           quantities: externalOnly ? 'display_only' : 'known',
           grocery_add: groceryAdd,
+          ingredient_feedback: feedbackEnabled,
+          ingredient_feedback_v2: feedbackEnabled,
+          planner: plannerEnabled,
           ...(groceryAddState === undefined ? {} : { grocery_add_state: groceryAddState }),
           ...(groceryAddReason === undefined ? {} : { grocery_add_reason: groceryAddReason }),
         },
@@ -322,7 +364,7 @@ describe('RecipeDetailModal', () => {
       await within(dialog).findByText('Serves 4')
 
       const generalTab = within(dialog).getByRole('tab', { name: 'General' })
-      const sourceLink = within(dialog).getByRole('link', { name: 'Open Source Recipe' })
+      const sourceLink = within(dialog).getByRole('link', { name: 'Open in Cookidoo' })
       const closeButton = within(dialog).getByRole('button', { name: 'Close' })
       for (const control of [generalTab, sourceLink, closeButton]) {
         control.focus()
@@ -466,17 +508,28 @@ describe('RecipeDetailModal', () => {
       render(<Harness />)
       const dialog = await openRecipe()
       expect(await within(dialog).findByText('Serves 4')).toBeInTheDocument()
+      expect(within(dialog).getByText('10 min')).toBeInTheDocument()
+      expect(within(dialog).getByText('20 min')).toBeInTheDocument()
       expect(within(dialog).getByText('25 min')).toBeInTheDocument()
+      expect(within(dialog).getByText('5 min')).toBeInTheDocument()
       expect(within(dialog).getByText('1 hr')).toBeInTheDocument()
-      expect(within(dialog).getAllByRole('group')).toHaveLength(8)
+      expect(within(dialog).getAllByRole('group')).toHaveLength(11)
       expect(within(dialog).getByRole('group', { name: 'Yield Serves 4' })).toHaveAttribute('data-icon', 'mdi:account-group')
+      expect(within(dialog).getByRole('group', { name: 'Prep Time 10 min' })).toHaveAttribute('data-icon', 'mdi:timer-cog')
+      expect(within(dialog).getByRole('group', { name: 'Cook Time 20 min' })).toHaveAttribute('data-icon', 'mdi:pot-steam')
       expect(within(dialog).getByRole('group', { name: 'Active Time 25 min' })).toBeInTheDocument()
+      expect(within(dialog).getByRole('group', { name: 'Inactive/Rest Time 5 min' })).toHaveAttribute('data-icon', 'mdi:pause-circle')
       expect(within(dialog).getByRole('group', { name: 'Total Time 1 hr' })).toBeInTheDocument()
       expect(within(dialog).getByRole('group', { name: 'Difficulty Easy' })).toBeInTheDocument()
       expect(within(dialog).getByRole('group', { name: 'Category Dinner' })).toBeInTheDocument()
       expect(within(dialog).getByRole('group', { name: 'Source Household recipe' })).toBeInTheDocument()
       expect(within(dialog).getByRole('group', { name: 'Locale en-US' })).toBeInTheDocument()
       expect(within(dialog).getByRole('group', { name: 'Freshness Current Aug 7, 2026' })).toHaveAttribute('data-tone', 'ok')
+      expect(within(dialog).getByRole('heading', { name: 'Devices' })).toBeInTheDocument()
+      expect(within(dialog).getByText('TM6')).toBeInTheDocument()
+      expect(within(dialog).getByText('Oven')).toBeInTheDocument()
+      expect(within(dialog).getByRole('heading', { name: 'Optional Devices' })).toBeInTheDocument()
+      expect(within(dialog).getByText('Slow cooker')).toBeInTheDocument()
       expect(within(dialog).getByRole('heading', { name: 'Additional Equipment' })).toBeInTheDocument()
       expect(within(dialog).queryByText(/Required Equipment/i)).not.toBeInTheDocument()
       expect(within(dialog).getByRole('link', { name: 'Open Source Recipe' })).toHaveAttribute('href', 'https://recipes.example.test/42')
@@ -487,9 +540,9 @@ describe('RecipeDetailModal', () => {
       fireEvent.keyDown(generalTab, { key: 'ArrowRight' })
       await waitFor(() => expect(within(dialog).getByRole('tabpanel', { name: 'Ingredients' })).toBeInTheDocument())
       await waitFor(() => expect(within(dialog).getByRole('tab', { name: 'Ingredients' })).toHaveFocus())
-      expect(await within(dialog).findByRole('checkbox', { name: /Diced Tomatoes · 1 can: Missing from inventory/ })).toHaveAttribute('aria-checked', 'false')
-      expect(within(dialog).getByRole('checkbox', { name: /Rice · 2 cups: Exact inventory match/ })).toHaveAttribute('aria-checked', 'true')
-      expect(within(dialog).getByRole('checkbox', { name: /Fresh herbs: Inventory match uncertain/ })).toHaveAttribute('aria-checked', 'mixed')
+      expect(await within(dialog).findByRole('group', { name: /Diced Tomatoes · 1 can: Missing from inventory/ })).toHaveAttribute('data-status', 'unchecked')
+      expect(within(dialog).getByRole('group', { name: /Rice · 2 cups: Exact inventory match/ })).toHaveAttribute('data-status', 'checked')
+      expect(within(dialog).getByRole('group', { name: /Fresh herbs: Inventory match uncertain/ })).toHaveAttribute('data-status', 'unchecked')
       expect(within(dialog).getByText('Product: Long grain rice')).toBeInTheDocument()
       expect(within(dialog).getByText('Diced Tomatoes · 1 can')).toBeInTheDocument()
       expect(within(dialog).getAllByText('Source quantity is display-only').length).toBeGreaterThan(0)
@@ -501,7 +554,7 @@ describe('RecipeDetailModal', () => {
       expect(within(dialog).queryByText('Source: Salt')).not.toBeInTheDocument()
       expect(within(dialog).queryByText('Source: 2 c Rice')).not.toBeInTheDocument()
       expect(within(dialog).getAllByText(/Quantity sufficiency is unknown/).length).toBeGreaterThan(0)
-      expect(within(dialog).getAllByRole('checkbox').every((row) => !row.hasAttribute('aria-pressed'))).toBe(true)
+      expect([...dialog.querySelectorAll('[data-read-only="true"]')].every((row) => !row.hasAttribute('aria-pressed'))).toBe(true)
 
       const groceryButton = within(dialog).getByRole('button', { name: 'Add Missing Ingredients to Groceries' })
       expect(groceryButton).toBeEnabled()
@@ -545,6 +598,398 @@ describe('RecipeDetailModal', () => {
       expect((groceryCalls[0].serviceData as { idempotency_key: string }).idempotency_key).toMatch(
         /^[A-Za-z0-9._:-]{1,128}$/,
       )
+    } finally {
+      mockState.helpers.callService = originalCallService
+    }
+  })
+
+  it('omits unavailable time and device facts while preserving available equipment', async () => {
+    const originalCallService = mockState.helpers.callService
+    const response = detailResponse() as unknown as {
+      response: {
+        detail: {
+          general: Record<string, unknown>
+        }
+      }
+    }
+    Object.assign(response.response.detail.general, {
+      prep_time_seconds: null,
+      cook_time_seconds: null,
+      inactive_time_seconds: null,
+      devices: [],
+      optional_devices: [],
+    })
+    mockState.helpers.callService = (params) => (
+      params.service === 'recipe_detail'
+        ? Promise.resolve(response)
+        : originalCallService(params)
+    )
+
+    try {
+      render(<Harness />)
+      const dialog = await openRecipe()
+      expect(within(dialog).queryByRole('group', { name: /Prep Time/ })).not.toBeInTheDocument()
+      expect(within(dialog).queryByRole('group', { name: /Cook Time/ })).not.toBeInTheDocument()
+      expect(within(dialog).queryByRole('group', { name: /Inactive\/Rest Time/ })).not.toBeInTheDocument()
+      expect(within(dialog).queryByRole('heading', { name: 'Devices' })).not.toBeInTheDocument()
+      expect(within(dialog).queryByRole('heading', { name: 'Optional Devices' })).not.toBeInTheDocument()
+      expect(within(dialog).getByRole('heading', { name: 'Additional Equipment' })).toBeInTheDocument()
+    } finally {
+      mockState.helpers.callService = originalCallService
+    }
+  })
+
+  it('opens an inventory picker without writes and Back submits assume_have only', async () => {
+    const originalCallService = mockState.helpers.callService
+    const calls: Record<string, unknown>[] = []
+    mockState.helpers.callService = (params) => {
+      calls.push(params)
+      if (params.service === 'recipe_detail') return Promise.resolve(detailResponse({ feedbackEnabled: true }))
+      if (params.service === 'list_inventory') {
+        return Promise.resolve({
+          response: {
+            inventory: [
+              { product_id: 501, name: 'Fresh parsley', quantity: 2, unit: 'bunch' },
+            ],
+          },
+        })
+      }
+      if (params.service === 'recipe_ingredient_decision') {
+        return Promise.resolve({ response: { success: true } })
+      }
+      return originalCallService(params)
+    }
+
+    try {
+      render(<Harness />)
+      const dialog = await openRecipe()
+      await openTab(dialog, 'Ingredients')
+      const uncertain = await within(dialog).findByRole('button', {
+        name: /Fresh herbs: Inventory match uncertain.*Activate to choose an inventory product/,
+      })
+      expect(uncertain).toHaveAttribute('data-status', 'unchecked')
+      fireEvent.click(uncertain)
+      expect(await within(dialog).findByRole('heading', { name: /Choose Product for Fresh herbs/ })).toBeInTheDocument()
+      expect(within(dialog).getByRole('searchbox', { name: 'Search inventory products' })).toBeInTheDocument()
+      expect(within(dialog).getByRole('tablist', { name: 'Pantry Bowl sections' })).toBeInTheDocument()
+      expect(calls.filter((call) => call.service === 'recipe_ingredient_decision')).toHaveLength(0)
+
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Back and mark ingredient available' }))
+      expect(await within(dialog).findByText('Ingredient marked available without AI evidence.')).toBeInTheDocument()
+      const decisions = calls.filter((call) => call.service === 'recipe_ingredient_decision')
+      expect(decisions).toHaveLength(1)
+      expect(decisions[0]).toMatchObject({
+        serviceData: {
+          action: 'assume_have',
+          action_origin: 'react_dashboard',
+          ingredient_key: 'ri:3:0000000000000004',
+          recipe_id: 42,
+        },
+      })
+      expect((decisions[0].serviceData as Record<string, unknown>)).not.toHaveProperty('selected_product_id')
+    } finally {
+      mockState.helpers.callService = originalCallService
+    }
+  })
+
+  it('selects one product-level inventory ID atomically and displays the correction optimistically', async () => {
+    const originalCallService = mockState.helpers.callService
+    const calls: Record<string, unknown>[] = []
+    let resolveDecision: ((value: unknown) => void) | undefined
+    mockState.helpers.callService = (params) => {
+      calls.push(params)
+      if (params.service === 'recipe_detail') return Promise.resolve(detailResponse({ feedbackEnabled: true }))
+      if (params.service === 'list_inventory') {
+        return Promise.resolve({
+          response: {
+            inventory: [
+              { inventory_id: 1, product_id: 501, name: 'Fresh parsley', quantity: 1, unit: 'bunch' },
+              { inventory_id: 2, product_id: 501, name: 'Fresh parsley', quantity: 1, unit: 'bunch' },
+            ],
+          },
+        })
+      }
+      if (params.service === 'recipe_ingredient_decision') {
+        return new Promise((resolve) => {
+          resolveDecision = resolve
+        })
+      }
+      return originalCallService(params)
+    }
+
+    try {
+      render(<Harness />)
+      const dialog = await openRecipe()
+      await openTab(dialog, 'Ingredients')
+      fireEvent.click(await within(dialog).findByRole('button', {
+        name: /Fresh herbs: Inventory match uncertain.*Activate to choose an inventory product/,
+      }))
+      const choices = await within(dialog).findAllByRole('button', { name: /Fresh parsley/ })
+      expect(choices).toHaveLength(1)
+      expect(choices[0]).toHaveAttribute('data-product-id', '501')
+      fireEvent.click(choices[0])
+
+      expect(await within(dialog).findByText('Product: Fresh parsley')).toBeInTheDocument()
+      expect(within(dialog).getByRole('button', {
+        name: /Fresh herbs: Inventory match uncertain.*Activate to mark missing/,
+      })).toHaveAttribute('data-status', 'checked')
+      const decision = calls.find((call) => call.service === 'recipe_ingredient_decision')
+      expect(decision).toMatchObject({
+        serviceData: {
+          action: 'select_inventory_product',
+          selected_product_id: 501,
+          ingredient_key: 'ri:3:0000000000000004',
+        },
+      })
+      await act(async () => resolveDecision?.({ response: { success: true } }))
+      expect(await within(dialog).findByText(/queued for ontology review/)).toBeInTheDocument()
+    } finally {
+      mockState.helpers.callService = originalCallService
+    }
+  })
+
+  it('reuses a decision idempotency key after an ambiguous transport failure', async () => {
+    const originalCallService = mockState.helpers.callService
+    const keys: string[] = []
+    let attempts = 0
+    mockState.helpers.callService = (params) => {
+      if (params.service === 'recipe_detail') return Promise.resolve(detailResponse({ feedbackEnabled: true }))
+      if (params.service === 'list_inventory') return Promise.resolve({ response: { inventory: [] } })
+      if (params.service === 'recipe_ingredient_decision') {
+        attempts += 1
+        keys.push(String((params.serviceData as { idempotency_key?: string }).idempotency_key))
+        return attempts === 1
+          ? Promise.reject(new Error('Connection lost after submit'))
+          : Promise.resolve({ response: { success: true } })
+      }
+      return originalCallService(params)
+    }
+
+    try {
+      render(<Harness />)
+      const dialog = await openRecipe()
+      await openTab(dialog, 'Ingredients')
+      const openPicker = async () => {
+        fireEvent.click(await within(dialog).findByRole('button', {
+          name: /Fresh herbs: Inventory match uncertain.*Activate to choose an inventory product/,
+        }))
+        await within(dialog).findByRole('button', { name: 'Back and mark ingredient available' })
+      }
+      await openPicker()
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Back and mark ingredient available' }))
+      expect(await within(dialog).findByText('Connection lost after submit')).toBeInTheDocument()
+      await openPicker()
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Back and mark ingredient available' }))
+      expect(await within(dialog).findByText('Ingredient marked available without AI evidence.')).toBeInTheDocument()
+      expect(keys).toHaveLength(2)
+      expect(keys[1]).toBe(keys[0])
+    } finally {
+      mockState.helpers.callService = originalCallService
+    }
+  })
+
+  it('reloads detail after a stale atomic decision token', async () => {
+    const originalCallService = mockState.helpers.callService
+    let detailCalls = 0
+    mockState.helpers.callService = (params) => {
+      if (params.service === 'recipe_detail') {
+        detailCalls += 1
+        return Promise.resolve(detailResponse({ feedbackEnabled: true }))
+      }
+      if (params.service === 'list_inventory') return Promise.resolve({ response: { inventory: [] } })
+      if (params.service === 'recipe_ingredient_decision') {
+        return Promise.resolve({ response: { success: false, error: 'ingredient_feedback_stale' } })
+      }
+      return originalCallService(params)
+    }
+
+    try {
+      render(<Harness />)
+      const dialog = await openRecipe()
+      await openTab(dialog, 'Ingredients')
+      fireEvent.click(await within(dialog).findByRole('button', {
+        name: /Fresh herbs: Inventory match uncertain.*Activate to choose an inventory product/,
+      }))
+      fireEvent.click(await within(dialog).findByRole('button', { name: 'Back and mark ingredient available' }))
+      await waitFor(() => expect(detailCalls).toBe(2))
+      expect(await within(dialog).findByText('ingredient_feedback_stale')).toBeInTheDocument()
+      expect(within(dialog).queryByText(/^Your override:/)).not.toBeInTheDocument()
+    } finally {
+      mockState.helpers.callService = originalCallService
+    }
+  })
+
+  it('rejects exact checked products while staples submit availability-only intent', async () => {
+    const originalCallService = mockState.helpers.callService
+    const decisions: Record<string, unknown>[] = []
+    mockState.helpers.callService = (params) => {
+      if (params.service === 'recipe_detail') return Promise.resolve(detailResponse({ feedbackEnabled: true }))
+      if (params.service === 'recipe_ingredient_decision') {
+        decisions.push(params.serviceData as Record<string, unknown>)
+        return Promise.resolve({ response: { success: true } })
+      }
+      return originalCallService(params)
+    }
+
+    try {
+      render(<Harness />)
+      const dialog = await openRecipe()
+      await openTab(dialog, 'Ingredients')
+      fireEvent.click(await within(dialog).findByRole('button', {
+        name: /Rice · 2 cups: Exact inventory match.*Activate to mark missing/,
+      }))
+      await within(dialog).findByText(/exact match feedback was queued/)
+      fireEvent.click(within(dialog).getByRole('button', {
+        name: /Salt · to taste: Staple.*Activate to mark missing/,
+      }))
+      await waitFor(() => expect(decisions).toHaveLength(2))
+      expect(decisions[0]).toMatchObject({
+        action: 'reject_current_match',
+        expected_target_product_id: 101,
+      })
+      expect(decisions[1]).toMatchObject({ action: 'reject_current_match' })
+      expect(decisions[1]).not.toHaveProperty('expected_target_product_id')
+    } finally {
+      mockState.helpers.callService = originalCallService
+    }
+  })
+
+  it('cancels the picker on tab navigation without writing and keeps the tab bar anchored', async () => {
+    const originalCallService = mockState.helpers.callService
+    const calls: Record<string, unknown>[] = []
+    mockState.helpers.callService = (params) => {
+      calls.push(params)
+      if (params.service === 'recipe_detail') return Promise.resolve(detailResponse({ feedbackEnabled: true }))
+      if (params.service === 'list_inventory') return Promise.resolve({ response: { inventory: [] } })
+      return originalCallService(params)
+    }
+
+    try {
+      render(<Harness />)
+      const dialog = await openRecipe()
+      await openTab(dialog, 'Ingredients')
+      fireEvent.click(await within(dialog).findByRole('button', {
+        name: /Fresh herbs: Inventory match uncertain.*Activate to choose an inventory product/,
+      }))
+      expect(await within(dialog).findByRole('searchbox', { name: 'Search inventory products' })).toBeInTheDocument()
+      const tabs = within(dialog).getByRole('tablist', { name: 'Pantry Bowl sections' })
+      expect(tabs.parentElement?.className).toContain('pickerFooterStack')
+      fireEvent.click(within(dialog).getByRole('tab', { name: 'General' }))
+      await waitFor(() => expect(within(dialog).getByRole('tabpanel', { name: 'General' })).toBeInTheDocument())
+      expect(within(dialog).queryByRole('searchbox', { name: 'Search inventory products' })).not.toBeInTheDocument()
+      expect(calls.filter((call) => call.service === 'recipe_ingredient_decision')).toHaveLength(0)
+    } finally {
+      mockState.helpers.callService = originalCallService
+    }
+  })
+
+  it('separates Open in Cookidoo from a bounded account-level My Week planner flow', async () => {
+    const originalCallService = mockState.helpers.callService
+    const calls: Record<string, unknown>[] = []
+    mockState.helpers.callService = (params) => {
+      calls.push(params)
+      if (params.service === 'recipe_detail') {
+        return Promise.resolve(detailResponse({
+          externalOnly: true,
+          plannerEnabled: true,
+        }))
+      }
+      if (params.service === 'recipe_planner_add') {
+        return Promise.resolve({
+          response: {
+            success: true,
+            changed: true,
+            already_present: false,
+            verified: true,
+          },
+        })
+      }
+      return originalCallService(params)
+    }
+
+    try {
+      render(<Harness />)
+      const dialog = await openRecipe()
+      expect(await within(dialog).findByRole('link', { name: 'Open in Cookidoo' })).toBeInTheDocument()
+      const addButton = within(dialog).getByRole('button', { name: 'Add to My Week' })
+      fireEvent.click(addButton)
+      expect(await within(dialog).findByRole('heading', { name: 'Add to My Week' })).toBeInTheDocument()
+      expect(within(dialog).getByText(/configured Cookidoo account/)).toBeInTheDocument()
+      const dateInput = within(dialog).getByLabelText('Cookidoo My Week date')
+      expect(dateInput).toHaveAttribute('min', '2026-08-12')
+      expect(dateInput).toHaveAttribute('max', '2027-08-12')
+      fireEvent.change(dateInput, { target: { value: '2026-08-20' } })
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Add to My Week' }))
+      expect(await within(dialog).findByText('Recipe added to Cookidoo My Week.')).toBeInTheDocument()
+      const plannerCalls = calls.filter((call) => call.service === 'recipe_planner_add')
+      expect(plannerCalls).toHaveLength(1)
+      expect(plannerCalls[0]).toMatchObject({
+        serviceData: {
+          recipe_id: 42,
+          date: '2026-08-20',
+          provider_action_token: 'b'.repeat(64),
+        },
+      })
+      expect(plannerCalls[0].serviceData).not.toHaveProperty('external_id')
+    } finally {
+      mockState.helpers.callService = originalCallService
+    }
+  })
+
+  it('cancels a planner sub-page with Back without a service write', async () => {
+    const originalCallService = mockState.helpers.callService
+    const calls: Record<string, unknown>[] = []
+    mockState.helpers.callService = (params) => {
+      calls.push(params)
+      if (params.service === 'recipe_detail') {
+        return Promise.resolve(detailResponse({ externalOnly: true, plannerEnabled: true }))
+      }
+      return originalCallService(params)
+    }
+
+    try {
+      render(<Harness />)
+      const dialog = await openRecipe()
+      fireEvent.click(await within(dialog).findByRole('button', { name: 'Add to My Week' }))
+      expect(await within(dialog).findByRole('button', { name: 'Back to recipe' })).toBeInTheDocument()
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Back to recipe' }))
+      expect(await within(dialog).findByRole('button', { name: 'Add to My Week' })).toBeInTheDocument()
+      expect(calls.filter((call) => call.service === 'recipe_planner_add')).toHaveLength(0)
+    } finally {
+      mockState.helpers.callService = originalCallService
+    }
+  })
+
+  it('reuses a planner idempotency key after an ambiguous transport failure', async () => {
+    const originalCallService = mockState.helpers.callService
+    const keys: string[] = []
+    let attempts = 0
+    mockState.helpers.callService = (params) => {
+      if (params.service === 'recipe_detail') {
+        return Promise.resolve(detailResponse({ externalOnly: true, plannerEnabled: true }))
+      }
+      if (params.service === 'recipe_planner_add') {
+        attempts += 1
+        keys.push(String((params.serviceData as { idempotency_key: string }).idempotency_key))
+        return attempts === 1
+          ? Promise.reject(new Error('Planner response was lost'))
+          : Promise.resolve({ response: { success: true, already_present: true, verified: true } })
+      }
+      return originalCallService(params)
+    }
+
+    try {
+      render(<Harness />)
+      const dialog = await openRecipe()
+      fireEvent.click(await within(dialog).findByRole('button', { name: 'Add to My Week' }))
+      const dateInput = await within(dialog).findByLabelText('Cookidoo My Week date')
+      fireEvent.change(dateInput, { target: { value: '2026-08-20' } })
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Add to My Week' }))
+      expect(await within(dialog).findByText('Planner response was lost')).toBeInTheDocument()
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Add to My Week' }))
+      expect(await within(dialog).findByText(/already in Cookidoo My Week/)).toBeInTheDocument()
+      expect(keys).toHaveLength(2)
+      expect(keys[1]).toBe(keys[0])
     } finally {
       mockState.helpers.callService = originalCallService
     }
@@ -597,7 +1042,7 @@ describe('RecipeDetailModal', () => {
       expect(within(panel).getByText('Diced Tomatoes · 1.5–2 cups')).toBeInTheDocument()
       expect(within(panel).getAllByText('Optional')).toHaveLength(1)
       expect(within(panel).queryByText(/Source amount:/)).not.toBeInTheDocument()
-      expect(within(panel).getAllByRole('checkbox')).toHaveLength(4)
+      expect(panel.querySelectorAll('[data-read-only="true"]')).toHaveLength(4)
     } finally {
       mockState.helpers.callService = originalCallService
     }
@@ -938,7 +1383,7 @@ describe('RecipeDetailModal', () => {
         const dialog = await openRecipe()
         await within(dialog).findByText('Serves 4')
         await openTab(dialog, 'Ingredients')
-        expect(within(dialog).getByRole('checkbox', { name: /Fresh herbs: Inventory match uncertain/ })).toBeInTheDocument()
+        expect(within(dialog).getByRole('group', { name: /Fresh herbs: Inventory match uncertain/ })).toBeInTheDocument()
         expect(within(dialog).queryByText('Matched as Italian parsley')).not.toBeInTheDocument()
         expect(within(dialog).queryAllByText(/^Matched as /)).toHaveLength(0)
       } finally {
@@ -1298,6 +1743,22 @@ describe('RecipeDetailModal', () => {
       ...detail,
       grocery: { ...detail.grocery, confirmedMissingCount: 0, uncertainCount: 0 },
     }, idle.status, false)).toBe('No missing ingredients to add.')
+    expect(recipeGroceryDisabledReason({
+      ...detail,
+      ingredients: detail.ingredients.map((ingredient) => (
+        ingredient.inventory.state === 'missing'
+          ? {
+              ...ingredient,
+              userOverride: {
+                availability: 'have' as const,
+                updatedAt: null,
+              },
+            }
+          : ingredient
+      )),
+    }, idle.status, false)).toBe(
+      'All confirmed missing ingredients are marked as available by your overrides.',
+    )
     expect(recipeGroceryDisabledReason(detail, idle.status, false)).toBeNull()
   })
 

@@ -186,10 +186,15 @@ describe('recipe response normalization', () => {
             },
             general: {
               yield: { quantity: '2.5', unit: 'bowls' },
+              prep_time_seconds: '600',
+              cookTimeSeconds: 1_200,
               activeTimeSeconds: '900',
+              inactive_time_seconds: '300',
               total_time_seconds: -5,
               difficulty: 'Easy',
               primaryCategory: 'Dinner',
+              devices: ['TM6', 'Oven', '', 7, 'tm6'],
+              optionalDevices: ['Slow cooker', 'OVEN', { invalid: true }],
               equipment: ['Large bowl', '', 7],
             },
             ingredients: [
@@ -261,8 +266,13 @@ describe('recipe response normalization', () => {
         },
         general: {
           yield: { quantity: 2.5, unit: 'bowls' },
+          prepTimeSeconds: 600,
+          cookTimeSeconds: 1_200,
           activeTimeSeconds: 900,
+          inactiveTimeSeconds: 300,
           totalTimeSeconds: null,
+          devices: ['TM6', 'Oven'],
+          optionalDevices: ['Slow cooker'],
           equipment: ['Large bowl'],
         },
         ingredientsTruncated: true,
@@ -368,7 +378,7 @@ describe('recipe response normalization', () => {
         detailIngredient(4, {
           display_name: 'First ingredient',
           source_optional: true,
-          provider_metadata: { aisle: 'produce', rank: 1, verified: true, note: null },
+          provider: { aisle: 'produce', rank: 1, verified: true, note: null },
         }),
         detailIngredient(1, {
           displayName: 'Second ingredient',
@@ -570,6 +580,96 @@ describe('recipe response normalization', () => {
       expect(result.detail.instructions.groups).toEqual([])
       expect(result.detail.instructions.steps).toEqual(['Use the safe flat instruction.'])
       expect(result.detail.instructions.available).toBe(true)
+      expect(result.detail.instructions.truncated).toBe(true)
+    })
+
+    it('normalizes backend step_positions into nested local instruction groups', () => {
+      const result = normalizeRecipeDetailServiceResult({
+        response: {
+          success: true,
+          detail: {
+            ...minimalRecipeDetail({
+              capabilities: { instructions: 'local' },
+            }),
+            instructions: {
+              available: true,
+              steps: ['Prepare locally.', 'Finish locally.'],
+              groups: [
+                {
+                  key: 'group:prepare',
+                  index: 0,
+                  label: 'Prepare',
+                  step_positions: [0],
+                },
+                {
+                  key: 'group:finish',
+                  index: 1,
+                  label: 'Finish',
+                  step_positions: [1],
+                },
+              ],
+            },
+          },
+        },
+      })
+
+      expect(result.kind).toBe('detail')
+      if (result.kind !== 'detail') return
+      expect(result.detail.instructions.groups).toEqual([
+        {
+          key: 'group:prepare',
+          index: 0,
+          label: 'Prepare',
+          steps: [{
+            key: 'instruction-step-0-0',
+            index: 0,
+            number: 1,
+            text: 'Prepare locally.',
+          }],
+        },
+        {
+          key: 'group:finish',
+          index: 1,
+          label: 'Finish',
+          steps: [{
+            key: 'instruction-step-1-1',
+            index: 1,
+            number: 2,
+            text: 'Finish locally.',
+          }],
+        },
+      ])
+    })
+
+    it('falls back to the complete flat list when position groups omit steps', () => {
+      const result = normalizeRecipeDetailServiceResult({
+        response: {
+          success: true,
+          detail: {
+            ...minimalRecipeDetail({
+              capabilities: { instructions: 'local' },
+            }),
+            instructions: {
+              available: true,
+              steps: ['Prepare locally.', 'Finish locally.'],
+              groups: [{
+                key: 'group:prepare',
+                index: 0,
+                label: 'Prepare',
+                step_positions: [0],
+              }],
+            },
+          },
+        },
+      })
+
+      expect(result.kind).toBe('detail')
+      if (result.kind !== 'detail') return
+      expect(result.detail.instructions.groups).toEqual([])
+      expect(result.detail.instructions.steps).toEqual([
+        'Prepare locally.',
+        'Finish locally.',
+      ])
       expect(result.detail.instructions.truncated).toBe(true)
     })
 

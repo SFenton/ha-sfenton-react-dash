@@ -193,6 +193,18 @@
   line-height: 1.2;
 }
 
+.ingredientChip[data-user-override='true'] {
+  border-color: var(--color-security);
+  color: var(--color-text);
+  background: color-mix(in srgb, var(--color-security) 28%, var(--color-modal-surface));
+}
+
+.ingredientChip[data-user-correction='true'] {
+  border-color: var(--color-security);
+  color: var(--color-text);
+  background: color-mix(in srgb, var(--color-security) 24%, var(--color-modal-surface));
+}
+
 .ingredientSource,
 .closestMatch {
   display: block;
@@ -204,6 +216,45 @@
 
 .closestMatch {
   color: rgba(202, 216, 231, 0.62);
+}
+
+.ingredientActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 0 6px 10px 52px;
+}
+
+.ingredientActions button {
+  min-height: 44px;
+  border: 1px solid var(--color-glass-soft);
+  border-radius: 999px;
+  padding: 0 13px;
+  color: var(--color-text-muted);
+  background: var(--color-glass-soft);
+  font: inherit;
+  font-size: 0.74rem;
+  font-weight: 760;
+}
+
+.ingredientActions button[aria-pressed='true'] {
+  border-color: var(--color-security);
+  color: var(--color-text);
+  background: color-mix(in srgb, var(--color-security) 42%, var(--color-modal-surface));
+}
+
+.ingredientActions button:disabled {
+  opacity: 0.48;
+}
+
+.ingredientActions button:focus:not(:focus-visible) {
+  outline: none;
+}
+
+.ingredientActions button:focus-visible {
+  outline: 2px solid var(--color-text);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 2px var(--color-modal-surface);
 }
 
 .instructions {
@@ -262,6 +313,115 @@
   display: grid;
   gap: 9px;
   padding-top: 4px;
+}
+
+.generalActions,
+.plannerStack,
+.pickerStack {
+  display: grid;
+  gap: 10px;
+}
+
+.secondaryPrimaryAction {
+  display: inline-flex;
+  width: 100%;
+  min-height: 50px;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  border: 1px solid var(--color-glass-soft);
+  border-radius: 999px;
+  padding: 0 18px;
+  color: var(--color-text);
+  background: color-mix(in srgb, var(--color-glass-soft) 62%, var(--color-modal-surface));
+  box-shadow: var(--shadow-glass);
+  font: inherit;
+  font-size: 0.86rem;
+  font-weight: 820;
+  -webkit-tap-highlight-color: var(--color-modal-footer-transparent);
+}
+
+.secondaryPrimaryAction:focus {
+  outline: none;
+}
+
+.secondaryPrimaryAction:focus-visible {
+  outline: 2px solid var(--color-text);
+  outline-offset: 2px;
+  box-shadow:
+    0 0 0 3px var(--color-text),
+    var(--shadow-glass);
+}
+
+.productChoices {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.productChoices li {
+  border-bottom: 1px solid var(--color-glass-soft);
+}
+
+.productChoices li:last-child {
+  border-bottom: 0;
+}
+
+.productChoices button {
+  display: grid;
+  width: 100%;
+  min-height: 64px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  border: 0;
+  padding: 8px 6px;
+  color: var(--color-text);
+  background: none;
+  font: inherit;
+  text-align: left;
+  -webkit-tap-highlight-color: var(--color-modal-footer-transparent);
+}
+
+.productChoices button > span {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+}
+
+.productChoices strong,
+.productChoices small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.productChoices strong {
+  font-size: 0.9rem;
+  font-weight: 820;
+}
+
+.productChoices small {
+  color: var(--color-text-muted);
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.productChoices button:focus {
+  outline: none;
+}
+
+.productChoices button:focus-visible {
+  outline: 2px solid var(--color-text);
+  outline-offset: -2px;
+}
+
+.pickerFooterStack {
+  display: grid;
+  width: 100%;
+  gap: 8px;
 }
 
 .primaryAction {

@@ -42,6 +42,18 @@ falls back to its same-origin `EVERSHELF_DEV_URL` proxy. The browser never
 receives an EverShelf API token; run an isolated updated EverShelf instance at
 that URL. Production builds never use this fallback.
 
+Recipe detail mutations use Home Assistant response services only:
+
+- uncertain ingredients render as blank unchecked rows and open an inventory
+  product picker without writing;
+- explicit Back submits `assume_have`, while X/backdrop/Escape/swipe/hash close
+  and tab navigation cancel without a write;
+- product selection and exact-match rejection use the single atomic
+  `evershelf.recipe_ingredient_decision` service with reusable idempotency keys;
+- Cookidoo keeps official instructions external-only;
+- “Open in Cookidoo” is separate from the default-off account-level “Add to My
+  Week” date planner, which uses `evershelf.recipe_planner_add`.
+
 ---
 
 # React + TypeScript + Vite

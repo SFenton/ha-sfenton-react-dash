@@ -20,12 +20,20 @@
   outline: none;
 }
 
+.checkboxRow[data-status-control='true']:focus-visible {
+  outline: 2px solid var(--color-text);
+  outline-offset: -2px;
+  box-shadow: inset 0 0 0 2px var(--color-text);
+}
+
 .checkboxRow[data-read-only='true'] {
   cursor: default;
 }
 
 .checkboxRow[data-read-only='true'] .copy strong,
-.checkboxRow[data-read-only='true'] .copy small {
+.checkboxRow[data-read-only='true'] .copy small,
+.checkboxRow[data-wrap-copy='true'] .copy strong,
+.checkboxRow[data-wrap-copy='true'] .copy small {
   overflow: visible;
   text-overflow: initial;
   white-space: normal;

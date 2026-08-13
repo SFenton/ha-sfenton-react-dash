@@ -8,6 +8,8 @@ interface NativePickerFieldProps {
   disabled?: boolean
   emptyLabel?: string
   label: string
+  max?: string
+  min?: string
   name?: string
   onChange: (value: string) => void
   type: 'date' | 'time'
@@ -35,7 +37,7 @@ function displayValue(type: NativePickerFieldProps['type'], value: string, empty
   return type === 'date' ? formatDate(value) : formatTime(value)
 }
 
-export function NativePickerField({ ariaLabel, className, detailAutoFocus = false, disabled = false, emptyLabel = 'Select', label, name, onChange, type, value }: NativePickerFieldProps) {
+export function NativePickerField({ ariaLabel, className, detailAutoFocus = false, disabled = false, emptyLabel = 'Select', label, max, min, name, onChange, type, value }: NativePickerFieldProps) {
   const inputRef = useRef<HTMLInputElement | null>(null)
   const fieldClassName = className ? `${styles.field} ${className}` : styles.field
   const openPickerFromField = (event: MouseEvent<HTMLLabelElement>) => {
@@ -59,7 +61,7 @@ export function NativePickerField({ ariaLabel, className, detailAutoFocus = fals
       <span>{label}</span>
       <span className={styles.pickerShell} data-empty={value ? 'false' : 'true'}>
         <span className={styles.pickerValue} aria-hidden="true">{displayValue(type, value, emptyLabel)}</span>
-        <input aria-label={ariaLabel ?? label} className={styles.nativePickerInput} data-modal-detail-autofocus={detailAutoFocus ? 'true' : undefined} disabled={disabled} name={name} onChange={(event) => onChange(event.target.value)} ref={inputRef} type={type} value={value} />
+        <input aria-label={ariaLabel ?? label} className={styles.nativePickerInput} data-modal-detail-autofocus={detailAutoFocus ? 'true' : undefined} disabled={disabled} max={max} min={min} name={name} onChange={(event) => onChange(event.target.value)} ref={inputRef} type={type} value={value} />
       </span>
     </label>
   )

@@ -122,4 +122,58 @@ describe('recipeService development fallback', () => {
       vi.unstubAllGlobals()
     }
   })
+
+  it('uses bounded POST proxy contracts for ingredient feedback services', async () => {
+    const fetchMock = vi.fn(async () => ({
+      json: async () => ({ success: true }),
+      ok: true,
+      status: 200,
+    }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    try {
+      const common = {
+        recipe_id: 17,
+        ingredient_key: 'ri:0:0123456789abcdef',
+        position: 0,
+        feedback_token: 'a'.repeat(64),
+        idempotency_key: 'react-feedback:17:test',
+      }
+      await callRecipeService(
+        () => Promise.reject(new Error('Service evershelf.recipe_ingredient_override not found')),
+        'recipe_ingredient_override',
+        { ...common, availability: 'have' },
+      )
+      await callRecipeService(
+        () => Promise.reject(new Error('Service evershelf.recipe_identity_feedback not found')),
+        'recipe_identity_feedback',
+        { ...common, verdict: 'wrong', target_kind: 'closest_match' },
+      )
+      await callRecipeService(
+        () => Promise.reject(new Error('Service evershelf.recipe_ingredient_decision not found')),
+        'recipe_ingredient_decision',
+        { ...common, action: 'assume_have', action_origin: 'react_dashboard' },
+      )
+      await callRecipeService(
+        () => Promise.reject(new Error('Service evershelf.recipe_planner_add not found')),
+        'recipe_planner_add',
+        {
+          recipe_id: 17,
+          date: '2026-08-20',
+          provider_action_token: 'b'.repeat(64),
+          idempotency_key: 'react-planner:17:test',
+        },
+      )
+
+      expect(String(fetchMock.mock.calls[0][0])).toContain('action=recipe_catalog_ingredient_override')
+      expect(String(fetchMock.mock.calls[1][0])).toContain('action=recipe_catalog_identity_feedback')
+      expect(String(fetchMock.mock.calls[2][0])).toContain('action=recipe_catalog_ingredient_decision')
+      expect(String(fetchMock.mock.calls[3][0])).toContain('action=recipe_catalog_planner_add')
+      expect(fetchMock.mock.calls.every((call) => (
+        (call[1] as RequestInit).method === 'POST'
+      ))).toBe(true)
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
 })

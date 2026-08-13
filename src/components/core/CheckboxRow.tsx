@@ -25,7 +25,17 @@ type CheckboxRowStatusProps = CheckboxRowSharedProps
     status?: 'checked' | 'mixed' | 'unchecked'
   }
 
-type CheckboxRowProps = CheckboxRowControlProps | CheckboxRowStatusProps
+type CheckboxRowStatusControlProps = CheckboxRowSharedProps
+  & Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'children' | 'className' | 'title'>
+  & {
+    mode: 'status-control'
+    status: 'checked' | 'mixed' | 'unchecked'
+  }
+
+type CheckboxRowProps =
+  | CheckboxRowControlProps
+  | CheckboxRowStatusControlProps
+  | CheckboxRowStatusProps
 
 function hasSubtitle(subtitle: ReactNode) {
   if (typeof subtitle === 'string') return subtitle.trim().length > 0
@@ -38,7 +48,9 @@ function lineHeightPx(element: HTMLElement) {
   return Number.parseFloat(lineHeight)
 }
 
-function checkboxControlAttributes(props: CheckboxRowControlProps) {
+function checkboxControlAttributes(
+  props: CheckboxRowControlProps | CheckboxRowStatusControlProps,
+) {
   const attributes = { ...props } as ButtonHTMLAttributes<HTMLButtonElement> & Record<string, unknown>
   delete attributes.active
   delete attributes.alignWrappedToIconTop
@@ -111,7 +123,9 @@ export function CheckboxRow(props: CheckboxRowProps) {
     }
   }, [alignWrappedToIconTop, measureCopy, title, subtitle])
 
-  const status = props.mode === 'status' ? (props.status ?? (active ? 'checked' : 'unchecked')) : undefined
+  const status = props.mode === 'status' || props.mode === 'status-control'
+    ? (props.status ?? (active ? 'checked' : 'unchecked'))
+    : undefined
   const icon = status === 'mixed'
     ? 'mdi:minus-box-outline'
     : active
@@ -130,14 +144,13 @@ export function CheckboxRow(props: CheckboxRowProps) {
   if (props.mode === 'status') {
     return (
       <div
-        aria-checked={status === 'mixed' ? 'mixed' : status === 'checked'}
         aria-label={props['aria-label']}
-        aria-readonly="true"
         className={[styles.checkboxRow, className].filter(Boolean).join(' ')}
         data-copy-wrapped={alignWrappedToIconTop && copyWrapped ? 'true' : undefined}
         data-read-only="true"
+        data-status={status}
         id={props.id}
-        role="checkbox"
+        role="group"
       >
         {content}
       </div>
@@ -145,6 +158,21 @@ export function CheckboxRow(props: CheckboxRowProps) {
   }
 
   const buttonProps = checkboxControlAttributes(props)
+  if (props.mode === 'status-control') {
+    return (
+      <button
+        {...buttonProps}
+        className={[styles.checkboxRow, className].filter(Boolean).join(' ')}
+        data-copy-wrapped={alignWrappedToIconTop && copyWrapped ? 'true' : undefined}
+        data-status={status}
+        data-status-control="true"
+        data-wrap-copy="true"
+        type={buttonProps.type ?? 'button'}
+      >
+        {content}
+      </button>
+    )
+  }
   return (
     <button
       {...buttonProps}

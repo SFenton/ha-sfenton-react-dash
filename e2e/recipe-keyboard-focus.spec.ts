@@ -160,10 +160,11 @@ async function openRecipeDetailWithKeyboard(page: Page) {
   await expectKeyboardFocusIndicator(page, recipeButton, recipeButton.locator('div').first())
   await page.keyboard.press('Enter')
 
-  const dialog = page.getByRole('dialog', {
-    name: 'Suggested Citrus Pantry Bowl with Roasted Garden Vegetables',
-  })
+  const dialog = page.getByRole('dialog')
   await expect(dialog).toBeVisible()
+  await expect(dialog).toHaveAccessibleName(
+    'Suggested Citrus Pantry Bowl with Roasted Garden Vegetables',
+  )
   await expect(dialog.getByText('Serves 4')).toBeVisible()
   return dialog
 }
@@ -177,7 +178,14 @@ async function verifyRecipeKeyboardFocus(page: Page) {
 
   await expectKeyboardFocusIndicator(page, closeButton)
   await expectKeyboardFocusIndicator(page, generalTab)
-  await expectKeyboardFocusIndicator(page, dialog.getByRole('link', { name: 'Open Source Recipe' }))
+  await expectKeyboardFocusIndicator(
+    page,
+    dialog.getByRole('link', { name: 'Open in Cookidoo' }),
+  )
+  await expectKeyboardFocusIndicator(
+    page,
+    dialog.getByRole('button', { name: 'Add to My Week' }),
+  )
 
   const ingredientsBaseline = await focusIndicator(ingredientsTab)
   await generalTab.focus()
@@ -188,6 +196,25 @@ async function verifyRecipeKeyboardFocus(page: Page) {
     page,
     dialog.getByRole('button', { name: 'Add Missing Ingredients to Groceries' }),
   )
+  await expectKeyboardFocusIndicator(
+    page,
+    dialog.getByRole('button', {
+      name: /Fresh herbs: Inventory match uncertain.*Activate to choose an inventory product/,
+    }),
+  )
+  await page.keyboard.press('Enter')
+  const pickerSearch = dialog.getByRole('searchbox', { name: 'Search inventory products' })
+  await expect(pickerSearch).toBeVisible()
+  await expect(dialog.getByRole('tablist', {
+    name: 'Suggested Citrus Pantry Bowl with Roasted Garden Vegetables sections',
+  })).toBeVisible()
+  const pickerBack = dialog.getByRole('button', { name: 'Back and mark ingredient available' })
+  await expectKeyboardFocusIndicator(page, pickerBack)
+  await page.keyboard.press('Enter')
+  await expect(dialog.getByText('Ingredient marked available without AI evidence.')).toBeVisible()
+  await expect(dialog.getByRole('button', {
+    name: /Fresh herbs: Inventory match uncertain.*Activate to mark missing/,
+  })).toBeFocused()
 
   const instructionsBaseline = await focusIndicator(instructionsTab)
   await ingredientsTab.focus()
@@ -209,10 +236,11 @@ test('393x852 coarse-pointer recipe controls keep keyboard focus visible without
   })
   await recipeButton.tap()
 
-  const dialog = page.getByRole('dialog', {
-    name: 'Suggested Citrus Pantry Bowl with Roasted Garden Vegetables',
-  })
+  const dialog = page.getByRole('dialog')
   await expect(dialog).toBeVisible()
+  await expect(dialog).toHaveAccessibleName(
+    'Suggested Citrus Pantry Bowl with Roasted Garden Vegetables',
+  )
   await expect(dialog.getByText('Serves 4')).toBeVisible()
   const ingredientsTab = dialog.getByRole('tab', { name: 'Ingredients' })
   const tabBaseline = await focusIndicator(ingredientsTab)
@@ -222,6 +250,24 @@ test('393x852 coarse-pointer recipe controls keep keyboard focus visible without
   await expect.poll(() => ingredientsTab.evaluate((element) => element.matches(':focus-visible'))).toBe(false)
   expect(hasVisibleFocusIndicator(await focusIndicator(ingredientsTab), tabBaseline)).toBe(false)
 
+  const uncertain = dialog.locator('button[data-status]').filter({ hasText: 'Fresh herbs' })
+  await expect(uncertain).toHaveAccessibleName(
+    /Fresh herbs: Inventory match uncertain.*Activate to choose an inventory product/,
+  )
+  const uncertainBaseline = await focusIndicator(uncertain)
+  await uncertain.tap()
+  await expect(dialog.getByRole('searchbox', { name: 'Search inventory products' })).toBeVisible()
+  await expect(dialog.getByRole('tablist', {
+    name: 'Suggested Citrus Pantry Bowl with Roasted Garden Vegetables sections',
+  })).toBeVisible()
+  await ingredientsTab.tap()
+  const restoredUncertain = dialog.locator('button[data-status]').filter({ hasText: 'Fresh herbs' })
+  await expect(restoredUncertain).toBeFocused()
+  await expect.poll(() => restoredUncertain.evaluate((element) => element.matches(':focus-visible'))).toBe(false)
+  expect(hasVisibleFocusIndicator(await focusIndicator(restoredUncertain), uncertainBaseline)).toBe(false)
+
+  await dialog.getByRole('button', { name: 'Close' }).tap()
+  await expect(dialog).not.toBeVisible({ timeout: 1_200 })
   await verifyRecipeKeyboardFocus(page)
 })
 

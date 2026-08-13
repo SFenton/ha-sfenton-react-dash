@@ -5,11 +5,26 @@ export const RECIPE_GROCERY_UNSUPPORTED_MESSAGE = 'The installed EverShelf/ha-ev
 
 export type RecipeGroceryRequestStatus = 'error' | 'idle' | 'loading' | 'success'
 
+export function recipeActionableMissingIngredients(detail: RecipeDetail) {
+  return detail.ingredients.filter((ingredient) => (
+    ingredient.inventory.state === 'missing'
+    && ingredient.userOverride?.availability !== 'have'
+  ))
+}
+
 export function recipeGroceryDisabledReason(
   detail: RecipeDetail,
   groceryStatus: RecipeGroceryRequestStatus,
   grocerySubmitted: boolean,
 ) {
+  const overrideSuppressedCount = detail.ingredients.filter(
+    (ingredient) => ingredient.inventory.state === 'missing'
+      && ingredient.userOverride?.availability === 'have',
+  ).length
+  const actionableMissingCount = Math.max(
+    0,
+    detail.grocery.confirmedMissingCount - overrideSuppressedCount,
+  )
   if (groceryStatus === 'loading') return 'Adding missing ingredients…'
   if (grocerySubmitted) return 'Missing ingredients were submitted.'
   if (
@@ -34,10 +49,13 @@ export function recipeGroceryDisabledReason(
     return 'No ingredient data is available, so groceries cannot be added.'
   }
   if (!detail.capabilities.groceryAdd) return 'Adding missing ingredients is unavailable for this recipe.'
-  if (detail.grocery.confirmedMissingCount > RECIPE_GROCERY_MAX_SELECTIONS) return 'Too many missing ingredients to add in one request.'
-  if (detail.grocery.confirmedMissingCount === 0 && detail.grocery.uncertainCount > 0) {
+  if (actionableMissingCount > RECIPE_GROCERY_MAX_SELECTIONS) return 'Too many missing ingredients to add in one request.'
+  if (detail.grocery.confirmedMissingCount > 0 && actionableMissingCount === 0) {
+    return 'All confirmed missing ingredients are marked as available by your overrides.'
+  }
+  if (actionableMissingCount === 0 && detail.grocery.uncertainCount > 0) {
     return `EverShelf can't yet tell which of these ${detail.grocery.uncertainCount} ingredients you're missing.`
   }
-  if (detail.grocery.confirmedMissingCount === 0) return 'No missing ingredients to add.'
+  if (actionableMissingCount === 0) return 'No missing ingredients to add.'
   return null
 }

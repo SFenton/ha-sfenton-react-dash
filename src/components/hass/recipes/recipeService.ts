@@ -1,5 +1,13 @@
 type CallService = (params: Record<string, unknown>) => Promise<unknown> | unknown
-export type RecipeServiceName = 'recipe_detail' | 'recipe_grocery_add' | 'recipe_hydration' | 'recipe_query'
+export type RecipeServiceName =
+  | 'recipe_detail'
+  | 'recipe_grocery_add'
+  | 'recipe_hydration'
+  | 'recipe_identity_feedback'
+  | 'recipe_ingredient_decision'
+  | 'recipe_ingredient_override'
+  | 'recipe_planner_add'
+  | 'recipe_query'
 
 function appendParam(params: URLSearchParams, key: string, value: unknown) {
   if (value === undefined || value === null || value === '') return
@@ -43,6 +51,30 @@ async function devRecipeGroceryAdd(serviceData: Record<string, unknown>) {
   }
   return devRecipeFetch('/__evershelf/api/index.php?action=recipe_catalog_grocery_add', {
     body: JSON.stringify(payload),
+    headers: { 'Content-Type': 'application/json' },
+    method: 'POST',
+  })
+}
+
+async function devRecipeFeedback(
+  service: 'recipe_identity_feedback' | 'recipe_ingredient_decision' | 'recipe_ingredient_override',
+  serviceData: Record<string, unknown>,
+) {
+  const action = service === 'recipe_ingredient_override'
+    ? 'recipe_catalog_ingredient_override'
+    : service === 'recipe_ingredient_decision'
+      ? 'recipe_catalog_ingredient_decision'
+      : 'recipe_catalog_identity_feedback'
+  return devRecipeFetch(`/__evershelf/api/index.php?action=${action}`, {
+    body: JSON.stringify(serviceData),
+    headers: { 'Content-Type': 'application/json' },
+    method: 'POST',
+  })
+}
+
+async function devRecipePlannerAdd(serviceData: Record<string, unknown>) {
+  return devRecipeFetch('/__evershelf/api/index.php?action=recipe_catalog_planner_add', {
+    body: JSON.stringify(serviceData),
     headers: { 'Content-Type': 'application/json' },
     method: 'POST',
   })
@@ -132,6 +164,8 @@ export async function callRecipeService(
     if (service === 'recipe_query') return devRecipeQuery(serviceData)
     if (service === 'recipe_hydration') return devHydrationResult()
     if (service === 'recipe_detail') return devRecipeDetail(serviceData)
-    return devRecipeGroceryAdd(serviceData)
+    if (service === 'recipe_grocery_add') return devRecipeGroceryAdd(serviceData)
+    if (service === 'recipe_planner_add') return devRecipePlannerAdd(serviceData)
+    return devRecipeFeedback(service, serviceData)
   }
 }

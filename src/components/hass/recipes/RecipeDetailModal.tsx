@@ -1,12 +1,16 @@
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import { CheckboxRow } from '../../core/CheckboxRow'
 import { EmptyState } from '../../core/EmptyState'
+import { ExpandingSearchAction } from '../../core/ExpandingSearchAction'
 import { MaterialIcon } from '../../core/Icon'
 import { ModalIconTabNav } from '../../core/ModalTabNav'
 import { modalTabId, modalTabPanelId } from '../../core/modalTabIds'
 import { ModalSheet, type ModalSheetStyle } from '../../core/ModalSheet'
+import { NativePickerField } from '../../core/NativePickerField'
 import { StatusPill, type StatusPillTone } from '../../core/StatusPill'
 import { useSmoothDisplayedModalTab } from '../../../hooks/useSmoothDisplayedModalTab'
+import { useModalDetailPageScroll } from '../../../hooks/useModalDetailPageScroll'
+import { useCopy } from '../../../i18n/useCopy'
 import {
   type RecipeDetail,
   type RecipeDetailIngredient,
@@ -15,7 +19,7 @@ import {
 } from './recipeTypes'
 import { formatRecipeDuration, formatRecipeNumber, formatRecipeYield } from './recipeDetailFormatting'
 import { recipeGroceryDisabledReason } from './recipeGroceryState'
-import type { RecipeDetailModalController } from './useRecipeDetailModal'
+import type { RecipeDetailModalController, RecipeInventoryProduct } from './useRecipeDetailModal'
 import { RECIPE_DETAIL_TABS, type RecipeDetailTab } from '../../../constants/surfaceSemantics'
 import styles from './RecipeDetailModal.module.css'
 
@@ -30,6 +34,39 @@ const RECIPE_DETAIL_MODAL_STYLE: ModalSheetStyle = {
 
 const RECIPE_DETAIL_TAB_ID_PREFIX = 'recipe-detail'
 const RECIPE_DETAIL_TAB_PANEL_ID = modalTabPanelId(RECIPE_DETAIL_TAB_ID_PREFIX, 'content')
+const RECIPE_I18N = { namespace: 'modalRecipe' } as const
+const RECIPE_COPY_KEYS = {
+  activateChooseProduct: 'activateChooseProduct',
+  activeTime: 'activeTime',
+  addMyWeek: 'addMyWeek',
+  additionalEquipment: 'additionalEquipment',
+  backAssumeHave: 'backAssumeHave',
+  backRecipe: 'backRecipe',
+  chooseProductTitle: 'chooseProductTitle',
+  cookTime: 'cookTime',
+  devices: 'devices',
+  inactiveRestTime: 'inactiveRestTime',
+  inventoryChoices: 'inventoryChoices',
+  inventoryPickerEmpty: 'inventoryPickerEmpty',
+  inventoryPickerEmptyTitle: 'inventoryPickerEmptyTitle',
+  inventoryPickerHelp: 'inventoryPickerHelp',
+  inventoryPickerLoading: 'inventoryPickerLoading',
+  inventoryPickerSearch: 'inventoryPickerSearch',
+  inventoryPickerSearchPlaceholder: 'inventoryPickerSearchPlaceholder',
+  inventoryPickerUnavailableTitle: 'inventoryPickerUnavailableTitle',
+  inventoryQuantity: 'inventoryQuantity',
+  inventoryQuantityUnknown: 'inventoryQuantityUnknown',
+  openCookidoo: 'openCookidoo',
+  plannerAdding: 'plannerAdding',
+  plannerDate: 'plannerDate',
+  plannerExplanation: 'plannerExplanation',
+  prepTime: 'prepTime',
+  product: 'product',
+  sectionNavigation: 'sectionNavigation',
+  sourceContentLanguage: 'sourceContentLanguage',
+  optionalDevices: 'optionalDevices',
+  totalTime: 'totalTime',
+} as const
 
 function formatRecipeDate(value: string | null) {
   if (!value) return null
@@ -53,6 +90,26 @@ function GeneralFact({
 }) {
   if (!value) return null
   return <StatusPill detail={detail} grouped icon={icon} label={label} tone={tone} value={value} />
+}
+
+function GeneralFactList({
+  id,
+  items,
+  label,
+}: {
+  id: string
+  items: string[]
+  label: string
+}) {
+  if (items.length === 0) return null
+  return (
+    <section className={styles.section} aria-labelledby={id}>
+      <h3 id={id}>{label}</h3>
+      <ul className={styles.equipment}>
+        {items.map((item, index) => <li key={`${item}-${index}`}>{item}</li>)}
+      </ul>
+    </section>
+  )
 }
 
 function RecipeDetailImage({ detail, fallbackImageUrl }: { detail: RecipeDetail; fallbackImageUrl?: string | null }) {
@@ -83,7 +140,16 @@ function RecipeDetailImage({ detail, fallbackImageUrl }: { detail: RecipeDetail;
   )
 }
 
-function GeneralTab({ detail, fallbackImageUrl }: { detail: RecipeDetail; fallbackImageUrl?: string | null }) {
+function GeneralTab({
+  detail,
+  fallbackImageUrl,
+  onOpenPlanner,
+}: {
+  detail: RecipeDetail
+  fallbackImageUrl?: string | null
+  onOpenPlanner: () => void
+}) {
+  const copy = useCopy('modalRecipe')
   const generalAvailable = detail.capabilities.general !== 'none'
   const source = detail.source.attribution || detail.source.label || detail.source.connector || null
   const updated = formatRecipeDate(detail.freshness.updatedAt ?? detail.freshness.retrievedAt)
@@ -99,12 +165,16 @@ function GeneralTab({ detail, fallbackImageUrl }: { detail: RecipeDetail; fallba
       <RecipeDetailImage detail={detail} fallbackImageUrl={fallbackImageUrl} />
       <div className={styles.statusGrid}>
         {generalAvailable && <GeneralFact icon="mdi:account-group" label="Yield" value={formatRecipeYield(detail.general.yield.quantity, detail.general.yield.unit)} />}
-        {generalAvailable && <GeneralFact icon="mdi:progress-clock" label="Active Time" value={formatRecipeDuration(detail.general.activeTimeSeconds)} />}
-        {generalAvailable && <GeneralFact icon="mdi:clock-outline" label="Total Time" value={formatRecipeDuration(detail.general.totalTimeSeconds)} />}
+        {generalAvailable && <GeneralFact icon="mdi:timer-cog" label={copy(RECIPE_COPY_KEYS.prepTime)} value={formatRecipeDuration(detail.general.prepTimeSeconds)} />}
+        {generalAvailable && <GeneralFact icon="mdi:pot-steam" label={copy(RECIPE_COPY_KEYS.cookTime)} value={formatRecipeDuration(detail.general.cookTimeSeconds)} />}
+        {generalAvailable && <GeneralFact icon="mdi:progress-clock" label={copy(RECIPE_COPY_KEYS.activeTime)} value={formatRecipeDuration(detail.general.activeTimeSeconds)} />}
+        {generalAvailable && <GeneralFact icon="mdi:pause-circle" label={copy(RECIPE_COPY_KEYS.inactiveRestTime)} value={formatRecipeDuration(detail.general.inactiveTimeSeconds)} />}
+        {generalAvailable && <GeneralFact icon="mdi:clock-outline" label={copy(RECIPE_COPY_KEYS.totalTime)} value={formatRecipeDuration(detail.general.totalTimeSeconds)} />}
         {generalAvailable && <GeneralFact icon="mdi:gauge" label="Difficulty" value={detail.general.difficulty} />}
         {generalAvailable && <GeneralFact icon="mdi:food-fork-drink" label="Category" value={detail.general.primaryCategory} />}
         <GeneralFact icon="mdi:book-open-page-variant" label="Source" value={source} />
         <GeneralFact icon="mdi:map-marker" label="Locale" value={detail.source.locale} />
+        <GeneralFact icon="mdi:translate" label={copy(RECIPE_COPY_KEYS.sourceContentLanguage)} value={detail.source.contentLanguage} />
         <GeneralFact
           detail={updated ?? undefined}
           icon="mdi:progress-clock"
@@ -113,26 +183,54 @@ function GeneralTab({ detail, fallbackImageUrl }: { detail: RecipeDetail; fallba
           value={freshness?.value ?? null}
         />
       </div>
-      {generalAvailable && detail.general.equipment.length > 0 && (
-        <section className={styles.section} aria-labelledby="recipe-additional-equipment">
-          <h3 id="recipe-additional-equipment">Additional Equipment</h3>
-          <ul className={styles.equipment}>
-            {detail.general.equipment.map((item, index) => <li key={`${item}-${index}`}>{item}</li>)}
-          </ul>
-        </section>
+      {!generalAvailable && (
+        <p className={styles.notice} role="status">
+          {copy('metadataUnavailable')}
+        </p>
       )}
-      {detail.source.canonicalUrl && (
-        <a
-          className={styles.primaryAction}
-          href={detail.source.canonicalUrl}
-          referrerPolicy="no-referrer"
-          rel="noreferrer noopener"
-          target="_blank"
-        >
-          <MaterialIcon name="mdi:open-in-new" size={20} />
-          <span>Open Source Recipe</span>
-        </a>
+      {generalAvailable && (
+        <>
+          <GeneralFactList
+            id="recipe-devices"
+            items={detail.general.devices}
+            label={copy(RECIPE_COPY_KEYS.devices)}
+          />
+          <GeneralFactList
+            id="recipe-optional-devices"
+            items={detail.general.optionalDevices}
+            label={copy(RECIPE_COPY_KEYS.optionalDevices)}
+          />
+          <GeneralFactList
+            id="recipe-additional-equipment"
+            items={detail.general.equipment}
+            label={copy(RECIPE_COPY_KEYS.additionalEquipment)}
+          />
+        </>
       )}
+      <div className={styles.generalActions}>
+        {detail.source.canonicalUrl && (
+          <a
+            className={styles.primaryAction}
+            href={detail.source.canonicalUrl}
+            referrerPolicy="no-referrer"
+            rel="noreferrer noopener"
+            target="_blank"
+          >
+            <MaterialIcon name="mdi:open-in-new" size={20} />
+            <span>
+              {detail.source.connector.toLowerCase() === 'cookidoo'
+                ? copy(RECIPE_COPY_KEYS.openCookidoo)
+                : 'Open Source Recipe'}
+            </span>
+          </a>
+        )}
+        {detail.capabilities.planner && detail.planner.available && (
+          <button className={styles.secondaryPrimaryAction} onClick={onOpenPlanner} type="button">
+            <MaterialIcon name="mdi:calendar-plus" size={20} />
+            <span>{copy(RECIPE_COPY_KEYS.addMyWeek)}</span>
+          </button>
+        )}
+      </div>
     </div>
   )
 }
@@ -148,8 +246,38 @@ function inventoryMatchLabel(ingredient: RecipeDetailIngredient) {
 
 function inventoryStatus(state: RecipeIngredientInventoryState) {
   if (state === 'missing') return 'unchecked' as const
-  if (state === 'uncertain') return 'mixed' as const
+  if (state === 'uncertain') return inventoryStatus(missingIngredientValue())
   return 'checked' as const
+}
+
+function missingIngredientValue(): RecipeIngredientInventoryState {
+  return 'missing'
+}
+
+function ingredientDisplayStatus(ingredient: RecipeDetailIngredient) {
+  if (ingredient.userOverride?.availability === 'have') return inventoryStatus('in_stock')
+  if (ingredient.userOverride?.availability === 'missing') return inventoryStatus(missingIngredientValue())
+  return inventoryStatus(ingredient.inventory.state)
+}
+
+function ingredientStatusChecked(value: ReturnType<typeof ingredientDisplayStatus>) {
+  return value === inventoryStatus('in_stock')
+}
+
+function ingredientStatusUnchecked(value: ReturnType<typeof ingredientDisplayStatus>) {
+  return value === inventoryStatus(missingIngredientValue())
+}
+
+function plannerSucceeded(controller: RecipeDetailModalController) {
+  return controller.plannerState.status === 'success'
+}
+
+function plannerFailed(controller: RecipeDetailModalController) {
+  return controller.plannerState.status === 'error'
+}
+
+function plannerFeedback(controller: RecipeDetailModalController) {
+  return (controller.plannerState as { message?: string }).message ?? ''
 }
 
 function recipeAmountText(ingredient: RecipeDetailIngredient) {
@@ -241,21 +369,29 @@ function ingredientQuantityExplanation(detail: RecipeDetail, ingredient: RecipeD
   return null
 }
 
-function ingredientDetailParts(detail: RecipeDetail, ingredient: RecipeDetailIngredient) {
+function ingredientDetailParts(
+  detail: RecipeDetail,
+  ingredient: RecipeDetailIngredient,
+  overrideLabel: string | null = null,
+) {
   const sourceDetail = ingredientSourceDetail(ingredient)
   return [
     inventoryMatchLabel(ingredient),
     ingredient.optional === true ? 'Optional' : null,
-    ingredient.inventory.matchedProduct?.name
-      ? `Product: ${ingredient.inventory.matchedProduct.name}`
+    ingredient.userOverride?.selectedProduct?.name
+      ? `Product: ${ingredient.userOverride.selectedProduct.name}`
+      : ingredient.inventory.matchedProduct?.name
+        ? `Product: ${ingredient.inventory.matchedProduct.name}`
       : null,
     sourceDetail ? `Source: ${sourceDetail}` : null,
     ingredient.closestMatch ? `Matched as ${ingredient.closestMatch.label}` : null,
+    overrideLabel,
     ingredientQuantityExplanation(detail, ingredient),
   ].filter((part): part is string => Boolean(part))
 }
 
 function IngredientSubtitle({ detail, ingredient }: { detail: RecipeDetail; ingredient: RecipeDetailIngredient }) {
+  const copy = useCopy('modalRecipe')
   const state = inventoryMatchLabel(ingredient)
   const quantityExplanation = ingredientQuantityExplanation(detail, ingredient)
   const sourceDetail = ingredientSourceDetail(ingredient)
@@ -264,8 +400,28 @@ function IngredientSubtitle({ detail, ingredient }: { detail: RecipeDetail; ingr
       <span className={styles.ingredientMetaRow}>
         <span className={styles.ingredientChip}>{state}</span>
         {ingredient.optional === true && <span className={styles.ingredientChip}>Optional</span>}
-        {ingredient.inventory.matchedProduct?.name && (
-          <span className={styles.ingredientChip}>Product: {ingredient.inventory.matchedProduct.name}</span>
+        {!ingredient.userOverride?.selectedProduct && ingredient.inventory.matchedProduct?.name && (
+          <span className={styles.ingredientChip}>
+            {copy(RECIPE_COPY_KEYS.product, {
+              product: ingredient.inventory.matchedProduct.name,
+            })}
+          </span>
+        )}
+        {ingredient.userOverride?.selectedProduct && (
+          <span className={styles.ingredientChip} data-user-correction="true">
+            {copy(RECIPE_COPY_KEYS.product, {
+              product: ingredient.userOverride.selectedProduct.name,
+            })}
+          </span>
+        )}
+        {ingredient.userOverride && (
+          <span className={styles.ingredientChip} data-user-override="true">
+            {copy('overridePrefix', {
+              value: ingredient.userOverride.availability === 'have'
+                ? copy('overrideHave')
+                : copy('overrideMissing'),
+            })}
+          </span>
         )}
         {quantityExplanation && <span className={styles.ingredientChip}>{quantityExplanation}</span>}
       </span>
@@ -344,15 +500,24 @@ function recipeSectionHeading(
 
 function IngredientsTab({
   detail,
+  feedbackMessage,
+  feedbackPending,
   groceryState,
   grocerySubmitted,
   onAddMissing,
+  onOpenIngredientPicker,
+  onRejectIngredientMatch,
 }: {
   detail: RecipeDetail
+  feedbackMessage: string | null
+  feedbackPending: ReadonlySet<string>
   groceryState: GroceryState
   grocerySubmitted: boolean
   onAddMissing: () => void
+  onOpenIngredientPicker: (ingredient: RecipeDetailIngredient) => void
+  onRejectIngredientMatch: (ingredient: RecipeDetailIngredient) => void
 }) {
+  const copy = useCopy('modalRecipe')
   const ingredientDetailsAvailable = detail.capabilities.ingredients !== 'none'
   const disabledReason = recipeGroceryDisabledReason(detail, groceryState.status, grocerySubmitted)
   const sections = recipeIngredientSections(detail)
@@ -379,29 +544,87 @@ function IngredientsTab({
                   </h3>
                 )}
                 <ol className={styles.ingredients}>
-                  {section.ingredients.map((ingredient) => (
-                    <li key={ingredient.key}>
-                      {detail.capabilities.ingredients === 'checklist' ? (
-                        <CheckboxRow
-                          active={ingredient.inventory.state === 'in_stock' || ingredient.inventory.state === 'staple'}
-                          alignWrappedToIconTop
-                          aria-label={`${ingredientTitle(ingredient)}: ${ingredientDetailParts(detail, ingredient).join('. ')}`}
-                          mode="status"
-                          status={inventoryStatus(ingredient.inventory.state)}
-                          subtitle={<IngredientSubtitle detail={detail} ingredient={ingredient} />}
-                          title={ingredientTitle(ingredient)}
-                        />
-                      ) : (
-                        <span className={styles.ingredientName}>
-                          <strong>{ingredientTitle(ingredient)}</strong>
-                          {ingredient.optional === true && <small>Optional</small>}
-                          {ingredientQuantityExplanation(detail, ingredient) && (
-                            <small>{ingredientQuantityExplanation(detail, ingredient)}</small>
-                          )}
-                        </span>
-                      )}
-                    </li>
-                  ))}
+                  {section.ingredients.map((ingredient) => {
+                    const status = ingredientDisplayStatus(ingredient)
+                    const pending = feedbackPending.has(ingredient.key)
+                    const canOpenPicker = detail.capabilities.ingredientFeedbackV2
+                      && ingredient.feedbackCapabilities.decision
+                      && ingredient.feedbackCapabilities.selectInventoryProduct
+                      && Boolean(ingredient.feedbackToken)
+                      && ingredient.inventory.state === 'uncertain'
+                      && ingredientStatusUnchecked(status)
+                    const canReject = detail.capabilities.ingredientFeedbackV2
+                      && ingredient.feedbackCapabilities.decision
+                      && ingredient.feedbackCapabilities.rejectCurrentMatch
+                      && Boolean(ingredient.feedbackToken)
+                      && ingredientStatusChecked(status)
+                    const canActivate = canOpenPicker || canReject
+                    const overrideLabel = ingredient.userOverride
+                      ? copy('overridePrefix', {
+                          value: ingredient.userOverride.availability === 'have'
+                            ? copy('overrideHave')
+                            : copy('overrideMissing'),
+                        })
+                      : null
+                    const detailParts = ingredientDetailParts(
+                      detail,
+                      ingredient,
+                      overrideLabel,
+                    )
+                    const overrideInstruction = canOpenPicker
+                      ? copy(RECIPE_COPY_KEYS.activateChooseProduct)
+                      : canReject
+                        ? copy('activateMarkMissing')
+                        : null
+                    const label = copy('ingredientAria', {
+                      details: [
+                        ...detailParts,
+                        overrideInstruction,
+                      ].filter(Boolean).join('. '),
+                      title: ingredientTitle(ingredient),
+                    })
+                    return (
+                      <li key={ingredient.key}>
+                        {detail.capabilities.ingredients === 'checklist' ? (
+                          canActivate ? (
+                            <CheckboxRow
+                              active={ingredientStatusChecked(status)}
+                              alignWrappedToIconTop
+                              aria-label={label}
+                              disabled={pending}
+                              data-modal-detail-trigger={ingredient.key}
+                              mode="status-control"
+                              onClick={() => {
+                                if (canOpenPicker) onOpenIngredientPicker(ingredient)
+                                else onRejectIngredientMatch(ingredient)
+                              }}
+                              status={status}
+                              subtitle={<IngredientSubtitle detail={detail} ingredient={ingredient} />}
+                              title={ingredientTitle(ingredient)}
+                            />
+                          ) : (
+                            <CheckboxRow
+                              active={ingredientStatusChecked(status)}
+                              alignWrappedToIconTop
+                              aria-label={label}
+                              mode="status"
+                              status={status}
+                              subtitle={<IngredientSubtitle detail={detail} ingredient={ingredient} />}
+                              title={ingredientTitle(ingredient)}
+                            />
+                          )
+                        ) : (
+                          <span className={styles.ingredientName}>
+                            <strong>{ingredientTitle(ingredient)}</strong>
+                            {ingredient.optional === true && <small>Optional</small>}
+                            {ingredientQuantityExplanation(detail, ingredient) && (
+                              <small>{ingredientQuantityExplanation(detail, ingredient)}</small>
+                            )}
+                          </span>
+                        )}
+                      </li>
+                    )
+                  })}
                 </ol>
               </section>
             )
@@ -424,6 +647,7 @@ function IngredientsTab({
         {disabledReason && <p className={styles.actionHint}>{disabledReason}</p>}
         {groceryState.status === 'success' && <p className={styles.successFeedback} role="status">{groceryState.message}</p>}
         {groceryState.status === 'error' && <p className={styles.errorFeedback} role="alert">{groceryState.message}</p>}
+        {feedbackMessage && <p className={styles.actionHint} role="status">{feedbackMessage}</p>}
       </div>
     </div>
   )
@@ -509,20 +733,139 @@ function InstructionsTab({ detail }: { detail: RecipeDetail }) {
   return <EmptyState description="Instructions are not available for this recipe." layout="modal" title="No Instructions Available" />
 }
 
+function inventoryProductSubtitle(
+  product: RecipeInventoryProduct,
+  copy: ReturnType<typeof useCopy>,
+) {
+  if (product.quantity === null) return copy(RECIPE_COPY_KEYS.inventoryQuantityUnknown)
+  const quantity = [
+    formatRecipeNumber(product.quantity),
+    product.unit,
+  ].filter(Boolean).join(' ')
+  return copy(RECIPE_COPY_KEYS.inventoryQuantity, { quantity })
+}
+
+function IngredientPickerPage({
+  controller,
+  onSelect,
+}: {
+  controller: RecipeDetailModalController
+  onSelect: (product: RecipeInventoryProduct) => void
+}) {
+  const copy = useCopy(RECIPE_I18N.namespace)
+  const state = controller.ingredientPickerLoadState
+  if (state.status === 'loading' || state.status === 'idle') {
+    return (
+      <div aria-label={copy(RECIPE_COPY_KEYS.inventoryPickerLoading)} className={styles.loader} role="status">
+        <span aria-hidden="true" />
+      </div>
+    )
+  }
+  if (state.status === 'error') {
+    return <EmptyState description={state.message} layout="modal" title={copy(RECIPE_COPY_KEYS.inventoryPickerUnavailableTitle)} />
+  }
+  if (state.items.length === 0) {
+    return (
+      <EmptyState
+        description={copy(RECIPE_COPY_KEYS.inventoryPickerEmpty)}
+        layout="modal"
+        title={copy(RECIPE_COPY_KEYS.inventoryPickerEmptyTitle)}
+      />
+    )
+  }
+  return (
+    <div className={styles.pickerStack}>
+      <p className={styles.notice}>
+        {copy(RECIPE_COPY_KEYS.inventoryPickerHelp)}
+      </p>
+      <ul aria-label={copy(RECIPE_COPY_KEYS.inventoryChoices)} className={styles.productChoices}>
+        {state.items.map((product) => (
+          <li key={product.id}>
+            <button
+              data-product-id={product.id}
+              onClick={() => onSelect(product)}
+              type="button"
+            >
+              <span>
+                <strong>{product.name}</strong>
+                <small>{inventoryProductSubtitle(product, copy)}</small>
+              </span>
+              <MaterialIcon name="mdi:chevron-right" size={22} />
+            </button>
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
+function PlannerPage({ controller }: { controller: RecipeDetailModalController }) {
+  const copy = useCopy(RECIPE_I18N.namespace)
+  const detail = controller.detailState.status === 'ready'
+    ? controller.detailState.detail
+    : null
+  if (!detail) return null
+  const disabled = controller.plannerState.status === 'loading'
+    || !controller.plannerDate
+  const plannerLoading = controller.plannerState.status === 'loading'
+  return (
+    <div className={styles.plannerStack}>
+      <p className={styles.notice}>
+        {copy(RECIPE_COPY_KEYS.plannerExplanation)}
+      </p>
+      <NativePickerField
+        ariaLabel={copy(RECIPE_COPY_KEYS.plannerDate)}
+        detailAutoFocus
+        label={copy(RECIPE_COPY_KEYS.plannerDate)}
+        max={detail.planner.maximumDate ?? undefined}
+        min={detail.planner.minimumDate ?? undefined}
+        onChange={controller.setPlannerDate}
+        type="date"
+        value={controller.plannerDate}
+      />
+      <button
+        className={styles.primaryAction}
+        disabled={disabled}
+        onClick={controller.submitPlanner}
+        type="button"
+      >
+        <MaterialIcon name="mdi:calendar-plus" size={20} />
+        <span>{plannerLoading ? copy(RECIPE_COPY_KEYS.plannerAdding) : copy(RECIPE_COPY_KEYS.addMyWeek)}</span>
+      </button>
+      {plannerSucceeded(controller) && (
+        <p className={styles.successFeedback} role="status">{plannerFeedback(controller)}</p>
+      )}
+      {plannerFailed(controller) && (
+        <p className={styles.errorFeedback} role="alert">{plannerFeedback(controller)}</p>
+      )}
+    </div>
+  )
+}
+
 function RecipeDetailTabContent({
   activeTab,
   detail,
   fallbackImageUrl,
+  feedbackMessage,
+  feedbackPending,
   groceryState,
   grocerySubmitted,
   onAddMissing,
+  onOpenIngredientPicker,
+  onOpenPlanner,
+  onRejectIngredientMatch,
 }: {
   activeTab: RecipeDetailTab
   detail: RecipeDetail
   fallbackImageUrl?: string | null
+  feedbackMessage: string | null
+  feedbackPending: ReadonlySet<string>
   groceryState: GroceryState
   grocerySubmitted: boolean
   onAddMissing: () => void
+  onOpenIngredientPicker: (ingredient: RecipeDetailIngredient) => void
+  onOpenPlanner: () => void
+  onRejectIngredientMatch: (ingredient: RecipeDetailIngredient) => void
 }) {
   const { displayedTab, transitionState } = useSmoothDisplayedModalTab(activeTab)
   return (
@@ -533,13 +876,23 @@ function RecipeDetailTabContent({
       id={RECIPE_DETAIL_TAB_PANEL_ID}
       role="tabpanel"
     >
-      {displayedTab === 'general' && <GeneralTab detail={detail} fallbackImageUrl={fallbackImageUrl} />}
+      {displayedTab === 'general' && (
+        <GeneralTab
+          detail={detail}
+          fallbackImageUrl={fallbackImageUrl}
+          onOpenPlanner={onOpenPlanner}
+        />
+      )}
       {displayedTab === 'ingredients' && (
         <IngredientsTab
           detail={detail}
+          feedbackMessage={feedbackMessage}
+          feedbackPending={feedbackPending}
           groceryState={groceryState}
           grocerySubmitted={grocerySubmitted}
           onAddMissing={onAddMissing}
+          onOpenIngredientPicker={onOpenIngredientPicker}
+          onRejectIngredientMatch={onRejectIngredientMatch}
         />
       )}
       {displayedTab === 'instructions' && <InstructionsTab detail={detail} />}
@@ -548,22 +901,124 @@ function RecipeDetailTabContent({
 }
 
 export function RecipeDetailModal({ controller }: { controller: RecipeDetailModalController }) {
+  const copy = useCopy(RECIPE_I18N.namespace)
   const readyDetail = controller.detailState.status === 'ready' ? controller.detailState.detail : null
-  const title = readyDetail?.title ?? controller.selectedRecipe?.title ?? 'Recipe Details'
-  const footer = readyDetail
+  const detailPageKey = controller.ingredientPickerIngredient
+    ? `ingredient:${controller.ingredientPickerIngredient.key}`
+    : controller.plannerOpen
+      ? `planner:${readyDetail?.id ?? 'none'}`
+      : null
+  const { bodyElementRef, enterDetailPage, leaveDetailPage, resetDetailPageScroll } = useModalDetailPageScroll(detailPageKey)
+  const title = controller.ingredientPickerIngredient
+    ? copy(RECIPE_COPY_KEYS.chooseProductTitle, {
+        ingredient: controller.ingredientPickerIngredient.displayName,
+      })
+    : controller.plannerOpen
+      ? copy(RECIPE_COPY_KEYS.addMyWeek)
+      : readyDetail?.title ?? controller.selectedRecipe?.title ?? 'Recipe Details'
+
+  const openIngredientPicker = (ingredient: RecipeDetailIngredient) => {
+    enterDetailPage(ingredient.key)
+    controller.openIngredientPicker(ingredient)
+  }
+
+  const openPlanner = () => {
+    enterDetailPage('planner')
+    controller.openPlanner()
+  }
+
+  const restoreIngredientFocus = (ingredientKey: string) => {
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
+        bodyElementRef.current
+          ?.querySelector<HTMLElement>(
+            `[data-modal-detail-trigger="${ingredientKey}"]`,
+          )
+          ?.focus({ preventScroll: true })
+      })
+    })
+  }
+
+  const cancelDetailPage = (restoreFocus = false) => {
+    const ingredientKey = controller.ingredientPickerIngredient?.key
+    leaveDetailPage()
+    if (controller.ingredientPickerIngredient) controller.cancelIngredientPicker()
+    if (controller.plannerOpen) controller.cancelPlanner()
+    if (restoreFocus && ingredientKey) restoreIngredientFocus(ingredientKey)
+  }
+
+  const assumeIngredientHave = () => {
+    const ingredientKey = controller.ingredientPickerIngredient?.key
+    leaveDetailPage()
+    controller.assumeIngredientHave()
+    if (ingredientKey) restoreIngredientFocus(ingredientKey)
+  }
+
+  const selectIngredientProduct = (product: RecipeInventoryProduct) => {
+    const ingredientKey = controller.ingredientPickerIngredient?.key
+    leaveDetailPage()
+    controller.selectIngredientProduct(product)
+    if (ingredientKey) restoreIngredientFocus(ingredientKey)
+  }
+
+  const changeTab = (tab: RecipeDetailTab) => {
+    if (detailPageKey) {
+      cancelDetailPage(
+        Boolean(controller.ingredientPickerIngredient)
+          && tab === controller.activeTab,
+      )
+    }
+    controller.setActiveTab(tab)
+  }
+
+  const closeModal = () => {
+    if (controller.ingredientPickerIngredient) controller.cancelIngredientPicker()
+    if (controller.plannerOpen) controller.cancelPlanner()
+    resetDetailPageScroll()
+    controller.close()
+  }
+
+  const tabNav = readyDetail
     ? (
         <ModalIconTabNav
           activeTab={controller.activeTab}
           idPrefix={RECIPE_DETAIL_TAB_ID_PREFIX}
-          label={`${title} sections`}
-          onTabChange={controller.setActiveTab}
+          label={copy(RECIPE_COPY_KEYS.sectionNavigation, { title: readyDetail.title })}
+          onTabChange={changeTab}
           panelId={RECIPE_DETAIL_TAB_PANEL_ID}
           tabs={RECIPE_DETAIL_TABS}
         />
       )
     : undefined
+  const footer = controller.ingredientPickerIngredient && tabNav
+    ? (
+        <div className={styles.pickerFooterStack}>
+          <ExpandingSearchAction
+            ariaLabel={copy(RECIPE_COPY_KEYS.inventoryPickerSearch)}
+            initiallyExpanded
+            onExpandedChange={() => undefined}
+            onQueryChange={controller.setIngredientPickerQuery}
+            persistent
+            placeholder={copy(RECIPE_COPY_KEYS.inventoryPickerSearchPlaceholder)}
+            query={controller.ingredientPickerQuery}
+          />
+          {tabNav}
+        </div>
+      )
+    : tabNav
 
-  const content = useMemo(() => {
+  const content = (() => {
+    if (controller.ingredientPickerIngredient) {
+      return (
+        <IngredientPickerPage
+          controller={controller}
+          onSelect={selectIngredientProduct}
+        />
+      )
+    }
+    if (controller.plannerOpen) {
+      return <PlannerPage controller={controller} />
+    }
     if (controller.detailState.status === 'loading') {
       return (
         <div aria-label="Loading recipe details" className={styles.loader} role="status">
@@ -583,30 +1038,38 @@ export function RecipeDetailModal({ controller }: { controller: RecipeDetailModa
           activeTab={controller.activeTab}
           detail={controller.detailState.detail}
           fallbackImageUrl={controller.selectedRecipe?.imageUrl ?? controller.selectedRecipe?.thumbnailUrl}
+          feedbackMessage={controller.ingredientFeedbackMessage}
+          feedbackPending={controller.ingredientFeedbackPending}
           groceryState={controller.groceryState}
           grocerySubmitted={controller.grocerySubmitted}
           onAddMissing={controller.addMissingIngredients}
+          onOpenIngredientPicker={openIngredientPicker}
+          onOpenPlanner={openPlanner}
+          onRejectIngredientMatch={controller.rejectIngredientMatch}
         />
       )
     }
     return null
-  }, [
-    controller.activeTab,
-    controller.addMissingIngredients,
-    controller.detailState,
-    controller.groceryState,
-    controller.grocerySubmitted,
-    controller.selectedRecipe?.imageUrl,
-    controller.selectedRecipe?.thumbnailUrl,
-  ])
+  })()
 
   return (
     <ModalSheet
       contentStyle={RECIPE_DETAIL_MODAL_STYLE}
       footer={footer}
-      onClose={controller.close}
+      backLabel={controller.ingredientPickerIngredient
+        ? copy(RECIPE_COPY_KEYS.backAssumeHave)
+        : controller.plannerOpen
+          ? copy(RECIPE_COPY_KEYS.backRecipe)
+          : undefined}
+      bodyElementRef={bodyElementRef}
+      onBack={controller.ingredientPickerIngredient
+        ? assumeIngredientHave
+        : controller.plannerOpen
+          ? cancelDetailPage
+          : undefined}
+      onClose={closeModal}
       open={controller.open && controller.selectedRecipe !== null}
-      scrollResetKey={`${controller.selectedRecipe?.id ?? 'none'}:${controller.activeTab}`}
+      scrollResetKey={`${controller.selectedRecipe?.id ?? 'none'}:${controller.activeTab}:${detailPageKey ?? 'root'}`}
       title={title}
     >
       {content}

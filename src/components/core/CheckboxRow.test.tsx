@@ -7,7 +7,7 @@ describe('CheckboxRow', () => {
     expect(screen.getByRole('button', { name: 'Interactive option' })).toHaveAttribute('aria-pressed', 'true')
   })
 
-  it('renders immutable inventory state as a read-only checkbox without aria-pressed', () => {
+  it('renders immutable inventory state as labelled status without checkbox semantics', () => {
     render(
       <CheckboxRow
         active={false}
@@ -19,10 +19,29 @@ describe('CheckboxRow', () => {
       />,
     )
 
-    const status = screen.getByRole('checkbox', { name: 'Fresh herbs: Inventory match uncertain' })
-    expect(status).toHaveAttribute('aria-checked', 'mixed')
-    expect(status).toHaveAttribute('aria-readonly', 'true')
+    const status = screen.getByRole('group', { name: 'Fresh herbs: Inventory match uncertain' })
+    expect(status).toHaveAttribute('data-status', 'mixed')
+    expect(status).not.toHaveAttribute('aria-checked')
     expect(status).not.toHaveAttribute('aria-pressed')
     expect(status).not.toHaveAttribute('tabindex')
+  })
+
+  it('renders actionable status rows as buttons without pretending to be checkboxes', () => {
+    render(
+      <CheckboxRow
+        active={false}
+        aria-label="Fresh herbs: uncertain. Activate to mark as have"
+        mode="status-control"
+        status="mixed"
+        subtitle="Inventory match uncertain"
+        title="Fresh herbs"
+      />,
+    )
+    const control = screen.getByRole('button', {
+      name: 'Fresh herbs: uncertain. Activate to mark as have',
+    })
+    expect(control).toHaveAttribute('data-status', 'mixed')
+    expect(control).not.toHaveAttribute('aria-checked')
+    expect(control).not.toHaveAttribute('aria-pressed')
   })
 })

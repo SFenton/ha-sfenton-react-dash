@@ -10,9 +10,11 @@ const SEARCH_EXPANDED_ATTR = 'data-dashboard-search-expanded'
 interface ExpandingSearchActionProps {
   ariaLabel: string
   collapsedLabel?: string
+  initiallyExpanded?: boolean
   onExpandedChange: (expanded: boolean) => void
   onQueryChange: (query: string) => void
   placeholder: string
+  persistent?: boolean
   query: string
 }
 
@@ -21,9 +23,9 @@ function updateSearchExpanded(expanded: boolean) {
   else document.documentElement.removeAttribute(SEARCH_EXPANDED_ATTR)
 }
 
-export function ExpandingSearchAction({ ariaLabel, collapsedLabel, onExpandedChange, onQueryChange, placeholder, query }: ExpandingSearchActionProps) {
+export function ExpandingSearchAction({ ariaLabel, collapsedLabel, initiallyExpanded = false, onExpandedChange, onQueryChange, placeholder, persistent = false, query }: ExpandingSearchActionProps) {
   const copy = useCopy('core')
-  const [expanded, setExpanded] = useState(false)
+  const [expanded, setExpanded] = useState(initiallyExpanded)
   const inputRef = useRef<HTMLInputElement>(null)
   const collapseTimerRef = useRef<number | null>(null)
   const pendingCollapseRef = useRef(false)
@@ -40,6 +42,7 @@ export function ExpandingSearchAction({ ariaLabel, collapsedLabel, onExpandedCha
   }, [onExpandedChange])
 
   useEffect(() => {
+    if (initiallyExpanded) updateSearchExpanded(true)
     const handleKeyboardState = (event: Event) => {
       const keyboardEvent = event as CustomEvent<DashboardKeyboardStateDetail>
       if (!keyboardEvent.detail.open && pendingCollapseRef.current) collapseSearch()
@@ -51,7 +54,7 @@ export function ExpandingSearchAction({ ariaLabel, collapsedLabel, onExpandedCha
       updateSearchExpanded(false)
       clearDashboardKeyboardPrediction()
     }
-  }, [collapseSearch])
+  }, [collapseSearch, initiallyExpanded])
 
   const focusInput = useCallback(() => {
     inputRef.current?.focus({ preventScroll: true })
@@ -79,10 +82,15 @@ export function ExpandingSearchAction({ ariaLabel, collapsedLabel, onExpandedCha
   }, [])
 
   const handleInputBlur = useCallback(() => {
+    if (persistent) {
+      pendingCollapseRef.current = false
+      clearDashboardKeyboardPrediction()
+      return
+    }
     pendingCollapseRef.current = true
     if (collapseTimerRef.current !== null) window.clearTimeout(collapseTimerRef.current)
     collapseTimerRef.current = window.setTimeout(collapseSearch, 400)
-  }, [collapseSearch])
+  }, [collapseSearch, persistent])
 
   const clearSearch = useCallback(() => {
     flushSync(() => onQueryChange(''))

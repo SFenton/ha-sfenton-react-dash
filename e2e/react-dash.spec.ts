@@ -354,10 +354,11 @@ test('mobile suggested recipe opens the shared external-only detail sheet and ke
     name: 'Open Suggested Citrus Pantry Bowl with Roasted Garden Vegetables recipe details',
   })
   await recipeButton.click()
-  const dialog = page.getByRole('dialog', {
-    name: 'Suggested Citrus Pantry Bowl with Roasted Garden Vegetables',
-  })
+  const dialog = page.getByRole('dialog')
   await expect(dialog).toBeVisible()
+  await expect(dialog).toHaveAccessibleName(
+    'Suggested Citrus Pantry Bowl with Roasted Garden Vegetables',
+  )
   await expect(dialog.getByRole('status', { name: 'Loading recipe details' })).toBeVisible()
   await expect(dialog.getByText('Serves 4')).toBeVisible()
   await expect(dialog.getByRole('group', { name: 'Yield Serves 4' })).toBeVisible()
@@ -365,6 +366,34 @@ test('mobile suggested recipe opens the shared external-only detail sheet and ke
   await expect(dialog.locator('img')).toHaveAttribute('referrerpolicy', 'no-referrer')
   await expect(dialog.getByRole('heading', { name: 'Additional Equipment' })).toBeVisible()
   await expect(dialog.getByText(/Required Equipment/i)).toHaveCount(0)
+  await expect(dialog.getByRole('link', { name: 'Open in Cookidoo' })).toBeVisible()
+  await expect(dialog.getByRole('button', { name: 'Add to My Week' })).toBeVisible()
+  await clearMockHassCalls(page)
+  await dialog.getByRole('button', { name: 'Add to My Week' }).click()
+  await expect(dialog.getByRole('heading', { name: 'Add to My Week' })).toBeVisible()
+  const plannerDate = dialog.getByLabel('Cookidoo My Week date')
+  await expect(plannerDate).toHaveAttribute('min', '2026-08-12')
+  await expect(plannerDate).toHaveAttribute('max', '2027-08-12')
+  await plannerDate.fill('2026-08-20')
+  await dialog.getByRole('button', { name: 'Add to My Week' }).click()
+  await expect(dialog.getByText('Recipe added to Cookidoo My Week.')).toBeVisible()
+  const plannerCalls = await page.evaluate(() => (
+    (window as unknown as { __mockHass: { calls: Record<string, unknown>[] } }).__mockHass.calls
+      .filter((call) => call.domain === 'evershelf' && call.service === 'recipe_planner_add')
+  ))
+  expect(plannerCalls).toHaveLength(1)
+  expect(plannerCalls[0]).toMatchObject({
+    serviceData: {
+      recipe_id: 1,
+      date: '2026-08-20',
+      provider_action_token: 'b'.repeat(64),
+    },
+  })
+  expect(plannerCalls[0].serviceData).not.toHaveProperty('external_id')
+  await dialog.getByRole('button', { name: 'Back to recipe' }).click()
+  await expect(dialog.getByRole('heading', {
+    name: 'Suggested Citrus Pantry Bowl with Roasted Garden Vegetables',
+  })).toBeVisible()
   const footer = dialog.locator('[data-modal-sheet-footer="true"]')
   const tabList = footer.getByRole('tablist', {
     name: 'Suggested Citrus Pantry Bowl with Roasted Garden Vegetables sections',
@@ -389,9 +418,12 @@ test('mobile suggested recipe opens the shared external-only detail sheet and ke
   await expect(dialog.getByRole('heading', { name: 'Section 1' })).toBeVisible()
   await expect(dialog.getByRole('heading', { name: 'Section 2' })).toBeVisible()
   await expect(dialog.getByText('Canned tomatoes · 1 can', { exact: true })).toBeVisible()
-  await expect(dialog.getByRole('checkbox', { name: /Canned tomatoes · 1 can: Missing from inventory/ })).toHaveAttribute('aria-checked', 'false')
-  await expect(dialog.getByRole('checkbox', { name: /Long-grain rice · 2 cups: Exact inventory match/ })).toHaveAttribute('aria-checked', 'true')
-  await expect(dialog.getByRole('checkbox', { name: /Fresh herbs: Inventory match uncertain/ })).toHaveAttribute('aria-checked', 'mixed')
+  await expect(dialog.getByRole('group', { name: /Canned tomatoes · 1 can: Missing from inventory/ })).toHaveAttribute('data-status', 'unchecked')
+  await expect(dialog.getByRole('button', { name: /Long-grain rice · 2 cups: Exact inventory match/ })).toHaveAttribute('data-status', 'checked')
+  const uncertainIngredient = dialog.getByRole('button', {
+    name: /Fresh herbs: Inventory match uncertain.*Activate to choose an inventory product/,
+  })
+  await expect(uncertainIngredient).toHaveAttribute('data-status', 'unchecked')
   await expect(dialog.getByText('Optional', { exact: true })).toBeVisible()
   await expect(dialog.getByText('Source: diced tomatoes, drained')).toBeVisible()
   await expect(dialog.getByText('Matched as Italian parsley')).toBeVisible()
@@ -402,6 +434,39 @@ test('mobile suggested recipe opens the shared external-only detail sheet and ke
   await expect.poll(() => footer.evaluate((element) => Math.round(element.getBoundingClientRect().top))).toBe(
     Math.round(footerTopBeforeScroll),
   )
+
+  await clearMockHassCalls(page)
+  await uncertainIngredient.click()
+  const inventorySearch = dialog.getByRole('searchbox', { name: 'Search inventory products' })
+  await expect(inventorySearch).toBeVisible()
+  const pickerTabList = dialog.getByRole('tablist', {
+    name: 'Suggested Citrus Pantry Bowl with Roasted Garden Vegetables sections',
+  })
+  const [searchBox, pickerTabsBox] = await Promise.all([
+    inventorySearch.locator('xpath=../..').boundingBox(),
+    pickerTabList.boundingBox(),
+  ])
+  expect((searchBox?.y ?? 0) + (searchBox?.height ?? 0)).toBeLessThanOrEqual((pickerTabsBox?.y ?? 0) + 1)
+  await inventorySearch.fill('beans')
+  const product = dialog.getByRole('button', { name: /Canned Beans.*in inventory/ })
+  await expect(product).toBeVisible()
+  await expect(product).toHaveAttribute('data-product-id', '1002')
+  await product.click()
+  await expect(dialog.getByText('Product: Canned Beans')).toBeVisible()
+  await expect(dialog.getByRole('button', {
+    name: /Fresh herbs: Inventory match uncertain.*Activate to mark missing/,
+  })).toHaveAttribute('data-status', 'checked')
+  const decisionCalls = await page.evaluate(() => (
+    (window as unknown as { __mockHass: { calls: Record<string, unknown>[] } }).__mockHass.calls
+      .filter((call) => call.domain === 'evershelf' && call.service === 'recipe_ingredient_decision')
+  ))
+  expect(decisionCalls).toHaveLength(1)
+  expect(decisionCalls[0]).toMatchObject({
+    serviceData: {
+      action: 'select_inventory_product',
+      selected_product_id: 1002,
+    },
+  })
 
   await dialog.getByRole('tab', { name: 'Instructions' }).click()
   await expect(dialog.getByRole('tabpanel', { name: 'Instructions' })).toBeVisible()
@@ -433,7 +498,7 @@ test('recipe detail never renders a high-confidence taxonomy-rule closest match'
   })
   await expect(dialog.getByText('Serves 4')).toBeVisible()
   await dialog.getByRole('tab', { name: 'Ingredients' }).click()
-  await expect(dialog.getByRole('checkbox', { name: /Fresh herbs: Inventory match uncertain/ })).toBeVisible()
+  await expect(dialog.getByRole('button', { name: /Fresh herbs: Inventory match uncertain/ })).toBeVisible()
   await expect(dialog.getByText(/^Matched as /)).toHaveCount(0)
 })
 

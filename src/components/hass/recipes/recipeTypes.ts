@@ -66,6 +66,10 @@ export type RecipeGroceryAddCapabilityState = 'unsupported' | 'unavailable'
 export type RecipeIngredientInventoryState = 'in_stock' | 'missing' | 'uncertain' | 'staple'
 export type RecipeIngredientQuantityState = 'known' | 'display_only' | 'unknown'
 export type RecipeIngredientQuantitySufficiency = 'sufficient' | 'insufficient' | 'unknown'
+export type RecipeIngredientAvailabilityOverride = 'have' | 'missing'
+export type RecipeIngredientIdentityVerdict = 'correct' | 'wrong'
+export type RecipeIngredientFeedbackTarget = 'matched_product' | 'closest_match' | 'inventory_product'
+export type RecipeIngredientDecisionAction = 'assume_have' | 'select_inventory_product' | 'reject_current_match'
 
 export interface RecipeDetailSource {
   connector: string
@@ -74,6 +78,7 @@ export interface RecipeDetailSource {
   externalId: string | null
   canonicalUrl: string | null
   locale: string | null
+  contentLanguage: string | null
   rightsBasis: string
 }
 
@@ -87,10 +92,15 @@ export interface RecipeDetailGeneral {
     quantity: number | null
     unit: string | null
   }
+  prepTimeSeconds: number | null
+  cookTimeSeconds: number | null
   activeTimeSeconds: number | null
+  inactiveTimeSeconds: number | null
   totalTimeSeconds: number | null
   difficulty: string | null
   primaryCategory: string | null
+  devices: string[]
+  optionalDevices: string[]
   equipment: string[]
 }
 
@@ -115,6 +125,32 @@ export interface RecipeDetailIngredient {
   optional: boolean | null
   providerMetadata: RecipeIngredientProviderMetadata | null
   closestMatch: RecipeIngredientClosestMatch | null
+  feedbackToken: string | null
+  userOverride: {
+    availability: RecipeIngredientAvailabilityOverride
+    decisionAction: RecipeIngredientDecisionAction | null
+    selectedProduct: {
+      id: number
+      name: string
+    } | null
+    updatedAt: string | null
+  } | null
+  identityFeedback: {
+    verdict: RecipeIngredientIdentityVerdict
+    targetKind: RecipeIngredientFeedbackTarget
+    settleAfter: string | null
+    updatedAt: string | null
+  } | null
+  feedbackCapabilities: {
+    availabilityOverride: boolean
+    identity: boolean
+    decision: boolean
+    assumeHave: boolean
+    selectInventoryProduct: boolean
+    rejectCurrentMatch: boolean
+    positiveIdentity: boolean
+    negativeIdentity: boolean
+  }
   amount: {
     quantity: number | null
     quantityMax: number | null
@@ -146,6 +182,15 @@ export interface RecipeDetailGrocery {
   confirmedMissingCount: number
   uncertainCount: number
   blockedReason: string | null
+}
+
+export interface RecipeDetailPlanner {
+  available: boolean
+  accountScope: 'configured_account'
+  minimumDate: string | null
+  maximumDate: string | null
+  providerActionToken: string | null
+  reason: string | null
 }
 
 export interface RecipeInstructionStep {
@@ -201,6 +246,13 @@ export interface RecipeDetailCapabilities {
   groceryAdd: boolean
   groceryAddState: RecipeGroceryAddCapabilityState | null
   groceryAddReason: string | null
+  ingredientFeedback: boolean
+  ingredientFeedbackV2: boolean
+  ingredientFeedbackV2State: RecipeGroceryAddCapabilityState | null
+  ingredientFeedbackV2Reason: string | null
+  planner: boolean
+  plannerState: RecipeGroceryAddCapabilityState | null
+  plannerReason: string | null
 }
 
 export interface RecipeDetail {
@@ -210,6 +262,7 @@ export interface RecipeDetail {
   source: RecipeDetailSource
   images: RecipeDetailImages
   general: RecipeDetailGeneral
+  planner: RecipeDetailPlanner
   ingredients: RecipeDetailIngredient[]
   ingredientGroups: RecipeIngredientGroup[]
   ingredientsTruncated: boolean
@@ -264,6 +317,26 @@ export type RecipeGroceryServiceResult = RecipeGroceryResult | RecipeServiceFail
 export interface RecipeGrocerySelection {
   key: string
   position: number
+}
+
+export interface RecipeIngredientDecisionResult {
+  action: RecipeIngredientDecisionAction
+  availability: RecipeIngredientAvailabilityOverride
+  identityEvidence: boolean
+  proposalEnqueued: boolean
+  selectedProduct: {
+    id: number
+    name: string
+  } | null
+  replayed: boolean
+}
+
+export interface RecipePlannerResult {
+  changed: boolean
+  alreadyPresent: boolean
+  verified: boolean
+  replayed: boolean
+  date: string
 }
 
 type UnknownRecord = Record<string, unknown>
@@ -330,6 +403,20 @@ function boundedText(value: unknown, maximum: number, fallback = '') {
 function boundedNullableText(value: unknown, maximum: number) {
   const text = nullableText(value)
   return text === null ? null : text.slice(0, maximum)
+}
+
+function boundedTextList(value: unknown, maximumItems = 50, maximumLength = 120) {
+  if (!Array.isArray(value)) return []
+  const items: string[] = []
+  const seen = new Set<string>()
+  for (const candidate of value.slice(0, maximumItems)) {
+    const item = boundedText(candidate, maximumLength)
+    const key = item.toLowerCase()
+    if (!item || seen.has(key)) continue
+    seen.add(key)
+    items.push(item)
+  }
+  return items
 }
 
 function boundedVerbatimText(value: unknown, maximum: number) {
@@ -399,6 +486,7 @@ function nullableBoolean(value: unknown) {
 
 const RECIPE_SAFE_KEY_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/
 const RECIPE_INGREDIENT_KEY_PATTERN = /^ri:\d+:[a-f0-9]{16}$/
+const RECIPE_FEEDBACK_TOKEN_PATTERN = /^[a-f0-9]{64}$/
 const RECIPE_MAX_INGREDIENTS = 200
 const RECIPE_MAX_INGREDIENT_GROUPS = 50
 const RECIPE_MAX_INSTRUCTION_GROUPS = 50
@@ -411,6 +499,10 @@ const RECIPE_GROCERY_ADD_CAPABILITY_STATES = ['unsupported', 'unavailable'] as c
 const RECIPE_INVENTORY_STATES = ['in_stock', 'missing', 'uncertain', 'staple'] as const
 const RECIPE_QUANTITY_STATES = ['known', 'display_only', 'unknown'] as const
 const RECIPE_QUANTITY_SUFFICIENCY_STATES = ['sufficient', 'insufficient', 'unknown'] as const
+const RECIPE_AVAILABILITY_OVERRIDES = ['have', 'missing'] as const
+const RECIPE_IDENTITY_VERDICTS = ['correct', 'wrong'] as const
+const RECIPE_FEEDBACK_TARGETS = ['matched_product', 'closest_match', 'inventory_product'] as const
+const RECIPE_DECISION_ACTIONS = ['assume_have', 'select_inventory_product', 'reject_current_match'] as const
 const RECIPE_INSTRUCTION_REASONS = ['provider_external_only', 'not_available'] as const
 const RECIPE_INGREDIENT_CLOSEST_MATCH_SOURCES = ['taxonomy_alias', 'taxonomy_slug', 'canonical_slug'] as const
 
@@ -569,6 +661,53 @@ function normalizeRecipeDetailIngredient(value: unknown): RecipeDetailIngredient
   const matchedProductName = matchedProductRecord
     ? boundedText(firstValue(matchedProductRecord, 'name'), 200)
     : ''
+  const userOverrideRecord = isRecord(firstValue(value, 'user_override', 'userOverride'))
+    ? firstValue(value, 'user_override', 'userOverride') as UnknownRecord
+    : null
+  const identityFeedbackRecord = isRecord(firstValue(value, 'identity_feedback', 'identityFeedback'))
+    ? firstValue(value, 'identity_feedback', 'identityFeedback') as UnknownRecord
+    : null
+  const feedbackCapabilitiesRecord = isRecord(firstValue(value, 'feedback_capabilities', 'feedbackCapabilities'))
+    ? firstValue(value, 'feedback_capabilities', 'feedbackCapabilities') as UnknownRecord
+    : {}
+  const feedbackTokenValue = boundedText(firstValue(value, 'feedback_token', 'feedbackToken'), 64)
+  const feedbackToken = RECIPE_FEEDBACK_TOKEN_PATTERN.test(feedbackTokenValue)
+    ? feedbackTokenValue
+    : null
+  const availabilityOverride = userOverrideRecord
+    ? nullableEnumValue(
+        firstValue(userOverrideRecord, 'availability'),
+        RECIPE_AVAILABILITY_OVERRIDES,
+      )
+    : null
+  const decisionAction = userOverrideRecord
+    ? nullableEnumValue(
+        firstValue(userOverrideRecord, 'decision_action', 'decisionAction'),
+        RECIPE_DECISION_ACTIONS,
+      )
+    : null
+  const selectedProductRecord = userOverrideRecord
+    && isRecord(firstValue(userOverrideRecord, 'selected_product', 'selectedProduct'))
+    ? firstValue(userOverrideRecord, 'selected_product', 'selectedProduct') as UnknownRecord
+    : null
+  const selectedProductId = selectedProductRecord
+    ? nullableInteger(firstValue(selectedProductRecord, 'id', 'product_id', 'productId'), 1)
+    : null
+  const selectedProductName = selectedProductRecord
+    ? boundedText(firstValue(selectedProductRecord, 'name'), 200)
+    : ''
+  const identityVerdict = identityFeedbackRecord
+    ? nullableEnumValue(
+        firstValue(identityFeedbackRecord, 'verdict'),
+        RECIPE_IDENTITY_VERDICTS,
+      )
+    : null
+  const identityTarget = identityFeedbackRecord
+    ? nullableEnumValue(
+        firstValue(identityFeedbackRecord, 'target_kind', 'targetKind'),
+        RECIPE_FEEDBACK_TARGETS,
+      )
+    : null
 
   return {
     key,
@@ -578,9 +717,63 @@ function normalizeRecipeDetailIngredient(value: unknown): RecipeDetailIngredient
     sourceText: boundedNullableText(firstValue(value, 'source_text', 'sourceText'), 500),
     optional: nullableBoolean(firstPresentValue(value, 'source_optional', 'sourceOptional', 'optional')),
     providerMetadata: normalizeIngredientProviderMetadata(
-      firstValue(value, 'provider_metadata', 'providerMetadata'),
+      firstValue(value, 'provider_metadata', 'providerMetadata', 'provider'),
     ),
     closestMatch: normalizeClosestIngredientMatch(firstValue(value, 'closest_match', 'closestMatch')),
+    feedbackToken,
+    userOverride: availabilityOverride
+      ? {
+          availability: availabilityOverride,
+          decisionAction,
+          selectedProduct: selectedProductId !== null && selectedProductName
+            ? { id: selectedProductId, name: selectedProductName }
+            : null,
+          updatedAt: boundedNullableText(
+            firstValue(userOverrideRecord ?? {}, 'updated_at', 'updatedAt'),
+            80,
+          ),
+        }
+      : null,
+    identityFeedback: identityVerdict && identityTarget
+      ? {
+          verdict: identityVerdict,
+          targetKind: identityTarget,
+          settleAfter: boundedNullableText(
+            firstValue(identityFeedbackRecord ?? {}, 'settle_after', 'settleAfter'),
+            80,
+          ),
+          updatedAt: boundedNullableText(
+            firstValue(identityFeedbackRecord ?? {}, 'updated_at', 'updatedAt'),
+            80,
+          ),
+        }
+      : null,
+    feedbackCapabilities: {
+      availabilityOverride: feedbackToken !== null && booleanValue(
+        firstValue(feedbackCapabilitiesRecord, 'availability_override', 'availabilityOverride'),
+      ),
+      identity: feedbackToken !== null && booleanValue(
+        firstValue(feedbackCapabilitiesRecord, 'identity'),
+      ),
+      decision: feedbackToken !== null && booleanValue(
+        firstValue(feedbackCapabilitiesRecord, 'decision'),
+      ),
+      assumeHave: feedbackToken !== null && booleanValue(
+        firstValue(feedbackCapabilitiesRecord, 'assume_have', 'assumeHave'),
+      ),
+      selectInventoryProduct: feedbackToken !== null && booleanValue(
+        firstValue(feedbackCapabilitiesRecord, 'select_inventory_product', 'selectInventoryProduct'),
+      ),
+      rejectCurrentMatch: feedbackToken !== null && booleanValue(
+        firstValue(feedbackCapabilitiesRecord, 'reject_current_match', 'rejectCurrentMatch'),
+      ),
+      positiveIdentity: feedbackToken !== null && booleanValue(
+        firstValue(feedbackCapabilitiesRecord, 'positive_identity', 'positiveIdentity'),
+      ),
+      negativeIdentity: feedbackToken !== null && booleanValue(
+        firstValue(feedbackCapabilitiesRecord, 'negative_identity', 'negativeIdentity'),
+      ),
+    },
     amount: {
       quantity: nullableNonNegativeNumber(firstValue(amountRecord, 'quantity')),
       quantityMax: nullableNonNegativeNumber(firstValue(amountRecord, 'quantity_max', 'quantityMax')),
@@ -712,7 +905,7 @@ function normalizeRecipeInstructionSteps(value: unknown) {
   return { steps, unsafe }
 }
 
-function normalizeRecipeInstructionGroups(value: unknown) {
+function normalizeRecipeInstructionGroups(value: unknown, flatSteps: string[]) {
   if (value === undefined || value === null) {
     return { groups: [] as RecipeInstructionGroup[], unsafe: false }
   }
@@ -723,6 +916,7 @@ function normalizeRecipeInstructionGroups(value: unknown) {
 
   const seenGroupKeys = new Set<string>()
   const seenStepKeys = new Set<string>()
+  const seenFlatPositions = new Set<number>()
   const groups: RecipeInstructionGroup[] = []
   let totalSteps = 0
 
@@ -731,36 +925,64 @@ function normalizeRecipeInstructionGroups(value: unknown) {
     const key = boundedText(firstValue(candidate, 'key', 'group_key', 'groupKey'), 128)
     const index = nullableInteger(firstValue(candidate, 'index'), 0)
     const rawSteps = firstValue(candidate, 'steps')
+    const rawStepPositions = firstValue(candidate, 'step_positions', 'stepPositions')
+    const usesPositions = rawSteps === undefined && Array.isArray(rawStepPositions)
     if (
       !RECIPE_SAFE_KEY_PATTERN.test(key)
       || seenGroupKeys.has(key)
       || index !== groupArrayIndex
-      || !Array.isArray(rawSteps)
-      || rawSteps.length === 0
+      || (!Array.isArray(rawSteps) && !usesPositions)
+      || (Array.isArray(rawSteps) && rawSteps.length === 0)
+      || (usesPositions && (rawStepPositions as unknown[]).length === 0)
     ) return { groups: [], unsafe: true }
 
     const steps: RecipeInstructionStep[] = []
-    for (const [stepArrayIndex, rawStep] of rawSteps.entries()) {
-      if (!isRecord(rawStep)) return { groups: [], unsafe: true }
-      const stepKey = boundedText(firstValue(rawStep, 'key', 'step_key', 'stepKey'), 128)
-      const stepIndex = nullableInteger(firstValue(rawStep, 'index'), 0)
-      const rawNumber = firstPresentValue(rawStep, 'number')
-      const number = nullableInteger(rawNumber, 1)
-      const rawText = firstValue(rawStep, 'text')
-      const text = boundedVerbatimText(rawText, 2000)
-      if (
-        !RECIPE_SAFE_KEY_PATTERN.test(stepKey)
-        || seenStepKeys.has(stepKey)
-        || stepIndex !== stepArrayIndex
-        || (rawNumber !== undefined && rawNumber !== null && rawNumber !== '' && number === null)
-        || text === null
-        || (typeof rawText === 'string' && rawText.length > 2000)
-      ) return { groups: [], unsafe: true }
+    if (usesPositions) {
+      let previousPosition = -1
+      for (const rawPosition of rawStepPositions as unknown[]) {
+        const position = nullableInteger(rawPosition, 0)
+        if (
+          position === null
+          || position <= previousPosition
+          || position >= flatSteps.length
+          || seenFlatPositions.has(position)
+        ) return { groups: [], unsafe: true }
+        const stepKey = `instruction-step-${groupArrayIndex}-${position}`
+        totalSteps += 1
+        if (totalSteps > RECIPE_MAX_INSTRUCTION_STEPS) return { groups: [], unsafe: true }
+        seenFlatPositions.add(position)
+        seenStepKeys.add(stepKey)
+        steps.push({
+          key: stepKey,
+          index: position,
+          number: position + 1,
+          text: flatSteps[position],
+        })
+        previousPosition = position
+      }
+    } else {
+      for (const [stepArrayIndex, rawStep] of (rawSteps as unknown[]).entries()) {
+        if (!isRecord(rawStep)) return { groups: [], unsafe: true }
+        const stepKey = boundedText(firstValue(rawStep, 'key', 'step_key', 'stepKey'), 128)
+        const stepIndex = nullableInteger(firstValue(rawStep, 'index'), 0)
+        const rawNumber = firstPresentValue(rawStep, 'number')
+        const number = nullableInteger(rawNumber, 1)
+        const rawText = firstValue(rawStep, 'text')
+        const text = boundedVerbatimText(rawText, 2000)
+        if (
+          !RECIPE_SAFE_KEY_PATTERN.test(stepKey)
+          || seenStepKeys.has(stepKey)
+          || stepIndex !== stepArrayIndex
+          || (rawNumber !== undefined && rawNumber !== null && rawNumber !== '' && number === null)
+          || text === null
+          || (typeof rawText === 'string' && rawText.length > 2000)
+        ) return { groups: [], unsafe: true }
 
-      totalSteps += 1
-      if (totalSteps > RECIPE_MAX_INSTRUCTION_STEPS) return { groups: [], unsafe: true }
-      seenStepKeys.add(stepKey)
-      steps.push({ key: stepKey, index: stepIndex, number, text })
+        totalSteps += 1
+        if (totalSteps > RECIPE_MAX_INSTRUCTION_STEPS) return { groups: [], unsafe: true }
+        seenStepKeys.add(stepKey)
+        steps.push({ key: stepKey, index: stepIndex, number, text })
+      }
     }
 
     seenGroupKeys.add(key)
@@ -770,6 +992,13 @@ function normalizeRecipeInstructionGroups(value: unknown) {
       label: boundedNullableText(firstPresentValue(candidate, 'label', 'title'), 160),
       steps,
     })
+  }
+
+  if (
+    seenFlatPositions.size > 0
+    && seenFlatPositions.size !== flatSteps.length
+  ) {
+    return { groups: [], unsafe: true }
   }
 
   return { groups, unsafe: false }
@@ -837,6 +1066,7 @@ export function normalizeRecipeDetail(value: unknown): RecipeDetail | null {
   const sourceRecord = isRecord(firstValue(value, 'source')) ? firstValue(value, 'source') as UnknownRecord : {}
   const imagesRecord = isRecord(firstValue(value, 'images')) ? firstValue(value, 'images') as UnknownRecord : {}
   const generalRecord = isRecord(firstValue(value, 'general')) ? firstValue(value, 'general') as UnknownRecord : {}
+  const plannerRecord = isRecord(firstValue(value, 'planner')) ? firstValue(value, 'planner') as UnknownRecord : {}
   const yieldRecord = isRecord(firstValue(generalRecord, 'yield')) ? firstValue(generalRecord, 'yield') as UnknownRecord : {}
   const instructionRecord = isRecord(firstValue(value, 'instructions')) ? firstValue(value, 'instructions') as UnknownRecord : {}
   const userStateRecord = isRecord(firstValue(value, 'user_state', 'userState'))
@@ -872,6 +1102,7 @@ export function normalizeRecipeDetail(value: unknown): RecipeDetail | null {
         'authorized_groups',
         'authorizedGroups',
       ) ?? firstValue(value, 'instruction_groups', 'instructionGroups'),
+      normalizedSteps.steps,
     )
     steps = normalizedSteps.steps
     instructionGroups = normalizedGroups.groups
@@ -892,6 +1123,11 @@ export function normalizeRecipeDetail(value: unknown): RecipeDetail | null {
       .map((item) => boundedText(item, 120))
       .filter(Boolean)
     : []
+  const devices = boundedTextList(firstValue(generalRecord, 'devices'))
+  const deviceKeys = new Set(devices.map((item) => item.toLowerCase()))
+  const optionalDevices = boundedTextList(
+    firstValue(generalRecord, 'optional_devices', 'optionalDevices'),
+  ).filter((item) => !deviceKeys.has(item.toLowerCase()))
 
   return {
     schemaVersion: 'recipe_detail_v1',
@@ -904,6 +1140,10 @@ export function normalizeRecipeDetail(value: unknown): RecipeDetail | null {
       externalId: boundedNullableText(firstValue(sourceRecord, 'external_id', 'externalId'), 160),
       canonicalUrl,
       locale: boundedNullableText(firstValue(sourceRecord, 'locale'), 16),
+      contentLanguage: boundedNullableText(
+        firstValue(sourceRecord, 'content_language', 'contentLanguage'),
+        20,
+      ),
       rightsBasis: boundedText(firstValue(sourceRecord, 'rights_basis', 'rightsBasis'), 160),
     },
     images: {
@@ -915,11 +1155,30 @@ export function normalizeRecipeDetail(value: unknown): RecipeDetail | null {
         quantity: nullableNonNegativeNumber(firstValue(yieldRecord, 'quantity')),
         unit: boundedNullableText(firstValue(yieldRecord, 'unit'), 80),
       },
+      prepTimeSeconds: nullableInteger(firstValue(generalRecord, 'prep_time_seconds', 'prepTimeSeconds'), 0),
+      cookTimeSeconds: nullableInteger(firstValue(generalRecord, 'cook_time_seconds', 'cookTimeSeconds'), 0),
       activeTimeSeconds: nullableInteger(firstValue(generalRecord, 'active_time_seconds', 'activeTimeSeconds'), 0),
+      inactiveTimeSeconds: nullableInteger(firstValue(generalRecord, 'inactive_time_seconds', 'inactiveTimeSeconds'), 0),
       totalTimeSeconds: nullableInteger(firstValue(generalRecord, 'total_time_seconds', 'totalTimeSeconds'), 0),
       difficulty: boundedNullableText(firstValue(generalRecord, 'difficulty'), 80),
       primaryCategory: boundedNullableText(firstValue(generalRecord, 'primary_category', 'primaryCategory'), 160),
+      devices,
+      optionalDevices,
       equipment,
+    },
+    planner: {
+      available: booleanValue(firstValue(plannerRecord, 'available')),
+      accountScope: 'configured_account',
+      minimumDate: boundedNullableText(firstValue(plannerRecord, 'minimum_date', 'minimumDate'), 10),
+      maximumDate: boundedNullableText(firstValue(plannerRecord, 'maximum_date', 'maximumDate'), 10),
+      providerActionToken: (() => {
+        const token = boundedText(
+          firstValue(plannerRecord, 'provider_action_token', 'providerActionToken'),
+          64,
+        )
+        return RECIPE_FEEDBACK_TOKEN_PATTERN.test(token) ? token : null
+      })(),
+      reason: boundedNullableText(firstValue(plannerRecord, 'reason'), 160),
     },
     ingredients: normalizedIngredients.ingredients,
     ingredientGroups,
@@ -971,6 +1230,29 @@ export function normalizeRecipeDetail(value: unknown): RecipeDetail | null {
       ),
       groceryAddReason: boundedNullableText(
         firstValue(capabilityRecord, 'grocery_add_reason', 'groceryAddReason'),
+        160,
+      ),
+      ingredientFeedback: booleanValue(
+        firstValue(capabilityRecord, 'ingredient_feedback', 'ingredientFeedback'),
+      ),
+      ingredientFeedbackV2: booleanValue(
+        firstValue(capabilityRecord, 'ingredient_feedback_v2', 'ingredientFeedbackV2'),
+      ),
+      ingredientFeedbackV2State: nullableEnumValue(
+        firstValue(capabilityRecord, 'ingredient_feedback_v2_state', 'ingredientFeedbackV2State'),
+        RECIPE_GROCERY_ADD_CAPABILITY_STATES,
+      ),
+      ingredientFeedbackV2Reason: boundedNullableText(
+        firstValue(capabilityRecord, 'ingredient_feedback_v2_reason', 'ingredientFeedbackV2Reason'),
+        160,
+      ),
+      planner: booleanValue(firstValue(capabilityRecord, 'planner')),
+      plannerState: nullableEnumValue(
+        firstValue(capabilityRecord, 'planner_state', 'plannerState'),
+        RECIPE_GROCERY_ADD_CAPABILITY_STATES,
+      ),
+      plannerReason: boundedNullableText(
+        firstValue(capabilityRecord, 'planner_reason', 'plannerReason'),
         160,
       ),
     },
@@ -1145,6 +1427,81 @@ export function recipeGroceryServiceData(
       })),
     idempotency_key: idempotencyKey.slice(0, 128),
     todo_entity_id: 'todo.shopping_list',
+  }
+}
+
+export function recipeIngredientOverrideServiceData(
+  recipeId: number,
+  ingredient: RecipeDetailIngredient,
+  availability: RecipeIngredientAvailabilityOverride | 'clear',
+  idempotencyKey: string,
+) {
+  return {
+    recipe_id: Math.max(1, Math.round(recipeId)),
+    ingredient_key: ingredient.key,
+    position: Math.max(0, Math.round(ingredient.position)),
+    availability,
+    feedback_token: ingredient.feedbackToken ?? '',
+    idempotency_key: idempotencyKey.slice(0, 128),
+  }
+}
+
+export function recipeIdentityFeedbackServiceData(
+  recipeId: number,
+  ingredient: RecipeDetailIngredient,
+  verdict: RecipeIngredientIdentityVerdict,
+  targetKind: RecipeIngredientFeedbackTarget,
+  idempotencyKey: string,
+) {
+  return {
+    recipe_id: Math.max(1, Math.round(recipeId)),
+    ingredient_key: ingredient.key,
+    position: Math.max(0, Math.round(ingredient.position)),
+    verdict,
+    target_kind: targetKind,
+    feedback_token: ingredient.feedbackToken ?? '',
+    idempotency_key: idempotencyKey.slice(0, 128),
+  }
+}
+
+export function recipeIngredientDecisionServiceData(
+  recipeId: number,
+  ingredient: RecipeDetailIngredient,
+  action: RecipeIngredientDecisionAction,
+  idempotencyKey: string,
+  options: {
+    expectedTargetProductId?: number | null
+    selectedProductId?: number
+  } = {},
+) {
+  return {
+    recipe_id: Math.max(1, Math.round(recipeId)),
+    ingredient_key: ingredient.key,
+    position: Math.max(0, Math.round(ingredient.position)),
+    action,
+    feedback_token: ingredient.feedbackToken ?? '',
+    idempotency_key: idempotencyKey.slice(0, 128),
+    action_origin: 'react_dashboard',
+    ...(action === 'select_inventory_product' && options.selectedProductId
+      ? { selected_product_id: Math.max(1, Math.round(options.selectedProductId)) }
+      : {}),
+    ...(action === 'reject_current_match' && options.expectedTargetProductId
+      ? { expected_target_product_id: Math.max(1, Math.round(options.expectedTargetProductId)) }
+      : {}),
+  }
+}
+
+export function recipePlannerServiceData(
+  recipeId: number,
+  plannedDate: string,
+  providerActionToken: string,
+  idempotencyKey: string,
+) {
+  return {
+    recipe_id: Math.max(1, Math.round(recipeId)),
+    date: plannedDate.slice(0, 10),
+    provider_action_token: providerActionToken.slice(0, 64),
+    idempotency_key: idempotencyKey.slice(0, 128),
   }
 }
 

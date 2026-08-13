@@ -6,18 +6,30 @@ import {
   normalizeRecipeGroceryServiceResult,
   recipeDetailServiceData,
   recipeGroceryServiceData,
+  recipeIdentityFeedbackServiceData,
+  recipeIngredientDecisionServiceData,
+  recipeIngredientOverrideServiceData,
+  recipePlannerServiceData,
+  recipeServiceResponse,
   type RecipeCardSummary,
   type RecipeDetail,
+  type RecipeDetailIngredient,
   type RecipeGroceryResult,
+  type RecipeIngredientIdentityVerdict,
+  type RecipeIngredientFeedbackTarget,
+  type RecipeIngredientDecisionAction,
 } from './recipeTypes'
 import { callRecipeService, recipeServiceErrorIsUnavailable } from './recipeService'
 import { recipeDetailIdempotencyKey } from './recipeDetailFormatting'
 import {
   RECIPE_GROCERY_MAX_SELECTIONS,
   RECIPE_GROCERY_UNSUPPORTED_MESSAGE,
+  recipeActionableMissingIngredients,
   recipeGroceryDisabledReason,
 } from './recipeGroceryState'
 import type { RecipeDetailTab } from '../../../constants/surfaceSemantics'
+import { useEverShelfInventoryControls } from '../EverShelfInventoryControls'
+import { useCopy } from '../../../i18n/useCopy'
 
 type CallService = (params: Record<string, unknown>) => Promise<unknown> | unknown
 
@@ -30,6 +42,23 @@ type GroceryState =
   | { status: 'idle' | 'loading' }
   | { status: 'error' | 'success'; message: string }
 
+type IngredientPickerLoadState =
+  | { status: 'idle' }
+  | { status: 'loading' }
+  | { status: 'error'; message: string }
+  | { status: 'ready'; items: RecipeInventoryProduct[] }
+
+type PlannerState =
+  | { status: 'idle' | 'loading' }
+  | { status: 'error' | 'success'; message: string }
+
+export interface RecipeInventoryProduct {
+  id: number
+  name: string
+  quantity: number | null
+  unit: string | null
+}
+
 export interface RecipeDetailModalController {
   activeTab: RecipeDetailTab
   addMissingIngredients: () => void
@@ -37,14 +66,50 @@ export interface RecipeDetailModalController {
   detailState: DetailLoadState
   groceryState: GroceryState
   grocerySubmitted: boolean
+  ingredientFeedbackMessage: string | null
+  ingredientFeedbackPending: ReadonlySet<string>
+  ingredientPickerIngredient: RecipeDetailIngredient | null
+  ingredientPickerLoadState: IngredientPickerLoadState
+  ingredientPickerQuery: string
   open: boolean
   openRecipe: (recipe: RecipeCardSummary) => void
+  openIngredientPicker: (ingredient: RecipeDetailIngredient) => void
+  cancelIngredientPicker: () => void
+  assumeIngredientHave: () => void
+  selectIngredientProduct: (product: RecipeInventoryProduct) => void
+  rejectIngredientMatch: (ingredient: RecipeDetailIngredient) => void
+  setIngredientPickerQuery: (query: string) => void
+  cycleIngredientOverride: (ingredient: RecipeDetailIngredient) => void
+  clearIngredientOverride: (ingredient: RecipeDetailIngredient) => void
+  recordIdentityFeedback: (
+    ingredient: RecipeDetailIngredient,
+    verdict: RecipeIngredientIdentityVerdict,
+    targetKind: RecipeIngredientFeedbackTarget,
+  ) => void
   selectedRecipe: RecipeCardSummary | null
   setActiveTab: (tab: RecipeDetailTab) => void
+  plannerOpen: boolean
+  plannerDate: string
+  plannerState: PlannerState
+  openPlanner: () => void
+  cancelPlanner: () => void
+  setPlannerDate: (value: string) => void
+  submitPlanner: () => void
 }
 
 const RECIPE_DETAIL_UNSUPPORTED = 'The installed EverShelf/ha-evershelf version does not support recipe details yet. Recipe cards remain available.'
 const MODAL_STATE_CLEAR_DELAY_MS = MODAL_SHEET_EXIT_ANIMATION_MS + 20
+const RECIPE_I18N = { namespace: 'modalRecipe' } as const
+const RECIPE_CONTROLLER_COPY_KEYS = {
+  decisionAssumeSaved: 'decisionAssumeSaved',
+  decisionRejectSaved: 'decisionRejectSaved',
+  decisionSaveError: 'decisionSaveError',
+  decisionSelectSaved: 'decisionSelectSaved',
+  inventoryPickerSearchError: 'inventoryPickerSearchError',
+  plannerAdded: 'plannerAdded',
+  plannerAlreadyPresent: 'plannerAlreadyPresent',
+  plannerError: 'plannerError',
+} as const
 
 function caughtMessage(error: unknown, fallback: string) {
   if (error instanceof Error && error.message.trim()) return error.message.trim()
@@ -52,6 +117,78 @@ function caughtMessage(error: unknown, fallback: string) {
     return error.message.trim()
   }
   return fallback
+}
+
+function feedbackFailure(result: unknown) {
+  const response = recipeServiceResponse(result)
+  if (!response || typeof response !== 'object' || !('success' in response) || response.success !== false) {
+    return null
+  }
+  const code = 'error' in response ? String(response.error ?? '') : ''
+  const message = 'message' in response
+    ? String(response.message ?? '')
+    : code
+  return { code, message: message || 'Recipe feedback request failed.' }
+}
+
+function feedbackErrorCode(error: unknown) {
+  if (error && typeof error === 'object' && 'code' in error) {
+    return String(error.code ?? '')
+  }
+  return ''
+}
+
+function feedbackRequestError(code: string, message: string) {
+  const error = new Error(message) as Error & { code?: string }
+  error.code = code
+  return error
+}
+
+function inventoryPickerProducts(result: unknown, query: string): RecipeInventoryProduct[] {
+  const response = recipeServiceResponse(result)
+  if (!response || typeof response !== 'object') return []
+  const rawItems = 'inventory' in response && Array.isArray(response.inventory)
+    ? response.inventory
+    : []
+  const normalizedQuery = query.trim().toLocaleLowerCase()
+  const products = new Map<number, RecipeInventoryProduct>()
+  for (const rawItem of rawItems) {
+    if (!rawItem || typeof rawItem !== 'object') continue
+    const record = rawItem as Record<string, unknown>
+    const id = Number(record.product_id)
+    const name = typeof record.name === 'string' ? record.name.trim() : ''
+    const quantityValue = Number(record.quantity)
+    const quantity = Number.isFinite(quantityValue) ? quantityValue : null
+    if (!Number.isFinite(id) || id <= 0 || !name || (quantity !== null && quantity <= 0)) continue
+    if (normalizedQuery && !name.toLocaleLowerCase().includes(normalizedQuery)) {
+      const responseSearch = typeof (response as { search?: unknown }).search === 'string'
+        ? (response as { search: string }).search.trim()
+        : ''
+      if (responseSearch !== query.trim()) continue
+    }
+    const existing = products.get(id)
+    if (existing) {
+      products.set(id, {
+        ...existing,
+        quantity: existing.quantity === null || quantity === null
+          ? existing.quantity ?? quantity
+          : existing.quantity + quantity,
+      })
+      continue
+    }
+    products.set(id, {
+      id,
+      name,
+      quantity,
+      unit: typeof record.unit === 'string' && record.unit.trim()
+        ? record.unit.trim()
+        : null,
+    })
+  }
+  return [...products.values()].sort((left, right) => (
+    left.name.localeCompare(right.name, undefined, { sensitivity: 'base' })
+      || left.id - right.id
+  ))
 }
 
 function groceryFeedback(result: RecipeGroceryResult) {
@@ -124,19 +261,38 @@ function groceryFeedback(result: RecipeGroceryResult) {
 
 export function useRecipeDetailModalController({ enabled = true }: { enabled?: boolean } = {}): RecipeDetailModalController {
   const callService = useHass((state) => state.helpers.callService) as unknown as CallService
+  const copy = useCopy(RECIPE_I18N.namespace)
   const [selectedRecipe, setSelectedRecipe] = useState<RecipeCardSummary | null>(null)
   const [open, setOpen] = useState(false)
   const [activeTab, setActiveTab] = useState<RecipeDetailTab>('general')
   const [detailState, setDetailState] = useState<DetailLoadState>({ status: 'idle' })
   const [groceryState, setGroceryState] = useState<GroceryState>({ status: 'idle' })
   const [grocerySubmitted, setGrocerySubmitted] = useState(false)
+  const [ingredientFeedbackMessage, setIngredientFeedbackMessage] = useState<string | null>(null)
+  const [ingredientFeedbackPending, setIngredientFeedbackPending] = useState<ReadonlySet<string>>(() => new Set())
+  const [ingredientPickerIngredient, setIngredientPickerIngredient] = useState<RecipeDetailIngredient | null>(null)
+  const [ingredientPickerLoadState, setIngredientPickerLoadState] = useState<IngredientPickerLoadState>({ status: 'idle' })
+  const ingredientPickerControls = useEverShelfInventoryControls(
+    'recipe-ingredient-picker',
+    Boolean(open && ingredientPickerIngredient),
+  )
+  const [plannerOpen, setPlannerOpen] = useState(false)
+  const [plannerDate, setPlannerDateState] = useState('')
+  const [plannerState, setPlannerState] = useState<PlannerState>({ status: 'idle' })
+  const [detailReloadKey, setDetailReloadKey] = useState(0)
   const clearTimerRef = useRef<number | null>(null)
   const modalSessionRef = useRef(0)
   const groceryCommandKeyRef = useRef<string | null>(null)
+  const grocerySelectionFingerprintRef = useRef<string | null>(null)
   const groceryInFlightRef = useRef(false)
   const groceryRequestRef = useRef(0)
   const grocerySubmittedRef = useRef(false)
   const returnFocusRef = useRef<HTMLElement | null>(null)
+  const feedbackCommandKeysRef = useRef<Map<string, string>>(new Map())
+  const ingredientPickerRequestRef = useRef(0)
+  const ingredientPickerRawQueryRef = useRef('')
+  const plannerCommandKeyRef = useRef<string | null>(null)
+  const plannerFingerprintRef = useRef<string | null>(null)
 
   const clearCloseTimer = useCallback(() => {
     if (clearTimerRef.current !== null) window.clearTimeout(clearTimerRef.current)
@@ -152,6 +308,7 @@ export function useRecipeDetailModalController({ enabled = true }: { enabled?: b
     modalSessionRef.current += 1
     groceryRequestRef.current += 1
     groceryCommandKeyRef.current = null
+    grocerySelectionFingerprintRef.current = null
     groceryInFlightRef.current = false
     grocerySubmittedRef.current = false
     setSelectedRecipe({ ...recipe })
@@ -159,8 +316,20 @@ export function useRecipeDetailModalController({ enabled = true }: { enabled?: b
     setDetailState({ status: 'loading' })
     setGroceryState({ status: 'idle' })
     setGrocerySubmitted(false)
+    setIngredientFeedbackMessage(null)
+    setIngredientFeedbackPending(new Set())
+    setIngredientPickerIngredient(null)
+    setIngredientPickerLoadState({ status: 'idle' })
+    ingredientPickerControls.setSearchQuery('')
+    ingredientPickerRequestRef.current += 1
+    setPlannerOpen(false)
+    setPlannerDateState('')
+    setPlannerState({ status: 'idle' })
+    plannerCommandKeyRef.current = null
+    plannerFingerprintRef.current = null
+    feedbackCommandKeysRef.current.clear()
     setOpen(true)
-  }, [clearCloseTimer, enabled])
+  }, [clearCloseTimer, enabled, ingredientPickerControls])
 
   const close = useCallback(() => {
     const returnFocus = returnFocusRef.current
@@ -169,13 +338,31 @@ export function useRecipeDetailModalController({ enabled = true }: { enabled?: b
     modalSessionRef.current += 1
     groceryRequestRef.current += 1
     groceryCommandKeyRef.current = null
+    grocerySelectionFingerprintRef.current = null
     groceryInFlightRef.current = false
     grocerySubmittedRef.current = false
+    ingredientPickerRequestRef.current += 1
+    setIngredientPickerIngredient(null)
+    setIngredientPickerLoadState({ status: 'idle' })
+    ingredientPickerControls.setSearchQuery('')
+    setPlannerOpen(false)
+    setPlannerState({ status: 'idle' })
+    plannerCommandKeyRef.current = null
+    plannerFingerprintRef.current = null
     clearTimerRef.current = window.setTimeout(() => {
       setSelectedRecipe(null)
       setDetailState({ status: 'idle' })
       setGroceryState({ status: 'idle' })
       setGrocerySubmitted(false)
+      setIngredientFeedbackMessage(null)
+      setIngredientFeedbackPending(new Set())
+      setIngredientPickerIngredient(null)
+      setIngredientPickerLoadState({ status: 'idle' })
+      ingredientPickerControls.setSearchQuery('')
+      setPlannerOpen(false)
+      setPlannerDateState('')
+      setPlannerState({ status: 'idle' })
+      feedbackCommandKeysRef.current.clear()
       setActiveTab('general')
       if (returnFocus?.isConnected && returnFocusRef.current === returnFocus) {
         returnFocus.focus({ preventScroll: true })
@@ -183,7 +370,7 @@ export function useRecipeDetailModalController({ enabled = true }: { enabled?: b
       returnFocusRef.current = null
       clearTimerRef.current = null
     }, MODAL_STATE_CLEAR_DELAY_MS)
-  }, [clearCloseTimer])
+  }, [clearCloseTimer, ingredientPickerControls])
 
   useEffect(() => {
     if (!enabled || !open || !selectedRecipe) return undefined
@@ -217,7 +404,589 @@ export function useRecipeDetailModalController({ enabled = true }: { enabled?: b
     return () => {
       stale = true
     }
-  }, [callService, enabled, open, selectedRecipe])
+  }, [callService, detailReloadKey, enabled, open, selectedRecipe])
+
+  useEffect(() => {
+    ingredientPickerRawQueryRef.current = ingredientPickerControls.searchQuery.trim()
+  }, [ingredientPickerControls.searchQuery])
+
+  useEffect(() => {
+    if (!open || !ingredientPickerIngredient) return undefined
+    const requestId = ingredientPickerRequestRef.current + 1
+    ingredientPickerRequestRef.current = requestId
+    const modalSession = modalSessionRef.current
+    const ingredientKey = ingredientPickerIngredient.key
+    const query = ingredientPickerControls.debouncedSearchQuery.trim()
+    let cancelled = false
+    queueMicrotask(() => {
+      if (
+        !cancelled
+        && requestId === ingredientPickerRequestRef.current
+      ) {
+        setIngredientPickerLoadState({ status: 'loading' })
+      }
+    })
+    void Promise.resolve(callService({
+      domain: 'evershelf',
+      service: 'list_inventory',
+      serviceData: query ? { q: query } : {},
+      returnResponse: true,
+    })).then((result) => {
+      if (
+        cancelled
+        || requestId !== ingredientPickerRequestRef.current
+        || modalSession !== modalSessionRef.current
+        || ingredientPickerRawQueryRef.current !== query
+      ) return
+      setIngredientPickerLoadState({
+        status: 'ready',
+        items: inventoryPickerProducts(result, query),
+      })
+    }).catch((error: unknown) => {
+      if (
+        cancelled
+        || requestId !== ingredientPickerRequestRef.current
+        || modalSession !== modalSessionRef.current
+      ) return
+      setIngredientPickerLoadState({
+        status: 'error',
+        message: caughtMessage(error, copy(RECIPE_CONTROLLER_COPY_KEYS.inventoryPickerSearchError)),
+      })
+    })
+    return () => {
+      cancelled = true
+      if (
+        ingredientPickerIngredient.key === ingredientKey
+        && requestId === ingredientPickerRequestRef.current
+      ) {
+        ingredientPickerRequestRef.current += 1
+      }
+    }
+  }, [
+    callService,
+    copy,
+    ingredientPickerControls.debouncedSearchQuery,
+    ingredientPickerIngredient,
+    open,
+  ])
+
+  const updateIngredient = useCallback((
+    ingredientKey: string,
+    update: (ingredient: RecipeDetailIngredient) => RecipeDetailIngredient,
+  ) => {
+    setDetailState((current) => {
+      if (current.status !== 'ready') return current
+      return {
+        ...current,
+        detail: {
+          ...current.detail,
+          ingredients: current.detail.ingredients.map((ingredient) => (
+            ingredient.key === ingredientKey ? update(ingredient) : ingredient
+          )),
+        },
+      }
+    })
+  }, [])
+
+  const setFeedbackPending = useCallback((ingredientKey: string, pending: boolean) => {
+    setIngredientFeedbackPending((current) => {
+      const next = new Set(current)
+      if (pending) next.add(ingredientKey)
+      else next.delete(ingredientKey)
+      return next
+    })
+  }, [])
+
+  const clearFeedbackCommandFamily = useCallback((prefix: string) => {
+    for (const key of feedbackCommandKeysRef.current.keys()) {
+      if (key.startsWith(prefix)) {
+        feedbackCommandKeysRef.current.delete(key)
+      }
+    }
+  }, [])
+
+  const resetGroceryCommandState = useCallback(() => {
+    groceryRequestRef.current += 1
+    groceryCommandKeyRef.current = null
+    grocerySelectionFingerprintRef.current = null
+    groceryInFlightRef.current = false
+    grocerySubmittedRef.current = false
+    setGroceryState({ status: 'idle' })
+    setGrocerySubmitted(false)
+  }, [])
+
+  const cancelIngredientPicker = useCallback(() => {
+    ingredientPickerRequestRef.current += 1
+    setIngredientPickerIngredient(null)
+    setIngredientPickerLoadState({ status: 'idle' })
+    ingredientPickerControls.setSearchQuery('')
+  }, [ingredientPickerControls])
+
+  const submitIngredientDecision = useCallback((
+    ingredient: RecipeDetailIngredient,
+    action: RecipeIngredientDecisionAction,
+    options: {
+      expectedTargetProductId?: number | null
+      selectedProduct?: RecipeInventoryProduct | null
+    } = {},
+  ) => {
+    if (
+      detailState.status !== 'ready'
+      || detailState.session !== modalSessionRef.current
+      || !detailState.detail.capabilities.ingredientFeedbackV2
+      || !ingredient.feedbackCapabilities.decision
+      || !ingredient.feedbackToken
+      || ingredientFeedbackPending.has(ingredient.key)
+      || (action === 'assume_have' && !ingredient.feedbackCapabilities.assumeHave)
+      || (action === 'select_inventory_product' && !ingredient.feedbackCapabilities.selectInventoryProduct)
+      || (action === 'reject_current_match' && !ingredient.feedbackCapabilities.rejectCurrentMatch)
+    ) return
+    const modalSession = modalSessionRef.current
+    const selectedProduct = options.selectedProduct ?? null
+    const selectedProductId = selectedProduct?.id
+    const commandIdentity = [
+      'decision',
+      ingredient.key,
+      action,
+      selectedProductId ?? '',
+      options.expectedTargetProductId ?? '',
+    ].join(':')
+    const idempotencyKey = feedbackCommandKeysRef.current.get(commandIdentity)
+      ?? recipeDetailIdempotencyKey(detailState.detail.id)
+    feedbackCommandKeysRef.current.set(commandIdentity, idempotencyKey)
+    const previous = ingredient.userOverride
+    const previousCapabilities = ingredient.feedbackCapabilities
+    const availability = action === 'reject_current_match' ? 'missing' : 'have'
+    updateIngredient(ingredient.key, (current) => ({
+      ...current,
+      userOverride: {
+        availability,
+        decisionAction: action,
+        selectedProduct: selectedProduct
+          ? { id: selectedProduct.id, name: selectedProduct.name }
+          : null,
+        updatedAt: new Date().toISOString(),
+      },
+      feedbackCapabilities: {
+        ...current.feedbackCapabilities,
+        rejectCurrentMatch: availability === 'have'
+          ? true
+          : current.feedbackCapabilities.rejectCurrentMatch,
+        negativeIdentity: selectedProduct
+          ? true
+          : current.feedbackCapabilities.negativeIdentity,
+      },
+    }))
+    resetGroceryCommandState()
+    setFeedbackPending(ingredient.key, true)
+    setIngredientFeedbackMessage(null)
+    if (ingredientPickerIngredient?.key === ingredient.key) cancelIngredientPicker()
+    void callRecipeService(
+      callService,
+      'recipe_ingredient_decision',
+      recipeIngredientDecisionServiceData(
+        detailState.detail.id,
+        ingredient,
+        action,
+        idempotencyKey,
+        {
+          expectedTargetProductId: options.expectedTargetProductId,
+          selectedProductId,
+        },
+      ),
+    ).then((result) => {
+      if (modalSession !== modalSessionRef.current) return
+      const failure = feedbackFailure(result)
+      if (failure) throw feedbackRequestError(failure.code, failure.message)
+      clearFeedbackCommandFamily(`decision:${ingredient.key}:`)
+      setIngredientFeedbackMessage(
+        action === 'select_inventory_product'
+          ? copy(RECIPE_CONTROLLER_COPY_KEYS.decisionSelectSaved)
+          : action === 'reject_current_match'
+            ? copy(RECIPE_CONTROLLER_COPY_KEYS.decisionRejectSaved)
+            : copy(RECIPE_CONTROLLER_COPY_KEYS.decisionAssumeSaved),
+      )
+    }).catch((error: unknown) => {
+      if (modalSession !== modalSessionRef.current) return
+      updateIngredient(ingredient.key, (current) => ({
+        ...current,
+        userOverride: previous,
+        feedbackCapabilities: previousCapabilities,
+      }))
+      const code = feedbackErrorCode(error)
+      if (code === 'ingredient_feedback_stale') {
+        feedbackCommandKeysRef.current.delete(commandIdentity)
+        setDetailState({ status: 'loading' })
+        setDetailReloadKey((current) => current + 1)
+      } else if (
+        code === 'idempotency_key_conflict'
+        || code === 'unsupported_capability'
+      ) {
+        feedbackCommandKeysRef.current.delete(commandIdentity)
+      }
+      setIngredientFeedbackMessage(
+        caughtMessage(error, copy(RECIPE_CONTROLLER_COPY_KEYS.decisionSaveError)),
+      )
+    }).finally(() => {
+      if (modalSession === modalSessionRef.current) {
+        setFeedbackPending(ingredient.key, false)
+      }
+    })
+  }, [
+    callService,
+    cancelIngredientPicker,
+    clearFeedbackCommandFamily,
+    copy,
+    detailState,
+    ingredientFeedbackPending,
+    ingredientPickerIngredient,
+    resetGroceryCommandState,
+    setFeedbackPending,
+    updateIngredient,
+  ])
+
+  const openIngredientPicker = useCallback((ingredient: RecipeDetailIngredient) => {
+    if (
+      detailState.status !== 'ready'
+      || !detailState.detail.capabilities.ingredientFeedbackV2
+      || !ingredient.feedbackCapabilities.selectInventoryProduct
+      || !ingredient.feedbackToken
+      || ingredientFeedbackPending.has(ingredient.key)
+    ) return
+    ingredientPickerControls.setSearchQuery('')
+    setIngredientPickerLoadState({ status: 'loading' })
+    setIngredientPickerIngredient(ingredient)
+  }, [detailState, ingredientFeedbackPending, ingredientPickerControls])
+
+  const assumeIngredientHave = useCallback(() => {
+    if (!ingredientPickerIngredient) return
+    submitIngredientDecision(
+      ingredientPickerIngredient,
+      'assume_have',
+    )
+  }, [ingredientPickerIngredient, submitIngredientDecision])
+
+  const selectIngredientProduct = useCallback((product: RecipeInventoryProduct) => {
+    if (!ingredientPickerIngredient) return
+    submitIngredientDecision(
+      ingredientPickerIngredient,
+      'select_inventory_product',
+      { selectedProduct: product },
+    )
+  }, [ingredientPickerIngredient, submitIngredientDecision])
+
+  const rejectIngredientMatch = useCallback((ingredient: RecipeDetailIngredient) => {
+    const expectedTargetProductId = ingredient.userOverride?.selectedProduct?.id
+      ?? ingredient.inventory.matchedProduct?.id
+      ?? null
+    submitIngredientDecision(
+      ingredient,
+      'reject_current_match',
+      { expectedTargetProductId },
+    )
+  }, [submitIngredientDecision])
+
+  const cancelPlanner = useCallback(() => {
+    setPlannerOpen(false)
+    setPlannerState({ status: 'idle' })
+  }, [])
+
+  const openPlanner = useCallback(() => {
+    if (
+      detailState.status !== 'ready'
+      || !detailState.detail.capabilities.planner
+      || !detailState.detail.planner.available
+      || !detailState.detail.planner.providerActionToken
+    ) return
+    setPlannerDateState(
+      detailState.detail.planner.minimumDate
+        ?? new Date().toISOString().slice(0, 10),
+    )
+    setPlannerState({ status: 'idle' })
+    setPlannerOpen(true)
+  }, [detailState])
+
+  const setPlannerDate = useCallback((value: string) => {
+    setPlannerDateState(value)
+    setPlannerState({ status: 'idle' })
+    const fingerprint = plannerFingerprintRef.current
+    if (fingerprint !== null && !fingerprint.endsWith(`:${value}`)) {
+      plannerCommandKeyRef.current = null
+      plannerFingerprintRef.current = null
+    }
+  }, [])
+
+  const submitPlanner = useCallback(() => {
+    if (
+      plannerState.status === 'loading'
+      || detailState.status !== 'ready'
+      || !plannerOpen
+      || !detailState.detail.capabilities.planner
+      || !detailState.detail.planner.available
+      || !detailState.detail.planner.providerActionToken
+      || !plannerDate
+      || (
+        detailState.detail.planner.minimumDate
+        && plannerDate < detailState.detail.planner.minimumDate
+      )
+      || (
+        detailState.detail.planner.maximumDate
+        && plannerDate > detailState.detail.planner.maximumDate
+      )
+    ) return
+    const modalSession = modalSessionRef.current
+    const fingerprint = `${detailState.detail.id}:${plannerDate}`
+    if (
+      plannerFingerprintRef.current !== null
+      && plannerFingerprintRef.current !== fingerprint
+    ) {
+      plannerCommandKeyRef.current = null
+    }
+    plannerFingerprintRef.current = fingerprint
+    const idempotencyKey = plannerCommandKeyRef.current
+      ?? recipeDetailIdempotencyKey(detailState.detail.id)
+    plannerCommandKeyRef.current = idempotencyKey
+    setPlannerState({ status: 'loading' })
+    void callRecipeService(
+      callService,
+      'recipe_planner_add',
+      recipePlannerServiceData(
+        detailState.detail.id,
+        plannerDate,
+        detailState.detail.planner.providerActionToken,
+        idempotencyKey,
+      ),
+    ).then((result) => {
+      if (modalSession !== modalSessionRef.current) return
+      const failure = feedbackFailure(result)
+      if (failure) throw feedbackRequestError(failure.code, failure.message)
+      const response = recipeServiceResponse(result)
+      const alreadyPresent = Boolean(
+        response
+        && typeof response === 'object'
+        && 'already_present' in response
+        && response.already_present,
+      )
+      setPlannerState({
+        status: 'success',
+        message: alreadyPresent
+          ? copy(RECIPE_CONTROLLER_COPY_KEYS.plannerAlreadyPresent)
+          : copy(RECIPE_CONTROLLER_COPY_KEYS.plannerAdded),
+      })
+    }).catch((error: unknown) => {
+      if (modalSession !== modalSessionRef.current) return
+      const code = feedbackErrorCode(error)
+      if (code === 'recipe_planner_stale') {
+        plannerCommandKeyRef.current = null
+        plannerFingerprintRef.current = null
+        setDetailState({ status: 'loading' })
+        setDetailReloadKey((current) => current + 1)
+        setPlannerOpen(false)
+      } else if (
+        code === 'idempotency_key_conflict'
+        || code === 'unsupported_capability'
+      ) {
+        plannerCommandKeyRef.current = null
+        plannerFingerprintRef.current = null
+      }
+      setPlannerState({
+        status: 'error',
+        message: caughtMessage(error, copy(RECIPE_CONTROLLER_COPY_KEYS.plannerError)),
+      })
+    })
+  }, [
+    callService,
+    copy,
+    detailState,
+    plannerDate,
+    plannerOpen,
+    plannerState.status,
+  ])
+
+  const setIngredientOverride = useCallback((
+    ingredient: RecipeDetailIngredient,
+    availability: 'have' | 'missing' | 'clear',
+  ) => {
+    if (
+      detailState.status !== 'ready'
+      || detailState.session !== modalSessionRef.current
+      || !detailState.detail.capabilities.ingredientFeedback
+      || !ingredient.feedbackCapabilities.availabilityOverride
+      || !ingredient.feedbackToken
+      || ingredientFeedbackPending.has(ingredient.key)
+    ) return
+    const modalSession = modalSessionRef.current
+    const previous = ingredient.userOverride
+    const commandIdentity = `override:${ingredient.key}:${availability}`
+    const idempotencyKey = feedbackCommandKeysRef.current.get(commandIdentity)
+      ?? recipeDetailIdempotencyKey(detailState.detail.id)
+    feedbackCommandKeysRef.current.set(commandIdentity, idempotencyKey)
+    const optimistic = availability === 'clear'
+      ? null
+      : {
+          availability,
+          decisionAction: null,
+          selectedProduct: null,
+          updatedAt: new Date().toISOString(),
+        } as const
+    updateIngredient(ingredient.key, (current) => ({
+      ...current,
+      userOverride: optimistic,
+    }))
+    resetGroceryCommandState()
+    setFeedbackPending(ingredient.key, true)
+    setIngredientFeedbackMessage(null)
+    void callRecipeService(
+      callService,
+      'recipe_ingredient_override',
+      recipeIngredientOverrideServiceData(
+        detailState.detail.id,
+        ingredient,
+        availability,
+        idempotencyKey,
+      ),
+    ).then((result) => {
+      if (modalSession !== modalSessionRef.current) return
+      const failure = feedbackFailure(result)
+      if (failure) throw feedbackRequestError(failure.code, failure.message)
+      clearFeedbackCommandFamily(
+        `override:${ingredient.key}:`,
+      )
+      setIngredientFeedbackMessage(
+        availability === 'clear'
+          ? 'Using EverShelf availability again.'
+          : 'Ingredient availability override saved.',
+      )
+    }).catch((error: unknown) => {
+      if (modalSession !== modalSessionRef.current) return
+      updateIngredient(ingredient.key, (current) => ({
+        ...current,
+        userOverride: previous,
+      }))
+      const code = feedbackErrorCode(error)
+      if (code === 'ingredient_feedback_stale') {
+        feedbackCommandKeysRef.current.delete(commandIdentity)
+        setDetailState({ status: 'loading' })
+        setDetailReloadKey((current) => current + 1)
+      } else if (
+        code === 'idempotency_key_conflict'
+        || code === 'unsupported_capability'
+      ) {
+        feedbackCommandKeysRef.current.delete(commandIdentity)
+      }
+      setIngredientFeedbackMessage(
+        caughtMessage(error, 'Unable to save ingredient override.'),
+      )
+    }).finally(() => {
+      if (modalSession === modalSessionRef.current) {
+        setFeedbackPending(ingredient.key, false)
+      }
+    })
+  }, [
+    callService,
+    detailState,
+    ingredientFeedbackPending,
+    setFeedbackPending,
+    clearFeedbackCommandFamily,
+    resetGroceryCommandState,
+    updateIngredient,
+  ])
+
+  const cycleIngredientOverride = useCallback((ingredient: RecipeDetailIngredient) => {
+    const next = ingredient.userOverride?.availability === 'have'
+      ? 'missing'
+      : 'have'
+    setIngredientOverride(ingredient, next)
+  }, [setIngredientOverride])
+
+  const clearIngredientOverride = useCallback((ingredient: RecipeDetailIngredient) => {
+    setIngredientOverride(ingredient, 'clear')
+  }, [setIngredientOverride])
+
+  const recordIdentityFeedback = useCallback((
+    ingredient: RecipeDetailIngredient,
+    verdict: RecipeIngredientIdentityVerdict,
+    targetKind: RecipeIngredientFeedbackTarget,
+  ) => {
+    if (
+      detailState.status !== 'ready'
+      || detailState.session !== modalSessionRef.current
+      || !detailState.detail.capabilities.ingredientFeedback
+      || !ingredient.feedbackCapabilities.identity
+      || !ingredient.feedbackToken
+      || ingredientFeedbackPending.has(ingredient.key)
+    ) return
+    const modalSession = modalSessionRef.current
+    const previous = ingredient.identityFeedback
+    const commandIdentity = `identity:${ingredient.key}:${targetKind}:${verdict}`
+    const idempotencyKey = feedbackCommandKeysRef.current.get(commandIdentity)
+      ?? recipeDetailIdempotencyKey(detailState.detail.id)
+    feedbackCommandKeysRef.current.set(commandIdentity, idempotencyKey)
+    const optimistic = {
+      verdict,
+      targetKind,
+      settleAfter: null,
+      updatedAt: new Date().toISOString(),
+    }
+    updateIngredient(ingredient.key, (current) => ({
+      ...current,
+      identityFeedback: optimistic,
+    }))
+    setFeedbackPending(ingredient.key, true)
+    setIngredientFeedbackMessage(null)
+    void callRecipeService(
+      callService,
+      'recipe_identity_feedback',
+      recipeIdentityFeedbackServiceData(
+        detailState.detail.id,
+        ingredient,
+        verdict,
+        targetKind,
+        idempotencyKey,
+      ),
+    ).then((result) => {
+      if (modalSession !== modalSessionRef.current) return
+      const failure = feedbackFailure(result)
+      if (failure) throw feedbackRequestError(failure.code, failure.message)
+      clearFeedbackCommandFamily(
+        `identity:${ingredient.key}:${targetKind}:`,
+      )
+      setIngredientFeedbackMessage(
+        'Match feedback saved for ontology review.',
+      )
+    }).catch((error: unknown) => {
+      if (modalSession !== modalSessionRef.current) return
+      updateIngredient(ingredient.key, (current) => ({
+        ...current,
+        identityFeedback: previous,
+      }))
+      const code = feedbackErrorCode(error)
+      if (code === 'ingredient_feedback_stale') {
+        feedbackCommandKeysRef.current.delete(commandIdentity)
+        setDetailState({ status: 'loading' })
+        setDetailReloadKey((current) => current + 1)
+      } else if (
+        code === 'idempotency_key_conflict'
+        || code === 'unsupported_capability'
+      ) {
+        feedbackCommandKeysRef.current.delete(commandIdentity)
+      }
+      setIngredientFeedbackMessage(
+        caughtMessage(error, 'Unable to save identity feedback.'),
+      )
+    }).finally(() => {
+      if (modalSession === modalSessionRef.current) {
+        setFeedbackPending(ingredient.key, false)
+      }
+    })
+  }, [
+    callService,
+    detailState,
+    ingredientFeedbackPending,
+    setFeedbackPending,
+    clearFeedbackCommandFamily,
+    updateIngredient,
+  ])
 
   const addMissingIngredients = useCallback(() => {
     if (
@@ -227,9 +996,25 @@ export function useRecipeDetailModalController({ enabled = true }: { enabled?: b
       || detailState.session !== modalSessionRef.current
     ) return
     if (recipeGroceryDisabledReason(detailState.detail, 'idle', false)) return
-    const missing = detailState.detail.ingredients.filter((ingredient) => ingredient.inventory.state === 'missing')
+    const missing = recipeActionableMissingIngredients(
+      detailState.detail,
+    )
     if (missing.length === 0 || missing.length > RECIPE_GROCERY_MAX_SELECTIONS) return
 
+    const selectionFingerprint = missing
+      .map(({ key, position }) => `${key}:${position}`)
+      .join('|')
+    if (
+      grocerySelectionFingerprintRef.current !== null
+      && grocerySelectionFingerprintRef.current
+          !== selectionFingerprint
+    ) {
+      groceryCommandKeyRef.current = null
+      grocerySubmittedRef.current = false
+      setGrocerySubmitted(false)
+    }
+    grocerySelectionFingerprintRef.current =
+      selectionFingerprint
     groceryInFlightRef.current = true
     const groceryRequest = ++groceryRequestRef.current
     const idempotencyKey = groceryCommandKeyRef.current
@@ -284,9 +1069,30 @@ export function useRecipeDetailModalController({ enabled = true }: { enabled?: b
     detailState,
     groceryState,
     grocerySubmitted,
+    ingredientFeedbackMessage,
+    ingredientFeedbackPending,
+    ingredientPickerIngredient,
+    ingredientPickerLoadState,
+    ingredientPickerQuery: ingredientPickerControls.searchQuery,
     open,
     openRecipe,
+    openIngredientPicker,
+    cancelIngredientPicker,
+    assumeIngredientHave,
+    selectIngredientProduct,
+    rejectIngredientMatch,
+    setIngredientPickerQuery: ingredientPickerControls.setSearchQuery,
+    cycleIngredientOverride,
+    clearIngredientOverride,
+    recordIdentityFeedback,
     selectedRecipe,
     setActiveTab,
+    plannerOpen,
+    plannerDate,
+    plannerState,
+    openPlanner,
+    cancelPlanner,
+    setPlannerDate,
+    submitPlanner,
   }
 }

@@ -231,6 +231,20 @@
     {
       "characters": 25,
       "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/recipe.json",
+      "id": "f52427de3a9e45d2",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [
+        "quantity"
+      ],
+      "value": "{{quantity}} in inventory",
+      "words": 3
+    },
+    {
+      "characters": 25,
+      "context": "catalog-copy",
       "file": "src/i18n/locales/en/modals/camera.json",
       "id": "1d8a8f5d0d50dec4",
       "lines": [],
@@ -241,6 +255,119 @@
       ],
       "value": "{{title}} camera controls",
       "words": 3
+    },
+    {
+      "characters": 18,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/recipe.json",
+      "id": "e3187e7595f235d0",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [
+        "title"
+      ],
+      "value": "{{title}} sections",
+      "words": 2
+    },
+    {
+      "characters": 22,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/recipe.json",
+      "id": "cb73b032fab7bfb3",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [
+        "details",
+        "title"
+      ],
+      "value": "{{title}}: {{details}}",
+      "words": 2
+    },
+    {
+      "characters": 39,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/recipe.json",
+      "id": "a32026bcb0c0536f",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Activate to choose an inventory product",
+      "words": 6
+    },
+    {
+      "characters": 24,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/recipe.json",
+      "id": "f995b78530734b23",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Activate to mark as have",
+      "words": 5
+    },
+    {
+      "characters": 24,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/recipe.json",
+      "id": "567803175309772d",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Activate to mark missing",
+      "words": 4
+    },
+    {
+      "characters": 11,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/recipe.json",
+      "id": "6262b595d9e833ed",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Active Time",
+      "words": 2
+    },
+    {
+      "characters": 14,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/recipe.json",
+      "id": "52767afb3e2ac429",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Add to My Week",
+      "words": 4
+    },
+    {
+      "characters": 7,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/recipe.json",
+      "id": "b7ea3167751e4532",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Adding…",
+      "words": 1
+    },
+    {
+      "characters": 20,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/recipe.json",
+      "id": "7b0d5c008c259642",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Additional Equipment",
+      "words": 2
     },
     {
       "characters": 79,
@@ -279,6 +406,44 @@
       "words": 1
     },
     {
+      "characters": 34,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/recipe.json",
+      "id": "6821a49f8db82aab",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Back and mark ingredient available",
+      "words": 5
+    },
+    {
+      "characters": 14,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/recipe.json",
+      "id": "d653e9f834b5b7b8",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Back to recipe",
+      "words": 3
+    },
+    {
+      "characters": 33,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/recipe.json",
+      "id": "8307d0894569d9a9",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [
+        "ingredient"
+      ],
+      "value": "Choose Product for {{ingredient}}",
+      "words": 4
+    },
+    {
       "characters": 162,
       "context": "catalog-copy",
       "file": "src/i18n/locales/en/pages/admin.json",
@@ -289,6 +454,42 @@
       "placeholders": [],
       "value": "Choose whether each room's presence lighting is Enabled, Disabled, Paused, or Quieted. Paused stays fail-dark until resumed; Quieted rearms after the room clears.",
       "words": 23
+    },
+    {
+      "characters": 16,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/recipe.json",
+      "id": "416f80a0e22500c2",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Content Language",
+      "words": 2
+    },
+    {
+      "characters": 9,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/recipe.json",
+      "id": "10db9b6c7cce16d7",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Cook Time",
+      "words": 2
+    },
+    {
+      "characters": 21,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/recipe.json",
+      "id": "c62f4d95ba8726d8",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Cookidoo My Week date",
+      "words": 4
     },
     {
       "characters": 413,
@@ -324,6 +525,18 @@
       "origin": "catalog",
       "placeholders": [],
       "value": "Days",
+      "words": 1
+    },
+    {
+      "characters": 7,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/recipe.json",
+      "id": "10c6cb507059d672",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Devices",
       "words": 1
     },
     {
@@ -365,6 +578,18 @@
       "words": 4
     },
     {
+      "characters": 7,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/recipe.json",
+      "id": "f00341ad763d3ed9",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Have it",
+      "words": 2
+    },
+    {
       "characters": 4,
       "context": "catalog-copy",
       "file": "src/i18n/locales/en/pages/security.json",
@@ -389,6 +614,114 @@
       "words": 38
     },
     {
+      "characters": 12,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/recipe.json",
+      "id": "2bd5aa3db5fc25f5",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "In inventory",
+      "words": 2
+    },
+    {
+      "characters": 18,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/recipe.json",
+      "id": "681422d9b5dd0bb6",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Inactive/Rest Time",
+      "words": 2
+    },
+    {
+      "characters": 48,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/recipe.json",
+      "id": "5a21b09dbc820eec",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Ingredient marked available without AI evidence.",
+      "words": 6
+    },
+    {
+      "characters": 74,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/recipe.json",
+      "id": "e7ee0bec8983797b",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Ingredient marked missing; exact match feedback was queued when available.",
+      "words": 10
+    },
+    {
+      "characters": 25,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/recipe.json",
+      "id": "2886182357b09686",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Inventory product choices",
+      "words": 3
+    },
+    {
+      "characters": 66,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/recipe.json",
+      "id": "5fbd5cc5cf58b596",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Inventory product correction saved and queued for ontology review.",
+      "words": 9
+    },
+    {
+      "characters": 14,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/recipe.json",
+      "id": "1ea2b6b64e825f15",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Match is right",
+      "words": 3
+    },
+    {
+      "characters": 14,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/recipe.json",
+      "id": "c67dddcea37c54dd",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Match is wrong",
+      "words": 3
+    },
+    {
+      "characters": 7,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/recipe.json",
+      "id": "03dedaddd0708bc0",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Missing",
+      "words": 1
+    },
+    {
       "characters": 5,
       "context": "catalog-copy",
       "file": "src/i18n/locales/en/pages/security.json",
@@ -399,6 +732,18 @@
       "placeholders": [],
       "value": "Night",
       "words": 1
+    },
+    {
+      "characters": 27,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/recipe.json",
+      "id": "4f5695b97df8379d",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "No Inventory Products Found",
+      "words": 4
     },
     {
       "characters": 14,
@@ -445,6 +790,30 @@
       "words": 6
     },
     {
+      "characters": 16,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/recipe.json",
+      "id": "f1ef105c52f3f861",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Open in Cookidoo",
+      "words": 3
+    },
+    {
+      "characters": 16,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/recipe.json",
+      "id": "e9ea1e4562e665f5",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Optional Devices",
+      "words": 2
+    },
+    {
       "characters": 26,
       "context": "catalog-copy",
       "file": "src/i18n/locales/en/core.json",
@@ -460,6 +829,44 @@
       "words": 4
     },
     {
+      "characters": 9,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/recipe.json",
+      "id": "07bb4e97e78322c3",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Prep Time",
+      "words": 2
+    },
+    {
+      "characters": 20,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/recipe.json",
+      "id": "dda63e7eb60b2445",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [
+        "product"
+      ],
+      "value": "Product: {{product}}",
+      "words": 2
+    },
+    {
+      "characters": 33,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/recipe.json",
+      "id": "48dc3d7c9abb3e89",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Recipe added to Cookidoo My Week.",
+      "words": 6
+    },
+    {
       "characters": 5,
       "context": "catalog-copy",
       "file": "src/i18n/locales/en/core.json",
@@ -472,6 +879,42 @@
       "words": 1
     },
     {
+      "characters": 25,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/recipe.json",
+      "id": "e814cf71d8aca6b0",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Search inventory products",
+      "words": 3
+    },
+    {
+      "characters": 28,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/recipe.json",
+      "id": "3c9e0921477cafa0",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Search inventory products...",
+      "words": 3
+    },
+    {
+      "characters": 28,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/recipe.json",
+      "id": "1373aeb76281d6fb",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Searching inventory products",
+      "words": 3
+    },
+    {
       "characters": 22,
       "context": "catalog-copy",
       "file": "src/i18n/locales/en/pages/security.json",
@@ -482,6 +925,30 @@
       "placeholders": [],
       "value": "Security System States",
       "words": 3
+    },
+    {
+      "characters": 73,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/recipe.json",
+      "id": "083b225aa43a33fb",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Select the exact inventory product that satisfies this recipe ingredient.",
+      "words": 10
+    },
+    {
+      "characters": 92,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/recipe.json",
+      "id": "079d50ebfd4446a9",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Servings, time, difficulty, and equipment are not available in the cached Cookidoo metadata.",
+      "words": 13
     },
     {
       "characters": 31,
@@ -532,6 +999,128 @@
       "placeholders": [],
       "value": "Start date and time must be before end date and time. Vacation mode is disabled until the dates are fixed.",
       "words": 20
+    },
+    {
+      "characters": 123,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/recipe.json",
+      "id": "62f2ce62700396be",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "This adds the recipe to the configured Cookidoo account's My Week planner. It does not push directly to a Thermomix device.",
+      "words": 21
+    },
+    {
+      "characters": 57,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/recipe.json",
+      "id": "e8a848543dc46440",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "This recipe is already in Cookidoo My Week for that date.",
+      "words": 11
+    },
+    {
+      "characters": 10,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/recipe.json",
+      "id": "6fc16978a8a3746e",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Total Time",
+      "words": 2
+    },
+    {
+      "characters": 108,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/recipe.json",
+      "id": "f20ec71978022fff",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Try another search, or use Back to trust that you already have this ingredient without creating AI evidence.",
+      "words": 18
+    },
+    {
+      "characters": 37,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/recipe.json",
+      "id": "dc5d2bafe4147330",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Unable to add this recipe to My Week.",
+      "words": 8
+    },
+    {
+      "characters": 35,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/recipe.json",
+      "id": "e486532ac451a21f",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Unable to save ingredient decision.",
+      "words": 5
+    },
+    {
+      "characters": 26,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/recipe.json",
+      "id": "47785fe9b8d5c17d",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Unable to Search Inventory",
+      "words": 4
+    },
+    {
+      "characters": 36,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/recipe.json",
+      "id": "4cc542a5beaf4fb3",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Unable to search inventory products.",
+      "words": 5
+    },
+    {
+      "characters": 20,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/recipe.json",
+      "id": "9377e6ebc8b7e8e2",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Use EverShelf result",
+      "words": 3
+    },
+    {
+      "characters": 24,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/recipe.json",
+      "id": "6bc6caedb3e69065",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [
+        "value"
+      ],
+      "value": "Your override: {{value}}",
+      "words": 3
     },
     {
       "characters": 24,
@@ -1870,20 +2459,6 @@
       ],
       "value": "{{hourlyLabel(forecast.datetime, index)}} {{condition.label}} {{formatTemperatureValue(forecast.temperature, entity?.attributes.temperature_unit)}}",
       "words": 5
-    },
-    {
-      "characters": 89,
-      "context": "accessibility",
-      "file": "src/components/hass/recipes/RecipeDetailModal.tsx",
-      "id": "360f0e657e9ca73f",
-      "lines": [
-        388
-      ],
-      "occurrences": 1,
-      "origin": "legacy",
-      "placeholders": [],
-      "value": "{{ingredientTitle(ingredient)}}: {{ingredientDetailParts(detail, ingredient).join('. ')}}",
-      "words": 4
     },
     {
       "characters": 60,
@@ -3846,7 +4421,7 @@
       "file": "src/components/hass/recipes/RecipeDetailModal.tsx",
       "id": "cfcd4870c31624d0",
       "lines": [
-        569
+        1024
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -5787,6 +6362,20 @@
       "words": 1
     },
     {
+      "characters": 19,
+      "context": "body-copy",
+      "file": "src/components/hass/recipes/RecipeDetailModal.tsx",
+      "id": "f4d9a60269281779",
+      "lines": [
+        577
+      ],
+      "occurrences": 1,
+      "origin": "legacy",
+      "placeholders": [],
+      "value": "activateMarkMissing",
+      "words": 1
+    },
+    {
       "characters": 45,
       "context": "body-copy",
       "file": "src/pages/DashboardViewPage.tsx",
@@ -5806,7 +6395,7 @@
       "file": "src/components/hass/recipes/RecipeDetailModal.tsx",
       "id": "656ca3d21924b4a3",
       "lines": [
-        422
+        645
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -5870,20 +6459,6 @@
       "origin": "legacy",
       "placeholders": [],
       "value": "Adding to",
-      "words": 2
-    },
-    {
-      "characters": 20,
-      "context": "body-copy",
-      "file": "src/components/hass/recipes/RecipeDetailModal.tsx",
-      "id": "0129d46dffd44f6b",
-      "lines": [
-        118
-      ],
-      "occurrences": 1,
-      "origin": "legacy",
-      "placeholders": [],
-      "value": "Additional Equipment",
       "words": 2
     },
     {
@@ -6202,7 +6777,7 @@
       "file": "src/components/hass/recipes/RecipeDetailModal.tsx",
       "id": "350569184f774e8d",
       "lines": [
-        384
+        588
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -6534,6 +7109,20 @@
       "words": 1
     },
     {
+      "characters": 8,
+      "context": "body-copy",
+      "file": "src/components/hass/recipes/RecipeDetailModal.tsx",
+      "id": "624041ca4ada5fbd",
+      "lines": [
+        221
+      ],
+      "occurrences": 1,
+      "origin": "legacy",
+      "placeholders": [],
+      "value": "cookidoo",
+      "words": 1
+    },
+    {
       "characters": 12,
       "context": "body-copy",
       "file": "src/components/hass/DonetickTaskFormPage.tsx",
@@ -6721,7 +7310,7 @@
       "file": "src/components/hass/recipes/RecipeDetailModal.tsx",
       "id": "e1a3d15d4006822a",
       "lines": [
-        426
+        649
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -6935,7 +7524,7 @@
       "file": "src/components/hass/recipes/RecipeDetailModal.tsx",
       "id": "5efde08cf19460c0",
       "lines": [
-        536
+        879
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -7172,12 +7761,26 @@
       "words": 2
     },
     {
+      "characters": 14,
+      "context": "body-copy",
+      "file": "src/components/hass/recipes/RecipeDetailModal.tsx",
+      "id": "6ac910b4c31589ea",
+      "lines": [
+        579
+      ],
+      "occurrences": 1,
+      "origin": "legacy",
+      "placeholders": [],
+      "value": "ingredientAria",
+      "words": 1
+    },
+    {
       "characters": 11,
       "context": "body-copy",
       "file": "src/components/hass/recipes/RecipeDetailModal.tsx",
       "id": "8133c6485bb606d4",
       "lines": [
-        537
+        886
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -7191,7 +7794,7 @@
       "file": "src/components/hass/recipes/RecipeDetailModal.tsx",
       "id": "256bb8e76df7d0b0",
       "lines": [
-        545
+        898
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -7205,7 +7808,7 @@
       "file": "src/components/hass/recipes/RecipeDetailModal.tsx",
       "id": "1e9c04171f4a542f",
       "lines": [
-        459
+        683
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -7430,13 +8033,27 @@
       "file": "src/components/hass/recipes/RecipeDetailModal.tsx",
       "id": "e6b87fd5e63a174f",
       "lines": [
-        276
+        432
       ],
       "occurrences": 1,
       "origin": "legacy",
       "placeholders": [],
       "value": "Matched as",
       "words": 2
+    },
+    {
+      "characters": 19,
+      "context": "body-copy",
+      "file": "src/components/hass/recipes/RecipeDetailModal.tsx",
+      "id": "6ee7146ed53e42b5",
+      "lines": [
+        188
+      ],
+      "occurrences": 1,
+      "origin": "legacy",
+      "placeholders": [],
+      "value": "metadataUnavailable",
+      "words": 1
     },
     {
       "characters": 29,
@@ -7628,7 +8245,7 @@
       "file": "src/components/hass/recipes/RecipeDetailModal.tsx",
       "id": "4dcd4b7dd8ff56b2",
       "lines": [
-        460
+        684
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -7712,7 +8329,7 @@
       "file": "src/components/hass/recipes/RecipeDetailModal.tsx",
       "id": "a3bea9dcf95f8162",
       "lines": [
-        469
+        693
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -7726,7 +8343,7 @@
       "file": "src/components/hass/recipes/RecipeDetailModal.tsx",
       "id": "e39602b6c3a15a4b",
       "lines": [
-        133
+        223
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -7740,8 +8357,8 @@
       "file": "src/components/hass/recipes/RecipeDetailModal.tsx",
       "id": "1c3cafef50bfc7c4",
       "lines": [
-        266,
-        397
+        402,
+        619
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -7775,6 +8392,21 @@
       "origin": "legacy",
       "placeholders": [],
       "value": "overdue",
+      "words": 1
+    },
+    {
+      "characters": 14,
+      "context": "body-copy",
+      "file": "src/components/hass/recipes/RecipeDetailModal.tsx",
+      "id": "11f061eff1eabb73",
+      "lines": [
+        419,
+        563
+      ],
+      "occurrences": 2,
+      "origin": "legacy",
+      "placeholders": [],
+      "value": "overridePrefix",
       "words": 1
     },
     {
@@ -7889,20 +8521,6 @@
       "origin": "legacy",
       "placeholders": [],
       "value": "Processing...",
-      "words": 1
-    },
-    {
-      "characters": 8,
-      "context": "body-copy",
-      "file": "src/components/hass/recipes/RecipeDetailModal.tsx",
-      "id": "a77d31ed567a752d",
-      "lines": [
-        268
-      ],
-      "occurrences": 1,
-      "origin": "legacy",
-      "placeholders": [],
-      "value": "Product:",
       "words": 1
     },
     {
@@ -8351,7 +8969,7 @@
       "file": "src/components/hass/recipes/RecipeDetailModal.tsx",
       "id": "a1c9d109a862896d",
       "lines": [
-        273
+        429
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -8423,7 +9041,7 @@
       "file": "src/components/hass/recipes/RecipeDetailModal.tsx",
       "id": "fc1d3d838ff9efd5",
       "lines": [
-        425
+        648
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -8648,7 +9266,7 @@
       "file": "src/components/hass/recipes/RecipeDetailModal.tsx",
       "id": "f2bdaf20ada560ca",
       "lines": [
-        479
+        703
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -8690,7 +9308,7 @@
       "file": "src/components/hass/recipes/RecipeDetailModal.tsx",
       "id": "30fbefc3a70cfa5a",
       "lines": [
-        363
+        528
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -8854,6 +9472,20 @@
       ],
       "value": "Unable to add this item to {{addedLocation}}.",
       "words": 7
+    },
+    {
+      "characters": 9,
+      "context": "body-copy",
+      "file": "src/components/hass/recipes/RecipeDetailModal.tsx",
+      "id": "f168ab72bad6c630",
+      "lines": [
+        554
+      ],
+      "occurrences": 1,
+      "origin": "legacy",
+      "placeholders": [],
+      "value": "uncertain",
+      "words": 1
     },
     {
       "characters": 13,
@@ -10317,7 +10949,7 @@
       "file": "src/components/hass/recipes/recipeTypes.ts",
       "id": "8c32d60775ce49d5",
       "lines": [
-        821
+        1050
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -10331,7 +10963,7 @@
       "file": "src/components/hass/recipes/recipeTypes.ts",
       "id": "9bc595ef3ff1d0b9",
       "lines": [
-        825
+        1054
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -10345,7 +10977,7 @@
       "file": "src/components/hass/recipes/recipeTypes.ts",
       "id": "0463d15c1a278dc3",
       "lines": [
-        1033
+        1315
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -10359,8 +10991,8 @@
       "file": "src/components/hass/recipes/recipeTypes.ts",
       "id": "baaec0f562a4d081",
       "lines": [
-        987,
-        998
+        1269,
+        1280
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -10374,7 +11006,7 @@
       "file": "src/components/hass/recipes/useRecipeDetailModal.ts",
       "id": "4ca33899bcf65f6b",
       "lines": [
-        202
+        389
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -10432,7 +11064,7 @@
       "file": "src/components/hass/recipes/useRecipeDetailModal.ts",
       "id": "8f6ec202852dccad",
       "lines": [
-        98
+        235
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -10460,7 +11092,7 @@
       "file": "src/components/hass/recipes/RecipeDetailModal.tsx",
       "id": "24187eafb9486850",
       "lines": [
-        412
+        635
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -10474,7 +11106,7 @@
       "file": "src/components/hass/recipes/RecipeDetailModal.tsx",
       "id": "a24faaf5ad70e232",
       "lines": [
-        509
+        733
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -10601,7 +11233,7 @@
       "file": "src/components/hass/recipes/recipeTypes.ts",
       "id": "fefd63099422a196",
       "lines": [
-        821
+        1050
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -10629,7 +11261,7 @@
       "file": "src/components/hass/recipes/recipeTypes.ts",
       "id": "b7e4e906b5c5c103",
       "lines": [
-        947
+        1206
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -10776,6 +11408,20 @@
       "placeholders": [],
       "value": "Reads a printed expiration label, accepts a native date entry, or allows the date to be skipped.",
       "words": 17
+    },
+    {
+      "characters": 31,
+      "context": "description",
+      "file": "src/components/hass/recipes/useRecipeDetailModal.ts",
+      "id": "9ad8f4fc8efb57ec",
+      "lines": [
+        131
+      ],
+      "occurrences": 1,
+      "origin": "legacy",
+      "placeholders": [],
+      "value": "Recipe feedback request failed.",
+      "words": 4
     },
     {
       "characters": 112,
@@ -11177,7 +11823,7 @@
       "file": "src/components/hass/recipes/RecipeDetailModal.tsx",
       "id": "e7cd5fd74ad3637e",
       "lines": [
-        452
+        676
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -11191,7 +11837,7 @@
       "file": "src/components/hass/recipes/useRecipeDetailModal.ts",
       "id": "6280e71d37efd0e9",
       "lines": [
-        46
+        100
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -11205,7 +11851,7 @@
       "file": "src/components/hass/recipes/recipeTypes.ts",
       "id": "741becc1c6e291f2",
       "lines": [
-        824
+        1053
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -11331,7 +11977,7 @@
       "file": "src/components/hass/recipes/useRecipeDetailModal.ts",
       "id": "906a2b30bc992528",
       "lines": [
-        273
+        1058
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -11359,7 +12005,7 @@
       "file": "src/components/hass/recipes/useRecipeDetailModal.ts",
       "id": "1c02c54d33b7cbfa",
       "lines": [
-        214
+        401
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -11373,8 +12019,8 @@
       "file": "src/components/hass/recipes/useRecipeDetailModal.ts",
       "id": "6cfe555e331ecd51",
       "lines": [
-        207,
-        253
+        394,
+        1038
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -11617,7 +12263,7 @@
       "file": "src/components/hass/recipes/recipeTypes.ts",
       "id": "18b00480a2c8fd86",
       "lines": [
-        336
+        423
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -11771,7 +12417,7 @@
       "file": "src/components/hass/recipes/useRecipeDetailModal.ts",
       "id": "2ffa2036a73ba9da",
       "lines": [
-        51
+        116
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -11785,7 +12431,7 @@
       "file": "src/components/hass/recipes/useRecipeDetailModal.ts",
       "id": "ed5d6f93b63a7de3",
       "lines": [
-        51
+        116
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -11799,7 +12445,7 @@
       "file": "src/components/hass/recipes/useRecipeDetailModal.ts",
       "id": "a3e4cbacc81fa01a",
       "lines": [
-        51
+        116
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -13593,7 +14239,7 @@
       "file": "src/components/core/CheckboxRow.tsx",
       "id": "9e218689f17259ab",
       "lines": [
-        31
+        41
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -13885,12 +14531,40 @@
       "words": 8
     },
     {
+      "characters": 4,
+      "context": "function-ingredientDisplayStatus",
+      "file": "src/components/hass/recipes/RecipeDetailModal.tsx",
+      "id": "6ab1c37e8d1e77a8",
+      "lines": [
+        258
+      ],
+      "occurrences": 1,
+      "origin": "legacy",
+      "placeholders": [],
+      "value": "have",
+      "words": 1
+    },
+    {
+      "characters": 7,
+      "context": "function-ingredientDisplayStatus",
+      "file": "src/components/hass/recipes/RecipeDetailModal.tsx",
+      "id": "cfc30bd6903cd7d6",
+      "lines": [
+        259
+      ],
+      "occurrences": 1,
+      "origin": "legacy",
+      "placeholders": [],
+      "value": "missing",
+      "words": 1
+    },
+    {
       "characters": 39,
       "context": "function-ingredientTitle",
       "file": "src/components/hass/recipes/RecipeDetailModal.tsx",
       "id": "d25208f7ad0ceb9c",
       "lines": [
-        166
+        294
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -13979,7 +14653,7 @@
       "file": "src/components/hass/recipes/RecipeDetailModal.tsx",
       "id": "2fbcc504a7b8323f",
       "lines": [
-        145
+        243
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -13993,7 +14667,7 @@
       "file": "src/components/hass/recipes/RecipeDetailModal.tsx",
       "id": "d38b12651d973902",
       "lines": [
-        145
+        243
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -14007,7 +14681,7 @@
       "file": "src/components/hass/recipes/RecipeDetailModal.tsx",
       "id": "19a72c3eeb694e7d",
       "lines": [
-        146
+        244
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -14021,7 +14695,7 @@
       "file": "src/components/hass/recipes/RecipeDetailModal.tsx",
       "id": "8009da7a8cde697b",
       "lines": [
-        143
+        241
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -14035,7 +14709,7 @@
       "file": "src/components/hass/recipes/RecipeDetailModal.tsx",
       "id": "debae0bb811c0787",
       "lines": [
-        142
+        240
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -14049,7 +14723,7 @@
       "file": "src/components/hass/recipes/RecipeDetailModal.tsx",
       "id": "9bc38d9127d90085",
       "lines": [
-        142
+        240
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -14063,7 +14737,7 @@
       "file": "src/components/hass/recipes/RecipeDetailModal.tsx",
       "id": "b0580b816600b832",
       "lines": [
-        141
+        239
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -14077,7 +14751,7 @@
       "file": "src/components/hass/recipes/RecipeDetailModal.tsx",
       "id": "08a471525735376b",
       "lines": [
-        141
+        239
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -14091,7 +14765,7 @@
       "file": "src/components/hass/recipes/RecipeDetailModal.tsx",
       "id": "1356b02438250c58",
       "lines": [
-        143
+        241
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -14105,7 +14779,7 @@
       "file": "src/components/hass/recipes/RecipeDetailModal.tsx",
       "id": "45b8cf5cde7dd29f",
       "lines": [
-        152
+        250
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -14119,7 +14793,7 @@
       "file": "src/components/hass/recipes/RecipeDetailModal.tsx",
       "id": "f53b6735d765eb1c",
       "lines": [
-        150
+        248
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -14128,26 +14802,12 @@
       "words": 1
     },
     {
-      "characters": 5,
-      "context": "function-inventoryStatus",
-      "file": "src/components/hass/recipes/RecipeDetailModal.tsx",
-      "id": "4430dc5d384acb51",
-      "lines": [
-        151
-      ],
-      "occurrences": 1,
-      "origin": "legacy",
-      "placeholders": [],
-      "value": "mixed",
-      "words": 1
-    },
-    {
       "characters": 9,
       "context": "function-inventoryStatus",
       "file": "src/components/hass/recipes/RecipeDetailModal.tsx",
       "id": "adbcea8c42187e00",
       "lines": [
-        151
+        249
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -14161,7 +14821,7 @@
       "file": "src/components/hass/recipes/RecipeDetailModal.tsx",
       "id": "5a885199c676e854",
       "lines": [
-        150
+        248
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -14843,7 +15503,7 @@
       "file": "src/components/hass/recipes/recipeTypes.ts",
       "id": "045877df505506cb",
       "lines": [
-        1009
+        1291
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -14857,7 +15517,7 @@
       "file": "src/components/hass/recipes/recipeTypes.ts",
       "id": "ef6c01c06ba6abc8",
       "lines": [
-        1010
+        1292
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -14871,7 +15531,7 @@
       "file": "src/components/hass/recipes/recipeTypes.ts",
       "id": "58eee008b029bef1",
       "lines": [
-        1013
+        1295
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -14885,7 +15545,7 @@
       "file": "src/components/hass/recipes/recipeTypes.ts",
       "id": "69486b929af7cbf6",
       "lines": [
-        1011
+        1293
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -14899,7 +15559,7 @@
       "file": "src/components/hass/recipes/recipeTypes.ts",
       "id": "78f519b80f878bbf",
       "lines": [
-        1012
+        1294
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -14913,7 +15573,7 @@
       "file": "src/components/hass/recipes/recipeTypes.ts",
       "id": "e8504bc70ddc87ac",
       "lines": [
-        1019
+        1301
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -14927,7 +15587,7 @@
       "file": "src/components/hass/recipes/recipeTypes.ts",
       "id": "0f6749455f971abd",
       "lines": [
-        1020
+        1302
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -14941,7 +15601,7 @@
       "file": "src/components/hass/recipes/recipeTypes.ts",
       "id": "cf92cd1851f8f435",
       "lines": [
-        1022
+        1304
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -14955,7 +15615,7 @@
       "file": "src/components/hass/recipes/recipeTypes.ts",
       "id": "c3ae115a87f5c42e",
       "lines": [
-        1021
+        1303
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -14969,7 +15629,7 @@
       "file": "src/components/hass/recipes/recipeTypes.ts",
       "id": "13bae5cf5bd7c3a9",
       "lines": [
-        322
+        395
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -15183,7 +15843,7 @@
       "file": "src/components/hass/recipes/RecipeDetailModal.tsx",
       "id": "aa4d3414cc748870",
       "lines": [
-        159
+        287
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -15197,7 +15857,7 @@
       "file": "src/components/hass/recipes/RecipeDetailModal.tsx",
       "id": "e7e47fadc05cdaaf",
       "lines": [
-        161
+        289
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -15213,7 +15873,7 @@
       "file": "src/components/hass/recipes/RecipeDetailModal.tsx",
       "id": "056962fe1a8eb52c",
       "lines": [
-        161
+        289
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -16430,22 +17090,6 @@
       "words": 3
     },
     {
-      "characters": 18,
-      "context": "label",
-      "file": "src/components/hass/recipes/RecipeDetailModal.tsx",
-      "id": "37d4c3eadeed631c",
-      "lines": [
-        558
-      ],
-      "occurrences": 1,
-      "origin": "legacy",
-      "placeholders": [
-        "title"
-      ],
-      "value": "{{title}} sections",
-      "words": 2
-    },
-    {
       "characters": 28,
       "context": "label",
       "file": "src/pages/DashboardViewPage.tsx",
@@ -16516,20 +17160,6 @@
       "placeholders": [],
       "value": "Actions",
       "words": 1
-    },
-    {
-      "characters": 11,
-      "context": "label",
-      "file": "src/components/hass/recipes/RecipeDetailModal.tsx",
-      "id": "6b616148514261c0",
-      "lines": [
-        102
-      ],
-      "occurrences": 1,
-      "origin": "legacy",
-      "placeholders": [],
-      "value": "Active Time",
-      "words": 2
     },
     {
       "characters": 8,
@@ -16864,7 +17494,7 @@
       "file": "src/components/hass/recipes/RecipeDetailModal.tsx",
       "id": "0e85cbc3cef9b4b5",
       "lines": [
-        105
+        174
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -17203,7 +17833,7 @@
       "file": "src/components/hass/recipes/RecipeDetailModal.tsx",
       "id": "5a2bb81f7b36cd97",
       "lines": [
-        104
+        173
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -17628,7 +18258,7 @@
       "file": "src/components/hass/recipes/RecipeDetailModal.tsx",
       "id": "5de840bc4aa4f6b1",
       "lines": [
-        111
+        181
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -17941,9 +18571,9 @@
       "file": "src/components/hass/recipes/recipeTypes.ts",
       "id": "b92ef4dcc0a699c6",
       "lines": [
-        688,
-        770,
-        902
+        881,
+        992,
+        1138
       ],
       "occurrences": 3,
       "origin": "legacy",
@@ -18073,7 +18703,7 @@
       "file": "src/components/hass/recipes/RecipeDetailModal.tsx",
       "id": "73ddbda36fac22a7",
       "lines": [
-        107
+        176
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -18428,7 +19058,7 @@
       "file": "src/components/hass/recipes/RecipeDetailModal.tsx",
       "id": "b7490a4550a6be3c",
       "lines": [
-        340
+        496
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -18872,7 +19502,7 @@
       "file": "src/components/hass/recipes/RecipeDetailModal.tsx",
       "id": "eaac8f03a6841077",
       "lines": [
-        342
+        498
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -18886,7 +19516,7 @@
       "file": "src/components/core/NativePickerField.tsx",
       "id": "8eff1ca55db17782",
       "lines": [
-        38
+        40
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -19018,7 +19648,7 @@
       "file": "src/components/hass/recipes/RecipeDetailModal.tsx",
       "id": "460b011523dc0baf",
       "lines": [
-        106
+        175
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -19300,8 +19930,8 @@
       "file": "src/components/hass/recipes/recipeTypes.ts",
       "id": "6c76c9efedae49d4",
       "lines": [
-        688,
-        770
+        881,
+        992
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -19322,20 +19952,6 @@
       "placeholders": [],
       "value": "Title",
       "words": 1
-    },
-    {
-      "characters": 10,
-      "context": "label",
-      "file": "src/components/hass/recipes/RecipeDetailModal.tsx",
-      "id": "e186f2ff27c9b3c1",
-      "lines": [
-        103
-      ],
-      "occurrences": 1,
-      "origin": "legacy",
-      "placeholders": [],
-      "value": "Total Time",
-      "words": 2
     },
     {
       "characters": 8,
@@ -19717,7 +20333,7 @@
       "file": "src/components/hass/recipes/RecipeDetailModal.tsx",
       "id": "547321d059a2000c",
       "lines": [
-        101
+        167
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -21360,7 +21976,7 @@
       "file": "src/components/hass/recipes/recipeTypes.ts",
       "id": "a7f587974615ebf2",
       "lines": [
-        588
+        781
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -24740,7 +25356,7 @@
       "file": "src/components/hass/recipes/RecipeDetailModal.tsx",
       "id": "743bbd62f259b24b",
       "lines": [
-        452
+        676
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -26211,7 +26827,7 @@
       "file": "src/components/hass/recipes/RecipeDetailModal.tsx",
       "id": "34797c2f75b5272a",
       "lines": [
-        412
+        635
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -26225,7 +26841,7 @@
       "file": "src/components/hass/recipes/RecipeDetailModal.tsx",
       "id": "038c93c2e285aa7b",
       "lines": [
-        509
+        733
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -27091,7 +27707,7 @@
       "file": "src/components/hass/recipes/RecipeDetailModal.tsx",
       "id": "c88bbe2485a8ff59",
       "lines": [
-        575
+        1030
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -28566,7 +29182,7 @@
       "file": "src/components/hass/recipes/RecipeDetailModal.tsx",
       "id": "f8fc910e255286bb",
       "lines": [
-        578
+        1033
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -29293,7 +29909,7 @@
       "file": "src/components/hass/recipes/useRecipeDetailModal.ts",
       "id": "428cbc0af895d850",
       "lines": [
-        66
+        203
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -29307,7 +29923,7 @@
       "file": "src/components/hass/recipes/useRecipeDetailModal.ts",
       "id": "a020d08e4521e18a",
       "lines": [
-        67
+        204
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -29763,7 +30379,7 @@
       "file": "src/components/core/ExpandingSearchAction.tsx",
       "id": "7c866bcb043cc447",
       "lines": [
-        25
+        27
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -29825,6 +30441,22 @@
       "origin": "legacy",
       "placeholders": [],
       "value": "modalCamera",
+      "words": 1
+    },
+    {
+      "characters": 11,
+      "context": "variable-copy",
+      "file": "src/components/hass/recipes/RecipeDetailModal.tsx",
+      "id": "4bc65bf293240001",
+      "lines": [
+        152,
+        394,
+        520
+      ],
+      "occurrences": 3,
+      "origin": "legacy",
+      "placeholders": [],
+      "value": "modalRecipe",
       "words": 1
     },
     {
@@ -30689,7 +31321,7 @@
       "file": "src/components/hass/recipes/recipeTypes.ts",
       "id": "6178c02d6a853c20",
       "lines": [
-        515
+        607
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -30933,7 +31565,7 @@
       "file": "src/components/hass/recipes/recipeService.ts",
       "id": "f1adeeb8243f96f1",
       "lines": [
-        100
+        132
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -30956,12 +31588,26 @@
       "words": 2
     },
     {
+      "characters": 7,
+      "context": "variable-message",
+      "file": "src/components/hass/recipes/useRecipeDetailModal.ts",
+      "id": "82f5318b0a9f7e33",
+      "lines": [
+        128
+      ],
+      "occurrences": 1,
+      "origin": "legacy",
+      "placeholders": [],
+      "value": "message",
+      "words": 1
+    },
+    {
       "characters": 6,
       "context": "variable-message",
       "file": "src/components/hass/recipes/recipeService.ts",
       "id": "b3b9f676cf9bcbf2",
       "lines": [
-        99
+        131
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -30989,7 +31635,7 @@
       "file": "src/components/hass/recipes/useRecipeDetailModal.ts",
       "id": "2dd4e6d4a3d2143a",
       "lines": [
-        111
+        248
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -31003,7 +31649,7 @@
       "file": "src/components/hass/recipes/useRecipeDetailModal.ts",
       "id": "af2ed4873646487a",
       "lines": [
-        112
+        249
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -31487,8 +32133,8 @@
       "file": "src/components/hass/recipes/recipeTypes.ts",
       "id": "3a9ddc89a085b3a0",
       "lines": [
-        703,
-        749
+        896,
+        970
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -32003,7 +32649,7 @@
       "file": "src/components/core/CheckboxRow.tsx",
       "id": "92f521539633f7f6",
       "lines": [
-        114
+        127
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -32073,7 +32719,7 @@
       "file": "src/components/core/CheckboxRow.tsx",
       "id": "3590d33dcd7b309a",
       "lines": [
-        114
+        126
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -32087,7 +32733,7 @@
       "file": "src/components/core/CheckboxRow.tsx",
       "id": "89a93f83a4fb41a0",
       "lines": [
-        114
+        127
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -32730,8 +33376,8 @@
       "file": "src/components/hass/recipes/recipeTypes.ts",
       "id": "7b1982e14a5e41af",
       "lines": [
-        421,
-        834
+        513,
+        1063
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -32745,7 +33391,7 @@
       "file": "src/components/hass/recipes/RecipeDetailModal.tsx",
       "id": "205a85a6635be806",
       "lines": [
-        552
+        918
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -32759,8 +33405,8 @@
       "file": "src/components/hass/recipes/recipeTypes.ts",
       "id": "7908df98ac4af996",
       "lines": [
-        421,
-        834
+        513,
+        1063
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -32982,11 +33628,11 @@
     }
   ],
   "summary": {
-    "catalogRecords": 135,
+    "catalogRecords": 183,
     "documentRecords": 1,
-    "legacyOccurrences": 2616,
-    "legacyRecords": 2172,
-    "totalRecords": 2308
+    "legacyOccurrences": 2623,
+    "legacyRecords": 2176,
+    "totalRecords": 2360
   },
   "version": 1
 }
