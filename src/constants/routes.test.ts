@@ -11,6 +11,7 @@ describe('routes', () => {
     expect(routePathFromUrl('/at-a-glance/freezer')).toBe('freezer')
     expect(routePathFromUrl('/at-a-glance/spice-rack')).toBe('spice-rack')
     expect(routePathFromUrl('/at-a-glance/cabinet')).toBe('cabinet')
+    expect(routePathFromUrl('/at-a-glance/special-device-modes')).toBe('special-device-modes')
     expect(routePathFromUrl('/at-a-glance/manual')).toBe('overview')
     expect(routePathFromUrl('/at-a-glance')).toBe('overview')
     expect(routePathFromUrl('/local/ha-sfenton-react-dash/index.html')).toBe('overview')
@@ -32,6 +33,7 @@ describe('routes', () => {
     expect(routeUrl('living-room', '/sfenton-react-dash/home?v=20260530', '#lights-living-room')).toBe('/sfenton-react-dash/home?v=20260530&path=living-room#lights-living-room')
     expect(routeUrl('vacuums', '/local/ha-sfenton-react-dash/index.html?v=20260530#old-popup')).toBe('/local/ha-sfenton-react-dash/index.html?v=20260530&path=vacuums')
     expect(routeUrl('vacation', '/at-a-glance/settings')).toBe('/at-a-glance/settings?path=vacation')
+    expect(routeUrl('special-device-modes', '/at-a-glance/settings')).toBe('/at-a-glance/settings?path=special-device-modes')
     expect(routeUrl('security', '/at-a-glance/overview#old-popup', '#security-system')).toBe('/at-a-glance/overview?path=security#security-system')
   })
 
@@ -89,6 +91,7 @@ describe('routes', () => {
     expect(primaryNavPathForRoute('admin')).toBe('settings')
     expect(primaryNavPathForRoute('guests-staying-over')).toBe('settings')
     expect(primaryNavPathForRoute('mach-e')).toBe('settings')
+    expect(primaryNavPathForRoute('special-device-modes')).toBe('settings')
     expect(primaryNavPathForRoute('to-do')).toBe('settings')
     expect(primaryNavPathForRoute('vacation')).toBe('settings')
     expect(primaryNavRouteActive('vacation', 'settings')).toBe(true)
@@ -98,6 +101,7 @@ describe('routes', () => {
   it('returns page-level fallback back paths for secondary routes', () => {
     expect(fallbackBackPathForRoute('to-do')).toBe('settings')
     expect(fallbackBackPathForRoute('admin')).toBe('settings')
+    expect(fallbackBackPathForRoute('special-device-modes')).toBe('settings')
     expect(fallbackBackPathForRoute('pantry')).toBe('food')
     expect(fallbackBackPathForRoute('all-food')).toBe('food')
     expect(fallbackBackPathForRoute('recipes')).toBe('food')

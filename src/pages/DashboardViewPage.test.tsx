@@ -1393,6 +1393,15 @@ describe('DashboardViewPage', () => {
     fireEvent.click(admin)
     expect(navigate).toHaveBeenLastCalledWith('admin')
 
+    const specialDeviceModes = screen.getByRole('button', { name: /Special Device Modes Allows enabling special device modes, such as High AQI Mode\./i })
+    expect(specialDeviceModes.querySelector('path')).toHaveAttribute('d', materialIconPath('mdi:tune-vertical'))
+    expect(specialDeviceModes).toHaveAttribute('data-action-kind', 'navigate')
+    expect(specialDeviceModes).toHaveAttribute('data-navigation-opener', 'true')
+    expect(specialDeviceModes.querySelector('[data-modal-disclosure="right-chevron"]')).toBeInTheDocument()
+    expect(screen.getByRole('navigation', { name: 'Settings pages' }).children[1]).toBe(specialDeviceModes)
+    fireEvent.click(specialDeviceModes)
+    expect(navigate).toHaveBeenLastCalledWith('special-device-modes')
+
     fireEvent.click(screen.getByRole('button', { name: /Guest Controls Toggle automations when guests stay over\./i }))
     expect(navigate).toHaveBeenLastCalledWith('guests-staying-over')
 
@@ -1416,8 +1425,60 @@ describe('DashboardViewPage', () => {
     expect(hassSettings.querySelector('[data-modal-disclosure]')).not.toBeInTheDocument()
   })
 
+  it('renders Special Device Modes as an optimistic typed High AQI toggle', () => {
+    const view = render(<DashboardViewPage activePath="special-device-modes" onNavigate={() => undefined} path="special-device-modes" />)
+
+    expect(screen.getByRole('heading', { name: 'Special Device Modes' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'High AQI Mode' })).toBeInTheDocument()
+    expect(screen.getByText('Toggling High AQI Mode sets all air purifiers in the house to their highest setting to ward off smoke and other inhalation hazards.')).toBeInTheDocument()
+
+    const disabledMode = screen.getByRole('switch', { name: 'High AQI Mode Off' })
+    expect(disabledMode).toHaveAttribute('aria-checked', 'false')
+    expect(disabledMode).toHaveAttribute('data-action-kind', 'toggle')
+    expect(disabledMode.querySelector('path')).toHaveAttribute('d', materialIconPath('mdi:air-purifier'))
+    expect(disabledMode.querySelector('[data-modal-disclosure]')).not.toBeInTheDocument()
+
+    fireEvent.click(disabledMode)
+    expect(disabledMode).toHaveAttribute('aria-checked', 'true')
+    expect(mockCallServiceCalls).toEqual([
+      { domain: 'input_boolean', service: 'turn_on', target: 'input_boolean.high_aqi_mode' },
+    ])
+
+    mockEntities['input_boolean.high_aqi_mode'].state = 'on'
+    view.rerender(<DashboardViewPage activePath="special-device-modes" onNavigate={() => undefined} path="special-device-modes" />)
+
+    const enabledMode = screen.getByRole('switch', { name: 'High AQI Mode On' })
+    expect(enabledMode).toHaveAttribute('aria-checked', 'true')
+    fireEvent.click(enabledMode)
+    expect(enabledMode).toHaveAttribute('aria-checked', 'false')
+    expect(mockCallServiceCalls).toEqual([
+      { domain: 'input_boolean', service: 'turn_on', target: 'input_boolean.high_aqi_mode' },
+      { domain: 'input_boolean', service: 'turn_off', target: 'input_boolean.high_aqi_mode' },
+    ])
+  })
+
+  it('disables High AQI Mode when its Home Assistant helper is unavailable', () => {
+    mockEntities['input_boolean.high_aqi_mode'].state = 'unavailable'
+
+    render(<DashboardViewPage activePath="special-device-modes" onNavigate={() => undefined} path="special-device-modes" />)
+
+    const mode = screen.getByRole('switch', { name: 'High AQI Mode Unavailable' })
+    expect(mode).toBeDisabled()
+    expect(mode).toHaveAttribute('aria-checked', 'false')
+    fireEvent.click(mode)
+    expect(mockCallServiceCalls).toEqual([])
+  })
+
+  it('preloads Special Device Modes as inert card geometry', () => {
+    render(<DashboardViewPage activePath="special-device-modes" onNavigate={() => undefined} path="special-device-modes" preload />)
+
+    expect(screen.getByRole('article', { name: 'High AQI Mode' })).toBeInTheDocument()
+    expect(screen.queryByRole('switch', { name: /High AQI Mode/i })).not.toBeInTheDocument()
+    expect(mockCallServiceCalls).toEqual([])
+  })
+
   it('keeps the Settings bottom nav item active on settings subpages', () => {
-    render(<DashboardViewPage activePath="vacation" onNavigate={() => undefined} path="vacation" />)
+    render(<DashboardViewPage activePath="special-device-modes" onNavigate={() => undefined} path="special-device-modes" />)
 
     const bottomNav = screen.getByRole('navigation', { name: 'Dashboard sections' })
     expect(within(bottomNav).getByRole('button', { name: 'Settings' })).toHaveAttribute('aria-current', 'page')

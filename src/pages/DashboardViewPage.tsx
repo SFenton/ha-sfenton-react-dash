@@ -13,6 +13,7 @@ import { dashboardRoomNameFromPath, hasDashboardFloatingAction } from '../compon
 import { EntityActionCard } from '../components/hass/EntityActionCard'
 import { PresenceOverrideCard, PresenceOverrideDetailPage } from '../components/hass/PresenceOverrideCard'
 import { SecurityDashboard, SecurityStatusRail } from '../components/hass/SecurityDashboard'
+import { SpecialDeviceModeCard } from '../components/hass/SpecialDeviceModeCard'
 import { StatusRail, type StatusRailChip } from '../components/hass/StatusRail'
 import { TodoListPanel } from '../components/hass/TodoListPanel'
 import { CreateDonetickTaskSheet } from '../components/hass/CreateDonetickTaskSheet'
@@ -111,6 +112,8 @@ import {
   ROOM_EXTRA_SECTIONS,
   SECURITY_COLOR,
   SETTINGS_PAGE_ITEMS,
+  SPECIAL_DEVICE_MODE_DESCRIPTIONS,
+  SPECIAL_DEVICE_MODE_ITEMS,
   THERMOSTAT_ROOMS,
   TODO_PAGES,
   UNAVAILABLE_COLOR,
@@ -1493,6 +1496,22 @@ function GuestControlsPage({ onNavigate }: { onNavigate: (path: string) => void 
             <EntityActionCard item={item} key={`${item.entityId}-${item.title}`} onNavigate={onNavigate} size="admin-modal" />
           ))}
         </DynamicGrid>
+      </section>
+    </div>
+  )
+}
+
+function SpecialDeviceModesPage({ preload = false }: { preload?: boolean }) {
+  const [highAqiMode] = SPECIAL_DEVICE_MODE_ITEMS
+
+  return (
+    <div className={styles.stack}>
+      <section className={styles.section}>
+        <SectionHeader title={highAqiMode.title} />
+        <Description>{SPECIAL_DEVICE_MODE_DESCRIPTIONS.highAqi}</Description>
+        <AdminWideGrid>
+          <SpecialDeviceModeCard item={highAqiMode} preload={preload} />
+        </AdminWideGrid>
       </section>
     </div>
   )
@@ -6047,6 +6066,7 @@ function Content({ inventoryControls, onNavigate, onRecipesInitialResolved, onSc
   const todoConfigPath = todoPageConfigPath(path)
   if (TODO_PAGES[todoConfigPath]) return <TodoPage configPath={todoConfigPath} onNavigate={onNavigate} onScrollLockChange={onScrollLockChange} path={path} />
   if (path === 'settings') return <SettingsPage onNavigate={onNavigate} />
+  if (path === 'special-device-modes') return <SpecialDeviceModesPage preload={preload} />
   if (path === 'guests-staying-over') return <GuestControlsPage onNavigate={onNavigate} />
   if (path === 'vacation') return <VacationPage />
   if (path === 'vacuums') return <VacuumPage preload={preload} />

@@ -19,6 +19,7 @@ export const HOME_FRIDGE_ROUTE_PATH = 'fridge'
 export const HOME_FREEZER_ROUTE_PATH = 'freezer'
 export const HOME_SPICE_RACK_ROUTE_PATH = 'spice-rack'
 export const HOME_CABINET_ROUTE_PATH = 'cabinet'
+const specialDeviceModesRouteName = copy('pageSettings', 'items.specialDeviceModes.title')
 
 export const DASHBOARD_ROUTES: DashboardRouteConfig[] = [
   { title: 'Overview', path: 'overview', icon: 'mdi:home' },
@@ -50,6 +51,7 @@ export const DASHBOARD_ROUTES: DashboardRouteConfig[] = [
   { title: 'Master Bathroom', path: 'master-bathroom', icon: 'mdi:bathtub' },
   { title: 'Mach-E', path: 'mach-e', icon: 'mdi:car-electric' },
   { title: 'Admin', path: 'admin', icon: 'mdi:home-assistant' },
+  { title: specialDeviceModesRouteName, path: 'special-device-modes', icon: 'mdi:tune-vertical' },
   { title: 'Entryway', path: 'entryway', icon: 'mdi:door' },
   { title: 'Settings', path: 'settings', icon: 'mdi:cog' },
   { title: 'To-Do', path: 'to-do', icon: 'mdi:clipboard-list' },
@@ -119,6 +121,7 @@ const SETTINGS_SUB_ROUTE_PATHS = new Set([
   'admin',
   'guests-staying-over',
   'mach-e',
+  'special-device-modes',
   'to-do',
   'vacation',
 ])
