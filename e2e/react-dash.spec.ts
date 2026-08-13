@@ -2221,6 +2221,37 @@ test('settings links to Vacation mode controls', async ({ page }) => {
   await expect(page.getByLabel('Start Date').locator('..')).toHaveCSS('outline-style', 'none')
 })
 
+test('settings links to Special Device Modes and toggles High AQI intent', async ({ page }) => {
+  await page.setViewportSize({ width: 393, height: 852 })
+  await page.goto('/at-a-glance/settings')
+
+  const settingsPages = page.getByRole('navigation', { name: 'Settings pages' })
+  const specialDeviceModes = page.getByRole('button', { name: /Special Device Modes Allows enabling special device modes, such as High AQI Mode\./i })
+  await expect(settingsPages.getByRole('button').nth(1)).toHaveAccessibleName(/Special Device Modes Allows enabling special device modes, such as High AQI Mode\./i)
+  await expect(specialDeviceModes).toHaveAttribute('data-action-kind', 'navigate')
+  await specialDeviceModes.click()
+
+  await expect(page).toHaveURL(/\/at-a-glance\/settings\?path=special-device-modes/)
+  await expect(page.getByRole('heading', { name: 'Special Device Modes' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'High AQI Mode' })).toBeVisible()
+  await expect(page.getByText('Toggling High AQI Mode sets all air purifiers in the house to their highest setting to ward off smoke and other inhalation hazards.')).toBeVisible()
+
+  const mode = page.getByRole('switch', { name: /High AQI Mode/ })
+  await expect(mode).toHaveAccessibleName('High AQI Mode Off')
+  await expect(mode).toHaveAttribute('aria-checked', 'false')
+  await expect(mode).toHaveAttribute('data-action-kind', 'toggle')
+  await expectNoChevron(mode)
+  await clearMockHassCalls(page)
+  await mode.click()
+  await expect(mode).toHaveAttribute('aria-checked', 'true')
+  await expect(mode).toHaveAccessibleName('High AQI Mode On')
+  await expect.poll(() => page.evaluate(() => (
+    (window as unknown as { __mockHass: { calls: Record<string, unknown>[] } }).__mockHass.calls
+  ))).toEqual([
+    { domain: 'input_boolean', service: 'turn_on', target: 'input_boolean.high_aqi_mode' },
+  ])
+})
+
 test('chores page shows source sections and checkbox todo rows for the logged-in user', async ({ page }) => {
   await page.goto('/at-a-glance/chores')
 

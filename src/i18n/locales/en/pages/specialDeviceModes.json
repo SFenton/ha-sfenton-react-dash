@@ -1,0 +1,8 @@
+{
+  "controls": {
+    "highAqi": {
+      "description": "Toggling High AQI Mode sets all air purifiers in the house to their highest setting to ward off smoke and other inhalation hazards.",
+      "title": "High AQI Mode"
+    }
+  }
+}

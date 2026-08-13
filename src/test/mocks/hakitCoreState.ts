@@ -963,6 +963,7 @@ export const explicitMockEntities: Record<string, MockEntity> = {
   'input_datetime.vacation_start': entity('input_datetime.vacation_start', '2026-06-14 10:01:00', { has_date: true, has_time: true }),
   'input_datetime.vacation_end': entity('input_datetime.vacation_end', '2026-06-15 10:01:00', { has_date: true, has_time: true }),
   'input_boolean.is_front_door_auto_lock_enabled': entity('input_boolean.is_front_door_auto_lock_enabled', 'on'),
+  'input_boolean.high_aqi_mode': entity('input_boolean.high_aqi_mode', 'off'),
   'input_boolean.relay_control_mode': entity('input_boolean.relay_control_mode', 'off'),
   'input_boolean.show_outdoor_faucets': entity('input_boolean.show_outdoor_faucets', 'off'),
   'input_boolean.show_christmas_lights': entity('input_boolean.show_christmas_lights', 'off'),
@@ -1333,6 +1334,7 @@ export function resetMockHass() {
   mockEntities['input_boolean.guests_staying_in_guest_room'].state = 'off'
   mockEntities['input_boolean.guests_staying_in_music_room'].state = 'off'
   mockEntities['input_boolean.guests_staying_in_theater_room'].state = 'off'
+  mockEntities['input_boolean.high_aqi_mode'].state = 'off'
   mockEntities['binary_sensor.thermostat_contact_sensors_away_mode_active'].state = 'off'
   mockEntities['sensor.thermostat_effective_home_away'].state = 'Home'
   mockEntities['sensor.thermostat_home_away_reason'].state = 'A resident is home, so TCS is using home behavior.'

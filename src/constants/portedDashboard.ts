@@ -198,6 +198,27 @@ export const ADMIN_RELAY_CONTROL_ITEMS: EntityTileConfig[] = [
   { title: 'Relay Control Mode', entityId: RELAY_CONTROL_MODE_ENTITY_ID, icon: 'mdi:toggle-switch', color: SWITCH_ACTIVE_COLOR, action: { type: 'toggle' }, showSubtitle: true },
 ]
 
+export const HIGH_AQI_MODE_ENTITY_ID = 'input_boolean.high_aqi_mode'
+const highAqiModeName = copy('pageSpecialDeviceModes', 'controls.highAqi.title')
+const highAqiModeDetails = copy('pageSpecialDeviceModes', 'controls.highAqi.description')
+const specialDeviceModesName = copy('pageSettings', 'items.specialDeviceModes.title')
+const specialDeviceModesDetails = copy('pageSettings', 'items.specialDeviceModes.subtitle')
+
+export const SPECIAL_DEVICE_MODE_DESCRIPTIONS = {
+  highAqi: highAqiModeDetails,
+} as const
+
+export const SPECIAL_DEVICE_MODE_ITEMS: EntityTileConfig[] = [
+  {
+    title: highAqiModeName,
+    entityId: HIGH_AQI_MODE_ENTITY_ID,
+    icon: 'mdi:air-purifier',
+    color: SWITCH_ACTIVE_COLOR,
+    disabledWhenUnavailable: true,
+    showSubtitle: true,
+  },
+]
+
 export const ADMIN_SHOW_SPECIFIC_CONTROLS: EntityTileConfig[] = [
   { title: 'Outdoor Faucets', entityId: 'input_boolean.show_outdoor_faucets', icon: 'mdi:water', color: SWITCH_ACTIVE_COLOR, action: { type: 'toggle' }, showSubtitle: true },
   { title: 'Christmas Lights', entityId: 'input_boolean.show_christmas_lights', icon: 'mdi:string-lights', color: SWITCH_ACTIVE_COLOR, action: { type: 'toggle' }, showSubtitle: true },
@@ -253,6 +274,12 @@ export const SETTINGS_PAGE_ITEMS: SettingsLinkConfig[] = [
     subtitle: copy('pageSettings', 'items.admin.subtitle'),
     icon: 'mdi:shield-account',
     path: 'admin',
+  },
+  {
+    title: specialDeviceModesName,
+    subtitle: specialDeviceModesDetails,
+    icon: 'mdi:tune-vertical',
+    path: 'special-device-modes',
   },
   {
     title: copy('pageSettings', 'items.guest.title'),

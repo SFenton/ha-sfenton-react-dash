@@ -6,6 +6,7 @@ import pageFood from './locales/en/pages/food.json' with { type: 'json' }
 import pageGuests from './locales/en/pages/guests.json' with { type: 'json' }
 import pageSecurity from './locales/en/pages/security.json' with { type: 'json' }
 import pageSettings from './locales/en/pages/settings.json' with { type: 'json' }
+import pageSpecialDeviceModes from './locales/en/pages/specialDeviceModes.json' with { type: 'json' }
 import pageVacation from './locales/en/pages/vacation.json' with { type: 'json' }
 import shell from './locales/en/shell.json' with { type: 'json' }
 
@@ -19,6 +20,7 @@ export const resources = {
     pageGuests,
     pageSecurity,
     pageSettings,
+    pageSpecialDeviceModes,
     pageVacation,
     shell,
   },

@@ -4,6 +4,10 @@
       "subtitle": "Presence-Based Toggles, Automation Overrides, and More",
       "title": "Admin Controls"
     },
+    "specialDeviceModes": {
+      "subtitle": "Allows enabling special device modes, such as High AQI Mode.",
+      "title": "Special Device Modes"
+    },
     "guest": {
       "subtitle": "Toggle automations when guests stay over.",
       "title": "Guest Controls"
