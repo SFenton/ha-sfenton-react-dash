@@ -3402,16 +3402,17 @@ test('vacuum mode dropdown keeps source option labels while optimistic', async (
   if (!cardBox) throw new Error('Main Floor vacuum card was not measurable')
 
   await mainFloorVacuum.click()
-  await expect(page.getByRole('dialog')).toBeVisible()
+  const dialog = page.getByRole('dialog')
+  await expect(dialog).toBeVisible()
 
   await page.getByRole('combobox', { name: /Mode/i }).selectOption('mop')
 
-  const closeBox = await page.getByRole('button', { name: 'Close' }).boundingBox()
-  if (!closeBox) throw new Error('Vacuum modal close button was not measurable')
-
-  await page.mouse.click(closeBox.x + closeBox.width / 2, closeBox.y + closeBox.height / 2)
+  await dialog.getByRole('button', { name: 'Close' }).click()
+  await expect(dialog).toHaveAttribute('data-state', 'closed')
   await page.waitForTimeout(50)
   await page.mouse.click(cardBox.x + cardBox.width / 2, cardBox.y + cardBox.height / 2)
+  await expect(dialog).toHaveAttribute('data-state', 'open')
+  await expect(page.getByRole('combobox', { name: /Mode Mop/i })).toBeVisible()
 
   const modeOptions = await page.getByRole('combobox', { name: /Mode Mop/i }).evaluate((select) => {
     const dialog = document.querySelector<HTMLElement>('[role="dialog"]')
