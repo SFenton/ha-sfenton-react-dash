@@ -551,7 +551,6 @@ function IngredientsTab({
                       && ingredient.feedbackCapabilities.decision
                       && ingredient.feedbackCapabilities.selectInventoryProduct
                       && Boolean(ingredient.feedbackToken)
-                      && ingredient.inventory.state === 'uncertain'
                       && ingredientStatusUnchecked(status)
                     const canReject = detail.capabilities.ingredientFeedbackV2
                       && ingredient.feedbackCapabilities.decision
