@@ -86,4 +86,47 @@ describe('TodoListPanel', () => {
     view.rerender(<TodoListPanel entityId={ENTITY_ID} title="Optimistic Chores" />)
     expect(screen.queryByRole('button', { name: 'Edit Editable chore' })).not.toBeInTheDocument()
   })
+
+  it('puts generated battery levels in task titles and keeps due status in subtitles', async () => {
+    mockTodoItemsByEntity[ENTITY_ID] = [
+      {
+        description: [
+          'The Front Yard battery is at 10%.',
+          '',
+          'Area: Entryway.',
+          '',
+          'Home Assistant updates this task when the reported percentage changes.',
+          '',
+          'Maintenance reference: BATT-7FA024E8.',
+        ].join('\n'),
+        due: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+        status: 'needs_action',
+        summary: 'Replace Front Yard battery',
+        uid: 'battery-replacement',
+      },
+      {
+        description: [
+          'The Aqara Smart Lock U400 battery is at 20%.',
+          '',
+          'Home Assistant updates this task when the reported percentage changes.',
+          '',
+          'Maintenance reference: BATT-68C6D9B6.',
+        ].join('\n'),
+        due: new Date(Date.now() - 7 * 60 * 60 * 1000).toISOString(),
+        status: 'needs_action',
+        summary: 'Charge Aqara Smart Lock U400',
+        uid: 'battery-charge',
+      },
+    ]
+
+    render(<TodoListPanel entityId={ENTITY_ID} title="Optimistic Chores" />)
+
+    expect(await screen.findByRole('button', { name: 'Replace Front Yard Battery · 10% 2 days overdue' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Charge Aqara Smart Lock U400 · 20% 7 hours overdue' })).toBeInTheDocument()
+    expect(screen.getByText('Replace Front Yard Battery · 10%')).toBeInTheDocument()
+    expect(screen.getByText('Charge Aqara Smart Lock U400 · 20%')).toBeInTheDocument()
+    expect(screen.getByText('2 days overdue')).toBeInTheDocument()
+    expect(screen.getByText('7 hours overdue')).toBeInTheDocument()
+    expect(screen.queryByText(/Maintenance reference:/i)).not.toBeInTheDocument()
+  })
 })
