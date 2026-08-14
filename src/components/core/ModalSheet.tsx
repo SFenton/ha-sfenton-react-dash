@@ -56,11 +56,19 @@ function assignRef<T>(ref: Ref<T> | undefined, value: T | null) {
   else if (ref) ref.current = value
 }
 
+function clearVaulDragStyles(content: HTMLDivElement) {
+  content.style.setProperty('transition', 'none')
+  content.style.removeProperty('transform')
+  // Flush the zero-transform state before restoring Vaul's transition.
+  content.getBoundingClientRect()
+  content.style.removeProperty('transition')
+}
+
 export function ModalSheet({ open, title, onClose, children, backLabel, bodyElementRef, bodyHeader, contentStyle, footer, onBack, scrollResetKey, subtitle }: ModalSheetProps) {
   const copy = useCopy('core')
   const contentRef = useRef<HTMLDivElement | null>(null)
   const bodyRef = useRef<HTMLDivElement | null>(null)
-  const [bodyElement, setBodyElement] = useState<HTMLDivElement | null>(null)
+  const [bodyRefVersion, setBodyRefVersion] = useState(0)
   const closeRequestedAtRef = useRef(Number.NEGATIVE_INFINITY)
   const ignoreInternalCloseUntilRef = useRef(0)
   const currentSnapshot: ModalSheetSnapshot = { backLabel: backLabel ?? copy('modal.back'), bodyHeader, children, contentStyle, footer, onBack, scrollResetKey, subtitle, title }
@@ -82,8 +90,8 @@ export function ModalSheet({ open, title, onClose, children, backLabel, bodyElem
   const isDesktopModalLayout = useDesktopModalLayout()
   const showDragHandle = !isDesktopModalLayout
   const setBodyRefs = useCallback((node: HTMLDivElement | null) => {
+    if (bodyRef.current !== node) setBodyRefVersion((current) => current + 1)
     bodyRef.current = node
-    setBodyElement(node)
     assignRef(bodyElementRef, node)
   }, [bodyElementRef])
 
@@ -103,7 +111,9 @@ export function ModalSheet({ open, title, onClose, children, backLabel, bodyElem
   useLayoutEffect(() => {
     if (open) {
       const now = window.performance.now()
-      ignoreInternalCloseUntilRef.current = closeWasWithinExitAnimation(closeRequestedAtRef.current) ? now + RECENT_OPEN_INTERNAL_CLOSE_GUARD_MS : 0
+      const reopenedDuringExit = closeWasWithinExitAnimation(closeRequestedAtRef.current)
+      ignoreInternalCloseUntilRef.current = reopenedDuringExit ? now + RECENT_OPEN_INTERNAL_CLOSE_GUARD_MS : 0
+      if (reopenedDuringExit && contentRef.current) clearVaulDragStyles(contentRef.current)
       return undefined
     }
 
@@ -144,36 +154,84 @@ export function ModalSheet({ open, title, onClose, children, backLabel, bodyElem
 
   useLayoutEffect(() => {
     if (!open) return undefined
-    const body = bodyElement
+    const body = bodyRef.current
     if (!body) return undefined
+
+    const syncGestureArbitration = () => {
+      const scrollable = body.scrollHeight > body.clientHeight + 1
+      const scrollableValue = scrollable ? 'true' : 'false'
+      // Safari can expose elastic negative scrollTop; normalize it to Vaul's exact top sentinel.
+      if (body.scrollTop < 0) body.scrollTop = 0
+      // pan-down lets upward finger motion scroll while reserving a downward pull at the top for Vaul.
+      const touchAction = !scrollable ? 'none' : body.scrollTop === 0 ? 'pan-down' : 'pan-y'
+      if (body.dataset.modalSheetScrollable !== scrollableValue) body.dataset.modalSheetScrollable = scrollableValue
+      if (body.style.touchAction !== touchAction) body.style.touchAction = touchAction
+    }
 
     const syncVisibleHeight = () => {
       const computed = window.getComputedStyle(body)
       const verticalPadding = parseFloat(computed.paddingTop || '0') + parseFloat(computed.paddingBottom || '0')
-      body.style.setProperty('--modal-body-visible-height', `${body.clientHeight}px`)
-      body.style.setProperty('--modal-body-content-height', `${Math.max(0, body.clientHeight - (Number.isFinite(verticalPadding) ? verticalPadding : 0))}px`)
+      const visibleHeight = `${body.clientHeight}px`
+      const contentHeight = `${Math.max(0, body.clientHeight - (Number.isFinite(verticalPadding) ? verticalPadding : 0))}px`
+      if (body.style.getPropertyValue('--modal-body-visible-height') !== visibleHeight) body.style.setProperty('--modal-body-visible-height', visibleHeight)
+      if (body.style.getPropertyValue('--modal-body-content-height') !== contentHeight) body.style.setProperty('--modal-body-content-height', contentHeight)
+      syncGestureArbitration()
     }
 
     syncVisibleHeight()
     window.addEventListener('resize', syncVisibleHeight)
+    const clearBodyGestureStyles = () => {
+      delete body.dataset.modalSheetScrollable
+      body.style.removeProperty('touch-action')
+    }
+    let mutationFrame: number | null = null
+    const scheduleVisibleHeightSync = () => {
+      if (mutationFrame !== null) return
+      mutationFrame = window.requestAnimationFrame(() => {
+        mutationFrame = null
+        syncVisibleHeight()
+      })
+    }
+    const mutationObserver = typeof window.MutationObserver === 'undefined'
+      ? null
+      : new window.MutationObserver((records) => {
+          if (records.some((record) => record.type !== 'attributes' || record.target !== body)) scheduleVisibleHeightSync()
+        })
+    mutationObserver?.observe(body, {
+      attributeFilter: ['aria-expanded', 'class', 'hidden', 'open', 'style'],
+      attributes: true,
+      characterData: true,
+      childList: true,
+      subtree: true,
+    })
+    body.addEventListener('load', syncVisibleHeight, true)
+    body.addEventListener('scroll', syncGestureArbitration, { passive: true })
+    const cleanupBodyObservers = () => {
+      if (mutationFrame !== null) window.cancelAnimationFrame(mutationFrame)
+      mutationObserver?.disconnect()
+      body.removeEventListener('load', syncVisibleHeight, true)
+      body.removeEventListener('scroll', syncGestureArbitration)
+      clearBodyGestureStyles()
+      window.removeEventListener('resize', syncVisibleHeight)
+    }
 
     const ResizeObserverConstructor = window.ResizeObserver
     if (typeof ResizeObserverConstructor === 'undefined') {
-      return () => window.removeEventListener('resize', syncVisibleHeight)
+      return cleanupBodyObservers
     }
 
     const observer = new ResizeObserverConstructor(syncVisibleHeight)
     observer.observe(body)
     return () => {
       observer.disconnect()
-      window.removeEventListener('resize', syncVisibleHeight)
+      cleanupBodyObservers()
     }
-  }, [bodyElement, open, rendered.contentStyle, renderedHasFooter, renderedHasSubtitle])
+  }, [bodyRefVersion, open, rendered.contentStyle, renderedHasFooter, renderedHasSubtitle])
 
   if (!shouldRender) return null
 
   return (
-    <Drawer.Root handleOnly modal={false} open={open} onOpenChange={handleOpenChange} repositionInputs={false}>
+    <Drawer.Root handleOnly={isDesktopModalLayout} modal={false} open={open} onOpenChange={handleOpenChange} repositionInputs={false}>
       <Drawer.Portal>
         {open && <div className={styles.overlay} data-modal-sheet-overlay="true" onPointerDown={(event) => {
           if (event.currentTarget === event.target) requestClose()
@@ -188,6 +246,9 @@ export function ModalSheet({ open, title, onClose, children, backLabel, bodyElem
           data-rapid-reopen={rapidReopen ? 'true' : 'false'}
           data-surface="hass-popup"
           inert={closing ? true : undefined}
+          onPointerCancel={() => {
+            if (open && contentRef.current) clearVaulDragStyles(contentRef.current)
+          }}
           style={renderedContentStyle}
         >
           {showDragHandle && <Drawer.Handle className={styles.handle} data-mobile-drag-handle="true" />}

@@ -41,7 +41,6 @@
 
 .content[data-rapid-reopen='true'][data-state='open'] {
   animation: none !important;
-  transform: none !important;
 }
 
 .content:focus,
