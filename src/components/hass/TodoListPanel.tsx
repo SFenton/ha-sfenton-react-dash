@@ -3,9 +3,12 @@ import { useEntity, useHass } from '@hakit/core'
 import { CheckboxRow } from '../core/CheckboxRow'
 import { MaterialIcon } from '../core/Icon'
 import { useTodoOptimisticStatuses, type TodoOptimisticStatuses } from '../../hooks/useTodoOptimisticStatuses'
+import { useCopy } from '../../i18n'
 import { donetickTaskIdFromUid, type DonetickTaskEditTarget } from './donetickTaskForm'
 import { asEntityName } from './entityState'
 import styles from './TodoListPanel.module.css'
+
+const TODO_LIST_I18N = { namespace: 'core' } as const
 
 interface TodoItem {
   description?: string
@@ -53,8 +56,25 @@ function compactText(value: string | undefined) {
   return trimmed ? trimmed : undefined
 }
 
-function todoSubtitle(item: TodoItem, due: DueInfo | null) {
-  const subtitle = [compactText(item.description), due?.label].filter((part): part is string => Boolean(part)).join(' · ')
+function compactDescription(value: string | undefined) {
+  return compactText(value)?.split(/\r?\n/, 1)[0]?.trim() || undefined
+}
+
+function batteryMaintenanceLevel(item: TodoItem) {
+  const description = compactText(item.description)
+  if (!description || !/\bMaintenance reference:\s*BATT-[A-Z0-9]+\b/i.test(description)) return undefined
+  const level = description.match(/\bbattery is at\s+(\d+(?:\.\d+)?)%/i)?.[1]
+  return level ? `${level}%` : undefined
+}
+
+function normalizeBatteryTaskTitle(title: string, batteryLevel: string | undefined) {
+  if (!batteryLevel) return title
+  return title.replace(/\bbattery\b/g, (word) => word.charAt(0).toUpperCase().concat(word.slice(1)))
+}
+
+function todoSubtitle(item: TodoItem, due: DueInfo | null, batteryLevel: string | undefined) {
+  const detail = batteryLevel ? undefined : compactDescription(item.description)
+  const subtitle = [due?.label, detail].filter((part): part is string => Boolean(part)).join(' · ')
   return subtitle || undefined
 }
 
@@ -100,6 +120,7 @@ function applyPendingTodoStatuses(items: TodoItem[], pendingStatuses: TodoOptimi
 }
 
 export function TodoListPanel({ completionScript, entityId, hideCompleted = true, onEditTask, onVisibleItemsChange, optimisticStatuses, reloadVersion = 0, rowVariant, title }: TodoListPanelProps) {
+  const copy = useCopy(TODO_LIST_I18N.namespace)
   const entity = useEntity(asEntityName(entityId), { returnNullIfNotFound: true })
   const connection = useHass((state) => state.connection) as unknown as HassConnection | undefined
   const callService = useHass((state) => state.helpers.callService) as unknown as CallService
@@ -195,8 +216,12 @@ export function TodoListPanel({ completionScript, entityId, hideCompleted = true
         <ul className={styles.items}>
           {visibleItems.map((item, index) => {
             const due = relativeDueInfo(todoDue(item))
-            const titleText = compactText(item.summary) ?? 'Untitled task'
-            const subtitle = todoSubtitle(item, due)
+            const batteryLevel = batteryMaintenanceLevel(item)
+            const normalizedTitle = normalizeBatteryTaskTitle(compactText(item.summary) ?? 'Untitled task', batteryLevel)
+            const titleText = batteryLevel
+              ? copy('todo.batteryTaskTitle', { percentage: batteryLevel, title: normalizedTitle })
+              : normalizedTitle
+            const subtitle = todoSubtitle(item, due, batteryLevel)
             const taskId = donetickTaskIdFromUid(item.uid)
             const editTarget = onEditTask && taskId && item.uid
               ? { itemUid: item.uid, taskId, todoEntityId: entityId }

@@ -6289,11 +6289,11 @@ describe('DashboardViewPage', () => {
     render(<DashboardViewPage activePath="stephens-chores" onNavigate={() => undefined} path="stephens-chores" />)
 
     const dueTodayList = await screen.findByLabelText('Due Today todo list')
-    const describedTask = within(dueTodayList).getByRole('button', { name: /Replace HVAC filter\s+Use MERV 13 · Due in 2 days/i })
+    const describedTask = within(dueTodayList).getByRole('button', { name: /Replace HVAC filter\s+Due in 2 days · Use MERV 13/i })
     const plainTask = within(dueTodayList).getByRole('button', { name: 'Take out trash' })
 
     expect(describedTask.querySelector('path')).toHaveAttribute('d', materialIconPath('mdi:checkbox-blank-outline'))
-    expect(within(describedTask).getByText('Use MERV 13 · Due in 2 days')).toBeInTheDocument()
+    expect(within(describedTask).getByText('Due in 2 days · Use MERV 13')).toBeInTheDocument()
     expect(plainTask.querySelector('small')).toBeNull()
   })
 

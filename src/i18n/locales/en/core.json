@@ -20,5 +20,8 @@
   "search": {
     "clear": "Clear Search",
     "collapsed": "Search"
+  },
+  "todo": {
+    "batteryTaskTitle": "{{title}} · {{percentage}}"
   }
 }

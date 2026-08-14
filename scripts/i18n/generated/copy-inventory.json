@@ -243,6 +243,21 @@
       "words": 3
     },
     {
+      "characters": 26,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/core.json",
+      "id": "b814287ebfaf1915",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [
+        "percentage",
+        "title"
+      ],
+      "value": "{{title}} · {{percentage}}",
+      "words": 3
+    },
+    {
       "characters": 25,
       "context": "catalog-copy",
       "file": "src/i18n/locales/en/modals/camera.json",
@@ -3426,7 +3441,7 @@
       "file": "src/components/hass/TodoListPanel.tsx",
       "id": "a1f6c53c96f43c15",
       "lines": [
-        192
+        213
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -3522,7 +3537,7 @@
       "file": "src/components/hass/TodoListPanel.tsx",
       "id": "5c82bc2a6cf513bb",
       "lines": [
-        210
+        235
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -3539,7 +3554,7 @@
       "file": "src/components/hass/TodoListPanel.tsx",
       "id": "c81b32f1cbd0b8a9",
       "lines": [
-        206
+        231
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -4087,7 +4102,7 @@
       "file": "src/components/hass/TodoListPanel.tsx",
       "id": "4b45e8113c50ef91",
       "lines": [
-        219
+        244
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -9493,7 +9508,7 @@
       "file": "src/components/hass/TodoListPanel.tsx",
       "id": "e2cd37f6184dc5af",
       "lines": [
-        198
+        220
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -17029,7 +17044,7 @@
       "file": "src/components/hass/TodoListPanel.tsx",
       "id": "2efb8b79b6247f13",
       "lines": [
-        77
+        97
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -17046,7 +17061,7 @@
       "file": "src/components/hass/TodoListPanel.tsx",
       "id": "e5c6768bc82da4cf",
       "lines": [
-        80
+        100
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -17919,7 +17934,7 @@
       "file": "src/components/hass/TodoListPanel.tsx",
       "id": "4ea8ae0bd396070c",
       "lines": [
-        79
+        99
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -31276,7 +31291,7 @@
       "file": "src/components/hass/TodoListPanel.tsx",
       "id": "ecbe4bdada409fac",
       "lines": [
-        77
+        97
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -31763,7 +31778,7 @@
       "file": "src/components/hass/TodoListPanel.tsx",
       "id": "fe0b75f9b9ed31ac",
       "lines": [
-        165
+        186
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -33628,11 +33643,11 @@
     }
   ],
   "summary": {
-    "catalogRecords": 183,
+    "catalogRecords": 184,
     "documentRecords": 1,
     "legacyOccurrences": 2623,
     "legacyRecords": 2176,
-    "totalRecords": 2360
+    "totalRecords": 2361
   },
   "version": 1
 }
