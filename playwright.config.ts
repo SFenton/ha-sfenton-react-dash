@@ -21,7 +21,7 @@ export default defineConfig({
     ...(enableWebkit
       ? [{
           name: 'webkit',
-          testMatch: /modal-sheet-webkit\.spec\.ts/,
+          testMatch: /modal-sheet-(?:lifecycle|webkit)\.spec\.ts/,
           use: {
             ...devices['iPhone 13'],
             browserName: 'webkit' as const,

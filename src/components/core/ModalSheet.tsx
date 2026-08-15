@@ -170,7 +170,7 @@ export function ModalSheet({ open, title, onClose, children, backLabel, bodyElem
   return (
     <Drawer.Root disablePointerDismissal modal="trap-focus" open={open} onOpenChange={handleOpenChange} swipeDirection="down">
       <Drawer.Portal keepMounted>
-        <Drawer.Backdrop className={styles.overlay} data-modal-sheet-overlay="true" hidden={false} onPointerDown={(event) => {
+        <Drawer.Backdrop className={styles.overlay} data-closing={closing ? 'true' : 'false'} data-modal-sheet-overlay="true" hidden={false} onPointerDown={(event) => {
           if (event.currentTarget === event.target) requestClose()
         }} />
         <Drawer.Viewport className={styles.viewport} hidden={false}>

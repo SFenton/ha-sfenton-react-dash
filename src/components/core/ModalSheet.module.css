@@ -24,6 +24,13 @@
   transition-duration: calc(var(--drawer-swipe-strength, 1) * 500ms);
 }
 
+/* Base UI drops ending-style after its velocity-scaled exit; keep the closed pose until app unmount. */
+.overlay[data-closing='true'],
+.overlay[data-closed] {
+  opacity: 0;
+  pointer-events: none;
+}
+
 .viewport {
   position: fixed;
   inset: 0;
@@ -78,6 +85,11 @@
 
 .content[data-ending-style] {
   transition-duration: calc(var(--drawer-swipe-strength, 1) * 500ms);
+}
+
+.content[data-closing='true'],
+.content[data-closed] {
+  transform: translate3d(0, 100%, 0);
 }
 
 .content:focus,
@@ -250,6 +262,12 @@
 
   .content[data-starting-style],
   .content[data-ending-style] {
+    opacity: 0;
+    transform: none;
+  }
+
+  .content[data-closing='true'],
+  .content[data-closed] {
     opacity: 0;
     transform: none;
   }
