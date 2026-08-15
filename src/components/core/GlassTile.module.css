@@ -135,6 +135,18 @@
   line-height: 1.25;
 }
 
+.visuallyHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 .tile:not(.compact, .headerPill) .icon {
   width: 44px;
   height: 44px;

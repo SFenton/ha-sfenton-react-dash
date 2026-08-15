@@ -187,6 +187,14 @@ describe('AtAGlancePage', () => {
     expect(within(dialog).getByRole('button', { name: /Guest Room On/i })).toBeInTheDocument()
     expect(within(dialog).getByRole('button', { name: /Main Floor Enabled/i })).toBeInTheDocument()
 
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Left Door Closed' }))
+    expect(within(dialog).getByRole('button', { name: 'Left Door Sending Open…' })).toHaveAttribute('aria-disabled', 'true')
+    expect(mockCallServiceCalls.at(-1)).toEqual({
+      domain: 'cover',
+      service: 'open_cover',
+      target: 'cover.left_door',
+    })
+
     fireEvent.click(within(dialog).getByRole('button', { name: /Enforce Home Temperatures Keep Eco Active/i }))
 
     expect(mockCallServiceCalls.at(-1)).toEqual({

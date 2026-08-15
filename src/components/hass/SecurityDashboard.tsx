@@ -14,6 +14,7 @@ import { ContactSheet } from '../../pages/AtAGlancePage'
 import { modalSquareGridModalStyleForHash, modalSquareGridStyle, useModalSquareGridLayout, type ModalSquareGridStyle } from '../../pages/modalSquareGrid'
 import { CameraModalContent } from './CameraModalContent'
 import { asEntityName, formatCompactEntityState, isActiveState, isContactOpen } from './entityState'
+import { GarageDoorTile } from './GarageDoorTile'
 import { SecurityControls } from './SecurityControls'
 import { SECURITY_SYSTEM_MODAL_STYLE, securitySystemModalSubtitle } from './securityControlsConfig'
 import { GuestPresenceSecurityModalContent, GuestPresenceSecuritySection, GUEST_PRESENCE_SECURITY_HASH } from './GuestPresenceSecurity'
@@ -59,7 +60,7 @@ function lockServiceForState(state: string | undefined) {
   return state === 'unlocked' || state === 'unlocking' ? 'lock' : 'unlock'
 }
 
-function SecurityTile({ item, onOpenHash }: { item: SecurityTileConfig; onOpenHash: (hash: string) => void }) {
+function StandardSecurityTile({ item, onOpenHash }: { item: SecurityTileConfig; onOpenHash: (hash: string) => void }) {
   const entity = useEntity(asEntityName(item.entityId), { returnNullIfNotFound: true })
   const callService = useHass((state) => state.helpers.callService) as unknown as CallService
   const unavailable = !entity || entity.state === 'unavailable' || entity.state === 'unknown'
@@ -72,6 +73,7 @@ function SecurityTile({ item, onOpenHash }: { item: SecurityTileConfig; onOpenHa
       onOpenHash(item.action.hash)
       return
     }
+    if (item.action.type === 'garage-door') return
     if (item.tone === 'lock') {
       callService({ domain: 'lock', service: lockServiceForState(entity?.state), target: item.entityId })
       return
@@ -81,15 +83,29 @@ function SecurityTile({ item, onOpenHash }: { item: SecurityTileConfig; onOpenHa
 
   return (
     <GlassTile
-      disclosure={item.action?.type === 'hash' && !unavailable}
       icon={tileIcon(item, entity?.state)}
       isOff={unavailable || (item.tone === 'vehicle' && !active)}
       onClick={item.action && !unavailable ? runAction : undefined}
+      semantics={item.action?.type === 'hash' ? { kind: 'modal' } : item.action ? { kind: 'command' } : undefined}
       subtitle={stateText}
       title={item.title}
       tone={tileTone(item, entity?.state, unavailable)}
     />
   )
+}
+
+function SecurityTile(props: { item: SecurityTileConfig; onOpenHash: (hash: string) => void }) {
+  if (props.item.action?.type === 'garage-door') {
+    return (
+      <GarageDoorTile
+        entityId={props.item.entityId}
+        icon={props.item.icon}
+        title={props.item.title}
+        toneForState={(state, unavailable) => tileTone(props.item, state, unavailable)}
+      />
+    )
+  }
+  return <StandardSecurityTile {...props} />
 }
 
 export function SecurityStatusRail({ onOpenHash }: { onOpenHash: (hash: string) => void }) {
