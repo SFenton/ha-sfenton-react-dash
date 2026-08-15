@@ -105,6 +105,13 @@
   flex-direction: column;
 }
 
+/* The near-opaque modal surface makes nested glass blur visually inert but expensive while moving. */
+.content [data-tone][data-variant='card'],
+.content [data-modal-tab-nav='true'] {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
 .handle {
   flex: 0 0 5px;
   width: 42px;

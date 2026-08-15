@@ -1,7 +1,11 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { useState } from 'react'
 import { describe, expect, it, vi } from 'vitest'
 import { ModalSheet } from './ModalSheet'
+
+const modalSheetCss = readFileSync(resolve(process.cwd(), 'src/components/core/ModalSheet.module.css'), 'utf8')
 
 function ModalSheetHarness() {
   const [open, setOpen] = useState(true)
@@ -49,6 +53,10 @@ function DelayedCloseModalSheetHarness() {
 }
 
 describe('ModalSheet', () => {
+  it('disables nested glass backdrop filters inside the moving modal surface', () => {
+    expect(modalSheetCss).toMatch(/\.content \[data-tone\]\[data-variant='card'\],\s*\.content \[data-modal-tab-nav='true'\]\s*\{[^}]*backdrop-filter:\s*none;[^}]*-webkit-backdrop-filter:\s*none;/s)
+  })
+
   it('leaves touch ownership to the drawer without forcing scroll position or directional touch-action', () => {
     render(<ModalSheetObserverHarness />)
 
