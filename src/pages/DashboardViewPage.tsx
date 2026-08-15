@@ -11,6 +11,7 @@ import { DashboardPageLoading, type DashboardPageLoadingPhase } from '../compone
 import { DashboardFloatingAction } from '../components/shell/DashboardFloatingAction'
 import { dashboardRoomNameFromPath, hasDashboardFloatingAction } from '../components/shell/dashboardFloatingAction'
 import { EntityActionCard } from '../components/hass/EntityActionCard'
+import { GarageDoorTile } from '../components/hass/GarageDoorTile'
 import { PresenceOverrideCard, PresenceOverrideDetailPage } from '../components/hass/PresenceOverrideCard'
 import { SecurityDashboard, SecurityStatusRail } from '../components/hass/SecurityDashboard'
 import { SpecialDeviceModeCard } from '../components/hass/SpecialDeviceModeCard'
@@ -895,7 +896,22 @@ interface RoomSourceCardProps {
 function RoomSourceCard(props: RoomSourceCardProps) {
   if (isDishwasherSourceCard(props.card)) return <DishwasherRoomSourceCard {...props} />
   if (props.card.kind === 'humidifier') return <HumidifierRoomSourceCard {...props} />
+  if (props.card.control === 'garage-door') return <GarageDoorRoomSourceCard {...props} />
   return <DefaultRoomSourceCard {...props} />
+}
+
+function GarageDoorRoomSourceCard({ card }: RoomSourceCardProps) {
+  const content = (
+    <GarageDoorTile
+      entityId={card.entityId}
+      icon={<SourceCardIcon card={card} size={24} />}
+      title={card.title}
+      toneForState={() => toneForSourceKind(card.kind)}
+    />
+  )
+
+  if (card.span === 'full') return <div className={styles.fullSpan}>{content}</div>
+  return content
 }
 
 function DishwasherRoomSourceCard({ card, onOpen }: RoomSourceCardProps) {

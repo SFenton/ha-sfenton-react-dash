@@ -5300,8 +5300,8 @@ describe('DashboardViewPage', () => {
     fireEvent.click(screen.getByRole('button', { name: /^Right Door Closed$/i }))
     expect(screen.queryByText(/interactive controls available from this view/i)).not.toBeInTheDocument()
     expect(mockCallServiceCalls).toEqual([
-      { domain: 'homeassistant', service: 'toggle', target: 'cover.left_door' },
-      { domain: 'homeassistant', service: 'toggle', target: 'cover.right_door' },
+      { domain: 'cover', service: 'open_cover', target: 'cover.left_door' },
+      { domain: 'cover', service: 'open_cover', target: 'cover.right_door' },
     ])
   })
 
@@ -5690,7 +5690,7 @@ describe('DashboardViewPage', () => {
     ])
   })
 
-  it('runs explicit lock services and YAML toggle actions for garage doors', () => {
+  it('runs explicit lock and garage door services from live state', () => {
     render(<DashboardViewPage activePath="security" onNavigate={() => undefined} path="security" />)
 
     fireEvent.click(screen.getByRole('button', { name: /Front Door Locked/i }))
@@ -5698,7 +5698,7 @@ describe('DashboardViewPage', () => {
 
     expect(mockCallServiceCalls).toEqual([
       { domain: 'lock', service: 'unlock', target: 'lock.aqara_smart_lock_u400' },
-      { domain: 'homeassistant', service: 'toggle', target: 'cover.left_door' },
+      { domain: 'cover', service: 'open_cover', target: 'cover.left_door' },
     ])
   })
 
