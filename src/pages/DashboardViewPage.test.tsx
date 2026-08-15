@@ -1339,7 +1339,7 @@ describe('DashboardViewPage', () => {
     dialog = await screen.findByRole('dialog', { name: 'Master Bedroom Presence Lighting' })
     fireEvent.click(within(dialog).getByRole('button', { name: 'Close' }))
     expect(dialog).toHaveAttribute('data-state', 'closed')
-    expect(within(dialog).getByRole('heading', { name: 'Master Bedroom Presence Lighting' })).toBeInTheDocument()
+    expect(within(dialog).getByRole('heading', { hidden: true, name: 'Master Bedroom Presence Lighting' })).toBeInTheDocument()
 
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Master Bedroom Presence Lighting' })).not.toBeInTheDocument())
     fireEvent.click(screen.getByRole('button', { name: 'Open Presence-Based Overrides' }))
@@ -5496,7 +5496,7 @@ describe('DashboardViewPage', () => {
   })
 
   it('keeps Back Deck grill controls inside the grill popup', async () => {
-    render(<DashboardViewPage activePath="back-deck" onNavigate={() => undefined} path="back-deck" />)
+    const inactiveView = render(<DashboardViewPage activePath="back-deck" onNavigate={() => undefined} path="back-deck" />)
 
     expect(screen.getByRole('heading', { name: 'Grill' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Bear Grills Off/i })).not.toBeInTheDocument()
@@ -5504,6 +5504,7 @@ describe('DashboardViewPage', () => {
     expect(screen.queryByText('Pellet Level')).not.toBeInTheDocument()
     expect(screen.queryByText('Keep Warm')).not.toBeInTheDocument()
 
+    inactiveView.unmount()
     mockEntities['sensor.d8478fa2ad0a_grill_state'].state = 'ignite'
     const activeView = render(<DashboardViewPage activePath="back-deck" onNavigate={() => undefined} path="back-deck" />)
 
@@ -6691,7 +6692,7 @@ describe('DashboardViewPage', () => {
         },
       },
     ]))
-    await waitFor(() => expect(screen.getByRole('dialog')).toHaveAttribute('data-state', 'closed'))
+    await waitFor(() => expect(dialog).toHaveAttribute('data-state', 'closed'))
   })
 
   it('opens a chore row in the prefilled edit modal and saves through DoneTick', async () => {

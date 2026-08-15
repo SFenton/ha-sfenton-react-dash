@@ -5,15 +5,36 @@
   background: var(--color-modal-overlay);
   backdrop-filter: var(--blur-modal);
   -webkit-backdrop-filter: var(--blur-modal);
+  opacity: calc(1 - var(--drawer-swipe-progress, 0));
   pointer-events: auto;
+  transition: opacity 500ms cubic-bezier(.32, .72, 0, 1);
+}
+
+.overlay[data-starting-style],
+.overlay[data-ending-style] {
+  opacity: 0;
+}
+
+.overlay[data-swiping] {
+  transition-duration: 0ms;
+}
+
+.overlay[data-ending-style] {
+  pointer-events: none;
+  transition-duration: calc(var(--drawer-swipe-strength, 1) * 500ms);
+}
+
+.viewport {
+  position: fixed;
+  inset: 0;
+  z-index: 41;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  pointer-events: none;
 }
 
 .content {
-  position: fixed;
-  right: 0;
-  bottom: 0;
-  left: 0;
-  z-index: 41;
   display: flex;
   width: var(--dashboard-viewport-width, 100vw);
   max-width: var(--dashboard-viewport-width, 100vw);
@@ -28,24 +49,48 @@
   color: #e1e1e1;
   background: var(--color-modal-surface);
   box-shadow: none;
-  backdrop-filter: var(--blur-modal);
-  -webkit-backdrop-filter: var(--blur-modal);
   box-sizing: border-box;
   overflow: clip;
   pointer-events: auto;
+  transform: translate3d(0, var(--drawer-swipe-movement-y, 0px), 0);
+  transition: transform 500ms cubic-bezier(.32, .72, 0, 1);
+  will-change: transform;
 }
 
 .content[data-closing='true'] {
   pointer-events: none;
 }
 
+.content[data-starting-style],
+.content[data-ending-style] {
+  transform: translate3d(0, 100%, 0);
+}
+
 .content[data-rapid-reopen='true'][data-state='open'] {
-  animation: none !important;
+  transform: none;
+  transition: none;
+}
+
+.content[data-swiping] {
+  user-select: none;
+  transition-duration: 0ms;
+}
+
+.content[data-ending-style] {
+  transition-duration: calc(var(--drawer-swipe-strength, 1) * 500ms);
 }
 
 .content:focus,
 .content:focus-visible {
   outline: none;
+}
+
+.contentLayout {
+  display: flex;
+  min-height: 0;
+  height: 100%;
+  flex: 1 1 auto;
+  flex-direction: column;
 }
 
 .handle {
@@ -183,11 +228,12 @@
 }
 
 @media (min-width: 760px) {
+  .viewport {
+    align-items: center;
+    padding: 32px;
+  }
+
   .content {
-    top: 50%;
-    right: auto;
-    bottom: auto;
-    left: 50%;
     width: var(--modal-desktop-width, 90vw);
     max-width: var(--modal-desktop-max-width, calc(var(--dashboard-viewport-width, 100vw) - 64px));
     height: var(--modal-desktop-height, 90vh);
@@ -197,29 +243,15 @@
     border: 1px solid rgba(255, 255, 255, 0.12);
     border-radius: 34px;
     box-shadow: 0 26px 86px rgba(0, 0, 0, 0.48), inset 0 1px 0 rgba(255, 255, 255, 0.08);
-    transform: translate3d(-50%, -50%, 0);
-    will-change: opacity, transform;
+    transform: none;
+    transition: opacity 200ms cubic-bezier(.4, 0, .2, 1);
+    will-change: opacity;
   }
 
-  .content::after {
-    display: none;
-  }
-
-  .content[data-vaul-drawer][data-vaul-snap-points='false'][data-vaul-drawer-direction='bottom'][data-state='open'] {
-    animation-name: desktopModalIn;
-    animation-duration: var(--duration-med);
-    animation-timing-function: cubic-bezier(.2, .9, .2, 1);
-  }
-
-  .content[data-rapid-reopen='true'][data-state='open'] {
-    animation: none !important;
-    transform: translate3d(-50%, -50%, 0) !important;
-  }
-
-  .content[data-vaul-drawer][data-vaul-snap-points='false'][data-vaul-drawer-direction='bottom'][data-state='closed'] {
-    animation-name: desktopModalOut;
-    animation-duration: 200ms;
-    animation-timing-function: cubic-bezier(.4, 0, .2, 1);
+  .content[data-starting-style],
+  .content[data-ending-style] {
+    opacity: 0;
+    transform: none;
   }
 
   .handle {
@@ -243,28 +275,4 @@
     padding: 12px 24px 20px;
   }
 
-}
-
-@keyframes desktopModalIn {
-  from {
-    opacity: 0;
-    transform: translate3d(-50%, -50%, 0);
-  }
-
-  to {
-    opacity: 1;
-    transform: translate3d(-50%, -50%, 0);
-  }
-}
-
-@keyframes desktopModalOut {
-  from {
-    opacity: 1;
-    transform: translate3d(-50%, -50%, 0);
-  }
-
-  to {
-    opacity: 0;
-    transform: translate3d(-50%, -50%, 0);
-  }
 }

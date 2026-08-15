@@ -55,6 +55,7 @@ export function CardCarousel({ ariaLabel, columns = 2, pages }: CardCarouselProp
         aria-label={ariaLabel}
         aria-roledescription="carousel"
         className={styles.viewport}
+        data-base-ui-swipe-ignore="true"
         onKeyDown={handleKeyDown}
         onTouchEnd={handleTouchEnd}
         onTouchStart={handleTouchStart}
