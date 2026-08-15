@@ -3692,7 +3692,7 @@ test('mobile bed dial maps taps, drag, and keyboard to targets without invoking 
   expect(powerOffCalls).toHaveLength(0)
 })
 
-test('mobile SleepyPod target prompt routes Tonight and swipes closed without a second command', async ({ page }) => {
+test('mobile SleepyPod target prompt commits Tonight immediately and closes without an extra command', async ({ page }) => {
   await page.setViewportSize({ width: 393, height: 852 })
   await page.goto('/at-a-glance/master-bedroom')
   await page.evaluate(() => {
@@ -3731,6 +3731,14 @@ test('mobile SleepyPod target prompt routes Tonight and swipes closed without a 
     expect(frame.regionLabel).toMatch(/Stephen's Bed thermostat Cooling -5/i)
     expect(frame.sliderValue).toBe('-5')
   }
+  await expect.poll(async () => page.evaluate(() => (
+    (window as unknown as { __mockHass: { calls: Record<string, unknown>[] } }).__mockHass.calls
+      .filter((call) => call.domain === 'script')
+  ))).toEqual([{
+    domain: 'script',
+    service: 'sleepypod_stephen_temperature_tonight',
+    serviceData: { level: -5 },
+  }])
   await expect(scopeDialog).toHaveAttribute('data-surface', 'hass-popup')
   await expect(scopeDialog).toContainText("Stephen's Bed • Bedtime • -5")
   await expect(scopeDialog.getByRole('button', { name: 'Tonight' })).toBeFocused()
@@ -3775,14 +3783,22 @@ test('mobile SleepyPod target prompt routes Tonight and swipes closed without a 
   await targetSlider.press('ArrowLeft')
   await expect(scopeDialog).toBeVisible()
   await expect(scopeDialog).toContainText("Stephen's Bed • Bedtime • -6")
-  await page.waitForTimeout(500)
-  const handle = scopeDialog.locator('[data-mobile-drag-handle="true"]')
-  const handleBox = await handle.boundingBox()
-  if (!handleBox) throw new Error('SleepyPod scope prompt drag handle was not measurable')
-  await page.mouse.move(handleBox.x + handleBox.width / 2, handleBox.y + handleBox.height / 2)
-  await page.mouse.down()
-  await page.mouse.move(handleBox.x + handleBox.width / 2, handleBox.y + 320, { steps: 10 })
-  await page.mouse.up()
+  await expect.poll(async () => page.evaluate(() => (
+    (window as unknown as { __mockHass: { calls: Record<string, unknown>[] } }).__mockHass.calls
+      .filter((call) => call.domain === 'script')
+  ))).toEqual([
+    {
+      domain: 'script',
+      service: 'sleepypod_stephen_temperature_tonight',
+      serviceData: { level: -5 },
+    },
+    {
+      domain: 'script',
+      service: 'sleepypod_stephen_temperature_tonight',
+      serviceData: { level: -6 },
+    },
+  ])
+  await scopeDialog.getByRole('button', { name: 'Close' }).click()
 
   await expect(scopeDialog).toHaveAttribute('data-state', 'closed')
   await expect(scopeDialog).toHaveAttribute('data-closing', 'true')
@@ -3794,8 +3810,8 @@ test('mobile SleepyPod target prompt routes Tonight and swipes closed without a 
   await expect.poll(async () => page.evaluate(() => (
     (window as unknown as { __mockHass: { calls: Record<string, unknown>[] } }).__mockHass.calls
       .filter((call) => call.domain === 'script')
-  ))).toHaveLength(1)
-  await expect(targetSlider).toHaveAttribute('aria-valuenow', '-5')
+  ))).toHaveLength(2)
+  await expect(targetSlider).toHaveAttribute('aria-valuenow', '-6')
 })
 
 test('thermostat Vacation end transitions to Away or Home with correct dial ranges on mobile', async ({ page }) => {

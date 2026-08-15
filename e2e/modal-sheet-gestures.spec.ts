@@ -244,8 +244,8 @@ test.describe('mobile ModalSheet gestures', () => {
     expect(Math.abs(await translateY(dialog))).toBeLessThanOrEqual(1)
   })
 
-  test('trusted touch can dismiss from non-scrollable modal content without firing its command', async ({ page }) => {
-    const { dialog } = await openSleepypodScopePrompt(page)
+  test('trusted touch can dismiss from non-scrollable modal content without adding another command', async ({ page }) => {
+    const { dialog, targetSlider } = await openSleepypodScopePrompt(page)
     const body = dialog.locator('[data-modal-sheet-body="true"]')
     const overflow = await body.evaluate((element) => element.scrollHeight - element.clientHeight)
     expect(overflow).toBeLessThanOrEqual(1)
@@ -261,7 +261,12 @@ test.describe('mobile ModalSheet gestures', () => {
     await expect.poll(async () => page.evaluate(() => (
       (window as unknown as { __mockHass: { calls: Record<string, unknown>[] } }).__mockHass.calls
         .filter((call) => call.domain === 'script')
-    ))).toEqual([])
+    ))).toEqual([{
+      domain: 'script',
+      service: 'sleepypod_stephen_temperature_tonight',
+      serviceData: { level: -3 },
+    }])
+    await expect(targetSlider).toHaveAttribute('aria-valuenow', '-3')
   })
 
   test('trusted touch can dismiss from scrollable content already at the top', async ({ page }) => {
@@ -524,7 +529,7 @@ test.describe('mobile ModalSheet gestures', () => {
     expect(await page.evaluate(() => (
       (window as unknown as { __mockHass: { calls: Record<string, unknown>[] } }).__mockHass.calls
         .filter((call) => call.domain === 'script').length
-    ))).toBe(0)
+    ))).toBe(1)
 
     start = await locatorPoint(dialog.getByRole('button', { name: 'Tonight' }))
     await dragTouch(page, start, { x: start.x, y: start.y + dialogBox.height * 0.6 }, 14, 24)
@@ -532,7 +537,7 @@ test.describe('mobile ModalSheet gestures', () => {
     expect(await page.evaluate(() => (
       (window as unknown as { __mockHass: { calls: Record<string, unknown>[] } }).__mockHass.calls
         .filter((call) => call.domain === 'script').length
-    ))).toBe(0)
+    ))).toBe(1)
   })
 
   test('touch cancellation resets a partial scrollable-top content drag and allows the next swipe', async ({ page }) => {

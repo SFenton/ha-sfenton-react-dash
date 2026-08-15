@@ -38,11 +38,13 @@ export function BedTemperatureScopePrompt({
   targetText,
 }: BedTemperatureScopePromptProps) {
   const phaseLabel = sleepypodSchedulePhaseLabel(phase)
+  const forceReturnFocusRef = useRef(false)
   const returnFocusRef = useRef<HTMLElement | null>(null)
   const tonightRef = useRef<HTMLButtonElement>(null)
 
   useEffect(() => {
     if (open) {
+      forceReturnFocusRef.current = false
       const activeElement = document.activeElement
       if (returnFocus?.isConnected) returnFocusRef.current = returnFocus
       else if (activeElement instanceof HTMLElement && activeElement !== document.body) returnFocusRef.current = activeElement
@@ -52,21 +54,28 @@ export function BedTemperatureScopePrompt({
 
     const returnTarget = returnFocusRef.current
     if (!returnTarget) return undefined
+    const forceReturnFocus = forceReturnFocusRef.current
     const focusAtClose = document.activeElement
     const timeout = window.setTimeout(() => {
+      forceReturnFocusRef.current = false
       returnFocusRef.current = null
       const currentFocus = document.activeElement
       const focusMovedElsewhere = currentFocus instanceof HTMLElement
         && currentFocus !== document.body
         && currentFocus !== focusAtClose
         && currentFocus.isConnected
-      if (focusMovedElsewhere) return
+      if (focusMovedElsewhere && !forceReturnFocus) return
       const ownerDialog = returnTarget.closest('[role="dialog"]')
       if (!returnTarget.isConnected || returnTarget.getAttribute('aria-disabled') === 'true' || ownerDialog?.hasAttribute('inert')) return
       returnTarget.focus({ preventScroll: true })
     }, MODAL_SHEET_EXIT_ANIMATION_MS + 20)
     return () => window.clearTimeout(timeout)
   }, [open, returnFocus])
+
+  const chooseScope = (scope: SleepypodTemperatureScope) => {
+    forceReturnFocusRef.current = true
+    onChoose(scope)
+  }
 
   return (
     <ModalSheet
@@ -81,14 +90,14 @@ export function BedTemperatureScopePrompt({
           Choose whether this target applies only to the current night or also becomes the {phaseLabel.toLowerCase()} setting for future nights.
         </Description>
         <div aria-label="Temperature duration" className={styles.choices} role="group">
-          <button aria-label="Tonight" className={styles.choice} onClick={() => onChoose('tonight')} ref={tonightRef} type="button">
+          <button aria-label="Tonight" className={styles.choice} onClick={() => chooseScope('tonight')} ref={tonightRef} type="button">
             <span aria-hidden="true" className={styles.icon}><MaterialIcon name="mdi:weather-night" size={24} /></span>
             <span className={styles.copy}>
               <strong>Tonight</strong>
               <span>Change the current Pod target only.</span>
             </span>
           </button>
-          <button aria-label="All Nights" className={styles.choice} onClick={() => onChoose('all-nights')} type="button">
+          <button aria-label="All Nights" className={styles.choice} onClick={() => chooseScope('all-nights')} type="button">
             <span aria-hidden="true" className={styles.icon}><MaterialIcon name="mdi:calendar-refresh" size={24} /></span>
             <span className={styles.copy}>
               <strong>All Nights</strong>
