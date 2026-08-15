@@ -2451,13 +2451,13 @@ describe('DashboardViewPage', () => {
   })
 
   it.each([
-    ['bedtime', 'Tonight', 'sleepypod_stephen_temperature_tonight'],
+    ['bedtime', 'Tonight', null],
     ['bedtime', 'All Nights', 'sleepypod_stephen_bedtime_temperature_all_nights'],
-    ['asleep', 'Tonight', 'sleepypod_stephen_temperature_tonight'],
+    ['asleep', 'Tonight', null],
     ['asleep', 'All Nights', 'sleepypod_stephen_asleep_temperature_all_nights'],
-    ['dawn', 'Tonight', 'sleepypod_stephen_temperature_tonight'],
+    ['dawn', 'Tonight', null],
     ['dawn', 'All Nights', 'sleepypod_stephen_dawn_temperature_all_nights'],
-  ])('prompts during %s and routes %s through %s', async (phase, choice, service) => {
+  ])('commits Tonight during %s before applying %s', async (phase, choice, allNightsService) => {
     setupStephenSleepypodLevelControl(phase)
     render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
 
@@ -2473,16 +2473,24 @@ describe('DashboardViewPage', () => {
     await waitFor(() => expect(within(scopeDialog).getByRole('button', { name: 'Tonight' })).toHaveFocus())
     expect(within(scopeDialog).getByRole('button', { name: 'Tonight' }).querySelector('[data-modal-disclosure]')).not.toBeInTheDocument()
     expect(within(scopeDialog).getByRole('button', { name: 'All Nights' }).querySelector('[data-modal-disclosure]')).not.toBeInTheDocument()
-    expect(mockCallServiceCalls).toEqual([])
+    const tonightCall = {
+      domain: 'script',
+      service: 'sleepypod_stephen_temperature_tonight',
+      serviceData: { level: -3 },
+    }
+    expect(mockCallServiceCalls).toEqual([tonightCall])
 
     fireEvent.click(within(scopeDialog).getByRole('button', { name: choice }))
 
     expect(targetSlider).toHaveAttribute('aria-valuenow', '-3')
-    await waitFor(() => expect(mockCallServiceCalls).toEqual([{
-      domain: 'script',
-      service,
-      serviceData: { level: -3 },
-    }]))
+    const expectedCalls = allNightsService
+      ? [tonightCall, {
+          domain: 'script',
+          service: allNightsService,
+          serviceData: { level: -3 },
+        }]
+      : [tonightCall]
+    await waitFor(() => expect(mockCallServiceCalls).toEqual(expectedCalls))
     await waitFor(() => expect(scopeDialog).toHaveAttribute('data-state', 'closed'))
     expect(scopeDialog).toHaveAttribute('data-closing', 'true')
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Set Bed Temperature' })).not.toBeInTheDocument())
@@ -2491,7 +2499,7 @@ describe('DashboardViewPage', () => {
     expect(mockCallServiceCalls.some((call) => call.domain === 'number')).toBe(false)
   })
 
-  it('cancels active-phase temperature changes from the action, close button, and backdrop', async () => {
+  it('keeps Tonight changes when the scope prompt is dismissed from the action, close button, or backdrop', async () => {
     setupStephenSleepypodLevelControl('asleep')
     render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
 
@@ -2499,35 +2507,45 @@ describe('DashboardViewPage', () => {
     const bedDialog = await screen.findByRole('dialog', { name: "Stephen's Bed" })
     const targetSlider = within(bedDialog).getByRole('slider', { name: "Stephen's Bed target level" })
 
-    const openScopePrompt = async () => {
+    const openScopePrompt = async (expectedValue: number) => {
       fireEvent.keyDown(targetSlider, { key: 'ArrowLeft' })
-      expect(targetSlider).toHaveAttribute('aria-valuenow', '-3')
-      return screen.findByRole('dialog', { name: 'Set Bed Temperature' })
+      expect(targetSlider).toHaveAttribute('aria-valuenow', String(expectedValue))
+      const scopeDialog = await screen.findByRole('dialog', { name: 'Set Bed Temperature' })
+      expect(mockCallServiceCalls.at(-1)).toEqual({
+        domain: 'script',
+        service: 'sleepypod_stephen_temperature_tonight',
+        serviceData: { level: expectedValue },
+      })
+      return scopeDialog
     }
 
-    let scopeDialog = await openScopePrompt()
+    let scopeDialog = await openScopePrompt(-3)
     fireEvent.click(within(scopeDialog).getByRole('button', { name: 'Cancel' }))
     expect(scopeDialog).toHaveTextContent("Stephen's Bed • Asleep • -3")
-    expect(targetSlider).toHaveAttribute('aria-valuenow', '-2')
+    expect(targetSlider).toHaveAttribute('aria-valuenow', '-3')
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Set Bed Temperature' })).not.toBeInTheDocument())
     await waitFor(() => expect(targetSlider).toHaveFocus())
 
-    scopeDialog = await openScopePrompt()
+    scopeDialog = await openScopePrompt(-4)
     fireEvent.click(within(scopeDialog).getByRole('button', { name: 'Close' }))
-    expect(targetSlider).toHaveAttribute('aria-valuenow', '-2')
+    expect(targetSlider).toHaveAttribute('aria-valuenow', '-4')
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Set Bed Temperature' })).not.toBeInTheDocument())
     await waitFor(() => expect(targetSlider).toHaveFocus())
 
-    scopeDialog = await openScopePrompt()
+    scopeDialog = await openScopePrompt(-5)
     const overlays = document.querySelectorAll('[data-modal-sheet-overlay]')
     fireEvent.pointerDown(overlays[overlays.length - 1])
-    expect(targetSlider).toHaveAttribute('aria-valuenow', '-2')
+    expect(targetSlider).toHaveAttribute('aria-valuenow', '-5')
     await waitFor(() => expect(scopeDialog).toHaveAttribute('data-state', 'closed'))
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Set Bed Temperature' })).not.toBeInTheDocument())
     await waitFor(() => expect(targetSlider).toHaveFocus())
 
-    expect(mockCallServiceCalls).toEqual([])
-    expect(within(bedDialog).getByRole('region', { name: /Stephen's Bed thermostat Cooling -2/i })).toBeInTheDocument()
+    expect(mockCallServiceCalls).toEqual([-3, -4, -5].map((level) => ({
+      domain: 'script',
+      service: 'sleepypod_stephen_temperature_tonight',
+      serviceData: { level },
+    })))
+    expect(within(bedDialog).getByRole('region', { name: /Stephen's Bed thermostat Cooling -5/i })).toBeInTheDocument()
   })
 
   it('keeps active-phase ring taps and drag commits visible while the scope prompt is open', async () => {
@@ -2569,25 +2587,33 @@ describe('DashboardViewPage', () => {
       expect(targetSlider).toHaveAttribute('aria-valuenow', '-3')
       expect(within(bedDialog).getByRole('region', { hidden: true, name: /Stephen's Bed thermostat Cooling -3/i })).toBeInTheDocument()
       let scopeDialog = screen.getByRole('dialog', { name: 'Set Bed Temperature' })
-      expect(mockCallServiceCalls).toEqual([])
+      expect(mockCallServiceCalls).toEqual([{
+        domain: 'script',
+        service: 'sleepypod_stephen_temperature_tonight',
+        serviceData: { level: -3 },
+      }])
 
       fireEvent.click(within(scopeDialog).getByRole('button', { name: 'Cancel' }))
-      expect(targetSlider).toHaveAttribute('aria-valuenow', '-2')
+      expect(targetSlider).toHaveAttribute('aria-valuenow', '-3')
       await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Set Bed Temperature' })).not.toBeInTheDocument())
 
-      fireEvent.pointerDown(targetSlider, { ...clientPoint(-2), pointerId: 52 })
+      fireEvent.pointerDown(targetSlider, { ...clientPoint(-3), pointerId: 52 })
       fireEvent.pointerMove(targetSlider, { ...clientPoint(-5), pointerId: 52 })
       fireEvent.pointerUp(targetSlider, { ...clientPoint(-5), pointerId: 52 })
 
       expect(targetSlider).toHaveAttribute('aria-valuenow', '-5')
       expect(within(bedDialog).getByRole('region', { hidden: true, name: /Stephen's Bed thermostat Cooling -5/i })).toBeInTheDocument()
       scopeDialog = screen.getByRole('dialog', { name: 'Set Bed Temperature' })
-      expect(mockCallServiceCalls).toEqual([])
+      expect(mockCallServiceCalls).toEqual([-3, -5].map((level) => ({
+        domain: 'script',
+        service: 'sleepypod_stephen_temperature_tonight',
+        serviceData: { level },
+      })))
 
       fireEvent.click(within(scopeDialog).getByRole('button', { name: 'Cancel' }))
-      expect(targetSlider).toHaveAttribute('aria-valuenow', '-2')
+      expect(targetSlider).toHaveAttribute('aria-valuenow', '-5')
       await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Set Bed Temperature' })).not.toBeInTheDocument())
-      expect(mockCallServiceCalls).toEqual([])
+      expect(mockCallServiceCalls).toHaveLength(2)
     } finally {
       rectSpy.mockRestore()
     }
@@ -2611,7 +2637,11 @@ describe('DashboardViewPage', () => {
     })
 
     expect(parentClose).toHaveFocus()
-    expect(mockCallServiceCalls).toEqual([])
+    expect(mockCallServiceCalls).toEqual([{
+      domain: 'script',
+      service: 'sleepypod_stephen_temperature_tonight',
+      serviceData: { level: -3 },
+    }])
   })
 
   it('closes a stale scope prompt when HA advances the schedule phase', async () => {
@@ -2632,11 +2662,15 @@ describe('DashboardViewPage', () => {
 
     await waitFor(() => expect(scopeDialog).toHaveAttribute('data-state', 'closed'))
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Set Bed Temperature' })).not.toBeInTheDocument())
-    expect(mockCallServiceCalls).toEqual([])
+    expect(mockCallServiceCalls).toEqual([{
+      domain: 'script',
+      service: 'sleepypod_stephen_temperature_tonight',
+      serviceData: { level: -3 },
+    }])
     expect(within(bedDialog).getByRole('region', { name: /Stephen's Bed thermostat Cooling -2/i })).toBeInTheDocument()
   })
 
-  it('closes the scope prompt without a command when the SleepyPod adapter becomes unavailable', async () => {
+  it('closes the scope prompt without a second command when the SleepyPod adapter becomes unavailable', async () => {
     setupStephenSleepypodLevelControl('bedtime')
     const view = render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
 
@@ -2660,7 +2694,11 @@ describe('DashboardViewPage', () => {
 
       expect(scopeDialog).toHaveAttribute('data-state', 'closed')
       fireEvent.click(retainedTonightAction)
-      expect(mockCallServiceCalls).toEqual([])
+      expect(mockCallServiceCalls).toEqual([{
+        domain: 'script',
+        service: 'sleepypod_stephen_temperature_tonight',
+        serviceData: { level: -3 },
+      }])
     } finally {
       vi.clearAllTimers()
       vi.useRealTimers()
