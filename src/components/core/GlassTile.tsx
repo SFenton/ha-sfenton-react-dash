@@ -17,7 +17,9 @@ type GlassTileStyle = CSSProperties & {
 export interface GlassTileProps {
   title: string
   icon: IconKey | string | ReactNode
+  announcement?: string
   ariaLabel?: string
+  ariaDisabled?: boolean
   backgroundColor?: string
   controlRole?: 'switch'
   detailAutoFocus?: boolean
@@ -41,7 +43,9 @@ export interface GlassTileProps {
 export function GlassTile({
   title,
   icon,
+  announcement,
   ariaLabel,
+  ariaDisabled = false,
   backgroundColor,
   controlRole,
   detailAutoFocus = false,
@@ -115,16 +119,22 @@ export function GlassTile({
       {showDisclosure && accessorySemantics && <SurfaceAccessory semantics={accessorySemantics} size={variant === 'header' ? 'compact' : 'standard'} />}
     </>
   )
+  const liveAnnouncement = announcement !== undefined ? (
+    <span aria-atomic="true" aria-live="polite" className={styles.visuallyHidden} data-live-announcement="true" role="status">
+      {announcement}
+    </span>
+  ) : null
 
   if (onClick) {
     const button = (
       <button
         aria-checked={semantics ? semanticChecked : controlRole === 'switch' ? pressed : undefined}
+        aria-disabled={disabled || ariaDisabled ? 'true' : undefined}
         aria-label={resolvedAccessibleName}
         aria-pressed={semantics ? semanticPressed : controlRole === 'switch' ? undefined : pressed}
         className={className}
         data-action-kind={semantics?.kind}
-        data-disabled={disabled ? 'true' : 'false'}
+        data-disabled={disabled || ariaDisabled ? 'true' : 'false'}
         data-icon={iconName}
         data-icon-color={iconColor}
         data-muted={isOff ? 'true' : 'false'}
@@ -146,19 +156,30 @@ export function GlassTile({
 
     if (trailingControl) {
       return (
-        <div className={styles.controlShell} data-disclosure={showDisclosure ? 'true' : 'false'}>
-          {button}
-          <div className={styles.trailingControl}>{trailingControl}</div>
-        </div>
+        <>
+          <div className={styles.controlShell} data-disclosure={showDisclosure ? 'true' : 'false'}>
+            {button}
+            <div className={styles.trailingControl}>{trailingControl}</div>
+          </div>
+          {liveAnnouncement}
+        </>
       )
     }
 
-    return button
+    return (
+      <>
+        {button}
+        {liveAnnouncement}
+      </>
+    )
   }
 
   return (
-    <div aria-label={resolvedAccessibleName} className={className} data-icon={iconName} data-icon-color={iconColor} data-muted={isOff ? 'true' : 'false'} data-progress={progressValue === undefined ? undefined : String(Math.round(progressValue))} data-tone={tone} data-variant={variant} style={resolvedStyle}>
-      {content}
-    </div>
+    <>
+      <div aria-label={resolvedAccessibleName} className={className} data-icon={iconName} data-icon-color={iconColor} data-muted={isOff ? 'true' : 'false'} data-progress={progressValue === undefined ? undefined : String(Math.round(progressValue))} data-tone={tone} data-variant={variant} style={resolvedStyle}>
+        {content}
+      </div>
+      {liveAnnouncement}
+    </>
   )
 }

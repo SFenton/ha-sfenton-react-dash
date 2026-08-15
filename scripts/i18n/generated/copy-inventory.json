@@ -954,6 +954,30 @@
       "words": 10
     },
     {
+      "characters": 14,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en.json",
+      "id": "42a451b606213ef5",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Sending Close…",
+      "words": 2
+    },
+    {
+      "characters": 13,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en.json",
+      "id": "6a8797b0eafa7b8f",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Sending Open…",
+      "words": 2
+    },
+    {
       "characters": 92,
       "context": "catalog-copy",
       "file": "src/i18n/locales/en/modals/recipe.json",
@@ -6194,7 +6218,7 @@
       "file": "src/components/hass/GuestPresenceSecurity.tsx",
       "id": "308add4305520b4f",
       "lines": [
-        217
+        218
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -7553,7 +7577,7 @@
       "file": "src/components/hass/GuestPresenceSecurity.tsx",
       "id": "dcd0caed3256635a",
       "lines": [
-        19
+        20
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -7567,7 +7591,7 @@
       "file": "src/components/hass/GuestPresenceSecurity.tsx",
       "id": "f95f0298ff74888e",
       "lines": [
-        30
+        31
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -7581,7 +7605,7 @@
       "file": "src/components/hass/GuestPresenceSecurity.tsx",
       "id": "d349cc27995183f8",
       "lines": [
-        31
+        32
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -9239,7 +9263,7 @@
       "file": "src/components/hass/GuestPresenceSecurity.tsx",
       "id": "84cf65c04df61316",
       "lines": [
-        27
+        28
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -9253,7 +9277,7 @@
       "file": "src/components/hass/GuestPresenceSecurity.tsx",
       "id": "0cc2a4c10f468fc9",
       "lines": [
-        28
+        29
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -9267,7 +9291,7 @@
       "file": "src/components/hass/GuestPresenceSecurity.tsx",
       "id": "f189ce9fb5802956",
       "lines": [
-        32
+        33
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -11796,7 +11820,7 @@
       "file": "src/components/hass/GuestPresenceSecurity.tsx",
       "id": "67d90385c12828fb",
       "lines": [
-        29
+        30
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -13837,8 +13861,8 @@
       "file": "src/components/hass/GuestPresenceSecurity.tsx",
       "id": "4115b8a2556474dd",
       "lines": [
-        82,
-        83
+        83,
+        84
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -15118,7 +15142,7 @@
       "file": "src/components/hass/GuestPresenceSecurity.tsx",
       "id": "c4dafbe418a6f185",
       "lines": [
-        70
+        71
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -15146,7 +15170,7 @@
       "file": "src/components/hass/GuestPresenceSecurity.tsx",
       "id": "46180a3acde3dfde",
       "lines": [
-        70
+        71
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -15332,7 +15356,7 @@
       "file": "src/components/hass/SecurityDashboard.tsx",
       "id": "33bd5e080a34bb75",
       "lines": [
-        59
+        60
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -15346,7 +15370,7 @@
       "file": "src/components/hass/SecurityDashboard.tsx",
       "id": "62dc104706115cf5",
       "lines": [
-        59
+        60
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -15360,7 +15384,7 @@
       "file": "src/components/hass/SecurityDashboard.tsx",
       "id": "94bc0126673c26bb",
       "lines": [
-        59
+        60
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -15374,7 +15398,7 @@
       "file": "src/components/hass/SecurityDashboard.tsx",
       "id": "e3e77852203250ca",
       "lines": [
-        59
+        60
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -15388,7 +15412,7 @@
       "file": "src/components/hass/SecurityDashboard.tsx",
       "id": "e0d0b9a18f53ffd8",
       "lines": [
-        114
+        130
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -15402,7 +15426,7 @@
       "file": "src/components/hass/SecurityDashboard.tsx",
       "id": "8b930c30c56fbd0a",
       "lines": [
-        113
+        129
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -15416,7 +15440,7 @@
       "file": "src/components/hass/SecurityDashboard.tsx",
       "id": "9fde3fc95b4d235a",
       "lines": [
-        112
+        128
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -15430,11 +15454,11 @@
       "file": "src/components/hass/SecurityDashboard.tsx",
       "id": "67d3c06115ce7f77",
       "lines": [
-        112,
-        113,
-        114,
-        116,
-        117
+        128,
+        129,
+        130,
+        132,
+        133
       ],
       "occurrences": 5,
       "origin": "legacy",
@@ -20774,7 +20798,7 @@
       "file": "src/components/hass/GuestPresenceSecurity.tsx",
       "id": "add6d358e2dc0773",
       "lines": [
-        290
+        291
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -20986,7 +21010,7 @@
       "file": "src/components/hass/GuestPresenceSecurity.tsx",
       "id": "f889af4574591d03",
       "lines": [
-        252
+        253
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -21014,7 +21038,7 @@
       "file": "src/components/hass/GuestPresenceSecurity.tsx",
       "id": "3c374a9cc93ec778",
       "lines": [
-        240
+        241
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -21056,7 +21080,7 @@
       "file": "src/components/hass/GuestPresenceSecurity.tsx",
       "id": "8005b89d4ea0abd6",
       "lines": [
-        325
+        326
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -21070,7 +21094,7 @@
       "file": "src/components/hass/GuestPresenceSecurity.tsx",
       "id": "a91ee78c6b6390c2",
       "lines": [
-        226
+        227
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -21507,7 +21531,7 @@
       "file": "src/components/hass/GuestPresenceSecurity.tsx",
       "id": "6858976c1904d1af",
       "lines": [
-        276
+        277
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -21549,7 +21573,7 @@
       "file": "src/components/hass/GuestPresenceSecurity.tsx",
       "id": "e6360b82bc05b21e",
       "lines": [
-        264
+        265
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -22093,8 +22117,8 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "ec1326741229dcbe",
       "lines": [
-        670,
-        730
+        668,
+        728
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -22108,12 +22132,12 @@
       "file": "src/constants/roomPages.ts",
       "id": "10ad54583f660c70",
       "lines": [
-        117,
-        137,
-        159,
-        209,
-        273,
-        292
+        119,
+        139,
+        161,
+        211,
+        275,
+        294
       ],
       "occurrences": 6,
       "origin": "legacy",
@@ -22127,7 +22151,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "d73c5d2d06e89a91",
       "lines": [
-        671
+        669
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -22155,12 +22179,12 @@
       "file": "src/constants/roomPages.ts",
       "id": "213240917dd1e281",
       "lines": [
-        112,
-        133,
-        149,
-        204,
-        268,
-        287
+        114,
+        135,
+        151,
+        206,
+        270,
+        289
       ],
       "occurrences": 6,
       "origin": "legacy",
@@ -22259,7 +22283,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "3a41d68f943d2b92",
       "lines": [
-        694
+        692
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -22273,7 +22297,7 @@
       "file": "src/constants/roomPages.ts",
       "id": "fad8530b8ad959b2",
       "lines": [
-        156
+        158
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -22301,7 +22325,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "d703676bd015bf74",
       "lines": [
-        708
+        706
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -22315,8 +22339,8 @@
       "file": "src/constants/roomPages.ts",
       "id": "dc36c783e0f602a9",
       "lines": [
-        228,
-        324
+        230,
+        326
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -22428,7 +22452,7 @@
       "file": "src/constants/roomPages.ts",
       "id": "f569bf23a22e9a6b",
       "lines": [
-        248
+        250
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -22559,7 +22583,7 @@
       "file": "src/constants/roomPages.ts",
       "id": "af20fe4c1c4473fe",
       "lines": [
-        256
+        258
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -22587,7 +22611,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "6ff9075956c04fac",
       "lines": [
-        685
+        683
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -22755,7 +22779,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "53ecb1d5324cee35",
       "lines": [
-        624
+        622
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -22769,8 +22793,8 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "77857ebec941f33e",
       "lines": [
-        652,
-        654
+        650,
+        652
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -22910,7 +22934,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "3e698516ba34479a",
       "lines": [
-        658
+        656
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -22924,31 +22948,31 @@
       "file": "src/constants/roomPages.ts",
       "id": "cb69c60498640f8c",
       "lines": [
-        109,
-        115,
-        130,
-        135,
-        146,
-        157,
-        178,
-        182,
-        190,
-        201,
-        207,
-        223,
-        231,
-        240,
-        244,
-        265,
-        271,
-        284,
-        290,
-        310,
-        340,
-        343,
-        355,
-        358,
-        371
+        111,
+        117,
+        132,
+        137,
+        148,
+        159,
+        180,
+        184,
+        192,
+        203,
+        209,
+        225,
+        233,
+        242,
+        246,
+        267,
+        273,
+        286,
+        292,
+        312,
+        342,
+        345,
+        357,
+        360,
+        373
       ],
       "occurrences": 25,
       "origin": "legacy",
@@ -23194,7 +23218,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "685563287d276388",
       "lines": [
-        636
+        634
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -23236,8 +23260,8 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "e6a6cda7c6aa6249",
       "lines": [
-        668,
-        728
+        666,
+        726
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -23251,9 +23275,9 @@
       "file": "src/constants/roomPages.ts",
       "id": "e5eb4b4b2ca5c8fb",
       "lines": [
-        119,
-        275,
-        301
+        121,
+        277,
+        303
       ],
       "occurrences": 3,
       "origin": "legacy",
@@ -23297,7 +23321,7 @@
       "file": "src/constants/roomPages.ts",
       "id": "46f5922b65dc94b2",
       "lines": [
-        236
+        238
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -23410,7 +23434,7 @@
       "file": "src/constants/roomPages.ts",
       "id": "998251da63232d17",
       "lines": [
-        229
+        231
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -23424,7 +23448,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "28bc98524c3d8bd6",
       "lines": [
-        710
+        708
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -23438,7 +23462,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "5fdf2fd62cff671e",
       "lines": [
-        711
+        709
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -23497,12 +23521,12 @@
       "file": "src/constants/roomPages.ts",
       "id": "78f42ddda38c1911",
       "lines": [
-        225,
-        242,
-        267,
-        286,
-        312,
-        372
+        227,
+        244,
+        269,
+        288,
+        314,
+        374
       ],
       "occurrences": 6,
       "origin": "legacy",
@@ -23545,7 +23569,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "954f453e344f3166",
       "lines": [
-        655
+        653
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -23559,8 +23583,8 @@
       "file": "src/constants/roomPages.ts",
       "id": "31a323e61b78a122",
       "lines": [
-        253,
-        321
+        255,
+        323
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -23603,7 +23627,7 @@
       "file": "src/constants/roomPages.ts",
       "id": "160d8c76f54fa824",
       "lines": [
-        306
+        308
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -23674,7 +23698,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "4408eb7193318654",
       "lines": [
-        656
+        654
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -23716,7 +23740,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "5991a8b861119353",
       "lines": [
-        627
+        625
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -23744,7 +23768,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "f862366d1c192ccb",
       "lines": [
-        751
+        749
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -23758,7 +23782,7 @@
       "file": "src/constants/roomPages.ts",
       "id": "e32304477b55085f",
       "lines": [
-        326
+        328
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -23860,7 +23884,7 @@
       "file": "src/components/hass/GuestPresenceSecurity.tsx",
       "id": "09765a84af5de9d1",
       "lines": [
-        218
+        219
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -23920,7 +23944,7 @@
       "file": "src/constants/roomPages.ts",
       "id": "53ded68f5de1da29",
       "lines": [
-        366
+        368
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -24049,7 +24073,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "27d95ef439328ad5",
       "lines": [
-        642
+        640
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -24063,7 +24087,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "e1cd0be909f35702",
       "lines": [
-        643
+        641
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -24077,8 +24101,8 @@
       "file": "src/constants/roomPages.ts",
       "id": "92c65024165d12dd",
       "lines": [
-        345,
-        360
+        347,
+        362
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -24331,7 +24355,7 @@
       "file": "src/components/hass/GuestPresenceSecurity.tsx",
       "id": "219e8893deb20dc3",
       "lines": [
-        184
+        185
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -24404,7 +24428,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "e4df65662105e27f",
       "lines": [
-        626
+        624
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -24461,7 +24485,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "9b78cbee27ab84e5",
       "lines": [
-        639
+        637
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -24489,7 +24513,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "d35f48497b02762b",
       "lines": [
-        748
+        746
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -24503,7 +24527,7 @@
       "file": "src/constants/roomPages.ts",
       "id": "0a37d49f38544373",
       "lines": [
-        318
+        320
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -24559,7 +24583,7 @@
       "file": "src/constants/roomPages.ts",
       "id": "0489cde73cb0a88e",
       "lines": [
-        328
+        330
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -24573,7 +24597,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "0e1855e2170c36db",
       "lines": [
-        717
+        715
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -24587,7 +24611,7 @@
       "file": "src/constants/roomPages.ts",
       "id": "cd44811d9175e8f3",
       "lines": [
-        255
+        257
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -24615,7 +24639,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "d5e6fb6e292473ac",
       "lines": [
-        719
+        717
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -24687,7 +24711,7 @@
       "file": "src/components/hass/GuestPresenceSecurity.tsx",
       "id": "b75b99f6e7d075f8",
       "lines": [
-        65
+        66
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -24731,7 +24755,7 @@
       "file": "src/constants/roomPages.ts",
       "id": "ca58578165c69bc7",
       "lines": [
-        336
+        338
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -24802,7 +24826,7 @@
       "file": "src/components/hass/GuestPresenceSecurity.tsx",
       "id": "e5e45ccbfd04633c",
       "lines": [
-        327
+        328
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -24849,7 +24873,7 @@
       "file": "src/constants/roomPages.ts",
       "id": "7fb2413d3d6b4db0",
       "lines": [
-        126
+        128
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -24991,7 +25015,7 @@
       "file": "src/constants/roomPages.ts",
       "id": "5c457f5f270665a0",
       "lines": [
-        174
+        176
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -25119,7 +25143,7 @@
       "file": "src/constants/roomPages.ts",
       "id": "14fcc64429350ec5",
       "lines": [
-        186
+        188
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -25287,7 +25311,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "9fb41891f1d29891",
       "lines": [
-        687
+        685
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -25301,7 +25325,7 @@
       "file": "src/constants/roomPages.ts",
       "id": "9f0a62dcd85417df",
       "lines": [
-        161
+        163
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -25413,7 +25437,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "3e09a1e5034b9369",
       "lines": [
-        721
+        719
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -25458,7 +25482,7 @@
       "file": "src/constants/roomPages.ts",
       "id": "d9fc83002d411594",
       "lines": [
-        219
+        221
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -25583,24 +25607,10 @@
     {
       "characters": 9,
       "context": "title",
-      "file": "src/constants/portedDashboard.ts",
-      "id": "f9350b2dd3c8ef04",
-      "lines": [
-        752
-      ],
-      "occurrences": 1,
-      "origin": "legacy",
-      "placeholders": [],
-      "value": "Left Door",
-      "words": 2
-    },
-    {
-      "characters": 9,
-      "context": "title",
       "file": "src/constants/roomPages.ts",
       "id": "3d870fc7d3280ed1",
       "lines": [
-        329
+        331
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -25637,32 +25647,18 @@
       "words": 3
     },
     {
-      "characters": 16,
-      "context": "title",
-      "file": "src/constants/portedDashboard.ts",
-      "id": "84b324e2b03f0f38",
-      "lines": [
-        619
-      ],
-      "occurrences": 1,
-      "origin": "legacy",
-      "placeholders": [],
-      "value": "Left Garage Door",
-      "words": 3
-    },
-    {
       "characters": 5,
       "context": "title",
       "file": "src/constants/roomPages.ts",
       "id": "d86294da939fced3",
       "lines": [
-        177,
-        200,
-        239,
-        309,
-        339,
-        354,
-        369
+        179,
+        202,
+        241,
+        311,
+        341,
+        356,
+        371
       ],
       "occurrences": 7,
       "origin": "legacy",
@@ -25704,14 +25700,14 @@
       "file": "src/constants/roomPages.ts",
       "id": "e88da6803b448745",
       "lines": [
-        108,
-        129,
-        145,
-        189,
-        222,
-        251,
-        264,
-        283
+        110,
+        131,
+        147,
+        191,
+        224,
+        253,
+        266,
+        285
       ],
       "occurrences": 8,
       "origin": "legacy",
@@ -25798,7 +25794,7 @@
       "lines": [
         584,
         600,
-        761
+        757
       ],
       "occurrences": 3,
       "origin": "legacy",
@@ -25812,7 +25808,7 @@
       "file": "src/constants/roomPages.ts",
       "id": "bd25b855e1d7e485",
       "lines": [
-        105
+        107
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -25925,7 +25921,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "eed3ba37ea31c7c0",
       "lines": [
-        763
+        759
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -25939,7 +25935,7 @@
       "file": "src/constants/roomPages.ts",
       "id": "cc579d7d51086309",
       "lines": [
-        120
+        122
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -25995,7 +25991,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "0f7a0d7196729ff4",
       "lines": [
-        629
+        627
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -26009,7 +26005,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "a82484c3657c2688",
       "lines": [
-        649
+        647
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -26079,7 +26075,7 @@
       "file": "src/constants/roomPages.ts",
       "id": "5b368ff769a88e91",
       "lines": [
-        119
+        121
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -26121,7 +26117,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "0fa1f4608243be69",
       "lines": [
-        641
+        639
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -26149,7 +26145,7 @@
       "file": "src/components/hass/GuestPresenceSecurity.tsx",
       "id": "6374dbb04b807170",
       "lines": [
-        66
+        67
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -26193,7 +26189,7 @@
       "file": "src/constants/roomPages.ts",
       "id": "cd28d4234ebc2b28",
       "lines": [
-        351
+        353
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -26309,7 +26305,7 @@
       "file": "src/constants/roomPages.ts",
       "id": "d3ed8ea9db61243c",
       "lines": [
-        142
+        144
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -26449,8 +26445,8 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "784983c328b87781",
       "lines": [
-        676,
-        693
+        674,
+        691
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -26464,7 +26460,7 @@
       "file": "src/constants/roomPages.ts",
       "id": "024195433666bf27",
       "lines": [
-        156
+        158
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -26492,7 +26488,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "16c302dba785c177",
       "lines": [
-        737
+        735
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -26552,8 +26548,8 @@
       "file": "src/constants/roomPages.ts",
       "id": "bf5ce194770b6a71",
       "lines": [
-        261,
-        275
+        263,
+        277
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -26693,7 +26689,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "8b6dcffa347ebf64",
       "lines": [
-        770
+        766
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -26707,7 +26703,7 @@
       "file": "src/constants/roomPages.ts",
       "id": "45180750f9788078",
       "lines": [
-        296
+        298
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -26927,21 +26923,21 @@
       "file": "src/constants/roomPages.ts",
       "id": "4b94a82251b38c2a",
       "lines": [
-        110,
-        131,
-        147,
-        179,
-        191,
-        202,
-        224,
-        241,
-        252,
-        266,
-        285,
-        311,
-        341,
-        356,
-        370
+        112,
+        133,
+        149,
+        181,
+        193,
+        204,
+        226,
+        243,
+        254,
+        268,
+        287,
+        313,
+        343,
+        358,
+        372
       ],
       "occurrences": 15,
       "origin": "legacy",
@@ -27030,7 +27026,7 @@
       "file": "src/constants/roomPages.ts",
       "id": "e12366e740db189e",
       "lines": [
-        197
+        199
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -27116,7 +27112,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "0096a2684b8ab2a7",
       "lines": [
-        699
+        697
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -27130,7 +27126,7 @@
       "file": "src/constants/roomPages.ts",
       "id": "ca8456c01b575b68",
       "lines": [
-        211
+        213
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -27303,7 +27299,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "49924f082d199fd3",
       "lines": [
-        657
+        655
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -27363,7 +27359,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "c7a9dc2027821337",
       "lines": [
-        720
+        718
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -27609,7 +27605,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "2ed96b23c14183c5",
       "lines": [
-        740
+        738
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -27651,8 +27647,8 @@
       "file": "src/constants/roomPages.ts",
       "id": "616d8b3c55d3661e",
       "lines": [
-        121,
-        299
+        123,
+        301
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -27750,8 +27746,8 @@
       "file": "src/constants/roomPages.ts",
       "id": "543b01337f9996a2",
       "lines": [
-        120,
-        294
+        122,
+        296
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -27818,24 +27814,10 @@
     {
       "characters": 10,
       "context": "title",
-      "file": "src/constants/portedDashboard.ts",
-      "id": "b50805c1e7535787",
-      "lines": [
-        753
-      ],
-      "occurrences": 1,
-      "origin": "legacy",
-      "placeholders": [],
-      "value": "Right Door",
-      "words": 2
-    },
-    {
-      "characters": 10,
-      "context": "title",
       "file": "src/constants/roomPages.ts",
       "id": "9615414135ba4377",
       "lines": [
-        330
+        332
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -27872,20 +27854,6 @@
       "words": 3
     },
     {
-      "characters": 17,
-      "context": "title",
-      "file": "src/constants/portedDashboard.ts",
-      "id": "8d119f789add8895",
-      "lines": [
-        620
-      ],
-      "occurrences": 1,
-      "origin": "legacy",
-      "placeholders": [],
-      "value": "Right Garage Door",
-      "words": 3
-    },
-    {
       "characters": 9,
       "context": "title",
       "file": "src/pages/DashboardViewPage.tsx",
@@ -27905,9 +27873,9 @@
       "file": "src/constants/roomPages.ts",
       "id": "aaf6dacc423657e1",
       "lines": [
-        119,
-        275,
-        301
+        121,
+        277,
+        303
       ],
       "occurrences": 3,
       "origin": "legacy",
@@ -28063,7 +28031,7 @@
       "file": "src/components/hass/GuestPresenceSecurity.tsx",
       "id": "1b1641cbc9ce5863",
       "lines": [
-        300
+        301
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -28189,7 +28157,7 @@
       "file": "src/constants/roomPages.ts",
       "id": "906003d93c7e38ad",
       "lines": [
-        152
+        154
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -28231,7 +28199,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "365688d118fbdc96",
       "lines": [
-        679
+        677
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -28329,7 +28297,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "9d090cbe5c57e525",
       "lines": [
-        689
+        687
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -28343,7 +28311,7 @@
       "file": "src/constants/roomPages.ts",
       "id": "11aa68cd60b82fe6",
       "lines": [
-        154
+        156
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -28399,7 +28367,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "3f85a796e800aeb4",
       "lines": [
-        702
+        700
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -28413,7 +28381,7 @@
       "file": "src/constants/roomPages.ts",
       "id": "6f0f56014f7327e2",
       "lines": [
-        213
+        215
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -28455,7 +28423,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "85b600355465add9",
       "lines": [
-        688
+        686
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -28469,7 +28437,7 @@
       "file": "src/constants/roomPages.ts",
       "id": "57a99dbf73a97fda",
       "lines": [
-        153
+        155
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -28525,7 +28493,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "cabcfbb4e7c58b47",
       "lines": [
-        701
+        699
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -28539,7 +28507,7 @@
       "file": "src/constants/roomPages.ts",
       "id": "b6474fa03b6e8c94",
       "lines": [
-        212
+        214
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -28637,7 +28605,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "431843c5700943bf",
       "lines": [
-        722
+        720
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -28665,7 +28633,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "9ff6cc4db0de18b5",
       "lines": [
-        741
+        739
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -28679,7 +28647,7 @@
       "file": "src/constants/roomPages.ts",
       "id": "92f9105ca784ce76",
       "lines": [
-        295
+        297
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -28726,8 +28694,8 @@
         348,
         512,
         610,
-        767,
-        769
+        763,
+        765
       ],
       "occurrences": 5,
       "origin": "legacy",
@@ -28741,8 +28709,8 @@
       "file": "src/constants/roomPages.ts",
       "id": "281773880aefbd22",
       "lines": [
-        280,
-        301
+        282,
+        303
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -28883,7 +28851,7 @@
       "file": "src/constants/roomPages.ts",
       "id": "295562204a11e697",
       "lines": [
-        300
+        302
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -28897,7 +28865,7 @@
       "file": "src/constants/roomPages.ts",
       "id": "b368808624621dae",
       "lines": [
-        300
+        302
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -28940,8 +28908,8 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "28792bc9b36ae407",
       "lines": [
-        739,
-        771
+        737,
+        767
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -28955,7 +28923,7 @@
       "file": "src/constants/roomPages.ts",
       "id": "5317fd6408b51ed9",
       "lines": [
-        297
+        299
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -29067,8 +29035,8 @@
       "file": "src/constants/roomPages.ts",
       "id": "f8dc4e6123524f65",
       "lines": [
-        346,
-        361
+        348,
+        363
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -29314,7 +29282,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "6c4eae5f67097d94",
       "lines": [
-        628
+        626
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -29384,9 +29352,9 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "18405ca671ea3249",
       "lines": [
-        672,
-        731,
-        742
+        670,
+        729,
+        740
       ],
       "occurrences": 3,
       "origin": "legacy",
@@ -29449,14 +29417,14 @@
       "file": "src/constants/roomPages.ts",
       "id": "2a075358b69dc12c",
       "lines": [
-        136,
-        182,
-        208,
-        231,
-        244,
-        272,
-        344,
-        359
+        138,
+        184,
+        210,
+        233,
+        246,
+        274,
+        346,
+        361
       ],
       "occurrences": 15,
       "origin": "legacy",
@@ -29498,9 +29466,9 @@
       "file": "src/constants/roomPages.ts",
       "id": "3b9f4d1399f38390",
       "lines": [
-        116,
-        158,
-        291
+        118,
+        160,
+        293
       ],
       "occurrences": 3,
       "origin": "legacy",
@@ -29514,9 +29482,9 @@
       "file": "src/constants/roomPages.ts",
       "id": "19ae4b88acc9c92e",
       "lines": [
-        116,
-        158,
-        291
+        118,
+        160,
+        293
       ],
       "occurrences": 3,
       "origin": "legacy",
@@ -29546,10 +29514,10 @@
       "file": "src/constants/roomPages.ts",
       "id": "f7cde10d61c5a669",
       "lines": [
-        116,
-        158,
-        272,
-        291
+        118,
+        160,
+        274,
+        293
       ],
       "occurrences": 4,
       "origin": "legacy",
@@ -29591,7 +29559,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "569193166167ea05",
       "lines": [
-        750
+        748
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -29605,7 +29573,7 @@
       "file": "src/constants/roomPages.ts",
       "id": "2faec3f70718f2a6",
       "lines": [
-        325
+        327
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -29707,10 +29675,10 @@
       "file": "src/constants/roomPages.ts",
       "id": "1343a8a675e882cc",
       "lines": [
-        111,
-        132,
-        148,
-        180
+        113,
+        134,
+        150,
+        182
       ],
       "occurrences": 4,
       "origin": "legacy",
@@ -29739,7 +29707,7 @@
       "file": "src/constants/roomPages.ts",
       "id": "3232563c6385e9ed",
       "lines": [
-        203
+        205
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -29896,7 +29864,7 @@
       "file": "src/components/hass/GuestPresenceSecurity.tsx",
       "id": "225d807be88478be",
       "lines": [
-        32
+        33
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -30296,7 +30264,7 @@
       "file": "src/components/hass/SecurityDashboard.tsx",
       "id": "65cde9d52829dc4d",
       "lines": [
-        101
+        117
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -30310,7 +30278,7 @@
       "file": "src/components/hass/SecurityDashboard.tsx",
       "id": "30ee0698c311f5a4",
       "lines": [
-        102
+        118
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -30494,8 +30462,8 @@
       "file": "src/components/hass/SecurityDashboard.tsx",
       "id": "bd2715381003b764",
       "lines": [
-        96,
-        155
+        112,
+        171
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -30975,7 +30943,7 @@
       "file": "src/components/hass/GuestPresenceSecurity.tsx",
       "id": "db17cc54d6a011c9",
       "lines": [
-        28
+        29
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -30989,7 +30957,7 @@
       "file": "src/components/hass/GuestPresenceSecurity.tsx",
       "id": "0ea6778b44989331",
       "lines": [
-        27
+        28
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -32261,7 +32229,7 @@
       "file": "src/components/hass/GuestPresenceSecurity.tsx",
       "id": "3a4a457dd35af5e3",
       "lines": [
-        29
+        30
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -32837,7 +32805,7 @@
       "file": "src/components/hass/GuestPresenceSecurity.tsx",
       "id": "3aa88bb4897e5d21",
       "lines": [
-        196
+        197
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -32893,7 +32861,7 @@
       "file": "src/components/hass/GuestPresenceSecurity.tsx",
       "id": "a31162ee98dd9d81",
       "lines": [
-        196
+        197
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -33201,7 +33169,7 @@
       "file": "src/components/hass/GuestPresenceSecurity.tsx",
       "id": "da3882a6da381775",
       "lines": [
-        26
+        27
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -33259,7 +33227,7 @@
       "file": "src/components/hass/GuestPresenceSecurity.tsx",
       "id": "6b1bec9d3a35f080",
       "lines": [
-        31
+        32
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -33561,7 +33529,7 @@
       "file": "src/components/hass/GuestPresenceSecurity.tsx",
       "id": "e466734bc3a62156",
       "lines": [
-        30
+        31
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -33629,11 +33597,11 @@
     }
   ],
   "summary": {
-    "catalogRecords": 184,
+    "catalogRecords": 186,
     "documentRecords": 1,
-    "legacyOccurrences": 2622,
-    "legacyRecords": 2175,
-    "totalRecords": 2360
+    "legacyOccurrences": 2618,
+    "legacyRecords": 2171,
+    "totalRecords": 2358
   },
   "version": 1
 }

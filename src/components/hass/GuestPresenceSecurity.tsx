@@ -11,6 +11,7 @@ import { useOptimisticState } from '../../hooks/useOptimisticState'
 import { asEntityName, formatCompactEntityState, titleCaseState } from './entityState'
 import { SecurityControls, type SecurityControlsProps } from './SecurityControls'
 import { VacuumAutoCleanControlCard } from './VacuumAutoCleanControls'
+import { GarageDoorTile } from './GarageDoorTile'
 import styles from './GuestPresenceSecurity.module.css'
 
 export const GUEST_PRESENCE_SECURITY_HASH = '#guest-presence-security'
@@ -152,18 +153,18 @@ function BooleanControlCard({ color = SWITCH_ACTIVE_COLOR, entityId, icon, title
 
 function GarageDoorCard({ entityId, title }: { entityId: string; title: string }) {
   return (
-    <GuestServiceCard
-      activeStates={['closed']}
-      colorForState={(state) => {
-        if (state === 'closed') return SWITCH_ACTIVE_COLOR
-        if (state === 'closing' || state === 'opening') return SECURITY_COLOR
-        return DANGER_COLOR
+    <GarageDoorTile
+      backgroundColorForState={(state) => {
+        const color = state === 'closed'
+          ? SWITCH_ACTIVE_COLOR
+          : state === 'closing' || state === 'opening'
+            ? SECURITY_COLOR
+            : DANGER_COLOR
+        return cardBackgroundColor(color)
       }}
       entityId={entityId}
+      errorBackgroundColor={cardBackgroundColor(DANGER_COLOR)}
       icon="mdi:garage"
-      mutedWhenInactive={false}
-      nextStateForState={(state) => (state === 'closed' ? 'open' : 'closed')}
-      serviceForState={() => ({ domain: 'homeassistant', service: 'toggle' })}
       title={title}
     />
   )

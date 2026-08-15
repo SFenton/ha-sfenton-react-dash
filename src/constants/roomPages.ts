@@ -1,4 +1,5 @@
 import type { EntityBasicAction, EntityStateAction } from './portedDashboard'
+import { GARAGE_DOOR_ENTITY_IDS } from './garageDoors'
 import { MASTER_BEDROOM_HUMIDIFIER } from './humidifiers'
 import { MEDIA_REMOTE_CONFIGS, type MediaRemoteAction } from './mediaRemotes'
 
@@ -17,6 +18,7 @@ export interface RoomSourceCardConfig {
     whenStates: string[]
   }
   disabledStates?: string[]
+  control?: 'garage-door'
   entityId: string
   hash?: string
   icon: string
@@ -326,8 +328,8 @@ export const ROOM_PAGE_CONFIGS: Record<string, RoomPageSourceConfig> = {
         { title: 'Dryer', entityId: 'input_boolean.dryer_started_helper', icon: 'mdi:tumble-dryer', kind: 'laundry', showState: true },
       ] },
       { title: 'Garage Doors', cards: [
-        { title: 'Left Door', entityId: 'cover.left_door', icon: 'mdi:garage', kind: 'contact', showState: true, action: { type: 'toggle' } },
-        { title: 'Right Door', entityId: 'cover.right_door', icon: 'mdi:garage', kind: 'contact', showState: true, action: { type: 'toggle' } },
+        { title: 'Left Door', entityId: GARAGE_DOOR_ENTITY_IDS.left, icon: 'mdi:garage', kind: 'contact', showState: true, control: 'garage-door' },
+        { title: 'Right Door', entityId: GARAGE_DOOR_ENTITY_IDS.right, icon: 'mdi:garage', kind: 'contact', showState: true, control: 'garage-door' },
       ] },
     ],
     popupTemplates: ['door-popup-2'],

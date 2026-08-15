@@ -6,11 +6,14 @@ export interface MockEntity {
   state: string
 }
 
+export type MockConnectionStatus = 'connected' | 'disconnected' | 'pending' | 'pending-suspension' | 'suspended'
+
 export interface MockHassState {
   config: Record<string, unknown>
   connection: {
     sendMessagePromise: <T>(message: Record<string, unknown>) => Promise<T>
   }
+  connectionStatus: MockConnectionStatus
   entities: Record<string, MockEntity>
   hassUrl: string
   helpers: {
@@ -33,8 +36,53 @@ export const mockTodoUpdateMessages: Record<string, unknown>[] = []
 export const mockTodoItemsByEntity: Record<string, MockTodoItem[] | undefined> = {}
 export const mockDonetickTasksById: Record<number, MockDonetickTask | undefined> = {}
 const mockInventoryItemsByLocation: Record<string, Record<string, unknown>[] | undefined> = {}
+export type MockCallServiceOutcome = 'pending' | 'reject' | 'resolve'
+const mockCallServiceOutcomes = new Map<string, MockCallServiceOutcome>()
+const mockHassListeners = new Set<() => void>()
+let mockHassRevision = 0
 let mockDonetickTaskLoadDelayMs = 0
 let mockRecipeQueryDelayMs = 0
+
+export function getMockHassRevision() {
+  return mockHassRevision
+}
+
+export function subscribeMockHass(listener: () => void) {
+  mockHassListeners.add(listener)
+  return () => mockHassListeners.delete(listener)
+}
+
+function notifyMockHass() {
+  mockHassRevision += 1
+  for (const listener of mockHassListeners) listener()
+}
+
+function mockCallServiceOutcomeKey(domain: string, service: string) {
+  return `${domain}.${service}`
+}
+
+export function setMockCallServiceOutcome(domain: string, service: string, outcome: MockCallServiceOutcome) {
+  mockCallServiceOutcomes.set(mockCallServiceOutcomeKey(domain, service), outcome)
+}
+
+export function setMockConnectionStatus(status: MockConnectionStatus) {
+  mockState.connectionStatus = status
+  notifyMockHass()
+}
+
+export function setMockEntityAttribute(entityId: string, attribute: string, value: unknown) {
+  const target = mockEntities[entityId]
+  if (!target) return
+  target.attributes = { ...target.attributes, [attribute]: value }
+  notifyMockHass()
+}
+
+export function setMockEntityState(entityId: string, state: string) {
+  const target = mockEntities[entityId]
+  if (!target) return
+  target.state = state
+  notifyMockHass()
+}
 
 function configuredRecipeQueryDelayMs() {
   if (typeof window === 'undefined') return 0
@@ -685,6 +733,8 @@ type MockHassDebugApi = {
   calls: Record<string, unknown>[]
   freeSleepSchedules: () => Record<string, unknown>
   reset: () => void
+  setCallServiceOutcome: (domain: string, service: string, outcome: MockCallServiceOutcome) => void
+  setConnectionStatus: (status: MockConnectionStatus) => void
   setHumidifierSchedule: (schedule: Record<string, unknown>) => void
   setEntityAttribute: (entityId: string, attribute: string, value: unknown) => void
   setEntityState: (entityId: string, state: string) => void
@@ -700,18 +750,14 @@ function exposeMockHassDebugApi() {
   ;(window as unknown as { __mockHass?: MockHassDebugApi }).__mockHass = {
     calls: mockCallServiceCalls,
     freeSleepSchedules: () => cloneRecord(mockEntities['sensor.nightcanvasrestful_schedules'].attributes),
+    setCallServiceOutcome: setMockCallServiceOutcome,
+    setConnectionStatus: setMockConnectionStatus,
     setHumidifierSchedule: (schedule) => {
       mockHumidifierSchedule = cloneRecord(schedule) as unknown as typeof mockHumidifierSchedule
     },
-    setEntityAttribute: (entityId, attribute, value) => {
-      const target = mockEntities[entityId]
-      if (target) target.attributes = { ...target.attributes, [attribute]: value }
-    },
+    setEntityAttribute: setMockEntityAttribute,
     reset: resetMockHass,
-    setEntityState: (entityId, state) => {
-      const target = mockEntities[entityId]
-      if (target) target.state = state
-    },
+    setEntityState: setMockEntityState,
     setDonetickTask: (taskId, task) => {
       mockDonetickTasksById[taskId] = task
     },
@@ -1305,6 +1351,7 @@ function todoItems(entityId: unknown) {
 
 export function resetMockHass() {
   mockCallServiceCalls.length = 0
+  mockCallServiceOutcomes.clear()
   mockScheduleMessages.length = 0
   mockTodoUpdateMessages.length = 0
   for (const entityId of Object.keys(mockTodoItemsByEntity)) delete mockTodoItemsByEntity[entityId]
@@ -1312,6 +1359,7 @@ export function resetMockHass() {
   for (const location of Object.keys(mockInventoryItemsByLocation)) delete mockInventoryItemsByLocation[location]
   mockDonetickTaskLoadDelayMs = 0
   mockRecipeQueryDelayMs = 0
+  mockState.connectionStatus = 'connected'
   mockState.user = { id: '64089b5683944c39b4f944c8f76830b0', is_admin: true, name: 'Stephen' }
   mockEntities['sensor.nightcanvasrestful_schedules'].attributes = mockFreeSleepScheduleAttributes()
   mockEntities['sensor.sleepypod_stephen_schedule_phase'].state = 'outside'
@@ -1384,8 +1432,11 @@ export function resetMockHass() {
   mockEntities['binary_sensor.lv600s_humidifier_tank_removed'].state = 'off'
   mockEntities['binary_sensor.lv600s_humidifier_humidifying'].state = 'on'
   mockEntities['input_boolean.master_bedroom_humidifier_schedule_enabled'].state = 'off'
+  mockEntities['cover.left_door'].state = 'closed'
+  mockEntities['cover.right_door'].state = 'closed'
   mockHumidifierSchedule = emptyHumidifierSchedule()
   exposeMockHassDebugApi()
+  notifyMockHass()
 }
 
 export const mockState: MockHassState = {
@@ -1417,10 +1468,27 @@ export const mockState: MockHassState = {
       if (message.type === 'call_service' && message.domain === 'weather' && message.service === 'get_forecasts') {
         return { service_response: { 'weather.pirate_weather': { forecast: mockDailyWeatherForecast } } } as T
       }
+      if (message.type === 'call_service' && typeof message.domain === 'string' && typeof message.service === 'string') {
+        const target = isRecord(message.target) && typeof message.target.entity_id === 'string'
+          ? message.target.entity_id
+          : undefined
+        const params: Record<string, unknown> = {
+          domain: message.domain,
+          service: message.service,
+        }
+        if (target !== undefined) params.target = target
+        if (message.service_data !== undefined) params.serviceData = message.service_data
+        mockCallServiceCalls.push(params)
+        const outcome = mockCallServiceOutcomes.get(mockCallServiceOutcomeKey(message.domain, message.service)) ?? 'resolve'
+        if (outcome === 'pending') return new Promise<T>(() => undefined)
+        if (outcome === 'reject') return Promise.reject(new Error('Mock service rejection'))
+        return {} as T
+      }
       if (message.type === 'calendar/event/list') return { events: [] } as T
       return {} as T
     },
   },
+  connectionStatus: 'connected',
   entities: mockEntities,
   hassUrl: 'http://mock-hass.local',
   helpers: {

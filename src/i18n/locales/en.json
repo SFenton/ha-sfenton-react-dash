@@ -16,6 +16,10 @@
   "fields": {
     "days": "Days"
   },
+  "garageDoor": {
+    "sendingClose": "Sending Close…",
+    "sendingOpen": "Sending Open…"
+  },
   "states": {
     "active": "Active",
     "armedAway": "Armed Away",
