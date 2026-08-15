@@ -1,4 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test'
+import { valueToThermostatPoint } from '../src/components/hass/thermostatDialGeometry'
 
 type FreeSleepAlarmSnapshot = {
   enabled: boolean
@@ -6,6 +7,14 @@ type FreeSleepAlarmSnapshot = {
 }
 
 type FreeSleepSchedulesSnapshot = Partial<Record<'left' | 'right', Partial<Record<string, { alarms?: FreeSleepAlarmSnapshot[] }>>>>
+
+type SleepypodPromptFrameSample = {
+  promptMounted: boolean
+  rangeValue: string | null
+  readout: string | null
+  regionLabel: string | null
+  sliderValue: string | null
+}
 
 declare global {
   interface Window {
@@ -60,6 +69,46 @@ async function clearMockHassCalls(page: Page) {
     const calls = (window as unknown as { __mockHass: { calls: Record<string, unknown>[] } }).__mockHass.calls
     calls.splice(0, calls.length)
   })
+}
+
+async function startSleepypodPromptFrameSampler(page: Page) {
+  await page.evaluate(() => {
+    const state = window as unknown as {
+      __sleepypodPromptFrameSamples?: SleepypodPromptFrameSample[]
+    }
+    state.__sleepypodPromptFrameSamples = []
+    let frameCount = 0
+    let mountedFrameCount = 0
+
+    const sample = () => {
+      const dialogs = [...document.querySelectorAll<HTMLElement>('[role="dialog"][data-surface="hass-popup"]')]
+      const promptMounted = dialogs.length >= 2 && dialogs.at(-1)?.getAttribute('data-state') === 'open'
+      const region = [...document.querySelectorAll<HTMLElement>('[role="region"]')]
+        .find((element) => element.getAttribute('aria-label')?.startsWith("Stephen's Bed thermostat"))
+      const slider = [...document.querySelectorAll<HTMLElement>('[role="slider"]')]
+        .find((element) => element.getAttribute('aria-label') === "Stephen's Bed target level")
+      const range = region?.querySelector<HTMLInputElement>('input[type="range"]')
+      state.__sleepypodPromptFrameSamples?.push({
+        promptMounted,
+        rangeValue: range?.value ?? null,
+        readout: region?.textContent?.replace(/\s+/g, ' ').trim() ?? null,
+        regionLabel: region?.getAttribute('aria-label') ?? null,
+        sliderValue: slider?.getAttribute('aria-valuenow') ?? null,
+      })
+      frameCount += 1
+      if (promptMounted) mountedFrameCount += 1
+      if (frameCount < 120 && mountedFrameCount < 5) requestAnimationFrame(sample)
+    }
+
+    requestAnimationFrame(sample)
+  })
+}
+
+async function sleepypodPromptFrameSamples(page: Page) {
+  return page.evaluate(() => (
+    (window as unknown as { __sleepypodPromptFrameSamples?: SleepypodPromptFrameSample[] })
+      .__sleepypodPromptFrameSamples ?? []
+  ))
 }
 
 async function openThermostatControls(page: Page, tab: 'Automation' | 'Rooms' | 'Tracking' = 'Rooms') {
@@ -3655,14 +3704,35 @@ test('mobile SleepyPod target prompt routes Tonight and swipes closed without a 
 
   await page.getByRole('button', { name: /Stephen's Bed Cooling/i }).click()
   const bedDialog = page.getByRole('dialog', { name: "Stephen's Bed" })
+  const dial = bedDialog.getByRole('region', { name: /Stephen's Bed thermostat Cooling -2/i })
   const targetSlider = bedDialog.getByRole('slider', { name: "Stephen's Bed target level" })
   await expect(targetSlider).toHaveAttribute('aria-valuenow', '-2')
-  await targetSlider.press('ArrowLeft')
+  const dialBox = await dial.boundingBox()
+  if (!dialBox) throw new Error('SleepyPod target dial geometry was not measurable')
+  const targetPoint = valueToThermostatPoint(-5, -10, 10)
+  await startSleepypodPromptFrameSampler(page)
+  await dial.click({
+    position: {
+      x: (targetPoint.x / 100) * dialBox.width,
+      y: (targetPoint.y / 100) * dialBox.height,
+    },
+  })
 
   const scopeDialog = page.getByRole('dialog', { name: 'Set Bed Temperature' })
   await expect(scopeDialog).toBeVisible()
+  await expect.poll(async () => (
+    (await sleepypodPromptFrameSamples(page)).filter((sample) => sample.promptMounted).length
+  )).toBeGreaterThanOrEqual(3)
+  const mountedPromptFrames = (await sleepypodPromptFrameSamples(page)).filter((sample) => sample.promptMounted)
+  expect(mountedPromptFrames.length).toBeGreaterThanOrEqual(3)
+  for (const frame of mountedPromptFrames) {
+    expect(frame.rangeValue).toBe('-5')
+    expect(frame.readout).toContain('-5')
+    expect(frame.regionLabel).toMatch(/Stephen's Bed thermostat Cooling -5/i)
+    expect(frame.sliderValue).toBe('-5')
+  }
   await expect(scopeDialog).toHaveAttribute('data-surface', 'hass-popup')
-  await expect(scopeDialog).toContainText("Stephen's Bed • Bedtime • -3")
+  await expect(scopeDialog).toContainText("Stephen's Bed • Bedtime • -5")
   await expect(scopeDialog.getByRole('button', { name: 'Tonight' })).toBeFocused()
   await expect(scopeDialog.locator('[data-modal-disclosure]')).toHaveCount(0)
   await expect.poll(async () => scopeDialog.evaluate((element) => Math.round(window.innerHeight - element.getBoundingClientRect().bottom))).toBe(0)
@@ -3691,7 +3761,7 @@ test('mobile SleepyPod target prompt routes Tonight and swipes closed without a 
   await expect(scopeDialog).toHaveAttribute('data-state', 'closed')
   await expect(scopeDialog).toHaveAttribute('data-closing', 'true')
   await expect(scopeDialog).toBeHidden()
-  await expect(targetSlider).toHaveAttribute('aria-valuenow', '-3')
+  await expect(targetSlider).toHaveAttribute('aria-valuenow', '-5')
   await expect(targetSlider).toBeFocused()
   await expect.poll(async () => page.evaluate(() => (
     (window as unknown as { __mockHass: { calls: Record<string, unknown>[] } }).__mockHass.calls
@@ -3699,12 +3769,12 @@ test('mobile SleepyPod target prompt routes Tonight and swipes closed without a 
   ))).toEqual([{
     domain: 'script',
     service: 'sleepypod_stephen_temperature_tonight',
-    serviceData: { level: -3 },
+    serviceData: { level: -5 },
   }])
 
   await targetSlider.press('ArrowLeft')
   await expect(scopeDialog).toBeVisible()
-  await expect(scopeDialog).toContainText("Stephen's Bed • Bedtime • -4")
+  await expect(scopeDialog).toContainText("Stephen's Bed • Bedtime • -6")
   await page.waitForTimeout(500)
   const handle = scopeDialog.locator('[data-mobile-drag-handle="true"]')
   const handleBox = await handle.boundingBox()
@@ -3725,7 +3795,7 @@ test('mobile SleepyPod target prompt routes Tonight and swipes closed without a 
     (window as unknown as { __mockHass: { calls: Record<string, unknown>[] } }).__mockHass.calls
       .filter((call) => call.domain === 'script')
   ))).toHaveLength(1)
-  await expect(targetSlider).toHaveAttribute('aria-valuenow', '-3')
+  await expect(targetSlider).toHaveAttribute('aria-valuenow', '-5')
 })
 
 test('thermostat Vacation end transitions to Away or Home with correct dial ranges on mobile', async ({ page }) => {

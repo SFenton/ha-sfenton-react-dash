@@ -3378,10 +3378,12 @@ function ThermostatDial({ actionOverride, entityId, inactiveOverride, interactiv
 function EightSleepThermostatHero({
   modalState,
   onRequestTemperatureScope,
+  pendingScopeTargetValue,
   side,
 }: {
   modalState: EightSleepBedModalState
   onRequestTemperatureScope?: (value: number, phase: SleepypodSchedulePhase, returnFocus: HTMLElement | null) => void
+  pendingScopeTargetValue: number | null
   side: EightSleepSideConfig
 }) {
   const callService = useCallService()
@@ -3398,7 +3400,7 @@ function EightSleepThermostatHero({
   const { activeSchedulePhase, cancelTargetTemperature, commitDisplaySideOn, commitTargetTemperature, controlMode, controlsSideOn, currentTemperature, displayedTargetValue: sourceTargetValue, schedulePhaseAvailable, sideAvailable, targetMax, targetMin, targetScale, targetStep } = modalState
   const targetConfirmationHoldMs = controlMode === 'climate' && targetScale === 'level' ? SLEEPYPOD_TARGET_CONFIRMATION_HOLD_MS : 0
   const [optimisticTargetValue, commitHeroTargetValue, cancelHeroTargetValue] = useOptimisticState(sourceTargetValue, { clearOn: 'confirmation', confirmationHoldMs: targetConfirmationHoldMs, revertMs: FREE_SLEEP_TARGET_REVERT_MS })
-  const displayedTargetValue = modalState.hotFlashActive ? sourceTargetValue : dragValue ?? optimisticTargetValue
+  const displayedTargetValue = modalState.hotFlashActive ? sourceTargetValue : dragValue ?? pendingScopeTargetValue ?? optimisticTargetValue
   const scopedSleepypodTarget = controlMode === 'climate' && targetScale === 'level'
   const canSetTarget = sideAvailable && controlsSideOn && !modalState.hotFlashActive && displayedTargetValue !== null && (!scopedSleepypodTarget || schedulePhaseAvailable)
   const [previousCanSetTarget, setPreviousCanSetTarget] = useState(canSetTarget)
@@ -4452,6 +4454,8 @@ function EightSleepBedModal({ modalState, onClose, open, side }: { modalState: E
   const [previousOpen, setPreviousOpen] = useState(open)
   const tabs = modalState.controlMode === 'climate' ? SLEEPYPOD_MODAL_TABS : EIGHT_SLEEP_MODAL_TABS
   const renderedActiveTab = tabs.some((tab) => tab.tab === activeTab) ? activeTab : tabs[0].tab
+  const scopePromptOpen = open && scopeRequest.open && modalState.sideAvailable && modalState.activeSchedulePhase === scopeRequest.phase
+  const pendingScopeTargetValue = scopePromptOpen ? scopeRequest.value : null
   const scopeRequestInvalid = scopeRequest.open && (!modalState.sideAvailable || modalState.activeSchedulePhase !== scopeRequest.phase)
   if (previousOpen !== open) {
     setPreviousOpen(open)
@@ -4565,8 +4569,8 @@ function EightSleepBedModal({ modalState, onClose, open, side }: { modalState: E
       closeScopePrompt()
       return
     }
-    closeScopePrompt()
     modalState.commitTargetTemperature(current.request.value)
+    closeScopePrompt()
     callService({
       domain: 'script',
       service: sleepypodTemperatureScopeService(side.scheduleSide, scope, current.request.phase),
@@ -4617,6 +4621,7 @@ function EightSleepBedModal({ modalState, onClose, open, side }: { modalState: E
             onOpenAlarmDay={openAlarmDay}
             onPanelElementChange={setAlarmPanelElement}
             onRequestTemperatureScope={requestTemperatureScope}
+            pendingScopeTargetValue={pendingScopeTargetValue}
             side={side}
             tabs={tabs}
           />
@@ -4627,6 +4632,7 @@ function EightSleepBedModal({ modalState, onClose, open, side }: { modalState: E
             modalState={modalState}
             onPanelElementChange={setAlarmPanelElement}
             onRequestTemperatureScope={requestTemperatureScope}
+            pendingScopeTargetValue={pendingScopeTargetValue}
             side={side}
             tabs={tabs}
           />
@@ -4635,7 +4641,7 @@ function EightSleepBedModal({ modalState, onClose, open, side }: { modalState: E
       <BedTemperatureScopePrompt
         onChoose={chooseTemperatureScope}
         onClose={closeScopePrompt}
-        open={open && scopeRequest.open && modalState.sideAvailable && modalState.activeSchedulePhase === scopeRequest.phase}
+        open={scopePromptOpen}
         phase={scopeRequest.phase}
         returnFocus={scopeRequest.returnFocus}
         sideTitle={side.title}
@@ -4720,6 +4726,7 @@ interface EightSleepBedModalContentProps {
   onOpenAlarmDay?: (day: FreeSleepAlarmDay) => void
   onPanelElementChange?: (element: HTMLDivElement | null) => void
   onRequestTemperatureScope?: (value: number, phase: SleepypodSchedulePhase, returnFocus: HTMLElement | null) => void
+  pendingScopeTargetValue?: number | null
   side: EightSleepSideConfig
   tabs?: typeof EIGHT_SLEEP_MODAL_TABS
 }
@@ -4738,6 +4745,7 @@ function EightSleepBedModalContentView({
   onOpenAlarmDay,
   onPanelElementChange,
   onRequestTemperatureScope,
+  pendingScopeTargetValue = null,
   side,
   tabs,
 }: EightSleepBedModalContentProps) {
@@ -4831,7 +4839,7 @@ function EightSleepBedModalContentView({
     <div className={`${styles.thermostatModalBody} ${styles.eightSleepModalBody}`} data-layout="eight-sleep-modal-body" ref={modalBodyRef}>
       <div className={styles.eightSleepHeroColumn} data-scroll-region="eight-sleep-hero-column">
         <div className={`${styles.eightSleepModalHeroShell} ${styles.thermostatModalDialShell}`} data-section="eight-sleep-hero" data-thermostat-modal-dial-shell="true" style={THERMOSTAT_MODAL_DIAL_SHELL_STYLE}>
-          <EightSleepThermostatHero modalState={modalState} onRequestTemperatureScope={onRequestTemperatureScope} side={side} />
+          <EightSleepThermostatHero modalState={modalState} onRequestTemperatureScope={onRequestTemperatureScope} pendingScopeTargetValue={pendingScopeTargetValue} side={side} />
         </div>
         <SleepypodActiveAlarmSection
           side={side.scheduleSide}
