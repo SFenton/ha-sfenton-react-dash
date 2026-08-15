@@ -109,6 +109,7 @@ describe('ModalSheet', () => {
     expect(dialog).toHaveAttribute('inert')
     const overlay = document.body.querySelector('[data-modal-sheet-overlay]')
     expect(overlay).toHaveAttribute('data-closed')
+    expect(overlay).toHaveAttribute('data-closing', 'true')
     expect(overlay).toHaveStyle({ pointerEvents: 'none' })
     expect(document.body).not.toHaveAttribute('data-scroll-locked')
     await waitFor(() => expect(document.body.style.pointerEvents).not.toBe('none'))
