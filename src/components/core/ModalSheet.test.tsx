@@ -52,6 +52,19 @@ function DelayedCloseModalSheetHarness() {
   )
 }
 
+function InitiallyClosedModalSheetHarness() {
+  const [open, setOpen] = useState(false)
+
+  return (
+    <>
+      <button onClick={() => setOpen(true)} type="button">Open first modal</button>
+      <ModalSheet onClose={() => setOpen(false)} open={open} title="First open controls">
+        First open modal content
+      </ModalSheet>
+    </>
+  )
+}
+
 describe('ModalSheet', () => {
   it('disables nested glass backdrop filters inside the moving modal surface', () => {
     expect(modalSheetCss).toMatch(/\.content \[data-tone\]\[data-variant='card'\],\s*\.content \[data-modal-tab-nav='true'\]\s*\{[^}]*backdrop-filter:\s*none;[^}]*-webkit-backdrop-filter:\s*none;/s)
@@ -140,6 +153,7 @@ describe('ModalSheet', () => {
     render(<ModalSheetHarness />)
 
     const dialog = screen.getByRole('dialog')
+    await waitFor(() => expect(dialog).toHaveAttribute('data-open'))
     fireEvent.keyDown(document, { key: 'Escape' })
 
     await waitFor(() => expect(dialog).toHaveAttribute('data-state', 'closed'))
@@ -149,6 +163,7 @@ describe('ModalSheet', () => {
     render(<DelayedCloseModalSheetHarness />)
 
     const dialog = screen.getByRole('dialog')
+    await waitFor(() => expect(dialog).toHaveAttribute('data-open'))
     fireEvent.keyDown(document, { key: 'Escape' })
 
     expect(dialog).toHaveAttribute('data-state', 'open')
@@ -157,10 +172,22 @@ describe('ModalSheet', () => {
     await waitFor(() => expect(dialog).toHaveAttribute('data-state', 'closed'))
   })
 
+  it('treats the first open as a normal open rather than a rapid reopen', async () => {
+    render(<InitiallyClosedModalSheetHarness />)
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Open first modal' }))
+
+    const dialog = await screen.findByRole('dialog', { name: 'First open controls' })
+    expect(dialog).toHaveAttribute('data-state', 'open')
+    expect(dialog).toHaveAttribute('data-rapid-reopen', 'false')
+  })
+
   it('reopens without stale swipe styles and remains closable', async () => {
     render(<ModalSheetHarness />)
 
     const dialog = screen.getByRole('dialog')
+    await waitFor(() => expect(dialog).toHaveAttribute('data-open'))
     fireEvent.click(within(dialog).getByRole('button', { name: 'Close' }))
     await waitFor(() => expect(dialog).toHaveAttribute('data-state', 'closed'))
 

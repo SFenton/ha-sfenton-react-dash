@@ -1,5 +1,7 @@
 import { expect, test, type CDPSession, type Page } from '@playwright/test'
 import {
+  assertAnimatedDesktopModalOpen,
+  assertAnimatedModalOpen,
   assertTerminalModalLifecycle,
   installModalLifecycleProbe,
   readModalLifecycleProbe,
@@ -106,11 +108,44 @@ function observedRemovedAttribute(trace: ModalLifecycleTrace, attribute: string)
   return trace.mutations.some((mutation) => mutation.attribute === attribute && mutation.value === null)
 }
 
+async function waitForModalOpenSettled(page: Page) {
+  await expect.poll(async () => page.evaluate(() => {
+    const popup = document.querySelector<HTMLElement>('[data-surface="hass-popup"]')
+    const overlay = document.querySelector<HTMLElement>('[data-modal-sheet-overlay]')
+    if (!popup || !overlay || popup.hasAttribute('data-starting-style')) return false
+
+    const popupStyle = getComputedStyle(popup)
+    const translateY = popupStyle.transform === 'none'
+      ? 0
+      : new DOMMatrixReadOnly(popupStyle.transform).m42
+
+    return (
+      Math.abs(translateY) <= 1
+      && Number(popupStyle.opacity) >= 0.99
+      && Number(getComputedStyle(overlay).opacity) >= 0.99
+    )
+  }), { timeout: 5_000 }).toBe(true)
+}
+
 test.describe('thermostat modal close lifecycle', () => {
   test.use({ viewport: { height: 852, width: 393 } })
 
   test.beforeEach(async ({ page }) => {
     await installModalLifecycleProbe(page)
+  })
+
+  test('animates its first open from offscreen to the settled modal position', async ({ page }) => {
+    await page.goto('/at-a-glance/ecobee')
+    await startModalLifecycleProbe(page)
+
+    await page.getByRole('button', { exact: true, name: 'Advanced Configuration' }).click()
+    const dialog = page.getByRole('dialog', { name: THERMOSTAT_TITLE })
+    await expect(dialog).toBeVisible()
+    await waitForModalOpenSettled(page)
+
+    const trace = await readModalLifecycleProbe(page)
+    expect(trace.historyPushCount).toBe(1)
+    assertAnimatedModalOpen(trace)
   })
 
   test('keeps the accelerated closed pose terminal through the mounted exit window', async ({ page }) => {
@@ -165,8 +200,40 @@ test.describe('thermostat modal close lifecycle', () => {
     expect(trace.events.some((event) => event.type === 'touchstart')).toBe(true)
     expect(trace.events.some((event) => event.type === 'touchmove')).toBe(true)
     expect(trace.events.some((event) => event.type === 'touchend')).toBe(true)
-    expect(trace.frames.some((frame) => frame.swiping) || observedAddedAttribute(trace, 'data-swiping')).toBe(true)
+    expect(trace.historyReplaceCount).toBe(1)
     assertTerminalModalLifecycle(trace)
     await expect(dialog).toHaveCount(0)
+  })
+})
+
+test.describe('direct hash-open thermostat modal lifecycle', () => {
+  test.use({ viewport: { height: 852, width: 393 } })
+
+  test('animates when the modal is already requested during initial page load', async ({ page }) => {
+    await installModalLifecycleProbe(page, { autoStart: true })
+    await page.goto(THERMOSTAT_PATH)
+    await expect(page.getByRole('dialog', { name: THERMOSTAT_TITLE })).toBeVisible()
+    await waitForModalOpenSettled(page)
+
+    const trace = await readModalLifecycleProbe(page)
+    expect(trace.historyPushCount).toBe(0)
+    expect(trace.historyReplaceCount).toBe(0)
+    assertAnimatedModalOpen(trace)
+  })
+})
+
+test.describe('desktop thermostat modal open lifecycle', () => {
+  test.use({ hasTouch: false, isMobile: false, viewport: { height: 900, width: 1280 } })
+
+  test('fades its first open without moving the centered dialog', async ({ page }) => {
+    await installModalLifecycleProbe(page)
+    await page.goto('/at-a-glance/ecobee')
+    await startModalLifecycleProbe(page)
+
+    await page.getByRole('button', { exact: true, name: 'Advanced Configuration' }).click()
+    await expect(page.getByRole('dialog', { name: THERMOSTAT_TITLE })).toBeVisible()
+    await waitForModalOpenSettled(page)
+
+    assertAnimatedDesktopModalOpen(await readModalLifecycleProbe(page))
   })
 })

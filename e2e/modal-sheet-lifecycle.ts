@@ -77,8 +77,8 @@ type ProbeWindow = Window & {
   __modalLifecycleProbe?: ModalLifecycleProbe
 }
 
-export async function installModalLifecycleProbe(page: Page) {
-  await page.addInitScript(() => {
+export async function installModalLifecycleProbe(page: Page, options: { autoStart?: boolean } = {}) {
+  await page.addInitScript(({ autoStart }) => {
     const nodeIds = new WeakMap<Node, number>()
     let nextNodeId = 1
     let active = false
@@ -183,6 +183,7 @@ export async function installModalLifecycleProbe(page: Page) {
         'data-closed',
         'data-starting-style',
         'data-ending-style',
+        'data-initial-starting-style',
         'data-swiping',
         'data-swipe-dismiss',
         'data-rapid-reopen',
@@ -231,7 +232,7 @@ export async function installModalLifecycleProbe(page: Page) {
         popupPresent: Boolean(popup),
         rapidReopen: popup?.getAttribute('data-rapid-reopen') ?? null,
         swipeDismiss: popup?.hasAttribute('data-swipe-dismiss') ?? false,
-        starting: popup?.hasAttribute('data-starting-style') ?? false,
+        starting: popup?.hasAttribute('data-starting-style') || popup?.getAttribute('data-initial-starting-style') === 'true',
         state: popup?.getAttribute('data-state') ?? null,
         strength: popup?.style.getPropertyValue('--drawer-swipe-strength') ?? '',
         swiping: popup?.hasAttribute('data-swiping') ?? false,
@@ -268,7 +269,8 @@ export async function installModalLifecycleProbe(page: Page) {
     }
 
     ;(window as ProbeWindow).__modalLifecycleProbe = probe
-  })
+    if (autoStart) probe.start()
+  }, options)
 }
 
 export async function startModalLifecycleProbe(page: Page) {
@@ -319,5 +321,75 @@ export function assertTerminalModalLifecycle(trace: ModalLifecycleTrace) {
     if ((current.overlayOpacity ?? 0) > (previous.overlayOpacity ?? 0) + 0.01) {
       throw new Error(`Modal overlay opacity increased at ${current.time.toFixed(1)}ms: ${previous.overlayOpacity} -> ${current.overlayOpacity}`)
     }
+  }
+}
+
+export function assertAnimatedModalOpen(trace: ModalLifecycleTrace) {
+  const openFrames = trace.frames.filter((frame) => frame.popupPresent && frame.open)
+  if (openFrames.length < 2) throw new Error('Modal opening trace did not capture enough frames')
+
+  const nodeIds = new Set(openFrames.map((frame) => frame.nodeId))
+  if (nodeIds.size !== 1) throw new Error(`Modal node identity changed during open: ${[...nodeIds].join(', ')}`)
+  if (!openFrames.some((frame) => frame.starting)) throw new Error('Modal never entered an opening starting style')
+  if (!openFrames.some((frame) => frame.animations.length > 0)) throw new Error('Modal opening transition was not exposed as an animation')
+  if (!openFrames.some((frame) => (frame.overlayOpacity ?? 1) < 0.5)) throw new Error('Modal overlay never started transparent')
+  if (!openFrames.some((frame) => (frame.translateY ?? 0) > 100)) {
+    throw new Error(`Modal first open never started offscreen: ${JSON.stringify(openFrames.map((frame) => ({
+      animations: frame.animations,
+      starting: frame.starting,
+      time: frame.time,
+      translateY: frame.translateY,
+    })))}`)
+  }
+
+  for (const frame of openFrames) {
+    if (frame.closed || frame.closing !== 'false' || frame.rapidReopen !== 'false' || frame.state !== 'open') {
+      throw new Error(`Modal entered an invalid opening state at ${frame.time.toFixed(1)}ms`)
+    }
+  }
+
+  for (let index = 1; index < openFrames.length; index += 1) {
+    const previous = openFrames[index - 1]
+    const current = openFrames[index]
+    if ((current.translateY ?? 0) > (previous.translateY ?? 0) + 1) {
+      throw new Error(`Modal opening transform reversed at ${current.time.toFixed(1)}ms: ${previous.translateY} -> ${current.translateY}`)
+    }
+    if ((current.overlayOpacity ?? 0) < (previous.overlayOpacity ?? 0) - 0.01) {
+      throw new Error(`Modal opening overlay opacity decreased at ${current.time.toFixed(1)}ms`)
+    }
+  }
+
+  const settled = openFrames[openFrames.length - 1]
+  if (Math.abs(settled.translateY ?? 0) > 1) throw new Error(`Modal did not settle at zero translation: ${settled.translateY}`)
+  if ((settled.overlayOpacity ?? 0) < 0.99) throw new Error(`Modal overlay did not settle opaque: ${settled.overlayOpacity}`)
+}
+
+export function assertAnimatedDesktopModalOpen(trace: ModalLifecycleTrace) {
+  const openFrames = trace.frames.filter((frame) => frame.popupPresent && frame.open)
+  if (openFrames.length < 2) throw new Error('Desktop modal opening trace did not capture enough frames')
+  if (!openFrames.some((frame) => frame.starting)) throw new Error('Desktop modal never entered data-starting-style')
+  if (!openFrames.some((frame) => frame.animations.length > 0)) throw new Error('Desktop modal opening transition was not exposed as an animation')
+  if (!openFrames.some((frame) => (frame.opacity ?? 1) < 0.5)) throw new Error('Desktop modal never started transparent')
+  if (!openFrames.some((frame) => (frame.overlayOpacity ?? 1) < 0.5)) throw new Error('Desktop modal overlay never started transparent')
+
+  for (let index = 0; index < openFrames.length; index += 1) {
+    const frame = openFrames[index]
+    if (Math.abs(frame.translateY ?? 0) > 1) throw new Error(`Desktop modal moved vertically at ${frame.time.toFixed(1)}ms`)
+    if (index > 0 && (frame.opacity ?? 0) < (openFrames[index - 1].opacity ?? 0) - 0.01) {
+      throw new Error(`Desktop modal opacity reversed at ${frame.time.toFixed(1)}ms`)
+    }
+  }
+
+  const settled = openFrames[openFrames.length - 1]
+  if ((settled.overlayOpacity ?? 0) < 0.99) throw new Error(`Desktop modal overlay did not settle opaque: ${settled.overlayOpacity}`)
+  if ((settled.opacity ?? 0) < 0.99) {
+    const finalFrames = openFrames.slice(-5).map((frame) => ({
+      animations: frame.animations,
+      opacity: frame.opacity,
+      starting: frame.starting,
+      time: frame.time,
+      translateY: frame.translateY,
+    }))
+    throw new Error(`Desktop modal did not settle opaque: ${JSON.stringify(finalFrames)}`)
   }
 }
