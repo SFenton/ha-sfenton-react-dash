@@ -16,6 +16,12 @@ interface GestureSample {
   translateY: number
 }
 
+interface DismissalSample {
+  rapidReopen: string | null
+  state: string | null
+  translateY: number
+}
+
 const MOBILE_VIEWPORT = { width: 393, height: 852 }
 const SHEET_OPEN_ANIMATION_MS = 500
 
@@ -167,6 +173,37 @@ function expectSheetStayedStill(samples: GestureSample[]) {
   for (const sample of samples) expect(Math.abs(sample.translateY)).toBeLessThanOrEqual(1)
 }
 
+async function dismissalSamples(dialog: Locator, count = 30): Promise<DismissalSample[]> {
+  const samples: DismissalSample[] = []
+  for (let index = 0; index < count; index += 1) {
+    const sample = await dialog.page().evaluate(() => {
+      const element = document.querySelector<HTMLElement>('[role="dialog"][data-surface="hass-popup"]')
+      if (!element) return null
+      const transform = window.getComputedStyle(element).transform
+      return {
+        rapidReopen: element.getAttribute('data-rapid-reopen'),
+        state: element.getAttribute('data-state'),
+        translateY: transform === 'none' ? 0 : new DOMMatrixReadOnly(transform).m42,
+      }
+    })
+    if (!sample) break
+    samples.push(sample)
+    await dialog.page().waitForTimeout(16)
+  }
+  return samples
+}
+
+function expectDismissalDoesNotRebound(samples: DismissalSample[]) {
+  expect(samples.length).toBeGreaterThan(0)
+  for (const sample of samples) {
+    expect(sample.rapidReopen).toBe('false')
+    expect(sample.state).toBe('closed')
+  }
+  for (let index = 1; index < samples.length; index += 1) {
+    expect(samples[index].translateY).toBeGreaterThanOrEqual(samples[index - 1].translateY - 1)
+  }
+}
+
 async function cancelVisibleDrag(page: Page, dialog: Locator, start: Point) {
   const dialogBox = await dialog.boundingBox()
   if (!dialogBox) throw new Error('Modal was not measurable before touch cancellation')
@@ -251,6 +288,7 @@ test.describe('mobile ModalSheet gestures', () => {
     await finishTouch(session)
 
     await expect(dialog).toHaveAttribute('data-state', 'closed')
+    expectDismissalDoesNotRebound(await dismissalSamples(dialog))
     expect(samples.every((sample) => Math.abs(sample.scrollTop) <= 1)).toBe(true)
     expectMonotonicSheetDrag(samples)
   })
@@ -454,6 +492,7 @@ test.describe('mobile ModalSheet gestures', () => {
     await page.waitForTimeout(50)
     await page.mouse.click(openerPoint.x, openerPoint.y)
     await expect(dialog).toHaveAttribute('data-state', 'open')
+    await expect(dialog).toHaveAttribute('data-rapid-reopen', 'true')
     await expect.poll(async () => Math.abs(await translateY(dialog))).toBeLessThanOrEqual(1)
 
     await waitForSheetDragReady(page)
