@@ -11,6 +11,7 @@
 }
 
 .overlay[data-starting-style],
+.overlay[data-initial-starting-style='true'],
 .overlay[data-ending-style] {
   opacity: 0;
 }
@@ -57,6 +58,7 @@
   background: var(--color-modal-surface);
   box-shadow: none;
   box-sizing: border-box;
+  opacity: 1;
   overflow: clip;
   pointer-events: auto;
   transform: translate3d(0, var(--drawer-swipe-movement-y, 0px), 0);
@@ -69,6 +71,7 @@
 }
 
 .content[data-starting-style],
+.content[data-initial-starting-style='true'],
 .content[data-ending-style] {
   transform: translate3d(0, 100%, 0);
 }
@@ -268,6 +271,7 @@
   }
 
   .content[data-starting-style],
+  .content[data-initial-starting-style='true'],
   .content[data-ending-style] {
     opacity: 0;
     transform: none;

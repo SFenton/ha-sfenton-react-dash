@@ -59,6 +59,7 @@ export function ModalSheet({ open, title, onClose, children, backLabel, bodyElem
   const currentSnapshot: ModalSheetSnapshot = { backLabel: backLabel ?? copy('modal.back'), bodyHeader, children, contentStyle, footer, onBack, scrollResetKey, subtitle, title }
   const [lastOpenSnapshot, setLastOpenSnapshot] = useState<ModalSheetSnapshot>(currentSnapshot)
   const [mounted, setMounted] = useState(open)
+  const [initialStarting, setInitialStarting] = useState(open)
   const [previousOpen, setPreviousOpen] = useState(open)
   const [rapidReopen, setRapidReopen] = useState(false)
   const [rapidReopenPending, setRapidReopenPending] = useState(false)
@@ -76,6 +77,12 @@ export function ModalSheet({ open, title, onClose, children, backLabel, bodyElem
   const renderedHasSubtitle = Boolean(rendered.subtitle)
   const closing = !open
   const shouldRender = open || mounted
+
+  useEffect(() => {
+    if (!initialStarting) return
+    const frame = requestAnimationFrame(() => setInitialStarting(false))
+    return () => cancelAnimationFrame(frame)
+  }, [initialStarting])
   const renderedContentStyle: ModalSheetStyle | undefined = closing ? { ...rendered.contentStyle, pointerEvents: 'none' } : rendered.contentStyle
   const isDesktopModalLayout = useDesktopModalLayout()
   const showDragHandle = !isDesktopModalLayout
@@ -165,57 +172,58 @@ export function ModalSheet({ open, title, onClose, children, backLabel, bodyElem
     }
   }, [bodyRefVersion, open, rendered.contentStyle, renderedHasFooter, renderedHasSubtitle])
 
-  if (!shouldRender) return null
-
   return (
     <Drawer.Root disablePointerDismissal modal="trap-focus" open={open} onOpenChange={handleOpenChange} swipeDirection="down">
-      <Drawer.Portal keepMounted>
-        <Drawer.Backdrop className={styles.overlay} data-closing={closing ? 'true' : 'false'} data-modal-sheet-overlay="true" hidden={false} onPointerDown={(event) => {
-          if (event.currentTarget === event.target) requestClose()
-        }} />
-        <Drawer.Viewport className={styles.viewport} hidden={false}>
-          <Drawer.Popup
-            className={styles.content}
-            data-closing={closing ? 'true' : 'false'}
-            data-has-footer={renderedHasFooter ? 'true' : 'false'}
-            data-has-body-header={rendered.bodyHeader ? 'true' : 'false'}
-            data-has-subtitle={renderedHasSubtitle ? 'true' : 'false'}
-            data-rapid-reopen={rapidReopen ? 'true' : 'false'}
-            data-state={open ? 'open' : 'closed'}
-            data-surface="hass-popup"
-            hidden={false}
-            inert={closing ? true : undefined}
-            initialFocus={false}
-            style={renderedContentStyle}
-          >
-            <Drawer.Content className={styles.contentLayout} data-base-ui-swipe-ignore={isDesktopModalLayout ? 'true' : undefined}>
-              {showDragHandle && <div className={styles.handle} data-mobile-drag-handle="true" />}
-              <div className={styles.header}>
-                <div className={styles.headingGroup}>
-                  {rendered.onBack && (
-                    <button aria-label={rendered.backLabel} className={styles.back} onClick={rendered.onBack} type="button">
-                      <MaterialIcon name="mdi:chevron-left" size={22} />
-                    </button>
-                  )}
-                  <div className={styles.titleBlock}>
-                    <Drawer.Title className={styles.title}>{rendered.title}</Drawer.Title>
-                    {rendered.subtitle && <p className={styles.subtitle}>{rendered.subtitle}</p>}
+      {shouldRender && (
+        <Drawer.Portal keepMounted>
+          <Drawer.Backdrop className={styles.overlay} data-closing={closing ? 'true' : 'false'} data-initial-starting-style={initialStarting ? 'true' : undefined} data-modal-sheet-overlay="true" hidden={false} onPointerDown={(event) => {
+            if (event.currentTarget === event.target) requestClose()
+          }} />
+          <Drawer.Viewport className={styles.viewport} hidden={false}>
+            <Drawer.Popup
+              className={styles.content}
+              data-closing={closing ? 'true' : 'false'}
+              data-has-footer={renderedHasFooter ? 'true' : 'false'}
+              data-has-body-header={rendered.bodyHeader ? 'true' : 'false'}
+              data-has-subtitle={renderedHasSubtitle ? 'true' : 'false'}
+              data-initial-starting-style={initialStarting ? 'true' : undefined}
+              data-rapid-reopen={rapidReopen ? 'true' : 'false'}
+              data-state={open ? 'open' : 'closed'}
+              data-surface="hass-popup"
+              hidden={false}
+              inert={closing ? true : undefined}
+              initialFocus={false}
+              style={renderedContentStyle}
+            >
+              <Drawer.Content className={styles.contentLayout} data-base-ui-swipe-ignore={isDesktopModalLayout ? 'true' : undefined}>
+                {showDragHandle && <div className={styles.handle} data-mobile-drag-handle="true" />}
+                <div className={styles.header}>
+                  <div className={styles.headingGroup}>
+                    {rendered.onBack && (
+                      <button aria-label={rendered.backLabel} className={styles.back} onClick={rendered.onBack} type="button">
+                        <MaterialIcon name="mdi:chevron-left" size={22} />
+                      </button>
+                    )}
+                    <div className={styles.titleBlock}>
+                      <Drawer.Title className={styles.title}>{rendered.title}</Drawer.Title>
+                      {rendered.subtitle && <p className={styles.subtitle}>{rendered.subtitle}</p>}
+                    </div>
                   </div>
+                  <Drawer.Description className={styles.description}>{rendered.subtitle
+                    ? copy('modal.descriptionWithSubtitle', { subtitle: rendered.subtitle, title: rendered.title })
+                    : copy('modal.description', { title: rendered.title })}</Drawer.Description>
+                  <button className={styles.close} aria-label={copy('modal.close')} onClick={requestClose} type="button">
+                    <MaterialIcon name="mdi:close" size={19} />
+                  </button>
                 </div>
-                <Drawer.Description className={styles.description}>{rendered.subtitle
-                  ? copy('modal.descriptionWithSubtitle', { subtitle: rendered.subtitle, title: rendered.title })
-                  : copy('modal.description', { title: rendered.title })}</Drawer.Description>
-                <button className={styles.close} aria-label={copy('modal.close')} onClick={requestClose} type="button">
-                  <MaterialIcon name="mdi:close" size={19} />
-                </button>
-              </div>
-              {rendered.bodyHeader && <div className={styles.bodyHeader} data-modal-sheet-body-header="true">{rendered.bodyHeader}</div>}
-              <div className={styles.body} data-modal-sheet-body="true" ref={setBodyRefs}>{rendered.children}</div>
-              {rendered.footer && <div className={styles.footer} data-modal-sheet-footer="true">{rendered.footer}</div>}
-            </Drawer.Content>
-          </Drawer.Popup>
-        </Drawer.Viewport>
-      </Drawer.Portal>
+                {rendered.bodyHeader && <div className={styles.bodyHeader} data-modal-sheet-body-header="true">{rendered.bodyHeader}</div>}
+                <div className={styles.body} data-modal-sheet-body="true" ref={setBodyRefs}>{rendered.children}</div>
+                {rendered.footer && <div className={styles.footer} data-modal-sheet-footer="true">{rendered.footer}</div>}
+              </Drawer.Content>
+            </Drawer.Popup>
+          </Drawer.Viewport>
+        </Drawer.Portal>
+      )}
     </Drawer.Root>
   )
 }

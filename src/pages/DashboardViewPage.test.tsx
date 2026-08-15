@@ -2468,7 +2468,7 @@ describe('DashboardViewPage', () => {
 
     expect(targetSlider).toHaveAttribute('aria-valuenow', '-3')
     expect(within(bedDialog).getByRole('region', { hidden: true, name: /Stephen's Bed thermostat Cooling -3/i })).toBeInTheDocument()
-    const scopeDialog = screen.getByRole('dialog', { name: 'Set Bed Temperature' })
+    const scopeDialog = await screen.findByRole('dialog', { name: 'Set Bed Temperature' })
     expect(scopeDialog).toHaveTextContent(new RegExp(`Stephen's Bed • ${phase} • -3`, 'i'))
     await waitFor(() => expect(within(scopeDialog).getByRole('button', { name: 'Tonight' })).toHaveFocus())
     expect(within(scopeDialog).getByRole('button', { name: 'Tonight' }).querySelector('[data-modal-disclosure]')).not.toBeInTheDocument()
@@ -2586,7 +2586,7 @@ describe('DashboardViewPage', () => {
 
       expect(targetSlider).toHaveAttribute('aria-valuenow', '-3')
       expect(within(bedDialog).getByRole('region', { hidden: true, name: /Stephen's Bed thermostat Cooling -3/i })).toBeInTheDocument()
-      let scopeDialog = screen.getByRole('dialog', { name: 'Set Bed Temperature' })
+      let scopeDialog = await screen.findByRole('dialog', { name: 'Set Bed Temperature' })
       expect(mockCallServiceCalls).toEqual([{
         domain: 'script',
         service: 'sleepypod_stephen_temperature_tonight',
@@ -2603,7 +2603,7 @@ describe('DashboardViewPage', () => {
 
       expect(targetSlider).toHaveAttribute('aria-valuenow', '-5')
       expect(within(bedDialog).getByRole('region', { hidden: true, name: /Stephen's Bed thermostat Cooling -5/i })).toBeInTheDocument()
-      scopeDialog = screen.getByRole('dialog', { name: 'Set Bed Temperature' })
+      scopeDialog = await screen.findByRole('dialog', { name: 'Set Bed Temperature' })
       expect(mockCallServiceCalls).toEqual([-3, -5].map((level) => ({
         domain: 'script',
         service: 'sleepypod_stephen_temperature_tonight',
