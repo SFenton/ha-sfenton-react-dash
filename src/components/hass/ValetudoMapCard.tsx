@@ -794,6 +794,7 @@ export function ValetudoMapCard({
           aria-hidden={interactive ? undefined : true}
           aria-label={interactive ? `${vacuum.title} cleaning area editor` : undefined}
           className={styles.overlay}
+          data-base-ui-swipe-ignore={interactive ? 'true' : undefined}
           data-interactive={interactive ? 'true' : 'false'}
           data-map-editor-overlay="true"
           onPointerCancel={interactive ? (event) => finishPointerGesture(event, true) : undefined}

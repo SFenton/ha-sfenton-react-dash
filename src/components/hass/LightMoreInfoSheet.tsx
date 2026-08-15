@@ -82,7 +82,7 @@ interface LightMoreInfoSheetProps {
 // on the wheel to recolor and only moves its marker once Home Assistant echoes the
 // new state back, which feels laggy. We render it for the wheel gradient only,
 // hide its built-in marker, and own the interaction ourselves: tap picks a color,
-// dragging the marker recolors live, and any other drag falls through to vaul so
+// dragging the marker recolors live, and any other drag falls through to the sheet so
 // the sheet can be dismissed by swiping over the wheel. The marker is driven by an
 // optimistic layer so it tracks the finger instantly while the backend catches up.
 function ColorWheel({ entityId }: { entityId: string }) {
@@ -160,7 +160,7 @@ function ColorWheel({ entityId }: { entityId: string }) {
     const onMarker = marker !== null && Math.hypot(event.clientX - marker.x, event.clientY - marker.y) <= NEAR_MARKER_PX
 
     if (onMarker) {
-      // Own this gesture so vaul never starts a dismiss drag while recoloring.
+      // Own this gesture so the sheet never starts a dismiss drag while recoloring.
       event.stopPropagation()
       event.preventDefault()
       draggingRef.current = true
@@ -171,7 +171,7 @@ function ColorWheel({ entityId }: { entityId: string }) {
         applyHs(computed.hue, computed.saturation, false)
       }
     } else {
-      // Tap-to-pick or swipe-to-dismiss; leave the event for vaul to evaluate.
+      // Tap-to-pick or swipe-to-dismiss; leave the event for the sheet to evaluate.
       draggingRef.current = false
       tapStartRef.current = { x: event.clientX, y: event.clientY, pointerId: event.pointerId }
     }
@@ -222,6 +222,7 @@ function ColorWheel({ entityId }: { entityId: string }) {
           {markerXY && (
             <span
               className={styles.wheelMarker}
+              data-base-ui-swipe-ignore="true"
               data-dragging={dragXY !== null}
               data-testid="color-wheel-marker"
               style={{ left: `${((markerXY.x + 1) / 2) * 100}%`, top: `${((markerXY.y + 1) / 2) * 100}%` }}

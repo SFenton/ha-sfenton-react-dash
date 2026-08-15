@@ -95,10 +95,15 @@ describe('LightMoreInfoSheet', () => {
     expect(screen.queryByRole('button', { name: 'Apply Bollard 1 Color' })).not.toBeInTheDocument()
   })
 
-  it('keeps the color picker swipeable so the modal can be dismissed over it', () => {
+  it('keeps the color wheel swipeable while its draggable marker owns its gesture', () => {
     render(<LightMoreInfoSheet entityId={OPEN} lights={LIGHTS} onClose={() => {}} open title="Bollard 1" />)
-    const picker = screen.getByTestId('color-picker')
-    expect(picker.closest('[data-vaul-no-drag]')).toBeNull()
+    const overlay = screen.getByTestId('color-wheel-overlay')
+    overlay.getBoundingClientRect = () =>
+      ({ left: 0, top: 0, right: 200, bottom: 200, width: 200, height: 200, x: 0, y: 0, toJSON: () => ({}) }) as DOMRect
+    expect(overlay).not.toHaveAttribute('data-base-ui-swipe-ignore')
+    fireEvent.pointerDown(overlay, { clientX: 150, clientY: 100, pointerId: 1 })
+    fireEvent.pointerUp(overlay, { clientX: 150, clientY: 100, pointerId: 1 })
+    expect(screen.getByTestId('color-wheel-marker')).toHaveAttribute('data-base-ui-swipe-ignore', 'true')
   })
 
   it('picks a color when the wheel is tapped', () => {

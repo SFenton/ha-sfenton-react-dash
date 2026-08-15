@@ -35,37 +35,19 @@ function ModalSheetObserverHarness() {
 }
 
 describe('ModalSheet', () => {
-  it('updates touch arbitration when mounted content changes scrollability', async () => {
+  it('leaves touch ownership to the drawer without forcing scroll position or directional touch-action', () => {
     render(<ModalSheetObserverHarness />)
 
     const body = document.querySelector('[data-modal-sheet-body="true"]') as HTMLDivElement
     Object.defineProperty(body, 'clientHeight', { configurable: true, value: 100 })
     Object.defineProperty(body, 'scrollHeight', { configurable: true, value: 220 })
     Object.defineProperty(body, 'scrollTop', { configurable: true, value: 0, writable: true })
-    const content = document.createElement('span')
-    body.append(content)
-
-    await waitFor(() => expect(body).toHaveAttribute('data-modal-sheet-scrollable', 'true'))
-    expect(body.style.touchAction).toBe('pan-down')
-
-    body.scrollTop = 12
-    fireEvent.scroll(body)
-    expect(body.style.touchAction).toBe('pan-y')
-
-    body.scrollTop = 0.5
-    fireEvent.scroll(body)
-    expect(body.style.touchAction).toBe('pan-y')
 
     body.scrollTop = -0.5
     fireEvent.scroll(body)
-    expect(body.scrollTop).toBe(0)
-    expect(body.style.touchAction).toBe('pan-down')
-
-    Object.defineProperty(body, 'scrollHeight', { configurable: true, value: 80 })
-    content.setAttribute('aria-expanded', 'true')
-
-    await waitFor(() => expect(body).toHaveAttribute('data-modal-sheet-scrollable', 'false'))
-    expect(body.style.touchAction).toBe('none')
+    expect(body.scrollTop).toBe(-0.5)
+    expect(body.style.touchAction).toBe('')
+    expect(body).not.toHaveAttribute('data-modal-sheet-scrollable')
   })
 
   it('keeps its body observer stable when footer and subtitle content change without changing layout presence', async () => {
@@ -111,7 +93,9 @@ describe('ModalSheet', () => {
     await waitFor(() => expect(dialog).toHaveAttribute('data-state', 'closed'))
     expect(dialog).toHaveAttribute('data-closing', 'true')
     expect(dialog).toHaveAttribute('inert')
-    expect(document.body.querySelector('[data-modal-sheet-overlay]')).not.toBeInTheDocument()
+    const overlay = document.body.querySelector('[data-modal-sheet-overlay]')
+    expect(overlay).toHaveAttribute('data-closed')
+    expect(overlay).toHaveStyle({ pointerEvents: 'none' })
     expect(document.body).not.toHaveAttribute('data-scroll-locked')
     await waitFor(() => expect(document.body.style.pointerEvents).not.toBe('none'))
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
@@ -121,39 +105,37 @@ describe('ModalSheet', () => {
   it('closes from the custom backdrop without enabling body scroll locking', async () => {
     render(<ModalSheetHarness />)
 
+    const dialog = screen.getByRole('dialog')
     expect(document.body).not.toHaveAttribute('data-scroll-locked')
     fireEvent.pointerDown(document.body.querySelector('[data-modal-sheet-overlay]') as Element)
 
-    await waitFor(() => expect(screen.getByRole('dialog')).toHaveAttribute('data-state', 'closed'))
+    await waitFor(() => expect(dialog).toHaveAttribute('data-state', 'closed'))
     expect(document.body).not.toHaveAttribute('data-scroll-locked')
   })
 
   it('allows internal close events on a fresh open', async () => {
     render(<ModalSheetHarness />)
 
+    const dialog = screen.getByRole('dialog')
     fireEvent.keyDown(document, { key: 'Escape' })
 
-    await waitFor(() => expect(screen.getByRole('dialog')).toHaveAttribute('data-state', 'closed'))
+    await waitFor(() => expect(dialog).toHaveAttribute('data-state', 'closed'))
   })
 
-  it('ignores stale internal close events immediately after reopening', async () => {
+  it('reopens without stale swipe styles and remains closable', async () => {
     render(<ModalSheetHarness />)
 
     const dialog = screen.getByRole('dialog')
-    expect(dialog).toHaveAttribute('data-rapid-reopen', 'false')
     fireEvent.click(within(dialog).getByRole('button', { name: 'Close' }))
     await waitFor(() => expect(dialog).toHaveAttribute('data-state', 'closed'))
-    dialog.style.transform = 'translate3d(0, 180px, 0)'
-    dialog.style.transition = 'none'
 
     fireEvent.click(screen.getByText('Host page swipe target'))
-    await waitFor(() => expect(dialog).toHaveAttribute('data-state', 'open'))
-    expect(dialog).toHaveAttribute('data-rapid-reopen', 'true')
-    expect(dialog.style.transform).toBe('')
-    expect(dialog.style.transition).toBe('')
+    const reopenedDialog = await screen.findByRole('dialog')
+    expect(reopenedDialog).toHaveAttribute('data-state', 'open')
+    expect(reopenedDialog.style.getPropertyValue('--drawer-swipe-movement-y')).toBe('0px')
 
     fireEvent.keyDown(document, { key: 'Escape' })
 
-    expect(dialog).toHaveAttribute('data-state', 'open')
+    await waitFor(() => expect(reopenedDialog).toHaveAttribute('data-state', 'closed'))
   })
 })

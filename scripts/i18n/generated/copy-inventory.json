@@ -3127,7 +3127,7 @@
       "file": "src/components/hass/LightMoreInfoSheet.tsx",
       "id": "9cb2e7e9db75fa87",
       "lines": [
-        327
+        328
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -3280,7 +3280,7 @@
       "file": "src/components/hass/LightMoreInfoSheet.tsx",
       "id": "5f83abf4c545ce2a",
       "lines": [
-        319
+        320
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -3344,7 +3344,7 @@
       "file": "src/components/hass/LightMoreInfoSheet.tsx",
       "id": "7bf0ebb43369ab5f",
       "lines": [
-        314
+        315
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -3756,7 +3756,7 @@
       "file": "src/components/hass/LightMoreInfoSheet.tsx",
       "id": "0e414ad8cff4366d",
       "lines": [
-        246
+        247
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -3886,7 +3886,7 @@
       "file": "src/components/core/CardCarousel.tsx",
       "id": "120889e736ea6b23",
       "lines": [
-        93
+        94
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -3900,7 +3900,7 @@
       "file": "src/components/core/CardCarousel.tsx",
       "id": "c709cf805799080e",
       "lines": [
-        73
+        74
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -4492,7 +4492,7 @@
       "file": "src/components/hass/ValetudoMapCard.tsx",
       "id": "4ec9da09c6937e86",
       "lines": [
-        811
+        812
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -4657,7 +4657,7 @@
       "file": "src/components/hass/LightBrightnessCard.tsx",
       "id": "53ae57c0b633505f",
       "lines": [
-        175
+        176
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -4705,7 +4705,7 @@
       "file": "src/components/hass/LightMoreInfoSheet.tsx",
       "id": "0f035a6ea4490ccc",
       "lines": [
-        361
+        362
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -4838,7 +4838,7 @@
       "file": "src/components/hass/ValetudoMapCard.tsx",
       "id": "9f67b3f8d27cdad7",
       "lines": [
-        842
+        843
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -5324,7 +5324,7 @@
       "file": "src/components/hass/LightBrightnessCard.tsx",
       "id": "a327d820bda72be3",
       "lines": [
-        185
+        186
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -6294,7 +6294,7 @@
       "file": "src/components/hass/LightBrightnessCard.tsx",
       "id": "e849bd6f12691bf9",
       "lines": [
-        182
+        183
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -8034,7 +8034,7 @@
       "file": "src/components/hass/ValetudoMapCard.tsx",
       "id": "f6260d29e11917fd",
       "lines": [
-        884
+        885
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -8076,7 +8076,7 @@
       "file": "src/components/core/ModalSheet.tsx",
       "id": "22323f3f09a98ce0",
       "lines": [
-        268
+        199
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -8387,7 +8387,7 @@
       "file": "src/components/hass/LightMoreInfoSheet.tsx",
       "id": "8406ab50e3a56498",
       "lines": [
-        362
+        363
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -9550,7 +9550,7 @@
       "file": "src/components/hass/ValetudoMapCard.tsx",
       "id": "c58dc411cceffd07",
       "lines": [
-        880
+        881
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -22330,7 +22330,7 @@
       "file": "src/components/hass/LightMoreInfoSheet.tsx",
       "id": "52b5f6226591b6b1",
       "lines": [
-        354
+        355
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -27793,7 +27793,7 @@
       "file": "src/components/hass/LightMoreInfoSheet.tsx",
       "id": "ce163b6c1ee49e90",
       "lines": [
-        346
+        347
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -30408,7 +30408,7 @@
       "file": "src/components/core/ModalSheet.tsx",
       "id": "f311f1d9068e6067",
       "lines": [
-        68
+        56
       ],
       "occurrences": 1,
       "origin": "legacy",

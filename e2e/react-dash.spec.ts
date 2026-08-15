@@ -3372,22 +3372,26 @@ test('vacuum native dropdown stays aligned after rapid close and reopen', async 
     const rect = select?.getBoundingClientRect()
     const style = dialog ? getComputedStyle(dialog) : null
     const selectStyle = select ? getComputedStyle(select) : null
+    const transform = style?.transform
+    const translateY = transform && transform !== 'none' ? new DOMMatrixReadOnly(transform).m42 : 0
 
     return {
       animationName: style?.animationName,
+      movementY: dialog?.style.getPropertyValue('--drawer-swipe-movement-y'),
       pointerEvents: selectStyle?.pointerEvents,
-      rapidReopen: dialog?.getAttribute('data-rapid-reopen'),
       selectRect: rect ? { y: rect.y, height: rect.height } : null,
-      transform: style?.transform,
+      state: dialog?.getAttribute('data-state'),
+      translateY,
       value: select?.value,
     }
   })
 
-  expect(rapidReopenState.rapidReopen).toBe('true')
   expect(rapidReopenState.animationName).toBe('none')
-  expect(rapidReopenState.transform).toBe('none')
+  expect(rapidReopenState.movementY).toBe('0px')
   expect(rapidReopenState.pointerEvents).toBe('auto')
   expect(rapidReopenState.selectRect?.y).toBeLessThan(720)
+  expect(rapidReopenState.state).toBe('open')
+  expect(Math.abs(rapidReopenState.translateY)).toBeLessThanOrEqual(1)
   expect(rapidReopenState.value).toBe('3')
 
   await page.getByRole('combobox', { name: /Cleaning Passes/i }).selectOption('2')
@@ -3417,18 +3421,21 @@ test('vacuum mode dropdown keeps source option labels while optimistic', async (
   const modeOptions = await page.getByRole('combobox', { name: /Mode Mop/i }).evaluate((select) => {
     const dialog = document.querySelector<HTMLElement>('[role="dialog"]')
     const style = dialog ? getComputedStyle(dialog) : null
+    const transform = style?.transform
     return {
       animationName: style?.animationName,
+      movementY: dialog?.style.getPropertyValue('--drawer-swipe-movement-y'),
       options: Array.from((select as HTMLSelectElement).options).map((option) => ({ label: option.label, value: option.value })),
-      rapidReopen: dialog?.getAttribute('data-rapid-reopen'),
-      transform: style?.transform,
+      state: dialog?.getAttribute('data-state'),
+      translateY: transform && transform !== 'none' ? new DOMMatrixReadOnly(transform).m42 : 0,
       value: (select as HTMLSelectElement).value,
     }
   })
 
-  expect(modeOptions.rapidReopen).toBe('true')
   expect(modeOptions.animationName).toBe('none')
-  expect(modeOptions.transform).toBe('none')
+  expect(modeOptions.movementY).toBe('0px')
+  expect(modeOptions.state).toBe('open')
+  expect(Math.abs(modeOptions.translateY)).toBeLessThanOrEqual(1)
   expect(modeOptions.value).toBe('mop')
   expect(modeOptions.options).toEqual([
     { label: 'Vacuum And Mop', value: 'vacuum_and_mop' },

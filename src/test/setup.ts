@@ -29,8 +29,7 @@ class MockResizeObserver implements ResizeObserver {
 
 globalThis.ResizeObserver = MockResizeObserver
 
-// jsdom does not implement the Pointer Capture API. vaul calls setPointerCapture
-// on pointerdown, so stub these to keep pointer-event tests from throwing.
+// jsdom does not implement the Pointer Capture API used by gesture controls.
 if (!HTMLElement.prototype.setPointerCapture) {
 	HTMLElement.prototype.setPointerCapture = () => {}
 }

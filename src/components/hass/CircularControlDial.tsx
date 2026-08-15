@@ -103,6 +103,7 @@ export const CircularControlDial = forwardRef<HTMLDivElement, CircularControlDia
       aria-disabled={disabled || undefined}
       aria-label={ariaLabel}
       className={styles.dial}
+      data-base-ui-swipe-ignore="true"
       data-inactive={inactive ? 'true' : 'false'}
       data-off={off ? 'true' : 'false'}
       data-size={size}
