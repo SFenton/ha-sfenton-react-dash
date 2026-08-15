@@ -61,10 +61,15 @@ export function ModalSheet({ open, title, onClose, children, backLabel, bodyElem
   const [mounted, setMounted] = useState(open)
   const [previousOpen, setPreviousOpen] = useState(open)
   const [rapidReopen, setRapidReopen] = useState(false)
+  const [rapidReopenPending, setRapidReopenPending] = useState(false)
   if (open && !mounted) setMounted(true)
   if (open !== previousOpen) {
     setPreviousOpen(open)
-    if (open) setLastOpenSnapshot(currentSnapshot)
+    if (open) {
+      setLastOpenSnapshot(currentSnapshot)
+      setRapidReopen(rapidReopenPending)
+      setRapidReopenPending(false)
+    }
   }
   const rendered = open ? currentSnapshot : lastOpenSnapshot
   const renderedHasFooter = Boolean(rendered.footer)
@@ -81,7 +86,8 @@ export function ModalSheet({ open, title, onClose, children, backLabel, bodyElem
   }, [bodyElementRef])
 
   const requestClose = () => {
-    setRapidReopen(true)
+    setRapidReopen(false)
+    setRapidReopenPending(true)
     setLastOpenSnapshot(currentSnapshot)
     onClose()
   }
@@ -100,6 +106,7 @@ export function ModalSheet({ open, title, onClose, children, backLabel, bodyElem
     if (open) return undefined
     const timeout = window.setTimeout(() => {
       setRapidReopen(false)
+      setRapidReopenPending(false)
       setMounted(false)
     }, MODAL_SHEET_EXIT_ANIMATION_MS)
     return () => window.clearTimeout(timeout)

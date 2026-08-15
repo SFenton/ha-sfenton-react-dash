@@ -34,6 +34,20 @@ function ModalSheetObserverHarness() {
   )
 }
 
+function DelayedCloseModalSheetHarness() {
+  const [closeRequested, setCloseRequested] = useState(false)
+  const [open, setOpen] = useState(true)
+
+  return (
+    <>
+      <button disabled={!closeRequested} onClick={() => setOpen(false)} type="button">Commit delayed close</button>
+      <ModalSheet onClose={() => setCloseRequested(true)} open={open} title="Delayed controls">
+        Delayed modal content
+      </ModalSheet>
+    </>
+  )
+}
+
 describe('ModalSheet', () => {
   it('leaves touch ownership to the drawer without forcing scroll position or directional touch-action', () => {
     render(<ModalSheetObserverHarness />)
@@ -122,6 +136,18 @@ describe('ModalSheet', () => {
     await waitFor(() => expect(dialog).toHaveAttribute('data-state', 'closed'))
   })
 
+  it('does not treat a pending close request as a rapid reopen', async () => {
+    render(<DelayedCloseModalSheetHarness />)
+
+    const dialog = screen.getByRole('dialog')
+    fireEvent.keyDown(document, { key: 'Escape' })
+
+    expect(dialog).toHaveAttribute('data-state', 'open')
+    expect(dialog).toHaveAttribute('data-rapid-reopen', 'false')
+    fireEvent.click(screen.getByRole('button', { hidden: true, name: 'Commit delayed close' }))
+    await waitFor(() => expect(dialog).toHaveAttribute('data-state', 'closed'))
+  })
+
   it('reopens without stale swipe styles and remains closable', async () => {
     render(<ModalSheetHarness />)
 
@@ -132,6 +158,7 @@ describe('ModalSheet', () => {
     fireEvent.click(screen.getByText('Host page swipe target'))
     const reopenedDialog = await screen.findByRole('dialog')
     expect(reopenedDialog).toHaveAttribute('data-state', 'open')
+    expect(reopenedDialog).toHaveAttribute('data-rapid-reopen', 'true')
     expect(reopenedDialog.style.getPropertyValue('--drawer-swipe-movement-y')).toBe('0px')
 
     fireEvent.keyDown(document, { key: 'Escape' })
