@@ -184,6 +184,7 @@ export const ADMIN_DESCRIPTIONS = {
   livingRoomPowerRecovery: copy('pageAdmin', 'descriptions.livingRoomPowerRecovery'),
   presenceOverrides: copy('pageAdmin', 'descriptions.presenceOverrides'),
   relayControlMode: copy('pageAdmin', 'descriptions.relayControlMode'),
+  relayGuestModeWarning: copy('pageAdmin', 'warnings.relayGuestMode'),
   showSpecific: copy('pageAdmin', 'descriptions.showSpecific'),
   autoReset: copy('pageAdmin', 'descriptions.autoReset'),
 } as const
@@ -193,6 +194,7 @@ export const ADMIN_SECURITY_CONTROLS: EntityTileConfig[] = [
 ]
 
 export const RELAY_CONTROL_MODE_ENTITY_ID = 'input_boolean.relay_control_mode'
+export const GUEST_ROOM_GUEST_MODE_ENTITY_ID = 'input_boolean.guests_staying_in_guest_room'
 
 export const ADMIN_RELAY_CONTROL_ITEMS: EntityTileConfig[] = [
   { title: 'Relay Control Mode', entityId: RELAY_CONTROL_MODE_ENTITY_ID, icon: 'mdi:toggle-switch', color: SWITCH_ACTIVE_COLOR, action: { type: 'toggle' }, showSubtitle: true },
@@ -343,7 +345,7 @@ function mainFloorAutoCleanDisabledRoom(title: string, roomId: string, icon: str
 }
 
 export const GUEST_CONTROL_ITEMS: EntityTileConfig[] = [
-  { title: 'Guest Room', entityId: 'input_boolean.guests_staying_in_guest_room', icon: 'mdi:bed', color: SWITCH_ACTIVE_COLOR, action: { type: 'toggle' }, showSubtitle: true },
+  { title: 'Guest Room', entityId: GUEST_ROOM_GUEST_MODE_ENTITY_ID, icon: 'mdi:bed', color: SWITCH_ACTIVE_COLOR, action: { type: 'toggle' }, showSubtitle: true },
   { title: 'Music Room', entityId: 'input_boolean.guests_staying_in_music_room', icon: 'mdi:guitar-electric', color: SWITCH_ACTIVE_COLOR, action: { type: 'toggle' }, showSubtitle: true },
   { title: 'Theater Room', entityId: 'input_boolean.guests_staying_in_theater_room', icon: 'mdi:projector', color: SWITCH_ACTIVE_COLOR, action: { type: 'toggle' }, showSubtitle: true },
 ]

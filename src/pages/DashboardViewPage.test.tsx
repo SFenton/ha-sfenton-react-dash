@@ -1329,6 +1329,31 @@ describe('DashboardViewPage', () => {
     ])
   })
 
+  it('warns when global relay control and Guest Room guest mode are both active', () => {
+    mockEntities['input_boolean.relay_control_mode'].state = 'on'
+    mockEntities['input_boolean.guests_staying_in_guest_room'].state = 'on'
+
+    render(<DashboardViewPage activePath="admin" onNavigate={() => undefined} path="admin" />)
+
+    const relaySection = screen.getByRole('heading', { name: 'Relay Control Mode' }).closest('section')
+    const warning = within(relaySection as HTMLElement).getByRole('alert')
+    expect(warning).toHaveTextContent('Guest Room guest mode is active. Turning off Relay Control Mode keeps the Guest Room on direct wall control and Guest Bathroom presence lighting off. Turn off Guest Room in Guest Controls to restore normal behavior.')
+    expect(relaySection?.lastElementChild).toBe(warning)
+  })
+
+  it.each([
+    ['off', 'off'],
+    ['on', 'off'],
+    ['off', 'on'],
+  ])('hides the relay guest-mode warning when relay=%s and guest=%s', (relayState, guestState) => {
+    mockEntities['input_boolean.relay_control_mode'].state = relayState
+    mockEntities['input_boolean.guests_staying_in_guest_room'].state = guestState
+
+    render(<DashboardViewPage activePath="admin" onNavigate={() => undefined} path="admin" />)
+
+    expect(screen.queryByText(/Guest Room guest mode is active/)).not.toBeInTheDocument()
+  })
+
   it('keeps the Presence Override detail page stable while closing and resets on reopen', async () => {
     render(<DashboardViewPage activePath="admin" onNavigate={() => undefined} path="admin" />)
 

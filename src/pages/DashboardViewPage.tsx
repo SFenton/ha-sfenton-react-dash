@@ -107,6 +107,7 @@ import {
   CONTROL_PAGES,
   GUEST_CONTROLS_DESCRIPTION,
   GUEST_CONTROL_ITEMS,
+  GUEST_ROOM_GUEST_MODE_ENTITY_ID,
   MEDIA_COLOR,
   NEUTRAL_COLOR,
   MEDIA_SECTIONS,
@@ -119,6 +120,7 @@ import {
   TODO_PAGES,
   UNAVAILABLE_COLOR,
   SWITCH_ACTIVE_COLOR,
+  RELAY_CONTROL_MODE_ENTITY_ID,
   VACATION_DATE_RANGE_ERROR,
   VACATION_DATES_DESCRIPTION,
   VACATION_END_ENTITY_ID,
@@ -1972,6 +1974,8 @@ function MediaPage({ preload = false, preloadHash, preloadHashes = [] }: { prelo
 }
 
 function AdminPage({ onNavigate, preload = false, preloadHash, preloadHashes = [] }: { onNavigate: (path: string) => void; preload?: boolean; preloadHash?: string; preloadHashes?: string[] }) {
+  const relayControlMode = useEntity(asEntityName(RELAY_CONTROL_MODE_ENTITY_ID), { returnNullIfNotFound: true })
+  const guestRoomGuestMode = useEntity(asEntityName(GUEST_ROOM_GUEST_MODE_ENTITY_ID), { returnNullIfNotFound: true })
   const { closeHash, hash, openHash } = useHashModal({ disabled: preload })
   const [selectedPresenceOverride, setSelectedPresenceOverride] = useState<PresenceOverrideConfig | null>(null)
   const presenceDetailPageKey = selectedPresenceOverride?.entityId ?? 'overview'
@@ -1981,6 +1985,7 @@ function AdminPage({ onNavigate, preload = false, preloadHash, preloadHashes = [
   const autoResetModalOpen = hash === '#presence-based-overrides-auto'
   const presenceModalContentActive = contentHash === '#presence-based-overrides'
   const autoResetModalContentActive = contentHash === '#presence-based-overrides-auto'
+  const showRelayGuestModeWarning = relayControlMode?.state === 'on' && guestRoomGuestMode?.state === 'on'
   const [presenceGridRef, presenceGridLayout] = useModalSquareGridLayout(presenceModalOpen, ADMIN_PRESENCE_OVERRIDE_ITEMS.length)
   const [autoResetGridRef, autoResetGridLayout] = useModalSquareGridLayout(autoResetModalOpen, ADMIN_AUTO_REENABLE_ITEMS.length)
   const openPresenceModal = (nextHash: string) => {
@@ -2015,6 +2020,7 @@ function AdminPage({ onNavigate, preload = false, preloadHash, preloadHashes = [
         <SectionHeader title="Relay Control Mode" />
         <Description>{ADMIN_DESCRIPTIONS.relayControlMode}</Description>
         <AdminTileGrid items={ADMIN_RELAY_CONTROL_ITEMS} onNavigate={onNavigate} />
+        {showRelayGuestModeWarning && <InlineAlert>{ADMIN_DESCRIPTIONS.relayGuestModeWarning}</InlineAlert>}
       </section>
 
       <section className={styles.section}>
