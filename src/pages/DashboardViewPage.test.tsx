@@ -4933,19 +4933,64 @@ describe('DashboardViewPage', () => {
     ])
   })
 
-  it('runs bathroom switch cards and preserves source switch colors', () => {
+  it('runs bathroom fan script controls and preserves the towel-rack switch behavior', () => {
     render(<DashboardViewPage activePath="guest-bathroom" onNavigate={() => undefined} path="guest-bathroom" />)
 
     const fan = screen.getByRole('button', { name: /Fan Off/i })
+    const power = screen.getByRole('switch', { name: 'Power' })
     const towelRack = screen.getByRole('button', { name: /Towel Rack On/i })
+    expect(fan.closest('[data-bathroom-fan-tile="guest"]')?.parentElement).toHaveClass(/fullSpan/)
+    expect(fan.closest('[data-dynamic-grid-cell="true"]')).toHaveAttribute('data-dynamic-grid-span', '2')
+    expect(fan).toHaveAttribute('data-modal-opener', 'true')
     expect(towelRack).toHaveStyle('--tile-color: rgba(136, 64, 26, 0.6)')
 
-    fireEvent.click(fan)
+    fireEvent.click(power)
     fireEvent.click(towelRack)
 
     expect(mockCallServiceCalls).toEqual([
-      { domain: 'homeassistant', service: 'toggle', target: 'switch.guest_bathroom_fan_switch_top' },
+      {
+        domain: 'script',
+        service: 'guest_bathroom_fan_command',
+        serviceData: { command: 'power', gesture: 'single', target_power: 'on' },
+      },
       { domain: 'homeassistant', service: 'toggle', target: 'switch.guest_bathroom_towel_rack_switch_top' },
+    ])
+  })
+
+  it('opens the bathroom fan hash modal and preserves its mounted close lifecycle', async () => {
+    render(<DashboardViewPage activePath="guest-bathroom" onNavigate={() => undefined} path="guest-bathroom" />)
+
+    fireEvent.click(screen.getByRole('button', { name: /Fan Off/i }))
+
+    const dialog = await screen.findByRole('dialog')
+    expect(window.location.hash).toBe('#fan-guest-bathroom')
+    expect(screen.getByRole('heading', { name: 'Guest Bathroom Fan' })).toBeInTheDocument()
+    expect(within(dialog).getByText('Room occupancy')).toBeInTheDocument()
+    expect(dialog.querySelector('[data-modal-sheet-footer="true"]')).toBeNull()
+    expect(mockCallServiceCalls).toEqual([])
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Close' }))
+
+    expect(window.location.hash).toBe('')
+    expect(dialog).toBeInTheDocument()
+    expect(dialog).toHaveAttribute('data-state', 'closed')
+  })
+
+  it('shares bathroom fan optimistic intent between the tile and modal', async () => {
+    render(<DashboardViewPage activePath="guest-bathroom" onNavigate={() => undefined} path="guest-bathroom" />)
+
+    fireEvent.click(screen.getByRole('switch', { name: 'Power' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Fan On' }))
+
+    const dialog = await screen.findByRole('dialog')
+    expect(within(dialog).getByRole('switch', { name: 'Power On' })).toHaveAttribute('aria-checked', 'true')
+    expect(within(dialog).getByRole('heading', { name: 'Timer' })).toBeInTheDocument()
+    expect(mockCallServiceCalls).toEqual([
+      {
+        domain: 'script',
+        service: 'guest_bathroom_fan_command',
+        serviceData: { command: 'power', gesture: 'single', target_power: 'on' },
+      },
     ])
   })
 

@@ -9,6 +9,8 @@ export type ControlSemantics =
   | { kind: 'modal' }
   | { kind: 'external' }
 
+export const TOGGLE_CONTROL_KIND = 'toggle'
+
 export function controlDisclosureTarget(semantics: ControlSemantics | undefined) {
   if (semantics?.kind === 'modal') return 'modal'
   if (semantics?.kind === 'navigate') return 'navigation'

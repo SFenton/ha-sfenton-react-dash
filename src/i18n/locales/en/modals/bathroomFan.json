@@ -1,0 +1,35 @@
+{
+  "autoDisableLock": "Auto-disable lock",
+  "clear": "Clear",
+  "durations": {
+    "fiveMinutes": "5 minutes",
+    "oneHour": "1 hour",
+    "tenMinutes": "10 minutes",
+    "thirtyMinutes": "30 minutes",
+    "twentyMinutes": "20 minutes",
+    "fifteenMinutes": "15 minutes"
+  },
+  "fan": "Fan",
+  "humidity": "Humidity",
+  "hintBody": "Both states will clear on their next physical change, or unlock from the app. Locking the fan will prevent automations from turning the fan on or off.",
+  "hintOff": "Double tapping Off on the fan switch will lock the fan off.",
+  "hintOn": "Double tapping On on the fan switch will lock the fan on.",
+  "hintTitle": "Hint",
+  "lock": "Lock",
+  "power": "Power",
+  "roomOccupancy": "Room occupancy",
+  "roomTemperatureRange": "Room temperature range",
+  "set": "Set",
+  "states": {
+    "clear": "Clear",
+    "locked": "Locked",
+    "occupied": "Occupied",
+    "off": "Off",
+    "on": "On",
+    "unavailable": "Unavailable",
+    "unlocked": "Unlocked"
+  },
+  "timerRowLabel": "{{label}} {{value}}",
+  "title": "{{room}} Fan",
+  "timer": "Timer"
+}

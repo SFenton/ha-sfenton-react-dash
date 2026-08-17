@@ -1,0 +1,39 @@
+.field {
+  display: grid;
+  min-width: 0;
+  gap: 7px;
+  color: var(--color-text);
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.field[data-disabled='true'] {
+  opacity: 0.64;
+}
+
+.label {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 7px;
+}
+
+.label > svg {
+  flex: 0 0 auto;
+  color: var(--color-text-muted);
+}
+
+.controls {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+}
+
+.select {
+  min-width: 0;
+}
+
+.action {
+  min-width: 82px;
+}
