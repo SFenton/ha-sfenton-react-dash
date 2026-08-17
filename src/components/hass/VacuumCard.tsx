@@ -3,6 +3,7 @@ import { useEntity, useHass } from '@hakit/core'
 import { GlassTile } from '../core/GlassTile'
 import { Description } from '../core/Description'
 import { InlineAlert } from '../core/InlineAlert'
+import { InfoBox } from '../core/InfoBox'
 import { MaterialIcon } from '../core/Icon'
 import { ModalActionButton, type ModalActionTone } from '../core/ModalActionFooter'
 import { ModalSheet } from '../core/ModalSheet'
@@ -14,6 +15,7 @@ import { DASHBOARD_ROUTE_CHANGE_EVENT, dashboardEventTargets, dashboardHash, das
 import { useModalDetailPageScroll } from '../../hooks/useModalDetailPageScroll'
 import { useImmediateVisualTab, useSmoothDisplayedModalTab } from '../../hooks/useSmoothDisplayedModalTab'
 import { useOptimisticState, type OptimisticCommitOptions } from '../../hooks/useOptimisticState'
+import { VACUUM_COPY_KEYS, VACUUM_COPY_NAMESPACE, useCopy } from '../../i18n'
 import { asEntityName, titleCaseState } from './entityState'
 import { mapGridRectDimensionsCm, mapGridRectToServiceData, type MapGridRect } from './ValetudoMapGeometry'
 import { ValetudoMapCard, type ValetudoMapEditorMeta } from './ValetudoMapCard'
@@ -740,6 +742,7 @@ function orderedSelectedVacuumZones(zones: VacuumZoneConfig[], entities: Record<
 }
 
 function VacuumSelectedRoomsSummary({ coordinator, vacuum }: { coordinator: VacuumCommandCoordinator; vacuum: VacuumConfig }) {
+  const copy = useCopy(VACUUM_COPY_NAMESPACE)
   const entities = useHass((state) => state.entities) as unknown as Record<string, EntityLike | undefined>
   if (vacuum.zones.length === 0) return null
 
@@ -747,8 +750,7 @@ function VacuumSelectedRoomsSummary({ coordinator, vacuum }: { coordinator: Vacu
 
   return (
     <div className={styles.awaySummary}>
-      <div className={styles.awayGroup} data-tone={selectedRooms.length > 0 ? 'selected' : 'neutral'}>
-        <h4>Selected Rooms</h4>
+      <InfoBox title={copy(VACUUM_COPY_KEYS.selectedRooms)} tone={selectedRooms.length > 0 ? 'success' : 'neutral'}>
         {selectedRooms.length > 0 ? (
           <ol>
             {selectedRooms.map(({ zone }) => <li key={zone.entityId}>{zone.title}</li>)}
@@ -758,7 +760,7 @@ function VacuumSelectedRoomsSummary({ coordinator, vacuum }: { coordinator: Vacu
             No rooms are selected. If you begin cleaning, the robot vacuum will attempt to clean every mapped area.
           </Description>
         )}
-      </div>
+      </InfoBox>
     </div>
   )
 }
@@ -1005,6 +1007,7 @@ function VacuumControlsSection({
 }
 
 function VacuumWhileAwaySection({ vacuum }: { vacuum: VacuumConfig }) {
+  const copy = useCopy(VACUUM_COPY_NAMESPACE)
   const session = useOptionalEntity(vacuum.coordinatorSessionEntityId)
   const cleaned = stringListAttribute(session, 'while_away_cleaned')
   const issues = stringListAttribute(session, 'while_away_issues')
@@ -1016,20 +1019,18 @@ function VacuumWhileAwaySection({ vacuum }: { vacuum: VacuumConfig }) {
       <SectionHeader title="While You Were Away" />
       <div className={styles.awaySummary}>
         {cleaned.length > 0 && (
-          <div className={styles.awayGroup}>
-            <h4>Cleaned</h4>
+          <InfoBox title={copy(VACUUM_COPY_KEYS.cleaned)}>
             <ul>
               {cleaned.map((line) => <li key={line}>{line}</li>)}
             </ul>
-          </div>
+          </InfoBox>
         )}
         {issues.length > 0 && (
-          <div className={styles.awayGroup} data-tone="issue">
-            <h4>Issues</h4>
+          <InfoBox title={copy(VACUUM_COPY_KEYS.issues)} tone="warning">
             <ul>
               {issues.map((line) => <li key={line}>{line}</li>)}
             </ul>
-          </div>
+          </InfoBox>
         )}
       </div>
     </section>

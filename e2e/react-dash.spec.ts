@@ -1,4 +1,5 @@
 import { expect, test, type FrameLocator, type Locator, type Page } from '@playwright/test'
+import { valueToThermostatPoint } from '../src/components/hass/thermostatDialGeometry'
 
 type FreeSleepAlarmSnapshot = {
   enabled: boolean
@@ -6,6 +7,14 @@ type FreeSleepAlarmSnapshot = {
 }
 
 type FreeSleepSchedulesSnapshot = Partial<Record<'left' | 'right', Partial<Record<string, { alarms?: FreeSleepAlarmSnapshot[] }>>>>
+
+type SleepypodPromptFrameSample = {
+  promptMounted: boolean
+  rangeValue: string | null
+  readout: string | null
+  regionLabel: string | null
+  sliderValue: string | null
+}
 
 declare global {
   interface Window {
@@ -69,6 +78,46 @@ async function clearMockHassCalls(page: Page) {
     const calls = (window as unknown as { __mockHass: { calls: Record<string, unknown>[] } }).__mockHass.calls
     calls.splice(0, calls.length)
   })
+}
+
+async function startSleepypodPromptFrameSampler(page: Page) {
+  await page.evaluate(() => {
+    const state = window as unknown as {
+      __sleepypodPromptFrameSamples?: SleepypodPromptFrameSample[]
+    }
+    state.__sleepypodPromptFrameSamples = []
+    let frameCount = 0
+    let mountedFrameCount = 0
+
+    const sample = () => {
+      const dialogs = [...document.querySelectorAll<HTMLElement>('[role="dialog"][data-surface="hass-popup"]')]
+      const promptMounted = dialogs.length >= 2 && dialogs.at(-1)?.getAttribute('data-state') === 'open'
+      const region = [...document.querySelectorAll<HTMLElement>('[role="region"]')]
+        .find((element) => element.getAttribute('aria-label')?.startsWith("Stephen's Bed thermostat"))
+      const slider = [...document.querySelectorAll<HTMLElement>('[role="slider"]')]
+        .find((element) => element.getAttribute('aria-label') === "Stephen's Bed target level")
+      const range = region?.querySelector<HTMLInputElement>('input[type="range"]')
+      state.__sleepypodPromptFrameSamples?.push({
+        promptMounted,
+        rangeValue: range?.value ?? null,
+        readout: region?.textContent?.replace(/\s+/g, ' ').trim() ?? null,
+        regionLabel: region?.getAttribute('aria-label') ?? null,
+        sliderValue: slider?.getAttribute('aria-valuenow') ?? null,
+      })
+      frameCount += 1
+      if (promptMounted) mountedFrameCount += 1
+      if (frameCount < 120 && mountedFrameCount < 5) requestAnimationFrame(sample)
+    }
+
+    requestAnimationFrame(sample)
+  })
+}
+
+async function sleepypodPromptFrameSamples(page: Page) {
+  return page.evaluate(() => (
+    (window as unknown as { __sleepypodPromptFrameSamples?: SleepypodPromptFrameSample[] })
+      .__sleepypodPromptFrameSamples ?? []
+  ))
 }
 
 async function openThermostatControls(page: Page, tab: 'Automation' | 'Rooms' | 'Tracking' = 'Rooms') {
@@ -3543,22 +3592,26 @@ test('vacuum native dropdown stays aligned after rapid close and reopen', async 
     const rect = select?.getBoundingClientRect()
     const style = dialog ? getComputedStyle(dialog) : null
     const selectStyle = select ? getComputedStyle(select) : null
+    const transform = style?.transform
+    const translateY = transform && transform !== 'none' ? new DOMMatrixReadOnly(transform).m42 : 0
 
     return {
       animationName: style?.animationName,
+      movementY: dialog?.style.getPropertyValue('--drawer-swipe-movement-y'),
       pointerEvents: selectStyle?.pointerEvents,
-      rapidReopen: dialog?.getAttribute('data-rapid-reopen'),
       selectRect: rect ? { y: rect.y, height: rect.height } : null,
-      transform: style?.transform,
+      state: dialog?.getAttribute('data-state'),
+      translateY,
       value: select?.value,
     }
   })
 
-  expect(rapidReopenState.rapidReopen).toBe('true')
   expect(rapidReopenState.animationName).toBe('none')
-  expect(rapidReopenState.transform).toBe('none')
+  expect(rapidReopenState.movementY).toBe('0px')
   expect(rapidReopenState.pointerEvents).toBe('auto')
   expect(rapidReopenState.selectRect?.y).toBeLessThan(720)
+  expect(rapidReopenState.state).toBe('open')
+  expect(Math.abs(rapidReopenState.translateY)).toBeLessThanOrEqual(1)
   expect(rapidReopenState.value).toBe('3')
 
   await page.getByRole('combobox', { name: /Cleaning Passes/i }).selectOption('2')
@@ -3588,18 +3641,21 @@ test('vacuum mode dropdown keeps source option labels while optimistic', async (
   const modeOptions = await page.getByRole('combobox', { name: /Mode Mop/i }).evaluate((select) => {
     const dialog = document.querySelector<HTMLElement>('[role="dialog"]')
     const style = dialog ? getComputedStyle(dialog) : null
+    const transform = style?.transform
     return {
       animationName: style?.animationName,
+      movementY: dialog?.style.getPropertyValue('--drawer-swipe-movement-y'),
       options: Array.from((select as HTMLSelectElement).options).map((option) => ({ label: option.label, value: option.value })),
-      rapidReopen: dialog?.getAttribute('data-rapid-reopen'),
-      transform: style?.transform,
+      state: dialog?.getAttribute('data-state'),
+      translateY: transform && transform !== 'none' ? new DOMMatrixReadOnly(transform).m42 : 0,
       value: (select as HTMLSelectElement).value,
     }
   })
 
-  expect(modeOptions.rapidReopen).toBe('true')
   expect(modeOptions.animationName).toBe('none')
-  expect(modeOptions.transform).toBe('none')
+  expect(modeOptions.movementY).toBe('0px')
+  expect(modeOptions.state).toBe('open')
+  expect(Math.abs(modeOptions.translateY)).toBeLessThanOrEqual(1)
   expect(modeOptions.value).toBe('mop')
   expect(modeOptions.options).toEqual([
     { label: 'Vacuum And Mop', value: 'vacuum_and_mop' },
@@ -3807,7 +3863,7 @@ test('mobile bed dial maps taps, drag, and keyboard to targets without invoking 
   expect(powerOffCalls).toHaveLength(0)
 })
 
-test('mobile SleepyPod target prompt routes Tonight and swipes closed without a second command', async ({ page }) => {
+test('mobile SleepyPod target prompt commits Tonight immediately and closes without an extra command', async ({ page }) => {
   await page.setViewportSize({ width: 393, height: 852 })
   await page.goto('/at-a-glance/master-bedroom')
   await page.evaluate(() => {
@@ -3819,14 +3875,43 @@ test('mobile SleepyPod target prompt routes Tonight and swipes closed without a 
 
   await page.getByRole('button', { name: /Stephen's Bed Cooling/i }).click()
   const bedDialog = page.getByRole('dialog', { name: "Stephen's Bed" })
+  const dial = bedDialog.getByRole('region', { name: /Stephen's Bed thermostat Cooling -2/i })
   const targetSlider = bedDialog.getByRole('slider', { name: "Stephen's Bed target level" })
   await expect(targetSlider).toHaveAttribute('aria-valuenow', '-2')
-  await targetSlider.press('ArrowLeft')
+  const dialBox = await dial.boundingBox()
+  if (!dialBox) throw new Error('SleepyPod target dial geometry was not measurable')
+  const targetPoint = valueToThermostatPoint(-5, -10, 10)
+  await startSleepypodPromptFrameSampler(page)
+  await dial.click({
+    position: {
+      x: (targetPoint.x / 100) * dialBox.width,
+      y: (targetPoint.y / 100) * dialBox.height,
+    },
+  })
 
   const scopeDialog = page.getByRole('dialog', { name: 'Set Bed Temperature' })
   await expect(scopeDialog).toBeVisible()
+  await expect.poll(async () => (
+    (await sleepypodPromptFrameSamples(page)).filter((sample) => sample.promptMounted).length
+  )).toBeGreaterThanOrEqual(3)
+  const mountedPromptFrames = (await sleepypodPromptFrameSamples(page)).filter((sample) => sample.promptMounted)
+  expect(mountedPromptFrames.length).toBeGreaterThanOrEqual(3)
+  for (const frame of mountedPromptFrames) {
+    expect(frame.rangeValue).toBe('-5')
+    expect(frame.readout).toContain('-5')
+    expect(frame.regionLabel).toMatch(/Stephen's Bed thermostat Cooling -5/i)
+    expect(frame.sliderValue).toBe('-5')
+  }
+  await expect.poll(async () => page.evaluate(() => (
+    (window as unknown as { __mockHass: { calls: Record<string, unknown>[] } }).__mockHass.calls
+      .filter((call) => call.domain === 'script')
+  ))).toEqual([{
+    domain: 'script',
+    service: 'sleepypod_stephen_temperature_tonight',
+    serviceData: { level: -5 },
+  }])
   await expect(scopeDialog).toHaveAttribute('data-surface', 'hass-popup')
-  await expect(scopeDialog).toContainText("Stephen's Bed • Bedtime • -3")
+  await expect(scopeDialog).toContainText("Stephen's Bed • Bedtime • -5")
   await expect(scopeDialog.getByRole('button', { name: 'Tonight' })).toBeFocused()
   await expect(scopeDialog.locator('[data-modal-disclosure]')).toHaveCount(0)
   await expect.poll(async () => scopeDialog.evaluate((element) => Math.round(window.innerHeight - element.getBoundingClientRect().bottom))).toBe(0)
@@ -3855,7 +3940,7 @@ test('mobile SleepyPod target prompt routes Tonight and swipes closed without a 
   await expect(scopeDialog).toHaveAttribute('data-state', 'closed')
   await expect(scopeDialog).toHaveAttribute('data-closing', 'true')
   await expect(scopeDialog).toBeHidden()
-  await expect(targetSlider).toHaveAttribute('aria-valuenow', '-3')
+  await expect(targetSlider).toHaveAttribute('aria-valuenow', '-5')
   await expect(targetSlider).toBeFocused()
   await expect.poll(async () => page.evaluate(() => (
     (window as unknown as { __mockHass: { calls: Record<string, unknown>[] } }).__mockHass.calls
@@ -3863,20 +3948,28 @@ test('mobile SleepyPod target prompt routes Tonight and swipes closed without a 
   ))).toEqual([{
     domain: 'script',
     service: 'sleepypod_stephen_temperature_tonight',
-    serviceData: { level: -3 },
+    serviceData: { level: -5 },
   }])
 
   await targetSlider.press('ArrowLeft')
   await expect(scopeDialog).toBeVisible()
-  await expect(scopeDialog).toContainText("Stephen's Bed • Bedtime • -4")
-  await page.waitForTimeout(500)
-  const handle = scopeDialog.locator('[data-mobile-drag-handle="true"]')
-  const handleBox = await handle.boundingBox()
-  if (!handleBox) throw new Error('SleepyPod scope prompt drag handle was not measurable')
-  await page.mouse.move(handleBox.x + handleBox.width / 2, handleBox.y + handleBox.height / 2)
-  await page.mouse.down()
-  await page.mouse.move(handleBox.x + handleBox.width / 2, handleBox.y + 320, { steps: 10 })
-  await page.mouse.up()
+  await expect(scopeDialog).toContainText("Stephen's Bed • Bedtime • -6")
+  await expect.poll(async () => page.evaluate(() => (
+    (window as unknown as { __mockHass: { calls: Record<string, unknown>[] } }).__mockHass.calls
+      .filter((call) => call.domain === 'script')
+  ))).toEqual([
+    {
+      domain: 'script',
+      service: 'sleepypod_stephen_temperature_tonight',
+      serviceData: { level: -5 },
+    },
+    {
+      domain: 'script',
+      service: 'sleepypod_stephen_temperature_tonight',
+      serviceData: { level: -6 },
+    },
+  ])
+  await scopeDialog.getByRole('button', { name: 'Close' }).click()
 
   await expect(scopeDialog).toHaveAttribute('data-state', 'closed')
   await expect(scopeDialog).toHaveAttribute('data-closing', 'true')
@@ -3888,8 +3981,8 @@ test('mobile SleepyPod target prompt routes Tonight and swipes closed without a 
   await expect.poll(async () => page.evaluate(() => (
     (window as unknown as { __mockHass: { calls: Record<string, unknown>[] } }).__mockHass.calls
       .filter((call) => call.domain === 'script')
-  ))).toHaveLength(1)
-  await expect(targetSlider).toHaveAttribute('aria-valuenow', '-3')
+  ))).toHaveLength(2)
+  await expect(targetSlider).toHaveAttribute('aria-valuenow', '-6')
 })
 
 test('thermostat Vacation end transitions to Away or Home with correct dial ranges on mobile', async ({ page }) => {

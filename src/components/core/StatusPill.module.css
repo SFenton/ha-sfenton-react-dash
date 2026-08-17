@@ -9,7 +9,7 @@
   border-radius: 18px;
   padding: 9px 10px;
   color: white;
-  background: var(--color-glass-soft);
+  background: var(--status-pill-color, var(--color-glass-soft));
   box-shadow: var(--shadow-glass), inset 0 -1px 0 rgba(0, 0, 0, 0.12);
   backdrop-filter: blur(15px) saturate(1.08);
   -webkit-backdrop-filter: blur(15px) saturate(1.08);
@@ -36,7 +36,7 @@
 }
 
 .label {
-  color: rgba(232, 240, 255, 0.62);
+  color: var(--color-text);
   font-size: 0.68rem;
   font-weight: 760;
   line-height: 1.05;

@@ -1,0 +1,31 @@
+{
+  "autoDisableLock": "Auto-disable lock",
+  "clear": "Clear",
+  "durations": {
+    "fiveMinutes": "5 minutes",
+    "oneHour": "1 hour",
+    "tenMinutes": "10 minutes",
+    "thirtyMinutes": "30 minutes",
+    "twentyMinutes": "20 minutes",
+    "fifteenMinutes": "15 minutes"
+  },
+  "fan": "Fan",
+  "humidity": "Humidity",
+  "lock": "Lock",
+  "power": "Power",
+  "roomOccupancy": "Room occupancy",
+  "roomTemperatureRange": "Room temperature range",
+  "set": "Set",
+  "states": {
+    "clear": "Clear",
+    "locked": "Locked",
+    "occupied": "Occupied",
+    "off": "Off",
+    "on": "On",
+    "unavailable": "Unavailable",
+    "unlocked": "Unlocked"
+  },
+  "timerRowLabel": "{{label}} {{value}}",
+  "title": "{{room}} Fan",
+  "timer": "Timer"
+}

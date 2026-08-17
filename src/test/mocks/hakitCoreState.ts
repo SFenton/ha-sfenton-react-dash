@@ -1,4 +1,5 @@
 import { mockEntitiesFixture } from './appEntities'
+import { BATHROOM_FAN_CONFIGS } from '../../constants/bathroomFans'
 
 export interface MockEntity {
   attributes: Record<string, unknown>
@@ -6,11 +7,14 @@ export interface MockEntity {
   state: string
 }
 
+export type MockConnectionStatus = 'connected' | 'disconnected' | 'pending' | 'pending-suspension' | 'suspended'
+
 export interface MockHassState {
   config: Record<string, unknown>
   connection: {
     sendMessagePromise: <T>(message: Record<string, unknown>) => Promise<T>
   }
+  connectionStatus: MockConnectionStatus
   entities: Record<string, MockEntity>
   hassUrl: string
   helpers: {
@@ -33,8 +37,53 @@ export const mockTodoUpdateMessages: Record<string, unknown>[] = []
 export const mockTodoItemsByEntity: Record<string, MockTodoItem[] | undefined> = {}
 export const mockDonetickTasksById: Record<number, MockDonetickTask | undefined> = {}
 const mockInventoryItemsByLocation: Record<string, Record<string, unknown>[] | undefined> = {}
+export type MockCallServiceOutcome = 'pending' | 'reject' | 'resolve'
+const mockCallServiceOutcomes = new Map<string, MockCallServiceOutcome>()
+const mockHassListeners = new Set<() => void>()
+let mockHassRevision = 0
 let mockDonetickTaskLoadDelayMs = 0
 let mockRecipeQueryDelayMs = 0
+
+export function getMockHassRevision() {
+  return mockHassRevision
+}
+
+export function subscribeMockHass(listener: () => void) {
+  mockHassListeners.add(listener)
+  return () => mockHassListeners.delete(listener)
+}
+
+function notifyMockHass() {
+  mockHassRevision += 1
+  for (const listener of mockHassListeners) listener()
+}
+
+function mockCallServiceOutcomeKey(domain: string, service: string) {
+  return `${domain}.${service}`
+}
+
+export function setMockCallServiceOutcome(domain: string, service: string, outcome: MockCallServiceOutcome) {
+  mockCallServiceOutcomes.set(mockCallServiceOutcomeKey(domain, service), outcome)
+}
+
+export function setMockConnectionStatus(status: MockConnectionStatus) {
+  mockState.connectionStatus = status
+  notifyMockHass()
+}
+
+export function setMockEntityAttribute(entityId: string, attribute: string, value: unknown) {
+  const target = mockEntities[entityId]
+  if (!target) return
+  target.attributes = { ...target.attributes, [attribute]: value }
+  notifyMockHass()
+}
+
+export function setMockEntityState(entityId: string, state: string) {
+  const target = mockEntities[entityId]
+  if (!target) return
+  target.state = state
+  notifyMockHass()
+}
 
 function configuredRecipeQueryDelayMs() {
   if (typeof window === 'undefined') return 0
@@ -629,7 +678,69 @@ function applyFreeSleepSchedulePayload(payload: unknown) {
   applySchedulePayload('sensor.nightcanvasrestful_schedules', payload)
 }
 
+function applyBathroomFanScriptSideEffects(params: Record<string, unknown>) {
+  if (params.domain !== 'script' || typeof params.service !== 'string') return
+  const config = BATHROOM_FAN_CONFIGS.find((candidate) => candidate.scriptService === params.service)
+  const serviceData = isRecord(params.serviceData) ? params.serviceData : {}
+  const command = serviceData.command
+  if (!config || typeof command !== 'string') return
+
+  const power = mockEntities[config.powerEntityId]
+  const lock = mockEntities[config.lockEntityId]
+  const pending = mockEntities[config.pendingEntityId]
+  const autoUnlock = mockEntities[config.autoUnlockEntityId]
+  const deadline = mockEntities[config.deadlineEntityId]
+  const timer = mockEntities[config.timerEntityId]
+
+  if (command === 'power' && (serviceData.target_power === 'on' || serviceData.target_power === 'off')) {
+    const powerChanges = power?.state !== serviceData.target_power
+    if (power) power.state = serviceData.target_power
+    if (powerChanges && pending) pending.state = 'off'
+    if (powerChanges && autoUnlock) autoUnlock.state = 'off'
+    if (powerChanges && timer) timer.state = 'idle'
+    if (powerChanges && lock?.state === 'on') lock.state = 'off'
+    return
+  }
+
+  if (command === 'lock' && typeof serviceData.locked === 'boolean') {
+    if (lock) lock.state = serviceData.locked ? 'on' : 'off'
+    if (autoUnlock) autoUnlock.state = serviceData.locked && pending?.state === 'on' ? 'on' : 'off'
+    return
+  }
+
+  if (command === 'timer_start') {
+    const minutes = Number(serviceData.minutes)
+    const durationMinutes = Number.isFinite(minutes) ? minutes : 30
+    const endsAt = Date.now() + durationMinutes * 60 * 1000
+    if (power) power.state = 'on'
+    if (pending) pending.state = 'on'
+    if (autoUnlock) autoUnlock.state = lock?.state === 'on' && serviceData.auto_unlock === true ? 'on' : 'off'
+    if (deadline) {
+      deadline.state = new Date(endsAt).toISOString()
+      deadline.attributes.timestamp = endsAt / 1000
+    }
+    if (timer) {
+      timer.state = 'active'
+      timer.attributes.finishes_at = new Date(endsAt).toISOString()
+    }
+    return
+  }
+
+  if (command === 'timer_cancel') {
+    if (pending) pending.state = 'off'
+    if (autoUnlock) autoUnlock.state = 'off'
+    if (timer) timer.state = 'idle'
+    return
+  }
+
+  if (command === 'timer_auto_unlock' && pending?.state === 'on' && lock?.state === 'on' && autoUnlock) {
+    autoUnlock.state = serviceData.enabled === true ? 'on' : 'off'
+  }
+}
+
 function applyMockCallServiceSideEffects(params: Record<string, unknown>) {
+  applyBathroomFanScriptSideEffects(params)
+
   if (params.domain === 'switch' && typeof params.target === 'string' && (params.service === 'turn_on' || params.service === 'turn_off')) {
     const switchEntity = mockEntities[params.target]
     if (switchEntity) switchEntity.state = params.service === 'turn_on' ? 'on' : 'off'
@@ -685,6 +796,8 @@ type MockHassDebugApi = {
   calls: Record<string, unknown>[]
   freeSleepSchedules: () => Record<string, unknown>
   reset: () => void
+  setCallServiceOutcome: (domain: string, service: string, outcome: MockCallServiceOutcome) => void
+  setConnectionStatus: (status: MockConnectionStatus) => void
   setHumidifierSchedule: (schedule: Record<string, unknown>) => void
   setEntityAttribute: (entityId: string, attribute: string, value: unknown) => void
   setEntityState: (entityId: string, state: string) => void
@@ -700,18 +813,14 @@ function exposeMockHassDebugApi() {
   ;(window as unknown as { __mockHass?: MockHassDebugApi }).__mockHass = {
     calls: mockCallServiceCalls,
     freeSleepSchedules: () => cloneRecord(mockEntities['sensor.nightcanvasrestful_schedules'].attributes),
+    setCallServiceOutcome: setMockCallServiceOutcome,
+    setConnectionStatus: setMockConnectionStatus,
     setHumidifierSchedule: (schedule) => {
       mockHumidifierSchedule = cloneRecord(schedule) as unknown as typeof mockHumidifierSchedule
     },
-    setEntityAttribute: (entityId, attribute, value) => {
-      const target = mockEntities[entityId]
-      if (target) target.attributes = { ...target.attributes, [attribute]: value }
-    },
+    setEntityAttribute: setMockEntityAttribute,
     reset: resetMockHass,
-    setEntityState: (entityId, state) => {
-      const target = mockEntities[entityId]
-      if (target) target.state = state
-    },
+    setEntityState: setMockEntityState,
     setDonetickTask: (taskId, task) => {
       mockDonetickTasksById[taskId] = task
     },
@@ -1010,12 +1119,22 @@ export const explicitMockEntities: Record<string, MockEntity> = {
   'sensor.steph_s_eight_sleep_side_now_level': entity('sensor.steph_s_eight_sleep_side_now_level', 'unknown', { raw_value: null, api_field: 'overrideLevels.bedtime', has_override: false, source: 'overrideLevels', unit_of_measurement: '°' }),
   'input_boolean.eight_sleep_stephen_hot_flash_active': entity('input_boolean.eight_sleep_stephen_hot_flash_active', 'off'),
   'input_boolean.eight_sleep_steph_hot_flash_active': entity('input_boolean.eight_sleep_steph_hot_flash_active', 'off'),
+  'input_boolean.guest_bathroom_fan_automation_lock': entity('input_boolean.guest_bathroom_fan_automation_lock', 'off'),
+  'input_boolean.guest_bathroom_fan_timer_auto_unlock': entity('input_boolean.guest_bathroom_fan_timer_auto_unlock', 'off'),
+  'input_boolean.guest_bathroom_fan_timer_pending': entity('input_boolean.guest_bathroom_fan_timer_pending', 'off'),
+  'input_boolean.master_bathroom_fan_automation_lock': entity('input_boolean.master_bathroom_fan_automation_lock', 'off'),
+  'input_boolean.master_bathroom_fan_timer_auto_unlock': entity('input_boolean.master_bathroom_fan_timer_auto_unlock', 'off'),
+  'input_boolean.master_bathroom_fan_timer_pending': entity('input_boolean.master_bathroom_fan_timer_pending', 'off'),
   'input_button.eight_sleep_stephen_cancel_hot_flash': entity('input_button.eight_sleep_stephen_cancel_hot_flash', 'unknown', { icon: 'mdi:close' }),
   'input_button.eight_sleep_stephen_hot_flash': entity('input_button.eight_sleep_stephen_hot_flash', 'unknown', { icon: 'mdi:snowflake' }),
   'input_button.eight_sleep_steph_cancel_hot_flash': entity('input_button.eight_sleep_steph_cancel_hot_flash', 'unknown', { icon: 'mdi:close' }),
   'input_button.eight_sleep_steph_hot_flash': entity('input_button.eight_sleep_steph_hot_flash', 'unknown', { icon: 'mdi:snowflake' }),
   'input_datetime.eight_sleep_stephen_hot_flash_restore_at': entity('input_datetime.eight_sleep_stephen_hot_flash_restore_at', '2026-06-07 00:00:00', { timestamp: 1780815600 }),
   'input_datetime.eight_sleep_steph_hot_flash_restore_at': entity('input_datetime.eight_sleep_steph_hot_flash_restore_at', '2026-06-07 00:00:00', { timestamp: 1780815600 }),
+  'input_datetime.guest_bathroom_fan_timer_ends_at': entity('input_datetime.guest_bathroom_fan_timer_ends_at', 'unavailable'),
+  'input_datetime.master_bathroom_fan_timer_ends_at': entity('input_datetime.master_bathroom_fan_timer_ends_at', 'unavailable'),
+  'input_text.guest_bathroom_climate_color': entity('input_text.guest_bathroom_climate_color', 'rgba(0, 200, 120, 1)'),
+  'input_text.master_bathroom_climate_color': entity('input_text.master_bathroom_climate_color', 'rgba(255, 215, 0, 1)'),
   'input_number.eight_sleep_stephen_asleep_level': entity('input_number.eight_sleep_stephen_asleep_level', '1'),
   'input_number.eight_sleep_stephen_bedtime_level': entity('input_number.eight_sleep_stephen_bedtime_level', '-5'),
   'input_number.eight_sleep_stephen_dawn_level': entity('input_number.eight_sleep_stephen_dawn_level', '2'),
@@ -1025,6 +1144,8 @@ export const explicitMockEntities: Record<string, MockEntity> = {
   ...mockFreeSleepAlarmHelpers(),
   'timer.eight_sleep_stephen_hot_flash': entity('timer.eight_sleep_stephen_hot_flash', 'idle'),
   'timer.eight_sleep_steph_hot_flash': entity('timer.eight_sleep_steph_hot_flash', 'active', { remaining: '0:12:34' }),
+  'timer.guest_bathroom_fan_off_timer': entity('timer.guest_bathroom_fan_off_timer', 'idle'),
+  'timer.master_bathroom_fan_off_timer': entity('timer.master_bathroom_fan_off_timer', 'idle'),
   'input_text.all_aqi_color': entity('input_text.all_aqi_color', 'rgba(0, 150, 136, 1)'),
   'input_text.all_aqi_range': entity('input_text.all_aqi_range', '1'),
   'input_text.all_climate_range': entity('input_text.all_climate_range', '68°F - 72°F'),
@@ -1212,6 +1333,8 @@ export const explicitMockEntities: Record<string, MockEntity> = {
   'sensor.guest_room_air_purifier_pm2_5': entity('sensor.guest_room_air_purifier_pm2_5', '2', { unit_of_measurement: 'μg/m³' }),
   'sensor.master_bedroom_air_purifier_air_quality_index': entity('sensor.master_bedroom_air_purifier_air_quality_index', '1'),
   'sensor.master_bedroom_air_purifier_pm2_5': entity('sensor.master_bedroom_air_purifier_pm2_5', '2', { unit_of_measurement: 'μg/m³' }),
+  'sensor.guest_bathroom_presence_sensor_humidity_2': entity('sensor.guest_bathroom_presence_sensor_humidity_2', '45', { unit_of_measurement: '%' }),
+  'sensor.master_bathroom_presence_sensor_humidity': entity('sensor.master_bathroom_presence_sensor_humidity', '48', { unit_of_measurement: '%' }),
   'sensor.office_air_purifier_air_quality_index': entity('sensor.office_air_purifier_air_quality_index', '1'),
   'sensor.office_air_purifier_pm2_5': entity('sensor.office_air_purifier_pm2_5', '2', { unit_of_measurement: 'μg/m³' }),
   'sensor.theater_room_air_purifier_air_quality_index': entity('sensor.theater_room_air_purifier_air_quality_index', '1'),
@@ -1387,6 +1510,7 @@ function todoItems(entityId: unknown) {
 
 export function resetMockHass() {
   mockCallServiceCalls.length = 0
+  mockCallServiceOutcomes.clear()
   mockScheduleMessages.length = 0
   mockTodoUpdateMessages.length = 0
   for (const entityId of Object.keys(mockTodoItemsByEntity)) delete mockTodoItemsByEntity[entityId]
@@ -1394,6 +1518,7 @@ export function resetMockHass() {
   for (const location of Object.keys(mockInventoryItemsByLocation)) delete mockInventoryItemsByLocation[location]
   mockDonetickTaskLoadDelayMs = 0
   mockRecipeQueryDelayMs = 0
+  mockState.connectionStatus = 'connected'
   mockState.user = { id: '64089b5683944c39b4f944c8f76830b0', is_admin: true, name: 'Stephen' }
   mockEntities['input_boolean.show_outdoor_faucets'].state = 'off'
   mockEntities['binary_sensor.front_yard_fault'].state = 'off'
@@ -1473,6 +1598,24 @@ export function resetMockHass() {
   mockEntities['input_boolean.guests_staying_in_guest_room'].state = 'off'
   mockEntities['input_boolean.guests_staying_in_music_room'].state = 'off'
   mockEntities['input_boolean.guests_staying_in_theater_room'].state = 'off'
+  mockEntities['input_boolean.guest_bathroom_fan_automation_lock'].state = 'off'
+  mockEntities['input_boolean.guest_bathroom_fan_timer_auto_unlock'].state = 'off'
+  mockEntities['input_boolean.guest_bathroom_fan_timer_pending'].state = 'off'
+  mockEntities['input_boolean.master_bathroom_fan_automation_lock'].state = 'off'
+  mockEntities['input_boolean.master_bathroom_fan_timer_auto_unlock'].state = 'off'
+  mockEntities['input_boolean.master_bathroom_fan_timer_pending'].state = 'off'
+  mockEntities['input_text.guest_bathroom_climate_color'].state = 'rgba(0, 200, 120, 1)'
+  mockEntities['input_text.master_bathroom_climate_color'].state = 'rgba(255, 215, 0, 1)'
+  mockEntities['switch.guest_bathroom_fan_switch_top'].state = 'off'
+  mockEntities['switch.master_bathroom_fan_switch_top'].state = 'off'
+  mockEntities['input_datetime.guest_bathroom_fan_timer_ends_at'].state = 'unavailable'
+  delete mockEntities['input_datetime.guest_bathroom_fan_timer_ends_at'].attributes.timestamp
+  mockEntities['input_datetime.master_bathroom_fan_timer_ends_at'].state = 'unavailable'
+  delete mockEntities['input_datetime.master_bathroom_fan_timer_ends_at'].attributes.timestamp
+  mockEntities['timer.guest_bathroom_fan_off_timer'].state = 'idle'
+  delete mockEntities['timer.guest_bathroom_fan_off_timer'].attributes.finishes_at
+  mockEntities['timer.master_bathroom_fan_off_timer'].state = 'idle'
+  delete mockEntities['timer.master_bathroom_fan_off_timer'].attributes.finishes_at
   mockEntities['input_boolean.high_aqi_mode'].state = 'off'
   mockEntities['binary_sensor.thermostat_contact_sensors_away_mode_active'].state = 'off'
   mockEntities['sensor.thermostat_effective_home_away'].state = 'Home'
@@ -1493,8 +1636,11 @@ export function resetMockHass() {
   mockEntities['binary_sensor.lv600s_humidifier_tank_removed'].state = 'off'
   mockEntities['binary_sensor.lv600s_humidifier_humidifying'].state = 'on'
   mockEntities['input_boolean.master_bedroom_humidifier_schedule_enabled'].state = 'off'
+  mockEntities['cover.left_door'].state = 'closed'
+  mockEntities['cover.right_door'].state = 'closed'
   mockHumidifierSchedule = emptyHumidifierSchedule()
   exposeMockHassDebugApi()
+  notifyMockHass()
 }
 
 export const mockState: MockHassState = {
@@ -1526,10 +1672,27 @@ export const mockState: MockHassState = {
       if (message.type === 'call_service' && message.domain === 'weather' && message.service === 'get_forecasts') {
         return { service_response: { 'weather.pirate_weather': { forecast: mockDailyWeatherForecast } } } as T
       }
+      if (message.type === 'call_service' && typeof message.domain === 'string' && typeof message.service === 'string') {
+        const target = isRecord(message.target) && typeof message.target.entity_id === 'string'
+          ? message.target.entity_id
+          : undefined
+        const params: Record<string, unknown> = {
+          domain: message.domain,
+          service: message.service,
+        }
+        if (target !== undefined) params.target = target
+        if (message.service_data !== undefined) params.serviceData = message.service_data
+        mockCallServiceCalls.push(params)
+        const outcome = mockCallServiceOutcomes.get(mockCallServiceOutcomeKey(message.domain, message.service)) ?? 'resolve'
+        if (outcome === 'pending') return new Promise<T>(() => undefined)
+        if (outcome === 'reject') return Promise.reject(new Error('Mock service rejection'))
+        return {} as T
+      }
       if (message.type === 'calendar/event/list') return { events: [] } as T
       return {} as T
     },
   },
+  connectionStatus: 'connected',
   entities: mockEntities,
   hassUrl: 'http://mock-hass.local',
   helpers: {

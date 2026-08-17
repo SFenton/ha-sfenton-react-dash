@@ -184,6 +184,7 @@ export const ADMIN_DESCRIPTIONS = {
   livingRoomPowerRecovery: copy('pageAdmin', 'descriptions.livingRoomPowerRecovery'),
   presenceOverrides: copy('pageAdmin', 'descriptions.presenceOverrides'),
   relayControlMode: copy('pageAdmin', 'descriptions.relayControlMode'),
+  relayGuestModeWarning: copy('pageAdmin', 'warnings.relayGuestMode'),
   showSpecific: copy('pageAdmin', 'descriptions.showSpecific'),
   autoReset: copy('pageAdmin', 'descriptions.autoReset'),
 } as const
@@ -193,6 +194,7 @@ export const ADMIN_SECURITY_CONTROLS: EntityTileConfig[] = [
 ]
 
 export const RELAY_CONTROL_MODE_ENTITY_ID = 'input_boolean.relay_control_mode'
+export const GUEST_ROOM_GUEST_MODE_ENTITY_ID = 'input_boolean.guests_staying_in_guest_room'
 
 export const ADMIN_RELAY_CONTROL_ITEMS: EntityTileConfig[] = [
   { title: 'Relay Control Mode', entityId: RELAY_CONTROL_MODE_ENTITY_ID, icon: 'mdi:toggle-switch', color: SWITCH_ACTIVE_COLOR, action: { type: 'toggle' }, showSubtitle: true },
@@ -343,7 +345,7 @@ function mainFloorAutoCleanDisabledRoom(title: string, roomId: string, icon: str
 }
 
 export const GUEST_CONTROL_ITEMS: EntityTileConfig[] = [
-  { title: 'Guest Room', entityId: 'input_boolean.guests_staying_in_guest_room', icon: 'mdi:bed', color: SWITCH_ACTIVE_COLOR, action: { type: 'toggle' }, showSubtitle: true },
+  { title: 'Guest Room', entityId: GUEST_ROOM_GUEST_MODE_ENTITY_ID, icon: 'mdi:bed', color: SWITCH_ACTIVE_COLOR, action: { type: 'toggle' }, showSubtitle: true },
   { title: 'Music Room', entityId: 'input_boolean.guests_staying_in_music_room', icon: 'mdi:guitar-electric', color: SWITCH_ACTIVE_COLOR, action: { type: 'toggle' }, showSubtitle: true },
   { title: 'Theater Room', entityId: 'input_boolean.guests_staying_in_theater_room', icon: 'mdi:projector', color: SWITCH_ACTIVE_COLOR, action: { type: 'toggle' }, showSubtitle: true },
 ]
@@ -616,8 +618,6 @@ export const SECURITY_SECTIONS: EntitySectionConfig[] = [
     items: [
       { title: 'Alarm', entityId: 'alarm_control_panel.aqara_hub_m3_0056_security_system_2', icon: 'mdi:shield', color: SECURITY_COLOR },
       { title: 'Front Door Lock', entityId: 'lock.aqara_smart_lock_u400', icon: 'mdi:lock', color: SECURITY_COLOR },
-      { title: 'Left Garage Door', entityId: 'cover.left_door', icon: 'mdi:garage', color: SECURITY_COLOR, action: { type: 'toggle' }, showSubtitle: true },
-      { title: 'Right Garage Door', entityId: 'cover.right_door', icon: 'mdi:garage', color: SECURITY_COLOR, action: { type: 'toggle' }, showSubtitle: true },
     ],
   },
   {
@@ -749,8 +749,6 @@ export const ROOM_EXTRA_SECTIONS: Record<string, EntitySectionConfig[]> = {
       items: [
         { title: 'Washing Machine', entityId: 'input_boolean.washer_started_helper', icon: 'mdi:washing-machine', color: CONTROL_COLOR },
         { title: 'Dryer', entityId: 'input_boolean.dryer_started_helper', icon: 'mdi:tumble-dryer', color: CONTROL_COLOR },
-        { title: 'Left Door', entityId: 'cover.left_door', icon: 'mdi:garage', color: SECURITY_COLOR, action: { type: 'toggle' }, showSubtitle: true },
-        { title: 'Right Door', entityId: 'cover.right_door', icon: 'mdi:garage', color: SECURITY_COLOR, action: { type: 'toggle' }, showSubtitle: true },
       ],
     },
   ],

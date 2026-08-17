@@ -1,4 +1,6 @@
 import type { EntityBasicAction, EntityStateAction } from './portedDashboard'
+import { BATHROOM_FANS } from './bathroomFans'
+import { GARAGE_DOOR_ENTITY_IDS } from './garageDoors'
 import { MASTER_BEDROOM_HUMIDIFIER } from './humidifiers'
 import { MEDIA_REMOTE_CONFIGS, type MediaRemoteAction } from './mediaRemotes'
 
@@ -17,6 +19,7 @@ export interface RoomSourceCardConfig {
     whenStates: string[]
   }
   disabledStates?: string[]
+  control?: 'bathroom-fan' | 'garage-door'
   entityId: string
   hash?: string
   icon: string
@@ -326,8 +329,8 @@ export const ROOM_PAGE_CONFIGS: Record<string, RoomPageSourceConfig> = {
         { title: 'Dryer', entityId: 'input_boolean.dryer_started_helper', icon: 'mdi:tumble-dryer', kind: 'laundry', showState: true },
       ] },
       { title: 'Garage Doors', cards: [
-        { title: 'Left Door', entityId: 'cover.left_door', icon: 'mdi:garage', kind: 'contact', showState: true, action: { type: 'toggle' } },
-        { title: 'Right Door', entityId: 'cover.right_door', icon: 'mdi:garage', kind: 'contact', showState: true, action: { type: 'toggle' } },
+        { title: 'Left Door', entityId: GARAGE_DOOR_ENTITY_IDS.left, icon: 'mdi:garage', kind: 'contact', showState: true, control: 'garage-door' },
+        { title: 'Right Door', entityId: GARAGE_DOOR_ENTITY_IDS.right, icon: 'mdi:garage', kind: 'contact', showState: true, control: 'garage-door' },
       ] },
     ],
     popupTemplates: ['door-popup-2'],
@@ -340,9 +343,9 @@ export const ROOM_PAGE_CONFIGS: Record<string, RoomPageSourceConfig> = {
       { title: 'Climate', entityId: 'input_text.all_climate_range', icon: 'mdi:thermometer', kind: 'climate', hash: '#climate-overview', showState: true },
       { title: 'Occupancy', entityId: 'binary_sensor.guest_bathroom_occupancy_sensors', icon: 'mdi:motion-sensor', kind: 'occupancy', hash: '#guest-bathroom-occupancy', showState: true },
     ],
-    sourceSections: [{ title: 'Climate', cards: [
+    sourceSections: [{ title: 'Climate', layout: 'lead-row', cards: [
+      { title: 'Fan', entityId: BATHROOM_FANS.guest.powerEntityId, icon: 'mdi:fan', kind: 'fan', control: 'bathroom-fan', hash: BATHROOM_FANS.guest.hash, showState: true, span: 'full' },
       { title: 'Vent', entityId: 'cover.guest_bathroom_vent_vent', icon: 'mdi:air-filter', kind: 'vent', hash: '#vents', showState: true, modalItems: [{ title: 'Vent', entityId: 'cover.guest_bathroom_vent_vent', icon: 'mdi:air-filter' }] },
-      { title: 'Fan', entityId: 'switch.guest_bathroom_fan_switch_top', icon: 'mdi:fan', kind: 'fan', showState: true, action: { type: 'toggle' } },
       { title: 'Towel Rack', entityId: 'switch.guest_bathroom_towel_rack_switch_top', icon: 'mdi:heat-wave', kind: 'light', showState: true, stateColors: { on: 'rgba(136, 64, 26, 0.6)' }, action: { type: 'toggle' } },
     ] }],
     popupTemplates: ['light-popup-single', 'climate-overview-popup', 'vent-popup-single', 'occupancy-popup-2', 'fan-switch'],
@@ -355,9 +358,9 @@ export const ROOM_PAGE_CONFIGS: Record<string, RoomPageSourceConfig> = {
       { title: 'Climate', entityId: 'input_text.all_climate_range', icon: 'mdi:thermometer', kind: 'climate', hash: '#climate-overview', showState: true },
       { title: 'Occupancy', entityId: 'binary_sensor.master_bathroom_presence_sensor_presence', icon: 'mdi:motion-sensor', kind: 'occupancy', hash: '#master-bathroom-occupancy', showState: true },
     ],
-    sourceSections: [{ title: 'Climate', cards: [
+    sourceSections: [{ title: 'Climate', layout: 'lead-row', cards: [
+      { title: 'Fan', entityId: BATHROOM_FANS.master.powerEntityId, icon: 'mdi:fan', kind: 'fan', control: 'bathroom-fan', hash: BATHROOM_FANS.master.hash, showState: true, span: 'full' },
       { title: 'Vent', entityId: 'cover.master_bathroom_vent_vent', icon: 'mdi:air-filter', kind: 'vent', hash: '#vents', showState: true, modalItems: [{ title: 'Vent', entityId: 'cover.master_bathroom_vent_vent', icon: 'mdi:air-filter' }] },
-      { title: 'Fan', entityId: 'switch.master_bathroom_fan_switch_top', icon: 'mdi:fan', kind: 'fan', showState: true, action: { type: 'toggle' } },
       { title: 'Towel Rack', entityId: 'switch.master_bathroom_towel_rack_switch_top', icon: 'mdi:heat-wave', kind: 'light', showState: true, stateColors: { on: 'rgba(136, 64, 26, 0.6)' }, action: { type: 'toggle' } },
     ] }],
     popupTemplates: ['light-popup-single', 'climate-popup-1', 'vent-popup-single', 'fan-switch', 'occupancy-popup-single'],

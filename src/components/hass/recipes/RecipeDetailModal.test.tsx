@@ -854,6 +854,68 @@ describe('RecipeDetailModal', () => {
     }
   })
 
+  it('reopens the picker after rejecting an exact match and reselects the same product', async () => {
+    const originalCallService = mockState.helpers.callService
+    const decisions: Record<string, unknown>[] = []
+    mockState.helpers.callService = (params) => {
+      if (params.service === 'recipe_detail') {
+        return Promise.resolve(detailResponse({ feedbackEnabled: true }))
+      }
+      if (params.service === 'list_inventory') {
+        return Promise.resolve({
+          response: {
+            inventory: [
+              { inventory_id: 10, product_id: 101, name: 'Rice', quantity: 2, unit: 'cups' },
+            ],
+          },
+        })
+      }
+      if (params.service === 'recipe_ingredient_decision') {
+        decisions.push(params.serviceData as Record<string, unknown>)
+        return Promise.resolve({ response: { success: true } })
+      }
+      return originalCallService(params)
+    }
+
+    try {
+      render(<Harness />)
+      const dialog = await openRecipe()
+      await openTab(dialog, 'Ingredients')
+      fireEvent.click(await within(dialog).findByRole('button', {
+        name: /Rice · 2 cups: Exact inventory match.*Activate to mark missing/,
+      }))
+      await within(dialog).findByText(/exact match feedback was queued/)
+
+      const rejected = within(dialog).getByRole('button', {
+        name: /Rice · 2 cups:.*Activate to choose an inventory product/,
+      })
+      expect(rejected).toHaveAttribute('data-status', 'unchecked')
+      fireEvent.click(rejected)
+
+      expect(await within(dialog).findByRole('heading', {
+        name: /Choose Product for Rice/,
+      })).toBeInTheDocument()
+      const sameProduct = (await within(dialog).findAllByRole('button', {
+        name: /Rice/,
+      })).find((choice) => choice.getAttribute('data-product-id') === '101')
+      expect(sameProduct).toBeDefined()
+      fireEvent.click(sameProduct!)
+
+      expect(await within(dialog).findByText('Product: Rice')).toBeInTheDocument()
+      await waitFor(() => expect(decisions).toHaveLength(2))
+      expect(decisions[0]).toMatchObject({
+        action: 'reject_current_match',
+        expected_target_product_id: 101,
+      })
+      expect(decisions[1]).toMatchObject({
+        action: 'select_inventory_product',
+        selected_product_id: 101,
+      })
+    } finally {
+      mockState.helpers.callService = originalCallService
+    }
+  })
+
   it('cancels the picker on tab navigation without writing and keeps the tab bar anchored', async () => {
     const originalCallService = mockState.helpers.callService
     const calls: Record<string, unknown>[] = []

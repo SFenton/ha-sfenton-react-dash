@@ -161,6 +161,7 @@ export function LightBrightnessCard({ entityId, title, tapAction = 'toggle', sho
       aria-label={title}
       className={styles.card}
       data-active={isOn}
+      data-base-ui-swipe-ignore="true"
       data-dragging={dragPct !== null}
       onPointerCancel={handlePointerUp}
       onPointerDown={handlePointerDown}

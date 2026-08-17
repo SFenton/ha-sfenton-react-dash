@@ -5,7 +5,7 @@ import { SECURITY_COLOR } from './portedDashboard'
 
 export type SecurityTileTone = 'alarm' | 'cover' | 'lock' | 'vehicle'
 
-export type SecurityTileAction = { type: 'hash'; hash: string } | { type: 'toggle' }
+export type SecurityTileAction = { type: 'garage-door' } | { type: 'hash'; hash: string } | { type: 'toggle' }
 
 export interface SecurityTileConfig {
   action?: SecurityTileAction
@@ -56,14 +56,14 @@ export const SECURITY_CONTROL_TILES: SecurityTileConfig[] = [
     entityId: 'cover.left_door',
     icon: 'mdi:garage',
     tone: 'cover',
-    action: { type: 'toggle' },
+    action: { type: 'garage-door' },
   },
   {
     title: 'Right Door',
     entityId: 'cover.right_door',
     icon: 'mdi:garage',
     tone: 'cover',
-    action: { type: 'toggle' },
+    action: { type: 'garage-door' },
   },
 ]
 

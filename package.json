@@ -39,12 +39,14 @@
     "test:e2e": "playwright test"
   },
   "dependencies": {
+    "@base-ui/react": "^1.7.0",
     "@hakit/components": "^6.0.2",
     "@hakit/core": "^6.0.2",
     "@mdi/js": "^7.4.47",
     "@zxing/browser": "0.1.5",
     "chalk": "^5.6.2",
     "dotenv": "^17.4.2",
+    "home-assistant-js-websocket": "^9.6.0",
     "i18next": "^26.3.6",
     "motion": "^12.38.0",
     "node-scp": "^0.0.25",
@@ -53,8 +55,7 @@
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
     "react-i18next": "^17.0.11",
-    "tsx": "^4.21.0",
-    "vaul": "^1.1.2"
+    "tsx": "^4.21.0"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

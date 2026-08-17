@@ -1,7 +1,11 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { useState } from 'react'
 import { describe, expect, it, vi } from 'vitest'
 import { ModalSheet } from './ModalSheet'
+
+const modalSheetCss = readFileSync(resolve(process.cwd(), 'src/components/core/ModalSheet.module.css'), 'utf8')
 
 function ModalSheetHarness() {
   const [open, setOpen] = useState(true)
@@ -34,38 +38,51 @@ function ModalSheetObserverHarness() {
   )
 }
 
+function DelayedCloseModalSheetHarness() {
+  const [closeRequested, setCloseRequested] = useState(false)
+  const [open, setOpen] = useState(true)
+
+  return (
+    <>
+      <button disabled={!closeRequested} onClick={() => setOpen(false)} type="button">Commit delayed close</button>
+      <ModalSheet onClose={() => setCloseRequested(true)} open={open} title="Delayed controls">
+        Delayed modal content
+      </ModalSheet>
+    </>
+  )
+}
+
+function InitiallyClosedModalSheetHarness() {
+  const [open, setOpen] = useState(false)
+
+  return (
+    <>
+      <button onClick={() => setOpen(true)} type="button">Open first modal</button>
+      <ModalSheet onClose={() => setOpen(false)} open={open} title="First open controls">
+        First open modal content
+      </ModalSheet>
+    </>
+  )
+}
+
 describe('ModalSheet', () => {
-  it('updates touch arbitration when mounted content changes scrollability', async () => {
+  it('disables nested glass backdrop filters inside the moving modal surface', () => {
+    expect(modalSheetCss).toMatch(/\.content \[data-tone\]\[data-variant='card'\],\s*\.content \[data-modal-tab-nav='true'\]\s*\{[^}]*backdrop-filter:\s*none;[^}]*-webkit-backdrop-filter:\s*none;/s)
+  })
+
+  it('leaves touch ownership to the drawer without forcing scroll position or directional touch-action', () => {
     render(<ModalSheetObserverHarness />)
 
     const body = document.querySelector('[data-modal-sheet-body="true"]') as HTMLDivElement
     Object.defineProperty(body, 'clientHeight', { configurable: true, value: 100 })
     Object.defineProperty(body, 'scrollHeight', { configurable: true, value: 220 })
     Object.defineProperty(body, 'scrollTop', { configurable: true, value: 0, writable: true })
-    const content = document.createElement('span')
-    body.append(content)
-
-    await waitFor(() => expect(body).toHaveAttribute('data-modal-sheet-scrollable', 'true'))
-    expect(body.style.touchAction).toBe('pan-down')
-
-    body.scrollTop = 12
-    fireEvent.scroll(body)
-    expect(body.style.touchAction).toBe('pan-y')
-
-    body.scrollTop = 0.5
-    fireEvent.scroll(body)
-    expect(body.style.touchAction).toBe('pan-y')
 
     body.scrollTop = -0.5
     fireEvent.scroll(body)
-    expect(body.scrollTop).toBe(0)
-    expect(body.style.touchAction).toBe('pan-down')
-
-    Object.defineProperty(body, 'scrollHeight', { configurable: true, value: 80 })
-    content.setAttribute('aria-expanded', 'true')
-
-    await waitFor(() => expect(body).toHaveAttribute('data-modal-sheet-scrollable', 'false'))
-    expect(body.style.touchAction).toBe('none')
+    expect(body.scrollTop).toBe(-0.5)
+    expect(body.style.touchAction).toBe('')
+    expect(body).not.toHaveAttribute('data-modal-sheet-scrollable')
   })
 
   it('keeps its body observer stable when footer and subtitle content change without changing layout presence', async () => {
@@ -111,7 +128,10 @@ describe('ModalSheet', () => {
     await waitFor(() => expect(dialog).toHaveAttribute('data-state', 'closed'))
     expect(dialog).toHaveAttribute('data-closing', 'true')
     expect(dialog).toHaveAttribute('inert')
-    expect(document.body.querySelector('[data-modal-sheet-overlay]')).not.toBeInTheDocument()
+    const overlay = document.body.querySelector('[data-modal-sheet-overlay]')
+    expect(overlay).toHaveAttribute('data-closed')
+    expect(overlay).toHaveAttribute('data-closing', 'true')
+    expect(overlay).toHaveStyle({ pointerEvents: 'none' })
     expect(document.body).not.toHaveAttribute('data-scroll-locked')
     await waitFor(() => expect(document.body.style.pointerEvents).not.toBe('none'))
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
@@ -121,39 +141,64 @@ describe('ModalSheet', () => {
   it('closes from the custom backdrop without enabling body scroll locking', async () => {
     render(<ModalSheetHarness />)
 
+    const dialog = screen.getByRole('dialog')
     expect(document.body).not.toHaveAttribute('data-scroll-locked')
     fireEvent.pointerDown(document.body.querySelector('[data-modal-sheet-overlay]') as Element)
 
-    await waitFor(() => expect(screen.getByRole('dialog')).toHaveAttribute('data-state', 'closed'))
+    await waitFor(() => expect(dialog).toHaveAttribute('data-state', 'closed'))
     expect(document.body).not.toHaveAttribute('data-scroll-locked')
   })
 
   it('allows internal close events on a fresh open', async () => {
     render(<ModalSheetHarness />)
 
+    const dialog = screen.getByRole('dialog')
+    await waitFor(() => expect(dialog).toHaveAttribute('data-open'))
     fireEvent.keyDown(document, { key: 'Escape' })
 
-    await waitFor(() => expect(screen.getByRole('dialog')).toHaveAttribute('data-state', 'closed'))
+    await waitFor(() => expect(dialog).toHaveAttribute('data-state', 'closed'))
   })
 
-  it('ignores stale internal close events immediately after reopening', async () => {
-    render(<ModalSheetHarness />)
+  it('does not treat a pending close request as a rapid reopen', async () => {
+    render(<DelayedCloseModalSheetHarness />)
 
     const dialog = screen.getByRole('dialog')
-    expect(dialog).toHaveAttribute('data-rapid-reopen', 'false')
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Close' }))
-    await waitFor(() => expect(dialog).toHaveAttribute('data-state', 'closed'))
-    dialog.style.transform = 'translate3d(0, 180px, 0)'
-    dialog.style.transition = 'none'
-
-    fireEvent.click(screen.getByText('Host page swipe target'))
-    await waitFor(() => expect(dialog).toHaveAttribute('data-state', 'open'))
-    expect(dialog).toHaveAttribute('data-rapid-reopen', 'true')
-    expect(dialog.style.transform).toBe('')
-    expect(dialog.style.transition).toBe('')
-
+    await waitFor(() => expect(dialog).toHaveAttribute('data-open'))
     fireEvent.keyDown(document, { key: 'Escape' })
 
     expect(dialog).toHaveAttribute('data-state', 'open')
+    expect(dialog).toHaveAttribute('data-rapid-reopen', 'false')
+    fireEvent.click(screen.getByRole('button', { hidden: true, name: 'Commit delayed close' }))
+    await waitFor(() => expect(dialog).toHaveAttribute('data-state', 'closed'))
+  })
+
+  it('treats the first open as a normal open rather than a rapid reopen', async () => {
+    render(<InitiallyClosedModalSheetHarness />)
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Open first modal' }))
+
+    const dialog = await screen.findByRole('dialog', { name: 'First open controls' })
+    expect(dialog).toHaveAttribute('data-state', 'open')
+    expect(dialog).toHaveAttribute('data-rapid-reopen', 'false')
+  })
+
+  it('reopens without stale swipe styles and remains closable', async () => {
+    render(<ModalSheetHarness />)
+
+    const dialog = screen.getByRole('dialog')
+    await waitFor(() => expect(dialog).toHaveAttribute('data-open'))
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Close' }))
+    await waitFor(() => expect(dialog).toHaveAttribute('data-state', 'closed'))
+
+    fireEvent.click(screen.getByText('Host page swipe target'))
+    const reopenedDialog = await screen.findByRole('dialog')
+    expect(reopenedDialog).toHaveAttribute('data-state', 'open')
+    expect(reopenedDialog).toHaveAttribute('data-rapid-reopen', 'true')
+    expect(reopenedDialog.style.getPropertyValue('--drawer-swipe-movement-y')).toBe('0px')
+
+    fireEvent.keyDown(document, { key: 'Escape' })
+
+    await waitFor(() => expect(reopenedDialog).toHaveAttribute('data-state', 'closed'))
   })
 })

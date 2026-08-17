@@ -11,6 +11,7 @@ import { DashboardPageLoading, type DashboardPageLoadingPhase } from '../compone
 import { DashboardFloatingAction } from '../components/shell/DashboardFloatingAction'
 import { dashboardRoomNameFromPath, hasDashboardFloatingAction } from '../components/shell/dashboardFloatingAction'
 import { EntityActionCard } from '../components/hass/EntityActionCard'
+import { GarageDoorTile } from '../components/hass/GarageDoorTile'
 import { PresenceOverrideCard, PresenceOverrideDetailPage } from '../components/hass/PresenceOverrideCard'
 import { SecurityDashboard, SecurityStatusRail } from '../components/hass/SecurityDashboard'
 import { SpecialDeviceModeCard } from '../components/hass/SpecialDeviceModeCard'
@@ -26,6 +27,9 @@ import { VacuumAutoCleanControlCard } from '../components/hass/VacuumAutoCleanCo
 import { VacuumCard, VacuumModal, VacuumRoomSourceModalContent } from '../components/hass/VacuumCard'
 import { VACUUM_MODAL_STYLE } from '../components/hass/vacuumModalStyle'
 import { AirQualityModalContent } from '../components/hass/AirQualityModalContent'
+import { BathroomFanModal, BathroomFanModalContent } from '../components/hass/BathroomFanModalContent'
+import { BathroomFanTile } from '../components/hass/BathroomFanTile'
+import { BathroomFanCommandProvider } from '../components/hass/BathroomFanCommandProvider'
 import { GrillModalContent } from '../components/hass/GrillModalContent'
 import { HumidifierModal, HumidifierModalContent } from '../components/hass/HumidifierModalContent'
 import { MediaRemoteModalContent, MediaRemoteModalNav } from '../components/hass/MediaRemoteModalContent'
@@ -106,6 +110,7 @@ import {
   CONTROL_PAGES,
   GUEST_CONTROLS_DESCRIPTION,
   GUEST_CONTROL_ITEMS,
+  GUEST_ROOM_GUEST_MODE_ENTITY_ID,
   MEDIA_COLOR,
   NEUTRAL_COLOR,
   MEDIA_SECTIONS,
@@ -118,6 +123,7 @@ import {
   TODO_PAGES,
   UNAVAILABLE_COLOR,
   SWITCH_ACTIVE_COLOR,
+  RELAY_CONTROL_MODE_ENTITY_ID,
   VACATION_DATE_RANGE_ERROR,
   VACATION_DATES_DESCRIPTION,
   VACATION_END_ENTITY_ID,
@@ -141,6 +147,7 @@ import { choreQuickLinkCounts, choreQuickLinkSubtitle, groceryCountSubtitle } fr
 import { FOOD_CARD_BACKGROUND_COLOR, foodSummarySubtitle } from '../constants/everShelfFood'
 import { modalSquareGridModalStyle, modalSquareGridStyle, type ModalSquareGridStyle, useModalSquareGridLayout } from '../components/core/modalSquareGrid'
 import { ROOM_PAGE_CONFIGS, type RoomSourceCardAction, type RoomSourceCardConfig, type RoomSourceKind, type RoomSourceModalItem, type RoomSourceSectionLayout } from '../constants/roomPages'
+import { bathroomFanForPowerEntity } from '../constants/bathroomFans'
 import { humidifierForPowerEntity, type HumidifierConfig } from '../constants/humidifiers'
 import { MEDIA_REMOTE_CONFIGS, type MediaRemoteConfig } from '../constants/mediaRemotes'
 import { VACUUM_AUTO_CLEAN_CONTROLS } from '../constants/vacuumAutoClean'
@@ -891,12 +898,38 @@ interface RoomSourceCardProps {
   card: RoomSourceCardConfig
   eightSleepModalState?: EightSleepBedModalState
   onOpen: (card: RoomSourceCardConfig) => void
+  preload?: boolean
 }
 
 function RoomSourceCard(props: RoomSourceCardProps) {
   if (isDishwasherSourceCard(props.card)) return <DishwasherRoomSourceCard {...props} />
+  if (props.card.control === 'bathroom-fan') return <BathroomFanRoomSourceCard {...props} />
   if (props.card.kind === 'humidifier') return <HumidifierRoomSourceCard {...props} />
+  if (props.card.control === 'garage-door') return <GarageDoorRoomSourceCard {...props} />
   return <DefaultRoomSourceCard {...props} />
+}
+
+function BathroomFanRoomSourceCard({ card, onOpen, preload }: RoomSourceCardProps) {
+  const config = bathroomFanForPowerEntity(card.entityId)
+  if (!config) return <DefaultRoomSourceCard card={card} onOpen={onOpen} />
+
+  const content = <BathroomFanTile config={config} onOpen={() => onOpen(card)} preload={preload} />
+  if (card.span === 'full') return <div className={styles.fullSpan}>{content}</div>
+  return content
+}
+
+function GarageDoorRoomSourceCard({ card }: RoomSourceCardProps) {
+  const content = (
+    <GarageDoorTile
+      entityId={card.entityId}
+      icon={<SourceCardIcon card={card} size={24} />}
+      title={card.title}
+      toneForState={() => toneForSourceKind(card.kind)}
+    />
+  )
+
+  if (card.span === 'full') return <div className={styles.fullSpan}>{content}</div>
+  return content
 }
 
 function DishwasherRoomSourceCard({ card, onOpen }: RoomSourceCardProps) {
@@ -984,7 +1017,7 @@ function MediaRoomSourceModal({ config, onClose, open, title }: { config: MediaR
   )
 }
 
-function RoomSourceModal({ card, eightSleepModalStates, onClose, preloadCard, roomTitle }: { card: RoomSourceCardConfig | null; eightSleepModalStates?: Partial<Record<string, EightSleepBedModalState>>; onClose: () => void; preloadCard?: RoomSourceCardConfig | null; roomTitle: string }) {
+function RoomSourceModal({ card, eightSleepModalStates, onClose, preload = false, preloadCard, roomTitle }: { card: RoomSourceCardConfig | null; eightSleepModalStates?: Partial<Record<string, EightSleepBedModalState>>; onClose: () => void; preload?: boolean; preloadCard?: RoomSourceCardConfig | null; roomTitle: string }) {
   const currentRenderCard = card ?? preloadCard ?? null
   const [retainedCard, setRetainedCard] = useState(currentRenderCard)
   if (currentRenderCard && currentRenderCard !== retainedCard) setRetainedCard(currentRenderCard)
@@ -992,6 +1025,7 @@ function RoomSourceModal({ card, eightSleepModalStates, onClose, preloadCard, ro
   const renderCard = currentRenderCard ?? retainedCard
   const eightSleepSide = renderCard ? eightSleepSideForHash(renderCard.hash) : undefined
   const eightSleepModalState = eightSleepSide ? eightSleepModalStates?.[eightSleepSide.hash] : undefined
+  const bathroomFan = renderCard?.control === 'bathroom-fan' ? bathroomFanForPowerEntity(renderCard.entityId) : undefined
   const mediaRemote = renderCard?.kind === 'media' && renderCard.hash ? MEDIA_REMOTE_CONFIGS[renderCard.hash] : undefined
   const content = renderCard && !eightSleepSide && !mediaRemote
     ? renderRoomReusableSheet(renderCard, roomTitle)
@@ -1019,6 +1053,11 @@ function RoomSourceModal({ card, eightSleepModalStates, onClose, preloadCard, ro
 
   if (mediaRemote) {
     return <MediaRoomSourceModal config={mediaRemote} key={mediaRemote.hash} onClose={onClose} open={Boolean(card)} title={title} />
+  }
+
+  if (bathroomFan) {
+    if (preload) return <BathroomFanModalContent config={bathroomFan} preload />
+    return <BathroomFanModal config={bathroomFan} onClose={onClose} open={Boolean(card)} roomTitle={roomTitle} />
   }
 
   const humidifier = renderCard?.kind === 'humidifier' ? humidifierForPowerEntity(renderCard.entityId) : undefined
@@ -1050,6 +1089,9 @@ function RoomSourcePreloadContent({ card, eightSleepModalState, roomTitle }: { c
     return <EightSleepBedModalContentView activeTab="schedule" alarmPage={null} modalState={eightSleepModalState} side={eightSleepSide} />
   }
 
+  const bathroomFan = card.control === 'bathroom-fan' ? bathroomFanForPowerEntity(card.entityId) : undefined
+  if (bathroomFan) return <BathroomFanModalContent config={bathroomFan} preload />
+
   const mediaRemote = card.kind === 'media' && card.hash ? MEDIA_REMOTE_CONFIGS[card.hash] : undefined
   const content = mediaRemote ? <MediaRemoteModalContent config={mediaRemote} /> : renderRoomReusableSheet(card, roomTitle)
   return <>{content ?? <RoomSourceFallback card={card} />}</>
@@ -1068,6 +1110,7 @@ function SourceRoomPage({ onNavigate, preload = false, preloadHash, preloadHashe
   const [selectedCard, setSelectedCard] = useState<RoomSourceCardConfig | null>(null)
   const eightSleepModalStates = useEightSleepBedModalStates()
   const allCards = useMemo(() => [...room.overviewCards, ...room.sourceSections.flatMap((section) => section.cards)], [room.overviewCards, room.sourceSections])
+  const bathroomFan = allCards.map((card) => card.control === 'bathroom-fan' ? bathroomFanForPowerEntity(card.entityId) : undefined).find(Boolean)
   const preloadCard = preloadHash ? allCards.find((candidate) => candidate.hash === preloadHash) ?? null : null
   const preloadCards = useMemo(() => preloadHashes.map((preloadTargetHash) => allCards.find((candidate) => candidate.hash === preloadTargetHash)).filter((card): card is RoomSourceCardConfig => Boolean(card?.hash)), [allCards, preloadHashes])
 
@@ -1107,7 +1150,7 @@ function SourceRoomPage({ onNavigate, preload = false, preloadHash, preloadHashe
     else setSelectedCard(card)
   }
 
-  return (
+  const content = (
     <div className={styles.stack}>
       {room.sourceSections.length === 0 && <EmptyRoomState />}
 
@@ -1118,7 +1161,7 @@ function SourceRoomPage({ onNavigate, preload = false, preloadHash, preloadHashe
         const leadCards = leadRow ? section.cards.slice(0, 1) : section.cards
         const followUpCards = leadRow ? section.cards.slice(1) : []
         const renderCard = (card: RoomSourceCardConfig) => (
-          <RoomSourceCard card={card} eightSleepModalState={card.hash ? eightSleepModalStates[card.hash] : undefined} key={`${room.path}-${section.title}-${card.title}-${card.entityId}`} onOpen={openSourceCard} />
+          <RoomSourceCard card={card} eightSleepModalState={card.hash ? eightSleepModalStates[card.hash] : undefined} key={`${room.path}-${section.title}-${card.title}-${card.entityId}`} onOpen={openSourceCard} preload={preload} />
         )
 
         return (
@@ -1136,7 +1179,7 @@ function SourceRoomPage({ onNavigate, preload = false, preloadHash, preloadHashe
         )
       })}
 
-      <RoomSourceModal card={selectedCard} eightSleepModalStates={eightSleepModalStates} onClose={closeSourceCard} preloadCard={preloadCard} roomTitle={room.title} />
+      <RoomSourceModal card={selectedCard} eightSleepModalStates={eightSleepModalStates} onClose={closeSourceCard} preload={preload} preloadCard={preloadCard} roomTitle={room.title} />
       {preloadCards.map((card) => (
         <div data-preload-modal={`${room.path}${card.hash}`} key={`${room.path}-preload-${card.hash}`}>
           <RoomSourcePreloadContent card={card} eightSleepModalState={card.hash ? eightSleepModalStates[card.hash] : undefined} roomTitle={room.title} />
@@ -1144,6 +1187,10 @@ function SourceRoomPage({ onNavigate, preload = false, preloadHash, preloadHashe
       ))}
     </div>
   )
+
+  return bathroomFan && !preload
+    ? <BathroomFanCommandProvider config={bathroomFan}>{content}</BathroomFanCommandProvider>
+    : content
 }
 
 function RoomPage({ onNavigate, path, preload = false, preloadHash, preloadHashes, title }: { onNavigate: (path: string) => void; path: string; preload?: boolean; preloadHash?: string; preloadHashes?: string[]; title: string }) {
@@ -1957,6 +2004,8 @@ function MediaPage({ preload = false, preloadHash, preloadHashes = [] }: { prelo
 }
 
 function AdminPage({ onNavigate, preload = false, preloadHash, preloadHashes = [] }: { onNavigate: (path: string) => void; preload?: boolean; preloadHash?: string; preloadHashes?: string[] }) {
+  const relayControlMode = useEntity(asEntityName(RELAY_CONTROL_MODE_ENTITY_ID), { returnNullIfNotFound: true })
+  const guestRoomGuestMode = useEntity(asEntityName(GUEST_ROOM_GUEST_MODE_ENTITY_ID), { returnNullIfNotFound: true })
   const { closeHash, hash, openHash } = useHashModal({ disabled: preload })
   const [selectedPresenceOverride, setSelectedPresenceOverride] = useState<PresenceOverrideConfig | null>(null)
   const presenceDetailPageKey = selectedPresenceOverride?.entityId ?? 'overview'
@@ -1966,6 +2015,7 @@ function AdminPage({ onNavigate, preload = false, preloadHash, preloadHashes = [
   const autoResetModalOpen = hash === '#presence-based-overrides-auto'
   const presenceModalContentActive = contentHash === '#presence-based-overrides'
   const autoResetModalContentActive = contentHash === '#presence-based-overrides-auto'
+  const showRelayGuestModeWarning = relayControlMode?.state === 'on' && guestRoomGuestMode?.state === 'on'
   const [presenceGridRef, presenceGridLayout] = useModalSquareGridLayout(presenceModalOpen, ADMIN_PRESENCE_OVERRIDE_ITEMS.length)
   const [autoResetGridRef, autoResetGridLayout] = useModalSquareGridLayout(autoResetModalOpen, ADMIN_AUTO_REENABLE_ITEMS.length)
   const openPresenceModal = (nextHash: string) => {
@@ -2000,6 +2050,7 @@ function AdminPage({ onNavigate, preload = false, preloadHash, preloadHashes = [
         <SectionHeader title="Relay Control Mode" />
         <Description>{ADMIN_DESCRIPTIONS.relayControlMode}</Description>
         <AdminTileGrid items={ADMIN_RELAY_CONTROL_ITEMS} onNavigate={onNavigate} />
+        {showRelayGuestModeWarning && <InlineAlert>{ADMIN_DESCRIPTIONS.relayGuestModeWarning}</InlineAlert>}
       </section>
 
       <section className={styles.section}>
@@ -3491,6 +3542,13 @@ function EightSleepThermostatHero({
       if (targetSyncTimerRef.current !== null) window.clearTimeout(targetSyncTimerRef.current)
       targetSyncTimerRef.current = null
       pendingTargetValueRef.current = null
+      commitHeroTargetValue(clampedValue)
+      commitTargetTemperature(clampedValue)
+      callService({
+        domain: 'script',
+        service: sleepypodTemperatureScopeService(side.scheduleSide, 'tonight', activeSchedulePhase),
+        serviceData: { level: clampedValue },
+      })
       onRequestTemperatureScope?.(clampedValue, activeSchedulePhase, targetSliderRef.current)
       return
     }
@@ -4453,6 +4511,7 @@ function EightSleepBedModal({ modalState, onClose, open, side }: { modalState: E
   const [previousOpen, setPreviousOpen] = useState(open)
   const tabs = modalState.controlMode === 'climate' ? SLEEPYPOD_MODAL_TABS : EIGHT_SLEEP_MODAL_TABS
   const renderedActiveTab = tabs.some((tab) => tab.tab === activeTab) ? activeTab : tabs[0].tab
+  const scopePromptOpen = open && scopeRequest.open && modalState.sideAvailable && modalState.activeSchedulePhase === scopeRequest.phase
   const scopeRequestInvalid = scopeRequest.open && (!modalState.sideAvailable || modalState.activeSchedulePhase !== scopeRequest.phase)
   if (previousOpen !== open) {
     setPreviousOpen(open)
@@ -4567,7 +4626,7 @@ function EightSleepBedModal({ modalState, onClose, open, side }: { modalState: E
       return
     }
     closeScopePrompt()
-    modalState.commitTargetTemperature(current.request.value)
+    if (scope === 'tonight') return
     callService({
       domain: 'script',
       service: sleepypodTemperatureScopeService(side.scheduleSide, scope, current.request.phase),
@@ -4636,7 +4695,7 @@ function EightSleepBedModal({ modalState, onClose, open, side }: { modalState: E
       <BedTemperatureScopePrompt
         onChoose={chooseTemperatureScope}
         onClose={closeScopePrompt}
-        open={open && scopeRequest.open && modalState.sideAvailable && modalState.activeSchedulePhase === scopeRequest.phase}
+        open={scopePromptOpen}
         phase={scopeRequest.phase}
         returnFocus={scopeRequest.returnFocus}
         sideTitle={side.title}
