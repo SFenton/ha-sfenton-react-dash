@@ -51,7 +51,7 @@ test.describe('bathroom fan controls', () => {
     await expect(dialog.locator('[data-icon="mdi:thermometer"]')).toBeVisible()
     await expect(dialog.locator('[data-icon="mdi:water-percent"]')).toBeVisible()
     await expect(dialog.getByRole('navigation')).toHaveCount(0)
-    await expect(dialog.getByRole('note', { name: 'Hint' })).toContainText('Double tapping On on the fan switch will lock the fan on')
+    await expect(dialog.getByRole('note', { name: 'Hint' })).toContainText('Double tapping On on the physical fan switch will lock the fan on')
 
     await dialog.getByRole('switch', { name: 'Power Off' }).click()
     await expect(dialog.getByRole('heading', { name: 'Timer' })).toBeVisible()
