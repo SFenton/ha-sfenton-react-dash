@@ -11,7 +11,7 @@ import {
   type SecurityTileConfig,
 } from '../../constants/securityPage'
 import { ContactSheet } from '../../pages/AtAGlancePage'
-import { modalSquareGridModalStyleForHash, modalSquareGridStyle, useModalSquareGridLayout, type ModalSquareGridStyle } from '../../pages/modalSquareGrid'
+import { modalSquareGridModalStyleForHash, modalSquareGridStyle, useModalSquareGridLayout, type ModalSquareGridStyle } from '../core/modalSquareGrid'
 import { CameraModalContent } from './CameraModalContent'
 import { asEntityName, formatCompactEntityState, isActiveState, isContactOpen } from './entityState'
 import { SecurityControls } from './SecurityControls'

@@ -10,8 +10,6 @@ import { AppShell } from '../components/shell/AppShell'
 import { BottomNav } from '../components/shell/BottomNav'
 import { DashboardPageLoading, type DashboardPageLoadingPhase } from '../components/shell/DashboardPageLoading'
 import { ActionPill } from '../components/core/ActionPill'
-import { DynamicGrid } from '../components/core/DynamicGrid'
-import { FloatingActionButton } from '../components/core/FloatingActionButton'
 import { GlassTile } from '../components/core/GlassTile'
 import { Icon, MaterialIcon } from '../components/core/Icon'
 import { ModalSheet } from '../components/core/ModalSheet'
@@ -26,8 +24,6 @@ import { StatusRail } from '../components/hass/StatusRail'
 import { WeatherSummary } from '../components/hass/WeatherSummary'
 import { formatAirMetricState } from '../components/hass/airQualityState'
 import { asEntityName, formatCompactEntityState, isActiveState, isContactOpen, isOccupancyActive } from '../components/hass/entityState'
-import { rankRoomsByAccess } from '../components/hass/roomAccessRanking'
-import { securityStateCssColor, securityStateIconName } from '../components/hass/securityState'
 import { WebRtcCamera } from '../components/hass/WebRtcCamera'
 import {
   AREA_ITEMS,
@@ -38,22 +34,17 @@ import {
   LIGHT_GROUPS,
   OCCUPANCY_GROUPS,
   OVERVIEW_STATUS_CHIPS,
-  QUICK_ACCESS_ITEMS,
-  ROOM_ACCESS_INCREMENT_SCRIPT_ENTITY_ID,
   SECURITY_ENTITY,
   type AirQualityRoomConfig,
   type AreaConfig,
   type EntityGroupConfig,
-  type QuickAccessConfig,
-  type RoomNavigationConfig,
 } from '../constants/atAGlance'
-import { CHORE_BLUE, CHORE_QUICK_LINKS, SETTINGS_PAGE_ITEMS, type ChoreQuickLinkConfig, type SettingsLinkConfig } from '../constants/portedDashboard'
+import { CHORE_QUICK_LINKS, SETTINGS_PAGE_ITEMS, type ChoreQuickLinkConfig, type SettingsLinkConfig } from '../constants/portedDashboard'
 import { choreQuickLinkCounts, choreQuickLinkSubtitle, groceryCountSubtitle } from '../constants/choreQuickLinkCounts'
-import { allFoodSubtitle } from '../constants/everShelfFood'
 import { useHashModal } from '../hooks/useHashModal'
 import { markDeferredRouteHydrated, useDeferredRouteHydration, type DeferredRouteHydrationPhase } from '../hooks/useDeferredRouteHydration'
 import type { RouteTransitionState } from '../components/shell/SmoothRouteOutlet'
-import { modalSquareGridModalStyle, modalSquareGridModalStyleForHash, modalSquareGridStyle, useModalSquareGridLayout, type ModalSquareGridStyle } from './modalSquareGrid'
+import { modalSquareGridModalStyleForHash, modalSquareGridStyle, useModalSquareGridLayout, type ModalSquareGridStyle } from '../components/core/modalSquareGrid'
 import styles from './AtAGlancePage.module.css'
 import { Page } from './Page'
 
@@ -351,36 +342,6 @@ function roomTitleFromLightGroup(group: EntityGroupConfig) {
   if (group.title.endsWith(LIGHTS_SUFFIX)) return group.title.slice(0, -LIGHTS_SUFFIX.length)
   if (group.title.endsWith(LIGHT_SUFFIX)) return group.title.slice(0, -LIGHT_SUFFIX.length)
   return group.title
-}
-
-function QuickAccessTile({ item, onNavigate, onOpenHash }: { item: QuickAccessConfig; onNavigate: (path: string) => void; onOpenHash: (hash: string) => void }) {
-  const entity = useEntity(asEntityName(item.entityId ?? 'sensor.unavailable'), { returnNullIfNotFound: true })
-  const foodSubtitle = useHass((state) => item.status === 'all_food' ? allFoodSubtitle(state.entities) : undefined)
-  const subtitle = item.status === 'entity_state' ? formatCompactEntityState(entity) : foodSubtitle
-  const itemHash = item.hash
-  const isSecurityTile = item.tone === 'security' && item.entityId?.startsWith('alarm_control_panel.')
-
-  const handleClick = () => {
-    if (itemHash) {
-      onOpenHash(itemHash)
-      return
-    }
-    if (item.route) onNavigate(item.route.split('/').filter(Boolean).at(-1) ?? 'overview')
-  }
-
-  return (
-    <GlassTile
-      backgroundColor={isSecurityTile ? securityStateCssColor(entity?.state, 0.5) : item.backgroundColor}
-      disclosure={Boolean(itemHash || item.route)}
-      disclosureKind={itemHash ? 'modal' : 'navigation'}
-      icon={isSecurityTile ? securityStateIconName(entity?.state) : item.icon}
-      iconColor={isSecurityTile ? 'white' : undefined}
-      onClick={itemHash || item.route ? handleClick : undefined}
-      subtitle={subtitle}
-      title={item.title}
-      tone={item.tone}
-    />
-  )
 }
 
 function ChorePreviewTile({ closeHash, item, onNavigate }: { closeHash: () => void; item: ChoreQuickLinkConfig; onNavigate: (path: string) => void }) {
@@ -1196,48 +1157,6 @@ function SheetContent({
   return <p className={styles.sheetText}>This overview section is not available from Home.</p>
 }
 
-export function RoomPickerButton({ onNavigate }: { onNavigate: (path: string) => void }) {
-  const [modalOpen, setModalOpen] = useState(false)
-  const [gridRef, gridLayout] = useModalSquareGridLayout(modalOpen, AREA_ITEMS.length)
-  const callService = useHass((state) => state.helpers.callService)
-  const entities = useHass((state) => state.entities)
-  const rankedAreas = useMemo(() => rankRoomsByAccess(AREA_ITEMS, entities), [entities])
-  const modalStyle = modalSquareGridModalStyle(gridLayout)
-  const gridStyle = modalSquareGridStyle(gridLayout)
-
-  const handleNavigate = (area: RoomNavigationConfig, path: string) => {
-    setModalOpen(false)
-    onNavigate(path)
-    try {
-      void Promise.resolve(callService({
-        domain: 'script',
-        service: 'turn_on',
-        target: ROOM_ACCESS_INCREMENT_SCRIPT_ENTITY_ID,
-        serviceData: { variables: { room: area.accessKey } },
-      })).catch((error: unknown) => {
-        console.error(`Failed to increment room access for ${area.accessKey}.`, error)
-      })
-    } catch (error) {
-      console.error(`Failed to increment room access for ${area.accessKey}.`, error)
-    }
-  }
-
-  return (
-    <>
-      <FloatingActionButton color={CHORE_BLUE} icon="mdi:floor-plan" label="Rooms" onClick={() => setModalOpen(true)} semantics={{ kind: 'modal' }} />
-      <ModalSheet contentStyle={modalStyle} open={modalOpen} title="Rooms" onClose={() => setModalOpen(false)}>
-        <section className={styles.roomPickerGrid} aria-label="Rooms" ref={gridRef} style={gridStyle}>
-          {rankedAreas.map((area) => (
-            <div className={styles.roomPickerCell} key={area.title}>
-              <RoomCard area={area} onNavigate={(path) => handleNavigate(area, path)} />
-            </div>
-          ))}
-        </section>
-      </ModalSheet>
-    </>
-  )
-}
-
 interface AtAGlancePageProps {
   activePath?: string
   deferRouteContent?: boolean
@@ -1284,7 +1203,6 @@ export function AtAGlancePage({ activePath = 'overview', deferRouteContent = fal
   const preloadModalHashes = useMemo(() => [...new Set(preloadHashes.filter((targetHash) => targetHash !== contentHash))], [contentHash, preloadHashes])
   const homeLoadingPhase: DashboardPageLoadingPhase | undefined = showContent ? undefined : homeHydrationPhase === 'loading-exiting' ? 'exiting' : 'loading'
   const activeLoadingPhase = routeLoadingPhase ?? homeLoadingPhase
-
   useEffect(() => {
     onHydrationPhaseChange?.(homeHydrationPhase)
   }, [homeHydrationPhase, onHydrationPhaseChange])
@@ -1316,13 +1234,6 @@ export function AtAGlancePage({ activePath = 'overview', deferRouteContent = fal
               <WeatherSummary deferRefresh={!hydrateHeavyContent} />
             </div>
 
-            <SectionHeader title="Quick Links" />
-            <DynamicGrid ariaLabel="Home quick links" className={styles.quickGrid} columns={2}>
-              {QUICK_ACCESS_ITEMS.map((item) => (
-                <QuickAccessTile item={item} key={item.title} onNavigate={onNavigate} onOpenHash={openHash} />
-              ))}
-            </DynamicGrid>
-
             <GuestPresenceSecuritySection onOpen={openHash} />
 
             <SectionHeader title="Cameras" />
@@ -1348,10 +1259,10 @@ export function AtAGlancePage({ activePath = 'overview', deferRouteContent = fal
     </>
   )
 
-  if (!withShell) return page
+  if (!withShell || preload) return page
 
   return (
-    <AppShell bottomNav={<BottomNav activePath={activePath} onNavigate={onNavigate} />} chromeHidden={Boolean(activeLoadingPhase)} floatingAction={<RoomPickerButton onNavigate={onNavigate} />}>
+    <AppShell bottomNav={<BottomNav activePath={activePath} onNavigate={onNavigate} />} chromeHidden={Boolean(activeLoadingPhase)} onNavigate={onNavigate}>
       {page}
     </AppShell>
   )

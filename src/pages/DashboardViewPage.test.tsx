@@ -534,13 +534,14 @@ describe('DashboardViewPage', () => {
     expect(within(dialog).queryByText('Rooms')).not.toBeInTheDocument()
   })
 
-  it('shows the Rooms FAB on room pages and navigates through the room picker', async () => {
+  it('opens Rooms from Quick Links on room pages without a standalone Rooms FAB', async () => {
     const navigate = vi.fn()
     render(<DashboardViewPage activePath="master-bedroom" onNavigate={navigate} path="master-bedroom" />)
 
-    const roomsButton = screen.getByRole('button', { name: 'Rooms' })
-    expect(roomsButton).toHaveTextContent('Rooms')
-    fireEvent.click(roomsButton)
+    const floatingDock = document.querySelector('[data-floating-action-dock="true"]') as HTMLElement
+    expect(within(floatingDock).getAllByRole('button').map((button) => button.getAttribute('aria-label'))).toEqual(['Quick Links'])
+    fireEvent.click(screen.getByRole('button', { name: 'Quick Links' }))
+    fireEvent.click(within(await screen.findByRole('dialog', { name: 'Quick Links' })).getByRole('button', { name: 'Rooms' }))
 
     const dialog = await screen.findByRole('dialog', { name: 'Rooms' })
     fireEvent.click(within(dialog).getByRole('button', { name: 'Living Room area' }))
@@ -558,8 +559,8 @@ describe('DashboardViewPage', () => {
       const scanButton = screen.getByRole('button', { name: 'Scan Item' })
       expect(scanButton).toHaveTextContent('Scan Item')
       expect(floatingDock).toContainElement(scanButton)
-      expect(floatingDock).toContainElement(screen.getByRole('button', { name: 'Rooms' }))
-      expect(within(floatingDock as HTMLElement).getAllByRole('button').map((button) => button.textContent?.trim())).toEqual(['Scan Item', 'Rooms'])
+      expect(screen.queryByRole('button', { name: 'Rooms' })).not.toBeInTheDocument()
+      expect(within(floatingDock as HTMLElement).getAllByRole('button').map((button) => button.textContent?.trim())).toEqual(['Scan Item', ''])
       fireEvent.click(scanButton)
 
       expect(await screen.findByRole('dialog', { name: 'Add Item' })).toBeInTheDocument()
@@ -616,6 +617,28 @@ describe('DashboardViewPage', () => {
         serviceData: { barcode: '3017620422003' },
       }))
       expect(await screen.findByLabelText('Product name')).toHaveValue('Nutella')
+      expect(mockCallServiceCalls.some((call) => call.domain === 'evershelf' && call.service === 'prepare_scanned_product')).toBe(false)
+      expect(mockCallServiceCalls.some((call) => call.domain === 'evershelf' && call.service === 'suggest_location')).toBe(false)
+      expect(screen.getByRole('button', { name: 'Scan Barcode Again' })).toBeEnabled()
+      expect(screen.queryByText('Source: mock')).not.toBeInTheDocument()
+      expect(screen.queryByLabelText('Live item scan camera feed')).not.toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Next' })).toBeEnabled()
+      expect(camera.stop).toHaveBeenCalled()
+
+      fireEvent.click(screen.getByRole('button', { name: 'Next' }))
+      expect(screen.getByText('Expiration Date · Step 2 of 3')).toBeInTheDocument()
+      await waitFor(() => expect(mockCallServiceCalls).toContainEqual({
+        domain: 'evershelf',
+        returnResponse: true,
+        service: 'prepare_scanned_product',
+        serviceData: {
+          barcode: '3017620422003',
+          brand: 'Ferrero',
+          image_url: 'https://example.test/nutella.jpg',
+          name: 'Nutella',
+          product_id: 42,
+        },
+      }))
       await waitFor(() => expect(mockCallServiceCalls).toContainEqual({
         domain: 'evershelf',
         returnResponse: true,
@@ -624,13 +647,10 @@ describe('DashboardViewPage', () => {
           barcode: '3017620422003',
           mode: 'barcode',
           name: 'Nutella',
+          product_fingerprint: 'f'.repeat(64),
+          product_id: 42,
         },
       }))
-      expect(screen.getByRole('button', { name: 'Scan Barcode Again' })).toBeEnabled()
-      expect(screen.queryByText('Source: mock')).not.toBeInTheDocument()
-      expect(screen.queryByLabelText('Live item scan camera feed')).not.toBeInTheDocument()
-      expect(screen.getByRole('button', { name: 'Next' })).toBeEnabled()
-      expect(camera.stop).toHaveBeenCalled()
 
       fireEvent.click(screen.getByRole('button', { name: 'Close' }))
       await waitFor(() => expect(camera.stop).toHaveBeenCalled())
@@ -655,8 +675,19 @@ describe('DashboardViewPage', () => {
               source: 'history_barcode',
               success: true,
             },
-            product: { brand: 'Costco', name: 'Costco Dairy-Free Reduced fat milk' },
+            product: { brand: 'Costco', id: 77, name: 'Costco Dairy-Free Reduced fat milk' },
             source: 'local',
+          },
+        })
+      }
+      if (params.domain === 'evershelf' && params.service === 'suggest_location' && params.returnResponse === true) {
+        mockCallServiceCalls.push(params)
+        return Promise.resolve({
+          response: {
+            confidence: 1,
+            location: 'frigo',
+            source: 'history_barcode',
+            success: true,
           },
         })
       }
@@ -671,8 +702,9 @@ describe('DashboardViewPage', () => {
       act(() => {
         zxingMock.latestCallback?.({ getText: () => '196633809865' }, undefined, { stop: zxingMock.scannerStop })
       })
-
       expect(await screen.findByLabelText('Product name')).toHaveValue('Costco Dairy-Free Reduced fat milk')
+      expect(await screen.findByLabelText('Product name')).toHaveValue('Costco Dairy-Free Reduced fat milk')
+      expect(mockCallServiceCalls.some((call) => call.domain === 'evershelf' && call.service === 'suggest_location')).toBe(false)
       fireEvent.click(screen.getByRole('button', { name: 'Next' }))
       expect(await screen.findByLabelText('Live expiration date camera feed')).toBeInTheDocument()
       fireEvent.click(screen.getByRole('button', { name: 'Manually Enter Expiration Date' }))
@@ -681,7 +713,29 @@ describe('DashboardViewPage', () => {
 
       expect(screen.getByRole('radio', { name: 'Fridge' })).toBeChecked()
       expect(screen.getByText('Selected from your previous EverShelf entries.')).toBeInTheDocument()
-      expect(mockCallServiceCalls.some((call) => call.domain === 'evershelf' && call.service === 'suggest_location')).toBe(false)
+      expect(mockCallServiceCalls).toContainEqual({
+        domain: 'evershelf',
+        returnResponse: true,
+        service: 'prepare_scanned_product',
+        serviceData: {
+          barcode: '196633809865',
+          brand: 'Costco',
+          name: 'Costco Dairy-Free Reduced fat milk',
+          product_id: 77,
+        },
+      })
+      expect(mockCallServiceCalls).toContainEqual({
+        domain: 'evershelf',
+        returnResponse: true,
+        service: 'suggest_location',
+        serviceData: {
+          barcode: '196633809865',
+          mode: 'barcode',
+          name: 'Costco Dairy-Free Reduced fat milk',
+          product_fingerprint: 'f'.repeat(64),
+          product_id: 77,
+        },
+      })
     } finally {
       mockState.helpers.callService = originalCallService
       camera.restore()
@@ -1052,6 +1106,7 @@ describe('DashboardViewPage', () => {
           image_url: 'https://example.test/nutella.jpg',
           location: 'freezer',
           name: 'Nutella',
+          product_id: 42,
           quantity: 2,
         }),
       })))
@@ -6030,8 +6085,8 @@ describe('DashboardViewPage', () => {
     expect(floatingDock).toContainElement(screen.getByRole('button', { name: 'Scan Item' }))
     expect(floatingDock).toContainElement(screen.getByRole('button', { name: 'Sort' }))
     expect(floatingDock).toContainElement(screen.getByRole('button', { name: 'Filter' }))
-    expect(within(floatingDock as HTMLElement).getAllByRole('button').map((button) => button.getAttribute('aria-label'))).toEqual(['Search inventory', 'Sort', 'Filter', 'Scan Item'])
-    expect(within(floatingDock as HTMLElement).getAllByRole('button').map((button) => button.textContent?.trim())).toEqual(['Search', '', '', ''])
+    expect(within(floatingDock as HTMLElement).getAllByRole('button').map((button) => button.getAttribute('aria-label'))).toEqual(['Search inventory', 'Sort', 'Filter', 'Scan Item', 'Quick Links'])
+    expect(within(floatingDock as HTMLElement).getAllByRole('button').map((button) => button.textContent?.trim())).toEqual(['Search', '', '', '', ''])
     expect(screen.queryByLabelText('Fridge inventory controls')).not.toBeInTheDocument()
 
     const sortButton = screen.getByRole('button', { name: 'Sort' })

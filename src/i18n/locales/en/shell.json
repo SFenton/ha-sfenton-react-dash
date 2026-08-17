@@ -22,6 +22,10 @@
     "openWithAttention_one": "Open {{title}}, {{count}} item needs attention",
     "openWithAttention_other": "Open {{title}}, {{count}} items need attention"
   },
+  "quickLinks": {
+    "rooms": "Rooms",
+    "title": "Quick Links"
+  },
   "tabs": {
     "overdue": "{{label}}, {{count}} overdue"
   }

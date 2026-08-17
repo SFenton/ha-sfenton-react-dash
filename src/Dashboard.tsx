@@ -43,8 +43,8 @@ function pageForPath(path: string, activePath: string, onNavigate: (path: string
   return <DashboardViewPage activePath={activePath} appChromeHidden={appChromeHidden} initialContentTransitionState={initialContentTransitionState} inventoryControls={inventoryControls} loadingPhase={loadingPhase} onBack={onBack} onNavigate={onNavigate} onRecipesInitialResolved={onRecipesInitialResolved} path={path} recipeControls={recipeControls} recipesInitiallyAppGated={recipesInitiallyAppGated} withShell={false} />
 }
 
-function floatingActionForPath(path: string, onNavigate: (path: string) => void, inventoryControls: EverShelfInventoryControls, recipeControls: RecipeControls): ReactNode {
-  return hasDashboardFloatingAction(path) ? <DashboardFloatingAction inventoryControls={inventoryControls} key={path} onNavigate={onNavigate} path={path} recipeControls={recipeControls} /> : undefined
+function floatingActionForPath(path: string, inventoryControls: EverShelfInventoryControls, recipeControls: RecipeControls): ReactNode {
+  return hasDashboardFloatingAction(path) ? <DashboardFloatingAction inventoryControls={inventoryControls} key={path} path={path} recipeControls={recipeControls} /> : undefined
 }
 
 function routeUsesMenuChrome(path: string) {
@@ -159,7 +159,7 @@ function Dashboard() {
   }
 
   return (
-    <AppShell bottomNav={<BottomNav activePath={path} onNavigate={navigateToPath} />} chromeHidden={Boolean(routeLoadingPhase)} floatingAction={floatingActionForPath(displayedPath, navigateToPath, inventoryControls, recipeControls)}>
+    <AppShell bottomNav={<BottomNav activePath={path} onNavigate={navigateToPath} />} chromeHidden={Boolean(routeLoadingPhase)} floatingAction={floatingActionForPath(displayedPath, inventoryControls, recipeControls)} onNavigate={navigateToPath}>
       <SmoothRouteOutlet leadingChromeTransition={leadingChromeTransition} routePath={displayedPath} transitionState={transitionState}>
         {pageForPath(displayedPath, path, navigateToPath, navigateBack, transitionState, inventoryControls, recipeControls, usesInitialDataAppGate, handleRecipesInitialResolved, waitsForInitialRecipes, pageLoadingPhase, pageInitialContentTransitionState)}
       </SmoothRouteOutlet>

@@ -1,4 +1,10 @@
 import { FOOD_CARD_BACKGROUND_COLOR } from './everShelfFood'
+import { copy } from '../i18n'
+import { HOME_FOOD_ROUTE_PATH, HOME_SPRINKLERS_ROUTE_PATH } from './routes'
+import { SHOW_OUTDOOR_FAUCETS_ENTITY_ID } from './sprinklers'
+
+const sprinklersQuickAccessName = copy('pageSprinklers', 'title')
+const roomsQuickAccessName = copy('shell', 'quickLinks.rooms')
 
 export type IconKey =
   | 'air'
@@ -47,15 +53,22 @@ export interface StatusChipConfig {
   width?: number
 }
 
+export type QuickAccessModalPage = 'rooms' | 'security-system'
+
+export type QuickAccessAction =
+  | { kind: 'modal'; page: QuickAccessModalPage }
+  | { kind: 'navigate'; path: string }
+
 export interface QuickAccessConfig {
+  action: QuickAccessAction
   title: string
+  id: string
   icon: DashboardIcon
   backgroundColor?: string
-  hash?: string
-  route?: string
   entityId?: string
   status?: 'all_food' | 'entity_state'
   tone: 'security' | 'climate' | 'neutral' | 'light' | 'vacuum' | 'media'
+  visibilityEntityId?: string
 }
 
 export interface AreaConfig {
@@ -201,40 +214,64 @@ export const AIR_QUALITY_ROOMS: AirQualityRoomConfig[] = [
   },
 ]
 
+export const SECURITY_QUICK_ACCESS_ITEM = {
+  action: { kind: 'modal', page: 'security-system' },
+  id: 'security-system',
+  title: 'Security System',
+  icon: 'mdi:shield-outline',
+  entityId: 'alarm_control_panel.aqara_hub_m3_0056_security_system_2',
+  status: 'entity_state',
+  tone: 'security',
+} satisfies QuickAccessConfig
+
+export const ROOMS_QUICK_ACCESS_ITEM = {
+  action: { kind: 'modal', page: 'rooms' },
+  id: 'rooms',
+  title: roomsQuickAccessName,
+  icon: 'mdi:floor-plan',
+  tone: 'climate',
+} satisfies QuickAccessConfig
+
 export const QUICK_ACCESS_ITEMS: QuickAccessConfig[] = [
+  ROOMS_QUICK_ACCESS_ITEM,
+  SECURITY_QUICK_ACCESS_ITEM,
   {
-    title: 'Security System',
-    icon: 'mdi:shield-outline',
-    entityId: 'alarm_control_panel.aqara_hub_m3_0056_security_system_2',
-    hash: '#security-system',
-    status: 'entity_state',
-    tone: 'security',
-  },
-  {
+    action: { kind: 'navigate', path: HOME_FOOD_ROUTE_PATH },
+    id: 'food',
     title: 'Food & Recipes',
     icon: 'mdi:food-fork-drink',
     backgroundColor: FOOD_CARD_BACKGROUND_COLOR,
-    route: '/at-a-glance/food',
     status: 'all_food',
     tone: 'neutral',
   },
   {
+    action: { kind: 'navigate', path: 'vacuums' },
+    id: 'vacuums',
     title: 'Vacuums',
     icon: 'mdi:robot-vacuum',
-    route: '/at-a-glance/vacuums',
     tone: 'vacuum',
   },
   {
+    action: { kind: 'navigate', path: 'media' },
+    id: 'media',
     title: 'Media',
     icon: 'mdi:remote',
-    route: '/at-a-glance/media',
     tone: 'media',
   },
   {
+    action: { kind: 'navigate', path: 'custom-lights' },
+    id: 'custom-lights',
     title: 'Custom Lights',
     icon: 'mdi:lightbulb-group',
-    route: '/at-a-glance/custom-lights',
     tone: 'light',
+  },
+  {
+    action: { kind: 'navigate', path: HOME_SPRINKLERS_ROUTE_PATH },
+    id: 'sprinklers',
+    title: sprinklersQuickAccessName,
+    icon: 'mdi:sprinkler-variant',
+    tone: 'neutral',
+    visibilityEntityId: SHOW_OUTDOOR_FAUCETS_ENTITY_ID,
   },
 ]
 

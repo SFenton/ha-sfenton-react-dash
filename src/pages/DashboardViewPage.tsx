@@ -92,7 +92,7 @@ import {
   OCCUPANCY_GROUPS,
   type EntityGroupConfig,
 } from '../constants/atAGlance'
-import { DASHBOARD_ROUTES, HOME_ALL_FOOD_ROUTE_PATH, HOME_CABINET_ROUTE_PATH, HOME_FOOD_ROUTE_PATH, HOME_FREEZER_ROUTE_PATH, HOME_FRIDGE_ROUTE_PATH, HOME_GROCERY_LIST_ROUTE_PATH, HOME_PANTRY_ROUTE_PATH, HOME_RECIPES_ROUTE_PATH, HOME_SPICE_RACK_ROUTE_PATH, fallbackBackPathForRoute } from '../constants/routes'
+import { DASHBOARD_ROUTES, HOME_ALL_FOOD_ROUTE_PATH, HOME_CABINET_ROUTE_PATH, HOME_FOOD_ROUTE_PATH, HOME_FREEZER_ROUTE_PATH, HOME_FRIDGE_ROUTE_PATH, HOME_GROCERY_LIST_ROUTE_PATH, HOME_PANTRY_ROUTE_PATH, HOME_RECIPES_ROUTE_PATH, HOME_SPICE_RACK_ROUTE_PATH, HOME_SPRINKLERS_ROUTE_PATH, fallbackBackPathForRoute } from '../constants/routes'
 import {
   ADMIN_AUTO_REENABLE_ITEMS,
   CHORE_QUICK_LINKS,
@@ -139,7 +139,7 @@ import {
 } from '../constants/portedDashboard'
 import { choreQuickLinkCounts, choreQuickLinkSubtitle, groceryCountSubtitle } from '../constants/choreQuickLinkCounts'
 import { FOOD_CARD_BACKGROUND_COLOR, foodSummarySubtitle } from '../constants/everShelfFood'
-import { modalSquareGridModalStyle, modalSquareGridStyle, type ModalSquareGridStyle, useModalSquareGridLayout } from './modalSquareGrid'
+import { modalSquareGridModalStyle, modalSquareGridStyle, type ModalSquareGridStyle, useModalSquareGridLayout } from '../components/core/modalSquareGrid'
 import { ROOM_PAGE_CONFIGS, type RoomSourceCardAction, type RoomSourceCardConfig, type RoomSourceKind, type RoomSourceModalItem, type RoomSourceSectionLayout } from '../constants/roomPages'
 import { humidifierForPowerEntity, type HumidifierConfig } from '../constants/humidifiers'
 import { MEDIA_REMOTE_CONFIGS, type MediaRemoteConfig } from '../constants/mediaRemotes'
@@ -154,6 +154,7 @@ import { Page } from './Page'
 import { ClimateSheet, ContactSheet, LightsSheet, OccupancySheet } from './AtAGlancePage'
 import { CustomLightsPage } from './CustomLightsPage'
 import { FoodHubPage } from './FoodHubPage'
+import { SprinklersPage } from './SprinklersPage'
 import { RecipesPage } from './RecipesPage'
 import styles from './DashboardViewPage.module.css'
 
@@ -6074,6 +6075,7 @@ function Content({ inventoryControls, onNavigate, onRecipesInitialResolved, onSc
   if (path === 'admin') return <AdminPage onNavigate={onNavigate} preload={preload} preloadHash={preloadHash} preloadHashes={preloadHashes} />
   if (path === 'ecobee') return <ThermostatPage preload={preload} preloadHash={preloadHash} preloadHashes={preloadHashes} />
   if (path === 'custom-lights') return <CustomLightsPage />
+  if (path === HOME_SPRINKLERS_ROUTE_PATH) return <SprinklersPage preload={preload} />
   if (path === HOME_FOOD_ROUTE_PATH) return <FoodHubPage onNavigate={onNavigate} preload={preload} />
   if (path === HOME_RECIPES_ROUTE_PATH) return <RecipesPage controls={recipeControls} initiallyAppGated={recipesInitiallyAppGated} onInitialResolved={onRecipesInitialResolved} preload={preload} />
   if (EVERSHELF_INVENTORY_PAGES[path]) return <EverShelfInventoryPage controls={inventoryControls} path={path} />
@@ -6108,7 +6110,7 @@ export function DashboardViewPage({ activePath, appChromeHidden = false, initial
   if (!withShell || preload) return page
 
   return (
-    <AppShell bottomNav={<BottomNav activePath={activePath} onNavigate={onNavigate} />} chromeHidden={pageChromeHidden} floatingAction={!preload && hasDashboardFloatingAction(path) ? <DashboardFloatingAction inventoryControls={inventoryControls} onNavigate={onNavigate} path={path} recipeControls={recipeControls} /> : undefined}>
+    <AppShell bottomNav={<BottomNav activePath={activePath} onNavigate={onNavigate} />} chromeHidden={pageChromeHidden} floatingAction={!preload && hasDashboardFloatingAction(path) ? <DashboardFloatingAction inventoryControls={inventoryControls} path={path} recipeControls={recipeControls} /> : undefined} onNavigate={onNavigate}>
       {page}
     </AppShell>
   )

@@ -1,0 +1,106 @@
+.pageStack,
+.modalStack,
+.settingList,
+.startTimeStack,
+.list {
+  display: grid;
+  min-width: 0;
+  align-content: start;
+}
+
+.pageStack {
+  gap: 12px;
+}
+
+.modalStack {
+  gap: 16px;
+}
+
+.list {
+  gap: 10px;
+}
+
+.statusGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.controlGrid {
+  --dynamic-grid-columns: 2;
+}
+
+.settingList {
+  gap: 2px;
+  border: 1px solid var(--color-glass-soft);
+  border-radius: 22px;
+  padding: 2px 10px;
+  background: var(--color-glass-soft);
+}
+
+.startTimeStack {
+  gap: 10px;
+}
+
+.startTimeRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 48px;
+  align-items: end;
+  gap: 8px;
+}
+
+.addStartTime,
+.removeStartTime {
+  border: 1px solid var(--color-glass-soft);
+  color: var(--color-text);
+  background: var(--color-glass-soft);
+  box-shadow: var(--shadow-glass);
+  font: inherit;
+  cursor: pointer;
+  -webkit-tap-highlight-color: var(--color-modal-footer-transparent);
+}
+
+.addStartTime {
+  display: inline-flex;
+  width: 100%;
+  min-height: 48px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border-radius: 18px;
+  padding: 0 14px;
+  font-size: 0.78rem;
+  font-weight: 820;
+}
+
+.removeStartTime {
+  display: grid;
+  width: 48px;
+  height: 58px;
+  place-items: center;
+  border-radius: 18px;
+}
+
+.addStartTime:focus,
+.removeStartTime:focus {
+  outline: none;
+}
+
+.addStartTime:focus-visible,
+.removeStartTime:focus-visible {
+  outline: 2px solid var(--color-text);
+  outline-offset: 2px;
+}
+
+.addStartTime:disabled,
+.removeStartTime:disabled {
+  cursor: default;
+  opacity: 0.48;
+}
+
+@media (hover: none), (pointer: coarse) {
+  .addStartTime:focus-visible,
+  .removeStartTime:focus-visible {
+    outline: none;
+  }
+}

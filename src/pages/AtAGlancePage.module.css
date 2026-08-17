@@ -2,10 +2,6 @@
   margin: 0 0 4px;
 }
 
-.quickGrid {
-  --dynamic-grid-columns: 2;
-}
-
 .cameraGrid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -30,16 +26,6 @@
   .homeContent {
     animation-duration: 1ms;
   }
-}
-
-.roomPickerGrid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-}
-
-.roomPickerCell {
-  min-width: 0;
 }
 
 .modalSquareCell {
@@ -516,10 +502,6 @@
 }
 
 @media (min-width: 720px) {
-  .quickGrid {
-    --dynamic-grid-columns: 3;
-  }
-
   .areaGrid {
     grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   }
@@ -564,7 +546,6 @@
     min-height: 0;
   }
 
-  .roomPickerGrid,
   .modalSquareGrid {
     height: 100%;
     min-height: 0;
@@ -580,7 +561,6 @@
     scrollbar-width: none;
   }
 
-  .roomPickerGrid::-webkit-scrollbar,
   .modalSquareGrid::-webkit-scrollbar {
     display: none;
     width: 0;
@@ -593,15 +573,12 @@
     align-content: start;
   }
 
-  .roomPickerCell,
   .modalSquareCell {
     width: var(--modal-square-card-size, 168px);
     height: var(--modal-square-card-size, 168px);
     min-height: 0;
   }
 
-  .roomPickerCell > button,
-  .roomPickerCell > article,
   .modalSquareCell > button,
   .modalSquareCell > article {
     height: 100%;
@@ -611,8 +588,6 @@
     padding: clamp(14px, 1.6vw, 22px);
   }
 
-  .roomPickerCell > button > span:first-child,
-  .roomPickerCell > article > span:first-child,
   .modalSquareCell > button > span:first-child,
   .modalSquareCell > article > span:first-child {
     flex-basis: clamp(38px, 4.2vw, 52px);
@@ -620,23 +595,17 @@
     height: clamp(38px, 4.2vw, 52px);
   }
 
-  .roomPickerCell > button > span:first-child svg,
-  .roomPickerCell > article > span:first-child svg,
   .modalSquareCell > button > span:first-child svg,
   .modalSquareCell > article > span:first-child svg {
     width: clamp(30px, 3.4vw, 46px);
     height: clamp(30px, 3.4vw, 46px);
   }
 
-  .roomPickerCell > button > span:last-child,
-  .roomPickerCell > article > span:last-child,
   .modalSquareCell > button > span:last-child,
   .modalSquareCell > article > span:last-child {
     gap: 3px;
   }
 
-  .roomPickerCell > button > span:last-child > span:first-child,
-  .roomPickerCell > article > span:last-child > span:first-child,
   .modalSquareCell > button > span:last-child > span:first-child,
   .modalSquareCell > article > span:last-child > span:first-child {
     font-size: clamp(0.78rem, 1.05vw, 1rem);

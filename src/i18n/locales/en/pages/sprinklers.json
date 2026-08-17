@@ -1,0 +1,83 @@
+{
+  "title": "Sprinklers",
+  "frontYard": {
+    "title": "Front Yard"
+  },
+  "backyard": {
+    "title": "Backyard Faucet"
+  },
+  "sections": {
+    "controllers": "Controllers",
+    "status": "Status",
+    "controls": "Controls",
+    "schedule": "Schedule",
+    "settings": "Settings",
+    "startTimes": "Start Times",
+    "zones": "Zones"
+  },
+  "labels": {
+    "controller": "Controller",
+    "battery": "Battery",
+    "hub": "Hub",
+    "nextWatering": "Next watering",
+    "lastWatering": "Last watering",
+    "runTime": "Run time",
+    "wateringBudget": "Watering budget",
+    "rainDelay": "Rain delay · 24 hours",
+    "smartWatering": "Smart watering",
+    "programEnabled": "Program enabled"
+  },
+  "actions": {
+    "waterNow": "Water now",
+    "stopWatering": "Stop watering",
+    "startWatering": "Start watering",
+    "startProgram": "Start program",
+    "addStartTime": "Add Another Start Time",
+    "removeStartTime": "Remove Start Time {{number}}"
+  },
+  "states": {
+    "watering": "Watering",
+    "fault": "Fault",
+    "connected": "Connected",
+    "notScheduled": "Not scheduled",
+    "noHistory": "No history"
+  },
+  "controller": {
+    "subtitle": "{{mode}} · Next {{next}}"
+  },
+  "schedule": {
+    "everyDay": "Every day",
+    "summary": "{{days}} · {{times}}",
+    "details": "{{minutes}} min · {{budget}}%",
+    "detailsWithZone": "{{zone}} · {{minutes}} min · {{budget}}%",
+    "accessibleLabel": "{{program}} · {{summary}} · {{details}}",
+    "fallbackProgram": "{{zone}} schedule",
+    "runTimeReadOnly": "Run time · {{minutes}} min",
+    "startTime": "Start {{number}}",
+    "days": {
+      "sunday": "Sunday",
+      "monday": "Monday",
+      "tuesday": "Tuesday",
+      "wednesday": "Wednesday",
+      "thursday": "Thursday",
+      "friday": "Friday",
+      "saturday": "Saturday"
+    }
+  },
+  "zone": {
+    "accessibleLabel": "Water now · {{zone}}"
+  },
+  "duration": {
+    "value": "{{minutes}} min",
+    "decrease": "Decrease run time",
+    "increase": "Increase run time"
+  },
+  "budget": {
+    "value": "{{percentage}}%",
+    "decrease": "Decrease watering budget",
+    "increase": "Increase watering budget"
+  },
+  "alerts": {
+    "lowBattery": "Battery {{percentage}}%"
+  }
+}

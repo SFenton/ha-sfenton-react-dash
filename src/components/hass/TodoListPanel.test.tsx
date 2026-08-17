@@ -114,8 +114,20 @@ describe('TodoListPanel', () => {
         ].join('\n'),
         due: new Date(Date.now() - 7 * 60 * 60 * 1000).toISOString(),
         status: 'needs_action',
-        summary: 'Charge Aqara Smart Lock U400',
+        summary: 'Charge Aqara Smart Lock U400 · 20%',
         uid: 'battery-charge',
+      },
+      {
+        description: [
+          'The Theater Room Vent battery is at 8%.',
+          '',
+          'Home Assistant updates this task when the reported percentage changes.',
+          '',
+          'Maintenance reference: BATT-VENT1234.',
+        ].join('\n'),
+        status: 'needs_action',
+        summary: 'Replace Theater Room Vent batteries',
+        uid: 'battery-plural',
       },
     ]
 
@@ -125,6 +137,8 @@ describe('TodoListPanel', () => {
     expect(screen.getByRole('button', { name: 'Charge Aqara Smart Lock U400 · 20% 7 hours overdue' })).toBeInTheDocument()
     expect(screen.getByText('Replace Front Yard Battery · 10%')).toBeInTheDocument()
     expect(screen.getByText('Charge Aqara Smart Lock U400 · 20%')).toBeInTheDocument()
+    expect(screen.getByText('Replace Theater Room Vent Batteries · 8%')).toBeInTheDocument()
+    expect(screen.queryByText('Charge Aqara Smart Lock U400 · 20% · 20%')).not.toBeInTheDocument()
     expect(screen.getByText('2 days overdue')).toBeInTheDocument()
     expect(screen.getByText('7 hours overdue')).toBeInTheDocument()
     expect(screen.queryByText(/Maintenance reference:/i)).not.toBeInTheDocument()

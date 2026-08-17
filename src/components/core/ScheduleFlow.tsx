@@ -5,6 +5,8 @@ import { MaterialIcon } from './Icon'
 import { InlineAlert } from './InlineAlert'
 import { ModalActionFooter, type ModalFooterAction } from './ModalActionFooter'
 import { SectionHeader } from './SectionHeader'
+import { SurfaceAccessory } from './SurfaceAccessory'
+import { controlDisclosureTarget, type ControlSemantics } from './controlSemantics'
 import styles from './ScheduleFlow.module.css'
 
 export interface ScheduleControlConfig {
@@ -54,6 +56,7 @@ interface ScheduleListRowProps {
   onClick: () => void
   pressed?: boolean
   primary: ReactNode
+  semantics?: ControlSemantics
   secondary?: ReactNode
   tertiary?: ReactNode
   trailingControl?: ReactNode
@@ -152,22 +155,34 @@ export function ScheduleListRow({
   onClick,
   pressed,
   primary,
+  semantics,
   secondary,
   tertiary,
   trailingControl,
   wrapText = false,
 }: ScheduleListRowProps) {
+  const semanticDisclosureTarget = controlDisclosureTarget(semantics)
+  const showDisclosure = semantics ? Boolean(semanticDisclosureTarget) : disclosure
+  const accessorySemantics: ControlSemantics | null = semanticDisclosureTarget === 'modal'
+    ? { kind: 'modal' }
+    : semanticDisclosureTarget === 'navigation'
+      ? { kind: 'navigate' }
+      : null
+
   return (
     <div className={styles.rowShell} data-schedule-list-row={true}>
       <button
         aria-label={accessibleLabel}
         aria-pressed={pressed}
         className={styles.row}
+        data-action-kind={semantics?.kind}
         data-active={active ? 'true' : 'false'}
         data-has-trailing-control={trailingControl ? 'true' : 'false'}
         data-icon-surface={iconSurface ? 'true' : 'false'}
         data-modal-detail-autofocus={autoFocus ? 'true' : undefined}
         data-modal-detail-trigger={focusKey}
+        data-modal-opener={semanticDisclosureTarget === 'modal' ? 'true' : undefined}
+        data-navigation-opener={semanticDisclosureTarget === 'navigation' ? 'true' : undefined}
         data-wrap-text={wrapText ? 'true' : undefined}
         disabled={disabled}
         onClick={onClick}
@@ -182,9 +197,9 @@ export function ScheduleListRow({
           {tertiary && <small>{tertiary}</small>}
         </span>
         {trailingControl && <span aria-hidden className={styles.rowTrailingSpacer} />}
-        {!disabled && disclosure && (
+        {!disabled && showDisclosure && (
           <span className={styles.rowChevron} data-schedule-list-row-chevron>
-            <MaterialIcon name='mdi:chevron-right' size={20} />
+            {accessorySemantics ? <SurfaceAccessory semantics={accessorySemantics} size="compact" /> : <MaterialIcon name='mdi:chevron-right' size={20} />}
           </span>
         )}
       </button>

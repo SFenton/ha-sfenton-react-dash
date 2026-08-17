@@ -1,0 +1,36 @@
+.globalAction {
+  flex: 0 0 auto;
+}
+
+:global(html[data-dashboard-search-expanded='true']) .globalAction {
+  display: none;
+}
+
+.grid {
+  --dynamic-grid-columns: 2;
+}
+
+.cell {
+  height: 100%;
+  min-width: 0;
+}
+
+.cell > button {
+  height: 100%;
+}
+
+.detail {
+  outline: none;
+}
+
+@media (min-width: 720px) {
+  .grid {
+    --dynamic-grid-columns: 3;
+  }
+
+  .cell > button {
+    min-height: 160px;
+    border-radius: clamp(22px, 2.4vw, 34px);
+    padding: clamp(14px, 1.6vw, 22px);
+  }
+}
