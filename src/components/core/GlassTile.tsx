@@ -2,7 +2,7 @@ import { Icon } from './Icon'
 import { isValidElement, type CSSProperties, type ReactNode } from 'react'
 import type { IconKey } from '../../constants/atAGlance'
 import { SurfaceAccessory } from './SurfaceAccessory'
-import { controlDisclosureTarget, type ControlSemantics } from './controlSemantics'
+import { controlDisclosureTarget, TOGGLE_CONTROL_KIND, type ControlSemantics } from './controlSemantics'
 import styles from './GlassTile.module.css'
 
 export type TileTone = 'air' | 'climate' | 'contact' | 'danger' | 'light' | 'media' | 'neutral' | 'presence' | 'security' | 'switch' | 'vacuum' | 'warning'
@@ -10,11 +10,27 @@ export type TileTone = 'air' | 'climate' | 'contact' | 'danger' | 'light' | 'med
 type GlassTileStyle = CSSProperties & {
   '--header-pill-color'?: string
   '--tile-color'?: string
+  '--tile-controls-width'?: string
   '--tile-progress'?: string
   '--tile-progress-color'?: string
 }
 
-export interface GlassTileProps {
+type GlassTileControlSemantics = Extract<ControlSemantics, { kind: 'command' } | { kind: 'toggle' }>
+
+export interface GlassTileControl {
+  ariaLabel: string
+  disabled: boolean
+  icon: IconKey | string | ReactNode
+  id: string
+  onPress: () => void
+  semantics: GlassTileControlSemantics
+}
+
+export type GlassTileControls =
+  | readonly [GlassTileControl]
+  | readonly [GlassTileControl, GlassTileControl]
+
+interface GlassTileBaseProps {
   title: string
   icon: IconKey | string | ReactNode
   announcement?: string
@@ -36,8 +52,17 @@ export interface GlassTileProps {
   pressed?: boolean
   progress?: number
   progressColor?: string
-  trailingControl?: ReactNode
   variant?: 'card' | 'header'
+}
+
+export type GlassTileProps = GlassTileBaseProps & (
+  | { controls?: never; trailingControl?: ReactNode }
+  | { controls: GlassTileControls; trailingControl?: never }
+)
+
+function tileIconContent(icon: GlassTileControl['icon'], size: number) {
+  const iconName = typeof icon === 'string' ? icon : undefined
+  return isValidElement(icon) ? icon : <Icon name={iconName ?? 'mdi:help-circle-outline'} size={size} />
 }
 
 export function GlassTile({
@@ -55,6 +80,7 @@ export function GlassTile({
   semantics,
   tone = 'neutral',
   compact = false,
+  controls,
   disclosure = false,
   disclosureKind = 'modal',
   isOff = false,
@@ -79,11 +105,13 @@ export function GlassTile({
   const resolvedControlRole = semantics?.kind === 'toggle' ? 'switch' : controlRole
   const semanticChecked = semantics?.kind === 'toggle' ? semantics.checked : undefined
   const semanticPressed = semantics?.kind === 'selection' ? semantics.selected : undefined
+  const controlCount = controls?.length ?? 0
   const className = [
     styles.tile,
     onClick ? styles.button : '',
     compact ? styles.compact : '',
     showDisclosure ? styles.hasDisclosure : '',
+    controlCount > 0 ? styles.hasControls : '',
     trailingControl ? styles.hasTrailingControl : '',
     variant === 'header' ? styles.headerPill : '',
     styles[tone],
@@ -98,11 +126,12 @@ export function GlassTile({
     style['--header-pill-color'] = backgroundColor
     style['--tile-color'] = backgroundColor
   }
+  if (controlCount > 0) style['--tile-controls-width'] = `${controlCount * 44 + (controlCount - 1) * 8}px`
   if (progressValue !== undefined) style['--tile-progress'] = `${progressValue}%`
   if (progressColor) style['--tile-progress-color'] = progressColor
   const resolvedStyle = Object.keys(style).length ? style : undefined
   const iconName = typeof icon === 'string' ? icon : undefined
-  const iconContent = isValidElement(icon) ? icon : <Icon name={iconName ?? 'mdi:help-circle-outline'} size={iconSize} />
+  const iconContent = tileIconContent(icon, iconSize)
 
   const content = (
     <>
@@ -157,9 +186,43 @@ export function GlassTile({
     if (trailingControl) {
       return (
         <>
-          <div className={styles.controlShell} data-disclosure={showDisclosure ? 'true' : 'false'}>
+          <div className={styles.controlShell} data-disclosure={showDisclosure ? 'true' : 'false'} data-glass-tile-control-shell="legacy">
             {button}
             <div className={styles.trailingControl}>{trailingControl}</div>
+          </div>
+          {liveAnnouncement}
+        </>
+      )
+    }
+
+    if (controls) {
+      return (
+        <>
+          <div className={styles.controlShell} data-disclosure={showDisclosure ? 'true' : 'false'} data-glass-tile-control-shell="rail">
+            {button}
+            <div className={styles.controlRail} data-glass-tile-control-rail="true">
+              {controls.map((control) => {
+                const checked = control.semantics.kind === TOGGLE_CONTROL_KIND ? control.semantics.checked : undefined
+                return (
+                  <button
+                    aria-checked={checked}
+                    aria-label={control.ariaLabel}
+                    className={styles.railControl}
+                    data-action-kind={control.semantics.kind}
+                    data-checked={checked === undefined ? undefined : checked ? 'true' : 'false'}
+                    data-control-id={control.id}
+                    data-glass-tile-control="true"
+                    disabled={control.disabled}
+                    key={control.id}
+                    onClick={control.onPress}
+                    role={control.semantics.kind === TOGGLE_CONTROL_KIND ? 'switch' : undefined}
+                    type="button"
+                  >
+                    {tileIconContent(control.icon, 20)}
+                  </button>
+                )
+              })}
+            </div>
           </div>
           {liveAnnouncement}
         </>

@@ -1,0 +1,53 @@
+.box {
+  --info-box-color: var(--color-presence);
+  display: grid;
+  gap: 6px;
+  border: 1px solid color-mix(in srgb, var(--info-box-color) 35%, var(--color-glass-soft));
+  border-radius: 16px;
+  padding: 10px 11px;
+  background: color-mix(in srgb, var(--info-box-color) 20%, var(--color-modal-surface));
+}
+
+.box[data-tone='warning'] {
+  --info-box-color: var(--color-timer);
+}
+
+.box[data-tone='neutral'] {
+  --info-box-color: var(--color-glass-soft);
+  background: var(--color-glass-soft);
+}
+
+.box h4 {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 0.65rem;
+  font-weight: 860;
+  letter-spacing: 0.08em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.body {
+  display: grid;
+  gap: 6px;
+  color: var(--color-text);
+  font-size: 0.76rem;
+  font-weight: 740;
+  line-height: 1.28;
+}
+
+.body p {
+  margin: 0;
+}
+
+.body ul,
+.body ol {
+  display: grid;
+  gap: 5px;
+  margin: 0;
+  padding-left: 18px;
+}
+
+.body li::marker {
+  color: var(--color-text-muted);
+}

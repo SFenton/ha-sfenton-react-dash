@@ -27,4 +27,10 @@ describe('StatusPill', () => {
     render(<StatusPill grouped icon="mdi:progress-clock" label="Freshness" tone={tone} value="Unknown" />)
     expect(screen.getByRole('group', { name: 'Freshness Unknown' })).toHaveAttribute('data-tone', tone)
   })
+
+  it('accepts a shared state-derived background color', () => {
+    render(<StatusPill backgroundColor="rgb(0 110 255 / 0.6)" grouped icon="mdi:thermometer" label="Temperature" value="65°F" />)
+
+    expect(screen.getByRole('group', { name: 'Temperature 65°F' })).toHaveStyle('--status-pill-color: rgb(0 110 255 / 0.6)')
+  })
 })
