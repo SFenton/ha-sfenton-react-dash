@@ -39,7 +39,7 @@ describe('BathroomFanTile', () => {
       {
         domain: 'script',
         service: 'guest_bathroom_fan_command',
-        serviceData: { command: 'power', gesture: 'single', target_power: 'on' },
+        serviceData: { command: 'power', target_power: 'on' },
       },
     ])
 
@@ -62,7 +62,7 @@ describe('BathroomFanTile', () => {
       {
         domain: 'script',
         service: 'guest_bathroom_fan_command',
-        serviceData: { command: 'power', gesture: 'single', target_power: 'off' },
+        serviceData: { command: 'power', target_power: 'off' },
       },
     ])
     expect(screen.getByRole('switch', { name: 'Lock' })).toHaveAttribute('aria-checked', 'false')

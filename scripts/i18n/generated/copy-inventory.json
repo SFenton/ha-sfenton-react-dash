@@ -544,18 +544,6 @@
       "words": 3
     },
     {
-      "characters": 150,
-      "context": "catalog-copy",
-      "file": "src/i18n/locales/en/modals/bathroomFan.json",
-      "id": "5a698bc8c435d83f",
-      "lines": [],
-      "occurrences": 1,
-      "origin": "catalog",
-      "placeholders": [],
-      "value": "Both states will clear on their next physical change, or unlock from the app. Locking the fan will prevent automations from turning the fan on or off.",
-      "words": 27
-    },
-    {
       "characters": 33,
       "context": "catalog-copy",
       "file": "src/i18n/locales/en/modals/recipe.json",
@@ -702,30 +690,6 @@
       "words": 1
     },
     {
-      "characters": 68,
-      "context": "catalog-copy",
-      "file": "src/i18n/locales/en/modals/bathroomFan.json",
-      "id": "a87036f831bb40b8",
-      "lines": [],
-      "occurrences": 1,
-      "origin": "catalog",
-      "placeholders": [],
-      "value": "Double tapping Off on the physical fan switch will lock the fan off.",
-      "words": 13
-    },
-    {
-      "characters": 66,
-      "context": "catalog-copy",
-      "file": "src/i18n/locales/en/modals/bathroomFan.json",
-      "id": "fb01dc988cea4c70",
-      "lines": [],
-      "occurrences": 1,
-      "origin": "catalog",
-      "placeholders": [],
-      "value": "Double tapping On on the physical fan switch will lock the fan on.",
-      "words": 13
-    },
-    {
       "characters": 152,
       "context": "catalog-copy",
       "file": "src/i18n/locales/en/pages/admin.json",
@@ -786,18 +750,6 @@
       "placeholders": [],
       "value": "Have it",
       "words": 2
-    },
-    {
-      "characters": 4,
-      "context": "catalog-copy",
-      "file": "src/i18n/locales/en/modals/bathroomFan.json",
-      "id": "2b027e01796e2f05",
-      "lines": [],
-      "occurrences": 1,
-      "origin": "catalog",
-      "placeholders": [],
-      "value": "Hint",
-      "words": 1
     },
     {
       "characters": 4,
@@ -33956,11 +33908,11 @@
     }
   ],
   "summary": {
-    "catalogRecords": 219,
+    "catalogRecords": 215,
     "documentRecords": 1,
     "legacyOccurrences": 2615,
     "legacyRecords": 2168,
-    "totalRecords": 2388
+    "totalRecords": 2384
   },
   "version": 1
 }

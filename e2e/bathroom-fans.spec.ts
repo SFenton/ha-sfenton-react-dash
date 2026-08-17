@@ -51,7 +51,6 @@ test.describe('bathroom fan controls', () => {
     await expect(dialog.locator('[data-icon="mdi:thermometer"]')).toBeVisible()
     await expect(dialog.locator('[data-icon="mdi:water-percent"]')).toBeVisible()
     await expect(dialog.getByRole('navigation')).toHaveCount(0)
-    await expect(dialog.getByRole('note', { name: 'Hint' })).toContainText('Double tapping On on the physical fan switch will lock the fan on')
 
     await dialog.getByRole('switch', { name: 'Power Off' }).click()
     await expect(dialog.getByRole('heading', { name: 'Timer' })).toBeVisible()
@@ -113,14 +112,11 @@ test.describe('bathroom fan controls', () => {
     await dialog.getByRole('switch', { name: 'Power Off' }).click()
     const select = dialog.getByRole('combobox', { name: 'Timer' })
     const set = dialog.getByRole('button', { name: 'Set' })
-    const hint = dialog.getByRole('note', { name: 'Hint' })
     await select.selectOption('10')
     const selectBox = await select.boundingBox()
     const setBox = await set.boundingBox()
-    const hintSetupBox = await hint.boundingBox()
-    if (!selectBox || !setBox || !hintSetupBox) throw new Error('Desktop timer setup controls were not measurable')
+    if (!selectBox || !setBox) throw new Error('Desktop timer setup controls were not measurable')
     expect(Math.abs(selectBox.y - setBox.y)).toBeLessThanOrEqual(2)
-    expect(hintSetupBox.y - (setBox.y + setBox.height)).toBeLessThanOrEqual(20)
     await set.click()
 
     const statuses = dialog.locator('[data-icon="mdi:motion-sensor-off"], [data-icon="mdi:thermometer"], [data-icon="mdi:water-percent"]')
@@ -134,10 +130,8 @@ test.describe('bathroom fan controls', () => {
     expect(statusBoxes[2].width).toBeGreaterThan(statusBoxes[0].width * 1.8)
 
     const timerBox = await dialog.locator('[data-timer-row="true"]').boundingBox()
-    const hintTimerBox = await hint.boundingBox()
-    if (!timerBox || !hintTimerBox) throw new Error('Desktop timer row was not measurable')
+    if (!timerBox) throw new Error('Desktop timer row was not measurable')
     expect(timerBox.width).toBeGreaterThan(selectBox.width)
-    expect(hintTimerBox.y - (timerBox.y + timerBox.height)).toBeLessThanOrEqual(20)
     const timerHeading = dialog.getByRole('heading', { name: 'Timer' })
     await expect(timerHeading.locator('xpath=..').locator('span')).toHaveCount(1)
 

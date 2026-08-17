@@ -23,7 +23,6 @@ export function bathroomFanServiceCall(config: BathroomFanConfig, command: Bathr
       service: config.scriptService,
       serviceData: {
         command: 'power',
-        gesture: 'single',
         target_power: command.targetPower,
       },
     }

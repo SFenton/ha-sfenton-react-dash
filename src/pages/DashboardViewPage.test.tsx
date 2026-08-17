@@ -4951,7 +4951,7 @@ describe('DashboardViewPage', () => {
       {
         domain: 'script',
         service: 'guest_bathroom_fan_command',
-        serviceData: { command: 'power', gesture: 'single', target_power: 'on' },
+        serviceData: { command: 'power', target_power: 'on' },
       },
       { domain: 'homeassistant', service: 'toggle', target: 'switch.guest_bathroom_towel_rack_switch_top' },
     ])
@@ -4989,7 +4989,7 @@ describe('DashboardViewPage', () => {
       {
         domain: 'script',
         service: 'guest_bathroom_fan_command',
-        serviceData: { command: 'power', gesture: 'single', target_power: 'on' },
+        serviceData: { command: 'power', target_power: 'on' },
       },
     ])
   })
