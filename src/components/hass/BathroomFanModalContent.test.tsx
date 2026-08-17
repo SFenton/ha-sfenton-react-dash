@@ -32,11 +32,7 @@ describe('BathroomFanModalContent', () => {
     expect(Array.from(container.querySelector('[data-dynamic-grid="true"]')?.children ?? []).map((cell) => cell.getAttribute('data-dynamic-grid-span'))).toEqual(['1', '1', '2'])
     expect(screen.getByRole('switch', { name: 'Power Off' })).toHaveAttribute('aria-checked', 'false')
     expect(screen.getByRole('switch', { name: 'Lock Unlocked' })).toHaveAttribute('aria-checked', 'false')
-    const hint = screen.getByRole('note', { name: 'Hint' })
-    expect(hint.querySelectorAll('li')).toHaveLength(2)
-    expect(hint).toHaveTextContent('Double tapping On on the physical fan switch will lock the fan on.')
-    expect(hint).toHaveTextContent('Double tapping Off on the physical fan switch will lock the fan off.')
-    expect(hint).toHaveTextContent('Both states will clear on their next physical change, or unlock from the app. Locking the fan will prevent automations from turning the fan on or off.')
+    expect(screen.queryByRole('note', { name: 'Hint' })).not.toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: 'Timer' })).not.toBeInTheDocument()
     expect(screen.queryByRole('combobox', { name: 'Timer' })).not.toBeInTheDocument()
   })
@@ -167,7 +163,7 @@ describe('BathroomFanModalContent', () => {
       {
         domain: 'script',
         service: 'guest_bathroom_fan_command',
-        serviceData: { command: 'power', gesture: 'single', target_power: 'off' },
+        serviceData: { command: 'power', target_power: 'off' },
       },
     ])
     expect(screen.queryByRole('heading', { name: 'Timer' })).not.toBeInTheDocument()

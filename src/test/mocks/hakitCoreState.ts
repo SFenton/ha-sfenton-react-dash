@@ -698,8 +698,7 @@ function applyBathroomFanScriptSideEffects(params: Record<string, unknown>) {
     if (powerChanges && pending) pending.state = 'off'
     if (powerChanges && autoUnlock) autoUnlock.state = 'off'
     if (powerChanges && timer) timer.state = 'idle'
-    if (powerChanges && serviceData.gesture !== 'double' && lock?.state === 'on') lock.state = 'off'
-    if (serviceData.gesture === 'double' && lock) lock.state = 'on'
+    if (powerChanges && lock?.state === 'on') lock.state = 'off'
     return
   }
 

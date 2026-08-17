@@ -6,7 +6,6 @@ import { cardColorCss, colorFromHumidity, colorFromRgba, colorFromTemperature } 
 import { DynamicGrid } from '../core/DynamicGrid'
 import { GlassTile } from '../core/GlassTile'
 import { MaterialIcon } from '../core/Icon'
-import { InfoBox } from '../core/InfoBox'
 import { ModalSheet, type ModalSheetStyle } from '../core/ModalSheet'
 import { SelectActionField } from '../core/SelectActionField'
 import { SectionHeader } from '../core/SectionHeader'
@@ -262,13 +261,6 @@ function BathroomFanModalView({
         </section>
       )}
 
-      <InfoBox title={copy(BATHROOM_FAN_COPY_KEYS.hintTitle)}>
-        <ul>
-          <li>{copy(BATHROOM_FAN_COPY_KEYS.hintOn)}</li>
-          <li>{copy(BATHROOM_FAN_COPY_KEYS.hintOff)}</li>
-        </ul>
-        <p>{copy(BATHROOM_FAN_COPY_KEYS.hintBody)}</p>
-      </InfoBox>
     </div>
   )
 }
