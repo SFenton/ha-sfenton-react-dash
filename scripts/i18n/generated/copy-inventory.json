@@ -702,28 +702,28 @@
       "words": 1
     },
     {
-      "characters": 59,
+      "characters": 68,
       "context": "catalog-copy",
       "file": "src/i18n/locales/en/modals/bathroomFan.json",
-      "id": "ee6f2fdaa55aa908",
+      "id": "a87036f831bb40b8",
       "lines": [],
       "occurrences": 1,
       "origin": "catalog",
       "placeholders": [],
-      "value": "Double tapping Off on the fan switch will lock the fan off.",
-      "words": 12
+      "value": "Double tapping Off on the physical fan switch will lock the fan off.",
+      "words": 13
     },
     {
-      "characters": 57,
+      "characters": 66,
       "context": "catalog-copy",
       "file": "src/i18n/locales/en/modals/bathroomFan.json",
-      "id": "7217377d82ea375a",
+      "id": "fb01dc988cea4c70",
       "lines": [],
       "occurrences": 1,
       "origin": "catalog",
       "placeholders": [],
-      "value": "Double tapping On on the fan switch will lock the fan on.",
-      "words": 12
+      "value": "Double tapping On on the physical fan switch will lock the fan on.",
+      "words": 13
     },
     {
       "characters": 152,
