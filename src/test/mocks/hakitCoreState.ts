@@ -1001,6 +1001,10 @@ export const explicitMockEntities: Record<string, MockEntity> = {
   'binary_sensor.all_contact_sensors': entity('binary_sensor.all_contact_sensors', 'off'),
   'binary_sensor.contact_sensors': entity('binary_sensor.contact_sensors', 'off'),
   'binary_sensor.occupancy_sensors': entity('binary_sensor.occupancy_sensors', 'on'),
+  'binary_sensor.front_yard_fault': entity('binary_sensor.front_yard_fault', 'off', { station_faults: [] }),
+  'binary_sensor.front_yard_hub_connected': entity('binary_sensor.front_yard_hub_connected', 'on'),
+  'binary_sensor.backyard_faucet_fault': entity('binary_sensor.backyard_faucet_fault', 'off', { station_faults: [] }),
+  'binary_sensor.wi_fi_hub_connected': entity('binary_sensor.wi_fi_hub_connected', 'on'),
   'button.theater_pc_theaterroom_pc_shutdown': entity('button.theater_pc_theaterroom_pc_shutdown', 'unavailable'),
   'button.master_bedroom_sleepypod_eight_pod_left_alarm_snooze': entity('button.master_bedroom_sleepypod_eight_pod_left_alarm_snooze', 'unknown'),
   'button.master_bedroom_sleepypod_eight_pod_left_alarm_stop': entity('button.master_bedroom_sleepypod_eight_pod_left_alarm_stop', 'unknown'),
@@ -1033,6 +1037,25 @@ export const explicitMockEntities: Record<string, MockEntity> = {
   'sensor.nightcanvasrestful_left_seconds_remaining': entity('sensor.nightcanvasrestful_left_seconds_remaining', '7200', { unit_of_measurement: 's' }),
   'sensor.nightcanvasrestful_right_seconds_remaining': entity('sensor.nightcanvasrestful_right_seconds_remaining', '0', { unit_of_measurement: 's' }),
   'sensor.nightcanvasrestful_schedules': entity('sensor.nightcanvasrestful_schedules', 'ready', mockFreeSleepScheduleAttributes()),
+  'sensor.front_yard_battery_level': entity('sensor.front_yard_battery_level', '12', { device_class: 'battery', unit_of_measurement: '%' }),
+  'sensor.front_yard_next_watering': entity('sensor.front_yard_next_watering', '2026-08-13T19:00:00', { programs: ['a'] }),
+  'sensor.front_yard_state': entity('sensor.front_yard_state', 'auto'),
+  'sensor.front_yard_zone_history': entity('sensor.front_yard_zone_history', '2026-08-13T07:00:00', {
+    budget: 100,
+    consumption_gallons: 91,
+    program: 'a',
+    program_name: 'Front Yard',
+    run_time: 15,
+    start_time: '2026-08-13T07:00:00',
+    status: 'complete',
+  }),
+  'sensor.backyard_faucet_battery_level': entity('sensor.backyard_faucet_battery_level', '100', { device_class: 'battery', unit_of_measurement: '%' }),
+  'sensor.backyard_faucet_next_watering': entity('sensor.backyard_faucet_next_watering', 'unknown'),
+  'sensor.backyard_faucet_state': entity('sensor.backyard_faucet_state', 'auto'),
+  'sensor.bushes_zone_history': entity('sensor.bushes_zone_history', '2026-08-13T20:47:49', { program_name: 'manual', run_time: 10, start_time: '2026-08-13T20:47:49', status: 'complete' }),
+  'sensor.house_zone_history': entity('sensor.house_zone_history', '2026-08-13T20:41:53', { program_name: 'manual', run_time: 0.6, start_time: '2026-08-13T20:41:53', status: 'skipped' }),
+  'sensor.backyard_zone_history': entity('sensor.backyard_zone_history', '2026-08-13T20:42:58', { program_name: 'manual', run_time: 1.17, start_time: '2026-08-13T20:42:58', status: 'skipped' }),
+  'sensor.sidewalk_zone_history': entity('sensor.sidewalk_zone_history', '2026-08-13T20:45:13', { program_name: 'manual', run_time: 1.83, start_time: '2026-08-13T20:45:13', status: 'skipped' }),
   'sensor.sleepypod_stephen_schedule_phase': entity('sensor.sleepypod_stephen_schedule_phase', 'outside'),
   'sensor.sleepypod_steph_schedule_phase': entity('sensor.sleepypod_steph_schedule_phase', 'outside'),
   'switch.nightcanvasrestful_left_power': entity('switch.nightcanvasrestful_left_power', 'on'),
@@ -1041,6 +1064,49 @@ export const explicitMockEntities: Record<string, MockEntity> = {
   'switch.nightcanvasrestful_right_away_mode': entity('switch.nightcanvasrestful_right_away_mode', 'off'),
   'switch.nightcanvasrestful_left_alarms_enabled': entity('switch.nightcanvasrestful_left_alarms_enabled', 'off'),
   'switch.nightcanvasrestful_right_alarms_enabled': entity('switch.nightcanvasrestful_right_alarms_enabled', 'off'),
+  'switch.front_yard_front_yard_program': entity('switch.front_yard_front_yard_program', 'on', {
+    budget: 100,
+    frequency: { days: [0, 1, 2, 3, 4, 5, 6], type: 'days' },
+    program: 'a',
+    run_times: [{ run_time: 15, station: 1 }],
+    start_times: ['07:00', '19:00'],
+  }),
+  'switch.front_yard_rain_delay': entity('switch.front_yard_rain_delay', 'off'),
+  'switch.front_yard_smart_watering': entity('switch.front_yard_smart_watering', 'on'),
+  'switch.backyard_faucet_rain_delay': entity('switch.backyard_faucet_rain_delay', 'off'),
+  'switch.backyard_faucet_bushes_smart_watering': entity('switch.backyard_faucet_bushes_smart_watering', 'on'),
+  'switch.backyard_faucet_bushes_program': entity('switch.backyard_faucet_bushes_program', 'on', {
+    budget: 100,
+    frequency: { days: [0, 1, 2, 3, 4, 5, 6], type: 'days' },
+    friendly_name: 'Backyard Faucet Bushes program',
+    program: 'b',
+    run_times: [{ run_time: 15, station: 1 }],
+    start_times: ['07:20', '19:20'],
+  }),
+  'switch.backyard_faucet_house_program': entity('switch.backyard_faucet_house_program', 'on', {
+    budget: 100,
+    frequency: { days: [0, 1, 2, 3, 4, 5, 6], type: 'days' },
+    friendly_name: 'Backyard Faucet House program',
+    program: 'd',
+    run_times: [{ run_time: 15, station: 2 }],
+    start_times: ['08:20', '20:20'],
+  }),
+  'switch.backyard_faucet_backyard_program': entity('switch.backyard_faucet_backyard_program', 'off', {
+    budget: 100,
+    frequency: { days: [0, 1, 2, 3, 4, 5, 6], type: 'days' },
+    friendly_name: 'Backyard Faucet Backyard program',
+    program: 'c',
+    run_times: [{ run_time: 15, station: 3 }],
+    start_times: ['08:00', '20:00'],
+  }),
+  'switch.backyard_faucet_sidewalk_program': entity('switch.backyard_faucet_sidewalk_program', 'on', {
+    budget: 100,
+    frequency: { days: [0, 1, 2, 3, 4, 5, 6], type: 'days' },
+    friendly_name: 'Backyard Faucet Sidewalk program',
+    program: 'a',
+    run_times: [{ run_time: 15, station: 4 }],
+    start_times: ['07:40', '19:40'],
+  }),
   'sensor.stephen_s_eight_sleep_side_active_level': entity('sensor.stephen_s_eight_sleep_side_active_level', '1', { raw_value: 9, api_field: 'leftTargetHeatingLevel', source: 'target_heating_level', unit_of_measurement: '°' }),
   'sensor.stephen_s_eight_sleep_side_asleep_level': entity('sensor.stephen_s_eight_sleep_side_asleep_level', '2', { raw_value: 17, api_field: 'initialSleepLevel', unit_of_measurement: '°' }),
   'sensor.stephen_s_eight_sleep_side_bedtime_level': entity('sensor.stephen_s_eight_sleep_side_bedtime_level', '-1', { raw_value: -13, api_field: 'bedTimeLevel', unit_of_measurement: '°' }),
@@ -1405,6 +1471,22 @@ export const explicitMockEntities: Record<string, MockEntity> = {
   'light.front_door_bollard_5': entity('light.front_door_bollard_5', 'off', { brightness: null }),
   'light.front_door_bollard_6': entity('light.front_door_bollard_6', 'off', { brightness: null }),
   'weather.pirate_weather': entity('weather.pirate_weather', 'partlycloudy', { temperature: 45, temperature_unit: '°F' }),
+  'select.front_yard_device_mode': entity('select.front_yard_device_mode', 'auto', { options: ['auto', 'off'] }),
+  'select.backyard_faucet_device_mode': entity('select.backyard_faucet_device_mode', 'auto', { options: ['auto', 'off'] }),
+  'valve.front_yard_zone': entity('valve.front_yard_zone', 'closed', {
+    device_class: 'water',
+    device_name: 'Front Yard',
+    manual_preset_runtime: 300,
+    next_start_programs: ['a'],
+    next_start_time: '2026-08-13T19:00:00',
+    smart_watering_enabled: true,
+    station: 1,
+    zone_name: 'Front Yard',
+  }),
+  'valve.backyard_faucet_bushes_zone': entity('valve.backyard_faucet_bushes_zone', 'closed', { device_name: 'Backyard Faucet', station: 1, zone_name: 'Sidewalk (New)' }),
+  'valve.backyard_faucet_house_zone': entity('valve.backyard_faucet_house_zone', 'closed', { device_name: 'Backyard Faucet', station: 2, zone_name: 'Bushes (New)' }),
+  'valve.backyard_faucet_backyard_zone': entity('valve.backyard_faucet_backyard_zone', 'closed', { device_name: 'Backyard Faucet', station: 3, zone_name: 'Backyard' }),
+  'valve.backyard_faucet_sidewalk_zone': entity('valve.backyard_faucet_sidewalk_zone', 'closed', { device_name: 'Backyard Faucet', station: 4, zone_name: 'House' }),
 }
 
 export function mergeMockEntityMaps(
@@ -1438,6 +1520,33 @@ export function resetMockHass() {
   mockRecipeQueryDelayMs = 0
   mockState.connectionStatus = 'connected'
   mockState.user = { id: '64089b5683944c39b4f944c8f76830b0', is_admin: true, name: 'Stephen' }
+  mockEntities['input_boolean.show_outdoor_faucets'].state = 'off'
+  mockEntities['binary_sensor.front_yard_fault'].state = 'off'
+  mockEntities['binary_sensor.front_yard_hub_connected'].state = 'on'
+  mockEntities['binary_sensor.backyard_faucet_fault'].state = 'off'
+  mockEntities['binary_sensor.wi_fi_hub_connected'].state = 'on'
+  mockEntities['select.backyard_faucet_device_mode'].state = 'auto'
+  mockEntities['select.front_yard_device_mode'].state = 'auto'
+  mockEntities['sensor.front_yard_battery_level'].state = '12'
+  mockEntities['sensor.front_yard_next_watering'].state = '2026-08-13T19:00:00'
+  mockEntities['sensor.front_yard_state'].state = 'auto'
+  mockEntities['sensor.backyard_faucet_battery_level'].state = '100'
+  mockEntities['sensor.backyard_faucet_next_watering'].state = 'unknown'
+  mockEntities['sensor.backyard_faucet_state'].state = 'auto'
+  mockEntities['switch.front_yard_front_yard_program'].state = 'on'
+  mockEntities['switch.front_yard_rain_delay'].state = 'off'
+  mockEntities['switch.front_yard_smart_watering'].state = 'on'
+  mockEntities['switch.backyard_faucet_rain_delay'].state = 'off'
+  mockEntities['switch.backyard_faucet_bushes_smart_watering'].state = 'on'
+  mockEntities['switch.backyard_faucet_bushes_program'].state = 'on'
+  mockEntities['switch.backyard_faucet_house_program'].state = 'on'
+  mockEntities['switch.backyard_faucet_backyard_program'].state = 'off'
+  mockEntities['switch.backyard_faucet_sidewalk_program'].state = 'on'
+  mockEntities['valve.front_yard_zone'].state = 'closed'
+  mockEntities['valve.backyard_faucet_bushes_zone'].state = 'closed'
+  mockEntities['valve.backyard_faucet_house_zone'].state = 'closed'
+  mockEntities['valve.backyard_faucet_backyard_zone'].state = 'closed'
+  mockEntities['valve.backyard_faucet_sidewalk_zone'].state = 'closed'
   mockEntities['sensor.nightcanvasrestful_schedules'].attributes = mockFreeSleepScheduleAttributes()
   mockEntities['sensor.sleepypod_stephen_schedule_phase'].state = 'outside'
   mockEntities['sensor.sleepypod_steph_schedule_phase'].state = 'outside'

@@ -18,5 +18,5 @@ export function isEverShelfInventoryRoute(path: string) {
 }
 
 export function hasDashboardFloatingAction(path: string) {
-  return path === 'overview' || Boolean(dashboardRoomNameFromPath(path)) || path === 'groceries' || path === HOME_GROCERY_LIST_ROUTE_PATH || path === HOME_FOOD_ROUTE_PATH || path === HOME_RECIPES_ROUTE_PATH || path === 'to-do' || isEverShelfInventoryRoute(path) || createTaskDefaultAssignee(path) !== null
+  return path === 'kitchen' || path === 'groceries' || path === HOME_GROCERY_LIST_ROUTE_PATH || path === HOME_FOOD_ROUTE_PATH || path === HOME_RECIPES_ROUTE_PATH || path === 'to-do' || isEverShelfInventoryRoute(path) || createTaskDefaultAssignee(path) !== null
 }

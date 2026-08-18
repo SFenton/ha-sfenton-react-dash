@@ -10,13 +10,11 @@ import type { EverShelfInventoryControls } from '../hass/EverShelfInventoryContr
 import { RecipeFloatingActions } from '../hass/recipes/RecipeFloatingActions'
 import type { RecipeControls } from '../hass/recipes/useRecipeControls'
 import { ScanItemCameraSheet, type EverShelfLocation } from '../hass/ScanItemCameraSheet'
-import { RoomPickerButton } from '../../pages/AtAGlancePage'
-import { createTaskDefaultAssignee, dashboardRoomNameFromPath, isEverShelfInventoryRoute } from './dashboardFloatingAction'
+import { createTaskDefaultAssignee, isEverShelfInventoryRoute } from './dashboardFloatingAction'
 import { HOME_CABINET_ROUTE_PATH, HOME_FOOD_ROUTE_PATH, HOME_FREEZER_ROUTE_PATH, HOME_FRIDGE_ROUTE_PATH, HOME_GROCERY_LIST_ROUTE_PATH, HOME_PANTRY_ROUTE_PATH, HOME_RECIPES_ROUTE_PATH, HOME_SPICE_RACK_ROUTE_PATH } from '../../constants/routes'
 
 interface DashboardFloatingActionProps {
   inventoryControls?: EverShelfInventoryControls
-  onNavigate: (path: string) => void
   path: string
   recipeControls?: RecipeControls
 }
@@ -77,7 +75,7 @@ function ScanItemButton({ defaultLocation, iconOnly = false }: { defaultLocation
   )
 }
 
-export function DashboardFloatingAction({ inventoryControls, onNavigate, path, recipeControls }: DashboardFloatingActionProps) {
+export function DashboardFloatingAction({ inventoryControls, path, recipeControls }: DashboardFloatingActionProps) {
   if (path === HOME_RECIPES_ROUTE_PATH) return recipeControls ? <RecipeFloatingActions controls={recipeControls} /> : null
   const createTaskAssignee = createTaskDefaultAssignee(path)
   const defaultScanLocation = scanItemDefaultLocation(path)
@@ -85,7 +83,6 @@ export function DashboardFloatingAction({ inventoryControls, onNavigate, path, r
   const inventoryReady = !inventoryRoute || inventoryControls?.inventoryLoadPhase === 'content'
   const primaryAction = (() => {
     if (path === 'kitchen' || path === HOME_FOOD_ROUTE_PATH) return <ScanItemButton key="scan-item" />
-    if (path === 'overview' || dashboardRoomNameFromPath(path)) return <RoomPickerButton key="rooms" onNavigate={onNavigate} />
     if (path === 'groceries' || path === HOME_GROCERY_LIST_ROUTE_PATH) return <CreateGroceryButton key="grocery" />
     if (path === 'to-do') return <CreateAdminTodoButton key="admin-todo" />
     if (createTaskAssignee !== null) return <CreateChoreButton defaultAssignee={createTaskAssignee} key={`chore-${createTaskAssignee}`} />
@@ -93,7 +90,6 @@ export function DashboardFloatingAction({ inventoryControls, onNavigate, path, r
   })()
   const secondaryActions: ReactNode[] = []
 
-  if (path === 'kitchen') secondaryActions.push(<RoomPickerButton key="rooms" onNavigate={onNavigate} />)
   if (inventoryRoute && inventoryControls && inventoryReady) secondaryActions.push(<EverShelfInventoryFloatingActions controls={inventoryControls} key="inventory-controls" />)
   if (inventoryRoute && inventoryReady) secondaryActions.push(<ScanItemButton defaultLocation={defaultScanLocation} iconOnly={inventoryControls?.searchActive || inventoryControls?.inventoryItemCount !== 0} key={`scan-item-${defaultScanLocation ?? 'default'}`} />)
   if (!primaryAction && secondaryActions.length === 0) return null

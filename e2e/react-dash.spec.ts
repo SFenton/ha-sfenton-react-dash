@@ -1,4 +1,4 @@
-import { expect, test, type Locator, type Page } from '@playwright/test'
+import { expect, test, type FrameLocator, type Locator, type Page } from '@playwright/test'
 import { valueToThermostatPoint } from '../src/components/hass/thermostatDialGeometry'
 
 type FreeSleepAlarmSnapshot = {
@@ -34,6 +34,15 @@ async function openBedAlarmDialog(page: Page, bedButtonName: RegExp) {
   await expect(dialog.getByRole('heading', { name: 'Alarms' })).toBeVisible()
   await expect(dialog.getByRole('heading', { name: 'Schedule Control' })).toHaveCount(0)
   return dialog
+}
+
+async function openRoomsFromQuickLinks(scope: FrameLocator | Page) {
+  await scope.getByRole('button', { name: 'Quick Links' }).click()
+  const quickLinksDialog = scope.getByRole('dialog', { name: 'Quick Links' })
+  await quickLinksDialog.getByRole('button', { name: 'Rooms' }).click()
+  const roomsDialog = scope.getByRole('dialog', { name: 'Rooms' })
+  await expect(roomsDialog).toBeVisible()
+  return roomsDialog
 }
 
 async function openAddAlarmForm(dialog: Locator, sideTitle: string) {
@@ -820,7 +829,7 @@ test('Food & Recipes hub and recipe browse use approved 393px mobile geometry', 
   const floatingDockBox = await page.locator('[data-floating-action-dock="true"]').boundingBox()
   const collapsedSearchBox = await page.getByRole('button', { name: 'Search recipes' }).boundingBox()
   expect(Math.round(collapsedSearchBox?.x ?? 0)).toBe(Math.round(floatingDockBox?.x ?? 0))
-  expect(Math.round(collapsedSearchBox?.width ?? 0)).toBeGreaterThanOrEqual(220)
+  expect(Math.round(collapsedSearchBox?.width ?? 0)).toBeGreaterThanOrEqual(160)
   await expect(page.getByRole('button', { name: 'Search recipes' })).toHaveCSS('background-color', 'rgba(18, 24, 38, 0.96)')
   await expect(page.getByRole('button', { name: 'Search recipes' })).toHaveCSS('border-top-color', 'rgba(255, 255, 255, 0.16)')
   await page.evaluate(() => {
@@ -863,6 +872,7 @@ test('Food & Recipes hub and recipe browse use approved 393px mobile geometry', 
   const expandedSearchBox = await recipeSearchInput.locator('xpath=..').boundingBox()
   expect(Math.round(expandedSearchBox?.x ?? 0)).toBe(Math.round(floatingDockBox?.x ?? 0))
   expect(Math.round(expandedSearchBox?.width ?? 0)).toBe(Math.round(floatingDockBox?.width ?? 0))
+  await expect(page.locator('button[aria-label="Quick Links"]')).toBeHidden()
   await expect(recipeSearchInput.locator('xpath=..')).toHaveCSS('background-color', 'rgba(18, 24, 38, 0.96)')
   await recipeSearchInput.fill('chicken')
   await expect(recipeSearchInput).toHaveValue('chicken')
@@ -994,14 +1004,17 @@ test('overview renders with mock Home Assistant state', async ({ page }) => {
 
   await expect(page).toHaveTitle('Home Assistant')
   await expect(page.getByRole('heading', { name: 'Home' })).toBeVisible()
-  await expect(page.getByRole('heading', { name: 'Quick Links' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Quick Links' })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Quick Links' })).toBeVisible()
 })
 
 test('Food quick link mirrors the All Food summary with the Kitchen Food orange', async ({ page }) => {
   await page.setViewportSize({ width: 393, height: 852 })
   await page.goto('/at-a-glance/overview')
 
-  const foodQuickLink = page.getByRole('button', { name: 'Food & Recipes 35 Items • 6 Expiring Soon' })
+  await page.getByRole('button', { name: 'Quick Links' }).click()
+  const dialog = page.getByRole('dialog', { name: 'Quick Links' })
+  const foodQuickLink = dialog.getByRole('button', { name: 'Food & Recipes 35 Items • 6 Expiring Soon' })
   await expect(foodQuickLink).toContainText('Food & Recipes')
   await expect(foodQuickLink).toContainText('35 Items • 6 Expiring Soon')
   await expect(foodQuickLink).toHaveCSS('background-color', 'rgba(155, 110, 64, 0.72)')
@@ -1011,11 +1024,85 @@ test('Food quick link mirrors the All Food summary with the Kitchen Food orange'
   await expect(page.getByRole('button', { name: 'All Food 35 Items • 6 Expiring Soon' })).toBeVisible()
 })
 
+test('global Quick Links opens from a non-Home route and preserves one-sheet detail navigation', async ({ page }) => {
+  await page.setViewportSize({ width: 393, height: 852 })
+  await page.goto('/at-a-glance/settings')
+
+  const trigger = page.getByRole('button', { name: 'Quick Links' })
+  await trigger.focus()
+  await trigger.press('Enter')
+  let dialog = page.getByRole('dialog', { name: 'Quick Links' })
+  await expect(dialog).toBeVisible()
+  await page.keyboard.press('Escape')
+  await expect(dialog).not.toBeVisible()
+  await expect(trigger).toBeFocused()
+
+  await trigger.click()
+  dialog = page.getByRole('dialog', { name: 'Quick Links' })
+  await expect.poll(() => dialog.locator('[data-dynamic-grid="true"][aria-label="Quick Links"]').evaluate((grid) => {
+    const styles = getComputedStyle(grid)
+    return {
+      columns: styles.gridTemplateColumns.split(' ').filter(Boolean).length,
+      itemCount: grid.children.length,
+      scrollsHorizontally: grid.scrollWidth > grid.clientWidth + 1,
+    }
+  })).toEqual({
+    columns: 2,
+    itemCount: 6,
+    scrollsHorizontally: false,
+  })
+  const initialHash = await page.evaluate(() => window.location.hash)
+  await dialog.getByRole('button', { name: /^Security System / }).click()
+  dialog = page.getByRole('dialog', { name: 'Security System' })
+  await expect(dialog.getByRole('heading', { exact: true, name: 'Security System' })).toBeVisible()
+  await expect(dialog.getByRole('button', { name: 'Back' })).toBeVisible()
+  expect(await page.evaluate(() => window.location.hash)).toBe(initialHash)
+  await dialog.getByRole('button', { name: 'Back' }).click()
+  dialog = page.getByRole('dialog', { name: 'Quick Links' })
+  await expect(dialog.getByRole('heading', { name: 'Quick Links' })).toBeVisible()
+  await dialog.getByRole('button', { name: 'Vacuums' }).click()
+  await expect(page.getByRole('heading', { name: 'Robot Vacuums' })).toBeVisible()
+})
+
+test('global Quick Links stays rightmost without overflowing representative mobile FAB rows', async ({ page }) => {
+  await page.setViewportSize({ width: 393, height: 852 })
+
+  for (const route of ['overview', 'security', 'settings', 'chores', 'kitchen', 'fridge', 'recipes']) {
+    await page.goto(`/at-a-glance/${route}`)
+    const trigger = page.getByRole('button', { name: 'Quick Links' })
+    const dock = page.locator('[data-floating-action-dock="true"]')
+    const nav = page.getByRole('navigation', { name: 'Dashboard sections' })
+    await expect(trigger).toBeVisible()
+
+    const geometry = await dock.evaluate((element) => {
+      const dockRect = element.getBoundingClientRect()
+      const quickLinks = element.querySelector<HTMLButtonElement>('button[aria-label="Quick Links"]')
+      const quickLinksRect = quickLinks?.getBoundingClientRect()
+      const visibleChildren = Array.from(element.children).filter((child) => {
+        const rect = child.getBoundingClientRect()
+        return rect.width > 0 && rect.height > 0
+      })
+      return {
+        lastVisibleIsQuickLinks: visibleChildren.at(-1) === quickLinks,
+        overflows: element.scrollWidth > element.clientWidth + 1,
+        quickLinksRight: Math.round(quickLinksRect?.right ?? 0),
+        dockRight: Math.round(dockRect.right),
+      }
+    })
+    const triggerBox = await trigger.boundingBox()
+    const navBox = await nav.boundingBox()
+
+    expect(geometry.lastVisibleIsQuickLinks).toBe(true)
+    expect(geometry.overflows).toBe(false)
+    expect(geometry.quickLinksRight).toBe(geometry.dockRight)
+    expect((triggerBox?.y ?? Number.POSITIVE_INFINITY) + (triggerBox?.height ?? 0)).toBeLessThanOrEqual(navBox?.y ?? Number.NEGATIVE_INFINITY)
+  }
+})
+
 test('room keyboard navigation signals one HA-owned increment without delaying the route', async ({ page }) => {
   await page.goto('/at-a-glance/overview')
-  await page.getByRole('button', { name: 'Rooms' }).click()
-
-  const livingRoom = page.getByRole('dialog', { name: 'Rooms' }).getByRole('button', { name: 'Living Room area' })
+  const roomsDialog = await openRoomsFromQuickLinks(page)
+  const livingRoom = roomsDialog.getByRole('button', { name: 'Living Room area' })
   await livingRoom.focus()
   await livingRoom.press('Enter')
 
@@ -1036,14 +1123,22 @@ test('mobile modal opener families use shared disclosures and explicit action ex
 
   await expectRightChevron(page.getByRole('button', { name: /Open seven-day weather forecast/i }))
   await expectNoChevron(page.getByRole('button', { name: /^Lights /i }).first())
-  await expectRightChevron(page.getByRole('button', { name: /^Security System /i }))
   await expectNoChevron(page.getByRole('button', { name: 'Open Front Door camera' }))
+  const quickLinksTrigger = page.getByRole('button', { name: 'Quick Links' })
+  await expect(quickLinksTrigger).toHaveAttribute('data-modal-opener-exception', 'floating-action')
+  await quickLinksTrigger.click()
+  const quickLinksDialog = page.getByRole('dialog', { name: 'Quick Links' })
+  await expectRightChevron(quickLinksDialog.getByRole('button', { name: 'Rooms' }))
+  await expect(quickLinksDialog.getByRole('button', { name: 'Rooms' })).toHaveAttribute('data-modal-opener', 'true')
+  await expectRightChevron(quickLinksDialog.getByRole('button', { name: /^Security System /i }))
   for (const quickLink of ['Food & Recipes 35 Items • 6 Expiring Soon', 'Vacuums', 'Media', 'Custom Lights']) {
-    const opener = page.getByRole('button', { exact: true, name: quickLink })
+    const opener = quickLinksDialog.getByRole('button', { exact: true, name: quickLink })
     await expectRightChevron(opener)
     await expect(opener).toHaveAttribute('data-navigation-opener', 'true')
   }
-  await expect(page.getByRole('button', { name: 'Rooms' })).toHaveAttribute('data-modal-opener-exception', 'floating-action')
+  await quickLinksDialog.getByRole('button', { name: 'Close' }).click()
+  await expect(quickLinksDialog).not.toBeVisible()
+  await expect(page.getByRole('button', { name: 'Rooms' })).toHaveCount(0)
 
   await page.goto('/at-a-glance/living-room')
   await expectNoChevron(page.getByRole('button', { name: /^Climate /i }).first())
@@ -1214,8 +1309,7 @@ test('kitchen restores full height after closing the keyboard and reopening by t
     visibleCssHeight: `${initialViewportHeight}px`,
   })
   await expect(app.getByRole('heading', { name: 'Home' })).toBeVisible()
-  await app.getByRole('button', { name: 'Rooms' }).evaluate((button) => button.click())
-  const roomsDialog = app.getByRole('dialog', { name: 'Rooms' })
+  const roomsDialog = await openRoomsFromQuickLinks(app)
   await roomsDialog.getByRole('button', { name: /Kitchen/i }).evaluate((button) => button.click())
   await expect(app.getByRole('heading', { name: 'Kitchen' })).toBeVisible()
 
@@ -1395,6 +1489,7 @@ test('inventory footer search moves above the mobile keyboard and clears results
   await expect(dock.locator('button[aria-label="Sort"]').locator('xpath=..')).toHaveAttribute('data-collapsed', 'true')
   await expect(dock.locator('button[aria-label="Filter"]').locator('xpath=..')).toHaveAttribute('data-collapsed', 'true')
   await expect(dock.getByRole('button', { name: 'Scan Item' })).toHaveCSS('opacity', '0')
+  await expect(dock.locator('button[aria-label="Quick Links"]')).toBeHidden()
 
   await page.evaluate(() => window.__setInventoryFakeKeyboardHeight?.(520))
   await expect.poll(async () => {
@@ -1412,6 +1507,7 @@ test('inventory footer search moves above the mobile keyboard and clears results
   await input.press('Enter')
   await page.evaluate(() => window.__setInventoryFakeKeyboardHeight?.(window.innerHeight))
   await expect.poll(async () => Math.round((await dock.boundingBox())?.y ?? 0)).toBe(Math.round(restBox.y))
+  await expect(dock.getByRole('button', { name: 'Quick Links' })).toBeVisible()
 
   await dock.getByRole('button', { name: 'Search inventory' }).click()
   const reopenedInput = page.getByLabel('Search inventory')
@@ -1806,10 +1902,7 @@ test.describe('desktop modal layout', () => {
 
   test('rooms modal uses fixed 168px square room cards on desktop', async ({ page }) => {
     await page.goto('/at-a-glance/overview')
-    await page.getByRole('button', { name: 'Rooms' }).click()
-
-    const dialog = page.getByRole('dialog', { name: 'Rooms' })
-    await expect(dialog).toBeVisible()
+    const dialog = await openRoomsFromQuickLinks(page)
 
     await expect.poll(async () => {
       return dialog.locator('section[aria-label="Rooms"]').evaluate((grid) => {
@@ -1842,17 +1935,47 @@ test.describe('desktop modal layout', () => {
     expect(Math.round(box?.width ?? 0)).toBe(Math.round(box?.height ?? 0))
     const dialogBox = await dialog.boundingBox()
     const gridBox = await dialog.locator('section[aria-label="Rooms"]').boundingBox()
-    expect(Math.round(dialogBox?.width ?? 0)).toBeLessThan(900)
-    expect(Math.round(dialogBox?.width ?? 0)).toBeLessThanOrEqual(Math.round((gridBox?.width ?? 0) + 52))
+    expect(Math.round(dialogBox?.width ?? 0)).toBe(900)
+    expect(Math.abs(
+      Math.round((gridBox?.x ?? 0) - (dialogBox?.x ?? 0))
+      - Math.round(((dialogBox?.x ?? 0) + (dialogBox?.width ?? 0)) - ((gridBox?.x ?? 0) + (gridBox?.width ?? 0))),
+    )).toBeLessThanOrEqual(2)
 
+  })
+
+  test('Quick Links modal uses a responsive DynamicGrid on desktop', async ({ page }) => {
+    await page.setViewportSize({ width: 900, height: 900 })
+    await page.goto('/at-a-glance/settings')
+    await page.getByRole('button', { name: 'Quick Links' }).click()
+
+    const dialog = page.getByRole('dialog', { name: 'Quick Links' })
+    await expect(dialog).toBeVisible()
+    await expect.poll(() => dialog.locator('[data-dynamic-grid="true"][aria-label="Quick Links"]').evaluate((grid) => {
+      const gridStyle = getComputedStyle(grid)
+      const columns = gridStyle.gridTemplateColumns.split(' ').filter(Boolean).length
+      const buttons = Array.from(grid.querySelectorAll('button'))
+      return {
+        cardCount: grid.children.length,
+        columns,
+        contentFits: buttons.every((button) => button.scrollHeight <= button.clientHeight + 1 && button.scrollWidth <= button.clientWidth + 1),
+        roomyTiles: buttons.every((button) => {
+          const rect = button.getBoundingClientRect()
+          return rect.width >= 220 && rect.height >= 160
+        }),
+        scrollsHorizontally: grid.scrollWidth > grid.clientWidth + 1,
+      }
+    })).toEqual({
+      cardCount: 6,
+      columns: 3,
+      contentFits: true,
+      roomyTiles: true,
+      scrollsHorizontally: false,
+    })
   })
 
   test('desktop modal has no grabber and cannot be dragged', async ({ page }) => {
     await page.goto('/at-a-glance/overview')
-    await page.getByRole('button', { name: 'Rooms' }).click()
-
-    const dialog = page.getByRole('dialog', { name: 'Rooms' })
-    await expect(dialog).toBeVisible()
+    const dialog = await openRoomsFromQuickLinks(page)
     await page.waitForTimeout(250)
     await expect(dialog.locator('[data-mobile-drag-handle="true"]')).toHaveCount(0)
 
@@ -2011,10 +2134,7 @@ test.describe('desktop modal layout', () => {
 
   test('desktop modal preserves its size during the close fade', async ({ page }) => {
     await page.goto('/at-a-glance/overview')
-    await page.getByRole('button', { name: 'Rooms' }).click()
-
-    const dialog = page.getByRole('dialog', { name: 'Rooms' })
-    await expect(dialog).toBeVisible()
+    const dialog = await openRoomsFromQuickLinks(page)
     const roomGrid = dialog.locator('section[aria-label="Rooms"]')
     await expect(roomGrid).toBeVisible()
     await expect.poll(async () => {
@@ -2699,7 +2819,8 @@ test('room sections keep popup-only grill controls out of the Back Deck page', a
 test('room status chips open direct reusable modal sheets', async ({ page }) => {
   await page.goto('/at-a-glance/kitchen')
 
-  await expect(page.getByRole('button', { name: 'Rooms' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Rooms' })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Quick Links' })).toBeVisible()
   await page.getByRole('button', { name: /Lights/i }).first().click()
 
   await expect(page.getByRole('dialog')).toBeVisible()

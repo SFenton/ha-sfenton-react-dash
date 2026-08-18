@@ -69,7 +69,11 @@ function batteryMaintenanceLevel(item: TodoItem) {
 
 function normalizeBatteryTaskTitle(title: string, batteryLevel: string | undefined) {
   if (!batteryLevel) return title
-  return title.replace(/\bbattery\b/g, (word) => word.charAt(0).toUpperCase().concat(word.slice(1)))
+  return title.replace(/\bbatter(?:y|ies)\b/gi, (word) => word.charAt(0).toUpperCase().concat(word.slice(1).toLowerCase()))
+}
+
+function batteryTaskTitleHasLevel(title: string, batteryLevel: string | undefined) {
+  return Boolean(batteryLevel && (title.endsWith(`(${batteryLevel})`) || title.endsWith(` · ${batteryLevel}`)))
 }
 
 function todoSubtitle(item: TodoItem, due: DueInfo | null, batteryLevel: string | undefined) {
@@ -218,7 +222,7 @@ export function TodoListPanel({ completionScript, entityId, hideCompleted = true
             const due = relativeDueInfo(todoDue(item))
             const batteryLevel = batteryMaintenanceLevel(item)
             const normalizedTitle = normalizeBatteryTaskTitle(compactText(item.summary) ?? 'Untitled task', batteryLevel)
-            const titleText = batteryLevel
+            const titleText = batteryLevel && !batteryTaskTitleHasLevel(normalizedTitle, batteryLevel)
               ? copy('todo.batteryTaskTitle', { percentage: batteryLevel, title: normalizedTitle })
               : normalizedTitle
             const subtitle = todoSubtitle(item, due, batteryLevel)

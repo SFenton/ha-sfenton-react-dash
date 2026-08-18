@@ -19,7 +19,9 @@ export const HOME_FRIDGE_ROUTE_PATH = 'fridge'
 export const HOME_FREEZER_ROUTE_PATH = 'freezer'
 export const HOME_SPICE_RACK_ROUTE_PATH = 'spice-rack'
 export const HOME_CABINET_ROUTE_PATH = 'cabinet'
+export const HOME_SPRINKLERS_ROUTE_PATH = 'sprinklers'
 const specialDeviceModesRouteName = copy('pageSettings', 'items.specialDeviceModes.title')
+const sprinklersRouteName = copy('pageSprinklers', 'title')
 
 export const DASHBOARD_ROUTES: DashboardRouteConfig[] = [
   { title: 'Overview', path: 'overview', icon: 'mdi:home' },
@@ -66,6 +68,7 @@ export const DASHBOARD_ROUTES: DashboardRouteConfig[] = [
   { title: 'Vacation', path: 'vacation', icon: 'mdi:airplane' },
   { title: 'Media', path: 'media', icon: 'mdi:remote' },
   { title: 'Custom Lights', path: 'custom-lights', icon: 'mdi:lightbulb-group' },
+  { title: sprinklersRouteName, path: HOME_SPRINKLERS_ROUTE_PATH, icon: 'mdi:sprinkler-variant' },
 ]
 
 export const PRIMARY_NAV_ROUTES = [
@@ -96,6 +99,7 @@ const HOME_SUB_ROUTE_PATHS = new Set([
   HOME_FREEZER_ROUTE_PATH,
   HOME_SPICE_RACK_ROUTE_PATH,
   HOME_CABINET_ROUTE_PATH,
+  HOME_SPRINKLERS_ROUTE_PATH,
   'kitchen',
   'living-room',
   'master-bathroom',

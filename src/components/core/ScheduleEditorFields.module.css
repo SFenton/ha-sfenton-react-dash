@@ -82,6 +82,10 @@
   gap: 10px;
 }
 
+.timeGrid:empty {
+  display: none;
+}
+
 .timePicker {
   --native-picker-min-height: 58px;
 }

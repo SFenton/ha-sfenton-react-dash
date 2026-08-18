@@ -1,10 +1,9 @@
-import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import { AtAGlancePage } from './AtAGlancePage'
-import { materialIconPath } from '../components/core/iconPaths'
-import { AREA_ITEMS, CONTACT_GROUPS, LIGHT_GROUPS, OCCUPANCY_GROUPS, SECURITY_ENTITY } from '../constants/atAGlance'
-import { CHORE_BLUE, GUEST_CONTROLS_DESCRIPTION } from '../constants/portedDashboard'
+import { CONTACT_GROUPS, LIGHT_GROUPS, OCCUPANCY_GROUPS, SECURITY_ENTITY } from '../constants/atAGlance'
+import { GUEST_CONTROLS_DESCRIPTION } from '../constants/portedDashboard'
 import { GUEST_PRESENCE_SECURITY_HASH, GUEST_PRESENCE_SECURITY_SUMMARY } from '../components/hass/GuestPresenceSecurity'
-import { entity, mockCallServiceCalls, mockEntities, mockState, resetMockHass } from '../test/mocks/hakitCoreState'
+import { entity, mockCallServiceCalls, mockEntities, resetMockHass } from '../test/mocks/hakitCoreState'
 import { resetDeferredRouteHydrationCache } from '../hooks/useDeferredRouteHydration'
 
 describe('AtAGlancePage', () => {
@@ -30,17 +29,10 @@ describe('AtAGlancePage', () => {
     }
   }
 
-  it('uses the shared disclosure affordance across representative Home modal openers', () => {
+  it('uses the shared disclosure affordance on the Home weather modal opener', () => {
     render(<AtAGlancePage />)
 
-    const openers = [
-      screen.getByRole('button', { name: /Open seven-day weather forecast/i }),
-      screen.getByRole('button', { name: /^Security System /i }),
-    ]
-
-    for (const opener of openers) {
-      expect(opener.querySelector('[data-modal-disclosure="right-chevron"]')).toBeInTheDocument()
-    }
+    expect(screen.getByRole('button', { name: /Open seven-day weather forecast/i }).querySelector('[data-modal-disclosure="right-chevron"]')).toBeInTheDocument()
   })
 
   it('keeps header status chips and camera pills free of disclosure chevrons', () => {
@@ -54,34 +46,12 @@ describe('AtAGlancePage', () => {
     expect(screen.getByRole('button', { name: 'Open Front Door camera' }).querySelector('[data-modal-disclosure]')).not.toBeInTheDocument()
   })
 
-  it('gives Home route quick links the shared chevron without marking them modal openers', () => {
-    const navigate = vi.fn()
-    render(<AtAGlancePage onNavigate={navigate} />)
-
-    expect(screen.getByRole('group', { name: 'Home quick links' })).toHaveAttribute('data-dynamic-grid', 'true')
-
-    for (const name of ['Food & Recipes 35 Items • 6 Expiring Soon', 'Vacuums', 'Media', 'Custom Lights']) {
-      const quickLink = screen.getByRole('button', { name })
-      expect(quickLink.querySelector('[data-modal-disclosure="right-chevron"]'), name).toBeInTheDocument()
-      expect(quickLink, name).toHaveAttribute('data-navigation-opener', 'true')
-      expect(quickLink, name).not.toHaveAttribute('data-modal-opener')
-    }
-
-    fireEvent.click(screen.getByRole('button', { name: 'Food & Recipes 35 Items • 6 Expiring Soon' }))
-    expect(navigate).toHaveBeenCalledWith('food')
-
-    const securityQuickLink = screen.getByRole('button', { name: /^Security System / })
-    expect(securityQuickLink).toHaveAttribute('data-modal-opener', 'true')
-    expect(securityQuickLink).not.toHaveAttribute('data-navigation-opener')
-  })
-
-  it('shows the All Food HA summary on Food & Recipes with the shared Kitchen Food orange', () => {
+  it('moves the Home Quick Links grid into the global floating action', () => {
     render(<AtAGlancePage />)
 
-    const foodQuickLink = screen.getByRole('button', { name: 'Food & Recipes 35 Items • 6 Expiring Soon' })
-    expect(within(foodQuickLink).getByText('Food & Recipes')).toBeInTheDocument()
-    expect(within(foodQuickLink).getByText('35 Items • 6 Expiring Soon')).toBeInTheDocument()
-    expect(foodQuickLink).toHaveStyle('--tile-color: rgba(155, 110, 64, 0.72)')
+    expect(screen.queryByRole('heading', { name: 'Quick Links' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: 'Home quick links' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Quick Links' })).toBeInTheDocument()
   })
 
   it('keeps cold Home content behind a centered spinner before fading content in', () => {
@@ -142,6 +112,8 @@ describe('AtAGlancePage', () => {
     const { container } = render(<AtAGlancePage preload preloadHashes={['#lights-overview']} />)
 
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Quick Links' })).not.toBeInTheDocument()
+    expect(container.querySelector('[data-floating-action-dock="true"]')).not.toBeInTheDocument()
     expect(container.querySelector('[data-preload-modal="overview#lights-overview"]')).toBeInTheDocument()
   })
 
@@ -150,7 +122,6 @@ describe('AtAGlancePage', () => {
     render(<AtAGlancePage />)
 
     expect(screen.getByRole('button', { name: 'Security Armed Night' })).toHaveStyle('--header-pill-color: rgba(142, 36, 170, 0.44)')
-    expect(screen.getByRole('button', { name: 'Security System Armed Night' })).toHaveStyle('--tile-color: rgba(142, 36, 170, 0.5)')
   })
 
   it('uses open and closed language for the home contact sensor chip', () => {
@@ -160,7 +131,7 @@ describe('AtAGlancePage', () => {
     expect(screen.queryByRole('button', { name: /Contact Sensors\s*0 Sensors Active/i })).not.toBeInTheDocument()
   })
 
-  it('shows Guest Presence Security below Quick Links only when a guest room is active', async () => {
+  it('shows Guest Presence Security only when a guest room is active', async () => {
     const inactiveView = render(<AtAGlancePage />)
     expect(screen.queryByRole('heading', { name: 'Guest Presence Security' })).not.toBeInTheDocument()
     inactiveView.unmount()
@@ -441,99 +412,4 @@ describe('AtAGlancePage', () => {
     expect(navigate).toHaveBeenCalledWith('groceries')
   })
 
-  it('moves overview room navigation into the layout FAB sheet', async () => {
-    const navigate = vi.fn()
-    render(<AtAGlancePage onNavigate={navigate} />)
-
-    expect(screen.queryByRole('heading', { name: 'Areas' })).not.toBeInTheDocument()
-    const layoutButton = screen.getByRole('button', { name: 'Rooms' })
-    expect(layoutButton).toHaveStyle(`--card-rgb: ${CHORE_BLUE.r} ${CHORE_BLUE.g} ${CHORE_BLUE.b}`)
-    expect(layoutButton).toHaveTextContent('Rooms')
-    expect(layoutButton.querySelector('path')).toHaveAttribute('d', materialIconPath('mdi:floor-plan'))
-    fireEvent.click(layoutButton)
-
-    const dialog = await screen.findByRole('dialog')
-    expect(within(dialog).getByRole('heading', { name: 'Rooms' })).toBeInTheDocument()
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Living Room area' }))
-
-    expect(navigate).toHaveBeenCalledWith('living-room')
-    expect(mockCallServiceCalls.filter((call) => call.domain === 'script' && call.target === 'script.increment_room_access')).toEqual([
-      {
-        domain: 'script',
-        service: 'turn_on',
-        serviceData: { variables: { room: 'living-room' } },
-        target: 'script.increment_room_access',
-      },
-    ])
-  })
-
-  it('ranks room navigation from live HA counters with deterministic ties and unavailable fallbacks', async () => {
-    const originalEntities = mockState.entities
-    const counterStates = [
-      [AREA_ITEMS[0].accessCounterEntityId, '2'],
-      [AREA_ITEMS[1].accessCounterEntityId, '7'],
-      [AREA_ITEMS[2].accessCounterEntityId, '7'],
-      [AREA_ITEMS[4].accessCounterEntityId, 'unavailable'],
-    ] as const
-    mockState.entities = {
-      ...mockEntities,
-      ...Object.fromEntries(counterStates.map(([entityId, state]) => [entityId, entity(entityId, state)])),
-    }
-
-    try {
-      const view = render(<AtAGlancePage />)
-      fireEvent.click(screen.getByRole('button', { name: 'Rooms' }))
-
-      const dialog = await screen.findByRole('dialog')
-      const roomGrid = within(dialog).getByRole('region', { name: 'Rooms' })
-      expect(within(roomGrid).getAllByRole('button').slice(0, 5).map((button) => button.getAttribute('aria-label'))).toEqual([
-        'Guest Room area',
-        'Gym area',
-        'Living Room area',
-        'Master Bedroom area',
-        'Office area',
-      ])
-
-      mockState.entities = {
-        ...mockState.entities,
-        [AREA_ITEMS[4].accessCounterEntityId]: entity(AREA_ITEMS[4].accessCounterEntityId, '8'),
-      }
-      view.rerender(<AtAGlancePage />)
-      expect(within(roomGrid).getAllByRole('button').slice(0, 5).map((button) => button.getAttribute('aria-label'))).toEqual([
-        'Office area',
-        'Guest Room area',
-        'Gym area',
-        'Living Room area',
-        'Master Bedroom area',
-      ])
-    } finally {
-      mockState.entities = originalEntities
-    }
-  })
-
-  it('does not delay or cancel room navigation when the HA increment command is unavailable', async () => {
-    const originalCallService = mockState.helpers.callService
-    const commandError = new Error('Home Assistant unavailable')
-    const callService = vi.fn(() => Promise.reject(commandError))
-    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined)
-    mockState.helpers.callService = callService
-
-    try {
-      const navigate = vi.fn()
-      render(<AtAGlancePage onNavigate={navigate} />)
-      fireEvent.click(screen.getByRole('button', { name: 'Rooms' }))
-      fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Living Room area' }))
-
-      expect(navigate).toHaveBeenCalledTimes(1)
-      expect(navigate).toHaveBeenCalledWith('living-room')
-      expect(callService).toHaveBeenCalledTimes(1)
-      await waitFor(() => expect(consoleError).toHaveBeenCalledWith(
-        'Failed to increment room access for living-room.',
-        commandError,
-      ))
-    } finally {
-      mockState.helpers.callService = originalCallService
-      consoleError.mockRestore()
-    }
-  })
 })

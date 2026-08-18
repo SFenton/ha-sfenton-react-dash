@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type CSSProperties } from 'react'
-import type { ModalSheetStyle } from '../components/core/ModalSheet'
+import type { ModalSheetStyle } from './ModalSheet'
 
 const MODAL_SQUARE_GRID_GAP = 10
 const MODAL_SQUARE_GRID_EDGE_GUTTER = 6

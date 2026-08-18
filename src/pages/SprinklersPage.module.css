@@ -1,0 +1,38 @@
+.content,
+.controllerList {
+  display: grid;
+}
+
+.content {
+  gap: 12px;
+}
+
+.controllerList {
+  gap: 24px;
+}
+
+.preload {
+  display: grid;
+  gap: 18px;
+}
+
+.preloadController,
+.preloadStatus {
+  background: var(--color-glass-soft);
+}
+
+.preloadController {
+  min-height: 120px;
+  border-radius: 32px;
+}
+
+.preloadStatusGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.preloadStatus {
+  min-height: 54px;
+  border-radius: 18px;
+}
