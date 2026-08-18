@@ -713,6 +713,21 @@ function useHumidifierController(config: HumidifierConfig) {
     },
     setMode: (nextMode: HumidifierMode) => {
       commitMode(nextMode)
+      if (!powerOn) {
+        commitPowerOn(true)
+        callService({
+          domain: 'script',
+          service: config.applyProfileScriptService,
+          serviceData: {
+            display: displayOn,
+            mist_level: mistLevel,
+            mode: nextMode,
+            target_humidity: targetHumidity,
+            warm_level: warmLevel,
+          },
+        })
+        return
+      }
       callService({ domain: 'select', service: 'select_option', target: config.modeEntityId, serviceData: { option: nextMode } })
     },
     setTargetHumidity: (humidity: number) => {
@@ -736,7 +751,7 @@ function useHumidifierController(config: HumidifierConfig) {
       commitPowerOn(next)
       callService({ domain: 'switch', service: next ? 'turn_on' : 'turn_off', target: config.powerEntityId })
     },
-  }), [callService, commitDisplayOn, commitMistLevel, commitMode, commitPowerOn, commitTargetHumidity, commitTargetHumidityValid, commitTimerMinutes, commitWarmLevel, config, powerOn])
+  }), [callService, commitDisplayOn, commitMistLevel, commitMode, commitPowerOn, commitTargetHumidity, commitTargetHumidityValid, commitTimerMinutes, commitWarmLevel, config, displayOn, mistLevel, powerOn, targetHumidity, warmLevel])
 
   return { actions, state }
 }
