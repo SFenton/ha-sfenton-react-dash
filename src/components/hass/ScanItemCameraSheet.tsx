@@ -85,6 +85,7 @@ interface EverShelfPreparedProductResult {
   id?: number | string
   message?: string
   merged?: boolean
+  prepared_food?: boolean | number | string
   product_fingerprint?: string
   service_response?: EverShelfPreparedProductResult
   success?: boolean
@@ -258,7 +259,10 @@ function productDefaultQuantity(product?: EverShelfProduct) {
 }
 
 function productPreparedFood(product?: EverShelfProduct) {
-  const value = product?.prepared_food
+  return preparedFoodValue(product?.prepared_food)
+}
+
+function preparedFoodValue(value: unknown) {
   return value === true || value === 1 || value === '1'
 }
 
@@ -735,6 +739,18 @@ export function ScanItemCameraSheet({ defaultLocation, open, onClose }: ScanItem
       }
 
       prepareBlockingErrorRef.current = null
+      if (
+        !preparedFoodTouchedRef.current
+        && payload
+        && Object.prototype.hasOwnProperty.call(
+          payload,
+          'prepared_food',
+        )
+      ) {
+        setItemPreparedFood(
+          preparedFoodValue(payload.prepared_food),
+        )
+      }
       preparedProductRef.current = {
         inputIdentity: current.inputIdentity,
         merged,

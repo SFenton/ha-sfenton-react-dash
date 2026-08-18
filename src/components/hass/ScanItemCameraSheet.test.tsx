@@ -387,6 +387,46 @@ describe('ScanItemCameraSheet prepared food flag', () => {
       }
     })
 
+    it('loads prepared-food state from a silently merged manual product', async () => {
+      const originalCallService = mockState.helpers.callService
+      mockState.helpers.callService = (params) => {
+        if (params.domain === 'evershelf' && params.service === 'prepare_scanned_product') {
+          mockCallServiceCalls.push(params)
+          return Promise.resolve({
+            response: {
+              id: 123,
+              merged: true,
+              prepared_food: true,
+              product_fingerprint: 'a'.repeat(64),
+              success: true,
+            },
+          })
+        }
+        return originalCallService(params)
+      }
+
+      try {
+        renderSheet()
+        goToReviewStep('Prepared casserole')
+
+        await waitFor(() => expect(
+          screen.getByRole('button', { name: PREPARED_TITLE }),
+        ).toHaveAttribute('aria-pressed', 'true'))
+        fireEvent.click(screen.getByRole('button', { name: 'Add' }))
+
+        await waitFor(() => {
+          const addCall = mockCallServiceCalls.find((call) => call.service === 'add_scanned_item')
+          expect(addCall?.serviceData).toMatchObject({
+            name: 'Prepared casserole',
+            product_id: 123,
+          })
+          expect(addCall?.serviceData).not.toHaveProperty('prepared_food')
+        })
+      } finally {
+        mockState.helpers.callService = originalCallService
+      }
+    })
+
     it('blocks inventory add after a barcode ownership conflict', async () => {
       const originalCallService = mockState.helpers.callService
       let prepareAttempts = 0
