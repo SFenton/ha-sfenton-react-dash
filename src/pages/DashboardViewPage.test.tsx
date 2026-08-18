@@ -234,6 +234,23 @@ function setupStephenSleepypodLevelControl(phase: string) {
   mockEntities['sensor.sleepypod_stephen_schedule_phase'].state = phase
 }
 
+function setupStephSleepypodLevelControl(phase: string) {
+  mockEntities['climate.sleepypod_eight_pod_right_side'] = entity('climate.sleepypod_eight_pod_right_side', 'heat', {
+    current_temperature: 84,
+    hvac_modes: ['off', 'heat'],
+    max_temp: 110,
+    min_temp: 55,
+    target_temp_step: 1,
+    temperature: 85,
+  })
+  mockEntities['number.master_bedroom_sleepypod_eight_pod_right_target_level'] = entity('number.master_bedroom_sleepypod_eight_pod_right_target_level', '1', {
+    max: 10,
+    min: -10,
+    step: 1,
+  })
+  mockEntities['sensor.sleepypod_steph_schedule_phase'].state = phase
+}
+
 type TestFreeSleepAlarm = {
   alarmTemperature: number
   duration: number
@@ -3655,10 +3672,11 @@ describe('DashboardViewPage', () => {
     }
   })
 
-  it('starts Free Sleep hot flash mode from the bed modal', async () => {
+  it('starts SleepyPod hot flash mode in the cooling phase from the bed modal', async () => {
+    setupStephenSleepypodLevelControl('bedtime')
     render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
 
-    fireEvent.click(screen.getByRole('button', { name: /Stephen's Bed Cooling • -1/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Stephen's Bed Cooling/i }))
 
     const dialog = await screen.findByRole('dialog')
     await clickModalTab(within(dialog), 'Special Modes')
@@ -3670,13 +3688,15 @@ describe('DashboardViewPage', () => {
     expect(within(dialog).getByText("Stephen's Bed: Hot Flash Mode")).toBeInTheDocument()
     expect(within(dialog).getByRole('region', { name: /Stephen's Bed thermostat Cooling -10/i })).toBeInTheDocument()
     expect(within(dialog).getByRole('button', { name: 'Hot Flash Mode Active' })).toBeInTheDocument()
+    expect(within(dialog).getByText('Cooling Bed')).toBeInTheDocument()
     expect(screen.getAllByRole('button', { name: /Stephen's Bed Hot Flash Mode/i, hidden: true }).some((button) => button.getAttribute('data-muted') === 'false')).toBe(true)
     expect(mockCallServiceCalls).toEqual([
       { domain: 'input_button', service: 'press', target: 'input_button.eight_sleep_stephen_hot_flash' },
     ])
   })
 
-  it('shows active Free Sleep hot flash countdown and cancel action', async () => {
+  it('shows the SleepyPod hot flash countdown only during the hold and cancels it', async () => {
+    setupStephSleepypodLevelControl('asleep')
     mockEntities['input_boolean.eight_sleep_steph_hot_flash_active'].state = 'on'
     mockEntities['timer.eight_sleep_steph_hot_flash'].state = 'active'
     render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
@@ -3688,23 +3708,25 @@ describe('DashboardViewPage', () => {
     await clickModalTab(within(dialog), 'Special Modes')
     expect(within(dialog).getByRole('button', { name: 'Hot Flash Mode Active' })).toBeInTheDocument()
     expect(within(dialog).getByText('12:34')).toBeInTheDocument()
+    expect(within(dialog).queryByText('Cooling Bed')).not.toBeInTheDocument()
     const cancel = within(dialog).getByRole('button', { name: "Cancel Steph's Bed hot flash mode" })
     expect(cancel.querySelector('path')).toHaveAttribute('d', materialIconPath('mdi:close'))
 
     fireEvent.click(cancel)
 
-    expect(within(dialog).getByText("Steph's Bed: Off")).toBeInTheDocument()
+    expect(within(dialog).getByText("Steph's Bed: Heating • +1")).toBeInTheDocument()
     expect(within(dialog).getByRole('button', { name: 'Hot Flash Mode Inactive' })).toBeInTheDocument()
-    expect(screen.getAllByRole('button', { name: /Steph's Bed Off/i, hidden: true }).some((button) => button.getAttribute('data-muted') === 'true')).toBe(true)
+    expect(screen.getAllByRole('button', { name: /Steph's Bed Heating • \+1/i, hidden: true }).some((button) => button.getAttribute('data-muted') === 'false')).toBe(true)
     expect(mockCallServiceCalls).toEqual([
       { domain: 'input_button', service: 'press', target: 'input_button.eight_sleep_steph_cancel_hot_flash' },
     ])
   })
 
-  it('uses Free Sleep target state and restore timestamp fallback during active Hot Flash mode', async () => {
+  it('shows Cooling Bed instead of the restore deadline while SleepyPod hot flash is cooling', async () => {
+    setupStephenSleepypodLevelControl('bedtime')
     mockEntities['input_boolean.eight_sleep_stephen_hot_flash_active'].state = 'on'
     mockEntities['timer.eight_sleep_stephen_hot_flash'].state = 'idle'
-    mockEntities['number.nightcanvasrestful_left_target_temperature'].state = '-10'
+    mockEntities['number.master_bedroom_sleepypod_eight_pod_left_target_level'].state = '-10'
     mockEntities['input_datetime.eight_sleep_stephen_hot_flash_restore_at'].attributes.timestamp = (Date.now() + (14 * 60 + 34) * 1000) / 1000
     render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
 
@@ -3717,7 +3739,29 @@ describe('DashboardViewPage', () => {
     expect(within(dialog).getByText('Hot Flash Mode controls the target.')).toBeInTheDocument()
     await clickModalTab(within(dialog), 'Special Modes')
     expect(within(dialog).getByRole('button', { name: 'Hot Flash Mode Active' })).toBeInTheDocument()
+    expect(within(dialog).getByText('Cooling Bed')).toBeInTheDocument()
+    expect(within(dialog).queryByText('14:34')).not.toBeInTheDocument()
+
+    fireEvent.click(within(dialog).getByRole('button', { name: "Cancel Stephen's Bed hot flash mode" }))
+
+    expect(mockCallServiceCalls).toEqual([
+      { domain: 'input_button', service: 'press', target: 'input_button.eight_sleep_stephen_cancel_hot_flash' },
+    ])
+  })
+
+  it('uses the restore deadline only as a fallback for an active SleepyPod hold timer', async () => {
+    setupStephenSleepypodLevelControl('bedtime')
+    mockEntities['input_boolean.eight_sleep_stephen_hot_flash_active'].state = 'on'
+    mockEntities['timer.eight_sleep_stephen_hot_flash'] = entity('timer.eight_sleep_stephen_hot_flash', 'active')
+    mockEntities['input_datetime.eight_sleep_stephen_hot_flash_restore_at'].attributes.timestamp = (Date.now() + (14 * 60 + 34) * 1000) / 1000
+    render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
+
+    fireEvent.click(screen.getByRole('button', { name: /Stephen's Bed Hot Flash Mode/i }))
+
+    const dialog = await screen.findByRole('dialog')
+    await clickModalTab(within(dialog), 'Special Modes')
     expect(within(dialog).getByText('14:34')).toBeInTheDocument()
+    expect(within(dialog).queryByText('Cooling Bed')).not.toBeInTheDocument()
   })
 
   it('cancels an in-flight target edit when Hot Flash mode takes ownership', async () => {

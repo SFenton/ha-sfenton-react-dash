@@ -89,6 +89,7 @@ import { useOptimisticState } from '../hooks/useOptimisticState'
 import { useScheduleDetailPage } from '../hooks/useScheduleDetailPage'
 import { useImmediateVisualTab, useSmoothDisplayedModalTab } from '../hooks/useSmoothDisplayedModalTab'
 import { useTodoOptimisticStatuses } from '../hooks/useTodoOptimisticStatuses'
+import { useCopy } from '../i18n'
 import {
   CLIMATE_GROUPS,
   CONTACT_GROUPS,
@@ -143,6 +144,7 @@ import {
   type PresenceOverrideConfig,
   type SettingsLinkConfig,
 } from '../constants/portedDashboard'
+
 import { choreQuickLinkCounts, choreQuickLinkSubtitle, groceryCountSubtitle } from '../constants/choreQuickLinkCounts'
 import { FOOD_CARD_BACKGROUND_COLOR, foodSummarySubtitle } from '../constants/everShelfFood'
 import { modalSquareGridModalStyle, modalSquareGridStyle, type ModalSquareGridStyle, useModalSquareGridLayout } from '../components/core/modalSquareGrid'
@@ -164,6 +166,11 @@ import { FoodHubPage } from './FoodHubPage'
 import { SprinklersPage } from './SprinklersPage'
 import { RecipesPage } from './RecipesPage'
 import styles from './DashboardViewPage.module.css'
+
+const SLEEPYPOD_COPY_NAMESPACE = 'modalSleepypod' as const
+const SLEEPYPOD_HOT_FLASH_KEYS = {
+  cooling: 'hotFlash.coolingStatus',
+} as const
 
 interface DashboardViewPageProps {
   activePath: string
@@ -3079,6 +3086,7 @@ function eightSleepRestoreAtCountdown(restoreAtEntity: ReturnType<typeof useEnti
 }
 
 function eightSleepHotFlashCountdown(timerEntity: ReturnType<typeof useEntity>, restoreAtEntity: ReturnType<typeof useEntity>, now: number) {
+  if (timerEntity?.state !== 'active') return null
   return eightSleepTimerCountdown(timerEntity, now) ?? eightSleepRestoreAtCountdown(restoreAtEntity, now)
 }
 
@@ -4421,20 +4429,22 @@ function EightSleepScheduleTemperatureControl({
 }
 
 function EightSleepHotFlashButton({ modalState, side }: { modalState: EightSleepBedModalState; side: EightSleepSideConfig }) {
+  const copy = useCopy(SLEEPYPOD_COPY_NAMESPACE)
   const restoreAtEntity = useEntity(asEntityName(side.hotFlashRestoreAtEntityId), { returnNullIfNotFound: true })
   const timerEntity = useEntity(asEntityName(side.hotFlashTimerEntityId), { returnNullIfNotFound: true })
   const callService = useCallService()
   const [now, setNow] = useState(() => Date.now())
   const unavailable = !modalState.hotFlashAvailable
   const active = modalState.hotFlashActive
+  const holding = active && timerEntity?.state === 'active'
   const stateText = unavailable ? 'Unavailable' : active ? 'Active' : 'Inactive'
-  const countdown = active ? eightSleepHotFlashCountdown(timerEntity, restoreAtEntity, now) : null
+  const countdown = holding ? eightSleepHotFlashCountdown(timerEntity, restoreAtEntity, now) : null
 
   useEffect(() => {
-    if (!active) return undefined
+    if (!holding) return undefined
     const interval = window.setInterval(() => setNow(Date.now()), 1000)
     return () => window.clearInterval(interval)
-  }, [active])
+  }, [holding])
 
   const activate = () => {
     if (unavailable) return
@@ -4452,7 +4462,9 @@ function EightSleepHotFlashButton({ modalState, side }: { modalState: EightSleep
     <ThermostatGlassCard active={active} icon="mdi:snowflake" onMainClick={activate} pressed={active} stateText={stateText} title="Hot Flash Mode">
       {active && (
         <div className={styles.eightSleepHotFlashStatus}>
-          {countdown && <span className={styles.eightSleepCountdown}>{countdown}</span>}
+          <span className={styles.eightSleepHotFlashPhase}>
+            {holding ? countdown : copy(SLEEPYPOD_HOT_FLASH_KEYS.cooling)}
+          </span>
           <button aria-label={`Cancel ${side.title} hot flash mode`} className={styles.eightSleepCancelButton} onClick={cancel} type="button">
             <MaterialIcon name="mdi:close" size={20} />
           </button>
