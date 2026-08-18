@@ -3357,6 +3357,32 @@ describe('DashboardViewPage', () => {
     expect(within(dialog).getByText('OFF')).toBeInTheDocument()
   })
 
+  it.each([
+    ['Manual', 'Manual'],
+    ['Auto Humidity', 'Target Humidity'],
+    ['Sleep', 'Sleep'],
+  ] as const)('turns the humidifier on when selecting %s while it is off', async (buttonLabel, mode) => {
+    mockEntities['switch.lv600s_humidifier_power'].state = 'off'
+    render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
+
+    fireEvent.click(screen.getByRole('button', { name: /Humidifier Off • 46%/i }))
+    const dialog = await screen.findByRole('dialog')
+    fireEvent.click(within(dialog).getByRole('button', { name: buttonLabel }))
+
+    expect(within(dialog).getByRole('button', { name: 'Turn Off' })).toBeInTheDocument()
+    expect(mockCallServiceCalls).toEqual([{
+      domain: 'script',
+      service: 'master_bedroom_humidifier_apply_profile',
+      serviceData: {
+        display: true,
+        mist_level: 5,
+        mode,
+        target_humidity: 50,
+        warm_level: 1,
+      },
+    }])
+  })
+
   it('uses the wide status readout for humidifier Sleep mode', async () => {
     mockEntities['select.lv600s_humidifier_mode'].state = 'Sleep'
     render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)

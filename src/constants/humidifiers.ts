@@ -1,6 +1,7 @@
 export type HumidifierMode = 'Manual' | 'Target Humidity' | 'Sleep'
 
 export interface HumidifierConfig {
+  applyProfileScriptService: string
   currentHumidityEntityId: string
   currentTemperatureEntityId: string
   displayEntityId: string
@@ -44,6 +45,7 @@ export const HUMIDIFIER_WARM_LEVELS = [
 ] as const
 
 export const MASTER_BEDROOM_HUMIDIFIER: HumidifierConfig = {
+  applyProfileScriptService: 'master_bedroom_humidifier_apply_profile',
   currentHumidityEntityId: 'sensor.lv600s_humidifier_current_humidity',
   currentTemperatureEntityId: 'sensor.lv600s_humidifier_current_temperature',
   displayEntityId: 'switch.lv600s_humidifier_display',

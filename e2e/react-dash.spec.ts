@@ -3097,6 +3097,40 @@ test('humidifier Sleep readout matches SleepyPod OFF typography and keeps mobile
   expect(sleepReadout.fontSize).toBeLessThan(offReadout.fontSize)
 })
 
+test('selecting a humidifier mode while off powers on through the HA profile command', async ({ page }) => {
+  await page.setViewportSize({ width: 393, height: 852 })
+  await page.goto('/at-a-glance/master-bedroom')
+  await page.evaluate(() => {
+    const mock = (window as unknown as {
+      __mockHass: {
+        calls: Record<string, unknown>[]
+        setEntityState: (entityId: string, state: string) => void
+      }
+    }).__mockHass
+    mock.calls.splice(0, mock.calls.length)
+    mock.setEntityState('switch.lv600s_humidifier_power', 'off')
+  })
+  await page.getByRole('button', { name: /Humidifier Off.*46%/i }).click()
+
+  const dialog = page.getByRole('dialog')
+  await dialog.getByRole('button', { name: 'Auto Humidity' }).click()
+  await expect(dialog.getByRole('button', { name: 'Turn Off' })).toBeVisible()
+  await expect.poll(() => page.evaluate(() => (
+    (window as unknown as { __mockHass: { calls: Record<string, unknown>[] } }).__mockHass.calls
+      .filter((call) => call.domain === 'script' && call.service === 'master_bedroom_humidifier_apply_profile')
+  ))).toEqual([{
+    domain: 'script',
+    service: 'master_bedroom_humidifier_apply_profile',
+    serviceData: {
+      display: true,
+      mist_level: 5,
+      mode: 'Target Humidity',
+      target_humidity: 50,
+      warm_level: 1,
+    },
+  }])
+})
+
 test('schedule detail pages keep the outer modal sheet anchored', async ({ page }) => {
   await page.setViewportSize({ width: 393, height: 852 })
   await page.goto('/at-a-glance/master-bedroom')
