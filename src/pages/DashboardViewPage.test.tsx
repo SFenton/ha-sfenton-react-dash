@@ -3357,6 +3357,18 @@ describe('DashboardViewPage', () => {
     expect(within(dialog).getByText('OFF')).toBeInTheDocument()
   })
 
+  it('uses the wide status readout for humidifier Sleep mode', async () => {
+    mockEntities['select.lv600s_humidifier_mode'].state = 'Sleep'
+    render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
+
+    fireEvent.click(screen.getByRole('button', { name: /Humidifier Humidifying • 46%/i }))
+    const dialog = await screen.findByRole('dialog')
+    const sleepReadout = within(dialog).getByRole('region', { name: 'Humidifier mist level Sleep' })
+
+    expect(within(sleepReadout).getByText('Sleep').closest('[data-primary-variant]')).toHaveAttribute('data-primary-variant', 'wide-status')
+    expect(within(sleepReadout).queryByRole('slider', { name: 'Mist level' })).not.toBeInTheDocument()
+  })
+
   it('disables activity save when a new rule overlaps an existing activity', async () => {
     await mockState.connection.sendMessagePromise({
       type: 'schedule/update',

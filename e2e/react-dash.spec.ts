@@ -3033,6 +3033,70 @@ test('Free Sleep global Add Alarm defaults to weekdays and writes enabled backen
   }
 })
 
+test('humidifier Sleep readout matches SleepyPod OFF typography and keeps mobile dial breathing room', async ({ page }) => {
+  await page.setViewportSize({ width: 393, height: 852 })
+  await page.goto('/at-a-glance/master-bedroom')
+  await page.evaluate(() => {
+    const mock = (window as unknown as { __mockHass: { setEntityState: (entityId: string, state: string) => void } }).__mockHass
+    mock.setEntityState('select.lv600s_humidifier_mode', 'Sleep')
+  })
+  await page.getByRole('button', { name: /Humidifier Humidifying.*46%/i }).click()
+
+  const dialog = page.getByRole('dialog')
+  const sleepDial = dialog.getByRole('region', { name: 'Humidifier mist level Sleep' })
+  const sleepText = sleepDial.getByText('Sleep', { exact: true })
+  await expect(sleepText).toHaveCSS('font-weight', '420')
+  await expect(sleepText).toHaveCSS('text-transform', 'uppercase')
+
+  const sleepReadout = await sleepText.evaluate((element) => {
+    const dial = element.closest<HTMLElement>('[role="region"]')
+    if (!dial) throw new Error('Humidifier dial region is missing.')
+    const dialRect = dial.getBoundingClientRect()
+    const textRect = element.getBoundingClientRect()
+    const style = getComputedStyle(element)
+    return {
+      fontSize: Number.parseFloat(style.fontSize),
+      gaps: {
+        above: textRect.top - dialRect.top,
+        left: textRect.left - dialRect.left,
+        right: dialRect.right - textRect.right,
+      },
+      typography: {
+        fontFamily: style.fontFamily,
+        fontStyle: style.fontStyle,
+        fontWeight: style.fontWeight,
+        letterSpacing: style.letterSpacing,
+        textTransform: style.textTransform,
+      },
+    }
+  })
+
+  expect(sleepReadout.gaps.above).toBeGreaterThanOrEqual(90)
+  expect(sleepReadout.gaps.left).toBeGreaterThanOrEqual(48)
+  expect(sleepReadout.gaps.right).toBeGreaterThanOrEqual(48)
+
+  await page.goto('/at-a-glance/master-bedroom')
+  await page.getByRole('button', { name: /Steph.s Bed Off/i }).click()
+  const sleepypodDialog = page.getByRole('dialog')
+  const offText = sleepypodDialog.getByRole('region', { name: /Steph.s Bed thermostat Off/i }).getByText('OFF', { exact: true })
+  const offReadout = await offText.evaluate((element) => {
+    const style = getComputedStyle(element)
+    return {
+      fontSize: Number.parseFloat(style.fontSize),
+      typography: {
+        fontFamily: style.fontFamily,
+        fontStyle: style.fontStyle,
+        fontWeight: style.fontWeight,
+        letterSpacing: style.letterSpacing,
+        textTransform: style.textTransform,
+      },
+    }
+  })
+
+  expect(sleepReadout.typography).toEqual(offReadout.typography)
+  expect(sleepReadout.fontSize).toBeLessThan(offReadout.fontSize)
+})
+
 test('schedule detail pages keep the outer modal sheet anchored', async ({ page }) => {
   await page.setViewportSize({ width: 393, height: 852 })
   await page.goto('/at-a-glance/master-bedroom')

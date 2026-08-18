@@ -216,6 +216,7 @@ function HumidifierHero({ actions, state }: { actions: HumidifierActions; state:
         off={!state.powerOn}
         onCommit={(value) => actions.setLevel(clamped(Math.round(value), DIAL_MIN, DIAL_MAX))}
         primaryText={(value) => sleepMode ? 'Sleep' : state.powerOn ? String(value) : 'OFF'}
+        primaryTextVariant={sleepMode ? 'wide-status' : undefined}
         secondaryText={state.powerOn ? `${formatHumidity(state.currentHumidity)} current` : undefined}
         step={DIAL_STEP}
         value={dialValue}
