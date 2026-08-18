@@ -5,6 +5,7 @@ import { ScanItemCameraSheet } from './ScanItemCameraSheet'
 
 const PREPARED_TITLE = 'Prepared Food Item'
 const PREPARED_SUBTITLE = 'Indicates this is a prepared food item and does not need classification.'
+const PRODUCT_FINGERPRINT = 'f'.repeat(64)
 
 function renderSheet() {
   return render(<ScanItemCameraSheet onClose={vi.fn()} open />)
@@ -13,19 +14,24 @@ function renderSheet() {
 /**
  * Walk the sheet from the barcode step to the review step.
  *
- * jsdom has no camera, so the scan-specific controls never render; the skip actions are
- * the reachable path to the review step.
+ * jsdom has no camera or manual-entry camera state. Enter the name on review,
+ * then traverse back through the name-page boundary to exercise the same Next
+ * transition used by the real manual-entry flow.
  */
 function goToReviewStep(name = 'Leftover lasagna') {
   fireEvent.click(screen.getByRole('button', { name: 'Skip Barcode' }))
   fireEvent.click(screen.getByRole('button', { name: 'Skip Expiration' }))
   fireEvent.change(screen.getByLabelText('Product name'), { target: { value: name } })
+  fireEvent.click(screen.getByRole('button', { name: 'Back to expiration date' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Back to barcode scan' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Next' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Skip Expiration' }))
 }
 
 describe('ScanItemCameraSheet prepared food flag', () => {
   beforeEach(() => resetMockHass())
 
-  it('renders the checkbox unchecked with the expected heading, title, and subtitle', () => {
+  it('renders the checkbox unchecked with the expected heading, title, and subtitle', async () => {
     renderSheet()
     goToReviewStep()
 
@@ -33,6 +39,7 @@ describe('ScanItemCameraSheet prepared food flag', () => {
     expect(screen.getByText(PREPARED_TITLE, { selector: 'strong' })).toBeInTheDocument()
     expect(screen.getByText(PREPARED_SUBTITLE, { selector: 'small' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: PREPARED_TITLE })).toHaveAttribute('aria-pressed', 'false')
+    await waitFor(() => expect(mockCallServiceCalls.some((call) => call.service === 'suggest_location')).toBe(true))
   })
 
   describe('ScanItemCameraSheet storage suggestions', () => {
@@ -64,7 +71,12 @@ describe('ScanItemCameraSheet prepared food flag', () => {
           domain: 'evershelf',
           returnResponse: true,
           service: 'suggest_location',
-          serviceData: { mode: 'manual', name: 'Milk' },
+          serviceData: {
+            mode: 'manual',
+            name: 'Milk',
+            product_fingerprint: PRODUCT_FINGERPRINT,
+            product_id: 123,
+          },
         }))
         await waitFor(() => expect(screen.getByRole('radio', { name: 'Fridge' })).toBeChecked())
         expect(screen.getByText('Selected from your previous EverShelf entries.')).toBeInTheDocument()
@@ -73,20 +85,39 @@ describe('ScanItemCameraSheet prepared food flag', () => {
       }
     })
 
-    it('debounces manual typing into one location lookup', async () => {
+    it('waits until Next, then prepares before requesting one committed location lookup', async () => {
       renderSheet()
       fireEvent.click(screen.getByRole('button', { name: 'Skip Barcode' }))
       fireEvent.click(screen.getByRole('button', { name: 'Skip Expiration' }))
       fireEvent.change(screen.getByLabelText('Product name'), { target: { value: 'Mil' } })
       fireEvent.change(screen.getByLabelText('Product name'), { target: { value: 'Milk' } })
 
+      expect(mockCallServiceCalls.filter((call) => call.domain === 'evershelf' && call.service === 'prepare_scanned_product')).toEqual([])
+      expect(mockCallServiceCalls.filter((call) => call.domain === 'evershelf' && call.service === 'suggest_location')).toEqual([])
+      fireEvent.click(screen.getByRole('button', { name: 'Back to expiration date' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Back to barcode scan' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Next' }))
+
       await waitFor(() => {
-        const suggestionCalls = mockCallServiceCalls.filter((call) => call.domain === 'evershelf' && call.service === 'suggest_location')
-        expect(suggestionCalls).toEqual([{
+        const commitCalls = mockCallServiceCalls.filter((call) => (
+          call.domain === 'evershelf'
+          && (call.service === 'prepare_scanned_product' || call.service === 'suggest_location')
+        ))
+        expect(commitCalls).toEqual([{
+          domain: 'evershelf',
+          returnResponse: true,
+          service: 'prepare_scanned_product',
+          serviceData: { name: 'Milk' },
+        }, {
           domain: 'evershelf',
           returnResponse: true,
           service: 'suggest_location',
-          serviceData: { mode: 'manual', name: 'Milk' },
+          serviceData: {
+            mode: 'manual',
+            name: 'Milk',
+            product_fingerprint: PRODUCT_FINGERPRINT,
+            product_id: 123,
+          },
         }])
       })
     })
@@ -99,7 +130,12 @@ describe('ScanItemCameraSheet prepared food flag', () => {
         domain: 'evershelf',
         returnResponse: true,
         service: 'suggest_location',
-        serviceData: { mode: 'manual', name: 'Mystery item' },
+        serviceData: {
+          mode: 'manual',
+          name: 'Mystery item',
+          product_fingerprint: PRODUCT_FINGERPRINT,
+          product_id: 123,
+        },
       }))
       expect(screen.getByRole('radio', { name: 'Freezer' })).toBeChecked()
       expect(screen.getByText('No confident match; using the current page default.')).toBeInTheDocument()
@@ -163,6 +199,49 @@ describe('ScanItemCameraSheet prepared food flag', () => {
       }
     })
 
+    it('does not request a suggestion when preparation finishes after a manual location choice', async () => {
+      const originalCallService = mockState.helpers.callService
+      let resolvePrepare!: (value: unknown) => void
+      mockState.helpers.callService = (params) => {
+        if (params.domain === 'evershelf' && params.service === 'prepare_scanned_product') {
+          mockCallServiceCalls.push(params)
+          return new Promise((resolve) => {
+            resolvePrepare = resolve
+          })
+        }
+        return originalCallService(params)
+      }
+
+      try {
+        renderSheet()
+        goToReviewStep('Slow commit')
+        await waitFor(() => expect(resolvePrepare).toEqual(expect.any(Function)))
+
+        fireEvent.click(screen.getByRole('radio', { name: 'Freezer' }))
+        resolvePrepare({
+          response: {
+            id: 501,
+            product_fingerprint: 'c'.repeat(64),
+            success: true,
+          },
+        })
+
+        await waitFor(() => expect(screen.getByRole('radio', { name: 'Freezer' })).toBeChecked())
+        expect(mockCallServiceCalls.filter((call) => call.service === 'suggest_location')).toEqual([])
+        expect(screen.getByText('Location selected manually.')).toBeInTheDocument()
+        fireEvent.click(screen.getByRole('button', { name: 'Add' }))
+        await waitFor(() => {
+          const addCall = mockCallServiceCalls.find((call) => call.service === 'add_scanned_item')
+          expect(addCall?.serviceData).toMatchObject({
+            location: 'freezer',
+            product_id: 501,
+          })
+        })
+      } finally {
+        mockState.helpers.callService = originalCallService
+      }
+    })
+
     it('does not apply a stale suggestion after the product name changes', async () => {
       const originalCallService = mockState.helpers.callService
       let resolveFirstSuggestion!: (value: unknown) => void
@@ -201,14 +280,222 @@ describe('ScanItemCameraSheet prepared food flag', () => {
           },
         })
 
+        fireEvent.click(screen.getByRole('button', { name: 'Back to expiration date' }))
+        fireEvent.click(screen.getByRole('button', { name: 'Back to barcode scan' }))
+        fireEvent.click(screen.getByRole('button', { name: 'Next' }))
+        fireEvent.click(screen.getByRole('button', { name: 'Skip Expiration' }))
+
         await waitFor(() => expect(mockCallServiceCalls).toContainEqual({
           domain: 'evershelf',
           returnResponse: true,
           service: 'suggest_location',
-          serviceData: { mode: 'manual', name: 'Bread' },
+          serviceData: {
+            mode: 'manual',
+            name: 'Bread',
+            product_fingerprint: PRODUCT_FINGERPRINT,
+            product_id: 123,
+          },
         }))
+        expect(mockCallServiceCalls).toContainEqual({
+          domain: 'evershelf',
+          returnResponse: true,
+          service: 'prepare_scanned_product',
+          serviceData: { name: 'Bread', product_id: 123 },
+        })
         await waitFor(() => expect(screen.getByRole('radio', { name: 'Pantry' })).toBeChecked())
         expect(screen.getByRole('radio', { name: 'Fridge' })).not.toBeChecked()
+      } finally {
+        mockState.helpers.callService = originalCallService
+      }
+    })
+
+    it('re-prepares a review-step name edit before the final add', async () => {
+      renderSheet()
+      goToReviewStep('Milk')
+      await waitFor(() => expect(mockCallServiceCalls).toContainEqual({
+        domain: 'evershelf',
+        returnResponse: true,
+        service: 'prepare_scanned_product',
+        serviceData: { name: 'Milk' },
+      }))
+
+      fireEvent.change(screen.getByLabelText('Product name'), { target: { value: 'Bread' } })
+      fireEvent.click(screen.getByRole('button', { name: 'Add' }))
+
+      await waitFor(() => expect(mockCallServiceCalls).toContainEqual({
+        domain: 'evershelf',
+        returnResponse: true,
+        service: 'prepare_scanned_product',
+        serviceData: { name: 'Bread', product_id: 123 },
+      }))
+      await waitFor(() => {
+        const addCall = mockCallServiceCalls.find((call) => call.service === 'add_scanned_item')
+        expect(addCall?.serviceData).toMatchObject({
+          name: 'Bread',
+          product_id: 123,
+        })
+      })
+    })
+
+    it('does not reuse a silently merged product ID after the name changes', async () => {
+      const originalCallService = mockState.helpers.callService
+      let prepareAttempts = 0
+      mockState.helpers.callService = (params) => {
+        if (params.domain === 'evershelf' && params.service === 'prepare_scanned_product') {
+          mockCallServiceCalls.push(params)
+          prepareAttempts += 1
+          return Promise.resolve({
+            response: {
+              id: prepareAttempts === 1 ? 123 : 456,
+              merged: prepareAttempts === 1,
+              product_fingerprint: 'a'.repeat(64),
+              success: true,
+            },
+          })
+        }
+        return originalCallService(params)
+      }
+
+      try {
+        renderSheet()
+        goToReviewStep('Milk')
+        await waitFor(() => expect(mockCallServiceCalls).toContainEqual({
+          domain: 'evershelf',
+          returnResponse: true,
+          service: 'prepare_scanned_product',
+          serviceData: { name: 'Milk' },
+        }))
+
+        fireEvent.change(screen.getByLabelText('Product name'), { target: { value: 'Bread' } })
+        fireEvent.click(screen.getByRole('button', { name: 'Add' }))
+
+        await waitFor(() => expect(mockCallServiceCalls).toContainEqual({
+          domain: 'evershelf',
+          returnResponse: true,
+          service: 'prepare_scanned_product',
+          serviceData: { name: 'Bread' },
+        }))
+        await waitFor(() => {
+          const addCall = mockCallServiceCalls.find((call) => call.service === 'add_scanned_item')
+          expect(addCall?.serviceData).toMatchObject({
+            name: 'Bread',
+            product_id: 456,
+          })
+        })
+      } finally {
+        mockState.helpers.callService = originalCallService
+      }
+    })
+
+    it('blocks inventory add after a barcode ownership conflict', async () => {
+      const originalCallService = mockState.helpers.callService
+      let prepareAttempts = 0
+      mockState.helpers.callService = (params) => {
+        if (params.domain === 'evershelf' && params.service === 'prepare_scanned_product') {
+          mockCallServiceCalls.push(params)
+          prepareAttempts += 1
+          if (prepareAttempts === 1) return originalCallService(params)
+          return Promise.resolve({
+            response: {
+              error: 'barcode_already_used',
+              message: 'Barcode already assigned to another product',
+              success: false,
+            },
+          })
+        }
+        return originalCallService(params)
+      }
+
+      try {
+        renderSheet()
+        goToReviewStep('Milk')
+        await waitFor(() => expect(mockCallServiceCalls.some((call) => call.service === 'suggest_location')).toBe(true))
+        fireEvent.change(screen.getByLabelText('Product name'), { target: { value: 'Bread' } })
+        fireEvent.click(screen.getByRole('button', { name: 'Add' }))
+
+        await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent(
+          'Barcode already assigned to another product',
+        ))
+        expect(mockCallServiceCalls.filter((call) => call.service === 'add_scanned_item')).toEqual([])
+      } finally {
+        mockState.helpers.callService = originalCallService
+      }
+    })
+
+    it('reuses a late prepared ID after a name edit without requesting the stale suggestion', async () => {
+      const originalCallService = mockState.helpers.callService
+      let resolveFirstPrepare!: (value: unknown) => void
+      let prepareAttempts = 0
+      mockState.helpers.callService = (params) => {
+        if (params.domain === 'evershelf' && params.service === 'prepare_scanned_product') {
+          mockCallServiceCalls.push(params)
+          prepareAttempts += 1
+          if (prepareAttempts === 1) {
+            return new Promise((resolve) => {
+              resolveFirstPrepare = resolve
+            })
+          }
+          return Promise.resolve({
+            response: {
+              id: 321,
+              product_fingerprint: 'b'.repeat(64),
+              success: true,
+            },
+          })
+        }
+        if (params.domain === 'evershelf' && params.service === 'suggest_location') {
+          mockCallServiceCalls.push(params)
+          return Promise.resolve({
+            response: {
+              confidence: 1,
+              location: 'dispensa',
+              source: 'history_name',
+              success: true,
+            },
+          })
+        }
+        return originalCallService(params)
+      }
+
+      try {
+        renderSheet()
+        goToReviewStep('Milk')
+        await waitFor(() => expect(resolveFirstPrepare).toEqual(expect.any(Function)))
+
+        fireEvent.change(screen.getByLabelText('Product name'), { target: { value: 'Bread' } })
+        fireEvent.click(screen.getByRole('button', { name: 'Back to expiration date' }))
+        fireEvent.click(screen.getByRole('button', { name: 'Back to barcode scan' }))
+        fireEvent.click(screen.getByRole('button', { name: 'Next' }))
+        expect(mockCallServiceCalls.filter((call) => call.service === 'prepare_scanned_product')).toHaveLength(1)
+
+        resolveFirstPrepare({
+          response: {
+            id: 321,
+            product_fingerprint: 'a'.repeat(64),
+            success: true,
+          },
+        })
+        await waitFor(() => {
+          expect(mockCallServiceCalls.filter((call) => call.service === 'suggest_location')).toEqual([])
+        })
+
+        await waitFor(() => expect(mockCallServiceCalls).toContainEqual({
+          domain: 'evershelf',
+          returnResponse: true,
+          service: 'prepare_scanned_product',
+          serviceData: { name: 'Bread', product_id: 321 },
+        }))
+        await waitFor(() => expect(mockCallServiceCalls).toContainEqual({
+          domain: 'evershelf',
+          returnResponse: true,
+          service: 'suggest_location',
+          serviceData: {
+            mode: 'manual',
+            name: 'Bread',
+            product_fingerprint: 'b'.repeat(64),
+            product_id: 321,
+          },
+        }))
       } finally {
         mockState.helpers.callService = originalCallService
       }
@@ -230,10 +517,13 @@ describe('ScanItemCameraSheet prepared food flag', () => {
   it('omits prepared_food from the service call when left unchecked', async () => {
     renderSheet()
     goToReviewStep()
+    await waitFor(() => expect(mockCallServiceCalls.some((call) => call.domain === 'evershelf' && call.service === 'suggest_location')).toBe(true))
     fireEvent.click(screen.getByRole('button', { name: 'Add' }))
 
-    await waitFor(() => expect(mockCallServiceCalls).toHaveLength(1))
-    expect(mockCallServiceCalls[0].serviceData).not.toHaveProperty('prepared_food')
+    await waitFor(() => expect(mockCallServiceCalls.some((call) => call.domain === 'evershelf' && call.service === 'add_scanned_item')).toBe(true))
+    const addCall = mockCallServiceCalls.find((call) => call.domain === 'evershelf' && call.service === 'add_scanned_item')
+    expect(addCall?.serviceData).not.toHaveProperty('prepared_food')
+    expect(addCall?.serviceData).toMatchObject({ product_id: 123 })
   })
 
   it('sends prepared_food when checked', async () => {
@@ -242,18 +532,139 @@ describe('ScanItemCameraSheet prepared food flag', () => {
     fireEvent.click(screen.getByRole('button', { name: PREPARED_TITLE }))
     fireEvent.click(screen.getByRole('button', { name: 'Add' }))
 
-    await waitFor(() => expect(mockCallServiceCalls).toHaveLength(1))
-    expect(mockCallServiceCalls[0]).toMatchObject({
+    await waitFor(() => expect(mockCallServiceCalls.some((call) => call.domain === 'evershelf' && call.service === 'add_scanned_item')).toBe(true))
+    const addCall = mockCallServiceCalls.find((call) => call.domain === 'evershelf' && call.service === 'add_scanned_item')
+    expect(addCall).toMatchObject({
       domain: 'evershelf',
       service: 'add_scanned_item',
     })
-    expect(mockCallServiceCalls[0].serviceData).toMatchObject({ prepared_food: true })
+    expect(addCall?.serviceData).toMatchObject({ prepared_food: true })
   })
 
-  it('resets to unchecked when the sheet is closed and reopened', () => {
+  it('sends prepared_food false after the user clears it', async () => {
+    renderSheet()
+    goToReviewStep()
+    const checkbox = screen.getByRole('button', { name: PREPARED_TITLE })
+    fireEvent.click(checkbox)
+    fireEvent.click(checkbox)
+    fireEvent.click(screen.getByRole('button', { name: 'Add' }))
+
+    await waitFor(() => expect(mockCallServiceCalls.some((call) => call.service === 'add_scanned_item')).toBe(true))
+    const addCall = mockCallServiceCalls.find((call) => call.service === 'add_scanned_item')
+    expect(addCall?.serviceData).toMatchObject({ prepared_food: false })
+  })
+
+  it('waits for in-flight preparation and adds inventory with the committed product ID', async () => {
+    const originalCallService = mockState.helpers.callService
+    let resolvePrepare!: (value: unknown) => void
+    mockState.helpers.callService = (params) => {
+      if (params.domain === 'evershelf' && params.service === 'prepare_scanned_product') {
+        mockCallServiceCalls.push(params)
+        return new Promise((resolve) => {
+          resolvePrepare = resolve
+        })
+      }
+      return originalCallService(params)
+    }
+
+    try {
+      renderSheet()
+      goToReviewStep('Buttermilk')
+      await waitFor(() => expect(resolvePrepare).toEqual(expect.any(Function)))
+
+      fireEvent.click(screen.getByRole('button', { name: 'Add' }))
+      expect(screen.getByText('Adding Item')).toBeInTheDocument()
+      expect(mockCallServiceCalls.filter((call) => call.service === 'add_scanned_item')).toEqual([])
+
+      resolvePrepare({
+        response: {
+          id: 186,
+          product_fingerprint: 'd'.repeat(64),
+          success: true,
+        },
+      })
+
+      await waitFor(() => expect(mockCallServiceCalls).toContainEqual(expect.objectContaining({
+        domain: 'evershelf',
+        returnResponse: true,
+        service: 'add_scanned_item',
+        serviceData: expect.objectContaining({
+          name: 'Buttermilk',
+          product_id: 186,
+        }),
+      })))
+    } finally {
+      mockState.helpers.callService = originalCallService
+    }
+  })
+
+  it('falls back to add_scanned_item product saving when preparation fails', async () => {
+    const originalCallService = mockState.helpers.callService
+    mockState.helpers.callService = (params) => {
+      if (params.domain === 'evershelf' && params.service === 'prepare_scanned_product') {
+        mockCallServiceCalls.push(params)
+        return Promise.reject(new Error('Prepare unavailable'))
+      }
+      return originalCallService(params)
+    }
+
+    try {
+      renderSheet()
+      goToReviewStep('Fallback item')
+      await waitFor(() => expect(screen.getByText('Storage suggestion unavailable; using the app default.')).toBeInTheDocument())
+
+      fireEvent.click(screen.getByRole('button', { name: 'Add' }))
+      await waitFor(() => expect(mockCallServiceCalls.some((call) => call.service === 'add_scanned_item')).toBe(true))
+      const addCall = mockCallServiceCalls.find((call) => call.service === 'add_scanned_item')
+      expect(addCall?.serviceData).toMatchObject({
+        location: 'dispensa',
+        name: 'Fallback item',
+        quantity: 1,
+      })
+      expect(addCall?.serviceData).not.toHaveProperty('product_id')
+    } finally {
+      mockState.helpers.callService = originalCallService
+    }
+  })
+
+  it('reuses the same idempotency key when an add is retried', async () => {
+    const originalCallService = mockState.helpers.callService
+    let addAttempts = 0
+    mockState.helpers.callService = (params) => {
+      if (params.domain === 'evershelf' && params.service === 'add_scanned_item') {
+        mockCallServiceCalls.push(params)
+        addAttempts += 1
+        return addAttempts === 1
+          ? Promise.reject(new Error('EverShelf busy'))
+          : Promise.resolve({ response: { success: true } })
+      }
+      return originalCallService(params)
+    }
+
+    try {
+      renderSheet()
+      goToReviewStep('Buttermilk')
+      fireEvent.click(screen.getByRole('button', { name: 'Add' }))
+      await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('EverShelf busy'))
+
+      fireEvent.click(screen.getByRole('button', { name: 'Add' }))
+      await waitFor(() => expect(addAttempts).toBe(2))
+
+      const addCalls = mockCallServiceCalls.filter((call) => call.domain === 'evershelf' && call.service === 'add_scanned_item')
+      const firstKey = (addCalls[0].serviceData as { idempotency_key?: string }).idempotency_key
+      const secondKey = (addCalls[1].serviceData as { idempotency_key?: string }).idempotency_key
+      expect(firstKey).toMatch(/^scan-[A-Za-z0-9-]+$/)
+      expect(secondKey).toBe(firstKey)
+    } finally {
+      mockState.helpers.callService = originalCallService
+    }
+  })
+
+  it('resets to unchecked when the sheet is closed and reopened', async () => {
     const onClose = vi.fn()
     const view = render(<ScanItemCameraSheet onClose={onClose} open />)
     goToReviewStep()
+    await waitFor(() => expect(mockCallServiceCalls.some((call) => call.service === 'suggest_location')).toBe(true))
 
     fireEvent.click(screen.getByRole('button', { name: PREPARED_TITLE }))
     expect(screen.getByRole('button', { name: PREPARED_TITLE })).toHaveAttribute('aria-pressed', 'true')
@@ -263,6 +674,7 @@ describe('ScanItemCameraSheet prepared food flag', () => {
     view.rerender(<ScanItemCameraSheet onClose={onClose} open={false} />)
     view.rerender(<ScanItemCameraSheet onClose={onClose} open />)
     goToReviewStep()
+    await waitFor(() => expect(mockCallServiceCalls.filter((call) => call.service === 'suggest_location')).toHaveLength(2))
 
     expect(screen.getByRole('button', { name: PREPARED_TITLE })).toHaveAttribute('aria-pressed', 'false')
   })

@@ -1297,6 +1297,56 @@ test('embedded inventory search follows the top visual viewport without a guesse
   await expect.poll(async () => Math.round((await dockMetrics()).y)).toBe(Math.round(before.y))
 })
 
+test('scan item commits the product on Next before requesting and using a location suggestion', async ({ page }) => {
+  await page.goto('/at-a-glance/kitchen')
+  await page.getByRole('button', { name: 'Scan Item' }).click()
+  const dialog = page.getByRole('dialog', { name: /Add Item/i })
+  await dialog.getByRole('button', { name: 'Manually Enter Name' }).click()
+  await clearMockHassCalls(page)
+
+  const productName = dialog.getByRole('textbox', { name: 'Product name' })
+  await productName.fill('Milk')
+  expect(await everShelfInventoryCalls(page)).toEqual([])
+
+  await dialog.getByRole('button', { name: 'Next' }).click()
+  await expect(dialog).toContainText('Expiration Date · Step 2 of 3')
+  await expect.poll(async () => (await everShelfInventoryCalls(page)).slice(0, 2)).toEqual([
+    {
+      domain: 'evershelf',
+      returnResponse: true,
+      service: 'prepare_scanned_product',
+      serviceData: { name: 'Milk' },
+    },
+    {
+      domain: 'evershelf',
+      returnResponse: true,
+      service: 'suggest_location',
+      serviceData: {
+        mode: 'manual',
+        name: 'Milk',
+        product_fingerprint: 'f'.repeat(64),
+        product_id: 123,
+      },
+    },
+  ])
+
+  await dialog.getByRole('button', { name: 'Skip Expiration' }).click()
+  await expect(dialog).toContainText('Review Item · Step 3 of 3')
+  await dialog.getByRole('button', { name: 'Add' }).click()
+  await expect.poll(() => everShelfInventoryCalls(page)).toContainEqual({
+    domain: 'evershelf',
+    returnResponse: true,
+    service: 'add_scanned_item',
+    serviceData: expect.objectContaining({
+      idempotency_key: expect.stringMatching(/^scan-/),
+      location: 'dispensa',
+      name: 'Milk',
+      product_id: 123,
+      quantity: 1,
+    }),
+  })
+})
+
 test('inventory footer search moves above the mobile keyboard and clears results', async ({ page }) => {
   await page.goto('/at-a-glance/fridge')
 

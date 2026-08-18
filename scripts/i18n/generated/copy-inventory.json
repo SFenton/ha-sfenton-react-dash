@@ -4233,7 +4233,7 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "238f0cc7efa5e90d",
       "lines": [
-        1171
+        1419
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -4509,8 +4509,8 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "ffb62090323212b6",
       "lines": [
-        1225,
-        1260
+        1473,
+        1508
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -4757,7 +4757,7 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "6f018fcd2e1175a7",
       "lines": [
-        1171
+        1419
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -4771,7 +4771,7 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "5895c26bf68421db",
       "lines": [
-        1171
+        1419
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -5096,7 +5096,7 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "d154ceee1271734b",
       "lines": [
-        1266
+        1514
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -5127,8 +5127,8 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "4fa73635436c28a6",
       "lines": [
-        1215,
-        1244
+        1463,
+        1492
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -5156,7 +5156,7 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "24fec60adf99bf4c",
       "lines": [
-        1249
+        1497
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -6499,7 +6499,7 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "fa8a62219505a2bb",
       "lines": [
-        1269
+        1517
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -6801,8 +6801,8 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "22f5ae8d04da0719",
       "lines": [
-        1129,
-        1279
+        1377,
+        1527
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -6816,7 +6816,7 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "f46c1d2bc10aabcf",
       "lines": [
-        1284
+        1532
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -6830,8 +6830,8 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "8e590c667fef3da9",
       "lines": [
-        1129,
-        1277
+        1377,
+        1525
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -6845,7 +6845,7 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "e946d258e03272ac",
       "lines": [
-        1289
+        1537
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -7056,8 +7056,8 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "7a3bcf95e8b730b2",
       "lines": [
-        1109,
-        1157
+        1357,
+        1405
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -7127,7 +7127,7 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "de8db48796105945",
       "lines": [
-        1176
+        1424
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -7380,7 +7380,7 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "b22bfee0465ace40",
       "lines": [
-        1166
+        1414
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -7716,8 +7716,8 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "2712c4a97777458f",
       "lines": [
-        1176,
-        1273
+        1424,
+        1521
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -7788,9 +7788,9 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "edd5ddf6bf6e1ea4",
       "lines": [
-        1114,
-        1119,
-        1161
+        1362,
+        1367,
+        1409
       ],
       "occurrences": 3,
       "origin": "legacy",
@@ -8042,7 +8042,7 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "ae205a3316b53ffc",
       "lines": [
-        1248
+        1496
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -8836,7 +8836,7 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "e1be5f38840500d2",
       "lines": [
-        1262
+        1510
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -8879,7 +8879,7 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "f01cbf4e77ded6d1",
       "lines": [
-        1153
+        1401
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -8907,7 +8907,7 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "8508346733b0bf92",
       "lines": [
-        1227
+        1475
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -8963,7 +8963,7 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "42e32a60c7314f10",
       "lines": [
-        1172
+        1420
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -9019,9 +9019,9 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "b15a47351bde61c0",
       "lines": [
-        1124,
-        1165,
-        1240
+        1372,
+        1413,
+        1488
       ],
       "occurrences": 3,
       "origin": "legacy",
@@ -9347,7 +9347,7 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "02a0326619031612",
       "lines": [
-        1176
+        1424
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -9813,7 +9813,7 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "2031a25b75294555",
       "lines": [
-        1273
+        1521
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -9955,8 +9955,8 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "5526e9d595e07acb",
       "lines": [
-        1214,
-        1243
+        1462,
+        1491
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -9970,7 +9970,7 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "b7875a02e7103d9b",
       "lines": [
-        1252
+        1500
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -10026,7 +10026,7 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "f4a6d93ae651b08f",
       "lines": [
-        1126
+        1374
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -10296,7 +10296,7 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "d4d5da8f8e318a41",
       "lines": [
-        1131
+        1379
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -10436,7 +10436,7 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "a96ed9d3462c189f",
       "lines": [
-        1191
+        1439
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -10450,7 +10450,7 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "b07e0be477aff3ba",
       "lines": [
-        1185
+        1433
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -12613,7 +12613,7 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "9cfef4b270c3eec2",
       "lines": [
-        163
+        179
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -12627,7 +12627,7 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "27f7de046f31d233",
       "lines": [
-        164
+        180
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -12641,7 +12641,7 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "2f6f2672b081399f",
       "lines": [
-        163
+        179
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -12655,7 +12655,7 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "6dc69655ddcf695d",
       "lines": [
-        164
+        180
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -12669,7 +12669,7 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "38015cad382dcff7",
       "lines": [
-        165
+        181
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -12683,7 +12683,7 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "1b445fd0fb563890",
       "lines": [
-        164
+        180
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -12697,7 +12697,7 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "e30f24932f9a1b52",
       "lines": [
-        163
+        179
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -12711,7 +12711,7 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "67624f2b1fad7328",
       "lines": [
-        165
+        181
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -12725,7 +12725,7 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "9c55e906a0dc4136",
       "lines": [
-        168
+        184
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -12739,7 +12739,7 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "4e2dffc33e882de5",
       "lines": [
-        162
+        178
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -13489,7 +13489,7 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "6f480662e7714ce6",
       "lines": [
-        343
+        383
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -13503,7 +13503,7 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "d746c0dcff581630",
       "lines": [
-        345
+        385
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -15313,7 +15313,7 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "4fd159e1cecea65f",
       "lines": [
-        332
+        372
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -15327,7 +15327,7 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "2e87b96d90c00173",
       "lines": [
-        337
+        377
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -15341,7 +15341,7 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "f8dacbec9e73506c",
       "lines": [
-        338
+        378
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -15355,7 +15355,7 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "afb8593ea57f81b7",
       "lines": [
-        336
+        376
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -15411,7 +15411,7 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "5694f21efbcd103a",
       "lines": [
-        267
+        307
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -15425,7 +15425,7 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "48653620dfc2e742",
       "lines": [
-        265
+        305
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -15439,7 +15439,7 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "5c8b3e61fe2e80b4",
       "lines": [
-        266
+        306
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -15653,7 +15653,7 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "06380a48ccf585ef",
       "lines": [
-        141
+        157
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -16309,7 +16309,7 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "4f75348384f60872",
       "lines": [
-        275
+        315
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -16325,7 +16325,7 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "e569fc8f891d8b6d",
       "lines": [
-        275
+        315
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -16339,7 +16339,7 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "52547259ec927dff",
       "lines": [
-        259
+        299
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -16353,7 +16353,7 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "b2bde78222199b60",
       "lines": [
-        259
+        299
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -17816,7 +17816,7 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "771c23f018e3c6f7",
       "lines": [
-        129
+        145
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -18580,7 +18580,7 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "2cd882878b4d1da4",
       "lines": [
-        127
+        143
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -18636,7 +18636,7 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "9ee2deb13f719230",
       "lines": [
-        126
+        142
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -18751,7 +18751,7 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "fd2abe6149be34a2",
       "lines": [
-        135
+        151
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -18765,7 +18765,7 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "07cc1b76e0a0975e",
       "lines": [
-        134
+        150
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -18779,7 +18779,7 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "8e16988a10af74d2",
       "lines": [
-        137
+        153
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -18793,7 +18793,7 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "569440042d7e407b",
       "lines": [
-        133
+        149
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -18807,7 +18807,7 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "c2abd9fb04e1fa51",
       "lines": [
-        136
+        152
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -18939,7 +18939,7 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "1ed2b4aa2240c861",
       "lines": [
-        130
+        146
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -19422,7 +19422,7 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "b0209e4fcee8353d",
       "lines": [
-        125
+        141
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -20027,7 +20027,7 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "860b5fb65381f7cc",
       "lines": [
-        128
+        144
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -20556,8 +20556,8 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "076afba57c90ce42",
       "lines": [
-        1225,
-        1260
+        1473,
+        1508
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -20757,7 +20757,7 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "0c8fd306b4d31a32",
       "lines": [
-        1147
+        1395
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -27797,7 +27797,7 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "f9ecb1a92f7f0eee",
       "lines": [
-        1270
+        1518
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -30102,7 +30102,7 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "d99203656b5c6f9e",
       "lines": [
-        1059
+        1307
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -30245,7 +30245,7 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "f78362985ed2b606",
       "lines": [
-        1087
+        1335
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -30259,7 +30259,7 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "d7c5bfcca1d077cb",
       "lines": [
-        1087
+        1335
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -30287,7 +30287,7 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "8d203f661ab99f1c",
       "lines": [
-        1087
+        1335
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -30301,7 +30301,7 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "07d400625b11f55e",
       "lines": [
-        1087
+        1335
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -30315,7 +30315,7 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "1ccbc7e3c8b4269b",
       "lines": [
-        1099
+        1347
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -30329,7 +30329,7 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "07048b8809cd6f91",
       "lines": [
-        1100
+        1348
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -30343,7 +30343,7 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "865cf597f0822f7a",
       "lines": [
-        1068
+        1316
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -30357,7 +30357,7 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "d9bc1d1263e7ba12",
       "lines": [
-        1068
+        1316
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -30371,7 +30371,7 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "b334d3ee5f221977",
       "lines": [
-        1070
+        1318
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -30385,7 +30385,7 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "1031f07391249b84",
       "lines": [
-        1070
+        1318
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -30399,7 +30399,7 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "16d3cff3cd0f1d55",
       "lines": [
-        1038
+        1286
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -30415,7 +30415,7 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "c65fe8adfc73ce9e",
       "lines": [
-        1040
+        1288
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -30429,7 +30429,7 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "6b1a2b4f7857aa9c",
       "lines": [
-        1038
+        1286
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -30443,7 +30443,7 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "a5abd764e0ac8898",
       "lines": [
-        1037
+        1285
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -30459,7 +30459,7 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "52ac14d95b85b21e",
       "lines": [
-        1039
+        1287
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -30475,7 +30475,7 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "a655ef7c8217ff09",
       "lines": [
-        1037
+        1285
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -30489,7 +30489,7 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "539a86069cbd9046",
       "lines": [
-        1041
+        1289
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -30503,7 +30503,7 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "fa0b34a7d85a2618",
       "lines": [
-        1040
+        1288
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -30603,7 +30603,7 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "2dc0f3d3dd631748",
       "lines": [
-        909
+        1128
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -30960,7 +30960,7 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "46ac352edd22b731",
       "lines": [
-        1104
+        1352
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -30974,7 +30974,7 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "e83b160612a33347",
       "lines": [
-        1103
+        1351
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -30988,7 +30988,7 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "a09d3fe9b46307c6",
       "lines": [
-        1105
+        1353
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -31002,7 +31002,7 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "aa811001b078a356",
       "lines": [
-        1073
+        1321
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -31016,7 +31016,7 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "cfe16d83eace6951",
       "lines": [
-        1073
+        1321
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -31044,7 +31044,7 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "e1d20d0c7b81862b",
       "lines": [
-        1071
+        1319
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -31058,7 +31058,7 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "eccca17295e29d73",
       "lines": [
-        1071
+        1319
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -31072,7 +31072,7 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "d427742394d4eb3c",
       "lines": [
-        1046
+        1294
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -31086,7 +31086,7 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "487969a665bc662f",
       "lines": [
-        1050
+        1298
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -31100,7 +31100,7 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "1c942cc049a323d1",
       "lines": [
-        1048
+        1296
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -31114,7 +31114,7 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "8fc42811931f3e60",
       "lines": [
-        1048
+        1296
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -31128,7 +31128,7 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "49eec6f6f79d05ed",
       "lines": [
-        1051
+        1299
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -31142,7 +31142,7 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "8e0e82aec0e6d412",
       "lines": [
-        1049
+        1297
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -31156,7 +31156,7 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "da9c07cbe8d45a3e",
       "lines": [
-        1047
+        1295
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -31170,7 +31170,7 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "444232832f7a1657",
       "lines": [
-        1047
+        1295
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -31184,7 +31184,7 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "53cc38b70d15a15c",
       "lines": [
-        1046
+        1294
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -31198,7 +31198,7 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "8f2405096afc6ed5",
       "lines": [
-        1050
+        1298
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -31212,7 +31212,7 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "1a358f2edd237ce9",
       "lines": [
-        1077
+        1325
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -31226,7 +31226,7 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "a6bf028442b9145e",
       "lines": [
-        1077
+        1325
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -31657,7 +31657,7 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "ab8c51f40ac3af4c",
       "lines": [
-        1079
+        1327
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -31671,7 +31671,7 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "61635c9823217f60",
       "lines": [
-        1079
+        1327
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -31685,7 +31685,7 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "ee319bb6151b581d",
       "lines": [
-        1083
+        1331
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -31699,7 +31699,7 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "f5f9d5dc98621cab",
       "lines": [
-        1080
+        1328
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -31713,7 +31713,7 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "23e8a73b7f4ec987",
       "lines": [
-        1084
+        1332
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -31727,7 +31727,7 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "385e953ca1c1477f",
       "lines": [
-        1084
+        1332
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -31741,7 +31741,7 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "11ff0222c845f39e",
       "lines": [
-        1082
+        1330
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -31757,7 +31757,7 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "d482e763b6283805",
       "lines": [
-        1080
+        1328
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -31771,7 +31771,7 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "6ce534d3938e09db",
       "lines": [
-        1083
+        1331
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -31787,7 +31787,7 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "7c58e002e19a4854",
       "lines": [
-        1081
+        1329
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -31801,7 +31801,7 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "e0725eb3291f093c",
       "lines": [
-        1081
+        1329
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -31815,7 +31815,7 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "ac97255433282856",
       "lines": [
-        1082
+        1330
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -31829,7 +31829,7 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "a5d8c54536a2d327",
       "lines": [
-        1085
+        1333
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -32399,7 +32399,7 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "32134b165880d91a",
       "lines": [
-        120
+        137
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -32428,7 +32428,7 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "43100585bd9b9eea",
       "lines": [
-        1065
+        1313
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -32442,7 +32442,7 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "9881cc5b66420113",
       "lines": [
-        1065
+        1313
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -32526,7 +32526,7 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "76fbfa756e9ef14f",
       "lines": [
-        118
+        135
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -32700,7 +32700,7 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "fe671b63fd9f8b71",
       "lines": [
-        1061
+        1309
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -32714,7 +32714,7 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "ff216e8201432004",
       "lines": [
-        1061
+        1309
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -32728,7 +32728,7 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "e1d9f44d5a798969",
       "lines": [
-        1062
+        1310
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -32742,7 +32742,7 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "a3e25c69b42bd7a0",
       "lines": [
-        1062
+        1310
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -33027,7 +33027,7 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "d1b065045bf25c6b",
       "lines": [
-        1090
+        1338
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -33088,7 +33088,7 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "5800a181966f2fe8",
       "lines": [
-        1095
+        1343
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -33102,7 +33102,7 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "bc5c2c9ece6a53f1",
       "lines": [
-        1097
+        1345
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -33130,7 +33130,7 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "a47c83f94a137135",
       "lines": [
-        1089
+        1337
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -33186,7 +33186,7 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "b645197cf06289cf",
       "lines": [
-        1090
+        1338
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -33200,7 +33200,7 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "eeee629bd710ca55",
       "lines": [
-        1092
+        1340
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -33214,7 +33214,7 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "a4de95d6f4ecd8ce",
       "lines": [
-        1091
+        1339
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -33270,7 +33270,7 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "56267f36c66202e2",
       "lines": [
-        1096
+        1344
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -33396,7 +33396,7 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "772139d8d951734f",
       "lines": [
-        1093
+        1341
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -33410,7 +33410,7 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "3416e9ec0f3c0aa4",
       "lines": [
-        1094
+        1342
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -33424,7 +33424,7 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "8547869848ededf0",
       "lines": [
-        1090
+        1338
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -33728,7 +33728,7 @@
       "file": "src/components/hass/ScanItemCameraSheet.tsx",
       "id": "113779f7e6254ceb",
       "lines": [
-        119
+        136
       ],
       "occurrences": 1,
       "origin": "legacy",

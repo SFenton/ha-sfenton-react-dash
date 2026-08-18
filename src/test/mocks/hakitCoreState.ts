@@ -1620,8 +1620,24 @@ export const mockState: MockHassState = {
           response: {
             barcode,
             found: true,
-            product: { brand: 'Ferrero', image_url: 'https://example.test/nutella.jpg', name: 'Nutella' },
+            product: {
+              brand: 'Ferrero',
+              id: 42,
+              image_url: 'https://example.test/nutella.jpg',
+              name: 'Nutella',
+              shopping_name: 'Chocolate hazelnut spread',
+            },
             source: 'mock',
+          },
+        })
+      }
+      if (params.domain === 'evershelf' && params.service === 'prepare_scanned_product' && params.returnResponse === true) {
+        const productId = Number((params.serviceData as { product_id?: unknown } | undefined)?.product_id)
+        return Promise.resolve({
+          response: {
+            id: Number.isFinite(productId) && productId > 0 ? productId : 123,
+            product_fingerprint: 'f'.repeat(64),
+            success: true,
           },
         })
       }

@@ -616,6 +616,28 @@ describe('DashboardViewPage', () => {
         serviceData: { barcode: '3017620422003' },
       }))
       expect(await screen.findByLabelText('Product name')).toHaveValue('Nutella')
+      expect(mockCallServiceCalls.some((call) => call.domain === 'evershelf' && call.service === 'prepare_scanned_product')).toBe(false)
+      expect(mockCallServiceCalls.some((call) => call.domain === 'evershelf' && call.service === 'suggest_location')).toBe(false)
+      expect(screen.getByRole('button', { name: 'Scan Barcode Again' })).toBeEnabled()
+      expect(screen.queryByText('Source: mock')).not.toBeInTheDocument()
+      expect(screen.queryByLabelText('Live item scan camera feed')).not.toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Next' })).toBeEnabled()
+      expect(camera.stop).toHaveBeenCalled()
+
+      fireEvent.click(screen.getByRole('button', { name: 'Next' }))
+      expect(screen.getByText('Expiration Date · Step 2 of 3')).toBeInTheDocument()
+      await waitFor(() => expect(mockCallServiceCalls).toContainEqual({
+        domain: 'evershelf',
+        returnResponse: true,
+        service: 'prepare_scanned_product',
+        serviceData: {
+          barcode: '3017620422003',
+          brand: 'Ferrero',
+          image_url: 'https://example.test/nutella.jpg',
+          name: 'Nutella',
+          product_id: 42,
+        },
+      }))
       await waitFor(() => expect(mockCallServiceCalls).toContainEqual({
         domain: 'evershelf',
         returnResponse: true,
@@ -624,13 +646,10 @@ describe('DashboardViewPage', () => {
           barcode: '3017620422003',
           mode: 'barcode',
           name: 'Nutella',
+          product_fingerprint: 'f'.repeat(64),
+          product_id: 42,
         },
       }))
-      expect(screen.getByRole('button', { name: 'Scan Barcode Again' })).toBeEnabled()
-      expect(screen.queryByText('Source: mock')).not.toBeInTheDocument()
-      expect(screen.queryByLabelText('Live item scan camera feed')).not.toBeInTheDocument()
-      expect(screen.getByRole('button', { name: 'Next' })).toBeEnabled()
-      expect(camera.stop).toHaveBeenCalled()
 
       fireEvent.click(screen.getByRole('button', { name: 'Close' }))
       await waitFor(() => expect(camera.stop).toHaveBeenCalled())
@@ -655,8 +674,19 @@ describe('DashboardViewPage', () => {
               source: 'history_barcode',
               success: true,
             },
-            product: { brand: 'Costco', name: 'Costco Dairy-Free Reduced fat milk' },
+            product: { brand: 'Costco', id: 77, name: 'Costco Dairy-Free Reduced fat milk' },
             source: 'local',
+          },
+        })
+      }
+      if (params.domain === 'evershelf' && params.service === 'suggest_location' && params.returnResponse === true) {
+        mockCallServiceCalls.push(params)
+        return Promise.resolve({
+          response: {
+            confidence: 1,
+            location: 'frigo',
+            source: 'history_barcode',
+            success: true,
           },
         })
       }
@@ -671,8 +701,9 @@ describe('DashboardViewPage', () => {
       act(() => {
         zxingMock.latestCallback?.({ getText: () => '196633809865' }, undefined, { stop: zxingMock.scannerStop })
       })
-
       expect(await screen.findByLabelText('Product name')).toHaveValue('Costco Dairy-Free Reduced fat milk')
+      expect(await screen.findByLabelText('Product name')).toHaveValue('Costco Dairy-Free Reduced fat milk')
+      expect(mockCallServiceCalls.some((call) => call.domain === 'evershelf' && call.service === 'suggest_location')).toBe(false)
       fireEvent.click(screen.getByRole('button', { name: 'Next' }))
       expect(await screen.findByLabelText('Live expiration date camera feed')).toBeInTheDocument()
       fireEvent.click(screen.getByRole('button', { name: 'Manually Enter Expiration Date' }))
@@ -681,7 +712,29 @@ describe('DashboardViewPage', () => {
 
       expect(screen.getByRole('radio', { name: 'Fridge' })).toBeChecked()
       expect(screen.getByText('Selected from your previous EverShelf entries.')).toBeInTheDocument()
-      expect(mockCallServiceCalls.some((call) => call.domain === 'evershelf' && call.service === 'suggest_location')).toBe(false)
+      expect(mockCallServiceCalls).toContainEqual({
+        domain: 'evershelf',
+        returnResponse: true,
+        service: 'prepare_scanned_product',
+        serviceData: {
+          barcode: '196633809865',
+          brand: 'Costco',
+          name: 'Costco Dairy-Free Reduced fat milk',
+          product_id: 77,
+        },
+      })
+      expect(mockCallServiceCalls).toContainEqual({
+        domain: 'evershelf',
+        returnResponse: true,
+        service: 'suggest_location',
+        serviceData: {
+          barcode: '196633809865',
+          mode: 'barcode',
+          name: 'Costco Dairy-Free Reduced fat milk',
+          product_fingerprint: 'f'.repeat(64),
+          product_id: 77,
+        },
+      })
     } finally {
       mockState.helpers.callService = originalCallService
       camera.restore()
@@ -1052,6 +1105,7 @@ describe('DashboardViewPage', () => {
           image_url: 'https://example.test/nutella.jpg',
           location: 'freezer',
           name: 'Nutella',
+          product_id: 42,
           quantity: 2,
         }),
       })))
@@ -1065,6 +1119,67 @@ describe('DashboardViewPage', () => {
       await waitFor(() => expect(camera.stop).toHaveBeenCalled())
     } finally {
       canvas.restore()
+      camera.restore()
+    }
+  })
+
+  it('loads and explicitly clears prepared-food state for an existing barcode product', async () => {
+    const camera = setupMockCamera()
+    const originalCallService = mockState.helpers.callService
+    mockState.helpers.callService = (params) => {
+      if (params.domain === 'evershelf' && params.service === 'resolve_barcode') {
+        mockCallServiceCalls.push(params)
+        return Promise.resolve({
+          response: {
+            barcode: '3017620422003',
+            found: true,
+            product: {
+              brand: 'Ferrero',
+              id: 42,
+              image_url: 'https://example.test/nutella.jpg',
+              name: 'Nutella',
+              prepared_food: true,
+            },
+            source: 'mock',
+          },
+        })
+      }
+      return originalCallService(params)
+    }
+
+    try {
+      render(<DashboardViewPage activePath="kitchen" onNavigate={() => undefined} path="kitchen" />)
+      fireEvent.click(screen.getByRole('button', { name: 'Scan Item' }))
+      await waitFor(() => expect(zxingMock.latestCallback).toEqual(expect.any(Function)))
+
+      act(() => {
+        zxingMock.latestCallback?.({ getText: () => '3017620422003' }, undefined, { stop: zxingMock.scannerStop })
+      })
+
+      expect(await screen.findByLabelText('Product name')).toHaveValue('Nutella')
+      fireEvent.click(screen.getByRole('button', { name: 'Next' }))
+      fireEvent.click(await screen.findByRole('button', { name: 'Manually Enter Expiration Date' }))
+      fireEvent.click(screen.getByRole('radio', { name: 'In 3 Days' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Next' }))
+
+      const preparedButton = screen.getByRole('button', { name: 'Prepared Food Item' })
+      expect(preparedButton).toHaveAttribute('aria-pressed', 'true')
+      fireEvent.click(preparedButton)
+      expect(preparedButton).toHaveAttribute('aria-pressed', 'false')
+      fireEvent.click(screen.getByRole('button', { name: 'Add' }))
+
+      await waitFor(() => {
+        const addCall = mockCallServiceCalls.find((call) => (
+          call.domain === 'evershelf'
+          && call.service === 'add_scanned_item'
+        ))
+        expect(addCall?.serviceData).toMatchObject({
+          prepared_food: false,
+          product_id: 42,
+        })
+      })
+    } finally {
+      mockState.helpers.callService = originalCallService
       camera.restore()
     }
   })
