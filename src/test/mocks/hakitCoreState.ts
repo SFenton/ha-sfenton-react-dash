@@ -1729,7 +1729,13 @@ export const mockState: MockHassState = {
           response: {
             barcode,
             found: true,
-            product: { brand: 'Ferrero', id: 42, image_url: 'https://example.test/nutella.jpg', name: 'Nutella' },
+            product: {
+              brand: 'Ferrero',
+              id: 42,
+              image_url: 'https://example.test/nutella.jpg',
+              name: 'Nutella',
+              shopping_name: 'Chocolate hazelnut spread',
+            },
             source: 'mock',
           },
         })

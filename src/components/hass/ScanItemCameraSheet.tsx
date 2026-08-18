@@ -45,7 +45,7 @@ interface EverShelfProduct {
   notes?: string
   nutriments?: Record<string, unknown>
   package_unit?: string
-  prepared_food?: boolean
+  prepared_food?: boolean | number | string
   product_name?: string
   quantity?: string
   shopping_name?: string
@@ -84,6 +84,8 @@ interface EverShelfPreparedProductResult {
   error_kind?: string
   id?: number | string
   message?: string
+  merged?: boolean
+  prepared_food?: boolean | number | string
   product_fingerprint?: string
   service_response?: EverShelfPreparedProductResult
   success?: boolean
@@ -256,6 +258,14 @@ function productDefaultQuantity(product?: EverShelfProduct) {
   return Number.isFinite(quantity) && quantity >= 0 ? quantity : null
 }
 
+function productPreparedFood(product?: EverShelfProduct) {
+  return preparedFoodValue(product?.prepared_food)
+}
+
+function preparedFoodValue(value: unknown) {
+  return value === true || value === 1 || value === '1'
+}
+
 function productNutriments(product?: EverShelfProduct) {
   const nutriments = product?.nutriments
   return nutriments && typeof nutriments === 'object' && !Array.isArray(nutriments)
@@ -272,6 +282,10 @@ function responseProductId(result?: EverShelfPreparedProductResult) {
 function responseProductFingerprint(result?: EverShelfPreparedProductResult) {
   const fingerprint = stringValue(result?.product_fingerprint)
   return fingerprint.length === 64 ? fingerprint : null
+}
+
+function responseProductMerged(result?: EverShelfPreparedProductResult) {
+  return result?.merged === true
 }
 
 function scannedItemQuantity(value: string) {
@@ -404,8 +418,14 @@ export function ScanItemCameraSheet({ defaultLocation, open, onClose }: ScanItem
   const prepareRequestIdentityRef = useRef('')
   const productLineageIdRef = useRef(0)
   const reusableProductIdRef = useRef<number | null>(null)
+  const preparedFoodTouchedRef = useRef(false)
+  const prepareBlockingErrorRef = useRef<{
+    inputIdentity: string
+    message: string
+  } | null>(null)
   const preparedProductRef = useRef<{
     inputIdentity: string
+    merged: boolean
     productFingerprint: string
     productId: number
   } | null>(null)
@@ -477,6 +497,7 @@ export function ScanItemCameraSheet({ defaultLocation, open, onClose }: ScanItem
     preparePromiseRef.current = null
     productLineageIdRef.current += 1
     reusableProductIdRef.current = null
+    prepareBlockingErrorRef.current = null
     preparedProductRef.current = null
   }, [])
 
@@ -506,6 +527,7 @@ export function ScanItemCameraSheet({ defaultLocation, open, onClose }: ScanItem
     setItemQuantityError(null)
     resetLocationSelection()
     setItemExpiryDate('')
+    preparedFoodTouchedRef.current = false
     setItemPreparedFood(false)
     setAddStatus('idle')
     setAddError(null)
@@ -607,7 +629,6 @@ export function ScanItemCameraSheet({ defaultLocation, open, onClose }: ScanItem
     const unit = stringValue(product?.unit)
     const notes = stringValue(product?.notes)
     const packageUnit = stringValue(product?.package_unit)
-    const shoppingName = stringValue(product?.shopping_name)
     const defaultQuantity = productDefaultQuantity(product)
     const nutriments = productNutriments(product)
     const serviceData: Record<string, unknown> = { name }
@@ -620,9 +641,8 @@ export function ScanItemCameraSheet({ defaultLocation, open, onClose }: ScanItem
     if (defaultQuantity !== null) serviceData.default_quantity = defaultQuantity
     if (notes) serviceData.notes = notes
     if (packageUnit) serviceData.package_unit = packageUnit
-    if (shoppingName) serviceData.shopping_name = shoppingName
     if (nutriments) serviceData.nutriments = nutriments
-    if (itemPreparedFood || product?.prepared_food === true) serviceData.prepared_food = true
+    if (preparedFoodTouchedRef.current) serviceData.prepared_food = itemPreparedFood
 
     return {
       barcode,
@@ -679,6 +699,7 @@ export function ScanItemCameraSheet({ defaultLocation, open, onClose }: ScanItem
       const payload = serviceResponsePayload(response)
       const committedProductId = responseProductId(payload)
       const productFingerprint = responseProductFingerprint(payload)
+      const merged = responseProductMerged(payload)
       const successfulCommit = Boolean(
         payload
         && payload.success !== false
@@ -689,6 +710,7 @@ export function ScanItemCameraSheet({ defaultLocation, open, onClose }: ScanItem
       if (
         successfulCommit
         && committedProductId
+        && !merged
         && productLineageIdRef.current === lineageId
       ) {
         reusableProductIdRef.current = committedProductId
@@ -699,6 +721,16 @@ export function ScanItemCameraSheet({ defaultLocation, open, onClose }: ScanItem
       ) return
       prepareRequestIdentityRef.current = ''
       if (!successfulCommit || !committedProductId || !productFingerprint) {
+        if (
+          current.barcode
+          || payload?.error === 'barcode_already_used'
+        ) {
+          prepareBlockingErrorRef.current = {
+            inputIdentity: current.inputIdentity,
+            message: payload?.message
+              ?? 'The barcode product could not be committed. Scan it again before adding inventory.',
+          }
+        }
         if (!userSelectedLocationRef.current) {
           setItemLocation(fallbackLocation)
           setLocationSuggestionStatus('error')
@@ -706,8 +738,22 @@ export function ScanItemCameraSheet({ defaultLocation, open, onClose }: ScanItem
         return
       }
 
+      prepareBlockingErrorRef.current = null
+      if (
+        !preparedFoodTouchedRef.current
+        && payload
+        && Object.prototype.hasOwnProperty.call(
+          payload,
+          'prepared_food',
+        )
+      ) {
+        setItemPreparedFood(
+          preparedFoodValue(payload.prepared_food),
+        )
+      }
       preparedProductRef.current = {
         inputIdentity: current.inputIdentity,
+        merged,
         productFingerprint,
         productId: committedProductId,
       }
@@ -726,6 +772,12 @@ export function ScanItemCameraSheet({ defaultLocation, open, onClose }: ScanItem
         || productLineageIdRef.current !== lineageId
       ) return
       prepareRequestIdentityRef.current = ''
+      if (current.barcode) {
+        prepareBlockingErrorRef.current = {
+          inputIdentity: current.inputIdentity,
+          message: 'The barcode product could not be committed. Scan it again before adding inventory.',
+        }
+      }
       if (!userSelectedLocationRef.current) {
         setItemLocation(fallbackLocation)
         setLocationSuggestionStatus('error')
@@ -736,6 +788,8 @@ export function ScanItemCameraSheet({ defaultLocation, open, onClose }: ScanItem
   const resolveBarcode = useCallback(async (barcode: string) => {
     resetPreparedProductLineage()
     resetLocationSelection()
+    preparedFoodTouchedRef.current = false
+    setItemPreparedFood(false)
     setLocationLookupMode('barcode')
     const requestId = serviceRequestIdRef.current + 1
     serviceRequestIdRef.current = requestId
@@ -758,6 +812,12 @@ export function ScanItemCameraSheet({ defaultLocation, open, onClose }: ScanItem
       if (!payload) throw new Error('Barcode lookup did not return a response.')
       setLookupResult(payload)
       setLookupStatus(payload.found ? 'found' : 'not-found')
+      preparedFoodTouchedRef.current = false
+      setItemPreparedFood(
+        payload.found && payload.product
+          ? productPreparedFood(payload.product)
+          : false,
+      )
       if (payload.found && payload.product) {
         const nextName = productNameValue(payload.product)
         reusableProductIdRef.current = productId(payload.product)
@@ -1005,6 +1065,8 @@ export function ScanItemCameraSheet({ defaultLocation, open, onClose }: ScanItem
   const manuallyEnterName = () => {
     resetPreparedProductLineage()
     resetLocationSelection()
+    preparedFoodTouchedRef.current = false
+    setItemPreparedFood(false)
     setLocationLookupMode('manual')
     setBarcodeCameraHidden(true)
     hideActiveCamera()
@@ -1020,6 +1082,8 @@ export function ScanItemCameraSheet({ defaultLocation, open, onClose }: ScanItem
     serviceRequestIdRef.current += 1
     resetPreparedProductLineage()
     resetLocationSelection()
+    preparedFoodTouchedRef.current = false
+    setItemPreparedFood(false)
     lastScannedBarcodeRef.current = null
     setBarcodeCameraHidden(false)
     setDetectedBarcode(null)
@@ -1059,7 +1123,11 @@ export function ScanItemCameraSheet({ defaultLocation, open, onClose }: ScanItem
   const invalidatePreparedProductInput = () => {
     prepareRequestIdRef.current += 1
     prepareRequestIdentityRef.current = ''
+    if (preparedProductRef.current?.merged) {
+      reusableProductIdRef.current = null
+    }
     preparedProductRef.current = null
+    prepareBlockingErrorRef.current = null
     locationRequestIdRef.current += 1
     locationRequestIdentityRef.current = ''
     if (!userSelectedLocationRef.current) {
@@ -1088,6 +1156,7 @@ export function ScanItemCameraSheet({ defaultLocation, open, onClose }: ScanItem
 
   const togglePreparedFood = () => {
     invalidatePreparedProductInput()
+    preparedFoodTouchedRef.current = true
     setItemPreparedFood((current) => !current)
     setAddStatus('idle')
     setAddError(null)
@@ -1212,6 +1281,25 @@ export function ScanItemCameraSheet({ defaultLocation, open, onClose }: ScanItem
     await prepareScannedProduct()
     if (serviceRequestIdRef.current !== requestId) return
 
+    const preparedInput = currentPreparedProduct()
+    const preparedProduct = preparedProductRef.current?.inputIdentity
+      === preparedInput.inputIdentity
+      ? preparedProductRef.current
+      : null
+    const blockingPrepare = prepareBlockingErrorRef.current
+    if (
+      blockingPrepare?.inputIdentity === preparedInput.inputIdentity
+      || (preparedInput.barcode && !preparedProduct)
+    ) {
+      setAddStatus('error')
+      setAddError(
+        blockingPrepare?.message
+          ?? 'The barcode product could not be committed. Scan it again before adding inventory.',
+      )
+      setStep('review')
+      return
+    }
+
     locationRequestIdRef.current += 1
     setLocationLookupMode(null)
     const product = lookupResult?.found ? lookupResult.product : undefined
@@ -1220,10 +1308,7 @@ export function ScanItemCameraSheet({ defaultLocation, open, onClose }: ScanItem
       name,
       quantity,
     }
-    const preparedInput = currentPreparedProduct()
-    const preparedProductId = preparedProductRef.current?.inputIdentity === preparedInput.inputIdentity
-      ? preparedProductRef.current.productId
-      : null
+    const preparedProductId = preparedProduct?.productId ?? null
     const barcode = stringValue(detectedBarcode ?? lookupResult?.barcode ?? product?.barcode)
     const brand = itemBrand.trim() || productBrand(product)
     const category = productCategory(product)
@@ -1232,7 +1317,6 @@ export function ScanItemCameraSheet({ defaultLocation, open, onClose }: ScanItem
     const unit = stringValue(product?.unit)
     const notes = stringValue(product?.notes)
     const packageUnit = stringValue(product?.package_unit)
-    const shoppingName = stringValue(product?.shopping_name)
     const nutriments = productNutriments(product)
     const expiryDate = itemExpiryDate.trim()
 
@@ -1244,13 +1328,12 @@ export function ScanItemCameraSheet({ defaultLocation, open, onClose }: ScanItem
     if (unit) serviceData.unit = unit
     if (notes) serviceData.notes = notes
     if (packageUnit) serviceData.package_unit = packageUnit
-    if (shoppingName) serviceData.shopping_name = shoppingName
     if (nutriments) serviceData.nutriments = nutriments
     if (expiryDate) {
       serviceData.expiry_date = expiryDate
       serviceData.expiry_user_set = true
     }
-    if (itemPreparedFood) serviceData.prepared_food = true
+    if (preparedFoodTouchedRef.current) serviceData.prepared_food = itemPreparedFood
     const commandFingerprint = JSON.stringify(serviceData)
     if (addCommandRef.current?.fingerprint !== commandFingerprint) {
       addCommandRef.current = {

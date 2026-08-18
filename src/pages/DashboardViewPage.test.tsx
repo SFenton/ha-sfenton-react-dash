@@ -1141,6 +1141,67 @@ describe('DashboardViewPage', () => {
     }
   })
 
+  it('loads and explicitly clears prepared-food state for an existing barcode product', async () => {
+    const camera = setupMockCamera()
+    const originalCallService = mockState.helpers.callService
+    mockState.helpers.callService = (params) => {
+      if (params.domain === 'evershelf' && params.service === 'resolve_barcode') {
+        mockCallServiceCalls.push(params)
+        return Promise.resolve({
+          response: {
+            barcode: '3017620422003',
+            found: true,
+            product: {
+              brand: 'Ferrero',
+              id: 42,
+              image_url: 'https://example.test/nutella.jpg',
+              name: 'Nutella',
+              prepared_food: true,
+            },
+            source: 'mock',
+          },
+        })
+      }
+      return originalCallService(params)
+    }
+
+    try {
+      render(<DashboardViewPage activePath="kitchen" onNavigate={() => undefined} path="kitchen" />)
+      fireEvent.click(screen.getByRole('button', { name: 'Scan Item' }))
+      await waitFor(() => expect(zxingMock.latestCallback).toEqual(expect.any(Function)))
+
+      act(() => {
+        zxingMock.latestCallback?.({ getText: () => '3017620422003' }, undefined, { stop: zxingMock.scannerStop })
+      })
+
+      expect(await screen.findByLabelText('Product name')).toHaveValue('Nutella')
+      fireEvent.click(screen.getByRole('button', { name: 'Next' }))
+      fireEvent.click(await screen.findByRole('button', { name: 'Manually Enter Expiration Date' }))
+      fireEvent.click(screen.getByRole('radio', { name: 'In 3 Days' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Next' }))
+
+      const preparedButton = screen.getByRole('button', { name: 'Prepared Food Item' })
+      expect(preparedButton).toHaveAttribute('aria-pressed', 'true')
+      fireEvent.click(preparedButton)
+      expect(preparedButton).toHaveAttribute('aria-pressed', 'false')
+      fireEvent.click(screen.getByRole('button', { name: 'Add' }))
+
+      await waitFor(() => {
+        const addCall = mockCallServiceCalls.find((call) => (
+          call.domain === 'evershelf'
+          && call.service === 'add_scanned_item'
+        ))
+        expect(addCall?.serviceData).toMatchObject({
+          prepared_food: false,
+          product_id: 42,
+        })
+      })
+    } finally {
+      mockState.helpers.callService = originalCallService
+      camera.restore()
+    }
+  })
+
   it('returns to Kitchen scan review with an error when EverShelf add fails', async () => {
     const camera = setupMockCamera()
 
