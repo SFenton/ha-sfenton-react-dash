@@ -4,6 +4,7 @@ import { circularDialArcPath, circularDialHandleStyle } from './circularDialGeom
 import styles from './CircularControlDial.module.css'
 
 type SliderTarget = 'high' | 'low' | 'value'
+export type CircularDialPrimaryVariant = 'status' | 'value' | 'wide-status'
 
 export interface CircularDialHandle {
   accessible?: boolean
@@ -54,6 +55,7 @@ interface CircularControlDialProps {
   onPointerUp?: PointerEventHandler<HTMLDivElement>
   onPointerUpCapture?: PointerEventHandler<HTMLDivElement>
   primaryText: ReactNode
+  primaryTextVariant?: CircularDialPrimaryVariant
   primaryUnit?: ReactNode
   readonly?: boolean
   secondaryText?: ReactNode
@@ -89,6 +91,7 @@ export const CircularControlDial = forwardRef<HTMLDivElement, CircularControlDia
   onPointerUp,
   onPointerUpCapture,
   primaryText,
+  primaryTextVariant = off ? 'status' : 'value',
   primaryUnit,
   readonly = false,
   secondaryText,
@@ -171,7 +174,7 @@ export const CircularControlDial = forwardRef<HTMLDivElement, CircularControlDia
           ))}
         </div>
       )}
-      <div className={styles.readout} data-off={off ? 'true' : 'false'} data-readout-state={off ? 'off' : undefined} data-single-value={actionText ? undefined : 'true'}>
+      <div className={styles.readout} data-off={off ? 'true' : 'false'} data-primary-variant={primaryTextVariant} data-readout-state={off ? 'off' : undefined} data-single-value={actionText ? undefined : 'true'}>
         {actionText && <span className={styles.action}>{actionText}</span>}
         <span className={styles.primary}>{primaryText}{primaryUnit && <small>{primaryUnit}</small>}</span>
         {secondaryText && <span className={styles.secondary}>{secondaryText}</span>}

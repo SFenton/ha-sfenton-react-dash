@@ -140,10 +140,15 @@
   margin-top: 0;
 }
 
-.readout[data-off='true'] .primary {
+.readout[data-primary-variant='status'] .primary,
+.readout[data-primary-variant='wide-status'] .primary {
   font-size: clamp(3rem, 15vw, 4.2rem);
   font-weight: 420;
   text-transform: uppercase;
+}
+
+.readout[data-primary-variant='wide-status'] .primary {
+  font-size: clamp(2.8rem, 14vw, 3.8rem);
 }
 
 .primary small {

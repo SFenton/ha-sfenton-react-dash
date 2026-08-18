@@ -26,5 +26,27 @@ describe('CircularControlDial', () => {
     expect(screen.getByRole('region', { name: 'Example dial' })).toHaveAttribute('data-off', 'true')
     expect(screen.getByRole('slider', { name: 'Target' })).toHaveAttribute('aria-valuenow', '4')
     expect(screen.getByText('Off').closest('[data-off]')).toHaveAttribute('data-off', 'true')
+    expect(screen.getByText('Off').closest('[data-primary-variant]')).toHaveAttribute('data-primary-variant', 'status')
+  })
+
+  it('supports wide status text without treating the dial as off', () => {
+    render(
+      <CircularControlDial
+        ariaLabel="Sleep mode dial"
+        colors={{ color: '#00aa88' }}
+        inactive
+        label="Example"
+        max={9}
+        min={0}
+        primaryText="Sleep"
+        primaryTextVariant="wide-status"
+        step={1}
+        value={0}
+      />,
+    )
+
+    const readout = screen.getByText('Sleep').closest('[data-primary-variant]')
+    expect(readout).toHaveAttribute('data-primary-variant', 'wide-status')
+    expect(readout).toHaveAttribute('data-off', 'false')
   })
 })

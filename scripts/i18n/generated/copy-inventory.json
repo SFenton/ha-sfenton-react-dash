@@ -3937,7 +3937,7 @@
       "file": "src/components/hass/HumidifierModalContent.tsx",
       "id": "d383aa2a53a8322f",
       "lines": [
-        784
+        785
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -3954,7 +3954,7 @@
       "file": "src/components/hass/HumidifierModalContent.tsx",
       "id": "9d3c0e98b6dff468",
       "lines": [
-        773
+        774
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -5991,7 +5991,7 @@
       "file": "src/components/hass/HumidifierModalContent.tsx",
       "id": "7ebec898cc882eb7",
       "lines": [
-        390
+        391
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -6007,7 +6007,7 @@
       "file": "src/components/hass/HumidifierModalContent.tsx",
       "id": "3088b20a5fbca0e8",
       "lines": [
-        407
+        408
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -6296,7 +6296,7 @@
       "file": "src/components/hass/HumidifierModalContent.tsx",
       "id": "187bdadcc0e8f543",
       "lines": [
-        243
+        244
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -6590,7 +6590,7 @@
       "id": "27f35bcf2536e68c",
       "lines": [
         209,
-        389
+        390
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -6604,8 +6604,8 @@
       "file": "src/components/hass/HumidifierModalContent.tsx",
       "id": "abca43438f44230c",
       "lines": [
-        242,
-        406
+        243,
+        407
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -6675,7 +6675,7 @@
       "file": "src/components/hass/HumidifierModalContent.tsx",
       "id": "974c953bf776f33c",
       "lines": [
-        875
+        876
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -6706,7 +6706,7 @@
       "file": "src/components/hass/HumidifierModalContent.tsx",
       "id": "bc7767d03780d9e3",
       "lines": [
-        315
+        316
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -6779,7 +6779,7 @@
       "file": "src/components/hass/HumidifierModalContent.tsx",
       "id": "0434b585a9f8eea3",
       "lines": [
-        588
+        589
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -6866,7 +6866,7 @@
       "file": "src/components/hass/HumidifierModalContent.tsx",
       "id": "35d8e81b15eb0fa6",
       "lines": [
-        392
+        393
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -6880,7 +6880,7 @@
       "file": "src/components/hass/HumidifierModalContent.tsx",
       "id": "b8a50f01fe1422f4",
       "lines": [
-        409
+        410
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -6894,7 +6894,7 @@
       "file": "src/components/hass/HumidifierModalContent.tsx",
       "id": "7e64018acd11caf0",
       "lines": [
-        246
+        247
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -6942,7 +6942,7 @@
       "file": "src/components/hass/HumidifierModalContent.tsx",
       "id": "0a216280d40256d5",
       "lines": [
-        319
+        320
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -6956,7 +6956,7 @@
       "file": "src/components/hass/HumidifierModalContent.tsx",
       "id": "0f8f4bcb9e989074",
       "lines": [
-        592
+        593
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -6998,7 +6998,7 @@
       "file": "src/components/hass/HumidifierModalContent.tsx",
       "id": "fecbd80f6a5669d4",
       "lines": [
-        593
+        594
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -7012,8 +7012,8 @@
       "file": "src/components/hass/HumidifierModalContent.tsx",
       "id": "ada0bd9251cffdbf",
       "lines": [
-        219,
-        252
+        220,
+        253
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -7214,7 +7214,7 @@
       "file": "src/components/hass/HumidifierModalContent.tsx",
       "id": "25d0bea5a3bb8182",
       "lines": [
-        285
+        286
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -7432,7 +7432,7 @@
       "file": "src/components/hass/HumidifierModalContent.tsx",
       "id": "f317c6e6b577034b",
       "lines": [
-        297
+        298
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -7884,7 +7884,7 @@
       "file": "src/components/hass/HumidifierModalContent.tsx",
       "id": "9dff8ab9fe6ad317",
       "lines": [
-        293
+        294
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -7940,7 +7940,7 @@
       "file": "src/components/hass/HumidifierModalContent.tsx",
       "id": "03e8a27084afcce1",
       "lines": [
-        447
+        448
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -8137,7 +8137,7 @@
       "file": "src/components/hass/HumidifierModalContent.tsx",
       "id": "a38235bf1693a9f7",
       "lines": [
-        785
+        786
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -8803,7 +8803,7 @@
       "file": "src/components/hass/HumidifierModalContent.tsx",
       "id": "24bfa840d3eff2aa",
       "lines": [
-        787
+        788
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -9835,7 +9835,7 @@
       "file": "src/components/hass/HumidifierModalContent.tsx",
       "id": "4aed363f5273fc3a",
       "lines": [
-        786
+        787
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -9849,7 +9849,7 @@
       "file": "src/components/hass/HumidifierModalContent.tsx",
       "id": "c4ef8734e901feb8",
       "lines": [
-        446
+        447
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -9934,9 +9934,9 @@
       "file": "src/components/hass/HumidifierModalContent.tsx",
       "id": "bc3bd9e2d3c5419d",
       "lines": [
-        384,
-        428,
-        439
+        385,
+        429,
+        440
       ],
       "occurrences": 3,
       "origin": "legacy",
@@ -10134,7 +10134,7 @@
       "file": "src/components/hass/HumidifierModalContent.tsx",
       "id": "0b44d74c086a5643",
       "lines": [
-        777
+        778
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -10148,7 +10148,7 @@
       "file": "src/components/hass/HumidifierModalContent.tsx",
       "id": "6282728ce9e74b66",
       "lines": [
-        777
+        778
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -10162,8 +10162,8 @@
       "file": "src/components/hass/HumidifierModalContent.tsx",
       "id": "b445448c8cef68f0",
       "lines": [
-        290,
-        402
+        291,
+        403
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -10177,7 +10177,7 @@
       "file": "src/components/hass/HumidifierModalContent.tsx",
       "id": "20d8a89481ac4bd7",
       "lines": [
-        296
+        297
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -10373,7 +10373,7 @@
       "file": "src/components/hass/HumidifierModalContent.tsx",
       "id": "3a9be6f1423d07a6",
       "lines": [
-        313
+        314
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -10486,7 +10486,7 @@
       "file": "src/components/hass/HumidifierModalContent.tsx",
       "id": "9b28ab6bfb87c775",
       "lines": [
-        231
+        232
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -10500,7 +10500,7 @@
       "file": "src/components/hass/HumidifierModalContent.tsx",
       "id": "9945d236e28bfc0e",
       "lines": [
-        231
+        232
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -10572,7 +10572,7 @@
       "file": "src/components/hass/HumidifierModalContent.tsx",
       "id": "7297af847ce27c5f",
       "lines": [
-        282
+        283
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -10614,7 +10614,7 @@
       "file": "src/components/hass/HumidifierModalContent.tsx",
       "id": "270be097bfd0fbd1",
       "lines": [
-        778
+        779
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -10628,7 +10628,7 @@
       "file": "src/components/hass/HumidifierModalContent.tsx",
       "id": "feec68f0e54d8e5a",
       "lines": [
-        778
+        779
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -10854,7 +10854,7 @@
       "file": "src/components/hass/HumidifierModalContent.tsx",
       "id": "bfcb6a3053e26c16",
       "lines": [
-        330
+        331
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -10938,7 +10938,7 @@
       "file": "src/components/hass/HumidifierModalContent.tsx",
       "id": "88510fdff7ab97c4",
       "lines": [
-        780
+        781
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -10952,9 +10952,9 @@
       "file": "src/components/hass/HumidifierModalContent.tsx",
       "id": "1ff70b25f56ce9f8",
       "lines": [
-        339,
-        442,
-        628
+        340,
+        443,
+        629
       ],
       "occurrences": 3,
       "origin": "legacy",
@@ -11081,7 +11081,7 @@
       "file": "src/components/hass/HumidifierModalContent.tsx",
       "id": "35b7e6ce26b09fed",
       "lines": [
-        636
+        637
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -11165,7 +11165,7 @@
       "file": "src/components/hass/HumidifierModalContent.tsx",
       "id": "cc18dfa3f8806548",
       "lines": [
-        638
+        639
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -11179,7 +11179,7 @@
       "file": "src/components/hass/HumidifierModalContent.tsx",
       "id": "daffac990d8658b7",
       "lines": [
-        627
+        628
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -11207,7 +11207,7 @@
       "file": "src/components/hass/HumidifierModalContent.tsx",
       "id": "51990e3ec0aa5726",
       "lines": [
-        624
+        625
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -11278,7 +11278,7 @@
       "file": "src/components/hass/HumidifierModalContent.tsx",
       "id": "ad4dad24e6fda529",
       "lines": [
-        330
+        331
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -11505,7 +11505,7 @@
       "file": "src/components/hass/HumidifierModalContent.tsx",
       "id": "c5f79ceb79da5f25",
       "lines": [
-        626
+        627
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -11519,8 +11519,8 @@
       "file": "src/components/hass/HumidifierModalContent.tsx",
       "id": "46776ae734e54726",
       "lines": [
-        637,
-        781
+        638,
+        782
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -11534,7 +11534,7 @@
       "file": "src/components/hass/HumidifierModalContent.tsx",
       "id": "37e71a16b19b3d3c",
       "lines": [
-        639
+        640
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -11562,7 +11562,7 @@
       "file": "src/components/hass/HumidifierModalContent.tsx",
       "id": "c28534e760dfd6bd",
       "lines": [
-        629
+        630
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -11576,7 +11576,7 @@
       "file": "src/components/hass/HumidifierModalContent.tsx",
       "id": "21f5f6257ccd63e0",
       "lines": [
-        625
+        626
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -12509,7 +12509,7 @@
       "file": "src/components/hass/HumidifierModalContent.tsx",
       "id": "2930e9d97308a81d",
       "lines": [
-        580
+        581
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -15420,7 +15420,7 @@
       "file": "src/components/hass/HumidifierModalContent.tsx",
       "id": "3a430b02e4bab33e",
       "lines": [
-        748
+        749
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -15434,7 +15434,7 @@
       "file": "src/components/hass/HumidifierModalContent.tsx",
       "id": "ae3f2561ec4d266e",
       "lines": [
-        745
+        746
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -15448,7 +15448,7 @@
       "file": "src/components/hass/HumidifierModalContent.tsx",
       "id": "951e661fd9c157a3",
       "lines": [
-        748
+        749
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -15462,7 +15462,7 @@
       "file": "src/components/hass/HumidifierModalContent.tsx",
       "id": "3e93c59c6300f25b",
       "lines": [
-        746
+        747
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -15476,7 +15476,7 @@
       "file": "src/components/hass/HumidifierModalContent.tsx",
       "id": "c30ed85daa191fb1",
       "lines": [
-        746
+        747
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -15490,7 +15490,7 @@
       "file": "src/components/hass/HumidifierModalContent.tsx",
       "id": "88b7316a7ad7828a",
       "lines": [
-        744
+        745
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -15504,7 +15504,7 @@
       "file": "src/components/hass/HumidifierModalContent.tsx",
       "id": "1aa8ef1d59284b9b",
       "lines": [
-        747
+        748
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -15518,7 +15518,7 @@
       "file": "src/components/hass/HumidifierModalContent.tsx",
       "id": "b9214f4ddb522e82",
       "lines": [
-        747
+        748
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -18235,7 +18235,7 @@
       "file": "src/components/hass/HumidifierModalContent.tsx",
       "id": "cb3489c3635dd746",
       "lines": [
-        577
+        578
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -18787,7 +18787,7 @@
       "file": "src/components/hass/HumidifierModalContent.tsx",
       "id": "774a234682a55af0",
       "lines": [
-        880
+        881
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -19029,7 +19029,7 @@
       "file": "src/components/hass/HumidifierModalContent.tsx",
       "id": "4ea3a6f9171e6af0",
       "lines": [
-        370
+        371
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -19883,7 +19883,7 @@
       "file": "src/components/hass/HumidifierModalContent.tsx",
       "id": "58c4fa7a4f20e62e",
       "lines": [
-        375
+        376
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -19983,7 +19983,7 @@
       "file": "src/components/hass/HumidifierModalContent.tsx",
       "id": "8af1f1d6df26ac9b",
       "lines": [
-        366
+        367
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -20183,7 +20183,7 @@
       "file": "src/components/hass/HumidifierModalContent.tsx",
       "id": "8e2b48a5ea99c67e",
       "lines": [
-        583
+        584
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -20400,7 +20400,7 @@
       "file": "src/components/hass/HumidifierModalContent.tsx",
       "id": "637259baaca503c9",
       "lines": [
-        881
+        882
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -20456,7 +20456,7 @@
       "file": "src/components/hass/HumidifierModalContent.tsx",
       "id": "0f6abcd3e8791de4",
       "lines": [
-        881
+        882
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -20498,7 +20498,7 @@
       "file": "src/components/hass/HumidifierModalContent.tsx",
       "id": "83dd50c8c2ee708c",
       "lines": [
-        583
+        584
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -20512,7 +20512,7 @@
       "file": "src/components/hass/HumidifierModalContent.tsx",
       "id": "7aada24dc5a80a97",
       "lines": [
-        583
+        584
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -20526,7 +20526,7 @@
       "file": "src/components/hass/HumidifierModalContent.tsx",
       "id": "8d9ac180c0de8b1b",
       "lines": [
-        583
+        584
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -20743,7 +20743,7 @@
       "file": "src/components/hass/HumidifierModalContent.tsx",
       "id": "348da020989ff92a",
       "lines": [
-        369
+        370
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -21039,7 +21039,7 @@
       "file": "src/components/hass/HumidifierModalContent.tsx",
       "id": "65dd9cec13df5bbc",
       "lines": [
-        320
+        321
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -21429,7 +21429,7 @@
       "file": "src/components/hass/HumidifierModalContent.tsx",
       "id": "4202dda652fac3cf",
       "lines": [
-        893
+        894
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -21910,7 +21910,7 @@
       "file": "src/components/hass/HumidifierModalContent.tsx",
       "id": "dc1d1101fd40e132",
       "lines": [
-        622
+        623
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -21924,7 +21924,7 @@
       "file": "src/components/hass/HumidifierModalContent.tsx",
       "id": "a2c3e5e02602627c",
       "lines": [
-        312
+        313
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -21966,8 +21966,8 @@
       "file": "src/components/hass/HumidifierModalContent.tsx",
       "id": "2b5409b085fe2f88",
       "lines": [
-        338,
-        441
+        339,
+        442
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -21995,7 +21995,7 @@
       "file": "src/components/hass/HumidifierModalContent.tsx",
       "id": "a890c998a5d62415",
       "lines": [
-        634
+        635
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -22149,7 +22149,7 @@
       "file": "src/components/hass/HumidifierModalContent.tsx",
       "id": "559ece4130a0b7f6",
       "lines": [
-        387
+        388
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -22163,7 +22163,7 @@
       "file": "src/components/hass/HumidifierModalContent.tsx",
       "id": "dcda59066df62a08",
       "lines": [
-        281
+        282
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -22177,7 +22177,7 @@
       "file": "src/components/hass/HumidifierModalContent.tsx",
       "id": "ad43536dda346493",
       "lines": [
-        272
+        273
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -22501,8 +22501,8 @@
       "file": "src/components/hass/HumidifierModalContent.tsx",
       "id": "e8d0ed512487d3d6",
       "lines": [
-        292,
-        404
+        293,
+        405
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -22572,8 +22572,8 @@
       "file": "src/components/hass/HumidifierModalContent.tsx",
       "id": "0de4dadbe10a95ad",
       "lines": [
-        302,
-        430
+        303,
+        431
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -22629,7 +22629,7 @@
       "file": "src/components/hass/HumidifierModalContent.tsx",
       "id": "9145007769811f5e",
       "lines": [
-        585
+        586
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -22645,7 +22645,7 @@
       "file": "src/components/hass/HumidifierModalContent.tsx",
       "id": "02478e8230c107f2",
       "lines": [
-        585
+        586
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -22659,7 +22659,7 @@
       "file": "src/components/hass/HumidifierModalContent.tsx",
       "id": "f2bcb4df88283519",
       "lines": [
-        585
+        586
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -22673,7 +22673,7 @@
       "file": "src/components/hass/HumidifierModalContent.tsx",
       "id": "992ca3be37e0878f",
       "lines": [
-        585
+        586
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -22687,7 +22687,7 @@
       "file": "src/components/hass/HumidifierModalContent.tsx",
       "id": "66fd1991fd0338e2",
       "lines": [
-        585
+        586
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -22701,7 +22701,7 @@
       "file": "src/components/hass/HumidifierModalContent.tsx",
       "id": "b4a4ba1af32db1c1",
       "lines": [
-        585
+        586
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -22972,7 +22972,7 @@
       "file": "src/components/hass/HumidifierModalContent.tsx",
       "id": "5c7209bb8794d9fb",
       "lines": [
-        585
+        586
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -23030,7 +23030,7 @@
       "file": "src/components/hass/HumidifierModalContent.tsx",
       "id": "511e76e8f93fb107",
       "lines": [
-        590
+        591
       ],
       "occurrences": 1,
       "origin": "legacy",

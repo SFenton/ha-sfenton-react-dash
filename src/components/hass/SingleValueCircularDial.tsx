@@ -1,5 +1,5 @@
 import { useRef, useState, type KeyboardEvent, type PointerEvent } from 'react'
-import { CircularControlDial, type CircularDialTrail } from './CircularControlDial'
+import { CircularControlDial, type CircularDialPrimaryVariant, type CircularDialTrail } from './CircularControlDial'
 import { circularDialPointIsOnRing, circularDialValueFromPoint } from './circularDialGeometry'
 
 interface SingleValueCircularDialProps {
@@ -14,6 +14,7 @@ interface SingleValueCircularDialProps {
   off?: boolean
   onCommit: (value: number) => void
   primaryText: (value: number) => string
+  primaryTextVariant?: CircularDialPrimaryVariant
   primaryUnit?: string
   secondaryText?: string
   size?: 'compact' | 'modal' | 'page'
@@ -38,6 +39,7 @@ export function SingleValueCircularDial({
   off = false,
   onCommit,
   primaryText,
+  primaryTextVariant,
   primaryUnit,
   secondaryText,
   size = 'modal',
@@ -166,6 +168,7 @@ export function SingleValueCircularDial({
       onPointerMove={moveDialTap}
       onPointerUp={endDialTap}
       primaryText={primaryText(displayValue)}
+      primaryTextVariant={primaryTextVariant}
       primaryUnit={primaryUnit}
       readonly={disabled}
       ref={dialRef}
