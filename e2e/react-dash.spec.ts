@@ -1802,6 +1802,65 @@ test('thermostat page accepts the first mobile scroll gesture after closing a ro
   }
 })
 
+test('SleepyPod hot flash keeps the cancel action stable from cooling through the hold', async ({ page }) => {
+  await page.setViewportSize({ width: 393, height: 852 })
+  await page.goto('/at-a-glance/master-bedroom')
+  await page.evaluate(() => {
+    const mock = (window as unknown as {
+      __mockHass: {
+        setEntityAttribute: (entityId: string, attribute: string, value: unknown) => void
+        setEntityState: (entityId: string, state: string) => void
+      }
+    }).__mockHass
+    mock.setEntityState('climate.sleepypod_eight_pod_left_side', 'heat')
+    mock.setEntityState('number.master_bedroom_sleepypod_eight_pod_left_target_level', '-2')
+    mock.setEntityState('sensor.sleepypod_stephen_schedule_phase', 'bedtime')
+    mock.setEntityState('input_boolean.eight_sleep_stephen_hot_flash_active', 'off')
+    mock.setEntityState('timer.eight_sleep_stephen_hot_flash', 'idle')
+  })
+
+  await page.getByRole('button', { name: /Stephen's Bed Cooling/i }).click()
+  const dialog = page.getByRole('dialog', { name: "Stephen's Bed" })
+  await dialog.getByRole('button', { name: 'Special Modes' }).click()
+  await dialog.getByRole('button', { name: 'Hot Flash Mode Inactive' }).click()
+
+  const cancel = dialog.getByRole('button', { name: "Cancel Stephen's Bed hot flash mode" })
+  const status = cancel.locator('..')
+  const phase = status.locator('span')
+  await expect(phase).toHaveText('Cooling Bed')
+  await expect(cancel).toBeVisible()
+  const coolingPhaseBox = await phase.boundingBox()
+  const coolingCancelBox = await cancel.boundingBox()
+  if (!coolingPhaseBox || !coolingCancelBox) throw new Error('Hot Flash cooling status was not measurable')
+
+  await page.evaluate(() => {
+    const mock = (window as unknown as {
+      __mockHass: {
+        setEntityAttribute: (entityId: string, attribute: string, value: unknown) => void
+        setEntityState: (entityId: string, state: string) => void
+      }
+    }).__mockHass
+    mock.setEntityAttribute('timer.eight_sleep_stephen_hot_flash', 'remaining', '0:15:00')
+    mock.setEntityState('timer.eight_sleep_stephen_hot_flash', 'active')
+  })
+
+  await expect(phase).toHaveText('15:00')
+  const holdingPhaseBox = await phase.boundingBox()
+  const holdingCancelBox = await cancel.boundingBox()
+  if (!holdingPhaseBox || !holdingCancelBox) throw new Error('Hot Flash hold status was not measurable')
+  expect(Math.abs(Math.round(holdingPhaseBox.width) - Math.round(coolingPhaseBox.width))).toBeLessThanOrEqual(1)
+  expect(Math.abs(Math.round(holdingCancelBox.x) - Math.round(coolingCancelBox.x))).toBeLessThanOrEqual(1)
+
+  await cancel.click()
+  await expect.poll(() => page.evaluate(() => (
+    (window as unknown as { __mockHass: { calls: Record<string, unknown>[] } }).__mockHass.calls
+      .filter((call) => call.domain === 'input_button' && typeof call.target === 'string' && call.target.includes('eight_sleep_stephen'))
+  ))).toEqual([
+    { domain: 'input_button', service: 'press', target: 'input_button.eight_sleep_stephen_hot_flash' },
+    { domain: 'input_button', service: 'press', target: 'input_button.eight_sleep_stephen_cancel_hot_flash' },
+  ])
+})
+
 test("SleepyPod active alarm actions stay per-side and optimistic", async ({ page }) => {
   await page.goto("/at-a-glance/master-bedroom")
   await page.evaluate(() => {

@@ -1494,8 +1494,8 @@ button.thermostatGlassMain {
   justify-content: flex-end;
 }
 
-.eightSleepCountdown {
-  min-width: 48px;
+.eightSleepHotFlashPhase {
+  min-width: 92px;
   color: white;
   font-size: 0.98rem;
   font-weight: 820;

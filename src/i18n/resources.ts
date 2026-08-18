@@ -3,6 +3,7 @@ import core from './locales/en/core.json' with { type: 'json' }
 import modalBathroomFan from './locales/en/modals/bathroomFan.json' with { type: 'json' }
 import modalCamera from './locales/en/modals/camera.json' with { type: 'json' }
 import modalRecipe from './locales/en/modals/recipe.json' with { type: 'json' }
+import modalSleepypod from './locales/en/modals/sleepypod.json' with { type: 'json' }
 import modalVacuum from './locales/en/modals/vacuum.json' with { type: 'json' }
 import pageAdmin from './locales/en/pages/admin.json' with { type: 'json' }
 import pageFood from './locales/en/pages/food.json' with { type: 'json' }
@@ -21,6 +22,7 @@ export const resources = {
     modalBathroomFan,
     modalCamera,
     modalRecipe,
+    modalSleepypod,
     modalVacuum,
     pageAdmin,
     pageFood,
