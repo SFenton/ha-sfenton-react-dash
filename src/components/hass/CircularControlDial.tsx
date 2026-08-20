@@ -6,10 +6,7 @@ import styles from './CircularControlDial.module.css'
 type SliderTarget = 'high' | 'low' | 'value'
 export type CircularDialPrimaryVariant = 'status' | 'value' | 'wide-status'
 
-export interface CircularDialHandle {
-  accessible?: boolean
-  ariaLabel: string
-  ariaValueText: string
+interface CircularDialHandleBase {
   color?: string
   dataTarget?: string
   dragging?: boolean
@@ -23,6 +20,19 @@ export interface CircularDialHandle {
   value: number
 }
 
+export type CircularDialHandle = CircularDialHandleBase & (
+  | {
+      accessible: false
+      ariaLabel?: never
+      ariaValueText?: never
+    }
+  | {
+      accessible?: true
+      ariaLabel: string
+      ariaValueText: string
+    }
+)
+
 export interface CircularDialTrail {
   color: string
   from: number
@@ -30,11 +40,22 @@ export interface CircularDialTrail {
   to: number
 }
 
+export interface CircularDialMarker {
+  color?: string
+  id: string
+  kind: 'current' | 'target'
+  value: number
+}
+
+interface PositionedCircularDialMarker extends CircularDialMarker {
+  clamped: boolean
+  positionValue: number
+}
+
 interface CircularControlDialProps {
   actionText?: ReactNode
   ariaLabel: string
   colors: { color: string; highColor?: string; lowColor?: string }
-  current?: number
   disabled?: boolean
   dual?: boolean
   handles?: CircularDialHandle[]
@@ -43,6 +64,7 @@ interface CircularControlDialProps {
   inert?: boolean
   label: string
   low?: number
+  markers?: CircularDialMarker[]
   max: number
   min: number
   mode?: 'full'
@@ -66,11 +88,20 @@ interface CircularControlDialProps {
   value?: number
 }
 
+function positionedCircularDialMarkers(markers: CircularDialMarker[], min: number, max: number): PositionedCircularDialMarker[] {
+  if (!Number.isFinite(min) || !Number.isFinite(max) || max <= min) return []
+  return [...markers.filter((marker) => marker.kind === 'target'), ...markers.filter((marker) => marker.kind === 'current')]
+    .flatMap((marker) => {
+      if (!Number.isFinite(marker.value)) return []
+      const positionValue = Math.max(min, Math.min(max, marker.value))
+      return [{ ...marker, clamped: positionValue !== marker.value, positionValue }]
+    })
+}
+
 export const CircularControlDial = forwardRef<HTMLDivElement, CircularControlDialProps>(function CircularControlDial({
   actionText,
   ariaLabel,
   colors,
-  current,
   disabled = false,
   dual = false,
   handles = [],
@@ -79,6 +110,7 @@ export const CircularControlDial = forwardRef<HTMLDivElement, CircularControlDia
   inert = false,
   label,
   low,
+  markers = [],
   max,
   min,
   mode,
@@ -101,6 +133,8 @@ export const CircularControlDial = forwardRef<HTMLDivElement, CircularControlDia
   trails = [],
   value,
 }, ref) {
+  const positionedMarkers = positionedCircularDialMarkers(markers, min, max)
+
   return (
     <div
       aria-disabled={disabled || undefined}
@@ -122,7 +156,6 @@ export const CircularControlDial = forwardRef<HTMLDivElement, CircularControlDia
         aria-hidden={sliderAriaHidden ? true : undefined}
         className={styles.slider}
         colors={colors}
-        current={current}
         disabled={disabled}
         dual={dual}
         high={high}
@@ -160,6 +193,7 @@ export const CircularControlDial = forwardRef<HTMLDivElement, CircularControlDia
               className={styles.handle}
               data-dragging={handle.dragging ? 'true' : undefined}
               data-target={handle.dataTarget}
+              data-value={handle.value}
               key={handle.id}
               onKeyDown={handle.onKeyDown}
               onPointerCancel={handle.onPointerCancel}
@@ -170,6 +204,21 @@ export const CircularControlDial = forwardRef<HTMLDivElement, CircularControlDia
               role={handle.accessible === false ? undefined : 'slider'}
               style={circularDialHandleStyle(handle.value, min, max, handle.color)}
               tabIndex={handle.accessible === false || disabled || readonly ? undefined : 0}
+            />
+          ))}
+        </div>
+      )}
+      {positionedMarkers.length > 0 && (
+        <div aria-hidden="true" className={styles.markerLayer}>
+          {positionedMarkers.map((marker) => (
+            <span
+              className={styles.marker}
+              data-clamped={marker.clamped ? 'true' : 'false'}
+              data-marker={marker.kind}
+              data-position-value={marker.positionValue}
+              data-value={marker.value}
+              key={marker.id}
+              style={circularDialHandleStyle(marker.positionValue, min, max, marker.color)}
             />
           ))}
         </div>

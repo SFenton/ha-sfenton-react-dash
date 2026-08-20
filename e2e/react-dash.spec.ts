@@ -1824,6 +1824,16 @@ test('SleepyPod hot flash keeps the cancel action stable from cooling through th
   await dialog.getByRole('button', { name: 'Special Modes' }).click()
   await dialog.getByRole('button', { name: 'Hot Flash Mode Inactive' }).click()
 
+  const dial = dialog.getByRole('region', { name: /Stephen's Bed thermostat Cooling -10/i })
+  const fixedTarget = dial.locator('[data-marker="target"]')
+  const currentMarker = dial.locator('[data-marker="current"]')
+  await expect(fixedTarget).toBeVisible()
+  await expect(fixedTarget).toHaveAttribute('data-value', '-10')
+  await expect(currentMarker).toBeVisible()
+  expect(Number(await currentMarker.getAttribute('data-value'))).toBeCloseTo(-0.55, 2)
+  await expect(dialog.getByRole('slider', { name: "Stephen's Bed target level" })).toHaveCount(0)
+  await expect(page.locator("button[aria-label=\"Stephen's Bed Hot Flash Mode • Cooling\"]")).toHaveCount(1)
+
   const cancel = dialog.getByRole('button', { name: "Cancel Stephen's Bed hot flash mode" })
   const status = cancel.locator('..')
   const phase = status.locator('span')
@@ -1845,6 +1855,7 @@ test('SleepyPod hot flash keeps the cancel action stable from cooling through th
   })
 
   await expect(phase).toHaveText('15:00')
+  await expect(page.locator("button[aria-label=\"Stephen's Bed 15:00 Remaining\"]")).toHaveCount(1)
   const holdingPhaseBox = await phase.boundingBox()
   const holdingCancelBox = await cancel.boundingBox()
   if (!holdingPhaseBox || !holdingCancelBox) throw new Error('Hot Flash hold status was not measurable')
@@ -3043,10 +3054,13 @@ test('humidifier Sleep readout matches SleepyPod OFF typography and keeps mobile
   await page.getByRole('button', { name: /Humidifier Humidifying.*46%/i }).click()
 
   const dialog = page.getByRole('dialog')
-  const sleepDial = dialog.getByRole('region', { name: 'Humidifier mist level Sleep' })
+  const sleepDial = dialog.getByRole('region', { name: 'Humidifier mist level Sleep • 5' })
   const sleepText = sleepDial.getByText('Sleep', { exact: true })
   await expect(sleepText).toHaveCSS('font-weight', '420')
   await expect(sleepText).toHaveCSS('text-transform', 'uppercase')
+  await expect(sleepDial).not.toHaveAttribute('aria-disabled')
+  await expect(sleepDial.locator('[data-marker="current"]')).toHaveAttribute('data-value', '5')
+  await expect(sleepDial.getByRole('slider', { name: 'Mist level' })).toHaveCount(0)
 
   const sleepReadout = await sleepText.evaluate((element) => {
     const dial = element.closest<HTMLElement>('[role="region"]')

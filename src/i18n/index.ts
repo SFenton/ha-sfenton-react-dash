@@ -5,6 +5,7 @@ export { useCopy } from './useCopy'
 
 export const COMMON_COPY_NAMESPACE = 'common' as const
 export const BATHROOM_FAN_COPY_NAMESPACE = 'modalBathroomFan' as const
+export const HUMIDIFIER_COPY_NAMESPACE = 'modalHumidifier' as const
 export const VACUUM_COPY_NAMESPACE = 'modalVacuum' as const
 export const GARAGE_DOOR_COPY_KEYS = {
   sendingClose: 'garageDoor.sendingClose',
@@ -47,4 +48,16 @@ export const VACUUM_COPY_KEYS = {
   cleaned: 'cleaned',
   issues: 'issues',
   selectedRooms: 'selectedRooms',
+} as const
+
+export const HUMIDIFIER_COPY_KEYS = {
+  dial: {
+    humiditySummary: 'dial.humiditySummary',
+    mistSummary: 'dial.mistSummary',
+    outputSummary: 'dial.outputSummary',
+    targetHumiditySummary: 'dial.targetHumiditySummary',
+  },
+  states: {
+    unavailable: 'states.unavailable',
+  },
 } as const

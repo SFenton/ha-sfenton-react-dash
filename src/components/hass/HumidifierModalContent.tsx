@@ -2,6 +2,7 @@ import { useEntity, useHass, useUser } from '@hakit/core'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { HUMIDIFIER_MIST_PRESETS, HUMIDIFIER_MODES, HUMIDIFIER_WARM_LEVELS, type HumidifierConfig, type HumidifierMode } from '../../constants/humidifiers'
 import { HUMIDIFIER_MODAL_TABS, type HumidifierModalTab } from '../../constants/surfaceSemantics'
+import { HUMIDIFIER_COPY_KEYS, HUMIDIFIER_COPY_NAMESPACE, useCopy } from '../../i18n'
 import { useImmediateVisualTab, useSmoothDisplayedModalTab } from '../../hooks/useSmoothDisplayedModalTab'
 import { useOptimisticState } from '../../hooks/useOptimisticState'
 import { useScheduleDetailPage } from '../../hooks/useScheduleDetailPage'
@@ -18,6 +19,7 @@ import { isValidScheduleTime } from '../core/scheduleTime'
 import { SectionHeader } from '../core/SectionHeader'
 import { StatusPill, type StatusPillTone } from '../core/StatusPill'
 import { ToggleSetting } from '../core/ToggleSetting'
+import type { CircularDialMarker } from './CircularControlDial'
 import { asEntityName, titleCaseState } from './entityState'
 import { HUMIDIFIER_MODAL_DETAIL_STYLE, HUMIDIFIER_MODAL_SCHEDULES_STYLE, HUMIDIFIER_MODAL_STYLE } from './humidifierModalStyle'
 import { SingleValueCircularDial } from './SingleValueCircularDial'
@@ -52,6 +54,7 @@ interface HumidifierModalContentProps {
 interface HumidifierControlState {
   blocked: boolean
   currentHumidity: number | null
+  currentMistLevel: number | null
   currentTemperatureText: string
   displayOn: boolean
   fault: 'tank' | 'water' | null
@@ -82,6 +85,7 @@ const HUMIDIFIER_OPTIMISTIC_REVERT_MS = 8000
 const DIAL_MIN = 0
 const DIAL_MAX = 9
 const DIAL_STEP = 1
+const HUMIDIFIER_DIAL_COLOR = 'rgba(48, 190, 151, 0.96)'
 
 function isUnavailable(entity: Entity | null | undefined) {
   return !entity || entity.state === 'unknown' || entity.state === 'unavailable'
@@ -186,10 +190,17 @@ function HumidifierModalNav({ activeTab, onTabChange }: { activeTab: HumidifierM
 }
 
 function HumidifierHero({ actions, state }: { actions: HumidifierActions; state: HumidifierControlState }) {
+  const copy = useCopy(HUMIDIFIER_COPY_NAMESPACE)
   const sleepMode = state.mode === 'Sleep'
   const canSetLevel = !state.blocked && !sleepMode
   const dialValue = state.powerOn ? state.mistLevel : 0
   const readout = sleepMode ? 'Sleep' : state.powerOn ? String(dialValue) : 'Off'
+  const markers: CircularDialMarker[] = state.powerOn && !state.blocked && state.currentMistLevel !== null ? [{
+    color: HUMIDIFIER_DIAL_COLOR,
+    id: 'current-mist-level',
+    kind: 'current',
+    value: state.currentMistLevel,
+  }] : []
   const hint: string | null = state.unavailable
     ? 'Humidifier controls are unavailable.'
     : state.fault === 'tank'
@@ -205,19 +216,27 @@ function HumidifierHero({ actions, state }: { actions: HumidifierActions; state:
   return (
     <div className={styles.hero}>
       <SingleValueCircularDial
-        ariaLabel={`Humidifier mist level ${readout}`}
+        ariaLabel={state.powerOn && state.currentMistLevel !== null
+          ? copy(HUMIDIFIER_COPY_KEYS.dial.mistSummary, { currentLevel: state.currentMistLevel, readout })
+          : `Humidifier mist level ${readout}`}
         actionText={state.powerOn && !sleepMode ? 'Mist Level' : undefined}
-        color="rgba(48, 190, 151, 0.96)"
-        disabled={!canSetLevel}
+        color={HUMIDIFIER_DIAL_COLOR}
+        disabled={state.blocked}
         handleAriaLabel="Mist level"
         inactive={!state.powerOn || sleepMode}
+        markers={markers}
         max={DIAL_MAX}
         min={DIAL_MIN}
         off={!state.powerOn}
         onCommit={(value) => actions.setLevel(clamped(Math.round(value), DIAL_MIN, DIAL_MAX))}
         primaryText={(value) => sleepMode ? 'Sleep' : state.powerOn ? String(value) : 'OFF'}
         primaryTextVariant={sleepMode ? 'wide-status' : undefined}
-        secondaryText={state.powerOn ? `${formatHumidity(state.currentHumidity)} current` : undefined}
+        readOnly={!canSetLevel}
+        secondaryText={state.powerOn
+          ? state.currentMistLevel === null
+            ? copy(HUMIDIFIER_COPY_KEYS.dial.humiditySummary, { currentHumidity: formatHumidity(state.currentHumidity) })
+            : copy(HUMIDIFIER_COPY_KEYS.dial.outputSummary, { currentHumidity: formatHumidity(state.currentHumidity), currentLevel: state.currentMistLevel })
+          : undefined}
         step={DIAL_STEP}
         value={dialValue}
       />
@@ -237,14 +256,25 @@ function HumidifierHero({ actions, state }: { actions: HumidifierActions; state:
 }
 
 function TargetHumidityDial({ actions, state }: { actions: HumidifierActions; state: HumidifierControlState }) {
+  const copy = useCopy(HUMIDIFIER_COPY_NAMESPACE)
+  const markers: CircularDialMarker[] = state.currentHumidity === null || state.blocked ? [] : [{
+    color: HUMIDIFIER_DIAL_COLOR,
+    id: 'current-humidity',
+    kind: 'current',
+    value: state.currentHumidity,
+  }]
+
   return (
     <div className={styles.targetDial}>
       <SingleValueCircularDial
         actionText="Target Humidity"
-        ariaLabel={`Target humidity ${state.targetHumidity}%`}
-        color="rgba(48, 190, 151, 0.96)"
+        ariaLabel={state.currentHumidity === null
+          ? `Target humidity ${state.targetHumidity}%`
+          : copy(HUMIDIFIER_COPY_KEYS.dial.targetHumiditySummary, { currentHumidity: formatHumidity(state.currentHumidity), target: state.targetHumidity })}
+        color={HUMIDIFIER_DIAL_COLOR}
         disabled={state.blocked}
         handleAriaLabel="Target humidity"
+        markers={markers}
         max={80}
         min={40}
         onCommit={actions.setTargetHumidity}
@@ -389,7 +419,7 @@ function ScheduleEditor({
             <SingleValueCircularDial
               actionText="Mist Level"
               ariaLabel={`Scheduled mist level ${draft.mistLevel}`}
-              color="rgba(48, 190, 151, 0.96)"
+              color={HUMIDIFIER_DIAL_COLOR}
               handleAriaLabel="Scheduled mist level"
               max={9}
               min={1}
@@ -406,7 +436,7 @@ function ScheduleEditor({
               <SingleValueCircularDial
                 actionText="Target Humidity"
                 ariaLabel={`Scheduled target humidity ${draft.targetHumidity}%`}
-                color="rgba(48, 190, 151, 0.96)"
+                color={HUMIDIFIER_DIAL_COLOR}
                 handleAriaLabel="Scheduled target humidity"
                 max={80}
                 min={40}
@@ -610,6 +640,7 @@ function SchedulesPanel({ controller, onAdd, onEdit }: { controller: HumidifierS
 }
 
 function InfoPanel({ state }: { state: HumidifierControlState }) {
+  const copy = useCopy(HUMIDIFIER_COPY_NAMESPACE)
   const outputValue = state.fault === 'tank' ? 'Tank Removed' : state.fault === 'water' ? 'Water Low' : state.humidifying ? 'Humidifying' : state.powerOn ? 'Idle' : 'Off'
   const outputTone = statusTone(state)
   const waterValue = state.fault === 'water' || state.fault === 'tank' ? 'Low' : 'OK'
@@ -636,7 +667,14 @@ function InfoPanel({ state }: { state: HumidifierControlState }) {
         <div className={styles.infoGrid}>
           <StatusPill grouped icon="mdi:water-percent" label="Humidity" value={formatHumidity(state.currentHumidity)} />
           <StatusPill grouped icon="mdi:thermometer" label="Temperature" value={state.currentTemperatureText} />
-          <StatusPill grouped icon="mdi:air-humidifier" label="Mist Level" value={state.powerOn ? `Level ${state.mistLevel}` : `Saved ${state.mistLevel}`} />
+          <StatusPill
+            grouped
+            icon="mdi:air-humidifier"
+            label="Mist Level"
+            value={state.powerOn
+              ? state.currentMistLevel === null ? copy(HUMIDIFIER_COPY_KEYS.states.unavailable) : `Level ${state.currentMistLevel}`
+              : `Saved ${state.mistLevel}`}
+          />
           <StatusPill grouped icon="mdi:clock-outline" label="Timer" value={formatDurationSeconds(state.timerRemaining)} />
         </div>
       </section>
@@ -663,7 +701,8 @@ function useHumidifierController(config: HumidifierConfig) {
   const unavailable = isUnavailable(powerEntity)
   const livePowerOn = powerEntity?.state === 'on'
   const liveMode = HUMIDIFIER_MODES.some((option) => option.value === modeEntity?.state) ? modeEntity?.state as HumidifierMode : 'Manual'
-  const liveMistLevel = clamped(Math.round(numberState(mistEntity) ?? 5), 1, 9)
+  const rawMistLevel = numberState(mistEntity)
+  const liveMistLevel = clamped(Math.round(rawMistLevel ?? 5), 1, 9)
   const rawTargetHumidity = numberState(targetEntity)
   const liveTargetValid = rawTargetHumidity !== null && rawTargetHumidity >= 40 && rawTargetHumidity <= 80
   const liveTargetHumidity = liveTargetValid ? rawTargetHumidity : DEFAULT_TARGET_HUMIDITY
@@ -685,6 +724,7 @@ function useHumidifierController(config: HumidifierConfig) {
   const state: HumidifierControlState = {
     blocked,
     currentHumidity,
+    currentMistLevel: rawMistLevel === null ? null : liveMistLevel,
     currentTemperatureText: displayTemperature(temperatureEntity),
     displayOn,
     fault,

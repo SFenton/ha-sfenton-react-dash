@@ -1,6 +1,7 @@
 import { defineConfig, devices } from '@playwright/test'
 
 const usePrebuiltMock = process.env.PLAYWRIGHT_PREBUILT_MOCK === '1'
+const useRealHakit = process.env.PLAYWRIGHT_REAL_HAKIT === '1'
 const serverPort = Number(process.env.PLAYWRIGHT_PORT ?? 5174)
 const serverUrl = `http://127.0.0.1:${serverPort}`
 const webkitExecutablePath = process.env.PLAYWRIGHT_WEBKIT_EXECUTABLE
@@ -31,7 +32,9 @@ export default defineConfig({
       : []),
   ],
   webServer: {
-    command: usePrebuiltMock
+    command: useRealHakit
+      ? `node node_modules/vite/bin/vite.js --host 127.0.0.1 --port ${serverPort} --strictPort`
+      : usePrebuiltMock
       ? `node node_modules/vite/bin/vite.js preview --outDir .playwright-dist --host 127.0.0.1 --port ${serverPort} --strictPort`
       : `node node_modules/vite/bin/vite.js build --mode test --outDir .playwright-dist && node node_modules/vite/bin/vite.js preview --outDir .playwright-dist --host 127.0.0.1 --port ${serverPort} --strictPort`,
     reuseExistingServer: false,

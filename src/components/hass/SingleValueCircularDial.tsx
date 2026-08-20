@@ -1,5 +1,5 @@
 import { useRef, useState, type KeyboardEvent, type PointerEvent } from 'react'
-import { CircularControlDial, type CircularDialPrimaryVariant, type CircularDialTrail } from './CircularControlDial'
+import { CircularControlDial, type CircularDialMarker, type CircularDialPrimaryVariant, type CircularDialTrail } from './CircularControlDial'
 import { circularDialPointIsOnRing, circularDialValueFromPoint } from './circularDialGeometry'
 
 interface SingleValueCircularDialProps {
@@ -9,6 +9,7 @@ interface SingleValueCircularDialProps {
   disabled?: boolean
   handleAriaLabel: string
   inactive?: boolean
+  markers?: CircularDialMarker[]
   max: number
   min: number
   off?: boolean
@@ -16,6 +17,7 @@ interface SingleValueCircularDialProps {
   primaryText: (value: number) => string
   primaryTextVariant?: CircularDialPrimaryVariant
   primaryUnit?: string
+  readOnly?: boolean
   secondaryText?: string
   size?: 'compact' | 'modal' | 'page'
   step: number
@@ -34,6 +36,7 @@ export function SingleValueCircularDial({
   disabled = false,
   handleAriaLabel,
   inactive = false,
+  markers = [],
   max,
   min,
   off = false,
@@ -41,6 +44,7 @@ export function SingleValueCircularDial({
   primaryText,
   primaryTextVariant,
   primaryUnit,
+  readOnly = false,
   secondaryText,
   size = 'modal',
   step,
@@ -52,6 +56,7 @@ export function SingleValueCircularDial({
   const tapCandidate = useRef<{ moved: boolean; pointerId: number; startX: number; startY: number } | null>(null)
   const [dragValue, setDragValue] = useState<number | null>(null)
   const displayValue = dragValue ?? value
+  const canAdjust = !disabled && !readOnly
 
   const valueFromPointer = (event: PointerEvent<HTMLElement>) => {
     const rect = dialRef.current?.getBoundingClientRect()
@@ -60,13 +65,13 @@ export function SingleValueCircularDial({
   }
 
   const commit = (nextValue: number) => {
-    if (disabled) return
+    if (!canAdjust) return
     setDragValue(null)
     onCommit(clamp(nextValue, min, max))
   }
 
   const startHandleDrag = (event: PointerEvent<HTMLSpanElement>) => {
-    if (disabled) return
+    if (!canAdjust) return
     const nextValue = valueFromPointer(event)
     if (nextValue === null) return
     event.preventDefault()
@@ -93,7 +98,7 @@ export function SingleValueCircularDial({
   }
 
   const startDialTap = (event: PointerEvent<HTMLDivElement>) => {
-    if (disabled || (event.pointerType === 'mouse' && event.button !== 0)) return
+    if (!canAdjust || (event.pointerType === 'mouse' && event.button !== 0)) return
     tapCandidate.current = { moved: false, pointerId: event.pointerId, startX: event.clientX, startY: event.clientY }
   }
 
@@ -122,7 +127,7 @@ export function SingleValueCircularDial({
   }
 
   const adjustFromKeyboard = (event: KeyboardEvent<HTMLSpanElement>) => {
-    if (disabled) return
+    if (!canAdjust) return
     let nextValue: number | null = null
     if (event.key === 'ArrowUp' || event.key === 'ArrowRight') nextValue = displayValue + step
     if (event.key === 'ArrowDown' || event.key === 'ArrowLeft') nextValue = displayValue - step
@@ -140,9 +145,8 @@ export function SingleValueCircularDial({
       actionText={actionText}
       ariaLabel={ariaLabel}
       colors={{ color, highColor: color, lowColor: color }}
-      current={displayValue}
       disabled={disabled}
-      handles={disabled ? [] : [{
+      handles={canAdjust ? [{
         ariaLabel: handleAriaLabel,
         ariaValueText: primaryText(displayValue),
         color,
@@ -154,15 +158,17 @@ export function SingleValueCircularDial({
         onPointerMove: moveHandleDrag,
         onPointerUp: endHandleDrag,
         value: displayValue,
-      }]}
+      }] : []}
       inactive={inactive}
+      inert
       label={handleAriaLabel}
+      markers={markers}
       max={max}
       min={min}
       mode="full"
       off={off}
-      onChange={setDragValue}
-      onChangeApplied={commit}
+      onChange={canAdjust ? setDragValue : undefined}
+      onChangeApplied={canAdjust ? commit : undefined}
       onPointerCancel={cancelDialTap}
       onPointerDown={startDialTap}
       onPointerMove={moveDialTap}
@@ -170,7 +176,7 @@ export function SingleValueCircularDial({
       primaryText={primaryText(displayValue)}
       primaryTextVariant={primaryTextVariant}
       primaryUnit={primaryUnit}
-      readonly={disabled}
+      readonly={readOnly}
       ref={dialRef}
       secondaryText={secondaryText}
       size={size}
