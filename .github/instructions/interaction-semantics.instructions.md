@@ -31,3 +31,6 @@ Follow the accessory and shared behavior contract in
 - Do not use an accessory to conceal a no-op surface. Noninteractive state and
   value displays must not receive button semantics, tab stops, pointer cursors,
   or decorative chevrons.
+- On circular dials, only an adjustable target is a slider. Fixed target and
+  live current markers are noninteractive state displays, use the shared dial
+  marker API, and must not receive handlers, roles, or tab stops.

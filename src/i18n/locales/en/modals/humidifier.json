@@ -1,0 +1,11 @@
+{
+  "dial": {
+    "humiditySummary": "{{currentHumidity}} current",
+    "mistSummary": "Humidifier mist level {{readout}} • {{currentLevel}}",
+    "outputSummary": "{{currentLevel}} • {{currentHumidity}} current",
+    "targetHumiditySummary": "Target humidity {{target}}% • {{currentHumidity}}"
+  },
+  "states": {
+    "unavailable": "Unavailable"
+  }
+}

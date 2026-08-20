@@ -45,6 +45,23 @@ the shared behavior layer rather than duplicating HA-owned side effects.
 - Use shared primitives before adding page-local variants. Static visible copy
   belongs in the i18n facade and catalogs.
 
+## Dial marker contract
+
+- Circular dials use `target` for commanded/requested values and `current` for
+  live Home Assistant values expressed on the same scale.
+- Adjustable targets are the only dial elements with slider semantics,
+  keyboard behavior, pointer handling, or a tab stop. Static target/current
+  markers are state displays and remain pointer-inert and hidden from the
+  accessibility tree.
+- Every dial exposes at most one adjustable slider. Equivalent target/current
+  values must remain available through the visible readout or dial
+  description.
+- Automatic or HA-owned control is read-only, not unavailable. Do not mark the
+  whole dial disabled merely because a current marker cannot be adjusted.
+- Render static target markers before current markers so the smaller current
+  marker remains visible when both values overlap. Distinguish them by size
+  and fill treatment, not color alone.
+
 ## Modal contract
 
 `ModalSheet` owns the hardcoded `data-surface="hass-popup"` treatment. Close,

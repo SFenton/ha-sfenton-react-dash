@@ -1,5 +1,10 @@
 {
+  "dial": {
+    "summaryWithCurrent": "{{side}} thermostat {{action}} {{target}} • {{current}}"
+  },
   "hotFlash": {
-    "coolingStatus": "Cooling Bed"
+    "coolingStatus": "Cooling Bed",
+    "remainingStatus": "{{countdown}} Remaining",
+    "tileCoolingStatus": "Hot Flash Mode • Cooling"
   }
 }

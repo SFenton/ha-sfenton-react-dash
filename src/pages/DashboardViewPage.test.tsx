@@ -1986,6 +1986,7 @@ describe('DashboardViewPage', () => {
     view.rerender(<DashboardViewPage activePath="ecobee" onNavigate={() => undefined} path="ecobee" />)
 
     const hero = screen.getByRole('region', { name: /Whole Home thermostat Idle 71.0°F 62.0 · 78.0/i })
+    expect(hero.querySelector('[data-marker="current"]')).toHaveAttribute('data-value', '71')
     const hub = screen.getByLabelText('Thermostat Hub Off')
     const vacationMode = screen.getByLabelText('Whole Home Vacation Mode')
     expect(screen.getByText('Vacation Mode Active. The room may be cooler or warmer than your heat/cool targets to save energy while away.')).toBeInTheDocument()
@@ -2916,7 +2917,7 @@ describe('DashboardViewPage', () => {
     fireEvent.click(screen.getByRole('button', { name: /Stephen's Bed Cooling • -2/i }))
     const dialog = await screen.findByRole('dialog', { name: "Stephen's Bed" })
 
-    expect(within(dialog).getByRole('region', { name: /Stephen's Bed thermostat Cooling -2/i })).toHaveAttribute('aria-disabled', 'true')
+    expect(within(dialog).getByRole('region', { name: /Stephen's Bed thermostat Cooling -2/i })).not.toHaveAttribute('aria-disabled')
     expect(within(dialog).queryByRole('slider', { name: "Stephen's Bed target level" })).not.toBeInTheDocument()
     expect(within(dialog).getByText('Schedule phase is unavailable.')).toBeInTheDocument()
     expect(screen.queryByRole('dialog', { name: 'Set Bed Temperature' })).not.toBeInTheDocument()
@@ -3235,7 +3236,12 @@ describe('DashboardViewPage', () => {
     const dialog = await screen.findByRole('dialog')
     expect(within(dialog).getByRole('heading', { name: 'Master Bedroom Humidifier' })).toBeInTheDocument()
     expect(within(dialog).getAllByLabelText('Master Bedroom humidifier controls').length).toBeGreaterThan(0)
-    expect(within(dialog).getByRole('slider', { name: 'Mist level' })).toHaveAttribute('aria-valuenow', '5')
+    const mistDial = within(dialog).getByRole('region', { name: 'Humidifier mist level 5 • 5' })
+    const mistTarget = within(mistDial).getByRole('slider', { name: 'Mist level' })
+    const mistCurrent = mistDial.querySelector('[data-marker="current"]')
+    expect(mistTarget).toHaveAttribute('aria-valuenow', '5')
+    expect(mistCurrent).toHaveAttribute('data-value', '5')
+    expect(mistTarget.compareDocumentPosition(mistCurrent!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     expect(within(dialog).getByRole('navigation', { name: 'Humidifier modal sections' })).toBeInTheDocument()
     expect(within(dialog).getByRole('button', { name: 'Controls' })).toHaveAttribute('aria-current', 'page')
     expect(within(dialog).getByText('46%')).toBeInTheDocument()
@@ -3389,10 +3395,27 @@ describe('DashboardViewPage', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /Humidifier Humidifying • 46%/i }))
     const dialog = await screen.findByRole('dialog')
-    const sleepReadout = within(dialog).getByRole('region', { name: 'Humidifier mist level Sleep' })
+    const sleepReadout = within(dialog).getByRole('region', { name: 'Humidifier mist level Sleep • 5' })
 
     expect(within(sleepReadout).getByText('Sleep').closest('[data-primary-variant]')).toHaveAttribute('data-primary-variant', 'wide-status')
+    expect(sleepReadout).not.toHaveAttribute('aria-disabled')
+    expect(sleepReadout.querySelector('[data-marker="current"]')).toHaveAttribute('data-value', '5')
     expect(within(sleepReadout).queryByRole('slider', { name: 'Mist level' })).not.toBeInTheDocument()
+  })
+
+  it('omits the humidifier current marker when the live mist level is unavailable', async () => {
+    mockEntities['number.lv600s_humidifier_mist_level'].state = 'unavailable'
+    render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
+
+    fireEvent.click(screen.getByRole('button', { name: /Humidifier Humidifying • 46%/i }))
+    const dialog = await screen.findByRole('dialog')
+    const mistDial = within(dialog).getByRole('region', { name: 'Humidifier mist level 5' })
+
+    expect(mistDial.querySelector('[data-marker="current"]')).not.toBeInTheDocument()
+    expect(within(mistDial).getByRole('slider', { name: 'Mist level' })).toHaveAttribute('aria-valuenow', '5')
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Info' }))
+    expect(await within(dialog).findByRole('group', { name: 'Mist Level Unavailable' })).toBeInTheDocument()
   })
 
   it('disables activity save when a new rule overlaps an existing activity', async () => {
@@ -3507,7 +3530,8 @@ describe('DashboardViewPage', () => {
     fireEvent.click(screen.getByRole('button', { name: /Humidifier Humidifying • 46%/i }))
     const dialog = await screen.findByRole('dialog')
     expect(within(dialog).getByText('Choose a target before relying on Auto Humidity.')).toBeInTheDocument()
-    const targetDial = within(dialog).getByRole('region', { name: 'Target humidity 50%' })
+    const targetDial = within(dialog).getByRole('region', { name: 'Target humidity 50% • 46%' })
+    expect(targetDial.querySelector('[data-marker="current"]')).toHaveAttribute('data-value', '46')
     const nativeSlider = within(targetDial).getByTestId('control-slider-circular').querySelector('input')
     expect(nativeSlider).not.toBeNull()
     fireEvent.change(nativeSlider!, { target: { value: '50' } })
@@ -3624,7 +3648,7 @@ describe('DashboardViewPage', () => {
     await clickModalTab(within(dialog), 'Status')
     expect(within(dialog).getByRole('heading', { name: 'Status' })).toBeInTheDocument()
     expect(within(dialog).getByText('Current Temp')).toBeInTheDocument()
-    expect(within(dialog).getByText('86°F')).toBeInTheDocument()
+    expect(within(dialog).getAllByText('86°F').length).toBeGreaterThanOrEqual(1)
     expect(within(dialog).getByText('Presence')).toBeInTheDocument()
     expect(within(dialog).getByText('In Bed')).toBeInTheDocument()
     expect(within(dialog).getByText('Time Remaining')).toBeInTheDocument()
@@ -3724,10 +3748,15 @@ describe('DashboardViewPage', () => {
     fireEvent.click(hotFlash)
 
     expect(within(dialog).getByText("Stephen's Bed: Hot Flash Mode")).toBeInTheDocument()
-    expect(within(dialog).getByRole('region', { name: /Stephen's Bed thermostat Cooling -10/i })).toBeInTheDocument()
+    const hotFlashDial = within(dialog).getByRole('region', { name: /Stephen's Bed thermostat Cooling -10/i })
+    expect(hotFlashDial).toBeInTheDocument()
+    expect(hotFlashDial.querySelector('[data-marker="target"]')).toHaveAttribute('data-value', '-10')
+    const currentMarker = hotFlashDial.querySelector('[data-marker="current"]')
+    expect(Number(currentMarker?.getAttribute('data-value'))).toBeCloseTo(-0.55, 2)
+    expect(within(dialog).queryByRole('slider', { name: "Stephen's Bed target level" })).not.toBeInTheDocument()
     expect(within(dialog).getByRole('button', { name: 'Hot Flash Mode Active' })).toBeInTheDocument()
     expect(within(dialog).getByText('Cooling Bed')).toBeInTheDocument()
-    expect(screen.getAllByRole('button', { name: /Stephen's Bed Hot Flash Mode/i, hidden: true }).some((button) => button.getAttribute('data-muted') === 'false')).toBe(true)
+    expect(screen.getAllByRole('button', { name: /Stephen's Bed Hot Flash Mode • Cooling/i, hidden: true }).some((button) => button.getAttribute('data-muted') === 'false')).toBe(true)
     expect(mockCallServiceCalls).toEqual([
       { domain: 'input_button', service: 'press', target: 'input_button.eight_sleep_stephen_hot_flash' },
     ])
@@ -3739,7 +3768,7 @@ describe('DashboardViewPage', () => {
     mockEntities['timer.eight_sleep_steph_hot_flash'].state = 'active'
     render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
 
-    fireEvent.click(screen.getByRole('button', { name: /Steph's Bed Hot Flash Mode/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Steph's Bed 12:34 Remaining/i }))
 
     const dialog = await screen.findByRole('dialog')
     expect(within(dialog).getByText("Steph's Bed: Hot Flash Mode")).toBeInTheDocument()
@@ -3747,6 +3776,7 @@ describe('DashboardViewPage', () => {
     expect(within(dialog).getByRole('button', { name: 'Hot Flash Mode Active' })).toBeInTheDocument()
     expect(within(dialog).getByText('12:34')).toBeInTheDocument()
     expect(within(dialog).queryByText('Cooling Bed')).not.toBeInTheDocument()
+    expect(screen.getAllByRole('button', { name: /Steph's Bed 12:34 Remaining/i, hidden: true }).some((button) => button.getAttribute('data-muted') === 'false')).toBe(true)
     const cancel = within(dialog).getByRole('button', { name: "Cancel Steph's Bed hot flash mode" })
     expect(cancel.querySelector('path')).toHaveAttribute('d', materialIconPath('mdi:close'))
 
@@ -3760,6 +3790,28 @@ describe('DashboardViewPage', () => {
     ])
   })
 
+  it('updates the bed tile countdown while the SleepyPod hot flash hold is active', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-08-19T12:00:00Z'))
+    try {
+      setupStephSleepypodLevelControl('asleep')
+      mockEntities['input_boolean.eight_sleep_steph_hot_flash_active'].state = 'on'
+      mockEntities['timer.eight_sleep_steph_hot_flash'] = entity('timer.eight_sleep_steph_hot_flash', 'active', {
+        finishes_at: new Date(Date.now() + 65_000).toISOString(),
+      })
+      render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
+
+      expect(screen.getByRole('button', { name: /Steph's Bed 1:05 Remaining/i })).toBeInTheDocument()
+
+      act(() => vi.advanceTimersByTime(1000))
+
+      expect(screen.getByRole('button', { name: /Steph's Bed 1:04 Remaining/i })).toBeInTheDocument()
+    } finally {
+      vi.clearAllTimers()
+      vi.useRealTimers()
+    }
+  })
+
   it('shows Cooling Bed instead of the restore deadline while SleepyPod hot flash is cooling', async () => {
     setupStephenSleepypodLevelControl('bedtime')
     mockEntities['input_boolean.eight_sleep_stephen_hot_flash_active'].state = 'on'
@@ -3768,11 +3820,11 @@ describe('DashboardViewPage', () => {
     mockEntities['input_datetime.eight_sleep_stephen_hot_flash_restore_at'].attributes.timestamp = (Date.now() + (14 * 60 + 34) * 1000) / 1000
     render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
 
-    fireEvent.click(screen.getByRole('button', { name: /Stephen's Bed Hot Flash Mode/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Stephen's Bed Hot Flash Mode • Cooling/i }))
 
     const dialog = await screen.findByRole('dialog')
     expect(within(dialog).getByText("Stephen's Bed: Hot Flash Mode")).toBeInTheDocument()
-    expect(within(dialog).getByRole('region', { name: /Stephen's Bed thermostat Cooling -10/i })).toHaveAttribute('aria-disabled', 'true')
+    expect(within(dialog).getByRole('region', { name: /Stephen's Bed thermostat Cooling -10/i })).not.toHaveAttribute('aria-disabled')
     expect(within(dialog).queryByRole('slider', { name: "Stephen's Bed target level" })).not.toBeInTheDocument()
     expect(within(dialog).getByText('Hot Flash Mode controls the target.')).toBeInTheDocument()
     await clickModalTab(within(dialog), 'Special Modes')
@@ -3794,7 +3846,7 @@ describe('DashboardViewPage', () => {
     mockEntities['input_datetime.eight_sleep_stephen_hot_flash_restore_at'].attributes.timestamp = (Date.now() + (14 * 60 + 34) * 1000) / 1000
     render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
 
-    fireEvent.click(screen.getByRole('button', { name: /Stephen's Bed Hot Flash Mode/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Stephen's Bed 14:34 Remaining/i }))
 
     const dialog = await screen.findByRole('dialog')
     await clickModalTab(within(dialog), 'Special Modes')
@@ -3814,7 +3866,7 @@ describe('DashboardViewPage', () => {
       expect(within(dialog).getByRole('region', { name: /Stephen's Bed thermostat Cooling -2/i })).toBeInTheDocument()
       fireEvent.click(within(dialog).getByRole('button', { name: 'Hot Flash Mode Inactive' }))
 
-      expect(within(dialog).getByRole('region', { name: /Stephen's Bed thermostat Cooling -10/i })).toHaveAttribute('aria-disabled', 'true')
+      expect(within(dialog).getByRole('region', { name: /Stephen's Bed thermostat Cooling -10/i })).not.toHaveAttribute('aria-disabled')
       expect(within(dialog).queryByRole('slider', { name: "Stephen's Bed target level" })).not.toBeInTheDocument()
       act(() => vi.advanceTimersByTime(300))
       expect(mockCallServiceCalls).toEqual([

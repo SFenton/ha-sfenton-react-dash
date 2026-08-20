@@ -10,6 +10,7 @@ type ControlSliderCircularProps = {
     highColor?: string
     lowColor?: string
   }
+  current?: number
   disabled?: boolean
   dual?: boolean
   high?: number | string
@@ -27,7 +28,7 @@ type ControlSliderCircularProps = {
   value?: number | string
 }
 
-export function ControlSliderCircular({ 'aria-hidden': ariaHidden, className, colors, disabled, dual, high, inactive, inert, label, low, max, min, onChange, onChangeApplied, onPointerUpCapture, readonly, step, value }: ControlSliderCircularProps) {
+export function ControlSliderCircular({ 'aria-hidden': ariaHidden, className, colors, current, disabled, dual, high, inactive, inert, label, low, max, min, onChange, onChangeApplied, onPointerUpCapture, readonly, step, value }: ControlSliderCircularProps) {
   const values = dual ? [{ type: 'low' as const, value: low }, { type: 'high' as const, value: high }] : [{ type: 'value' as const, value }]
   const style = {
     '--ha-control-slider-color': colors?.color,
@@ -35,8 +36,8 @@ export function ControlSliderCircular({ 'aria-hidden': ariaHidden, className, co
     '--ha-control-slider-low-color': colors?.lowColor,
   } as CSSProperties
   return (
-    <div aria-hidden={ariaHidden} className={className} data-inactive={inactive ? 'true' : 'false'} data-testid="control-slider-circular" inert={inert} style={style}>
-      {values.map((slider) => (
+    <div aria-hidden={ariaHidden} className={className} data-hakit-current={current} data-inactive={inactive ? 'true' : 'false'} data-testid="control-slider-circular" inert={inert} style={style}>
+      {!disabled && values.map((slider) => (
         <input
           aria-label={label}
           aria-readonly={readonly}

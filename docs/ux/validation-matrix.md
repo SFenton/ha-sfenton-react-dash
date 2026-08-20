@@ -11,6 +11,7 @@ mutation.
 | HA behavior | State/service matrices cover every displayed-state branch without duplicating HA-owned side effects. | Focused mocked HAKit tests; no live service call. |
 | Visual system | Established materials, density, type, state treatment, safe areas, scrolling, and stable dimensions remain intact. | Same-viewport screenshots and computed-style/DOM evidence. |
 | Interaction feedback | No press-only visual `:active` feedback; persistent dragging and state feedback remain. | Design checker, unit coverage, and touch/keyboard browser pass. |
+| Dial markers | Target/current meanings, one-slider ownership, read-only versus disabled state, marker ordering, zero/range behavior, and same-scale live data remain consistent. | Primitive tests plus real-HAKit mobile DOM/focus and screenshot evidence. |
 | Accessibility | Names, roles, focus order, target size, checked/selected state, keyboard behavior, and unavailable state remain valid. | Unit/accessibility assertions plus browser pass. |
 | Copy/i18n | Static visible copy stays catalog-backed with no stale keys. | `npm run i18n:check` and focused i18n tests when copy changes. |
 | Static design rules | Baseline debt does not increase for raw colors, undefined `--rd-*`, direct disclosure imports, or visual `:active` rules. | `npm run design:check` and `npm run test:design`. |

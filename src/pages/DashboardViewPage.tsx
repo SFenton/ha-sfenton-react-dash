@@ -44,7 +44,7 @@ import {
   type MediaRemoteModalTab,
   type ThermostatModalTab,
 } from '../constants/surfaceSemantics'
-import { CircularControlDial } from '../components/hass/CircularControlDial'
+import { CircularControlDial, type CircularDialHandle, type CircularDialMarker } from '../components/hass/CircularControlDial'
 import { SleepypodActiveAlarmSection } from '../components/hass/SleepypodActiveAlarmSection'
 import { isSleepypodAlarmActive, sleepypodAlarmState, sleepypodAlarmStatusText } from '../components/hass/sleepypodAlarmState'
 import {
@@ -168,8 +168,13 @@ import { RecipesPage } from './RecipesPage'
 import styles from './DashboardViewPage.module.css'
 
 const SLEEPYPOD_COPY_NAMESPACE = 'modalSleepypod' as const
+const SLEEPYPOD_DIAL_KEYS = {
+  summaryWithCurrent: 'dial.summaryWithCurrent',
+} as const
 const SLEEPYPOD_HOT_FLASH_KEYS = {
   cooling: 'hotFlash.coolingStatus',
+  remaining: 'hotFlash.remainingStatus',
+  tileCooling: 'hotFlash.tileCoolingStatus',
 } as const
 
 interface DashboardViewPageProps {
@@ -982,7 +987,7 @@ function DefaultRoomSourceCard({ card, eightSleepModalState, onOpen }: RoomSourc
     ? [subtitleEntityOne, subtitleEntityTwo].slice(0, effectiveSubtitleEntityIds.length).map((subtitleEntity) => formatRoomSourceSubtitleEntity(subtitleEntity)).join(' • ')
     : effectiveShowState ? formatRoomSourceState(card, entity) : undefined
   const displayUnavailable = eightSleepModalState ? !eightSleepModalState.sideAvailable : unavailable
-  const displaySubtitle = eightSleepModalState ? eightSleepModalState.subtitle : subtitle
+  const displaySubtitle = eightSleepModalState ? eightSleepModalState.tileSubtitle : subtitle
   const clickable = Boolean(card.hash || card.action) && !displayUnavailable && !disabledByState
   const activeByState = Boolean(entity && card.activeStates?.includes(entity.state))
   const sourceStateInactive = card.stateDisplay === 'climate-action-temperature' && (entity?.state === 'off' || entity?.attributes.hvac_action === 'off')
@@ -1115,7 +1120,7 @@ function EmptyRoomState() {
 
 function SourceRoomPage({ onNavigate, preload = false, preloadHash, preloadHashes = [], room }: { onNavigate: (path: string) => void; preload?: boolean; preloadHash?: string; preloadHashes?: string[]; room: (typeof ROOM_PAGE_CONFIGS)[string] }) {
   const [selectedCard, setSelectedCard] = useState<RoomSourceCardConfig | null>(null)
-  const eightSleepModalStates = useEightSleepBedModalStates()
+  const eightSleepModalStates = useEightSleepBedModalStates(preload)
   const allCards = useMemo(() => [...room.overviewCards, ...room.sourceSections.flatMap((section) => section.cards)], [room.overviewCards, room.sourceSections])
   const bathroomFan = allCards.map((card) => card.control === 'bathroom-fan' ? bathroomFanForPowerEntity(card.entityId) : undefined).find(Boolean)
   const preloadCard = preloadHash ? allCards.find((candidate) => candidate.hash === preloadHash) ?? null : null
@@ -2547,11 +2552,14 @@ interface EightSleepBedModalState {
   commitTargetTemperature: (value: number) => void
   controlMode: 'climate' | 'legacy'
   controlsSideOn: boolean
+  currentLevel: number | null
   currentTemperature: number | null
   displayedTargetValue: number | null
   heroAction: string
   hotFlashActive: boolean
   hotFlashAvailable: boolean
+  hotFlashCountdown: string | null
+  hotFlashHolding: boolean
   schedulePhaseAvailable: boolean
   sideAvailable: boolean
   subtitle: string
@@ -2559,6 +2567,7 @@ interface EightSleepBedModalState {
   targetMin: number
   targetScale: 'level' | 'temperature'
   targetStep: number
+  tileSubtitle: string
 }
 
 interface BedTemperatureScopeRequest {
@@ -2794,6 +2803,11 @@ function freeSleepBedtimeSetTopic(side: FreeSleepSide) {
 
 function eightSleepLevelToFahrenheit(level: number) {
   return Math.round(EIGHT_SLEEP_LEVEL_ZERO_F + (level / FREE_SLEEP_TARGET_MAX) * EIGHT_SLEEP_LEVEL_RANGE_F)
+}
+
+function eightSleepFahrenheitToLevel(temperature: number, min: number, max: number) {
+  const level = ((temperature - EIGHT_SLEEP_LEVEL_ZERO_F) / EIGHT_SLEEP_LEVEL_RANGE_F) * FREE_SLEEP_TARGET_MAX
+  return Math.max(min, Math.min(max, level))
 }
 
 function scheduleTemperatureEntries(daySchedule: FreeSleepDailySchedule | undefined, powerOn: string) {
@@ -3120,9 +3134,9 @@ function eightSleepCardBackgroundColor(modalState: EightSleepBedModalState) {
   return 'rgba(67, 160, 71, 0.6)'
 }
 
-function useEightSleepBedModalStates() {
-  const stephenState = useEightSleepBedModalState(EIGHT_SLEEP_SIDE_CONFIGS[0])
-  const stephState = useEightSleepBedModalState(EIGHT_SLEEP_SIDE_CONFIGS[1])
+function useEightSleepBedModalStates(preload = false) {
+  const stephenState = useEightSleepBedModalState(EIGHT_SLEEP_SIDE_CONFIGS[0], preload)
+  const stephState = useEightSleepBedModalState(EIGHT_SLEEP_SIDE_CONFIGS[1], preload)
 
   return {
     [EIGHT_SLEEP_SIDE_CONFIGS[0].hash]: stephenState,
@@ -3130,9 +3144,12 @@ function useEightSleepBedModalStates() {
   }
 }
 
-function useEightSleepBedModalState(side: EightSleepSideConfig | undefined): EightSleepBedModalState {
+function useEightSleepBedModalState(side: EightSleepSideConfig | undefined, preload = false): EightSleepBedModalState {
+  const sleepypodCopy = useCopy(SLEEPYPOD_COPY_NAMESPACE)
   const climateEntity = useEntity(asEntityName(side?.climateEntityId ?? 'climate.sleepypod_unselected_side'), { returnNullIfNotFound: true })
   const hotFlashActiveEntity = useEntity(asEntityName(side?.hotFlashActiveEntityId ?? 'input_boolean.free_sleep_unselected_hot_flash_active'), { returnNullIfNotFound: true })
+  const hotFlashRestoreAtEntity = useEntity(asEntityName(side?.hotFlashRestoreAtEntityId ?? 'input_datetime.sleepypod_unselected_hot_flash_restore_at'), { returnNullIfNotFound: true })
+  const hotFlashTimerEntity = useEntity(asEntityName(side?.hotFlashTimerEntityId ?? 'timer.sleepypod_unselected_hot_flash'), { returnNullIfNotFound: true })
   const schedulePhaseEntity = useEntity(asEntityName(side ? SLEEPYPOD_SCHEDULE_PHASE_ENTITY_IDS[side.scheduleSide] : 'sensor.sleepypod_unselected_schedule_phase'), { returnNullIfNotFound: true })
   const targetLevelEntity = useEntity(asEntityName(side?.targetLevelEntityId ?? 'number.sleepypod_unselected_target_level'), { returnNullIfNotFound: true })
   const targetEntity = useEntity(asEntityName(side?.targetTemperatureEntityId ?? 'number.free_sleep_unselected_target_temperature'), { returnNullIfNotFound: true })
@@ -3143,6 +3160,7 @@ function useEightSleepBedModalState(side: EightSleepSideConfig | undefined): Eig
   const stablePowerEntity = useRecentAvailableEntity(powerEntity, EIGHT_SLEEP_UNAVAILABLE_HOLD_MS)
   const stableTargetEntity = useRecentAvailableEntity(targetEntity, EIGHT_SLEEP_UNAVAILABLE_HOLD_MS)
   const stableCurrentEntity = useRecentAvailableEntity(currentEntity, EIGHT_SLEEP_UNAVAILABLE_HOLD_MS)
+  const [hotFlashNow, setHotFlashNow] = useState(() => Date.now())
   const useClimateEntity = Boolean(side?.climateEntityId && stableClimateEntity && !isUnavailable(stableClimateEntity))
   const useTargetLevelEntity = Boolean(side?.targetLevelEntityId && stableTargetLevelEntity && !isUnavailable(stableTargetLevelEntity))
   const sleepypodAdapterConfigured = Boolean(side?.climateEntityId && side?.targetLevelEntityId)
@@ -3173,6 +3191,7 @@ function useEightSleepBedModalState(side: EightSleepSideConfig | undefined): Eig
   const targetStep = useSleepypodAdapter
     ? numberValue(stableTargetLevelEntity?.attributes.step) ?? FREE_SLEEP_TARGET_STEP
     : numberValue(stableTargetEntity?.attributes.step) ?? FREE_SLEEP_TARGET_STEP
+  const currentLevel = currentTemperature === null ? null : eightSleepFahrenheitToLevel(currentTemperature, targetMin, targetMax)
   const liveHotFlashActive = Boolean(side && hotFlashActiveEntity && !isUnavailable(hotFlashActiveEntity) && hotFlashActiveEntity.state === 'on')
   const hotFlashAvailable = Boolean(side && hotFlashActiveEntity && !isUnavailable(hotFlashActiveEntity))
   const schedulePhaseState = schedulePhaseEntity?.state
@@ -3183,11 +3202,28 @@ function useEightSleepBedModalState(side: EightSleepSideConfig | undefined): Eig
   const [displayedTargetValueRaw, commitTargetTemperature, cancelTargetTemperature] = useOptimisticState(liveTargetTemperature, { clearOn: 'confirmation', confirmationHoldMs: targetConfirmationHoldMs, revertMs: FREE_SLEEP_TARGET_REVERT_MS })
   const [displaySideOn, commitDisplaySideOn] = useOptimisticState(liveSideOn, { clearOn: 'confirmation', revertMs: EIGHT_SLEEP_POWER_REVERT_MS })
   const previousSchedulePhaseStateRef = useRef(schedulePhaseState)
+  const hotFlashHolding = displayHotFlashActive && isOccupancyActive(hotFlashTimerEntity)
+  const hotFlashCountdown = hotFlashHolding ? eightSleepHotFlashCountdown(hotFlashTimerEntity, hotFlashRestoreAtEntity, hotFlashNow) : null
   const displayedTargetValue = displayHotFlashActive ? targetMin : displayedTargetValueRaw
   const controlsSideOn = sideAvailable && displaySideOn
   const heroAction = eightSleepTemperatureAction(displayedTargetValue, controlsSideOn)
   const targetText = formatEightSleepTargetLevel(displayedTargetValue)
   const subtitle = displayHotFlashActive ? 'Hot Flash Mode' : controlsSideOn ? `${titleCaseState(heroAction)} • ${targetText}` : 'Off'
+  const tileSubtitle = displayHotFlashActive
+    ? hotFlashHolding && hotFlashCountdown
+      ? sleepypodCopy(SLEEPYPOD_HOT_FLASH_KEYS.remaining, { countdown: hotFlashCountdown })
+      : sleepypodCopy(SLEEPYPOD_HOT_FLASH_KEYS.tileCooling)
+    : subtitle
+
+  useEffect(() => {
+    if (preload || !hotFlashHolding) return undefined
+    const syncTimer = window.setTimeout(() => setHotFlashNow(Date.now()), 0)
+    const interval = window.setInterval(() => setHotFlashNow(Date.now()), 1000)
+    return () => {
+      window.clearTimeout(syncTimer)
+      window.clearInterval(interval)
+    }
+  }, [hotFlashHolding, preload])
 
   useEffect(() => {
     if (previousSchedulePhaseStateRef.current === schedulePhaseState) return
@@ -3203,11 +3239,14 @@ function useEightSleepBedModalState(side: EightSleepSideConfig | undefined): Eig
     commitTargetTemperature,
     controlMode: useSleepypodAdapter ? 'climate' : 'legacy',
     controlsSideOn,
+    currentLevel,
     currentTemperature,
     displayedTargetValue,
     heroAction,
     hotFlashActive: displayHotFlashActive,
     hotFlashAvailable,
+    hotFlashCountdown,
+    hotFlashHolding,
     schedulePhaseAvailable: schedulePhaseIsAvailable,
     sideAvailable,
     subtitle,
@@ -3215,6 +3254,7 @@ function useEightSleepBedModalState(side: EightSleepSideConfig | undefined): Eig
     targetMin,
     targetScale,
     targetStep,
+    tileSubtitle,
   }
 }
 
@@ -3388,13 +3428,10 @@ function ThermostatDial({ actionOverride, entityId, inactiveOverride, interactiv
       actionText={hvacAction}
       ariaLabel={`${title} thermostat ${hvacAction} ${[primaryValueOverride ?? formatTemperatureValue(currentTemperature, unit), displayRangeText].filter(Boolean).join(' ')}`}
       colors={thermostatSliderColors(rawHvacAction)}
-      current={current}
       disabled={disabled}
       dual={hasRange}
       handles={!disabled && interactive ? handleTargets.map((handle) => ({
         accessible: false,
-        ariaLabel: `${title} ${handle.type} target`,
-        ariaValueText: formatTemperatureValue(handle.value, unit),
         color: handle.type === 'low' ? THERMOSTAT_HEAT_COLOR : handle.type === 'high' ? THERMOSTAT_COOL_COLOR : actionColor ?? THERMOSTAT_NEUTRAL_COLOR,
         dataTarget: handle.type,
         dragging: activeHandle?.type === handle.type,
@@ -3409,6 +3446,12 @@ function ThermostatDial({ actionOverride, entityId, inactiveOverride, interactiv
       inactive={inactive}
       label={`${title} target temperature`}
       low={displayLow ?? undefined}
+      markers={disabled || current === undefined ? [] : [{
+        color: actionColor ?? THERMOSTAT_NEUTRAL_COLOR,
+        id: 'current-temperature',
+        kind: 'current',
+        value: current,
+      }]}
       max={maxTemperature}
       min={minTemperature}
       onChange={updateDisplayedTarget}
@@ -3444,6 +3487,7 @@ function EightSleepThermostatHero({
   onRequestTemperatureScope?: (value: number, phase: SleepypodSchedulePhase, returnFocus: HTMLElement | null) => void
   side: EightSleepSideConfig
 }) {
+  const sleepypodCopy = useCopy(SLEEPYPOD_COPY_NAMESPACE)
   const callService = useCallService()
   const dialRef = useRef<HTMLDivElement>(null)
   const dialTapCandidateRef = useRef<{ moved: boolean; pointerId: number; startX: number; startY: number } | null>(null)
@@ -3473,9 +3517,14 @@ function EightSleepThermostatHero({
   const heroTargetText = displayedTargetValue === null ? '--' : formatBedTargetValue(displayedTargetValue, modalState)
   const heroReadoutAction = controlsSideOn ? titleCaseState(heroAction) : null
   const heroReadoutText = controlsSideOn ? heroTargetText : 'OFF'
+  const heroCurrentText = controlsSideOn && currentTemperature !== null ? formatTemperatureCompact(currentTemperature) : null
   const heroLabel = !sideAvailable
     ? `${side.title} thermostat unavailable`
-    : controlsSideOn ? `${side.title} thermostat ${heroReadoutAction} ${heroTargetText}` : `${side.title} thermostat Off`
+    : controlsSideOn
+      ? heroCurrentText
+        ? sleepypodCopy(SLEEPYPOD_DIAL_KEYS.summaryWithCurrent, { action: heroReadoutAction, current: heroCurrentText, side: side.title, target: heroTargetText })
+        : `${side.title} thermostat ${heroReadoutAction} ${heroTargetText}`
+      : `${side.title} thermostat Off`
   const heroHintText = !sideAvailable
     ? 'Bed controls are unavailable.'
     : !controlsSideOn
@@ -3696,6 +3745,38 @@ function EightSleepThermostatHero({
     else callService({ domain: 'switch', service: 'turn_off', target: side.powerSwitchEntityId })
   }
 
+  const targetHandleColor = thermostatActionColor(heroAction) ?? THERMOSTAT_NEUTRAL_COLOR
+  const dialHandles: CircularDialHandle[] = canSetTarget ? [{
+    ariaLabel: targetSliderLabel,
+    ariaValueText: heroTargetText,
+    color: targetHandleColor,
+    dataTarget: 'value',
+    dragging: targetDragging,
+    elementRef: targetSliderRef,
+    id: 'value',
+    onKeyDown: adjustTargetFromKeyboard,
+    onPointerCancel: cancelTargetDrag,
+    onPointerDown: startTargetDrag,
+    onPointerMove: moveTargetDrag,
+    onPointerUp: endTargetDrag,
+    value: sliderValue,
+  }] : []
+  const dialMarkers: CircularDialMarker[] = [
+    ...(modalState.hotFlashActive ? [{
+      color: targetHandleColor,
+      id: 'hot-flash-target',
+      kind: 'target' as const,
+      value: targetMin,
+    }] : []),
+    ...(controlsSideOn && modalState.currentLevel !== null ? [{
+      color: targetHandleColor,
+      id: 'current-level',
+      kind: 'current' as const,
+      value: modalState.currentLevel,
+    }] : []),
+  ]
+  const dialDisabled = !sideAvailable || !controlsSideOn
+
   return (
     <div className={styles.eightSleepThermostatHero}>
       <div className={styles.eightSleepThermostatControl}>
@@ -3703,26 +3784,12 @@ function EightSleepThermostatHero({
           actionText={heroReadoutAction}
           ariaLabel={heroLabel}
           colors={thermostatSliderColors(heroAction)}
-          current={0}
-          disabled={!canSetTarget}
-          handles={canSetTarget ? [{
-            ariaLabel: targetSliderLabel,
-            ariaValueText: heroTargetText,
-            color: thermostatActionColor(heroAction) ?? THERMOSTAT_NEUTRAL_COLOR,
-            dataTarget: 'value',
-            dragging: targetDragging,
-            elementRef: targetSliderRef,
-            id: 'value',
-            onKeyDown: adjustTargetFromKeyboard,
-            onPointerCancel: cancelTargetDrag,
-            onPointerDown: startTargetDrag,
-            onPointerMove: moveTargetDrag,
-            onPointerUp: endTargetDrag,
-            value: sliderValue,
-          }] : []}
+          disabled={dialDisabled}
+          handles={dialHandles}
           inactive={!controlsSideOn}
           inert
           label={targetSliderLabel}
+          markers={dialMarkers}
           max={targetMax}
           min={targetMin}
           mode="full"
@@ -3736,6 +3803,12 @@ function EightSleepThermostatHero({
           primaryText={heroReadoutText}
           readonly={!canSetTarget}
           ref={dialRef}
+          secondaryText={heroCurrentText ? (
+            <>
+              <MaterialIcon name="mdi:thermometer" size={17} />
+              {heroCurrentText}
+            </>
+          ) : undefined}
           size="modal"
           step={targetStep}
           value={sliderValue}
@@ -4430,21 +4503,12 @@ function EightSleepScheduleTemperatureControl({
 
 function EightSleepHotFlashButton({ modalState, side }: { modalState: EightSleepBedModalState; side: EightSleepSideConfig }) {
   const copy = useCopy(SLEEPYPOD_COPY_NAMESPACE)
-  const restoreAtEntity = useEntity(asEntityName(side.hotFlashRestoreAtEntityId), { returnNullIfNotFound: true })
-  const timerEntity = useEntity(asEntityName(side.hotFlashTimerEntityId), { returnNullIfNotFound: true })
   const callService = useCallService()
-  const [now, setNow] = useState(() => Date.now())
   const unavailable = !modalState.hotFlashAvailable
   const active = modalState.hotFlashActive
-  const holding = active && timerEntity?.state === 'active'
+  const holding = modalState.hotFlashHolding
   const stateText = unavailable ? 'Unavailable' : active ? 'Active' : 'Inactive'
-  const countdown = holding ? eightSleepHotFlashCountdown(timerEntity, restoreAtEntity, now) : null
-
-  useEffect(() => {
-    if (!holding) return undefined
-    const interval = window.setInterval(() => setNow(Date.now()), 1000)
-    return () => window.clearInterval(interval)
-  }, [holding])
+  const countdown = modalState.hotFlashCountdown
 
   const activate = () => {
     if (unavailable) return
@@ -4463,7 +4527,7 @@ function EightSleepHotFlashButton({ modalState, side }: { modalState: EightSleep
       {active && (
         <div className={styles.eightSleepHotFlashStatus}>
           <span className={styles.eightSleepHotFlashPhase}>
-            {holding ? countdown : copy(SLEEPYPOD_HOT_FLASH_KEYS.cooling)}
+            {holding ? countdown ?? copy(SLEEPYPOD_HOT_FLASH_KEYS.cooling) : copy(SLEEPYPOD_HOT_FLASH_KEYS.cooling)}
           </span>
           <button aria-label={`Cancel ${side.title} hot flash mode`} className={styles.eightSleepCancelButton} onClick={cancel} type="button">
             <MaterialIcon name="mdi:close" size={20} />

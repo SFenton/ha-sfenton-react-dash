@@ -8,7 +8,6 @@ describe('CircularControlDial', () => {
       <CircularControlDial
         ariaLabel="Example dial"
         colors={{ color: '#00aa88' }}
-        current={0}
         handles={[{ ariaLabel: 'Target', ariaValueText: 'Level 4', color: '#00aa88', id: 'target', value: 4 }]}
         inactive
         label="Example"
@@ -48,5 +47,71 @@ describe('CircularControlDial', () => {
     const readout = screen.getByText('Sleep').closest('[data-primary-variant]')
     expect(readout).toHaveAttribute('data-primary-variant', 'wide-status')
     expect(readout).toHaveAttribute('data-off', 'false')
+  })
+
+  it('renders ordered static markers without slider semantics', () => {
+    render(
+      <CircularControlDial
+        ariaLabel="Hot flash dial"
+        colors={{ color: '#00aa88' }}
+        disabled
+        label="Hot flash"
+        markers={[
+          {
+            color: '#00aa88',
+            id: 'current',
+            kind: 'current',
+            value: -2,
+          },
+          {
+            id: 'target',
+            kind: 'target',
+            value: -10,
+          },
+        ]}
+        max={10}
+        min={-10}
+        primaryText="-10"
+        readonly
+        step={1}
+        value={-10}
+      />,
+    )
+
+    const dial = screen.getByRole('region', { name: 'Hot flash dial' })
+    const markers = dial.querySelectorAll('[data-marker]')
+    expect(markers).toHaveLength(2)
+    expect(markers[0]).toHaveAttribute('data-marker', 'target')
+    expect(markers[0]).toHaveAttribute('data-value', '-10')
+    expect(markers[1]).toHaveAttribute('data-marker', 'current')
+    expect(markers[1]).toHaveAttribute('data-value', '-2')
+    expect(screen.queryByRole('slider')).not.toBeInTheDocument()
+    expect(screen.getByTestId('control-slider-circular')).not.toHaveAttribute('data-hakit-current')
+  })
+
+  it('keeps zero markers and safely positions finite out-of-range values', () => {
+    render(
+      <CircularControlDial
+        ariaLabel="Measured dial"
+        colors={{ color: '#00aa88' }}
+        label="Measured"
+        markers={[
+          { id: 'zero', kind: 'current', value: 0 },
+          { id: 'high', kind: 'current', value: 12 },
+          { id: 'invalid', kind: 'current', value: Number.NaN },
+        ]}
+        max={10}
+        min={-10}
+        primaryText="0"
+        step={1}
+        value={0}
+      />,
+    )
+
+    const dial = screen.getByRole('region', { name: 'Measured dial' })
+    expect(dial.querySelector('[data-value="0"]')).toHaveAttribute('data-clamped', 'false')
+    expect(dial.querySelector('[data-value="12"]')).toHaveAttribute('data-position-value', '10')
+    expect(dial.querySelector('[data-value="12"]')).toHaveAttribute('data-clamped', 'true')
+    expect(dial.querySelectorAll('[data-marker]')).toHaveLength(2)
   })
 })
