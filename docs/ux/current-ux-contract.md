@@ -58,9 +58,9 @@ the shared behavior layer rather than duplicating HA-owned side effects.
   description.
 - Automatic or HA-owned control is read-only, not unavailable. Do not mark the
   whole dial disabled merely because a current marker cannot be adjusted.
-- Render static target markers before current markers so the smaller current
-  marker remains visible when both values overlap. Distinguish them by size
-  and fill treatment, not color alone.
+- Render live current markers beneath adjustable and fixed target markers so
+  the target owns the visual state when both values overlap. Distinguish them
+  by size and fill treatment, not color alone.
 
 ## Modal contract
 

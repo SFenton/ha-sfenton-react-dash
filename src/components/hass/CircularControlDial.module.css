@@ -138,7 +138,7 @@
   width: 18px;
   height: 18px;
   border: 3px solid var(--color-text);
-  background: var(--color-modal-surface);
+  background: var(--rd-dial-current-fill);
   box-shadow: var(--rd-dial-current-shadow);
 }
 

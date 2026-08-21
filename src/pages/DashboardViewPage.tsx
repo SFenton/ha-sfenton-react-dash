@@ -2810,6 +2810,23 @@ function eightSleepFahrenheitToLevel(temperature: number, min: number, max: numb
   return Math.max(min, Math.min(max, level))
 }
 
+function eightSleepCurrentLevel(
+  currentTemperature: number,
+  min: number,
+  max: number,
+  liveTargetLevel: number | null,
+  liveTargetTemperature: number | null,
+) {
+  if (
+    liveTargetLevel !== null
+    && liveTargetTemperature !== null
+    && Math.abs(currentTemperature - liveTargetTemperature) <= 0.5
+  ) {
+    return Math.max(min, Math.min(max, liveTargetLevel))
+  }
+  return eightSleepFahrenheitToLevel(currentTemperature, min, max)
+}
+
 function scheduleTemperatureEntries(daySchedule: FreeSleepDailySchedule | undefined, powerOn: string) {
   return Object.entries(daySchedule?.temperatures ?? {})
     .map(([time, value]) => {
@@ -3191,7 +3208,12 @@ function useEightSleepBedModalState(side: EightSleepSideConfig | undefined, prel
   const targetStep = useSleepypodAdapter
     ? numberValue(stableTargetLevelEntity?.attributes.step) ?? FREE_SLEEP_TARGET_STEP
     : numberValue(stableTargetEntity?.attributes.step) ?? FREE_SLEEP_TARGET_STEP
-  const currentLevel = currentTemperature === null ? null : eightSleepFahrenheitToLevel(currentTemperature, targetMin, targetMax)
+  const liveTargetPhysicalTemperature = useSleepypodAdapter
+    ? numberValue(stableTargetLevelEntity?.attributes.targetTemperature) ?? numberValue(stableClimateEntity?.attributes.temperature)
+    : null
+  const currentLevel = currentTemperature === null
+    ? null
+    : eightSleepCurrentLevel(currentTemperature, targetMin, targetMax, liveTargetTemperature, liveTargetPhysicalTemperature)
   const liveHotFlashActive = Boolean(side && hotFlashActiveEntity && !isUnavailable(hotFlashActiveEntity) && hotFlashActiveEntity.state === 'on')
   const hotFlashAvailable = Boolean(side && hotFlashActiveEntity && !isUnavailable(hotFlashActiveEntity))
   const schedulePhaseState = schedulePhaseEntity?.state

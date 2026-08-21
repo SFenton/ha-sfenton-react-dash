@@ -21,12 +21,18 @@ test.describe('real HAKit dial integration', () => {
       const style = getComputedStyle(marker)
       const rect = marker.getBoundingClientRect()
       return {
+        backgroundColor: style.backgroundColor,
         height: rect.height,
         pointerEvents: style.pointerEvents,
         width: rect.width,
       }
     })
-    expect(markerStyle).toEqual({ height: 18, pointerEvents: 'none', width: 18 })
+    expect(markerStyle).toEqual({
+      backgroundColor: 'rgba(112, 117, 126, 0.98)',
+      height: 18,
+      pointerEvents: 'none',
+      width: 18,
+    })
 
     const sliderState = await mistDial.evaluate((dial) => ({
       exposed: Array.from(dial.querySelectorAll('[role="slider"]')).filter((element) => !element.closest('[aria-hidden="true"]')).length,
@@ -37,6 +43,11 @@ test.describe('real HAKit dial integration', () => {
 
     const adjustableSlider = mistDial.getByRole('slider', { name: 'Mist level' })
     if (await adjustableSlider.count()) {
+      expect(await mistDial.evaluate((dial) => {
+        const current = dial.querySelector('[data-marker="current"]')
+        const target = Array.from(dial.querySelectorAll('[role="slider"]')).find((element) => !element.closest('[aria-hidden="true"]'))
+        return Boolean(current && target && (current.compareDocumentPosition(target) & Node.DOCUMENT_POSITION_FOLLOWING))
+      })).toBe(true)
       await dialog.getByRole('button', { name: 'Close' }).focus()
       await page.keyboard.press('Tab')
       const focused = await page.evaluate(() => ({
