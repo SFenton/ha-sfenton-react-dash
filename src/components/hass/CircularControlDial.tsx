@@ -90,12 +90,30 @@ interface CircularControlDialProps {
 
 function positionedCircularDialMarkers(markers: CircularDialMarker[], min: number, max: number): PositionedCircularDialMarker[] {
   if (!Number.isFinite(min) || !Number.isFinite(max) || max <= min) return []
-  return [...markers.filter((marker) => marker.kind === 'target'), ...markers.filter((marker) => marker.kind === 'current')]
-    .flatMap((marker) => {
-      if (!Number.isFinite(marker.value)) return []
-      const positionValue = Math.max(min, Math.min(max, marker.value))
-      return [{ ...marker, clamped: positionValue !== marker.value, positionValue }]
-    })
+  return markers.flatMap((marker) => {
+    if (!Number.isFinite(marker.value)) return []
+    const positionValue = Math.max(min, Math.min(max, marker.value))
+    return [{ ...marker, clamped: positionValue !== marker.value, positionValue }]
+  })
+}
+
+function CircularDialMarkerLayer({ markers, min, max }: { markers: PositionedCircularDialMarker[]; min: number; max: number }) {
+  if (markers.length === 0) return null
+  return (
+    <div aria-hidden="true" className={styles.markerLayer} data-marker-layer={markers[0].kind}>
+      {markers.map((marker) => (
+        <span
+          className={styles.marker}
+          data-clamped={marker.clamped ? 'true' : 'false'}
+          data-marker={marker.kind}
+          data-position-value={marker.positionValue}
+          data-value={marker.value}
+          key={marker.id}
+          style={circularDialHandleStyle(marker.positionValue, min, max, marker.color)}
+        />
+      ))}
+    </div>
+  )
 }
 
 export const CircularControlDial = forwardRef<HTMLDivElement, CircularControlDialProps>(function CircularControlDial({
@@ -134,6 +152,8 @@ export const CircularControlDial = forwardRef<HTMLDivElement, CircularControlDia
   value,
 }, ref) {
   const positionedMarkers = positionedCircularDialMarkers(markers, min, max)
+  const currentMarkers = positionedMarkers.filter((marker) => marker.kind === 'current')
+  const targetMarkers = positionedMarkers.filter((marker) => marker.kind === 'target')
 
   return (
     <div
@@ -179,6 +199,7 @@ export const CircularControlDial = forwardRef<HTMLDivElement, CircularControlDia
           ))}
         </svg>
       )}
+      <CircularDialMarkerLayer markers={currentMarkers} max={max} min={min} />
       {handles.length > 0 && (
         <div className={styles.handleLayer}>
           {handles.map((handle) => (
@@ -208,21 +229,7 @@ export const CircularControlDial = forwardRef<HTMLDivElement, CircularControlDia
           ))}
         </div>
       )}
-      {positionedMarkers.length > 0 && (
-        <div aria-hidden="true" className={styles.markerLayer}>
-          {positionedMarkers.map((marker) => (
-            <span
-              className={styles.marker}
-              data-clamped={marker.clamped ? 'true' : 'false'}
-              data-marker={marker.kind}
-              data-position-value={marker.positionValue}
-              data-value={marker.value}
-              key={marker.id}
-              style={circularDialHandleStyle(marker.positionValue, min, max, marker.color)}
-            />
-          ))}
-        </div>
-      )}
+      <CircularDialMarkerLayer markers={targetMarkers} max={max} min={min} />
       <div className={styles.readout} data-off={off ? 'true' : 'false'} data-primary-variant={primaryTextVariant} data-readout-state={off ? 'off' : undefined} data-single-value={actionText ? undefined : 'true'}>
         {actionText && <span className={styles.action}>{actionText}</span>}
         <span className={styles.primary}>{primaryText}{primaryUnit && <small>{primaryUnit}</small>}</span>

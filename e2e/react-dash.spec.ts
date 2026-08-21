@@ -1802,6 +1802,43 @@ test('thermostat page accepts the first mobile scroll gesture after closing a ro
   }
 })
 
+test('SleepyPod current marker aligns with a reached physical target', async ({ page }) => {
+  await page.setViewportSize({ width: 393, height: 852 })
+  await page.goto('/at-a-glance/master-bedroom')
+  await page.evaluate(() => {
+    const mock = (window as unknown as {
+      __mockHass: {
+        setEntityAttribute: (entityId: string, attribute: string, value: unknown) => void
+        setEntityState: (entityId: string, state: string) => void
+      }
+    }).__mockHass
+    mock.setEntityState('climate.sleepypod_eight_pod_left_side', 'heat')
+    mock.setEntityAttribute('climate.sleepypod_eight_pod_left_side', 'current_temperature', 85)
+    mock.setEntityState('number.master_bedroom_sleepypod_eight_pod_left_target_level', '1')
+    mock.setEntityAttribute('number.master_bedroom_sleepypod_eight_pod_left_target_level', 'targetTemperature', 85)
+    mock.setEntityState('sensor.sleepypod_stephen_schedule_phase', 'bedtime')
+  })
+
+  await page.getByRole('button', { name: /Stephen's Bed Heating • \+1/i }).click()
+
+  const dial = page.getByRole('dialog').getByRole('region', { name: /Stephen's Bed thermostat Heating \+1 • 85°F/i })
+  const target = dial.getByRole('slider', { name: "Stephen's Bed target level" })
+  const current = dial.locator('[data-marker="current"]')
+  expect(await dial.evaluate((element) => {
+    const currentMarker = element.querySelector('[data-marker="current"]')
+    const targetHandle = Array.from(element.querySelectorAll('[role="slider"]')).find((candidate) => !candidate.closest('[aria-hidden="true"]'))
+    return Boolean(currentMarker && targetHandle && (currentMarker.compareDocumentPosition(targetHandle) & Node.DOCUMENT_POSITION_FOLLOWING))
+  })).toBe(true)
+  await expect.poll(async () => {
+    const targetBox = await target.boundingBox()
+    const currentBox = await current.boundingBox()
+    if (!targetBox || !currentBox) return Number.POSITIVE_INFINITY
+    const targetCenter = { x: targetBox.x + targetBox.width / 2, y: targetBox.y + targetBox.height / 2 }
+    const currentCenter = { x: currentBox.x + currentBox.width / 2, y: currentBox.y + currentBox.height / 2 }
+    return Math.hypot(currentCenter.x - targetCenter.x, currentCenter.y - targetCenter.y)
+  }).toBeLessThanOrEqual(0.5)
+})
+
 test('SleepyPod hot flash keeps the cancel action stable from cooling through the hold', async ({ page }) => {
   await page.setViewportSize({ width: 393, height: 852 })
   await page.goto('/at-a-glance/master-bedroom')

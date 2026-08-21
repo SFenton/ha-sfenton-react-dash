@@ -32,6 +32,7 @@
   --bottom-nav-height: 86px;
   --duration-fast: 160ms;
   --duration-med: 260ms;
+  --rd-dial-current-fill: rgba(112, 117, 126, 0.98);
   --rd-dial-current-shadow: 0 5px 14px rgba(0, 0, 0, 0.32);
   --rd-dial-target-fill: rgba(255, 255, 255, 0.98);
   --rd-dial-target-shadow: 0 8px 18px rgba(0, 0, 0, 0.24);

@@ -3241,7 +3241,7 @@ describe('DashboardViewPage', () => {
     const mistCurrent = mistDial.querySelector('[data-marker="current"]')
     expect(mistTarget).toHaveAttribute('aria-valuenow', '5')
     expect(mistCurrent).toHaveAttribute('data-value', '5')
-    expect(mistTarget.compareDocumentPosition(mistCurrent!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(mistCurrent!.compareDocumentPosition(mistTarget) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     expect(within(dialog).getByRole('navigation', { name: 'Humidifier modal sections' })).toBeInTheDocument()
     expect(within(dialog).getByRole('button', { name: 'Controls' })).toHaveAttribute('aria-current', 'page')
     expect(within(dialog).getByText('46%')).toBeInTheDocument()
@@ -3732,6 +3732,24 @@ describe('DashboardViewPage', () => {
       if (originalScrollTo) Object.defineProperty(HTMLElement.prototype, 'scrollTo', { configurable: true, value: originalScrollTo })
       else Reflect.deleteProperty(HTMLElement.prototype, 'scrollTo')
     }
+  })
+
+  it('aligns the SleepyPod current marker when HA reports the physical target is reached', async () => {
+    setupStephenSleepypodLevelControl('bedtime')
+    mockEntities['climate.sleepypod_eight_pod_left_side'].attributes.current_temperature = 85
+    mockEntities['number.master_bedroom_sleepypod_eight_pod_left_target_level'].state = '1'
+    mockEntities['number.master_bedroom_sleepypod_eight_pod_left_target_level'].attributes.targetTemperature = 85
+    render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
+
+    fireEvent.click(screen.getByRole('button', { name: /Stephen's Bed Heating • \+1/i }))
+
+    const dialog = await screen.findByRole('dialog')
+    const dial = within(dialog).getByRole('region', { name: /Stephen's Bed thermostat Heating \+1 • 85°F/i })
+    const target = within(dial).getByRole('slider', { name: "Stephen's Bed target level" })
+    const current = dial.querySelector('[data-marker="current"]')
+
+    expect(current).toHaveAttribute('data-value', '1')
+    expect(current).toHaveAttribute('style', target.getAttribute('style'))
   })
 
   it('starts SleepyPod hot flash mode in the cooling phase from the bed modal', async () => {
