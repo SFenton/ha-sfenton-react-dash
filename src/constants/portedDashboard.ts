@@ -189,6 +189,15 @@ export const ADMIN_DESCRIPTIONS = {
   autoReset: copy('pageAdmin', 'descriptions.autoReset'),
 } as const
 
+export const ADMIN_SECTION_TITLES = {
+  autoReset: copy('pageAdmin', 'sections.autoReset'),
+  livingRoomPowerRecovery: copy('pageAdmin', 'sections.livingRoomPowerRecovery'),
+  presenceOverrides: copy('pageAdmin', 'sections.presenceOverrides'),
+  relayControlMode: copy('pageAdmin', 'sections.relayControlMode'),
+  securityControls: copy('pageAdmin', 'sections.securityControls'),
+  showSpecific: copy('pageAdmin', 'sections.showSpecific'),
+} as const
+
 export const ADMIN_SECURITY_CONTROLS: EntityTileConfig[] = [
   { title: 'Front Door Auto-Lock', entityId: 'input_boolean.is_front_door_auto_lock_enabled', icon: 'mdi:lock-clock', color: SWITCH_ACTIVE_COLOR, action: { type: 'toggle' }, showSubtitle: true },
 ]
@@ -316,6 +325,7 @@ export const SETTINGS_PAGE_ITEMS: SettingsLinkConfig[] = [
 ]
 
 export const GUEST_CONTROLS_DESCRIPTION = copy('pageGuests', 'description')
+export const GUEST_CONTROLS_TITLE = SETTINGS_PAGE_ITEMS[2].title
 
 const VALETUDO_CONSUMABLES: (Omit<VacuumConsumableConfig, 'entityId'> & { entitySuffix: string })[] = [
   { title: 'Main Brush', entitySuffix: 'main_brush', icon: 'mdi:brush', valueKind: 'duration' },

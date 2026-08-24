@@ -46,6 +46,7 @@ function RecipeSortSheet({ controls, onApplied }: { controls: RecipeControls; on
       )}
       onClose={controls.closeSortSheet}
       open={controls.sortOpen}
+      size="form"
       title="Sort Recipes"
     >
       <fieldset className={styles.fieldset}>
@@ -86,6 +87,7 @@ function RecipeFilterSheet({ controls, onApplied }: { controls: RecipeControls; 
       )}
       onClose={controls.closeFilterSheet}
       open={controls.filterOpen}
+      size="form"
       title="Filter Recipes"
     >
       <div className={styles.sheetStack}>

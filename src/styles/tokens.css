@@ -30,6 +30,11 @@
   --radius-pill: 999px;
   --space-page-x: 16px;
   --bottom-nav-height: 86px;
+  --page-measure-reading: 960px;
+  --page-measure-dashboard: 1280px;
+  --page-measure-media: 1440px;
+  --app-sidebar-width: 248px;
+  --app-sidebar-gap: 0px;
   --duration-fast: 160ms;
   --duration-med: 260ms;
   --rd-dial-current-fill: rgba(112, 117, 126, 0.98);

@@ -29,11 +29,12 @@ applyTo: "src/pages/FoodHubPage*,src/pages/RecipesPage*,src/components/hass/reci
   never add press animation or transient active styling.
 - Recipe Detail has General, Ingredients, and Instructions tabs. React requests the
   bounded DTO only through `evershelf.recipe_detail` with `returnResponse: true`.
-  The icon-only tablist stays in the shared `ModalSheet` footer with tab/tabpanel
-  semantics, roving keyboard focus, and the same pill geometry as other device
-  modal navigation. Capabilities are authoritative, partial metadata remains
-  optional, and the modal stays mounted through its close animation before detail
-  state is cleared.
+  The tablist stays in the shared `ModalSheet.navigation` slot with
+  tab/tabpanel semantics, roving keyboard focus, icon-only compact/mobile
+  presentation, and icon-plus-label centered presentation using the same pill
+  geometry as other device modal navigation. Capabilities are authoritative,
+  partial metadata remains optional, and the modal stays mounted through its
+  close animation before detail state is cleared.
 - General recipe facts use grouped `StatusPill` fields. Normalize the additive
   `ingredient_groups`/`ingredientGroups` contract against the bounded flat
   ingredient list. Reject unsafe counts, duplicate or missing references, invalid

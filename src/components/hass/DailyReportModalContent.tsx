@@ -1,16 +1,16 @@
-import { useMemo, useState, type CSSProperties } from 'react'
-import { CountBadge } from '../core/CountBadge'
+import { useMemo, useState } from 'react'
 import { EmptyState } from '../core/EmptyState'
 import { GlassTile } from '../core/GlassTile'
-import { MaterialIcon } from '../core/Icon'
+import { ModalIconTabNav } from '../core/ModalTabNav'
+import { modalTabId, modalTabPanelId } from '../core/modalTabIds'
 import { EverShelfInventoryPanel, type EverShelfInventoryDetailsTarget } from './EverShelfInventoryPanel'
 import { useEverShelfInventoryControls } from './EverShelfInventoryControls'
 import { TodoListPanel } from './TodoListPanel'
 import { DAILY_REPORT_EXPIRED_FOOD_SCOPE, dailyReportExpiredFoodControls, useExpiredFoodCount, type DailyReportContext } from './dailyReportModal'
 import { DAILY_REPORT_TABS, DAILY_REPORT_USERS, dailyReportRouteUrl, type DailyReportTab } from '../../constants/dailyReport'
 import { dashboardHref, pushDashboardUrl } from '../../hooks/dashboardLocation'
-import { useImmediateVisualTab, useSmoothDisplayedModalTab } from '../../hooks/useSmoothDisplayedModalTab'
 import { VACATION_EMPTY_DESCRIPTION } from '../../constants/portedDashboard'
+import { CORE_COPY_KEYS, CORE_COPY_NAMESPACE, useCopy } from '../../i18n'
 import type { DonetickTaskEditTarget } from './donetickTaskForm'
 import styles from './DailyReportModalContent.module.css'
 
@@ -19,41 +19,29 @@ const NO_EXPIRED_FOOD_EMPTY_STATE = {
   layout: 'modal',
   title: 'No Expired Food',
 } as const
+const DAILY_REPORT_TAB_ID_PREFIX = 'daily-report'
+const DAILY_REPORT_TAB_PANEL_ID = modalTabPanelId(DAILY_REPORT_TAB_ID_PREFIX, 'content')
 
 /** Only actionable tabs badge; upcoming chores are informational so they never get one. */
 export function DailyReportModalNav({ activeTab, counts, onTabChange }: { activeTab: DailyReportTab; counts?: Partial<Record<DailyReportTab, number>>; onTabChange: (tab: DailyReportTab) => void }) {
-  const { clearVisualTab, setVisualTabNow, visualActiveTab } = useImmediateVisualTab(activeTab)
-  const navStyle = { '--daily-report-nav-cols': DAILY_REPORT_TABS.length } as CSSProperties
+  const copy = useCopy(CORE_COPY_NAMESPACE)
 
   return (
-    <nav aria-label="Daily report sections" className={styles.nav} style={navStyle}>
-      {DAILY_REPORT_TABS.map((item) => {
-        const isActive = visualActiveTab === item.tab
+    <ModalIconTabNav
+      activeTab={activeTab}
+      idPrefix={DAILY_REPORT_TAB_ID_PREFIX}
+      label={copy(CORE_COPY_KEYS.modal.dailyReportSections)}
+      onTabChange={onTabChange}
+      panelId={DAILY_REPORT_TAB_PANEL_ID}
+      tabs={DAILY_REPORT_TABS.map((item) => {
         const count = counts?.[item.tab] ?? 0
-        return (
-          <button
-            aria-current={activeTab === item.tab ? 'page' : undefined}
-            aria-label={count > 0 ? `${item.label}, ${count} ${count === 1 ? 'item' : 'items'}` : item.label}
-            className={styles.navButton}
-            data-active={isActive}
-            key={item.tab}
-            onBlur={clearVisualTab}
-            onClick={() => {
-              setVisualTabNow(item.tab)
-              onTabChange(item.tab)
-            }}
-            onPointerCancel={clearVisualTab}
-            onPointerDown={() => setVisualTabNow(item.tab)}
-            type="button"
-          >
-            <span className={styles.navIcon}>
-              <MaterialIcon name={item.icon} size={22} />
-              <CountBadge className={styles.navBadge} count={count} />
-            </span>
-          </button>
-        )
+        return {
+          ...item,
+          ariaLabel: count > 0 ? copy(CORE_COPY_KEYS.modal.tabItemCount, { count, label: item.label }) : item.label,
+          badgeCount: count,
+        }
       })}
-    </nav>
+    />
   )
 }
 
@@ -121,15 +109,14 @@ function DailyReportUserPicker() {
 
 export function DailyReportModalContent({ activeTab, context, onEditTask, onOpenInventoryDetails, reloadVersion }: { activeTab: DailyReportTab; context: DailyReportContext; onEditTask: (target: DonetickTaskEditTarget) => void; onOpenInventoryDetails: (target: EverShelfInventoryDetailsTarget) => void; reloadVersion: number }) {
   const { user, vacationMode } = context
-  const { displayedTab, transitionState } = useSmoothDisplayedModalTab(activeTab)
 
   if (!user) return <DailyReportUserPicker />
 
   return (
-    <div className={styles.panel} data-modal-tab-transition-state={transitionState} data-tab={displayedTab}>
-      {displayedTab === 'overdue' && <DailyReportTodoTab emptyDescription="You are all caught up on chores that slipped past their due date." emptyTitle="No Chores Due" entityId={user.todoEntityIds.overdue} onEditTask={onEditTask} reloadVersion={reloadVersion} title="Overdue Chores" vacationMode={vacationMode} />}
-      {displayedTab === 'upcoming' && <DailyReportTodoTab emptyDescription="There is nothing else on your schedule for the rest of today." emptyTitle="No Chores Upcoming" entityId={user.todoEntityIds.upcoming} onEditTask={onEditTask} reloadVersion={reloadVersion} title="Upcoming Chores" vacationMode={vacationMode} />}
-      {displayedTab === 'expired-food' && <DailyReportExpiredFoodTab onOpenDetails={onOpenInventoryDetails} vacationMode={vacationMode} />}
+    <div aria-labelledby={modalTabId(DAILY_REPORT_TAB_ID_PREFIX, activeTab)} className={styles.panel} data-tab={activeTab} id={DAILY_REPORT_TAB_PANEL_ID} role="tabpanel">
+      {activeTab === 'overdue' && <DailyReportTodoTab emptyDescription="You are all caught up on chores that slipped past their due date." emptyTitle="No Chores Due" entityId={user.todoEntityIds.overdue} onEditTask={onEditTask} reloadVersion={reloadVersion} title="Overdue Chores" vacationMode={vacationMode} />}
+      {activeTab === 'upcoming' && <DailyReportTodoTab emptyDescription="There is nothing else on your schedule for the rest of today." emptyTitle="No Chores Upcoming" entityId={user.todoEntityIds.upcoming} onEditTask={onEditTask} reloadVersion={reloadVersion} title="Upcoming Chores" vacationMode={vacationMode} />}
+      {activeTab === 'expired-food' && <DailyReportExpiredFoodTab onOpenDetails={onOpenInventoryDetails} vacationMode={vacationMode} />}
     </div>
   )
 }

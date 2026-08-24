@@ -59,6 +59,7 @@ export function CreateTodoItemSheet({ entityId, open, onClose }: CreateTodoItemS
       )}
       onClose={handleClose}
       open={open}
+      size="form"
       title="Add Task"
     >
       <form className={styles.form} id={FORM_ID} onSubmit={handleSubmit}>

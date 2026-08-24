@@ -384,7 +384,7 @@ export function BathroomFanModalContent({ config, preload = false, runtimeActive
 export function BathroomFanModal({ config, onClose, open, roomTitle }: { config: BathroomFanConfig; onClose: () => void; open: boolean; roomTitle: string }) {
   const copy = useCopy(BATHROOM_FAN_COPY_NAMESPACE)
   return (
-    <ModalSheet contentStyle={BATHROOM_FAN_MODAL_STYLE} onClose={onClose} open={open} title={copy(BATHROOM_FAN_COPY_KEYS.title, { room: roomTitle })}>
+    <ModalSheet contentStyle={BATHROOM_FAN_MODAL_STYLE} onClose={onClose} open={open} size="compact" title={copy(BATHROOM_FAN_COPY_KEYS.title, { room: roomTitle })}>
       <BathroomFanModalContent config={config} runtimeActive={open} />
     </ModalSheet>
   )

@@ -18,6 +18,7 @@
 }
 
 .backButton {
+  position: relative;
   display: inline-flex;
   min-width: 0;
   max-width: 100%;
@@ -32,6 +33,12 @@
   font: inherit;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
+}
+
+.backButton::before {
+  position: absolute;
+  inset: -8px 0;
+  content: '';
 }
 
 .backIconSlot {
@@ -103,6 +110,13 @@
   -webkit-tap-highlight-color: transparent;
   backdrop-filter: blur(18px) saturate(1.18);
   -webkit-backdrop-filter: blur(18px) saturate(1.18);
+}
+
+.profileButton::before {
+  position: absolute;
+  inset: -3px;
+  border-radius: inherit;
+  content: '';
 }
 
 .profileButton:focus,
@@ -195,6 +209,22 @@
   content: '';
 }
 
+.backMenuButton {
+  display: none;
+  margin-left: 0;
+  justify-self: auto;
+}
+
+@media (orientation: landscape) and (max-height: 500px) and (max-width: 1119px) {
+  .headerWithBack {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .backMenuButton {
+    display: inline-flex;
+  }
+}
+
 :global([data-route-transition-state='exiting']) .backTitle,
 :global([data-route-transition-state='exiting']) .titleWrap,
 :global([data-route-transition-state='exiting']) .iconButton {
@@ -234,6 +264,28 @@
   .titleWrap,
   .iconButton {
     transition: none;
+  }
+}
+
+@media (min-width: 560px) {
+  .backTitle,
+  .title {
+    font-size: 1.5rem;
+  }
+}
+
+@media (min-width: 1120px) {
+  .headerWithMenu {
+    grid-template-columns: minmax(0, 1fr) 48px;
+    gap: 8px;
+  }
+
+  .headerWithMenu .leading {
+    display: none;
+  }
+
+  .headerWithMenu .titleWrap {
+    margin-left: 0;
   }
 }
 
@@ -343,7 +395,7 @@
 .menuItem {
   display: grid;
   min-height: 46px;
-  grid-template-columns: 30px minmax(0, 1fr);
+  grid-template-columns: 30px minmax(0, 1fr) auto;
   gap: 10px;
   align-items: center;
   border: 0;
@@ -356,6 +408,10 @@
   font-weight: 760;
   text-align: left;
   cursor: pointer;
+}
+
+.sidebarBadge {
+  justify-self: end;
 }
 
 .menuItem[aria-current='page'] {

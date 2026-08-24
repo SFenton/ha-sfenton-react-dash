@@ -69,7 +69,13 @@
 }
 
 .inventoryLoading {
-  min-height: max(260px, calc(100dvh - var(--bottom-nav-height) - 80px - env(safe-area-inset-bottom, 0px)));
+  min-height: max(
+    260px,
+    var(
+      --modal-body-content-height,
+      calc(100dvh - var(--bottom-nav-height) - 80px - env(safe-area-inset-bottom, 0px))
+    )
+  );
 }
 
 .pantryRow {
@@ -357,7 +363,13 @@
 
 .inventoryEmpty {
   --inventory-empty-bottom-reserve: calc(var(--bottom-nav-height) + env(safe-area-inset-bottom, 0px));
-  min-height: max(180px, calc(var(--dashboard-visible-height, var(--dashboard-viewport-height, 100dvh)) - 160px - env(safe-area-inset-top, 0px) - var(--inventory-empty-bottom-reserve)));
+  min-height: max(
+    180px,
+    var(
+      --modal-body-content-height,
+      calc(var(--dashboard-visible-height, var(--dashboard-viewport-height, 100dvh)) - 160px - env(safe-area-inset-top, 0px) - var(--inventory-empty-bottom-reserve))
+    )
+  );
 }
 
 :global(html[data-dashboard-keyboard='open']) .inventoryEmpty {

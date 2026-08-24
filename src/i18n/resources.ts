@@ -7,6 +7,7 @@ import modalRecipe from './locales/en/modals/recipe.json' with { type: 'json' }
 import modalSleepypod from './locales/en/modals/sleepypod.json' with { type: 'json' }
 import modalVacuum from './locales/en/modals/vacuum.json' with { type: 'json' }
 import pageAdmin from './locales/en/pages/admin.json' with { type: 'json' }
+import pageCustomLights from './locales/en/pages/customLights.json' with { type: 'json' }
 import pageFood from './locales/en/pages/food.json' with { type: 'json' }
 import pageGuests from './locales/en/pages/guests.json' with { type: 'json' }
 import pageSecurity from './locales/en/pages/security.json' with { type: 'json' }
@@ -27,6 +28,7 @@ export const resources = {
     modalSleepypod,
     modalVacuum,
     pageAdmin,
+    pageCustomLights,
     pageFood,
     pageGuests,
     pageSecurity,

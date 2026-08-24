@@ -8,7 +8,10 @@ export type ModalSheetStyle = CSSProperties & {
   [key: `--${string}`]: string | number | undefined
 }
 
-interface ModalSheetProps {
+export type ModalSheetSize = 'compact' | 'form' | 'media' | 'standard' | 'workspace'
+export type ModalSheetScrollMode = 'body' | 'panes'
+
+export interface ModalSheetProps {
   open: boolean
   title: string
   onClose: () => void
@@ -18,32 +21,36 @@ interface ModalSheetProps {
   bodyHeader?: ReactNode
   contentStyle?: ModalSheetStyle
   footer?: ReactNode
+  navigation?: ReactNode
   onBack?: () => void
+  scrollMode?: ModalSheetScrollMode
   scrollResetKey?: string | number | boolean
+  size?: ModalSheetSize
   subtitle?: string
 }
 
-type ModalSheetSnapshot = Pick<ModalSheetProps, 'backLabel' | 'bodyHeader' | 'children' | 'contentStyle' | 'footer' | 'onBack' | 'scrollResetKey' | 'subtitle' | 'title'>
+type ModalSheetSnapshot = Pick<ModalSheetProps, 'backLabel' | 'bodyHeader' | 'children' | 'contentStyle' | 'footer' | 'navigation' | 'onBack' | 'scrollMode' | 'scrollResetKey' | 'size' | 'subtitle' | 'title'>
 export const MODAL_SHEET_EXIT_ANIMATION_MS = 520
+export const MODAL_SHEET_CENTERED_QUERY = '(min-width: 760px) and (min-height: 560px)'
 
-function desktopModalLayoutMatches() {
-  return typeof window !== 'undefined' && typeof window.matchMedia === 'function' && window.matchMedia('(min-width: 760px)').matches
+function centeredModalLayoutMatches() {
+  return typeof window !== 'undefined' && typeof window.matchMedia === 'function' && window.matchMedia(MODAL_SHEET_CENTERED_QUERY).matches
 }
 
-function useDesktopModalLayout() {
-  const [isDesktopModalLayout, setIsDesktopModalLayout] = useState(desktopModalLayoutMatches)
+function useCenteredModalLayout() {
+  const [isCenteredModalLayout, setIsCenteredModalLayout] = useState(centeredModalLayoutMatches)
 
   useEffect(() => {
     if (typeof window.matchMedia !== 'function') return
 
-    const mediaQuery = window.matchMedia('(min-width: 760px)')
-    const syncLayout = () => setIsDesktopModalLayout(mediaQuery.matches)
+    const mediaQuery = window.matchMedia(MODAL_SHEET_CENTERED_QUERY)
+    const syncLayout = () => setIsCenteredModalLayout(mediaQuery.matches)
     syncLayout()
     mediaQuery.addEventListener('change', syncLayout)
     return () => mediaQuery.removeEventListener('change', syncLayout)
   }, [])
 
-  return isDesktopModalLayout
+  return isCenteredModalLayout
 }
 
 function assignRef<T>(ref: Ref<T> | undefined, value: T | null) {
@@ -52,17 +59,35 @@ function assignRef<T>(ref: Ref<T> | undefined, value: T | null) {
 }
 
 // Base UI arbitrates native nested scrolling and dismissal before React's delegated touch handlers.
-export function ModalSheet({ open, title, onClose, children, backLabel, bodyElementRef, bodyHeader, contentStyle, footer, onBack, scrollResetKey, subtitle }: ModalSheetProps) {
+export function ModalSheet({
+  open,
+  title,
+  onClose,
+  children,
+  backLabel,
+  bodyElementRef,
+  bodyHeader,
+  contentStyle,
+  footer,
+  navigation,
+  onBack,
+  scrollMode = 'body',
+  scrollResetKey,
+  size = 'standard',
+  subtitle,
+}: ModalSheetProps) {
   const copy = useCopy('core')
   const bodyRef = useRef<HTMLDivElement | null>(null)
   const [bodyRefVersion, setBodyRefVersion] = useState(0)
-  const currentSnapshot: ModalSheetSnapshot = { backLabel: backLabel ?? copy('modal.back'), bodyHeader, children, contentStyle, footer, onBack, scrollResetKey, subtitle, title }
+  const currentSnapshot: ModalSheetSnapshot = { backLabel: backLabel ?? copy('modal.back'), bodyHeader, children, contentStyle, footer, navigation, onBack, scrollMode, scrollResetKey, size, subtitle, title }
   const [lastOpenSnapshot, setLastOpenSnapshot] = useState<ModalSheetSnapshot>(currentSnapshot)
   const [mounted, setMounted] = useState(open)
   const [initialStarting, setInitialStarting] = useState(open)
   const [previousOpen, setPreviousOpen] = useState(open)
   const [rapidReopen, setRapidReopen] = useState(false)
   const [rapidReopenPending, setRapidReopenPending] = useState(false)
+  const [inputShielded, setInputShielded] = useState(false)
+  const inputShieldFrameRef = useRef<number | null>(null)
   if (open && !mounted) setMounted(true)
   if (open !== previousOpen) {
     setPreviousOpen(open)
@@ -74,6 +99,7 @@ export function ModalSheet({ open, title, onClose, children, backLabel, bodyElem
   }
   const rendered = open ? currentSnapshot : lastOpenSnapshot
   const renderedHasFooter = Boolean(rendered.footer)
+  const renderedHasNavigation = Boolean(rendered.navigation)
   const renderedHasSubtitle = Boolean(rendered.subtitle)
   const closing = !open
   const shouldRender = open || mounted
@@ -84,8 +110,8 @@ export function ModalSheet({ open, title, onClose, children, backLabel, bodyElem
     return () => cancelAnimationFrame(frame)
   }, [initialStarting])
   const renderedContentStyle: ModalSheetStyle | undefined = closing ? { ...rendered.contentStyle, pointerEvents: 'none' } : rendered.contentStyle
-  const isDesktopModalLayout = useDesktopModalLayout()
-  const showDragHandle = !isDesktopModalLayout
+  const isCenteredModalLayout = useCenteredModalLayout()
+  const showDragHandle = !isCenteredModalLayout
   const setBodyRefs = useCallback((node: HTMLDivElement | null) => {
     if (bodyRef.current !== node) setBodyRefVersion((current) => current + 1)
     bodyRef.current = node
@@ -93,6 +119,12 @@ export function ModalSheet({ open, title, onClose, children, backLabel, bodyElem
   }, [bodyElementRef])
 
   const requestClose = () => {
+    if (inputShieldFrameRef.current !== null) window.cancelAnimationFrame(inputShieldFrameRef.current)
+    setInputShielded(true)
+    inputShieldFrameRef.current = window.requestAnimationFrame(() => {
+      inputShieldFrameRef.current = null
+      setInputShielded(false)
+    })
     setRapidReopen(false)
     setRapidReopenPending(true)
     setLastOpenSnapshot(currentSnapshot)
@@ -103,11 +135,6 @@ export function ModalSheet({ open, title, onClose, children, backLabel, bodyElem
     if (nextOpen) return
     if (open) requestClose()
   }
-
-  useLayoutEffect(() => {
-    if (!closing || typeof document === 'undefined') return
-    document.body.style.pointerEvents = 'auto'
-  }, [closing])
 
   useLayoutEffect(() => {
     if (open) return undefined
@@ -130,6 +157,12 @@ export function ModalSheet({ open, title, onClose, children, backLabel, bodyElem
       if (resetFrame) window.cancelAnimationFrame(resetFrame)
     }
   }, [open, rapidReopen])
+
+  useEffect(() => {
+    return () => {
+      if (inputShieldFrameRef.current !== null) window.cancelAnimationFrame(inputShieldFrameRef.current)
+    }
+  }, [])
 
   useLayoutEffect(() => {
     if (!open) return
@@ -170,32 +203,53 @@ export function ModalSheet({ open, title, onClose, children, backLabel, bodyElem
       observer.disconnect()
       cleanupBodyObservers()
     }
-  }, [bodyRefVersion, open, rendered.contentStyle, renderedHasFooter, renderedHasSubtitle])
+  }, [bodyRefVersion, open, rendered.contentStyle, rendered.scrollMode, rendered.size, renderedHasFooter, renderedHasNavigation, renderedHasSubtitle])
 
   return (
     <Drawer.Root disablePointerDismissal modal="trap-focus" open={open} onOpenChange={handleOpenChange} swipeDirection="down">
       {shouldRender && (
         <Drawer.Portal keepMounted>
-          <Drawer.Backdrop className={styles.overlay} data-closing={closing ? 'true' : 'false'} data-initial-starting-style={initialStarting ? 'true' : undefined} data-modal-sheet-overlay="true" hidden={false} onPointerDown={(event) => {
-            if (event.currentTarget === event.target) requestClose()
-          }} />
+          <Drawer.Backdrop
+            className={styles.overlay}
+            data-closing={closing ? 'true' : 'false'}
+            data-input-shielded={inputShielded ? 'true' : undefined}
+            data-initial-starting-style={initialStarting ? 'true' : undefined}
+            data-modal-sheet-overlay="true"
+            hidden={false}
+            onClick={(event) => {
+              if (event.currentTarget !== event.target) return
+              event.preventDefault()
+              event.stopPropagation()
+              requestClose()
+            }}
+            onPointerDown={(event) => {
+              if (event.currentTarget === event.target) event.stopPropagation()
+            }}
+            onPointerUp={(event) => {
+              if (event.currentTarget === event.target) event.stopPropagation()
+            }}
+          />
           <Drawer.Viewport className={styles.viewport} hidden={false}>
             <Drawer.Popup
               className={styles.content}
+              data-centered-layout={isCenteredModalLayout ? 'true' : 'false'}
               data-closing={closing ? 'true' : 'false'}
               data-has-footer={renderedHasFooter ? 'true' : 'false'}
+              data-has-navigation={renderedHasNavigation ? 'true' : 'false'}
               data-has-body-header={rendered.bodyHeader ? 'true' : 'false'}
               data-has-subtitle={renderedHasSubtitle ? 'true' : 'false'}
               data-initial-starting-style={initialStarting ? 'true' : undefined}
               data-rapid-reopen={rapidReopen ? 'true' : 'false'}
               data-state={open ? 'open' : 'closed'}
+              data-scroll-mode={rendered.scrollMode}
+              data-size={rendered.size}
               data-surface="hass-popup"
               hidden={false}
               inert={closing ? true : undefined}
               initialFocus={false}
               style={renderedContentStyle}
             >
-              <Drawer.Content className={styles.contentLayout} data-base-ui-swipe-ignore={isDesktopModalLayout ? 'true' : undefined}>
+              <Drawer.Content className={styles.contentLayout} data-base-ui-swipe-ignore={isCenteredModalLayout ? 'true' : undefined}>
                 {showDragHandle && <div className={styles.handle} data-mobile-drag-handle="true" />}
                 <div className={styles.header}>
                   <div className={styles.headingGroup}>
@@ -218,6 +272,7 @@ export function ModalSheet({ open, title, onClose, children, backLabel, bodyElem
                 </div>
                 {rendered.bodyHeader && <div className={styles.bodyHeader} data-modal-sheet-body-header="true">{rendered.bodyHeader}</div>}
                 <div className={styles.body} data-modal-sheet-body="true" ref={setBodyRefs}>{rendered.children}</div>
+                {rendered.navigation && <div className={styles.navigation} data-modal-sheet-navigation="true">{rendered.navigation}</div>}
                 {rendered.footer && <div className={styles.footer} data-modal-sheet-footer="true">{rendered.footer}</div>}
               </Drawer.Content>
             </Drawer.Popup>

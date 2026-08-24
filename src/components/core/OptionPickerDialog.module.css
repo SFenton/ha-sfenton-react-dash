@@ -150,7 +150,9 @@
 }
 
 @media (min-width: 760px) {
+  .sheetOptions[data-layout='card-grid'],
   .compactSheetOptions {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 240px));
+    justify-content: center;
   }
 }

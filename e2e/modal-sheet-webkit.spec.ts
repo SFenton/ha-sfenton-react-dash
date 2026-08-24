@@ -5,12 +5,18 @@ test('WebKit modal scrolling does not depend on unsupported directional touch-ac
 
   expect(await page.evaluate(() => CSS.supports('touch-action', 'pan-down'))).toBe(false)
 
-  await page.getByRole('button', { name: 'Rooms' }).click()
+  await page.getByRole('button', { name: 'Quick Links' }).click()
+  await page.getByRole('dialog', { name: 'Quick Links' }).getByRole('button', { name: 'Rooms' }).click()
   const dialog = page.getByRole('dialog', { name: 'Rooms' })
   const body = dialog.locator('[data-modal-sheet-body="true"]')
   await expect(dialog).toBeVisible()
   await expect(body).toHaveCSS('touch-action', 'auto')
+  await expect.poll(() => body.evaluate((element) => element.scrollHeight > element.clientHeight)).toBe(true)
+  await body.evaluate((element) => {
+    element.scrollTop = element.scrollHeight
+  })
+  await expect.poll(() => body.evaluate((element) => element.scrollTop)).toBeGreaterThan(0)
 
   await dialog.getByRole('button', { name: 'Close' }).click()
-  await expect(dialog).toHaveCount(0, { timeout: 1_000 })
+  await expect(dialog).toHaveCount(0, { timeout: 700 })
 })

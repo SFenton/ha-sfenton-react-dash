@@ -15,7 +15,7 @@ const COLOR_MODES = ['hs', 'rgb', 'rgbw', 'rgbww', 'xy']
 const LIGHT_COLOR_PICKER_MODAL_STYLE: ModalSheetStyle = {
   '--modal-desktop-width': '700px',
   '--modal-desktop-max-width': '700px',
-  '--modal-desktop-height': 'auto',
+  '--modal-desktop-height': 'min(760px, calc(var(--dashboard-visible-height, 100dvh) - 64px))',
 }
 
 // Pointer distance (px) from the wheel marker that still counts as grabbing it.
@@ -309,7 +309,7 @@ export function LightMoreInfoSheet({ entityId, title, open, onClose, lights = []
   const hasOtherColorLights = supportsColor && otherLights.length > 0
 
   return (
-    <ModalSheet contentStyle={LIGHT_COLOR_PICKER_MODAL_STYLE} onClose={onClose} open={open} title={title}>
+    <ModalSheet contentStyle={LIGHT_COLOR_PICKER_MODAL_STYLE} onClose={onClose} open={open} size="standard" title={title}>
       <div className={styles.body} data-has-other-lights={hasOtherColorLights ? 'true' : 'false'}>
         {entityId && (
           <section aria-label={`${title} light slider`} className={styles.sliderPane} data-layout="light-slider">

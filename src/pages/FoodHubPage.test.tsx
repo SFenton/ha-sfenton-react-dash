@@ -45,6 +45,12 @@ describe('FoodHubPage loading gate', () => {
     }
   })
 
+  it('keeps the All Recipes navigation section full-span', () => {
+    const { container } = render(<FoodHubPage onNavigate={() => undefined} preload />)
+    expect(screen.getByRole('region', { name: 'All Recipes' }).closest('[data-responsive-section-item="true"]')).toHaveAttribute('data-span', 'full')
+    expect(container.querySelector('[data-responsive-section-grid="true"]')).toBeInTheDocument()
+  })
+
   it('keeps the standard page loader until recommendations settle and fades it out', async () => {
     const originalCallService = mockState.helpers.callService
     mockState.helpers.callService = (params) => (

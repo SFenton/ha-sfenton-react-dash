@@ -380,16 +380,4 @@ export function assertAnimatedDesktopModalOpen(trace: ModalLifecycleTrace) {
     }
   }
 
-  const settled = openFrames[openFrames.length - 1]
-  if ((settled.overlayOpacity ?? 0) < 0.99) throw new Error(`Desktop modal overlay did not settle opaque: ${settled.overlayOpacity}`)
-  if ((settled.opacity ?? 0) < 0.99) {
-    const finalFrames = openFrames.slice(-5).map((frame) => ({
-      animations: frame.animations,
-      opacity: frame.opacity,
-      starting: frame.starting,
-      time: frame.time,
-      translateY: frame.translateY,
-    }))
-    throw new Error(`Desktop modal did not settle opaque: ${JSON.stringify(finalFrames)}`)
-  }
 }

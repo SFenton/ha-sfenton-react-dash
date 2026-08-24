@@ -1,12 +1,14 @@
 import { useEntity, useHass } from '@hakit/core'
-import { useState } from 'react'
+import { useState, type CSSProperties } from 'react'
+import { DynamicGrid } from '../components/core/DynamicGrid'
 import { MaterialIcon } from '../components/core/Icon'
 import { OptionPickerDialog } from '../components/core/OptionPickerDialog'
 import type { ModalSheetStyle } from '../components/core/ModalSheet'
-import { SectionHeader } from '../components/core/SectionHeader'
+import { Section } from '../components/core/Section'
 import { asEntityName, isActiveState } from '../components/hass/entityState'
 import { LightBrightnessCard, type LightTapAction } from '../components/hass/LightBrightnessCard'
 import { LightMoreInfoSheet } from '../components/hass/LightMoreInfoSheet'
+import { CUSTOM_LIGHTS_COPY_KEYS, CUSTOM_LIGHTS_COPY_NAMESPACE, useCopy } from '../i18n'
 import styles from './CustomLightsPage.module.css'
 
 const MANUAL_CONTROL_ENTITY = 'input_boolean.manually_control_front_yard_lights'
@@ -42,6 +44,9 @@ const SEAHAWKS_GRADIENT = 'linear-gradient(90deg, rgb(0 255 0), rgb(0 0 255))'
 const VALENTINES_GRADIENT = 'linear-gradient(90deg, rgb(255 0 0), rgb(255 0 234))'
 
 type Rgb = [number, number, number]
+type LightingModeStyle = CSSProperties & {
+  '--lighting-mode-background'?: string
+}
 
 function rgbLuminance([r, g, b]: Rgb) {
   return 0.299 * r + 0.587 * g + 0.114 * b
@@ -88,7 +93,7 @@ function useCustomLightGradient(): string | undefined {
   return buildCustomGradient(colors)
 }
 
-function ModeToggleCard({ onOpenModePicker }: { onOpenModePicker: () => void }) {
+function ModeToggleCard({ mode, modeBackground, modeTitle, onOpenModePicker }: { mode: string; modeBackground?: string; modeTitle: string; onOpenModePicker: () => void }) {
   const callService = useHass((state) => state.helpers.callService)
   const manualEntity = useEntity(asEntityName(MANUAL_CONTROL_ENTITY), { returnNullIfNotFound: true })
   const active = isActiveState(manualEntity)
@@ -113,9 +118,14 @@ function ModeToggleCard({ onOpenModePicker }: { onOpenModePicker: () => void }) 
           aria-label="Select lighting mode"
           className={styles.modeSelect}
           onClick={onOpenModePicker}
+          style={{ '--lighting-mode-background': modeBackground } as LightingModeStyle}
           type="button"
         >
           <MaterialIcon name="mdi:palette" size={20} />
+          <span className={styles.modeSelectCopy}>
+            <span className={styles.modeTitle}>{modeTitle}</span>
+            <span className={styles.modeSubtitle}>{mode}</span>
+          </span>
           <MaterialIcon name="mdi:chevron-down" size={18} />
         </button>
       )}
@@ -124,6 +134,7 @@ function ModeToggleCard({ onOpenModePicker }: { onOpenModePicker: () => void }) 
 }
 
 export function CustomLightsPage() {
+  const copy = useCopy(CUSTOM_LIGHTS_COPY_NAMESPACE)
   const callService = useHass((state) => state.helpers.callService)
   const manualEntity = useEntity(asEntityName(MANUAL_CONTROL_ENTITY), { returnNullIfNotFound: true })
   const modeEntity = useEntity(asEntityName(MODE_SELECT_ENTITY), { returnNullIfNotFound: true })
@@ -135,6 +146,8 @@ export function CustomLightsPage() {
   const modeOptions = (modeEntity?.attributes?.options as string[] | undefined) ?? ['Default', 'Custom', 'Seahawks', "Valentine's Day"]
   const showCustomGrid = manualOn && mode === 'Custom'
   const customGradient = useCustomLightGradient()
+  const frontYardTitle = copy(CUSTOM_LIGHTS_COPY_KEYS.frontYard)
+  const lightingModeTitle = copy(CUSTOM_LIGHTS_COPY_KEYS.lightingMode)
 
   const modeBackground = (option: string): string | undefined => {
     if (option === 'Seahawks') return SEAHAWKS_GRADIENT
@@ -154,11 +167,10 @@ export function CustomLightsPage() {
 
   return (
     <div className={styles.stack}>
-      <section className={styles.section}>
-        <SectionHeader title="Front Yard" />
-        <ModeToggleCard onOpenModePicker={() => setPickerOpen(true)} />
+      <Section className={styles.section} gap={12} span="full" title={frontYardTitle}>
+        <ModeToggleCard mode={mode} modeBackground={modeBackground(mode)} modeTitle={lightingModeTitle} onOpenModePicker={() => setPickerOpen(true)} />
         {showCustomGrid && (
-          <div className={styles.lightGrid}>
+          <DynamicGrid className={styles.lightGrid} columns={2} fillRows={false} gap={12} itemSizing="uniform" layout="bounded" maxCellWidth={280} maxColumns={4}>
             {CUSTOM_LIGHTS.map((light) => (
               <div className={styles.lightCell} key={light.entityId}>
                 <LightBrightnessCard
@@ -170,14 +182,14 @@ export function CustomLightsPage() {
                 />
               </div>
             ))}
-          </div>
+          </DynamicGrid>
         )}
         {showCustomGrid && (
           <button className={styles.resetAllButton} onClick={resetAllLights} type="button">
             Reset All Lights
           </button>
         )}
-      </section>
+      </Section>
 
       <OptionPickerDialog
         icon="mdi:palette"
@@ -188,7 +200,7 @@ export function CustomLightsPage() {
         presentation="sheet"
         sheetLayout="compact-grid"
         sheetStyle={LIGHTING_MODE_MODAL_STYLE}
-        title="Lighting Mode"
+        title={lightingModeTitle}
         value={mode}
       />
 

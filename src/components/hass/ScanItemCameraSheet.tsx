@@ -1478,6 +1478,7 @@ export function ScanItemCameraSheet({ defaultLocation, open, onClose }: ScanItem
       onClose={handleClose}
       open={open}
       scrollResetKey={step}
+      size="form"
       subtitle={subtitle}
       title="Add Item"
     >

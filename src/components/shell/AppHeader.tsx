@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { useDailyReportContext } from '../hass/dailyReportModal'
 import { DAILY_REPORT_HASH, PRIMARY_NAV_ROUTES, primaryNavRouteActive } from '../../constants/routes'
@@ -7,6 +7,7 @@ import { IconSize } from '../../constants/theme'
 import { CountBadge } from '../core/CountBadge'
 import { MaterialIcon } from '../core/Icon'
 import { useCopy } from '../../i18n'
+import { BADGED_NAV_PATH, OVERDUE_TAB_COPY_KEY } from './BottomNav'
 import styles from './AppHeader.module.css'
 
 export interface AppHeaderAction {
@@ -26,6 +27,10 @@ interface AppHeaderProps {
 }
 
 type SidebarState = 'closed' | 'closing' | 'open'
+
+export const SHELL_COPY_NAMESPACE = 'shell'
+export const SHELL_NAVIGATION_HEADING_COPY_KEY = 'navigation.heading'
+export const SHELL_NAVIGATION_MENU_COPY_KEY = 'navigation.menu'
 
 function BackChevron() {
   return (
@@ -47,18 +52,33 @@ export function AppHeader({ activePath, actions = [], backLabel, backPath, onBac
   const [sidebarState, setSidebarState] = useState<SidebarState>('closed')
   const [actionsOpen, setActionsOpen] = useState(false)
   const commonCopy = useCopy('common')
-  const shellCopy = useCopy('shell')
-  const { badgeCount, title: profileTitle } = useDailyReportContext()
+  const shellCopy = useCopy(SHELL_COPY_NAMESPACE)
+  const { badgeCount, overdueCount, title: profileTitle } = useDailyReportContext()
   const profileLabel = badgeCount > 0
     ? shellCopy('profile.openWithAttention', { count: badgeCount, title: profileTitle })
     : shellCopy('profile.open', { title: profileTitle })
   const resolvedBackLabel = backLabel ?? commonCopy('actions.goBack')
   const showBack = Boolean(backPath)
   const showMenu = Boolean(!showBack && onNavigate)
+  const showBackMenu = Boolean(showBack && onNavigate)
+  const backMenuClassName = [styles.menuButton, styles.backMenuButton].join(' ')
   const showActions = actions.length > 0
   const menuOpen = sidebarState === 'open'
   const sidebarMounted = sidebarState !== 'closed'
   const sidebarDataState = sidebarState === 'closing' ? 'closed' : 'open'
+
+  useEffect(() => {
+    if (typeof window.matchMedia !== 'function') return undefined
+    const query = window.matchMedia('(min-width: 1120px)')
+    const closeForRail = () => {
+      if (!query.matches) return
+      setSidebarState('closed')
+      setActionsOpen(false)
+    }
+    closeForRail()
+    query.addEventListener('change', closeForRail)
+    return () => query.removeEventListener('change', closeForRail)
+  }, [])
 
   const closeSidebar = () => {
     setSidebarState((current) => (current === 'open' ? 'closing' : current))
@@ -73,6 +93,11 @@ export function AppHeader({ activePath, actions = [], backLabel, backPath, onBac
     setActionsOpen(false)
     setSidebarState((current) => (current === 'open' ? 'closing' : 'open'))
   }
+  const renderMenuButton = (className = styles.menuButton) => (
+    <button aria-expanded={menuOpen} aria-label={shellCopy('navigation.openMenu')} className={className} onClick={toggleSidebar} type="button">
+      <MenuIcon />
+    </button>
+  )
 
   const navigate = (path: string) => {
     closeMenus()
@@ -106,18 +131,30 @@ export function AppHeader({ activePath, actions = [], backLabel, backPath, onBac
       }}
       onClick={closeMenus}
     >
-      <aside aria-label={shellCopy('navigation.menu')} className={styles.sidebar} data-state={sidebarDataState} onClick={(event) => event.stopPropagation()}>
+      <aside aria-label={shellCopy(SHELL_NAVIGATION_MENU_COPY_KEY)} className={styles.sidebar} data-state={sidebarDataState} onClick={(event) => event.stopPropagation()}>
         <div className={styles.sidebarHeader}>
-          <span>{shellCopy('navigation.heading')}</span>
+          <span>{shellCopy(SHELL_NAVIGATION_HEADING_COPY_KEY)}</span>
         </div>
         <nav className={styles.sidebarNav} role="menu">
           <div className={styles.primaryNavigation} data-primary-navigation="true">
-            {PRIMARY_NAV_ROUTES.filter((route) => route.path !== 'settings').map((route) => (
-              <button aria-current={primaryNavRouteActive(activePath, route.path) ? 'page' : undefined} className={styles.menuItem} key={route.path} onClick={() => navigate(route.path)} role="menuitem" type="button">
-                <MaterialIcon name={route.icon} size={22} />
-                <span>{route.label}</span>
-              </button>
-            ))}
+            {PRIMARY_NAV_ROUTES.filter((route) => route.path !== 'settings').map((route) => {
+              const routeBadgeCount = route.path === BADGED_NAV_PATH ? overdueCount : 0
+              return (
+                <button
+                  aria-current={primaryNavRouteActive(activePath, route.path) ? 'page' : undefined}
+                  aria-label={routeBadgeCount > 0 ? shellCopy(OVERDUE_TAB_COPY_KEY, { count: routeBadgeCount, label: route.label }) : route.label}
+                  className={styles.menuItem}
+                  key={route.path}
+                  onClick={() => navigate(route.path)}
+                  role="menuitem"
+                  type="button"
+                >
+                  <MaterialIcon name={route.icon} size={22} />
+                  <span>{route.label}</span>
+                  <CountBadge className={styles.sidebarBadge} count={routeBadgeCount} />
+                </button>
+              )
+            })}
           </div>
           {PRIMARY_NAV_ROUTES.filter((route) => route.path === 'settings').map((route) => (
             <button aria-current={primaryNavRouteActive(activePath, route.path) ? 'page' : undefined} className={`${styles.menuItem} ${styles.sidebarSettingsItem}`} key={route.path} onClick={() => navigate(route.path)} role="menuitem" type="button">
@@ -144,9 +181,7 @@ export function AppHeader({ activePath, actions = [], backLabel, backPath, onBac
         <>
           <div className={styles.leading}>
             {showMenu && (
-              <button aria-expanded={menuOpen} aria-label={shellCopy('navigation.openMenu')} className={styles.menuButton} onClick={toggleSidebar} type="button">
-                <MenuIcon />
-              </button>
+              renderMenuButton()
             )}
           </div>
 
@@ -155,6 +190,9 @@ export function AppHeader({ activePath, actions = [], backLabel, backPath, onBac
       )}
 
       <div className={styles.trailing}>
+        {showBackMenu && (
+          renderMenuButton(backMenuClassName)
+        )}
         {showActions && (
           <button aria-expanded={actionsOpen} aria-label={shellCopy('navigation.moreActions')} className={styles.iconButton} onClick={() => { setActionsOpen((open) => !open); closeSidebar() }} type="button">
             <MaterialIcon name="mdi:dots-horizontal" size={28} />

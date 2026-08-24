@@ -325,6 +325,20 @@
   color: rgba(255, 255, 255, 0.46);
 }
 
+@media (min-width: 560px) {
+  .headerPill {
+    --header-pill-height: 52px;
+  }
+
+  .headerPill .title {
+    font-size: 0.86rem;
+  }
+
+  .headerPill .subtitle {
+    font-size: 0.72rem;
+  }
+}
+
 .light {
   --tile-color: rgba(0, 0, 255, 0.22);
 }

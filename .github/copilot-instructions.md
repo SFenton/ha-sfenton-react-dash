@@ -4,7 +4,11 @@
 
 Recreate the Home Assistant `at-a-glance` dashboard as a React app using `ha-component-kit`/HAKit. The React app should mirror the Home Assistant dashboard page by page, starting with `at-a-glance`, while improving maintainability through reusable local components, tests, and responsive shell patterns.
 
-Primary target is mobile. Build so tablet and desktop layouts are straightforward extensions, but do not let desktop concerns distort the mobile experience.
+Primary target is mobile, but tablet and desktop are first-class release
+targets. Mobile-first defines implementation order, not validation scope.
+Every UX change must satisfy the canonical viewport, resize, state, modal,
+fine-pointer desktop, preload-I/O, and mobile-baseline gates in
+`docs/ux/validation-matrix.md`.
 
 ## Current Stack
 
@@ -105,7 +109,7 @@ Before implementing each Home Assistant page:
 5. Click visible controls and cards on the page.
 6. If a click navigates to another page, note the target and immediately navigate back.
 7. If a click opens a modal, inspect and recreate the modal content, layout, controls, dismiss behavior, and any internal scrolling.
-8. Resize both the live Home Assistant tab and local React tab to a mobile viewport first, preferably iPhone-sized such as `393x852`, and capture/compare the mobile layout before desktop or tablet refinements.
+8. Resize both the live Home Assistant tab and local React tab to a mobile viewport first, preferably iPhone-sized such as `393x852`, then complete the canonical responsive matrix in `docs/ux/validation-matrix.md`.
 9. Capture screenshots when visual fidelity matters; use accessibility snapshots for structure and text.
 10. Implement the React page against the real Home Assistant backend, not mock data, unless writing tests.
 11. Validate in the local React tab and compare against the Home Assistant tab at the same viewport size.
@@ -202,6 +206,9 @@ Add tests as features are implemented.
 
 - Unit tests: component rendering, hooks, entity formatting, service-call behavior, modal open/close behavior, navigation state.
 - Playwright tests: page routing, bottom nav behavior, expected visible sections, modal open/close, core entity controls, WebRTC/camera containers.
+- UX completion requires the canonical responsive matrix in
+  `docs/ux/validation-matrix.md`; mobile-only or resized-mobile desktop
+  coverage is insufficient.
 - Prefer focused tests added with each page or reusable component rather than one large late test pass.
 - Do not rely on live Home Assistant for unit tests; mock HAKit/HA state and services there.
 - Use the live Home Assistant browser tab for planning and manual verification.

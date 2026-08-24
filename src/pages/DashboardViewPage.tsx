@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent, type ReactNode } from 'react'
+import { Children, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent, type ReactNode } from 'react'
 import { useEntity, useHass, useUser } from '@hakit/core'
 import type { HassEntity } from 'home-assistant-js-websocket'
 import { ClimateCard } from '../components/cards/ClimateCard'
@@ -25,7 +25,6 @@ import type { RecipeControls } from '../components/hass/recipes/useRecipeControl
 import { useRecipeControls } from '../components/hass/recipes/useRecipeControls'
 import { VacuumAutoCleanControlCard } from '../components/hass/VacuumAutoCleanControls'
 import { VacuumCard, VacuumModal, VacuumRoomSourceModalContent } from '../components/hass/VacuumCard'
-import { VACUUM_MODAL_STYLE } from '../components/hass/vacuumModalStyle'
 import { AirQualityModalContent } from '../components/hass/AirQualityModalContent'
 import { BathroomFanModal, BathroomFanModalContent } from '../components/hass/BathroomFanModalContent'
 import { BathroomFanTile } from '../components/hass/BathroomFanTile'
@@ -33,7 +32,6 @@ import { BathroomFanCommandProvider } from '../components/hass/BathroomFanComman
 import { GrillModalContent } from '../components/hass/GrillModalContent'
 import { HumidifierModal, HumidifierModalContent } from '../components/hass/HumidifierModalContent'
 import { MediaRemoteModalContent, MediaRemoteModalNav } from '../components/hass/MediaRemoteModalContent'
-import { MEDIA_REMOTE_MODAL_STYLE } from '../components/hass/mediaRemoteModalStyle'
 import { BedTemperatureScopePrompt } from '../components/hass/BedTemperatureScopePrompt'
 import {
   EIGHT_SLEEP_MODAL_TABS,
@@ -59,7 +57,7 @@ import {
 import { Card, type CardColor } from '../components/core/Card'
 import { CheckboxRow } from '../components/core/CheckboxRow'
 import { Description } from '../components/core/Description'
-import { DynamicGrid } from '../components/core/DynamicGrid'
+import { DynamicGrid, type DynamicGridItemSizing } from '../components/core/DynamicGrid'
 import { EmptyState } from '../components/core/EmptyState'
 import { GlassTile } from '../components/core/GlassTile'
 import { MaterialIcon } from '../components/core/Icon'
@@ -70,11 +68,14 @@ import { ModalSheet, type ModalSheetStyle } from '../components/core/ModalSheet'
 import { ModalOpenerRow } from '../components/core/ModalOpenerRow'
 import { NativePickerField } from '../components/core/NativePickerField'
 import { OptionPickerDialog, type PickerOption } from '../components/core/OptionPickerDialog'
+import { ResponsiveSectionGrid, ResponsiveSectionItem } from '../components/core/ResponsiveSectionGrid'
+import { Section } from '../components/core/Section'
 import { ScheduleEditorFields } from '../components/core/ScheduleEditorFields'
 import { resolveScheduleDefaultDays } from '../components/core/scheduleDays'
 import { ScheduleCollection, ScheduleDetailFooter, ScheduleListRow } from '../components/core/ScheduleFlow'
 import { isValidScheduleTime } from '../components/core/scheduleTime'
 import { SectionHeader } from '../components/core/SectionHeader'
+import { SettingsSection } from '../components/core/SettingsSection'
 import { Stepper } from '../components/core/Stepper'
 import { SurfaceAccessory } from '../components/core/SurfaceAccessory'
 import { ToggleControl } from '../components/core/ToggleControl'
@@ -87,9 +88,10 @@ import { useHashModal } from '../hooks/useHashModal'
 import { useModalDetailPageScroll } from '../hooks/useModalDetailPageScroll'
 import { useOptimisticState } from '../hooks/useOptimisticState'
 import { useScheduleDetailPage } from '../hooks/useScheduleDetailPage'
-import { useImmediateVisualTab, useSmoothDisplayedModalTab } from '../hooks/useSmoothDisplayedModalTab'
+import { useSmoothDisplayedModalTab } from '../hooks/useSmoothDisplayedModalTab'
 import { useTodoOptimisticStatuses } from '../hooks/useTodoOptimisticStatuses'
-import { useCopy } from '../i18n'
+import { CORE_COPY_KEYS, CORE_COPY_NAMESPACE, useCopy } from '../i18n'
+import { pageMeasureForPath } from '../constants/pageLayout'
 import {
   CLIMATE_GROUPS,
   CONTACT_GROUPS,
@@ -102,6 +104,7 @@ import {
   ADMIN_AUTO_REENABLE_ITEMS,
   CHORE_QUICK_LINKS,
   ADMIN_DESCRIPTIONS,
+  ADMIN_SECTION_TITLES,
   ADMIN_PRESENCE_OVERRIDE_ITEMS,
   ADMIN_RELAY_CONTROL_ITEMS,
   ADMIN_SECURITY_CONTROLS,
@@ -110,6 +113,7 @@ import {
   CONTROL_COLOR,
   CONTROL_PAGES,
   GUEST_CONTROLS_DESCRIPTION,
+  GUEST_CONTROLS_TITLE,
   GUEST_CONTROL_ITEMS,
   GUEST_ROOM_GUEST_MODE_ENTITY_ID,
   MEDIA_COLOR,
@@ -235,7 +239,7 @@ const APP_LAUNCH_MAX_COLUMNS = 6
 // controls keep the standard responsive room grid underneath it.
 const LEAD_ROW_GRID_LABEL_SUFFIX = 'Controls'
 
-function RoomGrid({ ariaLabel, children, layout }: { ariaLabel: string; children: ReactNode; layout?: RoomSourceSectionLayout }) {
+function RoomGrid({ ariaLabel, children, itemSizing, layout }: { ariaLabel: string; children: ReactNode; itemSizing?: DynamicGridItemSizing; layout?: RoomSourceSectionLayout }) {
   if (layout === 'app-launch') {
     return (
       <DynamicGrid
@@ -243,6 +247,9 @@ function RoomGrid({ ariaLabel, children, layout }: { ariaLabel: string; children
         className={styles.appLaunchGrid}
         columns={2}
         fillRows={false}
+        justify="center"
+        lastRow="center"
+        layout="bounded"
         maxCellWidth={APP_LAUNCH_TILE_MAX_WIDTH_PX}
         maxColumns={APP_LAUNCH_MAX_COLUMNS}
       >
@@ -251,7 +258,24 @@ function RoomGrid({ ariaLabel, children, layout }: { ariaLabel: string; children
     )
   }
 
-  return <DynamicGrid ariaLabel={ariaLabel} className={styles.roomGrid} columns={2}>{children}</DynamicGrid>
+  if (layout === 'lead-row') {
+    return <DynamicGrid ariaLabel={ariaLabel} className={styles.roomGrid} columns={2} itemSizing={itemSizing}>{children}</DynamicGrid>
+  }
+
+  return (
+    <DynamicGrid
+      ariaLabel={ariaLabel}
+      className={styles.roomGrid}
+      columns={2}
+      itemSizing={itemSizing}
+      lastRow="fill-minimum"
+      layout="bounded"
+      maxCellWidth={280}
+      maxColumns={4}
+    >
+      {children}
+    </DynamicGrid>
+  )
 }
 
 const VACUUM_AUTO_CLEAN_TITLE_ORDER = new Map(VACUUM_AUTO_CLEAN_CONTROLS.map((control, index) => [control.title, index]))
@@ -262,12 +286,6 @@ const ORDERED_VACUUMS = [...VACUUMS].sort((first, second) => {
 })
 
 const SECURITY_SIZED_ROOM_SOURCE_KINDS = new Set<RoomSourceKind>(['air', 'climate', 'contact', 'light', 'occupancy', 'vent'])
-
-const ROOM_SOURCE_SECURITY_SIZED_MODAL_STYLE: ModalSheetStyle = {
-  '--modal-desktop-height': 'auto',
-  '--modal-desktop-max-width': '500px',
-  '--modal-desktop-width': '500px',
-}
 
 const DISHWASHER_ENTITY_IDS = {
   activeProgram: 'select.dishwasher_active_program',
@@ -326,23 +344,25 @@ function Notice({ children }: { children: React.ReactNode }) {
 
 function EntitySections({ onNavigate, sections }: { onNavigate: (path: string) => void; sections: EntitySectionConfig[] }) {
   return (
-    <div className={styles.stack}>
+    <ResponsiveSectionGrid>
       {sections.map((section) => (
-        <section className={styles.section} key={section.title}>
-          <SectionHeader title={section.title} />
-          <Grid>
-            {section.items.map((item) => (
-              <EntityActionCard item={item} key={`${section.title}-${item.entityId}-${item.title}`} onNavigate={onNavigate} />
-            ))}
-          </Grid>
-        </section>
+        <ResponsiveSectionItem key={section.title} span={sections.length === 1 ? 'full' : 'auto'}>
+          <section className={styles.section}>
+            <SectionHeader title={section.title} />
+            <div aria-label={section.title} className={`${styles.grid} ${styles.responsiveEntityGrid}`} role="group">
+              {section.items.map((item) => (
+                <EntityActionCard item={item} key={`${section.title}-${item.entityId}-${item.title}`} onNavigate={onNavigate} />
+              ))}
+            </div>
+          </section>
+        </ResponsiveSectionItem>
       ))}
-    </div>
+    </ResponsiveSectionGrid>
   )
 }
 
 function AdminWideGrid({ children }: { children: ReactNode }) {
-  return <div className={styles.adminWideGrid}>{children}</div>
+  return <div className={styles.adminWideGrid} data-multiple={Children.count(children) > 1 ? 'true' : undefined}>{children}</div>
 }
 
 function AdminModalGrid({ children, label, squareGridRef, squareGridStyle }: { children: ReactNode; label?: string; squareGridRef?: (node: HTMLElement | null) => void; squareGridStyle?: ModalSquareGridStyle }) {
@@ -350,7 +370,11 @@ function AdminModalGrid({ children, label, squareGridRef, squareGridStyle }: { c
 }
 
 function AdminHashButton({ hash, onOpen, title }: { hash: string; onOpen: (hash: string) => void; title: string }) {
-  return <ModalOpenerRow onClick={() => onOpen(hash)} title={title} tone="switch-active" variant="wide" />
+  return (
+    <AdminWideGrid>
+      <ModalOpenerRow onClick={() => onOpen(hash)} title={title} tone="switch-active" variant="wide" />
+    </AdminWideGrid>
+  )
 }
 
 const LIVING_ROOM_POWER_RECOVERY_AUTOMATION = 'automation.attempt_to_turn_power_back_on_in_living_room'
@@ -360,21 +384,23 @@ function LivingRoomPowerRecoveryButton() {
   const title = 'Attempt to turn power back on'
 
   return (
-    <button
-      aria-label={`${title} in Living Room`}
-      className={styles.adminAutomationButton}
-      data-action-kind="command"
-      data-automation-target={LIVING_ROOM_POWER_RECOVERY_AUTOMATION}
-      onClick={() => callService({ domain: 'automation', service: 'trigger', target: LIVING_ROOM_POWER_RECOVERY_AUTOMATION })}
-      type="button"
-    >
-      <span aria-hidden="true" className={styles.adminAutomationButtonIcon}>
-        <MaterialIcon name="mdi:flash" size={30} />
-      </span>
-      <span className={styles.adminAutomationButtonCopy}>
-        <span className={styles.adminAutomationButtonTitle}>{title}</span>
-      </span>
-    </button>
+    <AdminWideGrid>
+      <button
+        aria-label={`${title} in Living Room`}
+        className={styles.adminAutomationButton}
+        data-action-kind="command"
+        data-automation-target={LIVING_ROOM_POWER_RECOVERY_AUTOMATION}
+        onClick={() => callService({ domain: 'automation', service: 'trigger', target: LIVING_ROOM_POWER_RECOVERY_AUTOMATION })}
+        type="button"
+      >
+        <span aria-hidden="true" className={styles.adminAutomationButtonIcon}>
+          <MaterialIcon name="mdi:flash" size={30} />
+        </span>
+        <span className={styles.adminAutomationButtonCopy}>
+          <span className={styles.adminAutomationButtonTitle}>{title}</span>
+        </span>
+      </button>
+    </AdminWideGrid>
   )
 }
 
@@ -1015,16 +1041,26 @@ function DefaultRoomSourceCard({ card, eightSleepModalState, onOpen }: RoomSourc
 
 function MediaRoomSourceModal({ config, onClose, open, title }: { config: MediaRemoteConfig; onClose: () => void; open: boolean; title: string }) {
   const [mediaActiveTab, setMediaActiveTab] = useState<MediaRemoteModalTab>('controls')
+  const bodyElementRef = useRef<HTMLDivElement | null>(null)
+  const handleTabChange = (tab: MediaRemoteModalTab) => {
+    if (bodyElementRef.current) bodyElementRef.current.scrollTop = 0
+    setMediaActiveTab(tab)
+    window.requestAnimationFrame(() => {
+      if (bodyElementRef.current) bodyElementRef.current.scrollTop = 0
+    })
+  }
 
   return (
     <ModalSheet
-      contentStyle={MEDIA_REMOTE_MODAL_STYLE}
-      footer={<MediaRemoteModalNav activeTab={mediaActiveTab} onTabChange={setMediaActiveTab} remoteTitle={config.title} showDevices={Boolean(config.devices?.length)} />}
+      bodyElementRef={bodyElementRef}
+      navigation={<MediaRemoteModalNav activeTab={mediaActiveTab} onTabChange={handleTabChange} remoteTitle={config.title} showDevices={Boolean(config.devices?.length)} />}
       onClose={onClose}
       open={open}
+      scrollMode="panes"
+      size="workspace"
       title={title}
     >
-      <MediaRemoteModalContent activeTab={mediaActiveTab} config={config} onTabChange={setMediaActiveTab} />
+      <MediaRemoteModalContent activeTab={mediaActiveTab} config={config} onTabChange={handleTabChange} />
     </ModalSheet>
   )
 }
@@ -1053,9 +1089,7 @@ function RoomSourceModal({ card, eightSleepModalStates, onClose, preload = false
     if (renderCard && isDishwasherSourceCard(renderCard)) return undefined
     return renderCard && plainTitle && renderCard.kind !== 'contact' && renderCard.kind !== 'light' ? roomSourceModalSubtitle(renderCard, roomTitle, state.entities) : undefined
   })
-  const modalStyle = renderCard?.kind === 'vacuum'
-    ? VACUUM_MODAL_STYLE
-    : renderCard && SECURITY_SIZED_ROOM_SOURCE_KINDS.has(renderCard.kind) ? ROOM_SOURCE_SECURITY_SIZED_MODAL_STYLE : undefined
+  const modalSize = renderCard && SECURITY_SIZED_ROOM_SOURCE_KINDS.has(renderCard.kind) ? 'compact' : 'standard'
 
   if (renderCard && eightSleepSide && eightSleepModalState) {
     return (
@@ -1084,9 +1118,9 @@ function RoomSourceModal({ card, eightSleepModalStates, onClose, preload = false
 
   return (
     <ModalSheet
-      contentStyle={modalStyle}
       onClose={onClose}
       open={Boolean(card)}
+      size={modalSize}
       subtitle={subtitle}
       title={title}
     >
@@ -1125,6 +1159,14 @@ function SourceRoomPage({ onNavigate, preload = false, preloadHash, preloadHashe
   const bathroomFan = allCards.map((card) => card.control === 'bathroom-fan' ? bathroomFanForPowerEntity(card.entityId) : undefined).find(Boolean)
   const preloadCard = preloadHash ? allCards.find((candidate) => candidate.hash === preloadHash) ?? null : null
   const preloadCards = useMemo(() => preloadHashes.map((preloadTargetHash) => allCards.find((candidate) => candidate.hash === preloadTargetHash)).filter((card): card is RoomSourceCardConfig => Boolean(card?.hash)), [allCards, preloadHashes])
+  const kitchenSection = room.path === 'kitchen'
+    ? (
+        <ResponsiveSectionItem>
+          <KitchenGroceriesSection onNavigate={onNavigate} />
+        </ResponsiveSectionItem>
+      )
+    : null
+  const pageSectionCount = room.sourceSections.length + (kitchenSection ? 1 : 0)
 
   const closeSourceCard = () => {
     setSelectedCard(null)
@@ -1166,30 +1208,35 @@ function SourceRoomPage({ onNavigate, preload = false, preloadHash, preloadHashe
     <div className={styles.stack}>
       {room.sourceSections.length === 0 && <EmptyRoomState />}
 
-      {room.path === 'kitchen' && <KitchenGroceriesSection onNavigate={onNavigate} />}
+      {(kitchenSection || room.sourceSections.length > 0) && (
+        <ResponsiveSectionGrid>
+          {kitchenSection}
+          {room.sourceSections.map((section) => {
+            const leadRow = section.layout === 'lead-row'
+            const leadCards = leadRow ? section.cards.slice(0, 1) : section.cards
+            const followUpCards = leadRow ? section.cards.slice(1) : []
+            const renderCard = (card: RoomSourceCardConfig) => (
+              <RoomSourceCard card={card} eightSleepModalState={card.hash ? eightSleepModalStates[card.hash] : undefined} key={`${room.path}-${section.title}-${card.title}-${card.entityId}`} onOpen={openSourceCard} preload={preload} />
+            )
 
-      {room.sourceSections.map((section) => {
-        const leadRow = section.layout === 'lead-row'
-        const leadCards = leadRow ? section.cards.slice(0, 1) : section.cards
-        const followUpCards = leadRow ? section.cards.slice(1) : []
-        const renderCard = (card: RoomSourceCardConfig) => (
-          <RoomSourceCard card={card} eightSleepModalState={card.hash ? eightSleepModalStates[card.hash] : undefined} key={`${room.path}-${section.title}-${card.title}-${card.entityId}`} onOpen={openSourceCard} preload={preload} />
-        )
-
-        return (
-          <section className={styles.section} id={sectionId(section.title)} key={`${room.path}-${section.title}`}>
-            <SectionHeader title={section.title} />
-            <RoomGrid ariaLabel={`${room.title} ${section.title}`} layout={leadRow ? undefined : section.layout}>
-              {leadCards.map(renderCard)}
-            </RoomGrid>
-            {followUpCards.length > 0 && (
-              <RoomGrid ariaLabel={`${room.title} ${section.title} ${LEAD_ROW_GRID_LABEL_SUFFIX}`}>
-                {followUpCards.map(renderCard)}
-              </RoomGrid>
-            )}
-          </section>
-        )
-      })}
+            return (
+              <ResponsiveSectionItem key={`${room.path}-${section.title}`} span={section.layout === 'app-launch' || pageSectionCount === 1 ? 'full' : 'auto'}>
+                <section className={styles.section} id={sectionId(section.title)}>
+                  <SectionHeader title={section.title} />
+                  <RoomGrid ariaLabel={`${room.title} ${section.title}`} layout={section.layout}>
+                    {leadCards.map(renderCard)}
+                  </RoomGrid>
+                  {followUpCards.length > 0 && (
+                    <RoomGrid ariaLabel={`${room.title} ${section.title} ${LEAD_ROW_GRID_LABEL_SUFFIX}`}>
+                      {followUpCards.map(renderCard)}
+                    </RoomGrid>
+                  )}
+                </section>
+              </ResponsiveSectionItem>
+            )
+          })}
+        </ResponsiveSectionGrid>
+      )}
 
       <RoomSourceModal card={selectedCard} eightSleepModalStates={eightSleepModalStates} onClose={closeSourceCard} preload={preload} preloadCard={preloadCard} roomTitle={room.title} />
       {preloadCards.map((card) => (
@@ -1217,65 +1264,77 @@ function RoomPage({ onNavigate, path, preload = false, preloadHash, preloadHashe
 
   return (
     <div className={styles.stack}>
-      {sectionHasItems(lightGroup) && (
-        <section className={styles.section} id={sectionId('Lights')}>
-          <SectionHeader title="Lights" />
-          <RoomGrid ariaLabel={`${title} Lights`}>
-            {lightGroup?.items.map((item) => (
-              <LightCard entityId={item.entityId} key={item.entityId} size="compact" title={item.title} />
-            ))}
-          </RoomGrid>
-        </section>
-      )}
+      <ResponsiveSectionGrid>
+        {sectionHasItems(lightGroup) && (
+          <ResponsiveSectionItem>
+            <section className={styles.section} id={sectionId('Lights')}>
+              <SectionHeader title="Lights" />
+              <RoomGrid ariaLabel={`${title} Lights`}>
+                {lightGroup?.items.map((item) => (
+                  <LightCard entityId={item.entityId} key={item.entityId} size="compact" title={item.title} />
+                ))}
+              </RoomGrid>
+            </section>
+          </ResponsiveSectionItem>
+        )}
 
-      {sectionHasItems(climateGroup) && (
-        <section className={styles.section} id={sectionId('Climate')}>
-          <SectionHeader title="Climate" />
-          <RoomGrid ariaLabel={`${title} Climate`}>
-            {climateGroup?.items.map((item) => (
-              <ClimateCard
-                colorEntityId={item.colorEntityId}
-                entityId={item.entityId}
-                icon={item.entityId.startsWith('cover.') ? 'vent' : 'temperature'}
-                key={item.entityId}
-                size="compact"
-                title={item.title}
-              />
-            ))}
-          </RoomGrid>
-        </section>
-      )}
+        {sectionHasItems(climateGroup) && (
+          <ResponsiveSectionItem>
+            <section className={styles.section} id={sectionId('Climate')}>
+              <SectionHeader title="Climate" />
+              <RoomGrid ariaLabel={`${title} Climate`}>
+                {climateGroup?.items.map((item) => (
+                  <ClimateCard
+                    colorEntityId={item.colorEntityId}
+                    entityId={item.entityId}
+                    icon={item.entityId.startsWith('cover.') ? 'vent' : 'temperature'}
+                    key={item.entityId}
+                    size="compact"
+                    title={item.title}
+                  />
+                ))}
+              </RoomGrid>
+            </section>
+          </ResponsiveSectionItem>
+        )}
 
-      {sectionHasItems(occupancyGroup) && (
-        <section className={styles.section} id={sectionId('Occupancy')}>
-          <SectionHeader title="Occupancy" />
-          <RoomGrid ariaLabel={`${title} Occupancy`}>
-            {occupancyGroup?.items.map((item) => (
-              <OccupancyCard entityId={item.entityId} key={item.entityId} size="compact" title={item.title} />
-            ))}
-          </RoomGrid>
-        </section>
-      )}
+        {sectionHasItems(occupancyGroup) && (
+          <ResponsiveSectionItem>
+            <section className={styles.section} id={sectionId('Occupancy')}>
+              <SectionHeader title="Occupancy" />
+              <RoomGrid ariaLabel={`${title} Occupancy`}>
+                {occupancyGroup?.items.map((item) => (
+                  <OccupancyCard entityId={item.entityId} key={item.entityId} size="compact" title={item.title} />
+                ))}
+              </RoomGrid>
+            </section>
+          </ResponsiveSectionItem>
+        )}
 
-      {sectionHasItems(contactGroup) && (
-        <section className={styles.section} id={sectionId('Contact Sensors')}>
-          <SectionHeader title="Contact Sensors" />
-          <RoomGrid ariaLabel={`${title} Contact Sensors`}>
-            {contactGroup?.items.map((item) => (
-              <ContactSensorCard entityId={item.entityId} key={item.entityId} size="compact" title={item.title} />
-            ))}
-          </RoomGrid>
-        </section>
-      )}
+        {sectionHasItems(contactGroup) && (
+          <ResponsiveSectionItem>
+            <section className={styles.section} id={sectionId('Contact Sensors')}>
+              <SectionHeader title="Contact Sensors" />
+              <RoomGrid ariaLabel={`${title} Contact Sensors`}>
+                {contactGroup?.items.map((item) => (
+                  <ContactSensorCard entityId={item.entityId} key={item.entityId} size="compact" title={item.title} />
+                ))}
+              </RoomGrid>
+            </section>
+          </ResponsiveSectionItem>
+        )}
 
-      {extras.map((section) => (
-        <section className={styles.section} id={sectionId(section.title)} key={section.title}>
-          <SectionHeader title={section.title} />
-          <RoomGrid ariaLabel={`${title} ${section.title}`}>
-            {section.items.map((item) => <EntityActionCard item={item} key={`${section.title}-${item.entityId}-${item.title}`} onNavigate={onNavigate} />)}
-          </RoomGrid>
-        </section>
-      ))}
+        {extras.map((section) => (
+          <ResponsiveSectionItem key={section.title}>
+            <section className={styles.section} id={sectionId(section.title)}>
+              <SectionHeader title={section.title} />
+              <RoomGrid ariaLabel={`${title} ${section.title}`}>
+                {section.items.map((item) => <EntityActionCard item={item} key={`${section.title}-${item.entityId}-${item.title}`} onNavigate={onNavigate} />)}
+              </RoomGrid>
+            </section>
+          </ResponsiveSectionItem>
+        ))}
+      </ResponsiveSectionGrid>
     </div>
   )
 }
@@ -1338,7 +1397,7 @@ function TodoPageContent({ config, configPath, onNavigate, onScrollLockChange, p
       {visibleLists.map((list) => {
         const entity = entities[list.entityId] as (typeof entities)[string] & { last_changed?: string; last_updated?: string }
         const entityVersion = `${entity?.state ?? ''}:${entity?.last_changed ?? ''}:${entity?.last_updated ?? ''}`
-        return <TodoSection entityVersion={entityVersion} hideListHeader={config.hideListHeaders} hideWhenEmpty={hideEmptyTodoSections} key={list.entityId} list={list} mayHaveItems={todoEntityMayHaveItems(entity)} onEditTask={editableDonetickTasks ? openTaskEditor : undefined} onSectionStateChange={handleTodoSectionState} reloadVersion={todoReloadVersion} rowVariant={configPath === 'to-do' ? 'settings' : undefined} />
+        return <TodoSection entityVersion={entityVersion} hideListHeader={config.hideListHeaders} hideWhenEmpty={hideEmptyTodoSections} key={list.entityId} list={list} mayHaveItems={todoEntityMayHaveItems(entity)} onEditTask={editableDonetickTasks ? openTaskEditor : undefined} onSectionStateChange={handleTodoSectionState} reloadVersion={todoReloadVersion} responsiveItems={editableDonetickTasks} rowVariant={configPath === 'to-do' ? 'settings' : undefined} />
       })}
       {editingTask && (
         <CreateDonetickTaskSheet
@@ -1362,7 +1421,7 @@ function todoEntityMayHaveItems(entity: EntityActionStateMap[string] & { state?:
   return Number(entity.state) > 0
 }
 
-function TodoSection({ entityVersion, hideListHeader = false, hideWhenEmpty, list, mayHaveItems, onEditTask, onSectionStateChange, reloadVersion, rowVariant }: { entityVersion: string; hideListHeader?: boolean; hideWhenEmpty: boolean | undefined; list: TodoListConfig; mayHaveItems: boolean; onEditTask?: (target: DonetickTaskEditTarget) => void; onSectionStateChange?: (entityId: string, state: { loaded: boolean; visible: boolean }) => void; reloadVersion?: number; rowVariant?: 'settings' }) {
+function TodoSection({ entityVersion, hideListHeader = false, hideWhenEmpty, list, mayHaveItems, onEditTask, onSectionStateChange, reloadVersion, responsiveItems = false, rowVariant }: { entityVersion: string; hideListHeader?: boolean; hideWhenEmpty: boolean | undefined; list: TodoListConfig; mayHaveItems: boolean; onEditTask?: (target: DonetickTaskEditTarget) => void; onSectionStateChange?: (entityId: string, state: { loaded: boolean; visible: boolean }) => void; reloadVersion?: number; responsiveItems?: boolean; rowVariant?: 'settings' }) {
   const [visibleItemState, setVisibleItemState] = useState<{ entityVersion: string; value: number | null }>({ entityVersion, value: hideWhenEmpty && !mayHaveItems ? 0 : null })
   const visibleItemCount = visibleItemState.entityVersion !== entityVersion && hideWhenEmpty && mayHaveItems && visibleItemState.value === 0
     ? null
@@ -1382,7 +1441,7 @@ function TodoSection({ entityVersion, hideListHeader = false, hideWhenEmpty, lis
   return (
     <section className={styles.section}>
       {!hideListHeader && <SectionHeader title={list.title} />}
-      <TodoListPanel completionScript={list.completionScript} entityId={list.entityId} hideCompleted={list.hideCompleted} onEditTask={onEditTask} onVisibleItemsChange={hideWhenEmpty ? handleVisibleItemsChange : undefined} optimisticStatuses={todoOptimisticStatuses} reloadVersion={reloadVersion} rowVariant={rowVariant} title={list.title} />
+      <TodoListPanel completionScript={list.completionScript} entityId={list.entityId} hideCompleted={list.hideCompleted} layout={responsiveItems ? 'responsive-grid' : 'list'} onEditTask={onEditTask} onVisibleItemsChange={hideWhenEmpty ? handleVisibleItemsChange : undefined} optimisticStatuses={todoOptimisticStatuses} reloadVersion={reloadVersion} rowVariant={rowVariant} title={list.title} />
     </section>
   )
 }
@@ -1397,7 +1456,7 @@ function ChoresIntro({ onNavigate }: { onNavigate: (path: string) => void }) {
   return (
     <section className={styles.section}>
       <SectionHeader title="Quick Links" />
-      <DynamicGrid ariaLabel="Chore quick links" className={styles.choreQuickGrid} columns={2}>
+      <DynamicGrid ariaLabel="Chore quick links" className={styles.choreQuickGrid} columns={2} itemSizing="uniform" itemSizingMinWidth={560} lastRow="fill-minimum" layout="bounded" maxCellWidth={380} maxColumns={3}>
         {CHORE_QUICK_LINKS.map((item) => (
           <ChoreQuickLink item={item} key={item.path} onNavigate={onNavigate} />
         ))}
@@ -1468,30 +1527,34 @@ function TodoEmptyState({ description = 'You have no chores due- nice job!', tit
 
 function VacuumPage({ preload = false }: { preload?: boolean }) {
   return (
-    <div className={styles.stack}>
-      <section className={styles.section}>
-        <SectionHeader title="Robot Vacuums" />
-        <DynamicGrid ariaLabel="Robot vacuums" className={styles.vacuumGrid} columns={2}>
-          {ORDERED_VACUUMS.map((vacuum) => (
-            <VacuumCard disableHashSync={preload} key={vacuum.entityId} vacuum={vacuum} />
-          ))}
-        </DynamicGrid>
-      </section>
-      <section className={styles.section}>
-        <SectionHeader title="Auto-Clean" />
-        <DynamicGrid ariaLabel="Vacuum auto-clean controls" className={styles.vacuumGrid} columns={2}>
-          {VACUUM_AUTO_CLEAN_CONTROLS.map((item) => <VacuumAutoCleanControlCard control={item} key={item.entityId} />)}
-        </DynamicGrid>
-      </section>
-    </div>
+    <ResponsiveSectionGrid>
+      <ResponsiveSectionItem>
+        <section className={styles.section}>
+          <SectionHeader title="Robot Vacuums" />
+          <DynamicGrid ariaLabel="Robot vacuums" className={styles.vacuumGrid} columns={2} justify="center" lastRow="fill-minimum" layout="bounded" maxCellWidth={280} maxColumns={3}>
+            {ORDERED_VACUUMS.map((vacuum) => (
+              <VacuumCard disableHashSync={preload} key={vacuum.entityId} vacuum={vacuum} />
+            ))}
+          </DynamicGrid>
+        </section>
+      </ResponsiveSectionItem>
+      <ResponsiveSectionItem>
+        <section className={styles.section}>
+          <SectionHeader title="Auto-Clean" />
+          <DynamicGrid ariaLabel="Vacuum auto-clean controls" className={styles.vacuumGrid} columns={2} justify="center" lastRow="fill-minimum" layout="bounded" maxCellWidth={280} maxColumns={3}>
+            {VACUUM_AUTO_CLEAN_CONTROLS.map((item) => <VacuumAutoCleanControlCard control={item} key={item.entityId} />)}
+          </DynamicGrid>
+        </section>
+      </ResponsiveSectionItem>
+    </ResponsiveSectionGrid>
   )
 }
 
 function SecurityPage({ activePath, backPath, contentTransitionState = 'idle', loadingPhase, onBack, onNavigate, preload = false, preloadHash, preloadHashes, title }: { activePath: string; backPath?: string; contentTransitionState?: 'entering' | 'idle' | 'pre-entering'; loadingPhase?: DashboardPageLoadingPhase; onBack?: (fallbackPath?: string) => void; onNavigate: (path: string) => void; preload?: boolean; preloadHash?: string; preloadHashes?: string[]; title: string }) {
   const { closeHash, hash, openHash } = useHashModal({ disabled: preload })
   return (
-    <Page activePath={activePath} backPath={backPath} chromeHidden={Boolean(loadingPhase)} contentTransitionState={contentTransitionState} headerQuickLinks={<SecurityStatusRail onOpenHash={openHash} />} onBack={onBack} onNavigate={onNavigate} title={title}>
-      {loadingPhase ? <DashboardPageLoading phase={loadingPhase} /> : <SecurityDashboard closeHash={closeHash} hash={hash} onOpenHash={openHash} preload={preload} preloadHash={preloadHash} preloadHashes={preloadHashes} />}
+    <Page activePath={activePath} backPath={backPath} chromeHidden={Boolean(loadingPhase)} contentTransitionState={contentTransitionState} headerQuickLinks={<SecurityStatusRail onOpenHash={openHash} />} measure="dashboard" onBack={onBack} onNavigate={onNavigate} title={title}>
+      {loadingPhase ? <DashboardPageLoading placement="viewport" phase={loadingPhase} /> : <SecurityDashboard closeHash={closeHash} hash={hash} onOpenHash={openHash} preload={preload} preloadHash={preloadHash} preloadHashes={preloadHashes} />}
     </Page>
   )
 }
@@ -1549,9 +1612,9 @@ function GuestControlsPage({ onNavigate }: { onNavigate: (path: string) => void 
   return (
     <div className={styles.stack}>
       <section className={styles.section}>
-        <SectionHeader title="Guest Controls" />
+        <SectionHeader title={GUEST_CONTROLS_TITLE} />
         <Description>{GUEST_CONTROLS_DESCRIPTION}</Description>
-        <DynamicGrid ariaLabel="Guest controls" columns={2} gap={8}>
+        <DynamicGrid ariaLabel="Guest controls" columns={2} gap={8} justify="center" lastRow="fill-minimum" layout="bounded" maxCellWidth={320} maxColumns={3}>
           {GUEST_CONTROL_ITEMS.map((item) => (
             <EntityActionCard item={item} key={`${item.entityId}-${item.title}`} onNavigate={onNavigate} size="admin-modal" />
           ))}
@@ -1566,13 +1629,11 @@ function SpecialDeviceModesPage({ preload = false }: { preload?: boolean }) {
 
   return (
     <div className={styles.stack}>
-      <section className={styles.section}>
-        <SectionHeader title={highAqiMode.title} />
-        <Description>{SPECIAL_DEVICE_MODE_DESCRIPTIONS.highAqi}</Description>
+      <SettingsSection description={SPECIAL_DEVICE_MODE_DESCRIPTIONS.highAqi} title={highAqiMode.title}>
         <AdminWideGrid>
           <SpecialDeviceModeCard item={highAqiMode} preload={preload} />
         </AdminWideGrid>
-      </section>
+      </SettingsSection>
     </div>
   )
 }
@@ -1860,7 +1921,7 @@ function VacationDatesSection({ dateRange, invalidDateRange, onDateRangeChange, 
 
 function VacationConfirmationModal({ dateRange, invalidDateRange, onClose, onConfirm, onDateRangeChange, open }: { dateRange: VacationDateRange; invalidDateRange: boolean; onClose: () => void; onConfirm: () => void; onDateRangeChange: (dateRange: VacationDateRange) => void; open: boolean }) {
   return (
-    <ModalSheet onClose={onClose} open={open} scrollResetKey={open ? 'open' : 'closed'} title="Confirm Vacation">
+    <ModalSheet onClose={onClose} open={open} scrollResetKey={open ? 'open' : 'closed'} size="form" title="Confirm Vacation">
       <div className={styles.vacationModalBody}>
         <VacationDateControls dateRange={dateRange} invalidDateRange={invalidDateRange} onConfirm={onConfirm} onDateRangeChange={onDateRangeChange} pending={true} recoveringInvalidDates={false} showConfirm />
       </div>
@@ -1917,15 +1978,21 @@ function VacationPage() {
 
   return (
     <div className={styles.stack}>
-      <section className={styles.section}>
-        <SectionHeader title="Vacation Mode" />
-        <Description>{VACATION_MODE_DESCRIPTION}</Description>
-        {showPreChecklistError && <InlineAlert className={styles.vacationModeError}>{VACATION_PRE_CHECKLIST_ERROR}</InlineAlert>}
-        <VacationModeCard disabled={recoveringInvalidDates && invalidDateRange} enabled={optimisticEnabled || recoveringInvalidDates} onBlockedEnable={() => setBlockedEnableAttempted(true)} onEnabledChange={commitVacationEnabled} onPendingChange={setVacationPending} pending={pendingVacation} preChecklistComplete={checklistComplete} />
-      </section>
-      {inlineDatesVisible
-        ? <VacationDatesSection dateRange={dateRange} invalidDateRange={invalidDateRange} onDateRangeChange={setPendingDateRange} recoveringInvalidDates={recoveringInvalidDates} />
-        : <VacationChecklistSection onStateChange={commitChecklistItemState} states={checklistStates} />}
+      <ResponsiveSectionGrid>
+        <ResponsiveSectionItem>
+          <section className={styles.section}>
+            <SectionHeader title="Vacation Mode" />
+            <Description>{VACATION_MODE_DESCRIPTION}</Description>
+            {showPreChecklistError && <InlineAlert className={styles.vacationModeError}>{VACATION_PRE_CHECKLIST_ERROR}</InlineAlert>}
+            <VacationModeCard disabled={recoveringInvalidDates && invalidDateRange} enabled={optimisticEnabled || recoveringInvalidDates} onBlockedEnable={() => setBlockedEnableAttempted(true)} onEnabledChange={commitVacationEnabled} onPendingChange={setVacationPending} pending={pendingVacation} preChecklistComplete={checklistComplete} />
+          </section>
+        </ResponsiveSectionItem>
+        <ResponsiveSectionItem>
+          {inlineDatesVisible
+            ? <VacationDatesSection dateRange={dateRange} invalidDateRange={invalidDateRange} onDateRangeChange={setPendingDateRange} recoveringInvalidDates={recoveringInvalidDates} />
+            : <VacationChecklistSection onStateChange={commitChecklistItemState} states={checklistStates} />}
+        </ResponsiveSectionItem>
+      </ResponsiveSectionGrid>
       <VacationConfirmationModal dateRange={pendingDateRange ?? dateRange} invalidDateRange={pendingVacation && invalidDateRange} onClose={() => setVacationPending(false)} onConfirm={confirmVacation} onDateRangeChange={setPendingDateRange} open={pendingVacation} />
     </div>
   )
@@ -1958,6 +2025,7 @@ const MEDIA_SOURCE_SECTIONS = MEDIA_SECTIONS.map((section) => ({
 const MEDIA_SOURCE_CARDS = MEDIA_SOURCE_SECTIONS.flatMap((section) => section.cards)
 
 function MediaPage({ preload = false, preloadHash, preloadHashes = [] }: { preload?: boolean; preloadHash?: string; preloadHashes?: string[] }) {
+  const coreCopy = useCopy(CORE_COPY_NAMESPACE)
   const [selectedCard, setSelectedCard] = useState<RoomSourceCardConfig | null>(null)
   const preloadCard = preloadHash ? MEDIA_SOURCE_CARDS.find((candidate) => candidate.hash === preloadHash) ?? null : null
   const preloadCards = useMemo(() => preloadHashes.map((preloadTargetHash) => MEDIA_SOURCE_CARDS.find((candidate) => candidate.hash === preloadTargetHash)).filter((card): card is RoomSourceCardConfig => Boolean(card?.hash)), [preloadHashes])
@@ -1996,22 +2064,36 @@ function MediaPage({ preload = false, preloadHash, preloadHashes = [] }: { prelo
   }, [preload])
 
   return (
-    <div className={styles.stack}>
-      {MEDIA_SOURCE_SECTIONS.map((section) => (
-        <section className={styles.section} key={section.title}>
-          <SectionHeader title={section.title} />
-          <Grid>
-            {section.cards.map((card) => <RoomSourceCard card={card} key={`${section.title}-${card.entityId}-${card.title}`} onOpen={openSourceCard} />)}
-          </Grid>
-        </section>
-      ))}
+    <>
+      <ResponsiveSectionGrid>
+        {MEDIA_SOURCE_SECTIONS.map((section) => {
+          const leadCards = section.cards.slice(0, 1)
+          const followUpCards = section.cards.slice(1)
+          const renderCard = (card: RoomSourceCardConfig) => (
+            <RoomSourceCard card={card} key={[section.title, card.entityId, card.title].join('-')} onOpen={openSourceCard} />
+          )
+
+          return (
+            <Section className={styles.section} key={section.title} title={section.title}>
+              <DynamicGrid ariaLabel={section.title} className={styles.mediaLeadGrid} columns={1} fillRows={false} itemSizing="uniform">
+                {leadCards.map(renderCard)}
+              </DynamicGrid>
+              {followUpCards.length > 0 && (
+                <RoomGrid ariaLabel={coreCopy(CORE_COPY_KEYS.groups.controls, { title: section.title })} itemSizing="uniform" layout="lead-row">
+                  {followUpCards.map(renderCard)}
+                </RoomGrid>
+              )}
+            </Section>
+          )
+        })}
+      </ResponsiveSectionGrid>
       <RoomSourceModal card={selectedCard} onClose={closeSourceCard} preloadCard={preloadCard} roomTitle={(selectedCard ?? preloadCard)?.title === 'Theater Room' ? 'Theater Room' : 'Living Room'} />
       {preloadCards.map((card) => (
-        <div data-preload-modal={`media${card.hash}`} key={`media-preload-${card.hash}`}>
+        <div data-preload-modal={'media' + card.hash} key={'media-preload-' + card.hash}>
           <RoomSourcePreloadContent card={card} roomTitle={card.title === 'Theater Room' ? 'Theater Room' : 'Living Room'} />
         </div>
       ))}
-    </div>
+    </>
   )
 }
 
@@ -2043,57 +2125,52 @@ function AdminPage({ onNavigate, preload = false, preloadHash, preloadHashes = [
     leaveDetailPage()
     setSelectedPresenceOverride(null)
   }
+  const presenceModalStyle: ModalSheetStyle | undefined = presenceModalContentActive
+    ? {
+        ...modalSquareGridModalStyle(presenceGridLayout),
+        '--modal-desktop-height': 'min(860px, calc(var(--dashboard-visible-height, var(--dashboard-viewport-height, 100dvh)) - 64px))',
+      }
+    : undefined
 
   return (
-    <div className={styles.stack}>
-      <section className={styles.section}>
-        <SectionHeader title="Security Controls" />
-        <Description>{ADMIN_DESCRIPTIONS.autoLock}</Description>
+    <div className={styles.settingsSectionStack}>
+      <SettingsSection description={ADMIN_DESCRIPTIONS.autoLock} title={ADMIN_SECTION_TITLES.securityControls}>
         <AdminTileGrid items={ADMIN_SECURITY_CONTROLS} onNavigate={onNavigate} />
-      </section>
+      </SettingsSection>
 
-      <section className={styles.section}>
-        <SectionHeader title="Living Room Power Recovery" />
-        <Description>{ADMIN_DESCRIPTIONS.livingRoomPowerRecovery}</Description>
+      <SettingsSection description={ADMIN_DESCRIPTIONS.livingRoomPowerRecovery} title={ADMIN_SECTION_TITLES.livingRoomPowerRecovery}>
         <LivingRoomPowerRecoveryButton />
-      </section>
+      </SettingsSection>
 
-      <section className={styles.section}>
-        <SectionHeader title="Relay Control Mode" />
-        <Description>{ADMIN_DESCRIPTIONS.relayControlMode}</Description>
+      <SettingsSection description={ADMIN_DESCRIPTIONS.relayControlMode} title={ADMIN_SECTION_TITLES.relayControlMode}>
         <AdminTileGrid items={ADMIN_RELAY_CONTROL_ITEMS} onNavigate={onNavigate} />
         {showRelayGuestModeWarning && <InlineAlert>{ADMIN_DESCRIPTIONS.relayGuestModeWarning}</InlineAlert>}
-      </section>
+      </SettingsSection>
 
-      <section className={styles.section}>
-        <SectionHeader title="Presence-Based Light Overrides" />
-        <Description>{ADMIN_DESCRIPTIONS.presenceOverrides}</Description>
+      <SettingsSection description={ADMIN_DESCRIPTIONS.presenceOverrides} title={ADMIN_SECTION_TITLES.presenceOverrides}>
         <AdminHashButton hash="#presence-based-overrides" onOpen={openPresenceModal} title="Open Presence-Based Overrides" />
-      </section>
+      </SettingsSection>
 
-      <section className={styles.section}>
-        <SectionHeader title="Show Specific Controls" />
-        <Description>{ADMIN_DESCRIPTIONS.showSpecific}</Description>
+      <SettingsSection description={ADMIN_DESCRIPTIONS.showSpecific} title={ADMIN_SECTION_TITLES.showSpecific}>
         <AdminTileGrid items={ADMIN_SHOW_SPECIFIC_CONTROLS} onNavigate={onNavigate} />
-      </section>
+      </SettingsSection>
 
-      <section className={styles.section}>
-        <SectionHeader title="Automatic Presence Setting Overrides" />
-        <Description>{ADMIN_DESCRIPTIONS.autoReset}</Description>
+      <SettingsSection description={ADMIN_DESCRIPTIONS.autoReset} title={ADMIN_SECTION_TITLES.autoReset}>
         <AdminHashButton hash="#presence-based-overrides-auto" onOpen={openHash} title="Open Presence-Based Auto-Reset Configuration" />
-      </section>
+      </SettingsSection>
 
       <ModalSheet
         backLabel="Back to presence overrides"
         bodyElementRef={bodyElementRef}
-        contentStyle={presenceModalContentActive ? modalSquareGridModalStyle(presenceGridLayout) : undefined}
+        contentStyle={presenceModalStyle}
         onBack={selectedPresenceOverride ? closePresenceDetail : undefined}
         onClose={closeHash}
         open={presenceModalOpen}
         scrollResetKey={presenceDetailPageKey}
+        size="media"
         title={selectedPresenceOverride ? `${selectedPresenceOverride.title} Presence Lighting` : 'Presence-Based Overrides'}
       >
-        <div className={styles.adminModalBody}>
+        <div className={`${styles.adminModalBody} ${styles.presenceModalBody}`} data-presence-modal-body="true">
           {presenceModalContentActive && (
             selectedPresenceOverride
               ? <PresenceOverrideDetailPage item={selectedPresenceOverride} />
@@ -2102,7 +2179,7 @@ function AdminPage({ onNavigate, preload = false, preloadHash, preloadHashes = [
         </div>
       </ModalSheet>
 
-      <ModalSheet contentStyle={autoResetModalContentActive ? modalSquareGridModalStyle(autoResetGridLayout) : undefined} onClose={closeHash} open={autoResetModalOpen} title="Presence-Based Overrides Auto-Reset">
+      <ModalSheet contentStyle={autoResetModalContentActive ? modalSquareGridModalStyle(autoResetGridLayout) : undefined} onClose={closeHash} open={autoResetModalOpen} size="media" title="Presence-Based Overrides Auto-Reset">
         <div className={styles.adminModalBody}>
           {autoResetModalContentActive && <AdminTileGrid gridLabel="Presence-Based Auto-Reset by room" items={ADMIN_AUTO_REENABLE_ITEMS} onNavigate={onNavigate} squareGridRef={autoResetGridRef} squareGridStyle={modalSquareGridStyle(autoResetGridLayout)} variant="admin-modal" />}
         </div>
@@ -2639,14 +2716,10 @@ const FREE_SLEEP_SCHEDULE_STAGES: { icon: string; key: FreeSleepScheduleStage; l
 const EIGHT_SLEEP_BED_MODAL_STYLE: ModalSheetStyle = {
   '--modal-desktop-width': '700px',
   '--modal-desktop-max-width': '700px',
-  '--modal-desktop-height': '70vh',
-  '--modal-desktop-max-height': '70vh',
 }
 const EIGHT_SLEEP_ALARM_EDITOR_MODAL_STYLE: ModalSheetStyle = {
   ...EIGHT_SLEEP_BED_MODAL_STYLE,
-  '--modal-desktop-height': 'auto',
 }
-const DESKTOP_MODAL_QUERY = '(min-width: 760px)'
 const FREE_SLEEP_ALARM_DAYS: { key: FreeSleepAlarmDay; label: string }[] = [
   { key: 'sunday', label: 'Sunday' },
   { key: 'monday', label: 'Monday' },
@@ -2658,9 +2731,6 @@ const FREE_SLEEP_ALARM_DAYS: { key: FreeSleepAlarmDay; label: string }[] = [
 ]
 const FREE_SLEEP_ALARM_DAY_OPTIONS = FREE_SLEEP_ALARM_DAYS.map((day) => ({ label: day.label, value: day.key }))
 
-function shouldResetScrollOnTabChange() {
-  return typeof window.matchMedia !== 'function' || window.matchMedia(DESKTOP_MODAL_QUERY).matches
-}
 const FREE_SLEEP_ALARM_DAY_KEYS = FREE_SLEEP_ALARM_DAYS.map((day) => day.key)
 
 const EIGHT_SLEEP_SIDE_CONFIGS: EightSleepSideConfig[] = [
@@ -4753,10 +4823,13 @@ function EightSleepBedModal({ modalState, onClose, open, side }: { modalState: E
             deleteAction={alarmEditor.editingId ? { disabled: !alarmController.available || alarmEditorStale, icon: 'mdi:delete', label: 'Delete Alarm', onClick: deleteAlarm } : undefined}
             primaryAction={{ disabled: alarmEditorInvalid, icon: alarmEditor.editingId ? 'mdi:content-save' : 'mdi:plus', label: alarmEditor.editingId ? 'Save Alarm' : 'Add Alarm', onClick: saveAlarm }}
           />
-        ) : alarmPage ? undefined : <EightSleepModalNav activeTab={renderedActiveTab} onTabChange={setActiveTab} sideTitle={side.title} tabs={tabs} />}
+        ) : undefined}
+        navigation={alarmPage ? undefined : <EightSleepModalNav activeTab={renderedActiveTab} onTabChange={setActiveTab} sideTitle={side.title} tabs={tabs} />}
         onBack={alarmDetailPage ? closeDetailPage : undefined}
         onClose={closeBedModal}
         open={open}
+        scrollMode={alarmDetailPage ? 'body' : 'panes'}
+        size={alarmDetailPage ? 'standard' : 'workspace'}
         subtitle={alarmDetailPage ? undefined : modalState.subtitle}
         title={modalTitle}
       >
@@ -4804,35 +4877,18 @@ function EightSleepBedModal({ modalState, onClose, open, side }: { modalState: E
 }
 
 function EightSleepModalNav({ activeTab, onTabChange, sideTitle, tabs }: { activeTab: EightSleepModalTab; onTabChange: (tab: EightSleepModalTab) => void; sideTitle: string; tabs: readonly typeof EIGHT_SLEEP_MODAL_TABS[number][] }) {
-  const { clearVisualTab, setVisualTabNow, visualActiveTab } = useImmediateVisualTab(activeTab)
-  const navStyle = { '--eight-sleep-modal-nav-cols': tabs.length } as CSSProperties
+  const copy = useCopy(CORE_COPY_NAMESPACE)
+  const idPrefix = `eight-sleep-${sideTitle.toLowerCase().replaceAll(/[^a-z0-9]+/g, '-')}`
 
   return (
-    <nav aria-label={`${sideTitle} modal sections`} className={styles.eightSleepModalNav} data-tab-count={tabs.length} style={navStyle}>
-      {tabs.map((item) => {
-        const isActive = visualActiveTab === item.tab
-        const isCurrent = activeTab === item.tab
-        return (
-          <button
-            aria-current={isCurrent ? 'page' : undefined}
-            aria-label={item.label}
-            className={[styles.eightSleepModalNavButton, isActive ? styles.eightSleepModalNavButtonActive : ''].filter(Boolean).join(' ')}
-            data-active={isActive}
-            key={item.tab}
-            onBlur={clearVisualTab}
-            onClick={() => {
-              setVisualTabNow(item.tab)
-              onTabChange(item.tab)
-            }}
-            onPointerCancel={clearVisualTab}
-            onPointerDown={() => setVisualTabNow(item.tab)}
-            type="button"
-          >
-            <MaterialIcon name={item.icon} size={22} />
-          </button>
-        )
-      })}
-    </nav>
+    <ModalIconTabNav
+      activeTab={activeTab}
+      idPrefix={idPrefix}
+      label={copy(CORE_COPY_KEYS.modal.sectionNavigation, { title: sideTitle })}
+      onTabChange={onTabChange}
+      panelId={modalTabPanelId(idPrefix, 'content')}
+      tabs={tabs}
+    />
   )
 }
 
@@ -4912,6 +4968,7 @@ function EightSleepBedModalContentView({
   const alarmState = sleepypodAlarmState(alarmStateEntity?.state)
   const alarmActive = isSleepypodAlarmActive(alarmState)
   const selectedTabLabel = (tabs ?? EIGHT_SLEEP_MODAL_TABS).find((tab) => tab.tab === effectiveActiveTab)?.label ?? 'Sleep Schedule'
+  const tabIdPrefix = `eight-sleep-${side.title.toLowerCase().replaceAll(/[^a-z0-9]+/g, '-')}`
   const alarmEditorPage = alarmPage?.kind === 'editor' ? alarmPage : null
   const alarmEditor = alarmEditorPage?.draft ?? null
   const alarmDayOptions = alarmEditor && alarmEditorPage?.lockedDay === null && !alarmEditor.editingId && alarmController && !alarmController.supportsMultiplePerDay
@@ -4922,8 +4979,6 @@ function EightSleepBedModalContentView({
     : FREE_SLEEP_ALARM_DAY_OPTIONS
 
   useEffect(() => {
-    if (!shouldResetScrollOnTabChange()) return
-
     const scrollContainers = [modalPanelRef.current, modalBodyRef.current?.parentElement]
     for (const scrollContainer of scrollContainers) {
       if (!scrollContainer || typeof scrollContainer.scrollTo !== 'function') continue
@@ -5001,13 +5056,16 @@ function EightSleepBedModalContentView({
       </div>
       <div
         aria-label={`${side.title} ${selectedTabLabel}`}
+        aria-labelledby={modalTabId(tabIdPrefix, effectiveActiveTab)}
         className={styles.eightSleepModalPanel}
         data-modal-tab-transition-state={transitionState}
         data-scroll-region="eight-sleep-panel"
+        id={modalTabPanelId(tabIdPrefix, 'content')}
         ref={(element) => {
           modalPanelRef.current = element
           onPanelElementChange?.(element)
         }}
+        role="tabpanel"
       >
         {!modalState.sideAvailable && (
           <section className={styles.section}>
@@ -6040,7 +6098,7 @@ function ThermostatModal({
   }
 
   const subtitle = detail?.type === 'predictive' ? formatPredictiveState(currentRecommendation) : undefined
-  const footer = detail
+  const navigation = detail
     ? undefined
     : (
         <ModalIconTabNav
@@ -6058,11 +6116,12 @@ function ThermostatModal({
       backLabel={detail ? thermostatModalBackLabel(detail) : undefined}
       bodyElementRef={bodyElementRef}
       contentStyle={THERMOSTAT_MODAL_STYLE}
-      footer={footer}
+      navigation={navigation}
       onBack={detail ? closeDetail : undefined}
       onClose={onClose}
       open={open}
       scrollResetKey={detailKey}
+      size="workspace"
       subtitle={subtitle}
       title={thermostatModalDetailTitle(detail)}
     >
@@ -6125,32 +6184,38 @@ function ThermostatPageEntry({
 
 function ThermostatPageEntries({ onOpen }: { onOpen: (hash: string) => void }) {
   return (
-    <div className={styles.thermostatPageEntries} data-thermostat-page-entrypoints="true">
-      <ThermostatPageEntry
-        description={thermostatTabDescription('rooms')}
-        hash={THERMOSTAT_ROOMS_HASH}
-        icon="mdi:home-thermometer"
-        onOpen={onOpen}
-        sectionTitle="Room Thermostats"
-        title="Room Thermostats"
-      />
-      <ThermostatPageEntry
-        description={thermostatTabDescription('automation')}
-        hash={THERMOSTAT_AUTOMATION_HASH}
-        icon="mdi:cog"
-        onOpen={onOpen}
-        sectionTitle="Advanced Configuration"
-        title="Advanced Configuration"
-      />
-      <ThermostatPageEntry
-        description={thermostatTabDescription('tracking')}
-        hash={THERMOSTAT_TRACKING_HASH}
-        icon="mdi:motion-sensor"
-        onOpen={onOpen}
-        sectionTitle="Room Tracking"
-        title="Room Tracking"
-      />
-    </div>
+    <ResponsiveSectionGrid className={styles.thermostatPageEntries} gap={16} maxColumns={3}>
+      <ResponsiveSectionItem>
+        <ThermostatPageEntry
+          description={thermostatTabDescription('rooms')}
+          hash={THERMOSTAT_ROOMS_HASH}
+          icon="mdi:home-thermometer"
+          onOpen={onOpen}
+          sectionTitle="Room Thermostats"
+          title="Room Thermostats"
+        />
+      </ResponsiveSectionItem>
+      <ResponsiveSectionItem>
+        <ThermostatPageEntry
+          description={thermostatTabDescription('automation')}
+          hash={THERMOSTAT_AUTOMATION_HASH}
+          icon="mdi:cog"
+          onOpen={onOpen}
+          sectionTitle="Advanced Configuration"
+          title="Advanced Configuration"
+        />
+      </ResponsiveSectionItem>
+      <ResponsiveSectionItem>
+        <ThermostatPageEntry
+          description={thermostatTabDescription('tracking')}
+          hash={THERMOSTAT_TRACKING_HASH}
+          icon="mdi:motion-sensor"
+          onOpen={onOpen}
+          sectionTitle="Room Tracking"
+          title="Room Tracking"
+        />
+      </ResponsiveSectionItem>
+    </ResponsiveSectionGrid>
   )
 }
 
@@ -6259,15 +6324,15 @@ export function DashboardViewPage({ activePath, appChromeHidden = false, initial
   const page = path === 'security' ? (
     <SecurityPage activePath={activePath} backPath={backPath} contentTransitionState={loadingPhase ? 'idle' : initialContentTransitionState} loadingPhase={loadingPhase} onBack={onBack} onNavigate={onNavigate} preload={preload} preloadHash={preloadHash} preloadHashes={preloadHashes} title={title} />
   ) : (
-    <Page activePath={activePath} backPath={backPath} chromeHidden={pageChromeHidden} contentHidden={appChromeHidden} contentTransitionState={loadingPhase ? 'idle' : initialContentTransitionState} headerQuickLinks={roomTitle ? <RoomSectionRail path={path} title={roomTitle} /> : undefined} onBack={onBack} onNavigate={onNavigate} scrollLocked={pageScrollLocked} title={title}>
-      {loadingPhase ? <DashboardPageLoading phase={loadingPhase} /> : <Content inventoryControls={inventoryControls} onNavigate={onNavigate} onRecipesInitialResolved={onRecipesInitialResolved} onScrollLockChange={handlePageScrollLockChange} path={path} preload={preload} preloadHash={preloadHash} preloadHashes={preloadHashes} recipeControls={recipeControls} recipesInitiallyAppGated={recipesInitiallyAppGated} />}
+    <Page activePath={activePath} backPath={backPath} chromeHidden={pageChromeHidden} contentHidden={appChromeHidden} contentTransitionState={loadingPhase ? 'idle' : initialContentTransitionState} headerQuickLinks={roomTitle ? <RoomSectionRail path={path} title={roomTitle} /> : undefined} measure={pageMeasureForPath(path)} onBack={onBack} onNavigate={onNavigate} scrollLocked={pageScrollLocked} title={title}>
+      {loadingPhase ? <DashboardPageLoading placement="viewport" phase={loadingPhase} /> : <Content inventoryControls={inventoryControls} onNavigate={onNavigate} onRecipesInitialResolved={onRecipesInitialResolved} onScrollLockChange={handlePageScrollLockChange} path={path} preload={preload} preloadHash={preloadHash} preloadHashes={preloadHashes} recipeControls={recipeControls} recipesInitiallyAppGated={recipesInitiallyAppGated} />}
     </Page>
   )
 
   if (!withShell || preload) return page
 
   return (
-    <AppShell bottomNav={<BottomNav activePath={activePath} onNavigate={onNavigate} />} chromeHidden={pageChromeHidden} floatingAction={!preload && hasDashboardFloatingAction(path) ? <DashboardFloatingAction inventoryControls={inventoryControls} path={path} recipeControls={recipeControls} /> : undefined} onNavigate={onNavigate}>
+    <AppShell activePath={activePath} bottomNav={<BottomNav activePath={activePath} onNavigate={onNavigate} />} chromeHidden={pageChromeHidden} floatingAction={!preload && hasDashboardFloatingAction(path) ? <DashboardFloatingAction inventoryControls={inventoryControls} path={path} recipeControls={recipeControls} /> : undefined} onNavigate={onNavigate} pageMeasure={pageMeasureForPath(path)}>
       {page}
     </AppShell>
   )

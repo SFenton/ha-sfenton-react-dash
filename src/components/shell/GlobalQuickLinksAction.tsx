@@ -104,6 +104,7 @@ export function GlobalQuickLinksAction({ onNavigate }: GlobalQuickLinksActionPro
         onClose={() => setOpen(false)}
         open={open}
         scrollResetKey={detailPage ?? false}
+        size="media"
         subtitle={detailPage === 'security-system' ? securitySubtitle : undefined}
         title={modalTitle}
       >

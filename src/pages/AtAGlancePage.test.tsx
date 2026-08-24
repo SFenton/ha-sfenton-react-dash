@@ -384,9 +384,11 @@ describe('AtAGlancePage', () => {
     render(<AtAGlancePage onNavigate={navigate} />)
 
     fireEvent.click(screen.getByRole('button', { name: 'Open navigation menu' }))
-    expect(screen.getByText('Navigation')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Close navigation menu' })).not.toBeInTheDocument()
-    const sidebar = screen.getByLabelText('Navigation menu')
+    const sidebar = screen.getAllByLabelText('Navigation menu').find((element) => element.getAttribute('data-state') === 'open')!
+    expect(within(sidebar).getByText('Navigation')).toBeInTheDocument()
+    const chores = within(sidebar).getByRole('menuitem', { name: /Chores/ })
+    expect(chores.lastElementChild).toHaveAttribute('data-count')
     expect(sidebar).toHaveAttribute('data-state', 'open')
     fireEvent.click(sidebar.parentElement!)
     expect(sidebar).toHaveAttribute('data-state', 'closed')

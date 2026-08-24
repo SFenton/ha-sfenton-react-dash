@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useHass } from '@hakit/core'
 import { CardCarousel } from '../../core/CardCarousel'
 import { responsiveDynamicGridColumnCount } from '../../core/dynamicGridLayout'
@@ -69,19 +69,38 @@ export function SuggestedRecipeCarousel({ onLoadStateChange, onOpenRecipe = () =
   const [layout, setLayout] = useState(() => recommendationLayout(
     preload || typeof window === 'undefined' ? 393 : window.innerWidth,
   ))
+  const [layoutReady, setLayoutReady] = useState(preload)
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (preload) return undefined
     const update = () => {
-      const next = recommendationLayout(window.innerWidth)
+      const carouselWidth = rootRef.current
+        ?.querySelector<HTMLElement>('[data-card-carousel="true"]')
+        ?.clientWidth
+      const rootWidth = rootRef.current?.clientWidth
+      const measuredWidth = carouselWidth && carouselWidth > 0
+        ? carouselWidth
+        : rootWidth && rootWidth > 0
+          ? rootWidth
+          : window.innerWidth
+      const next = recommendationLayout(measuredWidth)
       setLayout((current) => layoutsMatch(current, next) ? current : next)
+      setLayoutReady(true)
     }
+    update()
     window.addEventListener('resize', update)
-    return () => window.removeEventListener('resize', update)
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(update)
+    if (rootRef.current) observer?.observe(rootRef.current)
+    const carousel = rootRef.current?.querySelector<HTMLElement>('[data-card-carousel="true"]')
+    if (carousel) observer?.observe(carousel)
+    return () => {
+      observer?.disconnect()
+      window.removeEventListener('resize', update)
+    }
   }, [preload])
 
   useEffect(() => {
-    if (preload) return undefined
+    if (preload || !layoutReady) return undefined
     let stale = false
     void callRecipeService(
       callService,
@@ -100,7 +119,7 @@ export function SuggestedRecipeCarousel({ onLoadStateChange, onOpenRecipe = () =
     return () => {
       stale = true
     }
-  }, [callService, layout.total, onLoadStateChange, preload])
+  }, [callService, layout.total, layoutReady, onLoadStateChange, preload])
 
   useEffect(() => {
     if (preload || status !== 'ready') return undefined
