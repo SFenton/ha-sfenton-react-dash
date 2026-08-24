@@ -30,6 +30,7 @@ type RouteParityResult = {
 
 const BASELINE_URL = process.env.RESPONSIVE_BASELINE_URL
 const CANDIDATE_URL = process.env.RESPONSIVE_CANDIDATE_URL
+const PARITY_REQUIRED = process.env.RESPONSIVE_PARITY_REQUIRED === '1'
 const ARTIFACT_DIR = process.env.RESPONSIVE_ARTIFACT_DIR
 const SELECTED_ROUTES = process.env.RESPONSIVE_PARITY_ROUTES
   ? RESPONSIVE_ROUTES.filter((route) => process.env.RESPONSIVE_PARITY_ROUTES?.split(',').includes(route))
@@ -296,7 +297,10 @@ async function comparePngs(page: Page, baseline: Buffer, candidate: Buffer) {
 }
 
 test('all 45 routes preserve the clean 393x852 presentation', async ({ browser }) => {
-  test.skip(!BASELINE_URL || !CANDIDATE_URL, 'Set responsive baseline and candidate URLs')
+  if (!BASELINE_URL || !CANDIDATE_URL) {
+    test.skip(!PARITY_REQUIRED, 'Set responsive baseline and candidate URLs')
+    throw new Error('Required mobile parity needs RESPONSIVE_BASELINE_URL and RESPONSIVE_CANDIDATE_URL')
+  }
   test.setTimeout(600_000)
 
   const baseline = await preparePage(browser, BASELINE_URL!)
@@ -374,5 +378,50 @@ test('all 45 routes preserve the clean 393x852 presentation', async ({ browser }
     await baseline.context.close()
     await candidate.context.close()
     await comparisonPage.close()
+  }
+})
+
+test('Food and Recipes preserves narrow mobile tile geometry', async ({ browser }) => {
+  if (!BASELINE_URL || !CANDIDATE_URL) {
+    test.skip(!PARITY_REQUIRED, 'Set responsive baseline and candidate URLs')
+    throw new Error('Required mobile parity needs RESPONSIVE_BASELINE_URL and RESPONSIVE_CANDIDATE_URL')
+  }
+
+  const baseline = await preparePage(browser, BASELINE_URL)
+  const candidate = await preparePage(browser, CANDIDATE_URL)
+  try {
+    await openRoute(baseline.page, 'food')
+    await ensureRouteContent(baseline.page, 'food')
+    await settleStableVisual(baseline.page)
+    await openRoute(candidate.page, 'food')
+    await ensureRouteContent(candidate.page, 'food')
+    await settleStableVisual(candidate.page)
+
+    const geometry = async (page: Page) => {
+      const allRecipes = page.getByRole('button', { exact: true, name: 'All Recipes' })
+      const allFood = page.getByRole('button', { name: /^All Food / })
+      const [allRecipesBox, allFoodBox] = await Promise.all([allRecipes.boundingBox(), allFood.boundingBox()])
+      return {
+        allFood: allFoodBox && {
+          height: Math.round(allFoodBox.height),
+          width: Math.round(allFoodBox.width),
+          x: Math.round(allFoodBox.x),
+        },
+        allRecipes: allRecipesBox && {
+          height: Math.round(allRecipesBox.height),
+          width: Math.round(allRecipesBox.width),
+          x: Math.round(allRecipesBox.x),
+        },
+      }
+    }
+
+    const candidateGeometry = await geometry(candidate.page)
+    expect(candidateGeometry).toEqual({
+      allFood: { height: 120, width: 176, x: 16 },
+      allRecipes: { height: 120, width: 361, x: 16 },
+    })
+  } finally {
+    await baseline.context.close()
+    await candidate.context.close()
   }
 })
