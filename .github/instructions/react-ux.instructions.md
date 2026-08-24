@@ -28,3 +28,8 @@ applyTo: "src/pages/**/*.tsx,src/components/**/*.tsx,src/pages/**/*.module.css,s
 - Use the darker HA-style modal surface app-wide: shared modals and picker dialogs should use the near-black `hass-popup` treatment, not translucent blue/glass backgrounds, unless a divergence is explicitly requested and documented.
 - Keep modal content stable and native-feeling: content should appear together without staggered entrance animations, modal controls should not show browser-default focus rings, and fixed modal footers/bottom nav bars must stay anchored to the sheet footer while respecting safe-area insets.
 - When a modal has internal tabs or pages, persistent header/hero content should remain in the modal's main scroll flow unless intentionally documented otherwise. Switching tabs should reset the modal body scroll to the top of the newly selected content.
+- Before marking UX work complete, update the affected route, modal, tab,
+  detail, and state inventory and run the canonical responsive release matrix
+  in `docs/ux/validation-matrix.md`. A resized mobile-emulation project does
+  not replace fine-pointer desktop coverage, and an unexplained skip or
+  failure blocks completion.

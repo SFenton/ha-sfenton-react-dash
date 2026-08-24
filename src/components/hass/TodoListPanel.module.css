@@ -150,3 +150,11 @@
     outline: none;
   }
 }
+
+@container page-content (min-width: 744px) {
+  .panel[data-layout='responsive-grid'] .items {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+    column-gap: 18px;
+  }
+}

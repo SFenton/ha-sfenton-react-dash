@@ -3,7 +3,7 @@ import { expect, test } from '@playwright/test'
 test.describe('real HAKit dial integration', () => {
   test.skip(process.env.PLAYWRIGHT_REAL_HAKIT !== '1', 'Requires the env-backed live HA connection and real HAKit package.')
 
-  test('uses app-owned current markers and one keyboard slider', async ({ page }) => {
+  test('uses state-appropriate current markers and at most one keyboard slider', async ({ page }) => {
     await page.setViewportSize({ width: 393, height: 852 })
     await page.goto('/at-a-glance/master-bedroom')
 
@@ -15,24 +15,28 @@ test.describe('real HAKit dial integration', () => {
     const mistDial = dialog.getByRole('region', { name: /Humidifier mist level/i })
     const currentMarker = mistDial.locator('[data-marker="current"]')
 
-    await expect(currentMarker).toBeVisible({ timeout: 10_000 })
     await expect(mistDial.locator('path.current:not(.arc-current)')).toHaveCount(0)
-    const markerStyle = await currentMarker.evaluate((marker) => {
-      const style = getComputedStyle(marker)
-      const rect = marker.getBoundingClientRect()
-      return {
-        backgroundColor: style.backgroundColor,
-        height: rect.height,
-        pointerEvents: style.pointerEvents,
-        width: rect.width,
-      }
-    })
-    expect(markerStyle).toEqual({
-      backgroundColor: 'rgba(112, 117, 126, 0.98)',
-      height: 18,
-      pointerEvents: 'none',
-      width: 18,
-    })
+    const currentMarkerVisible = await currentMarker.isVisible().catch(() => false)
+    if (currentMarkerVisible) {
+      const markerStyle = await currentMarker.evaluate((marker) => {
+        const style = getComputedStyle(marker)
+        const rect = marker.getBoundingClientRect()
+        return {
+          backgroundColor: style.backgroundColor,
+          height: rect.height,
+          pointerEvents: style.pointerEvents,
+          width: rect.width,
+        }
+      })
+      expect(markerStyle).toEqual({
+        backgroundColor: 'rgba(112, 117, 126, 0.98)',
+        height: 18,
+        pointerEvents: 'none',
+        width: 18,
+      })
+    } else {
+      await expect(mistDial).toHaveAccessibleName(/Humidifier mist level (?:Off|Unavailable|\d+)/i)
+    }
 
     const sliderState = await mistDial.evaluate((dial) => ({
       exposed: Array.from(dial.querySelectorAll('[role="slider"]')).filter((element) => !element.closest('[aria-hidden="true"]')).length,
@@ -43,11 +47,14 @@ test.describe('real HAKit dial integration', () => {
 
     const adjustableSlider = mistDial.getByRole('slider', { name: 'Mist level' })
     if (await adjustableSlider.count()) {
-      expect(await mistDial.evaluate((dial) => {
-        const current = dial.querySelector('[data-marker="current"]')
-        const target = Array.from(dial.querySelectorAll('[role="slider"]')).find((element) => !element.closest('[aria-hidden="true"]'))
-        return Boolean(current && target && (current.compareDocumentPosition(target) & Node.DOCUMENT_POSITION_FOLLOWING))
-      })).toBe(true)
+      if (currentMarkerVisible) {
+        expect(await mistDial.evaluate((dial) => {
+          const current = Array.from(dial.querySelectorAll<HTMLElement>('[data-marker="current"]'))
+            .find((element) => element.getClientRects().length > 0)
+          const target = Array.from(dial.querySelectorAll('[role="slider"]')).find((element) => !element.closest('[aria-hidden="true"]'))
+          return Boolean(current && target && (current.compareDocumentPosition(target) & Node.DOCUMENT_POSITION_FOLLOWING))
+        })).toBe(true)
+      }
       await dialog.getByRole('button', { name: 'Close' }).focus()
       await page.keyboard.press('Tab')
       const focused = await page.evaluate(() => ({

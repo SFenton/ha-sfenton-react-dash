@@ -5,6 +5,7 @@ import { mockCallServiceCalls, mockEntities, resetMockHass } from '../../test/mo
 import { MediaRemoteModalContent, MediaRemoteModalNav } from './MediaRemoteModalContent'
 
 const livingRoomRemote = MEDIA_REMOTE_CONFIGS['#living-room-shield']
+const theaterRemote = MEDIA_REMOTE_CONFIGS['#theater-room-shield']
 
 beforeEach(() => {
   resetMockHass()
@@ -18,17 +19,17 @@ describe('MediaRemoteModalNav', () => {
 
     render(<MediaRemoteModalNav activeTab="controls" onTabChange={onTabChange} remoteTitle="Living Room" showDevices />)
 
-    const controlsTab = screen.getByRole('button', { name: 'Controls' })
-    const devicesTab = screen.getByRole('button', { name: 'Devices' })
+    const controlsTab = screen.getByRole('tab', { name: 'Controls' })
+    const devicesTab = screen.getByRole('tab', { name: 'Devices' })
 
     expect(controlsTab).toHaveAttribute('data-active', 'true')
-    expect(controlsTab).toHaveAttribute('aria-current', 'page')
+    expect(controlsTab).toHaveAttribute('aria-selected', 'true')
 
     fireEvent.pointerDown(devicesTab)
 
     expect(devicesTab).toHaveAttribute('data-active', 'true')
-    expect(devicesTab).not.toHaveAttribute('aria-current')
-    expect(controlsTab).toHaveAttribute('aria-current', 'page')
+    expect(devicesTab).toHaveAttribute('aria-selected', 'false')
+    expect(controlsTab).toHaveAttribute('aria-selected', 'true')
     expect(onTabChange).not.toHaveBeenCalled()
 
     fireEvent.click(devicesTab)
@@ -38,6 +39,18 @@ describe('MediaRemoteModalNav', () => {
 })
 
 describe('MediaRemoteModalContent', () => {
+  it('renders Theater devices in the shared uniform DynamicGrid without calling services', () => {
+    render(<MediaRemoteModalContent activeTab="devices" config={theaterRemote} onTabChange={() => undefined} />)
+
+    expect(screen.getByRole('group', { name: 'Theater Room SHIELD remote controls' })).toBeInTheDocument()
+    const projector = screen.getByRole('button', { name: /Projector Off/i })
+    const grid = projector.closest('[data-dynamic-grid="true"]')
+    expect(grid).toHaveAttribute('data-dynamic-grid-item-sizing', 'uniform')
+    expect(grid).toHaveAttribute('data-dynamic-grid-max-cell-width', '260')
+    expect(grid).toHaveAttribute('data-dynamic-grid-max-columns', '4')
+    expect(mockCallServiceCalls).toEqual([])
+  })
+
   it('keeps the text prompt mounted through its close transition and restores input focus on open', async () => {
     render(<MediaRemoteModalContent config={livingRoomRemote} />)
 
@@ -87,5 +100,27 @@ describe('MediaRemoteModalContent', () => {
     mockEntities[livingRoomRemote.volumeEntityId].attributes.volume_level = 0.42
     view.rerender(<MediaRemoteModalContent config={livingRoomRemote} />)
     expect(slider).toHaveValue('42')
+  })
+
+  it('cancels delayed text-prompt visibility work when unmounted', () => {
+    vi.useFakeTimers()
+    try {
+      const view = render(<MediaRemoteModalContent config={livingRoomRemote} />)
+      act(() => {
+        vi.advanceTimersByTime(20)
+      })
+      const baselineTimerCount = vi.getTimerCount()
+
+      fireEvent.click(screen.getByRole('button', { name: 'Keyboard' }))
+      const openTimerCount = vi.getTimerCount()
+      expect(openTimerCount).toBeGreaterThan(baselineTimerCount)
+
+      view.unmount()
+      expect(vi.getTimerCount()).toBeLessThan(openTimerCount)
+      expect(vi.getTimerCount()).toBeLessThanOrEqual(baselineTimerCount + 1)
+    } finally {
+      vi.clearAllTimers()
+      vi.useRealTimers()
+    }
   })
 })

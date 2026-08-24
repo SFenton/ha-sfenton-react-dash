@@ -1,12 +1,16 @@
-import { useEffect, useRef, useState, type CSSProperties, type RefObject } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type RefObject } from 'react'
 import { flushSync } from 'react-dom'
 import { useEntity, useHass } from '@hakit/core'
+import { DynamicGrid } from '../core/DynamicGrid'
 import { MaterialIcon } from '../core/Icon'
 import { GlassTile, type TileTone } from '../core/GlassTile'
+import { ModalIconTabNav } from '../core/ModalTabNav'
+import { modalTabId, modalTabPanelId } from '../core/modalTabIds'
 import type { MediaRemoteAction, MediaRemoteAppConfig, MediaRemoteButtonConfig, MediaRemoteConfig, MediaRemoteDeviceConfig, MediaRemoteIconColorRule } from '../../constants/mediaRemotes'
 import { mediaRemoteModalTabs, type MediaRemoteModalTab } from '../../constants/surfaceSemantics'
 import { useOptimisticState } from '../../hooks/useOptimisticState'
-import { useImmediateVisualTab, useSmoothDisplayedModalTab } from '../../hooks/useSmoothDisplayedModalTab'
+import { useSmoothDisplayedModalTab } from '../../hooks/useSmoothDisplayedModalTab'
+import { CORE_COPY_KEYS, CORE_COPY_NAMESPACE, useCopy } from '../../i18n'
 import { asEntityName, titleCaseState } from './entityState'
 import styles from './MediaRemoteModalContent.module.css'
 
@@ -17,7 +21,6 @@ type TextPromptState = { accordionState: TextPromptAccordionState; action: TextP
 
 const VOLUME_OPTIMISTIC_REVERT_MS = 2500
 const REMOTE_ACCORDION_DEBUG_KEY = 'haDash.remoteAccordionDebug'
-const DESKTOP_MODAL_QUERY = '(min-width: 760px)'
 
 interface EntityLike {
   attributes: Record<string, unknown>
@@ -40,10 +43,6 @@ function formatMediaState(entity: EntityLike | null | undefined, fallback = 'Una
   return titleCaseState(entity.state)
 }
 
-function shouldResetScrollOnTabChange() {
-  return typeof window.matchMedia !== 'function' || window.matchMedia(DESKTOP_MODAL_QUERY).matches
-}
-
 function textInputCommand(value: string) {
   return `input text '${value.replace(/'/g, "'\\''")}'`
 }
@@ -62,21 +61,28 @@ function logRemoteAccordion(event: string, details: Record<string, unknown>) {
 }
 
 function scrollableAncestor(element: HTMLElement) {
+  const ownerDocument = element.ownerDocument
+  const view = ownerDocument.defaultView
+  if (!view) return null
+
   let current = element.parentElement
-  while (current && current !== document.body) {
-    const style = window.getComputedStyle(current)
+  while (current && current !== ownerDocument.body) {
+    const style = view.getComputedStyle(current)
     if (/(auto|scroll)/.test(style.overflowY) && current.scrollHeight > current.clientHeight) return current
     current = current.parentElement
   }
-  return document.scrollingElement instanceof HTMLElement ? document.scrollingElement : document.documentElement
+  return ownerDocument.scrollingElement instanceof HTMLElement ? ownerDocument.scrollingElement : ownerDocument.documentElement
 }
 
 function keepTextPromptVisible(input: HTMLInputElement | null, reason: string) {
-  if (!input) return
+  if (!input || !input.isConnected) return
+  const view = input.ownerDocument.defaultView
+  if (!view) return
   const scroller = scrollableAncestor(input)
-  const viewport = window.visualViewport
+  if (!scroller) return
+  const viewport = view.visualViewport
   const viewportTop = viewport?.offsetTop ?? 0
-  const viewportBottom = viewport ? viewport.offsetTop + viewport.height : window.innerHeight
+  const viewportBottom = viewport ? viewport.offsetTop + viewport.height : view.innerHeight
   const scrollerRect = scroller.getBoundingClientRect()
   const inputRect = input.getBoundingClientRect()
   const visibleTop = Math.max(scrollerRect.top, viewportTop) + 16
@@ -101,12 +107,22 @@ function keepTextPromptVisible(input: HTMLInputElement | null, reason: string) {
 }
 
 function scheduleTextPromptVisibility(input: HTMLInputElement | null, reason: string) {
-  if (!input) return
+  if (!input || !input.isConnected) return () => undefined
+  const view = input.ownerDocument.defaultView
+  if (!view) return () => undefined
+
   keepTextPromptVisible(input, `${reason}:now`)
-  window.requestAnimationFrame(() => keepTextPromptVisible(input, `${reason}:raf`))
-  window.setTimeout(() => keepTextPromptVisible(input, `${reason}:80ms`), 80)
-  window.setTimeout(() => keepTextPromptVisible(input, `${reason}:240ms`), 240)
-  window.setTimeout(() => keepTextPromptVisible(input, `${reason}:520ms`), 520)
+  const animationFrame = view.requestAnimationFrame(() => keepTextPromptVisible(input, `${reason}:raf`))
+  const timers = [
+    view.setTimeout(() => keepTextPromptVisible(input, `${reason}:80ms`), 80),
+    view.setTimeout(() => keepTextPromptVisible(input, `${reason}:240ms`), 240),
+    view.setTimeout(() => keepTextPromptVisible(input, `${reason}:520ms`), 520),
+  ]
+
+  return () => {
+    view.cancelAnimationFrame(animationFrame)
+    for (const timer of timers) view.clearTimeout(timer)
+  }
 }
 
 function resolveAction(action: MediaRemoteAction, entityId: string | undefined, entities: Record<string, EntityLike | undefined>) {
@@ -265,8 +281,18 @@ function RemoteShortcutSection({
 function TextPromptForm({ accordionState, action, inputRef, onCancel, onExited, onOpened, onSubmit }: { accordionState: TextPromptAccordionState; action: TextPromptAction; inputRef: RefObject<HTMLInputElement | null>; onCancel: () => void; onExited: () => void; onOpened: () => void; onSubmit: (action: TextPromptAction, text: string) => void }) {
   const [text, setText] = useState('')
   const accordionRef = useRef<HTMLDivElement | null>(null)
+  const visibilityScheduleCleanupRef = useRef<(() => void) | null>(null)
   const interactive = accordionState !== 'closed'
   const open = accordionState !== 'closing'
+  const scheduleVisibility = useCallback((reason: string) => {
+    visibilityScheduleCleanupRef.current?.()
+    visibilityScheduleCleanupRef.current = scheduleTextPromptVisibility(inputRef.current, reason)
+  }, [inputRef])
+
+  useEffect(() => () => {
+    visibilityScheduleCleanupRef.current?.()
+    visibilityScheduleCleanupRef.current = null
+  }, [])
 
   useEffect(() => {
     if (!remoteAccordionDebugEnabled()) return undefined
@@ -315,8 +341,8 @@ function TextPromptForm({ accordionState, action, inputRef, onCancel, onExited, 
     if (!open) return undefined
     const viewport = window.visualViewport
     const input = inputRef.current
-    const handleViewportChange = () => scheduleTextPromptVisibility(inputRef.current, 'visual-viewport')
-    const handleFocus = () => scheduleTextPromptVisibility(inputRef.current, 'input-focus')
+    const handleViewportChange = () => scheduleVisibility('visual-viewport')
+    const handleFocus = () => scheduleVisibility('input-focus')
 
     input?.addEventListener('focus', handleFocus)
     viewport?.addEventListener('resize', handleViewportChange)
@@ -329,7 +355,7 @@ function TextPromptForm({ accordionState, action, inputRef, onCancel, onExited, 
       viewport?.removeEventListener('scroll', handleViewportChange)
       window.removeEventListener('resize', handleViewportChange)
     }
-  }, [inputRef, open])
+  }, [inputRef, open, scheduleVisibility])
 
   return (
     <div
@@ -344,7 +370,7 @@ function TextPromptForm({ accordionState, action, inputRef, onCancel, onExited, 
         if (accordionState === 'opening') {
           onOpened()
           inputRef.current?.focus()
-          scheduleTextPromptVisibility(inputRef.current, 'transition-focus')
+          scheduleVisibility('transition-focus')
           logRemoteAccordion('focus-after-open', { activeElement: document.activeElement instanceof HTMLElement ? document.activeElement.id || document.activeElement.tagName : null })
         } else if (accordionState === 'closing') {
           onExited()
@@ -438,36 +464,20 @@ function AppButton({ app }: { app: MediaRemoteAppConfig }) {
 }
 
 export function MediaRemoteModalNav({ activeTab, onTabChange, remoteTitle, showDevices = false }: { activeTab: MediaRemoteModalTab; onTabChange: (tab: MediaRemoteModalTab) => void; remoteTitle: string; showDevices?: boolean }) {
+  const copy = useCopy(CORE_COPY_NAMESPACE)
   const tabs = mediaRemoteModalTabs(showDevices)
   const effectiveActiveTab = tabs.some((tab) => tab.tab === activeTab) ? activeTab : 'controls'
-  const { clearVisualTab, setVisualTabNow, visualActiveTab } = useImmediateVisualTab(effectiveActiveTab)
+  const idPrefix = `media-${remoteTitle.toLowerCase().replaceAll(/[^a-z0-9]+/g, '-')}`
 
   return (
-    <nav aria-label={`${remoteTitle} modal sections`} className={styles.remoteModalNav} style={{ '--remote-nav-tab-count': tabs.length } as CSSProperties}>
-      {tabs.map((item) => {
-        const isActive = visualActiveTab === item.tab
-        const isCurrent = effectiveActiveTab === item.tab
-        return (
-          <button
-            aria-current={isCurrent ? 'page' : undefined}
-            aria-label={item.label}
-            className={[styles.remoteModalNavButton, isActive ? styles.remoteModalNavButtonActive : ''].filter(Boolean).join(' ')}
-            data-active={isActive}
-            key={item.tab}
-            onBlur={clearVisualTab}
-            onClick={() => {
-              setVisualTabNow(item.tab)
-              onTabChange(item.tab)
-            }}
-            onPointerCancel={clearVisualTab}
-            onPointerDown={() => setVisualTabNow(item.tab)}
-            type="button"
-          >
-            <MaterialIcon name={item.icon} size={22} />
-          </button>
-        )
-      })}
-    </nav>
+    <ModalIconTabNav
+      activeTab={effectiveActiveTab}
+      idPrefix={idPrefix}
+      label={copy(CORE_COPY_KEYS.modal.sectionNavigation, { title: remoteTitle })}
+      onTabChange={onTabChange}
+      panelId={modalTabPanelId(idPrefix, 'content')}
+      tabs={tabs}
+    />
   )
 }
 
@@ -505,38 +515,42 @@ function MediaRemoteModalTabContent({
   const controlEntity = useEntity(asEntityName(config.controlEntityId), { returnNullIfNotFound: true }) as EntityLike | null
   const modalBodyRef = useRef<HTMLDivElement | null>(null)
   const modalPanelRef = useRef<HTMLDivElement | null>(null)
-  const tabContentRef = useRef<HTMLDivElement | null>(null)
   const availableTabs = mediaRemoteModalTabs(Boolean(config.devices?.length))
   const targetTab = availableTabs.some((tab) => tab.tab === activeTab) ? activeTab : 'controls'
   const { displayedTab: effectiveActiveTab, transitionState } = useSmoothDisplayedModalTab(targetTab)
   const selectedTabLabel = availableTabs.find((tab) => tab.tab === effectiveActiveTab)?.label ?? 'Controls'
+  const tabIdPrefix = `media-${config.title.toLowerCase().replaceAll(/[^a-z0-9]+/g, '-')}`
+  const previousDisplayedTabRef = useRef(effectiveActiveTab)
 
-  useEffect(() => {
-    if (!shouldResetScrollOnTabChange()) return
-
+  useLayoutEffect(() => {
+    if (previousDisplayedTabRef.current === effectiveActiveTab) return undefined
+    previousDisplayedTabRef.current = effectiveActiveTab
     const scrollContainers = [
       modalPanelRef.current,
-      tabContentRef.current,
       modalBodyRef.current,
-      modalBodyRef.current ? scrollableAncestor(modalBodyRef.current) : null,
+      modalBodyRef.current?.closest<HTMLElement>('[data-modal-sheet-body="true"]') ?? null,
     ]
-    for (const scrollContainer of scrollContainers) {
-      if (!scrollContainer || typeof scrollContainer.scrollTo !== 'function') continue
-      scrollContainer.scrollTo({ top: 0, behavior: 'auto' })
+    const reset = () => {
+      for (const scrollContainer of scrollContainers) {
+        if (scrollContainer) scrollContainer.scrollTop = 0
+      }
     }
+    reset()
+    const frame = window.requestAnimationFrame(reset)
+    return () => window.cancelAnimationFrame(frame)
   }, [effectiveActiveTab])
 
   return (
     <div className={styles.modalBody} ref={modalBodyRef}>
-      <div aria-label={`${config.title} ${selectedTabLabel}`} className={styles.rightPane} role="group">
+      <div aria-label={`${config.title} ${selectedTabLabel}`} className={styles.rightPane} data-tab={effectiveActiveTab} role="group">
         <PowerSection config={config} controlEntity={controlEntity} onTextPrompt={onTextPrompt} />
 
-        <div className={styles.tabPanel} data-scroll-region="media-remote-panel" data-tab={effectiveActiveTab} ref={modalPanelRef}>
+        <div className={styles.tabPanel} data-tab={effectiveActiveTab}>
           <section className={`${styles.section} ${styles.remoteControlSection}`}>
             <RemoteGrid config={config} disabled={controlsDisabled} onTextPrompt={onTextPrompt} />
           </section>
 
-          <div className={styles.tabContent} data-modal-tab-transition-state={transitionState} ref={tabContentRef}>
+          <div aria-labelledby={modalTabId(tabIdPrefix, effectiveActiveTab)} className={styles.tabContent} data-modal-tab-transition-state={transitionState} data-scroll-region="media-remote-panel" data-tab={effectiveActiveTab} id={modalTabPanelId(tabIdPrefix, 'content')} ref={modalPanelRef} role="tabpanel">
             {effectiveActiveTab === 'controls' ? (
               <>
                 {showVolumeControls ? (
@@ -579,9 +593,9 @@ function MediaRemoteModalTabContent({
             {effectiveActiveTab === 'devices' && config.devices?.length ? (
               <section className={styles.section}>
                 <SectionHeader title="Devices" />
-                <div className={styles.deviceGrid}>
+                <DynamicGrid className={styles.deviceGrid} columns={2} fillRows={false} itemSizing="uniform" layout="bounded" maxCellWidth={260} maxColumns={4}>
                   {config.devices.map((device) => <DeviceButton device={device} key={device.title} />)}
-                </div>
+                </DynamicGrid>
               </section>
             ) : null}
           </div>
@@ -599,6 +613,7 @@ export function MediaRemoteModalContent({ activeTab: controlledActiveTab, config
   const [textPrompt, setTextPrompt] = useState<TextPromptState | null>(null)
   const textPromptInputRef = useRef<HTMLInputElement | null>(null)
   const textPromptAnimationFrameRef = useRef<number | null>(null)
+  const textPromptVisibilityCleanupRef = useRef<(() => void) | null>(null)
   const activeTab = controlledActiveTab ?? localActiveTab
   const setActiveTab = onTabChange ?? setLocalActiveTab
   const hasExternalNav = Boolean(onTabChange)
@@ -611,12 +626,17 @@ export function MediaRemoteModalContent({ activeTab: controlledActiveTab, config
 
   useEffect(() => () => {
     if (textPromptAnimationFrameRef.current !== null) window.cancelAnimationFrame(textPromptAnimationFrameRef.current)
+    textPromptVisibilityCleanupRef.current?.()
   }, [])
 
   const cancelTextPromptAnimationFrame = () => {
     if (textPromptAnimationFrameRef.current === null) return
     window.cancelAnimationFrame(textPromptAnimationFrameRef.current)
     textPromptAnimationFrameRef.current = null
+  }
+  const schedulePromptVisibility = (reason: string) => {
+    textPromptVisibilityCleanupRef.current?.()
+    textPromptVisibilityCleanupRef.current = scheduleTextPromptVisibility(textPromptInputRef.current, reason)
   }
 
   const openTextPrompt = (action: TextPromptAction) => {
@@ -647,11 +667,13 @@ export function MediaRemoteModalContent({ activeTab: controlledActiveTab, config
       })
     }
     if (shouldFocus) textPromptInputRef.current?.focus()
-    if (shouldFocus) scheduleTextPromptVisibility(textPromptInputRef.current, 'sync-focus')
+    if (shouldFocus) schedulePromptVisibility('sync-focus')
     else textPromptInputRef.current?.blur()
   }
   const closeTextPrompt = () => {
     cancelTextPromptAnimationFrame()
+    textPromptVisibilityCleanupRef.current?.()
+    textPromptVisibilityCleanupRef.current = null
     textPromptInputRef.current?.blur()
     setTextPrompt((current) => {
       if (!current || current.accordionState === 'closed') return null
@@ -666,24 +688,26 @@ export function MediaRemoteModalContent({ activeTab: controlledActiveTab, config
   }
 
   return (
-    <div className={styles.remoteModal} data-inline-nav={hasExternalNav ? 'false' : 'true'}>
-      <MediaRemoteModalTabContent
-        activeTab={activeTab}
-        config={config}
-        controlsDisabled={controlsDisabled}
-        hideKeyboard={hideKeyboard}
-        onTextPrompt={openTextPrompt}
-        onTextPromptCancel={closeTextPrompt}
-        onTextPromptExited={() => setTextPrompt((current) => current?.accordionState === 'closing' ? null : current)}
-        onTextPromptOpened={() => setTextPrompt((current) => current?.accordionState === 'opening' ? { ...current, accordionState: 'open' } : current)}
-        onTextPromptSubmit={submitTextPrompt}
-        showMediaControls={showMediaControls}
-        showVolumeControls={showVolumeControls}
-        volumeControlsDisabled={volumeControlsDisabled}
-        textPrompt={textPrompt}
-        textPromptInputRef={textPromptInputRef}
-      />
-      {!hasExternalNav ? <MediaRemoteModalNav activeTab={activeTab} onTabChange={setActiveTab} remoteTitle={config.title} showDevices={Boolean(config.devices?.length)} /> : null}
+    <div className={styles.remoteContainer}>
+      <div className={styles.remoteModal} data-inline-nav={hasExternalNav ? 'false' : 'true'}>
+        <MediaRemoteModalTabContent
+          activeTab={activeTab}
+          config={config}
+          controlsDisabled={controlsDisabled}
+          hideKeyboard={hideKeyboard}
+          onTextPrompt={openTextPrompt}
+          onTextPromptCancel={closeTextPrompt}
+          onTextPromptExited={() => setTextPrompt((current) => current?.accordionState === 'closing' ? null : current)}
+          onTextPromptOpened={() => setTextPrompt((current) => current?.accordionState === 'opening' ? { ...current, accordionState: 'open' } : current)}
+          onTextPromptSubmit={submitTextPrompt}
+          showMediaControls={showMediaControls}
+          showVolumeControls={showVolumeControls}
+          volumeControlsDisabled={volumeControlsDisabled}
+          textPrompt={textPrompt}
+          textPromptInputRef={textPromptInputRef}
+        />
+        {!hasExternalNav ? <MediaRemoteModalNav activeTab={activeTab} onTabChange={setActiveTab} remoteTitle={config.title} showDevices={Boolean(config.devices?.length)} /> : null}
+      </div>
     </div>
   )
 }

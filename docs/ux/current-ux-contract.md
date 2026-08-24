@@ -69,13 +69,16 @@ backdrop, swipe, hash, route, and state-driven dismissal must render
 `open={false}` while the sheet remains mounted so the exit animation completes.
 Do not restore dead surface or chrome variants, immediately unmount a closing
 sheet, or add nested sheets when one mounted detail flow can be used.
+Switching a modal tab resets the active body or pane scroll owner to the top.
 
 ## Validation and release boundary
 
 Use the design-system checker to ratchet raw colors, undefined `--rd-*`
 variables, direct `ModalDisclosureIcon` imports, and visual `:active` rules.
-Validate mobile first with focused unit tests and Playwright at the same route,
-state, scroll position, and viewport. Follow
+Mobile-first is sequencing, not an exemption for wider layouts. Validate with
+focused unit tests and Playwright at the same route, state, scroll position,
+and viewport, then complete the canonical viewport, resize, inventory,
+fine-pointer desktop, preload-I/O, and mobile-baseline gates in
 [Validation Matrix](validation-matrix.md).
 
 Authoring or review does not authorize deployment, Home Assistant mutation,

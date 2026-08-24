@@ -19,8 +19,16 @@
   overflow: hidden;
 }
 
-.cache [data-preload-modal] {
+.routeGeometry,
+.modalGeometry {
   position: absolute;
-  inset: 0;
+  inset: 16px;
+  border-radius: var(--radius-panel);
+  background: var(--color-glass-soft);
   overflow: hidden;
+}
+
+.modalGeometry {
+  inset: 10%;
+  border-radius: 30px;
 }

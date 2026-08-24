@@ -1,8 +1,10 @@
 import { useEntity, useHass } from '@hakit/core'
 import { CameraTile } from './CameraTile'
+import { DynamicGrid } from '../core/DynamicGrid'
+import { ResponsiveSectionGrid, ResponsiveSectionItem } from '../core/ResponsiveSectionGrid'
+import { Section } from '../core/Section'
 import { GlassTile, type TileTone } from '../core/GlassTile'
-import { ModalSheet } from '../core/ModalSheet'
-import { SectionHeader } from '../core/SectionHeader'
+import { ModalSheet, type ModalSheetSize } from '../core/ModalSheet'
 import { CAMERA_ITEMS, CONTACT_GROUPS, SECURITY_ENTITY } from '../../constants/atAGlance'
 import {
   SECURITY_CONTROL_TILES,
@@ -18,6 +20,7 @@ import { GarageDoorTile } from './GarageDoorTile'
 import { SecurityControls } from './SecurityControls'
 import { SECURITY_SYSTEM_MODAL_STYLE, securitySystemModalSubtitle } from './securityControlsConfig'
 import { GuestPresenceSecurityModalContent, GuestPresenceSecuritySection, GUEST_PRESENCE_SECURITY_HASH } from './GuestPresenceSecurity'
+import { useGuestPresenceSecurityActive } from './useGuestPresenceSecurityActive'
 import { StatusRail } from './StatusRail'
 import { copy as translate, useCopy } from '../../i18n'
 import styles from './SecurityDashboard.module.css'
@@ -169,6 +172,7 @@ interface SecurityDashboardProps {
 
 export function SecurityDashboard({ closeHash, hash, onOpenHash, preload = false, preloadHash, preloadHashes = [] }: SecurityDashboardProps) {
   const copy = useCopy('pageSecurity')
+  const guestPresenceSecurityActive = useGuestPresenceSecurityActive()
   const securitySubtitle = useHass((state) => securitySystemModalSubtitle(state.entities[SECURITY_ENTITY]?.state))
   const activeHash = isSecurityModalHash(hash) ? hash : ''
   const preloadContentHash = preloadHash && isSecurityModalHash(preloadHash) ? preloadHash : ''
@@ -179,38 +183,46 @@ export function SecurityDashboard({ closeHash, hash, onOpenHash, preload = false
   const contactGridStyle = modalSquareGridStyle(contactGridLayout)
   const modalSubtitle = contentHash === '#security-system' ? securitySubtitle : undefined
   const modalContentStyle = contentHash === '#security-system' ? SECURITY_SYSTEM_MODAL_STYLE : contactModalContentActive ? modalSquareGridModalStyleForHash(CONTACT_SENSORS_HASH, contactGridLayout) : undefined
+  const modalSize: ModalSheetSize = CAMERA_ITEMS.some((camera) => camera.hash === contentHash)
+    ? 'media'
+    : contentHash === '#security-system'
+      ? 'compact'
+      : contactModalContentActive
+        ? 'media'
+        : 'standard'
   const preloadModalHashes = preloadHashes.filter(isSecurityModalHash)
 
   return (
     <>
-      <div className={styles.dashboard}>
-        <section className={styles.section}>
-          <SectionHeader title={copy('sections.security')} />
-          <div className={styles.grid} data-security-control-grid="true">
+      <ResponsiveSectionGrid className={styles.dashboard} gap={20}>
+        <Section className={styles.section} span="full" title={copy('sections.security')}>
+          <DynamicGrid className={styles.grid} columns={2} fillRows={false} itemSizing="uniform" layout="fill" maxCellWidth={280} maxColumns={4}>
             {SECURITY_CONTROL_TILES.map((item) => <SecurityTile item={item} key={item.entityId} onOpenHash={onOpenHash} />)}
-          </div>
-        </section>
+          </DynamicGrid>
+        </Section>
 
-        <GuestPresenceSecuritySection onOpen={onOpenHash} />
+        {guestPresenceSecurityActive && (
+          <ResponsiveSectionItem span="full">
+            <GuestPresenceSecuritySection onOpen={onOpenHash} />
+          </ResponsiveSectionItem>
+        )}
 
-        <section className={styles.section}>
-          <SectionHeader title={copy('sections.cameras')} />
-          <div className={styles.cameraGrid}>
+        <Section className={styles.section} span="full" title={copy('sections.cameras')}>
+          <DynamicGrid className={styles.cameraGrid} columns={2} fillRows={false} itemSizing="uniform" layout="fill" maxCellWidth={280} maxColumns={4}>
             {CAMERA_ITEMS.map((camera) => <CameraTile camera={camera} key={camera.entityId} live={!preload} onOpen={onOpenHash} />)}
-          </div>
-        </section>
+          </DynamicGrid>
+        </Section>
 
         {SHOW_MACHE_SECTION && (
-          <section className={styles.section}>
-            <SectionHeader title={copy('sections.vehicle')} />
-            <div className={styles.grid}>
+          <Section className={styles.section} title={copy('sections.vehicle')}>
+            <DynamicGrid className={styles.grid} columns={2} fillRows={false} itemSizing="uniform" layout="fill" maxCellWidth={280} maxColumns={4}>
               {SECURITY_MACHE_TILES.map((item) => <SecurityTile item={item} key={item.entityId} onOpenHash={onOpenHash} />)}
-            </div>
-          </section>
+            </DynamicGrid>
+          </Section>
         )}
-      </div>
+      </ResponsiveSectionGrid>
 
-      <ModalSheet contentStyle={modalContentStyle} onClose={closeHash} open={activeHash !== ''} subtitle={modalSubtitle} title={modalTitle(contentHash)}>
+      <ModalSheet contentStyle={modalContentStyle} onClose={closeHash} open={activeHash !== ''} size={modalSize} subtitle={modalSubtitle} title={modalTitle(contentHash)}>
         <SecurityModalContent contactGridRef={contactGridRef} contactGridStyle={contactGridStyle} hash={contentHash} />
       </ModalSheet>
       {preloadModalHashes.map((preloadTargetHash) => (

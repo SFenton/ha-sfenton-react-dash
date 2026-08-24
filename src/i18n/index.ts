@@ -4,6 +4,8 @@ export { copyNamespaces, resources, type CopyNamespace, type CopyResources } fro
 export { useCopy } from './useCopy'
 
 export const COMMON_COPY_NAMESPACE = 'common' as const
+export const CORE_COPY_NAMESPACE = 'core' as const
+export const CUSTOM_LIGHTS_COPY_NAMESPACE = 'pageCustomLights' as const
 export const BATHROOM_FAN_COPY_NAMESPACE = 'modalBathroomFan' as const
 export const HUMIDIFIER_COPY_NAMESPACE = 'modalHumidifier' as const
 export const VACUUM_COPY_NAMESPACE = 'modalVacuum' as const
@@ -60,4 +62,21 @@ export const HUMIDIFIER_COPY_KEYS = {
   states: {
     unavailable: 'states.unavailable',
   },
+} as const
+
+export const CORE_COPY_KEYS = {
+  groups: {
+    controls: 'groups.controls',
+  },
+  modal: {
+    dailyReportSections: 'modal.dailyReportSections',
+    humidifierSections: 'modal.humidifierSections',
+    sectionNavigation: 'modal.sectionNavigation',
+    tabItemCount: 'modal.tabItemCount',
+  },
+} as const
+
+export const CUSTOM_LIGHTS_COPY_KEYS = {
+  frontYard: 'frontYard',
+  lightingMode: 'lightingMode',
 } as const

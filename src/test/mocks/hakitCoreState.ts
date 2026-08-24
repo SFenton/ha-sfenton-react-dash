@@ -998,7 +998,6 @@ function nonLiveReferenceMockEntities() {
 export const explicitMockEntities: Record<string, MockEntity> = {
   ...nonLiveReferenceMockEntities(),
   'alarm_control_panel.aqara_hub_m3_0056_security_system_2': entity('alarm_control_panel.aqara_hub_m3_0056_security_system_2', 'armed_home'),
-  'binary_sensor.all_contact_sensors': entity('binary_sensor.all_contact_sensors', 'off'),
   'binary_sensor.contact_sensors': entity('binary_sensor.contact_sensors', 'off'),
   'binary_sensor.occupancy_sensors': entity('binary_sensor.occupancy_sensors', 'on'),
   'binary_sensor.front_yard_fault': entity('binary_sensor.front_yard_fault', 'off', { station_faults: [] }),

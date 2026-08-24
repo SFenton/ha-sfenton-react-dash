@@ -1,0 +1,35 @@
+.wrapper {
+  min-width: 0;
+}
+
+.section {
+  display: grid;
+  min-width: 0;
+  gap: 10px;
+  container-name: settings-section;
+  container-type: inline-size;
+}
+
+.body {
+  display: grid;
+  min-width: 0;
+  gap: 10px;
+  align-items: start;
+}
+
+.description {
+  min-width: 0;
+}
+
+.controls {
+  min-width: 0;
+  container-name: settings-controls;
+  container-type: inline-size;
+}
+
+@container settings-section (min-width: 744px) {
+  .body {
+    grid-template-columns: minmax(0, 1fr) minmax(320px, 460px);
+    gap: 24px;
+  }
+}

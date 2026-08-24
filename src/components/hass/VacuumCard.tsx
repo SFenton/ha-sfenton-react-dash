@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useEntity, useHass } from '@hakit/core'
 import { GlassTile } from '../core/GlassTile'
 import { Description } from '../core/Description'
@@ -6,6 +6,8 @@ import { InlineAlert } from '../core/InlineAlert'
 import { InfoBox } from '../core/InfoBox'
 import { MaterialIcon } from '../core/Icon'
 import { ModalActionButton, type ModalActionTone } from '../core/ModalActionFooter'
+import { ModalIconTabNav } from '../core/ModalTabNav'
+import { modalTabId, modalTabPanelId } from '../core/modalTabIds'
 import { ModalSheet } from '../core/ModalSheet'
 import { NativeSelectField } from '../core/NativeSelectField'
 import { StatusPill } from '../core/StatusPill'
@@ -13,13 +15,12 @@ import { type VacuumAutoCleanDisabledRoomConfig, type VacuumConfig, type VacuumC
 import { VACUUM_MODAL_TABS, type VacuumModalTab } from '../../constants/surfaceSemantics'
 import { DASHBOARD_ROUTE_CHANGE_EVENT, dashboardEventTargets, dashboardHash, dashboardPathWithSearch, replaceDashboardUrl } from '../../hooks/dashboardLocation'
 import { useModalDetailPageScroll } from '../../hooks/useModalDetailPageScroll'
-import { useImmediateVisualTab, useSmoothDisplayedModalTab } from '../../hooks/useSmoothDisplayedModalTab'
+import { useSmoothDisplayedModalTab } from '../../hooks/useSmoothDisplayedModalTab'
 import { useOptimisticState, type OptimisticCommitOptions } from '../../hooks/useOptimisticState'
-import { VACUUM_COPY_KEYS, VACUUM_COPY_NAMESPACE, useCopy } from '../../i18n'
+import { CORE_COPY_KEYS, CORE_COPY_NAMESPACE, VACUUM_COPY_KEYS, VACUUM_COPY_NAMESPACE, useCopy } from '../../i18n'
 import { asEntityName, titleCaseState } from './entityState'
 import { mapGridRectDimensionsCm, mapGridRectToServiceData, type MapGridRect } from './ValetudoMapGeometry'
 import { ValetudoMapCard, type ValetudoMapEditorMeta } from './ValetudoMapCard'
-import { VACUUM_AREA_EDITOR_MODAL_STYLE, VACUUM_MODAL_STYLE } from './vacuumModalStyle'
 import { isUnavailableVacuumState, vacuumConsumableVisual, vacuumStateVisual, type VacuumVisualTone } from './vacuumVisualState'
 import styles from './VacuumCard.module.css'
 
@@ -1076,36 +1077,20 @@ function VacuumAutoCleanDisabledRooms({ vacuum }: { vacuum: VacuumConfig }) {
 }
 
 function VacuumModalNav({ activeTab, onTabChange, vacuum }: { activeTab: VacuumModalTab; onTabChange: (tab: VacuumModalTab) => void; vacuum: VacuumConfig }) {
+  const copy = useCopy(CORE_COPY_NAMESPACE)
   const tabs = vacuumModalTabs(vacuum)
   const effectiveActiveTab = tabs.some((tab) => tab.tab === activeTab) ? activeTab : 'controls'
-  const { clearVisualTab, setVisualTabNow, visualActiveTab } = useImmediateVisualTab(effectiveActiveTab)
+  const idPrefix = `vacuum-${vacuum.vacuumMapId}`
 
   return (
-    <nav aria-label={`${vacuum.title} modal sections`} className={styles.vacuumModalNav} data-tab-count={tabs.length} style={{ '--vacuum-nav-tab-count': tabs.length } as CSSProperties}>
-      {tabs.map((item) => {
-        const isActive = visualActiveTab === item.tab
-        const isCurrent = effectiveActiveTab === item.tab
-        return (
-          <button
-            aria-current={isCurrent ? 'page' : undefined}
-            aria-label={item.label}
-            className={[styles.vacuumModalNavButton, isActive ? styles.vacuumModalNavButtonActive : ''].filter(Boolean).join(' ')}
-            data-active={isActive}
-            key={item.tab}
-            onBlur={clearVisualTab}
-            onClick={() => {
-              setVisualTabNow(item.tab)
-              onTabChange(item.tab)
-            }}
-            onPointerCancel={clearVisualTab}
-            onPointerDown={() => setVisualTabNow(item.tab)}
-            type="button"
-          >
-            <MaterialIcon name={item.icon} size={22} />
-          </button>
-        )
-      })}
-    </nav>
+    <ModalIconTabNav
+      activeTab={effectiveActiveTab}
+      idPrefix={idPrefix}
+      label={copy(CORE_COPY_KEYS.modal.sectionNavigation, { title: vacuum.title })}
+      onTabChange={onTabChange}
+      panelId={modalTabPanelId(idPrefix, 'content')}
+      tabs={tabs}
+    />
   )
 }
 
@@ -1150,6 +1135,7 @@ function VacuumModalTabContent({
   const tabs = vacuumModalTabs(vacuum)
   const targetTab = tabs.some((tab) => tab.tab === activeTab) ? activeTab : 'controls'
   const { displayedTab: effectiveActiveTab, transitionState } = useSmoothDisplayedModalTab(targetTab)
+  const tabIdPrefix = `vacuum-${vacuum.vacuumMapId}`
   const panelSections = [
     'controls',
     vacuum.zones.length > 0 ? 'zones' : null,
@@ -1191,23 +1177,25 @@ function VacuumModalTabContent({
       </div>
       {!areaEditorOpen && (
         <div aria-label={panelLabel} className={styles.rightPane} data-modal-tab-transition-state={transitionState} data-scroll-region="vacuum-panel" data-tab={effectiveActiveTab} ref={modalPanelRef} role="group">
-          {effectiveActiveTab === 'controls' && (
-            <VacuumControlsSection
-              areaEditorMeta={areaEditorMeta}
-              areaSelection={areaSelection}
-              cleanTarget={cleanTarget}
-              coordinator={coordinator}
-              onAreaSelectionChange={onAreaSelectionChange}
-              onCleanTargetChange={onCleanTargetChange}
-              onEditArea={onEditArea}
-              optimisticState={optimisticState}
-              vacuum={vacuum}
-            />
-          )}
-          {effectiveActiveTab === 'zones' && <VacuumZones coordinator={coordinator} optimisticState={optimisticState} vacuum={vacuum} />}
-          {effectiveActiveTab === 'autoClean' && <VacuumAutoCleanDisabledRooms vacuum={vacuum} />}
-          {effectiveActiveTab === 'more' && <VacuumDockControlsSection coordinator={coordinator} optimisticState={optimisticState} vacuum={vacuum} />}
-          {effectiveActiveTab === 'info' && <VacuumInfoSection vacuum={vacuum} />}
+          <div aria-labelledby={modalTabId(tabIdPrefix, effectiveActiveTab)} className={styles.rightPaneContent} id={modalTabPanelId(tabIdPrefix, 'content')} role="tabpanel">
+            {effectiveActiveTab === 'controls' && (
+              <VacuumControlsSection
+                areaEditorMeta={areaEditorMeta}
+                areaSelection={areaSelection}
+                cleanTarget={cleanTarget}
+                coordinator={coordinator}
+                onAreaSelectionChange={onAreaSelectionChange}
+                onCleanTargetChange={onCleanTargetChange}
+                onEditArea={onEditArea}
+                optimisticState={optimisticState}
+                vacuum={vacuum}
+              />
+            )}
+            {effectiveActiveTab === 'zones' && <VacuumZones coordinator={coordinator} optimisticState={optimisticState} vacuum={vacuum} />}
+            {effectiveActiveTab === 'autoClean' && <VacuumAutoCleanDisabledRooms vacuum={vacuum} />}
+            {effectiveActiveTab === 'more' && <VacuumDockControlsSection coordinator={coordinator} optimisticState={optimisticState} vacuum={vacuum} />}
+            {effectiveActiveTab === 'info' && <VacuumInfoSection vacuum={vacuum} />}
+          </div>
         </div>
       )}
     </div>
@@ -1429,15 +1417,16 @@ export function VacuumModal({
     <ModalSheet
       backLabel="Back to controls"
       bodyElementRef={bodyElementRef}
-      contentStyle={areaEditorOpen ? VACUUM_AREA_EDITOR_MODAL_STYLE : VACUUM_MODAL_STYLE}
-      footer={areaEditorOpen ? undefined : <VacuumModalNav activeTab={activeTab} onTabChange={(tab) => {
+      navigation={areaEditorOpen ? undefined : <VacuumModalNav activeTab={activeTab} onTabChange={(tab) => {
         if (tab === 'zones') setCleanTarget('rooms')
         setActiveTab(tab)
       }} vacuum={vacuum} />}
       onBack={areaEditorOpen ? closeAreaEditor : undefined}
       onClose={onClose}
       open={open}
+      scrollMode="panes"
       scrollResetKey={detailPageKey}
+      size="workspace"
       subtitle={areaEditorOpen ? undefined : subtitle}
       title={title}
     >

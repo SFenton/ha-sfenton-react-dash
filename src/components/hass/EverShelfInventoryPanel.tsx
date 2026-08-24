@@ -1068,7 +1068,7 @@ function InventoryItemDetailsModal({ item, locationLabel, onClose, onInventoryCh
   return (
     <ModalSheet onClose={() => {
       if (!controller.busy) onClose()
-    }} open={open && item !== null} title={controller.title}>
+    }} open={open && item !== null} size="form" title={controller.title}>
       <EverShelfInventoryDetailsPage controller={controller} />
     </ModalSheet>
   )
@@ -1088,6 +1088,7 @@ function InventorySortSheet({ draftDirection, draftMode, onApply, onClose, onDra
       )}
       onClose={onClose}
       open={open}
+      size="form"
       title="Sort Inventory"
     >
       <div className={styles.sheetStack}>
@@ -1144,6 +1145,7 @@ function InventoryFilterSheet({ draftMode, onApply, onClose, onDraftModeChange, 
       )}
       onClose={onClose}
       open={open}
+      size="form"
       title="Filter Inventory"
     >
       <fieldset className={styles.fieldset}>

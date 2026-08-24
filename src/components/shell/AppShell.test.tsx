@@ -2,6 +2,10 @@ import { render, screen, within } from '@testing-library/react'
 import { AppShell } from './AppShell'
 
 describe('AppShell', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
   it('renders Quick Links as the rightmost action when a page has no local FAB', () => {
     render(
       <AppShell bottomNav={<nav aria-label="Test navigation" />} onNavigate={() => undefined}>
@@ -38,5 +42,18 @@ describe('AppShell', () => {
 
     expect(document.querySelector('[data-floating-action-dock="true"]')).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Quick Links' })).not.toBeInTheDocument()
+  })
+
+  it('mounts both CSS-adaptive navigation surfaces without a resize gap', () => {
+    render(
+      <AppShell activePath="security" bottomNav={<nav aria-label="Test navigation" />} onNavigate={() => undefined} pageMeasure="reading">
+        <div>Page content</div>
+      </AppShell>,
+    )
+
+    expect(document.querySelector('[data-app-shell="true"]')).toHaveAttribute('data-page-measure', 'reading')
+    expect(document.querySelector('[data-adaptive-navigation="rail"]')).toBeInTheDocument()
+    expect(screen.getByRole('navigation', { name: 'Test navigation' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Security' })).toHaveAttribute('aria-current', 'page')
   })
 })

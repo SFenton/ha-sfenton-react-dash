@@ -102,16 +102,16 @@ describe('Daily summary modal', () => {
     expect(within(dialog).getByRole('heading', { level: 2, name: "Steph's Summary" })).toBeInTheDocument()
   })
 
-  it('uses icon-only tabs for overdue, upcoming, and expired food', async () => {
+  it('uses shared tabs for overdue, upcoming, and expired food', async () => {
     mockEntities[OVERDUE_ENTITY_ID].state = '0'
     setExpiredFood(0)
     renderHome()
 
     const dialog = await screen.findByRole('dialog')
-    const nav = within(dialog).getByRole('navigation', { name: 'Daily report sections' })
-    const tabButtons = within(nav).getAllByRole('button')
+    const nav = within(dialog).getByRole('tablist', { name: 'Daily report sections' })
+    const tabButtons = within(nav).getAllByRole('tab')
     expect(tabButtons.map((button) => button.getAttribute('aria-label'))).toEqual(['Overdue Chores', 'Upcoming Chores', 'Expired Food'])
-    for (const button of tabButtons) expect(button).toHaveTextContent('')
+    expect(tabButtons.map((button) => button.textContent)).toEqual(['Overdue Chores', 'Upcoming Chores', 'Expired Food'])
   })
 
   it('badges the overdue and expired food tabs but never upcoming', async () => {
@@ -121,12 +121,12 @@ describe('Daily summary modal', () => {
     renderHome()
 
     const dialog = await screen.findByRole('dialog')
-    const nav = within(dialog).getByRole('navigation', { name: 'Daily report sections' })
+    const nav = within(dialog).getByRole('tablist', { name: 'Daily report sections' })
 
-    expect(within(within(nav).getByRole('button', { name: /^Overdue Chores/ })).getByText('2')).toBeInTheDocument()
-    expect(within(within(nav).getByRole('button', { name: /^Expired Food/ })).getByText('4')).toBeInTheDocument()
+    expect(within(within(nav).getByRole('tab', { name: /^Overdue Chores/ })).getByText('2')).toBeInTheDocument()
+    expect(within(within(nav).getByRole('tab', { name: /^Expired Food/ })).getByText('4')).toBeInTheDocument()
 
-    const upcoming = within(nav).getByRole('button', { name: /^Upcoming Chores/ })
+    const upcoming = within(nav).getByRole('tab', { name: /^Upcoming Chores/ })
     expect(upcoming.querySelector('[data-count]')).toBeNull()
     expect(upcoming).toHaveAccessibleName('Upcoming Chores')
   })
@@ -137,10 +137,10 @@ describe('Daily summary modal', () => {
     renderHome()
 
     const dialog = await screen.findByRole('dialog')
-    const nav = within(dialog).getByRole('navigation', { name: 'Daily report sections' })
+    const nav = within(dialog).getByRole('tablist', { name: 'Daily report sections' })
 
-    expect(within(within(nav).getByRole('button', { name: /^Expired Food/ })).getByText('9+')).toBeInTheDocument()
-    expect(within(nav).getByRole('button', { name: 'Overdue Chores' }).querySelector('[data-count]')).toBeNull()
+    expect(within(within(nav).getByRole('tab', { name: /^Expired Food/ })).getByText('9+')).toBeInTheDocument()
+    expect(within(nav).getByRole('tab', { name: 'Overdue Chores' }).querySelector('[data-count]')).toBeNull()
   })
 
   it('drops the expired food nav badge while Vacation Mode is on', async () => {
@@ -150,10 +150,10 @@ describe('Daily summary modal', () => {
     renderHome()
 
     const dialog = await screen.findByRole('dialog')
-    const nav = within(dialog).getByRole('navigation', { name: 'Daily report sections' })
+    const nav = within(dialog).getByRole('tablist', { name: 'Daily report sections' })
 
-    expect(within(within(nav).getByRole('button', { name: /^Overdue Chores/ })).getByText('2')).toBeInTheDocument()
-    expect(within(nav).getByRole('button', { name: 'Expired Food' }).querySelector('[data-count]')).toBeNull()
+    expect(within(within(nav).getByRole('tab', { name: /^Overdue Chores/ })).getByText('2')).toBeInTheDocument()
+    expect(within(nav).getByRole('tab', { name: 'Expired Food' }).querySelector('[data-count]')).toBeNull()
   })
 
   it('keeps a section header for the active tab outside the modal scroller', async () => {
@@ -165,8 +165,8 @@ describe('Daily summary modal', () => {
     expect(bodyHeader?.contains(dialog.querySelector('[data-modal-sheet-body="true"]'))).toBe(false)
     expect(within(bodyHeader as HTMLElement).getByRole('heading', { level: 2, name: 'Overdue Chores' })).toBeInTheDocument()
 
-    const nav = within(dialog).getByRole('navigation', { name: 'Daily report sections' })
-    fireEvent.click(within(nav).getByRole('button', { name: /^Expired Food/ }))
+    const nav = within(dialog).getByRole('tablist', { name: 'Daily report sections' })
+    fireEvent.click(within(nav).getByRole('tab', { name: /^Expired Food/ }))
     expect(within(bodyHeader as HTMLElement).getByRole('heading', { level: 2, name: 'Expired Food' })).toBeInTheDocument()
   })
 
@@ -174,14 +174,14 @@ describe('Daily summary modal', () => {
     renderHome()
 
     const dialog = await screen.findByRole('dialog')
-    const nav = within(dialog).getByRole('navigation', { name: 'Daily report sections' })
+    const nav = within(dialog).getByRole('tablist', { name: 'Daily report sections' })
     expect(await within(dialog).findByText('Take out the trash')).toBeInTheDocument()
 
-    fireEvent.click(within(nav).getByRole('button', { name: /^Upcoming Chores/ }))
+    fireEvent.click(within(nav).getByRole('tab', { name: /^Upcoming Chores/ }))
     expect(await within(dialog).findByText('Water the plants')).toBeInTheDocument()
     expect(within(dialog).queryByText('Take out the trash')).not.toBeInTheDocument()
 
-    fireEvent.click(within(nav).getByRole('button', { name: /^Expired Food/ }))
+    fireEvent.click(within(nav).getByRole('tab', { name: /^Expired Food/ }))
     await waitFor(() => expect(within(dialog).getByLabelText('Expired Food inventory list')).toBeInTheDocument())
     expect(within(dialog).queryByText('Water the plants')).not.toBeInTheDocument()
   })
@@ -199,14 +199,14 @@ describe('Daily summary modal', () => {
     await waitFor(() => expect(within(editPage).getByLabelText('Task Name')).toHaveValue('Take out the trash'))
     expect(within(editPage).getByLabelText('Description')).toHaveValue('Use both bins')
     expect(within(editPage).getByRole('button', { name: 'Save Task' })).toBeInTheDocument()
-    expect(within(editPage).queryByRole('navigation', { name: 'Daily report sections' })).not.toBeInTheDocument()
+    expect(within(editPage).queryByRole('tablist', { name: 'Daily report sections' })).not.toBeInTheDocument()
 
     fireEvent.click(within(editPage).getByRole('button', { name: 'Back to daily summary' }))
     await waitFor(() => expect(within(summaryDialog).getByRole('heading', { name: "Stephen's Summary" })).toBeInTheDocument())
     expect(summaryDialog).toHaveAttribute('data-state', 'open')
 
-    const nav = within(summaryDialog).getByRole('navigation', { name: 'Daily report sections' })
-    fireEvent.click(within(nav).getByRole('button', { name: /^Upcoming Chores/ }))
+    const nav = within(summaryDialog).getByRole('tablist', { name: 'Daily report sections' })
+    fireEvent.click(within(nav).getByRole('tab', { name: /^Upcoming Chores/ }))
     const upcomingRegion = await within(summaryDialog).findByRole('region', { name: 'Upcoming Chores' })
     expect(await within(upcomingRegion).findByRole('button', { name: 'Edit Water the plants' })).toBeInTheDocument()
   })
@@ -253,8 +253,8 @@ describe('Daily summary modal', () => {
     renderHome()
 
     const dialog = await screen.findByRole('dialog')
-    const nav = within(dialog).getByRole('navigation', { name: 'Daily report sections' })
-    fireEvent.click(within(nav).getByRole('button', { name: /^Expired Food/ }))
+    const nav = within(dialog).getByRole('tablist', { name: 'Daily report sections' })
+    fireEvent.click(within(nav).getByRole('tab', { name: /^Expired Food/ }))
 
     const [expiredRow] = await within(dialog).findAllByLabelText(/^Milk Expired on /, {}, { timeout: 3000 })
     expect(expiredRow).toHaveAttribute('data-expiry-tone', 'expired')
@@ -268,8 +268,8 @@ describe('Daily summary modal', () => {
     renderHome()
 
     const dialog = await screen.findByRole('dialog')
-    const nav = within(dialog).getByRole('navigation', { name: 'Daily report sections' })
-    fireEvent.click(within(nav).getByRole('button', { name: /^Expired Food/ }))
+    const nav = within(dialog).getByRole('tablist', { name: 'Daily report sections' })
+    fireEvent.click(within(nav).getByRole('tab', { name: /^Expired Food/ }))
 
     fireEvent.click(await within(dialog).findByRole('button', { name: 'Delete Almond Flour' }, { timeout: 3000 }))
     await waitFor(() => expect(within(dialog).queryByRole('button', { name: 'Delete Almond Flour' })).not.toBeInTheDocument())
@@ -286,8 +286,8 @@ describe('Daily summary modal', () => {
     renderHome()
 
     const summaryDialog = await screen.findByRole('dialog', { name: "Stephen's Summary" })
-    const nav = within(summaryDialog).getByRole('navigation', { name: 'Daily report sections' })
-    fireEvent.click(within(nav).getByRole('button', { name: /^Expired Food/ }))
+    const nav = within(summaryDialog).getByRole('tablist', { name: 'Daily report sections' })
+    fireEvent.click(within(nav).getByRole('tab', { name: /^Expired Food/ }))
     const [expiredRow] = await within(summaryDialog).findAllByLabelText(/^Milk Expired on /, {}, { timeout: 3000 })
 
     fireEvent.click(within(expiredRow).getByRole('button', { name: 'Edit Milk' }))
@@ -297,7 +297,7 @@ describe('Daily summary modal', () => {
     expect(screen.getAllByRole('dialog')).toHaveLength(1)
     expect(within(inventoryPage).getByRole('button', { name: 'Back to expired food' })).toBeInTheDocument()
     expect(within(inventoryPage).getByRole('button', { name: 'Delete Milk' })).toBeInTheDocument()
-    expect(within(inventoryPage).queryByRole('navigation', { name: 'Daily report sections' })).not.toBeInTheDocument()
+    expect(within(inventoryPage).queryByRole('tablist', { name: 'Daily report sections' })).not.toBeInTheDocument()
 
     fireEvent.click(within(inventoryPage).getByRole('button', { name: 'Back to expired food' }))
     await waitFor(() => expect(within(summaryDialog).getByRole('heading', { name: "Stephen's Summary" })).toBeInTheDocument())
@@ -318,8 +318,8 @@ describe('Daily summary modal', () => {
     renderHome()
 
     const summaryDialog = await screen.findByRole('dialog', { name: "Stephen's Summary" })
-    const nav = within(summaryDialog).getByRole('navigation', { name: 'Daily report sections' })
-    fireEvent.click(within(nav).getByRole('button', { name: /^Expired Food/ }))
+    const nav = within(summaryDialog).getByRole('tablist', { name: 'Daily report sections' })
+    fireEvent.click(within(nav).getByRole('tab', { name: /^Expired Food/ }))
     const [expiredRow] = await within(summaryDialog).findAllByLabelText(/^Milk Expired on /, {}, { timeout: 3000 })
     fireEvent.click(within(expiredRow).getByRole('button', { name: 'Edit Milk' }))
     const inventoryPage = await screen.findByRole('dialog', { name: 'Milk' })
@@ -362,13 +362,13 @@ describe('Daily summary modal', () => {
     renderHome()
 
     const dialog = await screen.findByRole('dialog')
-    const nav = within(dialog).getByRole('navigation', { name: 'Daily report sections' })
+    const nav = within(dialog).getByRole('tablist', { name: 'Daily report sections' })
 
-    fireEvent.click(within(nav).getByRole('button', { name: /^Upcoming Chores/ }))
+    fireEvent.click(within(nav).getByRole('tab', { name: /^Upcoming Chores/ }))
     expect(await within(dialog).findByRole('heading', { level: 2, name: 'No Chores Upcoming' })).toBeInTheDocument()
     expect(within(dialog).getByText('There is nothing else on your schedule for the rest of today.')).toBeInTheDocument()
 
-    fireEvent.click(within(nav).getByRole('button', { name: /^Expired Food/ }))
+    fireEvent.click(within(nav).getByRole('tab', { name: /^Expired Food/ }))
     expect(await within(dialog).findByRole('heading', { level: 2, name: 'No Expired Food' })).toBeInTheDocument()
     expect(within(dialog).getByText('Everything in the kitchen is still within date.')).toBeInTheDocument()
   })
@@ -383,8 +383,8 @@ describe('Daily summary modal', () => {
     expect(await within(dialog).findByRole('heading', { level: 2, name: 'No Chores Due' })).toBeInTheDocument()
     expect(within(dialog).getByText('Enjoy vacation!')).toBeInTheDocument()
 
-    const nav = within(dialog).getByRole('navigation', { name: 'Daily report sections' })
-    fireEvent.click(within(nav).getByRole('button', { name: /^Upcoming Chores/ }))
+    const nav = within(dialog).getByRole('tablist', { name: 'Daily report sections' })
+    fireEvent.click(within(nav).getByRole('tab', { name: /^Upcoming Chores/ }))
     expect(await within(dialog).findByRole('heading', { level: 2, name: 'No Chores Upcoming' })).toBeInTheDocument()
     expect(within(dialog).getByText('Enjoy vacation!')).toBeInTheDocument()
   })
@@ -394,8 +394,8 @@ describe('Daily summary modal', () => {
     renderHome()
 
     const dialog = await screen.findByRole('dialog')
-    const nav = within(dialog).getByRole('navigation', { name: 'Daily report sections' })
-    fireEvent.click(within(nav).getByRole('button', { name: /^Expired Food/ }))
+    const nav = within(dialog).getByRole('tablist', { name: 'Daily report sections' })
+    fireEvent.click(within(nav).getByRole('tab', { name: /^Expired Food/ }))
 
     expect(await within(dialog).findByRole('heading', { level: 2, name: 'Expired Food Hidden' })).toBeInTheDocument()
     expect(within(dialog).getByText('Enjoy vacation!')).toBeInTheDocument()
@@ -408,8 +408,8 @@ describe('Daily summary modal', () => {
     renderHome()
 
     const dialog = await screen.findByRole('dialog')
-    const nav = within(dialog).getByRole('navigation', { name: 'Daily report sections' })
-    fireEvent.click(within(nav).getByRole('button', { name: /^Expired Food/ }))
+    const nav = within(dialog).getByRole('tablist', { name: 'Daily report sections' })
+    fireEvent.click(within(nav).getByRole('tab', { name: /^Expired Food/ }))
 
     expect(await within(dialog).findByRole('heading', { level: 2, name: 'No Expired Food' })).toBeInTheDocument()
     expect(within(dialog).getByText('Enjoy vacation!')).toBeInTheDocument()
@@ -420,8 +420,8 @@ describe('Daily summary modal', () => {
     renderHome()
 
     const dialog = await screen.findByRole('dialog')
-    const nav = within(dialog).getByRole('navigation', { name: 'Daily report sections' })
-    fireEvent.click(within(nav).getByRole('button', { name: /^Expired Food/ }))
+    const nav = within(dialog).getByRole('tablist', { name: 'Daily report sections' })
+    fireEvent.click(within(nav).getByRole('tab', { name: /^Expired Food/ }))
 
     const empty = await within(dialog).findByRole('heading', { level: 2, name: 'No Expired Food' })
     expect(empty.closest('section')).toHaveAttribute('data-empty-layout', 'modal')
@@ -446,7 +446,7 @@ describe('Daily summary modal', () => {
     expect(within(dialog).getByRole('heading', { name: 'Whose Summary?' })).toBeInTheDocument()
     expect(within(dialog).getByRole('button', { name: 'Stephen' })).toBeInTheDocument()
     expect(within(dialog).getByRole('button', { name: 'Steph' })).toBeInTheDocument()
-    expect(within(dialog).queryByRole('navigation', { name: 'Daily report sections' })).not.toBeInTheDocument()
+    expect(within(dialog).queryByRole('tablist', { name: 'Daily report sections' })).not.toBeInTheDocument()
   })
 
   it('badges the profile button with overdue chores plus expired food', async () => {
@@ -596,7 +596,7 @@ describe('Daily summary modal', () => {
 
     const dialog = await screen.findByRole('dialog')
     expect(within(dialog).getByRole('heading', { level: 2, name: "Stephen's Summary" })).toBeInTheDocument()
-    expect(within(dialog).getByRole('navigation', { name: 'Daily report sections' })).toBeInTheDocument()
+    expect(within(dialog).getByRole('tablist', { name: 'Daily report sections' })).toBeInTheDocument()
   })
 
   it('does not open a page sheet for the app-level summary hash', async () => {

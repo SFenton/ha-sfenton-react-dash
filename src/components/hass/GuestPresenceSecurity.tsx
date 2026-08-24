@@ -12,6 +12,7 @@ import { asEntityName, formatCompactEntityState, titleCaseState } from './entity
 import { SecurityControls, type SecurityControlsProps } from './SecurityControls'
 import { VacuumAutoCleanControlCard } from './VacuumAutoCleanControls'
 import { GarageDoorTile } from './GarageDoorTile'
+import { useGuestPresenceSecurityActive } from './useGuestPresenceSecurityActive'
 import styles from './GuestPresenceSecurity.module.css'
 
 export const GUEST_PRESENCE_SECURITY_HASH = '#guest-presence-security'
@@ -34,8 +35,6 @@ const AWAY_ROUTINE_EXTRAS_DESCRIPTION = 'The skipped away routine normally turns
 
 type CallService = (params: Record<string, unknown>) => void
 
-type EntityMap = Record<string, Pick<HassEntity, 'state'> | undefined>
-
 interface ControlService {
   domain: string
   service: string
@@ -57,8 +56,6 @@ interface GuestServiceCardProps {
   title: string
 }
 
-const guestToggleEntityIds = GUEST_CONTROL_ITEMS.map((item) => item.entityId)
-
 const garageDoorControls = SECURITY_CONTROL_TILES.filter((item) => item.tone === 'cover')
 const frontDoorControl = SECURITY_CONTROL_TILES.find((item) => item.tone === 'lock')
 
@@ -69,14 +66,6 @@ const towelRackControls = [
 
 function isUnavailableState(state: string | undefined) {
   return !state || state === 'unavailable' || state === 'unknown'
-}
-
-function hasGuestPresenceSecurityActive(entities: EntityMap) {
-  return guestToggleEntityIds.some((entityId) => entities[entityId]?.state === 'on')
-}
-
-function useGuestPresenceSecurityActive() {
-  return useHass((state) => hasGuestPresenceSecurityActive(state.entities as EntityMap))
 }
 
 function formatGuestControlState(entity: HassEntity | null, state: string) {

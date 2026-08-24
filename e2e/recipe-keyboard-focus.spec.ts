@@ -35,12 +35,28 @@ function hasVisibleFocusIndicator(current: FocusIndicator, baseline: FocusIndica
 }
 
 async function expectKeyboardFocusIndicator(page: Page, control: Locator, visualTarget = control) {
-  await control.evaluate((element) => (element as HTMLElement).blur())
+  const key = await control.evaluate((element) => {
+    const root = element.closest('[role="dialog"]') ?? document
+    const candidates = Array.from(root.querySelectorAll<HTMLElement>(
+      'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]',
+    )).filter((candidate) => candidate.tabIndex >= 0 && candidate.getClientRects().length > 0)
+    const index = candidates.indexOf(element as HTMLElement)
+    const previous = candidates[index - 1]
+    if (previous) {
+      previous.focus()
+      return 'Tab'
+    }
+    const next = candidates[index + 1]
+    if (next) {
+      next.focus()
+      return 'Shift+Tab'
+    }
+    ;(element as HTMLElement).blur()
+    return 'Tab'
+  })
   const baseline = await focusIndicator(visualTarget)
 
-  await control.focus()
-  await page.keyboard.press('Shift+Tab')
-  await page.keyboard.press('Tab')
+  await page.keyboard.press(key)
 
   await expect(control).toBeFocused()
   await expect.poll(() => control.evaluate((element) => element.matches(':focus-visible'))).toBe(true)
@@ -271,9 +287,9 @@ test('393x852 coarse-pointer recipe controls keep keyboard focus visible without
   await verifyRecipeKeyboardFocus(page)
 })
 
-test('desktop recipe controls keep keyboard focus visible without mouse rings', async ({ browser }) => {
+test('desktop recipe controls keep keyboard focus visible without mouse rings', async ({ baseURL, browser }) => {
   const context = await browser.newContext({
-    baseURL: 'http://127.0.0.1:5174',
+    baseURL,
     hasTouch: false,
     isMobile: false,
     viewport: { width: 1280, height: 900 },

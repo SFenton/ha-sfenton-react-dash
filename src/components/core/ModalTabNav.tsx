@@ -1,10 +1,14 @@
-import { useRef, type CSSProperties, type KeyboardEvent } from 'react'
+import { useRef, type CSSProperties, type KeyboardEvent, type ReactNode } from 'react'
 import { useImmediateVisualTab } from '../../hooks/useSmoothDisplayedModalTab'
+import { CountBadge } from './CountBadge'
 import { MaterialIcon } from './Icon'
 import { modalTabId, modalTabPanelId } from './modalTabIds'
 import styles from './ModalTabNav.module.css'
 
 export interface ModalIconTabDefinition<T extends string> {
+  accessory?: ReactNode
+  ariaLabel?: string
+  badgeCount?: number
   icon: string
   label: string
   tab: T
@@ -72,7 +76,7 @@ export function ModalIconTabNav<T extends string>({
         return (
           <button
             aria-controls={panelId ?? modalTabPanelId(idPrefix, item.tab)}
-            aria-label={item.label}
+            aria-label={item.ariaLabel ?? item.label}
             aria-selected={selected}
             className={styles.tab}
             data-active={visuallyActive ? 'true' : undefined}
@@ -91,7 +95,12 @@ export function ModalIconTabNav<T extends string>({
             tabIndex={selected ? 0 : -1}
             type="button"
           >
-            <MaterialIcon name={item.icon} size={22} />
+            <span className={styles.icon}>
+              <MaterialIcon name={item.icon} size={22} />
+              <CountBadge className={styles.badge} count={item.badgeCount ?? 0} />
+            </span>
+            <span className={styles.label}>{item.label}</span>
+            {item.accessory && <span className={styles.accessory}>{item.accessory}</span>}
           </button>
         )
       })}

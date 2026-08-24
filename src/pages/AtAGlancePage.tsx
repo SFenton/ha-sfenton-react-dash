@@ -12,7 +12,7 @@ import { DashboardPageLoading, type DashboardPageLoadingPhase } from '../compone
 import { ActionPill } from '../components/core/ActionPill'
 import { GlassTile } from '../components/core/GlassTile'
 import { Icon, MaterialIcon } from '../components/core/Icon'
-import { ModalSheet } from '../components/core/ModalSheet'
+import { ModalSheet, type ModalSheetSize } from '../components/core/ModalSheet'
 import { Separator } from '../components/core/Separator'
 import { SectionHeader } from '../components/core/SectionHeader'
 import { SurfaceAccessory } from '../components/core/SurfaceAccessory'
@@ -1199,6 +1199,13 @@ export function AtAGlancePage({ activePath = 'overview', deferRouteContent = fal
   const squareGridModalStyle = modalSquareGridModalStyleForHash(contentHash, overviewGridLayout)
   const squareGridStyle = modalSquareGridStyle(overviewGridLayout)
   const sheetStyle = contentHash === '#security-system' ? SECURITY_SYSTEM_MODAL_STYLE : squareGridModalOpen ? squareGridModalStyle : undefined
+  const sheetSize: ModalSheetSize = CAMERA_ITEMS.some((camera) => camera.hash === contentHash)
+    ? 'media'
+    : contentHash === '#security-system'
+      ? 'compact'
+      : squareGridModalOpen
+        ? 'media'
+        : 'standard'
   const sheetSubtitle = contentHash === '#security-system' ? securitySystemSubtitle : undefined
   const preloadModalHashes = useMemo(() => [...new Set(preloadHashes.filter((targetHash) => targetHash !== contentHash))], [contentHash, preloadHashes])
   const homeLoadingPhase: DashboardPageLoadingPhase | undefined = showContent ? undefined : homeHydrationPhase === 'loading-exiting' ? 'exiting' : 'loading'
@@ -1216,6 +1223,7 @@ export function AtAGlancePage({ activePath = 'overview', deferRouteContent = fal
       <Page
         activePath={activePath}
         chromeHidden={Boolean(activeLoadingPhase)}
+        measure="dashboard"
         title="Home"
         onNavigate={onNavigate}
         headerQuickLinks={
@@ -1227,7 +1235,7 @@ export function AtAGlancePage({ activePath = 'overview', deferRouteContent = fal
         }
       >
         {activeLoadingPhase ? (
-          <DashboardPageLoading label="Loading Home dashboard content" phase={activeLoadingPhase} />
+          <DashboardPageLoading label="Loading Home dashboard content" placement="viewport" phase={activeLoadingPhase} />
         ) : (
           <div className={styles.homeContent}>
             <div className={styles.weatherWrap}>
@@ -1248,7 +1256,7 @@ export function AtAGlancePage({ activePath = 'overview', deferRouteContent = fal
         )}
       </Page>
 
-      <ModalSheet contentStyle={sheetStyle} open={hash !== ''} subtitle={sheetSubtitle} title={modalTitle} onClose={closeHash}>
+      <ModalSheet contentStyle={sheetStyle} open={hash !== ''} size={sheetSize} subtitle={sheetSubtitle} title={modalTitle} onClose={closeHash}>
         <SheetContent closeHash={closeHash} hash={contentHash} overviewGridRef={overviewGridRef} overviewGridStyle={squareGridStyle} onNavigate={onNavigate} />
       </ModalSheet>
       {preloadModalHashes.map((preloadTargetHash) => (
@@ -1262,7 +1270,7 @@ export function AtAGlancePage({ activePath = 'overview', deferRouteContent = fal
   if (!withShell || preload) return page
 
   return (
-    <AppShell bottomNav={<BottomNav activePath={activePath} onNavigate={onNavigate} />} chromeHidden={Boolean(activeLoadingPhase)} onNavigate={onNavigate}>
+    <AppShell activePath={activePath} bottomNav={<BottomNav activePath={activePath} onNavigate={onNavigate} />} chromeHidden={Boolean(activeLoadingPhase)} onNavigate={onNavigate} pageMeasure="dashboard">
       {page}
     </AppShell>
   )

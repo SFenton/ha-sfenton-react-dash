@@ -8,7 +8,9 @@ import { useCopy } from '../../i18n'
 import styles from './BottomNav.module.css'
 
 /** Only Chores badges, and only with overdue chores - expired food belongs to the summary, not here. */
-const BADGED_NAV_PATH = 'chores'
+export const BADGED_NAV_PATH = 'chores'
+export const DASHBOARD_SECTIONS_COPY_KEY = 'navigation.dashboardSections'
+export const OVERDUE_TAB_COPY_KEY = 'tabs.overdue'
 
 interface BottomNavProps {
   activePath: string
@@ -25,7 +27,7 @@ export function BottomNav({ activePath, onNavigate }: BottomNavProps) {
   }
 
   return (
-    <nav className={styles.nav} aria-label={copy('navigation.dashboardSections')}>
+    <nav className={styles.nav} aria-label={copy(DASHBOARD_SECTIONS_COPY_KEY)} data-adaptive-navigation="bottom">
       {PRIMARY_NAV_ROUTES.map((tab) => {
         const isCurrent = primaryNavRouteActive(activePath, tab.path)
         const isActive = primaryNavRouteActive(visualActivePath, tab.path)
@@ -43,7 +45,7 @@ export function BottomNav({ activePath, onNavigate }: BottomNavProps) {
             onPointerCancel={() => setVisualOverride(undefined)}
             onPointerDown={() => setVisualPathNow(tab.path)}
             type="button"
-            aria-label={badgeCount > 0 ? copy('tabs.overdue', { count: badgeCount, label: tab.label }) : tab.label}
+            aria-label={badgeCount > 0 ? copy(OVERDUE_TAB_COPY_KEY, { count: badgeCount, label: tab.label }) : tab.label}
             aria-current={isCurrent ? 'page' : undefined}
           >
             <span className={styles.tabIcon}>

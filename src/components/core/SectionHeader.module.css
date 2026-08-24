@@ -17,3 +17,9 @@
 .rule {
   width: 100%;
 }
+
+@container page-content (min-width: 560px) {
+  .sectionHeader h2 {
+    font-size: 1rem;
+  }
+}

@@ -155,7 +155,7 @@ describe('LightMoreInfoSheet', () => {
 
     const dialog = screen.getByRole('dialog', { name: 'Bollard 1' })
     expect(dialog).toHaveStyle({
-      '--modal-desktop-height': 'auto',
+      '--modal-desktop-height': 'min(760px, calc(var(--dashboard-visible-height, 100dvh) - 64px))',
       '--modal-desktop-max-width': '700px',
       '--modal-desktop-width': '700px',
     })

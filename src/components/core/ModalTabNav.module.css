@@ -32,6 +32,23 @@
   -webkit-tap-highlight-color: transparent;
 }
 
+.icon {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+}
+
+.badge {
+  position: absolute;
+  top: -8px;
+  right: -13px;
+}
+
+.label,
+.accessory {
+  display: none;
+}
+
 .tab[data-active='true'] {
   color: #111;
   background: rgba(255, 255, 255, 0.92);
@@ -44,4 +61,31 @@
 .tab:focus-visible {
   outline: none;
   box-shadow: inset 0 0 0 3px rgba(255, 255, 255, 0.72);
+}
+
+@media (min-width: 760px) and (min-height: 560px) {
+  .tabList {
+    width: min(100%, 680px);
+    margin-inline: auto;
+  }
+
+  .tab {
+    grid-template-columns: auto minmax(0, auto) auto;
+    gap: 8px;
+    padding-inline: 12px;
+  }
+
+  .label,
+  .accessory {
+    display: block;
+    min-width: 0;
+  }
+
+  .label {
+    overflow: hidden;
+    font-size: 0.78rem;
+    font-weight: 780;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
 }

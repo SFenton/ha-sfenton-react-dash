@@ -7,6 +7,14 @@
     "relayControlMode": "Couples every smart-bulb wall switch to its own relay, so the paddles keep working even if Home Assistant, Zigbee2MQTT, or the host is down. This turns on automatically while Vacation Mode is active, so house-sitters always have a way to get light.\n\nWhile this is on, turning lights off at the wall cuts power to those bulbs, so presence-based lighting can't bring them back until the paddle is switched on again.",
     "showSpecific": "Shows the outdoor faucets in our Home Assistant pages. Useful to disable during the winter, when we aren't using them."
   },
+  "sections": {
+    "autoReset": "Automatic Presence Setting Overrides",
+    "livingRoomPowerRecovery": "Living Room Power Recovery",
+    "presenceOverrides": "Presence-Based Light Overrides",
+    "relayControlMode": "Relay Control Mode",
+    "securityControls": "Security Controls",
+    "showSpecific": "Show Specific Controls"
+  },
   "warnings": {
     "relayGuestMode": "Guest Room guest mode is active. Turning off Relay Control Mode keeps the Guest Room on direct wall control and Guest Bathroom presence lighting off. Turn off Guest Room in Guest Controls to restore normal behavior."
   }

@@ -1,15 +1,17 @@
 import { useEntity, useHass, useUser } from '@hakit/core'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { HUMIDIFIER_MIST_PRESETS, HUMIDIFIER_MODES, HUMIDIFIER_WARM_LEVELS, type HumidifierConfig, type HumidifierMode } from '../../constants/humidifiers'
 import { HUMIDIFIER_MODAL_TABS, type HumidifierModalTab } from '../../constants/surfaceSemantics'
-import { HUMIDIFIER_COPY_KEYS, HUMIDIFIER_COPY_NAMESPACE, useCopy } from '../../i18n'
-import { useImmediateVisualTab, useSmoothDisplayedModalTab } from '../../hooks/useSmoothDisplayedModalTab'
+import { CORE_COPY_KEYS, CORE_COPY_NAMESPACE, HUMIDIFIER_COPY_KEYS, HUMIDIFIER_COPY_NAMESPACE, useCopy } from '../../i18n'
+import { useSmoothDisplayedModalTab } from '../../hooks/useSmoothDisplayedModalTab'
 import { useOptimisticState } from '../../hooks/useOptimisticState'
 import { useScheduleDetailPage } from '../../hooks/useScheduleDetailPage'
 import { Description } from '../core/Description'
 import { GlassTile } from '../core/GlassTile'
 import { InlineAlert } from '../core/InlineAlert'
 import { MaterialIcon } from '../core/Icon'
+import { ModalIconTabNav } from '../core/ModalTabNav'
+import { modalTabId, modalTabPanelId } from '../core/modalTabIds'
 import { ModalSheet } from '../core/ModalSheet'
 import { NativeSelectField } from '../core/NativeSelectField'
 import { NumberStepper } from '../core/Stepper'
@@ -21,7 +23,7 @@ import { StatusPill, type StatusPillTone } from '../core/StatusPill'
 import { ToggleSetting } from '../core/ToggleSetting'
 import type { CircularDialMarker } from './CircularControlDial'
 import { asEntityName, titleCaseState } from './entityState'
-import { HUMIDIFIER_MODAL_DETAIL_STYLE, HUMIDIFIER_MODAL_SCHEDULES_STYLE, HUMIDIFIER_MODAL_STYLE } from './humidifierModalStyle'
+import { HUMIDIFIER_MODAL_SCHEDULES_STYLE } from './humidifierModalStyle'
 import { SingleValueCircularDial } from './SingleValueCircularDial'
 import {
   HUMIDIFIER_WEEKDAYS,
@@ -38,6 +40,9 @@ import {
   type ScheduleConflict,
 } from './humidifierSchedule'
 import styles from './HumidifierModalContent.module.css'
+
+const HUMIDIFIER_TAB_ID_PREFIX = 'humidifier'
+const HUMIDIFIER_TAB_PANEL_ID = modalTabPanelId(HUMIDIFIER_TAB_ID_PREFIX, 'content')
 
 type CallService = (params: Record<string, unknown>) => void
 type Entity = ReturnType<typeof useEntity>
@@ -160,32 +165,17 @@ function ModeTile({ active, disabled, icon, label, onClick, subtitle }: { active
 }
 
 function HumidifierModalNav({ activeTab, onTabChange }: { activeTab: HumidifierModalTab; onTabChange: (tab: HumidifierModalTab) => void }) {
-  const { clearVisualTab, setVisualTabNow, visualActiveTab } = useImmediateVisualTab(activeTab)
+  const copy = useCopy(CORE_COPY_NAMESPACE)
 
   return (
-    <nav aria-label="Humidifier modal sections" className={styles.modalNav}>
-      {HUMIDIFIER_MODAL_TABS.map((item) => {
-        const active = visualActiveTab === item.tab
-        return (
-          <button
-            aria-current={activeTab === item.tab ? 'page' : undefined}
-            aria-label={item.label}
-            className={[styles.modalNavButton, active ? styles.modalNavButtonActive : ''].filter(Boolean).join(' ')}
-            key={item.tab}
-            onBlur={clearVisualTab}
-            onClick={() => {
-              setVisualTabNow(item.tab)
-              onTabChange(item.tab)
-            }}
-            onPointerCancel={clearVisualTab}
-            onPointerDown={() => setVisualTabNow(item.tab)}
-            type="button"
-          >
-            <MaterialIcon name={item.icon} size={22} />
-          </button>
-        )
-      })}
-    </nav>
+    <ModalIconTabNav
+      activeTab={activeTab}
+      idPrefix={HUMIDIFIER_TAB_ID_PREFIX}
+      label={copy(CORE_COPY_KEYS.modal.humidifierSections)}
+      onTabChange={onTabChange}
+      panelId={HUMIDIFIER_TAB_PANEL_ID}
+      tabs={HUMIDIFIER_MODAL_TABS}
+    />
   )
 }
 
@@ -824,11 +814,26 @@ function HumidifierMainPage({
   onPanelElementChange?: (element: HTMLDivElement | null) => void
 }) {
   const { displayedTab, transitionState } = useSmoothDisplayedModalTab(activeTab)
+  const modalPanelRef = useRef<HTMLDivElement | null>(null)
+  const previousDisplayedTabRef = useRef(displayedTab)
+
+  useLayoutEffect(() => {
+    if (previousDisplayedTabRef.current === displayedTab) return undefined
+    previousDisplayedTabRef.current = displayedTab
+    const panel = modalPanelRef.current
+    if (!panel) return undefined
+    const reset = () => {
+      panel.scrollTop = 0
+    }
+    reset()
+    const frame = window.requestAnimationFrame(reset)
+    return () => window.cancelAnimationFrame(frame)
+  }, [displayedTab])
 
   return (
     <div aria-label={`${roomTitle} humidifier controls`} className={styles.modalSheetPage}>
       <div className={styles.modalBody}>
-        <div className={styles.heroColumn}>
+        <div className={styles.heroColumn} data-scroll-region="humidifier-hero">
           <HumidifierHero actions={actions} state={state} />
           {state.fault === 'tank' && <InlineAlert>Tank removed — reinsert it before turning the humidifier on.</InlineAlert>}
           {state.fault === 'water' && <InlineAlert>Water is low — refill the tank before turning the humidifier on.</InlineAlert>}
@@ -837,7 +842,20 @@ function HumidifierMainPage({
             <StatusPill icon="mdi:thermometer" label="Temperature" value={state.currentTemperatureText} />
           </div>
         </div>
-        <div aria-label={`${roomTitle} humidifier ${displayedTab} panel`} className={styles.modalPanel} data-modal-tab-transition-state={transitionState} data-tab={displayedTab} ref={onPanelElementChange}>
+        <div
+          aria-label={`${roomTitle} humidifier ${displayedTab} panel`}
+          aria-labelledby={modalTabId(HUMIDIFIER_TAB_ID_PREFIX, displayedTab)}
+          className={styles.modalPanel}
+          data-modal-tab-transition-state={transitionState}
+          data-scroll-region="humidifier-panel"
+          data-tab={displayedTab}
+          id={HUMIDIFIER_TAB_PANEL_ID}
+          ref={(element) => {
+            modalPanelRef.current = element
+            onPanelElementChange?.(element)
+          }}
+          role="tabpanel"
+        >
           {displayedTab === 'controls' && <ControlsPanel actions={actions} state={state} />}
           {displayedTab === 'schedules' && <SchedulesPanel controller={scheduleController} onAdd={onAddActivity} onEdit={onEditActivity} />}
           {displayedTab === 'info' && <InfoPanel state={state} />}
@@ -864,6 +882,15 @@ export function HumidifierModal({ config, onClose, open, roomTitle }: Humidifier
   const setSchedulePanelElement = useCallback((element: HTMLDivElement | null) => {
     schedulePanelRef.current = element
   }, [])
+  const changeTab = (tab: HumidifierModalTab) => {
+    if (modalBodyRef.current) modalBodyRef.current.scrollTop = 0
+    if (schedulePanelRef.current) schedulePanelRef.current.scrollTop = 0
+    setActiveTab(tab)
+    window.requestAnimationFrame(() => {
+      if (modalBodyRef.current) modalBodyRef.current.scrollTop = 0
+      if (schedulePanelRef.current) schedulePanelRef.current.scrollTop = 0
+    })
+  }
   if (open !== previousOpen) {
     setPreviousOpen(open)
     if (!open && activityPage) resetDetailPage()
@@ -930,13 +957,14 @@ export function HumidifierModal({ config, onClose, open, roomTitle }: Humidifier
     <ModalSheet
       backLabel="Back to schedules"
       bodyElementRef={modalBodyRef}
-      contentStyle={detailOpen ? HUMIDIFIER_MODAL_DETAIL_STYLE : activeTab === 'schedules' ? HUMIDIFIER_MODAL_SCHEDULES_STYLE : HUMIDIFIER_MODAL_STYLE}
+      contentStyle={!detailOpen && activeTab === 'schedules' ? HUMIDIFIER_MODAL_SCHEDULES_STYLE : undefined}
       footer={activityPage ? (
         <ScheduleDetailFooter
           deleteAction={activityPage.editingId ? { disabled: scheduleController.saving, icon: 'mdi:delete', label: 'Delete Activity', onClick: () => void deleteActivity() } : undefined}
           primaryAction={{ disabled: activityInvalid || scheduleController.saving, icon: 'mdi:content-save', label: scheduleController.saving ? 'Saving...' : 'Save Activity', onClick: () => void saveActivity() }}
         />
-      ) : <HumidifierModalNav activeTab={activeTab} onTabChange={setActiveTab} />}
+      ) : undefined}
+      navigation={activityPage ? undefined : <HumidifierModalNav activeTab={activeTab} onTabChange={changeTab} />}
       onBack={detailOpen && !scheduleController.saving ? closeActivityPage : undefined}
       onClose={() => {
         activityOperationRef.current += 1
@@ -944,7 +972,9 @@ export function HumidifierModal({ config, onClose, open, roomTitle }: Humidifier
         onClose()
       }}
       open={open}
+      scrollMode={activityPage ? 'body' : 'panes'}
       scrollResetKey={activeTab}
+      size={activityPage ? 'standard' : 'workspace'}
       subtitle={detailOpen ? undefined : humidifierSubtitle(state)}
       title={detailOpen ? activityPage?.editingId ? activityPage.rule.label : `Add ${config.title} Schedule` : config.title}
     >

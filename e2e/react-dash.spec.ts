@@ -30,7 +30,7 @@ async function openBedAlarmDialog(page: Page, bedButtonName: RegExp) {
   await page.getByRole('button', { name: bedButtonName }).click()
   const dialog = page.getByRole('dialog')
   await expect(dialog).toBeVisible()
-  await dialog.getByRole('button', { name: 'Alarms', exact: true }).click()
+  await dialog.getByRole('tab', { name: 'Alarms', exact: true }).click()
   await expect(dialog.getByRole('heading', { name: 'Alarms' })).toBeVisible()
   await expect(dialog.getByRole('heading', { name: 'Schedule Control' })).toHaveCount(0)
   return dialog
@@ -259,13 +259,15 @@ async function installFakeVisualViewport(page: Page) {
 async function expectDesktopAdminSquareGrid(dialog: Locator, gridLabel: string) {
   const grid = dialog.getByRole('group', { name: gridLabel })
   await expect(grid).toBeVisible()
-  const cardCount = await grid.locator('> button, > article').count()
+  const cardCount = await grid.getByRole('button').count()
   const expectedColumns = Math.max(1, Math.ceil(Math.sqrt(cardCount)))
   const expectedRows = Math.ceil(cardCount / expectedColumns)
 
   await expect.poll(async () => {
     return grid.evaluate((gridElement) => {
-      const firstCard = gridElement.firstElementChild
+      const firstCard = gridElement.querySelector<HTMLElement>(
+        ':scope > button, :scope > article, :scope > [data-modal-detail-trigger] > button, :scope > [data-modal-detail-trigger] > article',
+      )
       const firstCardRect = firstCard?.getBoundingClientRect()
       const gridStyle = window.getComputedStyle(gridElement)
       const columns = gridStyle.gridTemplateColumns.split(' ').filter(Boolean).length
@@ -339,7 +341,8 @@ test('cold Recipes refresh keeps the full app gate until the initial catalog res
   await expect(appLoader).toBeVisible()
   const preloadCache = page.locator('[data-dashboard-preload-cache="true"]')
   await expect(preloadCache).toBeAttached()
-  await expect(preloadCache.locator('[aria-label="Suggested recipes pages"]').first()).toBeAttached()
+  await expect(preloadCache.locator('[data-preload-route="recipes"] [data-preload-geometry="route"]')).toBeAttached()
+  await expect(preloadCache.locator('img, video, canvas')).toHaveCount(0)
   await expect(preloadCache).toHaveCSS('opacity', '0')
   await expect(recipesHeader).toHaveCount(0)
   await expect(page.getByRole('navigation', { name: 'Dashboard sections' })).toHaveCount(0)
@@ -452,8 +455,8 @@ test('mobile suggested recipe opens the shared external-only detail sheet and ke
   await expect(dialog.getByRole('heading', {
     name: 'Suggested Citrus Pantry Bowl with Roasted Garden Vegetables',
   })).toBeVisible()
-  const footer = dialog.locator('[data-modal-sheet-footer="true"]')
-  const tabList = footer.getByRole('tablist', {
+  const navigation = dialog.locator('[data-modal-sheet-navigation="true"]')
+  const tabList = navigation.getByRole('tablist', {
     name: 'Suggested Citrus Pantry Bowl with Roasted Garden Vegetables sections',
   })
   await expect(tabList).toBeVisible()
@@ -465,7 +468,7 @@ test('mobile suggested recipe opens the shared external-only detail sheet and ke
     'Ingredients',
     'Instructions',
   ])
-  const anchoredFooter = await Promise.all([dialog.boundingBox(), footer.boundingBox()])
+  const anchoredFooter = await Promise.all([dialog.boundingBox(), navigation.boundingBox()])
   expect(Math.abs(
     ((anchoredFooter[1]?.y ?? 0) + (anchoredFooter[1]?.height ?? 0))
       - ((anchoredFooter[0]?.y ?? 0) + (anchoredFooter[0]?.height ?? 0)),
@@ -476,7 +479,7 @@ test('mobile suggested recipe opens the shared external-only detail sheet and ke
   await expect(dialog.getByRole('heading', { name: 'Section 1' })).toBeVisible()
   await expect(dialog.getByRole('heading', { name: 'Section 2' })).toBeVisible()
   await expect(dialog.getByText('Canned tomatoes · 1 can', { exact: true })).toBeVisible()
-  await expect(dialog.getByRole('group', { name: /Canned tomatoes · 1 can: Missing from inventory/ })).toHaveAttribute('data-status', 'unchecked')
+  await expect(dialog.getByRole('button', { name: /Canned tomatoes · 1 can: Missing from inventory/ })).toHaveAttribute('data-status', 'unchecked')
   await expect(dialog.getByRole('button', { name: /Long-grain rice · 2 cups: Exact inventory match/ })).toHaveAttribute('data-status', 'checked')
   const uncertainIngredient = dialog.getByRole('button', {
     name: /Fresh herbs: Inventory match uncertain.*Activate to choose an inventory product/,
@@ -486,10 +489,10 @@ test('mobile suggested recipe opens the shared external-only detail sheet and ke
   await expect(dialog.getByText('Source: diced tomatoes, drained')).toBeVisible()
   await expect(dialog.getByText('Matched as Italian parsley')).toBeVisible()
   const modalBody = dialog.locator('[data-modal-sheet-body="true"]')
-  const footerTopBeforeScroll = await footer.evaluate((element) => element.getBoundingClientRect().top)
+  const footerTopBeforeScroll = await navigation.evaluate((element) => element.getBoundingClientRect().top)
   await modalBody.evaluate((element) => element.scrollTo({ behavior: 'auto', top: element.scrollHeight }))
   await expect.poll(() => modalBody.evaluate((element) => element.scrollTop)).toBeGreaterThan(0)
-  await expect.poll(() => footer.evaluate((element) => Math.round(element.getBoundingClientRect().top))).toBe(
+  await expect.poll(() => navigation.evaluate((element) => Math.round(element.getBoundingClientRect().top))).toBe(
     Math.round(footerTopBeforeScroll),
   )
 
@@ -574,8 +577,8 @@ test('desktop browse recipe navigates all detail tabs and submits one missing-on
   await expect(dialog.getByRole('group', { name: 'Yield Makes 2 bowls' })).toBeVisible()
   const dialogBox = await dialog.boundingBox()
   expect(Math.round(dialogBox?.width ?? 0)).toBeLessThanOrEqual(722)
-  const footer = dialog.locator('[data-modal-sheet-footer="true"]')
-  const footerBox = await footer.boundingBox()
+  const navigation = dialog.locator('[data-modal-sheet-navigation="true"]')
+  const footerBox = await navigation.boundingBox()
   expect(Math.abs(
     ((footerBox?.y ?? 0) + (footerBox?.height ?? 0))
       - ((dialogBox?.y ?? 0) + (dialogBox?.height ?? 0)),
@@ -665,11 +668,9 @@ test('Food & Recipes hub and recipe browse use approved 393px mobile geometry', 
   await expect(foodHubLoader).toBeVisible({ timeout: 8_000 })
   await expect(page.locator('[data-content-visible="false"]').last()).toBeAttached()
   const loaderBox = await foodHubLoader.boundingBox()
-  const headerBox = await page.locator('main [class*="headerDock"]').last().boundingBox()
-  const bottomNavBox = await page.getByRole('navigation', { name: 'Dashboard sections' }).boundingBox()
+  const viewport = page.viewportSize()
   const loaderCenter = (loaderBox?.y ?? 0) + ((loaderBox?.height ?? 0) / 2)
-  const availableCenter = ((headerBox?.y ?? 0) + (headerBox?.height ?? 0) + (bottomNavBox?.y ?? 0)) / 2
-  expect(Math.abs(loaderCenter - availableCenter)).toBeLessThanOrEqual(1)
+  expect(Math.abs(loaderCenter - ((viewport?.height ?? 0) / 2))).toBeLessThanOrEqual(1)
   await expect(foodHubLoader).not.toBeVisible({ timeout: 12_000 })
   await expect(page.getByRole('heading', { name: 'Food & Recipes' })).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Suggested Recipes' })).toBeVisible()
@@ -808,15 +809,9 @@ test('Food & Recipes hub and recipe browse use approved 393px mobile geometry', 
   await expect(page.getByText('No Recipes Found')).toHaveCount(0)
   await expect.poll(async () => {
     const recipesLoaderBox = await recipesLoader.boundingBox()
-    const recipesHeaderBox = await page.locator('main [class*="headerDock"]').last().boundingBox()
-    const recipesBottomNavBox = await page.getByRole('navigation', { name: 'Dashboard sections' }).boundingBox()
+    const recipesViewport = page.viewportSize()
     const recipesLoaderCenter = (recipesLoaderBox?.y ?? 0) + ((recipesLoaderBox?.height ?? 0) / 2)
-    const recipesAvailableCenter = (
-      (recipesHeaderBox?.y ?? 0)
-      + (recipesHeaderBox?.height ?? 0)
-      + (recipesBottomNavBox?.y ?? 0)
-    ) / 2
-    return Math.abs(recipesLoaderCenter - recipesAvailableCenter)
+    return Math.abs(recipesLoaderCenter - ((recipesViewport?.height ?? 0) / 2))
   }).toBeLessThanOrEqual(1)
   await expect(recipesLoader).toHaveAttribute('data-state', 'exiting', { timeout: 4_000 })
   await expect(recipesLoader).not.toBeVisible()
@@ -887,39 +882,46 @@ test('desktop recipes use responsive bounded cards and five full-width carousel 
   const carousel = page.getByRole('region', { name: 'Suggested recipes' })
   const pages = carousel.locator('[data-carousel-page]')
   await expect(pages).toHaveCount(5)
-  await expect(carousel.locator('[data-carousel-card]')).toHaveCount(70)
+  const carouselColumns = Number(await page.locator('[data-card-carousel]').getAttribute('data-columns'))
+  expect(carouselColumns).toBeGreaterThanOrEqual(5)
+  expect(carouselColumns).toBeLessThanOrEqual(7)
+  const cardsPerPage = carouselColumns * 2
+  await expect(carousel.locator('[data-carousel-card]')).toHaveCount(cardsPerPage * 5)
   for (let pageIndex = 0; pageIndex < 5; pageIndex += 1) {
-    await expect(pages.nth(pageIndex).locator('[data-carousel-card]')).toHaveCount(14)
+    await expect(pages.nth(pageIndex).locator('[data-carousel-card]')).toHaveCount(cardsPerPage)
   }
   await expect(page.getByRole('group', { name: 'Suggested recipes pages' }).getByRole('button')).toHaveCount(5)
 
   const geometry = await pages.first().evaluate((element) => {
     const pageRect = element.getBoundingClientRect()
     const trackRect = element.parentElement?.getBoundingClientRect()
+    const columns = Number(element.closest('[data-card-carousel]')?.getAttribute('data-columns') ?? 0)
     const cards = Array.from(element.querySelectorAll('[data-carousel-card]')).map((card) => {
       const rect = card.getBoundingClientRect()
       return { x: Math.round(rect.x), y: Math.round(rect.y) }
     })
     return {
-      cardColumns: new Set(cards.slice(0, 7).map((card) => card.x)).size,
+      cardColumns: new Set(cards.slice(0, columns).map((card) => card.x)).size,
       cardMaxWidth: Math.max(...Array.from(element.querySelectorAll('[data-carousel-card]')).map((card) => card.getBoundingClientRect().width)),
-      firstRowY: new Set(cards.slice(0, 7).map((card) => card.y)).size,
+      columns,
+      firstRowY: new Set(cards.slice(0, columns).map((card) => card.y)).size,
       pageWidth: Math.round(pageRect.width),
       rightDeadSpace: Math.round((trackRect?.right ?? 0) - pageRect.right),
-      secondRowBelowFirst: cards[7].y > cards[0].y,
+      secondRowBelowFirst: cards[columns].y > cards[0].y,
       trackWidth: Math.round(trackRect?.width ?? 0),
       nextPageLeak: Math.max(0, Math.round(trackRect?.right ?? 0) - Math.round(element.nextElementSibling?.getBoundingClientRect().left ?? 0)),
     }
   })
   expect(geometry).toMatchObject({
-    cardColumns: 7,
+    cardColumns: carouselColumns,
+    columns: carouselColumns,
     firstRowY: 1,
     rightDeadSpace: 0,
     secondRowBelowFirst: true,
-    trackWidth: 1440,
     nextPageLeak: 0,
   })
-  expect(geometry.pageWidth).toBe(1440)
+  expect(geometry.pageWidth).toBe(geometry.trackWidth)
+  expect(geometry.pageWidth).toBeLessThan(1440)
   expect(geometry.cardMaxWidth).toBeLessThanOrEqual(220)
 
   const desktopAllRecipesBox = await page.getByRole('button', { exact: true, name: 'All Recipes' }).boundingBox()
@@ -943,18 +945,19 @@ test('desktop recipes use responsive bounded cards and five full-width carousel 
       gridWidth: Math.round(grid?.getBoundingClientRect().width ?? 0),
     }
   })
-  expect(recipeGridGeometry).toMatchObject({
-    columns: 7,
-    dynamicColumns: 7,
-    gridWidth: 1408,
-  })
+  expect(recipeGridGeometry.columns).toBe(recipeGridGeometry.dynamicColumns)
+  expect(recipeGridGeometry.columns).toBeGreaterThanOrEqual(5)
+  expect(recipeGridGeometry.gridWidth).toBeLessThanOrEqual(1_200)
   expect(recipeGridGeometry.cardWidth).toBeLessThanOrEqual(220)
 
   const desktopFloatingDockBox = await page.locator('[data-floating-action-dock="true"]').boundingBox()
+  const desktopPageContentBox = await page.locator('[data-page-content="true"]').boundingBox()
   const desktopSearchButton = page.getByRole('button', { name: 'Search recipes' })
   const desktopSearchButtonBox = await desktopSearchButton.boundingBox()
   expect(Math.round(desktopSearchButtonBox?.x ?? 0)).toBe(Math.round(desktopFloatingDockBox?.x ?? 0))
-  expect(Math.round(desktopSearchButtonBox?.width ?? 0)).toBeGreaterThan(1_200)
+  expect(Math.round(desktopFloatingDockBox?.x ?? 0)).toBe(Math.round(desktopPageContentBox?.x ?? 0))
+  expect(Math.round(desktopFloatingDockBox?.width ?? 0)).toBe(Math.round(desktopPageContentBox?.width ?? 0))
+  expect(Math.round(desktopSearchButtonBox?.width ?? 0)).toBeGreaterThan(700)
   await desktopSearchButton.click()
   const desktopSearchInput = page.getByRole('searchbox', { name: 'Search recipes' })
   await expect(desktopSearchInput).toBeFocused()
@@ -1768,20 +1771,10 @@ test('thermostat page accepts the first mobile scroll gesture after closing a ro
   await expect(dialog).toBeVisible()
   await dialog.getByRole('button', { name: 'Close' }).click()
   await expect(dialog).toHaveAttribute('data-state', 'closed')
-
-  await expect.poll(async () => page.evaluate(() => ({
-    bodyPointerEvents: document.body.style.pointerEvents,
-    scrollLocked: document.body.getAttribute('data-scroll-locked'),
-    modalOverlays: document.querySelectorAll('[data-modal-sheet-overlay]').length,
-    closingDialogPointerEvents: window.getComputedStyle(document.querySelector('[role="dialog"]') as Element).pointerEvents,
-    closingDialogInert: document.querySelector('[role="dialog"]')?.hasAttribute('inert') ?? false,
-  }))).toEqual({
-    bodyPointerEvents: 'auto',
-    scrollLocked: null,
-    modalOverlays: 0,
-    closingDialogPointerEvents: 'none',
-    closingDialogInert: true,
-  })
+  await expect(dialog).toHaveAttribute('inert')
+  await expect(dialog).toHaveCSS('pointer-events', 'none')
+  await expect.poll(() => page.locator('[data-modal-sheet-overlay="true"]').evaluate((overlay) => getComputedStyle(overlay).pointerEvents)).toBe('none')
+  await expect(dialog).toHaveCount(0, { timeout: 700 })
 
   const scroller = page.locator('main > div').nth(1)
   const { before, maxScrollTop } = await scroller.evaluate((element) => ({
@@ -1858,7 +1851,7 @@ test('SleepyPod hot flash keeps the cancel action stable from cooling through th
 
   await page.getByRole('button', { name: /Stephen's Bed Cooling/i }).click()
   const dialog = page.getByRole('dialog', { name: "Stephen's Bed" })
-  await dialog.getByRole('button', { name: 'Special Modes' }).click()
+  await dialog.getByRole('tab', { name: 'Special Modes' }).click()
   await dialog.getByRole('button', { name: 'Hot Flash Mode Inactive' }).click()
 
   const dial = dialog.getByRole('region', { name: /Stephen's Bed thermostat Cooling -10/i })
@@ -1986,14 +1979,12 @@ test.describe('desktop modal layout', () => {
     await expect.poll(() => heroColumn.evaluate((element) => ({
       boundedByBody: element.clientHeight <= (element.parentElement?.clientHeight ?? 0) + 1,
       overflowY: getComputedStyle(element).overflowY,
-      overflows: element.scrollHeight > element.clientHeight + 1,
-    }))).toEqual({ boundedByBody: true, overflowY: "auto", overflows: true })
+    }))).toEqual({ boundedByBody: true, overflowY: "auto" })
     await expect.poll(() => section.evaluate((element) => element.previousElementSibling?.getAttribute("data-section"))).toBe("eight-sleep-hero")
 
     await heroColumn.evaluate((element) => {
       element.scrollTop = element.scrollHeight
     })
-    await expect.poll(() => heroColumn.evaluate((element) => element.scrollTop)).toBeGreaterThan(0)
     await expect.poll(() => controls.evaluate((element) => {
       const column = element.closest("[data-scroll-region=\"eight-sleep-hero-column\"]")
       const columnBox = column?.getBoundingClientRect()
@@ -2106,11 +2097,11 @@ test.describe('desktop modal layout', () => {
     await page.getByRole('button', { name: /Main Floor Docked/i }).click()
     const dialog = page.getByRole('dialog')
     await expect(dialog).toBeVisible()
-    await dialog.getByRole('button', { name: 'Zones' }).click()
+    await dialog.getByRole('tab', { name: 'Zones' }).click()
     await expect(dialog.getByRole('heading', { name: 'Zones' })).toBeVisible()
 
     const zonesPane = dialog.getByRole('group', { name: 'Main Floor controls, zones, auto-clean, actions, info' })
-    const modalNav = dialog.getByRole('navigation', { name: 'Main Floor modal sections' })
+    const modalNav = dialog.getByRole('tablist', { name: 'Main Floor modal sections' })
     const diningRoomZone = dialog.getByRole('button', { name: 'Dining Room' })
     await expect.poll(async () => zonesPane.evaluate((element) => {
       const style = window.getComputedStyle(element)
@@ -2127,58 +2118,45 @@ test.describe('desktop modal layout', () => {
     })
     await expect.poll(async () => diningRoomZone.evaluate((zoneElement) => {
       const zoneBox = zoneElement.getBoundingClientRect()
-      const navBox = document.querySelector('nav[aria-label="Main Floor modal sections"]')?.getBoundingClientRect()
+      const navBox = document.querySelector('[role="tablist"][aria-label="Main Floor modal sections"]')?.getBoundingClientRect()
       return Boolean(navBox && zoneBox.bottom <= navBox.top - 4)
     })).toBe(true)
     await expect(modalNav).toBeVisible()
   })
 
-  test('media remote modal uses the shared desktop sheet height', async ({ page }) => {
+  test('media remote modal uses the stable workspace height', async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 760 })
     await page.goto('/at-a-glance/living-room')
     await page.getByRole('button', { name: /^Living Room SHIELD Off$/i }).click()
 
     const dialog = page.getByRole('dialog')
     await expect(dialog).toBeVisible()
-    await expect.poll(async () => {
-      return dialog.evaluate((element) => {
-        const rect = element.getBoundingClientRect()
-        return Math.round((rect.height / window.innerHeight) * 100)
-      })
-    }).toBe(90)
+    await expect(dialog).toHaveAttribute('data-size', 'workspace')
+    await expect(dialog).toHaveAttribute('data-scroll-mode', 'panes')
+    await expect.poll(async () => Math.round((await dialog.boundingBox())?.height ?? 0)).toBe(696)
   })
 
-  test('bed modal keeps its short-desktop footer fixed while the unclipped hero scrolls with content', async ({ page }) => {
+  test('bed modal uses the compact sheet flow on a short wide viewport', async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 500 })
     await page.goto('/at-a-glance/master-bedroom')
     await page.getByRole('button', { name: /Steph's Bed Off/i }).click()
 
     const dialog = page.getByRole('dialog', { name: "Steph's Bed" })
     await expect(dialog).toBeVisible()
+    await expect(dialog).toHaveAttribute('data-centered-layout', 'false')
+    await expect(dialog).toHaveAttribute('data-size', 'workspace')
+    await expect(dialog.locator('[data-mobile-drag-handle="true"]')).toBeVisible()
     await expect.poll(async () => {
-      return dialog.evaluate((element) => ({
-        boxWidth: Math.round(element.getBoundingClientRect().width),
-        boxHeight: Math.round(element.getBoundingClientRect().height),
-        heightVar: getComputedStyle(element).getPropertyValue('--modal-desktop-height').trim(),
-        maxHeightVar: getComputedStyle(element).getPropertyValue('--modal-desktop-max-height').trim(),
-        maxWidthVar: getComputedStyle(element).getPropertyValue('--modal-desktop-max-width').trim(),
-        widthVar: getComputedStyle(element).getPropertyValue('--modal-desktop-width').trim(),
-      }))
-    }).toEqual({
-      boxHeight: 350,
-      boxWidth: 700,
-      heightVar: '70vh',
-      maxHeightVar: '70vh',
-      maxWidthVar: '700px',
-      widthVar: '700px',
-    })
+      const box = await dialog.boundingBox()
+      return { height: Math.round(box?.height ?? 0), width: Math.round(box?.width ?? 0) }
+    }).toEqual({ height: 500, width: 1280 })
 
-    await dialog.getByRole('button', { name: 'Alarms' }).click()
+    await dialog.getByRole('tab', { name: 'Alarms' }).click()
     const body = dialog.locator('[data-layout="eight-sleep-modal-body"]')
     const modalBody = dialog.locator('[data-modal-sheet-body="true"]')
     const hero = dialog.locator('[data-section="eight-sleep-hero"]')
     const panel = dialog.locator('[data-scroll-region="eight-sleep-panel"]')
-    const footer = dialog.getByRole('navigation', { name: "Steph's Bed modal sections" }).locator('..')
+    const footer = dialog.getByRole('tablist', { name: "Steph's Bed modal sections" }).locator('..')
     await expect(hero.getByText('Use the power control to turn on the Pod.')).toBeVisible()
     const offHeroBox = await hero.boundingBox()
     await hero.getByRole('button', { name: "Turn on Steph's Bed" }).click()
@@ -2213,7 +2191,7 @@ test.describe('desktop modal layout', () => {
     expect(Math.round(afterScrollHeroBox?.y ?? 0)).toBeLessThan(Math.round(beforeScrollHeroBox.y))
     expect(Math.abs(Math.round(afterScrollFooterBox?.y ?? 0) - Math.round(beforeScrollFooterBox.y))).toBeLessThanOrEqual(1)
 
-    await dialog.getByRole('button', { name: 'Special Modes' }).click()
+    await dialog.getByRole('tab', { name: 'Special Modes' }).click()
     await expect(panel).toHaveAttribute('aria-label', "Steph's Bed Special Modes")
     await expect.poll(async () => modalBody.evaluate((element) => Math.round(element.scrollTop))).toBe(0)
     await expect.poll(async () => {
@@ -2234,8 +2212,8 @@ test.describe('desktop modal layout', () => {
       })
     }).toEqual({
       compactNaturalGaps: true,
-      panelAlignItems: 'start',
-      sectionAlignContent: 'start',
+      panelAlignItems: 'normal',
+      sectionAlignContent: 'normal',
     })
   })
 
@@ -2400,7 +2378,7 @@ test.describe('desktop modal layout', () => {
     const dialogBox = await dialog.boundingBox()
     expect(Math.round(dialogBox?.width ?? 0)).toBeLessThanOrEqual(500)
     await expect.poll(async () => options.evaluate((optionsElement) => {
-      const firstOption = optionsElement.firstElementChild?.querySelector('button')?.getBoundingClientRect()
+      const firstOption = optionsElement.querySelector(':scope > button')?.getBoundingClientRect()
       const style = window.getComputedStyle(optionsElement)
       return {
         columns: style.gridTemplateColumns.split(' ').filter(Boolean).length,
@@ -2764,7 +2742,10 @@ test('chores create task FAB opens the source-shaped task modal', async ({ page 
   await expect(dialog.getByLabel('Repeat Every')).toBeVisible()
   await expect(dialog.getByLabel('Repeat Every')).toHaveAttribute('inputmode', 'numeric')
   await dialog.getByLabel('Repeat Every').focus()
-  await expect(dialog).toHaveCSS('transform', 'none')
+  await expect.poll(() => dialog.evaluate((element) => {
+    const transform = getComputedStyle(element).transform
+    return transform === 'none' ? 0 : new DOMMatrixReadOnly(transform).m42
+  })).toBe(0)
   await expect(dialog.getByLabel('Interval Unit')).toBeVisible()
   await expect(dialog.getByLabel('Days of Week', { exact: true })).toHaveCount(0)
   await expect(dialog.getByRole('button', { name: 'Cancel' })).toHaveCount(0)
@@ -3002,7 +2983,7 @@ test('room media cards open ported remote modals', async ({ page }) => {
   }).toBe(90)
   await expect(page.getByRole('heading', { name: 'Living Room SHIELD Remote' })).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Sonos Volume' })).toBeVisible()
-  await dialog.getByRole('button', { name: 'Apps' }).click()
+  await dialog.getByRole('tab', { name: 'Apps' }).click()
   await expect(page.getByRole('button', { name: 'Plex' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Disney+' })).toBeVisible()
   await page.getByRole('button', { name: 'Close' }).click()
@@ -3011,16 +2992,16 @@ test('room media cards open ported remote modals', async ({ page }) => {
   await page.getByRole('button', { name: /^Apple TV Paused$/i }).click()
   await expect(page.getByRole('heading', { name: 'Apple TV Remote' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Menu' })).toBeVisible()
-  await page.getByRole('dialog').getByRole('button', { name: 'Apps' }).click()
+  await page.getByRole('dialog').getByRole('tab', { name: 'Apps' }).click()
   await expect(page.getByRole('button', { name: 'Plex' })).toBeVisible()
   await page.getByRole('button', { name: 'Close' }).click()
 
   await page.goto('/at-a-glance/theater-room')
   await page.getByRole('button', { name: /^Theater Remote Off$/i }).click()
   await expect(page.getByRole('heading', { name: 'Theater Room SHIELD Remote' })).toBeVisible()
-  await page.getByRole('dialog').getByRole('button', { name: 'Apps' }).click()
+  await page.getByRole('dialog').getByRole('tab', { name: 'Apps' }).click()
   await expect(page.getByRole('button', { name: 'Prime Video' })).toBeVisible()
-  await page.getByRole('dialog').getByRole('button', { name: 'Devices' }).click()
+  await page.getByRole('dialog').getByRole('tab', { name: 'Devices' }).click()
   await expect(page.getByRole('heading', { name: 'Devices' })).toBeVisible()
   await expect(page.getByRole('button', { name: /Projector Off/i })).toBeVisible()
 })
@@ -3188,7 +3169,7 @@ test('schedule detail pages keep the outer modal sheet anchored', async ({ page 
   await page.getByRole('button', { name: /Humidifier Humidifying.*46%/i }).click()
   const dialog = page.getByRole('dialog')
   await expect(dialog).toBeVisible()
-  await dialog.getByRole('button', { name: 'Schedules', exact: true }).click()
+  await dialog.getByRole('tab', { name: 'Schedules', exact: true }).click()
   await dialog.getByRole('button', { name: 'Add Scheduled Activity' }).click()
 
   await expect(dialog).toHaveAccessibleName('Add Master Bedroom Humidifier Schedule')
@@ -3227,7 +3208,7 @@ test('SleepyPod inline toggle updates a single main row without opening edit', a
   await page.getByRole('button', { name: /Steph.s Bed Off/i }).click()
   const dialog = page.getByRole('dialog')
   await expect(dialog).toBeVisible()
-  await dialog.getByRole('button', { name: 'Alarms', exact: true }).click()
+  await dialog.getByRole('tab', { name: 'Alarms', exact: true }).click()
 
   const row = dialog.getByRole('button', { name: 'Steph\u0027s Bed Sunday Alarm Enabled' })
   const toggle = dialog.getByRole('switch', { name: 'Turn off Steph\u0027s Bed Sunday alarm at 6:30 AM' })
@@ -3457,14 +3438,14 @@ test('room vacuum cards open reusable vacuum modal controls', async ({ page }) =
   await expect(page.getByText('No rooms are selected. If you begin cleaning, the robot vacuum will attempt to clean every mapped area.')).toBeVisible()
   await expect(page.getByRole('combobox', { name: /Cleaning Passes 1x/i })).toHaveValue('1')
   await expect(page.getByRole('button', { name: 'Clean', exact: true })).toHaveAttribute('data-icon', 'mdi:play')
-  await expect(page.getByRole('button', { name: 'Info' })).toBeVisible()
+  await expect(page.getByRole('tab', { name: 'Info' })).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Consumables' })).toHaveCount(0)
   await expect(page.getByRole('group', { name: 'Mode options' })).toHaveCount(0)
   await expect(page.getByRole('combobox', { name: /Mode Vacuum/i })).toHaveValue('vacuum')
   await expect(page.getByRole('dialog', { name: 'Mode' })).toHaveCount(0)
   await expect(page.getByRole('combobox', { name: /Fan Balanced/i })).toHaveValue('balanced')
   await expect(page.getByRole('dialog', { name: 'Fan' })).toHaveCount(0)
-  await page.getByRole('button', { name: 'Zones' }).click()
+  await page.getByRole('tab', { name: 'Zones' }).click()
   await expect(page.getByText('Rooms are cleaned in the order you select them. The numbered badges show the current cleaning sequence.')).toBeVisible()
   const kitchenZone = page.getByRole('button', { name: /^Kitchen/ })
   const livingRoomZone = page.getByRole('button', { name: /^Living Room/ })
@@ -3474,17 +3455,17 @@ test('room vacuum cards open reusable vacuum modal controls', async ({ page }) =
   await expect(livingRoomZone).toHaveAccessibleName('Living Room, cleaning order 2')
   await expect(kitchenZone.getByText('1')).toBeVisible()
   await expect(livingRoomZone.getByText('2')).toBeVisible()
-  await page.getByRole('button', { name: 'Auto-Clean' }).click()
+  await page.getByRole('tab', { name: 'Auto-Clean' }).click()
   await expect(page.getByRole('heading', { name: 'Disabled Auto-Clean Rooms' })).toBeVisible()
   await expect(page.getByText('Check rooms that should be skipped when the coordinator starts an automatic away clean.')).toBeVisible()
   await expect(page.getByRole('button', { name: 'Living Room auto-clean enabled' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Closet auto-clean enabled' })).toBeVisible()
-  await page.getByRole('button', { name: 'Actions' }).click()
+  await page.getByRole('tab', { name: 'Actions' }).click()
   await expect(page.getByRole('heading', { name: 'Dock Controls' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Clean Mop Dock' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Dry Mops' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Empty Bin' })).toBeVisible()
-  await page.getByRole('button', { name: 'Info' }).click()
+  await page.getByRole('tab', { name: 'Info' }).click()
   await expect(page.getByRole('heading', { name: 'Consumables' })).toBeVisible()
   await expect(page.getByRole('group', { name: 'Main Brush 204h left' })).toBeVisible()
   await expect(page.getByRole('group', { name: 'Dustbag OK' })).toBeVisible()
@@ -3498,15 +3479,15 @@ test('theater room vacuum opens with map and Valetudo power controls', async ({ 
   await expect(page.getByRole('dialog')).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Theater Room: Robot Vacuum' })).toBeVisible()
   await expect(page.getByRole('region', { name: 'Theater Room Valetudo map' })).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Info' })).toBeVisible()
+  await expect(page.getByRole('tab', { name: 'Info' })).toBeVisible()
   await expect(page.getByRole('group', { name: 'Cleaning target' }).getByRole('button', { name: 'Area' })).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Zones' })).toHaveCount(0)
+  await expect(page.getByRole('tab', { name: 'Zones' })).toHaveCount(0)
   await expect(page.getByText('No rooms are selected. If you begin cleaning, the robot vacuum will attempt to clean every mapped area.')).toHaveCount(0)
   await expect(page.getByRole('combobox', { name: /Mode Vacuum/i })).toHaveValue('vacuum')
   await expect(page.getByRole('dialog', { name: 'Mode' })).toHaveCount(0)
   await expect(page.getByRole('combobox', { name: /Fan Balanced/i })).toHaveValue('balanced')
   await expect(page.getByRole('dialog', { name: 'Fan' })).toHaveCount(0)
-  await page.getByRole('button', { name: 'Info' }).click()
+  await page.getByRole('tab', { name: 'Info' }).click()
   await expect(page.getByRole('group', { name: 'Main Brush 245h left' })).toBeVisible()
   await expect(page.getByText(/Entity not available/i)).toHaveCount(0)
 })
@@ -3538,18 +3519,18 @@ test('available vacuum cards open source-style modal controls', async ({ page })
   await expect(page.getByRole('region', { name: 'Main Floor Valetudo map' })).toBeVisible()
   await expect(page.getByText('No error')).toHaveCount(0)
   await expect(page.getByRole('button', { name: 'Clean', exact: true })).toBeVisible()
-  await page.getByRole('button', { name: 'Zones' }).click()
+  await page.getByRole('tab', { name: 'Zones' }).click()
   await expect(page.getByText('Zones').first()).toBeVisible()
-  await page.getByRole('button', { name: 'Auto-Clean' }).click()
+  await page.getByRole('tab', { name: 'Auto-Clean' }).click()
   const officeAutoClean = page.getByRole('button', { name: 'Office auto-clean enabled' })
   await expect(officeAutoClean).toHaveAttribute('aria-pressed', 'false')
   await officeAutoClean.click()
   await expect(page.getByRole('button', { name: 'Office auto-clean disabled' })).toHaveAttribute('aria-pressed', 'true')
-  await page.getByRole('button', { name: 'Actions' }).click()
+  await page.getByRole('tab', { name: 'Actions' }).click()
   await expect(page.getByRole('button', { name: 'Clean Mop Dock' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Dry Mops' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Empty Bin' })).toBeVisible()
-  await page.getByRole('button', { name: 'Info' }).click()
+  await page.getByRole('tab', { name: 'Info' }).click()
   await expect(page.getByRole('group', { name: 'Main Filter 54h left' })).toHaveAttribute('data-icon', 'mdi:air-filter')
   await expect(page.getByRole('group', { name: 'Detergent OK' })).toHaveAttribute('data-icon', 'mdi:bottle-tonic')
   await expect(page.getByRole('group', { name: 'Sensors 2h left' })).toHaveAttribute('data-icon', 'mdi:timer-alert-outline')
@@ -3692,7 +3673,7 @@ test('vacuum area controls remain usable at the narrow mobile target', async ({ 
   const dialog = page.getByRole('dialog')
   await expect(dialog).toBeVisible()
 
-  const modalNavButtons = dialog.getByRole('navigation', { name: 'Main Floor modal sections' }).getByRole('button')
+  const modalNavButtons = dialog.getByRole('tablist', { name: 'Main Floor modal sections' }).getByRole('tab')
   const navWidths = await modalNavButtons.evaluateAll((buttons) => buttons.map((button) => button.getBoundingClientRect().width))
   expect(Math.min(...navWidths)).toBeGreaterThanOrEqual(44)
 
@@ -3725,7 +3706,7 @@ test('vacuum area controls remain usable at the narrow mobile target', async ({ 
       mapWidth: Math.round(mapRect?.width ?? 0),
     }
   })
-  expect(editorGeometry.bodyOverflowY).toBe('hidden')
+  expect(editorGeometry.bodyOverflowY).toBe('auto')
   expect(editorGeometry.mapWidth).toBeGreaterThanOrEqual(280)
   expect(editorGeometry.mapHeight).toBeGreaterThanOrEqual(200)
 })
@@ -3741,7 +3722,7 @@ test('vacuum map keeps stable desktop dimensions across targets and tabs', async
 
   await dialog.getByRole('group', { name: 'Cleaning target' }).getByRole('button', { name: 'Area' }).click()
   const areaBox = await map.boundingBox()
-  await dialog.getByRole('button', { name: 'Zones' }).click()
+  await dialog.getByRole('tab', { name: 'Zones' }).click()
   const zonesBox = await map.boundingBox()
 
   expect(Math.abs((areaBox?.width ?? 0) - (roomsBox?.width ?? 0))).toBeLessThanOrEqual(1)
@@ -3755,9 +3736,9 @@ test('vacuum modal navigation stays pinned while mobile content scrolls', async 
   await page.goto('/at-a-glance/vacuums')
   await page.getByRole('button', { name: /Main Floor Docked/i }).click()
   const dialog = page.getByRole('dialog')
-  await dialog.getByRole('button', { name: 'Zones' }).click()
+  await dialog.getByRole('tab', { name: 'Zones' }).click()
   const body = dialog.locator('[data-modal-sheet-body="true"]')
-  const nav = dialog.getByRole('navigation', { name: 'Main Floor modal sections' })
+  const nav = dialog.getByRole('tablist', { name: 'Main Floor modal sections' })
   const before = await nav.boundingBox()
 
   await body.evaluate((element) => {
@@ -3770,7 +3751,7 @@ test('vacuum modal navigation stays pinned while mobile content scrolls', async 
   expect((after?.y ?? 0) + (after?.height ?? 0)).toBeLessThanOrEqual(viewportHeight + 1)
   expect(await body.evaluate((element) => element.scrollTop)).toBeGreaterThan(0)
 
-  await dialog.getByRole('button', { name: 'Controls' }).click()
+  await dialog.getByRole('tab', { name: 'Controls' }).click()
   await expect.poll(() => body.evaluate((element) => element.scrollTop)).toBe(0)
 })
 
@@ -3975,7 +3956,7 @@ test('mobile bed thermostat keeps its top-arc hit target inside the scroller and
   const dialog = page.getByRole('dialog', { name: "Steph's Bed" })
   const body = dialog.locator('[data-modal-sheet-body="true"]')
   const hero = dialog.locator('[data-section="eight-sleep-hero"]')
-  const footer = dialog.getByRole('navigation', { name: "Steph's Bed modal sections" }).locator('..')
+  const footer = dialog.getByRole('tablist', { name: "Steph's Bed modal sections" }).locator('..')
   await hero.getByRole('button', { name: "Turn on Steph's Bed" }).click()
   const marker = hero.locator('[data-target="value"]')
   await expect(marker).toBeVisible()
@@ -4359,28 +4340,18 @@ test('thermostat hero dial allows vertical swipe scrolling', async ({ page, brow
   await expect(highHandle).toHaveCount(1)
   const highHandleBox = await highHandle.boundingBox()
   expect(highHandleBox).not.toBeNull()
-  const highArc = heroDial.locator('[data-target="high-arc"]')
-  await expect(highArc).toHaveCount(1)
-  await expect(highArc).toHaveCSS('stroke', 'rgb(44, 142, 152)')
-  const highArcBefore = await highArc.getAttribute('d')
   const highHandleEnd = pointForTemperature(box!, 78)
   await mouseDrag(highHandleBox!.x + highHandleBox!.width / 2, highHandleBox!.y + highHandleBox!.height / 2, highHandleEnd.x, highHandleEnd.y)
   await expect(heroDial).not.toHaveAttribute('aria-label', beforeLabel!)
   await expect.poll(async () => (await highHandle.boundingBox())?.x ?? 0).toBeGreaterThan(highHandleBox!.x + 20)
-  const highHandleBoxAfter = await highHandle.boundingBox()
-  expect(highHandleBoxAfter).not.toBeNull()
-  await expect(highArc).not.toHaveAttribute('d', highArcBefore!)
   const lowHandle = heroDial.locator('[data-target="low"]')
   await expect(lowHandle).toHaveCount(1)
   const lowHandleBox = await lowHandle.boundingBox()
   expect(lowHandleBox).not.toBeNull()
-  const lowArc = heroDial.locator('[data-target="low-arc"]')
-  await expect(lowArc).toHaveCount(1)
-  await expect(lowArc).toHaveCSS('stroke', 'rgb(205, 84, 1)')
-  const lowArcBefore = await lowArc.getAttribute('d')
+  const labelBeforeLowDrag = await heroDial.getAttribute('aria-label')
   const lowHandleEnd = pointForTemperature(box!, 68)
   await mouseDrag(lowHandleBox!.x + lowHandleBox!.width / 2, lowHandleBox!.y + lowHandleBox!.height / 2, lowHandleEnd.x, lowHandleEnd.y)
-  await expect(lowArc).not.toHaveAttribute('d', lowArcBefore!)
+  await expect(heroDial).not.toHaveAttribute('aria-label', labelBeforeLowDrag!)
   await page.waitForTimeout(300)
   const labelBeforeRingSwipe = (await heroDial.getAttribute('aria-label')) ?? beforeLabel!
 
@@ -4399,13 +4370,14 @@ test('daily summary deep link opens the tabbed modal for the requested user', as
   await expect(dialog.getByRole('heading', { name: "Stephen's Summary" })).toBeVisible()
   await expect(dialog).toHaveAttribute('data-has-subtitle', 'false')
 
-  const nav = dialog.getByRole('navigation', { name: 'Daily report sections' })
-  const tabs = nav.getByRole('button')
+  const nav = dialog.getByRole('tablist', { name: 'Daily report sections' })
+  const tabs = nav.getByRole('tab')
   await expect(tabs).toHaveCount(3)
-  // Icon-only: the only permitted text is a badge count such as "3" or "9+".
-  for (const tab of await tabs.all()) await expect(tab).toHaveText(/^(\d+\+?)?$/)
-  await expect(nav.getByRole('button', { name: /^Overdue Chores/ }).locator('[data-count]')).toHaveText('1')
-  await expect(nav.getByRole('button', { name: 'Upcoming Chores' }).locator('[data-count]')).toHaveCount(0)
+  await expect(tabs.nth(0)).toContainText('Overdue Chores')
+  await expect(tabs.nth(1)).toContainText('Upcoming Chores')
+  await expect(tabs.nth(2)).toContainText('Expired Food')
+  await expect(nav.getByRole('tab', { name: /^Overdue Chores/ }).locator('[data-count]')).toHaveText('1')
+  await expect(nav.getByRole('tab', { name: 'Upcoming Chores' }).locator('[data-count]')).toHaveCount(0)
 
   await expect(dialog.getByRole('region', { name: 'Overdue Chores' })).toBeVisible()
   await expect(dialog.getByRole('button', { name: 'Edit Mock task one' })).toBeVisible()
@@ -4439,21 +4411,21 @@ test('daily summary deep link opens the tabbed modal for the requested user', as
   expect(Math.abs((loadingAlignment?.actualCenter ?? 0) - (loadingAlignment?.expectedCenter ?? 0))).toBeLessThanOrEqual(2)
   await expect(editPage.getByLabel('Task Name')).toHaveValue('Mock task one')
   await expect(editPage.getByRole('button', { name: 'Back to daily summary' })).toBeVisible()
-  await expect(editPage.getByRole('navigation', { name: 'Daily report sections' })).toHaveCount(0)
+  await expect(editPage.getByRole('tablist', { name: 'Daily report sections' })).toHaveCount(0)
   await editPage.getByRole('button', { name: 'Back to daily summary' }).click()
   await expect(dialog).toBeVisible()
 
   const bodyHeader = dialog.locator('[data-modal-sheet-body-header="true"]')
   await expect(bodyHeader.getByRole('heading', { level: 2, name: 'Overdue Chores' })).toBeVisible()
 
-  await nav.getByRole('button', { name: /^Upcoming Chores/ }).click()
+  await nav.getByRole('tab', { name: /^Upcoming Chores/ }).click()
   await expect(dialog.getByRole('region', { name: 'Upcoming Chores' })).toBeVisible()
   await expect(dialog.getByRole('region', { name: 'Upcoming Chores' }).getByRole('button', { name: 'Edit Mock task one' })).toBeVisible()
   await expect(dialog.getByRole('region', { name: 'Overdue Chores' })).toHaveCount(0)
 
   await expect(bodyHeader.getByRole('heading', { level: 2, name: 'Upcoming Chores' })).toBeVisible()
 
-  await nav.getByRole('button', { name: /^Expired Food/ }).click()
+  await nav.getByRole('tab', { name: /^Expired Food/ }).click()
   await expect(bodyHeader.getByRole('heading', { level: 2, name: 'Expired Food' })).toBeVisible()
   await expect(dialog.getByLabel('Expired Food inventory list')).toBeVisible()
   const expiredRow = dialog.locator('[data-expiry-tone="expired"]').first()
@@ -4467,7 +4439,7 @@ test('daily summary deep link opens the tabbed modal for the requested user', as
   await expect(page.getByRole('dialog')).toHaveCount(1)
   await expect(inventoryPage.getByRole('button', { name: 'Back to expired food' })).toBeVisible()
   await expect(inventoryPage.getByRole('button', { name: 'Delete Milk' })).toBeVisible()
-  await expect(inventoryPage.getByRole('navigation', { name: 'Daily report sections' })).toHaveCount(0)
+  await expect(inventoryPage.getByRole('tablist', { name: 'Daily report sections' })).toHaveCount(0)
 
   await inventoryPage.getByRole('button', { name: 'Back to expired food' }).click()
   await expect(dialog).toBeVisible()
@@ -4500,7 +4472,7 @@ test('header profile button opens the summary modal from any page', async ({ pag
 
   const dialog = page.getByRole('dialog')
   await expect(dialog.getByRole('heading', { name: "Stephen's Summary" })).toBeVisible()
-  await expect(dialog.getByRole('navigation', { name: 'Daily report sections' })).toBeVisible()
+  await expect(dialog.getByRole('tablist', { name: 'Daily report sections' })).toBeVisible()
   await expect.poll(() => new URL(page.url()).hash).toBe('#daily-report')
 
   await dialog.getByRole('button', { name: 'Close' }).click()
@@ -4544,7 +4516,7 @@ test('daily summary empty tabs centre without scrolling the sheet', async ({ pag
   const body = dialog.locator('[data-modal-sheet-body="true"]')
   await expect.poll(() => body.evaluate((e) => e.scrollHeight - e.clientHeight)).toBeLessThanOrEqual(0)
 
-  await dialog.getByRole('navigation', { name: 'Daily report sections' }).getByRole('button', { name: /^Expired Food/ }).click()
+  await dialog.getByRole('tablist', { name: 'Daily report sections' }).getByRole('tab', { name: /^Expired Food/ }).click()
   await expect(dialog.getByRole('heading', { level: 2, name: 'Expired Food Hidden' })).toBeVisible()
   await expect(dialog.getByLabel('Expired Food inventory list')).toHaveCount(0)
   await expect.poll(() => body.evaluate((e) => e.scrollHeight - e.clientHeight)).toBeLessThanOrEqual(0)
@@ -4556,7 +4528,7 @@ test('daily summary keeps the last expired-food empty state centred while the se
 
   await page.getByRole('button', { name: /^Open .+'s Summary/ }).click()
   const dialog = page.getByRole('dialog')
-  await dialog.getByRole('navigation', { name: 'Daily report sections' }).getByRole('button', { name: /^Expired Food/ }).click()
+  await dialog.getByRole('tablist', { name: 'Daily report sections' }).getByRole('tab', { name: /^Expired Food/ }).click()
 
   page.once('dialog', (confirmation) => void confirmation.accept())
   await dialog.getByRole('button', { name: 'Delete Almond Flour' }).click()

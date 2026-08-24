@@ -66,8 +66,53 @@ function InitiallyClosedModalSheetHarness() {
 }
 
 describe('ModalSheet', () => {
+  it('exposes typed size, scroll, and navigation intents', () => {
+    render(
+      <ModalSheet
+        navigation={<span data-testid="modal-navigation" />}
+        onClose={() => undefined}
+        open
+        scrollMode="panes"
+        size="form"
+        title=""
+      >
+        <div />
+      </ModalSheet>,
+    )
+
+    const dialog = screen.getByRole('dialog')
+    expect(dialog).toHaveAttribute('data-size', 'form')
+    expect(dialog).toHaveAttribute('data-scroll-mode', 'panes')
+    expect(dialog).toHaveAttribute('data-has-navigation', 'true')
+    expect(dialog.querySelector('[data-modal-sheet-navigation="true"]')).toContainElement(screen.getByTestId('modal-navigation'))
+  })
+
+  it('retains navigation and typed layout intent during the mounted close frame', () => {
+    const view = render(
+      <ModalSheet navigation={<span data-testid="closing-navigation" />} onClose={() => undefined} open scrollMode="panes" size="workspace" title="">
+        <div />
+      </ModalSheet>,
+    )
+
+    const dialog = screen.getByRole('dialog')
+    view.rerender(
+      <ModalSheet navigation={undefined} onClose={() => undefined} open={false} size="compact" title="">
+        <div />
+      </ModalSheet>,
+    )
+
+    expect(dialog).toHaveAttribute('data-state', 'closed')
+    expect(dialog).toHaveAttribute('data-size', 'workspace')
+    expect(dialog).toHaveAttribute('data-scroll-mode', 'panes')
+    expect(screen.getByTestId('closing-navigation')).toBeInTheDocument()
+  })
+
   it('disables nested glass backdrop filters inside the moving modal surface', () => {
     expect(modalSheetCss).toMatch(/\.content \[data-tone\]\[data-variant='card'\],\s*\.content \[data-modal-tab-nav='true'\]\s*\{[^}]*backdrop-filter:\s*none;[^}]*-webkit-backdrop-filter:\s*none;/s)
+  })
+
+  it('keeps centered tabbed sheets at a stable viewport-bounded height', () => {
+    expect(modalSheetCss).toMatch(/\.content\[data-has-navigation='true'\]\s*\{\s*height:\s*min\(\s*760px,\s*calc\(var\(--dashboard-visible-height,[^}]+- 64px\)\s*\);/s)
   })
 
   it('leaves touch ownership to the drawer without forcing scroll position or directional touch-action', () => {
@@ -118,7 +163,7 @@ describe('ModalSheet', () => {
     }
   })
 
-  it('makes the closing sheet inert and releases background pointer locking during exit animation', async () => {
+  it('makes the closing sheet inert and releases the dismissal input shield on the next frame', async () => {
     render(<ModalSheetHarness />)
 
     const dialog = screen.getByRole('dialog')
@@ -131,9 +176,9 @@ describe('ModalSheet', () => {
     const overlay = document.body.querySelector('[data-modal-sheet-overlay]')
     expect(overlay).toHaveAttribute('data-closed')
     expect(overlay).toHaveAttribute('data-closing', 'true')
-    expect(overlay).toHaveStyle({ pointerEvents: 'none' })
+    expect(modalSheetCss).toMatch(/\.overlay\[data-closing='true'\],\s*\.overlay\[data-closed\]\s*\{[^}]*pointer-events:\s*none !important;/s)
+    expect(modalSheetCss).toMatch(/\.overlay\[data-input-shielded='true'\]\s*\{[^}]*pointer-events:\s*auto !important;/s)
     expect(document.body).not.toHaveAttribute('data-scroll-locked')
-    await waitFor(() => expect(document.body.style.pointerEvents).not.toBe('none'))
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
     expect(screen.getByRole('button', { name: 'Host page swipe target' })).toBeInTheDocument()
   })
@@ -143,7 +188,7 @@ describe('ModalSheet', () => {
 
     const dialog = screen.getByRole('dialog')
     expect(document.body).not.toHaveAttribute('data-scroll-locked')
-    fireEvent.pointerDown(document.body.querySelector('[data-modal-sheet-overlay]') as Element)
+    fireEvent.click(document.body.querySelector('[data-modal-sheet-overlay]') as Element)
 
     await waitFor(() => expect(dialog).toHaveAttribute('data-state', 'closed'))
     expect(document.body).not.toHaveAttribute('data-scroll-locked')

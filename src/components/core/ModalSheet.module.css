@@ -21,7 +21,6 @@
 }
 
 .overlay[data-ending-style] {
-  pointer-events: none;
   transition-duration: calc(var(--drawer-swipe-strength, 1) * 500ms);
 }
 
@@ -29,7 +28,11 @@
 .overlay[data-closing='true'],
 .overlay[data-closed] {
   opacity: 0;
-  pointer-events: none;
+  pointer-events: none !important;
+}
+
+.overlay[data-input-shielded='true'] {
+  pointer-events: auto !important;
 }
 
 .viewport {
@@ -43,6 +46,9 @@
 }
 
 .content {
+  --modal-intent-width: 720px;
+  --modal-intent-max-width: 720px;
+  --modal-intent-height: auto;
   display: flex;
   width: var(--dashboard-viewport-width, 100vw);
   max-width: var(--dashboard-viewport-width, 100vw);
@@ -64,6 +70,27 @@
   transform: translate3d(0, var(--drawer-swipe-movement-y, 0px), 0);
   transition: transform 500ms cubic-bezier(.32, .72, 0, 1);
   will-change: transform;
+}
+
+.content[data-size='compact'] {
+  --modal-intent-width: 500px;
+  --modal-intent-max-width: 500px;
+}
+
+.content[data-size='form'] {
+  --modal-intent-width: 560px;
+  --modal-intent-max-width: 560px;
+}
+
+.content[data-size='media'] {
+  --modal-intent-width: 1100px;
+  --modal-intent-max-width: 1100px;
+}
+
+.content[data-size='workspace'] {
+  --modal-intent-width: 980px;
+  --modal-intent-max-width: 980px;
+  --modal-intent-height: min(760px, calc(var(--dashboard-visible-height, var(--dashboard-viewport-height, 100dvh)) - 64px));
 }
 
 .content[data-closing='true'] {
@@ -153,6 +180,7 @@
 }
 
 .back {
+  position: relative;
   display: grid;
   width: 38px;
   height: 38px;
@@ -163,6 +191,14 @@
   color: white;
   background: rgba(255, 255, 255, 0.16);
   cursor: pointer;
+}
+
+.back::before,
+.close::before {
+  position: absolute;
+  inset: -3px;
+  border-radius: inherit;
+  content: '';
 }
 
 .subtitle {
@@ -195,6 +231,7 @@
 }
 
 .close {
+  position: relative;
   display: grid;
   width: 38px;
   height: 38px;
@@ -232,7 +269,8 @@
   padding-top: 12px;
 }
 
-.content[data-has-footer='true'] .body {
+.content[data-has-footer='true'] .body,
+.content[data-has-navigation='true'] .body {
   padding-bottom: var(--modal-body-footer-padding-bottom, 12px);
 }
 
@@ -242,6 +280,7 @@
   height: 0;
 }
 
+.navigation,
 .footer {
   flex: 0 0 auto;
   box-sizing: border-box;
@@ -249,25 +288,43 @@
   background: linear-gradient(to top, var(--color-modal-footer) 72%, var(--color-modal-footer-transparent));
 }
 
-@media (min-width: 760px) {
+@media (orientation: landscape) and (max-height: 559px) {
+  .content {
+    height: var(--modal-mobile-height, 100dvh);
+    max-height: var(--modal-mobile-max-height, 100dvh);
+  }
+}
+
+@media (min-width: 760px) and (min-height: 560px) {
   .viewport {
     align-items: center;
     padding: 32px;
   }
 
   .content {
-    width: var(--modal-desktop-width, 90vw);
-    max-width: var(--modal-desktop-max-width, calc(var(--dashboard-viewport-width, 100vw) - 64px));
-    height: var(--modal-desktop-height, 90vh);
-    max-height: var(--modal-desktop-max-height, calc(100vh - 64px));
-    height: var(--modal-desktop-height, 90dvh);
-    max-height: var(--modal-desktop-max-height, calc(var(--dashboard-visible-height, var(--dashboard-viewport-height, 100dvh)) - 64px));
+    width: var(--modal-desktop-width, var(--modal-intent-width));
+    max-width: min(
+      var(--modal-desktop-max-width, var(--modal-intent-max-width)),
+      calc(var(--dashboard-viewport-width, 100vw) - 64px)
+    );
+    height: var(--modal-desktop-height, var(--modal-intent-height));
+    max-height: min(
+      var(--modal-desktop-max-height, calc(var(--dashboard-visible-height, var(--dashboard-viewport-height, 100dvh)) - 64px)),
+      calc(var(--dashboard-visible-height, var(--dashboard-viewport-height, 100dvh)) - 64px)
+    );
     border: 1px solid rgba(255, 255, 255, 0.12);
     border-radius: 34px;
     box-shadow: 0 26px 86px rgba(0, 0, 0, 0.48), inset 0 1px 0 rgba(255, 255, 255, 0.08);
     transform: none;
     transition: opacity 200ms cubic-bezier(.4, 0, .2, 1);
     will-change: opacity;
+  }
+
+  .content[data-has-navigation='true'] {
+    height: min(
+      760px,
+      calc(var(--dashboard-visible-height, var(--dashboard-viewport-height, 100dvh)) - 64px)
+    );
   }
 
   .content[data-starting-style],
@@ -300,6 +357,11 @@
     overflow-y: var(--modal-desktop-body-overflow-y, auto);
   }
 
+  .content[data-scroll-mode='panes'] .body {
+    overflow-y: hidden;
+  }
+
+  .navigation,
   .footer {
     padding: 12px 24px 20px;
   }

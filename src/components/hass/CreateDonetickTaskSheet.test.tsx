@@ -45,6 +45,7 @@ describe('CreateDonetickTaskSheet Hide On Vacation metadata', () => {
   it('defaults checked with the exact fieldset heading, title, and subtitle', () => {
     renderSheet()
 
+    expect(screen.getByRole('dialog', { name: 'Create Task' }).style.getPropertyValue('--modal-desktop-height')).toBe('')
     expect(screen.getByText('Hide On Vacation', { selector: 'legend' })).toBeInTheDocument()
     expect(screen.getByText(HIDE_TITLE, { selector: 'strong' })).toBeInTheDocument()
     expect(screen.getByText(HIDE_SUBTITLE, { selector: 'small' })).toBeInTheDocument()
@@ -117,6 +118,9 @@ describe('CreateDonetickTaskSheet edit mode', () => {
     renderEditSheet()
 
     expect(await screen.findByRole('heading', { name: 'Edit Task' })).toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: 'Edit Task' })).toHaveStyle({
+      '--modal-desktop-height': 'min(940px, calc(var(--dashboard-visible-height, var(--dashboard-viewport-height, 100dvh)) - 64px))',
+    })
     await waitFor(() => expect(screen.getByLabelText('Task Name')).toHaveValue('Clean the gutters'))
     expect(screen.getByLabelText('Assignee')).toHaveValue('2')
     expect(screen.getByLabelText('Description')).toHaveValue('Use the tall ladder')

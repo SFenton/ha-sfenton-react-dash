@@ -137,11 +137,10 @@ export function DailyReportModal() {
             contentStyle={DAILY_REPORT_MODAL_STYLE}
             footer={editingTaskPage
               ? <DonetickTaskFormFooter controller={taskForm} />
-              : detailPage
-                ? undefined
-                : context.user
-                  ? <DailyReportModalNav activeTab={activeTab} counts={{ 'expired-food': context.expiredFoodCount, overdue: context.overdueCount }} onTabChange={setActiveTab} />
-                  : undefined}
+              : undefined}
+            navigation={!detailPage && context.user
+              ? <DailyReportModalNav activeTab={activeTab} counts={{ 'expired-food': context.expiredFoodCount, overdue: context.overdueCount }} onTabChange={setActiveTab} />
+              : undefined}
             onBack={detailPage ? showSummary : undefined}
             onClose={() => {
               if (detailBusy) return
@@ -156,6 +155,7 @@ export function DailyReportModal() {
               : editingInventoryPage
                 ? `inventory-${inventoryDetailsTarget?.item.inventory_id ?? inventoryDetailsTarget?.item.id ?? 'item'}`
                 : activeTab}
+            size="standard"
             title={editingTaskPage ? 'Edit Task' : editingInventoryPage ? inventoryDetails.title : context.title}
           >
             {editingTaskPage

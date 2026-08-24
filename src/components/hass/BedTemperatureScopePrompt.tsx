@@ -82,6 +82,7 @@ export function BedTemperatureScopePrompt({
       contentStyle={BED_TEMPERATURE_SCOPE_MODAL_STYLE}
       onClose={onClose}
       open={open}
+      size="compact"
       subtitle={`${sideTitle} • ${phaseLabel} • ${targetText}`}
       title="Set Bed Temperature"
     >

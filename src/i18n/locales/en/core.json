@@ -8,11 +8,19 @@
     "apply": "Apply",
     "reset": "Reset"
   },
+  "groups": {
+    "controls": "{{title}} Controls"
+  },
   "modal": {
     "back": "Back",
     "close": "Close",
     "description": "{{title}} controls and status details",
-    "descriptionWithSubtitle": "{{title}}: {{subtitle}}"
+    "descriptionWithSubtitle": "{{title}}: {{subtitle}}",
+    "dailyReportSections": "Daily report sections",
+    "humidifierSections": "Humidifier modal sections",
+    "sectionNavigation": "{{title}} modal sections",
+    "tabItemCount_one": "{{label}}, {{count}} item",
+    "tabItemCount_other": "{{label}}, {{count}} items"
   },
   "fields": {
     "days": "Days"

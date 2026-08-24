@@ -59,6 +59,7 @@ export function CreateGroceryItemSheet({ entityId, open, onClose }: CreateGrocer
       )}
       onClose={handleClose}
       open={open}
+      size="form"
       title="Add Grocery Item"
     >
       <form className={styles.form} id={FORM_ID} onSubmit={handleSubmit}>
