@@ -47,6 +47,27 @@ test('preserves the approved 393x852 Home geometry', async ({ page }) => {
   })
 })
 
+test('preserves the approved 393x852 Food tile geometry', async ({ page }) => {
+  await page.setViewportSize({ width: 393, height: 852 })
+  await page.goto('/index.html?path=food')
+  await expect(page.getByRole('heading', { name: 'Suggested Recipes' })).toBeVisible({ timeout: 15_000 })
+
+  const [allRecipes, allFood] = await Promise.all([
+    page.getByRole('button', { exact: true, name: 'All Recipes' }).boundingBox(),
+    page.getByRole('button', { name: /^All Food / }).boundingBox(),
+  ])
+  expect(allRecipes && {
+    height: Math.round(allRecipes.height),
+    width: Math.round(allRecipes.width),
+    x: Math.round(allRecipes.x),
+  }).toEqual({ height: 120, width: 361, x: 16 })
+  expect(allFood && {
+    height: Math.round(allFood.height),
+    width: Math.round(allFood.width),
+    x: Math.round(allFood.x),
+  }).toEqual({ height: 120, width: 176, x: 16 })
+})
+
 test('switches exclusively between bottom navigation and the permanent rail at 1120px', async ({ page }) => {
   await page.setViewportSize({ width: 820, height: 1180 })
   await page.goto('/index.html?path=overview')

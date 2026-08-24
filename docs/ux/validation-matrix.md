@@ -70,6 +70,17 @@ comparison at `393x852` against clean `origin/master`. Differences require a
 documented intentional bug-fix rationale. Keep route, state, scroll position,
 authentication, and mock data equivalent.
 
+Run required mobile parity with explicit reachable servers:
+
+```bash
+npm run test:e2e:mobile-parity -- \
+  --baseline http://127.0.0.1:5188 \
+  --candidate http://127.0.0.1:5187
+```
+
+The command and parity spec must fail, rather than skip, when required URLs are
+missing or unreachable.
+
 `DASHBOARD_ROUTES` is the route inventory source of truth. Modal acceptance
 must reconcile the exact physical `ModalSheet` callsite set and every
 production consumer, then exercise each listed tab, detail kind, and

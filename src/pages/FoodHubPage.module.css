@@ -24,11 +24,14 @@
 
 .singleTileGrid {
   display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
 }
 
 @container page-content (min-width: 560px) {
   .singleTileGrid {
     width: min(100%, 520px);
+    grid-template-columns: minmax(0, 1fr);
     margin-inline: auto;
   }
 }

@@ -43,7 +43,7 @@ test('hidden preload geometry performs no runtime I/O', async ({ page }) => {
   await expect(cache.locator('[data-dynamic-grid="true"]')).toHaveCount(0)
 
   const audit = await page.evaluate(() => ({
-    calls: window.__mockHass?.calls.filter((call) => call.domain !== 'weather') ?? [],
+    calls: window.__mockHass?.calls ?? [],
     images: document.querySelectorAll('[data-dashboard-preload-cache] img, [data-dashboard-preload-cache] video, [data-dashboard-preload-cache] canvas').length,
     io: (window as unknown as {
       __preloadIoAudit: {

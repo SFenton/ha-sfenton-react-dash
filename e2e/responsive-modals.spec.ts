@@ -226,9 +226,12 @@ test('short-landscape square-grid families keep fixed tracks and reachable termi
 test('short-landscape sheet pickers use compact fixed tracks', async ({ page }) => {
   await page.setViewportSize({ height: 393, width: 852 })
   await page.goto('/index.html?path=custom-lights')
+  await expect.poll(() => page.evaluate(() => Boolean(window.__mockHass))).toBe(true)
   await page.evaluate(() => {
-    window.__mockHass?.setEntityState('input_boolean.manually_control_front_yard_lights', 'on')
-    window.__mockHass?.setEntityState('input_select.front_yard_custom_lights', 'Custom')
+    const mockHass = window.__mockHass
+    if (!mockHass) throw new Error('Mock Home Assistant API is unavailable')
+    mockHass.setEntityState('input_boolean.manually_control_front_yard_lights', 'on')
+    mockHass.setEntityState('input_select.front_yard_custom_lights', 'Custom')
   })
   await page.getByRole('button', { name: 'Select lighting mode' }).click()
   let dialog = page.getByRole('dialog', { name: 'Lighting Mode' })
