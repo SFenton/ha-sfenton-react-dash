@@ -21,6 +21,8 @@ npm run build
 npm run lint
 npm run sync
 npm run deploy  # SSH fallback only; prefer SMB deployment below
+npm run deploy:both  # Build + SSH deploy + synchronize both HA dashboard hosts
+npm run deploy:sync  # Synchronize dashboard metadata after an SMB copy
 ```
 
 When running terminal commands, explicitly set the working directory to this repo or use `npm --prefix "C:\\Users\\sfent\\source\\repos\\homeassistant\\ha-sfenton-react-dash" ...`; terminals may reuse another workspace folder.
@@ -50,7 +52,16 @@ Remove-Item "\\192.168.1.22\config\www\ha-sfenton-react-dash\*" -Recurse -Force
 Copy-Item "C:\Users\sfent\source\repos\homeassistant\ha-sfenton-react-dash\dist\*" -Destination "\\192.168.1.22\config\www\ha-sfenton-react-dash" -Recurse -Force
 ```
 
-After every production deployment, bump the Home Assistant wrapper card URL query string so the sidebar dashboard reloads `index.html` instead of a cached copy. Use a unique value such as the commit SHA or `YYYYMMDD-HHMM`:
+The same production build is exposed through two Home Assistant hosts until the user explicitly retires one:
+
+| Host | URL | Ownership |
+| --- | --- | --- |
+| Legacy Lovelace wrapper | `/sfenton-react-dash/home` | Storage-mode dashboard using `custom:sfenton-react-app-card` |
+| Embedded custom panel | `/sfenton-react-panel` | YAML `panel_custom` package with `embed_iframe: true` |
+
+Do not delete, rename, or stop updating either host without explicit approval.
+
+After every production deployment, bump the legacy wrapper card URL query string so it reloads `index.html` instead of a cached copy. Use a unique value such as the commit SHA or `YYYYMMDD-HHMM`:
 
 ```text
 /local/ha-sfenton-react-dash/index.html?v=<unique-deploy-version>
@@ -61,6 +72,32 @@ Use Home Assistant MCP to update the storage-mode dashboard:
 1. Read the current wrapper config with `ha_config_get_dashboard(url_path="sfenton-react-dash", force_reload=True)`.
 2. Update the custom card URL with `ha_config_set_dashboard(url_path="sfenton-react-dash", config_hash=<hash>, python_transform="config['views'][0]['cards'][0]['url'] = '/local/ha-sfenton-react-dash/index.html?v=<unique-deploy-version>'")`.
 3. Re-open or reload `/sfenton-react-dash/home` and verify it loads the same deployed version.
+
+The custom-panel host is registered by:
+
+```text
+home-assistant/packages/sfenton_react_panel.yaml
+```
+
+Deploy that file to:
+
+```text
+\\192.168.1.22\config\packages\sfenton_react_panel.yaml
+```
+
+Its stable `sfenton-react-panel.js` bridge adds a fresh cache-busting query to the inner app whenever the panel document mounts, so normal React app deployments do not require a Home Assistant restart. If the bridge itself changes, bump its `module_url` query in the package, run a Home Assistant configuration check, deploy the package, and restart Home Assistant.
+
+During this parallel-host experiment, the custom panel intentionally retains Home Assistant's native desktop sidebar because `panel_custom` has no supported per-panel kiosk option. Mobile uses HA's narrow layout and fills the viewport. Do not inject top-window CSS or persist global kiosk-mode preferences to hide the desktop sidebar; keep that temporary divergence explicit until the user chooses the final host architecture.
+
+For an SSH deployment, `npm run deploy:both` builds the app, uploads `dist/`, deploys the panel package when changed, validates Home Assistant configuration, and synchronizes the legacy wrapper URL. The script supports the configured password or `VITE_SSH_PRIVATE_KEY`; on this workstation it defaults to `~/.ssh/ha-sfenton-react-dash-deploy`.
+
+For the preferred SMB flow:
+
+1. Run `npm run build`.
+2. Copy `dist/` to `\\192.168.1.22\config\www\ha-sfenton-react-dash`.
+3. Copy `home-assistant/packages/sfenton_react_panel.yaml` to `\\192.168.1.22\config\packages\sfenton_react_panel.yaml` if it changed.
+4. Run `npm run deploy:sync` to bump the legacy wrapper URL and verify the custom panel registration.
+5. Restart Home Assistant only when the panel package or bridge version changed.
 
 The app is served by Home Assistant at:
 
@@ -179,9 +216,15 @@ The wrapper should fill the viewport and remove Home Assistant dashboard chrome.
 When validating deployment, check both:
 
 - Raw app: `/local/ha-sfenton-react-dash/index.html`
-- Sidebar dashboard: `/sfenton-react-dash/home`
+- Legacy sidebar dashboard: `/sfenton-react-dash/home`
+- Embedded custom panel: `/sfenton-react-panel`
 
-Always validate the raw app with a cache-busting query param, and always bump the wrapper card URL after copying `dist/`. The custom wrapper iframe can keep loading cached `index.html` even after the SMB copy succeeds.
+Always validate the raw app with a cache-busting query param, always bump the legacy wrapper card URL after copying `dist/`, and verify that both dashboard hosts render the same route. The custom wrapper iframe can keep loading cached `index.html` even after the SMB copy succeeds.
+
+For reconnect validation, capture the inner React iframe `performance.timeOrigin`, force or observe a Home Assistant WebSocket reconnect, and confirm:
+
+- `/sfenton-react-dash/home` recreates its Lovelace wrapper iframe;
+- `/sfenton-react-panel` retains the same inner React iframe and `performance.timeOrigin`.
 
 ## WebRTC And Cameras
 

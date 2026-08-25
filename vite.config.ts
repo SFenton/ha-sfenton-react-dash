@@ -33,6 +33,21 @@ export default defineConfig(({ mode }) => {
   return {
     base: mode === 'test' ? '/' : './',
     plugins: [react()],
+    build: {
+      rollupOptions: {
+        input: {
+          app: resolve(process.cwd(), 'index.html'),
+          'sfenton-react-panel': resolve(process.cwd(), 'src/panel/sfentonReactPanel.ts'),
+        },
+        output: {
+          entryFileNames: (chunkInfo) => (
+            chunkInfo.name === 'sfenton-react-panel'
+              ? 'sfenton-react-panel.js'
+              : 'assets/[name]-[hash].js'
+          ),
+        },
+      },
+    },
     resolve: {
       alias: mode === 'test'
         ? {

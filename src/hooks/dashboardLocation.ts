@@ -1,4 +1,5 @@
 import { copy } from '../i18n'
+import { isDashboardRouteHostPath } from '../constants/dashboardHosts'
 
 export const DASHBOARD_ROUTE_CHANGE_EVENT = 'dashboard-route-change'
 export const DASHBOARD_DOCUMENT_TITLE = copy('common', 'app.title')
@@ -11,16 +12,11 @@ function canReadWindow(candidate: Window) {
   }
 }
 
-function isDashboardShellPath(pathname: string) {
-  const parts = pathname.split('/').filter(Boolean)
-  return parts.includes('sfenton-react-dash') || parts.includes('at-a-glance')
-}
-
 export function dashboardWindow() {
   if (typeof window === 'undefined') return undefined
 
   const topWindow = window.top
-  if (topWindow && topWindow !== window && canReadWindow(topWindow) && isDashboardShellPath(topWindow.location.pathname)) {
+  if (topWindow && topWindow !== window && canReadWindow(topWindow) && isDashboardRouteHostPath(topWindow.location.pathname)) {
     return topWindow
   }
 
