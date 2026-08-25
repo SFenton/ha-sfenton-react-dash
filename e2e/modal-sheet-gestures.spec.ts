@@ -27,17 +27,18 @@ const SHEET_OPEN_ANIMATION_MS = 500
 
 async function openRoomsModal(page: Page) {
   await page.goto('/at-a-glance/overview')
-  const opener = page.getByRole('button', { name: 'Rooms' })
+  const opener = page.getByRole('button', { name: 'Quick Links' })
   const openerBox = await opener.boundingBox()
   if (!openerBox) throw new Error('Rooms opener was not measurable')
   await opener.click()
+  await page.getByRole('dialog', { name: 'Quick Links' }).getByRole('button', { name: 'Rooms' }).click()
   const dialog = page.getByRole('dialog', { name: 'Rooms' })
   await expect(dialog).toBeVisible()
   return {
     dialog,
-    openerPoint: {
-      x: openerBox.x + openerBox.width / 2,
-      y: openerBox.y + openerBox.height / 2,
+    reopen: async () => {
+      await page.mouse.click(openerBox.x + openerBox.width / 2, openerBox.y + openerBox.height / 2)
+      await page.getByRole('dialog', { name: 'Quick Links' }).getByRole('button', { name: 'Rooms' }).click()
     },
   }
 }
@@ -220,7 +221,7 @@ test.describe('mobile ModalSheet gestures', () => {
   test.use({ viewport: MOBILE_VIEWPORT })
 
   test('trusted touch from the grab bar closes with the mounted exit lifecycle and reopens cleanly', async ({ page }) => {
-    const { dialog, openerPoint } = await openRoomsModal(page)
+    const { dialog, reopen } = await openRoomsModal(page)
     await waitForSheetDragReady(page)
     const handle = dialog.locator('[data-mobile-drag-handle="true"]')
     const start = await locatorPoint(handle)
@@ -236,7 +237,7 @@ test.describe('mobile ModalSheet gestures', () => {
     await page.waitForTimeout(600)
     expect(await dialog.count()).toBe(0)
 
-    await page.mouse.click(openerPoint.x, openerPoint.y)
+    await reopen()
     await expect(dialog).toHaveAttribute('data-state', 'open')
     await expect(dialog.locator('[data-mobile-drag-handle="true"]')).toBeVisible()
     await expect.poll(() => dialog.locator('[data-modal-sheet-body="true"]').evaluate((element) => element.scrollTop)).toBe(0)
@@ -484,8 +485,8 @@ test.describe('mobile ModalSheet gestures', () => {
     await expect.poll(async () => Math.abs(await translateY(dialog))).toBeLessThanOrEqual(1)
   })
 
-  test('swipe close and rapid reopen starts at zero translation and remains swipeable', async ({ page }) => {
-    const { dialog, openerPoint } = await openRoomsModal(page)
+  test('swipe close blocks the dismissal gesture but releases the host for an intentional follow-up tap', async ({ page }) => {
+    const { dialog } = await openRoomsModal(page)
     await waitForSheetDragReady(page)
     let handle = dialog.locator('[data-mobile-drag-handle="true"]')
     let start = await locatorPoint(handle)
@@ -493,11 +494,19 @@ test.describe('mobile ModalSheet gestures', () => {
     if (!dialogBox) throw new Error('Rooms modal was not measurable before swipe close')
     await dragTouch(page, start, { x: start.x, y: start.y + dialogBox.height * 0.6 }, 12, 24)
     await expect(dialog).toHaveAttribute('data-state', 'closed')
+    const closeStartedAt = Date.now()
+    await expect(page.getByRole('dialog', { name: 'Quick Links' })).toHaveCount(0)
 
     await page.waitForTimeout(50)
-    await page.mouse.click(openerPoint.x, openerPoint.y)
+    const quickLinks = page.getByRole('button', { name: 'Quick Links' })
+    const quickLinksBox = await quickLinks.boundingBox()
+    if (!quickLinksBox) throw new Error('Quick Links opener was not measurable during modal exit')
+    await page.mouse.click(quickLinksBox.x + quickLinksBox.width / 2, quickLinksBox.y + quickLinksBox.height / 2)
+    const quickLinksDialog = page.getByRole('dialog', { name: 'Quick Links' })
+    await expect(quickLinksDialog).toBeVisible()
+    expect(Date.now() - closeStartedAt).toBeLessThan(700)
+    await quickLinksDialog.getByRole('button', { name: 'Rooms' }).click()
     await expect(dialog).toHaveAttribute('data-state', 'open')
-    await expect(dialog).toHaveAttribute('data-rapid-reopen', 'true')
     await expect.poll(async () => Math.abs(await translateY(dialog))).toBeLessThanOrEqual(1)
 
     await waitForSheetDragReady(page)
@@ -572,15 +581,16 @@ test.describe('mobile ModalSheet gestures', () => {
   })
 
   test('X, backdrop, and hash-backed close paths remain functional', async ({ page }) => {
-    let { dialog } = await openRoomsModal(page)
+    const roomsModal = await openRoomsModal(page)
+    let { dialog } = roomsModal
     await dialog.getByRole('button', { name: 'Close' }).click()
     await expect(dialog).toHaveAttribute('data-state', 'closed')
-    await expect(dialog).toHaveCount(0, { timeout: 1_000 })
+    await expect(dialog).toHaveCount(0, { timeout: 700 })
 
-    await page.getByRole('button', { name: 'Rooms' }).click()
+    await roomsModal.reopen()
     await expect(dialog).toHaveAttribute('data-state', 'open')
     await page.mouse.click(8, 8)
-    await expect(dialog).toHaveCount(0, { timeout: 1_000 })
+    await expect(dialog).toHaveCount(0, { timeout: 700 })
 
     await page.goto('/at-a-glance/overview#lights-overview')
     dialog = page.getByRole('dialog', { name: /Lights/ })

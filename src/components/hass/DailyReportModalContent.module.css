@@ -1,15 +1,6 @@
 .panel {
   display: grid;
   gap: 12px;
-  transition:
-    opacity 170ms ease-out,
-    transform 170ms ease-out;
-}
-
-.panel[data-modal-tab-transition-state='exiting'],
-.panel[data-modal-tab-transition-state='pre-entering'] {
-  opacity: 0;
-  transform: translate3d(0, 5px, 0);
 }
 
 .tabSection {
@@ -22,56 +13,6 @@
   gap: 0;
 }
 
-.nav {
-  display: grid;
-  grid-template-columns: repeat(var(--daily-report-nav-cols, 3), minmax(0, 1fr));
-  align-items: center;
-  gap: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 999px;
-  padding: 7px;
-  background: rgba(20, 20, 20, 0.72);
-  box-shadow: 0 16px 34px rgba(0, 0, 0, 0.34), inset 0 1px 0 rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-}
-
-.navButton {
-  display: grid;
-  width: 100%;
-  min-height: 48px;
-  place-items: center;
-  border: 0;
-  border-radius: 999px;
-  color: rgba(255, 255, 255, 0.68);
-  background: transparent;
-  font: inherit;
-  cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
-}
-
-.navIcon {
-  position: relative;
-  display: inline-grid;
-  place-items: center;
-}
-
-.navBadge {
-  position: absolute;
-  top: -8px;
-  right: -13px;
-}
-
-.navButton[data-active='true'] {
-  color: #111;
-  background: rgba(255, 255, 255, 0.92);
-}
-
-.navButton:focus,
-.navButton:focus-visible {
-  outline: none;
-}
-
 .picker {
   display: grid;
   gap: 14px;
@@ -81,10 +22,4 @@
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .panel {
-    transition: none;
-  }
 }

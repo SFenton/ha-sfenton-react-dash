@@ -1,5 +1,6 @@
 import { SprinklerController } from '../components/hass/SprinklerController'
 import { SectionHeader } from '../components/core/SectionHeader'
+import { ResponsiveSectionGrid, ResponsiveSectionItem } from '../components/core/ResponsiveSectionGrid'
 import { BACKYARD_SPRINKLER, FRONT_YARD_SPRINKLER } from '../constants/sprinklers'
 import { useCopy } from '../i18n'
 import styles from './SprinklersPage.module.css'
@@ -27,10 +28,10 @@ function SprinklersPageContent() {
   return (
     <div className={styles.content}>
       <SectionHeader title={sectionName} />
-      <div className={styles.controllerList}>
-        <SprinklerController config={FRONT_YARD_SPRINKLER} />
-        <SprinklerController config={BACKYARD_SPRINKLER} />
-      </div>
+      <ResponsiveSectionGrid className={styles.controllerList} gap={24}>
+        <ResponsiveSectionItem><SprinklerController config={FRONT_YARD_SPRINKLER} /></ResponsiveSectionItem>
+        <ResponsiveSectionItem><SprinklerController config={BACKYARD_SPRINKLER} /></ResponsiveSectionItem>
+      </ResponsiveSectionGrid>
     </div>
   )
 }

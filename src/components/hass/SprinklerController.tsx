@@ -517,7 +517,7 @@ export function SprinklerController({ config }: { config: SprinklerControllerCon
         </div>
       </div>
 
-      <ModalSheet bodyElementRef={bodyElementRef} footer={modalFooter} onBack={detailPage === DETAIL_OVERVIEW ? undefined : closeDetail} onClose={closeHash} open={modalOpen} scrollResetKey={detailPage} subtitle={modalSubtitle} title={modalTitle}>
+      <ModalSheet bodyElementRef={bodyElementRef} footer={modalFooter} onBack={detailPage === DETAIL_OVERVIEW ? undefined : closeDetail} onClose={closeHash} open={modalOpen} scrollResetKey={detailPage} size="standard" subtitle={modalSubtitle} title={modalTitle}>
         {detailPage === DETAIL_WATER ? waterDetail : detailPage === DETAIL_SCHEDULE ? scheduleDetail : overview}
       </ModalSheet>
     </>

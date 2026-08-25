@@ -1,0 +1,11 @@
+.section {
+  display: grid;
+  min-width: 0;
+  gap: var(--section-gap, 10px);
+}
+
+.content {
+  display: grid;
+  min-width: 0;
+  gap: var(--section-gap, 10px);
+}

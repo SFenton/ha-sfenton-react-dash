@@ -38,7 +38,8 @@
     "test:run": "vitest run",
     "test:i18n": "vitest run src/i18n scripts/i18n",
     "test:design": "vitest run scripts/design-system",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "test:e2e:mobile-parity": "tsx scripts/required-mobile-parity.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",

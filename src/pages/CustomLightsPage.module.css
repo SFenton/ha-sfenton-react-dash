@@ -9,6 +9,11 @@
 }
 
 .modeCard {
+  --mode-card-background: rgba(255, 255, 255, 0.1);
+  --mode-card-active-background: rgb(76 161 84 / 0.82);
+  --mode-card-inset-highlight: rgba(255, 255, 255, 0.18);
+  --mode-card-inset-shadow: rgba(0, 0, 0, 0.14);
+  --mode-card-transparent: transparent;
   position: relative;
   display: flex;
   width: 100%;
@@ -18,15 +23,15 @@
   border-radius: 26px;
   padding: 0 10px 0 0;
   color: white;
-  background: rgba(255, 255, 255, 0.1);
-  box-shadow: var(--shadow-glass), inset 0 1px 0 rgba(255, 255, 255, 0.18), inset 0 -1px 0 rgba(0, 0, 0, 0.14);
+  background: var(--mode-card-background);
+  box-shadow: var(--shadow-glass), inset 0 1px 0 var(--mode-card-inset-highlight), inset 0 -1px 0 var(--mode-card-inset-shadow);
   backdrop-filter: blur(15px) saturate(1.12);
   -webkit-backdrop-filter: blur(15px) saturate(1.12);
   transition: background var(--duration-fast) ease;
 }
 
 .modeCard[data-active='true'] {
-  background: rgb(76 161 84 / 0.82);
+  background: var(--mode-card-active-background);
 }
 
 .modeToggle {
@@ -38,7 +43,7 @@
   border: 0;
   padding: 0 8px 0 18px;
   color: inherit;
-  background: transparent;
+  background: var(--mode-card-transparent);
   font: inherit;
   cursor: pointer;
   text-align: left;
@@ -99,14 +104,19 @@
   padding: 8px;
   border-radius: 14px;
   color: white;
-  background: transparent;
+  background: var(--mode-card-transparent);
   cursor: pointer;
 }
 
+.modeSelectCopy {
+  display: none;
+  min-width: 0;
+  gap: 2px;
+  text-align: left;
+}
+
 .lightGrid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
+  --dynamic-grid-columns: 2;
 }
 
 .lightCell {
@@ -124,4 +134,58 @@
   font-weight: 760;
   background: rgba(255, 255, 255, 0.12);
   cursor: pointer;
+}
+
+@container page-content (min-width: 560px) {
+  .modeCard {
+    display: grid;
+    width: 100%;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+    padding: 0;
+    background: var(--mode-card-transparent);
+    box-shadow: none;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+
+  .modeCard[data-active='true'] {
+    background: var(--mode-card-transparent);
+  }
+
+  .modeToggle,
+  .modeSelect {
+    min-height: 112px;
+    border-radius: 26px;
+    padding: 0 18px;
+    box-shadow: var(--shadow-glass), inset 0 1px 0 var(--mode-card-inset-highlight), inset 0 -1px 0 var(--mode-card-inset-shadow);
+    backdrop-filter: blur(15px) saturate(1.12);
+    -webkit-backdrop-filter: blur(15px) saturate(1.12);
+  }
+
+  .modeToggle {
+    background: var(--mode-card-background);
+  }
+
+  .modeCard[data-active='true'] .modeToggle {
+    background: var(--mode-card-active-background);
+  }
+
+  .modeSelect {
+    justify-content: flex-start;
+    gap: 12px;
+    margin-left: 0;
+    background: var(--lighting-mode-background, var(--mode-card-background));
+  }
+
+  .modeSelectCopy {
+    display: grid;
+    flex: 1 1 auto;
+  }
+
+  .resetAllButton {
+    width: calc((100% - 12px) / 2);
+    margin-right: auto;
+    margin-left: 0;
+  }
 }

@@ -26,6 +26,10 @@ describe('SuggestedRecipeCarousel', () => {
     Object.defineProperty(window, 'innerWidth', { configurable: true, value: 393 })
   })
 
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
   it('preloads exactly five by six inert slots with no service calls or images', () => {
     const callService = vi.fn(mockState.helpers.callService)
     const originalCallService = mockState.helpers.callService
@@ -153,9 +157,15 @@ describe('SuggestedRecipeCarousel', () => {
     }
   })
 
-  it('uses five responsive desktop pages with bounded card widths', async () => {
+  it('measures the desktop container before issuing one correctly sized recommendation request', async () => {
     const originalMatchMedia = window.matchMedia
+    const originalCallService = mockState.helpers.callService
+    const recommendationCalls: Record<string, unknown>[] = []
     Object.defineProperty(window, 'innerWidth', { configurable: true, value: 1_440 })
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockImplementation(function () {
+      if (this.dataset.recommendationStatus !== undefined || this.dataset.cardCarousel === 'true') return 1_192
+      return 0
+    })
     window.matchMedia = vi.fn().mockImplementation((query: string) => ({
       matches: query === '(min-width: 900px)',
       media: query,
@@ -166,16 +176,36 @@ describe('SuggestedRecipeCarousel', () => {
       removeListener: vi.fn(),
       dispatchEvent: vi.fn(),
     }))
+    mockState.helpers.callService = (params) => {
+      if (params.domain === 'evershelf' && params.service === 'recipe_query') {
+        recommendationCalls.push(params)
+        return Promise.resolve({
+          response: {
+            kind: 'recommendations',
+            items: Array.from({ length: 60 }, (_, index) => recommendationCard(index + 1)),
+          },
+        })
+      }
+      return originalCallService(params)
+    }
 
     try {
       const { container } = render(<SuggestedRecipeCarousel />)
-      await screen.findByRole('button', { name: 'Open Suggested Citrus Pantry Bowl with Roasted Garden Vegetables recipe details' })
+      await screen.findByRole('button', { name: 'Open Test Recipe 1 recipe details' })
       const pages = Array.from(container.querySelectorAll('[data-carousel-page]'))
       expect(pages).toHaveLength(5)
-      pages.forEach((page) => expect(page.querySelectorAll('[data-carousel-card]')).toHaveLength(14))
-      expect(container.querySelector('[data-card-carousel]')).toHaveAttribute('data-columns', '7')
+      pages.forEach((page) => expect(page.querySelectorAll('[data-carousel-card]')).toHaveLength(12))
+      expect(container.querySelector('[data-card-carousel]')).toHaveAttribute('data-columns', '6')
       expect(within(screen.getByRole('group', { name: 'Suggested recipes pages' })).getAllByRole('button')).toHaveLength(5)
+      expect(recommendationCalls).toHaveLength(1)
+      expect(recommendationCalls[0]).toMatchObject({
+        serviceData: {
+          kind: 'recommendations',
+          limit: 60,
+        },
+      })
     } finally {
+      mockState.helpers.callService = originalCallService
       window.matchMedia = originalMatchMedia
       Object.defineProperty(window, 'innerWidth', { configurable: true, value: 393 })
     }

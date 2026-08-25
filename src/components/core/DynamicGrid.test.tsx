@@ -1,12 +1,20 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { act, render, screen, waitFor } from '@testing-library/react'
 import { DynamicGrid } from './DynamicGrid'
-import { equivalentDynamicGridColumnCount, packDynamicGridSpans, responsiveDynamicGridColumnCount } from './dynamicGridLayout'
+import { centeredDynamicGridStarts, equivalentDynamicGridColumnCount, packDynamicGridSpans, responsiveDynamicGridColumnCount } from './dynamicGridLayout'
 
 describe('packDynamicGridSpans', () => {
   it('fills partial and final rows without changing item order', () => {
     expect(packDynamicGridSpans([1, 1, 1, 1], 3)).toEqual([1, 1, 1, 3])
     expect(packDynamicGridSpans([2, 1, 2], 3)).toEqual([2, 1, 3])
     expect(packDynamicGridSpans([1, 1], 3)).toEqual([1, 2])
+  })
+
+  describe('centeredDynamicGridStarts', () => {
+    it('centers only the final partial row without changing item order', () => {
+      expect(centeredDynamicGridStarts([1, 1, 1, 1, 1], 4)).toEqual([0, 0, 0, 0, 2])
+      expect(centeredDynamicGridStarts([2, 1, 1, 1], 4)).toEqual([0, 0, 0, 2])
+      expect(centeredDynamicGridStarts([1, 1, 1, 1], 4)).toEqual([0, 0, 0, 0])
+    })
   })
 
   it('promotes adjacent wide items to full rows instead of leaving holes', () => {
@@ -137,6 +145,77 @@ describe('DynamicGrid', () => {
     })
   })
 
+  it('keeps uniform cells equal without overriding each child component label layout', async () => {
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockImplementation(function () {
+      if (this.dataset.dynamicGrid === 'true') return 210
+      return 0
+    })
+    vi.spyOn(HTMLElement.prototype, 'scrollWidth', 'get').mockImplementation(function () {
+      return Number(this.dataset.naturalWidth ?? 0)
+    })
+
+    render(
+      <DynamicGrid ariaLabel="Uniform links" columns={2} fillRows={false} itemSizing="uniform">
+        <button type="button">
+          <span data-dynamic-grid-label-container="true">
+            <span data-dynamic-grid-label="true" data-natural-width="300">A very long first link</span>
+          </span>
+        </button>
+        <button type="button">
+          <span data-dynamic-grid-label-container="true">
+            <span data-dynamic-grid-label="true" data-natural-width="40">Short</span>
+          </span>
+        </button>
+      </DynamicGrid>,
+    )
+
+    const grid = screen.getByRole('group', { name: 'Uniform links' })
+    await waitFor(() => {
+      expect(grid).toHaveAttribute('data-dynamic-grid-item-sizing', 'uniform')
+      expect(Array.from(grid.children).map((cell) => cell.getAttribute('data-dynamic-grid-span'))).toEqual(['1', '1'])
+      expect(Array.from(grid.children).map((cell) => cell.getAttribute('data-dynamic-grid-wrap'))).toEqual([null, null])
+    })
+  })
+
+  it('activates uniform sizing only after the measured width threshold', async () => {
+    let gridWidth = 400
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockImplementation(function () {
+      if (this.dataset.dynamicGrid === 'true') return gridWidth
+      if (this.dataset.dynamicGridLabelContainer === 'true') return 80
+      return 0
+    })
+    vi.spyOn(HTMLElement.prototype, 'scrollWidth', 'get').mockImplementation(function () {
+      return Number(this.dataset.naturalWidth ?? 0)
+    })
+
+    render(
+      <DynamicGrid ariaLabel="Adaptive uniform links" columns={2} fillRows={false} itemSizing="uniform" itemSizingMinWidth={560}>
+        <button type="button">
+          <span data-dynamic-grid-label-container="true">
+            <span data-dynamic-grid-label="true" data-natural-width="300">A very long first link</span>
+          </span>
+        </button>
+        <button type="button">
+          <span data-dynamic-grid-label-container="true">
+            <span data-dynamic-grid-label="true" data-natural-width="40">Short</span>
+          </span>
+        </button>
+      </DynamicGrid>,
+    )
+
+    const grid = screen.getByRole('group', { name: 'Adaptive uniform links' })
+    await waitFor(() => {
+      expect(grid).toHaveAttribute('data-dynamic-grid-item-sizing', 'content-aware')
+    })
+
+    gridWidth = 800
+    act(() => window.dispatchEvent(new Event('resize')))
+    await waitFor(() => {
+      expect(grid).toHaveAttribute('data-dynamic-grid-item-sizing', 'uniform')
+      expect(Array.from(grid.children).map((cell) => cell.getAttribute('data-dynamic-grid-span'))).toEqual(['1', '1'])
+    })
+  })
+
   it('inserts responsive columns without stretching cards past a requested max width', async () => {
     vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockImplementation(function () {
       if (this.dataset.dynamicGrid === 'true') return 1_408
@@ -160,5 +239,59 @@ describe('DynamicGrid', () => {
     await waitFor(() => expect(grid).toHaveAttribute('data-dynamic-grid-columns', '7'))
     expect(Array.from(grid.children).every((cell) => cell.getAttribute('data-dynamic-grid-span') === '1')).toBe(true)
     expect(grid.style.getPropertyValue('--dynamic-grid-rendered-columns')).toBe('7')
+  })
+
+  it('keeps bounded grids mobile-compatible and stops filling rows after expansion', async () => {
+    let availableWidth = 361
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockImplementation(function () {
+      if (this.dataset.dynamicGrid === 'true') return availableWidth
+      if (this.querySelector?.('[data-dynamic-grid="true"]')) return availableWidth
+      return 0
+    })
+
+    const view = render(
+      <div>
+        <DynamicGrid
+          ariaLabel="Bounded controls"
+          columns={2}
+          lastRow="fill-minimum"
+          layout="bounded"
+          maxCellWidth={320}
+          maxColumns={4}
+        >
+          <button type="button">Only control</button>
+        </DynamicGrid>
+      </div>,
+    )
+
+    const grid = screen.getByRole('group', { name: 'Bounded controls' })
+    await waitFor(() => {
+      expect(grid).toHaveAttribute('data-dynamic-grid-columns', '2')
+      expect(grid.firstElementChild).toHaveAttribute('data-dynamic-grid-span', '2')
+      expect(grid.style.getPropertyValue('--dynamic-grid-max-width')).toBe('')
+    })
+
+    availableWidth = 1_408
+    act(() => window.dispatchEvent(new Event('resize')))
+    view.rerender(
+      <div>
+        <DynamicGrid
+          ariaLabel="Bounded controls"
+          columns={2}
+          lastRow="fill-minimum"
+          layout="bounded"
+          maxCellWidth={320}
+          maxColumns={4}
+        >
+          <button type="button">Only control</button>
+        </DynamicGrid>
+      </div>,
+    )
+
+    await waitFor(() => {
+      expect(grid).toHaveAttribute('data-dynamic-grid-columns', '1')
+      expect(grid.firstElementChild).toHaveAttribute('data-dynamic-grid-span', '1')
+      expect(grid.style.getPropertyValue('--dynamic-grid-max-width')).toBe('320px')
+    })
   })
 })

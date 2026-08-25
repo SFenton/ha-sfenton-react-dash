@@ -28,7 +28,7 @@ export const SECURITY_STATUS_CHIPS: StatusRailChip[] = [
   {
     title: 'Contact Sensors',
     icon: 'mdi:door',
-    entityId: 'binary_sensor.all_contact_sensors',
+    entityId: 'binary_sensor.contact_sensors',
     hash: '#contact-sensors-overview',
     stateKind: 'contact',
     tone: 'contact',

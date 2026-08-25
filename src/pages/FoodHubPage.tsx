@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react'
 import { useHass } from '@hakit/core'
 import { GlassTile } from '../components/core/GlassTile'
+import { ResponsiveSectionGrid, ResponsiveSectionItem } from '../components/core/ResponsiveSectionGrid'
 import { SectionHeader } from '../components/core/SectionHeader'
 import { RecipeDetailModal } from '../components/hass/recipes/RecipeDetailModal'
 import { SuggestedRecipeCarousel, type RecommendationLoadState } from '../components/hass/recipes/SuggestedRecipeCarousel'
@@ -32,55 +33,65 @@ export function FoodHubPage({ onNavigate, preload = false }: FoodHubPageProps) {
   return (
     <>
       <DashboardPageLoadGate
-        contentClassName={styles.stack}
+        contentClassName={styles.content}
         label={copy('loading')}
         preload={preload}
         settled={carouselLoadState !== 'loading'}
       >
-        <section className={`${styles.section} ${styles.leadingSection}`} id="section-suggested-recipes">
-          <SectionHeader title={copy('sections.suggestedRecipes')} />
-          <SuggestedRecipeCarousel onLoadStateChange={handleCarouselLoadState} onOpenRecipe={recipeDetail.openRecipe} preload={preload} />
-        </section>
+        <ResponsiveSectionGrid gap={12}>
+          <ResponsiveSectionItem span="full">
+            <section className={`${styles.section} ${styles.leadingSection}`} id="section-suggested-recipes">
+              <SectionHeader title={copy('sections.suggestedRecipes')} />
+              <SuggestedRecipeCarousel onLoadStateChange={handleCarouselLoadState} onOpenRecipe={recipeDetail.openRecipe} preload={preload} />
+            </section>
+          </ResponsiveSectionItem>
 
-        <section aria-label={copy('sections.allRecipes')} className={styles.fullWidthTile}>
-          <GlassTile
-            backgroundColor="rgba(42, 126, 180, 0.72)"
-            disclosure
-            disclosureKind="navigation"
-            icon="mdi:book-open-page-variant"
-            onClick={navigate(HOME_RECIPES_ROUTE_PATH)}
-            title={copy('sections.allRecipes')}
-          />
-        </section>
-
-        <section className={styles.section} id="section-all-food">
-          <SectionHeader title={copy('sections.allFood')} />
-          <div className={styles.grid}>
-            <GlassTile
-              backgroundColor="rgba(88, 128, 94, 0.72)"
-              icon="mdi:food-variant"
-              onClick={navigate(HOME_ALL_FOOD_ROUTE_PATH)}
-              subtitle={allFoodSubtitle(entities)}
-              title={copy('sections.allFood')}
-            />
-          </div>
-        </section>
-
-        <section className={styles.section} id="section-food-spaces">
-          <SectionHeader title={copy('sections.foodSpaces')} />
-          <div className={styles.grid}>
-            {EVERSHELF_FOOD_SPACES.map((place) => (
+          <ResponsiveSectionItem span="full">
+            <section aria-label={copy('sections.allRecipes')} className={styles.fullWidthTile}>
               <GlassTile
-                backgroundColor={`rgba(${place.color.r}, ${place.color.g}, ${place.color.b}, 0.72)`}
-                icon={place.icon}
-                key={place.location}
-                onClick={navigate(place.routePath)}
-                subtitle={groceryPlaceSubtitle(entities, place.entityId, place.location)}
-                title={place.title}
+                backgroundColor="rgba(42, 126, 180, 0.72)"
+                disclosure
+                disclosureKind="navigation"
+                icon="mdi:book-open-page-variant"
+                onClick={navigate(HOME_RECIPES_ROUTE_PATH)}
+                title={copy('sections.allRecipes')}
               />
-            ))}
-          </div>
-        </section>
+            </section>
+          </ResponsiveSectionItem>
+
+          <ResponsiveSectionItem>
+            <section className={styles.section} id="section-all-food">
+              <SectionHeader title={copy('sections.allFood')} />
+              <div className={styles.singleTileGrid}>
+                <GlassTile
+                  backgroundColor="rgba(88, 128, 94, 0.72)"
+                  icon="mdi:food-variant"
+                  onClick={navigate(HOME_ALL_FOOD_ROUTE_PATH)}
+                  subtitle={allFoodSubtitle(entities)}
+                  title={copy('sections.allFood')}
+                />
+              </div>
+            </section>
+          </ResponsiveSectionItem>
+
+          <ResponsiveSectionItem span="full">
+            <section className={styles.section} id="section-food-spaces">
+              <SectionHeader title={copy('sections.foodSpaces')} />
+              <div className={styles.grid}>
+                {EVERSHELF_FOOD_SPACES.map((place) => (
+                  <GlassTile
+                    backgroundColor={`rgba(${place.color.r}, ${place.color.g}, ${place.color.b}, 0.72)`}
+                    icon={place.icon}
+                    key={place.location}
+                    onClick={navigate(place.routePath)}
+                    subtitle={groceryPlaceSubtitle(entities, place.entityId, place.location)}
+                    title={place.title}
+                  />
+                ))}
+              </div>
+            </section>
+          </ResponsiveSectionItem>
+        </ResponsiveSectionGrid>
       </DashboardPageLoadGate>
       {!preload && <RecipeDetailModal controller={recipeDetail} />}
     </>

@@ -507,7 +507,7 @@
   }
 }
 
-@media (min-width: 760px) {
+@media (min-width: 760px) and (min-height: 560px) {
   .hero {
     aspect-ratio: 16 / 7;
   }

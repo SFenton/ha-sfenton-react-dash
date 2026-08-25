@@ -1182,7 +1182,7 @@ export function WeatherSummary({ deferRefresh = false }: WeatherSummaryProps) {
         <SurfaceAccessory className={styles.disclosure} semantics={{ kind: 'modal' }} />
       </button>
 
-      <ModalSheet open={open} title="Weather" subtitle="Pirate Weather · 7-day forecast" onClose={() => setOpen(false)}>
+      <ModalSheet open={open} size="media" title="Weather" subtitle="Pirate Weather · 7-day forecast" onClose={() => setOpen(false)}>
         <WeatherForecastSheet entity={weather} error={forecastError} forecasts={forecasts} hourlyError={hourlyForecastError} hourlyForecasts={hourlyForecasts} hourlyLoading={hourlyForecastLoading} loading={forecastLoading} />
       </ModalSheet>
     </>

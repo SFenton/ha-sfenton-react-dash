@@ -1,5 +1,6 @@
 import { useCallback, useRef, type ReactNode } from 'react'
 import { AppHeader, type AppHeaderAction } from '../components/shell/AppHeader'
+import type { PageMeasure } from '../constants/pageLayout'
 import { PageScrollerContext, PageScrollToTopContext } from '../hooks/usePageScroller'
 import { useCopy } from '../i18n'
 import styles from './Page.module.css'
@@ -13,6 +14,7 @@ interface PageProps {
   title: string
   headerQuickLinks?: ReactNode
   children: ReactNode
+  measure?: PageMeasure
   onBack?: (fallbackPath?: string) => void
   onNavigate?: (path: string) => void
   onProfile?: () => void
@@ -20,7 +22,7 @@ interface PageProps {
   scrollLocked?: boolean
 }
 
-export function Page({ activePath, backPath, chromeHidden = false, contentHidden = false, contentTransitionState = 'idle', title, headerQuickLinks, children, onBack, onNavigate, onProfile, onSettings, scrollLocked = false }: PageProps) {
+export function Page({ activePath, backPath, chromeHidden = false, contentHidden = false, contentTransitionState = 'idle', title, headerQuickLinks, children, measure = 'dashboard', onBack, onNavigate, onProfile, onSettings, scrollLocked = false }: PageProps) {
   const copy = useCopy('common')
   const scrollerRef = useRef<HTMLDivElement>(null)
   const scrollToTop = useCallback(() => {
@@ -40,15 +42,17 @@ export function Page({ activePath, backPath, chromeHidden = false, contentHidden
   return (
     <PageScrollerContext.Provider value={scrollerRef}>
       <PageScrollToTopContext.Provider value={scrollToTop}>
-        <main className={styles.page} data-chrome-hidden={chromeHidden ? 'true' : undefined} data-content-transition-state={contentTransitionState === 'idle' ? undefined : contentTransitionState}>
+        <main className={styles.page} data-chrome-hidden={chromeHidden ? 'true' : undefined} data-content-transition-state={contentTransitionState === 'idle' ? undefined : contentTransitionState} data-page-measure={measure}>
         {!chromeHidden && (
-          <div className={styles.headerDock}>
-            <AppHeader activePath={activePath} actions={actions} backPath={backPath} onBack={onBack} onNavigate={onNavigate} title={title} />
-            {headerQuickLinks && <div className={styles.headerQuickLinks}>{headerQuickLinks}</div>}
+          <div className={styles.headerDock} data-page-header="true">
+            <div className={styles.headerContent}>
+              <AppHeader activePath={activePath} actions={actions} backPath={backPath} onBack={onBack} onNavigate={onNavigate} title={title} />
+              {headerQuickLinks && <div className={styles.headerQuickLinks}>{headerQuickLinks}</div>}
+            </div>
           </div>
         )}
-        <div className={styles.scroller} data-chrome-hidden={chromeHidden ? 'true' : undefined} data-scroll-lock={scrollLocked ? 'true' : undefined} ref={scrollerRef}>
-          <div aria-hidden={contentHidden ? true : undefined} className={styles.scrollContent} data-chrome-hidden={chromeHidden ? 'true' : undefined} data-scroll-lock={scrollLocked ? 'true' : undefined} inert={contentHidden ? true : undefined}>{children}</div>
+        <div className={styles.scroller} data-chrome-hidden={chromeHidden ? 'true' : undefined} data-page-scroller="true" data-scroll-lock={scrollLocked ? 'true' : undefined} ref={scrollerRef}>
+          <div aria-hidden={contentHidden ? true : undefined} className={styles.scrollContent} data-chrome-hidden={chromeHidden ? 'true' : undefined} data-page-content="true" data-scroll-lock={scrollLocked ? 'true' : undefined} inert={contentHidden ? true : undefined}>{children}</div>
         </div>
         </main>
       </PageScrollToTopContext.Provider>

@@ -1,6 +1,5 @@
-.stack {
-  display: grid;
-  gap: 12px;
+.content {
+  min-width: 0;
 }
 
 .section {
@@ -21,4 +20,36 @@
 
 .fullWidthTile {
   display: grid;
+}
+
+.singleTileGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+@container page-content (min-width: 560px) {
+  .singleTileGrid {
+    width: min(100%, 520px);
+    grid-template-columns: minmax(0, 1fr);
+    margin-inline: auto;
+  }
+}
+
+@container page-content (min-width: 680px) {
+  .grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@container page-content (min-width: 910px) {
+  .grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+@container page-content (min-width: 1140px) {
+  .grid {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
 }

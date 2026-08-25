@@ -24,6 +24,7 @@ interface TodoListPanelProps {
   completionScript?: string
   entityId: string
   hideCompleted?: boolean
+  layout?: 'list' | 'responsive-grid'
   onEditTask?: (target: DonetickTaskEditTarget) => void
   onVisibleItemsChange?: (count: number) => void
   optimisticStatuses?: TodoOptimisticStatuses
@@ -123,7 +124,7 @@ function applyPendingTodoStatuses(items: TodoItem[], pendingStatuses: TodoOptimi
   })
 }
 
-export function TodoListPanel({ completionScript, entityId, hideCompleted = true, onEditTask, onVisibleItemsChange, optimisticStatuses, reloadVersion = 0, rowVariant, title }: TodoListPanelProps) {
+export function TodoListPanel({ completionScript, entityId, hideCompleted = true, layout = 'list', onEditTask, onVisibleItemsChange, optimisticStatuses, reloadVersion = 0, rowVariant, title }: TodoListPanelProps) {
   const copy = useCopy(TODO_LIST_I18N.namespace)
   const entity = useEntity(asEntityName(entityId), { returnNullIfNotFound: true })
   const connection = useHass((state) => state.connection) as unknown as HassConnection | undefined
@@ -214,7 +215,7 @@ export function TodoListPanel({ completionScript, entityId, hideCompleted = true
   }
 
   return (
-    <article aria-label={`${title} todo list`} className={styles.panel} data-row-variant={rowVariant}>
+    <article aria-label={`${title} todo list`} className={styles.panel} data-layout={layout} data-row-variant={rowVariant}>
       {error && <span className={styles.error}>{error}</span>}
       {visibleItems.length > 0 && (
         <ul className={styles.items}>

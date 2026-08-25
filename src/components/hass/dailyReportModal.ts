@@ -16,6 +16,7 @@ import { useDashboardUrl } from '../../hooks/useDashboardUrl'
 export const DAILY_REPORT_EXPIRED_FOOD_SCOPE = 'daily-report-expired-food'
 
 export const DAILY_REPORT_MODAL_STYLE: ModalSheetStyle = {
+  '--modal-desktop-height': 'min(760px, calc(var(--dashboard-visible-height, var(--dashboard-viewport-height, 100dvh)) - 64px))',
   '--modal-desktop-max-width': '620px',
   '--modal-desktop-width': '620px',
 }

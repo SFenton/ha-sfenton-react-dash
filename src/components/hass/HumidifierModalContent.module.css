@@ -8,10 +8,7 @@
   min-height: 0;
   gap: 18px;
   padding-top: 2px;
-  overflow-x: hidden;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  scrollbar-width: none;
+  overflow: visible;
 }
 
 .modalBody::-webkit-scrollbar {
@@ -100,6 +97,7 @@
 .modalPanel {
   min-height: 220px;
   gap: 18px;
+  overflow-anchor: none;
   opacity: 1;
   transform: translate3d(0, 0, 0);
   transition:
@@ -177,55 +175,13 @@
   --native-picker-min-height: 58px;
 }
 
-.modalNav {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  align-items: center;
-  gap: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 999px;
-  padding: 7px;
-  background: rgba(20, 20, 20, 0.72);
-  box-shadow: 0 16px 34px rgba(0, 0, 0, 0.34), inset 0 1px 0 rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-}
-
-.modalNavButton {
-  display: grid;
-  width: 100%;
-  min-height: 48px;
-  place-items: center;
-  border: 0;
-  border-radius: 999px;
-  color: rgba(255, 255, 255, 0.68);
-  background: transparent;
-  font: inherit;
-  cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
-}
-
-.modalNavButtonActive {
-  color: #111;
-  background: rgba(255, 255, 255, 0.92);
-}
-
-.modalNavButton:focus {
-  outline: none;
-}
-
-.modalNavButton:focus-visible {
-  outline: 2px solid rgba(111, 225, 185, 0.95);
-  outline-offset: -4px;
-}
-
 @media (max-width: 420px) {
   .activityDialGrid[data-count='2'] {
     --activity-dial-cols: 1;
   }
 }
 
-@media (min-width: 760px) {
+@media (min-width: 760px) and (min-height: 560px) {
   .modalSheetPage {
     height: min(720px, calc(100dvh - 150px));
     max-height: 100%;
@@ -233,13 +189,15 @@
 
   .modalBody {
     grid-template-columns: minmax(0, 1.05fr) minmax(340px, 0.95fr);
+    height: 100%;
     overflow: hidden;
   }
 
   .heroColumn,
   .modalPanel {
+    height: 100%;
     min-height: 0;
-    max-height: min(580px, calc(100dvh - 220px));
+    max-height: 100%;
     overflow-x: hidden;
     overflow-y: auto;
     overscroll-behavior: contain;

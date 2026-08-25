@@ -1,6 +1,7 @@
 .detailPage {
   display: grid;
-  padding-bottom: 16px;
+  min-height: var(--modal-body-content-height, 0);
+  align-content: center;
 }
 
 .stateGrid [data-schedule-list-row],

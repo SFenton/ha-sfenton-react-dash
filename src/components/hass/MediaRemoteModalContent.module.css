@@ -1,31 +1,37 @@
+.remoteContainer {
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  container-name: media-remote;
+  container-type: inline-size;
+}
+
 .remoteModal {
   display: grid;
-  height: 100%;
+  height: auto;
   min-height: 0;
   color: white;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .remoteModal[data-inline-nav='true'] {
-  grid-template-rows: minmax(0, 1fr) auto;
+  grid-template-rows: auto auto;
   gap: 10px;
 }
 
 .remoteModal[data-inline-nav='false'] {
-  grid-template-rows: minmax(0, 1fr);
+  grid-template-rows: auto;
 }
 
 .modalBody {
   display: grid;
-  grid-template-rows: minmax(0, 1fr);
-  height: 100%;
+  grid-template-rows: auto;
+  height: auto;
   min-height: 0;
   gap: 14px;
   padding-top: 2px;
-  overflow-x: hidden;
-  overflow-y: hidden;
-  overscroll-behavior: contain;
-  scrollbar-width: none;
+  overflow: visible;
 }
 
 .modalBody::-webkit-scrollbar {
@@ -38,11 +44,11 @@
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   min-width: 0;
-  height: 100%;
+  height: auto;
   min-height: 0;
   align-content: stretch;
   gap: 12px;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .section {
@@ -68,10 +74,7 @@
   min-height: 0;
   align-content: start;
   gap: 12px;
-  overflow-x: hidden;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  scrollbar-width: none;
+  overflow: visible;
 }
 
 .tabContent {
@@ -79,6 +82,7 @@
   min-height: 0;
   align-content: start;
   gap: 12px;
+  overflow-anchor: none;
   opacity: 1;
   transform: translate3d(0, 0, 0);
   transition:
@@ -393,53 +397,11 @@
 }
 
 .deviceGrid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-}
-
-.remoteModalNav {
-  display: grid;
-  grid-template-columns: repeat(var(--remote-nav-tab-count, 2), minmax(0, 1fr));
-  align-items: center;
-  gap: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 999px;
-  padding: 7px;
-  background: rgba(20, 20, 20, 0.72);
-  box-shadow: 0 16px 34px rgba(0, 0, 0, 0.34), inset 0 1px 0 rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-}
-
-.remoteModalNavButton {
-  display: grid;
-  width: 100%;
-  min-height: 48px;
-  place-items: center;
-  border: 0;
-  border-radius: 999px;
-  color: rgba(255, 255, 255, 0.68);
-  background: transparent;
-  font: inherit;
-  cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
-  transition: transform var(--duration-fast) ease;
-}
-
-.remoteModalNavButtonActive {
-  color: #111;
-  background: rgba(255, 255, 255, 0.92);
-}
-
-.remoteModalNavButton:focus,
-.remoteModalNavButton:focus-visible {
-  outline: none;
+  --dynamic-grid-columns: 2;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .tabContent,
-  .remoteModalNavButton {
+  .tabContent {
     transition: none;
   }
 }
@@ -451,99 +413,164 @@
   }
 }
 
-@media (min-width: 760px) {
-  .modalBody {
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: minmax(0, 1fr);
-    align-items: start;
-    height: 100%;
-    min-height: 0;
-    gap: 16px;
-    overflow: hidden;
+@media (min-height: 560px) {
+  @container media-remote (min-width: 600px) and (max-width: 839px) {
+    .remoteModal,
+    .modalBody,
+    .rightPane {
+      height: 100%;
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    .modalBody {
+      grid-template-rows: minmax(0, 1fr);
+    }
+
+    .rightPane {
+      grid-template-rows: auto minmax(0, 1fr);
+    }
+
+    .tabPanel {
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr);
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    .tabContent {
+      min-height: 0;
+      max-height: 100%;
+      overflow-x: hidden;
+      overflow-y: auto;
+      overscroll-behavior: contain;
+      overflow-anchor: none;
+      scrollbar-width: none;
+    }
+
+    .tabContent::-webkit-scrollbar {
+      display: none;
+      width: 0;
+      height: 0;
+    }
   }
 
-  .section[data-desktop-muted-only='true'] {
-    display: grid;
+  @container media-remote (min-width: 600px) {
+    .appGrid {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      justify-content: stretch;
+    }
+
+    .appButton {
+      width: 100%;
+    }
   }
 
-  .rightPane {
-    min-height: 0;
-    max-height: 100%;
-    align-self: start;
-    grid-template-areas:
-      'remote power'
-      'remote tabs';
-    grid-template-columns: minmax(286px, 0.95fr) minmax(300px, 0.8fr);
-    grid-template-rows: auto minmax(0, 1fr);
-    align-content: stretch;
-    align-items: start;
-    overflow-x: hidden;
-    overflow-y: hidden;
-  }
+  @container media-remote (min-width: 840px) {
+    .remoteModal {
+      height: 100%;
+      overflow: hidden;
+    }
 
-  .remoteControlSection {
-    grid-area: remote;
-    height: 100%;
-    align-self: stretch;
-    align-content: center;
-    padding: 10px 8px;
-  }
+    .modalBody {
+      grid-template-columns: minmax(0, 1fr);
+      grid-template-rows: minmax(0, 1fr);
+      align-items: start;
+      height: 100%;
+      min-height: 0;
+      gap: 16px;
+      overflow: hidden;
+    }
 
-  .remoteGrid {
-    width: min(100%, 390px);
-    gap: 10px;
-  }
+    .section[data-desktop-muted-only='true'] {
+      display: grid;
+    }
 
-  .powerSection {
-    grid-area: power;
-    justify-items: end;
-  }
+    .rightPane {
+      height: 100%;
+      min-height: 0;
+      max-height: 100%;
+      align-self: start;
+      grid-template-areas:
+        'remote power'
+        'remote tabs';
+      grid-template-columns: 406px minmax(0, 1fr);
+      grid-template-rows: auto minmax(0, 1fr);
+      align-content: stretch;
+      align-items: start;
+      overflow-x: hidden;
+      overflow-y: hidden;
+    }
 
-  .remoteButton[data-size='power'] {
-    display: inline-grid;
-    width: max-content;
-    min-width: 148px;
-    min-height: 64px;
-    height: auto;
-    grid-template-columns: 48px max-content;
-    align-items: center;
-    justify-items: center;
-    gap: 10px;
-    border-radius: 999px;
-    padding: 6px 16px 6px 8px;
-    text-align: left;
-  }
+    .remoteControlSection {
+      grid-area: remote;
+      height: 100%;
+      align-self: stretch;
+      align-content: center;
+      padding: 10px 8px;
+    }
 
-  .powerButtonLabel {
-    display: block;
-    justify-self: start;
-    color: rgba(255, 255, 255, 0.9);
-    font-size: 0.92rem;
-    font-weight: 850;
-    line-height: 1;
-  }
+    .remoteGrid {
+      width: min(100%, 390px);
+      gap: 10px;
+    }
 
-  .buttonRow[data-size='round'] {
-    padding-block: 8px;
-  }
+    .powerSection {
+      grid-area: power;
+      justify-items: end;
+    }
 
-  .tabPanel {
-    display: contents;
-  }
+    .remoteButton[data-size='power'] {
+      display: inline-grid;
+      width: max-content;
+      min-width: 148px;
+      min-height: 64px;
+      height: auto;
+      grid-template-columns: 48px max-content;
+      align-items: center;
+      justify-items: center;
+      gap: 10px;
+      border-radius: 999px;
+      padding: 6px 16px 6px 8px;
+      text-align: left;
+    }
 
-  .tabContent {
-    grid-area: tabs;
-    width: 100%;
-    max-height: 100%;
-    overflow-x: hidden;
-    overflow-y: auto;
-    overscroll-behavior: contain;
-    scrollbar-width: none;
-  }
+    .powerButtonLabel {
+      display: block;
+      justify-self: start;
+      color: rgba(255, 255, 255, 0.9);
+      font-size: 0.92rem;
+      font-weight: 850;
+      line-height: 1;
+    }
 
-  .tabContent::-webkit-scrollbar {
-    display: none;
-    width: 0;
-    height: 0;
+    .buttonRow[data-size='round'] {
+      padding-block: 8px;
+    }
+
+    .tabPanel {
+      display: contents;
+    }
+
+    .tabContent {
+      grid-area: tabs;
+      width: 100%;
+      max-height: 100%;
+      overflow-x: hidden;
+      overflow-y: auto;
+      overscroll-behavior: contain;
+      overflow-anchor: none;
+      scrollbar-width: none;
+    }
+
+    .tabContent::-webkit-scrollbar {
+      display: none;
+      width: 0;
+      height: 0;
+    }
+
+    .deviceGrid {
+      --dynamic-grid-columns: 3;
+    }
   }
 }

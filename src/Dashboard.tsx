@@ -12,10 +12,12 @@ import { useRecipeControls, type RecipeControls } from './components/hass/recipe
 import { SmoothRouteOutlet } from './components/shell/SmoothRouteOutlet'
 import { hasDashboardFloatingAction } from './components/shell/dashboardFloatingAction'
 import { HOME_ALL_FOOD_ROUTE_PATH, HOME_CABINET_ROUTE_PATH, HOME_FREEZER_ROUTE_PATH, HOME_FRIDGE_ROUTE_PATH, HOME_PANTRY_ROUTE_PATH, HOME_RECIPES_ROUTE_PATH, HOME_SPICE_RACK_ROUTE_PATH, PRIMARY_NAV_ROUTES, routeUrl } from './constants/routes'
+import { pageMeasureForPath } from './constants/pageLayout'
 import { dashboardHref } from './hooks/dashboardLocation'
 import { DASHBOARD_PAGE_LOAD_TIMEOUT_MS } from './constants/loading'
 import { useDashboardRoute } from './hooks/useDashboardRoute'
 import { useSmoothDisplayedRoute } from './hooks/useSmoothDisplayedRoute'
+import { ModalAcceptanceHarness } from './test/ModalAcceptanceHarness'
 import styles from './Dashboard.module.css'
 
 const INITIAL_PRELOAD_MIN_MS = 1000
@@ -59,7 +61,6 @@ function Dashboard() {
   }))
   const { displayedPath, transitionSourcePath, transitionState } = useSmoothDisplayedRoute(path)
   const leadingChromeTransition = routeUsesMenuChrome(transitionSourcePath) === routeUsesMenuChrome(path) ? 'stable' : 'changing'
-  const [preloadReady, setPreloadReady] = useState(initialPreloadCompleted)
   const [preloadGatePhase, setPreloadGatePhase] = useState<DashboardPageLoadingPhase | 'content'>(() => (initialPreloadCompleted ? 'content' : 'loading'))
   const [initialDataGateTimedOut, setInitialDataGateTimedOut] = useState(false)
   const [initialRecipesResolved, setInitialRecipesResolved] = useState(false)
@@ -87,10 +88,9 @@ function Dashboard() {
   ) || initialDataGateTimedOut
   const pageLoadingPhase = usesInitialDataAppGate ? undefined : routeLoadingPhase
   const pageInitialContentTransitionState = initialContentTransitionState
+  const modalAcceptanceHarness = import.meta.env.MODE === 'test'
+    && new URLSearchParams(window.location.search).has('__modalAcceptance')
 
-  const handlePreloadComplete = useCallback(() => {
-    setPreloadReady(true)
-  }, [])
   const handleRecipesInitialResolved = useCallback(() => {
     setInitialRecipesResolved(true)
   }, [])
@@ -124,13 +124,13 @@ function Dashboard() {
   }, [clearInitialContentEnterTimers])
 
   useEffect(() => {
-    if (!preloadReady || preloadGatePhase !== 'loading' || !initialDataGateReady) return undefined
+    if (preloadGatePhase !== 'loading' || !initialDataGateReady) return undefined
     const preloadStartedAt = preloadStartedAtRef.current ?? Date.now()
     preloadStartedAtRef.current = preloadStartedAt
     const remainingLoadingMs = Math.max(0, INITIAL_PRELOAD_MIN_MS - (Date.now() - preloadStartedAt))
     const timer = window.setTimeout(() => setPreloadGatePhase('exiting'), remainingLoadingMs)
     return () => window.clearTimeout(timer)
-  }, [initialDataGateReady, preloadGatePhase, preloadReady])
+  }, [initialDataGateReady, preloadGatePhase])
 
   useEffect(() => {
     if (!waitsForInitialData || preloadGatePhase !== 'loading') return undefined
@@ -158,13 +158,15 @@ function Dashboard() {
     navigate(routeUrl(nextPath, dashboardHref()))
   }
 
+  if (modalAcceptanceHarness) return <ModalAcceptanceHarness />
+
   return (
-    <AppShell bottomNav={<BottomNav activePath={path} onNavigate={navigateToPath} />} chromeHidden={Boolean(routeLoadingPhase)} floatingAction={floatingActionForPath(displayedPath, inventoryControls, recipeControls)} onNavigate={navigateToPath}>
+    <AppShell activePath={path} bottomNav={<BottomNav activePath={path} onNavigate={navigateToPath} />} chromeHidden={Boolean(routeLoadingPhase)} floatingAction={floatingActionForPath(displayedPath, inventoryControls, recipeControls)} onNavigate={navigateToPath} pageMeasure={displayedPath === 'overview' ? 'dashboard' : pageMeasureForPath(displayedPath)}>
       <SmoothRouteOutlet leadingChromeTransition={leadingChromeTransition} routePath={displayedPath} transitionState={transitionState}>
         {pageForPath(displayedPath, path, navigateToPath, navigateBack, transitionState, inventoryControls, recipeControls, usesInitialDataAppGate, handleRecipesInitialResolved, waitsForInitialRecipes, pageLoadingPhase, pageInitialContentTransitionState)}
       </SmoothRouteOutlet>
-      {usesInitialDataAppGate && routeLoadingPhase && <DashboardPageLoading className={styles.initialAppLoader} phase={routeLoadingPhase} />}
-      {!initialPreloadCompleted && <DashboardPreloadCache active onComplete={handlePreloadComplete} />}
+      {usesInitialDataAppGate && routeLoadingPhase && <DashboardPageLoading className={styles.initialAppLoader} placement="viewport" phase={routeLoadingPhase} />}
+      {!initialPreloadCompleted && <DashboardPreloadCache active />}
     </AppShell>
   )
 }

@@ -12,3 +12,10 @@
 .description p {
   margin: 0;
 }
+
+@container page-content (min-width: 560px) {
+  .description {
+    max-width: 68ch;
+    font-size: 0.88rem;
+  }
+}

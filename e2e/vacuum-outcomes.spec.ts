@@ -57,10 +57,11 @@ test('typed vacuum outcomes stay compact and use one same-sheet detail at 393x85
   const dialog = await openVacuum(page)
   const summary = dialog.getByRole('button', { name: 'Open Main Floor Cleaning Outcomes for Aug 19, 2026' })
   const summarySection = dialog.getByRole('heading', { name: 'While You Were Away' }).locator('xpath=ancestor::section[1]')
-  const nav = dialog.getByRole('navigation', { name: 'Main Floor modal sections' })
+  const nav = dialog.getByRole('tablist', { name: 'Main Floor modal sections' })
 
   await expect(summary).toBeVisible()
   await expect(nav).toBeVisible()
+  await expect(dialog).toHaveAttribute('data-scroll-mode', 'panes')
   const summaryHeight = Math.round((await summary.boundingBox())?.height ?? 0)
   const summarySectionHeight = Math.round((await summarySection.boundingBox())?.height ?? 0)
   expect(summaryHeight).toBe(56)
@@ -77,6 +78,7 @@ test('typed vacuum outcomes stay compact and use one same-sheet detail at 393x85
   await expect(page.getByRole('dialog')).toHaveCount(1)
   await expect(dialog.getByRole('heading', { name: 'While-Away Vacuum Outcomes · Aug 19, 2026' })).toBeVisible()
   await expect(nav).toHaveCount(0)
+  await expect(dialog).toHaveAttribute('data-scroll-mode', 'body')
   await expect(dialog.locator('[data-vacuum-outcome-detail="true"]')).toBeVisible()
   expect(await dialog.locator('[data-group]').evaluateAll((groups) => groups.map((group) => group.getAttribute('data-group')))).toEqual([
     'needsAttention',
@@ -114,7 +116,8 @@ test('typed vacuum outcomes stay compact and use one same-sheet detail at 393x85
 
   await dialog.getByRole('button', { name: 'Back to Vacuum Controls' }).click()
   await expect(dialog.getByRole('button', { name: 'Open Main Floor Cleaning Outcomes for Aug 19, 2026' })).toBeFocused()
-  await expect(dialog.getByRole('navigation', { name: 'Main Floor modal sections' })).toBeVisible()
+  await expect(dialog).toHaveAttribute('data-scroll-mode', 'panes')
+  await expect(dialog.getByRole('tablist', { name: 'Main Floor modal sections' })).toBeVisible()
   expect(await vacuumActionCalls(page)).toEqual([])
 })
 
@@ -187,24 +190,32 @@ for (const viewport of [
     const dialog = await openVacuum(page)
     const body = dialog.locator('[data-modal-sheet-body="true"]')
     const summary = dialog.getByRole('button', { name: 'Open Main Floor Cleaning Outcomes for Aug 19, 2026' })
+    const mapPane = dialog.getByRole('group', { name: 'Main Floor map and status' })
     const panel = dialog.getByRole('group', { name: 'Main Floor controls, zones, auto-clean, actions, info' })
 
     await expect(summary).toBeVisible()
-    const geometry = await body.evaluate((element) => ({
+    const bodyGeometry = await body.evaluate((element) => ({
       clientHeight: element.clientHeight,
       overflowY: getComputedStyle(element).overflowY,
       scrollHeight: element.scrollHeight,
     }))
-    expect(geometry.overflowY).toBe('auto')
-    expect(await panel.evaluate((element) => getComputedStyle(element).overflowY)).toBe('visible')
+    const mapPaneGeometry = await mapPane.evaluate((element) => ({
+      clientHeight: element.clientHeight,
+      overflowY: getComputedStyle(element).overflowY,
+      scrollHeight: element.scrollHeight,
+    }))
+    expect(bodyGeometry.overflowY).toBe('hidden')
+    expect(mapPaneGeometry.overflowY).toBe('auto')
+    expect(await panel.evaluate((element) => getComputedStyle(element).overflowY)).toBe('auto')
     await summary.scrollIntoViewIfNeeded()
     await expect(summary).toBeInViewport()
     expect(await dialog.locator('[class*="modalBody"]').evaluate((element) => getComputedStyle(element).gridTemplateColumns.split(' ').length)).toBe(2)
     expect(await horizontalOverflow(dialog)).toBeLessThanOrEqual(0)
     expect(await vacuumActionCalls(page)).toEqual([])
     await saveEvidence(page, dialog, `vacuum-outcomes-desktop-${viewport.name}`, {
-      ...geometry,
+      body: bodyGeometry,
       dialogHorizontalOverflow: await horizontalOverflow(dialog),
+      mapPane: mapPaneGeometry,
       panelOverflowY: await panel.evaluate((element) => getComputedStyle(element).overflowY),
       viewport,
     })

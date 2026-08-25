@@ -3,10 +3,8 @@ import { act } from 'react'
 import { vi } from 'vitest'
 import { materialIconPath } from '../components/core/iconPaths'
 import { INVENTORY_SEARCH_DEBOUNCE_MS } from '../components/hass/EverShelfInventoryControls'
-import { MEDIA_REMOTE_MODAL_STYLE } from '../components/hass/mediaRemoteModalStyle'
 import { valueToThermostatPoint } from '../components/hass/thermostatDialGeometry'
 import { VacuumRoomSourceModalContent } from '../components/hass/VacuumCard'
-import { VACUUM_MODAL_STYLE, VACUUM_OUTCOME_MODAL_STYLE } from '../components/hass/vacuumModalStyle'
 import { DashboardViewPage } from './DashboardViewPage'
 import { CONTACT_GROUPS } from '../constants/atAGlance'
 import { VACUUMS } from '../constants/portedDashboard'
@@ -47,11 +45,6 @@ vi.mock('@zxing/browser', () => ({
   }),
 }))
 
-const ROOM_SOURCE_SECURITY_SIZED_MODAL_STYLE = {
-  '--modal-desktop-height': 'auto',
-  '--modal-desktop-max-width': '500px',
-  '--modal-desktop-width': '500px',
-}
 const MODAL_TAB_TEST_SETTLE_MS = 340
 
 type RoleScope = Pick<typeof screen, 'getByRole'>
@@ -63,7 +56,7 @@ async function settleModalTabTransition() {
 }
 
 async function clickModalTab(scope: RoleScope, name: string) {
-  const button = scope.getByRole('button', { name })
+  const button = scope.getByRole('tab', { name })
   fireEvent.pointerDown(button)
   fireEvent.click(button)
   await settleModalTabTransition()
@@ -312,7 +305,6 @@ describe('DashboardViewPage', () => {
     delete mockEntities['number.master_bedroom_sleepypod_eight_pod_right_target_level']
     delete mockEntities['sensor.master_bedroom_sleepypod_eight_pod_schedules']
     mockEntities['alarm_control_panel.aqara_hub_m3_0056_security_system_2'].state = 'armed_home'
-    mockEntities['binary_sensor.all_contact_sensors'].state = 'off'
     mockEntities['binary_sensor.contact_sensors'].state = 'off'
     CONTACT_GROUPS.flatMap((group) => group.items).forEach((item) => {
       mockEntities[item.entityId].state = 'off'
@@ -423,16 +415,23 @@ describe('DashboardViewPage', () => {
 
         if (section.layout === 'app-launch') {
           expect(grid).toHaveAttribute('data-dynamic-grid-max-cell-width', '200')
-        } else {
+          expect(grid).toHaveAttribute('data-dynamic-grid-last-row', 'center')
+        } else if (section.layout === 'lead-row') {
           expect(grid).not.toHaveAttribute('data-dynamic-grid-max-cell-width')
+          expect(grid).toHaveAttribute('data-dynamic-grid-layout', 'fill')
+        } else {
+          expect(grid).toHaveAttribute('data-dynamic-grid-max-cell-width', '280')
+          expect(grid).toHaveAttribute('data-dynamic-grid-last-row', 'fill-minimum')
+          expect(grid).toHaveAttribute('data-dynamic-grid-layout', 'bounded')
         }
+        if (section.layout === 'app-launch') expect(grid).toHaveAttribute('data-dynamic-grid-layout', 'bounded')
 
         if (section.layout === 'lead-row') {
           expect(grid.querySelectorAll('[data-dynamic-grid-cell="true"]')).toHaveLength(1)
           expect(grid.querySelector('[data-dynamic-grid-cell="true"]')).toHaveAttribute('data-dynamic-grid-span', '2')
           const followUpGrid = screen.getByRole('group', { name: `${room.title} ${section.title} Controls` })
           expect(followUpGrid).toHaveAttribute('data-dynamic-grid', 'true')
-          expect(followUpGrid).not.toHaveAttribute('data-dynamic-grid-max-cell-width')
+          expect(followUpGrid).toHaveAttribute('data-dynamic-grid-max-cell-width', '280')
           expect(followUpGrid.querySelectorAll('[data-dynamic-grid-cell="true"]')).toHaveLength(section.cards.length - 1)
         }
       }
@@ -1258,7 +1257,7 @@ describe('DashboardViewPage', () => {
     const renderLivingRoom = () => render(<DashboardViewPage activePath="living-room" onNavigate={() => undefined} path="living-room" />)
 
     let view = renderLivingRoom()
-    fireEvent.click(screen.getAllByRole('button', { name: /Climate/i })[0])
+    fireEvent.click(document.querySelector('[data-status-chip="Climate"] button')!)
     let dialog = await screen.findByRole('dialog')
     expect(dialog).toBeInTheDocument()
     expect(within(dialog).getAllByRole('heading', { name: 'Living Room Climate' })).toHaveLength(1)
@@ -1267,7 +1266,7 @@ describe('DashboardViewPage', () => {
     window.history.replaceState(null, '', window.location.pathname)
 
     view = renderLivingRoom()
-    fireEvent.click(screen.getAllByRole('button', { name: /Occupancy/i })[0])
+    fireEvent.click(document.querySelector('[data-status-chip="Occupancy"] button')!)
     dialog = await screen.findByRole('dialog')
     expect(dialog).toBeInTheDocument()
     expect(within(dialog).getAllByRole('heading', { name: 'Living Room Occupancy' })).toHaveLength(1)
@@ -1276,7 +1275,7 @@ describe('DashboardViewPage', () => {
     window.history.replaceState(null, '', window.location.pathname)
 
     renderLivingRoom()
-    fireEvent.click(screen.getAllByRole('button', { name: /Air Quality/i })[0])
+    fireEvent.click(document.querySelector('[data-status-chip="Air Quality"] button')!)
     dialog = await screen.findByRole('dialog')
     expect(dialog).toBeInTheDocument()
     expect(within(dialog).getByRole('heading', { name: 'Living Room Air Quality' })).toBeInTheDocument()
@@ -1310,7 +1309,7 @@ describe('DashboardViewPage', () => {
 
     fireEvent.click(ventCard)
     let dialog = await screen.findByRole('dialog')
-    expect(dialog).toHaveStyle(ROOM_SOURCE_SECURITY_SIZED_MODAL_STYLE)
+    expect(dialog).toHaveAttribute('data-size', 'compact')
     expect(within(dialog).getByRole('heading', { name: 'Guest Room: Vent' })).toBeInTheDocument()
     expect(within(dialog).getByRole('article', { name: /^Vent Open$/i })).toBeInTheDocument()
     view.unmount()
@@ -1319,7 +1318,7 @@ describe('DashboardViewPage', () => {
     view = renderGuestRoom()
     fireEvent.click(screen.getByRole('button', { name: /^Lights On$/i }))
     dialog = await screen.findByRole('dialog')
-    expect(dialog).toHaveStyle(ROOM_SOURCE_SECURITY_SIZED_MODAL_STYLE)
+    expect(dialog).toHaveAttribute('data-size', 'compact')
     expect(screen.getByRole('heading', { name: 'Guest Room Lights' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /TV Light On/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Bed Light Off/i })).toBeInTheDocument()
@@ -1329,7 +1328,7 @@ describe('DashboardViewPage', () => {
     view = renderGuestRoom()
     fireEvent.click(screen.getByRole('button', { name: /^Climate 69°F - 71°F$/i }))
     dialog = await screen.findByRole('dialog')
-    expect(dialog).toHaveStyle(ROOM_SOURCE_SECURITY_SIZED_MODAL_STYLE)
+    expect(dialog).toHaveAttribute('data-size', 'compact')
     expect(screen.getByRole('heading', { name: 'Guest Room Climate' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Temperature Sensors' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Vent' })).toBeInTheDocument()
@@ -1341,7 +1340,7 @@ describe('DashboardViewPage', () => {
     view = renderGuestRoom()
     fireEvent.click(screen.getByRole('button', { name: /^Occupancy Detected$/i }))
     dialog = await screen.findByRole('dialog')
-    expect(dialog).toHaveStyle(ROOM_SOURCE_SECURITY_SIZED_MODAL_STYLE)
+    expect(dialog).toHaveAttribute('data-size', 'compact')
     expect(within(dialog).getByRole('heading', { name: 'Guest Room Occupancy' })).toBeInTheDocument()
     expect(within(dialog).getByText('Detected')).toBeInTheDocument()
     view.unmount()
@@ -1350,7 +1349,7 @@ describe('DashboardViewPage', () => {
     view = renderGuestRoom()
     fireEvent.click(screen.getByRole('button', { name: /^Window Closed$/i }))
     dialog = await screen.findByRole('dialog')
-    expect(dialog).toHaveStyle(ROOM_SOURCE_SECURITY_SIZED_MODAL_STYLE)
+    expect(dialog).toHaveAttribute('data-size', 'compact')
     expect(within(dialog).getByRole('heading', { name: 'Guest Room Window' })).toBeInTheDocument()
     expect(within(dialog).queryByText('All Closed')).not.toBeInTheDocument()
     expect(within(dialog).queryByText('Guest Room Window: All Closed')).not.toBeInTheDocument()
@@ -1363,7 +1362,7 @@ describe('DashboardViewPage', () => {
     renderGuestRoom()
     fireEvent.click(screen.getByRole('button', { name: /^Air Quality 1 • 2 μg\/m³$/i }))
     dialog = await screen.findByRole('dialog')
-    expect(dialog).toHaveStyle(ROOM_SOURCE_SECURITY_SIZED_MODAL_STYLE)
+    expect(dialog).toHaveAttribute('data-size', 'compact')
     expect(within(dialog).getByRole('heading', { name: 'Guest Room Air Quality' })).toBeInTheDocument()
     expect(within(dialog).getByText('1 • 2 μg/m³')).toBeInTheDocument()
     expect(screen.getByText('Fan Modes')).toBeInTheDocument()
@@ -1431,6 +1430,9 @@ describe('DashboardViewPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Open Presence-Based Overrides' }))
     const presenceDialog = await screen.findByRole('dialog', { name: 'Presence-Based Overrides' })
     expect(presenceDialog).toHaveAttribute('data-surface', 'hass-popup')
+    expect(presenceDialog).toHaveStyle({
+      '--modal-desktop-height': 'min(860px, calc(var(--dashboard-visible-height, var(--dashboard-viewport-height, 100dvh)) - 64px))',
+    })
     expect(screen.getByRole('heading', { name: 'Presence-Based Overrides' })).toBeInTheDocument()
     const livingRoomPresence = within(presenceDialog).getByRole('button', { name: 'Living Room Enabled' })
     expect(livingRoomPresence).toHaveStyle({ '--card-rgb': '67 160 71' })
@@ -1441,6 +1443,9 @@ describe('DashboardViewPage', () => {
 
     const detailPage = await screen.findByRole('dialog', { name: 'Living Room Presence Lighting' })
     expect(detailPage).toBe(presenceDialog)
+    expect(detailPage).toHaveStyle({
+      '--modal-desktop-height': 'min(860px, calc(var(--dashboard-visible-height, var(--dashboard-viewport-height, 100dvh)) - 64px))',
+    })
     expect(screen.getAllByRole('dialog')).toHaveLength(1)
     expect(within(detailPage).getAllByRole('button', { name: /Set Living Room presence lighting to/i })).toHaveLength(4)
     fireEvent.click(within(detailPage).getByRole('button', { name: 'Set Living Room presence lighting to Paused' }))
@@ -1474,7 +1479,7 @@ describe('DashboardViewPage', () => {
     const relaySection = screen.getByRole('heading', { name: 'Relay Control Mode' }).closest('section')
     const warning = within(relaySection as HTMLElement).getByRole('alert')
     expect(warning).toHaveTextContent('Guest Room guest mode is active. Turning off Relay Control Mode keeps the Guest Room on direct wall control and Guest Bathroom presence lighting off. Turn off Guest Room in Guest Controls to restore normal behavior.')
-    expect(relaySection?.lastElementChild).toBe(warning)
+    expect(warning.parentElement).toHaveAttribute('data-settings-section-controls', 'true')
   })
 
   it.each([
@@ -1641,7 +1646,7 @@ describe('DashboardViewPage', () => {
   it('keeps the Settings bottom nav item active on settings subpages', () => {
     render(<DashboardViewPage activePath="special-device-modes" onNavigate={() => undefined} path="special-device-modes" />)
 
-    const bottomNav = screen.getByRole('navigation', { name: 'Dashboard sections' })
+    const bottomNav = document.querySelector('[data-adaptive-navigation="bottom"]')!
     expect(within(bottomNav).getByRole('button', { name: 'Settings' })).toHaveAttribute('aria-current', 'page')
   })
 
@@ -2575,7 +2580,7 @@ describe('DashboardViewPage', () => {
     fireEvent.click(screen.getByRole('button', { name: /Stephen's Bed Cooling • -2/i }))
 
     const dialog = await screen.findByRole('dialog', { name: "Stephen's Bed" })
-    expect(within(dialog).getByRole('button', { name: 'Alarms' })).toBeInTheDocument()
+    expect(within(dialog).getByRole('tab', { name: 'Alarms' })).toBeInTheDocument()
     expect(within(dialog).getByRole('region', { name: /Stephen's Bed thermostat Cooling -2/i })).toBeInTheDocument()
     expect(within(dialog).getByText('Bedtime')).toBeInTheDocument()
     expect(within(dialog).getByText('Asleep')).toBeInTheDocument()
@@ -2696,7 +2701,7 @@ describe('DashboardViewPage', () => {
 
     scopeDialog = await openScopePrompt(-5)
     const overlays = document.querySelectorAll('[data-modal-sheet-overlay]')
-    fireEvent.pointerDown(overlays[overlays.length - 1])
+    fireEvent.click(overlays[overlays.length - 1])
     expect(targetSlider).toHaveAttribute('aria-valuenow', '-5')
     await waitFor(() => expect(scopeDialog).toHaveAttribute('data-state', 'closed'))
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Set Bed Temperature' })).not.toBeInTheDocument())
@@ -3245,8 +3250,8 @@ describe('DashboardViewPage', () => {
     expect(mistTarget).toHaveAttribute('aria-valuenow', '5')
     expect(mistCurrent).toHaveAttribute('data-value', '5')
     expect(mistCurrent!.compareDocumentPosition(mistTarget) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
-    expect(within(dialog).getByRole('navigation', { name: 'Humidifier modal sections' })).toBeInTheDocument()
-    expect(within(dialog).getByRole('button', { name: 'Controls' })).toHaveAttribute('aria-current', 'page')
+    expect(within(dialog).getByRole('tablist', { name: 'Humidifier modal sections' })).toBeInTheDocument()
+    expect(within(dialog).getByRole('tab', { name: 'Controls' })).toHaveAttribute('aria-selected', 'true')
     expect(within(dialog).getByText('46%')).toBeInTheDocument()
     expect(within(dialog).getByText('72°F')).toBeInTheDocument()
 
@@ -3279,8 +3284,11 @@ describe('DashboardViewPage', () => {
     fireEvent.click(screen.getByRole('button', { name: /Humidifier Humidifying • 46%/i }))
     const dialog = await screen.findByRole('dialog')
 
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Schedules' }))
+    fireEvent.click(within(dialog).getByRole('tab', { name: 'Schedules' }))
     expect(await within(dialog).findByText('No activities yet. Add morning, evening, or overnight profiles.')).toBeInTheDocument()
+    await act(async () => {
+      await new Promise<void>((resolve) => window.requestAnimationFrame(() => resolve()))
+    })
     expect(dialog).toHaveStyle('--modal-body-footer-padding-bottom: 0px')
     const modalBody = dialog.querySelector<HTMLElement>('[data-modal-sheet-body="true"]')
     expect(modalBody).not.toBeNull()
@@ -3291,7 +3299,7 @@ describe('DashboardViewPage', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: 'Add Scheduled Activity' }))
     const activityPage = await screen.findByRole('dialog', { name: 'Add Master Bedroom Humidifier Schedule' })
     expect(activityPage).toBe(dialog)
-    expect(activityPage).toHaveStyle('--modal-desktop-body-overflow-y: auto')
+    expect(activityPage).toHaveAttribute('data-scroll-mode', 'body')
     expect(screen.getAllByRole('dialog')).toHaveLength(1)
     expect(within(activityPage).getByLabelText('Name')).toHaveFocus()
     expect(modalBody).toHaveProperty('scrollTop', 0)
@@ -3417,7 +3425,7 @@ describe('DashboardViewPage', () => {
     expect(mistDial.querySelector('[data-marker="current"]')).not.toBeInTheDocument()
     expect(within(mistDial).getByRole('slider', { name: 'Mist level' })).toHaveAttribute('aria-valuenow', '5')
 
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Info' }))
+    fireEvent.click(within(dialog).getByRole('tab', { name: 'Info' }))
     expect(await within(dialog).findByRole('group', { name: 'Mist Level Unavailable' })).toBeInTheDocument()
   })
 
@@ -3439,7 +3447,7 @@ describe('DashboardViewPage', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /Humidifier Humidifying • 46%/i }))
     const dialog = await screen.findByRole('dialog')
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Schedules' }))
+    fireEvent.click(within(dialog).getByRole('tab', { name: 'Schedules' }))
     fireEvent.click(await within(dialog).findByRole('button', { name: 'Add Scheduled Activity' }))
     const activityPage = await screen.findByRole('dialog', { name: 'Add Master Bedroom Humidifier Schedule' })
     expect(within(activityPage).getByRole('alert')).toHaveTextContent('This activity overlaps another activity on Monday.')
@@ -3467,7 +3475,7 @@ describe('DashboardViewPage', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /Humidifier Humidifying • 46%/i }))
     const dialog = await screen.findByRole('dialog')
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Schedules' }))
+    fireEvent.click(within(dialog).getByRole('tab', { name: 'Schedules' }))
     const activityLabel = await within(dialog).findByText('Night')
     fireEvent.click(activityLabel.closest('button')!)
     const activityPage = await screen.findByRole('dialog', { name: 'Night' })
@@ -3508,7 +3516,7 @@ describe('DashboardViewPage', () => {
       render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
       fireEvent.click(screen.getByRole('button', { name: /Humidifier Humidifying • 46%/i }))
       const dialog = await screen.findByRole('dialog')
-      fireEvent.click(within(dialog).getByRole('button', { name: 'Schedules' }))
+      fireEvent.click(within(dialog).getByRole('tab', { name: 'Schedules' }))
       fireEvent.click((await within(dialog).findByText('Night')).closest('button')!)
       const activityPage = await screen.findByRole('dialog', { name: 'Night' })
 
@@ -3563,7 +3571,7 @@ describe('DashboardViewPage', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /Humidifier Humidifying • 46%/i }))
     const dialog = await screen.findByRole('dialog')
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Schedules' }))
+    fireEvent.click(within(dialog).getByRole('tab', { name: 'Schedules' }))
     expect(await within(dialog).findByText('Paused for Vacation')).toBeInTheDocument()
     expect(within(dialog).getByText('Vacation mode disables scheduled runs')).toBeInTheDocument()
     expect(within(dialog).queryByRole('button', { name: /Paused for Vacation/i })).not.toBeInTheDocument()
@@ -3588,7 +3596,7 @@ describe('DashboardViewPage', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /Humidifier Humidifying • 46%/i }))
     const dialog = await screen.findByRole('dialog')
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Schedules' }))
+    fireEvent.click(within(dialog).getByRole('tab', { name: 'Schedules' }))
 
     expect(await within(dialog).findByText('Scheduling Unavailable')).toBeInTheDocument()
     expect(within(dialog).getByText('Home Assistant schedule control is unavailable')).toBeInTheDocument()
@@ -3610,7 +3618,7 @@ describe('DashboardViewPage', () => {
     expect(within(dialog).getByRole('alert')).toHaveTextContent('Tank removed')
     expect(within(dialog).queryByRole('slider', { name: 'Mist level' })).not.toBeInTheDocument()
     expect(within(dialog).getByRole('button', { name: 'Turn Off' })).toBeEnabled()
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Info' }))
+    fireEvent.click(within(dialog).getByRole('tab', { name: 'Info' }))
     expect(await within(dialog).findByRole('group', { name: 'Tank Removed' })).toHaveAttribute('data-tone', 'danger')
   })
 
@@ -5004,8 +5012,9 @@ describe('DashboardViewPage', () => {
     fireEvent.click(screen.getByRole('button', { name: /^Living Room SHIELD Off$/i }))
 
     const dialog = await screen.findByRole('dialog')
-    expect(dialog).toHaveStyle(MEDIA_REMOTE_MODAL_STYLE)
-    expect(dialog).toHaveAttribute('data-has-footer', 'true')
+    expect(dialog).toHaveAttribute('data-size', 'workspace')
+    expect(dialog).toHaveAttribute('data-scroll-mode', 'panes')
+    expect(dialog).toHaveAttribute('data-has-navigation', 'true')
     expect(screen.getByRole('heading', { name: 'Living Room SHIELD Remote' })).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: 'Power' })).not.toBeInTheDocument()
     expect(screen.getByText('Power Off')).toBeInTheDocument()
@@ -5015,8 +5024,8 @@ describe('DashboardViewPage', () => {
     expect(screen.getByRole('heading', { name: 'Controls' })).toBeInTheDocument()
     expect(within(dialog).getByRole('group', { name: 'Living Room SHIELD remote controls' })).toBeInTheDocument()
     expect(within(dialog).getByRole('group', { name: 'Living Room SHIELD Controls' })).toBeInTheDocument()
-    expect(within(dialog).getByRole('navigation', { name: 'Living Room SHIELD modal sections' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Controls' })).toHaveAttribute('aria-current', 'page')
+    expect(within(dialog).getByRole('tablist', { name: 'Living Room SHIELD modal sections' })).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: 'Controls' })).toHaveAttribute('aria-selected', 'true')
     expect(screen.queryByRole('heading', { name: 'Media' })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Power' })).toHaveStyle({ color: 'rgb(255, 0, 0)' })
     expect(screen.getByRole('button', { name: 'Select' })).toHaveAttribute('data-icon', ' ')
@@ -5043,7 +5052,7 @@ describe('DashboardViewPage', () => {
     fireEvent.click(screen.getByRole('button', { name: /^Living Room SHIELD Off$/i }))
 
     const dialog = await screen.findByRole('dialog')
-    expect(dialog).toHaveAttribute('data-has-footer', 'true')
+    expect(dialog).toHaveAttribute('data-has-navigation', 'true')
     expect(screen.getByRole('heading', { name: 'Living Room SHIELD Remote' })).toBeInTheDocument()
     expect(screen.getByText('Power On')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Power' })).toHaveStyle({ color: 'rgb(0, 128, 0)' })
@@ -5055,7 +5064,7 @@ describe('DashboardViewPage', () => {
     expect(mockCallServiceCalls).toEqual([])
   })
 
-  it('keeps the mobile remote scroll offset when switching modal tabs', async () => {
+  it('resets the mobile remote scroll offset when switching modal tabs', async () => {
     const originalMatchMedia = window.matchMedia
     const mobileMatchMedia = vi.fn((query: string): MediaQueryList => ({
       matches: false,
@@ -5082,7 +5091,7 @@ describe('DashboardViewPage', () => {
       await clickModalTab(within(dialog), 'Apps')
 
       expect(panel).toHaveAttribute('data-tab', 'apps')
-      expect(panel!.scrollTop).toBe(137)
+      expect(panel!.scrollTop).toBe(0)
     } finally {
       Object.defineProperty(window, 'matchMedia', { configurable: true, value: originalMatchMedia })
     }
@@ -5157,6 +5166,13 @@ describe('DashboardViewPage', () => {
     expect(screen.queryByRole('button', { name: /^Theater Off$/i })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /^Projector Off$/i })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: /^Theater SHIELD Off$/i }).querySelector('path')).toHaveAttribute('d', materialIconPath('mdi:television'))
+    const livingSection = screen.getByRole('button', { name: /^Living Room SHIELD Off$/i }).closest('[data-responsive-section-item="true"]')
+    const theaterSection = screen.getByRole('button', { name: /^Theater Room Off$/i }).closest('[data-responsive-section-item="true"]')
+    expect(livingSection).not.toBe(theaterSection)
+    expect(screen.getByRole('button', { name: /^Living Room SHIELD Off$/i }).closest('[data-dynamic-grid="true"]')).toHaveAttribute('data-dynamic-grid-layout', 'fill')
+    expect(screen.getByRole('button', { name: /^Nintendo Switch Off$/i }).closest('[data-dynamic-grid="true"]')).toHaveAttribute('data-dynamic-grid-layout', 'fill')
+    expect(screen.getByRole('button', { name: /^Nintendo Switch Off$/i }).closest('[data-dynamic-grid="true"]')).toHaveAttribute('data-dynamic-grid-item-sizing', 'uniform')
+    expect(screen.getByRole('group', { name: 'Theater Room Controls' })).toContainElement(screen.getByRole('button', { name: /^Nintendo Switch Off$/i }))
 
     fireEvent.click(screen.getByRole('button', { name: /^Nintendo Switch Off$/i }))
     fireEvent.click(screen.getByRole('button', { name: /^Theater SHIELD Off$/i }))
@@ -5301,13 +5317,13 @@ describe('DashboardViewPage', () => {
     expect(screen.getByRole('heading', { name: 'Yamaha Volume' })).toBeInTheDocument()
     expect(screen.getByRole('slider', { name: 'Yamaha Volume volume' })).toBeEnabled()
     expect(screen.getByRole('button', { name: 'Volume Down' })).toBeEnabled()
-    expect(screen.getByRole('button', { name: 'Devices' })).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: 'Devices' })).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: 'Devices' })).not.toBeInTheDocument()
     expect(screen.getByText('Power Off')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Power' })).toHaveStyle({ color: 'rgb(255, 0, 0)' })
     const remoteControls = within(screen.getByRole('dialog')).getByRole('group', { name: 'Theater Room SHIELD remote controls' })
     expect(screen.getByRole('button', { name: 'Power' }).compareDocumentPosition(remoteControls) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
-    expect(remoteControls.closest('[data-scroll-region="media-remote-panel"]')).toBeInTheDocument()
+    expect(within(screen.getByRole('dialog')).getByRole('tabpanel', { name: 'Controls' })).toHaveAttribute('data-scroll-region', 'media-remote-panel')
     expect(mockCallServiceCalls).toEqual([])
 
     fireEvent.click(screen.getByRole('button', { name: 'Power' }))
@@ -5317,12 +5333,16 @@ describe('DashboardViewPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Mute' }))
 
     await clickModalTab(within(screen.getByRole('dialog')), 'Devices')
-    expect(screen.getByRole('button', { name: 'Devices' })).toHaveAttribute('aria-current', 'page')
+    expect(screen.getByRole('tab', { name: 'Devices' })).toHaveAttribute('aria-selected', 'true')
     expect(screen.getByRole('heading', { name: 'Devices' })).toBeInTheDocument()
-    expect(remoteControls.closest('[data-scroll-region="media-remote-panel"]')).toHaveAttribute('data-tab', 'devices')
+    expect(within(screen.getByRole('dialog')).getByRole('tabpanel', { name: 'Devices' })).toHaveAttribute('data-tab', 'devices')
     expect(screen.queryByRole('heading', { name: 'Yamaha Volume' })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Projector Off/i })).toHaveAttribute('data-tone', 'media')
     expect(screen.getByRole('button', { name: /Projector Off/i })).toHaveAttribute('data-icon', 'mdi:projector')
+    const deviceGrid = screen.getByRole('button', { name: /Projector Off/i }).closest('[data-dynamic-grid="true"]')
+    expect(deviceGrid).toHaveAttribute('data-dynamic-grid-item-sizing', 'uniform')
+    expect(deviceGrid).toHaveAttribute('data-dynamic-grid-max-cell-width', '260')
+    expect(deviceGrid).toHaveAttribute('data-dynamic-grid-max-columns', '4')
     expect(screen.getByRole('button', { name: /Theater Room PC On/i })).toHaveAttribute('data-tone', 'switch')
     fireEvent.click(screen.getByRole('button', { name: /Projector Off/i }))
     fireEvent.click(screen.getByRole('button', { name: /Theater Room PC On/i }))
@@ -5360,13 +5380,14 @@ describe('DashboardViewPage', () => {
     fireEvent.click(screen.getByRole('button', { name: /Main Floor Docked/i }))
 
     const dialog = await screen.findByRole('dialog')
-    expect(dialog).toHaveStyle(VACUUM_MODAL_STYLE)
+    expect(dialog).toHaveAttribute('data-size', 'workspace')
+    expect(dialog).toHaveAttribute('data-scroll-mode', 'panes')
     expect(screen.getByRole('heading', { name: 'Living Room: Robot Vacuum' })).toBeInTheDocument()
     expect(screen.queryByText('Main Floor Robot Vacuum')).not.toBeInTheDocument()
     const mapPane = within(dialog).getByRole('group', { name: 'Main Floor map and status' })
     const controlsPane = within(dialog).getByRole('group', { name: 'Main Floor controls, zones, auto-clean, actions, info' })
-    const modalNav = within(dialog).getByRole('navigation', { name: 'Main Floor modal sections' })
-    const modalNavButtons = within(modalNav).getAllByRole('button')
+    const modalNav = within(dialog).getByRole('tablist', { name: 'Main Floor modal sections' })
+    const modalNavButtons = within(modalNav).getAllByRole('tab')
     expect(modalNavButtons.map((button) => button.getAttribute('aria-label'))).toEqual(['Controls', 'Zones', 'Auto-Clean', 'Actions', 'Info'])
     expect(modalNavButtons[2].querySelector('path')).toHaveAttribute('d', materialIconPath('mdi:robot-vacuum-off'))
     expect(modalNavButtons[3].querySelector('path')).toHaveAttribute('d', materialIconPath('mdi:flash'))
@@ -5545,12 +5566,12 @@ describe('DashboardViewPage', () => {
     expect(within(dialog).getByRole('button', { name: 'Back to controls' })).toBeInTheDocument()
     expect(within(dialog).getByRole('button', { name: 'Draw' })).toHaveAttribute('data-active', 'true')
     expect(within(dialog).getByRole('button', { name: 'Draw an Area to Continue' })).toBeDisabled()
-    expect(within(dialog).queryByRole('navigation', { name: 'Main Floor modal sections' })).not.toBeInTheDocument()
+    expect(within(dialog).queryByRole('tablist', { name: 'Main Floor modal sections' })).not.toBeInTheDocument()
 
     fireEvent.click(within(dialog).getByRole('button', { name: 'Back to controls' }))
 
     expect(within(dialog).getByRole('heading', { name: 'Living Room: Robot Vacuum' })).toBeInTheDocument()
-    expect(within(dialog).getByRole('navigation', { name: 'Main Floor modal sections' })).toBeInTheDocument()
+    expect(within(dialog).getByRole('tablist', { name: 'Main Floor modal sections' })).toBeInTheDocument()
     expect(within(dialog).getByRole('button', { name: 'Area' })).toHaveAttribute('aria-pressed', 'true')
   })
 
@@ -5644,11 +5665,11 @@ describe('DashboardViewPage', () => {
     expect(await screen.findByRole('dialog')).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Theater Room: Robot Vacuum' })).toBeInTheDocument()
     expect(screen.getByRole('region', { name: 'Theater Room Valetudo map' })).toBeInTheDocument()
-    expect(screen.getByRole('navigation', { name: 'Theater Room modal sections' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Controls' })).toHaveAttribute('aria-current', 'page')
-    expect(screen.getByRole('button', { name: 'Actions' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Info' })).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Zones' })).not.toBeInTheDocument()
+    expect(screen.getByRole('tablist', { name: 'Theater Room modal sections' })).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: 'Controls' })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByRole('tab', { name: 'Actions' })).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: 'Info' })).toBeInTheDocument()
+    expect(screen.queryByRole('tab', { name: 'Zones' })).not.toBeInTheDocument()
     const cleaningTarget = screen.getByRole('group', { name: 'Cleaning target' })
     expect(within(cleaningTarget).getByRole('button', { name: 'Rooms' })).toHaveAttribute('aria-pressed', 'true')
     expect(within(cleaningTarget).getByRole('button', { name: 'Area' })).toHaveAttribute('aria-pressed', 'false')
@@ -5946,6 +5967,16 @@ describe('DashboardViewPage', () => {
     expect(screen.getByRole('button', { name: /Left Door Closed/i })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Cameras' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Open Front Door camera' })).toBeInTheDocument()
+    const securityGrid = screen.getByRole('button', { name: /Security System Armed Home/i }).closest('[data-dynamic-grid="true"]')
+    const cameraGrid = screen.getByRole('button', { name: 'Open Front Door camera' }).closest('[data-dynamic-grid="true"]')
+    expect(securityGrid).toHaveAttribute('data-dynamic-grid-item-sizing', 'uniform')
+    expect(securityGrid).toHaveAttribute('data-dynamic-grid-layout', 'fill')
+    expect(securityGrid).toHaveAttribute('data-dynamic-grid-max-cell-width', '280')
+    expect(cameraGrid).toHaveAttribute('data-dynamic-grid-item-sizing', 'uniform')
+    expect(cameraGrid).toHaveAttribute('data-dynamic-grid-layout', 'fill')
+    expect(cameraGrid).toHaveAttribute('data-dynamic-grid-max-cell-width', '280')
+    expect(screen.getByRole('button', { name: /Security System Armed Home/i }).closest('[data-responsive-section-item="true"]')).toHaveAttribute('data-span', 'full')
+    expect(screen.getByRole('button', { name: 'Open Front Door camera' }).closest('[data-responsive-section-item="true"]')).toHaveAttribute('data-span', 'full')
     expect(screen.queryByRole('heading', { name: 'Mach-E' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Doors Locked/i })).not.toBeInTheDocument()
     expect(screen.queryByText(/not available in the React dashboard yet/i)).not.toBeInTheDocument()
@@ -5956,6 +5987,8 @@ describe('DashboardViewPage', () => {
     render(<DashboardViewPage activePath="security" onNavigate={() => undefined} path="security" />)
 
     expect(screen.getByRole('heading', { name: 'Guest Presence Security' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Security System Armed Home/i }).closest('[data-responsive-section-item="true"]')).toHaveAttribute('data-span', 'full')
+    expect(screen.getByRole('button', { name: 'Guest Presence Security' }).closest('[data-responsive-section-item="true"]')).toHaveAttribute('data-span', 'full')
     fireEvent.click(screen.getByRole('button', { name: 'Guest Presence Security' }))
 
     const dialog = await screen.findByRole('dialog')
@@ -5999,6 +6032,16 @@ describe('DashboardViewPage', () => {
 
     expect(page.firstElementChild).toContainElement(securityChip)
     expect(scroller).not.toContainElement(securityChip)
+  })
+
+  it('uses the live contact summary entity for open-state icon and tone', () => {
+    mockEntities['binary_sensor.contact_sensors'].state = 'on'
+    mockEntities['binary_sensor.front_door_contact_sensor_contact'].state = 'on'
+    render(<DashboardViewPage activePath="security" onNavigate={() => undefined} path="security" />)
+
+    const contactChip = screen.getByRole('button', { name: /Contact Sensors\s*1 Open/i })
+    expect(contactChip).toHaveAttribute('data-icon', 'mdi:door-open')
+    expect(contactChip).toHaveAttribute('data-muted', 'false')
   })
 
   it('reflects alarm state in the Security header chip', () => {
@@ -6765,7 +6808,9 @@ describe('DashboardViewPage', () => {
     expect(screen.getByRole('heading', { name: 'Quick Links' })).toBeInTheDocument()
     const quickLinks = screen.getByRole('group', { name: 'Chore quick links' })
     expect(quickLinks).toHaveAttribute('data-dynamic-grid', 'true')
-    expect(quickLinks.lastElementChild).toHaveAttribute('data-dynamic-grid-span', '2')
+    expect(quickLinks).toHaveAttribute('data-dynamic-grid-item-sizing', 'content-aware')
+    expect(quickLinks).toHaveAttribute('data-dynamic-grid-item-sizing-min-width', '560')
+    expect(quickLinks.children).toHaveLength(5)
     expect(screen.getByRole('button', { name: /Groceries 2 items/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Stephen's Tasks 4 upcoming tasks · 1 task listed/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Steph's Tasks No tasks listed/i })).toBeInTheDocument()
@@ -6778,7 +6823,9 @@ describe('DashboardViewPage', () => {
     expect(screen.queryByRole('heading', { name: 'Afternoon Tasks' })).not.toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'No Due Date' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Upcoming' })).toBeInTheDocument()
-    expect(screen.getAllByLabelText(/todo list$/)).toHaveLength(4)
+    const todoLists = screen.getAllByLabelText(/todo list$/)
+    expect(todoLists).toHaveLength(4)
+    expect(todoLists.every((list) => list.getAttribute('data-layout') === 'responsive-grid')).toBe(true)
     expect(within(screen.getByLabelText('Past Due todo list')).queryByText('Active')).not.toBeInTheDocument()
   })
 
@@ -7174,31 +7221,23 @@ describe('DashboardViewPage', () => {
   })
 
   it('shows the create task FAB on chore task pages with route-specific assignee defaults', async () => {
-    const { rerender } = render(<DashboardViewPage activePath="chores" onNavigate={() => undefined} path="chores" />)
+    for (const [path, assignee] of [
+      ['chores', ''],
+      ['stephens-chores', '1'],
+      ['stephs-chores', '2'],
+      ['unassigned-chores', ''],
+      ['home-improvement-chores', '3'],
+    ] as const) {
+      const view = render(<DashboardViewPage activePath={path} onNavigate={() => undefined} path={path} />)
+      fireEvent.click(await screen.findByRole('button', { name: 'Add Task' }))
+      expect(within(await screen.findByRole('dialog')).getByLabelText('Assignee')).toHaveValue(assignee)
+      view.unmount()
+    }
 
-    expect(await screen.findByRole('button', { name: 'Add Task' })).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: 'Add Task' }))
-    expect(within(await screen.findByRole('dialog')).getByLabelText('Assignee')).toHaveValue('')
-
-    rerender(<DashboardViewPage activePath="stephens-chores" onNavigate={() => undefined} path="stephens-chores" />)
-    fireEvent.click(screen.getByRole('button', { name: 'Add Task' }))
-    expect(within(await screen.findByRole('dialog')).getByLabelText('Assignee')).toHaveValue('1')
-
-    rerender(<DashboardViewPage activePath="stephs-chores" onNavigate={() => undefined} path="stephs-chores" />)
-    fireEvent.click(screen.getByRole('button', { name: 'Add Task' }))
-    expect(within(await screen.findByRole('dialog')).getByLabelText('Assignee')).toHaveValue('2')
-
-    rerender(<DashboardViewPage activePath="unassigned-chores" onNavigate={() => undefined} path="unassigned-chores" />)
-    fireEvent.click(screen.getByRole('button', { name: 'Add Task' }))
-    expect(within(await screen.findByRole('dialog')).getByLabelText('Assignee')).toHaveValue('')
-
-    rerender(<DashboardViewPage activePath="home-improvement-chores" onNavigate={() => undefined} path="home-improvement-chores" />)
-    fireEvent.click(screen.getByRole('button', { name: 'Add Task' }))
-    expect(within(await screen.findByRole('dialog')).getByLabelText('Assignee')).toHaveValue('3')
-
-    rerender(<DashboardViewPage activePath="groceries" onNavigate={() => undefined} path="groceries" />)
+    const groceries = render(<DashboardViewPage activePath="groceries" onNavigate={() => undefined} path="groceries" />)
     expect(screen.queryByRole('button', { name: 'Add Task' })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Add Groceries' })).toBeInTheDocument()
+    groceries.unmount()
   })
 
   it('opens a grocery item modal on the Groceries page and adds to the shopping list', async () => {
@@ -7505,7 +7544,8 @@ describe('DashboardViewPage', () => {
     fireEvent.click(mainFloorVacuum)
 
     const dialog = await screen.findByRole('dialog')
-    expect(dialog).toHaveStyle(VACUUM_MODAL_STYLE)
+    expect(dialog).toHaveAttribute('data-size', 'workspace')
+    expect(dialog).toHaveAttribute('data-scroll-mode', 'panes')
     expect(screen.getByRole('heading', { name: 'Main Floor Robot Vacuum' })).toBeInTheDocument()
     const mapPane = within(dialog).getByRole('group', { name: 'Main Floor map and status' })
     const controlsPane = within(dialog).getByRole('group', { name: 'Main Floor controls, zones, auto-clean, actions, info' })
@@ -7586,9 +7626,10 @@ describe('DashboardViewPage', () => {
     fireEvent.click(summary)
 
     expect(screen.getByRole('dialog')).toBe(dialog)
-    expect(dialog).toHaveStyle(VACUUM_OUTCOME_MODAL_STYLE)
+    expect(dialog).toHaveAttribute('data-size', 'workspace')
+    expect(dialog).toHaveAttribute('data-scroll-mode', 'body')
     expect(within(dialog).getByRole('heading', { name: 'While-Away Vacuum Outcomes · Aug 19, 2026' })).toBeInTheDocument()
-    expect(within(dialog).queryByRole('navigation', { name: 'Main Floor modal sections' })).not.toBeInTheDocument()
+    expect(within(dialog).queryByRole('tablist', { name: 'Main Floor modal sections' })).not.toBeInTheDocument()
     expect(within(dialog).getAllByLabelText('Dining Room Failed')).toHaveLength(1)
     fireEvent.click(within(dialog).getByRole('button', { name: 'Show Dining Room History' }))
     fireEvent.click(within(dialog).getByRole('button', { name: 'Show Dining Room Technical Vacuum Diagnostics' }))
@@ -7598,7 +7639,8 @@ describe('DashboardViewPage', () => {
     await waitFor(() => expect(
       within(dialog).getByRole('button', { name: 'Open Main Floor Cleaning Outcomes for Aug 19, 2026' }),
     ).toHaveFocus())
-    expect(within(dialog).getByRole('navigation', { name: 'Main Floor modal sections' })).toBeInTheDocument()
+    expect(dialog).toHaveAttribute('data-scroll-mode', 'panes')
+    expect(within(dialog).getByRole('tablist', { name: 'Main Floor modal sections' })).toBeInTheDocument()
     expect(mockCallServiceCalls).toEqual([])
   })
 
@@ -7650,7 +7692,7 @@ describe('DashboardViewPage', () => {
     expect(screen.getAllByRole('dialog')).toHaveLength(1)
     expect(within(dialog).getByRole('heading', { name: 'While-Away Vacuum Outcomes · Aug 19, 2026' })).toBeInTheDocument()
     expect(within(dialog).getByLabelText('Dining Room Failed')).toBeInTheDocument()
-    expect(within(dialog).queryByRole('navigation', { name: 'Main Floor modal sections' })).not.toBeInTheDocument()
+    expect(within(dialog).queryByRole('tablist', { name: 'Main Floor modal sections' })).not.toBeInTheDocument()
 
     fireEvent.click(within(dialog).getByRole('button', { name: 'Back to Vacuum Controls' }))
 
@@ -7662,7 +7704,7 @@ describe('DashboardViewPage', () => {
     })
     await waitFor(() => expect(legacySection).toHaveFocus())
     expect(body.scrollTop).toBe(47)
-    expect(within(dialog).getByRole('navigation', { name: 'Main Floor modal sections' })).toBeInTheDocument()
+    expect(within(dialog).getByRole('tablist', { name: 'Main Floor modal sections' })).toBeInTheDocument()
     expect(within(dialog).queryByRole('button', { name: /Cleaning Outcomes for/ })).not.toBeInTheDocument()
   })
 

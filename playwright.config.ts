@@ -16,8 +16,20 @@ export default defineConfig({
   projects: [
     {
       name: 'mobile',
-      testIgnore: /modal-sheet-webkit\.spec\.ts/,
+      testIgnore: /(?:desktop-responsive|modal-sheet-webkit)\.spec\.ts/,
       use: { ...devices['iPhone 13'], browserName: 'chromium' },
+    },
+    {
+      name: 'desktop',
+      testMatch: /desktop-responsive\.spec\.ts/,
+      use: {
+        ...devices['Desktop Chrome'],
+        browserName: 'chromium',
+        deviceScaleFactor: 1,
+        hasTouch: false,
+        isMobile: false,
+        viewport: { height: 900, width: 1440 },
+      },
     },
     ...(enableWebkit
       ? [{

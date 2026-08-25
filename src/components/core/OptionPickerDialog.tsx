@@ -1,7 +1,7 @@
 import { useEffect, useId, useRef, type ReactNode } from 'react'
 import { MaterialIcon } from './Icon'
 import glassTileStyles from './GlassTile.module.css'
-import { ModalSheet, type ModalSheetStyle } from './ModalSheet'
+import { ModalSheet, type ModalSheetSize, type ModalSheetStyle } from './ModalSheet'
 import { useCopy } from '../../i18n'
 import styles from './OptionPickerDialog.module.css'
 
@@ -32,6 +32,7 @@ interface OptionPickerDialogProps {
   selectedIcon?: string
   presentation?: 'dialog' | 'sheet'
   sheetLayout?: 'card-grid' | 'compact-grid'
+  sheetSize?: ModalSheetSize
   sheetStyle?: ModalSheetStyle
   onClose: () => void
   onSelect: (value: string) => void
@@ -92,7 +93,7 @@ export function OptionPickerPanel({
   )
 }
 
-export function OptionPickerDialog({ open, options, title, value, icon, selectedIcon, presentation = 'dialog', sheetLayout = 'card-grid', sheetStyle, onClose, onSelect }: OptionPickerDialogProps) {
+export function OptionPickerDialog({ open, options, title, value, icon, selectedIcon, presentation = 'dialog', sheetLayout = 'card-grid', sheetSize = 'compact', sheetStyle, onClose, onSelect }: OptionPickerDialogProps) {
   const copy = useCopy('common')
   const titleId = useId()
   const isSheet = presentation === 'sheet'
@@ -113,7 +114,7 @@ export function OptionPickerDialog({ open, options, title, value, icon, selected
 
   if (isSheet) {
     return (
-      <ModalSheet contentStyle={sheetStyle} onClose={onClose} open={open} title={title}>
+      <ModalSheet contentStyle={sheetStyle} onClose={onClose} open={open} size={sheetSize} title={title}>
         {optionPanel}
       </ModalSheet>
     )

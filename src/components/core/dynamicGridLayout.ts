@@ -66,3 +66,29 @@ export function packDynamicGridSpans(minimumSpans: readonly number[], columnCoun
 
   return spans
 }
+
+export function centeredDynamicGridStarts(spans: readonly number[], columnCount: number) {
+  const columns = normalizedDynamicGridColumns(columnCount)
+  const starts = Array.from({ length: spans.length }, () => 0)
+  const rows: Array<{ firstIndex: number; occupied: number }> = []
+  let firstIndex = 0
+  let occupied = 0
+
+  spans.forEach((span, index) => {
+    const normalized = normalizedSpan(span, columns)
+    if (occupied > 0 && occupied + normalized > columns) {
+      rows.push({ firstIndex, occupied })
+      firstIndex = index
+      occupied = 0
+    }
+    occupied += normalized
+  })
+  if (spans.length > 0) rows.push({ firstIndex, occupied })
+
+  const lastRow = rows.at(-1)
+  if (lastRow && lastRow.occupied < columns) {
+    starts[lastRow.firstIndex] = Math.floor((columns - lastRow.occupied) / 2) + 1
+  }
+
+  return starts
+}

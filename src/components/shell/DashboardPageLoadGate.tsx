@@ -55,6 +55,7 @@ export function DashboardPageLoadGate({
         <DashboardPageLoading
           className={styles.loading}
           label={label}
+          placement="viewport"
           phase={phase === 'exiting' ? 'exiting' : 'loading'}
         />
       )}

@@ -989,7 +989,7 @@ export function RecipeDetailModal({ controller }: { controller: RecipeDetailModa
         />
       )
     : undefined
-  const footer = controller.ingredientPickerIngredient && tabNav
+  const navigation = controller.ingredientPickerIngredient && tabNav
     ? (
         <div className={styles.pickerFooterStack}>
           <ExpandingSearchAction
@@ -1054,7 +1054,7 @@ export function RecipeDetailModal({ controller }: { controller: RecipeDetailModa
   return (
     <ModalSheet
       contentStyle={RECIPE_DETAIL_MODAL_STYLE}
-      footer={footer}
+      navigation={navigation}
       backLabel={controller.ingredientPickerIngredient
         ? copy(RECIPE_COPY_KEYS.backAssumeHave)
         : controller.plannerOpen
@@ -1069,6 +1069,7 @@ export function RecipeDetailModal({ controller }: { controller: RecipeDetailModa
       onClose={closeModal}
       open={controller.open && controller.selectedRecipe !== null}
       scrollResetKey={`${controller.selectedRecipe?.id ?? 'none'}:${controller.activeTab}:${detailPageKey ?? 'root'}`}
+      size="standard"
       title={title}
     >
       {content}

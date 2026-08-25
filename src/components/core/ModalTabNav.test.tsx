@@ -35,13 +35,13 @@ function Harness() {
 }
 
 describe('ModalIconTabNav', () => {
-  it('renders icon-only named tabs with linked panels and a roving tab stop', () => {
+  it('renders named icon tabs with linked panels and a roving tab stop', () => {
     render(<Harness />)
 
     const tabList = screen.getByRole('tablist', { name: 'Recipe sections' })
     const tabs = within(tabList).getAllByRole('tab')
     expect(tabs).toHaveLength(3)
-    expect(tabs.map((tab) => tab.textContent)).toEqual(['', '', ''])
+    expect(tabs.map((tab) => tab.textContent)).toEqual(['General', 'Ingredients', 'Instructions'])
     expect(tabs.every((tab) => tab.querySelector('svg') !== null)).toBe(true)
     for (const [index, definition] of TABS.entries()) {
       expect(tabs[index]).toHaveAttribute('data-icon', definition.icon)
@@ -55,6 +55,24 @@ describe('ModalIconTabNav', () => {
     expect(general).toHaveAttribute('tabindex', '0')
     expect(within(tabList).getByRole('tab', { name: 'Ingredients' })).toHaveAttribute('tabindex', '-1')
     expect(screen.getByRole('tabpanel', { name: 'General' })).toHaveAttribute('id', 'test-detail-panel-general')
+  })
+
+  it('renders optional count badges and accessories without changing the accessible tab name', () => {
+    render(
+      <ModalIconTabNav
+        activeTab="general"
+        idPrefix="badged-detail"
+        label="Recipe sections"
+        onTabChange={() => undefined}
+        tabs={[
+          { accessory: <span data-testid="tab-accessory" />, badgeCount: 3, icon: 'mdi:information-outline', label: 'General', tab: 'general' },
+        ]}
+      />,
+    )
+
+    const tab = screen.getByRole('tab', { name: 'General' })
+    expect(within(tab).getByText('3')).toBeInTheDocument()
+    expect(within(tab).getByTestId('tab-accessory')).toBeInTheDocument()
   })
 
   it('selects and focuses tabs with ArrowLeft, ArrowRight, Home, and End', async () => {

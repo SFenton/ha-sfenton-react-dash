@@ -16,6 +16,18 @@
   --page-bottom-extra-padding: calc(var(--floating-action-size) + var(--floating-action-gap) + var(--floating-action-content-gap));
 }
 
+.shell[data-page-measure='dashboard'] {
+  --active-page-measure: var(--page-measure-dashboard);
+}
+
+.shell[data-page-measure='media'] {
+  --active-page-measure: var(--page-measure-media);
+}
+
+.shell[data-page-measure='reading'] {
+  --active-page-measure: var(--page-measure-reading);
+}
+
 .backdrop {
   position: fixed;
   inset: -24px;
@@ -100,5 +112,42 @@
 @media (prefers-reduced-motion: reduce) {
   .floatingAction {
     animation-duration: 1ms;
+  }
+}
+
+@media (min-width: 1120px) {
+  .shell {
+    --page-scroll-bottom-inset: 0px;
+  }
+
+  .content {
+    width: calc(100% - var(--app-sidebar-width));
+    margin-left: var(--app-sidebar-width);
+  }
+
+  .floatingAction {
+    right: var(--space-page-x);
+    left: calc(var(--app-sidebar-width) + var(--space-page-x));
+    width: auto;
+    max-width: var(--active-page-measure);
+    margin-inline: auto;
+    bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+  }
+}
+
+@media (min-width: 560px) and (max-width: 1119px) {
+  .floatingAction {
+    left: auto;
+    width: min(calc(100vw - 42px), var(--page-measure-reading));
+  }
+}
+
+@media (orientation: landscape) and (max-height: 500px) and (max-width: 1119px) {
+  .shell {
+    --page-scroll-bottom-inset: 0px;
+  }
+
+  .floatingAction {
+    bottom: calc(12px + env(safe-area-inset-bottom, 0px));
   }
 }

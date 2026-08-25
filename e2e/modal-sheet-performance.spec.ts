@@ -126,7 +126,8 @@ test.describe('modal dismissal performance', () => {
     test.skip(browserName !== 'webkit', 'Backdrop-filter computed styles are validated in WebKit')
     test.setTimeout(60_000)
     await page.goto(BASE_URL_PATH)
-    const opener = page.getByRole('button', { exact: true, name: 'Advanced Configuration' })
+    const opener = page.locator('button[data-tone]').filter({ hasText: 'Advanced Configuration' }).first()
+    await expect(opener).toBeVisible()
     const pageFilter = await opener.evaluate((element) => getComputedStyle(element).getPropertyValue('-webkit-backdrop-filter'))
     expect(pageFilter).toContain('blur(15px)')
 
@@ -137,8 +138,8 @@ test.describe('modal dismissal performance', () => {
     const modalTabs = dialog.getByRole('tablist', { name: 'Thermostat sections' })
     await expect.poll(() => modalTile.evaluate((element) => getComputedStyle(element).getPropertyValue('-webkit-backdrop-filter'))).toBe('none')
     await expect.poll(() => modalTabs.evaluate((element) => getComputedStyle(element).getPropertyValue('-webkit-backdrop-filter'))).toBe('none')
-    const hiddenOpener = page.locator('[data-thermostat-page-entrypoints="true"] [data-icon="mdi:cog"]')
-    expect(await hiddenOpener.evaluate((element) => getComputedStyle(element).getPropertyValue('-webkit-backdrop-filter'))).toContain('blur(15px)')
+    await expect(opener).toBeVisible()
+    expect(await opener.evaluate((element) => getComputedStyle(element).getPropertyValue('-webkit-backdrop-filter'))).toContain('blur(15px)')
   })
 
   test('records paired throttled frame metrics without a modal cadence regression', async ({ browser, browserName }, testInfo) => {
