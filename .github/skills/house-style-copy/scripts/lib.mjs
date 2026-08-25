@@ -1,11 +1,25 @@
+import { spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { readFile, readdir } from 'node:fs/promises'
+import { readFile, readdir, stat } from 'node:fs/promises'
 import { dirname, relative, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import ts from 'typescript'
 
 export const skillRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 export const repositoryRoot = resolve(skillRoot, '../../..')
+export const qualifiedCorpusDirectory = resolve(skillRoot, 'assets/corpus/qualified')
+export const qualifiedCorpusPointerPath = resolve(qualifiedCorpusDirectory, 'current.json')
+
+export const QUALIFIED_CORPUS_POINTER_VERSION = 1
+export const QUALIFIED_CORPUS_MANIFEST_VERSION = 2
+export const QUALIFIED_CORPUS_PROVENANCE = 'buildCorpus(repositoryRoot)'
+export const CORPUS_INPUT_PATHS = [
+  'src',
+  'scripts/i18n',
+  '.github/skills/house-style-copy/assets/corpus/curated.jsonl',
+  '.github/skills/house-style-copy/assets/corpus/notification-reference.jsonl',
+  '.github/skills/house-style-copy/assets/corpus/notification-manifest.json',
+]
 
 export const CONTEXT_CLASSES = [
   'button',
@@ -252,8 +266,7 @@ export async function readJson(path) {
   return JSON.parse(await readFile(path, 'utf8'))
 }
 
-export async function readJsonLines(path) {
-  const content = await readFile(path, 'utf8')
+function parseJsonLines(content, path) {
   return content
     .split(/\r?\n/)
     .map((line) => line.trim())
@@ -265,6 +278,10 @@ export async function readJsonLines(path) {
         throw new Error(`${path}:${index + 1}: ${error instanceof Error ? error.message : String(error)}`)
       }
     })
+}
+
+export async function readJsonLines(path) {
+  return parseJsonLines(await readFile(path, 'utf8'), path)
 }
 
 export function parseCliArgs(argv) {
@@ -415,6 +432,56 @@ async function walkFiles(directory) {
   return result
 }
 
+export async function collectCorpusInputProvenance(root = repositoryRoot) {
+  const headResult = spawnSync('git', ['rev-parse', 'HEAD'], {
+    cwd: root,
+    encoding: 'utf8',
+  })
+  const sourceHead = headResult.status === 0 ? headResult.stdout.trim() : ''
+  if (!/^[0-9a-f]{40,64}$/.test(sourceHead)) {
+    throw new Error('Unable to resolve the source git HEAD for the qualified corpus.')
+  }
+
+  const statusResult = spawnSync(
+    'git',
+    ['status', '--porcelain=v1', '--untracked-files=all', '--', ...CORPUS_INPUT_PATHS],
+    {
+      cwd: root,
+      encoding: 'utf8',
+    },
+  )
+  if (statusResult.status !== 0) {
+    throw new Error(`Unable to inspect corpus input status: ${statusResult.stderr.trim() || 'git status failed.'}`)
+  }
+  const statusEntries = statusResult.stdout
+    .split(/\r?\n/)
+    .map((line) => line.trimEnd())
+    .filter(Boolean)
+    .sort()
+
+  const inputFiles = []
+  for (const relativePath of CORPUS_INPUT_PATHS) {
+    const path = resolve(root, relativePath)
+    const metadata = await stat(path).catch(() => null)
+    if (!metadata) throw new Error(`Corpus input path is missing: ${relativePath}`)
+    const paths = metadata.isDirectory() ? await walkFiles(path) : [path]
+    for (const inputPath of paths.sort()) {
+      const inputRelativePath = relative(root, inputPath).replaceAll('\\', '/')
+      const contentHash = createHash('sha256').update(await readFile(inputPath)).digest('hex')
+      inputFiles.push([inputRelativePath, contentHash])
+    }
+  }
+  inputFiles.sort(([left], [right]) => left.localeCompare(right))
+
+  return {
+    sourceHead,
+    sourceInputFileCount: inputFiles.length,
+    sourceInputHash: valueHash(inputFiles),
+    sourceInputsDirty: statusEntries.length > 0,
+    sourceStatusHash: valueHash(statusEntries),
+  }
+}
+
 export async function hashSkillFiles(root = skillRoot) {
   const included = []
   for (const path of (await walkFiles(root)).sort()) {
@@ -488,16 +555,25 @@ function inferContext({ field, file, owner, value }) {
   return value.length <= 32 ? 'status' : 'description'
 }
 
-function inferNamespace(path) {
-  const lower = path.toLowerCase()
+export function inferNamespace(path) {
+  const lower = ` ${String(path)
+    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+    .replace(/([A-Z]+)([A-Z][a-z])/g, '$1 $2')
+    .replace(/([A-Za-z])([0-9])/g, '$1 $2')
+    .replace(/([0-9])([A-Za-z])/g, '$1 $2')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()} `
   const rules = [
+    ['custom lights', 'customLights'],
+    ['grocery', 'food'],
     ['recipe', 'recipes'],
     ['food', 'food'],
     ['inventory', 'food'],
     ['vacuum', 'vacuum'],
     ['humidifier', 'humidifier'],
     ['sleepypod', 'sleepypod'],
-    ['eightSleep'.toLowerCase(), 'sleepypod'],
+    ['eight sleep', 'sleepypod'],
     ['security', 'security'],
     ['camera', 'camera'],
     ['weather', 'weather'],
@@ -515,7 +591,7 @@ function inferNamespace(path) {
     ['header', 'shell'],
     ['nav', 'shell'],
   ]
-  return rules.find(([needle]) => lower.includes(needle))?.[1] ?? 'common'
+  return rules.find(([needle]) => lower.includes(` ${needle} `))?.[1] ?? 'common'
 }
 
 function usableSourceText(value) {
@@ -606,30 +682,61 @@ export async function scanSourceCorpus(root = repositoryRoot) {
   return [...records.values()].sort((left, right) => left.id.localeCompare(right.id))
 }
 
+const CORPUS_RECORD_FIELDS = [
+  'id',
+  'text',
+  'contextClass',
+  'band',
+  'ownership',
+  'quality',
+  'placeholders',
+  'intentTags',
+  'namespace',
+  'surface',
+  'provenance',
+]
+
+const OPTIONAL_CORPUS_RECORD_FIELDS = ['bounded', 'restyle']
+
+function canonicalCorpusRecord(record) {
+  const canonical = Object.fromEntries(CORPUS_RECORD_FIELDS.map((field) => [field, record[field]]))
+  if ('bounded' in record) canonical.bounded = record.bounded
+  if ('restyle' in record) canonical.restyle = record.restyle
+  return canonical
+}
+
+export function serializeCorpus(records) {
+  return `${records.map((record) => JSON.stringify(canonicalCorpusRecord(record))).join('\n')}\n`
+}
+
 export function validateCorpusRecord(record) {
   const errors = []
-  const required = [
-    'id',
-    'text',
-    'contextClass',
-    'band',
-    'ownership',
-    'quality',
-    'placeholders',
-    'intentTags',
-    'namespace',
-    'surface',
-    'provenance',
-  ]
-  for (const field of required) {
+  if (!record || typeof record !== 'object' || Array.isArray(record)) {
+    return ['Corpus record must be an object.']
+  }
+  for (const field of CORPUS_RECORD_FIELDS) {
     if (!(field in record)) errors.push(`Missing corpus field ${field}.`)
   }
+  for (const field of Object.keys(record)) {
+    if (![...CORPUS_RECORD_FIELDS, ...OPTIONAL_CORPUS_RECORD_FIELDS].includes(field)) {
+      errors.push(`Unexpected corpus field ${field}.`)
+    }
+  }
+  if (typeof record.id !== 'string' || !record.id) errors.push('Corpus id must be a nonempty string.')
+  if (typeof record.text !== 'string' || !record.text) errors.push('Corpus text must be a nonempty string.')
+  if (typeof record.namespace !== 'string' || !record.namespace) errors.push('Corpus namespace must be a nonempty string.')
+  if (typeof record.surface !== 'string' || !record.surface) errors.push('Corpus surface must be a nonempty string.')
+  if (typeof record.provenance !== 'string' || !record.provenance) errors.push('Corpus provenance must be a nonempty string.')
   if (!CONTEXT_CLASSES.includes(record.contextClass)) errors.push(`Invalid context ${record.contextClass}.`)
   if (!['micro', 'short', 'long'].includes(record.band)) errors.push(`Invalid band ${record.band}.`)
   if (!OWNERSHIPS.includes(record.ownership)) errors.push(`Invalid ownership ${record.ownership}.`)
   if (!['canonical', 'current', 'avoid'].includes(record.quality)) errors.push(`Invalid quality ${record.quality}.`)
   if (!Array.isArray(record.placeholders)) errors.push('Corpus placeholders must be an array.')
+  else if (record.placeholders.some((value) => typeof value !== 'string')) errors.push('Corpus placeholders must contain strings.')
   if (!Array.isArray(record.intentTags)) errors.push('Corpus intentTags must be an array.')
+  else if (record.intentTags.some((value) => typeof value !== 'string')) errors.push('Corpus intentTags must contain strings.')
+  if ('bounded' in record && typeof record.bounded !== 'boolean') errors.push('Corpus bounded must be a boolean.')
+  if ('restyle' in record && typeof record.restyle !== 'boolean') errors.push('Corpus restyle must be a boolean.')
   if (record.text && record.band !== measureBand(record.text)) errors.push('Corpus band does not match measured text.')
   return errors
 }
@@ -647,9 +754,292 @@ export async function buildCorpus(root = repositoryRoot) {
     const errors = validateCorpusRecord(record)
     if (errors.length) throw new Error(`${record.id ?? '<unknown>'}: ${errors.join(' ')}`)
     if (records.has(record.id)) throw new Error(`Duplicate corpus id ${record.id}.`)
-    records.set(record.id, record)
+    records.set(record.id, canonicalCorpusRecord(record))
   }
   return [...records.values()].sort((left, right) => left.id.localeCompare(right.id))
+}
+
+function qualifiedSnapshotIdentity(manifest) {
+  return {
+    version: manifest.version,
+    recordCount: manifest.recordCount,
+    corpusHash: manifest.corpusHash,
+    sourceHead: manifest.sourceHead,
+    sourceInputsDirty: manifest.sourceInputsDirty,
+    sourceInputFileCount: manifest.sourceInputFileCount,
+    sourceInputHash: manifest.sourceInputHash,
+    sourceStatusHash: manifest.sourceStatusHash,
+    provenance: manifest.provenance,
+  }
+}
+
+export function createQualifiedCorpusManifest(records, source, generatedAt = new Date().toISOString()) {
+  const identity = {
+    version: QUALIFIED_CORPUS_MANIFEST_VERSION,
+    recordCount: records.length,
+    corpusHash: valueHash(records),
+    sourceHead: source.sourceHead,
+    sourceInputsDirty: source.sourceInputsDirty,
+    sourceInputFileCount: source.sourceInputFileCount,
+    sourceInputHash: source.sourceInputHash,
+    sourceStatusHash: source.sourceStatusHash,
+    provenance: QUALIFIED_CORPUS_PROVENANCE,
+  }
+  return {
+    version: identity.version,
+    snapshotId: valueHash(identity),
+    recordCount: identity.recordCount,
+    corpusHash: identity.corpusHash,
+    sourceHead: identity.sourceHead,
+    sourceInputsDirty: identity.sourceInputsDirty,
+    sourceInputFileCount: identity.sourceInputFileCount,
+    sourceInputHash: identity.sourceInputHash,
+    sourceStatusHash: identity.sourceStatusHash,
+    generatedAt,
+    provenance: identity.provenance,
+  }
+}
+
+export function qualifiedCorpusBundlePaths(
+  snapshotId,
+  { directory = qualifiedCorpusDirectory } = {},
+) {
+  if (typeof snapshotId !== 'string' || !/^[0-9a-f]{64}$/.test(snapshotId)) {
+    throw new Error('Qualified corpus snapshot id must be a SHA-256 hex string.')
+  }
+  return {
+    corpusPath: resolve(directory, `${snapshotId}.jsonl`),
+    manifestPath: resolve(directory, `${snapshotId}.manifest.json`),
+  }
+}
+
+export function validateQualifiedCorpusPointer(pointer) {
+  const errors = []
+  if (!pointer || typeof pointer !== 'object' || Array.isArray(pointer)) {
+    return ['Qualified corpus pointer must be an object.']
+  }
+  if (JSON.stringify(Object.keys(pointer).sort()) !== JSON.stringify(['snapshotId', 'version'])) {
+    errors.push('Qualified corpus pointer fields are invalid.')
+  }
+  if (pointer.version !== QUALIFIED_CORPUS_POINTER_VERSION) {
+    errors.push(`Qualified corpus pointer version must be ${QUALIFIED_CORPUS_POINTER_VERSION}.`)
+  }
+  if (typeof pointer.snapshotId !== 'string' || !/^[0-9a-f]{64}$/.test(pointer.snapshotId)) {
+    errors.push('Qualified corpus pointer snapshotId must be a SHA-256 hex string.')
+  }
+  return errors
+}
+
+export function validateQualifiedCorpusSnapshot(records, manifest, { serializedContent = null } = {}) {
+  const errors = []
+  if (!Array.isArray(records) || !records.length) {
+    errors.push('Qualified corpus must contain at least one record.')
+  } else {
+    const ids = new Set()
+    let previousId = null
+    for (const record of records) {
+      const recordErrors = validateCorpusRecord(record)
+      if (recordErrors.length) errors.push(`${record?.id ?? '<unknown>'}: ${recordErrors.join(' ')}`)
+      if (ids.has(record?.id)) errors.push(`Duplicate qualified corpus id ${record.id}.`)
+      ids.add(record?.id)
+      if (previousId !== null && String(previousId).localeCompare(String(record?.id)) >= 0) {
+        errors.push('Qualified corpus records must be sorted by unique id.')
+      }
+      previousId = record?.id
+    }
+  }
+
+  if (serializedContent !== null && Array.isArray(records) && serializedContent !== serializeCorpus(records)) {
+    errors.push('Qualified corpus JSONL is not in deterministic canonical form.')
+  }
+
+  if (!manifest || typeof manifest !== 'object' || Array.isArray(manifest)) {
+    errors.push('Qualified corpus manifest must be an object.')
+  } else {
+    const expectedFields = [
+      'version',
+      'snapshotId',
+      'recordCount',
+      'corpusHash',
+      'sourceHead',
+      'sourceInputsDirty',
+      'sourceInputFileCount',
+      'sourceInputHash',
+      'sourceStatusHash',
+      'generatedAt',
+      'provenance',
+    ]
+    const actualFields = Object.keys(manifest).sort()
+    if (JSON.stringify(actualFields) !== JSON.stringify([...expectedFields].sort())) {
+      errors.push('Qualified corpus manifest fields are invalid.')
+    }
+    if (manifest.version !== QUALIFIED_CORPUS_MANIFEST_VERSION) {
+      errors.push(`Qualified corpus manifest version must be ${QUALIFIED_CORPUS_MANIFEST_VERSION}.`)
+    }
+    if (!Number.isInteger(manifest.recordCount) || manifest.recordCount < 1) {
+      errors.push('Qualified corpus manifest recordCount must be a positive integer.')
+    } else if (Array.isArray(records) && manifest.recordCount !== records.length) {
+      errors.push('Qualified corpus manifest recordCount does not match the snapshot.')
+    }
+    if (typeof manifest.corpusHash !== 'string' || !/^[0-9a-f]{64}$/.test(manifest.corpusHash)) {
+      errors.push('Qualified corpus manifest corpusHash must be a SHA-256 hex string.')
+    } else if (Array.isArray(records) && manifest.corpusHash !== valueHash(records)) {
+      errors.push('Qualified corpus manifest corpusHash does not match the snapshot.')
+    }
+    if (typeof manifest.sourceHead !== 'string' || !/^[0-9a-f]{40,64}$/.test(manifest.sourceHead)) {
+      errors.push('Qualified corpus manifest sourceHead must be a git hash.')
+    }
+    if (typeof manifest.sourceInputsDirty !== 'boolean') {
+      errors.push('Qualified corpus manifest sourceInputsDirty must be a boolean.')
+    }
+    if (!Number.isInteger(manifest.sourceInputFileCount) || manifest.sourceInputFileCount < 1) {
+      errors.push('Qualified corpus manifest sourceInputFileCount must be a positive integer.')
+    }
+    if (typeof manifest.sourceInputHash !== 'string' || !/^[0-9a-f]{64}$/.test(manifest.sourceInputHash)) {
+      errors.push('Qualified corpus manifest sourceInputHash must be a SHA-256 hex string.')
+    }
+    if (typeof manifest.sourceStatusHash !== 'string' || !/^[0-9a-f]{64}$/.test(manifest.sourceStatusHash)) {
+      errors.push('Qualified corpus manifest sourceStatusHash must be a SHA-256 hex string.')
+    } else if (manifest.sourceInputsDirty === false && manifest.sourceStatusHash !== valueHash([])) {
+      errors.push('A clean qualified corpus manifest must record the empty source status hash.')
+    }
+    if (
+      typeof manifest.generatedAt !== 'string'
+      || !Number.isFinite(Date.parse(manifest.generatedAt))
+      || new Date(manifest.generatedAt).toISOString() !== manifest.generatedAt
+    ) {
+      errors.push('Qualified corpus manifest generatedAt must be a canonical ISO timestamp.')
+    }
+    if (manifest.provenance !== QUALIFIED_CORPUS_PROVENANCE) {
+      errors.push(`Qualified corpus manifest provenance must be ${QUALIFIED_CORPUS_PROVENANCE}.`)
+    }
+    if (typeof manifest.snapshotId !== 'string' || !/^[0-9a-f]{64}$/.test(manifest.snapshotId)) {
+      errors.push('Qualified corpus manifest snapshotId must be a SHA-256 hex string.')
+    } else if (manifest.snapshotId !== valueHash(qualifiedSnapshotIdentity(manifest))) {
+      errors.push('Qualified corpus manifest snapshotId does not match its deterministic identity.')
+    }
+  }
+  return errors
+}
+
+export async function loadQualifiedCorpusBundle(
+  snapshotId,
+  { directory = qualifiedCorpusDirectory } = {},
+) {
+  const { corpusPath, manifestPath } = qualifiedCorpusBundlePaths(snapshotId, { directory })
+  const [serializedContent, manifest] = await Promise.all([
+    readFile(corpusPath, 'utf8'),
+    readJson(manifestPath),
+  ])
+  const records = parseJsonLines(serializedContent, corpusPath)
+  const errors = validateQualifiedCorpusSnapshot(records, manifest, { serializedContent })
+  if (manifest.snapshotId !== snapshotId) {
+    errors.push('Qualified corpus manifest does not match the requested snapshot id.')
+  }
+  if (errors.length) throw new Error(`Qualified corpus snapshot is invalid: ${errors.join(' ')}`)
+  return {
+    corpusHash: manifest.corpusHash,
+    corpusPath,
+    manifest,
+    manifestPath,
+    records,
+    snapshotId,
+  }
+}
+
+export async function loadQualifiedCorpus(options = {}) {
+  const directory = options.directory ?? qualifiedCorpusDirectory
+  const pointerPath = options.pointerPath ?? resolve(directory, 'current.json')
+  const pointer = await readJson(pointerPath)
+  const pointerErrors = validateQualifiedCorpusPointer(pointer)
+  if (pointerErrors.length) {
+    throw new Error(`Qualified corpus pointer is invalid: ${pointerErrors.join(' ')}`)
+  }
+  return {
+    ...await loadQualifiedCorpusBundle(pointer.snapshotId, { directory }),
+    pointer,
+    pointerPath,
+  }
+}
+
+export async function validateQualifiedCorpusInventory({
+  directory = qualifiedCorpusDirectory,
+} = {}) {
+  const errors = []
+  let pointer = null
+  try {
+    pointer = await readJson(resolve(directory, 'current.json'))
+    errors.push(...validateQualifiedCorpusPointer(pointer))
+  } catch (error) {
+    errors.push(`Qualified corpus pointer cannot be read: ${error instanceof Error ? error.message : String(error)}`)
+  }
+  const expected = new Set(['current.json'])
+  if (pointer && validateQualifiedCorpusPointer(pointer).length === 0) {
+    expected.add(`${pointer.snapshotId}.jsonl`)
+    expected.add(`${pointer.snapshotId}.manifest.json`)
+  }
+  const entries = await readdir(directory, { withFileTypes: true }).catch(() => [])
+  for (const entry of entries) {
+    if (!entry.isFile() || !expected.has(entry.name)) {
+      errors.push(`Unexpected qualified corpus bundle entry ${entry.name}.`)
+    }
+  }
+  for (const name of expected) {
+    if (!entries.some((entry) => entry.isFile() && entry.name === name)) {
+      errors.push(`Qualified corpus bundle entry ${name} is missing.`)
+    }
+  }
+  return { errors, expectedFiles: [...expected].sort(), pointer }
+}
+
+export function compareLiveAndQualifiedCorpus(liveRecords, qualifiedRecords) {
+  const liveById = new Map(liveRecords.map((record) => [record.id, record]))
+  const qualifiedById = new Map(qualifiedRecords.map((record) => [record.id, record]))
+  const addedRecords = [...liveById.keys()].filter((id) => !qualifiedById.has(id)).length
+  const removedRecords = [...qualifiedById.keys()].filter((id) => !liveById.has(id)).length
+  const changedRecords = [...liveById].filter(([id, record]) => (
+    qualifiedById.has(id) && valueHash(record) !== valueHash(qualifiedById.get(id))
+  )).length
+  const liveHash = valueHash(liveRecords)
+  const qualifiedHash = valueHash(qualifiedRecords)
+  const drifted = liveHash !== qualifiedHash
+  return {
+    status: drifted ? 'drifted' : 'in-sync',
+    drifted,
+    liveHash,
+    liveRecordCount: liveRecords.length,
+    qualifiedHash,
+    qualifiedRecordCount: qualifiedRecords.length,
+    addedRecords,
+    removedRecords,
+    changedRecords,
+    warning: drifted
+      ? 'Live corpus differs from the qualified snapshot; runtime remains pinned to the qualified snapshot.'
+      : null,
+  }
+}
+
+export async function liveVsQualifiedCorpusStatus(
+  root = repositoryRoot,
+  qualifiedRecords = null,
+) {
+  const records = qualifiedRecords ?? (await loadQualifiedCorpus()).records
+  try {
+    return compareLiveAndQualifiedCorpus(await buildCorpus(root), records)
+  } catch (error) {
+    return {
+      status: 'unavailable',
+      drifted: null,
+      liveHash: null,
+      liveRecordCount: null,
+      qualifiedHash: valueHash(records),
+      qualifiedRecordCount: records.length,
+      addedRecords: null,
+      removedRecords: null,
+      changedRecords: null,
+      warning: `Live corpus status is unavailable: ${error instanceof Error ? error.message : String(error)}`,
+    }
+  }
 }
 
 function siblingContexts(contextClass) {
@@ -847,6 +1237,23 @@ export function normalizedRequestForResponse(request, rawInput = '') {
     forbiddenTerms: [],
     stateMatrix: [],
     outputCount: 1,
+  }
+}
+
+export function localRefusalResponse(request, rawInput = '') {
+  const rawText = typeof rawInput === 'string' ? rawInput : JSON.stringify(rawInput)
+  const refusal = detectRefusal(request, rawText)
+  if (!refusal) return null
+  return {
+    status: 'refused',
+    normalizedRequest: normalizedRequestForResponse(request, rawInput),
+    proposedKey: null,
+    rankedCandidates: [],
+    exemplarsUsed: [],
+    checks: Object.fromEntries(RESPONSE_CHECKS.map((check) => [check, true])),
+    warnings: [],
+    refusal,
+    confidence: 'high',
   }
 }
 
@@ -1087,7 +1494,16 @@ export function validateResponse(response, request, rawInput = '') {
   }
   if (
     typeof response.proposedKey === 'string'
-    && response.proposedKey.split('.').slice(1).some((segment) => BACKEND_DOMAIN_SEGMENT.test(segment))
+    && response.proposedKey.split('.').slice(1).some((segment) => {
+      if (!BACKEND_DOMAIN_SEGMENT.test(segment)) return false
+      const semanticText = ` ${`${request.surface} ${request.intent}`
+        .toLowerCase()
+        .replace(/[_-]+/g, ' ')
+        .replace(/[^a-z0-9]+/g, ' ')
+        .trim()} `
+      const semanticSegment = segment.replaceAll('_', ' ')
+      return !semanticText.includes(` ${semanticSegment} `)
+    })
   ) {
     errors.push('proposedKey must not embed a raw backend domain.')
   }

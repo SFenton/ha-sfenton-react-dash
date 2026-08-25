@@ -21,6 +21,9 @@ import { CORE_COPY_KEYS, CORE_COPY_NAMESPACE, VACUUM_COPY_KEYS, VACUUM_COPY_NAME
 import { asEntityName, titleCaseState } from './entityState'
 import { mapGridRectDimensionsCm, mapGridRectToServiceData, type MapGridRect } from './ValetudoMapGeometry'
 import { ValetudoMapCard, type ValetudoMapEditorMeta } from './ValetudoMapCard'
+import { VacuumOutcomeDetail, VacuumOutcomeOverview } from './VacuumOutcomes'
+import { vacuumWhileAwayPresentation, type VacuumOutcomeContract, type VacuumWhileAwayPresentation } from './vacuumOutcomes'
+import { vacuumOutcomeDayValue } from './vacuumOutcomePresentation'
 import { isUnavailableVacuumState, vacuumConsumableVisual, vacuumStateVisual, type VacuumVisualTone } from './vacuumVisualState'
 import styles from './VacuumCard.module.css'
 
@@ -384,11 +387,6 @@ function SectionText({ lines }: { lines?: string[] }) {
       {lines.map((line, index) => <p key={`${index}-${line}`}>{line}</p>)}
     </div>
   )
-}
-
-function stringListAttribute(entity: EntityLike | null | undefined, name: string) {
-  const value = entity?.attributes[name]
-  return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string' && item.trim().length > 0) : []
 }
 
 function ControlItem({ children, description, detailTrigger }: { children: ReactNode; description?: string; detailTrigger?: string }) {
@@ -1007,16 +1005,27 @@ function VacuumControlsSection({
   )
 }
 
-function VacuumWhileAwaySection({ vacuum }: { vacuum: VacuumConfig }) {
+function VacuumWhileAwaySection({
+  onOpenOutcomes,
+  presentation,
+  vacuum,
+}: {
+  onOpenOutcomes?: () => void
+  presentation: VacuumWhileAwayPresentation
+  vacuum: VacuumConfig
+}) {
   const copy = useCopy(VACUUM_COPY_NAMESPACE)
-  const session = useOptionalEntity(vacuum.coordinatorSessionEntityId)
-  const cleaned = stringListAttribute(session, 'while_away_cleaned')
-  const issues = stringListAttribute(session, 'while_away_issues')
 
+  if (presentation.kind === 'empty') return null
+  if (presentation.kind === 'typed' && onOpenOutcomes) {
+    return <VacuumOutcomeOverview contract={presentation.contract} onOpen={onOpenOutcomes} vacuum={vacuum} />
+  }
+  const cleaned = presentation.cleaned
+  const issues = presentation.issues
   if (!cleaned.length && !issues.length) return null
 
   return (
-    <section className={styles.section}>
+    <section className={styles.section} data-modal-detail-trigger="vacuum-outcomes" tabIndex={-1}>
       <SectionHeader title="While You Were Away" />
       <div className={styles.awaySummary}>
         {cleaned.length > 0 && (
@@ -1107,7 +1116,9 @@ function VacuumModalTabContent({
   onDrawModeChange,
   onEditArea,
   onFinishAreaEditing,
+  onOpenOutcomes,
   onResetAreaView,
+  outcomePresentation,
   resetAreaViewRevision,
   vacuum,
 }: {
@@ -1123,7 +1134,9 @@ function VacuumModalTabContent({
   onDrawModeChange: (drawMode: boolean) => void
   onEditArea?: () => void
   onFinishAreaEditing: () => void
+  onOpenOutcomes?: () => void
   onResetAreaView: () => void
+  outcomePresentation: VacuumWhileAwayPresentation
   resetAreaViewRevision: number
   vacuum: VacuumConfig
 }) {
@@ -1168,8 +1181,10 @@ function VacuumModalTabContent({
           onAreaSelectionChange={onAreaSelectionChange}
           onDrawModeChange={onDrawModeChange}
           onFinishAreaEditing={onFinishAreaEditing}
+          onOpenOutcomes={onOpenOutcomes}
           onResetAreaView={onResetAreaView}
           optimisticState={optimisticState}
+          outcomePresentation={outcomePresentation}
           resetAreaViewRevision={resetAreaViewRevision}
           showAreaSelection={cleanTarget === 'area'}
           vacuum={vacuum}
@@ -1210,8 +1225,10 @@ function VacuumMapAndStatus({
   onAreaSelectionChange,
   onDrawModeChange,
   onFinishAreaEditing,
+  onOpenOutcomes,
   onResetAreaView,
   optimisticState,
+  outcomePresentation,
   resetAreaViewRevision,
   showAreaSelection,
   vacuum,
@@ -1223,8 +1240,10 @@ function VacuumMapAndStatus({
   onAreaSelectionChange: (selection: MapGridRect | null) => void
   onDrawModeChange: (drawMode: boolean) => void
   onFinishAreaEditing: () => void
+  onOpenOutcomes?: () => void
   onResetAreaView: () => void
   optimisticState: OptimisticVacuumState
+  outcomePresentation: VacuumWhileAwayPresentation
   resetAreaViewRevision: number
   showAreaSelection: boolean
   vacuum: VacuumConfig
@@ -1314,7 +1333,7 @@ function VacuumMapAndStatus({
       ) : (
         <>
           <VacuumStatusSummary displayState={optimisticState.state} vacuum={vacuum} />
-          <VacuumWhileAwaySection vacuum={vacuum} />
+          <VacuumWhileAwaySection onOpenOutcomes={onOpenOutcomes} presentation={outcomePresentation} vacuum={vacuum} />
         </>
       )}
     </>
@@ -1322,6 +1341,8 @@ function VacuumMapAndStatus({
 }
 
 export function VacuumRoomSourceModalContent({ vacuum }: VacuumCardProps) {
+  const session = useOptionalEntity(vacuum.coordinatorSessionEntityId)
+  const outcomePresentation = vacuumWhileAwayPresentation(session?.attributes)
   const [activeTab, setActiveTab] = useState<VacuumModalTab>('controls')
   const [areaEditorOpen, setAreaEditorOpen] = useState(false)
   const [areaSelection, setAreaSelection] = useState<MapGridRect | null>(null)
@@ -1350,6 +1371,7 @@ export function VacuumRoomSourceModalContent({ vacuum }: VacuumCardProps) {
         }}
         onFinishAreaEditing={() => setAreaEditorOpen(false)}
         onResetAreaView={() => setResetAreaViewRevision((revision) => revision + 1)}
+        outcomePresentation={outcomePresentation}
         resetAreaViewRevision={resetAreaViewRevision}
         vacuum={vacuum}
       />
@@ -1374,35 +1396,57 @@ export function VacuumModal({
   title?: string
   vacuum: VacuumConfig
 }) {
+  const copy = useCopy(VACUUM_COPY_NAMESPACE)
+  const session = useOptionalEntity(vacuum.coordinatorSessionEntityId)
+  const outcomePresentation = vacuumWhileAwayPresentation(session?.attributes)
   const [activeTab, setActiveTab] = useState<VacuumModalTab>('controls')
   const [areaEditorOpen, setAreaEditorOpen] = useState(false)
+  const [outcomeDetailContract, setOutcomeDetailContract] = useState<VacuumOutcomeContract | null>(null)
   const [areaSelection, setAreaSelection] = useState<MapGridRect | null>(null)
   const [cleanTarget, setCleanTarget] = useState<VacuumCleanTarget>('rooms')
   const [drawMode, setDrawMode] = useState(false)
   const [editorMeta, setEditorMeta] = useState<ValetudoMapEditorMeta>({ error: null, geometry: null, isLoaded: false })
   const [resetAreaViewRevision, setResetAreaViewRevision] = useState(0)
   const previousOpenRef = useRef(open)
-  const detailPageKey = areaEditorOpen ? 'vacuum-area-editor' : activeTab
+  const renderedOutcomeContract = outcomeDetailContract
+  const showOutcomes = renderedOutcomeContract !== null
+  const detailPageKey = areaEditorOpen ? 'vacuum-area-editor' : showOutcomes ? 'vacuum-outcomes' : activeTab
   const { bodyElementRef, enterDetailPage, leaveDetailPage, resetDetailPageScroll } = useModalDetailPageScroll(detailPageKey)
-  const title = areaEditorOpen ? `${vacuum.title} Cleaning Area` : titleOverride ?? `${vacuum.title} Robot Vacuum`
+  const title = areaEditorOpen
+    ? `${vacuum.title} Cleaning Area`
+    : showOutcomes
+      ? copy(VACUUM_COPY_KEYS.outcomes.detailTitle, { date: vacuumOutcomeDayValue(renderedOutcomeContract.day) })
+      : titleOverride ?? `${vacuum.title} Robot Vacuum`
   const closeAreaEditor = useCallback(() => {
     leaveDetailPage()
     setDrawMode(false)
     setAreaEditorOpen(false)
-  }, [leaveDetailPage])
+  }, [leaveDetailPage, setAreaEditorOpen, setDrawMode])
+  const closeOutcomes = useCallback(() => {
+    leaveDetailPage()
+    setOutcomeDetailContract(null)
+  }, [leaveDetailPage, setOutcomeDetailContract])
   const openAreaEditor = useCallback(() => {
     enterDetailPage('vacuum-area-editor')
+    setOutcomeDetailContract(null)
     setActiveTab('controls')
     setCleanTarget('area')
     setDrawMode(!areaSelection)
     setAreaEditorOpen(true)
-  }, [areaSelection, enterDetailPage])
+  }, [areaSelection, enterDetailPage, setActiveTab, setAreaEditorOpen, setCleanTarget, setDrawMode, setOutcomeDetailContract])
+  const openOutcomes = useCallback(() => {
+    if (outcomePresentation.kind !== 'typed') return
+    enterDetailPage('vacuum-outcomes')
+    setAreaEditorOpen(false)
+    setOutcomeDetailContract(outcomePresentation.contract)
+  }, [enterDetailPage, outcomePresentation, setAreaEditorOpen, setOutcomeDetailContract])
 
   useEffect(() => {
     const wasOpen = previousOpenRef.current
     if (open && !wasOpen) {
       setActiveTab('controls')
       setAreaEditorOpen(false)
+      setOutcomeDetailContract(null)
       setAreaSelection(null)
       setCleanTarget('rooms')
       setDrawMode(false)
@@ -1415,38 +1459,44 @@ export function VacuumModal({
 
   return (
     <ModalSheet
-      backLabel="Back to controls"
+      backLabel={showOutcomes ? copy(VACUUM_COPY_KEYS.outcomes.backToControls) : 'Back to controls'}
       bodyElementRef={bodyElementRef}
-      navigation={areaEditorOpen ? undefined : <VacuumModalNav activeTab={activeTab} onTabChange={(tab) => {
+      navigation={areaEditorOpen || showOutcomes ? undefined : <VacuumModalNav activeTab={activeTab} onTabChange={(tab) => {
         if (tab === 'zones') setCleanTarget('rooms')
         setActiveTab(tab)
       }} vacuum={vacuum} />}
-      onBack={areaEditorOpen ? closeAreaEditor : undefined}
+      onBack={areaEditorOpen ? closeAreaEditor : showOutcomes ? closeOutcomes : undefined}
       onClose={onClose}
       open={open}
-      scrollMode="panes"
+      scrollMode={showOutcomes ? 'body' : 'panes'}
       scrollResetKey={detailPageKey}
       size="workspace"
-      subtitle={areaEditorOpen ? undefined : subtitle}
+      subtitle={areaEditorOpen || showOutcomes ? undefined : subtitle}
       title={title}
     >
-      <VacuumModalTabContent
-        activeTab={activeTab}
-        areaEditorMeta={editorMeta}
-        areaEditorOpen={areaEditorOpen}
-        areaSelection={areaSelection}
-        cleanTarget={cleanTarget}
-        drawMode={drawMode}
-        onAreaEditorMetaChange={setEditorMeta}
-        onAreaSelectionChange={setAreaSelection}
-        onCleanTargetChange={setCleanTarget}
-        onDrawModeChange={setDrawMode}
-        onEditArea={openAreaEditor}
-        onFinishAreaEditing={closeAreaEditor}
-        onResetAreaView={() => setResetAreaViewRevision((revision) => revision + 1)}
-        resetAreaViewRevision={resetAreaViewRevision}
-        vacuum={vacuum}
-      />
+      {showOutcomes ? (
+        <VacuumOutcomeDetail contract={renderedOutcomeContract} vacuum={vacuum} />
+      ) : (
+        <VacuumModalTabContent
+          activeTab={activeTab}
+          areaEditorMeta={editorMeta}
+          areaEditorOpen={areaEditorOpen}
+          areaSelection={areaSelection}
+          cleanTarget={cleanTarget}
+          drawMode={drawMode}
+          onAreaEditorMetaChange={setEditorMeta}
+          onAreaSelectionChange={setAreaSelection}
+          onCleanTargetChange={setCleanTarget}
+          onDrawModeChange={setDrawMode}
+          onEditArea={openAreaEditor}
+          onFinishAreaEditing={closeAreaEditor}
+          onOpenOutcomes={openOutcomes}
+          onResetAreaView={() => setResetAreaViewRevision((revision) => revision + 1)}
+          outcomePresentation={outcomePresentation}
+          resetAreaViewRevision={resetAreaViewRevision}
+          vacuum={vacuum}
+        />
+      )}
     </ModalSheet>
   )
 }
@@ -1463,7 +1513,7 @@ export function VacuumCard({ disableHashSync = false, vacuum }: VacuumCardProps)
   useEffect(() => {
     if (disableHashSync) return undefined
 
-    const syncFromHash = () => setOpen(dashboardHash() === `#${vacuum.hash}` && !unavailable)
+    const syncFromHash = () => setOpen(dashboardHash() === `#${vacuum.hash}`)
     const targets = dashboardEventTargets()
 
     syncFromHash()
@@ -1479,13 +1529,13 @@ export function VacuumCard({ disableHashSync = false, vacuum }: VacuumCardProps)
         target.removeEventListener(DASHBOARD_ROUTE_CHANGE_EVENT, syncFromHash)
       })
     }
-  }, [disableHashSync, unavailable, vacuum.hash])
+  }, [disableHashSync, vacuum.hash])
 
   const openModal = useCallback(() => {
-    if (disableHashSync || unavailable) return
+    if (disableHashSync) return
     replaceDashboardUrl(`${dashboardPathWithSearch()}#${vacuum.hash}`)
     setOpen(true)
-  }, [disableHashSync, unavailable, vacuum.hash])
+  }, [disableHashSync, vacuum.hash])
 
   const closeModal = useCallback(() => {
     if (!disableHashSync) replaceDashboardUrl(dashboardPathWithSearch())
@@ -1498,11 +1548,11 @@ export function VacuumCard({ disableHashSync = false, vacuum }: VacuumCardProps)
     <>
       <GlassTile
         backgroundColor={visual.backgroundColor}
-        disclosure={!unavailable}
         icon={visual.icon}
         iconColor={visual.iconColor}
         isOff={unavailable}
-        onClick={unavailable ? undefined : openModal}
+        onClick={disableHashSync ? undefined : openModal}
+        semantics={{ kind: 'modal' }}
         subtitle={subtitle}
         tone={visual.tileTone}
         title={vacuum.title}

@@ -1,7 +1,7 @@
 import { readFile, readdir, writeFile } from 'node:fs/promises'
 import { basename, dirname, resolve } from 'node:path'
 import {
-  buildCorpus,
+  loadQualifiedCorpus,
   normalizeRequest,
   parseCliArgs,
   readJson,
@@ -19,7 +19,13 @@ async function resultPaths(directory) {
     for (const entry of await readdir(current, { withFileTypes: true })) {
       const path = resolve(current, entry.name)
       if (entry.isDirectory()) await walk(path)
-      else if (entry.isFile() && entry.name === 'result.json' && current.includes('/participants/')) paths.push(path)
+      else if (
+        entry.isFile()
+        && entry.name === 'result.json'
+        && (current.includes('/participants/') || current.includes('/local-results/'))
+      ) {
+        paths.push(path)
+      }
     }
   }
   await walk(directory)
@@ -110,6 +116,17 @@ function candidateText(candidate) {
   return typeof candidate?.text === 'string' ? candidate.text : ''
 }
 
+function normalizedWords(value) {
+  return String(value ?? '').toLowerCase().match(/[a-z0-9]+/g) ?? []
+}
+
+function hasSurfaceSubject(text, surface) {
+  const ignored = new Set(['card', 'control', 'footer', 'modal', 'notification', 'page', 'row', 'search', 'section', 'sheet', 'summary'])
+  const subjectTerms = normalizedWords(surface).filter((term) => !ignored.has(term))
+  const candidateTerms = new Set(normalizedWords(text))
+  return subjectTerms.some((term) => candidateTerms.has(term))
+}
+
 function oracleScore(response, evalCase, exemplarIds) {
   const oracle = evalCase.oracle
   const hardFailures = []
@@ -134,6 +151,9 @@ function oracleScore(response, evalCase, exemplarIds) {
       warnings.push(`proposedKey does not start with ${oracle.requiredKeyPrefix}.`)
     }
     const accepted = new Set(oracle.acceptedTexts ?? [])
+    const primary = candidateText(candidates.find((candidate) => candidate.rank === 1))
+    const requiredTerms = oracle.requiredTerms ?? []
+    const matchingTerms = requiredTerms.filter((term) => primary.toLowerCase().includes(term.toLowerCase())).length
     if (accepted.size) {
       const acceptedCount = candidates.filter((candidate) => accepted.has(candidateText(candidate))).length
       if (acceptedCount === candidates.length) {
@@ -143,20 +163,16 @@ function oracleScore(response, evalCase, exemplarIds) {
         score -= Math.min(24, unmatchedCount * 8)
         warnings.push(`${unmatchedCount} candidate(s) did not match accepted outputs.`)
       } else {
-        const semanticTerms = oracle.requiredTerms ?? []
-        const primaryText = candidateText(candidates.find((candidate) => candidate.rank === 1))
-        const allSemanticTermsPresent = semanticTerms.length > 0
-          && semanticTerms.every((term) => primaryText.toLowerCase().includes(term.toLowerCase()))
-        score -= allSemanticTermsPresent ? 8 : 25
+        const semanticCoverage = requiredTerms.length ? matchingTerms / requiredTerms.length : 0
+        const semanticPenalty = requiredTerms.length
+          ? semanticCoverage > 0 ? Math.round(12 * (1 - semanticCoverage)) : 25
+          : hasSurfaceSubject(primary, evalCase.expectedRequest.surface) ? 12 : 25
+        score -= semanticPenalty
         warnings.push('No candidate matched an accepted output.')
       }
     }
-    const primary = candidateText(candidates.find((candidate) => candidate.rank === 1))
-    const requiredTerms = oracle.requiredTerms ?? []
-    const matchingTerms = requiredTerms.filter((term) => primary.toLowerCase().includes(term.toLowerCase())).length
     if (requiredTerms.length) {
       const missing = requiredTerms.length - matchingTerms
-      score -= Math.round(15 * (missing / requiredTerms.length))
       if (missing) warnings.push(`Primary candidate missed ${missing} required semantic term(s).`)
     }
     const used = new Set(Array.isArray(response.exemplarsUsed) ? response.exemplarsUsed : [])
@@ -200,7 +216,8 @@ const savedCases = await readJson(resolve(runDir, 'cases.json')).catch(() => nul
 const publicCases = savedCases ?? await readJson(resolve(evalRoot, 'cases.public.json'))
 const holdoutCases = savedCases ? { cases: [] } : await readJson(resolve(evalRoot, 'cases.holdout.json'))
 const casesById = new Map([...publicCases.cases, ...holdoutCases.cases].map((evalCase) => [evalCase.id, evalCase]))
-const corpus = await readJson(resolve(runDir, 'corpus.json')).catch(() => buildCorpus())
+const corpus = await readJson(resolve(runDir, 'corpus.json'))
+  .catch(async () => (await loadQualifiedCorpus()).records)
 const scoredCases = []
 const batchRecords = []
 
@@ -209,17 +226,18 @@ for (const path of await resultPaths(runDir)) {
   const result = record.result
   const profile = candidatesById.get(record.profile.id)
   const batchHardFailures = []
+  const localOnly = record.localOnly === true
   if (!profile) batchHardFailures.push(`Unknown profile ${record.profile.id}.`)
-  if (result.exit?.code !== 0) batchHardFailures.push(`Copilot exited with ${result.exit?.code ?? result.exit?.signal}.`)
+  if (!localOnly && result.exit?.code !== 0) batchHardFailures.push(`Copilot exited with ${result.exit?.code ?? result.exit?.signal}.`)
   if (result.parseError || !result.parsedOutput) batchHardFailures.push(`Invalid JSON: ${result.parseError ?? 'missing output'}.`)
-  if (result.finalMessage?.model !== record.profile.model) {
+  if (!localOnly && result.finalMessage?.model !== record.profile.model) {
     batchHardFailures.push(`Runtime model ${result.finalMessage?.model} did not match ${record.profile.model}.`)
   }
-  if (
+  if (!localOnly && (
     result.launcherProfile?.model !== record.profile.model
     || result.launcherProfile?.effort !== record.profile.effort
     || result.launcherProfile?.context !== record.profile.context
-  ) {
+  )) {
     batchHardFailures.push('Launcher profile did not match the requested model, effort, and context.')
   }
   const runtimeProfileEvents = (result.selectedEvents ?? []).filter((event) => (
@@ -229,19 +247,22 @@ for (const path of await resultPaths(runDir)) {
     .filter((event) => event.type === 'model.call_start')
     .map((event) => event.data?.model)
     .filter(Boolean)
-  if (!runtimeModels.length || runtimeModels.some((model) => model !== record.profile.model)) {
+  if (!localOnly && (!runtimeModels.length || runtimeModels.some((model) => model !== record.profile.model))) {
     batchHardFailures.push(`Runtime model-call evidence did not match ${record.profile.model}.`)
   }
   const runtimeEffort = findString(runtimeProfileEvents, ['effort', 'effortlevel', 'reasoning_effort'])
   const runtimeContext = findString(runtimeProfileEvents, ['context', 'contexttier', 'context_tier'])
-  if (record.profile.effort !== null && runtimeEffort !== null && runtimeEffort !== record.profile.effort) {
+  if (!localOnly && record.profile.effort !== null && runtimeEffort !== null && runtimeEffort !== record.profile.effort) {
     batchHardFailures.push(`Runtime effort ${runtimeEffort} did not match ${record.profile.effort}.`)
   }
-  if (runtimeContext !== null && runtimeContext !== record.profile.context) {
+  if (!localOnly && runtimeContext !== null && runtimeContext !== record.profile.context) {
     batchHardFailures.push(`Runtime context ${runtimeContext} did not match ${record.profile.context}.`)
   }
   if (result.toolEvents?.length) batchHardFailures.push('Participant requested or executed a tool.')
   if (result.unexpectedFiles?.length) batchHardFailures.push(`Participant wrote files: ${result.unexpectedFiles.join(', ')}`)
+  if (localOnly && (record.modelCaseIds?.length || result.finalMessage || result.selectedEvents?.length)) {
+    batchHardFailures.push('Local-only refusal batch contains participant execution evidence.')
+  }
 
   const rawOutputResults = Array.isArray(result.parsedOutput?.results) ? result.parsedOutput.results : []
   const outputResults = rawOutputResults.filter((entry) =>
@@ -257,17 +278,33 @@ for (const path of await resultPaths(runDir)) {
     batchHardFailures.push(`Unexpected case id ${extra}.`)
   }
 
-  const promptText = await readFile(resolve(dirname(path), 'prompt.md'), 'utf8').catch(() => '')
-  const usage = usageProjection(result.resultEvent?.usage, profile?.pricing ?? {
-    input: 0,
-    cachedInput: 0,
-    cacheWrite: 0,
-    output: 0,
-  }, promptText, result.finalMessage?.content ?? '')
+  const promptText = localOnly
+    ? ''
+    : await readFile(resolve(dirname(path), 'prompt.md'), 'utf8').catch(() => '')
+  const usage = localOnly
+    ? {
+        cacheWriteTokens: 0,
+        cachedInputTokens: 0,
+        estimatedAiCredits: 0,
+        estimatedUsd: 0,
+        inputTokens: 0,
+        outputTokens: 0,
+        premiumRequests: null,
+        reportedAiCredits: null,
+        tokenEstimateMethod: 'local-deterministic',
+        totalNanoAiu: null,
+      }
+    : usageProjection(result.resultEvent?.usage, profile?.pricing ?? {
+        input: 0,
+        cachedInput: 0,
+        cacheWrite: 0,
+        output: 0,
+      }, promptText, result.finalMessage?.content ?? '')
   batchRecords.push({
     batchId: record.batchId,
     durationMs: result.durationMs,
     hardFailures: batchHardFailures,
+    localOnly,
     profileId: record.profile.id,
     repeat: record.repeat,
     singleton: record.singleton,
@@ -277,7 +314,8 @@ for (const path of await resultPaths(runDir)) {
   for (const caseId of record.caseIds) {
     const evalCase = casesById.get(caseId)
     const response = byCase.get(caseId)
-    const hardFailures = [...batchHardFailures]
+    const localCase = record.localCaseIds?.includes(caseId) ?? false
+    const hardFailures = localCase ? [] : [...batchHardFailures]
     const warnings = []
     let score = 0
     if (!evalCase) {
@@ -292,12 +330,14 @@ for (const path of await resultPaths(runDir)) {
         else warnings.push(error)
       }
       const validationWarningCount = warnings.length
-      const retrieval = retrieveExamples(corpus, {
-        ...request,
-        sourceText: typeof evalCase.input === 'string'
-          ? evalCase.input
-          : evalCase.input.sourceText ?? evalCase.input.intent,
-      })
+      const retrieval = localCase
+        ? { positives: [], negatives: [] }
+        : retrieveExamples(corpus, {
+            ...request,
+            sourceText: typeof evalCase.input === 'string'
+              ? evalCase.input
+              : evalCase.input.sourceText ?? evalCase.input.intent,
+          })
       const exemplarIds = new Set([...retrieval.positives, ...retrieval.negatives].map((record) => record.id))
       const oracle = oracleScore(response, evalCase, exemplarIds)
       hardFailures.push(...oracle.hardFailures)
@@ -314,6 +354,7 @@ for (const path of await resultPaths(runDir)) {
       repeat: record.repeat,
       score,
       singleton: record.singleton,
+      local: localCase,
       warnings,
     })
   }

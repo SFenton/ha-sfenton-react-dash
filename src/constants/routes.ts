@@ -1,4 +1,5 @@
 import { copy } from '../i18n'
+import { dashboardRouteHostIndex, isDashboardRouteHostPath } from './dashboardHosts'
 
 export interface DashboardRouteConfig {
   title: string
@@ -178,11 +179,8 @@ function routeSegment(segment: string | undefined) {
 
 function routePathFromPathname(pathname: string) {
   const parts = pathname.split('/').filter(Boolean)
-  const atAGlanceIndex = parts.lastIndexOf('at-a-glance')
-  if (atAGlanceIndex >= 0) return routeSegment(parts[atAGlanceIndex + 1]) ?? DEFAULT_ROUTE_PATH
-
-  const wrapperIndex = parts.lastIndexOf('sfenton-react-dash')
-  if (wrapperIndex >= 0) return routeSegment(parts[wrapperIndex + 1]) ?? DEFAULT_ROUTE_PATH
+  const dashboardIndex = dashboardRouteHostIndex(parts)
+  if (dashboardIndex >= 0) return routeSegment(parts[dashboardIndex + 1]) ?? DEFAULT_ROUTE_PATH
 
   return routeSegment(parts.at(-1))
 }
@@ -214,11 +212,6 @@ function isStaticAppPath(pathname: string) {
 
 function shouldUseQueryRoute(url: URL) {
   return isDashboardRouteHostPath(url.pathname) || isStaticAppPath(url.pathname)
-}
-
-function isDashboardRouteHostPath(pathname: string) {
-  const parts = pathname.split('/').filter(Boolean)
-  return parts.includes('sfenton-react-dash') || parts.includes('at-a-glance')
 }
 
 function normalizedHash(hash: string | undefined) {

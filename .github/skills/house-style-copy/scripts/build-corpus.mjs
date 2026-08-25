@@ -1,11 +1,15 @@
 import { mkdir, writeFile } from 'node:fs/promises'
 import { dirname, resolve } from 'node:path'
-import { buildCorpus, parseCliArgs, repositoryRoot } from './lib.mjs'
+import { buildCorpus, parseCliArgs, repositoryRoot, serializeCorpus } from './lib.mjs'
 
 const args = parseCliArgs(process.argv.slice(2))
+if (args.help) {
+  console.log('Usage: build-corpus.mjs [--root <repository>] [--out <corpus.jsonl>]\nBuilds the unqualified live source/catalog corpus for inspection only. Use snapshot-corpus.mjs to cleanliness-check inputs and atomically publish production authority.')
+  process.exit()
+}
 const root = args.root ? resolve(String(args.root)) : repositoryRoot
 const corpus = await buildCorpus(root)
-const content = `${corpus.map((record) => JSON.stringify(record)).join('\n')}\n`
+const content = serializeCorpus(corpus)
 
 if (args.out) {
   const output = resolve(String(args.out))

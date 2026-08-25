@@ -1,5 +1,109 @@
 {
   "cleaned": "Cleaned",
   "issues": "Issues",
-  "selectedRooms": "Selected Rooms"
+  "selectedRooms": "Selected Rooms",
+  "outcomes": {
+    "sectionTitle": "While You Were Away",
+    "detailTitle": "While-Away Vacuum Outcomes · {{date}}",
+    "backToControls": "Back to Vacuum Controls",
+    "openDetail": "Open {{room}} Cleaning Outcomes for {{date}}",
+    "allRoomsComplete": "All Rooms Complete",
+    "groups": {
+      "needsAttention": "Needs Attention",
+      "interrupted": "Interrupted",
+      "stillDue": "Work Still Due",
+      "done": "Fully Completed"
+    },
+    "statuses": {
+      "failed": "Failed",
+      "interrupted": "Interrupted",
+      "partial": "Partially Complete",
+      "deferred": "Not Attempted",
+      "completed": "Completed"
+    },
+    "summary": {
+      "completedRooms_one": "{{count}} Room Done Today",
+      "completedRooms_other": "{{count}} Rooms Done Today",
+      "roomsDue_one": "{{count}} Room Needs Cleaning",
+      "roomsDue_other": "{{count}} Rooms Need Cleaning",
+      "attention_one": "{{count}} Room Failure • Review",
+      "attention_other": "{{count}} Room Failures • Review",
+      "interrupted_one": "{{count}} Room Interruption",
+      "interrupted_other": "{{count}} Room Interruptions"
+    },
+    "attempts_one": "{{count}} Clean Attempt",
+    "attempts_other": "{{count}} Clean Attempts",
+    "history": {
+      "title": "Room Event History",
+      "diagnosticsTitle": "Vacuum Diagnostics",
+      "show": "Show {{room}} History",
+      "hide": "Hide {{room}} History",
+      "showDiagnostics": "Show {{room}} Technical Vacuum Diagnostics",
+      "hideDiagnostics": "Hide {{room}} Technical Vacuum Diagnostics"
+    },
+    "reasonLabels": {
+      "attempt": "Attempt Reason",
+      "outstanding": "Work Blocker"
+    },
+    "primary": {
+      "completed": {
+        "vacuum": "Vacuuming completed for the room.",
+        "vacuumMop": "Vacuuming and mopping completed for the room.",
+        "fallbackVacuum": "Fallback vacuuming completed for the room; mopping was not confirmed."
+      },
+      "failed": {
+        "vacuum": "Vacuuming the room without mopping failed.",
+        "vacuumMop": "Vacuuming and mopping the room failed.",
+        "fallbackVacuum": "The fallback attempt to vacuum the room without mopping failed."
+      },
+      "interrupted": {
+        "vacuum": "The vacuum-only attempt was interrupted before completion.",
+        "vacuumMop": "The vacuuming and mopping attempt was interrupted before completion.",
+        "fallbackVacuum": "The fallback vacuum-only attempt was interrupted before completion."
+      },
+      "deferred": {
+        "vacuum": "Vacuuming was deferred before any attempt.",
+        "vacuumMop": "Vacuuming and mopping were deferred before any attempt.",
+        "mop": "Only mopping was deferred without being attempted."
+      },
+      "partialCredit": "Home Assistant credited vacuuming; work may remain."
+    },
+    "outstanding": {
+      "vacuum": "Vacuuming remains due.",
+      "vacuumMop": "Combined vacuuming and mopping remain due.",
+      "mop": "Mopping remains due."
+    },
+    "reasons": {
+      "freshWaterMissing": "Fresh-water status is missing.",
+      "freshWaterUnknown": "Fresh-water status is unknown.",
+      "freshWaterUnavailable": "Fresh-water status is unavailable.",
+      "cleanWaterEmpty": "The mop dock's clean-water tank was empty; refill it.",
+      "mopAttachmentMissing": "The vacuum's mop attachment was missing; attach it before mopping.",
+      "dirtyWaterUnavailable": "The dirty-water tank was unavailable; check it before mopping.",
+      "cleaningLiquidUnavailable": "Mop cleaning liquid was unavailable; check it before mopping.",
+      "mopHardwareUnavailable": "The mop hardware was unavailable; check it before mopping.",
+      "autoEmptyBlocked": "The auto-empty dock dust bag was full or its dust duct was blocked.",
+      "someoneReturned": "Cleaning was interrupted because someone returned home.",
+      "lowBattery": "The vacuum battery was too low to continue cleaning the room.",
+      "roomRunCancelled": "The room run was cancelled.",
+      "dispatchTimeout": "The room-cleaning request did not start within {{seconds}} seconds; try again.",
+      "dispatchTimeoutWithoutDuration": "The room-cleaning request timed out without a verified duration; try again.",
+      "dispatchFailed": "Home Assistant could not dispatch the room-cleaning request; try again.",
+      "resumeTimeout": "The vacuum did not resume within {{seconds}} seconds; try again.",
+      "resumeTimeoutWithoutDuration": "The vacuum resume request timed out without a verified duration; try again.",
+      "cleaningNotStarted": "The vacuum never entered a cleaning state for the attempted room run; try again.",
+      "segmentNotReported": "The vacuum never reported cleaning the requested room segment; try again.",
+      "durationBelowMinimum": "Room cleaning lasted {{observed}} seconds, below the required minimum of {{minimum}} seconds.",
+      "durationBelowMinimumWithoutValues": "Room-cleaning duration fell below the required minimum without verified values; retry.",
+      "areaBelowMinimumWithoutValues": "The cleaned area of the room was below the required minimum.",
+      "estimatedRoomTimeBelowMinimum": "Estimated time in the requested room was {{observed}} seconds, below the required minimum of {{minimum}} seconds.",
+      "estimatedRoomTimeBelowMinimumWithoutValues": "Estimated time in the requested room was below the required minimum; reliable values were unavailable.",
+      "wrongRoom": "Observed cleaning was dominated by {{dominantRoom}} for {{dominantSeconds}} seconds instead of the requested {{commandedRoom}} for {{commandedSeconds}} seconds.",
+      "wrongRoomWithoutNames": "Observed cleaning time was dominated elsewhere, with {{dominantSeconds}} seconds versus {{commandedSeconds}} seconds in the requested room.",
+      "stuck": "The vacuum became stuck while trying to clean the room.",
+      "roomUnreachable": "The vacuum could not reach the requested room.",
+      "dockUnreachable": "The vacuum could not reach its dock.",
+      "unknown": "The vacuum outcome reason was not recognized."
+    }
+  }
 }

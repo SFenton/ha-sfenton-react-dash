@@ -1,5 +1,16 @@
 # HASS React Dashboard
 
+## Home Assistant deployment
+
+The production build currently ships to two Home Assistant sidebar hosts:
+
+- `/sfenton-react-dash/home` — the existing storage-mode Lovelace wrapper.
+- `/sfenton-react-panel` — an embedded `panel_custom` host that keeps the React iframe outside Lovelace card rebuilds.
+
+Both hosts use the same files under `/local/ha-sfenton-react-dash/`. Use `npm run deploy:both` for the SSH build/deploy/sync flow, or copy `dist/` over SMB and then run `npm run deploy:sync`. The custom-panel registration is versioned in `home-assistant/packages/sfenton_react_panel.yaml`; Home Assistant only needs a restart when that package or its bridge version changes.
+
+The experimental custom panel keeps Home Assistant's native sidebar on desktop; mobile remains full-viewport. This avoids unsupported top-window styling while the two hosts are evaluated in parallel.
+
 ## UX review and governance
 
 Run the review workspace on the fixed local port:

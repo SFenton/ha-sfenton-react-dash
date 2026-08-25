@@ -5,9 +5,14 @@ mutation, Home Assistant access, network tools, or participant file writes.
 
 ## Layout
 
-- `cases.public.json`: 42 calibration cases.
+- `cases.public.json`: 41 calibration cases.
 - `cases.holdout.json`: 18 anti-overfit cases.
 - `candidates.json`: exact candidate profiles and pricing snapshot.
+- `../assets/corpus/qualified/current.json`: atomic pointer to the exact
+  production and evaluation bundle.
+- `../assets/corpus/qualified/<snapshot-id>.jsonl` and
+  `<snapshot-id>.manifest.json`: hash-versioned corpus plus clean-input
+  provenance.
 - `model-pin.json`: launcher-enforced profile. It is provisional until the
   benchmark passes.
 - `plans/`: calibration, rule-tuning, frozen public qualification, holdout, and
@@ -24,12 +29,39 @@ Run before any model call:
 node .github/skills/house-style-copy/evals/bin/static-check.mjs
 ```
 
-The command validates all 60 cases, corpus records, context coverage, plans,
+The command validates all 59 cases, qualified corpus records and manifest,
+live-corpus drift status, context coverage, plans,
 candidate ordering, pin shape, boundaries, and script contracts.
+It also guards source namespace distribution so camel/Pascal component names
+cannot silently collapse nearly all retrieval evidence into `common`.
 
 Every plan uses a 30-credit per-call safety cap because the Copilot CLI rejects
 lower values. This is a ceiling, not expected spend; scoring records measured
 or estimated usage for actual cost comparison.
+
+## Qualified corpus lifecycle
+
+Generation and every pin-producing evaluation use the exact pointer-selected
+qualified snapshot; they never rebuild or silently fall back to live app copy.
+Mandatory refusals are deterministic local results and are removed before
+participant prompt construction. Ordinary source or catalog changes are
+reported as live drift and do not invalidate a valid pin.
+
+When new repository copy should become retrieval evidence, refresh explicitly:
+
+```bash
+node .github/skills/house-style-copy/scripts/snapshot-corpus.mjs
+node .github/skills/house-style-copy/evals/bin/static-check.mjs
+```
+
+The refresh rejects dirty corpus input paths by default. It stages a complete
+hash-named bundle, validates it, atomically renames `current.json`, and then
+removes superseded bundles. `--allow-dirty` is for maintenance previews only;
+restore and review clean inputs before release qualification.
+
+If the snapshot changes, its corpus hash and the enclosing skill hash change.
+Fresh qualification, holdout, latency, selection, and pin validation are then
+mandatory. Do not manually change hashes in `model-pin.json`.
 
 ## Calibration
 
@@ -51,9 +83,10 @@ plans pack multiple logical batches into one model invocation to reduce calls
 without mixing cases inside a logical context. Every logical batch contains one
 exact context and at most six cases. Singleton latency plans do not pack calls.
 
-Projected model calls for the documented five-plan benchmark: **221**. This
+Projected model calls for the documented five-plan benchmark: **211**. This
 planner-derived total includes availability preflights, every configured
-candidate and repeat, packed launch units, and singleton controls.
+candidate and repeat, model-bound packed launch units, and singleton controls.
+Local mandatory refusals consume no model call.
 
 ## Rule tuning
 
@@ -62,7 +95,7 @@ Pass a small explicit candidate list:
 ```bash
 node .github/skills/house-style-copy/evals/bin/run.mjs \
   --plan .github/skills/house-style-copy/evals/plans/rule-tuning.json \
-  --models gpt-5.6-luna-low,gpt-5-mini-low \
+  --models gpt-5.6-terra-low,gpt-5.6-sol-max-long \
   --out artifacts/house-style-copy-evals/rule-tuning-<run-id>
 ```
 
@@ -77,7 +110,7 @@ evidence.
 ```bash
 node .github/skills/house-style-copy/evals/bin/run.mjs \
   --plan .github/skills/house-style-copy/evals/plans/qualification.json \
-  --models gpt-5.6-luna-low,grok-4.5-low,gpt-5.6-terra-low \
+  --models claude-sonnet-5-low,gpt-5.6-terra-low,gpt-5.6-sol-max-long \
   --out artifacts/house-style-copy-evals/qualification-<run-id>
 ```
 
@@ -111,11 +144,47 @@ node .github/skills/house-style-copy/evals/bin/select-model.mjs \
   --runs artifacts/house-style-copy-evals/qualification-<run-id>,artifacts/house-style-copy-evals/holdout-<run-id>,artifacts/house-style-copy-evals/latency-<run-id>
 ```
 
-Add `--write-pin` only after reviewing the result. The selector never chooses
+Add `--write-pin` only after reviewing the result. It atomically stages
+`model-pin.json` and `latest-results.json` through one rollback-protected
+workflow, so both record the same winner, runs, date, and finalist metrics. The selector never chooses
 Auto and never admits a profile that fails the quality gate. Selection also
-requires calibration, holdout, and singleton-latency runs from the current
+requires qualification, holdout, and singleton-latency runs from the current
 skill, corpus, cases, plans, candidate list, and pricing snapshot; stale or
 mixed-hash evidence fails closed.
+
+For the current exact finalist plans, run and score:
+
+```bash
+node .github/skills/house-style-copy/evals/bin/run.mjs \
+  --plan .github/skills/house-style-copy/evals/plans/qualification.json \
+  --models claude-sonnet-5-low,gpt-5.6-terra-low,gpt-5.6-sol-max-long \
+  --out artifacts/house-style-copy-evals/qualification-<run-id>
+node .github/skills/house-style-copy/evals/bin/score.mjs \
+  --run artifacts/house-style-copy-evals/qualification-<run-id>
+
+node .github/skills/house-style-copy/evals/bin/run.mjs \
+  --plan .github/skills/house-style-copy/evals/plans/holdout.json \
+  --models claude-sonnet-5-low,gpt-5.6-terra-low,gpt-5.6-sol-max-long \
+  --out artifacts/house-style-copy-evals/holdout-<run-id>
+node .github/skills/house-style-copy/evals/bin/score.mjs \
+  --run artifacts/house-style-copy-evals/holdout-<run-id>
+
+node .github/skills/house-style-copy/evals/bin/run.mjs \
+  --plan .github/skills/house-style-copy/evals/plans/latency.json \
+  --models gpt-5.6-terra-low,gpt-5.6-sol-max-long \
+  --out artifacts/house-style-copy-evals/latency-<run-id>
+node .github/skills/house-style-copy/evals/bin/score.mjs \
+  --run artifacts/house-style-copy-evals/latency-<run-id>
+
+node .github/skills/house-style-copy/evals/bin/select-model.mjs \
+  --runs artifacts/house-style-copy-evals/qualification-<run-id>,artifacts/house-style-copy-evals/holdout-<run-id>,artifacts/house-style-copy-evals/latency-<run-id>
+# Review the passing gates and winner, then repeat the same command with:
+# --write-pin
+
+node .github/skills/house-style-copy/scripts/check-pin.mjs \
+  --model <selected-model> --effort <selected-effort-or-none> \
+  --context <selected-context>
+```
 
 `--pinned` runs fail while `model-pin.json` is provisional. The escape hatch
 `--allow-provisional-pin` exists only for an explicit launcher test and must
@@ -131,7 +200,7 @@ stays provisional whenever the latest result has no qualified profile.
 
 ## Reproducibility
 
-Each artifact run records:
+Each artifact run records the qualified corpus verbatim and:
 
 - Copilot CLI and git versions;
 - exact launcher model, effort, and context plus runtime model-call evidence;
@@ -149,3 +218,12 @@ Artifacts remain under the gitignored
 Candidate token prices come from GitHub's official
 [Models and pricing for GitHub Copilot](https://docs.github.com/en/copilot/reference/copilot-billing/models-and-pricing)
 table for the recorded `pricingAsOf` date.
+
+## Runtime launcher
+
+`scripts/generate.mjs` resolves mandatory refusals locally. Only remaining
+requests validate the current pin and qualified snapshot before launching the
+exact pinned profile with mutation, shell, URL, MCP, remote, and
+custom-instruction access disabled. This prevents private refusal input from
+entering participant prompts while retaining the qualified profile for safe
+copy requests.

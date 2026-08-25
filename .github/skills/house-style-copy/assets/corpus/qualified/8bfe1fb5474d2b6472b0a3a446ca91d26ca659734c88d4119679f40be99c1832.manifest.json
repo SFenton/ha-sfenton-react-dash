@@ -1,0 +1,13 @@
+{
+  "version": 2,
+  "snapshotId": "8bfe1fb5474d2b6472b0a3a446ca91d26ca659734c88d4119679f40be99c1832",
+  "recordCount": 1905,
+  "corpusHash": "ca6f2b65c8c5c44eb5f2574e7ebaa834de6261fce7172d923e7f4369b56e3a5b",
+  "sourceHead": "5de827c16d342a268b1aada7a227ba8487e9b7cb",
+  "sourceInputsDirty": false,
+  "sourceInputFileCount": 398,
+  "sourceInputHash": "e35c0bd03aa9c5fb834b19489ca85708d19267a597efc6aa025641173dba6db4",
+  "sourceStatusHash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+  "generatedAt": "2026-08-21T18:41:39.315Z",
+  "provenance": "buildCorpus(repositoryRoot)"
+}

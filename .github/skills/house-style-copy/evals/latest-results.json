@@ -1,65 +1,66 @@
 {
   "version": 1,
-  "evaluatedAt": "2026-08-11",
-  "status": "no-qualified-profile",
+  "evaluatedAt": "2026-08-21",
+  "status": "validated",
   "runs": [
-    "artifacts/house-style-copy-evals/release-qualification-20260811",
-    "artifacts/house-style-copy-evals/release-holdout-20260811",
-    "artifacts/house-style-copy-evals/release-latency-20260811"
+    "artifacts/house-style-copy-evals/durable2-qualification-20260821",
+    "artifacts/house-style-copy-evals/durable2-holdout-20260821",
+    "artifacts/house-style-copy-evals/durable2-latency-20260821"
   ],
+  "winner": "gpt-5.6-sol-max-long",
   "finalists": [
+    {
+      "candidateId": "gpt-5.6-sol-max-long",
+      "public": {
+        "passRate": 1,
+        "meanScore": 99.63414634146342,
+        "hardFailureCount": 0
+      },
+      "holdout": {
+        "passRate": 1,
+        "meanScore": 97.75925925925925,
+        "hardFailureCount": 0
+      },
+      "latency": {
+        "passRate": 1,
+        "meanScore": 97.5,
+        "hardFailureCount": 0,
+        "p95Milliseconds": 14182
+      }
+    },
+    {
+      "candidateId": "claude-sonnet-5-low",
+      "public": {
+        "passRate": 0.21951219512195122,
+        "meanScore": 24.26829268292683,
+        "hardFailureCount": 94
+      },
+      "holdout": {
+        "passRate": 0.46296296296296297,
+        "meanScore": 50.7037037037037,
+        "hardFailureCount": 79
+      },
+      "latency": null
+    },
     {
       "candidateId": "gpt-5.6-terra-low",
       "public": {
-        "passRate": 0.9523809523809523,
-        "meanScore": 99.66666666666667,
-        "hardFailureCount": 2
+        "passRate": 0.975609756097561,
+        "meanScore": 99.02439024390245,
+        "hardFailureCount": 0
       },
       "holdout": {
-        "passRate": 0.6666666666666666,
-        "meanScore": 90.07407407407408,
-        "hardFailureCount": 6
+        "passRate": 0.9814814814814815,
+        "meanScore": 97.5925925925926,
+        "hardFailureCount": 0
       },
       "latency": {
         "passRate": 1,
-        "meanScore": 94.5,
+        "meanScore": 98.5,
         "hardFailureCount": 0,
-        "p95Milliseconds": 6368
+        "p95Milliseconds": 6383
       }
-    },
-    {
-      "candidateId": "grok-4.5-low",
-      "public": {
-        "passRate": 0.9523809523809523,
-        "meanScore": 99.47619047619048,
-        "hardFailureCount": 2
-      },
-      "holdout": {
-        "passRate": 0.6851851851851852,
-        "meanScore": 90.33333333333333,
-        "hardFailureCount": 6
-      },
-      "latency": {
-        "passRate": 1,
-        "meanScore": 94.5,
-        "hardFailureCount": 0,
-        "p95Milliseconds": 16542
-      }
-    },
-    {
-      "candidateId": "gpt-5.6-luna-low",
-      "public": {
-        "passRate": 0.9047619047619048,
-        "meanScore": 98.78571428571429,
-        "hardFailureCount": 3
-      },
-      "holdout": {
-        "passRate": 0.5555555555555556,
-        "meanScore": 87.85185185185185,
-        "hardFailureCount": 10
-      },
-      "latency": null
     }
   ],
-  "decision": "No profile passed the frozen quality gate. Keep normal skill generation and pinned execution disabled."
+  "decision": "gpt-5.6-sol-max-long passed every quality gate and was selected by the deterministic cost, latency, and variance rule."
 }

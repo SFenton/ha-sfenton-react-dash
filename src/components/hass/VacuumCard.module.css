@@ -792,22 +792,31 @@
     gap: 14px;
   }
 
+  .leftPane:not(.areaEditorPane),
   .rightPane {
     box-sizing: border-box;
     height: 100%;
     min-height: 0;
     max-height: 100%;
-    align-self: start;
-    align-content: start;
-    align-items: start;
-    grid-auto-rows: max-content;
     overflow-x: hidden;
     overflow-y: auto;
-    padding-bottom: 12px;
     overscroll-behavior: contain;
     scrollbar-width: none;
   }
 
+  .leftPane:not(.areaEditorPane) {
+    padding-bottom: 12px;
+  }
+
+  .rightPane {
+    align-self: start;
+    align-content: start;
+    align-items: start;
+    grid-auto-rows: max-content;
+    padding-bottom: 12px;
+  }
+
+  .leftPane:not(.areaEditorPane)::-webkit-scrollbar,
   .rightPane::-webkit-scrollbar {
     display: none;
     width: 0;

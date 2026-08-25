@@ -4,10 +4,13 @@ import { vi } from 'vitest'
 import { materialIconPath } from '../components/core/iconPaths'
 import { INVENTORY_SEARCH_DEBOUNCE_MS } from '../components/hass/EverShelfInventoryControls'
 import { valueToThermostatPoint } from '../components/hass/thermostatDialGeometry'
+import { VacuumRoomSourceModalContent } from '../components/hass/VacuumCard'
 import { DashboardViewPage } from './DashboardViewPage'
 import { CONTACT_GROUPS } from '../constants/atAGlance'
+import { VACUUMS } from '../constants/portedDashboard'
 import { ROOM_PAGE_CONFIGS, ROOM_PAGE_ORDER } from '../constants/roomPages'
-import { entity, mockCallServiceCalls, mockDonetickTasksById, mockEntities, mockFreeSleepScheduleAttributes, mockScheduleMessages, mockState, mockTodoItemsByEntity, resetMockHass } from '../test/mocks/hakitCoreState'
+import { LEGACY_VACUUM_OUTCOMES, NINE_ROOM_VACUUM_OUTCOME_CONTRACT } from '../test/fixtures/vacuumOutcomes'
+import { entity, mockCallServiceCalls, mockDonetickTasksById, mockEntities, mockFreeSleepScheduleAttributes, mockScheduleMessages, mockState, mockTodoItemsByEntity, resetMockHass, setMockEntityState } from '../test/mocks/hakitCoreState'
 
 type MockDecodeCallback = (
   result: { getText: () => string } | undefined,
@@ -7529,10 +7532,12 @@ describe('DashboardViewPage', () => {
     expect(within(selectedRoomsSummary).queryByText('No rooms are selected. If you begin cleaning, the robot vacuum will attempt to clean every mapped area.')).not.toBeInTheDocument()
   })
 
-  it('opens available vacuum cards as modal controls and leaves unavailable cards inert', async () => {
+  it('opens available vacuum cards as modal controls', async () => {
     render(<DashboardViewPage activePath="vacuums" onNavigate={() => undefined} path="vacuums" />)
 
-    expect(screen.getByLabelText('Music Room')).toHaveAttribute('data-icon', 'mdi:robot-vacuum-off')
+    const musicRoomVacuum = screen.getByRole('button', { name: 'Music Room' })
+    expect(musicRoomVacuum).toHaveAttribute('data-icon', 'mdi:robot-vacuum-off')
+    expect(musicRoomVacuum).toHaveAttribute('data-modal-opener', 'true')
     const mainFloorVacuum = screen.getByRole('button', { name: /main floor docked/i })
     expect(mainFloorVacuum).toHaveAttribute('data-tone', 'vacuum')
     expect(mainFloorVacuum).toHaveAttribute('data-icon', 'mdi:home')
@@ -7572,6 +7577,171 @@ describe('DashboardViewPage', () => {
     expect(detergent).toHaveAttribute('data-icon', 'mdi:bottle-tonic')
     expect(sensors).toHaveAttribute('data-icon', 'mdi:timer-alert-outline')
     expect(sensors).toHaveAttribute('data-tone', 'warning')
+  })
+
+  it.each([
+    ['error', /Main Floor Error/i, 'Error', 'danger'],
+    ['unavailable', 'Main Floor', 'Unavailable', 'unavailable'],
+  ])('opens %s vacuum cards for status access without calling Home Assistant', async (state, cardName, statusValue, statusTone) => {
+    mockEntities['vacuum.valetudo_exaltedsneakydeer'].state = state
+    render(<DashboardViewPage activePath="vacuums" onNavigate={() => undefined} path="vacuums" />)
+
+    const card = screen.getByRole('button', { name: cardName })
+    expect(card).toHaveAttribute('data-action-kind', 'modal')
+    expect(card).toHaveAttribute('data-modal-opener', 'true')
+    fireEvent.click(card)
+
+    const dialog = await screen.findByRole('dialog')
+    expect(within(dialog).getByRole('heading', { name: 'Main Floor Robot Vacuum' })).toBeInTheDocument()
+    const statusPill = within(dialog).getByText('Status').closest('[data-icon]')
+    expect(statusPill).toHaveTextContent(statusValue)
+    expect(statusPill).toHaveAttribute('data-tone', statusTone)
+    expect(mockCallServiceCalls).toEqual([])
+  })
+
+  it('keeps an open vacuum status modal mounted when the vacuum goes offline', async () => {
+    render(<DashboardViewPage activePath="vacuums" onNavigate={() => undefined} path="vacuums" />)
+    fireEvent.click(screen.getByRole('button', { name: /Main Floor Docked/i }))
+    const dialog = await screen.findByRole('dialog')
+
+    act(() => setMockEntityState('vacuum.valetudo_exaltedsneakydeer', 'unavailable'))
+
+    expect(screen.getByRole('dialog')).toBe(dialog)
+    const statusPill = within(dialog).getByText('Status').closest('[data-icon]')
+    await waitFor(() => expect(statusPill).toHaveTextContent('Unavailable'))
+    expect(statusPill).toHaveAttribute('data-tone', 'unavailable')
+    expect(mockCallServiceCalls).toEqual([])
+  })
+
+  it('opens typed vacuum outcomes in the same mounted sheet and restores overview focus without HA calls', async () => {
+    mockEntities['sensor.main_floor_vacuum_coordinator_session_state'].attributes = {
+      while_away_outcomes: structuredClone(NINE_ROOM_VACUUM_OUTCOME_CONTRACT),
+    }
+    render(<DashboardViewPage activePath="vacuums" onNavigate={() => undefined} path="vacuums" />)
+
+    fireEvent.click(screen.getByRole('button', { name: /Main Floor Docked/i }))
+    const dialog = await screen.findByRole('dialog')
+    const summary = within(dialog).getByRole('button', { name: 'Open Main Floor Cleaning Outcomes for Aug 19, 2026' })
+    summary.focus()
+    fireEvent.click(summary)
+
+    expect(screen.getByRole('dialog')).toBe(dialog)
+    expect(dialog).toHaveAttribute('data-size', 'workspace')
+    expect(dialog).toHaveAttribute('data-scroll-mode', 'body')
+    expect(within(dialog).getByRole('heading', { name: 'While-Away Vacuum Outcomes · Aug 19, 2026' })).toBeInTheDocument()
+    expect(within(dialog).queryByRole('tablist', { name: 'Main Floor modal sections' })).not.toBeInTheDocument()
+    expect(within(dialog).getAllByLabelText('Dining Room Failed')).toHaveLength(1)
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Show Dining Room History' }))
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Show Dining Room Technical Vacuum Diagnostics' }))
+    expect(mockCallServiceCalls).toEqual([])
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Back to Vacuum Controls' }))
+    await waitFor(() => expect(
+      within(dialog).getByRole('button', { name: 'Open Main Floor Cleaning Outcomes for Aug 19, 2026' }),
+    ).toHaveFocus())
+    expect(dialog).toHaveAttribute('data-scroll-mode', 'panes')
+    expect(within(dialog).getByRole('tablist', { name: 'Main Floor modal sections' })).toBeInTheDocument()
+    expect(mockCallServiceCalls).toEqual([])
+  })
+
+  it('keeps legacy while-away content in room-source modal content when typed detail has no opener', () => {
+    mockEntities['sensor.main_floor_vacuum_coordinator_session_state'].attributes = {
+      ...LEGACY_VACUUM_OUTCOMES,
+      while_away_outcomes: structuredClone(NINE_ROOM_VACUUM_OUTCOME_CONTRACT),
+    }
+    const mainFloorVacuum = VACUUMS.find((vacuum) => vacuum.coordinatorSessionEntityId)
+    if (!mainFloorVacuum) throw new Error('Expected Main Floor vacuum fixture')
+
+    render(<VacuumRoomSourceModalContent vacuum={mainFloorVacuum} />)
+
+    expect(screen.getByRole('heading', { name: 'While You Were Away' })).toBeInTheDocument()
+    expect(screen.getByRole('note', { name: 'Cleaned' })).toHaveTextContent('Cleaned Gym')
+    expect(screen.getByRole('note', { name: 'Issues' })).toHaveTextContent('Could not clean Dining Room because the clean water tank is empty')
+    expect(screen.queryByRole('button', { name: /Cleaning Outcomes for/ })).not.toBeInTheDocument()
+  })
+
+  it('renders no dead outcome surface for room-source content when typed data has no legacy arrays', () => {
+    mockEntities['sensor.main_floor_vacuum_coordinator_session_state'].attributes = {
+      while_away_outcomes: structuredClone(NINE_ROOM_VACUUM_OUTCOME_CONTRACT),
+    }
+    const mainFloorVacuum = VACUUMS.find((vacuum) => vacuum.coordinatorSessionEntityId)
+    if (!mainFloorVacuum) throw new Error('Expected Main Floor vacuum fixture')
+
+    render(<VacuumRoomSourceModalContent vacuum={mainFloorVacuum} />)
+
+    expect(screen.queryByRole('heading', { name: 'While You Were Away' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Cleaning Outcomes for/ })).not.toBeInTheDocument()
+  })
+
+  it('keeps the captured outcome detail stable across live legacy updates until Back', async () => {
+    const session = mockEntities['sensor.main_floor_vacuum_coordinator_session_state']
+    session.attributes = {
+      ...LEGACY_VACUUM_OUTCOMES,
+      while_away_outcomes: structuredClone(NINE_ROOM_VACUUM_OUTCOME_CONTRACT),
+    }
+    const view = render(<DashboardViewPage activePath="vacuums" onNavigate={() => undefined} path="vacuums" />)
+    fireEvent.click(screen.getByRole('button', { name: /Main Floor Docked/i }))
+    const dialog = await screen.findByRole('dialog')
+    const body = dialog.querySelector<HTMLElement>('[data-modal-sheet-body="true"]')!
+    body.scrollTop = 47
+    fireEvent.click(within(dialog).getByRole('button', { name: /Open Main Floor Cleaning Outcomes/ }))
+
+    session.attributes = { ...LEGACY_VACUUM_OUTCOMES }
+    view.rerender(<DashboardViewPage activePath="vacuums" onNavigate={() => undefined} path="vacuums" />)
+
+    expect(screen.getAllByRole('dialog')).toHaveLength(1)
+    expect(within(dialog).getByRole('heading', { name: 'While-Away Vacuum Outcomes · Aug 19, 2026' })).toBeInTheDocument()
+    expect(within(dialog).getByLabelText('Dining Room Failed')).toBeInTheDocument()
+    expect(within(dialog).queryByRole('tablist', { name: 'Main Floor modal sections' })).not.toBeInTheDocument()
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Back to Vacuum Controls' }))
+
+    const legacySection = await waitFor(() => {
+      const note = within(dialog).getByRole('note', { name: 'Cleaned' })
+      const section = note.closest<HTMLElement>('section')
+      expect(section).toBeTruthy()
+      return section!
+    })
+    await waitFor(() => expect(legacySection).toHaveFocus())
+    expect(body.scrollTop).toBe(47)
+    expect(within(dialog).getByRole('tablist', { name: 'Main Floor modal sections' })).toBeInTheDocument()
+    expect(within(dialog).queryByRole('button', { name: /Cleaning Outcomes for/ })).not.toBeInTheDocument()
+  })
+
+  it('preserves the outcome detail while the shared sheet performs its mounted close animation', async () => {
+    mockEntities['sensor.main_floor_vacuum_coordinator_session_state'].attributes = {
+      while_away_outcomes: structuredClone(NINE_ROOM_VACUUM_OUTCOME_CONTRACT),
+    }
+    render(<DashboardViewPage activePath="vacuums" onNavigate={() => undefined} path="vacuums" />)
+    fireEvent.click(screen.getByRole('button', { name: /Main Floor Docked/i }))
+    const dialog = await screen.findByRole('dialog')
+    fireEvent.click(within(dialog).getByRole('button', { name: /Open Main Floor Cleaning Outcomes/ }))
+    const detailTitle = within(dialog).getByRole('heading', { name: 'While-Away Vacuum Outcomes · Aug 19, 2026' })
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Close' }))
+
+    await waitFor(() => expect(dialog).toHaveAttribute('data-state', 'closed'))
+    expect(detailTitle).toBeInTheDocument()
+    expect(dialog).toHaveAttribute('inert')
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+  })
+
+  it('uses the complete legacy InfoBox branch when typed vacuum outcomes are incomplete', async () => {
+    mockEntities['sensor.main_floor_vacuum_coordinator_session_state'].attributes = {
+      ...LEGACY_VACUUM_OUTCOMES,
+      while_away_outcomes: {
+        ...structuredClone(NINE_ROOM_VACUUM_OUTCOME_CONTRACT),
+        complete: false,
+      },
+    }
+    render(<DashboardViewPage activePath="vacuums" onNavigate={() => undefined} path="vacuums" />)
+    fireEvent.click(screen.getByRole('button', { name: /Main Floor Docked/i }))
+    const dialog = await screen.findByRole('dialog')
+
+    expect(within(dialog).getByRole('heading', { name: 'While You Were Away' })).toBeInTheDocument()
+    expect(within(dialog).getByRole('note', { name: 'Cleaned' })).toHaveTextContent('Cleaned Gym')
+    expect(within(dialog).getByRole('note', { name: 'Issues' })).toHaveTextContent('Could not clean Dining Room because the clean water tank is empty')
+    expect(within(dialog).queryByRole('button', { name: /Cleaning Outcomes for/ })).not.toBeInTheDocument()
   })
 
   it.each([
@@ -7630,6 +7800,7 @@ describe('DashboardViewPage', () => {
   })
 
   it('opens the real Vacuums route modal from a vacuum URL hash', async () => {
+    mockEntities['vacuum.valetudo_exaltedsneakydeer'].state = 'unavailable'
     window.history.replaceState(null, '', `${window.location.pathname}#main-floor-robot-vacuum`)
     render(<DashboardViewPage activePath="vacuums" onNavigate={() => undefined} path="vacuums" />)
 

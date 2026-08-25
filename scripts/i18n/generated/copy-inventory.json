@@ -249,6 +249,34 @@
     {
       "characters": 23,
       "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "680b1640f70f9f60",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [
+        "count"
+      ],
+      "value": "{{count}} Clean Attempt",
+      "words": 3
+    },
+    {
+      "characters": 24,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "c117120cf4607f52",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [
+        "count"
+      ],
+      "value": "{{count}} Clean Attempts",
+      "words": 3
+    },
+    {
+      "characters": 23,
+      "context": "catalog-copy",
       "file": "src/i18n/locales/en/pages/food.json",
       "id": "c1486449fb9377f2",
       "lines": [],
@@ -721,6 +749,18 @@
       "words": 13
     },
     {
+      "characters": 18,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "3f7b84e63111aace",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "All Rooms Complete",
+      "words": 3
+    },
+    {
       "characters": 5,
       "context": "catalog-copy",
       "file": "src/i18n/locales/en/core.json",
@@ -731,6 +771,18 @@
       "placeholders": [],
       "value": "Apply",
       "words": 1
+    },
+    {
+      "characters": 14,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "7065d3224ab7c985",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Attempt Reason",
+      "words": 2
     },
     {
       "characters": 17,
@@ -779,6 +831,18 @@
       "placeholders": [],
       "value": "Back to recipe",
       "words": 3
+    },
+    {
+      "characters": 23,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "a31766b23a967ff6",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Back to Vacuum Controls",
+      "words": 4
     },
     {
       "characters": 7,
@@ -845,6 +909,18 @@
       "words": 1
     },
     {
+      "characters": 55,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "3f5de452c3a3534e",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Cleaning was interrupted because someone returned home.",
+      "words": 7
+    },
+    {
       "characters": 5,
       "context": "catalog-copy",
       "file": "src/i18n/locales/en/modals/bathroomFan.json",
@@ -854,6 +930,30 @@
       "origin": "catalog",
       "placeholders": [],
       "value": "Clear",
+      "words": 1
+    },
+    {
+      "characters": 42,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "b4ff330aa08603df",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Combined vacuuming and mopping remain due.",
+      "words": 6
+    },
+    {
+      "characters": 9,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "4c4590b3f5439998",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Completed",
       "words": 1
     },
     {
@@ -1013,6 +1113,33 @@
       "words": 24
     },
     {
+      "characters": 113,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "cb184d5c6b118b27",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [
+        "minimum",
+        "observed"
+      ],
+      "value": "Estimated time in the requested room was {{observed}} seconds, below the required minimum of {{minimum}} seconds.",
+      "words": 16
+    },
+    {
+      "characters": 102,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "45b1d5ba6879184a",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Estimated time in the requested room was below the required minimum; reliable values were unavailable.",
+      "words": 15
+    },
+    {
       "characters": 9,
       "context": "catalog-copy",
       "file": "src/i18n/locales/en/pages/sprinklers.json",
@@ -1025,6 +1152,30 @@
       "words": 2
     },
     {
+      "characters": 6,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "b8e342e05cbeff24",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Failed",
+      "words": 1
+    },
+    {
+      "characters": 69,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "129086f4149b194f",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Fallback vacuuming completed for the room; mopping was not confirmed.",
+      "words": 10
+    },
+    {
       "characters": 3,
       "context": "catalog-copy",
       "file": "src/i18n/locales/en/modals/bathroomFan.json",
@@ -1035,6 +1186,42 @@
       "placeholders": [],
       "value": "Fan",
       "words": 1
+    },
+    {
+      "characters": 30,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "7288f578ed6fa07b",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Fresh-water status is missing.",
+      "words": 4
+    },
+    {
+      "characters": 34,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "d7dc7b2baf1c2039",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Fresh-water status is unavailable.",
+      "words": 4
+    },
+    {
+      "characters": 30,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "0953304e0136d347",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Fresh-water status is unknown.",
+      "words": 4
     },
     {
       "characters": 6,
@@ -1058,6 +1245,18 @@
       "origin": "catalog",
       "placeholders": [],
       "value": "Front Yard",
+      "words": 2
+    },
+    {
+      "characters": 15,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "b146ec7db11e2fb1",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Fully Completed",
       "words": 2
     },
     {
@@ -1099,6 +1298,34 @@
       "words": 2
     },
     {
+      "characters": 21,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "e30c22334f4878e3",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [
+        "room"
+      ],
+      "value": "Hide {{room}} History",
+      "words": 3
+    },
+    {
+      "characters": 42,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "de85881e630a3a72",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [
+        "room"
+      ],
+      "value": "Hide {{room}} Technical Vacuum Diagnostics",
+      "words": 5
+    },
+    {
       "characters": 4,
       "context": "catalog-copy",
       "file": "src/i18n/locales/en/pages/security.json",
@@ -1109,6 +1336,30 @@
       "placeholders": [],
       "value": "Home",
       "words": 1
+    },
+    {
+      "characters": 71,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "2bef107ed02c2717",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Home Assistant could not dispatch the room-cleaning request; try again.",
+      "words": 10
+    },
+    {
+      "characters": 51,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "8cf1bc719f53bdff",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Home Assistant credited vacuuming; work may remain.",
+      "words": 7
     },
     {
       "characters": 24,
@@ -1246,6 +1497,18 @@
       "words": 10
     },
     {
+      "characters": 11,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "053f90842722f7f1",
+      "lines": [],
+      "occurrences": 2,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Interrupted",
+      "words": 1
+    },
+    {
       "characters": 25,
       "context": "catalog-copy",
       "file": "src/i18n/locales/en/modals/recipe.json",
@@ -1366,6 +1629,42 @@
       "words": 1
     },
     {
+      "characters": 61,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "e47833f93c68f65f",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Mop cleaning liquid was unavailable; check it before mopping.",
+      "words": 9
+    },
+    {
+      "characters": 20,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "eec0aa5348add0de",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Mopping remains due.",
+      "words": 3
+    },
+    {
+      "characters": 15,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "cd537a1b3ba87b8f",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Needs Attention",
+      "words": 2
+    },
+    {
       "characters": 13,
       "context": "catalog-copy",
       "file": "src/i18n/locales/en/pages/sprinklers.json",
@@ -1400,6 +1699,77 @@
       "placeholders": [],
       "value": "No Inventory Products Found",
       "words": 4
+    },
+    {
+      "characters": 13,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "ea5c98caa1016c11",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Not Attempted",
+      "words": 2
+    },
+    {
+      "characters": 139,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "197e46d3e8cd2ef6",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [
+        "commandedSeconds",
+        "dominantSeconds"
+      ],
+      "value": "Observed cleaning time was dominated elsewhere, with {{dominantSeconds}} seconds versus {{commandedSeconds}} seconds in the requested room.",
+      "words": 16
+    },
+    {
+      "characters": 160,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "ce9e0315e50a1ac4",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [
+        "commandedRoom",
+        "commandedSeconds",
+        "dominantRoom",
+        "dominantSeconds"
+      ],
+      "value": "Observed cleaning was dominated by {{dominantRoom}} for {{dominantSeconds}} seconds instead of the requested {{commandedRoom}} for {{commandedSeconds}} seconds.",
+      "words": 17
+    },
+    {
+      "characters": 50,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "ae92c8c621553f60",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Only mopping was deferred without being attempted.",
+      "words": 7
+    },
+    {
+      "characters": 44,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "45e73575c52f5002",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [
+        "date",
+        "room"
+      ],
+      "value": "Open {{room}} Cleaning Outcomes for {{date}}",
+      "words": 6
     },
     {
       "characters": 14,
@@ -1483,6 +1853,18 @@
       ],
       "value": "Page {{page}} of {{count}}",
       "words": 4
+    },
+    {
+      "characters": 18,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "5a40dbc489ee38b7",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Partially Complete",
+      "words": 2
     },
     {
       "characters": 5,
@@ -1571,6 +1953,21 @@
       "words": 1
     },
     {
+      "characters": 93,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "b8054b92a4de8576",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [
+        "minimum",
+        "observed"
+      ],
+      "value": "Room cleaning lasted {{observed}} seconds, below the required minimum of {{minimum}} seconds.",
+      "words": 12
+    },
+    {
       "characters": 14,
       "context": "catalog-copy",
       "file": "src/i18n/locales/en/modals/bathroomFan.json",
@@ -1593,6 +1990,18 @@
       "placeholders": [],
       "value": "Room temperature range",
       "words": 3
+    },
+    {
+      "characters": 86,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "ec8c410d4ace8502",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Room-cleaning duration fell below the required minimum without verified values; retry.",
+      "words": 11
     },
     {
       "characters": 5,
@@ -1779,6 +2188,34 @@
       "words": 5
     },
     {
+      "characters": 21,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "eb17f0a6bd1782d7",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [
+        "room"
+      ],
+      "value": "Show {{room}} History",
+      "words": 3
+    },
+    {
+      "characters": 42,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "80c46b2623824044",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [
+        "room"
+      ],
+      "value": "Show {{room}} Technical Vacuum Diagnostics",
+      "words": 5
+    },
+    {
       "characters": 118,
       "context": "catalog-copy",
       "file": "src/i18n/locales/en/pages/admin.json",
@@ -1866,6 +2303,274 @@
       ],
       "value": "Target humidity {{target}}% • {{currentHumidity}}",
       "words": 5
+    },
+    {
+      "characters": 67,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "f03720ceb9fb6f80",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "The auto-empty dock dust bag was full or its dust duct was blocked.",
+      "words": 13
+    },
+    {
+      "characters": 60,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "2ad605e2686e090d",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "The cleaned area of the room was below the required minimum.",
+      "words": 11
+    },
+    {
+      "characters": 62,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "3c61af6a8ab5ac12",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "The dirty-water tank was unavailable; check it before mopping.",
+      "words": 9
+    },
+    {
+      "characters": 63,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "2825cc2a12277d3a",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "The fallback attempt to vacuum the room without mopping failed.",
+      "words": 10
+    },
+    {
+      "characters": 67,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "4fd99f966b2b6e0b",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "The fallback vacuum-only attempt was interrupted before completion.",
+      "words": 8
+    },
+    {
+      "characters": 53,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "0d5f94bb411cd528",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "The mop dock's clean-water tank was empty; refill it.",
+      "words": 9
+    },
+    {
+      "characters": 58,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "0d8487951870754c",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "The mop hardware was unavailable; check it before mopping.",
+      "words": 9
+    },
+    {
+      "characters": 27,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "8f3dab26da43ea50",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "The room run was cancelled.",
+      "words": 5
+    },
+    {
+      "characters": 78,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "2253f7c058430c79",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [
+        "seconds"
+      ],
+      "value": "The room-cleaning request did not start within {{seconds}} seconds; try again.",
+      "words": 11
+    },
+    {
+      "characters": 75,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "d80421fe3d2c7a60",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "The room-cleaning request timed out without a verified duration; try again.",
+      "words": 11
+    },
+    {
+      "characters": 61,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "1d756fdf1633cab3",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "The vacuum battery was too low to continue cleaning the room.",
+      "words": 11
+    },
+    {
+      "characters": 55,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "aa49b248682fe8df",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "The vacuum became stuck while trying to clean the room.",
+      "words": 10
+    },
+    {
+      "characters": 36,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "ceac9bbfc13c9c48",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "The vacuum could not reach its dock.",
+      "words": 7
+    },
+    {
+      "characters": 46,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "b7a416d353c8b67e",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "The vacuum could not reach the requested room.",
+      "words": 8
+    },
+    {
+      "characters": 64,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "9beed4de90d428b9",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [
+        "seconds"
+      ],
+      "value": "The vacuum did not resume within {{seconds}} seconds; try again.",
+      "words": 10
+    },
+    {
+      "characters": 80,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "6a5a9c7b2891cc1d",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "The vacuum never entered a cleaning state for the attempted room run; try again.",
+      "words": 14
+    },
+    {
+      "characters": 73,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "bdbb6557671c4e3a",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "The vacuum never reported cleaning the requested room segment; try again.",
+      "words": 11
+    },
+    {
+      "characters": 45,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "ff7a104b0b323a32",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "The vacuum outcome reason was not recognized.",
+      "words": 7
+    },
+    {
+      "characters": 75,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "ded494c36c17acac",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "The vacuum resume request timed out without a verified duration; try again.",
+      "words": 12
+    },
+    {
+      "characters": 58,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "44180061ecaed421",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "The vacuum-only attempt was interrupted before completion.",
+      "words": 7
+    },
+    {
+      "characters": 66,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "78b3719dad6f462f",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "The vacuum's mop attachment was missing; attach it before mopping.",
+      "words": 10
+    },
+    {
+      "characters": 68,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "d303218bc0f81f6b",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "The vacuuming and mopping attempt was interrupted before completion.",
+      "words": 9
     },
     {
       "characters": 123,
@@ -2012,6 +2717,102 @@
       "words": 3
     },
     {
+      "characters": 18,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "854c16ebe2ac4aaf",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Vacuum Diagnostics",
+      "words": 2
+    },
+    {
+      "characters": 45,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "04d1aeead854c500",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Vacuuming and mopping completed for the room.",
+      "words": 7
+    },
+    {
+      "characters": 38,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "cfd790ccf3a724a7",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Vacuuming and mopping the room failed.",
+      "words": 6
+    },
+    {
+      "characters": 55,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "01a0da683e2a6ee6",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Vacuuming and mopping were deferred before any attempt.",
+      "words": 8
+    },
+    {
+      "characters": 33,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "000fd6521b73401d",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Vacuuming completed for the room.",
+      "words": 5
+    },
+    {
+      "characters": 22,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "ca4892c730a8a40a",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Vacuuming remains due.",
+      "words": 3
+    },
+    {
+      "characters": 42,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "f902eec9d3cee17b",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Vacuuming the room without mopping failed.",
+      "words": 6
+    },
+    {
+      "characters": 42,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "16726b6cedd24484",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Vacuuming was deferred before any attempt.",
+      "words": 6
+    },
+    {
       "characters": 20,
       "context": "catalog-copy",
       "file": "src/i18n/locales/en/pages/sprinklers.json",
@@ -2050,6 +2851,56 @@
       "words": 1
     },
     {
+      "characters": 19,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "a5cb1fc61c9d6256",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "While You Were Away",
+      "words": 4
+    },
+    {
+      "characters": 37,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "2fba57b0a6519a7a",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [
+        "date"
+      ],
+      "value": "While-Away Vacuum Outcomes · {{date}}",
+      "words": 5
+    },
+    {
+      "characters": 12,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "b01987c10ddf77f2",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Work Blocker",
+      "words": 2
+    },
+    {
+      "characters": 14,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "60a5aa8a06e66e85",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Work Still Due",
+      "words": 3
+    },
+    {
       "characters": 24,
       "context": "catalog-copy",
       "file": "src/i18n/locales/en/modals/recipe.json",
@@ -2062,6 +2913,118 @@
       ],
       "value": "Your override: {{value}}",
       "words": 3
+    },
+    {
+      "characters": 25,
+      "context": "description",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "4d996b8baa0b025a",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [
+        "count"
+      ],
+      "value": "{{count}} Room Done Today",
+      "words": 4
+    },
+    {
+      "characters": 31,
+      "context": "description",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "a2d5602d4411c298",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [
+        "count"
+      ],
+      "value": "{{count}} Room Failure • Review",
+      "words": 5
+    },
+    {
+      "characters": 32,
+      "context": "description",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "3703d9efd298838a",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [
+        "count"
+      ],
+      "value": "{{count}} Room Failures • Review",
+      "words": 5
+    },
+    {
+      "characters": 27,
+      "context": "description",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "c46ca25d5cd70d11",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [
+        "count"
+      ],
+      "value": "{{count}} Room Interruption",
+      "words": 3
+    },
+    {
+      "characters": 28,
+      "context": "description",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "aea1c2f97e9d2b31",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [
+        "count"
+      ],
+      "value": "{{count}} Room Interruptions",
+      "words": 3
+    },
+    {
+      "characters": 29,
+      "context": "description",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "5f1d0b88bdf34915",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [
+        "count"
+      ],
+      "value": "{{count}} Room Needs Cleaning",
+      "words": 4
+    },
+    {
+      "characters": 26,
+      "context": "description",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "11943854d5843982",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [
+        "count"
+      ],
+      "value": "{{count}} Rooms Done Today",
+      "words": 4
+    },
+    {
+      "characters": 29,
+      "context": "description",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "a8188b4adb63c765",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [
+        "count"
+      ],
+      "value": "{{count}} Rooms Need Cleaning",
+      "words": 4
     },
     {
       "characters": 20,
@@ -3523,6 +4486,18 @@
       "words": 3
     },
     {
+      "characters": 18,
+      "context": "title",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "bd4953416cf07eaf",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Room Event History",
+      "words": 3
+    },
+    {
       "characters": 8,
       "context": "title",
       "file": "src/i18n/locales/en/pages/sprinklers.json",
@@ -3995,7 +4970,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "8cece36462a6d31c",
       "lines": [
-        569
+        567
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -4148,7 +5123,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "8a3ea0af40458397",
       "lines": [
-        622
+        620
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -4919,7 +5894,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "7971dde7cc3b4ff2",
       "lines": [
-        1146
+        1159
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -4951,7 +5926,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "318a739189324689",
       "lines": [
-        1162
+        1175
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -5016,7 +5991,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "4f445292fb0a681a",
       "lines": [
-        594
+        592
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -5261,7 +6236,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "46eeb96ef76dd3ab",
       "lines": [
-        439
+        437
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -5390,7 +6365,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "ffdd5935fc7707f7",
       "lines": [
-        622
+        620
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -5437,7 +6412,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "a79e6a338e64a220",
       "lines": [
-        622
+        620
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -6790,7 +7765,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "3dfaf5ac43b7a70d",
       "lines": [
-        1418
+        1462
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -7500,7 +8475,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "30dc860a8ba498c3",
       "lines": [
-        1301
+        1320
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -7528,7 +8503,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "3f7c009d32246ed9",
       "lines": [
-        1300
+        1319
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -7815,7 +8790,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "08cb328bd03e30fc",
       "lines": [
-        869
+        867
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -7843,7 +8818,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "ff02cf6eb9ce89b8",
       "lines": [
-        965
+        963
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -7885,7 +8860,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "6ab15f42b484c3eb",
       "lines": [
-        1195
+        1210
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -8026,7 +9001,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "d7064d5493aa1051",
       "lines": [
-        29
+        32
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -8082,7 +9057,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "d8466de28eb1263c",
       "lines": [
-        1293
+        1312
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -8096,7 +9071,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "ff76132f9bc4cba6",
       "lines": [
-        28
+        31
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -8180,8 +9155,8 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "b995465c5c9586fa",
       "lines": [
-        884,
-        885
+        882,
+        883
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -8335,7 +9310,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "0e09df4bf046aeee",
       "lines": [
-        1181
+        1196
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -8433,7 +9408,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "a15b0e2464a82141",
       "lines": [
-        966
+        964
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -8447,7 +9422,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "80e1cc8d85583e3f",
       "lines": [
-        1293
+        1312
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -8461,7 +9436,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "0afdee0c9228d6fd",
       "lines": [
-        1293
+        1312
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -8475,7 +9450,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "71da0c370f567c73",
       "lines": [
-        34
+        37
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -8489,7 +9464,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "605daaf013c8e261",
       "lines": [
-        1301
+        1320
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -8503,7 +9478,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "813d0589a9261bc5",
       "lines": [
-        33
+        36
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -8602,8 +9577,8 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "3e8124fdb4ac01a5",
       "lines": [
-        880,
-        881
+        878,
+        879
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -8927,7 +9902,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "4b82ce916c49c0e3",
       "lines": [
-        879
+        877
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -8987,7 +9962,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "13455b3f1e7072d8",
       "lines": [
-        1197
+        1212
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -9099,7 +10074,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "08072923d5c6a410",
       "lines": [
-        855
+        853
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -9184,7 +10159,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "5565511f0c0262ac",
       "lines": [
-        855
+        853
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -9310,7 +10285,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "a6d6c4c0e0c37c42",
       "lines": [
-        1196
+        1211
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -9338,7 +10313,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "beeca8d55b7688f9",
       "lines": [
-        1300
+        1319
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -9410,7 +10385,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "f838ad45f6ed71ba",
       "lines": [
-        761
+        759
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -9650,8 +10625,8 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "7c228c4f7921341b",
       "lines": [
-        886,
-        887
+        884,
+        885
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -9862,7 +10837,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "2292ec51353d129c",
       "lines": [
-        888
+        886
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -9949,7 +10924,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "0a5762a3627953e7",
       "lines": [
-        35
+        38
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -10487,7 +11462,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "0947fc6af50641bd",
       "lines": [
-        858
+        856
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -10869,7 +11844,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "5f0778b4b7fdc74c",
       "lines": [
-        1194
+        1209
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -10954,7 +11929,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "f345c5400a472e98",
       "lines": [
-        663
+        661
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -10996,7 +11971,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "6597f02b2f5e39b9",
       "lines": [
-        883
+        881
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -11024,7 +11999,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "de8c7c50482053b2",
       "lines": [
-        834
+        832
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -11038,7 +12013,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "475c60ea0112ac78",
       "lines": [
-        941
+        939
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -11052,7 +12027,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "1f89bcf5d13c7fc3",
       "lines": [
-        1267
+        1286
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -11066,7 +12041,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "82aefd8262bbb925",
       "lines": [
-        850
+        848
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -11124,8 +12099,8 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "04a5ecb259532e7a",
       "lines": [
-        879,
-        881
+        877,
+        879
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -11139,7 +12114,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "b60c770a8110ad33",
       "lines": [
-        666
+        664
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -11167,7 +12142,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "b2e6ceccffb95353",
       "lines": [
-        1259
+        1278
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -11181,7 +12156,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "3984a8e431efd170",
       "lines": [
-        846
+        844
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -11195,7 +12170,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "857644f030beda0a",
       "lines": [
-        951
+        949
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -11209,7 +12184,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "d946a9242077abb9",
       "lines": [
-        846
+        844
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -11223,7 +12198,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "bf4a4994a7a6efa7",
       "lines": [
-        960
+        958
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -11279,7 +12254,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "fe811efa537d9d3d",
       "lines": [
-        1288
+        1307
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -11377,8 +12352,8 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "09b4895905e105a2",
       "lines": [
-        884,
-        888
+        882,
+        886
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -11420,7 +12395,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "4be64edb2c675700",
       "lines": [
-        1259
+        1278
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -11476,7 +12451,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "c0c59dfdfc506a2d",
       "lines": [
-        1263
+        1282
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -11490,8 +12465,8 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "a15aed963b699872",
       "lines": [
-        882,
-        886
+        880,
+        884
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -11589,7 +12564,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "9d54dc413e59ed7a",
       "lines": [
-        861
+        859
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -11603,7 +12578,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "93a4783ef9002e67",
       "lines": [
-        662
+        660
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -11617,9 +12592,9 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "861166c35ab35a2c",
       "lines": [
-        880,
-        885,
-        887
+        878,
+        883,
+        885
       ],
       "occurrences": 3,
       "origin": "legacy",
@@ -11633,7 +12608,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "c48604f9cb8eb7ea",
       "lines": [
-        941
+        939
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -11647,7 +12622,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "9f552ab550db7adf",
       "lines": [
-        951
+        949
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -11792,7 +12767,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "2e7f91ff04e49564",
       "lines": [
-        423
+        424
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -11806,7 +12781,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "554f084ba12640fd",
       "lines": [
-        31
+        34
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -11848,7 +12823,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "6d19f1b25f285978",
       "lines": [
-        883
+        881
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -11932,7 +12907,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "648de6eec0a5821c",
       "lines": [
-        30
+        33
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -12002,7 +12977,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "094623685a22becf",
       "lines": [
-        882
+        880
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -12016,7 +12991,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "c7cccdc2e2d3c85c",
       "lines": [
-        886
+        884
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -12213,7 +13188,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "20513292a8a80729",
       "lines": [
-        938
+        936
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -12454,7 +13429,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "e39682a6c43f41fa",
       "lines": [
-        884
+        882
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -12468,7 +13443,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "3cc3c215bcf99da9",
       "lines": [
-        888
+        886
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -12693,8 +13668,8 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "4b031eaaec2fb09b",
       "lines": [
-        879,
-        881
+        877,
+        879
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -12708,7 +13683,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "79bba21fbd4e98a9",
       "lines": [
-        32
+        35
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -12848,7 +13823,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "dc1ff9d9b5384383",
       "lines": [
-        948
+        946
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -12862,7 +13837,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "f3f55b391ae9862c",
       "lines": [
-        938
+        936
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -12890,7 +13865,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "a11f2a401109e9a7",
       "lines": [
-        442
+        443
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -12904,7 +13879,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "88c42570658e67a0",
       "lines": [
-        429
+        430
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -12918,7 +13893,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "04fdfbf915feeb8d",
       "lines": [
-        885
+        883
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -12932,7 +13907,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "b7d542af44dc82e4",
       "lines": [
-        948
+        946
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -12946,7 +13921,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "143ffa27f337809e",
       "lines": [
-        880
+        878
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -12960,7 +13935,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "cae94a81b9d1a612",
       "lines": [
-        887
+        885
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -13059,7 +14034,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "ccddfd8c06adc399",
       "lines": [
-        468
+        469
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -13073,7 +14048,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "69c1a49749055a34",
       "lines": [
-        455
+        456
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -13129,7 +14104,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "88b917629798349f",
       "lines": [
-        957
+        955
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -13228,7 +14203,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "41f421a2d291c2ea",
       "lines": [
-        415
+        416
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -13284,7 +14259,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "2870c0ddaa31e8e4",
       "lines": [
-        393
+        394
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -13370,8 +14345,8 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "cf313768424a9721",
       "lines": [
-        125,
-        138
+        128,
+        141
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -16227,7 +17202,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "3c2bb18caa0f9eaa",
       "lines": [
-        115
+        118
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -16241,7 +17216,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "2bd73ff54f4de538",
       "lines": [
-        110
+        113
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -16255,7 +17230,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "78d5ab8552bb07ff",
       "lines": [
-        110
+        113
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -17301,7 +18276,7 @@
       "file": "src/hooks/dashboardLocation.ts",
       "id": "c3ebbec071783b55",
       "lines": [
-        50
+        46
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -18092,7 +19067,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "ce91ef51045962bd",
       "lines": [
-        650
+        648
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -18106,7 +19081,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "07fc5da12d280853",
       "lines": [
-        650
+        648
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -18120,7 +19095,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "186269bda92d5d42",
       "lines": [
-        649
+        647
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -18134,7 +19109,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "ba4f3831d1b20a40",
       "lines": [
-        122
+        125
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -18151,7 +19126,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "972f39ee03e0edbd",
       "lines": [
-        121
+        124
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -18165,7 +19140,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "e2baed8b496cddfb",
       "lines": [
-        121
+        124
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -18502,7 +19477,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "1780690011fb6463",
       "lines": [
-        442
+        440
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -18685,8 +19660,8 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "3c73bafeb1909fdb",
       "lines": [
-        833,
-        860
+        831,
+        858
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -19068,7 +20043,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "5cc3c776063e9d88",
       "lines": [
-        1309
+        1328
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -19379,7 +20354,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "b8e95a853d4d9d1f",
       "lines": [
-        721
+        719
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -20036,7 +21011,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "d6cd315290c67a77",
       "lines": [
-        720
+        718
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -20483,7 +21458,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "ecc01bf8e94804ef",
       "lines": [
-        441
+        439
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -20751,11 +21726,11 @@
       "file": "src/constants/routes.ts",
       "id": "182c5ef27f1c6cf1",
       "lines": [
-        75,
         76,
         77,
         78,
-        79
+        79,
+        80
       ],
       "occurrences": 5,
       "origin": "legacy",
@@ -21237,7 +22212,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "72bdcf7e55855edc",
       "lines": [
-        1309
+        1328
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -21299,7 +22274,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "a43d419b6f76ef6c",
       "lines": [
-        722
+        720
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -22077,7 +23052,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "64261a0575242950",
       "lines": [
-        1070
+        1079
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -22614,7 +23589,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "5b30d09b95d4529c",
       "lines": [
-        1020
+        1029
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -22642,7 +23617,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "7e6ab4d6e7dcf56e",
       "lines": [
-        1053
+        1062
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -22812,7 +23787,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "151b663a88bba9a1",
       "lines": [
-        321
+        322
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -22826,7 +23801,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "dec9d91864a003fd",
       "lines": [
-        315
+        316
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -22854,12 +23829,12 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "def55c0a8f97dd10",
       "lines": [
-        285,
-        297,
-        303,
-        309,
-        315,
-        321
+        286,
+        298,
+        304,
+        310,
+        316,
+        322
       ],
       "occurrences": 6,
       "origin": "legacy",
@@ -23071,7 +24046,7 @@
       "file": "src/constants/routes.ts",
       "id": "2f418da272905de0",
       "lines": [
-        55
+        56
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -23085,7 +24060,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "4bedf8e2a9203107",
       "lines": [
-        417
+        418
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -23114,8 +24089,8 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "5afb0730075a1d34",
       "lines": [
-        399,
-        404
+        400,
+        405
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -23129,8 +24104,8 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "ec1326741229dcbe",
       "lines": [
-        680,
-        740
+        694,
+        754
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -23163,7 +24138,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "d73c5d2d06e89a91",
       "lines": [
-        681
+        695
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -23210,7 +24185,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "3768f2c4bd08db7c",
       "lines": [
-        629
+        643
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -23253,7 +24228,7 @@
       "file": "src/constants/routes.ts",
       "id": "ec2651d4abeb2f6c",
       "lines": [
-        40
+        41
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -23295,7 +24270,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "3a41d68f943d2b92",
       "lines": [
-        704
+        718
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -23337,7 +24312,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "d703676bd015bf74",
       "lines": [
-        718
+        732
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -23478,7 +24453,7 @@
       "file": "src/constants/routes.ts",
       "id": "55bbfca1fd31aae1",
       "lines": [
-        47
+        48
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -23623,7 +24598,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "6ff9075956c04fac",
       "lines": [
-        695
+        709
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -23637,7 +24612,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "215a6c134bfb2389",
       "lines": [
-        697
+        695
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -23763,7 +24738,7 @@
       "file": "src/constants/routes.ts",
       "id": "7cb9830be16bb1ed",
       "lines": [
-        45
+        46
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -23791,7 +24766,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "53ecb1d5324cee35",
       "lines": [
-        634
+        648
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -23805,8 +24780,8 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "77857ebec941f33e",
       "lines": [
-        662,
-        664
+        676,
+        678
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -23820,7 +24795,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "b25f874768e0d2c6",
       "lines": [
-        391
+        392
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -23834,7 +24809,7 @@
       "file": "src/constants/routes.ts",
       "id": "99d071a3fef69da6",
       "lines": [
-        29
+        30
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -23848,7 +24823,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "7583537b326edf16",
       "lines": [
-        235
+        236
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -23862,7 +24837,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "3775c1f18b5df085",
       "lines": [
-        516
+        517
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -23876,7 +24851,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "fe5c800735cbb564",
       "lines": [
-        515
+        516
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -23890,7 +24865,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "2d758196baa41215",
       "lines": [
-        514
+        515
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -23946,7 +24921,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "3e698516ba34479a",
       "lines": [
-        668
+        682
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -24032,7 +25007,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "33a6d59e66affa69",
       "lines": [
-        605
+        619
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -24089,7 +25064,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "75a43c55464e7344",
       "lines": [
-        698
+        696
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -24230,7 +25205,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "685563287d276388",
       "lines": [
-        646
+        660
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -24244,7 +25219,7 @@
       "file": "src/constants/routes.ts",
       "id": "5f8af12e9f722844",
       "lines": [
-        70
+        71
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -24258,7 +25233,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "8521ec444dda6526",
       "lines": [
-        339
+        340
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -24272,8 +25247,8 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "e6a6cda7c6aa6249",
       "lines": [
-        678,
-        738
+        692,
+        752
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -24318,8 +25293,8 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "584e5a06604d0f4f",
       "lines": [
-        606,
-        618
+        620,
+        632
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -24347,7 +25322,7 @@
       "file": "src/constants/routes.ts",
       "id": "a0611275da0a99cc",
       "lines": [
-        46
+        47
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -24460,7 +25435,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "28bc98524c3d8bd6",
       "lines": [
-        720
+        734
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -24474,7 +25449,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "5fdf2fd62cff671e",
       "lines": [
-        721
+        735
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -24502,7 +25477,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "f13993e669b663bb",
       "lines": [
-        934
+        932
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -24581,7 +25556,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "954f453e344f3166",
       "lines": [
-        665
+        679
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -24653,7 +25628,7 @@
       "file": "src/constants/routes.ts",
       "id": "9389c244b36a2199",
       "lines": [
-        50
+        51
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -24710,7 +25685,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "4408eb7193318654",
       "lines": [
-        666
+        680
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -24752,7 +25727,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "5991a8b861119353",
       "lines": [
-        637
+        651
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -24780,7 +25755,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "f862366d1c192ccb",
       "lines": [
-        761
+        775
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -24808,8 +25783,8 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "116ded96fe1b6f6f",
       "lines": [
-        401,
-        406
+        402,
+        407
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -24823,10 +25798,10 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "38f1db9ee55008a1",
       "lines": [
-        434,
-        447,
-        460,
-        473
+        435,
+        448,
+        461,
+        474
       ],
       "occurrences": 4,
       "origin": "legacy",
@@ -24840,7 +25815,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "cc4342d67b638986",
       "lines": [
-        336
+        337
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -24970,7 +25945,7 @@
       "file": "src/constants/routes.ts",
       "id": "3508318bfaa77b1b",
       "lines": [
-        57
+        58
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -25042,8 +26017,8 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "c923afbd502cc22e",
       "lines": [
-        398,
-        403
+        399,
+        404
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -25085,7 +26060,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "27d95ef439328ad5",
       "lines": [
-        652
+        666
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -25099,7 +26074,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "e1cd0be909f35702",
       "lines": [
-        653
+        667
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -25241,7 +26216,7 @@
       "file": "src/constants/routes.ts",
       "id": "1b19bf4a03254dc4",
       "lines": [
-        38
+        39
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -25269,7 +26244,7 @@
       "file": "src/constants/routes.ts",
       "id": "0605ed7e20e4de6f",
       "lines": [
-        43
+        44
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -25297,7 +26272,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "6ed1de35faf8d11a",
       "lines": [
-        337
+        338
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -25325,7 +26300,7 @@
       "file": "src/constants/routes.ts",
       "id": "e86c9735fb38cc7f",
       "lines": [
-        42
+        43
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -25412,7 +26387,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "47dd3dc97297dd1c",
       "lines": [
-        202
+        203
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -25426,7 +26401,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "8882180f3aab50c4",
       "lines": [
-        630
+        644
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -25440,7 +26415,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "e4df65662105e27f",
       "lines": [
-        636
+        650
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -25497,7 +26472,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "9b78cbee27ab84e5",
       "lines": [
-        649
+        663
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -25525,7 +26500,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "d35f48497b02762b",
       "lines": [
-        758
+        772
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -25553,7 +26528,7 @@
       "file": "src/constants/routes.ts",
       "id": "d34532e6edc11d47",
       "lines": [
-        51
+        52
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -25609,7 +26584,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "0e1855e2170c36db",
       "lines": [
-        727
+        741
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -25651,7 +26626,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "d5e6fb6e292473ac",
       "lines": [
-        729
+        743
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -25665,8 +26640,8 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "30ce6dbcc8185a2a",
       "lines": [
-        175,
-        421
+        176,
+        422
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -25680,8 +26655,8 @@
       "file": "src/constants/routes.ts",
       "id": "9a6a5113c5a86c33",
       "lines": [
-        37,
-        61
+        38,
+        62
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -25695,7 +26670,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "dd350285a2ec1792",
       "lines": [
-        424
+        425
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -25752,8 +26727,8 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "dda31e7be858d09b",
       "lines": [
-        603,
-        620
+        617,
+        634
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -25781,7 +26756,7 @@
       "file": "src/constants/routes.ts",
       "id": "cf975d88bbb412db",
       "lines": [
-        52
+        53
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -25869,9 +26844,9 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "c60d593808427009",
       "lines": [
-        358,
-        601,
-        617
+        359,
+        615,
+        631
       ],
       "occurrences": 3,
       "origin": "legacy",
@@ -25899,7 +26874,7 @@
       "file": "src/constants/routes.ts",
       "id": "411590e4fa4928b3",
       "lines": [
-        31
+        32
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -25983,7 +26958,7 @@
       "file": "src/constants/routes.ts",
       "id": "ab963f8ea613d0f2",
       "lines": [
-        67
+        68
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -26012,8 +26987,8 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "f82590cfbd9e3c58",
       "lines": [
-        604,
-        619
+        618,
+        633
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -26041,7 +27016,7 @@
       "file": "src/constants/routes.ts",
       "id": "443ba5e31c2ed5a1",
       "lines": [
-        33
+        34
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -26141,7 +27116,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "a9c2589c45aa7f10",
       "lines": [
-        600
+        614
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -26169,7 +27144,7 @@
       "file": "src/constants/routes.ts",
       "id": "5db7a0549129ab4f",
       "lines": [
-        34
+        35
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -26267,7 +27242,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "ff88a19e0a0f6c2a",
       "lines": [
-        466
+        467
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -26281,7 +27256,7 @@
       "file": "src/constants/routes.ts",
       "id": "783803985add42c9",
       "lines": [
-        65
+        66
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -26295,7 +27270,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "ed8a24de4a0bc057",
       "lines": [
-        179
+        180
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -26323,7 +27298,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "9fb41891f1d29891",
       "lines": [
-        697
+        711
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -26407,7 +27382,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "d1163fb7c80f3406",
       "lines": [
-        320
+        321
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -26421,7 +27396,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "94f13a47d8705b9f",
       "lines": [
-        314
+        315
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -26449,7 +27424,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "3e09a1e5034b9369",
       "lines": [
-        731
+        745
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -26479,8 +27454,8 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "c334b76c21c8c114",
       "lines": [
-        598,
-        616
+        612,
+        630
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -26508,7 +27483,7 @@
       "file": "src/constants/routes.ts",
       "id": "bb8afb2a0c89ee3f",
       "lines": [
-        36
+        37
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -26790,9 +27765,9 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "06c4d0b44ed8c94f",
       "lines": [
-        596,
-        612,
-        769
+        610,
+        626,
+        783
       ],
       "occurrences": 3,
       "origin": "legacy",
@@ -26820,7 +27795,7 @@
       "file": "src/constants/routes.ts",
       "id": "94936e4904eca551",
       "lines": [
-        30
+        31
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -26919,7 +27894,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "eed3ba37ea31c7c0",
       "lines": [
-        771
+        785
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -26989,7 +27964,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "0f7a0d7196729ff4",
       "lines": [
-        639
+        653
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -27003,7 +27978,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "a82484c3657c2688",
       "lines": [
-        659
+        673
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -27017,7 +27992,7 @@
       "file": "src/constants/routes.ts",
       "id": "1c71d46dfeb2888e",
       "lines": [
-        54
+        55
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -27031,7 +28006,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "3db58d03bc190b5d",
       "lines": [
-        331
+        332
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -27045,7 +28020,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "f00b40c2c4158b36",
       "lines": [
-        333
+        334
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -27059,7 +28034,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "b8e1b0e018111c7d",
       "lines": [
-        553
+        554
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -27101,7 +28076,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "b86393fb7101d0d2",
       "lines": [
-        381
+        382
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -27115,7 +28090,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "0fa1f4608243be69",
       "lines": [
-        651
+        665
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -27172,8 +28147,8 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "ccbdfdb245d04015",
       "lines": [
-        602,
-        615
+        616,
+        629
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -27201,7 +28176,7 @@
       "file": "src/constants/routes.ts",
       "id": "d2935994c61208ca",
       "lines": [
-        53
+        54
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -27288,8 +28263,8 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "1a79d1478507ae5e",
       "lines": [
-        597,
-        614
+        611,
+        628
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -27317,7 +28292,7 @@
       "file": "src/constants/routes.ts",
       "id": "c29cbd4efc8aa557",
       "lines": [
-        32
+        33
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -27443,8 +28418,8 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "784983c328b87781",
       "lines": [
-        686,
-        703
+        700,
+        717
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -27472,7 +28447,7 @@
       "file": "src/constants/routes.ts",
       "id": "2fb5b44c3e81711b",
       "lines": [
-        69
+        70
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -27486,7 +28461,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "16c302dba785c177",
       "lines": [
-        747
+        761
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -27500,8 +28475,8 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "8f79a83a2f0723a2",
       "lines": [
-        400,
-        405
+        401,
+        406
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -27530,9 +28505,9 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "2e234555e1919a1a",
       "lines": [
-        359,
-        486,
-        621
+        360,
+        487,
+        635
       ],
       "occurrences": 3,
       "origin": "legacy",
@@ -27561,7 +28536,7 @@
       "file": "src/constants/routes.ts",
       "id": "688db91493632aca",
       "lines": [
-        48
+        49
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -27687,7 +28662,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "8b6dcffa347ebf64",
       "lines": [
-        778
+        792
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -27729,10 +28704,10 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "3f8957779fa1ff5a",
       "lines": [
-        392,
-        428,
-        441,
-        454
+        393,
+        429,
+        442,
+        455
       ],
       "occurrences": 4,
       "origin": "legacy",
@@ -27774,12 +28749,12 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "68b63ef86ea25d02",
       "lines": [
-        402,
-        407,
-        436,
-        449,
-        462,
-        475
+        403,
+        408,
+        437,
+        450,
+        463,
+        476
       ],
       "occurrences": 6,
       "origin": "legacy",
@@ -27808,7 +28783,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "83c8835b6856b8ea",
       "lines": [
-        422
+        423
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -27864,7 +28839,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "378fe1857b10eafa",
       "lines": [
-        467
+        468
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -27878,7 +28853,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "d7421504388f3ee8",
       "lines": [
-        414
+        415
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -28009,8 +28984,8 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "3db0157e271d3cd4",
       "lines": [
-        599,
-        613
+        613,
+        627
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -28038,7 +29013,7 @@
       "file": "src/constants/routes.ts",
       "id": "d88cbbdbe14d69b8",
       "lines": [
-        35
+        36
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -28110,7 +29085,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "0096a2684b8ab2a7",
       "lines": [
-        709
+        723
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -28180,7 +29155,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "2311250f3fb14941",
       "lines": [
-        234
+        235
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -28208,7 +29183,7 @@
       "file": "src/constants/routes.ts",
       "id": "0aaac2921882a294",
       "lines": [
-        27
+        28
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -28222,12 +29197,12 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "6783bf1303de25af",
       "lines": [
-        284,
-        296,
-        302,
-        308,
-        314,
-        320
+        285,
+        297,
+        303,
+        309,
+        315,
+        321
       ],
       "occurrences": 6,
       "origin": "legacy",
@@ -28255,7 +29230,7 @@
       "file": "src/constants/routes.ts",
       "id": "e775c6ac3430a55d",
       "lines": [
-        41
+        42
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -28297,7 +29272,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "49924f082d199fd3",
       "lines": [
-        667
+        681
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -28311,11 +29286,11 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "8d7292e7c2ec7e06",
       "lines": [
-        397,
-        433,
-        446,
-        459,
-        472
+        398,
+        434,
+        447,
+        460,
+        473
       ],
       "occurrences": 5,
       "origin": "legacy",
@@ -28357,7 +29332,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "c7a9dc2027821337",
       "lines": [
-        730
+        744
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -28386,7 +29361,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "502b6efce9b7a61a",
       "lines": [
-        380
+        381
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -28414,7 +29389,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "db0d3dff85212207",
       "lines": [
-        719
+        717
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -28603,7 +29578,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "2ed96b23c14183c5",
       "lines": [
-        750
+        764
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -28716,7 +29691,7 @@
       "file": "src/constants/routes.ts",
       "id": "005db227c2770a84",
       "lines": [
-        39
+        40
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -28730,7 +29705,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "b9b0edf594e609ac",
       "lines": [
-        209
+        210
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -28987,7 +29962,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "b5bdabff0b94ae1c",
       "lines": [
-        627
+        641
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -29001,7 +29976,7 @@
       "file": "src/constants/routes.ts",
       "id": "d6045c8a7bd06b48",
       "lines": [
-        28
+        29
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -29085,7 +30060,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "a593978a7a3b6280",
       "lines": [
-        334
+        335
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -29113,7 +30088,7 @@
       "file": "src/constants/routes.ts",
       "id": "b6d83187dace9ab1",
       "lines": [
-        58
+        59
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -29127,7 +30102,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "f90bc89ebe996008",
       "lines": [
-        332
+        333
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -29197,7 +30172,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "365688d118fbdc96",
       "lines": [
-        689
+        703
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -29239,7 +30214,7 @@
       "file": "src/constants/routes.ts",
       "id": "47a0485f0dd11dde",
       "lines": [
-        44
+        45
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -29295,7 +30270,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "9d090cbe5c57e525",
       "lines": [
-        699
+        713
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -29337,7 +30312,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "f9070e86e9eeaa3e",
       "lines": [
-        440
+        441
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -29351,7 +30326,7 @@
       "file": "src/constants/routes.ts",
       "id": "4da15304d0fdbec6",
       "lines": [
-        63
+        64
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -29365,7 +30340,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "3f85a796e800aeb4",
       "lines": [
-        712
+        726
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -29393,7 +30368,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "dd30ffd718d772fa",
       "lines": [
-        177
+        178
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -29421,7 +30396,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "85b600355465add9",
       "lines": [
-        698
+        712
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -29463,7 +30438,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "5b5153b2f63a7eb7",
       "lines": [
-        427
+        428
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -29477,7 +30452,7 @@
       "file": "src/constants/routes.ts",
       "id": "1ad039bd84f01842",
       "lines": [
-        62
+        63
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -29491,7 +30466,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "cabcfbb4e7c58b47",
       "lines": [
-        711
+        725
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -29519,7 +30494,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "686569e0e0701ce8",
       "lines": [
-        176
+        177
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -29603,7 +30578,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "431843c5700943bf",
       "lines": [
-        732
+        746
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -29631,7 +30606,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "9ff6cc4db0de18b5",
       "lines": [
-        751
+        765
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -29689,11 +30664,11 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "eb67f81cb7cf9c79",
       "lines": [
-        360,
-        524,
-        622,
-        775,
-        777
+        361,
+        525,
+        636,
+        789,
+        791
       ],
       "occurrences": 5,
       "origin": "legacy",
@@ -29722,7 +30697,7 @@
       "file": "src/constants/routes.ts",
       "id": "2a6297df6418a5ac",
       "lines": [
-        49
+        50
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -29906,8 +30881,8 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "28792bc9b36ae407",
       "lines": [
-        749,
-        779
+        763,
+        793
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -29935,7 +30910,7 @@
       "file": "src/constants/routes.ts",
       "id": "51b88ed95508d638",
       "lines": [
-        60
+        61
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -30005,7 +30980,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "f543aae04cafc3fb",
       "lines": [
-        413
+        414
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -30019,7 +30994,7 @@
       "file": "src/constants/routes.ts",
       "id": "c28ae8066ac4ca24",
       "lines": [
-        59
+        60
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -30062,7 +31037,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "3ce90246e315d850",
       "lines": [
-        383
+        384
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -30076,7 +31051,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "0b48b66888c1f1d3",
       "lines": [
-        379
+        380
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -30177,7 +31152,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "46fbebf026d9f9d3",
       "lines": [
-        453
+        454
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -30191,7 +31166,7 @@
       "file": "src/constants/routes.ts",
       "id": "67eb6f23be769849",
       "lines": [
-        64
+        65
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -30205,7 +31180,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "c65bbd0424871a5b",
       "lines": [
-        178
+        179
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -30219,7 +31194,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "1c0bbcfce52433a7",
       "lines": [
-        382
+        383
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -30233,12 +31208,12 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "3df5bc0163b2a08a",
       "lines": [
-        408,
         409,
-        435,
-        448,
-        461,
-        474
+        410,
+        436,
+        449,
+        462,
+        475
       ],
       "occurrences": 6,
       "origin": "legacy",
@@ -30280,7 +31255,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "6c4eae5f67097d94",
       "lines": [
-        638
+        652
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -30308,7 +31283,7 @@
       "file": "src/constants/routes.ts",
       "id": "6159ee85b8fd5ac8",
       "lines": [
-        68
+        69
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -30322,7 +31297,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "9b5199487a2cd700",
       "lines": [
-        375
+        376
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -30350,9 +31325,9 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "18405ca671ea3249",
       "lines": [
-        682,
-        741,
-        752
+        696,
+        755,
+        766
       ],
       "occurrences": 3,
       "origin": "legacy",
@@ -30380,7 +31355,7 @@
       "file": "src/constants/routes.ts",
       "id": "6a4edc38df1a2fde",
       "lines": [
-        66
+        67
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -30557,7 +31532,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "569193166167ea05",
       "lines": [
-        760
+        774
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -30585,7 +31560,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "fe10b58426d9bef4",
       "lines": [
-        338
+        339
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -30599,7 +31574,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "3481362ed899fbd1",
       "lines": [
-        335
+        336
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -30820,7 +31795,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "223dba96517f15bf",
       "lines": [
-        33
+        36
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -30834,7 +31809,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "9e9573e061a3e6d8",
       "lines": [
-        34
+        37
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -30848,7 +31823,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "5e42e3b827344d3d",
       "lines": [
-        29
+        32
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -31204,7 +32179,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "58e75d4f8f441773",
       "lines": [
-        652
+        650
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -31220,7 +32195,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "7aa69992efb8d18d",
       "lines": [
-        652
+        650
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -31234,7 +32209,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "a1882e55483c2323",
       "lines": [
-        28
+        31
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -31517,7 +32492,7 @@
       "file": "src/hooks/dashboardLocation.ts",
       "id": "955082213a792a30",
       "lines": [
-        4
+        5
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -31633,7 +32608,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "2a4a5a7df0ad2f9c",
       "lines": [
-        655
+        653
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -31927,7 +32902,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "f05a4c7144e86cdb",
       "lines": [
-        31
+        34
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -31969,7 +32944,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "490cf1fb2c84a1aa",
       "lines": [
-        327
+        328
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -31983,7 +32958,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "564b54179452968f",
       "lines": [
-        327
+        328
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -32646,7 +33621,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "d44f804a86994716",
       "lines": [
-        30
+        33
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -32660,7 +33635,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "e1a2313f44fc3be6",
       "lines": [
-        714
+        712
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -32744,7 +33719,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "3467ef97660ab0a5",
       "lines": [
-        1146
+        1159
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -33171,7 +34146,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "3b972639d4f29241",
       "lines": [
-        35
+        38
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -33185,7 +34160,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "df3f7fb412854e65",
       "lines": [
-        806
+        804
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -33199,7 +34174,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "545d87b2976a18fe",
       "lines": [
-        806
+        804
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -33471,7 +34446,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "bd3f507c6abc7f85",
       "lines": [
-        651
+        649
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -34269,7 +35244,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "2884d06ef7f4ad71",
       "lines": [
-        1387
+        1416
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -34285,7 +35260,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "10cb26ba12827f19",
       "lines": [
-        1387
+        1419
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -34429,7 +35404,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "178a82bede532858",
       "lines": [
-        365
+        366
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -34443,7 +35418,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "8fcc18fb665a8be6",
       "lines": [
-        365
+        366
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -34457,7 +35432,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "03937fc4005bf680",
       "lines": [
-        364
+        365
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -34471,7 +35446,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "6411d52d4d14d68f",
       "lines": [
-        370
+        371
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -34485,7 +35460,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "b40c5010515fe3ea",
       "lines": [
-        363
+        364
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -34499,7 +35474,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "5986c6a7ca21b7c7",
       "lines": [
-        366
+        367
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -34513,7 +35488,7 @@
       "file": "src/constants/portedDashboard.ts",
       "id": "a18f7d962c72af6b",
       "lines": [
-        366
+        367
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -34585,7 +35560,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "384a752c362cf272",
       "lines": [
-        32
+        35
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -34595,11 +35570,11 @@
     }
   ],
   "summary": {
-    "catalogRecords": 295,
+    "catalogRecords": 372,
     "documentRecords": 1,
     "legacyOccurrences": 2592,
     "legacyRecords": 2145,
-    "totalRecords": 2441
+    "totalRecords": 2518
   },
   "version": 1
 }
