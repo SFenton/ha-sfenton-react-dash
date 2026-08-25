@@ -111,6 +111,7 @@ export interface VacuumConfig {
   mapScale: number
   modeEntityId?: string
   modeTextEntityId?: string
+  outcomeRoomNames?: Record<string, string>
   passesEntityId: string
   statusFlagEntityId: string
   vacuumMapId: string
@@ -561,6 +562,19 @@ export const VACUUMS: VacuumConfig[] = [
     mapScale: 1.2,
     modeEntityId: 'select.valetudo_exaltedsneakydeer_mode',
     modeTextEntityId: 'input_text.main_floor_vacuum_mode',
+    outcomeRoomNames: {
+      dining_room: 'Dining Room',
+      guest_bathroom: 'Guest Bathroom',
+      guest_room: 'Guest Room',
+      gym: 'Gym',
+      hallway: 'Hallway',
+      kitchen: 'Kitchen',
+      living_room: 'Living Room',
+      master_bathroom: 'Master Bathroom',
+      master_bedroom: 'Master Bedroom',
+      master_bedroom_closet: 'Master Bedroom Closet',
+      office: 'Office',
+    },
     passesEntityId: 'input_select.main_floor_vacuum_cleaning_passes',
     statusFlagEntityId: 'sensor.valetudo_exaltedsneakydeer_status_flag',
     vacuumMapId: 'valetudo_exaltedsneakydeer',

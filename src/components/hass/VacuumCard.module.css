@@ -1,3 +1,4 @@
+/* Keep the ModalSheet body as the sole desktop scroller so left-pane status and outcomes stay reachable. */
 .modalBody {
   display: grid;
   min-height: 0;
@@ -764,10 +765,10 @@
     grid-template-columns: minmax(0, 1.15fr) minmax(330px, 0.85fr);
     align-items: start;
     gap: 18px;
-    grid-template-rows: minmax(0, 1fr);
-    height: 100%;
+    grid-template-rows: auto;
+    height: auto;
     min-height: 0;
-    overflow: hidden;
+    overflow: visible;
   }
 
   .areaEditorModalBody {
@@ -788,23 +789,13 @@
   .rightPane {
     box-sizing: border-box;
     min-height: 0;
-    max-height: min(560px, calc(100vh - 220px));
-    max-height: min(560px, calc(100dvh - 220px));
+    max-height: none;
     align-self: start;
     align-content: start;
     align-items: start;
     grid-auto-rows: max-content;
-    overflow-x: hidden;
-    overflow-y: auto;
+    overflow: visible;
     padding-bottom: 12px;
-    overscroll-behavior: contain;
-    scrollbar-width: none;
-  }
-
-  .rightPane::-webkit-scrollbar {
-    display: none;
-    width: 0;
-    height: 0;
   }
 }
 

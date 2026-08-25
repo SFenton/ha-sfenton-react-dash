@@ -2099,7 +2099,7 @@ test.describe('desktop modal layout', () => {
     expect(Math.abs(Math.round(after?.y ?? 0) - Math.round(before.y))).toBeLessThanOrEqual(8)
   })
 
-  test('room-source vacuum zones tab scrolls above its constrained desktop modal nav', async ({ page }) => {
+  test('room-source vacuum modal body scrolls both desktop panes above its constrained nav', async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 620 })
     await page.goto('/at-a-glance/living-room')
 
@@ -2110,21 +2110,22 @@ test.describe('desktop modal layout', () => {
     await expect(dialog.getByRole('heading', { name: 'Zones' })).toBeVisible()
 
     const zonesPane = dialog.getByRole('group', { name: 'Main Floor controls, zones, auto-clean, actions, info' })
+    const modalBody = dialog.locator('[data-modal-sheet-body="true"]')
     const modalNav = dialog.getByRole('navigation', { name: 'Main Floor modal sections' })
     const diningRoomZone = dialog.getByRole('button', { name: 'Dining Room' })
-    await expect.poll(async () => zonesPane.evaluate((element) => {
-      const style = window.getComputedStyle(element)
+    await expect.poll(async () => modalBody.evaluate((element) => {
       element.scrollTop = element.scrollHeight
       return {
         canScroll: element.scrollTop > 0,
         overflows: element.scrollHeight > element.clientHeight + 1,
-        overflowY: style.overflowY,
+        overflowY: window.getComputedStyle(element).overflowY,
       }
     })).toEqual({
       canScroll: true,
       overflows: true,
       overflowY: 'auto',
     })
+    await expect(zonesPane).toHaveCSS('overflow-y', 'visible')
     await expect.poll(async () => diningRoomZone.evaluate((zoneElement) => {
       const zoneBox = zoneElement.getBoundingClientRect()
       const navBox = document.querySelector('nav[aria-label="Main Floor modal sections"]')?.getBoundingClientRect()
@@ -3521,11 +3522,26 @@ test('vacuums page renders without live HASS backend', async ({ page }) => {
   const autoCleanGrid = page.getByRole('group', { name: 'Vacuum auto-clean controls' })
   await expect(autoCleanGrid).toHaveAttribute('data-dynamic-grid', 'true')
   await expect(autoCleanGrid.locator('[data-dynamic-grid-cell="true"]').last()).toHaveAttribute('data-dynamic-grid-span', '2')
-  await expect(page.getByLabel('Music Room', { exact: true })).toHaveAttribute('data-icon', 'mdi:robot-vacuum-off')
+  const musicRoomVacuum = page.getByRole('button', { name: 'Music Room', exact: true })
+  await expect(musicRoomVacuum).toHaveAttribute('data-icon', 'mdi:robot-vacuum-off')
+  await expect(musicRoomVacuum).toHaveAttribute('data-modal-opener', 'true')
   const mainFloorVacuum = page.getByRole('button', { name: /Main Floor Docked/i })
   await expect(mainFloorVacuum).toBeVisible()
   await expect(mainFloorVacuum).toHaveAttribute('data-tone', 'vacuum')
   await expect(mainFloorVacuum).toHaveAttribute('data-icon', 'mdi:home')
+})
+
+test('offline vacuum cards open their status modal', async ({ page }) => {
+  await page.goto('/at-a-glance/vacuums')
+
+  await page.getByRole('button', { name: 'Music Room', exact: true }).click()
+
+  const dialog = page.getByRole('dialog')
+  await expect(dialog).toBeVisible()
+  await expect(dialog.getByRole('heading', { name: 'Music Room Robot Vacuum' })).toBeVisible()
+  const statusPill = dialog.locator('[data-icon="mdi:robot-vacuum-off"][data-tone="unavailable"]')
+  await expect(statusPill).toContainText('Unavailable')
+  await expect(statusPill).toHaveAttribute('data-tone', 'unavailable')
 })
 
 test('available vacuum cards open source-style modal controls', async ({ page }) => {
