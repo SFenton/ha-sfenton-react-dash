@@ -12,7 +12,7 @@ import { CONTACT_GROUPS } from '../constants/atAGlance'
 import { VACUUMS } from '../constants/portedDashboard'
 import { ROOM_PAGE_CONFIGS, ROOM_PAGE_ORDER } from '../constants/roomPages'
 import { LEGACY_VACUUM_OUTCOMES, NINE_ROOM_VACUUM_OUTCOME_CONTRACT } from '../test/fixtures/vacuumOutcomes'
-import { entity, mockCallServiceCalls, mockDonetickTasksById, mockEntities, mockFreeSleepScheduleAttributes, mockScheduleMessages, mockState, mockTodoItemsByEntity, resetMockHass } from '../test/mocks/hakitCoreState'
+import { entity, mockCallServiceCalls, mockDonetickTasksById, mockEntities, mockFreeSleepScheduleAttributes, mockScheduleMessages, mockState, mockTodoItemsByEntity, resetMockHass, setMockEntityState } from '../test/mocks/hakitCoreState'
 
 type MockDecodeCallback = (
   result: { getText: () => string } | undefined,
@@ -7560,12 +7560,11 @@ describe('DashboardViewPage', () => {
   })
 
   it('keeps an open vacuum status modal mounted when the vacuum goes offline', async () => {
-    const view = render(<DashboardViewPage activePath="vacuums" onNavigate={() => undefined} path="vacuums" />)
+    render(<DashboardViewPage activePath="vacuums" onNavigate={() => undefined} path="vacuums" />)
     fireEvent.click(screen.getByRole('button', { name: /Main Floor Docked/i }))
     const dialog = await screen.findByRole('dialog')
 
-    mockEntities['vacuum.valetudo_exaltedsneakydeer'].state = 'unavailable'
-    view.rerender(<DashboardViewPage activePath="vacuums" onNavigate={() => undefined} path="vacuums" />)
+    act(() => setMockEntityState('vacuum.valetudo_exaltedsneakydeer', 'unavailable'))
 
     expect(screen.getByRole('dialog')).toBe(dialog)
     const statusPill = within(dialog).getByText('Status').closest('[data-icon]')
