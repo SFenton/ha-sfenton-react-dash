@@ -6,8 +6,8 @@
   "expectedCandidateCount": 2,
   "requiresModelsArgument": true,
   "projectionCandidateIds": [
-    "grok-4.5-low",
-    "gpt-5.6-terra-low"
+    "gpt-5.6-terra-low",
+    "gpt-5.6-sol-max-long"
   ],
   "repeats": 2,
   "batchSize": 1,

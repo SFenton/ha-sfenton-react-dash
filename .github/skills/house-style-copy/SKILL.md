@@ -3,7 +3,7 @@ name: house-style-copy
 description: Generates, rewrites, audits, and ranks UI and Home Assistant reference copy in the ha-sfenton-react-dash house style. Use for buttons, actions, chips, titles, descriptions, modals, states, forms, accessibility labels, confirmations, compound metrics, and notification wording.
 metadata:
   model_pin: evals/model-pin.json
-  model_pin_status: provisional-no-qualified-profile
+  model_pin_status: validated
 ---
 
 # House Style Copy
@@ -17,20 +17,28 @@ and is owned by GPT-5.6 Sol; generated copy is not implementation approval.
 
 ## Activation gate
 
-Never generate copy directly under the host model. Before normalization or
-retrieval, run:
+Never generate copy directly under the host model. Normalize the request, then
+invoke the hash-bound pinned launcher:
 
 ```bash
-node .github/skills/house-style-copy/scripts/check-pin.mjs \
-  --model <active-model-id> \
-  --effort <active-effort-or-none> \
-  --context <active-context-tier>
+node .github/skills/house-style-copy/scripts/generate.mjs \
+  --request-json '<normalized-request-or-request-list-json>'
 ```
 
-Proceed only when the command returns `ok: true`. It verifies a validated,
-unexpired pin, current candidate/corpus/skill hashes, and an exact active
-model/effort/context match. If it fails or the active profile cannot be proven,
-return `status: "refused"` with code `unsafe`, reason
+Mandatory boundary refusals are produced locally before any pin lookup, prompt
+construction, or participant launch. All-local refusal requests therefore do
+not require an available model, and private raw input is never serialized into
+a participant prompt. For mixed lists, only safe non-refused entries reach the
+participant and results are merged back into original order.
+
+For model-bound entries, the launcher verifies the validated, unexpired pin and current
+candidate/qualified-corpus/skill hashes, then retrieves from the exact corpus
+snapshot used for qualification and invokes the exact pinned model, effort,
+and context with mutation and external tools disabled. Ordinary app copy or
+source drift does not change runtime authority or invalidate the pin. Return
+its validated strict JSON output verbatim. If pin or launcher validation fails,
+return
+`status: "refused"` with code `unsafe`, reason
 `No validated model profile is available.`, and no candidates. Never use the
 host model as an unpinned fallback.
 
@@ -63,6 +71,8 @@ See [ownership boundaries](references/ownership-boundaries.md).
    - exact context first;
    - same measured length band;
    - same namespace and surface when available;
+   - source-path namespaces split camel, Pascal, and acronym boundaries before
+     token matching;
    - notification contexts only from notification peers;
    - no more than five positive and two negative examples.
 5. Apply [style-guide.md](references/style-guide.md), treating `avoid` corpus
@@ -126,12 +136,33 @@ The skill resources include deterministic corpus, retrieval, request, and
 response tooling:
 
 ```bash
+# Inspect the unqualified live source/catalog corpus.
 node .github/skills/house-style-copy/scripts/build-corpus.mjs --out artifacts/house-style-copy-corpus/corpus.jsonl
+
+# Retrieve from qualified production authority; add --live only for maintenance preview.
 node .github/skills/house-style-copy/scripts/retrieve.mjs --request request.json
+
 node .github/skills/house-style-copy/scripts/validate-request.mjs --request request.json
 node .github/skills/house-style-copy/scripts/validate-response.mjs --request request.json --response response.json
 node .github/skills/house-style-copy/scripts/check-pin.mjs --model <model> --effort <effort-or-none> --context <context>
 ```
+
+Production retrieval follows `assets/corpus/qualified/current.json` to one
+complete hash-versioned corpus/manifest bundle. Refresh authority only when new
+repository copy should become generation evidence:
+
+```bash
+node .github/skills/house-style-copy/scripts/snapshot-corpus.mjs
+```
+
+The refresh rejects dirty corpus input paths by default, writes and validates a
+new bundle completely, then atomically swaps the small pointer and removes
+superseded bundles. `--allow-dirty` is maintenance-only, non-release evidence.
+Every changed snapshot changes the qualified corpus and skill hashes. Run the
+full qualification, holdout, latency, selection, and pin check workflow in
+[evals/README.md](evals/README.md) before generation can resume. Model
+selection writes `model-pin.json` and `latest-results.json` together. Never
+edit either evidence file or pin hashes manually.
 
 Do not run the model benchmark merely to answer a copy request. Benchmark and
 pinning procedures are documented in

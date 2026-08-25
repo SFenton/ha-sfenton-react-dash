@@ -14,6 +14,8 @@
 
 - Use sentence case and terminal punctuation.
 - State the fact or effect first.
+- Treat the normalized intent as authoritative behavior. Preserve its actor,
+  action, timing, and consequence instead of shifting agency or adding hedges.
 - Add a consequence, next action, or recovery only when useful.
 - Errors say what failed and what the user can safely do next.
 - Never blame the user.
@@ -41,6 +43,8 @@
 - Validation messages identify the field requirement and correction.
 - Accessible names use action plus target and do not append the role:
   `Back to Alarms`, not `Back to Alarms button`.
+- Close actions name the content being closed, not its container type:
+  `Close Camera`, not `Close Camera Modal`.
 
 ## Empty, error, loading, and success
 

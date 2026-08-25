@@ -1,7 +1,8 @@
 import { resolve } from 'node:path'
 import {
-  buildCorpus,
   hashSkillFiles,
+  liveVsQualifiedCorpusStatus,
+  loadQualifiedCorpus,
   parseCliArgs,
   readJson,
   skillRoot,
@@ -13,6 +14,14 @@ const pin = await readJson(resolve(skillRoot, 'evals/model-pin.json'))
 const candidates = await readJson(resolve(skillRoot, 'evals/candidates.json'))
 const candidate = candidates.candidates.find((entry) => entry.id === pin.candidateId)
 const errors = []
+const warnings = []
+let qualifiedSnapshot = null
+
+try {
+  qualifiedSnapshot = await loadQualifiedCorpus()
+} catch (error) {
+  errors.push(error instanceof Error ? error.message : String(error))
+}
 
 if (pin.status !== 'validated') errors.push('No validated model profile is available.')
 if (!candidate) errors.push('Pinned candidate does not exist.')
@@ -35,13 +44,15 @@ if (pin.status === 'validated') {
     errors.push('Validated pin has expired.')
   }
 
-  const currentHashes = {
-    candidates: valueHash(candidates),
-    corpus: valueHash(await buildCorpus()),
-    skill: await hashSkillFiles(),
-  }
-  for (const [name, value] of Object.entries(currentHashes)) {
-    if (pin.evidence?.qualificationHashes?.[name] !== value) errors.push(`Validated pin has a stale ${name} hash.`)
+  if (qualifiedSnapshot) {
+    const currentHashes = {
+      candidates: valueHash(candidates),
+      corpus: qualifiedSnapshot.corpusHash,
+      skill: await hashSkillFiles(),
+    }
+    for (const [name, value] of Object.entries(currentHashes)) {
+      if (pin.evidence?.qualificationHashes?.[name] !== value) errors.push(`Validated pin has a stale ${name} hash.`)
+    }
   }
 
   const activeEffort = args.effort === 'none' ? null : args.effort
@@ -50,14 +61,35 @@ if (pin.status === 'validated') {
   }
 }
 
+const liveCorpus = qualifiedSnapshot
+  ? await liveVsQualifiedCorpusStatus(undefined, qualifiedSnapshot.records)
+  : {
+      status: 'unavailable',
+      drifted: null,
+      warning: 'Live corpus status is unavailable because the qualified snapshot is invalid.',
+    }
+if (liveCorpus.warning) warnings.push(liveCorpus.warning)
+
 console.log(JSON.stringify({
   ok: errors.length === 0,
   errors,
+  warnings,
   profile: errors.length ? null : {
     candidateId: pin.candidateId,
     context: pin.context,
     effort: pin.effort,
     model: pin.model,
+  },
+  corpus: {
+    qualified: qualifiedSnapshot
+      ? {
+          hash: qualifiedSnapshot.corpusHash,
+          records: qualifiedSnapshot.records.length,
+          snapshotId: qualifiedSnapshot.snapshotId,
+          sourceHead: qualifiedSnapshot.manifest.sourceHead,
+        }
+      : null,
+    live: liveCorpus,
   },
 }, null, 2))
 if (errors.length) process.exitCode = 1

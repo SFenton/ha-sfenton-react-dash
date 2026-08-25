@@ -1,5 +1,36 @@
 # Deterministic Retrieval
 
+## Production authority
+
+Runtime generation, default retrieval, qualification, holdout, latency, and
+selection follow `assets/corpus/qualified/current.json` to one complete,
+hash-versioned JSONL/manifest bundle. The pointer, target names, manifest,
+record count, corpus hash, deterministic source-input/status hashes, and bundle
+inventory are validated. Runtime never rebuilds or silently falls back to the
+live app corpus.
+
+`buildCorpus(root)` remains the live source/catalog builder for maintenance.
+Use `scripts/retrieve.mjs --live` to preview live retrieval without changing
+production authority. Ordinary app copy and source changes therefore appear as
+live drift but do not invalidate a qualified pin.
+
+Refresh authority deliberately with:
+
+```bash
+node .github/skills/house-style-copy/scripts/snapshot-corpus.mjs
+```
+
+Refresh rejects dirty `src/**`, i18n inventory/catalog, curated, or notification
+inputs by default. It stages and validates hash-named files before atomically
+renaming the current pointer, so interruption before pointer publication leaves
+the old authority valid. Superseded and staged files are removed deterministically.
+`--allow-dirty` is maintenance-only and cannot produce release-qualified
+evidence without restoring and reviewing clean captured inputs.
+
+A changed snapshot changes both corpus and skill hashes and requires fresh
+qualification, holdout, latency, model selection, and pin validation. Never
+copy a live hash into `model-pin.json` or edit pin hashes manually.
+
 ## Corpus record
 
 Every record contains:
@@ -38,6 +69,11 @@ Score remaining records:
 - exact surface: 7
 - shared intent tags: up to 5
 - identical placeholder shape: 5
+
+Source-derived namespaces tokenize camelCase, PascalCase, acronym-to-word, and
+letter/number boundaries before lowercased whole-token matching. Component
+paths such as `VacuumCard.tsx` and `HumidifierModalContent.tsx` therefore keep
+their domain namespace instead of collapsing into `common`.
 
 Tie-break by:
 

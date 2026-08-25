@@ -122,6 +122,18 @@
         "cacheWrite": 2.5,
         "output": 12
       }
+    },
+    {
+      "id": "gpt-5.6-sol-max-long",
+      "model": "gpt-5.6-sol",
+      "effort": "max",
+      "context": "long_context",
+      "pricing": {
+        "input": 10,
+        "cachedInput": 1,
+        "cacheWrite": 12.5,
+        "output": 45
+      }
     }
   ]
 }

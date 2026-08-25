@@ -1,9 +1,9 @@
-import { readFile, writeFile } from 'node:fs/promises'
+import { readFile, rename, unlink, writeFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import {
   batchesForCases,
-  buildCorpus,
   hashSkillFiles,
+  loadQualifiedCorpus,
   packedLaunchUnits,
   parseCliArgs,
   readJson,
@@ -32,6 +32,37 @@ function normalizeLower(value, min, max) {
   if (value === null || value === undefined || !Number.isFinite(value)) return 1
   if (max === min) return 0
   return (value - min) / (max - min)
+}
+
+async function atomicReplace(path, content, label) {
+  const stagedPath = `${path}.next-${process.pid}-${label}`
+  await unlink(stagedPath).catch(() => {})
+  await writeFile(stagedPath, content, { flag: 'wx' })
+  try {
+    await rename(stagedPath, path)
+  } catch (error) {
+    await unlink(stagedPath).catch(() => {})
+    throw error
+  }
+}
+
+async function writeEvidencePair(pin, latestResults) {
+  const pinPath = resolve(skillRoot, 'evals/model-pin.json')
+  const latestPath = resolve(skillRoot, 'evals/latest-results.json')
+  const [originalPin, originalLatest] = await Promise.all([
+    readFile(pinPath, 'utf8'),
+    readFile(latestPath, 'utf8'),
+  ])
+  try {
+    await atomicReplace(pinPath, `${JSON.stringify(pin, null, 2)}\n`, 'pin')
+    await atomicReplace(latestPath, `${JSON.stringify(latestResults, null, 2)}\n`, 'latest')
+  } catch (error) {
+    await Promise.all([
+      atomicReplace(pinPath, originalPin, 'pin-rollback'),
+      atomicReplace(latestPath, originalLatest, 'latest-rollback'),
+    ])
+    throw error
+  }
 }
 
 const args = parseCliArgs(process.argv.slice(2))
@@ -63,7 +94,7 @@ const caseHashes = new Map(await Promise.all(['cases.public.json', 'cases.holdou
 ])))
 const currentHashes = {
   candidates: valueHash(candidates),
-  corpus: valueHash(await buildCorpus()),
+  corpus: (await loadQualifiedCorpus()).corpusHash,
   skill: await hashSkillFiles(),
 }
 
@@ -187,6 +218,22 @@ if (evidenceErrors.length) {
   }, null, 2))
   process.exitCode = 1
   process.exit()
+}
+
+function latestPhaseMetrics(phase, profileId) {
+  const report = reportsByPhase.get(phase)[0].score
+  const cases = report.cases.filter((record) => record.profileId === profileId)
+  if (!cases.length) return null
+  const metrics = {
+    passRate: cases.filter((record) => record.ok).length / cases.length,
+    meanScore: mean(cases.map((record) => record.score)),
+    hardFailureCount: cases.reduce((sum, record) => sum + record.hardFailures.length, 0),
+  }
+  if (phase === 'latency') {
+    const batches = report.batches.filter((record) => record.profileId === profileId)
+    metrics.p95Milliseconds = percentile(batches.map((record) => record.durationMs), 0.95)
+  }
+  return metrics
 }
 
 const phaseProfiles = Object.fromEntries([...reportsByPhase].map(([phase, phaseReports]) => [
@@ -345,6 +392,8 @@ if (!passing.length) {
     if (winner.metrics.p95SingletonLatencyMs === null) {
       throw new Error('Cannot write a pin without singleton latency evidence.')
     }
+    const selectedAt = new Date().toISOString()
+    const runPaths = reports.map(({ runDir }) => runDir.replace(`${repositoryRoot}/`, ''))
     const pin = {
       version: 1,
       status: 'validated',
@@ -355,10 +404,10 @@ if (!passing.length) {
       selectionBasis: winner.metrics.singletonEvidenceSelected
         ? 'Passed deterministic quality gate; singleton quality trailed batch quality by more than four points, so selection used singleton evidence before cost, latency, and variance.'
         : 'Passed deterministic quality gate, then minimized accepted-output cost, p95 singleton latency, and variance risk.',
-      evalRun: reports.map(({ runDir }) => runDir.replace(`${repositoryRoot}/`, '')).join(','),
+      evalRun: runPaths.join(','),
       pricingAsOf: candidates.pricingAsOf,
       expiresAfterDays: 90,
-      selectedAt: new Date().toISOString(),
+      selectedAt,
       autoSelectionAllowed: false,
       evidence: {
         qualificationHashes: currentHashes,
@@ -367,8 +416,28 @@ if (!passing.length) {
         selectionScore: winner.selectionScore,
       },
     }
-    await writeFile(resolve(skillRoot, 'evals/model-pin.json'), `${JSON.stringify(pin, null, 2)}\n`)
+    const qualificationIds = reportsByPhase.get('qualification')[0].manifest.availableCandidateIds
+    const finalistIds = [
+      winner.candidate.id,
+      ...qualificationIds.filter((profileId) => profileId !== winner.candidate.id),
+    ]
+    const latestResults = {
+      version: 1,
+      evaluatedAt: selectedAt.slice(0, 10),
+      status: 'validated',
+      runs: runPaths,
+      winner: winner.candidate.id,
+      finalists: finalistIds.map((profileId) => ({
+        candidateId: profileId,
+        public: latestPhaseMetrics('qualification', profileId),
+        holdout: latestPhaseMetrics('holdout', profileId),
+        latency: latestPhaseMetrics('latency', profileId),
+      })),
+      decision: `${winner.candidate.id} passed every quality gate and was selected by the deterministic cost, latency, and variance rule.`,
+    }
+    await writeEvidencePair(pin, latestResults)
     result.pinWritten = true
+    result.latestResultsWritten = true
   }
   console.log(JSON.stringify(result, null, 2))
 }
