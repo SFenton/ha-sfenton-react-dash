@@ -1,0 +1,192 @@
+.atmosphere {
+  --weather-scene: var(--rd-weather-scene-neutral);
+  --weather-glow: var(--rd-weather-glow-neutral);
+  --weather-pattern: none;
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: inherit;
+  background: var(--weather-scene);
+  pointer-events: none;
+  transition: background var(--duration-med) ease;
+}
+
+.atmosphere::after {
+  position: absolute;
+  inset: 0;
+  background: var(--rd-weather-atmosphere-shade);
+  content: "";
+}
+
+.light,
+.motion {
+  position: absolute;
+  inset: -14%;
+  display: block;
+}
+
+.light {
+  background: var(--weather-glow);
+}
+
+.motion {
+  background-image: var(--weather-pattern);
+  background-position: center;
+  background-size: cover;
+  opacity: 0.72;
+}
+
+.atmosphere[data-weather-scene='sunny'] {
+  --weather-scene: var(--rd-weather-scene-sunny);
+  --weather-glow: var(--rd-weather-glow-sunny);
+  --weather-pattern: var(--rd-weather-pattern-sunny);
+}
+
+.atmosphere[data-weather-scene='night'] {
+  --weather-scene: var(--rd-weather-scene-night);
+  --weather-glow: var(--rd-weather-glow-night);
+  --weather-pattern: var(--rd-weather-pattern-night);
+}
+
+.atmosphere[data-weather-scene='clouds'] {
+  --weather-scene: var(--rd-weather-scene-clouds);
+  --weather-glow: var(--rd-weather-glow-clouds);
+  --weather-pattern: var(--rd-weather-pattern-clouds);
+}
+
+.atmosphere[data-weather-scene='fog'] {
+  --weather-scene: var(--rd-weather-scene-fog);
+  --weather-glow: var(--rd-weather-glow-fog);
+  --weather-pattern: var(--rd-weather-pattern-fog);
+}
+
+.atmosphere[data-weather-scene='rain'] {
+  --weather-scene: var(--rd-weather-scene-rain);
+  --weather-glow: var(--rd-weather-glow-rain);
+  --weather-pattern: var(--rd-weather-pattern-rain);
+}
+
+.atmosphere[data-weather-scene='storm'] {
+  --weather-scene: var(--rd-weather-scene-storm);
+  --weather-glow: var(--rd-weather-glow-storm);
+  --weather-pattern: var(--rd-weather-pattern-storm);
+}
+
+.atmosphere[data-weather-scene='snow'] {
+  --weather-scene: var(--rd-weather-scene-snow);
+  --weather-glow: var(--rd-weather-glow-snow);
+  --weather-pattern: var(--rd-weather-pattern-snow);
+}
+
+.atmosphere[data-weather-scene='wind'] {
+  --weather-scene: var(--rd-weather-scene-wind);
+  --weather-glow: var(--rd-weather-glow-wind);
+  --weather-pattern: var(--rd-weather-pattern-wind);
+}
+
+.atmosphere[data-weather-scene='exceptional'] {
+  --weather-scene: var(--rd-weather-scene-exceptional);
+  --weather-glow: var(--rd-weather-glow-exceptional);
+  --weather-pattern: none;
+}
+
+.atmosphere[data-weather-scene='sunny'] .light,
+.atmosphere[data-weather-scene='night'] .light,
+.atmosphere[data-weather-scene='clouds'] .light,
+.atmosphere[data-weather-scene='fog'] .light,
+.atmosphere[data-weather-scene='rain'] .light,
+.atmosphere[data-weather-scene='storm'] .light,
+.atmosphere[data-weather-scene='snow'] .light,
+.atmosphere[data-weather-scene='wind'] .light {
+  animation: weatherLightDrift 28s ease-in-out infinite alternate;
+  will-change: transform;
+}
+
+.atmosphere[data-weather-scene='sunny'] .motion,
+.atmosphere[data-weather-scene='night'] .motion,
+.atmosphere[data-weather-scene='clouds'] .motion,
+.atmosphere[data-weather-scene='fog'] .motion {
+  animation: weatherCloudDrift 32s ease-in-out infinite alternate;
+  will-change: transform;
+}
+
+.atmosphere[data-weather-scene='wind'] .motion {
+  animation: weatherWindDrift 14s linear infinite;
+  will-change: transform;
+}
+
+.atmosphere[data-weather-scene='night'] .motion {
+  background-size: 120px 120px, 180px 180px, 240px 240px;
+}
+
+.atmosphere[data-weather-scene='rain'] .motion,
+.atmosphere[data-weather-scene='storm'] .motion {
+  animation: weatherFall 2.2s linear infinite;
+  will-change: transform;
+}
+
+.atmosphere[data-weather-scene='snow'] .motion {
+  background-size: 56px 56px, 92px 92px;
+  animation: weatherFall 12s linear infinite;
+  will-change: transform;
+}
+
+:global([data-closing='true']) .light,
+:global([data-closing='true']) .motion {
+  animation-play-state: paused;
+}
+
+@keyframes weatherLightDrift {
+  from {
+    transform: translate3d(-2%, -1%, 0) scale(1.02);
+  }
+
+  to {
+    transform: translate3d(3%, 2%, 0) scale(1.08);
+  }
+}
+
+@keyframes weatherCloudDrift {
+  from {
+    transform: translate3d(-5%, 0, 0);
+  }
+
+  to {
+    transform: translate3d(5%, 1%, 0);
+  }
+}
+
+@keyframes weatherWindDrift {
+  from {
+    transform: translate3d(-8%, 0, 0);
+  }
+
+  to {
+    transform: translate3d(8%, 0, 0);
+  }
+}
+
+@keyframes weatherFall {
+  from {
+    transform: translate3d(0, -7%, 0);
+  }
+
+  to {
+    transform: translate3d(0, 7%, 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .light,
+  .motion {
+    animation: none !important;
+    transform: none !important;
+    will-change: auto;
+  }
+}
+
+@media (forced-colors: active) {
+  .atmosphere {
+    display: none;
+  }
+}

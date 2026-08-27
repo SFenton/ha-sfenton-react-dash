@@ -1171,6 +1171,41 @@ test('mobile modal opener families use shared disclosures and explicit action ex
   await expectRightChevron(page.getByRole('button', { name: 'Edit Canned Beans' }))
 })
 
+test('weather modal renders a live atmosphere and outdoor AQI without motion-only semantics', async ({ page }) => {
+  await page.setViewportSize({ width: 393, height: 852 })
+  await page.goto('/at-a-glance/overview')
+  await page.getByRole('button', { name: /Open seven-day weather forecast/i }).click()
+
+  const dialog = page.getByRole('dialog', { name: 'Weather' })
+  await expect(dialog).toHaveAttribute('data-has-surface-decoration', 'true')
+  await expect(dialog.locator('[data-weather-scene="clouds"]')).toBeVisible()
+  const aqiTile = dialog.getByRole('article', { name: 'Outdoor air quality 152, Unhealthy' })
+  await expect(aqiTile).toHaveAttribute('data-aqi-tone', 'unhealthy')
+  await expect(aqiTile.getByText('Health effects are possible for everyone.')).toHaveCount(0)
+  await expect(dialog.getByRole('article', { name: /^Wind / })).toHaveAttribute('data-wide', 'true')
+  await expect(dialog.getByRole('article', { name: 'Cloud Cover 57%' }).locator('[data-cloud-cover-visual="dial"]')).toBeVisible()
+  const decorationCoverage = await dialog.evaluate((element) => {
+    const decoration = element.querySelector<HTMLElement>('[data-modal-sheet-surface-decoration="true"]')
+    if (!decoration) return null
+    const dialogRect = element.getBoundingClientRect()
+    const decorationRect = decoration.getBoundingClientRect()
+    return {
+      heightDelta: Math.abs(dialogRect.height - decorationRect.height),
+      widthDelta: Math.abs(dialogRect.width - decorationRect.width),
+      xDelta: Math.abs(dialogRect.x - decorationRect.x),
+      yDelta: Math.abs(dialogRect.y - decorationRect.y),
+    }
+  })
+  expect(decorationCoverage).not.toBeNull()
+  expect(decorationCoverage?.heightDelta).toBeLessThanOrEqual(2)
+  expect(decorationCoverage?.widthDelta).toBeLessThanOrEqual(2)
+  expect(decorationCoverage?.xDelta).toBeLessThanOrEqual(2)
+  expect(decorationCoverage?.yDelta).toBeLessThanOrEqual(2)
+
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  await expect(dialog.locator('[data-weather-atmosphere-motion="true"]')).toHaveCSS('animation-name', 'none')
+})
+
 test('mobile navigation chevrons stay vertically centered in their opener', async ({ page }) => {
   await page.setViewportSize({ width: 393, height: 852 })
 

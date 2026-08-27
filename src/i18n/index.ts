@@ -9,6 +9,7 @@ export const CUSTOM_LIGHTS_COPY_NAMESPACE = 'pageCustomLights' as const
 export const BATHROOM_FAN_COPY_NAMESPACE = 'modalBathroomFan' as const
 export const HUMIDIFIER_COPY_NAMESPACE = 'modalHumidifier' as const
 export const VACUUM_COPY_NAMESPACE = 'modalVacuum' as const
+export const WEATHER_COPY_NAMESPACE = 'modalWeather' as const
 export const GARAGE_DOOR_COPY_KEYS = {
   sendingClose: 'garageDoor.sendingClose',
   sendingOpen: 'garageDoor.sendingOpen',
@@ -161,6 +162,60 @@ export const HUMIDIFIER_COPY_KEYS = {
   states: {
     unavailable: 'states.unavailable',
   },
+} as const
+
+export const WEATHER_COPY_KEYS = {
+  aqi: {
+    ariaLabel: 'aqi.ariaLabel',
+    categories: {
+      good: 'aqi.categories.good',
+      hazardous: 'aqi.categories.hazardous',
+      moderate: 'aqi.categories.moderate',
+      sensitive: 'aqi.categories.sensitive',
+      unhealthy: 'aqi.categories.unhealthy',
+      veryUnhealthy: 'aqi.categories.veryUnhealthy',
+    },
+    guidance: {
+      good: 'aqi.guidance.good',
+      hazardous: 'aqi.guidance.hazardous',
+      moderate: 'aqi.guidance.moderate',
+      sensitive: 'aqi.guidance.sensitive',
+      unhealthy: 'aqi.guidance.unhealthy',
+      veryUnhealthy: 'aqi.guidance.veryUnhealthy',
+    },
+    subtitle: 'aqi.subtitle',
+    title: 'aqi.title',
+    unavailableAriaLabel: 'aqi.unavailableAriaLabel',
+  },
+  attribution: 'attribution',
+  details: {
+    ariaLabel: 'details.ariaLabel',
+    sun: {
+      sunrise: 'details.sun.sunrise',
+      sunset: 'details.sun.sunset',
+    },
+    uv: {
+      categories: {
+        extreme: 'details.uv.categories.extreme',
+        high: 'details.uv.categories.high',
+        low: 'details.uv.categories.low',
+        moderate: 'details.uv.categories.moderate',
+        veryHigh: 'details.uv.categories.veryHigh',
+      },
+    },
+    wind: {
+      direction: 'details.wind.direction',
+      gusts: 'details.wind.gusts',
+      speed: 'details.wind.speed',
+    },
+  },
+  headline: {
+    aqi: 'headline.aqi',
+    label: 'headline.label',
+    weather: 'headline.weather',
+  },
+  subtitle: 'subtitle',
+  unavailable: 'unavailable',
 } as const
 
 export const CORE_COPY_KEYS = {

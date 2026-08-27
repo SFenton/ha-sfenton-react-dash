@@ -233,9 +233,18 @@
 }
 
 .sheet {
+  position: relative;
+  isolation: isolate;
+}
+
+.sheetContent {
+  position: relative;
+  z-index: 1;
   display: grid;
   gap: 16px;
   padding-bottom: 18px;
+  container-name: weather-sheet;
+  container-type: inline-size;
 }
 
 .modalHero {
@@ -280,20 +289,15 @@
 .hourlyPanel,
 .forecastPanel,
 .highlightTile {
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  border: 1px solid var(--rd-weather-panel-border);
   border-radius: 24px;
-  background: linear-gradient(
-    145deg,
-    rgba(255, 255, 255, 0.14),
-    rgba(255, 255, 255, 0.06)
-  );
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.14),
-    0 16px 36px rgba(0, 0, 0, 0.18);
+  background: var(--rd-weather-panel-surface);
+  box-shadow: var(--rd-weather-panel-shadow);
 }
 
 .currentPanel {
   display: grid;
+  min-height: 124px;
   gap: 16px;
   padding: 18px;
 }
@@ -321,10 +325,11 @@
 }
 
 .currentCopy strong {
+  min-height: 2.1em;
   color: white;
   font-size: 1.2rem;
   font-weight: 840;
-  line-height: 1.05;
+  line-height: 1.08;
 }
 
 .hourlyPanel {
@@ -341,7 +346,6 @@
   transition:
     opacity 140ms ease,
     transform 140ms ease;
-  will-change: opacity, transform;
 }
 
 .modeContent[data-transition="out"] {
@@ -375,8 +379,9 @@
 
 .hourlyModes button {
   display: inline-flex;
+  width: 44px;
   min-width: 44px;
-  height: 28px;
+  height: 44px;
   align-items: center;
   justify-content: center;
   border-radius: 999px;
@@ -676,11 +681,17 @@
 }
 
 .highlightTile {
+  position: relative;
   display: grid;
-  min-height: 184px;
+  min-height: 150px;
   align-content: space-between;
   gap: 10px;
   padding: 14px;
+  overflow: hidden;
+}
+
+.highlightTile[data-wide='true'] {
+  grid-column: span 2;
 }
 
 .highlightTitle {
@@ -704,6 +715,22 @@
   font-size: 2.35rem;
   font-weight: 300;
   line-height: 0.95;
+  white-space: nowrap;
+}
+
+.highlightValueRow {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.highlightStatus {
+  min-width: 0;
+  color: var(--color-text-muted);
+  font-size: 0.9rem;
+  font-weight: 760;
+  line-height: 1.08;
 }
 
 .highlightTile[data-kind="pressure"] .highlightValue {
@@ -713,16 +740,14 @@
 }
 
 .highlightTile[data-kind="pressure"] {
+  min-height: 184px;
   grid-template-rows: auto 1fr;
   padding-right: 10px;
   padding-left: 10px;
 }
 
-.highlightNote {
-  color: rgba(255, 255, 255, 0.76);
-  font-size: 0.88rem;
-  font-weight: 640;
-  line-height: 1.22;
+.highlightTile[data-kind="cloud"] {
+  min-height: 166px;
 }
 
 .highlightMeter {
@@ -730,7 +755,7 @@
   display: block;
   height: 8px;
   border-radius: 999px;
-  background: rgba(22, 36, 52, 0.42);
+  background: var(--rd-weather-meter-track);
 }
 
 .highlightMeterFill {
@@ -785,29 +810,62 @@
 }
 
 .highlightMeter_feels .highlightMeterFill {
-  background: linear-gradient(
-    90deg,
-    #64d8ff,
-    #a8df85 46%,
-    #ffd34d 72%,
-    #ff8a1f
-  );
+  width: 100%;
+  background: var(--rd-weather-feels-scale);
+}
+
+.highlightMeter_precipitation .highlightMeterFill,
+.highlightMeter_humidity .highlightMeterFill {
+  background: var(--rd-weather-water-scale);
+}
+
+.highlightMeter_visibility .highlightMeterFill {
+  background: var(--rd-weather-visibility-scale);
+}
+
+.windDetailLayout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 96px;
+  gap: 18px;
+  align-items: center;
+}
+
+.windDetails {
+  display: grid;
+  min-width: 0;
+}
+
+.windDetailRow {
+  display: flex;
+  min-height: 34px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-top: 1px solid var(--rd-weather-panel-border);
+  color: var(--color-text-muted);
+  font-size: 0.82rem;
+}
+
+.windDetailRow:first-child {
+  border-top: 0;
+}
+
+.windDetailRow strong {
+  color: var(--color-text);
+  font-size: 0.9rem;
+  font-weight: 760;
+  white-space: nowrap;
 }
 
 .highlightCompass {
   position: relative;
   display: grid;
-  width: 74px;
-  height: 74px;
+  width: 92px;
+  height: 92px;
   justify-self: center;
-  border: 1px solid rgba(255, 255, 255, 0.16);
+  border: 1px solid var(--rd-weather-panel-border);
   border-radius: 50%;
-  background: radial-gradient(
-    circle,
-    rgba(255, 255, 255, 0.13),
-    rgba(255, 255, 255, 0.05) 62%,
-    rgba(0, 0, 0, 0.14)
-  );
+  background: var(--rd-weather-compass-surface);
 }
 
 .compassNorth,
@@ -849,11 +907,174 @@
   position: absolute;
   top: 50%;
   left: 50%;
+  z-index: 1;
   display: inline-flex;
-  color: #56d7ff;
+  color: var(--rd-weather-compass-accent);
   filter: drop-shadow(0 1px 4px rgba(0, 0, 0, 0.35));
   transform: translate(-50%, -50%) rotate(var(--highlight-rotation, 0deg));
   transform-origin: center;
+}
+
+.compassReadout {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  z-index: 2;
+  display: grid;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--color-text);
+  background: var(--rd-weather-modal-surface);
+  font-size: 0.66rem;
+  font-weight: 820;
+  line-height: 1.05;
+  text-align: center;
+  transform: translate(-50%, -50%);
+}
+
+.sunArc {
+  display: block;
+  height: 52px;
+}
+
+.sunArc svg {
+  display: block;
+  width: 100%;
+  height: 52px;
+  overflow: visible;
+}
+
+.sunArcPath {
+  fill: none;
+  stroke: var(--rd-weather-sun-arc);
+  stroke-linecap: round;
+  stroke-width: 3;
+}
+
+.sunHorizon {
+  stroke: var(--rd-weather-sun-horizon);
+  stroke-width: 1.5;
+}
+
+.sunMarker {
+  fill: var(--rd-weather-marker);
+  filter: drop-shadow(0 0 5px var(--rd-weather-marker));
+}
+
+.highlightUnavailableVisual {
+  display: grid;
+  min-height: 74px;
+  place-items: center;
+  color: var(--color-subtle);
+}
+
+.aqiTile {
+  --aqi-color: var(--rd-aqi-unavailable);
+  order: -2;
+  height: 150px;
+  grid-template-rows: auto 58px 10px;
+  align-content: start;
+  box-sizing: border-box;
+}
+
+.aqiTile::before {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 10% 0%, var(--aqi-color), var(--rd-weather-panel-tone-fade) 72%);
+  content: "";
+  opacity: 0.18;
+  pointer-events: none;
+}
+
+.aqiTile > * {
+  position: relative;
+  z-index: 1;
+}
+
+.aqiTile[data-aqi-tone='good'] {
+  --aqi-color: var(--rd-aqi-good);
+}
+
+.aqiTile[data-aqi-tone='moderate'] {
+  --aqi-color: var(--rd-aqi-moderate);
+}
+
+.aqiTile[data-aqi-tone='sensitive'] {
+  --aqi-color: var(--rd-aqi-sensitive);
+}
+
+.aqiTile[data-aqi-tone='unhealthy'] {
+  --aqi-color: var(--rd-aqi-unhealthy);
+}
+
+.aqiTile[data-aqi-tone='veryUnhealthy'] {
+  --aqi-color: var(--rd-aqi-very-unhealthy);
+}
+
+.aqiTile[data-aqi-tone='hazardous'] {
+  --aqi-color: var(--rd-aqi-hazardous);
+}
+
+.aqiHeader {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.aqiSource {
+  color: var(--color-text-muted);
+  font-size: 0.7rem;
+  font-weight: 680;
+  white-space: nowrap;
+}
+
+.aqiReading {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.aqiValue {
+  color: var(--color-text);
+  font-size: 3.2rem;
+  font-weight: 260;
+  line-height: 0.9;
+}
+
+.aqiCategory {
+  display: flex;
+  min-width: 0;
+  min-height: 2.16em;
+  align-items: center;
+  color: var(--color-text);
+  font-size: 1.08rem;
+  font-weight: 800;
+  line-height: 1.08;
+}
+
+.aqiScale {
+  position: relative;
+  height: 10px;
+  border-radius: 999px;
+  background: var(--rd-aqi-scale);
+}
+
+.aqiMarker {
+  position: absolute;
+  top: 50%;
+  left: var(--aqi-marker, 0%);
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--rd-weather-marker);
+  border-radius: 50%;
+  background: var(--aqi-color);
+  box-shadow: 0 2px 8px var(--rd-weather-meter-track);
+  transform: translate(-50%, -50%);
 }
 
 .pressureGauge {
@@ -933,30 +1154,34 @@
   transform: translateX(-50%);
 }
 
-.cloudMeter {
+.cloudDial {
   position: relative;
-  display: block;
-  height: 36px;
-  overflow: hidden;
-  border-radius: 14px;
-  background: linear-gradient(
-    180deg,
-    rgba(85, 160, 214, 0.46),
-    rgba(30, 55, 78, 0.4)
+  display: grid;
+  width: 68px;
+  height: 68px;
+  justify-self: center;
+  place-items: center;
+  border-radius: 50%;
+  background: conic-gradient(
+    from -90deg,
+    var(--rd-weather-cloud-accent) 0 var(--highlight-percent, 0%),
+    var(--rd-weather-meter-track) var(--highlight-percent, 0%) 100%
   );
 }
 
-.cloudMeterFill {
+.cloudDial::before {
   position: absolute;
-  right: 0;
-  bottom: 0;
-  left: 0;
-  height: var(--highlight-percent, 0%);
-  background: linear-gradient(
-    180deg,
-    rgba(255, 255, 255, 0.84),
-    rgba(255, 255, 255, 0.48)
-  );
+  inset: 7px;
+  border-radius: 50%;
+  background: var(--rd-weather-modal-surface);
+  content: "";
+}
+
+.cloudDialCore {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  color: var(--rd-weather-cloud-accent);
 }
 
 .errorState,
@@ -995,7 +1220,9 @@
 .sheet .forecastWindRange,
 .sheet .highlightTitle,
 .sheet .highlightValue,
-.sheet .highlightNote,
+.sheet .aqiCategory,
+.sheet .aqiSource,
+.sheet .aqiValue,
 .sheet .errorState {
   color: #fff;
 }
@@ -1004,21 +1231,49 @@
   min-height: 92px;
 }
 
-@media (max-width: 430px) {
-  .currentHero {
-    grid-template-columns: auto 1fr;
+.attribution {
+  padding: 2px 4px 0;
+  color: var(--color-text-muted);
+  font-size: 0.72rem;
+  font-weight: 640;
+  text-align: center;
+}
+
+@container weather-sheet (min-width: 620px) {
+  .highlightGrid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
-  .currentTemperature {
+  .highlightGrid .highlightTile.aqiTile {
     grid-column: 1 / -1;
-    justify-self: start;
   }
 
-  .forecastMain {
-    grid-template-columns: auto 1fr;
+  .highlightTile[data-kind='wind'] {
+    order: -1;
+    grid-column: span 2;
+  }
+}
+
+@container weather-sheet (min-width: 900px) {
+  .highlightGrid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 
-  .forecastTemps {
-    grid-column: 2;
+  .highlightGrid .highlightTile.aqiTile {
+    grid-column: span 2;
+  }
+
+  .highlightTile[data-kind='wind'] {
+    grid-column: span 2;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .modeContent,
+  .modeContent[data-transition='out'],
+  .modeContent[data-transition='in'] {
+    opacity: 1;
+    transform: none;
+    transition: none;
   }
 }

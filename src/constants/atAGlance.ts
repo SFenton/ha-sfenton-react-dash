@@ -755,3 +755,5 @@ export const SECURITY_ACTIONS = [
 ] as const
 
 export const WEATHER_ENTITY = 'weather.pirate_weather'
+export const WEATHER_AQI_ENTITY = 'sensor.pirate_weather_air_quality_index'
+export const SUN_ENTITY = 'sun.sun'
