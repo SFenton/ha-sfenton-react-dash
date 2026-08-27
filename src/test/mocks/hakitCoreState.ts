@@ -1470,6 +1470,11 @@ export const explicitMockEntities: Record<string, MockEntity> = {
   'light.front_door_bollard_5': entity('light.front_door_bollard_5', 'off', { brightness: null }),
   'light.front_door_bollard_6': entity('light.front_door_bollard_6', 'off', { brightness: null }),
   'weather.pirate_weather': entity('weather.pirate_weather', 'partlycloudy', { temperature: 45, temperature_unit: '°F' }),
+  'sensor.pirate_weather_air_quality_index': entity('sensor.pirate_weather_air_quality_index', '152', { attribution: 'Powered by Pirate Weather', device_class: 'aqi' }),
+  'sun.sun': entity('sun.sun', 'above_horizon', {
+    next_rising: '2030-06-11T13:20:00.000Z',
+    next_setting: '2030-06-11T03:00:00.000Z',
+  }),
   'select.front_yard_device_mode': entity('select.front_yard_device_mode', 'auto', { options: ['auto', 'off'] }),
   'select.backyard_faucet_device_mode': entity('select.backyard_faucet_device_mode', 'auto', { options: ['auto', 'off'] }),
   'valve.front_yard_zone': entity('valve.front_yard_zone', 'closed', {

@@ -26,10 +26,11 @@ export interface ModalSheetProps {
   scrollMode?: ModalSheetScrollMode
   scrollResetKey?: string | number | boolean
   size?: ModalSheetSize
+  surfaceDecoration?: ReactNode
   subtitle?: string
 }
 
-type ModalSheetSnapshot = Pick<ModalSheetProps, 'backLabel' | 'bodyHeader' | 'children' | 'contentStyle' | 'footer' | 'navigation' | 'onBack' | 'scrollMode' | 'scrollResetKey' | 'size' | 'subtitle' | 'title'>
+type ModalSheetSnapshot = Pick<ModalSheetProps, 'backLabel' | 'bodyHeader' | 'children' | 'contentStyle' | 'footer' | 'navigation' | 'onBack' | 'scrollMode' | 'scrollResetKey' | 'size' | 'subtitle' | 'surfaceDecoration' | 'title'>
 export const MODAL_SHEET_EXIT_ANIMATION_MS = 520
 export const MODAL_SHEET_CENTERED_QUERY = '(min-width: 760px) and (min-height: 560px)'
 
@@ -74,12 +75,13 @@ export function ModalSheet({
   scrollMode = 'body',
   scrollResetKey,
   size = 'standard',
+  surfaceDecoration,
   subtitle,
 }: ModalSheetProps) {
   const copy = useCopy('core')
   const bodyRef = useRef<HTMLDivElement | null>(null)
   const [bodyRefVersion, setBodyRefVersion] = useState(0)
-  const currentSnapshot: ModalSheetSnapshot = { backLabel: backLabel ?? copy('modal.back'), bodyHeader, children, contentStyle, footer, navigation, onBack, scrollMode, scrollResetKey, size, subtitle, title }
+  const currentSnapshot: ModalSheetSnapshot = { backLabel: backLabel ?? copy('modal.back'), bodyHeader, children, contentStyle, footer, navigation, onBack, scrollMode, scrollResetKey, size, subtitle, surfaceDecoration, title }
   const [lastOpenSnapshot, setLastOpenSnapshot] = useState<ModalSheetSnapshot>(currentSnapshot)
   const [mounted, setMounted] = useState(open)
   const [initialStarting, setInitialStarting] = useState(open)
@@ -238,6 +240,7 @@ export function ModalSheet({
               data-has-navigation={renderedHasNavigation ? 'true' : 'false'}
               data-has-body-header={rendered.bodyHeader ? 'true' : 'false'}
               data-has-subtitle={renderedHasSubtitle ? 'true' : 'false'}
+              data-has-surface-decoration={rendered.surfaceDecoration ? 'true' : 'false'}
               data-initial-starting-style={initialStarting ? 'true' : undefined}
               data-rapid-reopen={rapidReopen ? 'true' : 'false'}
               data-state={open ? 'open' : 'closed'}
@@ -249,6 +252,11 @@ export function ModalSheet({
               initialFocus={false}
               style={renderedContentStyle}
             >
+              {rendered.surfaceDecoration && (
+                <div aria-hidden="true" className={styles.surfaceDecoration} data-modal-sheet-surface-decoration="true">
+                  {rendered.surfaceDecoration}
+                </div>
+              )}
               <Drawer.Content className={styles.contentLayout} data-base-ui-swipe-ignore={isCenteredModalLayout ? 'true' : undefined}>
                 {showDragHandle && <div className={styles.handle} data-mobile-drag-handle="true" />}
                 <div className={styles.header}>

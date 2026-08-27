@@ -1,0 +1,53 @@
+{
+  "aqi": {
+    "ariaLabel": "Outdoor air quality {{value}}, {{category}}",
+    "categories": {
+      "good": "Good",
+      "hazardous": "Hazardous",
+      "moderate": "Moderate",
+      "sensitive": "Unhealthy for Sensitive Groups",
+      "unhealthy": "Unhealthy",
+      "veryUnhealthy": "Very Unhealthy"
+    },
+    "guidance": {
+      "good": "Air pollution poses little or no risk.",
+      "hazardous": "Emergency health effects are possible for everyone.",
+      "moderate": "Air quality is acceptable for most people.",
+      "sensitive": "Sensitive groups may experience health effects.",
+      "unhealthy": "Health effects are possible for everyone.",
+      "veryUnhealthy": "Health risk is increased for everyone."
+    },
+    "subtitle": "Outdoor · Pirate Weather",
+    "title": "Air Quality",
+    "unavailableAriaLabel": "Outdoor air quality unavailable"
+  },
+  "attribution": "Powered by Pirate Weather",
+  "details": {
+    "ariaLabel": "{{title}} {{value}}",
+    "sun": {
+      "sunrise": "Sunrise",
+      "sunset": "Sunset"
+    },
+    "uv": {
+      "categories": {
+        "extreme": "Extreme",
+        "high": "High",
+        "low": "Low",
+        "moderate": "Moderate",
+        "veryHigh": "Very High"
+      }
+    },
+    "wind": {
+      "direction": "Direction",
+      "gusts": "Gusts",
+      "speed": "Wind"
+    }
+  },
+  "headline": {
+    "aqi": "Outdoor air quality is {{category}} ({{value}})",
+    "label": "Today",
+    "weather": "{{condition}} today"
+  },
+  "subtitle": "Home · {{temperature}} · {{condition}}",
+  "unavailable": "Unavailable"
+}

@@ -371,12 +371,38 @@ describe('AtAGlancePage', () => {
     expect(await within(dialog).findByRole('article', { name: 'Today wind 4-8 mph' })).toBeInTheDocument()
     expect(await within(dialog).findByText('Next Seven Days')).toBeInTheDocument()
     expect(within(dialog).getByLabelText('Current weather conditions')).toHaveTextContent('Home57°CloudyH:65° L:48°')
+    expect(dialog.querySelector('[data-weather-scene="clouds"]')).toBeInTheDocument()
+    expect(within(dialog).getByText('Outdoor air quality is Unhealthy (152)')).toBeInTheDocument()
+    const aqiTile = within(dialog).getByRole('article', { name: 'Outdoor air quality 152, Unhealthy' })
+    expect(aqiTile).toHaveAttribute('data-aqi-tone', 'unhealthy')
+    expect(within(aqiTile).queryByText('Health effects are possible for everyone.')).not.toBeInTheDocument()
     fireEvent.click(within(dialog).getByRole('button', { name: 'Conditions conditions' }))
     expect(await within(dialog).findByRole('article', { name: 'Today Sunny H:65° L:48°' })).toBeInTheDocument()
     expect(await within(dialog).findByRole('article', { name: 'Thu Sunny H:71° L:50°' })).toBeInTheDocument()
     expect(await within(dialog).findByRole('article', { name: /Tue Rain H:84° L:59°/ })).toBeInTheDocument()
     expect(within(dialog).getByRole('article', { name: 'Feels Like 63°F' })).toBeInTheDocument()
     expect(within(dialog).getByRole('article', { name: 'Humidity 72%' })).toBeInTheDocument()
+    expect(within(dialog).getByRole('article', { name: /^Wind / })).toHaveAttribute('data-wide', 'true')
+    expect(within(dialog).getByRole('article', { name: /^Sunset / })).toBeInTheDocument()
+    expect(within(dialog).getByRole('article', { name: 'Cloud Cover 100%' }).querySelector('[data-cloud-cover-visual="dial"]')).toBeInTheDocument()
+  })
+
+  it('keeps outdoor AQI visible across good and unavailable states', async () => {
+    mockEntities['sensor.pirate_weather_air_quality_index'].state = '42'
+    const view = render(<AtAGlancePage />)
+    fireEvent.click(screen.getByRole('button', { name: /Open seven-day weather forecast/i }))
+
+    let dialog = await screen.findByRole('dialog')
+    expect(within(dialog).getByRole('article', { name: 'Outdoor air quality 42, Good' })).toHaveAttribute('data-aqi-tone', 'good')
+    expect(within(dialog).queryByText(/Outdoor air quality is/i)).not.toBeInTheDocument()
+
+    view.unmount()
+    mockEntities['sensor.pirate_weather_air_quality_index'].state = 'unavailable'
+    render(<AtAGlancePage />)
+    fireEvent.click(screen.getByRole('button', { name: /Open seven-day weather forecast/i }))
+
+    dialog = await screen.findByRole('dialog')
+    expect(within(dialog).getByRole('article', { name: 'Outdoor air quality unavailable' })).toHaveAttribute('data-unavailable', 'true')
   })
 
   it('uses the shell header menu without Home header actions', async () => {

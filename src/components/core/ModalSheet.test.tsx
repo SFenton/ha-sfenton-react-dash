@@ -74,6 +74,7 @@ describe('ModalSheet', () => {
         open
         scrollMode="panes"
         size="form"
+        surfaceDecoration={<span data-testid="modal-decoration" />}
         title=""
       >
         <div />
@@ -84,12 +85,14 @@ describe('ModalSheet', () => {
     expect(dialog).toHaveAttribute('data-size', 'form')
     expect(dialog).toHaveAttribute('data-scroll-mode', 'panes')
     expect(dialog).toHaveAttribute('data-has-navigation', 'true')
+    expect(dialog).toHaveAttribute('data-has-surface-decoration', 'true')
     expect(dialog.querySelector('[data-modal-sheet-navigation="true"]')).toContainElement(screen.getByTestId('modal-navigation'))
+    expect(dialog.querySelector('[data-modal-sheet-surface-decoration="true"]')).toContainElement(screen.getByTestId('modal-decoration'))
   })
 
-  it('retains navigation and typed layout intent during the mounted close frame', () => {
+  it('retains navigation, decoration, and typed layout intent during the mounted close frame', () => {
     const view = render(
-      <ModalSheet navigation={<span data-testid="closing-navigation" />} onClose={() => undefined} open scrollMode="panes" size="workspace" title="">
+      <ModalSheet navigation={<span data-testid="closing-navigation" />} onClose={() => undefined} open scrollMode="panes" size="workspace" surfaceDecoration={<span data-testid="closing-decoration" />} title="">
         <div />
       </ModalSheet>,
     )
@@ -105,6 +108,7 @@ describe('ModalSheet', () => {
     expect(dialog).toHaveAttribute('data-size', 'workspace')
     expect(dialog).toHaveAttribute('data-scroll-mode', 'panes')
     expect(screen.getByTestId('closing-navigation')).toBeInTheDocument()
+    expect(screen.getByTestId('closing-decoration')).toBeInTheDocument()
   })
 
   it('disables nested glass backdrop filters inside the moving modal surface', () => {
