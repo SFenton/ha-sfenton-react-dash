@@ -104,7 +104,6 @@ export interface VacuumConfig {
   dockButtonEntityId?: string
   dockControls?: VacuumDockControlsConfig
   errorEntityId: string
-  errorMessageEntityId: string
   fanEntityId?: string
   hash: string
   mapRotationDegrees?: number
@@ -113,6 +112,7 @@ export interface VacuumConfig {
   modeTextEntityId?: string
   outcomeRoomNames?: Record<string, string>
   passesEntityId: string
+  statusEntityId: string
   statusFlagEntityId: string
   vacuumMapId: string
   waterEntityId?: string
@@ -497,13 +497,13 @@ export const VACUUMS: VacuumConfig[] = [
       mopAttachmentEntityId: 'binary_sensor.valetudo_elatedusedram_mop_attachment',
     },
     errorEntityId: 'sensor.valetudo_elatedusedram_error',
-    errorMessageEntityId: 'input_text.music_room_vacuum_error_message',
     fanEntityId: 'select.valetudo_elatedusedram_fan',
     hash: 'music-room-robot-vacuum',
     mapScale: 2.4,
     modeEntityId: 'select.valetudo_elatedusedram_mode',
     modeTextEntityId: 'input_text.music_room_vacuum_mode',
     passesEntityId: 'input_select.music_room_vacuum_cleaning_passes',
+    statusEntityId: 'sensor.music_room_vacuum_status',
     statusFlagEntityId: 'sensor.valetudo_elatedusedram_status_flag',
     vacuumMapId: 'valetudo_elatedusedram',
     waterEntityId: 'select.valetudo_elatedusedram_water',
@@ -535,12 +535,12 @@ export const VACUUMS: VacuumConfig[] = [
       mopAttachmentEntityId: 'binary_sensor.valetudo_politefatherlykingfisher_mop_attachment',
     },
     errorEntityId: 'sensor.valetudo_politefatherlykingfisher_error',
-    errorMessageEntityId: 'input_text.theater_room_vacuum_error_message',
     fanEntityId: 'select.valetudo_politefatherlykingfisher_fan',
     hash: 'theater-room-robot-vacuum',
     mapScale: 2.4,
     modeEntityId: 'select.valetudo_politefatherlykingfisher_mode',
     passesEntityId: 'input_select.theater_room_vacuum_cleaning_passes',
+    statusEntityId: 'sensor.theater_room_vacuum_status',
     statusFlagEntityId: 'sensor.valetudo_politefatherlykingfisher_status_flag',
     vacuumMapId: 'valetudo_politefatherlykingfisher',
     waterEntityId: 'select.valetudo_politefatherlykingfisher_water',
@@ -565,7 +565,6 @@ export const VACUUMS: VacuumConfig[] = [
       mopAttachmentEntityId: 'binary_sensor.valetudo_exaltedsneakydeer_mop_attachment',
     },
     errorEntityId: 'sensor.valetudo_exaltedsneakydeer_error',
-    errorMessageEntityId: 'input_text.main_floor_vacuum_error_message',
     fanEntityId: 'select.valetudo_exaltedsneakydeer_fan',
     hash: 'main-floor-robot-vacuum',
     mapRotationDegrees: 180,
@@ -586,6 +585,7 @@ export const VACUUMS: VacuumConfig[] = [
       office: 'Office',
     },
     passesEntityId: 'input_select.main_floor_vacuum_cleaning_passes',
+    statusEntityId: 'sensor.main_floor_vacuum_status',
     statusFlagEntityId: 'sensor.valetudo_exaltedsneakydeer_status_flag',
     vacuumMapId: 'valetudo_exaltedsneakydeer',
     waterEntityId: 'select.valetudo_exaltedsneakydeer_water',

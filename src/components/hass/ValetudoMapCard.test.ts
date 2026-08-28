@@ -63,6 +63,36 @@ describe('ValetudoMapCard helpers', () => {
     expect(selectValetudoMapEntity(cameraEntityId, storeEntity, otherLiveEntity)).toBe(storeEntity)
   })
 
+  it('uses the newest same-camera state so recovery can replace a stale fetched snapshot', () => {
+    const cameraEntityId = 'camera.valetudo_elatedusedram_map_data'
+    const storeEntity = {
+      attributes: { entity_picture: '/api/camera_proxy/camera.valetudo_elatedusedram_map_data?recovered' },
+      entity_id: cameraEntityId,
+      last_updated: '2026-08-27T12:00:05.000Z',
+      state: 'idle',
+    }
+    const staleFetchedEntity = {
+      attributes: { entity_picture: '/api/camera_proxy/camera.valetudo_elatedusedram_map_data?unavailable' },
+      entity_id: cameraEntityId,
+      last_updated: '2026-08-27T12:00:00.000Z',
+      state: 'unavailable',
+    }
+
+    expect(selectValetudoMapEntity(cameraEntityId, storeEntity, staleFetchedEntity)).toBe(storeEntity)
+  })
+
+  it('lets a live removal tombstone override a cached HASS store entity', () => {
+    const cameraEntityId = 'camera.valetudo_elatedusedram_map_data'
+    const cachedStoreEntity = {
+      attributes: { entity_picture: '/api/camera_proxy/camera.valetudo_elatedusedram_map_data?cached' },
+      entity_id: cameraEntityId,
+      last_updated: '2026-08-27T12:00:00.000Z',
+      state: 'idle',
+    }
+
+    expect(selectValetudoMapEntity(cameraEntityId, cachedStoreEntity, null, true)).toBeNull()
+  })
+
   it('resolves Valetudo marker icons used by the ha-icon fallback', () => {
     expect(materialIconPath('mdi:robot-vacuum')).not.toBe(materialIconPath('mdi:home'))
     expect(materialIconPath('mdi:flash')).not.toBe(materialIconPath('mdi:home'))

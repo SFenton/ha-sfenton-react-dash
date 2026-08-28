@@ -2,6 +2,25 @@
   "cleaned": "Cleaned",
   "issues": "Issues",
   "selectedRooms": "Selected Rooms",
+  "status": {
+    "unavailableHelp": "Home Assistant does not have a current status for the vacuum.",
+    "unavailableLiveStatus": "{{status}}. Home Assistant does not have the vacuum's current status.",
+    "errorSourceUnavailable": "Error Source Unavailable",
+    "errorSourceUnavailableHelp": "The current vacuum error status cannot be confirmed because its error source is unavailable.",
+    "currentIssue": "Current Issue",
+    "homeAssistantCondition": "Home Assistant Condition",
+    "conditions": {
+      "resumePending": "Kept for Later",
+      "vacuumingOnly": "Vacuuming Only",
+      "dockingMayBeIncomplete": "Docking May Be Incomplete"
+    },
+    "previousIssue": "Previous Issue",
+    "previousIssueObserved": "Previous Vacuum Issue · {{issue}} • Observed {{date}}",
+    "queuedCleaningCanceled": "The queued cleaning request was canceled because the vacuum is no longer ready. Retry when ready.",
+    "loadingCurrentMap": "Loading Current Map…",
+    "mapUnavailable": "Map Unavailable",
+    "mapUnavailableHelp": "Home Assistant cannot currently confirm the vacuum's map or position."
+  },
   "outcomes": {
     "sectionTitle": "While You Were Away",
     "detailTitle": "While-Away Vacuum Outcomes · {{date}}",
