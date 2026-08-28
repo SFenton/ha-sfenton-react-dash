@@ -290,9 +290,47 @@
   opacity: 0.68;
 }
 
-.errorMessage {
+.statusNoticeWide {
   grid-column: 1 / -1;
-  padding: 0 3px;
+}
+
+.statusNotice {
+  display: grid;
+  gap: 6px;
+  border: 1px solid var(--color-line);
+  border-radius: 16px;
+  padding: 10px 11px;
+  background: var(--color-glass-soft);
+}
+
+.statusNotice[data-tone='warning'] {
+  border-color: color-mix(in srgb, var(--color-timer) 38%, var(--color-line));
+  background: color-mix(in srgb, var(--color-timer) 14%, var(--color-modal-surface));
+}
+
+.statusNotice h3 {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 0.65rem;
+  font-weight: 860;
+  letter-spacing: 0.08em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.statusNotice > div {
+  color: var(--color-text);
+}
+
+.visuallyHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .section {

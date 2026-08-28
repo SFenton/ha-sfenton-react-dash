@@ -3557,6 +3557,35 @@ test('offline vacuum cards open their status modal', async ({ page }) => {
   const statusPill = dialog.locator('[data-icon="mdi:robot-vacuum-off"][data-tone="unavailable"]')
   await expect(statusPill).toContainText('Unavailable')
   await expect(statusPill).toHaveAttribute('data-tone', 'unavailable')
+  await expect(dialog.getByLabel('Unavailable')).toContainText('Home Assistant does not have a current status for the vacuum.')
+  await expect(dialog.getByText('Map Unavailable')).toBeVisible()
+  await expect(dialog.getByText("Home Assistant cannot currently confirm the vacuum's map or position.")).toBeVisible()
+  await expect(dialog.getByRole('button', { name: 'Locate' })).toHaveCount(0)
+  await expect(dialog.getByRole('alert')).toHaveCount(0)
+  await expect(dialog.getByText(/battery is critically low/i)).toHaveCount(0)
+})
+
+test('current vacuum issues use coherent raw state without assertive helper prose', async ({ page }) => {
+  await page.goto('/at-a-glance/vacuums')
+  await page.evaluate(() => {
+    const mock = (window as unknown as {
+      __mockHass: {
+        setEntityState: (entityId: string, state: string) => void
+      }
+    }).__mockHass
+    mock.setEntityState('vacuum.valetudo_exaltedsneakydeer', 'error')
+    mock.setEntityState('sensor.valetudo_exaltedsneakydeer_error', 'Brush stuck')
+    mock.setEntityState('input_text.main_floor_vacuum_error_message', 'Main brush is stuck under the sofa')
+  })
+
+  await page.getByRole('button', { name: /Main Floor Error/i }).click()
+
+  const dialog = page.getByRole('dialog')
+  await expect(dialog.getByLabel('Current Issue')).toContainText('Brush stuck')
+  await expect(dialog.getByText('Main brush is stuck under the sofa')).toHaveCount(0)
+  await expect(dialog.getByRole('alert')).toHaveCount(0)
+  await expect(dialog.getByRole('button', { name: 'Stop' })).toBeEnabled()
+  await expect(dialog.getByRole('button', { name: 'Dock' })).toBeEnabled()
 })
 
 test('available vacuum cards open source-style modal controls', async ({ page }) => {

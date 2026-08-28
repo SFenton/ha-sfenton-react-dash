@@ -50,6 +50,25 @@ export const BATHROOM_FAN_COPY_KEYS = {
 export const VACUUM_COPY_KEYS = {
   cleaned: 'cleaned',
   issues: 'issues',
+  status: {
+    conditions: {
+      dockingMayBeIncomplete: 'status.conditions.dockingMayBeIncomplete',
+      resumePending: 'status.conditions.resumePending',
+      vacuumingOnly: 'status.conditions.vacuumingOnly',
+    },
+    currentIssue: 'status.currentIssue',
+    errorSourceUnavailable: 'status.errorSourceUnavailable',
+    errorSourceUnavailableHelp: 'status.errorSourceUnavailableHelp',
+    homeAssistantCondition: 'status.homeAssistantCondition',
+    loadingCurrentMap: 'status.loadingCurrentMap',
+    mapUnavailable: 'status.mapUnavailable',
+    mapUnavailableHelp: 'status.mapUnavailableHelp',
+    previousIssue: 'status.previousIssue',
+    previousIssueObserved: 'status.previousIssueObserved',
+    queuedCleaningCanceled: 'status.queuedCleaningCanceled',
+    unavailableLiveStatus: 'status.unavailableLiveStatus',
+    unavailableHelp: 'status.unavailableHelp',
+  },
   outcomes: {
     allRoomsComplete: 'outcomes.allRoomsComplete',
     attempts: 'outcomes.attempts',

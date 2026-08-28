@@ -233,8 +233,21 @@ export function createMockValetudoMap(vacuumMapId: string): ValetudoMap {
   }
 }
 
-export function selectValetudoMapEntity(cameraEntityId: string, storeEntity: ValetudoEntityLike | null, liveEntity: ValetudoEntityLike | null) {
-  return liveEntity?.entity_id === cameraEntityId ? liveEntity : storeEntity
+export function selectValetudoMapEntity(
+  cameraEntityId: string,
+  storeEntity: ValetudoEntityLike | null,
+  liveEntity: ValetudoEntityLike | null,
+  liveEntityMissing = false,
+) {
+  if (liveEntityMissing) return null
+  if (liveEntity?.entity_id !== cameraEntityId) return storeEntity
+  if (!storeEntity) return liveEntity
+  const storeUpdated = Date.parse(storeEntity.last_updated ?? storeEntity.last_changed ?? '')
+  const liveUpdated = Date.parse(liveEntity.last_updated ?? liveEntity.last_changed ?? '')
+  if (Number.isFinite(storeUpdated) && Number.isFinite(liveUpdated)) {
+    return liveUpdated >= storeUpdated ? liveEntity : storeEntity
+  }
+  return liveEntity
 }
 
 function readPngChunkLength(bytes: Uint8Array, offset: number) {

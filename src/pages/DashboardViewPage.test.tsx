@@ -304,6 +304,9 @@ describe('DashboardViewPage', () => {
     delete mockEntities['number.master_bedroom_sleepypod_eight_pod_left_target_level']
     delete mockEntities['number.master_bedroom_sleepypod_eight_pod_right_target_level']
     delete mockEntities['sensor.master_bedroom_sleepypod_eight_pod_schedules']
+    delete mockEntities['sensor.main_floor_vacuum_status']
+    delete mockEntities['sensor.music_room_vacuum_status']
+    delete mockEntities['sensor.theater_room_vacuum_status']
     mockEntities['alarm_control_panel.aqara_hub_m3_0056_security_system_2'].state = 'armed_home'
     mockEntities['binary_sensor.contact_sensors'].state = 'off'
     CONTACT_GROUPS.flatMap((group) => group.items).forEach((item) => {
@@ -5479,7 +5482,7 @@ describe('DashboardViewPage', () => {
   })
 
   it.each([
-    { state: 'docked', stateLabel: 'Docked', heading: 'Charging Before Resuming', actions: ['Resume', 'Cancel'] },
+    { state: 'docked', stateLabel: 'Docked', heading: 'Docked', actions: ['Resume', 'Cancel'] },
     { state: 'idle', stateLabel: 'Idle', heading: 'Idle', actions: ['Resume', 'Cancel'] },
     { state: 'paused', stateLabel: 'Paused', heading: 'Paused', actions: ['Resume', 'Stop'] },
     { state: 'returning', stateLabel: 'Returning', heading: 'Returning', actions: ['Pause', 'Cancel'] },
@@ -5493,6 +5496,8 @@ describe('DashboardViewPage', () => {
     const dialog = await screen.findByRole('dialog')
     const controlsPane = within(dialog).getByRole('group', { name: 'Main Floor controls, zones, auto-clean, actions, info' })
     expect(within(controlsPane).getByRole('heading', { name: heading })).toBeInTheDocument()
+    expect(within(dialog).getByLabelText('Home Assistant Condition')).toHaveTextContent('Kept for Later')
+    expect(within(dialog).getByRole('status')).toHaveTextContent('Kept for Later')
     expect(within(controlsPane).queryByRole('button', { name: 'Clean' })).not.toBeInTheDocument()
     expect(within(controlsPane).queryByRole('group', { name: 'Cleaning target' })).not.toBeInTheDocument()
     if (state === 'idle') {
@@ -5528,6 +5533,11 @@ describe('DashboardViewPage', () => {
     mockEntities['sensor.valetudo_exaltedsneakydeer_status_flag'].state = 'none'
     rerender(<DashboardViewPage activePath="living-room" onNavigate={() => undefined} path="living-room" />)
 
+    if (state === 'returning') {
+      expect(within(controlsPane).queryByRole('button', { name: 'Clean' })).not.toBeInTheDocument()
+      mockEntities['vacuum.valetudo_exaltedsneakydeer'].state = 'idle'
+      rerender(<DashboardViewPage activePath="living-room" onNavigate={() => undefined} path="living-room" />)
+    }
     await waitFor(() => expect(within(controlsPane).getByRole('button', { name: 'Clean' })).toBeEnabled())
     expect(within(controlsPane).queryByRole('button', { name: 'Cancel' })).not.toBeInTheDocument()
   })
@@ -5639,20 +5649,33 @@ describe('DashboardViewPage', () => {
     }
   })
 
-  it('keeps mapped vacuum error text visible in the modal status area', async () => {
+  it('shows only the coherent raw vacuum issue as non-assertive current status', async () => {
     mockEntities['vacuum.valetudo_exaltedsneakydeer'].state = 'error'
     mockEntities['sensor.valetudo_exaltedsneakydeer_error'].state = 'Brush stuck'
     mockEntities['input_text.main_floor_vacuum_error_message'].state = 'Main brush is stuck under the sofa'
+    mockEntities['sensor.main_floor_vacuum_status'] = entity('sensor.main_floor_vacuum_status', 'error', {
+      active_conditions: [],
+      availability: { since: null, status: 'available' },
+      command_policy: { mode: 'normal', reason: null },
+      current_issue: { status: 'clear' },
+      last_issue: null,
+      observed_vacuum_state: 'error',
+      vacuum_entity_id: 'vacuum.valetudo_exaltedsneakydeer',
+      version: 1,
+    })
     render(<DashboardViewPage activePath="living-room" onNavigate={() => undefined} path="living-room" />)
 
     fireEvent.click(screen.getByRole('button', { name: /Main Floor Error/i }))
 
-    const errorMessage = await screen.findByRole('alert')
+    const currentIssue = await screen.findByLabelText('Current Issue')
     const statusPill = screen.getByText('Status').closest('[data-icon]')
-    expect(within(errorMessage).getByText('Main brush is stuck under the sofa')).toBeInTheDocument()
+    expect(currentIssue).toHaveTextContent('Brush stuck')
+    expect(screen.queryByText('Main brush is stuck under the sofa')).not.toBeInTheDocument()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
     expect(statusPill).toHaveAttribute('data-icon', 'mdi:alert-circle')
     expect(statusPill).toHaveAttribute('data-tone', 'danger')
     expect(statusPill?.querySelector('path')).toHaveAttribute('d', materialIconPath('mdi:alert-circle'))
+    expect(screen.queryByRole('button', { name: 'Locate' })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Stop' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Dock' })).toBeInTheDocument()
   })
@@ -7392,6 +7415,48 @@ describe('DashboardViewPage', () => {
     expect(within(controlsPane).getByRole('button', { name: 'Stop' })).toBeEnabled()
   })
 
+  it('lets an unexpected live error replace optimistic vacuum state and routes Stop from live truth', async () => {
+    mockEntities['vacuum.valetudo_exaltedsneakydeer'].state = 'idle'
+    render(<DashboardViewPage activePath="living-room" onNavigate={() => undefined} path="living-room" />)
+    fireEvent.click(screen.getByRole('button', { name: /Main Floor Idle/i }))
+    const dialog = await screen.findByRole('dialog')
+    const controlsPane = within(dialog).getByRole('group', { name: 'Main Floor controls, zones, auto-clean, actions, info' })
+
+    fireEvent.click(within(controlsPane).getByRole('button', { name: 'Dock' }))
+    expect(within(controlsPane).getByRole('heading', { name: 'Returning' })).toBeInTheDocument()
+
+    act(() => {
+      setMockEntityState('sensor.valetudo_exaltedsneakydeer_error', 'Brush stuck')
+      setMockEntityState('vacuum.valetudo_exaltedsneakydeer', 'error')
+    })
+
+    await waitFor(() => expect(within(controlsPane).getByRole('heading', { name: 'Error' })).toBeInTheDocument())
+    fireEvent.click(within(controlsPane).getByRole('button', { name: 'Stop' }))
+
+    expect(mockCallServiceCalls).toEqual([
+      { domain: 'vacuum', service: 'return_to_base', target: 'vacuum.valetudo_exaltedsneakydeer' },
+      { domain: 'vacuum', service: 'stop', target: 'vacuum.valetudo_exaltedsneakydeer' },
+    ])
+  })
+
+  it('cancels a queued clean before dispatch when live command policy becomes restricted', async () => {
+    render(<DashboardViewPage activePath="living-room" onNavigate={() => undefined} path="living-room" />)
+    fireEvent.click(screen.getByRole('button', { name: /Main Floor Docked/i }))
+    const dialog = await screen.findByRole('dialog')
+
+    fireEvent.change(within(dialog).getByRole('combobox', { name: /Mode Vacuum/i }), { target: { value: 'mop' } })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Clean' }))
+    act(() => setMockEntityState('sensor.valetudo_exaltedsneakydeer_error', 'unavailable'))
+
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent('The queued cleaning request was canceled because the vacuum is no longer ready. Retry when ready.')
+    await act(async () => {
+      await new Promise((resolve) => window.setTimeout(resolve, 700))
+    })
+    expect(mockCallServiceCalls).toEqual([
+      { domain: 'select', service: 'select_option', target: 'select.valetudo_exaltedsneakydeer_mode', serviceData: { option: 'mop' } },
+    ])
+  })
+
   it('does not report a clean failure when only a setting confirmation expires', async () => {
     render(<DashboardViewPage activePath="living-room" onNavigate={() => undefined} path="living-room" />)
 
@@ -7596,10 +7661,150 @@ describe('DashboardViewPage', () => {
     const statusPill = within(dialog).getByText('Status').closest('[data-icon]')
     expect(statusPill).toHaveTextContent(statusValue)
     expect(statusPill).toHaveAttribute('data-tone', statusTone)
+    if (state === 'unavailable') {
+      expect(within(dialog).getByLabelText('Unavailable')).toHaveTextContent('Home Assistant does not have a current status for the vacuum.')
+      expect(within(dialog).getByText('Map Unavailable')).toBeInTheDocument()
+      expect(within(dialog).getByText("Home Assistant cannot currently confirm the vacuum's map or position.")).toBeInTheDocument()
+      expect(within(dialog).queryByRole('button', { name: 'Locate' })).not.toBeInTheDocument()
+      expect(within(dialog).queryByRole('alert')).not.toBeInTheDocument()
+    }
     expect(mockCallServiceCalls).toEqual([])
   })
 
+  it('ignores stale helper prose while the vacuum and raw error source are unavailable', async () => {
+    mockEntities['vacuum.valetudo_elatedusedram'].state = 'unavailable'
+    mockEntities['sensor.valetudo_elatedusedram_error'].state = 'unavailable'
+    mockEntities['input_text.music_room_vacuum_error_message'].state = 'The battery is critically low and the vacuum will shut down soon.'
+    render(<DashboardViewPage activePath="vacuums" onNavigate={() => undefined} path="vacuums" />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Music Room' }))
+
+    const dialog = await screen.findByRole('dialog')
+    expect(within(dialog).queryByText(/battery is critically low/i)).not.toBeInTheDocument()
+    expect(within(dialog).queryByRole('alert')).not.toBeInTheDocument()
+    expect(within(dialog).getByLabelText('Unavailable')).toHaveTextContent('Home Assistant does not have a current status for the vacuum.')
+    expect(within(dialog).queryByRole('button', { name: 'Locate' })).not.toBeInTheDocument()
+    expect(mockCallServiceCalls).toEqual([])
+  })
+
+  it('renders only provenance-backed historical issues from a coherent status contract', async () => {
+    mockEntities['vacuum.valetudo_elatedusedram'].state = 'unavailable'
+    mockEntities['sensor.valetudo_elatedusedram_error'].state = 'unavailable'
+    mockEntities['sensor.music_room_vacuum_status'] = entity('sensor.music_room_vacuum_status', 'unavailable', {
+      active_conditions: [],
+      availability: { since: '2026-08-21T21:51:49Z', status: 'unavailable' },
+      command_policy: { mode: 'none', reason: 'primary_unavailable' },
+      current_issue: { status: 'unknown' },
+      last_issue: {
+        code: 'vendor.unknown_error_75',
+        provenance: 'recorder_backfill',
+        raw: 'Unknown error 75',
+        reported_at: '2026-08-21T21:20:11Z',
+      },
+      observed_vacuum_state: 'unavailable',
+      vacuum_entity_id: 'vacuum.valetudo_elatedusedram',
+      version: 1,
+    })
+    render(<DashboardViewPage activePath="vacuums" onNavigate={() => undefined} path="vacuums" />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Music Room' }))
+
+    const dialog = await screen.findByRole('dialog')
+    const previousIssue = within(dialog).getByLabelText('Previous Issue')
+    expect(previousIssue).toHaveTextContent('Unknown error 75')
+    expect(previousIssue).toHaveTextContent('Observed')
+    expect(within(dialog).queryByRole('alert')).not.toBeInTheDocument()
+    expect(within(dialog).queryByRole('button', { name: 'Locate' })).not.toBeInTheDocument()
+  })
+
+  it('does not present a previously cleared status-contract issue as unresolved history', async () => {
+    mockEntities['vacuum.valetudo_elatedusedram'].state = 'unavailable'
+    mockEntities['sensor.valetudo_elatedusedram_error'].state = 'unavailable'
+    mockEntities['sensor.music_room_vacuum_status'] = entity('sensor.music_room_vacuum_status', 'unavailable', {
+      active_conditions: [],
+      availability: { since: '2026-08-27T21:00:00Z', status: 'unavailable' },
+      command_policy: { mode: 'none', reason: 'primary_unavailable' },
+      current_issue: { status: 'unknown' },
+      last_issue: {
+        cleared_at: '2026-08-26T18:00:00Z',
+        code: 'navigation.stuck',
+        provenance: 'observed',
+        raw: 'Robot stuck or trapped',
+        reported_at: '2026-08-26T17:00:00Z',
+      },
+      observed_vacuum_state: 'unavailable',
+      vacuum_entity_id: 'vacuum.valetudo_elatedusedram',
+      version: 1,
+    })
+    render(<DashboardViewPage activePath="vacuums" onNavigate={() => undefined} path="vacuums" />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Music Room' }))
+
+    const dialog = await screen.findByRole('dialog')
+    expect(within(dialog).queryByLabelText('Previous Issue')).not.toBeInTheDocument()
+    expect(within(dialog).queryByText('Robot stuck or trapped')).not.toBeInTheDocument()
+  })
+
+  it('fails closed when the primary vacuum is available but its error source is unreadable', async () => {
+    mockEntities['vacuum.valetudo_exaltedsneakydeer'].state = 'docked'
+    mockEntities['sensor.valetudo_exaltedsneakydeer_error'].state = 'unavailable'
+    mockEntities['sensor.main_floor_vacuum_status'] = entity('sensor.main_floor_vacuum_status', 'docked', {
+      active_conditions: [],
+      availability: { since: null, status: 'available' },
+      command_policy: { mode: 'normal', reason: null },
+      current_issue: { status: 'clear' },
+      last_issue: null,
+      observed_vacuum_state: 'docked',
+      vacuum_entity_id: 'vacuum.valetudo_exaltedsneakydeer',
+      version: 1,
+    })
+    render(<DashboardViewPage activePath="vacuums" onNavigate={() => undefined} path="vacuums" />)
+
+    fireEvent.click(screen.getByRole('button', { name: /Main Floor Docked/i }))
+
+    const dialog = await screen.findByRole('dialog')
+    expect(within(dialog).getByLabelText('Error Source Unavailable')).toHaveTextContent('The current vacuum error status cannot be confirmed because its error source is unavailable.')
+    expect(within(dialog).queryByRole('alert')).not.toBeInTheDocument()
+    expect(within(dialog).queryByRole('button', { name: 'Locate' })).not.toBeInTheDocument()
+    expect(within(dialog).queryByRole('button', { name: 'Clean' })).not.toBeInTheDocument()
+    expect(mockCallServiceCalls).toEqual([])
+  })
+
+  it('keeps unresolved history visible while the recovered primary has an unreadable error source', async () => {
+    mockEntities['vacuum.valetudo_elatedusedram'].state = 'docked'
+    mockEntities['sensor.valetudo_elatedusedram_error'].state = 'unavailable'
+    mockEntities['sensor.valetudo_elatedusedram_battery_level'].state = '100'
+    mockEntities['sensor.valetudo_elatedusedram_status_flag'].state = 'none'
+    mockEntities['sensor.valetudo_elatedusedram_dock_status'].state = 'idle'
+    mockEntities['camera.valetudo_elatedusedram_map_data'].state = 'idle'
+    mockEntities['sensor.music_room_vacuum_status'] = entity('sensor.music_room_vacuum_status', 'docked', {
+      active_conditions: [],
+      availability: { since: null, status: 'available' },
+      command_policy: { mode: 'restricted', reason: 'source_unreadable' },
+      current_issue: { status: 'unknown' },
+      last_issue: {
+        cleared_at: null,
+        code: 'navigation.stuck',
+        provenance: 'observed',
+        raw: 'Robot stuck or trapped',
+        reported_at: '2026-08-26T17:00:00Z',
+      },
+      observed_vacuum_state: 'docked',
+      vacuum_entity_id: 'vacuum.valetudo_elatedusedram',
+      version: 1,
+    })
+    render(<DashboardViewPage activePath="vacuums" onNavigate={() => undefined} path="vacuums" />)
+
+    fireEvent.click(screen.getByRole('button', { name: /Music Room Docked/i }))
+
+    const dialog = await screen.findByRole('dialog')
+    expect(within(dialog).getByLabelText('Error Source Unavailable')).toBeInTheDocument()
+    expect(within(dialog).getByLabelText('Previous Issue')).toHaveTextContent('Robot stuck or trapped')
+    expect(within(dialog).queryByRole('button', { name: 'Locate' })).not.toBeInTheDocument()
+  })
+
   it('keeps an open vacuum status modal mounted when the vacuum goes offline', async () => {
+    mockEntities['input_text.main_floor_vacuum_error_message'].state = 'Battery level is low. The vacuum will return to charge.'
     render(<DashboardViewPage activePath="vacuums" onNavigate={() => undefined} path="vacuums" />)
     fireEvent.click(screen.getByRole('button', { name: /Main Floor Docked/i }))
     const dialog = await screen.findByRole('dialog')
@@ -7610,6 +7815,12 @@ describe('DashboardViewPage', () => {
     const statusPill = within(dialog).getByText('Status').closest('[data-icon]')
     await waitFor(() => expect(statusPill).toHaveTextContent('Unavailable'))
     expect(statusPill).toHaveAttribute('data-tone', 'unavailable')
+    expect(within(dialog).getByText('Battery').closest('[data-icon]')).toHaveTextContent('Unknown')
+    expect(within(dialog).getByRole('group', { name: 'Dock Status Unknown' })).toBeInTheDocument()
+    expect(within(dialog).getByText('Map Unavailable')).toBeInTheDocument()
+    expect(within(dialog).queryByText(/Battery level is low/i)).not.toBeInTheDocument()
+    expect(within(dialog).queryByRole('button', { name: 'Locate' })).not.toBeInTheDocument()
+    expect(within(dialog).queryByRole('alert')).not.toBeInTheDocument()
     expect(mockCallServiceCalls).toEqual([])
   })
 
