@@ -50,6 +50,9 @@ export const BATHROOM_FAN_COPY_KEYS = {
 export const VACUUM_COPY_KEYS = {
   cleaned: 'cleaned',
   issues: 'issues',
+  tile: {
+    subtitleWithBattery: 'tile.subtitleWithBattery',
+  },
   status: {
     conditions: {
       dockingMayBeIncomplete: 'status.conditions.dockingMayBeIncomplete',

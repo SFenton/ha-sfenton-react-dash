@@ -5206,7 +5206,10 @@ describe('DashboardViewPage', () => {
     render(<DashboardViewPage activePath="music-room" onNavigate={() => undefined} path="music-room" />)
 
     expect(screen.getByRole('heading', { name: 'Devices' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Music Room Docked • 100%/i })).toBeInTheDocument()
+    const vacuum = screen.getByRole('button', { name: /Music Room Docked • 100%/i })
+    expect(vacuum).toHaveAttribute('data-icon', 'mdi:home')
+    expect(vacuum).toHaveAttribute('data-tone', 'vacuum')
+    expect(vacuum).toHaveStyle('--tile-color: rgba(67, 160, 71, 0.48)')
     expect(screen.queryByRole('button', { name: /Robot Vacuum Docked/i })).not.toBeInTheDocument()
   })
 
@@ -5216,11 +5219,62 @@ describe('DashboardViewPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Plex' }))
     fireEvent.click(screen.getByRole('button', { name: /Theater Room PC Off/i }))
 
-    expect(screen.getByRole('button', { name: /Theater Room Docked • 99%/i })).toBeInTheDocument()
+    const vacuum = screen.getByRole('button', { name: /Theater Room Docked • 99%/i })
+    expect(vacuum).toHaveAttribute('data-icon', 'mdi:home')
+    expect(vacuum).toHaveAttribute('data-tone', 'vacuum')
+    expect(vacuum).toHaveStyle('--tile-color: rgba(67, 160, 71, 0.48)')
     expect(mockCallServiceCalls).toEqual([
       { domain: 'script', service: 'launch_app_on_media_player', serviceData: { entity: 'media_player.theater_room_shield', remote_entity: 'remote.theater_shield_remote', app_id: 'com.plexapp.android', turn_on_projector: true } },
       { domain: 'input_button', service: 'press', target: 'input_button.theater_pc_on' },
     ])
+  })
+
+  it.each([
+    ['living-room', 'vacuum.valetudo_exaltedsneakydeer', 'sensor.valetudo_exaltedsneakydeer_battery_level', 'cleaning', '72', 'Main Floor Cleaning • 72%', 'mdi:broom', 'vacuum'],
+    ['music-room', 'vacuum.valetudo_elatedusedram', 'sensor.valetudo_elatedusedram_battery_level', 'unavailable', '87', 'Music Room Unavailable', 'mdi:robot-vacuum-off', 'neutral'],
+    ['theater-room', 'vacuum.valetudo_politefatherlykingfisher', 'sensor.valetudo_politefatherlykingfisher_battery_level', 'error', '0', 'Theater Room Error • 0%', 'mdi:alert-circle', 'danger'],
+  ])('uses the shared vacuum tile presentation on %s', (path, entityId, batteryEntityId, state, battery, accessibleName, icon, tone) => {
+    mockEntities[entityId].state = state
+    mockEntities[batteryEntityId].state = battery
+    render(<DashboardViewPage activePath={path} onNavigate={() => undefined} path={path} />)
+
+    const tile = screen.getByRole('button', { name: accessibleName })
+    expect(tile).toHaveAttribute('data-icon', icon)
+    expect(tile).toHaveAttribute('data-tone', tone)
+    expect(tile).toHaveAttribute('data-modal-opener', 'true')
+    expect(tile).not.toHaveAttribute('aria-disabled')
+  })
+
+  it('opens an unavailable room vacuum without calling Home Assistant', async () => {
+    mockEntities['vacuum.valetudo_elatedusedram'].state = 'unavailable'
+    mockEntities['sensor.valetudo_elatedusedram_battery_level'].state = '87'
+    mockEntities['sensor.valetudo_elatedusedram_error'].state = 'unavailable'
+    render(<DashboardViewPage activePath="music-room" onNavigate={() => undefined} path="music-room" />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Music Room Unavailable' }))
+
+    const dialog = await screen.findByRole('dialog')
+    expect(within(dialog).getByRole('heading', { name: 'Music Room: Robot Vacuum' })).toBeInTheDocument()
+    expect(within(dialog).getByLabelText('Unavailable')).toHaveTextContent('Home Assistant does not have a current status for the vacuum.')
+    expect(within(dialog).queryByRole('button', { name: 'Locate' })).not.toBeInTheDocument()
+    expect(mockCallServiceCalls).toEqual([])
+  })
+
+  it('retains room vacuum focus when the vacuum becomes unavailable', () => {
+    mockEntities['vacuum.valetudo_elatedusedram'].state = 'docked'
+    mockEntities['sensor.valetudo_elatedusedram_battery_level'].state = '100'
+    render(<DashboardViewPage activePath="music-room" onNavigate={() => undefined} path="music-room" />)
+
+    const tile = screen.getByRole('button', { name: 'Music Room Docked • 100%' })
+    tile.focus()
+
+    act(() => {
+      setMockEntityState('vacuum.valetudo_elatedusedram', 'unavailable')
+      setMockEntityState('sensor.valetudo_elatedusedram_battery_level', 'unavailable')
+    })
+
+    expect(screen.getByRole('button', { name: 'Music Room Unavailable' })).toBe(tile)
+    expect(tile).toHaveFocus()
   })
 
   it('runs bathroom fan script controls and preserves the towel-rack switch behavior', () => {
@@ -7600,7 +7654,7 @@ describe('DashboardViewPage', () => {
   it('opens available vacuum cards as modal controls', async () => {
     render(<DashboardViewPage activePath="vacuums" onNavigate={() => undefined} path="vacuums" />)
 
-    const musicRoomVacuum = screen.getByRole('button', { name: 'Music Room' })
+    const musicRoomVacuum = screen.getByRole('button', { name: 'Music Room Unavailable' })
     expect(musicRoomVacuum).toHaveAttribute('data-icon', 'mdi:robot-vacuum-off')
     expect(musicRoomVacuum).toHaveAttribute('data-modal-opener', 'true')
     const mainFloorVacuum = screen.getByRole('button', { name: /main floor docked/i })
@@ -7646,7 +7700,7 @@ describe('DashboardViewPage', () => {
 
   it.each([
     ['error', /Main Floor Error/i, 'Error', 'danger'],
-    ['unavailable', 'Main Floor', 'Unavailable', 'unavailable'],
+    ['unavailable', 'Main Floor Unavailable', 'Unavailable', 'unavailable'],
   ])('opens %s vacuum cards for status access without calling Home Assistant', async (state, cardName, statusValue, statusTone) => {
     mockEntities['vacuum.valetudo_exaltedsneakydeer'].state = state
     render(<DashboardViewPage activePath="vacuums" onNavigate={() => undefined} path="vacuums" />)
@@ -7677,7 +7731,7 @@ describe('DashboardViewPage', () => {
     mockEntities['input_text.music_room_vacuum_error_message'].state = 'The battery is critically low and the vacuum will shut down soon.'
     render(<DashboardViewPage activePath="vacuums" onNavigate={() => undefined} path="vacuums" />)
 
-    fireEvent.click(screen.getByRole('button', { name: 'Music Room' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Music Room Unavailable' }))
 
     const dialog = await screen.findByRole('dialog')
     expect(within(dialog).queryByText(/battery is critically low/i)).not.toBeInTheDocument()
@@ -7707,7 +7761,7 @@ describe('DashboardViewPage', () => {
     })
     render(<DashboardViewPage activePath="vacuums" onNavigate={() => undefined} path="vacuums" />)
 
-    fireEvent.click(screen.getByRole('button', { name: 'Music Room' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Music Room Unavailable' }))
 
     const dialog = await screen.findByRole('dialog')
     const previousIssue = within(dialog).getByLabelText('Previous Issue')
@@ -7738,7 +7792,7 @@ describe('DashboardViewPage', () => {
     })
     render(<DashboardViewPage activePath="vacuums" onNavigate={() => undefined} path="vacuums" />)
 
-    fireEvent.click(screen.getByRole('button', { name: 'Music Room' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Music Room Unavailable' }))
 
     const dialog = await screen.findByRole('dialog')
     expect(within(dialog).queryByLabelText('Previous Issue')).not.toBeInTheDocument()
@@ -8010,6 +8064,20 @@ describe('DashboardViewPage', () => {
     ])
   })
 
+  it('keeps every room vacuum title aligned with its shared vacuum configuration', () => {
+    const roomVacuumCards = Object.values(ROOM_PAGE_CONFIGS)
+      .flatMap((room) => room.sourceSections)
+      .flatMap((section) => section.cards)
+      .filter((card) => card.kind === 'vacuum')
+
+    expect(roomVacuumCards).toHaveLength(VACUUMS.length)
+    for (const card of roomVacuumCards) {
+      const vacuum = VACUUMS.find((candidate) => candidate.entityId === card.entityId)
+      expect(vacuum?.title).toBe(card.title)
+      expect(card.subtitleEntityIds).toBeUndefined()
+    }
+  })
+
   it('opens the real Vacuums route modal from a vacuum URL hash', async () => {
     mockEntities['vacuum.valetudo_exaltedsneakydeer'].state = 'unavailable'
     window.history.replaceState(null, '', `${window.location.pathname}#main-floor-robot-vacuum`)
@@ -8025,5 +8093,9 @@ describe('DashboardViewPage', () => {
 
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Robot Vacuums' })).toBeInTheDocument()
+    const tile = screen.getByLabelText('Main Floor Unavailable')
+    expect(tile.tagName).toBe('DIV')
+    expect(tile).not.toHaveAttribute('data-modal-opener')
+    expect(screen.queryByRole('button', { name: /Main Floor Unavailable/ })).not.toBeInTheDocument()
   })
 })

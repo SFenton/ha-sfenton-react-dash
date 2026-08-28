@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useEntity, useHass } from '@hakit/core'
-import { GlassTile } from '../core/GlassTile'
 import { Description } from '../core/Description'
 import { InlineAlert } from '../core/InlineAlert'
 import { InfoBox } from '../core/InfoBox'
@@ -44,6 +43,7 @@ import {
   type VacuumLastIssue,
 } from './vacuumStatus'
 import { isUnavailableVacuumState, vacuumConsumableVisual, vacuumStateVisual, type VacuumVisualTone } from './vacuumVisualState'
+import { VacuumTile } from './VacuumTile'
 import styles from './VacuumCard.module.css'
 
 type VacuumCleanTarget = 'rooms' | 'area'
@@ -81,7 +81,7 @@ interface EntityLike {
 }
 
 interface VacuumCardProps {
-  disableHashSync?: boolean
+  preload?: boolean
   vacuum: VacuumConfig
 }
 
@@ -153,13 +153,6 @@ function isMeaningfulText(value: string | undefined) {
   if (!value) return false
   const normalized = value.trim().toLowerCase()
   return normalized !== '' && normalized !== 'unknown' && normalized !== 'unavailable'
-}
-
-function vacuumSubtitle(state: string | undefined, battery: string | undefined) {
-  if (isUnavailableState(state)) return undefined
-  const label = formatStateValue(state)
-  if (!battery || battery === 'unknown' || battery === 'unavailable') return label
-  return `${label} • ${battery}%`
 }
 
 function formatStateValue(value: string | undefined, fallback = 'Unavailable') {
@@ -1793,18 +1786,10 @@ export function VacuumModal({
   )
 }
 
-export function VacuumCard({ disableHashSync = false, vacuum }: VacuumCardProps) {
-  const entity = useEntity(asEntityName(vacuum.entityId), { returnNullIfNotFound: true })
-  const battery = useEntity(asEntityName(vacuum.batteryEntityId), { returnNullIfNotFound: true })
+function LiveVacuumCard({ vacuum }: Pick<VacuumCardProps, 'vacuum'>) {
   const [open, setOpen] = useState(false)
-  const state = entity?.state
-  const unavailable = isUnavailableState(state)
-  const subtitle = vacuumSubtitle(state, battery?.state)
-  const visual = vacuumStateVisual(state)
 
   useEffect(() => {
-    if (disableHashSync) return undefined
-
     const syncFromHash = () => setOpen(dashboardHash() === `#${vacuum.hash}`)
     const targets = dashboardEventTargets()
 
@@ -1821,35 +1806,30 @@ export function VacuumCard({ disableHashSync = false, vacuum }: VacuumCardProps)
         target.removeEventListener(DASHBOARD_ROUTE_CHANGE_EVENT, syncFromHash)
       })
     }
-  }, [disableHashSync, vacuum.hash])
+  }, [vacuum.hash])
 
   const openModal = useCallback(() => {
-    if (disableHashSync) return
     replaceDashboardUrl(`${dashboardPathWithSearch()}#${vacuum.hash}`)
     setOpen(true)
-  }, [disableHashSync, vacuum.hash])
+  }, [vacuum.hash])
 
   const closeModal = useCallback(() => {
-    if (!disableHashSync) replaceDashboardUrl(dashboardPathWithSearch())
+    replaceDashboardUrl(dashboardPathWithSearch())
     setOpen(false)
-  }, [disableHashSync])
+  }, [])
 
   const modal = useMemo(() => <VacuumModal onClose={closeModal} open={open} vacuum={vacuum} />, [closeModal, open, vacuum])
 
   return (
     <>
-      <GlassTile
-        backgroundColor={visual.backgroundColor}
-        icon={visual.icon}
-        iconColor={visual.iconColor}
-        isOff={unavailable}
-        onClick={disableHashSync ? undefined : openModal}
-        semantics={{ kind: 'modal' }}
-        subtitle={subtitle}
-        tone={visual.tileTone}
-        title={vacuum.title}
-      />
+      <VacuumTile interaction={{ kind: 'modal', onOpen: openModal }} vacuum={vacuum} />
       {modal}
     </>
   )
+}
+
+export function VacuumCard({ preload = false, vacuum }: VacuumCardProps) {
+  return preload
+    ? <VacuumTile interaction={{ kind: 'preload' }} vacuum={vacuum} />
+    : <LiveVacuumCard vacuum={vacuum} />
 }

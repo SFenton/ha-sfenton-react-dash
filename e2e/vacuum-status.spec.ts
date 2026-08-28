@@ -9,6 +9,11 @@ const VIEWPORTS = [
   { height: 1080, width: 1920 },
 ] as const
 
+const UNAVAILABLE_ROUTES = [
+  { label: 'Vacuums', path: '/at-a-glance/vacuums' },
+  { label: 'Music Room', path: '/at-a-glance/music-room' },
+] as const
+
 async function setMusicVacuumUnavailable(page: Page) {
   await page.evaluate(() => {
     const mock = (window as unknown as {
@@ -28,10 +33,10 @@ async function setMusicVacuumUnavailable(page: Page) {
   })
 }
 
-async function openUnavailableMusicVacuum(page: Page) {
-  await page.goto('/at-a-glance/vacuums')
+async function openUnavailableMusicVacuum(page: Page, path = '/at-a-glance/vacuums') {
+  await page.goto(path)
   await setMusicVacuumUnavailable(page)
-  await page.getByRole('button', { name: 'Music Room', exact: true }).click()
+  await page.getByRole('button', { name: 'Music Room Unavailable', exact: true }).click()
   const dialog = page.getByRole('dialog')
   await expect(dialog).toBeVisible()
   return dialog
@@ -52,31 +57,94 @@ async function assertUnavailableAccuracy(page: Page) {
   expect(await page.evaluate(() => (window as unknown as { __mockHass: { calls: Record<string, unknown>[] } }).__mockHass.calls)).toEqual([])
 }
 
-for (const viewport of VIEWPORTS) {
-  test(`unavailable vacuum status stays truthful at ${viewport.width}x${viewport.height}`, async ({ page }) => {
-    await page.setViewportSize(viewport)
-    await openUnavailableMusicVacuum(page)
-    await assertUnavailableAccuracy(page)
-  })
+for (const route of UNAVAILABLE_ROUTES) {
+  for (const viewport of VIEWPORTS) {
+    test(`unavailable vacuum status stays truthful on ${route.label} at ${viewport.width}x${viewport.height}`, async ({ page }) => {
+      await page.setViewportSize(viewport)
+      await openUnavailableMusicVacuum(page, route.path)
+      await assertUnavailableAccuracy(page)
+    })
+  }
 }
 
-test('an unavailable vacuum modal keeps truthful state through mounted resize sequences', async ({ page }) => {
+test('room vacuum tiles match the dedicated Vacuums page presentation', async ({ page }) => {
   await page.setViewportSize({ height: 852, width: 393 })
-  const dialog = await openUnavailableMusicVacuum(page)
-  const dialogId = await dialog.getAttribute('id')
 
-  for (const viewport of [
-    { height: 900, width: 1440 },
-    { height: 852, width: 393 },
-    { height: 1180, width: 820 },
-    { height: 820, width: 1180 },
-    { height: 1180, width: 820 },
-  ]) {
-    await page.setViewportSize(viewport)
-    await expect(page.getByRole('dialog')).toHaveAttribute('id', dialogId ?? '')
-    await assertUnavailableAccuracy(page)
+  const cases = [
+    {
+      accessibleName: 'Main Floor Cleaning • 72%',
+      batteryEntityId: 'sensor.valetudo_exaltedsneakydeer_battery_level',
+      batteryState: '72',
+      entityId: 'vacuum.valetudo_exaltedsneakydeer',
+      path: '/at-a-glance/living-room',
+      state: 'cleaning',
+    },
+    {
+      accessibleName: 'Music Room Unavailable',
+      batteryEntityId: 'sensor.valetudo_elatedusedram_battery_level',
+      batteryState: '87',
+      entityId: 'vacuum.valetudo_elatedusedram',
+      path: '/at-a-glance/music-room',
+      state: 'unavailable',
+    },
+    {
+      accessibleName: 'Theater Room Error • 0%',
+      batteryEntityId: 'sensor.valetudo_politefatherlykingfisher_battery_level',
+      batteryState: '0',
+      entityId: 'vacuum.valetudo_politefatherlykingfisher',
+      path: '/at-a-glance/theater-room',
+      state: 'error',
+    },
+  ] as const
+
+  for (const vacuum of cases) {
+    const readPresentation = async (path: string) => {
+      await page.goto(path)
+      await page.evaluate(({ batteryEntityId, batteryState, entityId, state }) => {
+        const mock = window.__mockHass
+        if (!mock) throw new Error('Mock Home Assistant API is unavailable')
+        mock.setEntityState(entityId, state)
+        mock.setEntityState(batteryEntityId, batteryState)
+      }, vacuum)
+      const tile = page.getByRole('button', { name: vacuum.accessibleName, exact: true })
+      await expect(tile).toBeVisible()
+      return tile.evaluate((element) => ({
+        actionKind: element.getAttribute('data-action-kind'),
+        icon: element.getAttribute('data-icon'),
+        inlineColor: (element as HTMLElement).style.getPropertyValue('--tile-color'),
+        modalOpener: element.getAttribute('data-modal-opener'),
+        muted: element.getAttribute('data-muted'),
+        tone: element.getAttribute('data-tone'),
+      }))
+    }
+
+    const dedicated = await readPresentation('/at-a-glance/vacuums')
+    const room = await readPresentation(vacuum.path)
+    expect(room).toEqual(dedicated)
+    expect(room.actionKind).toBe('modal')
+    expect(room.modalOpener).toBe('true')
   }
 })
+
+for (const route of UNAVAILABLE_ROUTES) {
+  test(`an unavailable vacuum modal on ${route.label} keeps truthful state through mounted resize sequences`, async ({ page }) => {
+    await page.setViewportSize({ height: 852, width: 393 })
+    const dialog = await openUnavailableMusicVacuum(page, route.path)
+    const dialogId = await dialog.getAttribute('id')
+
+    for (const viewport of [
+      { height: 900, width: 1440 },
+      { height: 852, width: 393 },
+      { height: 1180, width: 820 },
+      { height: 820, width: 1180 },
+      { height: 1180, width: 820 },
+    ]) {
+      await page.setViewportSize(viewport)
+      await expect(page.getByRole('dialog')).toHaveAttribute('id', dialogId ?? '')
+      await assertUnavailableAccuracy(page)
+    }
+  })
+}
 
 test('a camera-only outage hides cached position and map-linked commands', async ({ page }) => {
   await page.goto('/at-a-glance/vacuums')
