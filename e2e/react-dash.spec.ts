@@ -3537,7 +3537,7 @@ test('vacuums page renders without live HASS backend', async ({ page }) => {
   const autoCleanGrid = page.getByRole('group', { name: 'Vacuum auto-clean controls' })
   await expect(autoCleanGrid).toHaveAttribute('data-dynamic-grid', 'true')
   await expect(autoCleanGrid.locator('[data-dynamic-grid-cell="true"]').last()).toHaveAttribute('data-dynamic-grid-span', '2')
-  const musicRoomVacuum = page.getByRole('button', { name: 'Music Room', exact: true })
+  const musicRoomVacuum = page.getByRole('button', { name: 'Music Room Unavailable', exact: true })
   await expect(musicRoomVacuum).toHaveAttribute('data-icon', 'mdi:robot-vacuum-off')
   await expect(musicRoomVacuum).toHaveAttribute('data-modal-opener', 'true')
   const mainFloorVacuum = page.getByRole('button', { name: /Main Floor Docked/i })
@@ -3549,7 +3549,7 @@ test('vacuums page renders without live HASS backend', async ({ page }) => {
 test('offline vacuum cards open their status modal', async ({ page }) => {
   await page.goto('/at-a-glance/vacuums')
 
-  await page.getByRole('button', { name: 'Music Room', exact: true }).click()
+  await page.getByRole('button', { name: 'Music Room Unavailable', exact: true }).click()
 
   const dialog = page.getByRole('dialog')
   await expect(dialog).toBeVisible()

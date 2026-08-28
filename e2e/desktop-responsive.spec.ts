@@ -136,33 +136,38 @@ test('permanent navigation and modal controls retain keyboard focus indicators',
   await expect.poll(() => visibleFocusIndicator(close)).toBe(true)
 })
 
-test('unavailable vacuum status stays truthful in a fine-pointer desktop context', async ({ page }) => {
-  await page.goto('/index.html?path=vacuums')
-  await expect.poll(() => page.evaluate(() => ({
-    coarse: window.matchMedia('(pointer: coarse)').matches,
-    hover: window.matchMedia('(hover: hover)').matches,
-  }))).toEqual({ coarse: false, hover: true })
-  await page.evaluate(() => {
-    const mock = window.__mockHass
-    if (!mock) throw new Error('Mock Home Assistant API is unavailable')
-    mock.setEntityState('vacuum.valetudo_elatedusedram', 'unavailable')
-    mock.setEntityState('sensor.valetudo_elatedusedram_error', 'unavailable')
-    mock.setEntityState('camera.valetudo_elatedusedram_map_data', 'unavailable')
-    mock.setEntityState('input_text.music_room_vacuum_error_message', 'The battery is critically low and the vacuum will shut down soon.')
-    mock.calls.splice(0, mock.calls.length)
+for (const route of [
+  { label: 'Vacuums', path: 'vacuums' },
+  { label: 'Music Room', path: 'music-room' },
+] as const) {
+  test(`unavailable vacuum status stays truthful on ${route.label} in a fine-pointer desktop context`, async ({ page }) => {
+    await page.goto(`/index.html?path=${route.path}`)
+    await expect.poll(() => page.evaluate(() => ({
+      coarse: window.matchMedia('(pointer: coarse)').matches,
+      hover: window.matchMedia('(hover: hover)').matches,
+    }))).toEqual({ coarse: false, hover: true })
+    await page.evaluate(() => {
+      const mock = window.__mockHass
+      if (!mock) throw new Error('Mock Home Assistant API is unavailable')
+      mock.setEntityState('vacuum.valetudo_elatedusedram', 'unavailable')
+      mock.setEntityState('sensor.valetudo_elatedusedram_error', 'unavailable')
+      mock.setEntityState('camera.valetudo_elatedusedram_map_data', 'unavailable')
+      mock.setEntityState('input_text.music_room_vacuum_error_message', 'The battery is critically low and the vacuum will shut down soon.')
+      mock.calls.splice(0, mock.calls.length)
+    })
+
+    await page.getByRole('button', { name: 'Music Room Unavailable', exact: true }).click()
+
+    const dialog = page.getByRole('dialog')
+    await expect(dialog).toBeVisible()
+    await expect(dialog.getByLabel('Unavailable')).toContainText('Home Assistant does not have a current status for the vacuum.')
+    await expect(dialog.getByRole('region', { name: 'Music Room Valetudo map' })).toHaveAttribute('data-source-available', 'false')
+    await expect(dialog.getByRole('button', { name: 'Locate' })).toHaveCount(0)
+    await expect(dialog.getByRole('alert')).toHaveCount(0)
+    await expect(dialog.getByText(/battery is critically low/i)).toHaveCount(0)
+    expect(await page.evaluate(() => window.__mockHass?.calls ?? [])).toEqual([])
+
+    const close = dialog.getByRole('button', { name: 'Close' })
+    await expect(close).toBeVisible()
   })
-
-  await page.getByRole('button', { name: 'Music Room', exact: true }).click()
-
-  const dialog = page.getByRole('dialog')
-  await expect(dialog).toBeVisible()
-  await expect(dialog.getByLabel('Unavailable')).toContainText('Home Assistant does not have a current status for the vacuum.')
-  await expect(dialog.getByRole('region', { name: 'Music Room Valetudo map' })).toHaveAttribute('data-source-available', 'false')
-  await expect(dialog.getByRole('button', { name: 'Locate' })).toHaveCount(0)
-  await expect(dialog.getByRole('alert')).toHaveCount(0)
-  await expect(dialog.getByText(/battery is critically low/i)).toHaveCount(0)
-  expect(await page.evaluate(() => window.__mockHass?.calls ?? [])).toEqual([])
-
-  const close = dialog.getByRole('button', { name: 'Close' })
-  await expect(close).toBeVisible()
-})
+}

@@ -25,6 +25,7 @@ import type { RecipeControls } from '../components/hass/recipes/useRecipeControl
 import { useRecipeControls } from '../components/hass/recipes/useRecipeControls'
 import { VacuumAutoCleanControlCard } from '../components/hass/VacuumAutoCleanControls'
 import { VacuumCard, VacuumModal, VacuumRoomSourceModalContent } from '../components/hass/VacuumCard'
+import { VacuumTile } from '../components/hass/VacuumTile'
 import { AirQualityModalContent } from '../components/hass/AirQualityModalContent'
 import { BathroomFanModal, BathroomFanModalContent } from '../components/hass/BathroomFanModalContent'
 import { BathroomFanTile } from '../components/hass/BathroomFanTile'
@@ -944,6 +945,7 @@ function RoomSourceCard(props: RoomSourceCardProps) {
   if (props.card.control === 'bathroom-fan') return <BathroomFanRoomSourceCard {...props} />
   if (props.card.kind === 'humidifier') return <HumidifierRoomSourceCard {...props} />
   if (props.card.control === 'garage-door') return <GarageDoorRoomSourceCard {...props} />
+  if (props.card.kind === 'vacuum') return <VacuumRoomSourceCard {...props} />
   return <DefaultRoomSourceCard {...props} />
 }
 
@@ -965,6 +967,18 @@ function GarageDoorRoomSourceCard({ card }: RoomSourceCardProps) {
       toneForState={() => toneForSourceKind(card.kind)}
     />
   )
+
+  if (card.span === 'full') return <div className={styles.fullSpan}>{content}</div>
+  return content
+}
+
+function VacuumRoomSourceCard({ card, onOpen, preload }: RoomSourceCardProps) {
+  const vacuum = VACUUMS.find((candidate) => candidate.entityId === card.entityId)
+  if (!vacuum) return <DefaultRoomSourceCard card={card} onOpen={onOpen} />
+
+  const content = preload
+    ? <VacuumTile interaction={{ kind: 'preload' }} title={card.title} vacuum={vacuum} />
+    : <VacuumTile interaction={{ kind: 'modal', onOpen: () => onOpen(card) }} title={card.title} vacuum={vacuum} />
 
   if (card.span === 'full') return <div className={styles.fullSpan}>{content}</div>
   return content
@@ -1533,7 +1547,7 @@ function VacuumPage({ preload = false }: { preload?: boolean }) {
           <SectionHeader title="Robot Vacuums" />
           <DynamicGrid ariaLabel="Robot vacuums" className={styles.vacuumGrid} columns={2} justify="center" lastRow="fill-minimum" layout="bounded" maxCellWidth={280} maxColumns={3}>
             {ORDERED_VACUUMS.map((vacuum) => (
-              <VacuumCard disableHashSync={preload} key={vacuum.entityId} vacuum={vacuum} />
+              <VacuumCard key={vacuum.entityId} preload={preload} vacuum={vacuum} />
             ))}
           </DynamicGrid>
         </section>

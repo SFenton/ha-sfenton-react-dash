@@ -53,6 +53,10 @@ export function subscribeMockHass(listener: () => void) {
   return () => mockHassListeners.delete(listener)
 }
 
+export function getMockHassListenerCount() {
+  return mockHassListeners.size
+}
+
 function notifyMockHass() {
   mockHassRevision += 1
   for (const listener of mockHassListeners) listener()

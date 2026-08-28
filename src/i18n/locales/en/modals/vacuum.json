@@ -2,6 +2,9 @@
   "cleaned": "Cleaned",
   "issues": "Issues",
   "selectedRooms": "Selected Rooms",
+  "tile": {
+    "subtitleWithBattery": "{{state}} • {{battery}}%"
+  },
   "status": {
     "unavailableHelp": "Home Assistant does not have a current status for the vacuum.",
     "unavailableLiveStatus": "{{status}}. Home Assistant does not have the vacuum's current status.",
