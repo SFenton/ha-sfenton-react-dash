@@ -44,8 +44,10 @@ async function openUnavailableMusicVacuum(page: Page, path = '/at-a-glance/vacuu
 
 async function assertUnavailableAccuracy(page: Page) {
   const dialog = page.getByRole('dialog')
-  await expect(dialog.getByLabel('Unavailable')).toContainText('Home Assistant does not have a current status for the vacuum.')
-  await expect(dialog.getByText('Battery').locator('xpath=ancestor::*[@data-icon][1]')).toContainText('Unknown')
+  await expect(dialog.getByLabel('Unavailable')).toHaveCount(0)
+  const battery = dialog.getByText('Battery').locator('xpath=ancestor::*[@data-icon][1]')
+  await expect(battery).toContainText('Unknown')
+  await expect(battery).toHaveAttribute('data-tone', 'unavailable')
   await expect(dialog.getByRole('group', { name: 'Dock Status Unknown' })).toBeVisible()
   const map = dialog.getByRole('region', { name: 'Music Room Valetudo map' })
   await expect(map).toHaveAttribute('data-source-available', 'false')
@@ -55,6 +57,11 @@ async function assertUnavailableAccuracy(page: Page) {
   await expect(note).toHaveAttribute('data-icon', 'mdi:alert-outline')
   await expect(note).toContainText('Last Reported Position')
   await expect(note).toContainText('The exact report time is unknown, and the vacuum may have been moved since then.')
+  const noteColors = await note.evaluate((element) => ({
+    body: getComputedStyle(element.querySelector('small')!).color,
+    title: getComputedStyle(element.querySelector('strong')!).color,
+  }))
+  expect(noteColors.body).toBe(noteColors.title)
   const [mapBox, noteBox] = await Promise.all([map.boundingBox(), note.boundingBox()])
   expect(mapBox).not.toBeNull()
   expect(noteBox).not.toBeNull()
@@ -208,7 +215,7 @@ test('an open vacuum modal immediately yields to a live unavailable transition',
   })
 
   await expect(page.getByRole('dialog')).toHaveAttribute('id', dialogId ?? '')
-  await expect(dialog.getByLabel('Unavailable')).toBeVisible()
+  await expect(dialog.getByLabel('Unavailable')).toHaveCount(0)
   await expect(dialog.getByRole('status')).toContainText("Unavailable. Home Assistant does not have the vacuum's current status.")
   const map = dialog.getByRole('region', { name: 'Main Floor Valetudo map' })
   await expect(map).toHaveAttribute('data-source-available', 'false')

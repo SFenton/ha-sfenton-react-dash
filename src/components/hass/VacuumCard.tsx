@@ -19,7 +19,13 @@ import { useOptimisticState, type OptimisticCommitOptions } from '../../hooks/us
 import { APP_LOCALE, COMMON_COPY_NAMESPACE, CORE_COPY_KEYS, CORE_COPY_NAMESPACE, VACUUM_COPY_KEYS, VACUUM_COPY_NAMESPACE, useCopy } from '../../i18n'
 import { asEntityName, titleCaseState } from './entityState'
 import { mapGridRectDimensionsCm, mapGridRectToServiceData, type MapGridRect } from './ValetudoMapGeometry'
-import { ValetudoMapCard, type ValetudoMapEditorMeta } from './ValetudoMapCard'
+import {
+  VALETUDO_MAP_PROVENANCE_NONE,
+  VALETUDO_MAP_PROVENANCE_REPORTED,
+  ValetudoMapCard,
+  type ValetudoMapEditorMeta,
+  type ValetudoMapProvenance,
+} from './ValetudoMapCard'
 import { VacuumOutcomeDetail, VacuumOutcomeOverview } from './VacuumOutcomes'
 import { vacuumWhileAwayPresentation, type VacuumOutcomeContract, type VacuumWhileAwayPresentation } from './vacuumOutcomes'
 import { vacuumOutcomeDayValue } from './vacuumOutcomePresentation'
@@ -815,11 +821,13 @@ function VacuumStatusNotice({
 function VacuumStatusSummary({
   displayState,
   liveState,
+  mapProvenance,
   status,
   vacuum,
 }: {
   displayState: string
   liveState: string
+  mapProvenance: ValetudoMapProvenance
   status: ResolvedVacuumStatus
   vacuum: VacuumConfig
 }) {
@@ -848,13 +856,13 @@ function VacuumStatusSummary({
   return (
     <section className={styles.statusPanel}>
       <InfoPill icon={visual.icon} label="Status" tone={visual.tone} value={stateLabel} />
-      <InfoPill icon="mdi:battery" label="Battery" value={batteryLabel} />
+      <InfoPill icon="mdi:battery" label="Battery" tone={status.primaryAvailable ? undefined : 'unavailable'} value={batteryLabel} />
       {vacuum.dockControls && (
         <div className={styles.dockStatusChip}>
           <InfoPill grouped icon={dockVisual.icon} label="Dock Status" tone={status.primaryAvailable ? dockVisual.tone : 'unavailable'} value={dockStatusLabel} />
         </div>
       )}
-      {!status.primaryAvailable && (
+      {!status.primaryAvailable && mapProvenance !== VALETUDO_MAP_PROVENANCE_REPORTED && (
         <div className={styles.statusNoticeWide}>
           <VacuumStatusNotice role="note" title={stateLabel}>
             {copy(VACUUM_COPY_KEYS.status.unavailableHelp)}
@@ -1531,7 +1539,7 @@ function VacuumMapAndStatus({
   const callService = useHass((state) => state.helpers.callService) as unknown as CallService
   const locate = useCallback(() => callServiceAction(callService, 'vacuum.locate', vacuum.entityId), [callService, vacuum.entityId])
   const deviceCommandsAllowed = status.primaryAvailable && status.commandPolicyMode === VACUUM_COMMAND_NORMAL
-  const [editorMeta, setEditorMeta] = useState<ValetudoMapEditorMeta>({ error: null, geometry: null, isLoaded: false })
+  const [editorMeta, setEditorMeta] = useState<ValetudoMapEditorMeta>({ error: null, geometry: null, isLoaded: false, provenance: VALETUDO_MAP_PROVENANCE_NONE })
   const mapCommandsAllowed = deviceCommandsAllowed && editorMeta.isLoaded
   useLayoutEffect(() => {
     if (!areaEditorOpen || status.primaryAvailable) return
@@ -1623,7 +1631,7 @@ function VacuumMapAndStatus({
         </div>
       ) : (
         <>
-          <VacuumStatusSummary displayState={optimisticState.state} liveState={optimisticState.liveState} status={status} vacuum={vacuum} />
+          <VacuumStatusSummary displayState={optimisticState.state} liveState={optimisticState.liveState} mapProvenance={editorMeta.provenance} status={status} vacuum={vacuum} />
           <VacuumWhileAwaySection onOpenOutcomes={onOpenOutcomes} presentation={outcomePresentation} vacuum={vacuum} />
         </>
       )}
@@ -1639,7 +1647,7 @@ export function VacuumRoomSourceModalContent({ vacuum }: VacuumCardProps) {
   const [areaSelection, setAreaSelection] = useState<MapGridRect | null>(null)
   const [cleanTarget, setCleanTarget] = useState<VacuumCleanTarget>('rooms')
   const [drawMode, setDrawMode] = useState(false)
-  const [editorMeta, setEditorMeta] = useState<ValetudoMapEditorMeta>({ error: null, geometry: null, isLoaded: false })
+  const [editorMeta, setEditorMeta] = useState<ValetudoMapEditorMeta>({ error: null, geometry: null, isLoaded: false, provenance: VALETUDO_MAP_PROVENANCE_NONE })
   const [resetAreaViewRevision, setResetAreaViewRevision] = useState(0)
 
   return (
@@ -1696,7 +1704,7 @@ export function VacuumModal({
   const [areaSelection, setAreaSelection] = useState<MapGridRect | null>(null)
   const [cleanTarget, setCleanTarget] = useState<VacuumCleanTarget>('rooms')
   const [drawMode, setDrawMode] = useState(false)
-  const [editorMeta, setEditorMeta] = useState<ValetudoMapEditorMeta>({ error: null, geometry: null, isLoaded: false })
+  const [editorMeta, setEditorMeta] = useState<ValetudoMapEditorMeta>({ error: null, geometry: null, isLoaded: false, provenance: VALETUDO_MAP_PROVENANCE_NONE })
   const [resetAreaViewRevision, setResetAreaViewRevision] = useState(0)
   const previousOpenRef = useRef(open)
   const renderedOutcomeContract = outcomeDetailContract
@@ -1741,7 +1749,7 @@ export function VacuumModal({
       setAreaSelection(null)
       setCleanTarget('rooms')
       setDrawMode(false)
-      setEditorMeta({ error: null, geometry: null, isLoaded: false })
+      setEditorMeta({ error: null, geometry: null, isLoaded: false, provenance: VALETUDO_MAP_PROVENANCE_NONE })
       setResetAreaViewRevision((revision) => revision + 1)
       resetDetailPageScroll()
     }
