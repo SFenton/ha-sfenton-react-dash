@@ -425,6 +425,32 @@ describe('RecipeDetailModal', () => {
     }
   })
 
+  it('keeps the outgoing tab scroll position until the incoming tab replaces it', async () => {
+    const originalCallService = mockState.helpers.callService
+    mockState.helpers.callService = (params) => (
+      params.service === 'recipe_detail' ? Promise.resolve(detailResponse()) : originalCallService(params)
+    )
+
+    try {
+      render(<Harness />)
+      const dialog = await openRecipe()
+      await within(dialog).findByText('Serves 4')
+
+      const body = dialog.querySelector('[data-modal-sheet-body="true"]') as HTMLDivElement
+      const initial = selectedTabPanel(dialog)
+      body.scrollTop = 320
+
+      fireEvent.click(within(dialog).getByRole('tab', { name: 'Ingredients' }))
+
+      expect(initial.panel).toHaveAccessibleName('General')
+      expect(body.scrollTop).toBe(320)
+      await waitFor(() => expect(initial.panel).toHaveAccessibleName('Ingredients'))
+      await waitFor(() => expect(body.scrollTop).toBe(0))
+    } finally {
+      mockState.helpers.callService = originalCallService
+    }
+  })
+
   it('shows a centered loader, structured unsupported state, and ordinary errors without closing', async () => {
     const originalCallService = mockState.helpers.callService
     let resolveDetail: ((value: unknown) => void) | undefined

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useLayoutEffect, useRef, useState, type RefObject } from 'react'
 import { CheckboxRow } from '../../core/CheckboxRow'
 import { EmptyState } from '../../core/EmptyState'
 import { ExpandingSearchAction } from '../../core/ExpandingSearchAction'
@@ -843,6 +843,7 @@ function PlannerPage({ controller }: { controller: RecipeDetailModalController }
 
 function RecipeDetailTabContent({
   activeTab,
+  bodyElementRef,
   detail,
   fallbackImageUrl,
   feedbackMessage,
@@ -855,6 +856,7 @@ function RecipeDetailTabContent({
   onRejectIngredientMatch,
 }: {
   activeTab: RecipeDetailTab
+  bodyElementRef: RefObject<HTMLDivElement | null>
   detail: RecipeDetail
   fallbackImageUrl?: string | null
   feedbackMessage: string | null
@@ -867,6 +869,19 @@ function RecipeDetailTabContent({
   onRejectIngredientMatch: (ingredient: RecipeDetailIngredient) => void
 }) {
   const { displayedTab, transitionState } = useSmoothDisplayedModalTab(activeTab)
+  const previousDisplayedTabRef = useRef(displayedTab)
+
+  useLayoutEffect(() => {
+    if (previousDisplayedTabRef.current === displayedTab) return undefined
+    previousDisplayedTabRef.current = displayedTab
+    const reset = () => {
+      if (bodyElementRef.current) bodyElementRef.current.scrollTop = 0
+    }
+    reset()
+    const frame = window.requestAnimationFrame(reset)
+    return () => window.cancelAnimationFrame(frame)
+  }, [bodyElementRef, displayedTab])
+
   return (
     <div
       aria-labelledby={modalTabId(RECIPE_DETAIL_TAB_ID_PREFIX, displayedTab)}
@@ -1035,6 +1050,7 @@ export function RecipeDetailModal({ controller }: { controller: RecipeDetailModa
       return (
         <RecipeDetailTabContent
           activeTab={controller.activeTab}
+          bodyElementRef={bodyElementRef}
           detail={controller.detailState.detail}
           fallbackImageUrl={controller.selectedRecipe?.imageUrl ?? controller.selectedRecipe?.thumbnailUrl}
           feedbackMessage={controller.ingredientFeedbackMessage}
@@ -1068,7 +1084,7 @@ export function RecipeDetailModal({ controller }: { controller: RecipeDetailModa
           : undefined}
       onClose={closeModal}
       open={controller.open && controller.selectedRecipe !== null}
-      scrollResetKey={`${controller.selectedRecipe?.id ?? 'none'}:${controller.activeTab}:${detailPageKey ?? 'root'}`}
+      scrollResetKey={`${controller.selectedRecipe?.id ?? 'none'}:${detailPageKey ?? 'root'}`}
       size="standard"
       title={title}
     >

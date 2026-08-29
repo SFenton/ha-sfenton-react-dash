@@ -14,6 +14,72 @@ async function closeModal(dialog: Locator) {
   await expect(dialog).toHaveCount(0, { timeout: 700 })
 }
 
+async function expectOutgoingTabScrollPreserved({
+  dialog,
+  panelSelector,
+  requireOutgoingFrame = true,
+  scrollOwnerSelector,
+  targetTab,
+}: {
+  dialog: Locator
+  panelSelector: string
+  requireOutgoingFrame?: boolean
+  scrollOwnerSelector: string
+  targetTab: string
+}) {
+  const panel = dialog.locator(panelSelector)
+  await expect(panel).toHaveAttribute('data-modal-tab-transition-state', 'idle')
+  const scrollOwner = dialog.locator(scrollOwnerSelector)
+  const preClickScrollTop = await scrollOwner.evaluate((element) => {
+    element.scrollTop = element.scrollHeight
+    return element.scrollTop
+  })
+  expect(preClickScrollTop).toBeGreaterThan(0)
+  const outgoingLabel = await panel.evaluate((element) => (
+    element.getAttribute('data-tab')
+    ?? element.getAttribute('aria-labelledby')
+    ?? element.getAttribute('aria-label')
+  ))
+  expect(outgoingLabel).toBeTruthy()
+
+  const samples = await dialog.getByRole('tab', { name: targetTab }).evaluate((tab, selectors) => new Promise<Array<{
+    label: string | null
+    opacity: number
+    scrollTop: number
+  }>>((resolve) => {
+    const dialogElement = tab.closest('[role="dialog"]')
+    const currentPanel = dialogElement?.querySelector<HTMLElement>(selectors.panelSelector)
+    const currentScrollOwner = dialogElement?.querySelector<HTMLElement>(selectors.scrollOwnerSelector)
+    const frames: Array<{ label: string | null; opacity: number; scrollTop: number }> = []
+    const started = performance.now()
+    const sample = () => {
+      if (!currentPanel || !currentScrollOwner) {
+        resolve(frames)
+        return
+      }
+      frames.push({
+        label: currentPanel.getAttribute('data-tab')
+          ?? currentPanel.getAttribute('aria-labelledby')
+          ?? currentPanel.getAttribute('aria-label'),
+        opacity: Number.parseFloat(getComputedStyle(currentPanel).opacity),
+        scrollTop: currentScrollOwner.scrollTop,
+      })
+      if (performance.now() - started < 360) requestAnimationFrame(sample)
+      else resolve(frames)
+    }
+    requestAnimationFrame(sample)
+    ;(tab as HTMLElement).click()
+  }), { panelSelector, scrollOwnerSelector })
+
+  const outgoingSamples = samples.filter((sample) => sample.label === outgoingLabel)
+  if (requireOutgoingFrame) expect(outgoingSamples.length).toBeGreaterThan(0)
+  expect(outgoingSamples.every((sample) => Math.abs(sample.scrollTop - preClickScrollTop) <= 1)).toBe(true)
+  const visibleIncomingSamples = samples.filter((sample) => sample.label !== outgoingLabel && sample.opacity > 0.01)
+  expect(visibleIncomingSamples.length).toBeGreaterThan(0)
+  expect(visibleIncomingSamples.every((sample) => Math.abs(sample.scrollTop) <= 1)).toBe(true)
+  await expect.poll(() => scrollOwner.evaluate((element) => element.scrollTop)).toBe(0)
+}
+
 async function expectScrollSafe(dialog: Locator) {
   const violations = await dialog.evaluate((element) => {
     const regions = [
@@ -267,6 +333,91 @@ test('tabbed workspaces reset the active scroll owner at mobile and short-landsc
     await expect.poll(() => body.evaluate((element) => element.scrollTop)).toBe(0)
     await closeModal(dialog)
   }
+})
+
+test('animated modal tabs preserve the outgoing scroll position until content swaps', async ({ page }) => {
+  test.setTimeout(60_000)
+  await page.setViewportSize({ height: 852, width: 393 })
+
+  await page.goto('/')
+  await page.evaluate(() => {
+    window.history.replaceState(null, '', '/at-a-glance/food')
+    window.dispatchEvent(new PopStateEvent('popstate'))
+  })
+  await expect(page.getByRole('heading', { name: 'Food & Recipes' })).toBeVisible({ timeout: 12_000 })
+  await page.getByRole('button', {
+    name: 'Open Suggested Citrus Pantry Bowl with Roasted Garden Vegetables recipe details',
+  }).click()
+  let dialog = page.getByRole('dialog')
+  await expect(dialog.getByText('Serves 4')).toBeVisible()
+  await expectOutgoingTabScrollPreserved({
+    dialog,
+    panelSelector: '[role="tabpanel"]',
+    scrollOwnerSelector: '[data-modal-sheet-body="true"]',
+    targetTab: 'Ingredients',
+  })
+  await closeModal(dialog)
+
+  await page.goto('/index.html?path=living-room')
+  await page.getByRole('button', { name: /^Living Room SHIELD Off$/i }).click()
+  dialog = page.getByRole('dialog')
+  await dialog.getByRole('tab', { name: 'Apps' }).click()
+  await expect(dialog.locator('[data-scroll-region="media-remote-panel"]')).toHaveAttribute('data-tab', 'apps')
+  await expectOutgoingTabScrollPreserved({
+    dialog,
+    panelSelector: '[data-scroll-region="media-remote-panel"]',
+    scrollOwnerSelector: '[data-modal-sheet-body="true"]',
+    targetTab: 'Controls',
+  })
+  await closeModal(dialog)
+
+  await page.goto('/index.html?path=master-bedroom')
+  await page.getByRole('button', { name: /Humidifier .*46%/i }).click()
+  dialog = page.getByRole('dialog')
+  await dialog.getByRole('tab', { name: 'Info' }).click()
+  await expect(dialog.locator('[data-scroll-region="humidifier-panel"]')).toHaveAttribute('data-tab', 'info')
+  await expectOutgoingTabScrollPreserved({
+    dialog,
+    panelSelector: '[data-scroll-region="humidifier-panel"]',
+    scrollOwnerSelector: '[data-modal-sheet-body="true"]',
+    targetTab: 'Schedules',
+  })
+  await closeModal(dialog)
+
+  dialog = await openMainFloorVacuum(page)
+  await dialog.getByRole('tab', { name: 'Info' }).click()
+  await expect(dialog.locator('[data-scroll-region="vacuum-panel"]')).toHaveAttribute('data-tab', 'info')
+  await expectOutgoingTabScrollPreserved({
+    dialog,
+    panelSelector: '[data-scroll-region="vacuum-panel"]',
+    scrollOwnerSelector: '[data-modal-sheet-body="true"]',
+    targetTab: 'Controls',
+  })
+  await closeModal(dialog)
+
+  await page.goto('/at-a-glance/ecobee#thermostat-automation')
+  dialog = page.getByRole('dialog', { name: 'Thermostat · Advanced Controls' })
+  await expect(dialog.getByRole('tabpanel', { name: 'Automation' })).toBeVisible()
+  await expectOutgoingTabScrollPreserved({
+    dialog,
+    panelSelector: '[role="tabpanel"]',
+    scrollOwnerSelector: '[data-modal-sheet-body="true"]',
+    targetTab: 'Rooms',
+  })
+  await closeModal(dialog)
+
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  dialog = await openMainFloorVacuum(page)
+  await dialog.getByRole('tab', { name: 'Info' }).click()
+  await expect(dialog.locator('[data-scroll-region="vacuum-panel"]')).toHaveAttribute('data-tab', 'info')
+  await expectOutgoingTabScrollPreserved({
+    dialog,
+    panelSelector: '[data-scroll-region="vacuum-panel"]',
+    requireOutgoingFrame: false,
+    scrollOwnerSelector: '[data-modal-sheet-body="true"]',
+    targetTab: 'Controls',
+  })
+  await closeModal(dialog)
 })
 
 test('humidifier centered panes reset to the top on tab changes', async ({ page }) => {

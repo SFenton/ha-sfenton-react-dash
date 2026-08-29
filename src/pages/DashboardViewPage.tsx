@@ -1055,26 +1055,17 @@ function DefaultRoomSourceCard({ card, eightSleepModalState, onOpen }: RoomSourc
 
 function MediaRoomSourceModal({ config, onClose, open, title }: { config: MediaRemoteConfig; onClose: () => void; open: boolean; title: string }) {
   const [mediaActiveTab, setMediaActiveTab] = useState<MediaRemoteModalTab>('controls')
-  const bodyElementRef = useRef<HTMLDivElement | null>(null)
-  const handleTabChange = (tab: MediaRemoteModalTab) => {
-    if (bodyElementRef.current) bodyElementRef.current.scrollTop = 0
-    setMediaActiveTab(tab)
-    window.requestAnimationFrame(() => {
-      if (bodyElementRef.current) bodyElementRef.current.scrollTop = 0
-    })
-  }
 
   return (
     <ModalSheet
-      bodyElementRef={bodyElementRef}
-      navigation={<MediaRemoteModalNav activeTab={mediaActiveTab} onTabChange={handleTabChange} remoteTitle={config.title} showDevices={Boolean(config.devices?.length)} />}
+      navigation={<MediaRemoteModalNav activeTab={mediaActiveTab} onTabChange={setMediaActiveTab} remoteTitle={config.title} showDevices={Boolean(config.devices?.length)} />}
       onClose={onClose}
       open={open}
       scrollMode="panes"
       size="workspace"
       title={title}
     >
-      <MediaRemoteModalContent activeTab={mediaActiveTab} config={config} onTabChange={handleTabChange} />
+      <MediaRemoteModalContent activeTab={mediaActiveTab} config={config} onTabChange={setMediaActiveTab} />
     </ModalSheet>
   )
 }
@@ -6134,7 +6125,7 @@ function ThermostatModal({
       onBack={detail ? closeDetail : undefined}
       onClose={onClose}
       open={open}
-      scrollResetKey={detailKey}
+      scrollResetKey={thermostatModalDetailKey(displayedTab, detail)}
       size="workspace"
       subtitle={subtitle}
       title={thermostatModalDetailTitle(detail)}
