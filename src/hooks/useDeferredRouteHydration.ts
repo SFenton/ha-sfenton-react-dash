@@ -25,6 +25,10 @@ export function markDeferredRouteHydrated(cacheKey: string) {
   hydratedRouteKeys.add(cacheKey)
 }
 
+export function isDeferredRouteHydrated(cacheKey: string) {
+  return hydratedRouteKeys.has(cacheKey)
+}
+
 export function useDeferredRouteHydration({
   cacheKey,
   coldContentDelayMs = 120,

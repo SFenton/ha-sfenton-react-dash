@@ -15,6 +15,7 @@ import { HOME_ALL_FOOD_ROUTE_PATH, HOME_CABINET_ROUTE_PATH, HOME_FREEZER_ROUTE_P
 import { pageMeasureForPath } from './constants/pageLayout'
 import { dashboardHref } from './hooks/dashboardLocation'
 import { DASHBOARD_PAGE_LOAD_TIMEOUT_MS } from './constants/loading'
+import { markDeferredRouteHydrated } from './hooks/useDeferredRouteHydration'
 import { useDashboardRoute } from './hooks/useDashboardRoute'
 import { useSmoothDisplayedRoute } from './hooks/useSmoothDisplayedRoute'
 import { ModalAcceptanceHarness } from './test/ModalAcceptanceHarness'
@@ -145,6 +146,7 @@ function Dashboard() {
       : null
     const timer = window.setTimeout(() => {
       initialPreloadCompleted = true
+      markDeferredRouteHydrated('home')
       if (!waitsForInitialData) startInitialContentEnter()
       setPreloadGatePhase('content')
     }, INITIAL_PRELOAD_EXIT_MS)

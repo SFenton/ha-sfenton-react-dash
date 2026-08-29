@@ -110,6 +110,17 @@ async function expectDisposed(page: Page) {
   })
 }
 
+async function currentReactDashboardFrame(page: Page) {
+  for (let attempt = 0; attempt < 80; attempt += 1) {
+    const frame = page.frames().find((candidate) => (
+      candidate.url().includes('/index.html')
+    ))
+    if (frame) return frame
+    await page.waitForTimeout(100)
+  }
+  throw new Error('React dashboard iframe was not created.')
+}
+
 test('legacy wrapper disposal prevents lifecycle accumulation across replacements', async ({ page }) => {
   await openLifecycleHost(
     page,
@@ -298,4 +309,87 @@ test('a new frame disposes a detached prior generation when pagehide is unavaila
     instanceId: second.instanceId,
     reason: 'test-final-cleanup',
   }))
+})
+
+test('a recreated non-Home legacy frame navigates Home without another loader', async ({ page }) => {
+  await openLifecycleHost(
+    page,
+    '/sfenton-react-dash/settings',
+    '/sfenton-react-app-card.js',
+  )
+  await page.waitForFunction((tag) => Boolean(customElements.get(tag)), SFENTON_REACT_APP_CARD_TAG)
+
+  const mountCard = async () => {
+    await page.evaluate(({ tag }) => {
+      const card = document.createElement(tag) as HTMLElement & {
+        setConfig: (config: { url: string }) => void
+      }
+      card.dataset.lifecycleHost = 'true'
+      card.setConfig({ url: '/index.html' })
+      document.body.append(card)
+    }, { tag: SFENTON_REACT_APP_CARD_TAG })
+    const frame = await currentReactDashboardFrame(page)
+    await frame.getByRole('heading', { name: 'Settings', exact: true }).waitFor({
+      state: 'visible',
+      timeout: 15_000,
+    })
+    return frame
+  }
+
+  await mountCard()
+  await page.locator('[data-lifecycle-host="true"]').evaluate((element) => element.remove())
+  await expectDisposed(page)
+  const frame = await mountCard()
+  const initialTimeOrigin = await frame.evaluate(() => performance.timeOrigin)
+  const initialLifecycleId = await page.evaluate(({ lifecycleProperty }) => (
+    (window as unknown as LifecycleHostWindow)[lifecycleProperty]?.instanceId
+  ), { lifecycleProperty: REACT_DASHBOARD_LIFECYCLE_PROPERTY })
+  const requests: string[] = []
+  page.on('request', (request) => {
+    if (/\/(?:index\.html|assets\/app-[^/]+\.js)(?:\?|$)/.test(request.url())) {
+      requests.push(request.url())
+    }
+  })
+  await frame.evaluate(() => {
+    const audit = { headerMissing: false, loaderSeen: false, running: true }
+    ;(window as unknown as { __recreatedHomeAudit: typeof audit }).__recreatedHomeAudit = audit
+    const sample = () => {
+      audit.headerMissing ||= !document.querySelector('[data-page-header="true"]')
+      audit.loaderSeen ||= Boolean(document.querySelector(
+        '[role="status"][aria-label="Loading Home dashboard content"]',
+      ))
+      if (audit.running) requestAnimationFrame(sample)
+    }
+    requestAnimationFrame(sample)
+  })
+
+  await frame.getByRole('navigation', { name: 'Dashboard sections' }).getByRole('button', {
+    name: 'Home',
+    exact: true,
+  }).click()
+  await frame.getByRole('heading', { name: 'Home', exact: true }).waitFor({
+    state: 'visible',
+    timeout: 1_000,
+  })
+  const audit = await frame.evaluate(() => {
+    const current = (window as unknown as {
+      __recreatedHomeAudit: {
+        headerMissing: boolean
+        loaderSeen: boolean
+        running: boolean
+      }
+    }).__recreatedHomeAudit
+    current.running = false
+    return current
+  })
+
+  expect(audit).toMatchObject({
+    headerMissing: false,
+    loaderSeen: false,
+  })
+  expect(await frame.evaluate(() => performance.timeOrigin)).toBe(initialTimeOrigin)
+  expect(await page.evaluate(({ lifecycleProperty }) => (
+    (window as unknown as LifecycleHostWindow)[lifecycleProperty]?.instanceId
+  ), { lifecycleProperty: REACT_DASHBOARD_LIFECYCLE_PROPERTY })).toBe(initialLifecycleId)
+  expect(requests).toEqual([])
 })
