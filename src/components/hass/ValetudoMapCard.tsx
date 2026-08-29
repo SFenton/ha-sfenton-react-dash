@@ -11,6 +11,7 @@ import {
 import { useEntity, useHass } from '@hakit/core'
 import type { VacuumConfig } from '../../constants/portedDashboard'
 import { VACUUM_COPY_KEYS, VACUUM_COPY_NAMESPACE, useCopy } from '../../i18n'
+import { MaterialIcon } from '../core/Icon'
 import { materialIconPath } from '../core/iconPaths'
 import { asEntityName } from './entityState'
 import { isUnavailableVacuumState } from './vacuumVisualState'
@@ -40,6 +41,7 @@ import {
   createMockValetudoMap,
   expandValetudoLayerPixels,
   extractValetudoMapFromPngBytes,
+  isReportedMapEntityVisible,
   mapCameraEntityId,
   selectValetudoMapEntity,
   valetudoMapEntityRenderStyle,
@@ -58,6 +60,8 @@ const DOCK_ICON_PATH = materialIconPath('mdi:flash')
 const GO_TO_ICON_PATH = materialIconPath('mdi:pin')
 const OBSTACLE_ICON_PATH = materialIconPath('mdi:alert-circle')
 const ROBOT_ICON_PATH = materialIconPath('mdi:robot-vacuum')
+const LIVE_ROBOT_COLOR = '#f8fafc'
+const REPORTED_ROBOT_STYLE = valetudoMapEntityRenderStyle('obstacle')
 const MAP_ICON_PATH_CACHE = new Map<string, Path2D>()
 const INITIAL_VIEWPORT: MapViewport = { panX: 0, panY: 0, zoom: 1 }
 const IDENTITY_MATRIX: AffineMatrix = { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 }
@@ -82,6 +86,8 @@ export interface ValetudoMapEditorMeta {
   geometry: ValetudoMapStageGeometry | null
   isLoaded: boolean
 }
+
+export type ValetudoMapProvenance = 'live' | 'none' | 'reported'
 
 interface ValetudoMapCardProps {
   available?: boolean
@@ -256,6 +262,7 @@ function renderValetudoMap(
   geometry: ValetudoMapStageGeometry,
   frame: MapFrameSize,
   matrix: AffineMatrix,
+  provenance: Exclude<ValetudoMapProvenance, 'none'>,
 ) {
   const dpr = window.devicePixelRatio || 1
   const width = Math.max(1, Math.round(frame.width))
@@ -353,7 +360,16 @@ function renderValetudoMap(
     if (entity.type === 'robot_position') {
       const angle = typeof entity.metaData?.angle === 'number' ? entity.metaData.angle : 0
       const radians = ((angle - 90) * Math.PI) / 180
-      drawMapEntityIcon(ctx, entity, geometry, ROBOT_ICON_PATH, '#f8fafc', screenScale, radians)
+      drawMapEntityIcon(
+        ctx,
+        entity,
+        geometry,
+        ROBOT_ICON_PATH,
+        provenance === 'reported' ? REPORTED_ROBOT_STYLE?.strokeStyle ?? LIVE_ROBOT_COLOR : LIVE_ROBOT_COLOR,
+        screenScale,
+        radians,
+        provenance === 'reported' ? REPORTED_ROBOT_STYLE?.haloColor : undefined,
+      )
     }
   }
 }
@@ -454,26 +470,43 @@ export function ValetudoMapCard({
     fetchedMapCameraMissing,
   )
   const cameraAvailabilityEntity = injectedMapCameraEntity
-  const mapSourceAvailable = available
+  const liveMapSourceAvailable = available
     && Boolean(cameraAvailabilityEntity)
     && !isUnavailableVacuumState(cameraAvailabilityEntity?.state)
+  const reportedMapSourceAvailable = !available && Boolean(cameraAvailabilityEntity)
+  const mapProvenance: ValetudoMapProvenance = liveMapSourceAvailable
+    ? 'live'
+    : reportedMapSourceAvailable
+      ? 'reported'
+      : 'none'
+  const mapSourceReadable = mapProvenance !== 'none'
   const entityPicture = typeof injectedMapCameraEntity?.attributes.entity_picture === 'string' ? injectedMapCameraEntity.attributes.entity_picture : undefined
-  const cameraImageUrl = entityPicture ?? `/api/camera_proxy/${cameraEntityId}`
-  const mapSourceKey = mapSourceAvailable
-    ? `${cameraImageUrl}|${cameraAvailabilityEntity?.last_changed ?? ''}|${sourceRevision ?? ''}`
+  const cameraProxyUrl = `/api/camera_proxy/${cameraEntityId}`
+  const cameraImageUrl = mapProvenance === 'reported' ? cameraProxyUrl : entityPicture ?? cameraProxyUrl
+  const mapSourceKey = mapSourceReadable
+    ? `${mapProvenance}|${cameraImageUrl}|${cameraAvailabilityEntity?.last_changed ?? ''}|${sourceRevision ?? ''}`
     : null
-  const displayedMap = mapSourceAvailable && (isMockMode || loadedMapSourceKey === mapSourceKey) ? map : null
-  const displayedError = mapSourceAvailable ? error : null
-  const displayedLoaded = mapSourceAvailable && Boolean(displayedMap) && isLoaded
-  const liveGeometry = useMemo(() => displayedMap ? valetudoMapStageGeometry(displayedMap, vacuum.mapScale) : null, [displayedMap, vacuum.mapScale])
-  const geometry = interactive ? frozenGeometry ?? liveGeometry : liveGeometry
+  const displayedMap = mapSourceReadable && (isMockMode || loadedMapSourceKey === mapSourceKey) ? map : null
+  const renderedMap = useMemo(() => {
+    if (!displayedMap || mapProvenance !== 'reported') return displayedMap
+    return {
+      ...displayedMap,
+      entities: displayedMap.entities.filter((entity) => isReportedMapEntityVisible(entity.type)),
+    }
+  }, [displayedMap, mapProvenance])
+  const displayedError = mapSourceReadable ? error : null
+  const displayedLoaded = mapSourceReadable && Boolean(renderedMap) && isLoaded
+  const liveGeometry = useMemo(() => renderedMap ? valetudoMapStageGeometry(renderedMap, vacuum.mapScale) : null, [renderedMap, vacuum.mapScale])
+  const mapInteractive = interactive && mapProvenance === 'live'
+  const mapExpanded = expanded && mapProvenance === 'live'
+  const geometry = mapInteractive ? frozenGeometry ?? liveGeometry : liveGeometry
   const viewport = storedViewport.revision === resetViewRevision ? storedViewport.value : INITIAL_VIEWPORT
   const rotationDegrees = vacuum.mapRotationDegrees ?? 0
   const matrix = useMemo(
     () => geometry ? mapViewportMatrix(geometry, frame, viewport, rotationDegrees) : IDENTITY_MATRIX,
     [frame, geometry, rotationDegrees, viewport],
   )
-  const displayedRect = interactive ? draftRect ?? selection : selection
+  const displayedRect = mapProvenance === 'reported' ? null : mapInteractive ? draftRect ?? selection : selection
   const setDraftRect = useCallback((rect: MapGridRect | null) => {
     draftRectRef.current = rect
     setDraftRectState(rect)
@@ -492,10 +525,10 @@ export function ValetudoMapCard({
     if (isMockMode) return undefined
 
     let cancelled = false
-    if (!connection || !injectedMapCameraEntity || !mapSourceAvailable) return undefined
+    if (!connection || !mapSourceReadable) return undefined
 
     const fetchMap = () => {
-      createFetchWithAuth(connection)(cameraImageUrl)
+      createFetchWithAuth(connection)(cameraImageUrl, mapProvenance === 'reported' ? { cache: 'no-store' } : undefined)
         .then(async (response) => {
           if (!response.ok) throw new Error(`Camera image request failed (${response.status})`)
           const bytes = new Uint8Array(await response.arrayBuffer())
@@ -516,12 +549,17 @@ export function ValetudoMapCard({
     }
 
     fetchMap()
+    if (mapProvenance !== 'live') {
+      return () => {
+        cancelled = true
+      }
+    }
     const timer = window.setInterval(fetchMap, VALETUDO_HASS_PULSE_MS)
     return () => {
       cancelled = true
       window.clearInterval(timer)
     }
-  }, [cameraImageUrl, connection, injectedMapCameraEntity, isMockMode, mapSourceAvailable, mapSourceKey, vacuum.vacuumMapId])
+  }, [cameraImageUrl, connection, isMockMode, mapProvenance, mapSourceKey, mapSourceReadable, vacuum.vacuumMapId])
 
   useEffect(() => {
     if (!connection || isMockMode) return undefined
@@ -557,7 +595,7 @@ export function ValetudoMapCard({
         .catch(() => undefined)
     }
 
-    if (mapSourceAvailable) {
+    if (liveMapSourceAvailable) {
       refreshLiveEntities()
       metadataRefreshTimer = window.setInterval(refreshLiveEntities, VALETUDO_LIVE_ENTITY_REFRESH_MS)
     }
@@ -583,7 +621,7 @@ export function ValetudoMapCard({
       if (metadataRefreshTimer !== undefined) window.clearInterval(metadataRefreshTimer)
       unsubscribe?.()
     }
-  }, [cameraEntityId, connection, isMockMode, mapSourceAvailable])
+  }, [cameraEntityId, connection, isMockMode, liveMapSourceAvailable])
 
   useEffect(() => {
     const element = frameRef.current
@@ -608,7 +646,7 @@ export function ValetudoMapCard({
   useEffect(() => {
     pointersRef.current.clear()
     gestureRef.current = null
-  }, [interactive, resetViewRevision])
+  }, [mapInteractive, resetViewRevision])
 
   useEffect(() => {
     onEditorMetaChange?.({ error: displayedError, geometry, isLoaded: displayedLoaded })
@@ -618,11 +656,11 @@ export function ValetudoMapCard({
     const canvas = canvasRef.current
     if (!canvas || frame.width <= 0 || frame.height <= 0) return undefined
     const frameId = window.requestAnimationFrame(() => {
-      if (displayedMap && geometry) renderValetudoMap(canvas, displayedMap, geometry, frame, matrix)
+      if (renderedMap && geometry) renderValetudoMap(canvas, renderedMap, geometry, frame, matrix, mapProvenance === 'reported' ? 'reported' : 'live')
       else renderFallbackGrid(canvas, frame)
     })
     return () => window.cancelAnimationFrame(frameId)
-  }, [displayedMap, frame, geometry, matrix])
+  }, [frame, geometry, mapProvenance, matrix, renderedMap])
 
   const clientPoint = useCallback((event: { clientX: number; clientY: number }): MapGridPoint => {
     const rect = frameRef.current?.getBoundingClientRect()
@@ -649,7 +687,7 @@ export function ValetudoMapCard({
   }, [geometry, setDraftRect])
 
   const handlePointerDown = useCallback((event: ReactPointerEvent<SVGSVGElement>) => {
-    if (!interactive || !geometry) return
+    if (!mapInteractive || !geometry) return
     event.preventDefault()
     event.stopPropagation()
     event.currentTarget.setPointerCapture(event.pointerId)
@@ -683,10 +721,10 @@ export function ValetudoMapCard({
     }
 
     gestureRef.current = { origin: viewportRef.current, startPoint: point, type: 'pan' }
-  }, [clientPoint, clientToGlobalGrid, drawMode, geometry, interactive, minimumSizeCm, selection, setDraftRect, startPinch])
+  }, [clientPoint, clientToGlobalGrid, drawMode, geometry, mapInteractive, minimumSizeCm, selection, setDraftRect, startPinch])
 
   const handlePointerMove = useCallback((event: ReactPointerEvent<SVGSVGElement>) => {
-    if (!interactive || !geometry || !pointersRef.current.has(event.pointerId)) return
+    if (!mapInteractive || !geometry || !pointersRef.current.has(event.pointerId)) return
     event.preventDefault()
     event.stopPropagation()
     const point = clientPoint(event)
@@ -731,7 +769,7 @@ export function ValetudoMapCard({
     } else {
       setDraftRect(resizeMapGridRectCorner(geometry, gesture.origin, globalPoint, minimumGridSize, gesture.corner))
     }
-  }, [clientPoint, clientToGlobalGrid, frame, geometry, interactive, minimumSizeCm, rotationDegrees, setDraftRect, setViewport])
+  }, [clientPoint, clientToGlobalGrid, frame, geometry, mapInteractive, minimumSizeCm, rotationDegrees, setDraftRect, setViewport])
 
   const finishPointerGesture = useCallback((event: ReactPointerEvent<SVGSVGElement>, cancelled: boolean) => {
     if (!pointersRef.current.has(event.pointerId)) return
@@ -755,20 +793,20 @@ export function ValetudoMapCard({
   }, [onDrawModeChange, onSelectionChange, setDraftRect])
 
   const handleWheel = useCallback((event: WheelEvent) => {
-    if (!interactive || !geometry) return
+    if (!mapInteractive || !geometry) return
     event.preventDefault()
     const point = clientPoint(event)
     const zoom = Math.min(MAP_ZOOM_MAX, Math.max(MAP_ZOOM_MIN, viewportRef.current.zoom * Math.exp(-event.deltaY * 0.0015)))
     setViewport(zoomViewportAt(geometry, frame, viewportRef.current, point, zoom, rotationDegrees))
-  }, [clientPoint, frame, geometry, interactive, rotationDegrees, setViewport])
+  }, [clientPoint, frame, geometry, mapInteractive, rotationDegrees, setViewport])
 
   useEffect(() => {
     const overlay = overlayRef.current
-    if (!interactive || !overlay) return undefined
+    if (!mapInteractive || !overlay) return undefined
     const listener = (event: Event) => handleWheel(event as WheelEvent)
     overlay.addEventListener('wheel', listener, { passive: false })
     return () => overlay.removeEventListener('wheel', listener)
-  }, [handleWheel, interactive])
+  }, [handleWheel, mapInteractive])
 
   const handleMoveKeyDown = useCallback((event: ReactKeyboardEvent<SVGRectElement>) => {
     if (!selection || !geometry) return
@@ -799,8 +837,8 @@ export function ValetudoMapCard({
     ))
   }, [geometry, minimumSizeCm, onSelectionChange, selection])
 
-  const showUnavailableFallback = !mapSourceAvailable || Boolean(displayedError)
-  const showLoadingFallback = mapSourceAvailable && !displayedError && !displayedMap
+  const showUnavailableFallback = mapProvenance === 'none' || Boolean(displayedError)
+  const showLoadingFallback = mapSourceReadable && !displayedError && !renderedMap
   const showFallback = showUnavailableFallback || showLoadingFallback
   const effectiveScale = geometry ? Math.max(affineScale(matrix), 0.01) : 1
   const localRect = displayedRect && geometry
@@ -811,7 +849,21 @@ export function ValetudoMapCard({
         y1: displayedRect.y1 - geometry.minGridY,
       }
     : null
-  const showOverlay = Boolean(geometry && frame.width > 0 && frame.height > 0 && (interactive || localRect))
+  const showOverlay = Boolean(geometry && frame.width > 0 && frame.height > 0 && (mapInteractive || localRect))
+  const reportedPosition = renderedMap?.entities.find((entity) => entity.type === 'robot_position')
+  const reportedPositionPresent = Boolean(reportedPosition?.points && reportedPosition.points.length >= 2)
+  const reportedPositionPoint = reportedPositionPresent && reportedPosition?.points && geometry
+    ? applyAffine(matrix, {
+        x: mapPointToLocal(reportedPosition.points[0] ?? 0, geometry.minGridX, geometry.pixelSize),
+        y: mapPointToLocal(reportedPosition.points[1] ?? 0, geometry.minGridY, geometry.pixelSize),
+      })
+    : null
+  const reportedNoticePlacement = reportedPositionPoint && reportedPositionPoint.y > frame.height / 2 ? 'top' : 'bottom'
+  const showReportedNotice = mapProvenance === 'reported' && displayedLoaded && !displayedError
+  const reportedNoticeId = `${vacuum.vacuumMapId}-last-reported-map-note`
+  const loadingMapKey = mapProvenance === 'reported'
+    ? VACUUM_COPY_KEYS.status.loadingLastMapPosition
+    : VACUUM_COPY_KEYS.status.loadingCurrentMap
   const mapStyle = {
     '--map-min-height': vacuum.mapScale > 2 ? '300px' : '340px',
   } as CSSProperties
@@ -819,12 +871,17 @@ export function ValetudoMapCard({
   return (
     <div
       aria-label={`${vacuum.title} Valetudo map`}
+      aria-describedby={showReportedNotice ? reportedNoticeId : undefined}
       className={styles.frame}
-      data-draw-mode={drawMode ? 'true' : 'false'}
-      data-expanded={expanded ? 'true' : 'false'}
-      data-interactive={interactive ? 'true' : 'false'}
+      data-draw-mode={mapInteractive && drawMode ? 'true' : 'false'}
+      data-expanded={mapExpanded ? 'true' : 'false'}
+      data-interactive={mapInteractive ? 'true' : 'false'}
       data-loaded={displayedLoaded ? 'true' : 'false'}
-      data-source-available={mapSourceAvailable ? 'true' : 'false'}
+      data-map-provenance={mapProvenance}
+      data-source-available={liveMapSourceAvailable ? 'true' : 'false'}
+      data-viewport-pan-x={viewport.panX}
+      data-viewport-pan-y={viewport.panY}
+      data-viewport-zoom={viewport.zoom}
       ref={frameRef}
       role="region"
       style={mapStyle}
@@ -832,22 +889,22 @@ export function ValetudoMapCard({
       <canvas aria-hidden="true" className={styles.canvas} data-valetudo-map-canvas="true" ref={canvasRef} />
       {showOverlay && geometry && (
         <svg
-          aria-hidden={interactive ? undefined : true}
-          aria-label={interactive ? `${vacuum.title} cleaning area editor` : undefined}
+          aria-hidden={mapInteractive ? undefined : true}
+          aria-label={mapInteractive ? `${vacuum.title} cleaning area editor` : undefined}
           className={styles.overlay}
-          data-base-ui-swipe-ignore={interactive ? 'true' : undefined}
-          data-interactive={interactive ? 'true' : 'false'}
+          data-base-ui-swipe-ignore={mapInteractive ? 'true' : undefined}
+          data-interactive={mapInteractive ? 'true' : 'false'}
           data-map-editor-overlay="true"
-          onPointerCancel={interactive ? (event) => finishPointerGesture(event, true) : undefined}
-          onPointerDown={interactive ? handlePointerDown : undefined}
-          onPointerMove={interactive ? handlePointerMove : undefined}
-          onPointerUp={interactive ? (event) => finishPointerGesture(event, false) : undefined}
+          onPointerCancel={mapInteractive ? (event) => finishPointerGesture(event, true) : undefined}
+          onPointerDown={mapInteractive ? handlePointerDown : undefined}
+          onPointerMove={mapInteractive ? handlePointerMove : undefined}
+          onPointerUp={mapInteractive ? (event) => finishPointerGesture(event, false) : undefined}
           ref={overlayRef}
-          role={interactive ? 'application' : undefined}
+          role={mapInteractive ? 'application' : undefined}
           viewBox={`0 0 ${frame.width} ${frame.height}`}
         >
           <g transform={affineToCssMatrix(matrix)}>
-            {localRect && interactive && (
+            {localRect && mapInteractive && (
               <>
                 <rect
                   aria-label="Move cleaning area"
@@ -898,7 +955,7 @@ export function ValetudoMapCard({
                 })}
               </>
             )}
-            {localRect && !interactive && (
+            {localRect && !mapInteractive && (
               <rect
                 aria-hidden="true"
                 className={[styles.selection, styles.staticSelection].join(' ')}
@@ -917,11 +974,22 @@ export function ValetudoMapCard({
           </g>
         </svg>
       )}
+      {showReportedNotice && (
+        <div className={styles.reportedNotice} data-icon="mdi:alert-outline" data-map-reported-note="true" data-placement={reportedNoticePlacement} id={reportedNoticeId} role="note">
+          <span aria-hidden="true" className={styles.reportedNoticeIcon}>
+            <MaterialIcon name="mdi:alert-outline" size={20} />
+          </span>
+          <span className={styles.reportedNoticeCopy}>
+            <strong>{copy(reportedPositionPresent ? VACUUM_COPY_KEYS.status.lastReportedPosition : VACUUM_COPY_KEYS.status.lastReportedMap)}</strong>
+            <small>{copy(VACUUM_COPY_KEYS.status.lastReportedMapHelp)}</small>
+          </span>
+        </div>
+      )}
       {showFallback && (
         <div className={styles.fallback}>
           <span className={styles.fallbackTitle}>
             {showLoadingFallback
-              ? copy(VACUUM_COPY_KEYS.status.loadingCurrentMap)
+              ? copy(loadingMapKey)
               : copy(VACUUM_COPY_KEYS.status.mapUnavailable)}
           </span>
           {showUnavailableFallback && (

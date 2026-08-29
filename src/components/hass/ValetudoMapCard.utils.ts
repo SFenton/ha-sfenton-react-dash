@@ -136,6 +136,21 @@ const ENTITY_RENDER_STYLES: Record<string, ValetudoMapEntityRenderStyle> = {
   },
 }
 
+const REPORTED_MAP_VISIBLE_ENTITY_TYPES = new Set([
+  'carpet',
+  'curtain',
+  'no_go_area',
+  'no_mop_area',
+  'ramp',
+  'robot_position',
+  'threshold',
+  'virtual_wall',
+])
+
+export function isReportedMapEntityVisible(type: string) {
+  return REPORTED_MAP_VISIBLE_ENTITY_TYPES.has(type)
+}
+
 export function valetudoMapEntityRenderStyle(type: string) {
   return ENTITY_RENDER_STYLES[type] ?? null
 }

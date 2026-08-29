@@ -2,6 +2,7 @@ import { deflateSync, inflateSync } from 'node:zlib'
 import {
   expandValetudoLayerPixels,
   extractValetudoMapFromPngBytes,
+  isReportedMapEntityVisible,
   mapCameraEntityId,
   selectValetudoMapEntity,
   valetudoMapBounds,
@@ -97,6 +98,21 @@ describe('ValetudoMapCard helpers', () => {
     expect(materialIconPath('mdi:robot-vacuum')).not.toBe(materialIconPath('mdi:home'))
     expect(materialIconPath('mdi:flash')).not.toBe(materialIconPath('mdi:home'))
     expect(materialIconPath('mdi:pin')).not.toBe(materialIconPath('mdi:home'))
+    expect(materialIconPath('mdi:alert-outline')).not.toBe(materialIconPath('mdi:home'))
+  })
+
+  it.each([
+    ['robot_position', true],
+    ['carpet', true],
+    ['no_go_area', true],
+    ['path', false],
+    ['predicted_path', false],
+    ['go_to_target', false],
+    ['active_zone', false],
+    ['obstacle', false],
+    ['charger_location', false],
+  ])('sets reported-map visibility for %s to %s', (type, visible) => {
+    expect(isReportedMapEntityVisible(type)).toBe(visible)
   })
 
   it.each([

@@ -21,6 +21,10 @@
     "previousIssueObserved": "Previous Vacuum Issue · {{issue}} • Observed {{date}}",
     "queuedCleaningCanceled": "The queued cleaning request was canceled because the vacuum is no longer ready. Retry when ready.",
     "loadingCurrentMap": "Loading Current Map…",
+    "loadingLastMapPosition": "Loading Last Vacuum Map Position…",
+    "lastReportedMap": "Last Reported Map",
+    "lastReportedMapHelp": "This is the last map the vacuum reported before contact was lost. The exact report time is unknown, and the vacuum may have been moved since then.",
+    "lastReportedPosition": "Last Reported Position",
     "mapUnavailable": "Map Unavailable",
     "mapUnavailableHelp": "Home Assistant cannot currently confirm the vacuum's map or position."
   },

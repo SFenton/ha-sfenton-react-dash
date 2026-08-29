@@ -5256,6 +5256,7 @@ describe('DashboardViewPage', () => {
     const dialog = await screen.findByRole('dialog')
     expect(within(dialog).getByRole('heading', { name: 'Music Room: Robot Vacuum' })).toBeInTheDocument()
     expect(within(dialog).getByLabelText('Unavailable')).toHaveTextContent('Home Assistant does not have a current status for the vacuum.')
+    expect(within(dialog).getByText('Last Reported Position').closest('[role="note"]')).toHaveTextContent('Last Reported Position')
     expect(within(dialog).queryByRole('button', { name: 'Locate' })).not.toBeInTheDocument()
     expect(mockCallServiceCalls).toEqual([])
   })
@@ -5637,6 +5638,24 @@ describe('DashboardViewPage', () => {
     expect(within(dialog).getByRole('heading', { name: 'Living Room: Robot Vacuum' })).toBeInTheDocument()
     expect(within(dialog).getByRole('tablist', { name: 'Main Floor modal sections' })).toBeInTheDocument()
     expect(within(dialog).getByRole('button', { name: 'Area' })).toHaveAttribute('aria-pressed', 'true')
+  })
+
+  it('closes the area editor when the vacuum becomes unavailable', async () => {
+    render(<DashboardViewPage activePath="living-room" onNavigate={() => undefined} path="living-room" />)
+
+    fireEvent.click(screen.getByRole('button', { name: /Main Floor Docked/i }))
+    const dialog = await screen.findByRole('dialog')
+    fireEvent.click(within(within(dialog).getByRole('group', { name: 'Cleaning target' })).getByRole('button', { name: 'Area' }))
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Draw Area' }))
+    expect(within(dialog).getByRole('heading', { name: 'Main Floor Cleaning Area' })).toBeInTheDocument()
+
+    act(() => setMockEntityState('vacuum.valetudo_exaltedsneakydeer', 'unavailable'))
+
+    await waitFor(() => expect(within(dialog).getByRole('heading', { name: 'Living Room: Robot Vacuum' })).toBeInTheDocument())
+    expect(within(dialog).queryByRole('button', { name: 'Draw' })).not.toBeInTheDocument()
+    expect(within(dialog).getByText('Last Reported Position').closest('[role="note"]')).toBeInTheDocument()
+    expect(within(dialog).queryByRole('button', { name: 'Locate' })).not.toBeInTheDocument()
+    expect(mockCallServiceCalls).toEqual([])
   })
 
   it('runs source-derived vacuum modal services without activating hidden actions', async () => {
@@ -7717,8 +7736,8 @@ describe('DashboardViewPage', () => {
     expect(statusPill).toHaveAttribute('data-tone', statusTone)
     if (state === 'unavailable') {
       expect(within(dialog).getByLabelText('Unavailable')).toHaveTextContent('Home Assistant does not have a current status for the vacuum.')
-      expect(within(dialog).getByText('Map Unavailable')).toBeInTheDocument()
-      expect(within(dialog).getByText("Home Assistant cannot currently confirm the vacuum's map or position.")).toBeInTheDocument()
+      expect(within(dialog).getByText('Last Reported Position').closest('[role="note"]')).toHaveTextContent('Last Reported Position')
+      expect(within(dialog).queryByText('Map Unavailable')).not.toBeInTheDocument()
       expect(within(dialog).queryByRole('button', { name: 'Locate' })).not.toBeInTheDocument()
       expect(within(dialog).queryByRole('alert')).not.toBeInTheDocument()
     }
@@ -7737,6 +7756,7 @@ describe('DashboardViewPage', () => {
     expect(within(dialog).queryByText(/battery is critically low/i)).not.toBeInTheDocument()
     expect(within(dialog).queryByRole('alert')).not.toBeInTheDocument()
     expect(within(dialog).getByLabelText('Unavailable')).toHaveTextContent('Home Assistant does not have a current status for the vacuum.')
+    expect(within(dialog).getByText('Last Reported Position').closest('[role="note"]')).toHaveTextContent('Last Reported Position')
     expect(within(dialog).queryByRole('button', { name: 'Locate' })).not.toBeInTheDocument()
     expect(mockCallServiceCalls).toEqual([])
   })
@@ -7871,7 +7891,8 @@ describe('DashboardViewPage', () => {
     expect(statusPill).toHaveAttribute('data-tone', 'unavailable')
     expect(within(dialog).getByText('Battery').closest('[data-icon]')).toHaveTextContent('Unknown')
     expect(within(dialog).getByRole('group', { name: 'Dock Status Unknown' })).toBeInTheDocument()
-    expect(within(dialog).getByText('Map Unavailable')).toBeInTheDocument()
+    expect(within(dialog).getByText('Last Reported Position').closest('[role="note"]')).toHaveTextContent('Last Reported Position')
+    expect(within(dialog).queryByText('Map Unavailable')).not.toBeInTheDocument()
     expect(within(dialog).queryByText(/Battery level is low/i)).not.toBeInTheDocument()
     expect(within(dialog).queryByRole('button', { name: 'Locate' })).not.toBeInTheDocument()
     expect(within(dialog).queryByRole('alert')).not.toBeInTheDocument()
