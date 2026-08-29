@@ -16,12 +16,12 @@ export default defineConfig({
   projects: [
     {
       name: 'mobile',
-      testIgnore: /(?:desktop-responsive|modal-sheet-webkit)\.spec\.ts/,
+      testIgnore: /(?:desktop-responsive|home-route-hydration-desktop|modal-sheet-webkit)\.spec\.ts/,
       use: { ...devices['iPhone 13'], browserName: 'chromium' },
     },
     {
       name: 'desktop',
-      testMatch: /desktop-responsive\.spec\.ts/,
+      testMatch: /(?:desktop-responsive|home-route-hydration-desktop)\.spec\.ts/,
       use: {
         ...devices['Desktop Chrome'],
         browserName: 'chromium',
