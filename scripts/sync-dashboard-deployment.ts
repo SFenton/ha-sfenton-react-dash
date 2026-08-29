@@ -4,7 +4,13 @@ import { pathToFileURL } from 'node:url'
 import { resolve } from 'node:path'
 import { LEGACY_REACT_DASHBOARD_HOST } from '../src/constants/dashboardHosts'
 import { loadRuntimeEnvironment } from './lib/runtimeEnv'
-import { resolveDeploymentVersion, updateLegacyDashboardConfig, validatePanelRegistration } from './lib/dashboardDeployment'
+import {
+  assertDashboardResourceAvailable,
+  resolveDeploymentVersion,
+  updateLegacyCardResource,
+  updateLegacyDashboardConfig,
+  validatePanelRegistration,
+} from './lib/dashboardDeployment'
 
 interface SyncDashboardDeploymentOptions {
   haToken: string
@@ -23,27 +29,66 @@ export async function syncDashboardDeployment({
   const connection = await createConnection({ auth })
 
   try {
-    const currentConfig = await connection.sendMessagePromise({
-      type: 'lovelace/config',
-      url_path: LEGACY_REACT_DASHBOARD_HOST,
-      force: true,
-    })
-    const wrapper = updateLegacyDashboardConfig(currentConfig, version)
-    if (wrapper.changed) {
-      await connection.sendMessagePromise({
-        type: 'lovelace/config/save',
+    const [currentConfig, resources, panels] = await Promise.all([
+      connection.sendMessagePromise({
+        type: 'lovelace/config',
         url_path: LEGACY_REACT_DASHBOARD_HOST,
-        config: wrapper.config,
-      })
+        force: true,
+      }),
+      connection.sendMessagePromise({
+        type: 'lovelace/resources',
+      }),
+      connection.sendMessagePromise<Record<string, unknown>>({
+        type: 'get_panels',
+      }),
+    ])
+    const wrapper = updateLegacyDashboardConfig(currentConfig, version)
+    const legacyCardResource = updateLegacyCardResource(resources, version)
+    if (requirePanel) validatePanelRegistration(panels)
+    await assertDashboardResourceAvailable(haUrl, legacyCardResource.url, haToken)
+
+    let legacyResourceUpdated = false
+    try {
+      if (legacyCardResource.changed) {
+        legacyResourceUpdated = true
+        await connection.sendMessagePromise({
+          type: 'lovelace/resources/update',
+          resource_id: legacyCardResource.resourceId,
+          res_type: 'module',
+          url: legacyCardResource.url,
+        })
+      }
+      if (wrapper.changed) {
+        await connection.sendMessagePromise({
+          type: 'lovelace/config/save',
+          url_path: LEGACY_REACT_DASHBOARD_HOST,
+          config: wrapper.config,
+        })
+      }
+    } catch (error) {
+      if (legacyResourceUpdated) {
+        try {
+          await connection.sendMessagePromise({
+            type: 'lovelace/resources/update',
+            resource_id: legacyCardResource.resourceId,
+            res_type: 'module',
+            url: legacyCardResource.previousUrl,
+          })
+        } catch (rollbackError) {
+          throw new AggregateError(
+            [error, rollbackError],
+            'Dashboard synchronization failed and the legacy card resource rollback also failed.',
+            { cause: rollbackError },
+          )
+        }
+      }
+      throw error
     }
 
-    const panels = await connection.sendMessagePromise<Record<string, unknown>>({
-      type: 'get_panels',
-    })
-    if (requirePanel) validatePanelRegistration(panels)
-
     return {
+      legacyCardResourceUrl: legacyCardResource.url,
       legacyDashboardUrl: wrapper.url,
+      legacyResourceUpdated,
       legacyUpdated: wrapper.changed,
       panelRegistered: Boolean(panels['sfenton-react-panel']),
       version,
@@ -69,6 +114,7 @@ async function main() {
   const result = await syncDashboardDeployment({ haToken, haUrl, version })
   console.info(chalk.green('Dashboard deployment metadata synchronized.'))
   console.info(chalk.blue(`${LEGACY_REACT_DASHBOARD_HOST}: ${result.legacyDashboardUrl}`))
+  console.info(chalk.blue(`sfenton-react-app-card: ${result.legacyCardResourceUrl}`))
   console.info(chalk.blue('sfenton-react-panel: registered embedded custom panel'))
 }
 

@@ -1,4 +1,12 @@
+import { REACT_DASHBOARD_DISPOSE_PROPERTY } from '../lifecycle/reactDashboardLifecycle'
 import { DEFAULT_REACT_DASHBOARD_URL, SFENTON_REACT_PANEL_TAG, SfentonReactPanel, reactDashboardUrl } from './sfentonReactPanel'
+
+function setIframeDisposer(iframe: HTMLIFrameElement | null | undefined, dispose: () => boolean) {
+  Object.defineProperty(iframe, 'contentWindow', {
+    configurable: true,
+    value: { [REACT_DASHBOARD_DISPOSE_PROPERTY]: dispose },
+  })
+}
 
 describe('Sfenton React custom panel', () => {
   afterEach(() => {
@@ -47,5 +55,45 @@ describe('Sfenton React custom panel', () => {
       'src',
       `${window.location.origin}/local/ha-sfenton-react-dash/index.html?v=5678`,
     )
+  })
+
+  it('disposes the current app before changing the configured app URL', () => {
+    vi.spyOn(Date, 'now').mockReturnValueOnce(1000).mockReturnValue(2000)
+    const panel = document.createElement(SFENTON_REACT_PANEL_TAG) as SfentonReactPanel
+    panel.panel = {
+      config: { app_url: DEFAULT_REACT_DASHBOARD_URL },
+      title: 'React Dash Panel',
+    }
+    document.body.append(panel)
+    const iframe = panel.shadowRoot?.querySelector('iframe')
+    const dispose = vi.fn(() => true)
+    setIframeDisposer(iframe, dispose)
+
+    panel.panel = {
+      config: { app_url: `${DEFAULT_REACT_DASHBOARD_URL}?source=updated` },
+      title: 'React Dash Panel',
+    }
+
+    expect(dispose).toHaveBeenCalledWith('panel-source-change')
+    expect(iframe).toHaveAttribute(
+      'src',
+      `${window.location.origin}/local/ha-sfenton-react-dash/index.html?source=updated&v=2000`,
+    )
+  })
+
+  it('disposes the current app when Home Assistant removes the panel', () => {
+    const panel = document.createElement(SFENTON_REACT_PANEL_TAG) as SfentonReactPanel
+    panel.panel = {
+      config: { app_url: DEFAULT_REACT_DASHBOARD_URL },
+      title: 'React Dash Panel',
+    }
+    document.body.append(panel)
+    const iframe = panel.shadowRoot?.querySelector('iframe')
+    const dispose = vi.fn(() => true)
+    setIframeDisposer(iframe, dispose)
+
+    panel.remove()
+
+    expect(dispose).toHaveBeenCalledWith('panel-host-disconnected')
   })
 })

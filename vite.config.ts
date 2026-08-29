@@ -37,12 +37,14 @@ export default defineConfig(({ mode }) => {
       rollupOptions: {
         input: {
           app: resolve(process.cwd(), 'index.html'),
+          'sfenton-react-app-card': resolve(process.cwd(), 'src/panel/sfentonReactAppCard.ts'),
           'sfenton-react-panel': resolve(process.cwd(), 'src/panel/sfentonReactPanel.ts'),
         },
         output: {
           entryFileNames: (chunkInfo) => (
             chunkInfo.name === 'sfenton-react-panel'
-              ? 'sfenton-react-panel.js'
+              || chunkInfo.name === 'sfenton-react-app-card'
+              ? `${chunkInfo.name}.js`
               : 'assets/[name]-[hash].js'
           ),
         },
