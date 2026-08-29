@@ -139,26 +139,18 @@
 }
 
 .reportedNotice {
-  position: absolute;
-  z-index: 4;
-  right: 12px;
-  bottom: 12px;
-  left: 12px;
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   align-items: start;
+  min-width: 0;
   gap: 9px;
+  margin-top: 10px;
   border: 1px solid color-mix(in srgb, var(--color-timer) 38%, var(--color-line));
   border-radius: 14px;
   padding: 9px 11px;
   color: var(--color-text);
   background: color-mix(in srgb, var(--color-timer) 14%, var(--color-modal-surface));
   box-shadow: var(--shadow-glass);
-}
-
-.reportedNotice[data-placement='top'] {
-  top: 12px;
-  bottom: auto;
 }
 
 .reportedNoticeIcon {
