@@ -1,5 +1,5 @@
 import { useEntity, useHass, useUser } from '@hakit/core'
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import { HUMIDIFIER_MIST_PRESETS, HUMIDIFIER_MODES, HUMIDIFIER_WARM_LEVELS, type HumidifierConfig, type HumidifierMode } from '../../constants/humidifiers'
 import { HUMIDIFIER_MODAL_TABS, type HumidifierModalTab } from '../../constants/surfaceSemantics'
 import { CORE_COPY_KEYS, CORE_COPY_NAMESPACE, HUMIDIFIER_COPY_KEYS, HUMIDIFIER_COPY_NAMESPACE, useCopy } from '../../i18n'
@@ -797,7 +797,9 @@ function humidifierSubtitle(state: HumidifierControlState) {
 function HumidifierMainPage({
   activeTab,
   actions,
+  bodyElementRef,
   onAddActivity,
+  onDisplayedTabChange,
   onEditActivity,
   roomTitle,
   scheduleController,
@@ -806,7 +808,9 @@ function HumidifierMainPage({
 }: {
   activeTab: HumidifierModalTab
   actions: HumidifierActions
+  bodyElementRef?: RefObject<HTMLDivElement | null>
   onAddActivity: () => void
+  onDisplayedTabChange?: (tab: HumidifierModalTab) => void
   onEditActivity: (rule: HumidifierScheduleRule) => void
   roomTitle: string
   scheduleController: HumidifierScheduleController
@@ -820,15 +824,15 @@ function HumidifierMainPage({
   useLayoutEffect(() => {
     if (previousDisplayedTabRef.current === displayedTab) return undefined
     previousDisplayedTabRef.current = displayedTab
-    const panel = modalPanelRef.current
-    if (!panel) return undefined
+    onDisplayedTabChange?.(displayedTab)
     const reset = () => {
-      panel.scrollTop = 0
+      if (modalPanelRef.current) modalPanelRef.current.scrollTop = 0
+      if (bodyElementRef?.current) bodyElementRef.current.scrollTop = 0
     }
     reset()
     const frame = window.requestAnimationFrame(reset)
     return () => window.cancelAnimationFrame(frame)
-  }, [displayedTab])
+  }, [bodyElementRef, displayedTab, onDisplayedTabChange])
 
   return (
     <div aria-label={`${roomTitle} humidifier controls`} className={styles.modalSheetPage}>
@@ -874,6 +878,7 @@ export function HumidifierModal({ config, onClose, open, roomTitle }: Humidifier
   const { actions, state } = useHumidifierController(config)
   const scheduleController = useHumidifierScheduleController(config)
   const [activeTab, setActiveTab] = useState<HumidifierModalTab>('controls')
+  const [displayedTab, setDisplayedTab] = useState<HumidifierModalTab>('controls')
   const [activityPage, setActivityPage] = useState<HumidifierActivityPage | null>(null)
   const [previousOpen, setPreviousOpen] = useState(open)
   const activityOperationRef = useRef(0)
@@ -882,15 +887,7 @@ export function HumidifierModal({ config, onClose, open, roomTitle }: Humidifier
   const setSchedulePanelElement = useCallback((element: HTMLDivElement | null) => {
     schedulePanelRef.current = element
   }, [])
-  const changeTab = (tab: HumidifierModalTab) => {
-    if (modalBodyRef.current) modalBodyRef.current.scrollTop = 0
-    if (schedulePanelRef.current) schedulePanelRef.current.scrollTop = 0
-    setActiveTab(tab)
-    window.requestAnimationFrame(() => {
-      if (modalBodyRef.current) modalBodyRef.current.scrollTop = 0
-      if (schedulePanelRef.current) schedulePanelRef.current.scrollTop = 0
-    })
-  }
+  const changeTab = (tab: HumidifierModalTab) => setActiveTab(tab)
   if (open !== previousOpen) {
     setPreviousOpen(open)
     if (!open && activityPage) resetDetailPage()
@@ -957,7 +954,7 @@ export function HumidifierModal({ config, onClose, open, roomTitle }: Humidifier
     <ModalSheet
       backLabel="Back to schedules"
       bodyElementRef={modalBodyRef}
-      contentStyle={!detailOpen && activeTab === 'schedules' ? HUMIDIFIER_MODAL_SCHEDULES_STYLE : undefined}
+      contentStyle={!detailOpen && displayedTab === 'schedules' ? HUMIDIFIER_MODAL_SCHEDULES_STYLE : undefined}
       footer={activityPage ? (
         <ScheduleDetailFooter
           deleteAction={activityPage.editingId ? { disabled: scheduleController.saving, icon: 'mdi:delete', label: 'Delete Activity', onClick: () => void deleteActivity() } : undefined}
@@ -973,7 +970,6 @@ export function HumidifierModal({ config, onClose, open, roomTitle }: Humidifier
       }}
       open={open}
       scrollMode={activityPage ? 'body' : 'panes'}
-      scrollResetKey={activeTab}
       size={activityPage ? 'standard' : 'workspace'}
       subtitle={detailOpen ? undefined : humidifierSubtitle(state)}
       title={detailOpen ? activityPage?.editingId ? activityPage.rule.label : `Add ${config.title} Schedule` : config.title}
@@ -989,7 +985,9 @@ export function HumidifierModal({ config, onClose, open, roomTitle }: Humidifier
         <HumidifierMainPage
           activeTab={activeTab}
           actions={actions}
+          bodyElementRef={modalBodyRef}
           onAddActivity={addActivity}
+          onDisplayedTabChange={setDisplayedTab}
           onEditActivity={editActivity}
           onPanelElementChange={setSchedulePanelElement}
           roomTitle={roomTitle}

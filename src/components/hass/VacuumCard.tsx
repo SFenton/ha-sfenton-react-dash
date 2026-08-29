@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useEntity, useHass } from '@hakit/core'
 import { Description } from '../core/Description'
 import { InlineAlert } from '../core/InlineAlert'
@@ -1437,7 +1437,7 @@ function VacuumModalTabContent({
   const coordinator = useVacuumCommandCoordinator(primaryState, status.commandPolicyMode, commitDisplayState)
   useVacuumSettingIntentConfirmations(vacuum, coordinator.confirmIntent)
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const scrollContainers = [modalPanelRef.current, modalBodyRef.current?.parentElement]
     for (const scrollContainer of scrollContainers) {
       if (!scrollContainer || typeof scrollContainer.scrollTo !== 'function') continue
@@ -1754,7 +1754,7 @@ export function VacuumModal({
       onClose={onClose}
       open={open}
       scrollMode={showOutcomes ? 'body' : 'panes'}
-      scrollResetKey={detailPageKey}
+      scrollResetKey={areaEditorOpen || showOutcomes ? detailPageKey : 'vacuum-root'}
       size="workspace"
       subtitle={areaEditorOpen || showOutcomes ? undefined : subtitle}
       title={title}
