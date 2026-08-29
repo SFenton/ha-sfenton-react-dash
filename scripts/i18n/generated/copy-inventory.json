@@ -6563,7 +6563,7 @@
       "file": "src/components/hass/ValetudoMapCard.tsx",
       "id": "d498ebc7662e2cc5",
       "lines": [
-        893
+        887
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -6595,7 +6595,7 @@
       "file": "src/components/hass/ValetudoMapCard.tsx",
       "id": "301b865d3ce22f72",
       "lines": [
-        873
+        867
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -7383,7 +7383,7 @@
       "file": "src/components/hass/ValetudoMapCard.tsx",
       "id": "4ec9da09c6937e86",
       "lines": [
-        910
+        904
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -7729,7 +7729,7 @@
       "file": "src/components/hass/ValetudoMapCard.tsx",
       "id": "9f67b3f8d27cdad7",
       "lines": [
-        941
+        935
       ],
       "occurrences": 1,
       "origin": "legacy",

@@ -852,13 +852,6 @@ export function ValetudoMapCard({
   const showOverlay = Boolean(geometry && frame.width > 0 && frame.height > 0 && (mapInteractive || localRect))
   const reportedPosition = renderedMap?.entities.find((entity) => entity.type === 'robot_position')
   const reportedPositionPresent = Boolean(reportedPosition?.points && reportedPosition.points.length >= 2)
-  const reportedPositionPoint = reportedPositionPresent && reportedPosition?.points && geometry
-    ? applyAffine(matrix, {
-        x: mapPointToLocal(reportedPosition.points[0] ?? 0, geometry.minGridX, geometry.pixelSize),
-        y: mapPointToLocal(reportedPosition.points[1] ?? 0, geometry.minGridY, geometry.pixelSize),
-      })
-    : null
-  const reportedNoticePlacement = reportedPositionPoint && reportedPositionPoint.y > frame.height / 2 ? 'top' : 'bottom'
   const showReportedNotice = mapProvenance === 'reported' && displayedLoaded && !displayedError
   const reportedNoticeId = `${vacuum.vacuumMapId}-last-reported-map-note`
   const loadingMapKey = mapProvenance === 'reported'
@@ -869,113 +862,127 @@ export function ValetudoMapCard({
   } as CSSProperties
 
   return (
-    <div
-      aria-label={`${vacuum.title} Valetudo map`}
-      aria-describedby={showReportedNotice ? reportedNoticeId : undefined}
-      className={styles.frame}
-      data-draw-mode={mapInteractive && drawMode ? 'true' : 'false'}
-      data-expanded={mapExpanded ? 'true' : 'false'}
-      data-interactive={mapInteractive ? 'true' : 'false'}
-      data-loaded={displayedLoaded ? 'true' : 'false'}
-      data-map-provenance={mapProvenance}
-      data-source-available={liveMapSourceAvailable ? 'true' : 'false'}
-      data-viewport-pan-x={viewport.panX}
-      data-viewport-pan-y={viewport.panY}
-      data-viewport-zoom={viewport.zoom}
-      ref={frameRef}
-      role="region"
-      style={mapStyle}
-    >
-      <canvas aria-hidden="true" className={styles.canvas} data-valetudo-map-canvas="true" ref={canvasRef} />
-      {showOverlay && geometry && (
-        <svg
-          aria-hidden={mapInteractive ? undefined : true}
-          aria-label={mapInteractive ? `${vacuum.title} cleaning area editor` : undefined}
-          className={styles.overlay}
-          data-base-ui-swipe-ignore={mapInteractive ? 'true' : undefined}
-          data-interactive={mapInteractive ? 'true' : 'false'}
-          data-map-editor-overlay="true"
-          onPointerCancel={mapInteractive ? (event) => finishPointerGesture(event, true) : undefined}
-          onPointerDown={mapInteractive ? handlePointerDown : undefined}
-          onPointerMove={mapInteractive ? handlePointerMove : undefined}
-          onPointerUp={mapInteractive ? (event) => finishPointerGesture(event, false) : undefined}
-          ref={overlayRef}
-          role={mapInteractive ? 'application' : undefined}
-          viewBox={`0 0 ${frame.width} ${frame.height}`}
-        >
-          <g transform={affineToCssMatrix(matrix)}>
-            {localRect && mapInteractive && (
-              <>
+    <>
+      <div
+        aria-label={`${vacuum.title} Valetudo map`}
+        aria-describedby={showReportedNotice ? reportedNoticeId : undefined}
+        className={styles.frame}
+        data-draw-mode={mapInteractive && drawMode ? 'true' : 'false'}
+        data-expanded={mapExpanded ? 'true' : 'false'}
+        data-interactive={mapInteractive ? 'true' : 'false'}
+        data-loaded={displayedLoaded ? 'true' : 'false'}
+        data-map-provenance={mapProvenance}
+        data-source-available={liveMapSourceAvailable ? 'true' : 'false'}
+        data-viewport-pan-x={viewport.panX}
+        data-viewport-pan-y={viewport.panY}
+        data-viewport-zoom={viewport.zoom}
+        ref={frameRef}
+        role="region"
+        style={mapStyle}
+      >
+        <canvas aria-hidden="true" className={styles.canvas} data-valetudo-map-canvas="true" ref={canvasRef} />
+        {showOverlay && geometry && (
+          <svg
+            aria-hidden={mapInteractive ? undefined : true}
+            aria-label={mapInteractive ? `${vacuum.title} cleaning area editor` : undefined}
+            className={styles.overlay}
+            data-base-ui-swipe-ignore={mapInteractive ? 'true' : undefined}
+            data-interactive={mapInteractive ? 'true' : 'false'}
+            data-map-editor-overlay="true"
+            onPointerCancel={mapInteractive ? (event) => finishPointerGesture(event, true) : undefined}
+            onPointerDown={mapInteractive ? handlePointerDown : undefined}
+            onPointerMove={mapInteractive ? handlePointerMove : undefined}
+            onPointerUp={mapInteractive ? (event) => finishPointerGesture(event, false) : undefined}
+            ref={overlayRef}
+            role={mapInteractive ? 'application' : undefined}
+            viewBox={`0 0 ${frame.width} ${frame.height}`}
+          >
+            <g transform={affineToCssMatrix(matrix)}>
+              {localRect && mapInteractive && (
+                <>
+                  <rect
+                    aria-label="Move cleaning area"
+                    className={styles.selection}
+                    data-editor-action="move"
+                    data-map-rect="true"
+                    data-x0={displayedRect?.x0}
+                    data-x1={displayedRect?.x1}
+                    data-y0={displayedRect?.y0}
+                    data-y1={displayedRect?.y1}
+                    height={localRect.y1 - localRect.y0}
+                    onKeyDown={handleMoveKeyDown}
+                    role="button"
+                    tabIndex={0}
+                    vectorEffect="non-scaling-stroke"
+                    width={localRect.x1 - localRect.x0}
+                    x={localRect.x0}
+                    y={localRect.y0}
+                  />
+                  {RESIZE_HANDLES.map((handle) => {
+                    const cx = localRect[handle.x]
+                    const cy = localRect[handle.y]
+                    return (
+                      <g key={handle.corner}>
+                        <circle
+                          aria-hidden="true"
+                          className={styles.resizeHandleVisual}
+                          cx={cx}
+                          cy={cy}
+                          r={8 / effectiveScale}
+                          vectorEffect="non-scaling-stroke"
+                        />
+                        <circle
+                          aria-label={`Resize cleaning area ${handle.label}`}
+                          className={styles.resizeHandleHit}
+                          cx={cx}
+                          cy={cy}
+                          data-editor-action="resize"
+                          data-editor-corner={handle.corner}
+                          data-resize-diagonal={handle.diagonal}
+                          onKeyDown={(event) => handleResizeKeyDown(event, handle.corner)}
+                          r={22 / effectiveScale}
+                          role="button"
+                          tabIndex={0}
+                        />
+                      </g>
+                    )
+                  })}
+                </>
+              )}
+              {localRect && !mapInteractive && (
                 <rect
-                  aria-label="Move cleaning area"
-                  className={styles.selection}
-                  data-editor-action="move"
+                  aria-hidden="true"
+                  className={[styles.selection, styles.staticSelection].join(' ')}
                   data-map-rect="true"
                   data-x0={displayedRect?.x0}
                   data-x1={displayedRect?.x1}
                   data-y0={displayedRect?.y0}
                   data-y1={displayedRect?.y1}
                   height={localRect.y1 - localRect.y0}
-                  onKeyDown={handleMoveKeyDown}
-                  role="button"
-                  tabIndex={0}
                   vectorEffect="non-scaling-stroke"
                   width={localRect.x1 - localRect.x0}
                   x={localRect.x0}
                   y={localRect.y0}
                 />
-                {RESIZE_HANDLES.map((handle) => {
-                  const cx = localRect[handle.x]
-                  const cy = localRect[handle.y]
-                  return (
-                    <g key={handle.corner}>
-                      <circle
-                        aria-hidden="true"
-                        className={styles.resizeHandleVisual}
-                        cx={cx}
-                        cy={cy}
-                        r={8 / effectiveScale}
-                        vectorEffect="non-scaling-stroke"
-                      />
-                      <circle
-                        aria-label={`Resize cleaning area ${handle.label}`}
-                        className={styles.resizeHandleHit}
-                        cx={cx}
-                        cy={cy}
-                        data-editor-action="resize"
-                        data-editor-corner={handle.corner}
-                        data-resize-diagonal={handle.diagonal}
-                        onKeyDown={(event) => handleResizeKeyDown(event, handle.corner)}
-                        r={22 / effectiveScale}
-                        role="button"
-                        tabIndex={0}
-                      />
-                    </g>
-                  )
-                })}
-              </>
+              )}
+            </g>
+          </svg>
+        )}
+        {showFallback && (
+          <div className={styles.fallback}>
+            <span className={styles.fallbackTitle}>
+              {showLoadingFallback
+                ? copy(loadingMapKey)
+                : copy(VACUUM_COPY_KEYS.status.mapUnavailable)}
+            </span>
+            {showUnavailableFallback && (
+              <span className={styles.fallbackSubtitle}>{copy(VACUUM_COPY_KEYS.status.mapUnavailableHelp)}</span>
             )}
-            {localRect && !mapInteractive && (
-              <rect
-                aria-hidden="true"
-                className={[styles.selection, styles.staticSelection].join(' ')}
-                data-map-rect="true"
-                data-x0={displayedRect?.x0}
-                data-x1={displayedRect?.x1}
-                data-y0={displayedRect?.y0}
-                data-y1={displayedRect?.y1}
-                height={localRect.y1 - localRect.y0}
-                vectorEffect="non-scaling-stroke"
-                width={localRect.x1 - localRect.x0}
-                x={localRect.x0}
-                y={localRect.y0}
-              />
-            )}
-          </g>
-        </svg>
-      )}
+          </div>
+        )}
+      </div>
       {showReportedNotice && (
-        <div className={styles.reportedNotice} data-icon="mdi:alert-outline" data-map-reported-note="true" data-placement={reportedNoticePlacement} id={reportedNoticeId} role="note">
+        <div className={styles.reportedNotice} data-icon="mdi:alert-outline" data-map-reported-note="true" id={reportedNoticeId} role="note">
           <span aria-hidden="true" className={styles.reportedNoticeIcon}>
             <MaterialIcon name="mdi:alert-outline" size={20} />
           </span>
@@ -985,18 +992,6 @@ export function ValetudoMapCard({
           </span>
         </div>
       )}
-      {showFallback && (
-        <div className={styles.fallback}>
-          <span className={styles.fallbackTitle}>
-            {showLoadingFallback
-              ? copy(loadingMapKey)
-              : copy(VACUUM_COPY_KEYS.status.mapUnavailable)}
-          </span>
-          {showUnavailableFallback && (
-            <span className={styles.fallbackSubtitle}>{copy(VACUUM_COPY_KEYS.status.mapUnavailableHelp)}</span>
-          )}
-        </div>
-      )}
-    </div>
+    </>
   )
 }

@@ -25,6 +25,7 @@ describe('ValetudoMapCard availability', () => {
     const note = screen.getByRole('note')
     expect(note).toHaveTextContent('Last Reported Position')
     expect(note).toHaveTextContent('This is the last map the vacuum reported before contact was lost. The exact report time is unknown, and the vacuum may have been moved since then.')
+    expect(map.compareDocumentPosition(note) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     expect(map).toHaveAccessibleDescription(/last map the vacuum reported.*may have been moved since then/i)
     await waitFor(() => expect(map).toHaveAttribute('data-loaded', 'true'))
   })
