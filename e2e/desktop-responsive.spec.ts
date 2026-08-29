@@ -160,7 +160,8 @@ for (const route of [
 
     const dialog = page.getByRole('dialog')
     await expect(dialog).toBeVisible()
-    await expect(dialog.getByLabel('Unavailable')).toContainText('Home Assistant does not have a current status for the vacuum.')
+    await expect(dialog.getByLabel('Unavailable')).toHaveCount(0)
+    await expect(dialog.getByText('Battery').locator('xpath=ancestor::*[@data-icon][1]')).toHaveAttribute('data-tone', 'unavailable')
     await expect(dialog.getByRole('region', { name: 'Music Room Valetudo map' })).toHaveAttribute('data-source-available', 'false')
     await expect(dialog.getByRole('button', { name: 'Locate' })).toHaveCount(0)
     await expect(dialog.getByRole('alert')).toHaveCount(0)

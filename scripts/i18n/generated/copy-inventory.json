@@ -5640,7 +5640,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "8cece36462a6d31c",
       "lines": [
-        723
+        729
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -5793,7 +5793,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "8a3ea0af40458397",
       "lines": [
-        776
+        782
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -6547,7 +6547,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "7971dde7cc3b4ff2",
       "lines": [
-        1434
+        1442
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -6563,7 +6563,7 @@
       "file": "src/components/hass/ValetudoMapCard.tsx",
       "id": "d498ebc7662e2cc5",
       "lines": [
-        887
+        891
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -6579,7 +6579,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "318a739189324689",
       "lines": [
-        1451
+        1459
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -6595,7 +6595,7 @@
       "file": "src/components/hass/ValetudoMapCard.tsx",
       "id": "301b865d3ce22f72",
       "lines": [
-        867
+        871
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -6644,7 +6644,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "4f445292fb0a681a",
       "lines": [
-        748
+        754
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -6889,7 +6889,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "46eeb96ef76dd3ab",
       "lines": [
-        593
+        599
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -7018,7 +7018,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "ffdd5935fc7707f7",
       "lines": [
-        776
+        782
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -7065,7 +7065,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "a79e6a338e64a220",
       "lines": [
-        776
+        782
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -7383,7 +7383,7 @@
       "file": "src/components/hass/ValetudoMapCard.tsx",
       "id": "4ec9da09c6937e86",
       "lines": [
-        904
+        908
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -7729,7 +7729,7 @@
       "file": "src/components/hass/ValetudoMapCard.tsx",
       "id": "9f67b3f8d27cdad7",
       "lines": [
-        935
+        939
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -8418,7 +8418,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "3dfaf5ac43b7a70d",
       "lines": [
-        1753
+        1761
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -9114,7 +9114,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "30dc860a8ba498c3",
       "lines": [
-        1611
+        1619
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -9142,7 +9142,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "3f7c009d32246ed9",
       "lines": [
-        1610
+        1618
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -9429,7 +9429,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "08cb328bd03e30fc",
       "lines": [
-        1115
+        1123
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -9457,7 +9457,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "ff02cf6eb9ce89b8",
       "lines": [
-        1224
+        1232
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -9499,7 +9499,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "6ab15f42b484c3eb",
       "lines": [
-        1488
+        1496
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -9640,7 +9640,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "d7064d5493aa1051",
       "lines": [
-        51
+        57
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -9696,7 +9696,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "d8466de28eb1263c",
       "lines": [
-        1603
+        1611
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -9710,7 +9710,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "ff76132f9bc4cba6",
       "lines": [
-        50
+        56
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -9794,8 +9794,8 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "b995465c5c9586fa",
       "lines": [
-        1130,
-        1131
+        1138,
+        1139
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -9949,7 +9949,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "0e09df4bf046aeee",
       "lines": [
-        1473
+        1481
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -10047,7 +10047,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "a15b0e2464a82141",
       "lines": [
-        1225
+        1233
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -10061,7 +10061,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "80e1cc8d85583e3f",
       "lines": [
-        1603
+        1611
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -10075,7 +10075,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "0afdee0c9228d6fd",
       "lines": [
-        1603
+        1611
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -10089,7 +10089,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "71da0c370f567c73",
       "lines": [
-        56
+        62
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -10103,7 +10103,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "605daaf013c8e261",
       "lines": [
-        1611
+        1619
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -10117,7 +10117,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "813d0589a9261bc5",
       "lines": [
-        55
+        61
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -10216,8 +10216,8 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "3e8124fdb4ac01a5",
       "lines": [
-        1126,
-        1127
+        1134,
+        1135
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -10541,7 +10541,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "4b82ce916c49c0e3",
       "lines": [
-        1125
+        1133
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -10601,7 +10601,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "13455b3f1e7072d8",
       "lines": [
-        1490
+        1498
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -10713,7 +10713,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "08072923d5c6a410",
       "lines": [
-        1102
+        1110
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -10798,7 +10798,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "5565511f0c0262ac",
       "lines": [
-        1102
+        1110
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -10910,7 +10910,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "a6d6c4c0e0c37c42",
       "lines": [
-        1489
+        1497
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -10938,7 +10938,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "beeca8d55b7688f9",
       "lines": [
-        1610
+        1618
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -11010,7 +11010,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "f838ad45f6ed71ba",
       "lines": [
-        1003
+        1011
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -11250,8 +11250,8 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "7c228c4f7921341b",
       "lines": [
-        1132,
-        1133
+        1140,
+        1141
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -11461,7 +11461,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "2292ec51353d129c",
       "lines": [
-        1134
+        1142
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -11548,7 +11548,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "0a5762a3627953e7",
       "lines": [
-        57
+        63
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -12086,7 +12086,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "0947fc6af50641bd",
       "lines": [
-        1105
+        1113
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -12440,7 +12440,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "5f0778b4b7fdc74c",
       "lines": [
-        1487
+        1495
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -12525,7 +12525,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "f345c5400a472e98",
       "lines": [
-        851
+        859
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -12567,7 +12567,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "6597f02b2f5e39b9",
       "lines": [
-        1129
+        1137
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -12595,7 +12595,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "de8c7c50482053b2",
       "lines": [
-        1081
+        1089
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -12609,7 +12609,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "475c60ea0112ac78",
       "lines": [
-        1200
+        1208
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -12623,7 +12623,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "1f89bcf5d13c7fc3",
       "lines": [
-        1575
+        1583
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -12637,7 +12637,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "82aefd8262bbb925",
       "lines": [
-        1097
+        1105
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -12695,8 +12695,8 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "04a5ecb259532e7a",
       "lines": [
-        1125,
-        1127
+        1133,
+        1135
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -12710,7 +12710,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "b60c770a8110ad33",
       "lines": [
-        854
+        862
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -12738,7 +12738,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "b2e6ceccffb95353",
       "lines": [
-        1567
+        1575
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -12752,7 +12752,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "3984a8e431efd170",
       "lines": [
-        1093
+        1101
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -12766,7 +12766,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "857644f030beda0a",
       "lines": [
-        1210
+        1218
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -12780,7 +12780,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "d946a9242077abb9",
       "lines": [
-        1093
+        1101
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -12794,7 +12794,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "bf4a4994a7a6efa7",
       "lines": [
-        1219
+        1227
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -12850,7 +12850,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "fe811efa537d9d3d",
       "lines": [
-        1598
+        1606
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -12948,8 +12948,8 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "09b4895905e105a2",
       "lines": [
-        1130,
-        1134
+        1138,
+        1142
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -12991,7 +12991,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "4be64edb2c675700",
       "lines": [
-        1567
+        1575
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -13047,7 +13047,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "c0c59dfdfc506a2d",
       "lines": [
-        1571
+        1579
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -13061,8 +13061,8 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "a15aed963b699872",
       "lines": [
-        1128,
-        1132
+        1136,
+        1140
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -13160,7 +13160,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "9d54dc413e59ed7a",
       "lines": [
-        1108
+        1116
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -13174,7 +13174,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "93a4783ef9002e67",
       "lines": [
-        850
+        858
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -13188,9 +13188,9 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "861166c35ab35a2c",
       "lines": [
-        1126,
-        1131,
-        1133
+        1134,
+        1139,
+        1141
       ],
       "occurrences": 3,
       "origin": "legacy",
@@ -13204,7 +13204,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "c48604f9cb8eb7ea",
       "lines": [
-        1200
+        1208
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -13218,7 +13218,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "9f552ab550db7adf",
       "lines": [
-        1210
+        1218
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -13331,7 +13331,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "554f084ba12640fd",
       "lines": [
-        53
+        59
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -13373,7 +13373,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "6d19f1b25f285978",
       "lines": [
-        1129
+        1137
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -13457,7 +13457,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "648de6eec0a5821c",
       "lines": [
-        52
+        58
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -13527,7 +13527,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "094623685a22becf",
       "lines": [
-        1128
+        1136
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -13541,7 +13541,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "c7cccdc2e2d3c85c",
       "lines": [
-        1132
+        1140
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -13682,7 +13682,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "20513292a8a80729",
       "lines": [
-        1197
+        1205
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -13907,7 +13907,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "e39682a6c43f41fa",
       "lines": [
-        1130
+        1138
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -13921,7 +13921,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "3cc3c215bcf99da9",
       "lines": [
-        1134
+        1142
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -14146,8 +14146,8 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "4b031eaaec2fb09b",
       "lines": [
-        1125,
-        1127
+        1133,
+        1135
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -14161,7 +14161,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "79bba21fbd4e98a9",
       "lines": [
-        54
+        60
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -14301,7 +14301,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "dc1ff9d9b5384383",
       "lines": [
-        1207
+        1215
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -14315,7 +14315,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "f3f55b391ae9862c",
       "lines": [
-        1197
+        1205
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -14371,7 +14371,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "04fdfbf915feeb8d",
       "lines": [
-        1131
+        1139
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -14385,7 +14385,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "b7d542af44dc82e4",
       "lines": [
-        1207
+        1215
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -14399,7 +14399,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "143ffa27f337809e",
       "lines": [
-        1126
+        1134
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -14413,7 +14413,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "cae94a81b9d1a612",
       "lines": [
-        1133
+        1141
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -14568,7 +14568,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "88b917629798349f",
       "lines": [
-        1216
+        1224
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -14809,8 +14809,8 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "cf313768424a9721",
       "lines": [
-        158,
-        276
+        164,
+        282
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -17666,7 +17666,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "2bd73ff54f4de538",
       "lines": [
-        155
+        161
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -17680,7 +17680,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "78d5ab8552bb07ff",
       "lines": [
-        155
+        161
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -19840,7 +19840,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "1780690011fb6463",
       "lines": [
-        596
+        602
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -20023,8 +20023,8 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "3c73bafeb1909fdb",
       "lines": [
-        1080,
-        1107
+        1088,
+        1115
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -20110,7 +20110,7 @@
       "file": "src/components/hass/ValetudoMapCard.tsx",
       "id": "3775342c11d20e97",
       "lines": [
-        122
+        126
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -20124,7 +20124,7 @@
       "file": "src/components/hass/ValetudoMapCard.tsx",
       "id": "44cb3c7e429650fc",
       "lines": [
-        123
+        127
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -20138,7 +20138,7 @@
       "file": "src/components/hass/ValetudoMapCard.tsx",
       "id": "d126d4895823f4d6",
       "lines": [
-        124
+        128
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -20152,7 +20152,7 @@
       "file": "src/components/hass/ValetudoMapCard.tsx",
       "id": "28eebe025802c5e9",
       "lines": [
-        125
+        129
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -20406,7 +20406,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "5cc3c776063e9d88",
       "lines": [
-        1619
+        1627
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -20717,7 +20717,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "b8e95a853d4d9d1f",
       "lines": [
-        963
+        971
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -21374,7 +21374,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "d6cd315290c67a77",
       "lines": [
-        962
+        970
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -21821,7 +21821,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "ecc01bf8e94804ef",
       "lines": [
-        595
+        601
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -22575,7 +22575,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "72bdcf7e55855edc",
       "lines": [
-        1619
+        1627
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -22637,7 +22637,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "a43d419b6f76ef6c",
       "lines": [
-        964
+        972
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -23415,7 +23415,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "64261a0575242950",
       "lines": [
-        1353
+        1361
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -23952,7 +23952,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "5b30d09b95d4529c",
       "lines": [
-        1293
+        1301
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -23980,7 +23980,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "7e6ab4d6e7dcf56e",
       "lines": [
-        1336
+        1344
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -24975,7 +24975,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "215a6c134bfb2389",
       "lines": [
-        930
+        938
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -25427,7 +25427,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "75a43c55464e7344",
       "lines": [
-        931
+        939
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -25840,7 +25840,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "f13993e669b663bb",
       "lines": [
-        1193
+        1201
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -29752,7 +29752,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "db0d3dff85212207",
       "lines": [
-        961
+        969
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -32158,7 +32158,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "223dba96517f15bf",
       "lines": [
-        55
+        61
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -32172,7 +32172,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "9e9573e061a3e6d8",
       "lines": [
-        56
+        62
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -32186,7 +32186,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "5e42e3b827344d3d",
       "lines": [
-        51
+        57
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -32542,7 +32542,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "58e75d4f8f441773",
       "lines": [
-        833
+        841
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -32558,7 +32558,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "a1882e55483c2323",
       "lines": [
-        50
+        56
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -33237,7 +33237,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "f05a4c7144e86cdb",
       "lines": [
-        53
+        59
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -33956,7 +33956,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "d44f804a86994716",
       "lines": [
-        52
+        58
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -33970,7 +33970,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "e1a2313f44fc3be6",
       "lines": [
-        955
+        963
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -34054,7 +34054,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "3467ef97660ab0a5",
       "lines": [
-        1434
+        1442
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -34481,7 +34481,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "3b972639d4f29241",
       "lines": [
-        57
+        63
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -34495,7 +34495,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "545d87b2976a18fe",
       "lines": [
-        1052
+        1060
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -35551,7 +35551,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "2884d06ef7f4ad71",
       "lines": [
-        1707
+        1715
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -35567,7 +35567,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "10cb26ba12827f19",
       "lines": [
-        1710
+        1718
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -35867,7 +35867,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "384a752c362cf272",
       "lines": [
-        54
+        60
       ],
       "occurrences": 1,
       "origin": "legacy",

@@ -171,7 +171,7 @@
 }
 
 .reportedNoticeCopy small {
-  color: var(--color-text-muted);
+  color: var(--color-text);
   font-size: 0.68rem;
   font-weight: 690;
   line-height: 1.35;

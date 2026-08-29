@@ -1,6 +1,7 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -85,9 +86,12 @@ export interface ValetudoMapEditorMeta {
   error: string | null
   geometry: ValetudoMapStageGeometry | null
   isLoaded: boolean
+  provenance: ValetudoMapProvenance
 }
 
-export type ValetudoMapProvenance = 'live' | 'none' | 'reported'
+export const VALETUDO_MAP_PROVENANCE_NONE = 'none' as const
+export const VALETUDO_MAP_PROVENANCE_REPORTED = 'reported' as const
+export type ValetudoMapProvenance = 'live' | typeof VALETUDO_MAP_PROVENANCE_NONE | typeof VALETUDO_MAP_PROVENANCE_REPORTED
 
 interface ValetudoMapCardProps {
   available?: boolean
@@ -648,9 +652,9 @@ export function ValetudoMapCard({
     gestureRef.current = null
   }, [mapInteractive, resetViewRevision])
 
-  useEffect(() => {
-    onEditorMetaChange?.({ error: displayedError, geometry, isLoaded: displayedLoaded })
-  }, [displayedError, displayedLoaded, geometry, onEditorMetaChange])
+  useLayoutEffect(() => {
+    onEditorMetaChange?.({ error: displayedError, geometry, isLoaded: displayedLoaded, provenance: mapProvenance })
+  }, [displayedError, displayedLoaded, geometry, mapProvenance, onEditorMetaChange])
 
   useEffect(() => {
     const canvas = canvasRef.current

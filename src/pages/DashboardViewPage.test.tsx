@@ -5255,10 +5255,29 @@ describe('DashboardViewPage', () => {
 
     const dialog = await screen.findByRole('dialog')
     expect(within(dialog).getByRole('heading', { name: 'Music Room: Robot Vacuum' })).toBeInTheDocument()
-    expect(within(dialog).getByLabelText('Unavailable')).toHaveTextContent('Home Assistant does not have a current status for the vacuum.')
+    expect(within(dialog).queryByLabelText('Unavailable')).not.toBeInTheDocument()
     expect(within(dialog).getByText('Last Reported Position').closest('[role="note"]')).toHaveTextContent('Last Reported Position')
+    expect(within(dialog).getByText('Battery').closest('[data-icon]')).toHaveAttribute('data-tone', 'unavailable')
     expect(within(dialog).queryByRole('button', { name: 'Locate' })).not.toBeInTheDocument()
     expect(mockCallServiceCalls).toEqual([])
+  })
+
+  it('keeps the unavailable notice when no retained vacuum map exists', async () => {
+    const cameraEntityId = 'camera.valetudo_elatedusedram_map_data'
+    const cameraEntity = mockEntities[cameraEntityId]
+    delete mockEntities[cameraEntityId]
+
+    try {
+      render(<DashboardViewPage activePath="music-room" onNavigate={() => undefined} path="music-room" />)
+      fireEvent.click(screen.getByRole('button', { name: 'Music Room Unavailable' }))
+
+      const dialog = await screen.findByRole('dialog')
+      expect(within(dialog).getByText('Map Unavailable')).toBeInTheDocument()
+      expect(within(dialog).getByLabelText('Unavailable')).toHaveTextContent('Home Assistant does not have a current status for the vacuum.')
+      expect(within(dialog).queryByText('Last Reported Position')).not.toBeInTheDocument()
+    } finally {
+      if (cameraEntity) mockEntities[cameraEntityId] = cameraEntity
+    }
   })
 
   it('retains room vacuum focus when the vacuum becomes unavailable', () => {
@@ -7735,8 +7754,9 @@ describe('DashboardViewPage', () => {
     expect(statusPill).toHaveTextContent(statusValue)
     expect(statusPill).toHaveAttribute('data-tone', statusTone)
     if (state === 'unavailable') {
-      expect(within(dialog).getByLabelText('Unavailable')).toHaveTextContent('Home Assistant does not have a current status for the vacuum.')
+      expect(within(dialog).queryByLabelText('Unavailable')).not.toBeInTheDocument()
       expect(within(dialog).getByText('Last Reported Position').closest('[role="note"]')).toHaveTextContent('Last Reported Position')
+      expect(within(dialog).getByText('Battery').closest('[data-icon]')).toHaveAttribute('data-tone', 'unavailable')
       expect(within(dialog).queryByText('Map Unavailable')).not.toBeInTheDocument()
       expect(within(dialog).queryByRole('button', { name: 'Locate' })).not.toBeInTheDocument()
       expect(within(dialog).queryByRole('alert')).not.toBeInTheDocument()
@@ -7755,7 +7775,7 @@ describe('DashboardViewPage', () => {
     const dialog = await screen.findByRole('dialog')
     expect(within(dialog).queryByText(/battery is critically low/i)).not.toBeInTheDocument()
     expect(within(dialog).queryByRole('alert')).not.toBeInTheDocument()
-    expect(within(dialog).getByLabelText('Unavailable')).toHaveTextContent('Home Assistant does not have a current status for the vacuum.')
+    expect(within(dialog).queryByLabelText('Unavailable')).not.toBeInTheDocument()
     expect(within(dialog).getByText('Last Reported Position').closest('[role="note"]')).toHaveTextContent('Last Reported Position')
     expect(within(dialog).queryByRole('button', { name: 'Locate' })).not.toBeInTheDocument()
     expect(mockCallServiceCalls).toEqual([])
