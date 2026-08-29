@@ -11,6 +11,7 @@ import { ModalSheet, type ModalSheetStyle } from '../core/ModalSheet'
 import { SurfaceAccessory } from '../core/SurfaceAccessory'
 import { asEntityName } from './entityState'
 import { WeatherAtmosphere } from './WeatherAtmosphere'
+import { WeatherPrecipitationTile } from './WeatherPrecipitationTile'
 import {
   classifyUsAqi,
   feelsLikePresentation,
@@ -63,7 +64,7 @@ type AqiStyle = CSSProperties & {
   '--aqi-marker'?: string
 }
 
-type HighlightKind = 'feels' | 'humidity' | 'wind' | 'visibility' | 'pressure' | 'precipitation' | 'uv' | 'cloud' | 'sun'
+type HighlightKind = 'feels' | 'humidity' | 'wind' | 'visibility' | 'pressure' | 'uv' | 'cloud' | 'sun'
 
 type WeatherHighlightStyle = CSSProperties & {
   '--pressure-high-label-x'?: string
@@ -423,6 +424,11 @@ function formatMeasure(value: unknown, unit: unknown, digits = 0) {
   return `${formatted}${unit ? ` ${unit}` : ''}`
 }
 
+function weatherPrecipitationUnit(entity: HassEntity | null) {
+  const unit = entity?.attributes.precipitation_unit
+  return typeof unit === 'string' && unit.trim() ? unit : 'in'
+}
+
 function formatWindRange(speed: unknown, gust: unknown, unit: unknown) {
   const wind = formatNumber(speed, 0)
   const windGust = formatNumber(gust, 0)
@@ -555,9 +561,6 @@ function highlightTiles(entity: HassEntity | null, forecasts: WeatherForecast[],
   const cloudCover = numberValue(attrs.cloud_coverage ?? today?.cloud_coverage)
   const pressure = numberValue(attrs.pressure)
   const pressureData = pressurePresentation(pressure, attrs.pressure_unit)
-  const precipProbability = numberValue(today?.precipitation_probability)
-  const precipChance = formatPercent(today?.precipitation_probability)
-  const precipAmount = formatMeasure(today?.precipitation, attrs.precipitation_unit, 2)
   const uv = uvPresentation(today?.uv_index)
   const feels = feelsLikePresentation(attrs.temperature, attrs.apparent_temperature, attrs.temperature_unit)
   const visibility = visibilityPresentation(attrs.visibility, attrs.visibility_unit)
@@ -603,14 +606,6 @@ function highlightTiles(entity: HassEntity | null, forecasts: WeatherForecast[],
       title: sun ? copy(SUN_TITLE_COPY_KEYS[sun.primary]) : copy(WEATHER_COPY_KEYS.details.sun.sunset),
       value: sunValue ?? '--',
     }] : []),
-    {
-      available: precipProbability !== undefined || numberValue(today?.precipitation) !== undefined,
-      icon: 'mdi:weather-rainy',
-      kind: 'precipitation',
-      percent: precipProbability,
-      title: 'Precipitation',
-      value: precipChance ?? precipAmount ?? '--',
-    },
     {
       available: Boolean(visibility),
       icon: 'mdi:eye',
@@ -1190,6 +1185,7 @@ function WeatherForecastSheet({
           <div className={styles.sectionLabel}>Highlights</div>
           <div className={styles.highlightGrid}>
             {aqiEntity ? <WeatherAqiTile entity={aqiEntity} /> : null}
+            <WeatherPrecipitationTile forecasts={hourlyForecasts} precipitationUnit={weatherPrecipitationUnit(entity)} />
             {highlights.map((tile) => (
               <HighlightTile key={tile.kind} tile={tile} />
             ))}

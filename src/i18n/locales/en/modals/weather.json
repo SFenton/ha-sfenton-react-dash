@@ -48,6 +48,20 @@
     "label": "Today",
     "weather": "{{condition}} today"
   },
+  "precipitation": {
+    "chanceChartAriaLabel": "Hourly precipitation chance over {{hours}} hours, peaking at {{chance}}",
+    "cumulativeChartAriaLabel": "Cumulative precipitation through {{hours}} hours, totaling {{total}}",
+    "cumulativeHeading": "Accumulation",
+    "now": "Now",
+    "table": {
+      "amount": "Amount",
+      "chance": "Chance",
+      "cumulative": "Cumulative",
+      "time": "Time"
+    },
+    "tableCaption": "{{hours}}-hour precipitation details",
+    "title": "Precipitation"
+  },
   "subtitle": "Home · {{temperature}} · {{condition}}",
   "unavailable": "Unavailable"
 }

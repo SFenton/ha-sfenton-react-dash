@@ -150,6 +150,8 @@ const mockDailyWeatherForecast = [
 ]
 
 const hourlyTemperatures = [57, 58, 60, 61, 63, 64, 65, 64, 62, 60, 58, 56, 55, 54, 53, 52, 51, 50, 49, 49, 50, 52, 55, 58]
+const hourlyPrecipitationProbabilities = [0, 5, 18, 42, 68, 94, 76, 58, 35, 22, 14, 8, 5, 3, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+const hourlyPrecipitationAmounts = [0, 0, 0.01, 0.01, 0.02, 0, 0.04, 0.02, 0.01, 0.01, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
 
 const mockHourlyWeatherForecast = Array.from({ length: 24 }, (_, index) => {
   const forecastDate = new Date('2026-06-10T12:00:00-07:00')
@@ -157,7 +159,8 @@ const mockHourlyWeatherForecast = Array.from({ length: 24 }, (_, index) => {
   return {
     datetime: forecastDate.toISOString(),
     condition: index < 3 ? 'cloudy' : index < 8 ? 'partlycloudy' : 'sunny',
-    precipitation_probability: index < 6 ? 0 : 4,
+    precipitation: hourlyPrecipitationAmounts[index],
+    precipitation_probability: hourlyPrecipitationProbabilities[index],
     temperature: hourlyTemperatures[index],
     wind_bearing: 185,
     wind_gust_speed: 5 + (index % 5),

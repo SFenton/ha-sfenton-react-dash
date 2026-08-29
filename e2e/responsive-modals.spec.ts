@@ -183,9 +183,72 @@ test('media sheets choose compact or centered presentation across the viewport m
     await expect(dialog).toHaveAttribute('data-centered-layout', centered ? 'true' : 'false')
     await expect(dialog).toHaveAttribute('data-size', 'media')
     if (!centered) await expect(dialog.locator('[data-mobile-drag-handle="true"]')).toBeVisible()
+    const precipitationTiles = dialog.locator('[data-weather-precipitation-tile="true"]')
+    await expect(precipitationTiles.locator('[data-precipitation-sample]')).toHaveCount(2)
+    await expect(precipitationTiles.locator('[data-precipitation-bar="true"]')).toHaveCount(6)
+    await expect(precipitationTiles.locator('[data-cumulative-bar="true"]')).toHaveCount(6)
+    await expect.poll(() => precipitationTiles.locator('[data-precipitation-hour-label="time"]').count()).toBeGreaterThan(1)
+    const precipitationMetrics = await precipitationTiles.evaluate((tiles) => {
+      const chanceTile = tiles.querySelector<HTMLElement>('[data-precipitation-sample="chance"]')
+      const cumulativeTile = tiles.querySelector<HTMLElement>('[data-precipitation-sample="cumulative"]')
+      const chanceLabels = Array.from(tiles.querySelectorAll<HTMLElement>('[data-precipitation-hour-label="time"]'))
+      const cumulativeLabels = Array.from(tiles.querySelectorAll<HTMLElement>('[data-precipitation-hour-label="cumulative-time"]'))
+      const chanceSlots = Array.from(tiles.querySelectorAll<HTMLElement>('[data-precipitation-bar-slot="true"]'))
+      const cumulativeSlots = Array.from(tiles.querySelectorAll<HTMLElement>('[data-cumulative-bar-slot="true"]'))
+      const chanceLines = Array.from(tiles.querySelectorAll<HTMLElement>('[data-precipitation-grid-lines="chance"] > i'))
+      const cumulativeLines = Array.from(tiles.querySelectorAll<HTMLElement>('[data-precipitation-grid-lines="cumulative"] > i'))
+      const aligned = (labels: HTMLElement[], slots: HTMLElement[]) => labels.every((label) => {
+        const slot = slots[Number(label.dataset.index)]
+        if (!slot) return false
+        const labelRect = label.getBoundingClientRect()
+        const slotRect = slot.getBoundingClientRect()
+        return Math.abs((labelRect.left + labelRect.width / 2) - (slotRect.left + slotRect.width / 2)) <= 1
+      })
+      return {
+        cardHeightDelta: Math.abs((chanceTile?.getBoundingClientRect().height ?? 0) - (cumulativeTile?.getBoundingClientRect().height ?? 0)),
+        columns: getComputedStyle(tiles).gridTemplateColumns.split(' ').filter(Boolean).length,
+        combinedAbsent: !tiles.querySelector('[data-kind="precipitation-timeline"]'),
+        guideRowsAligned: chanceLines.length === 3
+          && cumulativeLines.length === 3
+          && chanceLines.every((line, index) => Math.abs(line.getBoundingClientRect().top - cumulativeLines[index].getBoundingClientRect().top) <= 1),
+        labelsAligned: aligned(chanceLabels, chanceSlots) && aligned(cumulativeLabels, cumulativeSlots),
+        labelsMatch: chanceLabels.map((label) => label.textContent).join('|') === cumulativeLabels.map((label) => label.textContent).join('|'),
+        labelsUseNow: chanceLabels[0]?.textContent === 'Now' && cumulativeLabels[0]?.textContent === 'Now',
+        overflow: tiles.scrollWidth > tiles.clientWidth + 1
+          || [chanceTile, cumulativeTile].some((tile) => Boolean(tile && tile.scrollWidth > tile.clientWidth + 1)),
+      }
+    })
+    expect(precipitationMetrics.columns).toBe(2)
+    expect(precipitationMetrics.combinedAbsent).toBe(true)
+    expect(precipitationMetrics.cardHeightDelta).toBeLessThanOrEqual(1)
+    expect(precipitationMetrics.guideRowsAligned).toBe(true)
+    expect(precipitationMetrics.labelsAligned).toBe(true)
+    expect(precipitationMetrics.labelsMatch).toBe(true)
+    expect(precipitationMetrics.labelsUseNow).toBe(true)
+    expect(precipitationMetrics.overflow).toBe(false)
     await expectScrollSafe(dialog)
     await closeModal(dialog)
   }
+})
+
+test('standalone precipitation tiles reflow while the weather modal stays mounted', async ({ page }) => {
+  await page.setViewportSize({ height: 852, width: 393 })
+  await page.goto('/index.html?path=overview')
+  await page.getByRole('button', { name: /Open seven-day weather forecast/i }).click()
+  const dialog = page.getByRole('dialog', { name: 'Weather' })
+  const precipitationTiles = dialog.locator('[data-weather-precipitation-tile="true"]')
+  const labelCount = () => precipitationTiles.locator('[data-precipitation-hour-label="time"]').count()
+
+  await expect.poll(labelCount).toBeGreaterThan(1)
+  const mobileCount = await labelCount()
+  await page.setViewportSize({ height: 1180, width: 820 })
+  await expect.poll(labelCount).toBe(6)
+  await page.setViewportSize({ height: 900, width: 1440 })
+  await expect.poll(labelCount).toBe(6)
+  await page.setViewportSize({ height: 852, width: 393 })
+  await expect.poll(labelCount).toBe(mobileCount)
+  await expect(precipitationTiles.locator('[data-precipitation-sample]')).toHaveCount(2)
+  await expect(dialog).toBeVisible()
 })
 
 test('compact, form, standard, and media intents avoid viewport-wide desktop sheets', async ({ page }) => {

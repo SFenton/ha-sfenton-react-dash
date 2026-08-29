@@ -75,6 +75,12 @@
   --rd-weather-marker: rgb(255, 255, 255);
   --rd-weather-feels-scale: linear-gradient(90deg, rgb(88, 202, 255), rgb(231, 244, 250) 50%, rgb(255, 190, 75));
   --rd-weather-water-scale: linear-gradient(90deg, rgba(80, 208, 232, 0.62), rgba(80, 208, 232, 0.96));
+  --rd-weather-precip-bar: rgb(88, 204, 255);
+  --rd-weather-precip-bar-soft: rgba(88, 204, 255, 0.42);
+  --rd-weather-precip-bar-glow: rgba(88, 204, 255, 0.22);
+  --rd-weather-precip-line: rgb(90, 218, 239);
+  --rd-weather-precip-grid: rgba(255, 255, 255, 0.14);
+  --rd-weather-precip-label: rgba(255, 255, 255, 0.58);
   --rd-weather-visibility-scale: linear-gradient(90deg, rgba(196, 226, 255, 0.62), rgba(255, 255, 255, 0.94));
   --rd-weather-cloud-accent: rgb(137, 193, 230);
   --rd-weather-compass-surface: radial-gradient(circle, rgba(255, 255, 255, 0.13), rgba(255, 255, 255, 0.05) 62%, rgba(0, 0, 0, 0.14));

@@ -1182,6 +1182,23 @@ test('weather modal renders a live atmosphere and outdoor AQI without motion-onl
   const aqiTile = dialog.getByRole('article', { name: 'Outdoor air quality 152, Unhealthy' })
   await expect(aqiTile).toHaveAttribute('data-aqi-tone', 'unhealthy')
   await expect(aqiTile.getByText('Health effects are possible for everyone.')).toHaveCount(0)
+  const precipitationTiles = dialog.locator('[data-weather-precipitation-tile="true"]')
+  const precipitationTile = dialog.getByRole('article', { name: 'Hourly precipitation chance over 6 hours, peaking at 94%' })
+  const accumulationTile = dialog.getByRole('article', { name: 'Cumulative precipitation through 6 hours, totaling 0.04 in' })
+  await expect(precipitationTiles.locator('[data-precipitation-sample]')).toHaveCount(2)
+  await expect(precipitationTile).toContainText('Precipitation')
+  await expect(accumulationTile).toContainText('Accumulation')
+  await expect(precipitationTile.locator('[data-precipitation-bar="true"]')).toHaveCount(6)
+  await expect(accumulationTile.locator('[data-cumulative-bar="true"]')).toHaveCount(6)
+  await expect(precipitationTile.locator('[data-precipitation-y-axis="chance"]')).toHaveText('100%50%0%')
+  await expect(accumulationTile.locator('[data-precipitation-y-axis="cumulative"]')).toHaveText('0.04 in0.02 in0 in')
+  await expect(precipitationTiles).toHaveAttribute('data-precipitation-chance-domain', '100')
+  await expect(precipitationTiles).toHaveAttribute('data-precipitation-amount-domain', '0.04')
+  expect(await precipitationTile.locator('[data-precipitation-hour-label="time"]').allTextContents())
+    .toEqual(await accumulationTile.locator('[data-precipitation-hour-label="cumulative-time"]').allTextContents())
+  await expect(precipitationTile.locator('[data-precipitation-hour-label="time"]').first()).toHaveText('Now')
+  await expect(precipitationTile.locator('[data-probability="94"][data-amount="0"]')).toHaveAttribute('data-measurable', 'false')
+  await expect(precipitationTiles.getByRole('table', { name: '6-hour precipitation details' })).toHaveCount(1)
   await expect(dialog.getByRole('article', { name: /^Wind / })).toHaveAttribute('data-wide', 'true')
   await expect(dialog.getByRole('article', { name: 'Cloud Cover 57%' }).locator('[data-cloud-cover-visual="dial"]')).toBeVisible()
   const decorationCoverage = await dialog.evaluate((element) => {
@@ -1204,6 +1221,9 @@ test('weather modal renders a live atmosphere and outdoor AQI without motion-onl
 
   await page.emulateMedia({ reducedMotion: 'reduce' })
   await expect(dialog.locator('[data-weather-atmosphere-motion="true"]')).toHaveCSS('animation-name', 'none')
+  await page.emulateMedia({ forcedColors: 'active', reducedMotion: 'reduce' })
+  const cumulativeBarColor = await accumulationTile.locator('[data-cumulative-bar="true"]').first().evaluate((element) => getComputedStyle(element).backgroundColor)
+  expect(cumulativeBarColor).not.toBe('rgba(0, 0, 0, 0)')
 })
 
 test('mobile navigation chevrons stay vertically centered in their opener', async ({ page }) => {

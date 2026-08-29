@@ -240,6 +240,20 @@ export const WEATHER_COPY_KEYS = {
     label: 'headline.label',
     weather: 'headline.weather',
   },
+  precipitation: {
+    chanceChartAriaLabel: 'precipitation.chanceChartAriaLabel',
+    cumulativeChartAriaLabel: 'precipitation.cumulativeChartAriaLabel',
+    cumulativeHeading: 'precipitation.cumulativeHeading',
+    now: 'precipitation.now',
+    table: {
+      amount: 'precipitation.table.amount',
+      chance: 'precipitation.table.chance',
+      cumulative: 'precipitation.table.cumulative',
+      time: 'precipitation.table.time',
+    },
+    tableCaption: 'precipitation.tableCaption',
+    title: 'precipitation.title',
+  },
   subtitle: 'subtitle',
   unavailable: 'unavailable',
 } as const

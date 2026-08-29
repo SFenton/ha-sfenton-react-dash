@@ -1,0 +1,243 @@
+.sampleGrid {
+  position: relative;
+  order: -1;
+  display: grid;
+  min-width: 0;
+  grid-column: span 2;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.sampleTile {
+  min-height: 184px;
+  grid-template-rows: auto minmax(0, 1fr);
+  align-content: stretch;
+  gap: 8px;
+}
+
+.hourlyVisual,
+.cumulativeVisual {
+  display: grid;
+  min-height: 0;
+  grid-template-columns: minmax(0, 1fr) max-content;
+  grid-template-rows: minmax(0, 1fr) 14px;
+  column-gap: 4px;
+}
+
+.axisRow {
+  display: grid;
+  min-width: 0;
+  grid-column: 1;
+  grid-template-columns: repeat(var(--precipitation-columns), minmax(0, 1fr));
+  align-items: center;
+  overflow: visible;
+}
+
+.axisLabel {
+  position: relative;
+  color: var(--color-text);
+  font-size: 0.625rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: 680;
+  line-height: 1;
+  justify-self: center;
+  white-space: nowrap;
+}
+
+.axisLabel::before {
+  position: absolute;
+  bottom: calc(100% + 1px);
+  left: 50%;
+  width: 1px;
+  height: 4px;
+  background: var(--rd-weather-precip-grid);
+  content: "";
+  transform: translateX(-50%);
+}
+
+.bars,
+.cumulativeBars {
+  position: relative;
+  display: grid;
+  min-width: 0;
+  min-height: 64px;
+  grid-column: 1;
+  grid-template-columns: repeat(var(--precipitation-columns), minmax(0, 1fr));
+  gap: 1px;
+  align-items: end;
+}
+
+.barSlot,
+.cumulativeBarSlot {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  height: 100%;
+  min-width: 0;
+  align-items: end;
+}
+
+.hourlyBar,
+.cumulativeBar {
+  display: block;
+  width: 100%;
+  min-height: 0;
+  border-radius: 3px 3px 0 0;
+}
+
+.hourlyBar {
+  height: var(--precipitation-probability);
+  background: var(--rd-weather-precip-bar-soft);
+}
+
+.hourlyBar[data-measurable='true'] {
+  background: var(--rd-weather-precip-bar);
+  box-shadow: 0 0 8px var(--rd-weather-precip-bar-glow);
+}
+
+.hourlyBar[data-unavailable='true'] {
+  opacity: 0;
+}
+
+.cumulativeBar {
+  height: var(--cumulative-amount);
+  background: var(--rd-weather-precip-line);
+  opacity: 0.86;
+}
+
+.gridLines {
+  position: absolute;
+  z-index: 0;
+  inset: 0;
+  pointer-events: none;
+}
+
+.gridLines i {
+  position: absolute;
+  right: 0;
+  left: 0;
+  height: 1px;
+  background: var(--rd-weather-precip-grid);
+}
+
+.gridLines i:first-child {
+  top: 0;
+}
+
+.gridLines i:nth-child(2) {
+  top: 50%;
+}
+
+.gridLines i:last-child {
+  bottom: 0;
+}
+
+.yAxis {
+  position: relative;
+  grid-column: 2;
+  color: var(--color-text);
+  font-size: 0.5rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: 680;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.yAxis[data-precipitation-y-axis='chance'] {
+  width: 22px;
+}
+
+.yAxis[data-precipitation-y-axis='cumulative'] {
+  width: 36px;
+}
+
+.yAxis span {
+  position: absolute;
+  right: 0;
+}
+
+.yAxis [data-axis-level='high'] {
+  top: 0;
+}
+
+.yAxis [data-axis-level='middle'] {
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.yAxis [data-axis-level='low'] {
+  bottom: 0;
+}
+
+.unavailable {
+  display: grid;
+  place-items: center;
+  color: var(--rd-weather-precip-label);
+  font-size: 0.78rem;
+  font-weight: 680;
+}
+
+.measurementBank {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: flex;
+  width: 1px;
+  height: 1px;
+  contain: layout;
+  visibility: hidden;
+  gap: 20px;
+  overflow: hidden;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+.measurementBank [data-precipitation-hour-measure] {
+  flex: 0 0 auto;
+  font-size: 0.625rem;
+  font-weight: 680;
+}
+
+.visuallyHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  margin: -1px;
+  white-space: nowrap;
+}
+
+@container weather-sheet (min-width: 620px) {
+  .sampleGrid {
+    grid-column: 1 / -1;
+  }
+}
+
+@container weather-sheet (min-width: 900px) {
+  .sampleGrid {
+    grid-column: span 2;
+  }
+}
+
+@media (forced-colors: active) {
+  .sampleTile {
+    border-color: CanvasText;
+    background: Canvas;
+  }
+
+  .gridLines i,
+  .axisLabel::before {
+    background: CanvasText;
+  }
+
+  .hourlyBar,
+  .hourlyBar[data-measurable='true'],
+  .cumulativeBar {
+    background: Highlight;
+    box-shadow: none;
+  }
+}
