@@ -1,10 +1,12 @@
 import { execFile } from 'node:child_process'
+import { Buffer } from 'node:buffer'
 import { promisify } from 'node:util'
 import { LEGACY_REACT_DASHBOARD_HOST, PANEL_REACT_DASHBOARD_HOST } from '../../src/constants/dashboardHosts'
 
 const execFileAsync = promisify(execFile)
 
 export const REACT_DASHBOARD_PUBLIC_PATH = '/local/ha-sfenton-react-dash/index.html'
+export const REACT_DASHBOARD_CARD_RESOURCE_PATH = '/local/ha-sfenton-react-dash/sfenton-react-app-card.js'
 
 interface LovelaceCard {
   type?: unknown
@@ -19,8 +21,104 @@ interface LovelaceConfig {
   views?: unknown
 }
 
+interface LovelaceResource {
+  id?: unknown
+  type?: unknown
+  url?: unknown
+}
+
 export function legacyDashboardUrl(version: string) {
   return `${REACT_DASHBOARD_PUBLIC_PATH}?v=${encodeURIComponent(version)}`
+}
+
+export function legacyCardResourceUrl(version: string) {
+  return `${REACT_DASHBOARD_CARD_RESOURCE_PATH}?v=${encodeURIComponent(version)}`
+}
+
+export async function assertDashboardResourceAvailable(
+  haUrl: string,
+  resourceUrl: string,
+  haToken: string,
+  fetchImpl: typeof fetch = fetch,
+) {
+  const targetUrl = new URL(resourceUrl, haUrl)
+  const headers = {
+    Authorization: `Bearer ${haToken}`,
+  }
+  let response = await fetchImpl(targetUrl, {
+    headers,
+    method: 'HEAD',
+  })
+  if (response.status === 405 || response.status === 501) {
+    response = await fetchImpl(targetUrl, {
+      headers: {
+        ...headers,
+        Range: 'bytes=0-0',
+      },
+      method: 'GET',
+    })
+    await response.body?.cancel()
+  }
+  if (!response.ok) {
+    throw new Error(`Dashboard resource ${targetUrl.pathname} is unavailable (HTTP ${response.status}).`)
+  }
+  const contentType = response.headers.get('content-type')?.toLowerCase()
+  if (contentType?.includes('text/html')) {
+    throw new Error(`Dashboard resource ${targetUrl.pathname} returned HTML instead of JavaScript.`)
+  }
+}
+
+function decodedInlineResourceSource(url: string) {
+  try {
+    const parsedUrl = new URL(url, 'https://home-assistant.invalid')
+    if (parsedUrl.origin === 'https://home-assistant.invalid') return ''
+    const encodedSource = parsedUrl.pathname.split('/').filter(Boolean).at(-1)
+    return encodedSource ? Buffer.from(encodedSource, 'base64').toString('utf8') : ''
+  } catch {
+    return ''
+  }
+}
+
+function isLegacyReactCardResource(resource: LovelaceResource) {
+  if (resource.type !== 'module' || typeof resource.url !== 'string') return false
+
+  let resourcePath: string
+  try {
+    resourcePath = new URL(resource.url, 'https://home-assistant.invalid').pathname
+  } catch {
+    return false
+  }
+  if (resourcePath === REACT_DASHBOARD_CARD_RESOURCE_PATH) return true
+
+  const inlineSource = decodedInlineResourceSource(resource.url)
+  return inlineSource.includes('customElements.define')
+    && inlineSource.includes('sfenton-react-app-card')
+}
+
+export function updateLegacyCardResource(resources: unknown, version: string) {
+  if (!Array.isArray(resources)) {
+    throw new Error('Home Assistant returned an invalid Lovelace resource list.')
+  }
+
+  const matches = resources.filter((resource): resource is LovelaceResource => (
+    Boolean(resource) && typeof resource === 'object' && isLegacyReactCardResource(resource)
+  ))
+  if (matches.length !== 1) {
+    throw new Error(`Expected one sfenton-react-app-card resource, found ${matches.length}.`)
+  }
+
+  const resource = matches[0]
+  if (typeof resource.id !== 'string' || !resource.id) {
+    throw new Error('The sfenton-react-app-card resource has no storage ID.')
+  }
+
+  const url = legacyCardResourceUrl(version)
+  return {
+    changed: resource.url !== url,
+    previousUrl: resource.url as string,
+    resourceId: resource.id,
+    url,
+  }
 }
 
 export function updateLegacyDashboardConfig(config: LovelaceConfig, version: string) {

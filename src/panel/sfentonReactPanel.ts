@@ -1,5 +1,26 @@
 export const SFENTON_REACT_PANEL_TAG = 'sfenton-react-panel'
 export const DEFAULT_REACT_DASHBOARD_URL = '/local/ha-sfenton-react-dash/index.html'
+const REACT_DASHBOARD_DISPOSE_PROPERTY = '__sfentonReactDashboardDispose'
+
+type DisposableDashboardWindow = Window & {
+  [REACT_DASHBOARD_DISPOSE_PROPERTY]?: (reason?: string) => boolean
+}
+
+function disposeReactDashboardFrame(
+  iframe: HTMLIFrameElement | null | undefined,
+  reason: string,
+) {
+  const childWindow = iframe?.contentWindow
+  if (!childWindow) return false
+
+  try {
+    const dispose = (childWindow as DisposableDashboardWindow)[REACT_DASHBOARD_DISPOSE_PROPERTY]
+    return typeof dispose === 'function' ? dispose(reason) : false
+  } catch (error) {
+    console.error('Unable to dispose the embedded React dashboard.', error)
+    return false
+  }
+}
 
 interface CustomPanelInfo {
   config?: {
@@ -22,11 +43,13 @@ export function reactDashboardUrl(
 }
 
 export class SfentonReactPanel extends HTMLElement {
+  private needsReload = false
   private panelInfo?: CustomPanelInfo
 
   set panel(value: CustomPanelInfo | undefined) {
     this.panelInfo = value
-    this.syncTitle()
+    if (this.isConnected) this.render()
+    else this.syncTitle()
   }
 
   get panel() {
@@ -35,6 +58,11 @@ export class SfentonReactPanel extends HTMLElement {
 
   connectedCallback() {
     this.render()
+  }
+
+  disconnectedCallback() {
+    disposeReactDashboardFrame(this.currentIframe(), 'panel-host-disconnected')
+    this.needsReload = true
   }
 
   private configuredAppUrl() {
@@ -47,47 +75,58 @@ export class SfentonReactPanel extends HTMLElement {
   }
 
   private render() {
-    if (this.shadowRoot) {
-      this.syncTitle()
-      return
+    if (!this.shadowRoot) {
+      const shadow = this.attachShadow({ mode: 'open' })
+      shadow.innerHTML = `
+        <style>
+          :host {
+            position: fixed;
+            inset: 0;
+            display: block;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background: #0b0f14;
+          }
+
+          iframe {
+            display: block;
+            width: 100%;
+            height: 100%;
+            border: 0;
+            background: #0b0f14;
+          }
+        </style>
+        <iframe
+          allow="autoplay; camera; microphone; fullscreen"
+          data-react-dashboard-panel="true"
+          referrerpolicy="same-origin"
+        ></iframe>
+      `
     }
 
-    const shadow = this.attachShadow({ mode: 'open' })
-    shadow.innerHTML = `
-      <style>
-        :host {
-          position: fixed;
-          inset: 0;
-          display: block;
-          width: 100%;
-          height: 100%;
-          overflow: hidden;
-          background: #0b0f14;
-        }
-
-        iframe {
-          display: block;
-          width: 100%;
-          height: 100%;
-          border: 0;
-          background: #0b0f14;
-        }
-      </style>
-      <iframe
-        allow="autoplay; camera; microphone; fullscreen"
-        data-react-dashboard-panel="true"
-        referrerpolicy="same-origin"
-      ></iframe>
-    `
-
     const iframe = this.iframe()
-    iframe.src = reactDashboardUrl(this.configuredAppUrl())
+    const configuredUrl = this.configuredAppUrl()
+    if (this.needsReload || iframe.dataset.configuredAppUrl !== configuredUrl) {
+      disposeReactDashboardFrame(
+        iframe,
+        this.needsReload ? 'panel-host-reconnected' : 'panel-source-change',
+      )
+      iframe.dataset.configuredAppUrl = configuredUrl
+      iframe.src = reactDashboardUrl(configuredUrl)
+      this.needsReload = false
+    }
     this.syncTitle()
   }
 
-  private iframe() {
+  private currentIframe() {
     const iframe = this.shadowRoot?.querySelector('iframe')
-    if (!(iframe instanceof HTMLIFrameElement)) {
+    return iframe instanceof HTMLIFrameElement ? iframe : undefined
+  }
+
+  private iframe() {
+    const iframe = this.currentIframe()
+    if (!iframe) {
       throw new Error('The React dashboard custom panel iframe was not created.')
     }
     return iframe

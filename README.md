@@ -7,7 +7,11 @@ The production build currently ships to two Home Assistant sidebar hosts:
 - `/sfenton-react-dash/home` — the existing storage-mode Lovelace wrapper.
 - `/sfenton-react-panel` — an embedded `panel_custom` host that keeps the React iframe outside Lovelace card rebuilds.
 
-Both hosts use the same files under `/local/ha-sfenton-react-dash/`. Use `npm run deploy:both` for the SSH build/deploy/sync flow, or copy `dist/` over SMB and then run `npm run deploy:sync`. The custom-panel registration is versioned in `home-assistant/packages/sfenton_react_panel.yaml`; Home Assistant only needs a restart when that package or its bridge version changes.
+Both hosts use the same files under `/local/ha-sfenton-react-dash/`. Use `npm run deploy:both` for the SSH build/deploy/sync flow, or copy `dist/` over SMB and then run `npm run deploy:sync`. Deployment sync also keeps the legacy `sfenton-react-app-card` resource on the repository-owned, versioned module instead of an out-of-band inline resource. The custom-panel registration is versioned in `home-assistant/packages/sfenton_react_panel.yaml`; Home Assistant only needs a restart when that package or its bridge version changes.
+
+Both iframe hosts explicitly dispose the React root before replacing an app frame. Frame removal normally cleans up through non-BFCache `pagehide`; host `disconnectedCallback` is a best-effort fallback, and a newly mounted frame disposes any stale prior generation if the browser skipped teardown. Current lifecycle state is exposed on `window.top.__sfentonReactDashboardLifecycle`; the bounded primitive-only event history is stored as JSON in `window.top.__sfentonReactDashboardLifecycleHistory` for device diagnostics.
+
+The install hook applies a fail-closed compatibility patch to `home-assistant-js-websocket@9.6.0`: it removes the exact `ready` callback that was registered, and embedded collections tear down synchronously before their iframe timer realm disappears.
 
 The experimental custom panel keeps Home Assistant's native sidebar on desktop; mobile remains full-viewport. This avoids unsupported top-window styling while the two hosts are evaluated in parallel.
 
