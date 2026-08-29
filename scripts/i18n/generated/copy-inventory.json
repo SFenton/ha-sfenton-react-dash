@@ -4383,6 +4383,30 @@
       "words": 3
     },
     {
+      "characters": 17,
+      "context": "status-value",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "e3e9ad8691881778",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Last Reported Map",
+      "words": 3
+    },
+    {
+      "characters": 22,
+      "context": "status-value",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "fb4e5e3716398501",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Last Reported Position",
+      "words": 3
+    },
+    {
       "characters": 20,
       "context": "status-value",
       "file": "src/i18n/locales/en/modals/vacuum.json",
@@ -4393,6 +4417,18 @@
       "placeholders": [],
       "value": "Loading Current Map…",
       "words": 3
+    },
+    {
+      "characters": 33,
+      "context": "status-value",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "e02cf4633b026dc0",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Loading Last Vacuum Map Position…",
+      "words": 5
     },
     {
       "characters": 6,
@@ -4720,6 +4756,18 @@
       "placeholders": [],
       "value": "The queued cleaning request was canceled because the vacuum is no longer ready. Retry when ready.",
       "words": 16
+    },
+    {
+      "characters": 146,
+      "context": "status-value",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "e02b6cce7041f096",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "This is the last map the vacuum reported before contact was lost. The exact report time is unknown, and the vacuum may have been moved since then.",
+      "words": 27
     },
     {
       "characters": 9,
@@ -6515,7 +6563,7 @@
       "file": "src/components/hass/ValetudoMapCard.tsx",
       "id": "d498ebc7662e2cc5",
       "lines": [
-        836
+        893
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -6547,7 +6595,7 @@
       "file": "src/components/hass/ValetudoMapCard.tsx",
       "id": "301b865d3ce22f72",
       "lines": [
-        821
+        873
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -7335,7 +7383,7 @@
       "file": "src/components/hass/ValetudoMapCard.tsx",
       "id": "4ec9da09c6937e86",
       "lines": [
-        853
+        910
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -7681,7 +7729,7 @@
       "file": "src/components/hass/ValetudoMapCard.tsx",
       "id": "9f67b3f8d27cdad7",
       "lines": [
-        884
+        941
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -8370,7 +8418,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "3dfaf5ac43b7a70d",
       "lines": [
-        1747
+        1753
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -9066,7 +9114,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "30dc860a8ba498c3",
       "lines": [
-        1605
+        1611
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -9094,7 +9142,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "3f7c009d32246ed9",
       "lines": [
-        1604
+        1610
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -9648,7 +9696,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "d8466de28eb1263c",
       "lines": [
-        1597
+        1603
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -10013,7 +10061,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "80e1cc8d85583e3f",
       "lines": [
-        1597
+        1603
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -10027,7 +10075,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "0afdee0c9228d6fd",
       "lines": [
-        1597
+        1603
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -10055,7 +10103,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "605daaf013c8e261",
       "lines": [
-        1605
+        1611
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -10890,7 +10938,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "beeca8d55b7688f9",
       "lines": [
-        1604
+        1610
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -12575,7 +12623,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "1f89bcf5d13c7fc3",
       "lines": [
-        1569
+        1575
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -12690,7 +12738,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "b2e6ceccffb95353",
       "lines": [
-        1561
+        1567
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -12802,7 +12850,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "fe811efa537d9d3d",
       "lines": [
-        1592
+        1598
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -12943,7 +12991,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "4be64edb2c675700",
       "lines": [
-        1561
+        1567
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -12999,7 +13047,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "c0c59dfdfc506a2d",
       "lines": [
-        1565
+        1571
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -17079,7 +17127,7 @@
       "file": "src/components/hass/ValetudoMapCard.utils.ts",
       "id": "4898b0b8690596cc",
       "lines": [
-        277
+        292
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -17093,7 +17141,7 @@
       "file": "src/components/hass/ValetudoMapCard.utils.ts",
       "id": "aa8d8380e97dee0d",
       "lines": [
-        271
+        286
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -17107,7 +17155,7 @@
       "file": "src/components/hass/ValetudoMapCard.utils.ts",
       "id": "a09affac7742f145",
       "lines": [
-        272
+        287
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -20062,7 +20110,7 @@
       "file": "src/components/hass/ValetudoMapCard.tsx",
       "id": "3775342c11d20e97",
       "lines": [
-        116
+        122
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -20076,7 +20124,7 @@
       "file": "src/components/hass/ValetudoMapCard.tsx",
       "id": "44cb3c7e429650fc",
       "lines": [
-        117
+        123
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -20090,7 +20138,7 @@
       "file": "src/components/hass/ValetudoMapCard.tsx",
       "id": "d126d4895823f4d6",
       "lines": [
-        118
+        124
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -20104,7 +20152,7 @@
       "file": "src/components/hass/ValetudoMapCard.tsx",
       "id": "28eebe025802c5e9",
       "lines": [
-        119
+        125
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -20358,7 +20406,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "5cc3c776063e9d88",
       "lines": [
-        1613
+        1619
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -22527,7 +22575,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "72bdcf7e55855edc",
       "lines": [
-        1613
+        1619
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -35503,7 +35551,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "2884d06ef7f4ad71",
       "lines": [
-        1701
+        1707
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -35519,7 +35567,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "10cb26ba12827f19",
       "lines": [
-        1704
+        1710
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -35829,11 +35877,11 @@
     }
   ],
   "summary": {
-    "catalogRecords": 422,
+    "catalogRecords": 426,
     "documentRecords": 1,
     "legacyOccurrences": 2566,
     "legacyRecords": 2120,
-    "totalRecords": 2543
+    "totalRecords": 2547
   },
   "version": 1
 }

@@ -1533,6 +1533,12 @@ function VacuumMapAndStatus({
   const deviceCommandsAllowed = status.primaryAvailable && status.commandPolicyMode === VACUUM_COMMAND_NORMAL
   const [editorMeta, setEditorMeta] = useState<ValetudoMapEditorMeta>({ error: null, geometry: null, isLoaded: false })
   const mapCommandsAllowed = deviceCommandsAllowed && editorMeta.isLoaded
+  useLayoutEffect(() => {
+    if (!areaEditorOpen || status.primaryAvailable) return
+    onDrawModeChange(false)
+    onResetAreaView()
+    onFinishAreaEditing()
+  }, [areaEditorOpen, onDrawModeChange, onFinishAreaEditing, onResetAreaView, status.primaryAvailable])
   const handleEditorMetaChange = useCallback((meta: ValetudoMapEditorMeta) => {
     setEditorMeta(meta)
     editorMetaChange(meta)
