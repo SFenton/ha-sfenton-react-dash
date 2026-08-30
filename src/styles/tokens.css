@@ -83,9 +83,7 @@
   --rd-weather-precip-label: rgba(255, 255, 255, 0.58);
   --rd-weather-hourly-humidity: rgb(68, 214, 176);
   --rd-weather-hourly-humidity-glow: rgba(68, 214, 176, 0.22);
-  --rd-weather-hourly-humidity-track: rgba(68, 214, 176, 0.1);
   --rd-weather-hourly-cloud: rgb(176, 190, 202);
-  --rd-weather-hourly-cloud-track: rgba(176, 190, 202, 0.1);
   --rd-weather-visibility-scale: linear-gradient(90deg, rgba(196, 226, 255, 0.62), rgba(255, 255, 255, 0.94));
   --rd-weather-cloud-accent: rgb(137, 193, 230);
   --rd-weather-compass-surface: radial-gradient(circle, rgba(255, 255, 255, 0.13), rgba(255, 255, 255, 0.05) 62%, rgba(0, 0, 0, 0.14));

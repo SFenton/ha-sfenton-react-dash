@@ -99,24 +99,15 @@
 }
 
 .metricBar {
-  position: absolute;
-  z-index: 2;
-  right: 0;
-  bottom: clamp(0px, calc(var(--weather-metric-level) - 1.5px), calc(100% - 3px));
-  left: 0;
-  height: 3px;
-  border-radius: 3px;
+  display: block;
+  width: 100%;
+  height: var(--weather-metric-percent);
+  min-height: 0;
+  border-radius: 3px 3px 0 0;
 }
 
 .metricBar[data-unavailable='true'] {
   opacity: 0;
-}
-
-.metricTrack {
-  position: absolute;
-  z-index: 1;
-  inset: 0;
-  border-radius: 3px;
 }
 
 .humidityBar {
@@ -124,16 +115,8 @@
   box-shadow: 0 0 8px var(--rd-weather-hourly-humidity-glow);
 }
 
-.humidityTrack {
-  background: var(--rd-weather-hourly-humidity-track);
-}
-
 .cloudBar {
   background: var(--rd-weather-hourly-cloud);
-}
-
-.cloudTrack {
-  background: var(--rd-weather-hourly-cloud-track);
 }
 
 .cumulativeBar {
@@ -284,8 +267,4 @@
     box-shadow: none;
   }
 
-  .metricTrack {
-    border: 1px solid CanvasText;
-    background: Canvas;
-  }
 }

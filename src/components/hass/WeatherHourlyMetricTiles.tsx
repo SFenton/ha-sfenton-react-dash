@@ -1,7 +1,7 @@
 import { useMemo, type CSSProperties, type RefObject } from 'react'
 import { formatDate, useCopy, WEATHER_COPY_KEYS, WEATHER_COPY_NAMESPACE } from '../../i18n'
 import { MaterialIcon } from '../core/Icon'
-import { hourlyPercentAxis, hourlyPercentPosition, type HourlyPercentAxis } from './hourlyPercentAxis'
+import { precipitationChanceDomain, precipitationScaledPercent } from './precipitationTimeline'
 import chartStyles from './WeatherPrecipitationTile.module.css'
 import summaryStyles from './WeatherSummary.module.css'
 import { useResponsiveWeatherChartLabels } from './useResponsiveWeatherChartLabels'
@@ -30,7 +30,7 @@ type TileStyle = CSSProperties & {
 }
 
 type MetricBarStyle = CSSProperties & {
-  '--weather-metric-level': string
+  '--weather-metric-percent': string
 }
 
 const HOURLY_METRIC_HOURS = 6
@@ -58,8 +58,8 @@ function displayPercent(value: number | null, unavailable: string) {
   return value === null ? unavailable : `${Math.round(value)}%`
 }
 
-function metricBarStyle(value: number | null, axis: HourlyPercentAxis): MetricBarStyle {
-  return { '--weather-metric-level': `${hourlyPercentPosition(value, axis)}%` }
+function metricBarStyle(value: number | null, domain: number): MetricBarStyle {
+  return { '--weather-metric-percent': `${precipitationScaledPercent(value, domain)}%` }
 }
 
 function metricValues(points: readonly HourlyMetricPoint[], tone: MetricTone) {
@@ -68,15 +68,15 @@ function metricValues(points: readonly HourlyMetricPoint[], tone: MetricTone) {
 
 function metricPlot({
   axisTimeLabels,
-  axis,
   labelIndices,
   plotRef,
   points,
   tone,
   unavailable,
+  domain,
 }: {
   axisTimeLabels: readonly string[]
-  axis: HourlyPercentAxis
+  domain: number
   labelIndices: readonly number[]
   plotRef?: RefObject<HTMLSpanElement | null>
   points: readonly HourlyMetricPoint[]
@@ -86,7 +86,7 @@ function metricPlot({
   const values = metricValues(points, tone)
   return (
     <span className={chartStyles.hourlyVisual}>
-      <span aria-hidden="true" className={chartStyles.bars} data-axis-truncated={axis.truncated ? 'true' : undefined} data-hourly-metric-plot={tone} ref={plotRef}>
+      <span aria-hidden="true" className={chartStyles.bars} data-hourly-metric-plot={tone} ref={plotRef}>
         <span className={chartStyles.gridLines} data-hourly-metric-grid-lines={tone}>
           <i />
           <i />
@@ -94,22 +94,21 @@ function metricPlot({
         </span>
         {values.map((value, index) => (
           <span className={chartStyles.barSlot} data-hourly-metric-bar-slot="true" key={index}>
-            <span className={`${chartStyles.metricTrack} ${tone === 'humidity' ? chartStyles.humidityTrack : chartStyles.cloudTrack}`} />
             <span
               className={`${chartStyles.metricBar} ${tone === 'humidity' ? chartStyles.humidityBar : chartStyles.cloudBar}`}
               data-hourly-metric-bar="true"
               data-metric={tone}
               data-unavailable={value === null ? 'true' : undefined}
               data-value={value ?? 'unavailable'}
-              style={metricBarStyle(value, axis)}
+              style={metricBarStyle(value, domain)}
             />
           </span>
         ))}
       </span>
       <span aria-hidden="true" className={chartStyles.yAxis} data-precipitation-y-axis={tone}>
-        <span data-axis-level="high">{displayPercent(axis.upper, unavailable)}</span>
-        <span data-axis-level="middle">{displayPercent(axis.middle, unavailable)}</span>
-        <span data-axis-level="low">{displayPercent(axis.lower, unavailable)}</span>
+        <span data-axis-level="high">{displayPercent(domain, unavailable)}</span>
+        <span data-axis-level="middle">{displayPercent(domain / 2, unavailable)}</span>
+        <span data-axis-level="low">{displayPercent(0, unavailable)}</span>
       </span>
       <span aria-hidden="true" className={chartStyles.axisRow} data-hourly-metric-axis={tone}>
         {labelIndices.map((index) => (
@@ -134,8 +133,8 @@ export function WeatherHourlyMetricTiles({ forecasts }: WeatherHourlyMetricTiles
   const pointCount = points.length
   const humidityValues = metricValues(points, 'humidity').filter((value): value is number => value !== null)
   const cloudValues = metricValues(points, 'cloud').filter((value): value is number => value !== null)
-  const humidityAxis = hourlyPercentAxis(humidityValues, 'humidity')
-  const cloudAxis = hourlyPercentAxis(cloudValues, 'cloud')
+  const humidityDomain = precipitationChanceDomain(humidityValues.length ? Math.max(...humidityValues) : null)
+  const cloudDomain = precipitationChanceDomain(cloudValues.length ? Math.max(...cloudValues) : null)
   const rawTimeLabels = points.map((point) => displayHour(point.time))
   const axisTimeLabels = rawTimeLabels.map((label, index) => index === 0 ? copy(WEATHER_COPY_KEYS.precipitation.now) : label)
   const measurementKey = axisTimeLabels.join('\0')
@@ -165,8 +164,8 @@ export function WeatherHourlyMetricTiles({ forecasts }: WeatherHourlyMetricTiles
           title: humidityTitle,
         })}
         className={`${summaryStyles.highlightTile} ${chartStyles.sampleTile}`}
-        data-axis-lower={humidityAxis?.lower}
-        data-axis-upper={humidityAxis?.upper}
+        data-axis-lower="0"
+        data-axis-upper={humidityDomain}
         data-hourly-metric-tile="humidity"
         data-unavailable={humidityValues.length ? undefined : 'true'}
       >
@@ -176,10 +175,10 @@ export function WeatherHourlyMetricTiles({ forecasts }: WeatherHourlyMetricTiles
           </span>
           {humidityTitle}
         </span>
-        {humidityAxis
+        {humidityValues.length
           ? metricPlot({
-              axis: humidityAxis,
               axisTimeLabels,
+              domain: humidityDomain,
               labelIndices,
               plotRef,
               points,
@@ -197,8 +196,8 @@ export function WeatherHourlyMetricTiles({ forecasts }: WeatherHourlyMetricTiles
           title: cloudTitle,
         })}
         className={`${summaryStyles.highlightTile} ${chartStyles.sampleTile}`}
-        data-axis-lower={cloudAxis?.lower}
-        data-axis-upper={cloudAxis?.upper}
+        data-axis-lower="0"
+        data-axis-upper={cloudDomain}
         data-hourly-metric-tile="cloud"
         data-unavailable={cloudValues.length ? undefined : 'true'}
       >
@@ -208,12 +207,12 @@ export function WeatherHourlyMetricTiles({ forecasts }: WeatherHourlyMetricTiles
           </span>
           {cloudTitle}
         </span>
-        {cloudAxis
+        {cloudValues.length
           ? metricPlot({
-              axis: cloudAxis,
               axisTimeLabels,
+              domain: cloudDomain,
               labelIndices,
-              plotRef: humidityAxis ? undefined : plotRef,
+              plotRef: humidityValues.length ? undefined : plotRef,
               points,
               tone: 'cloud',
               unavailable,

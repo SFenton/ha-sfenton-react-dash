@@ -12,7 +12,7 @@ const FORECASTS = [
 ]
 
 describe('WeatherHourlyMetricTiles', () => {
-  it('renders ranged humidity and zero-anchored cloud cover tiles', () => {
+  it('renders filled humidity and cloud cover columns with shared labels', () => {
     render(<WeatherHourlyMetricTiles forecasts={FORECASTS} />)
 
     const humidity = screen.getByRole('article', { name: 'Hourly Humidity over 6 hours, ranging from 62% to 74%' })
@@ -22,16 +22,15 @@ describe('WeatherHourlyMetricTiles', () => {
 
     expect(humidity.querySelectorAll('[data-hourly-metric-bar="true"]')).toHaveLength(6)
     expect(cloud.querySelectorAll('[data-hourly-metric-bar="true"]')).toHaveLength(6)
-    expect(humidity.querySelector('[data-precipitation-y-axis="humidity"]')).toHaveTextContent('80%70%60%')
+    expect(humidity.querySelector('[data-precipitation-y-axis="humidity"]')).toHaveTextContent('80%40%0%')
     expect(cloud.querySelector('[data-precipitation-y-axis="cloud"]')).toHaveTextContent('70%35%0%')
-    expect(humidity.querySelector('[data-hourly-metric-plot="humidity"]')).toHaveAttribute('data-axis-truncated', 'true')
-    expect(cloud.querySelector('[data-hourly-metric-plot="cloud"]')).not.toHaveAttribute('data-axis-truncated')
-    expect(humidity.querySelectorAll('[class*="metricTrack"]')).toHaveLength(6)
-    expect(cloud.querySelectorAll('[class*="metricTrack"]')).toHaveLength(6)
+    expect(humidity.querySelector('[data-hourly-metric-plot="humidity"]')).not.toHaveAttribute('data-axis-truncated')
+    expect(humidity.querySelectorAll('[class*="metricTrack"]')).toHaveLength(0)
+    expect(cloud.querySelectorAll('[class*="metricTrack"]')).toHaveLength(0)
     expect(humidityLabels).toEqual(cloudLabels)
     expect(humidityLabels[0]).toBe('Now')
     expect(humidity.querySelector('[data-metric="humidity"]')).toHaveAttribute('data-value', '62')
-    expect(humidity.querySelector('[data-metric="humidity"]')).toHaveStyle({ '--weather-metric-level': '10%' })
+    expect(humidity.querySelector('[data-metric="humidity"]')).toHaveStyle({ '--weather-metric-percent': '77.5%' })
     expect(cloud.querySelector('[data-metric="cloud"]')).toHaveAttribute('data-value', '20')
     expect(within(document.querySelector('[data-weather-hourly-metric-tiles="true"]') as HTMLElement).getAllByRole('row')).toHaveLength(7)
   })
