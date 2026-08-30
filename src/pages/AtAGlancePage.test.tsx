@@ -1,9 +1,9 @@
-import { act, fireEvent, render, screen, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { AtAGlancePage } from './AtAGlancePage'
 import { CONTACT_GROUPS, LIGHT_GROUPS, OCCUPANCY_GROUPS, SECURITY_ENTITY } from '../constants/atAGlance'
 import { GUEST_CONTROLS_DESCRIPTION } from '../constants/portedDashboard'
 import { GUEST_PRESENCE_SECURITY_HASH, GUEST_PRESENCE_SECURITY_SUMMARY } from '../components/hass/GuestPresenceSecurity'
-import { entity, mockCallServiceCalls, mockEntities, resetMockHass } from '../test/mocks/hakitCoreState'
+import { entity, mockCallServiceCalls, mockEntities, resetMockHass, setMockEntityAttribute } from '../test/mocks/hakitCoreState'
 import { resetDeferredRouteHydrationCache } from '../hooks/useDeferredRouteHydration'
 
 describe('AtAGlancePage', () => {
@@ -367,16 +367,143 @@ describe('AtAGlancePage', () => {
     expect(await within(dialog).findByRole('article', { name: 'Now precipitation 0%' })).toBeInTheDocument()
     expect(await within(dialog).findByRole('article', { name: 'Today precipitation 0 in 0%' })).toBeInTheDocument()
     fireEvent.click(within(dialog).getByRole('button', { name: 'Wind conditions' }))
-    expect(await within(dialog).findByRole('article', { name: 'Now wind 3 mph gusts 5 mph' })).toBeInTheDocument()
-    expect(await within(dialog).findByRole('article', { name: 'Today wind 4-8 mph' })).toBeInTheDocument()
+    const hourlyWind = await within(dialog).findByRole('article', { name: 'Now wind 3 mph gusts 5 mph' })
+    expect(hourlyWind.querySelector('[data-wind-source-bearing="185"]')).toHaveAttribute('data-wind-destination-bearing', '5')
+    expect(hourlyWind.querySelector('[data-wind-source-bearing="185"]')).toHaveStyle({ transform: 'rotate(5deg)' })
+    const dailyWind = await within(dialog).findByRole('article', { name: 'Today wind 4-8 mph' })
+    expect(dailyWind.querySelector('[data-wind-source-bearing="185"]')).toHaveAttribute('data-wind-destination-bearing', '5')
+    expect(dailyWind.querySelector('[data-wind-source-bearing="185"]')).toHaveStyle({ transform: 'rotate(5deg)' })
     expect(await within(dialog).findByText('Next Seven Days')).toBeInTheDocument()
-    expect(within(dialog).getByLabelText('Current weather conditions')).toHaveTextContent('Home57°CloudyH:65° L:48°')
+    expect(within(dialog).getByLabelText('Current weather conditions')).toHaveTextContent('57°CloudyHigh: 65° Low: 48°')
+    expect(within(dialog).getByText('57° · Cloudy')).toBeInTheDocument()
+    expect(within(dialog).queryByText('Powered by Pirate Weather')).not.toBeInTheDocument()
+    expect(within(dialog).queryByText('Outdoor · Pirate Weather')).not.toBeInTheDocument()
+    expect(dialog.querySelector('[data-weather-scene="clouds"]')).toBeInTheDocument()
+    expect(within(dialog).getByText('Outdoor air quality is Unhealthy (152)')).toBeInTheDocument()
+    const aqiTile = within(dialog).getByRole('article', { name: 'Outdoor air quality 152, Unhealthy' })
+    expect(aqiTile).toHaveAttribute('data-aqi-tone', 'unhealthy')
+    expect(within(aqiTile).queryByText('Health effects are possible for everyone.')).not.toBeInTheDocument()
+    const precipitationTiles = dialog.querySelector('[data-weather-precipitation-tile="true"]') as HTMLElement
+    const precipitationTile = within(dialog).getByRole('article', { name: 'Hourly precipitation chance over 6 hours, peaking at 94%' })
+    const accumulationTile = within(dialog).getByRole('article', { name: 'Cumulative precipitation through 6 hours, totaling 0.04 in' })
+    expect(precipitationTiles.querySelectorAll('[data-precipitation-sample]')).toHaveLength(2)
+    expect(precipitationTile).toHaveTextContent('Precipitation')
+    expect(accumulationTile).toHaveTextContent('Accumulation')
+    expect(precipitationTile.querySelectorAll('[data-precipitation-bar="true"]')).toHaveLength(6)
+    expect(accumulationTile.querySelectorAll('[data-cumulative-bar="true"]')).toHaveLength(6)
+    expect(precipitationTile.querySelectorAll('[data-precipitation-grid-lines="chance"] > i')).toHaveLength(3)
+    expect(accumulationTile.querySelectorAll('[data-precipitation-grid-lines="cumulative"] > i')).toHaveLength(3)
+    expect(precipitationTile.querySelector('[data-precipitation-y-axis="chance"]')).toHaveTextContent('100%50%0%')
+    expect(accumulationTile.querySelector('[data-precipitation-y-axis="cumulative"]')).toHaveTextContent('0.04 in0.02 in0 in')
+    expect([...precipitationTile.querySelectorAll('[data-precipitation-hour-label="time"]')].map((label) => label.textContent))
+      .toEqual([...accumulationTile.querySelectorAll('[data-precipitation-hour-label="cumulative-time"]')].map((label) => label.textContent))
+    expect(precipitationTile.querySelector('[data-precipitation-hour-label="time"]')).toHaveTextContent('Now')
+    const highProbabilityDryBar = precipitationTile.querySelector('[data-probability="94"][data-amount="0"]')
+    expect(highProbabilityDryBar).toHaveAttribute('data-measurable', 'false')
+    expect(highProbabilityDryBar).toHaveStyle({ '--precipitation-probability': '94%' })
+    expect(precipitationTile.querySelector('[data-probability="0"]')).toHaveStyle({ '--precipitation-probability': '0%' })
+    const precipitationTable = within(precipitationTiles).getByRole('table', { name: '6-hour precipitation details' })
+    expect(within(precipitationTable).getAllByRole('row')).toHaveLength(7)
     fireEvent.click(within(dialog).getByRole('button', { name: 'Conditions conditions' }))
     expect(await within(dialog).findByRole('article', { name: 'Today Sunny H:65° L:48°' })).toBeInTheDocument()
     expect(await within(dialog).findByRole('article', { name: 'Thu Sunny H:71° L:50°' })).toBeInTheDocument()
     expect(await within(dialog).findByRole('article', { name: /Tue Rain H:84° L:59°/ })).toBeInTheDocument()
-    expect(within(dialog).getByRole('article', { name: 'Feels Like 63°F' })).toBeInTheDocument()
-    expect(within(dialog).getByRole('article', { name: 'Humidity 72%' })).toBeInTheDocument()
+    const feelsLikeTile = within(dialog).getByRole('article', { name: 'Feels Like 63°F' })
+    expect(feelsLikeTile.querySelector('[data-weather-highlight-rail="feels"]')).toBeInTheDocument()
+    const uvTile = within(dialog).getByRole('article', { name: 'UV Index 6.7 High' })
+    expect(uvTile.querySelector('[data-weather-highlight-rail="uv"]')).toBeInTheDocument()
+    const visibilityTile = within(dialog).getByRole('article', { name: 'Visibility 10 mi' })
+    expect(visibilityTile.querySelector('[data-visibility-visual="distance-rail"]')).toHaveStyle({ '--highlight-percent': '100%' })
+    expect(visibilityTile.querySelector('[class*="visibilityDistanceMarker"]')).toBeInTheDocument()
+    const humidityTile = within(dialog).getByRole('article', { name: 'Hourly Humidity over 6 hours, ranging from 62% to 74%' })
+    const cloudTile = within(dialog).getByRole('article', { name: 'Hourly Cloud Cover over 6 hours, ranging from 20% to 70%' })
+    expect(humidityTile.querySelectorAll('[data-hourly-metric-bar="true"]')).toHaveLength(6)
+    expect(cloudTile.querySelectorAll('[data-hourly-metric-bar="true"]')).toHaveLength(6)
+    expect(humidityTile.querySelector('[data-precipitation-y-axis="humidity"]')).toHaveTextContent('80%40%0%')
+    expect(cloudTile.querySelector('[data-precipitation-y-axis="cloud"]')).toHaveTextContent('70%35%0%')
+    expect(humidityTile.querySelector('[data-hourly-metric-plot="humidity"]')).not.toHaveAttribute('data-axis-truncated')
+    expect(humidityTile.querySelector('[data-metric="humidity"]')).toHaveAttribute('data-value', '62')
+    expect(cloudTile.querySelector('[data-metric="cloud"]')).toHaveAttribute('data-value', '20')
+    expect([...humidityTile.querySelectorAll('[data-hourly-metric-label="humidity"]')].map((label) => label.textContent))
+      .toEqual([...cloudTile.querySelectorAll('[data-hourly-metric-label="cloud"]')].map((label) => label.textContent))
+    const windTile = within(dialog).getByRole('article', { name: "Wind <1 mph; Today's gust 8 mph; From east-northeast, 59 degrees" })
+    expect(windTile).toHaveAttribute('data-wide', 'true')
+    expect(windTile).toHaveAttribute('data-wind-gust-forecast', 'true')
+    expect(windTile.querySelector('[data-wind-speed-label]')).toHaveTextContent('Wind')
+    expect(windTile.querySelector('[data-wind-speed-value]')).toHaveTextContent('<1 mph')
+    expect(windTile.querySelector('[data-wind-gust-label]')).toHaveTextContent("Today's gust")
+    expect(windTile.querySelector('[data-wind-gust-value]')).toHaveTextContent('8 mph')
+    expect(windTile.querySelector('[data-wind-direction-label]')).toHaveTextContent('From')
+    expect(windTile.querySelector('[data-wind-direction-value]')).toHaveTextContent('ENE · 59°')
+    expect(windTile.querySelector('[data-wind-compass]')).toHaveAttribute('aria-hidden', 'true')
+    expect(windTile.querySelector('[data-wind-vector]')).toHaveAttribute('data-source-bearing', '59')
+    expect(windTile.querySelector('[data-wind-vector]')).toHaveAttribute('data-destination-bearing', '239')
+    expect(within(dialog).getByRole('article', { name: /^Sunset / })).toBeInTheDocument()
+    expect(within(dialog).queryByRole('article', { name: 'Cloud Cover 100%' })).not.toBeInTheDocument()
+    expect(within(dialog).queryByRole('button', { name: /Visualization Lab/i })).not.toBeInTheDocument()
+  })
+
+  it('keeps outdoor AQI visible across good and unavailable states', async () => {
+    mockEntities['sensor.pirate_weather_air_quality_index'].state = '42'
+    const view = render(<AtAGlancePage />)
+    fireEvent.click(screen.getByRole('button', { name: /Open seven-day weather forecast/i }))
+
+    let dialog = await screen.findByRole('dialog')
+    expect(within(dialog).getByRole('article', { name: 'Outdoor air quality 42, Good' })).toHaveAttribute('data-aqi-tone', 'good')
+    expect(within(dialog).queryByText(/Outdoor air quality is/i)).not.toBeInTheDocument()
+
+    view.unmount()
+    mockEntities['sensor.pirate_weather_air_quality_index'].state = 'unavailable'
+    render(<AtAGlancePage />)
+    fireEvent.click(screen.getByRole('button', { name: /Open seven-day weather forecast/i }))
+
+    dialog = await screen.findByRole('dialog')
+    expect(within(dialog).getByRole('article', { name: 'Outdoor air quality unavailable' })).toHaveAttribute('data-unavailable', 'true')
+  })
+
+  it('shows calm wind without a misleading direction vector', async () => {
+    mockEntities['weather.pirate_weather'].attributes = {
+      ...mockEntities['weather.pirate_weather'].attributes,
+      wind_bearing: 0,
+      wind_gust_speed: undefined,
+      wind_speed: 0,
+    }
+    render(<AtAGlancePage />)
+    fireEvent.click(screen.getByRole('button', { name: /Open seven-day weather forecast/i }))
+
+    const dialog = await screen.findByRole('dialog', { name: 'Weather' })
+    const windTile = await within(dialog).findByRole('article', { name: "Wind 0 mph; Today's gust 8 mph; Direction Calm" })
+    expect(windTile.querySelector('[data-wind-direction-value]')).toHaveTextContent('Calm')
+    expect(windTile.querySelector('[data-wind-vector]')).not.toBeInTheDocument()
+
+    act(() => {
+      setMockEntityAttribute('weather.pirate_weather', 'wind_bearing', 20)
+      setMockEntityAttribute('weather.pirate_weather', 'wind_speed', 5)
+    })
+    await waitFor(() => expect(windTile.querySelector('[data-wind-vector]')).toHaveStyle({ transform: 'rotate(20deg)' }))
+  })
+
+  it('unwraps live wind bearing updates over the shortest path', async () => {
+    mockEntities['weather.pirate_weather'].attributes = {
+      ...mockEntities['weather.pirate_weather'].attributes,
+      wind_bearing: 350,
+    }
+    render(<AtAGlancePage />)
+    fireEvent.click(screen.getByRole('button', { name: /Open seven-day weather forecast/i }))
+
+    const dialog = await screen.findByRole('dialog', { name: 'Weather' })
+    const windTile = await within(dialog).findByRole('article', { name: /^Wind / })
+    expect(windTile).toHaveAccessibleName(/^Wind .*; From north, 350 degrees$/)
+    const vector = windTile.querySelector('[data-wind-vector]') as SVGGElement
+    expect(vector).toHaveStyle({ transform: 'rotate(350deg)' })
+
+    act(() => setMockEntityAttribute('weather.pirate_weather', 'wind_bearing', 10))
+    await waitFor(() => expect(vector).toHaveStyle({ transform: 'rotate(370deg)' }))
+    expect(vector).toHaveAttribute('data-source-bearing', '10')
+
+    act(() => setMockEntityAttribute('weather.pirate_weather', 'wind_bearing', 350))
+    await waitFor(() => expect(vector).toHaveStyle({ transform: 'rotate(350deg)' }))
+    expect(vector).toHaveAttribute('data-source-bearing', '350')
   })
 
   it('uses the shell header menu without Home header actions', async () => {

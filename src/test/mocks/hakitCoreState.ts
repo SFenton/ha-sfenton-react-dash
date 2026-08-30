@@ -146,6 +146,10 @@ const mockDailyWeatherForecast = [
 ]
 
 const hourlyTemperatures = [57, 58, 60, 61, 63, 64, 65, 64, 62, 60, 58, 56, 55, 54, 53, 52, 51, 50, 49, 49, 50, 52, 55, 58]
+const hourlyPrecipitationProbabilities = [0, 5, 18, 42, 68, 94, 76, 58, 35, 22, 14, 8, 5, 3, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+const hourlyPrecipitationAmounts = [0, 0, 0.01, 0.01, 0.02, 0, 0.04, 0.02, 0.01, 0.01, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+const hourlyHumidity = [62, 66, 71, 74, 69, 64, 61, 59, 58, 60, 63, 65, 67, 69, 70, 72, 73, 74, 75, 74, 72, 69, 66, 64]
+const hourlyCloudCoverage = [20, 35, 55, 70, 45, 25, 15, 10, 5, 8, 12, 18, 25, 32, 40, 48, 55, 62, 68, 72, 65, 52, 38, 28]
 
 const mockHourlyWeatherForecast = Array.from({ length: 24 }, (_, index) => {
   const forecastDate = new Date('2026-06-10T12:00:00-07:00')
@@ -153,7 +157,10 @@ const mockHourlyWeatherForecast = Array.from({ length: 24 }, (_, index) => {
   return {
     datetime: forecastDate.toISOString(),
     condition: index < 3 ? 'cloudy' : index < 8 ? 'partlycloudy' : 'sunny',
-    precipitation_probability: index < 6 ? 0 : 4,
+    cloud_coverage: hourlyCloudCoverage[index],
+    humidity: hourlyHumidity[index],
+    precipitation: hourlyPrecipitationAmounts[index],
+    precipitation_probability: hourlyPrecipitationProbabilities[index],
     temperature: hourlyTemperatures[index],
     wind_bearing: 185,
     wind_gust_speed: 5 + (index % 5),
@@ -1469,7 +1476,22 @@ export const explicitMockEntities: Record<string, MockEntity> = {
   'light.front_door_bollard_4': entity('light.front_door_bollard_4', 'off', { brightness: null }),
   'light.front_door_bollard_5': entity('light.front_door_bollard_5', 'off', { brightness: null }),
   'light.front_door_bollard_6': entity('light.front_door_bollard_6', 'off', { brightness: null }),
-  'weather.pirate_weather': entity('weather.pirate_weather', 'partlycloudy', { temperature: 45, temperature_unit: '°F' }),
+  'weather.pirate_weather': entity('weather.pirate_weather', 'partlycloudy', {
+    apparent_temperature: 49,
+    temperature: 45,
+    temperature_unit: '°F',
+    visibility: 10,
+    visibility_unit: 'mi',
+    wind_bearing: 236,
+    wind_gust_speed: 8,
+    wind_speed: 4,
+    wind_speed_unit: 'mph',
+  }),
+  'sensor.pirate_weather_air_quality_index': entity('sensor.pirate_weather_air_quality_index', '152', { attribution: 'Powered by Pirate Weather', device_class: 'aqi' }),
+  'sun.sun': entity('sun.sun', 'above_horizon', {
+    next_rising: '2030-06-11T13:20:00.000Z',
+    next_setting: '2030-06-11T03:00:00.000Z',
+  }),
   'select.front_yard_device_mode': entity('select.front_yard_device_mode', 'auto', { options: ['auto', 'off'] }),
   'select.backyard_faucet_device_mode': entity('select.backyard_faucet_device_mode', 'auto', { options: ['auto', 'off'] }),
   'valve.front_yard_zone': entity('valve.front_yard_zone', 'closed', {

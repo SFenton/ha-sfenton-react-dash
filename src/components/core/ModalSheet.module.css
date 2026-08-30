@@ -49,6 +49,8 @@
   --modal-intent-width: 720px;
   --modal-intent-max-width: 720px;
   --modal-intent-height: auto;
+  position: relative;
+  isolation: isolate;
   display: flex;
   width: var(--dashboard-viewport-width, 100vw);
   max-width: var(--dashboard-viewport-width, 100vw);
@@ -128,11 +130,22 @@
 }
 
 .contentLayout {
+  position: relative;
+  z-index: 1;
   display: flex;
   min-height: 0;
   height: 100%;
   flex: 1 1 auto;
   flex-direction: column;
+}
+
+.surfaceDecoration {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  border-radius: inherit;
+  pointer-events: none;
 }
 
 /* The near-opaque modal surface makes nested glass blur visually inert but expensive while moving. */

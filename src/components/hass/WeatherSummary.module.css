@@ -233,9 +233,18 @@
 }
 
 .sheet {
+  position: relative;
+  isolation: isolate;
+}
+
+.sheetContent {
+  position: relative;
+  z-index: 1;
   display: grid;
   gap: 16px;
   padding-bottom: 18px;
+  container-name: weather-sheet;
+  container-type: inline-size;
 }
 
 .modalHero {
@@ -245,16 +254,7 @@
   text-align: center;
 }
 
-.modalPlace {
-  color: rgba(255, 255, 255, 0.72);
-  font-size: 0.74rem;
-  font-weight: 840;
-  letter-spacing: 0;
-  text-transform: uppercase;
-}
-
 .modalTemperature {
-  margin-top: 2px;
   color: white;
   font-size: 5.1rem;
   font-weight: 250;
@@ -280,20 +280,15 @@
 .hourlyPanel,
 .forecastPanel,
 .highlightTile {
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  border: 1px solid var(--rd-weather-panel-border);
   border-radius: 24px;
-  background: linear-gradient(
-    145deg,
-    rgba(255, 255, 255, 0.14),
-    rgba(255, 255, 255, 0.06)
-  );
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.14),
-    0 16px 36px rgba(0, 0, 0, 0.18);
+  background: var(--rd-weather-panel-surface);
+  box-shadow: var(--rd-weather-panel-shadow);
 }
 
 .currentPanel {
   display: grid;
+  min-height: 124px;
   gap: 16px;
   padding: 18px;
 }
@@ -321,10 +316,11 @@
 }
 
 .currentCopy strong {
+  min-height: 2.1em;
   color: white;
   font-size: 1.2rem;
   font-weight: 840;
-  line-height: 1.05;
+  line-height: 1.08;
 }
 
 .hourlyPanel {
@@ -341,7 +337,6 @@
   transition:
     opacity 140ms ease,
     transform 140ms ease;
-  will-change: opacity, transform;
 }
 
 .modeContent[data-transition="out"] {
@@ -375,8 +370,9 @@
 
 .hourlyModes button {
   display: inline-flex;
+  width: 44px;
   min-width: 44px;
-  height: 28px;
+  height: 44px;
   align-items: center;
   justify-content: center;
   border-radius: 999px;
@@ -676,11 +672,27 @@
 }
 
 .highlightTile {
+  position: relative;
   display: grid;
-  min-height: 184px;
+  min-height: 150px;
   align-content: space-between;
   gap: 10px;
   padding: 14px;
+  overflow: hidden;
+}
+
+.highlightTile[data-wide='true'] {
+  grid-column: span 2;
+}
+
+.highlightTile[data-kind='feels'],
+.highlightTile[data-kind='uv'],
+.highlightTile[data-kind='sun'],
+.highlightTile[data-kind='visibility'] {
+  height: 154px;
+  min-height: 154px;
+  grid-template-rows: 16px 36px 52px;
+  align-content: start;
 }
 
 .highlightTitle {
@@ -704,6 +716,23 @@
   font-size: 2.35rem;
   font-weight: 300;
   line-height: 0.95;
+  white-space: nowrap;
+}
+
+.highlightValueRow {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.highlightStatus {
+  min-width: 0;
+  color: var(--color-text-muted);
+  font-size: 0.9rem;
+  font-weight: 760;
+  line-height: 1.08;
+  white-space: nowrap;
 }
 
 .highlightTile[data-kind="pressure"] .highlightValue {
@@ -713,16 +742,14 @@
 }
 
 .highlightTile[data-kind="pressure"] {
+  min-height: 184px;
   grid-template-rows: auto 1fr;
   padding-right: 10px;
   padding-left: 10px;
 }
 
-.highlightNote {
-  color: rgba(255, 255, 255, 0.76);
-  font-size: 0.88rem;
-  font-weight: 640;
-  line-height: 1.22;
+.highlightTile[data-kind="cloud"] {
+  min-height: 166px;
 }
 
 .highlightMeter {
@@ -730,7 +757,7 @@
   display: block;
   height: 8px;
   border-radius: 999px;
-  background: rgba(22, 36, 52, 0.42);
+  background: var(--rd-weather-meter-track);
 }
 
 .highlightMeterFill {
@@ -756,17 +783,6 @@
   transform: translate(-50%, -50%);
 }
 
-.highlightMeter_uv .highlightMeterFill {
-  width: 100%;
-  background: linear-gradient(
-    90deg,
-    #5fca7a,
-    #f5d94a 42%,
-    #f28b30 68%,
-    #d9568b 100%
-  );
-}
-
 .highlightMeter_precipitation .highlightMeterFill,
 .highlightMeter_humidity .highlightMeterFill {
   background: linear-gradient(
@@ -784,76 +800,332 @@
   );
 }
 
-.highlightMeter_feels .highlightMeterFill {
-  background: linear-gradient(
-    90deg,
-    #64d8ff,
-    #a8df85 46%,
-    #ffd34d 72%,
-    #ff8a1f
-  );
+.highlightMeter_precipitation .highlightMeterFill,
+.highlightMeter_humidity .highlightMeterFill {
+  background: var(--rd-weather-water-scale);
 }
 
-.highlightCompass {
+.highlightMeter_visibility .highlightMeterFill {
+  background: var(--rd-weather-visibility-scale);
+}
+
+.highlightVisualSlot {
+  display: grid;
+  width: 100%;
+  height: 52px;
+  place-items: center;
+}
+
+.highlightVisualSlot .highlightUnavailableVisual {
+  min-height: 52px;
+}
+
+.highlightVisualSlot > .highlightRail,
+.highlightVisualSlot > .visibilityDistanceRail {
+  transform: translateY(8px);
+}
+
+.highlightRail {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 10px;
+  border-radius: 999px;
+}
+
+.highlightRail_feels {
+  background: var(--rd-weather-feels-scale);
+}
+
+.highlightRail_uv {
+  background: var(--rd-weather-uv-scale);
+}
+
+.highlightRailMarker {
+  position: absolute;
+  top: 50%;
+  left: var(--highlight-percent, 0%);
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--rd-weather-modal-surface);
+  border-radius: 50%;
+  background: var(--rd-weather-marker);
+  box-shadow: 0 0 0 1px var(--rd-weather-panel-border);
+  transform: translate(-50%, -50%);
+}
+
+.visibilityDistanceRail {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 10px;
+  border-radius: 999px;
+  background: var(--rd-weather-visibility-rail-track);
+}
+
+.visibilityDistanceFill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: var(--highlight-percent, 0%);
+  border-radius: inherit;
+  background: var(--rd-weather-visibility-rail);
+}
+
+.visibilityDistanceMarker {
+  position: absolute;
+  top: 50%;
+  left: var(--highlight-percent, 0%);
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--color-text);
+  border-radius: 50%;
+  background: var(--rd-weather-visibility-marker);
+  transform: translate(-50%, -50%);
+}
+
+.highlightTile[data-kind='wind'] {
+  min-height: 158px;
+  grid-template-columns: minmax(0, 1fr) 112px;
+  grid-template-rows: 16px minmax(0, 1fr);
+  align-content: stretch;
+  column-gap: 16px;
+  row-gap: 10px;
+}
+
+.highlightTile[data-kind='wind'] .highlightTitle {
+  grid-row: 1;
+  grid-column: 1;
+  color: var(--rd-weather-wind-ink);
+}
+
+.windReadout {
+  display: grid;
+  min-width: 0;
+  align-content: stretch;
+  grid-row: 2;
+  grid-column: 1;
+}
+
+.windDetailRow {
+  display: flex;
+  min-height: 34px;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-top: 1px solid var(--rd-weather-panel-border);
+  color: var(--rd-weather-wind-ink);
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.windDetailRow:first-child {
+  border-top: 0;
+}
+
+.windDetailRow strong {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--rd-weather-wind-ink);
+  font-size: 0.9rem;
+  font-weight: 760;
+  line-height: 1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.windCompass {
   position: relative;
   display: grid;
-  width: 74px;
-  height: 74px;
+  width: 112px;
+  height: 112px;
+  align-self: center;
+  grid-row: 1 / -1;
+  grid-column: 2;
   justify-self: center;
-  border: 1px solid rgba(255, 255, 255, 0.16);
   border-radius: 50%;
-  background: radial-gradient(
-    circle,
-    rgba(255, 255, 255, 0.13),
-    rgba(255, 255, 255, 0.05) 62%,
-    rgba(0, 0, 0, 0.14)
-  );
+  background-image: var(--rd-weather-wind-vignette), var(--rd-weather-wind-surface);
+  box-shadow:
+    0 0 0 1px var(--rd-weather-wind-rim),
+    inset 0 1px 0 var(--rd-weather-wind-highlight),
+    inset 0 -2px 5px var(--rd-weather-wind-depth),
+    0 2px 5px var(--rd-weather-wind-shadow);
 }
 
-.compassNorth,
-.compassEast,
-.compassSouth,
-.compassWest {
-  position: absolute;
-  color: white;
-  font-size: 0.58rem;
-  font-weight: 840;
+.windCompassSvg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.windCompassTick {
+  fill: none;
+  stroke: var(--rd-weather-wind-tick);
+  stroke-width: 1.5;
+  vector-effect: non-scaling-stroke;
+}
+
+.windVector {
+  transform-box: view-box;
+  transform-origin: 50% 50%;
+}
+
+.windVectorSourceBlade {
+  fill: var(--rd-weather-wind-source);
+}
+
+.windVectorSource {
+  fill: none;
+  stroke: var(--rd-weather-wind-source);
+  stroke-linecap: round;
+  stroke-width: 1.5;
+  vector-effect: non-scaling-stroke;
+}
+
+.windVectorArrow {
+  fill: var(--rd-weather-wind-destination);
+}
+
+.windCompassNorthMarker {
+  fill: var(--rd-weather-wind-north);
+}
+
+.windCompassCardinal {
+  fill: var(--rd-weather-wind-ink);
+  stroke: none;
+  font-size: 9px;
+  font-weight: 700;
   line-height: 1;
 }
 
-.compassNorth {
-  top: 7px;
-  left: 50%;
-  transform: translateX(-50%);
+.sunArc {
+  display: block;
+  width: 100%;
+  height: 52px;
 }
 
-.compassEast {
-  top: 50%;
-  right: 7px;
-  transform: translateY(-50%);
+.sunArc svg {
+  display: block;
+  width: 100%;
+  height: 52px;
+  overflow: visible;
 }
 
-.compassSouth {
-  bottom: 7px;
-  left: 50%;
-  transform: translateX(-50%);
+.sunArcPath {
+  fill: none;
+  stroke: var(--rd-weather-sun-arc);
+  stroke-linecap: round;
+  stroke-width: 3;
 }
 
-.compassWest {
-  top: 50%;
-  left: 7px;
-  transform: translateY(-50%);
+.sunHorizon {
+  stroke: var(--rd-weather-sun-horizon);
+  stroke-width: 1.5;
 }
 
-.compassNeedle {
+.sunMarker {
+  fill: var(--rd-weather-marker);
+  filter: drop-shadow(0 0 5px var(--rd-weather-marker));
+}
+
+.highlightUnavailableVisual {
+  display: grid;
+  min-height: 74px;
+  place-items: center;
+  color: var(--color-subtle);
+}
+
+.aqiTile {
+  --aqi-color: var(--rd-aqi-unavailable);
+  order: -2;
+  height: 150px;
+  grid-template-rows: auto 58px 10px;
+  align-content: start;
+  box-sizing: border-box;
+}
+
+.aqiTile::before {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 10% 0%, var(--aqi-color), var(--rd-weather-panel-tone-fade) 72%);
+  content: "";
+  opacity: 0.18;
+  pointer-events: none;
+}
+
+.aqiTile > * {
+  position: relative;
+  z-index: 1;
+}
+
+.aqiTile[data-aqi-tone='good'] {
+  --aqi-color: var(--rd-aqi-good);
+}
+
+.aqiTile[data-aqi-tone='moderate'] {
+  --aqi-color: var(--rd-aqi-moderate);
+}
+
+.aqiTile[data-aqi-tone='sensitive'] {
+  --aqi-color: var(--rd-aqi-sensitive);
+}
+
+.aqiTile[data-aqi-tone='unhealthy'] {
+  --aqi-color: var(--rd-aqi-unhealthy);
+}
+
+.aqiTile[data-aqi-tone='veryUnhealthy'] {
+  --aqi-color: var(--rd-aqi-very-unhealthy);
+}
+
+.aqiTile[data-aqi-tone='hazardous'] {
+  --aqi-color: var(--rd-aqi-hazardous);
+}
+
+.aqiReading {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.aqiValue {
+  color: var(--color-text);
+  font-size: 3.2rem;
+  font-weight: 260;
+  line-height: 0.9;
+}
+
+.aqiCategory {
+  display: flex;
+  min-width: 0;
+  min-height: 2.16em;
+  align-items: center;
+  color: var(--color-text);
+  font-size: 1.08rem;
+  font-weight: 800;
+  line-height: 1.08;
+}
+
+.aqiScale {
+  position: relative;
+  height: 10px;
+  border-radius: 999px;
+  background: var(--rd-aqi-scale);
+}
+
+.aqiMarker {
   position: absolute;
   top: 50%;
-  left: 50%;
-  display: inline-flex;
-  color: #56d7ff;
-  filter: drop-shadow(0 1px 4px rgba(0, 0, 0, 0.35));
-  transform: translate(-50%, -50%) rotate(var(--highlight-rotation, 0deg));
-  transform-origin: center;
+  left: var(--aqi-marker, 0%);
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--rd-weather-marker);
+  border-radius: 50%;
+  background: var(--aqi-color);
+  box-shadow: 0 2px 8px var(--rd-weather-meter-track);
+  transform: translate(-50%, -50%);
 }
 
 .pressureGauge {
@@ -933,30 +1205,34 @@
   transform: translateX(-50%);
 }
 
-.cloudMeter {
+.cloudDial {
   position: relative;
-  display: block;
-  height: 36px;
-  overflow: hidden;
-  border-radius: 14px;
-  background: linear-gradient(
-    180deg,
-    rgba(85, 160, 214, 0.46),
-    rgba(30, 55, 78, 0.4)
+  display: grid;
+  width: 68px;
+  height: 68px;
+  justify-self: center;
+  place-items: center;
+  border-radius: 50%;
+  background: conic-gradient(
+    from -90deg,
+    var(--rd-weather-cloud-accent) 0 var(--highlight-percent, 0%),
+    var(--rd-weather-meter-track) var(--highlight-percent, 0%) 100%
   );
 }
 
-.cloudMeterFill {
+.cloudDial::before {
   position: absolute;
-  right: 0;
-  bottom: 0;
-  left: 0;
-  height: var(--highlight-percent, 0%);
-  background: linear-gradient(
-    180deg,
-    rgba(255, 255, 255, 0.84),
-    rgba(255, 255, 255, 0.48)
-  );
+  inset: 7px;
+  border-radius: 50%;
+  background: var(--rd-weather-modal-surface);
+  content: "";
+}
+
+.cloudDialCore {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  color: var(--rd-weather-cloud-accent);
 }
 
 .errorState,
@@ -974,7 +1250,6 @@
 }
 
 .sheet,
-.sheet .modalPlace,
 .sheet .modalTemperature,
 .sheet .modalCondition,
 .sheet .modalHighLow,
@@ -995,7 +1270,8 @@
 .sheet .forecastWindRange,
 .sheet .highlightTitle,
 .sheet .highlightValue,
-.sheet .highlightNote,
+.sheet .aqiCategory,
+.sheet .aqiValue,
 .sheet .errorState {
   color: #fff;
 }
@@ -1004,21 +1280,92 @@
   min-height: 92px;
 }
 
-@media (max-width: 430px) {
-  .currentHero {
-    grid-template-columns: auto 1fr;
+@container weather-sheet (min-width: 620px) {
+  .highlightGrid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
-  .currentTemperature {
+  .highlightGrid .highlightTile.aqiTile {
     grid-column: 1 / -1;
-    justify-self: start;
   }
 
-  .forecastMain {
-    grid-template-columns: auto 1fr;
+  .highlightGrid [data-weather-precipitation-tile='true'] {
+    grid-column: 1 / -1;
   }
 
-  .forecastTemps {
-    grid-column: 2;
+  .highlightTile[data-kind='wind'] {
+    order: -1;
+    grid-column: span 2;
   }
+}
+
+@container weather-sheet (min-width: 900px) {
+  .highlightGrid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .highlightGrid .highlightTile.aqiTile {
+    grid-column: span 2;
+  }
+
+  .highlightGrid [data-weather-precipitation-tile='true'] {
+    grid-column: span 2;
+  }
+
+  .highlightTile[data-kind='wind'] {
+    grid-column: span 2;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .modeContent,
+  .modeContent[data-transition='out'],
+  .modeContent[data-transition='in'] {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+}
+
+@media (forced-colors: active) {
+  .highlightRail,
+  .visibilityDistanceRail {
+    border: 1px solid CanvasText;
+    background: Canvas;
+  }
+
+  .highlightRailMarker,
+  .visibilityDistanceFill,
+  .visibilityDistanceMarker {
+    background: Highlight;
+  }
+
+  .windCompass {
+    border: 1px solid CanvasText;
+    background: Canvas;
+  }
+
+  .windCompassTick {
+    stroke: CanvasText;
+  }
+
+  .windVectorSourceBlade {
+    fill: Highlight;
+  }
+
+  .windVectorArrow,
+  .windCompassNorthMarker,
+  .windCompassCardinal {
+    fill: CanvasText;
+  }
+
+  .windVectorSource {
+    fill: Canvas;
+    stroke: Highlight;
+  }
+
+  .windCompassCardinal {
+    stroke: none;
+  }
+
 }

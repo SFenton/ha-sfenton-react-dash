@@ -117,7 +117,272 @@ test('media sheets choose compact or centered presentation across the viewport m
     await expect(dialog).toHaveAttribute('data-centered-layout', centered ? 'true' : 'false')
     await expect(dialog).toHaveAttribute('data-size', 'media')
     if (!centered) await expect(dialog.locator('[data-mobile-drag-handle="true"]')).toBeVisible()
+    const precipitationTile = dialog.locator('[data-weather-precipitation-tile="true"]')
+    await expect(precipitationTile.locator('[data-precipitation-bar="true"]')).toHaveCount(6)
+    await expect(precipitationTile.locator('[data-cumulative-bar="true"]')).toHaveCount(6)
+    await expect.poll(() => precipitationTile.locator('[data-precipitation-hour-label="time"]').count()).toBeGreaterThan(1)
+    const precipitationMetrics = await precipitationTile.evaluate((tile) => {
+      const grid = tile.parentElement
+      if (!grid) return null
+      const gridStyle = getComputedStyle(grid)
+      const tracks = gridStyle.gridTemplateColumns.split(' ').map(Number.parseFloat).filter(Number.isFinite)
+      const gap = Number.parseFloat(gridStyle.columnGap) || 0
+      const tileRect = tile.getBoundingClientRect()
+      const sampleGrid = tile
+      const sampleCards = Array.from(sampleGrid.querySelectorAll<HTMLElement>('[data-precipitation-sample]'))
+      const averageTrack = tracks.reduce((total, track) => total + track, 0) / Math.max(1, tracks.length)
+      const span = Math.round((tileRect.width + gap) / (averageTrack + gap))
+      const minimumGap = (selector: string) => {
+        const boxes = Array.from(tile.querySelectorAll<HTMLElement>(selector))
+          .filter((element) => element.getClientRects().length > 0)
+          .map((element) => element.getBoundingClientRect())
+          .sort((left, right) => left.left - right.left)
+        if (boxes.length < 2) return null
+        return Math.min(...boxes.slice(1).map((box, index) => box.left - boxes[index].right))
+      }
+      const timeLabels = Array.from(tile.querySelectorAll<HTMLElement>('[data-precipitation-hour-label="time"]'))
+      const timeIndices = timeLabels.map((label) => Number(label.dataset.index))
+      const cadence = timeIndices.length > 1 ? timeIndices[1] - timeIndices[0] : null
+      const barSlots = Array.from(tile.querySelectorAll<HTMLElement>('[data-precipitation-bar-slot="true"]'))
+      const cumulativeTimeLabels = Array.from(tile.querySelectorAll<HTMLElement>('[data-precipitation-hour-label="cumulative-time"]'))
+      const cumulativeBarSlots = Array.from(tile.querySelectorAll<HTMLElement>('[data-cumulative-bar-slot="true"]'))
+      const hourlyPlot = tile.querySelector<HTMLElement>('[data-precipitation-hourly-plot="true"]')
+      const cumulativePlot = tile.querySelector<HTMLElement>('[data-precipitation-cumulative-plot="true"]')
+      const hourlyPlotRect = hourlyPlot?.getBoundingClientRect()
+      const cumulativePlotRect = cumulativePlot?.getBoundingClientRect()
+      const barsWithinPlot = Boolean(hourlyPlotRect) && Array.from(tile.querySelectorAll<HTMLElement>('[data-precipitation-bar="true"]')).every((bar) => {
+        const rect = bar.getBoundingClientRect()
+        return rect.top >= (hourlyPlotRect?.top ?? 0) - 1 && rect.bottom <= (hourlyPlotRect?.bottom ?? 0) + 1
+      })
+      const cumulativeBarsWithinPlot = Boolean(cumulativePlotRect) && Array.from(tile.querySelectorAll<HTMLElement>('[data-cumulative-bar="true"]')).every((bar) => {
+        const rect = bar.getBoundingClientRect()
+        return rect.top >= (cumulativePlotRect?.top ?? 0) - 1 && rect.bottom <= (cumulativePlotRect?.bottom ?? 0) + 1
+      })
+      const xAxisAligned = timeLabels.every((label) => {
+        const slot = barSlots[Number(label.dataset.index)]
+        if (!slot) return false
+        const labelRect = label.getBoundingClientRect()
+        const slotRect = slot.getBoundingClientRect()
+        return Math.abs((labelRect.left + labelRect.width / 2) - (slotRect.left + slotRect.width / 2)) <= 1
+      })
+      const xAxisTickHeight = timeLabels.length
+        ? Number.parseFloat(getComputedStyle(timeLabels[0], '::before').height)
+        : 0
+      const cumulativeXAxisAligned = cumulativeTimeLabels.every((label) => {
+        const slot = cumulativeBarSlots[Number(label.dataset.index)]
+        if (!slot) return false
+        const labelRect = label.getBoundingClientRect()
+        const slotRect = slot.getBoundingClientRect()
+        return Math.abs((labelRect.left + labelRect.width / 2) - (slotRect.left + slotRect.width / 2)) <= 1
+      })
+      const cumulativeXAxisTickHeight = cumulativeTimeLabels.length
+        ? Number.parseFloat(getComputedStyle(cumulativeTimeLabels[0], '::before').height)
+        : 0
+      const yAxisAligned = (name: string) => {
+        const lines = Array.from(tile.querySelectorAll<HTMLElement>(`[data-precipitation-grid-lines="${name}"] > i`))
+        const labels = Array.from(tile.querySelectorAll<HTMLElement>(`[data-precipitation-y-axis="${name}"] > span`))
+        return lines.length === 3 && labels.length === 3 && lines.every((line, index) => {
+          const lineRect = line.getBoundingClientRect()
+          const labelRect = labels[index].getBoundingClientRect()
+          return lineRect.right <= labelRect.left
+            && lineRect.top >= labelRect.top - 1
+            && lineRect.top <= labelRect.bottom + 1
+        })
+      }
+      const chanceGuideLines = Array.from(tile.querySelectorAll<HTMLElement>('[data-precipitation-grid-lines="chance"] > i'))
+      const cumulativeGuideLines = Array.from(tile.querySelectorAll<HTMLElement>('[data-precipitation-grid-lines="cumulative"] > i'))
+      return {
+        barsWithinPlot,
+        cadence,
+        cumulativeLabelsUseNow: cumulativeTimeLabels[0]?.textContent === 'Now'
+          && cumulativeTimeLabels.slice(1).every((label) => label.textContent !== 'Now'),
+        matchingTimeLabels: timeLabels.map((label) => label.textContent).join('|') === cumulativeTimeLabels.map((label) => label.textContent).join('|'),
+        cumulativeXAxisAligned,
+        cumulativeXAxisTickHeight,
+        domainsPositive: Number(tile.dataset.precipitationChanceDomain) > 0 && Number(tile.dataset.precipitationAmountDomain) > 0,
+        cumulativeBarsWithinPlot,
+        height: tileRect.height,
+        horizontalOverflow: tile.scrollWidth > tile.clientWidth + 1,
+        labelsUseNow: timeLabels[0]?.textContent === 'Now'
+          && timeLabels.slice(1).every((label) => label.textContent !== 'Now'),
+        span,
+        timeGap: minimumGap('[data-precipitation-hour-label="time"]'),
+        trackCount: tracks.length,
+        uniformCadence: cadence === null || timeIndices.slice(1).every((index, position) => index - timeIndices[position] === cadence),
+        sharedGuideRows: chanceGuideLines.length === 3
+          && cumulativeGuideLines.length === 3
+          && chanceGuideLines.every((line, index) => Math.abs(line.getBoundingClientRect().top - cumulativeGuideLines[index].getBoundingClientRect().top) <= 1),
+        xAxisAligned,
+        xAxisTickHeight,
+        yAxesAligned: yAxisAligned('chance') && yAxisAligned('cumulative'),
+        sampleCards: sampleCards.length,
+        sampleColumns: getComputedStyle(sampleGrid).gridTemplateColumns.split(' ').filter(Boolean).length,
+        combinedTileAbsent: !grid.querySelector('[data-kind="precipitation-timeline"]'),
+        sampleOverflow: sampleCards.some((card) => card.scrollWidth > card.clientWidth + 1),
+      }
+    })
+    expect(precipitationMetrics).not.toBeNull()
+    expect(precipitationMetrics?.height).toBeGreaterThanOrEqual(150)
+    expect(precipitationMetrics?.barsWithinPlot).toBe(true)
+    expect(precipitationMetrics?.cumulativeBarsWithinPlot).toBe(true)
+    expect(precipitationMetrics?.domainsPositive).toBe(true)
+    expect(precipitationMetrics?.cumulativeLabelsUseNow).toBe(true)
+    expect(precipitationMetrics?.matchingTimeLabels).toBe(true)
+    expect(precipitationMetrics?.cumulativeXAxisAligned).toBe(true)
+    expect(precipitationMetrics?.cumulativeXAxisTickHeight).toBeGreaterThanOrEqual(4)
+    expect(precipitationMetrics?.horizontalOverflow).toBe(false)
+    expect(precipitationMetrics?.labelsUseNow).toBe(true)
+    expect(precipitationMetrics?.uniformCadence).toBe(true)
+    expect(precipitationMetrics?.sharedGuideRows).toBe(true)
+    expect(precipitationMetrics?.xAxisAligned).toBe(true)
+    expect(precipitationMetrics?.xAxisTickHeight).toBeGreaterThanOrEqual(4)
+    expect(precipitationMetrics?.yAxesAligned).toBe(true)
+    expect(precipitationMetrics?.sampleCards).toBe(2)
+    expect(precipitationMetrics?.sampleColumns).toBe(2)
+    expect(precipitationMetrics?.combinedTileAbsent).toBe(true)
+    expect(precipitationMetrics?.sampleOverflow).toBe(false)
+    expect(precipitationMetrics?.timeGap ?? 2).toBeGreaterThanOrEqual(1)
+    expect(precipitationMetrics?.span).toBe(precipitationMetrics?.trackCount === 3 ? 3 : 2)
+    const hourlyMetricTiles = dialog.locator('[data-weather-hourly-metric-tiles="true"]')
+    await expect(hourlyMetricTiles.locator('[data-hourly-metric-tile]')).toHaveCount(2)
+    await expect(hourlyMetricTiles.locator('[data-hourly-metric-bar="true"]')).toHaveCount(12)
+    const hourlyMetricMetrics = await hourlyMetricTiles.evaluate((tiles) => {
+      const humidityLabels = Array.from(tiles.querySelectorAll<HTMLElement>('[data-hourly-metric-label="humidity"]'))
+      const cloudLabels = Array.from(tiles.querySelectorAll<HTMLElement>('[data-hourly-metric-label="cloud"]'))
+      return {
+        columns: getComputedStyle(tiles).gridTemplateColumns.split(' ').filter(Boolean).length,
+        labelsMatch: humidityLabels.map((label) => label.textContent).join('|') === cloudLabels.map((label) => label.textContent).join('|'),
+        usesNow: humidityLabels[0]?.textContent === 'Now' && cloudLabels[0]?.textContent === 'Now',
+        overflow: tiles.scrollWidth > tiles.clientWidth + 1
+          || Array.from(tiles.querySelectorAll<HTMLElement>('[data-hourly-metric-tile]')).some((tile) => tile.scrollWidth > tile.clientWidth + 1),
+        tracks: tiles.querySelectorAll('[class*="metricTrack"]').length,
+        columnRadii: Array.from(tiles.querySelectorAll<HTMLElement>('[data-hourly-metric-bar="true"]'))
+          .map((bar) => getComputedStyle(bar).borderTopLeftRadius),
+      }
+    })
+    expect(hourlyMetricMetrics.columns).toBe(2)
+    expect(hourlyMetricMetrics.labelsMatch).toBe(true)
+    expect(hourlyMetricMetrics.usesNow).toBe(true)
+    expect(hourlyMetricMetrics.overflow).toBe(false)
+    expect(hourlyMetricMetrics.tracks).toBe(0)
+    expect(hourlyMetricMetrics.columnRadii.every((radius) => radius === '3px')).toBe(true)
+    const paintedColumnGaps = await dialog.evaluate((element) => (
+      Array.from(element.querySelectorAll<HTMLElement>(
+        '[data-precipitation-hourly-plot="true"], [data-precipitation-cumulative-plot="true"], [data-hourly-metric-plot]',
+      )).map((plot) => {
+        const bars = Array.from(plot.querySelectorAll<HTMLElement>(
+          '[data-precipitation-bar="true"], [data-cumulative-bar="true"], [data-hourly-metric-bar="true"]',
+        ))
+        const boxes = bars.map((bar) => bar.getBoundingClientRect())
+        return boxes.slice(1).map((box, index) => box.left - boxes[index].right)
+      })
+    ))
+    expect(paintedColumnGaps).toHaveLength(4)
+    expect(paintedColumnGaps.every((gaps) => gaps.length === 5 && gaps.every((gap) => Math.abs(gap - 2) <= 0.05))).toBe(true)
     await expectScrollSafe(dialog)
+    await closeModal(dialog)
+  }
+})
+
+test('weather precipitation labels reflow while the modal stays mounted', async ({ page }) => {
+  await page.setViewportSize({ height: 852, width: 393 })
+  await page.goto('/index.html?path=overview')
+  await page.getByRole('button', { name: /Open seven-day weather forecast/i }).click()
+  const dialog = page.getByRole('dialog', { name: 'Weather' })
+  const tile = dialog.locator('[data-weather-precipitation-tile="true"]')
+  const labelCount = () => tile.locator('[data-precipitation-hour-label="time"]').count()
+
+  await expect.poll(labelCount).toBeGreaterThan(1)
+  const mobileCount = await labelCount()
+
+  await page.setViewportSize({ height: 1180, width: 820 })
+  await expect.poll(labelCount).toBe(6)
+
+  await page.setViewportSize({ height: 900, width: 1440 })
+  await expect.poll(labelCount).toBe(6)
+  expect(await labelCount()).toBeGreaterThanOrEqual(mobileCount)
+
+  await page.setViewportSize({ height: 852, width: 393 })
+  await expect.poll(labelCount).toBe(mobileCount)
+  await expect(tile.locator('[data-precipitation-bar="true"]')).toHaveCount(6)
+  await expect(dialog).toBeVisible()
+})
+
+test('weather highlight values and visuals align across the viewport matrix', async ({ page }) => {
+  for (const viewport of VIEWPORTS) {
+    await page.setViewportSize(viewport)
+    await page.goto('/index.html?path=overview')
+    await page.getByRole('button', { name: /Open seven-day weather forecast/i }).click()
+    const dialog = page.getByRole('dialog', { name: 'Weather' })
+    await expect(dialog).toBeVisible()
+    await expect(dialog.getByRole('button', { name: /Visualization Lab/i })).toHaveCount(0)
+    const tiles = dialog.locator('[data-kind="feels"], [data-kind="uv"], [data-kind="sun"], [data-kind="visibility"]')
+    await expect(tiles).toHaveCount(4)
+
+    const metrics = await tiles.evaluateAll((elements) => elements.map((element) => {
+      const tile = element.getBoundingClientRect()
+      const value = element.querySelector<HTMLElement>('[data-highlight-value]')?.getBoundingClientRect()
+      const visual = element.querySelector<HTMLElement>('[data-highlight-visual]')?.getBoundingClientRect()
+      const visualContent = element.querySelector<HTMLElement>('[data-highlight-visual] > *')?.getBoundingClientRect()
+      const sunArc = element.querySelector<SVGPathElement>('[class*="sunArcPath"]')?.getBoundingClientRect()
+      return {
+        height: tile.height,
+        paintedCenter: sunArc
+          ? sunArc.top + sunArc.height / 2 - tile.top
+          : visualContent
+            ? visualContent.top + visualContent.height / 2 - tile.top
+            : null,
+        valueTop: value ? value.top - tile.top : null,
+        visualCenter: visual ? visual.top + visual.height / 2 - tile.top : null,
+      }
+    }))
+    const paintedCenters = metrics.map(({ paintedCenter }) => paintedCenter).filter((value): value is number => value !== null)
+    const valueTops = metrics.map(({ valueTop }) => valueTop).filter((value): value is number => value !== null)
+    const visualCenters = metrics.map(({ visualCenter }) => visualCenter).filter((value): value is number => value !== null)
+    const heights = metrics.map(({ height }) => height)
+    expect(Math.max(...paintedCenters) - Math.min(...paintedCenters)).toBeLessThanOrEqual(0.5)
+    expect(Math.max(...valueTops) - Math.min(...valueTops)).toBeLessThanOrEqual(0.5)
+    expect(Math.max(...visualCenters) - Math.min(...visualCenters)).toBeLessThanOrEqual(0.5)
+    expect(Math.max(...heights) - Math.min(...heights)).toBeLessThanOrEqual(0.5)
+
+    const windTile = dialog.locator('[data-kind="wind"]')
+    const windMetrics = await windTile.evaluate((element) => {
+      const tile = element.getBoundingClientRect()
+      const readout = element.querySelector<HTMLElement>('[class*="windReadout"]')?.getBoundingClientRect()
+      const dial = element.querySelector<HTMLElement>('[data-wind-compass]')?.getBoundingClientRect()
+      const source = element.querySelector<SVGCircleElement>('[data-wind-source-marker]')?.getBoundingClientRect()
+      const destination = element.querySelector<SVGPathElement>('[data-wind-destination-arrow]')?.getBoundingClientRect()
+      const vector = element.querySelector<SVGGElement>('[data-wind-vector]')?.getBBox()
+      const insideDial = (rect: DOMRect | undefined) => Boolean(dial && rect
+        && rect.left >= dial.left - 1
+        && rect.right <= dial.right + 1
+        && rect.top >= dial.top - 1
+        && rect.bottom <= dial.bottom + 1)
+      return {
+        destinationInside: insideDial(destination),
+        dialHeight: dial?.height ?? 0,
+        dialWidth: dial?.width ?? 0,
+        height: tile.height,
+        noOverlap: Boolean(readout && dial && readout.right <= dial.left),
+        overflow: element.scrollWidth > element.clientWidth + 1,
+        ringCount: element.querySelectorAll('[class*="windCompassRing"]').length,
+        sourceInside: insideDial(source),
+        tickCount: element.querySelectorAll('[class*="windCompassTick"]').length,
+        vectorSpan: vector ? Math.max(vector.width, vector.height) : 0,
+      }
+    })
+    expect(windMetrics).toMatchObject({
+      destinationInside: true,
+      noOverlap: true,
+      overflow: false,
+      ringCount: 0,
+      sourceInside: true,
+      tickCount: 47,
+    })
+    expect(Math.abs(windMetrics.dialHeight - 112)).toBeLessThanOrEqual(0.5)
+    expect(Math.abs(windMetrics.dialWidth - 112)).toBeLessThanOrEqual(0.5)
+    expect(Math.abs(windMetrics.height - 158)).toBeLessThanOrEqual(0.5)
+    expect(windMetrics.vectorSpan).toBeLessThanOrEqual(53)
     await closeModal(dialog)
   }
 })

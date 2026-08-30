@@ -1,0 +1,84 @@
+{
+  "aqi": {
+    "ariaLabel": "Outdoor air quality {{value}}, {{category}}",
+    "categories": {
+      "good": "Good",
+      "hazardous": "Hazardous",
+      "moderate": "Moderate",
+      "sensitive": "Unhealthy for Sensitive Groups",
+      "unhealthy": "Unhealthy",
+      "veryUnhealthy": "Very Unhealthy"
+    },
+    "guidance": {
+      "good": "Air pollution poses little or no risk.",
+      "hazardous": "Emergency health effects are possible for everyone.",
+      "moderate": "Air quality is acceptable for most people.",
+      "sensitive": "Sensitive groups may experience health effects.",
+      "unhealthy": "Health effects are possible for everyone.",
+      "veryUnhealthy": "Health risk is increased for everyone."
+    },
+    "title": "Air Quality",
+    "unavailableAriaLabel": "Outdoor air quality unavailable"
+  },
+  "details": {
+    "ariaLabel": "{{title}} {{value}}",
+    "sun": {
+      "sunrise": "Sunrise",
+      "sunset": "Sunset"
+    },
+    "uv": {
+      "categories": {
+        "extreme": "Extreme",
+        "high": "High",
+        "low": "Low",
+        "moderate": "Moderate",
+        "veryHigh": "Very High"
+      }
+    },
+    "wind": {
+      "ariaLabel": "Wind {{speed}}; {{gustLabel}} {{gust}}; {{directionLabel}} {{direction}}",
+      "bearingDegrees": "{{direction}}, {{degrees}} degrees",
+      "calm": "Calm",
+      "direction": "Direction",
+      "from": "From",
+      "gusts": "Gusts",
+      "speed": "Wind",
+      "todaysGust": "Today's gust"
+    }
+  },
+  "headline": {
+    "aqi": "Outdoor air quality is {{category}} ({{value}})",
+    "label": "Today",
+    "weather": "{{condition}} today"
+  },
+  "hero": {
+    "high": "High: {{high}}",
+    "highLow": "High: {{high}}  Low: {{low}}",
+    "low": "Low: {{low}}"
+  },
+  "hourlyMetrics": {
+    "ariaLabel": "Hourly {{title}} over {{hours}} hours, ranging from {{minimum}} to {{maximum}}",
+    "cloudCover": "Cloud Cover",
+    "humidity": "Humidity",
+    "table": {
+      "time": "Time"
+    },
+    "tableCaption": "{{hours}}-hour humidity and cloud cover details"
+  },
+  "precipitation": {
+    "chanceChartAriaLabel": "Hourly precipitation chance over {{hours}} hours, peaking at {{chance}}",
+    "cumulativeChartAriaLabel": "Cumulative precipitation through {{hours}} hours, totaling {{total}}",
+    "cumulativeHeading": "Accumulation",
+    "now": "Now",
+    "table": {
+      "amount": "Amount",
+      "chance": "Chance",
+      "cumulative": "Cumulative",
+      "time": "Time"
+    },
+    "tableCaption": "{{hours}}-hour precipitation details",
+    "title": "Precipitation"
+  },
+  "subtitle": "{{temperature}} · {{condition}}",
+  "unavailable": "Unavailable"
+}
