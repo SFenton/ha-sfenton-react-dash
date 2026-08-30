@@ -117,6 +117,13 @@ export const mockEntitiesFixture = {
     "entity_id": "binary_sensor.master_bedroom_bathroom_presence_sensor_presence",
     "state": "off"
   },
+  "binary_sensor.master_bedroom_bed_presence_sensor_presence": {
+    "attributes": {
+      "device_class": "occupancy"
+    },
+    "entity_id": "binary_sensor.master_bedroom_bed_presence_sensor_presence",
+    "state": "off"
+  },
   "binary_sensor.master_bedroom_occupancy_sensors": {
     "attributes": {},
     "entity_id": "binary_sensor.master_bedroom_occupancy_sensors",
@@ -722,6 +729,16 @@ export const mockEntitiesFixture = {
     },
     "entity_id": "input_text.master_bedroom_bathroom_climate_color",
     "state": "rgba(0, 128, 128, 1)"
+  },
+  "input_text.master_bedroom_bed_climate_color": {
+    "attributes": {
+      "editable": true,
+      "max": 100,
+      "min": 0,
+      "mode": "text"
+    },
+    "entity_id": "input_text.master_bedroom_bed_climate_color",
+    "state": "rgba(220, 213, 17, 1)"
   },
   "input_text.master_bedroom_climate_color": {
     "attributes": {
@@ -2418,6 +2435,15 @@ export const mockEntitiesFixture = {
     },
     "entity_id": "sensor.master_bedroom_bathroom_presence_sensor_temperature",
     "state": "70"
+  },
+  "sensor.master_bedroom_bed_presence_sensor_temperature": {
+    "attributes": {
+      "device_class": "temperature",
+      "state_class": "measurement",
+      "unit_of_measurement": "\u00b0F"
+    },
+    "entity_id": "sensor.master_bedroom_bed_presence_sensor_temperature",
+    "state": "73.1"
   },
   "sensor.master_bedroom_closet_presence_sensor_temperature": {
     "attributes": {

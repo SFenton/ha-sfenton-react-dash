@@ -16,6 +16,9 @@
   "fields": {
     "days": "Days"
   },
+  "labels": {
+    "bed": "Bed"
+  },
   "garageDoor": {
     "sendingClose": "Sending Close…",
     "sendingOpen": "Sending Open…"

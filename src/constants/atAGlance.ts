@@ -1,10 +1,11 @@
 import { FOOD_CARD_BACKGROUND_COLOR } from './everShelfFood'
-import { copy } from '../i18n'
+import { COMMON_COPY_NAMESPACE, copy } from '../i18n'
 import { HOME_FOOD_ROUTE_PATH, HOME_SPRINKLERS_ROUTE_PATH } from './routes'
 import { SHOW_OUTDOOR_FAUCETS_ENTITY_ID } from './sprinklers'
 
 const sprinklersQuickAccessName = copy('pageSprinklers', 'title')
 const roomsQuickAccessName = copy('shell', 'quickLinks.rooms')
+const bedLabel = copy(COMMON_COPY_NAMESPACE, 'labels.bed')
 
 export type IconKey =
   | 'air'
@@ -496,6 +497,7 @@ export const CLIMATE_GROUPS: EntityGroupConfig[] = [
     colorEntityId: 'input_text.master_bedroom_climate_color',
     items: [
       { title: 'Window', entityId: 'sensor.master_bedroom_window_presence_sensor_temperature', colorEntityId: 'input_text.master_bedroom_window_climate_color', tone: 'climate' },
+      { title: bedLabel, entityId: 'sensor.master_bedroom_bed_presence_sensor_temperature', colorEntityId: 'input_text.master_bedroom_bed_climate_color', tone: 'climate' },
       { title: 'Bathroom', entityId: 'sensor.master_bedroom_bathroom_presence_sensor_temperature', colorEntityId: 'input_text.master_bedroom_bathroom_climate_color', tone: 'climate' },
       { title: 'Closet', entityId: 'sensor.master_bedroom_closet_presence_sensor_temperature', colorEntityId: 'input_text.master_bedroom_closet_climate_color', tone: 'climate' },
       { title: 'Vents', entityId: 'cover.master_bedroom_vents', tone: 'neutral' },
@@ -647,6 +649,7 @@ export const OCCUPANCY_GROUPS: EntityGroupConfig[] = [
     title: 'Master Bedroom Occupancy',
     items: [
       { title: 'Master Bedroom', entityId: 'binary_sensor.master_bedroom_window_presence_sensor_presence', tone: 'presence' },
+      { title: bedLabel, entityId: 'binary_sensor.master_bedroom_bed_presence_sensor_presence', tone: 'presence' },
       { title: 'Bathroom', entityId: 'binary_sensor.master_bedroom_bathroom_presence_sensor_presence', tone: 'presence' },
       { title: 'Closet', entityId: 'binary_sensor.master_bedroom_closet_presence_sensor_presence', tone: 'presence' },
     ],
