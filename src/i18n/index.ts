@@ -8,6 +8,7 @@ export const CORE_COPY_NAMESPACE = 'core' as const
 export const CUSTOM_LIGHTS_COPY_NAMESPACE = 'pageCustomLights' as const
 export const BATHROOM_FAN_COPY_NAMESPACE = 'modalBathroomFan' as const
 export const HUMIDIFIER_COPY_NAMESPACE = 'modalHumidifier' as const
+export const MEDIA_COPY_NAMESPACE = 'pageMedia' as const
 export const VACUUM_COPY_NAMESPACE = 'modalVacuum' as const
 export const WEATHER_COPY_NAMESPACE = 'modalWeather' as const
 export const GARAGE_DOOR_COPY_KEYS = {
@@ -279,6 +280,43 @@ export const WEATHER_COPY_KEYS = {
   },
   subtitle: 'subtitle',
   unavailable: 'unavailable',
+} as const
+
+export const MEDIA_COPY_KEYS = {
+  musicRoom: {
+    fortnite: 'musicRoom.fortnite',
+    quickAppLaunch: 'musicRoom.quickAppLaunch',
+    remote: 'musicRoom.remote',
+    remoteSection: 'musicRoom.remoteSection',
+    server: 'musicRoom.server',
+    sonosBeam: 'musicRoom.sonosBeam',
+    sonosBeamVolume: 'musicRoom.sonosBeamVolume',
+    title: 'musicRoom.title',
+    tv: 'musicRoom.tv',
+    xbox: 'musicRoom.xbox',
+  },
+  remoteControls: {
+    back: 'remoteControls.back',
+    down: 'remoteControls.down',
+    home: 'remoteControls.home',
+    left: 'remoteControls.left',
+    mute: 'remoteControls.mute',
+    pause: 'remoteControls.pause',
+    play: 'remoteControls.play',
+    power: 'remoteControls.power',
+    right: 'remoteControls.right',
+    select: 'remoteControls.select',
+    up: 'remoteControls.up',
+    volumeDown: 'remoteControls.volumeDown',
+    volumeUp: 'remoteControls.volumeUp',
+  },
+  remoteTabs: {
+    devicesDescription: 'remoteTabs.devicesDescription',
+  },
+  remoteOpeners: {
+    livingRoom: 'remoteOpeners.livingRoom',
+    theaterRoom: 'remoteOpeners.theaterRoom',
+  },
 } as const
 
 export const CORE_COPY_KEYS = {

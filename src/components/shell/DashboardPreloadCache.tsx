@@ -1,6 +1,7 @@
 import { CAMERA_ITEMS } from '../../constants/atAGlance'
 import { DASHBOARD_ROUTES } from '../../constants/routes'
 import { ROOM_PAGE_CONFIGS } from '../../constants/roomPages'
+import { MUSIC_ROOM_REMOTE_HASH } from '../../constants/mediaRemotes'
 import { THERMOSTAT_ROOMS } from '../../constants/portedDashboard'
 import { GUEST_PRESENCE_SECURITY_HASH } from '../hass/GuestPresenceSecurity'
 import styles from './DashboardPreloadCache.module.css'
@@ -26,7 +27,7 @@ const SECURITY_PRELOAD_HASHES = [
 ]
 
 const ADMIN_PRELOAD_HASHES = ['#presence-based-overrides', '#presence-based-overrides-auto']
-const MEDIA_PRELOAD_HASHES = ['#living-room-shield', '#theater-room-shield']
+const MEDIA_PRELOAD_HASHES = ['#living-room-shield', '#theater-room-shield', MUSIC_ROOM_REMOTE_HASH]
 const THERMOSTAT_PRELOAD_HASHES = [
   '#thermostat-controls',
   '#thermostat-rooms',

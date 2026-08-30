@@ -9,6 +9,8 @@ export type ControlSemantics =
   | { kind: 'modal' }
   | { kind: 'external' }
 
+export type ControlSemanticsResolver = (state: string | undefined) => ControlSemantics
+
 export const TOGGLE_CONTROL_KIND = 'toggle'
 
 export function controlDisclosureTarget(semantics: ControlSemantics | undefined) {

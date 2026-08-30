@@ -7,6 +7,7 @@ import { valueToThermostatPoint } from '../components/hass/thermostatDialGeometr
 import { VacuumRoomSourceModalContent } from '../components/hass/VacuumCard'
 import { DashboardViewPage } from './DashboardViewPage'
 import { CONTACT_GROUPS } from '../constants/atAGlance'
+import { MUSIC_ROOM_COMMAND_REVERT_MS } from '../constants/mediaRemotes'
 import { VACUUMS } from '../constants/portedDashboard'
 import { ROOM_PAGE_CONFIGS, ROOM_PAGE_ORDER } from '../constants/roomPages'
 import { LEGACY_VACUUM_OUTCOMES, NINE_ROOM_VACUUM_OUTCOME_CONTRACT } from '../test/fixtures/vacuumOutcomes'
@@ -454,7 +455,7 @@ describe('DashboardViewPage', () => {
       'Devices',
     ])
     const theaterRemote = screen.getByRole('group', { name: 'Theater Room Remote' })
-    expect(within(theaterRemote).getByRole('button', { name: /^Theater Remote/ })).toBeInTheDocument()
+    expect(within(theaterRemote).getByRole('button', { name: /^Theater Room Remote/ })).toBeInTheDocument()
     expect(within(theaterRemote).queryByRole('button', { name: /^Nintendo Switch/ })).not.toBeInTheDocument()
     expect(within(theaterRemote).queryByRole('button', { name: /^Theater SHIELD/ })).not.toBeInTheDocument()
 
@@ -487,8 +488,8 @@ describe('DashboardViewPage', () => {
       'Quick App Launch',
     ])
     const livingRemote = screen.getByRole('group', { name: 'Living Room Remote' })
-    expect(within(livingRemote).getByRole('button', { name: /^Living Room SHIELD/ })).toBeInTheDocument()
-    expect(screen.queryByRole('heading', { name: 'Living Room SHIELD' })).not.toBeInTheDocument()
+    expect(within(livingRemote).getByRole('button', { name: /^Living Room Remote/ })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Living Room Remote' })).not.toBeInTheDocument()
     const livingApps = screen.getByRole('group', { name: 'Living Room Quick App Launch' })
     expect(within(livingApps).getAllByRole('button')).toHaveLength(6)
   })
@@ -503,9 +504,116 @@ describe('DashboardViewPage', () => {
       { domain: 'script', service: 'theater_room_tv_movie', serviceData: undefined },
     ])
 
-    fireEvent.click(screen.getByRole('button', { name: /^Theater Remote/ }))
+    fireEvent.click(screen.getByRole('button', { name: /^Theater Room Remote/ }))
     const dialog = await screen.findByRole('dialog')
     expect(within(dialog).getByRole('heading', { name: 'Theater Room SHIELD Remote' })).toBeInTheDocument()
+  })
+
+  it('adds the Music Room remote lead row and local Fortnite app tile in source order', () => {
+    render(<DashboardViewPage activePath="music-room" onNavigate={() => undefined} path="music-room" />)
+
+    expect(ROOM_PAGE_CONFIGS['music-room'].sourceSections.map((section) => section.title)).toEqual([
+      'Climate',
+      'Remote',
+      'Quick App Launch',
+      'Devices',
+    ])
+
+    const opener = screen.getByRole('group', { name: 'Music Room Remote' })
+    const controls = screen.getByRole('group', { name: 'Music Room Remote Controls' })
+    const remote = within(opener).getByRole('button', { name: 'Music Room Remote Off' })
+    const xbox = within(controls).getByRole('button', { name: 'Xbox Off' })
+    const server = within(controls).getByRole('button', { name: 'Server Off' })
+    const fortnite = within(screen.getByRole('group', { name: 'Music Room Quick App Launch' })).getByRole('button', { name: 'Fortnite' })
+
+    expect(remote).toHaveAttribute('data-action-kind', 'modal')
+    expect(remote).toHaveAttribute('data-modal-opener', 'true')
+    expect(xbox).toHaveAttribute('data-action-kind', 'selection')
+    expect(xbox).toHaveAttribute('aria-pressed', 'false')
+    expect(server).toHaveAttribute('data-action-kind', 'selection')
+    expect(server).toHaveAttribute('aria-pressed', 'false')
+    expect(server).not.toHaveAttribute('data-modal-opener')
+    expect(fortnite).toHaveAttribute('data-card', 'media-app')
+    expect(fortnite).toHaveAttribute('data-action-kind', 'selection')
+    expect(fortnite).toHaveAttribute('aria-pressed', 'false')
+    expect(fortnite.querySelector('img')).not.toBeInTheDocument()
+  })
+
+  it('runs Music Room source scripts with their configured optimistic windows', () => {
+    vi.useFakeTimers()
+    try {
+      render(<DashboardViewPage activePath="music-room" onNavigate={() => undefined} path="music-room" />)
+
+      fireEvent.click(screen.getByRole('button', { name: 'Xbox Off' }))
+      expect(screen.getByRole('button', { name: 'Xbox On' })).toHaveAttribute('aria-pressed', 'true')
+      expect(mockCallServiceCalls).toEqual([
+        { domain: 'script', returnResponse: true, service: 'music_room_xbox' },
+      ])
+
+      act(() => vi.advanceTimersByTime(MUSIC_ROOM_COMMAND_REVERT_MS.tv))
+      expect(screen.getByRole('button', { name: 'Xbox On' })).toHaveAttribute('aria-pressed', 'true')
+      act(() => vi.advanceTimersByTime(MUSIC_ROOM_COMMAND_REVERT_MS.xbox - MUSIC_ROOM_COMMAND_REVERT_MS.tv))
+      expect(screen.getByRole('button', { name: 'Xbox Off' })).toHaveAttribute('aria-pressed', 'false')
+
+      fireEvent.click(screen.getByRole('button', { name: 'Server Off' }))
+      expect(screen.getByRole('button', { name: 'Server On' })).toHaveAttribute('aria-pressed', 'true')
+      expect(screen.getByRole('button', { name: 'Xbox Off' })).toHaveAttribute('aria-pressed', 'false')
+      act(() => vi.advanceTimersByTime(MUSIC_ROOM_COMMAND_REVERT_MS.server - 1))
+      expect(screen.getByRole('button', { name: 'Server On' })).toBeInTheDocument()
+      act(() => vi.advanceTimersByTime(1))
+      expect(screen.getByRole('button', { name: 'Server Off' })).toHaveAttribute('aria-pressed', 'false')
+
+      fireEvent.click(screen.getByRole('button', { name: 'Fortnite' }))
+      expect(screen.getByRole('button', { name: 'Fortnite' })).toHaveAttribute('data-active', 'true')
+      expect(screen.getByRole('button', { name: 'Fortnite' })).toHaveAttribute('aria-pressed', 'true')
+      expect(mockCallServiceCalls).toEqual([
+        { domain: 'script', returnResponse: true, service: 'music_room_xbox' },
+        { domain: 'script', returnResponse: true, service: 'music_room_server' },
+        { domain: 'script', returnResponse: true, service: 'music_room_fortnite' },
+      ])
+    } finally {
+      vi.clearAllTimers()
+      vi.useRealTimers()
+    }
+  })
+
+  it('keeps an already-selected Xbox source as a one-tap command and shares Xbox optimism with the modal', async () => {
+    mockEntities['input_select.music_room_media_source'].state = 'Xbox'
+    render(<DashboardViewPage activePath="music-room" onNavigate={() => undefined} path="music-room" />)
+
+    const xbox = screen.getByRole('button', { name: 'Xbox On' })
+    expect(xbox).toHaveAttribute('data-action-kind', 'selection')
+    expect(xbox).toHaveAttribute('aria-pressed', 'true')
+    fireEvent.click(xbox)
+
+    expect(mockCallServiceCalls).toEqual([
+      { domain: 'script', returnResponse: true, service: 'music_room_xbox' },
+    ])
+
+    fireEvent.click(screen.getByRole('button', { name: 'Music Room Remote On' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Music Room Remote' })
+    await clickModalTab(within(dialog), 'Devices')
+    expect(within(dialog).getByRole('switch', { name: 'Xbox On' })).toHaveAttribute('aria-checked', 'true')
+  })
+
+  it('opens the Music Room remote with its configured title, apps, and devices', async () => {
+    render(<DashboardViewPage activePath="music-room" onNavigate={() => undefined} path="music-room" />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Music Room Remote Off' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Music Room Remote' })
+    expect(within(dialog).getByRole('heading', { name: 'Music Room Remote' })).toBeInTheDocument()
+    expect(within(dialog).getByRole('tab', { name: 'Apps' })).toBeInTheDocument()
+    expect(within(dialog).getByRole('tab', { name: 'Devices' })).toBeInTheDocument()
+    expect(within(dialog).queryByRole('button', { name: 'Keyboard' })).not.toBeInTheDocument()
+
+    await clickModalTab(within(dialog), 'Apps')
+    expect(within(dialog).getByRole('button', { name: 'Fortnite' })).toBeInTheDocument()
+
+    await clickModalTab(within(dialog), 'Devices')
+    expect(within(dialog).getByRole('switch', { name: 'TV Off' })).toBeInTheDocument()
+    expect(within(dialog).getByRole('switch', { name: 'Xbox Off' })).toBeInTheDocument()
+    expect(within(dialog).getByRole('button', { name: 'Server Off' })).toBeInTheDocument()
+    expect(within(dialog).getByLabelText('Sonos Beam Playing')).toHaveAttribute('data-action-kind', 'state')
   })
 
   it('renders the source empty room state for room pages without body cards', () => {
@@ -5041,7 +5149,7 @@ describe('DashboardViewPage', () => {
     mockEntities['media_player.living_room_shield_2'].state = 'playing'
     render(<DashboardViewPage activePath="living-room" onNavigate={() => undefined} path="living-room" />)
 
-    fireEvent.click(screen.getByRole('button', { name: /^Living Room SHIELD Off$/i }))
+    fireEvent.click(screen.getByRole('button', { name: /^Living Room Remote Off$/i }))
 
     const dialog = await screen.findByRole('dialog')
     expect(dialog).toHaveAttribute('data-size', 'workspace')
@@ -5081,7 +5189,7 @@ describe('DashboardViewPage', () => {
     mockEntities['media_player.sonos'].state = 'off'
     render(<DashboardViewPage activePath="living-room" onNavigate={() => undefined} path="living-room" />)
 
-    fireEvent.click(screen.getByRole('button', { name: /^Living Room SHIELD Off$/i }))
+    fireEvent.click(screen.getByRole('button', { name: /^Living Room Remote Off$/i }))
 
     const dialog = await screen.findByRole('dialog')
     expect(dialog).toHaveAttribute('data-has-navigation', 'true')
@@ -5113,7 +5221,7 @@ describe('DashboardViewPage', () => {
     try {
       mockEntities['media_player.living_room_shield_2'].state = 'playing'
       render(<DashboardViewPage activePath="living-room" onNavigate={() => undefined} path="living-room" />)
-      fireEvent.click(screen.getByRole('button', { name: /^Living Room SHIELD Off$/i }))
+      fireEvent.click(screen.getByRole('button', { name: /^Living Room Remote Off$/i }))
 
       const dialog = await screen.findByRole('dialog')
       const panel = dialog.querySelector<HTMLElement>('[data-scroll-region="media-remote-panel"]')
@@ -5132,7 +5240,7 @@ describe('DashboardViewPage', () => {
   it('ports media app cards inside remote modals with YAML service payloads', async () => {
     mockEntities['media_player.living_room_shield_2'].state = 'playing'
     let view = render(<DashboardViewPage activePath="living-room" onNavigate={() => undefined} path="living-room" />)
-    fireEvent.click(screen.getByRole('button', { name: /^Living Room SHIELD Off$/i }))
+    fireEvent.click(screen.getByRole('button', { name: /^Living Room Remote Off$/i }))
     await clickModalTab(within(await screen.findByRole('dialog')), 'Apps')
     expect(await screen.findByRole('heading', { name: 'Media' })).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: 'Power' })).not.toBeInTheDocument()
@@ -5160,7 +5268,7 @@ describe('DashboardViewPage', () => {
     window.history.replaceState(null, '', window.location.pathname)
 
     render(<DashboardViewPage activePath="theater-room" onNavigate={() => undefined} path="theater-room" />)
-    fireEvent.click(screen.getByRole('button', { name: /^Theater Remote Off$/i }))
+    fireEvent.click(screen.getByRole('button', { name: /^Theater Room Remote Off$/i }))
     await clickModalTab(within(await screen.findByRole('dialog')), 'Apps')
     fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Disney+' }))
     expect(mockCallServiceCalls).toEqual([
@@ -5213,6 +5321,35 @@ describe('DashboardViewPage', () => {
       { domain: 'script', service: 'theater_room_nintendo_switch' },
       { domain: 'script', service: 'theater_room_tv_movie' },
     ])
+  })
+
+  it('adds the Music Room remote, source commands, and Fortnite to the Media page', async () => {
+    render(<DashboardViewPage activePath="media" onNavigate={() => undefined} path="media" />)
+
+    expect(screen.getAllByRole('heading', { level: 2 }).map((heading) => heading.textContent)).toEqual([
+      'Living Room',
+      'Music Room',
+      'Theater Room',
+    ])
+    const musicHeading = screen.getByRole('heading', { name: 'Music Room' })
+    const musicSection = musicHeading.closest('section')
+    expect(musicSection).not.toBeNull()
+    const remote = within(musicSection!).getByRole('button', { name: 'Music Room Remote Off' })
+    const xbox = within(musicSection!).getByRole('button', { name: 'Xbox Off' })
+    const server = within(musicSection!).getByRole('button', { name: 'Server Off' })
+    const fortnite = within(musicSection!).getByRole('button', { name: 'Fortnite' })
+
+    expect(remote).toHaveAttribute('data-action-kind', 'modal')
+    expect(xbox).toHaveAttribute('data-action-kind', 'selection')
+    expect(server).toHaveAttribute('data-action-kind', 'selection')
+    expect(fortnite).toHaveAttribute('data-action-kind', 'selection')
+    expect(fortnite).toHaveAttribute('aria-pressed', 'false')
+    expect(remote.compareDocumentPosition(xbox) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(xbox.compareDocumentPosition(server) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(server.compareDocumentPosition(fortnite) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+
+    fireEvent.click(remote)
+    expect(await screen.findByRole('dialog', { name: 'Music Room Remote' })).toBeInTheDocument()
   })
 
   it('runs Living Room page-level media app shortcuts from source image tiles', () => {
@@ -5416,7 +5553,7 @@ describe('DashboardViewPage', () => {
     mockEntities['input_boolean.theater_pc_power'].state = 'on'
     render(<DashboardViewPage activePath="theater-room" onNavigate={() => undefined} path="theater-room" />)
 
-    fireEvent.click(screen.getByRole('button', { name: /^Theater Remote Off$/i }))
+    fireEvent.click(screen.getByRole('button', { name: /^Theater Room Remote Off$/i }))
 
     expect(await screen.findByRole('dialog')).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Theater Room SHIELD Remote' })).toBeInTheDocument()
@@ -5469,7 +5606,7 @@ describe('DashboardViewPage', () => {
     mockEntities['media_player.theater'].state = 'off'
     render(<DashboardViewPage activePath="theater-room" onNavigate={() => undefined} path="theater-room" />)
 
-    fireEvent.click(screen.getByRole('button', { name: /^Theater Remote Off$/i }))
+    fireEvent.click(screen.getByRole('button', { name: /^Theater Room Remote Off$/i }))
 
     expect(await screen.findByRole('heading', { name: 'Theater Room SHIELD Remote' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Yamaha Volume' })).toBeInTheDocument()

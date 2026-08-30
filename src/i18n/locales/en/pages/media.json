@@ -1,0 +1,36 @@
+{
+  "musicRoom": {
+    "fortnite": "Fortnite",
+    "quickAppLaunch": "Quick App Launch",
+    "remote": "Music Room Remote",
+    "remoteSection": "Remote",
+    "server": "Server",
+    "sonosBeam": "Sonos Beam",
+    "sonosBeamVolume": "Sonos Beam Volume",
+    "title": "Music Room",
+    "tv": "TV",
+    "xbox": "Xbox"
+  },
+  "remoteControls": {
+    "back": "Back",
+    "down": "Down",
+    "home": "Home",
+    "left": "Left",
+    "mute": "Mute",
+    "pause": "Pause",
+    "play": "Play",
+    "power": "Power",
+    "right": "Right",
+    "select": "Select",
+    "up": "Up",
+    "volumeDown": "Volume Down",
+    "volumeUp": "Volume Up"
+  },
+  "remoteTabs": {
+    "devicesDescription": "Shows configured device states and available command or toggle controls."
+  },
+  "remoteOpeners": {
+    "livingRoom": "Living Room Remote",
+    "theaterRoom": "Theater Room Remote"
+  }
+}

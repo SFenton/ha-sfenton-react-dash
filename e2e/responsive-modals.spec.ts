@@ -521,7 +521,7 @@ test('tabbed workspaces reset the active scroll owner at mobile and short-landsc
   for (const viewport of [{ height: 852, width: 393 }, { height: 393, width: 852 }]) {
     await page.setViewportSize(viewport)
     await page.goto('/index.html?path=living-room')
-    await page.getByRole('button', { name: /^Living Room SHIELD Off$/i }).click()
+    await page.getByRole('button', { name: /^Living Room Remote Off$/i }).click()
     const dialog = page.getByRole('dialog')
     const body = dialog.locator('[data-modal-sheet-body="true"]')
     await dialog.getByRole('tab', { name: 'Apps' }).click()
@@ -561,7 +561,7 @@ test('animated modal tabs preserve the outgoing scroll position until content sw
   await closeModal(dialog)
 
   await page.goto('/index.html?path=living-room')
-  await page.getByRole('button', { name: /^Living Room SHIELD Off$/i }).click()
+  await page.getByRole('button', { name: /^Living Room Remote Off$/i }).click()
   dialog = page.getByRole('dialog')
   await dialog.getByRole('tab', { name: 'Apps' }).click()
   await expect(dialog.locator('[data-scroll-region="media-remote-panel"]')).toHaveAttribute('data-tab', 'apps')
@@ -773,7 +773,7 @@ test('other workspace modals use body scrolling when short and named pane scroll
     {
       open: async () => {
         await page.goto('/index.html?path=living-room')
-        await page.getByRole('button', { name: /Living Room SHIELD Off/i }).click()
+        await page.getByRole('button', { name: /Living Room Remote Off/i }).click()
       },
       pane: 'media-remote-panel',
     },

@@ -11,6 +11,7 @@ import pageAdmin from './locales/en/pages/admin.json' with { type: 'json' }
 import pageCustomLights from './locales/en/pages/customLights.json' with { type: 'json' }
 import pageFood from './locales/en/pages/food.json' with { type: 'json' }
 import pageGuests from './locales/en/pages/guests.json' with { type: 'json' }
+import pageMedia from './locales/en/pages/media.json' with { type: 'json' }
 import pageSecurity from './locales/en/pages/security.json' with { type: 'json' }
 import pageSettings from './locales/en/pages/settings.json' with { type: 'json' }
 import pageSprinklers from './locales/en/pages/sprinklers.json' with { type: 'json' }
@@ -33,6 +34,7 @@ export const resources = {
     pageCustomLights,
     pageFood,
     pageGuests,
+    pageMedia,
     pageSecurity,
     pageSettings,
     pageSprinklers,

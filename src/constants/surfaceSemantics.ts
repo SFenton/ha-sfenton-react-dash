@@ -1,3 +1,5 @@
+import { MEDIA_COPY_KEYS, MEDIA_COPY_NAMESPACE, copy } from '../i18n'
+
 export interface ModalTabDefinition<T extends string> {
   description: string
   icon: string
@@ -30,23 +32,27 @@ export const WEATHER_HOURLY_MODES: readonly ModalTabDefinition<WeatherHourlyMode
 
 export type MediaRemoteModalTab = 'controls' | 'apps' | 'devices'
 
+export const CONTROLS_MEDIA_REMOTE_MODAL_TAB: ModalTabDefinition<MediaRemoteModalTab> = {
+  description: 'Keeps power and the directional pad visible, then adds volume, navigation, keyboard, and playback controls.',
+  icon: 'mdi:remote',
+  label: 'Controls',
+  tab: 'controls',
+}
+
+export const APPS_MEDIA_REMOTE_MODAL_TAB: ModalTabDefinition<MediaRemoteModalTab> = {
+  description: 'Shows direct launch tiles for the configured streaming services and sends the selected Home Assistant script.',
+  icon: 'mdi:play-box',
+  label: 'Apps',
+  tab: 'apps',
+}
+
 export const BASE_MEDIA_REMOTE_MODAL_TABS: readonly ModalTabDefinition<MediaRemoteModalTab>[] = [
-  {
-    description: 'Keeps power and the directional pad visible, then adds volume, navigation, keyboard, and playback controls.',
-    icon: 'mdi:remote',
-    label: 'Controls',
-    tab: 'controls',
-  },
-  {
-    description: 'Shows direct launch tiles for the configured streaming services and sends the selected Home Assistant script.',
-    icon: 'mdi:play-box',
-    label: 'Apps',
-    tab: 'apps',
-  },
+  CONTROLS_MEDIA_REMOTE_MODAL_TAB,
+  APPS_MEDIA_REMOTE_MODAL_TAB,
 ]
 
 export const DEVICES_MEDIA_REMOTE_MODAL_TAB: ModalTabDefinition<MediaRemoteModalTab> = {
-  description: 'Shows the Theater projector, receiver, SHIELD, and state-dependent computer power controls.',
+  description: copy(MEDIA_COPY_NAMESPACE, MEDIA_COPY_KEYS.remoteTabs.devicesDescription),
   icon: 'mdi:projector',
   label: 'Devices',
   tab: 'devices',
@@ -57,13 +63,18 @@ export const MEDIA_REMOTE_MODAL_TABS: readonly ModalTabDefinition<MediaRemoteMod
   DEVICES_MEDIA_REMOTE_MODAL_TAB,
 ]
 
-export function mediaRemoteModalTabs(showDevices: boolean) {
-  return showDevices ? MEDIA_REMOTE_MODAL_TABS : BASE_MEDIA_REMOTE_MODAL_TABS
+export function mediaRemoteModalTabs(showApps: boolean, showDevices: boolean) {
+  return [
+    CONTROLS_MEDIA_REMOTE_MODAL_TAB,
+    ...(showApps ? [APPS_MEDIA_REMOTE_MODAL_TAB] : []),
+    ...(showDevices ? [DEVICES_MEDIA_REMOTE_MODAL_TAB] : []),
+  ]
 }
 
 export const MEDIA_PAGE_REMOTE_HASH_BY_ENTITY_ID: Readonly<Record<string, string>> = {
   'media_player.living_room_shield': '#living-room-shield',
   'media_player.living_room_shield_2': '#living-room-shield',
+  'media_player.music_room_tv_android': '#music-room-remote',
   'media_player.sony_projector': '#theater-room-shield',
   'media_player.theater_room_shield': '#theater-room-shield',
 }

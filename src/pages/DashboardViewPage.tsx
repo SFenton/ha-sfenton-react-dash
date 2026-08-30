@@ -62,6 +62,7 @@ import { DynamicGrid, type DynamicGridItemSizing } from '../components/core/Dyna
 import { EmptyState } from '../components/core/EmptyState'
 import { GlassTile } from '../components/core/GlassTile'
 import { MaterialIcon } from '../components/core/Icon'
+import type { ControlSemantics } from '../components/core/controlSemantics'
 import { InlineAlert } from '../components/core/InlineAlert'
 import { ModalIconTabNav } from '../components/core/ModalTabNav'
 import { modalTabId, modalTabPanelId } from '../components/core/modalTabIds'
@@ -84,6 +85,14 @@ import { ToggleSetting } from '../components/core/ToggleSetting'
 import { derivedAirPurifierEntityIds, formatAirQualitySummary } from '../components/hass/airQualityState'
 import { resolveEntityAction, type EntityActionStateMap } from '../components/hass/entityActions'
 import { asEntityName, formatCompactEntityState, formatContactEntityState, isActiveState, isContactOpen, isOccupancyActive, titleCaseState } from '../components/hass/entityState'
+import {
+  OptimisticActionStateBoundary,
+} from '../components/hass/OptimisticActionState'
+import {
+  optimisticStateValue,
+  runOptimisticServiceCommand,
+  useOptimisticActionStates,
+} from '../components/hass/optimisticActionState'
 import { DASHBOARD_ROUTE_CHANGE_EVENT, dashboardEventTargets, dashboardHash, dashboardPathWithSearch, replaceDashboardUrl } from '../hooks/dashboardLocation'
 import { useHashModal } from '../hooks/useHashModal'
 import { useModalDetailPageScroll } from '../hooks/useModalDetailPageScroll'
@@ -156,7 +165,7 @@ import { modalSquareGridModalStyle, modalSquareGridStyle, type ModalSquareGridSt
 import { ROOM_PAGE_CONFIGS, type RoomSourceCardAction, type RoomSourceCardConfig, type RoomSourceKind, type RoomSourceModalItem, type RoomSourceSectionLayout } from '../constants/roomPages'
 import { bathroomFanForPowerEntity } from '../constants/bathroomFans'
 import { humidifierForPowerEntity, type HumidifierConfig } from '../constants/humidifiers'
-import { MEDIA_REMOTE_CONFIGS, type MediaRemoteConfig } from '../constants/mediaRemotes'
+import { MEDIA_REMOTE_CONFIGS, MUSIC_ROOM_MEDIA_OPTIMISTIC_ENTITY_IDS, type MediaRemoteConfig } from '../constants/mediaRemotes'
 import { VACUUM_AUTO_CLEAN_CONTROLS } from '../constants/vacuumAutoClean'
 import {
   THERMOSTAT_MODAL_DIAL_GUTTER_PX,
@@ -886,10 +895,26 @@ function HumidifierRoomSourceCard({ card, onOpen }: RoomSourceCardProps) {
   return content
 }
 
-function RoomSourceMediaAppCard({ card, isOff, onClick }: { card: RoomSourceCardConfig; isOff: boolean; onClick?: () => void }) {
+function RoomSourceMediaAppCard({
+  active,
+  card,
+  disabled,
+  isOff,
+  onClick,
+  preload,
+  semantics,
+}: {
+  active: boolean
+  card: RoomSourceCardConfig
+  disabled: boolean
+  isOff: boolean
+  onClick?: () => void
+  preload: boolean
+  semantics?: ControlSemantics
+}) {
   const [imageFailed, setImageFailed] = useState(false)
   const className = [styles.mediaAppTile, card.imageBackground === 'white' ? styles.mediaAppTileWhite : '', isOff ? styles.mediaAppTileMuted : ''].filter(Boolean).join(' ')
-  const content = imageFailed ? (
+  const content = preload || !card.imageUrl || imageFailed ? (
     <span className={styles.mediaAppFallback}>
       <MaterialIcon name={card.icon} size={34} />
       <span>{card.title}</span>
@@ -900,25 +925,45 @@ function RoomSourceMediaAppCard({ card, isOff, onClick }: { card: RoomSourceCard
 
   if (onClick) {
     return (
-      <button aria-label={card.title} className={className} data-card="media-app" data-muted={isOff ? 'true' : 'false'} data-tone="media" onClick={onClick} type="button">
+      <button
+        aria-checked={semantics?.kind === 'toggle' ? semantics.checked : undefined}
+        aria-label={card.title}
+        aria-pressed={semantics?.kind === 'selection' ? semantics.selected : undefined}
+        className={className}
+        data-action-kind={semantics?.kind}
+        data-active={active ? 'true' : 'false'}
+        data-card="media-app"
+        data-muted={isOff ? 'true' : 'false'}
+        data-tone="media"
+        disabled={disabled}
+        onClick={onClick}
+        role={semantics?.kind === 'toggle' ? 'switch' : undefined}
+        type="button"
+      >
         {content}
       </button>
     )
   }
 
   return (
-    <div aria-label={card.title} className={className} data-card="media-app" data-muted={isOff ? 'true' : 'false'} data-tone="media">
+    <div aria-label={card.title} className={className} data-action-kind={semantics?.kind} data-active={active ? 'true' : 'false'} data-card="media-app" data-muted={isOff ? 'true' : 'false'} data-tone="media">
       {content}
     </div>
   )
 }
 
 function useRoomSourceActionRunner() {
-  const callService = useHass((state) => state.helpers.callService) as unknown as (params: Record<string, unknown>) => void
+  const callService = useHass((state) => state.helpers.callService) as unknown as (params: Record<string, unknown>) => unknown
   const entities = useHass((state) => state.entities) as unknown as EntityActionStateMap
+  const optimisticStates = useOptimisticActionStates()
 
   return (entityId: string, action: RoomSourceCardAction | undefined) => {
-    const resolvedAction = resolveEntityAction(entityId, action, entities)
+    const resolvedAction = resolveEntityAction(
+      entityId,
+      action,
+      entities,
+      (targetEntityId) => optimisticStateValue(targetEntityId, entities[targetEntityId]?.state, optimisticStates),
+    )
     if (!resolvedAction) return
     if (resolvedAction.type === 'toggle') {
       callService({ domain: 'homeassistant', service: 'toggle', target: entityId })
@@ -929,7 +974,13 @@ function useRoomSourceActionRunner() {
     const params: Record<string, unknown> = { domain: resolvedAction.domain, service: resolvedAction.service }
     if (resolvedAction.serviceData !== undefined) params.serviceData = resolvedAction.serviceData
     if (target !== undefined) params.target = target
-    callService(params)
+    runOptimisticServiceCommand(
+      callService,
+      params,
+      resolvedAction.optimisticState,
+      resolvedAction.optimisticResetState,
+      optimisticStates,
+    )
   }
 }
 
@@ -1010,14 +1061,19 @@ function DishwasherRoomSourceCard({ card, onOpen }: RoomSourceCardProps) {
   return content
 }
 
-function DefaultRoomSourceCard({ card, eightSleepModalState, onOpen }: RoomSourceCardProps) {
+function DefaultRoomSourceCard({ card, eightSleepModalState, onOpen, preload = false }: RoomSourceCardProps) {
   const alternateGate = useEntity(asEntityName(card.alternate?.whenEntityId ?? card.entityId), { returnNullIfNotFound: true })
   const runAction = useRoomSourceActionRunner()
+  const optimisticStates = useOptimisticActionStates()
   const useAlternate = Boolean(card.alternate && alternateGate && card.alternate.whenStates.includes(alternateGate.state))
   const effectiveEntityId = useAlternate ? card.alternate?.entityId ?? card.entityId : card.entityId
   const effectiveShowState = useAlternate ? card.alternate?.showState : card.showState
   const effectiveSubtitleEntityIds = useAlternate ? card.alternate?.subtitleEntityIds : card.subtitleEntityIds
-  const entity = useEntity(asEntityName(effectiveEntityId), { returnNullIfNotFound: true })
+  const liveEntity = useEntity(asEntityName(effectiveEntityId), { returnNullIfNotFound: true })
+  const displayedState = optimisticStateValue(effectiveEntityId, liveEntity?.state, optimisticStates)
+  const entity = liveEntity && displayedState && displayedState !== liveEntity.state
+    ? { ...liveEntity, state: displayedState }
+    : liveEntity
   const presenceEntity = useEntity(asEntityName(card.presenceEntityId ?? effectiveEntityId), { returnNullIfNotFound: true })
   const subtitleEntityOne = useEntity(asEntityName(effectiveSubtitleEntityIds?.[0] ?? effectiveEntityId), { returnNullIfNotFound: true })
   const subtitleEntityTwo = useEntity(asEntityName(effectiveSubtitleEntityIds?.[1] ?? effectiveEntityId), { returnNullIfNotFound: true })
@@ -1028,21 +1084,37 @@ function DefaultRoomSourceCard({ card, eightSleepModalState, onOpen }: RoomSourc
     : effectiveShowState ? formatRoomSourceState(card, entity) : undefined
   const displayUnavailable = eightSleepModalState ? !eightSleepModalState.sideAvailable : unavailable
   const displaySubtitle = eightSleepModalState ? eightSleepModalState.tileSubtitle : subtitle
-  const clickable = Boolean(card.hash || card.action) && !displayUnavailable && !disabledByState
+  const interactionDisabled = displayUnavailable || disabledByState
+  const hasInteraction = Boolean(card.hash || card.action)
+  const clickable = hasInteraction && !interactionDisabled
+  const preserveDisabledInteraction = Boolean(card.semantics && hasInteraction)
   const activeByState = Boolean(entity && card.activeStates?.includes(entity.state))
   const sourceStateInactive = card.stateDisplay === 'climate-action-temperature' && (entity?.state === 'off' || entity?.attributes.hvac_action === 'off')
   const inactiveMuted = eightSleepModalState ? !eightSleepModalState.controlsSideOn : sourceStateInactive || (!unavailable && !activeByState && !isActiveState(entity) && ['fan', 'grill', 'light', 'media', 'power'].includes(card.kind))
-  const handleClick = clickable ? (card.action ? () => runAction(card.entityId, card.action) : () => onOpen(card)) : undefined
+  const handleClick = !preload && (clickable || preserveDisabledInteraction)
+    ? (card.action ? () => runAction(card.entityId, card.action) : () => onOpen(card))
+    : undefined
+  const semantics = card.semantics?.(entity?.state)
   const backgroundColor = eightSleepModalState ? eightSleepCardBackgroundColor(eightSleepModalState) : roomSourceBackgroundColor(card, entity, presenceEntity)
-  const content = card.imageUrl && card.kind === 'media' && card.action ? (
-    <RoomSourceMediaAppCard card={card} isOff={displayUnavailable || disabledByState} onClick={handleClick} />
+  const content = (card.presentation === 'app' || card.imageUrl) && card.kind === 'media' && card.action ? (
+    <RoomSourceMediaAppCard
+      active={activeByState}
+      card={card}
+      disabled={interactionDisabled}
+      isOff={interactionDisabled || Boolean(card.activeStates?.length && !activeByState)}
+      onClick={handleClick}
+      preload={preload}
+      semantics={semantics}
+    />
   ) : (
     <GlassTile
       icon={<SourceCardIcon card={card} size={24} />}
       backgroundColor={backgroundColor}
+      disabled={interactionDisabled && Boolean(handleClick)}
       disclosure={Boolean(handleClick && card.hash && !card.action)}
       isOff={displayUnavailable || disabledByState || inactiveMuted}
       onClick={handleClick}
+      semantics={semantics}
       subtitle={displaySubtitle}
       title={card.title}
       tone={displayUnavailable ? 'neutral' : toneForSourceKind(card.kind)}
@@ -1058,7 +1130,15 @@ function MediaRoomSourceModal({ config, onClose, open, title }: { config: MediaR
 
   return (
     <ModalSheet
-      navigation={<MediaRemoteModalNav activeTab={mediaActiveTab} onTabChange={setMediaActiveTab} remoteTitle={config.title} showDevices={Boolean(config.devices?.length)} />}
+      navigation={(
+        <MediaRemoteModalNav
+          activeTab={mediaActiveTab}
+          onTabChange={setMediaActiveTab}
+          remoteTitle={config.title}
+          showApps={Boolean(config.appCards?.length)}
+          showDevices={Boolean(config.devices?.length)}
+        />
+      )}
       onClose={onClose}
       open={open}
       scrollMode="panes"
@@ -1100,6 +1180,10 @@ function RoomSourceModal({ card, eightSleepModalStates, onClose, preload = false
     return (
       <EightSleepBedModal key={eightSleepSide.hash} modalState={eightSleepModalState} onClose={onClose} open={Boolean(card)} side={eightSleepSide} />
     )
+  }
+
+  if (mediaRemote && preload) {
+    return <MediaRemoteModalContent config={mediaRemote} preload />
   }
 
   if (mediaRemote) {
@@ -1144,7 +1228,7 @@ function RoomSourcePreloadContent({ card, eightSleepModalState, roomTitle }: { c
   if (bathroomFan) return <BathroomFanModalContent config={bathroomFan} preload />
 
   const mediaRemote = card.kind === 'media' && card.hash ? MEDIA_REMOTE_CONFIGS[card.hash] : undefined
-  const content = mediaRemote ? <MediaRemoteModalContent config={mediaRemote} /> : renderRoomReusableSheet(card, roomTitle)
+  const content = mediaRemote ? <MediaRemoteModalContent config={mediaRemote} preload /> : renderRoomReusableSheet(card, roomTitle)
   return <>{content ?? <RoomSourceFallback card={card} />}</>
 }
 
@@ -1252,9 +1336,13 @@ function SourceRoomPage({ onNavigate, preload = false, preloadHash, preloadHashe
     </div>
   )
 
-  return bathroomFan && !preload
-    ? <BathroomFanCommandProvider config={bathroomFan}>{content}</BathroomFanCommandProvider>
+  const optimisticContent = !preload && room.optimisticStateEntityIds?.length
+    ? <OptimisticActionStateBoundary entityIds={room.optimisticStateEntityIds}>{content}</OptimisticActionStateBoundary>
     : content
+
+  return bathroomFan && !preload
+    ? <BathroomFanCommandProvider config={bathroomFan}>{optimisticContent}</BathroomFanCommandProvider>
+    : optimisticContent
 }
 
 function RoomPage({ onNavigate, path, preload = false, preloadHash, preloadHashes, title }: { onNavigate: (path: string) => void; path: string; preload?: boolean; preloadHash?: string; preloadHashes?: string[]; title: string }) {
@@ -2022,12 +2110,31 @@ function mediaPageCardFromItem(item: EntitySectionConfig['items'][number]): Room
   }
 }
 
-const MEDIA_SOURCE_SECTIONS = MEDIA_SECTIONS.map((section) => ({
-  ...section,
-  cards: section.items.map(mediaPageCardFromItem),
-}))
+const musicRoomMediaPageCards = ROOM_PAGE_CONFIGS['music-room'].sourceSections
+  .filter((section) => section.layout === 'lead-row' || section.layout === 'app-launch')
+  .flatMap((section) => section.cards)
+
+const musicRoomMediaPageSection = {
+  cards: musicRoomMediaPageCards,
+  title: ROOM_PAGE_CONFIGS['music-room'].title,
+}
+
+const MEDIA_SOURCE_SECTIONS: Array<{ cards: RoomSourceCardConfig[]; title: string }> = MEDIA_SECTIONS.flatMap((section) => {
+  const mappedSection = {
+    cards: section.items.map(mediaPageCardFromItem),
+    title: section.title,
+  }
+  return section.title === 'Theater Room'
+    ? [musicRoomMediaPageSection, mappedSection]
+    : [mappedSection]
+})
 
 const MEDIA_SOURCE_CARDS = MEDIA_SOURCE_SECTIONS.flatMap((section) => section.cards)
+function mediaRoomTitleForCard(card: RoomSourceCardConfig | null | undefined) {
+  return card?.hash
+    ? MEDIA_REMOTE_CONFIGS[card.hash]?.roomTitle ?? card.title
+    : card?.title ?? MEDIA_REMOTE_CONFIGS['#living-room-shield'].roomTitle
+}
 
 function MediaPage({ preload = false, preloadHash, preloadHashes = [] }: { preload?: boolean; preloadHash?: string; preloadHashes?: string[] }) {
   const coreCopy = useCopy(CORE_COPY_NAMESPACE)
@@ -2068,14 +2175,14 @@ function MediaPage({ preload = false, preloadHash, preloadHashes = [] }: { prelo
     }
   }, [preload])
 
-  return (
+  const content = (
     <>
       <ResponsiveSectionGrid>
         {MEDIA_SOURCE_SECTIONS.map((section) => {
           const leadCards = section.cards.slice(0, 1)
           const followUpCards = section.cards.slice(1)
           const renderCard = (card: RoomSourceCardConfig) => (
-            <RoomSourceCard card={card} key={[section.title, card.entityId, card.title].join('-')} onOpen={openSourceCard} />
+            <RoomSourceCard card={card} key={[section.title, card.entityId, card.title].join('-')} onOpen={openSourceCard} preload={preload} />
           )
 
           return (
@@ -2092,14 +2199,18 @@ function MediaPage({ preload = false, preloadHash, preloadHashes = [] }: { prelo
           )
         })}
       </ResponsiveSectionGrid>
-      <RoomSourceModal card={selectedCard} onClose={closeSourceCard} preloadCard={preloadCard} roomTitle={(selectedCard ?? preloadCard)?.title === 'Theater Room' ? 'Theater Room' : 'Living Room'} />
+      <RoomSourceModal card={selectedCard} onClose={closeSourceCard} preload={preload} preloadCard={preloadCard} roomTitle={mediaRoomTitleForCard(selectedCard ?? preloadCard)} />
       {preloadCards.map((card) => (
         <div data-preload-modal={'media' + card.hash} key={'media-preload-' + card.hash}>
-          <RoomSourcePreloadContent card={card} roomTitle={card.title === 'Theater Room' ? 'Theater Room' : 'Living Room'} />
+          <RoomSourcePreloadContent card={card} roomTitle={mediaRoomTitleForCard(card)} />
         </div>
       ))}
     </>
   )
+
+  return preload
+    ? content
+    : <OptimisticActionStateBoundary entityIds={MUSIC_ROOM_MEDIA_OPTIMISTIC_ENTITY_IDS}>{content}</OptimisticActionStateBoundary>
 }
 
 function AdminPage({ onNavigate, preload = false, preloadHash, preloadHashes = [] }: { onNavigate: (path: string) => void; preload?: boolean; preloadHash?: string; preloadHashes?: string[] }) {

@@ -287,9 +287,17 @@ const MODAL_CASES: ModalCase[] = [
     expectedScrollMode: 'panes',
     expectedSize: 'workspace',
     id: 'media-room-source',
-    open: (page) => openButtonModal(page, 'living-room', /^Living Room SHIELD Off$/i),
+    open: (page) => openButtonModal(page, 'living-room', /^Living Room Remote Off$/i),
     physicalCallsite: 'src/pages/DashboardViewPage.tsx:MediaRoomSourceModal',
     selectTabs: ['Controls', 'Apps'],
+  },
+  {
+    expectedScrollMode: 'panes',
+    expectedSize: 'workspace',
+    id: 'music-room-media-remote',
+    open: (page) => openButtonModal(page, 'music-room', /^Music Room Remote Off$/i),
+    physicalCallsite: 'src/pages/DashboardViewPage.tsx:MediaRoomSourceModal',
+    selectTabs: ['Controls', 'Apps', 'Devices'],
   },
   {
     expectedScrollMode: 'body',
@@ -725,7 +733,7 @@ test.describe.serial('complete ModalSheet inventory acceptance', () => {
       optionPickerSheetConsumers: 2,
       physicalCallsiteCounts: EXPECTED_PHYSICAL_MODAL_CALLSITES,
     })
-    expect(MODAL_CASES).toHaveLength(31)
+    expect(MODAL_CASES).toHaveLength(32)
     expect([...new Set(MODAL_CASES.map((modalCase) => modalCase.physicalCallsite))].sort()).toEqual(
       Object.keys(EXPECTED_PHYSICAL_MODAL_CALLSITES).sort(),
     )

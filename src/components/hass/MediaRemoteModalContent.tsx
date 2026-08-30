@@ -4,6 +4,7 @@ import { useEntity, useHass } from '@hakit/core'
 import { DynamicGrid } from '../core/DynamicGrid'
 import { MaterialIcon } from '../core/Icon'
 import { GlassTile, type TileTone } from '../core/GlassTile'
+import type { ControlSemantics } from '../core/controlSemantics'
 import { ModalIconTabNav } from '../core/ModalTabNav'
 import { modalTabId, modalTabPanelId } from '../core/modalTabIds'
 import type { MediaRemoteAction, MediaRemoteAppConfig, MediaRemoteButtonConfig, MediaRemoteConfig, MediaRemoteDeviceConfig, MediaRemoteIconColorRule } from '../../constants/mediaRemotes'
@@ -12,9 +13,18 @@ import { useOptimisticState } from '../../hooks/useOptimisticState'
 import { useSmoothDisplayedModalTab } from '../../hooks/useSmoothDisplayedModalTab'
 import { CORE_COPY_KEYS, CORE_COPY_NAMESPACE, useCopy } from '../../i18n'
 import { asEntityName, titleCaseState } from './entityState'
+import {
+  OptimisticActionStateBoundary,
+} from './OptimisticActionState'
+import {
+  optimisticStateValue,
+  runOptimisticServiceCommand,
+  useOptimisticActionStates,
+  type OptimisticActionStateMap,
+} from './optimisticActionState'
 import styles from './MediaRemoteModalContent.module.css'
 
-type CallService = (params: Record<string, unknown>) => void
+type CallService = (params: Record<string, unknown>) => unknown
 type TextPromptAction = Extract<MediaRemoteAction, { type: 'textPrompt' }>
 type TextPromptAccordionState = 'closed' | 'closing' | 'open' | 'opening'
 type TextPromptState = { accordionState: TextPromptAccordionState; action: TextPromptAction }
@@ -125,33 +135,60 @@ function scheduleTextPromptVisibility(input: HTMLInputElement | null, reason: st
   }
 }
 
-function resolveAction(action: MediaRemoteAction, entityId: string | undefined, entities: Record<string, EntityLike | undefined>) {
+function resolveAction(
+  action: MediaRemoteAction,
+  entityId: string | undefined,
+  entities: Record<string, EntityLike | undefined>,
+  optimisticStates: OptimisticActionStateMap,
+) {
   if (action.type !== 'state') return action
   const stateEntityId = action.entityId ?? entityId
-  const state = stateEntityId ? entities[stateEntityId]?.state : undefined
+  const state = stateEntityId
+    ? optimisticStateValue(stateEntityId, entities[stateEntityId]?.state, optimisticStates)
+    : undefined
   const matchedCase = action.cases.find((candidate) => state !== undefined && candidate.states.includes(state))
   return matchedCase?.action ?? action.defaultAction
 }
 
-function runAction(callService: CallService, action: MediaRemoteAction, entities: Record<string, EntityLike | undefined>, entityId: string | undefined, onTextPrompt: (action: TextPromptAction) => void) {
-  const resolvedAction = resolveAction(action, entityId, entities)
+function runAction(
+  callService: CallService,
+  action: MediaRemoteAction,
+  entities: Record<string, EntityLike | undefined>,
+  entityId: string | undefined,
+  onTextPrompt: (action: TextPromptAction) => void,
+  optimisticStates: OptimisticActionStateMap,
+) {
+  const resolvedAction = resolveAction(action, entityId, entities, optimisticStates)
 
   if (resolvedAction.type === 'textPrompt') {
     onTextPrompt(resolvedAction)
     return
   }
 
-  callService({ domain: resolvedAction.domain, service: resolvedAction.service, target: resolvedAction.target, serviceData: resolvedAction.serviceData })
+  runOptimisticServiceCommand(
+    callService,
+    { domain: resolvedAction.domain, service: resolvedAction.service, target: resolvedAction.target, serviceData: resolvedAction.serviceData },
+    resolvedAction.optimisticState,
+    resolvedAction.optimisticResetState,
+    optimisticStates,
+  )
 }
 
-function iconColorFromRule(rule: MediaRemoteIconColorRule | undefined, entities: Record<string, EntityLike | undefined>) {
+function iconColorFromRule(rule: MediaRemoteIconColorRule | undefined, entities: Record<string, EntityLike | undefined>, optimisticStates: OptimisticActionStateMap) {
   if (!rule) return undefined
   const inactive = rule.entityIds.every((entityId) => {
     const entity = entities[entityId]
     const inactiveStates = rule.inactiveStatesByEntity?.[entityId] ?? rule.inactiveStates
-    return entity ? inactiveStates.includes(entity.state) : false
+    const state = optimisticStateValue(entityId, entity?.state, optimisticStates)
+    return state ? inactiveStates.includes(state) : false
   })
   return inactive ? rule.inactiveColor : rule.activeColor
+}
+
+function withOptimisticState(entity: EntityLike | null, entityId: string, optimisticStates: OptimisticActionStateMap) {
+  const state = optimisticStateValue(entityId, entity?.state, optimisticStates)
+  if (!entity || !state || state === entity.state) return entity
+  return { ...entity, state }
 }
 
 function SectionHeader({ title }: { title: string }) {
@@ -166,7 +203,9 @@ function SectionHeader({ title }: { title: string }) {
 function RemoteButton({ button, disabled = false, onTextPrompt, size = 'large' }: { button: MediaRemoteButtonConfig; disabled?: boolean; onTextPrompt: (action: TextPromptAction) => void; size?: 'large' | 'round' | 'small' }) {
   const callService = useHass((state) => state.helpers.callService) as unknown as CallService
   const entities = useHass((state) => state.entities) as unknown as Record<string, EntityLike | undefined>
-  const iconColor = iconColorFromRule(button.iconColorRule, entities)
+  const optimisticStates = useOptimisticActionStates()
+  const semantics: ControlSemantics = button.semantics?.(undefined) ?? { kind: 'command' }
+  const iconColor = iconColorFromRule(button.iconColorRule, entities, optimisticStates)
   const iconSize = size === 'large' ? 42 : button.icon === 'mdi:circle' ? 24 : 30
   const iconRotation = button.iconRotationDegrees ? `rotate(${button.iconRotationDegrees} 12 12)` : undefined
   const hasIcon = button.icon.trim().length > 0
@@ -174,11 +213,14 @@ function RemoteButton({ button, disabled = false, onTextPrompt, size = 'large' }
   return (
     <button
       aria-label={button.label}
+      aria-checked={semantics.kind === 'toggle' ? semantics.checked : undefined}
       className={styles.remoteButton}
+      data-action-kind={semantics.kind}
       data-icon={button.icon}
       data-size={size}
       disabled={disabled}
-      onClick={() => runAction(callService, button.action, entities, undefined, onTextPrompt)}
+      onClick={() => runAction(callService, button.action, entities, undefined, onTextPrompt, optimisticStates)}
+      role={semantics.kind === 'toggle' ? 'switch' : undefined}
       style={iconColor ? { color: iconColor } : undefined}
       type="button"
     >
@@ -216,17 +258,25 @@ function ButtonRow({ buttons, disabled, onTextPrompt, size = 'small' }: { button
 function PowerButton({ button, controlEntity, onTextPrompt }: { button: MediaRemoteButtonConfig; controlEntity: EntityLike | null; onTextPrompt: (action: TextPromptAction) => void }) {
   const callService = useHass((state) => state.helpers.callService) as unknown as CallService
   const entities = useHass((state) => state.entities) as unknown as Record<string, EntityLike | undefined>
-  const iconColor = iconColorFromRule(button.iconColorRule, entities)
+  const optimisticStates = useOptimisticActionStates()
+  const displayedControlEntity = controlEntity
+    ? withOptimisticState(controlEntity, controlEntity.entity_id, optimisticStates)
+    : controlEntity
+  const semantics: ControlSemantics = button.semantics?.(displayedControlEntity?.state) ?? { kind: 'command' }
+  const iconColor = iconColorFromRule(button.iconColorRule, entities, optimisticStates)
   const iconRotation = button.iconRotationDegrees ? `rotate(${button.iconRotationDegrees} 12 12)` : undefined
-  const powerLabel = isOff(controlEntity) ? 'Power On' : 'Power Off'
+  const powerLabel = isOff(displayedControlEntity) ? 'Power On' : 'Power Off'
 
   return (
     <button
+      aria-checked={semantics.kind === 'toggle' ? semantics.checked : undefined}
       aria-label={button.label}
       className={`${styles.remoteButton} ${styles.powerButton}`}
+      data-action-kind={semantics.kind}
       data-icon={button.icon}
       data-size="power"
-      onClick={() => runAction(callService, button.action, entities, undefined, onTextPrompt)}
+      onClick={() => runAction(callService, button.action, entities, undefined, onTextPrompt, optimisticStates)}
+      role={semantics.kind === 'toggle' ? 'switch' : undefined}
       style={iconColor ? { color: iconColor } : undefined}
       type="button"
     >
@@ -440,32 +490,65 @@ function VolumeSlider({ entityId, title }: { entityId: string; title: string }) 
 function DeviceButton({ device }: { device: MediaRemoteDeviceConfig }) {
   const callService = useHass((state) => state.helpers.callService) as unknown as CallService
   const entities = useHass((state) => state.entities) as unknown as Record<string, EntityLike | undefined>
-  const entity = useEntity(asEntityName(device.entityId), { returnNullIfNotFound: true }) as EntityLike | null
-  const unavailable = isUnavailable(entity)
-  const subtitle = formatMediaState(entity)
+  const optimisticStates = useOptimisticActionStates()
+  const liveEntity = useEntity(asEntityName(device.entityId), { returnNullIfNotFound: true }) as EntityLike | null
+  const entity = withOptimisticState(liveEntity, device.entityId, optimisticStates)
+  const unavailable = isUnavailable(liveEntity)
+  const active = device.activeStates?.length ? Boolean(entity && device.activeStates.includes(entity.state)) : !isOff(entity)
+  const subtitle = entity ? device.stateLabels?.[entity.state] ?? formatMediaState(entity) : formatMediaState(entity)
   const tone: TileTone = device.entityId.startsWith('input_boolean.') ? 'switch' : 'media'
-  const runDeviceAction = unavailable ? undefined : () => runAction(callService, device.action, entities, device.entityId, () => undefined)
+  const semantics: ControlSemantics = device.semantics?.(entity?.state) ?? (device.action ? { kind: 'command' } : { kind: 'state' })
+  const runDeviceAction = device.action
+    ? () => runAction(callService, device.action!, entities, device.entityId, () => undefined, optimisticStates)
+    : undefined
 
   return (
-    <GlassTile icon={device.icon} isOff={isOff(entity)} onClick={runDeviceAction} subtitle={subtitle} title={device.title} tone={tone} />
+    <GlassTile disabled={unavailable && Boolean(device.action)} icon={device.icon} isOff={unavailable || !active} onClick={runDeviceAction} semantics={semantics} subtitle={subtitle} title={device.title} tone={tone} />
   )
 }
 
 function AppButton({ app }: { app: MediaRemoteAppConfig }) {
   const callService = useHass((state) => state.helpers.callService) as unknown as CallService
   const entities = useHass((state) => state.entities) as unknown as Record<string, EntityLike | undefined>
+  const optimisticStates = useOptimisticActionStates()
   const [imageFailed, setImageFailed] = useState(false)
+  const liveState = app.stateEntityId ? entities[app.stateEntityId]?.state : undefined
+  const displayedState = app.stateEntityId
+    ? optimisticStateValue(app.stateEntityId, liveState, optimisticStates)
+    : undefined
+  const active = Boolean(displayedState && app.activeStates?.includes(displayedState))
+  const unavailable = Boolean(app.stateEntityId && (!liveState || ['unavailable', 'unknown'].includes(liveState)))
+  const semantics: ControlSemantics = app.semantics?.(displayedState) ?? { kind: 'command' }
 
   return (
-    <button aria-label={app.title} className={styles.appButton} data-background={app.background} onClick={() => runAction(callService, app.action, entities, undefined, () => undefined)} type="button">
-      {imageFailed ? <MaterialIcon name={app.icon ?? 'mdi:play-box'} size={34} /> : <img alt="" className={styles.appImage} onError={() => setImageFailed(true)} src={app.imageUrl} />}
+    <button
+      aria-label={app.title}
+      aria-checked={semantics.kind === 'toggle' ? semantics.checked : undefined}
+      aria-pressed={semantics.kind === 'selection' ? semantics.selected : undefined}
+      className={styles.appButton}
+      data-action-kind={semantics.kind}
+      data-active={active ? 'true' : 'false'}
+      data-background={app.background}
+      disabled={unavailable}
+      onClick={() => runAction(callService, app.action, entities, undefined, () => undefined, optimisticStates)}
+      role={semantics.kind === 'toggle' ? 'switch' : undefined}
+      type="button"
+    >
+      {!app.imageUrl || imageFailed
+        ? (
+            <span className={styles.appFallback}>
+              <MaterialIcon name={app.icon ?? 'mdi:play-box'} size={34} />
+              <span>{app.title}</span>
+            </span>
+          )
+        : <img alt="" className={styles.appImage} onError={() => setImageFailed(true)} src={app.imageUrl} />}
     </button>
   )
 }
 
-export function MediaRemoteModalNav({ activeTab, onTabChange, remoteTitle, showDevices = false }: { activeTab: MediaRemoteModalTab; onTabChange: (tab: MediaRemoteModalTab) => void; remoteTitle: string; showDevices?: boolean }) {
+export function MediaRemoteModalNav({ activeTab, onTabChange, remoteTitle, showApps = true, showDevices = false }: { activeTab: MediaRemoteModalTab; onTabChange: (tab: MediaRemoteModalTab) => void; remoteTitle: string; showApps?: boolean; showDevices?: boolean }) {
   const copy = useCopy(CORE_COPY_NAMESPACE)
-  const tabs = mediaRemoteModalTabs(showDevices)
+  const tabs = mediaRemoteModalTabs(showApps, showDevices)
   const effectiveActiveTab = tabs.some((tab) => tab.tab === activeTab) ? activeTab : 'controls'
   const idPrefix = `media-${remoteTitle.toLowerCase().replaceAll(/[^a-z0-9]+/g, '-')}`
 
@@ -512,10 +595,12 @@ function MediaRemoteModalTabContent({
   onTextPromptOpened: () => void
   onTextPromptSubmit: (action: TextPromptAction, text: string) => void
 }) {
-  const controlEntity = useEntity(asEntityName(config.controlEntityId), { returnNullIfNotFound: true }) as EntityLike | null
+  const optimisticStates = useOptimisticActionStates()
+  const liveControlEntity = useEntity(asEntityName(config.controlEntityId), { returnNullIfNotFound: true }) as EntityLike | null
+  const controlEntity = withOptimisticState(liveControlEntity, config.controlEntityId, optimisticStates)
   const modalBodyRef = useRef<HTMLDivElement | null>(null)
   const modalPanelRef = useRef<HTMLDivElement | null>(null)
-  const availableTabs = mediaRemoteModalTabs(Boolean(config.devices?.length))
+  const availableTabs = mediaRemoteModalTabs(Boolean(config.appCards?.length), Boolean(config.devices?.length))
   const targetTab = availableTabs.some((tab) => tab.tab === activeTab) ? activeTab : 'controls'
   const { displayedTab: effectiveActiveTab, transitionState } = useSmoothDisplayedModalTab(targetTab)
   const selectedTabLabel = availableTabs.find((tab) => tab.tab === effectiveActiveTab)?.label ?? 'Controls'
@@ -605,9 +690,11 @@ function MediaRemoteModalTabContent({
   )
 }
 
-export function MediaRemoteModalContent({ activeTab: controlledActiveTab, config, onTabChange }: { activeTab?: MediaRemoteModalTab; config: MediaRemoteConfig; onTabChange?: (tab: MediaRemoteModalTab) => void }) {
+function MediaRemoteModalInteractiveContent({ activeTab: controlledActiveTab, config, onTabChange }: { activeTab?: MediaRemoteModalTab; config: MediaRemoteConfig; onTabChange?: (tab: MediaRemoteModalTab) => void }) {
   const callService = useHass((state) => state.helpers.callService) as unknown as CallService
-  const controlEntity = useEntity(asEntityName(config.controlEntityId), { returnNullIfNotFound: true }) as EntityLike | null
+  const optimisticStates = useOptimisticActionStates()
+  const liveControlEntity = useEntity(asEntityName(config.controlEntityId), { returnNullIfNotFound: true }) as EntityLike | null
+  const controlEntity = withOptimisticState(liveControlEntity, config.controlEntityId, optimisticStates)
   const volumeEntity = useEntity(asEntityName(config.volumeEntityId), { returnNullIfNotFound: true }) as EntityLike | null
   const [localActiveTab, setLocalActiveTab] = useState<MediaRemoteModalTab>('controls')
   const [textPrompt, setTextPrompt] = useState<TextPromptState | null>(null)
@@ -706,8 +793,43 @@ export function MediaRemoteModalContent({ activeTab: controlledActiveTab, config
           textPrompt={textPrompt}
           textPromptInputRef={textPromptInputRef}
         />
-        {!hasExternalNav ? <MediaRemoteModalNav activeTab={activeTab} onTabChange={setActiveTab} remoteTitle={config.title} showDevices={Boolean(config.devices?.length)} /> : null}
+        {!hasExternalNav ? (
+          <MediaRemoteModalNav
+            activeTab={activeTab}
+            onTabChange={setActiveTab}
+            remoteTitle={config.title}
+            showApps={Boolean(config.appCards?.length)}
+            showDevices={Boolean(config.devices?.length)}
+          />
+        ) : null}
       </div>
     </div>
   )
+}
+
+function MediaRemotePreloadContent({ config }: { config: MediaRemoteConfig }) {
+  return (
+    <div className={styles.remoteContainer} data-media-remote-preload={config.hash}>
+      <div aria-hidden="true" className={styles.preloadRemoteGeometry} />
+    </div>
+  )
+}
+
+export function MediaRemoteModalContent({
+  activeTab,
+  config,
+  onTabChange,
+  preload = false,
+}: {
+  activeTab?: MediaRemoteModalTab
+  config: MediaRemoteConfig
+  onTabChange?: (tab: MediaRemoteModalTab) => void
+  preload?: boolean
+}) {
+  if (preload) return <MediaRemotePreloadContent config={config} />
+
+  const content = <MediaRemoteModalInteractiveContent activeTab={activeTab} config={config} onTabChange={onTabChange} />
+  return config.optimisticStateEntityIds?.length
+    ? <OptimisticActionStateBoundary entityIds={config.optimisticStateEntityIds}>{content}</OptimisticActionStateBoundary>
+    : content
 }
