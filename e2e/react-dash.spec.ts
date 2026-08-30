@@ -2323,7 +2323,7 @@ test.describe('desktop modal layout', () => {
   test('media remote modal uses the stable workspace height', async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 760 })
     await page.goto('/at-a-glance/living-room')
-    await page.getByRole('button', { name: /^Living Room SHIELD Off$/i }).click()
+    await page.getByRole('button', { name: /^Living Room Remote Off$/i }).click()
 
     const dialog = page.getByRole('dialog')
     await expect(dialog).toBeVisible()
@@ -3168,7 +3168,7 @@ test('guest room page opens source-aligned header popups', async ({ page }) => {
 
 test('room media cards open ported remote modals', async ({ page }) => {
   await page.goto('/at-a-glance/living-room')
-  await page.getByRole('button', { name: /^Living Room SHIELD Off$/i }).click()
+  await page.getByRole('button', { name: /^Living Room Remote Off$/i }).click()
   const dialog = page.getByRole('dialog')
   await expect(dialog).toBeVisible()
   await expect.poll(async () => {
@@ -3193,7 +3193,7 @@ test('room media cards open ported remote modals', async ({ page }) => {
   await page.getByRole('button', { name: 'Close' }).click()
 
   await page.goto('/at-a-glance/theater-room')
-  await page.getByRole('button', { name: /^Theater Remote Off$/i }).click()
+  await page.getByRole('button', { name: /^Theater Room Remote Off$/i }).click()
   await expect(page.getByRole('heading', { name: 'Theater Room SHIELD Remote' })).toBeVisible()
   await page.getByRole('dialog').getByRole('tab', { name: 'Apps' }).click()
   await expect(page.getByRole('button', { name: 'Prime Video' })).toBeVisible()
@@ -3207,7 +3207,7 @@ test('theater remote leads a full-width row above its source control grid', asyn
 
   const opener = page.getByRole('group', { exact: true, name: 'Theater Room Remote' })
   const controls = page.getByRole('group', { exact: true, name: 'Theater Room Remote Controls' })
-  await expect(opener.getByRole('button', { name: /^Theater Remote/ })).toBeVisible()
+  await expect(opener.getByRole('button', { name: /^Theater Room Remote/ })).toBeVisible()
   await expect(opener.getByRole('button', { name: /^Nintendo Switch/ })).toHaveCount(0)
   await expect(controls.getByRole('button', { name: /^Nintendo Switch/ })).toBeVisible()
   await expect(controls.getByRole('button', { name: /^Theater SHIELD/ })).toBeVisible()
@@ -3239,6 +3239,89 @@ test('theater remote leads a full-width row above its source control grid', asyn
     sourcesBelowRemote: true,
     sourcesShareRow: true,
   })
+})
+
+test('Music Room route orders remote controls before its local Fortnite app tile', async ({ page }) => {
+  await page.goto('/at-a-glance/music-room')
+
+  const remoteHeading = page.getByRole('heading', { exact: true, name: 'Remote' })
+  const appsHeading = page.getByRole('heading', { exact: true, name: 'Quick App Launch' })
+  const devicesHeading = page.getByRole('heading', { exact: true, name: 'Devices' })
+  await expect(remoteHeading).toBeVisible()
+  await expect(appsHeading).toBeVisible()
+  await expect(devicesHeading).toBeVisible()
+  const [remoteBox, appsBox, devicesBox] = await Promise.all([
+    remoteHeading.boundingBox(),
+    appsHeading.boundingBox(),
+    devicesHeading.boundingBox(),
+  ])
+  expect((appsBox?.y ?? 0) > (remoteBox?.y ?? 0)).toBe(true)
+  expect((devicesBox?.y ?? 0) > (appsBox?.y ?? 0)).toBe(true)
+
+  const opener = page.getByRole('group', { exact: true, name: 'Music Room Remote' })
+  const controls = page.getByRole('group', { exact: true, name: 'Music Room Remote Controls' })
+  const remote = opener.getByRole('button', { name: 'Music Room Remote Off' })
+  const xbox = controls.getByRole('button', { name: 'Xbox Off' })
+  const server = controls.getByRole('button', { name: 'Server Off' })
+  const fortnite = page.getByRole('group', { exact: true, name: 'Music Room Quick App Launch' }).getByRole('button', { name: 'Fortnite' })
+  await expect(remote).toHaveAttribute('data-action-kind', 'modal')
+  await expect(xbox).toHaveAttribute('data-action-kind', 'selection')
+  await expect(xbox).toHaveAttribute('aria-pressed', 'false')
+  await expect(server).toHaveAttribute('data-action-kind', 'selection')
+  await expect(fortnite).toHaveAttribute('data-action-kind', 'selection')
+  await expect(fortnite).toHaveAttribute('aria-pressed', 'false')
+  await expect(fortnite.locator('img')).toHaveCount(0)
+
+  await xbox.click()
+  const selectedXbox = controls.getByRole('button', { name: 'Xbox On' })
+  await expect(selectedXbox).toHaveAttribute('aria-pressed', 'true')
+  await selectedXbox.click()
+  await server.click()
+  await expect(controls.getByRole('button', { name: 'Server On' })).toBeVisible()
+  await fortnite.click()
+  await expect(fortnite).toHaveAttribute('data-active', 'true')
+  await expect(fortnite).toHaveAttribute('aria-pressed', 'true')
+  expect(await page.evaluate(() => (window as unknown as { __mockHass: { calls: Record<string, unknown>[] } }).__mockHass.calls)).toEqual([
+    { domain: 'script', returnResponse: true, service: 'music_room_xbox' },
+    { domain: 'script', returnResponse: true, service: 'music_room_xbox' },
+    { domain: 'script', returnResponse: true, service: 'music_room_server' },
+    { domain: 'script', returnResponse: true, service: 'music_room_fortnite' },
+  ])
+
+  await page.reload()
+  await remote.click()
+  const dialog = page.getByRole('dialog', { name: 'Music Room Remote' })
+  await expect(dialog).toBeVisible()
+  await expect(dialog.getByRole('heading', { name: 'Sonos Beam Volume' })).toBeVisible()
+  await expect(dialog.getByRole('button', { name: 'Keyboard' })).toHaveCount(0)
+  await dialog.getByRole('switch', { name: 'Power' }).click()
+  await dialog.getByRole('button', { exact: true, name: 'Up' }).click()
+  await expect.poll(() => page.evaluate(() => (window as unknown as { __mockHass: { calls: Record<string, unknown>[] } }).__mockHass.calls.at(-1))).toEqual({
+    domain: 'remote',
+    service: 'send_command',
+    target: 'remote.music_room_tv_android',
+    serviceData: { command: 'DPAD_UP' },
+  })
+
+  await dialog.getByRole('tab', { name: 'Devices' }).click()
+  await expect(dialog.getByRole('switch', { name: 'TV On' })).toBeVisible()
+  await expect(dialog.getByRole('switch', { name: 'Xbox Off' })).toBeVisible()
+  await expect(dialog.getByRole('button', { name: 'Server Off' })).toBeVisible()
+  await expect(dialog.getByLabel('Sonos Beam Playing')).toHaveAttribute('data-action-kind', 'state')
+  await expect(dialog.getByRole('button', { name: 'Sonos Beam Playing' })).toHaveCount(0)
+})
+
+test('Media page includes the Music Room remote, Xbox, Server, and Fortnite controls', async ({ page }) => {
+  await page.goto('/at-a-glance/media')
+
+  const musicSection = page.getByRole('heading', { exact: true, name: 'Music Room' }).locator('xpath=ancestor::section[1]')
+  await expect(musicSection.getByRole('button', { name: 'Music Room Remote Off' })).toBeVisible()
+  await expect(musicSection.getByRole('button', { name: 'Xbox Off' })).toHaveAttribute('data-action-kind', 'selection')
+  await expect(musicSection.getByRole('button', { name: 'Server Off' })).toBeVisible()
+  await expect(musicSection.getByRole('button', { name: 'Fortnite' })).toBeVisible()
+
+  await musicSection.getByRole('button', { name: 'Music Room Remote Off' }).click()
+  await expect(page.getByRole('dialog', { name: 'Music Room Remote' })).toBeVisible()
 })
 
 test('Free Sleep global Add Alarm defaults to weekdays and writes enabled backend records', async ({ page }) => {

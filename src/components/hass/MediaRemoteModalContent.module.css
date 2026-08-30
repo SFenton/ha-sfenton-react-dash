@@ -389,6 +389,16 @@
   background: #fff;
 }
 
+.appButton[data-active='true'] {
+  border-color: var(--color-text);
+  background: var(--color-glass-strong);
+}
+
+.appButton:disabled {
+  cursor: default;
+  opacity: 0.4;
+}
+
 .appImage {
   display: block;
   width: 100%;
@@ -396,8 +406,24 @@
   object-fit: cover;
 }
 
+.appFallback {
+  display: grid;
+  gap: 8px;
+  place-items: center;
+  color: var(--color-text);
+  font-size: 0.86rem;
+  font-weight: 850;
+}
+
 .deviceGrid {
   --dynamic-grid-columns: 2;
+}
+
+.preloadRemoteGeometry {
+  width: 100%;
+  min-height: 360px;
+  border-radius: 24px;
+  background: var(--color-glass-soft);
 }
 
 @media (prefers-reduced-motion: reduce) {

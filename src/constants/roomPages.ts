@@ -1,8 +1,20 @@
 import type { EntityBasicAction, EntityStateAction } from './portedDashboard'
+import type { ControlSemanticsResolver } from '../components/core/controlSemantics'
 import { BATHROOM_FANS } from './bathroomFans'
 import { GARAGE_DOOR_ENTITY_IDS } from './garageDoors'
 import { MASTER_BEDROOM_HUMIDIFIER } from './humidifiers'
-import { MEDIA_REMOTE_CONFIGS, type MediaRemoteAction } from './mediaRemotes'
+import {
+  MEDIA_REMOTE_CONFIGS,
+  MUSIC_ROOM_CONTROL_ENTITY_ID,
+  MUSIC_ROOM_MEDIA_ACTIONS,
+  MUSIC_ROOM_MEDIA_SOURCE_ENTITY_ID,
+  MUSIC_ROOM_MEDIA_SOURCE_STATES,
+  MUSIC_ROOM_REMOTE_HASH,
+  MUSIC_ROOM_XBOX_ENTITY_ID,
+  musicRoomSourceLabels,
+  type MediaRemoteAction,
+} from './mediaRemotes'
+import { MEDIA_COPY_KEYS, MEDIA_COPY_NAMESPACE, copy } from '../i18n'
 
 export type RoomSourceKind = 'air' | 'appliance' | 'climate' | 'contact' | 'fan' | 'grill' | 'humidifier' | 'laundry' | 'light' | 'media' | 'occupancy' | 'power' | 'vacuum' | 'vent'
 type RoomSourceBaseAction = Exclude<EntityBasicAction, { type: 'navigate' }>
@@ -29,7 +41,9 @@ export interface RoomSourceCardConfig {
   modalEntityId?: string
   modalItems?: RoomSourceModalItem[]
   modalTitle?: string
+  presentation?: 'app'
   presenceEntityId?: string
+  semantics?: ControlSemanticsResolver
   showState?: boolean
   span?: 'full'
   stateColors?: Partial<Record<string, string>>
@@ -61,6 +75,7 @@ export interface RoomSourceSectionConfig {
 
 export interface RoomPageSourceConfig {
   overviewCards: RoomSourceCardConfig[]
+  optimisticStateEntityIds?: readonly string[]
   path: string
   popupTemplates: string[]
   sourceSections: RoomSourceSectionConfig[]
@@ -68,8 +83,31 @@ export interface RoomPageSourceConfig {
 }
 
 function sourceActionFromMediaAction(action: MediaRemoteAction, serviceDataOverride?: Record<string, unknown>): RoomSourceCardAction | undefined {
-  if (action.type !== 'service') return undefined
-  return { type: 'service', domain: action.domain, service: action.service, target: action.target ?? null, serviceData: { ...action.serviceData, ...serviceDataOverride } }
+  if (action.type === 'textPrompt') return undefined
+  if (action.type === 'state') {
+    const defaultAction = sourceActionFromMediaAction(action.defaultAction, serviceDataOverride)
+    if (!defaultAction || defaultAction.type === 'state') return undefined
+    return {
+      type: 'state',
+      entityId: action.entityId,
+      cases: action.cases.flatMap((candidate) => {
+        const resolvedAction = sourceActionFromMediaAction(candidate.action, serviceDataOverride)
+        return resolvedAction && resolvedAction.type !== 'state'
+          ? [{ action: resolvedAction, states: candidate.states }]
+          : []
+      }),
+      defaultAction,
+    }
+  }
+  return {
+    type: 'service',
+    domain: action.domain,
+    service: action.service,
+    target: action.target ?? null,
+    serviceData: action.serviceData || serviceDataOverride ? { ...action.serviceData, ...serviceDataOverride } : undefined,
+    optimisticResetState: action.optimisticResetState,
+    optimisticState: action.optimisticState,
+  }
 }
 
 function inputButtonPress(target: string): RoomSourceBaseAction {
@@ -96,12 +134,23 @@ function mediaAppShortcuts(hash: string, entityId: string, serviceDataOverride?:
     imageBackground: app.background,
     imageUrl: app.imageUrl,
     kind: 'media',
+    presentation: 'app',
     action: sourceActionFromMediaAction(app.action, serviceDataOverride),
   }))
 }
 
 const livingRoomShieldAppShortcuts = mediaAppShortcuts('#living-room-shield', 'media_player.living_room_shield')
 const theaterAppShortcuts = mediaAppShortcuts('#theater-room-shield', 'media_player.theater_room_shield', { remote_entity: 'remote.theater_shield_remote' })
+const modalSemantics: ControlSemanticsResolver = () => ({ kind: 'modal' })
+const commandSemantics: ControlSemanticsResolver = () => ({ kind: 'command' })
+const musicRoomXboxSemantics: ControlSemanticsResolver = (state) => ({ kind: 'selection', selected: state === MUSIC_ROOM_MEDIA_SOURCE_STATES.xbox })
+const musicRoomServerSemantics: ControlSemanticsResolver = (state) => ({ kind: 'selection', selected: state === MUSIC_ROOM_MEDIA_SOURCE_STATES.server })
+const musicRoomFortniteSemantics: ControlSemanticsResolver = (state) => ({ kind: 'selection', selected: state === MUSIC_ROOM_MEDIA_SOURCE_STATES.fortnite })
+const musicRoomTitle = copy(MEDIA_COPY_NAMESPACE, MEDIA_COPY_KEYS.musicRoom.title)
+const musicRoomRemoteTitle = copy(MEDIA_COPY_NAMESPACE, MEDIA_COPY_KEYS.musicRoom.remote)
+const musicRoomXboxTitle = copy(MEDIA_COPY_NAMESPACE, MEDIA_COPY_KEYS.musicRoom.xbox)
+const musicRoomServerTitle = copy(MEDIA_COPY_NAMESPACE, MEDIA_COPY_KEYS.musicRoom.server)
+const musicRoomFortniteTitle = copy(MEDIA_COPY_NAMESPACE, MEDIA_COPY_KEYS.musicRoom.fortnite)
 
 export const ROOM_PAGE_CONFIGS: Record<string, RoomPageSourceConfig> = {
   'living-room': {
@@ -120,7 +169,7 @@ export const ROOM_PAGE_CONFIGS: Record<string, RoomPageSourceConfig> = {
         { title: 'Air Purifier', entityId: 'select.living_room_air_purifier_fan_mode', icon: 'mdi:fan', kind: 'air', hash: '#air-purifier', modalEntityId: 'sensor.living_room_air_purifier_pm2_5', subtitleEntityIds: ['select.living_room_air_purifier_fan_mode', 'fan.living_room_air_purifier_levoit_purifier'] },
       ] },
       { title: 'Devices', cards: [{ title: 'Main Floor', modalTitle: 'Robot Vacuum', entityId: 'vacuum.valetudo_exaltedsneakydeer', icon: 'mdi:robot-vacuum', kind: 'vacuum', hash: '#robot-vacuum', span: 'full' }] },
-      { title: 'Remote', cards: [{ title: 'Living Room SHIELD', entityId: 'media_player.living_room_shield', icon: 'mdi:remote', kind: 'media', hash: '#living-room-shield', showState: true }] },
+      { title: 'Remote', cards: [{ title: copy(MEDIA_COPY_NAMESPACE, MEDIA_COPY_KEYS.remoteOpeners.livingRoom), entityId: 'media_player.living_room_shield', icon: 'mdi:remote', kind: 'media', hash: '#living-room-shield', semantics: modalSemantics, showState: true }] },
       { title: 'Quick App Launch', layout: 'app-launch', cards: livingRoomShieldAppShortcuts },
     ],
     popupTemplates: ['light-slider-toggle', 'window-popup-single', 'air-purifier-popup', 'vent-popup-2', 'vacuum-*', 'media-player-popup'],
@@ -261,8 +310,9 @@ export const ROOM_PAGE_CONFIGS: Record<string, RoomPageSourceConfig> = {
     popupTemplates: ['light-popup-2', 'door-popup-2', 'grill-popup'],
   },
   'music-room': {
-    title: 'Music Room',
+    title: musicRoomTitle,
     path: 'music-room',
+    optimisticStateEntityIds: [MUSIC_ROOM_MEDIA_SOURCE_ENTITY_ID, MUSIC_ROOM_CONTROL_ENTITY_ID, MUSIC_ROOM_XBOX_ENTITY_ID],
     overviewCards: [
       { title: 'Lights', entityId: 'light.music_room', icon: 'mdi:lightbulb-group', kind: 'light', hash: '#lights-music-room', showState: true },
       { title: 'Climate', entityId: 'input_text.music_room_climate_range', icon: 'mdi:thermometer', kind: 'climate', hash: '#climate-music-room', showState: true },
@@ -275,9 +325,52 @@ export const ROOM_PAGE_CONFIGS: Record<string, RoomPageSourceConfig> = {
         { title: 'Vents', entityId: 'cover.music_room_vent_vent', icon: 'mdi:air-filter', kind: 'vent', hash: '#vents', showState: true, modalItems: [{ title: 'Vent', entityId: 'cover.music_room_vent_vent', icon: 'mdi:air-filter' }] },
         { title: 'Air Purifier', entityId: 'select.air_purifier_fan_mode', icon: 'mdi:fan', kind: 'air', hash: '#air-purifier', modalEntityId: 'sensor.air_purifier_pm2_5', subtitleEntityIds: ['select.air_purifier_fan_mode', 'fan.air_purifier_levoit_purifier'] },
       ] },
-      { title: 'Devices', cards: [{ title: 'Music Room', modalTitle: 'Robot Vacuum', entityId: 'vacuum.valetudo_elatedusedram', icon: 'mdi:robot-vacuum', kind: 'vacuum', hash: '#robot-vacuum', span: 'full' }] },
+      {
+        title: copy(MEDIA_COPY_NAMESPACE, MEDIA_COPY_KEYS.musicRoom.remoteSection),
+        layout: 'lead-row',
+        cards: [
+          { title: musicRoomRemoteTitle, entityId: MUSIC_ROOM_CONTROL_ENTITY_ID, icon: 'mdi:remote', kind: 'media', hash: MUSIC_ROOM_REMOTE_HASH, semantics: modalSemantics, showState: true },
+          {
+            title: musicRoomXboxTitle,
+            entityId: MUSIC_ROOM_MEDIA_SOURCE_ENTITY_ID,
+            icon: 'mdi:microsoft-xbox',
+            kind: 'media',
+            showState: true,
+            activeStates: [MUSIC_ROOM_MEDIA_SOURCE_STATES.xbox],
+            stateLabels: musicRoomSourceLabels(MUSIC_ROOM_MEDIA_SOURCE_STATES.xbox),
+            semantics: musicRoomXboxSemantics,
+            action: sourceActionFromMediaAction(MUSIC_ROOM_MEDIA_ACTIONS.xboxSource),
+          },
+          {
+            title: musicRoomServerTitle,
+            entityId: MUSIC_ROOM_MEDIA_SOURCE_ENTITY_ID,
+            icon: 'mdi:server',
+            kind: 'media',
+            showState: true,
+            activeStates: [MUSIC_ROOM_MEDIA_SOURCE_STATES.server],
+            stateLabels: musicRoomSourceLabels(MUSIC_ROOM_MEDIA_SOURCE_STATES.server),
+            semantics: musicRoomServerSemantics,
+            action: sourceActionFromMediaAction(MUSIC_ROOM_MEDIA_ACTIONS.server),
+          },
+        ],
+      },
+      {
+        title: copy(MEDIA_COPY_NAMESPACE, MEDIA_COPY_KEYS.musicRoom.quickAppLaunch),
+        layout: 'app-launch',
+        cards: [{
+          title: musicRoomFortniteTitle,
+          entityId: MUSIC_ROOM_MEDIA_SOURCE_ENTITY_ID,
+          icon: 'mdi:gamepad-variant',
+          kind: 'media',
+          presentation: 'app',
+          activeStates: [MUSIC_ROOM_MEDIA_SOURCE_STATES.fortnite],
+          semantics: musicRoomFortniteSemantics,
+          action: sourceActionFromMediaAction(MUSIC_ROOM_MEDIA_ACTIONS.fortnite),
+        }],
+      },
+      { title: 'Devices', cards: [{ title: musicRoomTitle, modalTitle: 'Robot Vacuum', entityId: 'vacuum.valetudo_elatedusedram', icon: 'mdi:robot-vacuum', kind: 'vacuum', hash: '#robot-vacuum', span: 'full' }] },
     ],
-    popupTemplates: ['light-popup-10', 'door-popup-single', 'vent-popup-single', 'climate-popup-3', 'air-purifier-popup', 'occupancy-popup-3', 'vacuum-*'],
+    popupTemplates: ['light-popup-10', 'door-popup-single', 'vent-popup-single', 'climate-popup-3', 'air-purifier-popup', 'occupancy-popup-3', 'media-player-popup', 'vacuum-*'],
   },
   'theater-room': {
     title: 'Theater Room',
@@ -295,9 +388,9 @@ export const ROOM_PAGE_CONFIGS: Record<string, RoomPageSourceConfig> = {
         { title: 'Air Purifier', entityId: 'select.theater_room_air_purifier_fan_mode', icon: 'mdi:fan', kind: 'air', hash: '#air-purifier', modalEntityId: 'sensor.theater_room_air_purifier_pm2_5', subtitleEntityIds: ['select.theater_room_air_purifier_fan_mode', 'fan.theater_room_air_purifier_levoit_purifier'] },
       ] },
       { title: 'Remote', layout: 'lead-row', cards: [
-        { title: 'Theater Remote', entityId: 'media_player.sony_projector', icon: 'mdi:projector', kind: 'media', hash: '#theater-room-shield', showState: true },
-        { title: 'Nintendo Switch', entityId: 'input_boolean.is_nintendo_switch_active', icon: 'mdi:gamepad', kind: 'media', showState: true, action: scriptAction('theater_room_nintendo_switch') },
-        { title: 'Theater SHIELD', entityId: 'input_boolean.is_theater_shield_active', icon: 'mdi:television', kind: 'media', showState: true, action: scriptAction('theater_room_tv_movie') },
+        { title: copy(MEDIA_COPY_NAMESPACE, MEDIA_COPY_KEYS.remoteOpeners.theaterRoom), entityId: 'media_player.sony_projector', icon: 'mdi:projector', kind: 'media', hash: '#theater-room-shield', semantics: modalSemantics, showState: true },
+        { title: 'Nintendo Switch', entityId: 'input_boolean.is_nintendo_switch_active', icon: 'mdi:gamepad', kind: 'media', semantics: commandSemantics, showState: true, action: scriptAction('theater_room_nintendo_switch') },
+        { title: 'Theater SHIELD', entityId: 'input_boolean.is_theater_shield_active', icon: 'mdi:television', kind: 'media', semantics: commandSemantics, showState: true, action: scriptAction('theater_room_tv_movie') },
       ] },
       { title: 'Quick App Launch', layout: 'app-launch', cards: theaterAppShortcuts },
       { title: 'Theater Room PCs', cards: [{ title: 'Theater Room PC', entityId: 'input_boolean.theater_pc_power', icon: 'mdi:projector', kind: 'power', subtitleEntityIds: ['input_text.theater_pc_power_state'], action: pcPowerAction('input_button.theater_pc_on', 'input_button.theater_pc_off') }] },

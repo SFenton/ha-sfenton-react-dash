@@ -1200,6 +1200,7 @@ export const explicitMockEntities: Record<string, MockEntity> = {
   'input_boolean.is_nintendo_switch_active': entity('input_boolean.is_nintendo_switch_active', 'off'),
   'input_boolean.is_theater_shield_active': entity('input_boolean.is_theater_shield_active', 'off'),
   'input_boolean.is_upper_deck_recording': entity('input_boolean.is_upper_deck_recording', 'on'),
+  'input_select.music_room_media_source': entity('input_select.music_room_media_source', 'Off', { options: ['Off', 'TV', 'Xbox', 'Server', 'Fortnite'] }),
   'light.lights': entity('light.lights', 'on'),
   'light.living_room': entity('light.living_room', 'on'),
   'light.living_room_front_left_light': entity('light.living_room_front_left_light', 'on'),
@@ -1213,6 +1214,9 @@ export const explicitMockEntities: Record<string, MockEntity> = {
   'media_player.living_room_shield': entity('media_player.living_room_shield', 'off'),
   'media_player.living_room_shield_2': entity('media_player.living_room_shield_2', 'off'),
   'media_player.master_bedroom_apple_tv': entity('media_player.master_bedroom_apple_tv', 'paused', { app_name: 'Apple TV' }),
+  'media_player.beam': entity('media_player.beam', 'playing', { volume_level: 0.3 }),
+  'media_player.music_room_tv_android': entity('media_player.music_room_tv_android', 'off'),
+  'media_player.xbox': entity('media_player.xbox', 'off'),
   'media_player.primary_bedroom': entity('media_player.primary_bedroom', 'playing', { volume_level: 0.34 }),
   'media_player.sonos': entity('media_player.sonos', 'playing', { volume_level: 0.26 }),
   'media_player.sony_projector': entity('media_player.sony_projector', 'off'),
@@ -1220,6 +1224,7 @@ export const explicitMockEntities: Record<string, MockEntity> = {
   'media_player.theater_room_shield': entity('media_player.theater_room_shield', 'off'),
   'remote.living_room_shield': entity('remote.living_room_shield', 'on'),
   'remote.master_bedroom_apple_tv': entity('remote.master_bedroom_apple_tv', 'on'),
+  'remote.music_room_tv_android': entity('remote.music_room_tv_android', 'on'),
   'remote.theater_shield_remote': entity('remote.theater_shield_remote', 'on'),
   'lock.aqara_smart_lock_u400': entity('lock.aqara_smart_lock_u400', 'locked'),
   'lock.fordpass_3fmtk3su5mma09266_doorlock': entity('lock.fordpass_3fmtk3su5mma09266_doorlock', 'locked'),
@@ -1623,6 +1628,11 @@ export function resetMockHass() {
   mockEntities['input_boolean.guests_staying_in_guest_room'].state = 'off'
   mockEntities['input_boolean.guests_staying_in_music_room'].state = 'off'
   mockEntities['input_boolean.guests_staying_in_theater_room'].state = 'off'
+  mockEntities['input_select.music_room_media_source'].state = 'Off'
+  mockEntities['media_player.music_room_tv_android'].state = 'off'
+  mockEntities['media_player.xbox'].state = 'off'
+  mockEntities['media_player.beam'].state = 'playing'
+  mockEntities['media_player.beam'].attributes.volume_level = 0.3
   mockEntities['input_boolean.guest_bathroom_fan_automation_lock'].state = 'off'
   mockEntities['input_boolean.guest_bathroom_fan_timer_auto_unlock'].state = 'off'
   mockEntities['input_boolean.guest_bathroom_fan_timer_pending'].state = 'off'
@@ -2054,9 +2064,15 @@ export const mockState: MockHassState = {
       main_floor_vacuum_clean_zone: {},
       main_floor_vacuum_mop_dock_clean: {},
       main_floor_vacuum_mop_dock_dry: {},
+      music_room_fortnite: {},
+      music_room_server: {},
+      music_room_tv: {},
+      music_room_tv_off: {},
       music_room_vacuum_clean_zone: {},
       music_room_vacuum_mop_dock_clean: {},
       music_room_vacuum_mop_dock_dry: {},
+      music_room_xbox: {},
+      music_room_xbox_off: {},
       theater_room_vacuum_clean_zone: {},
       theater_room_vacuum_mop_dock_clean: {},
       theater_room_vacuum_mop_dock_dry: {},

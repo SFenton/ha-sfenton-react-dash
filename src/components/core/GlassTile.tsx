@@ -239,7 +239,7 @@ export function GlassTile({
 
   return (
     <>
-      <div aria-label={resolvedAccessibleName} className={className} data-icon={iconName} data-icon-color={iconColor} data-muted={isOff ? 'true' : 'false'} data-progress={progressValue === undefined ? undefined : String(Math.round(progressValue))} data-tone={tone} data-variant={variant} style={resolvedStyle}>
+      <div aria-label={resolvedAccessibleName} className={className} data-action-kind={semantics?.kind} data-icon={iconName} data-icon-color={iconColor} data-muted={isOff ? 'true' : 'false'} data-progress={progressValue === undefined ? undefined : String(Math.round(progressValue))} data-tone={tone} data-variant={variant} style={resolvedStyle}>
         {content}
       </div>
       {liveAnnouncement}

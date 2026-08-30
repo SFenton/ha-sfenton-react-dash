@@ -1,11 +1,12 @@
 import type { CardColor } from '../components/core/Card'
 import { MASTER_BEDROOM_HUMIDIFIER } from './humidifiers'
 import { copy } from '../i18n'
+import type { OptimisticActionMetadata } from './actionIntents'
 
 export type EntityBasicAction =
   | { type: 'navigate'; path: string }
   | { type: 'toggle' }
-  | { type: 'service'; domain: string; service: string; target?: string | null; serviceData?: Record<string, unknown> }
+  | ({ type: 'service'; domain: string; service: string; target?: string | null; serviceData?: Record<string, unknown> } & OptimisticActionMetadata)
 
 export interface EntityStateAction<TAction extends EntityBasicAction = EntityBasicAction> {
   type: 'state'

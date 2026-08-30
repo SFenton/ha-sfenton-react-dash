@@ -40,6 +40,8 @@ test('hidden preload geometry performs no runtime I/O', async ({ page }) => {
   await expect(cache).toBeAttached()
   await expect(cache.locator('[data-preload-route]')).toHaveCount(RESPONSIVE_ROUTES.length)
   await expect(cache.locator('[data-preload-geometry="modal"]').first()).toBeAttached()
+  await expect(cache.locator('[data-preload-modal="media#music-room-remote"]')).toBeAttached()
+  await expect(cache.locator('[data-preload-modal="music-room#music-room-remote"]')).toBeAttached()
   await expect(cache.locator('[data-dynamic-grid="true"]')).toHaveCount(0)
 
   const audit = await page.evaluate(() => ({

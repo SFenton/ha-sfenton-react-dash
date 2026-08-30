@@ -181,6 +181,42 @@ test('music room focused-map control works in a fine-pointer desktop context', a
   await expect(fullMap).toHaveAttribute('aria-pressed', 'true')
 })
 
+test('Music Room media controls remain usable in a fine-pointer desktop context', async ({ page }) => {
+  await expect.poll(() => page.evaluate(() => ({
+    coarse: window.matchMedia('(pointer: coarse)').matches,
+    hover: window.matchMedia('(hover: hover)').matches,
+  }))).toEqual({ coarse: false, hover: true })
+
+  for (const viewport of DESKTOP_VIEWPORTS) {
+    await page.setViewportSize(viewport)
+    await page.goto('/index.html?path=music-room')
+    const root = await waitForRoute(page, 'music-room')
+    await expect(root.getByRole('button', { name: 'Music Room Remote Off' })).toBeVisible()
+    await expect(root.getByRole('button', { name: 'Xbox Off' })).toHaveAttribute('data-action-kind', 'selection')
+    await expect(root.getByRole('button', { name: 'Server Off' })).toHaveAttribute('data-action-kind', 'selection')
+    await expect(root.getByRole('button', { name: 'Fortnite' })).toHaveAttribute('aria-pressed', 'false')
+
+    await root.getByRole('button', { name: 'Music Room Remote Off' }).click()
+    const dialog = page.getByRole('dialog', { name: 'Music Room Remote' })
+    await expect(dialog).toBeVisible()
+    await expect(dialog.getByRole('heading', { name: 'Sonos Beam Volume' })).toBeVisible()
+    await dialog.getByRole('tab', { name: 'Devices' }).click()
+    await expect(dialog.getByRole('switch', { name: 'TV Off' })).toBeVisible()
+    await expect(dialog.getByRole('switch', { name: 'Xbox Off' })).toBeVisible()
+    await expect(dialog.getByRole('button', { name: 'Server Off' })).toHaveAttribute('aria-pressed', 'false')
+    await expect(dialog.getByLabel('Sonos Beam Playing')).toHaveAttribute('data-action-kind', 'state')
+    expect(await dialog.evaluate((element) => element.scrollWidth - element.clientWidth)).toBeLessThanOrEqual(0)
+    await dialog.getByRole('button', { name: 'Close' }).click()
+
+    const media = await navigateRoute(page, 'media')
+    const musicSection = media.getByRole('heading', { level: 2, name: 'Music Room' }).locator('xpath=ancestor::section[1]')
+    await expect(musicSection.getByRole('button', { name: 'Music Room Remote Off' })).toBeVisible()
+    await expect(musicSection.getByRole('button', { name: 'Xbox Off' })).toBeVisible()
+    await expect(musicSection.getByRole('button', { name: 'Server Off' })).toBeVisible()
+    await expect(musicSection.getByRole('button', { name: 'Fortnite' })).toBeVisible()
+  }
+})
+
 for (const route of [
   { label: 'Vacuums', path: 'vacuums' },
   { label: 'Music Room', path: 'music-room' },
