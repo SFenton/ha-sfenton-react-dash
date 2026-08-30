@@ -17,11 +17,9 @@
       "unhealthy": "Health effects are possible for everyone.",
       "veryUnhealthy": "Health risk is increased for everyone."
     },
-    "subtitle": "Outdoor · Pirate Weather",
     "title": "Air Quality",
     "unavailableAriaLabel": "Outdoor air quality unavailable"
   },
-  "attribution": "Powered by Pirate Weather",
   "details": {
     "ariaLabel": "{{title}} {{value}}",
     "sun": {
@@ -48,6 +46,11 @@
     "label": "Today",
     "weather": "{{condition}} today"
   },
+  "hero": {
+    "high": "High: {{high}}",
+    "highLow": "High: {{high}}  Low: {{low}}",
+    "low": "Low: {{low}}"
+  },
   "hourlyMetrics": {
     "ariaLabel": "Hourly {{title}} over {{hours}} hours, ranging from {{minimum}} to {{maximum}}",
     "cloudCover": "Cloud Cover",
@@ -71,6 +74,6 @@
     "tableCaption": "{{hours}}-hour precipitation details",
     "title": "Precipitation"
   },
-  "subtitle": "Home · {{temperature}} · {{condition}}",
+  "subtitle": "{{temperature}} · {{condition}}",
   "unavailable": "Unavailable"
 }

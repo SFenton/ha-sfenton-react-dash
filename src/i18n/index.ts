@@ -211,11 +211,9 @@ export const WEATHER_COPY_KEYS = {
       unhealthy: 'aqi.guidance.unhealthy',
       veryUnhealthy: 'aqi.guidance.veryUnhealthy',
     },
-    subtitle: 'aqi.subtitle',
     title: 'aqi.title',
     unavailableAriaLabel: 'aqi.unavailableAriaLabel',
   },
-  attribution: 'attribution',
   details: {
     ariaLabel: 'details.ariaLabel',
     sun: {
@@ -241,6 +239,11 @@ export const WEATHER_COPY_KEYS = {
     aqi: 'headline.aqi',
     label: 'headline.label',
     weather: 'headline.weather',
+  },
+  hero: {
+    high: 'hero.high',
+    highLow: 'hero.highLow',
+    low: 'hero.low',
   },
   hourlyMetrics: {
     ariaLabel: 'hourlyMetrics.ariaLabel',

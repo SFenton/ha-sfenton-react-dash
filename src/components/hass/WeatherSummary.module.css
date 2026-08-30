@@ -254,16 +254,7 @@
   text-align: center;
 }
 
-.modalPlace {
-  color: rgba(255, 255, 255, 0.72);
-  font-size: 0.74rem;
-  font-weight: 840;
-  letter-spacing: 0;
-  text-transform: uppercase;
-}
-
 .modalTemperature {
-  margin-top: 2px;
   color: white;
   font-size: 5.1rem;
   font-weight: 250;
@@ -1017,21 +1008,6 @@
   --aqi-color: var(--rd-aqi-hazardous);
 }
 
-.aqiHeader {
-  display: flex;
-  min-width: 0;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.aqiSource {
-  color: var(--color-text-muted);
-  font-size: 0.7rem;
-  font-weight: 680;
-  white-space: nowrap;
-}
-
 .aqiReading {
   display: flex;
   min-width: 0;
@@ -1199,7 +1175,6 @@
 }
 
 .sheet,
-.sheet .modalPlace,
 .sheet .modalTemperature,
 .sheet .modalCondition,
 .sheet .modalHighLow,
@@ -1221,7 +1196,6 @@
 .sheet .highlightTitle,
 .sheet .highlightValue,
 .sheet .aqiCategory,
-.sheet .aqiSource,
 .sheet .aqiValue,
 .sheet .errorState {
   color: #fff;
@@ -1229,14 +1203,6 @@
 
 .skeletonRow {
   min-height: 92px;
-}
-
-.attribution {
-  padding: 2px 4px 0;
-  color: var(--color-text-muted);
-  font-size: 0.72rem;
-  font-weight: 640;
-  text-align: center;
 }
 
 @container weather-sheet (min-width: 620px) {

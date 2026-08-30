@@ -484,6 +484,16 @@ function compactHighLowLabel(forecast: WeatherForecast | undefined) {
   return `H:${high}  L:${low}`
 }
 
+function modalHighLowLabel(copy: WeatherCopy, forecast: WeatherForecast | undefined) {
+  if (!forecast) return ''
+  const high = formatDegreeValue(forecast.temperature)
+  const low = formatDegreeValue(forecast.templow)
+  if (high === '--' && low === '--') return ''
+  if (high === '--') return copy(WEATHER_COPY_KEYS.hero.low, { low })
+  if (low === '--') return copy(WEATHER_COPY_KEYS.hero.high, { high })
+  return copy(WEATHER_COPY_KEYS.hero.highLow, { high, low })
+}
+
 function forecastSummary(forecasts: WeatherForecast[], entity: HassEntity | null) {
   if (!forecasts.length) return 'Daily Pirate Weather forecast will appear when Home Assistant returns forecast data.'
   const highs = forecasts.map((forecast) => numberValue(forecast.temperature)).filter((value): value is number => value !== undefined)
@@ -830,14 +840,11 @@ function WeatherAqiTile({ entity }: { entity: HassEntity }) {
       data-unavailable={status ? undefined : 'true'}
       data-wide="true"
     >
-      <span className={styles.aqiHeader}>
-        <span className={styles.highlightTitle}>
-          <span className={styles.highlightIcon}>
-            <MaterialIcon name="mdi:air-filter" size={16} />
-          </span>
-          {copy(WEATHER_COPY_KEYS.aqi.title)}
+      <span className={styles.highlightTitle}>
+        <span className={styles.highlightIcon}>
+          <MaterialIcon name="mdi:air-filter" size={16} />
         </span>
-        <span className={styles.aqiSource}>{copy(WEATHER_COPY_KEYS.aqi.subtitle)}</span>
+        {copy(WEATHER_COPY_KEYS.aqi.title)}
       </span>
       <span className={styles.aqiReading}>
         <strong className={styles.aqiValue}>{value}</strong>
@@ -1085,9 +1092,6 @@ function WeatherForecastSheet({
   const headlineDetail = headlineIsAqi && aqiStatus
     ? aqiGuidance(copy, aqiStatus.level)
     : forecastSummary(forecasts, entity)
-  const attribution = typeof entity?.attributes.attribution === 'string' && entity.attributes.attribution.trim()
-    ? entity.attributes.attribution
-    : copy(WEATHER_COPY_KEYS.attribution)
   const [selectedMode, setSelectedMode] = useState<HourlyMode>('condition')
   const [displayMode, setDisplayMode] = useState<HourlyMode>('condition')
   const [transitionPhase, setTransitionPhase] = useState<ModeTransitionPhase>('idle')
@@ -1127,10 +1131,9 @@ function WeatherForecastSheet({
     <div className={styles.sheet}>
       <div className={styles.sheetContent}>
         <section className={styles.modalHero} aria-label="Current weather conditions">
-          <span className={styles.modalPlace}>Home</span>
           <strong className={styles.modalTemperature}>{weatherDegree(entity)}</strong>
           <span className={styles.modalCondition}>{condition.label}</span>
-          {today ? <span className={styles.modalHighLow}>{compactHighLowLabel(today)}</span> : null}
+          {today ? <span className={styles.modalHighLow}>{modalHighLowLabel(copy, today)}</span> : null}
         </section>
 
         <section className={styles.currentPanel} aria-label="Today weather summary">
@@ -1176,7 +1179,6 @@ function WeatherForecastSheet({
           </div>
         </section>
 
-        <p className={styles.attribution}>{attribution}</p>
       </div>
     </div>
   )
