@@ -226,6 +226,43 @@ test('media sheets choose compact or centered presentation across the viewport m
     expect(precipitationMetrics.labelsMatch).toBe(true)
     expect(precipitationMetrics.labelsUseNow).toBe(true)
     expect(precipitationMetrics.overflow).toBe(false)
+    const hourlyMetricTiles = dialog.locator('[data-weather-hourly-metric-tiles="true"]')
+    await expect(hourlyMetricTiles.locator('[data-hourly-metric-tile]')).toHaveCount(2)
+    await expect(hourlyMetricTiles.locator('[data-hourly-metric-bar="true"]')).toHaveCount(12)
+    const hourlyMetricMetrics = await hourlyMetricTiles.evaluate((tiles) => {
+      const humidityLabels = Array.from(tiles.querySelectorAll<HTMLElement>('[data-hourly-metric-label="humidity"]'))
+      const cloudLabels = Array.from(tiles.querySelectorAll<HTMLElement>('[data-hourly-metric-label="cloud"]'))
+      return {
+        columns: getComputedStyle(tiles).gridTemplateColumns.split(' ').filter(Boolean).length,
+        labelsMatch: humidityLabels.map((label) => label.textContent).join('|') === cloudLabels.map((label) => label.textContent).join('|'),
+        usesNow: humidityLabels[0]?.textContent === 'Now' && cloudLabels[0]?.textContent === 'Now',
+        overflow: tiles.scrollWidth > tiles.clientWidth + 1
+          || Array.from(tiles.querySelectorAll<HTMLElement>('[data-hourly-metric-tile]')).some((tile) => tile.scrollWidth > tile.clientWidth + 1),
+        tracks: tiles.querySelectorAll('[class*="metricTrack"]').length,
+        markHeights: Array.from(tiles.querySelectorAll<HTMLElement>('[data-hourly-metric-bar="true"]'))
+          .filter((mark) => mark.dataset.unavailable !== 'true')
+          .map((mark) => mark.getBoundingClientRect().height),
+      }
+    })
+    expect(hourlyMetricMetrics.columns).toBe(2)
+    expect(hourlyMetricMetrics.labelsMatch).toBe(true)
+    expect(hourlyMetricMetrics.usesNow).toBe(true)
+    expect(hourlyMetricMetrics.overflow).toBe(false)
+    expect(hourlyMetricMetrics.tracks).toBe(12)
+    expect(hourlyMetricMetrics.markHeights.every((height) => Math.abs(height - 3) <= 0.05)).toBe(true)
+    const paintedColumnGaps = await dialog.evaluate((element) => (
+      Array.from(element.querySelectorAll<HTMLElement>(
+        '[data-precipitation-hourly-plot="true"], [data-precipitation-cumulative-plot="true"], [data-hourly-metric-plot]',
+      )).map((plot) => {
+        const bars = Array.from(plot.querySelectorAll<HTMLElement>(
+          '[data-precipitation-bar="true"], [data-cumulative-bar="true"], [data-hourly-metric-bar="true"]',
+        ))
+        const boxes = bars.map((bar) => bar.getBoundingClientRect())
+        return boxes.slice(1).map((box, index) => box.left - boxes[index].right)
+      })
+    ))
+    expect(paintedColumnGaps).toHaveLength(4)
+    expect(paintedColumnGaps.every((gaps) => gaps.length === 5 && gaps.every((gap) => Math.abs(gap - 2) <= 0.05))).toBe(true)
     await expectScrollSafe(dialog)
     await closeModal(dialog)
   }

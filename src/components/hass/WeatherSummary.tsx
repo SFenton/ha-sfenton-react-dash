@@ -11,6 +11,7 @@ import { ModalSheet, type ModalSheetStyle } from '../core/ModalSheet'
 import { SurfaceAccessory } from '../core/SurfaceAccessory'
 import { asEntityName } from './entityState'
 import { WeatherAtmosphere } from './WeatherAtmosphere'
+import { WeatherHourlyMetricTiles } from './WeatherHourlyMetricTiles'
 import { WeatherPrecipitationTile } from './WeatherPrecipitationTile'
 import {
   classifyUsAqi,
@@ -557,8 +558,6 @@ function highlightTiles(entity: HassEntity | null, forecasts: WeatherForecast[],
   const attrs = entity?.attributes ?? {}
   const wind = formatMeasure(attrs.wind_speed, attrs.wind_speed_unit, 0)
   const gust = formatMeasure(attrs.wind_gust_speed ?? today?.wind_gust_speed, attrs.wind_speed_unit, 0)
-  const humidity = numberValue(attrs.humidity)
-  const cloudCover = numberValue(attrs.cloud_coverage ?? today?.cloud_coverage)
   const pressure = numberValue(attrs.pressure)
   const pressureData = pressurePresentation(pressure, attrs.pressure_unit)
   const uv = uvPresentation(today?.uv_index)
@@ -615,14 +614,6 @@ function highlightTiles(entity: HassEntity | null, forecasts: WeatherForecast[],
       value: visibility ? formatMeasure(attrs.visibility, attrs.visibility_unit, 1) ?? '--' : '--',
     },
     {
-      available: humidity !== undefined,
-      icon: 'mdi:water-percent',
-      kind: 'humidity',
-      percent: humidity,
-      title: 'Humidity',
-      value: humidity === undefined ? '--' : formatPercent(humidity) ?? '--',
-    },
-    {
       available: pressureData !== null,
       icon: 'mdi:gauge',
       kind: 'pressure',
@@ -630,14 +621,6 @@ function highlightTiles(entity: HassEntity | null, forecasts: WeatherForecast[],
       rotation: pressureData === null ? undefined : (pressureData.markerPercent - 50) * 1.35,
       title: 'Pressure',
       value: pressureData === null ? '--' : formatMeasure(pressure, attrs.pressure_unit, 2) ?? '--',
-    },
-    {
-      available: cloudCover !== undefined,
-      icon: 'mdi:cloud',
-      kind: 'cloud',
-      percent: cloudCover,
-      title: 'Cloud Cover',
-      value: cloudCover === undefined ? '--' : formatPercent(cloudCover) ?? '--',
     },
   ]
 
@@ -1186,6 +1169,7 @@ function WeatherForecastSheet({
           <div className={styles.highlightGrid}>
             {aqiEntity ? <WeatherAqiTile entity={aqiEntity} /> : null}
             <WeatherPrecipitationTile forecasts={hourlyForecasts} precipitationUnit={weatherPrecipitationUnit(entity)} />
+            <WeatherHourlyMetricTiles forecasts={hourlyForecasts} />
             {highlights.map((tile) => (
               <HighlightTile key={tile.kind} tile={tile} />
             ))}

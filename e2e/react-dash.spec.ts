@@ -1199,8 +1199,19 @@ test('weather modal renders a live atmosphere and outdoor AQI without motion-onl
   await expect(precipitationTile.locator('[data-precipitation-hour-label="time"]').first()).toHaveText('Now')
   await expect(precipitationTile.locator('[data-probability="94"][data-amount="0"]')).toHaveAttribute('data-measurable', 'false')
   await expect(precipitationTiles.getByRole('table', { name: '6-hour precipitation details' })).toHaveCount(1)
+  const hourlyMetricTiles = dialog.locator('[data-weather-hourly-metric-tiles="true"]')
+  const humidityTile = dialog.getByRole('article', { name: 'Hourly Humidity over 6 hours, ranging from 62% to 74%' })
+  const cloudTile = dialog.getByRole('article', { name: 'Hourly Cloud Cover over 6 hours, ranging from 20% to 70%' })
+  await expect(hourlyMetricTiles.locator('[data-hourly-metric-tile]')).toHaveCount(2)
+  await expect(humidityTile.locator('[data-hourly-metric-bar="true"]')).toHaveCount(6)
+  await expect(cloudTile.locator('[data-hourly-metric-bar="true"]')).toHaveCount(6)
+  await expect(humidityTile.locator('[data-precipitation-y-axis="humidity"]')).toHaveText('80%70%60%')
+  await expect(cloudTile.locator('[data-precipitation-y-axis="cloud"]')).toHaveText('70%35%0%')
+  await expect(humidityTile.locator('[data-hourly-metric-plot="humidity"]')).toHaveAttribute('data-axis-truncated', 'true')
+  expect(await humidityTile.locator('[data-hourly-metric-label="humidity"]').allTextContents())
+    .toEqual(await cloudTile.locator('[data-hourly-metric-label="cloud"]').allTextContents())
   await expect(dialog.getByRole('article', { name: /^Wind / })).toHaveAttribute('data-wide', 'true')
-  await expect(dialog.getByRole('article', { name: 'Cloud Cover 57%' }).locator('[data-cloud-cover-visual="dial"]')).toBeVisible()
+  await expect(dialog.getByRole('article', { name: 'Cloud Cover 57%' })).toHaveCount(0)
   const decorationCoverage = await dialog.evaluate((element) => {
     const decoration = element.querySelector<HTMLElement>('[data-modal-sheet-surface-decoration="true"]')
     if (!decoration) return null
@@ -1224,6 +1235,8 @@ test('weather modal renders a live atmosphere and outdoor AQI without motion-onl
   await page.emulateMedia({ forcedColors: 'active', reducedMotion: 'reduce' })
   const cumulativeBarColor = await accumulationTile.locator('[data-cumulative-bar="true"]').first().evaluate((element) => getComputedStyle(element).backgroundColor)
   expect(cumulativeBarColor).not.toBe('rgba(0, 0, 0, 0)')
+  const humidityCapColor = await humidityTile.locator('[data-hourly-metric-bar="true"]').first().evaluate((element) => getComputedStyle(element).backgroundColor)
+  expect(humidityCapColor).not.toBe('rgba(0, 0, 0, 0)')
 })
 
 test('mobile navigation chevrons stay vertically centered in their opener', async ({ page }) => {
