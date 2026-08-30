@@ -34,6 +34,79 @@
   height: 100%;
 }
 
+.scopeControls {
+  position: absolute;
+  z-index: 5;
+  top: 12px;
+  right: 12px;
+  display: flex;
+  max-width: calc(100% - 24px);
+  align-items: center;
+  justify-content: flex-end;
+  gap: 7px;
+  pointer-events: auto;
+}
+
+.frame[data-expanded='true'] .scopeControls {
+  top: auto;
+  bottom: 12px;
+}
+
+.focusStatus,
+.scopeToggle {
+  border: 1px solid var(--color-line);
+  border-radius: 999px;
+  color: var(--color-text);
+  background: var(--color-modal-surface);
+  box-shadow: var(--shadow-glass);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+.focusStatus {
+  display: inline-flex;
+  min-height: 34px;
+  min-width: 0;
+  align-items: center;
+  padding: 0 11px;
+  font-size: 0.68rem;
+  font-weight: 780;
+  white-space: nowrap;
+}
+
+.scopeToggle {
+  display: inline-flex;
+  flex: 0 0 auto;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 11px;
+  font: inherit;
+  font-size: 0.7rem;
+  font-weight: 820;
+  cursor: pointer;
+}
+
+.scopeToggle[data-active='true'] {
+  border-color: color-mix(in srgb, var(--color-timer) 54%, var(--color-line));
+  background: color-mix(in srgb, var(--color-timer) 20%, var(--color-modal-surface));
+}
+
+.scopeToggle:disabled {
+  cursor: default;
+  opacity: 0.58;
+}
+
+.scopeToggle:focus {
+  outline: none;
+}
+
+.scopeToggle:focus-visible {
+  outline: 2px solid var(--color-text-muted);
+  outline-offset: 2px;
+}
+
 .overlay {
   z-index: 2;
   overflow: visible;
@@ -104,8 +177,10 @@
 
 @media (hover: none), (pointer: coarse) {
   .selection:focus-visible,
-  .resizeHandleHit:focus-visible {
+  .resizeHandleHit:focus-visible,
+  .scopeToggle:focus-visible {
     stroke: rgba(143, 214, 255, 0.98);
+    outline: none;
   }
 }
 

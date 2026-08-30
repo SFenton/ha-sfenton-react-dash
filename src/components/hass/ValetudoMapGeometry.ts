@@ -112,8 +112,11 @@ export function affineToCssMatrix(matrix: AffineMatrix) {
   return `matrix(${matrix.a}, ${matrix.b}, ${matrix.c}, ${matrix.d}, ${matrix.e}, ${matrix.f})`
 }
 
-export function valetudoMapStageGeometry(map: ValetudoMap, mapScale: number): ValetudoMapStageGeometry {
-  const bounds = valetudoMapBounds(map)
+export function valetudoMapStageGeometry(
+  map: ValetudoMap,
+  mapScale: number,
+  bounds: ValetudoMapBounds = valetudoMapBounds(map),
+): ValetudoMapStageGeometry {
   const scale = Math.max(1, mapScale)
   const pixelWidth = Math.max(1, Math.ceil((bounds.maxX - bounds.minX + 2) * scale))
   const pixelHeight = Math.max(1, Math.ceil((bounds.maxY - bounds.minY + 2) * scale))

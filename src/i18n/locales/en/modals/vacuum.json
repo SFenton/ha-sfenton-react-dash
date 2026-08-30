@@ -1,6 +1,10 @@
 {
   "cleaned": "Cleaned",
   "issues": "Issues",
+  "mapScope": {
+    "fullMap": "Full Map",
+    "reachableAreaOnly": "Reachable Area Only"
+  },
   "selectedRooms": "Selected Rooms",
   "tile": {
     "subtitleWithBattery": "{{state}} • {{battery}}%"

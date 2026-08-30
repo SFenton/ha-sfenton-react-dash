@@ -13,6 +13,7 @@ import { useEntity, useHass } from '@hakit/core'
 import type { VacuumConfig } from '../../constants/portedDashboard'
 import { VACUUM_COPY_KEYS, VACUUM_COPY_NAMESPACE, useCopy } from '../../i18n'
 import { MaterialIcon } from '../core/Icon'
+import type { ControlSemantics } from '../core/controlSemantics'
 import { materialIconPath } from '../core/iconPaths'
 import { asEntityName } from './entityState'
 import { isUnavailableVacuumState } from './vacuumVisualState'
@@ -38,6 +39,12 @@ import {
   type MapViewport,
   type ValetudoMapStageGeometry,
 } from './ValetudoMapGeometry'
+import {
+  mapGridRectWithinBounds,
+  resolveValetudoMapFocus,
+  valetudoMapPixelKey,
+  type ValetudoMapFocusResult,
+} from './ValetudoMapFocus'
 import {
   createMockValetudoMap,
   expandValetudoLayerPixels,
@@ -83,21 +90,26 @@ interface HassConnectionLike {
 }
 
 export interface ValetudoMapEditorMeta {
+  displayScope: ValetudoMapScope
   error: string | null
+  focusAvailable: boolean
   geometry: ValetudoMapStageGeometry | null
   isLoaded: boolean
   provenance: ValetudoMapProvenance
+  selectionAllowed: boolean
 }
 
 export const VALETUDO_MAP_PROVENANCE_NONE = 'none' as const
 export const VALETUDO_MAP_PROVENANCE_REPORTED = 'reported' as const
+export const VALETUDO_MAP_SCOPE_FOCUSED = 'focused' as const
+export const VALETUDO_MAP_SCOPE_FULL = 'full' as const
 export type ValetudoMapProvenance = 'live' | typeof VALETUDO_MAP_PROVENANCE_NONE | typeof VALETUDO_MAP_PROVENANCE_REPORTED
+export type ValetudoMapScope = typeof VALETUDO_MAP_SCOPE_FOCUSED | typeof VALETUDO_MAP_SCOPE_FULL
 
 interface ValetudoMapCardProps {
   available?: boolean
   drawMode?: boolean
   expanded?: boolean
-  frozenGeometry?: ValetudoMapStageGeometry | null
   interactive?: boolean
   minimumSizeCm?: number
   onDrawModeChange?: (drawMode: boolean) => void
@@ -115,6 +127,14 @@ type MapGesture =
   | { corner: MapGridRectCorner; origin: MapGridRect; type: 'resize' }
   | { origin: MapViewport; startPoint: MapGridPoint; type: 'pan' }
   | { anchor: MapGridPoint; startDistance: number; startZoom: number; type: 'pinch' }
+
+interface MapViewSnapshot {
+  geometry: ValetudoMapStageGeometry
+  interactionGeometry: ValetudoMapStageGeometry
+  renderFocus: ValetudoMapFocusResult | null
+  resetViewRevision: number
+  vacuumMapId: string
+}
 
 const RESIZE_HANDLES: {
   corner: MapGridRectCorner
@@ -267,6 +287,7 @@ function renderValetudoMap(
   frame: MapFrameSize,
   matrix: AffineMatrix,
   provenance: Exclude<ValetudoMapProvenance, 'none'>,
+  focus: ValetudoMapFocusResult | null,
 ) {
   const dpr = window.devicePixelRatio || 1
   const width = Math.max(1, Math.round(frame.width))
@@ -285,6 +306,12 @@ function renderValetudoMap(
   ctx.fillStyle = 'rgba(6, 12, 18, 0.56)'
   ctx.fillRect(0, 0, width, height)
   ctx.setTransform(dpr * matrix.a, dpr * matrix.b, dpr * matrix.c, dpr * matrix.d, dpr * matrix.e, dpr * matrix.f)
+  if (focus) {
+    ctx.save()
+    ctx.beginPath()
+    ctx.rect(0, 0, geometry.width, geometry.height)
+    ctx.clip()
+  }
 
   const visible = localVisibleBounds(matrix, frame)
   let segmentIndex = 0
@@ -292,13 +319,19 @@ function renderValetudoMap(
     const pixels = expandValetudoLayerPixels(layer)
     if (pixels.length === 0) continue
     const isSegment = layer.type === 'segment'
+    const segmentId = typeof layer.metaData?.segmentId === 'string' || typeof layer.metaData?.segmentId === 'number'
+      ? String(layer.metaData.segmentId)
+      : null
+    const segmentColorIndex = segmentIndex
+    if (isSegment) segmentIndex += 1
+    if (focus && isSegment && (!segmentId || !focus.acceptedSegmentIds.has(segmentId))) continue
     const material = isSegment ? layer.metaData?.material : undefined
     const accentPixels: number[] = []
-    ctx.fillStyle = layer.type === 'wall' ? 'rgba(236, 244, 255, 0.82)' : segmentColor(segmentIndex)
-    if (isSegment) segmentIndex += 1
+    ctx.fillStyle = layer.type === 'wall' ? 'rgba(236, 244, 255, 0.82)' : segmentColor(segmentColorIndex)
     for (let index = 0; index + 1 < pixels.length; index += 2) {
       const sourceX = pixels[index] ?? 0
       const sourceY = pixels[index + 1] ?? 0
+      if (focus && layer.type === 'wall' && !focus.renderWallPixelKeys?.has(valetudoMapPixelKey(sourceX, sourceY))) continue
       const x = sourceX - geometry.minGridX
       const y = sourceY - geometry.minGridY
       if (x < visible.minX || x > visible.maxX || y < visible.minY || y > visible.maxY) continue
@@ -376,6 +409,7 @@ function renderValetudoMap(
       )
     }
   }
+  if (focus) ctx.restore()
 }
 
 function renderFallbackGrid(canvas: HTMLCanvasElement, frame: MapFrameSize) {
@@ -430,7 +464,6 @@ export function ValetudoMapCard({
   available = true,
   drawMode = false,
   expanded = false,
-  frozenGeometry = null,
   interactive = false,
   minimumSizeCm = 25,
   onDrawModeChange,
@@ -455,9 +488,11 @@ export function ValetudoMapCard({
   const [fetchedMapCameraEntity, setFetchedMapCameraEntity] = useState<ValetudoEntityLike | null>(null)
   const [fetchedMapCameraMissing, setFetchedMapCameraMissing] = useState(false)
   const [frame, setFrame] = useState<MapFrameSize>({ height: 0, width: 0 })
+  const [gestureView, setGestureView] = useState<MapViewSnapshot | null>(null)
   const [isLoaded, setIsLoaded] = useState(import.meta.env.MODE === 'test')
   const [loadedMapSourceKey, setLoadedMapSourceKey] = useState<string | null>(null)
   const [map, setMap] = useState<ValetudoMap | null>(() => import.meta.env.MODE === 'test' ? createMockValetudoMap(vacuum.vacuumMapId) : null)
+  const [scopePreference, setScopePreference] = useState({ showFullMap: false, vacuumMapId: vacuum.vacuumMapId })
   const [storedViewport, setStoredViewport] = useState<{ revision: number; value: MapViewport }>({
     revision: resetViewRevision,
     value: INITIAL_VIEWPORT,
@@ -500,10 +535,60 @@ export function ValetudoMapCard({
   }, [displayedMap, mapProvenance])
   const displayedError = mapSourceReadable ? error : null
   const displayedLoaded = mapSourceReadable && Boolean(renderedMap) && isLoaded
-  const liveGeometry = useMemo(() => renderedMap ? valetudoMapStageGeometry(renderedMap, vacuum.mapScale) : null, [renderedMap, vacuum.mapScale])
+  const focusResult = useMemo(
+    () => displayedMap ? resolveValetudoMapFocus(displayedMap, vacuum.mapFocus) : null,
+    [displayedMap, vacuum.mapFocus],
+  )
+  const focusAvailable = focusResult?.mode === 'focused'
+  const showFullMap = focusAvailable
+    && scopePreference.vacuumMapId === vacuum.vacuumMapId
+    && scopePreference.showFullMap
+  const selectionAllowed = !selection
+    || !focusAvailable
+    || mapGridRectWithinBounds(selection, focusResult.interactionBounds)
+  const displayScope = focusAvailable && !showFullMap ? VALETUDO_MAP_SCOPE_FOCUSED : VALETUDO_MAP_SCOPE_FULL
+  const liveGeometry = useMemo(
+    () => renderedMap
+      ? valetudoMapStageGeometry(
+          renderedMap,
+          vacuum.mapScale,
+          displayScope === VALETUDO_MAP_SCOPE_FOCUSED && focusResult ? focusResult.viewBounds : undefined,
+        )
+      : null,
+    [displayScope, focusResult, renderedMap, vacuum.mapScale],
+  )
+  const liveInteractionGeometry = useMemo(
+    () => renderedMap
+      ? valetudoMapStageGeometry(
+          renderedMap,
+          vacuum.mapScale,
+          focusAvailable && focusResult ? focusResult.interactionBounds : undefined,
+        )
+      : null,
+    [focusAvailable, focusResult, renderedMap, vacuum.mapScale],
+  )
+  const liveView = useMemo<Omit<MapViewSnapshot, 'resetViewRevision' | 'vacuumMapId'> | null>(
+    () => liveGeometry && liveInteractionGeometry
+      ? {
+          geometry: liveGeometry,
+          interactionGeometry: liveInteractionGeometry,
+          renderFocus: displayScope === VALETUDO_MAP_SCOPE_FOCUSED ? focusResult : null,
+        }
+      : null,
+    [displayScope, focusResult, liveGeometry, liveInteractionGeometry],
+  )
   const mapInteractive = interactive && mapProvenance === 'live'
   const mapExpanded = expanded && mapProvenance === 'live'
-  const geometry = mapInteractive ? frozenGeometry ?? liveGeometry : liveGeometry
+  const currentGestureView = mapInteractive
+    && gestureView?.resetViewRevision === resetViewRevision
+    && gestureView.vacuumMapId === vacuum.vacuumMapId
+    ? gestureView
+    : null
+  const focusGestureInvalidated = Boolean(currentGestureView?.renderFocus && !focusAvailable)
+  const activeView = currentGestureView ?? liveView
+  const geometry = activeView?.geometry ?? null
+  const interactionGeometry = activeView?.interactionGeometry ?? null
+  const renderFocus = activeView?.renderFocus ?? null
   const viewport = storedViewport.revision === resetViewRevision ? storedViewport.value : INITIAL_VIEWPORT
   const rotationDegrees = vacuum.mapRotationDegrees ?? 0
   const matrix = useMemo(
@@ -519,6 +604,15 @@ export function ValetudoMapCard({
     viewportRef.current = nextViewport
     setStoredViewport({ revision: resetViewRevision, value: nextViewport })
   }, [resetViewRevision])
+  const fullMapSemantics = { kind: 'toggle', checked: showFullMap } satisfies ControlSemantics
+  const toggleFullMap = useCallback(() => {
+    setGestureView(null)
+    setScopePreference({
+      showFullMap: !showFullMap,
+      vacuumMapId: vacuum.vacuumMapId,
+    })
+    setViewport(INITIAL_VIEWPORT)
+  }, [setViewport, showFullMap, vacuum.vacuumMapId])
 
   useEffect(() => {
     matrixRef.current = matrix
@@ -650,21 +744,38 @@ export function ValetudoMapCard({
   useEffect(() => {
     pointersRef.current.clear()
     gestureRef.current = null
-  }, [mapInteractive, resetViewRevision])
+    draftRectRef.current = null
+    const frameId = window.requestAnimationFrame(() => setGestureView(null))
+    const draftFrameId = window.requestAnimationFrame(() => setDraftRectState(null))
+    return () => {
+      window.cancelAnimationFrame(frameId)
+      window.cancelAnimationFrame(draftFrameId)
+    }
+  }, [focusGestureInvalidated, mapInteractive, resetViewRevision])
 
   useLayoutEffect(() => {
-    onEditorMetaChange?.({ error: displayedError, geometry, isLoaded: displayedLoaded, provenance: mapProvenance })
-  }, [displayedError, displayedLoaded, geometry, mapProvenance, onEditorMetaChange])
+    onEditorMetaChange?.({
+      displayScope,
+      error: displayedError,
+      focusAvailable,
+      geometry,
+      isLoaded: displayedLoaded,
+      provenance: mapProvenance,
+      selectionAllowed,
+    })
+  }, [displayScope, displayedError, displayedLoaded, focusAvailable, geometry, mapProvenance, onEditorMetaChange, selectionAllowed])
 
   useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas || frame.width <= 0 || frame.height <= 0) return undefined
     const frameId = window.requestAnimationFrame(() => {
-      if (renderedMap && geometry) renderValetudoMap(canvas, renderedMap, geometry, frame, matrix, mapProvenance === 'reported' ? 'reported' : 'live')
+      if (renderedMap && geometry) {
+        renderValetudoMap(canvas, renderedMap, geometry, frame, matrix, mapProvenance === 'reported' ? 'reported' : 'live', renderFocus)
+      }
       else renderFallbackGrid(canvas, frame)
     })
     return () => window.cancelAnimationFrame(frameId)
-  }, [frame, geometry, mapProvenance, matrix, renderedMap])
+  }, [frame, geometry, mapProvenance, matrix, renderFocus, renderedMap])
 
   const clientPoint = useCallback((event: { clientX: number; clientY: number }): MapGridPoint => {
     const rect = frameRef.current?.getBoundingClientRect()
@@ -691,10 +802,15 @@ export function ValetudoMapCard({
   }, [geometry, setDraftRect])
 
   const handlePointerDown = useCallback((event: ReactPointerEvent<SVGSVGElement>) => {
-    if (!mapInteractive || !geometry) return
+    if (!mapInteractive || !geometry || !interactionGeometry || !liveView) return
     event.preventDefault()
     event.stopPropagation()
     event.currentTarget.setPointerCapture(event.pointerId)
+    setGestureView({
+      ...liveView,
+      resetViewRevision,
+      vacuumMapId: vacuum.vacuumMapId,
+    })
     const point = clientPoint(event)
     pointersRef.current.set(event.pointerId, point)
 
@@ -720,15 +836,20 @@ export function ValetudoMapCard({
     }
     if (drawMode) {
       gestureRef.current = { anchor: globalPoint, type: 'draw' }
-      setDraftRect(mapGridRectFromPoints(geometry, globalPoint, globalPoint, Math.ceil(minimumSizeCm / geometry.pixelSize)))
+      setDraftRect(mapGridRectFromPoints(
+        interactionGeometry,
+        globalPoint,
+        globalPoint,
+        Math.ceil(minimumSizeCm / interactionGeometry.pixelSize),
+      ))
       return
     }
 
     gestureRef.current = { origin: viewportRef.current, startPoint: point, type: 'pan' }
-  }, [clientPoint, clientToGlobalGrid, drawMode, geometry, mapInteractive, minimumSizeCm, selection, setDraftRect, startPinch])
+  }, [clientPoint, clientToGlobalGrid, drawMode, geometry, interactionGeometry, liveView, mapInteractive, minimumSizeCm, resetViewRevision, selection, setDraftRect, startPinch, vacuum.vacuumMapId])
 
   const handlePointerMove = useCallback((event: ReactPointerEvent<SVGSVGElement>) => {
-    if (!mapInteractive || !geometry || !pointersRef.current.has(event.pointerId)) return
+    if (!mapInteractive || !geometry || !interactionGeometry || !pointersRef.current.has(event.pointerId)) return
     event.preventDefault()
     event.stopPropagation()
     const point = clientPoint(event)
@@ -762,18 +883,18 @@ export function ValetudoMapCard({
 
     const globalPoint = clientToGlobalGrid(point)
     if (!globalPoint) return
-    const minimumGridSize = Math.ceil(minimumSizeCm / geometry.pixelSize)
+    const minimumGridSize = Math.ceil(minimumSizeCm / interactionGeometry.pixelSize)
     if (gesture.type === 'draw') {
-      setDraftRect(mapGridRectFromPoints(geometry, gesture.anchor, globalPoint, minimumGridSize))
+      setDraftRect(mapGridRectFromPoints(interactionGeometry, gesture.anchor, globalPoint, minimumGridSize))
     } else if (gesture.type === 'move') {
-      setDraftRect(translateMapGridRect(geometry, gesture.origin, {
+      setDraftRect(translateMapGridRect(interactionGeometry, gesture.origin, {
         x: globalPoint.x - gesture.startPoint.x,
         y: globalPoint.y - gesture.startPoint.y,
       }))
     } else {
-      setDraftRect(resizeMapGridRectCorner(geometry, gesture.origin, globalPoint, minimumGridSize, gesture.corner))
+      setDraftRect(resizeMapGridRectCorner(interactionGeometry, gesture.origin, globalPoint, minimumGridSize, gesture.corner))
     }
-  }, [clientPoint, clientToGlobalGrid, frame, geometry, mapInteractive, minimumSizeCm, rotationDegrees, setDraftRect, setViewport])
+  }, [clientPoint, clientToGlobalGrid, frame, geometry, interactionGeometry, mapInteractive, minimumSizeCm, rotationDegrees, setDraftRect, setViewport])
 
   const finishPointerGesture = useCallback((event: ReactPointerEvent<SVGSVGElement>, cancelled: boolean) => {
     if (!pointersRef.current.has(event.pointerId)) return
@@ -794,6 +915,7 @@ export function ValetudoMapCard({
     }
     gestureRef.current = null
     setDraftRect(null)
+    setGestureView(null)
   }, [onDrawModeChange, onSelectionChange, setDraftRect])
 
   const handleWheel = useCallback((event: WheelEvent) => {
@@ -813,7 +935,7 @@ export function ValetudoMapCard({
   }, [handleWheel, mapInteractive])
 
   const handleMoveKeyDown = useCallback((event: ReactKeyboardEvent<SVGRectElement>) => {
-    if (!selection || !geometry) return
+    if (!selection || !interactionGeometry) return
     if (event.key === 'Delete' || event.key === 'Backspace') {
       event.preventDefault()
       onSelectionChange?.(null)
@@ -822,24 +944,24 @@ export function ValetudoMapCard({
     const delta = keyboardDelta(event)
     if (!delta) return
     event.preventDefault()
-    onSelectionChange?.(translateMapGridRect(geometry, selection, delta))
-  }, [geometry, onSelectionChange, selection])
+    onSelectionChange?.(translateMapGridRect(interactionGeometry, selection, delta))
+  }, [interactionGeometry, onSelectionChange, selection])
 
   const handleResizeKeyDown = useCallback((event: ReactKeyboardEvent<SVGCircleElement>, corner: MapGridRectCorner) => {
-    if (!selection || !geometry) return
+    if (!selection || !interactionGeometry) return
     const delta = keyboardDelta(event)
     if (!delta) return
     event.preventDefault()
     const handle = RESIZE_HANDLES.find((candidate) => candidate.corner === corner)
     if (!handle) return
     onSelectionChange?.(resizeMapGridRectCorner(
-      geometry,
+      interactionGeometry,
       selection,
       { x: selection[handle.x] + delta.x, y: selection[handle.y] + delta.y },
-      Math.ceil(minimumSizeCm / geometry.pixelSize),
+      Math.ceil(minimumSizeCm / interactionGeometry.pixelSize),
       corner,
     ))
-  }, [geometry, minimumSizeCm, onSelectionChange, selection])
+  }, [interactionGeometry, minimumSizeCm, onSelectionChange, selection])
 
   const showUnavailableFallback = mapProvenance === 'none' || Boolean(displayedError)
   const showLoadingFallback = mapSourceReadable && !displayedError && !renderedMap
@@ -875,8 +997,16 @@ export function ValetudoMapCard({
         data-expanded={mapExpanded ? 'true' : 'false'}
         data-interactive={mapInteractive ? 'true' : 'false'}
         data-loaded={displayedLoaded ? 'true' : 'false'}
+        data-map-focus-reason={focusResult?.reason ?? 'unavailable'}
         data-map-provenance={mapProvenance}
+        data-map-render-clipped={renderFocus ? 'true' : 'false'}
+        data-map-scope={displayScope}
+        data-selection-allowed={selectionAllowed ? 'true' : 'false'}
         data-source-available={liveMapSourceAvailable ? 'true' : 'false'}
+        data-view-max-x={geometry?.bounds.maxX}
+        data-view-max-y={geometry?.bounds.maxY}
+        data-view-min-x={geometry?.bounds.minX}
+        data-view-min-y={geometry?.bounds.minY}
         data-viewport-pan-x={viewport.panX}
         data-viewport-pan-y={viewport.panY}
         data-viewport-zoom={viewport.zoom}
@@ -885,6 +1015,24 @@ export function ValetudoMapCard({
         style={mapStyle}
       >
         <canvas aria-hidden="true" className={styles.canvas} data-valetudo-map-canvas="true" ref={canvasRef} />
+        {focusAvailable && displayedLoaded && !showFallback && (
+          <div className={styles.scopeControls} data-base-ui-swipe-ignore="true">
+            {!showFullMap && (
+              <span className={styles.focusStatus}>{copy(VACUUM_COPY_KEYS.mapScope.reachableAreaOnly)}</span>
+            )}
+            <button
+              aria-pressed={fullMapSemantics.checked}
+              className={styles.scopeToggle}
+              data-active={showFullMap ? 'true' : 'false'}
+              disabled={Boolean(currentGestureView)}
+              onClick={toggleFullMap}
+              type="button"
+            >
+              <MaterialIcon name="mdi:map-outline" size={17} />
+              {copy(VACUUM_COPY_KEYS.mapScope.fullMap)}
+            </button>
+          </div>
+        )}
         {showOverlay && geometry && (
           <svg
             aria-hidden={mapInteractive ? undefined : true}

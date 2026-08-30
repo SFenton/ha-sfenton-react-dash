@@ -1,14 +1,16 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { VACUUMS } from '../../constants/portedDashboard'
 import { mockEntities, resetMockHass } from '../../test/mocks/hakitCoreState'
 import { ValetudoMapCard } from './ValetudoMapCard'
 
 const mainFloorVacuum = VACUUMS.find((vacuum) => vacuum.title === 'Main Floor')
+const musicRoomVacuum = VACUUMS.find((vacuum) => vacuum.title === 'Music Room')
 
 describe('ValetudoMapCard availability', () => {
   beforeEach(() => {
     resetMockHass()
     mockEntities['camera.valetudo_exaltedsneakydeer_map_data'].state = 'idle'
+    mockEntities['camera.valetudo_elatedusedram_map_data'].state = 'idle'
   })
 
   it.each(VACUUMS)('renders the $title last reported position as a noninteractive historical map', async (vacuum) => {
@@ -38,6 +40,7 @@ describe('ValetudoMapCard availability', () => {
     const map = screen.getByRole('region', { name: 'Main Floor Valetudo map' })
     expect(map).toHaveAttribute('data-source-available', 'true')
     expect(map).toHaveAttribute('data-map-provenance', 'live')
+    expect(map).toHaveAttribute('data-map-render-clipped', 'false')
     expect(map).toHaveAttribute('data-loaded', 'true')
     expect(screen.queryByText('Map Unavailable')).not.toBeInTheDocument()
   })
@@ -72,5 +75,44 @@ describe('ValetudoMapCard availability', () => {
     } finally {
       if (cameraEntity) mockEntities[cameraEntityId] = cameraEntity
     }
+  })
+
+  it('starts the Music Room map in focused mode and exposes a full-map toggle', () => {
+    if (!musicRoomVacuum) throw new Error('Expected Music Room vacuum config')
+
+    render(<ValetudoMapCard available vacuum={musicRoomVacuum} />)
+
+    const map = screen.getByRole('region', { name: 'Music Room Valetudo map' })
+    const fullMap = screen.getByRole('button', { name: 'Full Map' })
+    expect(map).toHaveAttribute('data-map-scope', 'focused')
+    expect(map).toHaveAttribute('data-map-focus-reason', 'focused')
+    expect(map).toHaveAttribute('data-map-render-clipped', 'true')
+    expect(map).toHaveAttribute('data-view-min-x', '634')
+    expect(map).toHaveAttribute('data-view-max-x', '782')
+    expect(screen.getByText('Reachable Area Only')).toBeVisible()
+    expect(fullMap).toHaveAttribute('aria-pressed', 'false')
+
+    fireEvent.click(fullMap)
+
+    expect(map).toHaveAttribute('data-map-scope', 'full')
+    expect(map).toHaveAttribute('data-map-render-clipped', 'false')
+    expect(map).toHaveAttribute('data-view-min-x', '504')
+    expect(fullMap).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.queryByText('Reachable Area Only')).not.toBeInTheDocument()
+  })
+
+  it('marks selections outside the focused interaction bounds as unsafe', () => {
+    if (!musicRoomVacuum) throw new Error('Expected Music Room vacuum config')
+
+    render(
+      <ValetudoMapCard
+        available
+        interactive
+        selection={{ x0: 520, x1: 540, y0: 580, y1: 600 }}
+        vacuum={musicRoomVacuum}
+      />,
+    )
+
+    expect(screen.getByRole('region', { name: 'Music Room Valetudo map' })).toHaveAttribute('data-selection-allowed', 'false')
   })
 })

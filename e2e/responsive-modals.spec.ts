@@ -114,6 +114,29 @@ async function openMainFloorVacuum(page: Page) {
   return dialog
 }
 
+async function openMusicRoomVacuum(page: Page) {
+  await page.goto('/index.html?path=vacuums')
+  await page.evaluate(() => {
+    const mock = (window as unknown as {
+      __mockHass: {
+        setEntityState: (entityId: string, state: string) => void
+      }
+    }).__mockHass
+    mock.setEntityState('vacuum.valetudo_elatedusedram', 'docked')
+    mock.setEntityState('sensor.valetudo_elatedusedram_battery_level', '100')
+    mock.setEntityState('sensor.valetudo_elatedusedram_error', 'No error')
+    mock.setEntityState('sensor.valetudo_elatedusedram_status_flag', 'none')
+    mock.setEntityState('camera.valetudo_elatedusedram_map_data', 'idle')
+    mock.setEntityState('select.valetudo_elatedusedram_mode', 'vacuum')
+    mock.setEntityState('select.valetudo_elatedusedram_fan', 'balanced')
+    mock.setEntityState('select.valetudo_elatedusedram_water', 'medium')
+  })
+  await page.getByRole('button', { name: /Music Room Docked/i }).click()
+  const dialog = page.getByRole('dialog')
+  await expect(dialog).toBeVisible()
+  return dialog
+}
+
 async function expectShortLandscapeFixedGrid(dialog: Locator) {
   await expect(dialog).toHaveAttribute('data-centered-layout', 'false')
   const grid = dialog.locator('[style*="--modal-square-cols"]').first()
@@ -570,6 +593,78 @@ test('vacuum workspace stays fixed across tabs and keeps each region reachable',
   expect(new Set(heights)).toEqual(new Set([760]))
   const tabListBox = await dialog.getByRole('tablist', { name: 'Main Floor modal sections' }).boundingBox()
   expect(Math.round(tabListBox?.width ?? 0)).toBeLessThanOrEqual(680)
+})
+
+test('music room focused-map controls stay contained across the canonical viewport matrix', async ({ page }) => {
+  for (const viewport of VIEWPORTS) {
+    await page.setViewportSize(viewport)
+    const dialog = await openMusicRoomVacuum(page)
+    const map = dialog.getByRole('region', { name: 'Music Room Valetudo map' })
+    const fullMap = dialog.getByRole('button', { name: 'Full Map' })
+
+    await expect(map).toHaveAttribute('data-map-scope', 'focused')
+    await expect(dialog.getByText('Reachable Area Only')).toBeVisible()
+    const geometry = await map.evaluate((element) => {
+      const frame = element.getBoundingClientRect()
+      const control = element.querySelector<HTMLElement>('button[aria-pressed]')
+      const controlRect = control?.getBoundingClientRect()
+      return {
+        contained: Boolean(controlRect)
+          && controlRect!.left >= frame.left
+          && controlRect!.right <= frame.right
+          && controlRect!.top >= frame.top
+          && controlRect!.bottom <= frame.bottom,
+        controlHeight: controlRect?.height ?? 0,
+        frameHeight: frame.height,
+        frameWidth: frame.width,
+      }
+    })
+    expect(geometry.contained).toBe(true)
+    expect(geometry.controlHeight).toBeGreaterThanOrEqual(44)
+    expect(geometry.frameHeight).toBeGreaterThan(0)
+    expect(geometry.frameWidth).toBeGreaterThan(0)
+
+    await fullMap.click()
+    await expect(map).toHaveAttribute('data-map-scope', 'full')
+    await fullMap.click()
+    await expect(map).toHaveAttribute('data-map-scope', 'focused')
+    await closeModal(dialog)
+  }
+})
+
+test('music room focused map survives mounted viewport transitions', async ({ page }) => {
+  const sequences = [
+    [
+      { height: 852, width: 393 },
+      { height: 900, width: 1440 },
+      { height: 852, width: 393 },
+    ],
+    [
+      { height: 900, width: 1440 },
+      { height: 852, width: 393 },
+      { height: 900, width: 1440 },
+    ],
+    [
+      { height: 1180, width: 820 },
+      { height: 820, width: 1180 },
+      { height: 1180, width: 820 },
+    ],
+  ] as const
+
+  for (const sequence of sequences) {
+    await page.setViewportSize(sequence[0])
+    const dialog = await openMusicRoomVacuum(page)
+    const map = dialog.getByRole('region', { name: 'Music Room Valetudo map' })
+
+    for (const viewport of sequence) {
+      await page.setViewportSize(viewport)
+      await expect(map).toHaveAttribute('data-map-scope', 'focused')
+      await expect(dialog.getByRole('button', { name: 'Full Map' })).toBeVisible()
+      await expect(dialog.getByText('Reachable Area Only')).toBeVisible()
+    }
+
+    await closeModal(dialog)
+  }
 })
 
 test('vacuum short landscape uses one body scroller with a fixed navigation footer', async ({ page }) => {
