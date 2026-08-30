@@ -55,17 +55,18 @@ test('typed vacuum outcomes stay compact and use one same-sheet detail at 393x85
   await page.goto('/at-a-glance/vacuums')
   await setOutcomeAttributes(page, structuredClone(NINE_ROOM_VACUUM_OUTCOME_CONTRACT))
   const dialog = await openVacuum(page)
-  const summary = dialog.getByRole('button', { name: 'Open Main Floor Cleaning Outcomes for Aug 19, 2026' })
-  const summarySection = dialog.getByRole('heading', { name: 'While You Were Away' }).locator('xpath=ancestor::section[1]')
+  const summary = dialog.getByRole('button', { name: 'Open Main Floor Automatic Cleaning Report for Aug 19, 2026' })
+  const summarySection = dialog.getByRole('heading', { name: 'Main Floor Cleaning Report' }).locator('xpath=ancestor::section[1]')
   const nav = dialog.getByRole('tablist', { name: 'Main Floor modal sections' })
 
   await expect(summary).toBeVisible()
+  await expect(summary).toContainText('4 Rooms Completed • 4 Rooms Need Attention • 1 Error')
   await expect(nav).toBeVisible()
   await expect(dialog).toHaveAttribute('data-scroll-mode', 'panes')
   const summaryHeight = Math.round((await summary.boundingBox())?.height ?? 0)
   const summarySectionHeight = Math.round((await summarySection.boundingBox())?.height ?? 0)
-  expect(summaryHeight).toBe(56)
-  expect(summarySectionHeight).toBeLessThanOrEqual(83)
+  expect(summaryHeight).toBe(120)
+  expect(summarySectionHeight).toBe(182)
   expect(await horizontalOverflow(dialog)).toBeLessThanOrEqual(0)
   await saveEvidence(page, dialog, 'vacuum-outcomes-393-overview', {
     dialogHorizontalOverflow: await horizontalOverflow(dialog),
@@ -76,7 +77,7 @@ test('typed vacuum outcomes stay compact and use one same-sheet detail at 393x85
 
   await summary.click()
   await expect(page.getByRole('dialog')).toHaveCount(1)
-  await expect(dialog.getByRole('heading', { name: 'While-Away Vacuum Outcomes · Aug 19, 2026' })).toBeVisible()
+  await expect(dialog.getByRole('heading', { name: 'Main Floor · Automatic Cleaning Report' })).toBeVisible()
   await expect(nav).toHaveCount(0)
   await expect(dialog).toHaveAttribute('data-scroll-mode', 'body')
   await expect(dialog.locator('[data-vacuum-outcome-detail="true"]')).toBeVisible()
@@ -86,36 +87,56 @@ test('typed vacuum outcomes stay compact and use one same-sheet detail at 393x85
     'stillDue',
     'done',
   ])
+  await expect(dialog.getByRole('heading', { name: 'Error' })).toBeVisible()
+  await expect(dialog.getByRole('heading', { name: 'Interrupted' })).toBeVisible()
+  await expect(dialog.getByRole('heading', { name: 'Completed' })).toBeVisible()
+  await expect(dialog.locator('[data-group] > div:first-child strong')).toHaveCount(0)
+  await expect(dialog.locator('[data-vacuum-outcome-detail="true"]')).toBeFocused()
+
+  const interrupted = dialog.locator('[data-room-id="hallway"]')
+  await expect(interrupted).toContainText('Cleaning was interrupted because someone returned home.')
+  await expect(interrupted).not.toContainText('The vacuum-only attempt was interrupted before completion.')
+  await expect(interrupted).not.toContainText('Vacuuming remains due.')
+  await expect(interrupted.getByText('Room Event History')).toHaveCount(0)
+  await expect(interrupted.getByRole('button')).toHaveCount(0)
 
   const dining = dialog.locator('[data-room-id="dining_room"]')
   await expect(dining).toHaveCount(1)
-  const diningHistory = dining.getByRole('button', { name: 'Show Dining Room History' })
-  const diningHistoryBox = await diningHistory.boundingBox()
-  expect(Math.round(diningHistoryBox?.width ?? 0)).toBeGreaterThanOrEqual(44)
-  expect(Math.round(diningHistoryBox?.height ?? 0)).toBeGreaterThanOrEqual(44)
-  await diningHistory.click()
-  await expect(dining.locator('ol > li')).toHaveCount(4)
-  const diagnostics = dining.getByRole('button', { name: 'Show Dining Room Technical Vacuum Diagnostics' })
-  await expect(dining.getByText('Mop Dock Clean Water Tank empty')).toBeHidden()
-  await diagnostics.click()
-  await expect(dining.getByText('Mop Dock Clean Water Tank empty')).toBeVisible()
+  await expect(dining.getByText('Failed', { exact: true })).toHaveClass(/visuallyHidden/)
+  await expect(dining).not.toContainText('Vacuuming and mopping the room failed.')
+  await expect(dining).toContainText("The mop dock's clean-water tank was empty; refill it.")
+  const diningProgress = dining.getByText('Vacuuming and mopping remain.')
+  await expect(diningProgress).toBeVisible()
+  expect(await diningProgress.evaluate((element) => getComputedStyle(element).color))
+    .toBe(await dining.getByText("The mop dock's clean-water tank was empty; refill it.").evaluate((element) => getComputedStyle(element).color))
+  await expect(dining).not.toContainText('Combined vacuuming and mopping remain due.')
+  await expect(dining.getByText('Room Event History')).toHaveCount(0)
+  await expect(dining.getByRole('button')).toHaveCount(0)
 
-  await dialog.getByRole('button', { name: /Fully Completed/ }).click()
   const office = dialog.locator('[data-room-id="office"]')
-  await office.getByRole('button', { name: 'Show Office History' }).click()
+  await expect(office.getByText('Completed', { exact: true })).toHaveClass(/visuallyHidden/)
+  const officeHistory = office.getByRole('button', { name: 'Show Office History' })
+  const officeHistoryBox = await officeHistory.boundingBox()
+  expect(Math.round(officeHistoryBox?.width ?? 0)).toBeGreaterThanOrEqual(44)
+  expect(Math.round(officeHistoryBox?.height ?? 0)).toBeGreaterThanOrEqual(44)
+  await officeHistory.click()
   await expect(office.locator('ol > li')).toHaveCount(2)
   await expect(office.getByText('The auto-empty dock dust bag was full or its dust duct was blocked.')).toBeVisible()
+  const diagnostics = office.getByRole('button', { name: 'Show Office Technical Vacuum Diagnostics' })
+  await expect(office.getByText('Auto-Empty Dock dust bag full or dust duct clogged')).toBeHidden()
+  await diagnostics.click()
+  await expect(office.getByText('Auto-Empty Dock dust bag full or dust duct clogged')).toBeVisible()
   expect(await horizontalOverflow(dialog)).toBeLessThanOrEqual(0)
   expect(await vacuumActionCalls(page)).toEqual([])
   await saveEvidence(page, dialog, 'vacuum-outcomes-393-detail', {
     dialogHorizontalOverflow: await horizontalOverflow(dialog),
-    diningHistoryEvents: await dining.locator('ol > li').count(),
-    diningHistoryTarget: diningHistoryBox,
+    officeHistoryEvents: await office.locator('ol > li').count(),
+    officeHistoryTarget: officeHistoryBox,
     viewport: { height: 852, width: 393 },
   })
 
   await dialog.getByRole('button', { name: 'Back to Vacuum Controls' }).click()
-  await expect(dialog.getByRole('button', { name: 'Open Main Floor Cleaning Outcomes for Aug 19, 2026' })).toBeFocused()
+  await expect(dialog.getByRole('button', { name: 'Open Main Floor Automatic Cleaning Report for Aug 19, 2026' })).toBeFocused()
   await expect(dialog).toHaveAttribute('data-scroll-mode', 'panes')
   await expect(dialog.getByRole('tablist', { name: 'Main Floor modal sections' })).toBeVisible()
   expect(await vacuumActionCalls(page)).toEqual([])
@@ -126,31 +147,29 @@ test('typed vacuum outcomes preserve narrow touch targets and wrapping at 320x56
   await page.goto('/at-a-glance/vacuums')
   await setOutcomeAttributes(page, structuredClone(NINE_ROOM_VACUUM_OUTCOME_CONTRACT))
   const dialog = await openVacuum(page)
-  const summary = dialog.getByRole('button', { name: 'Open Main Floor Cleaning Outcomes for Aug 19, 2026' })
-  const summarySection = dialog.getByRole('heading', { name: 'While You Were Away' }).locator('xpath=ancestor::section[1]')
+  const summary = dialog.getByRole('button', { name: 'Open Main Floor Automatic Cleaning Report for Aug 19, 2026' })
+  const summarySection = dialog.getByRole('heading', { name: 'Main Floor Cleaning Report' }).locator('xpath=ancestor::section[1]')
 
   const summaryHeight = Math.round((await summary.boundingBox())?.height ?? 0)
   const summarySectionHeight = Math.round((await summarySection.boundingBox())?.height ?? 0)
-  expect(summaryHeight).toBe(56)
-  expect(summarySectionHeight).toBeLessThanOrEqual(88)
+  expect(summaryHeight).toBe(120)
+  expect(summarySectionHeight).toBe(182)
   expect(await horizontalOverflow(dialog)).toBeLessThanOrEqual(0)
   await summary.click()
 
-  const dining = dialog.locator('[data-room-id="dining_room"]')
-  await dining.getByRole('button', { name: 'Show Dining Room History' }).click()
+  const office = dialog.locator('[data-room-id="office"]')
+  await office.getByRole('button', { name: 'Show Office History' }).click()
   const commandTargets = [
-    dialog.getByRole('button', { name: /Needs Attention/ }),
-    dining.getByRole('button', { name: 'Hide Dining Room History' }),
-    dining.getByRole('button', { name: 'Show Dining Room Technical Vacuum Diagnostics' }),
+    office.getByRole('button', { name: 'Hide Office History' }),
+    office.getByRole('button', { name: 'Show Office Technical Vacuum Diagnostics' }),
   ]
   for (const target of commandTargets) {
     const box = await target.boundingBox()
     expect(Math.round(box?.width ?? 0)).toBeGreaterThanOrEqual(44)
     expect(Math.round(box?.height ?? 0)).toBeGreaterThanOrEqual(44)
   }
-  await expect(dialog.getByText('Master Bedroom Closet')).toBeHidden()
-  await dialog.getByRole('button', { name: /Fully Completed/ }).click()
   await expect(dialog.getByText('Master Bedroom Closet')).toBeVisible()
+  await expect(dialog.locator('[data-room-id="hallway"]').getByText('Interrupted', { exact: true })).toHaveClass(/visuallyHidden/)
   expect(await horizontalOverflow(dialog)).toBeLessThanOrEqual(0)
   expect(await vacuumActionCalls(page)).toEqual([])
   await saveEvidence(page, dialog, 'vacuum-outcomes-320-detail', {
@@ -170,10 +189,10 @@ test('incomplete typed data stays on the whole legacy branch', async ({ page }) 
   }, LEGACY_VACUUM_OUTCOMES)
   const dialog = await openVacuum(page)
 
-  await expect(dialog.getByRole('heading', { name: 'While You Were Away' })).toBeVisible()
+  await expect(dialog.getByRole('heading', { name: 'Main Floor Cleaning Report' })).toBeVisible()
   await expect(dialog.getByRole('note', { name: 'Cleaned' })).toContainText('Cleaned Gym')
   await expect(dialog.getByRole('note', { name: 'Issues' })).toContainText('Could not clean Dining Room because the clean water tank is empty')
-  await expect(dialog.getByRole('button', { name: /Cleaning Outcomes for/ })).toHaveCount(0)
+  await expect(dialog.getByRole('button', { name: /Automatic Cleaning Report for/ })).toHaveCount(0)
   expect(await vacuumActionCalls(page)).toEqual([])
   await saveEvidence(page, dialog, 'vacuum-outcomes-legacy')
 })
@@ -189,7 +208,7 @@ for (const viewport of [
     await setOutcomeAttributes(page, structuredClone(NINE_ROOM_VACUUM_OUTCOME_CONTRACT))
     const dialog = await openVacuum(page)
     const body = dialog.locator('[data-modal-sheet-body="true"]')
-    const summary = dialog.getByRole('button', { name: 'Open Main Floor Cleaning Outcomes for Aug 19, 2026' })
+    const summary = dialog.getByRole('button', { name: 'Open Main Floor Automatic Cleaning Report for Aug 19, 2026' })
     const mapPane = dialog.getByRole('group', { name: 'Main Floor map and status' })
     const panel = dialog.getByRole('group', { name: 'Main Floor controls, zones, auto-clean, actions, info' })
 

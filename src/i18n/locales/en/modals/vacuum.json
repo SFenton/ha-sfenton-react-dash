@@ -29,16 +29,15 @@
     "mapUnavailableHelp": "Home Assistant cannot currently confirm the vacuum's map or position."
   },
   "outcomes": {
-    "sectionTitle": "While You Were Away",
-    "detailTitle": "While-Away Vacuum Outcomes · {{date}}",
+    "sectionTitle": "{{room}} Cleaning Report",
+    "detailTitle": "{{room}} · Automatic Cleaning Report",
     "backToControls": "Back to Vacuum Controls",
-    "openDetail": "Open {{room}} Cleaning Outcomes for {{date}}",
-    "allRoomsComplete": "All Rooms Complete",
+    "openDetail": "Open {{room}} Automatic Cleaning Report for {{date}}",
     "groups": {
-      "needsAttention": "Needs Attention",
+      "needsAttention": "Error",
       "interrupted": "Interrupted",
       "stillDue": "Work Still Due",
-      "done": "Fully Completed"
+      "done": "Completed"
     },
     "statuses": {
       "failed": "Failed",
@@ -48,14 +47,12 @@
       "completed": "Completed"
     },
     "summary": {
-      "completedRooms_one": "{{count}} Room Done Today",
-      "completedRooms_other": "{{count}} Rooms Done Today",
-      "roomsDue_one": "{{count}} Room Needs Cleaning",
-      "roomsDue_other": "{{count}} Rooms Need Cleaning",
-      "attention_one": "{{count}} Room Failure • Review",
-      "attention_other": "{{count}} Room Failures • Review",
-      "interrupted_one": "{{count}} Room Interruption",
-      "interrupted_other": "{{count}} Room Interruptions"
+      "completedRooms_one": "{{count}} Room Completed",
+      "completedRooms_other": "{{count}} Rooms Completed",
+      "roomsNeedAttention_one": "{{count}} Room Needs Attention",
+      "roomsNeedAttention_other": "{{count}} Rooms Need Attention",
+      "errors_one": "{{count}} Error",
+      "errors_other": "{{count}} Errors"
     },
     "attempts_one": "{{count}} Clean Attempt",
     "attempts_other": "{{count}} Clean Attempts",
@@ -98,6 +95,10 @@
       "vacuum": "Vacuuming remains due.",
       "vacuumMop": "Combined vacuuming and mopping remain due.",
       "mop": "Mopping remains due."
+    },
+    "errorProgress": {
+      "vacuumCompleteMoppingRemaining": "Vacuuming is complete; mopping remains.",
+      "vacuumingAndMoppingRemaining": "Vacuuming and mopping remain."
     },
     "reasons": {
       "freshWaterMissing": "Fresh-water status is missing.",

@@ -1,6 +1,8 @@
 import { useId, useMemo, useState } from 'react'
+import { GlassTile, type TileTone } from '../core/GlassTile'
 import { MaterialIcon } from '../core/Icon'
-import { SurfaceAccessory } from '../core/SurfaceAccessory'
+import { SectionHeader } from '../core/SectionHeader'
+import { Separator } from '../core/Separator'
 import type { VacuumConfig } from '../../constants/portedDashboard'
 import { VACUUM_COPY_KEYS, VACUUM_COPY_NAMESPACE, formatDate, type CopyKey, type CopyValues, useCopy } from '../../i18n'
 import {
@@ -56,13 +58,6 @@ const GROUP_COPY_KEYS: Record<OutcomeGroupKey, CopyKey<'modalVacuum'>> = {
   stillDue: OUTCOME_COPY_KEYS.groups.stillDue,
 }
 
-const GROUP_VISUAL: Record<OutcomeGroupKey, OutcomeVisual> = {
-  done: STATUS_VISUAL.completed,
-  interrupted: STATUS_VISUAL.interrupted,
-  needsAttention: STATUS_VISUAL.failed,
-  stillDue: STATUS_VISUAL.deferred,
-}
-
 const PRIMARY_COPY_KEYS: Record<VacuumOutcomeAttemptResult, Record<VacuumOutcomeAttemptMode, CopyKey<'modalVacuum'>>> = {
   completed: {
     fallback_vacuum: OUTCOME_COPY_KEYS.primary.completed.fallbackVacuum,
@@ -100,6 +95,10 @@ function outcomeGroupKey(status: VacuumOutcomeStatus): OutcomeGroupKey {
   return 'stillDue'
 }
 
+function roomStatusIsRedundant(status: VacuumOutcomeStatus) {
+  return status === 'completed' || status === 'failed' || status === 'interrupted'
+}
+
 function groupedRooms(contract: VacuumOutcomeContract): OutcomeGroup[] {
   return GROUP_ORDER.map((key) => ({
     key,
@@ -117,6 +116,20 @@ function deferredSentence(copy: VacuumCopy, operation: VacuumOutcomeOperation) {
 
 function outstandingSentence(copy: VacuumCopy, operation: VacuumOutcomeOperation) {
   return copy(OUTSTANDING_COPY_KEYS[operation])
+}
+
+function failedProgressSentence(copy: VacuumCopy, room: VacuumOutcomeRoom) {
+  if (
+    room.credit.status === 'partial'
+    && room.credit.operation === 'vacuum'
+    && room.outstanding?.operation === 'mop'
+  ) {
+    return copy(OUTCOME_COPY_KEYS.errorProgress.vacuumCompleteMoppingRemaining)
+  }
+  if (room.credit.status === 'none' && room.outstanding?.operation === 'vacuum_mop') {
+    return copy(OUTCOME_COPY_KEYS.errorProgress.vacuumingAndMoppingRemaining)
+  }
+  return null
 }
 
 function OutcomeReasonLine({
@@ -225,7 +238,9 @@ export function VacuumOutcomeRow({
 }) {
   const copy = useCopy(VACUUM_COPY_NAMESPACE)
   const events = vacuumOutcomeEventsForRoom(contract, room)
-  const usefulHistory = hasUsefulHistory(events)
+  const isFailed = room.status === 'failed'
+  const isInterrupted = room.status === 'interrupted'
+  const historyAvailable = !isFailed && !isInterrupted && hasUsefulHistory(events)
   const [historyOpen, setHistoryOpen] = useState(false)
   const historyId = useId()
   const attemptsId = useId()
@@ -241,7 +256,12 @@ export function VacuumOutcomeRow({
   const primary = room.latest_attempt
     ? primaryAttemptSentence(copy, room.latest_attempt.mode, room.latest_attempt.result)
     : deferredSentence(copy, room.required_operation)
+  const compactReason = isFailed || isInterrupted
+    ? resultReasonValue ?? outstandingReasonValue ?? primary
+    : null
+  const errorProgress = isFailed ? failedProgressSentence(copy, room) : null
   const showPartialCredit = room.credit.status === 'partial' && room.status !== 'partial'
+  const showStatusLabel = !roomStatusIsRedundant(room.status)
   const historyLabel = historyOpen
     ? copy(OUTCOME_COPY_KEYS.history.hide, { room: room.room_name })
     : copy(OUTCOME_COPY_KEYS.history.show, { room: room.room_name })
@@ -261,27 +281,38 @@ export function VacuumOutcomeRow({
       <div className={styles.roomCopy}>
         <div className={styles.roomHeading}>
           <h4 id={roomNameId}>{room.room_name}</h4>
-          <span className={styles.statusLabel} id={statusId}>{copy(STATUS_COPY_KEYS[room.status])}</span>
+          <span className={showStatusLabel ? styles.statusLabel : styles.visuallyHidden} id={statusId}>{copy(STATUS_COPY_KEYS[room.status])}</span>
         </div>
-        <p className={styles.primaryLine}>{primary}</p>
-        {showPartialCredit && (
-          <p className={styles.creditLine}>{copy(OUTCOME_COPY_KEYS.primary.partialCredit)}</p>
-        )}
-        {resultReasonValue && (
-          <OutcomeReasonLine
-            label={reasonsDiffer ? copy(OUTCOME_COPY_KEYS.reasonLabels.attempt) : undefined}
-            value={resultReasonValue}
-          />
-        )}
-        {room.outstanding && <p className={styles.outstandingLine}>{outstandingSentence(copy, room.outstanding.operation)}</p>}
-        {outstandingReasonValue && (!resultReasonValue || reasonsDiffer) && (
-          <OutcomeReasonLine
-            label={reasonsDiffer ? copy(OUTCOME_COPY_KEYS.reasonLabels.outstanding) : undefined}
-            value={outstandingReasonValue}
-          />
+        {compactReason ? (
+          <>
+            <OutcomeReasonLine value={compactReason} />
+            {errorProgress && (
+              <p className={styles.errorOutstandingLine}>{errorProgress}</p>
+            )}
+          </>
+        ) : (
+          <>
+            <p className={styles.primaryLine}>{primary}</p>
+            {showPartialCredit && (
+              <p className={styles.creditLine}>{copy(OUTCOME_COPY_KEYS.primary.partialCredit)}</p>
+            )}
+            {resultReasonValue && (
+              <OutcomeReasonLine
+                label={reasonsDiffer ? copy(OUTCOME_COPY_KEYS.reasonLabels.attempt) : undefined}
+                value={resultReasonValue}
+              />
+            )}
+            {room.outstanding && <p className={styles.outstandingLine}>{outstandingSentence(copy, room.outstanding.operation)}</p>}
+            {outstandingReasonValue && (!resultReasonValue || reasonsDiffer) && (
+              <OutcomeReasonLine
+                label={reasonsDiffer ? copy(OUTCOME_COPY_KEYS.reasonLabels.outstanding) : undefined}
+                value={outstandingReasonValue}
+              />
+            )}
+          </>
         )}
       </div>
-      {usefulHistory && (
+      {historyAvailable && (
         <button
           aria-controls={historyId}
           aria-describedby={room.occurrence_count > 1 ? attemptsId : undefined}
@@ -293,6 +324,7 @@ export function VacuumOutcomeRow({
           onClick={() => setHistoryOpen((current) => !current)}
           type="button"
         >
+          <span className={styles.historyButtonLabel}>{copy(OUTCOME_COPY_KEYS.history.title)}</span>
           {room.occurrence_count > 1 && (
             <>
               <span aria-hidden="true" className={styles.attemptBadge}>{room.occurrence_count}</span>
@@ -304,7 +336,7 @@ export function VacuumOutcomeRow({
           <ExpandGlyph expanded={historyOpen} />
         </button>
       )}
-      {usefulHistory && (
+      {historyAvailable && (
         <div className={styles.history} hidden={!historyOpen} id={historyId}>
           <VacuumOutcomeHistory events={events} room={room} roomNames={roomNames} />
         </div>
@@ -314,39 +346,24 @@ export function VacuumOutcomeRow({
 }
 
 function VacuumOutcomeGroup({
-  autofocus,
   contract,
-  defaultExpanded,
   group,
   roomNames,
 }: {
-  autofocus: boolean
   contract: VacuumOutcomeContract
-  defaultExpanded: boolean
   group: OutcomeGroup
   roomNames: Record<string, string>
 }) {
   const copy = useCopy(VACUUM_COPY_NAMESPACE)
-  const [expanded, setExpanded] = useState(defaultExpanded)
-  const contentId = useId()
   const label = copy(GROUP_COPY_KEYS[group.key])
 
   return (
     <section className={styles.group} data-group={group.key}>
-      <button
-        aria-controls={contentId}
-        aria-expanded={expanded}
-        className={styles.groupButton}
-        data-action-kind="command"
-        data-modal-detail-autofocus={autofocus ? 'true' : undefined}
-        onClick={() => setExpanded((current) => !current)}
-        type="button"
-      >
-        <span>{label}</span>
-        <strong>{group.rooms.length}</strong>
-        <ExpandGlyph expanded={expanded} />
-      </button>
-      <div className={styles.groupRows} hidden={!expanded} id={contentId}>
+      <div className={styles.groupHeader}>
+        <h3>{label}</h3>
+        <Separator className={styles.groupRule} />
+      </div>
+      <div className={styles.groupRows}>
         {group.rooms.map((room) => (
           <VacuumOutcomeRow contract={contract} key={room.room_id} room={room} roomNames={roomNames} />
         ))}
@@ -364,8 +381,11 @@ function reasonRoomNames(contract: VacuumOutcomeContract, vacuum: VacuumConfig) 
   return { ...names, ...vacuum.outcomeRoomNames }
 }
 
-function groupStartsExpanded(group: OutcomeGroup, hasIncompleteGroup: boolean) {
-  return group.key !== 'done' || !hasIncompleteGroup
+function summaryTileTone(tone: OutcomeTone): TileTone {
+  if (tone === 'danger') return 'danger'
+  if (tone === 'interrupted') return 'security'
+  if (tone === 'warning') return 'warning'
+  return 'presence'
 }
 
 export function VacuumOutcomeOverview({
@@ -380,7 +400,6 @@ export function VacuumOutcomeOverview({
   const copy = useCopy(VACUUM_COPY_NAMESPACE)
   const summary = countVacuumOutcomes(contract)
   const formattedDay = vacuumOutcomeDayValue(contract.day)
-  const allComplete = summary.completed === contract.rooms.length && summary.due === 0
   const visual = summary.attention > 0
     ? STATUS_VISUAL.failed
     : summary.interrupted > 0
@@ -388,43 +407,26 @@ export function VacuumOutcomeOverview({
       : summary.due > 0
         ? STATUS_VISUAL.deferred
         : STATUS_VISUAL.completed
+  const subtitle = [
+    summary.completed > 0 ? copy(OUTCOME_COPY_KEYS.summary.completedRooms, { count: summary.completed }) : null,
+    summary.needsAttention > 0 ? copy(OUTCOME_COPY_KEYS.summary.roomsNeedAttention, { count: summary.needsAttention }) : null,
+    summary.attention > 0 ? copy(OUTCOME_COPY_KEYS.summary.errors, { count: summary.attention }) : null,
+  ].filter((value): value is string => Boolean(value)).join(' • ')
 
   return (
     <section className={styles.overviewSection}>
-      <div className={styles.sectionHeader}>
-        <h3>{copy(OUTCOME_COPY_KEYS.sectionTitle)}</h3>
-        <span />
+      <SectionHeader title={copy(OUTCOME_COPY_KEYS.sectionTitle, { room: vacuum.title })} />
+      <div data-modal-detail-trigger="vacuum-outcomes">
+        <GlassTile
+          ariaLabel={copy(OUTCOME_COPY_KEYS.openDetail, { date: formattedDay, room: vacuum.title })}
+          icon={visual.icon}
+          onClick={onOpen}
+          semantics={{ kind: 'modal' }}
+          subtitle={subtitle || undefined}
+          title={formattedDay}
+          tone={summaryTileTone(visual.tone)}
+        />
       </div>
-      <button
-        aria-label={copy(OUTCOME_COPY_KEYS.openDetail, { date: formattedDay, room: vacuum.title })}
-        className={styles.summaryButton}
-        data-action-kind="modal"
-        data-modal-detail-trigger="vacuum-outcomes"
-        data-tone={visual.tone}
-        onClick={onOpen}
-        type="button"
-      >
-        <span aria-hidden="true" className={styles.summaryIcon}>
-          <MaterialIcon name={visual.icon} size={22} />
-        </span>
-        <span className={styles.summaryCopy}>
-          <span className={styles.summaryPrimary}>
-            <span>{copy(OUTCOME_COPY_KEYS.summary.completedRooms, { count: summary.completed })}</span>
-            <span aria-hidden="true">•</span>
-            <span>{copy(OUTCOME_COPY_KEYS.summary.roomsDue, { count: summary.due })}</span>
-          </span>
-          <span className={styles.summarySecondary}>
-            {allComplete ? copy(OUTCOME_COPY_KEYS.allRoomsComplete) : (
-              <>
-                {summary.attention > 0 && <span>{copy(OUTCOME_COPY_KEYS.summary.attention, { count: summary.attention })}</span>}
-                {summary.attention > 0 && summary.interrupted > 0 && <span aria-hidden="true">•</span>}
-                {summary.interrupted > 0 && <span>{copy(OUTCOME_COPY_KEYS.summary.interrupted, { count: summary.interrupted })}</span>}
-              </>
-            )}
-          </span>
-        </span>
-        <SurfaceAccessory semantics={{ kind: 'modal' }} size="compact" />
-      </button>
     </section>
   )
 }
@@ -436,31 +438,15 @@ export function VacuumOutcomeDetail({
   contract: VacuumOutcomeContract
   vacuum: VacuumConfig
 }) {
-  const copy = useCopy(VACUUM_COPY_NAMESPACE)
   const groups = groupedRooms(contract)
-  const hasIncompleteGroup = groups.some((group) => group.key !== 'done')
-  const roomNames = useMemo(() => reasonRoomNames(contract, vacuum), [contract, vacuum])
+  const roomNames = reasonRoomNames(contract, vacuum)
 
   return (
-    <div className={styles.detail} data-vacuum-outcome-detail="true">
-      <div aria-label={copy(OUTCOME_COPY_KEYS.sectionTitle)} className={styles.detailSummary} role="group">
-        {groups.map((group) => {
-          const visual = GROUP_VISUAL[group.key]
-          return (
-            <div data-tone={visual.tone} key={group.key}>
-              <MaterialIcon name={visual.icon} size={18} />
-              <span>{copy(GROUP_COPY_KEYS[group.key])}</span>
-              <strong>{group.rooms.length}</strong>
-            </div>
-          )
-        })}
-      </div>
+    <div className={styles.detail} data-modal-detail-autofocus="true" data-vacuum-outcome-detail="true" tabIndex={-1}>
       <div className={styles.groups}>
-        {groups.map((group, index) => (
+        {groups.map((group) => (
           <VacuumOutcomeGroup
-            autofocus={index === 0}
             contract={contract}
-            defaultExpanded={groupStartsExpanded(group, hasIncompleteGroup)}
             group={group}
             key={group.key}
             roomNames={roomNames}

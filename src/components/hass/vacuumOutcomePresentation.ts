@@ -10,7 +10,10 @@ export function countVacuumOutcomes(contract: VacuumOutcomeContract) {
   const due = contract.rooms.filter((room) => room.outstanding !== null).length
   const attention = contract.rooms.filter((room) => room.status === 'failed').length
   const interrupted = contract.rooms.filter((room) => room.status === 'interrupted').length
-  return { attention, completed, due, interrupted }
+  const needsAttention = contract.rooms.filter(
+    (room) => room.outstanding !== null && room.status !== 'interrupted',
+  ).length
+  return { attention, completed, due, interrupted, needsAttention }
 }
 
 export function vacuumOutcomeDayValue(day: string) {
