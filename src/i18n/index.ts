@@ -77,7 +77,6 @@ export const VACUUM_COPY_KEYS = {
     unavailableHelp: 'status.unavailableHelp',
   },
   outcomes: {
-    allRoomsComplete: 'outcomes.allRoomsComplete',
     attempts: 'outcomes.attempts',
     backToControls: 'outcomes.backToControls',
     detailTitle: 'outcomes.detailTitle',
@@ -100,6 +99,10 @@ export const VACUUM_COPY_KEYS = {
       mop: 'outcomes.outstanding.mop',
       vacuum: 'outcomes.outstanding.vacuum',
       vacuumMop: 'outcomes.outstanding.vacuumMop',
+    },
+    errorProgress: {
+      vacuumCompleteMoppingRemaining: 'outcomes.errorProgress.vacuumCompleteMoppingRemaining',
+      vacuumingAndMoppingRemaining: 'outcomes.errorProgress.vacuumingAndMoppingRemaining',
     },
     primary: {
       completed: {
@@ -169,10 +172,9 @@ export const VACUUM_COPY_KEYS = {
       partial: 'outcomes.statuses.partial',
     },
     summary: {
-      attention: 'outcomes.summary.attention',
       completedRooms: 'outcomes.summary.completedRooms',
-      interrupted: 'outcomes.summary.interrupted',
-      roomsDue: 'outcomes.summary.roomsDue',
+      errors: 'outcomes.summary.errors',
+      roomsNeedAttention: 'outcomes.summary.roomsNeedAttention',
     },
   },
   selectedRooms: 'selectedRooms',

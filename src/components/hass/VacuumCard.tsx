@@ -28,7 +28,6 @@ import {
 } from './ValetudoMapCard'
 import { VacuumOutcomeDetail, VacuumOutcomeOverview } from './VacuumOutcomes'
 import { vacuumWhileAwayPresentation, type VacuumOutcomeContract, type VacuumWhileAwayPresentation } from './vacuumOutcomes'
-import { vacuumOutcomeDayValue } from './vacuumOutcomePresentation'
 import {
   nativeVacuumIssue,
   resolveVacuumStatusContract,
@@ -1298,7 +1297,7 @@ function VacuumWhileAwaySection({
 
   return (
     <section className={styles.section} data-modal-detail-trigger="vacuum-outcomes" tabIndex={-1}>
-      <SectionHeader title="While You Were Away" />
+      <SectionHeader title={copy(VACUUM_COPY_KEYS.outcomes.sectionTitle, { room: vacuum.title })} />
       <div className={styles.awaySummary}>
         {cleaned.length > 0 && (
           <InfoBox title={copy(VACUUM_COPY_KEYS.cleaned)}>
@@ -1714,7 +1713,7 @@ export function VacuumModal({
   const title = areaEditorOpen
     ? `${vacuum.title} Cleaning Area`
     : showOutcomes
-      ? copy(VACUUM_COPY_KEYS.outcomes.detailTitle, { date: vacuumOutcomeDayValue(renderedOutcomeContract.day) })
+      ? copy(VACUUM_COPY_KEYS.outcomes.detailTitle, { room: vacuum.title })
       : titleOverride ?? `${vacuum.title} Robot Vacuum`
   const closeAreaEditor = useCallback(() => {
     leaveDetailPage()

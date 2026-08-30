@@ -1,128 +1,26 @@
 .overviewSection {
   display: grid;
-  gap: 6px;
+  gap: 8px;
 }
 
-.sectionHeader {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 2px 2px 0;
-}
-
-.sectionHeader h3 {
-  flex: 0 0 auto;
-  margin: 0;
-  color: var(--color-text);
-  font-size: 0.86rem;
-  font-weight: 820;
-}
-
-.sectionHeader > span {
-  height: 1px;
-  flex: 1 1 auto;
-  border-radius: var(--radius-pill);
-  background: var(--color-line);
-}
-
-.summaryButton,
-.roomRow,
-.detailSummary > div {
+.roomRow {
   --outcome-tone: var(--color-glass-soft);
 }
 
-.summaryButton[data-tone='danger'],
-.roomRow[data-tone='danger'],
-.detailSummary > div[data-tone='danger'] {
+.roomRow[data-tone='danger'] {
   --outcome-tone: var(--color-warning);
 }
 
-.summaryButton[data-tone='interrupted'],
-.roomRow[data-tone='interrupted'],
-.detailSummary > div[data-tone='interrupted'] {
+.roomRow[data-tone='interrupted'] {
   --outcome-tone: var(--color-security);
 }
 
-.summaryButton[data-tone='warning'],
-.roomRow[data-tone='warning'],
-.detailSummary > div[data-tone='warning'] {
+.roomRow[data-tone='warning'] {
   --outcome-tone: var(--color-timer);
 }
 
-.summaryButton[data-tone='success'],
-.roomRow[data-tone='success'],
-.detailSummary > div[data-tone='success'] {
+.roomRow[data-tone='success'] {
   --outcome-tone: var(--color-presence);
-}
-
-.summaryButton {
-  display: grid;
-  width: 100%;
-  min-width: 0;
-  min-height: 56px;
-  grid-template-columns: 34px minmax(0, 1fr) 22px;
-  align-items: center;
-  gap: 8px;
-  box-sizing: border-box;
-  border: 1px solid color-mix(in srgb, var(--outcome-tone) 42%, var(--color-glass-soft));
-  border-radius: 17px;
-  padding: 6px 9px;
-  color: var(--color-text);
-  background: color-mix(in srgb, var(--outcome-tone) 18%, var(--color-modal-surface));
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-  -webkit-tap-highlight-color: var(--color-modal-footer-transparent);
-}
-
-.summaryButton:focus {
-  outline: none;
-}
-
-.summaryButton:focus-visible {
-  outline: 2px solid var(--color-text);
-  outline-offset: 2px;
-}
-
-.summaryIcon {
-  display: grid;
-  width: 34px;
-  height: 34px;
-  place-items: center;
-  border-radius: 50%;
-  color: var(--color-text);
-  background: color-mix(in srgb, var(--outcome-tone) 34%, var(--color-glass-soft));
-}
-
-.summaryCopy {
-  display: grid;
-  min-width: 0;
-  gap: 3px;
-}
-
-.summaryPrimary,
-.summarySecondary {
-  display: flex;
-  min-width: 0;
-  align-items: center;
-  gap: 5px;
-  overflow: hidden;
-  white-space: nowrap;
-}
-
-.summaryPrimary {
-  color: var(--color-text);
-  font-size: 0.72rem;
-  font-weight: 820;
-  line-height: 1.1;
-}
-
-.summarySecondary {
-  min-height: 0.72rem;
-  color: var(--color-text-muted);
-  font-size: 0.62rem;
-  font-weight: 760;
-  line-height: 1.05;
 }
 
 .detail {
@@ -131,93 +29,39 @@
   padding-top: 2px;
 }
 
-.detailSummary {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-}
-
-.detailSummary > div {
-  display: grid;
-  min-width: 0;
-  min-height: 50px;
-  grid-template-columns: 24px minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 7px;
-  border: 1px solid color-mix(in srgb, var(--outcome-tone) 38%, var(--color-glass-soft));
-  border-radius: 15px;
-  padding: 7px 9px;
-  color: var(--color-text);
-  background: color-mix(in srgb, var(--outcome-tone) 15%, var(--color-modal-surface));
-}
-
-.detailSummary span {
-  overflow: hidden;
-  font-size: 0.68rem;
-  font-weight: 760;
-  line-height: 1.08;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.detailSummary strong {
-  font-size: 0.84rem;
-  font-variant-numeric: tabular-nums;
-  font-weight: 860;
+.detail:focus {
+  outline: none;
 }
 
 .groups {
   display: grid;
-  gap: 12px;
+  gap: 16px;
 }
 
 .group {
   display: grid;
-  gap: 7px;
+  gap: 8px;
 }
 
-.groupButton {
+.groupHeader {
   display: grid;
-  min-height: 44px;
-  grid-template-columns: minmax(0, 1fr) auto 28px;
+  grid-template-columns: auto minmax(20px, 1fr);
   align-items: center;
   gap: 8px;
-  border: 0;
-  border-radius: 14px;
-  padding: 0 8px 0 10px;
-  color: var(--color-text);
-  background: var(--color-glass-soft);
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-  -webkit-tap-highlight-color: var(--color-modal-footer-transparent);
 }
 
-.groupButton > span {
+.groupHeader h3 {
+  margin: 0;
+  color: var(--color-text);
   font-size: 0.78rem;
   font-weight: 840;
 }
 
-.groupButton > strong {
-  min-width: 20px;
-  color: var(--color-text-muted);
-  font-size: 0.72rem;
-  font-variant-numeric: tabular-nums;
-  font-weight: 820;
-  text-align: right;
-}
-
-.groupButton > svg {
-  justify-self: center;
-}
-
-.groupButton:focus,
 .historyButton:focus,
 .diagnosticsButton:focus {
   outline: none;
 }
 
-.groupButton:focus-visible,
 .historyButton:focus-visible,
 .diagnosticsButton:focus-visible {
   outline: 2px solid var(--color-text);
@@ -229,7 +73,6 @@
   gap: 8px;
 }
 
-.groupRows[hidden],
 .history[hidden],
 .diagnostics ul[hidden] {
   display: none;
@@ -238,7 +81,7 @@
 .roomRow {
   display: grid;
   min-width: 0;
-  grid-template-columns: 32px minmax(0, 1fr) auto;
+  grid-template-columns: 32px minmax(0, 1fr);
   gap: 8px;
   align-items: start;
   border: 1px solid color-mix(in srgb, var(--outcome-tone) 34%, var(--color-glass-soft));
@@ -292,6 +135,7 @@
 .primaryLine,
 .creditLine,
 .outstandingLine,
+.errorOutstandingLine,
 .reasonLine p,
 .timeline p {
   margin: 0;
@@ -307,6 +151,11 @@
 
 .outstandingLine {
   color: color-mix(in srgb, var(--color-timer) 72%, var(--color-text));
+  font-weight: 780;
+}
+
+.errorOutstandingLine {
+  color: var(--color-text);
   font-weight: 780;
 }
 
@@ -326,23 +175,32 @@
 
 .historyButton {
   display: grid;
-  width: 44px;
-  min-width: 44px;
+  width: 100%;
+  min-width: 0;
   min-height: 44px;
-  align-self: stretch;
-  place-items: center;
+  grid-column: 2 / -1;
+  grid-template-columns: minmax(0, 1fr) 24px;
+  align-items: center;
+  gap: 8px;
   border: 0;
   border-radius: 13px;
+  padding: 0 10px 0 12px;
   color: var(--color-text);
   background: var(--color-glass-soft);
+  font: inherit;
   cursor: pointer;
+  text-align: left;
   -webkit-tap-highlight-color: var(--color-modal-footer-transparent);
 }
 
 .historyButton[data-has-attempt-count='true'] {
-  grid-template-rows: 18px 20px;
-  align-content: center;
-  gap: 2px;
+  grid-template-columns: minmax(0, 1fr) auto 24px;
+}
+
+.historyButtonLabel {
+  min-width: 0;
+  font-size: 0.67rem;
+  font-weight: 820;
 }
 
 .attemptBadge {
@@ -464,8 +322,6 @@
 }
 
 @media (hover: none), (pointer: coarse) {
-  .summaryButton:focus-visible,
-  .groupButton:focus-visible,
   .historyButton:focus-visible,
   .diagnosticsButton:focus-visible {
     outline: none;
@@ -478,7 +334,4 @@
     justify-self: center;
   }
 
-  .detailSummary {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
 }

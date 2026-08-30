@@ -1,4 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test'
+import { NINE_ROOM_VACUUM_OUTCOME_CONTRACT } from '../src/test/fixtures/vacuumOutcomes'
 import { RESPONSIVE_ROUTES, RESPONSIVE_ROUTE_TITLES } from './responsive-acceptance-data'
 
 const DESKTOP_VIEWPORTS = [
@@ -172,3 +173,51 @@ for (const route of [
     await expect(close).toBeVisible()
   })
 }
+
+test('cleaning report detail remains usable in a fine-pointer desktop context', async ({ page }) => {
+  await expect.poll(() => page.evaluate(() => ({
+    coarse: window.matchMedia('(pointer: coarse)').matches,
+    hover: window.matchMedia('(hover: hover)').matches,
+  }))).toEqual({ coarse: false, hover: true })
+
+  for (const viewport of [
+    { height: 820, width: 1180 },
+    ...DESKTOP_VIEWPORTS,
+  ]) {
+    await page.setViewportSize(viewport)
+    await page.goto('/index.html?path=vacuums')
+    await page.evaluate((contract) => {
+      const mock = window.__mockHass
+      if (!mock) throw new Error('Mock Home Assistant API is unavailable')
+      mock.setEntityAttribute(
+        'sensor.main_floor_vacuum_coordinator_session_state',
+        'while_away_outcomes',
+        contract,
+      )
+      mock.calls.splice(0, mock.calls.length)
+    }, structuredClone(NINE_ROOM_VACUUM_OUTCOME_CONTRACT))
+
+    await page.getByRole('button', { name: /Main Floor Docked/i }).click()
+    const dialog = page.getByRole('dialog')
+    const summary = dialog.getByRole('button', {
+      name: 'Open Main Floor Automatic Cleaning Report for Aug 19, 2026',
+    })
+    await expect(summary).toBeVisible()
+    await summary.click()
+
+    await expect(dialog.getByRole('heading', {
+      name: 'Main Floor · Automatic Cleaning Report',
+    })).toBeVisible()
+    await expect(dialog.locator('[data-vacuum-outcome-detail="true"]')).toBeFocused()
+    await expect(dialog.locator('[data-group] > button')).toHaveCount(0)
+    await expect(dialog.locator('[data-room-id="dining_room"]').getByRole('button')).toHaveCount(0)
+    await expect(dialog.locator('[data-room-id="dining_room"]')).toContainText(
+      'Vacuuming and mopping remain.',
+    )
+    expect(await dialog.evaluate((element) => element.scrollWidth - element.clientWidth)).toBeLessThanOrEqual(0)
+    expect(await page.evaluate(() => window.__mockHass?.calls ?? [])).toEqual([])
+
+    await dialog.getByRole('button', { name: 'Back to Vacuum Controls' }).click()
+    await expect(summary).toBeFocused()
+  }
+})
