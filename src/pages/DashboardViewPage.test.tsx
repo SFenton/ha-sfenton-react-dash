@@ -1290,6 +1290,35 @@ describe('DashboardViewPage', () => {
     expect(screen.queryByText('Current Readings')).not.toBeInTheDocument()
   })
 
+  it('shows the bed sensor in the Master Bedroom occupancy and climate popups', async () => {
+    const renderMasterBedroom = () => render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
+
+    let view = renderMasterBedroom()
+    fireEvent.click(document.querySelector('[data-status-chip="Occupancy"] button')!)
+    let dialog = await screen.findByRole('dialog')
+    expect(within(dialog).getAllByRole('article').map((card) => card.getAttribute('aria-label'))).toEqual([
+      'Master Bedroom Clear',
+      'Bed Clear',
+      'Bathroom Clear',
+      'Closet Clear',
+    ])
+    view.unmount()
+    window.history.replaceState(null, '', window.location.pathname)
+
+    view = renderMasterBedroom()
+    fireEvent.click(document.querySelector('[data-status-chip="Climate"] button')!)
+    dialog = await screen.findByRole('dialog')
+    expect(within(dialog).getAllByRole('article').map((card) => card.getAttribute('aria-label'))).toEqual([
+      'Window 70.0°F',
+      'Bed 73.1°F',
+      'Bathroom 70.0°F',
+      'Closet 70.0°F',
+      'Vents Closed',
+    ])
+    expect(within(dialog).getByRole('article', { name: 'Bed 73.1°F' })).toHaveStyle('--card-rgb: 220 213 17')
+    view.unmount()
+  })
+
   it('ports the Guest Room source page with its status chips and reusable popups', async () => {
     const renderGuestRoom = () => render(<DashboardViewPage activePath="guest-room" onNavigate={() => undefined} path="guest-room" />)
 

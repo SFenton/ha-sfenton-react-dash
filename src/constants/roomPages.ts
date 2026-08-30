@@ -171,7 +171,7 @@ export const ROOM_PAGE_CONFIGS: Record<string, RoomPageSourceConfig> = {
         },
       ] },
     ],
-    popupTemplates: ['light-popup-6', 'window-popup-single', 'humidifier', 'vent-popup-2', 'climate-popup-3', 'air-purifier-popup', 'eight-sleep-popups', 'media-player-popup', 'occupancy-popup-3'],
+    popupTemplates: ['light-popup-6', 'window-popup-single', 'humidifier', 'vent-popup-2', 'climate-popup-4', 'air-purifier-popup', 'eight-sleep-popups', 'media-player-popup', 'occupancy-popup-4'],
   },
   gym: {
     title: 'Gym',

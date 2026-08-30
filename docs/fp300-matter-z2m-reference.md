@@ -8,6 +8,7 @@ Generated from live Home Assistant device/entity registry and Zigbee2MQTT bridge
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | Master Bathroom | Master Bathroom Presense Sensor | `0x54ef44100146f64c` | `binary_sensor.master_bathroom_presence_occupancy` | `sensor.master_bathroom_presence_sensor_occupancy` | `sensor.master_bathroom_presence_temperature` | `sensor.master_bathroom_presence_humidity` | `sensor.master_bathroom_presence_illuminance` | yes |
 | Master Bedroom | Master Bedroom Bathroom Presence Sensor | `0x54ef4410014ae9cb` | `binary_sensor.master_bedroom_bathroom_presence_occupancy` | `sensor.master_bedroom_bathroom_presence_sensor_occupancy` | `sensor.master_bedroom_bathroom_presence_temperature` | `sensor.master_bedroom_bathroom_presence_humidity` | `sensor.master_bedroom_bathroom_presence_illuminance` | yes |
+| Master Bedroom | Master Bedroom Bed Presence Sensor | `0x54ef441001499822` | `binary_sensor.master_bedroom_bed_presence_sensor_presence` | `sensor.master_bedroom_bed_presence_sensor_presence_real_last_changed` | `sensor.master_bedroom_bed_presence_sensor_temperature` | `sensor.master_bedroom_bed_presence_sensor_humidity` | `sensor.master_bedroom_bed_presence_sensor_illuminance` | yes |
 | Master Bedroom | Master Bedroom Closet Presence Sensor | `0x54ef44100146eb59` | `binary_sensor.master_bedroom_closet_presence_occupancy` | `sensor.master_bedroom_closet_presence_sensor_occupancy` | `sensor.master_bedroom_closet_presence_temperature` | `sensor.master_bedroom_closet_presence_humidity` | `sensor.master_bedroom_closet_presence_illuminance` | yes |
 | Master Bedroom | Master Bedroom Window Presence Sensor | `0x54ef44100146f191` | `binary_sensor.master_bedroom_window_presence_occupancy` | `sensor.master_bedroom_window_presence_sensor_occupancy` | `sensor.master_bedroom_window_presence_temperature` | `sensor.master_bedroom_window_presence_humidity` | `sensor.master_bedroom_window_presence_illuminance` | yes |
 
@@ -60,6 +61,7 @@ Generated from live Home Assistant device/entity registry and Zigbee2MQTT bridge
 | Hallway Office Bedroom Presence Sensor | `0x54ef44100146ca84` | PS-S04D | 0.0.1 | SUCCESSFUL | yes |
 | Master Bathroom Presence Sensor | `0x54ef44100146f64c` | PS-S04D | 0.0.1 | SUCCESSFUL | yes |
 | Master Bedroom Bathroom Presence Sensor | `0x54ef4410014ae9cb` | PS-S04D | 0.0.1 | SUCCESSFUL | yes |
+| Master Bedroom Bed Presence Sensor | `0x54ef441001499822` | PS-S04D | 0.0.1 | SUCCESSFUL | yes |
 | Master Bedroom Closet Presence Sensor | `0x54ef44100146eb59` | PS-S04D | 0.0.1 | SUCCESSFUL | yes |
 | Master Bedroom Window Presence Sensor | `0x54ef44100146f191` | PS-S04D | 0.0.1 | SUCCESSFUL | yes |
 | Music Room Door Presence Sensor | `0x54ef441001498c47` | PS-S04D | 0.0.1 | SUCCESSFUL | yes |

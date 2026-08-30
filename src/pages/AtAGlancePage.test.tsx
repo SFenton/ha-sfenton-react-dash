@@ -305,6 +305,40 @@ describe('AtAGlancePage', () => {
     expect(within(dialog).getByRole('article', { name: /Closet Clear/i })).toBeInTheDocument()
   })
 
+  it('shows the Master Bedroom bed sensor after the main sensor in occupancy details', async () => {
+    render(<AtAGlancePage />)
+
+    fireEvent.click(screen.getByRole('button', { name: /^Occupancy\b/i }))
+
+    const dialog = await screen.findByRole('dialog')
+    fireEvent.click(within(dialog).getByLabelText('Open Master Bedroom Occupancy'))
+
+    expect(within(dialog).getAllByRole('article').map((card) => card.getAttribute('aria-label'))).toEqual([
+      'Master Bedroom Clear',
+      'Bed Clear',
+      'Bathroom Clear',
+      'Closet Clear',
+    ])
+  })
+
+  it('shows the Master Bedroom bed temperature after Window with its helper color', async () => {
+    render(<AtAGlancePage />)
+
+    fireEvent.click(document.querySelector('[data-status-chip="Climate"] button')!)
+
+    const dialog = await screen.findByRole('dialog')
+    fireEvent.click(within(dialog).getByLabelText('Open Master Bedroom Climate'))
+
+    expect(within(dialog).getAllByRole('article').map((card) => card.getAttribute('aria-label'))).toEqual([
+      'Window 70.0°F',
+      'Bed 73.1°F',
+      'Bathroom 70.0°F',
+      'Closet 70.0°F',
+      'Vents Closed',
+    ])
+    expect(within(dialog).getByRole('article', { name: 'Bed 73.1°F' })).toHaveStyle('--card-rgb: 220 213 17')
+  })
+
   it('groups the Occupancy overview by occupied and clear rooms', async () => {
     render(<AtAGlancePage />)
 

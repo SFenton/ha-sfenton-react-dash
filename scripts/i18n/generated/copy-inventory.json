@@ -1022,6 +1022,18 @@
       "words": 2
     },
     {
+      "characters": 3,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en.json",
+      "id": "f53a60a52baad7b1",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Bed",
+      "words": 1
+    },
+    {
       "characters": 4,
       "context": "catalog-copy",
       "file": "src/i18n/locales/en/modals/weather.json",
@@ -24742,7 +24754,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "8e51bb5b8de6f3dc",
       "lines": [
-        167
+        168
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -24987,7 +24999,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "3caa1046486d605b",
       "lines": [
-        752
+        755
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -25015,7 +25027,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "df92f5d33582a56f",
       "lines": [
-        328
+        329
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -25057,7 +25069,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "59ef70630146d8b9",
       "lines": [
-        408
+        409
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -25071,7 +25083,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "9961d2c8292aad20",
       "lines": [
-        343
+        344
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -25085,7 +25097,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "ee0554248ca60f50",
       "lines": [
-        344
+        345
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -25099,8 +25111,8 @@
       "file": "src/constants/atAGlance.ts",
       "id": "de1ff9eedd036b2a",
       "lines": [
-        476,
-        610
+        477,
+        612
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -25114,8 +25126,8 @@
       "file": "src/constants/atAGlance.ts",
       "id": "67e7a7aa13add478",
       "lines": [
-        477,
-        611
+        478,
+        613
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -25129,9 +25141,9 @@
       "file": "src/constants/atAGlance.ts",
       "id": "61347449de0524fd",
       "lines": [
-        499,
-        620,
-        650
+        501,
+        622,
+        653
       ],
       "occurrences": 3,
       "origin": "legacy",
@@ -25145,8 +25157,8 @@
       "file": "src/constants/atAGlance.ts",
       "id": "917c7e79e7592c8d",
       "lines": [
-        360,
-        423
+        361,
+        424
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -25174,7 +25186,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "cb649a23ec6207d9",
       "lines": [
-        352
+        353
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -25497,7 +25509,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "b4eb01569adaee3d",
       "lines": [
-        143
+        144
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -25577,13 +25589,13 @@
       "file": "src/constants/atAGlance.ts",
       "id": "d881a60835ead3c9",
       "lines": [
-        489,
-        500,
-        531,
-        632,
-        643,
-        651,
-        656
+        490,
+        502,
+        533,
+        634,
+        645,
+        654,
+        659
       ],
       "occurrences": 7,
       "origin": "legacy",
@@ -25611,8 +25623,8 @@
       "file": "src/constants/atAGlance.ts",
       "id": "ec23cc822198bfda",
       "lines": [
-        364,
-        370
+        365,
+        371
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -25654,7 +25666,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "eac200f5adbc00c7",
       "lines": [
-        159
+        160
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -25696,7 +25708,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "85dcf8d9549008ab",
       "lines": [
-        424
+        425
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -25710,7 +25722,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "38773671fda29589",
       "lines": [
-        412
+        413
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -25724,7 +25736,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "be943749928cc517",
       "lines": [
-        398
+        399
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -25767,7 +25779,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "c7adb1b827d09b92",
       "lines": [
-        264
+        265
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -25854,8 +25866,8 @@
       "file": "src/constants/atAGlance.ts",
       "id": "ac0899d157b3ce97",
       "lines": [
-        332,
-        679
+        333,
+        682
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -25912,7 +25924,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "e170af3c637634b2",
       "lines": [
-        545
+        547
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -25926,7 +25938,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "fecd4f018efb95cb",
       "lines": [
-        723
+        726
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -25940,7 +25952,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "ebcc00fcbe3135d1",
       "lines": [
-        724
+        727
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -25954,8 +25966,8 @@
       "file": "src/constants/atAGlance.ts",
       "id": "5913f634415fe5f0",
       "lines": [
-        403,
-        405
+        404,
+        406
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -25969,7 +25981,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "61020f3a7292489f",
       "lines": [
-        678
+        681
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -25983,7 +25995,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "2242c015afa5bcac",
       "lines": [
-        754
+        757
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -26067,10 +26079,10 @@
       "file": "src/constants/atAGlance.ts",
       "id": "449fcf10042cc110",
       "lines": [
-        510,
-        529,
-        560,
-        674
+        512,
+        531,
+        562,
+        677
       ],
       "occurrences": 4,
       "origin": "legacy",
@@ -26117,8 +26129,8 @@
       "file": "src/constants/atAGlance.ts",
       "id": "bca59477442c6360",
       "lines": [
-        361,
-        397
+        362,
+        398
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -26175,8 +26187,8 @@
       "file": "src/constants/atAGlance.ts",
       "id": "2e7065c7385e0781",
       "lines": [
-        329,
-        694
+        330,
+        697
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -26218,7 +26230,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "1e6a72bb5ece2220",
       "lines": [
-        574
+        576
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -26232,8 +26244,8 @@
       "file": "src/constants/atAGlance.ts",
       "id": "f24cd163e40482e9",
       "lines": [
-        444,
-        446
+        445,
+        447
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -26247,7 +26259,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "3eb5ec23a178efb9",
       "lines": [
-        693
+        696
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -26275,7 +26287,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "ebba93d9ee8a364e",
       "lines": [
-        289
+        290
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -26289,7 +26301,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "a2c422ef26c926bd",
       "lines": [
-        464
+        465
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -26317,7 +26329,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "73e54926c48a3163",
       "lines": [
-        422
+        423
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -26461,9 +26473,9 @@
       "file": "src/constants/atAGlance.ts",
       "id": "626f388014d5d9c0",
       "lines": [
-        519,
-        585,
-        662
+        521,
+        587,
+        665
       ],
       "occurrences": 3,
       "origin": "legacy",
@@ -26477,8 +26489,8 @@
       "file": "src/constants/atAGlance.ts",
       "id": "29ee0b2688b51523",
       "lines": [
-        381,
-        421
+        382,
+        422
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -26492,8 +26504,8 @@
       "file": "src/constants/atAGlance.ts",
       "id": "8dc2b4fb41234004",
       "lines": [
-        333,
-        619
+        334,
+        621
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -26535,7 +26547,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "bf92eb998eb572a8",
       "lines": [
-        599
+        601
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -26549,7 +26561,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "4178d1584adc6c94",
       "lines": [
-        700
+        703
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -26563,8 +26575,8 @@
       "file": "src/constants/atAGlance.ts",
       "id": "413dbd36bbeb297c",
       "lines": [
-        459,
-        461
+        460,
+        462
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -26578,8 +26590,8 @@
       "file": "src/constants/atAGlance.ts",
       "id": "9227658736f68b12",
       "lines": [
-        686,
-        688
+        689,
+        691
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -26721,8 +26733,8 @@
       "file": "src/constants/atAGlance.ts",
       "id": "d02c2178f72b9a39",
       "lines": [
-        479,
-        613
+        480,
+        615
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -26736,7 +26748,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "c744e8cbe6290491",
       "lines": [
-        419
+        420
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -26750,7 +26762,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "0d349d5367aec284",
       "lines": [
-        466
+        467
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -26778,7 +26790,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "5bf86bda62ee75b3",
       "lines": [
-        241
+        242
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -26904,7 +26916,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "a347b35f25240764",
       "lines": [
-        437
+        438
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -26932,10 +26944,10 @@
       "file": "src/constants/atAGlance.ts",
       "id": "e420f9d0ad33335d",
       "lines": [
-        280,
-        602,
-        689,
-        701
+        281,
+        604,
+        692,
+        704
       ],
       "occurrences": 4,
       "origin": "legacy",
@@ -27005,7 +27017,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "2af4710ff8ff4283",
       "lines": [
-        341
+        342
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -27019,8 +27031,8 @@
       "file": "src/constants/atAGlance.ts",
       "id": "593a83ea65e0d2bd",
       "lines": [
-        342,
-        436
+        343,
+        437
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -27034,7 +27046,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "0cc393c9397118f8",
       "lines": [
-        435
+        436
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -27062,7 +27074,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "79c3d4bc7fae58ab",
       "lines": [
-        326
+        327
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -27118,7 +27130,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "bd904fabd5b59653",
       "lines": [
-        715
+        718
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -27132,7 +27144,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "7ae75f4703ab025c",
       "lines": [
-        716
+        719
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -27188,7 +27200,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "2cec065c704e210c",
       "lines": [
-        411
+        412
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -27288,8 +27300,8 @@
       "file": "src/constants/atAGlance.ts",
       "id": "ee891ef324665ea6",
       "lines": [
-        330,
-        661
+        331,
+        664
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -27346,7 +27358,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "3b0c4237bc831e02",
       "lines": [
-        580
+        582
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -27360,8 +27372,8 @@
       "file": "src/constants/atAGlance.ts",
       "id": "f3095b7880cd3bf6",
       "lines": [
-        449,
-        451
+        450,
+        452
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -27375,7 +27387,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "539c5a51a1faf2cd",
       "lines": [
-        659
+        662
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -27403,10 +27415,10 @@
       "file": "src/constants/atAGlance.ts",
       "id": "e269d7dcdef9287f",
       "lines": [
-        186,
-        319,
-        520,
-        631
+        187,
+        320,
+        522,
+        633
       ],
       "occurrences": 4,
       "origin": "legacy",
@@ -27464,7 +27476,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "d5e890fe5f2232f5",
       "lines": [
-        484
+        485
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -27478,7 +27490,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "790857ac021a477d",
       "lines": [
-        739
+        742
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -27492,7 +27504,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "3b9baa9db1426b3d",
       "lines": [
-        383
+        384
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -27506,7 +27518,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "2c0567ba272e6121",
       "lines": [
-        348
+        349
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -27520,7 +27532,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "b05aad9fe2af0e85",
       "lines": [
-        629
+        631
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -27548,8 +27560,8 @@
       "file": "src/constants/atAGlance.ts",
       "id": "af86c03f879f53e0",
       "lines": [
-        320,
-        637
+        321,
+        639
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -27606,7 +27618,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "8758808193e8a50f",
       "lines": [
-        505
+        507
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -27620,7 +27632,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "627bf981c23ad27d",
       "lines": [
-        743
+        746
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -27634,9 +27646,9 @@
       "file": "src/constants/atAGlance.ts",
       "id": "75aa49387e7d6620",
       "lines": [
-        373,
-        375,
-        382
+        374,
+        376,
+        383
       ],
       "occurrences": 3,
       "origin": "legacy",
@@ -27650,7 +27662,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "36fe44024ec28f86",
       "lines": [
-        636
+        638
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -27678,7 +27690,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "01ae4f4b068e4e4d",
       "lines": [
-        323
+        324
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -27734,7 +27746,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "4ff8362a21f3f26d",
       "lines": [
-        515
+        517
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -27748,7 +27760,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "deb341db56a688bb",
       "lines": [
-        378
+        379
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -27762,7 +27774,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "d0205f59770efea0",
       "lines": [
-        617
+        619
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -27804,7 +27816,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "730438e01f16f3aa",
       "lines": [
-        751
+        754
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -28000,9 +28012,9 @@
       "file": "src/constants/atAGlance.ts",
       "id": "cebc7f033655cc58",
       "lines": [
-        324,
-        540,
-        626
+        325,
+        542,
+        628
       ],
       "occurrences": 3,
       "origin": "legacy",
@@ -28059,7 +28071,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "8ee8e7ebd57c9ed3",
       "lines": [
-        536
+        538
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -28073,7 +28085,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "c8ea9569a05ef1f4",
       "lines": [
-        727
+        730
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -28087,7 +28099,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "d2e358e763bff2d0",
       "lines": [
-        728
+        731
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -28101,7 +28113,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "2be160ec6fa4a846",
       "lines": [
-        393
+        394
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -28115,7 +28127,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "d70694674a19ef04",
       "lines": [
-        625
+        627
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -28129,8 +28141,8 @@
       "file": "src/constants/atAGlance.ts",
       "id": "31af4efc072764df",
       "lines": [
-        478,
-        612
+        479,
+        614
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -28144,8 +28156,8 @@
       "file": "src/constants/atAGlance.ts",
       "id": "ebe418193bcadb42",
       "lines": [
-        558,
-        673
+        560,
+        676
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -28221,7 +28233,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "cbe48c3654392d91",
       "lines": [
-        127
+        128
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -28298,8 +28310,8 @@
       "file": "src/constants/atAGlance.ts",
       "id": "e4d38b4eb2c1b367",
       "lines": [
-        180,
-        318
+        181,
+        319
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -28386,7 +28398,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "a883a9597e8553a2",
       "lines": [
-        472
+        473
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -28400,7 +28412,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "8ff347ac31fd22b6",
       "lines": [
-        711
+        714
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -28414,7 +28426,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "015354ae92294e74",
       "lines": [
-        338
+        339
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -28428,7 +28440,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "d2624cd372d43bf4",
       "lines": [
-        608
+        610
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -28512,7 +28524,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "03de57bd474930be",
       "lines": [
-        307
+        308
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -28694,8 +28706,8 @@
       "file": "src/constants/atAGlance.ts",
       "id": "da3122dfb21d6487",
       "lines": [
-        331,
-        667
+        332,
+        670
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -28752,7 +28764,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "f6c91897de594a78",
       "lines": [
-        590
+        592
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -28766,8 +28778,8 @@
       "file": "src/constants/atAGlance.ts",
       "id": "2751dcc57552d3db",
       "lines": [
-        454,
-        456
+        455,
+        457
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -28781,7 +28793,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "61208d396fd74242",
       "lines": [
-        666
+        669
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -28795,9 +28807,9 @@
       "file": "src/constants/atAGlance.ts",
       "id": "16700faa3c0e8af9",
       "lines": [
-        198,
-        321,
-        649
+        199,
+        322,
+        651
       ],
       "occurrences": 3,
       "origin": "legacy",
@@ -28868,7 +28880,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "42b32594fe76d675",
       "lines": [
-        494
+        495
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -28882,7 +28894,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "393b8be746ec73b7",
       "lines": [
-        368
+        369
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -28896,7 +28908,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "471f3c9ad420b0fc",
       "lines": [
-        655
+        658
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -28910,7 +28922,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "f61842a4297910f5",
       "lines": [
-        719
+        722
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -28938,7 +28950,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "3aaf00ac600e8f1c",
       "lines": [
-        356
+        357
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -28952,7 +28964,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "d2b5cf41d2ce1c25",
       "lines": [
-        647
+        649
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -28966,7 +28978,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "a15ce31850d975ef",
       "lines": [
-        257
+        258
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -29052,8 +29064,8 @@
       "file": "src/constants/atAGlance.ts",
       "id": "3f32ad6066127acb",
       "lines": [
-        204,
-        325
+        205,
+        326
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -29126,7 +29138,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "af97f0db9deb75f5",
       "lines": [
-        554
+        556
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -29140,7 +29152,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "706997df35b66874",
       "lines": [
-        731
+        734
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -29154,7 +29166,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "787b9f1dc5749823",
       "lines": [
-        732
+        735
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -29168,7 +29180,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "2f808ead70cf1105",
       "lines": [
-        416
+        417
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -29182,7 +29194,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "2d5add1884d5a583",
       "lines": [
-        670
+        673
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -29210,7 +29222,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "4e7d3dd8a266e7ae",
       "lines": [
-        753
+        756
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -29429,8 +29441,8 @@
       "file": "src/constants/atAGlance.ts",
       "id": "657bb6c40ac69d0d",
       "lines": [
-        559,
-        672
+        561,
+        675
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -29444,7 +29456,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "ecd555ab98feb1ab",
       "lines": [
-        151
+        152
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -29528,11 +29540,11 @@
       "file": "src/constants/atAGlance.ts",
       "id": "73d08bcbb716f2bb",
       "lines": [
-        192,
-        322,
-        521,
-        621,
-        642
+        193,
+        323,
+        523,
+        623,
+        644
       ],
       "occurrences": 5,
       "origin": "legacy",
@@ -29589,7 +29601,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "66ad6b889d6b5c39",
       "lines": [
-        525
+        527
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -29603,7 +29615,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "c18a5d14e35c9bb8",
       "lines": [
-        704
+        707
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -29617,9 +29629,9 @@
       "file": "src/constants/atAGlance.ts",
       "id": "feb4e44459008b37",
       "lines": [
-        384,
-        388,
-        390
+        385,
+        389,
+        391
       ],
       "occurrences": 3,
       "origin": "legacy",
@@ -29633,7 +29645,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "7da6ac7b42187049",
       "lines": [
-        640
+        642
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -29866,7 +29878,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "97aa09a3d7aa060e",
       "lines": [
-        706
+        709
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -30021,14 +30033,14 @@
       "file": "src/constants/atAGlance.ts",
       "id": "2a97b20ccf1b39d0",
       "lines": [
-        488,
-        509,
-        530,
-        549,
-        569,
-        577,
-        584,
-        594
+        489,
+        511,
+        532,
+        551,
+        571,
+        579,
+        586,
+        596
       ],
       "occurrences": 8,
       "origin": "legacy",
@@ -30183,7 +30195,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "41c9adb562b3f93a",
       "lines": [
-        439
+        440
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -30197,7 +30209,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "3e3e563e3ab87e70",
       "lines": [
-        438
+        439
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -30211,7 +30223,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "c2d63f453781437e",
       "lines": [
-        440
+        441
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -30496,7 +30508,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "b0c769cad965c57a",
       "lines": [
-        135
+        136
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -30566,7 +30578,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "2a0b1cf609d6b614",
       "lines": [
-        220
+        221
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -30622,7 +30634,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "ebdfd0e61878c4d6",
       "lines": [
-        425
+        426
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -30664,7 +30676,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "5c9948eb41892f19",
       "lines": [
-        399
+        400
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -30804,7 +30816,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "2bbbec4f2b663af4",
       "lines": [
-        363
+        364
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -30930,7 +30942,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "51d038ae98fb3aaf",
       "lines": [
-        362
+        363
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -31098,7 +31110,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "241f46cdf7f4923a",
       "lines": [
-        720
+        723
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -31140,7 +31152,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "20b5cfe05e4ea644",
       "lines": [
-        396
+        397
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -31182,9 +31194,9 @@
       "file": "src/constants/atAGlance.ts",
       "id": "8bcec9a83f4a4fbc",
       "lines": [
-        210,
-        327,
-        683
+        211,
+        328,
+        686
       ],
       "occurrences": 3,
       "origin": "legacy",
@@ -31288,7 +31300,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "69ec300ac233bb90",
       "lines": [
-        565
+        567
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -31302,7 +31314,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "93c4e6fe83d1b107",
       "lines": [
-        735
+        738
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -31316,7 +31328,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "bc9cc65fa30cd2ce",
       "lines": [
-        736
+        739
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -31330,7 +31342,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "9af76073ffbd3f21",
       "lines": [
-        432
+        433
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -31344,7 +31356,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "de81b1cac118645c",
       "lines": [
-        682
+        685
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -31613,7 +31625,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "8080177f6689a74a",
       "lines": [
-        427
+        428
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -31627,8 +31639,8 @@
       "file": "src/constants/atAGlance.ts",
       "id": "70814e248e27cea3",
       "lines": [
-        351,
-        426
+        352,
+        427
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -31642,7 +31654,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "9752222e4f595b9a",
       "lines": [
-        428
+        429
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -31789,7 +31801,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "a3344e23cfec8387",
       "lines": [
-        298
+        299
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -31889,7 +31901,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "633af9f8f33d2668",
       "lines": [
-        250
+        251
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -31917,14 +31929,14 @@
       "file": "src/constants/atAGlance.ts",
       "id": "0491b1009b1f2006",
       "lines": [
-        490,
-        511,
-        532,
-        541,
-        550,
-        561,
-        586,
-        595
+        491,
+        513,
+        534,
+        543,
+        552,
+        563,
+        588,
+        597
       ],
       "occurrences": 8,
       "origin": "legacy",
@@ -32019,9 +32031,9 @@
       "file": "src/constants/atAGlance.ts",
       "id": "a0826f1fd28a48c7",
       "lines": [
-        480,
-        501,
-        570
+        481,
+        503,
+        572
       ],
       "occurrences": 3,
       "origin": "legacy",
@@ -32178,11 +32190,11 @@
       "file": "src/constants/atAGlance.ts",
       "id": "816422b3d89d919c",
       "lines": [
-        498,
-        707,
-        712,
-        740,
-        744
+        499,
+        710,
+        715,
+        743,
+        747
       ],
       "occurrences": 5,
       "origin": "legacy",
@@ -32213,8 +32225,8 @@
       "file": "src/constants/atAGlance.ts",
       "id": "2e7cc535b77e5fac",
       "lines": [
-        359,
-        420
+        360,
+        421
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -36034,11 +36046,11 @@
     }
   ],
   "summary": {
-    "catalogRecords": 446,
+    "catalogRecords": 447,
     "documentRecords": 1,
     "legacyOccurrences": 2558,
     "legacyRecords": 2112,
-    "totalRecords": 2559
+    "totalRecords": 2560
   },
   "version": 1
 }
