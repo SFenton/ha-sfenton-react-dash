@@ -68,7 +68,7 @@ test('preserves the approved 393x852 Food tile geometry', async ({ page }) => {
   }).toEqual({ height: 120, width: 176, x: 16 })
 })
 
-test('switches exclusively between bottom navigation and the permanent rail at 1120px', async ({ page }) => {
+test('requires both rail width and rail height before showing permanent navigation', async ({ page }) => {
   await page.setViewportSize({ width: 820, height: 1180 })
   await page.goto('/index.html?path=overview')
   await expect(page.locator('[data-adaptive-navigation="rail"]')).not.toBeVisible()
@@ -78,6 +78,12 @@ test('switches exclusively between bottom navigation and the permanent rail at 1
   await page.setViewportSize({ width: 1119, height: 820 })
   await expect(page.locator('[data-adaptive-navigation="rail"]')).not.toBeVisible()
   await expect(page.locator('[data-adaptive-navigation="bottom"]')).toBeVisible()
+
+  await page.setViewportSize({ width: 1120, height: 819 })
+  await expect(page.locator('[data-adaptive-navigation="rail"]')).not.toBeVisible()
+  await expect(page.locator('[data-adaptive-navigation="bottom"]')).not.toBeVisible()
+  await expect(page.getByRole('button', { name: 'Open navigation menu' })).toBeVisible()
+  expect(Math.round((await page.getByRole('main').boundingBox())?.x ?? -1)).toBe(0)
 
   await page.setViewportSize({ width: 1120, height: 820 })
   await expect(page.locator('[data-adaptive-navigation="rail"]')).toBeVisible()
@@ -114,6 +120,24 @@ test('uses drawer navigation on both root and back-path routes in short landscap
   await expect(backPathMenu).toBeVisible()
   await backPathMenu.click()
   await expect(page.locator('aside[data-state="open"]').getByRole('menuitem', { name: 'Home' })).toBeVisible()
+})
+
+test('uses drawer navigation on wide compact root and back-path routes', async ({ page }) => {
+  await page.setViewportSize({ width: 1152, height: 741 })
+  await page.goto('/index.html?path=overview')
+
+  await expect(page.locator('[data-app-shell="true"]')).toHaveAttribute('data-navigation-layout', 'drawer-only')
+  await expect(page.locator('[data-adaptive-navigation="rail"]')).not.toBeVisible()
+  await expect(page.locator('[data-adaptive-navigation="bottom"]')).not.toBeVisible()
+  await expect(page.getByRole('button', { name: 'Open navigation menu' })).toBeVisible()
+  expect(Math.round((await page.getByRole('main').boundingBox())?.x ?? -1)).toBe(0)
+
+  await page.goto('/index.html?path=living-room')
+  await expect(page.getByRole('button', { name: 'Go back' })).toBeVisible()
+  const menu = page.getByRole('button', { name: 'Open navigation menu' })
+  await expect(menu).toBeVisible()
+  await menu.click()
+  await expect(page.locator('[data-adaptive-navigation="drawer"][data-state="open"]').getByRole('menuitem', { name: 'Home' })).toBeVisible()
 })
 
 test('bounds representative dashboard, settings, room and reading layouts on wide screens', async ({ page }) => {

@@ -20,6 +20,10 @@
   will-change: opacity, transform;
 }
 
+.nav[hidden] {
+  display: none;
+}
+
 :global(html[data-dashboard-keyboard='open']) .nav {
   opacity: 0;
   pointer-events: none;
@@ -64,15 +68,9 @@
   background: rgba(255, 255, 255, 0.16);
 }
 
-@media (min-width: 560px) and (max-width: 1119px) and (min-height: 501px) {
+@media (min-width: 560px) {
   .nav {
     right: max(14px, calc((100vw - 560px) / 2));
     left: max(14px, calc((100vw - 560px) / 2));
-  }
-}
-
-@media (min-width: 1120px), (orientation: landscape) and (max-height: 500px) and (max-width: 1119px) {
-  .nav {
-    display: none;
   }
 }

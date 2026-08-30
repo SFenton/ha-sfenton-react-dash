@@ -7,6 +7,7 @@ const VIEWPORTS = [
   { height: 820, width: 1180 },
   { height: 900, width: 1440 },
   { height: 1080, width: 1920 },
+  { height: 741, width: 1152 },
 ] as const
 
 async function closeModal(dialog: Locator) {

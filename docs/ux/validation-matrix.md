@@ -37,6 +37,8 @@ The canonical viewport matrix is:
 
 - `393x852` phone portrait
 - `852x393` phone landscape
+- `1152x741` passport-foldable landscape
+- `842x836` square-foldable landscape
 - `820x1180` tablet portrait
 - `1180x820` tablet landscape
 - `1440x900` desktop
@@ -48,6 +50,14 @@ pass these mounted resize sequences:
 - phone portrait -> desktop -> phone portrait
 - desktop -> phone portrait -> desktop
 - tablet portrait -> tablet landscape -> tablet portrait
+- passport-foldable portrait -> passport-foldable landscape -> passport-foldable portrait
+- tablet landscape -> passport-foldable landscape -> tablet landscape
+
+Navigation changes additionally run focused Playwright projects with native
+phone, passport-foldable, square-foldable, tablet, and non-mobile fine-pointer
+desktop contexts. The expensive all-route sweep includes one representative
+wide compact viewport; the focused suite owns the complete boundary and input
+semantics matrix.
 
 When replacing a breakpoint, test immediately below, at, and above every
 changed boundary. Keep independent width concerns such as card tracks separate

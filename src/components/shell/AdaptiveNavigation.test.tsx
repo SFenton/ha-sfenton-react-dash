@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { AdaptiveNavigation } from './AdaptiveNavigation'
 import { resetMockHass } from '../../test/mocks/hakitCoreState'
+import { NavigationLayoutContext } from './NavigationLayoutContext'
 
 describe('AdaptiveNavigation', () => {
   beforeEach(() => {
@@ -9,7 +10,11 @@ describe('AdaptiveNavigation', () => {
 
   it('uses the shared primary route data and active-route semantics', () => {
     const onNavigate = vi.fn()
-    render(<AdaptiveNavigation activePath="living-room" onNavigate={onNavigate} />)
+    render(
+      <NavigationLayoutContext.Provider value="rail">
+        <AdaptiveNavigation activePath="living-room" onNavigate={onNavigate} />
+      </NavigationLayoutContext.Provider>,
+    )
 
     expect(screen.getByRole('button', { name: 'Home' })).toHaveAttribute('aria-current', 'page')
     expect(screen.getByRole('button', { name: 'Settings' })).not.toHaveAttribute('aria-current')

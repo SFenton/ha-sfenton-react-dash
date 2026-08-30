@@ -8,6 +8,7 @@ import {
   type ResponsiveRoute,
   type ResponsiveViewport,
 } from './responsive-acceptance-data'
+import { navigationLayoutForViewport } from '../src/constants/navigationLayout'
 
 type PageAudit = {
   boundedCellViolations: number
@@ -149,9 +150,10 @@ async function auditPage(page: Page, route: ResponsiveRoute, viewport: Responsiv
 
   expect(metrics.navigation.length, `${route} ${stage} has no primary navigation`).toBeGreaterThan(0)
   expect(metrics.heading, `${route} ${stage} heading`).toBe(RESPONSIVE_ROUTE_TITLES.get(route))
-  if (viewport.width >= 1120) {
+  const navigationLayout = navigationLayoutForViewport(viewport)
+  if (navigationLayout === 'rail') {
     expect(metrics.navigation, `${route} ${stage} desktop navigation`).toEqual(['rail'])
-  } else if (viewport.height <= 500 && viewport.width > viewport.height) {
+  } else if (navigationLayout === 'drawer-only') {
     expect(metrics.navigation, `${route} ${stage} short-landscape navigation`).toContain('drawer')
     expect(metrics.navigation, `${route} ${stage} short-landscape bottom nav`).not.toContain('bottom')
   } else {
@@ -224,6 +226,10 @@ test.describe.serial('all-route responsive acceptance', () => {
     {
       name: 'ipad-portrait-landscape-portrait',
       viewports: [RESPONSIVE_VIEWPORTS[2], RESPONSIVE_VIEWPORTS[3], RESPONSIVE_VIEWPORTS[2]],
+    },
+    {
+      name: 'tablet-passport-tablet',
+      viewports: [RESPONSIVE_VIEWPORTS[3], RESPONSIVE_VIEWPORTS[6], RESPONSIVE_VIEWPORTS[3]],
     },
   ] as const
 

@@ -17,6 +17,7 @@ export const RESPONSIVE_VIEWPORTS = [
   { height: 820, name: 'ipad-landscape', width: 1180 },
   { height: 900, name: 'desktop', width: 1440 },
   { height: 1080, name: 'wide-desktop', width: 1920 },
+  { height: 741, name: 'passport-foldable-landscape', width: 1152 },
 ] as const
 
 export type ResponsiveRoute = (typeof RESPONSIVE_ROUTES)[number]
