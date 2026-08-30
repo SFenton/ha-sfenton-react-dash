@@ -193,7 +193,65 @@ function mockCompressedRows(minX: number, maxX: number, minY: number, maxY: numb
   return rows
 }
 
+function mockOutlineRows(minX: number, maxX: number, minY: number, maxY: number) {
+  const rows = [
+    ...mockCompressedRows(minX, maxX, minY, minY),
+    ...mockCompressedRows(minX, maxX, maxY, maxY),
+  ]
+  for (let y = minY + 1; y < maxY; y += 1) {
+    rows.push(minX, y, 1, maxX, y, 1)
+  }
+  return rows
+}
+
+function createMockMusicRoomMap(): ValetudoMap {
+  const segmentDefinitions = [
+    { id: '3', name: 'Music Room', minX: 638, maxX: 781, minY: 556, maxY: 667 },
+    { id: '10', name: 'Downstairs Hallway', minX: 710, maxX: 729, minY: 668, maxY: 713 },
+    { id: '12', name: 'Downstairs Bathroom', minX: 638, maxX: 709, minY: 668, maxY: 721 },
+    { id: '4', minX: 505, maxX: 630, minY: 545, maxY: 684 },
+  ]
+
+  return {
+    __class: 'ValetudoMap',
+    entities: [
+      { type: 'charger_location', points: [3230, 3275] },
+      { type: 'robot_position', points: [3230, 3275], metaData: { angle: 90 } },
+    ],
+    layers: [
+      {
+        type: 'wall',
+        dimensions: {
+          x: { min: 504, max: 782 },
+          y: { min: 544, max: 722 },
+        },
+        compressedPixels: [
+          ...mockOutlineRows(637, 782, 555, 722),
+          ...mockOutlineRows(504, 631, 544, 685),
+        ],
+      },
+      ...segmentDefinitions.map((segment) => ({
+        type: 'segment',
+        dimensions: {
+          x: { min: segment.minX, max: segment.maxX },
+          y: { min: segment.minY, max: segment.maxY },
+        },
+        compressedPixels: mockCompressedRows(segment.minX, segment.maxX, segment.minY, segment.maxY),
+        metaData: {
+          name: segment.name,
+          segmentId: segment.id,
+        },
+      })),
+    ],
+    metaData: { nonce: 'mock-music-room-focus', version: 2 },
+    pixelSize: 5,
+    size: { x: 6554, y: 6554 },
+  }
+}
+
 export function createMockValetudoMap(vacuumMapId: string): ValetudoMap {
+  if (vacuumMapId === 'valetudo_elatedusedram') return createMockMusicRoomMap()
+
   const bounds = MOCK_MAP_BOUNDS[vacuumMapId] ?? MOCK_MAP_BOUNDS.valetudo_exaltedsneakydeer
   const width = bounds.maxX - bounds.minX
   const height = bounds.maxY - bounds.minY

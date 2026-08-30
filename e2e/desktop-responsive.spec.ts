@@ -137,6 +137,50 @@ test('permanent navigation and modal controls retain keyboard focus indicators',
   await expect.poll(() => visibleFocusIndicator(close)).toBe(true)
 })
 
+test('music room focused-map control works in a fine-pointer desktop context', async ({ page }) => {
+  await page.goto('/index.html?path=vacuums')
+  await expect.poll(() => page.evaluate(() => ({
+    coarse: window.matchMedia('(pointer: coarse)').matches,
+    hover: window.matchMedia('(hover: hover)').matches,
+  }))).toEqual({ coarse: false, hover: true })
+  await page.evaluate(() => {
+    const mock = window.__mockHass
+    if (!mock) throw new Error('Mock Home Assistant API is unavailable')
+    mock.setEntityState('vacuum.valetudo_elatedusedram', 'docked')
+    mock.setEntityState('sensor.valetudo_elatedusedram_battery_level', '100')
+    mock.setEntityState('sensor.valetudo_elatedusedram_error', 'No error')
+    mock.setEntityState('sensor.valetudo_elatedusedram_status_flag', 'none')
+    mock.setEntityState('camera.valetudo_elatedusedram_map_data', 'idle')
+    mock.setEntityState('select.valetudo_elatedusedram_mode', 'vacuum')
+    mock.setEntityState('select.valetudo_elatedusedram_fan', 'balanced')
+    mock.setEntityState('select.valetudo_elatedusedram_water', 'medium')
+  })
+
+  await page.getByRole('button', { name: /Music Room Docked/i }).click()
+  const dialog = page.getByRole('dialog')
+  const map = dialog.getByRole('region', { name: 'Music Room Valetudo map' })
+  const fullMap = dialog.getByRole('button', { name: 'Full Map' })
+
+  await expect(map).toHaveAttribute('data-map-scope', 'focused')
+  await fullMap.focus()
+  await expect(fullMap).toBeFocused()
+  await expect.poll(() => visibleFocusIndicator(fullMap)).toBe(true)
+  const containment = await map.evaluate((element) => {
+    const frame = element.getBoundingClientRect()
+    const control = element.querySelector<HTMLElement>('button[aria-pressed]')?.getBoundingClientRect()
+    return Boolean(control)
+      && control!.left >= frame.left
+      && control!.right <= frame.right
+      && control!.top >= frame.top
+      && control!.bottom <= frame.bottom
+  })
+  expect(containment).toBe(true)
+
+  await fullMap.click()
+  await expect(map).toHaveAttribute('data-map-scope', 'full')
+  await expect(fullMap).toHaveAttribute('aria-pressed', 'true')
+})
+
 for (const route of [
   { label: 'Vacuums', path: 'vacuums' },
   { label: 'Music Room', path: 'music-room' },

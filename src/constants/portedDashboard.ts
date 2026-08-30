@@ -106,6 +106,7 @@ export interface VacuumConfig {
   errorEntityId: string
   fanEntityId?: string
   hash: string
+  mapFocus?: VacuumMapFocusConfig
   mapRotationDegrees?: number
   mapScale: number
   modeEntityId?: string
@@ -118,6 +119,20 @@ export interface VacuumConfig {
   waterEntityId?: string
   zoneDescription?: string[]
   zones: VacuumZoneConfig[]
+}
+
+export interface VacuumMapFocusConfig {
+  maximumViewAreaRatio?: number
+  minimumExcludedAreaM2?: number
+  minimumExcludedFraction?: number
+  paddingCm?: number
+  requiredSegments: VacuumMapFocusSegmentConfig[]
+  wallAssociationCm?: number
+}
+
+export interface VacuumMapFocusSegmentConfig {
+  id: string
+  name?: string
 }
 
 export interface VacuumDockControlsConfig {
@@ -499,6 +514,15 @@ export const VACUUMS: VacuumConfig[] = [
     errorEntityId: 'sensor.valetudo_elatedusedram_error',
     fanEntityId: 'select.valetudo_elatedusedram_fan',
     hash: 'music-room-robot-vacuum',
+    mapFocus: {
+      paddingCm: 15,
+      requiredSegments: [
+        { id: '3', name: 'Music Room' },
+        { id: '10', name: 'Downstairs Hallway' },
+        { id: '12', name: 'Downstairs Bathroom' },
+      ],
+      wallAssociationCm: 20,
+    },
     mapScale: 2.4,
     modeEntityId: 'select.valetudo_elatedusedram_mode',
     modeTextEntityId: 'input_text.music_room_vacuum_mode',

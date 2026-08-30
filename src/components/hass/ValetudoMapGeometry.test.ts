@@ -3,7 +3,9 @@ import {
   applyAffine,
   clampMapViewport,
   defaultMapGridRect,
+  globalGridPointToLocal,
   invertAffine,
+  localPointToGlobalGrid,
   mapGridRectDimensionsCm,
   mapGridRectFromPoints,
   mapGridRectToServiceData,
@@ -53,6 +55,24 @@ describe('Valetudo map geometry', () => {
       expect(roundTripped.y).toBeCloseTo(point.y, 10)
     }
     expect(affineScale(matrix)).toBeGreaterThan(0)
+  })
+
+  it('keeps world coordinates and service payloads exact with focused display bounds', () => {
+    const focused = valetudoMapStageGeometry(map, 1.2, {
+      minX: geometry.minGridX + 20,
+      maxX: geometry.maxGridX - 21,
+      minY: geometry.minGridY + 30,
+      maxY: geometry.maxGridY - 31,
+    })
+    const matrix = mapViewportMatrix(focused, frame, { panX: 17, panY: -11, zoom: 2.8 }, 180)
+    const worldPoint = { x: focused.minGridX + 12, y: focused.minGridY + 18 }
+    const localPoint = globalGridPointToLocal(focused, worldPoint)
+    const roundTripped = localPointToGlobalGrid(focused, applyAffine(invertAffine(matrix), applyAffine(matrix, localPoint)))
+    const rect = { x0: worldPoint.x, x1: worldPoint.x + 8, y0: worldPoint.y, y1: worldPoint.y + 6 }
+
+    expect(roundTripped.x).toBeCloseTo(worldPoint.x, 10)
+    expect(roundTripped.y).toBeCloseTo(worldPoint.y, 10)
+    expect(mapGridRectToServiceData(rect, focused.pixelSize)).toEqual(mapGridRectToServiceData(rect, geometry.pixelSize))
   })
 
   it('keeps the zoom anchor fixed under rotation', () => {

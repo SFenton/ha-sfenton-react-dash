@@ -50,6 +50,10 @@ export const BATHROOM_FAN_COPY_KEYS = {
 export const VACUUM_COPY_KEYS = {
   cleaned: 'cleaned',
   issues: 'issues',
+  mapScope: {
+    fullMap: 'mapScope.fullMap',
+    reachableAreaOnly: 'mapScope.reachableAreaOnly',
+  },
   tile: {
     subtitleWithBattery: 'tile.subtitleWithBattery',
   },

@@ -3728,6 +3728,142 @@ test('offline vacuum cards open their status modal', async ({ page }) => {
   await expect(dialog.getByText(/battery is critically low/i)).toHaveCount(0)
 })
 
+test('music room focused map hides the phantom area without changing world-space drawing', async ({ page }) => {
+  await page.goto('/at-a-glance/vacuums')
+  await page.evaluate(() => {
+    const mock = (window as unknown as {
+      __mockHass: {
+        setEntityState: (entityId: string, state: string) => void
+      }
+    }).__mockHass
+    mock.setEntityState('vacuum.valetudo_elatedusedram', 'docked')
+    mock.setEntityState('sensor.valetudo_elatedusedram_battery_level', '100')
+    mock.setEntityState('sensor.valetudo_elatedusedram_error', 'No error')
+    mock.setEntityState('sensor.valetudo_elatedusedram_status_flag', 'none')
+    mock.setEntityState('camera.valetudo_elatedusedram_map_data', 'idle')
+    mock.setEntityState('select.valetudo_elatedusedram_mode', 'vacuum')
+    mock.setEntityState('select.valetudo_elatedusedram_fan', 'balanced')
+    mock.setEntityState('select.valetudo_elatedusedram_water', 'medium')
+  })
+
+  await page.getByRole('button', { name: /Music Room Docked/i }).click()
+  const dialog = page.getByRole('dialog')
+  const map = dialog.getByRole('region', { name: 'Music Room Valetudo map' })
+  const fullMap = dialog.getByRole('button', { name: 'Full Map' })
+
+  await expect(map).toHaveAttribute('data-map-scope', 'focused')
+  await expect(map).toHaveAttribute('data-map-focus-reason', 'focused')
+  await expect(map).toHaveAttribute('data-map-render-clipped', 'true')
+  await expect(map).toHaveAttribute('data-view-min-x', '634')
+  await expect(map).toHaveAttribute('data-view-max-x', '782')
+  await expect(dialog.getByText('Reachable Area Only')).toBeVisible()
+  await expect(fullMap).toHaveAttribute('aria-pressed', 'false')
+
+  await fullMap.click()
+  await expect(map).toHaveAttribute('data-map-scope', 'full')
+  await expect(map).toHaveAttribute('data-map-render-clipped', 'false')
+  await expect(map).toHaveAttribute('data-view-min-x', '504')
+  await expect(fullMap).toHaveAttribute('aria-pressed', 'true')
+
+  await dialog.getByRole('group', { name: 'Cleaning target' }).getByRole('button', { name: 'Area' }).click()
+  await dialog.getByRole('button', { name: 'Draw Area' }).click()
+  const overlay = dialog.locator('[data-map-editor-overlay="true"]')
+  const overlayBox = await overlay.boundingBox()
+  if (!overlayBox) throw new Error('Music Room vacuum map editor overlay was not measurable')
+
+  await page.mouse.move(overlayBox.x + overlayBox.width * 0.08, overlayBox.y + overlayBox.height * 0.45)
+  await page.mouse.down()
+  await page.mouse.move(overlayBox.x + overlayBox.width * 0.16, overlayBox.y + overlayBox.height * 0.58, { steps: 6 })
+  await page.mouse.up()
+
+  const selection = dialog.locator('[data-map-rect="true"]')
+  await expect(selection).toBeVisible()
+  const selectedRect = await selection.evaluate((element) => ({
+    x0: Number(element.getAttribute('data-x0')),
+    x1: Number(element.getAttribute('data-x1')),
+    y0: Number(element.getAttribute('data-y0')),
+    y1: Number(element.getAttribute('data-y1')),
+  }))
+  expect(selectedRect.x0).toBeGreaterThanOrEqual(638)
+  expect(selectedRect.x1).toBeLessThanOrEqual(782)
+  await expect(map).toHaveAttribute('data-selection-allowed', 'true')
+
+  await dialog.getByRole('button', { name: 'Use This Area' }).click()
+  await dialog.getByRole('button', { name: 'Start Area Clean' }).click()
+  const calls = await page.evaluate(() => (
+    (window as unknown as { __mockHass: { calls: Record<string, unknown>[] } }).__mockHass.calls
+      .filter((call) => call.domain === 'script' && call.service === 'music_room_vacuum_clean_zone')
+  ))
+  expect(calls).toEqual([{
+    domain: 'script',
+    service: 'music_room_vacuum_clean_zone',
+    serviceData: {
+      x_max_cm: selectedRect.x1 * 5,
+      x_min_cm: selectedRect.x0 * 5,
+      y_max_cm: selectedRect.y1 * 5,
+      y_min_cm: selectedRect.y0 * 5,
+    },
+  }])
+})
+
+test('music room focus control recovers when availability changes during a gesture', async ({ page }) => {
+  await page.goto('/at-a-glance/vacuums')
+  await page.evaluate(() => {
+    const mock = (window as unknown as {
+      __mockHass: {
+        setEntityState: (entityId: string, state: string) => void
+      }
+    }).__mockHass
+    mock.setEntityState('vacuum.valetudo_elatedusedram', 'docked')
+    mock.setEntityState('sensor.valetudo_elatedusedram_battery_level', '100')
+    mock.setEntityState('sensor.valetudo_elatedusedram_error', 'No error')
+    mock.setEntityState('sensor.valetudo_elatedusedram_status_flag', 'none')
+    mock.setEntityState('camera.valetudo_elatedusedram_map_data', 'idle')
+    mock.setEntityState('select.valetudo_elatedusedram_mode', 'vacuum')
+    mock.setEntityState('select.valetudo_elatedusedram_fan', 'balanced')
+    mock.setEntityState('select.valetudo_elatedusedram_water', 'medium')
+  })
+
+  await page.getByRole('button', { name: /Music Room Docked/i }).click()
+  const dialog = page.getByRole('dialog')
+  await dialog.getByRole('group', { name: 'Cleaning target' }).getByRole('button', { name: 'Area' }).click()
+  await dialog.getByRole('button', { name: 'Draw Area' }).click()
+  const overlay = dialog.locator('[data-map-editor-overlay="true"]')
+  const overlayBox = await overlay.boundingBox()
+  if (!overlayBox) throw new Error('Music Room vacuum map editor overlay was not measurable')
+  await page.mouse.move(overlayBox.x + overlayBox.width / 2, overlayBox.y + overlayBox.height / 2)
+  await page.mouse.down()
+
+  await page.evaluate(() => {
+    const mock = (window as unknown as {
+      __mockHass: {
+        setEntityState: (entityId: string, state: string) => void
+      }
+    }).__mockHass
+    mock.setEntityState('vacuum.valetudo_elatedusedram', 'unavailable')
+    mock.setEntityState('sensor.valetudo_elatedusedram_error', 'unavailable')
+  })
+  await expect(dialog.getByRole('heading', { name: 'Music Room Robot Vacuum' })).toBeVisible()
+  await page.mouse.up()
+
+  await page.evaluate(() => {
+    const mock = (window as unknown as {
+      __mockHass: {
+        setEntityState: (entityId: string, state: string) => void
+      }
+    }).__mockHass
+    mock.setEntityState('vacuum.valetudo_elatedusedram', 'docked')
+    mock.setEntityState('sensor.valetudo_elatedusedram_error', 'No error')
+  })
+
+  const map = dialog.getByRole('region', { name: 'Music Room Valetudo map' })
+  const fullMap = dialog.getByRole('button', { name: 'Full Map' })
+  await expect(map).toHaveAttribute('data-map-scope', 'focused')
+  await expect(fullMap).toBeEnabled()
+  await fullMap.click()
+  await expect(map).toHaveAttribute('data-map-scope', 'full')
+})
+
 test('current vacuum issues use coherent raw state without assertive helper prose', async ({ page }) => {
   await page.goto('/at-a-glance/vacuums')
   await page.evaluate(() => {
