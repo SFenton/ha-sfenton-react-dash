@@ -12,9 +12,22 @@
   grid-template-columns: minmax(0, 1fr) 48px;
 }
 
+.headerWithBackMenu {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
 .headerWithMenu {
   grid-template-columns: 28px minmax(0, 1fr) 48px;
   gap: 4px;
+}
+
+.headerWithRail {
+  grid-template-columns: minmax(0, 1fr) 48px;
+  gap: 8px;
+}
+
+.headerWithRail .leading {
+  display: none;
 }
 
 .backButton {
@@ -210,19 +223,9 @@
 }
 
 .backMenuButton {
-  display: none;
+  display: inline-flex;
   margin-left: 0;
   justify-self: auto;
-}
-
-@media (orientation: landscape) and (max-height: 500px) and (max-width: 1119px) {
-  .headerWithBack {
-    grid-template-columns: minmax(0, 1fr) auto;
-  }
-
-  .backMenuButton {
-    display: inline-flex;
-  }
 }
 
 :global([data-route-transition-state='exiting']) .backTitle,
@@ -274,19 +277,8 @@
   }
 }
 
-@media (min-width: 1120px) {
-  .headerWithMenu {
-    grid-template-columns: minmax(0, 1fr) 48px;
-    gap: 8px;
-  }
-
-  .headerWithMenu .leading {
-    display: none;
-  }
-
-  .headerWithMenu .titleWrap {
-    margin-left: 0;
-  }
+.headerWithRail .titleWrap {
+  margin-left: 0;
 }
 
 .iconButton:focus,
@@ -416,6 +408,15 @@
 
 .menuItem[aria-current='page'] {
   background: rgba(255, 255, 255, 0.15);
+}
+
+.menuItem:focus {
+  outline: none;
+}
+
+.menuItem:focus-visible {
+  outline: 2px solid var(--color-text-muted);
+  outline-offset: -2px;
 }
 
 @keyframes sidebarScrimIn {

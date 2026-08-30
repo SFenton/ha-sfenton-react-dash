@@ -5,6 +5,7 @@ import { MaterialIcon } from '../core/Icon'
 import { useDailyReportContext } from '../hass/dailyReportModal'
 import { PRIMARY_NAV_ROUTES, primaryNavRouteActive } from '../../constants/routes'
 import { useCopy } from '../../i18n'
+import { useNavigationLayout } from './NavigationLayoutContext'
 import styles from './BottomNav.module.css'
 
 /** Only Chores badges, and only with overdue chores - expired food belongs to the summary, not here. */
@@ -20,6 +21,7 @@ interface BottomNavProps {
 export function BottomNav({ activePath, onNavigate }: BottomNavProps) {
   const { overdueCount } = useDailyReportContext()
   const copy = useCopy('shell')
+  const navigationLayout = useNavigationLayout()
   const [visualOverride, setVisualOverride] = useState<{ activePath: string, path: string } | undefined>()
   const visualActivePath = visualOverride?.activePath === activePath ? visualOverride.path : activePath
   const setVisualPathNow = (path: string) => {
@@ -27,7 +29,7 @@ export function BottomNav({ activePath, onNavigate }: BottomNavProps) {
   }
 
   return (
-    <nav className={styles.nav} aria-label={copy(DASHBOARD_SECTIONS_COPY_KEY)} data-adaptive-navigation="bottom">
+    <nav className={styles.nav} aria-label={copy(DASHBOARD_SECTIONS_COPY_KEY)} data-adaptive-navigation="bottom" hidden={navigationLayout !== 'bottom'}>
       {PRIMARY_NAV_ROUTES.map((tab) => {
         const isCurrent = primaryNavRouteActive(activePath, tab.path)
         const isActive = primaryNavRouteActive(visualActivePath, tab.path)

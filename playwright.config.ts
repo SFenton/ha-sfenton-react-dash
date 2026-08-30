@@ -6,6 +6,7 @@ const serverPort = Number(process.env.PLAYWRIGHT_PORT ?? 5174)
 const serverUrl = `http://127.0.0.1:${serverPort}`
 const webkitExecutablePath = process.env.PLAYWRIGHT_WEBKIT_EXECUTABLE
 const enableWebkit = process.env.PLAYWRIGHT_WEBKIT === '1' || Boolean(webkitExecutablePath)
+const adaptiveNavigationSpec = /adaptive-navigation\.spec\.ts/
 
 export default defineConfig({
   testDir: './e2e',
@@ -16,12 +17,56 @@ export default defineConfig({
   projects: [
     {
       name: 'mobile',
-      testIgnore: /(?:desktop-responsive|home-route-hydration-desktop|modal-sheet-webkit)\.spec\.ts/,
+      testIgnore: /(?:adaptive-navigation|desktop-responsive|home-route-hydration-desktop|modal-sheet-webkit)\.spec\.ts/,
       use: { ...devices['iPhone 13'], browserName: 'chromium' },
     },
     {
+      name: 'phone-navigation',
+      testMatch: adaptiveNavigationSpec,
+      use: {
+        ...devices['iPhone 13'],
+        browserName: 'chromium',
+        screen: { height: 852, width: 393 },
+        viewport: { height: 852, width: 393 },
+      },
+    },
+    {
+      name: 'passport-foldable',
+      testMatch: adaptiveNavigationSpec,
+      use: {
+        ...devices['Pixel 5'],
+        browserName: 'chromium',
+        deviceScaleFactor: 2.625,
+        hasTouch: true,
+        isMobile: true,
+        screen: { height: 741, width: 1152 },
+        viewport: { height: 741, width: 1152 },
+      },
+    },
+    {
+      name: 'square-foldable',
+      testMatch: adaptiveNavigationSpec,
+      use: {
+        ...devices['Pixel 5'],
+        browserName: 'chromium',
+        deviceScaleFactor: 2.625,
+        hasTouch: true,
+        isMobile: true,
+        screen: { height: 836, width: 842 },
+        viewport: { height: 836, width: 842 },
+      },
+    },
+    {
+      name: 'tablet',
+      testMatch: adaptiveNavigationSpec,
+      use: {
+        ...devices['iPad Pro 11 landscape'],
+        browserName: 'chromium',
+      },
+    },
+    {
       name: 'desktop',
-      testMatch: /(?:desktop-responsive|home-route-hydration-desktop)\.spec\.ts/,
+      testMatch: /(?:adaptive-navigation|desktop-responsive|home-route-hydration-desktop)\.spec\.ts/,
       use: {
         ...devices['Desktop Chrome'],
         browserName: 'chromium',

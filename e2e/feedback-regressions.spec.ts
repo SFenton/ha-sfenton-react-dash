@@ -1,4 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test'
+import { navigationLayoutForViewport } from '../src/constants/navigationLayout'
 
 const PHONE = { width: 393, height: 852 }
 const TABLET_PORTRAIT = { width: 820, height: 1180 }
@@ -154,15 +155,16 @@ test('sidebars place the Chores count at the trailing edge of its row', async ({
     await page.setViewportSize(viewport)
     await page.goto(`/at-a-glance/overview?feedback-sidebar-badge=${viewport.width}`)
     let navigation: Locator
-    if (viewport.width < 1120) {
+    const navigationLayout = navigationLayoutForViewport(viewport)
+    if (navigationLayout !== 'rail') {
       await page.locator('[data-page-header="true"]:visible button[aria-label="Open navigation menu"]').click()
-      navigation = page.getByRole('complementary', { name: 'Navigation menu' })
+      navigation = page.locator('[data-adaptive-navigation="drawer"]')
       await expect(navigation).toHaveAttribute('data-state', 'open')
     } else {
-      navigation = page.getByRole('complementary', { name: 'Navigation menu' })
+      navigation = page.locator('[data-adaptive-navigation="rail"]')
     }
 
-    const chores = navigation.getByRole(viewport.width < 1120 ? 'menuitem' : 'button', { name: /Chores/ })
+    const chores = navigation.getByRole(navigationLayout === 'rail' ? 'button' : 'menuitem', { name: /Chores/ })
     const icon = chores.locator('svg').first()
     const badge = chores.locator('[data-count]')
     const [rowBox, iconBox, badgeBox] = await Promise.all([

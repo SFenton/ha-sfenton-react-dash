@@ -7573,7 +7573,7 @@
       "file": "src/components/shell/BottomNav.tsx",
       "id": "3bb7a008ed62e268",
       "lines": [
-        12
+        13
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -7587,7 +7587,7 @@
       "file": "src/components/shell/AppHeader.tsx",
       "id": "3849ebb80beeb8a7",
       "lines": [
-        197
+        269
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -7601,7 +7601,7 @@
       "file": "src/components/shell/AppHeader.tsx",
       "id": "8a3086a5da9ca0a9",
       "lines": [
-        97
+        115
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -7615,7 +7615,7 @@
       "file": "src/components/shell/AppHeader.tsx",
       "id": "898c12cd5c68c182",
       "lines": [
-        210
+        282
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -9942,7 +9942,7 @@
       "file": "src/components/shell/BottomNav.tsx",
       "id": "a8272272b198f9e2",
       "lines": [
-        11
+        12
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -11822,8 +11822,8 @@
       "file": "src/components/shell/AppHeader.tsx",
       "id": "74cc037a7ed08608",
       "lines": [
-        140,
-        159
+        206,
+        225
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -11994,8 +11994,8 @@
       "file": "src/components/shell/AppHeader.tsx",
       "id": "30058cdb2d183ca4",
       "lines": [
-        178,
-        188
+        250,
+        260
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -32678,7 +32678,7 @@
       "file": "src/components/shell/AppHeader.tsx",
       "id": "d5266bcc4d39710d",
       "lines": [
-        54
+        59
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -32905,7 +32905,7 @@
       "file": "src/components/shell/BottomNav.tsx",
       "id": "521b1480d3c313bf",
       "lines": [
-        22
+        23
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -34460,7 +34460,7 @@
       "file": "src/components/shell/AppHeader.tsx",
       "id": "3f9523d78ee21694",
       "lines": [
-        58
+        65
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -34573,7 +34573,7 @@
       "file": "src/components/shell/AppHeader.tsx",
       "id": "7ba9df97477bb198",
       "lines": [
-        60
+        67
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -34699,7 +34699,7 @@
       "file": "src/components/shell/AppHeader.tsx",
       "id": "8fd99119d5765b7d",
       "lines": [
-        31
+        32
       ],
       "occurrences": 1,
       "origin": "legacy",

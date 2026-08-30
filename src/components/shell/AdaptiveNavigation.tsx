@@ -5,6 +5,7 @@ import { MaterialIcon } from '../core/Icon'
 import { useDailyReportContext } from '../hass/dailyReportModal'
 import { SHELL_COPY_NAMESPACE, SHELL_NAVIGATION_HEADING_COPY_KEY, SHELL_NAVIGATION_MENU_COPY_KEY } from './AppHeader'
 import { BADGED_NAV_PATH, DASHBOARD_SECTIONS_COPY_KEY, OVERDUE_TAB_COPY_KEY } from './BottomNav'
+import { useNavigationLayout } from './NavigationLayoutContext'
 import styles from './AdaptiveNavigation.module.css'
 
 interface AdaptiveNavigationProps {
@@ -15,6 +16,7 @@ interface AdaptiveNavigationProps {
 export function AdaptiveNavigation({ activePath, onNavigate }: AdaptiveNavigationProps) {
   const copy = useCopy(SHELL_COPY_NAMESPACE)
   const { overdueCount } = useDailyReportContext()
+  const navigationLayout = useNavigationLayout()
   const primaryRoutes = PRIMARY_NAV_ROUTES.filter((route) => route.path !== 'settings')
   const settingsRoute = PRIMARY_NAV_ROUTES.find((route) => route.path === 'settings')
 
@@ -44,7 +46,7 @@ export function AdaptiveNavigation({ activePath, onNavigate }: AdaptiveNavigatio
   }
 
   return (
-    <aside aria-label={copy(SHELL_NAVIGATION_MENU_COPY_KEY)} className={styles.rail} data-adaptive-navigation="rail">
+    <aside aria-label={copy(SHELL_NAVIGATION_MENU_COPY_KEY)} className={styles.rail} data-adaptive-navigation="rail" hidden={navigationLayout !== 'rail'}>
       <div className={styles.heading}>{copy(SHELL_NAVIGATION_HEADING_COPY_KEY)}</div>
       <nav aria-label={copy(DASHBOARD_SECTIONS_COPY_KEY)} className={styles.navigation}>
         <div className={styles.primary}>{primaryRoutes.map((route) => renderRoute(route))}</div>

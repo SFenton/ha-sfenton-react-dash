@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { useDailyReportContext } from '../hass/dailyReportModal'
 import { DAILY_REPORT_HASH, PRIMARY_NAV_ROUTES, primaryNavRouteActive } from '../../constants/routes'
@@ -8,6 +8,7 @@ import { CountBadge } from '../core/CountBadge'
 import { MaterialIcon } from '../core/Icon'
 import { useCopy } from '../../i18n'
 import { BADGED_NAV_PATH, OVERDUE_TAB_COPY_KEY } from './BottomNav'
+import { useNavigationLayout } from './NavigationLayoutContext'
 import styles from './AppHeader.module.css'
 
 export interface AppHeaderAction {
@@ -51,16 +52,22 @@ function MenuIcon() {
 export function AppHeader({ activePath, actions = [], backLabel, backPath, onBack, onNavigate, title }: AppHeaderProps) {
   const [sidebarState, setSidebarState] = useState<SidebarState>('closed')
   const [actionsOpen, setActionsOpen] = useState(false)
+  const menuButtonRef = useRef<HTMLButtonElement>(null)
+  const sidebarRef = useRef<HTMLElement>(null)
+  const restoreFocusAfterCloseRef = useRef(false)
+  const previousActivePathRef = useRef(activePath)
   const commonCopy = useCopy('common')
   const shellCopy = useCopy(SHELL_COPY_NAMESPACE)
   const { badgeCount, overdueCount, title: profileTitle } = useDailyReportContext()
+  const navigationLayout = useNavigationLayout()
+  const previousNavigationLayoutRef = useRef(navigationLayout)
   const profileLabel = badgeCount > 0
     ? shellCopy('profile.openWithAttention', { count: badgeCount, title: profileTitle })
     : shellCopy('profile.open', { title: profileTitle })
   const resolvedBackLabel = backLabel ?? commonCopy('actions.goBack')
   const showBack = Boolean(backPath)
-  const showMenu = Boolean(!showBack && onNavigate)
-  const showBackMenu = Boolean(showBack && onNavigate)
+  const showMenu = Boolean(!showBack && onNavigate && navigationLayout !== 'rail')
+  const showBackMenu = Boolean(showBack && onNavigate && navigationLayout === 'drawer-only')
   const backMenuClassName = [styles.menuButton, styles.backMenuButton].join(' ')
   const showActions = actions.length > 0
   const menuOpen = sidebarState === 'open'
@@ -68,44 +75,55 @@ export function AppHeader({ activePath, actions = [], backLabel, backPath, onBac
   const sidebarDataState = sidebarState === 'closing' ? 'closed' : 'open'
 
   useEffect(() => {
-    if (typeof window.matchMedia !== 'function') return undefined
-    const query = window.matchMedia('(min-width: 1120px)')
-    const closeForRail = () => {
-      if (!query.matches) return
+    const previousNavigationLayout = previousNavigationLayoutRef.current
+    previousNavigationLayoutRef.current = navigationLayout
+    if (navigationLayout !== 'rail' || previousNavigationLayout === 'rail') return undefined
+    const drawerWasMounted = sidebarState !== 'closed'
+    queueMicrotask(() => {
+      restoreFocusAfterCloseRef.current = false
       setSidebarState('closed')
       setActionsOpen(false)
-    }
-    closeForRail()
-    query.addEventListener('change', closeForRail)
-    return () => query.removeEventListener('change', closeForRail)
+      if (!drawerWasMounted) return
+      queueMicrotask(() => {
+        document.querySelector<HTMLButtonElement>('[data-adaptive-navigation="rail"] button[aria-current="page"]')?.focus({ preventScroll: true })
+      })
+    })
+  }, [navigationLayout, sidebarState])
+
+  const closeSidebar = useCallback((restoreFocus = false) => {
+    if (restoreFocus) restoreFocusAfterCloseRef.current = true
+    setSidebarState((current) => (current === 'open' ? 'closing' : current))
   }, [])
 
-  const closeSidebar = () => {
-    setSidebarState((current) => (current === 'open' ? 'closing' : current))
-  }
-
-  const closeMenus = () => {
-    closeSidebar()
+  const closeMenus = useCallback((restoreFocus = false) => {
+    closeSidebar(restoreFocus)
     setActionsOpen(false)
-  }
+  }, [closeSidebar])
 
   const toggleSidebar = () => {
     setActionsOpen(false)
-    setSidebarState((current) => (current === 'open' ? 'closing' : 'open'))
+    setSidebarState((current) => {
+      if (current === 'open') {
+        restoreFocusAfterCloseRef.current = true
+        return 'closing'
+      }
+      restoreFocusAfterCloseRef.current = false
+      return 'open'
+    })
   }
   const renderMenuButton = (className = styles.menuButton) => (
-    <button aria-expanded={menuOpen} aria-label={shellCopy('navigation.openMenu')} className={className} onClick={toggleSidebar} type="button">
+    <button aria-controls="dashboard-navigation-drawer" aria-expanded={menuOpen} aria-label={shellCopy('navigation.openMenu')} className={className} onClick={toggleSidebar} ref={menuButtonRef} type="button">
       <MenuIcon />
     </button>
   )
 
   const navigate = (path: string) => {
-    closeMenus()
+    closeMenus(false)
     onNavigate?.(path)
   }
 
   const goBack = () => {
-    closeMenus()
+    closeMenus(false)
     if (onBack) {
       onBack(backPath)
       return
@@ -118,20 +136,68 @@ export function AppHeader({ activePath, actions = [], backLabel, backPath, onBac
   }
 
   const openProfile = () => {
-    closeMenus()
+    closeMenus(false)
     pushDashboardUrl(DAILY_REPORT_HASH)
     dispatchDashboardRouteChange()
   }
-  const sidebar = sidebarMounted ? (
+
+  useEffect(() => {
+    if (sidebarState !== 'open' || navigationLayout === 'rail') return
+    const target = sidebarRef.current?.querySelector<HTMLButtonElement>('[aria-current="page"]')
+      ?? sidebarRef.current?.querySelector<HTMLButtonElement>('button')
+    target?.focus({ preventScroll: true })
+  }, [navigationLayout, sidebarState])
+
+  useEffect(() => {
+    if (!sidebarMounted) return undefined
+    const handleDrawerKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        closeMenus(true)
+        return
+      }
+      if (event.key !== 'Tab' || sidebarState !== 'open') return
+
+      const items = Array.from(sidebarRef.current?.querySelectorAll<HTMLButtonElement>('button:not(:disabled)') ?? [])
+      if (items.length === 0) return
+      const firstItem = items[0]
+      const lastItem = items.at(-1)!
+      const activeElement = document.activeElement
+      if (event.shiftKey && (activeElement === firstItem || !sidebarRef.current?.contains(activeElement))) {
+        event.preventDefault()
+        lastItem.focus({ preventScroll: true })
+      } else if (!event.shiftKey && activeElement === lastItem) {
+        event.preventDefault()
+        firstItem.focus({ preventScroll: true })
+      }
+    }
+    document.addEventListener('keydown', handleDrawerKeyDown)
+    return () => document.removeEventListener('keydown', handleDrawerKeyDown)
+  }, [closeMenus, sidebarMounted, sidebarState])
+
+  useEffect(() => {
+    if (previousActivePathRef.current !== activePath) {
+      previousActivePathRef.current = activePath
+      closeMenus(false)
+    }
+  }, [activePath, closeMenus])
+
+  const finishSidebarClose = () => {
+    setSidebarState((current) => (current === 'closing' ? 'closed' : current))
+    if (restoreFocusAfterCloseRef.current) {
+      restoreFocusAfterCloseRef.current = false
+      menuButtonRef.current?.focus({ preventScroll: true })
+    }
+  }
+
+  const sidebar = sidebarMounted && navigationLayout !== 'rail' ? (
     <div
       className={styles.sidebarScrim}
       data-state={sidebarDataState}
-      onAnimationEnd={() => {
-        setSidebarState((current) => (current === 'closing' ? 'closed' : current))
-      }}
-      onClick={closeMenus}
+      onAnimationEnd={finishSidebarClose}
+      onClick={() => closeMenus(true)}
     >
-      <aside aria-label={shellCopy(SHELL_NAVIGATION_MENU_COPY_KEY)} className={styles.sidebar} data-state={sidebarDataState} onClick={(event) => event.stopPropagation()}>
+      <aside aria-label={shellCopy(SHELL_NAVIGATION_MENU_COPY_KEY)} className={styles.sidebar} data-adaptive-navigation="drawer" data-state={sidebarDataState} id="dashboard-navigation-drawer" onClick={(event) => event.stopPropagation()} ref={sidebarRef}>
         <div className={styles.sidebarHeader}>
           <span>{shellCopy(SHELL_NAVIGATION_HEADING_COPY_KEY)}</span>
         </div>
@@ -168,7 +234,13 @@ export function AppHeader({ activePath, actions = [], backLabel, backPath, onBac
   ) : null
 
   return (
-    <header className={`${styles.header} ${showBack ? styles.headerWithBack : ''} ${showMenu ? styles.headerWithMenu : ''}`}>
+    <header className={[
+      styles.header,
+      showBack ? styles.headerWithBack : '',
+      showMenu ? styles.headerWithMenu : '',
+      showBackMenu ? styles.headerWithBackMenu : '',
+      !showBack && navigationLayout === 'rail' ? styles.headerWithRail : '',
+    ].filter(Boolean).join(' ')}>
       {showBack ? (
         <>
           <button aria-label={resolvedBackLabel} className={styles.backButton} onClick={goBack} type="button">
@@ -194,7 +266,7 @@ export function AppHeader({ activePath, actions = [], backLabel, backPath, onBac
           renderMenuButton(backMenuClassName)
         )}
         {showActions && (
-          <button aria-expanded={actionsOpen} aria-label={shellCopy('navigation.moreActions')} className={styles.iconButton} onClick={() => { setActionsOpen((open) => !open); closeSidebar() }} type="button">
+          <button aria-expanded={actionsOpen} aria-label={shellCopy('navigation.moreActions')} className={styles.iconButton} onClick={() => { setActionsOpen((open) => !open); closeSidebar(false) }} type="button">
             <MaterialIcon name="mdi:dots-horizontal" size={28} />
           </button>
         )}
@@ -209,7 +281,7 @@ export function AppHeader({ activePath, actions = [], backLabel, backPath, onBac
       {actionsOpen && (
         <div aria-label={shellCopy('navigation.pageActions')} className={`${styles.menu} ${styles.actionsMenu}`} role="menu">
           {actions.map((action) => (
-            <button className={styles.menuItem} key={action.label} onClick={() => { closeMenus(); action.onClick() }} role="menuitem" type="button">
+            <button className={styles.menuItem} key={action.label} onClick={() => { closeMenus(false); action.onClick() }} role="menuitem" type="button">
               <MaterialIcon name={action.icon} size={20} />
               <span>{action.label}</span>
             </button>

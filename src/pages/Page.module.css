@@ -106,7 +106,7 @@
   }
 }
 
-@media (orientation: landscape) and (max-height: 500px) and (max-width: 1119px) {
+@media (orientation: landscape) and (max-height: 500px) {
   .headerDock {
     padding-top: calc(8px + env(safe-area-inset-top, 0px));
   }
