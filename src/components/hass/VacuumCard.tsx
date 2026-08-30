@@ -22,6 +22,7 @@ import { mapGridRectDimensionsCm, mapGridRectToServiceData, type MapGridRect } f
 import {
   VALETUDO_MAP_PROVENANCE_NONE,
   VALETUDO_MAP_PROVENANCE_REPORTED,
+  VALETUDO_MAP_SCOPE_FULL,
   ValetudoMapCard,
   type ValetudoMapEditorMeta,
   type ValetudoMapProvenance,
@@ -1060,7 +1061,13 @@ function VacuumStateActions({
   const mapReady = areaEditorMeta.isLoaded && Boolean(areaEditorMeta.geometry) && !areaEditorMeta.error
   const servicesLoaded = isRecord(services) && Object.keys(services).length > 0
   const areaServiceReady = Boolean(areaCleaning && hassServiceAvailable(services, areaCleaning.script))
-  const areaStartDisabled = !showCleaningSetup || !areaSelection || !areaEditorMeta.geometry || !mapReady || !areaServiceReady || normalCommandsDisabled
+  const areaStartDisabled = !showCleaningSetup
+    || !areaSelection
+    || !areaEditorMeta.geometry
+    || !areaEditorMeta.selectionAllowed
+    || !mapReady
+    || !areaServiceReady
+    || normalCommandsDisabled
   const commitAndCall = (nextState: string, action: string, target?: string) => {
     if (commandPolicyMode === VACUUM_COMMAND_NONE) return
     optimisticState.commitState(nextState)
@@ -1538,7 +1545,15 @@ function VacuumMapAndStatus({
   const callService = useHass((state) => state.helpers.callService) as unknown as CallService
   const locate = useCallback(() => callServiceAction(callService, 'vacuum.locate', vacuum.entityId), [callService, vacuum.entityId])
   const deviceCommandsAllowed = status.primaryAvailable && status.commandPolicyMode === VACUUM_COMMAND_NORMAL
-  const [editorMeta, setEditorMeta] = useState<ValetudoMapEditorMeta>({ error: null, geometry: null, isLoaded: false, provenance: VALETUDO_MAP_PROVENANCE_NONE })
+  const [editorMeta, setEditorMeta] = useState<ValetudoMapEditorMeta>({
+    displayScope: VALETUDO_MAP_SCOPE_FULL,
+    error: null,
+    focusAvailable: false,
+    geometry: null,
+    isLoaded: false,
+    provenance: VALETUDO_MAP_PROVENANCE_NONE,
+    selectionAllowed: true,
+  })
   const mapCommandsAllowed = deviceCommandsAllowed && editorMeta.isLoaded
   useLayoutEffect(() => {
     if (!areaEditorOpen || status.primaryAvailable) return
@@ -1588,7 +1603,6 @@ function VacuumMapAndStatus({
           available={status.primaryAvailable}
           drawMode={drawMode}
           expanded={areaEditorOpen}
-          frozenGeometry={areaEditorOpen ? editorMeta.geometry : null}
           interactive={areaEditorOpen && mapCommandsAllowed}
           minimumSizeCm={vacuum.areaCleaning?.minimumSizeCm}
           onDrawModeChange={onDrawModeChange}
@@ -1646,7 +1660,15 @@ export function VacuumRoomSourceModalContent({ vacuum }: VacuumCardProps) {
   const [areaSelection, setAreaSelection] = useState<MapGridRect | null>(null)
   const [cleanTarget, setCleanTarget] = useState<VacuumCleanTarget>('rooms')
   const [drawMode, setDrawMode] = useState(false)
-  const [editorMeta, setEditorMeta] = useState<ValetudoMapEditorMeta>({ error: null, geometry: null, isLoaded: false, provenance: VALETUDO_MAP_PROVENANCE_NONE })
+  const [editorMeta, setEditorMeta] = useState<ValetudoMapEditorMeta>({
+    displayScope: VALETUDO_MAP_SCOPE_FULL,
+    error: null,
+    focusAvailable: false,
+    geometry: null,
+    isLoaded: false,
+    provenance: VALETUDO_MAP_PROVENANCE_NONE,
+    selectionAllowed: true,
+  })
   const [resetAreaViewRevision, setResetAreaViewRevision] = useState(0)
 
   return (
@@ -1703,7 +1725,15 @@ export function VacuumModal({
   const [areaSelection, setAreaSelection] = useState<MapGridRect | null>(null)
   const [cleanTarget, setCleanTarget] = useState<VacuumCleanTarget>('rooms')
   const [drawMode, setDrawMode] = useState(false)
-  const [editorMeta, setEditorMeta] = useState<ValetudoMapEditorMeta>({ error: null, geometry: null, isLoaded: false, provenance: VALETUDO_MAP_PROVENANCE_NONE })
+  const [editorMeta, setEditorMeta] = useState<ValetudoMapEditorMeta>({
+    displayScope: VALETUDO_MAP_SCOPE_FULL,
+    error: null,
+    focusAvailable: false,
+    geometry: null,
+    isLoaded: false,
+    provenance: VALETUDO_MAP_PROVENANCE_NONE,
+    selectionAllowed: true,
+  })
   const [resetAreaViewRevision, setResetAreaViewRevision] = useState(0)
   const previousOpenRef = useRef(open)
   const renderedOutcomeContract = outcomeDetailContract
@@ -1748,7 +1778,15 @@ export function VacuumModal({
       setAreaSelection(null)
       setCleanTarget('rooms')
       setDrawMode(false)
-      setEditorMeta({ error: null, geometry: null, isLoaded: false, provenance: VALETUDO_MAP_PROVENANCE_NONE })
+      setEditorMeta({
+        displayScope: VALETUDO_MAP_SCOPE_FULL,
+        error: null,
+        focusAvailable: false,
+        geometry: null,
+        isLoaded: false,
+        provenance: VALETUDO_MAP_PROVENANCE_NONE,
+        selectionAllowed: true,
+      })
       setResetAreaViewRevision((revision) => revision + 1)
       resetDetailPageScroll()
     }
