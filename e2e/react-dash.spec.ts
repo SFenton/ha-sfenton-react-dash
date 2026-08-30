@@ -1195,10 +1195,15 @@ test('weather modal renders a live atmosphere and outdoor AQI without motion-onl
   await expect(accumulationTile).toContainText('Accumulation')
   await expect(precipitationTile.locator('[data-precipitation-bar="true"]')).toHaveCount(6)
   await expect(accumulationTile.locator('[data-cumulative-bar="true"]')).toHaveCount(6)
+  await expect(precipitationTile.locator('[data-precipitation-grid-lines="chance"] > i')).toHaveCount(3)
+  await expect(accumulationTile.locator('[data-precipitation-grid-lines="cumulative"] > i')).toHaveCount(3)
   await expect(precipitationTile.locator('[data-precipitation-y-axis="chance"]')).toHaveText('100%50%0%')
   await expect(accumulationTile.locator('[data-precipitation-y-axis="cumulative"]')).toHaveText('0.04 in0.02 in0 in')
   await expect(precipitationTiles).toHaveAttribute('data-precipitation-chance-domain', '100')
   await expect(precipitationTiles).toHaveAttribute('data-precipitation-amount-domain', '0.04')
+  await expect(precipitationTile.locator('[data-precipitation-hour-label="chance"]')).toHaveCount(0)
+  await expect(accumulationTile.locator('[data-cumulative-annotation="true"]')).toHaveCount(0)
+  await expect.poll(() => accumulationTile.locator('[data-precipitation-hour-label="cumulative-time"]').count()).toBeGreaterThan(1)
   expect(await precipitationTile.locator('[data-precipitation-hour-label="time"]').allTextContents())
     .toEqual(await accumulationTile.locator('[data-precipitation-hour-label="cumulative-time"]').allTextContents())
   await expect(precipitationTile.locator('[data-precipitation-hour-label="time"]').first()).toHaveText('Now')
@@ -1215,8 +1220,118 @@ test('weather modal renders a live atmosphere and outdoor AQI without motion-onl
   await expect(humidityTile.locator('[data-hourly-metric-plot="humidity"]')).not.toHaveAttribute('data-axis-truncated')
   expect(await humidityTile.locator('[data-hourly-metric-label="humidity"]').allTextContents())
     .toEqual(await cloudTile.locator('[data-hourly-metric-label="cloud"]').allTextContents())
-  await expect(dialog.getByRole('article', { name: /^Wind / })).toHaveAttribute('data-wide', 'true')
+  await expect(dialog.locator('[data-weather-highlight-rail="feels"]')).toBeVisible()
+  await expect(dialog.locator('[data-weather-highlight-rail="uv"]')).toBeVisible()
+  const visibilityTile = dialog.getByRole('article', { name: /^Visibility / })
+  await expect(visibilityTile.locator('[data-visibility-visual="distance-rail"]')).toBeVisible()
+  await expect(visibilityTile.locator('[class*="visibilityDistanceMarker"]')).toBeVisible()
+  const windTile = dialog.locator('[data-kind="wind"]')
+  await expect(windTile).toHaveAttribute('aria-label', 'Wind 4 mph; Gusts 8 mph; From southwest, 236 degrees')
+  await expect(windTile).toHaveAttribute('data-wide', 'true')
+  await expect(windTile.locator('[data-wind-compass="true"]')).toBeVisible()
+  const windVector = windTile.locator('[data-wind-vector="true"]')
+  await expect(windVector).toHaveAttribute('data-source-bearing', '236')
+  await expect(windVector).toHaveAttribute('data-destination-bearing', '56')
+  await expect.poll(() => windVector.evaluate((element) => element.getAnimations().length)).toBe(0)
+  const windTextColors = await windTile.locator('[data-wind-text="true"]').evaluateAll((elements) => elements.map((element) => {
+    const style = getComputedStyle(element)
+    return element instanceof SVGElement ? style.fill : style.color
+  }))
+  expect(new Set(windTextColors)).toEqual(new Set(['rgb(255, 255, 255)']))
+  const windInstrumentColors = await windTile.evaluate((element) => ({
+    destination: getComputedStyle(element.querySelector<SVGPathElement>('[data-wind-destination-arrow]')!).fill,
+    source: getComputedStyle(element.querySelector<SVGCircleElement>('[data-wind-source-marker]')!).stroke,
+  }))
+  expect(windInstrumentColors.source).not.toBe(windInstrumentColors.destination)
+  expect(windInstrumentColors.source).not.toBe('rgb(255, 255, 255)')
+  expect(windInstrumentColors.destination).not.toBe('rgb(255, 255, 255)')
+  await expect(windTile.locator('[class*="windCompassTick"]')).toHaveCount(47)
+  await expect(windTile.locator('linearGradient')).toHaveCount(0)
+  const windCompassClearance = await windTile.evaluate((element) => {
+    const vectorParts = Array.from(element.querySelectorAll<SVGGraphicsElement>(
+      '[data-wind-source-blade], [data-wind-source-marker], [data-wind-destination-arrow]',
+    ))
+    const cardinals = Array.from(element.querySelectorAll<SVGTextElement>('svg text[data-wind-text]'))
+    if (vectorParts.length !== 3 || cardinals.length !== 4) return null
+    const cornerRadii = (box: DOMRect | SVGRect) => [
+      Math.hypot(box.x - 56, box.y - 56),
+      Math.hypot(box.x + box.width - 56, box.y - 56),
+      Math.hypot(box.x - 56, box.y + box.height - 56),
+      Math.hypot(box.x + box.width - 56, box.y + box.height - 56),
+    ]
+    const maximumInstrumentRadius = Math.max(...vectorParts.flatMap((part) => {
+      const stroke = getComputedStyle(part).stroke === 'none' ? 0 : Number.parseFloat(getComputedStyle(part).strokeWidth) / 2
+      return cornerRadii(part.getBBox()).map((radius) => radius + stroke)
+    }))
+    const minimumCardinalRadius = Math.min(...cardinals.flatMap((cardinal) => cornerRadii(cardinal.getBBox())))
+    return minimumCardinalRadius - maximumInstrumentRadius
+  })
+  expect(windCompassClearance).not.toBeNull()
+  expect(windCompassClearance ?? 0).toBeGreaterThanOrEqual(2.5)
+
+  const setWindBearing = (bearing: number) => page.evaluate((nextBearing) => {
+    const mockHass = (window as unknown as {
+      __mockHass?: { setEntityAttribute: (entityId: string, attribute: string, value: unknown) => void }
+    }).__mockHass
+    mockHass?.setEntityAttribute('weather.pirate_weather', 'wind_bearing', nextBearing)
+  }, bearing)
+  const finishWindAnimation = () => windVector.evaluate((element) => {
+    element.getAnimations().forEach((animation) => animation.finish())
+  })
+
+  await setWindBearing(350)
+  await expect.poll(() => windVector.evaluate((element) => element.getAnimations().length)).toBe(1)
+  await finishWindAnimation()
+  await expect.poll(() => windVector.evaluate((element) => element.getAnimations().length)).toBe(0)
+
+  await setWindBearing(10)
+  await expect.poll(() => windVector.evaluate((element) => element.getAnimations().length)).toBe(1)
+  const wrapKeyframes = await windVector.evaluate((element) => {
+    const effect = element.getAnimations()[0]?.effect as KeyframeEffect | null
+    return effect?.getKeyframes().map((keyframe) => Number(String(keyframe.transform).match(/-?[\d.]+/)?.[0])) ?? []
+  })
+  expect(((wrapKeyframes[0] % 360) + 360) % 360).toBeCloseTo(350)
+  expect(((wrapKeyframes[1] % 360) + 360) % 360).toBeCloseTo(10)
+  expect(wrapKeyframes[1] - wrapKeyframes[0]).toBeCloseTo(20)
+  await finishWindAnimation()
+
+  await setWindBearing(0)
+  await expect.poll(() => windVector.evaluate((element) => element.getAnimations().length)).toBe(1)
+  await finishWindAnimation()
+  await setWindBearing(170)
+  await expect.poll(() => windVector.evaluate((element) => element.getAnimations().length)).toBe(1)
+  const paintedBeforeRetarget = await windVector.evaluate(async (element) => {
+    const animation = element.getAnimations()[0]
+    const effect = animation.effect as KeyframeEffect
+    const duration = Number(effect.getTiming().duration)
+    animation.currentTime = duration * 0.35
+    animation.pause()
+    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
+    const matrix = new DOMMatrixReadOnly(getComputedStyle(element).transform)
+    return (Math.atan2(matrix.b, matrix.a) * 180) / Math.PI
+  })
+  await setWindBearing(300)
+  await expect.poll(async () => {
+    const frames = await windVector.evaluate((element) => {
+      const effect = element.getAnimations()[0]?.effect as KeyframeEffect | null
+      return effect?.getKeyframes().map((keyframe) => String(keyframe.transform)) ?? []
+    })
+    return frames.length
+  }).toBe(2)
+  const interruptedKeyframes = await windVector.evaluate((element) => {
+    const effect = element.getAnimations()[0]?.effect as KeyframeEffect
+    return effect.getKeyframes().map((keyframe) => Number(String(keyframe.transform).match(/-?[\d.]+/)?.[0]))
+  })
+  expect(Math.abs(interruptedKeyframes[0] - paintedBeforeRetarget)).toBeLessThanOrEqual(1)
+  expect(Math.abs(interruptedKeyframes[1] - interruptedKeyframes[0])).toBeLessThanOrEqual(180)
+  await finishWindAnimation()
+
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  await setWindBearing(100)
+  await expect.poll(() => windVector.evaluate((element) => element.getAnimations().length)).toBe(0)
+  await expect(windVector).toHaveAttribute('data-source-bearing', '100')
   await expect(dialog.getByRole('article', { name: 'Cloud Cover 57%' })).toHaveCount(0)
+  await expect(dialog.getByRole('button', { name: /Visualization Lab/i })).toHaveCount(0)
   const decorationCoverage = await dialog.evaluate((element) => {
     const decoration = element.querySelector<HTMLElement>('[data-modal-sheet-surface-decoration="true"]')
     if (!decoration) return null
@@ -1242,6 +1357,14 @@ test('weather modal renders a live atmosphere and outdoor AQI without motion-onl
   expect(cumulativeBarColor).not.toBe('rgba(0, 0, 0, 0)')
   const humidityCapColor = await humidityTile.locator('[data-hourly-metric-bar="true"]').first().evaluate((element) => getComputedStyle(element).backgroundColor)
   expect(humidityCapColor).not.toBe('rgba(0, 0, 0, 0)')
+  const forcedWindColors = await windTile.evaluate((element) => ({
+    destination: getComputedStyle(element.querySelector<SVGPathElement>('[data-wind-destination-arrow]')!).fill,
+    sourceFill: getComputedStyle(element.querySelector<SVGCircleElement>('[data-wind-source-marker]')!).fill,
+    sourceStroke: getComputedStyle(element.querySelector<SVGCircleElement>('[data-wind-source-marker]')!).stroke,
+  }))
+  expect(forcedWindColors.destination).not.toBe('none')
+  expect(forcedWindColors.sourceStroke).not.toBe('none')
+  expect(forcedWindColors.sourceFill).not.toBe(forcedWindColors.sourceStroke)
 })
 
 test('mobile navigation chevrons stay vertically centered in their opener', async ({ page }) => {

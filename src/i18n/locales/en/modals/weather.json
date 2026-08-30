@@ -36,9 +36,14 @@
       }
     },
     "wind": {
+      "ariaLabel": "Wind {{speed}}; {{gustLabel}} {{gust}}; {{directionLabel}} {{direction}}",
+      "bearingDegrees": "{{direction}}, {{degrees}} degrees",
+      "calm": "Calm",
       "direction": "Direction",
+      "from": "From",
       "gusts": "Gusts",
-      "speed": "Wind"
+      "speed": "Wind",
+      "todaysGust": "Today's gust"
     }
   },
   "headline": {

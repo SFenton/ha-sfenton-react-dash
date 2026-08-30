@@ -311,6 +311,85 @@ test('standalone precipitation tiles reflow while the weather modal stays mounte
   await expect(dialog).toBeVisible()
 })
 
+test('weather highlight values and visuals align across the viewport matrix', async ({ page }) => {
+  for (const viewport of VIEWPORTS) {
+    await page.setViewportSize(viewport)
+    await page.goto('/index.html?path=overview')
+    await page.getByRole('button', { name: /Open seven-day weather forecast/i }).click()
+    const dialog = page.getByRole('dialog', { name: 'Weather' })
+    await expect(dialog).toBeVisible()
+    await expect(dialog.getByRole('button', { name: /Visualization Lab/i })).toHaveCount(0)
+    const tiles = dialog.locator('[data-kind="feels"], [data-kind="uv"], [data-kind="sun"], [data-kind="visibility"]')
+    await expect(tiles).toHaveCount(4)
+
+    const metrics = await tiles.evaluateAll((elements) => elements.map((element) => {
+      const tile = element.getBoundingClientRect()
+      const value = element.querySelector<HTMLElement>('[data-highlight-value]')?.getBoundingClientRect()
+      const visual = element.querySelector<HTMLElement>('[data-highlight-visual]')?.getBoundingClientRect()
+      const visualContent = element.querySelector<HTMLElement>('[data-highlight-visual] > *')?.getBoundingClientRect()
+      const sunArc = element.querySelector<SVGPathElement>('[class*="sunArcPath"]')?.getBoundingClientRect()
+      return {
+        height: tile.height,
+        paintedCenter: sunArc
+          ? sunArc.top + sunArc.height / 2 - tile.top
+          : visualContent
+            ? visualContent.top + visualContent.height / 2 - tile.top
+            : null,
+        valueTop: value ? value.top - tile.top : null,
+        visualCenter: visual ? visual.top + visual.height / 2 - tile.top : null,
+      }
+    }))
+    const paintedCenters = metrics.map(({ paintedCenter }) => paintedCenter).filter((value): value is number => value !== null)
+    const valueTops = metrics.map(({ valueTop }) => valueTop).filter((value): value is number => value !== null)
+    const visualCenters = metrics.map(({ visualCenter }) => visualCenter).filter((value): value is number => value !== null)
+    const heights = metrics.map(({ height }) => height)
+    expect(Math.max(...paintedCenters) - Math.min(...paintedCenters)).toBeLessThanOrEqual(0.5)
+    expect(Math.max(...valueTops) - Math.min(...valueTops)).toBeLessThanOrEqual(0.5)
+    expect(Math.max(...visualCenters) - Math.min(...visualCenters)).toBeLessThanOrEqual(0.5)
+    expect(Math.max(...heights) - Math.min(...heights)).toBeLessThanOrEqual(0.5)
+
+    const windTile = dialog.locator('[data-kind="wind"]')
+    const windMetrics = await windTile.evaluate((element) => {
+      const tile = element.getBoundingClientRect()
+      const readout = element.querySelector<HTMLElement>('[class*="windReadout"]')?.getBoundingClientRect()
+      const dial = element.querySelector<HTMLElement>('[data-wind-compass]')?.getBoundingClientRect()
+      const source = element.querySelector<SVGCircleElement>('[data-wind-source-marker]')?.getBoundingClientRect()
+      const destination = element.querySelector<SVGPathElement>('[data-wind-destination-arrow]')?.getBoundingClientRect()
+      const vector = element.querySelector<SVGGElement>('[data-wind-vector]')?.getBBox()
+      const insideDial = (rect: DOMRect | undefined) => Boolean(dial && rect
+        && rect.left >= dial.left - 1
+        && rect.right <= dial.right + 1
+        && rect.top >= dial.top - 1
+        && rect.bottom <= dial.bottom + 1)
+      return {
+        destinationInside: insideDial(destination),
+        dialHeight: dial?.height ?? 0,
+        dialWidth: dial?.width ?? 0,
+        height: tile.height,
+        noOverlap: Boolean(readout && dial && readout.right <= dial.left),
+        overflow: element.scrollWidth > element.clientWidth + 1,
+        ringCount: element.querySelectorAll('[class*="windCompassRing"]').length,
+        sourceInside: insideDial(source),
+        tickCount: element.querySelectorAll('[class*="windCompassTick"]').length,
+        vectorSpan: vector ? Math.max(vector.width, vector.height) : 0,
+      }
+    })
+    expect(windMetrics).toMatchObject({
+      destinationInside: true,
+      noOverlap: true,
+      overflow: false,
+      ringCount: 0,
+      sourceInside: true,
+      tickCount: 47,
+    })
+    expect(Math.abs(windMetrics.dialHeight - 112)).toBeLessThanOrEqual(0.5)
+    expect(Math.abs(windMetrics.dialWidth - 112)).toBeLessThanOrEqual(0.5)
+    expect(Math.abs(windMetrics.height - 158)).toBeLessThanOrEqual(0.5)
+    expect(windMetrics.vectorSpan).toBeLessThanOrEqual(53)
+    await closeModal(dialog)
+  }
+})
+
 test('compact, form, standard, and media intents avoid viewport-wide desktop sheets', async ({ page }) => {
   await page.setViewportSize({ height: 900, width: 1440 })
 

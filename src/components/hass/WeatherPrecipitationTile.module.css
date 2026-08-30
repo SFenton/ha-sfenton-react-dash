@@ -14,8 +14,7 @@
   gap: 8px;
 }
 
-.hourlyVisual,
-.cumulativeVisual {
+.hourlyVisual {
   display: grid;
   min-height: 0;
   grid-template-columns: minmax(0, 1fr) max-content;
@@ -54,8 +53,7 @@
   transform: translateX(-50%);
 }
 
-.bars,
-.cumulativeBars {
+.bars {
   position: relative;
   display: grid;
   min-width: 0;
@@ -66,8 +64,7 @@
   align-items: end;
 }
 
-.barSlot,
-.cumulativeBarSlot {
+.barSlot {
   position: relative;
   z-index: 1;
   display: flex;
@@ -76,16 +73,12 @@
   align-items: end;
 }
 
-.hourlyBar,
-.cumulativeBar {
+.hourlyBar {
   display: block;
   width: 100%;
+  height: var(--precipitation-probability);
   min-height: 0;
   border-radius: 3px 3px 0 0;
-}
-
-.hourlyBar {
-  height: var(--precipitation-probability);
   background: var(--rd-weather-precip-bar-soft);
 }
 
@@ -119,8 +112,40 @@
   background: var(--rd-weather-hourly-cloud);
 }
 
+.cumulativeVisual {
+  display: grid;
+  min-height: 0;
+  grid-template-columns: minmax(0, 1fr) max-content;
+  grid-template-rows: minmax(0, 1fr) 14px;
+  column-gap: 4px;
+}
+
+.cumulativeBars {
+  position: relative;
+  display: grid;
+  min-width: 0;
+  min-height: 64px;
+  grid-column: 1;
+  grid-template-columns: repeat(var(--precipitation-columns), minmax(0, 1fr));
+  gap: 2px;
+  align-items: end;
+}
+
+.cumulativeBarSlot {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  height: 100%;
+  min-width: 0;
+  align-items: end;
+}
+
 .cumulativeBar {
+  display: block;
+  width: 100%;
   height: var(--cumulative-amount);
+  min-height: 0;
+  border-radius: 3px 3px 0 0;
   background: var(--rd-weather-precip-line);
   opacity: 0.86;
 }

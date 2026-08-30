@@ -12,7 +12,7 @@ const FORECASTS = [
 ]
 
 describe('WeatherHourlyMetricTiles', () => {
-  it('renders filled humidity and cloud cover columns with shared labels', () => {
+  it('renders six-hour humidity and cloud cover tiles with shared labels', () => {
     render(<WeatherHourlyMetricTiles forecasts={FORECASTS} />)
 
     const humidity = screen.getByRole('article', { name: 'Hourly Humidity over 6 hours, ranging from 62% to 74%' })

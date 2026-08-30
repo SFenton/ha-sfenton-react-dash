@@ -90,5 +90,7 @@ describe('precipitation timeline', () => {
     expect(precipitationScaledPercent(0.09, 0.1)).toBe(90)
     expect(precipitationScaledPercent(100, 100)).toBe(100)
     expect(precipitationScaledPercent(120, 100)).toBe(100)
+
   })
+
 })

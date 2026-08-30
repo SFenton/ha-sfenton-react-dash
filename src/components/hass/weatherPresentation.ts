@@ -4,6 +4,27 @@ export type PressureBand = 'above' | 'below' | 'typical'
 export type UvLevel = 'extreme' | 'high' | 'low' | 'moderate' | 'veryHigh'
 export type VisibilityBand = 'clear' | 'good' | 'moderate' | 'poor' | 'veryPoor'
 export type WeatherScene = 'clouds' | 'exceptional' | 'fog' | 'neutral' | 'night' | 'rain' | 'snow' | 'storm' | 'sunny' | 'wind'
+export const DEFAULT_WIND_SPEED_UNIT = 'mph'
+export const WIND_ROTATION_EASING = 'cubic-bezier(.32, .72, 0, 1)'
+
+const WIND_COMPASS_POINTS = [
+  { abbreviation: 'N', spoken: 'north' },
+  { abbreviation: 'NNE', spoken: 'north-northeast' },
+  { abbreviation: 'NE', spoken: 'northeast' },
+  { abbreviation: 'ENE', spoken: 'east-northeast' },
+  { abbreviation: 'E', spoken: 'east' },
+  { abbreviation: 'ESE', spoken: 'east-southeast' },
+  { abbreviation: 'SE', spoken: 'southeast' },
+  { abbreviation: 'SSE', spoken: 'south-southeast' },
+  { abbreviation: 'S', spoken: 'south' },
+  { abbreviation: 'SSW', spoken: 'south-southwest' },
+  { abbreviation: 'SW', spoken: 'southwest' },
+  { abbreviation: 'WSW', spoken: 'west-southwest' },
+  { abbreviation: 'W', spoken: 'west' },
+  { abbreviation: 'WNW', spoken: 'west-northwest' },
+  { abbreviation: 'NW', spoken: 'northwest' },
+  { abbreviation: 'NNW', spoken: 'north-northwest' },
+] as const
 
 interface AqiBandDefinition {
   level: AqiLevel
@@ -31,6 +52,19 @@ function numberValue(value: unknown) {
 
 function clampPercent(value: number) {
   return Math.min(100, Math.max(0, value))
+}
+
+export function normalizeBearingDegrees(value: number) {
+  return ((value % 360) + 360) % 360
+}
+
+export function shortestBearingDelta(from: number, to: number) {
+  const delta = ((normalizeBearingDegrees(to) - normalizeBearingDegrees(from) + 540) % 360) - 180
+  return delta <= -180 ? 180 : delta
+}
+
+export function compassRotationDurationMs(from: number, to: number) {
+  return Math.round(260 * (1 + Math.min(180, Math.abs(to - from)) / 180))
 }
 
 export function classifyUsAqi(value: unknown) {
@@ -88,6 +122,39 @@ export function feelsLikePresentation(actualValue: unknown, apparentValue: unkno
     delta,
     markerPercent: clampPercent(((delta + displayRange) / (displayRange * 2)) * 100),
     relation,
+  }
+}
+
+export function windBearingPresentation(value: unknown) {
+  let degrees: number | undefined
+  let reportedAsDegrees = false
+
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    degrees = value
+    reportedAsDegrees = true
+  } else if (typeof value === 'string' && value.trim()) {
+    const normalized = value.trim().toUpperCase()
+    const numeric = Number(normalized)
+    if (Number.isFinite(numeric)) {
+      degrees = numeric
+      reportedAsDegrees = true
+    } else {
+      const cardinalIndex = WIND_COMPASS_POINTS.findIndex(({ abbreviation }) => abbreviation === normalized)
+      if (cardinalIndex === -1) return null
+      degrees = cardinalIndex * 22.5
+    }
+  }
+
+  if (degrees === undefined) return null
+  const sourceDegrees = normalizeBearingDegrees(degrees)
+  const direction = WIND_COMPASS_POINTS[Math.floor((sourceDegrees + 11.25) / 22.5) % WIND_COMPASS_POINTS.length]
+
+  return {
+    cardinal: direction.abbreviation,
+    destinationDegrees: (sourceDegrees + 180) % 360,
+    displayDegrees: reportedAsDegrees ? Math.round(sourceDegrees) % 360 : undefined,
+    sourceDegrees,
+    spoken: direction.spoken,
   }
 }
 

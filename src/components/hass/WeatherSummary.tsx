@@ -1,10 +1,11 @@
-import { useEffect, useRef, useState, type CSSProperties } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react'
 import { useEntity, useHass } from '@hakit/core'
 import type { HassEntity } from 'home-assistant-js-websocket'
 import effects from '../../styles/effects.module.css'
 import { SUN_ENTITY, WEATHER_AQI_ENTITY, WEATHER_ENTITY } from '../../constants/atAGlance'
 import { WEATHER_HOURLY_MODES, type WeatherHourlyMode } from '../../constants/surfaceSemantics'
 import { formatDate, useCopy, WEATHER_COPY_KEYS, WEATHER_COPY_NAMESPACE, type CopyKey, type CopyValues } from '../../i18n'
+import { useReducedMotion } from '../../hooks/useReducedMotion'
 import { MaterialIcon } from '../core/Icon'
 import { materialIconPath } from '../core/iconPaths'
 import { ModalSheet, type ModalSheetStyle } from '../core/ModalSheet'
@@ -15,12 +16,17 @@ import { WeatherHourlyMetricTiles } from './WeatherHourlyMetricTiles'
 import { WeatherPrecipitationTile } from './WeatherPrecipitationTile'
 import {
   classifyUsAqi,
+  compassRotationDurationMs,
+  DEFAULT_WIND_SPEED_UNIT,
   feelsLikePresentation,
   pressurePresentation,
+  shortestBearingDelta,
   sunArcMarker,
   sunPresentation,
   uvPresentation,
   visibilityPresentation,
+  WIND_ROTATION_EASING,
+  windBearingPresentation,
   type AqiLevel,
   type UvLevel,
 } from './weatherPresentation'
@@ -75,11 +81,8 @@ type WeatherHighlightStyle = CSSProperties & {
 }
 
 interface WeatherHighlightData {
+  ariaLabel?: string
   available: boolean
-  details?: readonly {
-    label: string
-    value: string
-  }[]
   icon: string
   kind: HighlightKind
   percent?: number
@@ -87,12 +90,26 @@ interface WeatherHighlightData {
   status?: string
   title: string
   value: string
+  wide?: boolean
+  wind?: {
+    bearingDegrees?: number
+    destinationDegrees?: number
+    directionLabel: string
+    directionValue: string
+    gustIsForecast: boolean
+    gustLabel: string
+    gustValue: string
+    showVector: boolean
+    speedLabel: string
+    speedValue: string
+  }
 }
 
 type HourlyMode = WeatherHourlyMode
 type ModeTransitionPhase = 'idle' | 'out' | 'in'
 type WeatherCopy = <K extends CopyKey<typeof WEATHER_COPY_NAMESPACE>>(key: K, values?: CopyValues) => string
 
+const DEFAULT_PRECIPITATION_UNIT = 'in'
 const WEATHER_MODAL_STYLE: ModalSheetStyle = {
   '--color-modal-surface': 'var(--rd-weather-modal-surface)',
 }
@@ -325,6 +342,7 @@ const FORECAST_CACHE_TTL_MS = 5 * 60 * 1000
 const PRESSURE_TICK_COUNT = 49
 const PRESSURE_ARC_START_DEGREES = 145
 const PRESSURE_ARC_SPAN_DEGREES = 250
+const WIND_COMPASS_TICK_COUNT = 48
 
 interface ForecastCache {
   forecasts: WeatherForecast[]
@@ -369,6 +387,10 @@ function numberValue(value: unknown) {
     if (Number.isFinite(parsed)) return parsed
   }
   return undefined
+}
+
+function stringValue(value: unknown, fallback: string) {
+  return typeof value === 'string' && value.trim() ? value : fallback
 }
 
 function conditionInfo(condition: string | undefined) {
@@ -425,18 +447,26 @@ function formatMeasure(value: unknown, unit: unknown, digits = 0) {
   return `${formatted}${unit ? ` ${unit}` : ''}`
 }
 
-function weatherPrecipitationUnit(entity: HassEntity | null) {
-  const unit = entity?.attributes.precipitation_unit
-  return typeof unit === 'string' && unit.trim() ? unit : 'in'
+function formatWindMeasure(value: unknown, unit: unknown) {
+  const numeric = numberValue(value)
+  if (numeric === undefined || numeric < 0) return undefined
+  const unitLabel = unitWithoutDegree(unit, DEFAULT_WIND_SPEED_UNIT)
+  const amount = numeric > 0 && numeric < 1 ? '<1' : formatNumber(numeric, 0) ?? '--'
+  return {
+    amount,
+    numeric,
+    unit: unitLabel,
+    value: `${amount} ${unitLabel}`,
+  }
 }
 
 function formatWindRange(speed: unknown, gust: unknown, unit: unknown) {
-  const wind = formatNumber(speed, 0)
-  const windGust = formatNumber(gust, 0)
-  const unitLabel = typeof unit === 'string' && unit.trim() ? unit : 'mph'
+  const wind = formatWindMeasure(speed, unit)
+  const windGust = formatWindMeasure(gust, unit)
   if (!wind && !windGust) return '--'
-  if (!windGust || windGust === wind) return `${wind ?? windGust} ${unitLabel}`
-  return `${wind ?? windGust}-${windGust} ${unitLabel}`
+  if (!windGust) return wind?.value ?? '--'
+  if (!wind || windGust.amount === wind.amount) return wind?.value ?? windGust.value
+  return `${wind.amount}-${windGust.amount} ${windGust.unit}`
 }
 
 function clampPercent(value: number) {
@@ -457,14 +487,6 @@ function hourlyLabel(value: string | undefined, index: number) {
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return `${index}h`
   return date.toLocaleTimeString([], { hour: 'numeric', hour12: true }).replace(/\s+/g, ' ')
-}
-
-function windBearingLabel(value: unknown) {
-  if (typeof value === 'string' && value.trim()) return value.toUpperCase()
-  const degrees = numberValue(value)
-  if (degrees === undefined) return undefined
-  const directions = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW']
-  return directions[Math.round(degrees / 45) % directions.length]
 }
 
 function extractForecasts(response: WeatherForecastResponse, limit = 7) {
@@ -566,8 +588,35 @@ function uvCategoryLabel(copy: WeatherCopy, level: UvLevel) {
 function highlightTiles(entity: HassEntity | null, forecasts: WeatherForecast[], sunEntity: HassEntity | null, copy: WeatherCopy) {
   const today = forecasts[0]
   const attrs = entity?.attributes ?? {}
-  const wind = formatMeasure(attrs.wind_speed, attrs.wind_speed_unit, 0)
-  const gust = formatMeasure(attrs.wind_gust_speed ?? today?.wind_gust_speed, attrs.wind_speed_unit, 0)
+  const wind = formatWindMeasure(attrs.wind_speed, attrs.wind_speed_unit)
+  const currentGust = numberValue(attrs.wind_gust_speed)
+  const dailyGust = numberValue(today?.wind_gust_speed)
+  const gustIsForecast = currentGust === undefined && dailyGust !== undefined
+  const gust = formatWindMeasure(currentGust ?? dailyGust, attrs.wind_speed_unit)
+  const bearing = windBearingPresentation(attrs.wind_bearing)
+  const calm = wind?.numeric === 0
+  const gustLabel = copy(gustIsForecast ? WEATHER_COPY_KEYS.details.wind.todaysGust : WEATHER_COPY_KEYS.details.wind.gusts)
+  const directionLabel = copy(calm || !bearing ? WEATHER_COPY_KEYS.details.wind.direction : WEATHER_COPY_KEYS.details.wind.from)
+  const directionAriaLabel = copy(calm || !bearing ? WEATHER_COPY_KEYS.details.wind.direction : WEATHER_COPY_KEYS.details.wind.from)
+  const directionValue = calm
+    ? copy(WEATHER_COPY_KEYS.details.wind.calm)
+    : bearing
+      ? `${bearing.cardinal}${bearing.displayDegrees === undefined ? '' : ` · ${bearing.displayDegrees}°`}`
+      : copy(WEATHER_COPY_KEYS.unavailable)
+  const directionAriaValue = calm
+    ? copy(WEATHER_COPY_KEYS.details.wind.calm)
+    : bearing
+      ? bearing.displayDegrees === undefined
+        ? bearing.spoken
+        : copy(WEATHER_COPY_KEYS.details.wind.bearingDegrees, { degrees: bearing.displayDegrees, direction: bearing.spoken })
+      : copy(WEATHER_COPY_KEYS.unavailable)
+  const windAriaLabel = copy(WEATHER_COPY_KEYS.details.wind.ariaLabel, {
+    direction: directionAriaValue,
+    directionLabel: directionAriaLabel,
+    gust: gust?.value ?? copy(WEATHER_COPY_KEYS.unavailable),
+    gustLabel,
+    speed: wind?.value ?? copy(WEATHER_COPY_KEYS.unavailable),
+  })
   const pressure = numberValue(attrs.pressure)
   const pressureData = pressurePresentation(pressure, attrs.pressure_unit)
   const uv = uvPresentation(today?.uv_index)
@@ -595,17 +644,25 @@ function highlightTiles(entity: HassEntity | null, forecasts: WeatherForecast[],
       value: uv ? formatNumber(uv.value, 1) ?? unavailable : '--',
     },
     {
-      available: Boolean(wind),
-      details: [
-        { label: copy(WEATHER_COPY_KEYS.details.wind.speed), value: wind ?? unavailable },
-        { label: copy(WEATHER_COPY_KEYS.details.wind.gusts), value: gust ?? unavailable },
-        { label: copy(WEATHER_COPY_KEYS.details.wind.direction), value: windBearingLabel(attrs.wind_bearing) ?? unavailable },
-      ],
-      icon: 'mdi:navigation',
+      ariaLabel: windAriaLabel,
+      available: Boolean(wind || gust || bearing),
+      icon: 'mdi:weather-windy',
       kind: 'wind',
-      rotation: numberValue(attrs.wind_bearing),
       title: 'Wind',
-      value: wind ?? '--',
+      value: wind?.value ?? '--',
+      wide: true,
+      wind: {
+        bearingDegrees: calm ? undefined : bearing?.sourceDegrees,
+        destinationDegrees: calm ? undefined : bearing?.destinationDegrees,
+        directionLabel,
+        directionValue,
+        gustIsForecast,
+        gustLabel,
+        gustValue: gust?.value ?? unavailable,
+        showVector: Boolean(bearing && !calm),
+        speedLabel: copy(WEATHER_COPY_KEYS.details.wind.speed),
+        speedValue: wind?.value ?? unavailable,
+      },
     },
     ...(sunEntity ? [{
       available: Boolean(sun && sunValue),
@@ -663,21 +720,18 @@ function ForecastRow({ entity, forecast, forecasts, index, mode }: { entity: Has
 
   if (mode === 'wind') {
     const speedRange = formatWindRange(forecast.wind_speed, forecast.wind_gust_speed, entity?.attributes.wind_speed_unit)
+    const bearing = windBearingPresentation(forecast.wind_bearing)
 
     return (
       <article className={styles.forecastRow} data-mode="wind" aria-label={`${forecastDayLabel(forecast.datetime, index)} wind ${speedRange}`}>
         <span className={styles.forecastDay}>{forecastDayLabel(forecast.datetime, index)}</span>
         <span
           className={styles.forecastIcon}
-          style={
-            forecast.wind_bearing === undefined
-              ? undefined
-              : {
-                  transform: `rotate(${numberValue(forecast.wind_bearing) ?? 0}deg)`,
-                }
-          }
+          data-wind-destination-bearing={bearing?.destinationDegrees}
+          data-wind-source-bearing={bearing?.sourceDegrees}
+          style={bearing ? { transform: `rotate(${bearing.destinationDegrees}deg)` } : undefined}
         >
-          <MaterialIcon name="mdi:navigation" size={24} />
+          <MaterialIcon name={bearing ? 'mdi:navigation' : 'mdi:weather-windy'} size={24} />
         </span>
         <span className={styles.windSparkline}>
           <span className={styles.windLine} />
@@ -708,21 +762,6 @@ function HighlightVisual({ tile }: { tile: WeatherHighlightData }) {
     return (
       <span className={styles.highlightUnavailableVisual}>
         <MaterialIcon name={tile.icon} size={34} />
-      </span>
-    )
-  }
-
-  if (tile.kind === 'wind') {
-    return (
-      <span className={styles.highlightCompass} style={highlightStyle(undefined, tile.rotation)}>
-        <span className={styles.compassNorth}>N</span>
-        <span className={styles.compassEast}>E</span>
-        <span className={styles.compassSouth}>S</span>
-        <span className={styles.compassWest}>W</span>
-        <span className={styles.compassNeedle}>
-          <MaterialIcon name="mdi:navigation" size={22} />
-        </span>
-        <span className={styles.compassReadout}>{tile.value}</span>
       </span>
     )
   }
@@ -773,6 +812,27 @@ function HighlightVisual({ tile }: { tile: WeatherHighlightData }) {
     )
   }
 
+  if (tile.kind === 'visibility') {
+    return (
+      <span className={styles.visibilityDistanceRail} data-visibility-visual="distance-rail" style={highlightStyle(tile.percent)}>
+        <span className={styles.visibilityDistanceFill} />
+        {tile.available && (tile.percent ?? 0) > 0 ? <span className={styles.visibilityDistanceMarker} /> : null}
+      </span>
+    )
+  }
+
+  if (tile.kind === 'feels' || tile.kind === 'uv') {
+    return (
+      <span
+        className={`${styles.highlightRail} ${styles[`highlightRail_${tile.kind}`]}`}
+        data-weather-highlight-rail={tile.kind}
+        style={highlightStyle(tile.percent)}
+      >
+        <span className={styles.highlightRailMarker} />
+      </span>
+    )
+  }
+
   return (
     <span className={`${styles.highlightMeter} ${styles[`highlightMeter_${tile.kind}`]}`} style={highlightStyle(tile.percent)}>
       <span className={styles.highlightMeterFill} />
@@ -781,43 +841,194 @@ function HighlightVisual({ tile }: { tile: WeatherHighlightData }) {
   )
 }
 
+function readPaintedWindRotation(element: SVGGElement) {
+  if (typeof DOMMatrixReadOnly === 'undefined') return null
+  const transform = getComputedStyle(element).transform
+  if (!transform || transform === 'none') return null
+
+  try {
+    const matrix = new DOMMatrixReadOnly(transform)
+    return (Math.atan2(matrix.b, matrix.a) * 180) / Math.PI
+  } catch {
+    return null
+  }
+}
+
+function AnimatedWindVector({
+  destinationDegrees,
+  sourceDegrees,
+}: {
+  destinationDegrees?: number
+  sourceDegrees: number
+}) {
+  const vectorRef = useRef<SVGGElement>(null)
+  const animationRef = useRef<Animation | null>(null)
+  const previousBearingRef = useRef<number | undefined>(undefined)
+  const underlyingRotationRef = useRef(sourceDegrees)
+  const [initialRotation] = useState(sourceDegrees)
+  const reducedMotion = useReducedMotion()
+
+  useLayoutEffect(() => {
+    const vector = vectorRef.current
+    if (!vector) return
+
+    if (previousBearingRef.current === undefined) {
+      previousBearingRef.current = sourceDegrees
+      underlyingRotationRef.current = sourceDegrees
+      vector.style.transform = `rotate(${sourceDegrees}deg)`
+      return
+    }
+
+    if (reducedMotion) {
+      animationRef.current?.cancel()
+      animationRef.current = null
+      previousBearingRef.current = sourceDegrees
+      underlyingRotationRef.current = sourceDegrees
+      vector.style.transform = `rotate(${sourceDegrees}deg)`
+      return
+    }
+
+    if (previousBearingRef.current === sourceDegrees) return
+
+    const currentRotation = readPaintedWindRotation(vector) ?? underlyingRotationRef.current
+    const delta = shortestBearingDelta(currentRotation, sourceDegrees)
+    const targetRotation = currentRotation + delta
+    animationRef.current?.cancel()
+    animationRef.current = null
+    previousBearingRef.current = sourceDegrees
+    underlyingRotationRef.current = targetRotation
+    vector.style.transform = `rotate(${targetRotation}deg)`
+
+    if (Math.abs(delta) < 0.01 || typeof vector.animate !== 'function') return
+
+    const animation = vector.animate(
+      [
+        { transform: `rotate(${currentRotation}deg)` },
+        { transform: `rotate(${targetRotation}deg)` },
+      ],
+      {
+        duration: compassRotationDurationMs(currentRotation, targetRotation),
+        easing: WIND_ROTATION_EASING,
+      },
+    )
+    animationRef.current = animation
+    animation.onfinish = () => {
+      if (animationRef.current !== animation) return
+      animationRef.current = null
+      animation.cancel()
+    }
+    animation.oncancel = () => {
+      if (animationRef.current === animation) animationRef.current = null
+    }
+  }, [reducedMotion, sourceDegrees])
+
+  useEffect(() => () => animationRef.current?.cancel(), [])
+
+  return (
+    <g
+      className={styles.windVector}
+      data-destination-bearing={destinationDegrees}
+      data-source-bearing={sourceDegrees}
+      data-wind-motion="true"
+      data-wind-vector="true"
+      ref={vectorRef}
+      style={{ transform: `rotate(${initialRotation}deg)` }}
+    >
+      <path className={styles.windVectorSourceBlade} d="M51.5 56 L60.5 56 L57.06 36.5 L54.94 36.5 Z" data-wind-source-blade="true" />
+      <circle className={styles.windVectorSource} cx="56" cy="33.5" data-wind-source-marker="true" r="2.8" />
+      <path className={styles.windVectorArrow} d="M51.5 56 L60.5 56 L56 82.5 Z" data-wind-destination-arrow="true" />
+    </g>
+  )
+}
+
+function WindCompass({ wind }: { wind: NonNullable<WeatherHighlightData['wind']> }) {
+  return (
+    <span aria-hidden="true" className={styles.windCompass} data-wind-compass="true">
+      <svg className={styles.windCompassSvg} focusable="false" viewBox="0 0 112 112">
+        <g>
+          {Array.from({ length: WIND_COMPASS_TICK_COUNT }, (_, index) => index === 0 ? null : (
+            <line className={styles.windCompassTick} key={index} shapeRendering="geometricPrecision" transform={`rotate(${index * (360 / WIND_COMPASS_TICK_COUNT)} 56 56)`} x1="56" x2="56" y1="5" y2={index % 2 === 0 ? 14 : 11.5} />
+          ))}
+        </g>
+        <path className={styles.windCompassNorthMarker} d="M56 6.5 L57.8 9.5 H54.2 Z" />
+        {wind.showVector && wind.bearingDegrees !== undefined ? (
+          <AnimatedWindVector destinationDegrees={wind.destinationDegrees} sourceDegrees={wind.bearingDegrees} />
+        ) : null}
+        <text className={styles.windCompassCardinal} data-wind-text="true" dominantBaseline="middle" textAnchor="middle" x="56" y="22.1">N</text>
+        <text className={styles.windCompassCardinal} data-wind-text="true" dominantBaseline="middle" textAnchor="middle" x="90.5" y="56.6">E</text>
+        <text className={styles.windCompassCardinal} data-wind-text="true" dominantBaseline="middle" textAnchor="middle" x="56" y="91.1">S</text>
+        <text className={styles.windCompassCardinal} data-wind-text="true" dominantBaseline="middle" textAnchor="middle" x="21.5" y="56.6">W</text>
+      </svg>
+    </span>
+  )
+}
+
+function WindHighlightTile({ tile }: { tile: WeatherHighlightData }) {
+  const wind = tile.wind
+  if (!wind) return null
+
+  return (
+    <article
+      aria-label={tile.ariaLabel}
+      className={styles.highlightTile}
+      data-kind="wind"
+      data-unavailable={tile.available ? undefined : 'true'}
+      data-wide="true"
+      data-wind-gust-forecast={wind.gustIsForecast ? 'true' : undefined}
+    >
+      <span className={styles.highlightTitle} data-wind-text="true">
+        <span className={styles.highlightIcon}>
+          <MaterialIcon name={tile.icon} size={16} />
+        </span>
+        {tile.title}
+      </span>
+      <span className={styles.windReadout}>
+        <span className={styles.windDetailRow}>
+          <span data-wind-speed-label="true" data-wind-text="true">{wind.speedLabel}</span>
+          <strong data-wind-speed-value="true" data-wind-text="true">{wind.speedValue}</strong>
+        </span>
+        <span className={styles.windDetailRow}>
+          <span data-wind-gust-label="true" data-wind-text="true">{wind.gustLabel}</span>
+          <strong data-wind-gust-value="true" data-wind-text="true">{wind.gustValue}</strong>
+        </span>
+        <span className={styles.windDetailRow}>
+          <span data-wind-direction-label="true" data-wind-text="true">{wind.directionLabel}</span>
+          <strong data-wind-direction-value="true" data-wind-text="true">{wind.directionValue}</strong>
+        </span>
+      </span>
+      <WindCompass wind={wind} />
+    </article>
+  )
+}
+
 function HighlightTile({ tile }: { tile: WeatherHighlightData }) {
   const copy = useCopy(WEATHER_COPY_NAMESPACE)
+  if (tile.kind === 'wind') return <WindHighlightTile tile={tile} />
+
   const accessibleValue = tile.available
     ? [tile.value, tile.status].filter(Boolean).join(' ')
     : copy(WEATHER_COPY_KEYS.unavailable)
+  const alignedVisual = tile.kind === 'feels' || tile.kind === 'uv' || tile.kind === 'sun' || tile.kind === 'visibility'
 
   return (
-    <article className={styles.highlightTile} data-kind={tile.kind} data-unavailable={tile.available ? undefined : 'true'} data-wide={tile.details ? 'true' : undefined} aria-label={copy(WEATHER_COPY_KEYS.details.ariaLabel, { title: tile.title, value: accessibleValue })}>
+    <article className={styles.highlightTile} data-kind={tile.kind} data-unavailable={tile.available ? undefined : 'true'} data-wide={tile.wide ? 'true' : undefined} aria-label={tile.ariaLabel ?? copy(WEATHER_COPY_KEYS.details.ariaLabel, { title: tile.title, value: accessibleValue })}>
       <span className={styles.highlightTitle}>
         <span className={styles.highlightIcon}>
           <MaterialIcon name={tile.icon} size={16} />
         </span>
         {tile.title}
       </span>
-      {tile.details ? (
-        <span className={styles.windDetailLayout}>
-          <span className={styles.windDetails}>
-            {tile.details?.map((detail) => (
-              <span className={styles.windDetailRow} key={detail.label}>
-                <span>{detail.label}</span>
-                <strong>{detail.value}</strong>
-              </span>
-            ))}
-          </span>
+      {tile.kind !== 'pressure' ? (
+        <span className={styles.highlightValueRow} data-highlight-value={tile.kind}>
+          <strong className={styles.highlightValue}>{tile.value}</strong>
+          {tile.status ? <span className={styles.highlightStatus}>{tile.status}</span> : null}
+        </span>
+      ) : null}
+      {alignedVisual ? (
+        <span className={styles.highlightVisualSlot} data-highlight-visual={tile.kind}>
           <HighlightVisual tile={tile} />
         </span>
-      ) : (
-        <>
-          {tile.kind !== 'pressure' ? (
-            <span className={styles.highlightValueRow}>
-              <strong className={styles.highlightValue}>{tile.value}</strong>
-              {tile.status ? <span className={styles.highlightStatus}>{tile.status}</span> : null}
-            </span>
-          ) : null}
-          <HighlightVisual tile={tile} />
-        </>
-      )}
+      ) : <HighlightVisual tile={tile} />}
     </article>
   )
 }
@@ -859,7 +1070,7 @@ function WeatherAqiTile({ entity }: { entity: HassEntity }) {
 
 function hourlySubhead(mode: HourlyMode, entity: HassEntity | null) {
   if (mode === 'precipitation') return 'Precipitation chance (%)'
-  if (mode === 'wind') return `Speed (${entity?.attributes.wind_speed_unit ?? 'mph'}) · Gusts`
+  if (mode === 'wind') return `Speed (${entity?.attributes.wind_speed_unit ?? DEFAULT_WIND_SPEED_UNIT}) · Gusts`
   return `Temperature (${unitWithoutDegree(entity?.attributes.temperature_unit, 'F')})`
 }
 
@@ -868,8 +1079,8 @@ function HourlyConditionItem({ entity, forecast, index, mode }: { entity: HassEn
   const temperature = formatTemperatureValue(forecast.temperature, entity?.attributes.temperature_unit)
   const precipitationChance = formatPercent(forecast.precipitation_probability) ?? '0%'
   const precipitationAmount = formatMeasure(forecast.precipitation, entity?.attributes.precipitation_unit, 2)
-  const windSpeed = formatMeasure(forecast.wind_speed, entity?.attributes.wind_speed_unit, 0) ?? '--'
-  const gustSpeed = formatMeasure(forecast.wind_gust_speed, entity?.attributes.wind_speed_unit, 0)
+  const windSpeed = formatWindMeasure(forecast.wind_speed, entity?.attributes.wind_speed_unit)?.value ?? '--'
+  const gustSpeed = formatWindMeasure(forecast.wind_gust_speed, entity?.attributes.wind_speed_unit)?.value
   const time = hourlyLabel(forecast.datetime, index)
 
   if (mode === 'precipitation') {
@@ -888,20 +1099,17 @@ function HourlyConditionItem({ entity, forecast, index, mode }: { entity: HassEn
   }
 
   if (mode === 'wind') {
+    const bearing = windBearingPresentation(forecast.wind_bearing)
     return (
       <article className={styles.hourlyItem} aria-label={`${time} wind ${windSpeed}${gustSpeed ? ` gusts ${gustSpeed}` : ''}`}>
         <span className={styles.hourlyTime}>{time}</span>
         <span
           className={styles.hourlyIcon}
-          style={
-            forecast.wind_bearing === undefined
-              ? undefined
-              : {
-                  transform: `rotate(${numberValue(forecast.wind_bearing) ?? 0}deg)`,
-                }
-          }
+          data-wind-destination-bearing={bearing?.destinationDegrees}
+          data-wind-source-bearing={bearing?.sourceDegrees}
+          style={bearing ? { transform: `rotate(${bearing.destinationDegrees}deg)` } : undefined}
         >
-          <MaterialIcon name="mdi:navigation" size={26} />
+          <MaterialIcon name={bearing ? 'mdi:navigation' : 'mdi:weather-windy'} size={26} />
         </span>
         <span className={styles.hourlyValueGroup}>
           <strong className={styles.hourlyTemperature}>{windSpeed}</strong>
@@ -1171,14 +1379,16 @@ function WeatherForecastSheet({
           <div className={styles.sectionLabel}>Highlights</div>
           <div className={styles.highlightGrid}>
             {aqiEntity ? <WeatherAqiTile entity={aqiEntity} /> : null}
-            <WeatherPrecipitationTile forecasts={hourlyForecasts} precipitationUnit={weatherPrecipitationUnit(entity)} />
+            <WeatherPrecipitationTile
+              forecasts={hourlyForecasts}
+              precipitationUnit={stringValue(entity?.attributes.precipitation_unit, DEFAULT_PRECIPITATION_UNIT)}
+            />
             <WeatherHourlyMetricTiles forecasts={hourlyForecasts} />
             {highlights.map((tile) => (
               <HighlightTile key={tile.kind} tile={tile} />
             ))}
           </div>
         </section>
-
       </div>
     </div>
   )
@@ -1303,9 +1513,13 @@ export function WeatherSummary({ deferRefresh = false }: WeatherSummaryProps) {
   const condition = conditionInfo(weather?.state)
   const today = forecasts[0]
 
+  const handleOpen = () => {
+    setOpen(true)
+  }
+
   return (
     <>
-      <button aria-label={`Open seven-day weather forecast. ${condition.label}, ${weatherTemperature(weather)}`} className={`${effects.frosted} ${styles.card}`} onClick={() => setOpen(true)} type="button">
+      <button aria-label={`Open seven-day weather forecast. ${condition.label}, ${weatherTemperature(weather)}`} className={`${effects.frosted} ${styles.card}`} onClick={handleOpen} type="button">
         <span className={styles.copy}>
           <span className={styles.heroMain}>
             <span className={styles.conditionRow}>
@@ -1324,7 +1538,15 @@ export function WeatherSummary({ deferRefresh = false }: WeatherSummaryProps) {
         <SurfaceAccessory className={styles.disclosure} semantics={{ kind: 'modal' }} />
       </button>
 
-      <ModalSheet contentStyle={WEATHER_MODAL_STYLE} onClose={() => setOpen(false)} open={open} size="media" surfaceDecoration={<WeatherAtmosphere condition={weather?.state} isNight={sun?.state === 'below_horizon'} />} title="Weather" subtitle={copy(WEATHER_COPY_KEYS.subtitle, { condition: condition.label, temperature: weatherDegree(weather) })}>
+      <ModalSheet
+        contentStyle={WEATHER_MODAL_STYLE}
+        onClose={() => setOpen(false)}
+        open={open}
+        size="media"
+        surfaceDecoration={<WeatherAtmosphere condition={weather?.state} isNight={sun?.state === 'below_horizon'} />}
+        title="Weather"
+        subtitle={copy(WEATHER_COPY_KEYS.subtitle, { condition: condition.label, temperature: weatherDegree(weather) })}
+      >
         <WeatherForecastSheet aqiEntity={aqi} entity={weather} error={forecastError} forecasts={forecasts} hourlyError={hourlyForecastError} hourlyForecasts={hourlyForecasts} hourlyLoading={hourlyForecastLoading} loading={forecastLoading} sunEntity={sun} />
       </ModalSheet>
     </>

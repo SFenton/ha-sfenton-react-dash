@@ -178,7 +178,8 @@ export function WeatherPrecipitationTile({ forecasts, precipitationUnit }: Weath
   const chanceLabels = points.map((point) => displayChance(point.probability, unavailable))
   const amountLabels = points.map((point) => displayAmount(point.amount, precipitationUnit, unavailable))
   const cumulativeLabels = points.map((point) => displayAmount(point.cumulative, precipitationUnit, unavailable))
-  const measurementKey = axisTimeLabels.join('\0')
+  const measurementLabels = axisTimeLabels
+  const measurementKey = measurementLabels.join('\0')
   const {
     labelIndices: hourLabelIndices,
     measurementRef,
@@ -235,7 +236,7 @@ export function WeatherPrecipitationTile({ forecasts, precipitationUnit }: Weath
       </article>
 
       <span aria-hidden="true" className={styles.measurementBank} ref={measurementRef}>
-        {axisTimeLabels.map((label, index) => <span data-weather-chart-label-measure="true" key={`${label}-${index}`}>{label}</span>)}
+        {measurementLabels.map((label, index) => <span data-weather-chart-label-measure="true" key={`${label}-${index}`}>{label}</span>)}
       </span>
 
       {pointCount ? (
