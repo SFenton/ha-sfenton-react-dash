@@ -240,6 +240,15 @@ export const WEATHER_COPY_KEYS = {
     label: 'headline.label',
     weather: 'headline.weather',
   },
+  hourlyMetrics: {
+    ariaLabel: 'hourlyMetrics.ariaLabel',
+    cloudCover: 'hourlyMetrics.cloudCover',
+    humidity: 'hourlyMetrics.humidity',
+    table: {
+      time: 'hourlyMetrics.table.time',
+    },
+    tableCaption: 'hourlyMetrics.tableCaption',
+  },
   precipitation: {
     chanceChartAriaLabel: 'precipitation.chanceChartAriaLabel',
     cumulativeChartAriaLabel: 'precipitation.cumulativeChartAriaLabel',

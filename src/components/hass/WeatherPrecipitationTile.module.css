@@ -9,7 +9,6 @@
 }
 
 .sampleTile {
-  min-height: 184px;
   grid-template-rows: auto minmax(0, 1fr);
   align-content: stretch;
   gap: 8px;
@@ -63,7 +62,7 @@
   min-height: 64px;
   grid-column: 1;
   grid-template-columns: repeat(var(--precipitation-columns), minmax(0, 1fr));
-  gap: 1px;
+  gap: 2px;
   align-items: end;
 }
 
@@ -97,6 +96,44 @@
 
 .hourlyBar[data-unavailable='true'] {
   opacity: 0;
+}
+
+.metricBar {
+  position: absolute;
+  z-index: 2;
+  right: 0;
+  bottom: clamp(0px, calc(var(--weather-metric-level) - 1.5px), calc(100% - 3px));
+  left: 0;
+  height: 3px;
+  border-radius: 3px;
+}
+
+.metricBar[data-unavailable='true'] {
+  opacity: 0;
+}
+
+.metricTrack {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  border-radius: 3px;
+}
+
+.humidityBar {
+  background: var(--rd-weather-hourly-humidity);
+  box-shadow: 0 0 8px var(--rd-weather-hourly-humidity-glow);
+}
+
+.humidityTrack {
+  background: var(--rd-weather-hourly-humidity-track);
+}
+
+.cloudBar {
+  background: var(--rd-weather-hourly-cloud);
+}
+
+.cloudTrack {
+  background: var(--rd-weather-hourly-cloud-track);
 }
 
 .cumulativeBar {
@@ -147,6 +184,11 @@
   width: 22px;
 }
 
+.yAxis[data-precipitation-y-axis='humidity'],
+.yAxis[data-precipitation-y-axis='cloud'] {
+  width: 22px;
+}
+
 .yAxis[data-precipitation-y-axis='cumulative'] {
   width: 36px;
 }
@@ -192,7 +234,7 @@
   white-space: nowrap;
 }
 
-.measurementBank [data-precipitation-hour-measure] {
+.measurementBank [data-weather-chart-label-measure] {
   flex: 0 0 auto;
   font-size: 0.625rem;
   font-weight: 680;
@@ -236,8 +278,14 @@
 
   .hourlyBar,
   .hourlyBar[data-measurable='true'],
-  .cumulativeBar {
+  .cumulativeBar,
+  .metricBar {
     background: Highlight;
     box-shadow: none;
+  }
+
+  .metricTrack {
+    border: 1px solid CanvasText;
+    background: Canvas;
   }
 }

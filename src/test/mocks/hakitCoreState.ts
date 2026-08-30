@@ -152,6 +152,8 @@ const mockDailyWeatherForecast = [
 const hourlyTemperatures = [57, 58, 60, 61, 63, 64, 65, 64, 62, 60, 58, 56, 55, 54, 53, 52, 51, 50, 49, 49, 50, 52, 55, 58]
 const hourlyPrecipitationProbabilities = [0, 5, 18, 42, 68, 94, 76, 58, 35, 22, 14, 8, 5, 3, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0]
 const hourlyPrecipitationAmounts = [0, 0, 0.01, 0.01, 0.02, 0, 0.04, 0.02, 0.01, 0.01, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+const hourlyHumidity = [62, 66, 71, 74, 69, 64, 61, 59, 58, 60, 63, 65, 67, 69, 70, 72, 73, 74, 75, 74, 72, 69, 66, 64]
+const hourlyCloudCoverage = [20, 35, 55, 70, 45, 25, 15, 10, 5, 8, 12, 18, 25, 32, 40, 48, 55, 62, 68, 72, 65, 52, 38, 28]
 
 const mockHourlyWeatherForecast = Array.from({ length: 24 }, (_, index) => {
   const forecastDate = new Date('2026-06-10T12:00:00-07:00')
@@ -159,6 +161,8 @@ const mockHourlyWeatherForecast = Array.from({ length: 24 }, (_, index) => {
   return {
     datetime: forecastDate.toISOString(),
     condition: index < 3 ? 'cloudy' : index < 8 ? 'partlycloudy' : 'sunny',
+    cloud_coverage: hourlyCloudCoverage[index],
+    humidity: hourlyHumidity[index],
     precipitation: hourlyPrecipitationAmounts[index],
     precipitation_probability: hourlyPrecipitationProbabilities[index],
     temperature: hourlyTemperatures[index],

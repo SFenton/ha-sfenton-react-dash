@@ -48,6 +48,15 @@
     "label": "Today",
     "weather": "{{condition}} today"
   },
+  "hourlyMetrics": {
+    "ariaLabel": "Hourly {{title}} over {{hours}} hours, ranging from {{minimum}} to {{maximum}}",
+    "cloudCover": "Cloud Cover",
+    "humidity": "Humidity",
+    "table": {
+      "time": "Time"
+    },
+    "tableCaption": "{{hours}}-hour humidity and cloud cover details"
+  },
   "precipitation": {
     "chanceChartAriaLabel": "Hourly precipitation chance over {{hours}} hours, peaking at {{chance}}",
     "cumulativeChartAriaLabel": "Cumulative precipitation through {{hours}} hours, totaling {{total}}",

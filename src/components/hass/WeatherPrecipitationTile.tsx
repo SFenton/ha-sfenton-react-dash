@@ -1,18 +1,17 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties, type RefObject } from 'react'
+import { useMemo, type CSSProperties, type RefObject } from 'react'
 import { formatDate, formatNumber, useCopy, WEATHER_COPY_KEYS, WEATHER_COPY_NAMESPACE } from '../../i18n'
 import { MaterialIcon } from '../core/Icon'
 import {
   buildPrecipitationTimeline,
   precipitationAmountAxis,
   precipitationChanceDomain,
-  precipitationLabelCadence,
-  precipitationLabelIndices,
   precipitationPeakChance,
   precipitationScaledPercent,
   precipitationTotal,
   type PrecipitationForecastInput,
   type PrecipitationTimelinePoint,
 } from './precipitationTimeline'
+import { useResponsiveWeatherChartLabels } from './useResponsiveWeatherChartLabels'
 import summaryStyles from './WeatherSummary.module.css'
 import styles from './WeatherPrecipitationTile.module.css'
 
@@ -33,77 +32,6 @@ type BarStyle = CSSProperties & {
 
 type CumulativeBarStyle = CSSProperties & {
   '--cumulative-amount': string
-}
-
-function sameNumbers(left: readonly number[], right: readonly number[]) {
-  return left.length === right.length && left.every((value, index) => value === right[index])
-}
-
-function measuredWidth(element: HTMLElement) {
-  return element.getBoundingClientRect().width || element.scrollWidth
-}
-
-function useResponsivePrecipitationLabels({
-  measurementKey,
-  pointCount,
-}: {
-  measurementKey: string
-  pointCount: number
-}) {
-  const hourlyPlotRef = useRef<HTMLSpanElement>(null)
-  const measurementRef = useRef<HTMLSpanElement>(null)
-  const [hourLabelIndices, setHourLabelIndices] = useState<number[]>(() => precipitationLabelIndices(pointCount, Math.max(1, Math.ceil(pointCount / 4))))
-
-  useEffect(() => {
-    let frame = 0
-    let active = true
-
-    const measure = () => {
-      frame = 0
-      const measurementRoot = measurementRef.current
-      if (!measurementRoot) return
-
-      const hourlyPlot = hourlyPlotRef.current
-      if (hourlyPlot) {
-        const hourMeasurementWidths = Array.from(measurementRoot.querySelectorAll<HTMLElement>('[data-precipitation-hour-measure]')).map(measuredWidth)
-        const widestHourLabel = Math.max(0, ...hourMeasurementWidths)
-        const cadence = precipitationLabelCadence(pointCount, measuredWidth(hourlyPlot), widestHourLabel)
-        const nextHourLabelIndices = precipitationLabelIndices(pointCount, cadence)
-        setHourLabelIndices((current) => sameNumbers(current, nextHourLabelIndices) ? current : nextHourLabelIndices)
-      } else {
-        setHourLabelIndices([])
-      }
-    }
-
-    const scheduleMeasure = () => {
-      if (!active) return
-      if (frame) window.cancelAnimationFrame(frame)
-      frame = window.requestAnimationFrame(measure)
-    }
-
-    scheduleMeasure()
-    const ResizeObserverConstructor = window.ResizeObserver
-    const observer = typeof ResizeObserverConstructor === 'undefined' ? null : new ResizeObserverConstructor(scheduleMeasure)
-    if (observer) {
-      if (hourlyPlotRef.current) observer.observe(hourlyPlotRef.current)
-    } else {
-      window.addEventListener('resize', scheduleMeasure)
-    }
-    void document.fonts?.ready.then(scheduleMeasure)
-
-    return () => {
-      active = false
-      if (frame) window.cancelAnimationFrame(frame)
-      observer?.disconnect()
-      if (!observer) window.removeEventListener('resize', scheduleMeasure)
-    }
-  }, [measurementKey, pointCount])
-
-  return {
-    hourLabelIndices,
-    hourlyPlotRef,
-    measurementRef,
-  }
 }
 
 function displayHour(date: Date | null) {
@@ -252,10 +180,10 @@ export function WeatherPrecipitationTile({ forecasts, precipitationUnit }: Weath
   const cumulativeLabels = points.map((point) => displayAmount(point.cumulative, precipitationUnit, unavailable))
   const measurementKey = axisTimeLabels.join('\0')
   const {
-    hourLabelIndices,
-    hourlyPlotRef,
+    labelIndices: hourLabelIndices,
     measurementRef,
-  } = useResponsivePrecipitationLabels({
+    plotRef: hourlyPlotRef,
+  } = useResponsiveWeatherChartLabels({
     measurementKey,
     pointCount,
   })
@@ -307,7 +235,7 @@ export function WeatherPrecipitationTile({ forecasts, precipitationUnit }: Weath
       </article>
 
       <span aria-hidden="true" className={styles.measurementBank} ref={measurementRef}>
-        {axisTimeLabels.map((label, index) => <span data-precipitation-hour-measure="true" key={`${label}-${index}`}>{label}</span>)}
+        {axisTimeLabels.map((label, index) => <span data-weather-chart-label-measure="true" key={`${label}-${index}`}>{label}</span>)}
       </span>
 
       {pointCount ? (
