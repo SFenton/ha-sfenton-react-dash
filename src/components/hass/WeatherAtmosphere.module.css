@@ -63,13 +63,13 @@
 .atmosphere[data-weather-scene='rain'] {
   --weather-scene: var(--rd-weather-scene-rain);
   --weather-glow: var(--rd-weather-glow-rain);
-  --weather-pattern: var(--rd-weather-pattern-rain);
+  --weather-pattern: none;
 }
 
 .atmosphere[data-weather-scene='storm'] {
   --weather-scene: var(--rd-weather-scene-storm);
   --weather-glow: var(--rd-weather-glow-storm);
-  --weather-pattern: var(--rd-weather-pattern-storm);
+  --weather-pattern: none;
 }
 
 .atmosphere[data-weather-scene='snow'] {
@@ -119,12 +119,6 @@
   background-size: 120px 120px, 180px 180px, 240px 240px;
 }
 
-.atmosphere[data-weather-scene='rain'] .motion,
-.atmosphere[data-weather-scene='storm'] .motion {
-  animation: weatherFall 2.2s linear infinite;
-  will-change: transform;
-}
-
 .atmosphere[data-weather-scene='snow'] .motion {
   background-size: 56px 56px, 92px 92px;
   animation: weatherFall 12s linear infinite;
@@ -132,8 +126,30 @@
 }
 
 :global([data-closing='true']) .light,
-:global([data-closing='true']) .motion {
+:global([data-closing='true']) .motion,
+:global([data-closing='true']) .rainDrop {
   animation-play-state: paused;
+}
+
+.rainField {
+  position: absolute;
+  inset: 0;
+  display: block;
+  overflow: hidden;
+}
+
+.rainDrop {
+  position: absolute;
+  top: -18vh;
+  left: var(--rain-x);
+  width: var(--rain-width);
+  height: var(--rain-length);
+  border-radius: 999px;
+  background: var(--rd-weather-rain-drop);
+  opacity: var(--rain-opacity);
+  transform: translate3d(0, -18vh, 0) rotate(2deg);
+  animation: weatherRainDrop var(--rain-duration) linear var(--rain-delay) infinite;
+  will-change: transform;
 }
 
 @keyframes weatherLightDrift {
@@ -176,12 +192,27 @@
   }
 }
 
+@keyframes weatherRainDrop {
+  from {
+    transform: translate3d(0, -18vh, 0) rotate(2deg);
+  }
+
+  to {
+    transform: translate3d(var(--rain-drift), 118vh, 0) rotate(2deg);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .light,
-  .motion {
+  .motion,
+  .rainDrop {
     animation: none !important;
     transform: none !important;
     will-change: auto;
+  }
+
+  .rainField {
+    display: none;
   }
 }
 

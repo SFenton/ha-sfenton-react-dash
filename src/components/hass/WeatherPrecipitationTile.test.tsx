@@ -9,7 +9,7 @@ const LOW_FORECAST = [
 ]
 
 describe('WeatherPrecipitationTile', () => {
-  it('renders independent precipitation and accumulation tiles with shared times', () => {
+  it('uses the 10 percent low-range domain for the current six-hour pattern', () => {
     render(<WeatherPrecipitationTile
       forecasts={[8, 9, 7, 6, 6, 0].map((precipitationProbability) => ({
         precipitation: 0,
@@ -23,15 +23,16 @@ describe('WeatherPrecipitationTile', () => {
     const cumulativeTile = screen.getByRole('article', { name: 'Cumulative precipitation through 6 hours, totaling 0.00 in' })
     const chanceTimes = [...chanceTile.querySelectorAll('[data-precipitation-hour-label="time"]')].map((label) => label.textContent)
     const cumulativeTimes = [...cumulativeTile.querySelectorAll('[data-precipitation-hour-label="cumulative-time"]')].map((label) => label.textContent)
-
     expect(group).toHaveAttribute('data-precipitation-chance-domain', '10')
-    expect(group?.querySelectorAll('[data-precipitation-sample]')).toHaveLength(2)
     expect(chanceTile).toHaveTextContent('Precipitation')
     expect(cumulativeTile).toHaveTextContent('Accumulation')
     expect(chanceTile.querySelector('[data-precipitation-y-axis="chance"]')).toHaveTextContent('10%5%0%')
+    expect(cumulativeTile.querySelectorAll('[data-precipitation-hour-label="cumulative-time"]')).toHaveLength(3)
     expect(chanceTimes).toEqual(cumulativeTimes)
     expect(chanceTimes[0]).toBe('Now')
     expect(chanceTile.querySelector('[data-probability="9"]')).toHaveStyle({ '--precipitation-probability': '90%' })
+    expect(chanceTile.querySelector('[data-probability="0"]')).toHaveStyle({ '--precipitation-probability': '0%' })
+    expect(group?.querySelectorAll('[data-precipitation-sample]')).toHaveLength(2)
     expect(chanceTile.querySelectorAll('[data-precipitation-bar="true"]')).toHaveLength(6)
     expect(cumulativeTile.querySelectorAll('[data-cumulative-bar="true"]')).toHaveLength(6)
   })
@@ -42,7 +43,6 @@ describe('WeatherPrecipitationTile', () => {
     const group = document.querySelector('[data-weather-precipitation-tile="true"]')
     const chanceTile = screen.getByRole('article', { name: 'Hourly precipitation chance over 3 hours, peaking at 41%' })
     const cumulativeTile = screen.getByRole('article', { name: 'Cumulative precipitation through 3 hours, totaling 0.09 in' })
-
     expect(group).toHaveAttribute('data-precipitation-chance-domain', '50')
     expect(group).toHaveAttribute('data-precipitation-amount-domain', '0.1')
     expect(chanceTile.querySelector('[data-precipitation-y-axis="chance"]')).toHaveTextContent('50%25%0%')
@@ -64,7 +64,6 @@ describe('WeatherPrecipitationTile', () => {
     const group = document.querySelector('[data-weather-precipitation-tile="true"]')
     const chanceTile = screen.getByRole('article', { name: 'Hourly precipitation chance over 2 hours, peaking at 50%' })
     const cumulativeTile = screen.getByRole('article', { name: 'Cumulative precipitation through 2 hours, totaling 0.12 in' })
-
     expect(group).toHaveAttribute('data-precipitation-chance-domain', '50')
     expect(group).toHaveAttribute('data-precipitation-amount-domain', '0.12')
     expect(chanceTile.querySelector('[data-precipitation-y-axis="chance"]')).toHaveTextContent('50%25%0%')
@@ -72,7 +71,7 @@ describe('WeatherPrecipitationTile', () => {
     expect(chanceTile.querySelector('[data-probability="50"]')).toHaveStyle({ '--precipitation-probability': '100%' })
   })
 
-  it('uses a trace-scale floor and unit-aware millimeter ticks', () => {
+  it('uses a trace-scale floor for zero amounts and unit-aware millimeter ticks', () => {
     const view = render(<WeatherPrecipitationTile
       forecasts={[{ precipitation: 0, precipitation_probability: 0 }]}
       precipitationUnit="in"

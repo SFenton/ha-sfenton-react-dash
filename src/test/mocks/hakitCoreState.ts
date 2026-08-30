@@ -1480,7 +1480,17 @@ export const explicitMockEntities: Record<string, MockEntity> = {
   'light.front_door_bollard_4': entity('light.front_door_bollard_4', 'off', { brightness: null }),
   'light.front_door_bollard_5': entity('light.front_door_bollard_5', 'off', { brightness: null }),
   'light.front_door_bollard_6': entity('light.front_door_bollard_6', 'off', { brightness: null }),
-  'weather.pirate_weather': entity('weather.pirate_weather', 'partlycloudy', { temperature: 45, temperature_unit: '°F' }),
+  'weather.pirate_weather': entity('weather.pirate_weather', 'partlycloudy', {
+    apparent_temperature: 49,
+    temperature: 45,
+    temperature_unit: '°F',
+    visibility: 10,
+    visibility_unit: 'mi',
+    wind_bearing: 236,
+    wind_gust_speed: 8,
+    wind_speed: 4,
+    wind_speed_unit: 'mph',
+  }),
   'sensor.pirate_weather_air_quality_index': entity('sensor.pirate_weather_air_quality_index', '152', { attribution: 'Powered by Pirate Weather', device_class: 'aqi' }),
   'sun.sun': entity('sun.sun', 'above_horizon', {
     next_rising: '2030-06-11T13:20:00.000Z',

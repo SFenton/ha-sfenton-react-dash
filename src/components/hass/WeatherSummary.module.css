@@ -685,6 +685,16 @@
   grid-column: span 2;
 }
 
+.highlightTile[data-kind='feels'],
+.highlightTile[data-kind='uv'],
+.highlightTile[data-kind='sun'],
+.highlightTile[data-kind='visibility'] {
+  height: 154px;
+  min-height: 154px;
+  grid-template-rows: 16px 36px 52px;
+  align-content: start;
+}
+
 .highlightTitle {
   display: inline-flex;
   align-items: center;
@@ -722,6 +732,7 @@
   font-size: 0.9rem;
   font-weight: 760;
   line-height: 1.08;
+  white-space: nowrap;
 }
 
 .highlightTile[data-kind="pressure"] .highlightValue {
@@ -772,17 +783,6 @@
   transform: translate(-50%, -50%);
 }
 
-.highlightMeter_uv .highlightMeterFill {
-  width: 100%;
-  background: linear-gradient(
-    90deg,
-    #5fca7a,
-    #f5d94a 42%,
-    #f28b30 68%,
-    #d9568b 100%
-  );
-}
-
 .highlightMeter_precipitation .highlightMeterFill,
 .highlightMeter_humidity .highlightMeterFill {
   background: linear-gradient(
@@ -800,11 +800,6 @@
   );
 }
 
-.highlightMeter_feels .highlightMeterFill {
-  width: 100%;
-  background: var(--rd-weather-feels-scale);
-}
-
 .highlightMeter_precipitation .highlightMeterFill,
 .highlightMeter_humidity .highlightMeterFill {
   background: var(--rd-weather-water-scale);
@@ -814,27 +809,114 @@
   background: var(--rd-weather-visibility-scale);
 }
 
-.windDetailLayout {
+.highlightVisualSlot {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 96px;
-  gap: 18px;
-  align-items: center;
+  width: 100%;
+  height: 52px;
+  place-items: center;
 }
 
-.windDetails {
+.highlightVisualSlot .highlightUnavailableVisual {
+  min-height: 52px;
+}
+
+.highlightVisualSlot > .highlightRail,
+.highlightVisualSlot > .visibilityDistanceRail {
+  transform: translateY(8px);
+}
+
+.highlightRail {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 10px;
+  border-radius: 999px;
+}
+
+.highlightRail_feels {
+  background: var(--rd-weather-feels-scale);
+}
+
+.highlightRail_uv {
+  background: var(--rd-weather-uv-scale);
+}
+
+.highlightRailMarker {
+  position: absolute;
+  top: 50%;
+  left: var(--highlight-percent, 0%);
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--rd-weather-modal-surface);
+  border-radius: 50%;
+  background: var(--rd-weather-marker);
+  box-shadow: 0 0 0 1px var(--rd-weather-panel-border);
+  transform: translate(-50%, -50%);
+}
+
+.visibilityDistanceRail {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 10px;
+  border-radius: 999px;
+  background: var(--rd-weather-visibility-rail-track);
+}
+
+.visibilityDistanceFill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: var(--highlight-percent, 0%);
+  border-radius: inherit;
+  background: var(--rd-weather-visibility-rail);
+}
+
+.visibilityDistanceMarker {
+  position: absolute;
+  top: 50%;
+  left: var(--highlight-percent, 0%);
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--color-text);
+  border-radius: 50%;
+  background: var(--rd-weather-visibility-marker);
+  transform: translate(-50%, -50%);
+}
+
+.highlightTile[data-kind='wind'] {
+  min-height: 158px;
+  grid-template-columns: minmax(0, 1fr) 112px;
+  grid-template-rows: 16px minmax(0, 1fr);
+  align-content: stretch;
+  column-gap: 16px;
+  row-gap: 10px;
+}
+
+.highlightTile[data-kind='wind'] .highlightTitle {
+  grid-row: 1;
+  grid-column: 1;
+  color: var(--rd-weather-wind-ink);
+}
+
+.windReadout {
   display: grid;
   min-width: 0;
+  align-content: stretch;
+  grid-row: 2;
+  grid-column: 1;
 }
 
 .windDetailRow {
   display: flex;
   min-height: 34px;
+  min-width: 0;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
   border-top: 1px solid var(--rd-weather-panel-border);
-  color: var(--color-text-muted);
+  color: var(--rd-weather-wind-ink);
   font-size: 0.82rem;
+  font-weight: 600;
 }
 
 .windDetailRow:first-child {
@@ -842,91 +924,84 @@
 }
 
 .windDetailRow strong {
-  color: var(--color-text);
+  min-width: 0;
+  overflow: hidden;
+  color: var(--rd-weather-wind-ink);
   font-size: 0.9rem;
   font-weight: 760;
+  line-height: 1;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.highlightCompass {
+.windCompass {
   position: relative;
   display: grid;
-  width: 92px;
-  height: 92px;
+  width: 112px;
+  height: 112px;
+  align-self: center;
+  grid-row: 1 / -1;
+  grid-column: 2;
   justify-self: center;
-  border: 1px solid var(--rd-weather-panel-border);
   border-radius: 50%;
-  background: var(--rd-weather-compass-surface);
+  background-image: var(--rd-weather-wind-vignette), var(--rd-weather-wind-surface);
+  box-shadow:
+    0 0 0 1px var(--rd-weather-wind-rim),
+    inset 0 1px 0 var(--rd-weather-wind-highlight),
+    inset 0 -2px 5px var(--rd-weather-wind-depth),
+    0 2px 5px var(--rd-weather-wind-shadow);
 }
 
-.compassNorth,
-.compassEast,
-.compassSouth,
-.compassWest {
-  position: absolute;
-  color: white;
-  font-size: 0.58rem;
-  font-weight: 840;
+.windCompassSvg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.windCompassTick {
+  fill: none;
+  stroke: var(--rd-weather-wind-tick);
+  stroke-width: 1.5;
+  vector-effect: non-scaling-stroke;
+}
+
+.windVector {
+  transform-box: view-box;
+  transform-origin: 50% 50%;
+}
+
+.windVectorSourceBlade {
+  fill: var(--rd-weather-wind-source);
+}
+
+.windVectorSource {
+  fill: none;
+  stroke: var(--rd-weather-wind-source);
+  stroke-linecap: round;
+  stroke-width: 1.5;
+  vector-effect: non-scaling-stroke;
+}
+
+.windVectorArrow {
+  fill: var(--rd-weather-wind-destination);
+}
+
+.windCompassNorthMarker {
+  fill: var(--rd-weather-wind-north);
+}
+
+.windCompassCardinal {
+  fill: var(--rd-weather-wind-ink);
+  stroke: none;
+  font-size: 9px;
+  font-weight: 700;
   line-height: 1;
-}
-
-.compassNorth {
-  top: 7px;
-  left: 50%;
-  transform: translateX(-50%);
-}
-
-.compassEast {
-  top: 50%;
-  right: 7px;
-  transform: translateY(-50%);
-}
-
-.compassSouth {
-  bottom: 7px;
-  left: 50%;
-  transform: translateX(-50%);
-}
-
-.compassWest {
-  top: 50%;
-  left: 7px;
-  transform: translateY(-50%);
-}
-
-.compassNeedle {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  z-index: 1;
-  display: inline-flex;
-  color: var(--rd-weather-compass-accent);
-  filter: drop-shadow(0 1px 4px rgba(0, 0, 0, 0.35));
-  transform: translate(-50%, -50%) rotate(var(--highlight-rotation, 0deg));
-  transform-origin: center;
-}
-
-.compassReadout {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  z-index: 2;
-  display: grid;
-  width: 38px;
-  height: 38px;
-  place-items: center;
-  border-radius: 50%;
-  color: var(--color-text);
-  background: var(--rd-weather-modal-surface);
-  font-size: 0.66rem;
-  font-weight: 820;
-  line-height: 1.05;
-  text-align: center;
-  transform: translate(-50%, -50%);
 }
 
 .sunArc {
   display: block;
+  width: 100%;
   height: 52px;
 }
 
@@ -1214,6 +1289,10 @@
     grid-column: 1 / -1;
   }
 
+  .highlightGrid [data-weather-precipitation-tile='true'] {
+    grid-column: 1 / -1;
+  }
+
   .highlightTile[data-kind='wind'] {
     order: -1;
     grid-column: span 2;
@@ -1226,6 +1305,10 @@
   }
 
   .highlightGrid .highlightTile.aqiTile {
+    grid-column: span 2;
+  }
+
+  .highlightGrid [data-weather-precipitation-tile='true'] {
     grid-column: span 2;
   }
 
@@ -1242,4 +1325,47 @@
     transform: none;
     transition: none;
   }
+}
+
+@media (forced-colors: active) {
+  .highlightRail,
+  .visibilityDistanceRail {
+    border: 1px solid CanvasText;
+    background: Canvas;
+  }
+
+  .highlightRailMarker,
+  .visibilityDistanceFill,
+  .visibilityDistanceMarker {
+    background: Highlight;
+  }
+
+  .windCompass {
+    border: 1px solid CanvasText;
+    background: Canvas;
+  }
+
+  .windCompassTick {
+    stroke: CanvasText;
+  }
+
+  .windVectorSourceBlade {
+    fill: Highlight;
+  }
+
+  .windVectorArrow,
+  .windCompassNorthMarker,
+  .windCompassCardinal {
+    fill: CanvasText;
+  }
+
+  .windVectorSource {
+    fill: Canvas;
+    stroke: Highlight;
+  }
+
+  .windCompassCardinal {
+    stroke: none;
+  }
+
 }

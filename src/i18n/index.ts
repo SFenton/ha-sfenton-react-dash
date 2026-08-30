@@ -230,9 +230,14 @@ export const WEATHER_COPY_KEYS = {
       },
     },
     wind: {
+      ariaLabel: 'details.wind.ariaLabel',
+      bearingDegrees: 'details.wind.bearingDegrees',
+      calm: 'details.wind.calm',
       direction: 'details.wind.direction',
+      from: 'details.wind.from',
       gusts: 'details.wind.gusts',
       speed: 'details.wind.speed',
+      todaysGust: 'details.wind.todaysGust',
     },
   },
   headline: {

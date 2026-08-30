@@ -1,12 +1,16 @@
 import { describe, expect, it } from 'vitest'
 import {
   classifyUsAqi,
+  compassRotationDurationMs,
   feelsLikePresentation,
+  normalizeBearingDegrees,
   pressurePresentation,
+  shortestBearingDelta,
   sunArcMarker,
   sunPresentation,
   uvPresentation,
   visibilityPresentation,
+  windBearingPresentation,
   weatherSceneForCondition,
 } from './weatherPresentation'
 
@@ -46,14 +50,71 @@ describe('weather presentation', () => {
   it('classifies UV values before rounding their display', () => {
     expect(uvPresentation(2.9)?.level).toBe('low')
     expect(uvPresentation(3)?.level).toBe('moderate')
+    expect(uvPresentation(6.7)?.markerPercent).toBeCloseTo((6.7 / 11) * 100)
     expect(uvPresentation(8)?.level).toBe('veryHigh')
-    expect(uvPresentation(11)?.level).toBe('extreme')
+    expect(uvPresentation(11)).toMatchObject({ level: 'extreme', markerPercent: 100 })
+    expect(uvPresentation(15)?.markerPercent).toBe(100)
   })
 
   it('presents apparent temperature as a delta from actual temperature', () => {
-    expect(feelsLikePresentation(60, 65, '°F')).toMatchObject({ relation: 'warmer' })
+    expect(feelsLikePresentation(57, 63, '°F')).toMatchObject({ markerPercent: 75, relation: 'warmer' })
     expect(feelsLikePresentation(20, 20.8, '°C')).toMatchObject({ relation: 'similar' })
     expect(feelsLikePresentation(50, 42, '°F')).toMatchObject({ relation: 'cooler' })
+  })
+
+  it.each([
+    [0, 'N'],
+    [11.24, 'N'],
+    [11.25, 'NNE'],
+    [33.75, 'NE'],
+    [59, 'ENE'],
+    [300, 'WNW'],
+    [348.75, 'N'],
+  ] as const)('maps a %s degree wind bearing to %s', (degrees, cardinal) => {
+    expect(windBearingPresentation(degrees)?.cardinal).toBe(cardinal)
+  })
+
+  it('normalizes numeric and cardinal wind bearings without inventing degree precision', () => {
+    expect(windBearingPresentation(-10)).toMatchObject({
+      cardinal: 'N',
+      destinationDegrees: 170,
+      displayDegrees: 350,
+      sourceDegrees: 350,
+    })
+    expect(windBearingPresentation('WNW')).toMatchObject({
+      cardinal: 'WNW',
+      destinationDegrees: 112.5,
+      displayDegrees: undefined,
+      sourceDegrees: 292.5,
+      spoken: 'west-northwest',
+    })
+    expect(windBearingPresentation('276')).toMatchObject({
+      cardinal: 'W',
+      destinationDegrees: 96,
+      displayDegrees: 276,
+      sourceDegrees: 276,
+    })
+    expect(windBearingPresentation(190)?.destinationDegrees).toBe(10)
+    expect(windBearingPresentation('gusty')).toBeNull()
+    expect(windBearingPresentation(undefined)).toBeNull()
+  })
+
+  it('unwraps wind bearings over the shortest clockwise or counter-clockwise arc', () => {
+    expect(normalizeBearingDegrees(-10)).toBe(350)
+    expect(shortestBearingDelta(359, 1)).toBe(2)
+    expect(shortestBearingDelta(1, 359)).toBe(-2)
+    expect(shortestBearingDelta(350, 10)).toBe(20)
+    expect(shortestBearingDelta(10, 350)).toBe(-20)
+    expect(shortestBearingDelta(0, 180)).toBe(180)
+    expect(shortestBearingDelta(0, -180)).toBe(180)
+    expect(shortestBearingDelta(720, 10)).toBe(10)
+  })
+
+  it('scales compass animation duration with the remaining arc', () => {
+    expect(compassRotationDurationMs(0, 0)).toBe(260)
+    expect(compassRotationDurationMs(0, 90)).toBe(390)
+    expect(compassRotationDurationMs(0, 180)).toBe(520)
+    expect(compassRotationDurationMs(350, 370)).toBe(289)
   })
 
   it('normalizes pressure units before assigning a band', () => {
@@ -64,7 +125,10 @@ describe('weather presentation', () => {
   })
 
   it('normalizes visibility and preserves descriptive bands', () => {
-    expect(visibilityPresentation(10, 'mi')?.band).toBe('clear')
+    expect(visibilityPresentation(10, 'mi')).toMatchObject({ band: 'clear', markerPercent: 100 })
+    expect(visibilityPresentation(5, 'mi')?.markerPercent).toBe(50)
+    expect(visibilityPresentation(0, 'mi')?.markerPercent).toBe(0)
+    expect(visibilityPresentation('unavailable', 'mi')).toBeNull()
     expect(visibilityPresentation(10, 'km')?.band).toBe('good')
     expect(visibilityPresentation(800, 'm')?.band).toBe('veryPoor')
   })
