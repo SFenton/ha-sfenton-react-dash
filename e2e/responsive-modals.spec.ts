@@ -239,17 +239,16 @@ test('media sheets choose compact or centered presentation across the viewport m
         overflow: tiles.scrollWidth > tiles.clientWidth + 1
           || Array.from(tiles.querySelectorAll<HTMLElement>('[data-hourly-metric-tile]')).some((tile) => tile.scrollWidth > tile.clientWidth + 1),
         tracks: tiles.querySelectorAll('[class*="metricTrack"]').length,
-        markHeights: Array.from(tiles.querySelectorAll<HTMLElement>('[data-hourly-metric-bar="true"]'))
-          .filter((mark) => mark.dataset.unavailable !== 'true')
-          .map((mark) => mark.getBoundingClientRect().height),
+        columnRadii: Array.from(tiles.querySelectorAll<HTMLElement>('[data-hourly-metric-bar="true"]'))
+          .map((bar) => getComputedStyle(bar).borderTopLeftRadius),
       }
     })
     expect(hourlyMetricMetrics.columns).toBe(2)
     expect(hourlyMetricMetrics.labelsMatch).toBe(true)
     expect(hourlyMetricMetrics.usesNow).toBe(true)
     expect(hourlyMetricMetrics.overflow).toBe(false)
-    expect(hourlyMetricMetrics.tracks).toBe(12)
-    expect(hourlyMetricMetrics.markHeights.every((height) => Math.abs(height - 3) <= 0.05)).toBe(true)
+    expect(hourlyMetricMetrics.tracks).toBe(0)
+    expect(hourlyMetricMetrics.columnRadii.every((radius) => radius === '3px')).toBe(true)
     const paintedColumnGaps = await dialog.evaluate((element) => (
       Array.from(element.querySelectorAll<HTMLElement>(
         '[data-precipitation-hourly-plot="true"], [data-precipitation-cumulative-plot="true"], [data-hourly-metric-plot]',
