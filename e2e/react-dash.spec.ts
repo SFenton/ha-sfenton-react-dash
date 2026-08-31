@@ -3270,7 +3270,9 @@ test('Music Room route orders remote controls before its local Fortnite app tile
   await expect(server).toHaveAttribute('data-action-kind', 'selection')
   await expect(fortnite).toHaveAttribute('data-action-kind', 'selection')
   await expect(fortnite).toHaveAttribute('aria-pressed', 'false')
-  await expect(fortnite.locator('img')).toHaveCount(0)
+  const fortniteArtwork = fortnite.locator('img')
+  await expect(fortniteArtwork).toHaveCount(1)
+  await expect.poll(() => fortniteArtwork.evaluate((image: HTMLImageElement) => image.complete && image.naturalWidth > 0)).toBe(true)
 
   await xbox.click()
   const selectedXbox = controls.getByRole('button', { name: 'Xbox On' })
@@ -3318,7 +3320,9 @@ test('Media page includes the Music Room remote, Xbox, Server, and Fortnite cont
   await expect(musicSection.getByRole('button', { name: 'Music Room Remote Off' })).toBeVisible()
   await expect(musicSection.getByRole('button', { name: 'Xbox Off' })).toHaveAttribute('data-action-kind', 'selection')
   await expect(musicSection.getByRole('button', { name: 'Server Off' })).toBeVisible()
-  await expect(musicSection.getByRole('button', { name: 'Fortnite' })).toBeVisible()
+  const fortnite = musicSection.getByRole('button', { name: 'Fortnite' })
+  await expect(fortnite).toBeVisible()
+  await expect.poll(() => fortnite.locator('img').evaluate((image: HTMLImageElement) => image.complete && image.naturalWidth > 0)).toBe(true)
 
   await musicSection.getByRole('button', { name: 'Music Room Remote Off' }).click()
   await expect(page.getByRole('dialog', { name: 'Music Room Remote' })).toBeVisible()

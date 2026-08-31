@@ -1,5 +1,6 @@
 import type { ControlSemanticsResolver } from '../components/core/controlSemantics'
 import { MEDIA_COPY_KEYS, MEDIA_COPY_NAMESPACE, copy } from '../i18n'
+import fortniteArtworkUrl from '../assets/apps/fortnite.jpg'
 import type { OptimisticActionMetadata, OptimisticStateIntent } from './actionIntents'
 
 type MediaRemoteServiceAction = {
@@ -141,6 +142,7 @@ export const MUSIC_ROOM_XBOX_ENTITY_ID = 'media_player.xbox'
 export const MUSIC_ROOM_REMOTE_ENTITY_ID = 'remote.music_room_tv_android'
 export const MUSIC_ROOM_VOLUME_ENTITY_ID = 'media_player.beam'
 export const MUSIC_ROOM_MEDIA_SOURCE_ENTITY_ID = 'input_select.music_room_media_source'
+export const MUSIC_ROOM_FORTNITE_ARTWORK_URL = fortniteArtworkUrl
 export const MUSIC_ROOM_MEDIA_SOURCE_STATES = {
   fortnite: 'Fortnite',
   off: 'Off',
@@ -367,6 +369,7 @@ export const MEDIA_REMOTE_CONFIGS: Record<string, MediaRemoteConfig> = {
     appCards: [{
       title: copy(MEDIA_COPY_NAMESPACE, MEDIA_COPY_KEYS.musicRoom.fortnite),
       icon: 'mdi:gamepad-variant',
+      imageUrl: MUSIC_ROOM_FORTNITE_ARTWORK_URL,
       stateEntityId: MUSIC_ROOM_MEDIA_SOURCE_ENTITY_ID,
       activeStates: [MUSIC_ROOM_MEDIA_SOURCE_STATES.fortnite],
       semantics: musicRoomFortniteSemantics,

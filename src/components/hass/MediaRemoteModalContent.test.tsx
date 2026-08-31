@@ -219,7 +219,7 @@ describe('MediaRemoteModalContent', () => {
       expect(fortnite).toHaveAttribute('data-action-kind', 'selection')
       expect(fortnite).toHaveAttribute('data-active', 'false')
       expect(fortnite).toHaveAttribute('aria-pressed', 'false')
-      expect(fortnite.querySelector('img')).not.toBeInTheDocument()
+      expect(fortnite.querySelector('img')).toHaveAttribute('src', expect.stringContaining('fortnite.jpg'))
 
       fireEvent.click(fortnite)
       expect(fortnite).toHaveAttribute('data-active', 'true')

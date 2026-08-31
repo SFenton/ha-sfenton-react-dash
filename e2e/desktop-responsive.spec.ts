@@ -194,7 +194,9 @@ test('Music Room media controls remain usable in a fine-pointer desktop context'
     await expect(root.getByRole('button', { name: 'Music Room Remote Off' })).toBeVisible()
     await expect(root.getByRole('button', { name: 'Xbox Off' })).toHaveAttribute('data-action-kind', 'selection')
     await expect(root.getByRole('button', { name: 'Server Off' })).toHaveAttribute('data-action-kind', 'selection')
-    await expect(root.getByRole('button', { name: 'Fortnite' })).toHaveAttribute('aria-pressed', 'false')
+    const fortnite = root.getByRole('button', { name: 'Fortnite' })
+    await expect(fortnite).toHaveAttribute('aria-pressed', 'false')
+    await expect.poll(() => fortnite.locator('img').evaluate((image: HTMLImageElement) => image.complete && image.naturalWidth > 0)).toBe(true)
 
     await root.getByRole('button', { name: 'Music Room Remote Off' }).click()
     const dialog = page.getByRole('dialog', { name: 'Music Room Remote' })
@@ -213,7 +215,9 @@ test('Music Room media controls remain usable in a fine-pointer desktop context'
     await expect(musicSection.getByRole('button', { name: 'Music Room Remote Off' })).toBeVisible()
     await expect(musicSection.getByRole('button', { name: 'Xbox Off' })).toBeVisible()
     await expect(musicSection.getByRole('button', { name: 'Server Off' })).toBeVisible()
-    await expect(musicSection.getByRole('button', { name: 'Fortnite' })).toBeVisible()
+    const mediaFortnite = musicSection.getByRole('button', { name: 'Fortnite' })
+    await expect(mediaFortnite).toBeVisible()
+    await expect.poll(() => mediaFortnite.locator('img').evaluate((image: HTMLImageElement) => image.complete && image.naturalWidth > 0)).toBe(true)
   }
 })
 
