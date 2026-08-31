@@ -536,7 +536,7 @@ describe('DashboardViewPage', () => {
     expect(fortnite).toHaveAttribute('data-card', 'media-app')
     expect(fortnite).toHaveAttribute('data-action-kind', 'selection')
     expect(fortnite).toHaveAttribute('aria-pressed', 'false')
-    expect(fortnite.querySelector('img')).not.toBeInTheDocument()
+    expect(fortnite.querySelector('img')).toHaveAttribute('src', expect.stringContaining('fortnite.jpg'))
   })
 
   it('runs Music Room source scripts with their configured optimistic windows', () => {

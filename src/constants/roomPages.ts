@@ -6,6 +6,7 @@ import { MASTER_BEDROOM_HUMIDIFIER } from './humidifiers'
 import {
   MEDIA_REMOTE_CONFIGS,
   MUSIC_ROOM_CONTROL_ENTITY_ID,
+  MUSIC_ROOM_FORTNITE_ARTWORK_URL,
   MUSIC_ROOM_MEDIA_ACTIONS,
   MUSIC_ROOM_MEDIA_SOURCE_ENTITY_ID,
   MUSIC_ROOM_MEDIA_SOURCE_STATES,
@@ -361,6 +362,7 @@ export const ROOM_PAGE_CONFIGS: Record<string, RoomPageSourceConfig> = {
           title: musicRoomFortniteTitle,
           entityId: MUSIC_ROOM_MEDIA_SOURCE_ENTITY_ID,
           icon: 'mdi:gamepad-variant',
+          imageUrl: MUSIC_ROOM_FORTNITE_ARTWORK_URL,
           kind: 'media',
           presentation: 'app',
           activeStates: [MUSIC_ROOM_MEDIA_SOURCE_STATES.fortnite],
