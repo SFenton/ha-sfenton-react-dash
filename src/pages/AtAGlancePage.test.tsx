@@ -470,6 +470,7 @@ describe('AtAGlancePage', () => {
     expect(windTile.querySelector('[data-wind-direction-label]')).toHaveTextContent('From')
     expect(windTile.querySelector('[data-wind-direction-value]')).toHaveTextContent('ENE · 59°')
     expect(windTile.querySelector('[data-wind-compass]')).toHaveAttribute('aria-hidden', 'true')
+    expect([...windTile.querySelectorAll('[data-wind-cardinal]')].map((cardinal) => cardinal.textContent)).toEqual(['N', 'E', 'S', 'W'])
     expect(windTile.querySelector('[data-wind-vector]')).toHaveAttribute('data-source-bearing', '59')
     expect(windTile.querySelector('[data-wind-vector]')).toHaveAttribute('data-destination-bearing', '239')
     expect(within(dialog).getByRole('article', { name: /^Sunset / })).toBeInTheDocument()
@@ -509,12 +510,14 @@ describe('AtAGlancePage', () => {
     const windTile = await within(dialog).findByRole('article', { name: "Wind 0 mph; Today's gust 8 mph; Direction Calm" })
     expect(windTile.querySelector('[data-wind-direction-value]')).toHaveTextContent('Calm')
     expect(windTile.querySelector('[data-wind-vector]')).not.toBeInTheDocument()
+    expect([...windTile.querySelectorAll('[data-wind-cardinal]')].map((cardinal) => cardinal.textContent)).toEqual(['N', 'S'])
 
     act(() => {
       setMockEntityAttribute('weather.pirate_weather', 'wind_bearing', 20)
       setMockEntityAttribute('weather.pirate_weather', 'wind_speed', 5)
     })
     await waitFor(() => expect(windTile.querySelector('[data-wind-vector]')).toHaveStyle({ transform: 'rotate(20deg)' }))
+    expect([...windTile.querySelectorAll('[data-wind-cardinal]')].map((cardinal) => cardinal.textContent)).toEqual(['N', 'E', 'S', 'W'])
   })
 
   it('unwraps live wind bearing updates over the shortest path', async () => {

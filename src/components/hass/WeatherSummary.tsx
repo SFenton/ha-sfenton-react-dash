@@ -943,7 +943,7 @@ function AnimatedWindVector({
 
 function WindCompass({ wind }: { wind: NonNullable<WeatherHighlightData['wind']> }) {
   return (
-    <span aria-hidden="true" className={styles.windCompass} data-wind-compass="true">
+    <span aria-hidden="true" className={styles.windCompass} data-wind-compass="true" data-wind-directional={wind.showVector ? 'true' : undefined}>
       <svg className={styles.windCompassSvg} focusable="false" viewBox="0 0 112 112">
         <g>
           {Array.from({ length: WIND_COMPASS_TICK_COUNT }, (_, index) => index === 0 ? null : (
@@ -954,10 +954,10 @@ function WindCompass({ wind }: { wind: NonNullable<WeatherHighlightData['wind']>
         {wind.showVector && wind.bearingDegrees !== undefined ? (
           <AnimatedWindVector destinationDegrees={wind.destinationDegrees} sourceDegrees={wind.bearingDegrees} />
         ) : null}
-        <text className={styles.windCompassCardinal} data-wind-text="true" dominantBaseline="middle" textAnchor="middle" x="56" y="22.1">N</text>
-        <text className={styles.windCompassCardinal} data-wind-text="true" dominantBaseline="middle" textAnchor="middle" x="90.5" y="56.6">E</text>
-        <text className={styles.windCompassCardinal} data-wind-text="true" dominantBaseline="middle" textAnchor="middle" x="56" y="91.1">S</text>
-        <text className={styles.windCompassCardinal} data-wind-text="true" dominantBaseline="middle" textAnchor="middle" x="21.5" y="56.6">W</text>
+        <text className={styles.windCompassCardinal} data-wind-cardinal="true" data-wind-text="true" dominantBaseline="middle" textAnchor="middle" x="56" y="22.1">N</text>
+        {wind.showVector ? <text className={styles.windCompassCardinal} data-wind-cardinal="true" data-wind-text="true" dominantBaseline="middle" textAnchor="middle" x="90.5" y="56.6">E</text> : null}
+        <text className={styles.windCompassCardinal} data-wind-cardinal="true" data-wind-text="true" dominantBaseline="middle" textAnchor="middle" x="56" y="91.1">S</text>
+        {wind.showVector ? <text className={styles.windCompassCardinal} data-wind-cardinal="true" data-wind-text="true" dominantBaseline="middle" textAnchor="middle" x="21.5" y="56.6">W</text> : null}
       </svg>
     </span>
   )
