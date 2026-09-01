@@ -1,8 +1,11 @@
 {
   "carousel": {
+    "controls": "{{label}} controls",
     "goToPage": "Go to page {{page}}",
+    "next": "Show next {{label}}",
     "pageOf": "Page {{page}} of {{count}}",
-    "pages": "{{label}} pages"
+    "pages": "{{label}} pages",
+    "previous": "Show previous {{label}}"
   },
   "filter": {
     "apply": "Apply",

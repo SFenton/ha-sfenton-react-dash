@@ -219,6 +219,11 @@ export const WEATHER_COPY_KEYS = {
     title: 'aqi.title',
     unavailableAriaLabel: 'aqi.unavailableAriaLabel',
   },
+  carousel: {
+    conditions: 'carousel.conditions',
+    forecast: 'carousel.forecast',
+    section: 'carousel.section',
+  },
   details: {
     ariaLabel: 'details.ariaLabel',
     sun: {
@@ -320,6 +325,13 @@ export const MEDIA_COPY_KEYS = {
 } as const
 
 export const CORE_COPY_KEYS = {
+  carousel: {
+    controls: 'carousel.controls',
+    goToPage: 'carousel.goToPage',
+    next: 'carousel.next',
+    pages: 'carousel.pages',
+    previous: 'carousel.previous',
+  },
   groups: {
     controls: 'groups.controls',
   },

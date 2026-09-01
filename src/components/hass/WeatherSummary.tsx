@@ -1,10 +1,11 @@
-import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react'
+import { useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent as ReactPointerEvent, type RefObject } from 'react'
 import { useEntity, useHass } from '@hakit/core'
 import type { HassEntity } from 'home-assistant-js-websocket'
 import effects from '../../styles/effects.module.css'
 import { SUN_ENTITY, WEATHER_AQI_ENTITY, WEATHER_ENTITY } from '../../constants/atAGlance'
 import { WEATHER_HOURLY_MODES, type WeatherHourlyMode } from '../../constants/surfaceSemantics'
-import { formatDate, useCopy, WEATHER_COPY_KEYS, WEATHER_COPY_NAMESPACE, type CopyKey, type CopyValues } from '../../i18n'
+import { CORE_COPY_KEYS, CORE_COPY_NAMESPACE, formatDate, useCopy, WEATHER_COPY_KEYS, WEATHER_COPY_NAMESPACE, type CopyKey, type CopyValues } from '../../i18n'
+import { useHorizontalScrollControls } from '../../hooks/useHorizontalScrollControls'
 import { useReducedMotion } from '../../hooks/useReducedMotion'
 import { MaterialIcon } from '../core/Icon'
 import { materialIconPath } from '../core/iconPaths'
@@ -1074,7 +1075,21 @@ function hourlySubhead(mode: HourlyMode, entity: HassEntity | null) {
   return `Temperature (${unitWithoutDegree(entity?.attributes.temperature_unit, 'F')})`
 }
 
-function HourlyConditionItem({ entity, forecast, index, mode }: { entity: HassEntity | null; forecast: WeatherForecast; index: number; mode: HourlyMode }) {
+function HourlyConditionItem({
+  entity,
+  forecast,
+  index,
+  mode,
+  pageEnd,
+  pageStart,
+}: {
+  entity: HassEntity | null
+  forecast: WeatherForecast
+  index: number
+  mode: HourlyMode
+  pageEnd: boolean
+  pageStart: boolean
+}) {
   const condition = conditionInfo(forecast.condition)
   const temperature = formatTemperatureValue(forecast.temperature, entity?.attributes.temperature_unit)
   const precipitationChance = formatPercent(forecast.precipitation_probability) ?? '0%'
@@ -1085,7 +1100,7 @@ function HourlyConditionItem({ entity, forecast, index, mode }: { entity: HassEn
 
   if (mode === 'precipitation') {
     return (
-      <article className={styles.hourlyItem} aria-label={`${time} precipitation ${precipitationChance}`}>
+      <article className={styles.hourlyItem} aria-label={`${time} precipitation ${precipitationChance}`} data-carousel-item="true" data-carousel-page-end={pageEnd ? 'true' : undefined} data-carousel-page-start={pageStart ? 'true' : undefined}>
         <span className={styles.hourlyTime}>{time}</span>
         <span className={styles.hourlyIcon}>
           <MaterialIcon name="mdi:water" size={28} />
@@ -1101,7 +1116,7 @@ function HourlyConditionItem({ entity, forecast, index, mode }: { entity: HassEn
   if (mode === 'wind') {
     const bearing = windBearingPresentation(forecast.wind_bearing)
     return (
-      <article className={styles.hourlyItem} aria-label={`${time} wind ${windSpeed}${gustSpeed ? ` gusts ${gustSpeed}` : ''}`}>
+      <article className={styles.hourlyItem} aria-label={`${time} wind ${windSpeed}${gustSpeed ? ` gusts ${gustSpeed}` : ''}`} data-carousel-item="true" data-carousel-page-end={pageEnd ? 'true' : undefined} data-carousel-page-start={pageStart ? 'true' : undefined}>
         <span className={styles.hourlyTime}>{time}</span>
         <span
           className={styles.hourlyIcon}
@@ -1120,13 +1135,131 @@ function HourlyConditionItem({ entity, forecast, index, mode }: { entity: HassEn
   }
 
   return (
-    <article className={styles.hourlyItem} aria-label={`${time} ${condition.label} ${temperature}`}>
+    <article className={styles.hourlyItem} aria-label={`${time} ${condition.label} ${temperature}`} data-carousel-item="true" data-carousel-page-end={pageEnd ? 'true' : undefined} data-carousel-page-start={pageStart ? 'true' : undefined}>
       <span className={styles.hourlyTime}>{time}</span>
       <span className={styles.hourlyIcon}>
         <WeatherGlyph condition={forecast.condition} size={30} />
       </span>
       <strong className={styles.hourlyTemperature}>{temperature}</strong>
     </article>
+  )
+}
+
+function WeatherScrollControls({
+  ariaControlsId,
+  canScrollNext,
+  canScrollPrevious,
+  fallbackRef,
+  hidden,
+  label,
+  modal = false,
+  onKeyDown,
+  onNext,
+  onPrevious,
+}: {
+  ariaControlsId?: string
+  canScrollNext: boolean
+  canScrollPrevious: boolean
+  fallbackRef: RefObject<HTMLElement | null>
+  hidden: boolean
+  label: string
+  modal?: boolean
+  onKeyDown: (event: KeyboardEvent<HTMLElement>) => void
+  onNext: () => void
+  onPrevious: () => void
+}) {
+  const copy = useCopy(CORE_COPY_NAMESPACE)
+  const controlsRef = useRef<HTMLSpanElement>(null)
+
+  useEffect(() => {
+    if (!hidden || !controlsRef.current?.contains(document.activeElement)) return
+    fallbackRef.current?.focus()
+  }, [fallbackRef, hidden])
+
+  const handlePointerUp = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    if (event.pointerType !== 'mouse') event.currentTarget.blur()
+  }
+
+  return (
+    <span
+      aria-label={copy(CORE_COPY_KEYS.carousel.controls, { label })}
+      className={`${styles.weatherCarouselControls} ${modal ? styles.weatherCarouselControlsModal : styles.weatherCarouselControlsHero}`}
+      data-weather-carousel-controls="true"
+      hidden={hidden}
+      onKeyDown={onKeyDown}
+      ref={controlsRef}
+      role="group"
+    >
+      <button
+        aria-controls={ariaControlsId}
+        aria-disabled={!canScrollPrevious}
+        aria-label={copy(CORE_COPY_KEYS.carousel.previous, { label })}
+        className={styles.weatherCarouselControl}
+        data-weather-carousel-previous="true"
+        onClick={() => canScrollPrevious && onPrevious()}
+        onPointerUp={handlePointerUp}
+        type="button"
+      >
+        <MaterialIcon name="mdi:chevron-left" size={20} />
+      </button>
+      <button
+        aria-controls={ariaControlsId}
+        aria-disabled={!canScrollNext}
+        aria-label={copy(CORE_COPY_KEYS.carousel.next, { label })}
+        className={styles.weatherCarouselControl}
+        data-weather-carousel-next="true"
+        onClick={() => canScrollNext && onNext()}
+        onPointerUp={handlePointerUp}
+        type="button"
+      >
+        <MaterialIcon name="mdi:chevron-right" size={20} />
+      </button>
+    </span>
+  )
+}
+
+function WeatherCarouselPagination({
+  currentPage,
+  hero = false,
+  hidden,
+  label,
+  onPageChange,
+  pageCount,
+}: {
+  currentPage: number
+  hero?: boolean
+  hidden: boolean
+  label: string
+  onPageChange: (page: number) => void
+  pageCount: number
+}) {
+  const copy = useCopy(CORE_COPY_NAMESPACE)
+
+  return (
+    <span
+      aria-label={copy(CORE_COPY_KEYS.carousel.pages, { label })}
+      className={`${styles.weatherCarouselPagination} ${hero ? styles.weatherCarouselPaginationHero : styles.weatherCarouselPaginationModal}`}
+      data-weather-carousel-page-count={pageCount}
+      data-weather-carousel-pagination="true"
+      hidden={hidden}
+      role="group"
+    >
+      {Array.from({ length: pageCount }, (_, page) => (
+        <button
+          aria-current={currentPage === page ? 'page' : undefined}
+          aria-label={copy(CORE_COPY_KEYS.carousel.goToPage, { page: page + 1 })}
+          data-weather-carousel-page={page + 1}
+          key={page}
+          onClick={() => onPageChange(page)}
+          onPointerUp={(event) => {
+            if (event.pointerType !== 'mouse') event.currentTarget.blur()
+          }}
+          type="button"
+        >
+          <span aria-hidden="true" />
+        </button>
+      ))}
+    </span>
   )
 }
 
@@ -1158,7 +1291,23 @@ function HeroDayForecast({ entity, forecast }: { entity: HassEntity | null; fore
   )
 }
 
-function HeroHourlyStrip({ entity, forecasts }: { entity: HassEntity | null; forecasts: WeatherForecast[] }) {
+function HeroHourlyStrip({
+  ariaLabel,
+  entity,
+  forecasts,
+  onKeyDown,
+  pageStartIndices,
+  scrollerId,
+  scrollerRef,
+}: {
+  ariaLabel: string
+  entity: HassEntity | null
+  forecasts: WeatherForecast[]
+  onKeyDown: (event: KeyboardEvent<HTMLElement>) => void
+  pageStartIndices: readonly number[]
+  scrollerId: string
+  scrollerRef: RefObject<HTMLSpanElement | null>
+}) {
   if (forecasts.length === 0) {
     return (
       <span aria-hidden="true" className={`${styles.heroHourlyStrip} ${styles.heroHourlyStripPlaceholder}`}>
@@ -1174,13 +1323,16 @@ function HeroHourlyStrip({ entity, forecasts }: { entity: HassEntity | null; for
   }
 
   return (
-    <span className={styles.heroHourlyStrip} aria-label="24-hour weather forecast">
+    <span aria-label={ariaLabel} className={styles.heroHourlyStrip} data-carousel-snap-ready={pageStartIndices.length > 0 ? 'true' : undefined} data-weather-carousel="hero" id={scrollerId} onKeyDown={onKeyDown} ref={scrollerRef} tabIndex={0}>
       {forecasts.map((forecast, index) => {
         const condition = conditionInfo(forecast.condition)
         return (
           <span
             className={styles.heroHourlyItem}
             aria-label={`${hourlyLabel(forecast.datetime, index)} ${condition.label} ${formatTemperatureValue(forecast.temperature, entity?.attributes.temperature_unit)}`}
+            data-carousel-page-end={index === forecasts.length - 1 ? 'true' : undefined}
+            data-carousel-page-start={pageStartIndices.includes(index) ? 'true' : undefined}
+            data-carousel-item="true"
             key={forecast.datetime ?? index}
           >
             <span className={styles.heroHourlyTime}>{hourlyLabel(forecast.datetime, index)}</span>
@@ -1214,8 +1366,30 @@ function HourlyConditionsPanel({
   onModeChange: (mode: HourlyMode) => void
   transitionPhase: ModeTransitionPhase
 }) {
+  const copy = useCopy(WEATHER_COPY_NAMESPACE)
+  const carouselId = useId()
+  const carouselLabel = copy(WEATHER_COPY_KEYS.carousel.conditions)
+  const sectionLabel = copy(WEATHER_COPY_KEYS.carousel.section)
+  const {
+    canScrollNext,
+    canScrollPrevious,
+    currentPage,
+    handleNavigationKeyDown,
+    hasOverflow,
+    pageCount,
+    pageStartIndices,
+    scrollNext,
+    scrollToPage,
+    scrollPrevious,
+    scrollerRef,
+  } = useHorizontalScrollControls<HTMLDivElement>({
+    enabled: !loading && !error && forecasts.length > 0,
+    itemCount: forecasts.length,
+    revision: mode,
+  })
+
   return (
-    <section className={styles.hourlyPanel} aria-label="24-hour weather conditions">
+    <section className={styles.hourlyPanel} aria-label={sectionLabel}>
       <div className={styles.hourlyHeader}>
         <span className={styles.sectionLabel}>Conditions</span>
         <span className={styles.hourlyModes}>
@@ -1245,10 +1419,45 @@ function HourlyConditionsPanel({
         {!loading && error ? <div className={styles.errorState}>{error}</div> : null}
         {!loading && !error && forecasts.length === 0 ? <div className={styles.errorState}>No hourly forecast data returned by Pirate Weather.</div> : null}
         {!loading && !error && forecasts.length > 0 ? (
-          <div className={styles.hourlyScroller}>
-            {forecasts.map((forecast, index) => (
-              <HourlyConditionItem entity={entity} forecast={forecast} index={index} key={forecast.datetime ?? index} mode={mode} />
-            ))}
+          <div className={styles.hourlyScrollerFrame} data-carousel-overflow={hasOverflow ? 'true' : undefined}>
+            <div
+              aria-label={carouselLabel}
+              aria-roledescription="carousel"
+              className={styles.hourlyScroller}
+              data-base-ui-swipe-ignore="true"
+              data-carousel-snap-ready={pageStartIndices.length > 0 ? 'true' : undefined}
+              data-weather-carousel="hourly"
+              id={carouselId}
+              onKeyDown={handleNavigationKeyDown}
+              ref={scrollerRef}
+              role="group"
+              tabIndex={0}
+            >
+              {forecasts.map((forecast, index) => (
+                <HourlyConditionItem
+                  entity={entity}
+                  forecast={forecast}
+                  index={index}
+                  key={forecast.datetime ?? index}
+                  mode={mode}
+                  pageEnd={index === forecasts.length - 1}
+                  pageStart={pageStartIndices.includes(index)}
+                />
+              ))}
+            </div>
+            <WeatherScrollControls
+              ariaControlsId={carouselId}
+              canScrollNext={canScrollNext}
+              canScrollPrevious={canScrollPrevious}
+              fallbackRef={scrollerRef}
+              hidden={!hasOverflow}
+              label={carouselLabel}
+              modal
+              onKeyDown={handleNavigationKeyDown}
+              onNext={scrollNext}
+              onPrevious={scrollPrevious}
+            />
+            <WeatherCarouselPagination currentPage={currentPage} hidden={!hasOverflow || pageCount <= 1} label={carouselLabel} onPageChange={scrollToPage} pageCount={pageCount} />
           </div>
         ) : null}
       </div>
@@ -1400,6 +1609,7 @@ interface WeatherSummaryProps {
 
 export function WeatherSummary({ deferRefresh = false }: WeatherSummaryProps) {
   const copy = useCopy(WEATHER_COPY_NAMESPACE)
+  const heroCarouselLabel = copy(WEATHER_COPY_KEYS.carousel.forecast)
   const weather = useEntity(asEntityName(WEATHER_ENTITY), {
     returnNullIfNotFound: true,
   })
@@ -1417,6 +1627,24 @@ export function WeatherSummary({ deferRefresh = false }: WeatherSummaryProps) {
   const [hourlyForecasts, setHourlyForecasts] = useState<WeatherForecast[]>(() => hourlyForecastCache?.forecasts ?? [])
   const [hourlyForecastError, setHourlyForecastError] = useState<string | null>(null)
   const [hourlyForecastLoading, setHourlyForecastLoading] = useState(false)
+  const heroCarouselId = useId()
+  const weatherCardButtonRef = useRef<HTMLButtonElement>(null)
+  const {
+    canScrollNext: canScrollHeroNext,
+    canScrollPrevious: canScrollHeroPrevious,
+    currentPage: currentHeroPage,
+    handleNavigationKeyDown: handleHeroNavigationKeyDown,
+    hasOverflow: heroHasOverflow,
+    pageCount: heroPageCount,
+    pageStartIndices: heroPageStartIndices,
+    scrollNext: scrollHeroNext,
+    scrollToPage: scrollHeroToPage,
+    scrollPrevious: scrollHeroPrevious,
+    scrollerRef: heroScrollerRef,
+  } = useHorizontalScrollControls<HTMLSpanElement>({
+    enabled: !deferRefresh && hourlyForecasts.length > 0,
+    itemCount: hourlyForecasts.length,
+  })
 
   useEffect(() => {
     let cancelled = false
@@ -1519,24 +1747,52 @@ export function WeatherSummary({ deferRefresh = false }: WeatherSummaryProps) {
 
   return (
     <>
-      <button aria-label={`Open seven-day weather forecast. ${condition.label}, ${weatherTemperature(weather)}`} className={`${effects.frosted} ${styles.card}`} onClick={handleOpen} type="button">
-        <span className={styles.copy}>
-          <span className={styles.heroMain}>
-            <span className={styles.conditionRow}>
-              <span className={styles.summaryIcon}>
-                <WeatherGlyph condition={weather?.state} size={40} />
+      <div className={styles.weatherCardFrame} data-carousel-overflow={heroHasOverflow ? 'true' : undefined}>
+        <button
+          aria-label={`Open seven-day weather forecast. ${condition.label}, ${weatherTemperature(weather)}`}
+          className={`${effects.frosted} ${styles.card}`}
+          onClick={handleOpen}
+          ref={weatherCardButtonRef}
+          type="button"
+        >
+          <span className={styles.copy}>
+            <span className={styles.heroMain}>
+              <span className={styles.conditionRow}>
+                <span className={styles.summaryIcon}>
+                  <WeatherGlyph condition={weather?.state} size={40} />
+                </span>
+                <span className={styles.condition}>{condition.label}</span>
               </span>
-              <span className={styles.condition}>{condition.label}</span>
+              <span className={styles.temperatureBlock}>
+                <span className={styles.temperature}>{weatherDegree(weather)}</span>
+              </span>
             </span>
-            <span className={styles.temperatureBlock}>
-              <span className={styles.temperature}>{weatherDegree(weather)}</span>
-            </span>
+            <HeroDayForecast entity={weather} forecast={today} />
+            <HeroHourlyStrip
+              ariaLabel={heroCarouselLabel}
+              entity={weather}
+              forecasts={hourlyForecasts}
+              onKeyDown={handleHeroNavigationKeyDown}
+              pageStartIndices={heroPageStartIndices}
+              scrollerId={heroCarouselId}
+              scrollerRef={heroScrollerRef}
+            />
           </span>
-          <HeroDayForecast entity={weather} forecast={today} />
-          <HeroHourlyStrip entity={weather} forecasts={hourlyForecasts} />
-        </span>
-        <SurfaceAccessory className={styles.disclosure} semantics={{ kind: 'modal' }} />
-      </button>
+          <SurfaceAccessory className={styles.disclosure} semantics={{ kind: 'modal' }} />
+        </button>
+        <WeatherScrollControls
+          ariaControlsId={heroCarouselId}
+          canScrollNext={canScrollHeroNext}
+          canScrollPrevious={canScrollHeroPrevious}
+          fallbackRef={weatherCardButtonRef}
+          hidden={open || !heroHasOverflow}
+          label={heroCarouselLabel}
+          onKeyDown={handleHeroNavigationKeyDown}
+          onNext={scrollHeroNext}
+          onPrevious={scrollHeroPrevious}
+        />
+        <WeatherCarouselPagination currentPage={currentHeroPage} hero hidden={!heroHasOverflow || heroPageCount <= 1} label={heroCarouselLabel} onPageChange={scrollHeroToPage} pageCount={heroPageCount} />
+      </div>
 
       <ModalSheet
         contentStyle={WEATHER_MODAL_STYLE}

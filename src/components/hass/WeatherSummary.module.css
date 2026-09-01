@@ -1,3 +1,9 @@
+.weatherCardFrame {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+}
+
 .card {
   position: relative;
   display: grid;
@@ -163,11 +169,13 @@
 }
 
 .heroHourlyStrip {
+  --weather-carousel-base-padding: 6px;
   display: grid;
   grid-auto-columns: 42px;
   grid-auto-flow: column;
   gap: 10px;
   margin: 2px -6px 0;
+  overscroll-behavior-x: contain;
   overflow-x: auto;
   padding: 2px 6px 4px;
   scrollbar-width: none;
@@ -179,6 +187,15 @@
 
 .heroHourlyStrip::-webkit-scrollbar {
   display: none;
+}
+
+.heroHourlyStrip:focus {
+  outline: none;
+}
+
+.heroHourlyStrip:focus-visible {
+  outline: 2px solid var(--rd-weather-carousel-focus);
+  outline-offset: -2px;
 }
 
 .heroHourlyItem {
@@ -401,12 +418,20 @@
   font-weight: 720;
 }
 
+.hourlyScrollerFrame {
+  position: relative;
+  display: grid;
+  min-width: 0;
+}
+
 .hourlyScroller {
+  --weather-carousel-base-padding: 2px;
   display: grid;
   grid-auto-columns: 62px;
   grid-auto-flow: column;
   gap: 12px;
   margin: 4px -2px 0;
+  overscroll-behavior-x: contain;
   overflow-x: auto;
   padding: 2px 2px 6px;
   scrollbar-width: none;
@@ -414,6 +439,180 @@
 
 .hourlyScroller::-webkit-scrollbar {
   display: none;
+}
+
+.hourlyScroller:focus {
+  outline: none;
+}
+
+.hourlyScroller:focus-visible {
+  outline: 2px solid var(--rd-weather-carousel-focus);
+  outline-offset: -2px;
+}
+
+.weatherCarouselControls {
+  position: absolute;
+  z-index: 3;
+  display: none;
+  align-items: center;
+  justify-content: space-between;
+  pointer-events: none;
+}
+
+.weatherCarouselControls[hidden] {
+  display: none;
+}
+
+.weatherCarouselControlsHero {
+  right: 8px;
+  bottom: 20px;
+  left: 8px;
+  height: 68px;
+}
+
+.weatherCarouselControlsModal {
+  top: 4px;
+  right: 4px;
+  left: 4px;
+  height: 116px;
+}
+
+.weatherCarouselControl {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  border: 1px solid var(--rd-weather-carousel-control-border);
+  border-radius: 999px;
+  padding: 0;
+  color: var(--color-text);
+  background: var(--rd-weather-carousel-control-surface);
+  box-shadow: var(--rd-weather-carousel-control-shadow);
+  cursor: pointer;
+  pointer-events: auto;
+  backdrop-filter: blur(12px);
+}
+
+.weatherCarouselControl:hover:not([aria-disabled='true']) {
+  background: var(--rd-weather-carousel-control-surface-hover);
+}
+
+.weatherCarouselControl[aria-disabled='true'] {
+  cursor: default;
+  opacity: 0.32;
+}
+
+.weatherCarouselControl:focus {
+  outline: none;
+}
+
+.weatherCarouselControl:focus-visible {
+  box-shadow: var(--rd-weather-carousel-control-focus);
+}
+
+.weatherCarouselPagination {
+  z-index: 4;
+  display: flex;
+  min-width: 0;
+  height: 24px;
+  align-items: center;
+  justify-content: center;
+  pointer-events: auto;
+}
+
+.weatherCarouselPagination[hidden] {
+  display: none;
+}
+
+.weatherCarouselPaginationHero {
+  position: absolute;
+  right: 24px;
+  bottom: 0;
+  left: 24px;
+}
+
+.weatherCarouselPaginationModal {
+  margin-top: 2px;
+}
+
+.weatherCarouselPagination button {
+  display: grid;
+  width: 28px;
+  height: 24px;
+  place-items: center;
+  border: 0;
+  border-radius: 999px;
+  padding: 0;
+  color: var(--color-text);
+  background: none;
+  cursor: pointer;
+}
+
+.weatherCarouselPagination button:focus {
+  outline: none;
+}
+
+.weatherCarouselPagination button:focus-visible {
+  box-shadow: var(--rd-weather-carousel-control-focus);
+}
+
+.weatherCarouselPagination button > span {
+  display: block;
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--rd-weather-carousel-page);
+}
+
+.weatherCarouselPagination button[aria-current='page'] > span {
+  width: 18px;
+  background: var(--rd-weather-carousel-page-active);
+}
+
+.weatherCardFrame:has(:focus-visible) .weatherCarouselControls:not([hidden]),
+.hourlyScrollerFrame:has(:focus-visible) .weatherCarouselControls:not([hidden]) {
+  display: flex;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .weatherCardFrame[data-carousel-overflow='true'] .heroHourlyStrip,
+  .hourlyScrollerFrame[data-carousel-overflow='true'] .hourlyScroller {
+    padding-inline: 46px;
+    mask-image: var(--rd-weather-carousel-edge-mask);
+    -webkit-mask-image: var(--rd-weather-carousel-edge-mask);
+  }
+
+  .hourlyScrollerFrame[data-carousel-overflow='true'] .hourlyScroller {
+    padding-inline: 50px;
+  }
+
+  .weatherCarouselControls:not([hidden]) {
+    display: flex;
+  }
+}
+
+@media (hover: none), (pointer: coarse) {
+  .weatherCarouselControls:not([hidden]) {
+    display: none;
+  }
+
+  .heroHourlyStrip[data-carousel-snap-ready='true'],
+  .hourlyScroller[data-carousel-snap-ready='true'] {
+    scroll-padding-inline: var(--weather-carousel-base-padding);
+    scroll-snap-type: x mandatory;
+  }
+
+  .heroHourlyItem[data-carousel-page-start='true'],
+  .hourlyItem[data-carousel-page-start='true'] {
+    scroll-snap-align: start;
+    scroll-snap-stop: always;
+  }
+
+  .heroHourlyItem[data-carousel-page-end='true'],
+  .hourlyItem[data-carousel-page-end='true'] {
+    scroll-snap-align: end;
+    scroll-snap-stop: always;
+  }
 }
 
 .hourlyItem {
@@ -1328,6 +1527,23 @@
 }
 
 @media (forced-colors: active) {
+  .weatherCarouselControl {
+    border-color: ButtonText;
+    color: ButtonText;
+    background: ButtonFace;
+    box-shadow: none;
+  }
+
+  .weatherCarouselControl[aria-disabled='true'] {
+    color: GrayText;
+    opacity: 1;
+  }
+
+  .weatherCarouselControl:focus-visible {
+    outline: 2px solid Highlight;
+    outline-offset: 2px;
+  }
+
   .highlightRail,
   .visibilityDistanceRail {
     border: 1px solid CanvasText;
