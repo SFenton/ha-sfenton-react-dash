@@ -57,10 +57,6 @@ function compactText(value: string | undefined) {
   return trimmed ? trimmed : undefined
 }
 
-function compactDescription(value: string | undefined) {
-  return compactText(value)?.split(/\r?\n/, 1)[0]?.trim() || undefined
-}
-
 function batteryMaintenanceLevel(item: TodoItem) {
   const description = compactText(item.description)
   if (!description || !/\bMaintenance reference:\s*BATT-[A-Z0-9]+\b/i.test(description)) return undefined
@@ -75,12 +71,6 @@ function normalizeBatteryTaskTitle(title: string, batteryLevel: string | undefin
 
 function batteryTaskTitleHasLevel(title: string, batteryLevel: string | undefined) {
   return Boolean(batteryLevel && (title.endsWith(`(${batteryLevel})`) || title.endsWith(` · ${batteryLevel}`)))
-}
-
-function todoSubtitle(item: TodoItem, due: DueInfo | null, batteryLevel: string | undefined) {
-  const detail = batteryLevel ? undefined : compactDescription(item.description)
-  const subtitle = [due?.label, detail].filter((part): part is string => Boolean(part)).join(' · ')
-  return subtitle || undefined
 }
 
 function relativeDueInfo(value: string | undefined): DueInfo | null {
@@ -226,7 +216,7 @@ export function TodoListPanel({ completionScript, entityId, hideCompleted = true
             const titleText = batteryLevel && !batteryTaskTitleHasLevel(normalizedTitle, batteryLevel)
               ? copy('todo.batteryTaskTitle', { percentage: batteryLevel, title: normalizedTitle })
               : normalizedTitle
-            const subtitle = todoSubtitle(item, due, batteryLevel)
+            const subtitle = due?.label
             const taskId = donetickTaskIdFromUid(item.uid)
             const editTarget = onEditTask && taskId && item.uid
               ? { itemUid: item.uid, taskId, todoEntityId: entityId }

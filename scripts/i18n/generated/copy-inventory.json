@@ -7089,7 +7089,7 @@
       "file": "src/components/hass/TodoListPanel.tsx",
       "id": "a1f6c53c96f43c15",
       "lines": [
-        218
+        208
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -7185,7 +7185,7 @@
       "file": "src/components/hass/TodoListPanel.tsx",
       "id": "5c82bc2a6cf513bb",
       "lines": [
-        240
+        230
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -7202,7 +7202,7 @@
       "file": "src/components/hass/TodoListPanel.tsx",
       "id": "c81b32f1cbd0b8a9",
       "lines": [
-        236
+        226
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -7692,7 +7692,7 @@
       "file": "src/components/hass/TodoListPanel.tsx",
       "id": "4b45e8113c50ef91",
       "lines": [
-        249
+        239
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -12900,7 +12900,7 @@
       "file": "src/components/hass/TodoListPanel.tsx",
       "id": "e2cd37f6184dc5af",
       "lines": [
-        225
+        215
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -20162,7 +20162,7 @@
       "file": "src/components/hass/TodoListPanel.tsx",
       "id": "2efb8b79b6247f13",
       "lines": [
-        102
+        92
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -20179,7 +20179,7 @@
       "file": "src/components/hass/TodoListPanel.tsx",
       "id": "e5c6768bc82da4cf",
       "lines": [
-        105
+        95
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -21035,7 +21035,7 @@
       "file": "src/components/hass/TodoListPanel.tsx",
       "id": "4ea8ae0bd396070c",
       "lines": [
-        104
+        94
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -34025,7 +34025,7 @@
       "file": "src/components/hass/TodoListPanel.tsx",
       "id": "ecbe4bdada409fac",
       "lines": [
-        102
+        92
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -34512,7 +34512,7 @@
       "file": "src/components/hass/TodoListPanel.tsx",
       "id": "fe0b75f9b9ed31ac",
       "lines": [
-        191
+        181
       ],
       "occurrences": 2,
       "origin": "legacy",

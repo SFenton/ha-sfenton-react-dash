@@ -297,6 +297,101 @@ test('Chores keeps uniform Quick Links and reflows task rows without reordering'
   }
 })
 
+test('long battery task titles remain fully visible across dashboard viewports', async ({ page }) => {
+  test.setTimeout(120_000)
+  const title = 'Replace Hallway/Entryway/Living Room Presence Sensor Battery · 20%'
+  const viewports = [
+    { width: 393, height: 852 },
+    { width: 852, height: 393 },
+    { width: 820, height: 1180 },
+    { width: 1180, height: 820 },
+    { width: 1440, height: 900 },
+    { width: 1920, height: 1080 },
+  ]
+
+  for (const viewport of viewports) {
+    await page.setViewportSize(viewport)
+    await page.goto(`/index.html?path=overview&battery-title=${viewport.width}`)
+    await page.evaluate((taskTitle) => {
+      const mock = (window as unknown as {
+        __mockHass: {
+          reset: () => void
+          setEntityState: (entityId: string, state: string) => void
+          setTodoItems: (entityId: string, items: {
+            description?: string
+            due?: string
+            status: string
+            summary: string
+            uid: string
+          }[]) => void
+        }
+      }).__mockHass
+      mock.reset()
+      const entityId = 'todo.stephen_s_past_due_with_unassigned'
+      mock.setTodoItems(entityId, [{
+        description: [
+          'The Hallway/Entryway/Living Room Presence Sensor battery is at 20%.',
+          '',
+          'Maintenance reference: BATT-LONG1234.',
+        ].join('\n'),
+        due: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+        status: 'needs_action',
+        summary: taskTitle,
+        uid: '540--2026-08-31 00:00:00+00:00',
+      }])
+      mock.setEntityState(entityId, '1')
+      const url = new URL(window.location.href)
+      url.searchParams.set('path', 'chores')
+      window.history.pushState({}, '', url)
+      window.dispatchEvent(new PopStateEvent('popstate'))
+    }, title)
+
+    const root = activeRoute(page, 'chores')
+    const titleElement = root.getByText(title, { exact: true })
+    await expect(titleElement).toBeVisible()
+    const metrics = await titleElement.evaluate((element) => {
+      const style = window.getComputedStyle(element)
+      return {
+        clientHeight: element.clientHeight,
+        clientWidth: element.clientWidth,
+        lineHeight: Number.parseFloat(style.lineHeight),
+        overflowWrap: style.overflowWrap,
+        pageOverflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+        scrollHeight: element.scrollHeight,
+        scrollWidth: element.scrollWidth,
+        whiteSpace: style.whiteSpace,
+      }
+    })
+
+    expect(metrics.whiteSpace).toBe('normal')
+    expect(metrics.overflowWrap).toBe('anywhere')
+    expect(metrics.scrollHeight).toBeLessThanOrEqual(metrics.clientHeight + 1)
+    expect(metrics.scrollWidth).toBeLessThanOrEqual(metrics.clientWidth + 1)
+    expect(metrics.pageOverflow).toBeLessThanOrEqual(1)
+    if (viewport.width === 393) {
+      expect(metrics.clientHeight).toBeGreaterThan(metrics.lineHeight * 1.5)
+    }
+  }
+
+  const resizeSequences = [
+    [{ width: 393, height: 852 }, { width: 1440, height: 900 }, { width: 393, height: 852 }],
+    [{ width: 1440, height: 900 }, { width: 393, height: 852 }, { width: 1440, height: 900 }],
+    [{ width: 820, height: 1180 }, { width: 1180, height: 820 }, { width: 820, height: 1180 }],
+  ]
+  const activeTitle = activeRoute(page, 'chores').getByText(title, { exact: true })
+  for (const sequence of resizeSequences) {
+    for (const viewport of sequence) {
+      await page.setViewportSize(viewport)
+      await expect(activeTitle).toBeVisible()
+      await expect.poll(() => activeTitle.evaluate((element) => (
+        element.scrollHeight <= element.clientHeight + 1
+        && element.scrollWidth <= element.clientWidth + 1
+        && document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1
+      ))).toBe(true)
+    }
+  }
+})
+
 test('Custom Lights keeps two phone columns and uses bounded uniform wider grids', async ({ page }) => {
   test.setTimeout(120_000)
   for (const viewport of PAGE_LAYOUT_VIEWPORTS) {
