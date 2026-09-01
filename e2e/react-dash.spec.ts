@@ -3815,7 +3815,7 @@ test('offline vacuum cards open their status modal', async ({ page }) => {
   await expect(dialog.getByText(/battery is critically low/i)).toHaveCount(0)
 })
 
-test('music room focused map hides the phantom area without changing world-space drawing', async ({ page }) => {
+test('music room focused map hides the phantom area without scope controls or coordinate changes', async ({ page }) => {
   await page.goto('/at-a-glance/vacuums')
   await page.evaluate(() => {
     const mock = (window as unknown as {
@@ -3836,21 +3836,14 @@ test('music room focused map hides the phantom area without changing world-space
   await page.getByRole('button', { name: /Music Room Docked/i }).click()
   const dialog = page.getByRole('dialog')
   const map = dialog.getByRole('region', { name: 'Music Room Valetudo map' })
-  const fullMap = dialog.getByRole('button', { name: 'Full Map' })
 
   await expect(map).toHaveAttribute('data-map-scope', 'focused')
   await expect(map).toHaveAttribute('data-map-focus-reason', 'focused')
   await expect(map).toHaveAttribute('data-map-render-clipped', 'true')
   await expect(map).toHaveAttribute('data-view-min-x', '634')
   await expect(map).toHaveAttribute('data-view-max-x', '782')
-  await expect(dialog.getByText('Reachable Area Only')).toBeVisible()
-  await expect(fullMap).toHaveAttribute('aria-pressed', 'false')
-
-  await fullMap.click()
-  await expect(map).toHaveAttribute('data-map-scope', 'full')
-  await expect(map).toHaveAttribute('data-map-render-clipped', 'false')
-  await expect(map).toHaveAttribute('data-view-min-x', '504')
-  await expect(fullMap).toHaveAttribute('aria-pressed', 'true')
+  await expect(dialog.getByRole('button', { name: 'Full Map' })).toHaveCount(0)
+  await expect(dialog.getByText('Reachable Area Only')).toHaveCount(0)
 
   await dialog.getByRole('group', { name: 'Cleaning target' }).getByRole('button', { name: 'Area' }).click()
   await dialog.getByRole('button', { name: 'Draw Area' }).click()
@@ -3893,7 +3886,7 @@ test('music room focused map hides the phantom area without changing world-space
   }])
 })
 
-test('music room focus control recovers when availability changes during a gesture', async ({ page }) => {
+test('music room focused map recovers when availability changes during a gesture', async ({ page }) => {
   await page.goto('/at-a-glance/vacuums')
   await page.evaluate(() => {
     const mock = (window as unknown as {
@@ -3944,11 +3937,10 @@ test('music room focus control recovers when availability changes during a gestu
   })
 
   const map = dialog.getByRole('region', { name: 'Music Room Valetudo map' })
-  const fullMap = dialog.getByRole('button', { name: 'Full Map' })
   await expect(map).toHaveAttribute('data-map-scope', 'focused')
-  await expect(fullMap).toBeEnabled()
-  await fullMap.click()
-  await expect(map).toHaveAttribute('data-map-scope', 'full')
+  await expect(dialog.getByRole('button', { name: 'Full Map' })).toHaveCount(0)
+  await expect(dialog.getByText('Reachable Area Only')).toHaveCount(0)
+  await expect(dialog.locator('[data-map-rect="true"]')).toHaveCount(0)
 })
 
 test('current vacuum issues use coherent raw state without assertive helper prose', async ({ page }) => {
