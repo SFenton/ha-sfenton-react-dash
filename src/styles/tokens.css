@@ -43,6 +43,15 @@
   --rd-weather-panel-border: rgba(255, 255, 255, 0.16);
   --rd-weather-panel-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12), 0 18px 42px rgba(0, 0, 0, 0.2);
   --rd-weather-panel-tone-fade: rgba(8, 14, 23, 0);
+  --rd-weather-carousel-control-border: rgba(255, 255, 255, 0.24);
+  --rd-weather-carousel-control-focus: inset 0 0 0 3px rgba(255, 255, 255, 0.62);
+  --rd-weather-carousel-control-shadow: 0 4px 14px rgba(0, 0, 0, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.16);
+  --rd-weather-carousel-control-surface: rgba(8, 14, 23, 0.82);
+  --rd-weather-carousel-control-surface-hover: rgba(24, 44, 68, 0.94);
+  --rd-weather-carousel-edge-mask: linear-gradient(90deg, rgba(0, 0, 0, 0), rgb(0, 0, 0) 46px, rgb(0, 0, 0) calc(100% - 46px), rgba(0, 0, 0, 0));
+  --rd-weather-carousel-focus: rgba(255, 255, 255, 0.54);
+  --rd-weather-carousel-page: rgba(255, 255, 255, 0.36);
+  --rd-weather-carousel-page-active: rgb(255, 255, 255);
   --rd-weather-scene-neutral: linear-gradient(160deg, rgb(30, 42, 58), rgb(11, 18, 29) 72%);
   --rd-weather-scene-sunny: linear-gradient(160deg, rgb(44, 120, 183), rgb(27, 76, 132) 42%, rgb(10, 28, 52) 100%);
   --rd-weather-scene-night: linear-gradient(160deg, rgb(20, 30, 72), rgb(18, 25, 52) 48%, rgb(7, 12, 28) 100%);

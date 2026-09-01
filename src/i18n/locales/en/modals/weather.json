@@ -20,6 +20,11 @@
     "title": "Air Quality",
     "unavailableAriaLabel": "Outdoor air quality unavailable"
   },
+  "carousel": {
+    "conditions": "24-hour conditions",
+    "forecast": "24-hour weather forecast",
+    "section": "24-hour weather conditions"
+  },
   "details": {
     "ariaLabel": "{{title}} {{value}}",
     "sun": {
