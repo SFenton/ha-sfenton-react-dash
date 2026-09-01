@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { TodoListPanel } from './TodoListPanel'
 import { entity, mockCallServiceCalls, mockEntities, mockTodoItemsByEntity, resetMockHass } from '../../test/mocks/hakitCoreState'
 
@@ -129,6 +129,19 @@ describe('TodoListPanel', () => {
         summary: 'Replace Theater Room Vent batteries',
         uid: 'battery-plural',
       },
+      {
+        description: [
+          'The Hallway/Entryway/Living Room Presence Sensor battery is at 20%.',
+          '',
+          'Home Assistant updates this task when the reported percentage changes.',
+          '',
+          'Maintenance reference: BATT-LONG1234.',
+        ].join('\n'),
+        due: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString(),
+        status: 'needs_action',
+        summary: 'Replace Hallway/Entryway/Living Room Presence Sensor Battery · 20%',
+        uid: 'battery-long-title',
+      },
     ]
 
     render(<TodoListPanel entityId={ENTITY_ID} title="Optimistic Chores" />)
@@ -138,9 +151,50 @@ describe('TodoListPanel', () => {
     expect(screen.getByText('Replace Front Yard Battery · 10%')).toBeInTheDocument()
     expect(screen.getByText('Charge Aqara Smart Lock U400 · 20%')).toBeInTheDocument()
     expect(screen.getByText('Replace Theater Room Vent Batteries · 8%')).toBeInTheDocument()
+    expect(screen.getByText('Replace Hallway/Entryway/Living Room Presence Sensor Battery · 20%')).toBeInTheDocument()
     expect(screen.queryByText('Charge Aqara Smart Lock U400 · 20% · 20%')).not.toBeInTheDocument()
     expect(screen.getByText('2 days overdue')).toBeInTheDocument()
     expect(screen.getByText('7 hours overdue')).toBeInTheDocument()
     expect(screen.queryByText(/Maintenance reference:/i)).not.toBeInTheDocument()
+  })
+
+  it('uses temporal subtitles only and hides task descriptions', async () => {
+    mockTodoItemsByEntity[ENTITY_ID] = [
+      {
+        description: [
+          'Home Assistant discovered a new battery entity: Battery (12V).',
+          '',
+          'Current reading: 66.0%.',
+          '',
+          'Open Settings > Devices & services > Battery Maintenance > Configure.',
+          '',
+          'Battery review reference: REVIEW-33BB580E.',
+        ].join('\n'),
+        due: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+        status: 'needs_action',
+        summary: 'Mustang Mach-E Battery (12V)',
+        uid: 'battery-review',
+      },
+      {
+        description: 'This description should not become a subtitle.',
+        status: 'needs_action',
+        summary: 'Undated task',
+        uid: 'undated-task',
+      },
+    ]
+
+    render(<TodoListPanel entityId={ENTITY_ID} title="Optimistic Chores" />)
+
+    const reviewTask = await screen.findByRole('button', {
+      name: 'Mustang Mach-E Battery (12V) 2 days overdue',
+    })
+    const subtitle = within(reviewTask).getByText('2 days overdue')
+
+    expect(subtitle.textContent).toBe('2 days overdue')
+    expect(subtitle.textContent).not.toContain('·')
+    expect(subtitle.textContent).not.toMatch(/\.$/)
+    expect(screen.queryByText(/Home Assistant discovered a new battery entity/i)).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Undated task' }).querySelector('small')).toBeNull()
+    expect(screen.queryByText('This description should not become a subtitle.')).not.toBeInTheDocument()
   })
 })
