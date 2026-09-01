@@ -4517,7 +4517,7 @@ test('mobile bed dial maps taps, drag, and keyboard to targets without invoking 
   expect(powerOffCalls).toHaveLength(0)
 })
 
-test('mobile SleepyPod target prompt commits Tonight immediately and closes without an extra command', async ({ page }) => {
+test('mobile SleepyPod target prompt keeps current-target commands separate from All Nights persistence', async ({ page }) => {
   await page.setViewportSize({ width: 393, height: 852 })
   await page.goto('/at-a-glance/master-bedroom')
   await page.evaluate(() => {
@@ -4623,7 +4623,7 @@ test('mobile SleepyPod target prompt commits Tonight immediately and closes with
       serviceData: { level: -6 },
     },
   ])
-  await scopeDialog.getByRole('button', { name: 'Close' }).click()
+  await scopeDialog.getByRole('button', { name: 'All Nights' }).click()
 
   await expect(scopeDialog).toHaveAttribute('data-state', 'closed')
   await expect(scopeDialog).toHaveAttribute('data-closing', 'true')
@@ -4636,6 +4636,19 @@ test('mobile SleepyPod target prompt commits Tonight immediately and closes with
     (window as unknown as { __mockHass: { calls: Record<string, unknown>[] } }).__mockHass.calls
       .filter((call) => call.domain === 'script')
   ))).toHaveLength(2)
+  await expect.poll(async () => page.evaluate(() => (
+    (window as unknown as { __mockHass: { calls: Record<string, unknown>[] } }).__mockHass.calls
+      .filter((call) => call.domain === 'number' || call.domain === 'climate')
+  ))).toEqual([])
+  await expect.poll(async () => page.evaluate(() => (
+    (window as unknown as { __mockHass: { calls: Record<string, unknown>[] } }).__mockHass.calls
+      .filter((call) => call.domain === 'input_number' && call.service === 'set_value')
+  ))).toEqual([{
+    domain: 'input_number',
+    service: 'set_value',
+    target: 'input_number.eight_sleep_stephen_bedtime_level',
+    serviceData: { value: -6 },
+  }])
   await expect(targetSlider).toHaveAttribute('aria-valuenow', '-6')
 })
 

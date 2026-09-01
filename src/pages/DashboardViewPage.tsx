@@ -51,7 +51,7 @@ import {
   sleepypodOutsideScheduleTemperatureService,
   sleepypodSchedulePhase,
   sleepypodSchedulePhaseAvailable,
-  sleepypodTemperatureScopeService,
+  sleepypodTonightTemperatureService,
   type SleepypodSchedulePhase,
   type SleepypodTemperatureScope,
 } from '../components/hass/bedTemperatureScope'
@@ -2753,6 +2753,7 @@ interface EightSleepBedModalState {
   hotFlashAvailable: boolean
   hotFlashCountdown: string | null
   hotFlashHolding: boolean
+  liveTargetValue: number | null
   schedulePhaseAvailable: boolean
   sideAvailable: boolean
   subtitle: string
@@ -3455,6 +3456,7 @@ function useEightSleepBedModalState(side: EightSleepSideConfig | undefined, prel
     hotFlashAvailable,
     hotFlashCountdown,
     hotFlashHolding,
+    liveTargetValue: liveTargetTemperature,
     schedulePhaseAvailable: schedulePhaseIsAvailable,
     sideAvailable,
     subtitle,
@@ -3703,11 +3705,12 @@ function EightSleepThermostatHero({
   const previousActiveSchedulePhaseRef = useRef<SleepypodSchedulePhase | null>(modalState.activeSchedulePhase)
   const targetSyncTimerRef = useRef<number | null>(null)
   const pendingTargetValueRef = useRef<number | null>(null)
+  const pendingTargetCommandRef = useRef<{ liveValue: number | null; value: number } | null>(null)
   const controlsSideOnRef = useRef(false)
   const targetSliderRef = useRef<HTMLSpanElement>(null)
   const [dragValue, setDragValue] = useState<number | null>(null)
   const [targetDragging, setTargetDragging] = useState(false)
-  const { activeSchedulePhase, cancelTargetTemperature, commitDisplaySideOn, commitTargetTemperature, controlMode, controlsSideOn, currentTemperature, displayedTargetValue: sourceTargetValue, schedulePhaseAvailable, sideAvailable, targetMax, targetMin, targetScale, targetStep } = modalState
+  const { activeSchedulePhase, cancelTargetTemperature, commitDisplaySideOn, commitTargetTemperature, controlMode, controlsSideOn, currentTemperature, displayedTargetValue: sourceTargetValue, liveTargetValue, schedulePhaseAvailable, sideAvailable, targetMax, targetMin, targetScale, targetStep } = modalState
   const targetConfirmationHoldMs = controlMode === 'climate' && targetScale === 'level' ? SLEEPYPOD_TARGET_CONFIRMATION_HOLD_MS : 0
   const [optimisticTargetValue, commitHeroTargetValue, cancelHeroTargetValue] = useOptimisticState(sourceTargetValue, { clearOn: 'confirmation', confirmationHoldMs: targetConfirmationHoldMs, revertMs: FREE_SLEEP_TARGET_REVERT_MS })
   const displayedTargetValue = modalState.hotFlashActive ? sourceTargetValue : dragValue ?? optimisticTargetValue
@@ -3749,6 +3752,14 @@ function EightSleepThermostatHero({
     controlsSideOnRef.current = controlsSideOn
   }, [controlsSideOn])
 
+  useEffect(() => {
+    const pendingCommand = pendingTargetCommandRef.current
+    if (!pendingCommand) return
+    if (liveTargetValue !== pendingCommand.liveValue || sourceTargetValue === liveTargetValue) {
+      pendingTargetCommandRef.current = null
+    }
+  }, [liveTargetValue, sourceTargetValue])
+
   const sendTargetTemperatureToHass = useCallback((pendingValue: number) => {
     if (controlMode === 'climate' && targetScale === 'level') {
       callService({ domain: 'script', service: sleepypodOutsideScheduleTemperatureService(side.scheduleSide), serviceData: { level: pendingValue } })
@@ -3776,6 +3787,7 @@ function EightSleepThermostatHero({
     if (targetSyncTimerRef.current !== null) window.clearTimeout(targetSyncTimerRef.current)
     targetSyncTimerRef.current = null
     pendingTargetValueRef.current = null
+    pendingTargetCommandRef.current = null
     activeHandle.current = null
     dialTapCandidateRef.current = null
     cancelHeroTargetValue()
@@ -3789,6 +3801,7 @@ function EightSleepThermostatHero({
     if (targetSyncTimerRef.current !== null) window.clearTimeout(targetSyncTimerRef.current)
     targetSyncTimerRef.current = null
     pendingTargetValueRef.current = null
+    pendingTargetCommandRef.current = null
     cancelHeroTargetValue()
     cancelTargetTemperature()
   }, [activeSchedulePhase, cancelHeroTargetValue, cancelTargetTemperature, scopedSleepypodTarget])
@@ -3803,20 +3816,45 @@ function EightSleepThermostatHero({
     if (!canSetTarget) return
     const clampedValue = snapNumberToStep(nextValue, targetMin, targetMax, targetStep)
     setDragValue(null)
-    if (scopedSleepypodTarget && activeSchedulePhase) {
+    const pendingCommand = pendingTargetCommandRef.current
+    const targetMatchesLive = liveTargetValue === clampedValue
+    const targetAlreadyPending = pendingCommand?.value === clampedValue && pendingCommand.liveValue === liveTargetValue
+    const pendingWouldMoveAwayFromLive = targetMatchesLive && pendingCommand !== null && pendingCommand.value !== clampedValue
+    const scopedActiveTarget = scopedSleepypodTarget && activeSchedulePhase
+    if (!scopedActiveTarget && targetMatchesLive && targetSyncTimerRef.current !== null) {
+      window.clearTimeout(targetSyncTimerRef.current)
+      targetSyncTimerRef.current = null
+      pendingTargetValueRef.current = null
+      pendingTargetCommandRef.current = null
+      cancelHeroTargetValue()
+      cancelTargetTemperature()
+      return
+    }
+    const shouldSendTargetCommand = pendingWouldMoveAwayFromLive || (!targetMatchesLive && !targetAlreadyPending)
+    if (!shouldSendTargetCommand && targetMatchesLive) {
+      pendingTargetCommandRef.current = null
+      cancelHeroTargetValue()
+      cancelTargetTemperature()
+    }
+    if (scopedActiveTarget) {
       if (targetSyncTimerRef.current !== null) window.clearTimeout(targetSyncTimerRef.current)
       targetSyncTimerRef.current = null
       pendingTargetValueRef.current = null
-      commitHeroTargetValue(clampedValue)
-      commitTargetTemperature(clampedValue)
-      callService({
-        domain: 'script',
-        service: sleepypodTemperatureScopeService(side.scheduleSide, 'tonight', activeSchedulePhase),
-        serviceData: { level: clampedValue },
-      })
+      if (shouldSendTargetCommand) {
+        pendingTargetCommandRef.current = { liveValue: liveTargetValue, value: clampedValue }
+        commitHeroTargetValue(clampedValue)
+        commitTargetTemperature(clampedValue)
+        callService({
+          domain: 'script',
+          service: sleepypodTonightTemperatureService(side.scheduleSide),
+          serviceData: { level: clampedValue },
+        })
+      }
       onRequestTemperatureScope?.(clampedValue, activeSchedulePhase, targetSliderRef.current)
       return
     }
+    if (!shouldSendTargetCommand) return
+    pendingTargetCommandRef.current = { liveValue: liveTargetValue, value: clampedValue }
     commitHeroTargetValue(clampedValue)
     commitTargetTemperature(clampedValue)
     queueTargetTemperatureSync(clampedValue)
@@ -4003,7 +4041,6 @@ function EightSleepThermostatHero({
           mode="full"
           off={!heroReadoutAction}
           onChange={updateDragValue}
-          onChangeApplied={setTargetTemperature}
           onPointerCancel={cancelDialTap}
           onPointerDown={startDialTap}
           onPointerMove={moveDialTap}
@@ -4818,7 +4855,12 @@ function EightSleepBedModal({ modalState, onClose, open, side }: { modalState: E
   }, [modalState.activeSchedulePhase, modalState.sideAvailable, scopeRequest])
 
   const closeScopePrompt = () => {
-    setScopeRequest((current) => ({ ...current, open: false }))
+    const current = scopeCommandStateRef.current
+    scopeCommandStateRef.current = {
+      ...current,
+      request: { ...current.request, open: false },
+    }
+    setScopeRequest((request) => request.open ? { ...request, open: false } : request)
   }
 
   const closeBedModal = () => {
@@ -4912,9 +4954,10 @@ function EightSleepBedModal({ modalState, onClose, open, side }: { modalState: E
     closeScopePrompt()
     if (scope === 'tonight') return
     callService({
-      domain: 'script',
-      service: sleepypodTemperatureScopeService(side.scheduleSide, scope, current.request.phase),
-      serviceData: { level: current.request.value },
+      domain: 'input_number',
+      service: 'set_value',
+      target: side.scheduleStageTemperatureEntityIds[current.request.phase],
+      serviceData: { value: current.request.value },
     })
   }
 
