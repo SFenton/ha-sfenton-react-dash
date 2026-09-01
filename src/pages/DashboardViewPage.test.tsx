@@ -2759,12 +2759,12 @@ describe('DashboardViewPage', () => {
 
   it.each([
     ['bedtime', 'Tonight', null],
-    ['bedtime', 'All Nights', 'sleepypod_stephen_bedtime_temperature_all_nights'],
+    ['bedtime', 'All Nights', 'input_number.eight_sleep_stephen_bedtime_level'],
     ['asleep', 'Tonight', null],
-    ['asleep', 'All Nights', 'sleepypod_stephen_asleep_temperature_all_nights'],
+    ['asleep', 'All Nights', 'input_number.eight_sleep_stephen_asleep_level'],
     ['dawn', 'Tonight', null],
-    ['dawn', 'All Nights', 'sleepypod_stephen_dawn_temperature_all_nights'],
-  ])('commits Tonight during %s before applying %s', async (phase, choice, allNightsService) => {
+    ['dawn', 'All Nights', 'input_number.eight_sleep_stephen_dawn_level'],
+  ])('commits Tonight during %s before persisting %s without reapplying the current target', async (phase, choice, allNightsTarget) => {
     setupStephenSleepypodLevelControl(phase)
     render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
 
@@ -2790,11 +2790,12 @@ describe('DashboardViewPage', () => {
     fireEvent.click(within(scopeDialog).getByRole('button', { name: choice }))
 
     expect(targetSlider).toHaveAttribute('aria-valuenow', '-3')
-    const expectedCalls = allNightsService
+    const expectedCalls = allNightsTarget
       ? [tonightCall, {
-          domain: 'script',
-          service: allNightsService,
-          serviceData: { level: -3 },
+          domain: 'input_number',
+          service: 'set_value',
+          target: allNightsTarget,
+          serviceData: { value: -3 },
         }]
       : [tonightCall]
     await waitFor(() => expect(mockCallServiceCalls).toEqual(expectedCalls))
@@ -2804,6 +2805,149 @@ describe('DashboardViewPage', () => {
     expect(within(bedDialog).getByRole('region', { hidden: true, name: /Stephen's Bed thermostat Cooling -3/i })).toBeInTheDocument()
     await waitFor(() => expect(within(bedDialog).getByRole('slider', { name: "Stephen's Bed target level" })).toHaveFocus())
     expect(mockCallServiceCalls.some((call) => call.domain === 'number')).toBe(false)
+    expect(mockCallServiceCalls.some((call) => call.domain === 'script' && call.service.includes('all_nights'))).toBe(false)
+  })
+
+  it('offers All Nights without sending a current-target command when the active-phase value is unchanged', async () => {
+    setupStephenSleepypodLevelControl('bedtime')
+    mockEntities['number.master_bedroom_sleepypod_eight_pod_left_target_level'].state = '-10'
+    render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
+
+    fireEvent.click(screen.getByRole('button', { name: /Stephen's Bed Cooling • -10/i }))
+    const bedDialog = await screen.findByRole('dialog', { name: "Stephen's Bed" })
+    const targetSlider = within(bedDialog).getByRole('slider', { name: "Stephen's Bed target level" })
+    fireEvent.keyDown(targetSlider, { key: 'Home' })
+
+    expect(targetSlider).toHaveAttribute('aria-valuenow', '-10')
+    const scopeDialog = await screen.findByRole('dialog', { name: 'Set Bed Temperature' })
+    expect(mockCallServiceCalls).toEqual([])
+    fireEvent.click(within(scopeDialog).getByRole('button', { name: 'All Nights' }))
+
+    await waitFor(() => expect(mockCallServiceCalls).toEqual([{
+      domain: 'input_number',
+      service: 'set_value',
+      target: 'input_number.eight_sleep_stephen_bedtime_level',
+      serviceData: { value: -10 },
+    }]))
+  })
+
+  it('does not send a command when an outside-window dial commit keeps the current target', async () => {
+    setupStephenSleepypodLevelControl('outside')
+    mockEntities['number.master_bedroom_sleepypod_eight_pod_left_target_level'].state = '-10'
+    render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
+
+    fireEvent.click(screen.getByRole('button', { name: /Stephen's Bed Cooling • -10/i }))
+    const bedDialog = await screen.findByRole('dialog', { name: "Stephen's Bed" })
+    const targetSlider = within(bedDialog).getByRole('slider', { name: "Stephen's Bed target level" })
+    fireEvent.keyDown(targetSlider, { key: 'Home' })
+
+    expect(targetSlider).toHaveAttribute('aria-valuenow', '-10')
+    expect(screen.queryByRole('dialog', { name: 'Set Bed Temperature' })).not.toBeInTheDocument()
+    await act(async () => {
+      await new Promise((resolve) => window.setTimeout(resolve, 400))
+    })
+    expect(mockCallServiceCalls).toEqual([])
+  })
+
+  it('cancels a queued outside-window command when the dial returns to the live target', async () => {
+    setupStephenSleepypodLevelControl('outside')
+    render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
+
+    fireEvent.click(screen.getByRole('button', { name: /Stephen's Bed Cooling • -2/i }))
+    const bedDialog = await screen.findByRole('dialog', { name: "Stephen's Bed" })
+    const targetSlider = within(bedDialog).getByRole('slider', { name: "Stephen's Bed target level" })
+    fireEvent.keyDown(targetSlider, { key: 'ArrowLeft' })
+    fireEvent.keyDown(targetSlider, { key: 'ArrowRight' })
+
+    expect(targetSlider).toHaveAttribute('aria-valuenow', '-2')
+    await act(async () => {
+      await new Promise((resolve) => window.setTimeout(resolve, 400))
+    })
+    expect(mockCallServiceCalls).toEqual([])
+  })
+
+  it('cancels a stale queued outside-window command after HA reports a new live target', async () => {
+    setupStephenSleepypodLevelControl('outside')
+    const view = render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
+
+    fireEvent.click(screen.getByRole('button', { name: /Stephen's Bed Cooling • -2/i }))
+    const bedDialog = await screen.findByRole('dialog', { name: "Stephen's Bed" })
+    const targetSlider = within(bedDialog).getByRole('slider', { name: "Stephen's Bed target level" })
+    fireEvent.keyDown(targetSlider, { key: 'ArrowLeft' })
+
+    act(() => {
+      mockEntities['number.master_bedroom_sleepypod_eight_pod_left_target_level'].state = '-4'
+      view.rerender(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
+    })
+    fireEvent.keyDown(targetSlider, { key: 'ArrowLeft' })
+
+    expect(targetSlider).toHaveAttribute('aria-valuenow', '-4')
+    await act(async () => {
+      await new Promise((resolve) => window.setTimeout(resolve, 400))
+    })
+    expect(mockCallServiceCalls).toEqual([])
+  })
+
+  it('allows the same target to be reasserted after HA reports an intervening external change', async () => {
+    setupStephenSleepypodLevelControl('outside')
+    mockEntities['number.master_bedroom_sleepypod_eight_pod_left_target_level'].state = '-9'
+    const view = render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
+
+    fireEvent.click(screen.getByRole('button', { name: /Stephen's Bed Cooling • -9/i }))
+    const bedDialog = await screen.findByRole('dialog', { name: "Stephen's Bed" })
+    const targetSlider = within(bedDialog).getByRole('slider', { name: "Stephen's Bed target level" })
+    fireEvent.keyDown(targetSlider, { key: 'Home' })
+    await waitFor(() => expect(mockCallServiceCalls).toHaveLength(1))
+
+    act(() => {
+      mockEntities['number.master_bedroom_sleepypod_eight_pod_left_target_level'].state = '-8'
+      view.rerender(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
+    })
+    fireEvent.keyDown(targetSlider, { key: 'Home' })
+
+    await waitFor(() => expect(mockCallServiceCalls).toEqual([
+      {
+        domain: 'script',
+        service: 'sleepypod_stephen_temperature_outside_schedule',
+        serviceData: { level: -10 },
+      },
+      {
+        domain: 'script',
+        service: 'sleepypod_stephen_temperature_outside_schedule',
+        serviceData: { level: -10 },
+      },
+    ]))
+  })
+
+  it('persists Steph All Nights through the schedule helper without another current-target script', async () => {
+    setupStephSleepypodLevelControl('bedtime')
+    render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
+
+    fireEvent.click(screen.getByRole('button', { name: /Steph's Bed/i }))
+    const bedDialog = await screen.findByRole('dialog', { name: "Steph's Bed" })
+    const targetSlider = within(bedDialog).getByRole('slider', { name: "Steph's Bed target level" })
+    fireEvent.keyDown(targetSlider, { key: 'ArrowLeft' })
+    const scopeDialog = await screen.findByRole('dialog', { name: 'Set Bed Temperature' })
+    const allNights = within(scopeDialog).getByRole('button', { name: 'All Nights' })
+
+    act(() => {
+      allNights.click()
+      allNights.click()
+    })
+
+    await waitFor(() => expect(mockCallServiceCalls).toEqual([
+      {
+        domain: 'script',
+        service: 'sleepypod_steph_temperature_tonight',
+        serviceData: { level: 0 },
+      },
+      {
+        domain: 'input_number',
+        service: 'set_value',
+        target: 'input_number.eight_sleep_steph_bedtime_level',
+        serviceData: { value: 0 },
+      },
+    ]))
   })
 
   it('keeps Tonight changes when the scope prompt is dismissed from the action, close button, or backdrop', async () => {
