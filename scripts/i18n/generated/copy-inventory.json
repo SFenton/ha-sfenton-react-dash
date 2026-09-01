@@ -1608,18 +1608,6 @@
       "words": 2
     },
     {
-      "characters": 8,
-      "context": "catalog-copy",
-      "file": "src/i18n/locales/en/modals/vacuum.json",
-      "id": "36ac85711b0c593a",
-      "lines": [],
-      "occurrences": 1,
-      "origin": "catalog",
-      "placeholders": [],
-      "value": "Full Map",
-      "words": 2
-    },
-    {
       "characters": 19,
       "context": "catalog-copy",
       "file": "src/i18n/locales/en/core.json",
@@ -2620,18 +2608,6 @@
       "placeholders": [],
       "value": "Rain delay · 24 hours",
       "words": 5
-    },
-    {
-      "characters": 19,
-      "context": "catalog-copy",
-      "file": "src/i18n/locales/en/modals/vacuum.json",
-      "id": "cf8c9099eb815260",
-      "lines": [],
-      "occurrences": 1,
-      "origin": "catalog",
-      "placeholders": [],
-      "value": "Reachable Area Only",
-      "words": 3
     },
     {
       "characters": 33,
@@ -7234,7 +7210,7 @@
       "file": "src/components/hass/ValetudoMapCard.tsx",
       "id": "d498ebc7662e2cc5",
       "lines": [
-        1039
+        1007
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -7266,7 +7242,7 @@
       "file": "src/components/hass/ValetudoMapCard.tsx",
       "id": "301b865d3ce22f72",
       "lines": [
-        993
+        979
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -8026,7 +8002,7 @@
       "file": "src/components/hass/ValetudoMapCard.tsx",
       "id": "4ec9da09c6937e86",
       "lines": [
-        1056
+        1024
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -8372,7 +8348,7 @@
       "file": "src/components/hass/ValetudoMapCard.tsx",
       "id": "9f67b3f8d27cdad7",
       "lines": [
-        1087
+        1055
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -20711,7 +20687,7 @@
       "file": "src/components/hass/ValetudoMapCard.tsx",
       "id": "3775342c11d20e97",
       "lines": [
-        146
+        145
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -20725,7 +20701,7 @@
       "file": "src/components/hass/ValetudoMapCard.tsx",
       "id": "44cb3c7e429650fc",
       "lines": [
-        147
+        146
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -20739,7 +20715,7 @@
       "file": "src/components/hass/ValetudoMapCard.tsx",
       "id": "d126d4895823f4d6",
       "lines": [
-        148
+        147
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -20753,7 +20729,7 @@
       "file": "src/components/hass/ValetudoMapCard.tsx",
       "id": "28eebe025802c5e9",
       "lines": [
-        149
+        148
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -36321,11 +36297,11 @@
     }
   ],
   "summary": {
-    "catalogRecords": 479,
+    "catalogRecords": 477,
     "documentRecords": 1,
     "legacyOccurrences": 2545,
     "legacyRecords": 2104,
-    "totalRecords": 2584
+    "totalRecords": 2582
   },
   "version": 1
 }

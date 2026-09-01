@@ -137,7 +137,7 @@ test('permanent navigation and modal controls retain keyboard focus indicators',
   await expect.poll(() => visibleFocusIndicator(close)).toBe(true)
 })
 
-test('music room focused-map control works in a fine-pointer desktop context', async ({ page }) => {
+test('music room focused map omits scope controls in a fine-pointer desktop context', async ({ page }) => {
   await page.goto('/index.html?path=vacuums')
   await expect.poll(() => page.evaluate(() => ({
     coarse: window.matchMedia('(pointer: coarse)').matches,
@@ -159,26 +159,20 @@ test('music room focused-map control works in a fine-pointer desktop context', a
   await page.getByRole('button', { name: /Music Room Docked/i }).click()
   const dialog = page.getByRole('dialog')
   const map = dialog.getByRole('region', { name: 'Music Room Valetudo map' })
-  const fullMap = dialog.getByRole('button', { name: 'Full Map' })
 
   await expect(map).toHaveAttribute('data-map-scope', 'focused')
-  await fullMap.focus()
-  await expect(fullMap).toBeFocused()
-  await expect.poll(() => visibleFocusIndicator(fullMap)).toBe(true)
+  await expect(dialog.getByRole('button', { name: 'Full Map' })).toHaveCount(0)
+  await expect(dialog.getByText('Reachable Area Only')).toHaveCount(0)
   const containment = await map.evaluate((element) => {
     const frame = element.getBoundingClientRect()
-    const control = element.querySelector<HTMLElement>('button[aria-pressed]')?.getBoundingClientRect()
-    return Boolean(control)
-      && control!.left >= frame.left
-      && control!.right <= frame.right
-      && control!.top >= frame.top
-      && control!.bottom <= frame.bottom
+    const dialog = element.closest<HTMLElement>('[role="dialog"]')?.getBoundingClientRect()
+    return Boolean(dialog)
+      && frame.left >= dialog!.left
+      && frame.right <= dialog!.right
+      && frame.top >= dialog!.top
+      && frame.bottom <= dialog!.bottom
   })
   expect(containment).toBe(true)
-
-  await fullMap.click()
-  await expect(map).toHaveAttribute('data-map-scope', 'full')
-  await expect(fullMap).toHaveAttribute('aria-pressed', 'true')
 })
 
 test('Music Room media controls remain usable in a fine-pointer desktop context', async ({ page }) => {

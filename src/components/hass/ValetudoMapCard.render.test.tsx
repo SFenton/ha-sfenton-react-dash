@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import { VACUUMS } from '../../constants/portedDashboard'
 import { mockEntities, resetMockHass } from '../../test/mocks/hakitCoreState'
 import { ValetudoMapCard } from './ValetudoMapCard'
@@ -77,27 +77,18 @@ describe('ValetudoMapCard availability', () => {
     }
   })
 
-  it('starts the Music Room map in focused mode and exposes a full-map toggle', () => {
+  it('keeps the Music Room map focused without map-scope controls', () => {
     if (!musicRoomVacuum) throw new Error('Expected Music Room vacuum config')
 
     render(<ValetudoMapCard available vacuum={musicRoomVacuum} />)
 
     const map = screen.getByRole('region', { name: 'Music Room Valetudo map' })
-    const fullMap = screen.getByRole('button', { name: 'Full Map' })
     expect(map).toHaveAttribute('data-map-scope', 'focused')
     expect(map).toHaveAttribute('data-map-focus-reason', 'focused')
     expect(map).toHaveAttribute('data-map-render-clipped', 'true')
     expect(map).toHaveAttribute('data-view-min-x', '634')
     expect(map).toHaveAttribute('data-view-max-x', '782')
-    expect(screen.getByText('Reachable Area Only')).toBeVisible()
-    expect(fullMap).toHaveAttribute('aria-pressed', 'false')
-
-    fireEvent.click(fullMap)
-
-    expect(map).toHaveAttribute('data-map-scope', 'full')
-    expect(map).toHaveAttribute('data-map-render-clipped', 'false')
-    expect(map).toHaveAttribute('data-view-min-x', '504')
-    expect(fullMap).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.queryByRole('button', { name: 'Full Map' })).not.toBeInTheDocument()
     expect(screen.queryByText('Reachable Area Only')).not.toBeInTheDocument()
   })
 

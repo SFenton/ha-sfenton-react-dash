@@ -674,39 +674,32 @@ test('vacuum workspace stays fixed across tabs and keeps each region reachable',
   expect(Math.round(tabListBox?.width ?? 0)).toBeLessThanOrEqual(680)
 })
 
-test('music room focused-map controls stay contained across the canonical viewport matrix', async ({ page }) => {
+test('music room focused map omits scope controls across the canonical viewport matrix', async ({ page }) => {
   for (const viewport of VIEWPORTS) {
     await page.setViewportSize(viewport)
     const dialog = await openMusicRoomVacuum(page)
     const map = dialog.getByRole('region', { name: 'Music Room Valetudo map' })
-    const fullMap = dialog.getByRole('button', { name: 'Full Map' })
 
     await expect(map).toHaveAttribute('data-map-scope', 'focused')
-    await expect(dialog.getByText('Reachable Area Only')).toBeVisible()
+    await expect(dialog.getByRole('button', { name: 'Full Map' })).toHaveCount(0)
+    await expect(dialog.getByText('Reachable Area Only')).toHaveCount(0)
     const geometry = await map.evaluate((element) => {
       const frame = element.getBoundingClientRect()
-      const control = element.querySelector<HTMLElement>('button[aria-pressed]')
-      const controlRect = control?.getBoundingClientRect()
+      const dialog = element.closest<HTMLElement>('[role="dialog"]')?.getBoundingClientRect()
       return {
-        contained: Boolean(controlRect)
-          && controlRect!.left >= frame.left
-          && controlRect!.right <= frame.right
-          && controlRect!.top >= frame.top
-          && controlRect!.bottom <= frame.bottom,
-        controlHeight: controlRect?.height ?? 0,
+        contained: Boolean(dialog)
+          && frame.left >= dialog!.left
+          && frame.right <= dialog!.right
+          && frame.top >= dialog!.top
+          && frame.bottom <= dialog!.bottom,
         frameHeight: frame.height,
         frameWidth: frame.width,
       }
     })
     expect(geometry.contained).toBe(true)
-    expect(geometry.controlHeight).toBeGreaterThanOrEqual(44)
     expect(geometry.frameHeight).toBeGreaterThan(0)
     expect(geometry.frameWidth).toBeGreaterThan(0)
 
-    await fullMap.click()
-    await expect(map).toHaveAttribute('data-map-scope', 'full')
-    await fullMap.click()
-    await expect(map).toHaveAttribute('data-map-scope', 'focused')
     await closeModal(dialog)
   }
 })
@@ -738,8 +731,8 @@ test('music room focused map survives mounted viewport transitions', async ({ pa
     for (const viewport of sequence) {
       await page.setViewportSize(viewport)
       await expect(map).toHaveAttribute('data-map-scope', 'focused')
-      await expect(dialog.getByRole('button', { name: 'Full Map' })).toBeVisible()
-      await expect(dialog.getByText('Reachable Area Only')).toBeVisible()
+      await expect(dialog.getByRole('button', { name: 'Full Map' })).toHaveCount(0)
+      await expect(dialog.getByText('Reachable Area Only')).toHaveCount(0)
     }
 
     await closeModal(dialog)

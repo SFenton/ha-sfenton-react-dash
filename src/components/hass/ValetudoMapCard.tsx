@@ -13,7 +13,6 @@ import { useEntity, useHass } from '@hakit/core'
 import type { VacuumConfig } from '../../constants/portedDashboard'
 import { VACUUM_COPY_KEYS, VACUUM_COPY_NAMESPACE, useCopy } from '../../i18n'
 import { MaterialIcon } from '../core/Icon'
-import type { ControlSemantics } from '../core/controlSemantics'
 import { materialIconPath } from '../core/iconPaths'
 import { asEntityName } from './entityState'
 import { isUnavailableVacuumState } from './vacuumVisualState'
@@ -492,7 +491,6 @@ export function ValetudoMapCard({
   const [isLoaded, setIsLoaded] = useState(import.meta.env.MODE === 'test')
   const [loadedMapSourceKey, setLoadedMapSourceKey] = useState<string | null>(null)
   const [map, setMap] = useState<ValetudoMap | null>(() => import.meta.env.MODE === 'test' ? createMockValetudoMap(vacuum.vacuumMapId) : null)
-  const [scopePreference, setScopePreference] = useState({ showFullMap: false, vacuumMapId: vacuum.vacuumMapId })
   const [storedViewport, setStoredViewport] = useState<{ revision: number; value: MapViewport }>({
     revision: resetViewRevision,
     value: INITIAL_VIEWPORT,
@@ -540,13 +538,10 @@ export function ValetudoMapCard({
     [displayedMap, vacuum.mapFocus],
   )
   const focusAvailable = focusResult?.mode === 'focused'
-  const showFullMap = focusAvailable
-    && scopePreference.vacuumMapId === vacuum.vacuumMapId
-    && scopePreference.showFullMap
   const selectionAllowed = !selection
     || !focusAvailable
     || mapGridRectWithinBounds(selection, focusResult.interactionBounds)
-  const displayScope = focusAvailable && !showFullMap ? VALETUDO_MAP_SCOPE_FOCUSED : VALETUDO_MAP_SCOPE_FULL
+  const displayScope = focusAvailable ? VALETUDO_MAP_SCOPE_FOCUSED : VALETUDO_MAP_SCOPE_FULL
   const liveGeometry = useMemo(
     () => renderedMap
       ? valetudoMapStageGeometry(
@@ -604,15 +599,6 @@ export function ValetudoMapCard({
     viewportRef.current = nextViewport
     setStoredViewport({ revision: resetViewRevision, value: nextViewport })
   }, [resetViewRevision])
-  const fullMapSemantics = { kind: 'toggle', checked: showFullMap } satisfies ControlSemantics
-  const toggleFullMap = useCallback(() => {
-    setGestureView(null)
-    setScopePreference({
-      showFullMap: !showFullMap,
-      vacuumMapId: vacuum.vacuumMapId,
-    })
-    setViewport(INITIAL_VIEWPORT)
-  }, [setViewport, showFullMap, vacuum.vacuumMapId])
 
   useEffect(() => {
     matrixRef.current = matrix
@@ -1015,24 +1001,6 @@ export function ValetudoMapCard({
         style={mapStyle}
       >
         <canvas aria-hidden="true" className={styles.canvas} data-valetudo-map-canvas="true" ref={canvasRef} />
-        {focusAvailable && displayedLoaded && !showFallback && (
-          <div className={styles.scopeControls} data-base-ui-swipe-ignore="true">
-            {!showFullMap && (
-              <span className={styles.focusStatus}>{copy(VACUUM_COPY_KEYS.mapScope.reachableAreaOnly)}</span>
-            )}
-            <button
-              aria-pressed={fullMapSemantics.checked}
-              className={styles.scopeToggle}
-              data-active={showFullMap ? 'true' : 'false'}
-              disabled={Boolean(currentGestureView)}
-              onClick={toggleFullMap}
-              type="button"
-            >
-              <MaterialIcon name="mdi:map-outline" size={17} />
-              {copy(VACUUM_COPY_KEYS.mapScope.fullMap)}
-            </button>
-          </div>
-        )}
         {showOverlay && geometry && (
           <svg
             aria-hidden={mapInteractive ? undefined : true}
