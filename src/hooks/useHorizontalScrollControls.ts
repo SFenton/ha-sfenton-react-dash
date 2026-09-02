@@ -12,7 +12,6 @@ interface HorizontalScrollState {
 interface HorizontalScrollControlsOptions {
   enabled?: boolean
   itemCount: number
-  minimumHiddenItems?: number
   revision?: number | string
 }
 
@@ -24,24 +23,71 @@ export interface HorizontalScrollControls<T extends HTMLElement> extends Horizon
   scrollerRef: RefObject<T | null>
 }
 
-const EDGE_TOLERANCE_PX = 1
-const OVERFLOW_HIDE_RATIO = 0.75
+const PAGE_LEADING_SPACE_PROPERTY = '--weather-carousel-page-leading-space'
+const PAGE_TRAILING_SPACE_PROPERTY = '--weather-carousel-page-trailing-space'
 
 function carouselItems(element: HTMLElement) {
   return Array.from(element.querySelectorAll<HTMLElement>(':scope > [data-carousel-item="true"]'))
 }
 
-function itemPitch(items: readonly HTMLElement[]) {
-  if (items.length > 1) {
-    const pitch = items[1].offsetLeft - items[0].offsetLeft
-    if (pitch > 0) return pitch
-  }
-  return items[0]?.offsetWidth ?? 0
+function cssPixels(value: string) {
+  const pixels = Number.parseFloat(value)
+  return Number.isFinite(pixels) ? pixels : 0
 }
 
 function baseInlinePadding(element: HTMLElement) {
-  const value = Number.parseFloat(getComputedStyle(element).getPropertyValue('--weather-carousel-base-padding'))
-  return Number.isFinite(value) ? value : 0
+  return cssPixels(getComputedStyle(element).getPropertyValue('--weather-carousel-base-padding'))
+}
+
+function clearPageSpacing(items: readonly HTMLElement[]) {
+  items.forEach((item) => {
+    item.style.removeProperty(PAGE_LEADING_SPACE_PROPERTY)
+    item.style.removeProperty(PAGE_TRAILING_SPACE_PROPERTY)
+  })
+}
+
+interface CarouselPage {
+  endIndex: number
+  leadingSpace: number
+  startIndex: number
+  trailingSpace: number
+}
+
+function carouselPages(items: readonly HTMLElement[], viewportWidth: number) {
+  const pages: CarouselPage[] = []
+  let startIndex = 0
+
+  while (startIndex < items.length) {
+    const pageStart = items[startIndex].offsetLeft
+    let endIndex = startIndex
+
+    while (
+      endIndex + 1 < items.length
+      && items[endIndex + 1].offsetLeft + items[endIndex + 1].offsetWidth - pageStart <= viewportWidth
+    ) {
+      endIndex += 1
+    }
+
+    const nextIndex = endIndex + 1
+    const pageContentWidth = items[endIndex].offsetLeft + items[endIndex].offsetWidth - pageStart
+    const unusedSpace = Math.max(0, viewportWidth - pageContentWidth)
+    const leadingSpace = unusedSpace / 2
+    const gapAfterPage = nextIndex < items.length
+      ? items[nextIndex].offsetLeft - items[endIndex].offsetLeft - items[endIndex].offsetWidth
+      : 0
+
+    pages.push({
+      endIndex,
+      leadingSpace,
+      startIndex,
+      trailingSpace: nextIndex < items.length
+        ? viewportWidth - leadingSpace - pageContentWidth - gapAfterPage
+        : unusedSpace - leadingSpace,
+    })
+    startIndex = nextIndex
+  }
+
+  return pages
 }
 
 function prefersReducedMotion() {
@@ -51,11 +97,11 @@ function prefersReducedMotion() {
 export function useHorizontalScrollControls<T extends HTMLElement>({
   enabled = true,
   itemCount,
-  minimumHiddenItems = 1,
   revision = 0,
 }: HorizontalScrollControlsOptions): HorizontalScrollControls<T> {
   const scrollerRef = useRef<T>(null)
   const frameRef = useRef(0)
+  const layoutSignatureRef = useRef('')
   const pageOffsetsRef = useRef<number[]>([0])
   const [state, setState] = useState<HorizontalScrollState>({
     canScrollNext: false,
@@ -71,53 +117,90 @@ export function useHorizontalScrollControls<T extends HTMLElement>({
     const element = scrollerRef.current
     if (!enabled || !element) return
     const items = carouselItems(element)
-    const pitch = itemPitch(items)
-    const first = items[0]
-    const last = items.at(-1)
-    const contentWidth = first && last ? last.offsetLeft + last.offsetWidth - first.offsetLeft : 0
-    const viewportWidth = Math.max(0, element.clientWidth - baseInlinePadding(element) * 2)
-    const hiddenPixels = Math.max(0, contentWidth - viewportWidth)
-    const maxScroll = Math.max(0, element.scrollWidth - element.clientWidth)
+    if (items.length === 0) return
+
+    const computedStyle = getComputedStyle(element)
+    const paddingStart = cssPixels(computedStyle.paddingLeft)
+    const paddingEnd = cssPixels(computedStyle.paddingRight)
+    const signature = [element.clientWidth, paddingStart, paddingEnd, items.length, revision].join(':')
+
+    if (layoutSignatureRef.current !== signature) {
+      clearPageSpacing(items)
+
+      const first = items[0]
+      const last = items.at(-1)
+      const contentWidth = last ? last.offsetLeft + last.offsetWidth - first.offsetLeft : 0
+      const baseViewportWidth = Math.max(0, element.clientWidth - baseInlinePadding(element) * 2)
+      const hasOverflow = contentWidth > baseViewportWidth
+      const viewportWidth = hasOverflow
+        ? Math.max(0, element.clientWidth - paddingStart - paddingEnd)
+        : baseViewportWidth
+      const pages = carouselPages(items, viewportWidth)
+
+      pages.forEach((page) => {
+        if (page.leadingSpace > 0) {
+          items[page.startIndex].style.setProperty(PAGE_LEADING_SPACE_PROPERTY, `${page.leadingSpace}px`)
+        }
+        if (page.trailingSpace !== 0) {
+          items[page.endIndex].style.setProperty(PAGE_TRAILING_SPACE_PROPERTY, `${page.trailingSpace}px`)
+        }
+      })
+
+      const firstOffset = first.offsetLeft - pages[0].leadingSpace
+      const maxScroll = Math.max(0, element.scrollWidth - element.clientWidth)
+      pageOffsetsRef.current = hasOverflow
+        ? pages.map((page) => Math.min(maxScroll, Math.max(0, items[page.startIndex].offsetLeft - page.leadingSpace - firstOffset)))
+        : [0]
+      layoutSignatureRef.current = signature
+
+      setState((current) => {
+        const pageStartIndices = hasOverflow ? pages.map((page) => page.startIndex) : []
+        const currentPage = pageOffsetsRef.current.reduce((closestIndex, offset, index) => (
+          Math.abs(offset - element.scrollLeft) < Math.abs(pageOffsetsRef.current[closestIndex] - element.scrollLeft)
+            ? index
+            : closestIndex
+        ), 0)
+        const next = {
+          canScrollNext: hasOverflow && currentPage < pageOffsetsRef.current.length - 1,
+          canScrollPrevious: hasOverflow && currentPage > 0,
+          currentPage,
+          hasOverflow,
+          pageCount: hasOverflow ? pages.length : 1,
+          pageStartIndices,
+        }
+        const samePageStarts = current.pageStartIndices.length === next.pageStartIndices.length
+          && current.pageStartIndices.every((value, index) => value === next.pageStartIndices[index])
+        return current.canScrollNext === next.canScrollNext
+          && current.canScrollPrevious === next.canScrollPrevious
+          && current.currentPage === next.currentPage
+          && current.hasOverflow === next.hasOverflow
+          && current.pageCount === next.pageCount
+          && samePageStarts
+          ? current
+          : next
+      })
+      return
+    }
 
     setState((current) => {
-      const showThreshold = pitch * minimumHiddenItems
-      const hideThreshold = showThreshold * OVERFLOW_HIDE_RATIO
-      const hasOverflow = pitch > 0 && hiddenPixels >= (current.hasOverflow ? hideThreshold : showThreshold)
-      const visibleItems = Math.max(1, items.filter((item) => item.offsetLeft - (first?.offsetLeft ?? 0) + item.offsetWidth <= viewportWidth + EDGE_TOLERANCE_PX).length)
-      const pageCount = hasOverflow ? Math.max(2, Math.ceil(items.length / visibleItems)) : 1
-      const firstOffset = first?.offsetLeft ?? 0
-      const pageOffsets = Array.from({ length: pageCount }, (_, page) => (
-        page === pageCount - 1
-          ? maxScroll
-          : Math.min(maxScroll, Math.max(0, (items[page * visibleItems]?.offsetLeft ?? firstOffset) - firstOffset))
-      ))
-      const pageStartIndices = pageCount > 1
-        ? Array.from({ length: pageCount - 1 }, (_, page) => Math.min(items.length - 1, page * visibleItems))
-        : []
-      pageOffsetsRef.current = pageOffsets
-      const currentPage = pageOffsets.reduce((closestIndex, offset, index) => (
-        Math.abs(offset - element.scrollLeft) < Math.abs(pageOffsets[closestIndex] - element.scrollLeft) ? index : closestIndex
+      const currentPage = pageOffsetsRef.current.reduce((closestIndex, offset, index) => (
+        Math.abs(offset - element.scrollLeft) < Math.abs(pageOffsetsRef.current[closestIndex] - element.scrollLeft)
+          ? index
+          : closestIndex
       ), 0)
       const next = {
-        canScrollNext: hasOverflow && currentPage < pageCount - 1,
-        canScrollPrevious: hasOverflow && currentPage > 0,
+        ...current,
+        canScrollNext: current.hasOverflow && currentPage < current.pageCount - 1,
+        canScrollPrevious: current.hasOverflow && currentPage > 0,
         currentPage,
-        hasOverflow,
-        pageCount,
-        pageStartIndices,
       }
-      const samePageStarts = current.pageStartIndices.length === next.pageStartIndices.length
-        && current.pageStartIndices.every((value, index) => value === next.pageStartIndices[index])
       return current.canScrollNext === next.canScrollNext
         && current.canScrollPrevious === next.canScrollPrevious
         && current.currentPage === next.currentPage
-        && current.hasOverflow === next.hasOverflow
-        && current.pageCount === next.pageCount
-        && samePageStarts
         ? current
         : next
     })
-  }, [enabled, minimumHiddenItems])
+  }, [enabled, revision])
 
   const scheduleMeasure = useCallback(() => {
     if (!enabled || frameRef.current) return
@@ -143,6 +226,8 @@ export function useHorizontalScrollControls<T extends HTMLElement>({
       if (!observer) window.removeEventListener('resize', scheduleMeasure)
       if (frameRef.current) window.cancelAnimationFrame(frameRef.current)
       frameRef.current = 0
+      layoutSignatureRef.current = ''
+      clearPageSpacing(carouselItems(element))
     }
   }, [enabled, itemCount, revision, scheduleMeasure])
 
