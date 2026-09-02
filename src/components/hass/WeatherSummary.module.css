@@ -4,6 +4,10 @@
   min-width: 0;
 }
 
+.weatherCardFrame[data-carousel-overflow='true'] .card {
+  padding-bottom: 40px;
+}
+
 .card {
   position: relative;
   display: grid;
@@ -169,15 +173,15 @@
 }
 
 .heroHourlyStrip {
-  --weather-carousel-base-padding: 6px;
-  display: grid;
-  grid-auto-columns: 42px;
-  grid-auto-flow: column;
+  --weather-carousel-base-padding: 2px;
+  --weather-carousel-inline-padding: var(--weather-carousel-base-padding);
+  display: flex;
   gap: 10px;
   margin: 2px -6px 0;
   overscroll-behavior-x: contain;
   overflow-x: auto;
-  padding: 2px 6px 4px;
+  padding: 2px var(--weather-carousel-inline-padding) 4px;
+  scroll-padding-inline: var(--weather-carousel-inline-padding);
   scrollbar-width: none;
 }
 
@@ -200,10 +204,14 @@
 
 .heroHourlyItem {
   display: grid;
+  flex: 0 0 42px;
   min-height: 62px;
   align-content: space-between;
   justify-items: center;
+  margin-inline-start: var(--weather-carousel-page-leading-space, 0);
+  margin-inline-end: var(--weather-carousel-page-trailing-space, 0);
   padding: 5px 0 3px;
+  scroll-margin-inline-start: var(--weather-carousel-page-leading-space, 0);
   color: white;
 }
 
@@ -426,14 +434,14 @@
 
 .hourlyScroller {
   --weather-carousel-base-padding: 2px;
-  display: grid;
-  grid-auto-columns: 62px;
-  grid-auto-flow: column;
+  --weather-carousel-inline-padding: var(--weather-carousel-base-padding);
+  display: flex;
   gap: 12px;
   margin: 4px -2px 0;
   overscroll-behavior-x: contain;
   overflow-x: auto;
-  padding: 2px 2px 6px;
+  padding: 2px var(--weather-carousel-inline-padding) 6px;
+  scroll-padding-inline: var(--weather-carousel-inline-padding);
   scrollbar-width: none;
 }
 
@@ -465,7 +473,7 @@
 
 .weatherCarouselControlsHero {
   right: 8px;
-  bottom: 20px;
+  bottom: 40px;
   left: 8px;
   height: 68px;
 }
@@ -527,7 +535,7 @@
 .weatherCarouselPaginationHero {
   position: absolute;
   right: 24px;
-  bottom: 0;
+  bottom: 15px;
   left: 24px;
 }
 
@@ -575,15 +583,16 @@
 }
 
 @media (hover: hover) and (pointer: fine) {
-  .weatherCardFrame[data-carousel-overflow='true'] .heroHourlyStrip,
-  .hourlyScrollerFrame[data-carousel-overflow='true'] .hourlyScroller {
-    padding-inline: 46px;
-    mask-image: var(--rd-weather-carousel-edge-mask);
-    -webkit-mask-image: var(--rd-weather-carousel-edge-mask);
+  .weatherCardFrame[data-carousel-overflow='true'] .heroHourlyStrip {
+    --weather-carousel-inline-padding: 46px;
+    mask-image: var(--rd-weather-carousel-edge-mask-hero);
+    -webkit-mask-image: var(--rd-weather-carousel-edge-mask-hero);
   }
 
   .hourlyScrollerFrame[data-carousel-overflow='true'] .hourlyScroller {
-    padding-inline: 50px;
+    --weather-carousel-inline-padding: 58px;
+    mask-image: var(--rd-weather-carousel-edge-mask-modal);
+    -webkit-mask-image: var(--rd-weather-carousel-edge-mask-modal);
   }
 
   .weatherCarouselControls:not([hidden]) {
@@ -591,37 +600,34 @@
   }
 }
 
+.heroHourlyStrip[data-carousel-snap-ready='true'],
+.hourlyScroller[data-carousel-snap-ready='true'] {
+  scroll-snap-type: x mandatory;
+}
+
+.heroHourlyItem[data-carousel-page-start='true'],
+.hourlyItem[data-carousel-page-start='true'] {
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
+}
+
 @media (hover: none), (pointer: coarse) {
   .weatherCarouselControls:not([hidden]) {
     display: none;
-  }
-
-  .heroHourlyStrip[data-carousel-snap-ready='true'],
-  .hourlyScroller[data-carousel-snap-ready='true'] {
-    scroll-padding-inline: var(--weather-carousel-base-padding);
-    scroll-snap-type: x mandatory;
-  }
-
-  .heroHourlyItem[data-carousel-page-start='true'],
-  .hourlyItem[data-carousel-page-start='true'] {
-    scroll-snap-align: start;
-    scroll-snap-stop: always;
-  }
-
-  .heroHourlyItem[data-carousel-page-end='true'],
-  .hourlyItem[data-carousel-page-end='true'] {
-    scroll-snap-align: end;
-    scroll-snap-stop: always;
   }
 }
 
 .hourlyItem {
   display: grid;
+  flex: 0 0 62px;
   min-height: 112px;
   align-content: space-between;
   justify-items: center;
+  margin-inline-start: var(--weather-carousel-page-leading-space, 0);
+  margin-inline-end: var(--weather-carousel-page-trailing-space, 0);
   border-radius: 0;
   padding: 8px 4px;
+  scroll-margin-inline-start: var(--weather-carousel-page-leading-space, 0);
   color: white;
   background: transparent;
 }
@@ -658,6 +664,7 @@
 }
 
 .hourlySkeleton {
+  flex: 0 0 62px;
   min-height: 124px;
   border-radius: 18px;
   background: rgba(255, 255, 255, 0.08);
