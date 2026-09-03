@@ -1,11 +1,12 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import { act } from 'react'
-import { MEDIA_REMOTE_CONFIGS, MUSIC_ROOM_COMMAND_REVERT_MS, MUSIC_ROOM_MEDIA_ACTIONS } from '../../constants/mediaRemotes'
-import { mockCallServiceCalls, mockEntities, resetMockHass } from '../../test/mocks/hakitCoreState'
+import { HUE_SYNC_OPTIMISTIC_REVERT_MS, MEDIA_REMOTE_CONFIGS, MUSIC_ROOM_COMMAND_REVERT_MS, MUSIC_ROOM_MEDIA_ACTIONS, MUSIC_ROOM_XBOX_ACTIVE_HOLD_MS, MUSIC_ROOM_XBOX_HDMI_STATUS_ENTITY_ID, MUSIC_ROOM_XBOX_OFF_REVERT_MS } from '../../constants/mediaRemotes'
+import { mockCallServiceCalls, mockEntities, resetMockHass, setMockCallServiceOutcome } from '../../test/mocks/hakitCoreState'
 import { MediaRemoteModalContent, MediaRemoteModalNav } from './MediaRemoteModalContent'
 
 const livingRoomRemote = MEDIA_REMOTE_CONFIGS['#living-room-shield']
 const musicRoomRemote = MEDIA_REMOTE_CONFIGS['#music-room-remote']
+const musicRoomHueSync = musicRoomRemote.hueSync!
 const theaterRemote = MEDIA_REMOTE_CONFIGS['#theater-room-shield']
 
 beforeEach(() => {
@@ -48,6 +49,16 @@ describe('MediaRemoteModalNav', () => {
     render(<MediaRemoteModalNav activeTab="controls" onTabChange={onTabChange} remoteTitle="Minimal Remote" showApps={false} showDevices={false} />)
 
     expect(screen.getAllByRole('tab').map((tab) => tab.getAttribute('aria-label'))).toEqual(['Controls'])
+  })
+
+  it('adds Hue Sync only when the remote config exposes Sync Box controls', () => {
+    const onTabChange = vi.fn()
+
+    const view = render(<MediaRemoteModalNav activeTab="controls" onTabChange={onTabChange} remoteTitle="Music Room" showApps showDevices showHueSync />)
+    expect(screen.getAllByRole('tab').map((tab) => tab.getAttribute('aria-label'))).toEqual(['Controls', 'Apps', 'Devices', 'Hue Sync'])
+
+    view.rerender(<MediaRemoteModalNav activeTab="controls" onTabChange={onTabChange} remoteTitle="Living Room" showApps showDevices />)
+    expect(screen.getAllByRole('tab').map((tab) => tab.getAttribute('aria-label'))).toEqual(['Controls', 'Apps', 'Devices'])
   })
 })
 
@@ -114,9 +125,15 @@ describe('MediaRemoteModalContent', () => {
       expect(power).toHaveAttribute('aria-checked', 'false')
 
       mockEntities[musicRoomRemote.controlEntityId].state = 'on'
-      view.rerender(<MediaRemoteModalContent config={musicRoomRemote} />)
+      mockEntities[MUSIC_ROOM_XBOX_HDMI_STATUS_ENTITY_ID].state = 'linked'
+      view.unmount()
+      render(<MediaRemoteModalContent activeTab="devices" config={musicRoomRemote} onTabChange={() => undefined} />)
+      expect(screen.getByRole('switch', { name: 'Xbox On' })).toHaveAttribute('aria-checked', 'true')
       fireEvent.click(screen.getByRole('switch', { name: 'Power' }))
       expect(screen.getByRole('switch', { name: 'Power' })).toHaveAttribute('aria-checked', 'false')
+      expect(screen.getByRole('switch', { name: 'Xbox Off' })).toHaveAttribute('aria-checked', 'false')
+      act(() => vi.advanceTimersByTime(MUSIC_ROOM_XBOX_ACTIVE_HOLD_MS))
+      expect(screen.getByRole('switch', { name: 'Xbox Off' })).toHaveAttribute('aria-checked', 'false')
 
       expect(mockCallServiceCalls).toEqual([
         { domain: 'script', returnResponse: true, service: 'music_room_tv', target: undefined, serviceData: undefined },
@@ -128,19 +145,41 @@ describe('MediaRemoteModalContent', () => {
     }
   })
 
-  it('derives TV and Xbox device toggles from their own media-player entities', () => {
+  it('derives the Xbox device toggle from cloud state or an active HDMI 1 link', () => {
+    vi.useFakeTimers()
     mockEntities['input_select.music_room_media_source'].state = 'Xbox'
     mockEntities[musicRoomRemote.controlEntityId].state = 'playing'
     mockEntities['media_player.xbox'].state = 'off'
+    mockEntities[MUSIC_ROOM_XBOX_HDMI_STATUS_ENTITY_ID].state = 'linked'
 
-    render(<MediaRemoteModalContent activeTab="devices" config={musicRoomRemote} onTabChange={() => undefined} />)
+    try {
+      const view = render(<MediaRemoteModalContent activeTab="devices" config={musicRoomRemote} onTabChange={() => undefined} />)
 
-    expect(musicRoomRemote.devices?.find((device) => device.title === 'Xbox')?.activeStates).toEqual(['on', 'playing', 'paused'])
-    expect(screen.getByRole('switch', { name: 'TV Playing' })).toHaveAttribute('aria-checked', 'true')
-    expect(screen.getByRole('switch', { name: 'Xbox Off' })).toHaveAttribute('aria-checked', 'false')
+      const xboxDevice = musicRoomRemote.devices?.find((device) => device.title === 'Xbox')
+      expect(xboxDevice?.activeHoldMs).toBe(MUSIC_ROOM_XBOX_ACTIVE_HOLD_MS)
+      expect(xboxDevice?.activeStates).toEqual(['on'])
+      expect(xboxDevice?.stateEntityIds).toEqual(['media_player.xbox', MUSIC_ROOM_XBOX_HDMI_STATUS_ENTITY_ID])
+      expect(screen.getByRole('switch', { name: 'TV Playing' })).toHaveAttribute('aria-checked', 'true')
+      expect(screen.getByRole('switch', { name: 'Xbox On' })).toHaveAttribute('aria-checked', 'true')
+
+      mockEntities[MUSIC_ROOM_XBOX_HDMI_STATUS_ENTITY_ID].state = 'unplugged'
+      view.rerender(<MediaRemoteModalContent activeTab="devices" config={musicRoomRemote} onTabChange={() => undefined} />)
+      expect(screen.getByRole('switch', { name: 'Xbox On' })).toHaveAttribute('aria-checked', 'true')
+      act(() => vi.advanceTimersByTime(MUSIC_ROOM_XBOX_ACTIVE_HOLD_MS - 1))
+      expect(screen.getByRole('switch', { name: 'Xbox On' })).toHaveAttribute('aria-checked', 'true')
+      act(() => vi.advanceTimersByTime(1))
+      expect(screen.getByRole('switch', { name: 'Xbox Off' })).toHaveAttribute('aria-checked', 'false')
+
+      mockEntities['media_player.xbox'].state = 'playing'
+      view.rerender(<MediaRemoteModalContent activeTab="devices" config={musicRoomRemote} onTabChange={() => undefined} />)
+      expect(screen.getByRole('switch', { name: 'Xbox On' })).toHaveAttribute('aria-checked', 'true')
+    } finally {
+      vi.clearAllTimers()
+      vi.useRealTimers()
+    }
   })
 
-  it('uses actual TV and Xbox states for device toggles without forcing the source off', () => {
+  it('uses combined Xbox state for optimistic device toggles without forcing a newer source off', () => {
     const view = render(<MediaRemoteModalContent activeTab="devices" config={musicRoomRemote} onTabChange={() => undefined} />)
 
     const tv = screen.getByRole('switch', { name: 'TV Off' })
@@ -173,16 +212,17 @@ describe('MediaRemoteModalContent', () => {
       serviceData: undefined,
     })
 
-    mockEntities['input_select.music_room_media_source'].state = 'Xbox'
-    mockEntities['media_player.xbox'].state = 'on'
-    view.rerender(<MediaRemoteModalContent activeTab="devices" config={musicRoomRemote} onTabChange={() => undefined} />)
-    mockEntities['media_player.xbox'].state = 'playing'
-    view.rerender(<MediaRemoteModalContent activeTab="devices" config={musicRoomRemote} onTabChange={() => undefined} />)
-    expect(screen.getByRole('switch', { name: 'Xbox Playing' })).toHaveAttribute('aria-checked', 'true')
-
     mockEntities['input_select.music_room_media_source'].state = 'Server'
+    mockEntities['media_player.xbox'].state = 'off'
+    mockEntities[MUSIC_ROOM_XBOX_HDMI_STATUS_ENTITY_ID].state = 'linked'
     view.rerender(<MediaRemoteModalContent activeTab="devices" config={musicRoomRemote} onTabChange={() => undefined} />)
-    fireEvent.click(screen.getByRole('switch', { name: 'Xbox Playing' }))
+    expect(screen.getByRole('switch', { name: 'Xbox On' })).toHaveAttribute('aria-checked', 'true')
+
+    mockEntities[MUSIC_ROOM_XBOX_HDMI_STATUS_ENTITY_ID].state = 'plugged'
+    view.rerender(<MediaRemoteModalContent activeTab="devices" config={musicRoomRemote} onTabChange={() => undefined} />)
+    expect(screen.getByRole('switch', { name: 'Xbox On' })).toHaveAttribute('aria-checked', 'true')
+
+    fireEvent.click(screen.getByRole('switch', { name: 'Xbox On' }))
     expect(mockCallServiceCalls.at(-1)).toEqual({
       domain: 'script',
       returnResponse: true,
@@ -203,7 +243,11 @@ describe('MediaRemoteModalContent', () => {
         }],
         optimisticState: [{
           entityId: 'media_player.xbox',
-          revertMs: MUSIC_ROOM_COMMAND_REVERT_MS.xbox,
+          revertMs: MUSIC_ROOM_XBOX_OFF_REVERT_MS,
+          value: 'off',
+        }, {
+          entityId: MUSIC_ROOM_XBOX_HDMI_STATUS_ENTITY_ID,
+          revertMs: MUSIC_ROOM_XBOX_OFF_REVERT_MS,
           value: 'off',
         }],
       })
@@ -242,6 +286,7 @@ describe('MediaRemoteModalContent', () => {
     mockEntities['input_select.music_room_media_source'].state = 'unavailable'
     mockEntities[musicRoomRemote.controlEntityId].state = 'unavailable'
     mockEntities['media_player.xbox'].state = 'unavailable'
+    mockEntities[MUSIC_ROOM_XBOX_HDMI_STATUS_ENTITY_ID].state = 'unavailable'
     mockEntities[musicRoomRemote.volumeEntityId].state = 'unavailable'
 
     render(<MediaRemoteModalContent activeTab="devices" config={musicRoomRemote} onTabChange={() => undefined} />)
@@ -253,6 +298,244 @@ describe('MediaRemoteModalContent', () => {
     expect(sonos).toHaveAttribute('data-action-kind', 'state')
     expect(screen.queryByRole('button', { name: 'Sonos Beam Unavailable' })).not.toBeInTheDocument()
     fireEvent.click(sonos)
+    expect(mockCallServiceCalls).toEqual([])
+  })
+
+  it('renders the Hue Sync tab from live entities without issuing commands', () => {
+    render(<MediaRemoteModalContent activeTab="hueSync" config={musicRoomRemote} onTabChange={() => undefined} />)
+
+    expect(screen.getByRole('switch', { name: 'Sync Box Power On' })).toHaveAttribute('aria-checked', 'true')
+    expect(screen.getByRole('switch', { name: 'Light Sync Off' })).toHaveAttribute('aria-checked', 'false')
+    const modeGroup = screen.getByRole('group', { name: 'Sync Mode' })
+    expect(within(modeGroup).getAllByRole('button').map((button) => button.getAttribute('aria-label'))).toEqual(['Music', 'Video', 'Game'])
+    expect(within(modeGroup).getByRole('button', { name: 'Music' })).toHaveAttribute('aria-pressed', 'true')
+    expect(within(modeGroup).getByRole('button', { name: 'Music' })).toHaveAttribute('data-size', 'round')
+    const intensityGroup = screen.getByRole('group', { name: 'Intensity' })
+    expect(within(intensityGroup).getByRole('button', { name: 'High' })).toHaveAttribute('aria-pressed', 'true')
+    expect(within(intensityGroup).getByRole('button', { name: 'High' })).toHaveAttribute('data-tone', 'light')
+    expect(within(intensityGroup).getByRole('button', { name: 'High' }).className).not.toMatch(/compact/)
+    expect(intensityGroup).toHaveAttribute('data-dynamic-grid', 'true')
+    expect(screen.getByRole('slider', { name: 'Brightness' })).toHaveValue('100')
+    const inputGroup = screen.getByRole('group', { name: 'HDMI Input' })
+    const unpluggedInput = within(inputGroup).getByRole('button', { name: 'HDMI 1 Selected • Unplugged' })
+    expect(unpluggedInput).toHaveAttribute('aria-pressed', 'true')
+    expect(unpluggedInput).toHaveAttribute('data-action-kind', 'selection')
+    expect(unpluggedInput).toHaveAttribute('data-icon', 'mdi:television-off')
+    expect(unpluggedInput).toHaveAttribute('data-tone', 'switch')
+    expect(unpluggedInput).toBeDisabled()
+    expect(unpluggedInput.parentElement).toHaveAttribute('data-disabled', 'true')
+    expect(unpluggedInput.className).not.toMatch(/compact/)
+    const pluggedInput = within(inputGroup).getByRole('button', { name: 'HDMI 2 Plugged' })
+    expect(pluggedInput).toHaveAttribute('aria-pressed', 'false')
+    expect(pluggedInput).toHaveAttribute('data-icon', 'mdi:television')
+    expect(pluggedInput).toBeEnabled()
+    expect(pluggedInput.parentElement).toHaveAttribute('data-disabled', 'false')
+    expect(inputGroup).toHaveAttribute('data-dynamic-grid', 'true')
+    expect(screen.queryByRole('combobox')).not.toBeInTheDocument()
+    expect(screen.queryByText('Entertainment Area')).not.toBeInTheDocument()
+    expect(screen.queryByText('LED Indicator')).not.toBeInTheDocument()
+    expect(screen.queryByText('Entertainment Stream')).not.toBeInTheDocument()
+    expect(document.querySelector('[data-surface-accessory="selection"]')).not.toBeInTheDocument()
+    fireEvent.click(unpluggedInput)
+    expect(mockCallServiceCalls).toEqual([])
+  })
+
+  it('sends one entity service per Hue Sync control and commits brightness once', () => {
+    render(<MediaRemoteModalContent activeTab="hueSync" config={musicRoomRemote} onTabChange={() => undefined} />)
+
+    fireEvent.click(screen.getByRole('switch', { name: 'Light Sync Off' }))
+    expect(screen.getByRole('switch', { name: 'Light Sync On' })).toHaveAttribute('aria-checked', 'true')
+    expect(screen.getByRole('switch', { name: 'Sync Box Power On' })).toHaveAttribute('aria-checked', 'true')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Game' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Intense' }))
+    fireEvent.click(screen.getByRole('button', { name: 'HDMI 2 Plugged' }))
+
+    const brightness = screen.getByRole('slider', { name: 'Brightness' })
+    fireEvent.change(brightness, { target: { value: '70' } })
+    fireEvent.change(brightness, { target: { value: '80' } })
+    expect(mockCallServiceCalls).toHaveLength(4)
+    fireEvent.pointerUp(brightness)
+
+    expect(mockCallServiceCalls).toEqual([
+      { domain: 'switch', service: 'turn_on', target: musicRoomHueSync.lightSyncEntityId },
+      { domain: 'select', service: 'select_option', target: musicRoomHueSync.syncModeEntityId, serviceData: { option: 'game' } },
+      { domain: 'select', service: 'select_option', target: musicRoomHueSync.intensityEntityId, serviceData: { option: 'intense' } },
+      { domain: 'select', service: 'select_option', target: musicRoomHueSync.hdmiInputEntityId, serviceData: { option: 'HDMI 2' } },
+      { domain: 'number', service: 'set_value', target: musicRoomHueSync.brightnessEntityId, serviceData: { value: 80 } },
+    ])
+  })
+
+  it('keeps power and light-sync projections coherent while sending one switch command', () => {
+    mockEntities[musicRoomHueSync.lightSyncEntityId].state = 'on'
+    render(<MediaRemoteModalContent activeTab="hueSync" config={musicRoomRemote} onTabChange={() => undefined} />)
+
+    fireEvent.click(screen.getByRole('switch', { name: 'Sync Box Power On' }))
+
+    expect(screen.getByRole('switch', { name: 'Sync Box Power Off' })).toHaveAttribute('aria-checked', 'false')
+    expect(screen.getByRole('switch', { name: 'Light Sync Off' })).toHaveAttribute('aria-checked', 'false')
+    expect(mockCallServiceCalls).toEqual([
+      { domain: 'switch', service: 'turn_off', target: musicRoomHueSync.powerEntityId },
+    ])
+  })
+
+  it('keeps a resolved Hue Sync command after its optimistic window expires', () => {
+    vi.useFakeTimers()
+    try {
+      render(<MediaRemoteModalContent activeTab="hueSync" config={musicRoomRemote} onTabChange={() => undefined} />)
+      fireEvent.click(screen.getByRole('switch', { name: 'Light Sync Off' }))
+
+      expect(mockEntities[musicRoomHueSync.lightSyncEntityId].state).toBe('on')
+      act(() => vi.advanceTimersByTime(HUE_SYNC_OPTIMISTIC_REVERT_MS))
+      expect(screen.getByRole('switch', { name: 'Light Sync On' })).toBeInTheDocument()
+    } finally {
+      vi.clearAllTimers()
+      vi.useRealTimers()
+    }
+  })
+
+  it('resets stale intensity optimism when the sync mode changes', () => {
+    setMockCallServiceOutcome('select', 'select_option', 'pending')
+    mockEntities[musicRoomHueSync.powerEntityId].state = 'off'
+    mockEntities[musicRoomHueSync.lightSyncEntityId].state = 'off'
+    render(<MediaRemoteModalContent activeTab="hueSync" config={musicRoomRemote} onTabChange={() => undefined} />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Intense' }))
+    expect(screen.getByRole('button', { name: 'Intense' })).toHaveAttribute('aria-pressed', 'true')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Game' }))
+    expect(screen.getByRole('button', { name: 'High' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('switch', { name: 'Sync Box Power On' })).toHaveAttribute('aria-checked', 'true')
+    expect(screen.getByRole('switch', { name: 'Light Sync On' })).toHaveAttribute('aria-checked', 'true')
+  })
+
+  it('restarts syncing when the already-selected mode is pressed while sync is off', () => {
+    mockEntities[musicRoomHueSync.powerEntityId].state = 'off'
+    mockEntities[musicRoomHueSync.lightSyncEntityId].state = 'off'
+    render(<MediaRemoteModalContent activeTab="hueSync" config={musicRoomRemote} onTabChange={() => undefined} />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Music' }))
+
+    expect(screen.getByRole('switch', { name: 'Sync Box Power On' })).toHaveAttribute('aria-checked', 'true')
+    expect(screen.getByRole('switch', { name: 'Light Sync On' })).toHaveAttribute('aria-checked', 'true')
+    expect(mockCallServiceCalls).toEqual([
+      { domain: 'select', service: 'select_option', target: musicRoomHueSync.syncModeEntityId, serviceData: { option: 'music' } },
+    ])
+  })
+
+  it('does not resend the selected mode while syncing is already active', () => {
+    mockEntities[musicRoomHueSync.powerEntityId].state = 'on'
+    mockEntities[musicRoomHueSync.lightSyncEntityId].state = 'on'
+    render(<MediaRemoteModalContent activeTab="hueSync" config={musicRoomRemote} onTabChange={() => undefined} />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Music' }))
+
+    expect(mockCallServiceCalls).toEqual([])
+  })
+
+  it('uses live HDMI option names for the fixed status slots', () => {
+    mockEntities[musicRoomHueSync.hdmiInputEntityId].state = 'Console'
+    mockEntities[musicRoomHueSync.hdmiInputEntityId].attributes.options = ['Console', 'Server', 'Spare', 'Guest']
+
+    render(<MediaRemoteModalContent activeTab="hueSync" config={musicRoomRemote} onTabChange={() => undefined} />)
+
+    expect(screen.getByRole('button', { name: 'Console Selected • Unplugged' })).toHaveAttribute('data-tone', 'switch')
+    expect(screen.getByRole('button', { name: 'Console Selected • Unplugged' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: 'Console Selected • Unplugged' })).toHaveAttribute('data-icon', 'mdi:television-off')
+    expect(screen.getByRole('button', { name: 'Console Selected • Unplugged' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Console Selected • Unplugged' }).parentElement).toHaveAttribute('data-disabled', 'true')
+    expect(screen.getByRole('button', { name: 'Server Plugged' })).toHaveAttribute('data-tone', 'neutral')
+    expect(screen.getByRole('button', { name: 'Server Plugged' })).toHaveAttribute('data-icon', 'mdi:television')
+    expect(screen.getByRole('button', { name: 'Server Plugged' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Server Plugged' }).parentElement).toHaveAttribute('data-disabled', 'false')
+  })
+
+  it('rolls Hue Sync optimism back on rejection and timeout', async () => {
+    vi.useFakeTimers()
+    try {
+      setMockCallServiceOutcome('switch', 'turn_on', 'reject')
+      const view = render(<MediaRemoteModalContent activeTab="hueSync" config={musicRoomRemote} onTabChange={() => undefined} />)
+
+      fireEvent.click(screen.getByRole('switch', { name: 'Light Sync Off' }))
+      expect(screen.getByRole('switch', { name: 'Light Sync On' })).toBeInTheDocument()
+      await act(async () => {
+        await Promise.resolve()
+        await Promise.resolve()
+      })
+      expect(screen.getByRole('switch', { name: 'Light Sync Off' })).toBeInTheDocument()
+
+      view.unmount()
+      setMockCallServiceOutcome('switch', 'turn_on', 'pending')
+      render(<MediaRemoteModalContent activeTab="hueSync" config={musicRoomRemote} onTabChange={() => undefined} />)
+      fireEvent.click(screen.getByRole('switch', { name: 'Light Sync Off' }))
+      act(() => vi.advanceTimersByTime(HUE_SYNC_OPTIMISTIC_REVERT_MS - 1))
+      expect(screen.getByRole('switch', { name: 'Light Sync On' })).toBeInTheDocument()
+      act(() => vi.advanceTimersByTime(1))
+      expect(screen.getByRole('switch', { name: 'Light Sync Off' })).toBeInTheDocument()
+    } finally {
+      vi.clearAllTimers()
+      vi.useRealTimers()
+    }
+  })
+
+  it('can return brightness to the live value during a pending optimistic change', () => {
+    setMockCallServiceOutcome('number', 'set_value', 'pending')
+    render(<MediaRemoteModalContent activeTab="hueSync" config={musicRoomRemote} onTabChange={() => undefined} />)
+    const brightness = screen.getByRole('slider', { name: 'Brightness' })
+
+    fireEvent.change(brightness, { target: { value: '70' } })
+    fireEvent.pointerUp(brightness)
+    expect(brightness).toHaveValue('70')
+
+    fireEvent.change(brightness, { target: { value: '100' } })
+    fireEvent.pointerUp(brightness)
+
+    expect(brightness).toHaveValue('100')
+    expect(mockCallServiceCalls).toEqual([
+      { domain: 'number', service: 'set_value', target: musicRoomHueSync.brightnessEntityId, serviceData: { value: 70 } },
+      { domain: 'number', service: 'set_value', target: musicRoomHueSync.brightnessEntityId, serviceData: { value: 100 } },
+    ])
+  })
+
+  it('keeps HDMI status live-only while remote Power Off is optimistic', () => {
+    mockEntities[musicRoomRemote.controlEntityId].state = 'on'
+    mockEntities[MUSIC_ROOM_XBOX_HDMI_STATUS_ENTITY_ID].state = 'linked'
+    render(<MediaRemoteModalContent activeTab="hueSync" config={musicRoomRemote} onTabChange={() => undefined} />)
+
+    expect(screen.getByRole('button', { name: 'HDMI 1 Selected • Linked' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('switch', { name: 'Power' }))
+
+    expect(screen.getByRole('button', { name: 'HDMI 1 Selected • Linked' })).toBeInTheDocument()
+    expect(mockCallServiceCalls.at(-1)).toEqual({ domain: 'script', returnResponse: true, service: 'music_room_tv_off', target: undefined, serviceData: undefined })
+  })
+
+  it('disables unavailable Hue Sync controls while preserving status geometry', () => {
+    for (const entityId of [
+      musicRoomHueSync.powerEntityId,
+      musicRoomHueSync.lightSyncEntityId,
+      musicRoomHueSync.brightnessEntityId,
+      musicRoomHueSync.syncModeEntityId,
+      musicRoomHueSync.intensityEntityId,
+      musicRoomHueSync.hdmiInputEntityId,
+      ...musicRoomHueSync.hdmiStatusEntityIds,
+    ]) {
+      mockEntities[entityId].state = 'unavailable'
+    }
+
+    render(<MediaRemoteModalContent activeTab="hueSync" config={musicRoomRemote} onTabChange={() => undefined} />)
+
+    expect(screen.getByRole('switch', { name: 'Sync Box Power Unavailable' })).toBeDisabled()
+    expect(screen.getByRole('switch', { name: 'Light Sync Unavailable' })).toBeDisabled()
+    expect(screen.getByRole('slider', { name: 'Brightness' })).toBeDisabled()
+    expect(within(screen.getByRole('group', { name: 'Sync Mode' })).getAllByRole('button')).toHaveLength(3)
+    expect(within(screen.getByRole('group', { name: 'Sync Mode' })).getAllByRole('button').every((button) => button.hasAttribute('disabled'))).toBe(true)
+    expect(within(screen.getByRole('group', { name: 'Intensity' })).getAllByRole('button')).toHaveLength(4)
+    expect(within(screen.getByRole('group', { name: 'Intensity' })).getAllByRole('button').every((button) => button.hasAttribute('disabled'))).toBe(true)
+    expect(within(screen.getByRole('group', { name: 'HDMI Input' })).getAllByRole('button')).toHaveLength(4)
+    expect(within(screen.getByRole('group', { name: 'HDMI Input' })).getAllByRole('button').every((button) => button.hasAttribute('disabled'))).toBe(true)
+    expect(screen.queryByRole('combobox')).not.toBeInTheDocument()
+    expect(screen.getAllByRole('button', { name: /HDMI [1-4].*Unavailable/ })).toHaveLength(4)
+    expect(screen.getByRole('slider', { name: 'Brightness' })).toHaveAttribute('aria-valuetext', 'Unavailable')
     expect(mockCallServiceCalls).toEqual([])
   })
 

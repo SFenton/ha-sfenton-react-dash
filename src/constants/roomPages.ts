@@ -8,10 +8,10 @@ import {
   MUSIC_ROOM_CONTROL_ENTITY_ID,
   MUSIC_ROOM_FORTNITE_ARTWORK_URL,
   MUSIC_ROOM_MEDIA_ACTIONS,
+  MUSIC_ROOM_MEDIA_OPTIMISTIC_ENTITY_IDS,
   MUSIC_ROOM_MEDIA_SOURCE_ENTITY_ID,
   MUSIC_ROOM_MEDIA_SOURCE_STATES,
   MUSIC_ROOM_REMOTE_HASH,
-  MUSIC_ROOM_XBOX_ENTITY_ID,
   musicRoomSourceLabels,
   type MediaRemoteAction,
 } from './mediaRemotes'
@@ -71,6 +71,7 @@ export type RoomSourceSectionLayout = 'app-launch' | 'lead-row'
 export interface RoomSourceSectionConfig {
   cards: RoomSourceCardConfig[]
   layout?: RoomSourceSectionLayout
+  showOnRoomPage?: boolean
   title: string
 }
 
@@ -313,7 +314,7 @@ export const ROOM_PAGE_CONFIGS: Record<string, RoomPageSourceConfig> = {
   'music-room': {
     title: musicRoomTitle,
     path: 'music-room',
-    optimisticStateEntityIds: [MUSIC_ROOM_MEDIA_SOURCE_ENTITY_ID, MUSIC_ROOM_CONTROL_ENTITY_ID, MUSIC_ROOM_XBOX_ENTITY_ID],
+    optimisticStateEntityIds: MUSIC_ROOM_MEDIA_OPTIMISTIC_ENTITY_IDS,
     overviewCards: [
       { title: 'Lights', entityId: 'light.music_room', icon: 'mdi:lightbulb-group', kind: 'light', hash: '#lights-music-room', showState: true },
       { title: 'Climate', entityId: 'input_text.music_room_climate_range', icon: 'mdi:thermometer', kind: 'climate', hash: '#climate-music-room', showState: true },
@@ -358,6 +359,7 @@ export const ROOM_PAGE_CONFIGS: Record<string, RoomPageSourceConfig> = {
       {
         title: copy(MEDIA_COPY_NAMESPACE, MEDIA_COPY_KEYS.musicRoom.quickAppLaunch),
         layout: 'app-launch',
+        showOnRoomPage: false,
         cards: [{
           title: musicRoomFortniteTitle,
           entityId: MUSIC_ROOM_MEDIA_SOURCE_ENTITY_ID,

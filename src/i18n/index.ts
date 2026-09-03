@@ -284,6 +284,19 @@ export const WEATHER_COPY_KEYS = {
 } as const
 
 export const MEDIA_COPY_KEYS = {
+  hueSync: {
+    brightness: 'hueSync.brightness',
+    hdmiInput: 'hueSync.hdmiInput',
+    hdmiPort: 'hueSync.hdmiPort',
+    intensity: 'hueSync.intensity',
+    lightSync: 'hueSync.lightSync',
+    powerAndSync: 'hueSync.powerAndSync',
+    powerBehaviorHelp: 'hueSync.powerBehaviorHelp',
+    selectedStatus: 'hueSync.selectedStatus',
+    syncBoxPower: 'hueSync.syncBoxPower',
+    syncMode: 'hueSync.syncMode',
+    tab: 'hueSync.tab',
+  },
   musicRoom: {
     fortnite: 'musicRoom.fortnite',
     quickAppLaunch: 'musicRoom.quickAppLaunch',
@@ -313,6 +326,7 @@ export const MEDIA_COPY_KEYS = {
   },
   remoteTabs: {
     devicesDescription: 'remoteTabs.devicesDescription',
+    hueSyncDescription: 'remoteTabs.hueSyncDescription',
   },
   remoteOpeners: {
     livingRoom: 'remoteOpeners.livingRoom',

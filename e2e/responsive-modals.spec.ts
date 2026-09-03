@@ -10,6 +10,25 @@ const VIEWPORTS = [
   { height: 741, width: 1152 },
 ] as const
 
+const HUE_SYNC_VIEWPORTS = [
+  { height: 852, width: 393 },
+  { height: 393, width: 852 },
+  { height: 741, width: 1152 },
+  { height: 836, width: 842 },
+  { height: 1180, width: 820 },
+  { height: 820, width: 1180 },
+  { height: 900, width: 1440 },
+  { height: 1080, width: 1920 },
+] as const
+
+const HUE_SYNC_RESIZE_SEQUENCES = [
+  [{ height: 852, width: 393 }, { height: 900, width: 1440 }, { height: 852, width: 393 }],
+  [{ height: 900, width: 1440 }, { height: 852, width: 393 }, { height: 900, width: 1440 }],
+  [{ height: 1180, width: 820 }, { height: 820, width: 1180 }, { height: 1180, width: 820 }],
+  [{ height: 1152, width: 741 }, { height: 741, width: 1152 }, { height: 1152, width: 741 }],
+  [{ height: 820, width: 1180 }, { height: 741, width: 1152 }, { height: 820, width: 1180 }],
+] as const
+
 async function closeModal(dialog: Locator) {
   await dialog.getByRole('button', { exact: true, name: 'Close' }).click()
   await expect(dialog).toHaveCount(0, { timeout: 700 })
@@ -136,6 +155,65 @@ async function openMusicRoomVacuum(page: Page) {
   await expect(dialog).toBeVisible()
   return dialog
 }
+
+async function openMusicRoomHueSync(page: Page) {
+  await page.goto('/index.html?path=music-room')
+  await page.getByRole('button', { name: /^Music Room Remote / }).click()
+  const dialog = page.getByRole('dialog', { name: 'Music Room Remote' })
+  await expect(dialog).toBeVisible()
+  await dialog.getByRole('tab', { name: 'Hue Sync' }).click()
+  await expect(dialog.locator('[data-hue-sync-tab="true"]')).toBeVisible()
+  return dialog
+}
+
+async function expectHueSyncReachable(dialog: Locator) {
+  await expect(dialog.getByRole('tab', { name: 'Hue Sync' })).toHaveAttribute('aria-selected', 'true')
+  await expect(dialog.getByRole('switch', { name: /^Sync Box Power / })).toBeAttached()
+  await expect(dialog.getByRole('switch', { name: /^Light Sync / })).toBeAttached()
+  await expect(dialog.getByRole('button', { name: 'Music' })).toBeAttached()
+  await expect(dialog.getByRole('button', { name: 'High' })).toBeAttached()
+  await expect(dialog.getByRole('slider', { name: 'Brightness' })).toBeAttached()
+  const terminalInput = dialog.getByRole('button', { name: /^HDMI 4 / })
+  await terminalInput.scrollIntoViewIfNeeded()
+  await expect(terminalInput).toBeVisible()
+  await expect(terminalInput).toBeDisabled()
+  await expect(terminalInput).toHaveAttribute('data-icon', 'mdi:television-off')
+  await expect(terminalInput.locator('..')).toHaveCSS('opacity', '0.48')
+  await expect(dialog.getByRole('button', { name: /^HDMI 2 / })).toBeEnabled()
+  await expect(dialog.getByRole('button', { name: /^HDMI 2 / })).toHaveAttribute('data-icon', 'mdi:television')
+  await expect(dialog.getByRole('button', { name: /^HDMI 2 / }).locator('..')).toHaveCSS('opacity', '1')
+  const [dialogBox, terminalInputBox, navBox] = await Promise.all([
+    dialog.boundingBox(),
+    terminalInput.boundingBox(),
+    dialog.locator('[data-modal-tab-nav="true"]').boundingBox(),
+  ])
+  expect(terminalInputBox?.x ?? -1).toBeGreaterThanOrEqual((dialogBox?.x ?? 0) - 1)
+  expect((terminalInputBox?.x ?? 0) + (terminalInputBox?.width ?? Number.POSITIVE_INFINITY)).toBeLessThanOrEqual((dialogBox?.x ?? 0) + (dialogBox?.width ?? 0) + 1)
+  expect((terminalInputBox?.y ?? 0) + (terminalInputBox?.height ?? Number.POSITIVE_INFINITY)).toBeLessThanOrEqual((navBox?.y ?? ((dialogBox?.y ?? 0) + (dialogBox?.height ?? 0))) + 1)
+  expect(await dialog.evaluate((element) => element.scrollWidth - element.clientWidth)).toBeLessThanOrEqual(0)
+}
+
+test('Hue Sync tab stays reachable across the canonical viewport and resize matrix', async ({ page }) => {
+  test.setTimeout(180_000)
+
+  for (const viewport of HUE_SYNC_VIEWPORTS) {
+    await page.setViewportSize(viewport)
+    const dialog = await openMusicRoomHueSync(page)
+    await expectHueSyncReachable(dialog)
+    await closeModal(dialog)
+  }
+
+  for (const sequence of HUE_SYNC_RESIZE_SEQUENCES) {
+    await page.setViewportSize(sequence[0])
+    const dialog = await openMusicRoomHueSync(page)
+    for (const viewport of sequence) {
+      await page.setViewportSize(viewport)
+      await expectHueSyncReachable(dialog)
+    }
+    await closeModal(dialog)
+  }
+
+})
 
 async function expectShortLandscapeFixedGrid(dialog: Locator) {
   await expect(dialog).toHaveAttribute('data-centered-layout', 'false')

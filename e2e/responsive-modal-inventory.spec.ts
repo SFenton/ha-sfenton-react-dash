@@ -297,7 +297,7 @@ const MODAL_CASES: ModalCase[] = [
     id: 'music-room-media-remote',
     open: (page) => openButtonModal(page, 'music-room', /^Music Room Remote Off$/i),
     physicalCallsite: 'src/pages/DashboardViewPage.tsx:MediaRoomSourceModal',
-    selectTabs: ['Controls', 'Apps', 'Devices'],
+    selectTabs: ['Controls', 'Apps', 'Devices', 'Hue Sync'],
   },
   {
     expectedScrollMode: 'body',

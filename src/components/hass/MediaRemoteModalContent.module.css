@@ -419,6 +419,73 @@
   --dynamic-grid-columns: 2;
 }
 
+.hueSyncStack {
+  display: grid;
+  gap: 18px;
+}
+
+.hueSyncToggleGrid,
+.hueSyncChoiceGrid {
+  --dynamic-grid-columns: 2;
+}
+
+.hueSyncModeRow {
+  display: grid;
+  width: min(100%, 296px);
+  grid-template-columns: repeat(3, 78px);
+  justify-content: space-between;
+  justify-self: center;
+  gap: 10px;
+}
+
+.hueSyncModeOption {
+  display: grid;
+  min-width: 0;
+  justify-items: center;
+  gap: 7px;
+}
+
+.hueSyncModeButton {
+  position: relative;
+}
+
+.hueSyncModeButton[data-selected='true'] {
+  background: var(--color-glass-strong);
+}
+
+.hueSyncModeButton:focus {
+  outline: none;
+}
+
+.hueSyncModeButton:focus-visible {
+  outline: 2px solid var(--color-text);
+  outline-offset: 3px;
+}
+
+.hueSyncModeLabel {
+  color: var(--color-muted);
+  font-size: 0.76rem;
+  font-weight: 760;
+  line-height: 1;
+  text-align: center;
+}
+
+.hueSyncModeOption[data-selected='true'] .hueSyncModeLabel {
+  color: var(--color-text);
+}
+
+.hueSyncSelectionTile {
+  height: 100%;
+}
+
+.hueSyncSelectionTile > [data-tone] {
+  height: 100%;
+}
+
+.hueSyncSelectionTile[data-disabled='true'] {
+  opacity: 0.48;
+}
+
 .preloadRemoteGeometry {
   width: 100%;
   min-height: 360px;
@@ -598,5 +665,6 @@
     .deviceGrid {
       --dynamic-grid-columns: 3;
     }
+
   }
 }

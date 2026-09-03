@@ -74,6 +74,33 @@ describe('runOptimisticServiceCommand', () => {
     expect(sourceReset).not.toHaveBeenCalled()
   })
 
+  it('can dispatch optimistic entity services without requesting response data', () => {
+    const callService = vi.fn()
+    const states: OptimisticActionStateMap = {
+      'switch.music_room_sync': {
+        commit: vi.fn(() => 1),
+        displayedState: 'off',
+        liveState: 'off',
+        reset: vi.fn(),
+      },
+    }
+
+    runOptimisticServiceCommand(
+      callService,
+      { domain: 'switch', service: 'turn_on', target: 'switch.music_room_sync' },
+      [{ entityId: 'switch.music_room_sync', revertMs: 8_000, value: 'on' }],
+      undefined,
+      states,
+      { requestResponse: false },
+    )
+
+    expect(callService).toHaveBeenCalledWith({
+      domain: 'switch',
+      service: 'turn_on',
+      target: 'switch.music_room_sync',
+    })
+  })
+
   it('immediately rolls optimistic state back when the service promise rejects', async () => {
     const reset = vi.fn()
     const states: OptimisticActionStateMap = {
