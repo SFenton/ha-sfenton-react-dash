@@ -12,7 +12,7 @@ import { OptimisticActionStateBoundary } from './components/hass/OptimisticActio
 import { useRecipeControls, type RecipeControls } from './components/hass/recipes/useRecipeControls'
 import { SmoothRouteOutlet } from './components/shell/SmoothRouteOutlet'
 import { hasDashboardFloatingAction } from './components/shell/dashboardFloatingAction'
-import { MUSIC_ROOM_MEDIA_OPTIMISTIC_ENTITY_IDS } from './constants/mediaRemotes'
+import { MUSIC_ROOM_MEDIA_LIVE_CHANGE_OPTIMISTIC_ENTITY_IDS, MUSIC_ROOM_MEDIA_OPTIMISTIC_ENTITY_IDS } from './constants/mediaRemotes'
 import { HOME_ALL_FOOD_ROUTE_PATH, HOME_CABINET_ROUTE_PATH, HOME_FREEZER_ROUTE_PATH, HOME_FRIDGE_ROUTE_PATH, HOME_PANTRY_ROUTE_PATH, HOME_RECIPES_ROUTE_PATH, HOME_SPICE_RACK_ROUTE_PATH, PRIMARY_NAV_ROUTES, routeUrl } from './constants/routes'
 import { pageMeasureForPath } from './constants/pageLayout'
 import { dashboardHref } from './hooks/dashboardLocation'
@@ -167,7 +167,7 @@ function Dashboard() {
   return (
     <AppShell activePath={path} bottomNav={<BottomNav activePath={path} onNavigate={navigateToPath} />} chromeHidden={Boolean(routeLoadingPhase)} floatingAction={floatingActionForPath(displayedPath, inventoryControls, recipeControls)} onNavigate={navigateToPath} pageMeasure={displayedPath === 'overview' ? 'dashboard' : pageMeasureForPath(displayedPath)}>
       <SmoothRouteOutlet leadingChromeTransition={leadingChromeTransition} routePath={displayedPath} transitionState={transitionState}>
-        <OptimisticActionStateBoundary entityIds={MUSIC_ROOM_MEDIA_OPTIMISTIC_ENTITY_IDS}>
+        <OptimisticActionStateBoundary entityIds={MUSIC_ROOM_MEDIA_OPTIMISTIC_ENTITY_IDS} liveChangeEntityIds={MUSIC_ROOM_MEDIA_LIVE_CHANGE_OPTIMISTIC_ENTITY_IDS}>
           {pageForPath(displayedPath, path, navigateToPath, navigateBack, transitionState, inventoryControls, recipeControls, usesInitialDataAppGate, handleRecipesInitialResolved, waitsForInitialRecipes, pageLoadingPhase, pageInitialContentTransitionState)}
         </OptimisticActionStateBoundary>
       </SmoothRouteOutlet>

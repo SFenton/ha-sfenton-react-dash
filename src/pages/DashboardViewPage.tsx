@@ -165,7 +165,7 @@ import { modalSquareGridModalStyle, modalSquareGridStyle, type ModalSquareGridSt
 import { ROOM_PAGE_CONFIGS, type RoomSourceCardAction, type RoomSourceCardConfig, type RoomSourceKind, type RoomSourceModalItem, type RoomSourceSectionLayout } from '../constants/roomPages'
 import { bathroomFanForPowerEntity } from '../constants/bathroomFans'
 import { humidifierForPowerEntity, type HumidifierConfig } from '../constants/humidifiers'
-import { MEDIA_REMOTE_CONFIGS, MUSIC_ROOM_MEDIA_OPTIMISTIC_ENTITY_IDS, type MediaRemoteConfig } from '../constants/mediaRemotes'
+import { MEDIA_REMOTE_CONFIGS, MUSIC_ROOM_MEDIA_LIVE_CHANGE_OPTIMISTIC_ENTITY_IDS, MUSIC_ROOM_MEDIA_OPTIMISTIC_ENTITY_IDS, type MediaRemoteConfig } from '../constants/mediaRemotes'
 import { VACUUM_AUTO_CLEAN_CONTROLS } from '../constants/vacuumAutoClean'
 import {
   THERMOSTAT_MODAL_DIAL_GUTTER_PX,
@@ -1339,7 +1339,7 @@ function SourceRoomPage({ onNavigate, preload = false, preloadHash, preloadHashe
   )
 
   const optimisticContent = !preload && room.optimisticStateEntityIds?.length
-    ? <OptimisticActionStateBoundary entityIds={room.optimisticStateEntityIds}>{content}</OptimisticActionStateBoundary>
+    ? <OptimisticActionStateBoundary entityIds={room.optimisticStateEntityIds} liveChangeEntityIds={room.optimisticLiveChangeEntityIds}>{content}</OptimisticActionStateBoundary>
     : content
 
   return bathroomFan && !preload
@@ -2212,7 +2212,7 @@ function MediaPage({ preload = false, preloadHash, preloadHashes = [] }: { prelo
 
   return preload
     ? content
-    : <OptimisticActionStateBoundary entityIds={MUSIC_ROOM_MEDIA_OPTIMISTIC_ENTITY_IDS}>{content}</OptimisticActionStateBoundary>
+    : <OptimisticActionStateBoundary entityIds={MUSIC_ROOM_MEDIA_OPTIMISTIC_ENTITY_IDS} liveChangeEntityIds={MUSIC_ROOM_MEDIA_LIVE_CHANGE_OPTIMISTIC_ENTITY_IDS}>{content}</OptimisticActionStateBoundary>
 }
 
 function AdminPage({ onNavigate, preload = false, preloadHash, preloadHashes = [] }: { onNavigate: (path: string) => void; preload?: boolean; preloadHash?: string; preloadHashes?: string[] }) {

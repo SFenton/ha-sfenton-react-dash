@@ -192,15 +192,18 @@ test('Music Room media controls remain usable in a fine-pointer desktop context'
 
     await page.evaluate(() => {
       const mock = (window as unknown as { __mockHass: { setEntityState: (entityId: string, state: string) => void } }).__mockHass
+      mock.setEntityState('media_player.music_room_tv_android', 'on')
       mock.setEntityState('media_player.xbox', 'off')
+      mock.setEntityState('switch.music_room_music_room_sync_box_power', 'on')
+      mock.setEntityState('select.music_room_music_room_sync_box_hdmi_input', 'HDMI 1')
       mock.setEntityState('sensor.music_room_music_room_sync_box_hdmi1_status', 'linked')
     })
-    await root.getByRole('button', { name: 'Music Room Remote Off' }).click()
+    await root.getByRole('button', { name: /^Music Room Remote / }).click()
     const dialog = page.getByRole('dialog', { name: 'Music Room Remote' })
     await expect(dialog).toBeVisible()
     await expect(dialog.getByRole('heading', { name: 'Sonos Beam Volume' })).toBeVisible()
     await dialog.getByRole('tab', { name: 'Devices' }).click()
-    await expect(dialog.getByRole('switch', { name: 'TV Off' })).toBeVisible()
+    await expect(dialog.getByRole('switch', { name: 'TV On' })).toBeVisible()
     await expect(dialog.getByRole('switch', { name: 'Xbox On' })).toBeVisible()
     await expect(dialog.getByRole('button', { name: 'Server Off' })).toHaveAttribute('aria-pressed', 'false')
     await expect(dialog.getByLabel('Sonos Beam Playing')).toHaveAttribute('data-action-kind', 'state')
@@ -215,7 +218,7 @@ test('Music Room media controls remain usable in a fine-pointer desktop context'
 
     const media = await navigateRoute(page, 'media')
     const musicSection = media.getByRole('heading', { level: 2, name: 'Music Room' }).locator('xpath=ancestor::section[1]')
-    await expect(musicSection.getByRole('button', { name: 'Music Room Remote Off' })).toBeVisible()
+    await expect(musicSection.getByRole('button', { name: /^Music Room Remote / })).toBeVisible()
     await expect(musicSection.getByRole('button', { name: 'Xbox Off' })).toBeVisible()
     await expect(musicSection.getByRole('button', { name: 'Server Off' })).toBeVisible()
     const mediaFortnite = musicSection.getByRole('button', { name: 'Fortnite' })

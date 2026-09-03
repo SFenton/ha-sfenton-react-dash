@@ -1211,6 +1211,7 @@ export const explicitMockEntities: Record<string, MockEntity> = {
   'input_boolean.is_theater_shield_active': entity('input_boolean.is_theater_shield_active', 'off'),
   'input_boolean.is_upper_deck_recording': entity('input_boolean.is_upper_deck_recording', 'on'),
   'input_select.music_room_media_source': entity('input_select.music_room_media_source', 'Off', { options: ['Off', 'TV', 'Xbox', 'Server', 'Fortnite'] }),
+  'sensor.music_room_active_media_source': entity('sensor.music_room_active_media_source', 'Off'),
   'light.lights': entity('light.lights', 'on'),
   'light.living_room': entity('light.living_room', 'on'),
   'light.living_room_front_left_light': entity('light.living_room_front_left_light', 'on'),
@@ -1652,6 +1653,7 @@ export function resetMockHass() {
   mockEntities['input_boolean.guests_staying_in_music_room'].state = 'off'
   mockEntities['input_boolean.guests_staying_in_theater_room'].state = 'off'
   mockEntities['input_select.music_room_media_source'].state = 'Off'
+  mockEntities['sensor.music_room_active_media_source'].state = 'Off'
   mockEntities['media_player.music_room_tv_android'].state = 'off'
   mockEntities['media_player.xbox'].state = 'off'
   mockEntities['binary_sensor.hue_bridge_music_room'].state = 'off'
