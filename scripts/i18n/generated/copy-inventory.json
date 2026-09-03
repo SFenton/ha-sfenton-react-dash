@@ -6190,7 +6190,7 @@
       "file": "src/components/hass/MediaRemoteModalContent.tsx",
       "id": "d732db02a05aac38",
       "lines": [
-        1083
+        1088
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -6223,7 +6223,7 @@
       "file": "src/components/hass/MediaRemoteModalContent.tsx",
       "id": "04a76b33e695c9b5",
       "lines": [
-        301
+        304
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -7245,7 +7245,7 @@
       "file": "src/components/hass/MediaRemoteModalContent.tsx",
       "id": "99e4a0dd52f21ce1",
       "lines": [
-        534
+        537
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -10165,7 +10165,7 @@
       "file": "src/components/hass/MediaRemoteModalContent.tsx",
       "id": "d6397e22cc07917c",
       "lines": [
-        1122
+        1127
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -10685,7 +10685,7 @@
       "file": "src/components/hass/MediaRemoteModalContent.tsx",
       "id": "e3851baa59413e90",
       "lines": [
-        1092
+        1097
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -10769,7 +10769,7 @@
       "file": "src/components/hass/MediaRemoteModalContent.tsx",
       "id": "55462fa9091d83ae",
       "lines": [
-        1131
+        1136
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -12752,7 +12752,7 @@
       "file": "src/components/hass/MediaRemoteModalContent.tsx",
       "id": "4c565d19fe7e5f45",
       "lines": [
-        492
+        495
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -13063,7 +13063,7 @@
       "file": "src/components/hass/MediaRemoteModalContent.tsx",
       "id": "89f743f33e932af2",
       "lines": [
-        532
+        535
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -13289,7 +13289,7 @@
       "file": "src/components/hass/MediaRemoteModalContent.tsx",
       "id": "e5a621e320702808",
       "lines": [
-        509
+        512
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -13868,7 +13868,7 @@
       "file": "src/components/hass/MediaRemoteModalContent.tsx",
       "id": "ed80f8a906aa703c",
       "lines": [
-        508
+        511
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -20660,8 +20660,8 @@
       "file": "src/constants/mediaRemotes.ts",
       "id": "d96e1bc036f3c837",
       "lines": [
-        351,
-        408
+        386,
+        443
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -21098,9 +21098,9 @@
       "file": "src/constants/mediaRemotes.ts",
       "id": "21bd6f6848a2d048",
       "lines": [
-        350,
-        376,
-        407
+        385,
+        411,
+        442
       ],
       "occurrences": 3,
       "origin": "legacy",
@@ -21608,9 +21608,9 @@
       "file": "src/constants/mediaRemotes.ts",
       "id": "5ffd560aefa30c53",
       "lines": [
-        352,
-        378,
-        409
+        387,
+        413,
+        444
       ],
       "occurrences": 3,
       "origin": "legacy",
@@ -21779,8 +21779,8 @@
       "file": "src/constants/mediaRemotes.ts",
       "id": "c21f58b4bacbf154",
       "lines": [
-        353,
-        410
+        388,
+        445
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -21810,9 +21810,9 @@
       "file": "src/constants/mediaRemotes.ts",
       "id": "c54701e2417dace0",
       "lines": [
-        347,
-        373,
-        404
+        382,
+        408,
+        439
       ],
       "occurrences": 3,
       "origin": "legacy",
@@ -22040,7 +22040,7 @@
       "file": "src/constants/mediaRemotes.ts",
       "id": "c7990ba09de73ed7",
       "lines": [
-        377
+        412
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -22152,9 +22152,9 @@
       "file": "src/constants/mediaRemotes.ts",
       "id": "f51fae55ae9bf142",
       "lines": [
-        355,
-        380,
-        412
+        390,
+        415,
+        447
       ],
       "occurrences": 3,
       "origin": "legacy",
@@ -22337,9 +22337,9 @@
       "file": "src/constants/mediaRemotes.ts",
       "id": "1c33a254fc4fc513",
       "lines": [
-        357,
-        382,
-        414
+        392,
+        417,
+        449
       ],
       "occurrences": 3,
       "origin": "legacy",
@@ -22382,9 +22382,9 @@
       "file": "src/constants/mediaRemotes.ts",
       "id": "308464ef00818c0f",
       "lines": [
-        358,
-        383,
-        415
+        393,
+        418,
+        450
       ],
       "occurrences": 3,
       "origin": "legacy",
@@ -22398,9 +22398,9 @@
       "file": "src/constants/mediaRemotes.ts",
       "id": "81cf9e7cc5775bf0",
       "lines": [
-        345,
-        371,
-        398
+        380,
+        406,
+        433
       ],
       "occurrences": 3,
       "origin": "legacy",
@@ -22513,9 +22513,9 @@
       "file": "src/constants/mediaRemotes.ts",
       "id": "67101ddf857ee05c",
       "lines": [
-        349,
-        375,
-        406
+        384,
+        410,
+        441
       ],
       "occurrences": 3,
       "origin": "legacy",
@@ -22767,9 +22767,9 @@
       "file": "src/constants/mediaRemotes.ts",
       "id": "6327698bd30798cd",
       "lines": [
-        348,
-        374,
-        405
+        383,
+        409,
+        440
       ],
       "occurrences": 3,
       "origin": "legacy",
@@ -23253,9 +23253,9 @@
       "file": "src/constants/mediaRemotes.ts",
       "id": "ea4655a41b3ed10b",
       "lines": [
-        346,
-        372,
-        403
+        381,
+        407,
+        438
       ],
       "occurrences": 3,
       "origin": "legacy",
@@ -23313,9 +23313,9 @@
       "file": "src/constants/mediaRemotes.ts",
       "id": "a6349908a9d2d7a9",
       "lines": [
-        354,
-        379,
-        411
+        389,
+        414,
+        446
       ],
       "occurrences": 3,
       "origin": "legacy",
@@ -23329,9 +23329,9 @@
       "file": "src/constants/mediaRemotes.ts",
       "id": "be853154dd9157e0",
       "lines": [
-        356,
-        381,
-        413
+        391,
+        416,
+        448
       ],
       "occurrences": 3,
       "origin": "legacy",
@@ -23854,7 +23854,7 @@
       "file": "src/components/hass/MediaRemoteModalContent.tsx",
       "id": "cc50fd557c6a5b12",
       "lines": [
-        502
+        505
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -24038,7 +24038,7 @@
       "file": "src/components/hass/MediaRemoteModalContent.tsx",
       "id": "84761a8a348ccf08",
       "lines": [
-        1116
+        1121
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -24109,7 +24109,7 @@
       "file": "src/components/hass/MediaRemoteModalContent.tsx",
       "id": "d905b5a2b8ac910b",
       "lines": [
-        1133
+        1138
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -24264,7 +24264,7 @@
       "file": "src/components/hass/MediaRemoteModalContent.tsx",
       "id": "81ab5bc7af47fcc7",
       "lines": [
-        1124
+        1129
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -24320,7 +24320,7 @@
       "file": "src/components/hass/MediaRemoteModalContent.tsx",
       "id": "2c46b3cacacd514b",
       "lines": [
-        381
+        384
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -25176,12 +25176,12 @@
       "file": "src/constants/roomPages.ts",
       "id": "10ad54583f660c70",
       "lines": [
-        171,
-        191,
-        213,
-        263,
-        328,
-        392
+        173,
+        193,
+        215,
+        265,
+        331,
+        395
       ],
       "occurrences": 6,
       "origin": "legacy",
@@ -25223,12 +25223,12 @@
       "file": "src/constants/roomPages.ts",
       "id": "213240917dd1e281",
       "lines": [
-        166,
-        187,
-        203,
-        258,
-        323,
-        387
+        168,
+        189,
+        205,
+        260,
+        326,
+        390
       ],
       "occurrences": 6,
       "origin": "legacy",
@@ -25313,7 +25313,7 @@
       "file": "src/constants/mediaRemotes.ts",
       "id": "8ef95984805529f0",
       "lines": [
-        362
+        397
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -25341,7 +25341,7 @@
       "file": "src/constants/roomPages.ts",
       "id": "fad8530b8ad959b2",
       "lines": [
-        210
+        212
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -25355,7 +25355,7 @@
       "file": "src/constants/mediaRemotes.ts",
       "id": "ee1c539ac7530316",
       "lines": [
-        364
+        399
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -25383,8 +25383,8 @@
       "file": "src/constants/roomPages.ts",
       "id": "dc36c783e0f602a9",
       "lines": [
-        282,
-        424
+        284,
+        427
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -25496,7 +25496,7 @@
       "file": "src/constants/roomPages.ts",
       "id": "f569bf23a22e9a6b",
       "lines": [
-        302
+        304
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -25627,7 +25627,7 @@
       "file": "src/constants/roomPages.ts",
       "id": "af20fe4c1c4473fe",
       "lines": [
-        310
+        312
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -25992,31 +25992,31 @@
       "file": "src/constants/roomPages.ts",
       "id": "cb69c60498640f8c",
       "lines": [
-        163,
-        169,
-        184,
-        189,
-        200,
-        211,
-        232,
-        236,
-        244,
-        255,
-        261,
-        277,
-        285,
-        294,
-        298,
-        320,
-        326,
-        384,
-        390,
-        410,
-        440,
+        165,
+        171,
+        186,
+        191,
+        202,
+        213,
+        234,
+        238,
+        246,
+        257,
+        263,
+        279,
+        287,
+        296,
+        300,
+        323,
+        329,
+        387,
+        393,
+        413,
         443,
-        455,
+        446,
         458,
-        471
+        461,
+        474
       ],
       "occurrences": 25,
       "origin": "legacy",
@@ -26305,9 +26305,9 @@
       "file": "src/constants/roomPages.ts",
       "id": "e5eb4b4b2ca5c8fb",
       "lines": [
-        173,
-        375,
-        401
+        175,
+        378,
+        404
       ],
       "occurrences": 3,
       "origin": "legacy",
@@ -26351,7 +26351,7 @@
       "file": "src/constants/roomPages.ts",
       "id": "46f5922b65dc94b2",
       "lines": [
-        290
+        292
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -26464,7 +26464,7 @@
       "file": "src/constants/roomPages.ts",
       "id": "998251da63232d17",
       "lines": [
-        283
+        285
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -26506,7 +26506,7 @@
       "file": "src/constants/mediaRemotes.ts",
       "id": "e8cce62b14561070",
       "lines": [
-        321
+        356
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -26551,12 +26551,12 @@
       "file": "src/constants/roomPages.ts",
       "id": "78f42ddda38c1911",
       "lines": [
-        279,
-        296,
-        322,
-        386,
-        412,
-        472
+        281,
+        298,
+        325,
+        389,
+        415,
+        475
       ],
       "occurrences": 6,
       "origin": "legacy",
@@ -26613,8 +26613,8 @@
       "file": "src/constants/roomPages.ts",
       "id": "31a323e61b78a122",
       "lines": [
-        307,
-        421
+        309,
+        424
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -26657,7 +26657,7 @@
       "file": "src/constants/roomPages.ts",
       "id": "160d8c76f54fa824",
       "lines": [
-        406
+        409
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -26812,7 +26812,7 @@
       "file": "src/constants/roomPages.ts",
       "id": "e32304477b55085f",
       "lines": [
-        426
+        429
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -26974,7 +26974,7 @@
       "file": "src/constants/roomPages.ts",
       "id": "53ded68f5de1da29",
       "lines": [
-        466
+        469
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -27131,8 +27131,8 @@
       "file": "src/constants/roomPages.ts",
       "id": "92c65024165d12dd",
       "lines": [
-        444,
-        459
+        447,
+        462
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -27557,7 +27557,7 @@
       "file": "src/constants/roomPages.ts",
       "id": "0a37d49f38544373",
       "lines": [
-        418
+        421
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -27613,7 +27613,7 @@
       "file": "src/constants/roomPages.ts",
       "id": "0489cde73cb0a88e",
       "lines": [
-        428
+        431
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -27641,7 +27641,7 @@
       "file": "src/constants/roomPages.ts",
       "id": "cd44811d9175e8f3",
       "lines": [
-        309
+        311
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -27785,7 +27785,7 @@
       "file": "src/constants/roomPages.ts",
       "id": "ca58578165c69bc7",
       "lines": [
-        436
+        439
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -27903,7 +27903,7 @@
       "file": "src/constants/roomPages.ts",
       "id": "7fb2413d3d6b4db0",
       "lines": [
-        180
+        182
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -28045,7 +28045,7 @@
       "file": "src/constants/roomPages.ts",
       "id": "5c457f5f270665a0",
       "lines": [
-        228
+        230
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -28173,7 +28173,7 @@
       "file": "src/constants/roomPages.ts",
       "id": "14fcc64429350ec5",
       "lines": [
-        240
+        242
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -28355,7 +28355,7 @@
       "file": "src/constants/roomPages.ts",
       "id": "9f0a62dcd85417df",
       "lines": [
-        215
+        217
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -28498,7 +28498,7 @@
       "file": "src/constants/roomPages.ts",
       "id": "d9fc83002d411594",
       "lines": [
-        273
+        275
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -28626,7 +28626,7 @@
       "file": "src/constants/roomPages.ts",
       "id": "3d870fc7d3280ed1",
       "lines": [
-        429
+        432
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -28668,13 +28668,13 @@
       "file": "src/constants/roomPages.ts",
       "id": "d86294da939fced3",
       "lines": [
-        231,
-        254,
-        293,
-        409,
-        439,
-        454,
-        469
+        233,
+        256,
+        295,
+        412,
+        442,
+        457,
+        472
       ],
       "occurrences": 7,
       "origin": "legacy",
@@ -28702,14 +28702,14 @@
       "file": "src/constants/roomPages.ts",
       "id": "e88da6803b448745",
       "lines": [
-        162,
-        183,
-        199,
-        243,
-        276,
-        305,
-        319,
-        383
+        164,
+        185,
+        201,
+        245,
+        278,
+        307,
+        322,
+        386
       ],
       "occurrences": 8,
       "origin": "legacy",
@@ -28780,7 +28780,7 @@
       "file": "src/constants/mediaRemotes.ts",
       "id": "48d1323bd50b8b21",
       "lines": [
-        337
+        372
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -28810,7 +28810,7 @@
       "file": "src/constants/roomPages.ts",
       "id": "bd25b855e1d7e485",
       "lines": [
-        159
+        161
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -28894,7 +28894,7 @@
       "file": "src/constants/mediaRemotes.ts",
       "id": "4fac4607f88f818d",
       "lines": [
-        336
+        371
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -28922,7 +28922,7 @@
       "file": "src/constants/mediaRemotes.ts",
       "id": "4efbad845566e3a2",
       "lines": [
-        338
+        373
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -29048,7 +29048,7 @@
       "file": "src/constants/roomPages.ts",
       "id": "5b368ff769a88e91",
       "lines": [
-        173
+        175
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -29162,7 +29162,7 @@
       "file": "src/constants/roomPages.ts",
       "id": "cd28d4234ebc2b28",
       "lines": [
-        451
+        454
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -29249,7 +29249,7 @@
       "file": "src/constants/mediaRemotes.ts",
       "id": "c4fd8e0642204dc1",
       "lines": [
-        363
+        398
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -29278,7 +29278,7 @@
       "file": "src/constants/roomPages.ts",
       "id": "d3ed8ea9db61243c",
       "lines": [
-        196
+        198
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -29433,7 +29433,7 @@
       "file": "src/constants/roomPages.ts",
       "id": "024195433666bf27",
       "lines": [
-        210
+        212
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -29619,7 +29619,7 @@
       "file": "src/constants/mediaRemotes.ts",
       "id": "19116c5af1458792",
       "lines": [
-        318
+        353
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -29661,7 +29661,7 @@
       "file": "src/constants/roomPages.ts",
       "id": "45180750f9788078",
       "lines": [
-        396
+        399
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -29881,21 +29881,21 @@
       "file": "src/constants/roomPages.ts",
       "id": "4b94a82251b38c2a",
       "lines": [
-        164,
-        185,
-        201,
-        233,
-        245,
-        256,
-        278,
-        295,
-        306,
-        321,
-        385,
-        411,
-        441,
-        456,
-        470
+        166,
+        187,
+        203,
+        235,
+        247,
+        258,
+        280,
+        297,
+        308,
+        324,
+        388,
+        414,
+        444,
+        459,
+        473
       ],
       "occurrences": 15,
       "origin": "legacy",
@@ -29984,7 +29984,7 @@
       "file": "src/constants/roomPages.ts",
       "id": "e12366e740db189e",
       "lines": [
-        251
+        253
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -30084,7 +30084,7 @@
       "file": "src/constants/roomPages.ts",
       "id": "ca8456c01b575b68",
       "lines": [
-        265
+        267
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -30243,7 +30243,7 @@
       "file": "src/constants/mediaRemotes.ts",
       "id": "03601e111667f8d1",
       "lines": [
-        320
+        355
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -30331,8 +30331,8 @@
       "file": "src/constants/mediaRemotes.ts",
       "id": "023372d471b5eb5d",
       "lines": [
-        316,
-        368
+        351,
+        403
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -30493,7 +30493,7 @@
       "file": "src/constants/mediaRemotes.ts",
       "id": "f6e93aa64fd97cbc",
       "lines": [
-        319
+        354
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -30535,7 +30535,7 @@
       "file": "src/constants/mediaRemotes.ts",
       "id": "beb2aedcf56719c5",
       "lines": [
-        417
+        452
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -30591,8 +30591,8 @@
       "file": "src/constants/roomPages.ts",
       "id": "616d8b3c55d3661e",
       "lines": [
-        175,
-        399
+        177,
+        402
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -30690,8 +30690,8 @@
       "file": "src/constants/roomPages.ts",
       "id": "543b01337f9996a2",
       "lines": [
-        174,
-        394
+        176,
+        397
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -30761,7 +30761,7 @@
       "file": "src/constants/roomPages.ts",
       "id": "9615414135ba4377",
       "lines": [
-        430
+        433
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -30817,9 +30817,9 @@
       "file": "src/constants/roomPages.ts",
       "id": "aaf6dacc423657e1",
       "lines": [
-        173,
-        375,
-        401
+        175,
+        378,
+        404
       ],
       "occurrences": 3,
       "origin": "legacy",
@@ -31101,7 +31101,7 @@
       "file": "src/constants/roomPages.ts",
       "id": "906003d93c7e38ad",
       "lines": [
-        206
+        208
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -31157,7 +31157,7 @@
       "file": "src/constants/mediaRemotes.ts",
       "id": "57af972615b02a89",
       "lines": [
-        343
+        378
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -31255,7 +31255,7 @@
       "file": "src/constants/roomPages.ts",
       "id": "11aa68cd60b82fe6",
       "lines": [
-        208
+        210
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -31325,7 +31325,7 @@
       "file": "src/constants/roomPages.ts",
       "id": "6f0f56014f7327e2",
       "lines": [
-        267
+        269
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -31381,7 +31381,7 @@
       "file": "src/constants/roomPages.ts",
       "id": "57a99dbf73a97fda",
       "lines": [
-        207
+        209
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -31451,7 +31451,7 @@
       "file": "src/constants/roomPages.ts",
       "id": "b6474fa03b6e8c94",
       "lines": [
-        266
+        268
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -31607,7 +31607,7 @@
       "file": "src/constants/mediaRemotes.ts",
       "id": "91a547bfbcac11e9",
       "lines": [
-        388
+        423
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -31639,8 +31639,8 @@
       "file": "src/constants/roomPages.ts",
       "id": "281773880aefbd22",
       "lines": [
-        380,
-        401
+        383,
+        404
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -31752,7 +31752,7 @@
       "file": "src/constants/mediaRemotes.ts",
       "id": "d01bdac6f31d3119",
       "lines": [
-        420
+        455
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -31766,7 +31766,7 @@
       "file": "src/constants/roomPages.ts",
       "id": "295562204a11e697",
       "lines": [
-        400
+        403
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -31780,7 +31780,7 @@
       "file": "src/constants/roomPages.ts",
       "id": "b368808624621dae",
       "lines": [
-        400
+        403
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -31794,8 +31794,8 @@
       "file": "src/constants/mediaRemotes.ts",
       "id": "36b50bc22629f6b1",
       "lines": [
-        387,
-        419
+        422,
+        454
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -31809,7 +31809,7 @@
       "file": "src/constants/mediaRemotes.ts",
       "id": "b467fae62969bfe3",
       "lines": [
-        389
+        424
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -31838,7 +31838,7 @@
       "file": "src/constants/roomPages.ts",
       "id": "5317fd6408b51ed9",
       "lines": [
-        397
+        400
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -31950,8 +31950,8 @@
       "file": "src/constants/roomPages.ts",
       "id": "f8dc4e6123524f65",
       "lines": [
-        446,
-        461
+        449,
+        464
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -32332,14 +32332,14 @@
       "file": "src/constants/roomPages.ts",
       "id": "2a075358b69dc12c",
       "lines": [
-        190,
-        236,
-        262,
-        285,
-        298,
-        327,
-        445,
-        460
+        192,
+        238,
+        264,
+        287,
+        300,
+        330,
+        448,
+        463
       ],
       "occurrences": 15,
       "origin": "legacy",
@@ -32381,9 +32381,9 @@
       "file": "src/constants/roomPages.ts",
       "id": "3b9f4d1399f38390",
       "lines": [
-        170,
-        212,
-        391
+        172,
+        214,
+        394
       ],
       "occurrences": 3,
       "origin": "legacy",
@@ -32397,9 +32397,9 @@
       "file": "src/constants/roomPages.ts",
       "id": "19ae4b88acc9c92e",
       "lines": [
-        170,
-        212,
-        391
+        172,
+        214,
+        394
       ],
       "occurrences": 3,
       "origin": "legacy",
@@ -32429,10 +32429,10 @@
       "file": "src/constants/roomPages.ts",
       "id": "f7cde10d61c5a669",
       "lines": [
-        170,
-        212,
-        327,
-        391
+        172,
+        214,
+        330,
+        394
       ],
       "occurrences": 4,
       "origin": "legacy",
@@ -32460,7 +32460,7 @@
       "file": "src/constants/mediaRemotes.ts",
       "id": "cb93395aeee876a0",
       "lines": [
-        369
+        404
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -32488,7 +32488,7 @@
       "file": "src/constants/roomPages.ts",
       "id": "2faec3f70718f2a6",
       "lines": [
-        425
+        428
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -32590,10 +32590,10 @@
       "file": "src/constants/roomPages.ts",
       "id": "1343a8a675e882cc",
       "lines": [
-        165,
-        186,
-        202,
-        234
+        167,
+        188,
+        204,
+        236
       ],
       "occurrences": 4,
       "origin": "legacy",
@@ -32622,7 +32622,7 @@
       "file": "src/constants/roomPages.ts",
       "id": "3232563c6385e9ed",
       "lines": [
-        257
+        259
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -32636,7 +32636,7 @@
       "file": "src/constants/mediaRemotes.ts",
       "id": "4c7699fc037945e3",
       "lines": [
-        418
+        453
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -32650,7 +32650,7 @@
       "file": "src/constants/mediaRemotes.ts",
       "id": "2ad5e70e0f9cdd87",
       "lines": [
-        394
+        429
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -32664,7 +32664,7 @@
       "file": "src/constants/mediaRemotes.ts",
       "id": "a016128fc30d9e5b",
       "lines": [
-        317
+        352
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -34835,7 +34835,7 @@
       "file": "src/components/hass/MediaRemoteModalContent.tsx",
       "id": "183af9288c87a23c",
       "lines": [
-        325
+        328
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -34849,7 +34849,7 @@
       "file": "src/components/hass/MediaRemoteModalContent.tsx",
       "id": "c0a8b49cf49d939c",
       "lines": [
-        325
+        328
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -35116,7 +35116,7 @@
       "file": "src/components/hass/MediaRemoteModalContent.tsx",
       "id": "901a314428499004",
       "lines": [
-        1059
+        1064
       ],
       "occurrences": 1,
       "origin": "legacy",

@@ -3270,11 +3270,12 @@ test('Music Room route keeps source controls and moves Fortnite into the remote 
   const selectedXbox = controls.getByRole('button', { name: 'Xbox On' })
   await expect(selectedXbox).toHaveAttribute('aria-pressed', 'true')
   await selectedXbox.click()
+  await expect(controls.getByRole('button', { name: 'Xbox Off' })).toHaveAttribute('aria-pressed', 'false')
   await server.click()
   await expect(controls.getByRole('button', { name: 'Server On' })).toBeVisible()
   expect(await page.evaluate(() => (window as unknown as { __mockHass: { calls: Record<string, unknown>[] } }).__mockHass.calls)).toEqual([
     { domain: 'script', returnResponse: true, service: 'music_room_xbox' },
-    { domain: 'script', returnResponse: true, service: 'music_room_xbox' },
+    { domain: 'script', returnResponse: true, service: 'music_room_tv_off' },
     { domain: 'script', returnResponse: true, service: 'music_room_server' },
   ])
 
@@ -3318,6 +3319,8 @@ test('Music Room route keeps source controls and moves Fortnite into the remote 
   await expect(dialog.getByRole('button', { name: 'Server Off' })).toBeVisible()
   await expect(dialog.getByLabel('Sonos Beam Playing')).toHaveAttribute('data-action-kind', 'state')
   await expect(dialog.getByRole('button', { name: 'Sonos Beam Playing' })).toHaveCount(0)
+  await dialog.getByRole('switch', { name: 'Xbox On' }).click()
+  await expect(dialog.getByRole('switch', { name: 'Xbox Off' })).toBeVisible()
   await dialog.getByRole('switch', { name: 'Power' }).click()
   await expect(dialog.getByRole('switch', { name: 'Xbox Off' })).toBeVisible()
   expect(await page.evaluate(() => (window as unknown as { __mockHass: { calls: Record<string, unknown>[] } }).__mockHass.calls)).toEqual([
@@ -3327,6 +3330,7 @@ test('Music Room route keeps source controls and moves Fortnite into the remote 
       target: 'remote.music_room_tv_android',
       serviceData: { command: 'DPAD_UP' },
     },
+    { domain: 'script', returnResponse: true, service: 'music_room_xbox_off' },
     { domain: 'script', returnResponse: true, service: 'music_room_tv_off' },
   ])
 })
@@ -3344,7 +3348,7 @@ test('Media page includes the Music Room remote, Xbox, Server, and Fortnite cont
 
   await page.evaluate(() => {
     const mock = (window as unknown as { __mockHass: { setEntityState: (entityId: string, state: string) => void } }).__mockHass
-    mock.setEntityState('media_player.xbox', 'off')
+    mock.setEntityState('media_player.xbox', 'on')
     mock.setEntityState('sensor.music_room_music_room_sync_box_hdmi1_status', 'linked')
   })
   await musicSection.getByRole('button', { name: 'Music Room Remote Off' }).click()
@@ -3361,6 +3365,33 @@ test('Media page includes the Music Room remote, Xbox, Server, and Fortnite cont
     target: 'select.music_room_music_room_sync_box_sync_mode',
     serviceData: { option: 'game' },
   })
+})
+
+test('Music Room source tiles follow external routed-source truth without simultaneous selection', async ({ page }) => {
+  await page.goto('/at-a-glance/music-room')
+  const controls = page.getByRole('group', { exact: true, name: 'Music Room Remote Controls' })
+  const setSource = (state: string) => page.evaluate((nextState) => {
+    window.__mockHass?.setEntityState('sensor.music_room_active_media_source', nextState)
+  }, state)
+
+  await setSource('Xbox')
+  await expect(controls.getByRole('button', { name: 'Xbox On' })).toHaveAttribute('aria-pressed', 'true')
+  await expect(controls.getByRole('button', { name: 'Server Off' })).toHaveAttribute('aria-pressed', 'false')
+
+  await setSource('Server')
+  await expect(controls.getByRole('button', { name: 'Xbox Off' })).toHaveAttribute('aria-pressed', 'false')
+  await expect(controls.getByRole('button', { name: 'Server On' })).toHaveAttribute('aria-pressed', 'true')
+
+  await page.evaluate(() => {
+    const mock = window.__mockHass
+    mock?.setEntityState('media_player.music_room_tv_android', 'on')
+    mock?.setEntityState('switch.music_room_music_room_sync_box_power', 'on')
+    mock?.setEntityState('select.music_room_music_room_sync_box_hdmi_input', 'HDMI 1')
+    mock?.setEntityState('sensor.music_room_music_room_sync_box_hdmi1_status', 'plugged')
+    mock?.setEntityState('sensor.music_room_active_media_source', 'Off')
+  })
+  await expect(controls.getByRole('button', { name: 'Xbox Off' })).toHaveAttribute('aria-pressed', 'false')
+  await expect(controls.getByRole('button', { name: 'Server Off' })).toHaveAttribute('aria-pressed', 'false')
 })
 
 test('Free Sleep global Add Alarm defaults to weekdays and writes enabled backend records', async ({ page }) => {

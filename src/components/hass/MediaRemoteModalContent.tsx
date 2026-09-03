@@ -216,22 +216,25 @@ function useHeldDeviceState(
   activeStates: readonly string[] | undefined,
   hasOptimisticOverride: boolean,
   holdMs = 0,
+  resetKey = '',
 ) {
   const liveActive = deviceStateIsActive(liveState, activeStates)
   const [holdState, setHoldState] = useState(() => ({
     holdingActive: false,
     liveActive,
+    resetKey,
   }))
   let holdingActive = holdState.holdingActive
 
   if (
-    liveActive !== holdState.liveActive
+    resetKey !== holdState.resetKey
+    || liveActive !== holdState.liveActive
     || ((!holdMs || hasOptimisticOverride) && holdingActive)
   ) {
-    holdingActive = !holdMs || hasOptimisticOverride
+    holdingActive = resetKey !== holdState.resetKey || !holdMs || hasOptimisticOverride
       ? false
       : liveActive || holdState.liveActive || holdingActive
-    setHoldState({ holdingActive, liveActive })
+    setHoldState({ holdingActive, liveActive, resetKey })
   }
 
   useEffect(() => {
@@ -242,7 +245,7 @@ function useHeldDeviceState(
         : current)
     }, holdMs)
     return () => window.clearTimeout(timer)
-  }, [hasOptimisticOverride, holdMs, holdingActive, liveActive])
+  }, [hasOptimisticOverride, holdMs, holdingActive, liveActive, resetKey])
 
   if (hasOptimisticOverride || !holdMs || liveActive || !holdingActive) return displayedState
   return activeStates?.[0] ?? displayedState
@@ -560,12 +563,14 @@ function DeviceButton({ device }: { device: MediaRemoteDeviceConfig }) {
     const optimisticState = optimisticStates[entityId]
     return Boolean(optimisticState && optimisticState.displayedState !== optimisticState.liveState)
   })
+  const activeHoldResetKey = device.activeHoldResetEntityIds?.map((entityId) => entities[entityId]?.state ?? 'unavailable').join('|') ?? ''
   const displayedState = useHeldDeviceState(
     liveState,
     optimisticDisplayedState,
     device.activeStates,
     hasOptimisticOverride,
     device.activeHoldMs,
+    activeHoldResetKey,
   )
   const baseEntity = entities[device.entityId] ?? stateEntityIds.map((entityId) => entities[entityId]).find(Boolean)
   const liveEntity: EntityLike = {
@@ -1286,6 +1291,6 @@ export function MediaRemoteModalContent({
 
   const content = <MediaRemoteModalInteractiveContent activeTab={activeTab} config={config} onTabChange={onTabChange} />
   return config.optimisticStateEntityIds?.length
-    ? <OptimisticActionStateBoundary entityIds={config.optimisticStateEntityIds}>{content}</OptimisticActionStateBoundary>
+    ? <OptimisticActionStateBoundary entityIds={config.optimisticStateEntityIds} liveChangeEntityIds={config.optimisticLiveChangeEntityIds}>{content}</OptimisticActionStateBoundary>
     : content
 }

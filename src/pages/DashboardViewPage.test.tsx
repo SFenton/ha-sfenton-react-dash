@@ -7,7 +7,7 @@ import { valueToThermostatPoint } from '../components/hass/thermostatDialGeometr
 import { VacuumRoomSourceModalContent } from '../components/hass/VacuumCard'
 import { DashboardViewPage } from './DashboardViewPage'
 import { CONTACT_GROUPS } from '../constants/atAGlance'
-import { MUSIC_ROOM_COMMAND_REVERT_MS } from '../constants/mediaRemotes'
+import { MUSIC_ROOM_ACTIVE_MEDIA_SOURCE_ENTITY_ID, MUSIC_ROOM_COMMAND_REVERT_MS, MUSIC_ROOM_HUE_SYNC_HDMI_INPUT_ENTITY_ID, MUSIC_ROOM_HUE_SYNC_POWER_ENTITY_ID, MUSIC_ROOM_XBOX_HDMI_STATUS_ENTITY_ID } from '../constants/mediaRemotes'
 import { VACUUMS } from '../constants/portedDashboard'
 import { ROOM_PAGE_CONFIGS, ROOM_PAGE_ORDER } from '../constants/roomPages'
 import { LEGACY_VACUUM_OUTCOMES, NINE_ROOM_VACUUM_OUTCOME_CONTRACT } from '../test/fixtures/vacuumOutcomes'
@@ -571,8 +571,14 @@ describe('DashboardViewPage', () => {
     }
   })
 
-  it('keeps an already-selected Xbox source as a one-tap command and shares Xbox optimism with the modal', async () => {
+  it('turns the full system off from an already-selected Xbox source and shares that optimism with the modal', async () => {
+    mockEntities[MUSIC_ROOM_ACTIVE_MEDIA_SOURCE_ENTITY_ID].state = 'Xbox'
     mockEntities['input_select.music_room_media_source'].state = 'Xbox'
+    mockEntities['media_player.music_room_tv_android'].state = 'on'
+    mockEntities['media_player.xbox'].state = 'on'
+    mockEntities[MUSIC_ROOM_HUE_SYNC_POWER_ENTITY_ID].state = 'on'
+    mockEntities[MUSIC_ROOM_HUE_SYNC_HDMI_INPUT_ENTITY_ID].state = 'HDMI 1'
+    mockEntities[MUSIC_ROOM_XBOX_HDMI_STATUS_ENTITY_ID].state = 'linked'
     render(<DashboardViewPage activePath="music-room" onNavigate={() => undefined} path="music-room" />)
 
     const xbox = screen.getByRole('button', { name: 'Xbox On' })
@@ -581,13 +587,74 @@ describe('DashboardViewPage', () => {
     fireEvent.click(xbox)
 
     expect(mockCallServiceCalls).toEqual([
-      { domain: 'script', returnResponse: true, service: 'music_room_xbox' },
+      { domain: 'script', returnResponse: true, service: 'music_room_tv_off' },
     ])
+    expect(screen.getByRole('button', { name: 'Xbox Off' })).toHaveAttribute('aria-pressed', 'false')
 
-    fireEvent.click(screen.getByRole('button', { name: 'Music Room Remote On' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Music Room Remote Off' }))
     const dialog = await screen.findByRole('dialog', { name: 'Music Room Remote' })
     await clickModalTab(within(dialog), 'Devices')
-    expect(within(dialog).getByRole('switch', { name: 'Xbox On' })).toHaveAttribute('aria-checked', 'true')
+    expect(within(dialog).getByRole('switch', { name: 'Xbox Off' })).toHaveAttribute('aria-checked', 'false')
+  })
+
+  it('turns the full system off from an already-selected Server source', () => {
+    mockEntities[MUSIC_ROOM_ACTIVE_MEDIA_SOURCE_ENTITY_ID].state = 'Server'
+    mockEntities['input_select.music_room_media_source'].state = 'Server'
+    mockEntities['media_player.music_room_tv_android'].state = 'on'
+    mockEntities[MUSIC_ROOM_HUE_SYNC_POWER_ENTITY_ID].state = 'on'
+    mockEntities[MUSIC_ROOM_HUE_SYNC_HDMI_INPUT_ENTITY_ID].state = 'HDMI 2'
+    render(<DashboardViewPage activePath="music-room" onNavigate={() => undefined} path="music-room" />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Server On' }))
+
+    expect(mockCallServiceCalls).toEqual([
+      { domain: 'script', returnResponse: true, service: 'music_room_tv_off' },
+    ])
+    expect(screen.getByRole('button', { name: 'Server Off' })).toHaveAttribute('aria-pressed', 'false')
+  })
+
+  it('lets an external routed-source change replace pending Xbox optimism immediately', () => {
+    render(<DashboardViewPage activePath="music-room" onNavigate={() => undefined} path="music-room" />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Xbox Off' }))
+    expect(screen.getByRole('button', { name: 'Xbox On' })).toHaveAttribute('aria-pressed', 'true')
+
+    act(() => setMockEntityState(MUSIC_ROOM_ACTIVE_MEDIA_SOURCE_ENTITY_ID, 'Server'))
+
+    expect(screen.getByRole('button', { name: 'Xbox Off' })).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.getByRole('button', { name: 'Server On' })).toHaveAttribute('aria-pressed', 'true')
+  })
+
+  it('switches directly between active Xbox and Server routes without dual selection', () => {
+    mockEntities[MUSIC_ROOM_ACTIVE_MEDIA_SOURCE_ENTITY_ID].state = 'Xbox'
+    const view = render(<DashboardViewPage activePath="music-room" onNavigate={() => undefined} path="music-room" />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Server Off' }))
+    expect(screen.getByRole('button', { name: 'Xbox Off' })).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.getByRole('button', { name: 'Server On' })).toHaveAttribute('aria-pressed', 'true')
+    expect(mockCallServiceCalls).toEqual([
+      { domain: 'script', returnResponse: true, service: 'music_room_server' },
+    ])
+
+    view.unmount()
+    resetMockHass()
+    mockEntities[MUSIC_ROOM_ACTIVE_MEDIA_SOURCE_ENTITY_ID].state = 'Server'
+    render(<DashboardViewPage activePath="music-room" onNavigate={() => undefined} path="music-room" />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Xbox Off' }))
+    expect(screen.getByRole('button', { name: 'Xbox On' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: 'Server Off' })).toHaveAttribute('aria-pressed', 'false')
+    expect(mockCallServiceCalls).toEqual([
+      { domain: 'script', returnResponse: true, service: 'music_room_xbox' },
+    ])
+  })
+
+  it('treats Fortnite as the active Xbox route on room source tiles', () => {
+    mockEntities[MUSIC_ROOM_ACTIVE_MEDIA_SOURCE_ENTITY_ID].state = 'Fortnite'
+    render(<DashboardViewPage activePath="music-room" onNavigate={() => undefined} path="music-room" />)
+
+    expect(screen.getByRole('button', { name: 'Xbox On' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: 'Server Off' })).toHaveAttribute('aria-pressed', 'false')
   })
 
   it('opens the Music Room remote with its configured title, apps, and devices', async () => {

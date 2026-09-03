@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, within } from '@testing-library/react'
 import { act } from 'react'
-import { HUE_SYNC_OPTIMISTIC_REVERT_MS, MEDIA_REMOTE_CONFIGS, MUSIC_ROOM_COMMAND_REVERT_MS, MUSIC_ROOM_MEDIA_ACTIONS, MUSIC_ROOM_XBOX_ACTIVE_HOLD_MS, MUSIC_ROOM_XBOX_HDMI_STATUS_ENTITY_ID, MUSIC_ROOM_XBOX_OFF_REVERT_MS } from '../../constants/mediaRemotes'
+import { HUE_SYNC_OPTIMISTIC_REVERT_MS, MEDIA_REMOTE_CONFIGS, MUSIC_ROOM_ACTIVE_MEDIA_SOURCE_ENTITY_ID, MUSIC_ROOM_COMMAND_REVERT_MS, MUSIC_ROOM_HUE_SYNC_HDMI_INPUT_ENTITY_ID, MUSIC_ROOM_HUE_SYNC_POWER_ENTITY_ID, MUSIC_ROOM_MEDIA_ACTIONS, MUSIC_ROOM_XBOX_ACTIVE_HOLD_MS, MUSIC_ROOM_XBOX_HDMI_STATUS_ENTITY_ID, MUSIC_ROOM_XBOX_OFF_REVERT_MS } from '../../constants/mediaRemotes'
 import { mockCallServiceCalls, mockEntities, resetMockHass, setMockCallServiceOutcome } from '../../test/mocks/hakitCoreState'
 import { MediaRemoteModalContent, MediaRemoteModalNav } from './MediaRemoteModalContent'
 
@@ -158,7 +158,13 @@ describe('MediaRemoteModalContent', () => {
       const xboxDevice = musicRoomRemote.devices?.find((device) => device.title === 'Xbox')
       expect(xboxDevice?.activeHoldMs).toBe(MUSIC_ROOM_XBOX_ACTIVE_HOLD_MS)
       expect(xboxDevice?.activeStates).toEqual(['on'])
-      expect(xboxDevice?.stateEntityIds).toEqual(['media_player.xbox', MUSIC_ROOM_XBOX_HDMI_STATUS_ENTITY_ID])
+      expect(xboxDevice?.stateEntityIds).toEqual([
+        'media_player.xbox',
+        MUSIC_ROOM_XBOX_HDMI_STATUS_ENTITY_ID,
+        musicRoomRemote.controlEntityId,
+        MUSIC_ROOM_HUE_SYNC_POWER_ENTITY_ID,
+        MUSIC_ROOM_HUE_SYNC_HDMI_INPUT_ENTITY_ID,
+      ])
       expect(screen.getByRole('switch', { name: 'TV Playing' })).toHaveAttribute('aria-checked', 'true')
       expect(screen.getByRole('switch', { name: 'Xbox On' })).toHaveAttribute('aria-checked', 'true')
 
@@ -168,6 +174,13 @@ describe('MediaRemoteModalContent', () => {
       act(() => vi.advanceTimersByTime(MUSIC_ROOM_XBOX_ACTIVE_HOLD_MS - 1))
       expect(screen.getByRole('switch', { name: 'Xbox On' })).toHaveAttribute('aria-checked', 'true')
       act(() => vi.advanceTimersByTime(1))
+      expect(screen.getByRole('switch', { name: 'Xbox Off' })).toHaveAttribute('aria-checked', 'false')
+
+      mockEntities[MUSIC_ROOM_XBOX_HDMI_STATUS_ENTITY_ID].state = 'linked'
+      view.rerender(<MediaRemoteModalContent activeTab="devices" config={musicRoomRemote} onTabChange={() => undefined} />)
+      expect(screen.getByRole('switch', { name: 'Xbox On' })).toHaveAttribute('aria-checked', 'true')
+      mockEntities[MUSIC_ROOM_HUE_SYNC_HDMI_INPUT_ENTITY_ID].state = 'HDMI 2'
+      view.rerender(<MediaRemoteModalContent activeTab="devices" config={musicRoomRemote} onTabChange={() => undefined} />)
       expect(screen.getByRole('switch', { name: 'Xbox Off' })).toHaveAttribute('aria-checked', 'false')
 
       mockEntities['media_player.xbox'].state = 'playing'
@@ -212,15 +225,16 @@ describe('MediaRemoteModalContent', () => {
       serviceData: undefined,
     })
 
+    mockEntities[MUSIC_ROOM_ACTIVE_MEDIA_SOURCE_ENTITY_ID].state = 'Server'
     mockEntities['input_select.music_room_media_source'].state = 'Server'
-    mockEntities['media_player.xbox'].state = 'off'
-    mockEntities[MUSIC_ROOM_XBOX_HDMI_STATUS_ENTITY_ID].state = 'linked'
-    view.rerender(<MediaRemoteModalContent activeTab="devices" config={musicRoomRemote} onTabChange={() => undefined} />)
-    expect(screen.getByRole('switch', { name: 'Xbox On' })).toHaveAttribute('aria-checked', 'true')
-
+    mockEntities[musicRoomRemote.controlEntityId].state = 'on'
+    mockEntities['media_player.xbox'].state = 'on'
+    mockEntities[MUSIC_ROOM_HUE_SYNC_POWER_ENTITY_ID].state = 'on'
+    mockEntities[MUSIC_ROOM_HUE_SYNC_HDMI_INPUT_ENTITY_ID].state = 'HDMI 2'
     mockEntities[MUSIC_ROOM_XBOX_HDMI_STATUS_ENTITY_ID].state = 'plugged'
     view.rerender(<MediaRemoteModalContent activeTab="devices" config={musicRoomRemote} onTabChange={() => undefined} />)
     expect(screen.getByRole('switch', { name: 'Xbox On' })).toHaveAttribute('aria-checked', 'true')
+    expect(screen.getByRole('button', { name: 'Server On' })).toHaveAttribute('aria-pressed', 'true')
 
     fireEvent.click(screen.getByRole('switch', { name: 'Xbox On' }))
     expect(mockCallServiceCalls.at(-1)).toEqual({
@@ -237,10 +251,6 @@ describe('MediaRemoteModalContent', () => {
     expect(xboxToggle.type).toBe('state')
     if (xboxToggle.type === 'state') {
       expect(xboxToggle.cases[0].action).toMatchObject({
-        optimisticResetState: [{
-          entityId: 'input_select.music_room_media_source',
-          values: ['Xbox', 'Fortnite'],
-        }],
         optimisticState: [{
           entityId: 'media_player.xbox',
           revertMs: MUSIC_ROOM_XBOX_OFF_REVERT_MS,
@@ -248,10 +258,49 @@ describe('MediaRemoteModalContent', () => {
         }, {
           entityId: MUSIC_ROOM_XBOX_HDMI_STATUS_ENTITY_ID,
           revertMs: MUSIC_ROOM_XBOX_OFF_REVERT_MS,
-          value: 'off',
+          value: 'plugged',
         }],
       })
     }
+
+    fireEvent.click(screen.getByRole('button', { name: 'Server On' }))
+    expect(mockCallServiceCalls.at(-1)).toEqual({
+      domain: 'script',
+      returnResponse: true,
+      service: 'music_room_tv_off',
+      target: undefined,
+      serviceData: undefined,
+    })
+    expect(screen.getByRole('button', { name: 'Server Off' })).toHaveAttribute('aria-pressed', 'false')
+  })
+
+  it('shows Xbox Off immediately when the modal turns off a linked Xbox route', () => {
+    mockEntities[MUSIC_ROOM_ACTIVE_MEDIA_SOURCE_ENTITY_ID].state = 'Xbox'
+    mockEntities[musicRoomRemote.controlEntityId].state = 'on'
+    mockEntities['media_player.xbox'].state = 'on'
+    mockEntities[MUSIC_ROOM_HUE_SYNC_POWER_ENTITY_ID].state = 'on'
+    mockEntities[MUSIC_ROOM_HUE_SYNC_HDMI_INPUT_ENTITY_ID].state = 'HDMI 1'
+    mockEntities[MUSIC_ROOM_XBOX_HDMI_STATUS_ENTITY_ID].state = 'linked'
+    render(<MediaRemoteModalContent activeTab="devices" config={musicRoomRemote} onTabChange={() => undefined} />)
+
+    fireEvent.click(screen.getByRole('switch', { name: 'Xbox On' }))
+
+    expect(screen.getByRole('switch', { name: 'Xbox Off' })).toHaveAttribute('aria-checked', 'false')
+    expect(mockEntities[MUSIC_ROOM_XBOX_HDMI_STATUS_ENTITY_ID].state).toBe('linked')
+    expect(mockCallServiceCalls).toEqual([
+      { domain: 'script', returnResponse: true, service: 'music_room_xbox_off', target: undefined, serviceData: undefined },
+    ])
+  })
+
+  it('does not optimistically hide an independently active Xbox during a Server request', () => {
+    mockEntities[MUSIC_ROOM_ACTIVE_MEDIA_SOURCE_ENTITY_ID].state = 'Xbox'
+    mockEntities['media_player.xbox'].state = 'on'
+    render(<MediaRemoteModalContent activeTab="devices" config={musicRoomRemote} onTabChange={() => undefined} />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Server Off' }))
+
+    expect(screen.getByRole('button', { name: 'Server On' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('switch', { name: 'Xbox On' })).toHaveAttribute('aria-checked', 'true')
   })
 
   it('rolls back Music Room app intent when Home Assistant never confirms it', () => {
@@ -283,9 +332,11 @@ describe('MediaRemoteModalContent', () => {
   })
 
   it('disables unavailable Music Room commands and keeps Sonos Beam state-only', () => {
-    mockEntities['input_select.music_room_media_source'].state = 'unavailable'
+    mockEntities[MUSIC_ROOM_ACTIVE_MEDIA_SOURCE_ENTITY_ID].state = 'unavailable'
     mockEntities[musicRoomRemote.controlEntityId].state = 'unavailable'
     mockEntities['media_player.xbox'].state = 'unavailable'
+    mockEntities[MUSIC_ROOM_HUE_SYNC_POWER_ENTITY_ID].state = 'unavailable'
+    mockEntities[MUSIC_ROOM_HUE_SYNC_HDMI_INPUT_ENTITY_ID].state = 'unavailable'
     mockEntities[MUSIC_ROOM_XBOX_HDMI_STATUS_ENTITY_ID].state = 'unavailable'
     mockEntities[musicRoomRemote.volumeEntityId].state = 'unavailable'
 
