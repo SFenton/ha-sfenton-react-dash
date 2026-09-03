@@ -13,6 +13,10 @@ export type OptimisticActionStateMap = Readonly<Record<string, OptimisticEntityS
 
 export const OptimisticActionStateContext = createContext<OptimisticActionStateMap>({})
 
+export interface OptimisticServiceCommandOptions {
+  requestResponse?: boolean
+}
+
 export function useOptimisticActionStates() {
   return useContext(OptimisticActionStateContext)
 }
@@ -44,6 +48,7 @@ export function runOptimisticServiceCommand(
   intents: readonly OptimisticStateIntent[] | undefined,
   resetIntents: readonly OptimisticResetIntent[] | undefined,
   states: OptimisticActionStateMap,
+  options: OptimisticServiceCommandOptions = {},
 ) {
   const controllers = stateControllers(intents, states)
   const controllersToReset = resetControllers(resetIntents, states)
@@ -52,7 +57,7 @@ export function runOptimisticServiceCommand(
     controller,
     generation: controller.commit(intent.value, { revertMs: intent.revertMs }),
   }))
-  const serviceParams = controllers.length || controllersToReset.length
+  const serviceParams = options.requestResponse !== false && (controllers.length || controllersToReset.length)
     ? { ...params, returnResponse: true }
     : params
 

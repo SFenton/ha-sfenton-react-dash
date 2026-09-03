@@ -1,17 +1,19 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type RefObject } from 'react'
 import { flushSync } from 'react-dom'
-import { useEntity, useHass } from '@hakit/core'
+import { OFF, ON, useEntity, useHass } from '@hakit/core'
+import { Description } from '../core/Description'
 import { DynamicGrid } from '../core/DynamicGrid'
 import { MaterialIcon } from '../core/Icon'
 import { GlassTile, type TileTone } from '../core/GlassTile'
 import type { ControlSemantics } from '../core/controlSemantics'
 import { ModalIconTabNav } from '../core/ModalTabNav'
 import { modalTabId, modalTabPanelId } from '../core/modalTabIds'
-import type { MediaRemoteAction, MediaRemoteAppConfig, MediaRemoteButtonConfig, MediaRemoteConfig, MediaRemoteDeviceConfig, MediaRemoteIconColorRule } from '../../constants/mediaRemotes'
-import { mediaRemoteModalTabs, type MediaRemoteModalTab } from '../../constants/surfaceSemantics'
+import { RangeField } from '../core/RangeField'
+import { HUE_SYNC_OPTIMISTIC_REVERT_MS, type MediaRemoteAction, type MediaRemoteAppConfig, type MediaRemoteButtonConfig, type MediaRemoteConfig, type MediaRemoteDeviceConfig, type MediaRemoteHueSyncConfig, type MediaRemoteIconColorRule } from '../../constants/mediaRemotes'
+import { HUE_SYNC_MEDIA_REMOTE_MODAL_TAB, mediaRemoteModalTabs, type MediaRemoteModalTab } from '../../constants/surfaceSemantics'
 import { useOptimisticState } from '../../hooks/useOptimisticState'
 import { useSmoothDisplayedModalTab } from '../../hooks/useSmoothDisplayedModalTab'
-import { CORE_COPY_KEYS, CORE_COPY_NAMESPACE, useCopy } from '../../i18n'
+import { CORE_COPY_KEYS, CORE_COPY_NAMESPACE, MEDIA_COPY_KEYS, MEDIA_COPY_NAMESPACE, useCopy } from '../../i18n'
 import { asEntityName, titleCaseState } from './entityState'
 import {
   OptimisticActionStateBoundary,
@@ -31,11 +33,22 @@ type TextPromptState = { accordionState: TextPromptAccordionState; action: TextP
 
 const VOLUME_OPTIMISTIC_REVERT_MS = 2500
 const REMOTE_ACCORDION_DEBUG_KEY = 'haDash.remoteAccordionDebug'
+const HDMI_UNPLUGGED_STATE = 'unplugged'
+const HUE_SYNC_MODE_ORDER = ['music', 'video', 'game'] as const
+const HUE_SYNC_MODE_ICONS: Readonly<Record<string, string>> = {
+  game: 'mdi:gamepad-variant',
+  music: 'mdi:music',
+  video: 'mdi:movie-open',
+}
 
 interface EntityLike {
   attributes: Record<string, unknown>
   entity_id: string
   state: string
+}
+
+interface AcknowledgedServiceConnection {
+  sendMessagePromise: <T>(message: Record<string, unknown>) => Promise<T>
 }
 
 function isUnavailable(entity: EntityLike | null | undefined) {
@@ -140,12 +153,13 @@ function resolveAction(
   entityId: string | undefined,
   entities: Record<string, EntityLike | undefined>,
   optimisticStates: OptimisticActionStateMap,
+  stateOverride?: string,
 ) {
   if (action.type !== 'state') return action
   const stateEntityId = action.entityId ?? entityId
-  const state = stateEntityId
+  const state = stateOverride ?? (stateEntityId
     ? optimisticStateValue(stateEntityId, entities[stateEntityId]?.state, optimisticStates)
-    : undefined
+    : undefined)
   const matchedCase = action.cases.find((candidate) => state !== undefined && candidate.states.includes(state))
   return matchedCase?.action ?? action.defaultAction
 }
@@ -157,8 +171,9 @@ function runAction(
   entityId: string | undefined,
   onTextPrompt: (action: TextPromptAction) => void,
   optimisticStates: OptimisticActionStateMap,
+  stateOverride?: string,
 ) {
-  const resolvedAction = resolveAction(action, entityId, entities, optimisticStates)
+  const resolvedAction = resolveAction(action, entityId, entities, optimisticStates, stateOverride)
 
   if (resolvedAction.type === 'textPrompt') {
     onTextPrompt(resolvedAction)
@@ -189,6 +204,48 @@ function withOptimisticState(entity: EntityLike | null, entityId: string, optimi
   const state = optimisticStateValue(entityId, entity?.state, optimisticStates)
   if (!entity || !state || state === entity.state) return entity
   return { ...entity, state }
+}
+
+function deviceStateIsActive(state: string, activeStates: readonly string[] | undefined) {
+  return activeStates?.length ? activeStates.includes(state) : !['off', 'unavailable', 'unknown'].includes(state)
+}
+
+function useHeldDeviceState(
+  liveState: string,
+  displayedState: string,
+  activeStates: readonly string[] | undefined,
+  hasOptimisticOverride: boolean,
+  holdMs = 0,
+) {
+  const liveActive = deviceStateIsActive(liveState, activeStates)
+  const [holdState, setHoldState] = useState(() => ({
+    holdingActive: false,
+    liveActive,
+  }))
+  let holdingActive = holdState.holdingActive
+
+  if (
+    liveActive !== holdState.liveActive
+    || ((!holdMs || hasOptimisticOverride) && holdingActive)
+  ) {
+    holdingActive = !holdMs || hasOptimisticOverride
+      ? false
+      : liveActive || holdState.liveActive || holdingActive
+    setHoldState({ holdingActive, liveActive })
+  }
+
+  useEffect(() => {
+    if (!holdMs || hasOptimisticOverride || liveActive || !holdingActive) return undefined
+    const timer = window.setTimeout(() => {
+      setHoldState((current) => current.holdingActive && !current.liveActive
+        ? { ...current, holdingActive: false }
+        : current)
+    }, holdMs)
+    return () => window.clearTimeout(timer)
+  }, [hasOptimisticOverride, holdMs, holdingActive, liveActive])
+
+  if (hasOptimisticOverride || !holdMs || liveActive || !holdingActive) return displayedState
+  return activeStates?.[0] ?? displayedState
 }
 
 function SectionHeader({ title }: { title: string }) {
@@ -491,15 +548,39 @@ function DeviceButton({ device }: { device: MediaRemoteDeviceConfig }) {
   const callService = useHass((state) => state.helpers.callService) as unknown as CallService
   const entities = useHass((state) => state.entities) as unknown as Record<string, EntityLike | undefined>
   const optimisticStates = useOptimisticActionStates()
-  const liveEntity = useEntity(asEntityName(device.entityId), { returnNullIfNotFound: true }) as EntityLike | null
-  const entity = withOptimisticState(liveEntity, device.entityId, optimisticStates)
+  const stateEntityIds = device.stateEntityIds ?? [device.entityId]
+  const liveStates = Object.fromEntries(stateEntityIds.map((entityId) => [entityId, entities[entityId]?.state]))
+  const displayedStates = Object.fromEntries(stateEntityIds.map((entityId) => [
+    entityId,
+    optimisticStateValue(entityId, entities[entityId]?.state, optimisticStates),
+  ]))
+  const liveState = device.stateResolver?.(liveStates) ?? liveStates[device.entityId] ?? 'unavailable'
+  const optimisticDisplayedState = device.stateResolver?.(displayedStates) ?? displayedStates[device.entityId] ?? liveState
+  const hasOptimisticOverride = stateEntityIds.some((entityId) => {
+    const optimisticState = optimisticStates[entityId]
+    return Boolean(optimisticState && optimisticState.displayedState !== optimisticState.liveState)
+  })
+  const displayedState = useHeldDeviceState(
+    liveState,
+    optimisticDisplayedState,
+    device.activeStates,
+    hasOptimisticOverride,
+    device.activeHoldMs,
+  )
+  const baseEntity = entities[device.entityId] ?? stateEntityIds.map((entityId) => entities[entityId]).find(Boolean)
+  const liveEntity: EntityLike = {
+    attributes: baseEntity?.attributes ?? {},
+    entity_id: device.entityId,
+    state: liveState,
+  }
+  const entity: EntityLike = { ...liveEntity, state: displayedState }
   const unavailable = isUnavailable(liveEntity)
   const active = device.activeStates?.length ? Boolean(entity && device.activeStates.includes(entity.state)) : !isOff(entity)
   const subtitle = entity ? device.stateLabels?.[entity.state] ?? formatMediaState(entity) : formatMediaState(entity)
   const tone: TileTone = device.entityId.startsWith('input_boolean.') ? 'switch' : 'media'
   const semantics: ControlSemantics = device.semantics?.(entity?.state) ?? (device.action ? { kind: 'command' } : { kind: 'state' })
   const runDeviceAction = device.action
-    ? () => runAction(callService, device.action!, entities, device.entityId, () => undefined, optimisticStates)
+    ? () => runAction(callService, device.action!, entities, device.entityId, () => undefined, optimisticStates, device.stateResolver ? displayedState : undefined)
     : undefined
 
   return (
@@ -546,9 +627,381 @@ function AppButton({ app }: { app: MediaRemoteAppConfig }) {
   )
 }
 
-export function MediaRemoteModalNav({ activeTab, onTabChange, remoteTitle, showApps = true, showDevices = false }: { activeTab: MediaRemoteModalTab; onTabChange: (tab: MediaRemoteModalTab) => void; remoteTitle: string; showApps?: boolean; showDevices?: boolean }) {
+function entityOptionValues(entity: EntityLike | null) {
+  const options = entity?.attributes.options
+  if (!Array.isArray(options)) return []
+  return options.filter((option): option is string => typeof option === 'string')
+}
+
+function hueSyncIntent(entityId: string, value: string) {
+  return { entityId, revertMs: HUE_SYNC_OPTIMISTIC_REVERT_MS, value }
+}
+
+function useHueSyncCallService(): CallService {
+  const connection = useHass((state) => state.connection) as unknown as AcknowledgedServiceConnection | null
+
+  return useCallback((params: Record<string, unknown>) => {
+    if (!connection) return Promise.reject()
+    const message: Record<string, unknown> = {
+      domain: params.domain,
+      service: params.service,
+      type: 'call_service',
+    }
+    if (params.serviceData !== undefined) message.service_data = params.serviceData
+    if (typeof params.target === 'string') message.target = { entity_id: params.target }
+    else if (params.target !== undefined) message.target = params.target
+    return connection.sendMessagePromise(message)
+  }, [connection])
+}
+
+function runHueSyncCommand(
+  callService: CallService,
+  optimisticStates: OptimisticActionStateMap,
+  params: Record<string, unknown>,
+  intents: ReturnType<typeof hueSyncIntent>[],
+) {
+  runOptimisticServiceCommand(callService, params, intents, undefined, optimisticStates, { requestResponse: false })
+}
+
+function HueSyncToggleTile({
+  entityId,
+  icon,
+  offProjections = [],
+  onProjections = [],
+  title,
+  tone,
+}: {
+  entityId: string
+  icon: string
+  offProjections?: string[]
+  onProjections?: string[]
+  title: string
+  tone: TileTone
+}) {
+  const callService = useHueSyncCallService()
+  const optimisticStates = useOptimisticActionStates()
+  const liveEntity = useEntity(asEntityName(entityId), { returnNullIfNotFound: true }) as EntityLike | null
+  const displayedState = optimisticStateValue(entityId, liveEntity?.state, optimisticStates) ?? liveEntity?.state ?? 'unavailable'
+  const unavailable = isUnavailable(liveEntity)
+  const checked = displayedState === ON
+  const nextState = checked ? OFF : ON
+  const projections = checked ? offProjections : onProjections
+
+  return (
+    <GlassTile
+      compact
+      disabled={unavailable}
+      icon={icon}
+      isOff={!checked}
+      onClick={() => runHueSyncCommand(
+        callService,
+        optimisticStates,
+        { domain: 'switch', service: checked ? 'turn_off' : 'turn_on', target: entityId },
+        [hueSyncIntent(entityId, nextState), ...projections.map((projectionEntityId) => hueSyncIntent(projectionEntityId, nextState))],
+      )}
+      semantics={{ kind: 'toggle', checked }}
+      subtitle={formatMediaState({ ...liveEntity, attributes: liveEntity?.attributes ?? {}, entity_id: entityId, state: displayedState })}
+      title={title}
+      tone={tone}
+    />
+  )
+}
+
+interface HueSyncSelectCommandOptions {
+  allowSameValue?: boolean
+  optimisticOnEntityIds?: string[]
+  resetEntityId?: string
+}
+
+function useHueSyncSelectControl(entityId: string) {
+  const callService = useHueSyncCallService()
+  const optimisticStates = useOptimisticActionStates()
+  const liveEntity = useEntity(asEntityName(entityId), { returnNullIfNotFound: true }) as EntityLike | null
+  const options = entityOptionValues(liveEntity)
+  const displayedState = optimisticStateValue(entityId, liveEntity?.state, optimisticStates) ?? ''
+  const unavailable = isUnavailable(liveEntity) || options.length === 0
+  const selectOption = (nextValue: string, {
+    allowSameValue = false,
+    optimisticOnEntityIds = [],
+    resetEntityId,
+  }: HueSyncSelectCommandOptions = {}) => {
+    if (unavailable || (!allowSameValue && nextValue === displayedState)) return
+    if (resetEntityId) optimisticStates[resetEntityId]?.reset()
+    runHueSyncCommand(
+      callService,
+      optimisticStates,
+      { domain: 'select', service: 'select_option', target: entityId, serviceData: { option: nextValue } },
+      [
+        hueSyncIntent(entityId, nextValue),
+        ...optimisticOnEntityIds.map((projectionEntityId) => hueSyncIntent(projectionEntityId, ON)),
+      ],
+    )
+  }
+
+  return { displayedState, options, selectOption, unavailable }
+}
+
+function orderedHueSyncModes(options: string[]) {
+  return [...options].sort((left, right) => {
+    const leftIndex = HUE_SYNC_MODE_ORDER.indexOf(left.toLowerCase() as (typeof HUE_SYNC_MODE_ORDER)[number])
+    const rightIndex = HUE_SYNC_MODE_ORDER.indexOf(right.toLowerCase() as (typeof HUE_SYNC_MODE_ORDER)[number])
+    return (leftIndex < 0 ? HUE_SYNC_MODE_ORDER.length : leftIndex) - (rightIndex < 0 ? HUE_SYNC_MODE_ORDER.length : rightIndex)
+  })
+}
+
+function HueSyncModeButtons({
+  intensityEntityId,
+  label,
+  lightSyncEntityId,
+  powerEntityId,
+  syncModeEntityId,
+}: {
+  intensityEntityId: string
+  label: string
+  lightSyncEntityId: string
+  powerEntityId: string
+  syncModeEntityId: string
+}) {
+  const optimisticStates = useOptimisticActionStates()
+  const livePowerEntity = useEntity(asEntityName(powerEntityId), { returnNullIfNotFound: true }) as EntityLike | null
+  const liveLightSyncEntity = useEntity(asEntityName(lightSyncEntityId), { returnNullIfNotFound: true }) as EntityLike | null
+  const { displayedState, options, selectOption, unavailable } = useHueSyncSelectControl(syncModeEntityId)
+  const syncing = optimisticStateValue(powerEntityId, livePowerEntity?.state, optimisticStates) === ON
+    && optimisticStateValue(lightSyncEntityId, liveLightSyncEntity?.state, optimisticStates) === ON
+
+  return (
+    <div aria-label={label} className={styles.hueSyncModeRow} role="group">
+      {orderedHueSyncModes(options).map((option) => {
+        const selected = displayedState === option
+        const semantics = { kind: 'selection', selected } as const
+        const title = titleCaseState(option)
+        return (
+          <div className={styles.hueSyncModeOption} data-selected={selected ? 'true' : 'false'} key={option}>
+            <button
+              aria-label={title}
+              aria-pressed={selected}
+              className={`${styles.remoteButton} ${styles.hueSyncModeButton}`}
+              data-action-kind={semantics.kind}
+              data-selected={selected ? 'true' : 'false'}
+              data-size="round"
+              disabled={unavailable}
+              onClick={() => selectOption(option, {
+                allowSameValue: !syncing,
+                optimisticOnEntityIds: [powerEntityId, lightSyncEntityId],
+                resetEntityId: intensityEntityId,
+              })}
+              type="button"
+            >
+              <MaterialIcon name={HUE_SYNC_MODE_ICONS[option.toLowerCase()] ?? 'mdi:lightbulb-multiple'} size={30} />
+            </button>
+            <span className={styles.hueSyncModeLabel}>{title}</span>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+function HueSyncSelectionTile({
+  disabled,
+  icon,
+  inactive = false,
+  onSelect,
+  selected,
+  selectedTone,
+  subtitle,
+  title,
+}: {
+  disabled: boolean
+  icon: string
+  inactive?: boolean
+  onSelect: () => void
+  selected: boolean
+  selectedTone: TileTone
+  subtitle?: string
+  title: string
+}) {
+  const semantics = { kind: 'selection', selected } as const
+
+  return (
+    <div className={styles.hueSyncSelectionTile} data-disabled={disabled ? 'true' : 'false'}>
+      <GlassTile
+        disabled={disabled}
+        icon={icon}
+        isOff={inactive || !selected}
+        onClick={onSelect}
+        semantics={semantics}
+        subtitle={subtitle}
+        title={title}
+        tone={selected ? selectedTone : 'neutral'}
+      />
+    </div>
+  )
+}
+
+function HueSyncIntensityGrid({ entityId, label }: { entityId: string; label: string }) {
+  const { displayedState, options, selectOption, unavailable } = useHueSyncSelectControl(entityId)
+
+  return (
+    <DynamicGrid ariaLabel={label} className={styles.hueSyncChoiceGrid} columns={2} fillRows={false} itemSizing="uniform" layout="bounded" maxCellWidth={260} maxColumns={2}>
+      {options.map((option) => (
+        <HueSyncSelectionTile
+          disabled={unavailable}
+          icon="mdi:gauge"
+          key={option}
+          onSelect={() => selectOption(option)}
+          selected={displayedState === option}
+          selectedTone="light"
+          title={titleCaseState(option)}
+        />
+      ))}
+    </DynamicGrid>
+  )
+}
+
+function numericAttribute(entity: EntityLike | null, key: string, fallback: number) {
+  const value = entity?.attributes[key]
+  return typeof value === 'number' && Number.isFinite(value) ? value : fallback
+}
+
+function HueSyncBrightnessField({ entityId, label }: { entityId: string; label: string }) {
+  const callService = useHueSyncCallService()
+  const optimisticStates = useOptimisticActionStates()
+  const liveEntity = useEntity(asEntityName(entityId), { returnNullIfNotFound: true }) as EntityLike | null
+  const min = numericAttribute(liveEntity, 'min', 1)
+  const max = numericAttribute(liveEntity, 'max', 100)
+  const step = numericAttribute(liveEntity, 'step', 1)
+  const liveValue = Math.min(max, Math.max(min, Number(liveEntity?.state) || min))
+  const optimisticValue = Math.min(max, Math.max(min, Number(optimisticStateValue(entityId, liveEntity?.state, optimisticStates)) || liveValue))
+  const [draftValue, setDraftValue] = useState<number | null>(null)
+  const displayedValue = draftValue ?? optimisticValue
+  const unavailable = isUnavailable(liveEntity)
+
+  return (
+    <RangeField
+      disabled={unavailable}
+      label={label}
+      max={max}
+      min={min}
+      onChange={setDraftValue}
+      onCommit={(nextValue) => {
+        setDraftValue(null)
+        if (nextValue === optimisticValue) return
+        runHueSyncCommand(
+          callService,
+          optimisticStates,
+          { domain: 'number', service: 'set_value', target: entityId, serviceData: { value: nextValue } },
+          [hueSyncIntent(entityId, String(nextValue))],
+        )
+      }}
+      step={step}
+      value={displayedValue}
+      valueText={unavailable ? formatMediaState(liveEntity) : undefined}
+    />
+  )
+}
+
+function HueSyncHdmiInputTile({
+  disabled,
+  entityId,
+  onSelect,
+  selected,
+  title,
+}: {
+  disabled: boolean
+  entityId: string
+  onSelect: () => void
+  selected: boolean
+  title: string
+}) {
+  const copy = useCopy(MEDIA_COPY_NAMESPACE)
+  const entity = useEntity(asEntityName(entityId), { returnNullIfNotFound: true }) as EntityLike | null
+  const disconnected = isUnavailable(entity) || entity?.state === HDMI_UNPLUGGED_STATE
+  const status = formatMediaState(entity)
+
+  return (
+    <HueSyncSelectionTile
+      disabled={disabled || disconnected}
+      icon={disconnected ? 'mdi:television-off' : 'mdi:television'}
+      inactive={disconnected}
+      onSelect={onSelect}
+      selected={selected}
+      selectedTone="switch"
+      subtitle={selected ? copy(MEDIA_COPY_KEYS.hueSync.selectedStatus, { status }) : status}
+      title={title}
+    />
+  )
+}
+
+function HueSyncTab({ config }: { config: MediaRemoteHueSyncConfig }) {
+  const copy = useCopy(MEDIA_COPY_NAMESPACE)
+  const inputControl = useHueSyncSelectControl(config.hdmiInputEntityId)
+  const inputOptions = inputControl.options.length
+    ? inputControl.options
+    : config.hdmiStatusEntityIds.map((_, index) => copy(MEDIA_COPY_KEYS.hueSync.hdmiPort, { port: index + 1 }))
+
+  return (
+    <div className={styles.hueSyncStack} data-hue-sync-tab="true">
+      <section className={styles.section}>
+        <SectionHeader title={copy(MEDIA_COPY_KEYS.hueSync.powerAndSync)} />
+        <DynamicGrid className={styles.hueSyncToggleGrid} columns={2} fillRows={false} itemSizing="uniform" layout="bounded" maxCellWidth={260} maxColumns={2}>
+          <HueSyncToggleTile
+            entityId={config.powerEntityId}
+            icon="mdi:power"
+            offProjections={[config.lightSyncEntityId]}
+            title={copy(MEDIA_COPY_KEYS.hueSync.syncBoxPower)}
+            tone="media"
+          />
+          <HueSyncToggleTile
+            entityId={config.lightSyncEntityId}
+            icon="mdi:lightbulb-multiple"
+            onProjections={[config.powerEntityId]}
+            title={copy(MEDIA_COPY_KEYS.hueSync.lightSync)}
+            tone="light"
+          />
+        </DynamicGrid>
+        <Description>{copy(MEDIA_COPY_KEYS.hueSync.powerBehaviorHelp)}</Description>
+      </section>
+
+      <section className={styles.section}>
+        <SectionHeader title={copy(MEDIA_COPY_KEYS.hueSync.syncMode)} />
+        <HueSyncModeButtons
+          intensityEntityId={config.intensityEntityId}
+          label={copy(MEDIA_COPY_KEYS.hueSync.syncMode)}
+          lightSyncEntityId={config.lightSyncEntityId}
+          powerEntityId={config.powerEntityId}
+          syncModeEntityId={config.syncModeEntityId}
+        />
+      </section>
+
+      <section className={styles.section}>
+        <SectionHeader title={copy(MEDIA_COPY_KEYS.hueSync.intensity)} />
+        <HueSyncIntensityGrid entityId={config.intensityEntityId} label={copy(MEDIA_COPY_KEYS.hueSync.intensity)} />
+        <HueSyncBrightnessField entityId={config.brightnessEntityId} label={copy(MEDIA_COPY_KEYS.hueSync.brightness)} />
+      </section>
+
+      <section className={styles.section}>
+        <SectionHeader title={copy(MEDIA_COPY_KEYS.hueSync.hdmiInput)} />
+        <DynamicGrid ariaLabel={copy(MEDIA_COPY_KEYS.hueSync.hdmiInput)} className={styles.hueSyncChoiceGrid} columns={2} fillRows={false} itemSizing="uniform" layout="bounded" maxCellWidth={260} maxColumns={2}>
+          {inputOptions.map((option, index) => (
+            <HueSyncHdmiInputTile
+              disabled={inputControl.unavailable}
+              entityId={config.hdmiStatusEntityIds[index] ?? config.hdmiStatusEntityIds[config.hdmiStatusEntityIds.length - 1]}
+              key={option}
+              onSelect={() => inputControl.selectOption(option)}
+              selected={inputControl.displayedState === option}
+              title={option}
+            />
+          ))}
+        </DynamicGrid>
+      </section>
+    </div>
+  )
+}
+
+export function MediaRemoteModalNav({ activeTab, onTabChange, remoteTitle, showApps = true, showDevices = false, showHueSync = false }: { activeTab: MediaRemoteModalTab; onTabChange: (tab: MediaRemoteModalTab) => void; remoteTitle: string; showApps?: boolean; showDevices?: boolean; showHueSync?: boolean }) {
   const copy = useCopy(CORE_COPY_NAMESPACE)
-  const tabs = mediaRemoteModalTabs(showApps, showDevices)
+  const tabs = mediaRemoteModalTabs(showApps, showDevices, showHueSync)
   const effectiveActiveTab = tabs.some((tab) => tab.tab === activeTab) ? activeTab : 'controls'
   const idPrefix = `media-${remoteTitle.toLowerCase().replaceAll(/[^a-z0-9]+/g, '-')}`
 
@@ -600,7 +1053,7 @@ function MediaRemoteModalTabContent({
   const controlEntity = withOptimisticState(liveControlEntity, config.controlEntityId, optimisticStates)
   const modalBodyRef = useRef<HTMLDivElement | null>(null)
   const modalPanelRef = useRef<HTMLDivElement | null>(null)
-  const availableTabs = mediaRemoteModalTabs(Boolean(config.appCards?.length), Boolean(config.devices?.length))
+  const availableTabs = mediaRemoteModalTabs(Boolean(config.appCards?.length), Boolean(config.devices?.length), Boolean(config.hueSync))
   const targetTab = availableTabs.some((tab) => tab.tab === activeTab) ? activeTab : 'controls'
   const { displayedTab: effectiveActiveTab, transitionState } = useSmoothDisplayedModalTab(targetTab)
   const selectedTabLabel = availableTabs.find((tab) => tab.tab === effectiveActiveTab)?.label ?? 'Controls'
@@ -683,6 +1136,8 @@ function MediaRemoteModalTabContent({
                 </DynamicGrid>
               </section>
             ) : null}
+
+            {effectiveActiveTab === HUE_SYNC_MEDIA_REMOTE_MODAL_TAB.tab && config.hueSync ? <HueSyncTab config={config.hueSync} /> : null}
           </div>
         </div>
       </div>
@@ -800,6 +1255,7 @@ function MediaRemoteModalInteractiveContent({ activeTab: controlledActiveTab, co
             remoteTitle={config.title}
             showApps={Boolean(config.appCards?.length)}
             showDevices={Boolean(config.devices?.length)}
+            showHueSync={Boolean(config.hueSync)}
           />
         ) : null}
       </div>

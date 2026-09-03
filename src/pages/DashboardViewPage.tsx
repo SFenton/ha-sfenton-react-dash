@@ -1137,6 +1137,7 @@ function MediaRoomSourceModal({ config, onClose, open, title }: { config: MediaR
           remoteTitle={config.title}
           showApps={Boolean(config.appCards?.length)}
           showDevices={Boolean(config.devices?.length)}
+          showHueSync={Boolean(config.hueSync)}
         />
       )}
       onClose={onClose}
@@ -1245,6 +1246,7 @@ function SourceRoomPage({ onNavigate, preload = false, preloadHash, preloadHashe
   const [selectedCard, setSelectedCard] = useState<RoomSourceCardConfig | null>(null)
   const eightSleepModalStates = useEightSleepBedModalStates(preload)
   const allCards = useMemo(() => [...room.overviewCards, ...room.sourceSections.flatMap((section) => section.cards)], [room.overviewCards, room.sourceSections])
+  const visibleSourceSections = useMemo(() => room.sourceSections.filter((section) => section.showOnRoomPage !== false), [room.sourceSections])
   const bathroomFan = allCards.map((card) => card.control === 'bathroom-fan' ? bathroomFanForPowerEntity(card.entityId) : undefined).find(Boolean)
   const preloadCard = preloadHash ? allCards.find((candidate) => candidate.hash === preloadHash) ?? null : null
   const preloadCards = useMemo(() => preloadHashes.map((preloadTargetHash) => allCards.find((candidate) => candidate.hash === preloadTargetHash)).filter((card): card is RoomSourceCardConfig => Boolean(card?.hash)), [allCards, preloadHashes])
@@ -1255,7 +1257,7 @@ function SourceRoomPage({ onNavigate, preload = false, preloadHash, preloadHashe
         </ResponsiveSectionItem>
       )
     : null
-  const pageSectionCount = room.sourceSections.length + (kitchenSection ? 1 : 0)
+  const pageSectionCount = visibleSourceSections.length + (kitchenSection ? 1 : 0)
 
   const closeSourceCard = () => {
     setSelectedCard(null)
@@ -1295,12 +1297,12 @@ function SourceRoomPage({ onNavigate, preload = false, preloadHash, preloadHashe
 
   const content = (
     <div className={styles.stack}>
-      {room.sourceSections.length === 0 && <EmptyRoomState />}
+      {visibleSourceSections.length === 0 && <EmptyRoomState />}
 
-      {(kitchenSection || room.sourceSections.length > 0) && (
+      {(kitchenSection || visibleSourceSections.length > 0) && (
         <ResponsiveSectionGrid>
           {kitchenSection}
-          {room.sourceSections.map((section) => {
+          {visibleSourceSections.map((section) => {
             const leadRow = section.layout === 'lead-row'
             const leadCards = leadRow ? section.cards.slice(0, 1) : section.cards
             const followUpCards = leadRow ? section.cards.slice(1) : []

@@ -1,4 +1,17 @@
 {
+  "hueSync": {
+    "brightness": "Brightness",
+    "hdmiInput": "HDMI Input",
+    "hdmiPort": "HDMI {{port}}",
+    "intensity": "Intensity",
+    "lightSync": "Light Sync",
+    "powerAndSync": "Power and Sync",
+    "powerBehaviorHelp": "Light sync turns on the Sync Box and starts entertainment syncing. Choosing a sync mode does the same in that mode. Presence lighting pauses, then resumes when syncing stops.",
+    "selectedStatus": "Selected • {{status}}",
+    "syncBoxPower": "Sync Box Power",
+    "syncMode": "Sync Mode",
+    "tab": "Hue Sync"
+  },
   "musicRoom": {
     "fortnite": "Fortnite",
     "quickAppLaunch": "Quick App Launch",
@@ -27,7 +40,8 @@
     "volumeUp": "Volume Up"
   },
   "remoteTabs": {
-    "devicesDescription": "Shows configured device states and available command or toggle controls."
+    "devicesDescription": "Shows configured device states and available command or toggle controls.",
+    "hueSyncDescription": "Control device power, light synchronization, brightness, mode, intensity, and input selection. View connection status."
   },
   "remoteOpeners": {
     "livingRoom": "Living Room Remote",

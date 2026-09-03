@@ -2,6 +2,11 @@ import { useSyncExternalStore, type ReactNode } from 'react'
 import { entity, getMockHassRevision, mockEntities, mockState, subscribeMockHass } from './hakitCoreState'
 import type { MockHassState } from './hakitCoreState'
 
+export const OFF = 'off'
+export const ON = 'on'
+export const UNAVAILABLE = 'unavailable'
+export const UNAVAILABLE_STATES = ['unavailable', 'unknown'] as const
+
 export function HassConnect({ children }: { children: ReactNode }) {
   return children
 }
