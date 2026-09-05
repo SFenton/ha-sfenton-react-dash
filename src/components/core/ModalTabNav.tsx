@@ -66,6 +66,7 @@ export function ModalIconTabNav<T extends string>({
       aria-label={label}
       aria-orientation="horizontal"
       className={styles.tabList}
+      data-tab-count={tabs.length}
       data-modal-tab-nav="true"
       role="tablist"
       style={style}

@@ -1505,6 +1505,20 @@
   }
 }
 
+@container weather-sheet (min-width: 680px) {
+  :global([data-modal-presentation='landscape-dialog'][data-landscape-density='compact']) .highlightGrid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  :global([data-modal-presentation='landscape-dialog'][data-landscape-density='compact']) .highlightGrid .highlightTile.aqiTile {
+    grid-column: span 2;
+  }
+
+  :global([data-modal-presentation='landscape-dialog'][data-landscape-density='compact']) .highlightTile[data-kind='wind'] {
+    grid-column: span 2;
+  }
+}
+
 @container weather-sheet (min-width: 900px) {
   .highlightGrid {
     grid-template-columns: repeat(4, minmax(0, 1fr));

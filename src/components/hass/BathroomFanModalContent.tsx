@@ -6,7 +6,7 @@ import { cardColorCss, colorFromHumidity, colorFromRgba, colorFromTemperature } 
 import { DynamicGrid } from '../core/DynamicGrid'
 import { GlassTile } from '../core/GlassTile'
 import { MaterialIcon } from '../core/Icon'
-import { ModalSheet, type ModalSheetStyle } from '../core/ModalSheet'
+import { ModalSheet, type ModalCenteredGeometry } from '../core/ModalSheet'
 import { SelectActionField } from '../core/SelectActionField'
 import { SectionHeader } from '../core/SectionHeader'
 import { StatusPill } from '../core/StatusPill'
@@ -19,11 +19,12 @@ import { type BathroomFanCommandController, useSharedBathroomFanCommand } from '
 import { useBathroomFanCommand } from './useBathroomFanCommand'
 import styles from './BathroomFanModalContent.module.css'
 
-const BATHROOM_FAN_MODAL_STYLE: ModalSheetStyle = {
-  '--modal-desktop-height': 'auto',
-  '--modal-desktop-max-width': '500px',
-  '--modal-desktop-width': '500px',
-}
+const BATHROOM_FAN_CENTERED_GEOMETRY = {
+  blockPolicy: 'fixed',
+  blockSize: '760px',
+  id: 'bathroom-fan',
+  inlineSize: '500px',
+} satisfies ModalCenteredGeometry
 const NOOP = () => undefined
 
 interface BathroomFanModalContentProps {
@@ -384,7 +385,7 @@ export function BathroomFanModalContent({ config, preload = false, runtimeActive
 export function BathroomFanModal({ config, onClose, open, roomTitle }: { config: BathroomFanConfig; onClose: () => void; open: boolean; roomTitle: string }) {
   const copy = useCopy(BATHROOM_FAN_COPY_NAMESPACE)
   return (
-    <ModalSheet contentStyle={BATHROOM_FAN_MODAL_STYLE} onClose={onClose} open={open} size="compact" title={copy(BATHROOM_FAN_COPY_KEYS.title, { room: roomTitle })}>
+    <ModalSheet centeredGeometry={BATHROOM_FAN_CENTERED_GEOMETRY} onClose={onClose} open={open} size="compact" title={copy(BATHROOM_FAN_COPY_KEYS.title, { room: roomTitle })}>
       <BathroomFanModalContent config={config} runtimeActive={open} />
     </ModalSheet>
   )

@@ -4,7 +4,7 @@ import { DynamicGrid } from '../core/DynamicGrid'
 import { ResponsiveSectionGrid, ResponsiveSectionItem } from '../core/ResponsiveSectionGrid'
 import { Section } from '../core/Section'
 import { GlassTile, type TileTone } from '../core/GlassTile'
-import { ModalSheet, type ModalSheetSize } from '../core/ModalSheet'
+import { ModalSheet, type ModalCenteredGeometry, type ModalSheetSize } from '../core/ModalSheet'
 import { CAMERA_ITEMS, CONTACT_GROUPS, SECURITY_ENTITY } from '../../constants/atAGlance'
 import {
   SECURITY_CONTROL_TILES,
@@ -13,12 +13,12 @@ import {
   type SecurityTileConfig,
 } from '../../constants/securityPage'
 import { ContactSheet } from '../../pages/AtAGlancePage'
-import { modalSquareGridModalStyleForHash, modalSquareGridStyle, useModalSquareGridLayout, type ModalSquareGridStyle } from '../core/modalSquareGrid'
+import { modalSquareGridCenteredGeometry, modalSquareGridStyle, useModalSquareGridLayout, type ModalSquareGridStyle } from '../core/modalSquareGrid'
 import { CameraModalContent } from './CameraModalContent'
 import { asEntityName, formatCompactEntityState, isActiveState, isContactOpen } from './entityState'
 import { GarageDoorTile } from './GarageDoorTile'
 import { SecurityControls } from './SecurityControls'
-import { SECURITY_SYSTEM_MODAL_STYLE, securitySystemModalSubtitle } from './securityControlsConfig'
+import { SECURITY_SYSTEM_CENTERED_GEOMETRY, securitySystemModalSubtitle } from './securityControlsConfig'
 import { GuestPresenceSecurityModalContent, GuestPresenceSecuritySection, GUEST_PRESENCE_SECURITY_HASH } from './GuestPresenceSecurity'
 import { useGuestPresenceSecurityActive } from './useGuestPresenceSecurityActive'
 import { StatusRail } from './StatusRail'
@@ -26,6 +26,18 @@ import { copy as translate, useCopy } from '../../i18n'
 import styles from './SecurityDashboard.module.css'
 
 const SHOW_MACHE_SECTION = false
+const SECURITY_CAMERA_CENTERED_GEOMETRY = {
+  blockPolicy: 'fixed',
+  blockSize: '620px',
+  id: 'security-camera',
+  inlineSize: '1100px',
+} satisfies ModalCenteredGeometry
+const SECURITY_STANDARD_CENTERED_GEOMETRY = {
+  blockPolicy: 'fixed',
+  blockSize: '620px',
+  id: 'security-standard',
+  inlineSize: '720px',
+} satisfies ModalCenteredGeometry
 
 type CallService = (params: Record<string, unknown>) => void
 
@@ -182,7 +194,13 @@ export function SecurityDashboard({ closeHash, hash, onOpenHash, preload = false
   const [contactGridRef, contactGridLayout] = useModalSquareGridLayout(contactModalOpen, CONTACT_GROUPS.length)
   const contactGridStyle = modalSquareGridStyle(contactGridLayout)
   const modalSubtitle = contentHash === '#security-system' ? securitySubtitle : undefined
-  const modalContentStyle = contentHash === '#security-system' ? SECURITY_SYSTEM_MODAL_STYLE : contactModalContentActive ? modalSquareGridModalStyleForHash(CONTACT_SENSORS_HASH, contactGridLayout) : undefined
+  const centeredGeometry = contentHash === '#security-system'
+    ? SECURITY_SYSTEM_CENTERED_GEOMETRY
+    : contactModalContentActive
+      ? modalSquareGridCenteredGeometry('security-contact-sensors', CONTACT_GROUPS.length)
+      : CAMERA_ITEMS.some((camera) => camera.hash === contentHash)
+        ? SECURITY_CAMERA_CENTERED_GEOMETRY
+        : SECURITY_STANDARD_CENTERED_GEOMETRY
   const modalSize: ModalSheetSize = CAMERA_ITEMS.some((camera) => camera.hash === contentHash)
     ? 'media'
     : contentHash === '#security-system'
@@ -222,7 +240,7 @@ export function SecurityDashboard({ closeHash, hash, onOpenHash, preload = false
         )}
       </ResponsiveSectionGrid>
 
-      <ModalSheet contentStyle={modalContentStyle} onClose={closeHash} open={activeHash !== ''} size={modalSize} subtitle={modalSubtitle} title={modalTitle(contentHash)}>
+      <ModalSheet centeredGeometry={centeredGeometry} contentWidth={contentHash === '#security-system' || contentHash === GUEST_PRESENCE_SECURITY_HASH ? 'full' : 'readable'} landscapeDensity={contactModalContentActive ? 'regular' : 'compact'} onClose={closeHash} open={activeHash !== ''} size={modalSize} subtitle={modalSubtitle} title={modalTitle(contentHash)}>
         <SecurityModalContent contactGridRef={contactGridRef} contactGridStyle={contactGridStyle} hash={contentHash} />
       </ModalSheet>
       {preloadModalHashes.map((preloadTargetHash) => (

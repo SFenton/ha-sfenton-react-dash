@@ -57,6 +57,32 @@ describe('Sfenton React custom panel', () => {
     )
   })
 
+  it('forwards outer panel safe-area variables into the React iframe', async () => {
+    const panel = document.createElement(SFENTON_REACT_PANEL_TAG) as SfentonReactPanel
+    panel.style.setProperty('--safe-area-inset-left', '59px')
+    panel.style.setProperty('--safe-area-inset-right', '44px')
+    panel.panel = {
+      config: { app_url: DEFAULT_REACT_DASHBOARD_URL },
+      title: 'React Dash Panel',
+    }
+    document.body.append(panel)
+
+    const iframe = panel.shadowRoot?.querySelector('iframe')
+    const iframeDocument = document.implementation.createHTMLDocument()
+    Object.defineProperty(iframe, 'contentDocument', {
+      configurable: true,
+      value: iframeDocument,
+    })
+    iframe?.dispatchEvent(new Event('load'))
+    expect(iframe?.contentDocument?.documentElement.style.getPropertyValue('--safe-area-inset-left')).toBe('59px')
+    expect(iframe?.contentDocument?.documentElement.style.getPropertyValue('--safe-area-inset-right')).toBe('44px')
+
+    panel.style.setProperty('--safe-area-inset-left', '24px')
+    await vi.waitFor(() => {
+      expect(iframe?.contentDocument?.documentElement.style.getPropertyValue('--safe-area-inset-left')).toBe('24px')
+    })
+  })
+
   it('disposes the current app before changing the configured app URL', () => {
     vi.spyOn(Date, 'now').mockReturnValueOnce(1000).mockReturnValue(2000)
     const panel = document.createElement(SFENTON_REACT_PANEL_TAG) as SfentonReactPanel

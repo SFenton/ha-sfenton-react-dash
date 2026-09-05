@@ -43,7 +43,12 @@ HASS_PORTING_REACT_URL=http://127.0.0.1:5173
 4. Expand or mentally resolve templates enough to understand the rendered structure. Preserve template-driven behavior such as variable-dependent names, icons, colors, visibility, service data, and conditional state.
 5. Open the Home Assistant dashboard in Playwright and log in using `.env.hass-porting.local` when needed.
 6. Open the React dashboard in a second Playwright page after starting the dev server.
-7. Set both pages to the same mobile viewport first. Later check tablet or desktop only when the requested surface needs it.
+7. Set both pages to the same `393x852` mobile viewport first. Then complete
+   the canonical matrix for every port: `852x393`, tablet portrait/landscape,
+   and fine-pointer desktop. When the surface touches shell, grid, modal, or
+   fixed-edge geometry, also run both mirrored landscape safe-area profiles
+   and a zero-inset rectangular-phone profile. Named Playwright devices do not
+   emulate physical cutout masks.
 8. Build a source evidence packet before implementing. This is mandatory, not optional. The packet must combine:
    - Lovelace/YAML/MCP config for structure, templates, entities, actions, visibility, and state/color branches
    - a state-to-service action matrix for each clickable control, including the current live state and at least active/on and inactive/off branches when the control can change behavior by state
@@ -61,13 +66,15 @@ HASS_PORTING_REACT_URL=http://127.0.0.1:5173
    - colors, active/inactive/error/unavailable states, disabled states, and loading states
    - computed color styles from the rendered Home Assistant DOM, not only semantic guesses from YAML
    - screenshot-visible rendered colors, gradients, blur layers, and opacity, especially when custom cards report transparent computed backgrounds
-   - animations, transitions, press feedback, and modal open/close behavior
+   - animations, transitions, press feedback, modal open/close behavior, and
+     whether one centered modal node changes outer size across tabs, loading,
+     details, Back, footer/navigation changes, or hashes
    - every clickable surface, including nested controls and sub-buttons
    - service calls, state-dependent service branches, navigation, popup hashes, no-op clicks, hold actions, and double-tap actions
 11. Inspect existing React pages, components, hooks, constants, tests, and Playwright specs before implementing. Reuse or extend existing primitives when practical.
 12. Implement the port against real Home Assistant state through HAKit and `@hakit/core`. Keep entity IDs and route metadata in constants when they are reused.
-13. Add or update focused unit tests for rendering, state formatting, service-call behavior, state-dependent service-call branches, modal behavior, navigation logic, and source-derived color/state mappings.
-14. Add or update Playwright coverage for the ported page/control where the behavior is user-visible or regression-prone.
+13. Add or update focused unit tests for rendering, state formatting, service-call behavior, state-dependent service-call branches, modal behavior, navigation logic, source-derived color/state mappings, and typed centered geometry.
+14. Add or update Playwright coverage for the ported page/control where the behavior is user-visible or regression-prone. Every production `ModalSheet` must declare `centeredGeometry` for identity and reading measure, not a family-specific outer size. Landscape dialogs share the safe rectangle; normal dialogs share the clamped 1100x760px frame. Compare different families as well as tabs/details/loading/results within one family. Square room/admin tiles use equal-width 132px-minimum landscape tracks and left-align incomplete rows; portrait and 168px desktop tiles keep their accepted metrics. Quick Links instead uses text-aware `DynamicGrid`: production-standard 120px filled portrait rows, compact 88px centered-layout tiles, and balanced non-final-row filling with a natural-width final row. Use `contentWidth="full"` for control collections such as Security that must fill the padded body. Open each affected tab in portrait and rotate before switching tabs, measuring typography, glyph bounds, columns, scroll ownership, and frame geometry. Linux WPE does not implement native iOS text autosizing, even with an iPhone descriptor; retain the real-device font-inflation gate.
 15. Compare Home Assistant and React in Playwright at the same viewport after implementation. Capture screenshots of both and use DOM/style/pixel checks when visual fidelity matters. Also compare the React rendered text, subtitles, attribute-derived strings, and accessible names against the source text/state content matrix; iterate until the result is close enough to defend.
 16. Run focused validation first, then broader validation as needed: targeted Vitest, targeted Playwright, `npm run lint`, and `npm run build` when the change warrants it.
 

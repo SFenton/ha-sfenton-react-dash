@@ -1,6 +1,6 @@
 .emptyState {
   display: grid;
-  min-height: calc(100vh - var(--bottom-nav-height) - 160px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+  min-height: calc(100vh - var(--bottom-nav-height) - 160px - var(--rd-safe-top) - var(--rd-safe-bottom));
   align-content: center;
   gap: 10px;
   justify-items: center;

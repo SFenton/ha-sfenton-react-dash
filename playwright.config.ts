@@ -66,7 +66,7 @@ export default defineConfig({
     },
     {
       name: 'desktop',
-      testMatch: /(?:adaptive-navigation|desktop-responsive|home-route-hydration-desktop)\.spec\.ts/,
+      testMatch: /(?:adaptive-navigation|desktop-responsive|home-route-hydration-desktop|modal-rotation-regressions)\.spec\.ts/,
       use: {
         ...devices['Desktop Chrome'],
         browserName: 'chromium',
@@ -79,7 +79,7 @@ export default defineConfig({
     ...(enableWebkit
       ? [{
           name: 'webkit',
-          testMatch: /(?:iframe-lifecycle|modal-sheet-(?:lifecycle|performance|webkit))\.spec\.ts/,
+          testMatch: /(?:iframe-lifecycle|modal-rotation-regressions|modal-sheet-(?:lifecycle|performance|webkit))\.spec\.ts/,
           use: {
             ...devices['iPhone 13'],
             browserName: 'webkit' as const,

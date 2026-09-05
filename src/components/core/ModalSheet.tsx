@@ -2,14 +2,49 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProp
 import { Drawer } from '@base-ui/react/drawer'
 import { MaterialIcon } from './Icon'
 import { useCopy } from '../../i18n'
+import {
+  modalBodyTierForInlineSize,
+  useModalSheetPresentation,
+  type ModalBodyTier,
+} from './modalSheetPresentation'
 import styles from './ModalSheet.module.css'
 
 export type ModalSheetStyle = CSSProperties & {
   [key: `--${string}`]: string | number | undefined
+  aspectRatio?: never
+  height?: never
+  maxHeight?: never
+  maxWidth?: never
+  minHeight?: never
+  minWidth?: never
+  width?: never
+  '--modal-desktop-height'?: never
+  '--modal-desktop-max-height'?: never
+  '--modal-desktop-max-width'?: never
+  '--modal-desktop-width'?: never
 }
 
 export type ModalSheetSize = 'compact' | 'form' | 'media' | 'standard' | 'workspace'
 export type ModalSheetScrollMode = 'body' | 'panes'
+export type ModalLandscapeDensity = 'compact' | 'regular'
+export type ModalContentWidth = 'readable' | 'full'
+/** Family reading measure and identity; the shared presentation owns the outer frame. */
+export type ModalCenteredGeometry = {
+  id: string
+  inlineSize: string
+  maxInlineSize?: string
+} & (
+  | {
+      blockPolicy: 'content-fit'
+      blockSize?: never
+      maxBlockSize?: string
+    }
+  | {
+      blockPolicy: 'fixed'
+      blockSize: string
+      maxBlockSize?: string
+    }
+)
 
 export interface ModalSheetProps {
   open: boolean
@@ -19,8 +54,11 @@ export interface ModalSheetProps {
   backLabel?: string
   bodyElementRef?: Ref<HTMLDivElement>
   bodyHeader?: ReactNode
+  centeredGeometry?: ModalCenteredGeometry
   contentStyle?: ModalSheetStyle
+  contentWidth?: ModalContentWidth
   footer?: ReactNode
+  landscapeDensity?: ModalLandscapeDensity
   navigation?: ReactNode
   onBack?: () => void
   scrollMode?: ModalSheetScrollMode
@@ -30,33 +68,34 @@ export interface ModalSheetProps {
   subtitle?: string
 }
 
-type ModalSheetSnapshot = Pick<ModalSheetProps, 'backLabel' | 'bodyHeader' | 'children' | 'contentStyle' | 'footer' | 'navigation' | 'onBack' | 'scrollMode' | 'scrollResetKey' | 'size' | 'subtitle' | 'surfaceDecoration' | 'title'>
+type ModalSheetSnapshot = Pick<ModalSheetProps, 'backLabel' | 'bodyHeader' | 'centeredGeometry' | 'children' | 'contentStyle' | 'contentWidth' | 'footer' | 'landscapeDensity' | 'navigation' | 'onBack' | 'scrollMode' | 'scrollResetKey' | 'size' | 'subtitle' | 'surfaceDecoration' | 'title'>
+interface ModalCenteredGeometrySnapshot {
+  centeredGeometry: ModalCenteredGeometry
+  size: ModalSheetSize
+}
 export const MODAL_SHEET_EXIT_ANIMATION_MS = 520
-export const MODAL_SHEET_CENTERED_QUERY = '(min-width: 760px) and (min-height: 560px)'
-
-function centeredModalLayoutMatches() {
-  return typeof window !== 'undefined' && typeof window.matchMedia === 'function' && window.matchMedia(MODAL_SHEET_CENTERED_QUERY).matches
-}
-
-function useCenteredModalLayout() {
-  const [isCenteredModalLayout, setIsCenteredModalLayout] = useState(centeredModalLayoutMatches)
-
-  useEffect(() => {
-    if (typeof window.matchMedia !== 'function') return
-
-    const mediaQuery = window.matchMedia(MODAL_SHEET_CENTERED_QUERY)
-    const syncLayout = () => setIsCenteredModalLayout(mediaQuery.matches)
-    syncLayout()
-    mediaQuery.addEventListener('change', syncLayout)
-    return () => mediaQuery.removeEventListener('change', syncLayout)
-  }, [])
-
-  return isCenteredModalLayout
-}
 
 function assignRef<T>(ref: Ref<T> | undefined, value: T | null) {
   if (typeof ref === 'function') ref(value)
   else if (ref) ref.current = value
+}
+
+function modalContentStyle(
+  contentStyle: ModalSheetStyle | undefined,
+  geometrySnapshot: ModalCenteredGeometrySnapshot | null,
+  closing: boolean,
+) {
+  const resolved: ModalSheetStyle = { ...contentStyle }
+  if (geometrySnapshot) {
+    const { centeredGeometry } = geometrySnapshot
+    resolved['--modal-centered-inline-size'] = centeredGeometry.inlineSize
+    resolved['--modal-centered-max-inline-size'] = centeredGeometry.maxInlineSize ?? centeredGeometry.inlineSize
+    resolved['--modal-centered-block-size'] = centeredGeometry.blockPolicy === 'fixed' ? centeredGeometry.blockSize : 'auto'
+    resolved['--modal-centered-max-block-size'] = centeredGeometry.maxBlockSize
+      ?? (centeredGeometry.blockPolicy === 'fixed' ? centeredGeometry.blockSize : undefined)
+  }
+  if (closing) resolved.pointerEvents = 'none'
+  return Object.keys(resolved).length > 0 ? resolved : undefined
 }
 
 // Base UI arbitrates native nested scrolling and dismissal before React's delegated touch handlers.
@@ -68,8 +107,11 @@ export function ModalSheet({
   backLabel,
   bodyElementRef,
   bodyHeader,
+  centeredGeometry,
   contentStyle,
+  contentWidth = 'readable',
   footer,
+  landscapeDensity = 'compact',
   navigation,
   onBack,
   scrollMode = 'body',
@@ -81,8 +123,12 @@ export function ModalSheet({
   const copy = useCopy('core')
   const bodyRef = useRef<HTMLDivElement | null>(null)
   const [bodyRefVersion, setBodyRefVersion] = useState(0)
-  const currentSnapshot: ModalSheetSnapshot = { backLabel: backLabel ?? copy('modal.back'), bodyHeader, children, contentStyle, footer, navigation, onBack, scrollMode, scrollResetKey, size, subtitle, surfaceDecoration, title }
+  const currentSnapshot: ModalSheetSnapshot = { backLabel: backLabel ?? copy('modal.back'), bodyHeader, centeredGeometry, children, contentStyle, contentWidth, footer, landscapeDensity, navigation, onBack, scrollMode, scrollResetKey, size, subtitle, surfaceDecoration, title }
+  const currentCenteredGeometrySnapshot: ModalCenteredGeometrySnapshot | null = centeredGeometry
+    ? { centeredGeometry, size }
+    : null
   const [lastOpenSnapshot, setLastOpenSnapshot] = useState<ModalSheetSnapshot>(currentSnapshot)
+  const [openCenteredGeometrySnapshot, setOpenCenteredGeometrySnapshot] = useState<ModalCenteredGeometrySnapshot | null>(currentCenteredGeometrySnapshot)
   const [mounted, setMounted] = useState(open)
   const [initialStarting, setInitialStarting] = useState(open)
   const [previousOpen, setPreviousOpen] = useState(open)
@@ -90,30 +136,57 @@ export function ModalSheet({
   const [rapidReopenPending, setRapidReopenPending] = useState(false)
   const [inputShielded, setInputShielded] = useState(false)
   const inputShieldFrameRef = useRef<number | null>(null)
+  const currentPresentation = useModalSheetPresentation()
+  const [measuredBodyTier, setMeasuredBodyTier] = useState<ModalBodyTier>('compact')
+  const currentBodyTier = currentPresentation === 'sheet' ? 'compact' : measuredBodyTier
+  const [lastOpenPresentation, setLastOpenPresentation] = useState(currentPresentation)
+  const [lastOpenBodyTier, setLastOpenBodyTier] = useState(currentBodyTier)
+  const opening = open && open !== previousOpen
+  const geometryIdentityChanged = Boolean(
+    open
+    && currentCenteredGeometrySnapshot
+    && openCenteredGeometrySnapshot
+    && currentCenteredGeometrySnapshot.centeredGeometry.id !== openCenteredGeometrySnapshot.centeredGeometry.id,
+  )
   if (open && !mounted) setMounted(true)
+  if (open && currentPresentation !== lastOpenPresentation) {
+    setLastOpenPresentation(currentPresentation)
+  }
+  if (open && currentBodyTier !== lastOpenBodyTier) {
+    setLastOpenBodyTier(currentBodyTier)
+  }
   if (open !== previousOpen) {
     setPreviousOpen(open)
     if (open) {
       setLastOpenSnapshot(currentSnapshot)
+      setOpenCenteredGeometrySnapshot(currentCenteredGeometrySnapshot)
       setRapidReopen(rapidReopenPending)
       setRapidReopenPending(false)
     }
   }
+  if (geometryIdentityChanged) setOpenCenteredGeometrySnapshot(currentCenteredGeometrySnapshot)
   const rendered = open ? currentSnapshot : lastOpenSnapshot
   const renderedHasFooter = Boolean(rendered.footer)
   const renderedHasNavigation = Boolean(rendered.navigation)
   const renderedHasSubtitle = Boolean(rendered.subtitle)
   const closing = !open
   const shouldRender = open || mounted
+  const renderedPresentation = open ? currentPresentation : lastOpenPresentation
+  const renderedBodyTier = open ? currentBodyTier : lastOpenBodyTier
+  const renderedCenteredGeometrySnapshot = opening || geometryIdentityChanged
+    ? currentCenteredGeometrySnapshot
+    : openCenteredGeometrySnapshot
+  const renderedCenteredGeometry = renderedCenteredGeometrySnapshot?.centeredGeometry
+  const renderedSize = renderedCenteredGeometrySnapshot?.size ?? rendered.size
+  const isDialogPresentation = renderedPresentation !== 'sheet'
 
   useEffect(() => {
     if (!initialStarting) return
     const frame = requestAnimationFrame(() => setInitialStarting(false))
     return () => cancelAnimationFrame(frame)
   }, [initialStarting])
-  const renderedContentStyle: ModalSheetStyle | undefined = closing ? { ...rendered.contentStyle, pointerEvents: 'none' } : rendered.contentStyle
-  const isCenteredModalLayout = useCenteredModalLayout()
-  const showDragHandle = !isCenteredModalLayout
+  const renderedContentStyle = modalContentStyle(rendered.contentStyle, renderedCenteredGeometrySnapshot, closing)
+  const showDragHandle = !isDialogPresentation
   const setBodyRefs = useCallback((node: HTMLDivElement | null) => {
     if (bodyRef.current !== node) setBodyRefVersion((current) => current + 1)
     bodyRef.current = node
@@ -130,6 +203,8 @@ export function ModalSheet({
     setRapidReopen(false)
     setRapidReopenPending(true)
     setLastOpenSnapshot(currentSnapshot)
+    setLastOpenPresentation(currentPresentation)
+    setLastOpenBodyTier(currentBodyTier)
     onClose()
   }
 
@@ -179,19 +254,29 @@ export function ModalSheet({
 
     const syncVisibleHeight = () => {
       const computed = window.getComputedStyle(body)
+      const contentMeasure = body.querySelector<HTMLElement>('[data-modal-content-measure="true"]')
       const verticalPadding = parseFloat(computed.paddingTop || '0') + parseFloat(computed.paddingBottom || '0')
       const visibleHeight = `${body.clientHeight}px`
       const contentHeight = `${Math.max(0, body.clientHeight - (Number.isFinite(verticalPadding) ? verticalPadding : 0))}px`
+      const contentInlineSize = Math.max(0, contentMeasure?.clientWidth ?? body.clientWidth)
+      const contentInlineWidth = `${contentInlineSize}px`
       if (body.style.getPropertyValue('--modal-body-visible-height') !== visibleHeight) body.style.setProperty('--modal-body-visible-height', visibleHeight)
       if (body.style.getPropertyValue('--modal-body-content-height') !== contentHeight) body.style.setProperty('--modal-body-content-height', contentHeight)
+      if (body.style.getPropertyValue('--modal-body-content-inline-size') !== contentInlineWidth) body.style.setProperty('--modal-body-content-inline-size', contentInlineWidth)
+      setMeasuredBodyTier((current) => {
+        const next = modalBodyTierForInlineSize(contentInlineSize)
+        return current === next ? current : next
+      })
     }
 
     syncVisibleHeight()
     window.addEventListener('resize', syncVisibleHeight)
+    window.visualViewport?.addEventListener('resize', syncVisibleHeight)
     body.addEventListener('load', syncVisibleHeight, true)
     const cleanupBodyObservers = () => {
       body.removeEventListener('load', syncVisibleHeight, true)
       window.removeEventListener('resize', syncVisibleHeight)
+      window.visualViewport?.removeEventListener('resize', syncVisibleHeight)
     }
 
     const ResizeObserverConstructor = window.ResizeObserver
@@ -201,11 +286,13 @@ export function ModalSheet({
 
     const observer = new ResizeObserverConstructor(syncVisibleHeight)
     observer.observe(body)
+    const contentMeasure = body.querySelector<HTMLElement>('[data-modal-content-measure="true"]')
+    if (contentMeasure) observer.observe(contentMeasure)
     return () => {
       observer.disconnect()
       cleanupBodyObservers()
     }
-  }, [bodyRefVersion, open, rendered.contentStyle, rendered.scrollMode, rendered.size, renderedHasFooter, renderedHasNavigation, renderedHasSubtitle])
+  }, [bodyRefVersion, open, rendered.contentStyle, rendered.contentWidth, rendered.landscapeDensity, rendered.scrollMode, renderedCenteredGeometry?.id, renderedHasFooter, renderedHasNavigation, renderedHasSubtitle, renderedPresentation, renderedSize])
 
   return (
     <Drawer.Root disablePointerDismissal modal="trap-focus" open={open} onOpenChange={handleOpenChange} swipeDirection="down">
@@ -231,10 +318,14 @@ export function ModalSheet({
               if (event.currentTarget === event.target) event.stopPropagation()
             }}
           />
-          <Drawer.Viewport className={styles.viewport} hidden={false}>
+          <Drawer.Viewport
+            className={styles.viewport}
+            data-modal-presentation={renderedPresentation}
+            hidden={false}
+          >
             <Drawer.Popup
               className={styles.content}
-              data-centered-layout={isCenteredModalLayout ? 'true' : 'false'}
+              data-centered-layout={isDialogPresentation ? 'true' : 'false'}
               data-closing={closing ? 'true' : 'false'}
               data-has-footer={renderedHasFooter ? 'true' : 'false'}
               data-has-navigation={renderedHasNavigation ? 'true' : 'false'}
@@ -242,10 +333,16 @@ export function ModalSheet({
               data-has-subtitle={renderedHasSubtitle ? 'true' : 'false'}
               data-has-surface-decoration={rendered.surfaceDecoration ? 'true' : 'false'}
               data-initial-starting-style={initialStarting ? 'true' : undefined}
+              data-landscape-density={rendered.landscapeDensity}
+              data-modal-block-policy={renderedCenteredGeometry?.blockPolicy}
               data-rapid-reopen={rapidReopen ? 'true' : 'false'}
+              data-modal-body-tier={renderedBodyTier}
+              data-modal-content-width={rendered.contentWidth ?? 'readable'}
+              data-modal-geometry-intent={renderedCenteredGeometry?.id}
+              data-modal-presentation={renderedPresentation}
               data-state={open ? 'open' : 'closed'}
               data-scroll-mode={rendered.scrollMode}
-              data-size={rendered.size}
+              data-size={renderedSize}
               data-surface="hass-popup"
               hidden={false}
               inert={closing ? true : undefined}
@@ -257,7 +354,7 @@ export function ModalSheet({
                   {rendered.surfaceDecoration}
                 </div>
               )}
-              <Drawer.Content className={styles.contentLayout} data-base-ui-swipe-ignore={isCenteredModalLayout ? 'true' : undefined}>
+              <Drawer.Content className={styles.contentLayout} data-base-ui-swipe-ignore={isDialogPresentation ? 'true' : undefined}>
                 {showDragHandle && <div className={styles.handle} data-mobile-drag-handle="true" />}
                 <div className={styles.header}>
                   <div className={styles.headingGroup}>
@@ -278,10 +375,24 @@ export function ModalSheet({
                     <MaterialIcon name="mdi:close" size={19} />
                   </button>
                 </div>
-                {rendered.bodyHeader && <div className={styles.bodyHeader} data-modal-sheet-body-header="true">{rendered.bodyHeader}</div>}
-                <div className={styles.body} data-modal-sheet-body="true" ref={setBodyRefs}>{rendered.children}</div>
-                {rendered.navigation && <div className={styles.navigation} data-modal-sheet-navigation="true">{rendered.navigation}</div>}
-                {rendered.footer && <div className={styles.footer} data-modal-sheet-footer="true">{rendered.footer}</div>}
+                {rendered.bodyHeader && (
+                  <div className={styles.bodyHeader} data-modal-sheet-body-header="true">
+                    <div className={styles.regionMeasure}>{rendered.bodyHeader}</div>
+                  </div>
+                )}
+                <div className={styles.body} data-modal-body-tier={renderedBodyTier} data-modal-sheet-body="true" ref={setBodyRefs}>
+                  <div className={`${styles.regionMeasure} ${styles.bodyMeasure}`} data-modal-content-measure="true">{rendered.children}</div>
+                </div>
+                {rendered.navigation && (
+                  <div className={styles.navigation} data-modal-sheet-navigation="true">
+                    <div className={`${styles.regionMeasure} ${styles.navigationMeasure}`}>{rendered.navigation}</div>
+                  </div>
+                )}
+                {rendered.footer && (
+                  <div className={styles.footer} data-modal-sheet-footer="true">
+                    <div className={styles.regionMeasure}>{rendered.footer}</div>
+                  </div>
+                )}
               </Drawer.Content>
             </Drawer.Popup>
           </Drawer.Viewport>

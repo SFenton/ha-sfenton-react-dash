@@ -82,6 +82,28 @@ export const style = {
     })
   })
 
+  it('requires runtime safe-area styles to use the owned token contract', () => {
+    withFixture({
+      'src/components/Fixture.module.css': `
+.fixture {
+  padding-left: env(safe-area-inset-left, 0px);
+  padding-bottom: env(safe-area-max-inset-bottom, 0px);
+}
+`,
+      'src/styles/tokens.css': `
+:root {
+  --rd-safe-left: env(safe-area-inset-left, 0px);
+  --rd-safe-bottom: env(safe-area-max-inset-bottom, 0px);
+}
+`,
+    }, (root) => {
+      expect(forRule(root, 'raw-safe-area-env')).toEqual([
+        expect.objectContaining({ subject: 'env(safe-area-inset-left' }),
+        expect.objectContaining({ subject: 'env(safe-area-max-inset-bottom' }),
+      ])
+    })
+  })
+
   it('enforces the shared semantic accessory boundary', () => {
     withFixture({
       'src/components/core/SurfaceAccessory.tsx': `
@@ -95,6 +117,52 @@ export const LazyIcon = import('./core/ModalDisclosureIcon')
 `,
     }, (root) => {
       expect(forRule(root, 'modal-disclosure-import')).toHaveLength(2)
+    })
+  })
+
+  it('requires typed centered geometry and rejects legacy modal size variables', () => {
+    withFixture({
+      'src/components/BadModal.tsx': `
+const style = { '--modal-desktop-height': '620px' }
+export function BadModal() {
+  return <ModalSheet contentStyle={style} open title="Bad" onClose={() => undefined}>Bad</ModalSheet>
+}
+`,
+      'src/components/GoodModal.tsx': `
+export function GoodModal() {
+  return <ModalSheet centeredGeometry={{ blockPolicy: 'fixed', blockSize: '620px', id: 'good', inlineSize: '720px' }} open title="Good" onClose={() => undefined}>Good</ModalSheet>
+}
+`,
+    }, (root) => {
+      expect(forRule(root, 'legacy-modal-geometry-variable')).toEqual([
+        expect.objectContaining({ subject: '--modal-desktop-height' }),
+      ])
+      expect(forRule(root, 'missing-modal-centered-geometry')).toEqual([
+        expect.objectContaining({ file: 'src/components/BadModal.tsx' }),
+      ])
+    })
+  })
+
+  it('rejects fixed modal square sizing outside a presentation selector', () => {
+    withFixture({
+      'src/components/Fixture.module.css': `
+.unsafe {
+  width: var(--modal-square-card-size);
+}
+
+.unsafeFluid {
+  flex-basis: var(--modal-square-track-width);
+}
+
+:global([data-modal-presentation='landscape-dialog']) .safe {
+  width: var(--modal-square-track-width);
+}
+`,
+    }, (root) => {
+      expect(forRule(root, 'unscoped-modal-square-size')).toEqual([
+        expect.objectContaining({ subject: '.unsafe' }),
+        expect.objectContaining({ subject: '.unsafeFluid' }),
+      ])
     })
   })
 

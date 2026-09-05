@@ -29,3 +29,7 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
 }
+
+:global([data-centered-layout='true']) .actions {
+  grid-template-columns: repeat(auto-fit, minmax(min(160px, 100%), 1fr));
+}

@@ -33,7 +33,7 @@ export function equivalentDynamicGridColumnCount(minimumSpans: readonly number[]
   return Math.max(1, Math.floor(columns / widestSpan))
 }
 
-export function packDynamicGridSpans(minimumSpans: readonly number[], columnCount: number) {
+export function packDynamicGridSpans(minimumSpans: readonly number[], columnCount: number, fill: 'all' | 'except-last' = 'all') {
   const columns = normalizedDynamicGridColumns(columnCount)
   const spans: number[] = []
   let itemIndex = 0
@@ -50,10 +50,13 @@ export function packDynamicGridSpans(minimumSpans: readonly number[], columnCoun
       itemIndex += 1
     }
 
-    let remainingColumns = columns - occupiedColumns
+    let remainingColumns = fill === 'except-last' && itemIndex === minimumSpans.length
+      ? 0
+      : columns - occupiedColumns
     let rowIndex = row.length - 1
 
     while (remainingColumns > 0) {
+      if (fill === 'except-last') rowIndex = row.lastIndexOf(Math.min(...row))
       if (row[rowIndex] < columns) {
         row[rowIndex] += 1
         remainingColumns -= 1

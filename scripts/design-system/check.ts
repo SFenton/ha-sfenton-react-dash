@@ -12,8 +12,12 @@ import ts from 'typescript'
 
 export const RULE_IDS = [
   'raw-color-literal',
+  'raw-safe-area-env',
   'undefined-rd-variable',
   'modal-disclosure-import',
+  'legacy-modal-geometry-variable',
+  'missing-modal-centered-geometry',
+  'unscoped-modal-square-size',
   'visual-active-rule',
 ] as const
 
@@ -82,6 +86,15 @@ const SURFACE_ACCESSORY_PATH = 'src/components/core/SurfaceAccessory.tsx'
 const RD_VARIABLE_PATTERN = '--rd-[A-Za-z0-9_-]+'
 const RAW_COLOR_DEFINITION_FILES = new Set([
   'src/styles/tokens.css',
+])
+const RAW_SAFE_AREA_DEFINITION_FILES = new Set([
+  'src/styles/tokens.css',
+])
+const LEGACY_MODAL_GEOMETRY_VARIABLES = new Set([
+  '--modal-desktop-height',
+  '--modal-desktop-max-height',
+  '--modal-desktop-max-width',
+  '--modal-desktop-width',
 ])
 const RULE_ORDER = new Map<RuleId, number>(RULE_IDS.map((rule, index) => [rule, index]))
 
@@ -284,6 +297,17 @@ function scanCss(
       })
     }
   }
+  if (!RAW_SAFE_AREA_DEFINITION_FILES.has(file)) {
+    const safeAreaPattern = /env\(\s*safe-area-(?:max-)?inset-(?:top|right|bottom|left)\b/gi
+    for (const match of masked.matchAll(safeAreaPattern)) {
+      violations.push({
+        file,
+        line: lineNumber(source, match.index!),
+        rule: 'raw-safe-area-env',
+        subject: match[0].replace(/\s+/g, ' ').trim().toLowerCase(),
+      })
+    }
+  }
   const definitionPattern = new RegExp(`(?:^|[;{])\\s*(${RD_VARIABLE_PATTERN})\\s*:`, 'gm')
   for (const match of masked.matchAll(definitionPattern)) {
     definitions.add(match[1])
@@ -305,10 +329,21 @@ function scanCss(
   for (const block of flattenBlocks(cssBlocks(masked))) {
     const selector = normalizeSelector(block.prelude)
     if (selector.startsWith('@')) continue
+    const body = directBlockBody(masked, block)
+    if (
+      /var\(\s*--modal-square-(?:card-size|track-width)\b/.test(body)
+      && !selector.includes('data-modal-presentation')
+    ) {
+      violations.push({
+        file,
+        line: lineNumber(source, block.bodyStart),
+        rule: 'unscoped-modal-square-size',
+        subject: selector,
+      })
+    }
     const activeSelectors = splitSelectorList(selector).filter((candidate) => candidate.includes(':active'))
     if (activeSelectors.length === 0) continue
 
-    const body = directBlockBody(masked, block)
     const declarationPattern = /(?:^|;)\s*([-\w]+)\s*:/g
     for (const match of body.matchAll(declarationPattern)) {
       const property = match[1].toLowerCase()
@@ -402,6 +437,28 @@ function scanTypeScript(
     if (ts.isPropertyAssignment(node)) {
       const name = staticPropertyName(node.name)
       if (name?.startsWith('--rd-')) definitions.add(name)
+      if (name && LEGACY_MODAL_GEOMETRY_VARIABLES.has(name)) {
+        violations.push({
+          file,
+          line: lineFor(node),
+          rule: 'legacy-modal-geometry-variable',
+          subject: name,
+        })
+      }
+    }
+
+    if (
+      (ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node))
+      && node.tagName.getText(sourceFile) === 'ModalSheet'
+      && !node.attributes.properties.some((property) =>
+        ts.isJsxAttribute(property) && property.name.getText(sourceFile) === 'centeredGeometry')
+    ) {
+      violations.push({
+        file,
+        line: lineFor(node),
+        rule: 'missing-modal-centered-geometry',
+        subject: 'ModalSheet',
+      })
     }
 
     if (

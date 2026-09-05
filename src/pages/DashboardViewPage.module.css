@@ -46,7 +46,7 @@
 
 .choresEmpty {
   display: grid;
-  min-height: calc(100vh - var(--bottom-nav-height) - 160px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+  min-height: calc(var(--dashboard-visible-height, var(--dashboard-viewport-height, 100dvh)) - var(--bottom-nav-height) - 160px);
   align-content: center;
   gap: 10px;
   padding: 24px 12px;
@@ -130,7 +130,7 @@
 
 .emptyRoomState {
   display: grid;
-  min-height: calc(100vh - var(--bottom-nav-height) - 160px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+  min-height: calc(var(--dashboard-visible-height, var(--dashboard-viewport-height, 100dvh)) - var(--bottom-nav-height) - 160px);
   align-content: center;
   gap: 18px;
   box-sizing: border-box;
@@ -402,6 +402,12 @@
 .dishwasherModal {
   display: grid;
   gap: 18px;
+}
+
+:global([data-modal-presentation='landscape-dialog'][data-landscape-density='compact']:is([data-modal-body-tier='standard'], [data-modal-body-tier='wide'])) .dishwasherModal[data-modal-landscape-layout='section-grid'] {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+  gap: 12px;
 }
 
 .dishwasherProgramSelect {
@@ -1155,52 +1161,112 @@ button.thermostatGlassMain {
   min-width: 0;
 }
 
-@media (min-width: 760px) {
-  .adminSquareGrid {
-    grid-template-columns: repeat(var(--modal-square-cols, 4), var(--modal-square-card-size, 168px));
-    grid-template-rows: repeat(var(--modal-square-rows, 4), var(--modal-square-card-size, 168px));
-    justify-content: center;
-    box-sizing: border-box;
-    gap: 10px;
-    padding-inline: 6px;
-  }
+:global([data-modal-presentation='landscape-dialog']) .adminSquareGrid,
+:global([data-modal-presentation='dialog']) .adminSquareGrid {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  box-sizing: border-box;
+  gap: 10px;
+  padding-inline: 6px;
+}
 
-  .adminSquareGrid > button,
-  .adminSquareGrid > article {
-    width: var(--modal-square-card-size, 168px);
-    height: var(--modal-square-card-size, 168px);
-    min-height: 0;
-    aspect-ratio: 1 / 1;
-    flex-direction: column;
-    align-items: flex-start;
-    justify-content: space-between;
-    border-radius: clamp(22px, 2.4vw, 34px);
-    padding: clamp(14px, 1.6vw, 22px);
-  }
+:global([data-modal-presentation='landscape-dialog']) .adminSquareGrid > button,
+:global([data-modal-presentation='landscape-dialog']) .adminSquareGrid > article,
+:global([data-modal-presentation='landscape-dialog']) .adminSquareGrid > [data-modal-detail-trigger] > button,
+:global([data-modal-presentation='landscape-dialog']) .adminSquareGrid > [data-modal-detail-trigger] > article,
+:global([data-modal-presentation='dialog']) .adminSquareGrid > button,
+:global([data-modal-presentation='dialog']) .adminSquareGrid > article,
+:global([data-modal-presentation='dialog']) .adminSquareGrid > [data-modal-detail-trigger] > button,
+:global([data-modal-presentation='dialog']) .adminSquareGrid > [data-modal-detail-trigger] > article {
+  width: var(--modal-square-card-size);
+  height: var(--modal-square-card-size);
+  min-height: 0;
+  flex: 0 0 var(--modal-square-card-size);
+  aspect-ratio: 1 / 1;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: space-between;
+}
 
-  .adminSquareGrid > button > span:first-child,
-  .adminSquareGrid > article > span:first-child {
-    flex-basis: clamp(38px, 4.2vw, 52px);
-    width: clamp(38px, 4.2vw, 52px);
-    height: clamp(38px, 4.2vw, 52px);
-  }
+:global([data-modal-presentation='landscape-dialog']) .adminSquareGrid > button,
+:global([data-modal-presentation='landscape-dialog']) .adminSquareGrid > article,
+:global([data-modal-presentation='landscape-dialog']) .adminSquareGrid > [data-modal-detail-trigger] > button,
+:global([data-modal-presentation='landscape-dialog']) .adminSquareGrid > [data-modal-detail-trigger] > article {
+  width: var(--modal-square-track-width);
+  height: auto;
+  flex-basis: var(--modal-square-track-width);
+  border-radius: 22px;
+  padding: 14px;
+}
 
-  .adminSquareGrid > button > span:first-child svg,
-  .adminSquareGrid > article > span:first-child svg {
-    width: clamp(30px, 3.4vw, 46px);
-    height: clamp(30px, 3.4vw, 46px);
-  }
+:global([data-modal-presentation='landscape-dialog']) .adminSquareGrid > button > span:first-child,
+:global([data-modal-presentation='landscape-dialog']) .adminSquareGrid > article > span:first-child,
+:global([data-modal-presentation='landscape-dialog']) .adminSquareGrid > [data-modal-detail-trigger] > button > span:first-child,
+:global([data-modal-presentation='landscape-dialog']) .adminSquareGrid > [data-modal-detail-trigger] > article > span:first-child {
+  width: 38px;
+  height: 38px;
+  flex-basis: 38px;
+}
 
-  .adminSquareGrid > button > span:last-child,
-  .adminSquareGrid > article > span:last-child {
-    gap: 3px;
-  }
+:global([data-modal-presentation='landscape-dialog']) .adminSquareGrid > button > span:first-child svg,
+:global([data-modal-presentation='landscape-dialog']) .adminSquareGrid > article > span:first-child svg,
+:global([data-modal-presentation='landscape-dialog']) .adminSquareGrid > [data-modal-detail-trigger] > button > span:first-child svg,
+:global([data-modal-presentation='landscape-dialog']) .adminSquareGrid > [data-modal-detail-trigger] > article > span:first-child svg {
+  width: 28px;
+  height: 28px;
+}
 
-  .adminSquareGrid > button > span:last-child > span:first-child,
-  .adminSquareGrid > article > span:last-child > span:first-child {
-    font-size: clamp(0.78rem, 1.05vw, 1rem);
-    line-height: 1.08;
-  }
+:global([data-modal-presentation='landscape-dialog']) .adminSquareGrid > button > span:last-child,
+:global([data-modal-presentation='landscape-dialog']) .adminSquareGrid > article > span:last-child,
+:global([data-modal-presentation='landscape-dialog']) .adminSquareGrid > [data-modal-detail-trigger] > button > span:last-child,
+:global([data-modal-presentation='landscape-dialog']) .adminSquareGrid > [data-modal-detail-trigger] > article > span:last-child,
+:global([data-modal-presentation='dialog']) .adminSquareGrid > button > span:last-child,
+:global([data-modal-presentation='dialog']) .adminSquareGrid > article > span:last-child,
+:global([data-modal-presentation='dialog']) .adminSquareGrid > [data-modal-detail-trigger] > button > span:last-child,
+:global([data-modal-presentation='dialog']) .adminSquareGrid > [data-modal-detail-trigger] > article > span:last-child {
+  gap: 3px;
+}
+
+:global([data-modal-presentation='landscape-dialog']) .adminSquareGrid > button > span:last-child > span:first-child,
+:global([data-modal-presentation='landscape-dialog']) .adminSquareGrid > article > span:last-child > span:first-child,
+:global([data-modal-presentation='landscape-dialog']) .adminSquareGrid > [data-modal-detail-trigger] > button > span:last-child > span:first-child,
+:global([data-modal-presentation='landscape-dialog']) .adminSquareGrid > [data-modal-detail-trigger] > article > span:last-child > span:first-child {
+  font-size: 0.78rem;
+  line-height: 1.08;
+}
+
+:global([data-modal-presentation='dialog']) .adminSquareGrid > button,
+:global([data-modal-presentation='dialog']) .adminSquareGrid > article,
+:global([data-modal-presentation='dialog']) .adminSquareGrid > [data-modal-detail-trigger] > button,
+:global([data-modal-presentation='dialog']) .adminSquareGrid > [data-modal-detail-trigger] > article {
+  border-radius: clamp(22px, 2.4vw, 34px);
+  padding: clamp(14px, 1.6vw, 22px);
+}
+
+:global([data-modal-presentation='dialog']) .adminSquareGrid > button > span:first-child,
+:global([data-modal-presentation='dialog']) .adminSquareGrid > article > span:first-child,
+:global([data-modal-presentation='dialog']) .adminSquareGrid > [data-modal-detail-trigger] > button > span:first-child,
+:global([data-modal-presentation='dialog']) .adminSquareGrid > [data-modal-detail-trigger] > article > span:first-child {
+  width: clamp(38px, 4.2vw, 52px);
+  height: clamp(38px, 4.2vw, 52px);
+  flex-basis: clamp(38px, 4.2vw, 52px);
+}
+
+:global([data-modal-presentation='dialog']) .adminSquareGrid > button > span:first-child svg,
+:global([data-modal-presentation='dialog']) .adminSquareGrid > article > span:first-child svg,
+:global([data-modal-presentation='dialog']) .adminSquareGrid > [data-modal-detail-trigger] > button > span:first-child svg,
+:global([data-modal-presentation='dialog']) .adminSquareGrid > [data-modal-detail-trigger] > article > span:first-child svg {
+  width: clamp(30px, 3.4vw, 46px);
+  height: clamp(30px, 3.4vw, 46px);
+}
+
+:global([data-modal-presentation='dialog']) .adminSquareGrid > button > span:last-child > span:first-child,
+:global([data-modal-presentation='dialog']) .adminSquareGrid > article > span:last-child > span:first-child,
+:global([data-modal-presentation='dialog']) .adminSquareGrid > [data-modal-detail-trigger] > button > span:last-child > span:first-child,
+:global([data-modal-presentation='dialog']) .adminSquareGrid > [data-modal-detail-trigger] > article > span:last-child > span:first-child {
+  font-size: clamp(0.78rem, 1.05vw, 1rem);
+  line-height: 1.08;
 }
 
 @media (min-width: 760px) and (min-height: 560px) {
@@ -1307,6 +1373,36 @@ button.thermostatGlassMain {
     max-height: none;
     overflow: visible;
   }
+}
+
+:global([data-modal-presentation='landscape-dialog'][data-landscape-density='compact']:is([data-modal-body-tier='standard'], [data-modal-body-tier='wide'])) .thermostatModalBody {
+  grid-template-columns: minmax(360px, 1.1fr) minmax(220px, 0.9fr);
+  align-items: start;
+  gap: 12px;
+}
+
+:global([data-modal-presentation='landscape-dialog'][data-landscape-density='compact']:is([data-modal-body-tier='standard'], [data-modal-body-tier='wide'])) .thermostatModalAway {
+  grid-column: 1 / -1;
+}
+
+:global([data-modal-presentation='landscape-dialog'][data-landscape-density='compact']:is([data-modal-body-tier='standard'], [data-modal-body-tier='wide'])) .eightSleepModalBody {
+  grid-template-columns: minmax(360px, 1.1fr) minmax(240px, 0.9fr);
+  grid-template-rows: auto;
+  height: auto;
+  min-height: 0;
+  align-items: start;
+  gap: 12px;
+  overflow: visible;
+}
+
+:global([data-modal-presentation='landscape-dialog'][data-landscape-density='compact']:is([data-modal-body-tier='standard'], [data-modal-body-tier='wide'])) .eightSleepModalBody .eightSleepHeroColumn,
+:global([data-modal-presentation='landscape-dialog'][data-landscape-density='compact']:is([data-modal-body-tier='standard'], [data-modal-body-tier='wide'])) .eightSleepModalBody .eightSleepModalPanel {
+  height: auto;
+  min-height: 0;
+  max-height: none;
+  align-self: start;
+  align-content: start;
+  overflow: visible;
 }
 
 .eightSleepHeroColumn {

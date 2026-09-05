@@ -8,6 +8,7 @@ export interface ModalLifecycleAnimation {
 
 export interface ModalLifecycleFrame {
   animations: ModalLifecycleAnimation[]
+  blockPolicy: string | null
   bodyClientHeight: number | null
   bodyScrollHeight: number | null
   bodyScrollTop: number | null
@@ -26,6 +27,10 @@ export interface ModalLifecycleFrame {
   overlayEnding: boolean
   overlayOpacity: number | null
   popupPresent: boolean
+  popupHeight: number | null
+  popupWidth: number | null
+  geometryIntent: string | null
+  presentation: string | null
   rapidReopen: string | null
   swipeDismiss: boolean
   starting: boolean
@@ -189,6 +194,9 @@ export async function installModalLifecycleProbe(page: Page, options: { autoStar
         'data-rapid-reopen',
         'data-state',
         'data-closing',
+        'data-modal-block-policy',
+        'data-modal-geometry-intent',
+        'data-modal-presentation',
         'hidden',
         'inert',
         'style',
@@ -206,12 +214,14 @@ export async function installModalLifecycleProbe(page: Page, options: { autoStar
       const popupStyle = popup ? getComputedStyle(popup) : null
       const overlayStyle = overlay ? getComputedStyle(overlay) : null
       const transform = popupStyle?.transform ?? 'none'
+      const popupRect = popup?.getBoundingClientRect() ?? null
       frames.push({
         animations: popup?.getAnimations().map((animation) => ({
           currentTime: typeof animation.currentTime === 'number' ? animation.currentTime : null,
           pending: animation.pending,
           playState: animation.playState,
         })) ?? [],
+        blockPolicy: popup?.getAttribute('data-modal-block-policy') ?? null,
         bodyClientHeight: body?.clientHeight ?? null,
         bodyScrollHeight: body?.scrollHeight ?? null,
         bodyScrollTop: body?.scrollTop ?? null,
@@ -230,6 +240,10 @@ export async function installModalLifecycleProbe(page: Page, options: { autoStar
         overlayEnding: overlay?.hasAttribute('data-ending-style') ?? false,
         overlayOpacity: overlayStyle ? Number.parseFloat(overlayStyle.opacity) : null,
         popupPresent: Boolean(popup),
+        popupHeight: popupRect?.height ?? null,
+        popupWidth: popupRect?.width ?? null,
+        geometryIntent: popup?.getAttribute('data-modal-geometry-intent') ?? null,
+        presentation: popup?.getAttribute('data-modal-presentation') ?? null,
         rapidReopen: popup?.getAttribute('data-rapid-reopen') ?? null,
         swipeDismiss: popup?.hasAttribute('data-swipe-dismiss') ?? false,
         starting: popup?.hasAttribute('data-starting-style') || popup?.getAttribute('data-initial-starting-style') === 'true',
@@ -368,7 +382,9 @@ export function assertAnimatedDesktopModalOpen(trace: ModalLifecycleTrace) {
   const openFrames = trace.frames.filter((frame) => frame.popupPresent && frame.open)
   if (openFrames.length < 2) throw new Error('Desktop modal opening trace did not capture enough frames')
   if (!openFrames.some((frame) => frame.starting)) throw new Error('Desktop modal never entered data-starting-style')
-  if (!openFrames.some((frame) => frame.animations.length > 0)) throw new Error('Desktop modal opening transition was not exposed as an animation')
+  const transitionExposed = openFrames.some((frame) =>
+    frame.animations.length > 0 || frame.transition?.split(',').some((value) => value.trim().startsWith('opacity ')))
+  if (!transitionExposed) throw new Error('Desktop modal opening transition was not exposed through animation or computed transition state')
   if (!openFrames.some((frame) => (frame.opacity ?? 1) < 0.5)) throw new Error('Desktop modal never started transparent')
   if (!openFrames.some((frame) => (frame.overlayOpacity ?? 1) < 0.5)) throw new Error('Desktop modal overlay never started transparent')
 

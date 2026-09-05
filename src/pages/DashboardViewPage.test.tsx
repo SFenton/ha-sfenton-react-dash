@@ -1637,8 +1637,9 @@ describe('DashboardViewPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Open Presence-Based Overrides' }))
     const presenceDialog = await screen.findByRole('dialog', { name: 'Presence-Based Overrides' })
     expect(presenceDialog).toHaveAttribute('data-surface', 'hass-popup')
+    expect(presenceDialog).toHaveAttribute('data-modal-geometry-intent', 'admin-presence-overrides')
     expect(presenceDialog).toHaveStyle({
-      '--modal-desktop-height': 'min(860px, calc(var(--dashboard-visible-height, var(--dashboard-viewport-height, 100dvh)) - 64px))',
+      '--modal-centered-block-size': '860px',
     })
     expect(screen.getByRole('heading', { name: 'Presence-Based Overrides' })).toBeInTheDocument()
     const livingRoomPresence = within(presenceDialog).getByRole('button', { name: 'Living Room Enabled' })
@@ -1650,8 +1651,9 @@ describe('DashboardViewPage', () => {
 
     const detailPage = await screen.findByRole('dialog', { name: 'Living Room Presence Lighting' })
     expect(detailPage).toBe(presenceDialog)
+    expect(detailPage).toHaveAttribute('data-modal-geometry-intent', 'admin-presence-overrides')
     expect(detailPage).toHaveStyle({
-      '--modal-desktop-height': 'min(860px, calc(var(--dashboard-visible-height, var(--dashboard-viewport-height, 100dvh)) - 64px))',
+      '--modal-centered-block-size': '860px',
     })
     expect(screen.getAllByRole('dialog')).toHaveLength(1)
     expect(within(detailPage).getAllByRole('button', { name: /Set Living Room presence lighting to/i })).toHaveLength(4)

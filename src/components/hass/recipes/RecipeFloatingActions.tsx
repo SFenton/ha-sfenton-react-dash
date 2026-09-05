@@ -4,7 +4,7 @@ import { ExpandingSearchAction } from '../../core/ExpandingSearchAction'
 import { FilterSheetFooter } from '../../core/FilterSheetFooter'
 import { FloatingActionSlot } from '../../core/FloatingActionSlot'
 import { FloatingActionButton } from '../../core/FloatingActionButton'
-import { ModalSheet } from '../../core/ModalSheet'
+import { ModalSheet, type ModalCenteredGeometry } from '../../core/ModalSheet'
 import { RadioRow } from '../../core/RadioRow'
 import { RangeField } from '../../core/RangeField'
 import { ToggleSetting } from '../../core/ToggleSetting'
@@ -14,6 +14,18 @@ import styles from './RecipeFloatingActions.module.css'
 
 const ACTION_COLOR = { r: 42, g: 126, b: 180 }
 const ACTIVE_ACTION_COLOR = { r: 155, g: 110, b: 64 }
+const RECIPE_SORT_CENTERED_GEOMETRY = {
+  blockPolicy: 'fixed',
+  blockSize: '500px',
+  id: 'recipe-sort',
+  inlineSize: '560px',
+} satisfies ModalCenteredGeometry
+const RECIPE_FILTER_CENTERED_GEOMETRY = {
+  blockPolicy: 'fixed',
+  blockSize: '760px',
+  id: 'recipe-filter',
+  inlineSize: '560px',
+} satisfies ModalCenteredGeometry
 
 const SORT_OPTIONS: Array<{ label: string; subtitle: string; value: RecipeSort }> = [
   { label: 'Ingredients Available', subtitle: 'Prioritize recipes you can make from current inventory.', value: 'availability' },
@@ -34,6 +46,7 @@ function focusSlotButton(slot: HTMLSpanElement | null) {
 function RecipeSortSheet({ controls, onApplied }: { controls: RecipeControls; onApplied: () => void }) {
   return (
     <ModalSheet
+      centeredGeometry={RECIPE_SORT_CENTERED_GEOMETRY}
       footer={(
         <FilterSheetFooter
           onApply={() => {
@@ -75,6 +88,7 @@ function RecipeFilterSheet({ controls, onApplied }: { controls: RecipeControls; 
   const alphabetical = controls.sort === 'alphabetical'
   return (
     <ModalSheet
+      centeredGeometry={RECIPE_FILTER_CENTERED_GEOMETRY}
       footer={(
         <FilterSheetFooter
           onApply={() => {
@@ -90,7 +104,7 @@ function RecipeFilterSheet({ controls, onApplied }: { controls: RecipeControls; 
       size="form"
       title="Filter Recipes"
     >
-      <div className={styles.sheetStack}>
+      <div className={styles.sheetStack} data-modal-landscape-layout="section-grid">
         <fieldset className={styles.fieldset}>
           <legend>Ingredient Coverage</legend>
           <Description className={styles.groupDescription}>Only show recipes where at least this percentage of required ingredients is currently available.</Description>

@@ -293,7 +293,7 @@ function SecuritySystemSection() {
 
 export function GuestPresenceSecurityModalContent() {
   return (
-    <div className={styles.modalContent}>
+    <div className={styles.modalContent} data-modal-landscape-layout="section-grid">
       <GuestRoomsSection />
       <GarageDoorsSection />
       <FrontDoorSection />

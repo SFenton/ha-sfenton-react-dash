@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test'
 import { RESPONSIVE_ROUTES } from './responsive-acceptance-data'
+import { setSafeAreaInsets } from './safe-area'
 
 async function setRoute(page: Page, path: string) {
   await page.evaluate((nextPath) => {
@@ -98,7 +99,8 @@ test('requires both rail width and rail height before showing permanent navigati
   await expect.poll(async () => Math.round((await page.getByRole('main').boundingBox())?.width ?? 0)).toBe(932)
 })
 
-test('uses drawer navigation on both root and back-path routes in short landscape', async ({ page }) => {
+test('keeps the menu on root pages and never duplicates Back with a trailing hamburger', async ({ page }) => {
+  test.setTimeout(90_000)
   await page.setViewportSize({ width: 852, height: 393 })
   await page.goto('/index.html?path=overview')
 
@@ -114,15 +116,39 @@ test('uses drawer navigation on both root and back-path routes in short landscap
   expect(Math.round(scrollerBox?.height ?? 0)).toBeGreaterThanOrEqual(250)
 
   await page.goto('/index.html?path=living-room')
-  await expect(page.getByRole('button', { name: 'Go back' })).toBeVisible()
-  await expect(page.locator('[data-adaptive-navigation="bottom"]')).not.toBeVisible()
-  const backPathMenu = page.getByRole('button', { name: 'Open navigation menu' })
-  await expect(backPathMenu).toBeVisible()
-  await backPathMenu.click()
-  await expect(page.locator('aside[data-state="open"]').getByRole('menuitem', { name: 'Home' })).toBeVisible()
+  const header = page.locator('[data-app-header="true"]')
+  const back = header.getByRole('button', { name: 'Go back' })
+  const profile = header.getByRole('button', { name: /^Open .*Summary/ })
+  for (const viewport of [
+    { width: 393, height: 852, insets: { top: 59, right: 0, bottom: 34, left: 0 } },
+    { width: 852, height: 393, insets: { top: 0, right: 44, bottom: 21, left: 59 } },
+    { width: 852, height: 393, insets: { top: 0, right: 59, bottom: 21, left: 44 } },
+    { width: 667, height: 375, insets: { top: 0, right: 0, bottom: 0, left: 0 } },
+    { width: 820, height: 1180, insets: { top: 0, right: 0, bottom: 0, left: 0 } },
+    { width: 1180, height: 820, insets: { top: 0, right: 0, bottom: 0, left: 0 } },
+    { width: 1119, height: 500, insets: { top: 0, right: 0, bottom: 0, left: 0 } },
+    { width: 1120, height: 500, insets: { top: 0, right: 0, bottom: 0, left: 0 } },
+    { width: 1440, height: 900, insets: { top: 0, right: 0, bottom: 0, left: 0 } },
+    { width: 1920, height: 1080, insets: { top: 0, right: 0, bottom: 0, left: 0 } },
+  ]) {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height })
+    await setSafeAreaInsets(page, viewport.insets)
+    await expect(back).toBeVisible()
+    await expect(profile).toBeVisible()
+    await expect(header.locator('button[aria-label="Open navigation menu"]')).toHaveCount(0)
+  }
+  await profile.click()
+  const summary = page.getByRole('dialog', { name: /Summary/ })
+  await expect(summary).toBeVisible()
+  await summary.getByRole('button', { name: 'Close', exact: true }).click()
+  await expect(summary).toHaveCount(0)
+  await page.setViewportSize({ width: 852, height: 393 })
+  await back.click()
+  await expect(page.getByRole('heading', { name: 'Home', exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Open navigation menu' })).toBeVisible()
 })
 
-test('uses drawer navigation on wide compact root and back-path routes', async ({ page }) => {
+test('uses the root drawer and Back on wide compact routes', async ({ page }) => {
   await page.setViewportSize({ width: 1152, height: 741 })
   await page.goto('/index.html?path=overview')
 
@@ -134,9 +160,10 @@ test('uses drawer navigation on wide compact root and back-path routes', async (
 
   await page.goto('/index.html?path=living-room')
   await expect(page.getByRole('button', { name: 'Go back' })).toBeVisible()
-  const menu = page.getByRole('button', { name: 'Open navigation menu' })
-  await expect(menu).toBeVisible()
-  await menu.click()
+  await expect(page.getByRole('button', { name: 'Open navigation menu', includeHidden: true })).toHaveCount(0)
+  await page.getByRole('button', { name: 'Go back' }).click()
+  await expect(page.getByRole('heading', { name: 'Home', exact: true })).toBeVisible()
+  await page.getByRole('button', { name: 'Open navigation menu' }).click()
   await expect(page.locator('[data-adaptive-navigation="drawer"][data-state="open"]').getByRole('menuitem', { name: 'Home' })).toBeVisible()
 })
 

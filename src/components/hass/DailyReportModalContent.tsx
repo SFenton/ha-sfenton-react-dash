@@ -50,7 +50,7 @@ function DailyReportTodoTab({ emptyDescription, emptyTitle, entityId, onEditTask
 
   return (
     <section aria-label={title} className={styles.tabSection} data-empty={visibleItemCount === 0 ? 'true' : undefined}>
-      <TodoListPanel entityId={entityId} hideCompleted onEditTask={onEditTask} onVisibleItemsChange={setVisibleItemCount} reloadVersion={reloadVersion} title={title} />
+      <TodoListPanel entityId={entityId} hideCompleted layout="responsive-grid" onEditTask={onEditTask} onVisibleItemsChange={setVisibleItemCount} reloadVersion={reloadVersion} rowVariant="summary" title={title} />
       {visibleItemCount === 0 && (
         <EmptyState description={vacationMode ? VACATION_EMPTY_DESCRIPTION : emptyDescription} layout="modal" title={emptyTitle} />
       )}
@@ -83,7 +83,7 @@ function DailyReportExpiredFoodTab({ onOpenDetails, vacationMode }: { onOpenDeta
 
   return (
     <section aria-label="Expired Food" className={styles.tabSection}>
-      <EverShelfInventoryPanel controls={lockedControls} emptyState={NO_EXPIRED_FOOD_EMPTY_STATE} location="all" onOpenDetails={onOpenDetails} title="Expired Food" />
+      <EverShelfInventoryPanel controls={lockedControls} emptyState={NO_EXPIRED_FOOD_EMPTY_STATE} layout="responsive-grid" location="all" onOpenDetails={onOpenDetails} rowVariant="summary" title="Expired Food" />
     </section>
   )
 }

@@ -1,7 +1,6 @@
-import { OFF, ON, UNAVAILABLE, UNAVAILABLE_STATES } from '@hakit/core'
+import { OFF, ON, UNAVAILABLE, UNAVAILABLE_STATES } from './haStates'
 import type { ControlSemanticsResolver } from '../components/core/controlSemantics'
 import { MEDIA_COPY_KEYS, MEDIA_COPY_NAMESPACE, copy } from '../i18n'
-import fortniteArtworkUrl from '../assets/apps/fortnite.jpg'
 import type { OptimisticActionMetadata, OptimisticStateIntent } from './actionIntents'
 
 type MediaRemoteServiceAction = {
@@ -176,7 +175,7 @@ export const MUSIC_ROOM_HUE_SYNC_HDMI_STATUS_ENTITY_IDS = [
   'sensor.music_room_music_room_sync_box_hdmi3_status',
   'sensor.music_room_music_room_sync_box_hdmi4_status',
 ] as const
-export const MUSIC_ROOM_FORTNITE_ARTWORK_URL = fortniteArtworkUrl
+export const MUSIC_ROOM_FORTNITE_ARTWORK_URL = new URL('../assets/apps/fortnite.jpg', import.meta.url).href
 export const MUSIC_ROOM_MEDIA_SOURCE_STATES = {
   fortnite: 'Fortnite',
   off: 'Off',

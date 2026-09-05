@@ -7,7 +7,7 @@ import { MaterialIcon } from '../core/Icon'
 import { ModalActionButton, type ModalActionTone } from '../core/ModalActionFooter'
 import { ModalIconTabNav } from '../core/ModalTabNav'
 import { modalTabId, modalTabPanelId } from '../core/modalTabIds'
-import { ModalSheet } from '../core/ModalSheet'
+import { ModalSheet, type ModalCenteredGeometry } from '../core/ModalSheet'
 import { NativeSelectField } from '../core/NativeSelectField'
 import { StatusPill } from '../core/StatusPill'
 import { type VacuumAutoCleanDisabledRoomConfig, type VacuumConfig, type VacuumConsumableConfig, type VacuumZoneConfig } from '../../constants/portedDashboard'
@@ -51,6 +51,13 @@ import {
 import { isUnavailableVacuumState, vacuumConsumableVisual, vacuumStateVisual, type VacuumVisualTone } from './vacuumVisualState'
 import { VacuumTile } from './VacuumTile'
 import styles from './VacuumCard.module.css'
+
+const VACUUM_CENTERED_GEOMETRY = {
+  blockPolicy: 'fixed',
+  blockSize: '760px',
+  id: 'vacuum',
+  inlineSize: '980px',
+} satisfies ModalCenteredGeometry
 
 type VacuumCleanTarget = 'rooms' | 'area'
 const CLEANING_SETUP_DESCRIPTION = 'Choose how many passes the vacuum should make, then start cleaning with the selected rooms.'
@@ -1451,13 +1458,25 @@ function VacuumModalTabContent({
   const coordinator = useVacuumCommandCoordinator(primaryState, status.commandPolicyMode, commitDisplayState)
   useVacuumSettingIntentConfirmations(vacuum, coordinator.confirmIntent)
 
-  useLayoutEffect(() => {
-    const scrollContainers = [modalPanelRef.current, modalBodyRef.current?.parentElement]
+  const resetTabScroll = useCallback(() => {
+    const scrollContainers = [
+      modalPanelRef.current,
+      modalBodyRef.current?.closest<HTMLElement>('[data-modal-sheet-body="true"]'),
+    ]
     for (const scrollContainer of scrollContainers) {
       if (!scrollContainer || typeof scrollContainer.scrollTo !== 'function') continue
       scrollContainer.scrollTo({ top: 0, behavior: 'auto' })
     }
-  }, [effectiveActiveTab])
+  }, [])
+
+  useLayoutEffect(() => {
+    resetTabScroll()
+  }, [effectiveActiveTab, resetTabScroll])
+
+  useLayoutEffect(() => {
+    if (targetTab !== effectiveActiveTab || transitionState !== 'idle') return
+    resetTabScroll()
+  }, [effectiveActiveTab, resetTabScroll, targetTab, transitionState])
 
   return (
     <div className={[styles.modalBody, areaEditorOpen ? styles.areaEditorModalBody : ''].filter(Boolean).join(' ')} data-area-editor={areaEditorOpen ? 'true' : 'false'} ref={modalBodyRef}>
@@ -1797,6 +1816,7 @@ export function VacuumModal({
     <ModalSheet
       backLabel={showOutcomes ? copy(VACUUM_COPY_KEYS.outcomes.backToControls) : 'Back to controls'}
       bodyElementRef={bodyElementRef}
+      centeredGeometry={VACUUM_CENTERED_GEOMETRY}
       navigation={areaEditorOpen || showOutcomes ? undefined : <VacuumModalNav activeTab={activeTab} onTabChange={(tab) => {
         if (tab === 'zones') setCleanTarget('rooms')
         setActiveTab(tab)

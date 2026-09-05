@@ -88,10 +88,12 @@ describe('CustomLightsPage', () => {
     render(<CustomLightsPage />)
     fireEvent.click(screen.getByRole('button', { name: 'Select lighting mode' }))
     const picker = screen.getByRole('dialog')
+    expect(picker).toHaveAttribute('data-modal-geometry-intent', 'option-picker-compact')
+    expect(picker).toHaveAttribute('data-modal-block-policy', 'content-fit')
     expect(picker).toHaveStyle({
-      '--modal-desktop-height': 'auto',
-      '--modal-desktop-max-width': '500px',
-      '--modal-desktop-width': '500px',
+      '--modal-centered-block-size': 'auto',
+      '--modal-centered-inline-size': '500px',
+      '--modal-centered-max-inline-size': '500px',
     })
     expect(screen.getByRole('group', { name: 'Lighting Mode options' })).toHaveAttribute('data-layout', 'compact-grid')
     expect(picker.querySelector('span[aria-hidden="true"][class*="separator"]')).not.toBeInTheDocument()

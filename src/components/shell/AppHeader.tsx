@@ -67,8 +67,6 @@ export function AppHeader({ activePath, actions = [], backLabel, backPath, onBac
   const resolvedBackLabel = backLabel ?? commonCopy('actions.goBack')
   const showBack = Boolean(backPath)
   const showMenu = Boolean(!showBack && onNavigate && navigationLayout !== 'rail')
-  const showBackMenu = Boolean(showBack && onNavigate && navigationLayout === 'drawer-only')
-  const backMenuClassName = [styles.menuButton, styles.backMenuButton].join(' ')
   const showActions = actions.length > 0
   const menuOpen = sidebarState === 'open'
   const sidebarMounted = sidebarState !== 'closed'
@@ -111,11 +109,6 @@ export function AppHeader({ activePath, actions = [], backLabel, backPath, onBac
       return 'open'
     })
   }
-  const renderMenuButton = (className = styles.menuButton) => (
-    <button aria-controls="dashboard-navigation-drawer" aria-expanded={menuOpen} aria-label={shellCopy('navigation.openMenu')} className={className} onClick={toggleSidebar} ref={menuButtonRef} type="button">
-      <MenuIcon />
-    </button>
-  )
 
   const navigate = (path: string) => {
     closeMenus(false)
@@ -238,12 +231,11 @@ export function AppHeader({ activePath, actions = [], backLabel, backPath, onBac
       styles.header,
       showBack ? styles.headerWithBack : '',
       showMenu ? styles.headerWithMenu : '',
-      showBackMenu ? styles.headerWithBackMenu : '',
       !showBack && navigationLayout === 'rail' ? styles.headerWithRail : '',
-    ].filter(Boolean).join(' ')}>
+    ].filter(Boolean).join(' ')} data-app-header="true">
       {showBack ? (
         <>
-          <button aria-label={resolvedBackLabel} className={styles.backButton} onClick={goBack} type="button">
+          <button aria-label={resolvedBackLabel} className={styles.backButton} data-app-header-back="true" onClick={goBack} type="button">
             <span className={styles.backIconSlot}><BackChevron /></span>
             <span className={styles.backTitle}>{title}</span>
           </button>
@@ -253,7 +245,9 @@ export function AppHeader({ activePath, actions = [], backLabel, backPath, onBac
         <>
           <div className={styles.leading}>
             {showMenu && (
-              renderMenuButton()
+              <button aria-controls="dashboard-navigation-drawer" aria-expanded={menuOpen} aria-label={shellCopy('navigation.openMenu')} className={styles.menuButton} onClick={toggleSidebar} ref={menuButtonRef} type="button">
+                <MenuIcon />
+              </button>
             )}
           </div>
 
@@ -262,9 +256,6 @@ export function AppHeader({ activePath, actions = [], backLabel, backPath, onBac
       )}
 
       <div className={styles.trailing}>
-        {showBackMenu && (
-          renderMenuButton(backMenuClassName)
-        )}
         {showActions && (
           <button aria-expanded={actionsOpen} aria-label={shellCopy('navigation.moreActions')} className={styles.iconButton} onClick={() => { setActionsOpen((open) => !open); closeSidebar(false) }} type="button">
             <MaterialIcon name="mdi:dots-horizontal" size={28} />

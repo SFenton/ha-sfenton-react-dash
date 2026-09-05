@@ -69,7 +69,7 @@ export function DonetickTaskFormBody({ controller }: { controller: DonetickTaskF
   if (loading) return <DashboardPageLoading className={styles.loading} label="Loading task" phase="loading" />
 
   return (
-    <form aria-busy={busy ? 'true' : undefined} className={styles.form} id={TASK_FORM_ID} onSubmit={handleSubmit}>
+    <form aria-busy={busy ? 'true' : undefined} className={styles.form} data-modal-landscape-layout="paired-form" id={TASK_FORM_ID} onSubmit={handleSubmit}>
       {error && <p className={styles.error}>{error}</p>}
       <label className={styles.field}>
         <span>Task Name</span>

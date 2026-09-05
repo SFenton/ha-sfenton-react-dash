@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { useState } from 'react'
 import { describe, expect, it, vi } from 'vitest'
-import { ModalSheet } from './ModalSheet'
+import { ModalSheet, type ModalCenteredGeometry } from './ModalSheet'
 
 const modalSheetCss = readFileSync(resolve(process.cwd(), 'src/components/core/ModalSheet.module.css'), 'utf8')
 
@@ -65,7 +65,88 @@ function InitiallyClosedModalSheetHarness() {
   )
 }
 
+const INITIAL_CENTERED_GEOMETRY = {
+  blockPolicy: 'fixed',
+  blockSize: '620px',
+  id: 'initial-flow',
+  inlineSize: '720px',
+} satisfies ModalCenteredGeometry
+
+const NEXT_CENTERED_GEOMETRY = {
+  blockPolicy: 'fixed',
+  blockSize: '760px',
+  id: 'next-flow',
+  inlineSize: '980px',
+} satisfies ModalCenteredGeometry
+const UPDATED_INITIAL_CENTERED_GEOMETRY = {
+  blockPolicy: 'fixed',
+  blockSize: '760px',
+  id: 'initial-flow',
+  inlineSize: '980px',
+} satisfies ModalCenteredGeometry
+
+describe('ModalSheet mounted orientation', () => {
+  it('remeasures the rendered presentation without needing a tab update or a resize observer', () => {
+    const width = window.innerWidth
+    const height = window.innerHeight
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: 393 })
+    Object.defineProperty(window, 'innerHeight', { configurable: true, value: 852 })
+    const view = render(<ModalSheet onClose={() => undefined} open title="Rotation controls"><div /></ModalSheet>)
+    const dialog = screen.getByRole('dialog')
+    const measure = dialog.querySelector('[data-modal-content-measure="true"]')!
+    Object.defineProperty(measure, 'clientWidth', {
+      configurable: true,
+      get: () => dialog.getAttribute('data-modal-presentation') === 'landscape-dialog' ? 688 : 359,
+    })
+    try {
+      Object.defineProperty(window, 'innerWidth', { configurable: true, value: 852 })
+      Object.defineProperty(window, 'innerHeight', { configurable: true, value: 393 })
+      fireEvent(window, new Event('resize'))
+      expect(dialog).toHaveAttribute('data-modal-presentation', 'landscape-dialog')
+      expect(dialog).toHaveAttribute('data-modal-body-tier', 'wide')
+
+      Object.defineProperty(window, 'innerWidth', { configurable: true, value: 393 })
+      Object.defineProperty(window, 'innerHeight', { configurable: true, value: 852 })
+      fireEvent(window, new Event('resize'))
+      expect(dialog).toHaveAttribute('data-modal-presentation', 'sheet')
+      expect(dialog).toHaveAttribute('data-modal-body-tier', 'compact')
+    } finally {
+      view.unmount()
+      Object.defineProperty(window, 'innerWidth', { configurable: true, value: width })
+      Object.defineProperty(window, 'innerHeight', { configurable: true, value: height })
+    }
+  })
+})
+
 describe('ModalSheet', () => {
+  it('remeasures full-width content while open and retains its width policy during close', () => {
+    const width = window.innerWidth
+    const height = window.innerHeight
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: 1440 })
+    Object.defineProperty(window, 'innerHeight', { configurable: true, value: 900 })
+    const view = render(<ModalSheet onClose={() => undefined} open title="Width policy"><div /></ModalSheet>)
+    const dialog = screen.getByRole('dialog')
+    const measure = dialog.querySelector('[data-modal-content-measure="true"]')!
+    Object.defineProperty(measure, 'clientWidth', {
+      configurable: true,
+      get: () => dialog.getAttribute('data-modal-content-width') === 'full' ? 1050 : 450,
+    })
+    try {
+      expect(dialog).toHaveAttribute('data-modal-content-width', 'readable')
+      view.rerender(<ModalSheet contentWidth="full" onClose={() => undefined} open title="Width policy"><div /></ModalSheet>)
+      expect(dialog).toHaveAttribute('data-modal-content-width', 'full')
+      expect(dialog).toHaveAttribute('data-modal-body-tier', 'wide')
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Close' }))
+      view.rerender(<ModalSheet contentWidth="readable" onClose={() => undefined} open={false} title="Width policy"><div /></ModalSheet>)
+      expect(dialog).toHaveAttribute('data-modal-content-width', 'full')
+      expect(dialog).toHaveAttribute('data-modal-body-tier', 'wide')
+    } finally {
+      view.unmount()
+      Object.defineProperty(window, 'innerWidth', { configurable: true, value: width })
+      Object.defineProperty(window, 'innerHeight', { configurable: true, value: height })
+    }
+  })
+
   it('exposes typed size, scroll, and navigation intents', () => {
     render(
       <ModalSheet
@@ -111,12 +192,182 @@ describe('ModalSheet', () => {
     expect(screen.getByTestId('closing-decoration')).toBeInTheDocument()
   })
 
+  it('freezes declared centered geometry for one open epoch while allowing content changes', () => {
+    const view = render(
+      <ModalSheet
+        centeredGeometry={INITIAL_CENTERED_GEOMETRY}
+        contentStyle={{ '--modal-title-font-size': '1rem' }}
+        navigation={<span>Initial navigation</span>}
+        onClose={() => undefined}
+        open
+        size="standard"
+        title="Initial title"
+      >
+        Initial content
+      </ModalSheet>,
+    )
+
+    const dialog = screen.getByRole('dialog')
+    expect(dialog).toHaveAttribute('data-modal-geometry-intent', 'initial-flow')
+    expect(dialog).toHaveAttribute('data-modal-block-policy', 'fixed')
+    expect(dialog).toHaveAttribute('data-size', 'standard')
+    expect(dialog).toHaveStyle({
+      '--modal-centered-block-size': '620px',
+      '--modal-centered-inline-size': '720px',
+      '--modal-centered-max-block-size': '620px',
+      '--modal-centered-max-inline-size': '720px',
+      '--modal-title-font-size': '1rem',
+    })
+
+    view.rerender(
+      <ModalSheet
+        centeredGeometry={UPDATED_INITIAL_CENTERED_GEOMETRY}
+        contentStyle={{ '--modal-title-font-size': '0.9rem' }}
+        onClose={() => undefined}
+        open
+        size="workspace"
+        title="Updated title"
+      >
+        Updated content
+      </ModalSheet>,
+    )
+
+    expect(dialog).toHaveAttribute('data-modal-geometry-intent', 'initial-flow')
+    expect(dialog).toHaveAttribute('data-size', 'standard')
+    expect(dialog).toHaveStyle({
+      '--modal-centered-block-size': '620px',
+      '--modal-centered-inline-size': '720px',
+      '--modal-title-font-size': '0.9rem',
+    })
+    expect(within(dialog).getByRole('heading', { name: 'Updated title' })).toBeInTheDocument()
+    expect(within(dialog).getByText('Updated content')).toBeInTheDocument()
+    expect(within(dialog).queryByText('Initial navigation')).not.toBeInTheDocument()
+  })
+
+  it('adopts a new centered geometry when the logical identity changes while open', () => {
+    const view = render(
+      <ModalSheet centeredGeometry={INITIAL_CENTERED_GEOMETRY} onClose={() => undefined} open size="standard" title="Initial">
+        Initial content
+      </ModalSheet>,
+    )
+    const dialog = screen.getByRole('dialog')
+
+    view.rerender(
+      <ModalSheet centeredGeometry={NEXT_CENTERED_GEOMETRY} onClose={() => undefined} open size="workspace" title="Next">
+        Next content
+      </ModalSheet>,
+    )
+
+    expect(dialog).toHaveAttribute('data-modal-geometry-intent', 'next-flow')
+    expect(dialog).toHaveAttribute('data-size', 'workspace')
+    expect(dialog).toHaveStyle({
+      '--modal-centered-block-size': '760px',
+      '--modal-centered-inline-size': '980px',
+    })
+  })
+
+  it('adopts the latest centered geometry on the next open epoch and freezes it while closing', () => {
+    const view = render(
+      <ModalSheet centeredGeometry={INITIAL_CENTERED_GEOMETRY} onClose={() => undefined} open={false} title="Closed">
+        Closed content
+      </ModalSheet>,
+    )
+
+    view.rerender(
+      <ModalSheet centeredGeometry={NEXT_CENTERED_GEOMETRY} onClose={() => undefined} open size="workspace" title="Open">
+        Open content
+      </ModalSheet>,
+    )
+    const dialog = screen.getByRole('dialog')
+    expect(dialog).toHaveAttribute('data-modal-geometry-intent', 'next-flow')
+    expect(dialog).toHaveAttribute('data-size', 'workspace')
+    expect(dialog).toHaveStyle({
+      '--modal-centered-block-size': '760px',
+      '--modal-centered-inline-size': '980px',
+    })
+
+    view.rerender(
+      <ModalSheet centeredGeometry={INITIAL_CENTERED_GEOMETRY} onClose={() => undefined} open={false} size="compact" title="Closing">
+        Closing content
+      </ModalSheet>,
+    )
+    expect(dialog).toHaveAttribute('data-modal-geometry-intent', 'next-flow')
+    expect(dialog).toHaveAttribute('data-size', 'workspace')
+    expect(dialog).toHaveAttribute('data-state', 'closed')
+  })
+
   it('disables nested glass backdrop filters inside the moving modal surface', () => {
     expect(modalSheetCss).toMatch(/\.content \[data-tone\]\[data-variant='card'\],\s*\.content \[data-modal-tab-nav='true'\]\s*\{[^}]*backdrop-filter:\s*none;[^}]*-webkit-backdrop-filter:\s*none;/s)
   })
 
-  it('keeps centered tabbed sheets at a stable viewport-bounded height', () => {
-    expect(modalSheetCss).toMatch(/\.content\[data-has-navigation='true'\]\s*\{\s*height:\s*min\(\s*760px,\s*calc\(var\(--dashboard-visible-height,[^}]+- 64px\)\s*\);/s)
+  it('keeps navigation and landscape density independent from outer modal geometry', () => {
+    expect(modalSheetCss).not.toMatch(/data-has-navigation[^}]*\{[^}]*height:/s)
+    expect(modalSheetCss).not.toMatch(/data-landscape-density[^}]*\{[^}]*height:/s)
+  })
+
+  it('switches to a no-drag landscape dialog and freezes that presentation while closing', async () => {
+    const originalWidth = window.innerWidth
+    const originalHeight = window.innerHeight
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: 393 })
+    Object.defineProperty(window, 'innerHeight', { configurable: true, value: 852 })
+    const view = render(
+      <ModalSheet onClose={() => undefined} open title="Responsive controls">
+        <div />
+      </ModalSheet>,
+    )
+
+    try {
+      const dialog = screen.getByRole('dialog')
+      expect(dialog).toHaveAttribute('data-modal-presentation', 'sheet')
+      expect(dialog).toHaveAttribute('data-landscape-density', 'compact')
+      expect(dialog).toHaveAttribute('data-modal-body-tier', 'compact')
+      expect(dialog.querySelector('[data-mobile-drag-handle="true"]')).not.toBeNull()
+
+      Object.defineProperty(window, 'innerWidth', { configurable: true, value: 852 })
+      Object.defineProperty(window, 'innerHeight', { configurable: true, value: 393 })
+      fireEvent(window, new Event('resize'))
+      await waitFor(() => expect(dialog).toHaveAttribute('data-modal-presentation', 'landscape-dialog'))
+      expect(dialog).toHaveAttribute('data-landscape-density', 'compact')
+      expect(dialog.querySelector('[data-mobile-drag-handle="true"]')).toBeNull()
+
+      view.rerender(
+        <ModalSheet onClose={() => undefined} open={false} title="Responsive controls">
+          <div />
+        </ModalSheet>,
+      )
+      Object.defineProperty(window, 'innerWidth', { configurable: true, value: 393 })
+      Object.defineProperty(window, 'innerHeight', { configurable: true, value: 852 })
+      fireEvent(window, new Event('resize'))
+      expect(dialog).toHaveAttribute('data-modal-presentation', 'landscape-dialog')
+      expect(dialog).toHaveAttribute('data-modal-body-tier', 'compact')
+    } finally {
+      view.unmount()
+      Object.defineProperty(window, 'innerWidth', { configurable: true, value: originalWidth })
+      Object.defineProperty(window, 'innerHeight', { configurable: true, value: originalHeight })
+      fireEvent(window, new Event('resize'))
+    }
+  })
+
+  it('publishes and freezes a measured body tier during the mounted close frame', async () => {
+    const view = render(
+      <ModalSheet onClose={() => undefined} open title="Measured controls">
+        <div />
+      </ModalSheet>,
+    )
+    const dialog = screen.getByRole('dialog')
+    const contentMeasure = dialog.querySelector('[data-modal-content-measure="true"]') as HTMLDivElement
+    Object.defineProperty(contentMeasure, 'clientWidth', { configurable: true, value: 720 })
+    fireEvent(window, new Event('resize'))
+    await waitFor(() => expect(dialog).toHaveAttribute('data-modal-body-tier', 'wide'))
+
+    view.rerender(
+      <ModalSheet onClose={() => undefined} open={false} title="Measured controls">
+        <div />
+      </ModalSheet>,
+    )
+    Object.defineProperty(contentMeasure, 'clientWidth', { configurable: true, value: 300 })
+    fireEvent(window, new Event('resize'))
+    expect(dialog).toHaveAttribute('data-modal-body-tier', 'wide')
   })
 
   it('leaves touch ownership to the drawer without forcing scroll position or directional touch-action', () => {
@@ -157,7 +408,7 @@ describe('ModalSheet', () => {
 
       fireEvent.click(screen.getByRole('button', { name: 'Toggle footer' }))
       await waitFor(() => expect(screen.queryByText('Footer 1')).not.toBeInTheDocument())
-      expect(observeSpy).toHaveBeenCalledTimes(initialObservations + 1)
+      expect(observeSpy).toHaveBeenCalledTimes(initialObservations + 2)
       expect(disconnectSpy).toHaveBeenCalledTimes(initialDisconnects + 1)
     } finally {
       unmount()

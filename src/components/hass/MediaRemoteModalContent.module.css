@@ -668,3 +668,96 @@
 
   }
 }
+
+:global([data-modal-presentation='landscape-dialog'][data-landscape-density='compact']) .modalBody {
+  --remote-landscape-pad-size: clamp(144px, calc(var(--modal-body-content-height, 240px) - 2px), 228px);
+  gap: 12px;
+}
+
+:global([data-modal-presentation='landscape-dialog'][data-landscape-density='compact']:is([data-modal-body-tier='fields'], [data-modal-body-tier='standard'], [data-modal-body-tier='wide'])) .rightPane {
+  grid-template-areas:
+    'remote power'
+    'remote tabs';
+  grid-template-columns: minmax(144px, var(--remote-landscape-pad-size)) minmax(0, 1fr);
+  grid-template-rows: auto auto;
+  height: auto;
+  min-height: 0;
+  max-height: none;
+  align-content: start;
+  align-items: start;
+  column-gap: 16px;
+  overflow: visible;
+}
+
+:global([data-modal-presentation='landscape-dialog'][data-landscape-density='compact']:is([data-modal-body-tier='fields'], [data-modal-body-tier='standard'], [data-modal-body-tier='wide'])) .remoteControlSection {
+  grid-area: remote;
+  align-self: start;
+  align-content: start;
+  padding: 0;
+}
+
+:global([data-modal-presentation='landscape-dialog'][data-landscape-density='compact']) .remoteGrid {
+  width: min(100%, var(--remote-landscape-pad-size));
+  gap: 6px;
+}
+
+:global([data-modal-presentation='landscape-dialog'][data-landscape-density='compact']) .remoteButton[data-size='large'] {
+  border-radius: 16px;
+}
+
+:global([data-modal-presentation='landscape-dialog'][data-landscape-density='compact']) .remoteButton[data-size='large'] svg {
+  width: 28px;
+  height: 28px;
+}
+
+:global([data-modal-presentation='landscape-dialog'][data-landscape-density='compact']) .buttonRow[data-size='round'] {
+  grid-template-columns: repeat(3, minmax(44px, 56px));
+  justify-content: space-between;
+}
+
+:global([data-modal-presentation='landscape-dialog'][data-landscape-density='compact']) .remoteButton[data-size='round'],
+:global([data-modal-presentation='landscape-dialog'][data-landscape-density='compact']) .remoteSpacer[data-size='round'] {
+  width: 48px;
+  height: 48px;
+}
+
+:global([data-modal-presentation='landscape-dialog'][data-landscape-density='compact']:is([data-modal-body-tier='fields'], [data-modal-body-tier='standard'], [data-modal-body-tier='wide'])) .powerSection {
+  grid-area: power;
+  justify-items: end;
+}
+
+:global([data-modal-presentation='landscape-dialog'][data-landscape-density='compact']) .remoteButton[data-size='power'] {
+  display: inline-grid;
+  width: max-content;
+  min-width: 132px;
+  min-height: 44px;
+  height: auto;
+  grid-template-columns: 32px max-content;
+  align-items: center;
+  justify-items: center;
+  gap: 8px;
+  padding: 4px 12px 4px 6px;
+}
+
+:global([data-modal-presentation='landscape-dialog'][data-landscape-density='compact']) .powerButtonLabel {
+  display: block;
+}
+
+:global([data-modal-presentation='landscape-dialog'][data-landscape-density='compact']:is([data-modal-body-tier='fields'], [data-modal-body-tier='standard'], [data-modal-body-tier='wide'])) .tabPanel {
+  display: contents;
+}
+
+:global([data-modal-presentation='landscape-dialog'][data-landscape-density='compact']:is([data-modal-body-tier='fields'], [data-modal-body-tier='standard'], [data-modal-body-tier='wide'])) .tabContent {
+  grid-area: tabs;
+  width: 100%;
+  max-height: none;
+  overflow: visible;
+}
+
+:global([data-modal-presentation='landscape-dialog'][data-landscape-density='compact']:is([data-modal-body-tier='fields'], [data-modal-body-tier='standard'], [data-modal-body-tier='wide'])) .appGrid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+:global([data-modal-presentation='landscape-dialog'][data-landscape-density='compact'][data-modal-body-tier='wide']) .deviceGrid {
+  --dynamic-grid-columns: 3;
+}

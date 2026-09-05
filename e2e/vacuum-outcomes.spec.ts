@@ -1,6 +1,7 @@
 import { mkdir, writeFile } from 'node:fs/promises'
 import { expect, test, type Locator, type Page } from '@playwright/test'
 import { LEGACY_VACUUM_OUTCOMES, NINE_ROOM_VACUUM_OUTCOME_CONTRACT } from '../src/test/fixtures/vacuumOutcomes'
+import { setSafeAreaInsets } from './safe-area'
 
 const SESSION_ENTITY_ID = 'sensor.main_floor_vacuum_coordinator_session_state'
 const EVIDENCE_DIRECTORY = 'artifacts/vacuum-outcomes'
@@ -197,46 +198,92 @@ test('incomplete typed data stays on the whole legacy branch', async ({ page }) 
   await saveEvidence(page, dialog, 'vacuum-outcomes-legacy')
 })
 
-for (const viewport of [
-  { height: 700, name: '820x700', width: 820 },
-  { height: 720, name: '1280x720', width: 1280 },
-  { height: 1180, name: '820x1180', width: 820 },
-]) {
-  test(`desktop vacuum status and outcomes remain reachable at ${viewport.name}`, async ({ page }) => {
-    await page.setViewportSize({ width: viewport.width, height: viewport.height })
-    await page.goto('/at-a-glance/vacuums')
-    await setOutcomeAttributes(page, structuredClone(NINE_ROOM_VACUUM_OUTCOME_CONTRACT))
-    const dialog = await openVacuum(page)
-    const body = dialog.locator('[data-modal-sheet-body="true"]')
-    const summary = dialog.getByRole('button', { name: 'Open Main Floor Automatic Cleaning Report for Aug 19, 2026' })
-    const mapPane = dialog.getByRole('group', { name: 'Main Floor map and status' })
-    const panel = dialog.getByRole('group', { name: 'Main Floor controls, zones, auto-clean, actions, info' })
+test.describe('fine-pointer outcome details', () => {
+  test.use({ hasTouch: false, isMobile: false })
 
-    await expect(summary).toBeVisible()
-    const bodyGeometry = await body.evaluate((element) => ({
-      clientHeight: element.clientHeight,
-      overflowY: getComputedStyle(element).overflowY,
-      scrollHeight: element.scrollHeight,
-    }))
-    const mapPaneGeometry = await mapPane.evaluate((element) => ({
-      clientHeight: element.clientHeight,
-      overflowY: getComputedStyle(element).overflowY,
-      scrollHeight: element.scrollHeight,
-    }))
-    expect(bodyGeometry.overflowY).toBe('hidden')
-    expect(mapPaneGeometry.overflowY).toBe('auto')
-    expect(await panel.evaluate((element) => getComputedStyle(element).overflowY)).toBe('auto')
-    await summary.scrollIntoViewIfNeeded()
-    await expect(summary).toBeInViewport()
-    expect(await dialog.locator('[class*="modalBody"]').evaluate((element) => getComputedStyle(element).gridTemplateColumns.split(' ').length)).toBe(2)
-    expect(await horizontalOverflow(dialog)).toBeLessThanOrEqual(0)
-    expect(await vacuumActionCalls(page)).toEqual([])
-    await saveEvidence(page, dialog, `vacuum-outcomes-desktop-${viewport.name}`, {
-      body: bodyGeometry,
-      dialogHorizontalOverflow: await horizontalOverflow(dialog),
-      mapPane: mapPaneGeometry,
-      panelOverflowY: await panel.evaluate((element) => getComputedStyle(element).overflowY),
-      viewport,
+  for (const viewport of [
+    { height: 700, name: '820x700', width: 820 },
+    { height: 720, name: '1280x720', width: 1280 },
+    { height: 1180, name: '820x1180', width: 820 },
+  ]) {
+    test(`desktop vacuum status and outcomes remain reachable at ${viewport.name}`, async ({ page }) => {
+      await page.setViewportSize({ width: viewport.width, height: viewport.height })
+      await page.goto('/at-a-glance/vacuums')
+      await setOutcomeAttributes(page, structuredClone(NINE_ROOM_VACUUM_OUTCOME_CONTRACT))
+      const dialog = await openVacuum(page)
+      await expect.poll(() => page.evaluate(() => matchMedia('(pointer: fine)').matches)).toBe(true)
+      await dialog.evaluate((element) => { element.setAttribute('data-outcome-flow-node', 'original') })
+      const initialFrame = await dialog.boundingBox()
+      const body = dialog.locator('[data-modal-sheet-body="true"]')
+      const summary = dialog.getByRole('button', { name: 'Open Main Floor Automatic Cleaning Report for Aug 19, 2026' })
+      const mapPane = dialog.getByRole('group', { name: 'Main Floor map and status' })
+      const panel = dialog.getByRole('group', { name: 'Main Floor controls, zones, auto-clean, actions, info' })
+
+      await expect(summary).toBeVisible()
+      const bodyGeometry = await body.evaluate((element) => ({
+        clientHeight: element.clientHeight,
+        overflowY: getComputedStyle(element).overflowY,
+        scrollHeight: element.scrollHeight,
+      }))
+      const mapPaneGeometry = await mapPane.evaluate((element) => ({
+        clientHeight: element.clientHeight,
+        overflowY: getComputedStyle(element).overflowY,
+        scrollHeight: element.scrollHeight,
+      }))
+      expect(bodyGeometry.overflowY).toBe('hidden')
+      expect(mapPaneGeometry.overflowY).toBe('auto')
+      expect(await panel.evaluate((element) => getComputedStyle(element).overflowY)).toBe('auto')
+      await summary.scrollIntoViewIfNeeded()
+      await expect(summary).toBeInViewport()
+      expect(await dialog.locator('[class*="modalBody"]').evaluate((element) => getComputedStyle(element).gridTemplateColumns.split(' ').length)).toBe(2)
+      expect(await horizontalOverflow(dialog)).toBeLessThanOrEqual(0)
+      expect(await vacuumActionCalls(page)).toEqual([])
+      await saveEvidence(page, dialog, `vacuum-outcomes-desktop-${viewport.name}`, {
+        body: bodyGeometry,
+        dialogHorizontalOverflow: await horizontalOverflow(dialog),
+        mapPane: mapPaneGeometry,
+        panelOverflowY: await panel.evaluate((element) => getComputedStyle(element).overflowY),
+        viewport,
+      })
+      await summary.click()
+      await expect(dialog.locator('[data-vacuum-outcome-detail="true"]')).toBeVisible()
+      await expect(dialog).toHaveAttribute('data-scroll-mode', 'body')
+      const office = dialog.locator('[data-room-id="office"]')
+      await office.getByRole('button', { name: 'Show Office History' }).click()
+      await office.getByRole('button', { name: 'Show Office Technical Vacuum Diagnostics' }).click()
+      await expect(office.locator('ol > li')).toHaveCount(2)
+      await expect(office.getByText('Auto-Empty Dock dust bag full or dust duct clogged')).toBeVisible()
+
+      for (const profile of [
+        { width: 852, height: 393, insets: { top: 0, right: 44, bottom: 21, left: 59 } },
+        { width: 667, height: 375, insets: { top: 0, right: 0, bottom: 0, left: 0 } },
+        { width: 393, height: 852, insets: { top: 59, right: 0, bottom: 34, left: 0 } },
+        { width: viewport.width, height: viewport.height, insets: { top: 0, right: 0, bottom: 0, left: 0 } },
+      ]) {
+        await page.setViewportSize({ width: profile.width, height: profile.height })
+        await setSafeAreaInsets(page, profile.insets)
+        const presentation = profile.height < 560 ? 'landscape-dialog' : profile.width < 760 ? 'sheet' : 'dialog'
+        await expect(dialog).toHaveAttribute('data-modal-presentation', presentation)
+        await expect(dialog).toHaveAttribute('data-outcome-flow-node', 'original')
+        await expect(office.getByRole('button', { name: 'Hide Office History' })).toHaveAttribute('aria-expanded', 'true')
+        expect(await horizontalOverflow(dialog)).toBeLessThanOrEqual(0)
+        if (presentation === 'landscape-dialog') {
+          const box = await dialog.boundingBox()
+          expect(Math.abs((box?.width ?? 0) - (profile.width - profile.insets.left - profile.insets.right - 24))).toBeLessThanOrEqual(1)
+          expect(Math.abs((box?.height ?? 0) - (profile.height - profile.insets.bottom - 16))).toBeLessThanOrEqual(1)
+        }
+        const terminal = dialog.locator('[data-vacuum-outcome-detail="true"] [data-room-id]').last()
+        await terminal.scrollIntoViewIfNeeded()
+        await expect(terminal).toBeInViewport()
+      }
+      const detailFrame = await dialog.boundingBox()
+      expect(Math.abs((detailFrame?.width ?? 0) - (initialFrame?.width ?? 0))).toBeLessThanOrEqual(1)
+      expect(Math.abs((detailFrame?.height ?? 0) - (initialFrame?.height ?? 0))).toBeLessThanOrEqual(1)
+      await saveEvidence(page, dialog, `vacuum-outcomes-desktop-${viewport.name}-expanded-detail`)
+      await dialog.getByRole('button', { name: 'Back to Vacuum Controls' }).click()
+      await expect(summary).toBeFocused()
+      await expect(dialog).toHaveAttribute('data-outcome-flow-node', 'original')
+      expect(await vacuumActionCalls(page)).toEqual([])
     })
-  })
-}
+  }
+})

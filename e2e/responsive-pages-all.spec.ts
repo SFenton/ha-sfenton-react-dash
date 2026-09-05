@@ -15,8 +15,10 @@ type PageAudit = {
   cameraWidthViolations: number
   contentWidth: number
   documentOverflow: number
+  duplicateBackMenu: boolean
   fixedControlOverlapViolations: number
   heading: string | null
+  hasBack: boolean
   navigation: string[]
   pageMeasure: string | null
   route: ResponsiveRoute
@@ -45,6 +47,7 @@ async function waitForDashboard(page: Page, route: ResponsiveRoute) {
       '[data-adaptive-navigation="rail"]',
       '[data-adaptive-navigation="bottom"]',
       'button[aria-label="Open navigation menu"]',
+      '[data-app-header-back="true"]',
     ]
     return selectors.some((selector) => {
       const element = document.querySelector<HTMLElement>(selector)
@@ -99,6 +102,7 @@ async function auditPage(page: Page, route: ResponsiveRoute, viewport: Responsiv
     const rail = document.querySelector<HTMLElement>('[data-adaptive-navigation="rail"]')
     const bottom = document.querySelector<HTMLElement>('[data-adaptive-navigation="bottom"]')
     const menu = document.querySelector<HTMLElement>('button[aria-label="Open navigation menu"]')
+    const back = main?.querySelector<HTMLElement>('[data-app-header-back="true"]') ?? null
     const navigation = [
       isVisible(rail) ? 'rail' : null,
       isVisible(bottom) ? 'bottom' : null,
@@ -140,6 +144,8 @@ async function auditPage(page: Page, route: ResponsiveRoute, viewport: Responsiv
       documentOverflow: Math.max(0, document.documentElement.scrollWidth - document.documentElement.clientWidth),
       fixedControlOverlapViolations,
       heading: document.querySelector('main h1')?.textContent?.trim() ?? null,
+      hasBack: isVisible(back),
+      duplicateBackMenu: isVisible(back) && Boolean(main?.querySelector('[data-app-header="true"] button[aria-label="Open navigation menu"]')),
       navigation,
       pageMeasure: main?.dataset.pageMeasure ?? null,
       scrollerHeight: Math.round(scroller?.getBoundingClientRect().height ?? 0),
@@ -148,14 +154,14 @@ async function auditPage(page: Page, route: ResponsiveRoute, viewport: Responsiv
     }
   })
 
-  expect(metrics.navigation.length, `${route} ${stage} has no primary navigation`).toBeGreaterThan(0)
+  expect(metrics.navigation.length > 0 || metrics.hasBack, `${route} ${stage} has no navigation`).toBe(true)
+  expect(metrics.duplicateBackMenu, `${route} ${stage} duplicates Back with a menu`).toBe(false)
   expect(metrics.heading, `${route} ${stage} heading`).toBe(RESPONSIVE_ROUTE_TITLES.get(route))
   const navigationLayout = navigationLayoutForViewport(viewport)
   if (navigationLayout === 'rail') {
     expect(metrics.navigation, `${route} ${stage} desktop navigation`).toEqual(['rail'])
   } else if (navigationLayout === 'drawer-only') {
-    expect(metrics.navigation, `${route} ${stage} short-landscape navigation`).toContain('drawer')
-    expect(metrics.navigation, `${route} ${stage} short-landscape bottom nav`).not.toContain('bottom')
+    expect(metrics.navigation, `${route} ${stage} short-landscape navigation`).toEqual(metrics.hasBack ? [] : ['drawer'])
   } else {
     expect(metrics.navigation, `${route} ${stage} mobile/tablet navigation`).toContain('bottom')
   }
@@ -222,6 +228,14 @@ test.describe.serial('all-route responsive acceptance', () => {
     {
       name: 'desktop-mobile-desktop',
       viewports: [RESPONSIVE_VIEWPORTS[4], RESPONSIVE_VIEWPORTS[0], RESPONSIVE_VIEWPORTS[4]],
+    },
+    {
+      name: 'phone-portrait-landscape-portrait',
+      viewports: [RESPONSIVE_VIEWPORTS[0], RESPONSIVE_VIEWPORTS[1], RESPONSIVE_VIEWPORTS[0]],
+    },
+    {
+      name: 'phone-landscape-portrait-landscape',
+      viewports: [RESPONSIVE_VIEWPORTS[1], RESPONSIVE_VIEWPORTS[0], RESPONSIVE_VIEWPORTS[1]],
     },
     {
       name: 'ipad-portrait-landscape-portrait',

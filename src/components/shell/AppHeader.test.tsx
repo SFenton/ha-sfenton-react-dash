@@ -41,7 +41,7 @@ describe('AppHeader adaptive navigation', () => {
 
     const drawer = renderHeader('drawer-only', { backPath: 'overview', title: 'Living Room' })
     expect(screen.getByRole('button', { name: 'Go back' })).toBeVisible()
-    expect(screen.getByRole('button', { name: 'Open navigation menu' })).toBeVisible()
+    expect(screen.queryByRole('button', { name: 'Open navigation menu', hidden: true })).not.toBeInTheDocument()
     drawer.unmount()
 
     renderHeader('rail')

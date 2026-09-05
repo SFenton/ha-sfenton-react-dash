@@ -5,7 +5,7 @@ import { ExpandingSearchAction } from '../../core/ExpandingSearchAction'
 import { MaterialIcon } from '../../core/Icon'
 import { ModalIconTabNav } from '../../core/ModalTabNav'
 import { modalTabId, modalTabPanelId } from '../../core/modalTabIds'
-import { ModalSheet, type ModalSheetStyle } from '../../core/ModalSheet'
+import { ModalSheet, type ModalCenteredGeometry, type ModalSheetStyle } from '../../core/ModalSheet'
 import { NativePickerField } from '../../core/NativePickerField'
 import { StatusPill, type StatusPillTone } from '../../core/StatusPill'
 import { useSmoothDisplayedModalTab } from '../../../hooks/useSmoothDisplayedModalTab'
@@ -26,11 +26,15 @@ import styles from './RecipeDetailModal.module.css'
 type GroceryState = RecipeDetailModalController['groceryState']
 
 const RECIPE_DETAIL_MODAL_STYLE: ModalSheetStyle = {
-  '--modal-desktop-max-width': '720px',
-  '--modal-desktop-width': '720px',
   '--modal-mobile-height': '92dvh',
   '--modal-mobile-max-height': '92dvh',
 }
+const RECIPE_DETAIL_CENTERED_GEOMETRY = {
+  blockPolicy: 'fixed',
+  blockSize: '760px',
+  id: 'recipe-detail',
+  inlineSize: '720px',
+} satisfies ModalCenteredGeometry
 
 const RECIPE_DETAIL_TAB_ID_PREFIX = 'recipe-detail'
 const RECIPE_DETAIL_TAB_PANEL_ID = modalTabPanelId(RECIPE_DETAIL_TAB_ID_PREFIX, 'content')
@@ -1069,6 +1073,7 @@ export function RecipeDetailModal({ controller }: { controller: RecipeDetailModa
 
   return (
     <ModalSheet
+      centeredGeometry={RECIPE_DETAIL_CENTERED_GEOMETRY}
       contentStyle={RECIPE_DETAIL_MODAL_STYLE}
       navigation={navigation}
       backLabel={controller.ingredientPickerIngredient
