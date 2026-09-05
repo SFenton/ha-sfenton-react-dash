@@ -2,16 +2,21 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { expect, test, type Locator, type Page } from '@playwright/test'
 import ts from 'typescript'
+import { modalSheetPresentationForViewport } from '../src/components/core/modalSheetPresentation'
 import { RESPONSIVE_VIEWPORTS, type ResponsiveViewport } from './responsive-acceptance-data'
+import { installSafeAreaInsets, setSafeAreaInsets } from './safe-area'
 
 type ModalAudit = {
+  blockPolicy: string
   bodyOverflowY: string
   bodyVisibleContent: boolean
   centered: boolean
   clippedRegions: string[]
   dialogHeight: number
   dialogWidth: number
+  geometryIntent: string
   id: string
+  presentation: string
   scrollMode: string
   size: string
   stage: string
@@ -35,6 +40,11 @@ const IPAD_PORTRAIT = RESPONSIVE_VIEWPORTS[2]
 const IPAD_LANDSCAPE = RESPONSIVE_VIEWPORTS[3]
 const DESKTOP = RESPONSIVE_VIEWPORTS[4]
 const WIDE_DESKTOP = RESPONSIVE_VIEWPORTS[5]
+const REGULAR_LANDSCAPE_DENSITY_CASES = new Set([
+  'admin-presence-auto-reset',
+  'admin-presence-overrides',
+  'at-a-glance-sheet',
+])
 const manifest: ModalAudit[] = []
 
 function productionTsxFiles(directory: string): string[] {
@@ -63,6 +73,7 @@ function enclosingComponentName(node: ts.Node) {
 function modalInventoryCounts() {
   let directModalSheetJsxCallsites = 0
   let optionPickerSheetConsumers = 0
+  const missingCenteredGeometryCallsites: string[] = []
   const optionPickerConsumerCallsites: string[] = []
   const physicalCallsiteCounts: Record<string, number> = {}
   for (const filePath of productionTsxFiles(path.resolve('src'))) {
@@ -86,6 +97,10 @@ function modalInventoryCounts() {
           const ownerName = enclosingComponentName(opening)
           const callsite = `${path.relative(process.cwd(), filePath)}:${ownerName}`
           physicalCallsiteCounts[callsite] = (physicalCallsiteCounts[callsite] ?? 0) + 1
+          const centeredGeometry = opening.attributes.properties.find((property) =>
+            ts.isJsxAttribute(property) && property.name.getText(sourceFile) === 'centeredGeometry',
+          )
+          if (!centeredGeometry) missingCenteredGeometryCallsites.push(callsite)
         }
         if (tagName === 'OptionPickerDialog') {
           const presentation = opening.attributes.properties.find((property) =>
@@ -110,6 +125,7 @@ function modalInventoryCounts() {
   return {
     directModalSheetJsxCallsites,
     expandedReviewRows: directModalSheetJsxCallsites + optionPickerSheetConsumers,
+    missingCenteredGeometryCallsites: missingCenteredGeometryCallsites.sort(),
     optionPickerConsumerCallsites: optionPickerConsumerCallsites.sort(),
     optionPickerSheetConsumers,
     physicalCallsiteCounts,
@@ -521,6 +537,205 @@ const MODAL_CASES: ModalCase[] = [
   },
 ]
 
+const LANDSCAPE_INTENT_CASES: ModalCase[] = [
+  ...MODAL_CASES,
+  {
+    expectedScrollMode: 'body',
+    expectedSize: 'media',
+    id: 'home-climate-overview',
+    open: (page) => openHashModal(page, 'overview', '#climate-overview', 'Climate'),
+    physicalCallsite: 'src/pages/AtAGlancePage.tsx:AtAGlancePage',
+  },
+  {
+    expectedScrollMode: 'body',
+    expectedSize: 'media',
+    id: 'home-occupancy-overview',
+    open: (page) => openHashModal(page, 'overview', '#occupancy-overview', 'Occupancy'),
+    physicalCallsite: 'src/pages/AtAGlancePage.tsx:AtAGlancePage',
+  },
+  {
+    expectedScrollMode: 'body',
+    expectedSize: 'media',
+    id: 'home-contact-overview',
+    open: (page) => openHashModal(page, 'overview', '#contact-sensors-overview', 'Contact Sensors'),
+    physicalCallsite: 'src/pages/AtAGlancePage.tsx:AtAGlancePage',
+  },
+  {
+    expectedScrollMode: 'body',
+    expectedSize: 'media',
+    id: 'home-aqi-overview',
+    open: (page) => openHashModal(page, 'overview', '#aqi-overview', 'Air Quality'),
+    physicalCallsite: 'src/pages/AtAGlancePage.tsx:AtAGlancePage',
+  },
+  {
+    expectedScrollMode: 'body',
+    expectedSize: 'compact',
+    id: 'home-security-system',
+    open: (page) => openHashModal(page, 'overview', '#security-system', 'Security System'),
+    physicalCallsite: 'src/pages/AtAGlancePage.tsx:AtAGlancePage',
+  },
+  {
+    expectedScrollMode: 'body',
+    expectedSize: 'standard',
+    id: 'home-guest-presence',
+    open: (page) => openHashModal(page, 'overview', '#guest-presence-security', 'Guest Presence Security'),
+    physicalCallsite: 'src/pages/AtAGlancePage.tsx:AtAGlancePage',
+  },
+  {
+    expectedScrollMode: 'body',
+    expectedSize: 'media',
+    id: 'home-camera',
+    open: (page) => openHashModal(page, 'overview', '#camera-front-door', /Front Door/),
+    physicalCallsite: 'src/pages/AtAGlancePage.tsx:AtAGlancePage',
+  },
+  {
+    expectedScrollMode: 'body',
+    expectedSize: 'standard',
+    id: 'home-chores-preview',
+    open: (page) => openHashModal(page, 'overview', '#chores-preview', 'Chores'),
+    physicalCallsite: 'src/pages/AtAGlancePage.tsx:AtAGlancePage',
+  },
+  {
+    expectedScrollMode: 'body',
+    expectedSize: 'standard',
+    id: 'home-settings-preview',
+    open: (page) => openHashModal(page, 'overview', '#settings-preview', 'Settings'),
+    physicalCallsite: 'src/pages/AtAGlancePage.tsx:AtAGlancePage',
+  },
+  {
+    expectedScrollMode: 'body',
+    expectedSize: 'compact',
+    id: 'master-bedroom-climate',
+    open: (page) => openButtonModal(page, 'master-bedroom', /^Climate /i, 'Master Bedroom Climate'),
+    physicalCallsite: 'src/pages/DashboardViewPage.tsx:RoomSourceModal',
+  },
+  {
+    expectedScrollMode: 'body',
+    expectedSize: 'compact',
+    id: 'master-bedroom-lights',
+    open: (page) => openHashModal(page, 'master-bedroom', '#lights-master-bedroom'),
+    physicalCallsite: 'src/pages/DashboardViewPage.tsx:RoomSourceModal',
+  },
+  {
+    expectedScrollMode: 'body',
+    expectedSize: 'compact',
+    id: 'master-bedroom-occupancy',
+    open: (page) => openHashModal(page, 'master-bedroom', '#master-bedroom-occupancy'),
+    physicalCallsite: 'src/pages/DashboardViewPage.tsx:RoomSourceModal',
+  },
+  {
+    expectedScrollMode: 'body',
+    expectedSize: 'compact',
+    id: 'master-bedroom-window',
+    open: (page) => openHashModal(page, 'master-bedroom', '#window-master-bedroom'),
+    physicalCallsite: 'src/pages/DashboardViewPage.tsx:RoomSourceModal',
+  },
+  {
+    expectedScrollMode: 'body',
+    expectedSize: 'compact',
+    id: 'master-bedroom-air',
+    open: (page) => openHashModal(page, 'master-bedroom', '#air-purifier'),
+    physicalCallsite: 'src/pages/DashboardViewPage.tsx:RoomSourceModal',
+  },
+  {
+    expectedScrollMode: 'body',
+    expectedSize: 'compact',
+    id: 'living-room-vents',
+    open: (page) => openHashModal(page, 'living-room', '#vents'),
+    physicalCallsite: 'src/pages/DashboardViewPage.tsx:RoomSourceModal',
+  },
+  {
+    expectedScrollMode: 'body',
+    expectedSize: 'standard',
+    id: 'kitchen-dishwasher',
+    open: (page) => openHashModal(page, 'kitchen', '#dishwasher', 'Dishwasher'),
+    physicalCallsite: 'src/pages/DashboardViewPage.tsx:RoomSourceModal',
+  },
+  {
+    expectedScrollMode: 'body',
+    expectedSize: 'media',
+    id: 'security-contact-sensors',
+    open: (page) => openHashModal(page, 'security', '#contact-sensors-overview', 'Contact Sensors'),
+    physicalCallsite: 'src/components/hass/SecurityDashboard.tsx:SecurityDashboard',
+  },
+  {
+    expectedScrollMode: 'body',
+    expectedSize: 'standard',
+    id: 'security-guest-presence',
+    open: (page) => openHashModal(page, 'security', '#guest-presence-security', 'Guest Presence Security'),
+    physicalCallsite: 'src/components/hass/SecurityDashboard.tsx:SecurityDashboard',
+  },
+  {
+    expectedScrollMode: 'body',
+    expectedSize: 'media',
+    id: 'security-camera',
+    open: (page) => openHashModal(page, 'security', '#camera-front-door', /Front Door/),
+    physicalCallsite: 'src/components/hass/SecurityDashboard.tsx:SecurityDashboard',
+  },
+]
+
+const LANDSCAPE_GEOMETRY_PROFILES = [
+  { height: 320, insets: { bottom: 0, left: 0, right: 0, top: 0 }, name: '568x320', width: 568 },
+  { height: 375, insets: { bottom: 0, left: 0, right: 0, top: 0 }, name: '667x375', width: 667 },
+  { height: 343, insets: { bottom: 0, left: 0, right: 0, top: 0 }, name: '734x343', width: 734 },
+  { height: 393, insets: { bottom: 21, left: 59, right: 44, top: 0 }, name: '852x393-left', width: 852 },
+  { height: 393, insets: { bottom: 21, left: 44, right: 59, top: 0 }, name: '852x393-right', width: 852 },
+] as const
+
+const PORTRAIT_TILE_CASES = [
+  {
+    id: 'rooms',
+    open: async (page: Page) => {
+      await gotoRoute(page, 'overview')
+      await page.getByRole('button', { name: 'Quick Links' }).click()
+      const quickLinks = page.getByRole('dialog', { name: 'Quick Links' })
+      await quickLinks.getByRole('button', { name: 'Rooms' }).click()
+      return page.getByRole('dialog', { name: 'Rooms' })
+    },
+    expected: { height: 147.875, icon: 42, padding: '22px 22px 18px', radius: '30px', titleFont: '15.68px', width: 174.5 },
+  },
+  {
+    id: 'home-lights',
+    open: (page: Page) => openHashModal(page, 'overview', '#lights-overview', /Lights/),
+    expected: { height: 147.875, icon: 31.078125, padding: '22px 22px 17px', radius: '30px', titleFont: '16px', width: 174.5 },
+  },
+  {
+    id: 'home-climate',
+    open: (page: Page) => openHashModal(page, 'overview', '#climate-overview', 'Climate'),
+    expected: { height: 147.875, icon: 42, padding: '22px 22px 17px', radius: '30px', titleFont: '15.68px', width: 174.5 },
+  },
+  {
+    id: 'home-occupancy',
+    open: (page: Page) => openHashModal(page, 'overview', '#occupancy-overview', 'Occupancy'),
+    expected: { height: 147.875, icon: 38, padding: '22px 22px 17px', radius: '30px', titleFont: '15.68px', width: 174.5 },
+  },
+  {
+    id: 'home-contact',
+    open: (page: Page) => openHashModal(page, 'overview', '#contact-sensors-overview', 'Contact Sensors'),
+    expected: { height: 147.875, icon: 38, padding: '22px 22px 17px', radius: '30px', titleFont: '15.68px', width: 174.5 },
+  },
+  {
+    id: 'home-aqi',
+    open: (page: Page) => openHashModal(page, 'overview', '#aqi-overview', 'Air Quality'),
+    expected: { height: 147.875, icon: 42, padding: '22px 22px 17px', radius: '30px', titleFont: '15.68px', width: 174.5 },
+  },
+  {
+    id: 'security-contact',
+    open: (page: Page) => openHashModal(page, 'security', '#contact-sensors-overview', 'Contact Sensors'),
+    expected: { height: 147.875, icon: 38, padding: '22px 22px 17px', radius: '30px', titleFont: '15.68px', width: 174.5 },
+  },
+  {
+    id: 'admin-presence',
+    open: (page: Page) => openHashModal(page, 'admin', '#presence-based-overrides', 'Presence-Based Overrides'),
+    expected: { height: 120, icon: 36, padding: '16px 14px', radius: '32px', titleFont: '13.76px', width: 175.5 },
+  },
+  {
+    id: 'admin-auto',
+    open: (page: Page) => openHashModal(page, 'admin', '#presence-based-overrides-auto', 'Presence-Based Overrides Auto-Reset'),
+    expected: { height: 120, icon: 36, padding: '16px 14px', radius: '32px', titleFont: '13.76px', width: 175.5 },
+  },
+] as const
+
 function listenForUnexpectedErrors(page: Page) {
   const errors: string[] = []
   page.on('pageerror', (error) => errors.push(`pageerror: ${error.message}`))
@@ -538,9 +753,16 @@ async function auditModal(page: Page, modalCase: ModalCase, dialog: Locator, vie
   await page.waitForTimeout(540)
   await expect(dialog).toHaveAttribute('data-size', modalCase.expectedSize)
   await expect(dialog).toHaveAttribute('data-scroll-mode', modalCase.expectedScrollMode)
+  await expect(dialog).toHaveAttribute(
+    'data-landscape-density',
+    REGULAR_LANDSCAPE_DENSITY_CASES.has(modalCase.id) ? 'regular' : 'compact',
+  )
+  const expectedPresentation = modalSheetPresentationForViewport(viewport.width, viewport.height)
+  await expect(dialog).toHaveAttribute('data-modal-presentation', expectedPresentation)
 
   const metrics = await dialog.evaluate((element) => {
     const dialogRect = element.getBoundingClientRect()
+    const rootStyle = getComputedStyle(document.documentElement)
     const body = element.querySelector<HTMLElement>('[data-modal-sheet-body="true"]')
     const navigation = element.querySelector<HTMLElement>('[data-modal-sheet-navigation="true"]')
     const footer = element.querySelector<HTMLElement>('[data-modal-sheet-footer="true"]')
@@ -596,6 +818,7 @@ async function auditModal(page: Page, modalCase: ModalCase, dialog: Locator, vie
       return rect ? { bottom: rect.bottom, top: rect.top } : null
     }
     return {
+      blockPolicy: element.dataset.modalBlockPolicy ?? '',
       bodyOverflowY: body ? getComputedStyle(body).overflowY : '',
       bodyVisibleContent: Boolean(body && Array.from(body.children).some((child) => {
         const rect = child.getBoundingClientRect()
@@ -612,7 +835,15 @@ async function auditModal(page: Page, modalCase: ModalCase, dialog: Locator, vie
         width: dialogRect.width,
       },
       footer: box(footer),
+      geometryIntent: element.dataset.modalGeometryIntent ?? '',
       navigation: box(navigation),
+      presentation: element.dataset.modalPresentation,
+      safeArea: {
+        bottom: Number.parseFloat(rootStyle.getPropertyValue('--rd-safe-bottom')) || 0,
+        left: Number.parseFloat(rootStyle.getPropertyValue('--rd-safe-left')) || 0,
+        right: Number.parseFloat(rootStyle.getPropertyValue('--rd-safe-right')) || 0,
+        top: Number.parseFloat(rootStyle.getPropertyValue('--rd-safe-top')) || 0,
+      },
       terminalViolations,
     }
   })
@@ -622,6 +853,8 @@ async function auditModal(page: Page, modalCase: ModalCase, dialog: Locator, vie
   expect(metrics.dialog.right, `${modalCase.id} ${stage} right containment`).toBeLessThanOrEqual(viewport.width + 1)
   expect(metrics.dialog.bottom, `${modalCase.id} ${stage} bottom containment`).toBeLessThanOrEqual(viewport.height + 1)
   expect(metrics.bodyVisibleContent, `${modalCase.id} ${stage} visible modal content`).toBe(true)
+  expect(metrics.geometryIntent, `${modalCase.id} ${stage} centered geometry intent`).not.toBe('')
+  expect(['content-fit', 'fixed'], `${modalCase.id} ${stage} centered block policy`).toContain(metrics.blockPolicy)
   expect(metrics.clippedRegions, `${modalCase.id} ${stage} clipped regions`).toEqual([])
   expect(metrics.terminalViolations, `${modalCase.id} ${stage} terminal reachability`).toEqual([])
   if (metrics.navigation) {
@@ -632,39 +865,54 @@ async function auditModal(page: Page, modalCase: ModalCase, dialog: Locator, vie
     expect(metrics.footer.top).toBeGreaterThanOrEqual(metrics.dialog.top - 1)
     expect(metrics.footer.bottom).toBeLessThanOrEqual(metrics.dialog.bottom + 1)
   }
-  if (modalCase.expectedScrollMode === 'panes' && metrics.centered) {
+  if (modalCase.expectedScrollMode === 'panes' && metrics.presentation === 'dialog') {
     expect(metrics.bodyOverflowY, `${modalCase.id} ${stage} pane body lock`).toBe('hidden')
   } else {
     expect(['auto', 'scroll'], `${modalCase.id} ${stage} body scroll owner`).toContain(metrics.bodyOverflowY)
   }
-  if (metrics.centered) {
-    const widthCap = {
-      compact: 500,
-      form: 560,
-      media: 1100,
-      standard: 720,
-      workspace: 980,
-    }[modalCase.expectedSize]
-    expect(Math.round(metrics.dialog.width), `${modalCase.id} ${stage} typed width cap`).toBeLessThanOrEqual(widthCap)
+  if (metrics.presentation === 'landscape-dialog') {
+    expect(Math.abs(metrics.dialog.left - (metrics.safeArea.left + 12)), `${modalCase.id} ${stage} landscape left`).toBeLessThanOrEqual(1)
+    expect(Math.abs(metrics.dialog.top - (metrics.safeArea.top + 8)), `${modalCase.id} ${stage} landscape top`).toBeLessThanOrEqual(1)
+    expect(Math.abs(metrics.dialog.width - (viewport.width - metrics.safeArea.left - metrics.safeArea.right - 24)), `${modalCase.id} ${stage} landscape width`).toBeLessThanOrEqual(1)
+    expect(Math.abs(metrics.dialog.height - (viewport.height - metrics.safeArea.top - metrics.safeArea.bottom - 16)), `${modalCase.id} ${stage} landscape height`).toBeLessThanOrEqual(1)
   }
-  if (modalCase.expectedSize === 'workspace' && viewport.width >= 760 && viewport.height >= 560) {
+  if (metrics.presentation === 'dialog') {
+    const left = Math.max(32, metrics.safeArea.left)
+    const right = Math.max(32, metrics.safeArea.right)
+    const top = Math.max(32, metrics.safeArea.top)
+    const bottom = Math.max(32, metrics.safeArea.bottom)
+    const width = Math.min(1100, viewport.width - left - right)
+    const height = Math.min(760, viewport.height - top - bottom)
+    expect(Math.abs(metrics.dialog.width - width), `${modalCase.id} ${stage} common dialog width`).toBeLessThanOrEqual(1)
+    expect(Math.abs(metrics.dialog.height - height), `${modalCase.id} ${stage} common dialog height`).toBeLessThanOrEqual(1)
+    expect(Math.abs(metrics.dialog.left - (left + (viewport.width - left - right - width) / 2)), `${modalCase.id} ${stage} dialog left`).toBeLessThanOrEqual(1)
+    expect(Math.abs(metrics.dialog.top - (top + (viewport.height - top - bottom - height) / 2)), `${modalCase.id} ${stage} dialog top`).toBeLessThanOrEqual(1)
+  }
+  if (modalCase.expectedSize === 'workspace' && metrics.presentation === 'dialog') {
     expect(Math.round(metrics.dialog.height), `${modalCase.id} ${stage} workspace height`).toBeLessThanOrEqual(viewport.height - 63)
   }
 
   manifest.push({
+    blockPolicy: metrics.blockPolicy,
     bodyOverflowY: metrics.bodyOverflowY,
     bodyVisibleContent: metrics.bodyVisibleContent,
     centered: metrics.centered,
     clippedRegions: metrics.clippedRegions,
     dialogHeight: Math.round(metrics.dialog.height),
     dialogWidth: Math.round(metrics.dialog.width),
+    geometryIntent: metrics.geometryIntent,
     id: modalCase.id,
+    presentation: metrics.presentation ?? '',
     scrollMode: modalCase.expectedScrollMode,
     size: modalCase.expectedSize,
     stage,
     terminalViolations: metrics.terminalViolations,
     viewport,
   })
+  if (stage.startsWith('state-') && ['portrait', '852x393-left', 'desktop'].some((suffix) => stage.endsWith(suffix))) {
+    const screenshot = artifactPath(`modal-${modalCase.id}-${stage.replace(/[^a-z0-9-]/gi, '-')}.png`)
+    if (screenshot) await page.screenshot({ path: screenshot, scale: 'css' })
+  }
   return metrics
 }
 
@@ -695,10 +943,13 @@ async function exercisePersistentTabs(dialog: Locator, modalCase: ModalCase) {
 }
 
 async function assertMountedClose(dialog: Locator) {
+  const node = await dialog.elementHandle()
+  if (!node) throw new Error('Cannot close a missing modal')
   await dialog.getByRole('button', { exact: true, name: 'Close' }).click()
-  await expect(dialog).toHaveAttribute('data-state', 'closed')
-  await expect(dialog).toHaveAttribute('data-closing', 'true')
+  expect(await node.getAttribute('data-state')).toBe('closed')
+  expect(await node.getAttribute('data-closing')).toBe('true')
   await expect(dialog).toHaveCount(0, { timeout: 700 })
+  await node.dispose()
 }
 
 test.describe.serial('complete ModalSheet inventory acceptance', () => {
@@ -709,8 +960,11 @@ test.describe.serial('complete ModalSheet inventory acceptance', () => {
         counting: {
           directModalSheetJsxCallsites: 29,
           expandedAcceptanceRows: MODAL_CASES.length,
-          logicalAcceptanceSurfaces: MODAL_CASES.length,
+          landscapeIntentAndKindRows: LANDSCAPE_INTENT_CASES.length,
           optionPickerConsumersAdded: 2,
+          portraitTileFamilies: PORTRAIT_TILE_CASES.length,
+          auditedGeometryIntentIds: [...new Set(manifest.map((entry) => entry.geometryIntent))].sort(),
+          auditedStateStages: [...new Set(manifest.filter((entry) => entry.stage.startsWith('state-')).map((entry) => `${entry.id}:${entry.stage}`))],
         },
         generatedAt: new Date().toISOString(),
         results: manifest,
@@ -729,11 +983,13 @@ test.describe.serial('complete ModalSheet inventory acceptance', () => {
     expect(modalInventoryCounts()).toEqual({
       directModalSheetJsxCallsites: 29,
       expandedReviewRows: 31,
+      missingCenteredGeometryCallsites: [],
       optionPickerConsumerCallsites: EXPECTED_OPTION_PICKER_CONSUMERS,
       optionPickerSheetConsumers: 2,
       physicalCallsiteCounts: EXPECTED_PHYSICAL_MODAL_CALLSITES,
     })
     expect(MODAL_CASES).toHaveLength(32)
+    expect(LANDSCAPE_INTENT_CASES).toHaveLength(51)
     expect([...new Set(MODAL_CASES.map((modalCase) => modalCase.physicalCallsite))].sort()).toEqual(
       Object.keys(EXPECTED_PHYSICAL_MODAL_CALLSITES).sort(),
     )
@@ -742,21 +998,130 @@ test.describe.serial('complete ModalSheet inventory acceptance', () => {
     )
   })
 
+  for (const profile of LANDSCAPE_GEOMETRY_PROFILES) {
+    test(`uses one exact landscape rectangle for each listed opener and kind at ${profile.name}`, async ({ page }) => {
+      test.setTimeout(900_000)
+      await page.setViewportSize({ height: profile.height, width: profile.width })
+      await installSafeAreaInsets(page, profile.insets)
+
+      for (const modalCase of LANDSCAPE_INTENT_CASES) {
+        const dialog = await modalCase.open(page)
+        await expect(dialog).toHaveAttribute('data-modal-presentation', 'landscape-dialog')
+        const geometry = await dialog.evaluate((element) => {
+          const rect = element.getBoundingClientRect()
+          return {
+            height: rect.height,
+            left: rect.left,
+            top: rect.top,
+            width: rect.width,
+          }
+        })
+        expect(Math.abs(geometry.left - (profile.insets.left + 12)), `${modalCase.id} left`).toBeLessThanOrEqual(1)
+        expect(Math.abs(geometry.top - (profile.insets.top + 8)), `${modalCase.id} top`).toBeLessThanOrEqual(1)
+        expect(Math.abs(geometry.width - (profile.width - profile.insets.left - profile.insets.right - 24)), `${modalCase.id} width`).toBeLessThanOrEqual(1)
+        expect(Math.abs(geometry.height - (profile.height - profile.insets.top - profile.insets.bottom - 16)), `${modalCase.id} height`).toBeLessThanOrEqual(1)
+        await assertNoMutatingCalls(page, modalCase)
+        await assertMountedClose(dialog)
+      }
+    })
+  }
+
+  test('preserves literal accepted portrait tile metrics for every affected family', async ({ page }) => {
+    test.setTimeout(180_000)
+    await page.setViewportSize({ height: 852, width: 393 })
+    await installSafeAreaInsets(page, { bottom: 34, left: 0, right: 0, top: 59 })
+
+    for (const tileCase of PORTRAIT_TILE_CASES) {
+      const dialog = await tileCase.open(page)
+      await expect(dialog).toHaveAttribute('data-modal-presentation', 'sheet')
+      const metrics = await dialog.evaluate((element) => {
+        const body = element.querySelector<HTMLElement>('[data-modal-sheet-body="true"]')
+        const bodyStyle = body ? getComputedStyle(body) : null
+        const bodyContentWidth = body
+          ? body.clientWidth - Number.parseFloat(bodyStyle?.paddingLeft ?? '0') - Number.parseFloat(bodyStyle?.paddingRight ?? '0')
+          : 0
+        const grid = element.querySelector<HTMLElement>('[style*="--modal-square-card-size"]')
+        const card = grid?.querySelector<HTMLElement>('button, article')
+        const cardRect = card?.getBoundingClientRect()
+        const cardStyle = card ? getComputedStyle(card) : null
+        const icon = card?.querySelector<SVGElement>('svg')
+        const title = card?.querySelector<HTMLElement>('span:last-child span:first-child')
+        const dialogRect = element.getBoundingClientRect()
+        return {
+          bodyContentWidth,
+          bodyPaddingBottom: bodyStyle?.paddingBottom ?? '',
+          cardHeight: cardRect?.height ?? 0,
+          cardWidth: cardRect?.width ?? 0,
+          dialogHeight: dialogRect.height,
+          dialogWidth: dialogRect.width,
+          gridWidth: grid?.getBoundingClientRect().width ?? 0,
+          iconWidth: icon?.getBoundingClientRect().width ?? 0,
+          padding: cardStyle?.padding ?? '',
+          radius: cardStyle?.borderRadius ?? '',
+          titleFont: title ? getComputedStyle(title).fontSize : '',
+        }
+      })
+
+      expect(Math.abs(metrics.dialogWidth - 393), `${tileCase.id} dialog width`).toBeLessThanOrEqual(1)
+      expect(Math.abs(metrics.dialogHeight - 767), `${tileCase.id} dialog height`).toBeLessThanOrEqual(1)
+      expect(metrics.bodyPaddingBottom, `${tileCase.id} body bottom padding`).toBe('58px')
+      expect(Math.abs(metrics.gridWidth - 359), `${tileCase.id} grid width`).toBeLessThanOrEqual(1)
+      expect(Math.abs(metrics.bodyContentWidth - 359), `${tileCase.id} body content width`).toBeLessThanOrEqual(1)
+      expect(Math.abs(metrics.cardWidth - tileCase.expected.width), `${tileCase.id} card width`).toBeLessThanOrEqual(0.1)
+      expect(Math.abs(metrics.cardHeight - tileCase.expected.height), `${tileCase.id} card height`).toBeLessThanOrEqual(0.1)
+      expect(Math.abs(metrics.iconWidth - tileCase.expected.icon), `${tileCase.id} icon width`).toBeLessThanOrEqual(0.1)
+      expect(metrics.padding, `${tileCase.id} padding`).toBe(tileCase.expected.padding)
+      expect(metrics.radius, `${tileCase.id} radius`).toBe(tileCase.expected.radius)
+      expect(metrics.titleFont, `${tileCase.id} title font`).toBe(tileCase.expected.titleFont)
+      await assertMountedClose(dialog)
+    }
+
+    const footerDialog = await openButtonModal(page, 'to-do', 'Add Task', 'Add Task')
+    await expect(footerDialog.locator('[data-modal-sheet-footer="true"]')).toHaveCSS('padding-bottom', '52px')
+    await assertMountedClose(footerDialog)
+  })
+
   for (const modalCase of MODAL_CASES) {
     test(`${modalCase.id} survives all required modal transitions`, async ({ page }) => {
-      test.setTimeout(150_000)
+      test.setTimeout(300_000)
       const errors = listenForUnexpectedErrors(page)
 
       await page.setViewportSize(PHONE)
       let dialog = await modalCase.open(page)
-      const selectedMobileTab = await exercisePersistentTabs(dialog, modalCase)
-      const mobileStart = await auditModal(page, modalCase, dialog, PHONE, 'mobile-start')
-      await page.setViewportSize(DESKTOP)
-      await auditModal(page, modalCase, dialog, DESKTOP, 'mobile-desktop')
-      if (selectedMobileTab) await expect(selectedMobileTab).toHaveAttribute('aria-selected', 'true')
-      await page.setViewportSize(PHONE)
-      const mobileEnd = await auditModal(page, modalCase, dialog, PHONE, 'mobile-desktop-mobile')
-      expect(Math.abs(mobileEnd.dialog.height - mobileStart.dialog.height)).toBeLessThanOrEqual(1)
+      await dialog.evaluate((element) => { element.setAttribute('data-state-cycle-node', 'original') })
+      const tabs = await dialog.getByRole('tab').evaluateAll((elements) =>
+        elements.map((element) => element.getAttribute('aria-label') ?? element.textContent?.trim() ?? ''))
+      const states = tabs.length > 0 ? tabs : [null]
+      for (const state of states) {
+        const label = `state-${state ?? 'root'}`
+        await page.setViewportSize(PHONE)
+        await setSafeAreaInsets(page, { top: 59, right: 0, bottom: 34, left: 0 })
+        const tab = state === null ? null : dialog.getByRole('tab', { name: state, exact: true })
+        if (tab) {
+          await expect(tab).toBeEnabled()
+          await tab.click()
+        }
+        const mobileStart = await auditModal(page, modalCase, dialog, PHONE, `${label}-portrait`)
+        for (const profile of LANDSCAPE_GEOMETRY_PROFILES) {
+          await page.setViewportSize({ width: profile.width, height: profile.height })
+          await setSafeAreaInsets(page, profile.insets)
+          await auditModal(page, modalCase, dialog, profile, `${label}-${profile.name}`)
+          if (tab) await expect(tab).toHaveAttribute('aria-selected', 'true')
+          await expect(dialog).toHaveAttribute('data-state-cycle-node', 'original')
+        }
+        await page.setViewportSize(PHONE)
+        await setSafeAreaInsets(page, { top: 59, right: 0, bottom: 34, left: 0 })
+        await auditModal(page, modalCase, dialog, PHONE, `${label}-rotated-portrait`)
+        await page.setViewportSize(DESKTOP)
+        await setSafeAreaInsets(page, { top: 0, right: 0, bottom: 0, left: 0 })
+        await auditModal(page, modalCase, dialog, DESKTOP, `${label}-desktop`)
+        if (tab) await expect(tab).toHaveAttribute('aria-selected', 'true')
+        await page.setViewportSize(PHONE)
+        await setSafeAreaInsets(page, { top: 59, right: 0, bottom: 34, left: 0 })
+        const mobileEnd = await auditModal(page, modalCase, dialog, PHONE, `${label}-desktop-portrait`)
+        expect(Math.abs(mobileEnd.dialog.height - mobileStart.dialog.height)).toBeLessThanOrEqual(1)
+        await expect(dialog).toHaveAttribute('data-state-cycle-node', 'original')
+      }
       await assertNoMutatingCalls(page, modalCase)
       await assertMountedClose(dialog)
 

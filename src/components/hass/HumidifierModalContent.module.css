@@ -216,6 +216,27 @@
   }
 }
 
+:global([data-modal-presentation='landscape-dialog'][data-landscape-density='compact']:is([data-modal-body-tier='standard'], [data-modal-body-tier='wide'])) .modalSheetPage {
+  height: auto;
+  max-height: none;
+}
+
+:global([data-modal-presentation='landscape-dialog'][data-landscape-density='compact']:is([data-modal-body-tier='standard'], [data-modal-body-tier='wide'])) .modalBody {
+  grid-template-columns: minmax(276px, 1fr) minmax(340px, 0.95fr);
+  height: auto;
+  align-items: start;
+  gap: 12px;
+  overflow: visible;
+}
+
+:global([data-modal-presentation='landscape-dialog'][data-landscape-density='compact']:is([data-modal-body-tier='standard'], [data-modal-body-tier='wide'])) .heroColumn,
+:global([data-modal-presentation='landscape-dialog'][data-landscape-density='compact']:is([data-modal-body-tier='standard'], [data-modal-body-tier='wide'])) .modalPanel {
+  height: auto;
+  min-height: 0;
+  max-height: none;
+  overflow: visible;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .modalPanel {
     transition: none;

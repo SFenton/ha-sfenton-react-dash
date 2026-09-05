@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { useHass } from '@hakit/core'
 import { MaterialIcon } from '../core/Icon'
-import { ModalSheet } from '../core/ModalSheet'
+import { ModalSheet, type ModalCenteredGeometry } from '../core/ModalSheet'
 import styles from './CreateDonetickTaskSheet.module.css'
 
 type CallService = (params: Record<string, unknown>) => Promise<unknown> | void
@@ -13,6 +13,12 @@ interface CreateTodoItemSheetProps {
 }
 
 const FORM_ID = 'create-admin-todo-item-form'
+const CREATE_TODO_ITEM_CENTERED_GEOMETRY = {
+  blockPolicy: 'fixed',
+  blockSize: '360px',
+  id: 'create-todo-item',
+  inlineSize: '560px',
+} satisfies ModalCenteredGeometry
 
 export function CreateTodoItemSheet({ entityId, open, onClose }: CreateTodoItemSheetProps) {
   const callService = useHass((state) => state.helpers.callService) as unknown as CallService
@@ -51,6 +57,7 @@ export function CreateTodoItemSheet({ entityId, open, onClose }: CreateTodoItemS
 
   return (
     <ModalSheet
+      centeredGeometry={CREATE_TODO_ITEM_CENTERED_GEOMETRY}
       footer={(
         <button className={styles.primaryAction} disabled={!taskName || submitting} form={FORM_ID} type="submit">
           <MaterialIcon name="mdi:checkbox-marked-circle" size={20} />

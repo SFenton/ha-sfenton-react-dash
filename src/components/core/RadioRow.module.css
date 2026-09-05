@@ -54,3 +54,9 @@
   text-overflow: clip;
   white-space: nowrap;
 }
+
+:global([data-modal-presentation='landscape-dialog']) .copy :is(strong, small),
+:global([data-modal-presentation='dialog']) .copy :is(strong, small) {
+  overflow-wrap: anywhere;
+  white-space: normal;
+}

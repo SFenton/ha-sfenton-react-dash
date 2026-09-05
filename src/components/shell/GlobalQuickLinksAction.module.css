@@ -6,10 +6,6 @@
   display: none;
 }
 
-.grid {
-  --dynamic-grid-columns: 2;
-}
-
 .cell {
   height: 100%;
   min-width: 0;
@@ -23,14 +19,6 @@
   outline: none;
 }
 
-@media (min-width: 720px) {
-  .grid {
-    --dynamic-grid-columns: 3;
-  }
-
-  .cell > button {
-    min-height: 160px;
-    border-radius: clamp(22px, 2.4vw, 34px);
-    padding: clamp(14px, 1.6vw, 22px);
-  }
+:global([data-centered-layout='true']) .cell > button {
+  min-height: 88px;
 }

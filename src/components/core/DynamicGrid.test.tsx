@@ -2,6 +2,20 @@ import { act, render, screen, waitFor } from '@testing-library/react'
 import { DynamicGrid } from './DynamicGrid'
 import { centeredDynamicGridStarts, equivalentDynamicGridColumnCount, packDynamicGridSpans, responsiveDynamicGridColumnCount } from './dynamicGridLayout'
 
+describe('text-aware leading-row fill', () => {
+  it('gives spare tracks to narrower tiles and leaves the final row at its minimum', () => {
+    expect(packDynamicGridSpans([1, 2, 2, 1, 1, 2], 4, 'except-last')).toEqual([2, 2, 2, 1, 1, 2])
+    expect(packDynamicGridSpans([2, 1, 2], 4, 'except-last')).toEqual([2, 2, 2])
+    expect(packDynamicGridSpans([2, 2], 3, 'except-last')).toEqual([3, 2])
+  })
+
+  it('does not inflate a final-only row or reorder uneven rows', () => {
+    expect(packDynamicGridSpans([1, 2], 4, 'except-last')).toEqual([1, 2])
+    expect(packDynamicGridSpans([1, 1, 1, 1, 1], 4, 'except-last')).toEqual([1, 1, 1, 1, 1])
+    expect(packDynamicGridSpans([], 4, 'except-last')).toEqual([])
+  })
+})
+
 describe('packDynamicGridSpans', () => {
   it('fills partial and final rows without changing item order', () => {
     expect(packDynamicGridSpans([1, 1, 1, 1], 3)).toEqual([1, 1, 1, 3])

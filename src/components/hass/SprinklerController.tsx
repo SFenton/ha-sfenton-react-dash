@@ -7,7 +7,7 @@ import { GlassTile } from '../core/GlassTile'
 import { MaterialIcon } from '../core/Icon'
 import { InlineAlert } from '../core/InlineAlert'
 import { ModalActionButton } from '../core/ModalActionFooter'
-import { ModalSheet } from '../core/ModalSheet'
+import { ModalSheet, type ModalCenteredGeometry } from '../core/ModalSheet'
 import { NativePickerField } from '../core/NativePickerField'
 import { ScheduleEditorFields, type ScheduleDayOption } from '../core/ScheduleEditorFields'
 import { ScheduleListRow } from '../core/ScheduleFlow'
@@ -29,6 +29,12 @@ const DETAIL_OVERVIEW = 0
 const DETAIL_SCHEDULE = 1
 const DETAIL_WATER = 2
 const OPTIMISTIC_REVERT_MS = 10_000
+const SPRINKLER_CENTERED_GEOMETRY = {
+  blockPolicy: 'fixed',
+  blockSize: '620px',
+  id: 'sprinkler-controller',
+  inlineSize: '720px',
+} satisfies ModalCenteredGeometry
 type SprinklerDetailPage = typeof DETAIL_OVERVIEW | typeof DETAIL_SCHEDULE | typeof DETAIL_WATER
 type SprinklerDay = '0' | '1' | '2' | '3' | '4' | '5' | '6'
 
@@ -517,7 +523,7 @@ export function SprinklerController({ config }: { config: SprinklerControllerCon
         </div>
       </div>
 
-      <ModalSheet bodyElementRef={bodyElementRef} footer={modalFooter} onBack={detailPage === DETAIL_OVERVIEW ? undefined : closeDetail} onClose={closeHash} open={modalOpen} scrollResetKey={detailPage} size="standard" subtitle={modalSubtitle} title={modalTitle}>
+      <ModalSheet bodyElementRef={bodyElementRef} centeredGeometry={SPRINKLER_CENTERED_GEOMETRY} footer={modalFooter} onBack={detailPage === DETAIL_OVERVIEW ? undefined : closeDetail} onClose={closeHash} open={modalOpen} scrollResetKey={detailPage} size="standard" subtitle={modalSubtitle} title={modalTitle}>
         {detailPage === DETAIL_WATER ? waterDetail : detailPage === DETAIL_SCHEDULE ? scheduleDetail : overview}
       </ModalSheet>
     </>

@@ -7,12 +7,13 @@ import { asEntityName, formatCompactEntityState } from './entityState'
 import { securityStateCssColor, securityStateIconName } from './securityState'
 
 interface QuickLinkTileProps {
+  compact?: boolean
   item: QuickAccessConfig
   onNavigate: (path: string) => void
   onOpenDetail: (page: QuickAccessModalPage) => void
 }
 
-export function QuickLinkTile({ item, onNavigate, onOpenDetail }: QuickLinkTileProps) {
+export function QuickLinkTile({ compact = false, item, onNavigate, onOpenDetail }: QuickLinkTileProps) {
   const entity = useEntity(asEntityName(item.entityId ?? 'sensor.unavailable'), { returnNullIfNotFound: true })
   const foodSubtitle = useHass((state) => item.status === 'all_food' ? allFoodSubtitle(state.entities) : undefined)
   const subtitle = item.status === 'entity_state' ? formatCompactEntityState(entity) : foodSubtitle
@@ -30,6 +31,7 @@ export function QuickLinkTile({ item, onNavigate, onOpenDetail }: QuickLinkTileP
   return (
     <GlassTile
       backgroundColor={isSecurityTile ? securityStateCssColor(entity?.state, 0.5) : item.backgroundColor}
+      compact={compact}
       icon={isSecurityTile ? securityStateIconName(entity?.state) : item.icon}
       iconColor={isSecurityTile ? 'white' : undefined}
       onClick={handleClick}

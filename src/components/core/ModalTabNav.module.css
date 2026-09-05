@@ -89,3 +89,63 @@
     white-space: nowrap;
   }
 }
+
+:global([data-modal-presentation='landscape-dialog'][data-landscape-density='compact']) .tabList {
+  gap: 4px;
+  padding: 5px;
+}
+
+:global([data-modal-presentation='landscape-dialog'][data-landscape-density='compact']) .tab {
+  min-width: 44px;
+  min-height: 44px;
+}
+
+@container modal-navigation (min-width: 500px) {
+  :global([data-modal-presentation='landscape-dialog'][data-landscape-density='compact']) .tabList:is([data-tab-count='2'], [data-tab-count='3']) .tab {
+    grid-template-columns: auto minmax(0, auto) auto;
+    gap: 8px;
+    padding-inline: 12px;
+  }
+
+  :global([data-modal-presentation='landscape-dialog'][data-landscape-density='compact']) .tabList:is([data-tab-count='2'], [data-tab-count='3']) .label,
+  :global([data-modal-presentation='landscape-dialog'][data-landscape-density='compact']) .tabList:is([data-tab-count='2'], [data-tab-count='3']) .accessory {
+    display: block;
+    min-width: 0;
+  }
+}
+
+@container modal-navigation (min-width: 560px) {
+  :global([data-modal-presentation='landscape-dialog'][data-landscape-density='compact']) .tabList[data-tab-count='4'] .tab {
+    grid-template-columns: auto minmax(0, auto) auto;
+    gap: 8px;
+    padding-inline: 10px;
+  }
+
+  :global([data-modal-presentation='landscape-dialog'][data-landscape-density='compact']) .tabList[data-tab-count='4'] .label,
+  :global([data-modal-presentation='landscape-dialog'][data-landscape-density='compact']) .tabList[data-tab-count='4'] .accessory {
+    display: block;
+    min-width: 0;
+  }
+}
+
+@container modal-navigation (min-width: 680px) {
+  :global([data-modal-presentation='landscape-dialog'][data-landscape-density='compact']) .tabList[data-tab-count='5'] .tab {
+    grid-template-columns: auto minmax(0, auto) auto;
+    gap: 6px;
+    padding-inline: 8px;
+  }
+
+  :global([data-modal-presentation='landscape-dialog'][data-landscape-density='compact']) .tabList[data-tab-count='5'] .label,
+  :global([data-modal-presentation='landscape-dialog'][data-landscape-density='compact']) .tabList[data-tab-count='5'] .accessory {
+    display: block;
+    min-width: 0;
+  }
+}
+
+:global([data-modal-presentation='landscape-dialog'][data-landscape-density='compact']) .label {
+  overflow: hidden;
+  font-size: 0.74rem;
+  font-weight: 780;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

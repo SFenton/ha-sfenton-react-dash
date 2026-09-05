@@ -8,7 +8,7 @@
   --floating-action-size: 56px;
   --floating-action-gap: 4px;
   --floating-action-content-gap: 20px;
-  --page-scroll-bottom-inset: calc(var(--bottom-nav-height) + env(safe-area-inset-bottom, 0px));
+  --page-scroll-bottom-inset: calc(var(--bottom-nav-height) - 12px + var(--rd-bottom-nav-offset));
   --page-bottom-extra-padding: 22px;
 }
 
@@ -57,15 +57,15 @@
 
 .floatingAction {
   position: fixed;
-  left: 20px;
-  right: 22px;
+  left: max(20px, var(--rd-safe-left));
+  right: max(22px, var(--rd-safe-right));
   bottom: var(--floating-action-bottom);
   z-index: 35;
   display: flex;
   justify-content: flex-end;
   gap: var(--floating-action-gap);
   pointer-events: none;
-  --floating-action-bottom: calc(var(--bottom-nav-height) - 2px + env(safe-area-inset-bottom, 0px));
+  --floating-action-bottom: calc(var(--bottom-nav-height) - 14px + var(--rd-bottom-nav-offset));
   --floating-action-keyboard-gap: 14px;
   animation: floatingActionFadeIn 170ms ease-out;
   transform: translate3d(0, 0, 0);
@@ -126,22 +126,25 @@
 }
 
 .shell[data-navigation-layout='rail'] .floatingAction {
-  right: var(--space-page-x);
+  right: max(var(--space-page-x), var(--rd-safe-right));
   left: calc(var(--app-sidebar-width) + var(--space-page-x));
   width: auto;
   max-width: var(--active-page-measure);
   margin-inline: auto;
-  bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+  bottom: max(20px, var(--rd-safe-bottom));
 }
 
 @media (min-width: 560px) {
   .shell[data-navigation-layout='bottom'] .floatingAction,
   .shell[data-navigation-layout='drawer-only'] .floatingAction {
     left: auto;
-    width: min(calc(100vw - 42px), var(--page-measure-reading));
+    width: min(
+      calc(100vw - max(20px, var(--rd-safe-left)) - max(22px, var(--rd-safe-right))),
+      var(--page-measure-reading)
+    );
   }
 }
 
 .shell[data-navigation-layout='drawer-only'] .floatingAction {
-  bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+  bottom: max(12px, var(--rd-safe-bottom));
 }

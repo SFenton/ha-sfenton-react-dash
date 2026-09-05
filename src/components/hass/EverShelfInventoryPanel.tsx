@@ -8,7 +8,7 @@ import { FilterSheetFooter } from '../core/FilterSheetFooter'
 import { FloatingActionSlot } from '../core/FloatingActionSlot'
 import { FloatingActionButton } from '../core/FloatingActionButton'
 import { MaterialIcon } from '../core/Icon'
-import { ModalSheet } from '../core/ModalSheet'
+import { ModalSheet, type ModalCenteredGeometry } from '../core/ModalSheet'
 import { NativePickerField } from '../core/NativePickerField'
 import { NumberStepper } from '../core/Stepper'
 import { RadioRow } from '../core/RadioRow'
@@ -27,8 +27,10 @@ interface EverShelfInventoryPanelProps {
     layout?: EmptyStateLayout
     title: string
   }
+  layout?: 'list' | 'responsive-grid'
   location: EverShelfInventoryLocation
   onOpenDetails?: (target: EverShelfInventoryDetailsTarget) => void
+  rowVariant?: 'summary'
   title: string
 }
 
@@ -82,6 +84,24 @@ const HASS_GROCERY_LIST_ENTITY_ID = 'todo.shopping_list'
 const INVENTORY_QUANTITY_MAX = 999
 const MULTIPLE_EXPIRATION_DATES_LABEL = 'Multiple Expiration Dates'
 const SHOPPING_ADDED_VISIBLE_MS = 3000
+const INVENTORY_DETAILS_CENTERED_GEOMETRY = {
+  blockPolicy: 'fixed',
+  blockSize: '760px',
+  id: 'inventory-details',
+  inlineSize: '560px',
+} satisfies ModalCenteredGeometry
+const INVENTORY_SORT_CENTERED_GEOMETRY = {
+  blockPolicy: 'fixed',
+  blockSize: '560px',
+  id: 'inventory-sort',
+  inlineSize: '560px',
+} satisfies ModalCenteredGeometry
+const INVENTORY_FILTER_CENTERED_GEOMETRY = {
+  blockPolicy: 'fixed',
+  blockSize: '760px',
+  id: 'inventory-filter',
+  inlineSize: '560px',
+} satisfies ModalCenteredGeometry
 
 const SORT_OPTIONS: { label: string; subtitle: string; value: InventorySortMode }[] = [
   { label: 'Title', subtitle: 'Sort alphabetically by item name.', value: 'title' },
@@ -1066,7 +1086,7 @@ function InventoryItemDetailsModal({ item, locationLabel, onClose, onInventoryCh
   })
 
   return (
-    <ModalSheet onClose={() => {
+    <ModalSheet centeredGeometry={INVENTORY_DETAILS_CENTERED_GEOMETRY} onClose={() => {
       if (!controller.busy) onClose()
     }} open={open && item !== null} size="form" title={controller.title}>
       <EverShelfInventoryDetailsPage controller={controller} />
@@ -1077,6 +1097,7 @@ function InventoryItemDetailsModal({ item, locationLabel, onClose, onInventoryCh
 function InventorySortSheet({ draftDirection, draftMode, onApply, onClose, onDraftDirectionChange, onDraftModeChange, onReset, open }: { draftDirection: InventorySortDirection; draftMode: InventorySortMode; onApply: () => void; onClose: () => void; onDraftDirectionChange: (direction: InventorySortDirection) => void; onDraftModeChange: (mode: InventorySortMode) => void; onReset: () => void; open: boolean }) {
   return (
     <ModalSheet
+      centeredGeometry={INVENTORY_SORT_CENTERED_GEOMETRY}
       footer={(
         <FilterSheetFooter
           onApply={() => {
@@ -1134,6 +1155,7 @@ function InventorySortSheet({ draftDirection, draftMode, onApply, onClose, onDra
 function InventoryFilterSheet({ draftMode, onApply, onClose, onDraftModeChange, onReset, open }: { draftMode: InventoryFilterMode; onApply: () => void; onClose: () => void; onDraftModeChange: (mode: InventoryFilterMode) => void; onReset: () => void; open: boolean }) {
   return (
     <ModalSheet
+      centeredGeometry={INVENTORY_FILTER_CENTERED_GEOMETRY}
       footer={(
         <FilterSheetFooter
           onApply={() => {
@@ -1148,7 +1170,7 @@ function InventoryFilterSheet({ draftMode, onApply, onClose, onDraftModeChange, 
       size="form"
       title="Filter Inventory"
     >
-      <fieldset className={styles.fieldset}>
+      <fieldset className={styles.fieldset} data-modal-landscape-layout="option-grid">
         <legend>Filter Items</legend>
         <div className={styles.radioGroup} role="radiogroup" aria-label="Filter items">
           {FILTER_OPTIONS.map((option) => (
@@ -1211,7 +1233,7 @@ export function EverShelfInventoryFloatingActions({ controls }: { controls: Ever
   )
 }
 
-export function EverShelfInventoryPanel({ controls, emptyState, location, onOpenDetails, title }: EverShelfInventoryPanelProps) {
+export function EverShelfInventoryPanel({ controls, emptyState, layout = 'list', location, onOpenDetails, rowVariant, title }: EverShelfInventoryPanelProps) {
   const callService = useHass((state) => state.helpers.callService) as unknown as CallService
   const { inventoryLoadPhase, setInventoryItemCount, setInventoryLoadPhase } = controls
   const [detailsItem, setDetailsItem] = useState<EverShelfInventoryDisplayItem | null>(null)
@@ -1434,7 +1456,7 @@ export function EverShelfInventoryPanel({ controls, emptyState, location, onOpen
 
   return (
     <>
-      <article aria-label={`${title} inventory list`} className={styles.panel}>
+      <article aria-label={`${title} inventory list`} className={styles.panel} data-layout={layout} data-row-variant={rowVariant}>
         {inventoryLoadPhase !== 'content' ? (
           <DashboardPageLoading className={styles.inventoryLoading} label={`Loading ${title}`} phase={inventoryLoadPhase === 'exiting' ? 'exiting' : 'loading'} />
         ) : (

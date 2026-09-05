@@ -18,6 +18,20 @@
   padding: 28px 6px 6px;
 }
 
+:global([data-modal-presentation='landscape-dialog'][data-landscape-density='compact']) .cameraFocus {
+  height: clamp(150px, 46dvh, 200px);
+}
+
+:global([data-modal-presentation='landscape-dialog'][data-landscape-density='compact']) .cameraFocus :global([data-variant='modal']),
+:global([data-modal-presentation='landscape-dialog'][data-landscape-density='compact']) .cameraFocus :global([data-variant='modal']) > div {
+  height: 100%;
+  min-height: 0 !important;
+}
+
+:global([data-modal-presentation='landscape-dialog'][data-landscape-density='compact']) .cameraControls {
+  padding-top: 12px;
+}
+
 @media (max-width: 520px) {
   .cameraControls {
     grid-template-columns: minmax(0, 1fr);

@@ -1,8 +1,8 @@
 .nav {
   position: fixed;
-  right: 14px;
-  bottom: calc(12px + env(safe-area-inset-bottom, 0px));
-  left: 14px;
+  right: max(14px, var(--rd-safe-right));
+  bottom: var(--rd-bottom-nav-offset);
+  left: max(14px, var(--rd-safe-left));
   z-index: 30;
   display: grid;
   grid-template-columns: repeat(5, 1fr);
@@ -27,13 +27,13 @@
 :global(html[data-dashboard-keyboard='open']) .nav {
   opacity: 0;
   pointer-events: none;
-  transform: translate3d(0, calc(100% + 32px + env(safe-area-inset-bottom, 0px)), 0);
+  transform: translate3d(0, calc(100% + 20px + var(--rd-bottom-nav-offset)), 0);
 }
 
 :global(html[data-dashboard-search-expanded='true']) .nav {
   opacity: 0;
   pointer-events: none;
-  transform: translate3d(0, calc(100% + 32px + env(safe-area-inset-bottom, 0px)), 0);
+  transform: translate3d(0, calc(100% + 20px + var(--rd-bottom-nav-offset)), 0);
 }
 
 .tab {
@@ -70,7 +70,7 @@
 
 @media (min-width: 560px) {
   .nav {
-    right: max(14px, calc((100vw - 560px) / 2));
-    left: max(14px, calc((100vw - 560px) / 2));
+    right: max(14px, var(--rd-safe-right), calc((100vw - 560px) / 2));
+    left: max(14px, var(--rd-safe-left), calc((100vw - 560px) / 2));
   }
 }

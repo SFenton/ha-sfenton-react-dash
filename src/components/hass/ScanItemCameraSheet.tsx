@@ -4,7 +4,7 @@ import { useHass } from '@hakit/core'
 import { Description } from '../core/Description'
 import { CheckboxRow } from '../core/CheckboxRow'
 import { MaterialIcon } from '../core/Icon'
-import { ModalSheet, type ModalSheetStyle } from '../core/ModalSheet'
+import { ModalSheet, type ModalCenteredGeometry } from '../core/ModalSheet'
 import { NativePickerField } from '../core/NativePickerField'
 import { RadioRow } from '../core/RadioRow'
 import { EVERSHELF_DEFAULT_LOCATION } from '../../constants/everShelfFood'
@@ -120,10 +120,12 @@ interface EverShelfAddItemResult {
   [key: string]: unknown
 }
 
-const SCAN_ITEM_MODAL_STYLE: ModalSheetStyle = {
-  '--modal-desktop-max-width': '560px',
-  '--modal-desktop-width': '560px',
-}
+const SCAN_ITEM_CENTERED_GEOMETRY = {
+  blockPolicy: 'fixed',
+  blockSize: '628px',
+  id: 'scan-item',
+  inlineSize: '560px',
+} satisfies ModalCenteredGeometry
 
 const CAMERA_CONSTRAINTS: MediaStreamConstraints = {
   audio: false,
@@ -1472,7 +1474,7 @@ export function ScanItemCameraSheet({ defaultLocation, open, onClose }: ScanItem
   return (
     <ModalSheet
       backLabel={backLabel}
-      contentStyle={SCAN_ITEM_MODAL_STYLE}
+      centeredGeometry={SCAN_ITEM_CENTERED_GEOMETRY}
       footer={footer}
       onBack={onBack}
       onClose={handleClose}

@@ -1,6 +1,7 @@
 export const SFENTON_REACT_PANEL_TAG = 'sfenton-react-panel'
 export const DEFAULT_REACT_DASHBOARD_URL = '/local/ha-sfenton-react-dash/index.html'
 const REACT_DASHBOARD_DISPOSE_PROPERTY = '__sfentonReactDashboardDispose'
+const SAFE_AREA_EDGES = ['top', 'right', 'bottom', 'left'] as const
 
 type DisposableDashboardWindow = Window & {
   [REACT_DASHBOARD_DISPOSE_PROPERTY]?: (reason?: string) => boolean
@@ -19,6 +20,55 @@ function disposeReactDashboardFrame(
   } catch (error) {
     console.error('Unable to dispose the embedded React dashboard.', error)
     return false
+  }
+}
+
+// Stable Home Assistant entry bundles must remain self-contained and cannot import a shared hashed chunk.
+function bridgeSafeAreaToDashboardFrame(
+  source: Element,
+  iframe: HTMLIFrameElement,
+) {
+  const sourceWindow = source.ownerDocument.defaultView
+  const sync = () => {
+    const childRoot = iframe.contentDocument?.documentElement
+    if (!childRoot || !sourceWindow) return
+
+    const sourceStyles = sourceWindow.getComputedStyle(source)
+    for (const edge of SAFE_AREA_EDGES) {
+      const property = `--safe-area-inset-${edge}`
+      const appProperty = `--app-safe-area-inset-${edge}`
+      const value = sourceStyles.getPropertyValue(property).trim()
+        || sourceStyles.getPropertyValue(appProperty).trim()
+      if (value) childRoot.style.setProperty(property, value)
+      else childRoot.style.removeProperty(property)
+    }
+  }
+  const observer = sourceWindow?.MutationObserver
+    ? new sourceWindow.MutationObserver(sync)
+    : undefined
+
+  iframe.addEventListener('load', sync)
+  sourceWindow?.addEventListener('resize', sync)
+  sourceWindow?.addEventListener('orientationchange', sync)
+  sourceWindow?.addEventListener('pageshow', sync)
+  observer?.observe(source.ownerDocument.documentElement, {
+    attributeFilter: ['style'],
+    attributes: true,
+  })
+  if (source !== source.ownerDocument.documentElement) {
+    observer?.observe(source, {
+      attributeFilter: ['style'],
+      attributes: true,
+    })
+  }
+  sync()
+
+  return () => {
+    iframe.removeEventListener('load', sync)
+    sourceWindow?.removeEventListener('resize', sync)
+    sourceWindow?.removeEventListener('orientationchange', sync)
+    sourceWindow?.removeEventListener('pageshow', sync)
+    observer?.disconnect()
   }
 }
 
@@ -45,6 +95,7 @@ export function reactDashboardUrl(
 export class SfentonReactPanel extends HTMLElement {
   private needsReload = false
   private panelInfo?: CustomPanelInfo
+  private releaseSafeAreaBridge?: () => void
 
   set panel(value: CustomPanelInfo | undefined) {
     this.panelInfo = value
@@ -58,9 +109,12 @@ export class SfentonReactPanel extends HTMLElement {
 
   connectedCallback() {
     this.render()
+    this.connectSafeAreaBridge()
   }
 
   disconnectedCallback() {
+    this.releaseSafeAreaBridge?.()
+    this.releaseSafeAreaBridge = undefined
     disposeReactDashboardFrame(this.currentIframe(), 'panel-host-disconnected')
     this.needsReload = true
   }
@@ -117,6 +171,7 @@ export class SfentonReactPanel extends HTMLElement {
       this.needsReload = false
     }
     this.syncTitle()
+    this.connectSafeAreaBridge()
   }
 
   private currentIframe() {
@@ -130,6 +185,11 @@ export class SfentonReactPanel extends HTMLElement {
       throw new Error('The React dashboard custom panel iframe was not created.')
     }
     return iframe
+  }
+
+  private connectSafeAreaBridge() {
+    if (!this.isConnected || this.releaseSafeAreaBridge) return
+    this.releaseSafeAreaBridge = bridgeSafeAreaToDashboardFrame(this, this.iframe())
   }
 
   private syncTitle() {

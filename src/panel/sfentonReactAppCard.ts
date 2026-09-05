@@ -1,6 +1,7 @@
 export const SFENTON_REACT_APP_CARD_TAG = 'sfenton-react-app-card'
 export const DEFAULT_REACT_DASHBOARD_CARD_URL = '/local/ha-sfenton-react-dash/index.html'
 const REACT_DASHBOARD_DISPOSE_PROPERTY = '__sfentonReactDashboardDispose'
+const SAFE_AREA_EDGES = ['top', 'right', 'bottom', 'left'] as const
 
 type DisposableDashboardWindow = Window & {
   [REACT_DASHBOARD_DISPOSE_PROPERTY]?: (reason?: string) => boolean
@@ -22,6 +23,55 @@ function disposeReactDashboardFrame(
   }
 }
 
+// Stable Home Assistant entry bundles must remain self-contained and cannot import a shared hashed chunk.
+function bridgeSafeAreaToDashboardFrame(
+  source: Element,
+  iframe: HTMLIFrameElement,
+) {
+  const sourceWindow = source.ownerDocument.defaultView
+  const sync = () => {
+    const childRoot = iframe.contentDocument?.documentElement
+    if (!childRoot || !sourceWindow) return
+
+    const sourceStyles = sourceWindow.getComputedStyle(source)
+    for (const edge of SAFE_AREA_EDGES) {
+      const property = `--safe-area-inset-${edge}`
+      const appProperty = `--app-safe-area-inset-${edge}`
+      const value = sourceStyles.getPropertyValue(property).trim()
+        || sourceStyles.getPropertyValue(appProperty).trim()
+      if (value) childRoot.style.setProperty(property, value)
+      else childRoot.style.removeProperty(property)
+    }
+  }
+  const observer = sourceWindow?.MutationObserver
+    ? new sourceWindow.MutationObserver(sync)
+    : undefined
+
+  iframe.addEventListener('load', sync)
+  sourceWindow?.addEventListener('resize', sync)
+  sourceWindow?.addEventListener('orientationchange', sync)
+  sourceWindow?.addEventListener('pageshow', sync)
+  observer?.observe(source.ownerDocument.documentElement, {
+    attributeFilter: ['style'],
+    attributes: true,
+  })
+  if (source !== source.ownerDocument.documentElement) {
+    observer?.observe(source, {
+      attributeFilter: ['style'],
+      attributes: true,
+    })
+  }
+  sync()
+
+  return () => {
+    iframe.removeEventListener('load', sync)
+    sourceWindow?.removeEventListener('resize', sync)
+    sourceWindow?.removeEventListener('orientationchange', sync)
+    sourceWindow?.removeEventListener('pageshow', sync)
+    observer?.disconnect()
+  }
+}
+
 interface ReactDashboardCardConfig {
   title?: unknown
   url?: unknown
@@ -39,6 +89,7 @@ type CustomCardWindow = Window & {
 export class SfentonReactAppCard extends HTMLElement {
   private config: ReactDashboardCardConfig = {}
   private needsReload = false
+  private releaseSafeAreaBridge?: () => void
 
   setConfig(config: ReactDashboardCardConfig | undefined) {
     this.config = config ?? {}
@@ -47,9 +98,12 @@ export class SfentonReactAppCard extends HTMLElement {
 
   connectedCallback() {
     this.render()
+    this.connectSafeAreaBridge()
   }
 
   disconnectedCallback() {
+    this.releaseSafeAreaBridge?.()
+    this.releaseSafeAreaBridge = undefined
     disposeReactDashboardFrame(this.currentIframe(), 'legacy-card-disconnected')
     this.needsReload = true
   }
@@ -121,6 +175,7 @@ export class SfentonReactAppCard extends HTMLElement {
       this.needsReload = false
     }
     iframe.title = this.iframeTitle()
+    this.connectSafeAreaBridge()
   }
 
   private currentIframe() {
@@ -132,6 +187,11 @@ export class SfentonReactAppCard extends HTMLElement {
     const iframe = this.currentIframe()
     if (!iframe) throw new Error('The React dashboard card iframe was not created.')
     return iframe
+  }
+
+  private connectSafeAreaBridge() {
+    if (!this.isConnected || this.releaseSafeAreaBridge) return
+    this.releaseSafeAreaBridge = bridgeSafeAreaToDashboardFrame(this, this.iframe())
   }
 
   getCardSize() {

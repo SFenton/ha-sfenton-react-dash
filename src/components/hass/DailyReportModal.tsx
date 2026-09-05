@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { ModalSheet } from '../core/ModalSheet'
 import { SectionHeader } from '../core/SectionHeader'
 import { DailyReportModalContent, DailyReportModalNav } from './DailyReportModalContent'
-import { DAILY_REPORT_MODAL_STYLE, useDailyReportContext } from './dailyReportModal'
+import { DAILY_REPORT_CENTERED_GEOMETRY, DAILY_REPORT_MODAL_STYLE, useDailyReportContext } from './dailyReportModal'
 import { DonetickTaskFormBody, DonetickTaskFormFooter } from './DonetickTaskFormPage'
 import {
   EverShelfInventoryDetailsPage,
@@ -23,6 +23,7 @@ import {
 import { dashboardPathWithSearch, replaceDashboardUrl } from '../../hooks/dashboardLocation'
 import { useDashboardUrl } from '../../hooks/useDashboardUrl'
 import { useHashModal } from '../../hooks/useHashModal'
+import styles from './DailyReportModalContent.module.css'
 
 /** Drops the consumed `tab` param so reopening later does not re-run the notification's selection. */
 function clearTabRequest() {
@@ -133,7 +134,8 @@ export function DailyReportModal() {
         return (
           <ModalSheet
             backLabel={editingInventoryPage ? 'Back to expired food' : 'Back to daily summary'}
-            bodyHeader={!detailPage && context.user ? <SectionHeader title={dailyReportTabLabel(activeTab)} /> : undefined}
+            bodyHeader={!detailPage && context.user ? <SectionHeader className={styles.summarySectionHeader} title={dailyReportTabLabel(activeTab)} /> : undefined}
+            centeredGeometry={DAILY_REPORT_CENTERED_GEOMETRY}
             contentStyle={DAILY_REPORT_MODAL_STYLE}
             footer={editingTaskPage
               ? <DonetickTaskFormFooter controller={taskForm} />

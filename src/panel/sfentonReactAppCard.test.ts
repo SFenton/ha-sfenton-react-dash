@@ -36,6 +36,29 @@ describe('Sfenton React app card', () => {
     })
   })
 
+  it('forwards outer dashboard safe-area variables into the React iframe', async () => {
+    const card = document.createElement(SFENTON_REACT_APP_CARD_TAG) as SfentonReactAppCard
+    card.style.setProperty('--safe-area-inset-bottom', '34px')
+    card.style.setProperty('--safe-area-inset-left', '59px')
+    card.setConfig({ url: DEFAULT_REACT_DASHBOARD_CARD_URL })
+    document.body.append(card)
+
+    const iframe = card.shadowRoot?.querySelector('iframe')
+    const iframeDocument = document.implementation.createHTMLDocument()
+    Object.defineProperty(iframe, 'contentDocument', {
+      configurable: true,
+      value: iframeDocument,
+    })
+    iframe?.dispatchEvent(new Event('load'))
+    expect(iframe?.contentDocument?.documentElement.style.getPropertyValue('--safe-area-inset-bottom')).toBe('34px')
+    expect(iframe?.contentDocument?.documentElement.style.getPropertyValue('--safe-area-inset-left')).toBe('59px')
+
+    card.style.setProperty('--safe-area-inset-bottom', '21px')
+    await vi.waitFor(() => {
+      expect(iframe?.contentDocument?.documentElement.style.getPropertyValue('--safe-area-inset-bottom')).toBe('21px')
+    })
+  })
+
   it('rejects a cross-origin app URL', () => {
     const card = document.createElement(SFENTON_REACT_APP_CARD_TAG) as SfentonReactAppCard
     expect(() => card.setConfig({ url: 'https://example.com/dashboard' })).toThrow(

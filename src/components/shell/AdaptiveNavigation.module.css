@@ -7,9 +7,10 @@
   grid-template-rows: auto minmax(0, 1fr);
   gap: 14px;
   padding:
-    calc(20px + env(safe-area-inset-top, 0px))
+    max(20px, var(--rd-safe-top))
     14px
-    calc(18px + env(safe-area-inset-bottom, 0px));
+    max(18px, var(--rd-safe-bottom))
+    max(14px, var(--rd-safe-left));
   box-sizing: border-box;
 }
 
@@ -75,6 +76,14 @@
 
 .settingsItem {
   margin-top: auto;
+}
+
+@media (max-height: 500px) {
+  .rail {
+    gap: 6px;
+    padding-top: max(8px, var(--rd-safe-top));
+    padding-bottom: max(8px, var(--rd-safe-bottom));
+  }
 }
 
 .icon {

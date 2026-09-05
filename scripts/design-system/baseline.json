@@ -1,8 +1,12 @@
 {
   "rules": [
     "raw-color-literal",
+    "raw-safe-area-env",
     "undefined-rd-variable",
     "modal-disclosure-import",
+    "legacy-modal-geometry-variable",
+    "missing-modal-centered-geometry",
+    "unscoped-modal-square-size",
     "visual-active-rule"
   ],
   "scanner": "scripts/design-system/check.ts",
@@ -850,13 +854,6 @@
     },
     {
       "file": "src/components/core/ModalActionFooter.module.css",
-      "id": "70912925ee12a17e",
-      "maxOccurrences": 1,
-      "rule": "raw-color-literal",
-      "subject": "rgb(198, 40, 40)"
-    },
-    {
-      "file": "src/components/core/ModalActionFooter.module.css",
       "id": "dcfb281d665646bc",
       "maxOccurrences": 1,
       "rule": "raw-color-literal",
@@ -1522,13 +1519,6 @@
     },
     {
       "file": "src/components/core/StatusPill.module.css",
-      "id": "66c1e4680945c56b",
-      "maxOccurrences": 1,
-      "rule": "raw-color-literal",
-      "subject": "rgba(232, 240, 255, 0.62)"
-    },
-    {
-      "file": "src/components/core/StatusPill.module.css",
       "id": "8f32b4d99317b171",
       "maxOccurrences": 1,
       "rule": "raw-color-literal",
@@ -1949,13 +1939,6 @@
     },
     {
       "file": "src/components/hass/CircularControlDial.module.css",
-      "id": "1ed4015193c0768e",
-      "maxOccurrences": 1,
-      "rule": "raw-color-literal",
-      "subject": "rgba(0, 0, 0, 0.24)"
-    },
-    {
-      "file": "src/components/hass/CircularControlDial.module.css",
       "id": "00d058bbdf34b9b4",
       "maxOccurrences": 1,
       "rule": "raw-color-literal",
@@ -2005,15 +1988,8 @@
     },
     {
       "file": "src/components/hass/CircularControlDial.module.css",
-      "id": "812a520a1d431274",
-      "maxOccurrences": 1,
-      "rule": "raw-color-literal",
-      "subject": "rgba(255, 255, 255, 0.96)"
-    },
-    {
-      "file": "src/components/hass/CircularControlDial.module.css",
       "id": "956b2aadc440113e",
-      "maxOccurrences": 2,
+      "maxOccurrences": 1,
       "rule": "raw-color-literal",
       "subject": "rgba(255, 255, 255, 0.98)"
     },
@@ -2114,62 +2090,6 @@
       "maxOccurrences": 3,
       "rule": "raw-color-literal",
       "subject": "white"
-    },
-    {
-      "file": "src/components/hass/DailyReportModalContent.module.css",
-      "id": "fb7b62148306c101",
-      "maxOccurrences": 1,
-      "rule": "raw-color-literal",
-      "subject": "#111"
-    },
-    {
-      "file": "src/components/hass/DailyReportModalContent.module.css",
-      "id": "cd9f3f0dede24e8d",
-      "maxOccurrences": 1,
-      "rule": "raw-color-literal",
-      "subject": "rgba(0, 0, 0, 0.34)"
-    },
-    {
-      "file": "src/components/hass/DailyReportModalContent.module.css",
-      "id": "e8d0e27fdab84df8",
-      "maxOccurrences": 1,
-      "rule": "raw-color-literal",
-      "subject": "rgba(20, 20, 20, 0.72)"
-    },
-    {
-      "file": "src/components/hass/DailyReportModalContent.module.css",
-      "id": "b7d27cba575bc540",
-      "maxOccurrences": 1,
-      "rule": "raw-color-literal",
-      "subject": "rgba(255, 255, 255, 0.1)"
-    },
-    {
-      "file": "src/components/hass/DailyReportModalContent.module.css",
-      "id": "a5a9cd98abc84ba3",
-      "maxOccurrences": 1,
-      "rule": "raw-color-literal",
-      "subject": "rgba(255, 255, 255, 0.12)"
-    },
-    {
-      "file": "src/components/hass/DailyReportModalContent.module.css",
-      "id": "face9a314cb5fcdf",
-      "maxOccurrences": 1,
-      "rule": "raw-color-literal",
-      "subject": "rgba(255, 255, 255, 0.68)"
-    },
-    {
-      "file": "src/components/hass/DailyReportModalContent.module.css",
-      "id": "544b2c740b8c0770",
-      "maxOccurrences": 1,
-      "rule": "raw-color-literal",
-      "subject": "rgba(255, 255, 255, 0.92)"
-    },
-    {
-      "file": "src/components/hass/DailyReportModalContent.module.css",
-      "id": "41193df9d7f99f72",
-      "maxOccurrences": 2,
-      "rule": "raw-color-literal",
-      "subject": "transparent"
     },
     {
       "file": "src/components/hass/EntityGroup.module.css",
@@ -2439,31 +2359,10 @@
     },
     {
       "file": "src/components/hass/HumidifierModalContent.module.css",
-      "id": "010b52f12271a169",
-      "maxOccurrences": 1,
-      "rule": "raw-color-literal",
-      "subject": "#111"
-    },
-    {
-      "file": "src/components/hass/HumidifierModalContent.module.css",
-      "id": "c3936041706b725b",
-      "maxOccurrences": 1,
-      "rule": "raw-color-literal",
-      "subject": "rgba(0, 0, 0, 0.34)"
-    },
-    {
-      "file": "src/components/hass/HumidifierModalContent.module.css",
       "id": "2dac67ffe1a00a09",
-      "maxOccurrences": 2,
+      "maxOccurrences": 1,
       "rule": "raw-color-literal",
       "subject": "rgba(111, 225, 185, 0.95)"
-    },
-    {
-      "file": "src/components/hass/HumidifierModalContent.module.css",
-      "id": "67289a1dfa1d048e",
-      "maxOccurrences": 1,
-      "rule": "raw-color-literal",
-      "subject": "rgba(20, 20, 20, 0.72)"
     },
     {
       "file": "src/components/hass/HumidifierModalContent.module.css",
@@ -2475,14 +2374,14 @@
     {
       "file": "src/components/hass/HumidifierModalContent.module.css",
       "id": "82c87340d2b7a7ff",
-      "maxOccurrences": 2,
+      "maxOccurrences": 1,
       "rule": "raw-color-literal",
       "subject": "rgba(255, 255, 255, 0.1)"
     },
     {
       "file": "src/components/hass/HumidifierModalContent.module.css",
       "id": "60acfa5cc7479a25",
-      "maxOccurrences": 2,
+      "maxOccurrences": 1,
       "rule": "raw-color-literal",
       "subject": "rgba(255, 255, 255, 0.12)"
     },
@@ -2495,20 +2394,6 @@
     },
     {
       "file": "src/components/hass/HumidifierModalContent.module.css",
-      "id": "3381ea282a217f49",
-      "maxOccurrences": 1,
-      "rule": "raw-color-literal",
-      "subject": "rgba(255, 255, 255, 0.68)"
-    },
-    {
-      "file": "src/components/hass/HumidifierModalContent.module.css",
-      "id": "6f3f1c5e5a06a796",
-      "maxOccurrences": 1,
-      "rule": "raw-color-literal",
-      "subject": "rgba(255, 255, 255, 0.92)"
-    },
-    {
-      "file": "src/components/hass/HumidifierModalContent.module.css",
       "id": "4f4f7159e5031dc3",
       "maxOccurrences": 1,
       "rule": "raw-color-literal",
@@ -2517,7 +2402,7 @@
     {
       "file": "src/components/hass/HumidifierModalContent.module.css",
       "id": "330443fcb5b9da5d",
-      "maxOccurrences": 3,
+      "maxOccurrences": 1,
       "rule": "raw-color-literal",
       "subject": "transparent"
     },
@@ -2775,13 +2660,6 @@
     },
     {
       "file": "src/components/hass/MediaRemoteModalContent.module.css",
-      "id": "da589009c8b3193e",
-      "maxOccurrences": 1,
-      "rule": "raw-color-literal",
-      "subject": "#111"
-    },
-    {
-      "file": "src/components/hass/MediaRemoteModalContent.module.css",
       "id": "f1c53f662541808c",
       "maxOccurrences": 1,
       "rule": "raw-color-literal",
@@ -2817,31 +2695,10 @@
     },
     {
       "file": "src/components/hass/MediaRemoteModalContent.module.css",
-      "id": "1e92ae889f014e14",
-      "maxOccurrences": 1,
-      "rule": "raw-color-literal",
-      "subject": "rgba(0, 0, 0, 0.34)"
-    },
-    {
-      "file": "src/components/hass/MediaRemoteModalContent.module.css",
-      "id": "a3714670a61869bf",
-      "maxOccurrences": 1,
-      "rule": "raw-color-literal",
-      "subject": "rgba(20, 20, 20, 0.72)"
-    },
-    {
-      "file": "src/components/hass/MediaRemoteModalContent.module.css",
       "id": "00989136ad03d4bd",
       "maxOccurrences": 1,
       "rule": "raw-color-literal",
       "subject": "rgba(20, 22, 24, 0.66)"
-    },
-    {
-      "file": "src/components/hass/MediaRemoteModalContent.module.css",
-      "id": "590fd5e9d8c4cd2c",
-      "maxOccurrences": 1,
-      "rule": "raw-color-literal",
-      "subject": "rgba(255, 255, 255, 0.1)"
     },
     {
       "file": "src/components/hass/MediaRemoteModalContent.module.css",
@@ -2853,7 +2710,7 @@
     {
       "file": "src/components/hass/MediaRemoteModalContent.module.css",
       "id": "6d7d9eb2ed09c9b8",
-      "maxOccurrences": 8,
+      "maxOccurrences": 7,
       "rule": "raw-color-literal",
       "subject": "rgba(255, 255, 255, 0.12)"
     },
@@ -2894,13 +2751,6 @@
     },
     {
       "file": "src/components/hass/MediaRemoteModalContent.module.css",
-      "id": "1412a2607bec2638",
-      "maxOccurrences": 1,
-      "rule": "raw-color-literal",
-      "subject": "rgba(255, 255, 255, 0.68)"
-    },
-    {
-      "file": "src/components/hass/MediaRemoteModalContent.module.css",
       "id": "82ddb4a981f66ab2",
       "maxOccurrences": 1,
       "rule": "raw-color-literal",
@@ -2919,20 +2769,6 @@
       "maxOccurrences": 2,
       "rule": "raw-color-literal",
       "subject": "rgba(255, 255, 255, 0.9)"
-    },
-    {
-      "file": "src/components/hass/MediaRemoteModalContent.module.css",
-      "id": "ff50665872338163",
-      "maxOccurrences": 1,
-      "rule": "raw-color-literal",
-      "subject": "rgba(255, 255, 255, 0.92)"
-    },
-    {
-      "file": "src/components/hass/MediaRemoteModalContent.module.css",
-      "id": "43a1145e9a752f7b",
-      "maxOccurrences": 2,
-      "rule": "raw-color-literal",
-      "subject": "transparent"
     },
     {
       "file": "src/components/hass/MediaRemoteModalContent.module.css",
@@ -3510,13 +3346,6 @@
     },
     {
       "file": "src/components/hass/VacuumCard.module.css",
-      "id": "67682942bb4484ed",
-      "maxOccurrences": 1,
-      "rule": "raw-color-literal",
-      "subject": "#111"
-    },
-    {
-      "file": "src/components/hass/VacuumCard.module.css",
       "id": "216bbea5d4683db2",
       "maxOccurrences": 1,
       "rule": "raw-color-literal",
@@ -3552,13 +3381,6 @@
     },
     {
       "file": "src/components/hass/VacuumCard.module.css",
-      "id": "7df1f796346cd4b2",
-      "maxOccurrences": 1,
-      "rule": "raw-color-literal",
-      "subject": "rgba(0, 0, 0, 0.34)"
-    },
-    {
-      "file": "src/components/hass/VacuumCard.module.css",
       "id": "ec15ece38413a862",
       "maxOccurrences": 1,
       "rule": "raw-color-literal",
@@ -3577,13 +3399,6 @@
       "maxOccurrences": 1,
       "rule": "raw-color-literal",
       "subject": "rgba(100, 181, 246, 0.38)"
-    },
-    {
-      "file": "src/components/hass/VacuumCard.module.css",
-      "id": "f22b1820c4168e27",
-      "maxOccurrences": 1,
-      "rule": "raw-color-literal",
-      "subject": "rgba(129, 199, 132, 0.2)"
     },
     {
       "file": "src/components/hass/VacuumCard.module.css",
@@ -3629,13 +3444,6 @@
     },
     {
       "file": "src/components/hass/VacuumCard.module.css",
-      "id": "39511955f518bfb7",
-      "maxOccurrences": 1,
-      "rule": "raw-color-literal",
-      "subject": "rgba(20, 20, 20, 0.72)"
-    },
-    {
-      "file": "src/components/hass/VacuumCard.module.css",
       "id": "aff75bf9ec75dab3",
       "maxOccurrences": 1,
       "rule": "raw-color-literal",
@@ -3650,24 +3458,10 @@
     },
     {
       "file": "src/components/hass/VacuumCard.module.css",
-      "id": "a7a5d774ac0761d7",
-      "maxOccurrences": 1,
-      "rule": "raw-color-literal",
-      "subject": "rgba(232, 240, 255, 0.5)"
-    },
-    {
-      "file": "src/components/hass/VacuumCard.module.css",
       "id": "23ab5003ca0fdf6d",
       "maxOccurrences": 2,
       "rule": "raw-color-literal",
       "subject": "rgba(232, 240, 255, 0.62)"
-    },
-    {
-      "file": "src/components/hass/VacuumCard.module.css",
-      "id": "a7257d7565748d06",
-      "maxOccurrences": 1,
-      "rule": "raw-color-literal",
-      "subject": "rgba(232, 240, 255, 0.68)"
     },
     {
       "file": "src/components/hass/VacuumCard.module.css",
@@ -3692,24 +3486,10 @@
     },
     {
       "file": "src/components/hass/VacuumCard.module.css",
-      "id": "4fc299d432795f2c",
-      "maxOccurrences": 1,
-      "rule": "raw-color-literal",
-      "subject": "rgba(251, 140, 0, 0.15)"
-    },
-    {
-      "file": "src/components/hass/VacuumCard.module.css",
       "id": "d2c9e71f97d07742",
       "maxOccurrences": 1,
       "rule": "raw-color-literal",
       "subject": "rgba(251, 140, 0, 0.22)"
-    },
-    {
-      "file": "src/components/hass/VacuumCard.module.css",
-      "id": "41f3b7307269f3e9",
-      "maxOccurrences": 1,
-      "rule": "raw-color-literal",
-      "subject": "rgba(255, 183, 77, 0.22)"
     },
     {
       "file": "src/components/hass/VacuumCard.module.css",
@@ -3721,7 +3501,7 @@
     {
       "file": "src/components/hass/VacuumCard.module.css",
       "id": "c2758f8ec038ee90",
-      "maxOccurrences": 3,
+      "maxOccurrences": 2,
       "rule": "raw-color-literal",
       "subject": "rgba(255, 255, 255, 0.06)"
     },
@@ -3735,14 +3515,14 @@
     {
       "file": "src/components/hass/VacuumCard.module.css",
       "id": "92058d058eec38dd",
-      "maxOccurrences": 3,
+      "maxOccurrences": 2,
       "rule": "raw-color-literal",
       "subject": "rgba(255, 255, 255, 0.1)"
     },
     {
       "file": "src/components/hass/VacuumCard.module.css",
       "id": "8740f85074574788",
-      "maxOccurrences": 3,
+      "maxOccurrences": 2,
       "rule": "raw-color-literal",
       "subject": "rgba(255, 255, 255, 0.12)"
     },
@@ -3756,7 +3536,7 @@
     {
       "file": "src/components/hass/VacuumCard.module.css",
       "id": "e07cc3908fa17193",
-      "maxOccurrences": 4,
+      "maxOccurrences": 3,
       "rule": "raw-color-literal",
       "subject": "rgba(255, 255, 255, 0.14)"
     },
@@ -3798,7 +3578,7 @@
     {
       "file": "src/components/hass/VacuumCard.module.css",
       "id": "7246ca481cf8a576",
-      "maxOccurrences": 2,
+      "maxOccurrences": 1,
       "rule": "raw-color-literal",
       "subject": "rgba(255, 255, 255, 0.68)"
     },
@@ -3836,13 +3616,6 @@
       "maxOccurrences": 1,
       "rule": "raw-color-literal",
       "subject": "rgba(255, 255, 255, 0.9)"
-    },
-    {
-      "file": "src/components/hass/VacuumCard.module.css",
-      "id": "20090e4e6ab5a6ab",
-      "maxOccurrences": 1,
-      "rule": "raw-color-literal",
-      "subject": "rgba(255, 255, 255, 0.92)"
     },
     {
       "file": "src/components/hass/VacuumCard.module.css",
@@ -3895,13 +3668,6 @@
     },
     {
       "file": "src/components/hass/VacuumCard.module.css",
-      "id": "6892ae85d73e8318",
-      "maxOccurrences": 1,
-      "rule": "raw-color-literal",
-      "subject": "rgba(67, 160, 71, 0.16)"
-    },
-    {
-      "file": "src/components/hass/VacuumCard.module.css",
       "id": "87b2db853eaabfae",
       "maxOccurrences": 1,
       "rule": "raw-color-literal",
@@ -3931,14 +3697,14 @@
     {
       "file": "src/components/hass/VacuumCard.module.css",
       "id": "5d50549ddf779299",
-      "maxOccurrences": 9,
+      "maxOccurrences": 7,
       "rule": "raw-color-literal",
       "subject": "transparent"
     },
     {
       "file": "src/components/hass/VacuumCard.module.css",
       "id": "4e9db13c0e0824fb",
-      "maxOccurrences": 7,
+      "maxOccurrences": 6,
       "rule": "raw-color-literal",
       "subject": "white"
     },
@@ -4063,64 +3829,29 @@
     },
     {
       "file": "src/components/hass/WeatherSummary.module.css",
-      "id": "8d421c86d4711672",
-      "maxOccurrences": 1,
-      "rule": "raw-color-literal",
-      "subject": "#56d7ff"
-    },
-    {
-      "file": "src/components/hass/WeatherSummary.module.css",
-      "id": "827b2aff265c6be5",
-      "maxOccurrences": 1,
-      "rule": "raw-color-literal",
-      "subject": "#5fca7a"
-    },
-    {
-      "file": "src/components/hass/WeatherSummary.module.css",
       "id": "badcbb99287d9513",
-      "maxOccurrences": 3,
+      "maxOccurrences": 2,
       "rule": "raw-color-literal",
       "subject": "#64d8ff"
     },
     {
       "file": "src/components/hass/WeatherSummary.module.css",
       "id": "9a8d967299d52bad",
-      "maxOccurrences": 3,
+      "maxOccurrences": 2,
       "rule": "raw-color-literal",
       "subject": "#a8df85"
     },
     {
       "file": "src/components/hass/WeatherSummary.module.css",
-      "id": "1f42a58b2eea200d",
-      "maxOccurrences": 1,
-      "rule": "raw-color-literal",
-      "subject": "#d9568b"
-    },
-    {
-      "file": "src/components/hass/WeatherSummary.module.css",
-      "id": "666a052843261a0b",
-      "maxOccurrences": 1,
-      "rule": "raw-color-literal",
-      "subject": "#f28b30"
-    },
-    {
-      "file": "src/components/hass/WeatherSummary.module.css",
-      "id": "61a6a84c7e7771bf",
-      "maxOccurrences": 1,
-      "rule": "raw-color-literal",
-      "subject": "#f5d94a"
-    },
-    {
-      "file": "src/components/hass/WeatherSummary.module.css",
       "id": "7175fb3d637b8adc",
-      "maxOccurrences": 3,
+      "maxOccurrences": 2,
       "rule": "raw-color-literal",
       "subject": "#ff8a1f"
     },
     {
       "file": "src/components/hass/WeatherSummary.module.css",
       "id": "5143dabed77cf549",
-      "maxOccurrences": 3,
+      "maxOccurrences": 2,
       "rule": "raw-color-literal",
       "subject": "#ffd34d"
     },
@@ -4134,16 +3865,9 @@
     {
       "file": "src/components/hass/WeatherSummary.module.css",
       "id": "4d1298eb2a475974",
-      "maxOccurrences": 2,
-      "rule": "raw-color-literal",
-      "subject": "rgba(0, 0, 0, 0.14)"
-    },
-    {
-      "file": "src/components/hass/WeatherSummary.module.css",
-      "id": "2ac12b0acaa44014",
       "maxOccurrences": 1,
       "rule": "raw-color-literal",
-      "subject": "rgba(0, 0, 0, 0.18)"
+      "subject": "rgba(0, 0, 0, 0.14)"
     },
     {
       "file": "src/components/hass/WeatherSummary.module.css",
@@ -4172,13 +3896,6 @@
       "maxOccurrences": 1,
       "rule": "raw-color-literal",
       "subject": "rgba(0, 0, 0, 0.34)"
-    },
-    {
-      "file": "src/components/hass/WeatherSummary.module.css",
-      "id": "7c38a5e078d73ebf",
-      "maxOccurrences": 1,
-      "rule": "raw-color-literal",
-      "subject": "rgba(0, 0, 0, 0.35)"
     },
     {
       "file": "src/components/hass/WeatherSummary.module.css",
@@ -4218,7 +3935,7 @@
     {
       "file": "src/components/hass/WeatherSummary.module.css",
       "id": "b4fc0a1ee2869714",
-      "maxOccurrences": 3,
+      "maxOccurrences": 2,
       "rule": "raw-color-literal",
       "subject": "rgba(22, 36, 52, 0.42)"
     },
@@ -4242,20 +3959,6 @@
       "maxOccurrences": 2,
       "rule": "raw-color-literal",
       "subject": "rgba(255, 255, 255, 0.04)"
-    },
-    {
-      "file": "src/components/hass/WeatherSummary.module.css",
-      "id": "19d207140eaef012",
-      "maxOccurrences": 1,
-      "rule": "raw-color-literal",
-      "subject": "rgba(255, 255, 255, 0.05)"
-    },
-    {
-      "file": "src/components/hass/WeatherSummary.module.css",
-      "id": "aae3a52eb7d7616f",
-      "maxOccurrences": 1,
-      "rule": "raw-color-literal",
-      "subject": "rgba(255, 255, 255, 0.06)"
     },
     {
       "file": "src/components/hass/WeatherSummary.module.css",
@@ -4287,22 +3990,8 @@
     },
     {
       "file": "src/components/hass/WeatherSummary.module.css",
-      "id": "6d0dc1756c3f22d3",
-      "maxOccurrences": 1,
-      "rule": "raw-color-literal",
-      "subject": "rgba(255, 255, 255, 0.13)"
-    },
-    {
-      "file": "src/components/hass/WeatherSummary.module.css",
-      "id": "320e636d677736c7",
-      "maxOccurrences": 3,
-      "rule": "raw-color-literal",
-      "subject": "rgba(255, 255, 255, 0.14)"
-    },
-    {
-      "file": "src/components/hass/WeatherSummary.module.css",
       "id": "6a23df7e7c4901a1",
-      "maxOccurrences": 2,
+      "maxOccurrences": 1,
       "rule": "raw-color-literal",
       "subject": "rgba(255, 255, 255, 0.16)"
     },
@@ -4337,7 +4026,7 @@
     {
       "file": "src/components/hass/WeatherSummary.module.css",
       "id": "33c54b5a4cf29be9",
-      "maxOccurrences": 2,
+      "maxOccurrences": 1,
       "rule": "raw-color-literal",
       "subject": "rgba(255, 255, 255, 0.48)"
     },
@@ -4386,16 +4075,9 @@
     {
       "file": "src/components/hass/WeatherSummary.module.css",
       "id": "8fee406de147e41b",
-      "maxOccurrences": 4,
+      "maxOccurrences": 3,
       "rule": "raw-color-literal",
       "subject": "rgba(255, 255, 255, 0.72)"
-    },
-    {
-      "file": "src/components/hass/WeatherSummary.module.css",
-      "id": "61b7dff58619c1fc",
-      "maxOccurrences": 1,
-      "rule": "raw-color-literal",
-      "subject": "rgba(255, 255, 255, 0.76)"
     },
     {
       "file": "src/components/hass/WeatherSummary.module.css",
@@ -4414,7 +4096,7 @@
     {
       "file": "src/components/hass/WeatherSummary.module.css",
       "id": "0597ec52d10ed9bd",
-      "maxOccurrences": 2,
+      "maxOccurrences": 1,
       "rule": "raw-color-literal",
       "subject": "rgba(255, 255, 255, 0.84)"
     },
@@ -4452,13 +4134,6 @@
       "maxOccurrences": 1,
       "rule": "raw-color-literal",
       "subject": "rgba(255, 255, 255, 0)"
-    },
-    {
-      "file": "src/components/hass/WeatherSummary.module.css",
-      "id": "87825dad71ede41c",
-      "maxOccurrences": 1,
-      "rule": "raw-color-literal",
-      "subject": "rgba(30, 55, 78, 0.4)"
     },
     {
       "file": "src/components/hass/WeatherSummary.module.css",
@@ -4539,13 +4214,6 @@
     },
     {
       "file": "src/components/hass/WeatherSummary.module.css",
-      "id": "5db747ac116bcf9c",
-      "maxOccurrences": 1,
-      "rule": "raw-color-literal",
-      "subject": "rgba(85, 160, 214, 0.46)"
-    },
-    {
-      "file": "src/components/hass/WeatherSummary.module.css",
       "id": "ce25607fe9b55a2d",
       "maxOccurrences": 3,
       "rule": "raw-color-literal",
@@ -4554,7 +4222,7 @@
     {
       "file": "src/components/hass/WeatherSummary.module.css",
       "id": "e4c8604c0e2d9e75",
-      "maxOccurrences": 21,
+      "maxOccurrences": 20,
       "rule": "raw-color-literal",
       "subject": "white"
     },
@@ -4918,7 +4586,7 @@
     {
       "file": "src/pages/CustomLightsPage.module.css",
       "id": "b8ca17af81461cc7",
-      "maxOccurrences": 3,
+      "maxOccurrences": 2,
       "rule": "raw-color-literal",
       "subject": "transparent"
     },
@@ -4935,13 +4603,6 @@
       "maxOccurrences": 1,
       "rule": "raw-color-literal",
       "subject": "#050505"
-    },
-    {
-      "file": "src/pages/DashboardViewPage.module.css",
-      "id": "f3603833b990677a",
-      "maxOccurrences": 1,
-      "rule": "raw-color-literal",
-      "subject": "#111"
     },
     {
       "file": "src/pages/DashboardViewPage.module.css",
@@ -5044,7 +4705,7 @@
     {
       "file": "src/pages/DashboardViewPage.module.css",
       "id": "7fb09cc79f6f724c",
-      "maxOccurrences": 2,
+      "maxOccurrences": 1,
       "rule": "raw-color-literal",
       "subject": "rgba(0, 0, 0, 0.34)"
     },
@@ -5068,13 +4729,6 @@
       "maxOccurrences": 1,
       "rule": "raw-color-literal",
       "subject": "rgba(14, 14, 14, 0.82)"
-    },
-    {
-      "file": "src/pages/DashboardViewPage.module.css",
-      "id": "3a061d6c7da3f85c",
-      "maxOccurrences": 1,
-      "rule": "raw-color-literal",
-      "subject": "rgba(20, 20, 20, 0.72)"
     },
     {
       "file": "src/pages/DashboardViewPage.module.css",
@@ -5184,7 +4838,7 @@
     {
       "file": "src/pages/DashboardViewPage.module.css",
       "id": "02fc7cee1028c209",
-      "maxOccurrences": 5,
+      "maxOccurrences": 4,
       "rule": "raw-color-literal",
       "subject": "rgba(255, 255, 255, 0.1)"
     },
@@ -5198,7 +4852,7 @@
     {
       "file": "src/pages/DashboardViewPage.module.css",
       "id": "87891e7d4551e67c",
-      "maxOccurrences": 4,
+      "maxOccurrences": 3,
       "rule": "raw-color-literal",
       "subject": "rgba(255, 255, 255, 0.12)"
     },
@@ -5282,7 +4936,7 @@
     {
       "file": "src/pages/DashboardViewPage.module.css",
       "id": "0822d207038bca11",
-      "maxOccurrences": 2,
+      "maxOccurrences": 1,
       "rule": "raw-color-literal",
       "subject": "rgba(255, 255, 255, 0.68)"
     },
@@ -5334,13 +4988,6 @@
       "maxOccurrences": 5,
       "rule": "raw-color-literal",
       "subject": "rgba(255, 255, 255, 0.9)"
-    },
-    {
-      "file": "src/pages/DashboardViewPage.module.css",
-      "id": "69ce48795ac75934",
-      "maxOccurrences": 1,
-      "rule": "raw-color-literal",
-      "subject": "rgba(255, 255, 255, 0.92)"
     },
     {
       "file": "src/pages/DashboardViewPage.module.css",
@@ -5408,7 +5055,7 @@
     {
       "file": "src/pages/DashboardViewPage.module.css",
       "id": "6a743008f6bc667b",
-      "maxOccurrences": 16,
+      "maxOccurrences": 14,
       "rule": "raw-color-literal",
       "subject": "transparent"
     },
