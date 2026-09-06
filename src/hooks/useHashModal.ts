@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { DAILY_REPORT_HASH } from '../constants/routes'
-import { DASHBOARD_ROUTE_CHANGE_EVENT, dashboardEventTargets, dashboardHash, dashboardPathWithSearch, pushDashboardUrl, replaceDashboardUrl } from './dashboardLocation'
+import { dashboardHash, dashboardPathWithSearch, pushDashboardUrl, replaceDashboardUrl, subscribeDashboardLocation } from './dashboardLocation'
 
 interface UseHashModalOptions {
   /** App chrome hosts the modal for every route instead of a single page. */
@@ -31,21 +31,7 @@ export function useHashModal({ appLevel = false, disabled = false }: UseHashModa
     if (disabled) return undefined
 
     const syncHash = () => setHash(scopedHash(currentHash(), appLevel))
-    const targets = dashboardEventTargets()
-
-    targets.forEach((target) => {
-      target.addEventListener('hashchange', syncHash)
-      target.addEventListener('popstate', syncHash)
-      target.addEventListener(DASHBOARD_ROUTE_CHANGE_EVENT, syncHash)
-    })
-
-    return () => {
-      targets.forEach((target) => {
-        target.removeEventListener('hashchange', syncHash)
-        target.removeEventListener('popstate', syncHash)
-        target.removeEventListener(DASHBOARD_ROUTE_CHANGE_EVENT, syncHash)
-      })
-    }
+    return subscribeDashboardLocation(syncHash, { hashChanges: true })
   }, [appLevel, disabled])
 
   const openHash = useCallback((nextHash: string) => {

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { routePathFromUrl, routeUrl } from '../constants/routes'
-import { DASHBOARD_ROUTE_CHANGE_EVENT, dashboardEventTargets, dashboardHref, pushDashboardUrl, replaceDashboardUrl, setDashboardDocumentTitle } from './dashboardLocation'
+import { dashboardHref, pushDashboardUrl, replaceDashboardUrl, setDashboardDocumentTitle, subscribeDashboardLocation } from './dashboardLocation'
 
 export function useDashboardRoute() {
   const [path, setPath] = useState(() => routePathFromUrl(dashboardHref()))
@@ -14,19 +14,7 @@ export function useDashboardRoute() {
       setPath(nextPath)
     }
 
-    const targets = dashboardEventTargets()
-
-    targets.forEach((target) => {
-      target.addEventListener('popstate', handleNavigation)
-      target.addEventListener(DASHBOARD_ROUTE_CHANGE_EVENT, handleNavigation)
-    })
-
-    return () => {
-      targets.forEach((target) => {
-        target.removeEventListener('popstate', handleNavigation)
-        target.removeEventListener(DASHBOARD_ROUTE_CHANGE_EVENT, handleNavigation)
-      })
-    }
+    return subscribeDashboardLocation(handleNavigation)
   }, [])
 
   useEffect(() => {

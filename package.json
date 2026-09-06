@@ -37,6 +37,7 @@
     "deploy": "tsx scripts/deploy.ts",
     "deploy:both": "npm run build:release && tsx scripts/deploy.ts --yes",
     "deploy:sync": "tsx scripts/sync-dashboard-deployment.ts",
+    "ha:front-door": "tsx scripts/sync-front-door-unsecured.ts",
     "test": "vitest",
     "test:run": "vitest run",
     "test:i18n": "vitest run src/i18n scripts/i18n",
