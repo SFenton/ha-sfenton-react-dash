@@ -55,7 +55,7 @@ export function validateCoverage(
           break
         }
         visited.add(current.spec)
-        const owner = axis === 'landscape' ? current.landscapeOwner : current.safeAreaOwner
+        const owner: string | undefined = axis === 'landscape' ? current.landscapeOwner : current.safeAreaOwner
         current = owner ? entriesBySpec.get(owner) : undefined
         if (current?.[axis] === 'not-applicable') {
           invalidOwnership.push(`${entry.spec}: ${axis} owner does not provide direct coverage`)
@@ -83,10 +83,11 @@ export function validateCoverage(
 }
 
 export function repositoryPlaywrightSpecs(root = process.cwd()) {
-  return readdirSync(resolve(root, 'e2e'), { withFileTypes: true })
-    .filter((entry) => entry.isFile() && entry.name.endsWith('.spec.ts'))
-    .map((entry) => entry.name)
-    .sort()
+  const walk = (directory: string, prefix = ''): string[] => readdirSync(directory, { withFileTypes: true })
+    .flatMap((entry) => entry.isDirectory()
+      ? walk(resolve(directory, entry.name), `${prefix}${entry.name}/`)
+      : entry.isFile() && entry.name.endsWith('.spec.ts') ? [`${prefix}${entry.name}`] : [])
+  return walk(resolve(root, 'e2e')).sort()
 }
 
 export function nestedTestDeclarations(source: string, filename: string) {

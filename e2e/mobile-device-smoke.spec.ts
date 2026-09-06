@@ -1,4 +1,4 @@
-import { devices, expect, test } from '@playwright/test'
+import { devices, expect, test } from './layout/fixture'
 import { modalSheetPresentationForViewport } from '../src/components/core/modalSheetPresentation'
 import { MOBILE_GEOMETRY_PROFILES } from './responsive-acceptance-data'
 import { installSafeAreaInsets, setSafeAreaInsets } from './safe-area'

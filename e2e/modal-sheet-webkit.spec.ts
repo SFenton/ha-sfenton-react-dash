@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './layout/fixture'
 import { setSafeAreaInsets } from './safe-area'
 
 test('WebKit modal scrolling does not depend on unsupported directional touch-action', async ({ page }) => {

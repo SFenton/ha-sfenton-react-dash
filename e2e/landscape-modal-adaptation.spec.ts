@@ -1,4 +1,4 @@
-import { expect, test, type Locator, type Page } from '@playwright/test'
+import { expect, test, type Locator, type Page } from './layout/fixture'
 import type { ModalBodyTier } from '../src/components/core/modalSheetPresentation'
 import { setSafeAreaInsets } from './safe-area'
 

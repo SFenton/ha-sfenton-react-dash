@@ -1,0 +1,296 @@
+import { test, expect, type Locator, type Page } from './layout/fixture'
+import { applyHostProfile, openHost, openSurface } from './layout/app'
+import { SCENARIO_IDS, SURFACE_CONTRACTS, type ScenarioId } from './layout/contracts'
+import { journey, obligationsFor, SOURCE_ROUTES } from './layout/scenarios'
+import { actualCapabilities, applyProfile, assertDeclaredTabs, checkpoint, closeMounted, contextForProject, modalFacts, runEnvironment, waitForModalReady, waitForNavigation, waitForRoute } from './layout/evidence'
+import { layoutProfile } from './responsive-acceptance-data'
+import { quickLinksLayout } from './quick-links'
+import { MUSIC_ROOM_REMOTE_ENTITY_ID } from '../src/constants/mediaRemotes'
+
+async function stateFacts(page: Page, dialog: Locator, scenario: ScenarioId, state: string) {
+  const preferredScrollMode = scenario === 'remote' || (scenario === 'quick-links' && state === 'rooms') ? 'panes' : 'body'
+  const facts: Record<string, unknown> = await modalFacts(dialog, preferredScrollMode)
+  await expect(dialog).toHaveAttribute('data-layout-mounted', 'original')
+  if (scenario === 'quick-links' && state !== 'rooms') {
+    const layout = await quickLinksLayout(dialog)
+    expect(layout.cards.length).toBeGreaterThan(0)
+    for (const card of layout.cards) {
+      expect(card.copyFits).toBe(true)
+      expect(Math.abs(card.height - (facts.presentation === 'sheet' ? 120 : 88))).toBeLessThanOrEqual(0.1)
+    }
+    facts.links = layout
+  }
+  if (scenario === 'quick-links' && state === 'rooms') {
+    const grids = await dialog.locator('[style*="--modal-square-card-size"]').evaluateAll((elements) => elements.map((grid) => {
+      const style = getComputedStyle(grid)
+      const box = grid.getBoundingClientRect()
+      return {
+        width: box.width - Number.parseFloat(style.paddingLeft) - Number.parseFloat(style.paddingRight),
+        left: box.left + Number.parseFloat(style.paddingLeft),
+        cards: Array.from(grid.querySelectorAll('button')).map((card) => {
+          const rect = card.getBoundingClientRect()
+          return { x: rect.x, y: rect.y, width: rect.width, height: rect.height }
+        }),
+      }
+    }))
+    expect(grids.length).toBeGreaterThan(0)
+    for (const grid of grids) {
+      expect(grid.cards.length).toBeGreaterThan(0)
+      if (facts.presentation === 'landscape-dialog') {
+        const columns = Math.max(1, Math.floor((grid.width + 10) / 142))
+        const track = (grid.width - (columns - 1) * 10) / columns
+        for (const card of grid.cards) {
+          expect(Math.abs(card.width - track)).toBeLessThanOrEqual(1)
+          expect(Math.abs(card.height - card.width)).toBeLessThanOrEqual(1)
+        }
+        const rows = new Map<number, typeof grid.cards>()
+        for (const card of grid.cards) rows.set(Math.round(card.y), [...(rows.get(Math.round(card.y)) ?? []), card])
+        for (const row of rows.values()) {
+          expect(Math.abs(row[0].x - grid.left)).toBeLessThanOrEqual(1)
+          if (row.length === columns) expect(Math.abs(row.at(-1)!.x + row.at(-1)!.width - row[0].x - grid.width)).toBeLessThanOrEqual(1)
+        }
+      }
+    }
+    facts.grids = grids
+  }
+  if (scenario === 'summary') {
+    const label = state === 'overdue' ? 'Overdue Chores' : state === 'upcoming' ? 'Upcoming Chores' : 'Expired Food'
+    const list = dialog.getByLabel(`${label} ${state === 'expired' ? 'inventory' : 'todo'} list`, { exact: true })
+    await expect(list).toBeVisible()
+    const rows = state === 'expired' ? list.locator('[data-expiry-tone="expired"]') : list.locator('li')
+    await expect(rows.first()).toBeVisible()
+    const count = await rows.count()
+    expect(count).toBeGreaterThan(0)
+    const expectedColumns = facts.tier === 'standard' || facts.tier === 'wide' ? Math.min(2, count) : 1
+    const rowGeometry = () => rows.evaluateAll((elements) => elements.map((element) => {
+      const rect = element.getBoundingClientRect()
+      return { x: rect.x, y: rect.y, width: rect.width, height: rect.height }
+    }))
+    await expect.poll(async () => new Set((await rowGeometry()).map((row) => Math.round(row.x))).size, {
+      message: 'The incoming Summary rows, not just CSS column declarations, must reflow before capture',
+    }).toBe(expectedColumns)
+    const typography = await list.locator('strong, small').evaluateAll((elements) => elements.map((element) => {
+      const range = document.createRange()
+      range.selectNodeContents(element)
+      return { tag: element.tagName, size: Number.parseFloat(getComputedStyle(element).fontSize), glyphHeight: range.getBoundingClientRect().height }
+    }))
+    expect(typography.length).toBeGreaterThan(0)
+    for (const font of typography) expect(Math.abs(font.size - (font.tag === 'STRONG' ? 13.12 : 11.2))).toBeLessThan(0.01)
+    facts.selectedState = label
+    facts.typography = typography
+    facts.rowGeometry = await rowGeometry()
+    facts.columns = expectedColumns
+  }
+  if (scenario === 'filters') {
+    const choices = dialog.getByRole('radio')
+    expect(await choices.count()).toBeGreaterThan(0)
+    if (facts.presentation !== 'sheet') {
+      const clipped = await choices.locator('strong, small').evaluateAll((elements) =>
+        elements.filter((element) => element.scrollWidth > element.clientWidth + 1 || element.scrollHeight > element.clientHeight + 1).length)
+      expect(clipped).toBe(0)
+      facts.clippedDescriptions = clipped
+    }
+    facts.choiceCount = await choices.count()
+  }
+  if (scenario === 'form') {
+    await expect(dialog.getByRole('textbox', { name: 'Task' })).toHaveValue('Layout validation draft')
+    facts.draft = 'preserved'
+  }
+  if (scenario === 'remote') {
+    const pad = dialog.locator('[role="group"][aria-label$=" remote controls"]')
+    const body = dialog.locator('[data-modal-sheet-body]')
+    await body.evaluate((element) => { element.scrollTop = 0 })
+    const buttons = await pad.getByRole('button').evaluateAll((elements) => elements.map((element) => {
+      const box = element.getBoundingClientRect()
+      const owner = element.closest('[data-modal-sheet-body]')!.getBoundingClientRect()
+      return { width: box.width, height: box.height, visible: box.top >= owner.top - 1 && box.bottom <= owner.bottom + 1 }
+    }))
+    expect(buttons).toHaveLength(5)
+    for (const button of buttons) {
+      expect(button.width).toBeGreaterThanOrEqual(44)
+      expect(button.height).toBeGreaterThanOrEqual(44)
+      expect(button.visible).toBe(true)
+    }
+    await page.evaluate(() => { window.__mockHass!.calls.length = 0 })
+    const box = await pad.getByRole('button', { name: 'Down', exact: true }).boundingBox()
+    if (!box) throw new Error('Missing coordinate target')
+    await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2)
+    await expect.poll(() => page.evaluate(() => window.__mockHass!.calls)).toEqual([
+      expect.objectContaining({ domain: 'remote', service: 'send_command', target: MUSIC_ROOM_REMOTE_ENTITY_ID, serviceData: { command: 'DPAD_DOWN' } }),
+    ])
+    expect(await body.evaluate((element) => element.scrollTop)).toBe(0)
+    facts.pad = buttons
+    facts.command = 'remote.send_command / DPAD_DOWN; exactly once, without auto-scroll'
+  }
+  return facts
+}
+
+async function pageFacts(page: Page, back: boolean) {
+  await waitForNavigation(page)
+  const facts = await page.evaluate((route) => {
+    const main = document.querySelector(`[data-route-path="${route}"]:not([aria-hidden="true"]) main`)!
+    if (!main) throw new Error(`Missing active route main: ${route}`)
+    const scroller = main.querySelector<HTMLElement>('[data-page-scroller]')!
+    const visible = (element: Element) => {
+      const rect = element.getBoundingClientRect()
+      return rect.width > 0 && rect.height > 0 && getComputedStyle(element).visibility !== 'hidden'
+    }
+    const buttons = Array.from(document.querySelectorAll('[data-app-header] button, [data-adaptive-navigation] button, [data-floating-action-dock] button')).filter(visible)
+    const overlaps = buttons.filter((button) => {
+      const rect = button.getBoundingClientRect()
+      const hit = document.elementFromPoint(rect.x + rect.width / 2, rect.y + rect.height / 2)
+      return rect.top >= 0 && rect.bottom <= innerHeight && !(hit === button || button.contains(hit))
+    }).length
+    return {
+      heading: main.querySelector('h1')?.textContent,
+      navigation: document.querySelector<HTMLElement>('[data-app-shell]')?.dataset.navigationLayout,
+      overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      scrollOwner: getComputedStyle(scroller).overflowY,
+      back: main.querySelectorAll('[data-app-header-back]').length,
+      menu: main.querySelectorAll('button[aria-label="Open navigation menu"]').length,
+      overlaps,
+    }
+  }, back ? 'living-room' : 'overview')
+  expect(facts.heading).toBe(back ? 'Living Room' : 'Home')
+  expect(facts.overflow).toBeLessThanOrEqual(1)
+  expect(['auto', 'scroll']).toContain(facts.scrollOwner)
+  expect(facts.overlaps).toBe(0)
+  if (back) { expect(facts.back).toBe(1); expect(facts.menu).toBe(0) }
+  return facts
+}
+
+for (const scenario of SCENARIO_IDS) {
+  test(`layout contract: ${scenario}`, { annotation: { type: 'layout-scenario', description: scenario } }, async ({ page, browser, browserName, isMobile, hasTouch }, testInfo) => {
+    test.setTimeout(240_000)
+    const context = contextForProject(testInfo.project.name)
+    const environment = runEnvironment()
+    const obligations = environment
+      ? environment.plan.obligations.filter((entry) => entry.scenario === scenario && entry.context === context)
+      : obligationsFor([scenario], [context])
+    expect(obligations.length, 'Required runtime loop is nonempty').toBeGreaterThan(0)
+    await page.setViewportSize(layoutProfile(journey(scenario, context)[0]).viewport)
+    const capabilities = await actualCapabilities(page, browserName, browser.version(), isMobile, hasTouch)
+    if (scenario === 'form' && isMobile) await page.addInitScript(() => {
+      Object.defineProperty(navigator, 'maxTouchPoints', { configurable: true, value: 1 })
+      const viewport = Object.assign(new EventTarget(), { layoutSynthetic: true, width: innerWidth, height: innerHeight, offsetTop: 0, offsetLeft: 0, pageTop: 0, pageLeft: 0, scale: 1 })
+      Object.defineProperty(window, 'visualViewport', { configurable: true, value: viewport })
+    })
+
+    if (scenario === 'host') {
+      for (const state of SURFACE_CONTRACTS.host.states) {
+        const frame = await openHost(page, state)
+        const origin = await frame.evaluate(() => performance.timeOrigin)
+        for (const obligation of obligations.filter((entry) => entry.state === state)) {
+          await applyHostProfile(page, frame, state, obligation.profile)
+          await frame.getByRole('button', { name: 'Quick Links', exact: true }).click()
+          const dialog = frame.getByRole('dialog')
+          const facts = await modalFacts(dialog)
+          expect(await frame.evaluate(() => performance.timeOrigin)).toBe(origin)
+          await checkpoint(page, frame, testInfo, obligation, await actualCapabilities(frame, browserName, browser.version(), isMobile, hasTouch), {
+            ...facts, host: `Actual ${state} bridge in a synthetic host, not deployed HA`,
+            insetDelivery: 'outer document → product bridge → React document',
+            event: 'resize without HA replacing the host element', retainedTimeOrigin: true,
+          })
+          await closeMounted(dialog)
+        }
+      }
+      return
+    }
+    if (scenario === 'preload') {
+      await page.goto('/index.html?path=overview')
+      const cache = page.locator('[data-dashboard-preload-cache]')
+      await expect(cache).toBeAttached()
+      const facts = await cache.evaluate((element) => ({
+        routes: element.querySelectorAll('[data-preload-route]').length,
+        mediaElements: element.querySelectorAll('img,video,canvas').length,
+        hidden: element.getAttribute('aria-hidden'),
+        services: window.__mockHass?.calls.length,
+      }))
+      expect(facts).toEqual({ routes: SOURCE_ROUTES.length, mediaElements: 0, hidden: 'true', services: 0 })
+      await checkpoint(page, page, testInfo, obligations[0], capabilities, { ...facts, phase: 'Initial hydration; the inert cache is intentionally removed once the app is ready' })
+      await waitForRoute(page, 'overview')
+      return
+    }
+    if (scenario === 'navigation') {
+      for (const state of SURFACE_CONTRACTS.navigation.states) {
+        const route = state === 'home' ? 'overview' : 'living-room'
+        await page.goto(`/index.html?path=${route}`)
+        await waitForRoute(page, route)
+        for (const obligation of obligations.filter((entry) => entry.state === state)) {
+          await applyProfile(page, obligation.profile)
+          const facts = await pageFacts(page, state === 'back-page')
+          if (!hasTouch && state === 'home' && facts.navigation === 'rail') {
+            const home = page.locator('[data-adaptive-navigation="rail"]').getByRole('button', { name: 'Home' })
+            await home.focus()
+            await expect(home).toBeFocused()
+          }
+          await checkpoint(page, page, testInfo, obligation, capabilities, facts)
+        }
+        if (state === 'back-page') {
+          await page.getByRole('button', { name: 'Go back' }).click()
+          await waitForRoute(page, 'overview')
+        }
+      }
+      return
+    }
+    const dialog = await openSurface(page, scenario)
+    const tabs = SURFACE_CONTRACTS[scenario].tabs
+    if (tabs) assertDeclaredTabs(await dialog.getByRole('tab').evaluateAll((elements) =>
+      elements.map((element) => element.getAttribute('aria-label') ?? element.textContent?.trim() ?? '')), tabs)
+    for (const state of SURFACE_CONTRACTS[scenario].states) {
+      if (scenario === 'quick-links' && state === 'rooms') await dialog.getByRole('button', { name: 'Rooms', exact: true }).click()
+      if (scenario === 'quick-links' && state === 'back') await dialog.getByRole('button', { name: 'Back', exact: true }).click()
+      if (scenario === 'summary') await dialog.getByRole('tab', { name: state === 'overdue' ? /^Overdue Chores/ : state === 'upcoming' ? 'Upcoming Chores' : /^Expired Food/ }).click()
+      let firstFrame: unknown
+      for (const obligation of obligations.filter((entry) => entry.state === state)) {
+        await applyProfile(page, obligation.profile)
+        try {
+        const facts = await stateFacts(page, dialog, scenario, state)
+        if (obligation.step === 0) firstFrame = facts.frame
+        const stages = journey(scenario, context)
+        if (obligation.step === stages.length - 1 && stages[0] === stages.at(-1)) {
+          const start = firstFrame as Record<string, number>
+          const end = facts.frame as Record<string, number>
+          for (const key of ['x', 'y', 'width', 'height']) expect(Math.abs(start[key] - end[key]), 'Mounted return geometry').toBeLessThanOrEqual(1)
+          facts.returnGeometry = 'unchanged within 1 CSS pixel'
+        }
+        if (scenario === 'form' && isMobile && obligation.profile === 'island-phone-landscape-left') {
+          await dialog.getByRole('textbox').focus()
+          await page.evaluate(() => {
+            Object.assign(window.visualViewport!, { height: 263 })
+            window.visualViewport!.dispatchEvent(new Event('resize'))
+          })
+          await expect.poll(() => page.evaluate(() => document.documentElement.style.getPropertyValue('--dashboard-keyboard-overlay-inset'))).toBe('130px')
+          const close = await dialog.getByRole('button', { name: 'Close', exact: true }).boundingBox()
+          expect(close!.y + close!.height).toBeLessThanOrEqual(263)
+          facts.keyboard = { synthetic: true, touchPointsHint: 1, visibleHeight: 263, closeBottom: close!.y + close!.height }
+          await applyProfile(page, obligation.profile)
+          await dialog.getByRole('textbox').blur()
+          await waitForModalReady(dialog)
+        }
+        await checkpoint(page, page, testInfo, obligation, capabilities, facts)
+        } catch (error) {
+          const failure = error instanceof Error ? error.message : String(error)
+          const body = dialog.locator('[data-modal-sheet-body]')
+          if (failure.includes('Intrinsic body measure') && await body.count()) {
+            await body.evaluate((element) => element.scrollTo({ top: element.scrollHeight, behavior: 'instant' }))
+          }
+          const observed = await page.evaluate(() => {
+            const modal = document.querySelector<HTMLElement>('[role="dialog"]')
+            return { title: modal?.querySelector('h2')?.textContent, intent: modal?.dataset.modalGeometryIntent, presentation: modal?.dataset.modalPresentation }
+          })
+          await checkpoint(page, page, testInfo, obligation, capabilities, { failure, observed, capture: 'Failure diagnostic; intended-state acceptance is not proven' }, 'failed')
+          expect.soft(false, `${obligation.id}: ${failure}`).toBe(true)
+          if (await body.count()) await body.evaluate((element) => element.scrollTo({ top: 0, behavior: 'instant' }))
+        }
+      }
+    }
+    if (scenario === 'form') {
+      await page.evaluate(() => window.__mockHass!.setCallServiceOutcome('todo', 'add_item', 'reject'))
+      await dialog.getByRole('button', { name: 'Add Task', exact: true }).click()
+      await expect(dialog).toContainText('Mock service rejection')
+      await expect(dialog.getByRole('textbox')).toHaveValue('Layout validation draft')
+    }
+    await closeMounted(dialog)
+  })
+}

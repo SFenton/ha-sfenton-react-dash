@@ -10,14 +10,28 @@ export const RESPONSIVE_ROUTE_TITLES = new Map(DASHBOARD_ROUTES.map((route) => [
       : route.title,
 ]))
 
+export const VIEWPORTS = {
+  'phone-portrait': { height: 852, name: 'phone-portrait', width: 393 },
+  'phone-landscape': { height: 393, name: 'phone-landscape', width: 852 },
+  'ipad-portrait': { height: 1180, name: 'ipad-portrait', width: 820 },
+  'ipad-landscape': { height: 820, name: 'ipad-landscape', width: 1180 },
+  desktop: { height: 900, name: 'desktop', width: 1440 },
+  'wide-desktop': { height: 1080, name: 'wide-desktop', width: 1920 },
+  'passport-foldable-landscape': { height: 741, name: 'passport-foldable-landscape', width: 1152 },
+  'square-foldable-landscape': { height: 836, name: 'square-foldable-landscape', width: 842 },
+  'passport-foldable-portrait': { height: 1152, name: 'passport-foldable-portrait', width: 741 },
+} as const
+
+export const CANONICAL_VIEWPORT_NAMES = [
+  'phone-portrait', 'phone-landscape', 'passport-foldable-landscape', 'square-foldable-landscape',
+  'ipad-portrait', 'ipad-landscape', 'desktop', 'wide-desktop',
+] as const
+
+// The broad sweep intentionally uses one compact-wide representative.
 export const RESPONSIVE_VIEWPORTS = [
-  { height: 852, name: 'phone-portrait', width: 393 },
-  { height: 393, name: 'phone-landscape', width: 852 },
-  { height: 1180, name: 'ipad-portrait', width: 820 },
-  { height: 820, name: 'ipad-landscape', width: 1180 },
-  { height: 900, name: 'desktop', width: 1440 },
-  { height: 1080, name: 'wide-desktop', width: 1920 },
-  { height: 741, name: 'passport-foldable-landscape', width: 1152 },
+  VIEWPORTS['phone-portrait'], VIEWPORTS['phone-landscape'], VIEWPORTS['ipad-portrait'],
+  VIEWPORTS['ipad-landscape'], VIEWPORTS.desktop, VIEWPORTS['wide-desktop'],
+  VIEWPORTS['passport-foldable-landscape'],
 ] as const
 
 export interface SafeAreaInsets {
@@ -150,3 +164,35 @@ export const ROUTE_SAFE_AREA_PROFILES = MOBILE_GEOMETRY_PROFILES.filter((profile
 
 export type ResponsiveRoute = (typeof RESPONSIVE_ROUTES)[number]
 export type ResponsiveViewport = typeof RESPONSIVE_VIEWPORTS[number]
+
+export const LAYOUT_PROFILES: Record<string, { viewport: { width: number; height: number }; insets: SafeAreaInsets }> = {
+  ...Object.fromEntries(Object.entries(VIEWPORTS).map(([name, viewport]) => [
+    name, { viewport, insets: { top: 0, right: 0, bottom: 0, left: 0 } },
+  ])),
+  ...Object.fromEntries(MOBILE_GEOMETRY_PROFILES.map(({ name, viewport, insets }) => [name, { viewport, insets }])),
+  'intermediate-landscape': { viewport: { width: 734, height: 343 }, insets: { top: 0, right: 0, bottom: 0, left: 0 } },
+  'rail-below': { viewport: { width: 1119, height: 819 }, insets: { top: 0, right: 0, bottom: 0, left: 0 } },
+  'rail-at': { viewport: { width: 1120, height: 820 }, insets: { top: 0, right: 0, bottom: 0, left: 0 } },
+  'rail-above': { viewport: { width: 1121, height: 821 }, insets: { top: 0, right: 0, bottom: 0, left: 0 } },
+}
+
+export function layoutProfile(name: string) {
+  const profile = LAYOUT_PROFILES[name]
+  if (!profile) throw new Error(`Unknown layout profile: ${name}`)
+  return profile
+}
+
+export const LAYOUT_JOURNEYS = {
+  modal: [
+    'island-phone-portrait', 'island-phone-landscape-left', 'island-phone-landscape-right',
+    'rectangular-phone-landscape', 'small-rectangular-landscape', 'intermediate-landscape',
+    'ipad-portrait', 'ipad-landscape', 'passport-foldable-landscape', 'square-foldable-landscape',
+    'desktop', 'wide-desktop', 'island-phone-portrait',
+  ],
+  navigation: [
+    'phone-portrait', 'phone-landscape', 'phone-portrait', 'desktop', 'phone-portrait',
+    'ipad-portrait', 'ipad-landscape', 'ipad-portrait',
+    'passport-foldable-portrait', 'passport-foldable-landscape', 'passport-foldable-portrait',
+    'square-foldable-landscape', 'rail-below', 'rail-at', 'rail-above', 'wide-desktop', 'phone-portrait',
+  ],
+} as const

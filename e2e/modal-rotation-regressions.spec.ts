@@ -1,4 +1,5 @@
-import { expect, test, type Locator, type Page } from '@playwright/test'
+import { expect, test, type Locator, type Page } from './layout/fixture'
+import { waitForModalReady, type ModalReadiness } from './layout/evidence'
 import { writeFileSync } from 'node:fs'
 import { ROOM_PAGE_CONFIGS } from '../src/constants/roomPages'
 import { MEDIA_REMOTE_CONFIGS } from '../src/constants/mediaRemotes'
@@ -22,25 +23,8 @@ const LANDSCAPES = [
 type Profile = typeof PORTRAIT
 type Box = { x: number; y: number; width: number; height: number }
 
-async function settle(dialog: Locator) {
-  await expect(dialog).toBeVisible()
-  await expect.poll(() => dialog.evaluate((element) => {
-    const style = getComputedStyle(element)
-    return {
-      opacity: style.opacity,
-      initialStarting: element.getAttribute('data-initial-starting-style'),
-      starting: element.hasAttribute('data-starting-style'),
-      animations: element.getAnimations().filter((animation) => animation.playState === 'running').length,
-      tabContentSettled: Array.from(element.querySelectorAll('[data-modal-tab-transition-state]'))
-        .every((panel) => panel.getAttribute('data-modal-tab-transition-state') === 'idle'),
-      selectedPanelsMatch: Array.from(element.querySelectorAll('[role="tab"][aria-selected="true"]')).every((tab) => {
-        const panelId = tab.getAttribute('aria-controls')
-        const panel = panelId ? document.getElementById(panelId) : null
-        const labelledBy = panel?.getAttribute('aria-labelledby')
-        return !labelledBy || labelledBy.split(/\s+/).includes(tab.id)
-      }),
-    }
-  })).toEqual({ opacity: '1', initialStarting: null, starting: false, animations: 0, tabContentSettled: true, selectedPanelsMatch: true })
+async function settle(dialog: Locator, readiness: ModalReadiness = 'tabs') {
+  await waitForModalReady(dialog, 5_000, readiness)
 }
 
 async function resize(page: Page, profile: Profile) {
@@ -48,8 +32,8 @@ async function resize(page: Page, profile: Profile) {
   await setSafeAreaInsets(page, profile.insets)
 }
 
-async function outerBox(dialog: Locator): Promise<Box> {
-  await settle(dialog)
+async function outerBox(dialog: Locator, readiness: ModalReadiness = 'tabs'): Promise<Box> {
+  await settle(dialog, readiness)
   const box = await dialog.boundingBox()
   if (!box) throw new Error('Open modal has no bounding box')
   return box
@@ -61,9 +45,9 @@ function expectBox(actual: Box, expected: Box, label: string) {
   }
 }
 
-async function expectLandscapeFrame(dialog: Locator, profile: Profile) {
+async function expectLandscapeFrame(dialog: Locator, profile: Profile, readiness: ModalReadiness = 'tabs') {
   await expect(dialog).toHaveAttribute('data-modal-presentation', 'landscape-dialog')
-  expectBox(await outerBox(dialog), {
+  expectBox(await outerBox(dialog, readiness), {
     x: profile.insets.left + 12,
     y: profile.insets.top + 8,
     width: profile.width - profile.insets.left - profile.insets.right - 24,
@@ -570,10 +554,11 @@ for (const room of CONFIGURED_ROOM_MODALS) {
         await page.goto(`/index.html?path=${room.path}&modalOpener=${encodeURIComponent(opener.hash)}${opener.hash}`)
         await setSafeAreaInsets(page, PORTRAIT.insets)
         const dialog = page.getByRole('dialog')
-        await settle(dialog)
+        const readiness = opener.kind === 'vacuum' ? 'vacuum-tabs' : 'tabs'
+        await settle(dialog, readiness)
         await expect(dialog).toHaveAttribute('data-modal-geometry-intent', /.+/)
         await dialog.evaluate((element) => { element.setAttribute('data-configured-modal-node', 'original') })
-        const portrait = await outerBox(dialog)
+        const portrait = await outerBox(dialog, readiness)
         const tabNames = await dialog.getByRole('tab').evaluateAll((tabs) =>
           tabs.map((tab) => tab.getAttribute('aria-label') ?? tab.textContent?.trim() ?? ''))
         for (const [index, name] of (tabNames.length > 0 ? tabNames : [null]).entries()) {
@@ -582,14 +567,14 @@ for (const room of CONFIGURED_ROOM_MODALS) {
             await expect(tab).toBeEnabled()
             await tab.click()
           }
-          await settle(dialog)
+          await settle(dialog, readiness)
           const artifact = `${room.path}-${opener.hash.slice(1)}-${index}`
           if (testInfo.project.name === 'mobile') {
             await page.screenshot({ path: testInfo.outputPath(`${artifact}-portrait.png`), scale: 'css' })
           }
           for (const profile of [LANDSCAPES[0], LANDSCAPES[1], LANDSCAPES[2]]) {
             await resize(page, profile)
-            await expectLandscapeFrame(dialog, profile)
+            await expectLandscapeFrame(dialog, profile, readiness)
             await expect(dialog).toHaveAttribute('data-configured-modal-node', 'original')
             if (tab) await expect(tab).toHaveAttribute('aria-selected', 'true')
             const body = dialog.locator('[data-modal-sheet-body]')
@@ -600,10 +585,10 @@ for (const room of CONFIGURED_ROOM_MODALS) {
           }
           await resize(page, { width: 1440, height: 900, insets: { top: 0, right: 0, bottom: 0, left: 0 } })
           await expect(dialog).toHaveAttribute('data-modal-presentation', 'dialog')
-          expectBox(await outerBox(dialog), { x: 170, y: 70, width: 1100, height: 760 }, `${artifact}: common desktop frame`)
+          expectBox(await outerBox(dialog, readiness), { x: 170, y: 70, width: 1100, height: 760 }, `${artifact}: common desktop frame`)
           await resize(page, PORTRAIT)
           await expect(dialog).toHaveAttribute('data-modal-presentation', 'sheet')
-          expectBox(await outerBox(dialog), portrait, `${artifact}: unchanged portrait frame`)
+          expectBox(await outerBox(dialog, readiness), portrait, `${artifact}: unchanged portrait frame`)
           if (tab) await expect(tab).toHaveAttribute('aria-selected', 'true')
           states.push({ route: room.path, hash: opener.hash, kind: opener.kind, tab: name ?? 'root', intent: await dialog.getAttribute('data-modal-geometry-intent') })
         }
@@ -725,10 +710,10 @@ test('recipe planner and ingredient search retain one frame and entered values o
   await expect(dialog.getByText('Serves 4')).toBeVisible()
   await dialog.evaluate((element) => { element.setAttribute('data-recipe-flow-node', 'original') })
   const portrait = await outerBox(dialog)
-  const rotateDetail = async (control: Locator) => {
+  const rotateDetail = async (control: Locator, readiness: ModalReadiness) => {
     for (const profile of [LANDSCAPES[0], LANDSCAPES[1], LANDSCAPES[2]]) {
       await resize(page, profile)
-      await expectLandscapeFrame(dialog, profile)
+      await expectLandscapeFrame(dialog, profile, readiness)
       await expect(dialog).toHaveAttribute('data-recipe-flow-node', 'original')
       await control.scrollIntoViewIfNeeded()
       await expect(control).toBeInViewport()
@@ -736,15 +721,15 @@ test('recipe planner and ingredient search retain one frame and entered values o
     }
     await resize(page, { width: 1440, height: 900, insets: { top: 0, right: 0, bottom: 0, left: 0 } })
     await expect(dialog).toHaveAttribute('data-modal-presentation', 'dialog')
-    expectBox(await outerBox(dialog), { x: 170, y: 70, width: 1100, height: 760 }, 'recipe detail desktop')
+    expectBox(await outerBox(dialog, readiness), { x: 170, y: 70, width: 1100, height: 760 }, 'recipe detail desktop')
     await resize(page, PORTRAIT)
     await expect(dialog).toHaveAttribute('data-modal-presentation', 'sheet')
-    expectBox(await outerBox(dialog), portrait, 'recipe detail portrait')
+    expectBox(await outerBox(dialog, readiness), portrait, 'recipe detail portrait')
   }
   await dialog.getByRole('button', { name: 'Add to My Week', exact: true }).click()
   const date = dialog.getByLabel('Cookidoo My Week date')
   const initialDate = await date.inputValue()
-  await rotateDetail(date)
+  await rotateDetail(date, 'recipe-planner')
   await expect(date).toHaveValue(initialDate)
   await dialog.getByRole('button', { name: 'Back to recipe', exact: true }).click()
   await dialog.getByRole('tab', { name: 'Ingredients', exact: true }).click()
@@ -752,7 +737,7 @@ test('recipe planner and ingredient search retain one frame and entered values o
   const search = dialog.getByRole('searchbox', { name: 'Search inventory products' })
   await search.fill('beans')
   await expect(dialog.getByRole('button', { name: /Canned Beans.*in inventory/ })).toBeVisible()
-  await rotateDetail(search)
+  await rotateDetail(search, 'recipe-product-picker')
   await expect(search).toHaveValue('beans')
   await dialog.getByRole('button', { name: 'Back and mark ingredient available', exact: true }).click()
   await expect(dialog.getByRole('tab', { name: 'Ingredients', exact: true })).toHaveAttribute('aria-selected', 'true')

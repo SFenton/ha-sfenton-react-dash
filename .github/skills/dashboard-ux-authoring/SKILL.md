@@ -19,6 +19,7 @@ Read before editing:
 
 - [Current UX Contract](../../../docs/ux/current-ux-contract.md)
 - [Validation Matrix](../../../docs/ux/validation-matrix.md)
+- [Executable Layouts](../../../docs/ux/layouts.md)
 - [Interaction Semantics](../../instructions/interaction-semantics.instructions.md)
 - every other repository instruction matching the target files
 
@@ -93,6 +94,21 @@ updates and cascading side effects; React uses one shared command path and
 
 ### 4. Validate narrowly
 
+First run `layout:check` and create a `layout:plan` against an explicit resolved
+master SHA in the approved worktree. Inspect the owners, complete declared state
+set, contexts, transitions, legacy fallback and blockers before editing or
+validating. The registry, not a second per-task viewport list, drives both
+automated assertions and manual inspection. Copy length is not a layout exemption.
+
+Use `layout:run` for owned, no-proxy mock builds/servers and exact collected test
+selection. Then actually replay the manual worklist, view the unnormalized images
+with an image-capable tool and record observations tied to checkpoints/hashes.
+Run `layout:verify` before acceptance. Never mark captures as manually inspected
+automatically. Missing engines, stale source, incomplete loops and access-unavailable
+artifacts block their required obligations. Device-only gaps remain explicit.
+The commands below remain useful for focused development; they do not replace
+the plan's completed acceptance ledger.
+
 Run the smallest applicable commands:
 
 ```bash
@@ -144,3 +160,5 @@ Report semantics and state/service coverage, shared primitives and i18n work,
 focused commands/results, visual evidence or blockers, exact files changed,
 and remaining integration concerns. State whether deployment or HA mutation
 was performed.
+Include the plan/run/assessment paths and distinguish checkpoint-certified,
+coarse legacy, manually reviewed and device-only evidence.

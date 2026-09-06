@@ -1,4 +1,4 @@
-import { expect, test, type Locator, type Page } from '@playwright/test'
+import { expect, test, type Locator, type Page } from './layout/fixture'
 import { modalSheetPresentationForViewport } from '../src/components/core/modalSheetPresentation'
 import { OCCUPANCY_GROUPS } from '../src/constants/atAGlance'
 import { SHOW_OUTDOOR_FAUCETS_ENTITY_ID } from '../src/constants/sprinklers'

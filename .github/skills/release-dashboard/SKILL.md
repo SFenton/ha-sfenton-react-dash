@@ -18,7 +18,8 @@ changed panel package requires a separately approved restart.
 
 ## Required preflight
 
-1. Read the repository instructions, `docs/ux/validation-matrix.md`, and every
+1. Read the repository instructions, `docs/ux/layouts.md`,
+   `docs/ux/validation-matrix.md`, and every
    instruction file matching the release-owned files.
 2. Inspect `git status`, the complete diff, the current branch, `origin/master`,
    GitHub CLI authentication, and open PRs.
@@ -28,8 +29,12 @@ changed panel package requires a separately approved restart.
 4. Confirm the task's required validation is complete. Re-run `npm run check`
    and the smallest affected Playwright release gates if the working tree
    changed after the last successful run.
-   Never set `PLAYWRIGHT_REUSE_SERVER=1` for release validation; release tests
-   must own a fresh build and server.
+   Require a successful current `layout:verify` assessment for the release-owned
+   changes, including actual manual image/interaction review. Check source,
+   fixture, build and served-asset fingerprints; replan when they changed.
+   Release tests must own their build/server and must not enable
+   `reuseExistingServer` or borrow an unowned port. Local mock acceptance does
+   not satisfy real-device or production-host verification.
 5. Never print tokens, passwords, private keys, or environment-file contents.
 
 ## Git and GitHub release

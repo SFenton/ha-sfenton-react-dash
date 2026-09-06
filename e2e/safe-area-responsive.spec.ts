@@ -1,4 +1,4 @@
-import { expect, test, type Locator, type Page } from '@playwright/test'
+import { expect, test, type Locator, type Page } from './layout/fixture'
 import {
   MOBILE_GEOMETRY_PROFILES,
   RESPONSIVE_ROUTES,
@@ -199,7 +199,7 @@ async function expectLandscapeModalContained(
   expect(closeReceivesPointer).toBe(true)
 }
 
-test.describe.serial('safe-area responsive acceptance', () => {
+test.describe('safe-area responsive acceptance', () => {
   for (const geometry of ROUTE_SAFE_AREA_PROFILES) {
     test(`keeps every route usable in ${geometry.name}`, async ({ page }) => {
       test.setTimeout(300_000)

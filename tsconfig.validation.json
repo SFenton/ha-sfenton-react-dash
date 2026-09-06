@@ -1,0 +1,21 @@
+{
+  "extends": "./tsconfig.app.json",
+  "compilerOptions": {
+    "tsBuildInfoFile": "./.cache/typescript/validation.tsbuildinfo",
+    "types": ["node", "vite/client", "vitest/globals"],
+    "allowJs": true,
+    "checkJs": false,
+    "noUnusedLocals": true
+  },
+  "include": [
+    "e2e/layout/**/*.ts",
+    "e2e/layout-acceptance.spec.ts",
+    "e2e/layout-guards.spec.ts",
+    "e2e/mock-preview.config.ts",
+    "scripts/layout/**/*.ts",
+    "scripts/required-mobile-parity.ts",
+    "scripts/required-mobile-parity.test.ts",
+    "src/vite-env.d.ts"
+  ],
+  "exclude": []
+}

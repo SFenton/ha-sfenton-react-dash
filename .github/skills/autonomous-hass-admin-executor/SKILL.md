@@ -35,6 +35,12 @@ If any profile value differs, stop before making changes.
 4. For Home Assistant config changes, call the Home Assistant best-practices skill before editing and use supported MCP/API configuration tools. Never edit `.storage` directly.
 5. Keep Home Assistant as the source of truth for state and multi-entity side effects. React only signals HA and uses existing optimistic-state patterns.
 6. For React UX changes, complete the repository's code/config comparison and Playwright live HASS-versus-React comparison, mobile first. If the visual comparison cannot run, report the blocker and do not claim visual acceptance.
+   Use `docs/ux/layouts.md` for the local layout plan and external assessment.
+   Resolve the approved worktree, execute the selected mock scenarios, and
+   actually inspect the worklist's images/interactions. Attach plan/run/assessment
+   references to the phase report; capture-only, stale, skipped or inaccessible
+   evidence is not acceptance. These local gates do not widen the phase's HA,
+   model, completion or email authority.
 7. Add focused tests for changed behavior and run the smallest existing validation commands that prove the phase gate.
 8. Do not commit, push, deploy, complete the HA todo item, send phase email, or send phone notifications. The parent runner owns completion and email; phone notifications are disabled.
 9. Transition the canonical task from `in_progress` to `accepted`, `rejected`, or `hard_blocked` with `npm run autonomous:admin:transition`. Never edit queue status text by hand.

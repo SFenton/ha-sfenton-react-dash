@@ -1,5 +1,30 @@
 # Playwright Coverage Corpus
 
+Current governance is documented in [Executable Layouts](layouts.md).
+`e2e/layout/contracts.ts` owns validation metadata; `e2e/playwright-coverage.ts`
+is its compatibility projection. Current runs persist actual registered,
+selected, attempted and checkpoint/manual outcomes. The numeric release tables
+below are the historical `c1e625b` corpus, not automatically updated current
+totals. Layout governance adds checkpoint-certified representative scenarios
+and guard tests without claiming exhaustive backend-state discovery.
+
+### Strict intrinsic-inset finding in the released baseline
+
+The new body-measure guard exposes a pre-existing Linux WPE end-inset problem
+in Rooms and the recipe filter. A guarded, same-fixture comparison of immutable
+`c1e625b` and the tooling candidate at `393x852` produced identical results:
+Rooms declared 58px body padding, but its bounded measure stopped early and its
+last card reached the viewport edge; the filter declared 12px while its measure
+also stopped before overflowing descendants. The computed wrapper gaps were
+620px and 66px respectively, not the declared insets.
+
+These are failed product assertions, not allowed negative-test fixtures. The
+governance work does not change production geometry to hide them. Keep the WPE
+checks enabled and report the actual failed checkpoints; neither a named device
+descriptor nor a raised tolerance resolves the defect. Physical iOS behavior
+remains a separate question. Fixture images/camera resources are local substitutes,
+so this comparison is layout evidence, not live-media or photographic fidelity.
+
 The file/ownership inventory is `e2e/playwright-coverage.ts`.
 `npm run test:e2e:coverage` rejects missing, stale or duplicate files,
 unexplained exclusions, unknown/cyclic ownership, ownership that does not
@@ -7,14 +32,14 @@ resolve to direct coverage on the same axis, and test declarations hidden
 inside another test or browser callback. This is an inventory guard, not a
 substitute for executed assertions.
 
-The current default registration is **446 tests in 32 active spec files**:
+The `c1e625b` release default registration was **446 tests in 32 active spec files**:
 369 in mobile, 57 in desktop, and 5 each in phone-navigation,
 passport-foldable, square-foldable and tablet. Enabling WebKit adds
 55 registrations, for **501 across all 33 spec files**. These are collected
 test cases, not a claim that every conditional integration test ran or that
 every application state is covered.
 
-The unit suite contains **1,359 tests in 126 files**. Use the commands below
+That release's unit suite contained **1,359 tests in 126 files**. Use the commands below
 to refresh counts after adding scenarios rather than copying an older total:
 
 ```bash
@@ -43,7 +68,7 @@ An iPhone descriptor does not change that engine limitation. The profile data in
 `e2e/responsive-acceptance-data.ts` injects explicit geometry for layout
 testing and is never presented as a physical-device screenshot.
 
-## Complete spec inventory
+## Released spec inventory (`c1e625b`)
 
 Default counts include all six Chromium projects. WebKit counts are additional,
 opt-in registrations. An owner designation is listed in the machine-readable

@@ -4,6 +4,13 @@ applyTo: "src/pages/**/*.tsx,src/components/**/*.tsx,src/pages/**/*.module.css,s
 ---
 # React UX Instructions
 
+- Follow the executable workflow in [Layouts](../../docs/ux/layouts.md). Classify
+  the change, resolve explicit owners and declared states, run the selected plan,
+  inspect its images/interactions, and pass the external assessor. Visible copy
+  and catalog changes are layout-sensitive; equal text counts are not equal
+  rendered widths. Unknown new surfaces/states need an owner and executable
+  obligation, not an exclusion or a guessed AST-based state reduction.
+
 - All changed dashboard surfaces must honor the single-experience
   [Current UX Contract](../../docs/ux/current-ux-contract.md). Preserve one
   React tree, one established visual system, and one Home Assistant
@@ -83,9 +90,10 @@ applyTo: "src/pages/**/*.tsx,src/components/**/*.tsx,src/pages/**/*.module.css,s
   padding when descendants overflow. Keep pane-scrolling wrappers bounded,
   and measure actual bottom clearance after scrolling, not just CSS padding.
 - When a modal has internal tabs or pages, persistent header/hero content should remain in the modal's main scroll flow unless intentionally documented otherwise. Switching tabs should reset the modal body scroll to the top of the newly selected content.
-- Before marking UX work complete, update the affected route, modal, tab,
-  detail, and state inventory and run the canonical responsive release matrix
-  in `docs/ux/validation-matrix.md`. A resized mobile-emulation project does
+- Before marking UX work complete, update affected route, modal, tab, detail,
+  and state obligations and satisfy the executable plan's applicable canonical
+  gates from `docs/ux/validation-matrix.md`. Shared changes expand consumers;
+  coarse legacy tests do not certify newly unmodeled states. A resized mobile-emulation project does
   not replace fine-pointer desktop coverage, and an unexplained skip or
   failure blocks completion. Shell, grid, fixed-control, or modal changes must
   include phone portrait, both mirrored landscape inset profiles, and a

@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './layout/fixture'
 
 test('shows both sprinkler controllers and edits Front Yard on mobile', async ({ page }) => {
   await page.goto('/at-a-glance/sprinklers')

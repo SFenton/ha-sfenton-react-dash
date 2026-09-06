@@ -1781,6 +1781,11 @@ export const mockState: MockHassState = {
   helpers: {
     callService: (params) => {
       mockCallServiceCalls.push(params)
+      const outcome = typeof params.domain === 'string' && typeof params.service === 'string'
+        ? mockCallServiceOutcomes.get(mockCallServiceOutcomeKey(params.domain, params.service))
+        : undefined
+      if (outcome === 'pending') return new Promise(() => undefined)
+      if (outcome === 'reject') return Promise.reject(new Error('Mock service rejection'))
       applyMockCallServiceSideEffects(params)
       if (params.domain === 'weather' && params.service === 'get_forecasts' && params.returnResponse === true) {
         const forecast = (params.serviceData as { type?: string } | undefined)?.type === 'hourly' ? mockHourlyWeatherForecast : mockDailyWeatherForecast

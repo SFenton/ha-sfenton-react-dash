@@ -31,6 +31,7 @@ export default defineConfig(({ mode }) => {
   const https = devHttpsOptions(mode, env)
 
   return {
+    cacheDir: resolve(process.cwd(), '.cache/vite'),
     base: mode === 'test' ? '/' : './',
     plugins: [react()],
     build: {

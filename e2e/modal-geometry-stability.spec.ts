@@ -1,4 +1,4 @@
-import { expect, test, type Locator, type Page } from '@playwright/test'
+import { expect, test, type Locator, type Page } from './layout/fixture'
 import { setSafeAreaInsets } from './safe-area'
 
 interface GeometrySnapshot {
@@ -74,7 +74,7 @@ async function expectStableGeometry(dialog: Locator, baseline: GeometrySnapshot,
   expect(Math.abs(current.height - baseline.height), `${label} height drift`).toBeLessThanOrEqual(1)
 }
 
-test.describe.serial('centered modal geometry stability', () => {
+test.describe('centered modal geometry stability', () => {
   test.beforeEach(() => {
     test.setTimeout(180_000)
   })
