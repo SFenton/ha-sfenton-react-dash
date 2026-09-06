@@ -783,3 +783,174 @@ test('all Weather condition modes retain their selection and common frame throug
   }
   await close(dialog)
 })
+
+const BODY_INSET_PROFILES = [
+  { ...PORTRAIT, name: 'portrait-start' },
+  ...['island-left', 'island-right', 'rectangular', 'small-rectangular', 'intermediate'].map((name) => {
+    const profile = LANDSCAPES.find((entry) => entry.name === name)
+    if (!profile) throw new Error(`Missing inset profile: ${name}`)
+    return profile
+  }),
+  { name: 'tablet-portrait', width: 820, height: 1180, insets: { top: 0, right: 0, bottom: 0, left: 0 } },
+  { name: 'tablet-landscape', width: 1180, height: 820, insets: { top: 0, right: 0, bottom: 0, left: 0 } },
+  { name: 'desktop', width: 1440, height: 900, insets: { top: 0, right: 0, bottom: 0, left: 0 } },
+  { ...PORTRAIT, name: 'portrait-return' },
+]
+
+async function bodyInsetMetrics(dialog: Locator) {
+  await settle(dialog)
+  const previous = await dialog.locator('[data-modal-sheet-body]').evaluate((body) => body.scrollTop)
+  await expect.poll(() => dialog.evaluate(async (element) => {
+    const body = element.querySelector<HTMLElement>('[data-modal-sheet-body]')!
+    body.scrollTo({ top: body.scrollHeight, behavior: 'instant' })
+    await new Promise<void>((done) => requestAnimationFrame(() => requestAnimationFrame(() => done())))
+    return Math.abs(body.scrollTop - Math.max(0, body.scrollHeight - body.clientHeight))
+  }), { message: 'Reach the real end after responsive content reflow' }).toBeLessThanOrEqual(1)
+  return dialog.evaluate(async (element, originalScrollTop) => {
+    const body = element.querySelector<HTMLElement>('[data-modal-sheet-body]')!
+    const measure = body.querySelector<HTMLElement>('[data-modal-content-measure]')!
+    const frame = element.getBoundingClientRect()
+    const firstCard = measure.querySelector<HTMLElement>('[style*="--modal-square-card-size"] button')
+    const card = firstCard?.getBoundingClientRect()
+    const style = getComputedStyle(body)
+    body.scrollTo({ top: body.scrollHeight, behavior: 'instant' })
+    await new Promise<void>((done) => requestAnimationFrame(() => requestAnimationFrame(() => done())))
+    const owners = [...body.querySelectorAll<HTMLElement>('*')].filter((node) =>
+      node.clientHeight > 0 && node.scrollHeight > node.clientHeight + 1 && ['auto', 'scroll'].includes(getComputedStyle(node).overflowY))
+    const eligiblePanes = [...body.querySelectorAll<HTMLElement>('*')].filter((node) =>
+      node.clientHeight > 0 && ['auto', 'scroll'].includes(getComputedStyle(node).overflowY))
+    const controls = [...body.querySelectorAll<HTMLElement>('button,input,select,textarea,[role="slider"]')].filter((node) => {
+      const rect = node.getBoundingClientRect()
+      return rect.width > 0 && rect.height > 0
+    })
+    if (!controls.length) throw new Error('Body-inset measurement requires terminal controls')
+    const terminalBottom = Math.max(...controls.map((node) => node.getBoundingClientRect().bottom))
+    const terminalGap = body.getBoundingClientRect().bottom - terminalBottom
+    if (!Number.isFinite(terminalBottom) || !Number.isFinite(terminalGap)) throw new Error('Body-inset terminal geometry must be finite')
+    const metrics = {
+      presentation: element.getAttribute('data-modal-presentation'),
+      scrollMode: element.getAttribute('data-scroll-mode'),
+      frame: { x: frame.x, y: frame.y, width: frame.width, height: frame.height },
+      bodyOverflow: style.overflowY,
+      bodyHeight: body.clientHeight,
+      contentHeight: body.clientHeight - Number.parseFloat(style.paddingTop) - Number.parseFloat(style.paddingBottom),
+      bodyScrollHeight: body.scrollHeight,
+      bodyScrollTop: body.scrollTop,
+      padding: Number.parseFloat(style.paddingBottom),
+      gap: body.getBoundingClientRect().bottom - measure.getBoundingClientRect().bottom,
+      measureHeight: measure.getBoundingClientRect().height,
+      measureOverflow: measure.scrollHeight - measure.clientHeight,
+      terminalGap,
+      terminalControlCount: controls.length,
+      innerOwners: owners.map((node) => node.dataset.scrollRegion ?? node.className),
+      eligiblePanes: eligiblePanes.map((node) => ({ name: node.dataset.scrollRegion ?? node.className, height: node.clientHeight })),
+      firstCard: card && firstCard ? {
+        width: card.width, height: card.height, padding: getComputedStyle(firstCard).padding,
+        radius: getComputedStyle(firstCard).borderRadius,
+        textSize: getComputedStyle(firstCard.querySelector('span:last-child span:first-child') ?? firstCard).fontSize,
+      } : null,
+    }
+    body.scrollTo({ top: originalScrollTop, behavior: 'instant' })
+    await new Promise<void>((done) => requestAnimationFrame(() => requestAnimationFrame(() => done())))
+    return metrics
+  }, previous)
+}
+
+test('body-inset measurement rejects missing or non-finite terminal controls', async ({ page }) => {
+  const markup = `<div role="dialog" data-state="open" style="width:200px">
+    <div data-modal-sheet-body style="height:80px;overflow-y:auto">
+      <div data-modal-content-measure style="height:40px"></div>
+    </div>
+  </div>`
+  await page.setContent(markup)
+  const dialog = page.getByRole('dialog')
+  await expect(bodyInsetMetrics(dialog)).rejects.toThrow('requires terminal controls')
+  await dialog.locator('[data-modal-content-measure]').evaluate((measure) => { measure.innerHTML = '<button>Terminal</button>' })
+  const valid = await bodyInsetMetrics(dialog)
+  expect(valid.terminalControlCount).toBe(1)
+  expect(Number.isFinite(valid.terminalGap)).toBe(true)
+  await dialog.getByRole('button').evaluate((button) => {
+    button.getBoundingClientRect = () => new DOMRect(0, 0, 20, Infinity)
+  })
+  await expect(bodyInsetMetrics(dialog)).rejects.toThrow('terminal geometry must be finite')
+})
+
+for (const surface of ['Rooms', 'Filter Recipes', 'Media Apps'] as const) {
+  test(`${surface} preserves body end inset and bounded panes through mounted rotation`, async ({ page }, testInfo) => {
+    test.setTimeout(150_000)
+    await page.setViewportSize(PORTRAIT)
+    await installSafeAreaInsets(page, PORTRAIT.insets)
+    const records: Array<Record<string, unknown>> = []
+    let dialog: Locator
+    if (surface === 'Rooms') {
+      await page.goto('/index.html?path=overview')
+      dialog = await openQuickLinks(page, true)
+    } else if (surface === 'Filter Recipes') {
+      await page.goto('/index.html?path=recipes')
+      await page.locator('[data-floating-action-dock]').getByRole('button', { name: 'Filter', exact: true }).click()
+      dialog = page.getByRole('dialog', { name: 'Filter Recipes' })
+    } else {
+      await page.goto('/index.html?path=living-room')
+      await page.getByRole('button', { name: /^Living Room Remote Off$/i }).click()
+      dialog = page.getByRole('dialog')
+      await dialog.getByRole('tab', { name: 'Apps', exact: true }).click()
+      await expect(dialog.locator('[data-scroll-region="media-remote-panel"]')).toHaveAttribute('data-tab', 'apps')
+    }
+    await settle(dialog)
+    const original = await dialog.elementHandle()
+    if (!original) throw new Error('Missing modal')
+    let portrait: Awaited<ReturnType<typeof bodyInsetMetrics>> | undefined
+    try {
+      for (const profile of BODY_INSET_PROFILES) {
+        await resize(page, profile)
+        const metrics = await bodyInsetMetrics(dialog)
+        records.push({ profile: profile.name, ...metrics })
+        expect.soft(await original.evaluate((node) => node.isConnected), `${surface}/${profile.name}: mounted identity`).toBe(true)
+        if (metrics.presentation === 'landscape-dialog') await expectLandscapeFrame(dialog, profile)
+        if (metrics.presentation === 'dialog') {
+          const width = Math.min(1100, profile.width - 64), height = Math.min(760, profile.height - 64)
+          expectBox(metrics.frame, { width, height, x: (profile.width - width) / 2, y: (profile.height - height) / 2 }, `${surface}/${profile.name}: shared frame`)
+        }
+        const paneOwned = surface !== 'Filter Recipes' && metrics.presentation === 'dialog'
+        if (paneOwned) {
+          expect.soft(metrics.bodyOverflow, `${surface}/${profile.name}: pane body lock`).toBe('hidden')
+          expect.soft(Math.abs(metrics.measureHeight - metrics.contentHeight), `${surface}/${profile.name}: bounded measure`).toBeLessThanOrEqual(1)
+          expect.soft(metrics.eligiblePanes.length, `${surface}/${profile.name}: pane owns overflow even when its content fits`).toBeGreaterThan(0)
+          if (surface === 'Rooms') expect.soft(metrics.innerOwners.length, `${profile.name}: long room grid scrolls inside its pane`).toBeGreaterThan(0)
+          for (const pane of metrics.eligiblePanes) expect.soft(pane.height, `${surface}/${profile.name}: bounded pane`).toBeLessThanOrEqual(metrics.bodyHeight + 1)
+        } else {
+          expect.soft(metrics.bodyOverflow, `${surface}/${profile.name}: body owner`).toBe('auto')
+          expect.soft(metrics.innerOwners, `${surface}/${profile.name}: no nested scroller`).toEqual([])
+          expect.soft(metrics.measureOverflow, `${surface}/${profile.name}: intrinsic wrapper`).toBeLessThanOrEqual(1)
+          expect.soft(Math.abs(metrics.gap - metrics.padding), `${surface}/${profile.name}: actual end inset`).toBeLessThanOrEqual(1)
+          expect.soft(metrics.terminalGap, `${surface}/${profile.name}: actual terminal control clearance`).toBeGreaterThanOrEqual(metrics.padding - 1)
+        }
+        if (profile.name === 'portrait-start') portrait = metrics
+        if (surface === 'Rooms' && metrics.presentation === 'sheet') {
+          expect.soft(Math.abs(metrics.firstCard!.width - 174.5)).toBeLessThanOrEqual(0.1)
+          expect.soft(Math.abs(metrics.firstCard!.height - 147.875)).toBeLessThanOrEqual(0.1)
+        }
+        if (profile.name === 'portrait-return') {
+          expectBox(metrics.frame, portrait!.frame, `${surface}: exact portrait return`)
+          expect.soft(metrics.firstCard).toEqual(portrait!.firstCard)
+          expect.soft(metrics.padding).toBe(portrait!.padding)
+          expect.soft(Math.abs(metrics.measureHeight - portrait!.measureHeight), `${surface}: portrait content height returns`).toBeLessThanOrEqual(1)
+          expect.soft(Math.abs(metrics.terminalGap - portrait!.terminalGap), `${surface}: portrait terminal clearance returns`).toBeLessThanOrEqual(1)
+        }
+        if (['portrait-start', 'island-left', 'desktop', 'portrait-return'].includes(profile.name)) {
+          await page.screenshot({ path: testInfo.outputPath(`${profile.name}-initial.png`), scale: 'css' })
+          if (!paneOwned) {
+            await dialog.locator('[data-modal-sheet-body]').evaluate((body) => body.scrollTo({ top: body.scrollHeight, behavior: 'instant' }))
+            await page.screenshot({ path: testInfo.outputPath(`${profile.name}-terminal.png`), scale: 'css' })
+            await dialog.locator('[data-modal-sheet-body]').evaluate((body) => body.scrollTo({ top: 0, behavior: 'instant' }))
+          }
+        }
+      }
+      await close(dialog)
+    } finally {
+      await testInfo.attach('body-inset-metrics', { body: JSON.stringify(records, null, 2), contentType: 'application/json' })
+      writeFileSync(testInfo.outputPath('body-inset-metrics.json'), JSON.stringify(records, null, 2))
+      await original.dispose()
+    }
+  })
+}

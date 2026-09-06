@@ -306,8 +306,12 @@
 }
 
 .content[data-scroll-mode='body'] .bodyMeasure,
+.content[data-modal-presentation='sheet'] .bodyMeasure,
 .content[data-modal-presentation='landscape-dialog'] .bodyMeasure {
-  min-height: min-content;
+  /* Own intrinsic layout so WebKit retains end padding and remeasures grids on rotation. */
+  display: flow-root;
+  height: auto;
+  min-height: 100%;
 }
 
 .content[data-has-body-header='true'] .body {

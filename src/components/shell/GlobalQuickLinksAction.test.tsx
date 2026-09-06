@@ -86,14 +86,17 @@ describe('GlobalQuickLinksAction', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Quick Links' }))
     const dialog = await screen.findByRole('dialog', { name: 'Quick Links' })
+    expect(dialog).toHaveAttribute('data-scroll-mode', 'body')
     const roomsTile = within(dialog).getByRole('button', { name: 'Rooms' })
     fireEvent.click(roomsTile)
 
     expect(within(dialog).getByRole('heading', { name: 'Rooms' })).toBeInTheDocument()
+    expect(dialog).toHaveAttribute('data-scroll-mode', 'panes')
     expect(within(dialog).getByRole('button', { name: 'Back' })).toBeInTheDocument()
     await waitFor(() => expect(within(dialog).getAllByRole('button', { name: / area$/ })[0]).toHaveFocus())
 
     fireEvent.click(within(dialog).getByRole('button', { name: 'Back' }))
+    expect(dialog).toHaveAttribute('data-scroll-mode', 'body')
     await waitFor(() => expect(within(dialog).getByRole('button', { name: 'Rooms' })).toHaveFocus())
 
     fireEvent.click(within(dialog).getByRole('button', { name: 'Rooms' }))

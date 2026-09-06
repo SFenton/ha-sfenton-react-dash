@@ -104,6 +104,7 @@ export function GlobalQuickLinksAction({ onNavigate }: GlobalQuickLinksActionPro
         onBack={detailPage === null ? undefined : handleBack}
         onClose={() => setOpen(false)}
         open={open}
+        scrollMode={detailPage === roomsPage ? 'panes' : 'body'}
         scrollResetKey={detailPage ?? false}
         size="media"
         subtitle={detailPage === 'security-system' ? securitySubtitle : undefined}
