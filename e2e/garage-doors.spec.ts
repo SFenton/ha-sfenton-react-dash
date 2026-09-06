@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test, type Page } from './layout/fixture'
 import {
   GARAGE_DOOR_CONFIRM_TIMEOUT_MS,
   GARAGE_DOOR_FAILURE_HOLD_MS,

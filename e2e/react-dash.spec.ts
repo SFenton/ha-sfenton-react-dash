@@ -1,4 +1,4 @@
-import { expect, test, type FrameLocator, type Locator, type Page } from '@playwright/test'
+import { expect, test, type FrameLocator, type Locator, type Page } from './layout/fixture'
 import { valueToThermostatPoint } from '../src/components/hass/thermostatDialGeometry'
 
 const DIALOG_SQUARE_TILE_SIZE = 168

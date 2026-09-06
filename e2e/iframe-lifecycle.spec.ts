@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test, type Page } from './layout/fixture'
 import {
   REACT_DASHBOARD_LIFECYCLE_HISTORY_PROPERTY,
   REACT_DASHBOARD_LIFECYCLE_PROPERTY,

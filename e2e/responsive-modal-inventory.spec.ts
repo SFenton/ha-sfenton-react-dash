@@ -1,9 +1,10 @@
 import fs from 'node:fs'
 import path from 'node:path'
-import { expect, test, type Locator, type Page } from '@playwright/test'
+import { expect, test, type Locator, type Page } from './layout/fixture'
+import { waitForModalReady } from './layout/evidence'
 import ts from 'typescript'
 import { modalSheetPresentationForViewport } from '../src/components/core/modalSheetPresentation'
-import { RESPONSIVE_VIEWPORTS, type ResponsiveViewport } from './responsive-acceptance-data'
+import { VIEWPORTS, type ResponsiveViewport } from './responsive-acceptance-data'
 import { installSafeAreaInsets, setSafeAreaInsets } from './safe-area'
 
 type ModalAudit = {
@@ -34,12 +35,12 @@ type ModalCase = {
   selectTabs?: Array<string | RegExp>
 }
 
-const PHONE = RESPONSIVE_VIEWPORTS[0]
-const PHONE_LANDSCAPE = RESPONSIVE_VIEWPORTS[1]
-const IPAD_PORTRAIT = RESPONSIVE_VIEWPORTS[2]
-const IPAD_LANDSCAPE = RESPONSIVE_VIEWPORTS[3]
-const DESKTOP = RESPONSIVE_VIEWPORTS[4]
-const WIDE_DESKTOP = RESPONSIVE_VIEWPORTS[5]
+const PHONE = VIEWPORTS['phone-portrait']
+const PHONE_LANDSCAPE = VIEWPORTS['phone-landscape']
+const IPAD_PORTRAIT = VIEWPORTS['ipad-portrait']
+const IPAD_LANDSCAPE = VIEWPORTS['ipad-landscape']
+const DESKTOP = VIEWPORTS.desktop
+const WIDE_DESKTOP = VIEWPORTS['wide-desktop']
 const REGULAR_LANDSCAPE_DENSITY_CASES = new Set([
   'admin-presence-auto-reset',
   'admin-presence-overrides',
@@ -750,7 +751,7 @@ function listenForUnexpectedErrors(page: Page) {
 }
 
 async function auditModal(page: Page, modalCase: ModalCase, dialog: Locator, viewport: ResponsiveViewport, stage: string) {
-  await page.waitForTimeout(540)
+  await waitForModalReady(dialog)
   await expect(dialog).toHaveAttribute('data-size', modalCase.expectedSize)
   await expect(dialog).toHaveAttribute('data-scroll-mode', modalCase.expectedScrollMode)
   await expect(dialog).toHaveAttribute(
@@ -952,31 +953,21 @@ async function assertMountedClose(dialog: Locator) {
   await node.dispose()
 }
 
-test.describe.serial('complete ModalSheet inventory acceptance', () => {
-  test.afterAll(() => {
-    const output = artifactPath('phase3-modal-acceptance.json')
-    if (output && manifest.length > 0) {
-      fs.writeFileSync(output, `${JSON.stringify({
-        counting: {
-          directModalSheetJsxCallsites: 29,
-          expandedAcceptanceRows: MODAL_CASES.length,
-          landscapeIntentAndKindRows: LANDSCAPE_INTENT_CASES.length,
-          optionPickerConsumersAdded: 2,
-          portraitTileFamilies: PORTRAIT_TILE_CASES.length,
-          auditedGeometryIntentIds: [...new Set(manifest.map((entry) => entry.geometryIntent))].sort(),
-          auditedStateStages: [...new Set(manifest.filter((entry) => entry.stage.startsWith('state-')).map((entry) => `${entry.id}:${entry.stage}`))],
-        },
-        generatedAt: new Date().toISOString(),
-        results: manifest,
-        surfaces: MODAL_CASES.map(({ consumerCallsite, expectedScrollMode, expectedSize, id, physicalCallsite }) => ({
-          consumerCallsite,
-          expectedScrollMode,
-          expectedSize,
-          id,
-          physicalCallsite,
-        })),
-      }, null, 2)}\n`)
+test.describe('complete ModalSheet inventory acceptance', () => {
+  test.beforeEach(() => { manifest.length = 0 })
+  test.afterEach(async ({ browserName }, testInfo) => {
+    const data = {
+      scope: 'Per-test legacy audit, not a complete matrix or checkpoint certificate',
+      testId: testInfo.testId, title: testInfo.title, status: testInfo.status, browserName,
+      auditedGeometryIntentIds: [...new Set(manifest.map((entry) => entry.geometryIntent))].sort(),
+      auditedStateStages: [...new Set(manifest.map((entry) => `${entry.id}:${entry.stage}`))],
+      results: manifest,
     }
+    const attached = testInfo.outputPath('modal-acceptance.json')
+    fs.writeFileSync(attached, `${JSON.stringify(data, null, 2)}\n`)
+    await testInfo.attach('legacy-modal-acceptance', { path: attached, contentType: 'application/json' })
+    const output = artifactPath(`phase3-modal-acceptance-${testInfo.testId}.json`)
+    if (output) fs.writeFileSync(output, `${JSON.stringify(data, null, 2)}\n`)
   })
 
   test('reconciles physical ModalSheet nodes with expanded review surfaces', () => {

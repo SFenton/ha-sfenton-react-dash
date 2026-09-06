@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './layout/fixture'
 
 test.describe('bathroom fan controls', () => {
   test.use({ viewport: { height: 852, width: 393 } })

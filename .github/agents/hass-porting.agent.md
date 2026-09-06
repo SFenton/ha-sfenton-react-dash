@@ -20,7 +20,14 @@ Work from the real Home Assistant dashboard and the real React app. Use the Love
 - Never print the credential values. Only mention variable names.
 - Prefer Home Assistant MCP config reads for dashboard structure instead of scraping YAML from disk.
 - Before using Home Assistant MCP to edit automations, helpers, scripts, dashboards, or similar HA resources, consult the Home Assistant best-practices skill and any reference files it directs you to.
-- Start or reuse the React dev server before browser comparison. Use `npm --prefix "C:\Users\sfent\source\repos\homeassistant\ha-sfenton-react-dash" run dev -- --host 127.0.0.1` unless another command is already active.
+- Use the explicitly approved worktree and an owned server with verified source/build identity. Never substitute the inherited cwd or an unowned running port.
+- Follow `docs/ux/layouts.md`: the executable plan supplies affected surfaces,
+  states, profiles and transitions for both automated and actual manual Playwright
+  inspection. Use the no-proxy mock workflow for local interaction, view its
+  screenshots, record truthful verdicts, and require `layout:verify`.
+  `porting:capture` is a source-evidence bootstrap, not a layout acceptance
+  certificate. Required authorized HA source/config comparisons remain separate;
+  the local workflow grants no live-service or external mutation permission.
 - Use `npm --prefix "C:\Users\sfent\source\repos\homeassistant\ha-sfenton-react-dash" run porting:capture -- --path /at-a-glance/<view> --hash <optional-hash> --labels "Label One,Label Two" --entities "entity.one,entity.two"` to bootstrap the evidence packet when possible. It writes HASS config, screenshots, accessibility/DOM/style snapshots, entity states, and React comparison artifacts to `.hass-porting/` without printing secrets.
 - Keep `vite.config.ts` `base: './'` unchanged.
 - Do not deploy or edit the Home Assistant wrapper dashboard unless the user explicitly asks for deployment.

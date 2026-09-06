@@ -4,6 +4,26 @@ Validation protects the single current dashboard experience and its shared
 Home Assistant behavior. No step here authorizes deployment or Home Assistant
 mutation.
 
+## Executable application of this matrix
+
+[Layouts](layouts.md) is the generated entry point for the validation-owned
+registry. Before UX work, resolve source provenance and classify the change.
+Explicit owners select affected scenarios; shared or unnarrowed sources use a
+conservative known-mock fallback. New obligations without bindings block
+acceptance. Unchanged scopes are not silently claimed as freshly tested.
+
+`layout:run` owns no-proxy builds/servers and collection-backed selection.
+`layout:verify` externally reconciles exact runtime checkpoints and actual
+manual-review records. All eight canonical contexts below remain meaningful,
+but are not a mandatory full Cartesian product with every backend state.
+Declared journeys and scoped applicability determine execution; native fine-
+pointer evidence cannot be inferred from a project name or resized phone.
+
+Use normal elapsed clocks for transition readiness. Missing selected panels,
+outgoing content, merely reachable servers, empty route filters and screenshots
+that were never viewed must not produce acceptance. Artifacts must be reachable
+from the reviewer's permitted scope; inaccessible evidence is explicitly blocked.
+
 | Gate | Current UX requirement | Evidence |
 | --- | --- | --- |
 | Architecture | One React tree, visual system, route meaning, entity subscription path, optimistic state path, and service callback. | Source review and focused behavior tests. |
@@ -175,12 +195,17 @@ Run required mobile parity with explicit reachable servers:
 
 ```bash
 npm run test:e2e:mobile-parity -- \
+  --run artifacts/layout/<run-id> \
   --baseline http://127.0.0.1:5188 \
   --candidate http://127.0.0.1:5187
 ```
 
 The command and parity spec must fail, rather than skip, when required URLs are
 missing or unreachable.
+The run manifest must attest both active owned endpoints and matching assets.
+For routine work use `layout:run`; it owns the endpoints and includes required
+phone parity for runtime changes. A manually supplied reachable URL is not proof
+of clean-master/candidate provenance.
 
 Run the machine-readable coverage and responsive release corpus with:
 

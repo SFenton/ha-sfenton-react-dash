@@ -1,4 +1,5 @@
-import { expect, test, type Locator, type Page } from '@playwright/test'
+import { expect, test, type Locator, type Page } from './layout/fixture'
+import { waitForModalReady, type ModalReadiness } from './layout/evidence'
 import { writeFileSync } from 'node:fs'
 import { ROOM_PAGE_CONFIGS } from '../src/constants/roomPages'
 import { MEDIA_REMOTE_CONFIGS } from '../src/constants/mediaRemotes'
@@ -22,25 +23,8 @@ const LANDSCAPES = [
 type Profile = typeof PORTRAIT
 type Box = { x: number; y: number; width: number; height: number }
 
-async function settle(dialog: Locator) {
-  await expect(dialog).toBeVisible()
-  await expect.poll(() => dialog.evaluate((element) => {
-    const style = getComputedStyle(element)
-    return {
-      opacity: style.opacity,
-      initialStarting: element.getAttribute('data-initial-starting-style'),
-      starting: element.hasAttribute('data-starting-style'),
-      animations: element.getAnimations().filter((animation) => animation.playState === 'running').length,
-      tabContentSettled: Array.from(element.querySelectorAll('[data-modal-tab-transition-state]'))
-        .every((panel) => panel.getAttribute('data-modal-tab-transition-state') === 'idle'),
-      selectedPanelsMatch: Array.from(element.querySelectorAll('[role="tab"][aria-selected="true"]')).every((tab) => {
-        const panelId = tab.getAttribute('aria-controls')
-        const panel = panelId ? document.getElementById(panelId) : null
-        const labelledBy = panel?.getAttribute('aria-labelledby')
-        return !labelledBy || labelledBy.split(/\s+/).includes(tab.id)
-      }),
-    }
-  })).toEqual({ opacity: '1', initialStarting: null, starting: false, animations: 0, tabContentSettled: true, selectedPanelsMatch: true })
+async function settle(dialog: Locator, readiness: ModalReadiness = 'tabs') {
+  await waitForModalReady(dialog, 5_000, readiness)
 }
 
 async function resize(page: Page, profile: Profile) {
@@ -48,8 +32,8 @@ async function resize(page: Page, profile: Profile) {
   await setSafeAreaInsets(page, profile.insets)
 }
 
-async function outerBox(dialog: Locator): Promise<Box> {
-  await settle(dialog)
+async function outerBox(dialog: Locator, readiness: ModalReadiness = 'tabs'): Promise<Box> {
+  await settle(dialog, readiness)
   const box = await dialog.boundingBox()
   if (!box) throw new Error('Open modal has no bounding box')
   return box
@@ -61,9 +45,9 @@ function expectBox(actual: Box, expected: Box, label: string) {
   }
 }
 
-async function expectLandscapeFrame(dialog: Locator, profile: Profile) {
+async function expectLandscapeFrame(dialog: Locator, profile: Profile, readiness: ModalReadiness = 'tabs') {
   await expect(dialog).toHaveAttribute('data-modal-presentation', 'landscape-dialog')
-  expectBox(await outerBox(dialog), {
+  expectBox(await outerBox(dialog, readiness), {
     x: profile.insets.left + 12,
     y: profile.insets.top + 8,
     width: profile.width - profile.insets.left - profile.insets.right - 24,
@@ -570,10 +554,11 @@ for (const room of CONFIGURED_ROOM_MODALS) {
         await page.goto(`/index.html?path=${room.path}&modalOpener=${encodeURIComponent(opener.hash)}${opener.hash}`)
         await setSafeAreaInsets(page, PORTRAIT.insets)
         const dialog = page.getByRole('dialog')
-        await settle(dialog)
+        const readiness = opener.kind === 'vacuum' ? 'vacuum-tabs' : 'tabs'
+        await settle(dialog, readiness)
         await expect(dialog).toHaveAttribute('data-modal-geometry-intent', /.+/)
         await dialog.evaluate((element) => { element.setAttribute('data-configured-modal-node', 'original') })
-        const portrait = await outerBox(dialog)
+        const portrait = await outerBox(dialog, readiness)
         const tabNames = await dialog.getByRole('tab').evaluateAll((tabs) =>
           tabs.map((tab) => tab.getAttribute('aria-label') ?? tab.textContent?.trim() ?? ''))
         for (const [index, name] of (tabNames.length > 0 ? tabNames : [null]).entries()) {
@@ -582,14 +567,14 @@ for (const room of CONFIGURED_ROOM_MODALS) {
             await expect(tab).toBeEnabled()
             await tab.click()
           }
-          await settle(dialog)
+          await settle(dialog, readiness)
           const artifact = `${room.path}-${opener.hash.slice(1)}-${index}`
           if (testInfo.project.name === 'mobile') {
             await page.screenshot({ path: testInfo.outputPath(`${artifact}-portrait.png`), scale: 'css' })
           }
           for (const profile of [LANDSCAPES[0], LANDSCAPES[1], LANDSCAPES[2]]) {
             await resize(page, profile)
-            await expectLandscapeFrame(dialog, profile)
+            await expectLandscapeFrame(dialog, profile, readiness)
             await expect(dialog).toHaveAttribute('data-configured-modal-node', 'original')
             if (tab) await expect(tab).toHaveAttribute('aria-selected', 'true')
             const body = dialog.locator('[data-modal-sheet-body]')
@@ -600,10 +585,10 @@ for (const room of CONFIGURED_ROOM_MODALS) {
           }
           await resize(page, { width: 1440, height: 900, insets: { top: 0, right: 0, bottom: 0, left: 0 } })
           await expect(dialog).toHaveAttribute('data-modal-presentation', 'dialog')
-          expectBox(await outerBox(dialog), { x: 170, y: 70, width: 1100, height: 760 }, `${artifact}: common desktop frame`)
+          expectBox(await outerBox(dialog, readiness), { x: 170, y: 70, width: 1100, height: 760 }, `${artifact}: common desktop frame`)
           await resize(page, PORTRAIT)
           await expect(dialog).toHaveAttribute('data-modal-presentation', 'sheet')
-          expectBox(await outerBox(dialog), portrait, `${artifact}: unchanged portrait frame`)
+          expectBox(await outerBox(dialog, readiness), portrait, `${artifact}: unchanged portrait frame`)
           if (tab) await expect(tab).toHaveAttribute('aria-selected', 'true')
           states.push({ route: room.path, hash: opener.hash, kind: opener.kind, tab: name ?? 'root', intent: await dialog.getAttribute('data-modal-geometry-intent') })
         }
@@ -725,10 +710,10 @@ test('recipe planner and ingredient search retain one frame and entered values o
   await expect(dialog.getByText('Serves 4')).toBeVisible()
   await dialog.evaluate((element) => { element.setAttribute('data-recipe-flow-node', 'original') })
   const portrait = await outerBox(dialog)
-  const rotateDetail = async (control: Locator) => {
+  const rotateDetail = async (control: Locator, readiness: ModalReadiness) => {
     for (const profile of [LANDSCAPES[0], LANDSCAPES[1], LANDSCAPES[2]]) {
       await resize(page, profile)
-      await expectLandscapeFrame(dialog, profile)
+      await expectLandscapeFrame(dialog, profile, readiness)
       await expect(dialog).toHaveAttribute('data-recipe-flow-node', 'original')
       await control.scrollIntoViewIfNeeded()
       await expect(control).toBeInViewport()
@@ -736,15 +721,15 @@ test('recipe planner and ingredient search retain one frame and entered values o
     }
     await resize(page, { width: 1440, height: 900, insets: { top: 0, right: 0, bottom: 0, left: 0 } })
     await expect(dialog).toHaveAttribute('data-modal-presentation', 'dialog')
-    expectBox(await outerBox(dialog), { x: 170, y: 70, width: 1100, height: 760 }, 'recipe detail desktop')
+    expectBox(await outerBox(dialog, readiness), { x: 170, y: 70, width: 1100, height: 760 }, 'recipe detail desktop')
     await resize(page, PORTRAIT)
     await expect(dialog).toHaveAttribute('data-modal-presentation', 'sheet')
-    expectBox(await outerBox(dialog), portrait, 'recipe detail portrait')
+    expectBox(await outerBox(dialog, readiness), portrait, 'recipe detail portrait')
   }
   await dialog.getByRole('button', { name: 'Add to My Week', exact: true }).click()
   const date = dialog.getByLabel('Cookidoo My Week date')
   const initialDate = await date.inputValue()
-  await rotateDetail(date)
+  await rotateDetail(date, 'recipe-planner')
   await expect(date).toHaveValue(initialDate)
   await dialog.getByRole('button', { name: 'Back to recipe', exact: true }).click()
   await dialog.getByRole('tab', { name: 'Ingredients', exact: true }).click()
@@ -752,7 +737,7 @@ test('recipe planner and ingredient search retain one frame and entered values o
   const search = dialog.getByRole('searchbox', { name: 'Search inventory products' })
   await search.fill('beans')
   await expect(dialog.getByRole('button', { name: /Canned Beans.*in inventory/ })).toBeVisible()
-  await rotateDetail(search)
+  await rotateDetail(search, 'recipe-product-picker')
   await expect(search).toHaveValue('beans')
   await dialog.getByRole('button', { name: 'Back and mark ingredient available', exact: true }).click()
   await expect(dialog.getByRole('tab', { name: 'Ingredients', exact: true })).toHaveAttribute('aria-selected', 'true')
@@ -783,3 +768,174 @@ test('all Weather condition modes retain their selection and common frame throug
   }
   await close(dialog)
 })
+
+const BODY_INSET_PROFILES = [
+  { ...PORTRAIT, name: 'portrait-start' },
+  ...['island-left', 'island-right', 'rectangular', 'small-rectangular', 'intermediate'].map((name) => {
+    const profile = LANDSCAPES.find((entry) => entry.name === name)
+    if (!profile) throw new Error(`Missing inset profile: ${name}`)
+    return profile
+  }),
+  { name: 'tablet-portrait', width: 820, height: 1180, insets: { top: 0, right: 0, bottom: 0, left: 0 } },
+  { name: 'tablet-landscape', width: 1180, height: 820, insets: { top: 0, right: 0, bottom: 0, left: 0 } },
+  { name: 'desktop', width: 1440, height: 900, insets: { top: 0, right: 0, bottom: 0, left: 0 } },
+  { ...PORTRAIT, name: 'portrait-return' },
+]
+
+async function bodyInsetMetrics(dialog: Locator) {
+  await settle(dialog)
+  const previous = await dialog.locator('[data-modal-sheet-body]').evaluate((body) => body.scrollTop)
+  await expect.poll(() => dialog.evaluate(async (element) => {
+    const body = element.querySelector<HTMLElement>('[data-modal-sheet-body]')!
+    body.scrollTo({ top: body.scrollHeight, behavior: 'instant' })
+    await new Promise<void>((done) => requestAnimationFrame(() => requestAnimationFrame(() => done())))
+    return Math.abs(body.scrollTop - Math.max(0, body.scrollHeight - body.clientHeight))
+  }), { message: 'Reach the real end after responsive content reflow' }).toBeLessThanOrEqual(1)
+  return dialog.evaluate(async (element, originalScrollTop) => {
+    const body = element.querySelector<HTMLElement>('[data-modal-sheet-body]')!
+    const measure = body.querySelector<HTMLElement>('[data-modal-content-measure]')!
+    const frame = element.getBoundingClientRect()
+    const firstCard = measure.querySelector<HTMLElement>('[style*="--modal-square-card-size"] button')
+    const card = firstCard?.getBoundingClientRect()
+    const style = getComputedStyle(body)
+    body.scrollTo({ top: body.scrollHeight, behavior: 'instant' })
+    await new Promise<void>((done) => requestAnimationFrame(() => requestAnimationFrame(() => done())))
+    const owners = [...body.querySelectorAll<HTMLElement>('*')].filter((node) =>
+      node.clientHeight > 0 && node.scrollHeight > node.clientHeight + 1 && ['auto', 'scroll'].includes(getComputedStyle(node).overflowY))
+    const eligiblePanes = [...body.querySelectorAll<HTMLElement>('*')].filter((node) =>
+      node.clientHeight > 0 && ['auto', 'scroll'].includes(getComputedStyle(node).overflowY))
+    const controls = [...body.querySelectorAll<HTMLElement>('button,input,select,textarea,[role="slider"]')].filter((node) => {
+      const rect = node.getBoundingClientRect()
+      return rect.width > 0 && rect.height > 0
+    })
+    if (!controls.length) throw new Error('Body-inset measurement requires terminal controls')
+    const terminalBottom = Math.max(...controls.map((node) => node.getBoundingClientRect().bottom))
+    const terminalGap = body.getBoundingClientRect().bottom - terminalBottom
+    if (!Number.isFinite(terminalBottom) || !Number.isFinite(terminalGap)) throw new Error('Body-inset terminal geometry must be finite')
+    const metrics = {
+      presentation: element.getAttribute('data-modal-presentation'),
+      scrollMode: element.getAttribute('data-scroll-mode'),
+      frame: { x: frame.x, y: frame.y, width: frame.width, height: frame.height },
+      bodyOverflow: style.overflowY,
+      bodyHeight: body.clientHeight,
+      contentHeight: body.clientHeight - Number.parseFloat(style.paddingTop) - Number.parseFloat(style.paddingBottom),
+      bodyScrollHeight: body.scrollHeight,
+      bodyScrollTop: body.scrollTop,
+      padding: Number.parseFloat(style.paddingBottom),
+      gap: body.getBoundingClientRect().bottom - measure.getBoundingClientRect().bottom,
+      measureHeight: measure.getBoundingClientRect().height,
+      measureOverflow: measure.scrollHeight - measure.clientHeight,
+      terminalGap,
+      terminalControlCount: controls.length,
+      innerOwners: owners.map((node) => node.dataset.scrollRegion ?? node.className),
+      eligiblePanes: eligiblePanes.map((node) => ({ name: node.dataset.scrollRegion ?? node.className, height: node.clientHeight })),
+      firstCard: card && firstCard ? {
+        width: card.width, height: card.height, padding: getComputedStyle(firstCard).padding,
+        radius: getComputedStyle(firstCard).borderRadius,
+        textSize: getComputedStyle(firstCard.querySelector('span:last-child span:first-child') ?? firstCard).fontSize,
+      } : null,
+    }
+    body.scrollTo({ top: originalScrollTop, behavior: 'instant' })
+    await new Promise<void>((done) => requestAnimationFrame(() => requestAnimationFrame(() => done())))
+    return metrics
+  }, previous)
+}
+
+test('body-inset measurement rejects missing or non-finite terminal controls', async ({ page }) => {
+  const markup = `<div role="dialog" data-state="open" style="width:200px">
+    <div data-modal-sheet-body style="height:80px;overflow-y:auto">
+      <div data-modal-content-measure style="height:40px"></div>
+    </div>
+  </div>`
+  await page.setContent(markup)
+  const dialog = page.getByRole('dialog')
+  await expect(bodyInsetMetrics(dialog)).rejects.toThrow('requires terminal controls')
+  await dialog.locator('[data-modal-content-measure]').evaluate((measure) => { measure.innerHTML = '<button>Terminal</button>' })
+  const valid = await bodyInsetMetrics(dialog)
+  expect(valid.terminalControlCount).toBe(1)
+  expect(Number.isFinite(valid.terminalGap)).toBe(true)
+  await dialog.getByRole('button').evaluate((button) => {
+    button.getBoundingClientRect = () => new DOMRect(0, 0, 20, Infinity)
+  })
+  await expect(bodyInsetMetrics(dialog)).rejects.toThrow('terminal geometry must be finite')
+})
+
+for (const surface of ['Rooms', 'Filter Recipes', 'Media Apps'] as const) {
+  test(`${surface} preserves body end inset and bounded panes through mounted rotation`, async ({ page }, testInfo) => {
+    test.setTimeout(150_000)
+    await page.setViewportSize(PORTRAIT)
+    await installSafeAreaInsets(page, PORTRAIT.insets)
+    const records: Array<Record<string, unknown>> = []
+    let dialog: Locator
+    if (surface === 'Rooms') {
+      await page.goto('/index.html?path=overview')
+      dialog = await openQuickLinks(page, true)
+    } else if (surface === 'Filter Recipes') {
+      await page.goto('/index.html?path=recipes')
+      await page.locator('[data-floating-action-dock]').getByRole('button', { name: 'Filter', exact: true }).click()
+      dialog = page.getByRole('dialog', { name: 'Filter Recipes' })
+    } else {
+      await page.goto('/index.html?path=living-room')
+      await page.getByRole('button', { name: /^Living Room Remote Off$/i }).click()
+      dialog = page.getByRole('dialog')
+      await dialog.getByRole('tab', { name: 'Apps', exact: true }).click()
+      await expect(dialog.locator('[data-scroll-region="media-remote-panel"]')).toHaveAttribute('data-tab', 'apps')
+    }
+    await settle(dialog)
+    const original = await dialog.elementHandle()
+    if (!original) throw new Error('Missing modal')
+    let portrait: Awaited<ReturnType<typeof bodyInsetMetrics>> | undefined
+    try {
+      for (const profile of BODY_INSET_PROFILES) {
+        await resize(page, profile)
+        const metrics = await bodyInsetMetrics(dialog)
+        records.push({ profile: profile.name, ...metrics })
+        expect.soft(await original.evaluate((node) => node.isConnected), `${surface}/${profile.name}: mounted identity`).toBe(true)
+        if (metrics.presentation === 'landscape-dialog') await expectLandscapeFrame(dialog, profile)
+        if (metrics.presentation === 'dialog') {
+          const width = Math.min(1100, profile.width - 64), height = Math.min(760, profile.height - 64)
+          expectBox(metrics.frame, { width, height, x: (profile.width - width) / 2, y: (profile.height - height) / 2 }, `${surface}/${profile.name}: shared frame`)
+        }
+        const paneOwned = surface !== 'Filter Recipes' && metrics.presentation === 'dialog'
+        if (paneOwned) {
+          expect.soft(metrics.bodyOverflow, `${surface}/${profile.name}: pane body lock`).toBe('hidden')
+          expect.soft(Math.abs(metrics.measureHeight - metrics.contentHeight), `${surface}/${profile.name}: bounded measure`).toBeLessThanOrEqual(1)
+          expect.soft(metrics.eligiblePanes.length, `${surface}/${profile.name}: pane owns overflow even when its content fits`).toBeGreaterThan(0)
+          if (surface === 'Rooms') expect.soft(metrics.innerOwners.length, `${profile.name}: long room grid scrolls inside its pane`).toBeGreaterThan(0)
+          for (const pane of metrics.eligiblePanes) expect.soft(pane.height, `${surface}/${profile.name}: bounded pane`).toBeLessThanOrEqual(metrics.bodyHeight + 1)
+        } else {
+          expect.soft(metrics.bodyOverflow, `${surface}/${profile.name}: body owner`).toBe('auto')
+          expect.soft(metrics.innerOwners, `${surface}/${profile.name}: no nested scroller`).toEqual([])
+          expect.soft(metrics.measureOverflow, `${surface}/${profile.name}: intrinsic wrapper`).toBeLessThanOrEqual(1)
+          expect.soft(Math.abs(metrics.gap - metrics.padding), `${surface}/${profile.name}: actual end inset`).toBeLessThanOrEqual(1)
+          expect.soft(metrics.terminalGap, `${surface}/${profile.name}: actual terminal control clearance`).toBeGreaterThanOrEqual(metrics.padding - 1)
+        }
+        if (profile.name === 'portrait-start') portrait = metrics
+        if (surface === 'Rooms' && metrics.presentation === 'sheet') {
+          expect.soft(Math.abs(metrics.firstCard!.width - 174.5)).toBeLessThanOrEqual(0.1)
+          expect.soft(Math.abs(metrics.firstCard!.height - 147.875)).toBeLessThanOrEqual(0.1)
+        }
+        if (profile.name === 'portrait-return') {
+          expectBox(metrics.frame, portrait!.frame, `${surface}: exact portrait return`)
+          expect.soft(metrics.firstCard).toEqual(portrait!.firstCard)
+          expect.soft(metrics.padding).toBe(portrait!.padding)
+          expect.soft(Math.abs(metrics.measureHeight - portrait!.measureHeight), `${surface}: portrait content height returns`).toBeLessThanOrEqual(1)
+          expect.soft(Math.abs(metrics.terminalGap - portrait!.terminalGap), `${surface}: portrait terminal clearance returns`).toBeLessThanOrEqual(1)
+        }
+        if (['portrait-start', 'island-left', 'desktop', 'portrait-return'].includes(profile.name)) {
+          await page.screenshot({ path: testInfo.outputPath(`${profile.name}-initial.png`), scale: 'css' })
+          if (!paneOwned) {
+            await dialog.locator('[data-modal-sheet-body]').evaluate((body) => body.scrollTo({ top: body.scrollHeight, behavior: 'instant' }))
+            await page.screenshot({ path: testInfo.outputPath(`${profile.name}-terminal.png`), scale: 'css' })
+            await dialog.locator('[data-modal-sheet-body]').evaluate((body) => body.scrollTo({ top: 0, behavior: 'instant' }))
+          }
+        }
+      }
+      await close(dialog)
+    } finally {
+      await testInfo.attach('body-inset-metrics', { body: JSON.stringify(records, null, 2), contentType: 'application/json' })
+      writeFileSync(testInfo.outputPath('body-inset-metrics.json'), JSON.stringify(records, null, 2))
+      await original.dispose()
+    }
+  })
+}

@@ -1,35 +1,44 @@
 import { spawn } from 'node:child_process'
 import { createRequire } from 'node:module'
+import { resolve } from 'node:path'
+import { artifactPath, assertOptions, isEntry, option, readJson, snapshot } from './layout/shared'
+import type { RunIdentity } from '../e2e/layout/types'
+import { verifyServedBuild } from './layout/run'
 
 const require = createRequire(import.meta.url)
 const playwrightCli = require.resolve('@playwright/test/cli')
 
-function optionValue(name: string) {
-  const index = process.argv.indexOf(name)
-  return index >= 0 ? process.argv[index + 1] : undefined
-}
-
-function normalizedUrl(value: string | undefined, label: string) {
+export function normalizedUrl(value: string | undefined, label: string) {
   if (!value) throw new Error(`Missing ${label}. Pass ${label === 'baseline URL' ? '--baseline' : '--candidate'} or set the matching RESPONSIVE_*_URL environment variable.`)
   const url = new URL(value)
   if (!['http:', 'https:'].includes(url.protocol)) throw new Error(`${label} must use http or https`)
+  if (!['127.0.0.1', '[::1]'].includes(url.hostname) || url.username || url.password || url.search || url.hash) throw new Error(`${label} must be an owned loopback URL without credentials or query parameters`)
   return url.href.replace(/\/$/, '')
 }
 
-async function assertReachable(baseUrl: string, label: string) {
-  const response = await fetch(`${baseUrl}/index.html?path=overview`, {
-    redirect: 'follow',
-    signal: AbortSignal.timeout(5_000),
-  })
-  if (!response.ok) throw new Error(`${label} returned HTTP ${response.status}`)
+export function selectedParityRoutes(raw: string | undefined, known: readonly string[]) {
+  const requested = raw === undefined ? [...known] : raw.split(',').map((route) => route.trim())
+  if (!requested.length || requested.some((route) => !route)) throw new Error('Required parity route selection is empty')
+  if (new Set(requested).size !== requested.length) throw new Error('Duplicate parity routes')
+  const unknown = requested.filter((route) => !known.includes(route))
+  if (unknown.length) throw new Error(`Unknown parity routes: ${unknown.join(', ')}`)
+  return requested
 }
 
 async function run() {
-  const baselineUrl = normalizedUrl(optionValue('--baseline') ?? process.env.RESPONSIVE_BASELINE_URL, 'baseline URL')
-  const candidateUrl = normalizedUrl(optionValue('--candidate') ?? process.env.RESPONSIVE_CANDIDATE_URL, 'candidate URL')
+  const args = process.argv.slice(2)
+  assertOptions(args, ['--baseline', '--candidate', '--run'])
+  const runPath = option(args, '--run') ?? process.env.LAYOUT_RUN_DIR
+  if (!runPath) throw new Error('Source-attested required parity needs --run artifacts/layout/<run-id> with active owned servers. Prefer layout:run, which supplies and verifies these automatically.')
+  const directory = artifactPath(process.cwd(), runPath, true)
+  const identity = readJson<RunIdentity>(resolve(directory, 'run.json'))
+  const baselineUrl = normalizedUrl(option(args, '--baseline') ?? identity.baseline.origin, 'baseline URL')
+  const candidateUrl = normalizedUrl(option(args, '--candidate') ?? identity.candidate.origin, 'candidate URL')
+  if (baselineUrl === candidateUrl) throw new Error('Baseline and candidate must use distinct owned endpoints')
+  if (baselineUrl !== identity.baseline.origin || candidateUrl !== identity.candidate.origin) throw new Error('Parity endpoints do not match the owned run provenance')
+  if (snapshot(process.cwd(), identity.source.base).digest !== identity.source.digest) throw new Error('Parity source is stale')
   await Promise.all([
-    assertReachable(baselineUrl, 'Baseline URL'),
-    assertReachable(candidateUrl, 'Candidate URL'),
+    verifyServedBuild(identity.baseline), verifyServedBuild(identity.candidate),
   ])
 
   const child = spawn(process.execPath, [
@@ -38,13 +47,11 @@ async function run() {
     'e2e/mobile-parity-all-routes.spec.ts',
     '--project=mobile',
     '--workers=1',
-    ...process.argv.slice(2).filter((argument, index, args) =>
-      !['--baseline', '--candidate'].includes(argument)
-      && !(['--baseline', '--candidate'].includes(args[index - 1] ?? '')),
-    ),
+    '--forbid-only',
   ], {
     env: {
       ...process.env,
+      LAYOUT_RUN_DIR: directory,
       RESPONSIVE_BASELINE_URL: baselineUrl,
       RESPONSIVE_CANDIDATE_URL: candidateUrl,
       RESPONSIVE_PARITY_REQUIRED: '1',
@@ -62,7 +69,9 @@ async function run() {
   process.exitCode = exitCode
 }
 
-void run().catch((error: unknown) => {
-  console.error(error instanceof Error ? error.message : String(error))
-  process.exitCode = 1
-})
+if (isEntry(import.meta.url)) {
+  void run().catch((error: unknown) => {
+    console.error(error instanceof Error ? error.message : String(error))
+    process.exitCode = 1
+  })
+}

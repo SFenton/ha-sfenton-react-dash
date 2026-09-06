@@ -24,7 +24,9 @@ demographic evidence.
 
 ## Scope
 
-- Work only in `/home/sfenton/repos/ha-sfenton-react-dash`.
+- Work only in this repository's explicitly approved working tree (the default
+  checkout or an operator-supplied isolated worktree); record its resolved source
+  identity instead of assuming the inherited cwd is current.
 - Accept one bounded target: a route, page, section, modal, control, component,
   workflow, instruction, or explicitly requested whole-app review.
 - Launch every core persona unless the operator explicitly requests a smaller
@@ -89,6 +91,11 @@ silently widen the scope.
    - visible labels, roles, states, geometry, and navigation choices;
    - mock service-call intent for exercised controls;
    - source/config evidence only for product or engineering tiers.
+   For layout work, consume the applicable `docs/ux/layouts.md` plan/worklist
+   rather than inventing another viewport/state inventory. Bind the packet to
+   the source, fixture, build and checkpoint fingerprints. Declare participant-
+   reachable artifact roots; access-unavailable evidence is blocked, not reviewed.
+   A panel packet or generated screenshot is not automatic visual acceptance.
 6. Launch all core participants independently with the exact profiles below.
    Give each the same normalized brief, only its own lens, its evidence tier,
    the target allowlist, the participant deny block, and the output schema. Do
@@ -541,6 +548,9 @@ When open:
 7. For user-visible or Home Assistant-backed changes, complete the repository's
    required code/config comparison, mobile-first Playwright comparison, and
    focused tests.
+   Also require the current layout plan's external assessment, with actual
+   coordinator image/interaction inspection. Preserve all existing Sol-only,
+   participant-isolation, mock-first and external-authorization boundaries.
 8. Re-run the personas that reported each implemented finding and one
    independent critic against the changed experience. Confirm the complaint is
    gone without creating a new higher-severity issue.

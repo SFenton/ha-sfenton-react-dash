@@ -1,7 +1,8 @@
 import fs from 'node:fs'
 import path from 'node:path'
-import { expect, test, type Browser, type Page } from '@playwright/test'
+import { expect, test, type Browser, type Page } from './layout/fixture'
 import { RESPONSIVE_ROUTES, type ResponsiveRoute } from './responsive-acceptance-data'
+import { selectedParityRoutes } from '../scripts/required-mobile-parity'
 
 type ElementSignature = {
   color: string
@@ -35,9 +36,7 @@ const BASELINE_URL = process.env.RESPONSIVE_BASELINE_URL
 const CANDIDATE_URL = process.env.RESPONSIVE_CANDIDATE_URL
 const PARITY_REQUIRED = process.env.RESPONSIVE_PARITY_REQUIRED === '1'
 const ARTIFACT_DIR = process.env.RESPONSIVE_ARTIFACT_DIR
-const SELECTED_ROUTES = process.env.RESPONSIVE_PARITY_ROUTES
-  ? RESPONSIVE_ROUTES.filter((route) => process.env.RESPONSIVE_PARITY_ROUTES?.split(',').includes(route))
-  : RESPONSIVE_ROUTES
+const SELECTED_ROUTES = selectedParityRoutes(process.env.RESPONSIVE_PARITY_ROUTES, RESPONSIVE_ROUTES)
 const PHONE_PARITY_VIEWPORTS = [
   { height: 852, name: 'phone-portrait', width: 393 },
   { height: 393, name: 'phone-landscape', width: 852 },
@@ -340,6 +339,8 @@ for (const parityViewport of PHONE_PARITY_VIEWPORTS) {
       test.skip(!PARITY_REQUIRED, 'Set responsive baseline and candidate URLs')
       throw new Error('Required mobile parity needs RESPONSIVE_BASELINE_URL and RESPONSIVE_CANDIDATE_URL')
     }
+    expect(BASELINE_URL, 'Baseline and candidate cannot be the same server').not.toBe(CANDIDATE_URL)
+    expect(SELECTED_ROUTES.length, 'Required route loop cannot be empty').toBeGreaterThan(0)
     test.setTimeout(600_000)
 
     const baseline = await preparePage(browser, BASELINE_URL!, parityViewport)

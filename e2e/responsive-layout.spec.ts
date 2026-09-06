@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test, type Page } from './layout/fixture'
 import { RESPONSIVE_ROUTES } from './responsive-acceptance-data'
 import { setSafeAreaInsets } from './safe-area'
 

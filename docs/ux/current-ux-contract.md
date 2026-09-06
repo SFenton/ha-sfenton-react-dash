@@ -234,6 +234,12 @@ and tier attributes; do not add alternate modal trees.
 
 ## Validation and release boundary
 
+Apply these product invariants through the source-bound executable workflow in
+[Layouts](layouts.md). Its registry and plan drive automated selection/checkpoints
+and the agent's actual manual Playwright/image inspection. Preserve independent
+expected geometry and source-inventory oracles. Neither a generated plan, a
+registered test, an image file nor a filled review schema alone proves acceptance.
+
 Use the design-system checker to ratchet raw colors, direct safe-area `env()`
 use outside the token file, undefined `--rd-*` variables, direct
 `ModalDisclosureIcon` imports, missing centered modal geometry, legacy modal

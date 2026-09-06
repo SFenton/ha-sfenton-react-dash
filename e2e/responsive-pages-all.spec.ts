@@ -1,10 +1,11 @@
 import fs from 'node:fs'
 import path from 'node:path'
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test, type Page } from './layout/fixture'
 import {
   RESPONSIVE_ROUTES,
   RESPONSIVE_ROUTE_TITLES,
   RESPONSIVE_VIEWPORTS,
+  VIEWPORTS,
   type ResponsiveRoute,
   type ResponsiveViewport,
 } from './responsive-acceptance-data'
@@ -189,17 +190,21 @@ async function auditPage(page: Page, route: ResponsiveRoute, viewport: Responsiv
   manifest.push({ route, stage, viewport, ...metrics })
 }
 
-test.describe.serial('all-route responsive acceptance', () => {
-  test.afterAll(() => {
-    const output = artifactPath('phase3-page-acceptance.json')
+test.describe('all-route responsive acceptance', () => {
+  test.beforeEach(() => { manifest.length = 0 })
+  test.afterEach(async ({ browserName }, testInfo) => {
+    const data = {
+      scope: 'Per-test legacy audit, not a complete matrix or checkpoint certificate',
+      testId: testInfo.testId, title: testInfo.title, status: testInfo.status, browserName,
+      routeCount: RESPONSIVE_ROUTES.length, viewportCount: RESPONSIVE_VIEWPORTS.length,
+      auditCount: manifest.length, results: manifest,
+    }
+    const attached = testInfo.outputPath('page-acceptance.json')
+    fs.writeFileSync(attached, `${JSON.stringify(data, null, 2)}\n`)
+    await testInfo.attach('legacy-page-acceptance', { path: attached, contentType: 'application/json' })
+    const output = artifactPath(`phase3-page-acceptance-${testInfo.testId}.json`)
     if (output) {
-      fs.writeFileSync(output, `${JSON.stringify({
-        generatedAt: new Date().toISOString(),
-        routeCount: RESPONSIVE_ROUTES.length,
-        viewportCount: RESPONSIVE_VIEWPORTS.length,
-        auditCount: manifest.length,
-        results: manifest,
-      }, null, 2)}\n`)
+      fs.writeFileSync(output, `${JSON.stringify(data, null, 2)}\n`)
     }
   })
 
@@ -223,27 +228,27 @@ test.describe.serial('all-route responsive acceptance', () => {
   const sequences = [
     {
       name: 'mobile-desktop-mobile',
-      viewports: [RESPONSIVE_VIEWPORTS[0], RESPONSIVE_VIEWPORTS[4], RESPONSIVE_VIEWPORTS[0]],
+      viewports: [VIEWPORTS['phone-portrait'], VIEWPORTS.desktop, VIEWPORTS['phone-portrait']],
     },
     {
       name: 'desktop-mobile-desktop',
-      viewports: [RESPONSIVE_VIEWPORTS[4], RESPONSIVE_VIEWPORTS[0], RESPONSIVE_VIEWPORTS[4]],
+      viewports: [VIEWPORTS.desktop, VIEWPORTS['phone-portrait'], VIEWPORTS.desktop],
     },
     {
       name: 'phone-portrait-landscape-portrait',
-      viewports: [RESPONSIVE_VIEWPORTS[0], RESPONSIVE_VIEWPORTS[1], RESPONSIVE_VIEWPORTS[0]],
+      viewports: [VIEWPORTS['phone-portrait'], VIEWPORTS['phone-landscape'], VIEWPORTS['phone-portrait']],
     },
     {
       name: 'phone-landscape-portrait-landscape',
-      viewports: [RESPONSIVE_VIEWPORTS[1], RESPONSIVE_VIEWPORTS[0], RESPONSIVE_VIEWPORTS[1]],
+      viewports: [VIEWPORTS['phone-landscape'], VIEWPORTS['phone-portrait'], VIEWPORTS['phone-landscape']],
     },
     {
       name: 'ipad-portrait-landscape-portrait',
-      viewports: [RESPONSIVE_VIEWPORTS[2], RESPONSIVE_VIEWPORTS[3], RESPONSIVE_VIEWPORTS[2]],
+      viewports: [VIEWPORTS['ipad-portrait'], VIEWPORTS['ipad-landscape'], VIEWPORTS['ipad-portrait']],
     },
     {
       name: 'tablet-passport-tablet',
-      viewports: [RESPONSIVE_VIEWPORTS[3], RESPONSIVE_VIEWPORTS[6], RESPONSIVE_VIEWPORTS[3]],
+      viewports: [VIEWPORTS['ipad-landscape'], VIEWPORTS['passport-foldable-landscape'], VIEWPORTS['ipad-landscape']],
     },
   ] as const
 

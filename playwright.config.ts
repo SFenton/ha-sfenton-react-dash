@@ -1,4 +1,6 @@
 import { defineConfig, devices } from '@playwright/test'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 
 const usePrebuiltMock = process.env.PLAYWRIGHT_PREBUILT_MOCK === '1'
 const useRealHakit = process.env.PLAYWRIGHT_REAL_HAKIT === '1'
@@ -7,12 +9,20 @@ const serverUrl = `http://127.0.0.1:${serverPort}`
 const webkitExecutablePath = process.env.PLAYWRIGHT_WEBKIT_EXECUTABLE
 const enableWebkit = process.env.PLAYWRIGHT_WEBKIT === '1' || Boolean(webkitExecutablePath)
 const adaptiveNavigationSpec = /adaptive-navigation\.spec\.ts/
+const managedRun = process.env.LAYOUT_RUN_DIR
+const managedOrigin = managedRun
+  ? (JSON.parse(readFileSync(resolve(managedRun, 'run.json'), 'utf8')) as { candidate: { origin: string } }).candidate.origin
+  : undefined
 
 export default defineConfig({
   testDir: './e2e',
   use: {
-    baseURL: serverUrl,
+    baseURL: managedOrigin ?? serverUrl,
     trace: 'on-first-retry',
+    ...(managedRun ? {
+      locale: 'en-US', timezoneId: 'America/Los_Angeles',
+      screenshot: 'only-on-failure' as const, trace: 'retain-on-failure' as const,
+    } : {}),
   },
   projects: [
     {
@@ -66,7 +76,7 @@ export default defineConfig({
     },
     {
       name: 'desktop',
-      testMatch: /(?:adaptive-navigation|desktop-responsive|home-route-hydration-desktop|modal-rotation-regressions)\.spec\.ts/,
+      testMatch: /(?:adaptive-navigation|desktop-responsive|home-route-hydration-desktop|modal-rotation-regressions|layout-acceptance)\.spec\.ts/,
       use: {
         ...devices['Desktop Chrome'],
         browserName: 'chromium',
@@ -79,7 +89,7 @@ export default defineConfig({
     ...(enableWebkit
       ? [{
           name: 'webkit',
-          testMatch: /(?:iframe-lifecycle|modal-rotation-regressions|modal-sheet-(?:lifecycle|performance|webkit))\.spec\.ts/,
+          testMatch: /(?:iframe-lifecycle|modal-rotation-regressions|modal-sheet-(?:lifecycle|performance|webkit)|layout-acceptance)\.spec\.ts/,
           use: {
             ...devices['iPhone 13'],
             browserName: 'webkit' as const,
@@ -88,12 +98,12 @@ export default defineConfig({
         }]
       : []),
   ],
-  webServer: {
+  webServer: managedRun ? undefined : {
     command: useRealHakit
       ? `node node_modules/vite/bin/vite.js --force --host 127.0.0.1 --port ${serverPort} --strictPort`
       : usePrebuiltMock
-      ? `node node_modules/vite/bin/vite.js preview --outDir .playwright-dist --host 127.0.0.1 --port ${serverPort} --strictPort`
-      : `node node_modules/vite/bin/vite.js build --mode test --outDir .playwright-dist && node node_modules/vite/bin/vite.js preview --outDir .playwright-dist --host 127.0.0.1 --port ${serverPort} --strictPort`,
+      ? `node node_modules/vite/bin/vite.js preview --config e2e/mock-preview.config.ts --configLoader native --outDir .playwright-dist --host 127.0.0.1 --port ${serverPort} --strictPort`
+      : `node node_modules/vite/bin/vite.js build --mode test --configLoader native --outDir .playwright-dist && node node_modules/vite/bin/vite.js preview --config e2e/mock-preview.config.ts --configLoader native --outDir .playwright-dist --host 127.0.0.1 --port ${serverPort} --strictPort`,
     reuseExistingServer: false,
     url: serverUrl,
   },
