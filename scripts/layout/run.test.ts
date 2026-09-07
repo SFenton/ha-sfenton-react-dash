@@ -1,9 +1,18 @@
 import { createServer } from 'node:http'
+import { readFileSync } from 'node:fs'
 import { hash, stableHash } from './shared'
-import { stopOwnedProcess, verifyServedBuild } from './run'
+import { isBaselineBuildInput, stopOwnedProcess, verifyServedBuild } from './run'
 import type { ChildProcess } from 'node:child_process'
 
 describe('owned build verification', () => {
+  it('exports every referenced root TypeScript configuration without including environment files', () => {
+    const config = JSON.parse(readFileSync('tsconfig.json', 'utf8')) as { references: { path: string }[] }
+    expect(config.references.length).toBeGreaterThan(0)
+    for (const reference of config.references) expect(isBaselineBuildInput(reference.path.replace(/^\.\//, ''))).toBe(true)
+    expect(isBaselineBuildInput('tsconfig.validation.json')).toBe(true)
+    expect(isBaselineBuildInput('.env.development')).toBe(false)
+    expect(isBaselineBuildInput('artifacts/tsconfig.validation.json')).toBe(false)
+  })
   it('does not hang or signal an already signalled/exited owned child', async () => {
     const kill = vi.fn()
     await stopOwnedProcess({ exitCode: null, signalCode: 'SIGTERM', kill } as unknown as ChildProcess)

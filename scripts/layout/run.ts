@@ -116,8 +116,7 @@ function extractBaseline(root: string, directory: string, base: string) {
   const destination = resolve(directory, 'baseline-source')
   if (existsSync(destination)) throw new Error('Baseline extraction already exists; use a new run directory')
   mkdirSync(destination)
-  const files = git(root, ['ls-tree', '-r', '--name-only', base]).split('\n').filter((file) =>
-    file.startsWith('src/') || file.startsWith('public/') || ['index.html', 'vite.config.ts', 'package.json', 'tsconfig.json', 'tsconfig.app.json', 'tsconfig.node.json'].includes(file))
+  const files = git(root, ['ls-tree', '-r', '--name-only', base]).split('\n').filter(isBaselineBuildInput)
   const archive = spawnSync('git', ['archive', '--format=tar', base, '--', ...files], { cwd: root, maxBuffer: 128 * 1024 * 1024 })
   if (archive.status !== 0) throw new Error('Cannot export the immutable baseline build inputs')
   const unpack = spawnSync('tar', ['-xf', '-', '-C', destination], { cwd: root, input: archive.stdout })
@@ -133,6 +132,13 @@ function extractBaseline(root: string, directory: string, base: string) {
     files: fingerprintDirectory(resolve(root, 'src/test/mocks')),
   })
   return destination
+}
+
+export function isBaselineBuildInput(file: string) {
+  return file.startsWith('src/')
+    || file.startsWith('public/')
+    || ['index.html', 'vite.config.ts', 'package.json'].includes(file)
+    || /^tsconfig(?:\.[a-zA-Z0-9_-]+)*\.json$/.test(file)
 }
 
 async function build(root: string, sourceRoot: string, directory: string, name: string, env: NodeJS.ProcessEnv) {
