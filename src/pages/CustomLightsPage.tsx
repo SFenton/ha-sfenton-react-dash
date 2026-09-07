@@ -3,7 +3,6 @@ import { useState, type CSSProperties } from 'react'
 import { DynamicGrid } from '../components/core/DynamicGrid'
 import { MaterialIcon } from '../components/core/Icon'
 import { OptionPickerDialog } from '../components/core/OptionPickerDialog'
-import type { ModalSheetStyle } from '../components/core/ModalSheet'
 import { Section } from '../components/core/Section'
 import { asEntityName, isActiveState } from '../components/hass/entityState'
 import { LightBrightnessCard, type LightTapAction } from '../components/hass/LightBrightnessCard'
@@ -13,11 +12,6 @@ import styles from './CustomLightsPage.module.css'
 
 const MANUAL_CONTROL_ENTITY = 'input_boolean.manually_control_front_yard_lights'
 const MODE_SELECT_ENTITY = 'input_select.front_yard_custom_lights'
-const LIGHTING_MODE_MODAL_STYLE: ModalSheetStyle = {
-  '--modal-desktop-height': 'auto',
-  '--modal-desktop-max-width': '500px',
-  '--modal-desktop-width': '500px',
-}
 
 interface CustomLight {
   entityId: string
@@ -199,7 +193,6 @@ export function CustomLightsPage() {
         options={modeOptions.map((option) => ({ label: option, value: option, activeBackground: modeBackground(option) }))}
         presentation="sheet"
         sheetLayout="compact-grid"
-        sheetStyle={LIGHTING_MODE_MODAL_STYLE}
         title={lightingModeTitle}
         value={mode}
       />

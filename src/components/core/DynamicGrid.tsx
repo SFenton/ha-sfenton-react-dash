@@ -45,13 +45,14 @@ interface DynamicGridLayout {
 export type DynamicGridLastRow = 'center' | 'fill' | 'fill-minimum' | 'start'
 export type DynamicGridLayoutMode = 'bounded' | 'fill'
 export type DynamicGridItemSizing = 'content-aware' | 'uniform'
+export type DynamicGridRowFill = boolean | 'except-last'
 
 interface DynamicGridProps {
   ariaLabel?: string
   children: ReactNode
   className?: string
   columns: number
-  fillRows?: boolean
+  fillRows?: DynamicGridRowFill
   forceEquivalentColumnCount?: boolean
   gap?: number
   itemSizing?: DynamicGridItemSizing
@@ -88,13 +89,13 @@ function configuredColumns(element: HTMLElement, fallbackColumns: number) {
   return normalizedDynamicGridColumns(fallbackColumns)
 }
 
-function initialLayout(itemCount: number, columns: number, fillRows: boolean, itemSizing: DynamicGridItemSizing): DynamicGridLayout {
+function initialLayout(itemCount: number, columns: number, fillRows: DynamicGridRowFill, itemSizing: DynamicGridItemSizing): DynamicGridLayout {
   return {
     columns,
     expanded: false,
     itemSizing,
     spans: fillRows
-      ? packDynamicGridSpans(Array.from({ length: itemCount }, () => 1), columns)
+      ? packDynamicGridSpans(Array.from({ length: itemCount }, () => 1), columns, fillRows === 'except-last' ? 'except-last' : 'all')
       : Array.from({ length: itemCount }, () => 1),
     starts: Array.from({ length: itemCount }, () => 0),
     wrapLabels: Array.from({ length: itemCount }, () => false),
@@ -105,7 +106,7 @@ function measuredLayout(
   grid: HTMLElement,
   fallbackColumns: number,
   forceEquivalentColumnCount: boolean,
-  fillRows: boolean,
+  fillRows: DynamicGridRowFill,
   gap: number,
   itemSizing: DynamicGridItemSizing,
   itemSizingMinWidth: number | undefined,
@@ -178,15 +179,17 @@ function measuredLayout(
   const renderedColumns = forceEquivalentColumnCount
     ? equivalentDynamicGridColumnCount(minimumSpans, columns)
     : columns
-  const fillMeasuredRows = lastRow === 'fill'
+  const fillFinalRow = lastRow === 'fill'
     || (lastRow === 'fill-minimum' && !expanded)
+  const rowFill = fillFinalRow ? 'all' : 'except-last'
+  const fillMeasuredRows = fillRows === 'except-last' || fillFinalRow
   const spans = forceEquivalentColumnCount
     ? (
       fillMeasuredRows
-        ? packDynamicGridSpans(Array.from({ length: cells.length }, () => 1), renderedColumns)
+        ? packDynamicGridSpans(Array.from({ length: cells.length }, () => 1), renderedColumns, rowFill)
         : Array.from({ length: cells.length }, () => 1)
     )
-    : (fillMeasuredRows ? packDynamicGridSpans(minimumSpans, columns) : minimumSpans)
+    : (fillMeasuredRows ? packDynamicGridSpans(minimumSpans, columns, rowFill) : minimumSpans)
   const starts = lastRow === 'center'
     ? centeredDynamicGridStarts(spans, renderedColumns)
     : Array.from({ length: cells.length }, () => 0)
@@ -229,7 +232,7 @@ export function DynamicGrid({
 }: DynamicGridProps) {
   const items = Children.toArray(children)
   const baseColumns = normalizedDynamicGridColumns(columns)
-  const resolvedLastRow: DynamicGridLastRow = lastRow ?? (fillRows ? 'fill' : 'start')
+  const resolvedLastRow: DynamicGridLastRow = lastRow ?? (fillRows === true ? 'fill' : 'start')
   const gridRef = useRef<HTMLDivElement | null>(null)
   const [layout, setLayout] = useState<DynamicGridLayout>(() => initialLayout(
     items.length,
@@ -311,6 +314,7 @@ export function DynamicGrid({
       className={[styles.grid, className].filter(Boolean).join(' ')}
       data-dynamic-grid="true"
       data-dynamic-grid-columns={activeLayout.columns}
+      data-dynamic-grid-fill-rows={String(fillRows)}
       data-dynamic-grid-force-equivalent-column-count={forceEquivalentColumnCount ? 'true' : undefined}
       data-dynamic-grid-item-sizing={activeLayout.itemSizing}
       data-dynamic-grid-item-sizing-min-width={itemSizingMinWidth}

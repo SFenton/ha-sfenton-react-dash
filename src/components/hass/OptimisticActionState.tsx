@@ -4,12 +4,12 @@ import { useOptimisticState } from '../../hooks/useOptimisticState'
 import { asEntityName } from './entityState'
 import { OptimisticActionStateContext } from './optimisticActionState'
 
-function OptimisticEntityStateProvider({ children, entityId }: { children: ReactNode; entityId: string }) {
+function OptimisticEntityStateProvider({ children, clearOnLiveChange, entityId }: { children: ReactNode; clearOnLiveChange: boolean; entityId: string }) {
   const parent = useContext(OptimisticActionStateContext)
   const entity = useEntity(asEntityName(entityId), { returnNullIfNotFound: true })
   const liveState = entity?.state ?? 'unavailable'
   const [displayedState, commit, reset] = useOptimisticState(liveState, {
-    clearOn: 'confirmation',
+    clearOn: clearOnLiveChange ? 'live-change' : 'confirmation',
   })
   const generationRef = useRef(0)
   const commitGeneration = useCallback((next: string, options?: Parameters<typeof commit>[1]) => {
@@ -35,17 +35,17 @@ function OptimisticEntityStateProvider({ children, entityId }: { children: React
   return <OptimisticActionStateContext.Provider value={value}>{children}</OptimisticActionStateContext.Provider>
 }
 
-function OptimisticActionStateLayer({ children, entityIds, index }: { children: ReactNode; entityIds: readonly string[]; index: number }) {
+function OptimisticActionStateLayer({ children, entityIds, index, liveChangeEntityIds }: { children: ReactNode; entityIds: readonly string[]; index: number; liveChangeEntityIds: ReadonlySet<string> }) {
   const states = useContext(OptimisticActionStateContext)
   const entityId = entityIds[index]
   if (!entityId) return children
 
-  const next = <OptimisticActionStateLayer entityIds={entityIds} index={index + 1}>{children}</OptimisticActionStateLayer>
+  const next = <OptimisticActionStateLayer entityIds={entityIds} index={index + 1} liveChangeEntityIds={liveChangeEntityIds}>{children}</OptimisticActionStateLayer>
   if (states[entityId]) return next
-  return <OptimisticEntityStateProvider entityId={entityId}>{next}</OptimisticEntityStateProvider>
+  return <OptimisticEntityStateProvider clearOnLiveChange={liveChangeEntityIds.has(entityId)} entityId={entityId}>{next}</OptimisticEntityStateProvider>
 }
 
-export function OptimisticActionStateBoundary({ children, entityIds }: { children: ReactNode; entityIds: readonly string[] }) {
+export function OptimisticActionStateBoundary({ children, entityIds, liveChangeEntityIds = [] }: { children: ReactNode; entityIds: readonly string[]; liveChangeEntityIds?: readonly string[] }) {
   const uniqueEntityIds = [...new Set(entityIds)]
-  return <OptimisticActionStateLayer entityIds={uniqueEntityIds} index={0}>{children}</OptimisticActionStateLayer>
+  return <OptimisticActionStateLayer entityIds={uniqueEntityIds} index={0} liveChangeEntityIds={new Set(liveChangeEntityIds)}>{children}</OptimisticActionStateLayer>
 }

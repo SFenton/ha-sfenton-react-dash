@@ -1,4 +1,13 @@
-import { expect, test, type Locator, type Page } from '@playwright/test'
+import { expect, test, type Locator, type Page } from './layout/fixture'
+import { modalSheetPresentationForViewport } from '../src/components/core/modalSheetPresentation'
+import { OCCUPANCY_GROUPS } from '../src/constants/atAGlance'
+import { SHOW_OUTDOOR_FAUCETS_ENTITY_ID } from '../src/constants/sprinklers'
+import { setSafeAreaInsets } from './safe-area'
+import { quickLinksLayout } from './quick-links'
+
+const DIALOG_SQUARE_TILE_SIZE = 168
+const PORTRAIT_TILE_WIDTH = 174.5
+const PORTRAIT_TILE_HEIGHT = 147.875
 
 const VIEWPORTS = [
   { height: 852, width: 393 },
@@ -8,6 +17,25 @@ const VIEWPORTS = [
   { height: 900, width: 1440 },
   { height: 1080, width: 1920 },
   { height: 741, width: 1152 },
+] as const
+
+const HUE_SYNC_VIEWPORTS = [
+  { height: 852, width: 393 },
+  { height: 393, width: 852 },
+  { height: 741, width: 1152 },
+  { height: 836, width: 842 },
+  { height: 1180, width: 820 },
+  { height: 820, width: 1180 },
+  { height: 900, width: 1440 },
+  { height: 1080, width: 1920 },
+] as const
+
+const HUE_SYNC_RESIZE_SEQUENCES = [
+  [{ height: 852, width: 393 }, { height: 900, width: 1440 }, { height: 852, width: 393 }],
+  [{ height: 900, width: 1440 }, { height: 852, width: 393 }, { height: 900, width: 1440 }],
+  [{ height: 1180, width: 820 }, { height: 820, width: 1180 }, { height: 1180, width: 820 }],
+  [{ height: 1152, width: 741 }, { height: 741, width: 1152 }, { height: 1152, width: 741 }],
+  [{ height: 820, width: 1180 }, { height: 741, width: 1152 }, { height: 820, width: 1180 }],
 ] as const
 
 async function closeModal(dialog: Locator) {
@@ -137,30 +165,106 @@ async function openMusicRoomVacuum(page: Page) {
   return dialog
 }
 
-async function expectShortLandscapeFixedGrid(dialog: Locator) {
-  await expect(dialog).toHaveAttribute('data-centered-layout', 'false')
+async function openMusicRoomHueSync(page: Page) {
+  await page.goto('/index.html?path=music-room')
+  await page.getByRole('button', { name: /^Music Room Remote / }).click()
+  const dialog = page.getByRole('dialog', { name: 'Music Room Remote' })
+  await expect(dialog).toBeVisible()
+  await dialog.getByRole('tab', { name: 'Hue Sync' }).click()
+  await expect(dialog.locator('[data-hue-sync-tab="true"]')).toBeVisible()
+  return dialog
+}
+
+async function expectHueSyncReachable(dialog: Locator) {
+  await expect(dialog.getByRole('tab', { name: 'Hue Sync' })).toHaveAttribute('aria-selected', 'true')
+  await expect(dialog.getByRole('switch', { name: /^Sync Box Power / })).toBeAttached()
+  await expect(dialog.getByRole('switch', { name: /^Light Sync / })).toBeAttached()
+  await expect(dialog.getByRole('button', { name: 'Music' })).toBeAttached()
+  await expect(dialog.getByRole('button', { name: 'High' })).toBeAttached()
+  await expect(dialog.getByRole('slider', { name: 'Brightness' })).toBeAttached()
+  const terminalInput = dialog.getByRole('button', { name: /^HDMI 4 / })
+  await terminalInput.scrollIntoViewIfNeeded()
+  await expect(terminalInput).toBeVisible()
+  await expect(terminalInput).toBeDisabled()
+  await expect(terminalInput).toHaveAttribute('data-icon', 'mdi:television-off')
+  await expect(terminalInput.locator('..')).toHaveCSS('opacity', '0.48')
+  await expect(dialog.getByRole('button', { name: /^HDMI 2 / })).toBeEnabled()
+  await expect(dialog.getByRole('button', { name: /^HDMI 2 / })).toHaveAttribute('data-icon', 'mdi:television')
+  await expect(dialog.getByRole('button', { name: /^HDMI 2 / }).locator('..')).toHaveCSS('opacity', '1')
+  const [dialogBox, terminalInputBox, navBox] = await Promise.all([
+    dialog.boundingBox(),
+    terminalInput.boundingBox(),
+    dialog.locator('[data-modal-tab-nav="true"]').boundingBox(),
+  ])
+  expect(terminalInputBox?.x ?? -1).toBeGreaterThanOrEqual((dialogBox?.x ?? 0) - 1)
+  expect((terminalInputBox?.x ?? 0) + (terminalInputBox?.width ?? Number.POSITIVE_INFINITY)).toBeLessThanOrEqual((dialogBox?.x ?? 0) + (dialogBox?.width ?? 0) + 1)
+  expect((terminalInputBox?.y ?? 0) + (terminalInputBox?.height ?? Number.POSITIVE_INFINITY)).toBeLessThanOrEqual((navBox?.y ?? ((dialogBox?.y ?? 0) + (dialogBox?.height ?? 0))) + 1)
+  expect(await dialog.evaluate((element) => element.scrollWidth - element.clientWidth)).toBeLessThanOrEqual(0)
+}
+
+test('Hue Sync tab stays reachable across the canonical viewport and resize matrix', async ({ page }) => {
+  test.setTimeout(180_000)
+
+  for (const viewport of HUE_SYNC_VIEWPORTS) {
+    await page.setViewportSize(viewport)
+    const dialog = await openMusicRoomHueSync(page)
+    await expectHueSyncReachable(dialog)
+    await closeModal(dialog)
+  }
+
+  for (const sequence of HUE_SYNC_RESIZE_SEQUENCES) {
+    await page.setViewportSize(sequence[0])
+    const dialog = await openMusicRoomHueSync(page)
+    for (const viewport of sequence) {
+      await page.setViewportSize(viewport)
+      await expectHueSyncReachable(dialog)
+    }
+    await closeModal(dialog)
+  }
+
+})
+
+async function expectShortLandscapeFluidGrid(dialog: Locator) {
+  await expect(dialog).toHaveAttribute('data-modal-presentation', 'landscape-dialog')
+  await expect(dialog).toHaveAttribute('data-centered-layout', 'true')
+  await expect(dialog.locator('[data-mobile-drag-handle="true"]')).toHaveCount(0)
   const grid = dialog.locator('[style*="--modal-square-cols"]').first()
   await expect(grid).toBeVisible()
 
   const gridMetrics = await grid.evaluate((element) => {
-    const tracks = getComputedStyle(element).gridTemplateColumns
-      .split(' ')
-      .map((track) => Number.parseFloat(track))
-      .filter(Number.isFinite)
-    const firstButton = element.querySelector<HTMLElement>('button, article')
-    const firstRect = firstButton?.getBoundingClientRect()
+    const gridRect = element.getBoundingClientRect()
+    const gridStyle = getComputedStyle(element)
+    const usableWidth = gridRect.width - Number.parseFloat(gridStyle.paddingLeft) - Number.parseFloat(gridStyle.paddingRight)
+    const capacity = Math.max(1, Math.floor((usableWidth + 10) / 142))
+    const trackWidth = (usableWidth - (capacity - 1) * 10) / capacity
+    const items = Array.from(element.children)
+      .map((child) => child.querySelector<HTMLElement>('button, article') ?? (child instanceof HTMLElement ? child : null))
+      .filter((child): child is HTMLElement => Boolean(child))
+    const rects = items.map((item) => item.getBoundingClientRect())
+    const rows = new Map<number, DOMRect[]>()
+    for (const rect of rects) {
+      const key = Math.round(rect.top)
+      rows.set(key, [...(rows.get(key) ?? []), rect])
+    }
     return {
-      firstHeight: Math.round(firstRect?.height ?? 0),
-      firstWidth: Math.round(firstRect?.width ?? 0),
-      tracks,
+      trackWidth: Math.round(trackWidth),
+      everyTrackFills: rects.every((rect) => Math.abs(rect.width - trackWidth) <= 1 && Math.abs(rect.height - trackWidth) <= 1),
+      columns: new Set(rects.map((rect) => Math.round(rect.left))).size,
+      firstHeight: Math.round(rects[0]?.height ?? 0),
+      firstWidth: Math.round(rects[0]?.width ?? 0),
+      maximumRowStartDelta: Math.max(0, ...[...rows.values()].map((row) => {
+        const rowLeft = Math.min(...row.map((rect) => rect.left))
+        return Math.abs(rowLeft - gridRect.left - Number.parseFloat(gridStyle.paddingLeft))
+      })),
     }
   })
-  expect(gridMetrics.tracks.length).toBeGreaterThanOrEqual(2)
-  expect(Math.max(...gridMetrics.tracks)).toBeLessThanOrEqual(170)
+  expect(gridMetrics.columns).toBeGreaterThanOrEqual(1)
   expect(gridMetrics.firstWidth).toBeGreaterThan(0)
   expect(gridMetrics.firstHeight).toBeGreaterThan(0)
-  expect(gridMetrics.firstWidth).toBeLessThanOrEqual(170)
-  expect(gridMetrics.firstHeight).toBeLessThanOrEqual(170)
+  expect(gridMetrics.firstWidth).toBe(gridMetrics.trackWidth)
+  expect(gridMetrics.firstHeight).toBe(gridMetrics.trackWidth)
+  expect(gridMetrics.everyTrackFills).toBe(true)
+  expect(gridMetrics.maximumRowStartDelta).toBeLessThanOrEqual(1)
 
   const reachability = await dialog.evaluate((element) => {
     const grids = Array.from(element.querySelectorAll<HTMLElement>('[style*="--modal-square-cols"]'))
@@ -194,7 +298,7 @@ async function expectShortLandscapeFixedGrid(dialog: Locator) {
   expect(reachability?.terminalBottom ?? Number.POSITIVE_INFINITY).toBeLessThanOrEqual((reachability?.ownerBottom ?? 0) + 1)
 }
 
-test('media sheets choose compact or centered presentation across the viewport matrix', async ({ page }) => {
+test('media sheets choose portrait sheet, landscape dialog, or full dialog presentation', async ({ page }) => {
   for (const viewport of VIEWPORTS) {
     await page.setViewportSize(viewport)
     await page.goto('/index.html?path=overview')
@@ -203,10 +307,13 @@ test('media sheets choose compact or centered presentation across the viewport m
     await expect(dialog).toBeVisible()
     await page.waitForTimeout(520)
 
-    const centered = viewport.width >= 760 && viewport.height >= 560
+    const presentation = modalSheetPresentationForViewport(viewport.width, viewport.height)
+    const centered = presentation !== 'sheet'
+    await expect(dialog).toHaveAttribute('data-modal-presentation', presentation)
     await expect(dialog).toHaveAttribute('data-centered-layout', centered ? 'true' : 'false')
     await expect(dialog).toHaveAttribute('data-size', 'media')
-    if (!centered) await expect(dialog.locator('[data-mobile-drag-handle="true"]')).toBeVisible()
+    if (centered) await expect(dialog.locator('[data-mobile-drag-handle="true"]')).toHaveCount(0)
+    else await expect(dialog.locator('[data-mobile-drag-handle="true"]')).toBeVisible()
     const precipitationTiles = dialog.locator('[data-weather-precipitation-tile="true"]')
     await expect(precipitationTiles.locator('[data-precipitation-sample]')).toHaveCount(2)
     await expect(precipitationTiles.locator('[data-precipitation-bar="true"]')).toHaveCount(6)
@@ -405,29 +512,419 @@ test('weather highlight values and visuals align across the viewport matrix', as
   }
 })
 
-test('compact, form, standard, and media intents avoid viewport-wide desktop sheets', async ({ page }) => {
+test('phone landscape uses one outer frame with size-appropriate centered content measures', async ({ page }) => {
+  test.setTimeout(120_000)
+  await page.setViewportSize({ height: 393, width: 852 })
+  const insets = { bottom: 21, left: 59, right: 44, top: 0 }
+  const cases = [
+    {
+      expectedMeasure: 468,
+      expectedTier: 'compact',
+      open: async () => {
+        await page.goto('/index.html?path=master-bedroom')
+        await setSafeAreaInsets(page, insets)
+        await page.getByRole('button', { name: /^Climate /i }).click()
+        return page.getByRole('dialog', { name: 'Master Bedroom Climate' })
+      },
+    },
+    {
+      expectedMeasure: 528,
+      expectedTier: 'fields',
+      footer: true,
+      open: async () => {
+        await page.goto('/index.html?path=to-do')
+        await setSafeAreaInsets(page, insets)
+        await page.getByRole('button', { name: 'Add Task' }).click()
+        return page.getByRole('dialog', { name: 'Add Task' })
+      },
+    },
+    {
+      expectedMeasure: 688,
+      expectedTier: 'wide',
+      open: async () => {
+        await page.goto('/index.html?path=overview&user=stephen#daily-report')
+        await setSafeAreaInsets(page, insets)
+        return page.getByRole('dialog', { name: "Stephen's Summary" })
+      },
+    },
+    {
+      expectedMeasure: 691,
+      expectedTier: 'wide',
+      open: async () => {
+        await page.goto('/index.html?path=master-bedroom')
+        await setSafeAreaInsets(page, insets)
+        await page.getByRole('button', { name: /Humidifier .*46%/i }).click()
+        return page.getByRole('dialog')
+      },
+    },
+    {
+      expectedMeasure: 468,
+      expectedTier: 'compact',
+      open: async () => {
+        await page.goto('/index.html?path=custom-lights')
+        await setSafeAreaInsets(page, insets)
+        await page.evaluate(() => {
+          window.__mockHass?.setEntityState('input_boolean.manually_control_front_yard_lights', 'on')
+          window.__mockHass?.setEntityState('input_select.front_yard_custom_lights', 'Custom')
+        })
+        await page.getByRole('button', { name: 'Select lighting mode' }).click()
+        return page.getByRole('dialog', { name: 'Lighting Mode' })
+      },
+    },
+  ]
+
+  for (const modalCase of cases) {
+    const dialog = await modalCase.open()
+    await expect(dialog).toBeVisible()
+    await expect(dialog).toHaveAttribute('data-modal-presentation', 'landscape-dialog')
+    await expect(dialog).toHaveAttribute('data-modal-body-tier', modalCase.expectedTier)
+    const metrics = await dialog.evaluate((element) => {
+      const rect = element.getBoundingClientRect()
+      const bodyMeasure = element.querySelector<HTMLElement>('[data-modal-content-measure="true"]')
+      const footerMeasure = element.querySelector<HTMLElement>('[data-modal-sheet-footer="true"] > div')
+      const bodyRect = bodyMeasure?.getBoundingClientRect()
+      const footerRect = footerMeasure?.getBoundingClientRect()
+      return {
+        bodyCenter: bodyRect ? (bodyRect.left + bodyRect.right) / 2 : null,
+        footerCenter: footerRect ? (footerRect.left + footerRect.right) / 2 : null,
+        footerWidth: footerRect?.width ?? null,
+        height: rect.height,
+        left: rect.left,
+        measureWidth: bodyRect?.width ?? 0,
+        top: rect.top,
+        width: rect.width,
+      }
+    })
+    expect(Math.abs(metrics.left - 71)).toBeLessThanOrEqual(1)
+    expect(Math.abs(metrics.top - 8)).toBeLessThanOrEqual(1)
+    expect(Math.abs(metrics.width - 725)).toBeLessThanOrEqual(1)
+    expect(Math.abs(metrics.height - 356)).toBeLessThanOrEqual(1)
+    expect(Math.abs(metrics.measureWidth - modalCase.expectedMeasure)).toBeLessThanOrEqual(1)
+    if (modalCase.footer) {
+      expect(Math.abs((metrics.footerWidth ?? 0) - modalCase.expectedMeasure)).toBeLessThanOrEqual(1)
+      expect(Math.abs((metrics.footerCenter ?? 0) - (metrics.bodyCenter ?? 0))).toBeLessThanOrEqual(1)
+    }
+    await closeModal(dialog)
+  }
+})
+
+test('Quick Links fills text-aware rows and keeps its conditional destination reachable', async ({ page }) => {
+  const profiles = [
+    { columns: 2, height: 852, insets: { bottom: 34, left: 0, right: 0, top: 59 }, width: 393 },
+    { columns: 3, height: 320, insets: { bottom: 0, left: 0, right: 0, top: 0 }, width: 568 },
+    { columns: 3, height: 375, insets: { bottom: 0, left: 0, right: 0, top: 0 }, width: 667 },
+    { columns: 4, height: 393, insets: { bottom: 21, left: 59, right: 44, top: 0 }, width: 852 },
+    { columns: 4, height: 393, insets: { bottom: 21, left: 44, right: 59, top: 0 }, width: 852 },
+    { columns: 4, height: 1180, insets: { bottom: 0, left: 0, right: 0, top: 0 }, width: 820 },
+    { columns: 4, height: 900, insets: { bottom: 0, left: 0, right: 0, top: 0 }, width: 1440 },
+  ]
+
+  for (const profile of profiles) {
+    await page.setViewportSize(profile)
+    await page.goto('/index.html?path=overview')
+    await setSafeAreaInsets(page, profile.insets)
+    await page.evaluate((entityId) => {
+      const mock = window.__mockHass
+      if (!mock) throw new Error('Mock Home Assistant API is unavailable')
+      mock.setEntityState(entityId, 'on')
+    }, SHOW_OUTDOOR_FAUCETS_ENTITY_ID)
+    await page.getByRole('button', { name: 'Quick Links' }).click()
+
+    const dialog = page.getByRole('dialog', { name: 'Quick Links' })
+    await expect(dialog).toBeVisible()
+    await expect(dialog).toHaveAttribute(
+      'data-modal-presentation',
+      modalSheetPresentationForViewport(profile.width, profile.height),
+    )
+    const grid = dialog.getByRole('group', { name: 'Quick Links', exact: true })
+    const portrait = profile.width === 393
+    await expect(grid).toHaveAttribute('data-dynamic-grid-item-sizing', 'content-aware')
+    await expect(grid).toHaveAttribute('data-dynamic-grid-fill-rows', portrait ? 'true' : 'except-last')
+    await expect.poll(async () => (await quickLinksLayout(dialog)).columns).toBe(profile.columns)
+    await expect.poll(async () => (await quickLinksLayout(dialog)).cards.every((card) => card.copyFits)).toBe(true)
+    const metrics = await quickLinksLayout(dialog)
+    expect(['auto', 'scroll']).toContain(metrics.bodyOverflow)
+    expect(metrics.cards).toHaveLength(7)
+    expect(Math.abs(metrics.gridWidth - metrics.measureWidth)).toBeLessThanOrEqual(1)
+    expect(Math.abs(metrics.gridTop - metrics.bodyTop)).toBeLessThanOrEqual(1)
+    const rows = new Map<number, typeof metrics.cards>()
+    for (const card of metrics.cards) {
+      expect(card.insideBody).toBe(true)
+      expect(card.height).toBeCloseTo(portrait ? 120 : 88, 2)
+      rows.set(card.y, [...(rows.get(card.y) ?? []), card])
+    }
+    const rowEntries = [...rows.values()]
+    for (const [index, row] of rowEntries.entries()) {
+      expect(Math.abs(row[0].x)).toBeLessThanOrEqual(1)
+      if (portrait || index < rowEntries.length - 1) expect(row.reduce((sum, card) => sum + card.span, 0)).toBe(profile.columns)
+    }
+    const terminal = grid.getByRole('button', { name: 'Sprinklers', exact: true })
+    await terminal.scrollIntoViewIfNeeded()
+    await expect(terminal).toBeInViewport()
+    await closeModal(dialog)
+  }
+})
+
+test('Daily Summary uses compact type and responsive chore and expired-food grids', async ({ page }) => {
+  test.setTimeout(120_000)
+  const profiles = [
+    { columns: 1, height: 852, insets: { bottom: 34, left: 0, right: 0, top: 59 }, tier: 'compact', width: 393 },
+    { columns: 1, height: 320, insets: { bottom: 0, left: 0, right: 0, top: 0 }, tier: 'fields', width: 568 },
+    { columns: 1, height: 375, insets: { bottom: 0, left: 0, right: 0, top: 0 }, tier: 'fields', width: 667 },
+    { columns: 2, height: 343, insets: { bottom: 0, left: 0, right: 0, top: 0 }, tier: 'standard', width: 734 },
+    { columns: 2, height: 393, insets: { bottom: 21, left: 59, right: 44, top: 0 }, tier: 'wide', width: 852 },
+    { columns: 2, height: 393, insets: { bottom: 21, left: 44, right: 59, top: 0 }, tier: 'wide', width: 852 },
+    { columns: 2, height: 1180, insets: { bottom: 0, left: 0, right: 0, top: 0 }, tier: 'standard', width: 820 },
+    { columns: 2, height: 900, insets: { bottom: 0, left: 0, right: 0, top: 0 }, tier: 'standard', width: 1440 },
+  ] as const
+
+  for (const profile of profiles) {
+    await page.setViewportSize(profile)
+    await page.goto('/index.html?path=overview&user=stephen')
+    await setSafeAreaInsets(page, profile.insets)
+    await page.evaluate(() => {
+      const mock = window.__mockHass
+      if (!mock) throw new Error('Mock Home Assistant API is unavailable')
+      const entityId = 'todo.stephen_s_past_due_with_unassigned'
+      const due = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString()
+      mock.setTodoItems(entityId, [
+        { due, status: 'needs_action', summary: 'First summary chore', uid: '401--summary-one' },
+        { due, status: 'needs_action', summary: 'Replace Hallway and Entryway Presence Sensor Batteries', uid: '402--summary-two' },
+        { due, status: 'needs_action', summary: 'Third summary chore', uid: '403--summary-three' },
+        { due, status: 'needs_action', summary: 'Fourth summary chore', uid: '404--summary-four' },
+      ])
+      mock.setEntityState(entityId, '4')
+      const past = new Date()
+      past.setDate(past.getDate() - 5)
+      const expiryDate = `${past.getFullYear()}-${String(past.getMonth() + 1).padStart(2, '0')}-${String(past.getDate()).padStart(2, '0')}`
+      mock.setEntityAttribute('sensor.evershelf_expired_items', 'expired_list', [
+        { expiry_date: expiryDate, inventory_id: 901, name: 'Milk' },
+        { expiry_date: expiryDate, inventory_id: 902, name: 'Almond Flour' },
+      ])
+      mock.setEntityState('sensor.evershelf_expired_items', '2')
+      window.location.hash = '#daily-report'
+    })
+
+    const dialog = page.getByRole('dialog', { name: "Stephen's Summary" })
+    await expect(dialog).toBeVisible()
+    await expect(dialog).toHaveAttribute('data-modal-body-tier', profile.tier)
+    await expect(dialog).toHaveAttribute(
+      'data-modal-presentation',
+      modalSheetPresentationForViewport(profile.width, profile.height),
+    )
+    await expect(dialog.locator('h2').first()).toHaveCSS('font-size', '16px')
+    await expect(dialog.locator('[data-modal-sheet-body-header="true"] h2')).toHaveCSS('font-size', '12.8px')
+
+    const todoList = dialog.getByLabel('Overdue Chores todo list')
+    await expect(todoList).toHaveAttribute('data-layout', 'responsive-grid')
+    await expect(todoList).toHaveAttribute('data-row-variant', 'summary')
+    await expect(todoList.locator('li')).toHaveCount(4)
+    const todoMetrics = await todoList.evaluate((element) => {
+      const rows = Array.from(element.querySelectorAll<HTMLElement>('li'))
+      const rects = rows.map((row) => row.getBoundingClientRect())
+      const titles = rows.map((row) => row.querySelector<HTMLElement>('strong')).filter((title): title is HTMLElement => Boolean(title))
+      const subtitles = rows.map((row) => row.querySelector<HTMLElement>('small')).filter((subtitle): subtitle is HTMLElement => Boolean(subtitle))
+      const controls = Array.from(element.querySelectorAll<HTMLElement>('button[aria-label^="Edit "]'))
+      return {
+        columns: new Set(rects.map((rect) => Math.round(rect.left))).size,
+        controlsAreTouchSized: controls.every((control) => {
+          const rect = control.getBoundingClientRect()
+          return rect.width >= 44 && rect.height >= 44
+        }),
+        copyFits: [...titles, ...subtitles].every((copy) =>
+          copy.scrollWidth <= copy.clientWidth + 1
+          && copy.scrollHeight <= copy.clientHeight + 1),
+        rowWidths: rects.map((rect) => rect.width),
+        subtitleFonts: [...new Set(subtitles.map((subtitle) => getComputedStyle(subtitle).fontSize))],
+        titleFonts: [...new Set(titles.map((title) => getComputedStyle(title).fontSize))],
+      }
+    })
+    expect(todoMetrics.columns).toBe(profile.columns)
+    expect(todoMetrics.controlsAreTouchSized).toBe(true)
+    expect(todoMetrics.copyFits).toBe(true)
+    expect(todoMetrics.subtitleFonts).toEqual(['11.2px'])
+    expect(todoMetrics.titleFonts).toEqual(['13.12px'])
+    expect(Math.min(...todoMetrics.rowWidths)).toBeGreaterThan(0)
+
+    await dialog.getByRole('tab', { name: /^Expired Food/ }).click()
+    const inventoryList = dialog.getByLabel('Expired Food inventory list')
+    await expect(inventoryList).toHaveAttribute('data-layout', 'responsive-grid')
+    await expect(inventoryList).toHaveAttribute('data-row-variant', 'summary')
+    const expiredRows = inventoryList.locator('[data-expiry-tone="expired"]')
+    await expect(expiredRows).toHaveCount(2)
+    const expiredMetrics = await expiredRows.evaluateAll((rows) => {
+      const rects = rows.map((row) => row.getBoundingClientRect())
+      const titles = rows.map((row) => row.querySelector<HTMLElement>('strong')).filter((title): title is HTMLElement => Boolean(title))
+      const subtitles = rows.map((row) => row.querySelector<HTMLElement>('small')).filter((subtitle): subtitle is HTMLElement => Boolean(subtitle))
+      const controls = rows.flatMap((row) => Array.from(row.querySelectorAll<HTMLElement>('button')))
+      return {
+        columns: new Set(rects.map((rect) => Math.round(rect.left))).size,
+        controlsAreTouchSized: controls.every((control) => {
+          const rect = control.getBoundingClientRect()
+          return rect.width >= 44 && rect.height >= 44
+        }),
+        rowsStayInsideViewport: rects.every((rect) => rect.left >= -1 && rect.right <= window.innerWidth + 1),
+        subtitleFonts: [...new Set(subtitles.map((subtitle) => getComputedStyle(subtitle).fontSize))],
+        titleFonts: [...new Set(titles.map((title) => getComputedStyle(title).fontSize))],
+      }
+    })
+    expect(expiredMetrics.columns).toBe(profile.columns)
+    expect(expiredMetrics.controlsAreTouchSized).toBe(true)
+    expect(expiredMetrics.rowsStayInsideViewport).toBe(true)
+    expect(expiredMetrics.subtitleFonts).toEqual(['11.2px'])
+    expect(expiredMetrics.titleFonts).toEqual(['13.12px'])
+
+    if (profile.width >= 820 && profile.height >= 560) {
+      expect(Math.round((await dialog.boundingBox())?.height ?? 0)).toBe(760)
+    }
+    await closeModal(dialog)
+  }
+})
+
+test('Occupancy room tiles preserve portrait cards and centered square presentations', async ({ page }) => {
+  test.setTimeout(120_000)
+  const occupancyEntityIds = [...new Set(OCCUPANCY_GROUPS.flatMap((group) => group.items.map((item) => item.entityId)))]
+  const activeEntityId = OCCUPANCY_GROUPS[0].items[0].entityId
+  const viewports = [
+    { centeredPresentation: false, height: 852, insets: { bottom: 34, left: 0, right: 0, top: 59 }, tileHeight: PORTRAIT_TILE_HEIGHT, tileWidth: PORTRAIT_TILE_WIDTH, width: 393 },
+    { centeredPresentation: true, height: 393, insets: { bottom: 21, left: 59, right: 44, top: 0 }, tileHeight: 158.25, tileWidth: 158.25, width: 852 },
+    { centeredPresentation: true, height: 1180, insets: { bottom: 0, left: 0, right: 0, top: 0 }, tileHeight: DIALOG_SQUARE_TILE_SIZE, tileWidth: DIALOG_SQUARE_TILE_SIZE, width: 820 },
+    { centeredPresentation: true, height: 900, insets: { bottom: 0, left: 0, right: 0, top: 0 }, tileHeight: DIALOG_SQUARE_TILE_SIZE, tileWidth: DIALOG_SQUARE_TILE_SIZE, width: 1440 },
+  ]
+
+  for (const viewport of viewports) {
+    await page.setViewportSize(viewport)
+    await page.goto('/index.html?path=overview#occupancy-overview')
+    await setSafeAreaInsets(page, viewport.insets)
+    await page.evaluate(({ activeId, entityIds }) => {
+      const mock = window.__mockHass
+      if (!mock) throw new Error('Mock Home Assistant API is unavailable')
+      for (const entityId of entityIds) mock.setEntityState(entityId, 'off')
+      mock.setEntityState(activeId, 'on')
+    }, { activeId: activeEntityId, entityIds: occupancyEntityIds })
+
+    const dialog = page.getByRole('dialog', { name: 'Occupancy' })
+    await expect(dialog).toBeVisible()
+    const occupiedSection = dialog.getByRole('region', { name: 'Occupied rooms' })
+    const clearSection = dialog.getByRole('region', { name: 'Clear rooms' })
+    await expect(occupiedSection.getByRole('button')).toHaveCount(1)
+    await expect(clearSection.getByRole('button')).toHaveCount(OCCUPANCY_GROUPS.length - 1)
+
+    const metrics = await dialog.evaluate((element, expectedCardSize) => {
+      const dialogRect = element.getBoundingClientRect()
+      const body = element.querySelector<HTMLElement>('[data-modal-sheet-body="true"]')
+      const bodyRect = body?.getBoundingClientRect()
+      const bodyStyle = body ? getComputedStyle(body) : null
+      const bodyContentWidth = body
+        ? body.clientWidth - Number.parseFloat(bodyStyle?.paddingLeft ?? '0') - Number.parseFloat(bodyStyle?.paddingRight ?? '0')
+        : 0
+      const scrollOwner = element.querySelector<HTMLElement>('[class*="occupancyContent"]')
+      const sections = Array.from(element.querySelectorAll<HTMLElement>('section[aria-label$=" rooms"]'))
+      const sectionMetrics = sections.map((section) => {
+        const grid = section.querySelector<HTMLElement>('[style*="--modal-square-card-size"]')
+        if (!grid) return null
+        const gridRect = grid.getBoundingClientRect()
+        const cards = Array.from(grid.querySelectorAll<HTMLElement>(':scope > * > button, :scope > * > article'))
+        const rects = cards.map((card) => card.getBoundingClientRect())
+        const rows = new Map<number, DOMRect[]>()
+        for (const rect of rects) {
+          const key = Math.round(rect.top)
+          rows.set(key, [...(rows.get(key) ?? []), rect])
+        }
+        return {
+          cardContentFits: cards.every((card) =>
+            card.scrollWidth <= card.clientWidth + 1
+            && card.scrollHeight <= card.clientHeight + 1),
+          cardSizesValid: rects.every((rect) =>
+            Math.abs(rect.width - expectedCardSize.width) <= 1
+            && Math.abs(rect.height - expectedCardSize.height) <= 1),
+          gridBodyWidthDelta: bodyRect ? Math.abs(gridRect.width - bodyContentWidth) : Number.POSITIVE_INFINITY,
+          gridInsideBody: Boolean(bodyRect && gridRect.left >= bodyRect.left - 1 && gridRect.right <= bodyRect.right + 1),
+          maximumRowStartDelta: Math.max(0, ...[...rows.values()].map((row) => {
+            const rowLeft = Math.min(...row.map((rect) => rect.left))
+            return Math.abs(rowLeft - gridRect.left - Number.parseFloat(getComputedStyle(grid).paddingLeft))
+          })),
+          minimumDialogInset: Math.min(
+            ...rects.flatMap((rect) => [
+              rect.left - dialogRect.left,
+              dialogRect.right - rect.right,
+            ]),
+          ),
+        }
+      }).filter((metric): metric is NonNullable<typeof metric> => metric !== null)
+      return {
+        scrollOwnerClientHeight: scrollOwner?.clientHeight ?? 0,
+        scrollOwnerScrollHeight: scrollOwner?.scrollHeight ?? 0,
+        sectionMetrics,
+      }
+    }, { height: viewport.tileHeight, width: viewport.tileWidth })
+
+    expect(metrics.sectionMetrics).toHaveLength(2)
+    for (const section of metrics.sectionMetrics) {
+      expect(section.cardContentFits).toBe(true)
+      expect(section.cardSizesValid).toBe(true)
+      expect(section.gridInsideBody).toBe(true)
+      if (viewport.centeredPresentation) {
+        expect(section.maximumRowStartDelta).toBeLessThanOrEqual(1)
+        expect(section.minimumDialogInset).toBeGreaterThanOrEqual(24)
+      } else {
+        expect(section.gridBodyWidthDelta).toBeLessThanOrEqual(1)
+      }
+    }
+
+    const scrollOwner = dialog.locator('[class*="occupancyContent"]')
+    if (metrics.scrollOwnerScrollHeight > metrics.scrollOwnerClientHeight + 1) {
+      await expect.poll(() => scrollOwner.evaluate((element) => {
+        element.scrollTop = element.scrollHeight
+        const terminalCard = Array.from(element.querySelectorAll<HTMLElement>('section[aria-label="Clear rooms"] button')).at(-1)
+        if (!terminalCard) return false
+        const ownerRect = element.getBoundingClientRect()
+        const terminalRect = terminalCard.getBoundingClientRect()
+        return terminalRect.top >= ownerRect.top - 1 && terminalRect.bottom <= ownerRect.bottom + 1
+      })).toBe(true)
+      await scrollOwner.evaluate((element) => {
+        element.scrollTop = 0
+      })
+    }
+
+    await occupiedSection.getByRole('button', { name: /Open Living Room Occupancy/i }).click()
+    await expect(dialog.getByRole('heading', { name: 'Living Room Occupancy' })).toBeVisible()
+    await dialog.getByRole('button', { name: 'Back to room occupancy' }).click()
+    await expect(dialog.getByRole('region', { name: 'Occupied rooms' })).toBeVisible()
+    await closeModal(dialog)
+  }
+})
+
+test('compact, form, standard, and media share a desktop frame with preserved reading measures', async ({ page }) => {
   await page.setViewportSize({ height: 900, width: 1440 })
+
+  const expectFrameAndMeasure = async (dialog: Locator, measureWidth: number) => {
+    await expect.poll(async () => {
+      const box = await dialog.boundingBox()
+      return { width: Math.round(box?.width ?? 0), height: Math.round(box?.height ?? 0) }
+    }).toEqual({ width: 1100, height: 760 })
+    await expect.poll(() => dialog.locator('[data-modal-content-measure="true"]').evaluate((element) => element.getBoundingClientRect().width)).toBe(measureWidth)
+  }
 
   await page.goto('/index.html?path=overview')
   await page.getByRole('button', { name: /Security Armed/i }).click()
   let dialog = page.getByRole('dialog')
   await expect(dialog).toHaveAttribute('data-size', 'compact')
-  await expect.poll(async () => Math.round((await dialog.boundingBox())?.width ?? 0)).toBe(500)
+  await expectFrameAndMeasure(dialog, 1050)
   await closeModal(dialog)
 
   await page.goto('/index.html?path=grocery-list')
   await page.getByRole('button', { exact: true, name: 'Add Groceries' }).click()
   dialog = page.getByRole('dialog')
   await expect(dialog).toHaveAttribute('data-size', 'form')
-  await expect.poll(async () => Math.round((await dialog.boundingBox())?.width ?? 0)).toBe(560)
-  await expect.poll(async () => Math.round((await dialog.boundingBox())?.height ?? 0)).toBeLessThan(400)
+  await expectFrameAndMeasure(dialog, 510)
   await closeModal(dialog)
 
   await page.goto('/index.html?path=sprinklers')
   await page.getByRole('button', { name: /Front Yard Auto/i }).click()
   dialog = page.getByRole('dialog')
   await expect(dialog).toHaveAttribute('data-size', 'standard')
-  await expect.poll(async () => Math.round((await dialog.boundingBox())?.width ?? 0)).toBe(720)
+  await expectFrameAndMeasure(dialog, 670)
   await expectScrollSafe(dialog)
   await closeModal(dialog)
 
@@ -435,7 +932,7 @@ test('compact, form, standard, and media intents avoid viewport-wide desktop she
   await page.getByRole('button', { name: /Open Front Door camera/i }).click()
   dialog = page.getByRole('dialog')
   await expect(dialog).toHaveAttribute('data-size', 'media')
-  await expect.poll(async () => Math.round((await dialog.boundingBox())?.width ?? 0)).toBe(1100)
+  await expectFrameAndMeasure(dialog, 1050)
   await closeModal(dialog)
 })
 
@@ -452,7 +949,8 @@ test('square-grid detail sheets delegate overflow to the correct owner', async (
     const body = dialog.locator('[data-modal-sheet-body="true"]')
     const grid = dialog.locator('section[aria-label="Rooms"]')
     if (viewport.height < 560) {
-      await expect(dialog).toHaveAttribute('data-centered-layout', 'false')
+      await expect(dialog).toHaveAttribute('data-modal-presentation', 'landscape-dialog')
+      await expect(dialog).toHaveAttribute('data-centered-layout', 'true')
       await expect(body).toHaveCSS('overflow-y', 'auto')
     } else {
       await expect(dialog).toHaveAttribute('data-centered-layout', 'true')
@@ -468,7 +966,7 @@ test('square-grid detail sheets delegate overflow to the correct owner', async (
   }
 })
 
-test('short-landscape square-grid families keep fixed tracks and reachable terminal controls', async ({ page }) => {
+test('short-landscape square-grid families fill equal tracks and reach terminal controls', async ({ page }) => {
   test.setTimeout(120_000)
   await page.setViewportSize({ height: 393, width: 852 })
 
@@ -477,7 +975,7 @@ test('short-landscape square-grid families keep fixed tracks and reachable termi
     const dialog = page.getByRole('dialog')
     await expect(dialog).toBeVisible()
     await page.waitForTimeout(520)
-    await expectShortLandscapeFixedGrid(dialog)
+    await expectShortLandscapeFluidGrid(dialog)
     await closeModal(dialog)
   }
 
@@ -485,7 +983,7 @@ test('short-landscape square-grid families keep fixed tracks and reachable termi
   let dialog = page.getByRole('dialog', { name: 'Contact Sensors' })
   await expect(dialog).toBeVisible()
   await page.waitForTimeout(520)
-  await expectShortLandscapeFixedGrid(dialog)
+  await expectShortLandscapeFluidGrid(dialog)
   await closeModal(dialog)
 
   await page.goto('/index.html?path=settings')
@@ -493,7 +991,7 @@ test('short-landscape square-grid families keep fixed tracks and reachable termi
   await page.getByRole('button', { exact: true, name: 'Rooms' }).click()
   dialog = page.getByRole('dialog', { name: 'Rooms' })
   await page.waitForTimeout(520)
-  await expectShortLandscapeFixedGrid(dialog)
+  await expectShortLandscapeFluidGrid(dialog)
   await closeModal(dialog)
 
   for (const hash of ['#presence-based-overrides', '#presence-based-overrides-auto']) {
@@ -501,12 +999,12 @@ test('short-landscape square-grid families keep fixed tracks and reachable termi
     dialog = page.getByRole('dialog')
     await expect(dialog).toBeVisible()
     await page.waitForTimeout(520)
-    await expectShortLandscapeFixedGrid(dialog)
+    await expectShortLandscapeFluidGrid(dialog)
     await closeModal(dialog)
   }
 })
 
-test('short-landscape sheet pickers use compact fixed tracks', async ({ page }) => {
+test('short-landscape dialog pickers use compact fixed tracks', async ({ page }) => {
   await page.setViewportSize({ height: 393, width: 852 })
   await page.goto('/index.html?path=custom-lights')
   await expect.poll(() => page.evaluate(() => Boolean(window.__mockHass))).toBe(true)
@@ -520,7 +1018,7 @@ test('short-landscape sheet pickers use compact fixed tracks', async ({ page }) 
   let dialog = page.getByRole('dialog', { name: 'Lighting Mode' })
   await expect(dialog).toBeVisible()
   let options = dialog.getByRole('group', { name: 'Lighting Mode options' })
-  await expect.poll(() => options.evaluate((element) => getComputedStyle(element).gridTemplateColumns)).toBe('240px 240px')
+  await expect.poll(() => options.evaluate((element) => getComputedStyle(element).gridTemplateColumns)).toBe('220px 220px')
   await closeModal(dialog)
 
   await page.goto('/index.html?path=ecobee')
@@ -528,7 +1026,7 @@ test('short-landscape sheet pickers use compact fixed tracks', async ({ page }) 
   dialog = page.getByRole('dialog', { name: 'Thermostat Hub Mode' })
   await expect(dialog).toBeVisible()
   options = dialog.getByRole('group', { name: 'Thermostat Hub Mode options' })
-  await expect.poll(() => options.evaluate((element) => getComputedStyle(element).gridTemplateColumns)).toBe('240px 240px')
+  await expect.poll(() => options.evaluate((element) => getComputedStyle(element).gridTemplateColumns)).toBe('220px 220px')
   await closeModal(dialog)
 })
 
@@ -759,8 +1257,9 @@ test('vacuum short landscape uses one body scroller with a fixed navigation foot
   const dialog = await openMainFloorVacuum(page)
   await page.waitForTimeout(520)
 
-  await expect(dialog).toHaveAttribute('data-centered-layout', 'false')
-  await expect(dialog.locator('[data-mobile-drag-handle="true"]')).toBeVisible()
+  await expect(dialog).toHaveAttribute('data-modal-presentation', 'landscape-dialog')
+  await expect(dialog).toHaveAttribute('data-centered-layout', 'true')
+  await expect(dialog.locator('[data-mobile-drag-handle="true"]')).toHaveCount(0)
   const body = dialog.locator('[data-modal-sheet-body="true"]')
   await expect(body).toHaveCSS('overflow-y', 'auto')
   await expect.poll(() => body.evaluate((element) => element.scrollHeight > element.clientHeight)).toBe(true)

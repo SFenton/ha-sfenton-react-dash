@@ -1,7 +1,7 @@
 import { useEffect, useId, useRef, type ReactNode } from 'react'
 import { MaterialIcon } from './Icon'
 import glassTileStyles from './GlassTile.module.css'
-import { ModalSheet, type ModalSheetSize, type ModalSheetStyle } from './ModalSheet'
+import { ModalSheet, type ModalCenteredGeometry, type ModalSheetSize, type ModalSheetStyle } from './ModalSheet'
 import { useCopy } from '../../i18n'
 import styles from './OptionPickerDialog.module.css'
 
@@ -36,6 +36,13 @@ interface OptionPickerDialogProps {
   sheetStyle?: ModalSheetStyle
   onClose: () => void
   onSelect: (value: string) => void
+}
+const MODAL_SIZE_INLINE_SIZE: Record<ModalSheetSize, string> = {
+  compact: '500px',
+  form: '560px',
+  media: '1100px',
+  standard: '720px',
+  workspace: '980px',
 }
 
 export function OptionPickerPanel({
@@ -113,8 +120,13 @@ export function OptionPickerDialog({ open, options, title, value, icon, selected
   if (!open && !isSheet) return null
 
   if (isSheet) {
+    const centeredGeometry = {
+      blockPolicy: 'content-fit',
+      id: `option-picker-${sheetSize}`,
+      inlineSize: MODAL_SIZE_INLINE_SIZE[sheetSize],
+    } satisfies ModalCenteredGeometry
     return (
-      <ModalSheet contentStyle={sheetStyle} onClose={onClose} open={open} size={sheetSize} title={title}>
+      <ModalSheet centeredGeometry={centeredGeometry} contentStyle={sheetStyle} onClose={onClose} open={open} size={sheetSize} title={title}>
         {optionPanel}
       </ModalSheet>
     )

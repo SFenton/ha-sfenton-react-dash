@@ -1,4 +1,4 @@
-import { expect, test, type Locator, type Page } from '@playwright/test'
+import { expect, test, type Locator, type Page } from './layout/fixture'
 
 const WEATHER_ENTITY = 'weather.pirate_weather'
 const WEATHER_MOTION_DURATION_MS = 390

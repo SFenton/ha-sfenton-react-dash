@@ -10,6 +10,20 @@ Every UX change must satisfy the canonical viewport, resize, state, modal,
 fine-pointer desktop, preload-I/O, and mobile-baseline gates in
 `docs/ux/validation-matrix.md`.
 
+Start with `docs/ux/layouts.md` and the executable layout plan. Resolve a clean
+base commit and an explicit working tree; never substitute a stale/dirty checkout
+or an already-running unowned server. Run `layout:check`, `layout:plan`,
+`layout:run`, and `layout:verify` as documented. The plan selects affected
+scenarios or a conservative full-known-mock fallback; it does not require every
+test for every non-layout change. Changed copy is layout-sensitive even when its
+character/word counts are unchanged.
+
+Actual manual Playwright interaction and image inspection remain mandatory for
+the plan's review items. Captured files, tags, registration counts and filled
+review schemas are not visual judgment. Record missing or inaccessible evidence
+as blocked; never bypass access restrictions. Local validation is mock-only,
+no-proxy and provenance-bound, and grants no HA or deployment authority.
+
 ## Current Stack
 
 - React 19 + TypeScript + Vite
@@ -228,10 +242,14 @@ When validating deployment, check both:
 
 Always validate the raw app with a cache-busting query param, always bump the legacy wrapper card URL after copying `dist/`, and verify that both dashboard hosts render the same route. The custom wrapper iframe can keep loading cached `index.html` even after the SMB copy succeeds.
 
-For reconnect validation, capture the inner React iframe `performance.timeOrigin`, force or observe a Home Assistant WebSocket reconnect, and confirm:
-
-- `/sfenton-react-dash/home` recreates its Lovelace wrapper iframe;
-- `/sfenton-react-panel` retains the same inner React iframe and `performance.timeOrigin`.
+For authorized host lifecycle validation, record the exact event, host/bridge
+version, inner frame identity and `performance.timeOrigin`. Distinguish a client
+WebSocket interruption from HA layout-driven element disconnection/reconnection.
+The recorded three-second interruption retained both hosts, including legacy v2;
+the recorded layout rotation remounted both tested legacy bridge versions.
+Do not infer that every legacy WebSocket reconnect recreates its iframe, or use
+current corrected source to explain an older run without matching provenance.
+Synthetic local host tests do not certify deployed Home Assistant behavior.
 
 ## WebRTC And Cameras
 

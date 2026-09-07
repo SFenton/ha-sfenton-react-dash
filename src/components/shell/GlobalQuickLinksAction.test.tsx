@@ -11,6 +11,38 @@ describe('GlobalQuickLinksAction', () => {
     mockEntities[SHOW_OUTDOOR_FAUCETS_ENTITY_ID].state = 'off'
   })
 
+  it('uses production portrait tiles and changes only the density and row-fill policy on rotation', async () => {
+    const previousWidth = window.innerWidth
+    const previousHeight = window.innerHeight
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: 393 })
+    Object.defineProperty(window, 'innerHeight', { configurable: true, value: 852 })
+    const view = render(<GlobalQuickLinksAction onNavigate={vi.fn()} />)
+    try {
+      fireEvent.click(screen.getByRole('button', { name: 'Quick Links' }))
+      const dialog = await screen.findByRole('dialog', { name: 'Quick Links' })
+      const grid = within(dialog).getByRole('group', { name: 'Quick Links' })
+      const rooms = within(grid).getByRole('button', { name: 'Rooms' })
+      expect(grid).toHaveAttribute('data-dynamic-grid-fill-rows', 'true')
+      expect(rooms.querySelector('svg')).toHaveAttribute('width', '24')
+      Object.defineProperty(window, 'innerWidth', { configurable: true, value: 852 })
+      Object.defineProperty(window, 'innerHeight', { configurable: true, value: 393 })
+      fireEvent(window, new Event('resize'))
+      expect(grid).toHaveAttribute('data-dynamic-grid-fill-rows', 'except-last')
+      expect(rooms.querySelector('svg')).toHaveAttribute('width', '18')
+      expect(within(grid).getByRole('button', { name: 'Rooms' })).toBe(rooms)
+      Object.defineProperty(window, 'innerWidth', { configurable: true, value: 393 })
+      Object.defineProperty(window, 'innerHeight', { configurable: true, value: 852 })
+      fireEvent(window, new Event('resize'))
+      expect(grid).toHaveAttribute('data-dynamic-grid-fill-rows', 'true')
+      expect(rooms.querySelector('svg')).toHaveAttribute('width', '24')
+      expect(mockCallServiceCalls).toHaveLength(0)
+    } finally {
+      view.unmount()
+      Object.defineProperty(window, 'innerWidth', { configurable: true, value: previousWidth })
+      Object.defineProperty(window, 'innerHeight', { configurable: true, value: previousHeight })
+    }
+  })
+
   it('opens the typed Quick Links grid and closes through the shared sheet before navigating', async () => {
     const navigate = vi.fn()
     render(<GlobalQuickLinksAction onNavigate={navigate} />)
@@ -29,6 +61,8 @@ describe('GlobalQuickLinksAction', () => {
     const dialog = await screen.findByRole('dialog', { name: 'Quick Links' })
     const grid = within(dialog).getByRole('group', { name: 'Quick Links' })
     expect(trigger).toHaveAttribute('aria-expanded', 'true')
+    expect(grid).toHaveAttribute('data-dynamic-grid', 'true')
+    expect(grid).toHaveAttribute('data-dynamic-grid-item-sizing', 'content-aware')
     expect(within(grid).getAllByRole('button')[0]).toHaveAccessibleName('Rooms')
     expect(within(grid).getAllByRole('button').map((button) => button.getAttribute('data-action-kind'))).toEqual(
       QUICK_ACCESS_ITEMS.filter((item) => !item.visibilityEntityId).map((item) => item.action.kind),
@@ -52,14 +86,17 @@ describe('GlobalQuickLinksAction', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Quick Links' }))
     const dialog = await screen.findByRole('dialog', { name: 'Quick Links' })
+    expect(dialog).toHaveAttribute('data-scroll-mode', 'body')
     const roomsTile = within(dialog).getByRole('button', { name: 'Rooms' })
     fireEvent.click(roomsTile)
 
     expect(within(dialog).getByRole('heading', { name: 'Rooms' })).toBeInTheDocument()
+    expect(dialog).toHaveAttribute('data-scroll-mode', 'panes')
     expect(within(dialog).getByRole('button', { name: 'Back' })).toBeInTheDocument()
     await waitFor(() => expect(within(dialog).getAllByRole('button', { name: / area$/ })[0]).toHaveFocus())
 
     fireEvent.click(within(dialog).getByRole('button', { name: 'Back' }))
+    expect(dialog).toHaveAttribute('data-scroll-mode', 'body')
     await waitFor(() => expect(within(dialog).getByRole('button', { name: 'Rooms' })).toHaveFocus())
 
     fireEvent.click(within(dialog).getByRole('button', { name: 'Rooms' }))

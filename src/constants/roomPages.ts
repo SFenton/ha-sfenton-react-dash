@@ -5,13 +5,14 @@ import { GARAGE_DOOR_ENTITY_IDS } from './garageDoors'
 import { MASTER_BEDROOM_HUMIDIFIER } from './humidifiers'
 import {
   MEDIA_REMOTE_CONFIGS,
+  MUSIC_ROOM_ACTIVE_MEDIA_SOURCE_ENTITY_ID,
   MUSIC_ROOM_CONTROL_ENTITY_ID,
   MUSIC_ROOM_FORTNITE_ARTWORK_URL,
   MUSIC_ROOM_MEDIA_ACTIONS,
-  MUSIC_ROOM_MEDIA_SOURCE_ENTITY_ID,
+  MUSIC_ROOM_MEDIA_LIVE_CHANGE_OPTIMISTIC_ENTITY_IDS,
+  MUSIC_ROOM_MEDIA_OPTIMISTIC_ENTITY_IDS,
   MUSIC_ROOM_MEDIA_SOURCE_STATES,
   MUSIC_ROOM_REMOTE_HASH,
-  MUSIC_ROOM_XBOX_ENTITY_ID,
   musicRoomSourceLabels,
   type MediaRemoteAction,
 } from './mediaRemotes'
@@ -71,12 +72,14 @@ export type RoomSourceSectionLayout = 'app-launch' | 'lead-row'
 export interface RoomSourceSectionConfig {
   cards: RoomSourceCardConfig[]
   layout?: RoomSourceSectionLayout
+  showOnRoomPage?: boolean
   title: string
 }
 
 export interface RoomPageSourceConfig {
   overviewCards: RoomSourceCardConfig[]
   optimisticStateEntityIds?: readonly string[]
+  optimisticLiveChangeEntityIds?: readonly string[]
   path: string
   popupTemplates: string[]
   sourceSections: RoomSourceSectionConfig[]
@@ -144,7 +147,7 @@ const livingRoomShieldAppShortcuts = mediaAppShortcuts('#living-room-shield', 'm
 const theaterAppShortcuts = mediaAppShortcuts('#theater-room-shield', 'media_player.theater_room_shield', { remote_entity: 'remote.theater_shield_remote' })
 const modalSemantics: ControlSemanticsResolver = () => ({ kind: 'modal' })
 const commandSemantics: ControlSemanticsResolver = () => ({ kind: 'command' })
-const musicRoomXboxSemantics: ControlSemanticsResolver = (state) => ({ kind: 'selection', selected: state === MUSIC_ROOM_MEDIA_SOURCE_STATES.xbox })
+const musicRoomXboxSemantics: ControlSemanticsResolver = (state) => ({ kind: 'selection', selected: state === MUSIC_ROOM_MEDIA_SOURCE_STATES.xbox || state === MUSIC_ROOM_MEDIA_SOURCE_STATES.fortnite })
 const musicRoomServerSemantics: ControlSemanticsResolver = (state) => ({ kind: 'selection', selected: state === MUSIC_ROOM_MEDIA_SOURCE_STATES.server })
 const musicRoomFortniteSemantics: ControlSemanticsResolver = (state) => ({ kind: 'selection', selected: state === MUSIC_ROOM_MEDIA_SOURCE_STATES.fortnite })
 const musicRoomTitle = copy(MEDIA_COPY_NAMESPACE, MEDIA_COPY_KEYS.musicRoom.title)
@@ -313,7 +316,8 @@ export const ROOM_PAGE_CONFIGS: Record<string, RoomPageSourceConfig> = {
   'music-room': {
     title: musicRoomTitle,
     path: 'music-room',
-    optimisticStateEntityIds: [MUSIC_ROOM_MEDIA_SOURCE_ENTITY_ID, MUSIC_ROOM_CONTROL_ENTITY_ID, MUSIC_ROOM_XBOX_ENTITY_ID],
+    optimisticStateEntityIds: MUSIC_ROOM_MEDIA_OPTIMISTIC_ENTITY_IDS,
+    optimisticLiveChangeEntityIds: MUSIC_ROOM_MEDIA_LIVE_CHANGE_OPTIMISTIC_ENTITY_IDS,
     overviewCards: [
       { title: 'Lights', entityId: 'light.music_room', icon: 'mdi:lightbulb-group', kind: 'light', hash: '#lights-music-room', showState: true },
       { title: 'Climate', entityId: 'input_text.music_room_climate_range', icon: 'mdi:thermometer', kind: 'climate', hash: '#climate-music-room', showState: true },
@@ -333,34 +337,35 @@ export const ROOM_PAGE_CONFIGS: Record<string, RoomPageSourceConfig> = {
           { title: musicRoomRemoteTitle, entityId: MUSIC_ROOM_CONTROL_ENTITY_ID, icon: 'mdi:remote', kind: 'media', hash: MUSIC_ROOM_REMOTE_HASH, semantics: modalSemantics, showState: true },
           {
             title: musicRoomXboxTitle,
-            entityId: MUSIC_ROOM_MEDIA_SOURCE_ENTITY_ID,
+            entityId: MUSIC_ROOM_ACTIVE_MEDIA_SOURCE_ENTITY_ID,
             icon: 'mdi:microsoft-xbox',
             kind: 'media',
             showState: true,
-            activeStates: [MUSIC_ROOM_MEDIA_SOURCE_STATES.xbox],
-            stateLabels: musicRoomSourceLabels(MUSIC_ROOM_MEDIA_SOURCE_STATES.xbox),
+            activeStates: [MUSIC_ROOM_MEDIA_SOURCE_STATES.xbox, MUSIC_ROOM_MEDIA_SOURCE_STATES.fortnite],
+            stateLabels: musicRoomSourceLabels([MUSIC_ROOM_MEDIA_SOURCE_STATES.xbox, MUSIC_ROOM_MEDIA_SOURCE_STATES.fortnite]),
             semantics: musicRoomXboxSemantics,
-            action: sourceActionFromMediaAction(MUSIC_ROOM_MEDIA_ACTIONS.xboxSource),
+            action: sourceActionFromMediaAction(MUSIC_ROOM_MEDIA_ACTIONS.xboxSourceToggle),
           },
           {
             title: musicRoomServerTitle,
-            entityId: MUSIC_ROOM_MEDIA_SOURCE_ENTITY_ID,
+            entityId: MUSIC_ROOM_ACTIVE_MEDIA_SOURCE_ENTITY_ID,
             icon: 'mdi:server',
             kind: 'media',
             showState: true,
             activeStates: [MUSIC_ROOM_MEDIA_SOURCE_STATES.server],
             stateLabels: musicRoomSourceLabels(MUSIC_ROOM_MEDIA_SOURCE_STATES.server),
             semantics: musicRoomServerSemantics,
-            action: sourceActionFromMediaAction(MUSIC_ROOM_MEDIA_ACTIONS.server),
+            action: sourceActionFromMediaAction(MUSIC_ROOM_MEDIA_ACTIONS.serverToggle),
           },
         ],
       },
       {
         title: copy(MEDIA_COPY_NAMESPACE, MEDIA_COPY_KEYS.musicRoom.quickAppLaunch),
         layout: 'app-launch',
+        showOnRoomPage: false,
         cards: [{
           title: musicRoomFortniteTitle,
-          entityId: MUSIC_ROOM_MEDIA_SOURCE_ENTITY_ID,
+          entityId: MUSIC_ROOM_ACTIVE_MEDIA_SOURCE_ENTITY_ID,
           icon: 'mdi:gamepad-variant',
           imageUrl: MUSIC_ROOM_FORTNITE_ARTWORK_URL,
           kind: 'media',

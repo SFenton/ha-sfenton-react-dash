@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto'
 import { writeFile } from 'node:fs/promises'
-import { expect, test, type Locator, type Page } from '@playwright/test'
+import { expect, test, type Locator, type Page } from './layout/fixture'
 import { WEATHER_SCENES } from '../src/components/hass/weatherPresentation'
 import { setWeatherSceneDebug } from './weather-scene-debug'
 

@@ -5,18 +5,19 @@ import { useRef, useState, type CSSProperties } from 'react'
 import { useOptimisticState } from '../../hooks/useOptimisticState'
 import { GlassTile } from '../core/GlassTile'
 import { MaterialIcon } from '../core/Icon'
-import { ModalSheet, type ModalSheetStyle } from '../core/ModalSheet'
+import { ModalSheet, type ModalCenteredGeometry } from '../core/ModalSheet'
 import { LightBrightnessCard } from './LightBrightnessCard'
 import { asEntityName } from './entityState'
 import styles from './LightMoreInfoSheet.module.css'
 
 const FRONT_YARD_GROUP = 'light.front_yard_lights'
 const COLOR_MODES = ['hs', 'rgb', 'rgbw', 'rgbww', 'xy']
-const LIGHT_COLOR_PICKER_MODAL_STYLE: ModalSheetStyle = {
-  '--modal-desktop-width': '700px',
-  '--modal-desktop-max-width': '700px',
-  '--modal-desktop-height': 'min(760px, calc(var(--dashboard-visible-height, 100dvh) - 64px))',
-}
+const LIGHT_COLOR_PICKER_CENTERED_GEOMETRY = {
+  blockPolicy: 'fixed',
+  blockSize: '760px',
+  id: 'light-more-info',
+  inlineSize: '700px',
+} satisfies ModalCenteredGeometry
 
 // Pointer distance (px) from the wheel marker that still counts as grabbing it.
 const NEAR_MARKER_PX = 28
@@ -309,7 +310,7 @@ export function LightMoreInfoSheet({ entityId, title, open, onClose, lights = []
   const hasOtherColorLights = supportsColor && otherLights.length > 0
 
   return (
-    <ModalSheet contentStyle={LIGHT_COLOR_PICKER_MODAL_STYLE} onClose={onClose} open={open} size="standard" title={title}>
+    <ModalSheet centeredGeometry={LIGHT_COLOR_PICKER_CENTERED_GEOMETRY} onClose={onClose} open={open} size="standard" title={title}>
       <div className={styles.body} data-has-other-lights={hasOtherColorLights ? 'true' : 'false'}>
         {entityId && (
           <section aria-label={`${title} light slider`} className={styles.sliderPane} data-layout="light-slider">

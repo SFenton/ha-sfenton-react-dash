@@ -101,7 +101,7 @@ describe('AppShell', () => {
 
     expect(document.querySelector('[data-app-shell="true"]')).toHaveAttribute('data-navigation-layout', 'drawer-only')
     expect(screen.getByRole('button', { name: 'Go back' })).toBeVisible()
-    expect(screen.getByRole('button', { name: 'Open navigation menu' })).toBeVisible()
+    expect(screen.queryByRole('button', { name: 'Open navigation menu', hidden: true })).not.toBeInTheDocument()
 
     act(() => media.setViewport({ height: 820, width: 1180 }))
     expect(document.querySelector('[data-app-shell="true"]')).toHaveAttribute('data-navigation-layout', 'rail')

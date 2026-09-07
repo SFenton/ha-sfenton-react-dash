@@ -1,4 +1,4 @@
-import { expect, test, type Browser, type Page } from '@playwright/test'
+import { expect, test, type Browser, type Page } from './layout/fixture'
 
 const BASE_URL_PATH = '/at-a-glance/ecobee'
 const MODAL_TITLE = 'Thermostat · Advanced Controls'

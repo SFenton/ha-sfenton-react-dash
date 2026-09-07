@@ -180,3 +180,17 @@
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+:global([data-modal-presentation='landscape-dialog'][data-landscape-density='compact']:is([data-modal-body-tier='fields'], [data-modal-body-tier='standard'], [data-modal-body-tier='wide'])) .form[data-modal-landscape-layout='paired-form'] {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+  gap: 12px;
+}
+
+:global([data-modal-presentation='landscape-dialog'][data-landscape-density='compact']:is([data-modal-body-tier='fields'], [data-modal-body-tier='standard'], [data-modal-body-tier='wide'])) .form[data-modal-landscape-layout='paired-form'] > .error,
+:global([data-modal-presentation='landscape-dialog'][data-landscape-density='compact']:is([data-modal-body-tier='fields'], [data-modal-body-tier='standard'], [data-modal-body-tier='wide'])) .form[data-modal-landscape-layout='paired-form'] > .fieldset,
+:global([data-modal-presentation='landscape-dialog'][data-landscape-density='compact']:is([data-modal-body-tier='fields'], [data-modal-body-tier='standard'], [data-modal-body-tier='wide'])) .form[data-modal-landscape-layout='paired-form'] > .field:has(textarea),
+:global([data-modal-presentation='landscape-dialog'][data-landscape-density='compact']:is([data-modal-body-tier='fields'], [data-modal-body-tier='standard'], [data-modal-body-tier='wide'])) .form[data-modal-landscape-layout='paired-form'] > .field:has(select[multiple]),
+:global([data-modal-presentation='landscape-dialog'][data-landscape-density='compact']:is([data-modal-body-tier='fields'], [data-modal-body-tier='standard'], [data-modal-body-tier='wide'])) .form[data-modal-landscape-layout='paired-form'] > .twoColumn {
+  grid-column: 1 / -1;
+}

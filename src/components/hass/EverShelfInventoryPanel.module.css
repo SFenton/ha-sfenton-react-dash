@@ -16,6 +16,10 @@
   min-width: 0;
 }
 
+.panel[data-row-variant='summary'] .inventoryContent {
+  min-height: 96px;
+}
+
 .inventoryContent {
   position: relative;
   min-height: 180px;
@@ -73,7 +77,7 @@
     260px,
     var(
       --modal-body-content-height,
-      calc(100dvh - var(--bottom-nav-height) - 80px - env(safe-area-inset-bottom, 0px))
+      calc(100dvh - var(--bottom-nav-height) + 12px - var(--rd-bottom-nav-offset) - 80px)
     )
   );
 }
@@ -128,7 +132,7 @@
   flex: 0 0 auto;
   gap: 2px;
   align-items: center;
-  transform: translateX(5.5px);
+  transform: translateX(min(5.5px, max(0px, calc(var(--space-page-x) - var(--rd-safe-right)))));
 }
 
 .rowAction {
@@ -218,6 +222,28 @@
 
 .pantryRow[data-expiry-tone='expired'] small {
   color: #ff6b6b;
+}
+
+.panel[data-row-variant='summary'] .pantryRow {
+  min-height: 58px;
+  padding: 6px 0 6px 4px;
+}
+
+.panel[data-row-variant='summary'] .pantryRowCopy strong {
+  font-size: 0.82rem;
+  line-height: 1.18;
+}
+
+.panel[data-row-variant='summary'] .pantryRowCopy small {
+  font-size: 0.7rem;
+  line-height: 1.15;
+}
+
+:global([data-modal-sheet-body='true'][data-modal-body-tier='standard']) .panel[data-layout='responsive-grid'] .items,
+:global([data-modal-sheet-body='true'][data-modal-body-tier='wide']) .panel[data-layout='responsive-grid'] .items {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+  column-gap: 12px;
 }
 
 .status,
@@ -362,12 +388,12 @@
 }
 
 .inventoryEmpty {
-  --inventory-empty-bottom-reserve: calc(var(--bottom-nav-height) + env(safe-area-inset-bottom, 0px));
+  --inventory-empty-bottom-reserve: calc(var(--bottom-nav-height) - 12px + var(--rd-bottom-nav-offset));
   min-height: max(
     180px,
     var(
       --modal-body-content-height,
-      calc(var(--dashboard-visible-height, var(--dashboard-viewport-height, 100dvh)) - 160px - env(safe-area-inset-top, 0px) - var(--inventory-empty-bottom-reserve))
+      calc(var(--dashboard-visible-height, var(--dashboard-viewport-height, 100dvh)) - 160px - var(--rd-safe-top) - var(--inventory-empty-bottom-reserve))
     )
   );
 }
@@ -539,6 +565,10 @@
 
 .radioGroup {
   gap: 4px;
+}
+
+:global([data-modal-presentation='landscape-dialog'][data-landscape-density='compact']:is([data-modal-body-tier='fields'], [data-modal-body-tier='standard'], [data-modal-body-tier='wide'])) [data-modal-landscape-layout='option-grid'] .radioGroup {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .directionControl {

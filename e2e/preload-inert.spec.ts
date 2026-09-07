@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './layout/fixture'
 import { RESPONSIVE_ROUTES } from './responsive-acceptance-data'
 
 test('hidden preload geometry performs no runtime I/O', async ({ page }) => {

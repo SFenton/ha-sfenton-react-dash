@@ -26,8 +26,11 @@ npm run dev:review
 Then open `http://127.0.0.1:5176/at-a-glance/overview`. See
 `docs/ux/current-ux-contract.md`,
 `.github/instructions/interaction-semantics.instructions.md`, and
-`docs/ux/validation-matrix.md` before changing shared UX. Run `npm run check`
-for the design, lint, unit, i18n, and build gates.
+`docs/ux/validation-matrix.md` before changing shared UX. The complete
+Playwright spec corpus and responsive ownership map are documented in
+`docs/ux/playwright-coverage.md`. Run `npm run test:e2e:coverage` to detect
+inventory drift, `npm run test:e2e:responsive` for the responsive release
+corpus, and `npm run check` for the design, lint, unit, i18n, and build gates.
 
 ## Autonomous Admin executor
 

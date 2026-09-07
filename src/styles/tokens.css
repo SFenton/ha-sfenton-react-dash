@@ -30,6 +30,15 @@
   --radius-panel: 32px;
   --radius-pill: 999px;
   --space-page-x: 16px;
+  --rd-safe-top: var(--safe-area-inset-top, var(--app-safe-area-inset-top, env(safe-area-inset-top, 0px)));
+  --rd-safe-right: var(--safe-area-inset-right, var(--app-safe-area-inset-right, env(safe-area-inset-right, 0px)));
+  --rd-safe-bottom: var(--safe-area-inset-bottom, var(--app-safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)));
+  --rd-safe-left: var(--safe-area-inset-left, var(--app-safe-area-inset-left, env(safe-area-inset-left, 0px)));
+  --rd-page-gutter-left: max(var(--space-page-x), var(--rd-safe-left));
+  --rd-page-gutter-right: max(var(--space-page-x), var(--rd-safe-right));
+  --rd-header-gutter-left: max(var(--space-page-x), calc(var(--rd-safe-left) + 6px));
+  --rd-header-gutter-right: var(--rd-page-gutter-right);
+  --rd-bottom-nav-offset: max(12px, var(--rd-safe-bottom));
   --bottom-nav-height: 86px;
   --page-measure-reading: 960px;
   --page-measure-dashboard: 1280px;

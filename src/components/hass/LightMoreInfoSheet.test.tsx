@@ -154,10 +154,10 @@ describe('LightMoreInfoSheet', () => {
     render(<LightMoreInfoSheet entityId={OPEN} lights={LIGHTS} onClose={() => {}} open title="Bollard 1" />)
 
     const dialog = screen.getByRole('dialog', { name: 'Bollard 1' })
+    expect(dialog).toHaveAttribute('data-modal-geometry-intent', 'light-more-info')
     expect(dialog).toHaveStyle({
-      '--modal-desktop-height': 'min(760px, calc(var(--dashboard-visible-height, 100dvh) - 64px))',
-      '--modal-desktop-max-width': '700px',
-      '--modal-desktop-width': '700px',
+      '--modal-centered-block-size': '760px',
+      '--modal-centered-inline-size': '700px',
     })
 
     const layout = dialog.querySelector('[data-has-other-lights="true"]')

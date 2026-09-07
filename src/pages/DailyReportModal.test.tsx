@@ -91,7 +91,16 @@ describe('Daily summary modal', () => {
     const dialog = await screen.findByRole('dialog')
     expect(within(dialog).getByText("Stephen's Summary")).toBeInTheDocument()
     expect(dialog).toHaveAttribute('data-has-subtitle', 'false')
+    expect(dialog).toHaveAttribute('data-modal-geometry-intent', 'daily-report')
+    expect(dialog).toHaveAttribute('data-modal-block-policy', 'fixed')
+    expect(dialog).toHaveStyle({
+      '--modal-centered-block-size': '620px',
+      '--modal-centered-inline-size': '720px',
+      '--modal-title-font-size': '1rem',
+    })
     expect(await within(dialog).findByText('Take out the trash')).toBeInTheDocument()
+    expect(within(dialog).getByLabelText('Overdue Chores todo list')).toHaveAttribute('data-layout', 'responsive-grid')
+    expect(within(dialog).getByLabelText('Overdue Chores todo list')).toHaveAttribute('data-row-variant', 'summary')
   })
 
   it('titles the summary for the other household user', async () => {
@@ -256,6 +265,9 @@ describe('Daily summary modal', () => {
     const nav = within(dialog).getByRole('tablist', { name: 'Daily report sections' })
     fireEvent.click(within(nav).getByRole('tab', { name: /^Expired Food/ }))
 
+    const inventoryList = await within(dialog).findByLabelText('Expired Food inventory list')
+    expect(inventoryList).toHaveAttribute('data-layout', 'responsive-grid')
+    expect(inventoryList).toHaveAttribute('data-row-variant', 'summary')
     const [expiredRow] = await within(dialog).findAllByLabelText(/^Milk Expired on /, {}, { timeout: 3000 })
     expect(expiredRow).toHaveAttribute('data-expiry-tone', 'expired')
     expect(within(expiredRow).getByRole('button', { name: 'Edit Milk' })).toBeInTheDocument()

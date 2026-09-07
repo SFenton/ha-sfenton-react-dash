@@ -12,13 +12,13 @@ import { DashboardPageLoading, type DashboardPageLoadingPhase } from '../compone
 import { ActionPill } from '../components/core/ActionPill'
 import { GlassTile } from '../components/core/GlassTile'
 import { Icon, MaterialIcon } from '../components/core/Icon'
-import { ModalSheet, type ModalSheetSize } from '../components/core/ModalSheet'
+import { ModalSheet, type ModalCenteredGeometry, type ModalSheetSize } from '../components/core/ModalSheet'
 import { Separator } from '../components/core/Separator'
 import { SectionHeader } from '../components/core/SectionHeader'
 import { SurfaceAccessory } from '../components/core/SurfaceAccessory'
 import { CameraTile } from '../components/hass/CameraTile'
 import { SecurityControls } from '../components/hass/SecurityControls'
-import { SECURITY_SYSTEM_MODAL_STYLE, securitySystemModalSubtitle } from '../components/hass/securityControlsConfig'
+import { SECURITY_SYSTEM_CENTERED_GEOMETRY, securitySystemModalSubtitle } from '../components/hass/securityControlsConfig'
 import { GuestPresenceSecurityModalContent, GuestPresenceSecuritySection, GUEST_PRESENCE_SECURITY_HASH } from '../components/hass/GuestPresenceSecurity'
 import { StatusRail } from '../components/hass/StatusRail'
 import { WeatherSummary } from '../components/hass/WeatherSummary'
@@ -44,7 +44,7 @@ import { choreQuickLinkCounts, choreQuickLinkSubtitle, groceryCountSubtitle } fr
 import { useHashModal } from '../hooks/useHashModal'
 import { markDeferredRouteHydrated, useDeferredRouteHydration, type DeferredRouteHydrationPhase } from '../hooks/useDeferredRouteHydration'
 import type { RouteTransitionState } from '../components/shell/SmoothRouteOutlet'
-import { modalSquareGridModalStyleForHash, modalSquareGridStyle, useModalSquareGridLayout, type ModalSquareGridStyle } from '../components/core/modalSquareGrid'
+import { modalSquareGridCenteredGeometry, modalSquareGridStyle, useModalSquareGridLayout, type ModalSquareGridStyle } from '../components/core/modalSquareGrid'
 import styles from './AtAGlancePage.module.css'
 import { Page } from './Page'
 
@@ -78,6 +78,25 @@ const ROOM_OCCUPANCY_GROUPS = OCCUPANCY_GROUPS
 const ROOM_CONTACT_GROUPS = CONTACT_GROUPS
 const ROOM_AIR_QUALITY_GROUPS = AIR_QUALITY_ROOMS
 const ROOM_CONTACT_ENTITY_IDS = [...new Set(ROOM_CONTACT_GROUPS.flatMap((group) => group.items.map((item) => item.entityId)))]
+const HOME_CAMERA_CENTERED_GEOMETRY = {
+  blockPolicy: 'fixed',
+  blockSize: '620px',
+  id: 'home-camera',
+  inlineSize: '1100px',
+} satisfies ModalCenteredGeometry
+const HOME_STANDARD_CENTERED_GEOMETRY = {
+  blockPolicy: 'fixed',
+  blockSize: '620px',
+  id: 'home-standard',
+  inlineSize: '720px',
+} satisfies ModalCenteredGeometry
+
+function homeCenteredGeometry(hash: string, squareGridCount: number) {
+  if (squareGridCount > 0) return modalSquareGridCenteredGeometry(`home-${hash.slice(1)}`, squareGridCount)
+  if (hash === '#security-system') return SECURITY_SYSTEM_CENTERED_GEOMETRY
+  if (CAMERA_ITEMS.some((camera) => camera.hash === hash)) return HOME_CAMERA_CENTERED_GEOMETRY
+  return HOME_STANDARD_CENTERED_GEOMETRY
+}
 
 function squareGridClassName(baseClassName: string, squareOverview: boolean) {
   return [baseClassName, squareOverview ? styles.modalSquareGrid : ''].filter(Boolean).join(' ')
@@ -516,8 +535,17 @@ function groupedRoomGridStyle(overviewGridStyle: ModalSquareGridStyle | undefine
   if (!overviewGridStyle) return undefined
 
   const columnCount = Number(overviewGridStyle['--modal-square-cols'])
-  const sectionRows = Number.isFinite(columnCount) && columnCount > 0 ? Math.ceil(groupCount / columnCount) : overviewGridStyle['--modal-square-rows']
-  return { ...overviewGridStyle, '--modal-square-rows': sectionRows }
+  const sectionColumns = Number.isFinite(columnCount) && columnCount > 0
+    ? Math.max(1, Math.min(columnCount, groupCount))
+    : overviewGridStyle['--modal-square-cols']
+  const sectionRows = Number.isFinite(sectionColumns) && sectionColumns > 0
+    ? Math.ceil(groupCount / sectionColumns)
+    : overviewGridStyle['--modal-square-rows']
+  return {
+    ...overviewGridStyle,
+    '--modal-square-cols': sectionColumns,
+    '--modal-square-rows': sectionRows,
+  }
 }
 
 function GroupedRoomOverview({ activeGroups, activeTitle, cardShellClassName, gridClassName, inactiveGroups, inactiveTitle, overviewGridRef, overviewGridStyle, renderCard }: GroupedRoomOverviewProps) {
@@ -1196,9 +1224,8 @@ export function AtAGlancePage({ activePath = 'overview', deferRouteContent = fal
   const lightStatusSubtitle = lightCountSubtitle(activeRoomLightCount)
   const contactStatusSubtitle = contactSensorStatusSubtitle(openContactSensorCount)
   const modalTitle = contentHash === '#lights-overview' ? lightsSheetTitle(activeRoomLightCount) : sheetTitle(contentHash)
-  const squareGridModalStyle = modalSquareGridModalStyleForHash(contentHash, overviewGridLayout)
   const squareGridStyle = modalSquareGridStyle(overviewGridLayout)
-  const sheetStyle = contentHash === '#security-system' ? SECURITY_SYSTEM_MODAL_STYLE : squareGridModalOpen ? squareGridModalStyle : undefined
+  const centeredGeometry = homeCenteredGeometry(contentHash, squareGridModalCount)
   const sheetSize: ModalSheetSize = CAMERA_ITEMS.some((camera) => camera.hash === contentHash)
     ? 'media'
     : contentHash === '#security-system'
@@ -1256,7 +1283,7 @@ export function AtAGlancePage({ activePath = 'overview', deferRouteContent = fal
         )}
       </Page>
 
-      <ModalSheet contentStyle={sheetStyle} open={hash !== ''} size={sheetSize} subtitle={sheetSubtitle} title={modalTitle} onClose={closeHash}>
+      <ModalSheet centeredGeometry={centeredGeometry} contentWidth={contentHash === '#security-system' || contentHash === GUEST_PRESENCE_SECURITY_HASH ? 'full' : 'readable'} landscapeDensity={squareGridModalOpen ? 'regular' : 'compact'} open={hash !== ''} size={sheetSize} subtitle={sheetSubtitle} title={modalTitle} onClose={closeHash}>
         <SheetContent closeHash={closeHash} hash={contentHash} overviewGridRef={overviewGridRef} overviewGridStyle={squareGridStyle} onNavigate={onNavigate} />
       </ModalSheet>
       {preloadModalHashes.map((preloadTargetHash) => (

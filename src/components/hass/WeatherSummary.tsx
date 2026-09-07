@@ -10,7 +10,7 @@ import { useHorizontalScrollControls } from '../../hooks/useHorizontalScrollCont
 import { useReducedMotion } from '../../hooks/useReducedMotion'
 import { MaterialIcon } from '../core/Icon'
 import { materialIconPath } from '../core/iconPaths'
-import { ModalSheet, type ModalSheetBackdropPolicy, type ModalSheetStyle } from '../core/ModalSheet'
+import { ModalSheet, type ModalCenteredGeometry, type ModalSheetBackdropPolicy, type ModalSheetStyle } from '../core/ModalSheet'
 import { SurfaceAccessory } from '../core/SurfaceAccessory'
 import { asEntityName } from './entityState'
 import { WeatherAtmosphere } from './WeatherAtmosphere'
@@ -82,6 +82,12 @@ const WEATHER_MODAL_STYLE: ModalSheetStyle = {
   '--color-modal-surface': 'var(--rd-weather-modal-surface)',
   '--modal-surface-backing': 'var(--rd-weather-modal-surface-opaque)',
 }
+const WEATHER_CENTERED_GEOMETRY = {
+  blockPolicy: 'fixed',
+  blockSize: '836px',
+  id: 'weather',
+  inlineSize: '1100px',
+} satisfies ModalCenteredGeometry
 
 const AQI_CATEGORY_COPY_KEYS: Record<AqiLevel, CopyKey<typeof WEATHER_COPY_NAMESPACE>> = WEATHER_COPY_KEYS.aqi.categories
 const AQI_GUIDANCE_COPY_KEYS: Record<AqiLevel, CopyKey<typeof WEATHER_COPY_NAMESPACE>> = WEATHER_COPY_KEYS.aqi.guidance
@@ -1736,6 +1742,7 @@ export function WeatherSummary({ deferRefresh = false }: WeatherSummaryProps) {
 
       <ModalSheet
         backdropPolicy={backdropPolicy}
+        centeredGeometry={WEATHER_CENTERED_GEOMETRY}
         contentStyle={WEATHER_MODAL_STYLE}
         onClose={() => setOpen(false)}
         open={open}

@@ -1,5 +1,8 @@
-import { expect, test, type FrameLocator, type Locator, type Page } from '@playwright/test'
+import { expect, test, type FrameLocator, type Locator, type Page } from './layout/fixture'
 import { valueToThermostatPoint } from '../src/components/hass/thermostatDialGeometry'
+
+const DIALOG_SQUARE_TILE_SIZE = 168
+const MODAL_SQUARE_GRID_MAX_COLUMNS = 4
 
 type FreeSleepAlarmSnapshot = {
   enabled: boolean
@@ -193,6 +196,21 @@ async function expectToggleChrome(toggle: Locator) {
   await expect.poll(() => toggle.evaluate((element) => getComputedStyle(element).getPropertyValue('--ha-control-switch-padding').trim())).toBe('4px')
 }
 
+async function expectSharedDesktopFrame(dialog: Locator) {
+  await expect(dialog).toHaveAttribute('data-modal-presentation', 'dialog')
+  await expect.poll(() => dialog.evaluate((element) => {
+    const box = element.getBoundingClientRect()
+    const width = Math.min(1100, innerWidth - 64)
+    const height = Math.min(760, innerHeight - 64)
+    return Math.max(
+      Math.abs(box.width - width),
+      Math.abs(box.height - height),
+      Math.abs(box.x - (innerWidth - width) / 2),
+      Math.abs(box.y - (innerHeight - height) / 2),
+    )
+  })).toBeLessThanOrEqual(1)
+}
+
 async function expectDesktopSquareGrid(dialog: Locator, sectionLabel: string) {
   const section = dialog.getByRole('region', { name: sectionLabel })
   await expect(section).toBeVisible()
@@ -202,15 +220,15 @@ async function expectDesktopSquareGrid(dialog: Locator, sectionLabel: string) {
   expect(cardCount).toBeGreaterThan(0)
 
   await expect.poll(async () => {
-    return cards.evaluateAll((elements) => {
+    return cards.evaluateAll((elements, expectedCardSize) => {
       const rects = elements.map((element) => element.getBoundingClientRect())
       return {
-        allFixedHeight: rects.every((rect) => Math.round(rect.height) === 168),
-        allFixedWidth: rects.every((rect) => Math.round(rect.width) === 168),
+        allFixedHeight: rects.every((rect) => Math.round(rect.height) === expectedCardSize),
+        allFixedWidth: rects.every((rect) => Math.round(rect.width) === expectedCardSize),
         cardCount: rects.length,
         squareCards: rects.every((rect) => Math.round(rect.width) === Math.round(rect.height)),
       }
-    })
+    }, DIALOG_SQUARE_TILE_SIZE)
   }).toMatchObject({
     allFixedHeight: true,
     allFixedWidth: true,
@@ -218,9 +236,11 @@ async function expectDesktopSquareGrid(dialog: Locator, sectionLabel: string) {
     squareCards: true,
   })
 
+  await expectSharedDesktopFrame(dialog)
   const dialogBox = await dialog.boundingBox()
   const sectionBox = await section.boundingBox()
-  expect(Math.round(dialogBox?.width ?? 0)).toBeLessThanOrEqual(Math.round((sectionBox?.width ?? 0) + 52))
+  expect(sectionBox?.x ?? 0).toBeGreaterThanOrEqual((dialogBox?.x ?? 0) + 23)
+  expect((sectionBox?.x ?? 0) + (sectionBox?.width ?? 0)).toBeLessThanOrEqual((dialogBox?.x ?? 0) + (dialogBox?.width ?? 0) - 23)
   return section
 }
 
@@ -260,18 +280,18 @@ async function expectDesktopAdminSquareGrid(dialog: Locator, gridLabel: string) 
   const grid = dialog.getByRole('group', { name: gridLabel })
   await expect(grid).toBeVisible()
   const cardCount = await grid.getByRole('button').count()
-  const expectedColumns = Math.max(1, Math.ceil(Math.sqrt(cardCount)))
+  const expectedColumns = Math.max(1, Math.min(MODAL_SQUARE_GRID_MAX_COLUMNS, Math.ceil(Math.sqrt(cardCount))))
   const expectedRows = Math.ceil(cardCount / expectedColumns)
 
   await expect.poll(async () => {
     return grid.evaluate((gridElement) => {
-      const firstCard = gridElement.querySelector<HTMLElement>(
+      const cards = Array.from(gridElement.querySelectorAll<HTMLElement>(
         ':scope > button, :scope > article, :scope > [data-modal-detail-trigger] > button, :scope > [data-modal-detail-trigger] > article',
-      )
-      const firstCardRect = firstCard?.getBoundingClientRect()
-      const gridStyle = window.getComputedStyle(gridElement)
-      const columns = gridStyle.gridTemplateColumns.split(' ').filter(Boolean).length
-      const rows = gridStyle.gridTemplateRows.split(' ').filter(Boolean).length
+      ))
+      const rects = cards.map((card) => card.getBoundingClientRect())
+      const firstCardRect = rects[0]
+      const columns = new Set(rects.map((rect) => Math.round(rect.left))).size
+      const rows = new Set(rects.map((rect) => Math.round(rect.top))).size
       return {
         cardCount: gridElement.children.length,
         cardHeight: Math.round(firstCardRect?.height ?? 0),
@@ -285,8 +305,8 @@ async function expectDesktopAdminSquareGrid(dialog: Locator, gridLabel: string) 
     })
   }).toMatchObject({
     cardCount,
-    cardHeight: 168,
-    cardWidth: 168,
+    cardHeight: DIALOG_SQUARE_TILE_SIZE,
+    cardWidth: DIALOG_SQUARE_TILE_SIZE,
     columns: expectedColumns,
     fitsAllCards: true,
     rows: expectedRows,
@@ -294,10 +314,11 @@ async function expectDesktopAdminSquareGrid(dialog: Locator, gridLabel: string) 
     squareCard: true,
   })
 
+  await expectSharedDesktopFrame(dialog)
   const dialogBox = await dialog.boundingBox()
   const gridBox = await grid.boundingBox()
-  expect(Math.round(dialogBox?.width ?? 0)).toBeLessThan(900)
-  expect(Math.round(dialogBox?.width ?? 0)).toBeLessThanOrEqual(Math.round((gridBox?.width ?? 0) + 52))
+  expect(gridBox?.x ?? 0).toBeGreaterThanOrEqual((dialogBox?.x ?? 0) + 23)
+  expect((gridBox?.x ?? 0) + (gridBox?.width ?? 0)).toBeLessThanOrEqual((dialogBox?.x ?? 0) + (dialogBox?.width ?? 0) - 23)
   return grid
 }
 
@@ -575,8 +596,9 @@ test('desktop browse recipe navigates all detail tabs and submits one missing-on
   await expect(dialog).toBeVisible()
   await expect(dialog.getByText('Makes 2 bowls')).toBeVisible()
   await expect(dialog.getByRole('group', { name: 'Yield Makes 2 bowls' })).toBeVisible()
+  await expectSharedDesktopFrame(dialog)
   const dialogBox = await dialog.boundingBox()
-  expect(Math.round(dialogBox?.width ?? 0)).toBeLessThanOrEqual(722)
+  expect(Math.round((await dialog.locator('[data-modal-content-measure="true"]').boundingBox())?.width ?? 0)).toBe(670)
   const navigation = dialog.locator('[data-modal-sheet-navigation="true"]')
   const footerBox = await navigation.boundingBox()
   expect(Math.abs(
@@ -1042,16 +1064,18 @@ test('global Quick Links opens from a non-Home route and preserves one-sheet det
 
   await trigger.click()
   dialog = page.getByRole('dialog', { name: 'Quick Links' })
-  await expect.poll(() => dialog.locator('[data-dynamic-grid="true"][aria-label="Quick Links"]').evaluate((grid) => {
-    const styles = getComputedStyle(grid)
+  await expect.poll(() => dialog.getByRole('group', { name: 'Quick Links', exact: true }).evaluate((grid) => {
+    const rows = new Set(Array.from(grid.children).map((cell) => Math.round(cell.getBoundingClientRect().top)))
     return {
-      columns: styles.gridTemplateColumns.split(' ').filter(Boolean).length,
+      columns: Number(grid.getAttribute('data-dynamic-grid-columns')),
       itemCount: grid.children.length,
+      rows: rows.size,
       scrollsHorizontally: grid.scrollWidth > grid.clientWidth + 1,
     }
   })).toEqual({
     columns: 2,
     itemCount: 6,
+    rows: 5,
     scrollsHorizontally: false,
   })
   const initialHash = await page.evaluate(() => window.location.hash)
@@ -2251,11 +2275,12 @@ test.describe('desktop modal layout', () => {
 
     await expect.poll(async () => {
       return dialog.locator('section[aria-label="Rooms"]').evaluate((grid) => {
-        const firstCard = grid.firstElementChild?.firstElementChild
-        const firstCardRect = firstCard?.getBoundingClientRect()
-        const gridStyle = window.getComputedStyle(grid)
-        const columns = gridStyle.gridTemplateColumns.split(' ').filter(Boolean).length
-        const rows = gridStyle.gridTemplateRows.split(' ').filter(Boolean).length
+        const rects = Array.from(grid.children)
+          .map((child) => child.firstElementChild?.getBoundingClientRect())
+          .filter((rect): rect is DOMRect => Boolean(rect))
+        const firstCardRect = rects[0]
+        const columns = new Set(rects.map((rect) => Math.round(rect.left))).size
+        const rows = new Set(rects.map((rect) => Math.round(rect.top))).size
         return {
           cardCount: grid.children.length,
           firstCardHeight: Math.round(firstCardRect?.height ?? 0),
@@ -2268,11 +2293,11 @@ test.describe('desktop modal layout', () => {
       })
     }).toMatchObject({
       cardCount: 16,
-      firstCardHeight: 168,
-      firstCardWidth: 168,
-      columns: 4,
+      firstCardHeight: DIALOG_SQUARE_TILE_SIZE,
+      firstCardWidth: DIALOG_SQUARE_TILE_SIZE,
+      columns: 3,
       fitsAllRooms: true,
-      rows: 4,
+      rows: 6,
       scrollsHorizontally: false,
     })
     const firstCard = dialog.locator('section[aria-label="Rooms"] > div').first()
@@ -2280,7 +2305,7 @@ test.describe('desktop modal layout', () => {
     expect(Math.round(box?.width ?? 0)).toBe(Math.round(box?.height ?? 0))
     const dialogBox = await dialog.boundingBox()
     const gridBox = await dialog.locator('section[aria-label="Rooms"]').boundingBox()
-    expect(Math.round(dialogBox?.width ?? 0)).toBe(900)
+    await expectSharedDesktopFrame(dialog)
     expect(Math.abs(
       Math.round((gridBox?.x ?? 0) - (dialogBox?.x ?? 0))
       - Math.round(((dialogBox?.x ?? 0) + (dialogBox?.width ?? 0)) - ((gridBox?.x ?? 0) + (gridBox?.width ?? 0))),
@@ -2288,32 +2313,38 @@ test.describe('desktop modal layout', () => {
 
   })
 
-  test('Quick Links modal uses a responsive DynamicGrid on desktop', async ({ page }) => {
+  test('Quick Links modal keeps compact text-aware navigation on desktop', async ({ page }) => {
     await page.setViewportSize({ width: 900, height: 900 })
     await page.goto('/at-a-glance/settings')
     await page.getByRole('button', { name: 'Quick Links' }).click()
 
     const dialog = page.getByRole('dialog', { name: 'Quick Links' })
     await expect(dialog).toBeVisible()
-    await expect.poll(() => dialog.locator('[data-dynamic-grid="true"][aria-label="Quick Links"]').evaluate((grid) => {
-      const gridStyle = getComputedStyle(grid)
-      const columns = gridStyle.gridTemplateColumns.split(' ').filter(Boolean).length
+    await expect.poll(() => dialog.getByRole('group', { name: 'Quick Links', exact: true }).evaluate((grid) => {
+      const columns = Number(grid.getAttribute('data-dynamic-grid-columns'))
       const buttons = Array.from(grid.querySelectorAll('button'))
       return {
         cardCount: grid.children.length,
+        centered: Math.abs(
+          (grid.getBoundingClientRect().left + grid.getBoundingClientRect().right) / 2
+          - (grid.parentElement!.getBoundingClientRect().left + grid.parentElement!.getBoundingClientRect().right) / 2,
+        ) <= 1,
         columns,
-        contentFits: buttons.every((button) => button.scrollHeight <= button.clientHeight + 1 && button.scrollWidth <= button.clientWidth + 1),
-        roomyTiles: buttons.every((button) => {
+        compactTiles: buttons.every((button) => {
           const rect = button.getBoundingClientRect()
-          return rect.width >= 220 && rect.height >= 160
+          return rect.width <= grid.clientWidth + 1 && Math.round(rect.height) === 88
         }),
+        contentFits: buttons.every((button) => button.scrollHeight <= button.clientHeight + 1 && button.scrollWidth <= button.clientWidth + 1),
+        gridWidth: Math.round(grid.getBoundingClientRect().width),
         scrollsHorizontally: grid.scrollWidth > grid.clientWidth + 1,
       }
     })).toEqual({
       cardCount: 6,
-      columns: 3,
+      centered: true,
+      columns: 4,
+      compactTiles: true,
       contentFits: true,
-      roomyTiles: true,
+      gridWidth: 670,
       scrollsHorizontally: false,
     })
   })
@@ -2383,20 +2414,21 @@ test.describe('desktop modal layout', () => {
     await expect.poll(async () => Math.round((await dialog.boundingBox())?.height ?? 0)).toBe(696)
   })
 
-  test('bed modal uses the compact sheet flow on a short wide viewport', async ({ page }) => {
+  test('bed modal uses the shared landscape frame on a short wide viewport', async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 500 })
     await page.goto('/at-a-glance/master-bedroom')
     await page.getByRole('button', { name: /Steph's Bed Off/i }).click()
 
     const dialog = page.getByRole('dialog', { name: "Steph's Bed" })
     await expect(dialog).toBeVisible()
-    await expect(dialog).toHaveAttribute('data-centered-layout', 'false')
+    await expect(dialog).toHaveAttribute('data-modal-presentation', 'landscape-dialog')
+    await expect(dialog).toHaveAttribute('data-centered-layout', 'true')
     await expect(dialog).toHaveAttribute('data-size', 'workspace')
-    await expect(dialog.locator('[data-mobile-drag-handle="true"]')).toBeVisible()
+    await expect(dialog.locator('[data-mobile-drag-handle="true"]')).toHaveCount(0)
     await expect.poll(async () => {
       const box = await dialog.boundingBox()
       return { height: Math.round(box?.height ?? 0), width: Math.round(box?.width ?? 0) }
-    }).toEqual({ height: 500, width: 1280 })
+    }).toEqual({ height: 484, width: 1256 })
 
     await dialog.getByRole('tab', { name: 'Alarms' }).click()
     const body = dialog.locator('[data-layout="eight-sleep-modal-body"]')
@@ -2478,7 +2510,10 @@ test.describe('desktop modal layout', () => {
           cardWidth: Math.round(firstCardRect?.width ?? 0),
         }
       })
-    }).toEqual({ cardHeight: 168, cardWidth: 168 })
+    }).toEqual({
+      cardHeight: DIALOG_SQUARE_TILE_SIZE,
+      cardWidth: DIALOG_SQUARE_TILE_SIZE,
+    })
 
     const before = await dialog.boundingBox()
     if (!before) throw new Error('Rooms modal was not measurable before closing')
@@ -2528,15 +2563,15 @@ test.describe('desktop modal layout', () => {
     const section = dialog.getByRole('region', { name: 'Lights by room' })
     const roomButtons = section.getByRole('button', { name: /^Open / })
     await expect.poll(async () => {
-      return roomButtons.evaluateAll((elements) => {
+      return roomButtons.evaluateAll((elements, expectedCardSize) => {
         const rects = elements.map((element) => element.getBoundingClientRect())
         return {
-          allFixedHeight: rects.every((rect) => Math.round(rect.height) === 168),
-          allFixedWidth: rects.every((rect) => Math.round(rect.width) === 168),
+          allFixedHeight: rects.every((rect) => Math.round(rect.height) === expectedCardSize),
+          allFixedWidth: rects.every((rect) => Math.round(rect.width) === expectedCardSize),
           cardCount: rects.length,
           squareCards: rects.every((rect) => Math.round(rect.width) === Math.round(rect.height)),
         }
-      })
+      }, DIALOG_SQUARE_TILE_SIZE)
     }).toMatchObject({
       allFixedHeight: true,
       allFixedWidth: true,
@@ -2548,8 +2583,9 @@ test.describe('desktop modal layout', () => {
     expect(Math.round(box?.width ?? 0)).toBe(Math.round(box?.height ?? 0))
     const dialogBox = await dialog.boundingBox()
     const gridBox = await section.boundingBox()
-    expect(Math.round(dialogBox?.width ?? 0)).toBeLessThanOrEqual(940)
-    expect(Math.round(dialogBox?.width ?? 0)).toBeLessThanOrEqual(Math.round((gridBox?.width ?? 0) + 52))
+    await expectSharedDesktopFrame(dialog)
+    expect(gridBox?.x ?? 0).toBeGreaterThanOrEqual((dialogBox?.x ?? 0) + 23)
+    expect((gridBox?.x ?? 0) + (gridBox?.width ?? 0)).toBeLessThanOrEqual((dialogBox?.x ?? 0) + (dialogBox?.width ?? 0) - 23)
 
     const livingRoomButton = section.getByRole('button', { name: /Open Living Room Lights/i })
     const livingRoomBox = await livingRoomButton.boundingBox()
@@ -2565,7 +2601,7 @@ test.describe('desktop modal layout', () => {
     await expect(dialog.getByRole('button', { name: 'Back to room lights' })).toBeVisible()
   })
 
-  test('security system modal is capped at 500px width with adaptive height on desktop', async ({ page }) => {
+  test('security system uses the shared desktop frame and full-width controls', async ({ page }) => {
     await page.goto('/at-a-glance/overview#security-system')
 
     const dialog = page.getByRole('dialog', { name: 'Security System' })
@@ -2573,13 +2609,12 @@ test.describe('desktop modal layout', () => {
     await expect(dialog.getByText('Armed Home', { exact: true })).toBeVisible()
     await expect(dialog.getByLabel('Current security system state Armed Home')).toHaveCount(0)
 
-    await expect.poll(async () => Math.round((await dialog.boundingBox())?.width ?? 0)).toBeGreaterThanOrEqual(495)
-    const box = await dialog.boundingBox()
-    expect(Math.round(box?.width ?? 0)).toBeLessThanOrEqual(500)
-    expect(Math.round(box?.height ?? 0)).toBeLessThan(720)
+    await expectSharedDesktopFrame(dialog)
+    await expect(dialog).toHaveAttribute('data-modal-content-width', 'full')
+    expect(Math.round((await dialog.locator('[data-modal-content-measure="true"]').boundingBox())?.width ?? 0)).toBe(1050)
   })
 
-  test('thermostat room modal uses the unified 720px desktop split layout', async ({ page }) => {
+  test('thermostat room modal keeps its reading measure inside the shared desktop frame', async ({ page }) => {
     await page.goto('/at-a-glance/ecobee#living-room')
 
     const dialog = page.getByRole('dialog', { name: 'Living Room' })
@@ -2590,13 +2625,13 @@ test.describe('desktop modal layout', () => {
     await expect(vents).toBeVisible()
     const ventGrid = vents.locator(':scope > div').nth(1)
 
-    await expect.poll(async () => Math.round((await dialog.boundingBox())?.width ?? 0)).toBeGreaterThanOrEqual(715)
+    await expectSharedDesktopFrame(dialog)
     const dialogBox = await dialog.boundingBox()
     const heroBox = await thermostatHero.boundingBox()
     const ventsBox = await vents.boundingBox()
     if (!dialogBox || !heroBox || !ventsBox) throw new Error('Thermostat modal layout was not measurable')
 
-    expect(Math.round(dialogBox.width)).toBeLessThanOrEqual(720)
+    expect(Math.round((await dialog.locator('[data-modal-content-measure="true"]').boundingBox())?.width ?? 0)).toBe(670)
     expect(heroBox.x).toBeLessThan(ventsBox.x)
     expect(Math.abs(heroBox.y - ventsBox.y)).toBeLessThanOrEqual(24)
     expect(heroBox.y + heroBox.height).toBeGreaterThan(ventsBox.y)
@@ -2621,9 +2656,8 @@ test.describe('desktop modal layout', () => {
     await expect(options).toHaveAttribute('data-layout', 'compact-grid')
     await expect(dialog.locator('span[aria-hidden="true"][class*="separator"]')).toHaveCount(0)
 
-    await expect.poll(async () => Math.round((await dialog.boundingBox())?.width ?? 0)).toBeGreaterThanOrEqual(495)
-    const dialogBox = await dialog.boundingBox()
-    expect(Math.round(dialogBox?.width ?? 0)).toBeLessThanOrEqual(500)
+    await expectSharedDesktopFrame(dialog)
+    expect(Math.round((await options.boundingBox())?.width ?? 0)).toBeLessThanOrEqual(500)
     await expect.poll(async () => options.evaluate((optionsElement) => {
       const firstOption = optionsElement.querySelector(':scope > button')?.getBoundingClientRect()
       const style = window.getComputedStyle(optionsElement)
@@ -2646,9 +2680,8 @@ test.describe('desktop modal layout', () => {
       await expect(options).not.toHaveAttribute('data-dynamic-grid')
       await expect(dialog.locator('span[aria-hidden="true"][class*="separator"]')).toHaveCount(0)
 
-      await expect.poll(async () => Math.round((await dialog.boundingBox())?.width ?? 0)).toBeGreaterThanOrEqual(715)
-      const dialogBox = await dialog.boundingBox()
-      expect(Math.round(dialogBox?.width ?? 0)).toBeLessThanOrEqual(720)
+      await expectSharedDesktopFrame(dialog)
+      expect(Math.round((await options.boundingBox())?.width ?? 0)).toBeLessThanOrEqual(670)
       await expect.poll(async () => options.evaluate((optionsElement) => {
         const firstOption = optionsElement.firstElementChild?.querySelector('button')?.getBoundingClientRect()
         const style = window.getComputedStyle(optionsElement)
@@ -2691,7 +2724,6 @@ test.describe('desktop modal layout', () => {
       sectionLabel: 'Occupancy by room',
     },
     {
-      adaptiveHeight: true,
       backButtonName: 'Back to room contact sensors',
       buttonName: /Open Living Room Contact Sensors/i,
       detailHeading: 'Living Room Contact Sensors',
@@ -2700,7 +2732,6 @@ test.describe('desktop modal layout', () => {
       sectionLabel: 'Contact sensors by room',
     },
     {
-      adaptiveHeight: true,
       dialogName: 'Air Quality',
       hash: '#aqi-overview',
       sectionLabel: 'AQI by room',
@@ -2708,7 +2739,7 @@ test.describe('desktop modal layout', () => {
   ]
 
   for (const modalCase of squareOverviewCases) {
-    test(`${modalCase.dialogName} modal uses fixed 168px square room grid on desktop`, async ({ page }) => {
+    test(`${modalCase.dialogName} modal uses compact fixed square room grid on desktop`, async ({ page }) => {
       await page.goto(`/at-a-glance/overview${modalCase.hash}`)
 
       const dialog = page.getByRole('dialog', { name: modalCase.dialogName })
@@ -2716,17 +2747,12 @@ test.describe('desktop modal layout', () => {
       const grid = await expectDesktopSquareGrid(dialog, modalCase.sectionLabel)
       const overviewDialogBox = await dialog.boundingBox()
 
-      if ('adaptiveHeight' in modalCase) {
-        const gridBox = await grid.boundingBox()
-        expect(Math.round(overviewDialogBox?.height ?? 0)).toBeLessThan(760)
-        expect(Math.round(overviewDialogBox?.height ?? 0)).toBeLessThanOrEqual(Math.round((gridBox?.height ?? 0) + 180))
-      }
-
       if ('buttonName' in modalCase) {
         await clickWithPointerJitter(page, grid.getByRole('button', { name: modalCase.buttonName }))
         await expect(dialog).toBeVisible()
         await expect(dialog.getByRole('heading', { name: modalCase.detailHeading })).toBeVisible()
         await expect(dialog.getByRole('button', { name: modalCase.backButtonName })).toBeVisible()
+        await expectSharedDesktopFrame(dialog)
         if (modalCase.dialogName === 'Contact Sensors') {
           const detailDialogBox = await dialog.boundingBox()
           expect(Math.abs(Math.round(detailDialogBox?.height ?? 0) - Math.round(overviewDialogBox?.height ?? 0))).toBeLessThanOrEqual(2)
@@ -2749,7 +2775,7 @@ test.describe('desktop modal layout', () => {
   ]
 
   for (const modalCase of adminSquareCases) {
-    test(`${modalCase.dialogName} modal uses fixed 168px square admin cards on desktop`, async ({ page }) => {
+    test(`${modalCase.dialogName} modal uses compact fixed square admin cards on desktop`, async ({ page }) => {
       await page.goto(`/at-a-glance/admin${modalCase.hash}`)
 
       const dialog = page.getByRole('dialog', { name: modalCase.dialogName })
@@ -3292,76 +3318,98 @@ test('theater remote leads a full-width row above its source control grid', asyn
   })
 })
 
-test('Music Room route orders remote controls before its local Fortnite app tile', async ({ page }) => {
+test('Music Room route keeps source controls and moves Fortnite into the remote modal', async ({ page }) => {
   await page.goto('/at-a-glance/music-room')
 
   const remoteHeading = page.getByRole('heading', { exact: true, name: 'Remote' })
-  const appsHeading = page.getByRole('heading', { exact: true, name: 'Quick App Launch' })
   const devicesHeading = page.getByRole('heading', { exact: true, name: 'Devices' })
   await expect(remoteHeading).toBeVisible()
-  await expect(appsHeading).toBeVisible()
   await expect(devicesHeading).toBeVisible()
-  const [remoteBox, appsBox, devicesBox] = await Promise.all([
+  const [remoteBox, devicesBox] = await Promise.all([
     remoteHeading.boundingBox(),
-    appsHeading.boundingBox(),
     devicesHeading.boundingBox(),
   ])
-  expect((appsBox?.y ?? 0) > (remoteBox?.y ?? 0)).toBe(true)
-  expect((devicesBox?.y ?? 0) > (appsBox?.y ?? 0)).toBe(true)
+  expect((devicesBox?.y ?? 0) > (remoteBox?.y ?? 0)).toBe(true)
+  await expect(page.getByRole('heading', { exact: true, name: 'Quick App Launch' })).toHaveCount(0)
+  await expect(page.getByRole('button', { exact: true, name: 'Fortnite' })).toHaveCount(0)
 
   const opener = page.getByRole('group', { exact: true, name: 'Music Room Remote' })
   const controls = page.getByRole('group', { exact: true, name: 'Music Room Remote Controls' })
   const remote = opener.getByRole('button', { name: 'Music Room Remote Off' })
   const xbox = controls.getByRole('button', { name: 'Xbox Off' })
   const server = controls.getByRole('button', { name: 'Server Off' })
-  const fortnite = page.getByRole('group', { exact: true, name: 'Music Room Quick App Launch' }).getByRole('button', { name: 'Fortnite' })
   await expect(remote).toHaveAttribute('data-action-kind', 'modal')
   await expect(xbox).toHaveAttribute('data-action-kind', 'selection')
   await expect(xbox).toHaveAttribute('aria-pressed', 'false')
   await expect(server).toHaveAttribute('data-action-kind', 'selection')
-  await expect(fortnite).toHaveAttribute('data-action-kind', 'selection')
-  await expect(fortnite).toHaveAttribute('aria-pressed', 'false')
-  const fortniteArtwork = fortnite.locator('img')
-  await expect(fortniteArtwork).toHaveCount(1)
-  await expect.poll(() => fortniteArtwork.evaluate((image: HTMLImageElement) => image.complete && image.naturalWidth > 0)).toBe(true)
 
   await xbox.click()
   const selectedXbox = controls.getByRole('button', { name: 'Xbox On' })
   await expect(selectedXbox).toHaveAttribute('aria-pressed', 'true')
   await selectedXbox.click()
+  await expect(controls.getByRole('button', { name: 'Xbox Off' })).toHaveAttribute('aria-pressed', 'false')
   await server.click()
   await expect(controls.getByRole('button', { name: 'Server On' })).toBeVisible()
-  await fortnite.click()
-  await expect(fortnite).toHaveAttribute('data-active', 'true')
-  await expect(fortnite).toHaveAttribute('aria-pressed', 'true')
   expect(await page.evaluate(() => (window as unknown as { __mockHass: { calls: Record<string, unknown>[] } }).__mockHass.calls)).toEqual([
     { domain: 'script', returnResponse: true, service: 'music_room_xbox' },
-    { domain: 'script', returnResponse: true, service: 'music_room_xbox' },
+    { domain: 'script', returnResponse: true, service: 'music_room_tv_off' },
     { domain: 'script', returnResponse: true, service: 'music_room_server' },
-    { domain: 'script', returnResponse: true, service: 'music_room_fortnite' },
   ])
 
   await page.reload()
-  await remote.click()
+  await page.evaluate(() => {
+    const mock = (window as unknown as {
+      __mockHass: {
+        calls: Record<string, unknown>[]
+        setEntityState: (entityId: string, state: string) => void
+      }
+    }).__mockHass
+    mock.calls.splice(0, mock.calls.length)
+    mock.setEntityState('media_player.music_room_tv_android', 'on')
+    mock.setEntityState('media_player.xbox', 'off')
+    mock.setEntityState('sensor.music_room_music_room_sync_box_hdmi1_status', 'linked')
+  })
+  await page.getByRole('button', { name: 'Music Room Remote On' }).click()
   const dialog = page.getByRole('dialog', { name: 'Music Room Remote' })
   await expect(dialog).toBeVisible()
   await expect(dialog.getByRole('heading', { name: 'Sonos Beam Volume' })).toBeVisible()
   await expect(dialog.getByRole('button', { name: 'Keyboard' })).toHaveCount(0)
-  await dialog.getByRole('switch', { name: 'Power' }).click()
   await dialog.getByRole('button', { exact: true, name: 'Up' }).click()
-  await expect.poll(() => page.evaluate(() => (window as unknown as { __mockHass: { calls: Record<string, unknown>[] } }).__mockHass.calls.at(-1))).toEqual({
-    domain: 'remote',
-    service: 'send_command',
-    target: 'remote.music_room_tv_android',
-    serviceData: { command: 'DPAD_UP' },
-  })
 
+  await dialog.getByRole('tab', { name: 'Apps' }).click()
+  const fortnite = dialog.getByRole('button', { name: 'Fortnite' })
+  await expect(fortnite).toBeVisible()
+  await expect.poll(() => fortnite.locator('img').evaluate((image: HTMLImageElement) => image.complete && image.naturalWidth > 0)).toBe(true)
+  await dialog.getByRole('tab', { name: 'Hue Sync' }).click()
+  await expect(dialog.getByRole('switch', { name: 'Sync Box Power On' })).toBeVisible()
+  await expect(dialog.getByRole('switch', { name: 'Light Sync Off' })).toBeVisible()
+  await expect(dialog.getByRole('button', { name: 'Music' })).toHaveAttribute('aria-pressed', 'true')
+  await expect(dialog.getByRole('button', { name: 'High' })).toHaveAttribute('aria-pressed', 'true')
+  await expect(dialog.getByRole('button', { name: /^HDMI 1 Selected • / })).toHaveAttribute('aria-pressed', 'true')
+  await expect(dialog.getByRole('slider', { name: 'Brightness' })).toHaveValue('100')
+  await expect(dialog.getByText('Entertainment Area')).toHaveCount(0)
+  await expect(dialog.getByText('LED Indicator')).toHaveCount(0)
+  await expect(dialog.getByText('Entertainment Stream')).toHaveCount(0)
   await dialog.getByRole('tab', { name: 'Devices' }).click()
   await expect(dialog.getByRole('switch', { name: 'TV On' })).toBeVisible()
-  await expect(dialog.getByRole('switch', { name: 'Xbox Off' })).toBeVisible()
+  await expect(dialog.getByRole('switch', { name: 'Xbox On' })).toBeVisible()
   await expect(dialog.getByRole('button', { name: 'Server Off' })).toBeVisible()
   await expect(dialog.getByLabel('Sonos Beam Playing')).toHaveAttribute('data-action-kind', 'state')
   await expect(dialog.getByRole('button', { name: 'Sonos Beam Playing' })).toHaveCount(0)
+  await dialog.getByRole('switch', { name: 'Xbox On' }).click()
+  await expect(dialog.getByRole('switch', { name: 'Xbox Off' })).toBeVisible()
+  await dialog.getByRole('switch', { name: 'Power' }).click()
+  await expect(dialog.getByRole('switch', { name: 'Xbox Off' })).toBeVisible()
+  expect(await page.evaluate(() => (window as unknown as { __mockHass: { calls: Record<string, unknown>[] } }).__mockHass.calls)).toEqual([
+    {
+      domain: 'remote',
+      service: 'send_command',
+      target: 'remote.music_room_tv_android',
+      serviceData: { command: 'DPAD_UP' },
+    },
+    { domain: 'script', returnResponse: true, service: 'music_room_xbox_off' },
+    { domain: 'script', returnResponse: true, service: 'music_room_tv_off' },
+  ])
 })
 
 test('Media page includes the Music Room remote, Xbox, Server, and Fortnite controls', async ({ page }) => {
@@ -3375,8 +3423,52 @@ test('Media page includes the Music Room remote, Xbox, Server, and Fortnite cont
   await expect(fortnite).toBeVisible()
   await expect.poll(() => fortnite.locator('img').evaluate((image: HTMLImageElement) => image.complete && image.naturalWidth > 0)).toBe(true)
 
+  await page.evaluate(() => {
+    const mock = (window as unknown as { __mockHass: { setEntityState: (entityId: string, state: string) => void } }).__mockHass
+    mock.setEntityState('media_player.xbox', 'on')
+    mock.setEntityState('sensor.music_room_music_room_sync_box_hdmi1_status', 'linked')
+  })
   await musicSection.getByRole('button', { name: 'Music Room Remote Off' }).click()
-  await expect(page.getByRole('dialog', { name: 'Music Room Remote' })).toBeVisible()
+  const dialog = page.getByRole('dialog', { name: 'Music Room Remote' })
+  await expect(dialog).toBeVisible()
+  await dialog.getByRole('tab', { name: 'Devices' }).click()
+  await expect(dialog.getByRole('switch', { name: 'Xbox On' })).toBeVisible()
+  await dialog.getByRole('tab', { name: 'Hue Sync' }).click()
+  await dialog.getByRole('button', { name: 'Game' }).click()
+  await expect(dialog.getByRole('button', { name: 'Game' })).toHaveAttribute('aria-pressed', 'true')
+  await expect.poll(() => page.evaluate(() => (window as unknown as { __mockHass: { calls: Record<string, unknown>[] } }).__mockHass.calls.at(-1))).toEqual({
+    domain: 'select',
+    service: 'select_option',
+    target: 'select.music_room_music_room_sync_box_sync_mode',
+    serviceData: { option: 'game' },
+  })
+})
+
+test('Music Room source tiles follow external routed-source truth without simultaneous selection', async ({ page }) => {
+  await page.goto('/at-a-glance/music-room')
+  const controls = page.getByRole('group', { exact: true, name: 'Music Room Remote Controls' })
+  const setSource = (state: string) => page.evaluate((nextState) => {
+    window.__mockHass?.setEntityState('sensor.music_room_active_media_source', nextState)
+  }, state)
+
+  await setSource('Xbox')
+  await expect(controls.getByRole('button', { name: 'Xbox On' })).toHaveAttribute('aria-pressed', 'true')
+  await expect(controls.getByRole('button', { name: 'Server Off' })).toHaveAttribute('aria-pressed', 'false')
+
+  await setSource('Server')
+  await expect(controls.getByRole('button', { name: 'Xbox Off' })).toHaveAttribute('aria-pressed', 'false')
+  await expect(controls.getByRole('button', { name: 'Server On' })).toHaveAttribute('aria-pressed', 'true')
+
+  await page.evaluate(() => {
+    const mock = window.__mockHass
+    mock?.setEntityState('media_player.music_room_tv_android', 'on')
+    mock?.setEntityState('switch.music_room_music_room_sync_box_power', 'on')
+    mock?.setEntityState('select.music_room_music_room_sync_box_hdmi_input', 'HDMI 1')
+    mock?.setEntityState('sensor.music_room_music_room_sync_box_hdmi1_status', 'plugged')
+    mock?.setEntityState('sensor.music_room_active_media_source', 'Off')
+  })
+  await expect(controls.getByRole('button', { name: 'Xbox Off' })).toHaveAttribute('aria-pressed', 'false')
+  await expect(controls.getByRole('button', { name: 'Server Off' })).toHaveAttribute('aria-pressed', 'false')
 })
 
 test('Free Sleep global Add Alarm defaults to weekdays and writes enabled backend records', async ({ page }) => {

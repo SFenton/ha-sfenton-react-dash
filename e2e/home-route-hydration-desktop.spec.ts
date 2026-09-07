@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './layout/fixture'
 
 type DesktopHomeRouteWindow = Window & {
   __sfentonReactDashboardLifecycle?: {

@@ -7,7 +7,7 @@ import { valueToThermostatPoint } from '../components/hass/thermostatDialGeometr
 import { VacuumRoomSourceModalContent } from '../components/hass/VacuumCard'
 import { DashboardViewPage } from './DashboardViewPage'
 import { CONTACT_GROUPS } from '../constants/atAGlance'
-import { MUSIC_ROOM_COMMAND_REVERT_MS } from '../constants/mediaRemotes'
+import { MUSIC_ROOM_ACTIVE_MEDIA_SOURCE_ENTITY_ID, MUSIC_ROOM_COMMAND_REVERT_MS, MUSIC_ROOM_HUE_SYNC_HDMI_INPUT_ENTITY_ID, MUSIC_ROOM_HUE_SYNC_POWER_ENTITY_ID, MUSIC_ROOM_XBOX_HDMI_STATUS_ENTITY_ID } from '../constants/mediaRemotes'
 import { VACUUMS } from '../constants/portedDashboard'
 import { ROOM_PAGE_CONFIGS, ROOM_PAGE_ORDER } from '../constants/roomPages'
 import { LEGACY_VACUUM_OUTCOMES, NINE_ROOM_VACUUM_OUTCOME_CONTRACT } from '../test/fixtures/vacuumOutcomes'
@@ -413,7 +413,7 @@ describe('DashboardViewPage', () => {
         expect(screen.getByRole('group', { name: 'Kitchen Groceries' })).toHaveAttribute('data-dynamic-grid', 'true')
       }
 
-      for (const section of room.sourceSections) {
+      for (const section of room.sourceSections.filter((candidate) => candidate.showOnRoomPage !== false)) {
         const grid = screen.getByRole('group', { name: `${room.title} ${section.title}` })
         expect(grid).toHaveAttribute('data-dynamic-grid', 'true')
 
@@ -509,7 +509,7 @@ describe('DashboardViewPage', () => {
     expect(within(dialog).getByRole('heading', { name: 'Theater Room SHIELD Remote' })).toBeInTheDocument()
   })
 
-  it('adds the Music Room remote lead row and local Fortnite app tile in source order', () => {
+  it('keeps the Music Room remote controls while hiding its page-level Fortnite app tile', () => {
     render(<DashboardViewPage activePath="music-room" onNavigate={() => undefined} path="music-room" />)
 
     expect(ROOM_PAGE_CONFIGS['music-room'].sourceSections.map((section) => section.title)).toEqual([
@@ -518,13 +518,13 @@ describe('DashboardViewPage', () => {
       'Quick App Launch',
       'Devices',
     ])
+    expect(ROOM_PAGE_CONFIGS['music-room'].sourceSections.find((section) => section.title === 'Quick App Launch')?.showOnRoomPage).toBe(false)
 
     const opener = screen.getByRole('group', { name: 'Music Room Remote' })
     const controls = screen.getByRole('group', { name: 'Music Room Remote Controls' })
     const remote = within(opener).getByRole('button', { name: 'Music Room Remote Off' })
     const xbox = within(controls).getByRole('button', { name: 'Xbox Off' })
     const server = within(controls).getByRole('button', { name: 'Server Off' })
-    const fortnite = within(screen.getByRole('group', { name: 'Music Room Quick App Launch' })).getByRole('button', { name: 'Fortnite' })
 
     expect(remote).toHaveAttribute('data-action-kind', 'modal')
     expect(remote).toHaveAttribute('data-modal-opener', 'true')
@@ -533,10 +533,8 @@ describe('DashboardViewPage', () => {
     expect(server).toHaveAttribute('data-action-kind', 'selection')
     expect(server).toHaveAttribute('aria-pressed', 'false')
     expect(server).not.toHaveAttribute('data-modal-opener')
-    expect(fortnite).toHaveAttribute('data-card', 'media-app')
-    expect(fortnite).toHaveAttribute('data-action-kind', 'selection')
-    expect(fortnite).toHaveAttribute('aria-pressed', 'false')
-    expect(fortnite.querySelector('img')).toHaveAttribute('src', expect.stringContaining('fortnite.jpg'))
+    expect(screen.queryByRole('heading', { name: 'Quick App Launch' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Fortnite' })).not.toBeInTheDocument()
   })
 
   it('runs Music Room source scripts with their configured optimistic windows', () => {
@@ -563,13 +561,9 @@ describe('DashboardViewPage', () => {
       act(() => vi.advanceTimersByTime(1))
       expect(screen.getByRole('button', { name: 'Server Off' })).toHaveAttribute('aria-pressed', 'false')
 
-      fireEvent.click(screen.getByRole('button', { name: 'Fortnite' }))
-      expect(screen.getByRole('button', { name: 'Fortnite' })).toHaveAttribute('data-active', 'true')
-      expect(screen.getByRole('button', { name: 'Fortnite' })).toHaveAttribute('aria-pressed', 'true')
       expect(mockCallServiceCalls).toEqual([
         { domain: 'script', returnResponse: true, service: 'music_room_xbox' },
         { domain: 'script', returnResponse: true, service: 'music_room_server' },
-        { domain: 'script', returnResponse: true, service: 'music_room_fortnite' },
       ])
     } finally {
       vi.clearAllTimers()
@@ -577,8 +571,14 @@ describe('DashboardViewPage', () => {
     }
   })
 
-  it('keeps an already-selected Xbox source as a one-tap command and shares Xbox optimism with the modal', async () => {
+  it('turns the full system off from an already-selected Xbox source and shares that optimism with the modal', async () => {
+    mockEntities[MUSIC_ROOM_ACTIVE_MEDIA_SOURCE_ENTITY_ID].state = 'Xbox'
     mockEntities['input_select.music_room_media_source'].state = 'Xbox'
+    mockEntities['media_player.music_room_tv_android'].state = 'on'
+    mockEntities['media_player.xbox'].state = 'on'
+    mockEntities[MUSIC_ROOM_HUE_SYNC_POWER_ENTITY_ID].state = 'on'
+    mockEntities[MUSIC_ROOM_HUE_SYNC_HDMI_INPUT_ENTITY_ID].state = 'HDMI 1'
+    mockEntities[MUSIC_ROOM_XBOX_HDMI_STATUS_ENTITY_ID].state = 'linked'
     render(<DashboardViewPage activePath="music-room" onNavigate={() => undefined} path="music-room" />)
 
     const xbox = screen.getByRole('button', { name: 'Xbox On' })
@@ -587,13 +587,74 @@ describe('DashboardViewPage', () => {
     fireEvent.click(xbox)
 
     expect(mockCallServiceCalls).toEqual([
-      { domain: 'script', returnResponse: true, service: 'music_room_xbox' },
+      { domain: 'script', returnResponse: true, service: 'music_room_tv_off' },
     ])
+    expect(screen.getByRole('button', { name: 'Xbox Off' })).toHaveAttribute('aria-pressed', 'false')
 
-    fireEvent.click(screen.getByRole('button', { name: 'Music Room Remote On' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Music Room Remote Off' }))
     const dialog = await screen.findByRole('dialog', { name: 'Music Room Remote' })
     await clickModalTab(within(dialog), 'Devices')
-    expect(within(dialog).getByRole('switch', { name: 'Xbox On' })).toHaveAttribute('aria-checked', 'true')
+    expect(within(dialog).getByRole('switch', { name: 'Xbox Off' })).toHaveAttribute('aria-checked', 'false')
+  })
+
+  it('turns the full system off from an already-selected Server source', () => {
+    mockEntities[MUSIC_ROOM_ACTIVE_MEDIA_SOURCE_ENTITY_ID].state = 'Server'
+    mockEntities['input_select.music_room_media_source'].state = 'Server'
+    mockEntities['media_player.music_room_tv_android'].state = 'on'
+    mockEntities[MUSIC_ROOM_HUE_SYNC_POWER_ENTITY_ID].state = 'on'
+    mockEntities[MUSIC_ROOM_HUE_SYNC_HDMI_INPUT_ENTITY_ID].state = 'HDMI 2'
+    render(<DashboardViewPage activePath="music-room" onNavigate={() => undefined} path="music-room" />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Server On' }))
+
+    expect(mockCallServiceCalls).toEqual([
+      { domain: 'script', returnResponse: true, service: 'music_room_tv_off' },
+    ])
+    expect(screen.getByRole('button', { name: 'Server Off' })).toHaveAttribute('aria-pressed', 'false')
+  })
+
+  it('lets an external routed-source change replace pending Xbox optimism immediately', () => {
+    render(<DashboardViewPage activePath="music-room" onNavigate={() => undefined} path="music-room" />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Xbox Off' }))
+    expect(screen.getByRole('button', { name: 'Xbox On' })).toHaveAttribute('aria-pressed', 'true')
+
+    act(() => setMockEntityState(MUSIC_ROOM_ACTIVE_MEDIA_SOURCE_ENTITY_ID, 'Server'))
+
+    expect(screen.getByRole('button', { name: 'Xbox Off' })).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.getByRole('button', { name: 'Server On' })).toHaveAttribute('aria-pressed', 'true')
+  })
+
+  it('switches directly between active Xbox and Server routes without dual selection', () => {
+    mockEntities[MUSIC_ROOM_ACTIVE_MEDIA_SOURCE_ENTITY_ID].state = 'Xbox'
+    const view = render(<DashboardViewPage activePath="music-room" onNavigate={() => undefined} path="music-room" />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Server Off' }))
+    expect(screen.getByRole('button', { name: 'Xbox Off' })).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.getByRole('button', { name: 'Server On' })).toHaveAttribute('aria-pressed', 'true')
+    expect(mockCallServiceCalls).toEqual([
+      { domain: 'script', returnResponse: true, service: 'music_room_server' },
+    ])
+
+    view.unmount()
+    resetMockHass()
+    mockEntities[MUSIC_ROOM_ACTIVE_MEDIA_SOURCE_ENTITY_ID].state = 'Server'
+    render(<DashboardViewPage activePath="music-room" onNavigate={() => undefined} path="music-room" />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Xbox Off' }))
+    expect(screen.getByRole('button', { name: 'Xbox On' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: 'Server Off' })).toHaveAttribute('aria-pressed', 'false')
+    expect(mockCallServiceCalls).toEqual([
+      { domain: 'script', returnResponse: true, service: 'music_room_xbox' },
+    ])
+  })
+
+  it('treats Fortnite as the active Xbox route on room source tiles', () => {
+    mockEntities[MUSIC_ROOM_ACTIVE_MEDIA_SOURCE_ENTITY_ID].state = 'Fortnite'
+    render(<DashboardViewPage activePath="music-room" onNavigate={() => undefined} path="music-room" />)
+
+    expect(screen.getByRole('button', { name: 'Xbox On' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: 'Server Off' })).toHaveAttribute('aria-pressed', 'false')
   })
 
   it('opens the Music Room remote with its configured title, apps, and devices', async () => {
@@ -604,6 +665,7 @@ describe('DashboardViewPage', () => {
     expect(within(dialog).getByRole('heading', { name: 'Music Room Remote' })).toBeInTheDocument()
     expect(within(dialog).getByRole('tab', { name: 'Apps' })).toBeInTheDocument()
     expect(within(dialog).getByRole('tab', { name: 'Devices' })).toBeInTheDocument()
+    expect(within(dialog).getByRole('tab', { name: 'Hue Sync' })).toBeInTheDocument()
     expect(within(dialog).queryByRole('button', { name: 'Keyboard' })).not.toBeInTheDocument()
 
     await clickModalTab(within(dialog), 'Apps')
@@ -614,6 +676,11 @@ describe('DashboardViewPage', () => {
     expect(within(dialog).getByRole('switch', { name: 'Xbox Off' })).toBeInTheDocument()
     expect(within(dialog).getByRole('button', { name: 'Server Off' })).toBeInTheDocument()
     expect(within(dialog).getByLabelText('Sonos Beam Playing')).toHaveAttribute('data-action-kind', 'state')
+
+    await clickModalTab(within(dialog), 'Hue Sync')
+    expect(within(dialog).getByRole('switch', { name: 'Sync Box Power On' })).toBeInTheDocument()
+    expect(within(dialog).getByRole('button', { name: 'Music' })).toHaveAttribute('aria-pressed', 'true')
+    expect(within(dialog).getByRole('button', { name: 'HDMI 1 Selected • Unplugged' })).toHaveAttribute('aria-pressed', 'true')
   })
 
   it('renders the source empty room state for room pages without body cards', () => {
@@ -1570,8 +1637,9 @@ describe('DashboardViewPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Open Presence-Based Overrides' }))
     const presenceDialog = await screen.findByRole('dialog', { name: 'Presence-Based Overrides' })
     expect(presenceDialog).toHaveAttribute('data-surface', 'hass-popup')
+    expect(presenceDialog).toHaveAttribute('data-modal-geometry-intent', 'admin-presence-overrides')
     expect(presenceDialog).toHaveStyle({
-      '--modal-desktop-height': 'min(860px, calc(var(--dashboard-visible-height, var(--dashboard-viewport-height, 100dvh)) - 64px))',
+      '--modal-centered-block-size': '860px',
     })
     expect(screen.getByRole('heading', { name: 'Presence-Based Overrides' })).toBeInTheDocument()
     const livingRoomPresence = within(presenceDialog).getByRole('button', { name: 'Living Room Enabled' })
@@ -1583,8 +1651,9 @@ describe('DashboardViewPage', () => {
 
     const detailPage = await screen.findByRole('dialog', { name: 'Living Room Presence Lighting' })
     expect(detailPage).toBe(presenceDialog)
+    expect(detailPage).toHaveAttribute('data-modal-geometry-intent', 'admin-presence-overrides')
     expect(detailPage).toHaveStyle({
-      '--modal-desktop-height': 'min(860px, calc(var(--dashboard-visible-height, var(--dashboard-viewport-height, 100dvh)) - 64px))',
+      '--modal-centered-block-size': '860px',
     })
     expect(screen.getAllByRole('dialog')).toHaveLength(1)
     expect(within(detailPage).getAllByRole('button', { name: /Set Living Room presence lighting to/i })).toHaveLength(4)
@@ -5493,7 +5562,11 @@ describe('DashboardViewPage', () => {
     expect(server.compareDocumentPosition(fortnite) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
 
     fireEvent.click(remote)
-    expect(await screen.findByRole('dialog', { name: 'Music Room Remote' })).toBeInTheDocument()
+    const dialog = await screen.findByRole('dialog', { name: 'Music Room Remote' })
+    await clickModalTab(within(dialog), 'Hue Sync')
+    expect(within(dialog).getByRole('switch', { name: 'Light Sync Off' })).toBeInTheDocument()
+    expect(within(dialog).getByRole('button', { name: 'High' })).toHaveAttribute('data-action-kind', 'selection')
+    expect(within(dialog).queryByText('Entertainment Stream')).not.toBeInTheDocument()
   })
 
   it('runs Living Room page-level media app shortcuts from source image tiles', () => {

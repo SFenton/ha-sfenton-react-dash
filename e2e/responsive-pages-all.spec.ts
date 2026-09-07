@@ -1,10 +1,11 @@
 import fs from 'node:fs'
 import path from 'node:path'
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test, type Page } from './layout/fixture'
 import {
   RESPONSIVE_ROUTES,
   RESPONSIVE_ROUTE_TITLES,
   RESPONSIVE_VIEWPORTS,
+  VIEWPORTS,
   type ResponsiveRoute,
   type ResponsiveViewport,
 } from './responsive-acceptance-data'
@@ -15,8 +16,10 @@ type PageAudit = {
   cameraWidthViolations: number
   contentWidth: number
   documentOverflow: number
+  duplicateBackMenu: boolean
   fixedControlOverlapViolations: number
   heading: string | null
+  hasBack: boolean
   navigation: string[]
   pageMeasure: string | null
   route: ResponsiveRoute
@@ -45,6 +48,7 @@ async function waitForDashboard(page: Page, route: ResponsiveRoute) {
       '[data-adaptive-navigation="rail"]',
       '[data-adaptive-navigation="bottom"]',
       'button[aria-label="Open navigation menu"]',
+      '[data-app-header-back="true"]',
     ]
     return selectors.some((selector) => {
       const element = document.querySelector<HTMLElement>(selector)
@@ -99,6 +103,7 @@ async function auditPage(page: Page, route: ResponsiveRoute, viewport: Responsiv
     const rail = document.querySelector<HTMLElement>('[data-adaptive-navigation="rail"]')
     const bottom = document.querySelector<HTMLElement>('[data-adaptive-navigation="bottom"]')
     const menu = document.querySelector<HTMLElement>('button[aria-label="Open navigation menu"]')
+    const back = main?.querySelector<HTMLElement>('[data-app-header-back="true"]') ?? null
     const navigation = [
       isVisible(rail) ? 'rail' : null,
       isVisible(bottom) ? 'bottom' : null,
@@ -140,6 +145,8 @@ async function auditPage(page: Page, route: ResponsiveRoute, viewport: Responsiv
       documentOverflow: Math.max(0, document.documentElement.scrollWidth - document.documentElement.clientWidth),
       fixedControlOverlapViolations,
       heading: document.querySelector('main h1')?.textContent?.trim() ?? null,
+      hasBack: isVisible(back),
+      duplicateBackMenu: isVisible(back) && Boolean(main?.querySelector('[data-app-header="true"] button[aria-label="Open navigation menu"]')),
       navigation,
       pageMeasure: main?.dataset.pageMeasure ?? null,
       scrollerHeight: Math.round(scroller?.getBoundingClientRect().height ?? 0),
@@ -148,14 +155,14 @@ async function auditPage(page: Page, route: ResponsiveRoute, viewport: Responsiv
     }
   })
 
-  expect(metrics.navigation.length, `${route} ${stage} has no primary navigation`).toBeGreaterThan(0)
+  expect(metrics.navigation.length > 0 || metrics.hasBack, `${route} ${stage} has no navigation`).toBe(true)
+  expect(metrics.duplicateBackMenu, `${route} ${stage} duplicates Back with a menu`).toBe(false)
   expect(metrics.heading, `${route} ${stage} heading`).toBe(RESPONSIVE_ROUTE_TITLES.get(route))
   const navigationLayout = navigationLayoutForViewport(viewport)
   if (navigationLayout === 'rail') {
     expect(metrics.navigation, `${route} ${stage} desktop navigation`).toEqual(['rail'])
   } else if (navigationLayout === 'drawer-only') {
-    expect(metrics.navigation, `${route} ${stage} short-landscape navigation`).toContain('drawer')
-    expect(metrics.navigation, `${route} ${stage} short-landscape bottom nav`).not.toContain('bottom')
+    expect(metrics.navigation, `${route} ${stage} short-landscape navigation`).toEqual(metrics.hasBack ? [] : ['drawer'])
   } else {
     expect(metrics.navigation, `${route} ${stage} mobile/tablet navigation`).toContain('bottom')
   }
@@ -183,17 +190,21 @@ async function auditPage(page: Page, route: ResponsiveRoute, viewport: Responsiv
   manifest.push({ route, stage, viewport, ...metrics })
 }
 
-test.describe.serial('all-route responsive acceptance', () => {
-  test.afterAll(() => {
-    const output = artifactPath('phase3-page-acceptance.json')
+test.describe('all-route responsive acceptance', () => {
+  test.beforeEach(() => { manifest.length = 0 })
+  test.afterEach(async ({ browserName }, testInfo) => {
+    const data = {
+      scope: 'Per-test legacy audit, not a complete matrix or checkpoint certificate',
+      testId: testInfo.testId, title: testInfo.title, status: testInfo.status, browserName,
+      routeCount: RESPONSIVE_ROUTES.length, viewportCount: RESPONSIVE_VIEWPORTS.length,
+      auditCount: manifest.length, results: manifest,
+    }
+    const attached = testInfo.outputPath('page-acceptance.json')
+    fs.writeFileSync(attached, `${JSON.stringify(data, null, 2)}\n`)
+    await testInfo.attach('legacy-page-acceptance', { path: attached, contentType: 'application/json' })
+    const output = artifactPath(`phase3-page-acceptance-${testInfo.testId}.json`)
     if (output) {
-      fs.writeFileSync(output, `${JSON.stringify({
-        generatedAt: new Date().toISOString(),
-        routeCount: RESPONSIVE_ROUTES.length,
-        viewportCount: RESPONSIVE_VIEWPORTS.length,
-        auditCount: manifest.length,
-        results: manifest,
-      }, null, 2)}\n`)
+      fs.writeFileSync(output, `${JSON.stringify(data, null, 2)}\n`)
     }
   })
 
@@ -217,19 +228,27 @@ test.describe.serial('all-route responsive acceptance', () => {
   const sequences = [
     {
       name: 'mobile-desktop-mobile',
-      viewports: [RESPONSIVE_VIEWPORTS[0], RESPONSIVE_VIEWPORTS[4], RESPONSIVE_VIEWPORTS[0]],
+      viewports: [VIEWPORTS['phone-portrait'], VIEWPORTS.desktop, VIEWPORTS['phone-portrait']],
     },
     {
       name: 'desktop-mobile-desktop',
-      viewports: [RESPONSIVE_VIEWPORTS[4], RESPONSIVE_VIEWPORTS[0], RESPONSIVE_VIEWPORTS[4]],
+      viewports: [VIEWPORTS.desktop, VIEWPORTS['phone-portrait'], VIEWPORTS.desktop],
+    },
+    {
+      name: 'phone-portrait-landscape-portrait',
+      viewports: [VIEWPORTS['phone-portrait'], VIEWPORTS['phone-landscape'], VIEWPORTS['phone-portrait']],
+    },
+    {
+      name: 'phone-landscape-portrait-landscape',
+      viewports: [VIEWPORTS['phone-landscape'], VIEWPORTS['phone-portrait'], VIEWPORTS['phone-landscape']],
     },
     {
       name: 'ipad-portrait-landscape-portrait',
-      viewports: [RESPONSIVE_VIEWPORTS[2], RESPONSIVE_VIEWPORTS[3], RESPONSIVE_VIEWPORTS[2]],
+      viewports: [VIEWPORTS['ipad-portrait'], VIEWPORTS['ipad-landscape'], VIEWPORTS['ipad-portrait']],
     },
     {
       name: 'tablet-passport-tablet',
-      viewports: [RESPONSIVE_VIEWPORTS[3], RESPONSIVE_VIEWPORTS[6], RESPONSIVE_VIEWPORTS[3]],
+      viewports: [VIEWPORTS['ipad-landscape'], VIEWPORTS['passport-foldable-landscape'], VIEWPORTS['ipad-landscape']],
     },
   ] as const
 

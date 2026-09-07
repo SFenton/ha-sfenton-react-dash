@@ -12,10 +12,6 @@
   grid-template-columns: minmax(0, 1fr) 48px;
 }
 
-.headerWithBackMenu {
-  grid-template-columns: minmax(0, 1fr) auto;
-}
-
 .headerWithMenu {
   grid-template-columns: 28px minmax(0, 1fr) 48px;
   gap: 4px;
@@ -222,12 +218,6 @@
   content: '';
 }
 
-.backMenuButton {
-  display: inline-flex;
-  margin-left: 0;
-  justify-self: auto;
-}
-
 :global([data-route-transition-state='exiting']) .backTitle,
 :global([data-route-transition-state='exiting']) .titleWrap,
 :global([data-route-transition-state='exiting']) .iconButton {
@@ -315,7 +305,11 @@
   grid-template-rows: auto minmax(0, 1fr);
   gap: 14px;
   border-right: 1px solid rgba(255, 255, 255, 0.16);
-  padding: calc(16px + env(safe-area-inset-top, 0px)) 14px calc(18px + env(safe-area-inset-bottom, 0px));
+  padding:
+    max(16px, var(--rd-safe-top))
+    14px
+    max(18px, var(--rd-safe-bottom))
+    max(14px, var(--rd-safe-left));
   box-sizing: border-box;
   background: #192436;
   box-shadow: 18px 0 44px rgba(0, 0, 0, 0.34), inset 1px 0 0 rgba(255, 255, 255, 0.1);

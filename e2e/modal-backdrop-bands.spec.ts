@@ -1,4 +1,4 @@
-import { expect, test, type Locator, type Page } from '@playwright/test'
+import { expect, test, type Locator, type Page } from './layout/fixture'
 
 const PHONE = { height: 852, width: 393 }
 const CENTERED_QUERY = (width: number, height: number) => width >= 760 && height >= 560

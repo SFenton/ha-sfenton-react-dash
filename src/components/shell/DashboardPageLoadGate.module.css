@@ -4,8 +4,8 @@
     260px,
     calc(
       var(--dashboard-visible-height, var(--dashboard-viewport-height, 100dvh))
-      - 80px
-      - env(safe-area-inset-top, 0px)
+      - 60px
+      - max(20px, var(--rd-safe-top))
       - var(--page-scroll-bottom-inset, var(--bottom-nav-height))
     )
   );

@@ -18,7 +18,8 @@ changed panel package requires a separately approved restart.
 
 ## Required preflight
 
-1. Read the repository instructions, `docs/ux/validation-matrix.md`, and every
+1. Read the repository instructions, `docs/ux/layouts.md`,
+   `docs/ux/validation-matrix.md`, and every
    instruction file matching the release-owned files.
 2. Inspect `git status`, the complete diff, the current branch, `origin/master`,
    GitHub CLI authentication, and open PRs.
@@ -28,6 +29,12 @@ changed panel package requires a separately approved restart.
 4. Confirm the task's required validation is complete. Re-run `npm run check`
    and the smallest affected Playwright release gates if the working tree
    changed after the last successful run.
+   Require a successful current `layout:verify` assessment for the release-owned
+   changes, including actual manual image/interaction review. Check source,
+   fixture, build and served-asset fingerprints; replan when they changed.
+   Release tests must own their build/server and must not enable
+   `reuseExistingServer` or borrow an unowned port. Local mock acceptance does
+   not satisfy real-device or production-host verification.
 5. Never print tokens, passwords, private keys, or environment-file contents.
 
 ## Git and GitHub release
@@ -85,13 +92,33 @@ The deployment must:
 
 1. Confirm the raw app, legacy wrapper, and custom panel load the merged
    production bundle.
-2. Open the affected route at `393x852` first, then verify the relevant
-   desktop/fine-pointer surface.
+2. Open the affected route at `393x852` first, rotate to `852x393`, and verify
+   the relevant desktop/fine-pointer surface. For shell, grid, modal, or
+   fixed-edge changes, inspect both mirrored landscape inset profiles and a
+   zero-inset rectangular-phone profile before the real-device smoke.
 3. Confirm the released behavior and modal access without calling live device
    services.
+   For phone-landscape modals, confirm every affected intent uses the same
+   exact padded safe rectangle. Within one intent, walk tabs/details/loading
+   and result states and confirm no outer size drift; in portrait, verify
+   literal accepted tile and safe-bottom metrics. Compare Quick Links,
+   Summary, Climate, forms, and media against each other on tablet/desktop as
+   well: all non-drawer frames are shared. Confirm complete landscape tile
+   rows fill the available width while incomplete rows align left. Security
+   control collections must fill the padded body on every opener path.
+   Quick Links must match production's 120px standard portrait tiles and use
+   text-aware, balanced non-final-row filling in centered layouts; do not
+   validate it against the square-grid sizing oracle.
 4. Compare the remote asset name or content to the clean worktree build and
    confirm the legacy wrapper cache-busting version is the merged commit.
-5. Remove the exact temporary worktree and local-only links after verification.
+5. On a real phone, confirm the raw app, legacy wrapper, and custom panel
+   deliver non-obscured controls in both rotations. Record the outer document,
+   bridge document, and React document safe-area variables without changing
+   Home Assistant state. Open each Summary tab in portrait and rotate before
+   touching any tabs; native typography and row wrapping must already match a
+   direct landscape open. Linux WPE does not implement iOS text autosizing and
+   cannot replace this check.
+6. Remove the exact temporary worktree and local-only links after verification.
 
 ## Completion report
 

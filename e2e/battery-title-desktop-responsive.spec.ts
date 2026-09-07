@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './layout/fixture'
 
 test('long battery task titles remain visible with a fine pointer', async ({ page }) => {
   const title = 'Replace Hallway/Entryway/Living Room Presence Sensor Battery · 20%'

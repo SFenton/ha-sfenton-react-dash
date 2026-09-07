@@ -66,7 +66,7 @@ import type { ControlSemantics } from '../components/core/controlSemantics'
 import { InlineAlert } from '../components/core/InlineAlert'
 import { ModalIconTabNav } from '../components/core/ModalTabNav'
 import { modalTabId, modalTabPanelId } from '../components/core/modalTabIds'
-import { ModalSheet, type ModalSheetStyle } from '../components/core/ModalSheet'
+import { ModalSheet, type ModalCenteredGeometry } from '../components/core/ModalSheet'
 import { ModalOpenerRow } from '../components/core/ModalOpenerRow'
 import { NativePickerField } from '../components/core/NativePickerField'
 import { OptionPickerDialog, type PickerOption } from '../components/core/OptionPickerDialog'
@@ -161,11 +161,11 @@ import {
 
 import { choreQuickLinkCounts, choreQuickLinkSubtitle, groceryCountSubtitle } from '../constants/choreQuickLinkCounts'
 import { FOOD_CARD_BACKGROUND_COLOR, foodSummarySubtitle } from '../constants/everShelfFood'
-import { modalSquareGridModalStyle, modalSquareGridStyle, type ModalSquareGridStyle, useModalSquareGridLayout } from '../components/core/modalSquareGrid'
+import { modalSquareGridCenteredGeometry, modalSquareGridStyle, type ModalSquareGridStyle, useModalSquareGridLayout } from '../components/core/modalSquareGrid'
 import { ROOM_PAGE_CONFIGS, type RoomSourceCardAction, type RoomSourceCardConfig, type RoomSourceKind, type RoomSourceModalItem, type RoomSourceSectionLayout } from '../constants/roomPages'
 import { bathroomFanForPowerEntity } from '../constants/bathroomFans'
 import { humidifierForPowerEntity, type HumidifierConfig } from '../constants/humidifiers'
-import { MEDIA_REMOTE_CONFIGS, MUSIC_ROOM_MEDIA_OPTIMISTIC_ENTITY_IDS, type MediaRemoteConfig } from '../constants/mediaRemotes'
+import { MEDIA_REMOTE_CONFIGS, MUSIC_ROOM_MEDIA_LIVE_CHANGE_OPTIMISTIC_ENTITY_IDS, MUSIC_ROOM_MEDIA_OPTIMISTIC_ENTITY_IDS, type MediaRemoteConfig } from '../constants/mediaRemotes'
 import { VACUUM_AUTO_CLEAN_CONTROLS } from '../constants/vacuumAutoClean'
 import {
   THERMOSTAT_MODAL_DIAL_GUTTER_PX,
@@ -1125,11 +1125,37 @@ function DefaultRoomSourceCard({ card, eightSleepModalState, onOpen, preload = f
   return content
 }
 
+const MEDIA_REMOTE_CENTERED_GEOMETRY = {
+  blockPolicy: 'fixed',
+  blockSize: '760px',
+  id: 'media-remote',
+  inlineSize: '980px',
+} satisfies ModalCenteredGeometry
+const ROOM_SOURCE_COMPACT_CENTERED_GEOMETRY = {
+  blockPolicy: 'fixed',
+  blockSize: '500px',
+  id: 'room-source-compact',
+  inlineSize: '500px',
+} satisfies ModalCenteredGeometry
+const ROOM_SOURCE_STANDARD_CENTERED_GEOMETRY = {
+  blockPolicy: 'fixed',
+  blockSize: '620px',
+  id: 'room-source-standard',
+  inlineSize: '720px',
+} satisfies ModalCenteredGeometry
+const VACATION_CONFIRMATION_CENTERED_GEOMETRY = {
+  blockPolicy: 'fixed',
+  blockSize: '620px',
+  id: 'vacation-confirmation',
+  inlineSize: '560px',
+} satisfies ModalCenteredGeometry
+
 function MediaRoomSourceModal({ config, onClose, open, title }: { config: MediaRemoteConfig; onClose: () => void; open: boolean; title: string }) {
   const [mediaActiveTab, setMediaActiveTab] = useState<MediaRemoteModalTab>('controls')
 
   return (
     <ModalSheet
+      centeredGeometry={MEDIA_REMOTE_CENTERED_GEOMETRY}
       navigation={(
         <MediaRemoteModalNav
           activeTab={mediaActiveTab}
@@ -1137,6 +1163,7 @@ function MediaRoomSourceModal({ config, onClose, open, title }: { config: MediaR
           remoteTitle={config.title}
           showApps={Boolean(config.appCards?.length)}
           showDevices={Boolean(config.devices?.length)}
+          showHueSync={Boolean(config.hueSync)}
         />
       )}
       onClose={onClose}
@@ -1207,6 +1234,7 @@ function RoomSourceModal({ card, eightSleepModalStates, onClose, preload = false
 
   return (
     <ModalSheet
+      centeredGeometry={modalSize === 'compact' ? ROOM_SOURCE_COMPACT_CENTERED_GEOMETRY : ROOM_SOURCE_STANDARD_CENTERED_GEOMETRY}
       onClose={onClose}
       open={Boolean(card)}
       size={modalSize}
@@ -1245,6 +1273,7 @@ function SourceRoomPage({ onNavigate, preload = false, preloadHash, preloadHashe
   const [selectedCard, setSelectedCard] = useState<RoomSourceCardConfig | null>(null)
   const eightSleepModalStates = useEightSleepBedModalStates(preload)
   const allCards = useMemo(() => [...room.overviewCards, ...room.sourceSections.flatMap((section) => section.cards)], [room.overviewCards, room.sourceSections])
+  const visibleSourceSections = useMemo(() => room.sourceSections.filter((section) => section.showOnRoomPage !== false), [room.sourceSections])
   const bathroomFan = allCards.map((card) => card.control === 'bathroom-fan' ? bathroomFanForPowerEntity(card.entityId) : undefined).find(Boolean)
   const preloadCard = preloadHash ? allCards.find((candidate) => candidate.hash === preloadHash) ?? null : null
   const preloadCards = useMemo(() => preloadHashes.map((preloadTargetHash) => allCards.find((candidate) => candidate.hash === preloadTargetHash)).filter((card): card is RoomSourceCardConfig => Boolean(card?.hash)), [allCards, preloadHashes])
@@ -1255,7 +1284,7 @@ function SourceRoomPage({ onNavigate, preload = false, preloadHash, preloadHashe
         </ResponsiveSectionItem>
       )
     : null
-  const pageSectionCount = room.sourceSections.length + (kitchenSection ? 1 : 0)
+  const pageSectionCount = visibleSourceSections.length + (kitchenSection ? 1 : 0)
 
   const closeSourceCard = () => {
     setSelectedCard(null)
@@ -1295,12 +1324,12 @@ function SourceRoomPage({ onNavigate, preload = false, preloadHash, preloadHashe
 
   const content = (
     <div className={styles.stack}>
-      {room.sourceSections.length === 0 && <EmptyRoomState />}
+      {visibleSourceSections.length === 0 && <EmptyRoomState />}
 
-      {(kitchenSection || room.sourceSections.length > 0) && (
+      {(kitchenSection || visibleSourceSections.length > 0) && (
         <ResponsiveSectionGrid>
           {kitchenSection}
-          {room.sourceSections.map((section) => {
+          {visibleSourceSections.map((section) => {
             const leadRow = section.layout === 'lead-row'
             const leadCards = leadRow ? section.cards.slice(0, 1) : section.cards
             const followUpCards = leadRow ? section.cards.slice(1) : []
@@ -1337,7 +1366,7 @@ function SourceRoomPage({ onNavigate, preload = false, preloadHash, preloadHashe
   )
 
   const optimisticContent = !preload && room.optimisticStateEntityIds?.length
-    ? <OptimisticActionStateBoundary entityIds={room.optimisticStateEntityIds}>{content}</OptimisticActionStateBoundary>
+    ? <OptimisticActionStateBoundary entityIds={room.optimisticStateEntityIds} liveChangeEntityIds={room.optimisticLiveChangeEntityIds}>{content}</OptimisticActionStateBoundary>
     : content
 
   return bathroomFan && !preload
@@ -2014,7 +2043,7 @@ function VacationDatesSection({ dateRange, invalidDateRange, onDateRangeChange, 
 
 function VacationConfirmationModal({ dateRange, invalidDateRange, onClose, onConfirm, onDateRangeChange, open }: { dateRange: VacationDateRange; invalidDateRange: boolean; onClose: () => void; onConfirm: () => void; onDateRangeChange: (dateRange: VacationDateRange) => void; open: boolean }) {
   return (
-    <ModalSheet onClose={onClose} open={open} scrollResetKey={open ? 'open' : 'closed'} size="form" title="Confirm Vacation">
+    <ModalSheet centeredGeometry={VACATION_CONFIRMATION_CENTERED_GEOMETRY} onClose={onClose} open={open} scrollResetKey={open ? 'open' : 'closed'} size="form" title="Confirm Vacation">
       <div className={styles.vacationModalBody}>
         <VacationDateControls dateRange={dateRange} invalidDateRange={invalidDateRange} onConfirm={onConfirm} onDateRangeChange={onDateRangeChange} pending={true} recoveringInvalidDates={false} showConfirm />
       </div>
@@ -2210,7 +2239,7 @@ function MediaPage({ preload = false, preloadHash, preloadHashes = [] }: { prelo
 
   return preload
     ? content
-    : <OptimisticActionStateBoundary entityIds={MUSIC_ROOM_MEDIA_OPTIMISTIC_ENTITY_IDS}>{content}</OptimisticActionStateBoundary>
+    : <OptimisticActionStateBoundary entityIds={MUSIC_ROOM_MEDIA_OPTIMISTIC_ENTITY_IDS} liveChangeEntityIds={MUSIC_ROOM_MEDIA_LIVE_CHANGE_OPTIMISTIC_ENTITY_IDS}>{content}</OptimisticActionStateBoundary>
 }
 
 function AdminPage({ onNavigate, preload = false, preloadHash, preloadHashes = [] }: { onNavigate: (path: string) => void; preload?: boolean; preloadHash?: string; preloadHashes?: string[] }) {
@@ -2241,12 +2270,12 @@ function AdminPage({ onNavigate, preload = false, preloadHash, preloadHashes = [
     leaveDetailPage()
     setSelectedPresenceOverride(null)
   }
-  const presenceModalStyle: ModalSheetStyle | undefined = presenceModalContentActive
-    ? {
-        ...modalSquareGridModalStyle(presenceGridLayout),
-        '--modal-desktop-height': 'min(860px, calc(var(--dashboard-visible-height, var(--dashboard-viewport-height, 100dvh)) - 64px))',
-      }
-    : undefined
+  const presenceCenteredGeometry = {
+    ...modalSquareGridCenteredGeometry('admin-presence-overrides', ADMIN_PRESENCE_OVERRIDE_ITEMS.length),
+    blockPolicy: 'fixed',
+    blockSize: '860px',
+  } satisfies ModalCenteredGeometry
+  const autoResetCenteredGeometry = modalSquareGridCenteredGeometry('admin-presence-auto-reset', ADMIN_AUTO_REENABLE_ITEMS.length)
 
   return (
     <div className={styles.settingsSectionStack}>
@@ -2278,7 +2307,8 @@ function AdminPage({ onNavigate, preload = false, preloadHash, preloadHashes = [
       <ModalSheet
         backLabel="Back to presence overrides"
         bodyElementRef={bodyElementRef}
-        contentStyle={presenceModalStyle}
+        centeredGeometry={presenceCenteredGeometry}
+        landscapeDensity="regular"
         onBack={selectedPresenceOverride ? closePresenceDetail : undefined}
         onClose={closeHash}
         open={presenceModalOpen}
@@ -2295,7 +2325,7 @@ function AdminPage({ onNavigate, preload = false, preloadHash, preloadHashes = [
         </div>
       </ModalSheet>
 
-      <ModalSheet contentStyle={autoResetModalContentActive ? modalSquareGridModalStyle(autoResetGridLayout) : undefined} onClose={closeHash} open={autoResetModalOpen} size="media" title="Presence-Based Overrides Auto-Reset">
+      <ModalSheet centeredGeometry={autoResetCenteredGeometry} landscapeDensity="regular" onClose={closeHash} open={autoResetModalOpen} size="media" title="Presence-Based Overrides Auto-Reset">
         <div className={styles.adminModalBody}>
           {autoResetModalContentActive && <AdminTileGrid gridLabel="Presence-Based Auto-Reset by room" items={ADMIN_AUTO_REENABLE_ITEMS} onNavigate={onNavigate} squareGridRef={autoResetGridRef} squareGridStyle={modalSquareGridStyle(autoResetGridLayout)} variant="admin-modal" />}
         </div>
@@ -2400,11 +2430,12 @@ const THERMOSTAT_NEUTRAL_COLOR = 'rgba(255, 255, 255, 0.78)'
 const THERMOSTAT_MODAL_DIAL_SHELL_STYLE = {
   '--thermostat-modal-dial-gutter': `${THERMOSTAT_MODAL_DIAL_GUTTER_PX}px`,
 } as CSSProperties
-const THERMOSTAT_MODAL_STYLE: ModalSheetStyle = {
-  '--modal-desktop-width': '720px',
-  '--modal-desktop-max-width': '720px',
-  '--modal-desktop-height': 'min(780px, calc(var(--dashboard-visible-height, 100dvh) - 64px))',
-}
+const THERMOSTAT_CENTERED_GEOMETRY = {
+  blockPolicy: 'fixed',
+  blockSize: '760px',
+  id: 'thermostat',
+  inlineSize: '720px',
+} satisfies ModalCenteredGeometry
 
 function thermostatTemperatureEntityId(room: ThermostatRoomView) {
   return `sensor.thermostat_contact_sensors_${room.key}_temperature`
@@ -2627,7 +2658,7 @@ function DishwasherModalContent() {
   const [displayOperationState, commitDisplayOperationState] = useOptimisticState(liveOperationState, { revertMs: DISHWASHER_OPTIMISTIC_REVERT_MS })
 
   return (
-    <div className={styles.dishwasherModal}>
+    <div className={styles.dishwasherModal} data-modal-landscape-layout="section-grid">
       <section className={styles.section}>
         <SectionHeader title="Program" />
         <DishwasherProgramPicker />
@@ -2830,13 +2861,12 @@ const FREE_SLEEP_SCHEDULE_STAGES: { icon: string; key: FreeSleepScheduleStage; l
   { icon: 'mdi:moon-waning-crescent', key: 'asleep', label: 'Asleep' },
   { icon: 'mdi:weather-sunny', key: 'dawn', label: 'Dawn' },
 ]
-const EIGHT_SLEEP_BED_MODAL_STYLE: ModalSheetStyle = {
-  '--modal-desktop-width': '700px',
-  '--modal-desktop-max-width': '700px',
-}
-const EIGHT_SLEEP_ALARM_EDITOR_MODAL_STYLE: ModalSheetStyle = {
-  ...EIGHT_SLEEP_BED_MODAL_STYLE,
-}
+const EIGHT_SLEEP_CENTERED_GEOMETRY = {
+  blockPolicy: 'fixed',
+  blockSize: '760px',
+  id: 'eight-sleep',
+  inlineSize: '700px',
+} satisfies ModalCenteredGeometry
 const FREE_SLEEP_ALARM_DAYS: { key: FreeSleepAlarmDay; label: string }[] = [
   { key: 'sunday', label: 'Sunday' },
   { key: 'monday', label: 'Monday' },
@@ -4976,7 +5006,7 @@ function EightSleepBedModal({ modalState, onClose, open, side }: { modalState: E
       <ModalSheet
         backLabel={backLabel}
         bodyElementRef={bodyElementRef}
-        contentStyle={alarmDetailPage ? EIGHT_SLEEP_ALARM_EDITOR_MODAL_STYLE : EIGHT_SLEEP_BED_MODAL_STYLE}
+        centeredGeometry={EIGHT_SLEEP_CENTERED_GEOMETRY}
         footer={alarmEditor ? (
           <ScheduleDetailFooter
             deleteAction={alarmEditor.editingId ? { disabled: !alarmController.available || alarmEditorStale, icon: 'mdi:delete', label: 'Delete Alarm', onClick: deleteAlarm } : undefined}
@@ -4988,7 +5018,7 @@ function EightSleepBedModal({ modalState, onClose, open, side }: { modalState: E
         onClose={closeBedModal}
         open={open}
         scrollMode={alarmDetailPage ? 'body' : 'panes'}
-        size={alarmDetailPage ? 'standard' : 'workspace'}
+        size="workspace"
         subtitle={alarmDetailPage ? undefined : modalState.subtitle}
         title={modalTitle}
       >
@@ -5138,7 +5168,10 @@ function EightSleepBedModalContentView({
     : FREE_SLEEP_ALARM_DAY_OPTIONS
 
   useEffect(() => {
-    const scrollContainers = [modalPanelRef.current, modalBodyRef.current?.parentElement]
+    const scrollContainers = [
+      modalPanelRef.current,
+      modalBodyRef.current?.closest<HTMLElement>('[data-modal-sheet-body="true"]'),
+    ]
     for (const scrollContainer of scrollContainers) {
       if (!scrollContainer || typeof scrollContainer.scrollTo !== 'function') continue
       scrollContainer.scrollTo({ top: 0, behavior: 'auto' })
@@ -5291,12 +5324,6 @@ const HVAC_MODE_ACTIVE_COLORS: Record<string, string> = {
   heat: 'rgba(205, 84, 1, 0.6)',
   heat_cool: 'linear-gradient(90deg, rgba(205, 84, 1, 0.6) 0%, rgba(44, 142, 152, 0.6) 100%)',
 }
-const THERMOSTAT_COMPACT_PICKER_MODAL_STYLE: ModalSheetStyle = {
-  '--modal-desktop-height': 'auto',
-  '--modal-desktop-max-width': '500px',
-  '--modal-desktop-width': '500px',
-}
-
 interface ThermostatSelectControlConfig {
   entityId: string
   hideWhenEmpty?: boolean
@@ -5307,7 +5334,6 @@ interface ThermostatSelectControlConfig {
   optionLabels?: Record<string, string>
   optionsAttribute?: string
   pickerSheetLayout?: 'card-grid' | 'compact-grid'
-  pickerSheetStyle?: ModalSheetStyle
   selectedIcon?: string
   serviceKind?: 'climate' | 'climate-fan' | 'select'
   title: string
@@ -5354,7 +5380,6 @@ function ThermostatSelectButton(config: ThermostatSelectControlConfig) {
     icon,
     keepOpenOnSelect = false,
     pickerSheetLayout,
-    pickerSheetStyle,
     selectedIcon = 'mdi:thermometer-check',
     title,
   } = config
@@ -5374,7 +5399,7 @@ function ThermostatSelectButton(config: ThermostatSelectControlConfig) {
         <MaterialIcon name={icon} size={22} />
         <MaterialIcon name="mdi:chevron-down" size={22} />
       </button>
-      <OptionPickerDialog icon={icon} onClose={() => setOpen(false)} onSelect={selectOption} open={open} options={control.options} presentation="sheet" selectedIcon={selectedIcon} sheetLayout={pickerSheetLayout} sheetStyle={pickerSheetStyle} title={title} value={control.displayValue} />
+      <OptionPickerDialog icon={icon} onClose={() => setOpen(false)} onSelect={selectOption} open={open} options={control.options} presentation="sheet" selectedIcon={selectedIcon} sheetLayout={pickerSheetLayout} title={title} value={control.displayValue} />
     </>
   )
 }
@@ -5383,7 +5408,6 @@ const THERMOSTAT_ECO_CRITICAL_CONFIG: ThermostatSelectControlConfig = {
   entityId: 'select.thermostat_contact_sensors_eco_mode_critical_tracking',
   icon: 'mdi:thermometer-alert',
   pickerSheetLayout: 'card-grid',
-  pickerSheetStyle: THERMOSTAT_COMPACT_PICKER_MODAL_STYLE,
   title: 'Eco Mode Critical Tracking',
 }
 
@@ -5391,7 +5415,6 @@ const THERMOSTAT_ECO_AWAY_CONFIG: ThermostatSelectControlConfig = {
   entityId: 'select.thermostat_contact_sensors_eco_behavior_when_away',
   icon: 'mdi:leaf-circle',
   pickerSheetLayout: 'card-grid',
-  pickerSheetStyle: THERMOSTAT_COMPACT_PICKER_MODAL_STYLE,
   title: 'Eco Behavior When Away',
 }
 
@@ -5578,7 +5601,7 @@ function ThermostatHubPill() {
 
   return (
     <ThermostatGlassCard ariaLabel={`Thermostat Hub ${stateText}`} hvacAction={rawHvacAction} icon="mdi:thermostat" stateText={stateText} thermalStatus={thermostatThermalStatus(rawHvacAction)} title="Thermostat Hub">
-      <ThermostatSelectButton entityId="climate.thermostat_hub_w200" icon="mdi:power" keepOpenOnSelect optionActiveColors={HVAC_MODE_ACTIVE_COLORS} optionIcons={HVAC_MODE_ICONS} optionLabels={HVAC_MODE_LABELS} optionsAttribute="hvac_modes" pickerSheetLayout="compact-grid" pickerSheetStyle={THERMOSTAT_COMPACT_PICKER_MODAL_STYLE} serviceKind="climate" title="Thermostat Hub Mode" />
+      <ThermostatSelectButton entityId="climate.thermostat_hub_w200" icon="mdi:power" keepOpenOnSelect optionActiveColors={HVAC_MODE_ACTIVE_COLORS} optionIcons={HVAC_MODE_ICONS} optionLabels={HVAC_MODE_LABELS} optionsAttribute="hvac_modes" pickerSheetLayout="compact-grid" serviceKind="climate" title="Thermostat Hub Mode" />
       <ThermostatSelectButton entityId="climate.thermostat_hub_w200" hideWhenEmpty icon="mdi:fan" optionsAttribute="fan_modes" selectedIcon="mdi:fan-check" serviceKind="climate-fan" title="Thermostat Hub Fan" valueAttribute="fan_mode" />
     </ThermostatGlassCard>
   )
@@ -6274,7 +6297,7 @@ function ThermostatModal({
     <ModalSheet
       backLabel={detail ? thermostatModalBackLabel(detail) : undefined}
       bodyElementRef={bodyElementRef}
-      contentStyle={THERMOSTAT_MODAL_STYLE}
+      centeredGeometry={THERMOSTAT_CENTERED_GEOMETRY}
       navigation={navigation}
       onBack={detail ? closeDetail : undefined}
       onClose={onClose}

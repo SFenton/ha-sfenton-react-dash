@@ -13,6 +13,16 @@
   gap: 0;
 }
 
+.summarySectionHeader {
+  gap: 10px;
+  margin: 8px 0;
+}
+
+.summarySectionHeader h2 {
+  font-size: 0.8rem;
+  font-weight: 720;
+}
+
 .picker {
   display: grid;
   gap: 14px;

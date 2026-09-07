@@ -45,3 +45,13 @@
     gap: 8px;
   }
 }
+
+:global([data-centered-layout='true']:is([data-modal-body-tier='standard'], [data-modal-body-tier='wide'])) .modalContent[data-modal-landscape-layout='section-grid'] {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+  gap: 12px;
+}
+
+:global([data-centered-layout='true']:is([data-modal-body-tier='standard'], [data-modal-body-tier='wide'])) .modalContent[data-modal-landscape-layout='section-grid'] > :last-child:nth-child(odd) {
+  grid-column: 1 / -1;
+}

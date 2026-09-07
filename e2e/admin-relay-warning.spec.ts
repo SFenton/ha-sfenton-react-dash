@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './layout/fixture'
 
 const WARNING_TEXT = 'Guest Room guest mode is active. Turning off Relay Control Mode keeps the Guest Room on direct wall control and Guest Bathroom presence lighting off. Turn off Guest Room in Guest Controls to restore normal behavior.'
 

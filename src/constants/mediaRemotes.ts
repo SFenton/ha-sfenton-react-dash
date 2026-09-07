@@ -1,6 +1,6 @@
+import { OFF, ON, UNAVAILABLE, UNAVAILABLE_STATES } from './haStates'
 import type { ControlSemanticsResolver } from '../components/core/controlSemantics'
 import { MEDIA_COPY_KEYS, MEDIA_COPY_NAMESPACE, copy } from '../i18n'
-import fortniteArtworkUrl from '../assets/apps/fortnite.jpg'
 import type { OptimisticActionMetadata, OptimisticStateIntent } from './actionIntents'
 
 type MediaRemoteServiceAction = {
@@ -46,12 +46,29 @@ export interface MediaRemoteAppConfig {
 
 export interface MediaRemoteDeviceConfig {
   action?: MediaRemoteAction
+  activeHoldMs?: number
+  activeHoldResetEntityIds?: readonly string[]
   activeStates?: readonly string[]
   entityId: string
   icon: string
   semantics?: ControlSemanticsResolver
+  stateEntityIds?: readonly string[]
   stateLabels?: Partial<Record<string, string>>
+  stateResolver?: MediaRemoteStateResolver
   title: string
+}
+
+export type MediaRemoteStateMap = Readonly<Record<string, string | undefined>>
+export type MediaRemoteStateResolver = (states: MediaRemoteStateMap) => string
+
+export interface MediaRemoteHueSyncConfig {
+  brightnessEntityId: string
+  hdmiInputEntityId: string
+  hdmiStatusEntityIds: readonly [string, string, string, string]
+  intensityEntityId: string
+  lightSyncEntityId: string
+  powerEntityId: string
+  syncModeEntityId: string
 }
 
 export interface MediaRemoteConfig {
@@ -64,10 +81,12 @@ export interface MediaRemoteConfig {
   hash: string
   hideKeyboardWhenOff?: boolean
   homeButton: MediaRemoteButtonConfig
+  hueSync?: MediaRemoteHueSyncConfig
   keyboardButton?: MediaRemoteButtonConfig
   leftButton: MediaRemoteButtonConfig
   mediaEntityId: string
   optimisticStateEntityIds?: readonly string[]
+  optimisticLiveChangeEntityIds?: readonly string[]
   pauseButton: MediaRemoteButtonConfig
   playButton: MediaRemoteButtonConfig
   powerButton: MediaRemoteButtonConfig
@@ -142,7 +161,21 @@ export const MUSIC_ROOM_XBOX_ENTITY_ID = 'media_player.xbox'
 export const MUSIC_ROOM_REMOTE_ENTITY_ID = 'remote.music_room_tv_android'
 export const MUSIC_ROOM_VOLUME_ENTITY_ID = 'media_player.beam'
 export const MUSIC_ROOM_MEDIA_SOURCE_ENTITY_ID = 'input_select.music_room_media_source'
-export const MUSIC_ROOM_FORTNITE_ARTWORK_URL = fortniteArtworkUrl
+export const MUSIC_ROOM_ACTIVE_MEDIA_SOURCE_ENTITY_ID = 'sensor.music_room_active_media_source'
+export const MUSIC_ROOM_XBOX_HDMI_STATUS_ENTITY_ID = 'sensor.music_room_music_room_sync_box_hdmi1_status'
+export const MUSIC_ROOM_HUE_SYNC_POWER_ENTITY_ID = 'switch.music_room_music_room_sync_box_power'
+export const MUSIC_ROOM_HUE_SYNC_LIGHT_SYNC_ENTITY_ID = 'switch.music_room_music_room_sync_box_light_sync'
+export const MUSIC_ROOM_HUE_SYNC_BRIGHTNESS_ENTITY_ID = 'number.music_room_music_room_sync_box_brightness'
+export const MUSIC_ROOM_HUE_SYNC_HDMI_INPUT_ENTITY_ID = 'select.music_room_music_room_sync_box_hdmi_input'
+export const MUSIC_ROOM_HUE_SYNC_MODE_ENTITY_ID = 'select.music_room_music_room_sync_box_sync_mode'
+export const MUSIC_ROOM_HUE_SYNC_INTENSITY_ENTITY_ID = 'select.music_room_music_room_sync_box_intensity'
+export const MUSIC_ROOM_HUE_SYNC_HDMI_STATUS_ENTITY_IDS = [
+  MUSIC_ROOM_XBOX_HDMI_STATUS_ENTITY_ID,
+  'sensor.music_room_music_room_sync_box_hdmi2_status',
+  'sensor.music_room_music_room_sync_box_hdmi3_status',
+  'sensor.music_room_music_room_sync_box_hdmi4_status',
+] as const
+export const MUSIC_ROOM_FORTNITE_ARTWORK_URL = new URL('../assets/apps/fortnite.jpg', import.meta.url).href
 export const MUSIC_ROOM_MEDIA_SOURCE_STATES = {
   fortnite: 'Fortnite',
   off: 'Off',
@@ -158,12 +191,51 @@ export const MUSIC_ROOM_COMMAND_REVERT_MS = {
   xbox: 90_000,
 } as const
 
+export const MUSIC_ROOM_XBOX_ACTIVE_HOLD_MS = 45_000
+export const MUSIC_ROOM_XBOX_OFF_REVERT_MS = 180_000
+export const HUE_SYNC_OPTIMISTIC_REVERT_MS = 8_000
 export const MUSIC_ROOM_XBOX_ACTIVE_STATES = ['on', 'playing', 'paused'] as const
+const MUSIC_ROOM_XBOX_HDMI_LINKED = { state: 'linked' } as const
 export const MUSIC_ROOM_MEDIA_OPTIMISTIC_ENTITY_IDS = [
-  MUSIC_ROOM_MEDIA_SOURCE_ENTITY_ID,
+  MUSIC_ROOM_ACTIVE_MEDIA_SOURCE_ENTITY_ID,
   MUSIC_ROOM_CONTROL_ENTITY_ID,
   MUSIC_ROOM_XBOX_ENTITY_ID,
+  MUSIC_ROOM_XBOX_HDMI_STATUS_ENTITY_ID,
+  MUSIC_ROOM_HUE_SYNC_POWER_ENTITY_ID,
+  MUSIC_ROOM_HUE_SYNC_LIGHT_SYNC_ENTITY_ID,
+  MUSIC_ROOM_HUE_SYNC_HDMI_INPUT_ENTITY_ID,
 ] as const
+export const MUSIC_ROOM_MEDIA_LIVE_CHANGE_OPTIMISTIC_ENTITY_IDS = [MUSIC_ROOM_ACTIVE_MEDIA_SOURCE_ENTITY_ID] as const
+export const MUSIC_ROOM_HUE_SYNC_OPTIMISTIC_ENTITY_IDS = [
+  MUSIC_ROOM_HUE_SYNC_POWER_ENTITY_ID,
+  MUSIC_ROOM_HUE_SYNC_LIGHT_SYNC_ENTITY_ID,
+  MUSIC_ROOM_HUE_SYNC_BRIGHTNESS_ENTITY_ID,
+  MUSIC_ROOM_HUE_SYNC_HDMI_INPUT_ENTITY_ID,
+  MUSIC_ROOM_HUE_SYNC_MODE_ENTITY_ID,
+  MUSIC_ROOM_HUE_SYNC_INTENSITY_ENTITY_ID,
+] as const
+export const MUSIC_ROOM_REMOTE_OPTIMISTIC_ENTITY_IDS = [
+  ...MUSIC_ROOM_MEDIA_OPTIMISTIC_ENTITY_IDS,
+  ...MUSIC_ROOM_HUE_SYNC_OPTIMISTIC_ENTITY_IDS,
+] as const
+
+export const musicRoomXboxState: MediaRemoteStateResolver = (states) => {
+  const cloudState = states[MUSIC_ROOM_XBOX_ENTITY_ID]
+  const hdmiState = states[MUSIC_ROOM_XBOX_HDMI_STATUS_ENTITY_ID]
+  const tvState = states[MUSIC_ROOM_CONTROL_ENTITY_ID]
+  const powerState = states[MUSIC_ROOM_HUE_SYNC_POWER_ENTITY_ID]
+  const inputState = states[MUSIC_ROOM_HUE_SYNC_HDMI_INPUT_ENTITY_ID]
+  const cloudActive = MUSIC_ROOM_XBOX_ACTIVE_STATES.some((activeState) => activeState === cloudState)
+  const linkedOnActivePath = tvState
+    && tvState !== OFF
+    && !UNAVAILABLE_STATES.some((unavailableState) => unavailableState === tvState)
+    && powerState === ON
+    && inputState?.endsWith(' 1')
+    && hdmiState === MUSIC_ROOM_XBOX_HDMI_LINKED.state
+  if (cloudActive || linkedOnActivePath) return ON
+  if ([cloudState, hdmiState, tvState, powerState, inputState].some((state) => state && !UNAVAILABLE_STATES.some((unavailableState) => unavailableState === state))) return OFF
+  return UNAVAILABLE
+}
 
 function optimisticIntent(entityId: string, value: string, revertMs: number): OptimisticStateIntent {
   return { entityId, revertMs, value }
@@ -171,53 +243,77 @@ function optimisticIntent(entityId: string, value: string, revertMs: number): Op
 
 const musicRoomTvOnAction = service('script', 'music_room_tv', undefined, undefined, [
   optimisticIntent(MUSIC_ROOM_CONTROL_ENTITY_ID, 'on', MUSIC_ROOM_COMMAND_REVERT_MS.tv),
-  optimisticIntent(MUSIC_ROOM_MEDIA_SOURCE_ENTITY_ID, MUSIC_ROOM_MEDIA_SOURCE_STATES.tv, MUSIC_ROOM_COMMAND_REVERT_MS.tv),
+  optimisticIntent(MUSIC_ROOM_ACTIVE_MEDIA_SOURCE_ENTITY_ID, MUSIC_ROOM_MEDIA_SOURCE_STATES.tv, MUSIC_ROOM_COMMAND_REVERT_MS.tv),
+  optimisticIntent(MUSIC_ROOM_HUE_SYNC_POWER_ENTITY_ID, ON, MUSIC_ROOM_COMMAND_REVERT_MS.tv),
+  optimisticIntent(MUSIC_ROOM_HUE_SYNC_LIGHT_SYNC_ENTITY_ID, OFF, MUSIC_ROOM_COMMAND_REVERT_MS.tv),
 ])
 const musicRoomTvOffAction = service('script', 'music_room_tv_off', undefined, undefined, [
-  optimisticIntent(MUSIC_ROOM_CONTROL_ENTITY_ID, 'off', MUSIC_ROOM_COMMAND_REVERT_MS.tv),
-  optimisticIntent(MUSIC_ROOM_MEDIA_SOURCE_ENTITY_ID, MUSIC_ROOM_MEDIA_SOURCE_STATES.off, MUSIC_ROOM_COMMAND_REVERT_MS.tv),
+  optimisticIntent(MUSIC_ROOM_CONTROL_ENTITY_ID, 'off', MUSIC_ROOM_XBOX_OFF_REVERT_MS),
+  optimisticIntent(MUSIC_ROOM_ACTIVE_MEDIA_SOURCE_ENTITY_ID, MUSIC_ROOM_MEDIA_SOURCE_STATES.off, MUSIC_ROOM_XBOX_OFF_REVERT_MS),
+  optimisticIntent(MUSIC_ROOM_XBOX_ENTITY_ID, OFF, MUSIC_ROOM_XBOX_OFF_REVERT_MS),
+  optimisticIntent(MUSIC_ROOM_HUE_SYNC_POWER_ENTITY_ID, OFF, MUSIC_ROOM_XBOX_OFF_REVERT_MS),
+  optimisticIntent(MUSIC_ROOM_HUE_SYNC_LIGHT_SYNC_ENTITY_ID, OFF, MUSIC_ROOM_XBOX_OFF_REVERT_MS),
 ])
 const musicRoomXboxOnAction = service('script', 'music_room_xbox', undefined, undefined, [
   optimisticIntent(MUSIC_ROOM_XBOX_ENTITY_ID, 'on', MUSIC_ROOM_COMMAND_REVERT_MS.xbox),
   optimisticIntent(MUSIC_ROOM_CONTROL_ENTITY_ID, 'on', MUSIC_ROOM_COMMAND_REVERT_MS.xbox),
-  optimisticIntent(MUSIC_ROOM_MEDIA_SOURCE_ENTITY_ID, MUSIC_ROOM_MEDIA_SOURCE_STATES.xbox, MUSIC_ROOM_COMMAND_REVERT_MS.xbox),
+  optimisticIntent(MUSIC_ROOM_ACTIVE_MEDIA_SOURCE_ENTITY_ID, MUSIC_ROOM_MEDIA_SOURCE_STATES.xbox, MUSIC_ROOM_COMMAND_REVERT_MS.xbox),
+  optimisticIntent(MUSIC_ROOM_HUE_SYNC_POWER_ENTITY_ID, ON, MUSIC_ROOM_COMMAND_REVERT_MS.xbox),
+  optimisticIntent(MUSIC_ROOM_HUE_SYNC_LIGHT_SYNC_ENTITY_ID, OFF, MUSIC_ROOM_COMMAND_REVERT_MS.xbox),
+  optimisticIntent(MUSIC_ROOM_HUE_SYNC_HDMI_INPUT_ENTITY_ID, 'HDMI 1', MUSIC_ROOM_COMMAND_REVERT_MS.xbox),
 ])
 const musicRoomXboxOffAction = service(
   'script',
   'music_room_xbox_off',
   undefined,
   undefined,
-  [optimisticIntent(MUSIC_ROOM_XBOX_ENTITY_ID, 'off', MUSIC_ROOM_COMMAND_REVERT_MS.xbox)],
-  [{
-    entityId: MUSIC_ROOM_MEDIA_SOURCE_ENTITY_ID,
-    values: [MUSIC_ROOM_MEDIA_SOURCE_STATES.xbox, MUSIC_ROOM_MEDIA_SOURCE_STATES.fortnite],
-  }],
+  [
+    optimisticIntent(MUSIC_ROOM_XBOX_ENTITY_ID, OFF, MUSIC_ROOM_XBOX_OFF_REVERT_MS),
+    optimisticIntent(MUSIC_ROOM_XBOX_HDMI_STATUS_ENTITY_ID, 'plugged', MUSIC_ROOM_XBOX_OFF_REVERT_MS),
+  ],
 )
+const musicRoomServerOnAction = service('script', 'music_room_server', undefined, undefined, [
+  optimisticIntent(MUSIC_ROOM_CONTROL_ENTITY_ID, 'on', MUSIC_ROOM_COMMAND_REVERT_MS.server),
+  optimisticIntent(MUSIC_ROOM_ACTIVE_MEDIA_SOURCE_ENTITY_ID, MUSIC_ROOM_MEDIA_SOURCE_STATES.server, MUSIC_ROOM_COMMAND_REVERT_MS.server),
+  optimisticIntent(MUSIC_ROOM_HUE_SYNC_POWER_ENTITY_ID, ON, MUSIC_ROOM_COMMAND_REVERT_MS.server),
+  optimisticIntent(MUSIC_ROOM_HUE_SYNC_LIGHT_SYNC_ENTITY_ID, OFF, MUSIC_ROOM_COMMAND_REVERT_MS.server),
+  optimisticIntent(MUSIC_ROOM_HUE_SYNC_HDMI_INPUT_ENTITY_ID, 'HDMI 2', MUSIC_ROOM_COMMAND_REVERT_MS.server),
+])
 
 export const MUSIC_ROOM_MEDIA_ACTIONS = {
   fortnite: service('script', 'music_room_fortnite', undefined, undefined, [
     optimisticIntent(MUSIC_ROOM_XBOX_ENTITY_ID, 'on', MUSIC_ROOM_COMMAND_REVERT_MS.fortnite),
     optimisticIntent(MUSIC_ROOM_CONTROL_ENTITY_ID, 'on', MUSIC_ROOM_COMMAND_REVERT_MS.fortnite),
-    optimisticIntent(MUSIC_ROOM_MEDIA_SOURCE_ENTITY_ID, MUSIC_ROOM_MEDIA_SOURCE_STATES.fortnite, MUSIC_ROOM_COMMAND_REVERT_MS.fortnite),
+    optimisticIntent(MUSIC_ROOM_ACTIVE_MEDIA_SOURCE_ENTITY_ID, MUSIC_ROOM_MEDIA_SOURCE_STATES.fortnite, MUSIC_ROOM_COMMAND_REVERT_MS.fortnite),
+    optimisticIntent(MUSIC_ROOM_HUE_SYNC_POWER_ENTITY_ID, ON, MUSIC_ROOM_COMMAND_REVERT_MS.fortnite),
+    optimisticIntent(MUSIC_ROOM_HUE_SYNC_LIGHT_SYNC_ENTITY_ID, ON, MUSIC_ROOM_COMMAND_REVERT_MS.fortnite),
+    optimisticIntent(MUSIC_ROOM_HUE_SYNC_HDMI_INPUT_ENTITY_ID, 'HDMI 1', MUSIC_ROOM_COMMAND_REVERT_MS.fortnite),
   ]),
-  server: service('script', 'music_room_server', undefined, undefined, [
-    optimisticIntent(MUSIC_ROOM_CONTROL_ENTITY_ID, 'on', MUSIC_ROOM_COMMAND_REVERT_MS.server),
-    optimisticIntent(MUSIC_ROOM_MEDIA_SOURCE_ENTITY_ID, MUSIC_ROOM_MEDIA_SOURCE_STATES.server, MUSIC_ROOM_COMMAND_REVERT_MS.server),
-  ]),
+  serverToggle: {
+    type: 'state',
+    entityId: MUSIC_ROOM_ACTIVE_MEDIA_SOURCE_ENTITY_ID,
+    cases: [{ states: [MUSIC_ROOM_MEDIA_SOURCE_STATES.server], action: musicRoomTvOffAction }],
+    defaultAction: musicRoomServerOnAction,
+  },
   tvToggle: {
     type: 'state',
     entityId: MUSIC_ROOM_CONTROL_ENTITY_ID,
     cases: [{ states: ['off', 'unavailable', 'unknown'], action: musicRoomTvOnAction }],
     defaultAction: musicRoomTvOffAction,
   },
-  xboxSource: musicRoomXboxOnAction,
+  xboxSourceToggle: {
+    type: 'state',
+    entityId: MUSIC_ROOM_ACTIVE_MEDIA_SOURCE_ENTITY_ID,
+    cases: [{ states: [MUSIC_ROOM_MEDIA_SOURCE_STATES.xbox, MUSIC_ROOM_MEDIA_SOURCE_STATES.fortnite], action: musicRoomTvOffAction }],
+    defaultAction: musicRoomXboxOnAction,
+  },
   xboxToggle: {
     type: 'state',
     entityId: MUSIC_ROOM_XBOX_ENTITY_ID,
-    cases: [{ states: [...MUSIC_ROOM_XBOX_ACTIVE_STATES], action: musicRoomXboxOffAction }],
+    cases: [{ states: [...MUSIC_ROOM_XBOX_ACTIVE_STATES, MUSIC_ROOM_XBOX_HDMI_LINKED.state], action: musicRoomXboxOffAction }],
     defaultAction: musicRoomXboxOnAction,
   },
-} satisfies Record<'fortnite' | 'server' | 'tvToggle' | 'xboxSource' | 'xboxToggle', MediaRemoteAction>
+} satisfies Record<'fortnite' | 'serverToggle' | 'tvToggle' | 'xboxSourceToggle' | 'xboxToggle', MediaRemoteAction>
 
 const musicRoomPowerAction = MUSIC_ROOM_MEDIA_ACTIONS.tvToggle
 
@@ -240,11 +336,12 @@ const musicRoomServerSemantics: ControlSemanticsResolver = (state) => ({
 
 const stateSemantics: ControlSemanticsResolver = () => ({ kind: 'state' })
 
-export function musicRoomSourceLabels(activeState: string) {
+export function musicRoomSourceLabels(activeState: string | readonly string[]) {
+  const activeStates = Array.isArray(activeState) ? activeState : [activeState]
   return Object.fromEntries(
     Object.values(MUSIC_ROOM_MEDIA_SOURCE_STATES).map((state) => [
       state,
-      copy('common', state === activeState ? 'states.on' : 'states.off'),
+      copy('common', activeStates.includes(state) ? 'states.on' : 'states.off'),
     ]),
   )
 }
@@ -364,13 +461,23 @@ export const MEDIA_REMOTE_CONFIGS: Record<string, MediaRemoteConfig> = {
     remoteTitle: copy(MEDIA_COPY_NAMESPACE, MEDIA_COPY_KEYS.musicRoom.remote),
     mediaEntityId: MUSIC_ROOM_CONTROL_ENTITY_ID,
     controlEntityId: MUSIC_ROOM_CONTROL_ENTITY_ID,
-    optimisticStateEntityIds: MUSIC_ROOM_MEDIA_OPTIMISTIC_ENTITY_IDS,
+    optimisticStateEntityIds: MUSIC_ROOM_REMOTE_OPTIMISTIC_ENTITY_IDS,
+    optimisticLiveChangeEntityIds: MUSIC_ROOM_MEDIA_LIVE_CHANGE_OPTIMISTIC_ENTITY_IDS,
+    hueSync: {
+      brightnessEntityId: MUSIC_ROOM_HUE_SYNC_BRIGHTNESS_ENTITY_ID,
+      hdmiInputEntityId: MUSIC_ROOM_HUE_SYNC_HDMI_INPUT_ENTITY_ID,
+      hdmiStatusEntityIds: MUSIC_ROOM_HUE_SYNC_HDMI_STATUS_ENTITY_IDS,
+      intensityEntityId: MUSIC_ROOM_HUE_SYNC_INTENSITY_ENTITY_ID,
+      lightSyncEntityId: MUSIC_ROOM_HUE_SYNC_LIGHT_SYNC_ENTITY_ID,
+      powerEntityId: MUSIC_ROOM_HUE_SYNC_POWER_ENTITY_ID,
+      syncModeEntityId: MUSIC_ROOM_HUE_SYNC_MODE_ENTITY_ID,
+    },
     appSectionTitle: copy(MEDIA_COPY_NAMESPACE, MEDIA_COPY_KEYS.musicRoom.quickAppLaunch),
     appCards: [{
       title: copy(MEDIA_COPY_NAMESPACE, MEDIA_COPY_KEYS.musicRoom.fortnite),
       icon: 'mdi:gamepad-variant',
       imageUrl: MUSIC_ROOM_FORTNITE_ARTWORK_URL,
-      stateEntityId: MUSIC_ROOM_MEDIA_SOURCE_ENTITY_ID,
+      stateEntityId: MUSIC_ROOM_ACTIVE_MEDIA_SOURCE_ENTITY_ID,
       activeStates: [MUSIC_ROOM_MEDIA_SOURCE_STATES.fortnite],
       semantics: musicRoomFortniteSemantics,
       action: MUSIC_ROOM_MEDIA_ACTIONS.fortnite,
@@ -409,18 +516,33 @@ export const MEDIA_REMOTE_CONFIGS: Record<string, MediaRemoteConfig> = {
         title: copy(MEDIA_COPY_NAMESPACE, MEDIA_COPY_KEYS.musicRoom.xbox),
         entityId: MUSIC_ROOM_XBOX_ENTITY_ID,
         icon: 'mdi:microsoft-xbox',
-        activeStates: MUSIC_ROOM_XBOX_ACTIVE_STATES,
+        activeHoldMs: MUSIC_ROOM_XBOX_ACTIVE_HOLD_MS,
+        activeHoldResetEntityIds: [
+          MUSIC_ROOM_CONTROL_ENTITY_ID,
+          MUSIC_ROOM_HUE_SYNC_POWER_ENTITY_ID,
+          MUSIC_ROOM_HUE_SYNC_HDMI_INPUT_ENTITY_ID,
+          MUSIC_ROOM_ACTIVE_MEDIA_SOURCE_ENTITY_ID,
+        ],
+        activeStates: ['on'],
         semantics: musicRoomXboxPowerSemantics,
+        stateEntityIds: [
+          MUSIC_ROOM_XBOX_ENTITY_ID,
+          MUSIC_ROOM_XBOX_HDMI_STATUS_ENTITY_ID,
+          MUSIC_ROOM_CONTROL_ENTITY_ID,
+          MUSIC_ROOM_HUE_SYNC_POWER_ENTITY_ID,
+          MUSIC_ROOM_HUE_SYNC_HDMI_INPUT_ENTITY_ID,
+        ],
+        stateResolver: musicRoomXboxState,
         action: MUSIC_ROOM_MEDIA_ACTIONS.xboxToggle,
       },
       {
         title: copy(MEDIA_COPY_NAMESPACE, MEDIA_COPY_KEYS.musicRoom.server),
-        entityId: MUSIC_ROOM_MEDIA_SOURCE_ENTITY_ID,
+        entityId: MUSIC_ROOM_ACTIVE_MEDIA_SOURCE_ENTITY_ID,
         icon: 'mdi:server',
         activeStates: [MUSIC_ROOM_MEDIA_SOURCE_STATES.server],
         stateLabels: musicRoomSourceLabels(MUSIC_ROOM_MEDIA_SOURCE_STATES.server),
         semantics: musicRoomServerSemantics,
-        action: MUSIC_ROOM_MEDIA_ACTIONS.server,
+        action: MUSIC_ROOM_MEDIA_ACTIONS.serverToggle,
       },
       {
         title: copy(MEDIA_COPY_NAMESPACE, MEDIA_COPY_KEYS.musicRoom.sonosBeam),

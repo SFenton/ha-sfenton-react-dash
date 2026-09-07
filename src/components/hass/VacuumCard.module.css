@@ -862,6 +862,22 @@
   }
 }
 
+:global([data-modal-presentation='landscape-dialog'][data-landscape-density='compact'][data-modal-body-tier='wide']) .modalBody:not(.areaEditorModalBody) {
+  grid-template-columns: minmax(300px, 1.15fr) minmax(330px, 0.85fr);
+  grid-template-rows: auto;
+  height: auto;
+  gap: 12px;
+  overflow: visible;
+}
+
+:global([data-modal-presentation='landscape-dialog'][data-landscape-density='compact'][data-modal-body-tier='wide']) .leftPane:not(.areaEditorPane),
+:global([data-modal-presentation='landscape-dialog'][data-landscape-density='compact'][data-modal-body-tier='wide']) .rightPane {
+  height: auto;
+  min-height: 0;
+  max-height: none;
+  overflow: visible;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .rightPane {
     transition: none;

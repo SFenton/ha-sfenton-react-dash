@@ -30,7 +30,7 @@ export const WEATHER_HOURLY_MODES: readonly ModalTabDefinition<WeatherHourlyMode
   },
 ]
 
-export type MediaRemoteModalTab = 'controls' | 'apps' | 'devices'
+export type MediaRemoteModalTab = 'controls' | 'apps' | 'devices' | 'hueSync'
 
 export const CONTROLS_MEDIA_REMOTE_MODAL_TAB: ModalTabDefinition<MediaRemoteModalTab> = {
   description: 'Keeps power and the directional pad visible, then adds volume, navigation, keyboard, and playback controls.',
@@ -58,16 +58,25 @@ export const DEVICES_MEDIA_REMOTE_MODAL_TAB: ModalTabDefinition<MediaRemoteModal
   tab: 'devices',
 }
 
+export const HUE_SYNC_MEDIA_REMOTE_MODAL_TAB: ModalTabDefinition<MediaRemoteModalTab> = {
+  description: copy(MEDIA_COPY_NAMESPACE, MEDIA_COPY_KEYS.remoteTabs.hueSyncDescription),
+  icon: 'mdi:lightbulb-multiple',
+  label: copy(MEDIA_COPY_NAMESPACE, MEDIA_COPY_KEYS.hueSync.tab),
+  tab: 'hueSync',
+}
+
 export const MEDIA_REMOTE_MODAL_TABS: readonly ModalTabDefinition<MediaRemoteModalTab>[] = [
   ...BASE_MEDIA_REMOTE_MODAL_TABS,
   DEVICES_MEDIA_REMOTE_MODAL_TAB,
+  HUE_SYNC_MEDIA_REMOTE_MODAL_TAB,
 ]
 
-export function mediaRemoteModalTabs(showApps: boolean, showDevices: boolean) {
+export function mediaRemoteModalTabs(showApps: boolean, showDevices: boolean, showHueSync = false) {
   return [
     CONTROLS_MEDIA_REMOTE_MODAL_TAB,
     ...(showApps ? [APPS_MEDIA_REMOTE_MODAL_TAB] : []),
     ...(showDevices ? [DEVICES_MEDIA_REMOTE_MODAL_TAB] : []),
+    ...(showHueSync ? [HUE_SYNC_MEDIA_REMOTE_MODAL_TAB] : []),
   ]
 }
 

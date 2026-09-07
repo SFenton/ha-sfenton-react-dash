@@ -1,4 +1,4 @@
-import { expect, test, type CDPSession, type Page } from '@playwright/test'
+import { expect, test, type CDPSession, type Page } from './layout/fixture'
 import {
   assertAnimatedDesktopModalOpen,
   assertAnimatedModalOpen,
@@ -31,7 +31,9 @@ async function accelerateModalExit(page: Page) {
   await page.addStyleTag({
     content: `
       [data-surface="hass-popup"][data-ending-style],
-      [data-modal-sheet-overlay][data-ending-style] {
+      [data-surface="hass-popup"][data-closing="true"],
+      [data-modal-sheet-overlay][data-ending-style],
+      [data-modal-sheet-overlay][data-closing="true"] {
         transition-duration: 40ms !important;
       }
     `,
@@ -105,7 +107,7 @@ test.describe('thermostat modal close lifecycle', () => {
     assertAnimatedModalOpen(trace)
   })
 
-  test('keeps the accelerated closed pose terminal through the mounted exit window', async ({ page }) => {
+  test('keeps the accelerated closed pose terminal through the mounted exit window', async ({ page }, testInfo) => {
     const { dialog } = await openThermostatAdvancedControls(page)
     await accelerateModalExit(page)
     await startModalLifecycleProbe(page)
@@ -114,6 +116,10 @@ test.describe('thermostat modal close lifecycle', () => {
     await page.waitForTimeout(650)
 
     const trace = await readModalLifecycleProbe(page)
+    await testInfo.attach('modal-lifecycle.json', {
+      body: Buffer.from(JSON.stringify(trace)),
+      contentType: 'application/json',
+    })
     expect(trace.historyReplaceCount).toBe(1)
     expect(trace.frames.some((frame) => frame.animations.length > 0)).toBe(true)
     expect(observedAddedAttribute(trace, 'data-ending-style')).toBe(true)

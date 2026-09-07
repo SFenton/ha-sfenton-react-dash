@@ -1,5 +1,5 @@
 import { useHass, useUser } from '@hakit/core'
-import type { ModalSheetStyle } from '../core/ModalSheet'
+import type { ModalCenteredGeometry, ModalSheetStyle } from '../core/ModalSheet'
 import type { EverShelfInventoryControls } from './EverShelfInventoryControls'
 import {
   EVERSHELF_EXPIRED_ITEMS_ENTITY_ID,
@@ -16,10 +16,14 @@ import { useDashboardUrl } from '../../hooks/useDashboardUrl'
 export const DAILY_REPORT_EXPIRED_FOOD_SCOPE = 'daily-report-expired-food'
 
 export const DAILY_REPORT_MODAL_STYLE: ModalSheetStyle = {
-  '--modal-desktop-height': 'min(760px, calc(var(--dashboard-visible-height, var(--dashboard-viewport-height, 100dvh)) - 64px))',
-  '--modal-desktop-max-width': '620px',
-  '--modal-desktop-width': '620px',
+  '--modal-title-font-size': '1rem',
 }
+export const DAILY_REPORT_CENTERED_GEOMETRY = {
+  blockPolicy: 'fixed',
+  blockSize: '620px',
+  id: 'daily-report',
+  inlineSize: '720px',
+} satisfies ModalCenteredGeometry
 
 export interface DailyReportContext {
   /** Overdue chores plus expired food; upcoming chores are deliberately excluded. */

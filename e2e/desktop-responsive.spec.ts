@@ -1,4 +1,4 @@
-import { expect, test, type Locator, type Page } from '@playwright/test'
+import { expect, test, type Locator, type Page } from './layout/fixture'
 import { NINE_ROOM_VACUUM_OUTCOME_CONTRACT } from '../src/test/fixtures/vacuumOutcomes'
 import { RESPONSIVE_ROUTES, RESPONSIVE_ROUTE_TITLES } from './responsive-acceptance-data'
 
@@ -131,10 +131,115 @@ test('permanent navigation and modal controls retain keyboard focus indicators',
   await page.keyboard.press('Enter')
   const dialog = page.getByRole('dialog', { name: 'Quick Links' })
   await expect(dialog).toBeVisible()
+  await expect.poll(() => dialog.getByRole('group', { name: 'Quick Links', exact: true }).evaluate((grid) => {
+    const gridRect = grid.getBoundingClientRect()
+    const bodyRect = grid.parentElement?.getBoundingClientRect()
+    const buttons = Array.from(grid.querySelectorAll('button'))
+    return {
+      centered: Boolean(bodyRect && Math.abs(
+        (gridRect.left + gridRect.right) / 2 - (bodyRect.left + bodyRect.right) / 2,
+      ) <= 1),
+      columns: Number(grid.getAttribute('data-dynamic-grid-columns')),
+      compactTiles: buttons.every((button) => {
+        const rect = button.getBoundingClientRect()
+        return rect.width <= grid.clientWidth + 1 && Math.round(rect.height) === 88
+      }),
+      contentFits: buttons.every((button) =>
+        button.scrollWidth <= button.clientWidth + 1
+        && button.scrollHeight <= button.clientHeight + 1),
+    }
+  })).toEqual({
+    centered: true,
+    columns: 4,
+    compactTiles: true,
+    contentFits: true,
+  })
   const close = dialog.getByRole('button', { name: 'Close' })
   await close.focus()
   await expect(close).toBeFocused()
   await expect.poll(() => visibleFocusIndicator(close)).toBe(true)
+})
+
+test('Daily Summary uses compact two-column rows in a fine-pointer desktop context', async ({ page }) => {
+  await page.goto('/index.html?path=overview&user=stephen#daily-report')
+  await expect.poll(() => page.evaluate(() => ({
+    coarse: window.matchMedia('(pointer: coarse)').matches,
+    hover: window.matchMedia('(hover: hover)').matches,
+  }))).toEqual({ coarse: false, hover: true })
+
+  const dialog = page.getByRole('dialog', { name: "Stephen's Summary" })
+  await expect(dialog).toBeVisible()
+  await expect(dialog).toHaveAttribute('data-modal-body-tier', 'standard')
+  await expect(dialog.locator('h2').first()).toHaveCSS('font-size', '16px')
+  const dialogBox = await dialog.boundingBox()
+  expect(Math.round(dialogBox?.width ?? 0)).toBe(1100)
+  expect(Math.round(dialogBox?.height ?? 0)).toBe(760)
+  await expect(dialog.locator('[data-modal-content-measure="true"]')).toHaveCSS('width', '670px')
+
+  const todoList = dialog.getByLabel('Overdue Chores todo list')
+  await expect(todoList.locator('li')).toHaveCount(2)
+  expect(await todoList.locator('li').evaluateAll((rows) =>
+    new Set(rows.map((row) => Math.round(row.getBoundingClientRect().left))).size,
+  )).toBe(2)
+  await expect(todoList.locator('strong').first()).toHaveCSS('font-size', '13.12px')
+
+  await dialog.getByRole('tab', { name: /^Expired Food/ }).click()
+  const expiredRows = dialog.locator('[data-expiry-tone="expired"]')
+  await expect(expiredRows).toHaveCount(2)
+  expect(await expiredRows.evaluateAll((rows) =>
+    new Set(rows.map((row) => Math.round(row.getBoundingClientRect().left))).size,
+  )).toBe(2)
+  await expect(expiredRows.locator('strong').first()).toHaveCSS('font-size', '13.12px')
+})
+
+test('centered modal geometry stays fixed through details in a fine-pointer desktop context', async ({ page }) => {
+  await page.goto('/index.html?path=overview')
+  await expect.poll(() => page.evaluate(() => ({
+    coarse: window.matchMedia('(pointer: coarse)').matches,
+    hover: window.matchMedia('(hover: hover)').matches,
+  }))).toEqual({ coarse: false, hover: true })
+
+  await page.getByRole('button', { name: 'Quick Links' }).click()
+  let dialog = page.getByRole('dialog', { name: 'Quick Links' })
+  const quickGeometry = await dialog.evaluate((element) => {
+    const rect = element.getBoundingClientRect()
+    return {
+      height: rect.height,
+      intent: element.dataset.modalGeometryIntent,
+      width: rect.width,
+    }
+  })
+  await dialog.getByRole('button', { name: 'Rooms' }).click()
+  dialog = page.getByRole('dialog', { name: 'Rooms' })
+  await expect.poll(() => dialog.evaluate((element) => {
+    const rect = element.getBoundingClientRect()
+    return {
+      height: rect.height,
+      intent: element.dataset.modalGeometryIntent,
+      width: rect.width,
+    }
+  })).toEqual(quickGeometry)
+
+  await page.goto('/index.html?path=sprinklers')
+  await page.getByRole('button', { name: /Front Yard Auto/i }).click()
+  dialog = page.getByRole('dialog')
+  const sprinklerGeometry = await dialog.evaluate((element) => {
+    const rect = element.getBoundingClientRect()
+    return {
+      height: rect.height,
+      intent: element.dataset.modalGeometryIntent,
+      width: rect.width,
+    }
+  })
+  await dialog.getByRole('button', { name: 'Water now · Front Yard' }).click()
+  await expect.poll(() => dialog.evaluate((element) => {
+    const rect = element.getBoundingClientRect()
+    return {
+      height: rect.height,
+      intent: element.dataset.modalGeometryIntent,
+      width: rect.width,
+    }
+  })).toEqual(sprinklerGeometry)
 })
 
 test('music room focused map omits scope controls in a fine-pointer desktop context', async ({ page }) => {
@@ -188,25 +293,37 @@ test('Music Room media controls remain usable in a fine-pointer desktop context'
     await expect(root.getByRole('button', { name: 'Music Room Remote Off' })).toBeVisible()
     await expect(root.getByRole('button', { name: 'Xbox Off' })).toHaveAttribute('data-action-kind', 'selection')
     await expect(root.getByRole('button', { name: 'Server Off' })).toHaveAttribute('data-action-kind', 'selection')
-    const fortnite = root.getByRole('button', { name: 'Fortnite' })
-    await expect(fortnite).toHaveAttribute('aria-pressed', 'false')
-    await expect.poll(() => fortnite.locator('img').evaluate((image: HTMLImageElement) => image.complete && image.naturalWidth > 0)).toBe(true)
+    await expect(root.getByRole('button', { name: 'Fortnite' })).toHaveCount(0)
 
-    await root.getByRole('button', { name: 'Music Room Remote Off' }).click()
+    await page.evaluate(() => {
+      const mock = (window as unknown as { __mockHass: { setEntityState: (entityId: string, state: string) => void } }).__mockHass
+      mock.setEntityState('media_player.music_room_tv_android', 'on')
+      mock.setEntityState('media_player.xbox', 'off')
+      mock.setEntityState('switch.music_room_music_room_sync_box_power', 'on')
+      mock.setEntityState('select.music_room_music_room_sync_box_hdmi_input', 'HDMI 1')
+      mock.setEntityState('sensor.music_room_music_room_sync_box_hdmi1_status', 'linked')
+    })
+    await root.getByRole('button', { name: /^Music Room Remote / }).click()
     const dialog = page.getByRole('dialog', { name: 'Music Room Remote' })
     await expect(dialog).toBeVisible()
     await expect(dialog.getByRole('heading', { name: 'Sonos Beam Volume' })).toBeVisible()
     await dialog.getByRole('tab', { name: 'Devices' }).click()
-    await expect(dialog.getByRole('switch', { name: 'TV Off' })).toBeVisible()
-    await expect(dialog.getByRole('switch', { name: 'Xbox Off' })).toBeVisible()
+    await expect(dialog.getByRole('switch', { name: 'TV On' })).toBeVisible()
+    await expect(dialog.getByRole('switch', { name: 'Xbox On' })).toBeVisible()
     await expect(dialog.getByRole('button', { name: 'Server Off' })).toHaveAttribute('aria-pressed', 'false')
     await expect(dialog.getByLabel('Sonos Beam Playing')).toHaveAttribute('data-action-kind', 'state')
+    await dialog.getByRole('tab', { name: 'Hue Sync' }).click()
+    await expect(dialog.getByRole('switch', { name: 'Sync Box Power On' })).toBeVisible()
+    await expect(dialog.getByRole('button', { name: 'Music' })).toHaveAttribute('aria-pressed', 'true')
+    await expect(dialog.getByRole('button', { name: 'High' })).toHaveAttribute('aria-pressed', 'true')
+    await expect(dialog.getByRole('button', { name: /^HDMI 1 Selected • / })).toBeVisible()
+    await expect(dialog.getByText('Entertainment Stream')).toHaveCount(0)
     expect(await dialog.evaluate((element) => element.scrollWidth - element.clientWidth)).toBeLessThanOrEqual(0)
     await dialog.getByRole('button', { name: 'Close' }).click()
 
     const media = await navigateRoute(page, 'media')
     const musicSection = media.getByRole('heading', { level: 2, name: 'Music Room' }).locator('xpath=ancestor::section[1]')
-    await expect(musicSection.getByRole('button', { name: 'Music Room Remote Off' })).toBeVisible()
+    await expect(musicSection.getByRole('button', { name: /^Music Room Remote / })).toBeVisible()
     await expect(musicSection.getByRole('button', { name: 'Xbox Off' })).toBeVisible()
     await expect(musicSection.getByRole('button', { name: 'Server Off' })).toBeVisible()
     const mediaFortnite = musicSection.getByRole('button', { name: 'Fortnite' })

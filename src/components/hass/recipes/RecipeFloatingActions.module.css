@@ -34,6 +34,16 @@
   gap: 4px;
 }
 
+:global([data-modal-presentation='landscape-dialog'][data-landscape-density='compact']:is([data-modal-body-tier='fields'], [data-modal-body-tier='standard'], [data-modal-body-tier='wide'])) .sheetStack[data-modal-landscape-layout='section-grid'] {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+  gap: 12px;
+}
+
+:global([data-modal-presentation='landscape-dialog'][data-landscape-density='compact']:is([data-modal-body-tier='fields'], [data-modal-body-tier='standard'], [data-modal-body-tier='wide'])) .sheetStack[data-modal-landscape-layout='section-grid'] > .fieldset:last-child {
+  grid-column: 1 / -1;
+}
+
 .groupDescription {
   margin: 2px 6px 3px;
 }

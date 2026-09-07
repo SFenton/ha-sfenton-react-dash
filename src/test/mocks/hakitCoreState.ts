@@ -769,6 +769,10 @@ function applyBathroomFanScriptSideEffects(params: Record<string, unknown>) {
   }
 }
 
+function targetsMusicRoomHueSyncEntity(params: Record<string, unknown>) {
+  return typeof params.target === 'string' && params.target.includes('.music_room_music_room_sync_box_')
+}
+
 function applyMockCallServiceSideEffects(params: Record<string, unknown>) {
   applyBathroomFanScriptSideEffects(params)
 
@@ -781,6 +785,12 @@ function applyMockCallServiceSideEffects(params: Record<string, unknown>) {
     const numberEntity = mockEntities[params.target]
     const value = isRecord(params.serviceData) ? params.serviceData.value : undefined
     if (numberEntity && value !== undefined) numberEntity.state = String(value)
+  }
+
+  if (params.domain === 'select' && params.service === 'select_option' && targetsMusicRoomHueSyncEntity(params)) {
+    const selectEntity = mockEntities[params.target]
+    const option = isRecord(params.serviceData) ? params.serviceData.option : undefined
+    if (selectEntity && typeof option === 'string') selectEntity.state = option
   }
 
   if (params.domain === 'text' && params.service === 'set_value' && typeof params.target === 'string') {
@@ -825,6 +835,7 @@ function applyMockCallServiceSideEffects(params: Record<string, unknown>) {
 
 export type MockHassDebugApi = {
   calls: Record<string, unknown>[]
+  clearWeatherForecasts: () => void
   freeSleepSchedules: () => Record<string, unknown>
   reset: () => void
   setCallServiceOutcome: (domain: string, service: string, outcome: MockCallServiceOutcome) => void
@@ -845,6 +856,10 @@ function exposeMockHassDebugApi() {
   if (typeof window === 'undefined') return
   ;(window as unknown as { __mockHass?: MockHassDebugApi }).__mockHass = {
     calls: mockCallServiceCalls,
+    clearWeatherForecasts: () => {
+      mockDailyWeatherForecast = []
+      mockHourlyWeatherForecast = []
+    },
     freeSleepSchedules: () => cloneRecord(mockEntities['sensor.nightcanvasrestful_schedules'].attributes),
     setCallServiceOutcome: setMockCallServiceOutcome,
     setConnectionStatus: setMockConnectionStatus,
@@ -1225,6 +1240,7 @@ export const explicitMockEntities: Record<string, MockEntity> = {
   'input_boolean.is_theater_shield_active': entity('input_boolean.is_theater_shield_active', 'off'),
   'input_boolean.is_upper_deck_recording': entity('input_boolean.is_upper_deck_recording', 'on'),
   'input_select.music_room_media_source': entity('input_select.music_room_media_source', 'Off', { options: ['Off', 'TV', 'Xbox', 'Server', 'Fortnite'] }),
+  'sensor.music_room_active_media_source': entity('sensor.music_room_active_media_source', 'Off'),
   'light.lights': entity('light.lights', 'on'),
   'light.living_room': entity('light.living_room', 'on'),
   'light.living_room_front_left_light': entity('light.living_room_front_left_light', 'on'),
@@ -1241,6 +1257,19 @@ export const explicitMockEntities: Record<string, MockEntity> = {
   'media_player.beam': entity('media_player.beam', 'playing', { volume_level: 0.3 }),
   'media_player.music_room_tv_android': entity('media_player.music_room_tv_android', 'off'),
   'media_player.xbox': entity('media_player.xbox', 'off'),
+  'binary_sensor.hue_bridge_music_room': entity('binary_sensor.hue_bridge_music_room', 'off'),
+  'number.music_room_music_room_sync_box_brightness': entity('number.music_room_music_room_sync_box_brightness', '100', { max: 100, min: 1, mode: 'auto', step: 1, unit_of_measurement: '%' }),
+  'select.music_room_music_room_sync_box_entertainment_area': entity('select.music_room_music_room_sync_box_entertainment_area', 'Music Room', { options: ['Christmas Lights', 'Music Room'] }),
+  'select.music_room_music_room_sync_box_hdmi_input': entity('select.music_room_music_room_sync_box_hdmi_input', 'HDMI 1', { options: ['HDMI 1', 'HDMI 2', 'HDMI 3', 'HDMI 4'] }),
+  'select.music_room_music_room_sync_box_intensity': entity('select.music_room_music_room_sync_box_intensity', 'high', { options: ['subtle', 'moderate', 'high', 'intense'] }),
+  'select.music_room_music_room_sync_box_led_indicator': entity('select.music_room_music_room_sync_box_led_indicator', 'normal', { options: ['dimmed', 'normal', 'off'] }),
+  'select.music_room_music_room_sync_box_sync_mode': entity('select.music_room_music_room_sync_box_sync_mode', 'music', { options: ['video', 'music', 'game'] }),
+  'sensor.music_room_music_room_sync_box_hdmi1_status': entity('sensor.music_room_music_room_sync_box_hdmi1_status', 'unplugged', { options: ['unplugged', 'plugged', 'linked', 'unknown'] }),
+  'sensor.music_room_music_room_sync_box_hdmi2_status': entity('sensor.music_room_music_room_sync_box_hdmi2_status', 'plugged', { options: ['unplugged', 'plugged', 'linked', 'unknown'] }),
+  'sensor.music_room_music_room_sync_box_hdmi3_status': entity('sensor.music_room_music_room_sync_box_hdmi3_status', 'unplugged', { options: ['unplugged', 'plugged', 'linked', 'unknown'] }),
+  'sensor.music_room_music_room_sync_box_hdmi4_status': entity('sensor.music_room_music_room_sync_box_hdmi4_status', 'unplugged', { options: ['unplugged', 'plugged', 'linked', 'unknown'] }),
+  'switch.music_room_music_room_sync_box_light_sync': entity('switch.music_room_music_room_sync_box_light_sync', 'off'),
+  'switch.music_room_music_room_sync_box_power': entity('switch.music_room_music_room_sync_box_power', 'on'),
   'media_player.primary_bedroom': entity('media_player.primary_bedroom', 'playing', { volume_level: 0.34 }),
   'media_player.sonos': entity('media_player.sonos', 'playing', { volume_level: 0.26 }),
   'media_player.sony_projector': entity('media_player.sony_projector', 'off'),
@@ -1655,8 +1684,31 @@ export function resetMockHass() {
   mockEntities['input_boolean.guests_staying_in_music_room'].state = 'off'
   mockEntities['input_boolean.guests_staying_in_theater_room'].state = 'off'
   mockEntities['input_select.music_room_media_source'].state = 'Off'
+  mockEntities['sensor.music_room_active_media_source'].state = 'Off'
   mockEntities['media_player.music_room_tv_android'].state = 'off'
   mockEntities['media_player.xbox'].state = 'off'
+  mockEntities['binary_sensor.hue_bridge_music_room'].state = 'off'
+  mockEntities['number.music_room_music_room_sync_box_brightness'].state = '100'
+  mockEntities['select.music_room_music_room_sync_box_entertainment_area'].state = 'Music Room'
+  mockEntities['select.music_room_music_room_sync_box_entertainment_area'].attributes.options = ['Christmas Lights', 'Music Room']
+  mockEntities['select.music_room_music_room_sync_box_hdmi_input'].state = 'HDMI 1'
+  mockEntities['select.music_room_music_room_sync_box_hdmi_input'].attributes.options = ['HDMI 1', 'HDMI 2', 'HDMI 3', 'HDMI 4']
+  mockEntities['select.music_room_music_room_sync_box_intensity'].state = 'high'
+  mockEntities['select.music_room_music_room_sync_box_intensity'].attributes.options = ['subtle', 'moderate', 'high', 'intense']
+  mockEntities['select.music_room_music_room_sync_box_led_indicator'].state = 'normal'
+  mockEntities['select.music_room_music_room_sync_box_led_indicator'].attributes.options = ['dimmed', 'normal', 'off']
+  mockEntities['select.music_room_music_room_sync_box_sync_mode'].state = 'music'
+  mockEntities['select.music_room_music_room_sync_box_sync_mode'].attributes.options = ['video', 'music', 'game']
+  mockEntities['sensor.music_room_music_room_sync_box_hdmi1_status'].state = 'unplugged'
+  mockEntities['sensor.music_room_music_room_sync_box_hdmi1_status'].attributes.options = ['unplugged', 'plugged', 'linked', 'unknown']
+  mockEntities['sensor.music_room_music_room_sync_box_hdmi2_status'].state = 'plugged'
+  mockEntities['sensor.music_room_music_room_sync_box_hdmi2_status'].attributes.options = ['unplugged', 'plugged', 'linked', 'unknown']
+  mockEntities['sensor.music_room_music_room_sync_box_hdmi3_status'].state = 'unplugged'
+  mockEntities['sensor.music_room_music_room_sync_box_hdmi3_status'].attributes.options = ['unplugged', 'plugged', 'linked', 'unknown']
+  mockEntities['sensor.music_room_music_room_sync_box_hdmi4_status'].state = 'unplugged'
+  mockEntities['sensor.music_room_music_room_sync_box_hdmi4_status'].attributes.options = ['unplugged', 'plugged', 'linked', 'unknown']
+  mockEntities['switch.music_room_music_room_sync_box_light_sync'].state = 'off'
+  mockEntities['switch.music_room_music_room_sync_box_power'].state = 'on'
   mockEntities['media_player.beam'].state = 'playing'
   mockEntities['media_player.beam'].attributes.volume_level = 0.3
   mockEntities['input_boolean.guest_bathroom_fan_automation_lock'].state = 'off'
@@ -1747,6 +1799,7 @@ export const mockState: MockHassState = {
         const outcome = mockCallServiceOutcomes.get(mockCallServiceOutcomeKey(message.domain, message.service)) ?? 'resolve'
         if (outcome === 'pending') return new Promise<T>(() => undefined)
         if (outcome === 'reject') return Promise.reject(new Error('Mock service rejection'))
+        if (targetsMusicRoomHueSyncEntity(params)) applyMockCallServiceSideEffects(params)
         return {} as T
       }
       if (message.type === 'calendar/event/list') return { events: [] } as T
@@ -1759,6 +1812,11 @@ export const mockState: MockHassState = {
   helpers: {
     callService: (params) => {
       mockCallServiceCalls.push(params)
+      const outcome = typeof params.domain === 'string' && typeof params.service === 'string'
+        ? mockCallServiceOutcomes.get(mockCallServiceOutcomeKey(params.domain, params.service))
+        : undefined
+      if (outcome === 'pending') return new Promise(() => undefined)
+      if (outcome === 'reject') return Promise.reject(new Error('Mock service rejection'))
       applyMockCallServiceSideEffects(params)
       if (params.domain === 'weather' && params.service === 'get_forecasts' && params.returnResponse === true) {
         const forecast = (params.serviceData as { type?: string } | undefined)?.type === 'hourly' ? mockHourlyWeatherForecast : mockDailyWeatherForecast

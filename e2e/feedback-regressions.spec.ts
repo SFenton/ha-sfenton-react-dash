@@ -1,5 +1,6 @@
-import { expect, test, type Locator, type Page } from '@playwright/test'
+import { expect, test, type Locator, type Page } from './layout/fixture'
 import { navigationLayoutForViewport } from '../src/constants/navigationLayout'
+import { installSafeAreaInsets, setSafeAreaInsets } from './safe-area'
 
 const PHONE = { width: 393, height: 852 }
 const TABLET_PORTRAIT = { width: 820, height: 1180 }
@@ -181,11 +182,12 @@ test('sidebars place the Chores count at the trailing edge of its row', async ({
 })
 
 const PAGE_LAYOUT_VIEWPORTS = [
-  { cameraColumns: 2, choreColumns: 2, customColumns: 2, height: 852, remoteColumns: 2, securityCellWidth: 175.5, width: 393 },
-  { cameraColumns: 4, choreColumns: 3, customColumns: 3, height: 1180, remoteColumns: 3, securityCellWidth: 189.5, width: 820 },
-  { cameraColumns: 4, choreColumns: 3, customColumns: 4, height: 820, remoteColumns: 3, securityCellWidth: 217.5, width: 1180 },
-  { cameraColumns: 4, choreColumns: 3, customColumns: 4, height: 900, remoteColumns: 3, securityCellWidth: 282.5, width: 1440 },
-  { cameraColumns: 4, choreColumns: 3, customColumns: 4, height: 1080, remoteColumns: 3, securityCellWidth: 312.5, width: 1920 },
+  { appColumns: 2, cameraColumns: 2, choreColumns: 2, customColumns: 2, height: 852, remoteColumns: 2, securityCellWidth: 175.5, width: 393 },
+  { appColumns: 3, cameraColumns: 4, choreColumns: 3, customColumns: 3, height: 393, remoteColumns: 3, securityCellWidth: 197.5, width: 852 },
+  { appColumns: 3, cameraColumns: 4, choreColumns: 3, customColumns: 3, height: 1180, remoteColumns: 3, securityCellWidth: 189.5, width: 820 },
+  { appColumns: 3, cameraColumns: 4, choreColumns: 3, customColumns: 4, height: 820, remoteColumns: 3, securityCellWidth: 217.5, width: 1180 },
+  { appColumns: 3, cameraColumns: 4, choreColumns: 3, customColumns: 4, height: 900, remoteColumns: 3, securityCellWidth: 282.5, width: 1440 },
+  { appColumns: 3, cameraColumns: 4, choreColumns: 3, customColumns: 4, height: 1080, remoteColumns: 3, securityCellWidth: 312.5, width: 1920 },
 ] as const
 
 function activeRoute(page: Page, path: string) {
@@ -443,12 +445,15 @@ test('Media source groups preserve order and fill the Theater follow-up row', as
     const root = activeRoute(page, 'media')
     await expect(root.getByRole('heading', { level: 1, name: 'Media' })).toBeVisible()
     const livingSection = root.getByRole('heading', { level: 2, name: 'Living Room' }).locator('xpath=ancestor::section[1]')
+    const musicSection = root.getByRole('heading', { level: 2, name: 'Music Room' }).locator('xpath=ancestor::section[1]')
     const theaterSection = root.getByRole('heading', { level: 2, name: 'Theater Room' }).locator('xpath=ancestor::section[1]')
     const livingBox = await livingSection.boundingBox()
+    const musicBox = await musicSection.boundingBox()
     const theaterBox = await theaterSection.boundingBox()
     const theaterControls = root.getByRole('group', { name: 'Theater Room Controls' })
     const theaterControlsBox = await theaterControls.boundingBox()
     expect(livingBox).not.toBeNull()
+    expect(musicBox).not.toBeNull()
     expect(theaterBox).not.toBeNull()
     expect(theaterControlsBox).not.toBeNull()
     expect(Math.abs((theaterControlsBox?.x ?? 0) - (theaterBox?.x ?? 0))).toBeLessThanOrEqual(1)
@@ -459,9 +464,15 @@ test('Media source groups preserve order and fill the Theater follow-up row', as
       expect(Math.round(livingBox?.x ?? 0)).toBe(16)
       expect(Math.round(livingBox?.width ?? 0)).toBe(361)
       expect(Math.round(theaterBox?.height ?? 0)).toBe(314)
-      expect((theaterBox?.y ?? 0)).toBeGreaterThan((livingBox?.y ?? 0) + (livingBox?.height ?? 0))
+      expect(musicBox?.y ?? 0).toBeGreaterThan((livingBox?.y ?? 0) + (livingBox?.height ?? 0))
+      expect(theaterBox?.y ?? 0).toBeGreaterThan((musicBox?.y ?? 0) + (musicBox?.height ?? 0))
     } else {
-      expect(Math.abs((livingBox?.y ?? 0) - (theaterBox?.y ?? 0))).toBeLessThanOrEqual(1)
+      expect(Math.abs((livingBox?.y ?? 0) - (musicBox?.y ?? 0))).toBeLessThanOrEqual(1)
+      expect(theaterBox?.y ?? 0).toBeGreaterThan(Math.max(
+        (livingBox?.y ?? 0) + (livingBox?.height ?? 0),
+        (musicBox?.y ?? 0) + (musicBox?.height ?? 0),
+      ))
+      expect(Math.abs((livingBox?.x ?? 0) - (theaterBox?.x ?? 0))).toBeLessThanOrEqual(1)
     }
 
     if (viewport.width === 1440) {
@@ -494,7 +505,7 @@ test('Theater Remote stays visible while Apps and Devices use their available pa
     const appColumns = await appButtons.evaluateAll((buttons) =>
       new Set(buttons.map((button) => Math.round(button.getBoundingClientRect().x))).size,
     )
-    expect(appColumns).toBe(viewport.width === 393 ? 2 : 3)
+    expect(appColumns).toBe(viewport.appColumns)
     await dialog.locator('[data-modal-sheet-body="true"], [data-scroll-region="media-remote-panel"]').evaluateAll((elements) => {
       for (const element of elements) element.scrollTop = element.scrollHeight
     })
@@ -535,11 +546,11 @@ test('Theater Remote stays visible while Apps and Devices use their available pa
 })
 
 const ROOM_OVERVIEW_MODALS = [
-  { centeredGaps: [40, 41], dialogName: /Lights/, hash: '#lights-overview', sectionLabel: 'Lights by room' },
-  { centeredGaps: [27, 28], dialogName: 'Climate', hash: '#climate-overview', sectionLabel: 'Climate by room' },
-  { centeredGaps: [27, 28], dialogName: 'Occupancy', hash: '#occupancy-overview', sectionLabel: 'Occupancy by room' },
-  { centeredGaps: [27, 28], dialogName: 'Contact Sensors', hash: '#contact-sensors-overview', sectionLabel: 'Contact sensors by room' },
-  { centeredGaps: [27, 28], dialogName: 'Air Quality', hash: '#aqi-overview', sectionLabel: 'AQI by room' },
+  { dialogName: /Lights/, hash: '#lights-overview', sectionLabel: 'Lights by room' },
+  { dialogName: 'Climate', hash: '#climate-overview', sectionLabel: 'Climate by room' },
+  { dialogName: 'Occupancy', hash: '#occupancy-overview', sectionLabel: 'Occupancy by room' },
+  { dialogName: 'Contact Sensors', hash: '#contact-sensors-overview', sectionLabel: 'Contact sensors by room' },
+  { dialogName: 'Air Quality', hash: '#aqi-overview', sectionLabel: 'AQI by room' },
 ] as const
 
 async function terminalOverviewGeometry(dialog: Locator, sectionLabel: string) {
@@ -554,30 +565,37 @@ async function terminalOverviewGeometry(dialog: Locator, sectionLabel: string) {
       if (overflowY === 'auto' || overflowY === 'scroll') candidate.scrollTop = candidate.scrollHeight
     }
   })
-  const [dialogBox, bodyBox, finalCardBox] = await Promise.all([
+  const [dialogBox, bodyBox, finalGridBox, finalCardBox] = await Promise.all([
     dialog.boundingBox(),
     body.boundingBox(),
+    finalGrid.boundingBox(),
     finalCard.boundingBox(),
   ])
   expect(dialogBox).not.toBeNull()
   expect(bodyBox).not.toBeNull()
+  expect(finalGridBox).not.toBeNull()
   expect(finalCardBox).not.toBeNull()
   return {
     finalGap: (dialogBox?.y ?? 0) + (dialogBox?.height ?? 0) - ((finalCardBox?.y ?? 0) + (finalCardBox?.height ?? 0)),
     fullyVisible: (finalCardBox?.y ?? 0) >= (bodyBox?.y ?? 0) - 1
       && (finalCardBox?.y ?? 0) + (finalCardBox?.height ?? 0) <= (bodyBox?.y ?? 0) + (bodyBox?.height ?? 0) + 1,
+    horizontalCenterDelta: Math.abs(
+      (finalGridBox?.x ?? 0) + (finalGridBox?.width ?? 0) / 2
+      - ((bodyBox?.x ?? 0) + (bodyBox?.width ?? 0) / 2),
+    ),
   }
 }
 
-test('room overview modals keep mobile spacing and share centered terminal spacing', async ({ page }) => {
+test('room overview modals keep portrait padding and centered dialog grids', async ({ page }) => {
   await page.setViewportSize(PHONE)
+  await installSafeAreaInsets(page, { bottom: 34, left: 0, right: 0, top: 59 })
   await page.goto('/at-a-glance/overview?feedback-lights=393#lights-overview')
   const mobileLights = page.getByRole('dialog', { name: /Lights/ })
   await expect(mobileLights).toBeVisible()
   await page.waitForTimeout(540)
   const mobileGeometry = await terminalOverviewGeometry(mobileLights, 'Lights by room')
   expect(mobileGeometry.fullyVisible).toBe(true)
-  expect(Math.round(mobileGeometry.finalGap)).toBe(38)
+  await expect(mobileLights.locator('[data-modal-sheet-body="true"]')).toHaveCSS('padding-bottom', '58px')
 
   for (const viewport of [TABLET_PORTRAIT, TABLET_LANDSCAPE, DESKTOP]) {
     for (const modalCase of ROOM_OVERVIEW_MODALS) {
@@ -588,7 +606,7 @@ test('room overview modals keep mobile spacing and share centered terminal spaci
       await page.waitForTimeout(540)
       const geometry = await terminalOverviewGeometry(dialog, modalCase.sectionLabel)
       expect(geometry.fullyVisible, `${modalCase.sectionLabel} ${viewport.width}x${viewport.height}`).toBe(true)
-      expect(modalCase.centeredGaps, `${modalCase.sectionLabel} terminal gap`).toContain(Math.round(geometry.finalGap))
+      expect(geometry.horizontalCenterDelta, `${modalCase.sectionLabel} horizontal centering`).toBeLessThanOrEqual(1)
     }
   }
 })
@@ -613,12 +631,43 @@ test('Lights room cards pass wheel scrolling to the modal body', async ({ page }
   expect([40, 41]).toContain(Math.round(geometry.finalGap))
 })
 
+test('body-scrolling modal measures retain their bottom padding at every presentation', async ({ page }) => {
+  test.setTimeout(90_000)
+  for (const profile of [
+    { width: 393, height: 852, insets: { top: 59, right: 0, bottom: 34, left: 0 } },
+    { width: 852, height: 393, insets: { top: 0, right: 44, bottom: 21, left: 59 } },
+    { width: 667, height: 375, insets: { top: 0, right: 0, bottom: 0, left: 0 } },
+    { width: 949, height: 860, insets: { top: 0, right: 0, bottom: 0, left: 0 } },
+  ]) {
+    for (const title of ['Lights', 'Rooms']) {
+      await page.setViewportSize(profile)
+      await page.goto(`/index.html?path=overview${title === 'Lights' ? '#lights-overview' : ''}`)
+      await setSafeAreaInsets(page, profile.insets)
+      if (title === 'Rooms') {
+        await page.getByRole('button', { name: 'Quick Links', exact: true }).click()
+        await page.getByRole('dialog', { name: 'Quick Links' }).getByRole('button', { name: 'Rooms', exact: true }).click()
+      }
+      const dialog = page.getByRole('dialog', { name: title === 'Lights' ? /Lights/ : 'Rooms' })
+      await expect(dialog).toBeVisible()
+      await expect.poll(() => dialog.evaluate((element) => {
+        const body = element.querySelector<HTMLElement>('[data-modal-sheet-body="true"]')!
+        const measure = element.querySelector<HTMLElement>('[data-modal-content-measure="true"]')!
+        body.scrollTop = body.scrollHeight
+        const gap = body.getBoundingClientRect().bottom - measure.getBoundingClientRect().bottom
+        return Math.abs(gap - Number.parseFloat(getComputedStyle(body).paddingBottom))
+      }), { message: `${title} ${profile.width}x${profile.height}: intrinsic content must retain the real end inset` }).toBeLessThanOrEqual(1)
+      await dialog.getByRole('button', { name: 'Close', exact: true }).click()
+      await expect(dialog).toHaveCount(0)
+    }
+  }
+})
+
 test('Presence Overrides keeps one stable sheet and one scroll owner', async ({ page }) => {
   const viewports = [
     { expectedHeight: 767, ...PHONE },
-    { expectedHeight: 860, ...TABLET_PORTRAIT },
+    { expectedHeight: 760, ...TABLET_PORTRAIT },
     { expectedHeight: 756, ...TABLET_LANDSCAPE },
-    { expectedHeight: 836, ...DESKTOP },
+    { expectedHeight: 760, ...DESKTOP },
   ]
 
   for (const viewport of viewports) {
@@ -668,7 +717,7 @@ test('Presence Overrides keeps one stable sheet and one scroll owner', async ({ 
   }
 })
 
-test('Edit Task opens at a stable final desktop height while Add Task stays unchanged', async ({ page }) => {
+test('task editors use the common stable desktop frame', async ({ page }) => {
   for (const viewport of [TABLET_PORTRAIT, TABLET_LANDSCAPE, DESKTOP]) {
     await page.setViewportSize(viewport)
     await page.goto(`/at-a-glance/chores?feedback-edit=${viewport.width}`)
@@ -683,7 +732,7 @@ test('Edit Task opens at a stable final desktop height while Add Task stays unch
     const initialHeight = (await dialog.boundingBox())?.height ?? 0
     await expect(dialog.getByLabel('Task Name')).toBeVisible()
     const finalHeight = (await dialog.boundingBox())?.height ?? 0
-    const expectedHeight = Math.min(940, viewport.height - 64)
+    const expectedHeight = Math.min(760, viewport.height - 64)
     expect(Math.abs(initialHeight - expectedHeight)).toBeLessThanOrEqual(1)
     expect(Math.abs(finalHeight - initialHeight)).toBeLessThanOrEqual(1)
   }
@@ -693,7 +742,7 @@ test('Edit Task opens at a stable final desktop height while Add Task stays unch
   await page.getByRole('button', { name: 'Add Task' }).click()
   const addDialog = page.getByRole('dialog', { name: 'Create Task' })
   await expect(addDialog).toBeVisible()
-  expect(Math.abs(((await addDialog.boundingBox())?.height ?? 0) - 819)).toBeLessThanOrEqual(1)
+  expect(Math.abs(((await addDialog.boundingBox())?.height ?? 0) - 760)).toBeLessThanOrEqual(1)
 })
 
 test('Daily Summary keeps its host height through task and inventory detail pages', async ({ page }) => {

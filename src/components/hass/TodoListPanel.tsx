@@ -29,7 +29,7 @@ interface TodoListPanelProps {
   onVisibleItemsChange?: (count: number) => void
   optimisticStatuses?: TodoOptimisticStatuses
   reloadVersion?: number
-  rowVariant?: 'settings'
+  rowVariant?: 'settings' | 'summary'
   title: string
 }
 
@@ -226,7 +226,7 @@ export function TodoListPanel({ completionScript, entityId, hideCompleted = true
                 <div aria-label={`${titleText} task`} className={styles.itemRow} data-editable={editTarget ? 'true' : 'false'} role="group">
                   <CheckboxRow
                     active={item.status === 'completed'}
-                    alignWrappedToIconTop={rowVariant === 'settings'}
+                    alignWrappedToIconTop={rowVariant === 'settings' || rowVariant === 'summary'}
                     aria-label={subtitle ? `${titleText} ${subtitle}` : titleText}
                     className={styles.itemButton}
                     data-due-tone={due?.tone}

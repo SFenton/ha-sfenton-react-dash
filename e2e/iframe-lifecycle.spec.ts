@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test, type Page } from './layout/fixture'
 import {
   REACT_DASHBOARD_LIFECYCLE_HISTORY_PROPERTY,
   REACT_DASHBOARD_LIFECYCLE_PROPERTY,
@@ -22,7 +22,7 @@ type LifecycleHostWindow = Window & {
 }
 
 async function openLifecycleHost(page: Page, path: string, entryModule?: string) {
-  await page.route(`**${path}`, async (route) => {
+  await page.route(`**${path.split('#', 1)[0]}`, async (route) => {
     await route.fulfill({
       body: `<!doctype html>
         <html>
@@ -120,6 +120,76 @@ async function currentReactDashboardFrame(page: Page) {
   }
   throw new Error('React dashboard iframe was not created.')
 }
+
+const notificationHosts = [
+  { name: 'legacy', path: '/sfenton-react-dash/home', module: '/sfenton-react-app-card.js', tag: SFENTON_REACT_APP_CARD_TAG },
+  { name: 'panel', path: '/sfenton-react-panel', module: '/sfenton-react-panel.js', tag: SFENTON_REACT_PANEL_TAG },
+] as const
+
+async function mountNotificationHost(page: Page, host: typeof notificationHosts[number], route: string) {
+  await openLifecycleHost(page, `${host.path}?path=${route}`, host.module)
+  await page.waitForFunction((tag) => Boolean(customElements.get(tag)), host.tag)
+  await page.evaluate(({ tag, name }) => {
+    const element = document.createElement(tag) as HTMLElement & {
+      setConfig?: (value: { url: string }) => void
+      panel?: { config: { app_url: string }; title: string }
+    }
+    if (name === 'legacy') element.setConfig!({ url: '/index.html' })
+    else element.panel = { config: { app_url: '/index.html' }, title: 'React Dash Panel' }
+    document.body.append(element)
+  }, host)
+  return currentReactDashboardFrame(page)
+}
+
+for (const host of notificationHosts) {
+  test(`${host.name} notification landing opens Security without a camera modal`, async ({ page }) => {
+    await page.setViewportSize({ width: 393, height: 852 })
+    const frame = await mountNotificationHost(page, host, 'security')
+    await expect(frame.getByRole('heading', { name: 'Security', exact: true }).first()).toBeVisible()
+    await expect(frame.getByRole('dialog')).toHaveCount(0)
+    await page.setViewportSize({ width: 852, height: 393 })
+    await expect(frame.getByRole('heading', { name: 'Security', exact: true }).first()).toBeVisible()
+    await expect(frame.getByRole('dialog')).toHaveCount(0)
+  })
+
+  test(`${host.name} warm notification landing handles the HA navigation event`, async ({ page }) => {
+    const frame = await mountNotificationHost(page, host, 'overview#camera-front-door')
+    await expect(frame.getByRole('dialog')).toBeVisible()
+    const timeOrigin = await frame.evaluate(() => performance.timeOrigin)
+    await page.evaluate((path) => {
+      window.history.pushState({}, '', `${path}?path=security`)
+      window.dispatchEvent(new CustomEvent('location-changed', { detail: { replace: false } }))
+    }, host.path)
+    await expect(frame.getByRole('heading', { name: 'Security', exact: true }).first()).toBeVisible()
+    await expect(frame.getByRole('dialog')).toHaveCount(0)
+    expect(await frame.evaluate(() => performance.timeOrigin)).toBe(timeOrigin)
+    expect(await frame.evaluate(() => (
+      (window as unknown as { __mockHass: { calls: { domain: string }[] } }).__mockHass.calls
+        .filter((call) => call.domain === 'lock').length
+    ))).toBe(0)
+  })
+}
+
+test('notification landing remains correct on tablet and fine-pointer desktop', async ({ browser, baseURL }) => {
+  const context = await browser.newContext({ baseURL, isMobile: false, hasTouch: false })
+  const page = await context.newPage()
+  try {
+    for (const viewport of [
+      { width: 820, height: 1180 }, { width: 1180, height: 820 },
+      { width: 1440, height: 900 }, { width: 1920, height: 1080 },
+    ]) {
+      await page.setViewportSize(viewport)
+      for (const host of notificationHosts) {
+        const frame = await mountNotificationHost(page, host, 'security')
+        await expect(frame.getByRole('heading', { name: 'Security', exact: true }).first()).toBeVisible()
+        await expect(frame.getByRole('dialog')).toHaveCount(0)
+        expect(await frame.evaluate(() => matchMedia('(pointer: fine)').matches)).toBe(true)
+      }
+    }
+  } finally {
+    await context.close()
+  }
+})
 
 test('legacy wrapper disposal prevents lifecycle accumulation across replacements', async ({ page }) => {
   await openLifecycleHost(

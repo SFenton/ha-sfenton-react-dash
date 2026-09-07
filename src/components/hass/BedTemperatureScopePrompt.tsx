@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { Description } from '../core/Description'
 import { MaterialIcon } from '../core/Icon'
-import { MODAL_SHEET_EXIT_ANIMATION_MS, ModalSheet, type ModalSheetStyle } from '../core/ModalSheet'
+import { MODAL_SHEET_EXIT_ANIMATION_MS, ModalSheet, type ModalCenteredGeometry, type ModalSheetStyle } from '../core/ModalSheet'
 import {
   sleepypodSchedulePhaseLabel,
   type SleepypodSchedulePhase,
@@ -10,13 +10,15 @@ import {
 import styles from './BedTemperatureScopePrompt.module.css'
 
 const BED_TEMPERATURE_SCOPE_MODAL_STYLE: ModalSheetStyle = {
-  '--modal-desktop-height': '360px',
-  '--modal-desktop-max-height': '360px',
-  '--modal-desktop-max-width': '440px',
-  '--modal-desktop-width': '440px',
   '--modal-mobile-height': 'min(430px, 54dvh)',
   '--modal-mobile-max-height': 'calc(var(--dashboard-viewport-height, 100dvh) - 24px)',
 }
+const BED_TEMPERATURE_SCOPE_CENTERED_GEOMETRY = {
+  blockPolicy: 'fixed',
+  blockSize: '360px',
+  id: 'bed-temperature-scope',
+  inlineSize: '440px',
+} satisfies ModalCenteredGeometry
 
 interface BedTemperatureScopePromptProps {
   onChoose: (scope: SleepypodTemperatureScope) => void
@@ -79,6 +81,7 @@ export function BedTemperatureScopePrompt({
 
   return (
     <ModalSheet
+      centeredGeometry={BED_TEMPERATURE_SCOPE_CENTERED_GEOMETRY}
       contentStyle={BED_TEMPERATURE_SCOPE_MODAL_STYLE}
       onClose={onClose}
       open={open}

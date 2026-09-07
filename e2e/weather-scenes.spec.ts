@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test, type Page } from './layout/fixture'
 import { WEATHER_SCENES } from '../src/components/hass/weatherPresentation'
 import type { MockHassDebugApi } from '../src/test/mocks/hakitCoreState'
 import { setWeatherSceneDebug } from './weather-scene-debug'

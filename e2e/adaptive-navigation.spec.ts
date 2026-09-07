@@ -1,4 +1,4 @@
-import { expect, test, type Page, type TestInfo } from '@playwright/test'
+import { expect, test, type Page, type TestInfo } from './layout/fixture'
 
 type ExpectedNavigationLayout = 'bottom' | 'drawer-only' | 'rail'
 
@@ -110,21 +110,19 @@ test('keeps root and back-path navigation usable', async ({ page }, testInfo) =>
   await page.goto('/index.html?path=living-room')
   await waitForRoute(page, 'living-room')
   await expect(page.getByRole('button', { name: 'Go back' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Open navigation menu', includeHidden: true })).toHaveCount(0)
 
-  if (expected.layout === 'drawer-only') {
-    const opener = page.getByRole('button', { name: 'Open navigation menu' })
-    await expect(opener).toBeVisible()
-    await opener.click()
-    const drawer = page.locator('[data-adaptive-navigation="drawer"]')
-    await drawer.getByRole('menuitem', { name: 'Home' }).click()
-    await waitForRoute(page, 'overview')
-  } else if (expected.layout === 'bottom') {
+  if (expected.layout === 'bottom') {
     await expect(page.locator('[data-adaptive-navigation="bottom"]')).toBeVisible()
-    await expect(page.getByRole('button', { name: 'Open navigation menu' })).not.toBeVisible()
-  } else {
+  } else if (expected.layout === 'rail') {
     await expect(page.locator('[data-adaptive-navigation="rail"]')).toBeVisible()
-    await expect(page.getByRole('button', { name: 'Open navigation menu' })).not.toBeVisible()
+  } else {
+    await expect(page.locator('[data-adaptive-navigation="bottom"]')).not.toBeVisible()
+    await expect(page.locator('[data-adaptive-navigation="rail"]')).not.toBeVisible()
   }
+  await page.getByRole('button', { name: 'Go back' }).click()
+  await waitForRoute(page, 'overview')
+  await expectNavigationLayout(page, expected.layout)
 })
 
 test('honors every changed width and height boundary', async ({ page }) => {

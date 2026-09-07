@@ -2,6 +2,7 @@ import { copy } from '../i18n'
 import { isDashboardRouteHostPath } from '../constants/dashboardHosts'
 
 export const DASHBOARD_ROUTE_CHANGE_EVENT = 'dashboard-route-change'
+export const HOME_ASSISTANT_LOCATION_CHANGE_EVENT = 'location-changed'
 export const DASHBOARD_DOCUMENT_TITLE = copy('common', 'app.title')
 
 function canReadWindow(candidate: Window) {
@@ -40,6 +41,20 @@ export function dashboardEventTargets() {
   const targetWindow = dashboardWindow()
   if (!targetWindow || targetWindow === window) return [window]
   return [window, targetWindow]
+}
+
+export function subscribeDashboardLocation(onChange: () => void, { hashChanges = false } = {}) {
+  const targets = dashboardEventTargets()
+  const events = ['popstate', DASHBOARD_ROUTE_CHANGE_EVENT, HOME_ASSISTANT_LOCATION_CHANGE_EVENT]
+  if (hashChanges) events.push('hashchange')
+  for (const target of targets) {
+    for (const event of events) target.addEventListener(event, onChange)
+  }
+  return () => {
+    for (const target of targets) {
+      for (const event of events) target.removeEventListener(event, onChange)
+    }
+  }
 }
 
 export function setDashboardDocumentTitle(title = DASHBOARD_DOCUMENT_TITLE) {

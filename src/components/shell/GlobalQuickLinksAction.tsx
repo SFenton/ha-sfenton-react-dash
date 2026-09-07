@@ -2,9 +2,9 @@ import { useMemo, useState } from 'react'
 import { useHass } from '@hakit/core'
 import { DynamicGrid } from '../core/DynamicGrid'
 import { FloatingActionButton } from '../core/FloatingActionButton'
-import { ModalSheet, type ModalSheetStyle } from '../core/ModalSheet'
+import { ModalSheet, type ModalCenteredGeometry } from '../core/ModalSheet'
+import { useModalSheetPresentation } from '../core/modalSheetPresentation'
 import {
-  modalSquareGridModalStyle,
   modalSquareGridStyle,
   useModalSquareGridLayout,
 } from '../core/modalSquareGrid'
@@ -25,10 +25,12 @@ import { useModalDetailPageScroll } from '../../hooks/useModalDetailPageScroll'
 import { useCopy } from '../../i18n'
 import styles from './GlobalQuickLinksAction.module.css'
 
-const QUICK_LINKS_MODAL_STYLE: ModalSheetStyle = {
-  '--modal-desktop-height': 'auto',
-  '--modal-desktop-width': '900px',
-}
+const QUICK_LINKS_CENTERED_GEOMETRY = {
+  blockPolicy: 'fixed',
+  blockSize: '500px',
+  id: 'global-quick-links',
+  inlineSize: '720px',
+} satisfies ModalCenteredGeometry
 
 interface GlobalQuickLinksActionProps {
   onNavigate: (path: string) => void
@@ -51,12 +53,9 @@ export function GlobalQuickLinksAction({ onNavigate }: GlobalQuickLinksActionPro
   const roomsPage = ROOMS_QUICK_ACCESS_ITEM.action.page
   const roomsOpen = open && detailPage === roomsPage
   const [roomGridRef, roomGridLayout] = useModalSquareGridLayout(roomsOpen, AREA_ITEMS.length)
+  const presentation = useModalSheetPresentation()
+  const portraitSheet = presentation === 'sheet'
   const { bodyElementRef, enterDetailPage, leaveDetailPage, resetDetailPageScroll } = useModalDetailPageScroll(detailPage)
-  const roomsModalStyle = {
-    ...modalSquareGridModalStyle(roomGridLayout),
-    '--modal-desktop-width': QUICK_LINKS_MODAL_STYLE['--modal-desktop-width'],
-  }
-  const contentStyle = detailPage === roomsPage ? roomsModalStyle : QUICK_LINKS_MODAL_STYLE
   const modalTitle = detailPage === roomsPage
     ? ROOMS_QUICK_ACCESS_ITEM.title
     : detailPage === 'security-system'
@@ -99,17 +98,26 @@ export function GlobalQuickLinksAction({ onNavigate }: GlobalQuickLinksActionPro
       />
       <ModalSheet
         bodyElementRef={bodyElementRef}
-        contentStyle={contentStyle}
+        centeredGeometry={QUICK_LINKS_CENTERED_GEOMETRY}
+        contentWidth={detailPage === 'security-system' ? 'full' : 'readable'}
+        landscapeDensity={detailPage === roomsPage ? 'regular' : 'compact'}
         onBack={detailPage === null ? undefined : handleBack}
         onClose={() => setOpen(false)}
         open={open}
+        scrollMode={detailPage === roomsPage ? 'panes' : 'body'}
         scrollResetKey={detailPage ?? false}
         size="media"
         subtitle={detailPage === 'security-system' ? securitySubtitle : undefined}
         title={modalTitle}
       >
         {detailPage === null ? (
-          <DynamicGrid ariaLabel={quickLinksName} className={styles.grid} columns={2}>
+          <DynamicGrid
+            ariaLabel={quickLinksName}
+            columns={2}
+            fillRows={portraitSheet ? true : 'except-last'}
+            itemSizing="content-aware"
+            maxCellWidth={portraitSheet ? undefined : 200}
+          >
             {visibleItems.map((item) => (
               <div
                 className={styles.cell}
@@ -117,6 +125,7 @@ export function GlobalQuickLinksAction({ onNavigate }: GlobalQuickLinksActionPro
                 key={item.id}
               >
                 <QuickLinkTile
+                  compact={!portraitSheet}
                   item={item}
                   onNavigate={handleNavigate}
                   onOpenDetail={(detailPage) => handleOpenDetail(detailPage, item.id)}

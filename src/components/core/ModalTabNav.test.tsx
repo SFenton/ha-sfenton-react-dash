@@ -39,6 +39,7 @@ describe('ModalIconTabNav', () => {
     render(<Harness />)
 
     const tabList = screen.getByRole('tablist', { name: 'Recipe sections' })
+    expect(tabList).toHaveAttribute('data-tab-count', '3')
     const tabs = within(tabList).getAllByRole('tab')
     expect(tabs).toHaveLength(3)
     expect(tabs.map((tab) => tab.textContent)).toEqual(['General', 'Ingredients', 'Instructions'])

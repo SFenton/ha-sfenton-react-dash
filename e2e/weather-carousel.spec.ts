@@ -1,4 +1,4 @@
-import { expect, test, type Browser, type Locator, type Page } from '@playwright/test'
+import { expect, test, type Browser, type Locator, type Page } from './layout/fixture'
 
 async function dragHorizontally(page: Page, selector: string, distance: number) {
   const target = page.locator(selector)

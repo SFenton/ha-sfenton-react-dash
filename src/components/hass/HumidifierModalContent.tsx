@@ -12,7 +12,7 @@ import { InlineAlert } from '../core/InlineAlert'
 import { MaterialIcon } from '../core/Icon'
 import { ModalIconTabNav } from '../core/ModalTabNav'
 import { modalTabId, modalTabPanelId } from '../core/modalTabIds'
-import { ModalSheet } from '../core/ModalSheet'
+import { ModalSheet, type ModalCenteredGeometry } from '../core/ModalSheet'
 import { NativeSelectField } from '../core/NativeSelectField'
 import { NumberStepper } from '../core/Stepper'
 import { ScheduleEditorFields } from '../core/ScheduleEditorFields'
@@ -43,6 +43,12 @@ import styles from './HumidifierModalContent.module.css'
 
 const HUMIDIFIER_TAB_ID_PREFIX = 'humidifier'
 const HUMIDIFIER_TAB_PANEL_ID = modalTabPanelId(HUMIDIFIER_TAB_ID_PREFIX, 'content')
+const HUMIDIFIER_CENTERED_GEOMETRY = {
+  blockPolicy: 'fixed',
+  blockSize: '760px',
+  id: 'humidifier',
+  inlineSize: '980px',
+} satisfies ModalCenteredGeometry
 
 type CallService = (params: Record<string, unknown>) => void
 type Entity = ReturnType<typeof useEntity>
@@ -954,6 +960,7 @@ export function HumidifierModal({ config, onClose, open, roomTitle }: Humidifier
     <ModalSheet
       backLabel="Back to schedules"
       bodyElementRef={modalBodyRef}
+      centeredGeometry={HUMIDIFIER_CENTERED_GEOMETRY}
       contentStyle={!detailOpen && displayedTab === 'schedules' ? HUMIDIFIER_MODAL_SCHEDULES_STYLE : undefined}
       footer={activityPage ? (
         <ScheduleDetailFooter
@@ -970,7 +977,7 @@ export function HumidifierModal({ config, onClose, open, roomTitle }: Humidifier
       }}
       open={open}
       scrollMode={activityPage ? 'body' : 'panes'}
-      size={activityPage ? 'standard' : 'workspace'}
+      size="workspace"
       subtitle={detailOpen ? undefined : humidifierSubtitle(state)}
       title={detailOpen ? activityPage?.editingId ? activityPage.rule.label : `Add ${config.title} Schedule` : config.title}
     >

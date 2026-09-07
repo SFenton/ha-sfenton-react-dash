@@ -15,6 +15,7 @@ dist-ssr
 .hass-porting/
 .playwright-mcp/
 .playwright-dist/
+.cache/
 .autonomous/
 .outbox/
 artifacts/

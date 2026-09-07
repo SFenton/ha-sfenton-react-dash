@@ -4,7 +4,11 @@
   z-index: 70;
   display: grid;
   place-items: center;
-  padding: 22px;
+  padding:
+    max(22px, var(--rd-safe-top))
+    max(22px, var(--rd-safe-right))
+    max(22px, var(--rd-safe-bottom))
+    max(22px, var(--rd-safe-left));
   background: var(--color-modal-overlay);
   -webkit-backdrop-filter: var(--blur-modal);
   backdrop-filter: var(--blur-modal);
@@ -155,4 +159,10 @@
     grid-template-columns: repeat(2, minmax(0, 240px));
     justify-content: center;
   }
+}
+
+:global([data-modal-presentation='landscape-dialog'][data-landscape-density='compact']) .sheetOptions[data-layout='card-grid'],
+:global([data-modal-presentation='landscape-dialog'][data-landscape-density='compact']) .compactSheetOptions {
+  grid-template-columns: repeat(2, minmax(0, 220px));
+  justify-content: center;
 }
