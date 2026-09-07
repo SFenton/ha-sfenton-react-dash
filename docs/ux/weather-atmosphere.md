@@ -62,9 +62,17 @@ source-intent comparison. That old build dropped standard backdrop declarations
 even though its source declared them. Only that attested baseline's browser CSS
 replays the existing prefixed values as standard declarations; candidate CSS is
 never repaired. The approved hero temperature-rail replacement has one bounded
-decorative comparison region, with unchanged adjacent labels/geometry and
+decorative comparison region, with unchanged adjacent labels, horizontal
+placement/width and centerline, the explicit approved8px-to10px track thickness, and
 independent rail tests. Numeric parity limits remain unchanged. This migration
 handling does not apply once the baseline advances beyond that exact commit.
+
+Backdrop pixel controls report raw differing-pixel counts as well as differences
+beyond the declared one-channel-unit rounding tolerance. The maximum permitted
+channel delta remains1/255; a positive filter-free control must still exceed10.
+Do not call scattered one-unit compositor rounding an exact zero-difference
+result. Controls keep the full fallback ineligible for automatic band restoration
+while sampling, and use a fresh settled presentation at each viewport.
 
 The Rain descriptor fingerprint in `WeatherAtmosphere.test.tsx` was captured from
 the user-approved preview before these changes; it is not generated from the

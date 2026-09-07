@@ -377,7 +377,10 @@ async function approvedHeroRailRegion(baseline: Page, candidate: Page): Promise<
   const beforeBox = await before.boundingBox()
   const afterBox = await after.boundingBox()
   if (!beforeBox || !afterBox) throw new Error('Approved rail migration must retain measurable geometry')
-  for (const key of ['x', 'y', 'width', 'height'] as const) expect(Math.abs(beforeBox[key] - afterBox[key])).toBeLessThanOrEqual(1)
+  for (const key of ['x', 'width'] as const) expect(Math.abs(beforeBox[key] - afterBox[key])).toBeLessThanOrEqual(1)
+  expect(Math.abs(beforeBox.height - 8)).toBeLessThanOrEqual(0.1)
+  expect(Math.abs(afterBox.height - 10)).toBeLessThanOrEqual(0.1)
+  expect(Math.abs(beforeBox.y + beforeBox.height / 2 - afterBox.y - afterBox.height / 2)).toBeLessThanOrEqual(1)
   const labels = (page: Page) => page.locator('[class*="heroDayForecast"]:visible [class*="heroDayLow"], [class*="heroDayForecast"]:visible [class*="heroDayHigh"]')
     .evaluateAll((elements) => elements.map((element) => {
       const style = getComputedStyle(element)
@@ -386,7 +389,7 @@ async function approvedHeroRailRegion(baseline: Page, candidate: Page): Promise<
     }))
   expect(await labels(candidate)).toEqual(await labels(baseline))
   expect(await afterHero.getAttribute('aria-label')).toBe(await beforeHero.getAttribute('aria-label'))
-  const region = { x: Math.floor(beforeBox.x - 12), y: Math.floor(beforeBox.y - 12), width: Math.ceil(beforeBox.width + 24), height: Math.ceil(beforeBox.height + 24) }
+  const region = { x: Math.floor(beforeBox.x - 12), y: Math.floor(Math.min(beforeBox.y, afterBox.y) - 12), width: Math.ceil(beforeBox.width + 24), height: Math.ceil(Math.max(beforeBox.height, afterBox.height) + 24) }
   expect(region.height).toBeLessThanOrEqual(40)
   const viewport = candidate.viewportSize()!
   expect(region.width * region.height / (viewport.width * viewport.height)).toBeLessThan(0.08)
