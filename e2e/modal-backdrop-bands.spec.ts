@@ -1,11 +1,13 @@
 import { expect, test, type Locator, type Page } from './layout/fixture'
+import { waitForModalReady } from './layout/evidence'
 
 const PHONE = { height: 852, width: 393 }
 const CENTERED_QUERY = (width: number, height: number) => width >= 760 && height >= 560
 
-async function openHarness(page: Page, harness: string, values: string[] = []) {
+async function openHarness(page: Page, harness: string, values: string[] = [], backdropPolicy?: 'auto' | 'full') {
   const search = new URLSearchParams({ __modalAcceptance: harness })
   for (const value of values) search.append('__modalValue', value)
+  if (backdropPolicy) search.set('modalBackdrop', backdropPolicy)
   await page.goto(`/?${search.toString()}`)
   const dialog = page.getByRole('dialog').last()
   await expect(dialog).toBeVisible()
@@ -250,32 +252,36 @@ test('default bands keep the full scrim above blur while full policy remains ava
 })
 
 test('rendered blur passes a positive control before checking automatic pixel parity', async ({ browserName, page }) => {
-  await page.setViewportSize(PHONE)
-  const dialog = await openHarness(page, 'option-picker', ['Backdrop test', 'Automatic', 'Manual'])
-  const overlay = page.locator('[data-modal-sheet-overlay="true"]').last()
-  await expect(overlay).toHaveAttribute('data-exposed-backdrop-bands', 'true')
-  await page.waitForTimeout(700)
-  await page.evaluate(() => {
-    const probe = document.createElement('div')
-    probe.dataset.modalBackdropPixelProbe = 'true'
-    Object.assign(probe.style, {
-      background: 'repeating-conic-gradient(#fff 0 25%, #000 0 50%) 0 0 / 16px 16px',
-      inset: '0',
-      pointerEvents: 'none',
-      position: 'fixed',
-      zIndex: '39',
+  async function prepare(policy: 'auto' | 'full') {
+    const dialog = await openHarness(page, 'option-picker', ['Backdrop test', 'Automatic', 'Manual'], policy)
+    await waitForModalReady(dialog)
+    await page.evaluate(() => {
+      const probe = document.createElement('div')
+      probe.dataset.modalBackdropPixelProbe = 'true'
+      Object.assign(probe.style, {
+        background: 'repeating-conic-gradient(#fff 0 25%, #000 0 50%) 0 0 / 16px 16px',
+        inset: '0', pointerEvents: 'none', position: 'fixed', zIndex: '39',
+      })
+      document.body.append(probe)
     })
-    document.body.append(probe)
-  })
-  await dialog.locator('[data-modal-sheet-body="true"]').locator('..').evaluate((element) => {
-    element.style.setProperty('visibility', 'hidden', 'important')
-  })
-  for (const viewport of [PHONE, { height: 393, width: 852 }, { height: 1152, width: 741 }]) {
+    await dialog.locator('[data-modal-sheet-body="true"]').locator('..').evaluate((element) => {
+      element.style.setProperty('visibility', 'hidden', 'important')
+    })
+    return page.locator('[data-modal-sheet-overlay="true"]').last()
+  }
+  for (const [viewport, bandsExpected] of [[PHONE, true], [{ height: 393, width: 852 }, false], [{ height: 1152, width: 741 }, true]] as const) {
     await page.setViewportSize(viewport)
-    await expect(overlay).toHaveAttribute('data-exposed-backdrop-bands', 'true')
-    await expect(overlay.locator('[data-modal-backdrop-band="top"]')).toHaveCSS('backdrop-filter', 'blur(10px)')
+    const automaticOverlay = await prepare('auto')
+    if (bandsExpected) await expect(automaticOverlay).toHaveAttribute('data-exposed-backdrop-bands', 'true')
+    else await expect(automaticOverlay).not.toHaveAttribute('data-exposed-backdrop-bands')
     const optimized = await page.screenshot({ animations: 'allow' })
-    await overlay.evaluate((element) => element.removeAttribute('data-exposed-backdrop-bands'))
+    // Hold the documented ineligible fallback on the same surface while sampling.
+    // Otherwise a resize-settlement callback can restore bands between captures.
+    await page.getByRole('dialog').last().evaluate((element) => element.setAttribute('data-centered-layout', 'true'))
+    await automaticOverlay.evaluate((element) => element.removeAttribute('data-exposed-backdrop-bands'))
+    const overlay = automaticOverlay
+    await expect(overlay).not.toHaveAttribute('data-exposed-backdrop-bands')
+    await expect(overlay.locator('[data-modal-backdrop-band="top"]')).toHaveCSS('visibility', 'hidden')
     await expect(overlay).toHaveCSS('backdrop-filter', 'blur(10px)')
     const full = await page.screenshot({ animations: 'allow' })
     await overlay.evaluate((element) => {
@@ -293,11 +299,6 @@ test('rendered blur passes a positive control before checking automatic pixel pa
     const parity = await screenshotDifference(page, optimized, full)
     expect(parity.maxDelta).toBeLessThanOrEqual(1)
     expect(parity.differentPixelRatio).toBeLessThanOrEqual(0.0015)
-    await overlay.evaluate((element) => {
-      element.style.removeProperty('-webkit-backdrop-filter')
-      element.style.removeProperty('backdrop-filter')
-      element.setAttribute('data-exposed-backdrop-bands', 'true')
-    })
   }
 })
 

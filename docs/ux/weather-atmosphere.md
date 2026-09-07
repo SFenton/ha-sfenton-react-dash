@@ -56,6 +56,16 @@ be header-only. Keep visibility and glyph contrast checks together when tuning i
 
 ## Regression evidence
 
+For the release from the pinned `ab84f9a` baseline, mobile parity retains raw
+before/after PNGs and raw differences, then performs a separately labelled
+source-intent comparison. That old build dropped standard backdrop declarations
+even though its source declared them. Only that attested baseline's browser CSS
+replays the existing prefixed values as standard declarations; candidate CSS is
+never repaired. The approved hero temperature-rail replacement has one bounded
+decorative comparison region, with unchanged adjacent labels/geometry and
+independent rail tests. Numeric parity limits remain unchanged. This migration
+handling does not apply once the baseline advances beyond that exact commit.
+
 The Rain descriptor fingerprint in `WeatherAtmosphere.test.tsx` was captured from
 the user-approved preview before these changes; it is not generated from the
 candidate renderer. Generated CSS-module identifiers are not stable references.

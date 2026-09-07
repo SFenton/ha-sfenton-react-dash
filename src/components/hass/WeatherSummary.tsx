@@ -14,6 +14,7 @@ import { ModalSheet, type ModalCenteredGeometry, type ModalSheetBackdropPolicy, 
 import { SurfaceAccessory } from '../core/SurfaceAccessory'
 import { asEntityName } from './entityState'
 import { WeatherAtmosphere } from './WeatherAtmosphere'
+import { useWeatherModeTransition } from './weatherModeTransition'
 import { WeatherRail, type WeatherRailRange } from './WeatherRail'
 import { WeatherHourlyMetricTiles } from './WeatherHourlyMetricTiles'
 import { WeatherPrecipitationTile } from './WeatherPrecipitationTile'
@@ -1535,39 +1536,7 @@ function WeatherForecastSheet({
     ? aqiGuidance(copy, aqiStatus.level)
     : forecastSummary(forecasts, entity)
   const [selectedMode, setSelectedMode] = useState<HourlyMode>('condition')
-  const [displayMode, setDisplayMode] = useState<HourlyMode>('condition')
-  const [transitionPhase, setTransitionPhase] = useState<ModeTransitionPhase>('idle')
-  const previousSelectedModeRef = useRef(selectedMode)
-
-  useEffect(() => {
-    if (selectedMode === previousSelectedModeRef.current) return undefined
-    previousSelectedModeRef.current = selectedMode
-
-    if (typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-      const reducedMotionFrame = window.requestAnimationFrame(() => {
-        setDisplayMode(selectedMode)
-        setTransitionPhase('idle')
-      })
-      return () => window.cancelAnimationFrame(reducedMotionFrame)
-    }
-
-    let animationFrame = 0
-    const exitTimer = window.setTimeout(() => setTransitionPhase('out'), 0)
-
-    const swapTimer = window.setTimeout(() => {
-      setDisplayMode(selectedMode)
-      animationFrame = window.requestAnimationFrame(() => setTransitionPhase('in'))
-    }, 140)
-
-    const settleTimer = window.setTimeout(() => setTransitionPhase('idle'), 320)
-
-    return () => {
-      window.clearTimeout(exitTimer)
-      window.clearTimeout(swapTimer)
-      window.clearTimeout(settleTimer)
-      if (animationFrame) window.cancelAnimationFrame(animationFrame)
-    }
-  }, [selectedMode])
+  const { displayMode, transitionPhase } = useWeatherModeTransition(selectedMode)
 
   return (
     <div className={styles.sheet}>

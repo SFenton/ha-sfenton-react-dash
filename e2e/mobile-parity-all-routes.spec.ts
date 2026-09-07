@@ -1,8 +1,12 @@
 import fs from 'node:fs'
 import path from 'node:path'
+import { createHash } from 'node:crypto'
 import { expect, test, type Browser, type Page } from './layout/fixture'
 import { RESPONSIVE_ROUTES, type ResponsiveRoute } from './responsive-acceptance-data'
-import { selectedParityRoutes } from '../scripts/required-mobile-parity'
+import { APPROVED_WEATHER_RENDER_MIGRATION_BASE, restoreSourceDeclaredBackdropFilters, selectedParityRoutes } from '../scripts/required-mobile-parity'
+import type { RunIdentity } from './layout/types'
+
+type PixelRegion = { x: number; y: number; width: number; height: number }
 
 type ElementSignature = {
   color: string
@@ -30,6 +34,9 @@ type RouteParityResult = {
   route: ResponsiveRoute
   signatureCount: number
   viewport: string
+  rawDifferentPixelRatio: number
+  rawMaxChannelDelta: number
+  approvedHeroRailRegion?: PixelRegion
 }
 
 const BASELINE_URL = process.env.RESPONSIVE_BASELINE_URL
@@ -37,6 +44,10 @@ const CANDIDATE_URL = process.env.RESPONSIVE_CANDIDATE_URL
 const PARITY_REQUIRED = process.env.RESPONSIVE_PARITY_REQUIRED === '1'
 const ARTIFACT_DIR = process.env.RESPONSIVE_ARTIFACT_DIR
 const SELECTED_ROUTES = selectedParityRoutes(process.env.RESPONSIVE_PARITY_ROUTES, RESPONSIVE_ROUTES)
+const RUN = process.env.LAYOUT_RUN_DIR
+  ? JSON.parse(fs.readFileSync(path.resolve(process.env.LAYOUT_RUN_DIR, 'run.json'), 'utf8')) as RunIdentity
+  : null
+const APPROVED_RENDER_MIGRATION = RUN?.source.base === APPROVED_WEATHER_RENDER_MIGRATION_BASE
 const PHONE_PARITY_VIEWPORTS = [
   { height: 852, name: 'phone-portrait', width: 393 },
   { height: 393, name: 'phone-landscape', width: 852 },
@@ -93,6 +104,7 @@ async function preparePage(
   browser: Browser,
   baseURL: string,
   viewport: { height: number; width: number } = MOBILE_VIEWPORT,
+  restoreDeclaredFilters = false,
 ) {
   const context = await browser.newContext({
     deviceScaleFactor: 1,
@@ -100,6 +112,22 @@ async function preparePage(
     isMobile: true,
     viewport,
   })
+  const filterRepairs: Array<{ url: string; originalHash: string; restoredHash: string; declarations: number }> = []
+  if (restoreDeclaredFilters) {
+    if (!APPROVED_RENDER_MIGRATION || baseURL !== BASELINE_URL) throw new Error('Only the attested approved baseline may receive the declared-filter replay')
+    await context.route(`${baseURL}/assets/*.css`, async (route) => {
+      const response = await route.fetch()
+      const original = await response.text()
+      const restored = restoreSourceDeclaredBackdropFilters(original)
+      filterRepairs.push({
+        url: route.request().url(),
+        originalHash: createHash('sha256').update(original).digest('hex'),
+        restoredHash: createHash('sha256').update(restored.css).digest('hex'),
+        declarations: restored.repairs.length,
+      })
+      await route.fulfill({ response, body: restored.css })
+    })
+  }
   const page = await context.newPage()
   const errors: string[] = []
   page.on('pageerror', (error) => errors.push(`pageerror: ${error.message}`))
@@ -115,7 +143,7 @@ async function preparePage(
   await waitForPrimaryNavigation(page)
   await page.addStyleTag({ content: SCREENSHOT_STYLE })
   await page.evaluate(() => document.fonts.ready)
-  return { context, errors, page }
+  return { context, errors, page, filterRepairs }
 }
 
 async function openRoute(page: Page, route: ResponsiveRoute) {
@@ -278,8 +306,8 @@ async function pageSignature(page: Page): Promise<ElementSignature[]> {
   })
 }
 
-async function comparePngs(page: Page, baseline: Buffer, candidate: Buffer) {
-  return page.evaluate(async ({ baselineBase64, candidateBase64 }) => {
+async function comparePngs(page: Page, baseline: Buffer, candidate: Buffer, ignoredRegions: PixelRegion[] = []) {
+  return page.evaluate(async ({ baselineBase64, candidateBase64, ignoredRegions }) => {
     const load = (source: string) => new Promise<HTMLImageElement>((resolve, reject) => {
       const image = new Image()
       image.onload = () => resolve(image)
@@ -313,6 +341,9 @@ async function comparePngs(page: Page, baseline: Buffer, candidate: Buffer) {
     let maxChannelDelta = 0
     let totalDelta = 0
     for (let index = 0; index < baselineData.length; index += 4) {
+      const x = (index / 4) % canvas.width
+      const y = Math.floor(index / 4 / canvas.width)
+      if (ignoredRegions.some((region) => x >= region.x && x < region.x + region.width && y >= region.y && y < region.y + region.height)) continue
       let pixelDelta = 0
       for (let channel = 0; channel < 4; channel += 1) {
         pixelDelta = Math.max(pixelDelta, Math.abs(baselineData[index + channel] - candidateData[index + channel]))
@@ -330,7 +361,36 @@ async function comparePngs(page: Page, baseline: Buffer, candidate: Buffer) {
   }, {
     baselineBase64: baseline.toString('base64'),
     candidateBase64: candidate.toString('base64'),
+    ignoredRegions,
   })
+}
+
+async function approvedHeroRailRegion(baseline: Page, candidate: Page): Promise<PixelRegion | undefined> {
+  if (!APPROVED_RENDER_MIGRATION) return undefined
+  const beforeHero = baseline.locator('[class*="heroDayForecast"]:visible').first()
+  const afterHero = candidate.locator('[class*="heroDayForecast"]:visible').first()
+  const before = beforeHero.locator('[class*="heroDayRangeTrack"]')
+  const after = afterHero.locator('[data-weather-rail="temperature"]')
+  if (await before.count() === 0 || await after.count() === 0) return undefined
+  await expect(before).toHaveCount(1)
+  await expect(after).toHaveCount(1)
+  const beforeBox = await before.boundingBox()
+  const afterBox = await after.boundingBox()
+  if (!beforeBox || !afterBox) throw new Error('Approved rail migration must retain measurable geometry')
+  for (const key of ['x', 'y', 'width', 'height'] as const) expect(Math.abs(beforeBox[key] - afterBox[key])).toBeLessThanOrEqual(1)
+  const labels = (page: Page) => page.locator('[class*="heroDayForecast"]:visible [class*="heroDayLow"], [class*="heroDayForecast"]:visible [class*="heroDayHigh"]')
+    .evaluateAll((elements) => elements.map((element) => {
+      const style = getComputedStyle(element)
+      const box = element.getBoundingClientRect()
+      return { text: element.textContent, color: style.color, font: style.font, x: Math.round(box.x * 10) / 10, y: Math.round(box.y * 10) / 10, width: Math.round(box.width * 10) / 10, height: Math.round(box.height * 10) / 10 }
+    }))
+  expect(await labels(candidate)).toEqual(await labels(baseline))
+  expect(await afterHero.getAttribute('aria-label')).toBe(await beforeHero.getAttribute('aria-label'))
+  const region = { x: Math.floor(beforeBox.x - 12), y: Math.floor(beforeBox.y - 12), width: Math.ceil(beforeBox.width + 24), height: Math.ceil(beforeBox.height + 24) }
+  expect(region.height).toBeLessThanOrEqual(40)
+  const viewport = candidate.viewportSize()!
+  expect(region.width * region.height / (viewport.width * viewport.height)).toBeLessThan(0.08)
+  return region
 }
 
 for (const parityViewport of PHONE_PARITY_VIEWPORTS) {
@@ -343,7 +403,8 @@ for (const parityViewport of PHONE_PARITY_VIEWPORTS) {
     expect(SELECTED_ROUTES.length, 'Required route loop cannot be empty').toBeGreaterThan(0)
     test.setTimeout(600_000)
 
-    const baseline = await preparePage(browser, BASELINE_URL!, parityViewport)
+    const baseline = await preparePage(browser, BASELINE_URL!, parityViewport, APPROVED_RENDER_MIGRATION)
+    const rawBaseline = APPROVED_RENDER_MIGRATION ? await preparePage(browser, BASELINE_URL!, parityViewport) : null
     const candidate = await preparePage(browser, CANDIDATE_URL!, parityViewport)
     const comparisonPage = await browser.newPage()
     const results: RouteParityResult[] = []
@@ -355,6 +416,12 @@ for (const parityViewport of PHONE_PARITY_VIEWPORTS) {
     try {
       for (const route of SELECTED_ROUTES) {
         await test.step(route, async () => {
+          if (rawBaseline) {
+            await openRoute(rawBaseline.page, route)
+            await ensureRouteContent(rawBaseline.page, route)
+            await ensureInventoryContent(rawBaseline.page, route)
+            await settleStableVisual(rawBaseline.page)
+          }
           await openRoute(baseline.page, route)
           await ensureRouteContent(baseline.page, route)
           await ensureInventoryContent(baseline.page, route)
@@ -381,11 +448,17 @@ for (const parityViewport of PHONE_PARITY_VIEWPORTS) {
             baseline.page.screenshot({ animations: 'disabled', mask: [baseline.page.locator('button[aria-label$=" camera"]')] }),
             candidate.page.screenshot({ animations: 'disabled', mask: [candidate.page.locator('button[aria-label$=" camera"]')] }),
           ])
+          const rawBaselineScreenshot = rawBaseline
+            ? await rawBaseline.page.screenshot({ animations: 'disabled', mask: [rawBaseline.page.locator('button[aria-label$=" camera"]')] })
+            : baselineScreenshot
           if (screenshotDirectory) {
             fs.writeFileSync(path.join(screenshotDirectory, `${sanitizeRoute(route)}-baseline.png`), baselineScreenshot)
             fs.writeFileSync(path.join(screenshotDirectory, `${sanitizeRoute(route)}-candidate.png`), candidateScreenshot)
+            if (rawBaseline) fs.writeFileSync(path.join(screenshotDirectory, `${sanitizeRoute(route)}-raw-baseline.png`), rawBaselineScreenshot)
           }
-          const difference = await comparePngs(comparisonPage, baselineScreenshot, candidateScreenshot)
+          const rawDifference = await comparePngs(comparisonPage, rawBaselineScreenshot, candidateScreenshot)
+          const railRegion = route === 'overview' ? await approvedHeroRailRegion(baseline.page, candidate.page) : undefined
+          const difference = await comparePngs(comparisonPage, baselineScreenshot, candidateScreenshot, railRegion ? [railRegion] : [])
           results.push({
             route,
             differentPixelRatio: difference.differentPixels / (parityViewport.width * parityViewport.height),
@@ -394,6 +467,9 @@ for (const parityViewport of PHONE_PARITY_VIEWPORTS) {
             intendedBackMenuRemoval: baselineBackMenus > 0,
             signatureCount: baselineSignature.length,
             viewport: parityViewport.name,
+            rawDifferentPixelRatio: rawDifference.differentPixels / (parityViewport.width * parityViewport.height),
+            rawMaxChannelDelta: rawDifference.maxChannelDelta,
+            approvedHeroRailRegion: railRegion,
             ...difference,
           })
         })
@@ -408,7 +484,8 @@ for (const parityViewport of PHONE_PARITY_VIEWPORTS) {
           baselineURL: BASELINE_URL,
           candidateURL: CANDIDATE_URL,
           generatedAt: new Date().toISOString(),
-          screenshotNormalization: 'Only the obsolete short-landscape Back-page menu glyph is hidden in the baseline, preserving its layout. The candidate must omit that control from the DOM.',
+          screenshotNormalization: 'Obsolete Back-page menu glyphs are hidden without changing layout. Only for the attested ab84f9a approved rendering migration, baseline-browser CSS replays its source-declared filters and the approved decorative hero rail region is compared by unchanged geometry/labels plus focused rail guards. Raw baseline/candidate PNGs and raw deltas are retained. No candidate filter is repaired and numeric parity tolerances are unchanged.',
+          baselineFilterRepairs: baseline.filterRepairs,
           routeCount: SELECTED_ROUTES.length,
           results,
           viewport: parityViewport,
@@ -416,6 +493,7 @@ for (const parityViewport of PHONE_PARITY_VIEWPORTS) {
       }
 
       expect(baseline.errors).toEqual([])
+      if (rawBaseline) expect(rawBaseline.errors).toEqual([])
       expect(candidate.errors).toEqual([])
       expect(results.filter((result) => !result.geometryMatches).map((result) => result.route), 'geometry/style parity').toEqual([])
       expect(
@@ -433,6 +511,7 @@ for (const parityViewport of PHONE_PARITY_VIEWPORTS) {
       })), 'screenshot maximum channel parity').toEqual([])
     } finally {
       await baseline.context.close()
+      await rawBaseline?.context.close()
       await candidate.context.close()
       await comparisonPage.close()
     }
