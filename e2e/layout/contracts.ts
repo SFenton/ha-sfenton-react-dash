@@ -406,7 +406,7 @@ export const LEGACY_ENGINE_SKIPS = [
   { spec: 'modal-sheet-lifecycle.spec.ts', title: 'keeps a synthetic WebKit top-edge swipe terminal through the mounted exit window', browser: 'chromium', reason: 'Constructed TouchEvent coverage targets the WebKit project' },
   { spec: 'modal-sheet-lifecycle.spec.ts', title: 'keeps a synthetic WebKit top-edge swipe terminal through the mounted exit window', browser: 'webkit', reason: 'Playwright WebKit exposes no trusted touch-drag injection; constructed TouchEvents are untrusted and cannot drive Base UI dismissal. Chromium CDP covers trusted swipe dismissal.' },
   { spec: 'modal-sheet-performance.spec.ts', title: 'keeps page glass blurred while removing nested modal glass blur in WebKit', browser: 'chromium', reason: 'Backdrop-filter computed styles are validated in WebKit' },
-  { spec: 'modal-sheet-performance.spec.ts', title: 'records paired throttled frame metrics without a modal cadence regression', browser: 'webkit', reason: 'CPU throttling and trusted touch injection are Chromium-only' },
+  { spec: 'modal-sheet-performance.spec.ts', title: 'compares automatic and full backdrop policies under throttled idle and trusted dismissal', browser: 'webkit', reason: 'CPU throttling and trusted touch injection are Chromium-only' },
 ] as const
 
 export function requireScenarios(ids: readonly string[]): ScenarioId[] {

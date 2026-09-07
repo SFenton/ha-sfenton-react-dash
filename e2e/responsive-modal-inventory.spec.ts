@@ -935,9 +935,12 @@ async function auditModal(page: Page, modalCase: ModalCase, dialog: Locator, vie
       unshieldedSvgTargets,
     }
   })
+  await expect.poll(async () => {
+    const current = await auditBackdropBands(page)
+    const expected = current.policy === 'auto' && !metrics.centered && current.areaRatio <= 0.25
+    return current.active === expected
+  }, { message: `${modalCase.id} ${stage} settled automatic backdrop eligibility` }).toBe(true)
   const backdrop = await auditBackdropBands(page)
-  const expectedBackdropActive = backdrop.policy === 'auto' && !metrics.centered && backdrop.areaRatio <= 0.25
-  expect(backdrop.active, `${modalCase.id} ${stage} automatic backdrop eligibility`).toBe(expectedBackdropActive)
   if (backdrop.policy === 'auto' && !metrics.centered) {
     expect(backdrop.proxyHeightDelta, `${modalCase.id} ${stage} backdrop proxy height`).toBeLessThanOrEqual(1)
   }
