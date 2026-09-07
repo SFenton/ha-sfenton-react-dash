@@ -251,6 +251,12 @@ export const WEATHER_COPY_KEYS = {
     label: 'headline.label',
     weather: 'headline.weather',
   },
+  forecast: {
+    dailyError: 'forecast.dailyError',
+    hourlyError: 'forecast.hourlyError',
+    dailyEmpty: 'forecast.dailyEmpty',
+    hourlyEmpty: 'forecast.hourlyEmpty',
+  },
   hero: {
     high: 'hero.high',
     highLow: 'hero.highLow',

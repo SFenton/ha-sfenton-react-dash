@@ -9,12 +9,19 @@ describe('DashboardPreloadCache', () => {
   })
 
   it('renders inert geometry without runtime I/O', () => {
+    const view = render(<div />)
     const resizeObserver = vi.fn()
     const mutationObserver = vi.fn()
+    const intersectionObserver = vi.fn()
+    const fetch = vi.fn()
     const timeout = vi.spyOn(window, 'setTimeout')
+    const interval = vi.spyOn(window, 'setInterval')
     const animationFrame = vi.spyOn(window, 'requestAnimationFrame')
     const windowListener = vi.spyOn(window, 'addEventListener')
+    const documentListener = vi.spyOn(document, 'addEventListener')
+    const xhr = vi.spyOn(XMLHttpRequest.prototype, 'open').mockImplementation(() => undefined)
 
+    vi.stubGlobal('fetch', fetch)
     vi.stubGlobal('ResizeObserver', class {
       constructor() {
         resizeObserver()
@@ -35,21 +42,37 @@ describe('DashboardPreloadCache', () => {
         return []
       }
     })
+    vi.stubGlobal('IntersectionObserver', class {
+      constructor() {
+        intersectionObserver()
+      }
+
+      disconnect() {}
+      observe() {}
+      unobserve() {}
+    })
 
     try {
-      const { container } = render(<DashboardPreloadCache active />)
+      view.rerender(<DashboardPreloadCache active />)
+      const { container } = view
 
       expect(container.querySelectorAll('[data-preload-route]')).toHaveLength(DASHBOARD_ROUTES.length)
       expect(container.querySelectorAll('[data-preload-geometry="modal"]').length).toBeGreaterThan(0)
       expect(container.querySelector('[data-dynamic-grid="true"]')).toBeNull()
-      expect(container.querySelector('img, video, canvas')).toBeNull()
+      expect(container.querySelector('img, video, audio, source, iframe, object, embed, script, link, canvas')).toBeNull()
       expect(mockCallServiceCalls).toEqual([])
       expect(resizeObserver).not.toHaveBeenCalled()
       expect(mutationObserver).not.toHaveBeenCalled()
+      expect(intersectionObserver).not.toHaveBeenCalled()
       expect(timeout).not.toHaveBeenCalled()
+      expect(interval).not.toHaveBeenCalled()
       expect(animationFrame).not.toHaveBeenCalled()
       expect(windowListener).not.toHaveBeenCalled()
+      expect(documentListener).not.toHaveBeenCalled()
+      expect(fetch).not.toHaveBeenCalled()
+      expect(xhr).not.toHaveBeenCalled()
     } finally {
+      view.unmount()
       vi.unstubAllGlobals()
       vi.restoreAllMocks()
     }

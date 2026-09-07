@@ -1181,6 +1181,7 @@ test('weather modal renders a live atmosphere and outdoor AQI without motion-onl
   await expect(dialog.locator('[data-weather-scene="clouds"]')).toBeVisible()
   const aqiTile = dialog.getByRole('article', { name: 'Outdoor air quality 152, Unhealthy' })
   await expect(aqiTile).toHaveAttribute('data-aqi-tone', 'unhealthy')
+  await expect(aqiTile.locator('[data-weather-rail="aqi"] [data-weather-rail-marker="true"]')).toBeVisible()
   await expect(aqiTile.getByText('Health effects are possible for everyone.')).toHaveCount(0)
   await expect(dialog.getByLabel('Current weather conditions')).toContainText(/High: 65°\s+Low: 48°/)
   await expect(dialog.getByLabel('Current weather conditions')).not.toContainText('Home')
@@ -1221,10 +1222,43 @@ test('weather modal renders a live atmosphere and outdoor AQI without motion-onl
   expect(await humidityTile.locator('[data-hourly-metric-label="humidity"]').allTextContents())
     .toEqual(await cloudTile.locator('[data-hourly-metric-label="cloud"]').allTextContents())
   await expect(dialog.locator('[data-weather-highlight-rail="feels"]')).toBeVisible()
+  await expect(dialog.locator('[data-weather-rail="feels"] [data-weather-rail-fill]')).toHaveCSS(
+    'background-image',
+    'linear-gradient(90deg, rgb(59, 130, 246), rgb(20, 184, 166) 42%, rgb(202, 138, 4) 70%, rgb(234, 88, 12))',
+  )
   await expect(dialog.locator('[data-weather-highlight-rail="uv"]')).toBeVisible()
   const visibilityTile = dialog.getByRole('article', { name: /^Visibility / })
   await expect(visibilityTile.locator('[data-visibility-visual="distance-rail"]')).toBeVisible()
-  await expect(visibilityTile.locator('[class*="visibilityDistanceMarker"]')).toBeVisible()
+  await expect(visibilityTile.locator('[data-weather-rail-marker="true"]')).toBeVisible()
+  const weatherRails = page.locator('[data-weather-rail]')
+  await expect(weatherRails).toHaveCount(12)
+  await expect(page.locator('[data-weather-rail="temperature"]')).toHaveCount(8)
+  const weatherRailGeometry = await weatherRails.evaluateAll((rails) => ({
+    classCount: new Set(rails.map((rail) => rail.className)).size,
+    fillsMatch: rails.every((rail) => rail.querySelector<HTMLElement>('[data-weather-rail-fill]')?.getBoundingClientRect().height === 10),
+    markersMatch: rails.every((rail) => {
+      const marker = rail.querySelector<HTMLElement>('[data-weather-rail-marker]')
+      if (!marker) return true
+      const bounds = marker.getBoundingClientRect()
+      return bounds.height === 12 && bounds.width === 12
+    }),
+    markersSolidWhite: rails.every((rail) => {
+      const marker = rail.querySelector<HTMLElement>('[data-weather-rail-marker]')
+      if (!marker) return true
+      const style = getComputedStyle(marker)
+      return style.backgroundColor === 'rgb(255, 255, 255)'
+        && style.borderTopWidth === '0px'
+        && style.boxShadow === 'none'
+    }),
+    railsMatch: rails.every((rail) => rail.getBoundingClientRect().height === 10),
+  }))
+  expect(weatherRailGeometry).toEqual({
+    classCount: 1,
+    fillsMatch: true,
+    markersMatch: true,
+    markersSolidWhite: true,
+    railsMatch: true,
+  })
   const windTile = dialog.locator('[data-kind="wind"]')
   await expect(windTile).toHaveAttribute('aria-label', 'Wind 4 mph; Gusts 8 mph; From southwest, 236 degrees')
   await expect(windTile).toHaveAttribute('data-wide', 'true')
@@ -1332,6 +1366,23 @@ test('weather modal renders a live atmosphere and outdoor AQI without motion-onl
   await expect(windVector).toHaveAttribute('data-source-bearing', '100')
   await expect(dialog.getByRole('article', { name: 'Cloud Cover 57%' })).toHaveCount(0)
   await expect(dialog.getByRole('button', { name: /Visualization Lab/i })).toHaveCount(0)
+  await dialog.getByRole('button', { name: 'Wind conditions' }).click()
+  const dailyWindSummary = dialog.getByRole('article', { name: 'Today wind 4-8 mph' }).locator('[data-forecast-wind-summary]')
+  await expect(dailyWindSummary).toBeVisible()
+  const dailyWindGeometry = await dailyWindSummary.evaluate((element) => {
+    const direction = element.querySelector<HTMLElement>('[data-wind-source-bearing]')?.getBoundingClientRect()
+    const speed = element.querySelector<HTMLElement>('[class*="forecastWindRange"]')?.getBoundingClientRect()
+    return {
+      directionBeforeSpeed: Boolean(direction && speed && direction.right <= speed.left),
+      gap: direction && speed ? speed.left - direction.right : Number.POSITIVE_INFINITY,
+      railCount: element.querySelectorAll('[class*="windSparkline"]').length,
+    }
+  })
+  expect(dailyWindGeometry).toMatchObject({
+    directionBeforeSpeed: true,
+    railCount: 0,
+  })
+  expect(dailyWindGeometry.gap).toBeLessThanOrEqual(12)
   const decorationCoverage = await dialog.evaluate((element) => {
     const decoration = element.querySelector<HTMLElement>('[data-modal-sheet-surface-decoration="true"]')
     if (!decoration) return null

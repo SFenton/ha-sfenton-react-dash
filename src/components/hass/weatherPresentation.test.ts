@@ -10,6 +10,7 @@ import {
   sunPresentation,
   uvPresentation,
   visibilityPresentation,
+  WEATHER_DATA_TRANSITION_MS,
   windBearingPresentation,
   weatherSceneForCondition,
 } from './weatherPresentation'
@@ -115,6 +116,7 @@ describe('weather presentation', () => {
     expect(compassRotationDurationMs(0, 90)).toBe(390)
     expect(compassRotationDurationMs(0, 180)).toBe(520)
     expect(compassRotationDurationMs(350, 370)).toBe(289)
+    expect(WEATHER_DATA_TRANSITION_MS).toBe(compassRotationDurationMs(0, 90))
   })
 
   it('normalizes pressure units before assigning a band', () => {

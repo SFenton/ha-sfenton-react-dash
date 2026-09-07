@@ -64,6 +64,23 @@ async function openSleepypodScopePrompt(page: Page) {
   return { dialog, targetSlider }
 }
 
+async function openWeatherModal(page: Page) {
+  await page.goto('/index.html?path=overview')
+  await page.evaluate(() => {
+    const api = (window as unknown as {
+      __mockHass: {
+        setEntityAttribute: (entityId: string, attribute: string, value: unknown) => void
+      }
+    }).__mockHass
+    api.setEntityAttribute('weather.pirate_weather', 'pressure', 29.92)
+    api.setEntityAttribute('weather.pirate_weather', 'pressure_unit', 'inHg')
+  })
+  await page.getByRole('button', { name: /Open seven-day weather forecast/i }).click()
+  const dialog = page.getByRole('dialog', { name: 'Weather' })
+  await expect(dialog.locator('[data-kind="pressure"] [class*="pressureGaugeSvg"]')).toBeVisible()
+  return dialog
+}
+
 async function waitForSheetDragReady(page: Page) {
   await page.waitForTimeout(SHEET_OPEN_ANIMATION_MS + 150)
 }
@@ -84,6 +101,20 @@ async function modalBodyPaddingPoint(dialog: Locator, yRatio = 0.25): Promise<Po
   return {
     x: box.x + 6,
     y: box.y + Math.max(12, Math.min(box.height - 12, box.height * yRatio)),
+  }
+}
+
+async function weatherHighlightGapPoint(dialog: Locator): Promise<Point> {
+  const grid = dialog.locator('[class*="highlightGrid"]')
+  const pressure = dialog.locator('[data-kind="pressure"]')
+  const [gridBox, pressureBox] = await Promise.all([grid.boundingBox(), pressure.boundingBox()])
+  if (!gridBox || !pressureBox) throw new Error('Weather highlight gap was not measurable')
+  const pressureCenterX = pressureBox.x + pressureBox.width / 2
+  return {
+    x: pressureCenterX < gridBox.x + gridBox.width / 2
+      ? gridBox.x + gridBox.width - pressureBox.width / 2
+      : gridBox.x + pressureBox.width / 2,
+    y: pressureBox.y + pressureBox.height / 2,
   }
 }
 
@@ -361,6 +392,72 @@ test.describe('mobile ModalSheet gestures', () => {
     await expect(dialog).toHaveAttribute('data-state', 'open')
     await expect.poll(() => body.evaluate((element) => element.scrollTop)).toBeLessThan(before)
     expectSheetStayedStill(samples)
+  })
+
+  test('weather decorative SVG starts preserve native scrolling and top-edge dismissal', async ({ page }) => {
+    const dialog = await openWeatherModal(page)
+    const body = dialog.locator('[data-modal-sheet-body="true"]')
+    const overlay = page.locator('[data-modal-sheet-overlay="true"]')
+    await waitForSheetDragReady(page)
+    await expect(overlay).toHaveAttribute('data-exposed-backdrop-bands', 'true')
+    await expect(dialog.locator('[class*="sheet"] svg')).not.toHaveCount(0)
+    expect(await dialog.locator('[class*="sheet"] svg').evaluateAll((elements) => (
+      elements.every((element) => getComputedStyle(element).pointerEvents === 'none')
+    ))).toBe(true)
+
+    const gestureTargets = [
+      dialog.locator('[data-kind="pressure"] [class*="pressureGaugeSvg"]'),
+      dialog.locator('[data-kind="pressure"] [class*="highlightTitle"] svg'),
+      dialog.locator('[data-kind="wind"] [data-wind-compass] svg'),
+      dialog.locator('[data-kind="sun"] [class*="sunArc"] svg'),
+    ]
+    for (const target of gestureTargets) {
+      const before = await body.evaluate((element) => {
+        element.scrollTop = element.scrollHeight
+        return element.scrollTop
+      })
+      const start = await locatorPoint(target)
+      const hitNamespace = await page.evaluate(({ x, y }) => document.elementFromPoint(x, y)?.namespaceURI, start)
+      expect(hitNamespace).not.toBe('http://www.w3.org/2000/svg')
+      const session = await beginTouch(page, start)
+      await expect(overlay).not.toHaveAttribute('data-exposed-backdrop-bands')
+      const samples: GestureSample[] = []
+      await moveTouch(session, { x: start.x, y: start.y + 140 }, 12, 24, async () => {
+        samples.push(await gestureSample(dialog, body))
+      })
+      await finishTouch(session)
+      await expect(dialog).toHaveAttribute('data-state', 'open')
+      await expect.poll(() => body.evaluate((element) => element.scrollTop)).toBeLessThan(before - 40)
+      expectSheetStayedStill(samples)
+      await expect(overlay).toHaveAttribute('data-exposed-backdrop-bands', 'true', { timeout: 1_000 })
+    }
+
+    const beforeGap = await body.evaluate((element) => {
+      element.scrollTop = element.scrollHeight
+      return element.scrollTop
+    })
+    const gapStart = await weatherHighlightGapPoint(dialog)
+    const gapSession = await beginTouch(page, gapStart)
+    await expect(overlay).not.toHaveAttribute('data-exposed-backdrop-bands')
+    const gapSamples: GestureSample[] = []
+    await moveTouch(gapSession, { x: gapStart.x, y: gapStart.y + 140 }, 12, 24, async () => {
+      gapSamples.push(await gestureSample(dialog, body))
+    })
+    await finishTouch(gapSession)
+    await expect.poll(() => body.evaluate((element) => element.scrollTop)).toBeLessThan(beforeGap - 40)
+    expectSheetStayedStill(gapSamples)
+    await expect(overlay).toHaveAttribute('data-exposed-backdrop-bands', 'true', { timeout: 1_000 })
+
+    await body.evaluate((element) => { element.scrollTop = 0 })
+    await dialog.getByRole('button', { name: 'Precipitation conditions' }).click()
+    await expect(dialog.getByRole('button', { name: 'Precipitation conditions' })).toHaveAttribute('aria-pressed', 'true')
+    const currentGlyph = dialog.locator('[class*="currentIcon"] svg')
+    const start = await locatorPoint(currentGlyph)
+    const dialogBox = await dialog.boundingBox()
+    if (!dialogBox) throw new Error('Weather modal was not measurable')
+    await dragTouch(page, start, { x: start.x, y: start.y + dialogBox.height * 0.6 }, 12, 24)
+    await expect(overlay).not.toHaveAttribute('data-exposed-backdrop-bands')
+    await expect(dialog).toHaveAttribute('data-state', 'closed')
   })
 
   test('sub-slop movement stays still before a downward top-edge drag takes ownership', async ({ page }) => {

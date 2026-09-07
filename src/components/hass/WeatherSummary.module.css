@@ -117,13 +117,6 @@
   white-space: nowrap;
 }
 
-.heroDayRangeTrack {
-  position: relative;
-  height: 8px;
-  border-radius: 999px;
-  background: rgba(22, 36, 52, 0.42);
-}
-
 .heroDayForecastPlaceholder {
   opacity: 0.58;
 }
@@ -139,37 +132,6 @@
 .heroDayIconPlaceholder {
   width: 22px;
   height: 22px;
-}
-
-.heroDayRangeFill {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: var(--range-start, 0%);
-  width: var(--range-size, 0%);
-  border-radius: 999px;
-  background: linear-gradient(
-    90deg,
-    #64d8ff,
-    #a8df85 46%,
-    #ffd34d 72%,
-    #ff8a1f
-  );
-}
-
-.heroDayRangeMarker {
-  position: absolute;
-  top: 50%;
-  left: var(--range-marker, 0%);
-  width: 14px;
-  height: 14px;
-  border: 1px solid rgba(112, 119, 128, 0.9);
-  border-radius: 50%;
-  background: #fff;
-  box-shadow:
-    0 0 0 1px rgba(32, 44, 62, 0.44),
-    0 2px 5px rgba(0, 0, 0, 0.28);
-  transform: translate(-50%, -50%);
 }
 
 .heroHourlyStrip {
@@ -690,6 +652,11 @@
   gap: 0;
 }
 
+.forecastList[data-mode='wind'] {
+  grid-template-columns: 70px minmax(0, 1fr) 24px minmax(0, max-content);
+  column-gap: 8px;
+}
+
 .forecastRow {
   display: grid;
   grid-template-columns: 70px 34px 42px minmax(80px, 1fr) 42px;
@@ -703,8 +670,10 @@
   grid-template-columns: 70px 34px minmax(86px, 1fr) 54px 42px;
 }
 
-.forecastRow[data-mode="wind"] {
-  grid-template-columns: 70px 34px minmax(96px, 1fr) minmax(66px, auto);
+.forecastList[data-mode='wind'] > .forecastRow[data-mode='wind'] {
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
+  column-gap: inherit;
 }
 
 .forecastRow:first-child {
@@ -745,85 +714,6 @@
   color: white;
 }
 
-.rangeTrack {
-  position: relative;
-  height: 5px;
-  border-radius: 999px;
-  background: rgba(22, 36, 52, 0.42);
-  overflow: hidden;
-}
-
-.rangeFill {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: var(--range-start, 0%);
-  width: var(--range-size, 0%);
-  border-radius: 999px;
-  background: linear-gradient(
-    90deg,
-    #64d8ff,
-    #a8df85 46%,
-    #ffd34d 72%,
-    #ff8a1f
-  );
-}
-
-.rangeMarker {
-  position: absolute;
-  top: 50%;
-  left: var(--range-marker, 0%);
-  width: 7px;
-  height: 7px;
-  border: 2px solid rgba(255, 255, 255, 0.88);
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.5);
-  transform: translate(-50%, -50%);
-  box-shadow: 0 0 0 2px rgba(32, 44, 62, 0.72);
-}
-
-.precipTrack {
-  position: relative;
-  display: grid;
-  grid-template-columns: repeat(12, 1fr);
-  gap: 3px;
-  height: 26px;
-  align-items: end;
-  overflow: hidden;
-}
-
-.precipTrack::before {
-  display: contents;
-  content: "";
-}
-
-.precipTrack::after {
-  position: absolute;
-  inset: 5px 0;
-  border-radius: 999px;
-  background: repeating-linear-gradient(
-    90deg,
-    rgba(255, 255, 255, 0.1) 0 5px,
-    rgba(255, 255, 255, 0.22) 5px 10px,
-    transparent 10px 15px
-  );
-  content: "";
-  opacity: 0.82;
-}
-
-.precipFill {
-  position: absolute;
-  top: 11px;
-  bottom: 11px;
-  left: 0;
-  width: var(--percent-fill, 0%);
-  min-width: 8px;
-  border-radius: 999px;
-  background: rgba(80, 208, 232, 0.9);
-  box-shadow: 0 0 10px rgba(80, 208, 232, 0.32);
-  z-index: 1;
-}
-
 .forecastAmount,
 .forecastChance,
 .forecastWindRange {
@@ -838,32 +728,30 @@
   color: rgba(255, 255, 255, 0.54);
 }
 
-.windSparkline {
-  position: relative;
-  height: 28px;
-  border-radius: 8px;
-  background: linear-gradient(
-    90deg,
-    rgba(255, 255, 255, 0.04),
-    rgba(255, 255, 255, 0.12) 50%,
-    rgba(255, 255, 255, 0.04)
-  );
+.forecastWindRange {
+  min-width: 0;
   overflow: hidden;
+  font-variant-numeric: tabular-nums;
+  text-overflow: ellipsis;
 }
 
-.windLine {
-  position: absolute;
-  right: 8px;
-  bottom: 8px;
-  left: 8px;
-  height: 4px;
-  border-radius: 999px;
-  background: linear-gradient(
-    90deg,
-    rgba(56, 211, 224, 0.65),
-    rgba(56, 211, 224, 0.96)
-  );
-  box-shadow: 0 -6px 0 rgba(56, 211, 224, 0.22);
+.forecastWindSummary {
+  display: grid;
+  min-width: 0;
+  grid-column: 3 / -1;
+  grid-template-columns: subgrid;
+  align-items: center;
+  column-gap: inherit;
+  justify-self: stretch;
+}
+
+.forecastWindSummary .forecastIcon {
+  grid-column: 1;
+  justify-self: center;
+}
+
+.forecastWindSummary .forecastWindRange {
+  grid-column: 2;
 }
 
 .highlightsPanel {
@@ -891,6 +779,7 @@
   grid-column: span 2;
 }
 
+.highlightTile[data-kind='pressure'],
 .highlightTile[data-kind='feels'],
 .highlightTile[data-kind='uv'],
 .highlightTile[data-kind='sun'],
@@ -941,15 +830,8 @@
   white-space: nowrap;
 }
 
-.highlightTile[data-kind="pressure"] .highlightValue {
-  font-size: 2rem;
-  line-height: 1;
-  white-space: nowrap;
-}
-
 .highlightTile[data-kind="pressure"] {
-  min-height: 184px;
-  grid-template-rows: auto 1fr;
+  grid-template-rows: 16px minmax(0, 1fr);
   padding-right: 10px;
   padding-left: 10px;
 }
@@ -1026,72 +908,13 @@
   min-height: 52px;
 }
 
-.highlightVisualSlot > .highlightRail,
-.highlightVisualSlot > .visibilityDistanceRail {
+.highlightVisualSlot > [data-weather-rail] {
   transform: translateY(8px);
-}
-
-.highlightRail {
-  position: relative;
-  display: block;
-  width: 100%;
-  height: 10px;
-  border-radius: 999px;
-}
-
-.highlightRail_feels {
-  background: var(--rd-weather-feels-scale);
-}
-
-.highlightRail_uv {
-  background: var(--rd-weather-uv-scale);
-}
-
-.highlightRailMarker {
-  position: absolute;
-  top: 50%;
-  left: var(--highlight-percent, 0%);
-  width: 12px;
-  height: 12px;
-  border: 2px solid var(--rd-weather-modal-surface);
-  border-radius: 50%;
-  background: var(--rd-weather-marker);
-  box-shadow: 0 0 0 1px var(--rd-weather-panel-border);
-  transform: translate(-50%, -50%);
-}
-
-.visibilityDistanceRail {
-  position: relative;
-  display: block;
-  width: 100%;
-  height: 10px;
-  border-radius: 999px;
-  background: var(--rd-weather-visibility-rail-track);
-}
-
-.visibilityDistanceFill {
-  position: absolute;
-  inset: 0 auto 0 0;
-  width: var(--highlight-percent, 0%);
-  border-radius: inherit;
-  background: var(--rd-weather-visibility-rail);
-}
-
-.visibilityDistanceMarker {
-  position: absolute;
-  top: 50%;
-  left: var(--highlight-percent, 0%);
-  width: 12px;
-  height: 12px;
-  border: 2px solid var(--color-text);
-  border-radius: 50%;
-  background: var(--rd-weather-visibility-marker);
-  transform: translate(-50%, -50%);
 }
 
 .highlightTile[data-kind='wind'] {
   min-height: 158px;
-  grid-template-columns: minmax(0, 1fr) 112px;
+  grid-template-columns: minmax(0, 1fr) 102px;
   grid-template-rows: 16px minmax(0, 1fr);
   align-content: stretch;
   column-gap: 16px;
@@ -1143,10 +966,10 @@
 .windCompass {
   position: relative;
   display: grid;
-  width: 112px;
-  height: 112px;
+  width: 102px;
+  height: 102px;
   align-self: center;
-  grid-row: 1 / -1;
+  grid-row: 2;
   grid-column: 2;
   justify-self: center;
   border-radius: 50%;
@@ -1314,45 +1137,22 @@
   line-height: 1.08;
 }
 
-.aqiScale {
-  position: relative;
-  height: 10px;
-  border-radius: 999px;
-  background: var(--rd-aqi-scale);
-}
-
-.aqiMarker {
-  position: absolute;
-  top: 50%;
-  left: var(--aqi-marker, 0%);
-  width: 14px;
-  height: 14px;
-  border: 2px solid var(--rd-weather-marker);
-  border-radius: 50%;
-  background: var(--aqi-color);
-  box-shadow: 0 2px 8px var(--rd-weather-meter-track);
-  transform: translate(-50%, -50%);
-}
-
 .pressureGauge {
   position: relative;
   display: grid;
-  width: 100%;
-  height: 132px;
+  width: min(100%, 140px);
+  height: 98px;
   justify-self: center;
   place-items: center;
   align-self: center;
-  margin: -4px 0 0;
 }
 
 .pressureGaugeSvg {
   position: absolute;
-  top: -5px;
-  left: 50%;
+  inset: 0;
   width: 100%;
-  height: 134px;
+  height: 100%;
   overflow: visible;
-  transform: translateX(-50%);
 }
 
 .pressureGaugeTick {
@@ -1370,19 +1170,23 @@
 
 .pressureGaugeReadout {
   position: absolute;
-  top: 58px;
+  top: 54.2857%;
   left: 50%;
   z-index: 2;
   display: grid;
   justify-items: center;
   color: white;
-  transform: translateX(-50%);
+  transform: translate(-50%, -50%);
 }
 
 .pressureGaugeValue {
   font-size: 1.42rem;
   font-weight: 520;
   line-height: 0.95;
+}
+
+.pressureGaugeValue[data-pressure-compact='true'] {
+  font-size: 1rem;
 }
 
 .pressureGaugeReadout small {
@@ -1394,7 +1198,7 @@
 .pressureGaugeLowLabel,
 .pressureGaugeHighLabel {
   position: absolute;
-  bottom: 8px;
+  bottom: 0;
   color: white;
   font-size: 0.78rem;
   font-weight: 520;
@@ -1549,18 +1353,6 @@
   .weatherCarouselControl:focus-visible {
     outline: 2px solid Highlight;
     outline-offset: 2px;
-  }
-
-  .highlightRail,
-  .visibilityDistanceRail {
-    border: 1px solid CanvasText;
-    background: Canvas;
-  }
-
-  .highlightRailMarker,
-  .visibilityDistanceFill,
-  .visibilityDistanceMarker {
-    background: Highlight;
   }
 
   .windCompass {

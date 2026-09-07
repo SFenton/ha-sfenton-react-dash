@@ -2268,6 +2268,30 @@
       "words": 1
     },
     {
+      "characters": 44,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/weather.json",
+      "id": "79e8e63aa348ce4e",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "No forecast data returned by Pirate Weather.",
+      "words": 7
+    },
+    {
+      "characters": 51,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/weather.json",
+      "id": "d4ef5341fb91d118",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "No hourly forecast data returned by Pirate Weather.",
+      "words": 8
+    },
+    {
       "characters": 27,
       "context": "catalog-copy",
       "file": "src/i18n/locales/en/modals/recipe.json",
@@ -3556,6 +3580,30 @@
       "placeholders": [],
       "value": "Unable to add this recipe to My Week.",
       "words": 8
+    },
+    {
+      "characters": 39,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/weather.json",
+      "id": "caad4544b0710013",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Unable to load Pirate Weather forecast.",
+      "words": 6
+    },
+    {
+      "characters": 46,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/weather.json",
+      "id": "5b344d2cf789f82a",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Unable to load Pirate Weather hourly forecast.",
+      "words": 7
     },
     {
       "characters": 35,
@@ -6091,7 +6139,7 @@
       "file": "src/components/hass/WeatherSummary.tsx",
       "id": "09d976ef3fbebfa1",
       "lines": [
-        746
+        744
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -6108,7 +6156,7 @@
       "file": "src/components/hass/WeatherSummary.tsx",
       "id": "0e1162aa87f074c4",
       "lines": [
-        708
+        716
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -6125,7 +6173,7 @@
       "file": "src/components/hass/WeatherSummary.tsx",
       "id": "bb80ae6d94cfb04e",
       "lines": [
-        727
+        733
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -6155,7 +6203,7 @@
       "file": "src/components/hass/WeatherSummary.tsx",
       "id": "c7118b53d05ec488",
       "lines": [
-        1332
+        1309
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -6338,7 +6386,7 @@
       "file": "src/components/hass/WeatherSummary.tsx",
       "id": "7b02274ecd5fb675",
       "lines": [
-        1398
+        1375
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -6651,7 +6699,7 @@
       "file": "src/components/hass/WeatherSummary.tsx",
       "id": "4b34e65da67b823e",
       "lines": [
-        1138
+        1118
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -6669,7 +6717,7 @@
       "file": "src/components/hass/WeatherSummary.tsx",
       "id": "fc2688cdba706497",
       "lines": [
-        1103
+        1083
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -6686,7 +6734,7 @@
       "file": "src/components/hass/WeatherSummary.tsx",
       "id": "8ee6b87436c99629",
       "lines": [
-        1119
+        1099
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -7606,7 +7654,7 @@
       "file": "src/components/hass/WeatherSummary.tsx",
       "id": "695214d673579ddd",
       "lines": [
-        1550
+        1569
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -7816,7 +7864,7 @@
       "file": "src/components/hass/WeatherSummary.tsx",
       "id": "e1470c6c878996f3",
       "lines": [
-        1119
+        1099
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -7918,7 +7966,7 @@
       "file": "src/components/hass/WeatherSummary.tsx",
       "id": "0524c9694470dffd",
       "lines": [
-        1413
+        1390
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -7974,7 +8022,7 @@
       "file": "src/components/hass/WeatherSummary.tsx",
       "id": "b97ee027b5be3d2b",
       "lines": [
-        1470
+        1447
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -8199,7 +8247,7 @@
       "file": "src/components/hass/WeatherSummary.tsx",
       "id": "b3a51e2e8c350cfd",
       "lines": [
-        1752
+        1686
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -8586,7 +8634,7 @@
       "file": "src/components/hass/WeatherSummary.tsx",
       "id": "05ef85e7237c294d",
       "lines": [
-        1571
+        1590
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -8774,7 +8822,7 @@
       "file": "src/components/hass/WeatherSummary.tsx",
       "id": "dbb2f48e36861558",
       "lines": [
-        1280
+        1260
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -8790,7 +8838,7 @@
       "file": "src/components/hass/WeatherSummary.tsx",
       "id": "8d855e8364a7e041",
       "lines": [
-        1556
+        1575
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -8993,7 +9041,7 @@
       "file": "src/components/hass/WeatherSummary.tsx",
       "id": "3e9f6f91b3fa0b1e",
       "lines": [
-        1587
+        1602
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -9816,20 +9864,6 @@
       "words": 4
     },
     {
-      "characters": 4,
-      "context": "body-copy",
-      "file": "src/components/hass/WeatherSummary.tsx",
-      "id": "8245a6998af65ac9",
-      "lines": [
-        1110
-      ],
-      "occurrences": 1,
-      "origin": "legacy",
-      "placeholders": [],
-      "value": "0 in",
-      "words": 2
-    },
-    {
       "characters": 55,
       "context": "body-copy",
       "file": "src/components/hass/HumidifierModalContent.tsx",
@@ -10456,7 +10490,7 @@
       "file": "src/components/hass/WeatherSummary.tsx",
       "id": "da6ddf7d100c21ad",
       "lines": [
-        265
+        233
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -10470,7 +10504,7 @@
       "file": "src/components/hass/WeatherSummary.tsx",
       "id": "288f824e0f7d9f8c",
       "lines": [
-        1394
+        1371
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -10850,7 +10884,7 @@
       "file": "src/components/hass/WeatherSummary.tsx",
       "id": "8408797d80638155",
       "lines": [
-        266
+        234
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -10936,7 +10970,7 @@
       "file": "src/components/hass/WeatherSummary.tsx",
       "id": "fa318dae21481cd9",
       "lines": [
-        272
+        240
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -11062,7 +11096,7 @@
       "file": "src/components/hass/WeatherSummary.tsx",
       "id": "bc7bb8e49d8e8e70",
       "lines": [
-        278
+        246
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -11090,7 +11124,7 @@
       "file": "src/components/hass/WeatherSummary.tsx",
       "id": "f528d9535ef9ec12",
       "lines": [
-        801
+        796
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -11104,7 +11138,7 @@
       "file": "src/components/hass/WeatherSummary.tsx",
       "id": "4548bd37fa3c9f1d",
       "lines": [
-        1588
+        1603
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -11375,7 +11409,7 @@
       "file": "src/components/hass/WeatherSummary.tsx",
       "id": "59ddc68c1f0382ec",
       "lines": [
-        284
+        252
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -11417,7 +11451,7 @@
       "file": "src/components/hass/WeatherSummary.tsx",
       "id": "d821e862fa52627f",
       "lines": [
-        800
+        795
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -11487,7 +11521,7 @@
       "file": "src/components/core/ModalSheet.tsx",
       "id": "22323f3f09a98ce0",
       "lines": [
-        275
+        363
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -11529,7 +11563,7 @@
       "file": "src/components/hass/WeatherSummary.tsx",
       "id": "6b73d4c017c13880",
       "lines": [
-        1572
+        1591
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -11557,7 +11591,7 @@
       "file": "src/components/hass/WeatherSummary.tsx",
       "id": "c562598a6d798eee",
       "lines": [
-        1576
+        1595
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -11571,7 +11605,7 @@
       "file": "src/components/hass/WeatherSummary.tsx",
       "id": "6add8b63cf64fd5b",
       "lines": [
-        1420
+        1397
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -11841,7 +11875,7 @@
       "file": "src/components/hass/WeatherSummary.tsx",
       "id": "4a1096e64c508980",
       "lines": [
-        297
+        265
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -11870,7 +11904,7 @@
       "file": "src/components/hass/WeatherSummary.tsx",
       "id": "417e72f1d0eaf177",
       "lines": [
-        303
+        271
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -11912,7 +11946,7 @@
       "file": "src/components/hass/WeatherSummary.tsx",
       "id": "979f76d317c4d138",
       "lines": [
-        1022
+        1004
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -11982,7 +12016,7 @@
       "file": "src/components/hass/WeatherSummary.tsx",
       "id": "d8e106ea3d938596",
       "lines": [
-        309
+        277
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -12310,7 +12344,7 @@
       "file": "src/components/hass/WeatherSummary.tsx",
       "id": "f20b3632a8b2d5c9",
       "lines": [
-        315
+        283
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -12480,7 +12514,7 @@
       "file": "src/components/hass/WeatherSummary.tsx",
       "id": "c5b9e1c95faf2b57",
       "lines": [
-        327
+        295
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -13031,7 +13065,7 @@
       "file": "src/components/hass/WeatherSummary.tsx",
       "id": "ce3724f8bacbee8a",
       "lines": [
-        328
+        296
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -15926,7 +15960,7 @@
       "file": "src/components/hass/WeatherSummary.tsx",
       "id": "6172ae377b405b08",
       "lines": [
-        506
+        474
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -15942,7 +15976,7 @@
       "file": "src/components/hass/WeatherSummary.tsx",
       "id": "157ba2608886e120",
       "lines": [
-        507
+        475
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -15959,7 +15993,7 @@
       "file": "src/components/hass/WeatherSummary.tsx",
       "id": "a829f97aaadb50c0",
       "lines": [
-        505
+        473
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -16405,8 +16439,8 @@
       "file": "src/components/hass/WeatherSummary.tsx",
       "id": "f6fa370b2ad98694",
       "lines": [
-        478,
-        480
+        453,
+        455
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -16420,7 +16454,7 @@
       "file": "src/components/hass/WeatherSummary.tsx",
       "id": "d4aea0190a24d80f",
       "lines": [
-        482
+        457
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -16434,9 +16468,9 @@
       "file": "src/components/hass/WeatherSummary.tsx",
       "id": "c9119acbd674f719",
       "lines": [
-        478,
-        480,
-        481
+        453,
+        455,
+        456
       ],
       "occurrences": 3,
       "origin": "legacy",
@@ -16450,7 +16484,7 @@
       "file": "src/components/hass/WeatherSummary.tsx",
       "id": "8180c2b5e89b83a8",
       "lines": [
-        521
+        489
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -16464,7 +16498,7 @@
       "file": "src/components/hass/WeatherSummary.tsx",
       "id": "c10c820e466ae724",
       "lines": [
-        529
+        497
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -16480,7 +16514,7 @@
       "file": "src/components/hass/WeatherSummary.tsx",
       "id": "a1b0e0340219c5da",
       "lines": [
-        529
+        497
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -16496,7 +16530,7 @@
       "file": "src/components/hass/WeatherSummary.tsx",
       "id": "8c64292c85cf1835",
       "lines": [
-        529
+        497
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -17491,8 +17525,8 @@
       "file": "src/components/hass/WeatherSummary.tsx",
       "id": "fb47c3c6d92944ef",
       "lines": [
-        487,
-        489
+        462,
+        464
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -17508,7 +17542,7 @@
       "file": "src/components/hass/WeatherSummary.tsx",
       "id": "d4a883d0706ff17a",
       "lines": [
-        486
+        461
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -17522,7 +17556,7 @@
       "file": "src/components/hass/WeatherSummary.tsx",
       "id": "80a6715d2ba91583",
       "lines": [
-        490
+        465
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -20615,7 +20649,7 @@
       "file": "src/components/hass/WeatherSummary.tsx",
       "id": "e47241b96e4d0119",
       "lines": [
-        127
+        95
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -20629,7 +20663,7 @@
       "file": "src/components/hass/WeatherSummary.tsx",
       "id": "56f8abf6fc53d3a2",
       "lines": [
-        128
+        96
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -21125,7 +21159,7 @@
       "file": "src/components/hass/WeatherSummary.tsx",
       "id": "57aeeda051d29d63",
       "lines": [
-        129
+        97
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -21308,7 +21342,7 @@
       "file": "src/components/hass/WeatherSummary.tsx",
       "id": "ff41434fe0b60153",
       "lines": [
-        130
+        98
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -21420,7 +21454,7 @@
       "file": "src/components/hass/WeatherSummary.tsx",
       "id": "8c04725234afeb3a",
       "lines": [
-        131
+        99
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -21434,7 +21468,7 @@
       "file": "src/components/hass/WeatherSummary.tsx",
       "id": "6dbc46053a080d1d",
       "lines": [
-        135
+        103
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -21709,7 +21743,7 @@
       "file": "src/components/hass/WeatherSummary.tsx",
       "id": "9e83b4ab473ba5b9",
       "lines": [
-        132
+        100
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -22192,7 +22226,7 @@
       "file": "src/components/hass/WeatherSummary.tsx",
       "id": "c8c1e0f0893f2b1f",
       "lines": [
-        134
+        102
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -22354,7 +22388,7 @@
       "file": "src/components/hass/WeatherSummary.tsx",
       "id": "936d066426c42404",
       "lines": [
-        136
+        104
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -22726,7 +22760,7 @@
       "file": "src/components/hass/WeatherSummary.tsx",
       "id": "08fab04e7c2591bd",
       "lines": [
-        137
+        105
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -22882,7 +22916,7 @@
       "file": "src/components/hass/WeatherSummary.tsx",
       "id": "bec8d41fc45d1054",
       "lines": [
-        133
+        101
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -22938,7 +22972,7 @@
       "file": "src/components/hass/WeatherSummary.tsx",
       "id": "f5a588f761b410aa",
       "lines": [
-        139
+        107
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -23242,7 +23276,7 @@
       "file": "src/components/hass/WeatherSummary.tsx",
       "id": "c91ff7a5d0413dc2",
       "lines": [
-        398
+        353
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -23355,7 +23389,7 @@
       "file": "src/components/hass/WeatherSummary.tsx",
       "id": "e6c07b3febab6858",
       "lines": [
-        140
+        108
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -23369,7 +23403,7 @@
       "file": "src/components/hass/WeatherSummary.tsx",
       "id": "243822f8381bc9f6",
       "lines": [
-        141
+        109
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -23383,7 +23417,7 @@
       "file": "src/components/hass/WeatherSummary.tsx",
       "id": "2ee5b44857b71c3e",
       "lines": [
-        138
+        106
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -23695,7 +23729,7 @@
       "file": "src/components/hass/WeatherSummary.tsx",
       "id": "320d69bbe695dd72",
       "lines": [
-        1803
+        1745
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -27029,7 +27063,7 @@
       "file": "src/components/hass/WeatherSummary.tsx",
       "id": "0d1bd6a7992c498f",
       "lines": [
-        635
+        610
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -30348,7 +30382,7 @@
       "file": "src/components/hass/WeatherSummary.tsx",
       "id": "53b17800ed69e396",
       "lines": [
-        690
+        665
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -32080,7 +32114,7 @@
       "file": "src/components/hass/WeatherSummary.tsx",
       "id": "0bf67e47d9a36e93",
       "lines": [
-        644
+        619
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -32315,7 +32349,7 @@
       "file": "src/components/hass/WeatherSummary.tsx",
       "id": "0989654578d40c0e",
       "lines": [
-        681
+        656
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -32427,7 +32461,7 @@
       "file": "src/components/hass/WeatherSummary.tsx",
       "id": "6186aa8b846d62ee",
       "lines": [
-        652
+        627
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -33146,7 +33180,7 @@
       "file": "src/components/core/ModalSheet.tsx",
       "id": "f311f1d9068e6067",
       "lines": [
-        81
+        111
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -36297,11 +36331,11 @@
     }
   ],
   "summary": {
-    "catalogRecords": 477,
+    "catalogRecords": 481,
     "documentRecords": 1,
-    "legacyOccurrences": 2545,
-    "legacyRecords": 2104,
-    "totalRecords": 2582
+    "legacyOccurrences": 2544,
+    "legacyRecords": 2103,
+    "totalRecords": 2585
   },
   "version": 1
 }

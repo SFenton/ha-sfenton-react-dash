@@ -174,12 +174,12 @@ test('weather carousels preserve native touch scrolling without arrow controls',
   await expect(modalPagination).toHaveAttribute('data-weather-carousel-page-count', '6')
   const modalScroller = dialog.locator('[data-weather-carousel="hourly"]')
   await expect(modalScroller).toHaveCSS('scroll-snap-type', 'x mandatory')
+  await page.waitForTimeout(650)
   await expect(await carouselDotRhythm(
     modalScroller,
     modalPagination.locator('[aria-current="page"] > span'),
     dialog.locator('[class*="hourlyPanel"]'),
   )).toEqual(heroDotRhythm)
-  await page.waitForTimeout(650)
   await modalPagination.locator('[data-weather-carousel-page="3"]').click()
   await expect.poll(() => modalScroller.evaluate((element) => element.scrollLeft)).toBeGreaterThan(500)
   await expectCompleteItemsOnly(modalScroller)

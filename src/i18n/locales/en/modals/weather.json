@@ -56,6 +56,12 @@
     "label": "Today",
     "weather": "{{condition}} today"
   },
+  "forecast": {
+    "dailyError": "Unable to load Pirate Weather forecast.",
+    "hourlyError": "Unable to load Pirate Weather hourly forecast.",
+    "dailyEmpty": "No forecast data returned by Pirate Weather.",
+    "hourlyEmpty": "No hourly forecast data returned by Pirate Weather."
+  },
   "hero": {
     "high": "High: {{high}}",
     "highLow": "High: {{high}}  Low: {{low}}",

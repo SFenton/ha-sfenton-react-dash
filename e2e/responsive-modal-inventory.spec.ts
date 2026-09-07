@@ -5,6 +5,11 @@ import ts from 'typescript'
 import { RESPONSIVE_VIEWPORTS, type ResponsiveViewport } from './responsive-acceptance-data'
 
 type ModalAudit = {
+  backdropActive: boolean
+  backdropAreaRatio: number
+  backdropCoverageComplete: boolean
+  backdropPolicy: string
+  backdropProxyHeightDelta: number
   bodyOverflowY: string
   bodyVisibleContent: boolean
   centered: boolean
@@ -16,6 +21,12 @@ type ModalAudit = {
   size: string
   stage: string
   terminalViolations: string[]
+  unshieldedSvgTargets: Array<{
+    ariaHidden: string | null
+    ariaLabel: string | null
+    className: string | null
+    index: number
+  }>
   viewport: ResponsiveViewport
 }
 
@@ -534,6 +545,60 @@ function listenForUnexpectedErrors(page: Page) {
   return errors
 }
 
+async function auditBackdropBands(page: Page) {
+  const overlay = page.locator('[data-modal-sheet-overlay="true"]:visible').last()
+  return overlay.evaluate((element) => {
+    const dialogs = Array.from(document.querySelectorAll<HTMLElement>('[role="dialog"]')).filter((dialog) => {
+      const bounds = dialog.getBoundingClientRect()
+      return bounds.width > 0 && bounds.height > 0
+    })
+    const dialog = dialogs.at(-1)
+    const proxy = element.querySelector<HTMLElement>('[data-modal-backdrop-proxy="true"]')
+    const bands = Object.fromEntries(Array.from(element.querySelectorAll<HTMLElement>('[data-modal-backdrop-band]')).map((band) => [
+      band.dataset.modalBackdropBand,
+      band.getBoundingClientRect(),
+    ]))
+    if (!dialog) throw new Error('Modal dialog geometry is unavailable')
+    if (!proxy || !bands.top || !bands.bottom || !bands.left || !bands.right) {
+      return {
+        active: false,
+        areaRatio: 1,
+        coverageComplete: element.dataset.backdropPolicy === 'full',
+        policy: element.dataset.backdropPolicy ?? '',
+        proxyHeightDelta: 0,
+      }
+    }
+    const overlayBounds = element.getBoundingClientRect()
+    const dialogBounds = dialog.getBoundingClientRect()
+    const proxyBounds = proxy.getBoundingClientRect()
+    const areaRatio = Object.values(bands).reduce((area, bounds) => area + bounds.width * bounds.height, 0)
+      / (overlayBounds.width * overlayBounds.height)
+    const tolerance = 1
+    const coverageComplete = bands.top.top <= overlayBounds.top + tolerance
+      && bands.top.left <= overlayBounds.left + tolerance
+      && bands.top.right >= overlayBounds.right - tolerance
+      && bands.top.bottom >= dialogBounds.top + 30 - tolerance
+      && bands.bottom.left <= overlayBounds.left + tolerance
+      && bands.bottom.right >= overlayBounds.right - tolerance
+      && bands.bottom.bottom >= overlayBounds.bottom - tolerance
+      && bands.left.left <= overlayBounds.left + tolerance
+      && bands.left.right >= dialogBounds.left + tolerance
+      && bands.left.top <= bands.top.bottom + tolerance
+      && bands.left.bottom >= bands.bottom.top - tolerance
+      && bands.right.right >= overlayBounds.right - tolerance
+      && bands.right.left <= dialogBounds.right - tolerance
+      && bands.right.top <= bands.top.bottom + tolerance
+      && bands.right.bottom >= bands.bottom.top - tolerance
+    return {
+      active: element.hasAttribute('data-exposed-backdrop-bands'),
+      areaRatio,
+      coverageComplete,
+      policy: element.dataset.backdropPolicy ?? '',
+      proxyHeightDelta: Math.abs(proxyBounds.height - dialogBounds.height),
+    }
+  })
+}
+
 async function auditModal(page: Page, modalCase: ModalCase, dialog: Locator, viewport: ResponsiveViewport, stage: string) {
   await page.waitForTimeout(540)
   await expect(dialog).toHaveAttribute('data-size', modalCase.expectedSize)
@@ -591,6 +656,27 @@ async function auditModal(page: Page, modalCase: ModalCase, dialog: Locator, vie
         ? [`${region.name}: ${Math.round(terminalResult.terminalTop)}-${Math.round(terminalResult.terminalBottom)} outside ${Math.round(terminalResult.ownerTop)}-${Math.round(terminalResult.ownerBottom)}`]
         : []
     })
+    const unshieldedSvgTargets = Array.from(body?.querySelectorAll<SVGSVGElement>('svg') ?? []).flatMap((svg, index) => {
+      const rect = svg.getBoundingClientRect()
+      const style = getComputedStyle(svg)
+      const visible = rect.width > 0
+        && rect.height > 0
+        && style.display !== 'none'
+        && style.visibility !== 'hidden'
+      if (
+        !visible
+        || style.pointerEvents === 'none'
+        || svg.closest('[data-base-ui-swipe-ignore="true"]')
+      ) {
+        return []
+      }
+      return [{
+        ariaHidden: svg.getAttribute('aria-hidden'),
+        ariaLabel: svg.getAttribute('aria-label'),
+        className: svg.getAttribute('class'),
+        index,
+      }]
+    })
     const box = (target: HTMLElement | null) => {
       const rect = target?.getBoundingClientRect()
       return rect ? { bottom: rect.bottom, top: rect.top } : null
@@ -614,8 +700,19 @@ async function auditModal(page: Page, modalCase: ModalCase, dialog: Locator, vie
       footer: box(footer),
       navigation: box(navigation),
       terminalViolations,
+      unshieldedSvgTargets,
     }
   })
+  const backdrop = await auditBackdropBands(page)
+  const expectedBackdropActive = backdrop.policy === 'auto' && !metrics.centered && backdrop.areaRatio <= 0.25
+  expect(backdrop.active, `${modalCase.id} ${stage} automatic backdrop eligibility`).toBe(expectedBackdropActive)
+  if (backdrop.policy === 'auto' && !metrics.centered) {
+    expect(backdrop.proxyHeightDelta, `${modalCase.id} ${stage} backdrop proxy height`).toBeLessThanOrEqual(1)
+  }
+  if (backdrop.active) {
+    expect(backdrop.areaRatio, `${modalCase.id} ${stage} backdrop band area`).toBeLessThanOrEqual(0.25)
+    expect(backdrop.coverageComplete, `${modalCase.id} ${stage} backdrop coverage`).toBe(true)
+  }
 
   expect(metrics.dialog.left, `${modalCase.id} ${stage} left containment`).toBeGreaterThanOrEqual(-1)
   expect(metrics.dialog.top, `${modalCase.id} ${stage} top containment`).toBeGreaterThanOrEqual(-1)
@@ -624,6 +721,7 @@ async function auditModal(page: Page, modalCase: ModalCase, dialog: Locator, vie
   expect(metrics.bodyVisibleContent, `${modalCase.id} ${stage} visible modal content`).toBe(true)
   expect(metrics.clippedRegions, `${modalCase.id} ${stage} clipped regions`).toEqual([])
   expect(metrics.terminalViolations, `${modalCase.id} ${stage} terminal reachability`).toEqual([])
+  expect(metrics.unshieldedSvgTargets, `${modalCase.id} ${stage} unshielded modal SVG targets`).toEqual([])
   if (metrics.navigation) {
     expect(metrics.navigation.top).toBeGreaterThanOrEqual(metrics.dialog.top - 1)
     expect(metrics.navigation.bottom).toBeLessThanOrEqual(metrics.dialog.bottom + 1)
@@ -652,6 +750,11 @@ async function auditModal(page: Page, modalCase: ModalCase, dialog: Locator, vie
   }
 
   manifest.push({
+    backdropActive: backdrop.active,
+    backdropAreaRatio: backdrop.areaRatio,
+    backdropCoverageComplete: backdrop.coverageComplete,
+    backdropPolicy: backdrop.policy,
+    backdropProxyHeightDelta: backdrop.proxyHeightDelta,
     bodyOverflowY: metrics.bodyOverflowY,
     bodyVisibleContent: metrics.bodyVisibleContent,
     centered: metrics.centered,
@@ -663,6 +766,7 @@ async function auditModal(page: Page, modalCase: ModalCase, dialog: Locator, vie
     size: modalCase.expectedSize,
     stage,
     terminalViolations: metrics.terminalViolations,
+    unshieldedSvgTargets: metrics.unshieldedSvgTargets,
     viewport,
   })
   return metrics

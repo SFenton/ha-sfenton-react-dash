@@ -73,8 +73,8 @@
   padding: 9px 10px;
   color: white;
   background: rgba(8, 12, 19, 0.48);
-  backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
 }
 
 .title {

@@ -6,8 +6,8 @@
   place-items: center;
   padding: 22px;
   background: var(--color-modal-overlay);
-  backdrop-filter: var(--blur-modal);
   -webkit-backdrop-filter: var(--blur-modal);
+  backdrop-filter: var(--blur-modal);
   pointer-events: auto;
 }
 
@@ -21,8 +21,8 @@
   color: #e1e1e1;
   background: var(--color-modal-surface);
   box-shadow: none;
-  backdrop-filter: var(--blur-modal);
   -webkit-backdrop-filter: var(--blur-modal);
+  backdrop-filter: var(--blur-modal);
   overflow: hidden;
   pointer-events: auto;
 }

@@ -46,7 +46,14 @@ test('hidden preload geometry performs no runtime I/O', async ({ page }) => {
 
   const audit = await page.evaluate(() => ({
     calls: window.__mockHass?.calls ?? [],
-    images: document.querySelectorAll('[data-dashboard-preload-cache] img, [data-dashboard-preload-cache] video, [data-dashboard-preload-cache] canvas').length,
+    images: document.querySelectorAll('[data-dashboard-preload-cache] :is(img, video, audio, source, iframe, object, embed, script, link, canvas)').length,
+    cssLoads: Array.from(document.querySelectorAll('[data-dashboard-preload-cache], [data-dashboard-preload-cache] *')).flatMap((element) => (
+      [undefined, '::before', '::after'].flatMap((pseudo) => {
+        const style = getComputedStyle(element, pseudo)
+        return ['background-image', 'mask-image', 'border-image-source', 'list-style-image', 'content']
+          .flatMap((property) => /url\s*\(/i.test(style.getPropertyValue(property)) ? [property] : [])
+      })
+    )),
     io: (window as unknown as {
       __preloadIoAudit: {
         eventListeners: number
@@ -58,6 +65,7 @@ test('hidden preload geometry performs no runtime I/O', async ({ page }) => {
 
   expect(audit.calls).toEqual([])
   expect(audit.images).toBe(0)
+  expect(audit.cssLoads).toEqual([])
   expect(audit.io).toEqual({
     eventListeners: 0,
     mutationObservations: 0,

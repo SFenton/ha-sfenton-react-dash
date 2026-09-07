@@ -105,6 +105,50 @@ Typed `ModalSheet` sizes are the default geometry contract. A CSS custom
 property override must be named, documented by the owning surface, and covered
 by runtime width, height, containment, and scroll-owner assertions.
 
+`ModalSheet` backdrop-band optimization defaults to `backdropPolicy="auto"`.
+Band geometry must be resolved by the inert CSS proxy that shares the popup's
+`--modal-mobile-height` and `--modal-mobile-max-height` declarations; JavaScript
+may decide eligibility but must not write band dimensions. Automatic mode must
+retain the full-screen solid scrim and fail closed to the original full-overlay
+blur for centered, stacked, transitioning, interacting, forced-colors,
+unsupported-filter, translucent/custom-surface, unsupported-geometry, or greater-than-25%
+band-area states. Every change to this contract must prove zero incomplete
+active frames through phone/foldable rotation, the `760x560` boundary, focused
+form viewport recovery, and stale dashboard-width simulation in Chromium and
+WebKit. `backdropPolicy="full"` must remain a tested deterministic opt-out.
+
+Standard sheets use an opaque backing in the same near-black color in both
+automatic and full modes. This intentionally removes the old 3% background
+transmission at the sheet surface, not from nested material tokens, because
+translucency exposes the difference between filtered and unfiltered content.
+Weather supplies its own opaque backing under the unchanged atmosphere.
+The full scrim must paint above the band filters, preserving blur-then-dim
+composition. The 25% area ceiling includes real filter-sampling margins
+(64px at the top, 32px at the bottom), replacing the earlier geometry-only
+20% budget. Small sheets still fail closed.
+
+Built CSS must retain the standard `backdrop-filter` property alongside any
+prefixed fallback. A screenshot comparison is valid only after full blur
+differs from an explicitly filter-free positive control. The Linux WPE and
+GTK WebKit builds in the review environment do not pass that control, so their
+geometry/lifecycle results are not Safari rendered-pixel proof. The real-pixel
+test runs on Chromium and supported Safari/WebKit renderers; this limitation
+blocks a production visual-parity claim, not investigation in the isolated
+preview. Compare actual `auto` and `full` policies for performance, including
+trusted input, and do not substitute nested-card-blur measurements for it.
+Trusted-input uptime must distinguish held-pointer time from resting time:
+bands remain disabled throughout a press and should be active for at least
+90% of resting frames. Gross uptime reflects input duty cycle, not energy savings.
+
+Weather freshness tests must install the browser clock before mounting the
+app, cross the five-minute TTL, and assert both service counts and changed
+daily/hourly UI values. Source updates, hidden-page resume, concurrent
+consumers, and in-flight refreshes must not duplicate requests or discard a
+successful pending response. Deferred/preload consumers must create no
+scheduler or listeners. Unknown precipitation is not zero, an incomplete
+accumulation is unavailable, and every rail endpoint must satisfy
+`0 <= start`, `0 <= size`, and `start + size <= 100`.
+
 Use the existing authorized review environment; do not deploy or mutate
 external systems unless the task separately permits it. An unexplained
 failure, skipped affected surface, unavailable required browser engine, or

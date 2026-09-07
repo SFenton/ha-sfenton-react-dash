@@ -2,6 +2,18 @@ import { readdir, readFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
+export function verifyBackdropDeclarations(css, assetName = 'CSS asset') {
+  for (const rule of css.matchAll(/\{([^{}]*)\}/g)) {
+    const declarations = rule[1]
+    if (
+      /(?:^|;)\s*-webkit-backdrop-filter\s*:/.test(declarations)
+      && !/(?:^|;)\s*backdrop-filter\s*:/.test(declarations)
+    ) {
+      throw new Error(`${assetName} contains a prefixed backdrop-filter without the standard declaration. Put the prefixed fallback before backdrop-filter in source CSS.`)
+    }
+  }
+}
+
 export async function verifyDashboardBuild(rootDirectory = process.cwd()) {
   const distDirectory = resolve(rootDirectory, 'dist')
   const bridgeFiles = [
@@ -17,6 +29,9 @@ export async function verifyDashboardBuild(rootDirectory = process.cwd()) {
   }
 
   const assetFiles = await readdir(resolve(distDirectory, 'assets'))
+  for (const fileName of assetFiles.filter((name) => name.endsWith('.css'))) {
+    verifyBackdropDeclarations(await readFile(resolve(distDirectory, 'assets', fileName), 'utf8'), fileName)
+  }
   const appFiles = assetFiles.filter((fileName) => /^app-.+\.js$/.test(fileName))
   if (appFiles.length !== 1) {
     throw new Error(`Expected one built app JavaScript asset, found ${appFiles.length}.`)

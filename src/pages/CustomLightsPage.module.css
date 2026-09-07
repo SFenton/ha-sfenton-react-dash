@@ -25,8 +25,8 @@
   color: white;
   background: var(--mode-card-background);
   box-shadow: var(--shadow-glass), inset 0 1px 0 var(--mode-card-inset-highlight), inset 0 -1px 0 var(--mode-card-inset-shadow);
-  backdrop-filter: blur(15px) saturate(1.12);
   -webkit-backdrop-filter: blur(15px) saturate(1.12);
+  backdrop-filter: blur(15px) saturate(1.12);
   transition: background var(--duration-fast) ease;
 }
 
@@ -145,8 +145,8 @@
     padding: 0;
     background: var(--mode-card-transparent);
     box-shadow: none;
-    backdrop-filter: none;
     -webkit-backdrop-filter: none;
+    backdrop-filter: none;
   }
 
   .modeCard[data-active='true'] {
@@ -159,8 +159,8 @@
     border-radius: 26px;
     padding: 0 18px;
     box-shadow: var(--shadow-glass), inset 0 1px 0 var(--mode-card-inset-highlight), inset 0 -1px 0 var(--mode-card-inset-shadow);
-    backdrop-filter: blur(15px) saturate(1.12);
     -webkit-backdrop-filter: blur(15px) saturate(1.12);
+    backdrop-filter: blur(15px) saturate(1.12);
   }
 
   .modeToggle {

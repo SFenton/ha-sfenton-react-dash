@@ -299,6 +299,18 @@ test('standalone precipitation tiles reflow while the weather modal stays mounte
   const precipitationTiles = dialog.locator('[data-weather-precipitation-tile="true"]')
   const labelCount = () => precipitationTiles.locator('[data-precipitation-hour-label="time"]').count()
 
+  await dialog.getByRole('button', { name: 'Precipitation conditions' }).click()
+  const dailyPrecipitationRails = dialog.locator('[class*="forecastPanel"] [data-weather-rail="precipitation"]')
+  await expect(dailyPrecipitationRails).toHaveCount(7)
+  await expect.poll(() => dailyPrecipitationRails.evaluateAll((rails) => rails.every((rail) => {
+    const bounds = rail.getBoundingClientRect()
+    const fill = rail.querySelector<HTMLElement>('[data-weather-rail-fill]')?.getBoundingClientRect()
+    const marker = rail.querySelector<HTMLElement>('[data-weather-rail-marker]')?.getBoundingClientRect()
+    return Math.abs(bounds.height - 10) <= 0.5
+      && Boolean(fill && Math.abs(fill.height - 10) <= 0.5)
+      && (!marker || (Math.abs(marker.height - 12) <= 0.5 && Math.abs(marker.width - 12) <= 0.5))
+  }))).toBe(true)
+
   await expect.poll(labelCount).toBeGreaterThan(1)
   const mobileCount = await labelCount()
   await page.setViewportSize({ height: 1180, width: 820 })
@@ -363,11 +375,13 @@ test('weather highlight values and visuals align across the viewport matrix', as
         && rect.bottom <= dial.bottom + 1)
       return {
         destinationInside: insideDial(destination),
+        dialCenter: dial ? dial.top + dial.height / 2 - tile.top : 0,
         dialHeight: dial?.height ?? 0,
         dialWidth: dial?.width ?? 0,
         height: tile.height,
         noOverlap: Boolean(readout && dial && readout.right <= dial.left),
         overflow: element.scrollWidth > element.clientWidth + 1,
+        readoutCenter: readout ? readout.top + readout.height / 2 - tile.top : 0,
         ringCount: element.querySelectorAll('[class*="windCompassRing"]').length,
         sourceInside: insideDial(source),
         tickCount: element.querySelectorAll('[class*="windCompassTick"]').length,
@@ -382,8 +396,9 @@ test('weather highlight values and visuals align across the viewport matrix', as
       sourceInside: true,
       tickCount: 47,
     })
-    expect(Math.abs(windMetrics.dialHeight - 112)).toBeLessThanOrEqual(0.5)
-    expect(Math.abs(windMetrics.dialWidth - 112)).toBeLessThanOrEqual(0.5)
+    expect(Math.abs(windMetrics.dialCenter - windMetrics.readoutCenter)).toBeLessThanOrEqual(0.5)
+    expect(Math.abs(windMetrics.dialHeight - 102)).toBeLessThanOrEqual(0.5)
+    expect(Math.abs(windMetrics.dialWidth - 102)).toBeLessThanOrEqual(0.5)
     expect(Math.abs(windMetrics.height - 158)).toBeLessThanOrEqual(0.5)
     expect(windMetrics.vectorSpan).toBeLessThanOrEqual(53)
     await closeModal(dialog)

@@ -53,7 +53,7 @@ function precipitationBarStyle(probability: number | null, domain: number): BarS
   return { '--precipitation-probability': `${precipitationScaledPercent(probability, domain)}%` }
 }
 
-function cumulativeBarStyle(cumulative: number, domain: number): CumulativeBarStyle {
+function cumulativeBarStyle(cumulative: number | null, domain: number): CumulativeBarStyle {
   return { '--cumulative-amount': `${precipitationScaledPercent(cumulative, domain)}%` }
 }
 
@@ -166,13 +166,12 @@ export function WeatherPrecipitationTile({ forecasts, precipitationUnit }: Weath
   const unavailable = copy(WEATHER_COPY_KEYS.unavailable)
   const points = useMemo(() => buildPrecipitationTimeline(forecasts, PRECIPITATION_TILE_HOURS), [forecasts])
   const pointCount = points.length
-  const hasMeasuredAmount = points.some((point) => point.amount !== null)
   const peakChance = precipitationPeakChance(points)
   const total = precipitationTotal(points)
   const chanceDomain = precipitationChanceDomain(peakChance)
   const amountAxis = precipitationAmountAxis(total, precipitationUnit)
   const peakChanceText = displayChance(peakChance, unavailable)
-  const totalText = hasMeasuredAmount ? displayAmount(total, precipitationUnit, unavailable) : unavailable
+  const totalText = displayAmount(total, precipitationUnit, unavailable)
   const startLabels = points.map((point) => displayHour(point.startTime))
   const axisTimeLabels = startLabels.map((label, index) => index === 0 ? copy(WEATHER_COPY_KEYS.precipitation.now) : label)
   const chanceLabels = points.map((point) => displayChance(point.probability, unavailable))
@@ -195,7 +194,7 @@ export function WeatherPrecipitationTile({ forecasts, precipitationUnit }: Weath
   return (
     <div
       className={styles.sampleGrid}
-      data-precipitation-amount-domain={amountAxis.domain}
+      data-precipitation-amount-domain={total === null ? 'unavailable' : amountAxis.domain}
       data-precipitation-chance-domain={chanceDomain}
       data-precipitation-samples="true"
       data-weather-precipitation-tile="true"
@@ -222,7 +221,7 @@ export function WeatherPrecipitationTile({ forecasts, precipitationUnit }: Weath
         aria-label={cumulativeAriaLabel}
         className={`${summaryStyles.highlightTile} ${styles.sampleTile}`}
         data-precipitation-sample="cumulative"
-        data-unavailable={pointCount && hasMeasuredAmount ? undefined : 'true'}
+        data-unavailable={total === null ? 'true' : undefined}
       >
         <span className={summaryStyles.highlightTitle}>
           <span className={summaryStyles.highlightIcon}>
@@ -230,7 +229,7 @@ export function WeatherPrecipitationTile({ forecasts, precipitationUnit }: Weath
           </span>
           {copy(WEATHER_COPY_KEYS.precipitation.cumulativeHeading)}
         </span>
-        {pointCount && hasMeasuredAmount
+        {total !== null
           ? <AccumulationPlot amountAxis={amountAxis} axisTimeLabels={axisTimeLabels} hourLabelIndices={hourLabelIndices} points={points} precipitationUnit={precipitationUnit} />
           : <span className={styles.unavailable}>{unavailable}</span>}
       </article>
@@ -256,7 +255,7 @@ export function WeatherPrecipitationTile({ forecasts, precipitationUnit }: Weath
                 <td>{startLabels[index]}</td>
                 <td>{chanceLabels[index]}</td>
                 <td>{amountLabels[index]}</td>
-                <td>{hasMeasuredAmount ? cumulativeLabels[index] : unavailable}</td>
+                <td>{cumulativeLabels[index]}</td>
               </tr>
             ))}
           </tbody>
