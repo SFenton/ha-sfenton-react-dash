@@ -222,7 +222,7 @@ async function openTheaterRemote(page: Page) {
   return dialog
 }
 
-test('Security control and camera grids fill full-width Sections at every tier', async ({ page }) => {
+test('Home cameras match the Security dynamic grid at every tier', async ({ page }) => {
   test.setTimeout(120_000)
   for (const viewport of PAGE_LAYOUT_VIEWPORTS) {
     await page.setViewportSize(viewport)
@@ -263,6 +263,21 @@ test('Security control and camera grids fill full-width Sections at every tier',
       await expect(guestSection).toHaveAttribute('data-span', 'full')
       await expect(controlGrid.locator('xpath=ancestor::*[@data-responsive-section-item="true"][1]')).toHaveAttribute('data-span', 'full')
     }
+
+    await page.goto('/at-a-glance/overview?feedback-layout=' + viewport.width)
+    const homeRoot = activeRoute(page, 'overview')
+    await expect(homeRoot.getByRole('heading', { level: 1, name: 'Home' })).toBeVisible()
+    const homeCameraGrid = homeRoot.getByRole('button', { name: 'Open Front Door camera' })
+      .locator('xpath=ancestor::*[@data-dynamic-grid="true"][1]')
+    await expect(homeCameraGrid).toHaveAttribute('data-dynamic-grid-columns', String(viewport.cameraColumns))
+    await expect(homeCameraGrid).toHaveAttribute('data-dynamic-grid-item-sizing', 'uniform')
+    await expect(homeCameraGrid).toHaveAttribute('data-dynamic-grid-layout', 'fill')
+    await expect(homeCameraGrid).toHaveAttribute('data-dynamic-grid-max-cell-width', '280')
+    await expect(homeCameraGrid).toHaveAttribute('data-dynamic-grid-max-columns', '4')
+    const homeWidths = await homeCameraGrid.locator(':scope > [data-dynamic-grid-cell]').evaluateAll((cells) =>
+      cells.map((cell) => cell.getBoundingClientRect().width),
+    )
+    for (const width of homeWidths) expect(Math.abs(width - viewport.securityCellWidth)).toBeLessThanOrEqual(1)
   }
 })
 

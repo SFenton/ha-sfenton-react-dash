@@ -49,6 +49,16 @@ describe('AtAGlancePage', () => {
     expect(screen.getByRole('button', { name: 'Open Front Door camera' }).querySelector('[data-modal-disclosure]')).not.toBeInTheDocument()
   })
 
+  it('uses the Security page dynamic camera grid layout', () => {
+    render(<AtAGlancePage />)
+
+    const cameraGrid = screen.getByRole('button', { name: 'Open Front Door camera' }).closest('[data-dynamic-grid="true"]')
+    expect(cameraGrid).toHaveAttribute('data-dynamic-grid-item-sizing', 'uniform')
+    expect(cameraGrid).toHaveAttribute('data-dynamic-grid-layout', 'fill')
+    expect(cameraGrid).toHaveAttribute('data-dynamic-grid-max-cell-width', '280')
+    expect(cameraGrid).toHaveAttribute('data-dynamic-grid-max-columns', '4')
+  })
+
   it('moves the Home Quick Links grid into the global floating action', () => {
     render(<AtAGlancePage />)
 
@@ -430,7 +440,7 @@ describe('AtAGlancePage', () => {
     expect(within(dialog).queryByText('Powered by Pirate Weather')).not.toBeInTheDocument()
     expect(within(dialog).queryByText('Outdoor · Pirate Weather')).not.toBeInTheDocument()
     expect(dialog.querySelector('[data-weather-scene="clouds"]')).toBeInTheDocument()
-    expect(within(dialog).getByText('Outdoor air quality is Unhealthy (152)')).toBeInTheDocument()
+    expect(within(dialog).getByText('Poor Air Quality')).toBeInTheDocument()
     const aqiTile = within(dialog).getByRole('article', { name: 'Outdoor air quality 152, Unhealthy' })
     expect(aqiTile).toHaveAttribute('data-aqi-tone', 'unhealthy')
     expect(within(aqiTile).queryByText('Health effects are possible for everyone.')).not.toBeInTheDocument()

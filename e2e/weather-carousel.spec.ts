@@ -96,6 +96,49 @@ async function expectPageCentered(scroller: Locator) {
   })).toBeLessThanOrEqual(3)
 }
 
+async function expectPageLeftAligned(scroller: Locator) {
+  await expect.poll(() => scroller.evaluate((element) => {
+    const bounds = element.getBoundingClientRect()
+    const style = getComputedStyle(element)
+    const viewportLeft = bounds.left + Number.parseFloat(style.paddingLeft)
+    const firstVisible = Array.from(element.querySelectorAll<HTMLElement>(':scope > [data-carousel-item="true"]'))
+      .map((item) => item.getBoundingClientRect())
+      .find((item) => item.right > viewportLeft + 0.5)
+    return firstVisible ? Math.abs(firstVisible.left - viewportLeft) : Number.POSITIVE_INFINITY
+  })).toBeLessThanOrEqual(3)
+}
+
+async function visibleItemCount(scroller: Locator) {
+  return scroller.evaluate((element) => {
+    const bounds = element.getBoundingClientRect()
+    const style = getComputedStyle(element)
+    const viewportLeft = bounds.left + Number.parseFloat(style.paddingLeft)
+    const viewportRight = bounds.right - Number.parseFloat(style.paddingRight)
+    return Array.from(element.querySelectorAll<HTMLElement>(':scope > [data-carousel-item="true"]'))
+      .map((item) => item.getBoundingClientRect())
+      .filter((item) => item.right > viewportLeft + 0.5 && item.left < viewportRight - 0.5)
+      .length
+  })
+}
+
+async function expectFinalPageAlignment(scroller: Locator) {
+  await expectCompleteItemsOnly(scroller)
+  const pageItemCounts = await scroller.evaluate((element) => {
+    const items = Array.from(element.querySelectorAll<HTMLElement>(':scope > [data-carousel-item="true"]'))
+    const starts = items
+      .map((item, index) => item.dataset.carouselPageStart === 'true' ? index : -1)
+      .filter((index) => index >= 0)
+    return starts.map((start, index) => (starts[index + 1] ?? items.length) - start)
+  })
+  const finalCount = pageItemCounts.at(-1) ?? 0
+  const pageCapacity = Math.max(...pageItemCounts)
+  if (pageItemCounts.length > 1 && finalCount < pageCapacity) {
+    await expectPageLeftAligned(scroller)
+  } else {
+    await expectPageCentered(scroller)
+  }
+}
+
 async function carouselDotRhythm(scroller: Locator, dot: Locator, container: Locator) {
   const [scrollerBounds, dotBounds, containerBounds] = await Promise.all([
     scroller.boundingBox(),
@@ -171,8 +214,7 @@ test('weather carousels preserve native touch scrolling without arrow controls',
 
   await heroPagination.locator('[data-weather-carousel-page="4"]').click()
   await expect.poll(() => heroStrip.evaluate((element) => element.scrollLeft)).toBeGreaterThan(800)
-  await expectPageCentered(heroStrip)
-  await expectCompleteItemsOnly(heroStrip)
+  await expectFinalPageAlignment(heroStrip)
   await expect(page.getByRole('dialog', { name: 'Weather' })).toHaveCount(0)
 
   await page.getByRole('button', { name: /Open seven-day weather forecast/i }).click()
@@ -214,12 +256,13 @@ test('weather carousels preserve native touch scrolling without arrow controls',
   await dialog.getByRole('button', { name: 'Close' }).click()
   await page.setViewportSize({ height: 1180, width: 820 })
   await expect(heroPagination).toHaveAttribute('data-weather-carousel-page-count', '2')
+  await heroPagination.locator('[data-weather-carousel-page="1"]').click()
+  await expectFirstPageSettled(heroStrip)
   await heroPagination.locator('[data-weather-carousel-page="2"]').click()
-  await expectPageCentered(heroStrip)
-  await expectCompleteItemsOnly(heroStrip)
+  await expectFinalPageAlignment(heroStrip)
 })
 
-test('weather carousel pages stay complete and centered across touch viewport sizes', async ({ baseURL, browser }) => {
+test('weather carousel pages stay complete with incomplete final pages aligned left across touch viewports', async ({ baseURL, browser }) => {
   test.setTimeout(120_000)
   const viewports = [
     { height: 393, width: 852 },
@@ -248,8 +291,7 @@ test('weather carousel pages stay complete and centered across touch viewport si
       const heroPageCount = Number(await heroPagination.getAttribute('data-weather-carousel-page-count'))
       if (heroPageCount > 1) {
         await heroPagination.locator(`[data-weather-carousel-page="${heroPageCount}"]`).click()
-        await expectPageCentered(heroStrip)
-        await expectCompleteItemsOnly(heroStrip)
+        await expectFinalPageAlignment(heroStrip)
       }
 
       await page.getByRole('button', { name: /Open seven-day weather forecast/i }).click()
@@ -263,11 +305,42 @@ test('weather carousel pages stay complete and centered across touch viewport si
       await expectPageCentered(modalScroller)
       const modalPageCount = Number(await modalPagination.getAttribute('data-weather-carousel-page-count'))
       await modalPagination.locator(`[data-weather-carousel-page="${modalPageCount}"]`).click()
-      await expectPageCentered(modalScroller)
-      await expectCompleteItemsOnly(modalScroller)
+      await expectFinalPageAlignment(modalScroller)
     } finally {
       await context.close()
     }
+  }
+})
+
+test('incomplete desktop hero page aligns left while complete modal pages stay centered', async ({ browser, baseURL }) => {
+  const { context, page } = await openDesktopPage(browser, baseURL ?? 'http://127.0.0.1:5174')
+  try {
+    const heroFrame = page.locator('[class*="weatherCardFrame"]')
+    const heroStrip = heroFrame.locator('[data-weather-carousel="hero"]')
+    const heroPagination = heroFrame.locator('[data-weather-carousel-pagination]')
+    await expectCompleteItemsOnly(heroStrip)
+    const heroFirstPageCount = await visibleItemCount(heroStrip)
+    await heroPagination.locator('[data-weather-carousel-page="2"]').click()
+    await expect(heroPagination.locator('[aria-current="page"]')).toHaveAttribute('data-weather-carousel-page', '2')
+    await expectCompleteItemsOnly(heroStrip)
+    expect(await visibleItemCount(heroStrip)).toBeLessThan(heroFirstPageCount)
+    await expectPageLeftAligned(heroStrip)
+
+    await page.getByRole('button', { name: /Open seven-day weather forecast/i }).click()
+    const dialog = page.getByRole('dialog', { name: 'Weather' })
+    await waitForModalReady(dialog)
+    const modalFrame = dialog.locator('[class*="hourlyScrollerFrame"]')
+    const modalScroller = modalFrame.locator('[data-weather-carousel="hourly"]')
+    const modalPagination = modalFrame.locator('[data-weather-carousel-pagination]')
+    await expectCompleteItemsOnly(modalScroller)
+    const modalFirstPageCount = await visibleItemCount(modalScroller)
+    await modalPagination.locator('[data-weather-carousel-page="2"]').click()
+    await expect(modalPagination.locator('[aria-current="page"]')).toHaveAttribute('data-weather-carousel-page', '2')
+    await expectCompleteItemsOnly(modalScroller)
+    expect(await visibleItemCount(modalScroller)).toBe(modalFirstPageCount)
+    await expectPageCentered(modalScroller)
+  } finally {
+    await context.close()
   }
 })
 
@@ -301,7 +374,7 @@ test('weather carousels expose boundary-aware mouse and keyboard controls', asyn
     await expect(heroNext).toHaveAttribute('aria-disabled', 'true')
     await expect(heroNext).toBeFocused()
     await expect(heroPagination.locator('[aria-current="page"]')).toHaveAttribute('data-weather-carousel-page', '2')
-    await expectPageCentered(heroStrip)
+    await expectPageLeftAligned(heroStrip)
     await expectCompleteItemsOnly(heroStrip)
 
     await heroPrevious.focus()
