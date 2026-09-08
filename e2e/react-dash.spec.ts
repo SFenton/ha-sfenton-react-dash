@@ -599,8 +599,9 @@ test('desktop browse recipe navigates all detail tabs and submits one missing-on
   await expect(dialog.getByRole('group', { name: 'Yield Makes 2 bowls' })).toBeVisible()
   await expectSharedDesktopFrame(dialog)
   const dialogBox = await dialog.boundingBox()
-  expect(Math.round((await dialog.locator('[data-modal-content-measure="true"]').boundingBox())?.width ?? 0)).toBe(670)
+  expect(Math.round((await dialog.locator('[data-modal-content-measure="true"]').boundingBox())?.width ?? 0)).toBe(1050)
   const navigation = dialog.locator('[data-modal-sheet-navigation="true"]')
+  expect(Math.round((await navigation.locator(':scope > div').boundingBox())?.width ?? 0)).toBe(670)
   const footerBox = await navigation.boundingBox()
   expect(Math.abs(
     ((footerBox?.y ?? 0) + (footerBox?.height ?? 0))
@@ -2674,7 +2675,7 @@ test.describe('desktop modal layout', () => {
     const ventsBox = await vents.boundingBox()
     if (!dialogBox || !heroBox || !ventsBox) throw new Error('Thermostat modal layout was not measurable')
 
-    expect(Math.round((await dialog.locator('[data-modal-content-measure="true"]').boundingBox())?.width ?? 0)).toBe(670)
+    expect(Math.round((await dialog.locator('[data-modal-content-measure="true"]').boundingBox())?.width ?? 0)).toBe(1050)
     expect(heroBox.x).toBeLessThan(ventsBox.x)
     expect(Math.abs(heroBox.y - ventsBox.y)).toBeLessThanOrEqual(24)
     expect(heroBox.y + heroBox.height).toBeGreaterThan(ventsBox.y)

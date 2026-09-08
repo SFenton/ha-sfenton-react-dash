@@ -170,12 +170,12 @@ test('Daily Summary uses compact two-column rows in a fine-pointer desktop conte
 
   const dialog = page.getByRole('dialog', { name: "Stephen's Summary" })
   await expect(dialog).toBeVisible()
-  await expect(dialog).toHaveAttribute('data-modal-body-tier', 'standard')
+  await expect(dialog).toHaveAttribute('data-modal-body-tier', 'wide')
   await expect(dialog.locator('h2').first()).toHaveCSS('font-size', '16px')
   const dialogBox = await dialog.boundingBox()
   expect(Math.round(dialogBox?.width ?? 0)).toBe(1100)
   expect(Math.round(dialogBox?.height ?? 0)).toBe(760)
-  await expect(dialog.locator('[data-modal-content-measure="true"]')).toHaveCSS('width', '670px')
+  await expect(dialog.locator('[data-modal-content-measure="true"]')).toHaveCSS('width', '1050px')
 
   const todoList = dialog.getByLabel('Overdue Chores todo list')
   await expect(todoList.locator('li')).toHaveCount(2)

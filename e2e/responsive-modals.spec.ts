@@ -674,8 +674,8 @@ test('Daily Summary uses compact type and responsive chore and expired-food grid
     { columns: 2, height: 343, insets: { bottom: 0, left: 0, right: 0, top: 0 }, tier: 'standard', width: 734 },
     { columns: 2, height: 393, insets: { bottom: 21, left: 59, right: 44, top: 0 }, tier: 'wide', width: 852 },
     { columns: 2, height: 393, insets: { bottom: 21, left: 44, right: 59, top: 0 }, tier: 'wide', width: 852 },
-    { columns: 2, height: 1180, insets: { bottom: 0, left: 0, right: 0, top: 0 }, tier: 'standard', width: 820 },
-    { columns: 2, height: 900, insets: { bottom: 0, left: 0, right: 0, top: 0 }, tier: 'standard', width: 1440 },
+    { columns: 2, height: 1180, insets: { bottom: 0, left: 0, right: 0, top: 0 }, tier: 'wide', width: 820 },
+    { columns: 2, height: 900, insets: { bottom: 0, left: 0, right: 0, top: 0 }, tier: 'wide', width: 1440 },
   ] as const
 
   for (const profile of profiles) {
@@ -895,7 +895,7 @@ test('Occupancy room tiles preserve portrait cards and centered square presentat
   }
 })
 
-test('compact, form, standard, and media share a desktop frame with preserved reading measures', async ({ page }) => {
+test('compact, form, standard, and media fill the desktop body within the shared frame', async ({ page }) => {
   await page.setViewportSize({ height: 900, width: 1440 })
 
   const expectFrameAndMeasure = async (dialog: Locator, measureWidth: number) => {
@@ -917,14 +917,14 @@ test('compact, form, standard, and media share a desktop frame with preserved re
   await page.getByRole('button', { exact: true, name: 'Add Groceries' }).click()
   dialog = page.getByRole('dialog')
   await expect(dialog).toHaveAttribute('data-size', 'form')
-  await expectFrameAndMeasure(dialog, 510)
+  await expectFrameAndMeasure(dialog, 1050)
   await closeModal(dialog)
 
   await page.goto('/index.html?path=sprinklers')
   await page.getByRole('button', { name: /Front Yard Auto/i }).click()
   dialog = page.getByRole('dialog')
   await expect(dialog).toHaveAttribute('data-size', 'standard')
-  await expectFrameAndMeasure(dialog, 670)
+  await expectFrameAndMeasure(dialog, 1050)
   await expectScrollSafe(dialog)
   await closeModal(dialog)
 

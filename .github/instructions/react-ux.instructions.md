@@ -59,10 +59,11 @@ applyTo: "src/pages/**/*.tsx,src/components/**/*.tsx,src/pages/**/*.module.css,s
 - Within one intent, a mounted modal must not change outer size across tabs,
   loading/ready states, Back/detail pages, or navigation/footer changes. A new
   intent id re-resolves the inner measure; both centered outer frames remain
-  presentation-owned. Compact/form content uses the shared centered
-  readable-measure wrapper, never a second landscape scroller. Use typed
-  `contentWidth="full"` for control collections that must fill the padded
-  body, as Security System and Guest Presence Security do.
+  presentation-owned. Desktop modal body, body-header, and footer regions fill
+  the padded frame while tab navigation retains its readable measure; landscape
+  compact/form content keeps the shared centered wrapper and never adds a second
+  scroller. Use typed `contentWidth="full"` when tab navigation must also fill
+  the padded width, as Security System and Guest Presence Security do.
 - Square room/admin tile density is presentation-specific: portrait sheets keep fluid
   two-column standard cards, phone landscape uses 132px-minimum equal-width
   tracks that fill each complete row, and tablet/desktop retains 168px
