@@ -54,7 +54,7 @@ describe('AtAGlancePage', () => {
 
     expect(screen.queryByRole('heading', { name: 'Quick Links' })).not.toBeInTheDocument()
     expect(screen.queryByRole('region', { name: 'Home quick links' })).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Quick Links' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Open Chat and Quick Links' })).toBeInTheDocument()
   })
 
   it('keeps cold Home content behind a centered spinner before fading content in', () => {

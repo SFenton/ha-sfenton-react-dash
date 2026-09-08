@@ -282,6 +282,7 @@
 }
 
 .header {
+  --modal-header-control-size: 38px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -300,6 +301,14 @@
   gap: 10px;
 }
 
+.headerActions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
 .title {
   margin: 0;
   color: #fff;
@@ -316,8 +325,8 @@
 .back {
   position: relative;
   display: grid;
-  width: 38px;
-  height: 38px;
+  width: var(--modal-header-control-size);
+  height: var(--modal-header-control-size);
   flex: 0 0 auto;
   place-items: center;
   border: 1px solid rgba(255, 255, 255, 0.14);
@@ -367,8 +376,8 @@
 .close {
   position: relative;
   display: grid;
-  width: 38px;
-  height: 38px;
+  width: var(--modal-header-control-size);
+  height: var(--modal-header-control-size);
   place-items: center;
   border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: 50%;

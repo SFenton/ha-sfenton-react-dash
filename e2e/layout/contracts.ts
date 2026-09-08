@@ -1,3 +1,5 @@
+import { CHAT_LAYOUT_STATES } from '../../src/test/fixtures/chat'
+
 export type ResponsiveCoverage = 'direct' | 'not-applicable' | 'owned'
 
 export interface PlaywrightSpecCoverage {
@@ -11,6 +13,12 @@ export interface PlaywrightSpecCoverage {
 }
 
 export const PLAYWRIGHT_SPEC_COVERAGE = [
+  {
+    area: 'Global chat, same-user shared history, deliberate resume, pending state and composer geometry',
+    landscape: 'direct',
+    safeArea: 'direct',
+    spec: 'chat-ux.spec.ts',
+  },
   {
     area: 'Contract-certified mock page, shell, modal, grid, form, remote, host and preload journeys',
     landscape: 'direct',
@@ -301,7 +309,7 @@ export const PLAYWRIGHT_SPEC_COVERAGE = [
   },
 ] as const satisfies readonly PlaywrightSpecCoverage[]
 
-export const SCENARIO_IDS = ['quick-links', 'summary', 'filters', 'form', 'remote', 'weather', 'navigation', 'host', 'preload'] as const
+export const SCENARIO_IDS = ['quick-links', 'chat', 'summary', 'filters', 'form', 'remote', 'weather', 'navigation', 'host', 'preload'] as const
 export type ScenarioId = typeof SCENARIO_IDS[number]
 export type ContextId = 'touch-chromium' | 'fine-chromium' | 'touch-webkit'
 export const CONTEXTS: Record<ContextId, { browser: 'chromium' | 'webkit'; touch: boolean; project: string }> = {
@@ -320,9 +328,17 @@ export const SURFACE_CONTRACTS: Record<ScenarioId, {
 }> = {
   'quick-links': {
     family: 'modal', states: ['root', 'rooms', 'back'],
+    tabs: ['^Home Assistant$', '^Quick Links$'],
     owners: ['src/components/shell/GlobalQuickLinksAction', 'src/components/hass/QuickLinkTile', 'src/components/hass/RoomNavigationGrid'],
     legacy: ['responsive-modal-inventory.spec.ts', 'modal-rotation-regressions.spec.ts'],
     question: 'Are text-aware links and left-aligned room tracks readable, with real end clearance and unchanged return geometry?',
+  },
+  chat: {
+    family: 'modal', states: CHAT_LAYOUT_STATES,
+    tabs: ['^Home Assistant$', '^Quick Links$'],
+    owners: ['src/components/hass/chat/', 'src/components/shell/GlobalQuickLinksAction', 'src/i18n/locales/en/modals/chat.json'],
+    legacy: ['chat-ux.spec.ts', 'modal-rotation-regressions.spec.ts'],
+    question: 'Are roles, genuine pending dots, history/resume warnings, errors and long messages clear, with a usable composer above bottom tabs and one safe scroll owner?',
   },
   summary: {
     family: 'modal', states: ['overdue', 'upcoming', 'expired'],
@@ -396,6 +412,7 @@ export const PARITY_SPEC = 'mobile-parity-all-routes.spec.ts'
 export const LAYOUT_UNIT_GATES = [
   'scripts/layout', 'scripts/e2e-coverage-check.test.ts', 'scripts/required-mobile-parity.test.ts',
   'src/components/shell/DashboardPreloadCache.test.tsx', 'src/test/mocks/hakitCoreState.test.ts',
+  'src/components/hass/chat', 'src/components/shell/GlobalChat.test.tsx', 'src/components/shell/GlobalQuickLinksAction.test.tsx',
 ] as const
 
 // Exact, existing engine restrictions; these remain skipped, never counted as passed.

@@ -1,5 +1,7 @@
 import { expect, test, type FrameLocator, type Locator, type Page } from './layout/fixture'
 import { valueToThermostatPoint } from '../src/components/hass/thermostatDialGeometry'
+import { globalQuickLinksAction, openQuickLinksTab, selectQuickLinksTab } from './quick-links'
+import { waitForModalReady } from './layout/evidence'
 
 const DIALOG_SQUARE_TILE_SIZE = 168
 const MODAL_SQUARE_GRID_MAX_COLUMNS = 4
@@ -40,8 +42,7 @@ async function openBedAlarmDialog(page: Page, bedButtonName: RegExp) {
 }
 
 async function openRoomsFromQuickLinks(scope: FrameLocator | Page) {
-  await scope.getByRole('button', { name: 'Quick Links' }).click()
-  const quickLinksDialog = scope.getByRole('dialog', { name: 'Quick Links' })
+  const quickLinksDialog = await openQuickLinksTab(scope)
   await quickLinksDialog.getByRole('button', { name: 'Rooms' }).click()
   const roomsDialog = scope.getByRole('dialog', { name: 'Rooms' })
   await expect(roomsDialog).toBeVisible()
@@ -889,7 +890,7 @@ test('Food & Recipes hub and recipe browse use approved 393px mobile geometry', 
   const expandedSearchBox = await recipeSearchInput.locator('xpath=..').boundingBox()
   expect(Math.round(expandedSearchBox?.x ?? 0)).toBe(Math.round(floatingDockBox?.x ?? 0))
   expect(Math.round(expandedSearchBox?.width ?? 0)).toBe(Math.round(floatingDockBox?.width ?? 0))
-  await expect(page.locator('button[aria-label="Quick Links"]')).toBeHidden()
+  await expect(globalQuickLinksAction(page)).toBeHidden()
   await expect(recipeSearchInput.locator('xpath=..')).toHaveCSS('background-color', 'rgba(18, 24, 38, 0.96)')
   await recipeSearchInput.fill('chicken')
   await expect(recipeSearchInput).toHaveValue('chicken')
@@ -1030,15 +1031,14 @@ test('overview renders with mock Home Assistant state', async ({ page }) => {
   await expect(page).toHaveTitle('Home Assistant')
   await expect(page.getByRole('heading', { name: 'Home' })).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Quick Links' })).toHaveCount(0)
-  await expect(page.getByRole('button', { name: 'Quick Links' })).toBeVisible()
+  await expect(globalQuickLinksAction(page)).toBeVisible()
 })
 
 test('Food quick link mirrors the All Food summary with the Kitchen Food orange', async ({ page }) => {
   await page.setViewportSize({ width: 393, height: 852 })
   await page.goto('/at-a-glance/overview')
 
-  await page.getByRole('button', { name: 'Quick Links' }).click()
-  const dialog = page.getByRole('dialog', { name: 'Quick Links' })
+  const dialog = await openQuickLinksTab(page)
   const foodQuickLink = dialog.getByRole('button', { name: 'Food & Recipes 35 Items • 6 Expiring Soon' })
   await expect(foodQuickLink).toContainText('Food & Recipes')
   await expect(foodQuickLink).toContainText('35 Items • 6 Expiring Soon')
@@ -1053,17 +1053,17 @@ test('global Quick Links opens from a non-Home route and preserves one-sheet det
   await page.setViewportSize({ width: 393, height: 852 })
   await page.goto('/at-a-glance/settings')
 
-  const trigger = page.getByRole('button', { name: 'Quick Links' })
+  const trigger = globalQuickLinksAction(page)
   await trigger.focus()
   await trigger.press('Enter')
-  let dialog = page.getByRole('dialog', { name: 'Quick Links' })
+  let dialog = await selectQuickLinksTab(page)
   await expect(dialog).toBeVisible()
   await page.keyboard.press('Escape')
   await expect(dialog).not.toBeVisible()
   await expect(trigger).toBeFocused()
 
   await trigger.click()
-  dialog = page.getByRole('dialog', { name: 'Quick Links' })
+  dialog = await selectQuickLinksTab(page)
   await expect.poll(() => dialog.getByRole('group', { name: 'Quick Links', exact: true }).evaluate((grid) => {
     const rows = new Set(Array.from(grid.children).map((cell) => Math.round(cell.getBoundingClientRect().top)))
     return {
@@ -1096,14 +1096,14 @@ test('global Quick Links stays rightmost without overflowing representative mobi
 
   for (const route of ['overview', 'security', 'settings', 'chores', 'kitchen', 'fridge', 'recipes']) {
     await page.goto(`/at-a-glance/${route}`)
-    const trigger = page.getByRole('button', { name: 'Quick Links' })
+    const trigger = globalQuickLinksAction(page)
     const dock = page.locator('[data-floating-action-dock="true"]')
     const nav = page.getByRole('navigation', { name: 'Dashboard sections' })
     await expect(trigger).toBeVisible()
 
     const geometry = await dock.evaluate((element) => {
       const dockRect = element.getBoundingClientRect()
-      const quickLinks = element.querySelector<HTMLButtonElement>('button[aria-label="Quick Links"]')
+      const quickLinks = element.querySelector<HTMLButtonElement>('button[aria-label="Quick Links"], button[aria-label="Open Chat and Quick Links"]')
       const quickLinksRect = quickLinks?.getBoundingClientRect()
       const visibleChildren = Array.from(element.children).filter((child) => {
         const rect = child.getBoundingClientRect()
@@ -1151,10 +1151,10 @@ test('mobile modal opener families use shared disclosures and explicit action ex
   await expectRightChevron(page.getByRole('button', { name: /Open seven-day weather forecast/i }))
   await expectNoChevron(page.getByRole('button', { name: /^Lights /i }).first())
   await expectNoChevron(page.getByRole('button', { name: 'Open Front Door camera' }))
-  const quickLinksTrigger = page.getByRole('button', { name: 'Quick Links' })
+  const quickLinksTrigger = globalQuickLinksAction(page)
   await expect(quickLinksTrigger).toHaveAttribute('data-modal-opener-exception', 'floating-action')
   await quickLinksTrigger.click()
-  const quickLinksDialog = page.getByRole('dialog', { name: 'Quick Links' })
+  const quickLinksDialog = await selectQuickLinksTab(page)
   await expectRightChevron(quickLinksDialog.getByRole('button', { name: 'Rooms' }))
   await expect(quickLinksDialog.getByRole('button', { name: 'Rooms' })).toHaveAttribute('data-modal-opener', 'true')
   await expectRightChevron(quickLinksDialog.getByRole('button', { name: /^Security System /i }))
@@ -1807,7 +1807,7 @@ test('inventory footer search moves above the mobile keyboard and clears results
   await expect(dock.locator('button[aria-label="Sort"]').locator('xpath=..')).toHaveAttribute('data-collapsed', 'true')
   await expect(dock.locator('button[aria-label="Filter"]').locator('xpath=..')).toHaveAttribute('data-collapsed', 'true')
   await expect(dock.getByRole('button', { name: 'Scan Item' })).toHaveCSS('opacity', '0')
-  await expect(dock.locator('button[aria-label="Quick Links"]')).toBeHidden()
+  await expect(globalQuickLinksAction(page)).toBeHidden()
 
   await page.evaluate(() => window.__setInventoryFakeKeyboardHeight?.(520))
   await expect.poll(async () => {
@@ -1825,7 +1825,7 @@ test('inventory footer search moves above the mobile keyboard and clears results
   await input.press('Enter')
   await page.evaluate(() => window.__setInventoryFakeKeyboardHeight?.(window.innerHeight))
   await expect.poll(async () => Math.round((await dock.boundingBox())?.y ?? 0)).toBe(Math.round(restBox.y))
-  await expect(dock.getByRole('button', { name: 'Quick Links' })).toBeVisible()
+  await expect(globalQuickLinksAction(page)).toBeVisible()
 
   await dock.getByRole('button', { name: 'Search inventory' }).click()
   const reopenedInput = page.getByLabel('Search inventory')
@@ -2360,7 +2360,7 @@ test.describe('desktop modal layout', () => {
   test('Quick Links modal keeps compact text-aware navigation on desktop', async ({ page }) => {
     await page.setViewportSize({ width: 900, height: 900 })
     await page.goto('/at-a-glance/settings')
-    await page.getByRole('button', { name: 'Quick Links' }).click()
+    await openQuickLinksTab(page)
 
     const dialog = page.getByRole('dialog', { name: 'Quick Links' })
     await expect(dialog).toBeVisible()
@@ -2559,40 +2559,39 @@ test.describe('desktop modal layout', () => {
       cardWidth: DIALOG_SQUARE_TILE_SIZE,
     })
 
+    await waitForModalReady(dialog)
     const before = await dialog.boundingBox()
     if (!before) throw new Error('Rooms modal was not measurable before closing')
 
-    const frames = await page.evaluate(async () => {
-      const dialogElement = document.querySelector('[role="dialog"]') as HTMLElement | null
-      const closeButton = dialogElement?.querySelector('button[aria-label="Close"]') as HTMLButtonElement | null
-      if (!dialogElement || !closeButton) return []
+    const { frames, closingAtStart } = await dialog.evaluate(async (dialogElement, closeWindowMs) => {
+      const closeButton = dialogElement.querySelector<HTMLButtonElement>('button[aria-label="Close"]')
+      if (!closeButton) throw new Error('Rooms modal requires its mounted Close control')
 
       const samples: Array<{ height: number; width: number }> = []
-      closeButton.click()
+      let closingAtStart: string | null = null
       const start = performance.now()
+      closeButton.click()
 
       await new Promise<void>((resolve) => {
         const sample = () => {
-          if (!document.body.contains(dialogElement)) {
+          if (!document.body.contains(dialogElement) || performance.now() - start > closeWindowMs) {
             resolve()
             return
           }
 
+          if (!samples.length) closingAtStart = dialogElement.getAttribute('data-closing')
           const rect = dialogElement.getBoundingClientRect()
           samples.push({ height: Math.round(rect.height), width: Math.round(rect.width) })
-          if (performance.now() - start >= 150) {
-            resolve()
-            return
-          }
           requestAnimationFrame(sample)
         }
 
         requestAnimationFrame(sample)
       })
 
-      return samples
-    })
+      return { frames: samples, closingAtStart }
+    }, 520)
 
+    expect(closingAtStart).toBe('true')
     expect(frames.length).toBeGreaterThan(2)
     expect(Math.max(...frames.map((frame) => Math.abs(frame.width - Math.round(before.width))))).toBeLessThanOrEqual(2)
     expect(Math.max(...frames.map((frame) => Math.abs(frame.height - Math.round(before.height))))).toBeLessThanOrEqual(2)
@@ -3225,7 +3224,7 @@ test('room status chips open direct reusable modal sheets', async ({ page }) => 
   await page.goto('/at-a-glance/kitchen')
 
   await expect(page.getByRole('button', { name: 'Rooms' })).toHaveCount(0)
-  await expect(page.getByRole('button', { name: 'Quick Links' })).toBeVisible()
+  await expect(globalQuickLinksAction(page)).toBeVisible()
   await page.getByRole('button', { name: /Lights/i }).first().click()
 
   await expect(page.getByRole('dialog')).toBeVisible()

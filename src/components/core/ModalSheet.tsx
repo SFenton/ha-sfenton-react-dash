@@ -61,6 +61,7 @@ export interface ModalSheetProps {
   contentStyle?: ModalSheetStyle
   contentWidth?: ModalContentWidth
   footer?: ReactNode
+  headerActions?: ReactNode
   landscapeDensity?: ModalLandscapeDensity
   navigation?: ReactNode
   onBack?: () => void
@@ -72,7 +73,7 @@ export interface ModalSheetProps {
   subtitle?: string
 }
 
-type ModalSheetSnapshot = Pick<ModalSheetProps, 'backLabel' | 'backdropPolicy' | 'bodyHeader' | 'centeredGeometry' | 'children' | 'contentStyle' | 'contentWidth' | 'footer' | 'landscapeDensity' | 'navigation' | 'onBack' | 'scrollMode' | 'scrollResetKey' | 'size' | 'subtitle' | 'surfaceDecoration' | 'surfaceDecorationOccludesBackdrop' | 'title'>
+type ModalSheetSnapshot = Pick<ModalSheetProps, 'backLabel' | 'backdropPolicy' | 'bodyHeader' | 'centeredGeometry' | 'children' | 'contentStyle' | 'contentWidth' | 'footer' | 'headerActions' | 'landscapeDensity' | 'navigation' | 'onBack' | 'scrollMode' | 'scrollResetKey' | 'size' | 'subtitle' | 'surfaceDecoration' | 'surfaceDecorationOccludesBackdrop' | 'title'>
 interface ModalCenteredGeometrySnapshot {
   centeredGeometry: ModalCenteredGeometry
   size: ModalSheetSize
@@ -145,6 +146,7 @@ export function ModalSheet({
   contentStyle,
   contentWidth = 'readable',
   footer,
+  headerActions,
   landscapeDensity = 'compact',
   navigation,
   onBack,
@@ -167,6 +169,7 @@ export function ModalSheet({
     contentStyle,
     contentWidth,
     footer,
+    headerActions,
     landscapeDensity,
     navigation,
     onBack,
@@ -458,6 +461,7 @@ export function ModalSheet({
                   <Drawer.Description className={styles.description}>{rendered.subtitle
                     ? copy('modal.descriptionWithSubtitle', { subtitle: rendered.subtitle, title: rendered.title })
                     : copy('modal.description', { title: rendered.title })}</Drawer.Description>
+                  {rendered.headerActions && <div className={styles.headerActions} data-modal-sheet-header-actions="true">{rendered.headerActions}</div>}
                   <button className={styles.close} aria-label={copy('modal.close')} onClick={requestClose} type="button">
                     <MaterialIcon name="mdi:close" size={19} />
                   </button>

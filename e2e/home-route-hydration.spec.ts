@@ -1,4 +1,5 @@
 import { expect, test, type Page } from './layout/fixture'
+import { waitForNavigation } from './layout/evidence'
 
 const VIEWPORTS = [
   { height: 852, name: 'phone portrait', width: 393 },
@@ -54,6 +55,7 @@ async function navigateHome(page: Page) {
 }
 
 async function startHomeRouteAudit(page: Page) {
+  await waitForNavigation(page)
   return page.evaluate(() => {
     const visible = (element: Element | null) => {
       if (!(element instanceof HTMLElement)) return false

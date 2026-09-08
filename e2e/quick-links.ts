@@ -1,4 +1,34 @@
-import type { Locator } from '@playwright/test'
+import { expect, type Frame, type FrameLocator, type Locator, type Page } from '@playwright/test'
+
+type QuickLinksScope = Page | Frame | FrameLocator
+
+export function globalQuickLinksAction(scope: QuickLinksScope) {
+  return scope.getByRole('button', { name: /^(?:Open Chat and Quick Links|Quick Links)$/ })
+}
+
+export async function selectQuickLinksTab(scope: QuickLinksScope, activation: 'pointer' | 'keyboard' = 'pointer') {
+  const tabs = scope.getByRole('tab', { name: 'Quick Links', exact: true })
+  const currentHost = await scope.locator('button[aria-label="Open Chat and Quick Links"]').count() > 0
+  if (currentHost) {
+    await expect(tabs).toBeVisible()
+    if (activation === 'keyboard') {
+      await tabs.focus()
+      await tabs.press('Enter')
+    } else await tabs.click()
+    await expect(tabs).toHaveAttribute('aria-selected', 'true')
+  }
+  const dialog = scope.getByRole('dialog', { name: 'Quick Links', exact: true })
+  await expect(dialog.getByRole('group', { name: 'Quick Links', exact: true })).toBeVisible()
+  return dialog
+}
+
+export async function openQuickLinksTab(scope: QuickLinksScope) {
+  const opener = globalQuickLinksAction(scope)
+  const currentHost = await opener.getAttribute('aria-label') === 'Open Chat and Quick Links'
+  await opener.click()
+  if (currentHost) await expect(scope.getByRole('tab', { name: 'Home Assistant', exact: true })).toBeVisible()
+  return selectQuickLinksTab(scope)
+}
 
 export async function quickLinksLayout(dialog: Locator) {
   return dialog.getByRole('group', { name: 'Quick Links', exact: true }).evaluate((grid) => {

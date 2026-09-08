@@ -88,6 +88,18 @@ The deployment must:
 - avoid a Home Assistant restart when the panel package and bridge are
   unchanged.
 
+Chat retention is a separate HA runtime dependency. Deploy the exact
+`home-assistant/custom_components/sfenton_react_chat/` files and
+`home-assistant/packages/sfenton_react_chat.yaml` following the component README.
+SSH deployment compares/backs up those files and validates after staging, with
+rollback on staging/validation failure; SMB requires the documented manual
+backup, copy, validation and rollback steps. Changed component/package files
+require a separately approved HA restart. Do not claim retention is active
+until `sfenton_react_chat.purge_expired_history` is registered and its daily
+automation is loaded/enabled. Asset deployment and `deploy:sync` do not prove
+this. Do not invoke the purge service during release verification without
+explicit deletion authorization.
+
 ## Production verification
 
 1. Confirm the raw app, legacy wrapper, and custom panel load the merged

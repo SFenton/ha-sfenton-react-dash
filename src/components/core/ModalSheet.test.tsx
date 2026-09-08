@@ -120,6 +120,27 @@ describe('ModalSheet mounted orientation', () => {
 })
 
 describe('ModalSheet', () => {
+  it('keeps the current header actions outside the body and mounted through close', () => {
+    const view = render(
+      <ModalSheet headerActions={<button type="button">First header action</button>} onClose={() => undefined} open title="Header actions">
+        Body content
+      </ModalSheet>,
+    )
+    const dialog = screen.getByRole('dialog')
+    view.rerender(
+      <ModalSheet headerActions={<button type="button">Current header action</button>} onClose={() => undefined} open title="Header actions">
+        Body content
+      </ModalSheet>,
+    )
+    const action = within(dialog).getByRole('button', { name: 'Current header action' })
+    expect(dialog.querySelector('[data-modal-sheet-header-actions]')).toContainElement(action)
+    expect(dialog.querySelector('[data-modal-sheet-body]')).not.toContainElement(action)
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Close' }))
+    view.rerender(<ModalSheet onClose={() => undefined} open={false} title="Header actions">Body content</ModalSheet>)
+    expect(dialog).toHaveAttribute('data-closing', 'true')
+    expect(action).toBeInTheDocument()
+  })
+
   it('remeasures full-width content while open and retains its width policy during close', () => {
     const width = window.innerWidth
     const height = window.innerHeight

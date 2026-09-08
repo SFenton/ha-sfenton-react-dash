@@ -133,7 +133,8 @@ export async function actualCapabilities(page: AuditedDocument, browser: string,
   }
 }
 
-export async function modalFacts(dialog: Locator, expectedScrollMode: 'body' | 'panes' = 'body') {
+export async function modalFacts(dialog: Locator, expectedScrollMode: 'body' | 'panes' = 'body', terminalKind: 'controls' | 'chat-content' = 'controls') {
+  if (terminalKind !== 'controls' && terminalKind !== 'chat-content') throw new Error('Unknown modal terminal kind')
   await waitForModalReady(dialog)
   await expect(dialog).toHaveAttribute('data-scroll-mode', expectedScrollMode)
   const body = dialog.locator('[data-modal-sheet-body]')
@@ -144,7 +145,7 @@ export async function modalFacts(dialog: Locator, expectedScrollMode: 'body' | '
     return Math.abs(element.scrollTop - Math.max(0, element.scrollHeight - element.clientHeight))
   })).toBeLessThanOrEqual(1)
   await dialog.evaluate(() => new Promise<void>((done) => requestAnimationFrame(() => requestAnimationFrame(() => done()))))
-  const facts = await dialog.evaluate((element) => {
+  const facts = await dialog.evaluate((element, terminalKind) => {
     const body = element.querySelector<HTMLElement>('[data-modal-sheet-body]')!
     const measure = element.querySelector<HTMLElement>('[data-modal-content-measure]')!
     const rect = element.getBoundingClientRect()
@@ -156,10 +157,19 @@ export async function modalFacts(dialog: Locator, expectedScrollMode: 'body' | '
         const rect = item.getBoundingClientRect()
         return rect.width > 0 && rect.height > 0 && !item.closest('[aria-hidden="true"]')
       })
-    if (!terminals.length) throw new Error('Modal body requires terminal controls')
-    const terminalBottom = Math.max(...terminals.map((item) => item.getBoundingClientRect().bottom))
-    const terminalControlGap = body.getBoundingClientRect().bottom - terminalBottom
-    if (![terminalGap, terminalBottom, terminalControlGap].every(Number.isFinite)) throw new Error('Modal terminal geometry must be finite')
+    const content = terminalKind === 'chat-content'
+      ? [...body.querySelectorAll<HTMLElement>('[data-chat-panel="true"], [data-chat-history="true"]')]
+      : []
+    if (terminalKind === 'controls' && !terminals.length) throw new Error('Modal body requires terminal controls')
+    if (terminalKind === 'chat-content' && (content.length !== 1 || !content[0].textContent?.trim()
+      || content[0].getBoundingClientRect().height <= 0 || content[0].getBoundingClientRect().width <= 0
+      || getComputedStyle(content[0]).visibility !== 'visible' || Number(getComputedStyle(content[0]).opacity) <= 0
+      || content[0].closest('[aria-hidden="true"], [inert]'))) throw new Error('Chat body requires one real terminal content region')
+    const targets = terminalKind === 'controls' ? terminals : content
+    const terminalBottom = Math.max(...targets.map((item) => item.getBoundingClientRect().bottom))
+    const terminalTargetGap = body.getBoundingClientRect().bottom - terminalBottom
+    const terminalControlGap = terminals.length ? body.getBoundingClientRect().bottom - Math.max(...terminals.map((item) => item.getBoundingClientRect().bottom)) : null
+    if (![terminalGap, terminalBottom, terminalTargetGap].every(Number.isFinite)) throw new Error('Modal terminal geometry must be finite')
     const scrollOwners = Array.from(body.querySelectorAll<HTMLElement>('*')).filter((child) =>
       child.clientHeight > 0 && child.scrollHeight > child.clientHeight + 1 && ['auto', 'scroll'].includes(getComputedStyle(child).overflowY))
     const eligiblePanes = Array.from(body.querySelectorAll<HTMLElement>('*')).filter((child) =>
@@ -182,13 +192,14 @@ export async function modalFacts(dialog: Locator, expectedScrollMode: 'body' | '
       bodyContentHeight: body.clientHeight - Number.parseFloat(getComputedStyle(body).paddingTop) - Number.parseFloat(getComputedStyle(body).paddingBottom),
       measureHeight: measure.getBoundingClientRect().height,
       measureOverflow: measure.scrollHeight - measure.clientHeight,
-      terminalGap, terminalControlGap, terminalControlCount: terminals.length,
+      terminalGap, terminalKind, terminalTargetGap, terminalControlGap, terminalControlCount: terminals.length,
+      terminalContentCount: content.length,
       nestedScrollOwners: scrollOwners.length,
       eligiblePanes: eligiblePanes.map((pane) => ({ name: pane.dataset.scrollRegion ?? pane.className, height: pane.clientHeight })),
       closeHit: hit === close || close.contains(hit),
       contentWidth: measure.getBoundingClientRect().width,
     }
-  })
+  }, terminalKind)
   await body.evaluate((element, top) => element.scrollTo({ top, behavior: 'instant' }), originalScroll)
   expect(facts.intent).toBeTruthy()
   expect(facts.closeHit).toBe(true)
@@ -217,7 +228,7 @@ export async function modalFacts(dialog: Locator, expectedScrollMode: 'body' | '
     expect(facts.nestedScrollOwners, 'Body-owned content must not introduce a nested vertical scroller').toBe(0)
     expect(Math.abs(facts.terminalGap - facts.bodyPadding), 'Intrinsic body measure must retain actual end padding').toBeLessThanOrEqual(1)
     expect(facts.measureOverflow, 'Intrinsic body measure contains its descendants').toBeLessThanOrEqual(1)
-    expect(facts.terminalControlGap, 'Actual terminal controls retain the body end clearance').toBeGreaterThanOrEqual(facts.bodyPadding - 1)
+    expect(facts.terminalTargetGap, 'The declared actual terminal target retains the body end clearance').toBeGreaterThanOrEqual(facts.bodyPadding - 1)
   }
   return { ...facts, effectiveScrollOwner }
 }

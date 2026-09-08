@@ -89,6 +89,7 @@ dimensions to positional arrays or confuse a resize with native input emulation.
 | Scenario | Family | States | Manual question |
 | --- | --- | --- | --- |
 | quick-links | modal | root, rooms, back | Are text-aware links and left-aligned room tracks readable, with real end clearance and unchanged return geometry? |
+| chat | modal | empty, history-empty, conversation, history, loading, unavailable, load-error, request-save-error, save-error, pending, archive, resume, resume-ready, removed-agent, conflict, unknown, long, reset, empty-reply, agent-error, not-sent, oversized-reply, multiple-agents, unreadable, limit | Are roles, genuine pending dots, history/resume warnings, errors and long messages clear, with a usable composer above bottom tabs and one safe scroll owner? |
 | summary | modal | overdue, upcoming, expired | Does the selected incoming Summary content retain readable type and columns on rotation before refreshing a tab? |
 | filters | modal | choices | Are filter descriptions readable at the actual column width, and are options and footer usable? |
 | form | modal | draft | Does the draft survive resizing, and are input, close and footer controls usable during synthetic keyboard contraction? |

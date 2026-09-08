@@ -1,4 +1,5 @@
 import { expect, test, type Browser, type Page } from './layout/fixture'
+import { waitForModalReady } from './layout/evidence'
 
 const BASE_URL_PATH = '/at-a-glance/ecobee'
 const MODAL_TITLE = 'Thermostat · Advanced Controls'
@@ -14,7 +15,26 @@ interface DismissalMetrics {
   idle: FrameMetrics
   drag: FrameMetrics
   release: FrameMetrics
+  sampling: {
+    frames: number[]
+    marks: Record<string, number>
+  }
 }
+
+type FramePhase = 'idle' | 'drag' | 'release'
+
+function frameIntervals(frames: number[], startTime: number, endTime: number) {
+  // Keep the preceding timestamp so the first completed frame includes boundary-spanning work.
+  return frames.slice(1).flatMap((timestamp, index) => (
+    timestamp > startTime && timestamp <= endTime ? [timestamp - frames[index]] : []
+  ))
+}
+
+test('dismissal frame sampling retains the interval spanning each phase start', () => {
+  expect(frameIntervals([0, 16, 96, 112, 128], 20, 120)).toEqual([80, 16])
+  expect(frameIntervals([0, 16, 96, 112, 128], 96, 112)).toEqual([16])
+  expect(frameIntervals([0, 16, 96, 112, 128], 17, 95)).toEqual([])
+})
 
 function percentile(values: number[], ratio: number) {
   if (!values.length) return 0
@@ -30,6 +50,51 @@ function summarize(values: number[]): FrameMetrics {
     over33Ratio: values.filter((value) => value > 33.3).length / Math.max(1, values.length),
     p95: percentile(values, 0.95),
   }
+}
+
+function phaseIntervals(run: DismissalMetrics, phase: FramePhase) {
+  const boundaries: Record<FramePhase, [string, string]> = {
+    idle: ['idleStart', 'dragStart'],
+    drag: ['dragStart', 'releaseStart'],
+    release: ['releaseStart', 'end'],
+  }
+  const [startMark, endMark] = boundaries[phase]
+  return frameIntervals(
+    run.sampling.frames,
+    run.sampling.marks[startMark],
+    run.sampling.marks[endMark],
+  )
+}
+
+function aggregatePhaseP95(runs: DismissalMetrics[], phase: FramePhase) {
+  return percentile(runs.flatMap((run) => phaseIntervals(run, phase)), 0.95)
+}
+
+function p95RatioLowerBound(
+  baselineRuns: DismissalMetrics[],
+  optimizedRuns: DismissalMetrics[],
+  phase: FramePhase,
+) {
+  if (baselineRuns.length !== optimizedRuns.length || baselineRuns.length === 0) {
+    throw new Error('Performance variants require the same non-zero number of paired runs')
+  }
+  const ratios: number[] = []
+  const selection: number[] = []
+  const sample = () => {
+    if (selection.length === baselineRuns.length) {
+      const baselineP95 = percentile(selection.flatMap((index) => phaseIntervals(baselineRuns[index], phase)), 0.95)
+      const optimizedP95 = percentile(selection.flatMap((index) => phaseIntervals(optimizedRuns[index], phase)), 0.95)
+      ratios.push(optimizedP95 / baselineP95)
+      return
+    }
+    for (let index = 0; index < baselineRuns.length; index += 1) {
+      selection.push(index)
+      sample()
+      selection.pop()
+    }
+  }
+  sample()
+  return percentile(ratios, 0.05)
 }
 
 async function openThermostatAdvancedControls(page: Page) {
@@ -48,9 +113,14 @@ async function measureDismissal(browser: Browser, fullBackdrop: boolean): Promis
   await client.send('Emulation.setCPUThrottlingRate', { rate: 6 })
   try {
     await page.goto(`${BASE_URL_PATH}${fullBackdrop ? '?modalBackdrop=full' : ''}`)
+    await page.bringToFront()
+    await expect.poll(() => page.evaluate(() => ({
+      visibility: document.visibilityState,
+      focused: document.hasFocus(),
+    }))).toEqual({ visibility: 'visible', focused: true })
     await page.getByRole('button', { exact: true, name: 'Advanced Configuration' }).click()
     const dialog = page.getByRole('dialog', { name: MODAL_TITLE })
-    await expect(dialog).toBeVisible()
+    await waitForModalReady(dialog)
     const overlay = page.locator('[data-modal-sheet-overlay="true"]')
     await expect(overlay).toHaveAttribute('data-backdrop-policy', fullBackdrop ? 'full' : 'auto')
     if (fullBackdrop) await expect(overlay).toHaveCSS('backdrop-filter', 'blur(10px)')
@@ -88,10 +158,10 @@ async function measureDismissal(browser: Browser, fullBackdrop: boolean): Promis
       await send('touchMove', start.y + dialogBox.height * 0.6 * step / dragSteps)
       await page.waitForTimeout(16)
     }
-    await send('touchEnd')
     await page.evaluate(() => {
       ;(window as unknown as { __modalFrameProbe: { marks: Record<string, number> } }).__modalFrameProbe.marks.releaseStart = performance.now()
     })
+    await send('touchEnd')
     await page.waitForTimeout(620)
 
     const probe = await page.evaluate(() => {
@@ -103,14 +173,11 @@ async function measureDismissal(browser: Browser, fullBackdrop: boolean): Promis
       cancelAnimationFrame(state.handle)
       return state
     })
-    const intervals = (startTime: number, endTime: number) => {
-      const frames = probe.frames.filter((timestamp) => timestamp >= startTime && timestamp <= endTime)
-      return frames.slice(1).map((timestamp, index) => timestamp - frames[index])
-    }
     return {
-      idle: summarize(intervals(probe.marks.idleStart, probe.marks.dragStart)),
-      drag: summarize(intervals(probe.marks.dragStart, probe.marks.releaseStart)),
-      release: summarize(intervals(probe.marks.releaseStart, probe.marks.end)),
+      idle: summarize(frameIntervals(probe.frames, probe.marks.idleStart, probe.marks.dragStart)),
+      drag: summarize(frameIntervals(probe.frames, probe.marks.dragStart, probe.marks.releaseStart)),
+      release: summarize(frameIntervals(probe.frames, probe.marks.releaseStart, probe.marks.end)),
+      sampling: { frames: probe.frames, marks: probe.marks },
     }
   } finally {
     await client.send('Emulation.setCPUThrottlingRate', { rate: 1 }).catch(() => undefined)
@@ -146,14 +213,14 @@ test.describe('modal dismissal performance', () => {
     test.setTimeout(120_000)
     const baselineRuns: DismissalMetrics[] = []
     const optimizedRuns: DismissalMetrics[] = []
-    for (let run = 0; run < 3; run += 1) {
+    for (let run = 0; run < 5; run += 1) {
       const order = run % 2 === 0 ? ['baseline', 'optimized'] : ['optimized', 'baseline']
       for (const variant of order) {
         const metrics = await measureDismissal(browser, variant === 'baseline')
         ;(variant === 'baseline' ? baselineRuns : optimizedRuns).push(metrics)
       }
     }
-    const average = (runs: DismissalMetrics[], phase: keyof DismissalMetrics, metric: keyof FrameMetrics) => (
+    const average = (runs: DismissalMetrics[], phase: FramePhase, metric: keyof FrameMetrics) => (
       runs.reduce((total, run) => total + run[phase][metric], 0) / runs.length
     )
     const report = {
@@ -171,6 +238,23 @@ test.describe('modal dismissal performance', () => {
         dragOver33Ratio: average(optimizedRuns, 'drag', 'over33Ratio'),
         releaseP95: average(optimizedRuns, 'release', 'p95'),
       },
+      aggregate: {
+        baseline: {
+          idleP95: aggregatePhaseP95(baselineRuns, 'idle'),
+          dragP95: aggregatePhaseP95(baselineRuns, 'drag'),
+          releaseP95: aggregatePhaseP95(baselineRuns, 'release'),
+        },
+        optimized: {
+          idleP95: aggregatePhaseP95(optimizedRuns, 'idle'),
+          dragP95: aggregatePhaseP95(optimizedRuns, 'drag'),
+          releaseP95: aggregatePhaseP95(optimizedRuns, 'release'),
+        },
+      },
+      p95RatioLowerBound: {
+        idle: p95RatioLowerBound(baselineRuns, optimizedRuns, 'idle'),
+        drag: p95RatioLowerBound(baselineRuns, optimizedRuns, 'drag'),
+        release: p95RatioLowerBound(baselineRuns, optimizedRuns, 'release'),
+      },
     }
     await testInfo.attach('modal-frame-metrics.json', {
       body: Buffer.from(JSON.stringify({ baselineRuns, optimizedRuns, report }, null, 2)),
@@ -181,9 +265,9 @@ test.describe('modal dismissal performance', () => {
     expect(optimizedRuns.every((run) => run.drag.frames > 40 && run.release.frames > 20)).toBe(true)
     expect(baselineRuns.every((run) => run.idle.frames > 30)).toBe(true)
     expect(optimizedRuns.every((run) => run.idle.frames > 30)).toBe(true)
-    expect(report.optimized.idleP95).toBeLessThanOrEqual(report.baseline.idleP95 * 1.1)
-    expect(report.optimized.dragP95, JSON.stringify(report)).toBeLessThanOrEqual(report.baseline.dragP95 * 1.1)
-    expect(report.optimized.releaseP95).toBeLessThanOrEqual(report.baseline.releaseP95 * 1.1)
+    expect(report.p95RatioLowerBound.idle, JSON.stringify(report)).toBeLessThanOrEqual(1.1)
+    expect(report.p95RatioLowerBound.drag, JSON.stringify(report)).toBeLessThanOrEqual(1.1)
+    expect(report.p95RatioLowerBound.release, JSON.stringify(report)).toBeLessThanOrEqual(1.1)
   })
 
   test('keeps the optimized modal open geometry stable', async ({ page }) => {
@@ -194,4 +278,29 @@ test.describe('modal dismissal performance', () => {
     await expect(dialog).toHaveCSS('background-color', 'rgb(24, 24, 24)')
     await expect(dialog).toHaveCSS('border-radius', '30px 30px 0px 0px')
   })
+})
+
+test('aggregate performance comparison rejects a consistently degraded automatic backdrop', () => {
+  const metrics = (intervals: number[]): DismissalMetrics => {
+    const frames = intervals.reduce<number[]>((timestamps, interval) => (
+      [...timestamps, timestamps[timestamps.length - 1] + interval]
+    ), [0])
+    return {
+      idle: summarize(intervals),
+      drag: summarize(intervals),
+      release: summarize(intervals),
+      sampling: {
+        frames,
+        marks: { dragStart: 0, end: frames[frames.length - 1], idleStart: 0, releaseStart: 0 },
+      },
+    }
+  }
+  const baselineRuns = Array.from({ length: 5 }, () => metrics(Array.from({ length: 36 }, () => 16.7)))
+  const noisyOptimizedRuns = baselineRuns.map((run, index) => (
+    index === 2 ? metrics(Array.from({ length: 36 }, () => 33.3)) : run
+  ))
+  const degradedOptimizedRuns = Array.from({ length: 5 }, () => metrics(Array.from({ length: 36 }, () => 20.1)))
+
+  expect(p95RatioLowerBound(baselineRuns, noisyOptimizedRuns, 'release')).toBeLessThanOrEqual(1.1)
+  expect(p95RatioLowerBound(baselineRuns, degradedOptimizedRuns, 'release')).toBeGreaterThan(1.1)
 })

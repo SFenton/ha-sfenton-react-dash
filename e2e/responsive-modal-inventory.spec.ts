@@ -2,6 +2,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { expect, test, type Locator, type Page } from './layout/fixture'
 import { waitForModalReady } from './layout/evidence'
+import { openQuickLinksTab } from './quick-links'
 import ts from 'typescript'
 import { modalSheetPresentationForViewport } from '../src/components/core/modalSheetPresentation'
 import { VIEWPORTS, type ResponsiveViewport } from './responsive-acceptance-data'
@@ -519,7 +520,11 @@ const MODAL_CASES: ModalCase[] = [
     expectedScrollMode: 'body',
     expectedSize: 'media',
     id: 'global-quick-links',
-    open: (page) => openButtonModal(page, 'living-room', 'Quick Links', 'Quick Links'),
+    open: async (page) => {
+      await gotoRoute(page, 'living-room')
+      await openQuickLinksTab(page)
+      return page.locator('[role="dialog"][data-modal-geometry-intent="global-quick-links"]')
+    },
     physicalCallsite: 'src/components/shell/GlobalQuickLinksAction.tsx:GlobalQuickLinksAction',
   },
   {
@@ -699,7 +704,7 @@ const PORTRAIT_TILE_CASES = [
     id: 'rooms',
     open: async (page: Page) => {
       await gotoRoute(page, 'overview')
-      await page.getByRole('button', { name: 'Quick Links' }).click()
+      await openQuickLinksTab(page)
       const quickLinks = page.getByRole('dialog', { name: 'Quick Links' })
       await quickLinks.getByRole('button', { name: 'Rooms' }).click()
       return page.getByRole('dialog', { name: 'Rooms' })
@@ -1162,7 +1167,10 @@ test.describe('complete ModalSheet inventory acceptance', () => {
 
       expect(Math.abs(metrics.dialogWidth - 393), `${tileCase.id} dialog width`).toBeLessThanOrEqual(1)
       expect(Math.abs(metrics.dialogHeight - 767), `${tileCase.id} dialog height`).toBeLessThanOrEqual(1)
-      expect(metrics.bodyPaddingBottom, `${tileCase.id} body bottom padding`).toBe('58px')
+      expect(metrics.bodyPaddingBottom, `${tileCase.id} body bottom padding`).toBe(tileCase.id === 'rooms' ? '12px' : '58px')
+      if (tileCase.id === 'rooms') {
+        await expect(dialog.locator('[data-modal-sheet-navigation="true"]')).toHaveCSS('padding-bottom', '52px')
+      }
       expect(Math.abs(metrics.gridWidth - 359), `${tileCase.id} grid width`).toBeLessThanOrEqual(1)
       expect(Math.abs(metrics.bodyContentWidth - 359), `${tileCase.id} body content width`).toBeLessThanOrEqual(1)
       expect(Math.abs(metrics.cardWidth - tileCase.expected.width), `${tileCase.id} card width`).toBeLessThanOrEqual(0.1)

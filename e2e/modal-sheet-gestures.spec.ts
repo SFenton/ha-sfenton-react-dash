@@ -1,4 +1,5 @@
 import { expect, test, type CDPSession, type Locator, type Page } from './layout/fixture'
+import { globalQuickLinksAction, selectQuickLinksTab } from './quick-links'
 
 type Point = {
   x: number
@@ -27,10 +28,11 @@ const SHEET_OPEN_ANIMATION_MS = 500
 
 async function openRoomsModal(page: Page) {
   await page.goto('/at-a-glance/overview')
-  const opener = page.getByRole('button', { name: 'Quick Links' })
+  const opener = globalQuickLinksAction(page)
   const openerBox = await opener.boundingBox()
   if (!openerBox) throw new Error('Rooms opener was not measurable')
   await opener.click()
+  await selectQuickLinksTab(page)
   await page.getByRole('dialog', { name: 'Quick Links' }).getByRole('button', { name: 'Rooms' }).click()
   const dialog = page.getByRole('dialog', { name: 'Rooms' })
   await expect(dialog).toBeVisible()
@@ -38,6 +40,7 @@ async function openRoomsModal(page: Page) {
     dialog,
     reopen: async () => {
       await page.mouse.click(openerBox.x + openerBox.width / 2, openerBox.y + openerBox.height / 2)
+      await selectQuickLinksTab(page)
       await page.getByRole('dialog', { name: 'Quick Links' }).getByRole('button', { name: 'Rooms' }).click()
     },
   }
@@ -595,10 +598,11 @@ test.describe('mobile ModalSheet gestures', () => {
     await expect(page.getByRole('dialog', { name: 'Quick Links' })).toHaveCount(0)
 
     await page.waitForTimeout(50)
-    const quickLinks = page.getByRole('button', { name: 'Quick Links' })
+    const quickLinks = globalQuickLinksAction(page)
     const quickLinksBox = await quickLinks.boundingBox()
     if (!quickLinksBox) throw new Error('Quick Links opener was not measurable during modal exit')
     await page.mouse.click(quickLinksBox.x + quickLinksBox.width / 2, quickLinksBox.y + quickLinksBox.height / 2)
+    await selectQuickLinksTab(page)
     const quickLinksDialog = page.getByRole('dialog', { name: 'Quick Links' })
     await expect(quickLinksDialog).toBeVisible()
     expect(Date.now() - closeStartedAt).toBeLessThan(700)

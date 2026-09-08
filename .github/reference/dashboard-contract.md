@@ -50,6 +50,18 @@ npm run deploy:sync  # Synchronize dashboard metadata after an SMB copy
 
 When running terminal commands, explicitly set the working directory to this repo or use `npm --prefix "C:\\Users\\sfent\\source\\repos\\homeassistant\\ha-sfenton-react-dash" ...`; terminals may reuse another workspace folder.
 
+## Hosting and LAN access
+
+Use the `host-web-app` skill for local LAN hosting, server bootstrap, or port
+selection work in this repository. It defines the exact runtime contract for
+binding the app on `0.0.0.0`, choosing an available port, and verifying the
+live backend connection without exposing secrets. The default LAN host is the
+Vite development server with HMR/React Fast Refresh; use production preview
+only when explicitly requested.
+When operating the host, launch from the requested worktree path explicitly
+and verify both process cwd and a non-HTML feature-module response from that
+worktree, not just `index.html`, before calling the runtime valid.
+
 ## Deployment To Home Assistant
 
 The deployed Home Assistant version should be a production Vite build, not the dev server.
@@ -112,15 +124,24 @@ Its stable `sfenton-react-panel.js` bridge adds a fresh cache-busting query to t
 
 During this parallel-host experiment, the custom panel intentionally retains Home Assistant's native desktop sidebar because `panel_custom` has no supported per-panel kiosk option. Mobile uses HA's narrow layout and fills the viewport. Do not inject top-window CSS or persist global kiosk-mode preferences to hide the desktop sidebar; keep that temporary divergence explicit until the user chooses the final host architecture.
 
-For an SSH deployment, `npm run deploy:both` builds the app, uploads `dist/`, deploys the panel package when changed, validates Home Assistant configuration, and synchronizes the legacy wrapper URL. The script supports the configured password or `VITE_SSH_PRIVATE_KEY`; on this workstation it defaults to `~/.ssh/ha-sfenton-react-dash-deploy`.
+For an SSH deployment, `npm run deploy:both` builds the app, uploads `dist/`, stages changed panel and `sfenton_react_chat` package/component files with backups, validates Home Assistant configuration, and synchronizes the legacy wrapper URL. Failed staging/validation attempts to restore the prior configuration files. The script does not restart HA or verify retention activation. It supports the configured password or `VITE_SSH_PRIVATE_KEY`; on this workstation it defaults to `~/.ssh/ha-sfenton-react-dash-deploy`.
 
 For the preferred SMB flow:
 
 1. Run `npm run build`.
 2. Copy `dist/` to `\\192.168.1.22\config\www\ha-sfenton-react-dash`.
 3. Copy `home-assistant/packages/sfenton_react_panel.yaml` to `\\192.168.1.22\config\packages\sfenton_react_panel.yaml` if it changed.
-4. Run `npm run deploy:sync` to bump the legacy wrapper URL and verify the custom panel registration.
-5. Restart Home Assistant only when the panel package or bridge version changed.
+4. Back up and copy changed `home-assistant/custom_components/sfenton_react_chat/` files to `\\192.168.1.22\config\custom_components\sfenton_react_chat\`, and `home-assistant/packages/sfenton_react_chat.yaml` to `\\192.168.1.22\config\packages\sfenton_react_chat.yaml`.
+5. Configuration-check HA after staging package/component changes. On failure, restore prior files and remove only newly introduced files; do not restart invalid configuration.
+6. Run `npm run deploy:sync` to bump the legacy wrapper URL and verify the custom panel registration.
+7. Restart Home Assistant only with explicit approval when the panel package/bridge or chat retention component/package changed.
+8. After restart, verify `sfenton_react_chat.purge_expired_history` is registered and its daily automation is loaded and enabled. Never invoke the purge service during verification without explicit deletion authorization.
+
+React assets, `deploy:sync`, and HMR do not activate chat retention. Do not claim
+retention active until the component/package installation, approved restart,
+and service/automation verification are complete. See `docs/chat.md` and
+`home-assistant/custom_components/sfenton_react_chat/README.md` for the fixed
+14-day policy, storage limitations, and detailed installation/rollback steps.
 
 The app is served by Home Assistant at:
 
@@ -189,7 +210,8 @@ Do not recreate the Home Assistant sidebar or top bar for now. Focus on the dash
 - Bottom navigation should be modeled after the FortniteFestivalWeb mobile bottom nav pattern: a route-aware fixed/frosted nav surface with icon+label buttons and clear active state.
 - Use reusable primitives for recurring patterns such as section headers, quick access buttons, entity rows, chip buttons, modal sheets, light sliders, and camera cards.
 - Do not add visual press/click feedback to dashboard cards, glass tiles, modal cards, dropdown options, toggles, or entity controls. Avoid `:active` scale transforms, press animations, transient background flashes, opacity changes, or similar interaction-only visual effects. Persistent state indicators such as selected, checked, active, on/off, disabled, unavailable, or HA state-derived colors are still expected.
-- On mobile/touch dashboard controls, do not leave persistent white focus or selected borders after a tap. Native dropdown/select wrappers, GlassTiles, buttons, chips, toggles, and modal controls should not retain a visible focus ring solely because they were tapped.
+- On coarse- or fine-pointer dashboard controls, do not leave persistent white focus borders, outlines, or shadows solely after a click or tap. Text inputs and textareas can match `:focus-visible` after pointer focus; it is not a keyboard-modality test. Preserve identifiable keyboard focus (including the native text caret/selection) and state-derived/error borders rather than clearing focus styles app-wide. Follow the focused pointer/Tab/overflow browser gate in `.github/instructions/react-ux.instructions.md`.
+- Textareas must remain editable and scrollable with the caret visible for long multiline or unbroken text, without scrollbar chrome or changing stable composer geometry. Hide the actual control's cross-browser scrollbar; never trap overflow with `overflow: hidden`.
 - Modals should use the shared `<ModalSheet />` behavior and must remain mounted for the `open={false}` render on close so the slide-out animation runs. Do not immediately unmount, re-key, or swap sheets when X/backdrop/swipe/hash close is requested.
 - `ModalSheet` uses `backdropPolicy="auto"` by default to restrict expensive backdrop blur to CSS-derived exposed bands on eligible mobile sheets. Keep mobile geometry in the shared `--modal-mobile-height` and `--modal-mobile-max-height` properties so the inert backdrop proxy resolves in the same layout pass. Automatic mode requires genuinely opaque sheet backing and paints the full scrim above the blur bands; near-opaque paint is not equivalent. Direct geometry, translucent or unaudited custom surfaces, centered layouts, stacked sheets, interaction/lifecycle transitions, unsupported filters, forced colors, and sampling-band area above 25% must fail closed. Use `backdropPolicy="full"` for an opt-out. Require Chromium and WebKit frame-level coverage, and accept pixel parity only after the renderer passes a blur-positive control.
 - Put `-webkit-backdrop-filter` before the standard `backdrop-filter` declaration. The CSS minifier can otherwise drop the standard property; build verification must inspect emitted CSS rather than assuming source declarations survive.

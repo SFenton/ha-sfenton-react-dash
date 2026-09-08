@@ -20,6 +20,7 @@ const PORT = Number(process.env.VITE_SSH_PORT || 22)
 const REMOTE_FOLDER_NAME = process.env.VITE_FOLDER_NAME
 const LOCAL_DIRECTORY = './dist'
 const PANEL_PACKAGE_PATH = resolve('home-assistant/packages/sfenton_react_panel.yaml')
+const CHAT_COMPONENT_FILES = ['__init__.py', 'manifest.json', 'services.yaml', 'retention.py', 'README.md']
 const REMOTE_PATH = `/www/${REMOTE_FOLDER_NAME}`
 const AUTO_CONFIRM = process.argv.includes('--yes')
 
@@ -80,23 +81,43 @@ async function deploy() {
     const packageContent = await readFile(PANEL_PACKAGE_PATH)
     const currentPackage = await readRemoteFile(client, remotePackage)
     const packageChanged = !currentPackage?.equals(packageContent)
+    const chatPaths = [
+      'packages/sfenton_react_chat.yaml',
+      ...CHAT_COMPONENT_FILES.map((file) => `custom_components/sfenton_react_chat/${file}`),
+    ]
+    const changedConfig = []
+    if (packageChanged) changedConfig.push({ path: remotePackage, content: packageContent, previous: currentPackage })
+    for (const path of chatPaths) {
+      const content = await readFile(resolve('home-assistant', path))
+      const previous = await readRemoteFile(client, `${configRoot}/${path}`)
+      if (!previous?.equals(content)) changedConfig.push({ path: `${configRoot}/${path}`, content, previous })
+    }
+    const chatChanged = changedConfig.some((file) => file.path !== remotePackage)
 
     if (await client.exists(remote)) await client.rmdir(remote)
     console.info(chalk.blue('Uploading', `"${LOCAL_DIRECTORY}"`, 'to', `"${remote}"`))
     await client.uploadDir(LOCAL_DIRECTORY, remote)
 
-    if (packageChanged) {
+    if (changedConfig.length) {
       await client.mkdir(`${configRoot}/packages`, undefined, { recursive: true })
-      if (currentPackage) await client.writeFile(`${remotePackage}.bak`, currentPackage)
-      await client.writeFile(remotePackage, packageContent)
+      await client.mkdir(`${configRoot}/custom_components/sfenton_react_chat`, undefined, { recursive: true })
+      for (const file of changedConfig) {
+        if (file.previous) await client.writeFile(`${file.path}.bak`, file.previous)
+      }
       try {
+        for (const file of changedConfig) await client.writeFile(file.path, file.content)
         await validateHomeAssistantConfig()
       } catch (error) {
-        if (currentPackage) {
-          await client.writeFile(remotePackage, currentPackage)
-        } else if (await client.exists(remotePackage)) {
-          await client.unlink(remotePackage)
+        const failures: unknown[] = [error]
+        for (const file of [...changedConfig].reverse()) {
+          try {
+            if (file.previous) await client.writeFile(file.path, file.previous)
+            else if (await client.exists(file.path)) await client.unlink(file.path)
+          } catch (restoreError) {
+            failures.push(restoreError)
+          }
         }
+        if (failures.length > 1) throw new AggregateError(failures, 'Configuration staging failed and rollback was incomplete; restore the .bak files before restarting HA.', { cause: error })
         throw error
       }
     }
@@ -118,6 +139,11 @@ async function deploy() {
     console.info(chalk.blue(`Legacy wrapper URL: ${syncResult.legacyDashboardUrl}`))
     if (packageChanged) {
       console.info(chalk.yellow('The panel_custom package changed; restart Home Assistant before using sfenton-react-panel.'))
+    }
+    if (chatChanged) {
+      console.info(chalk.yellow('Chat retention component/package changes are staged. Restart Home Assistant with approval, then verify sfenton_react_chat.purge_expired_history and the daily automation; retention is not yet confirmed active.'))
+    } else {
+      console.info(chalk.yellow('Chat retention files match; runtime service/automation activation is not verified by asset deployment.'))
     }
   } finally {
     client.close()
@@ -150,7 +176,7 @@ async function validateHomeAssistantConfig() {
 
   const result = await response.json() as { errors?: unknown; result?: unknown }
   if (result.result !== 'valid') {
-    throw new Error(`Home Assistant rejected the panel package: ${String(result.errors || 'unknown validation error')}`)
+    throw new Error(`Home Assistant rejected the staged configuration: ${String(result.errors || 'unknown validation error')}`)
   }
 }
 

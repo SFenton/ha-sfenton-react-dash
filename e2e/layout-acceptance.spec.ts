@@ -4,8 +4,9 @@ import { SCENARIO_IDS, SURFACE_CONTRACTS, type ScenarioId } from './layout/contr
 import { journey, obligationsFor, SOURCE_ROUTES } from './layout/scenarios'
 import { actualCapabilities, applyProfile, assertDeclaredTabs, checkpoint, closeMounted, contextForProject, modalFacts, runEnvironment, waitForModalReady, waitForNavigation, waitForRoute } from './layout/evidence'
 import { layoutProfile } from './responsive-acceptance-data'
-import { quickLinksLayout } from './quick-links'
+import { openQuickLinksTab, quickLinksLayout } from './quick-links'
 import { MUSIC_ROOM_REMOTE_ENTITY_ID } from '../src/constants/mediaRemotes'
+import { chatStateFacts, openChatState } from './chat-layout'
 
 async function stateFacts(page: Page, dialog: Locator, scenario: ScenarioId, state: string) {
   const preferredScrollMode = scenario === 'remote' || (scenario === 'quick-links' && state === 'rooms') ? 'panes' : 'body'
@@ -175,7 +176,7 @@ async function pageFacts(page: Page, back: boolean) {
 
 for (const scenario of SCENARIO_IDS) {
   test(`layout contract: ${scenario}`, { annotation: { type: 'layout-scenario', description: scenario } }, async ({ page, browser, browserName, isMobile, hasTouch }, testInfo) => {
-    test.setTimeout(240_000)
+    test.setTimeout(scenario === 'chat' ? 480_000 : 240_000)
     const context = contextForProject(testInfo.project.name)
     const environment = runEnvironment()
     const obligations = environment
@@ -196,7 +197,7 @@ for (const scenario of SCENARIO_IDS) {
         const origin = await frame.evaluate(() => performance.timeOrigin)
         for (const obligation of obligations.filter((entry) => entry.state === state)) {
           await applyHostProfile(page, frame, state, obligation.profile)
-          await frame.getByRole('button', { name: 'Quick Links', exact: true }).click()
+          await openQuickLinksTab(frame)
           const dialog = frame.getByRole('dialog')
           const facts = await modalFacts(dialog)
           expect(await frame.evaluate(() => performance.timeOrigin)).toBe(origin)
@@ -210,6 +211,27 @@ for (const scenario of SCENARIO_IDS) {
       }
       return
     }
+    if (scenario === 'chat') {
+      for (const state of SURFACE_CONTRACTS.chat.states) {
+        const dialog = await openChatState(page, state)
+        let firstFrame: Record<string, number> | undefined
+        const selected = obligations.filter((entry) => entry.state === state)
+        for (const obligation of selected) {
+          await applyProfile(page, obligation.profile)
+          const facts = await chatStateFacts(dialog, state)
+          if (obligation.step === 0) firstFrame = facts.frame
+          const stages = journey(scenario, context)
+          if (obligation.step === stages.length - 1 && stages[0] === stages.at(-1)) {
+            for (const key of ['x', 'y', 'width', 'height'] as const) {
+              expect(Math.abs(firstFrame![key] - facts.frame[key]), 'Mounted Chat return geometry').toBeLessThanOrEqual(1)
+            }
+          }
+          await checkpoint(page, page, testInfo, obligation, capabilities, facts)
+        }
+        await closeMounted(dialog)
+      }
+      return
+    }
     if (scenario === 'preload') {
       await page.goto('/index.html?path=overview')
       const cache = page.locator('[data-dashboard-preload-cache]')
@@ -219,8 +241,10 @@ for (const scenario of SCENARIO_IDS) {
         mediaElements: element.querySelectorAll('img,video,canvas').length,
         hidden: element.getAttribute('aria-hidden'),
         services: window.__mockHass?.calls.length,
+        chatMessages: window.__mockHass?.chat.messages.length,
+        chatSubscriptions: window.__mockHass?.chat.subscriptions(),
       }))
-      expect(facts).toEqual({ routes: SOURCE_ROUTES.length, mediaElements: 0, hidden: 'true', services: 0 })
+      expect(facts).toEqual({ routes: SOURCE_ROUTES.length, mediaElements: 0, hidden: 'true', services: 0, chatMessages: 0, chatSubscriptions: 0 })
       await checkpoint(page, page, testInfo, obligations[0], capabilities, { ...facts, phase: 'Initial hydration; the inert cache is intentionally removed once the app is ready' })
       await waitForRoute(page, 'overview')
       return

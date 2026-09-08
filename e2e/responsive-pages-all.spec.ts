@@ -264,7 +264,7 @@ test.describe('all-route responsive acceptance', () => {
         if (route !== 'overview') await setRoute(page, route)
         for (const [index, viewport] of sequence.viewports.entries()) {
           await page.setViewportSize(viewport)
-          await page.waitForTimeout(100)
+          await expect(page.locator('[data-app-shell="true"]')).toHaveAttribute('data-navigation-layout', navigationLayoutForViewport(viewport))
           await auditPage(page, route, viewport, `${sequence.name}-${index}`)
         }
       }

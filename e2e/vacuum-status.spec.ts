@@ -1,4 +1,5 @@
 import { expect, test, type Page } from './layout/fixture'
+import { waitForModalReady } from './layout/evidence'
 
 const VIEWPORTS = [
   { height: 852, width: 393 },
@@ -39,11 +40,13 @@ async function openUnavailableMusicVacuum(page: Page, path = '/at-a-glance/vacuu
   await page.getByRole('button', { name: 'Music Room Unavailable', exact: true }).click()
   const dialog = page.getByRole('dialog')
   await expect(dialog).toBeVisible()
+  await waitForModalReady(dialog, undefined, 'vacuum-tabs')
   return dialog
 }
 
 async function assertUnavailableAccuracy(page: Page) {
   const dialog = page.getByRole('dialog')
+  await waitForModalReady(dialog, undefined, 'vacuum-tabs')
   await expect(dialog.getByLabel('Unavailable')).toHaveCount(0)
   const battery = dialog.getByText('Battery').locator('xpath=ancestor::*[@data-icon][1]')
   await expect(battery).toContainText('Unknown')
@@ -62,10 +65,22 @@ async function assertUnavailableAccuracy(page: Page) {
     title: getComputedStyle(element.querySelector('strong')!).color,
   }))
   expect(noteColors.body).toBe(noteColors.title)
-  const [mapBox, noteBox] = await Promise.all([map.boundingBox(), note.boundingBox()])
-  expect(mapBox).not.toBeNull()
-  expect(noteBox).not.toBeNull()
-  expect(noteBox!.y).toBeGreaterThanOrEqual(mapBox!.y + mapBox!.height)
+  const targets = await Promise.all([map.elementHandle(), note.elementHandle()])
+  try {
+    // Resolve identities first; both rectangles are sampled in one browser task.
+    const [mapBox, noteBox] = await dialog.evaluate((element, targets) => targets.map((target) => {
+      if (!target || !element.contains(target) || !target.getClientRects().length) return null
+      const rect = target.getBoundingClientRect()
+      const style = getComputedStyle(target)
+      if (rect.width <= 0 || rect.height <= 0 || style.visibility !== 'visible') return null
+      return { x: rect.x, y: rect.y, width: rect.width, height: rect.height }
+    }), targets)
+    expect(mapBox).not.toBeNull()
+    expect(noteBox).not.toBeNull()
+    expect(noteBox!.y).toBeGreaterThanOrEqual(mapBox!.y + mapBox!.height)
+  } finally {
+    await Promise.all(targets.map((target) => target?.dispose()))
+  }
   await expect(map.locator('[data-map-editor-overlay="true"]')).toHaveCount(0)
   await expect(dialog.getByText('Map Unavailable')).toHaveCount(0)
   await expect(dialog.getByRole('button', { name: 'Locate' })).toHaveCount(0)

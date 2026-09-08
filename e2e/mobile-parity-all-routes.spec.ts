@@ -252,7 +252,7 @@ async function pageSignature(page: Page): Promise<ElementSignature[]> {
           .sort((left, right) => right.getBoundingClientRect().height - left.getBoundingClientRect().height)[0] ?? null
       : null
     const bottomNavigation = Array.from(document.querySelectorAll<HTMLElement>('nav[aria-label="Dashboard sections"]')).find(visible) ?? null
-    const quickLinks = Array.from(document.querySelectorAll<HTMLElement>('button[aria-label="Quick Links"]')).find(visible) ?? null
+    const quickLinks = Array.from(document.querySelectorAll<HTMLElement>('button[aria-label="Quick Links"], button[aria-label="Open Chat and Quick Links"]')).find(visible) ?? null
     let floatingDock = quickLinks?.parentElement ?? null
     while (floatingDock && getComputedStyle(floatingDock).position !== 'fixed') floatingDock = floatingDock.parentElement
 
@@ -270,7 +270,7 @@ async function pageSignature(page: Page): Promise<ElementSignature[]> {
     const occurrences = new Map<string, number>()
     for (const element of Array.from(document.querySelectorAll<HTMLElement>(
       'main h1, main h2, main h3, main header button, '
-      + 'nav[aria-label="Dashboard sections"] button, button[aria-label="Quick Links"]',
+      + 'nav[aria-label="Dashboard sections"] button, button[aria-label="Quick Links"], button[aria-label="Open Chat and Quick Links"]',
     )).filter(visible)) {
       if (roots.has(element)) continue
       const label = (
@@ -279,7 +279,9 @@ async function pageSignature(page: Page): Promise<ElementSignature[]> {
         ?? element.textContent?.replaceAll(/\s+/g, ' ').trim().slice(0, 80)
         ?? ''
       ).replaceAll(/-?\d+(?:\.\d+)?/g, '#')
-      const baseKey = `${element.tagName}:${element.getAttribute('role') ?? ''}:${label}`
+      // The global action intentionally gains Chat in its name; retain its geometry comparison.
+      const identity = element === quickLinks ? 'global-quick-links-action' : label
+      const baseKey = `${element.tagName}:${element.getAttribute('role') ?? ''}:${identity}`
       const occurrence = occurrences.get(baseKey) ?? 0
       occurrences.set(baseKey, occurrence + 1)
       entries.push({ element, key: `${baseKey}:${occurrence}` })
