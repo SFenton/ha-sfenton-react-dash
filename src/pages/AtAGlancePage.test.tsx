@@ -166,7 +166,7 @@ describe('AtAGlancePage', () => {
     expect(mockCallServiceCalls.at(-1)).toEqual({
       domain: 'cover',
       service: 'open_cover',
-      target: 'cover.left_door',
+      target: 'cover.garage_left_door',
     })
 
     fireEvent.click(within(dialog).getByRole('button', { name: /Enforce Home Temperatures Keep Eco Active/i }))

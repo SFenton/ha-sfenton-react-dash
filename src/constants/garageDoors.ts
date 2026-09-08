@@ -1,6 +1,6 @@
 export const GARAGE_DOOR_ENTITY_IDS = {
-  left: 'cover.left_door',
-  right: 'cover.right_door',
+  left: 'cover.garage_left_door',
+  right: 'cover.garage_right_door',
 } as const
 
 export const GARAGE_DOOR_SENDING_FEEDBACK_MS = 1000
