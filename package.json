@@ -50,7 +50,9 @@
     "test:e2e:coverage": "tsx scripts/e2e-coverage-check.ts",
     "test:e2e:responsive": "playwright test e2e/chat-ux.spec.ts e2e/adaptive-navigation.spec.ts e2e/responsive-layout.spec.ts e2e/responsive-pages-all.spec.ts e2e/responsive-modals.spec.ts e2e/responsive-modal-inventory.spec.ts e2e/modal-geometry-stability.spec.ts e2e/modal-rotation-regressions.spec.ts e2e/landscape-modal-adaptation.spec.ts e2e/safe-area-responsive.spec.ts e2e/mobile-device-smoke.spec.ts e2e/feedback-regressions.spec.ts e2e/desktop-responsive.spec.ts e2e/home-route-hydration-desktop.spec.ts e2e/preload-inert.spec.ts",
     "test:e2e": "playwright test",
-    "test:e2e:mobile-parity": "tsx scripts/required-mobile-parity.ts"
+    "test:e2e:mobile-parity": "tsx scripts/required-mobile-parity.ts",
+    "test:emulator": "tsx e2e/emulator/run.ts",
+    "test:emulator:list": "tsx e2e/emulator/run.ts --list"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",
@@ -89,7 +91,8 @@
     "typescript": "~6.0.2",
     "typescript-eslint": "^8.58.2",
     "vite": "^8.0.10",
-    "vitest": "^4.1.6"
+    "vitest": "^4.1.6",
+    "webdriverio": "^9.31.7"
   },
   "packageManager": "yarn@4.12.0+sha512.f45ab632439a67f8bc759bf32ead036a1f413287b9042726b7cc4818b7b49e14e9423ba49b18f9e06ea4941c1ad062385b1d8760a8d5091a1a31e5f6219afca8"
 }
