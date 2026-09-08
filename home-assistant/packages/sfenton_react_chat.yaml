@@ -1,0 +1,12 @@
+sfenton_react_chat:
+
+automation:
+  - id: sfenton_react_chat_purge_expired_history
+    alias: Sfenton React Chat - daily history retention
+    description: Clear conversation payloads based on their fourteen-day creation age.
+    triggers:
+      - trigger: time
+        at: "03:15:00"
+    actions:
+      - action: sfenton_react_chat.purge_expired_history
+    mode: single

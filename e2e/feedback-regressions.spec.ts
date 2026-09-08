@@ -1,7 +1,8 @@
 import { expect, test, type Locator, type Page } from './layout/fixture'
 import { navigationLayoutForViewport } from '../src/constants/navigationLayout'
 import { installSafeAreaInsets, setSafeAreaInsets } from './safe-area'
-import { waitForModalReady } from './layout/evidence'
+import { waitForModalReady, waitForNavigation } from './layout/evidence'
+import { openQuickLinksTab } from './quick-links'
 
 const PHONE = { width: 393, height: 852 }
 const TABLET_PORTRAIT = { width: 820, height: 1180 }
@@ -23,8 +24,7 @@ async function openQuickLinks(page: Page) {
   const menu = page.locator('[data-page-header="true"]:visible button[aria-label="Open navigation menu"]').first()
   await expect(menu).toBeVisible()
   const menuBox = await menu.boundingBox()
-  await page.getByRole('button', { name: 'Quick Links' }).click()
-  const dialog = page.getByRole('dialog', { name: 'Quick Links' })
+  const dialog = await openQuickLinksTab(page)
   await expect(dialog).toBeVisible()
   return { dialog, menuBox }
 }
@@ -156,6 +156,7 @@ test('sidebars place the Chores count at the trailing edge of its row', async ({
   for (const viewport of [PHONE, DESKTOP]) {
     await page.setViewportSize(viewport)
     await page.goto(`/at-a-glance/overview?feedback-sidebar-badge=${viewport.width}`)
+    await waitForNavigation(page)
     let navigation: Locator
     const navigationLayout = navigationLayoutForViewport(viewport)
     if (navigationLayout !== 'rail') {
@@ -166,19 +167,28 @@ test('sidebars place the Chores count at the trailing edge of its row', async ({
       navigation = page.locator('[data-adaptive-navigation="rail"]')
     }
 
+    await expect(navigation).toBeVisible()
+    await expect.poll(() => navigation.evaluate((element) => !element.getAnimations({ subtree: true }).some((animation) =>
+      animation.playState === 'running' && animation.effect?.getComputedTiming().iterations !== Infinity,
+    ))).toBe(true)
     const chores = navigation.getByRole(navigationLayout === 'rail' ? 'button' : 'menuitem', { name: /Chores/ })
-    const icon = chores.locator('svg').first()
-    const badge = chores.locator('[data-count]')
-    const [rowBox, iconBox, badgeBox] = await Promise.all([
-      chores.boundingBox(),
-      icon.boundingBox(),
-      badge.boundingBox(),
-    ])
-    expect(rowBox).not.toBeNull()
-    expect(iconBox).not.toBeNull()
-    expect(badgeBox).not.toBeNull()
-    expect((badgeBox?.x ?? 0)).toBeGreaterThan((iconBox?.x ?? 0) + (iconBox?.width ?? 0))
-    expect(Math.abs((rowBox?.x ?? 0) + (rowBox?.width ?? 0) - ((badgeBox?.x ?? 0) + (badgeBox?.width ?? 0)) - 11)).toBeLessThanOrEqual(2)
+    await expect.poll(async () => {
+      const metrics = await chores.evaluate((row) => {
+        const icon = row.querySelector('svg')
+        const badge = row.querySelector('[data-count]')
+        if (!icon || !badge) throw new Error('Chores row requires its actual icon and count badge')
+        const measure = (element: Element) => {
+          const rect = element.getBoundingClientRect()
+          const style = getComputedStyle(element)
+          if (!element.getClientRects().length || rect.width <= 0 || rect.height <= 0
+            || style.visibility !== 'visible' || Number(style.opacity) <= 0) throw new Error('Chores geometry requires visible nonzero elements')
+          return { left: rect.left, right: rect.right }
+        }
+        return { row: measure(row), icon: measure(icon), badge: measure(badge) }
+      })
+      expect(metrics.badge.left).toBeGreaterThan(metrics.icon.right)
+      return Math.abs(metrics.row.right - metrics.badge.right - 11)
+    }).toBeLessThanOrEqual(2)
   }
 })
 
@@ -650,7 +660,7 @@ test('body-scrolling modal measures retain their bottom padding at every present
       await page.goto(`/index.html?path=overview${title === 'Lights' ? '#lights-overview' : ''}`)
       await setSafeAreaInsets(page, profile.insets)
       if (title === 'Rooms') {
-        await page.getByRole('button', { name: 'Quick Links', exact: true }).click()
+        await openQuickLinksTab(page)
         await page.getByRole('dialog', { name: 'Quick Links' }).getByRole('button', { name: 'Rooms', exact: true }).click()
       }
       const dialog = page.getByRole('dialog', { name: title === 'Lights' ? /Lights/ : 'Rooms' })

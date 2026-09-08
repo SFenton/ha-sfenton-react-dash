@@ -12,6 +12,8 @@ describe('owned build verification', () => {
     expect(isBaselineBuildInput('tsconfig.validation.json')).toBe(true)
     expect(isBaselineBuildInput('.env.development')).toBe(false)
     expect(isBaselineBuildInput('artifacts/tsconfig.validation.json')).toBe(false)
+    expect(isBaselineBuildInput('.env')).toBe(false)
+    expect(isBaselineBuildInput('scripts/deploy.ts')).toBe(false)
   })
   it('does not hang or signal an already signalled/exited owned child', async () => {
     const kill = vi.fn()

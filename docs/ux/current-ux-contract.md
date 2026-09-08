@@ -42,8 +42,15 @@ the shared behavior layer rather than duplicating HA-owned side effects.
 - Do not add visual press-only feedback through `:active` transforms, opacity,
   background, filter, or border changes. Persistent dragging, selected,
   checked, on/off, disabled, unavailable, and HA-derived state remain visible.
-- Coarse-pointer taps must not leave a focus ring solely because of touch, but
-  do not globally erase component border colors or keyboard focus treatment.
+- Neither coarse-pointer taps nor fine-pointer clicks may introduce white
+  focus borders, outlines, or shadows. Text inputs and textareas can match
+  `:focus-visible` after pointer focus, so that selector is not a keyboard-
+  modality test. Preserve intentional keyboard focus, including a visible
+  native text caret/selection, and state-derived/error borders; do not erase
+  component focus treatment globally.
+- Hide textarea scrollbar chrome on the actual control while retaining native
+  overflow scrolling, caret reveal, selection, and editing for multiline and
+  unbroken pasted text. Do not trap overflow or grow stable composer geometry.
 - Keep card, control, modal, slider, and navigation dimensions stable while
   live entity values update.
 - Square room/admin overview tiles are presentation-specific. Portrait `sheet` uses the

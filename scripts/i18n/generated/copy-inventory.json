@@ -806,6 +806,20 @@
       "words": 2
     },
     {
+      "characters": 68,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/chat.json",
+      "id": "28b4b7392d5708bb",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [
+        "count"
+      ],
+      "value": "A chat message may contain at most {{count}} characters. Shorten it.",
+      "words": 11
+    },
+    {
       "characters": 12,
       "context": "catalog-copy",
       "file": "src/i18n/locales/en/modals/weather.json",
@@ -959,6 +973,30 @@
       "origin": "catalog",
       "placeholders": [],
       "value": "Apply",
+      "words": 1
+    },
+    {
+      "characters": 51,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/chat.json",
+      "id": "7a72daa72cc844ad",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Ask a question or give a command to Home Assistant.",
+      "words": 10
+    },
+    {
+      "characters": 9,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/chat.json",
+      "id": "05708d473f401ee2",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Assistant",
       "words": 1
     },
     {
@@ -1120,6 +1158,54 @@
       "words": 1
     },
     {
+      "characters": 92,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/chat.json",
+      "id": "212c801a5cdbd083",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Chat could not be loaded from Home Assistant. Reconnect to Home Assistant, then reload chat.",
+      "words": 15
+    },
+    {
+      "characters": 12,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/chat.json",
+      "id": "75788dd96ac35c99",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Chat History",
+      "words": 2
+    },
+    {
+      "characters": 121,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/chat.json",
+      "id": "bf6f2959bfffdcc4",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Chats are shared with other devices using the same Home Assistant account, but the assistant may forget earlier messages.",
+      "words": 19
+    },
+    {
+      "characters": 31,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/chat.json",
+      "id": "e1f3846ad816eb0f",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Choose a Conversation Assistant",
+      "words": 4
+    },
+    {
       "characters": 33,
       "context": "catalog-copy",
       "file": "src/i18n/locales/en/modals/recipe.json",
@@ -1230,6 +1316,18 @@
       "words": 2
     },
     {
+      "characters": 15,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/chat.json",
+      "id": "591f029b4f982357",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Continue Anyway",
+      "words": 2
+    },
+    {
       "characters": 118,
       "context": "catalog-copy",
       "file": "src/i18n/locales/en/pages/media.json",
@@ -1252,6 +1350,18 @@
       "placeholders": [],
       "value": "Controller",
       "words": 1
+    },
+    {
+      "characters": 22,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/chat.json",
+      "id": "88479313439e8327",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Conversation Assistant",
+      "words": 2
     },
     {
       "characters": 9,
@@ -1849,6 +1959,18 @@
       "words": 1
     },
     {
+      "characters": 20,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/chat.json",
+      "id": "70923ec7e70bbeef",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Home Assistant Agent",
+      "words": 3
+    },
+    {
       "characters": 71,
       "context": "catalog-copy",
       "file": "src/i18n/locales/en/modals/vacuum.json",
@@ -1871,6 +1993,42 @@
       "placeholders": [],
       "value": "Home Assistant credited vacuuming; work may remain.",
       "words": 7
+    },
+    {
+      "characters": 134,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/chat.json",
+      "id": "9d326a543ea4ae2a",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Home Assistant is disconnected, so sending is paused. Any request already submitted may have run; check its outcome in Home Assistant.",
+      "words": 21
+    },
+    {
+      "characters": 121,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/chat.json",
+      "id": "880fb25a4a403d08",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Home Assistant returned no readable reply. Check Home Assistant before asking again because a request may still have run.",
+      "words": 19
+    },
+    {
+      "characters": 159,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/chat.json",
+      "id": "fad306438eb57c59",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Home Assistant started a new conversation for this reply without the earlier context. The previous chat remains visible, and no earlier messages were replayed.",
+      "words": 24
     },
     {
       "characters": 24,
@@ -2222,6 +2380,18 @@
       "words": 2
     },
     {
+      "characters": 153,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/chat.json",
+      "id": "5472bb6bda2a816d",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Make the supported native conversation assistant available in Home Assistant, then load chat again. Setup is managed in Home Assistant, not this control.",
+      "words": 23
+    },
+    {
       "characters": 14,
       "context": "catalog-copy",
       "file": "src/i18n/locales/en/modals/recipe.json",
@@ -2244,6 +2414,18 @@
       "placeholders": [],
       "value": "Match is wrong",
       "words": 3
+    },
+    {
+      "characters": 125,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/chat.json",
+      "id": "3a311c0dc11a190f",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Messages overlapped with messages from another device. Both are kept, but this chat cannot safely continue. Start a new chat.",
+      "words": 20
     },
     {
       "characters": 7,
@@ -2354,6 +2536,18 @@
       "words": 1
     },
     {
+      "characters": 22,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/chat.json",
+      "id": "acd597860f96ccbd",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "No Assistant Available",
+      "words": 3
+    },
+    {
       "characters": 44,
       "context": "catalog-copy",
       "file": "src/i18n/locales/en/modals/weather.json",
@@ -2390,6 +2584,18 @@
       "words": 4
     },
     {
+      "characters": 32,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/chat.json",
+      "id": "45984769550aad2d",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "No Stored Chats for This Account",
+      "words": 6
+    },
+    {
       "characters": 13,
       "context": "catalog-copy",
       "file": "src/i18n/locales/en/modals/vacuum.json",
@@ -2400,6 +2606,18 @@
       "placeholders": [],
       "value": "Not Attempted",
       "words": 2
+    },
+    {
+      "characters": 21,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/chat.json",
+      "id": "be6576df261232cd",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Not Sent to Assistant",
+      "words": 4
     },
     {
       "characters": 3,
@@ -2517,6 +2735,18 @@
       "words": 6
     },
     {
+      "characters": 25,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/chat.json",
+      "id": "96cb5abacd597751",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Open Chat and Quick Links",
+      "words": 5
+    },
+    {
       "characters": 16,
       "context": "catalog-copy",
       "file": "src/i18n/locales/en/modals/recipe.json",
@@ -2539,6 +2769,18 @@
       "placeholders": [],
       "value": "Optional Devices",
       "words": 2
+    },
+    {
+      "characters": 34,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/chat.json",
+      "id": "875a8346c7cf9769",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Ordered Chat Conversation Messages",
+      "words": 4
     },
     {
       "characters": 43,
@@ -2756,6 +2998,18 @@
       "words": 1
     },
     {
+      "characters": 30,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/chat.json",
+      "id": "8550e20487e0f751",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Reply History Save Unconfirmed",
+      "words": 4
+    },
+    {
       "characters": 5,
       "context": "catalog-copy",
       "file": "src/i18n/locales/en/core.json",
@@ -2766,6 +3020,30 @@
       "placeholders": [],
       "value": "Reset",
       "words": 1
+    },
+    {
+      "characters": 18,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/chat.json",
+      "id": "68a407671b006629",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Retry Loading Chat",
+      "words": 3
+    },
+    {
+      "characters": 25,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/chat.json",
+      "id": "03a5ae1df4c33a74",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Retry Saving Chat History",
+      "words": 4
     },
     {
       "characters": 5,
@@ -2881,6 +3159,18 @@
       "words": 1
     },
     {
+      "characters": 47,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/chat.json",
+      "id": "f4c2a3440537d48f",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Saving Message · Assistant Has Not Received It…",
+      "words": 8
+    },
+    {
       "characters": 25,
       "context": "catalog-copy",
       "file": "src/i18n/locales/en/modals/recipe.json",
@@ -2977,6 +3267,30 @@
       "placeholders": [],
       "value": "Selected Rooms",
       "words": 2
+    },
+    {
+      "characters": 17,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/chat.json",
+      "id": "7174ef211592d134",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Send Chat Message",
+      "words": 3
+    },
+    {
+      "characters": 65,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/chat.json",
+      "id": "a18c5feac748fab5",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Send the first message to start a chat in this account's history.",
+      "words": 12
     },
     {
       "characters": 14,
@@ -3157,6 +3471,30 @@
       "words": 2
     },
     {
+      "characters": 126,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/chat.json",
+      "id": "776f25a04ad2c71e",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Some chat history could not be saved to Home Assistant. Retry the save; this will not send the message to the assistant again.",
+      "words": 23
+    },
+    {
+      "characters": 164,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/chat.json",
+      "id": "cab7fb8f78a6c097",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Some stored chat records use an unreadable format. Existing records are kept, and sending is disabled to protect them. Resolve the format issue before trying again.",
+      "words": 26
+    },
+    {
       "characters": 366,
       "context": "catalog-copy",
       "file": "src/i18n/locales/en/pages/admin.json",
@@ -3217,6 +3555,18 @@
       "placeholders": [],
       "value": "Start date and time must be before end date and time. Vacation mode is disabled until the dates are fixed.",
       "words": 20
+    },
+    {
+      "characters": 14,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/chat.json",
+      "id": "53ee5a440d059016",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Start New Chat",
+      "words": 3
     },
     {
       "characters": 6,
@@ -3294,6 +3644,18 @@
       "words": 5
     },
     {
+      "characters": 114,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/chat.json",
+      "id": "1c60880573904c2f",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "The assistant reported an error. Check Home Assistant before asking again because the request may have partly run.",
+      "words": 18
+    },
+    {
       "characters": 67,
       "context": "catalog-copy",
       "file": "src/i18n/locales/en/modals/vacuum.json",
@@ -3328,6 +3690,30 @@
       "placeholders": [],
       "value": "The dirty-water tank was unavailable; check it before mopping.",
       "words": 9
+    },
+    {
+      "characters": 177,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/chat.json",
+      "id": "a614d3c7652dade9",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "The displayed message was not submitted to the assistant. This conversation remains readable, but start a new chat to enter a new message. Earlier messages will not be replayed.",
+      "words": 29
+    },
+    {
+      "characters": 132,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/chat.json",
+      "id": "82ed249bb8357ca2",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "The earlier assistant context may have expired. This chat remains readable. Start a new chat; earlier messages will not be replayed.",
+      "words": 21
     },
     {
       "characters": 63,
@@ -3376,6 +3762,18 @@
       "placeholders": [],
       "value": "The mop hardware was unavailable; check it before mopping.",
       "words": 9
+    },
+    {
+      "characters": 140,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/chat.json",
+      "id": "c4e9b47e0c8b163f",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "The reply outcome is unknown, and the request may have run. Check Home Assistant before sending another request. The app will not resend it.",
+      "words": 24
     },
     {
       "characters": 27,
@@ -3586,6 +3984,42 @@
       "words": 21
     },
     {
+      "characters": 119,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/chat.json",
+      "id": "3a3df546beaabaec",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "This assistant is no longer available. The chat history remains readable; start a new chat with an available assistant.",
+      "words": 19
+    },
+    {
+      "characters": 148,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/chat.json",
+      "id": "9aecd56c309661d2",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "This chat history has reached its storage limit. Existing chats are kept, but sending new messages is disabled. Try again when storage is available.",
+      "words": 24
+    },
+    {
+      "characters": 228,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/chat.json",
+      "id": "d94395683257c140",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "This recent chat is from another session, so Home Assistant may no longer have its earlier context. If you continue, your next message could be handled without previous messages. Start a new chat if your request depends on them.",
+      "words": 39
+    },
+    {
       "characters": 57,
       "context": "catalog-copy",
       "file": "src/i18n/locales/en/modals/recipe.json",
@@ -3596,6 +4030,18 @@
       "placeholders": [],
       "value": "This recipe is already in Cookidoo My Week for that date.",
       "words": 11
+    },
+    {
+      "characters": 316,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/chat.json",
+      "id": "2b64dd39aaa724d0",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "This reply exceeds the Home Assistant history save limit. Its full text is visible only in this dashboard session and is unavailable on other devices. Closing the Chat modal preserves it, but refreshing or closing the browser loses the unsaved reply. No prompt is resent, and previously saved chats remain available.",
+      "words": 51
     },
     {
       "characters": 8,
@@ -3982,6 +4428,30 @@
       "words": 2
     },
     {
+      "characters": 12,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/chat.json",
+      "id": "0c8626babdfb9432",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "View History",
+      "words": 2
+    },
+    {
+      "characters": 19,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/chat.json",
+      "id": "a38ec1e864b44bd1",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "View Latest Message",
+      "words": 3
+    },
+    {
       "characters": 11,
       "context": "catalog-copy",
       "file": "src/i18n/locales/en/pages/media.json",
@@ -4004,6 +4474,30 @@
       "placeholders": [],
       "value": "Volume Up",
       "words": 2
+    },
+    {
+      "characters": 35,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/chat.json",
+      "id": "653cd70c582e3b5e",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Waiting for the Assistant to Reply…",
+      "words": 6
+    },
+    {
+      "characters": 62,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/chat.json",
+      "id": "55c207a273c40084",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Waiting for the Reply to Another Device’s Recent Chat Request…",
+      "words": 10
     },
     {
       "characters": 20,
@@ -4107,6 +4601,18 @@
       "origin": "catalog",
       "placeholders": [],
       "value": "Xbox",
+      "words": 1
+    },
+    {
+      "characters": 3,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/chat.json",
+      "id": "b6041d3bcfb074d2",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "You",
       "words": 1
     },
     {
@@ -4304,6 +4810,18 @@
       "words": 6
     },
     {
+      "characters": 12,
+      "context": "description",
+      "file": "src/i18n/locales/en/modals/chat.json",
+      "id": "e1ce42651f4b39a5",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Chat Message",
+      "words": 2
+    },
+    {
       "characters": 32,
       "context": "description",
       "file": "src/i18n/locales/en/pages/settings.json",
@@ -4410,6 +4928,18 @@
       "placeholders": [],
       "value": "When guests stay over, toggle these controls on based on the rooms they're staying in to disable automations (like automatic vacuuming in the music room) and ensure that rooms are tracked for temperature monitoring and vent control.",
       "words": 37
+    },
+    {
+      "characters": 41,
+      "context": "loading-label",
+      "file": "src/i18n/locales/en/modals/chat.json",
+      "id": "5af0863c7afa101f",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Loading Chat History from Home Assistant…",
+      "words": 6
     },
     {
       "characters": 17,
@@ -4634,6 +5164,18 @@
       "words": 3
     },
     {
+      "characters": 29,
+      "context": "navigation",
+      "file": "src/i18n/locales/en/modals/chat.json",
+      "id": "312cfde3f1168f4e",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Chat and Quick Links Sections",
+      "words": 5
+    },
+    {
       "characters": 6,
       "context": "navigation",
       "file": "src/i18n/locales/en/shell.json",
@@ -4788,6 +5330,18 @@
       "placeholders": [],
       "value": "Clear Search",
       "words": 2
+    },
+    {
+      "characters": 15,
+      "context": "placeholder",
+      "file": "src/i18n/locales/en/modals/chat.json",
+      "id": "c38124db3bab4cb2",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Enter a Message",
+      "words": 3
     },
     {
       "characters": 6,
@@ -11652,7 +12206,7 @@
       "file": "src/components/core/ModalSheet.tsx",
       "id": "22323f3f09a98ce0",
       "lines": [
-        459
+        462
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -33311,7 +33865,7 @@
       "file": "src/components/core/ModalSheet.tsx",
       "id": "f311f1d9068e6067",
       "lines": [
-        158
+        160
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -36462,11 +37016,11 @@
     }
   ],
   "summary": {
-    "catalogRecords": 493,
+    "catalogRecords": 539,
     "documentRecords": 1,
     "legacyOccurrences": 2543,
     "legacyRecords": 2102,
-    "totalRecords": 2596
+    "totalRecords": 2642
   },
   "version": 1
 }

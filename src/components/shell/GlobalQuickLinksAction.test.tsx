@@ -4,6 +4,13 @@ import { SHOW_OUTDOOR_FAUCETS_ENTITY_ID } from '../../constants/sprinklers'
 import { mockCallServiceCalls, mockEntities, resetMockHass } from '../../test/mocks/hakitCoreState'
 import { GlobalQuickLinksAction } from './GlobalQuickLinksAction'
 
+async function openQuickLinks(trigger = screen.getByRole('button', { name: 'Open Chat and Quick Links' })) {
+  fireEvent.click(trigger)
+  const dialog = await screen.findByRole('dialog', { name: 'Home Assistant' })
+  fireEvent.click(within(dialog).getByRole('tab', { name: 'Quick Links' }))
+  return screen.findByRole('dialog', { name: 'Quick Links' })
+}
+
 describe('GlobalQuickLinksAction', () => {
   beforeEach(() => {
     window.history.replaceState(null, '', window.location.pathname)
@@ -18,8 +25,7 @@ describe('GlobalQuickLinksAction', () => {
     Object.defineProperty(window, 'innerHeight', { configurable: true, value: 852 })
     const view = render(<GlobalQuickLinksAction onNavigate={vi.fn()} />)
     try {
-      fireEvent.click(screen.getByRole('button', { name: 'Quick Links' }))
-      const dialog = await screen.findByRole('dialog', { name: 'Quick Links' })
+      const dialog = await openQuickLinks()
       const grid = within(dialog).getByRole('group', { name: 'Quick Links' })
       const rooms = within(grid).getByRole('button', { name: 'Rooms' })
       expect(grid).toHaveAttribute('data-dynamic-grid-fill-rows', 'true')
@@ -47,18 +53,16 @@ describe('GlobalQuickLinksAction', () => {
     const navigate = vi.fn()
     render(<GlobalQuickLinksAction onNavigate={navigate} />)
 
-    const trigger = screen.getByRole('button', { name: 'Quick Links' })
+    const trigger = screen.getByRole('button', { name: 'Open Chat and Quick Links' })
     expect(trigger).toHaveTextContent('')
     expect(trigger).toHaveAttribute('aria-expanded', 'false')
     expect(trigger).toHaveAttribute('aria-haspopup', 'dialog')
     expect(trigger).toHaveAttribute('data-action-kind', 'modal')
     expect(trigger).toHaveAttribute('data-modal-opener-exception', 'floating-action')
-    expect(trigger).toHaveAttribute('title', 'Quick Links')
+    expect(trigger).toHaveAttribute('title', 'Open Chat and Quick Links')
     expect(screen.queryByRole('button', { name: 'Vacuums' })).not.toBeInTheDocument()
 
-    fireEvent.click(trigger)
-
-    const dialog = await screen.findByRole('dialog', { name: 'Quick Links' })
+    const dialog = await openQuickLinks(trigger)
     const grid = within(dialog).getByRole('group', { name: 'Quick Links' })
     expect(trigger).toHaveAttribute('aria-expanded', 'true')
     expect(grid).toHaveAttribute('data-dynamic-grid', 'true')
@@ -84,8 +88,7 @@ describe('GlobalQuickLinksAction', () => {
     const navigate = vi.fn()
     render(<GlobalQuickLinksAction onNavigate={navigate} />)
 
-    fireEvent.click(screen.getByRole('button', { name: 'Quick Links' }))
-    const dialog = await screen.findByRole('dialog', { name: 'Quick Links' })
+    const dialog = await openQuickLinks()
     expect(dialog).toHaveAttribute('data-scroll-mode', 'body')
     const roomsTile = within(dialog).getByRole('button', { name: 'Rooms' })
     fireEvent.click(roomsTile)
@@ -108,8 +111,7 @@ describe('GlobalQuickLinksAction', () => {
     mockEntities[SECURITY_ENTITY].state = 'armed_night'
     render(<GlobalQuickLinksAction onNavigate={() => undefined} />)
 
-    fireEvent.click(screen.getByRole('button', { name: 'Quick Links' }))
-    const dialog = await screen.findByRole('dialog', { name: 'Quick Links' })
+    const dialog = await openQuickLinks()
     const securityTile = within(dialog).getByRole('button', { name: 'Security System Armed Night' })
     expect(securityTile).toHaveStyle('--tile-color: rgba(142, 36, 170, 0.5)')
 
@@ -130,8 +132,7 @@ describe('GlobalQuickLinksAction', () => {
   it('shows the Sprinklers destination only while Outdoor Faucets is enabled', async () => {
     const navigate = vi.fn()
     const view = render(<GlobalQuickLinksAction onNavigate={navigate} />)
-    fireEvent.click(screen.getByRole('button', { name: 'Quick Links' }))
-    const dialog = await screen.findByRole('dialog', { name: 'Quick Links' })
+    const dialog = await openQuickLinks()
     expect(within(dialog).queryByRole('button', { name: 'Sprinklers' })).not.toBeInTheDocument()
 
     mockEntities[SHOW_OUTDOOR_FAUCETS_ENTITY_ID].state = 'on'

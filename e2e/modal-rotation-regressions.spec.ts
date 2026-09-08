@@ -5,7 +5,7 @@ import { ROOM_PAGE_CONFIGS } from '../src/constants/roomPages'
 import { MEDIA_REMOTE_CONFIGS } from '../src/constants/mediaRemotes'
 import { SHOW_OUTDOOR_FAUCETS_ENTITY_ID } from '../src/constants/sprinklers'
 import { installSafeAreaInsets, setSafeAreaInsets } from './safe-area'
-import { quickLinksLayout } from './quick-links'
+import { openQuickLinksTab, quickLinksLayout } from './quick-links'
 
 const PORTRAIT = { width: 393, height: 852, insets: { top: 59, right: 0, bottom: 34, left: 0 } }
 const LANDSCAPES = [
@@ -66,8 +66,7 @@ async function close(dialog: Locator) {
 }
 
 async function openQuickLinks(page: Page, rooms = false) {
-  await page.getByRole('button', { name: 'Quick Links', exact: true }).click()
-  let dialog = page.getByRole('dialog', { name: 'Quick Links', exact: true })
+  let dialog = await openQuickLinksTab(page)
   if (rooms) {
     await dialog.getByRole('button', { name: 'Rooms', exact: true }).click()
     dialog = page.getByRole('dialog', { name: 'Rooms', exact: true })

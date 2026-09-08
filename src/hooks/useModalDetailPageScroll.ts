@@ -27,7 +27,8 @@ export function useModalDetailPageScroll(pageKey: DetailPageKey, additionalScrol
     if (pendingRestore) {
       if (bodyElementRef.current) bodyElementRef.current.scrollTop = pendingRestore.bodyScrollTop
       if (additionalScrollRef?.current) additionalScrollRef.current.scrollTop = pendingRestore.additionalScrollTop
-      const detailTriggers = [...(bodyElementRef.current?.querySelectorAll<HTMLElement>('[data-modal-detail-trigger]') ?? [])]
+      const focusScope = bodyElementRef.current?.closest('[role="dialog"]') ?? bodyElementRef.current
+      const detailTriggers = [...(focusScope?.querySelectorAll<HTMLElement>('[data-modal-detail-trigger]') ?? [])]
       const returnTarget = pendingRestore.focusKey
         ? detailTriggers.find((element) => element.dataset.modalDetailTrigger === pendingRestore.focusKey) ?? detailTriggers.at(-1)
         : pendingRestore.focusElement

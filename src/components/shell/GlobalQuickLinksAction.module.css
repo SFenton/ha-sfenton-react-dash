@@ -22,3 +22,8 @@
 :global([data-centered-layout='true']) .cell > button {
   min-height: 88px;
 }
+
+:global([data-modal-presentation='dialog']) .panePanel {
+  height: 100%;
+  min-height: 0;
+}

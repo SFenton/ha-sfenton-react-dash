@@ -1,12 +1,13 @@
 import { expect, test } from './layout/fixture'
 import { setSafeAreaInsets } from './safe-area'
+import { openQuickLinksTab } from './quick-links'
 
 test('WebKit modal scrolling does not depend on unsupported directional touch-action', async ({ page }) => {
   await page.goto('/at-a-glance/overview')
 
   expect(await page.evaluate(() => CSS.supports('touch-action', 'pan-down'))).toBe(false)
 
-  await page.getByRole('button', { name: 'Quick Links' }).click()
+  await openQuickLinksTab(page)
   await page.getByRole('dialog', { name: 'Quick Links' }).getByRole('button', { name: 'Rooms' }).click()
   const dialog = page.getByRole('dialog', { name: 'Rooms' })
   const body = dialog.locator('[data-modal-sheet-body="true"]')

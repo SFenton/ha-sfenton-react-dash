@@ -1,6 +1,6 @@
 import { render } from '@testing-library/react'
 import { DASHBOARD_ROUTES } from '../../constants/routes'
-import { mockCallServiceCalls, resetMockHass } from '../../test/mocks/hakitCoreState'
+import { mockCallServiceCalls, mockState, resetMockHass } from '../../test/mocks/hakitCoreState'
 import { DashboardPreloadCache } from './DashboardPreloadCache'
 
 describe('DashboardPreloadCache', () => {
@@ -20,6 +20,8 @@ describe('DashboardPreloadCache', () => {
     const windowListener = vi.spyOn(window, 'addEventListener')
     const documentListener = vi.spyOn(document, 'addEventListener')
     const xhr = vi.spyOn(XMLHttpRequest.prototype, 'open').mockImplementation(() => undefined)
+    const websocketCalls = vi.spyOn(mockState.connection, 'sendMessagePromise')
+    const websocketSubscriptions = vi.spyOn(mockState.connection, 'subscribeMessage')
 
     vi.stubGlobal('fetch', fetch)
     vi.stubGlobal('ResizeObserver', class {
@@ -61,6 +63,8 @@ describe('DashboardPreloadCache', () => {
       expect(container.querySelector('[data-dynamic-grid="true"]')).toBeNull()
       expect(container.querySelector('img, video, audio, source, iframe, object, embed, script, link, canvas')).toBeNull()
       expect(mockCallServiceCalls).toEqual([])
+      expect(websocketCalls).not.toHaveBeenCalled()
+      expect(websocketSubscriptions).not.toHaveBeenCalled()
       expect(resizeObserver).not.toHaveBeenCalled()
       expect(mutationObserver).not.toHaveBeenCalled()
       expect(intersectionObserver).not.toHaveBeenCalled()

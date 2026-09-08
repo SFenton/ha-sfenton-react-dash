@@ -1,5 +1,6 @@
 import { expect, test, type Locator, type Page } from './layout/fixture'
 import { setSafeAreaInsets } from './safe-area'
+import { openQuickLinksTab } from './quick-links'
 
 interface GeometrySnapshot {
   geometryIntent: string | null
@@ -82,7 +83,7 @@ test.describe('centered modal geometry stability', () => {
   test('keeps Quick Links stable through Rooms and Security details', async ({ page }) => {
     for (const viewport of CENTERED_VIEWPORTS) {
       await gotoPath(page, 'overview', viewport)
-      await page.getByRole('button', { name: 'Quick Links' }).click()
+      await openQuickLinksTab(page)
       let dialog = page.getByRole('dialog', { name: 'Quick Links' })
       const baseline = await markGeometry(dialog, `quick-links-${viewport.name}`)
 
@@ -245,7 +246,7 @@ test.describe('centered modal geometry stability', () => {
 
     for (const viewport of stressViewports) {
       await gotoPath(page, 'overview', viewport)
-      await page.getByRole('button', { name: 'Quick Links' }).click()
+      await openQuickLinksTab(page)
       let dialog = page.getByRole('dialog', { name: 'Quick Links' })
       const baseline = await markGeometry(dialog, `quick-stress-${viewport.width}-${viewport.height}`)
       await dialog.getByRole('button', { name: 'Rooms' }).click()
@@ -258,7 +259,7 @@ test.describe('centered modal geometry stability', () => {
       insets: { bottom: 34, left: 0, right: 0, top: 59 },
       width: 393,
     })
-    await page.getByRole('button', { name: 'Quick Links' }).click()
+    await openQuickLinksTab(page)
     const dialog = page.getByRole('dialog', { name: 'Quick Links' })
     const portraitStart = await markGeometry(dialog, 'quick-rotation')
     await resizeViewport(page, LANDSCAPE_LEFT)

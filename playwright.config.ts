@@ -76,7 +76,7 @@ export default defineConfig({
     },
     {
       name: 'desktop',
-      testMatch: /(?:adaptive-navigation|desktop-responsive|home-route-hydration-desktop|modal-backdrop-bands|modal-rotation-regressions|weather-(?:scenes|atmosphere-scenes)|layout-acceptance)\.spec\.ts/,
+      testMatch: /(?:adaptive-navigation|chat-ux|desktop-responsive|home-route-hydration-desktop|modal-backdrop-bands|modal-rotation-regressions|weather-(?:scenes|atmosphere-scenes)|layout-acceptance)\.spec\.ts/,
       use: {
         ...devices['Desktop Chrome'],
         browserName: 'chromium',
@@ -89,7 +89,7 @@ export default defineConfig({
     ...(enableWebkit
       ? [{
           name: 'webkit',
-          testMatch: /(?:iframe-lifecycle|weather-(?:data|scenes|atmosphere-scenes)|modal-(?:backdrop-bands|rotation-regressions|sheet-(?:lifecycle|performance|webkit))|layout-acceptance)\.spec\.ts/,
+          testMatch: /(?:chat-ux|iframe-lifecycle|weather-(?:data|scenes|atmosphere-scenes)|modal-(?:backdrop-bands|rotation-regressions|sheet-(?:lifecycle|performance|webkit))|layout-acceptance)\.spec\.ts/,
           use: {
             ...devices['iPhone 13'],
             browserName: 'webkit' as const,

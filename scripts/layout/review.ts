@@ -6,6 +6,8 @@ import { CONTEXTS, requireScenarios, SURFACE_CONTRACTS, type ContextId } from '.
 import { applyHostProfile, enterState, openHost, openSurface } from '../../e2e/layout/app'
 import { applyProfile, actualCapabilities, waitForModalReady, waitForRoute } from '../../e2e/layout/evidence'
 import { guardContext } from '../../e2e/layout/fixture'
+import { openChatState } from '../../e2e/chat-layout'
+import { openQuickLinksTab } from '../../e2e/quick-links'
 import { layoutProfile } from '../../e2e/responsive-acceptance-data'
 import type { BuildIdentity, LayoutPlan, RunIdentity } from '../../e2e/layout/types'
 import { assertCurrentPlan } from './plan'
@@ -60,9 +62,12 @@ export async function review(args: string[], root: string) {
     let dialog: Locator | undefined
     if (scenario === 'host') {
       frame = await openHost(page, state)
-      await frame.getByRole('button', { name: 'Quick Links', exact: true }).click()
+      await openQuickLinksTab(frame)
       dialog = frame.getByRole('dialog')
       actions.push(`Mounted actual ${state} product bridge; opened inner Quick Links`)
+    } else if (scenario === 'chat') {
+      dialog = await openChatState(page, state)
+      actions.push(`Opened real Chat components through mocked HA storage in ${state}`)
     } else if (scenario === 'navigation' || scenario === 'preload') {
       const route = state === 'back-page' ? 'living-room' : 'overview'
       await page.goto(`/index.html?path=${route}`)
@@ -103,6 +108,22 @@ export async function review(args: string[], root: string) {
           await expect.poll(() => dialog!.locator('[data-transition]').evaluateAll((elements) =>
             elements.every((element) => element.getAttribute('data-transition') === 'idle'))).toBe(true)
           actions.push('Changed and restored the Weather mode through its real buttons; inspected the selected backend state')
+        }
+        if (scenario === 'chat' && dialog) {
+          const history = state === 'history' || state === 'history-empty'
+          const input = dialog.getByRole('textbox', { name: 'Chat Message', exact: true })
+          if (!history && await input.isEnabled() && await input.getAttribute('readonly') === null) {
+            const draft = await input.inputValue()
+            await input.fill('A manual review draft')
+            await input.fill(draft)
+            await input.blur()
+            actions.push('Edited and restored the chat draft without sending a prompt')
+          }
+          await dialog.getByRole('tab', { name: 'Quick Links', exact: true }).click()
+          await dialog.getByRole('group', { name: 'Quick Links', exact: true }).waitFor({ state: 'visible' })
+          await dialog.getByRole('tab', { name: 'Home Assistant', exact: true }).click()
+          if (history) await dialog.getByRole('button', { name: 'View History', exact: true }).click()
+          actions.push('Visited the real Quick Links tab and returned to the same Chat/history state')
         }
         if (scenario === 'remote' && dialog) {
           const down = dialog.getByRole('button', { name: 'Down', exact: true })
@@ -189,6 +210,11 @@ export async function review(args: string[], root: string) {
           scrollTop: body?.scrollTop,
           selectedTabs: [...document.querySelectorAll('[role="tab"][aria-selected="true"]')].map((element) => element.getAttribute('aria-label') ?? element.textContent),
           calls: window.__mockHass?.calls,
+          chat: window.__mockHass?.chat && {
+            requests: window.__mockHass.chat.messages.filter((message) => message.type === 'conversation/process').length,
+            writes: window.__mockHass.chat.messages.filter((message) => message.type === 'frontend/set_user_data').length,
+            subscriptions: window.__mockHass.chat.subscriptions(),
+          },
           preloadRoutes: document.querySelectorAll('[data-dashboard-preload-cache] [data-preload-route]').length,
         }
       })

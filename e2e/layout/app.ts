@@ -3,12 +3,13 @@ import { MUSIC_ROOM_CONTROL_ENTITY_ID, MUSIC_ROOM_REMOTE_HASH } from '../../src/
 import { layoutProfile } from '../responsive-acceptance-data'
 import type { ScenarioId } from './contracts'
 import { applyProfile, waitForModalReady, waitForRoute } from './evidence'
+import { openQuickLinksTab } from '../quick-links'
 
 export async function openSurface(page: Page, scenario: ScenarioId): Promise<Locator> {
   const route = scenario === 'filters' ? 'recipes' : scenario === 'form' ? 'to-do' : scenario === 'remote' ? 'music-room' : 'overview'
   await page.goto(`/index.html?path=${route}${scenario === 'summary' ? '&user=stephen#daily-report' : ''}`)
   await waitForRoute(page, route, scenario === 'summary')
-  if (scenario === 'quick-links') await page.getByRole('button', { name: 'Quick Links', exact: true }).click()
+  if (scenario === 'quick-links') await openQuickLinksTab(page)
   if (scenario === 'weather') await page.getByRole('button', { name: /Open seven-day weather forecast/ }).click()
   if (scenario === 'filters') await page.locator('[data-floating-action-dock]').getByRole('button', { name: 'Filter', exact: true }).click()
   if (scenario === 'form') {

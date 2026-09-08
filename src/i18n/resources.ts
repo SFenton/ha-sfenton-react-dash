@@ -2,6 +2,7 @@ import common from './locales/en.json' with { type: 'json' }
 import core from './locales/en/core.json' with { type: 'json' }
 import modalBathroomFan from './locales/en/modals/bathroomFan.json' with { type: 'json' }
 import modalCamera from './locales/en/modals/camera.json' with { type: 'json' }
+import modalChat from './locales/en/modals/chat.json' with { type: 'json' }
 import modalHumidifier from './locales/en/modals/humidifier.json' with { type: 'json' }
 import modalRecipe from './locales/en/modals/recipe.json' with { type: 'json' }
 import modalSleepypod from './locales/en/modals/sleepypod.json' with { type: 'json' }
@@ -25,6 +26,7 @@ export const resources = {
     core,
     modalBathroomFan,
     modalCamera,
+    modalChat,
     modalHumidifier,
     modalRecipe,
     modalSleepypod,

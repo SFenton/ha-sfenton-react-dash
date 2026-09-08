@@ -3,6 +3,8 @@ import { useHass } from '@hakit/core'
 import { DynamicGrid } from '../core/DynamicGrid'
 import { FloatingActionButton } from '../core/FloatingActionButton'
 import { ModalSheet, type ModalCenteredGeometry } from '../core/ModalSheet'
+import { ModalIconTabNav, type ModalIconTabDefinition } from '../core/ModalTabNav'
+import { modalTabId, modalTabPanelId } from '../core/modalTabIds'
 import { useModalSheetPresentation } from '../core/modalSheetPresentation'
 import {
   modalSquareGridStyle,
@@ -12,6 +14,10 @@ import { QuickLinkTile } from '../hass/QuickLinkTile'
 import { RoomNavigationGrid } from '../hass/RoomNavigationGrid'
 import { SecurityControls } from '../hass/SecurityControls'
 import { securitySystemModalSubtitle } from '../hass/securityControlsConfig'
+import { ChatHistory, ChatPanel, ChatUnavailable } from '../hass/chat/ChatPanel'
+import { ChatComposer } from '../hass/chat/ChatComposer'
+import { ChatHeaderActions } from '../hass/chat/ChatHeaderActions'
+import { useDashboardChat } from '../hass/chat/useDashboardChat'
 import {
   AREA_ITEMS,
   QUICK_ACCESS_ITEMS,
@@ -22,8 +28,14 @@ import {
 } from '../../constants/atAGlance'
 import { CHORE_BLUE } from '../../constants/portedDashboard'
 import { useModalDetailPageScroll } from '../../hooks/useModalDetailPageScroll'
-import { useCopy } from '../../i18n'
+import { CHAT_COPY_KEYS as chatKeys, CHAT_COPY_NAMESPACE, COMMON_COPY_NAMESPACE, useCopy } from '../../i18n'
 import styles from './GlobalQuickLinksAction.module.css'
+import chatStyles from '../hass/chat/Chat.module.css'
+
+type GlobalTab = 'chat' | 'links'
+type GlobalDetailPage = QuickAccessModalPage | 'chat-history'
+const TAB_ID_PREFIX = 'global-quick-links'
+const TAB_PANEL_ID = modalTabPanelId(TAB_ID_PREFIX, 'content')
 
 const QUICK_LINKS_CENTERED_GEOMETRY = {
   blockPolicy: 'fixed',
@@ -38,9 +50,19 @@ interface GlobalQuickLinksActionProps {
 
 export function GlobalQuickLinksAction({ onNavigate }: GlobalQuickLinksActionProps) {
   const translate = useCopy('shell')
+  const chatCopy = useCopy(CHAT_COPY_NAMESPACE)
+  const commonCopy = useCopy(COMMON_COPY_NAMESPACE)
   const quickLinksName = translate('quickLinks.title')
   const [open, setOpen] = useState(false)
-  const [detailPage, setDetailPage] = useState<QuickAccessModalPage | null>(null)
+  const [activeTab, setActiveTab] = useState<GlobalTab>('chat')
+  const [detailPage, setDetailPage] = useState<GlobalDetailPage | null>(null)
+  const chatTab = activeTab === 'chat'
+  const historyPage = detailPage === 'chat-history'
+  const chat = useDashboardChat(open && chatTab)
+  const tabs: readonly ModalIconTabDefinition<GlobalTab>[] = [
+    { tab: 'chat', icon: 'mdi:chat-outline', label: commonCopy('app.title') },
+    { tab: 'links', icon: 'mdi:menu', label: quickLinksName },
+  ]
   const visibleItemIds = useHass((state) => QUICK_ACCESS_ITEMS
     .filter((item) => !item.visibilityEntityId || state.entities[item.visibilityEntityId]?.state === 'on')
     .map((item) => item.id)
@@ -60,7 +82,9 @@ export function GlobalQuickLinksAction({ onNavigate }: GlobalQuickLinksActionPro
     ? ROOMS_QUICK_ACCESS_ITEM.title
     : detailPage === 'security-system'
       ? SECURITY_QUICK_ACCESS_ITEM.title
-      : quickLinksName
+      : detailPage === 'chat-history'
+        ? chatCopy(chatKeys.historyTitle)
+        : chatTab ? commonCopy('app.title') : quickLinksName
 
   const handleOpen = () => {
     resetDetailPageScroll()
@@ -73,7 +97,7 @@ export function GlobalQuickLinksAction({ onNavigate }: GlobalQuickLinksActionPro
     onNavigate(path)
   }
 
-  const handleOpenDetail = (detailPage: QuickAccessModalPage, returnFocusKey: string) => {
+  const handleOpenDetail = (detailPage: GlobalDetailPage, returnFocusKey: string) => {
     enterDetailPage(returnFocusKey)
     setDetailPage(detailPage)
   }
@@ -83,34 +107,74 @@ export function GlobalQuickLinksAction({ onNavigate }: GlobalQuickLinksActionPro
     setDetailPage(null)
   }
 
+  const handleTabChange = (tab: GlobalTab) => {
+    if (tab === activeTab) return
+    resetDetailPageScroll()
+    setDetailPage(null)
+    setActiveTab(tab)
+  }
+
+  const handleNewChat = () => {
+    resetDetailPageScroll()
+    chat?.newChat()
+    setDetailPage(null)
+  }
+
   return (
     <>
       <FloatingActionButton
         ariaExpanded={open}
         ariaHasPopup="dialog"
-        ariaLabel={quickLinksName}
+        ariaLabel={chatCopy(chatKeys.launcher)}
         className={styles.globalAction}
         color={CHORE_BLUE}
         icon="mdi:menu"
         onClick={handleOpen}
         semantics={{ kind: 'modal' }}
-        title={quickLinksName}
+        title={chatCopy(chatKeys.launcher)}
       />
       <ModalSheet
         bodyElementRef={bodyElementRef}
         centeredGeometry={QUICK_LINKS_CENTERED_GEOMETRY}
         contentWidth={detailPage === 'security-system' ? 'full' : 'readable'}
+        headerActions={chatTab && chat ? (
+          <ChatHeaderActions
+            history={historyPage}
+            onHistory={() => handleOpenDetail('chat-history', 'chat-history')}
+            onNewChat={handleNewChat}
+          />
+        ) : undefined}
         landscapeDensity={detailPage === roomsPage ? 'regular' : 'compact'}
+        navigation={(
+          <div className={chatStyles.dock}>
+            {chatTab && detailPage === null && chat && <ChatComposer active={open} client={chat} />}
+            <ModalIconTabNav
+              activeTab={activeTab}
+              idPrefix={TAB_ID_PREFIX}
+              label={chatCopy(chatKeys.navigation)}
+              onTabChange={handleTabChange}
+              panelId={TAB_PANEL_ID}
+              tabs={tabs}
+            />
+          </div>
+        )}
         onBack={detailPage === null ? undefined : handleBack}
         onClose={() => setOpen(false)}
         open={open}
         scrollMode={detailPage === roomsPage ? 'panes' : 'body'}
-        scrollResetKey={detailPage ?? false}
+        scrollResetKey={`${activeTab}:${detailPage ?? 'root'}`}
         size="media"
         subtitle={detailPage === 'security-system' ? securitySubtitle : undefined}
         title={modalTitle}
       >
-        {detailPage === null ? (
+        <div aria-labelledby={modalTabId(TAB_ID_PREFIX, activeTab)} className={detailPage === roomsPage ? styles.panePanel : undefined} data-tab={activeTab} id={TAB_PANEL_ID} role="tabpanel">
+        {chatTab ? (
+          chat ? historyPage ? (
+            <ChatHistory client={chat} onSelect={handleBack} />
+          ) : (
+            <ChatPanel active={open} bodyElementRef={bodyElementRef} client={chat} />
+          ) : <ChatUnavailable />
+        ) : detailPage === null ? (
           <DynamicGrid
             ariaLabel={quickLinksName}
             columns={2}
@@ -145,6 +209,7 @@ export function GlobalQuickLinksAction({ onNavigate }: GlobalQuickLinksActionPro
             <SecurityControls />
           </div>
         )}
+        </div>
       </ModalSheet>
     </>
   )

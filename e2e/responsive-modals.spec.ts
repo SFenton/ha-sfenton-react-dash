@@ -3,7 +3,7 @@ import { modalSheetPresentationForViewport } from '../src/components/core/modalS
 import { OCCUPANCY_GROUPS } from '../src/constants/atAGlance'
 import { SHOW_OUTDOOR_FAUCETS_ENTITY_ID } from '../src/constants/sprinklers'
 import { setSafeAreaInsets } from './safe-area'
-import { quickLinksLayout } from './quick-links'
+import { openQuickLinksTab, quickLinksLayout } from './quick-links'
 
 const DIALOG_SQUARE_TILE_SIZE = 168
 const PORTRAIT_TILE_WIDTH = 174.5
@@ -628,7 +628,7 @@ test('Quick Links fills text-aware rows and keeps its conditional destination re
       if (!mock) throw new Error('Mock Home Assistant API is unavailable')
       mock.setEntityState(entityId, 'on')
     }, SHOW_OUTDOOR_FAUCETS_ENTITY_ID)
-    await page.getByRole('button', { name: 'Quick Links' }).click()
+    await openQuickLinksTab(page)
 
     const dialog = page.getByRole('dialog', { name: 'Quick Links' })
     await expect(dialog).toBeVisible()
@@ -940,7 +940,7 @@ test('square-grid detail sheets delegate overflow to the correct owner', async (
   for (const viewport of [{ height: 393, width: 852 }, { height: 1180, width: 820 }]) {
     await page.setViewportSize(viewport)
     await page.goto('/index.html?path=settings')
-    await page.getByRole('button', { name: 'Quick Links' }).click()
+    await openQuickLinksTab(page)
     await page.getByRole('button', { exact: true, name: 'Rooms' }).click()
     const dialog = page.getByRole('dialog', { name: 'Rooms' })
     await expect(dialog).toBeVisible()
@@ -987,7 +987,7 @@ test('short-landscape square-grid families fill equal tracks and reach terminal 
   await closeModal(dialog)
 
   await page.goto('/index.html?path=settings')
-  await page.getByRole('button', { name: 'Quick Links' }).click()
+  await openQuickLinksTab(page)
   await page.getByRole('button', { exact: true, name: 'Rooms' }).click()
   dialog = page.getByRole('dialog', { name: 'Rooms' })
   await page.waitForTimeout(520)

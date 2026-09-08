@@ -34,6 +34,7 @@ import {
   mdiBrush,
   mdiBrushVariant,
   mdiCalendar,
+  mdiChatOutline,
   mdiCamera,
   mdiCar,
   mdiCarDefrostFront,
@@ -273,6 +274,7 @@ const ICON_PATHS = {
 } satisfies Record<IconKey, string>
 
 const MATERIAL_ICON_PATHS: Record<string, string> = {
+  'mdi:chat-outline': mdiChatOutline,
   'mdi:account': mdiAccount,
   'mdi:account-check': mdiAccountCheck,
   'mdi:account-cog': mdiAccountCog,

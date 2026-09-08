@@ -1,4 +1,5 @@
 import { mockCallServiceCalls, mockState, resetMockHass, setMockCallServiceOutcome, type MockHassDebugApi } from './hakitCoreState'
+import { mockChatServer } from './chatServer'
 
 describe('helper service outcome fixtures', () => {
   beforeEach(resetMockHass)
@@ -23,5 +24,16 @@ describe('helper service outcome fixtures', () => {
     resetMockHass()
     const restored = await mockState.helpers.callService(request) as { response: { 'weather.pirate_weather': { forecast: unknown[] } } }
     expect(restored.response['weather.pirate_weather'].forecast).toHaveLength(7)
+  })
+  it('repairs only the current mock account chat namespace without importing new product modules', () => {
+    const userId = mockState.user!.id
+    mockChatServer.seed(userId, { theme: 'retained', 'another-app.setting': true, 'react-dash.chat.v9.old': { version: 9 } })
+    mockChatServer.seed('another-user', { 'react-dash.chat.v1.other': { retained: true } })
+    const api = (window as unknown as { __mockHass: { chat: { replaceRecords: (records: Record<string, unknown>) => void } } }).__mockHass
+    api.chat.replaceRecords({ 'react-dash.chat.v1.repaired': { version: 1 } })
+    expect(mockChatServer.data(userId)).toEqual({
+      theme: 'retained', 'another-app.setting': true, 'react-dash.chat.v1.repaired': { version: 1 },
+    })
+    expect(mockChatServer.data('another-user')).toEqual({ 'react-dash.chat.v1.other': { retained: true } })
   })
 })

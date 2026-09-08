@@ -1,5 +1,6 @@
 import { mockEntitiesFixture } from './appEntities'
 import { BATHROOM_FAN_CONFIGS } from '../../constants/bathroomFans'
+import { isChatMockCommand, MOCK_CHAT_AGENT, mockChatMessages, mockChatRequest, mockChatServer, mockChatSubscribe } from './chatServer'
 
 export interface MockEntity {
   attributes: Record<string, unknown>
@@ -13,7 +14,11 @@ export type MockConnectionStatus = 'connected' | 'disconnected' | 'pending' | 'p
 export interface MockHassState {
   config: Record<string, unknown>
   connection: {
+    readonly connected: boolean
     sendMessagePromise: <T>(message: Record<string, unknown>) => Promise<T>
+    subscribeMessage: <T>(callback: (value: T) => void, message: Record<string, unknown>) => Promise<() => void | Promise<void>>
+    addEventListener: (event: 'ready' | 'disconnected', listener: () => void) => void
+    removeEventListener: (event: 'ready' | 'disconnected', listener: () => void) => void
   }
   connectionStatus: MockConnectionStatus
   entities: Record<string, MockEntity>
@@ -41,6 +46,7 @@ const mockInventoryItemsByLocation: Record<string, Record<string, unknown>[] | u
 export type MockCallServiceOutcome = 'pending' | 'reject' | 'resolve'
 const mockCallServiceOutcomes = new Map<string, MockCallServiceOutcome>()
 const mockHassListeners = new Set<() => void>()
+const mockConnectionListeners = new Map<string, Set<() => void>>()
 let mockHassRevision = 0
 let mockDonetickTaskLoadDelayMs = 0
 let mockRecipeQueryDelayMs = 0
@@ -72,7 +78,16 @@ export function setMockCallServiceOutcome(domain: string, service: string, outco
 }
 
 export function setMockConnectionStatus(status: MockConnectionStatus) {
+  const changed = mockState.connectionStatus !== status
   mockState.connectionStatus = status
+  if (changed) {
+    for (const listener of mockConnectionListeners.get(status === 'connected' ? 'ready' : 'disconnected') ?? []) listener()
+  }
+  notifyMockHass()
+}
+
+export function setMockUser(user: MockHassState['user']) {
+  mockState.user = user
   notifyMockHass()
 }
 
@@ -849,10 +864,25 @@ function applyMockCallServiceSideEffects(params: Record<string, unknown>) {
 export type MockHassDebugApi = {
   calls: Record<string, unknown>[]
   clearWeatherForecasts: () => void
+  chat: {
+    messages: Record<string, unknown>[]
+    seed: (records: Record<string, unknown>) => void
+    replaceRecords: (records: Record<string, unknown>) => void
+    setAgents: (agents: { id: string; name: string }[]) => void
+    setAgentsAvailable: (available: boolean) => void
+    setLoadFailure: (failed: boolean) => void
+    setLoading: () => void
+    setResultWriteFailure: (failed: boolean) => void
+    setWriteFailure: (failed: boolean) => void
+    setPending: () => void
+    setReply: (text: string) => void
+    subscriptions: () => number
+  }
   freeSleepSchedules: () => Record<string, unknown>
   reset: () => void
   setCallServiceOutcome: (domain: string, service: string, outcome: MockCallServiceOutcome) => void
   setConnectionStatus: (status: MockConnectionStatus) => void
+  setUser: (user: MockHassState['user']) => void
   setHumidifierSchedule: (schedule: Record<string, unknown>) => void
   setDailyWeatherForecast: (index: number, patch: Record<string, unknown>) => void
   setHourlyWeatherForecast: (index: number, patch: Record<string, unknown>) => void
@@ -873,11 +903,44 @@ function exposeMockHassDebugApi() {
       mockDailyWeatherForecast = []
       mockHourlyWeatherForecast = []
     },
+    chat: {
+      messages: mockChatMessages,
+      seed: (records) => mockChatServer.seed(mockState.user?.id ?? '', records),
+      replaceRecords: (records) => {
+        const userId = mockState.user?.id ?? ''
+        // This mock is also overlaid onto pre-Chat baselines, so its wire namespace must be self-contained.
+        const preferences = Object.fromEntries(Object.entries(mockChatServer.data(userId)).filter(([key]) => !key.startsWith('react-dash.chat.')))
+        mockChatServer.users.set(userId, { ...preferences, ...records })
+        mockChatServer.notify(userId)
+      },
+      setAgents: (agents) => {
+        mockChatServer.agents = agents
+        for (const agent of agents) mockChatServer.platforms[agent.id] = 'google_generative_ai_conversation'
+      },
+      setAgentsAvailable: (available) => { mockChatServer.agents = available ? [MOCK_CHAT_AGENT] : [] },
+      setLoadFailure: (failed) => { mockChatServer.beforeRead = failed ? async () => { throw new Error('Mock chat load failure') } : undefined },
+      setLoading: () => { mockChatServer.beforeRead = () => new Promise(() => undefined) },
+      setResultWriteFailure: (failed) => {
+        mockChatServer.beforeWrite = failed ? async ({ message }) => {
+          if ((message.value as { kind?: string }).kind === 'result') throw new Error('Mock reply save failure')
+        } : undefined
+      },
+      setWriteFailure: (failed) => { mockChatServer.beforeWrite = failed ? async () => { throw new Error('Mock chat write failure') } : undefined },
+      setPending: () => { mockChatServer.process = () => new Promise(() => undefined) },
+      setReply: (text) => {
+        mockChatServer.process = async () => ({
+          conversation_id: '01MOCKFIXTURECONVERSATION000',
+          response: { response_type: 'query_answer', speech: { plain: { speech: text } } },
+        })
+      },
+      subscriptions: () => [...mockChatServer.subscriptions.values()].reduce((count, subscribers) => count + subscribers.size, 0),
+    },
     freeSleepSchedules: () => cloneRecord(mockEntities['sensor.nightcanvasrestful_schedules'].attributes),
     setCallServiceOutcome: setMockCallServiceOutcome,
     setConnectionStatus: setMockConnectionStatus,
     setDailyWeatherForecast: setMockDailyWeatherForecast,
     setHourlyWeatherForecast: setMockHourlyWeatherForecast,
+    setUser: setMockUser,
     setHumidifierSchedule: (schedule) => {
       mockHumidifierSchedule = cloneRecord(schedule) as unknown as typeof mockHumidifierSchedule
     },
@@ -1606,6 +1669,8 @@ function todoItems(entityId: unknown) {
 
 export function resetMockHass() {
   mockCallServiceCalls.length = 0
+  mockChatMessages.length = 0
+  mockChatServer.reset()
   mockCallServiceOutcomes.clear()
   mockScheduleMessages.length = 0
   mockTodoUpdateMessages.length = 0
@@ -1772,7 +1837,19 @@ export function resetMockHass() {
 export const mockState: MockHassState = {
   config: {},
   connection: {
+    get connected() { return mockState.connectionStatus === 'connected' },
+    addEventListener: (name, listener) => {
+      const listeners = mockConnectionListeners.get(name) ?? new Set()
+      listeners.add(listener)
+      mockConnectionListeners.set(name, listeners)
+    },
+    removeEventListener: (name, listener) => { mockConnectionListeners.get(name)?.delete(listener) },
+    subscribeMessage: (callback, message) => {
+      if (message.type !== 'frontend/subscribe_user_data') return Promise.reject(new Error('Unsupported mocked subscription'))
+      return mockChatSubscribe(mockState.user?.id ?? '', callback)
+    },
     sendMessagePromise: async <T,>(message: Record<string, unknown>) => {
+      if (isChatMockCommand(message)) return mockChatRequest(mockState.user?.id ?? '', message) as Promise<T>
       if (message.type === 'schedule/list') return [cloneRecord(mockHumidifierSchedule)] as T
       if (message.type === 'schedule/update') {
         mockScheduleMessages.push(cloneRecord(message))

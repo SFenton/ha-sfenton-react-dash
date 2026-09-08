@@ -48,7 +48,7 @@
     "test:i18n": "vitest run src/i18n scripts/i18n",
     "test:design": "vitest run scripts/design-system",
     "test:e2e:coverage": "tsx scripts/e2e-coverage-check.ts",
-    "test:e2e:responsive": "playwright test e2e/adaptive-navigation.spec.ts e2e/responsive-layout.spec.ts e2e/responsive-pages-all.spec.ts e2e/responsive-modals.spec.ts e2e/responsive-modal-inventory.spec.ts e2e/modal-geometry-stability.spec.ts e2e/modal-rotation-regressions.spec.ts e2e/landscape-modal-adaptation.spec.ts e2e/safe-area-responsive.spec.ts e2e/mobile-device-smoke.spec.ts e2e/feedback-regressions.spec.ts e2e/desktop-responsive.spec.ts e2e/home-route-hydration-desktop.spec.ts e2e/preload-inert.spec.ts",
+    "test:e2e:responsive": "playwright test e2e/chat-ux.spec.ts e2e/adaptive-navigation.spec.ts e2e/responsive-layout.spec.ts e2e/responsive-pages-all.spec.ts e2e/responsive-modals.spec.ts e2e/responsive-modal-inventory.spec.ts e2e/modal-geometry-stability.spec.ts e2e/modal-rotation-regressions.spec.ts e2e/landscape-modal-adaptation.spec.ts e2e/safe-area-responsive.spec.ts e2e/mobile-device-smoke.spec.ts e2e/feedback-regressions.spec.ts e2e/desktop-responsive.spec.ts e2e/home-route-hydration-desktop.spec.ts e2e/preload-inert.spec.ts",
     "test:e2e": "playwright test",
     "test:e2e:mobile-parity": "tsx scripts/required-mobile-parity.ts"
   },

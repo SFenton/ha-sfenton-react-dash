@@ -1,6 +1,7 @@
 import { expect, test, type Locator, type Page } from './layout/fixture'
 import { NINE_ROOM_VACUUM_OUTCOME_CONTRACT } from '../src/test/fixtures/vacuumOutcomes'
 import { RESPONSIVE_ROUTES, RESPONSIVE_ROUTE_TITLES } from './responsive-acceptance-data'
+import { globalQuickLinksAction, openQuickLinksTab, selectQuickLinksTab } from './quick-links'
 
 const DESKTOP_VIEWPORTS = [
   { height: 900, width: 1440 },
@@ -126,10 +127,10 @@ test('permanent navigation and modal controls retain keyboard focus indicators',
   await expect(home).toBeFocused()
   await expect.poll(() => visibleFocusIndicator(home)).toBe(true)
 
-  const quickLinks = page.getByRole('button', { name: 'Quick Links' })
+  const quickLinks = globalQuickLinksAction(page)
   await quickLinks.focus()
   await page.keyboard.press('Enter')
-  const dialog = page.getByRole('dialog', { name: 'Quick Links' })
+  const dialog = await selectQuickLinksTab(page, 'keyboard')
   await expect(dialog).toBeVisible()
   await expect.poll(() => dialog.getByRole('group', { name: 'Quick Links', exact: true }).evaluate((grid) => {
     const gridRect = grid.getBoundingClientRect()
@@ -199,7 +200,7 @@ test('centered modal geometry stays fixed through details in a fine-pointer desk
     hover: window.matchMedia('(hover: hover)').matches,
   }))).toEqual({ coarse: false, hover: true })
 
-  await page.getByRole('button', { name: 'Quick Links' }).click()
+  await openQuickLinksTab(page)
   let dialog = page.getByRole('dialog', { name: 'Quick Links' })
   const quickGeometry = await dialog.evaluate((element) => {
     const rect = element.getBoundingClientRect()

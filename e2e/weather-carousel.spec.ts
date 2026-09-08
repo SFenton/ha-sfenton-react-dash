@@ -1,4 +1,5 @@
 import { expect, test, type Browser, type Locator, type Page } from './layout/fixture'
+import { waitForModalReady } from './layout/evidence'
 
 async function dragHorizontally(page: Page, selector: string, distance: number) {
   const target = page.locator(selector)
@@ -50,6 +51,18 @@ async function expectAtPageBoundary(scroller: Locator) {
     pageOffsets.push(Math.max(0, element.scrollWidth - element.clientWidth))
     return Math.min(...pageOffsets.map((offset) => Math.abs(offset - element.scrollLeft)))
   })).toBeLessThanOrEqual(3)
+}
+
+async function expectFirstPageSettled(scroller: Locator) {
+  // The nearest-page indicator can change before native smooth scrolling ends.
+  await expect.poll(() => scroller.evaluate(async (element) => {
+    const offsets = [element.scrollLeft]
+    for (let frame = 0; frame < 2; frame += 1) {
+      await new Promise<void>((done) => requestAnimationFrame(() => done()))
+      offsets.push(element.scrollLeft)
+    }
+    return offsets
+  })).toEqual([0, 0, 0])
 }
 
 async function expectCompleteItemsOnly(scroller: Locator) {
@@ -144,10 +157,9 @@ test('weather carousels preserve native touch scrolling without arrow controls',
   await heroStrip.focus()
   await heroStrip.press('ArrowRight')
   await expect.poll(() => heroStrip.evaluate((element) => element.scrollLeft)).toBeGreaterThan(40)
-  await heroStrip.evaluate((element) => {
-    element.scrollLeft = 0
-    element.blur()
-  })
+  await heroPagination.locator('[data-weather-carousel-page="1"]').click()
+  await expect(heroPagination.locator('[aria-current="page"]')).toHaveAttribute('data-weather-carousel-page', '1')
+  await expectFirstPageSettled(heroStrip)
   const heroStart = await heroStrip.evaluate((element) => element.scrollLeft)
   await dragHorizontally(page, '[data-weather-carousel="hero"]', 210)
   await expect.poll(() => heroStrip.evaluate((element) => element.scrollLeft)).toBeGreaterThan(heroStart + 40)
@@ -165,6 +177,7 @@ test('weather carousels preserve native touch scrolling without arrow controls',
 
   await page.getByRole('button', { name: /Open seven-day weather forecast/i }).click()
   const dialog = page.getByRole('dialog', { name: 'Weather' })
+  await waitForModalReady(dialog)
   await expect(heroFrame.locator('[data-weather-carousel-controls]')).not.toBeVisible()
   await expect(dialog.getByRole('region', { name: '24-hour weather conditions' })).toBeVisible()
   const modalFrame = dialog.locator('[class*="hourlyScrollerFrame"]')
@@ -188,6 +201,7 @@ test('weather carousels preserve native touch scrolling without arrow controls',
   await expectPageCentered(modalScroller)
   await expectCompleteItemsOnly(modalScroller)
   await expect(modalPagination.locator('[aria-current="page"]')).toHaveAttribute('data-weather-carousel-page', '1')
+  await expectFirstPageSettled(modalScroller)
   const modalStart = await modalScroller.evaluate((element) => element.scrollLeft)
   await dragHorizontally(page, '[data-weather-carousel="hourly"]', 210)
   await expect.poll(() => modalScroller.evaluate((element) => element.scrollLeft)).toBeGreaterThan(modalStart + 40)
