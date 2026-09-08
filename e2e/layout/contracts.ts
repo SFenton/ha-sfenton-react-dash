@@ -254,9 +254,54 @@ export const PLAYWRIGHT_SPEC_COVERAGE = [
     safeAreaOwner: 'safe-area-responsive.spec.ts',
     spec: 'weather-carousel.spec.ts',
   },
+  {
+    area: 'Opaque backdrop bands, filter-positive controls and mounted geometry',
+    landscape: 'direct',
+    safeArea: 'owned',
+    safeAreaOwner: 'layout-acceptance.spec.ts',
+    spec: 'modal-backdrop-bands.spec.ts',
+  },
+  {
+    area: 'Weather atmospheric scene shape, original Rain, motion and lifecycle',
+    landscape: 'direct',
+    safeArea: 'owned',
+    safeAreaOwner: 'layout-acceptance.spec.ts',
+    spec: 'weather-atmosphere-scenes.spec.ts',
+  },
+  {
+    area: 'Weather forecast freshness, missing values and bounded rails',
+    landscape: 'owned',
+    landscapeOwner: 'layout-acceptance.spec.ts',
+    safeArea: 'owned',
+    safeAreaOwner: 'layout-acceptance.spec.ts',
+    spec: 'weather-data.spec.ts',
+  },
+  {
+    area: 'Weather atmosphere continuity, backdrop composition and close behavior',
+    landscape: 'owned',
+    landscapeOwner: 'layout-acceptance.spec.ts',
+    safeArea: 'owned',
+    safeAreaOwner: 'layout-acceptance.spec.ts',
+    spec: 'weather-modal-rendering.spec.ts',
+  },
+  {
+    area: 'Weather rails, synchronized forecast wind and reduced-motion transitions',
+    landscape: 'owned',
+    landscapeOwner: 'layout-acceptance.spec.ts',
+    safeArea: 'owned',
+    safeAreaOwner: 'layout-acceptance.spec.ts',
+    spec: 'weather-motion.spec.ts',
+  },
+  {
+    area: 'Explicit debug scenes, absent preview UI and pressure units/resize geometry',
+    landscape: 'direct',
+    safeArea: 'owned',
+    safeAreaOwner: 'layout-acceptance.spec.ts',
+    spec: 'weather-scenes.spec.ts',
+  },
 ] as const satisfies readonly PlaywrightSpecCoverage[]
 
-export const SCENARIO_IDS = ['quick-links', 'summary', 'filters', 'form', 'remote', 'navigation', 'host', 'preload'] as const
+export const SCENARIO_IDS = ['quick-links', 'summary', 'filters', 'form', 'remote', 'weather', 'navigation', 'host', 'preload'] as const
 export type ScenarioId = typeof SCENARIO_IDS[number]
 export type ContextId = 'touch-chromium' | 'fine-chromium' | 'touch-webkit'
 export const CONTEXTS: Record<ContextId, { browser: 'chromium' | 'webkit'; touch: boolean; project: string }> = {
@@ -304,6 +349,13 @@ export const SURFACE_CONTRACTS: Record<ScenarioId, {
     legacy: ['modal-rotation-regressions.spec.ts', 'react-dash.spec.ts'],
     question: 'Is the complete active direction pad visible without auto-scroll, operable, and unchanged on portrait return?',
   },
+  weather: {
+    family: 'modal',
+    states: ['condition', 'precipitation', 'wind', 'pressure-unavailable', 'pressure-long', 'forecast-error-stale', 'forecast-empty', 'forecast-error-empty'],
+    owners: ['src/components/hass/Weather', 'src/components/hass/weather', 'src/components/hass/precipitationTimeline', 'src/components/hass/useWeatherForecasts', 'src/hooks/useForecastWindMotion'],
+    legacy: ['weather-scenes.spec.ts', 'weather-atmosphere-scenes.spec.ts', 'weather-carousel.spec.ts', 'weather-data.spec.ts', 'weather-motion.spec.ts', 'weather-modal-rendering.spec.ts'],
+    question: 'Are forecast modes, stale/empty/error states, missing and long Pressure readings readable and reachable after rotation, with equal small-tile heights, no preview dropdown and unchanged return geometry?',
+  },
   navigation: {
     family: 'page-shell-grid', states: ['home', 'back-page'],
     owners: ['src/pages/Page.', 'src/components/shell/AdaptiveNavigation', 'src/components/shell/AppHeader', 'src/constants/navigationLayout'],
@@ -335,6 +387,7 @@ export const SHARED_OWNER_ROOTS = [
   'src/components/core/DynamicGrid', 'src/components/core/dynamicGrid', 'src/components/core/modalSquareGrid',
   'src/components/shell/AppShell', 'src/styles/', 'src/constants/routes',
   'src/hooks/useDashboardViewport', 'src/hooks/useAdaptiveNavigationLayout',
+  'src/hooks/useModalBackdropBands',
   'public/', 'index.html',
 ] as const
 
@@ -347,12 +400,13 @@ export const LAYOUT_UNIT_GATES = [
 
 // Exact, existing engine restrictions; these remain skipped, never counted as passed.
 export const LEGACY_ENGINE_SKIPS = [
+  { spec: 'modal-backdrop-bands.spec.ts', title: 'rendered blur passes a positive control before checking automatic pixel parity', browser: 'webkit', reason: 'This Linux WebKit renderer does not execute the blur-positive control; its pixel parity is unverified.' },
   { spec: 'iframe-lifecycle.spec.ts', title: 'legacy replacements keep post-GC heap bounded', browser: 'webkit', reason: 'CDP heap measurements require Chromium.' },
   { spec: 'modal-sheet-lifecycle.spec.ts', title: 'keeps a fast top-edge swipe terminal after Base UI finishes its velocity-scaled exit', browser: 'webkit', reason: 'Trusted multi-point touch injection is Chromium-only in Playwright' },
   { spec: 'modal-sheet-lifecycle.spec.ts', title: 'keeps a synthetic WebKit top-edge swipe terminal through the mounted exit window', browser: 'chromium', reason: 'Constructed TouchEvent coverage targets the WebKit project' },
   { spec: 'modal-sheet-lifecycle.spec.ts', title: 'keeps a synthetic WebKit top-edge swipe terminal through the mounted exit window', browser: 'webkit', reason: 'Playwright WebKit exposes no trusted touch-drag injection; constructed TouchEvents are untrusted and cannot drive Base UI dismissal. Chromium CDP covers trusted swipe dismissal.' },
   { spec: 'modal-sheet-performance.spec.ts', title: 'keeps page glass blurred while removing nested modal glass blur in WebKit', browser: 'chromium', reason: 'Backdrop-filter computed styles are validated in WebKit' },
-  { spec: 'modal-sheet-performance.spec.ts', title: 'records paired throttled frame metrics without a modal cadence regression', browser: 'webkit', reason: 'CPU throttling and trusted touch injection are Chromium-only' },
+  { spec: 'modal-sheet-performance.spec.ts', title: 'compares automatic and full backdrop policies under throttled idle and trusted dismissal', browser: 'webkit', reason: 'CPU throttling and trusted touch injection are Chromium-only' },
 ] as const
 
 export function requireScenarios(ids: readonly string[]): ScenarioId[] {

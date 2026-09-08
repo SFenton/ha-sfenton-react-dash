@@ -1,6 +1,7 @@
 import { expect, test, type Locator, type Page } from './layout/fixture'
 import { navigationLayoutForViewport } from '../src/constants/navigationLayout'
 import { installSafeAreaInsets, setSafeAreaInsets } from './safe-area'
+import { waitForModalReady } from './layout/evidence'
 
 const PHONE = { width: 393, height: 852 }
 const TABLET_PORTRAIT = { width: 820, height: 1180 }
@@ -499,6 +500,7 @@ test('Theater Remote stays visible while Apps and Devices use their available pa
 
     await dialog.getByRole('tab', { name: 'Apps' }).click()
     await expect(dialog.getByRole('heading', { name: 'Media' })).toBeVisible()
+    await waitForModalReady(dialog)
     await expect(remote).toBeVisible()
     const appButtons = dialog.locator('button[class*="appButton"]')
     await expect(appButtons).toHaveCount(6)
@@ -515,6 +517,7 @@ test('Theater Remote stays visible while Apps and Devices use their available pa
 
     await dialog.getByRole('tab', { name: 'Devices' }).click()
     await expect(dialog.getByRole('heading', { name: 'Devices' })).toBeVisible()
+    await waitForModalReady(dialog)
     await expect(remote).toBeVisible()
     const deviceGrid = dialog.getByRole('button', { name: /Projector Off/i })
       .locator('xpath=ancestor::*[@data-dynamic-grid="true"][1]')
@@ -526,7 +529,10 @@ test('Theater Remote stays visible while Apps and Devices use their available pa
     if (viewport.width === 820) {
       expect(Math.round(gridBox?.width ?? 0)).toBeGreaterThan(600)
       const stackedScroller = dialog.locator('[data-scroll-region="media-remote-panel"]')
-      await stackedScroller.evaluate((element) => { element.scrollTop = element.scrollHeight })
+      await expect.poll(() => stackedScroller.evaluate((element) => {
+        element.scrollTop = element.scrollHeight
+        return Math.abs(element.scrollTop - Math.max(0, element.scrollHeight - element.clientHeight))
+      })).toBeLessThanOrEqual(1)
       const pcBox = await dialog.getByRole('button', { name: /Theater Room PC Off/i }).boundingBox()
       expect((pcBox?.y ?? 0) + (pcBox?.height ?? 0)).toBeLessThanOrEqual(navBox?.y ?? 0)
     } else if (viewport.width >= 1180) {

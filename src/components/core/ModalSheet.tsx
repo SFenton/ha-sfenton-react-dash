@@ -2,6 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProp
 import { Drawer } from '@base-ui/react/drawer'
 import { MaterialIcon } from './Icon'
 import { useCopy } from '../../i18n'
+import { useModalBackdropBands } from '../../hooks/useModalBackdropBands'
 import {
   modalBodyTierForInlineSize,
   useModalSheetPresentation,
@@ -26,6 +27,7 @@ export type ModalSheetStyle = CSSProperties & {
 
 export type ModalSheetSize = 'compact' | 'form' | 'media' | 'standard' | 'workspace'
 export type ModalSheetScrollMode = 'body' | 'panes'
+export type ModalSheetBackdropPolicy = 'auto' | 'full'
 export type ModalLandscapeDensity = 'compact' | 'regular'
 export type ModalContentWidth = 'readable' | 'full'
 /** Family reading measure and identity; the shared presentation owns the outer frame. */
@@ -50,6 +52,7 @@ export interface ModalSheetProps {
   open: boolean
   title: string
   onClose: () => void
+  backdropPolicy?: ModalSheetBackdropPolicy
   children: ReactNode
   backLabel?: string
   bodyElementRef?: Ref<HTMLDivElement>
@@ -65,10 +68,11 @@ export interface ModalSheetProps {
   scrollResetKey?: string | number | boolean
   size?: ModalSheetSize
   surfaceDecoration?: ReactNode
+  surfaceDecorationOccludesBackdrop?: boolean
   subtitle?: string
 }
 
-type ModalSheetSnapshot = Pick<ModalSheetProps, 'backLabel' | 'bodyHeader' | 'centeredGeometry' | 'children' | 'contentStyle' | 'contentWidth' | 'footer' | 'landscapeDensity' | 'navigation' | 'onBack' | 'scrollMode' | 'scrollResetKey' | 'size' | 'subtitle' | 'surfaceDecoration' | 'title'>
+type ModalSheetSnapshot = Pick<ModalSheetProps, 'backLabel' | 'backdropPolicy' | 'bodyHeader' | 'centeredGeometry' | 'children' | 'contentStyle' | 'contentWidth' | 'footer' | 'landscapeDensity' | 'navigation' | 'onBack' | 'scrollMode' | 'scrollResetKey' | 'size' | 'subtitle' | 'surfaceDecoration' | 'surfaceDecorationOccludesBackdrop' | 'title'>
 interface ModalCenteredGeometrySnapshot {
   centeredGeometry: ModalCenteredGeometry
   size: ModalSheetSize
@@ -80,12 +84,41 @@ function assignRef<T>(ref: Ref<T> | undefined, value: T | null) {
   else if (ref) ref.current = value
 }
 
+function previewModalBackdropPolicy(policy: ModalSheetBackdropPolicy) {
+  if (import.meta.env.MODE === 'production' || typeof window === 'undefined') return policy
+  return new URLSearchParams(window.location.search).get('modalBackdrop') === 'full' ? 'full' : policy
+}
+
+function automaticBackdropSupported(snapshot: ModalSheetSnapshot) {
+  if (snapshot.contentStyle && Object.keys(snapshot.contentStyle).some((property) => !property.startsWith('--'))) {
+    return false
+  }
+  return snapshot.contentStyle?.['--color-modal-surface'] === undefined
+    || snapshot.surfaceDecorationOccludesBackdrop === true
+}
+
+function modalBackdropStyle(contentStyle: ModalSheetStyle | undefined): ModalSheetStyle | undefined {
+  if (!contentStyle) return undefined
+  const height = contentStyle['--modal-mobile-height']
+  const maxHeight = contentStyle['--modal-mobile-max-height']
+  if (height === undefined && maxHeight === undefined) return undefined
+  return {
+    '--modal-mobile-height': height,
+    '--modal-mobile-max-height': maxHeight,
+  }
+}
+
 function modalContentStyle(
   contentStyle: ModalSheetStyle | undefined,
   geometrySnapshot: ModalCenteredGeometrySnapshot | null,
   closing: boolean,
 ) {
-  const resolved: ModalSheetStyle = { ...contentStyle }
+  const resolved: ModalSheetStyle = {
+    '--modal-surface-backing': contentStyle?.['--color-modal-surface'] === undefined
+      ? 'var(--rd-modal-surface-opaque)'
+      : undefined,
+    ...contentStyle,
+  }
   if (geometrySnapshot) {
     const { centeredGeometry } = geometrySnapshot
     resolved['--modal-centered-inline-size'] = centeredGeometry.inlineSize
@@ -105,6 +138,7 @@ export function ModalSheet({
   onClose,
   children,
   backLabel,
+  backdropPolicy = 'auto',
   bodyElementRef,
   bodyHeader,
   centeredGeometry,
@@ -118,12 +152,32 @@ export function ModalSheet({
   scrollResetKey,
   size = 'standard',
   surfaceDecoration,
+  surfaceDecorationOccludesBackdrop = false,
   subtitle,
 }: ModalSheetProps) {
   const copy = useCopy('core')
   const bodyRef = useRef<HTMLDivElement | null>(null)
   const [bodyRefVersion, setBodyRefVersion] = useState(0)
-  const currentSnapshot: ModalSheetSnapshot = { backLabel: backLabel ?? copy('modal.back'), bodyHeader, centeredGeometry, children, contentStyle, contentWidth, footer, landscapeDensity, navigation, onBack, scrollMode, scrollResetKey, size, subtitle, surfaceDecoration, title }
+  const currentSnapshot: ModalSheetSnapshot = {
+    backLabel: backLabel ?? copy('modal.back'),
+    backdropPolicy: previewModalBackdropPolicy(backdropPolicy),
+    bodyHeader,
+    centeredGeometry,
+    children,
+    contentStyle,
+    contentWidth,
+    footer,
+    landscapeDensity,
+    navigation,
+    onBack,
+    scrollMode,
+    scrollResetKey,
+    size,
+    subtitle,
+    surfaceDecoration,
+    surfaceDecorationOccludesBackdrop,
+    title,
+  }
   const currentCenteredGeometrySnapshot: ModalCenteredGeometrySnapshot | null = centeredGeometry
     ? { centeredGeometry, size }
     : null
@@ -186,6 +240,19 @@ export function ModalSheet({
     return () => cancelAnimationFrame(frame)
   }, [initialStarting])
   const renderedContentStyle = modalContentStyle(rendered.contentStyle, renderedCenteredGeometrySnapshot, closing)
+  const renderedBackdropPolicy: ModalSheetBackdropPolicy = rendered.backdropPolicy === 'auto' && automaticBackdropSupported(rendered)
+    ? 'auto'
+    : 'full'
+  const renderBackdropBands = renderedBackdropPolicy === 'auto'
+  const renderedBackdropStyle = modalBackdropStyle(rendered.contentStyle)
+  const { contentRef: backdropContentRef, overlayRef: backdropOverlayRef } = useModalBackdropBands(Boolean(
+    open
+    && renderBackdropBands
+    && !closing
+    && !initialStarting
+    && !rapidReopen
+    && !isDialogPresentation,
+  ))
   const showDragHandle = !isDialogPresentation
   const setBodyRefs = useCallback((node: HTMLDivElement | null) => {
     if (bodyRef.current !== node) setBodyRefVersion((current) => current + 1)
@@ -300,10 +367,13 @@ export function ModalSheet({
         <Drawer.Portal keepMounted>
           <Drawer.Backdrop
             className={styles.overlay}
+            data-backdrop-policy={renderedBackdropPolicy}
             data-closing={closing ? 'true' : 'false'}
             data-input-shielded={inputShielded ? 'true' : undefined}
             data-initial-starting-style={initialStarting ? 'true' : undefined}
+            data-modal-presentation={renderedPresentation}
             data-modal-sheet-overlay="true"
+            data-rapid-reopen={rapidReopen ? 'true' : undefined}
             hidden={false}
             onClick={(event) => {
               if (event.currentTarget !== event.target) return
@@ -317,14 +387,25 @@ export function ModalSheet({
             onPointerUp={(event) => {
               if (event.currentTarget === event.target) event.stopPropagation()
             }}
-          />
-          <Drawer.Viewport
-            className={styles.viewport}
-            data-modal-presentation={renderedPresentation}
-            hidden={false}
+            ref={backdropOverlayRef}
+            style={renderedBackdropStyle}
           >
+            {renderBackdropBands ? (
+              <span aria-hidden="true" className={styles.backdropBandLayer} data-modal-backdrop-layer="true">
+                <span aria-hidden="true" className={styles.overlayBand} data-modal-backdrop-band="top" />
+                <span aria-hidden="true" className={styles.backdropGeometryProxy} data-modal-backdrop-proxy="true">
+                  <span aria-hidden="true" className={styles.overlayBand} data-modal-backdrop-band="left" />
+                  <span aria-hidden="true" className={styles.overlayBand} data-modal-backdrop-band="right" />
+                  <span aria-hidden="true" className={styles.overlayBand} data-modal-backdrop-band="bottom" />
+                </span>
+              </span>
+            ) : null}
+            {renderBackdropBands && <span aria-hidden="true" className={styles.backdropScrim} data-modal-backdrop-scrim="true" />}
+          </Drawer.Backdrop>
+          <Drawer.Viewport className={styles.viewport} data-modal-presentation={renderedPresentation} hidden={false}>
             <Drawer.Popup
               className={styles.content}
+              data-backdrop-policy={renderedBackdropPolicy}
               data-centered-layout={isDialogPresentation ? 'true' : 'false'}
               data-closing={closing ? 'true' : 'false'}
               data-has-footer={renderedHasFooter ? 'true' : 'false'}
@@ -347,10 +428,16 @@ export function ModalSheet({
               hidden={false}
               inert={closing ? true : undefined}
               initialFocus={false}
+              ref={backdropContentRef}
               style={renderedContentStyle}
             >
               {rendered.surfaceDecoration && (
-                <div aria-hidden="true" className={styles.surfaceDecoration} data-modal-sheet-surface-decoration="true">
+                <div
+                  aria-hidden="true"
+                  className={styles.surfaceDecoration}
+                  data-modal-backdrop-occluder={rendered.surfaceDecorationOccludesBackdrop ? 'opaque' : undefined}
+                  data-modal-sheet-surface-decoration="true"
+                >
                   {rendered.surfaceDecoration}
                 </div>
               )}

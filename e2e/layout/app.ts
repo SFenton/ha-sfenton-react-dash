@@ -9,6 +9,7 @@ export async function openSurface(page: Page, scenario: ScenarioId): Promise<Loc
   await page.goto(`/index.html?path=${route}${scenario === 'summary' ? '&user=stephen#daily-report' : ''}`)
   await waitForRoute(page, route, scenario === 'summary')
   if (scenario === 'quick-links') await page.getByRole('button', { name: 'Quick Links', exact: true }).click()
+  if (scenario === 'weather') await page.getByRole('button', { name: /Open seven-day weather forecast/ }).click()
   if (scenario === 'filters') await page.locator('[data-floating-action-dock]').getByRole('button', { name: 'Filter', exact: true }).click()
   if (scenario === 'form') {
     await page.getByRole('button', { name: 'Add Task', exact: true }).click()
@@ -34,6 +35,37 @@ export async function enterState(dialog: Locator, scenario: ScenarioId, state: s
   if (scenario === 'summary') await dialog.getByRole('tab', {
     name: state === 'overdue' ? /^Overdue Chores/ : state === 'upcoming' ? 'Upcoming Chores' : /^Expired Food/,
   }).click()
+  if (scenario === 'weather') {
+    const page = dialog.page()
+    await page.evaluate((nextState) => {
+      const api = window.__mockHass!
+      api.setCallServiceOutcome('weather', 'get_forecasts', 'resolve')
+      if (nextState === 'forecast-empty' || nextState === 'forecast-error-empty') api.clearWeatherForecasts()
+      api.setEntityAttribute('weather.pirate_weather', 'pressure', nextState === 'pressure-unavailable' ? null : nextState === 'pressure-long' ? 101325.25 : 29.92)
+      api.setEntityAttribute('weather.pirate_weather', 'pressure_unit', nextState === 'pressure-long' ? 'Pa' : 'inHg')
+    }, state)
+    const rows = dialog.locator('[class*="forecastRow"]')
+    if (state === 'forecast-empty' || state === 'forecast-error-empty') {
+      await expect(dialog.getByText('No forecast data returned by Pirate Weather.', { exact: true })).toBeVisible()
+      await expect(rows).toHaveCount(0)
+    } else {
+      await expect(rows).toHaveCount(7)
+    }
+    if (state.startsWith('forecast-error')) {
+      await page.evaluate(() => {
+        window.__mockHass!.setCallServiceOutcome('weather', 'get_forecasts', 'reject')
+        window.__mockHass!.setEntityAttribute('weather.pirate_weather', 'forecast_revision', Date.now())
+      })
+      await expect(dialog.getByText('Mock service rejection', { exact: true })).toHaveCount(2)
+    }
+    const label = state === 'wind' ? 'Wind conditions' : state === 'precipitation' ? 'Precipitation conditions' : 'Conditions conditions'
+    await dialog.getByRole('button', { name: label, exact: true }).click()
+    await expect(dialog.getByRole('button', { name: label, exact: true })).toHaveAttribute('aria-pressed', 'true')
+    await expect.poll(() => dialog.locator('[data-transition]').evaluateAll((elements) => (
+      elements.every((element) => element.getAttribute('data-transition') === 'idle')
+    ))).toBe(true)
+    await dialog.locator('[data-modal-sheet-body]').evaluate((element) => { element.scrollTop = 0 })
+  }
   await waitForModalReady(dialog)
 }
 

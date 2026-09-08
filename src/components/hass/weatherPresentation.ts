@@ -3,8 +3,10 @@ export type FeelsLikeRelation = 'cooler' | 'similar' | 'warmer'
 export type PressureBand = 'above' | 'below' | 'typical'
 export type UvLevel = 'extreme' | 'high' | 'low' | 'moderate' | 'veryHigh'
 export type VisibilityBand = 'clear' | 'good' | 'moderate' | 'poor' | 'veryPoor'
-export type WeatherScene = 'clouds' | 'exceptional' | 'fog' | 'neutral' | 'night' | 'rain' | 'snow' | 'storm' | 'sunny' | 'wind'
+export const WEATHER_SCENES = ['sunny', 'night', 'clouds', 'fog', 'rain', 'storm', 'snow', 'wind', 'exceptional', 'neutral'] as const
+export type WeatherScene = typeof WEATHER_SCENES[number]
 export const DEFAULT_WIND_SPEED_UNIT = 'mph'
+export const WEATHER_DATA_TRANSITION_MS = 390
 export const WIND_ROTATION_EASING = 'cubic-bezier(.32, .72, 0, 1)'
 
 const WIND_COMPASS_POINTS = [

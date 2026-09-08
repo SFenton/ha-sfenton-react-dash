@@ -1,5 +1,5 @@
 import { test, expect, type Locator, type Page } from './layout/fixture'
-import { applyHostProfile, openHost, openSurface } from './layout/app'
+import { applyHostProfile, enterState, openHost, openSurface } from './layout/app'
 import { SCENARIO_IDS, SURFACE_CONTRACTS, type ScenarioId } from './layout/contracts'
 import { journey, obligationsFor, SOURCE_ROUTES } from './layout/scenarios'
 import { actualCapabilities, applyProfile, assertDeclaredTabs, checkpoint, closeMounted, contextForProject, modalFacts, runEnvironment, waitForModalReady, waitForNavigation, waitForRoute } from './layout/evidence'
@@ -95,6 +95,20 @@ async function stateFacts(page: Page, dialog: Locator, scenario: ScenarioId, sta
   if (scenario === 'form') {
     await expect(dialog.getByRole('textbox', { name: 'Task' })).toHaveValue('Layout validation draft')
     facts.draft = 'preserved'
+  }
+  if (scenario === 'weather') {
+    await expect(dialog.locator('[data-weather-scene-preview], select')).toHaveCount(0)
+    const pressure = dialog.locator('[data-kind="pressure"]')
+    await expect(pressure).toHaveAttribute('aria-label', state === 'pressure-unavailable'
+      ? 'Pressure Unavailable'
+      : state === 'pressure-long' ? 'Pressure 101,325.25 Pa' : 'Pressure 29.92 inHg')
+    const heights = await dialog.locator('[data-kind="pressure"], [data-kind="feels"], [data-kind="uv"], [data-kind="sun"], [data-kind="visibility"]')
+      .evaluateAll((elements) => elements.map((element) => element.getBoundingClientRect().height))
+    expect(heights).toHaveLength(5)
+    for (const height of heights) expect(Math.abs(height - 154)).toBeLessThanOrEqual(1)
+    const label = state === 'wind' ? 'Wind conditions' : state === 'precipitation' ? 'Precipitation conditions' : 'Conditions conditions'
+    await expect(dialog.getByRole('button', { name: label, exact: true })).toHaveAttribute('aria-pressed', 'true')
+    facts.weather = { state, pressureHeights: heights, previewControls: 0, selectedMode: label }
   }
   if (scenario === 'remote') {
     const pad = dialog.locator('[role="group"][aria-label$=" remote controls"]')
@@ -238,6 +252,7 @@ for (const scenario of SCENARIO_IDS) {
     if (tabs) assertDeclaredTabs(await dialog.getByRole('tab').evaluateAll((elements) =>
       elements.map((element) => element.getAttribute('aria-label') ?? element.textContent?.trim() ?? '')), tabs)
     for (const state of SURFACE_CONTRACTS[scenario].states) {
+      if (scenario === 'weather') await enterState(dialog, scenario, state)
       if (scenario === 'quick-links' && state === 'rooms') await dialog.getByRole('button', { name: 'Rooms', exact: true }).click()
       if (scenario === 'quick-links' && state === 'back') await dialog.getByRole('button', { name: 'Back', exact: true }).click()
       if (scenario === 'summary') await dialog.getByRole('tab', { name: state === 'overdue' ? /^Overdue Chores/ : state === 'upcoming' ? 'Upcoming Chores' : /^Expired Food/ }).click()

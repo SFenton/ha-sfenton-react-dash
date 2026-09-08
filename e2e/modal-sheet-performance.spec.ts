@@ -2,17 +2,6 @@ import { expect, test, type Browser, type Page } from './layout/fixture'
 
 const BASE_URL_PATH = '/at-a-glance/ecobee'
 const MODAL_TITLE = 'Thermostat · Advanced Controls'
-const RESTORE_GLASS_BLUR = `
-  [data-surface="hass-popup"] [data-tone][data-variant="card"] {
-    backdrop-filter: blur(15px) saturate(1.08) !important;
-    -webkit-backdrop-filter: blur(15px) saturate(1.08) !important;
-  }
-  [data-surface="hass-popup"] [data-modal-tab-nav="true"] {
-    backdrop-filter: blur(20px) !important;
-    -webkit-backdrop-filter: blur(20px) !important;
-  }
-`
-
 interface FrameMetrics {
   frames: number
   max: number
@@ -22,6 +11,7 @@ interface FrameMetrics {
 }
 
 interface DismissalMetrics {
+  idle: FrameMetrics
   drag: FrameMetrics
   release: FrameMetrics
 }
@@ -51,18 +41,20 @@ async function openThermostatAdvancedControls(page: Page) {
   return dialog
 }
 
-async function measureDismissal(browser: Browser, restoreBlur: boolean): Promise<DismissalMetrics> {
+async function measureDismissal(browser: Browser, fullBackdrop: boolean): Promise<DismissalMetrics> {
   const context = await browser.newContext({ hasTouch: true, isMobile: true, viewport: { height: 852, width: 393 } })
   const page = await context.newPage()
   const client = await context.newCDPSession(page)
   await client.send('Emulation.setCPUThrottlingRate', { rate: 6 })
   try {
-    await page.goto(BASE_URL_PATH)
-    if (restoreBlur) await page.addStyleTag({ content: RESTORE_GLASS_BLUR })
+    await page.goto(`${BASE_URL_PATH}${fullBackdrop ? '?modalBackdrop=full' : ''}`)
     await page.getByRole('button', { exact: true, name: 'Advanced Configuration' }).click()
     const dialog = page.getByRole('dialog', { name: MODAL_TITLE })
     await expect(dialog).toBeVisible()
-    await page.waitForTimeout(500)
+    const overlay = page.locator('[data-modal-sheet-overlay="true"]')
+    await expect(overlay).toHaveAttribute('data-backdrop-policy', fullBackdrop ? 'full' : 'auto')
+    if (fullBackdrop) await expect(overlay).toHaveCSS('backdrop-filter', 'blur(10px)')
+    else await expect(overlay).toHaveAttribute('data-exposed-backdrop-bands', 'true')
     const body = dialog.locator('[data-modal-sheet-body="true"]')
     const bodyBox = await body.boundingBox()
     const dialogBox = await dialog.boundingBox()
@@ -76,8 +68,12 @@ async function measureDismissal(browser: Browser, restoreBlur: boolean): Promise
         state.handle = requestAnimationFrame(sample)
       }
       ;(window as unknown as { __modalFrameProbe: typeof state }).__modalFrameProbe = state
-      state.marks.dragStart = performance.now()
+      state.marks.idleStart = performance.now()
       state.handle = requestAnimationFrame(sample)
+    })
+    await page.waitForTimeout(1_200)
+    await page.evaluate(() => {
+      ;(window as unknown as { __modalFrameProbe: { marks: Record<string, number> } }).__modalFrameProbe.marks.dragStart = performance.now()
     })
 
     const start = { x: bodyBox.x + 8, y: bodyBox.y + bodyBox.height * 0.25 }
@@ -86,8 +82,10 @@ async function measureDismissal(browser: Browser, restoreBlur: boolean): Promise
       touchPoints: typeof y === 'number' ? [{ id: 1, radiusX: 4, radiusY: 4, x: start.x, y }] : [],
     })
     await send('touchStart', start.y)
-    for (let step = 1; step <= 12; step += 1) {
-      await send('touchMove', start.y + dialogBox.height * 0.6 * step / 12)
+    // A p95 needs enough frames: a 12-step drag made one missed frame the entire tail estimate.
+    const dragSteps = 36
+    for (let step = 1; step <= dragSteps; step += 1) {
+      await send('touchMove', start.y + dialogBox.height * 0.6 * step / dragSteps)
       await page.waitForTimeout(16)
     }
     await send('touchEnd')
@@ -110,6 +108,7 @@ async function measureDismissal(browser: Browser, restoreBlur: boolean): Promise
       return frames.slice(1).map((timestamp, index) => timestamp - frames[index])
     }
     return {
+      idle: summarize(intervals(probe.marks.idleStart, probe.marks.dragStart)),
       drag: summarize(intervals(probe.marks.dragStart, probe.marks.releaseStart)),
       release: summarize(intervals(probe.marks.releaseStart, probe.marks.end)),
     }
@@ -142,7 +141,7 @@ test.describe('modal dismissal performance', () => {
     expect(await opener.evaluate((element) => getComputedStyle(element).getPropertyValue('-webkit-backdrop-filter'))).toContain('blur(15px)')
   })
 
-  test('records paired throttled frame metrics without a modal cadence regression', async ({ browser, browserName }, testInfo) => {
+  test('compares automatic and full backdrop policies under throttled idle and trusted dismissal', async ({ browser, browserName }, testInfo) => {
     test.skip(browserName !== 'chromium', 'CPU throttling and trusted touch injection are Chromium-only')
     test.setTimeout(120_000)
     const baselineRuns: DismissalMetrics[] = []
@@ -159,11 +158,17 @@ test.describe('modal dismissal performance', () => {
     )
     const report = {
       baseline: {
+        idleP95: average(baselineRuns, 'idle', 'p95'),
         dragP95: average(baselineRuns, 'drag', 'p95'),
+        dragMax: Math.max(...baselineRuns.map((run) => run.drag.max)),
+        dragOver33Ratio: average(baselineRuns, 'drag', 'over33Ratio'),
         releaseP95: average(baselineRuns, 'release', 'p95'),
       },
       optimized: {
+        idleP95: average(optimizedRuns, 'idle', 'p95'),
         dragP95: average(optimizedRuns, 'drag', 'p95'),
+        dragMax: Math.max(...optimizedRuns.map((run) => run.drag.max)),
+        dragOver33Ratio: average(optimizedRuns, 'drag', 'over33Ratio'),
         releaseP95: average(optimizedRuns, 'release', 'p95'),
       },
     }
@@ -172,10 +177,13 @@ test.describe('modal dismissal performance', () => {
       contentType: 'application/json',
     })
 
-    expect(baselineRuns.every((run) => run.drag.frames > 5 && run.release.frames > 20)).toBe(true)
-    expect(optimizedRuns.every((run) => run.drag.frames > 5 && run.release.frames > 20)).toBe(true)
-    expect(report.optimized.dragP95).toBeLessThanOrEqual(report.baseline.dragP95 * 1.5)
-    expect(report.optimized.releaseP95).toBeLessThanOrEqual(report.baseline.releaseP95 * 1.5)
+    expect(baselineRuns.every((run) => run.drag.frames > 40 && run.release.frames > 20)).toBe(true)
+    expect(optimizedRuns.every((run) => run.drag.frames > 40 && run.release.frames > 20)).toBe(true)
+    expect(baselineRuns.every((run) => run.idle.frames > 30)).toBe(true)
+    expect(optimizedRuns.every((run) => run.idle.frames > 30)).toBe(true)
+    expect(report.optimized.idleP95).toBeLessThanOrEqual(report.baseline.idleP95 * 1.1)
+    expect(report.optimized.dragP95, JSON.stringify(report)).toBeLessThanOrEqual(report.baseline.dragP95 * 1.1)
+    expect(report.optimized.releaseP95).toBeLessThanOrEqual(report.baseline.releaseP95 * 1.1)
   })
 
   test('keeps the optimized modal open geometry stable', async ({ page }) => {
@@ -183,7 +191,7 @@ test.describe('modal dismissal performance', () => {
     const box = await dialog.boundingBox()
     expect(box?.width).toBeGreaterThan(380)
     expect(box?.height).toBeGreaterThan(700)
-    await expect(dialog).toHaveCSS('background-color', 'rgba(24, 24, 24, 0.97)')
+    await expect(dialog).toHaveCSS('background-color', 'rgb(24, 24, 24)')
     await expect(dialog).toHaveCSS('border-radius', '30px 30px 0px 0px')
   })
 })

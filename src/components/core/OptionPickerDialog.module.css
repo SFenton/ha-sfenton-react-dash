@@ -10,8 +10,8 @@
     max(22px, var(--rd-safe-bottom))
     max(22px, var(--rd-safe-left));
   background: var(--color-modal-overlay);
-  backdrop-filter: var(--blur-modal);
   -webkit-backdrop-filter: var(--blur-modal);
+  backdrop-filter: var(--blur-modal);
   pointer-events: auto;
 }
 
@@ -25,8 +25,8 @@
   color: #e1e1e1;
   background: var(--color-modal-surface);
   box-shadow: none;
-  backdrop-filter: var(--blur-modal);
   -webkit-backdrop-filter: var(--blur-modal);
+  backdrop-filter: var(--blur-modal);
   overflow: hidden;
   pointer-events: auto;
 }

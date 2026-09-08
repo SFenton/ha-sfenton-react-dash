@@ -6,6 +6,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { ModalSheet, type ModalCenteredGeometry } from './ModalSheet'
 
 const modalSheetCss = readFileSync(resolve(process.cwd(), 'src/components/core/ModalSheet.module.css'), 'utf8')
+const tokensCss = readFileSync(resolve(process.cwd(), 'src/styles/tokens.css'), 'utf8')
 
 function ModalSheetHarness() {
   const [open, setOpen] = useState(true)
@@ -171,9 +172,79 @@ describe('ModalSheet', () => {
     expect(dialog.querySelector('[data-modal-sheet-surface-decoration="true"]')).toContainElement(screen.getByTestId('modal-decoration'))
   })
 
+  it('defaults to automatic backdrop bands and keeps the full policy explicit', () => {
+    const view = render(
+      <ModalSheet onClose={() => undefined} open title="Automatic backdrop">
+        <div />
+      </ModalSheet>,
+    )
+
+    let dialog = screen.getByRole('dialog')
+    let overlay = document.querySelector('[data-modal-sheet-overlay="true"]')
+    expect(dialog).toHaveAttribute('data-backdrop-policy', 'auto')
+    expect(overlay).toHaveAttribute('data-backdrop-policy', 'auto')
+    expect(overlay?.querySelector('[data-modal-backdrop-layer="true"]')).toHaveAttribute('aria-hidden', 'true')
+    expect(overlay?.querySelector('[data-modal-backdrop-scrim="true"]')).toHaveAttribute('aria-hidden', 'true')
+    expect(overlay?.querySelectorAll('[data-modal-backdrop-band]')).toHaveLength(4)
+    expect(overlay?.querySelectorAll('[data-modal-backdrop-band][aria-hidden="true"]')).toHaveLength(4)
+    expect(overlay?.querySelector('[data-modal-backdrop-proxy="true"]')).toBeInTheDocument()
+
+    view.rerender(
+      <ModalSheet backdropPolicy="full" onClose={() => undefined} open title="Full backdrop">
+        <div />
+      </ModalSheet>,
+    )
+
+    dialog = screen.getByRole('dialog')
+    overlay = document.querySelector('[data-modal-sheet-overlay="true"]')
+    expect(dialog).toHaveAttribute('data-backdrop-policy', 'full')
+    expect(overlay).toHaveAttribute('data-backdrop-policy', 'full')
+    expect(overlay?.querySelector('[data-modal-backdrop-layer="true"]')).not.toBeInTheDocument()
+    expect(dialog).toHaveStyle({ '--modal-surface-backing': 'var(--rd-modal-surface-opaque)' })
+  })
+
+  it('fails closed for unsupported inline geometry and unaudited custom surfaces', () => {
+    const view = render(
+      <ModalSheet contentStyle={{ height: '400px' }} onClose={() => undefined} open title="Custom geometry">
+        <div />
+      </ModalSheet>,
+    )
+
+    expect(screen.getByRole('dialog')).toHaveAttribute('data-backdrop-policy', 'full')
+
+    view.rerender(
+      <ModalSheet contentStyle={{ borderRadius: '80px 80px 0 0' }} onClose={() => undefined} open title="Custom radius">
+        <div />
+      </ModalSheet>,
+    )
+    expect(screen.getByRole('dialog')).toHaveAttribute('data-backdrop-policy', 'full')
+
+    view.rerender(
+      <ModalSheet contentStyle={{ '--color-modal-surface': 'rgba(8, 14, 23, 0.9)' }} onClose={() => undefined} open title="Custom surface">
+        <div />
+      </ModalSheet>,
+    )
+    expect(screen.getByRole('dialog')).toHaveAttribute('data-backdrop-policy', 'full')
+
+    view.rerender(
+      <ModalSheet
+        contentStyle={{ '--color-modal-surface': 'rgba(8, 14, 23, 0.9)' }}
+        onClose={() => undefined}
+        open
+        surfaceDecoration={<span />}
+        surfaceDecorationOccludesBackdrop
+        title="Audited custom surface"
+      >
+        <div />
+      </ModalSheet>,
+    )
+    expect(screen.getByRole('dialog')).toHaveAttribute('data-backdrop-policy', 'auto')
+    expect(screen.getByRole('dialog').querySelector('[data-modal-backdrop-occluder="opaque"]')).toBeInTheDocument()
+  })
+
   it('retains navigation, decoration, and typed layout intent during the mounted close frame', () => {
     const view = render(
-      <ModalSheet navigation={<span data-testid="closing-navigation" />} onClose={() => undefined} open scrollMode="panes" size="workspace" surfaceDecoration={<span data-testid="closing-decoration" />} title="">
+      <ModalSheet backdropPolicy="full" navigation={<span data-testid="closing-navigation" />} onClose={() => undefined} open scrollMode="panes" size="workspace" surfaceDecoration={<span data-testid="closing-decoration" />} title="">
         <div />
       </ModalSheet>,
     )
@@ -188,6 +259,7 @@ describe('ModalSheet', () => {
     expect(dialog).toHaveAttribute('data-state', 'closed')
     expect(dialog).toHaveAttribute('data-size', 'workspace')
     expect(dialog).toHaveAttribute('data-scroll-mode', 'panes')
+    expect(dialog).toHaveAttribute('data-backdrop-policy', 'full')
     expect(screen.getByTestId('closing-navigation')).toBeInTheDocument()
     expect(screen.getByTestId('closing-decoration')).toBeInTheDocument()
   })
@@ -297,7 +369,20 @@ describe('ModalSheet', () => {
   })
 
   it('disables nested glass backdrop filters inside the moving modal surface', () => {
-    expect(modalSheetCss).toMatch(/\.content \[data-tone\]\[data-variant='card'\],\s*\.content \[data-modal-tab-nav='true'\]\s*\{[^}]*backdrop-filter:\s*none;[^}]*-webkit-backdrop-filter:\s*none;/s)
+    expect(modalSheetCss).toMatch(/\.content \[data-tone\]\[data-variant='card'\],\s*\.content \[data-modal-tab-nav='true'\]\s*\{[^}]*-webkit-backdrop-filter:\s*none;\s*backdrop-filter:\s*none;/s)
+  })
+
+  it('composites the full scrim above CSS-derived blur bands and uses opaque backing', () => {
+    expect(modalSheetCss).toMatch(/\.overlay\s*\{[^}]*background:\s*var\(--color-modal-overlay\);[^}]*-webkit-backdrop-filter:\s*var\(--blur-modal\);\s*backdrop-filter:\s*var\(--blur-modal\);/s)
+    expect(modalSheetCss).toMatch(/\.overlayBand\s*\{[^}]*visibility:\s*hidden;[^}]*background:\s*var\(--rd-transparent\);[^}]*backdrop-filter:\s*var\(--blur-modal\);/s)
+    expect(modalSheetCss).toMatch(/\.overlay\[data-exposed-backdrop-bands='true'\]\s*\{[^}]*-webkit-backdrop-filter:\s*none;\s*backdrop-filter:\s*none;/s)
+    expect(modalSheetCss).toMatch(/\.backdropScrim\s*\{[^}]*inset:\s*0;[^}]*background:\s*var\(--color-modal-overlay\);/s)
+    expect(modalSheetCss).toContain('background: var(--modal-surface-backing, var(--color-modal-surface))')
+    expect(modalSheetCss).toMatch(/\.content,\s*\.backdropGeometryProxy\s*\{[^}]*height:\s*var\(--modal-mobile-height,\s*90dvh\);[^}]*max-height:\s*min\(\s*var\(--modal-mobile-max-height,\s*90dvh\),[^}]*--dashboard-visible-height[^}]*--rd-safe-top/s)
+    expect(modalSheetCss).toMatch(/\.overlay\[data-exposed-backdrop-bands='true'\]\[data-modal-presentation='landscape-dialog'\]\s*\{[^}]*-webkit-backdrop-filter:\s*var\(--blur-modal\);\s*backdrop-filter:\s*var\(--blur-modal\);/s)
+    expect(modalSheetCss).toMatch(/margin-bottom:\s*calc\(-1 \* var\(--modal-backdrop-band-overlap\)\);[\s\S]*top:\s*var\(--modal-backdrop-band-overlap\);/)
+    expect(tokensCss).toMatch(/--color-modal-surface:\s*rgba\(24,\s*24,\s*24,\s*0\.97\);/)
+    expect(tokensCss).toMatch(/--rd-modal-surface-opaque:\s*rgb\(24,\s*24,\s*24\);/)
   })
 
   it('keeps navigation and landscape density independent from outer modal geometry', () => {

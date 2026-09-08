@@ -13,7 +13,7 @@ export interface PrecipitationForecastInput {
 
 export interface PrecipitationTimelinePoint {
   amount: number | null
-  cumulative: number
+  cumulative: number | null
   endTime: Date | null
   index: number
   probability: number | null
@@ -47,12 +47,12 @@ function forecastDate(value: unknown) {
 }
 
 export function buildPrecipitationTimeline(forecasts: readonly PrecipitationForecastInput[], limit = 24) {
-  let cumulative = 0
+  let cumulative: number | null = 0
   return forecasts.slice(0, limit).map((forecast, index): PrecipitationTimelinePoint => {
     const startTime = forecastDate(forecast.datetime)
     const probabilityValue = nonNegativeNumber(forecast.precipitation_probability)
     const amount = nonNegativeNumber(forecast.precipitation)
-    cumulative += amount ?? 0
+    cumulative = cumulative === null || amount === null ? null : cumulative + amount
 
     return {
       amount,
@@ -71,7 +71,7 @@ export function precipitationPeakChance(points: readonly PrecipitationTimelinePo
 }
 
 export function precipitationTotal(points: readonly PrecipitationTimelinePoint[]) {
-  return points.at(-1)?.cumulative ?? 0
+  return points.at(-1)?.cumulative ?? null
 }
 
 export function precipitationChanceDomain(peak: number | null) {
@@ -99,11 +99,11 @@ function millimeterUnit(unit: string) {
   return unit.trim().toLowerCase().includes('mm')
 }
 
-export function precipitationAmountAxis(total: number, unit: string): PrecipitationAmountAxis {
+export function precipitationAmountAxis(total: number | null, unit: string): PrecipitationAmountAxis {
   const metric = millimeterUnit(unit)
   const minimumStep = metric ? 0.25 : 0.01
   const maximumFractionDigits = metric ? 2 : 3
-  const boundedTotal = Number.isFinite(total) ? Math.max(0, total) : 0
+  const boundedTotal = total !== null && Number.isFinite(total) ? Math.max(0, total) : 0
   const targetStep = Math.max(minimumStep, boundedTotal / 2)
   const startingExponent = Math.floor(Math.log10(targetStep))
 

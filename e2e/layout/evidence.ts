@@ -57,8 +57,14 @@ export async function waitForModalReady(dialog: Locator, timeout = 5_000, readin
     return {
       opacity: Number(style.opacity),
       starting: element.hasAttribute('data-starting-style') || element.getAttribute('data-initial-starting-style') === 'true',
-      running: element.getAnimations({ subtree: true }).some((animation) =>
-        animation.playState === 'running' && animation.effect?.getComputedTiming().iterations !== Infinity),
+      running: element.getAnimations({ subtree: true }).filter((animation) =>
+        animation.playState === 'running' && animation.effect?.getComputedTiming().iterations !== Infinity)
+        .map((animation) => ({
+          name: (animation as CSSAnimation).animationName ?? (animation as CSSTransition).transitionProperty ?? 'web-animation',
+          time: animation.currentTime,
+          timing: animation.effect?.getComputedTiming(),
+          target: (animation.effect as KeyframeEffect).target?.nodeName,
+        })),
       tabsValid: readiness === 'tabs' ? tabCount === 0 || selected.length === 1 : selected.length === 1,
       incoming: Array.from(element.querySelectorAll('[data-modal-tab-transition-state]'))
         .every((panel) => panel.getAttribute('data-modal-tab-transition-state') === 'idle'),
@@ -84,7 +90,7 @@ export async function waitForModalReady(dialog: Locator, timeout = 5_000, readin
       }),
     }
   }, { readiness, detail }), { timeout, message: 'Wait for actual incoming content, not merely selected-tab chrome' }).toEqual({
-    opacity: 1, starting: false, running: false, tabsValid: true, incoming: true, panelsMatch: true,
+    opacity: 1, starting: false, running: [], tabsValid: true, incoming: true, panelsMatch: true,
   })
   await dialog.evaluate(() => document.fonts.ready)
   await dialog.evaluate(() => new Promise<void>((done) => requestAnimationFrame(() => requestAnimationFrame(() => done()))))

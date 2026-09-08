@@ -4,6 +4,7 @@ import { BATHROOM_FAN_CONFIGS } from '../../constants/bathroomFans'
 export interface MockEntity {
   attributes: Record<string, unknown>
   entity_id: string
+  last_updated?: string
   state: string
 }
 
@@ -79,6 +80,7 @@ export function setMockEntityAttribute(entityId: string, attribute: string, valu
   const target = mockEntities[entityId]
   if (!target) return
   target.attributes = { ...target.attributes, [attribute]: value }
+  target.last_updated = new Date().toISOString()
   notifyMockHass()
 }
 
@@ -86,6 +88,7 @@ export function setMockEntityState(entityId: string, state: string) {
   const target = mockEntities[entityId]
   if (!target) return
   target.state = state
+  target.last_updated = new Date().toISOString()
   notifyMockHass()
 }
 
@@ -139,7 +142,7 @@ function emptyHumidifierSchedule() {
 
 let mockHumidifierSchedule = emptyHumidifierSchedule()
 
-const mockDailyWeatherForecast = [
+const initialMockDailyWeatherForecast = [
   { datetime: '2026-06-10T07:00:00+00:00', condition: 'sunny', temperature: 65, templow: 48, precipitation_probability: 0, precipitation: 0, humidity: 74, dew_point: 48, cloud_coverage: 57, wind_speed: 3.56, wind_gust_speed: 7.97, wind_bearing: 185, uv_index: 6.7 },
   { datetime: '2026-06-11T07:00:00+00:00', condition: 'sunny', temperature: 71, templow: 50, precipitation_probability: 0, precipitation: 0, humidity: 68, dew_point: 48, cloud_coverage: 14, wind_speed: 2.31, wind_gust_speed: 5.18, wind_bearing: 169, uv_index: 7.44 },
   { datetime: '2026-06-12T07:00:00+00:00', condition: 'partlycloudy', temperature: 72, templow: 51, precipitation_probability: 0, precipitation: 0, humidity: 66, dew_point: 49, cloud_coverage: 17, wind_speed: 3.18, wind_gust_speed: 6.94, wind_bearing: 212, uv_index: 7.09 },
@@ -148,6 +151,13 @@ const mockDailyWeatherForecast = [
   { datetime: '2026-06-15T07:00:00+00:00', condition: 'sunny', temperature: 90, templow: 63, precipitation_probability: 0, precipitation: 0, humidity: 55, dew_point: 57, cloud_coverage: 32, wind_speed: 2.31, wind_gust_speed: 5.09, wind_bearing: 149, uv_index: 6.69 },
   { datetime: '2026-06-16T07:00:00+00:00', condition: 'rainy', temperature: 84, templow: 59, precipitation_probability: 7, precipitation: 0, humidity: 55, dew_point: 56, cloud_coverage: 24, wind_speed: 3.96, wind_gust_speed: 7.89, wind_bearing: 157, uv_index: 7.36 },
 ]
+let mockDailyWeatherForecast = initialMockDailyWeatherForecast.map((forecast) => ({ ...forecast }))
+
+export function setMockDailyWeatherForecast(index: number, patch: Record<string, unknown>) {
+  const forecast = mockDailyWeatherForecast[index]
+  if (!forecast) return
+  mockDailyWeatherForecast[index] = { ...forecast, ...patch }
+}
 
 const hourlyTemperatures = [57, 58, 60, 61, 63, 64, 65, 64, 62, 60, 58, 56, 55, 54, 53, 52, 51, 50, 49, 49, 50, 52, 55, 58]
 const hourlyPrecipitationProbabilities = [0, 5, 18, 42, 68, 94, 76, 58, 35, 22, 14, 8, 5, 3, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0]
@@ -155,22 +165,32 @@ const hourlyPrecipitationAmounts = [0, 0, 0.01, 0.01, 0.02, 0, 0.04, 0.02, 0.01,
 const hourlyHumidity = [62, 66, 71, 74, 69, 64, 61, 59, 58, 60, 63, 65, 67, 69, 70, 72, 73, 74, 75, 74, 72, 69, 66, 64]
 const hourlyCloudCoverage = [20, 35, 55, 70, 45, 25, 15, 10, 5, 8, 12, 18, 25, 32, 40, 48, 55, 62, 68, 72, 65, 52, 38, 28]
 
-const mockHourlyWeatherForecast = Array.from({ length: 24 }, (_, index) => {
-  const forecastDate = new Date('2026-06-10T12:00:00-07:00')
-  forecastDate.setHours(forecastDate.getHours() + index)
-  return {
-    datetime: forecastDate.toISOString(),
-    condition: index < 3 ? 'cloudy' : index < 8 ? 'partlycloudy' : 'sunny',
-    cloud_coverage: hourlyCloudCoverage[index],
-    humidity: hourlyHumidity[index],
-    precipitation: hourlyPrecipitationAmounts[index],
-    precipitation_probability: hourlyPrecipitationProbabilities[index],
-    temperature: hourlyTemperatures[index],
-    wind_bearing: 185,
-    wind_gust_speed: 5 + (index % 5),
-    wind_speed: 3 + (index % 4),
-  }
-})
+function createMockHourlyWeatherForecast() {
+  return Array.from({ length: 24 }, (_, index) => {
+    const forecastDate = new Date()
+    forecastDate.setMinutes(0, 0, 0)
+    forecastDate.setHours(forecastDate.getHours() + index)
+    return {
+      datetime: forecastDate.toISOString(),
+      condition: index < 3 ? 'cloudy' : index < 8 ? 'partlycloudy' : 'sunny',
+      cloud_coverage: hourlyCloudCoverage[index],
+      humidity: hourlyHumidity[index],
+      precipitation: hourlyPrecipitationAmounts[index],
+      precipitation_probability: hourlyPrecipitationProbabilities[index],
+      temperature: hourlyTemperatures[index],
+      wind_bearing: 185,
+      wind_gust_speed: 5 + (index % 5),
+      wind_speed: 3 + (index % 4),
+    }
+  })
+}
+let mockHourlyWeatherForecast = createMockHourlyWeatherForecast()
+
+export function setMockHourlyWeatherForecast(index: number, patch: Record<string, unknown>) {
+  const forecast = mockHourlyWeatherForecast[index]
+  if (!forecast) return
+  mockHourlyWeatherForecast[index] = { ...forecast, ...patch }
+}
 
 function mockDateOffset(days: number) {
   const date = new Date()
@@ -813,13 +833,16 @@ function applyMockCallServiceSideEffects(params: Record<string, unknown>) {
   }
 }
 
-type MockHassDebugApi = {
+export type MockHassDebugApi = {
   calls: Record<string, unknown>[]
+  clearWeatherForecasts: () => void
   freeSleepSchedules: () => Record<string, unknown>
   reset: () => void
   setCallServiceOutcome: (domain: string, service: string, outcome: MockCallServiceOutcome) => void
   setConnectionStatus: (status: MockConnectionStatus) => void
   setHumidifierSchedule: (schedule: Record<string, unknown>) => void
+  setDailyWeatherForecast: (index: number, patch: Record<string, unknown>) => void
+  setHourlyWeatherForecast: (index: number, patch: Record<string, unknown>) => void
   setEntityAttribute: (entityId: string, attribute: string, value: unknown) => void
   setEntityState: (entityId: string, state: string) => void
   setDonetickTask: (taskId: number, task: MockDonetickTask) => void
@@ -833,9 +856,15 @@ function exposeMockHassDebugApi() {
   if (typeof window === 'undefined') return
   ;(window as unknown as { __mockHass?: MockHassDebugApi }).__mockHass = {
     calls: mockCallServiceCalls,
+    clearWeatherForecasts: () => {
+      mockDailyWeatherForecast = []
+      mockHourlyWeatherForecast = []
+    },
     freeSleepSchedules: () => cloneRecord(mockEntities['sensor.nightcanvasrestful_schedules'].attributes),
     setCallServiceOutcome: setMockCallServiceOutcome,
     setConnectionStatus: setMockConnectionStatus,
+    setDailyWeatherForecast: setMockDailyWeatherForecast,
+    setHourlyWeatherForecast: setMockHourlyWeatherForecast,
     setHumidifierSchedule: (schedule) => {
       mockHumidifierSchedule = cloneRecord(schedule) as unknown as typeof mockHumidifierSchedule
     },
@@ -1572,6 +1601,8 @@ export function resetMockHass() {
   for (const location of Object.keys(mockInventoryItemsByLocation)) delete mockInventoryItemsByLocation[location]
   mockDonetickTaskLoadDelayMs = 0
   mockRecipeQueryDelayMs = 0
+  mockDailyWeatherForecast = initialMockDailyWeatherForecast.map((forecast) => ({ ...forecast }))
+  mockHourlyWeatherForecast = createMockHourlyWeatherForecast()
   mockState.connectionStatus = 'connected'
   mockState.user = { id: '64089b5683944c39b4f944c8f76830b0', is_admin: true, name: 'Stephen' }
   mockEntities['input_boolean.show_outdoor_faucets'].state = 'off'

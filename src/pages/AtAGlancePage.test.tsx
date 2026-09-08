@@ -1,10 +1,12 @@
-import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { AtAGlancePage } from './AtAGlancePage'
 import { CONTACT_GROUPS, LIGHT_GROUPS, OCCUPANCY_GROUPS, SECURITY_ENTITY } from '../constants/atAGlance'
 import { GUEST_CONTROLS_DESCRIPTION } from '../constants/portedDashboard'
 import { GUEST_PRESENCE_SECURITY_HASH, GUEST_PRESENCE_SECURITY_SUMMARY } from '../components/hass/GuestPresenceSecurity'
-import { entity, mockCallServiceCalls, mockEntities, resetMockHass, setMockEntityAttribute } from '../test/mocks/hakitCoreState'
+import { entity, mockCallServiceCalls, mockEntities, mockState, resetMockHass, setMockDailyWeatherForecast, setMockEntityAttribute, setMockHourlyWeatherForecast } from '../test/mocks/hakitCoreState'
 import { resetDeferredRouteHydrationCache } from '../hooks/useDeferredRouteHydration'
+import { WeatherSummary } from '../components/hass/WeatherSummary'
+import { WEATHER_FORECAST_TTL_MS } from '../components/hass/useWeatherForecasts'
 
 describe('AtAGlancePage', () => {
   beforeEach(() => {
@@ -29,10 +31,11 @@ describe('AtAGlancePage', () => {
     }
   }
 
-  it('uses the shared disclosure affordance on the Home weather modal opener', () => {
+  it('uses the shared disclosure affordance on the Home weather modal opener', async () => {
     render(<AtAGlancePage />)
 
     expect(screen.getByRole('button', { name: /Open seven-day weather forecast/i }).querySelector('[data-modal-disclosure="right-chevron"]')).toBeInTheDocument()
+    await act(async () => {})
   })
 
   it('keeps header status chips and camera pills free of disclosure chevrons', () => {
@@ -385,13 +388,18 @@ describe('AtAGlancePage', () => {
     render(<AtAGlancePage />)
 
     expect(await screen.findByLabelText('Today Sunny H:65° L:48°')).toBeInTheDocument()
-  expect(screen.getByLabelText('Today Sunny H:65° L:48°').querySelector('[class*="heroDayRangeTrack"]')).toHaveStyle({ '--range-marker': '52.94117647058824%', '--range-size': '100%', '--range-start': '0%' })
+    expect(screen.getByLabelText('Today Sunny H:65° L:48°').querySelector('[data-weather-rail="temperature"]')).toHaveStyle({ '--weather-rail-marker': '52.94117647058824%', '--weather-rail-size': '100%', '--weather-rail-start': '0%' })
     const heroHourly = await screen.findByLabelText('24-hour weather forecast')
     expect(heroHourly).toHaveAttribute('data-weather-carousel', 'hero')
     expect(heroHourly).toHaveAttribute('tabindex', '0')
-    expect(heroHourly).toHaveTextContent('Now57°1 PM58°')
+    const nextHour = new Date()
+    nextHour.setHours(nextHour.getHours() + 1)
+    const finalHour = new Date()
+    finalHour.setHours(finalHour.getHours() + 23)
+    const hourLabel = (date: Date) => date.toLocaleTimeString([], { hour: 'numeric', hour12: true }).replace(/\s+/g, ' ')
+    expect(heroHourly).toHaveTextContent(`Now57°${hourLabel(nextHour)}58°`)
     expect(within(heroHourly).getByLabelText('Now Cloudy 57°F')).toBeInTheDocument()
-    expect(within(heroHourly).getByLabelText('11 AM Sunny 58°F')).toBeInTheDocument()
+    expect(within(heroHourly).getByLabelText(`${hourLabel(finalHour)} Sunny 58°F`)).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: /Open seven-day weather forecast/i }))
 
@@ -402,14 +410,20 @@ describe('AtAGlancePage', () => {
     expect(within(dialog).getByRole('article', { name: 'Now Cloudy 57°F' })).toBeInTheDocument()
     fireEvent.click(within(dialog).getByRole('button', { name: 'Precipitation conditions' }))
     expect(await within(dialog).findByRole('article', { name: 'Now precipitation 0%' })).toBeInTheDocument()
-    expect(await within(dialog).findByRole('article', { name: 'Today precipitation 0 in 0%' })).toBeInTheDocument()
+    const dailyPrecipitation = await within(dialog).findByRole('article', { name: 'Today precipitation 0 in 0%' })
+    expect(dailyPrecipitation.querySelector('[data-weather-rail="precipitation"]')).toHaveStyle({
+      '--weather-rail-size': '0%',
+      '--weather-rail-start': '0%',
+    })
     fireEvent.click(within(dialog).getByRole('button', { name: 'Wind conditions' }))
     const hourlyWind = await within(dialog).findByRole('article', { name: 'Now wind 3 mph gusts 5 mph' })
     expect(hourlyWind.querySelector('[data-wind-source-bearing="185"]')).toHaveAttribute('data-wind-destination-bearing', '5')
     expect(hourlyWind.querySelector('[data-wind-source-bearing="185"]')).toHaveStyle({ transform: 'rotate(5deg)' })
     const dailyWind = await within(dialog).findByRole('article', { name: 'Today wind 4-8 mph' })
     expect(dailyWind.querySelector('[data-wind-source-bearing="185"]')).toHaveAttribute('data-wind-destination-bearing', '5')
-    expect(dailyWind.querySelector('[data-wind-source-bearing="185"]')).toHaveStyle({ transform: 'rotate(5deg)' })
+    expect(dailyWind.querySelector('[data-wind-source-bearing="185"]')).toHaveStyle({ transform: 'translateX(0px) rotate(5deg)' })
+    expect(dailyWind.querySelector('[data-forecast-wind-summary="true"]')).toHaveTextContent('4-8 mph')
+    expect(dailyWind.querySelector('[class*="windSparkline"]')).not.toBeInTheDocument()
     expect(await within(dialog).findByText('Next Seven Days')).toBeInTheDocument()
     expect(within(dialog).getByLabelText('Current weather conditions')).toHaveTextContent('57°CloudyHigh: 65° Low: 48°')
     expect(within(dialog).getByText('57° · Cloudy')).toBeInTheDocument()
@@ -450,8 +464,8 @@ describe('AtAGlancePage', () => {
     const uvTile = within(dialog).getByRole('article', { name: 'UV Index 6.7 High' })
     expect(uvTile.querySelector('[data-weather-highlight-rail="uv"]')).toBeInTheDocument()
     const visibilityTile = within(dialog).getByRole('article', { name: 'Visibility 10 mi' })
-    expect(visibilityTile.querySelector('[data-visibility-visual="distance-rail"]')).toHaveStyle({ '--highlight-percent': '100%' })
-    expect(visibilityTile.querySelector('[class*="visibilityDistanceMarker"]')).toBeInTheDocument()
+    expect(visibilityTile.querySelector('[data-visibility-visual="distance-rail"]')).toHaveStyle({ '--weather-rail-marker': '100%', '--weather-rail-size': '100%', '--weather-rail-start': '0%' })
+    expect(visibilityTile.querySelector('[data-weather-rail-marker="true"]')).toBeInTheDocument()
     const humidityTile = within(dialog).getByRole('article', { name: 'Hourly Humidity over 6 hours, ranging from 62% to 74%' })
     const cloudTile = within(dialog).getByRole('article', { name: 'Hourly Cloud Cover over 6 hours, ranging from 20% to 70%' })
     expect(humidityTile.querySelectorAll('[data-hourly-metric-bar="true"]')).toHaveLength(6)
@@ -581,4 +595,154 @@ describe('AtAGlancePage', () => {
     expect(navigate).toHaveBeenCalledWith('groceries')
   })
 
+})
+
+describe('Home weather forecast freshness and ranges', () => {
+  const weather = mockEntities['weather.pirate_weather']
+  let originalAttributes: typeof weather.attributes
+  let originalRevision: typeof weather.last_updated
+
+  beforeEach(() => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-09-05T12:30:00Z'))
+    resetMockHass()
+    originalAttributes = weather.attributes
+    originalRevision = weather.last_updated
+    weather.attributes = { ...weather.attributes, precipitation_unit: 'mm', temperature: 57, temperature_unit: '°F' }
+    weather.last_updated = '2026-09-05T12:29:00Z'
+    vi.spyOn(mockState.helpers, 'callService')
+  })
+
+  afterEach(() => {
+    cleanup()
+    weather.attributes = originalAttributes
+    weather.last_updated = originalRevision
+    vi.clearAllTimers()
+    vi.useRealTimers()
+    vi.restoreAllMocks()
+  })
+
+  async function settle() {
+    await act(async () => {})
+  }
+
+  async function openWeather() {
+    fireEvent.click(screen.getByRole('button', { name: /Open seven-day weather forecast/i }))
+    await settle()
+    return screen.getByRole('dialog', { name: 'Weather' })
+  }
+
+  function forecastCalls() {
+    return mockCallServiceCalls
+      .filter((call) => call.domain === 'weather')
+      .map((call) => (call.serviceData as { type: string }).type)
+  }
+
+  it('delivers TTL and HA source refreshes to the hero, hourly carousel and highlight charts', async () => {
+    render(<WeatherSummary />)
+    await settle()
+    expect(forecastCalls()).toEqual(['daily', 'hourly'])
+    const hero = screen.getByLabelText('24-hour weather forecast')
+    expect(within(hero).getByLabelText('Now Cloudy 57°F')).toBeInTheDocument()
+    setMockHourlyWeatherForecast(0, { temperature: 71, precipitation_probability: 98, humidity: 99, cloud_coverage: 98 })
+    setMockDailyWeatherForecast(0, { temperature: 85 })
+    await act(async () => { await vi.advanceTimersByTimeAsync(WEATHER_FORECAST_TTL_MS) })
+    expect(forecastCalls()).toEqual(['daily', 'hourly', 'daily', 'hourly'])
+    expect(within(hero).getByLabelText('Now Cloudy 71°F')).toBeInTheDocument()
+    const dialog = await openWeather()
+    expect(forecastCalls()).toHaveLength(4)
+    expect(within(dialog).getByRole('article', { name: 'Now Cloudy 71°F' })).toBeInTheDocument()
+    expect(within(dialog).getByRole('article', { name: 'Today Sunny H:85° L:48°' })).toBeInTheDocument()
+    expect(dialog.querySelector('[data-probability="98"]')).toBeInTheDocument()
+    expect(dialog.querySelector('[data-metric="humidity"][data-value="99"]')).toBeInTheDocument()
+    expect(dialog.querySelector('[data-metric="cloud"][data-value="98"]')).toBeInTheDocument()
+    setMockHourlyWeatherForecast(0, { temperature: 73, precipitation_probability: 42, humidity: 51 })
+    setMockDailyWeatherForecast(0, { temperature: 86 })
+    act(() => setMockEntityAttribute('weather.pirate_weather', 'temperature', 58))
+    await settle()
+    expect(forecastCalls()).toEqual(['daily', 'hourly', 'daily', 'hourly', 'daily', 'hourly'])
+    expect(within(hero).getByLabelText('Now Cloudy 73°F')).toBeInTheDocument()
+    expect(within(dialog).getByRole('article', { name: 'Now Cloudy 73°F' })).toBeInTheDocument()
+    expect(within(dialog).getByRole('article', { name: 'Today Sunny H:86° L:48°' })).toBeInTheDocument()
+    expect(dialog.querySelector('[data-metric="humidity"][data-value="51"]')).toBeInTheDocument()
+  })
+
+  it.each([
+    [undefined, undefined, 'Unavailable Unavailable'],
+    [undefined, 0, 'Unavailable 0%'],
+    [0, undefined, '0 mm Unavailable'],
+    [0, 0, '0 mm 0%'],
+  ])('keeps daily amount=%s and chance=%s independent with millimeter units', async (amount, chance, label) => {
+    setMockDailyWeatherForecast(0, { precipitation: amount, precipitation_probability: chance })
+    setMockHourlyWeatherForecast(0, { precipitation: amount, precipitation_probability: chance })
+    render(<WeatherSummary />)
+    await settle()
+    const dialog = await openWeather()
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Precipitation conditions' }))
+    await act(async () => { await vi.advanceTimersByTimeAsync(400) })
+    const row = within(dialog).getByRole('article', { name: `Today precipitation ${label}` })
+    expect(row).not.toHaveTextContent(' in')
+    expect(within(dialog).getByRole('article', { name: `Now precipitation ${chance === undefined ? 'Unavailable' : '0%'}` })).toBeInTheDocument()
+  })
+
+  it('does not invent a unit when the daily amount is known but its unit is missing', async () => {
+    delete weather.attributes.precipitation_unit
+    setMockDailyWeatherForecast(0, { precipitation: 0, precipitation_probability: 0 })
+    render(<WeatherSummary />)
+    await settle()
+    const dialog = await openWeather()
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Precipitation conditions' }))
+    await act(async () => { await vi.advanceTimersByTimeAsync(400) })
+    expect(within(dialog).getByRole('article', { name: 'Today precipitation 0 0%' })).toBeInTheDocument()
+  })
+
+  it.each([
+    [90, 90, '100%', '50%'],
+    [0, 0, '0%', '50%'],
+    [40, 80, '0%', '0%'],
+    [Number.NaN, 40, '0%', '0%'],
+    [Infinity, 40, '0%', '0%'],
+  ])('does not fabricate a temperature range for high=%s low=%s', async (high, low, dailyStart, heroStart) => {
+    setMockDailyWeatherForecast(0, { temperature: high, templow: low })
+    render(<WeatherSummary />)
+    await settle()
+    const hero = screen.getByRole('button', { name: /Open seven-day weather forecast/i })
+    expect(hero.querySelector('[data-weather-rail="temperature"]')).toHaveStyle({
+      '--weather-rail-start': heroStart,
+      '--weather-rail-size': '0%',
+    })
+    const dialog = await openWeather()
+    const rail = within(dialog).getByRole('region', { name: 'Seven-day weather forecast' }).querySelector('[data-weather-rail="temperature"]')
+    expect(rail).toHaveStyle({ '--weather-rail-start': dailyStart, '--weather-rail-size': '0%' })
+    if (!Number.isFinite(high) || high < low) expect(rail?.querySelector('[data-weather-rail-marker]')).toBeNull()
+  })
+
+  it('centers an entirely equal weekly range without a fabricated spread', async () => {
+    for (let index = 0; index < 7; index += 1) setMockDailyWeatherForecast(index, { temperature: 0, templow: 0 })
+    weather.attributes.temperature = 0
+    render(<WeatherSummary />)
+    await settle()
+    const dialog = await openWeather()
+    const rails = within(dialog).getByRole('region', { name: 'Seven-day weather forecast' }).querySelectorAll('[data-weather-rail="temperature"]')
+    expect(rails).toHaveLength(7)
+    rails.forEach((rail) => expect(rail).toHaveStyle({ '--weather-rail-start': '50%', '--weather-rail-size': '0%' }))
+    expect(rails[0]).toHaveStyle({ '--weather-rail-marker': '50%' })
+  })
+
+  it.each([false, true])('reports refresh errors with cached forecasts=%s without silently hiding available data', async (cached) => {
+    if (!cached) vi.mocked(mockState.helpers.callService).mockRejectedValue(new Error('Weather connection lost'))
+    render(<WeatherSummary />)
+    await settle()
+    if (cached) {
+      vi.mocked(mockState.helpers.callService).mockRejectedValue(new Error('Weather connection lost'))
+      act(() => setMockEntityAttribute('weather.pirate_weather', 'temperature', 58))
+      await settle()
+    }
+    expect(screen.getAllByRole('status').map((status) => status.textContent)).toEqual(['Weather connection lost', 'Weather connection lost'])
+    const dialog = await openWeather()
+    expect(within(dialog).getAllByText('Weather connection lost')).toHaveLength(2)
+    expect(within(dialog).queryByRole('article', { name: 'Now Cloudy 57°F' }) !== null).toBe(cached)
+    expect(within(dialog).queryByRole('article', { name: 'Today Sunny H:65° L:48°' }) !== null).toBe(cached)
+    expect(within(dialog).queryByLabelText('Loading 24-hour conditions')).toBeNull()
+  })
 })

@@ -1,0 +1,84 @@
+@property --weather-rail-start {
+  syntax: '<percentage>';
+  inherits: true;
+  initial-value: 0%;
+}
+
+@property --weather-rail-size {
+  syntax: '<percentage>';
+  inherits: true;
+  initial-value: 0%;
+}
+
+@property --weather-rail-marker {
+  syntax: '<percentage>';
+  inherits: true;
+  initial-value: 0%;
+}
+
+.rail {
+  --weather-rail-fill: var(--rd-weather-marker);
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 10px;
+  border-radius: 999px;
+  background: var(--rd-weather-visibility-rail-track);
+}
+
+.rail[data-tone='temperature'] {
+  --weather-rail-fill: var(--rd-weather-temperature-scale);
+}
+
+.rail[data-tone='aqi'] {
+  --weather-rail-fill: var(--rd-aqi-scale);
+}
+
+.rail[data-tone='feels'] {
+  --weather-rail-fill: var(--rd-weather-feels-scale);
+}
+
+.rail[data-tone='precipitation'] {
+  --weather-rail-fill: var(--rd-weather-precipitation-scale);
+}
+
+.rail[data-tone='uv'] {
+  --weather-rail-fill: var(--rd-weather-uv-scale);
+}
+
+.rail[data-tone='visibility'] {
+  --weather-rail-fill: var(--rd-weather-visibility-rail);
+}
+
+.fill {
+  position: absolute;
+  inset: 0 auto 0 var(--weather-rail-start, 0%);
+  width: var(--weather-rail-size, 0%);
+  border-radius: inherit;
+  background: var(--weather-rail-fill);
+}
+
+.marker {
+  position: absolute;
+  top: 50%;
+  left: var(--weather-rail-marker, 0%);
+  width: 12px;
+  height: 12px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--rd-weather-marker);
+  box-shadow: none;
+  transform: translate(-50%, -50%);
+}
+
+@media (forced-colors: active) {
+  .rail {
+    border: 1px solid CanvasText;
+    background: Canvas;
+  }
+
+  .fill,
+  .marker {
+    background: Highlight;
+  }
+}

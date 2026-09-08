@@ -94,6 +94,16 @@ export async function review(args: string[], root: string) {
       if (dialog) await waitForModalReady(dialog)
       actions.push(`Mounted resize to ${profile}`)
       if (args.includes('--interact')) {
+        if (scenario === 'weather' && dialog) {
+          const selected = state === 'wind' ? 'Wind conditions' : state === 'precipitation' ? 'Precipitation conditions' : 'Conditions conditions'
+          const alternative = selected === 'Wind conditions' ? 'Conditions conditions' : 'Wind conditions'
+          await dialog.getByRole('button', { name: alternative, exact: true }).click()
+          await dialog.getByRole('button', { name: selected, exact: true }).click()
+          await expect(dialog.getByRole('button', { name: selected, exact: true })).toHaveAttribute('aria-pressed', 'true')
+          await expect.poll(() => dialog!.locator('[data-transition]').evaluateAll((elements) =>
+            elements.every((element) => element.getAttribute('data-transition') === 'idle'))).toBe(true)
+          actions.push('Changed and restored the Weather mode through its real buttons; inspected the selected backend state')
+        }
         if (scenario === 'remote' && dialog) {
           const down = dialog.getByRole('button', { name: 'Down', exact: true })
           const box = await down.boundingBox()

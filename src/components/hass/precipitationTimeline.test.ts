@@ -31,7 +31,30 @@ describe('precipitation timeline', () => {
     ])
 
     expect(points[0]).toMatchObject({ amount: 0, cumulative: 0, probability: 0 })
-    expect(points[1]).toMatchObject({ amount: null, cumulative: 0, probability: 100 })
+    expect(points[1]).toMatchObject({ amount: null, cumulative: null, probability: 100 })
+  })
+
+  it('propagates a missing bucket through subsequent cumulative values and the total', () => {
+    const points = buildPrecipitationTimeline([
+      { precipitation: 0.2, precipitation_probability: 0 },
+      { precipitation: null, precipitation_probability: 65 },
+      { precipitation: 0.3 },
+    ])
+    expect(points.map((point) => point.amount)).toEqual([0.2, null, 0.3])
+    expect(points.map((point) => point.cumulative)).toEqual([0.2, null, null])
+    expect(points.map((point) => point.probability)).toEqual([0, 65, null])
+    expect(precipitationTotal(points)).toBeNull()
+    expect(precipitationTotal([])).toBeNull()
+  })
+
+  it('distinguishes true zero from wholly unknown amount and probability series', () => {
+    const zero = buildPrecipitationTimeline([{ precipitation: 0 }, { precipitation: '0', precipitation_probability: 0 }])
+    expect(zero.map((point) => point.cumulative)).toEqual([0, 0])
+    expect(zero.map((point) => point.probability)).toEqual([null, 0])
+    expect(precipitationTotal(zero)).toBe(0)
+    const missing = buildPrecipitationTimeline([{}, { precipitation: Number.NaN, precipitation_probability: Infinity }])
+    expect(missing.map((point) => point.cumulative)).toEqual([null, null])
+    expect(precipitationTotal(missing)).toBeNull()
   })
 
   it('uses available width to choose a uniform label cadence without appending a crowded final label', () => {

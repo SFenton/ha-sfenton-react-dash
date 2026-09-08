@@ -8,6 +8,19 @@ import { verifyServedBuild } from './layout/run'
 const require = createRequire(import.meta.url)
 const playwrightCli = require.resolve('@playwright/test/cli')
 
+export const APPROVED_WEATHER_RENDER_MIGRATION_BASE = 'ab84f9a8789381b982d79b53eeecdc5d191a3d48'
+
+export function restoreSourceDeclaredBackdropFilters(css: string) {
+  const repairs: Array<{ selector: string; value: string }> = []
+  const restored = css.replace(/([^{}]+)\{([^{}]*)\}/g, (whole, selector: string, declarations: string) => {
+    const prefixed = declarations.match(/(?:^|;)\s*-webkit-backdrop-filter\s*:\s*([^;]+)/)
+    if (!prefixed || /(?:^|;)\s*backdrop-filter\s*:/.test(declarations)) return whole
+    repairs.push({ selector, value: prefixed[1] })
+    return `${selector}{${declarations.replace(/;?$/, ';')}backdrop-filter:${prefixed[1]}}`
+  })
+  return { css: restored, repairs }
+}
+
 export function normalizedUrl(value: string | undefined, label: string) {
   if (!value) throw new Error(`Missing ${label}. Pass ${label === 'baseline URL' ? '--baseline' : '--candidate'} or set the matching RESPONSIVE_*_URL environment variable.`)
   const url = new URL(value)

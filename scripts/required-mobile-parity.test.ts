@@ -1,6 +1,14 @@
-import { normalizedUrl, selectedParityRoutes } from './required-mobile-parity'
+import { normalizedUrl, restoreSourceDeclaredBackdropFilters, selectedParityRoutes } from './required-mobile-parity'
 
 describe('required mobile parity inputs', () => {
+  it('restores only the dropped standard filter with the existing declared value and context', () => {
+    const source = '@media(min-width:1px){.tile{color:red;-webkit-backdrop-filter:blur(15px)}}.kept{backdrop-filter:none;-webkit-backdrop-filter:blur(3px)}'
+    expect(restoreSourceDeclaredBackdropFilters(source)).toEqual({
+      css: '@media(min-width:1px){.tile{color:red;-webkit-backdrop-filter:blur(15px);backdrop-filter:blur(15px)}}.kept{backdrop-filter:none;-webkit-backdrop-filter:blur(3px)}',
+      repairs: [{ selector: '.tile', value: 'blur(15px)' }],
+    })
+    expect(restoreSourceDeclaredBackdropFilters('.tile{color:red}')).toEqual({ css: '.tile{color:red}', repairs: [] })
+  })
   it('selects exact known routes and rejects unknown-only and empty loops', () => {
     expect(selectedParityRoutes(undefined, ['overview', 'to-do'])).toEqual(['overview', 'to-do'])
     expect(selectedParityRoutes('to-do', ['overview', 'to-do'])).toEqual(['to-do'])

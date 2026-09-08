@@ -117,8 +117,8 @@
   font: inherit;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
-  backdrop-filter: blur(18px) saturate(1.18);
   -webkit-backdrop-filter: blur(18px) saturate(1.18);
+  backdrop-filter: blur(18px) saturate(1.18);
 }
 
 .profileButton::before {
@@ -288,8 +288,8 @@
   z-index: 80;
   background: rgba(0, 0, 0, 0.46);
   animation: sidebarScrimIn var(--duration-med) cubic-bezier(.2, .9, .2, 1) both;
-  backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
 }
 
 .sidebarScrim[data-state='closed'] {
@@ -369,8 +369,8 @@
   padding: 8px;
   background: rgba(25, 36, 54, 0.82);
   box-shadow: 0 12px 34px rgba(0, 0, 0, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.14);
-  backdrop-filter: var(--blur-glass);
   -webkit-backdrop-filter: var(--blur-glass);
+  backdrop-filter: var(--blur-glass);
 }
 
 .actionsMenu {
@@ -416,28 +416,28 @@
 @keyframes sidebarScrimIn {
   from {
     opacity: 0;
-    backdrop-filter: blur(0);
     -webkit-backdrop-filter: blur(0);
+    backdrop-filter: blur(0);
   }
 
   to {
     opacity: 1;
-    backdrop-filter: blur(10px);
     -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
   }
 }
 
 @keyframes sidebarScrimOut {
   from {
     opacity: 1;
-    backdrop-filter: blur(10px);
     -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
   }
 
   to {
     opacity: 0;
-    backdrop-filter: blur(0);
     -webkit-backdrop-filter: blur(0);
+    backdrop-filter: blur(0);
   }
 }
 

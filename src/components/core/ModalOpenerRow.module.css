@@ -31,8 +31,8 @@
   border-radius: 24px;
   padding: 18px 14px 18px 18px;
   box-shadow: var(--shadow-glass), inset 0 1px 0 rgba(255, 255, 255, 0.18), inset 0 -1px 0 rgba(0, 0, 0, 0.14);
-  backdrop-filter: blur(15px) saturate(1.12);
   -webkit-backdrop-filter: blur(15px) saturate(1.12);
+  backdrop-filter: blur(15px) saturate(1.12);
 }
 
 .row[data-variant='wide'][data-has-icon='true'] {

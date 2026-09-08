@@ -5,16 +5,20 @@ import effects from '../../styles/effects.module.css'
 import { SUN_ENTITY, WEATHER_AQI_ENTITY, WEATHER_ENTITY } from '../../constants/atAGlance'
 import { WEATHER_HOURLY_MODES, type WeatherHourlyMode } from '../../constants/surfaceSemantics'
 import { CORE_COPY_KEYS, CORE_COPY_NAMESPACE, formatDate, useCopy, WEATHER_COPY_KEYS, WEATHER_COPY_NAMESPACE, type CopyKey, type CopyValues } from '../../i18n'
+import { useForecastWindMotion } from '../../hooks/useForecastWindMotion'
 import { useHorizontalScrollControls } from '../../hooks/useHorizontalScrollControls'
 import { useReducedMotion } from '../../hooks/useReducedMotion'
 import { MaterialIcon } from '../core/Icon'
 import { materialIconPath } from '../core/iconPaths'
-import { ModalSheet, type ModalCenteredGeometry, type ModalSheetStyle } from '../core/ModalSheet'
+import { ModalSheet, type ModalCenteredGeometry, type ModalSheetBackdropPolicy, type ModalSheetStyle } from '../core/ModalSheet'
 import { SurfaceAccessory } from '../core/SurfaceAccessory'
 import { asEntityName } from './entityState'
 import { WeatherAtmosphere } from './WeatherAtmosphere'
+import { useWeatherModeTransition } from './weatherModeTransition'
+import { WeatherRail, type WeatherRailRange } from './WeatherRail'
 import { WeatherHourlyMetricTiles } from './WeatherHourlyMetricTiles'
 import { WeatherPrecipitationTile } from './WeatherPrecipitationTile'
+import { useWeatherForecasts, WEATHER_FORECAST_PHASE, type WeatherForecast } from './useWeatherForecasts'
 import {
   classifyUsAqi,
   compassRotationDurationMs,
@@ -26,51 +30,15 @@ import {
   sunPresentation,
   uvPresentation,
   visibilityPresentation,
+  WEATHER_SCENES,
   WIND_ROTATION_EASING,
   windBearingPresentation,
+  weatherSceneForCondition,
   type AqiLevel,
   type UvLevel,
+  type WeatherScene,
 } from './weatherPresentation'
 import styles from './WeatherSummary.module.css'
-
-type CallService = <Response extends object>(params: Record<string, unknown>) => Promise<{ response: Response }> | void
-
-interface WeatherForecast {
-  apparent_temperature?: number
-  cloud_coverage?: number
-  condition?: string
-  datetime?: string
-  dew_point?: number
-  humidity?: number
-  precipitation?: number
-  precipitation_probability?: number
-  pressure?: number
-  temperature?: number
-  templow?: number
-  uv_index?: number
-  wind_bearing?: number | string
-  wind_gust_speed?: number
-  wind_speed?: number
-}
-
-interface WeatherForecastResponse {
-  service_response?: Record<string, { forecast?: WeatherForecast[] }>
-  [entityId: string]: { forecast?: WeatherForecast[] } | Record<string, { forecast?: WeatherForecast[] }> | undefined
-}
-
-type WeatherRangeStyle = CSSProperties & {
-  '--range-marker'?: string
-  '--range-size'?: string
-  '--range-start'?: string
-}
-
-type WeatherPercentStyle = CSSProperties & {
-  '--percent-fill'?: string
-}
-
-type AqiStyle = CSSProperties & {
-  '--aqi-marker'?: string
-}
 
 type HighlightKind = 'feels' | 'humidity' | 'wind' | 'visibility' | 'pressure' | 'uv' | 'cloud' | 'sun'
 
@@ -113,6 +81,7 @@ type WeatherCopy = <K extends CopyKey<typeof WEATHER_COPY_NAMESPACE>>(key: K, va
 const DEFAULT_PRECIPITATION_UNIT = 'in'
 const WEATHER_MODAL_STYLE: ModalSheetStyle = {
   '--color-modal-surface': 'var(--rd-weather-modal-surface)',
+  '--modal-surface-backing': 'var(--rd-weather-modal-surface-opaque)',
 }
 const WEATHER_CENTERED_GEOMETRY = {
   blockPolicy: 'fixed',
@@ -345,23 +314,10 @@ export function WeatherGlyph({ condition, size = 24 }: { condition?: string; siz
 
 const FORECAST_PLACEHOLDERS = Array.from({ length: 7 }, (_, index) => index)
 const HERO_HOURLY_PLACEHOLDERS = Array.from({ length: 8 }, (_, index) => index)
-const FORECAST_CACHE_TTL_MS = 5 * 60 * 1000
 const PRESSURE_TICK_COUNT = 49
 const PRESSURE_ARC_START_DEGREES = 145
 const PRESSURE_ARC_SPAN_DEGREES = 250
 const WIND_COMPASS_TICK_COUNT = 48
-
-interface ForecastCache {
-  forecasts: WeatherForecast[]
-  updatedAt: number
-}
-
-let dailyForecastCache: ForecastCache | null = null
-let hourlyForecastCache: ForecastCache | null = null
-
-function cacheFresh(cache: ForecastCache | null) {
-  return Boolean(cache && Date.now() - cache.updatedAt < FORECAST_CACHE_TTL_MS)
-}
 
 function pressureGaugeLine(percent: number, innerRadius: number, outerRadius: number) {
   const angle = ((PRESSURE_ARC_START_DEGREES + (clampPercent(percent) / 100) * PRESSURE_ARC_SPAN_DEGREES) * Math.PI) / 180
@@ -408,6 +364,26 @@ function conditionInfo(condition: string | undefined) {
       label: condition.replace(/[-_]/g, ' ').replace(/\b\w/g, (letter) => letter.toUpperCase()),
     }
   )
+}
+
+function weatherSceneDebugEnabled() {
+  return (import.meta.env.DEV || import.meta.env.MODE === 'test')
+    && typeof window !== 'undefined'
+    && new URLSearchParams(window.location.search).get('weatherSceneDebug') === '1'
+}
+
+function previewWeatherScene(): WeatherScene | undefined {
+  if (!weatherSceneDebugEnabled()) return undefined
+  const value = new URLSearchParams(window.location.search).get('weatherScene')?.trim()
+  const scene = WEATHER_SCENES.find((candidate) => candidate === value)
+  if (scene) return scene
+  // Legacy condition aliases remain available only in explicit debug links.
+  return value && Object.hasOwn(WEATHER_CONDITIONS, value) ? weatherSceneForCondition(value) : undefined
+}
+
+function previewWeatherBackdropPolicy(): ModalSheetBackdropPolicy {
+  if (import.meta.env.MODE === 'production' || typeof window === 'undefined') return 'auto'
+  return new URLSearchParams(window.location.search).get('weatherBackdrop') === 'full' ? 'full' : 'auto'
 }
 
 function unitWithoutDegree(unit: unknown, fallback: string) {
@@ -496,13 +472,6 @@ function hourlyLabel(value: string | undefined, index: number) {
   return date.toLocaleTimeString([], { hour: 'numeric', hour12: true }).replace(/\s+/g, ' ')
 }
 
-function extractForecasts(response: WeatherForecastResponse, limit = 7) {
-  const responseMap = response.service_response ?? response
-  const weatherResponse = responseMap[WEATHER_ENTITY]
-  if (!weatherResponse || !('forecast' in weatherResponse) || !Array.isArray(weatherResponse.forecast)) return []
-  return weatherResponse.forecast.slice(0, limit)
-}
-
 function compactHighLowLabel(forecast: WeatherForecast | undefined) {
   if (!forecast) return ''
   const high = formatDegreeValue(forecast.temperature)
@@ -535,41 +504,48 @@ function forecastSummary(forecasts: WeatherForecast[], entity: HassEntity | null
   return [`The week opens ${first}`, warmestLabel ? `peaks near ${warmestLabel}` : undefined, rainLabel ? `rain chance tops out at ${rainLabel}` : undefined].filter(Boolean).join(' · ')
 }
 
-function forecastRangeStyle(forecast: WeatherForecast, forecasts: WeatherForecast[], entity: HassEntity | null, index: number): WeatherRangeStyle | undefined {
-  const lows = forecasts.map((item) => numberValue(item.templow)).filter((value): value is number => value !== undefined)
-  const highs = forecasts.map((item) => numberValue(item.temperature)).filter((value): value is number => value !== undefined)
+function forecastRailRange(forecast: WeatherForecast, forecasts: WeatherForecast[], entity: HassEntity | null, index: number): WeatherRailRange | undefined {
+  const ranges = forecasts.flatMap((item) => {
+    const low = numberValue(item.templow)
+    const high = numberValue(item.temperature)
+    return low !== undefined && high !== undefined && high >= low ? [{ low, high }] : []
+  })
   const low = numberValue(forecast.templow)
   const high = numberValue(forecast.temperature)
-  if (low === undefined || high === undefined || lows.length === 0 || highs.length === 0) return undefined
-  const minLow = Math.min(...lows)
-  const maxHigh = Math.max(...highs)
-  const spread = Math.max(1, maxHigh - minLow)
+  if (low === undefined || high === undefined || high < low || ranges.length === 0) return undefined
+  const minLow = Math.min(...ranges.map((range) => range.low))
+  const maxHigh = Math.max(...ranges.map((range) => range.high))
+  const spread = maxHigh - minLow
   const current = index === 0 ? numberValue(entity?.attributes.temperature) : undefined
+  if (spread === 0) return {
+    markerPercent: current === undefined ? undefined : current < low ? 0 : current > high ? 100 : 50,
+    rangeSizePercent: 0,
+    rangeStartPercent: 50,
+  }
   return {
-    '--range-marker': current === undefined ? undefined : `${clampPercent(((current - minLow) / spread) * 100)}%`,
-    '--range-size': `${Math.max(6, clampPercent(((high - low) / spread) * 100))}%`,
-    '--range-start': `${clampPercent(((low - minLow) / spread) * 100)}%`,
+    markerPercent: current === undefined ? undefined : clampPercent(((current - minLow) / spread) * 100),
+    rangeSizePercent: clampPercent(((high - low) / spread) * 100),
+    rangeStartPercent: clampPercent(((low - minLow) / spread) * 100),
   }
 }
 
-function heroRangeStyle(forecast: WeatherForecast, entity: HassEntity | null): WeatherRangeStyle | undefined {
+function heroRailRange(forecast: WeatherForecast, entity: HassEntity | null): WeatherRailRange | undefined {
   const low = numberValue(forecast.templow)
   const high = numberValue(forecast.temperature)
   const current = numberValue(entity?.attributes.temperature)
-  if (low === undefined || high === undefined) return undefined
+  if (low === undefined || high === undefined || high < low) return undefined
 
-  const spread = Math.max(1, high - low)
-  return {
-    '--range-marker': current === undefined ? undefined : `${clampPercent(((current - low) / spread) * 100)}%`,
-    '--range-size': '100%',
-    '--range-start': '0%',
+  const spread = high - low
+  if (spread === 0) return {
+    markerPercent: current === undefined ? undefined : current < low ? 0 : current > high ? 100 : 50,
+    rangeSizePercent: 0,
+    rangeStartPercent: 50,
   }
-}
-
-function percentStyle(value: unknown): WeatherPercentStyle | undefined {
-  const percent = numberValue(value)
-  if (percent === undefined) return undefined
-  return { '--percent-fill': `${clampPercent(percent)}%` }
+  return {
+    markerPercent: current === undefined ? undefined : clampPercent(((current - low) / spread) * 100),
+    rangeSizePercent: 100,
+    rangeStartPercent: 0,
+  }
 }
 
 function highlightStyle(percent: number | undefined, rotation?: number): WeatherHighlightStyle | undefined {
@@ -701,14 +677,47 @@ function highlightTiles(entity: HassEntity | null, forecasts: WeatherForecast[],
   return tiles
 }
 
-function ForecastRow({ entity, forecast, forecasts, index, mode }: { entity: HassEntity | null; forecast: WeatherForecast; forecasts: WeatherForecast[]; index: number; mode: HourlyMode }) {
+function ForecastWindDirection({ bearing }: { bearing: ReturnType<typeof windBearingPresentation> }) {
+  const [initialRotation] = useState(bearing?.destinationDegrees ?? 0)
+
+  return (
+    <span
+      className={styles.forecastIcon}
+      data-forecast-wind-arrow="true"
+      data-wind-destination-bearing={bearing?.destinationDegrees}
+      data-wind-source-bearing={bearing?.sourceDegrees}
+      style={{ transform: `translateX(0px) rotate(${initialRotation}deg)` }}
+    >
+      <MaterialIcon name={bearing ? 'mdi:navigation' : 'mdi:weather-windy'} size={24} />
+    </span>
+  )
+}
+
+function ForecastRow({
+  entity,
+  forecast,
+  forecasts,
+  index,
+  mode,
+  motionEnabled,
+}: {
+  entity: HassEntity | null
+  forecast: WeatherForecast
+  forecasts: WeatherForecast[]
+  index: number
+  mode: HourlyMode
+  motionEnabled: boolean
+}) {
+  const copy = useCopy(WEATHER_COPY_NAMESPACE)
   const condition = conditionInfo(forecast.condition)
   const highLow = compactHighLowLabel(forecast)
-  const rangeStyle = forecastRangeStyle(forecast, forecasts, entity, index)
+  const railRange = forecastRailRange(forecast, forecasts, entity, index)
 
   if (mode === 'precipitation') {
-    const amount = formatMeasure(forecast.precipitation, entity?.attributes.precipitation_unit, 2) ?? '0 in'
-    const chance = formatPercent(forecast.precipitation_probability) ?? '0%'
+    const unavailable = copy(WEATHER_COPY_KEYS.unavailable)
+    const amount = formatMeasure(forecast.precipitation, entity?.attributes.precipitation_unit, 2) ?? unavailable
+    const probability = numberValue(forecast.precipitation_probability)
+    const chance = formatPercent(probability) ?? unavailable
 
     return (
       <article className={styles.forecastRow} data-mode="precipitation" aria-label={`${forecastDayLabel(forecast.datetime, index)} precipitation ${amount} ${chance}`}>
@@ -716,9 +725,7 @@ function ForecastRow({ entity, forecast, forecasts, index, mode }: { entity: Has
         <span className={styles.forecastIcon}>
           <MaterialIcon name="mdi:weather-rainy" size={25} />
         </span>
-        <span className={styles.precipTrack} style={percentStyle(forecast.precipitation_probability)}>
-          <span className={styles.precipFill} />
-        </span>
+        <WeatherRail markerPercent={(probability ?? 0) > 0 ? probability : undefined} motionEnabled={motionEnabled} rangeSizePercent={probability} tone="precipitation" />
         <span className={styles.forecastAmount}>{amount}</span>
         <span className={styles.forecastChance}>{chance}</span>
       </article>
@@ -732,18 +739,10 @@ function ForecastRow({ entity, forecast, forecasts, index, mode }: { entity: Has
     return (
       <article className={styles.forecastRow} data-mode="wind" aria-label={`${forecastDayLabel(forecast.datetime, index)} wind ${speedRange}`}>
         <span className={styles.forecastDay}>{forecastDayLabel(forecast.datetime, index)}</span>
-        <span
-          className={styles.forecastIcon}
-          data-wind-destination-bearing={bearing?.destinationDegrees}
-          data-wind-source-bearing={bearing?.sourceDegrees}
-          style={bearing ? { transform: `rotate(${bearing.destinationDegrees}deg)` } : undefined}
-        >
-          <MaterialIcon name={bearing ? 'mdi:navigation' : 'mdi:weather-windy'} size={24} />
+        <span className={styles.forecastWindSummary} data-forecast-wind-summary="true">
+          <ForecastWindDirection bearing={bearing} />
+          <span className={styles.forecastWindRange} data-forecast-wind-range="true">{speedRange}</span>
         </span>
-        <span className={styles.windSparkline}>
-          <span className={styles.windLine} />
-        </span>
-        <span className={styles.forecastWindRange}>{speedRange}</span>
       </article>
     )
   }
@@ -755,16 +754,13 @@ function ForecastRow({ entity, forecast, forecasts, index, mode }: { entity: Has
         <WeatherGlyph condition={forecast.condition} size={26} />
       </span>
       <span className={styles.forecastLow}>{formatDegreeValue(forecast.templow)}</span>
-      <span className={styles.rangeTrack} style={rangeStyle}>
-        <span className={styles.rangeFill} />
-        {index === 0 ? <span className={styles.rangeMarker} /> : null}
-      </span>
+      <WeatherRail {...railRange} markerPercent={index === 0 ? railRange?.markerPercent : undefined} motionEnabled={motionEnabled} tone="temperature" />
       <span className={styles.forecastHigh}>{formatDegreeValue(forecast.temperature)}</span>
     </article>
   )
 }
 
-function HighlightVisual({ tile }: { tile: WeatherHighlightData }) {
+function HighlightVisual({ motionEnabled, tile }: { motionEnabled: boolean; tile: WeatherHighlightData }) {
   if (!tile.available) {
     return (
       <span className={styles.highlightUnavailableVisual}>
@@ -792,7 +788,7 @@ function HighlightVisual({ tile }: { tile: WeatherHighlightData }) {
     const indicatorLine = pressureGaugeLine(tile.percent ?? 50, 60, 74)
     return (
       <span className={styles.pressureGauge} style={pressureLabelStyle(tile.percent, tile.rotation)}>
-        <svg aria-hidden="true" className={styles.pressureGaugeSvg} viewBox="0 0 200 164">
+        <svg aria-hidden="true" className={styles.pressureGaugeSvg} focusable="false" viewBox="0 18 200 140">
           {Array.from({ length: PRESSURE_TICK_COUNT }, (_, index) => {
             const line = pressureGaugeLine((index / (PRESSURE_TICK_COUNT - 1)) * 100, 60, 70)
             return <line className={styles.pressureGaugeTick} key={index} x1={line.x1} x2={line.x2} y1={line.y1} y2={line.y2} />
@@ -800,7 +796,7 @@ function HighlightVisual({ tile }: { tile: WeatherHighlightData }) {
           <line className={styles.pressureGaugeIndicator} x1={indicatorLine.x1} x2={indicatorLine.x2} y1={indicatorLine.y1} y2={indicatorLine.y2} />
         </svg>
         <span className={styles.pressureGaugeReadout}>
-          <span className={styles.pressureGaugeValue}>{pressureValue}</span>
+          <span className={styles.pressureGaugeValue} data-pressure-compact={pressureValue.length > 6 ? 'true' : undefined}>{pressureValue}</span>
           {pressureUnit ? <small>{pressureUnit}</small> : null}
         </span>
         <span className={styles.pressureGaugeLowLabel}>Low</span>
@@ -820,24 +816,11 @@ function HighlightVisual({ tile }: { tile: WeatherHighlightData }) {
   }
 
   if (tile.kind === 'visibility') {
-    return (
-      <span className={styles.visibilityDistanceRail} data-visibility-visual="distance-rail" style={highlightStyle(tile.percent)}>
-        <span className={styles.visibilityDistanceFill} />
-        {tile.available && (tile.percent ?? 0) > 0 ? <span className={styles.visibilityDistanceMarker} /> : null}
-      </span>
-    )
+    return <WeatherRail markerPercent={(tile.percent ?? 0) > 0 ? tile.percent : undefined} motionEnabled={motionEnabled} rangeSizePercent={tile.percent} tone="visibility" />
   }
 
   if (tile.kind === 'feels' || tile.kind === 'uv') {
-    return (
-      <span
-        className={`${styles.highlightRail} ${styles[`highlightRail_${tile.kind}`]}`}
-        data-weather-highlight-rail={tile.kind}
-        style={highlightStyle(tile.percent)}
-      >
-        <span className={styles.highlightRailMarker} />
-      </span>
-    )
+    return <WeatherRail markerPercent={tile.percent} motionEnabled={motionEnabled} tone={tile.kind} />
   }
 
   return (
@@ -1008,7 +991,7 @@ function WindHighlightTile({ tile }: { tile: WeatherHighlightData }) {
   )
 }
 
-function HighlightTile({ tile }: { tile: WeatherHighlightData }) {
+function HighlightTile({ motionEnabled, tile }: { motionEnabled: boolean; tile: WeatherHighlightData }) {
   const copy = useCopy(WEATHER_COPY_NAMESPACE)
   if (tile.kind === 'wind') return <WindHighlightTile tile={tile} />
 
@@ -1033,19 +1016,18 @@ function HighlightTile({ tile }: { tile: WeatherHighlightData }) {
       ) : null}
       {alignedVisual ? (
         <span className={styles.highlightVisualSlot} data-highlight-visual={tile.kind}>
-          <HighlightVisual tile={tile} />
+          <HighlightVisual motionEnabled={motionEnabled} tile={tile} />
         </span>
-      ) : <HighlightVisual tile={tile} />}
+      ) : <HighlightVisual motionEnabled={motionEnabled} tile={tile} />}
     </article>
   )
 }
 
-function WeatherAqiTile({ entity }: { entity: HassEntity }) {
+function WeatherAqiTile({ entity, motionEnabled }: { entity: HassEntity; motionEnabled: boolean }) {
   const copy = useCopy(WEATHER_COPY_NAMESPACE)
   const status = classifyUsAqi(entity.state)
   const category = status ? aqiCategory(copy, status.level) : copy(WEATHER_COPY_KEYS.unavailable)
   const value = status ? String(status.value) : '--'
-  const style: AqiStyle | undefined = status ? { '--aqi-marker': `${status.markerPercent}%` } : undefined
   const ariaLabel = status
     ? copy(WEATHER_COPY_KEYS.aqi.ariaLabel, { category, value })
     : copy(WEATHER_COPY_KEYS.aqi.unavailableAriaLabel)
@@ -1068,9 +1050,7 @@ function WeatherAqiTile({ entity }: { entity: HassEntity }) {
         <strong className={styles.aqiValue}>{value}</strong>
         <span className={styles.aqiCategory}>{category}</span>
       </span>
-      <span className={styles.aqiScale} style={style}>
-        <span className={styles.aqiMarker} />
-      </span>
+      <WeatherRail markerPercent={status?.markerPercent} motionEnabled={motionEnabled} tone="aqi" />
     </article>
   )
 }
@@ -1096,9 +1076,10 @@ function HourlyConditionItem({
   pageEnd: boolean
   pageStart: boolean
 }) {
+  const copy = useCopy(WEATHER_COPY_NAMESPACE)
   const condition = conditionInfo(forecast.condition)
   const temperature = formatTemperatureValue(forecast.temperature, entity?.attributes.temperature_unit)
-  const precipitationChance = formatPercent(forecast.precipitation_probability) ?? '0%'
+  const precipitationChance = formatPercent(forecast.precipitation_probability) ?? copy(WEATHER_COPY_KEYS.unavailable)
   const precipitationAmount = formatMeasure(forecast.precipitation, entity?.attributes.precipitation_unit, 2)
   const windSpeed = formatWindMeasure(forecast.wind_speed, entity?.attributes.wind_speed_unit)?.value ?? '--'
   const gustSpeed = formatWindMeasure(forecast.wind_gust_speed, entity?.attributes.wind_speed_unit)?.value
@@ -1113,7 +1094,7 @@ function HourlyConditionItem({
         </span>
         <span className={styles.hourlyValueGroup}>
           <strong className={styles.hourlyTemperature}>{precipitationChance}</strong>
-          {precipitationAmount && precipitationAmount !== '0 in' ? <span className={styles.hourlyDetail}>{precipitationAmount}</span> : null}
+          {precipitationAmount ? <span className={styles.hourlyDetail}>{precipitationAmount}</span> : null}
         </span>
       </article>
     )
@@ -1269,13 +1250,13 @@ function WeatherCarouselPagination({
   )
 }
 
-function HeroDayForecast({ entity, forecast }: { entity: HassEntity | null; forecast: WeatherForecast | undefined }) {
+function HeroDayForecast({ entity, forecast, motionEnabled }: { entity: HassEntity | null; forecast: WeatherForecast | undefined; motionEnabled: boolean }) {
   if (!forecast) {
     return (
       <span aria-hidden="true" className={`${styles.heroDayForecast} ${styles.heroDayForecastPlaceholder}`}>
         <span className={styles.heroDayIconPlaceholder} />
         <span className={styles.heroDayLow} />
-        <span className={styles.heroDayRangeTrack} />
+        <WeatherRail tone="temperature" />
         <span className={styles.heroDayHigh} />
       </span>
     )
@@ -1288,10 +1269,7 @@ function HeroDayForecast({ entity, forecast }: { entity: HassEntity | null; fore
         <WeatherGlyph condition={forecast.condition} size={24} />
       </span>
       <span className={styles.heroDayLow}>{formatDegreeValue(forecast.templow)}</span>
-      <span className={styles.heroDayRangeTrack} style={heroRangeStyle(forecast, entity)}>
-        <span className={styles.heroDayRangeFill} />
-        <span className={styles.heroDayRangeMarker} />
-      </span>
+      <WeatherRail {...heroRailRange(forecast, entity)} motionEnabled={motionEnabled} tone="temperature" />
       <span className={styles.heroDayHigh}>{formatDegreeValue(forecast.temperature)}</span>
     </span>
   )
@@ -1389,7 +1367,7 @@ function HourlyConditionsPanel({
     scrollPrevious,
     scrollerRef,
   } = useHorizontalScrollControls<HTMLDivElement>({
-    enabled: !loading && !error && forecasts.length > 0,
+    enabled: forecasts.length > 0,
     itemCount: forecasts.length,
     revision: mode,
   })
@@ -1424,7 +1402,7 @@ function HourlyConditionsPanel({
         ) : null}
         {!loading && error ? <div className={styles.errorState}>{error}</div> : null}
         {!loading && !error && forecasts.length === 0 ? <div className={styles.errorState}>No hourly forecast data returned by Pirate Weather.</div> : null}
-        {!loading && !error && forecasts.length > 0 ? (
+        {forecasts.length > 0 ? (
           <div className={styles.hourlyScrollerFrame} data-carousel-overflow={hasOverflow ? 'true' : undefined}>
             <div
               aria-label={carouselLabel}
@@ -1481,6 +1459,46 @@ function ForecastSkeleton() {
   )
 }
 
+function ForecastRows({
+  entity,
+  forecasts,
+  mode,
+  motionEnabled,
+}: {
+  entity: HassEntity | null
+  forecasts: WeatherForecast[]
+  mode: HourlyMode
+  motionEnabled: boolean
+}) {
+  const windRevision = forecasts.map((forecast) => [
+    forecast.datetime,
+    forecast.wind_bearing,
+    forecast.wind_gust_speed,
+    forecast.wind_speed,
+    entity?.attributes.wind_speed_unit,
+  ].join(':')).join('|')
+  const listRef = useForecastWindMotion<HTMLDivElement>({
+    enabled: motionEnabled && mode === 'wind',
+    revision: windRevision,
+  })
+
+  return (
+    <div className={styles.forecastList} data-mode={mode} ref={listRef}>
+      {forecasts.map((forecast, index) => (
+        <ForecastRow
+          entity={entity}
+          forecast={forecast}
+          forecasts={forecasts}
+          index={index}
+          key={forecast.datetime ?? index}
+          mode={mode}
+          motionEnabled={motionEnabled}
+        />
+      ))}
+    </div>
+  )
+}
+
 function WeatherForecastSheet({
   aqiEntity,
   entity,
@@ -1490,6 +1508,7 @@ function WeatherForecastSheet({
   hourlyForecasts,
   hourlyLoading,
   loading,
+  motionEnabled,
   sunEntity,
 }: {
   aqiEntity: HassEntity | null
@@ -1500,6 +1519,7 @@ function WeatherForecastSheet({
   hourlyForecasts: WeatherForecast[]
   hourlyLoading: boolean
   loading: boolean
+  motionEnabled: boolean
   sunEntity: HassEntity | null
 }) {
   const copy = useCopy(WEATHER_COPY_NAMESPACE)
@@ -1516,39 +1536,7 @@ function WeatherForecastSheet({
     ? aqiGuidance(copy, aqiStatus.level)
     : forecastSummary(forecasts, entity)
   const [selectedMode, setSelectedMode] = useState<HourlyMode>('condition')
-  const [displayMode, setDisplayMode] = useState<HourlyMode>('condition')
-  const [transitionPhase, setTransitionPhase] = useState<ModeTransitionPhase>('idle')
-  const previousSelectedModeRef = useRef(selectedMode)
-
-  useEffect(() => {
-    if (selectedMode === previousSelectedModeRef.current) return undefined
-    previousSelectedModeRef.current = selectedMode
-
-    if (typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-      const reducedMotionFrame = window.requestAnimationFrame(() => {
-        setDisplayMode(selectedMode)
-        setTransitionPhase('idle')
-      })
-      return () => window.cancelAnimationFrame(reducedMotionFrame)
-    }
-
-    let animationFrame = 0
-    const exitTimer = window.setTimeout(() => setTransitionPhase('out'), 0)
-
-    const swapTimer = window.setTimeout(() => {
-      setDisplayMode(selectedMode)
-      animationFrame = window.requestAnimationFrame(() => setTransitionPhase('in'))
-    }, 140)
-
-    const settleTimer = window.setTimeout(() => setTransitionPhase('idle'), 320)
-
-    return () => {
-      window.clearTimeout(exitTimer)
-      window.clearTimeout(swapTimer)
-      window.clearTimeout(settleTimer)
-      if (animationFrame) window.cancelAnimationFrame(animationFrame)
-    }
-  }, [selectedMode])
+  const { displayMode, transitionPhase } = useWeatherModeTransition(selectedMode)
 
   return (
     <div className={styles.sheet}>
@@ -1580,12 +1568,8 @@ function WeatherForecastSheet({
             {loading ? <ForecastSkeleton /> : null}
             {!loading && error ? <div className={styles.errorState}>{error}</div> : null}
             {!loading && !error && forecasts.length === 0 ? <div className={styles.errorState}>No forecast data returned by Pirate Weather.</div> : null}
-            {!loading && !error && forecasts.length > 0 ? (
-              <div className={styles.forecastList}>
-                {forecasts.map((forecast, index) => (
-                  <ForecastRow entity={entity} forecast={forecast} forecasts={forecasts} index={index} key={forecast.datetime ?? index} mode={displayMode} />
-                ))}
-              </div>
+            {forecasts.length > 0 ? (
+              <ForecastRows entity={entity} forecasts={forecasts} mode={displayMode} motionEnabled={motionEnabled} />
             ) : null}
           </div>
         </section>
@@ -1593,14 +1577,14 @@ function WeatherForecastSheet({
         <section className={styles.highlightsPanel} aria-label="Weather highlights">
           <div className={styles.sectionLabel}>Highlights</div>
           <div className={styles.highlightGrid}>
-            {aqiEntity ? <WeatherAqiTile entity={aqiEntity} /> : null}
+            {aqiEntity ? <WeatherAqiTile entity={aqiEntity} motionEnabled={motionEnabled} /> : null}
             <WeatherPrecipitationTile
               forecasts={hourlyForecasts}
               precipitationUnit={stringValue(entity?.attributes.precipitation_unit, DEFAULT_PRECIPITATION_UNIT)}
             />
             <WeatherHourlyMetricTiles forecasts={hourlyForecasts} />
             {highlights.map((tile) => (
-              <HighlightTile key={tile.kind} tile={tile} />
+              <HighlightTile key={tile.kind} motionEnabled={motionEnabled} tile={tile} />
             ))}
           </div>
         </section>
@@ -1625,14 +1609,22 @@ export function WeatherSummary({ deferRefresh = false }: WeatherSummaryProps) {
   const sun = useEntity(asEntityName(SUN_ENTITY), {
     returnNullIfNotFound: true,
   })
-  const callService = useHass((state) => state.helpers.callService) as unknown as CallService
+  const callService = useHass((state) => state.helpers.callService)
   const [open, setOpen] = useState(false)
-  const [forecasts, setForecasts] = useState<WeatherForecast[]>(() => dailyForecastCache?.forecasts ?? [])
-  const [forecastError, setForecastError] = useState<string | null>(null)
-  const [forecastLoading, setForecastLoading] = useState(false)
-  const [hourlyForecasts, setHourlyForecasts] = useState<WeatherForecast[]>(() => hourlyForecastCache?.forecasts ?? [])
-  const [hourlyForecastError, setHourlyForecastError] = useState<string | null>(null)
-  const [hourlyForecastLoading, setHourlyForecastLoading] = useState(false)
+  const [sceneOverride, setSceneOverride] = useState<WeatherScene>()
+  const { daily, hourly } = useWeatherForecasts({
+    callService,
+    enabled: !deferRefresh,
+    sourceRevision: weather?.last_updated,
+  })
+  const forecasts = daily.forecasts
+  const forecastError = daily.error
+  const forecastLoading = daily.refreshing && !forecasts.length
+  const hourlyForecasts = hourly.forecasts
+  const hourlyForecastError = hourly.error
+  const hourlyForecastLoading = hourly.refreshing && !hourlyForecasts.length
+  const dailyNotice = forecastError ?? (daily.status === WEATHER_FORECAST_PHASE.EMPTY ? copy(WEATHER_COPY_KEYS.forecast.dailyEmpty) : null)
+  const hourlyNotice = hourlyForecastError ?? (hourly.status === WEATHER_FORECAST_PHASE.EMPTY ? copy(WEATHER_COPY_KEYS.forecast.hourlyEmpty) : null)
   const heroCarouselId = useId()
   const weatherCardButtonRef = useRef<HTMLButtonElement>(null)
   const {
@@ -1652,102 +1644,12 @@ export function WeatherSummary({ deferRefresh = false }: WeatherSummaryProps) {
     itemCount: hourlyForecasts.length,
   })
 
-  useEffect(() => {
-    let cancelled = false
-    const cached = dailyForecastCache
-    if (deferRefresh || cacheFresh(cached)) {
-      const settleTimer = window.setTimeout(() => setForecastLoading(false), 0)
-      return () => {
-        cancelled = true
-        window.clearTimeout(settleTimer)
-      }
-    }
-
-    const loadingTimer = window.setTimeout(() => {
-      setForecastLoading(open && !cached)
-      setForecastError(null)
-    }, 0)
-
-    Promise.resolve(
-      callService<WeatherForecastResponse>({
-        domain: 'weather',
-        service: 'get_forecasts',
-        target: WEATHER_ENTITY,
-        serviceData: { type: 'daily' },
-        returnResponse: true,
-      }),
-    )
-      .then((serviceResponse) => {
-        if (cancelled) return
-        const nextForecasts = serviceResponse ? extractForecasts(serviceResponse.response) : []
-        dailyForecastCache = { forecasts: nextForecasts, updatedAt: Date.now() }
-        setForecasts(nextForecasts)
-        setForecastError(null)
-      })
-      .catch((caughtError: unknown) => {
-        if (cancelled) return
-        if (!cached) setForecastError(caughtError instanceof Error ? caughtError.message : 'Unable to load Pirate Weather forecast.')
-      })
-      .finally(() => {
-        if (!cancelled) setForecastLoading(false)
-      })
-
-    return () => {
-      cancelled = true
-      window.clearTimeout(loadingTimer)
-    }
-  }, [callService, deferRefresh, open])
-
-  useEffect(() => {
-    let cancelled = false
-    const cached = hourlyForecastCache
-    if (deferRefresh || cacheFresh(cached)) {
-      const settleTimer = window.setTimeout(() => setHourlyForecastLoading(false), 0)
-      return () => {
-        cancelled = true
-        window.clearTimeout(settleTimer)
-      }
-    }
-
-    const loadingTimer = window.setTimeout(() => {
-      setHourlyForecastLoading(!cached)
-      setHourlyForecastError(null)
-    }, 0)
-
-    Promise.resolve(
-      callService<WeatherForecastResponse>({
-        domain: 'weather',
-        service: 'get_forecasts',
-        target: WEATHER_ENTITY,
-        serviceData: { type: 'hourly' },
-        returnResponse: true,
-      }),
-    )
-      .then((serviceResponse) => {
-        if (cancelled) return
-        const nextForecasts = serviceResponse ? extractForecasts(serviceResponse.response, 24) : []
-        hourlyForecastCache = { forecasts: nextForecasts, updatedAt: Date.now() }
-        setHourlyForecasts(nextForecasts)
-        setHourlyForecastError(null)
-      })
-      .catch((caughtError: unknown) => {
-        if (cancelled) return
-        if (!cached) setHourlyForecastError(caughtError instanceof Error ? caughtError.message : 'Unable to load Pirate Weather hourly forecast.')
-      })
-      .finally(() => {
-        if (!cancelled) setHourlyForecastLoading(false)
-      })
-
-    return () => {
-      cancelled = true
-      window.clearTimeout(loadingTimer)
-    }
-  }, [callService, deferRefresh, open])
-
   const condition = conditionInfo(weather?.state)
+  const backdropPolicy = previewWeatherBackdropPolicy()
   const today = forecasts[0]
 
   const handleOpen = () => {
+    setSceneOverride(previewWeatherScene())
     setOpen(true)
   }
 
@@ -1755,6 +1657,7 @@ export function WeatherSummary({ deferRefresh = false }: WeatherSummaryProps) {
     <>
       <div className={styles.weatherCardFrame} data-carousel-overflow={heroHasOverflow ? 'true' : undefined}>
         <button
+          aria-busy={!deferRefresh && (daily.refreshing || hourly.refreshing)}
           aria-label={`Open seven-day weather forecast. ${condition.label}, ${weatherTemperature(weather)}`}
           className={`${effects.frosted} ${styles.card}`}
           onClick={handleOpen}
@@ -1773,7 +1676,7 @@ export function WeatherSummary({ deferRefresh = false }: WeatherSummaryProps) {
                 <span className={styles.temperature}>{weatherDegree(weather)}</span>
               </span>
             </span>
-            <HeroDayForecast entity={weather} forecast={today} />
+            <HeroDayForecast entity={weather} forecast={today} motionEnabled={!deferRefresh} />
             <HeroHourlyStrip
               ariaLabel={heroCarouselLabel}
               entity={weather}
@@ -1799,18 +1702,37 @@ export function WeatherSummary({ deferRefresh = false }: WeatherSummaryProps) {
         />
         <WeatherCarouselPagination currentPage={currentHeroPage} hero hidden={!heroHasOverflow || heroPageCount <= 1} label={heroCarouselLabel} onPageChange={scrollHeroToPage} pageCount={heroPageCount} />
       </div>
+      {!deferRefresh && !open ? (
+        <>
+          {dailyNotice ? <div className={styles.errorState} role="status">{dailyNotice}</div> : null}
+          {hourlyNotice ? <div className={styles.errorState} role="status">{hourlyNotice}</div> : null}
+        </>
+      ) : null}
 
       <ModalSheet
+        backdropPolicy={backdropPolicy}
         centeredGeometry={WEATHER_CENTERED_GEOMETRY}
         contentStyle={WEATHER_MODAL_STYLE}
         onClose={() => setOpen(false)}
         open={open}
         size="media"
-        surfaceDecoration={<WeatherAtmosphere condition={weather?.state} isNight={sun?.state === 'below_horizon'} />}
+        surfaceDecoration={<WeatherAtmosphere condition={weather?.state} isNight={sun?.state === 'below_horizon'} sceneOverride={weatherSceneDebugEnabled() ? sceneOverride : undefined} />}
+        surfaceDecorationOccludesBackdrop
         title="Weather"
         subtitle={copy(WEATHER_COPY_KEYS.subtitle, { condition: condition.label, temperature: weatherDegree(weather) })}
       >
-        <WeatherForecastSheet aqiEntity={aqi} entity={weather} error={forecastError} forecasts={forecasts} hourlyError={hourlyForecastError} hourlyForecasts={hourlyForecasts} hourlyLoading={hourlyForecastLoading} loading={forecastLoading} sunEntity={sun} />
+        <WeatherForecastSheet
+          aqiEntity={aqi}
+          entity={weather}
+          error={forecastError}
+          forecasts={forecasts}
+          hourlyError={hourlyForecastError}
+          hourlyForecasts={hourlyForecasts}
+          hourlyLoading={hourlyForecastLoading}
+          loading={forecastLoading}
+          motionEnabled={open && !deferRefresh}
+          sunEntity={sun}
+        />
       </ModalSheet>
     </>
   )

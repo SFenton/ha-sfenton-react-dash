@@ -1,4 +1,4 @@
-import { mockCallServiceCalls, mockState, resetMockHass, setMockCallServiceOutcome } from './hakitCoreState'
+import { mockCallServiceCalls, mockState, resetMockHass, setMockCallServiceOutcome, type MockHassDebugApi } from './hakitCoreState'
 
 describe('helper service outcome fixtures', () => {
   beforeEach(resetMockHass)
@@ -15,5 +15,13 @@ describe('helper service outcome fixtures', () => {
     expect(await Promise.race([pending.then(() => true), Promise.resolve(false)])).toBe(false)
     resetMockHass()
     await expect(Promise.resolve(mockState.helpers.callService(command))).resolves.toBeUndefined()
+  })
+  it('provides an explicit empty Weather fixture and restores it on reset', async () => {
+    ;(window as unknown as { __mockHass: MockHassDebugApi }).__mockHass.clearWeatherForecasts()
+    const request = { domain: 'weather', service: 'get_forecasts', target: 'weather.pirate_weather', serviceData: { type: 'daily' }, returnResponse: true }
+    await expect(mockState.helpers.callService(request)).resolves.toEqual({ response: { 'weather.pirate_weather': { forecast: [] } } })
+    resetMockHass()
+    const restored = await mockState.helpers.callService(request) as { response: { 'weather.pirate_weather': { forecast: unknown[] } } }
+    expect(restored.response['weather.pirate_weather'].forecast).toHaveLength(7)
   })
 })

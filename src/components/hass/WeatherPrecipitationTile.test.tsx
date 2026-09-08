@@ -89,4 +89,45 @@ describe('WeatherPrecipitationTile', () => {
     expect(cumulativeTile.querySelector('[data-precipitation-y-axis="cumulative"]')).toHaveTextContent('2.5 mm1.25 mm0 mm')
     expect(within(group as HTMLElement).getByRole('table', { name: '1-hour precipitation details' })).toBeInTheDocument()
   })
+
+  it.each(['in', 'mm'])('does not claim a complete accumulation after a gap (%s)', (unit) => {
+    const { container } = render(<WeatherPrecipitationTile forecasts={[
+      { precipitation: 0.2, precipitation_probability: 0 },
+      { precipitation: null, precipitation_probability: 65 },
+      { precipitation: 0.3, precipitation_probability: 10 },
+    ]} precipitationUnit={unit} />)
+    const tile = screen.getByRole('article', { name: 'Cumulative precipitation through 3 hours, totaling Unavailable' })
+    expect(tile).toHaveAttribute('data-unavailable', 'true')
+    expect(tile).toHaveTextContent('Unavailable')
+    expect(tile.querySelector('[data-cumulative-bar="true"]')).toBeNull()
+    expect(tile.querySelector('[data-precipitation-y-axis="cumulative"]')).toBeNull()
+    expect(container.querySelector('[data-weather-precipitation-tile]')).toHaveAttribute('data-precipitation-amount-domain', 'unavailable')
+    const chanceTile = screen.getByRole('article', { name: 'Hourly precipitation chance over 3 hours, peaking at 65%' })
+    expect(chanceTile.querySelector('[data-probability="0"]')).toHaveStyle({ '--precipitation-probability': '0%' })
+    expect(chanceTile.querySelector('[data-amount="unavailable"]')).toHaveAttribute('data-probability', '65')
+    const rows = within(screen.getByRole('table')).getAllByRole('row').slice(1)
+    const digits = unit === 'mm' ? 1 : 2
+    expect(within(rows[0]).getAllByRole('cell')[3]).toHaveTextContent(`${(0.2).toFixed(digits)} ${unit}`)
+    expect(within(rows[1]).getAllByRole('cell')[2]).toHaveTextContent('Unavailable')
+    expect(within(rows[1]).getAllByRole('cell')[3]).toHaveTextContent('Unavailable')
+    expect(within(rows[2]).getAllByRole('cell')[2]).toHaveTextContent(`${(0.3).toFixed(digits)} ${unit}`)
+    expect(within(rows[2]).getAllByRole('cell')[3]).toHaveTextContent('Unavailable')
+  })
+
+  it('keeps millimeter zero accumulation independent of unknown chance', () => {
+    render(<WeatherPrecipitationTile forecasts={[{ precipitation: 0 }, { precipitation: 0 }]} precipitationUnit="mm" />)
+    const tile = screen.getByRole('article', { name: 'Cumulative precipitation through 2 hours, totaling 0.0 mm' })
+    expect(tile).not.toHaveAttribute('data-unavailable')
+    expect(tile.querySelectorAll('[data-cumulative-bar="true"]')).toHaveLength(2)
+    expect(tile.querySelector('[data-cumulative-bar="true"]')).toHaveStyle({ '--cumulative-amount': '0%' })
+    expect(screen.getByRole('article', { name: 'Hourly precipitation chance over 2 hours, peaking at Unavailable' })).toHaveAttribute('data-unavailable', 'true')
+  })
+
+  it('does not turn known zero probability into known zero amount', () => {
+    render(<WeatherPrecipitationTile forecasts={[{ precipitation_probability: 0 }]} precipitationUnit="mm" />)
+    expect(screen.getByRole('article', { name: 'Cumulative precipitation through 1 hours, totaling Unavailable' })).toHaveAttribute('data-unavailable', 'true')
+    const chance = screen.getByRole('article', { name: 'Hourly precipitation chance over 1 hours, peaking at 0%' })
+    expect(chance).not.toHaveAttribute('data-unavailable')
+    expect(chance.querySelector('[data-probability="0"]')).toHaveAttribute('data-amount', 'unavailable')
+  })
 })
