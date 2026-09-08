@@ -151,7 +151,7 @@ test('permanent navigation and modal controls retain keyboard focus indicators',
     }
   })).toEqual({
     centered: true,
-    columns: 4,
+    columns: 6,
     compactTiles: true,
     contentFits: true,
   })

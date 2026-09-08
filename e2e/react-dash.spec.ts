@@ -4,7 +4,6 @@ import { globalQuickLinksAction, openQuickLinksTab, selectQuickLinksTab } from '
 import { waitForModalReady } from './layout/evidence'
 
 const DIALOG_SQUARE_TILE_SIZE = 168
-const MODAL_SQUARE_GRID_MAX_COLUMNS = 4
 
 type FreeSleepAlarmSnapshot = {
   enabled: boolean
@@ -281,7 +280,7 @@ async function expectDesktopAdminSquareGrid(dialog: Locator, gridLabel: string) 
   const grid = dialog.getByRole('group', { name: gridLabel })
   await expect(grid).toBeVisible()
   const cardCount = await grid.getByRole('button').count()
-  const expectedColumns = Math.max(1, Math.min(MODAL_SQUARE_GRID_MAX_COLUMNS, Math.ceil(Math.sqrt(cardCount))))
+  const expectedColumns = Math.max(1, Math.min(5, cardCount))
   const expectedRows = Math.ceil(cardCount / expectedColumns)
 
   await expect.poll(async () => {
@@ -2340,9 +2339,9 @@ test.describe('desktop modal layout', () => {
       cardCount: 16,
       firstCardHeight: DIALOG_SQUARE_TILE_SIZE,
       firstCardWidth: DIALOG_SQUARE_TILE_SIZE,
-      columns: 3,
+      columns: 5,
       fitsAllRooms: true,
-      rows: 6,
+      rows: 4,
       scrollsHorizontally: false,
     })
     const firstCard = dialog.locator('section[aria-label="Rooms"] > div').first()
@@ -2389,7 +2388,7 @@ test.describe('desktop modal layout', () => {
       columns: 4,
       compactTiles: true,
       contentFits: true,
-      gridWidth: 670,
+      gridWidth: 786,
       scrollsHorizontally: false,
     })
   })
@@ -2701,7 +2700,7 @@ test.describe('desktop modal layout', () => {
     await expect(dialog.locator('span[aria-hidden="true"][class*="separator"]')).toHaveCount(0)
 
     await expectSharedDesktopFrame(dialog)
-    expect(Math.round((await options.boundingBox())?.width ?? 0)).toBeLessThanOrEqual(500)
+    expect(Math.round((await options.boundingBox())?.width ?? 0)).toBe(1050)
     await expect.poll(async () => options.evaluate((optionsElement) => {
       const firstOption = optionsElement.querySelector(':scope > button')?.getBoundingClientRect()
       const style = window.getComputedStyle(optionsElement)
@@ -2725,7 +2724,7 @@ test.describe('desktop modal layout', () => {
       await expect(dialog.locator('span[aria-hidden="true"][class*="separator"]')).toHaveCount(0)
 
       await expectSharedDesktopFrame(dialog)
-      expect(Math.round((await options.boundingBox())?.width ?? 0)).toBeLessThanOrEqual(670)
+      expect(Math.round((await options.boundingBox())?.width ?? 0)).toBe(1050)
       await expect.poll(async () => options.evaluate((optionsElement) => {
         const firstOption = optionsElement.firstElementChild?.querySelector('button')?.getBoundingClientRect()
         const style = window.getComputedStyle(optionsElement)

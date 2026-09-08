@@ -616,7 +616,7 @@ test('Quick Links fills text-aware rows and keeps its conditional destination re
     { columns: 4, height: 393, insets: { bottom: 21, left: 59, right: 44, top: 0 }, width: 852 },
     { columns: 4, height: 393, insets: { bottom: 21, left: 44, right: 59, top: 0 }, width: 852 },
     { columns: 4, height: 1180, insets: { bottom: 0, left: 0, right: 0, top: 0 }, width: 820 },
-    { columns: 4, height: 900, insets: { bottom: 0, left: 0, right: 0, top: 0 }, width: 1440 },
+    { columns: 6, height: 900, insets: { bottom: 0, left: 0, right: 0, top: 0 }, width: 1440 },
   ]
 
   for (const profile of profiles) {

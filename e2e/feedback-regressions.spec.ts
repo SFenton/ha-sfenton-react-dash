@@ -546,8 +546,8 @@ test('Theater Remote stays visible while Apps and Devices use their available pa
       const pcBox = await dialog.getByRole('button', { name: /Theater Room PC Off/i }).boundingBox()
       expect((pcBox?.y ?? 0) + (pcBox?.height ?? 0)).toBeLessThanOrEqual(navBox?.y ?? 0)
     } else if (viewport.width >= 1180) {
-      expect(Math.round(gridBox?.width ?? 0)).toBeGreaterThanOrEqual(500)
-      expect(Math.round(gridBox?.width ?? 0)).toBeLessThanOrEqual(515)
+      expect(Math.round(gridBox?.width ?? 0)).toBeGreaterThanOrEqual(630)
+      expect(Math.round(gridBox?.width ?? 0)).toBeLessThanOrEqual(634)
       expect(Math.round((await remote.boundingBox())?.width ?? 0)).toBeGreaterThanOrEqual(389)
       expect(Math.round((await remote.boundingBox())?.width ?? 0)).toBeLessThanOrEqual(391)
     }

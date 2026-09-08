@@ -1,5 +1,7 @@
 import { expect, test } from './layout/fixture'
 
+test.use({ hasTouch: false, isMobile: false, viewport: { width: 1440, height: 900 } })
+
 test('long battery task titles remain visible with a fine pointer', async ({ page }) => {
   const title = 'Replace Hallway/Entryway/Living Room Presence Sensor Battery · 20%'
   await page.goto('/index.html?path=overview&battery-title-desktop=1')
