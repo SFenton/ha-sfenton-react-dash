@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "project": "ha-react",
+  "instructions": [".github/copilot-instructions.md", ".github/skills/ha-budget-workflow/SKILL.md"],
+  "riskTerms": ["alarm", "lock", "garage", "physical", "reconnect", "authentication", "service ownership"],
+  "gates": [
+    "Read the full dashboard contract for application, integration, port, or release work",
+    "Focused Vitest tests for changed behavior; build/typecheck where relevant",
+    "UX: executable layout plan, mandatory manual image/interaction review, matching state and viewport coverage",
+    "Ports: Lovelace config/action mapping plus authorized real-browser parity",
+    "No production release without explicit authorization; preserve both HA hosts"
+  ],
+  "evidencePolicy": {
+    "always": ["Keep secrets out of evidence and preserve user changes.", "Home Assistant owns state changes and cascading effects; research grants no live-operation authority."],
+    "phases": {
+      "research": ["Use actual shared components and HA service boundaries as evidence; do not infer runtime/browser behavior from source alone.", "EverShelf access belongs behind HA services, with ranking/filtering owned by its backend."],
+      "implementation": ["Read the full dashboard contract and matching scoped instructions before changes."],
+      "validation": ["Use the affected tests and executable layout plan; required manual image/state review is not replaceable by source inspection."],
+      "release": ["Explicit release-dashboard authorization and both HA hosts remain required."]
+    },
+    "content": {
+      "allowPaths": ["src", "scripts", "docs", ".github/copilot-instructions.md", ".github/reference", ".github/instructions"],
+      "denyPaths": ["scripts/i18n/generated"],
+      "maxFileBytes": 1000000
+    }
+  },
+  "commands": {
+    "unit": "npm run test:run -- <affected test files>",
+    "layout": "npm run layout:check; use docs/ux/layouts.md for plan/run/verify arguments",
+    "build": "npm run build",
+    "release": "Explicit release-dashboard skill only"
+  }
+}
