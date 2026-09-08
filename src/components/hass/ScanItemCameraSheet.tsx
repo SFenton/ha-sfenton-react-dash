@@ -1486,8 +1486,8 @@ export function ScanItemCameraSheet({ defaultLocation, open, onClose }: ScanItem
     >
       <div className={styles.sheet} data-processing={isProcessing ? 'true' : 'false'} data-step={step}>
         {isProcessing && (
-          <section className={styles.processingPage} aria-live="polite" role="status">
-            <div className={styles.spinner} aria-hidden="true" />
+          <section className={styles.processingPage} aria-live="polite" data-scan-progress="processing" role="status">
+            <div className={styles.spinner} aria-hidden="true" data-scan-progress-spinner="true" />
             <strong>Processing...</strong>
           </section>
         )}
@@ -1613,7 +1613,7 @@ export function ScanItemCameraSheet({ defaultLocation, open, onClose }: ScanItem
         )}
 
         {step === 'adding' && (
-          <section className={styles.addingPage} aria-live="polite">
+          <section className={styles.addingPage} aria-live="polite" data-scan-progress={addStatus === 'added' ? 'complete' : 'adding'} role="status">
             {addStatus === 'added' ? (
               <>
                 <div className={styles.successIcon} aria-hidden="true">
@@ -1623,7 +1623,7 @@ export function ScanItemCameraSheet({ defaultLocation, open, onClose }: ScanItem
               </>
             ) : (
               <>
-                <div className={styles.spinner} aria-hidden="true" />
+                <div className={styles.spinner} aria-hidden="true" data-scan-progress-spinner="true" />
                 <strong>Adding to {addedLocation}...</strong>
               </>
             )}

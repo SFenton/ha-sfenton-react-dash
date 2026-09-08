@@ -1715,6 +1715,50 @@ test('scan item commits the product on Next before requesting and using a locati
   })
 })
 
+test('scan item add progress stays visible and centered across phone orientations', async ({ page }) => {
+  for (const viewport of [
+    { height: 852, width: 393 },
+    { height: 393, width: 852 },
+  ]) {
+    await page.setViewportSize(viewport)
+    await page.goto('/at-a-glance/food?__mockScanItemDelayMs=1200')
+    await page.getByRole('button', { name: 'Scan Item' }).click()
+    const dialog = page.getByRole('dialog', { name: /Add Item/i })
+    await dialog.getByRole('button', { name: 'Manually Enter Name' }).click()
+    await dialog.getByRole('textbox', { name: 'Product name' }).fill('Milk')
+    await dialog.getByRole('button', { name: 'Next' }).click()
+    await dialog.getByRole('button', { name: 'Skip Expiration' }).click()
+    await dialog.getByRole('button', { name: 'Add' }).click()
+
+    const progress = dialog.locator('[data-scan-progress="adding"]')
+    const spinner = progress.locator('[data-scan-progress-spinner="true"]')
+    await expect(progress).toHaveText('Adding to Pantry...')
+    await expect(progress).toBeVisible()
+    await expect(spinner).toBeVisible()
+    await expect(spinner).toHaveCSS('animation-name', /.+/)
+
+    const geometry = await dialog.evaluate((element) => {
+      const body = element.querySelector<HTMLElement>('[data-modal-sheet-body="true"]')
+      const status = element.querySelector<HTMLElement>('[data-scan-progress="adding"]')
+      const spinnerElement = element.querySelector<HTMLElement>('[data-scan-progress-spinner="true"]')
+      if (!body || !status || !spinnerElement) return null
+      const bodyRect = body.getBoundingClientRect()
+      const statusRect = status.getBoundingClientRect()
+      return {
+        bodyCenter: bodyRect.top + bodyRect.height / 2,
+        spinnerHeight: Number.parseFloat(getComputedStyle(spinnerElement).height),
+        spinnerWidth: Number.parseFloat(getComputedStyle(spinnerElement).width),
+        statusCenter: statusRect.top + statusRect.height / 2,
+      }
+    })
+    expect(geometry).not.toBeNull()
+    expect(geometry?.spinnerHeight).toBe(58)
+    expect(geometry?.spinnerWidth).toBe(58)
+    expect(Math.abs((geometry?.bodyCenter ?? 0) - (geometry?.statusCenter ?? 0))).toBeLessThanOrEqual(12)
+    await expect(dialog.locator('[data-scan-progress="complete"]')).toHaveText('Added to Pantry')
+  }
+})
+
 test('inventory footer search moves above the mobile keyboard and clears results', async ({ page }) => {
   await page.goto('/at-a-glance/fridge')
 
