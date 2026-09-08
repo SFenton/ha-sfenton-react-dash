@@ -1,6 +1,7 @@
 import type { CardColor } from '../components/core/Card'
 import type { StatusRailChip } from '../components/hass/StatusRail'
 import { SECURITY_ENTITY } from './atAGlance'
+import { GARAGE_DOOR_ENTITY_IDS } from './garageDoors'
 import { SECURITY_COLOR } from './portedDashboard'
 
 export type SecurityTileTone = 'alarm' | 'cover' | 'lock' | 'vehicle'
@@ -53,14 +54,14 @@ export const SECURITY_CONTROL_TILES: SecurityTileConfig[] = [
   },
   {
     title: 'Left Door',
-    entityId: 'cover.left_door',
+    entityId: GARAGE_DOOR_ENTITY_IDS.left,
     icon: 'mdi:garage',
     tone: 'cover',
     action: { type: 'garage-door' },
   },
   {
     title: 'Right Door',
-    entityId: 'cover.right_door',
+    entityId: GARAGE_DOOR_ENTITY_IDS.right,
     icon: 'mdi:garage',
     tone: 'cover',
     action: { type: 'garage-door' },

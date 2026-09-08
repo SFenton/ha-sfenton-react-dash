@@ -17,8 +17,8 @@ async function resetGarageMocks(page: Page) {
       }
     }).__mockHass
     mock.reset()
-    mock.setEntityState('cover.left_door', 'closed')
-    mock.setEntityState('cover.right_door', 'closed')
+    mock.setEntityState('cover.garage_left_door', 'closed')
+    mock.setEntityState('cover.garage_right_door', 'closed')
   })
 }
 
@@ -40,7 +40,7 @@ async function setDoorState(page: Page, state: string) {
         setEntityState: (entityId: string, state: string) => void
       }
     }).__mockHass
-    mock.setEntityState('cover.left_door', nextState)
+    mock.setEntityState('cover.garage_left_door', nextState)
   }, state)
 }
 
@@ -86,7 +86,7 @@ test('garage command feedback is immediate, stable, and converges on Home Assist
   expect(Math.round(during.width)).toBe(Math.round(before.width))
   expect(Math.round(during.height)).toBe(Math.round(before.height))
   await expect.poll(() => garageCalls(page)).toEqual([
-    { domain: 'cover', service: 'open_cover', target: 'cover.left_door' },
+    { domain: 'cover', service: 'open_cover', target: 'cover.garage_left_door' },
   ])
 
   await expect(page.getByRole('button', { name: 'Left Door Opening' })).toBeVisible()
@@ -109,7 +109,7 @@ test('garage service rejection restores truth, announces an error, and remains r
   await expect(failed).toHaveAttribute('data-tone', 'danger')
   await expect(page.locator('[data-live-announcement="true"]').filter({ hasText: 'Error' })).toHaveText('Error')
   await expect.poll(() => garageCalls(page)).toEqual([
-    { domain: 'cover', service: 'open_cover', target: 'cover.left_door' },
+    { domain: 'cover', service: 'open_cover', target: 'cover.garage_left_door' },
   ])
 
   await setServiceOutcome(page, 'open_cover', 'resolve')
@@ -159,7 +159,7 @@ test('garage and guest surfaces share duplicate suppression and the explicit ser
     button.click()
   })
   await expect.poll(() => garageCalls(page)).toEqual([
-    { domain: 'cover', service: 'open_cover', target: 'cover.left_door' },
+    { domain: 'cover', service: 'open_cover', target: 'cover.garage_left_door' },
   ])
   await expect(page.getByRole('button', { name: 'Left Door Sending Open…' })).toHaveAttribute('aria-disabled', 'true')
 
@@ -179,6 +179,6 @@ test('garage and guest surfaces share duplicate suppression and the explicit ser
   await dialog.getByRole('button', { name: 'Left Door Closed' }).click()
   await expect(dialog.getByRole('button', { name: 'Left Door Sending Open…' })).toHaveAttribute('aria-disabled', 'true')
   await expect.poll(() => garageCalls(page)).toEqual([
-    { domain: 'cover', service: 'open_cover', target: 'cover.left_door' },
+    { domain: 'cover', service: 'open_cover', target: 'cover.garage_left_door' },
   ])
 })

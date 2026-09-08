@@ -384,8 +384,8 @@ describe('DashboardViewPage', () => {
     mockEntities['switch.guest_bathroom_towel_rack_switch_top'].state = 'on'
     mockEntities['switch.master_bathroom_fan_switch_top'].state = 'off'
     mockEntities['switch.master_bathroom_towel_rack_switch_top'].state = 'on'
-    mockEntities['cover.left_door'].state = 'closed'
-    mockEntities['cover.right_door'].state = 'closed'
+    mockEntities['cover.garage_left_door'].state = 'closed'
+    mockEntities['cover.garage_right_door'].state = 'closed'
     mockEntities['lock.aqara_smart_lock_u400'].state = 'locked'
     mockEntities['lock.fordpass_3fmtk3su5mma09266_doorlock'].state = 'locked'
   })
@@ -6198,8 +6198,8 @@ describe('DashboardViewPage', () => {
     fireEvent.click(screen.getByRole('button', { name: /^Right Door Closed$/i }))
     expect(screen.queryByText(/interactive controls available from this view/i)).not.toBeInTheDocument()
     expect(mockCallServiceCalls).toEqual([
-      { domain: 'cover', service: 'open_cover', target: 'cover.left_door' },
-      { domain: 'cover', service: 'open_cover', target: 'cover.right_door' },
+      { domain: 'cover', service: 'open_cover', target: 'cover.garage_left_door' },
+      { domain: 'cover', service: 'open_cover', target: 'cover.garage_right_door' },
     ])
   })
 
@@ -6573,8 +6573,8 @@ describe('DashboardViewPage', () => {
     expect(screen.getByRole('button', { name: /Right Door Closed/i })).toHaveAttribute('data-muted', 'false')
     closedView.unmount()
 
-    mockEntities['cover.left_door'].state = 'open'
-    mockEntities['cover.right_door'].state = 'open'
+    mockEntities['cover.garage_left_door'].state = 'open'
+    mockEntities['cover.garage_right_door'].state = 'open'
     const openView = render(<DashboardViewPage activePath="security" onNavigate={() => undefined} path="security" />)
 
     expect(screen.getByRole('button', { name: /Left Door Open/i })).toHaveAttribute('data-tone', 'danger')
@@ -6583,8 +6583,8 @@ describe('DashboardViewPage', () => {
     expect(screen.getByRole('button', { name: /Right Door Open/i })).toHaveAttribute('data-muted', 'false')
     openView.unmount()
 
-    mockEntities['cover.left_door'].state = 'closing'
-    mockEntities['cover.right_door'].state = 'closing'
+    mockEntities['cover.garage_left_door'].state = 'closing'
+    mockEntities['cover.garage_right_door'].state = 'closing'
     render(<DashboardViewPage activePath="security" onNavigate={() => undefined} path="security" />)
 
     expect(screen.getByRole('button', { name: /Left Door Closing/i })).toHaveAttribute('data-tone', 'security')
@@ -6618,7 +6618,7 @@ describe('DashboardViewPage', () => {
 
     expect(mockCallServiceCalls).toEqual([
       { domain: 'lock', service: 'unlock', target: 'lock.aqara_smart_lock_u400' },
-      { domain: 'cover', service: 'open_cover', target: 'cover.left_door' },
+      { domain: 'cover', service: 'open_cover', target: 'cover.garage_left_door' },
     ])
   })
 

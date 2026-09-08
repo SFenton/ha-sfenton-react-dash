@@ -1332,8 +1332,8 @@ export const explicitMockEntities: Record<string, MockEntity> = {
   'binary_sensor.stephen_s_eight_sleep_side_bed_presence': entity('binary_sensor.stephen_s_eight_sleep_side_bed_presence', 'on'),
   'binary_sensor.steph_s_eight_sleep_side_bed_presence': entity('binary_sensor.steph_s_eight_sleep_side_bed_presence', 'off'),
   'binary_sensor.theater_room_door_contact_sensor_contact': entity('binary_sensor.theater_room_door_contact_sensor_contact', 'off'),
-  'cover.left_door': entity('cover.left_door', 'closed'),
-  'cover.right_door': entity('cover.right_door', 'closed'),
+  'cover.garage_left_door': entity('cover.garage_left_door', 'closed'),
+  'cover.garage_right_door': entity('cover.garage_right_door', 'closed'),
   'fan.air_purifier_levoit_purifier': entity('fan.air_purifier_levoit_purifier', 'on', { percentage: 33 }),
   'fan.guest_room_air_purifier_levoit_purifier': entity('fan.guest_room_air_purifier_levoit_purifier', 'on', { percentage: 33 }),
   'fan.living_room_air_purifier_levoit_purifier': entity('fan.living_room_air_purifier_levoit_purifier', 'on', { percentage: 33 }),
@@ -1749,8 +1749,8 @@ export function resetMockHass() {
   mockEntities['binary_sensor.lv600s_humidifier_tank_removed'].state = 'off'
   mockEntities['binary_sensor.lv600s_humidifier_humidifying'].state = 'on'
   mockEntities['input_boolean.master_bedroom_humidifier_schedule_enabled'].state = 'off'
-  mockEntities['cover.left_door'].state = 'closed'
-  mockEntities['cover.right_door'].state = 'closed'
+  mockEntities['cover.garage_left_door'].state = 'closed'
+  mockEntities['cover.garage_right_door'].state = 'closed'
   mockHumidifierSchedule = emptyHumidifierSchedule()
   exposeMockHassDebugApi()
   notifyMockHass()

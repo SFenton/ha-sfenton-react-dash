@@ -19,7 +19,7 @@ import { GarageDoorTile } from './GarageDoorTile'
 function renderGarageDoor() {
   return render(
     <GarageDoorTile
-      entityId="cover.left_door"
+      entityId="cover.garage_left_door"
       icon="mdi:garage"
       title="Left Door"
       toneForState={(state) => state === 'closed' ? 'contact' : state === 'closing' ? 'security' : 'danger'}
@@ -63,7 +63,7 @@ describe('GarageDoorTile', () => {
     expect(sending).toHaveAttribute('aria-disabled', 'true')
     expect(screen.getByRole('status')).toHaveTextContent('Sending Open…')
     expect(mockCallServiceCalls).toEqual([
-      { domain: 'cover', service: 'open_cover', target: 'cover.left_door' },
+      { domain: 'cover', service: 'open_cover', target: 'cover.garage_left_door' },
     ])
 
     await advanceTimers(GARAGE_DOOR_SENDING_FEEDBACK_MS)
@@ -82,16 +82,16 @@ describe('GarageDoorTile', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Left Door Closed' }))
     await advanceTimers(GARAGE_DOOR_SENDING_FEEDBACK_MS)
 
-    act(() => setMockEntityState('cover.left_door', 'opening'))
+    act(() => setMockEntityState('cover.garage_left_door', 'opening'))
     expect(screen.getByRole('button', { name: 'Left Door Opening' })).toBeEnabled()
     expect(screen.getByRole('status')).toHaveTextContent('')
 
-    act(() => setMockEntityState('cover.left_door', 'open'))
+    act(() => setMockEntityState('cover.garage_left_door', 'open'))
     expect(screen.getByRole('button', { name: 'Left Door Open' })).toBeEnabled()
 
-    act(() => setMockEntityState('cover.left_door', 'closed'))
+    act(() => setMockEntityState('cover.garage_left_door', 'closed'))
     fireEvent.click(screen.getByRole('button', { name: 'Left Door Closed' }))
-    act(() => setMockEntityState('cover.left_door', 'open'))
+    act(() => setMockEntityState('cover.garage_left_door', 'open'))
     expect(screen.getByRole('button', { name: 'Left Door Open' })).toBeEnabled()
   })
 
@@ -146,16 +146,16 @@ describe('GarageDoorTile', () => {
     await advanceTimers(GARAGE_DOOR_COMMAND_LOCKOUT_MS - GARAGE_DOOR_SENDING_FEEDBACK_MS)
     fireEvent.click(screen.getByRole('button', { name: 'Left Door Opening' }))
     expect(mockCallServiceCalls).toEqual([
-      { domain: 'cover', service: 'open_cover', target: 'cover.left_door' },
-      { domain: 'cover', service: 'open_cover', target: 'cover.left_door' },
+      { domain: 'cover', service: 'open_cover', target: 'cover.garage_left_door' },
+      { domain: 'cover', service: 'open_cover', target: 'cover.garage_left_door' },
     ])
 
-    act(() => setMockEntityState('cover.left_door', 'opening'))
+    act(() => setMockEntityState('cover.garage_left_door', 'opening'))
     fireEvent.click(screen.getByRole('button', { name: 'Left Door Opening' }))
     expect(mockCallServiceCalls.at(-1)).toEqual({
       domain: 'cover',
       service: 'close_cover',
-      target: 'cover.left_door',
+      target: 'cover.garage_left_door',
     })
   })
 
@@ -184,14 +184,14 @@ describe('GarageDoorTile', () => {
     await flushPromises()
     expect(screen.getByRole('button', { name: 'Left Door Error' })).toBeEnabled()
 
-    act(() => setMockEntityState('cover.left_door', 'unavailable'))
+    act(() => setMockEntityState('cover.garage_left_door', 'unavailable'))
     expect(screen.queryByRole('button', { name: /Left Door/i })).not.toBeInTheDocument()
     expect(screen.getByLabelText('Left Door Unavailable')).toHaveAttribute('data-muted', 'true')
     expect(screen.getByRole('status')).toHaveTextContent('')
   })
 
   it('renders unavailable and unknown states as noninteractive', () => {
-    setMockEntityState('cover.left_door', 'unavailable')
+    setMockEntityState('cover.garage_left_door', 'unavailable')
     renderGarageDoor()
 
     expect(screen.queryByRole('button', { name: /Left Door/i })).not.toBeInTheDocument()
