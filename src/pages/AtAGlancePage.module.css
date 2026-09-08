@@ -3,20 +3,12 @@
 }
 
 .cameraGrid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
+  --dynamic-grid-columns: 2;
 }
 
-@container page-content (min-width: 900px) {
+@container page-content (min-width: 744px) {
   .cameraGrid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-}
-
-@container page-content (min-width: 1220px) {
-  .cameraGrid {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    --dynamic-grid-columns: 4;
   }
 }
 

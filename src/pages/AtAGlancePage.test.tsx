@@ -49,6 +49,16 @@ describe('AtAGlancePage', () => {
     expect(screen.getByRole('button', { name: 'Open Front Door camera' }).querySelector('[data-modal-disclosure]')).not.toBeInTheDocument()
   })
 
+  it('uses the Security page dynamic camera grid layout', () => {
+    render(<AtAGlancePage />)
+
+    const cameraGrid = screen.getByRole('button', { name: 'Open Front Door camera' }).closest('[data-dynamic-grid="true"]')
+    expect(cameraGrid).toHaveAttribute('data-dynamic-grid-item-sizing', 'uniform')
+    expect(cameraGrid).toHaveAttribute('data-dynamic-grid-layout', 'fill')
+    expect(cameraGrid).toHaveAttribute('data-dynamic-grid-max-cell-width', '280')
+    expect(cameraGrid).toHaveAttribute('data-dynamic-grid-max-columns', '4')
+  })
+
   it('moves the Home Quick Links grid into the global floating action', () => {
     render(<AtAGlancePage />)
 

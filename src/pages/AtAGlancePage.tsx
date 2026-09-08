@@ -10,6 +10,7 @@ import { AppShell } from '../components/shell/AppShell'
 import { BottomNav } from '../components/shell/BottomNav'
 import { DashboardPageLoading, type DashboardPageLoadingPhase } from '../components/shell/DashboardPageLoading'
 import { ActionPill } from '../components/core/ActionPill'
+import { DynamicGrid } from '../components/core/DynamicGrid'
 import { GlassTile } from '../components/core/GlassTile'
 import { Icon, MaterialIcon } from '../components/core/Icon'
 import { ModalSheet, type ModalCenteredGeometry, type ModalSheetSize } from '../components/core/ModalSheet'
@@ -1272,13 +1273,11 @@ export function AtAGlancePage({ activePath = 'overview', deferRouteContent = fal
             <GuestPresenceSecuritySection onOpen={openHash} />
 
             <SectionHeader title="Cameras" />
-            <section className={styles.cameraGrid}>
+            <DynamicGrid className={styles.cameraGrid} columns={2} fillRows={false} itemSizing="uniform" layout="fill" maxCellWidth={280} maxColumns={4}>
               {CAMERA_ITEMS.map((camera) => (
-                <div key={camera.title}>
-                  <CameraTile camera={camera} live={hydrateHeavyContent && !preload} onOpen={openHash} />
-                </div>
+                <CameraTile camera={camera} key={camera.entityId} live={hydrateHeavyContent && !preload} onOpen={openHash} />
               ))}
-            </section>
+            </DynamicGrid>
           </div>
         )}
       </Page>
