@@ -307,7 +307,11 @@
 }
 
 .currentNarrative {
-  color: var(--color-text-muted);
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding-inline-start: 1.25rem;
+  color: var(--rd-weather-marker);
   font-size: 0.82rem;
   font-weight: 560;
   letter-spacing: 0.005em;

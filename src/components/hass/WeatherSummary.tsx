@@ -20,7 +20,7 @@ import { WeatherHourlyMetricTiles } from './WeatherHourlyMetricTiles'
 import { WeatherPrecipitationTile } from './WeatherPrecipitationTile'
 import { useWeatherForecasts, WEATHER_FORECAST_PHASE, type WeatherForecast } from './useWeatherForecasts'
 import { useWeatherDayBriefing } from './useWeatherDayBriefing'
-import { renderWeatherBriefingText, weatherBriefingHeadline, type WeatherDayBriefing } from './weatherDayBriefing'
+import { renderBriefingRef, weatherBriefingHeadline, type WeatherDayBriefing } from './weatherDayBriefing'
 import {
   classifyUsAqi,
   compassRotationDurationMs,
@@ -1493,10 +1493,10 @@ function WeatherForecastSheet({
   const headlineTitle = briefing
     ? weatherBriefingHeadline(copy, briefing)
     : copy(WEATHER_COPY_KEYS.headline.weather, { condition: condition.label })
-  const headlineDetail = briefing
-    ? renderWeatherBriefingText(copy, briefing)
-    : copy(WEATHER_COPY_KEYS.briefing.unavailable)
   const headlineIcon = briefing?.icon ?? conditionInfo(entity?.state).icon
+  const narrativeSentences = briefing
+    ? briefing.sentences.map((sentence) => renderBriefingRef(copy, sentence))
+    : [copy(WEATHER_COPY_KEYS.briefing.unavailable)]
   const [selectedMode, setSelectedMode] = useState<HourlyMode>('condition')
   const { displayMode, transitionPhase } = useWeatherModeTransition(selectedMode)
 
@@ -1519,7 +1519,9 @@ function WeatherForecastSheet({
               <strong>{headlineTitle}</strong>
             </span>
           </div>
-          <p className={styles.currentNarrative} data-briefing-date={briefing?.dateKey}>{headlineDetail}</p>
+          <ul className={styles.currentNarrative} data-briefing-date={briefing?.dateKey}>
+            {narrativeSentences.map((sentence, index) => <li key={`${briefing?.sentences[index]?.key ?? 'unavailable'}-${index}`}>{sentence}</li>)}
+          </ul>
         </section>
 
         <HourlyConditionsPanel activeMode={selectedMode} entity={entity} error={hourlyError} forecasts={hourlyForecasts} loading={hourlyLoading} mode={displayMode} onModeChange={setSelectedMode} transitionPhase={transitionPhase} />
