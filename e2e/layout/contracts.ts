@@ -368,7 +368,7 @@ export const SURFACE_CONTRACTS: Record<ScenarioId, {
   weather: {
     family: 'modal',
     states: ['condition', 'precipitation', 'wind', 'pressure-unavailable', 'pressure-long', 'forecast-error-stale', 'forecast-empty', 'forecast-error-empty'],
-    owners: ['src/components/hass/Weather', 'src/components/hass/weather', 'src/components/hass/precipitationTimeline', 'src/components/hass/useWeatherForecasts', 'src/hooks/useForecastWindMotion'],
+    owners: ['src/components/hass/Weather', 'src/components/hass/weather', 'src/components/hass/precipitationTimeline', 'src/components/hass/useWeatherDayBriefing', 'src/components/hass/useWeatherForecasts', 'src/hooks/useForecastWindMotion', 'src/i18n/locales/en/modals/weather.json'],
     legacy: ['weather-scenes.spec.ts', 'weather-atmosphere-scenes.spec.ts', 'weather-carousel.spec.ts', 'weather-data.spec.ts', 'weather-motion.spec.ts', 'weather-modal-rendering.spec.ts'],
     question: 'Are forecast modes, stale/empty/error states, missing and long Pressure readings readable and reachable after rotation, with equal small-tile heights, no preview dropdown and unchanged return geometry?',
   },
