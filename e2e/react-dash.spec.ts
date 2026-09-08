@@ -1,6 +1,9 @@
 import { expect, test, type FrameLocator, type Locator, type Page } from '@playwright/test'
 import { valueToThermostatPoint } from '../src/components/hass/thermostatDialGeometry'
 
+const DIALOG_SQUARE_TILE_SIZE = 168
+const MODAL_SQUARE_GRID_MAX_COLUMNS = 4
+
 type FreeSleepAlarmSnapshot = {
   enabled: boolean
   time: string
@@ -202,15 +205,15 @@ async function expectDesktopSquareGrid(dialog: Locator, sectionLabel: string) {
   expect(cardCount).toBeGreaterThan(0)
 
   await expect.poll(async () => {
-    return cards.evaluateAll((elements) => {
+    return cards.evaluateAll((elements, expectedCardSize) => {
       const rects = elements.map((element) => element.getBoundingClientRect())
       return {
-        allFixedHeight: rects.every((rect) => Math.round(rect.height) === 168),
-        allFixedWidth: rects.every((rect) => Math.round(rect.width) === 168),
+        allFixedHeight: rects.every((rect) => Math.round(rect.height) === expectedCardSize),
+        allFixedWidth: rects.every((rect) => Math.round(rect.width) === expectedCardSize),
         cardCount: rects.length,
         squareCards: rects.every((rect) => Math.round(rect.width) === Math.round(rect.height)),
       }
-    })
+    }, DIALOG_SQUARE_TILE_SIZE)
   }).toMatchObject({
     allFixedHeight: true,
     allFixedWidth: true,
@@ -260,18 +263,18 @@ async function expectDesktopAdminSquareGrid(dialog: Locator, gridLabel: string) 
   const grid = dialog.getByRole('group', { name: gridLabel })
   await expect(grid).toBeVisible()
   const cardCount = await grid.getByRole('button').count()
-  const expectedColumns = Math.max(1, Math.ceil(Math.sqrt(cardCount)))
+  const expectedColumns = Math.max(1, Math.min(MODAL_SQUARE_GRID_MAX_COLUMNS, Math.ceil(Math.sqrt(cardCount))))
   const expectedRows = Math.ceil(cardCount / expectedColumns)
 
   await expect.poll(async () => {
     return grid.evaluate((gridElement) => {
-      const firstCard = gridElement.querySelector<HTMLElement>(
+      const cards = Array.from(gridElement.querySelectorAll<HTMLElement>(
         ':scope > button, :scope > article, :scope > [data-modal-detail-trigger] > button, :scope > [data-modal-detail-trigger] > article',
-      )
-      const firstCardRect = firstCard?.getBoundingClientRect()
-      const gridStyle = window.getComputedStyle(gridElement)
-      const columns = gridStyle.gridTemplateColumns.split(' ').filter(Boolean).length
-      const rows = gridStyle.gridTemplateRows.split(' ').filter(Boolean).length
+      ))
+      const rects = cards.map((card) => card.getBoundingClientRect())
+      const firstCardRect = rects[0]
+      const columns = new Set(rects.map((rect) => Math.round(rect.left))).size
+      const rows = new Set(rects.map((rect) => Math.round(rect.top))).size
       return {
         cardCount: gridElement.children.length,
         cardHeight: Math.round(firstCardRect?.height ?? 0),
@@ -285,8 +288,8 @@ async function expectDesktopAdminSquareGrid(dialog: Locator, gridLabel: string) 
     })
   }).toMatchObject({
     cardCount,
-    cardHeight: 168,
-    cardWidth: 168,
+    cardHeight: DIALOG_SQUARE_TILE_SIZE,
+    cardWidth: DIALOG_SQUARE_TILE_SIZE,
     columns: expectedColumns,
     fitsAllCards: true,
     rows: expectedRows,
@@ -1042,16 +1045,18 @@ test('global Quick Links opens from a non-Home route and preserves one-sheet det
 
   await trigger.click()
   dialog = page.getByRole('dialog', { name: 'Quick Links' })
-  await expect.poll(() => dialog.locator('[data-dynamic-grid="true"][aria-label="Quick Links"]').evaluate((grid) => {
-    const styles = getComputedStyle(grid)
+  await expect.poll(() => dialog.getByRole('group', { name: 'Quick Links', exact: true }).evaluate((grid) => {
+    const rows = new Set(Array.from(grid.children).map((cell) => Math.round(cell.getBoundingClientRect().top)))
     return {
-      columns: styles.gridTemplateColumns.split(' ').filter(Boolean).length,
+      columns: Number(grid.getAttribute('data-dynamic-grid-columns')),
       itemCount: grid.children.length,
+      rows: rows.size,
       scrollsHorizontally: grid.scrollWidth > grid.clientWidth + 1,
     }
   })).toEqual({
     columns: 2,
     itemCount: 6,
+    rows: 5,
     scrollsHorizontally: false,
   })
   const initialHash = await page.evaluate(() => window.location.hash)
@@ -1477,6 +1482,50 @@ test('scan item commits the product on Next before requesting and using a locati
       quantity: 1,
     }),
   })
+})
+
+test('scan item add progress stays visible and centered across phone orientations', async ({ page }) => {
+  for (const viewport of [
+    { height: 852, width: 393 },
+    { height: 393, width: 852 },
+  ]) {
+    await page.setViewportSize(viewport)
+    await page.goto('/at-a-glance/food?__mockScanItemDelayMs=1200')
+    await page.getByRole('button', { name: 'Scan Item' }).click()
+    const dialog = page.getByRole('dialog', { name: /Add Item/i })
+    await dialog.getByRole('button', { name: 'Manually Enter Name' }).click()
+    await dialog.getByRole('textbox', { name: 'Product name' }).fill('Milk')
+    await dialog.getByRole('button', { name: 'Next' }).click()
+    await dialog.getByRole('button', { name: 'Skip Expiration' }).click()
+    await dialog.getByRole('button', { name: 'Add' }).click()
+
+    const progress = dialog.locator('[data-scan-progress="adding"]')
+    const spinner = progress.locator('[data-scan-progress-spinner="true"]')
+    await expect(progress).toHaveText('Adding to Pantry...')
+    await expect(progress).toBeVisible()
+    await expect(spinner).toBeVisible()
+    await expect(spinner).toHaveCSS('animation-name', /.+/)
+
+    const geometry = await dialog.evaluate((element) => {
+      const body = element.querySelector<HTMLElement>('[data-modal-sheet-body="true"]')
+      const status = element.querySelector<HTMLElement>('[data-scan-progress="adding"]')
+      const spinnerElement = element.querySelector<HTMLElement>('[data-scan-progress-spinner="true"]')
+      if (!body || !status || !spinnerElement) return null
+      const bodyRect = body.getBoundingClientRect()
+      const statusRect = status.getBoundingClientRect()
+      return {
+        bodyCenter: bodyRect.top + bodyRect.height / 2,
+        spinnerHeight: Number.parseFloat(getComputedStyle(spinnerElement).height),
+        spinnerWidth: Number.parseFloat(getComputedStyle(spinnerElement).width),
+        statusCenter: statusRect.top + statusRect.height / 2,
+      }
+    })
+    expect(geometry).not.toBeNull()
+    expect(geometry?.spinnerHeight).toBe(58)
+    expect(geometry?.spinnerWidth).toBe(58)
+    expect(Math.abs((geometry?.bodyCenter ?? 0) - (geometry?.statusCenter ?? 0))).toBeLessThanOrEqual(12)
+    await expect(dialog.locator('[data-scan-progress="complete"]')).toHaveText('Added to Pantry')
+  }
 })
 
 test('inventory footer search moves above the mobile keyboard and clears results', async ({ page }) => {
@@ -2039,11 +2088,12 @@ test.describe('desktop modal layout', () => {
 
     await expect.poll(async () => {
       return dialog.locator('section[aria-label="Rooms"]').evaluate((grid) => {
-        const firstCard = grid.firstElementChild?.firstElementChild
-        const firstCardRect = firstCard?.getBoundingClientRect()
-        const gridStyle = window.getComputedStyle(grid)
-        const columns = gridStyle.gridTemplateColumns.split(' ').filter(Boolean).length
-        const rows = gridStyle.gridTemplateRows.split(' ').filter(Boolean).length
+        const rects = Array.from(grid.children)
+          .map((child) => child.firstElementChild?.getBoundingClientRect())
+          .filter((rect): rect is DOMRect => Boolean(rect))
+        const firstCardRect = rects[0]
+        const columns = new Set(rects.map((rect) => Math.round(rect.left))).size
+        const rows = new Set(rects.map((rect) => Math.round(rect.top))).size
         return {
           cardCount: grid.children.length,
           firstCardHeight: Math.round(firstCardRect?.height ?? 0),
@@ -2056,11 +2106,11 @@ test.describe('desktop modal layout', () => {
       })
     }).toMatchObject({
       cardCount: 16,
-      firstCardHeight: 168,
-      firstCardWidth: 168,
-      columns: 4,
+      firstCardHeight: DIALOG_SQUARE_TILE_SIZE,
+      firstCardWidth: DIALOG_SQUARE_TILE_SIZE,
+      columns: 3,
       fitsAllRooms: true,
-      rows: 4,
+      rows: 6,
       scrollsHorizontally: false,
     })
     const firstCard = dialog.locator('section[aria-label="Rooms"] > div').first()
@@ -2068,7 +2118,7 @@ test.describe('desktop modal layout', () => {
     expect(Math.round(box?.width ?? 0)).toBe(Math.round(box?.height ?? 0))
     const dialogBox = await dialog.boundingBox()
     const gridBox = await dialog.locator('section[aria-label="Rooms"]').boundingBox()
-    expect(Math.round(dialogBox?.width ?? 0)).toBe(900)
+    expect(Math.round(dialogBox?.width ?? 0)).toBe(720)
     expect(Math.abs(
       Math.round((gridBox?.x ?? 0) - (dialogBox?.x ?? 0))
       - Math.round(((dialogBox?.x ?? 0) + (dialogBox?.width ?? 0)) - ((gridBox?.x ?? 0) + (gridBox?.width ?? 0))),
@@ -2076,32 +2126,38 @@ test.describe('desktop modal layout', () => {
 
   })
 
-  test('Quick Links modal uses a responsive DynamicGrid on desktop', async ({ page }) => {
+  test('Quick Links modal keeps compact text-aware navigation on desktop', async ({ page }) => {
     await page.setViewportSize({ width: 900, height: 900 })
     await page.goto('/at-a-glance/settings')
     await page.getByRole('button', { name: 'Quick Links' }).click()
 
     const dialog = page.getByRole('dialog', { name: 'Quick Links' })
     await expect(dialog).toBeVisible()
-    await expect.poll(() => dialog.locator('[data-dynamic-grid="true"][aria-label="Quick Links"]').evaluate((grid) => {
-      const gridStyle = getComputedStyle(grid)
-      const columns = gridStyle.gridTemplateColumns.split(' ').filter(Boolean).length
+    await expect.poll(() => dialog.getByRole('group', { name: 'Quick Links', exact: true }).evaluate((grid) => {
+      const columns = Number(grid.getAttribute('data-dynamic-grid-columns'))
       const buttons = Array.from(grid.querySelectorAll('button'))
       return {
         cardCount: grid.children.length,
+        centered: Math.abs(
+          (grid.getBoundingClientRect().left + grid.getBoundingClientRect().right) / 2
+          - (grid.parentElement!.getBoundingClientRect().left + grid.parentElement!.getBoundingClientRect().right) / 2,
+        ) <= 1,
         columns,
-        contentFits: buttons.every((button) => button.scrollHeight <= button.clientHeight + 1 && button.scrollWidth <= button.clientWidth + 1),
-        roomyTiles: buttons.every((button) => {
+        compactTiles: buttons.every((button) => {
           const rect = button.getBoundingClientRect()
-          return rect.width >= 220 && rect.height >= 160
+          return rect.width <= grid.clientWidth + 1 && Math.round(rect.height) === 88
         }),
+        contentFits: buttons.every((button) => button.scrollHeight <= button.clientHeight + 1 && button.scrollWidth <= button.clientWidth + 1),
+        gridWidth: Math.round(grid.getBoundingClientRect().width),
         scrollsHorizontally: grid.scrollWidth > grid.clientWidth + 1,
       }
     })).toEqual({
       cardCount: 6,
-      columns: 3,
+      centered: true,
+      columns: 4,
+      compactTiles: true,
       contentFits: true,
-      roomyTiles: true,
+      gridWidth: 670,
       scrollsHorizontally: false,
     })
   })
@@ -2171,20 +2227,21 @@ test.describe('desktop modal layout', () => {
     await expect.poll(async () => Math.round((await dialog.boundingBox())?.height ?? 0)).toBe(696)
   })
 
-  test('bed modal uses the compact sheet flow on a short wide viewport', async ({ page }) => {
+  test('bed modal uses the shared landscape frame on a short wide viewport', async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 500 })
     await page.goto('/at-a-glance/master-bedroom')
     await page.getByRole('button', { name: /Steph's Bed Off/i }).click()
 
     const dialog = page.getByRole('dialog', { name: "Steph's Bed" })
     await expect(dialog).toBeVisible()
-    await expect(dialog).toHaveAttribute('data-centered-layout', 'false')
+    await expect(dialog).toHaveAttribute('data-modal-presentation', 'landscape-dialog')
+    await expect(dialog).toHaveAttribute('data-centered-layout', 'true')
     await expect(dialog).toHaveAttribute('data-size', 'workspace')
-    await expect(dialog.locator('[data-mobile-drag-handle="true"]')).toBeVisible()
+    await expect(dialog.locator('[data-mobile-drag-handle="true"]')).toHaveCount(0)
     await expect.poll(async () => {
       const box = await dialog.boundingBox()
       return { height: Math.round(box?.height ?? 0), width: Math.round(box?.width ?? 0) }
-    }).toEqual({ height: 500, width: 1280 })
+    }).toEqual({ height: 484, width: 1256 })
 
     await dialog.getByRole('tab', { name: 'Alarms' }).click()
     const body = dialog.locator('[data-layout="eight-sleep-modal-body"]')
@@ -2266,7 +2323,10 @@ test.describe('desktop modal layout', () => {
           cardWidth: Math.round(firstCardRect?.width ?? 0),
         }
       })
-    }).toEqual({ cardHeight: 168, cardWidth: 168 })
+    }).toEqual({
+      cardHeight: DIALOG_SQUARE_TILE_SIZE,
+      cardWidth: DIALOG_SQUARE_TILE_SIZE,
+    })
 
     const before = await dialog.boundingBox()
     if (!before) throw new Error('Rooms modal was not measurable before closing')
@@ -2316,15 +2376,15 @@ test.describe('desktop modal layout', () => {
     const section = dialog.getByRole('region', { name: 'Lights by room' })
     const roomButtons = section.getByRole('button', { name: /^Open / })
     await expect.poll(async () => {
-      return roomButtons.evaluateAll((elements) => {
+      return roomButtons.evaluateAll((elements, expectedCardSize) => {
         const rects = elements.map((element) => element.getBoundingClientRect())
         return {
-          allFixedHeight: rects.every((rect) => Math.round(rect.height) === 168),
-          allFixedWidth: rects.every((rect) => Math.round(rect.width) === 168),
+          allFixedHeight: rects.every((rect) => Math.round(rect.height) === expectedCardSize),
+          allFixedWidth: rects.every((rect) => Math.round(rect.width) === expectedCardSize),
           cardCount: rects.length,
           squareCards: rects.every((rect) => Math.round(rect.width) === Math.round(rect.height)),
         }
-      })
+      }, DIALOG_SQUARE_TILE_SIZE)
     }).toMatchObject({
       allFixedHeight: true,
       allFixedWidth: true,
@@ -2496,7 +2556,7 @@ test.describe('desktop modal layout', () => {
   ]
 
   for (const modalCase of squareOverviewCases) {
-    test(`${modalCase.dialogName} modal uses fixed 168px square room grid on desktop`, async ({ page }) => {
+    test(`${modalCase.dialogName} modal uses compact fixed square room grid on desktop`, async ({ page }) => {
       await page.goto(`/at-a-glance/overview${modalCase.hash}`)
 
       const dialog = page.getByRole('dialog', { name: modalCase.dialogName })
@@ -2537,7 +2597,7 @@ test.describe('desktop modal layout', () => {
   ]
 
   for (const modalCase of adminSquareCases) {
-    test(`${modalCase.dialogName} modal uses fixed 168px square admin cards on desktop`, async ({ page }) => {
+    test(`${modalCase.dialogName} modal uses compact fixed square admin cards on desktop`, async ({ page }) => {
       await page.goto(`/at-a-glance/admin${modalCase.hash}`)
 
       const dialog = page.getByRole('dialog', { name: modalCase.dialogName })
@@ -3557,12 +3617,142 @@ test('offline vacuum cards open their status modal', async ({ page }) => {
   const statusPill = dialog.locator('[data-icon="mdi:robot-vacuum-off"][data-tone="unavailable"]')
   await expect(statusPill).toContainText('Unavailable')
   await expect(statusPill).toHaveAttribute('data-tone', 'unavailable')
-  await expect(dialog.getByLabel('Unavailable')).toContainText('Home Assistant does not have a current status for the vacuum.')
-  await expect(dialog.getByText('Map Unavailable')).toBeVisible()
-  await expect(dialog.getByText("Home Assistant cannot currently confirm the vacuum's map or position.")).toBeVisible()
+  await expect(dialog.getByLabel('Unavailable')).toHaveCount(0)
+  await expect(dialog.getByText('Battery').locator('xpath=ancestor::*[@data-icon][1]')).toHaveAttribute('data-tone', 'unavailable')
+  await expect(dialog.getByRole('region', { name: 'Music Room Valetudo map' })).toHaveAttribute('data-map-provenance', 'reported')
+  await expect(dialog.locator('[data-map-reported-note="true"]')).toContainText('Last Reported Position')
+  await expect(dialog.getByText('Map Unavailable')).toHaveCount(0)
   await expect(dialog.getByRole('button', { name: 'Locate' })).toHaveCount(0)
   await expect(dialog.getByRole('alert')).toHaveCount(0)
   await expect(dialog.getByText(/battery is critically low/i)).toHaveCount(0)
+})
+
+test('music room focused map hides the phantom area without scope controls or coordinate changes', async ({ page }) => {
+  await page.goto('/at-a-glance/vacuums')
+  await page.evaluate(() => {
+    const mock = (window as unknown as {
+      __mockHass: {
+        setEntityState: (entityId: string, state: string) => void
+      }
+    }).__mockHass
+    mock.setEntityState('vacuum.valetudo_elatedusedram', 'docked')
+    mock.setEntityState('sensor.valetudo_elatedusedram_battery_level', '100')
+    mock.setEntityState('sensor.valetudo_elatedusedram_error', 'No error')
+    mock.setEntityState('sensor.valetudo_elatedusedram_status_flag', 'none')
+    mock.setEntityState('camera.valetudo_elatedusedram_map_data', 'idle')
+    mock.setEntityState('select.valetudo_elatedusedram_mode', 'vacuum')
+    mock.setEntityState('select.valetudo_elatedusedram_fan', 'balanced')
+    mock.setEntityState('select.valetudo_elatedusedram_water', 'medium')
+  })
+
+  await page.getByRole('button', { name: /Music Room Docked/i }).click()
+  const dialog = page.getByRole('dialog')
+  const map = dialog.getByRole('region', { name: 'Music Room Valetudo map' })
+
+  await expect(map).toHaveAttribute('data-map-scope', 'focused')
+  await expect(map).toHaveAttribute('data-map-focus-reason', 'focused')
+  await expect(map).toHaveAttribute('data-map-render-clipped', 'true')
+  await expect(map).toHaveAttribute('data-view-min-x', '634')
+  await expect(map).toHaveAttribute('data-view-max-x', '782')
+  await expect(dialog.getByRole('button', { name: 'Full Map' })).toHaveCount(0)
+  await expect(dialog.getByText('Reachable Area Only')).toHaveCount(0)
+
+  await dialog.getByRole('group', { name: 'Cleaning target' }).getByRole('button', { name: 'Area' }).click()
+  await dialog.getByRole('button', { name: 'Draw Area' }).click()
+  const overlay = dialog.locator('[data-map-editor-overlay="true"]')
+  const overlayBox = await overlay.boundingBox()
+  if (!overlayBox) throw new Error('Music Room vacuum map editor overlay was not measurable')
+
+  await page.mouse.move(overlayBox.x + overlayBox.width * 0.08, overlayBox.y + overlayBox.height * 0.45)
+  await page.mouse.down()
+  await page.mouse.move(overlayBox.x + overlayBox.width * 0.16, overlayBox.y + overlayBox.height * 0.58, { steps: 6 })
+  await page.mouse.up()
+
+  const selection = dialog.locator('[data-map-rect="true"]')
+  await expect(selection).toBeVisible()
+  const selectedRect = await selection.evaluate((element) => ({
+    x0: Number(element.getAttribute('data-x0')),
+    x1: Number(element.getAttribute('data-x1')),
+    y0: Number(element.getAttribute('data-y0')),
+    y1: Number(element.getAttribute('data-y1')),
+  }))
+  expect(selectedRect.x0).toBeGreaterThanOrEqual(638)
+  expect(selectedRect.x1).toBeLessThanOrEqual(782)
+  await expect(map).toHaveAttribute('data-selection-allowed', 'true')
+
+  await dialog.getByRole('button', { name: 'Use This Area' }).click()
+  await dialog.getByRole('button', { name: 'Start Area Clean' }).click()
+  const calls = await page.evaluate(() => (
+    (window as unknown as { __mockHass: { calls: Record<string, unknown>[] } }).__mockHass.calls
+      .filter((call) => call.domain === 'script' && call.service === 'music_room_vacuum_clean_zone')
+  ))
+  expect(calls).toEqual([{
+    domain: 'script',
+    service: 'music_room_vacuum_clean_zone',
+    serviceData: {
+      x_max_cm: selectedRect.x1 * 5,
+      x_min_cm: selectedRect.x0 * 5,
+      y_max_cm: selectedRect.y1 * 5,
+      y_min_cm: selectedRect.y0 * 5,
+    },
+  }])
+})
+
+test('music room focused map recovers when availability changes during a gesture', async ({ page }) => {
+  await page.goto('/at-a-glance/vacuums')
+  await page.evaluate(() => {
+    const mock = (window as unknown as {
+      __mockHass: {
+        setEntityState: (entityId: string, state: string) => void
+      }
+    }).__mockHass
+    mock.setEntityState('vacuum.valetudo_elatedusedram', 'docked')
+    mock.setEntityState('sensor.valetudo_elatedusedram_battery_level', '100')
+    mock.setEntityState('sensor.valetudo_elatedusedram_error', 'No error')
+    mock.setEntityState('sensor.valetudo_elatedusedram_status_flag', 'none')
+    mock.setEntityState('camera.valetudo_elatedusedram_map_data', 'idle')
+    mock.setEntityState('select.valetudo_elatedusedram_mode', 'vacuum')
+    mock.setEntityState('select.valetudo_elatedusedram_fan', 'balanced')
+    mock.setEntityState('select.valetudo_elatedusedram_water', 'medium')
+  })
+
+  await page.getByRole('button', { name: /Music Room Docked/i }).click()
+  const dialog = page.getByRole('dialog')
+  await dialog.getByRole('group', { name: 'Cleaning target' }).getByRole('button', { name: 'Area' }).click()
+  await dialog.getByRole('button', { name: 'Draw Area' }).click()
+  const overlay = dialog.locator('[data-map-editor-overlay="true"]')
+  const overlayBox = await overlay.boundingBox()
+  if (!overlayBox) throw new Error('Music Room vacuum map editor overlay was not measurable')
+  await page.mouse.move(overlayBox.x + overlayBox.width / 2, overlayBox.y + overlayBox.height / 2)
+  await page.mouse.down()
+
+  await page.evaluate(() => {
+    const mock = (window as unknown as {
+      __mockHass: {
+        setEntityState: (entityId: string, state: string) => void
+      }
+    }).__mockHass
+    mock.setEntityState('vacuum.valetudo_elatedusedram', 'unavailable')
+    mock.setEntityState('sensor.valetudo_elatedusedram_error', 'unavailable')
+  })
+  await expect(dialog.getByRole('heading', { name: 'Music Room Robot Vacuum' })).toBeVisible()
+  await page.mouse.up()
+
+  await page.evaluate(() => {
+    const mock = (window as unknown as {
+      __mockHass: {
+        setEntityState: (entityId: string, state: string) => void
+      }
+    }).__mockHass
+    mock.setEntityState('vacuum.valetudo_elatedusedram', 'docked')
+    mock.setEntityState('sensor.valetudo_elatedusedram_error', 'No error')
+  })
+
+  const map = dialog.getByRole('region', { name: 'Music Room Valetudo map' })
+  await expect(map).toHaveAttribute('data-map-scope', 'focused')
+  await expect(dialog.getByRole('button', { name: 'Full Map' })).toHaveCount(0)
+  await expect(dialog.getByText('Reachable Area Only')).toHaveCount(0)
+  await expect(dialog.locator('[data-map-rect="true"]')).toHaveCount(0)
 })
 
 test('current vacuum issues use coherent raw state without assertive helper prose', async ({ page }) => {
@@ -4131,7 +4321,7 @@ test('mobile bed dial maps taps, drag, and keyboard to targets without invoking 
   expect(powerOffCalls).toHaveLength(0)
 })
 
-test('mobile SleepyPod target prompt commits Tonight immediately and closes without an extra command', async ({ page }) => {
+test('mobile SleepyPod target prompt keeps current-target commands separate from All Nights persistence', async ({ page }) => {
   await page.setViewportSize({ width: 393, height: 852 })
   await page.goto('/at-a-glance/master-bedroom')
   await page.evaluate(() => {
@@ -4237,7 +4427,7 @@ test('mobile SleepyPod target prompt commits Tonight immediately and closes with
       serviceData: { level: -6 },
     },
   ])
-  await scopeDialog.getByRole('button', { name: 'Close' }).click()
+  await scopeDialog.getByRole('button', { name: 'All Nights' }).click()
 
   await expect(scopeDialog).toHaveAttribute('data-state', 'closed')
   await expect(scopeDialog).toHaveAttribute('data-closing', 'true')
@@ -4250,6 +4440,19 @@ test('mobile SleepyPod target prompt commits Tonight immediately and closes with
     (window as unknown as { __mockHass: { calls: Record<string, unknown>[] } }).__mockHass.calls
       .filter((call) => call.domain === 'script')
   ))).toHaveLength(2)
+  await expect.poll(async () => page.evaluate(() => (
+    (window as unknown as { __mockHass: { calls: Record<string, unknown>[] } }).__mockHass.calls
+      .filter((call) => call.domain === 'number' || call.domain === 'climate')
+  ))).toEqual([])
+  await expect.poll(async () => page.evaluate(() => (
+    (window as unknown as { __mockHass: { calls: Record<string, unknown>[] } }).__mockHass.calls
+      .filter((call) => call.domain === 'input_number' && call.service === 'set_value')
+  ))).toEqual([{
+    domain: 'input_number',
+    service: 'set_value',
+    target: 'input_number.eight_sleep_stephen_bedtime_level',
+    serviceData: { value: -6 },
+  }])
   await expect(targetSlider).toHaveAttribute('aria-valuenow', '-6')
 })
 

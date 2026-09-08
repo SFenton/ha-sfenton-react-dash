@@ -4,7 +4,7 @@ import { useHass } from '@hakit/core'
 import { Description } from '../core/Description'
 import { CheckboxRow } from '../core/CheckboxRow'
 import { MaterialIcon } from '../core/Icon'
-import { ModalSheet, type ModalSheetStyle } from '../core/ModalSheet'
+import { ModalSheet, type ModalCenteredGeometry } from '../core/ModalSheet'
 import { NativePickerField } from '../core/NativePickerField'
 import { RadioRow } from '../core/RadioRow'
 import { EVERSHELF_DEFAULT_LOCATION } from '../../constants/everShelfFood'
@@ -120,10 +120,12 @@ interface EverShelfAddItemResult {
   [key: string]: unknown
 }
 
-const SCAN_ITEM_MODAL_STYLE: ModalSheetStyle = {
-  '--modal-desktop-max-width': '560px',
-  '--modal-desktop-width': '560px',
-}
+const SCAN_ITEM_CENTERED_GEOMETRY = {
+  blockPolicy: 'fixed',
+  blockSize: '628px',
+  id: 'scan-item',
+  inlineSize: '560px',
+} satisfies ModalCenteredGeometry
 
 const CAMERA_CONSTRAINTS: MediaStreamConstraints = {
   audio: false,
@@ -1472,7 +1474,7 @@ export function ScanItemCameraSheet({ defaultLocation, open, onClose }: ScanItem
   return (
     <ModalSheet
       backLabel={backLabel}
-      contentStyle={SCAN_ITEM_MODAL_STYLE}
+      centeredGeometry={SCAN_ITEM_CENTERED_GEOMETRY}
       footer={footer}
       onBack={onBack}
       onClose={handleClose}
@@ -1484,8 +1486,8 @@ export function ScanItemCameraSheet({ defaultLocation, open, onClose }: ScanItem
     >
       <div className={styles.sheet} data-processing={isProcessing ? 'true' : 'false'} data-step={step}>
         {isProcessing && (
-          <section className={styles.processingPage} aria-live="polite" role="status">
-            <div className={styles.spinner} aria-hidden="true" />
+          <section className={styles.processingPage} aria-live="polite" data-scan-progress="processing" role="status">
+            <div className={styles.spinner} aria-hidden="true" data-scan-progress-spinner="true" />
             <strong>Processing...</strong>
           </section>
         )}
@@ -1611,7 +1613,7 @@ export function ScanItemCameraSheet({ defaultLocation, open, onClose }: ScanItem
         )}
 
         {step === 'adding' && (
-          <section className={styles.addingPage} aria-live="polite">
+          <section className={styles.addingPage} aria-live="polite" data-scan-progress={addStatus === 'added' ? 'complete' : 'adding'} role="status">
             {addStatus === 'added' ? (
               <>
                 <div className={styles.successIcon} aria-hidden="true">
@@ -1621,7 +1623,7 @@ export function ScanItemCameraSheet({ defaultLocation, open, onClose }: ScanItem
               </>
             ) : (
               <>
-                <div className={styles.spinner} aria-hidden="true" />
+                <div className={styles.spinner} aria-hidden="true" data-scan-progress-spinner="true" />
                 <strong>Adding to {addedLocation}...</strong>
               </>
             )}

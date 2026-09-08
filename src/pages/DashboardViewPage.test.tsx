@@ -859,7 +859,10 @@ describe('DashboardViewPage', () => {
         zxingMock.latestCallback?.({ getText: () => '3017620422003' }, undefined, { stop: zxingMock.scannerStop })
       })
 
-      expect(await screen.findByRole('status')).toHaveTextContent('Processing...')
+      const barcodeProgress = await screen.findByRole('status')
+      expect(barcodeProgress).toHaveAttribute('data-scan-progress', 'processing')
+      expect(barcodeProgress).toHaveTextContent('Processing...')
+      expect(barcodeProgress.querySelector('[data-scan-progress-spinner="true"]')).toBeInTheDocument()
       expect(screen.queryByText('Use the product barcode to look up item details')).not.toBeInTheDocument()
       expect(screen.queryByLabelText('Live item scan camera feed')).not.toBeInTheDocument()
       expect(screen.queryByRole('button', { name: 'Skip Barcode' })).not.toBeInTheDocument()
@@ -881,7 +884,10 @@ describe('DashboardViewPage', () => {
       fireEvent.click(screen.getByRole('button', { name: 'Next' }))
       await startAndCaptureExpirationDate()
 
-      expect(await screen.findByRole('status')).toHaveTextContent('Processing...')
+      const expiryProgress = await screen.findByRole('status')
+      expect(expiryProgress).toHaveAttribute('data-scan-progress', 'processing')
+      expect(expiryProgress).toHaveTextContent('Processing...')
+      expect(expiryProgress.querySelector('[data-scan-progress-spinner="true"]')).toBeInTheDocument()
       expect(screen.queryByText('Take a clear photo of the printed expiration date')).not.toBeInTheDocument()
       expect(screen.queryByLabelText('Live expiration date camera feed')).not.toBeInTheDocument()
       expect(screen.queryByRole('button', { name: 'Read Expiration Date' })).not.toBeInTheDocument()
@@ -1290,6 +1296,35 @@ describe('DashboardViewPage', () => {
     expect(screen.queryByText('Current Readings')).not.toBeInTheDocument()
   })
 
+  it('shows the bed sensor in the Master Bedroom occupancy and climate popups', async () => {
+    const renderMasterBedroom = () => render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
+
+    let view = renderMasterBedroom()
+    fireEvent.click(document.querySelector('[data-status-chip="Occupancy"] button')!)
+    let dialog = await screen.findByRole('dialog')
+    expect(within(dialog).getAllByRole('article').map((card) => card.getAttribute('aria-label'))).toEqual([
+      'Master Bedroom Clear',
+      'Bed Clear',
+      'Bathroom Clear',
+      'Closet Clear',
+    ])
+    view.unmount()
+    window.history.replaceState(null, '', window.location.pathname)
+
+    view = renderMasterBedroom()
+    fireEvent.click(document.querySelector('[data-status-chip="Climate"] button')!)
+    dialog = await screen.findByRole('dialog')
+    expect(within(dialog).getAllByRole('article').map((card) => card.getAttribute('aria-label'))).toEqual([
+      'Window 70.0°F',
+      'Bed 73.1°F',
+      'Bathroom 70.0°F',
+      'Closet 70.0°F',
+      'Vents Closed',
+    ])
+    expect(within(dialog).getByRole('article', { name: 'Bed 73.1°F' })).toHaveStyle('--card-rgb: 220 213 17')
+    view.unmount()
+  })
+
   it('ports the Guest Room source page with its status chips and reusable popups', async () => {
     const renderGuestRoom = () => render(<DashboardViewPage activePath="guest-room" onNavigate={() => undefined} path="guest-room" />)
 
@@ -1433,8 +1468,9 @@ describe('DashboardViewPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Open Presence-Based Overrides' }))
     const presenceDialog = await screen.findByRole('dialog', { name: 'Presence-Based Overrides' })
     expect(presenceDialog).toHaveAttribute('data-surface', 'hass-popup')
+    expect(presenceDialog).toHaveAttribute('data-modal-geometry-intent', 'admin-presence-overrides')
     expect(presenceDialog).toHaveStyle({
-      '--modal-desktop-height': 'min(860px, calc(var(--dashboard-visible-height, var(--dashboard-viewport-height, 100dvh)) - 64px))',
+      '--modal-centered-block-size': '860px',
     })
     expect(screen.getByRole('heading', { name: 'Presence-Based Overrides' })).toBeInTheDocument()
     const livingRoomPresence = within(presenceDialog).getByRole('button', { name: 'Living Room Enabled' })
@@ -1446,8 +1482,9 @@ describe('DashboardViewPage', () => {
 
     const detailPage = await screen.findByRole('dialog', { name: 'Living Room Presence Lighting' })
     expect(detailPage).toBe(presenceDialog)
+    expect(detailPage).toHaveAttribute('data-modal-geometry-intent', 'admin-presence-overrides')
     expect(detailPage).toHaveStyle({
-      '--modal-desktop-height': 'min(860px, calc(var(--dashboard-visible-height, var(--dashboard-viewport-height, 100dvh)) - 64px))',
+      '--modal-centered-block-size': '860px',
     })
     expect(screen.getAllByRole('dialog')).toHaveLength(1)
     expect(within(detailPage).getAllByRole('button', { name: /Set Living Room presence lighting to/i })).toHaveLength(4)
@@ -2622,12 +2659,12 @@ describe('DashboardViewPage', () => {
 
   it.each([
     ['bedtime', 'Tonight', null],
-    ['bedtime', 'All Nights', 'sleepypod_stephen_bedtime_temperature_all_nights'],
+    ['bedtime', 'All Nights', 'input_number.eight_sleep_stephen_bedtime_level'],
     ['asleep', 'Tonight', null],
-    ['asleep', 'All Nights', 'sleepypod_stephen_asleep_temperature_all_nights'],
+    ['asleep', 'All Nights', 'input_number.eight_sleep_stephen_asleep_level'],
     ['dawn', 'Tonight', null],
-    ['dawn', 'All Nights', 'sleepypod_stephen_dawn_temperature_all_nights'],
-  ])('commits Tonight during %s before applying %s', async (phase, choice, allNightsService) => {
+    ['dawn', 'All Nights', 'input_number.eight_sleep_stephen_dawn_level'],
+  ])('commits Tonight during %s before persisting %s without reapplying the current target', async (phase, choice, allNightsTarget) => {
     setupStephenSleepypodLevelControl(phase)
     render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
 
@@ -2653,11 +2690,12 @@ describe('DashboardViewPage', () => {
     fireEvent.click(within(scopeDialog).getByRole('button', { name: choice }))
 
     expect(targetSlider).toHaveAttribute('aria-valuenow', '-3')
-    const expectedCalls = allNightsService
+    const expectedCalls = allNightsTarget
       ? [tonightCall, {
-          domain: 'script',
-          service: allNightsService,
-          serviceData: { level: -3 },
+          domain: 'input_number',
+          service: 'set_value',
+          target: allNightsTarget,
+          serviceData: { value: -3 },
         }]
       : [tonightCall]
     await waitFor(() => expect(mockCallServiceCalls).toEqual(expectedCalls))
@@ -2667,6 +2705,149 @@ describe('DashboardViewPage', () => {
     expect(within(bedDialog).getByRole('region', { hidden: true, name: /Stephen's Bed thermostat Cooling -3/i })).toBeInTheDocument()
     await waitFor(() => expect(within(bedDialog).getByRole('slider', { name: "Stephen's Bed target level" })).toHaveFocus())
     expect(mockCallServiceCalls.some((call) => call.domain === 'number')).toBe(false)
+    expect(mockCallServiceCalls.some((call) => call.domain === 'script' && call.service.includes('all_nights'))).toBe(false)
+  })
+
+  it('offers All Nights without sending a current-target command when the active-phase value is unchanged', async () => {
+    setupStephenSleepypodLevelControl('bedtime')
+    mockEntities['number.master_bedroom_sleepypod_eight_pod_left_target_level'].state = '-10'
+    render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
+
+    fireEvent.click(screen.getByRole('button', { name: /Stephen's Bed Cooling • -10/i }))
+    const bedDialog = await screen.findByRole('dialog', { name: "Stephen's Bed" })
+    const targetSlider = within(bedDialog).getByRole('slider', { name: "Stephen's Bed target level" })
+    fireEvent.keyDown(targetSlider, { key: 'Home' })
+
+    expect(targetSlider).toHaveAttribute('aria-valuenow', '-10')
+    const scopeDialog = await screen.findByRole('dialog', { name: 'Set Bed Temperature' })
+    expect(mockCallServiceCalls).toEqual([])
+    fireEvent.click(within(scopeDialog).getByRole('button', { name: 'All Nights' }))
+
+    await waitFor(() => expect(mockCallServiceCalls).toEqual([{
+      domain: 'input_number',
+      service: 'set_value',
+      target: 'input_number.eight_sleep_stephen_bedtime_level',
+      serviceData: { value: -10 },
+    }]))
+  })
+
+  it('does not send a command when an outside-window dial commit keeps the current target', async () => {
+    setupStephenSleepypodLevelControl('outside')
+    mockEntities['number.master_bedroom_sleepypod_eight_pod_left_target_level'].state = '-10'
+    render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
+
+    fireEvent.click(screen.getByRole('button', { name: /Stephen's Bed Cooling • -10/i }))
+    const bedDialog = await screen.findByRole('dialog', { name: "Stephen's Bed" })
+    const targetSlider = within(bedDialog).getByRole('slider', { name: "Stephen's Bed target level" })
+    fireEvent.keyDown(targetSlider, { key: 'Home' })
+
+    expect(targetSlider).toHaveAttribute('aria-valuenow', '-10')
+    expect(screen.queryByRole('dialog', { name: 'Set Bed Temperature' })).not.toBeInTheDocument()
+    await act(async () => {
+      await new Promise((resolve) => window.setTimeout(resolve, 400))
+    })
+    expect(mockCallServiceCalls).toEqual([])
+  })
+
+  it('cancels a queued outside-window command when the dial returns to the live target', async () => {
+    setupStephenSleepypodLevelControl('outside')
+    render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
+
+    fireEvent.click(screen.getByRole('button', { name: /Stephen's Bed Cooling • -2/i }))
+    const bedDialog = await screen.findByRole('dialog', { name: "Stephen's Bed" })
+    const targetSlider = within(bedDialog).getByRole('slider', { name: "Stephen's Bed target level" })
+    fireEvent.keyDown(targetSlider, { key: 'ArrowLeft' })
+    fireEvent.keyDown(targetSlider, { key: 'ArrowRight' })
+
+    expect(targetSlider).toHaveAttribute('aria-valuenow', '-2')
+    await act(async () => {
+      await new Promise((resolve) => window.setTimeout(resolve, 400))
+    })
+    expect(mockCallServiceCalls).toEqual([])
+  })
+
+  it('cancels a stale queued outside-window command after HA reports a new live target', async () => {
+    setupStephenSleepypodLevelControl('outside')
+    const view = render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
+
+    fireEvent.click(screen.getByRole('button', { name: /Stephen's Bed Cooling • -2/i }))
+    const bedDialog = await screen.findByRole('dialog', { name: "Stephen's Bed" })
+    const targetSlider = within(bedDialog).getByRole('slider', { name: "Stephen's Bed target level" })
+    fireEvent.keyDown(targetSlider, { key: 'ArrowLeft' })
+
+    act(() => {
+      mockEntities['number.master_bedroom_sleepypod_eight_pod_left_target_level'].state = '-4'
+      view.rerender(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
+    })
+    fireEvent.keyDown(targetSlider, { key: 'ArrowLeft' })
+
+    expect(targetSlider).toHaveAttribute('aria-valuenow', '-4')
+    await act(async () => {
+      await new Promise((resolve) => window.setTimeout(resolve, 400))
+    })
+    expect(mockCallServiceCalls).toEqual([])
+  })
+
+  it('allows the same target to be reasserted after HA reports an intervening external change', async () => {
+    setupStephenSleepypodLevelControl('outside')
+    mockEntities['number.master_bedroom_sleepypod_eight_pod_left_target_level'].state = '-9'
+    const view = render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
+
+    fireEvent.click(screen.getByRole('button', { name: /Stephen's Bed Cooling • -9/i }))
+    const bedDialog = await screen.findByRole('dialog', { name: "Stephen's Bed" })
+    const targetSlider = within(bedDialog).getByRole('slider', { name: "Stephen's Bed target level" })
+    fireEvent.keyDown(targetSlider, { key: 'Home' })
+    await waitFor(() => expect(mockCallServiceCalls).toHaveLength(1))
+
+    act(() => {
+      mockEntities['number.master_bedroom_sleepypod_eight_pod_left_target_level'].state = '-8'
+      view.rerender(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
+    })
+    fireEvent.keyDown(targetSlider, { key: 'Home' })
+
+    await waitFor(() => expect(mockCallServiceCalls).toEqual([
+      {
+        domain: 'script',
+        service: 'sleepypod_stephen_temperature_outside_schedule',
+        serviceData: { level: -10 },
+      },
+      {
+        domain: 'script',
+        service: 'sleepypod_stephen_temperature_outside_schedule',
+        serviceData: { level: -10 },
+      },
+    ]))
+  })
+
+  it('persists Steph All Nights through the schedule helper without another current-target script', async () => {
+    setupStephSleepypodLevelControl('bedtime')
+    render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
+
+    fireEvent.click(screen.getByRole('button', { name: /Steph's Bed/i }))
+    const bedDialog = await screen.findByRole('dialog', { name: "Steph's Bed" })
+    const targetSlider = within(bedDialog).getByRole('slider', { name: "Steph's Bed target level" })
+    fireEvent.keyDown(targetSlider, { key: 'ArrowLeft' })
+    const scopeDialog = await screen.findByRole('dialog', { name: 'Set Bed Temperature' })
+    const allNights = within(scopeDialog).getByRole('button', { name: 'All Nights' })
+
+    act(() => {
+      allNights.click()
+      allNights.click()
+    })
+
+    await waitFor(() => expect(mockCallServiceCalls).toEqual([
+      {
+        domain: 'script',
+        service: 'sleepypod_steph_temperature_tonight',
+        serviceData: { level: 0 },
+      },
+      {
+        domain: 'input_number',
+        service: 'set_value',
+        target: 'input_number.eight_sleep_steph_bedtime_level',
+        serviceData: { value: 0 },
+      },
+    ]))
   })
 
   it('keeps Tonight changes when the scope prompt is dismissed from the action, close button, or backdrop', async () => {
@@ -5255,9 +5436,29 @@ describe('DashboardViewPage', () => {
 
     const dialog = await screen.findByRole('dialog')
     expect(within(dialog).getByRole('heading', { name: 'Music Room: Robot Vacuum' })).toBeInTheDocument()
-    expect(within(dialog).getByLabelText('Unavailable')).toHaveTextContent('Home Assistant does not have a current status for the vacuum.')
+    expect(within(dialog).queryByLabelText('Unavailable')).not.toBeInTheDocument()
+    expect(within(dialog).getByText('Last Reported Position').closest('[role="note"]')).toHaveTextContent('Last Reported Position')
+    expect(within(dialog).getByText('Battery').closest('[data-icon]')).toHaveAttribute('data-tone', 'unavailable')
     expect(within(dialog).queryByRole('button', { name: 'Locate' })).not.toBeInTheDocument()
     expect(mockCallServiceCalls).toEqual([])
+  })
+
+  it('keeps the unavailable notice when no retained vacuum map exists', async () => {
+    const cameraEntityId = 'camera.valetudo_elatedusedram_map_data'
+    const cameraEntity = mockEntities[cameraEntityId]
+    delete mockEntities[cameraEntityId]
+
+    try {
+      render(<DashboardViewPage activePath="music-room" onNavigate={() => undefined} path="music-room" />)
+      fireEvent.click(screen.getByRole('button', { name: 'Music Room Unavailable' }))
+
+      const dialog = await screen.findByRole('dialog')
+      expect(within(dialog).getByText('Map Unavailable')).toBeInTheDocument()
+      expect(within(dialog).getByLabelText('Unavailable')).toHaveTextContent('Home Assistant does not have a current status for the vacuum.')
+      expect(within(dialog).queryByText('Last Reported Position')).not.toBeInTheDocument()
+    } finally {
+      if (cameraEntity) mockEntities[cameraEntityId] = cameraEntity
+    }
   })
 
   it('retains room vacuum focus when the vacuum becomes unavailable', () => {
@@ -5637,6 +5838,24 @@ describe('DashboardViewPage', () => {
     expect(within(dialog).getByRole('heading', { name: 'Living Room: Robot Vacuum' })).toBeInTheDocument()
     expect(within(dialog).getByRole('tablist', { name: 'Main Floor modal sections' })).toBeInTheDocument()
     expect(within(dialog).getByRole('button', { name: 'Area' })).toHaveAttribute('aria-pressed', 'true')
+  })
+
+  it('closes the area editor when the vacuum becomes unavailable', async () => {
+    render(<DashboardViewPage activePath="living-room" onNavigate={() => undefined} path="living-room" />)
+
+    fireEvent.click(screen.getByRole('button', { name: /Main Floor Docked/i }))
+    const dialog = await screen.findByRole('dialog')
+    fireEvent.click(within(within(dialog).getByRole('group', { name: 'Cleaning target' })).getByRole('button', { name: 'Area' }))
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Draw Area' }))
+    expect(within(dialog).getByRole('heading', { name: 'Main Floor Cleaning Area' })).toBeInTheDocument()
+
+    act(() => setMockEntityState('vacuum.valetudo_exaltedsneakydeer', 'unavailable'))
+
+    await waitFor(() => expect(within(dialog).getByRole('heading', { name: 'Living Room: Robot Vacuum' })).toBeInTheDocument())
+    expect(within(dialog).queryByRole('button', { name: 'Draw' })).not.toBeInTheDocument()
+    expect(within(dialog).getByText('Last Reported Position').closest('[role="note"]')).toBeInTheDocument()
+    expect(within(dialog).queryByRole('button', { name: 'Locate' })).not.toBeInTheDocument()
+    expect(mockCallServiceCalls).toEqual([])
   })
 
   it('runs source-derived vacuum modal services without activating hidden actions', async () => {
@@ -6864,7 +7083,7 @@ describe('DashboardViewPage', () => {
     render(<DashboardViewPage activePath="stephens-chores" onNavigate={() => undefined} path="stephens-chores" />)
 
     const dueTodayList = await screen.findByLabelText('Due Today todo list')
-    const describedTask = within(dueTodayList).getByRole('button', { name: /Replace HVAC filter\s+Due in 2 days · Use MERV 13/i })
+    const describedTask = within(dueTodayList).getByRole('button', { name: /Replace HVAC filter\s+Due in 2 days/i })
     const plainTask = within(dueTodayList).getByRole('button', { name: 'Take out trash' })
 
     expect(describedTask.querySelector('path')).toHaveAttribute('d', materialIconPath('mdi:checkbox-blank-outline'))
@@ -7716,9 +7935,10 @@ describe('DashboardViewPage', () => {
     expect(statusPill).toHaveTextContent(statusValue)
     expect(statusPill).toHaveAttribute('data-tone', statusTone)
     if (state === 'unavailable') {
-      expect(within(dialog).getByLabelText('Unavailable')).toHaveTextContent('Home Assistant does not have a current status for the vacuum.')
-      expect(within(dialog).getByText('Map Unavailable')).toBeInTheDocument()
-      expect(within(dialog).getByText("Home Assistant cannot currently confirm the vacuum's map or position.")).toBeInTheDocument()
+      expect(within(dialog).queryByLabelText('Unavailable')).not.toBeInTheDocument()
+      expect(within(dialog).getByText('Last Reported Position').closest('[role="note"]')).toHaveTextContent('Last Reported Position')
+      expect(within(dialog).getByText('Battery').closest('[data-icon]')).toHaveAttribute('data-tone', 'unavailable')
+      expect(within(dialog).queryByText('Map Unavailable')).not.toBeInTheDocument()
       expect(within(dialog).queryByRole('button', { name: 'Locate' })).not.toBeInTheDocument()
       expect(within(dialog).queryByRole('alert')).not.toBeInTheDocument()
     }
@@ -7736,7 +7956,8 @@ describe('DashboardViewPage', () => {
     const dialog = await screen.findByRole('dialog')
     expect(within(dialog).queryByText(/battery is critically low/i)).not.toBeInTheDocument()
     expect(within(dialog).queryByRole('alert')).not.toBeInTheDocument()
-    expect(within(dialog).getByLabelText('Unavailable')).toHaveTextContent('Home Assistant does not have a current status for the vacuum.')
+    expect(within(dialog).queryByLabelText('Unavailable')).not.toBeInTheDocument()
+    expect(within(dialog).getByText('Last Reported Position').closest('[role="note"]')).toHaveTextContent('Last Reported Position')
     expect(within(dialog).queryByRole('button', { name: 'Locate' })).not.toBeInTheDocument()
     expect(mockCallServiceCalls).toEqual([])
   })
@@ -7871,7 +8092,8 @@ describe('DashboardViewPage', () => {
     expect(statusPill).toHaveAttribute('data-tone', 'unavailable')
     expect(within(dialog).getByText('Battery').closest('[data-icon]')).toHaveTextContent('Unknown')
     expect(within(dialog).getByRole('group', { name: 'Dock Status Unknown' })).toBeInTheDocument()
-    expect(within(dialog).getByText('Map Unavailable')).toBeInTheDocument()
+    expect(within(dialog).getByText('Last Reported Position').closest('[role="note"]')).toHaveTextContent('Last Reported Position')
+    expect(within(dialog).queryByText('Map Unavailable')).not.toBeInTheDocument()
     expect(within(dialog).queryByText(/Battery level is low/i)).not.toBeInTheDocument()
     expect(within(dialog).queryByRole('button', { name: 'Locate' })).not.toBeInTheDocument()
     expect(within(dialog).queryByRole('alert')).not.toBeInTheDocument()
@@ -7886,23 +8108,24 @@ describe('DashboardViewPage', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /Main Floor Docked/i }))
     const dialog = await screen.findByRole('dialog')
-    const summary = within(dialog).getByRole('button', { name: 'Open Main Floor Cleaning Outcomes for Aug 19, 2026' })
+    const summary = within(dialog).getByRole('button', { name: 'Open Main Floor Automatic Cleaning Report for Aug 19, 2026' })
     summary.focus()
     fireEvent.click(summary)
 
     expect(screen.getByRole('dialog')).toBe(dialog)
     expect(dialog).toHaveAttribute('data-size', 'workspace')
     expect(dialog).toHaveAttribute('data-scroll-mode', 'body')
-    expect(within(dialog).getByRole('heading', { name: 'While-Away Vacuum Outcomes · Aug 19, 2026' })).toBeInTheDocument()
+    expect(within(dialog).getByRole('heading', { name: 'Main Floor · Automatic Cleaning Report' })).toBeInTheDocument()
     expect(within(dialog).queryByRole('tablist', { name: 'Main Floor modal sections' })).not.toBeInTheDocument()
     expect(within(dialog).getAllByLabelText('Dining Room Failed')).toHaveLength(1)
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Show Dining Room History' }))
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Show Dining Room Technical Vacuum Diagnostics' }))
+    expect(within(dialog).queryByRole('button', { name: 'Show Dining Room History' })).not.toBeInTheDocument()
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Show Office History' }))
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Show Office Technical Vacuum Diagnostics' }))
     expect(mockCallServiceCalls).toEqual([])
 
     fireEvent.click(within(dialog).getByRole('button', { name: 'Back to Vacuum Controls' }))
     await waitFor(() => expect(
-      within(dialog).getByRole('button', { name: 'Open Main Floor Cleaning Outcomes for Aug 19, 2026' }),
+      within(dialog).getByRole('button', { name: 'Open Main Floor Automatic Cleaning Report for Aug 19, 2026' }),
     ).toHaveFocus())
     expect(dialog).toHaveAttribute('data-scroll-mode', 'panes')
     expect(within(dialog).getByRole('tablist', { name: 'Main Floor modal sections' })).toBeInTheDocument()
@@ -7919,10 +8142,10 @@ describe('DashboardViewPage', () => {
 
     render(<VacuumRoomSourceModalContent vacuum={mainFloorVacuum} />)
 
-    expect(screen.getByRole('heading', { name: 'While You Were Away' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Main Floor Cleaning Report' })).toBeInTheDocument()
     expect(screen.getByRole('note', { name: 'Cleaned' })).toHaveTextContent('Cleaned Gym')
     expect(screen.getByRole('note', { name: 'Issues' })).toHaveTextContent('Could not clean Dining Room because the clean water tank is empty')
-    expect(screen.queryByRole('button', { name: /Cleaning Outcomes for/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Automatic Cleaning Report for/ })).not.toBeInTheDocument()
   })
 
   it('renders no dead outcome surface for room-source content when typed data has no legacy arrays', () => {
@@ -7934,8 +8157,8 @@ describe('DashboardViewPage', () => {
 
     render(<VacuumRoomSourceModalContent vacuum={mainFloorVacuum} />)
 
-    expect(screen.queryByRole('heading', { name: 'While You Were Away' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /Cleaning Outcomes for/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Main Floor Cleaning Report' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Automatic Cleaning Report for/ })).not.toBeInTheDocument()
   })
 
   it('keeps the captured outcome detail stable across live legacy updates until Back', async () => {
@@ -7949,13 +8172,13 @@ describe('DashboardViewPage', () => {
     const dialog = await screen.findByRole('dialog')
     const body = dialog.querySelector<HTMLElement>('[data-modal-sheet-body="true"]')!
     body.scrollTop = 47
-    fireEvent.click(within(dialog).getByRole('button', { name: /Open Main Floor Cleaning Outcomes/ }))
+    fireEvent.click(within(dialog).getByRole('button', { name: /Open Main Floor Automatic Cleaning Report/ }))
 
     session.attributes = { ...LEGACY_VACUUM_OUTCOMES }
     view.rerender(<DashboardViewPage activePath="vacuums" onNavigate={() => undefined} path="vacuums" />)
 
     expect(screen.getAllByRole('dialog')).toHaveLength(1)
-    expect(within(dialog).getByRole('heading', { name: 'While-Away Vacuum Outcomes · Aug 19, 2026' })).toBeInTheDocument()
+    expect(within(dialog).getByRole('heading', { name: 'Main Floor · Automatic Cleaning Report' })).toBeInTheDocument()
     expect(within(dialog).getByLabelText('Dining Room Failed')).toBeInTheDocument()
     expect(within(dialog).queryByRole('tablist', { name: 'Main Floor modal sections' })).not.toBeInTheDocument()
 
@@ -7970,7 +8193,7 @@ describe('DashboardViewPage', () => {
     await waitFor(() => expect(legacySection).toHaveFocus())
     expect(body.scrollTop).toBe(47)
     expect(within(dialog).getByRole('tablist', { name: 'Main Floor modal sections' })).toBeInTheDocument()
-    expect(within(dialog).queryByRole('button', { name: /Cleaning Outcomes for/ })).not.toBeInTheDocument()
+    expect(within(dialog).queryByRole('button', { name: /Automatic Cleaning Report for/ })).not.toBeInTheDocument()
   })
 
   it('preserves the outcome detail while the shared sheet performs its mounted close animation', async () => {
@@ -7980,8 +8203,8 @@ describe('DashboardViewPage', () => {
     render(<DashboardViewPage activePath="vacuums" onNavigate={() => undefined} path="vacuums" />)
     fireEvent.click(screen.getByRole('button', { name: /Main Floor Docked/i }))
     const dialog = await screen.findByRole('dialog')
-    fireEvent.click(within(dialog).getByRole('button', { name: /Open Main Floor Cleaning Outcomes/ }))
-    const detailTitle = within(dialog).getByRole('heading', { name: 'While-Away Vacuum Outcomes · Aug 19, 2026' })
+    fireEvent.click(within(dialog).getByRole('button', { name: /Open Main Floor Automatic Cleaning Report/ }))
+    const detailTitle = within(dialog).getByRole('heading', { name: 'Main Floor · Automatic Cleaning Report' })
 
     fireEvent.click(within(dialog).getByRole('button', { name: 'Close' }))
 
@@ -8003,10 +8226,10 @@ describe('DashboardViewPage', () => {
     fireEvent.click(screen.getByRole('button', { name: /Main Floor Docked/i }))
     const dialog = await screen.findByRole('dialog')
 
-    expect(within(dialog).getByRole('heading', { name: 'While You Were Away' })).toBeInTheDocument()
+    expect(within(dialog).getByRole('heading', { name: 'Main Floor Cleaning Report' })).toBeInTheDocument()
     expect(within(dialog).getByRole('note', { name: 'Cleaned' })).toHaveTextContent('Cleaned Gym')
     expect(within(dialog).getByRole('note', { name: 'Issues' })).toHaveTextContent('Could not clean Dining Room because the clean water tank is empty')
-    expect(within(dialog).queryByRole('button', { name: /Cleaning Outcomes for/ })).not.toBeInTheDocument()
+    expect(within(dialog).queryByRole('button', { name: /Automatic Cleaning Report for/ })).not.toBeInTheDocument()
   })
 
   it.each([

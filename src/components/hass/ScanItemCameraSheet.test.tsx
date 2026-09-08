@@ -667,6 +667,39 @@ describe('ScanItemCameraSheet prepared food flag', () => {
     }
   })
 
+  it('keeps an accessible spinner and progress label mounted while an add is pending', async () => {
+    const originalCallService = mockState.helpers.callService
+    let resolveAdd!: (value: unknown) => void
+    mockState.helpers.callService = (params) => {
+      if (params.domain === 'evershelf' && params.service === 'add_scanned_item') {
+        mockCallServiceCalls.push(params)
+        return new Promise((resolve) => {
+          resolveAdd = resolve
+        })
+      }
+      return originalCallService(params)
+    }
+
+    try {
+      renderSheet()
+      goToReviewStep('Buttermilk')
+      fireEvent.click(screen.getByRole('button', { name: 'Add' }))
+
+      const progress = await screen.findByRole('status')
+      expect(progress).toHaveAttribute('data-scan-progress', 'adding')
+      expect(progress).toHaveTextContent('Adding to Pantry...')
+      expect(progress.querySelector('[data-scan-progress-spinner="true"]')).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Add' })).not.toBeInTheDocument()
+
+      resolveAdd({ response: { success: true } })
+      await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Added to Pantry'))
+      expect(screen.getByRole('status')).toHaveAttribute('data-scan-progress', 'complete')
+      expect(screen.queryByRole('button', { name: 'Done' })).toBeEnabled()
+    } finally {
+      mockState.helpers.callService = originalCallService
+    }
+  })
+
   it('reuses the same idempotency key when an add is retried', async () => {
     const originalCallService = mockState.helpers.callService
     let addAttempts = 0
