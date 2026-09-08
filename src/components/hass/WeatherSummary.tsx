@@ -19,9 +19,13 @@ import { WeatherRail, type WeatherRailRange } from './WeatherRail'
 import { WeatherHourlyMetricTiles } from './WeatherHourlyMetricTiles'
 import { WeatherPrecipitationTile } from './WeatherPrecipitationTile'
 import { useWeatherForecasts, WEATHER_FORECAST_PHASE, type WeatherForecast } from './useWeatherForecasts'
+import { useWeatherDayBriefing } from './useWeatherDayBriefing'
+import { renderWeatherBriefingText, weatherBriefingHeadline, type WeatherDayBriefing } from './weatherDayBriefing'
 import {
   classifyUsAqi,
   compassRotationDurationMs,
+  conditionInfo,
+  conditionLabel,
   DEFAULT_WIND_SPEED_UNIT,
   feelsLikePresentation,
   pressurePresentation,
@@ -30,6 +34,7 @@ import {
   sunPresentation,
   uvPresentation,
   visibilityPresentation,
+  WEATHER_CONDITIONS,
   WEATHER_SCENES,
   WIND_ROTATION_EASING,
   windBearingPresentation,
@@ -91,30 +96,11 @@ const WEATHER_CENTERED_GEOMETRY = {
 } satisfies ModalCenteredGeometry
 
 const AQI_CATEGORY_COPY_KEYS: Record<AqiLevel, CopyKey<typeof WEATHER_COPY_NAMESPACE>> = WEATHER_COPY_KEYS.aqi.categories
-const AQI_GUIDANCE_COPY_KEYS: Record<AqiLevel, CopyKey<typeof WEATHER_COPY_NAMESPACE>> = WEATHER_COPY_KEYS.aqi.guidance
 const UV_CATEGORY_COPY_KEYS: Record<UvLevel, CopyKey<typeof WEATHER_COPY_NAMESPACE>> = WEATHER_COPY_KEYS.details.uv.categories
 const SUN_TITLE_COPY_KEYS = {
   sunrise: WEATHER_COPY_KEYS.details.sun.sunrise,
   sunset: WEATHER_COPY_KEYS.details.sun.sunset,
 } as const
-
-const WEATHER_CONDITIONS: Record<string, { icon: string; label: string }> = {
-  'clear-night': { icon: 'mdi:weather-night', label: 'Clear Night' },
-  cloudy: { icon: 'mdi:cloud', label: 'Cloudy' },
-  exceptional: { icon: 'mdi:alert-circle', label: 'Exceptional' },
-  fog: { icon: 'mdi:weather-fog', label: 'Fog' },
-  hail: { icon: 'mdi:weather-hail', label: 'Hail' },
-  lightning: { icon: 'mdi:weather-lightning', label: 'Lightning' },
-  'lightning-rainy': { icon: 'mdi:weather-lightning-rainy', label: 'Storms' },
-  partlycloudy: { icon: 'mdi:weather-partly-cloudy', label: 'Partly Cloudy' },
-  pouring: { icon: 'mdi:weather-pouring', label: 'Heavy Rain' },
-  rainy: { icon: 'mdi:weather-rainy', label: 'Rain' },
-  snowy: { icon: 'mdi:weather-snowy', label: 'Snow' },
-  'snowy-rainy': { icon: 'mdi:weather-snowy-rainy', label: 'Wintry Mix' },
-  sunny: { icon: 'mdi:weather-sunny', label: 'Sunny' },
-  windy: { icon: 'mdi:weather-windy', label: 'Windy' },
-  'windy-variant': { icon: 'mdi:weather-windy-variant', label: 'Windy Clouds' },
-}
 
 const GLYPH_COLOR = {
   alert: '#ff9a3d',
@@ -356,16 +342,6 @@ function stringValue(value: unknown, fallback: string) {
   return typeof value === 'string' && value.trim() ? value : fallback
 }
 
-function conditionInfo(condition: string | undefined) {
-  if (!condition) return { icon: 'mdi:alert-circle', label: 'Weather Unavailable' }
-  return (
-    WEATHER_CONDITIONS[condition] ?? {
-      icon: 'mdi:cloud',
-      label: condition.replace(/[-_]/g, ' ').replace(/\b\w/g, (letter) => letter.toUpperCase()),
-    }
-  )
-}
-
 function weatherSceneDebugEnabled() {
   return (import.meta.env.DEV || import.meta.env.MODE === 'test')
     && typeof window !== 'undefined'
@@ -492,18 +468,6 @@ function modalHighLowLabel(copy: WeatherCopy, forecast: WeatherForecast | undefi
   return copy(WEATHER_COPY_KEYS.hero.highLow, { high, low })
 }
 
-function forecastSummary(forecasts: WeatherForecast[], entity: HassEntity | null) {
-  if (!forecasts.length) return 'Daily Pirate Weather forecast will appear when Home Assistant returns forecast data.'
-  const highs = forecasts.map((forecast) => numberValue(forecast.temperature)).filter((value): value is number => value !== undefined)
-  const rainChances = forecasts.map((forecast) => numberValue(forecast.precipitation_probability)).filter((value): value is number => value !== undefined)
-  const warmest = highs.length ? Math.max(...highs) : undefined
-  const wettest = rainChances.length ? Math.max(...rainChances) : undefined
-  const first = conditionInfo(forecasts[0]?.condition).label.toLowerCase()
-  const warmestLabel = warmest === undefined ? undefined : formatTemperatureValue(warmest, entity?.attributes.temperature_unit)
-  const rainLabel = wettest === undefined ? undefined : formatPercent(wettest)
-  return [`The week opens ${first}`, warmestLabel ? `peaks near ${warmestLabel}` : undefined, rainLabel ? `rain chance tops out at ${rainLabel}` : undefined].filter(Boolean).join(' · ')
-}
-
 function forecastRailRange(forecast: WeatherForecast, forecasts: WeatherForecast[], entity: HassEntity | null, index: number): WeatherRailRange | undefined {
   const ranges = forecasts.flatMap((item) => {
     const low = numberValue(item.templow)
@@ -558,10 +522,6 @@ function highlightStyle(percent: number | undefined, rotation?: number): Weather
 
 function aqiCategory(copy: WeatherCopy, level: AqiLevel) {
   return copy(AQI_CATEGORY_COPY_KEYS[level])
-}
-
-function aqiGuidance(copy: WeatherCopy, level: AqiLevel) {
-  return copy(AQI_GUIDANCE_COPY_KEYS[level])
 }
 
 function uvCategoryLabel(copy: WeatherCopy, level: UvLevel) {
@@ -709,7 +669,7 @@ function ForecastRow({
   motionEnabled: boolean
 }) {
   const copy = useCopy(WEATHER_COPY_NAMESPACE)
-  const condition = conditionInfo(forecast.condition)
+  const condition = { label: conditionLabel(copy, forecast.condition) }
   const highLow = compactHighLowLabel(forecast)
   const railRange = forecastRailRange(forecast, forecasts, entity, index)
 
@@ -1077,7 +1037,7 @@ function HourlyConditionItem({
   pageStart: boolean
 }) {
   const copy = useCopy(WEATHER_COPY_NAMESPACE)
-  const condition = conditionInfo(forecast.condition)
+  const condition = { label: conditionLabel(copy, forecast.condition) }
   const temperature = formatTemperatureValue(forecast.temperature, entity?.attributes.temperature_unit)
   const precipitationChance = formatPercent(forecast.precipitation_probability) ?? copy(WEATHER_COPY_KEYS.unavailable)
   const precipitationAmount = formatMeasure(forecast.precipitation, entity?.attributes.precipitation_unit, 2)
@@ -1251,6 +1211,7 @@ function WeatherCarouselPagination({
 }
 
 function HeroDayForecast({ entity, forecast, motionEnabled }: { entity: HassEntity | null; forecast: WeatherForecast | undefined; motionEnabled: boolean }) {
+  const copy = useCopy(WEATHER_COPY_NAMESPACE)
   if (!forecast) {
     return (
       <span aria-hidden="true" className={`${styles.heroDayForecast} ${styles.heroDayForecastPlaceholder}`}>
@@ -1262,7 +1223,7 @@ function HeroDayForecast({ entity, forecast, motionEnabled }: { entity: HassEnti
     )
   }
 
-  const condition = conditionInfo(forecast.condition)
+  const condition = { label: conditionLabel(copy, forecast.condition) }
   return (
     <span className={styles.heroDayForecast} aria-label={`Today ${condition.label} ${compactHighLowLabel(forecast)}`}>
       <span className={styles.heroDayIcon}>
@@ -1292,6 +1253,7 @@ function HeroHourlyStrip({
   scrollerId: string
   scrollerRef: RefObject<HTMLSpanElement | null>
 }) {
+  const copy = useCopy(WEATHER_COPY_NAMESPACE)
   if (forecasts.length === 0) {
     return (
       <span aria-hidden="true" className={`${styles.heroHourlyStrip} ${styles.heroHourlyStripPlaceholder}`}>
@@ -1309,7 +1271,7 @@ function HeroHourlyStrip({
   return (
     <span aria-label={ariaLabel} className={styles.heroHourlyStrip} data-carousel-snap-ready={pageStartIndices.length > 0 ? 'true' : undefined} data-weather-carousel="hero" id={scrollerId} onKeyDown={onKeyDown} ref={scrollerRef} tabIndex={0}>
       {forecasts.map((forecast, index) => {
-        const condition = conditionInfo(forecast.condition)
+        const condition = { label: conditionLabel(copy, forecast.condition) }
         return (
           <span
             className={styles.heroHourlyItem}
@@ -1501,6 +1463,7 @@ function ForecastRows({
 
 function WeatherForecastSheet({
   aqiEntity,
+  briefing,
   entity,
   error,
   forecasts,
@@ -1512,6 +1475,7 @@ function WeatherForecastSheet({
   sunEntity,
 }: {
   aqiEntity: HassEntity | null
+  briefing: WeatherDayBriefing | null
   entity: HassEntity | null
   error: string | null
   forecasts: WeatherForecast[]
@@ -1523,18 +1487,16 @@ function WeatherForecastSheet({
   sunEntity: HassEntity | null
 }) {
   const copy = useCopy(WEATHER_COPY_NAMESPACE)
-  const condition = conditionInfo(entity?.state)
+  const condition = { label: conditionLabel(copy, entity?.state) }
   const today = forecasts[0]
   const highlights = highlightTiles(entity, forecasts, sunEntity, copy)
-  const aqiStatus = classifyUsAqi(aqiEntity?.state)
-  const headlineCategory = aqiStatus ? aqiCategory(copy, aqiStatus.level) : null
-  const headlineIsAqi = Boolean(aqiStatus?.elevated && headlineCategory)
-  const headlineTitle = headlineIsAqi
-    ? copy(WEATHER_COPY_KEYS.headline.aqi, { category: headlineCategory, value: aqiStatus?.value })
+  const headlineTitle = briefing
+    ? weatherBriefingHeadline(copy, briefing)
     : copy(WEATHER_COPY_KEYS.headline.weather, { condition: condition.label })
-  const headlineDetail = headlineIsAqi && aqiStatus
-    ? aqiGuidance(copy, aqiStatus.level)
-    : forecastSummary(forecasts, entity)
+  const headlineDetail = briefing
+    ? renderWeatherBriefingText(copy, briefing)
+    : copy(WEATHER_COPY_KEYS.briefing.unavailable)
+  const headlineIcon = briefing?.icon ?? conditionInfo(entity?.state).icon
   const [selectedMode, setSelectedMode] = useState<HourlyMode>('condition')
   const { displayMode, transitionPhase } = useWeatherModeTransition(selectedMode)
 
@@ -1549,15 +1511,15 @@ function WeatherForecastSheet({
 
         <section className={styles.currentPanel} aria-label="Today weather summary">
           <div className={styles.currentHero}>
-            <span className={styles.currentIcon}>
-              {headlineIsAqi ? <MaterialIcon name="mdi:air-filter" size={30} /> : <WeatherGlyph condition={entity?.state} size={32} />}
+            <span className={styles.currentIcon} data-severity={briefing?.severity ?? 'calm'}>
+              {briefing?.hazard ? <MaterialIcon name={headlineIcon} size={30} /> : <WeatherGlyph condition={briefing?.condition ?? entity?.state} size={32} />}
             </span>
             <span className={styles.currentCopy}>
               <span className={styles.currentLabel}>{copy(WEATHER_COPY_KEYS.headline.label)}</span>
               <strong>{headlineTitle}</strong>
-              <span>{headlineDetail}</span>
             </span>
           </div>
+          <p className={styles.currentNarrative} data-briefing-date={briefing?.dateKey}>{headlineDetail}</p>
         </section>
 
         <HourlyConditionsPanel activeMode={selectedMode} entity={entity} error={hourlyError} forecasts={hourlyForecasts} loading={hourlyLoading} mode={displayMode} onModeChange={setSelectedMode} transitionPhase={transitionPhase} />
@@ -1623,6 +1585,16 @@ export function WeatherSummary({ deferRefresh = false }: WeatherSummaryProps) {
   const hourlyForecasts = hourly.forecasts
   const hourlyForecastError = hourly.error
   const hourlyForecastLoading = hourly.refreshing && !hourlyForecasts.length
+  const briefing = useWeatherDayBriefing({
+    aqi: aqi?.state,
+    daily: forecasts,
+    hourly: hourlyForecasts,
+    precipitationUnit: weather?.attributes.precipitation_unit,
+    sunrise: sun?.attributes.next_rising,
+    sunset: sun?.attributes.next_setting,
+    temperatureUnit: weather?.attributes.temperature_unit,
+    windSpeedUnit: weather?.attributes.wind_speed_unit,
+  })
   const dailyNotice = forecastError ?? (daily.status === WEATHER_FORECAST_PHASE.EMPTY ? copy(WEATHER_COPY_KEYS.forecast.dailyEmpty) : null)
   const hourlyNotice = hourlyForecastError ?? (hourly.status === WEATHER_FORECAST_PHASE.EMPTY ? copy(WEATHER_COPY_KEYS.forecast.hourlyEmpty) : null)
   const heroCarouselId = useId()
@@ -1644,7 +1616,7 @@ export function WeatherSummary({ deferRefresh = false }: WeatherSummaryProps) {
     itemCount: hourlyForecasts.length,
   })
 
-  const condition = conditionInfo(weather?.state)
+  const condition = { label: conditionLabel(copy, weather?.state) }
   const backdropPolicy = previewWeatherBackdropPolicy()
   const today = forecasts[0]
 
@@ -1723,6 +1695,7 @@ export function WeatherSummary({ deferRefresh = false }: WeatherSummaryProps) {
       >
         <WeatherForecastSheet
           aqiEntity={aqi}
+          briefing={briefing}
           entity={weather}
           error={forecastError}
           forecasts={forecasts}

@@ -20,6 +20,143 @@
     "title": "Air Quality",
     "unavailableAriaLabel": "Outdoor air quality unavailable"
   },
+  "briefing": {
+    "advisory": {
+      "damagingWind": "Gusts near {{gust}} can topple patio furniture and shove high-profile vehicles around.",
+      "denseFog": "Fog can cut visibility sharply, so slow down on the early drive.",
+      "extremeCold": "Lows feel near {{feelsLike}}, cold enough for exposed skin to suffer quickly.",
+      "extremeHeat": "It feels near {{feelsLike}} at the peak, so limit afternoon exertion and drink often.",
+      "freeze": "Lows feel near {{feelsLike}}, so cover tender plants and protect outdoor faucets.",
+      "hail": "Hail is possible, so park under cover if you can.",
+      "heat": "It feels near {{feelsLike}} at the peak, so pace any outdoor work.",
+      "heavyRain": "Downpours can pond on roads, so give low spots a wide berth.",
+      "heavySnow": "Heavy snow can pile up quickly and slow travel, so clear the drive early.",
+      "highUv": "The UV index tops out near {{uv}}, so sunscreen is worth it before midday.",
+      "ice": "Freezing rain can glaze walkways and roads, so allow extra time before heading out.",
+      "poorAir": "Air quality reads {{aqi}}, so keep windows closed and outdoor time short.",
+      "severeStorms": "Storms could turn strong, so keep plans flexible and head inside when thunder rolls.",
+      "snow": "Snow can leave roads slick, so leave extra room on the way out.",
+      "wind": "Gusts near {{gust}} may push loose items around outside."
+    },
+    "direction": {
+      "north": "north",
+      "northeast": "northeast",
+      "east": "east",
+      "southeast": "southeast",
+      "south": "south",
+      "southwest": "southwest",
+      "west": "west",
+      "northwest": "northwest"
+    },
+    "hazard": {
+      "damagingWind": "Damaging Wind",
+      "denseFog": "Dense Fog",
+      "extremeCold": "Extreme Cold",
+      "extremeHeat": "Extreme Heat",
+      "freeze": "Freezing",
+      "hail": "Hail",
+      "heat": "Hot",
+      "heavyRain": "Heavy Rain",
+      "heavySnow": "Heavy Snow",
+      "highUv": "High UV",
+      "ice": "Ice Risk",
+      "poorAir": "Poor Air Quality",
+      "severeStorms": "Severe Storms",
+      "snow": "Snow",
+      "wind": "Windy"
+    },
+    "overview": {
+      "improving": "The day opens with {{start}}, then eases into {{later}}.",
+      "steady": "Expect {{condition}} for most of the day.",
+      "threePart": "The day opens with {{morning}}, shifts to {{afternoon}}, and settles into {{evening}}.",
+      "twoPart": "The day opens with {{start}}, then turns to {{later}}.",
+      "unknown": "Conditions look mixed, with limited hourly detail from Pirate Weather."
+    },
+    "phrase": {
+      "clear-night": "clear skies",
+      "cloudy": "overcast skies",
+      "exceptional": "unsettled conditions",
+      "fog": "fog",
+      "hail": "hail",
+      "lightning": "thunder",
+      "lightning-rainy": "thunderstorms",
+      "partlycloudy": "a mix of sun and clouds",
+      "pouring": "heavy rain",
+      "rainy": "steady rain",
+      "snowy": "snow",
+      "snowy-rainy": "a wintry mix",
+      "sunny": "full sun",
+      "windy": "gusty wind",
+      "windy-variant": "gusty wind under thick cloud"
+    },
+    "precipitation": {
+      "allDay": "Expect {{type}} on and off through the day, with chances near {{chance}}.",
+      "allDayAmount": "Expect {{type}} on and off through the day, with chances near {{chance}} and about {{amount}} adding up.",
+      "none": "No meaningful {{type}} is expected.",
+      "slight": "Only a slight chance of {{type}}, peaking near {{chance}}.",
+      "window": "Look for {{type}} {{window}}, with chances near {{chance}}.",
+      "windowAmount": "Look for {{type}} {{window}}, with chances near {{chance}} and about {{amount}} adding up."
+    },
+    "precipitationType": {
+      "precipitation": "precipitation",
+      "rain": "rain",
+      "snow": "snow",
+      "thunderstorms": "thunderstorms",
+      "wintryMix": "a wintry mix"
+    },
+    "sun": {
+      "daylight_one": "Sunrise is at {{sunrise}} and sunset at {{sunset}}, giving {{count}} hour and {{minutes}} minutes of daylight.",
+      "daylight_other": "Sunrise is at {{sunrise}} and sunset at {{sunset}}, giving {{count}} hours and {{minutes}} minutes of daylight.",
+      "daylightWhole_one": "Sunrise is at {{sunrise}} and sunset at {{sunset}}, giving {{count}} hour of daylight.",
+      "daylightWhole_other": "Sunrise is at {{sunrise}} and sunset at {{sunset}}, giving {{count}} hours of daylight."
+    },
+    "temperature": {
+      "falling": "Temperatures peak near {{high}} early, then slide toward {{low}} as the day goes on.",
+      "feelsCooler": "Highs reach {{high}}, though it feels more like {{feelsLike}}, with lows near {{low}}.",
+      "feelsWarmer": "Highs reach {{high}} but feel closer to {{feelsLike}}, with lows near {{low}}.",
+      "flat": "Temperatures hold steady between {{low}} and {{high}} all day.",
+      "range": "Highs reach {{high}} before falling back to {{low}} overnight.",
+      "single": "Temperatures stay near {{temperature}}.",
+      "windChill": "Highs reach {{high}}, and lows near {{low}} feel closer to {{feelsLike}} in the wind."
+    },
+    "unavailable": "Today's outlook appears once Pirate Weather returns forecast data.",
+    "window": {
+      "after": "from {{start}} onward",
+      "afternoon": "through the afternoon",
+      "around": "around {{time}}",
+      "before": "before {{end}}",
+      "between": "between {{start}} and {{end}}",
+      "evening": "in the evening",
+      "morning": "through the morning",
+      "overnight": "overnight"
+    },
+    "wind": {
+      "calm": "Winds stay light all day.",
+      "gusty": "Winds near {{speed}} gust to {{gust}}.",
+      "gustyDirected": "Winds out of the {{direction}} near {{speed}} gust to {{gust}}.",
+      "gustsOnly": "Gusts reach {{gust}}.",
+      "steady": "Winds run near {{speed}}.",
+      "steadyDirected": "Winds run out of the {{direction}} near {{speed}}."
+    }
+  },
+  "condition": {
+    "clear-night": "Clear Night",
+    "cloudy": "Cloudy",
+    "exceptional": "Exceptional",
+    "fog": "Fog",
+    "hail": "Hail",
+    "lightning": "Lightning",
+    "lightning-rainy": "Storms",
+    "partlycloudy": "Partly Cloudy",
+    "pouring": "Heavy Rain",
+    "rainy": "Rain",
+    "snowy": "Snow",
+    "snowy-rainy": "Wintry Mix",
+    "sunny": "Sunny",
+    "unavailable": "Weather Unavailable",
+    "windy": "Windy",
+    "windy-variant": "Windy Clouds"
+  },
   "carousel": {
     "conditions": "24-hour conditions",
     "forecast": "24-hour weather forecast",
@@ -54,7 +191,7 @@
   "headline": {
     "aqi": "Outdoor air quality is {{category}} ({{value}})",
     "label": "Today",
-    "weather": "{{condition}} today"
+    "weather": "{{condition}}"
   },
   "forecast": {
     "dailyError": "Unable to load Pirate Weather forecast.",

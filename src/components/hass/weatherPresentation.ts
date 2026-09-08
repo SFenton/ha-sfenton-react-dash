@@ -1,3 +1,5 @@
+import { WEATHER_COPY_KEYS, WEATHER_COPY_NAMESPACE } from '../../i18n'
+import type { CopyKey } from '../../i18n'
 export type AqiLevel = 'good' | 'moderate' | 'sensitive' | 'unhealthy' | 'veryUnhealthy' | 'hazardous'
 export type FeelsLikeRelation = 'cooler' | 'similar' | 'warmer'
 export type PressureBand = 'above' | 'below' | 'typical'
@@ -259,4 +261,47 @@ export function weatherSceneForCondition(condition: string | undefined, isNight 
   if (condition === 'windy' || condition === 'windy-variant') return 'wind'
   if (condition === 'exceptional') return 'exceptional'
   return 'neutral'
+}
+
+export interface WeatherConditionInfo {
+  icon: string
+  label?: string
+  labelKey?: CopyKey<typeof WEATHER_COPY_NAMESPACE>
+}
+
+export const WEATHER_CONDITIONS: Record<string, WeatherConditionInfo> = {
+  'clear-night': { icon: 'mdi:weather-night', labelKey: WEATHER_COPY_KEYS.condition['clear-night'] },
+  cloudy: { icon: 'mdi:cloud', labelKey: WEATHER_COPY_KEYS.condition.cloudy },
+  exceptional: { icon: 'mdi:alert-circle', labelKey: WEATHER_COPY_KEYS.condition.exceptional },
+  fog: { icon: 'mdi:weather-fog', labelKey: WEATHER_COPY_KEYS.condition.fog },
+  hail: { icon: 'mdi:weather-hail', labelKey: WEATHER_COPY_KEYS.condition.hail },
+  lightning: { icon: 'mdi:weather-lightning', labelKey: WEATHER_COPY_KEYS.condition.lightning },
+  'lightning-rainy': { icon: 'mdi:weather-lightning-rainy', labelKey: WEATHER_COPY_KEYS.condition['lightning-rainy'] },
+  partlycloudy: { icon: 'mdi:weather-partly-cloudy', labelKey: WEATHER_COPY_KEYS.condition.partlycloudy },
+  pouring: { icon: 'mdi:weather-pouring', labelKey: WEATHER_COPY_KEYS.condition.pouring },
+  rainy: { icon: 'mdi:weather-rainy', labelKey: WEATHER_COPY_KEYS.condition.rainy },
+  snowy: { icon: 'mdi:weather-snowy', labelKey: WEATHER_COPY_KEYS.condition.snowy },
+  'snowy-rainy': { icon: 'mdi:weather-snowy-rainy', labelKey: WEATHER_COPY_KEYS.condition['snowy-rainy'] },
+  sunny: { icon: 'mdi:weather-sunny', labelKey: WEATHER_COPY_KEYS.condition.sunny },
+  windy: { icon: 'mdi:weather-windy', labelKey: WEATHER_COPY_KEYS.condition.windy },
+  'windy-variant': { icon: 'mdi:weather-windy-variant', labelKey: WEATHER_COPY_KEYS.condition['windy-variant'] },
+}
+
+export function conditionInfo(condition: string | undefined): WeatherConditionInfo {
+  if (!condition) return { icon: 'mdi:alert-circle', labelKey: WEATHER_COPY_KEYS.condition.unavailable }
+  return (
+    WEATHER_CONDITIONS[condition] ?? {
+      icon: 'mdi:cloud',
+      // Providers occasionally emit conditions Home Assistant has not standardised.
+      label: condition.replace(/[-_]/g, ' ').replace(/\b\w/g, (letter) => letter.toUpperCase()),
+    }
+  )
+}
+
+export function conditionLabel(
+  copy: (key: CopyKey<typeof WEATHER_COPY_NAMESPACE>) => string,
+  condition: string | undefined,
+) {
+  const info = conditionInfo(condition)
+  return info.labelKey ? copy(info.labelKey) : info.label ?? ''
 }
