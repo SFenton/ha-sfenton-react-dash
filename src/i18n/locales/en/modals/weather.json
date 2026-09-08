@@ -21,23 +21,6 @@
     "unavailableAriaLabel": "Outdoor air quality unavailable"
   },
   "briefing": {
-    "advisory": {
-      "damagingWind": "Gusts near {{gust}} can topple patio furniture and shove high-profile vehicles around.",
-      "denseFog": "Fog can cut visibility sharply, so slow down on the early drive.",
-      "extremeCold": "Lows feel near {{feelsLike}}, cold enough for exposed skin to suffer quickly.",
-      "extremeHeat": "It feels near {{feelsLike}} at the peak, so limit afternoon exertion and drink often.",
-      "freeze": "Lows feel near {{feelsLike}}, so cover tender plants and protect outdoor faucets.",
-      "hail": "Hail is possible, so park under cover if you can.",
-      "heat": "It feels near {{feelsLike}} at the peak, so pace any outdoor work.",
-      "heavyRain": "Downpours can pond on roads, so give low spots a wide berth.",
-      "heavySnow": "Heavy snow can pile up quickly and slow travel, so clear the drive early.",
-      "highUv": "The UV index tops out near {{uv}}, so sunscreen is worth it before midday.",
-      "ice": "Freezing rain can glaze walkways and roads, so allow extra time before heading out.",
-      "poorAir": "Air quality reads {{aqi}}, so keep windows closed and outdoor time short.",
-      "severeStorms": "Storms could turn strong, so keep plans flexible and head inside when thunder rolls.",
-      "snow": "Snow can leave roads slick, so leave extra room on the way out.",
-      "wind": "Gusts near {{gust}} may push loose items around outside."
-    },
     "direction": {
       "north": "north",
       "northeast": "northeast",

@@ -89,7 +89,7 @@ describe('weather day briefing', () => {
     expect(sentence).toContain('80%')
   })
 
-  it('leads with a hazard headline, icon and advisory for thunderstorms', () => {
+  it('uses a hazard headline and icon without appending an advisory sentence', () => {
     const hours = day('2026-01-15', Array.from({ length: 24 }, (_, hour) => ({
       condition: hour >= 14 && hour <= 18 ? 'lightning-rainy' : 'cloudy',
       hour,
@@ -105,7 +105,8 @@ describe('weather day briefing', () => {
     expect(briefing.severity).toBe('alert')
     expect(briefing.icon).toBe('mdi:weather-lightning')
     expect(weatherBriefingHeadline(briefingCopy, briefing)).toBe('Severe Storms')
-    expect(renderWeatherBriefingText(briefingCopy, briefing)).toContain('Storms could turn strong')
+    expect(briefing.sentences).toHaveLength(4)
+    expect(renderWeatherBriefingText(briefingCopy, briefing)).toMatch(/Winds near 14 mph gust to 38 mph\.$/)
   })
 
   it('prefers the most severe hazard when several qualify', () => {
@@ -147,7 +148,7 @@ describe('weather day briefing', () => {
     })
 
     expect(briefing.hazard).toBe('extremeHeat')
-    expect(renderWeatherBriefingText(briefingCopy, briefing)).toContain('106°')
+    expect(weatherBriefingHeadline(briefingCopy, briefing)).toBe('Extreme Heat')
   })
 
   it('says nothing is coming when the day is dry', () => {

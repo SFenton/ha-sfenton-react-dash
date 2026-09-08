@@ -430,7 +430,7 @@ describe('AtAGlancePage', () => {
     expect(within(dialog).queryByText('Powered by Pirate Weather')).not.toBeInTheDocument()
     expect(within(dialog).queryByText('Outdoor · Pirate Weather')).not.toBeInTheDocument()
     expect(dialog.querySelector('[data-weather-scene="clouds"]')).toBeInTheDocument()
-    expect(within(dialog).getByText('Air quality reads 152, so keep windows closed and outdoor time short.', { exact: false })).toBeInTheDocument()
+    expect(within(dialog).getByText('Poor Air Quality')).toBeInTheDocument()
     const aqiTile = within(dialog).getByRole('article', { name: 'Outdoor air quality 152, Unhealthy' })
     expect(aqiTile).toHaveAttribute('data-aqi-tone', 'unhealthy')
     expect(within(aqiTile).queryByText('Health effects are possible for everyone.')).not.toBeInTheDocument()

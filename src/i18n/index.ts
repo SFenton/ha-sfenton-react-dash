@@ -262,23 +262,6 @@ export const WEATHER_COPY_KEYS = {
     'windy-variant': 'condition.windy-variant',
   },
   briefing: {
-    advisory: {
-      damagingWind: 'briefing.advisory.damagingWind',
-      denseFog: 'briefing.advisory.denseFog',
-      extremeCold: 'briefing.advisory.extremeCold',
-      extremeHeat: 'briefing.advisory.extremeHeat',
-      freeze: 'briefing.advisory.freeze',
-      hail: 'briefing.advisory.hail',
-      heat: 'briefing.advisory.heat',
-      heavyRain: 'briefing.advisory.heavyRain',
-      heavySnow: 'briefing.advisory.heavySnow',
-      highUv: 'briefing.advisory.highUv',
-      ice: 'briefing.advisory.ice',
-      poorAir: 'briefing.advisory.poorAir',
-      severeStorms: 'briefing.advisory.severeStorms',
-      snow: 'briefing.advisory.snow',
-      wind: 'briefing.advisory.wind',
-    },
     direction: {
       north: 'briefing.direction.north',
       northeast: 'briefing.direction.northeast',

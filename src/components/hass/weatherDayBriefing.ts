@@ -98,7 +98,6 @@ const HAZARD_ICON: Record<WeatherHazardKind, string> = {
 }
 
 const HAZARD_HEADLINE: Record<WeatherHazardKind, WeatherBriefingCopyKey> = BRIEFING.hazard
-const HAZARD_ADVISORY: Record<WeatherHazardKind, WeatherBriefingCopyKey> = BRIEFING.advisory
 
 // Severity first, then meteorological priority inside a severity band.
 const HAZARD_PRIORITY: WeatherHazardKind[] = [
@@ -520,10 +519,6 @@ export function generateWeatherDayBriefing(input: WeatherDayBriefingInput): Weat
   if (precipitation) sentences.push(precipitation)
   const wind = windSentence(windMph, gustMph, bearing, windUnit)
   if (wind) sentences.push(wind)
-  const advisory = leadHazard
-    ? advisorySentence(leadHazard, { aqi, feelsHigh, feelsLow, gust: maxGust, uv: maxUv, windUnit })
-    : undefined
-  if (advisory) sentences.push(advisory)
   const sun = sunSentence(input.sunrise, input.sunset, dateKey, timeZone)
   if (sun) sentences.push(sun)
 
@@ -745,21 +740,6 @@ function fromMph(value: number, unit: unknown) {
   if (normalized.includes('m/s')) return value / 2.23694
   if (normalized.includes('kn')) return value / 1.15078
   return value
-}
-
-function advisorySentence(
-  hazard: WeatherHazardKind,
-  context: { aqi?: number; feelsHigh?: number; feelsLow?: number; gust?: number; uv?: number; windUnit: unknown },
-): WeatherBriefingSentence {
-  const values: WeatherBriefingValues = {}
-  if (hazard === 'damagingWind' || hazard === 'wind') {
-    values.gust = formatSpeed(context.gust, context.windUnit) ?? ''
-  }
-  if (hazard === 'extremeHeat' || hazard === 'heat') values.feelsLike = formatTemperature(context.feelsHigh) ?? ''
-  if (hazard === 'extremeCold' || hazard === 'freeze') values.feelsLike = formatTemperature(context.feelsLow) ?? ''
-  if (hazard === 'poorAir') values.aqi = context.aqi === undefined ? '' : String(Math.round(context.aqi))
-  if (hazard === 'highUv') values.uv = context.uv === undefined ? '' : String(Math.round(context.uv))
-  return { key: HAZARD_ADVISORY[hazard], values: Object.keys(values).length ? values : undefined }
 }
 
 // Home Assistant's sun entity reports the *next* rise and set, which drift onto the
