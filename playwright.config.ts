@@ -27,7 +27,7 @@ export default defineConfig({
   projects: [
     {
       name: 'mobile',
-      testIgnore: /(?:adaptive-navigation|desktop-responsive|home-route-hydration-desktop|modal-sheet-webkit)\.spec\.ts/,
+      testIgnore: /(?:^|[/\\])(?:(?:adaptive-navigation|desktop-responsive|home-route-hydration-desktop|modal-sheet-webkit)\.spec\.ts$|emulator[/\\])/,
       use: { ...devices['iPhone 13'], browserName: 'chromium' },
     },
     {

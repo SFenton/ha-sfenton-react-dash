@@ -38,5 +38,6 @@ modified_files.txt
 
 # Environment files with secrets
 .env.development
+.env.emulator
 .env.local
 .env.*.local
