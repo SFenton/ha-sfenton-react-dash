@@ -1034,7 +1034,10 @@ describe('DashboardViewPage', () => {
         zxingMock.latestCallback?.({ getText: () => '3017620422003' }, undefined, { stop: zxingMock.scannerStop })
       })
 
-      expect(await screen.findByRole('status')).toHaveTextContent('Processing...')
+      const barcodeProgress = await screen.findByRole('status')
+      expect(barcodeProgress).toHaveAttribute('data-scan-progress', 'processing')
+      expect(barcodeProgress).toHaveTextContent('Processing...')
+      expect(barcodeProgress.querySelector('[data-scan-progress-spinner="true"]')).toBeInTheDocument()
       expect(screen.queryByText('Use the product barcode to look up item details')).not.toBeInTheDocument()
       expect(screen.queryByLabelText('Live item scan camera feed')).not.toBeInTheDocument()
       expect(screen.queryByRole('button', { name: 'Skip Barcode' })).not.toBeInTheDocument()
@@ -1056,7 +1059,10 @@ describe('DashboardViewPage', () => {
       fireEvent.click(screen.getByRole('button', { name: 'Next' }))
       await startAndCaptureExpirationDate()
 
-      expect(await screen.findByRole('status')).toHaveTextContent('Processing...')
+      const expiryProgress = await screen.findByRole('status')
+      expect(expiryProgress).toHaveAttribute('data-scan-progress', 'processing')
+      expect(expiryProgress).toHaveTextContent('Processing...')
+      expect(expiryProgress.querySelector('[data-scan-progress-spinner="true"]')).toBeInTheDocument()
       expect(screen.queryByText('Take a clear photo of the printed expiration date')).not.toBeInTheDocument()
       expect(screen.queryByLabelText('Live expiration date camera feed')).not.toBeInTheDocument()
       expect(screen.queryByRole('button', { name: 'Read Expiration Date' })).not.toBeInTheDocument()

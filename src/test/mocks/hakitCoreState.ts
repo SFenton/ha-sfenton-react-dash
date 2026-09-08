@@ -104,6 +104,19 @@ function configuredRecipeDetailDelayMs() {
   return Number.isFinite(configured) ? Math.max(0, configured) : 0
 }
 
+function configuredScanItemDelayMs() {
+  if (typeof window === 'undefined') return 0
+  const configured = Number(new URLSearchParams(window.location.search).get('__mockScanItemDelayMs') ?? 0)
+  return Number.isFinite(configured) ? Math.max(0, configured) : 0
+}
+
+function scanItemResponse<T>(response: T) {
+  const delayMs = configuredScanItemDelayMs()
+  return delayMs > 0
+    ? new Promise<T>((resolve) => window.setTimeout(() => resolve(response), delayMs))
+    : Promise.resolve(response)
+}
+
 function configuredRecipeTotal() {
   if (typeof window === 'undefined') return 150
   const configured = Number(new URLSearchParams(window.location.search).get('__mockRecipeTotal') ?? 150)
@@ -1844,7 +1857,7 @@ export const mockState: MockHassState = {
       }
       if (params.domain === 'evershelf' && params.service === 'resolve_barcode' && params.returnResponse === true) {
         const barcode = (params.serviceData as { barcode?: string } | undefined)?.barcode
-        return Promise.resolve({
+        return scanItemResponse({
           response: {
             barcode,
             found: true,
@@ -1880,7 +1893,7 @@ export const mockState: MockHassState = {
         })
       }
       if (params.domain === 'evershelf' && params.service === 'read_expiry_image' && params.returnResponse === true) {
-        return Promise.resolve({
+        return scanItemResponse({
           response: {
             expiry_date: '2026-06-30',
             raw_text: 'EXP 06/30/2026',
@@ -2128,7 +2141,7 @@ export const mockState: MockHassState = {
             },
           })
         }
-        return Promise.resolve({
+        return scanItemResponse({
           response: {
             inventory: {
               new_qty: 1,
