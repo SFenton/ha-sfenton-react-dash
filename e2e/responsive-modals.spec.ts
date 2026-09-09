@@ -4,6 +4,7 @@ import { OCCUPANCY_GROUPS } from '../src/constants/atAGlance'
 import { SHOW_OUTDOOR_FAUCETS_ENTITY_ID } from '../src/constants/sprinklers'
 import { setSafeAreaInsets } from './safe-area'
 import { openQuickLinksTab, quickLinksLayout } from './quick-links'
+import { waitForModalReady } from './layout/evidence'
 
 const DIALOG_SQUARE_TILE_SIZE = 168
 const PORTRAIT_TILE_WIDTH = 174.5
@@ -298,14 +299,13 @@ async function expectShortLandscapeFluidGrid(dialog: Locator) {
   expect(reachability?.terminalBottom ?? Number.POSITIVE_INFINITY).toBeLessThanOrEqual((reachability?.ownerBottom ?? 0) + 1)
 }
 
-test('media sheets choose portrait sheet, landscape dialog, or full dialog presentation', async ({ page }) => {
-  for (const viewport of VIEWPORTS) {
+for (const viewport of VIEWPORTS) {
+  test(`media sheets choose the correct presentation at ${viewport.width}x${viewport.height}`, async ({ page }) => {
     await page.setViewportSize(viewport)
     await page.goto('/index.html?path=overview')
     await page.getByRole('button', { name: /Open seven-day weather forecast/i }).click()
     const dialog = page.getByRole('dialog', { name: 'Weather' })
-    await expect(dialog).toBeVisible()
-    await page.waitForTimeout(520)
+    await waitForModalReady(dialog)
 
     const presentation = modalSheetPresentationForViewport(viewport.width, viewport.height)
     const centered = presentation !== 'sheet'
@@ -395,8 +395,8 @@ test('media sheets choose portrait sheet, landscape dialog, or full dialog prese
     expect(paintedColumnGaps.every((gaps) => gaps.length === 5 && gaps.every((gap) => Math.abs(gap - 2) <= 0.05))).toBe(true)
     await expectScrollSafe(dialog)
     await closeModal(dialog)
-  }
-})
+  })
+}
 
 test('standalone precipitation tiles reflow while the weather modal stays mounted', async ({ page }) => {
   await page.setViewportSize({ height: 852, width: 393 })
@@ -706,7 +706,7 @@ test('Daily Summary uses compact type and responsive chore and expired-food grid
     })
 
     const dialog = page.getByRole('dialog', { name: "Stephen's Summary" })
-    await expect(dialog).toBeVisible()
+    await waitForModalReady(dialog)
     await expect(dialog).toHaveAttribute('data-modal-body-tier', profile.tier)
     await expect(dialog).toHaveAttribute(
       'data-modal-presentation',

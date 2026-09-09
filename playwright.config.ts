@@ -10,12 +10,20 @@ const webkitExecutablePath = process.env.PLAYWRIGHT_WEBKIT_EXECUTABLE
 const enableWebkit = process.env.PLAYWRIGHT_WEBKIT === '1' || Boolean(webkitExecutablePath)
 const adaptiveNavigationSpec = /adaptive-navigation\.spec\.ts/
 const managedRun = process.env.LAYOUT_RUN_DIR
+const mobileTestIgnore = managedRun
+  ? /(?:^|[/\\])(?:(?:adaptive-navigation|battery-title-desktop-responsive|desktop-responsive|home-route-hydration-desktop|modal-sheet-webkit)\.spec\.ts$|emulator[/\\])/
+  : /(?:^|[/\\])(?:(?:adaptive-navigation|battery-title-desktop-responsive|desktop-responsive|home-route-hydration-desktop|layout-acceptance|modal-sheet-webkit)\.spec\.ts$|emulator[/\\])/
+const desktopTestMatch = managedRun
+  ? /(?:adaptive-navigation|chat-ux|desktop-responsive|home-route-hydration-desktop|modal-backdrop-bands|modal-rotation-regressions|weather-(?:scenes|atmosphere-scenes)|layout-acceptance)\.spec\.ts/
+  : /(?:adaptive-navigation|chat-ux|desktop-responsive|home-route-hydration-desktop|modal-backdrop-bands|modal-rotation-regressions|weather-(?:scenes|atmosphere-scenes))\.spec\.ts/
 const managedOrigin = managedRun
   ? (JSON.parse(readFileSync(resolve(managedRun, 'run.json'), 'utf8')) as { candidate: { origin: string } }).candidate.origin
   : undefined
 
 export default defineConfig({
   testDir: './e2e',
+  fullyParallel: true,
+  workers: process.env.CI ? 2 : 6,
   use: {
     baseURL: managedOrigin ?? serverUrl,
     trace: 'on-first-retry',
@@ -27,7 +35,7 @@ export default defineConfig({
   projects: [
     {
       name: 'mobile',
-      testIgnore: /(?:^|[/\\])(?:(?:adaptive-navigation|desktop-responsive|home-route-hydration-desktop|modal-sheet-webkit)\.spec\.ts$|emulator[/\\])/,
+      testIgnore: mobileTestIgnore,
       use: { ...devices['iPhone 13'], browserName: 'chromium' },
     },
     {
@@ -76,7 +84,7 @@ export default defineConfig({
     },
     {
       name: 'desktop',
-      testMatch: /(?:adaptive-navigation|chat-ux|desktop-responsive|home-route-hydration-desktop|modal-backdrop-bands|modal-rotation-regressions|weather-(?:scenes|atmosphere-scenes)|layout-acceptance)\.spec\.ts/,
+      testMatch: desktopTestMatch,
       use: {
         ...devices['Desktop Chrome'],
         browserName: 'chromium',
@@ -89,7 +97,9 @@ export default defineConfig({
     ...(enableWebkit
       ? [{
           name: 'webkit',
-          testMatch: /(?:chat-ux|iframe-lifecycle|weather-(?:data|scenes|atmosphere-scenes)|modal-(?:backdrop-bands|rotation-regressions|sheet-(?:lifecycle|performance|webkit))|layout-acceptance)\.spec\.ts/,
+          testMatch: managedRun
+            ? /(?:chat-ux|iframe-lifecycle|weather-(?:data|scenes|atmosphere-scenes)|modal-(?:backdrop-bands|rotation-regressions|sheet-(?:lifecycle|performance|webkit))|layout-acceptance)\.spec\.ts/
+            : /(?:chat-ux|iframe-lifecycle|weather-(?:data|scenes|atmosphere-scenes)|modal-(?:backdrop-bands|rotation-regressions|sheet-(?:lifecycle|performance|webkit)))\.spec\.ts/,
           use: {
             ...devices['iPhone 13'],
             browserName: 'webkit' as const,

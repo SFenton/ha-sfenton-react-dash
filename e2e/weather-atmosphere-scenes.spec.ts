@@ -44,6 +44,29 @@ async function settleScene(atmosphere: Locator) {
   ))).toBe(0)
 }
 
+async function closeAndRapidlyReopenWeather(page: Page) {
+  return page.evaluate(() => new Promise<{ animationsPaused: boolean; closingObserved: boolean }>((resolve) => {
+    const atmosphere = document.querySelector<HTMLElement>('[data-weather-scene]')
+    const dialog = atmosphere?.closest<HTMLElement>('[role="dialog"]')
+    const close = dialog?.querySelector<HTMLButtonElement>('button[aria-label="Close"]')
+    const opener = document.querySelector<HTMLButtonElement>('button[aria-label^="Open seven-day weather forecast"]')
+    if (!dialog || !close || !opener || !atmosphere) throw new Error('Weather lifecycle controls are unavailable')
+    close.click()
+    const observeClosingFrame = () => {
+      const closingObserved = dialog.getAttribute('data-closing') === 'true'
+      const animationsPaused = atmosphere.getAnimations({ subtree: true })
+        .every((animation) => animation.playState === 'paused')
+      if (closingObserved && animationsPaused) {
+        opener.click()
+        resolve({ animationsPaused, closingObserved })
+        return
+      }
+      requestAnimationFrame(observeClosingFrame)
+    }
+    requestAnimationFrame(observeClosingFrame)
+  }))
+}
+
 async function pixelDifference(page: Page, first: Buffer, second: Buffer, cssWidth: number) {
   return page.evaluate(async ({ first, second, cssWidth }) => {
     const load = (value: string) => new Promise<HTMLImageElement>((resolve, reject) => {
@@ -177,11 +200,7 @@ test('new atmospheric elements follow CSS-owned close, reduced-motion and forced
   for (const scene of WEATHER_SCENES.filter((value) => value !== 'rain')) {
     await setWeatherSceneDebug(page, scene)
     const reference = await atmosphere.elementHandle()
-    await dialog.getByRole('button', { name: 'Close', exact: true }).click()
-    await expect(dialog).toHaveAttribute('data-closing', 'true')
-    await expect.poll(() => atmosphere.evaluate((element) => element.getAnimations({ subtree: true })
-      .every((animation) => animation.playState === 'paused'))).toBe(true)
-    await opener.evaluate((element) => (element as HTMLButtonElement).click())
+    expect(await closeAndRapidlyReopenWeather(page)).toEqual({ animationsPaused: true, closingObserved: true })
     await expect(dialog).toHaveAttribute('data-state', 'open')
     expect(await atmosphere.evaluate((element, previous) => element === previous, reference)).toBe(true)
     await expect.poll(() => atmosphere.evaluate((element) => element.getAnimations({ subtree: true })

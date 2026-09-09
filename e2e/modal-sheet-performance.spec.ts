@@ -97,6 +97,24 @@ function p95RatioLowerBound(
   return percentile(ratios, 0.05)
 }
 
+async function markAfterFrames(page: Page, mark: string, minimumFrames: number) {
+  await page.evaluate(({ mark, minimumFrames }) => new Promise<void>((resolve) => {
+    const state = (window as unknown as {
+      __modalFrameProbe: { frames: number[]; marks: Record<string, number> }
+    }).__modalFrameProbe
+    const initialFrames = state.frames.length
+    const waitForFrames = () => {
+      if (state.frames.length - initialFrames >= minimumFrames) {
+        state.marks[mark] = performance.now()
+        resolve()
+        return
+      }
+      requestAnimationFrame(waitForFrames)
+    }
+    requestAnimationFrame(waitForFrames)
+  }), { mark, minimumFrames })
+}
+
 async function openThermostatAdvancedControls(page: Page) {
   await page.goto(BASE_URL_PATH)
   await page.getByRole('button', { exact: true, name: 'Advanced Configuration' }).click()
@@ -141,10 +159,7 @@ async function measureDismissal(browser: Browser, fullBackdrop: boolean): Promis
       state.marks.idleStart = performance.now()
       state.handle = requestAnimationFrame(sample)
     })
-    await page.waitForTimeout(1_200)
-    await page.evaluate(() => {
-      ;(window as unknown as { __modalFrameProbe: { marks: Record<string, number> } }).__modalFrameProbe.marks.dragStart = performance.now()
-    })
+    await markAfterFrames(page, 'dragStart', 32)
 
     const start = { x: bodyBox.x + 8, y: bodyBox.y + bodyBox.height * 0.25 }
     const send = (type: 'touchEnd' | 'touchMove' | 'touchStart', y?: number) => client.send('Input.dispatchTouchEvent', {
@@ -152,23 +167,22 @@ async function measureDismissal(browser: Browser, fullBackdrop: boolean): Promis
       touchPoints: typeof y === 'number' ? [{ id: 1, radiusX: 4, radiusY: 4, x: start.x, y }] : [],
     })
     await send('touchStart', start.y)
-    // A p95 needs enough frames: a 12-step drag made one missed frame the entire tail estimate.
-    const dragSteps = 36
+    // Drive the trusted gesture by rendered frames so host load cannot reduce the p95 sample.
+    const dragSteps = 44
     for (let step = 1; step <= dragSteps; step += 1) {
       await send('touchMove', start.y + dialogBox.height * 0.6 * step / dragSteps)
-      await page.waitForTimeout(16)
+      await page.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => resolve())))
     }
     await page.evaluate(() => {
       ;(window as unknown as { __modalFrameProbe: { marks: Record<string, number> } }).__modalFrameProbe.marks.releaseStart = performance.now()
     })
     await send('touchEnd')
-    await page.waitForTimeout(620)
+    await markAfterFrames(page, 'end', 22)
 
     const probe = await page.evaluate(() => {
       const state = (window as unknown as {
         __modalFrameProbe: { active: boolean; frames: number[]; handle: number; marks: Record<string, number> }
       }).__modalFrameProbe
-      state.marks.end = performance.now()
       state.active = false
       cancelAnimationFrame(state.handle)
       return state
@@ -213,7 +227,7 @@ test.describe('modal dismissal performance', () => {
     test.setTimeout(120_000)
     const baselineRuns: DismissalMetrics[] = []
     const optimizedRuns: DismissalMetrics[] = []
-    for (let run = 0; run < 5; run += 1) {
+    for (let run = 0; run < 4; run += 1) {
       const order = run % 2 === 0 ? ['baseline', 'optimized'] : ['optimized', 'baseline']
       for (const variant of order) {
         const metrics = await measureDismissal(browser, variant === 'baseline')

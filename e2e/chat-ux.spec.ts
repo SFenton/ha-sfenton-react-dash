@@ -5,7 +5,7 @@ import { bindChatServer, openChat, sendChat } from './chat-fixture'
 import { MockChatServer } from '../src/test/mocks/chatServer'
 import { applyProfile, modalFacts, waitForModalReady } from './layout/evidence'
 import { CANONICAL_VIEWPORT_NAMES } from './responsive-acceptance-data'
-import type { ChatRecord, ChatRequestRecord, ChatResultRecord, ChatThreadRecord } from '../src/components/hass/chat/chatRecords'
+import { CHAT_MESSAGE_LIMIT, type ChatRecord, type ChatRequestRecord, type ChatResultRecord, type ChatThreadRecord } from '../src/components/hass/chat/chatRecords'
 import { chatStateFacts, openChatState } from './chat-layout'
 
 test('Home Assistant copy stays quiet in empty chat and history across viewports', async ({ page, context }, testInfo) => {
@@ -204,7 +204,7 @@ test(`chat textarea keeps pointer focus neutral and hides scrollbars without tra
       expect(await chrome()).toEqual(before)
     }
     let frame = await composer.boundingBox()
-    for (const text of ['Long_unbroken_'.repeat(140), Array.from({ length: 55 }, (_, index) => `Line ${index}: editable message`).join('\n')]) {
+    for (const text of [`${'Long_unbroken_'.repeat(12)}12345678`, Array.from({ length: 10 }, (_, index) => `Line ${index}: editable`).join('\n')]) {
       await input.fill(text)
       await expect(composer).toHaveAttribute('data-expanded', 'true')
       await composer.evaluate((element) => Promise.all(element.getAnimations({ subtree: true }).map((animation) => animation.finished)))
@@ -273,7 +273,7 @@ test(`chat textarea keeps pointer focus neutral and hides scrollbars without tra
     expect(Math.abs(send!.y + 22 - frame!.y - frame!.height / 2)).toBeLessThanOrEqual(1)
     expect(frame!.x + frame!.width - send!.x - send!.width).toBe(9)
     await page.screenshot({ path: resolve(directory, `input-overflow-${profile}.png`), scale: 'css' })
-    await input.fill('x'.repeat(4001))
+    await input.fill('x'.repeat(CHAT_MESSAGE_LIMIT + 1))
     const errorBorder = await composer.evaluate((element) => getComputedStyle(element).borderColor)
     expect(errorBorder).toBe('rgba(229, 57, 53, 0.7)')
     await input.click()

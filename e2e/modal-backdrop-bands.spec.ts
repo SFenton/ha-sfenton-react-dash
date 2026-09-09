@@ -14,6 +14,23 @@ async function openHarness(page: Page, harness: string, values: string[] = [], b
   return dialog
 }
 
+async function waitForCompositor(page: Page) {
+  await page.evaluate(() => new Promise<void>((resolve) => {
+    requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+  }))
+}
+
+async function stableScreenshot(page: Page) {
+  let previous = await page.screenshot({ animations: 'allow' })
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    await waitForCompositor(page)
+    const current = await page.screenshot({ animations: 'allow' })
+    if ((await screenshotDifference(page, previous, current)).maxDelta <= 1) return current
+    previous = current
+  }
+  throw new Error('Backdrop compositor did not produce two stable consecutive frames')
+}
+
 async function screenshotDifference(page: Page, first: Buffer, second: Buffer) {
   return page.evaluate(async ({ firstBase64, secondBase64 }) => {
     const load = (source: string) => new Promise<HTMLImageElement>((resolve, reject) => {
@@ -270,6 +287,7 @@ test('rendered blur passes a positive control before checking automatic pixel pa
     await dialog.locator('[data-modal-sheet-body="true"]').locator('..').evaluate((element) => {
       element.style.setProperty('visibility', 'hidden', 'important')
     })
+    await waitForCompositor(page)
     return page.locator('[data-modal-sheet-overlay="true"]').last()
   }
   for (const [viewport, bandsExpected] of [[PHONE, true], [{ height: 393, width: 852 }, false], [{ height: 1152, width: 741 }, true]] as const) {
@@ -277,7 +295,7 @@ test('rendered blur passes a positive control before checking automatic pixel pa
     const automaticOverlay = await prepare('auto')
     if (bandsExpected) await expect(automaticOverlay).toHaveAttribute('data-exposed-backdrop-bands', 'true')
     else await expect(automaticOverlay).not.toHaveAttribute('data-exposed-backdrop-bands')
-    const optimized = await page.screenshot({ animations: 'allow' })
+    const optimized = await stableScreenshot(page)
     // Hold the documented ineligible fallback on the same surface while sampling.
     // Otherwise a resize-settlement callback can restore bands between captures.
     await page.getByRole('dialog').last().evaluate((element) => element.setAttribute('data-centered-layout', 'true'))
@@ -286,12 +304,14 @@ test('rendered blur passes a positive control before checking automatic pixel pa
     await expect(overlay).not.toHaveAttribute('data-exposed-backdrop-bands')
     await expect(overlay.locator('[data-modal-backdrop-band="top"]')).toHaveCSS('visibility', 'hidden')
     await expect(overlay).toHaveCSS('backdrop-filter', 'blur(10px)')
-    const full = await page.screenshot({ animations: 'allow' })
+    await waitForCompositor(page)
+    const full = await stableScreenshot(page)
     await overlay.evaluate((element) => {
       element.style.setProperty('-webkit-backdrop-filter', 'none', 'important')
       element.style.setProperty('backdrop-filter', 'none', 'important')
     })
-    const filterFree = await page.screenshot({ animations: 'allow' })
+    await waitForCompositor(page)
+    const filterFree = await stableScreenshot(page)
     const positiveControl = await screenshotDifference(page, full, filterFree)
     await testInfo.attach(`blur-positive-control-${viewport.width}x${viewport.height}`, {
       body: JSON.stringify(positiveControl), contentType: 'application/json',

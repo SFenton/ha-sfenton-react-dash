@@ -173,6 +173,26 @@ async function finishTouch(session: TouchSession, type: 'touchCancel' | 'touchEn
   await session.client.detach()
 }
 
+async function fastTouchFlick(page: Page, start: Point, end: Point) {
+  const client = await page.context().newCDPSession(page)
+  const timestamp = await page.evaluate(() => Date.now() / 1_000)
+  const point = (ratio: number) => ({
+    id: 1,
+    radiusX: 4,
+    radiusY: 4,
+    x: start.x + (end.x - start.x) * ratio,
+    y: start.y + (end.y - start.y) * ratio,
+  })
+  try {
+    await client.send('Input.dispatchTouchEvent', { timestamp, type: 'touchStart', touchPoints: [point(0)] })
+    await client.send('Input.dispatchTouchEvent', { timestamp: timestamp + 0.004, type: 'touchMove', touchPoints: [point(0.5)] })
+    await client.send('Input.dispatchTouchEvent', { timestamp: timestamp + 0.008, type: 'touchMove', touchPoints: [point(1)] })
+    await client.send('Input.dispatchTouchEvent', { timestamp: timestamp + 0.012, type: 'touchEnd', touchPoints: [] })
+  } finally {
+    await client.detach()
+  }
+}
+
 async function dragTouch(page: Page, start: Point, end: Point, steps = 10, stepDelayMs = 20) {
   const session = await beginTouch(page, start)
   try {
@@ -550,10 +570,7 @@ test.describe('mobile ModalSheet gestures', () => {
     const { dialog } = await openRoomsModal(page)
     await waitForSheetDragReady(page)
     const start = await locatorPoint(dialog.locator('[data-mobile-drag-handle="true"]'))
-    const session = await beginTouch(page, start)
-
-    await moveTouch(session, { x: start.x, y: start.y + 120 }, 2, 0)
-    await finishTouch(session)
+    await fastTouchFlick(page, start, { x: start.x, y: start.y + 120 })
 
     await expect(dialog).toHaveAttribute('data-state', 'closed')
   })

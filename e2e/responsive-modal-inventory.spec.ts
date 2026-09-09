@@ -205,13 +205,7 @@ async function gotoRoute(page: Page, route: string) {
 }
 
 async function waitForDialogSettled(dialog: Locator) {
-  await expect(dialog).toHaveAttribute('data-state', 'open')
-  await expect.poll(() => dialog.evaluate((element) => {
-    const style = getComputedStyle(element)
-    const transform = style.transform
-    const translateY = transform === 'none' ? 0 : new DOMMatrixReadOnly(transform).m42
-    return Math.abs(translateY) <= 1 && Number.parseFloat(style.opacity) >= 0.99
-  }), { timeout: 2_000 }).toBe(true)
+  await waitForModalReady(dialog)
 }
 
 async function openButtonModal(page: Page, route: string, opener: string | RegExp, dialogName?: string | RegExp) {
@@ -1061,7 +1055,14 @@ async function assertMountedClose(dialog: Locator) {
   await dialog.getByRole('button', { exact: true, name: 'Close' }).click()
   expect(await node.getAttribute('data-state')).toBe('closed')
   expect(await node.getAttribute('data-closing')).toBe('true')
-  await expect(dialog).toHaveCount(0, { timeout: 700 })
+  const exitDurations = await node.evaluate((element) => element.getAnimations({ subtree: true })
+    .filter((animation) => animation.effect?.getComputedTiming().iterations !== Infinity)
+    .map((animation) => Number(animation.effect?.getComputedTiming().endTime ?? 0)))
+  expect(Math.max(0, ...exitDurations)).toBeLessThanOrEqual(700)
+  await node.evaluate((element) => Promise.all(element.getAnimations({ subtree: true })
+    .filter((animation) => animation.effect?.getComputedTiming().iterations !== Infinity)
+    .map((animation) => animation.finished.catch(() => undefined))))
+  await expect(dialog).toHaveCount(0)
   await node.dispose()
 }
 

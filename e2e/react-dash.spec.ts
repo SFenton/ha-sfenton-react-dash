@@ -1,7 +1,7 @@
 import { expect, test, type FrameLocator, type Locator, type Page } from './layout/fixture'
 import { valueToThermostatPoint } from '../src/components/hass/thermostatDialGeometry'
 import { globalQuickLinksAction, openQuickLinksTab, selectQuickLinksTab } from './quick-links'
-import { waitForModalReady } from './layout/evidence'
+import { waitForModalReady, waitForRoute } from './layout/evidence'
 
 const DIALOG_SQUARE_TILE_SIZE = 168
 const MODAL_SQUARE_GRID_MAX_COLUMNS = 4
@@ -1096,6 +1096,7 @@ test('global Quick Links stays rightmost without overflowing representative mobi
 
   for (const route of ['overview', 'security', 'settings', 'chores', 'kitchen', 'fridge', 'recipes']) {
     await page.goto(`/at-a-glance/${route}`)
+    await waitForRoute(page, route)
     const trigger = globalQuickLinksAction(page)
     const dock = page.locator('[data-floating-action-dock="true"]')
     const nav = page.getByRole('navigation', { name: 'Dashboard sections' })
@@ -1447,6 +1448,7 @@ test('mobile navigation chevrons stay vertically centered in their opener', asyn
 
   for (const path of ['overview', 'security', 'living-room', 'master-bedroom', 'ecobee', 'vacuums', 'admin', 'pantry']) {
     await page.goto(`/at-a-glance/${path}`)
+    await waitForRoute(page, path)
     const chevrons = page.locator('[data-modal-disclosure="right-chevron"]')
     await expect.poll(() => chevrons.count()).toBeGreaterThan(0)
     await expectVerticallyCenteredChevrons(chevrons)
@@ -1458,6 +1460,7 @@ test('mobile header status chips never render a disclosure chevron', async ({ pa
 
   for (const path of ['overview', 'security', 'living-room', 'master-bedroom', 'kitchen', 'office']) {
     await page.goto(`/at-a-glance/${path}`)
+    await waitForRoute(page, path)
     const chips = page.locator('[data-variant="header"]')
     await expect.poll(() => chips.count(), { message: `${path} header chips` }).toBeGreaterThan(0)
     await expect(chips.locator('[data-modal-disclosure]'), `${path} header chip chevrons`).toHaveCount(0)
@@ -1952,6 +1955,7 @@ test('thermostat page entry points deep link to their matching modal tabs', asyn
 
   for (const entry of cases) {
     await page.goto('/at-a-glance/ecobee')
+    await waitForRoute(page, 'ecobee')
     const dialog = await openThermostatControls(page, entry.tab)
     await expect(page).toHaveURL(new RegExp(`${entry.hash}$`))
     await expect(dialog.getByRole('tab', { name: entry.tab })).toHaveAttribute('aria-selected', 'true')
@@ -4380,6 +4384,7 @@ test('vacuum modal navigation stays pinned while mobile content scrolls', async 
   await page.getByRole('button', { name: /Main Floor Docked/i }).click()
   const dialog = page.getByRole('dialog')
   await dialog.getByRole('tab', { name: 'Zones' }).click()
+  await waitForModalReady(dialog, 5_000, 'vacuum-tabs')
   const body = dialog.locator('[data-modal-sheet-body="true"]')
   const nav = dialog.getByRole('tablist', { name: 'Main Floor modal sections' })
   const before = await nav.boundingBox()
@@ -4402,20 +4407,19 @@ test('vacuum native dropdown stays aligned after rapid close and reopen', async 
   await page.goto('/at-a-glance/vacuums')
 
   const mainFloorVacuum = page.getByRole('button', { name: /Main Floor Docked/i })
-  const cardBox = await mainFloorVacuum.boundingBox()
-  if (!cardBox) throw new Error('Main Floor vacuum card was not measurable')
 
   await mainFloorVacuum.click()
   await expect(page.getByRole('dialog')).toBeVisible()
   await page.waitForTimeout(450)
 
   await page.getByRole('combobox', { name: /Cleaning Passes/i }).selectOption('3')
-  const closeBox = await page.getByRole('button', { name: 'Close' }).boundingBox()
-  if (!closeBox) throw new Error('Vacuum modal close button was not measurable')
-
-  await page.mouse.click(closeBox.x + closeBox.width / 2, closeBox.y + closeBox.height / 2)
-  await page.waitForTimeout(50)
-  await page.mouse.click(cardBox.x + cardBox.width / 2, cardBox.y + cardBox.height / 2)
+  await page.getByRole('button', { name: 'Close' }).click()
+  await mainFloorVacuum.evaluate((element) => new Promise<void>((resolve) => {
+    window.setTimeout(() => {
+      element.click()
+      resolve()
+    }, 50)
+  }))
   await page.getByRole('combobox', { name: /Cleaning Passes/i }).scrollIntoViewIfNeeded()
 
   const rapidReopenState = await page.evaluate(() => {
@@ -4454,19 +4458,21 @@ test('vacuum mode dropdown keeps source option labels while optimistic', async (
   await page.goto('/at-a-glance/vacuums')
 
   const mainFloorVacuum = page.getByRole('button', { name: /Main Floor Docked/i })
-  const cardBox = await mainFloorVacuum.boundingBox()
-  if (!cardBox) throw new Error('Main Floor vacuum card was not measurable')
 
   await mainFloorVacuum.click()
-  const dialog = page.getByRole('dialog')
+  const dialog = page.getByRole('dialog', { name: 'Main Floor Robot Vacuum' })
   await expect(dialog).toBeVisible()
 
   await page.getByRole('combobox', { name: /Mode/i }).selectOption('mop')
 
   await dialog.getByRole('button', { name: 'Close' }).click()
   await expect(dialog).toHaveAttribute('data-state', 'closed')
-  await page.waitForTimeout(50)
-  await page.mouse.click(cardBox.x + cardBox.width / 2, cardBox.y + cardBox.height / 2)
+  await mainFloorVacuum.evaluate((element) => new Promise<void>((resolve) => {
+    window.setTimeout(() => {
+      element.click()
+      resolve()
+    }, 50)
+  }))
   await expect(dialog).toHaveAttribute('data-state', 'open')
   await expect(page.getByRole('combobox', { name: /Mode Mop/i })).toBeVisible()
 
