@@ -1,6 +1,6 @@
 ---
 name: host-web-app
-description: Host the current requested worktree on a LAN-accessible 0.0.0.0 server, picking the first free port from 5176 upward, wiring the real Home Assistant backend, and reporting the exact runtime details.
+description: Start, run, serve, host, open, or preview the current React worktree for manual, browser, responsive, phone, tablet, or LAN validation. Use after user-visible dashboard work that needs operator review, even when the prompt only says "start the dev server" and does not mention LAN or 0.0.0.0. Bind to 0.0.0.0, pick the first free port from 5176 upward, use the real Home Assistant backend, and report the exact runtime details.
 metadata:
   model: gpt-5.4-mini
   reasoning_effort: low
@@ -9,10 +9,19 @@ metadata:
 
 # Host Web App
 
-Use this skill when the operator asks to run the React app for LAN access,
-expose it on `0.0.0.0`, or choose a free local port for a browser/client smoke
-test. This skill covers runtime hosting only; it does not authorize
-deployment, Home Assistant configuration changes, commits, or pushes.
+Use this skill whenever the operator asks to start, run, serve, host, open, or
+preview the React app or dev server. LAN-specific wording is not required.
+Also use it before handing off user-visible dashboard or UX work when the
+operator would reasonably validate the result manually on a browser, phone, or
+tablet, unless the operator opted out of hosting.
+
+Explicit `/host-web-app` invocation always wins. Do not replace this workflow
+with a bare `npm run dev`, a loopback-only server, or an already-running
+unverified listener. Automated unit, build, mock, and Playwright validation do
+not by themselves require a LAN server unless manual review is also expected.
+
+This skill covers runtime hosting only; it does not authorize deployment, Home
+Assistant configuration changes, commits, or pushes.
 
 ## Hard requirements
 

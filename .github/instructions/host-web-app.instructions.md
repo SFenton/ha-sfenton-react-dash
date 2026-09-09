@@ -1,13 +1,22 @@
 ---
-description: "Use when implementing or operating LAN hosting for the React app, including port selection, dev/preview startup, backend wiring, and verification."
+description: "Use when starting, serving, hosting, opening, or previewing the React app for manual, browser, responsive, phone, tablet, or LAN validation, including after user-visible UX work."
 applyTo: ".github/skills/host-web-app/**,.github/instructions/host-web-app.instructions.md,.github/copilot-instructions.md,.github/reference/dashboard-contract.md"
 ---
 
 # Host Web App
 
-Use this instruction for repo-owned hosting tasks that expose the React app to
-other devices on the LAN. It is read-only guidance for the host workflow and
-does not authorize deployment, commits, or Home Assistant mutation.
+Use this instruction for repo-owned app hosting and manual-validation handoff.
+Requests such as "start the server", "run the app", "serve this", or "let me
+validate it" are hosting requests even when they omit LAN, bind-address, or
+port wording. User-visible dashboard and UX work should finish with a compliant
+hosted runtime when operator review is reasonably expected, unless the operator
+opts out.
+
+Invoke `/host-web-app` rather than reconstructing the workflow from memory.
+If skill invocation is unavailable in the active custom-agent client, follow
+this complete runtime contract directly and never fall back to loopback-only
+hosting. This instruction does not authorize deployment, commits, or Home
+Assistant mutation.
 
 ## Required scope
 

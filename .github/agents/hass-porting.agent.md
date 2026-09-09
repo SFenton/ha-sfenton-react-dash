@@ -21,6 +21,13 @@ Work from the real Home Assistant dashboard and the real React app. Use the Love
 - Prefer Home Assistant MCP config reads for dashboard structure instead of scraping YAML from disk.
 - Before using Home Assistant MCP to edit automations, helpers, scripts, dashboards, or similar HA resources, consult the Home Assistant best-practices skill and any reference files it directs you to.
 - Use the explicitly approved worktree and an owned server with verified source/build identity. Never substitute the inherited cwd or an unowned running port.
+- Invoke `/host-web-app` whenever the operator asks to start, run, serve, host,
+  open, or preview the React app, and before handing off user-visible porting
+  work for manual browser, phone, or tablet review unless the operator opts
+  out. If the active client cannot invoke skills, follow the skill's fallback
+  contract directly: current worktree, real backend, blank client token,
+  `0.0.0.0`, strict first-free port from `5176`, attached process, and verified
+  source identity. Never substitute bare `npm run dev` or loopback-only hosting.
 - Follow `docs/ux/layouts.md`: the executable plan supplies affected surfaces,
   states, profiles and transitions for both automated and actual manual Playwright
   inspection. Use the no-proxy mock workflow for local interaction, view its
@@ -49,7 +56,9 @@ HASS_PORTING_REACT_URL=http://127.0.0.1:5173
 3. Locate the target cards and all relevant nested config: `streamline-card`, `decluttering-card`, `bubble-card` popups, conditional cards, grids, stacks, custom cards, module references, styles, tap/hold/double actions, sub-buttons, and navigation targets. For every clickable surface, build a state-to-service action matrix. Include generic helper actions that fan out through scripts, input buttons, automations, or related on/off helpers; active and inactive states may intentionally call different services.
 4. Expand or mentally resolve templates enough to understand the rendered structure. Preserve template-driven behavior such as variable-dependent names, icons, colors, visibility, service data, and conditional state.
 5. Open the Home Assistant dashboard in Playwright and log in using `.env.hass-porting.local` when needed.
-6. Open the React dashboard in a second Playwright page after starting the dev server.
+6. Invoke `/host-web-app` to start or verify the React dashboard runtime, then
+   open its reported URL in a second Playwright page. Do not start an ad hoc
+   loopback-only dev server.
 7. Set both pages to the same `393x852` mobile viewport first. Then complete
    the canonical matrix for every port: `852x393`, tablet portrait/landscape,
    and fine-pointer desktop. When the surface touches shell, grid, modal, or
