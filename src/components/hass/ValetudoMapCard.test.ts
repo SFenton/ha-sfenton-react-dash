@@ -1,11 +1,14 @@
 import { deflateSync, inflateSync } from 'node:zlib'
 import {
+  createMockValetudoMap,
   expandValetudoLayerPixels,
   extractValetudoMapFromPngBytes,
   isReportedMapEntityVisible,
   mapCameraEntityId,
+  selectableValetudoRooms,
   selectValetudoMapEntity,
   valetudoMapBounds,
+  valetudoRoomAtGridPoint,
   valetudoMapEntityRenderStyle,
   valetudoMapMaterialAccent,
 } from './ValetudoMapCard.utils'
@@ -145,6 +148,30 @@ describe('ValetudoMapCard helpers', () => {
     ['generic', 4, 4, null],
   ] as const)('maps %s material coordinates to %s accents', (material, x, y, accent) => {
     expect(valetudoMapMaterialAccent(material, x, y)).toBe(accent)
+  })
+
+  it('matches configured rooms by normalized map name and keeps marker centroids inside the room', () => {
+    const map = createMockValetudoMap('valetudo_exaltedsneakydeer')
+    const rooms = selectableValetudoRooms(map, [
+      { entityId: 'input_boolean.kitchen', mapName: '  KITCHEN  ' },
+      { entityId: 'input_boolean.closet', mapName: 'Master Bedroom Closet' },
+    ])
+
+    expect(rooms.map((room) => room.entityId)).toEqual(['input_boolean.kitchen', 'input_boolean.closet'])
+    for (const room of rooms) {
+      expect(room.pixelKeys.has(`${room.centroid.x}:${room.centroid.y}`)).toBe(true)
+      expect(valetudoRoomAtGridPoint(rooms, room.centroid)?.entityId).toBe(room.entityId)
+    }
+  })
+
+  it('uses exact room pixels for hit testing', () => {
+    const map = createMockValetudoMap('valetudo_elatedusedram')
+    const rooms = selectableValetudoRooms(map, [
+      { entityId: 'input_boolean.music_room', mapName: 'Music Room' },
+    ])
+
+    expect(valetudoRoomAtGridPoint(rooms, { x: 700.4, y: 600.4 })?.entityId).toBe('input_boolean.music_room')
+    expect(valetudoRoomAtGridPoint(rooms, { x: 500, y: 500 })).toBeNull()
   })
 
   it('extracts ValetudoMap JSON from a zTXt PNG chunk', async () => {

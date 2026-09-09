@@ -1165,7 +1165,7 @@ test('vacuum workspace stays fixed across tabs and keeps each region reachable',
   const dialog = await openMainFloorVacuum(page)
   const heights: number[] = []
 
-  for (const tabName of ['Controls', 'Zones', 'Auto-Clean', 'Actions', 'Info']) {
+  for (const tabName of ['Controls', 'Rooms', 'Auto-Clean', 'Actions', 'Info']) {
     await dialog.getByRole('tab', { name: tabName }).click()
     await page.waitForTimeout(220)
     heights.push(Math.round((await dialog.boundingBox())?.height ?? 0))
@@ -1334,10 +1334,10 @@ test('an open workspace modal survives both resize directions', async ({ page })
 
   await page.setViewportSize({ height: 1080, width: 1920 })
   dialog = await openMainFloorVacuum(page)
-  await dialog.getByRole('tab', { name: 'Zones' }).click()
+  await dialog.getByRole('tab', { name: 'Rooms' }).click()
   await page.setViewportSize({ height: 852, width: 393 })
   await expect(dialog).toHaveAttribute('data-centered-layout', 'false')
-  await expect(dialog.getByRole('tab', { name: 'Zones' })).toHaveAttribute('aria-selected', 'true')
+  await expect(dialog.getByRole('tab', { name: 'Rooms' })).toHaveAttribute('aria-selected', 'true')
   await page.setViewportSize({ height: 1080, width: 1920 })
   await expect(dialog).toHaveAttribute('data-centered-layout', 'true')
   await expectScrollSafe(dialog)

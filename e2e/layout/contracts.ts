@@ -309,7 +309,7 @@ export const PLAYWRIGHT_SPEC_COVERAGE = [
   },
 ] as const satisfies readonly PlaywrightSpecCoverage[]
 
-export const SCENARIO_IDS = ['quick-links', 'chat', 'summary', 'filters', 'form', 'remote', 'weather', 'navigation', 'host', 'preload'] as const
+export const SCENARIO_IDS = ['quick-links', 'chat', 'summary', 'filters', 'form', 'remote', 'vacuum', 'weather', 'navigation', 'host', 'preload'] as const
 export type ScenarioId = typeof SCENARIO_IDS[number]
 export type ContextId = 'touch-chromium' | 'fine-chromium' | 'touch-webkit'
 export const CONTEXTS: Record<ContextId, { browser: 'chromium' | 'webkit'; touch: boolean; project: string }> = {
@@ -364,6 +364,12 @@ export const SURFACE_CONTRACTS: Record<ScenarioId, {
     owners: ['src/constants/mediaRemotes', 'src/components/hass/MediaRemote'],
     legacy: ['modal-rotation-regressions.spec.ts', 'react-dash.spec.ts'],
     question: 'Is the complete active direction pad visible without auto-scroll, operable, and unchanged on portrait return?',
+  },
+  vacuum: {
+    family: 'modal', states: ['docked'],
+    owners: ['src/components/hass/VacuumCard', 'src/components/hass/ValetudoMap', 'src/i18n/locales/en/modals/vacuum.json'],
+    legacy: ['vacuum-status.spec.ts', 'modal-rotation-regressions.spec.ts'],
+    question: 'Does the vacuum map remain fully usable without a second left-pane scroller, using a proportionally fitted map with a visible Locate action, moving status detail to the Controls tab, only when height is constrained?',
   },
   weather: {
     family: 'modal',

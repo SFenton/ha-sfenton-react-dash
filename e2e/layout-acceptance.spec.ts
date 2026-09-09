@@ -9,7 +9,7 @@ import { MUSIC_ROOM_REMOTE_ENTITY_ID } from '../src/constants/mediaRemotes'
 import { chatStateFacts, openChatState } from './chat-layout'
 
 async function stateFacts(page: Page, dialog: Locator, scenario: ScenarioId, state: string) {
-  const preferredScrollMode = scenario === 'remote' || (scenario === 'quick-links' && state === 'rooms') ? 'panes' : 'body'
+  const preferredScrollMode = scenario === 'remote' || scenario === 'vacuum' || (scenario === 'quick-links' && state === 'rooms') ? 'panes' : 'body'
   const facts: Record<string, unknown> = await modalFacts(dialog, preferredScrollMode)
   await expect(dialog).toHaveAttribute('data-layout-mounted', 'original')
   if (scenario === 'quick-links' && state !== 'rooms') {
@@ -110,6 +110,48 @@ async function stateFacts(page: Page, dialog: Locator, scenario: ScenarioId, sta
     const label = state === 'wind' ? 'Wind conditions' : state === 'precipitation' ? 'Precipitation conditions' : 'Conditions conditions'
     await expect(dialog.getByRole('button', { name: label, exact: true })).toHaveAttribute('aria-pressed', 'true')
     facts.weather = { state, pressureHeights: heights, previewControls: 0, selectedMode: label }
+  }
+  if (scenario === 'vacuum') {
+    const pane = dialog.getByRole('group', { name: 'Main Floor map and status' })
+    const map = pane.getByRole('region', { name: 'Main Floor Valetudo map' })
+    await expect(pane).toHaveAttribute('data-map-status-layout-transition', 'idle')
+    const modalBody = dialog.locator('[data-area-editor="false"]')
+    const canShowTwoPanes = await modalBody.evaluate((element) => getComputedStyle(element).gridTemplateColumns.split(' ').filter(Boolean).length >= 2)
+    const constrained = facts.presentation === 'landscape-dialog' && canShowTwoPanes
+    await expect(pane).toHaveAttribute('data-map-status-layout', constrained ? 'split' : 'stacked')
+    await expect(map).toHaveAttribute('data-map-display', constrained ? 'fitted' : 'contained')
+    if (constrained) {
+      await expect(pane.getByRole('heading', { name: 'Status' })).toHaveCount(0)
+      await expect(pane.getByRole('heading', { name: 'Actions' })).toHaveCount(0)
+      await expect(pane.getByRole('button', { name: 'Locate' })).toBeVisible()
+      const geometry = await pane.evaluate((element) => {
+        const mapFrame = element.querySelector<HTMLElement>('[data-valetudo-map-frame="true"]')
+        const mapStage = element.querySelector<HTMLElement>('[data-vacuum-map-stage="true"]')
+        const status = element.querySelector<HTMLElement>('[data-vacuum-map-status-controls="true"]')
+        const mapRect = mapFrame?.getBoundingClientRect()
+        const naturalAspect = mapFrame ? Number.parseFloat(getComputedStyle(mapFrame).getPropertyValue('--map-aspect-ratio')) : 0
+        return {
+          mapAspect: mapRect ? mapRect.width / mapRect.height : 0,
+          naturalAspect,
+          mapStageWidth: mapStage?.getBoundingClientRect().width,
+          overflow: element.scrollHeight - element.clientHeight,
+          statusOverflow: (() => {
+            const controls = element.querySelector<HTMLElement>('[data-vacuum-map-status-controls="true"]')
+            return controls ? controls.scrollHeight - controls.clientHeight : 0
+          })(),
+          statusWidth: status?.getBoundingClientRect().width,
+        }
+      })
+      expect(geometry.overflow).toBeLessThanOrEqual(1)
+      expect(geometry.statusOverflow).toBeLessThanOrEqual(1)
+      expect(geometry.naturalAspect).toBeGreaterThan(0)
+      expect(geometry.mapAspect).toBeCloseTo(geometry.naturalAspect, 1)
+      expect(geometry.mapStageWidth).toBeLessThanOrEqual((geometry.statusWidth ?? 0) + 1)
+      facts.vacuum = geometry
+    } else {
+      await expect(pane.getByRole('heading', { name: 'Status' })).toHaveCount(0)
+      await expect(pane.getByRole('heading', { name: 'Actions' })).toHaveCount(0)
+    }
   }
   if (scenario === 'remote') {
     const pad = dialog.locator('[role="group"][aria-label$=" remote controls"]')

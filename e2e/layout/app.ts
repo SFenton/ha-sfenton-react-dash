@@ -6,7 +6,7 @@ import { applyProfile, waitForModalReady, waitForRoute } from './evidence'
 import { openQuickLinksTab } from '../quick-links'
 
 export async function openSurface(page: Page, scenario: ScenarioId): Promise<Locator> {
-  const route = scenario === 'filters' ? 'recipes' : scenario === 'form' ? 'to-do' : scenario === 'remote' ? 'music-room' : 'overview'
+  const route = scenario === 'filters' ? 'recipes' : scenario === 'form' ? 'to-do' : scenario === 'remote' ? 'music-room' : scenario === 'vacuum' ? 'vacuums' : 'overview'
   await page.goto(`/index.html?path=${route}${scenario === 'summary' ? '&user=stephen#daily-report' : ''}`)
   await waitForRoute(page, route, scenario === 'summary')
   if (scenario === 'quick-links') await openQuickLinksTab(page)
@@ -22,8 +22,9 @@ export async function openSurface(page: Page, scenario: ScenarioId): Promise<Loc
     window.__mockHass.setEntityState(entity, 'idle')
     window.location.hash = hash
   }, { entity: MUSIC_ROOM_CONTROL_ENTITY_ID, hash: MUSIC_ROOM_REMOTE_HASH })
+  if (scenario === 'vacuum') await page.getByRole('button', { name: /Main Floor Docked/i }).click()
   const dialog = page.getByRole('dialog')
-  await waitForModalReady(dialog)
+  await waitForModalReady(dialog, undefined, scenario === 'vacuum' ? 'vacuum-tabs' : undefined)
   await dialog.evaluate((element) => { element.setAttribute('data-layout-mounted', 'original') })
   return dialog
 }

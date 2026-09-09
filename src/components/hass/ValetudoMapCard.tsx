@@ -7,6 +7,7 @@ import {
   useState,
   type CSSProperties,
   type KeyboardEvent as ReactKeyboardEvent,
+  type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent,
 } from 'react'
 import { useEntity, useHass } from '@hakit/core'
@@ -14,6 +15,7 @@ import type { VacuumConfig } from '../../constants/portedDashboard'
 import { VACUUM_COPY_KEYS, VACUUM_COPY_NAMESPACE, useCopy } from '../../i18n'
 import { MaterialIcon } from '../core/Icon'
 import { materialIconPath } from '../core/iconPaths'
+import { DashboardPageLoading } from '../shell/DashboardPageLoading'
 import { asEntityName } from './entityState'
 import { isUnavailableVacuumState } from './vacuumVisualState'
 import {
@@ -24,6 +26,7 @@ import {
   invertAffine,
   localPointToGlobalGrid,
   mapGridRectFromPoints,
+  mapStageAspectRatio,
   mapViewportMatrix,
   resizeMapGridRectCorner,
   translateMapGridRect,
@@ -50,8 +53,10 @@ import {
   extractValetudoMapFromPngBytes,
   isReportedMapEntityVisible,
   mapCameraEntityId,
+  selectableValetudoRooms,
   selectValetudoMapEntity,
   valetudoMapEntityRenderStyle,
+  valetudoRoomAtGridPoint,
   valetudoMapMaterialAccent,
   type ValetudoEntityLike,
   type ValetudoMap,
@@ -95,6 +100,7 @@ export interface ValetudoMapEditorMeta {
   geometry: ValetudoMapStageGeometry | null
   isLoaded: boolean
   provenance: ValetudoMapProvenance
+  reportedPositionPresent: boolean
   selectionAllowed: boolean
 }
 
@@ -107,15 +113,19 @@ export type ValetudoMapScope = typeof VALETUDO_MAP_SCOPE_FOCUSED | typeof VALETU
 
 interface ValetudoMapCardProps {
   available?: boolean
+  displayMode?: 'contained' | 'fitted'
   drawMode?: boolean
   expanded?: boolean
   interactive?: boolean
   minimumSizeCm?: number
   onDrawModeChange?: (drawMode: boolean) => void
   onEditorMetaChange?: (meta: ValetudoMapEditorMeta) => void
+  onRoomToggle?: (entityId: string) => void
   onSelectionChange?: (selection: MapGridRect | null) => void
   resetViewRevision?: number
+  selectedRooms?: { entityId: string; order: number }[]
   selection?: MapGridRect | null
+  showReportedNotice?: boolean
   sourceRevision?: string
   vacuum: VacuumConfig
 }
@@ -459,17 +469,42 @@ function keyboardDelta(event: ReactKeyboardEvent<SVGElement>) {
   return null
 }
 
+export function ValetudoReportedMapNotice({
+  id,
+  reportedPositionPresent,
+}: {
+  id?: string
+  reportedPositionPresent: boolean
+}) {
+  const copy = useCopy(VACUUM_COPY_NAMESPACE)
+  return (
+    <div className={styles.reportedNotice} data-icon="mdi:alert-outline" data-map-reported-note="true" id={id} role="note">
+      <span aria-hidden="true" className={styles.reportedNoticeIcon}>
+        <MaterialIcon name="mdi:alert-outline" size={20} />
+      </span>
+      <span className={styles.reportedNoticeCopy}>
+        <strong>{copy(reportedPositionPresent ? VACUUM_COPY_KEYS.status.lastReportedPosition : VACUUM_COPY_KEYS.status.lastReportedMap)}</strong>
+        <small>{copy(VACUUM_COPY_KEYS.status.lastReportedMapHelp)}</small>
+      </span>
+    </div>
+  )
+}
+
 export function ValetudoMapCard({
   available = true,
+  displayMode = 'contained',
   drawMode = false,
   expanded = false,
   interactive = false,
   minimumSizeCm = 25,
   onDrawModeChange,
   onEditorMetaChange,
+  onRoomToggle,
   onSelectionChange,
   resetViewRevision = 0,
+  selectedRooms = [],
   selection = null,
+  showReportedNotice = true,
   sourceRevision,
   vacuum,
 }: ValetudoMapCardProps) {
@@ -590,6 +625,18 @@ export function ValetudoMapCard({
     () => geometry ? mapViewportMatrix(geometry, frame, viewport, rotationDegrees) : IDENTITY_MATRIX,
     [frame, geometry, rotationDegrees, viewport],
   )
+  const selectableRooms = useMemo(
+    () => renderedMap && vacuum.mapRoomSelection
+      ? selectableValetudoRooms(renderedMap, vacuum.zones.map((zone) => ({
+          entityId: zone.entityId,
+          mapName: zone.mapName ?? zone.title,
+          title: zone.title,
+        })))
+      : [],
+    [renderedMap, vacuum.mapRoomSelection, vacuum.zones],
+  )
+  const selectedRoomOrders = useMemo(() => new Map(selectedRooms.map((room) => [room.entityId, room.order])), [selectedRooms])
+  const roomSelectionInteractive = Boolean(onRoomToggle && selectableRooms.length > 0 && mapProvenance === 'live' && !mapExpanded)
   const displayedRect = mapProvenance === 'reported' ? null : mapInteractive ? draftRect ?? selection : selection
   const setDraftRect = useCallback((rect: MapGridRect | null) => {
     draftRectRef.current = rect
@@ -739,6 +786,9 @@ export function ValetudoMapCard({
     }
   }, [focusGestureInvalidated, mapInteractive, resetViewRevision])
 
+  const reportedPosition = renderedMap?.entities.find((entity) => entity.type === 'robot_position')
+  const reportedPositionPresent = Boolean(reportedPosition?.points && reportedPosition.points.length >= 2)
+
   useLayoutEffect(() => {
     onEditorMetaChange?.({
       displayScope,
@@ -747,9 +797,10 @@ export function ValetudoMapCard({
       geometry,
       isLoaded: displayedLoaded,
       provenance: mapProvenance,
+      reportedPositionPresent,
       selectionAllowed,
     })
-  }, [displayScope, displayedError, displayedLoaded, focusAvailable, geometry, mapProvenance, onEditorMetaChange, selectionAllowed])
+  }, [displayScope, displayedError, displayedLoaded, focusAvailable, geometry, mapProvenance, onEditorMetaChange, reportedPositionPresent, selectionAllowed])
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -949,6 +1000,17 @@ export function ValetudoMapCard({
     ))
   }, [interactionGeometry, minimumSizeCm, onSelectionChange, selection])
 
+  const handleRoomClick = useCallback((event: ReactMouseEvent<SVGSVGElement>) => {
+    if (!roomSelectionInteractive || !geometry || !onRoomToggle) return
+    const rect = event.currentTarget.getBoundingClientRect()
+    const localPoint = applyAffine(invertAffine(matrixRef.current), {
+      x: event.clientX - rect.left,
+      y: event.clientY - rect.top,
+    })
+    const room = valetudoRoomAtGridPoint(selectableRooms, localPointToGlobalGrid(geometry, localPoint))
+    if (room) onRoomToggle(room.entityId)
+  }, [geometry, onRoomToggle, roomSelectionInteractive, selectableRooms])
+
   const showUnavailableFallback = mapProvenance === 'none' || Boolean(displayedError)
   const showLoadingFallback = mapSourceReadable && !displayedError && !renderedMap
   const showFallback = showUnavailableFallback || showLoadingFallback
@@ -961,28 +1023,30 @@ export function ValetudoMapCard({
         y1: displayedRect.y1 - geometry.minGridY,
       }
     : null
-  const showOverlay = Boolean(geometry && frame.width > 0 && frame.height > 0 && (mapInteractive || localRect))
-  const reportedPosition = renderedMap?.entities.find((entity) => entity.type === 'robot_position')
-  const reportedPositionPresent = Boolean(reportedPosition?.points && reportedPosition.points.length >= 2)
-  const showReportedNotice = mapProvenance === 'reported' && displayedLoaded && !displayedError
+  const showOverlay = Boolean(geometry && frame.width > 0 && frame.height > 0 && (mapInteractive || roomSelectionInteractive || localRect))
+  const reportedNoticeVisible = showReportedNotice && mapProvenance === 'reported' && displayedLoaded && !displayedError
   const reportedNoticeId = `${vacuum.vacuumMapId}-last-reported-map-note`
   const loadingMapKey = mapProvenance === 'reported'
     ? VACUUM_COPY_KEYS.status.loadingLastMapPosition
     : VACUUM_COPY_KEYS.status.loadingCurrentMap
+  const stageAspectRatio = geometry ? mapStageAspectRatio(geometry, rotationDegrees) : 1
   const mapStyle = {
     '--map-min-height': vacuum.mapScale > 2 ? '300px' : '340px',
+    '--map-aspect-ratio': `${stageAspectRatio}`,
   } as CSSProperties
 
   return (
     <>
       <div
         aria-label={`${vacuum.title} Valetudo map`}
-        aria-describedby={showReportedNotice ? reportedNoticeId : undefined}
+        aria-describedby={reportedNoticeVisible ? reportedNoticeId : undefined}
         className={styles.frame}
         data-draw-mode={mapInteractive && drawMode ? 'true' : 'false'}
         data-expanded={mapExpanded ? 'true' : 'false'}
         data-interactive={mapInteractive ? 'true' : 'false'}
         data-loaded={displayedLoaded ? 'true' : 'false'}
+        data-map-display={displayMode}
+        data-valetudo-map-frame="true"
         data-map-focus-reason={focusResult?.reason ?? 'unavailable'}
         data-map-provenance={mapProvenance}
         data-map-render-clipped={renderFocus ? 'true' : 'false'}
@@ -1003,18 +1067,20 @@ export function ValetudoMapCard({
         <canvas aria-hidden="true" className={styles.canvas} data-valetudo-map-canvas="true" ref={canvasRef} />
         {showOverlay && geometry && (
           <svg
-            aria-hidden={mapInteractive ? undefined : true}
-            aria-label={mapInteractive ? `${vacuum.title} cleaning area editor` : undefined}
+            aria-hidden={mapInteractive || roomSelectionInteractive ? undefined : true}
+            aria-label={mapInteractive ? `${vacuum.title} cleaning area editor` : roomSelectionInteractive ? copy(VACUUM_COPY_KEYS.layout.roomSelector, { title: vacuum.title }) : undefined}
             className={styles.overlay}
-            data-base-ui-swipe-ignore={mapInteractive ? 'true' : undefined}
-            data-interactive={mapInteractive ? 'true' : 'false'}
+            data-base-ui-swipe-ignore={mapInteractive || roomSelectionInteractive ? 'true' : undefined}
+            data-interactive={mapInteractive || roomSelectionInteractive ? 'true' : 'false'}
             data-map-editor-overlay="true"
+            data-room-selection={roomSelectionInteractive ? 'true' : 'false'}
+            onClick={roomSelectionInteractive ? handleRoomClick : undefined}
             onPointerCancel={mapInteractive ? (event) => finishPointerGesture(event, true) : undefined}
             onPointerDown={mapInteractive ? handlePointerDown : undefined}
             onPointerMove={mapInteractive ? handlePointerMove : undefined}
             onPointerUp={mapInteractive ? (event) => finishPointerGesture(event, false) : undefined}
             ref={overlayRef}
-            role={mapInteractive ? 'application' : undefined}
+            role={mapInteractive || roomSelectionInteractive ? 'application' : undefined}
             viewBox={`0 0 ${frame.width} ${frame.height}`}
           >
             <g transform={affineToCssMatrix(matrix)}>
@@ -1085,32 +1151,43 @@ export function ValetudoMapCard({
                   y={localRect.y0}
                 />
               )}
+              {selectableRooms.map((room) => {
+                const order = selectedRoomOrders.get(room.entityId)
+                if (!order) return null
+                const cx = room.centroid.x - geometry.minGridX
+                const cy = room.centroid.y - geometry.minGridY
+                return (
+                  <g
+                    aria-hidden="true"
+                    className={styles.roomOrderMarker}
+                    data-room-entity-id={room.entityId}
+                    data-room-order={order}
+                    key={room.entityId}
+                    transform={`rotate(${-rotationDegrees} ${cx} ${cy})`}
+                  >
+                    <circle cx={cx} cy={cy} r="11" />
+                    <text dominantBaseline="central" textAnchor="middle" x={cx} y={cy}>{order}</text>
+                  </g>
+                )
+              })}
             </g>
           </svg>
         )}
         {showFallback && (
-          <div className={styles.fallback}>
-            <span className={styles.fallbackTitle}>
-              {showLoadingFallback
-                ? copy(loadingMapKey)
-                : copy(VACUUM_COPY_KEYS.status.mapUnavailable)}
-            </span>
-            {showUnavailableFallback && (
-              <span className={styles.fallbackSubtitle}>{copy(VACUUM_COPY_KEYS.status.mapUnavailableHelp)}</span>
+          <div className={styles.fallback} data-map-fallback={showUnavailableFallback ? 'unavailable' : 'loading'}>
+            {showUnavailableFallback ? (
+              <>
+                <span className={styles.fallbackTitle}>{copy(VACUUM_COPY_KEYS.status.mapUnavailable)}</span>
+                <span className={styles.fallbackSubtitle}>{copy(VACUUM_COPY_KEYS.status.mapUnavailableHelp)}</span>
+              </>
+            ) : (
+              <DashboardPageLoading className={styles.fallbackLoading} label={copy(loadingMapKey)} phase="loading" />
             )}
           </div>
         )}
       </div>
-      {showReportedNotice && (
-        <div className={styles.reportedNotice} data-icon="mdi:alert-outline" data-map-reported-note="true" id={reportedNoticeId} role="note">
-          <span aria-hidden="true" className={styles.reportedNoticeIcon}>
-            <MaterialIcon name="mdi:alert-outline" size={20} />
-          </span>
-          <span className={styles.reportedNoticeCopy}>
-            <strong>{copy(reportedPositionPresent ? VACUUM_COPY_KEYS.status.lastReportedPosition : VACUUM_COPY_KEYS.status.lastReportedMap)}</strong>
-            <small>{copy(VACUUM_COPY_KEYS.status.lastReportedMapHelp)}</small>
-          </span>
-        </div>
+      {reportedNoticeVisible && (
+        <ValetudoReportedMapNotice id={reportedNoticeId} reportedPositionPresent={reportedPositionPresent} />
       )}
     </>
   )

@@ -27,10 +27,10 @@ export function StatusPill({ backgroundColor, detail, grouped = false, icon, lab
   return (
     <span {...accessibilityProps} className={styles.pill} data-icon={icon} data-tone={tone} style={style}>
       <MaterialIcon name={icon} size={18} />
-      <span className={styles.text}>
-        <span className={styles.label}>{label}</span>
-        <strong className={styles.value}>{value}</strong>
-        {detail && <span className={styles.detail}>{detail}</span>}
+      <span className={styles.text} data-dynamic-grid-label-container="true">
+        <span className={styles.label} data-dynamic-grid-label="true">{label}</span>
+        <strong className={styles.value} data-dynamic-grid-label="true">{value}</strong>
+        {detail && <span className={styles.detail} data-dynamic-grid-label="true">{detail}</span>}
       </span>
     </span>
   )
