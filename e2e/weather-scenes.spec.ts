@@ -202,7 +202,6 @@ test('Pressure matches small highlight peers without clipping across units and m
   ]) {
     await page.setViewportSize(viewport)
     await measure()
-    await pressure.scrollIntoViewIfNeeded()
     const reachable = await pressure.evaluate((element) => {
       const bodyElement = element.closest<HTMLElement>('[data-modal-sheet-body]')!
       let tile = element.getBoundingClientRect()
