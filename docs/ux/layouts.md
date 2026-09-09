@@ -94,6 +94,7 @@ dimensions to positional arrays or confuse a resize with native input emulation.
 | filters | modal | choices | Are filter descriptions readable at the actual column width, and are options and footer usable? |
 | form | modal | draft | Does the draft survive resizing, and are input, close and footer controls usable during synthetic keyboard contraction? |
 | remote | modal | active | Is the complete active direction pad visible without auto-scroll, operable, and unchanged on portrait return? |
+| vacuum | modal | docked | Does the vacuum map remain fully usable without a second left-pane scroller, using a proportionally fitted map with a visible Locate action, moving status detail to the Controls tab, only when height is constrained? |
 | weather | modal | condition, precipitation, wind, pressure-unavailable, pressure-long, forecast-error-stale, forecast-empty, forecast-error-empty | Are forecast modes, stale/empty/error states, missing and long Pressure readings readable and reachable after rotation, with complete carousel pages centered and incomplete final pages aligned left, equal small-tile heights, no preview dropdown and unchanged return geometry? |
 | navigation | page-shell-grid | home, back-page | Do content, grid, fixed controls, Back/menu and focus remain usable across the named form-factor and stretch-return journey? |
 | host | host | legacy, panel | Does the actual product bridge preserve its app during synthetic resizing and forward independent outer safe edges to the correctly sized inner viewport? |
