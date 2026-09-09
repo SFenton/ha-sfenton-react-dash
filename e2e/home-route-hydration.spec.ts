@@ -1,4 +1,4 @@
-import { expect, test, type Page } from './layout/fixture'
+import { expect, test, type Locator, type Page } from './layout/fixture'
 import { waitForNavigation } from './layout/evidence'
 
 const VIEWPORTS = [
@@ -18,7 +18,9 @@ interface HomeRouteAudit {
   adaptiveNavigationMissing: boolean
   appShellMissing: boolean
   headerMissing: boolean
+  homeHeadingSeenAt: number | null
   loaderSeen: boolean
+  navigationStartedAt: number | null
   running: boolean
   samples: number
   shell: Element | null
@@ -37,21 +39,27 @@ async function waitForSettings(page: Page) {
   })
 }
 
+async function clickAndMarkNavigation(page: Page, target: Locator) {
+  await target.evaluate((element) => {
+    const audit = (window as HomeRouteAuditWindow).__homeRouteAudit
+    if (!audit) throw new Error('Home route audit was not installed.')
+    audit.navigationStartedAt = performance.now()
+    ;(element as HTMLElement).click()
+  })
+}
+
 async function navigateHome(page: Page) {
   const adaptiveNavigation = page.locator('[data-adaptive-navigation]:visible')
   if (await adaptiveNavigation.count()) {
-    const startedAt = Date.now()
-    await adaptiveNavigation.getByRole('button', { name: 'Home', exact: true }).click()
-    return startedAt
+    await clickAndMarkNavigation(page, adaptiveNavigation.getByRole('button', { name: 'Home', exact: true }))
+    return
   }
 
   await page.getByRole('button', { name: 'Open navigation menu' }).click()
-  const startedAt = Date.now()
-  await page.locator('aside[data-state="open"]').getByRole('menuitem', {
+  await clickAndMarkNavigation(page, page.locator('aside[data-state="open"]').getByRole('menuitem', {
     name: 'Home',
     exact: true,
-  }).click()
-  return startedAt
+  }))
 }
 
 async function startHomeRouteAudit(page: Page) {
@@ -73,7 +81,9 @@ async function startHomeRouteAudit(page: Page) {
       adaptiveNavigationMissing: false,
       appShellMissing: false,
       headerMissing: false,
+      homeHeadingSeenAt: null,
       loaderSeen: false,
+      navigationStartedAt: null,
       running: true,
       samples: 0,
       shell: document.querySelector('[data-app-shell="true"]'),
@@ -87,6 +97,12 @@ async function startHomeRouteAudit(page: Page) {
       ))
       audit.appShellMissing ||= !document.querySelector('[data-app-shell="true"]')
       audit.headerMissing ||= !document.querySelector('[data-page-header="true"]')
+      if (audit.navigationStartedAt !== null && audit.homeHeadingSeenAt === null) {
+        const homeHeading = [...document.querySelectorAll('h1, h2, h3')].find((element) => (
+          element.textContent?.trim() === 'Home' && visible(element)
+        ))
+        if (homeHeading) audit.homeHeadingSeenAt = performance.now()
+      }
       if (adaptiveNavigationExpected) {
         audit.adaptiveNavigationMissing ||= !visibleAdaptiveNavigation()
       }
@@ -106,7 +122,7 @@ async function expectWarmHomeNavigation(
   requests: string[],
   initial: { lifecycleId?: string, timeOrigin: number },
 ) {
-  const startedAt = await navigateHome(page)
+  await navigateHome(page)
   await expect(page.getByRole('heading', { name: 'Home', exact: true })).toBeVisible({
     timeout: 1_000,
   })
@@ -121,6 +137,9 @@ async function expectWarmHomeNavigation(
       adaptiveNavigationMissing: audit.adaptiveNavigationMissing,
       appShellMissing: audit.appShellMissing,
       headerMissing: audit.headerMissing,
+      homeNavigationDuration: audit.homeHeadingSeenAt !== null && audit.navigationStartedAt !== null
+        ? audit.homeHeadingSeenAt - audit.navigationStartedAt
+        : null,
       lifecycleId: (window as HomeRouteAuditWindow).__sfentonReactDashboardLifecycle?.instanceId,
       loaderSeen: audit.loaderSeen,
       sameShell: audit.shell === document.querySelector('[data-app-shell="true"]'),
@@ -129,7 +148,8 @@ async function expectWarmHomeNavigation(
     }
   })
 
-  expect(Date.now() - startedAt).toBeLessThan(1_000)
+  expect(result.homeNavigationDuration).not.toBeNull()
+  expect(result.homeNavigationDuration ?? Number.POSITIVE_INFINITY).toBeLessThan(1_000)
   expect(requests).toEqual([])
   expect(result).toMatchObject({
     adaptiveNavigationMissing: false,

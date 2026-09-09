@@ -50,6 +50,51 @@ async function updateDailyForecast(page: Page, updates: ForecastPatch[], revisio
   }, { entityId: WEATHER_ENTITY, forecastUpdates: updates, nextRevision: revision })
 }
 
+async function updateDailyForecastAndFreezeAnimations(
+  page: Page,
+  updates: ForecastPatch[],
+  revision: number,
+  expectedAnimations: number,
+  expectedDestinationBearing: string,
+) {
+  await page.evaluate(({ entityId, forecastUpdates, nextRevision, expectedAnimations, expectedDestinationBearing }) => new Promise<void>((resolve, reject) => {
+    const api = (window as unknown as {
+      __mockHass?: {
+        setDailyWeatherForecast: (index: number, patch: ForecastPatch) => void
+        setEntityAttribute: (entityId: string, attribute: string, value: unknown) => void
+      }
+    }).__mockHass
+    forecastUpdates.forEach((patch, index) => api?.setDailyWeatherForecast(index, patch))
+    api?.setEntityAttribute(entityId, 'forecast_revision', nextRevision)
+
+    const deadline = performance.now() + 5_000
+    const capture = () => {
+      const arrows = [...document.querySelectorAll<HTMLElement>('[data-forecast-wind-arrow]')]
+      const animations = arrows.flatMap((element) => element.getAnimations())
+      if (
+        arrows[0]?.dataset.windDestinationBearing === expectedDestinationBearing
+        && animations.length === expectedAnimations
+      ) {
+        animations.forEach((animation) => animation.pause())
+        resolve()
+        return
+      }
+      if (performance.now() >= deadline) {
+        reject(new Error(`Expected ${expectedAnimations} wind animations, found ${animations.length}`))
+        return
+      }
+      requestAnimationFrame(capture)
+    }
+    requestAnimationFrame(capture)
+  }), {
+    entityId: WEATHER_ENTITY,
+    expectedAnimations,
+    expectedDestinationBearing,
+    forecastUpdates: updates,
+    nextRevision: revision,
+  })
+}
+
 test('daily wind directions remain aligned across responsive and font geometry', async ({ page }) => {
   await page.setViewportSize({ height: 852, width: 393 })
   const dialog = await openWeather(page)
@@ -143,7 +188,7 @@ test('live weather motion shares fixed timing and retargets from the painted sta
   await expect(arrows).toHaveCount(7)
   await expect.poll(() => arrows.evaluateAll((elements) => elements.reduce((count, element) => count + element.getAnimations().length, 0))).toBe(0)
 
-  await updateDailyForecast(page, [
+  await updateDailyForecastAndFreezeAnimations(page, [
     { wind_bearing: 350, wind_gust_speed: 1000, wind_speed: 100 },
     { wind_bearing: 10, wind_gust_speed: 8, wind_speed: 4 },
     { wind_bearing: 120, wind_gust_speed: 9, wind_speed: 5 },
@@ -151,9 +196,8 @@ test('live weather motion shares fixed timing and retargets from the painted sta
     { wind_bearing: 45, wind_gust_speed: 11, wind_speed: 7 },
     { wind_bearing: 220, wind_gust_speed: 12, wind_speed: 8 },
     { wind_bearing: 80, wind_gust_speed: 13, wind_speed: 9 },
-  ], 1)
+  ], 1, 7, '170')
   await expect(arrows.first()).toHaveAttribute('data-wind-destination-bearing', '170')
-  await expect.poll(() => arrows.evaluateAll((elements) => elements.reduce((count, element) => count + element.getAnimations().length, 0))).toBe(7)
   const firstTiming = await arrows.evaluateAll((elements) => elements.map((element) => {
     const animation = element.getAnimations()[0]
     return {
@@ -180,7 +224,7 @@ test('live weather motion shares fixed timing and retargets from the painted sta
   }))
 
   await page.waitForTimeout(10)
-  await updateDailyForecast(page, [
+  await updateDailyForecastAndFreezeAnimations(page, [
     { wind_bearing: 20, wind_gust_speed: 8, wind_speed: 4 },
     { wind_bearing: 60, wind_gust_speed: 7, wind_speed: 3 },
     { wind_bearing: 160, wind_gust_speed: 6, wind_speed: 2 },
@@ -188,9 +232,8 @@ test('live weather motion shares fixed timing and retargets from the painted sta
     { wind_bearing: 90, wind_gust_speed: 10, wind_speed: 6 },
     { wind_bearing: 260, wind_gust_speed: 11, wind_speed: 7 },
     { wind_bearing: 130, wind_gust_speed: 12, wind_speed: 8 },
-  ], 2)
+  ], 2, 7, '200')
   await expect(arrows.first()).toHaveAttribute('data-wind-destination-bearing', '200')
-  await expect.poll(() => arrows.evaluateAll((elements) => elements.reduce((count, element) => count + element.getAnimations().length, 0))).toBe(7)
   const interruption = await arrows.evaluateAll((elements) => elements.map((element) => {
     const animation = element.getAnimations()[0]
     const frames = animation.effect?.getKeyframes() ?? []
