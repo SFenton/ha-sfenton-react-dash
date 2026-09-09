@@ -145,8 +145,10 @@
 .viewport {
   position: fixed;
   inset: 0;
+  bottom: auto;
   z-index: 41;
   display: flex;
+  height: min(100%, calc(100dvh - var(--dashboard-keyboard-overlay-inset, 0px)));
   align-items: flex-end;
   justify-content: center;
   pointer-events: none;
@@ -509,8 +511,6 @@
 
 .viewport[data-modal-presentation='dialog'],
 .viewport[data-modal-presentation='landscape-dialog'] {
-  bottom: auto;
-  height: min(100%, calc(100dvh - var(--dashboard-keyboard-overlay-inset, 0px)));
   align-items: center;
 }
 

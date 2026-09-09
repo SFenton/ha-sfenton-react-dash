@@ -5,7 +5,7 @@ import { ROOM_PAGE_CONFIGS } from '../src/constants/roomPages'
 import { MEDIA_REMOTE_CONFIGS } from '../src/constants/mediaRemotes'
 import { SHOW_OUTDOOR_FAUCETS_ENTITY_ID } from '../src/constants/sprinklers'
 import { installSafeAreaInsets, setSafeAreaInsets } from './safe-area'
-import { openQuickLinksTab, quickLinksLayout } from './quick-links'
+import { globalQuickLinksAction, openQuickLinksTab, quickLinksLayout } from './quick-links'
 
 const PORTRAIT = { width: 393, height: 852, insets: { top: 59, right: 0, bottom: 34, left: 0 } }
 const LANDSCAPES = [
@@ -470,6 +470,53 @@ test('responsive typography disables orientation inflation but retains browser z
 
 test.describe('touch keyboard viewport', () => {
   test.use({ hasTouch: true, isMobile: true })
+
+  test('portrait form and chat sheets rise into the keyboard-safe viewport', async ({ page }) => {
+    await page.setViewportSize(PORTRAIT)
+    await installSafeAreaInsets(page, PORTRAIT.insets)
+    await page.addInitScript(({ width, height }) => {
+      Object.defineProperty(navigator, 'maxTouchPoints', { configurable: true, value: 1 })
+      const viewport = Object.assign(new EventTarget(), {
+        width, height, offsetTop: 0, offsetLeft: 0,
+        pageTop: 0, pageLeft: 0, scale: 1,
+      })
+      Object.defineProperty(window, 'visualViewport', { configurable: true, value: viewport })
+    }, PORTRAIT)
+    await page.goto('/index.html?path=to-do')
+    await page.getByRole('button', { name: 'Add Task', exact: true }).click()
+    const formDialog = page.getByRole('dialog', { name: 'Add Task', exact: true })
+    await formDialog.getByRole('textbox').focus()
+    await page.evaluate(() => {
+      Object.defineProperty(window.visualViewport, 'height', { configurable: true, value: 520 })
+      window.visualViewport!.dispatchEvent(new Event('resize'))
+    })
+    await expect.poll(() => page.evaluate(() => document.documentElement.style.getPropertyValue('--dashboard-keyboard-overlay-inset'))).toBe('332px')
+    const formBox = await outerBox(formDialog)
+    expectBox(formBox, { x: 0, y: 59, width: 393, height: 461 }, 'keyboard-safe portrait form')
+    const formFooter = await formDialog.locator('[data-modal-sheet-footer="true"]').boundingBox()
+    expect(formFooter!.y + formFooter!.height).toBeLessThanOrEqual(520)
+    await formDialog.getByRole('textbox').blur()
+    await page.evaluate(() => {
+      Object.defineProperty(window.visualViewport, 'height', { configurable: true, value: 852 })
+      window.visualViewport!.dispatchEvent(new Event('resize'))
+    })
+    await expect.poll(() => page.evaluate(() => document.documentElement.style.getPropertyValue('--dashboard-keyboard-overlay-inset'))).toBe('0px')
+    expectBox(await outerBox(formDialog), { x: 0, y: 85.203125, width: 393, height: 766.796875 }, 'restored portrait form')
+    await close(formDialog)
+
+    await page.goto('/index.html?path=overview')
+    await globalQuickLinksAction(page).click()
+    const chatDialog = page.getByRole('dialog', { name: 'Home Assistant', exact: true })
+    await chatDialog.getByRole('textbox', { name: 'Chat Message' }).focus()
+    await page.evaluate(() => {
+      Object.defineProperty(window.visualViewport, 'height', { configurable: true, value: 520 })
+      window.visualViewport!.dispatchEvent(new Event('resize'))
+    })
+    await expect.poll(() => page.evaluate(() => document.documentElement.style.getPropertyValue('--dashboard-keyboard-overlay-inset'))).toBe('332px')
+    expectBox(await outerBox(chatDialog), formBox, 'matching keyboard-safe portrait chat frame')
+    const composer = await chatDialog.locator('[data-chat-composer="true"]').boundingBox()
+    expect(composer!.y + composer!.height).toBeLessThanOrEqual(520)
+  })
 
   test('landscape frames follow the keyboard overlay below the page minimum height', async ({ page }) => {
     const profile = LANDSCAPES[0]
