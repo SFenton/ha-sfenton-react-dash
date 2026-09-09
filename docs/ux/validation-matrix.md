@@ -239,10 +239,11 @@ rectangle: `x=safe-left+12`, `y=safe-top+8`,
 Normal dialogs use `width=min(1100, viewport-left-padding-right-padding)`
 and `height=min(760, visible-height-top-padding-bottom-padding)`, centered in
 the remaining box; each padding is `max(32, safe-edge)`.
-Compact/form inner content remains centered at its typed readable measure by
-default. Full-width control collections opt into `contentWidth="full"` and
-must match the actual padded body width rather than an old reading cap.
-Neither policy may introduce another scroll owner. Exercise Security System
+Desktop modal body, body-header, and footer regions match the actual padded frame
+width, while readable tab navigation retains its typed family measure.
+`contentWidth="full"` expands tab navigation as well. Landscape compact/form
+bodies retain their readable caps. Neither policy may introduce another scroll
+owner. Exercise Security System
 through Home, Security and Quick Links, plus Guest Presence Security through
 both routes, and retain their portrait card dimensions.
 

@@ -73,8 +73,9 @@ the shared behavior layer rather than duplicating HA-owned side effects.
   without shrinking their text-required spans or changing order. Ties go to
   the later item. The final row retains its required spans and aligns left.
   On a four-track layout the ordinary six-link example is `2+2`, `2+1+1`, `2`.
-- Daily Summary uses the shared centered frame and retains its 670px desktop
-  reading measure, documented 16px title and compact row typography. It reflows chore
+- Daily Summary uses the shared centered frame and fills the padded desktop body,
+  while its tab navigator retains the family reading measure. It keeps the documented
+  16px title and compact row typography. It reflows chore
   and expired-food rows to two columns only at standard and wide modal-body
   tiers. Compact and fields tiers remain single-column.
 - Set `text-size-adjust: 100%` and `-webkit-text-size-adjust: 100%` on the
@@ -183,17 +184,19 @@ than making compact text or forms span that entire width.
 Centered viewport height comes directly from `100dvh` minus the existing
 keyboard overlay inset, not from a stale JS height captured before rotation.
 Do not apply the page's 320px minimum height to a keyboard-reduced dialog.
-Compact/form content stays centered inside the shared readable-measure
-wrapper by default. `contentWidth="full"` explicitly opts control collections
-out of that reading cap without changing the outer frame or portrait sizing.
+Desktop modal bodies fill the padded frame so their content can use the available
+space; readable tab navigation retains the family measure.
+`contentWidth="full"` opts navigation out of that cap without changing
+the outer frame or portrait sizing.
 In body-scrolling modes, the measure wrapper must grow to its intrinsic content
 height so descendant overflow cannot consume the body's bottom padding.
 Pane-scrolling presentations retain their bounded wrapper height.
 Security System uses it on Home, Security and Quick Links; Guest Presence
 Security uses it for its responsive section grid. Security mode choices keep
 their 74px height and use 160px-minimum auto-fit tracks.
-Desktop readable inner width retains the declared family width less 50px of
-chrome; landscape retains the compact/form/standard measure caps. The modal
+Desktop readable tab navigation retains the declared family width less 50px of
+chrome while body content and footer regions fill their padded width; landscape
+retains the compact/form/standard measure caps. The modal
 body is the sole landscape vertical scroll owner, including 568px and 667px
 windows. Body tiers are measured from the capped content, not the outer frame.
 

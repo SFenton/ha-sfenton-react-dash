@@ -547,7 +547,7 @@
   max-height: 100%;
 }
 
-.content[data-modal-presentation='dialog'][data-modal-content-width='readable'] .regionMeasure {
+.content[data-modal-presentation='dialog'][data-modal-content-width='readable'] .navigation .regionMeasure {
   max-width: min(100%, calc(var(--modal-centered-inline-size, var(--modal-intent-width)) - 50px));
 }
 
