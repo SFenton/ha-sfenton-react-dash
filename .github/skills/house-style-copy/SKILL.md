@@ -2,8 +2,9 @@
 name: house-style-copy
 description: Generates, rewrites, audits, and ranks UI and Home Assistant reference copy in the ha-sfenton-react-dash house style. Use for buttons, actions, chips, titles, descriptions, modals, states, forms, accessibility labels, confirmations, compound metrics, and notification wording.
 metadata:
-  model_pin: evals/model-pin.json
-  model_pin_status: validated
+  runtime_routing: evals/runtime-routing.json
+  default_status: provisional
+  historical_model_pin: evals/model-pin.json
 ---
 
 # House Style Copy
@@ -12,13 +13,14 @@ Use this skill to produce or audit user-visible English copy. The skill is
 read-only by default. It does not edit source, catalogs, Home Assistant, or
 external systems.
 
-Any later implementation requires separate explicit operator authorization
-and is owned by GPT-5.6 Sol; generated copy is not implementation approval.
+Any later implementation requires separate explicit operator authorization and
+the exact hierarchical project route; generated copy is not implementation
+approval.
 
 ## Activation gate
 
 Never generate copy directly under the host model. Normalize the request, then
-invoke the hash-bound pinned launcher:
+invoke the deterministic route-enforcing launcher:
 
 ```bash
 node .github/skills/house-style-copy/scripts/generate.mjs \
@@ -31,16 +33,20 @@ not require an available model, and private raw input is never serialized into
 a participant prompt. For mixed lists, only safe non-refused entries reach the
 participant and results are merged back into original order.
 
-For model-bound entries, the launcher verifies the validated, unexpired pin and current
-candidate/qualified-corpus/skill hashes, then retrieves from the exact corpus
-snapshot used for qualification and invokes the exact pinned model, effort,
-and context with mutation and external tools disabled. Ordinary app copy or
-source drift does not change runtime authority or invalidate the pin. Return
-its validated strict JSON output verbatim. If pin or launcher validation fails,
-return
-`status: "refused"` with code `unsafe`, reason
-`No validated model profile is available.`, and no candidates. Never use the
-host model as an unpinned fallback.
+For model-bound entries, the launcher uses the provisional measured-finalist
+default in `evals/runtime-routing.json`, retrieves from the qualified corpus,
+and invokes the exact profile with mutation and external tools disabled. This
+does not claim new qualification; every deterministic request/response,
+privacy, ownership, placeholder, and quality gate remains unchanged.
+The historical validated Sol max/long profile may run only when
+`--trigger-receipt` supplies an exact, canonical-hash-valid
+`copy-safety-conflict` receipt and `--pipeline-state` supplies the complete
+current-contract receipt prefix named by it. The launcher rechecks the
+opportunity, tool, workflow, repository, revision, scope, role, profile,
+authority, command, usage, order, predecessor hashes, complete ordered prompt
+payload, redacted locally resolved batch entries, and receipt freshness. The
+same adjudication receipt cannot be replayed for another request or batch.
+Never use the host model as an unpinned fallback.
 
 ## Mandatory boundaries
 
@@ -160,9 +166,11 @@ new bundle completely, then atomically swaps the small pointer and removes
 superseded bundles. `--allow-dirty` is maintenance-only, non-release evidence.
 Every changed snapshot changes the qualified corpus and skill hashes. Run the
 full qualification, holdout, latency, selection, and pin check workflow in
-[evals/README.md](evals/README.md) before generation can resume. Model
-selection writes `model-pin.json` and `latest-results.json` together. Never
-edit either evidence file or pin hashes manually.
+[evals/README.md](evals/README.md) before changing qualification claims.
+Historical model selection writes `model-pin.json` and `latest-results.json`
+together; preserve both as evidence. Runtime default/conditional routing lives
+separately in `runtime-routing.json` so the old max result is not routine
+residency.
 
 Do not run the model benchmark merely to answer a copy request. Benchmark and
 pinning procedures are documented in

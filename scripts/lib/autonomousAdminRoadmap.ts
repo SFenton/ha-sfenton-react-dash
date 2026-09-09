@@ -1,8 +1,16 @@
 import { createHash } from 'node:crypto'
 
 export const AUTONOMOUS_ADMIN_MODEL = 'gpt-5.6-sol'
-export const AUTONOMOUS_ADMIN_REASONING_EFFORT = 'max'
-export const AUTONOMOUS_ADMIN_CONTEXT_TIER = 'long_context'
+export const AUTONOMOUS_ADMIN_REASONING_EFFORT = 'medium'
+export const AUTONOMOUS_ADMIN_CONTEXT_TIER = 'default'
+export const AUTONOMOUS_ADMIN_CRITICAL_MODEL = 'gpt-5.6-sol'
+export const AUTONOMOUS_ADMIN_CRITICAL_REASONING_EFFORT = 'max'
+export const AUTONOMOUS_ADMIN_CRITICAL_CONTEXT_TIER = 'long_context'
+export const AUTONOMOUS_ADMIN_CRITICAL_TRIGGER_IDS = [
+  'ha-physical-action-conflict',
+  'ha-credential-exposure-conflict',
+  'ha-release-rollback-or-host-conflict',
+] as const
 export const AUTONOMOUS_ADMIN_SKILL = 'autonomous-hass-admin-executor'
 
 export const autonomousAdminStatuses = [
@@ -17,6 +25,10 @@ export const autonomousAdminStatuses = [
 export type AutonomousAdminStatus = (typeof autonomousAdminStatuses)[number]
 
 export interface AutonomousAdminExecutionProfile {
+  criticalContextTier: string
+  criticalModel: string
+  criticalReasoningEffort: string
+  criticalTriggerIds: string[]
   completionReceiptEntityId: string
   completionScript: string
   contextTier: string
@@ -211,6 +223,10 @@ function parseProfile(markdown: string, errors: string[]): AutonomousAdminExecut
   const model = values.get('model')
   const reasoningEffort = values.get('reasoning_effort')
   const contextTier = values.get('context_tier')
+  const criticalModel = values.get('critical_model')
+  const criticalReasoningEffort = values.get('critical_reasoning_effort')
+  const criticalContextTier = values.get('critical_context_tier')
+  const criticalTriggerIds = splitList(values.get('critical_trigger_ids'))
   const requiredSkills = splitList(values.get('required_skills'))
   const todoEntityId = values.get('todo_entity_id')
   const completionScript = values.get('completion_script')
@@ -220,6 +236,10 @@ function parseProfile(markdown: string, errors: string[]): AutonomousAdminExecut
     completion_receipt_entity_id: completionReceiptEntityId,
     completion_script: completionScript,
     context_tier: contextTier,
+    critical_context_tier: criticalContextTier,
+    critical_model: criticalModel,
+    critical_reasoning_effort: criticalReasoningEffort,
+    critical_trigger_ids: criticalTriggerIds.length > 0 ? criticalTriggerIds.join(',') : undefined,
     final_task_id: finalTaskId,
     model,
     plan_id: planId,
@@ -230,11 +250,28 @@ function parseProfile(markdown: string, errors: string[]): AutonomousAdminExecut
   for (const [key, value] of Object.entries(requiredValues)) {
     if (!value) errors.push(`Execution profile is missing ${key}.`)
   }
-  if (!planId || !finalTaskId || !model || !reasoningEffort || !contextTier || requiredSkills.length === 0 || !todoEntityId || !completionScript || !completionReceiptEntityId) {
+  if (!planId || !finalTaskId || !model || !reasoningEffort || !contextTier ||
+    !criticalModel || !criticalReasoningEffort || !criticalContextTier ||
+    criticalTriggerIds.length === 0 || requiredSkills.length === 0 ||
+    !todoEntityId || !completionScript || !completionReceiptEntityId) {
     return undefined
   }
 
-  return { completionReceiptEntityId, completionScript, contextTier, finalTaskId, model, planId, reasoningEffort, requiredSkills, todoEntityId }
+  return {
+    completionReceiptEntityId,
+    completionScript,
+    contextTier,
+    criticalContextTier,
+    criticalModel,
+    criticalReasoningEffort,
+    criticalTriggerIds,
+    finalTaskId,
+    model,
+    planId,
+    reasoningEffort,
+    requiredSkills,
+    todoEntityId,
+  }
 }
 
 function parseQueue(markdown: string, errors: string[]): AutonomousAdminTask[] {
@@ -327,6 +364,19 @@ function validateProfile(profile: AutonomousAdminExecutionProfile | undefined, e
   }
   if (profile.contextTier !== AUTONOMOUS_ADMIN_CONTEXT_TIER) {
     errors.push(`Execution profile context tier is "${profile.contextTier}", expected "${AUTONOMOUS_ADMIN_CONTEXT_TIER}".`)
+  }
+  if (profile.criticalModel !== AUTONOMOUS_ADMIN_CRITICAL_MODEL) {
+    errors.push(`Critical profile model is "${profile.criticalModel}", expected "${AUTONOMOUS_ADMIN_CRITICAL_MODEL}".`)
+  }
+  if (profile.criticalReasoningEffort !== AUTONOMOUS_ADMIN_CRITICAL_REASONING_EFFORT) {
+    errors.push(`Critical profile reasoning effort is "${profile.criticalReasoningEffort}", expected "${AUTONOMOUS_ADMIN_CRITICAL_REASONING_EFFORT}".`)
+  }
+  if (profile.criticalContextTier !== AUTONOMOUS_ADMIN_CRITICAL_CONTEXT_TIER) {
+    errors.push(`Critical profile context tier is "${profile.criticalContextTier}", expected "${AUTONOMOUS_ADMIN_CRITICAL_CONTEXT_TIER}".`)
+  }
+  if (JSON.stringify(profile.criticalTriggerIds) !==
+    JSON.stringify(AUTONOMOUS_ADMIN_CRITICAL_TRIGGER_IDS)) {
+    errors.push(`Critical profile trigger ids must be exactly "${AUTONOMOUS_ADMIN_CRITICAL_TRIGGER_IDS.join(',')}".`)
   }
   if (profile.requiredSkills.length !== 1 || profile.requiredSkills[0] !== AUTONOMOUS_ADMIN_SKILL) {
     errors.push(`Execution profile required skills must be exactly "${AUTONOMOUS_ADMIN_SKILL}".`)

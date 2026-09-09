@@ -25,7 +25,7 @@ services. Keep entity IDs in constants and pages declarative.
 | Dashboard code, HA services, ports, cameras, lifecycle, release | [.github/reference/dashboard-contract.md](reference/dashboard-contract.md), in full |
 | UX, styling, visible copy, responsive behavior | Matching `.github/instructions/` files, `docs/ux/layouts.md`, and its executable plan |
 | Port from Lovelace | `dashboard-ux-authoring` / HASS Porting; source config and real browser parity remain required |
-| Release explicitly requested | `release-dashboard`; its pins and authorization gates remain unchanged |
+| Release explicitly requested | `release-dashboard`; while its version 3 machine is disabled, stop after local scope review and deterministic preflight |
 | Generic research/implementation/testing | `.github/agent-budget.json` and `ha-budget-workflow` |
 
 Local layout validation is mock-only and provenance-bound. It does not
@@ -37,3 +37,16 @@ Do not invoke tandem, the simulated user panel, or the autonomous admin
 executor unless explicitly requested. Unknown or consequential architectural
 questions need frontier evidence, not a cheap summary. A model route never
 changes repository safety or release requirements.
+
+The version 3 budget route is deterministic first. The interactive model may be
+Sol, HydraFusion, or another model; identity never bypasses the exact
+opportunity pin. A matching qualified model may fill the resolved role,
+otherwise the router dispatches the project medium coordinator/reviewer.
+Unqualified models may orchestrate and read evidence but gain no semantic,
+repository-apply, Home Assistant, production, or release authority. Sol
+max/long is conditional on a named trigger receipt, never routine residency.
+
+The installed continuous-improvement observer is governed by
+`.github/agent-learning.json`. It silently no-ops when no repeated reusable
+pattern qualifies and grants no visual, HA, repository-apply or release
+authority.

@@ -4,7 +4,11 @@ applyTo: ".github/skills/autonomous-hass-admin-executor/SKILL.md,scripts/autonom
 
 # Autonomous Admin tooling instructions
 
-- Keep the roadmap profile pinned to `gpt-5.6-sol`, `max`, and `long_context`.
+- Keep the default roadmap coordinator pinned to `gpt-5.6-sol`, `medium`, and
+  `default`. Keep Sol `max`/`long_context` only as a conditional critical-review
+  profile for `ha-physical-action-conflict`,
+  `ha-credential-exposure-conflict`, or
+  `ha-release-rollback-or-host-conflict`, with a preceding trigger receipt.
 - Keep exactly one queue between the autonomous queue markers and exactly one phase per Home Assistant Admin todo UID.
 - Statuses are limited to `pending`, `in_progress`, `accepted`, `rejected`, `hard_blocked`, and `superseded`.
 - Fail closed on profile mismatch, duplicate task ids or todo UIDs, unknown dependencies, cycles, multiple in-progress tasks, HA queue drift, missing SMTP readiness, missing phase reports, or unreceipted delivery claims.

@@ -1,0 +1,134 @@
+{
+  "version": 1,
+  "project": "ha-react",
+  "tools": [
+    {
+      "id": "check-dashboard",
+      "kind": "command",
+      "argv": ["npm", "run", "check"],
+      "cwd": ".",
+      "timeoutSeconds": 3600,
+      "sideEffect": "workspace",
+      "environment": []
+    },
+    {
+      "id": "test-focused-pure",
+      "kind": "command",
+      "argv": ["npm", "run", "test:run", "--", "src/constants/routes.test.ts", "src/components/core/DynamicGrid.test.tsx", "src/components/core/ScheduleEditorFields.test.tsx"],
+      "cwd": ".",
+      "timeoutSeconds": 900,
+      "sideEffect": "workspace",
+      "environment": []
+    },
+    {
+      "id": "test-interactions",
+      "kind": "command",
+      "argv": ["npm", "run", "test:run", "--", "src/components/core/SurfaceAccessory.test.tsx", "src/components/core/GlassTile.semantics.test.tsx", "src/components/core/ModalOpeners.test.tsx", "src/components/core/SelectActionField.test.tsx", "src/components/core/ToggleControl.test.tsx"],
+      "cwd": ".",
+      "timeoutSeconds": 900,
+      "sideEffect": "workspace",
+      "environment": []
+    },
+    {
+      "id": "test-ha-service-mappings",
+      "kind": "command",
+      "argv": ["npm", "run", "test:run", "--", "src/components/hass/BathroomFanTile.test.tsx", "src/components/hass/BathroomFanModalContent.test.tsx", "src/components/hass/TodoListPanel.test.tsx"],
+      "cwd": ".",
+      "timeoutSeconds": 900,
+      "sideEffect": "workspace",
+      "environment": []
+    },
+    {
+      "id": "test-core-scaffolds",
+      "kind": "command",
+      "argv": ["npm", "run", "test:run", "--", "src/pages/Page.test.tsx", "src/components/core/Section.test.tsx", "src/components/core/ResponsiveSectionGrid.test.tsx", "src/components/core/ModalOpeners.test.tsx"],
+      "cwd": ".",
+      "timeoutSeconds": 900,
+      "sideEffect": "workspace",
+      "environment": []
+    },
+    {
+      "id": "test-core-transforms",
+      "kind": "command",
+      "argv": ["npm", "run", "test:run", "--", "src/components/core/SurfaceAccessory.test.tsx", "src/components/core/ModalOpeners.test.tsx", "src/components/core/GlassTile.semantics.test.tsx", "src/components/hass/EntityActionCard.test.tsx"],
+      "cwd": ".",
+      "timeoutSeconds": 900,
+      "sideEffect": "workspace",
+      "environment": []
+    },
+    {
+      "id": "test-runtime-debugging",
+      "kind": "command",
+      "argv": ["npm", "run", "test:run", "--", "src/components/core/ModalSheet.test.tsx", "src/components/hass/BathroomFanModalContent.test.tsx", "src/components/hass/LightMoreInfoSheet.test.tsx"],
+      "cwd": ".",
+      "timeoutSeconds": 900,
+      "sideEffect": "workspace",
+      "environment": []
+    },
+    {
+      "id": "verify-layout",
+      "kind": "disabled",
+      "reason": "Layout verification requires an exact provenance-bound --run directory",
+      "sideEffect": "workspace",
+      "environment": []
+    },
+    {
+      "id": "build-release",
+      "kind": "command",
+      "argv": ["npm", "run", "build:release"],
+      "cwd": ".",
+      "timeoutSeconds": 1800,
+      "sideEffect": "workspace",
+      "environment": []
+    },
+    {
+      "id": "git-release-disabled",
+      "kind": "disabled",
+      "reason": "Exact Git and GitHub release driver is not implemented",
+      "sideEffect": "github",
+      "environment": []
+    },
+    {
+      "id": "affected-playwright-disabled",
+      "kind": "disabled",
+      "reason": "Affected Playwright execution requires exact scope and an owned server",
+      "sideEffect": "workspace",
+      "environment": []
+    },
+    {
+      "id": "build-merged-master-disabled",
+      "kind": "disabled",
+      "reason": "Post-merge build requires an exact detached origin/master worktree",
+      "sideEffect": "workspace",
+      "environment": []
+    },
+    {
+      "id": "deploy-dashboard-disabled",
+      "kind": "disabled",
+      "reason": "Home Assistant deployment driver is not implemented",
+      "sideEffect": "production",
+      "environment": []
+    },
+    {
+      "id": "verify-production-disabled",
+      "kind": "disabled",
+      "reason": "Production browser and host verification driver is not implemented",
+      "sideEffect": "production",
+      "environment": []
+    },
+    {
+      "id": "rollback-dashboard-disabled",
+      "kind": "disabled",
+      "reason": "Production bundle and wrapper rollback driver is not implemented",
+      "sideEffect": "production",
+      "environment": []
+    },
+    {
+      "id": "cleanup-release-disabled",
+      "kind": "disabled",
+      "reason": "Release worktree cleanup driver is not implemented",
+      "sideEffect": "workspace",
+      "environment": []
+    }
+  ]
+}

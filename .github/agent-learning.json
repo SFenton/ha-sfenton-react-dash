@@ -1,0 +1,53 @@
+{
+  "version": 1,
+  "project": "ha-react",
+  "enabled": true,
+  "retentionDays": 30,
+  "thresholds": {
+    "minimumSuccessfulWorkflows": 3,
+    "minimumDistinctSessions": 2,
+    "minimumStability": 0.8,
+    "maximumCandidatesPerWorkflow": 1,
+    "minimumOperationCount": 2,
+    "maximumSubgraphOperations": 6,
+    "maximumAnalysisEvents": 10000
+  },
+  "priorities": [
+    { "id": "action-state-matrix", "opportunity": "interactions", "class": "reusable-skill", "description": "Extract explicit state-to-service action matrices from dashboard contracts.", "validators": ["test-interactions"], "destination": "skills" },
+    { "id": "layout-test-selection", "opportunity": "ux", "class": "routing-policy", "description": "Select deterministic layout and responsive checks without replacing visual review.", "validators": ["verify-layout"], "destination": "fixtures" },
+    { "id": "i18n-inventory", "opportunity": "transforms", "class": "deterministic-tool", "description": "Inventory changed user-visible strings and locale coverage.", "validators": ["test-core-transforms"], "destination": "tools" },
+    { "id": "preload-io-check", "opportunity": "debugging", "class": "deterministic-tool", "description": "Detect runtime I/O introduced into preload rendering.", "validators": ["test-runtime-debugging"], "destination": "tools" },
+    { "id": "route-synchronization", "opportunity": "transforms", "class": "deterministic-tool", "description": "Keep route constants, navigation and route tests synchronized.", "validators": ["test-core-transforms"], "destination": "tools" },
+    { "id": "bundle-fingerprint", "opportunity": "release", "class": "qualification-fixture", "description": "Record local build fingerprints without deployment or production claims.", "validators": ["build-release"], "destination": "fixtures" }
+  ],
+  "destinations": {
+    "incubation": ".git/copilot-learning",
+    "tools": ".github/learned-tools",
+    "skills": ".github/skills",
+    "fixtures": ".github/evals/learning"
+  },
+  "eligiblePaths": ["src", "scripts", "e2e", ".github/evals", ".github/skills"],
+  "excludedPaths": [".env", "dist", "scripts/i18n/generated", "home-assistant", "public"],
+  "riskClasses": ["subjective-visual", "physical-action", "live-home-assistant", "camera", "webrtc", "credential", "security", "production", "release", "destructive"],
+  "validators": [
+    { "id": "test-interactions", "targets": ["action-state-matrix"] },
+    { "id": "verify-layout", "targets": ["layout-test-selection"] },
+    { "id": "test-core-transforms", "targets": ["i18n-inventory", "route-synchronization"] },
+    { "id": "test-runtime-debugging", "targets": ["preload-io-check"] },
+    { "id": "build-release", "targets": ["bundle-fingerprint"] }
+  ],
+  "knownTools": ["check-dashboard", "test-focused-pure", "test-interactions", "test-ha-service-mappings", "test-core-scaffolds", "test-core-transforms", "test-runtime-debugging", "verify-layout", "build-release"],
+  "knownSkills": ["ha-budget-workflow", "dashboard-ux-authoring", "release-dashboard", "house-style-copy", "simulated-user-panel"],
+  "automaticBuild": true,
+  "automaticPromotion": false,
+  "continuation": { "enabled": true },
+  "promotion": {
+    "allowedSideEffects": ["none", "workspace"],
+    "requireReplay": true,
+    "requireProjectValidation": true,
+    "requireMediumReview": true,
+    "requirePositiveValue": true,
+    "requireScopeCheck": true,
+    "requireRollback": true
+  }
+}

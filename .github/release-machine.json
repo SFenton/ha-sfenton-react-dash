@@ -1,0 +1,30 @@
+{
+  "version": 3,
+  "project": "ha-react",
+  "opportunity": "release",
+  "enabled": false,
+  "operatorAuthorizationRequired": true,
+  "reviewer": {
+    "role": "medium-review",
+    "profile": { "model": "gpt-5.6-sol", "effort": "medium", "context": "default" },
+    "authority": "review-only"
+  },
+  "exception": {
+    "role": "risk-triggered-frontier-review",
+    "profile": { "model": "gpt-5.6-sol", "effort": "max", "context": "long_context" },
+    "triggerIds": ["ha-release-rollback-or-host-conflict"],
+    "requiresTriggerReceipt": true
+  },
+  "steps": [
+    { "id": "validate-change", "label": "Run complete dashboard validation", "executor": "deterministic", "operation": "command", "tool": "check-dashboard", "failure": "rejected", "evidence": ["test, lint, build, layout and coverage results"] },
+    { "id": "verify-layout-review", "label": "Verify layout and manual review evidence", "executor": "deterministic", "operation": "verify", "tool": "verify-layout", "failure": "rejected", "evidence": ["layout assessment", "manual image and interaction attestation"] },
+    { "id": "verify-affected-playwright", "label": "Run affected Playwright gates with an owned server", "executor": "deterministic", "operation": "verify", "tool": "affected-playwright-disabled", "failure": "rejected", "evidence": ["affected specs", "owned build and server", "viewport and state matrix"] },
+    { "id": "create-merge-pr", "label": "Create and merge the exact pull request", "executor": "deterministic", "operation": "git-release", "tool": "git-release-disabled", "failure": "rollback-git", "evidence": ["branch", "commit", "pull request", "merge commit"] },
+    { "id": "build-merged-master", "label": "Build the isolated merged origin/master revision", "executor": "deterministic", "operation": "command", "tool": "build-merged-master-disabled", "failure": "rollback-git", "evidence": ["detached origin/master revision", "bundle fingerprints"] },
+    { "id": "deploy-both-hosts", "label": "Deploy both Home Assistant hosts", "executor": "deterministic", "operation": "deploy", "tool": "deploy-dashboard-disabled", "failure": "rollback-production", "evidence": ["raw app", "legacy wrapper", "custom panel", "cache-bust version"] },
+    { "id": "verify-production", "label": "Verify all production routes and affected behavior", "executor": "deterministic", "operation": "verify", "tool": "verify-production-disabled", "failure": "rollback-production", "evidence": ["three routes", "matching bundle", "viewport, behavior and restart receipts"] },
+    { "id": "rollback-production", "label": "Restore the prior bundle and wrapper version", "executor": "deterministic", "operation": "rollback", "tool": "rollback-dashboard-disabled", "rollbackOnly": true, "rollbackVerificationTool": "verify-production-disabled", "failure": "abnormal", "evidence": ["restored bundle", "restored wrapper", "healthy hosts"] },
+    { "id": "rollback-git", "label": "Close the release or create the authorized revert", "executor": "deterministic", "operation": "rollback", "tool": "git-release-disabled", "rollbackOnly": true, "rollbackVerificationTool": "git-release-disabled", "failure": "abnormal", "evidence": ["closed pull request or revert commit"] },
+    { "id": "cleanup-release", "label": "Remove exact temporary release artifacts", "executor": "deterministic", "operation": "cleanup", "tool": "cleanup-release-disabled", "failure": "abnormal", "evidence": ["clean temporary workspace", "preserved primary worktree"] }
+  ]
+}

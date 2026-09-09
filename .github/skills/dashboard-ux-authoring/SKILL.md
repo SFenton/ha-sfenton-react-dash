@@ -1,6 +1,10 @@
 ---
 name: dashboard-ux-authoring
 description: Authors or reviews the current dashboard UX with typed interaction semantics, one Home Assistant behavior layer, shared primitives, design checks, i18n, and mobile-first validation.
+metadata:
+  model: claude-sonnet-5
+  reasoning_effort: medium
+  context_tier: default
 ---
 
 # Dashboard UX Authoring

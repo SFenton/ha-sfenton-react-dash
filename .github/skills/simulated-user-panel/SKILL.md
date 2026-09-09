@@ -1,10 +1,10 @@
 ---
 name: simulated-user-panel
-description: Explicitly invoked simulated user-research panel for ha-sfenton-react-dash. Runs diverse read-only persona agents against a page, control, workflow, or instruction, cross-critiques evidence, and gates any improvements to Sol-only implementation.
+description: Explicitly invoked simulated user-research panel for ha-sfenton-react-dash. Runs diverse read-only persona agents, cross-critiques evidence, and routes authorized improvements through the project pipeline.
 metadata:
   model: gpt-5.6-sol
-  reasoning_effort: max
-  context_tier: long_context
+  reasoning_effort: medium
+  context_tier: default
 ---
 
 # Simulated User Panel
@@ -13,10 +13,16 @@ Use this skill when the operator invokes `simulated-user-panel`, requests
 multi-persona user testing, or asks a diverse simulated panel to assess or
 improve this Home Assistant dashboard.
 
-The coordinator must be `gpt-5.6-sol` with reasoning effort `max` and context
-tier `long_context`. If the current coordinator does not match, launch a
+The routine coordinator must be `gpt-5.6-sol` with reasoning effort `medium`
+and context tier `default`. If the current coordinator does not match, launch a
 `general-purpose` coordinator with that exact profile or stop before running
 the panel.
+
+Sol `max` / `long_context` may adjudicate only an evidence-bound
+`panel-deep-safety-adjudication` or
+`panel-material-disagreement-adjudication` trigger linked to the preceding
+panel receipt. `budget: deep`, panel size, or task terminology alone is not a
+trigger.
 
 This panel produces synthetic usability evidence and hypotheses. It is not a
 substitute for research with real people and must never be presented as
@@ -160,7 +166,7 @@ silently widen the scope.
     conflicts. Agreement is never proof.
 15. Produce the final panel report and stop unless implementation was
     authorized by the original invocation.
-16. If implementation is authorized, follow the Sol-only implementation gate,
+16. If implementation is authorized, follow the hierarchical implementation gate,
     validate the result, and re-run the affected personas against the changed
     experience.
 
@@ -526,16 +532,18 @@ Use this order:
     secret exposure, each marked verified, violated, or unverified.
 13. **Implementation gate** - approved, not requested, blocked, or completed.
 
-## Sol-only implementation gate
+## Hierarchical implementation gate
 
 Implementation is closed unless the original invocation explicitly requests a
 fix, change, improvement, or implementation.
 
 When open:
 
-1. The main coordinator owns edits, or delegates them only to a
-   `general-purpose` agent using `gpt-5.6-sol`, effort `max`, and
-   `long_context`.
+1. Resolve the exact implementation opportunity through
+   `.github/agent-opportunities.json`. The project medium coordinator owns
+   known-pattern work; any cheap worker is staged-only and requires medium
+   review. Panel max/long adjudication does not become implementation
+   residency.
 2. Persona, research, explore, critique, and review agents remain read-only.
 3. Implement only reproduced Strong, Moderate, and in-scope Material Minority
    findings that answer the original question. Do not implement Unverified or
@@ -549,12 +557,15 @@ When open:
    required code/config comparison, mobile-first Playwright comparison, and
    focused tests.
    Also require the current layout plan's external assessment, with actual
-   coordinator image/interaction inspection. Preserve all existing Sol-only,
-   participant-isolation, mock-first and external-authorization boundaries.
-8. Re-run the personas that reported each implemented finding and one
+   coordinator image/interaction inspection. Preserve participant isolation,
+   mock-first evidence and every external-authorization boundary.
+8. Repository apply is separate operator authority. Panel implementation
+   authorization never grants Home Assistant, GitHub, production, release, or
+   destructive authority.
+9. Re-run the personas that reported each implemented finding and one
    independent critic against the changed experience. Confirm the complaint is
    gone without creating a new higher-severity issue.
-9. Report each proposed change as implemented, deferred, or rejected with the
+10. Report each proposed change as implemented, deferred, or rejected with the
    evidence-based reason.
 
 ## Completion boundary

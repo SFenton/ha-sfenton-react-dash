@@ -3,8 +3,8 @@ name: autonomous-hass-admin-executor
 description: Explicitly invoked autonomous executor for the HASS Admin To-Do roadmap. Runs one HA todo item per phase through implementation, validation, email reporting, and HA-owned completion.
 metadata:
   model: gpt-5.6-sol
-  reasoning_effort: max
-  context_tier: long_context
+  reasoning_effort: medium
+  context_tier: default
 ---
 
 # Autonomous HASS Admin Executor
@@ -14,10 +14,16 @@ Use this skill only when the operator invokes `autonomous-hass-admin-executor` d
 The launcher is authoritative for execution profile selection. It must run this skill with:
 
 - model `gpt-5.6-sol`
-- reasoning effort `max`
-- context tier `long_context`
+- reasoning effort `medium`
+- context tier `default`
 
 If any profile value differs, stop before making changes.
+
+Sol `max` / `long_context` is not phase residency. It may be launched only for
+an evidence-bound `ha-physical-action-conflict`,
+`ha-credential-exposure-conflict`, or
+`ha-release-rollback-or-host-conflict` trigger receipt linked to the preceding
+phase receipt. A failed rollback is eligible only through the last trigger.
 
 ## Scope
 

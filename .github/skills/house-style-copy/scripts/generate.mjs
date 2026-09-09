@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto'
 import { resolve } from 'node:path'
 import readline from 'node:readline'
 import {
-  hashSkillFiles,
+  canonicalReceiptHash,
   inferNamespace,
   localRefusalResponse,
   loadQualifiedCorpus,
@@ -14,9 +14,9 @@ import {
   repositoryRoot,
   retrieveExamples,
   skillRoot,
+  validateBoundTriggerReceipt,
   validateRequest,
   validateResponseSet,
-  valueHash,
 } from './lib.mjs'
 
 const args = parseCliArgs(process.argv.slice(2))
@@ -48,6 +48,65 @@ function safeEnv() {
 async function loadInput() {
   if (args.request) return readJson(resolve(String(args.request)))
   return JSON.parse(String(args['request-json']))
+}
+
+async function selectedRoute(candidates, requestHash) {
+  const routing = await readJson(resolve(skillRoot, 'evals/runtime-routing.json'))
+  if (routing.version !== 1 || routing.status !== 'provisional') {
+    throw new Error('No routed model profile is available.')
+  }
+  if (!args['trigger-receipt']) {
+    const candidate = candidates.candidates.find((entry) =>
+      entry.id === routing.default?.candidateId)
+    if (
+      routing.default?.qualificationClaim !== false
+      || routing.default?.evidenceStatus !== 'measured-finalist-provisional'
+      || !candidate
+      || candidate.model !== routing.default.model
+      || candidate.effort !== routing.default.effort
+      || candidate.context !== routing.default.context
+    ) {
+      throw new Error('No routed model profile is available.')
+    }
+    return routing.default
+  }
+  const receipt = await readJson(resolve(String(args['trigger-receipt'])))
+  const adjudicator = routing.conditionalAdjudicator
+  if (!args['pipeline-state'] ||
+    adjudicator.requiresTriggerReceipt !== true) {
+    throw new Error('Copy adjudication trigger receipt is invalid.')
+  }
+  const pipelineState = await readJson(resolve(String(args['pipeline-state'])))
+  const policy = await readJson(resolve(
+    repositoryRoot,
+    '.github/agent-opportunities.json',
+  ))
+  const registry = await readJson(resolve(
+    repositoryRoot,
+    '.github/agent-tools.json',
+  ))
+  validateBoundTriggerReceipt(receipt, pipelineState, {
+    project: 'ha-react',
+    opportunityId: 'ux',
+    triggerIds: adjudicator.triggerIds,
+    policy,
+    registry,
+    requestHash,
+  })
+  const historicalPin = await readJson(resolve(skillRoot, adjudicator.historicalEvidence))
+  const candidate = candidates.candidates.find((entry) =>
+    entry.id === adjudicator.candidateId)
+  if (
+    historicalPin.status !== 'validated'
+    || historicalPin.candidateId !== adjudicator.candidateId
+    || !candidate
+    || candidate.model !== adjudicator.model
+    || candidate.effort !== adjudicator.effort
+    || candidate.context !== adjudicator.context
+  ) {
+    throw new Error('Conditional copy adjudicator evidence is unavailable.')
+  }
+  return adjudicator
 }
 
 function modelRequests(entries, corpus) {
@@ -176,7 +235,13 @@ function normalizeGeneratedResponse(response, requests) {
             ? candidate.rationale
             : 'Matches the supplied intent and comparable exemplars.',
           ...(request.requiredVariantIds.length && !candidate?.variant
-            ? { variant: request.requiredVariantIds[candidateIndex] }
+            ? {
+                variant: request.requiredVariantIds[
+                  Number.isInteger(candidate?.rank)
+                    ? candidate.rank - 1
+                    : candidateIndex
+                ],
+              }
             : {}),
         }))
       }
@@ -298,33 +363,24 @@ const modelEntries = partitioned.filter((entry) => entry.localResponse === null)
 let modelResponses = []
 
 if (modelEntries.length) {
-  const pin = await readJson(resolve(skillRoot, 'evals/model-pin.json'))
   const candidates = await readJson(resolve(skillRoot, 'evals/candidates.json'))
-  const candidate = candidates.candidates.find((entry) => entry.id === pin.candidateId)
-  if (pin.status !== 'validated' || !candidate) throw new Error('No validated model profile is available.')
-  if (candidate.model !== pin.model || candidate.effort !== pin.effort || candidate.context !== pin.context) {
-    throw new Error('No validated model profile is available.')
-  }
-  const selectedAt = Date.parse(pin.selectedAt)
-  if (
-    !Number.isFinite(selectedAt)
-    || !Number.isInteger(pin.expiresAfterDays)
-    || pin.expiresAfterDays <= 0
-    || Date.now() > selectedAt + pin.expiresAfterDays * 24 * 60 * 60 * 1000
-  ) {
-    throw new Error('No validated model profile is available.')
-  }
   const corpus = (await loadQualifiedCorpus()).records
-  const currentHashes = {
-    candidates: valueHash(candidates),
-    corpus: valueHash(corpus),
-    skill: await hashSkillFiles(),
-  }
-  if (Object.entries(currentHashes).some(([name, value]) => pin.evidence?.qualificationHashes?.[name] !== value)) {
-    throw new Error('No validated model profile is available.')
-  }
 
   const requests = modelRequests(modelEntries, corpus)
+  const requestHash = canonicalReceiptHash({
+    modelPromptPayload: requests,
+    locallyResolved: partitioned
+      .filter((entry) => entry.localResponse !== null)
+      .map((entry) => ({
+        requestIndex: entry.originalIndex,
+        normalizedRequest: normalizedRequestForResponse(
+          entry.request,
+          entry.rawInput,
+        ),
+        localResponse: entry.localResponse,
+      })),
+  })
+  const pin = await selectedRoute(candidates, requestHash)
   const modelResponse = normalizeGeneratedResponse(await launch(pin, promptFor(requests)), requests)
   modelResponses = requests.length === 1 ? [modelResponse] : modelResponse
   if (!Array.isArray(modelResponses) || modelResponses.length !== modelEntries.length) {

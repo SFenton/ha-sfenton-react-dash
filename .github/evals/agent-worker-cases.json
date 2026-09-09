@@ -1,0 +1,54 @@
+{
+  "version": 1,
+  "project": "ha-react",
+  "opportunity": "focused-tests",
+  "cases": [
+    {
+      "id": "focused-tests-routes",
+      "target": "src/constants/routes.test.ts",
+      "instruction": "Add focused tests for pure route utilities covering query precedence, hash stripping, wrapper/static URL generation, known-route recognition, and fallback back paths.",
+      "sources": [
+        { "file": "src/constants/routes.ts", "start": 142, "end": 157 },
+        { "file": "src/constants/routes.ts", "start": 163, "end": 253 },
+        { "file": "src/constants/routes.test.ts", "start": 3, "end": 120 }
+      ],
+      "failureCriteria": [
+        "Query-path precedence or hash/query stripping is untested.",
+        "Wrapper/static URL generation or fallback back-path behavior is untested."
+      ],
+      "requiredPatterns": ["routePathFromUrl", "routeUrl", "fallbackBackPathForRoute", "expect("],
+      "validator": ["npm", "run", "test:run", "--", "src/constants/routes.test.ts"]
+    },
+    {
+      "id": "focused-tests-grid-layout",
+      "target": "src/components/core/DynamicGrid.test.tsx",
+      "instruction": "Add focused tests for responsive column clamping, fill-order packing, and final-row centering in the pure dynamic grid helpers.",
+      "sources": [
+        { "file": "src/components/core/dynamicGridLayout.ts", "start": 1, "end": 97 },
+        { "file": "src/components/core/DynamicGrid.test.tsx", "start": 5, "end": 231 }
+      ],
+      "failureCriteria": [
+        "Row order, min/max clamping, or non-final row behavior is untested.",
+        "fillRows except-last or centered final-row offsets are untested."
+      ],
+      "requiredPatterns": ["responsiveDynamicGridColumnCount", "packDynamicGridSpans", "centeredDynamicGridStarts", "expect("],
+      "validator": ["npm", "run", "test:run", "--", "src/components/core/DynamicGrid.test.tsx"]
+    },
+    {
+      "id": "focused-tests-schedule",
+      "target": "src/components/core/ScheduleEditorFields.test.tsx",
+      "instruction": "Add focused tests for default weekday selection, explicit empty/nonempty overrides, and exact 24-hour time validation.",
+      "sources": [
+        { "file": "src/components/core/scheduleDays.ts", "start": 1, "end": 22 },
+        { "file": "src/components/core/scheduleTime.ts", "start": 1, "end": 3 },
+        { "file": "src/components/core/ScheduleEditorFields.test.tsx", "start": 33, "end": 58 }
+      ],
+      "failureCriteria": [
+        "Default weekdays or explicit empty overrides are untested.",
+        "Boundary-valid and invalid 24-hour times are untested."
+      ],
+      "requiredPatterns": ["resolveScheduleDefaultDays", "isValidScheduleTime", "expect("],
+      "validator": ["npm", "run", "test:run", "--", "src/components/core/ScheduleEditorFields.test.tsx"]
+    }
+  ]
+}

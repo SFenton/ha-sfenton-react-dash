@@ -1,0 +1,461 @@
+{
+  "version": 3,
+  "project": "ha-react",
+  "qualification": {
+    "status": "provisional",
+    "minimumUnattendedCases": 30,
+    "automaticApplication": false
+  },
+  "triggerCatalog": [
+    {
+      "id": "approved-novel-public-research",
+      "category": "research",
+      "description": "The operator approved a specific novel public-research question after repository evidence proved the gap."
+    },
+    {
+      "id": "binding-novel-spec-required",
+      "category": "specification",
+      "description": "Novel evidence must be bound into an implementation-ready specification before known-pattern work starts."
+    },
+    {
+      "id": "consequential-architecture-review",
+      "category": "specification",
+      "description": "A proposed architecture change crosses established state, lifecycle, hosting, or interaction ownership."
+    },
+    {
+      "id": "ha-physical-action-conflict",
+      "category": "critical-review",
+      "description": "Primary evidence shows conflicting physical-device outcomes or an unsafe state-to-service mapping."
+    },
+    {
+      "id": "ha-duplicate-side-effect-risk",
+      "category": "critical-review",
+      "description": "Evidence shows one user intent may issue duplicate or conflicting Home Assistant side effects."
+    },
+    {
+      "id": "ha-credential-exposure-conflict",
+      "category": "critical-review",
+      "description": "Evidence shows a credential exposure or authentication migration conflict that routine safeguards cannot reconcile."
+    },
+    {
+      "id": "ha-release-rollback-or-host-conflict",
+      "category": "critical-review",
+      "description": "Release evidence, rollback state, or the two supported Home Assistant hosts disagree."
+    },
+    {
+      "id": "panel-deep-safety-adjudication",
+      "category": "critical-review",
+      "description": "A deep simulated panel produced a reproduced safety, privacy, or accessibility conflict that material cross-critique did not resolve."
+    },
+    {
+      "id": "panel-material-disagreement-adjudication",
+      "category": "critical-review",
+      "description": "Primary evidence and cross-vendor panel findings remain materially contradictory after the smallest safe coordinator probe."
+    },
+    {
+      "id": "copy-safety-conflict",
+      "category": "critical-review",
+      "description": "Deterministic copy gates expose a consequential safety, ownership, placeholder, or notification conflict that routine generation cannot resolve."
+    }
+  ],
+  "opportunities": [
+    {
+      "id": "focused-tests",
+      "label": "Focused test generation",
+      "triggers": ["focused test", "add unit tests", "generate tests"],
+      "evidence": "repository",
+      "enabled": true,
+      "evaluationStatus": "provisional-three-cases",
+      "casePacketStatus": "provisional-three-cases",
+      "skills": ["ha-budget-workflow"],
+      "team": {
+        "id": "ha-react-focused-tests-team",
+        "topology": "medium-owner-cheap-worker-medium-review",
+        "trustTier": "provisional-staging",
+        "maxRevisions": 1,
+        "coordinator": {
+          "role": "medium-coordinator",
+          "profile": { "model": "claude-sonnet-5", "effort": "medium", "context": "default" },
+          "evidenceStatus": "provisional"
+        },
+        "reviewer": {
+          "role": "medium-review",
+          "profile": { "model": "claude-sonnet-5", "effort": "medium", "context": "default" },
+          "evidenceStatus": "provisional"
+        },
+        "workerCandidate": {
+          "role": "cheap-worker",
+          "enabled": true,
+          "profile": { "model": "gpt-5-mini", "effort": "medium", "context": "default" },
+          "evidenceStatus": "provisional",
+          "currentCases": 3,
+          "capability": "ha-react-focused-tests",
+          "sandboxProfile": "ha-react-focused-tests",
+          "delegationClass": "test-generation",
+          "validators": ["test-focused-pure"],
+          "authority": "staging-only"
+        },
+        "repositoryApply": { "authority": "operator", "enabled": false }
+      },
+      "conditionalProfiles": [
+        {
+          "id": "external-research",
+          "kind": "research-frontier",
+          "profile": { "model": "gpt-6-astra", "effort": "high", "context": "default" },
+          "triggerIds": ["approved-novel-public-research"],
+          "requiresTriggerReceipt": true
+        },
+        {
+          "id": "binding-spec",
+          "kind": "spec-planner",
+          "profile": { "model": "gpt-5.6-sol", "effort": "high", "context": "default" },
+          "triggerIds": ["binding-novel-spec-required"],
+          "requiresTriggerReceipt": true
+        }
+      ],
+      "phases": [
+        {
+          "id": "research-if-triggered",
+          "kind": "research-frontier",
+          "profileRef": "conditional:external-research",
+          "condition": { "triggerIds": ["approved-novel-public-research"], "requiresTriggerReceipt": true }
+        },
+        {
+          "id": "spec-if-triggered",
+          "kind": "spec-planner",
+          "profileRef": "conditional:binding-spec",
+          "condition": { "triggerIds": ["binding-novel-spec-required"], "requiresTriggerReceipt": true }
+        },
+        { "id": "coordinate", "kind": "medium-coordinator", "profileRef": "coordinator" },
+        { "id": "implement-bounded", "kind": "cheap-worker", "profileRef": "worker-candidate", "enabled": true },
+        { "id": "validate-focused-tests", "kind": "deterministic", "sideEffect": "workspace", "tool": "test-focused-pure" },
+        { "id": "review-bounded", "kind": "medium-review", "profileRef": "reviewer" }
+      ],
+      "rationale": "GPT-5 mini may create only staged, untrusted focused tests. A medium reviewer may request one exact revision; repository application remains separately disabled."
+    },
+    {
+      "id": "ux",
+      "label": "Dashboard UX",
+      "triggers": ["dashboard ux", "responsive layout", "modal layout", "design system"],
+      "evidence": "hybrid",
+      "enabled": true,
+      "evaluationStatus": "provisional-three-cases",
+      "casePacketStatus": "provisional-three-cases",
+      "skills": ["dashboard-ux-authoring", "house-style-copy"],
+      "team": {
+        "id": "ha-react-ux-team",
+        "topology": "medium-owner-only",
+        "trustTier": "provisional-staging",
+        "maxRevisions": 1,
+        "coordinator": { "role": "medium-coordinator", "profile": { "model": "claude-sonnet-5", "effort": "medium", "context": "default" }, "evidenceStatus": "provisional" },
+        "reviewer": { "role": "medium-review", "profile": { "model": "claude-sonnet-5", "effort": "medium", "context": "default" }, "evidenceStatus": "provisional" },
+        "workerCandidate": { "role": "cheap-worker", "enabled": false, "profile": { "model": "gpt-5-mini", "effort": "medium", "context": "default" }, "evidenceStatus": "disabled", "currentCases": 0, "authority": "staging-only" },
+        "repositoryApply": { "authority": "operator", "enabled": false }
+      },
+      "conditionalProfiles": [
+        { "id": "external-research", "kind": "research-frontier", "profile": { "model": "gpt-6-astra", "effort": "high", "context": "default" }, "triggerIds": ["approved-novel-public-research"], "requiresTriggerReceipt": true },
+        { "id": "binding-spec", "kind": "spec-planner", "profile": { "model": "gpt-5.6-sol", "effort": "high", "context": "default" }, "triggerIds": ["binding-novel-spec-required", "consequential-architecture-review"], "requiresTriggerReceipt": true },
+        { "id": "critical-review", "kind": "risk-triggered-frontier-review", "profile": { "model": "gpt-5.6-sol", "effort": "max", "context": "long_context" }, "triggerIds": ["panel-deep-safety-adjudication", "panel-material-disagreement-adjudication", "copy-safety-conflict"], "requiresTriggerReceipt": true }
+      ],
+      "phases": [
+        { "id": "validate-dashboard", "kind": "deterministic", "sideEffect": "workspace", "tool": "check-dashboard" },
+        { "id": "research-if-triggered", "kind": "research-frontier", "profileRef": "conditional:external-research", "condition": { "triggerIds": ["approved-novel-public-research"], "requiresTriggerReceipt": true } },
+        { "id": "spec-if-triggered", "kind": "spec-planner", "profileRef": "conditional:binding-spec", "condition": { "triggerIds": ["binding-novel-spec-required", "consequential-architecture-review"], "requiresTriggerReceipt": true } },
+        { "id": "coordinate", "kind": "medium-coordinator", "profileRef": "coordinator" },
+        { "id": "critical-review-if-triggered", "kind": "risk-triggered-frontier-review", "profileRef": "conditional:critical-review", "condition": { "triggerIds": ["panel-deep-safety-adjudication", "panel-material-disagreement-adjudication", "copy-safety-conflict"], "requiresTriggerReceipt": true } }
+      ],
+      "rationale": "Known dashboard patterns are medium-owned. Strong planning and max/long adjudication are conditional on exact evidence receipts."
+    },
+    {
+      "id": "visual-behavior",
+      "label": "Visual behavior",
+      "triggers": ["visual behavior", "css", "animation", "safe area", "viewport"],
+      "evidence": "runtime",
+      "enabled": true,
+      "evaluationStatus": "provisional-three-cases",
+      "casePacketStatus": "provisional-three-cases",
+      "skills": ["dashboard-ux-authoring"],
+      "team": {
+        "id": "ha-react-visual-behavior-team",
+        "topology": "medium-owner-only",
+        "trustTier": "provisional-staging",
+        "maxRevisions": 1,
+        "coordinator": { "role": "medium-coordinator", "profile": { "model": "claude-sonnet-5", "effort": "medium", "context": "default" }, "evidenceStatus": "provisional" },
+        "reviewer": { "role": "medium-review", "profile": { "model": "claude-sonnet-5", "effort": "medium", "context": "default" }, "evidenceStatus": "provisional" },
+        "workerCandidate": { "role": "cheap-worker", "enabled": false, "profile": { "model": "gpt-5-mini", "effort": "medium", "context": "default" }, "evidenceStatus": "disabled", "currentCases": 0, "authority": "staging-only" },
+        "repositoryApply": { "authority": "operator", "enabled": false }
+      },
+      "conditionalProfiles": [
+        { "id": "external-research", "kind": "research-frontier", "profile": { "model": "gpt-6-astra", "effort": "high", "context": "default" }, "triggerIds": ["approved-novel-public-research"], "requiresTriggerReceipt": true },
+        { "id": "binding-spec", "kind": "spec-planner", "profile": { "model": "gpt-5.6-sol", "effort": "high", "context": "default" }, "triggerIds": ["binding-novel-spec-required", "consequential-architecture-review"], "requiresTriggerReceipt": true }
+      ],
+      "phases": [
+        { "id": "validate-dashboard", "kind": "deterministic", "sideEffect": "workspace", "tool": "check-dashboard" },
+        { "id": "research-if-triggered", "kind": "research-frontier", "profileRef": "conditional:external-research", "condition": { "triggerIds": ["approved-novel-public-research"], "requiresTriggerReceipt": true } },
+        { "id": "spec-if-triggered", "kind": "spec-planner", "profileRef": "conditional:binding-spec", "condition": { "triggerIds": ["binding-novel-spec-required", "consequential-architecture-review"], "requiresTriggerReceipt": true } },
+        { "id": "coordinate", "kind": "medium-coordinator", "profileRef": "coordinator" }
+      ],
+      "rationale": "Deterministic layout evidence and medium ownership are normal; reproduced deep panel safety disagreement is the only max/long route."
+    },
+    {
+      "id": "interactions",
+      "label": "Typed dashboard interactions",
+      "triggers": ["interaction", "tap action", "toggle", "modal opener", "control semantics"],
+      "evidence": "repository",
+      "enabled": true,
+      "evaluationStatus": "provisional-three-cases",
+      "casePacketStatus": "provisional-three-cases",
+      "skills": ["dashboard-ux-authoring"],
+      "team": {
+        "id": "ha-react-interactions-team",
+        "topology": "medium-owner-only",
+        "trustTier": "provisional-staging",
+        "maxRevisions": 1,
+        "coordinator": { "role": "medium-coordinator", "profile": { "model": "claude-sonnet-5", "effort": "medium", "context": "default" }, "evidenceStatus": "provisional" },
+        "reviewer": { "role": "medium-review", "profile": { "model": "claude-sonnet-5", "effort": "medium", "context": "default" }, "evidenceStatus": "provisional" },
+        "workerCandidate": { "role": "cheap-worker", "enabled": false, "profile": { "model": "gpt-5-mini", "effort": "medium", "context": "default" }, "evidenceStatus": "disabled", "currentCases": 0, "authority": "staging-only" },
+        "repositoryApply": { "authority": "operator", "enabled": false }
+      },
+      "conditionalProfiles": [
+        { "id": "external-research", "kind": "research-frontier", "profile": { "model": "gpt-6-astra", "effort": "high", "context": "default" }, "triggerIds": ["approved-novel-public-research"], "requiresTriggerReceipt": true },
+        { "id": "binding-spec", "kind": "spec-planner", "profile": { "model": "gpt-5.6-sol", "effort": "high", "context": "default" }, "triggerIds": ["binding-novel-spec-required", "consequential-architecture-review"], "requiresTriggerReceipt": true }
+      ],
+      "phases": [
+        { "id": "validate-interactions", "kind": "deterministic", "sideEffect": "workspace", "tool": "test-interactions" },
+        { "id": "research-if-triggered", "kind": "research-frontier", "profileRef": "conditional:external-research", "condition": { "triggerIds": ["approved-novel-public-research"], "requiresTriggerReceipt": true } },
+        { "id": "spec-if-triggered", "kind": "spec-planner", "profileRef": "conditional:binding-spec", "condition": { "triggerIds": ["binding-novel-spec-required", "consequential-architecture-review"], "requiresTriggerReceipt": true } },
+        { "id": "coordinate", "kind": "medium-coordinator", "profileRef": "coordinator" }
+      ],
+      "rationale": "Typed interaction work is a known pattern until evidence identifies a conflicting physical consequence."
+    },
+    {
+      "id": "ha-service-mappings",
+      "label": "Home Assistant service mappings",
+      "triggers": ["service mapping", "entity action", "home assistant action", "service call"],
+      "evidence": "hybrid",
+      "enabled": true,
+      "evaluationStatus": "provisional-three-cases",
+      "casePacketStatus": "provisional-three-cases",
+      "skills": ["ha-budget-workflow"],
+      "team": {
+        "id": "ha-react-service-mappings-team",
+        "topology": "medium-owner-only",
+        "trustTier": "provisional-staging",
+        "maxRevisions": 1,
+        "coordinator": { "role": "medium-coordinator", "profile": { "model": "gpt-5.6-sol", "effort": "medium", "context": "default" }, "evidenceStatus": "provisional" },
+        "reviewer": { "role": "medium-review", "profile": { "model": "gpt-5.6-sol", "effort": "medium", "context": "default" }, "evidenceStatus": "provisional" },
+        "workerCandidate": { "role": "cheap-worker", "enabled": false, "profile": { "model": "gpt-5-mini", "effort": "medium", "context": "default" }, "evidenceStatus": "disabled", "currentCases": 0, "authority": "staging-only" },
+        "repositoryApply": { "authority": "operator", "enabled": false }
+      },
+      "conditionalProfiles": [
+        { "id": "external-research", "kind": "research-frontier", "profile": { "model": "gpt-6-astra", "effort": "high", "context": "default" }, "triggerIds": ["approved-novel-public-research"], "requiresTriggerReceipt": true },
+        { "id": "binding-spec", "kind": "spec-planner", "profile": { "model": "gpt-5.6-sol", "effort": "high", "context": "default" }, "triggerIds": ["binding-novel-spec-required", "consequential-architecture-review"], "requiresTriggerReceipt": true },
+        { "id": "critical-review", "kind": "risk-triggered-frontier-review", "profile": { "model": "gpt-5.6-sol", "effort": "max", "context": "long_context" }, "triggerIds": ["ha-physical-action-conflict", "ha-duplicate-side-effect-risk", "ha-credential-exposure-conflict"], "requiresTriggerReceipt": true }
+      ],
+      "phases": [
+        { "id": "validate-service-contract", "kind": "deterministic", "sideEffect": "workspace", "tool": "test-ha-service-mappings" },
+        { "id": "research-if-triggered", "kind": "research-frontier", "profileRef": "conditional:external-research", "condition": { "triggerIds": ["approved-novel-public-research"], "requiresTriggerReceipt": true } },
+        { "id": "spec-if-triggered", "kind": "spec-planner", "profileRef": "conditional:binding-spec", "condition": { "triggerIds": ["binding-novel-spec-required", "consequential-architecture-review"], "requiresTriggerReceipt": true } },
+        { "id": "coordinate", "kind": "medium-coordinator", "profileRef": "coordinator" },
+        { "id": "critical-review-if-triggered", "kind": "risk-triggered-frontier-review", "profileRef": "conditional:critical-review", "condition": { "triggerIds": ["ha-physical-action-conflict", "ha-duplicate-side-effect-risk", "ha-credential-exposure-conflict"], "requiresTriggerReceipt": true } }
+      ],
+      "rationale": "A sensitive medium coordinator owns ordinary service mapping. Max/long requires a receipt proving physical or duplicate-side-effect conflict."
+    },
+    {
+      "id": "scaffolds",
+      "label": "React scaffolds",
+      "triggers": ["scaffold component", "new component skeleton", "new page skeleton"],
+      "evidence": "repository",
+      "enabled": true,
+      "evaluationStatus": "provisional-three-cases",
+      "casePacketStatus": "provisional-three-cases",
+      "skills": ["ha-budget-workflow"],
+      "team": {
+        "id": "ha-react-scaffolds-team",
+        "topology": "medium-owner-only",
+        "trustTier": "provisional-staging",
+        "maxRevisions": 1,
+        "coordinator": { "role": "medium-coordinator", "profile": { "model": "claude-sonnet-5", "effort": "medium", "context": "default" }, "evidenceStatus": "provisional" },
+        "reviewer": { "role": "medium-review", "profile": { "model": "claude-sonnet-5", "effort": "medium", "context": "default" }, "evidenceStatus": "provisional" },
+        "workerCandidate": { "role": "cheap-worker", "enabled": false, "profile": { "model": "gpt-5-mini", "effort": "medium", "context": "default" }, "evidenceStatus": "disabled", "currentCases": 0, "authority": "staging-only" },
+        "repositoryApply": { "authority": "operator", "enabled": false }
+      },
+      "conditionalProfiles": [
+        { "id": "external-research", "kind": "research-frontier", "profile": { "model": "gpt-6-astra", "effort": "high", "context": "default" }, "triggerIds": ["approved-novel-public-research"], "requiresTriggerReceipt": true },
+        { "id": "binding-spec", "kind": "spec-planner", "profile": { "model": "gpt-5.6-sol", "effort": "high", "context": "default" }, "triggerIds": ["binding-novel-spec-required"], "requiresTriggerReceipt": true }
+      ],
+      "phases": [
+        { "id": "validate-scaffold", "kind": "deterministic", "sideEffect": "workspace", "tool": "test-core-scaffolds" },
+        { "id": "research-if-triggered", "kind": "research-frontier", "profileRef": "conditional:external-research", "condition": { "triggerIds": ["approved-novel-public-research"], "requiresTriggerReceipt": true } },
+        { "id": "spec-if-triggered", "kind": "spec-planner", "profileRef": "conditional:binding-spec", "condition": { "triggerIds": ["binding-novel-spec-required"], "requiresTriggerReceipt": true } },
+        { "id": "coordinate", "kind": "medium-coordinator", "profileRef": "coordinator" }
+      ],
+      "rationale": "No cheap scaffold implementation is qualified; a routine medium owner follows approved local patterns."
+    },
+    {
+      "id": "transforms",
+      "label": "Mechanical React transforms",
+      "triggers": ["mechanical transform", "codemod", "bulk rename", "move imports"],
+      "evidence": "repository",
+      "enabled": true,
+      "evaluationStatus": "provisional-three-cases",
+      "casePacketStatus": "provisional-three-cases",
+      "skills": ["ha-budget-workflow"],
+      "team": {
+        "id": "ha-react-transforms-team",
+        "topology": "medium-owner-only",
+        "trustTier": "provisional-staging",
+        "maxRevisions": 1,
+        "coordinator": { "role": "medium-coordinator", "profile": { "model": "claude-sonnet-5", "effort": "medium", "context": "default" }, "evidenceStatus": "provisional" },
+        "reviewer": { "role": "medium-review", "profile": { "model": "claude-sonnet-5", "effort": "medium", "context": "default" }, "evidenceStatus": "provisional" },
+        "workerCandidate": { "role": "cheap-worker", "enabled": false, "profile": { "model": "gpt-5-mini", "effort": "medium", "context": "default" }, "evidenceStatus": "disabled", "currentCases": 0, "authority": "staging-only" },
+        "repositoryApply": { "authority": "operator", "enabled": false }
+      },
+      "conditionalProfiles": [
+        { "id": "external-research", "kind": "research-frontier", "profile": { "model": "gpt-6-astra", "effort": "high", "context": "default" }, "triggerIds": ["approved-novel-public-research"], "requiresTriggerReceipt": true },
+        { "id": "binding-spec", "kind": "spec-planner", "profile": { "model": "gpt-5.6-sol", "effort": "high", "context": "default" }, "triggerIds": ["binding-novel-spec-required"], "requiresTriggerReceipt": true }
+      ],
+      "phases": [
+        { "id": "validate-transform", "kind": "deterministic", "sideEffect": "workspace", "tool": "test-core-transforms" },
+        { "id": "research-if-triggered", "kind": "research-frontier", "profileRef": "conditional:external-research", "condition": { "triggerIds": ["approved-novel-public-research"], "requiresTriggerReceipt": true } },
+        { "id": "spec-if-triggered", "kind": "spec-planner", "profileRef": "conditional:binding-spec", "condition": { "triggerIds": ["binding-novel-spec-required"], "requiresTriggerReceipt": true } },
+        { "id": "coordinate", "kind": "medium-coordinator", "profileRef": "coordinator" }
+      ],
+      "rationale": "Existing evidence does not qualify a cheap existing-file transform; medium ownership and deterministic tests remain required."
+    },
+    {
+      "id": "debugging",
+      "label": "React and integration debugging",
+      "triggers": ["debug", "regression", "failure", "reconnect", "race"],
+      "evidence": "runtime",
+      "enabled": true,
+      "evaluationStatus": "provisional-three-cases",
+      "casePacketStatus": "provisional-three-cases",
+      "skills": ["ha-budget-workflow", "dashboard-ux-authoring"],
+      "team": {
+        "id": "ha-react-debugging-team",
+        "topology": "medium-owner-only",
+        "trustTier": "provisional-staging",
+        "maxRevisions": 1,
+        "coordinator": { "role": "medium-coordinator", "profile": { "model": "gpt-5.6-sol", "effort": "medium", "context": "default" }, "evidenceStatus": "provisional" },
+        "reviewer": { "role": "medium-review", "profile": { "model": "gpt-5.6-sol", "effort": "medium", "context": "default" }, "evidenceStatus": "provisional" },
+        "workerCandidate": { "role": "cheap-worker", "enabled": false, "profile": { "model": "gpt-5-mini", "effort": "medium", "context": "default" }, "evidenceStatus": "disabled", "currentCases": 0, "authority": "staging-only" },
+        "repositoryApply": { "authority": "operator", "enabled": false }
+      },
+      "conditionalProfiles": [
+        { "id": "external-research", "kind": "research-frontier", "profile": { "model": "gpt-6-astra", "effort": "high", "context": "default" }, "triggerIds": ["approved-novel-public-research"], "requiresTriggerReceipt": true },
+        { "id": "binding-spec", "kind": "spec-planner", "profile": { "model": "gpt-5.6-sol", "effort": "high", "context": "default" }, "triggerIds": ["binding-novel-spec-required", "consequential-architecture-review"], "requiresTriggerReceipt": true },
+        { "id": "critical-review", "kind": "risk-triggered-frontier-review", "profile": { "model": "gpt-5.6-sol", "effort": "max", "context": "long_context" }, "triggerIds": ["ha-physical-action-conflict", "ha-duplicate-side-effect-risk"], "requiresTriggerReceipt": true }
+      ],
+      "phases": [
+        { "id": "validate-repair", "kind": "deterministic", "sideEffect": "workspace", "tool": "test-runtime-debugging" },
+        { "id": "research-if-triggered", "kind": "research-frontier", "profileRef": "conditional:external-research", "condition": { "triggerIds": ["approved-novel-public-research"], "requiresTriggerReceipt": true } },
+        { "id": "spec-if-triggered", "kind": "spec-planner", "profileRef": "conditional:binding-spec", "condition": { "triggerIds": ["binding-novel-spec-required", "consequential-architecture-review"], "requiresTriggerReceipt": true } },
+        { "id": "coordinate", "kind": "medium-coordinator", "profileRef": "coordinator" },
+        { "id": "critical-review-if-triggered", "kind": "risk-triggered-frontier-review", "profileRef": "conditional:critical-review", "condition": { "triggerIds": ["ha-physical-action-conflict", "ha-duplicate-side-effect-risk"], "requiresTriggerReceipt": true } }
+      ],
+      "rationale": "A sensitive medium coordinator owns ordinary debugging. Max/long is reserved for reproduced physical or duplicate-effect conflicts."
+    },
+    {
+      "id": "ports",
+      "label": "Home Assistant page ports",
+      "triggers": ["port lovelace", "port dashboard", "recreate home assistant page"],
+      "evidence": "hybrid",
+      "enabled": false,
+      "evaluationStatus": "invalidated-mismatched-scope",
+      "casePacketStatus": "invalidated-mismatched-scope",
+      "skills": ["dashboard-ux-authoring"],
+      "team": {
+        "id": "ha-react-ports-team",
+        "topology": "medium-owner-only",
+        "trustTier": "provisional-staging",
+        "maxRevisions": 1,
+        "coordinator": { "role": "medium-coordinator", "profile": { "model": "gpt-5.6-sol", "effort": "medium", "context": "default" }, "evidenceStatus": "provisional" },
+        "reviewer": { "role": "medium-review", "profile": { "model": "gpt-5.6-sol", "effort": "medium", "context": "default" }, "evidenceStatus": "provisional" },
+        "workerCandidate": { "role": "cheap-worker", "enabled": false, "profile": { "model": "gpt-5-mini", "effort": "medium", "context": "default" }, "evidenceStatus": "invalidated", "currentCases": 0, "authority": "staging-only" },
+        "repositoryApply": { "authority": "operator", "enabled": false }
+      },
+      "conditionalProfiles": [
+        { "id": "external-research", "kind": "research-frontier", "profile": { "model": "gpt-6-astra", "effort": "high", "context": "default" }, "triggerIds": ["approved-novel-public-research"], "requiresTriggerReceipt": true },
+        { "id": "binding-spec", "kind": "spec-planner", "profile": { "model": "gpt-5.6-sol", "effort": "high", "context": "default" }, "triggerIds": ["binding-novel-spec-required", "consequential-architecture-review"], "requiresTriggerReceipt": true }
+      ],
+      "phases": [
+        { "id": "validate-port", "kind": "deterministic", "sideEffect": "workspace", "tool": "check-dashboard" },
+        { "id": "research-if-triggered", "kind": "research-frontier", "profileRef": "conditional:external-research", "condition": { "triggerIds": ["approved-novel-public-research"], "requiresTriggerReceipt": true } },
+        { "id": "spec-if-triggered", "kind": "spec-planner", "profileRef": "conditional:binding-spec", "condition": { "triggerIds": ["binding-novel-spec-required", "consequential-architecture-review"], "requiresTriggerReceipt": true } },
+        { "id": "coordinate", "kind": "medium-coordinator", "profileRef": "coordinator" }
+      ],
+      "rationale": "The existing cases cover hosting rather than port semantics. The pipeline remains disabled until replacement source-action and visual-parity packets exist."
+    },
+    {
+      "id": "live-ha",
+      "label": "Live Home Assistant work",
+      "triggers": ["live home assistant", "modify home assistant", "live ha"],
+      "evidence": "runtime",
+      "enabled": true,
+      "evaluationStatus": "provisional-three-cases",
+      "casePacketStatus": "provisional-three-cases",
+      "skills": [],
+      "team": {
+        "id": "ha-react-live-ha-team",
+        "topology": "medium-owner-only",
+        "trustTier": "provisional-staging",
+        "maxRevisions": 1,
+        "coordinator": { "role": "medium-coordinator", "profile": { "model": "gpt-5.6-sol", "effort": "medium", "context": "default" }, "evidenceStatus": "provisional" },
+        "reviewer": { "role": "medium-review", "profile": { "model": "gpt-5.6-sol", "effort": "medium", "context": "default" }, "evidenceStatus": "provisional" },
+        "workerCandidate": { "role": "cheap-worker", "enabled": false, "profile": { "model": "gpt-5-mini", "effort": "medium", "context": "default" }, "evidenceStatus": "disabled", "currentCases": 0, "authority": "staging-only" },
+        "repositoryApply": { "authority": "operator", "enabled": false }
+      },
+      "conditionalProfiles": [
+        { "id": "external-research", "kind": "research-frontier", "profile": { "model": "gpt-6-astra", "effort": "high", "context": "default" }, "triggerIds": ["approved-novel-public-research"], "requiresTriggerReceipt": true },
+        { "id": "binding-spec", "kind": "spec-planner", "profile": { "model": "gpt-5.6-sol", "effort": "high", "context": "default" }, "triggerIds": ["binding-novel-spec-required", "consequential-architecture-review"], "requiresTriggerReceipt": true },
+        { "id": "critical-review", "kind": "risk-triggered-frontier-review", "profile": { "model": "gpt-5.6-sol", "effort": "max", "context": "long_context" }, "triggerIds": ["ha-physical-action-conflict", "ha-duplicate-side-effect-risk"], "requiresTriggerReceipt": true }
+      ],
+      "phases": [
+        { "id": "validate-client-change", "kind": "deterministic", "sideEffect": "workspace", "tool": "check-dashboard" },
+        { "id": "research-if-triggered", "kind": "research-frontier", "profileRef": "conditional:external-research", "condition": { "triggerIds": ["approved-novel-public-research"], "requiresTriggerReceipt": true } },
+        { "id": "spec-if-triggered", "kind": "spec-planner", "profileRef": "conditional:binding-spec", "condition": { "triggerIds": ["binding-novel-spec-required", "consequential-architecture-review"], "requiresTriggerReceipt": true } },
+        { "id": "coordinate", "kind": "medium-coordinator", "profileRef": "coordinator" },
+        { "id": "critical-review-if-triggered", "kind": "risk-triggered-frontier-review", "profileRef": "conditional:critical-review", "condition": { "triggerIds": ["ha-physical-action-conflict", "ha-duplicate-side-effect-risk"], "requiresTriggerReceipt": true } }
+      ],
+      "rationale": "Model roles can prepare and review local artifacts only. Home Assistant mutation always requires separate operator authorization and a real driver, which remains unavailable."
+    },
+    {
+      "id": "release",
+      "label": "Dashboard release",
+      "triggers": ["release dashboard", "deploy dashboard", "production release"],
+      "evidence": "runtime",
+      "enabled": false,
+      "evaluationStatus": "invalidated-release-machine-contract-changed",
+      "casePacketStatus": "invalidated-release-machine-contract-changed",
+      "skills": ["release-dashboard"],
+      "executionMachine": ".github/release-machine.json",
+      "executionEnabled": false,
+      "team": {
+        "id": "ha-react-release-team",
+        "topology": "medium-owner-only",
+        "trustTier": "provisional-staging",
+        "maxRevisions": 1,
+        "coordinator": { "role": "medium-coordinator", "profile": { "model": "gpt-5.6-sol", "effort": "medium", "context": "default" }, "evidenceStatus": "provisional" },
+        "reviewer": { "role": "medium-review", "profile": { "model": "gpt-5.6-sol", "effort": "medium", "context": "default" }, "evidenceStatus": "provisional" },
+        "workerCandidate": { "role": "cheap-worker", "enabled": false, "profile": { "model": "gpt-5-mini", "effort": "medium", "context": "default" }, "evidenceStatus": "disabled", "currentCases": 0, "authority": "staging-only" },
+        "repositoryApply": { "authority": "operator", "enabled": false }
+      },
+      "conditionalProfiles": [
+        { "id": "external-research", "kind": "research-frontier", "profile": { "model": "gpt-6-astra", "effort": "high", "context": "default" }, "triggerIds": ["approved-novel-public-research"], "requiresTriggerReceipt": true },
+        { "id": "binding-spec", "kind": "spec-planner", "profile": { "model": "gpt-5.6-sol", "effort": "high", "context": "default" }, "triggerIds": ["binding-novel-spec-required", "consequential-architecture-review"], "requiresTriggerReceipt": true },
+        { "id": "critical-review", "kind": "risk-triggered-frontier-review", "profile": { "model": "gpt-5.6-sol", "effort": "max", "context": "long_context" }, "triggerIds": ["ha-release-rollback-or-host-conflict"], "requiresTriggerReceipt": true }
+      ],
+      "phases": [
+        { "id": "validate-release", "kind": "deterministic", "sideEffect": "workspace", "tool": "check-dashboard" },
+        { "id": "build-release", "kind": "deterministic", "sideEffect": "workspace", "tool": "build-release" },
+        { "id": "research-if-triggered", "kind": "research-frontier", "profileRef": "conditional:external-research", "condition": { "triggerIds": ["approved-novel-public-research"], "requiresTriggerReceipt": true } },
+        { "id": "spec-if-triggered", "kind": "spec-planner", "profileRef": "conditional:binding-spec", "condition": { "triggerIds": ["binding-novel-spec-required", "consequential-architecture-review"], "requiresTriggerReceipt": true } },
+        { "id": "coordinate", "kind": "medium-coordinator", "profileRef": "coordinator" },
+        { "id": "critical-review-if-triggered", "kind": "risk-triggered-frontier-review", "profileRef": "conditional:critical-review", "condition": { "triggerIds": ["ha-release-rollback-or-host-conflict"], "requiresTriggerReceipt": true } },
+        { "id": "execute-release-machine", "kind": "deterministic-release", "machine": ".github/release-machine.json", "operatorAuthorizationRequired": true }
+      ],
+      "rationale": "A medium reviewer checks release scope; the disabled deterministic machine executes only after operator authorization. Max/long is reserved for an evidenced host or rollback conflict."
+    }
+  ]
+}

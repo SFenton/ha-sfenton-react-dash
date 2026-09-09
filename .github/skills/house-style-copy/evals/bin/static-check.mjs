@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import {
   batchesForCases,
+  canonicalReceiptHash,
   compareLiveAndQualifiedCorpus,
   CONTEXT_CLASSES,
   detectRefusal,
@@ -16,9 +17,13 @@ import {
   normalizedRequestForResponse,
   packedLaunchUnits,
   readJson,
+  repositoryRoot,
   retrieveExamples,
+  routedPipelineContractHash,
+  routedPipelinePhaseContracts,
   qualifiedCorpusDirectory,
   skillRoot,
+  validateBoundTriggerReceipt,
   validateCorpusRecord,
   validateQualifiedCorpusInventory,
   validateQualifiedCorpusPointer,
@@ -64,6 +69,7 @@ const requiredFiles = [
   'evals/candidates.json',
   'evals/latest-results.json',
   'evals/model-pin.json',
+  'evals/runtime-routing.json',
   'evals/rubric.md',
   'evals/README.md',
   'evals/gold/deterministic.json',
@@ -92,8 +98,9 @@ for (const relativePath of requiredFiles) {
 const skillText = await readFile(resolve(skillRoot, 'SKILL.md'), 'utf8')
 check(/^---\nname: house-style-copy\n/m.test(skillText), 'Skill name is house-style-copy.')
 check(/read-only by default/i.test(skillText), 'Skill states its read-only default.')
-check(/owned by GPT-5\.6 Sol/.test(skillText), 'Skill keeps later implementation Sol-owned.')
-check(/model_pin: evals\/model-pin\.json/.test(skillText), 'Skill metadata points to the enforced model-pin file.')
+check(/hierarchical project route/.test(skillText), 'Skill separates copy generation from implementation authority.')
+check(/runtime_routing: evals\/runtime-routing\.json/.test(skillText), 'Skill metadata points to runtime routing.')
+check(/historical_model_pin: evals\/model-pin\.json/.test(skillText), 'Skill preserves the historical model pin.')
 check(/Never generate copy directly under the host model/.test(skillText), 'Skill requires the enforced activation gate.')
 check(/check-pin\.mjs/.test(skillText), 'Skill invokes the pin guard before generation.')
 check(/generate\.mjs/.test(skillText), 'Skill invokes the pinned runtime launcher for generation.')
@@ -461,7 +468,267 @@ for (const candidate of candidates.candidates) {
 }
 
 const pin = await readJson(resolve(evalRoot, 'model-pin.json'))
+const runtimeRouting = await readJson(resolve(evalRoot, 'runtime-routing.json'))
 const latestResults = await readJson(resolve(evalRoot, 'latest-results.json'))
+const defaultCandidate = candidates.candidates.find((candidate) =>
+  candidate.id === runtimeRouting.default?.candidateId)
+check(runtimeRouting.version === 1 && runtimeRouting.status === 'provisional',
+  'Runtime routing is explicitly provisional.')
+check(
+  defaultCandidate?.model === 'gpt-5.6-terra'
+    && defaultCandidate?.effort === 'low'
+    && defaultCandidate?.context === 'default'
+    && runtimeRouting.default?.qualificationClaim === false
+    && latestResults.finalists.some((entry) =>
+      entry.candidateId === runtimeRouting.default.candidateId
+      && entry.public?.hardFailureCount === 0
+      && entry.holdout?.hardFailureCount === 0),
+  'Routine route uses the measured non-max finalist without claiming qualification.',
+)
+check(
+  runtimeRouting.conditionalAdjudicator?.candidateId === pin.candidateId
+    && runtimeRouting.conditionalAdjudicator?.requiresTriggerReceipt === true
+    && runtimeRouting.conditionalAdjudicator?.triggerIds?.includes('copy-safety-conflict'),
+  'Historical Sol max/long pin is conditional on copy-safety-conflict.',
+)
+const routedPolicy = await readJson(resolve(
+  skillRoot,
+  '../../agent-opportunities.json',
+))
+const routedRegistry = await readJson(resolve(
+  skillRoot,
+  '../../agent-tools.json',
+))
+const routedOpportunity = routedPolicy.opportunities.find((entry) =>
+  entry.id === 'ux')
+const routedContracts = routedPipelinePhaseContracts(
+  routedOpportunity,
+  routedRegistry,
+)
+const criticalIndex = routedContracts.findIndex((phase) =>
+  phase.kind === 'risk-triggered-frontier-review'
+  && phase.condition.triggerIds.includes('copy-safety-conflict'))
+const pipelineHash = routedPipelineContractHash(
+  'ha-react',
+  routedOpportunity,
+  routedRegistry,
+)
+const routedRevision = spawnSync(
+  'git',
+  ['rev-parse', 'HEAD'],
+  {
+    cwd: repositoryRoot,
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'pipe'],
+  },
+).stdout.trim()
+const routedRequestHash = canonicalReceiptHash([{
+  contextClass: 'button',
+  surface: 'Fixture',
+  intent: 'Resolve a safety copy conflict',
+}])
+const pipelineIdentity = {
+  workflowId: 'copy-adjudication-fixture',
+  pipelineHash,
+  pipelineId: 'ha-react-ux',
+  teamId: routedOpportunity.team.id,
+  repository: repositoryRoot,
+  baseRevision: routedRevision,
+  scopeHash: 'b'.repeat(64),
+}
+const pipelineBinding = {
+  ...pipelineIdentity,
+  requestHash: routedRequestHash,
+  requestBindingHash: canonicalReceiptHash({
+    requestHash: routedRequestHash,
+    pipelineHash,
+    workflowId: pipelineIdentity.workflowId,
+    repository: pipelineIdentity.repository,
+    baseRevision: pipelineIdentity.baseRevision,
+    scopeHash: pipelineIdentity.scopeHash,
+  }),
+}
+let previousReceiptHash = null
+const pipelineReceipts = routedContracts.slice(0, criticalIndex)
+  .map((contract) => {
+    const conditional = Boolean(contract.condition)
+    const modelPhase = contract.profile !== null
+    const receipt = {
+      version: 1,
+      kind: 'team-pipeline-leg',
+      ...pipelineBinding,
+      project: 'ha-react',
+      opportunityId: 'ux',
+      phaseId: contract.id,
+      phaseKind: contract.kind,
+      role: contract.role,
+      trustTier: routedOpportunity.team.trustTier,
+      attempt: 1,
+      revisionParent: null,
+      defectReceipt: null,
+      conditionReceipt: conditional ? { matched: false } : null,
+      profile: contract.profile,
+      authority: contract.authority,
+      authorizationHash: null,
+      configurationEvidence: modelPhase && !conditional
+        ? 'c'.repeat(64)
+        : null,
+      usage: modelPhase
+        ? conditional
+          ? { state: 'not-run', modelCalls: 0, credits: 0 }
+          : { state: 'measured', modelCalls: 1, credits: 1 }
+        : { state: 'deterministic', modelCalls: 0, credits: 0 },
+      state: conditional ? 'condition-false' : 'executed',
+      outcome: conditional
+        ? 'not-run'
+        : contract.kind === 'medium-coordinator'
+          ? 'dispatch-approved'
+          : 'accepted',
+      durationMs: 1,
+      toolEvidence: contract.kind === 'deterministic'
+        ? contract.builtin
+          ? { builtin: contract.builtin }
+          : {
+              toolId: contract.tool,
+              toolHash: contract.toolContract.toolHash,
+              sideEffect: contract.toolContract.sideEffect,
+              argvHash: contract.toolContract.argvHash,
+              exitCode: 0,
+            }
+        : null,
+      previousReceiptHash,
+      startedAt: '2026-09-08T00:00:00.000Z',
+      completedAt: '2026-09-08T00:00:01.000Z',
+    }
+    const complete = {
+      ...receipt,
+      receiptHash: canonicalReceiptHash(receipt),
+    }
+    previousReceiptHash = complete.receiptHash
+    return complete
+  })
+const triggerUnsigned = {
+  version: 1,
+  kind: 'trigger-receipt',
+  project: 'ha-react',
+  opportunityId: 'ux',
+  triggerId: 'copy-safety-conflict',
+  evidenceHash: '1'.repeat(64),
+  requestHash: routedRequestHash,
+  requestBindingHash: pipelineBinding.requestBindingHash,
+  precedingReceiptHash: previousReceiptHash,
+  observedAt: new Date().toISOString(),
+}
+const triggerReceipt = {
+  ...triggerUnsigned,
+  receiptHash: canonicalReceiptHash(triggerUnsigned),
+}
+let triggerAccepted = false
+try {
+  triggerAccepted = validateBoundTriggerReceipt(
+    triggerReceipt,
+    {
+      version: 1,
+      ...pipelineBinding,
+      receipts: pipelineReceipts,
+    },
+    {
+      project: 'ha-react',
+      opportunityId: 'ux',
+      triggerIds: ['copy-safety-conflict'],
+      policy: routedPolicy,
+      registry: routedRegistry,
+      requestHash: routedRequestHash,
+    },
+  )
+} catch {
+  triggerAccepted = false
+}
+check(triggerAccepted,
+  'Conditional copy adjudication accepts only a complete canonical current-policy prefix.')
+let incompletePipelineRejected = false
+try {
+  const incomplete = {
+    version: 1,
+    ...pipelineBinding,
+    receipts: pipelineReceipts.slice(1),
+  }
+  validateBoundTriggerReceipt(
+    triggerReceipt,
+    incomplete,
+    {
+      project: 'ha-react',
+      opportunityId: 'ux',
+      triggerIds: ['copy-safety-conflict'],
+      policy: routedPolicy,
+      registry: routedRegistry,
+      requestHash: routedRequestHash,
+    },
+  )
+} catch {
+  incompletePipelineRejected = true
+}
+check(incompletePipelineRejected,
+  'Conditional copy adjudication rejects incomplete or stripped pipeline evidence.')
+let unrelatedRequestRejected = false
+try {
+  validateBoundTriggerReceipt(
+    triggerReceipt,
+    {
+      version: 1,
+      ...pipelineBinding,
+      receipts: pipelineReceipts,
+    },
+    {
+      project: 'ha-react',
+      opportunityId: 'ux',
+      triggerIds: ['copy-safety-conflict'],
+      policy: routedPolicy,
+      registry: routedRegistry,
+      requestHash: '0'.repeat(64),
+    },
+  )
+} catch {
+  unrelatedRequestRejected = true
+}
+check(unrelatedRequestRejected,
+  'Conditional copy adjudication cannot be replayed for another request.')
+let rejectedCoordinatorRejected = false
+try {
+  const rejectedReceipts = structuredClone(pipelineReceipts)
+  const rejectedCoordinator = rejectedReceipts.at(-1)
+  delete rejectedCoordinator.receiptHash
+  rejectedCoordinator.outcome = 'rejected'
+  rejectedCoordinator.receiptHash = canonicalReceiptHash(rejectedCoordinator)
+  const rejectedTriggerUnsigned = {
+    ...triggerUnsigned,
+    precedingReceiptHash: rejectedCoordinator.receiptHash,
+  }
+  const rejectedTrigger = {
+    ...rejectedTriggerUnsigned,
+    receiptHash: canonicalReceiptHash(rejectedTriggerUnsigned),
+  }
+  validateBoundTriggerReceipt(
+    rejectedTrigger,
+    {
+      version: 1,
+      ...pipelineBinding,
+      receipts: rejectedReceipts,
+    },
+    {
+      project: 'ha-react',
+      opportunityId: 'ux',
+      triggerIds: ['copy-safety-conflict'],
+      policy: routedPolicy,
+      registry: routedRegistry,
+      requestHash: routedRequestHash,
+    },
+  )
+} catch {
+  rejectedCoordinatorRejected = true
+}
+check(rejectedCoordinatorRejected,
+  'Conditional copy adjudication rejects a semantically rejected coordinator prefix.')
 const pinnedCandidate = candidates.candidates.find((candidate) => candidate.id === pin.candidateId)
 check(Boolean(pinnedCandidate), 'model-pin candidate exists.')
 check(['provisional', 'validated'].includes(pin.status), 'model-pin status is provisional or validated.')
@@ -850,7 +1117,15 @@ check(!/15 \* \(missing \/ requiredTerms\.length\)/.test(scorerText), 'Scorer do
 check(/validated model pin has expired/.test(runnerText), 'Pinned execution enforces qualification expiry.')
 check(/positive integer expiresAfterDays/.test(runnerText), 'Pinned execution rejects malformed expiry windows.')
 check(/qualificationHashes/.test(runnerText), 'Pinned execution enforces current qualification hashes.')
-check(/pin\.evidence\?\.qualificationHashes/.test(generatorText), 'Runtime launcher enforces current qualification hashes.')
+check(/selectedRoute/.test(generatorText) && /runtime-routing\.json/.test(generatorText),
+  'Runtime launcher enforces the default or trigger-gated route.')
+check(/Copy adjudication trigger receipt is invalid/.test(generatorText),
+  'Runtime launcher rejects an invalid max/long trigger receipt.')
+check(/modelPromptPayload: requests/.test(generatorText) &&
+  /locallyResolved: partitioned/.test(generatorText),
+'Conditional routing binds the complete ordered prompt payload and redacted local batch identity.')
+check(/candidate\.rank - 1/.test(generatorText),
+  'Missing state variants are assigned by candidate rank, not response array order.')
 check(/localRefusalResponse/.test(generatorText) && /modelEntries\.length/.test(generatorText), 'Runtime launcher resolves mandatory refusals before pin or participant launch.')
 check(/entry\.localResponse \?\? modelResponses/.test(generatorText), 'Runtime launcher merges local and model responses in original order.')
 check(/loadQualifiedCorpus/.test(generatorText) && !/\bbuildCorpus\b/.test(generatorText), 'Runtime launcher uses only the qualified corpus snapshot.')
