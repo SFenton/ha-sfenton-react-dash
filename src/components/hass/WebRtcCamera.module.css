@@ -22,7 +22,10 @@
 
 .frame[data-variant='tile'],
 .frame[data-variant='tile'] .host,
-.frame[data-variant='tile'] :global(webrtc-camera-sfenton) {
+.frame[data-variant='tile'] :global(webrtc-camera-sfenton),
+.frame[data-fill='true'],
+.frame[data-fill='true'] .host,
+.frame[data-fill='true'] :global(webrtc-camera-sfenton) {
   height: 100%;
   min-height: 0;
 }

@@ -1,5 +1,5 @@
 import { useEntity, useHass } from '@hakit/core'
-import { useEffect, useMemo, useRef, useState, type MutableRefObject, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type MutableRefObject, type ReactNode } from 'react'
 import type { HassEntity } from 'home-assistant-js-websocket'
 import { ClimateCard } from '../components/cards/ClimateCard'
 import { ContactSensorCard } from '../components/cards/ContactSensorCard'
@@ -14,6 +14,7 @@ import { DynamicGrid } from '../components/core/DynamicGrid'
 import { GlassTile } from '../components/core/GlassTile'
 import { Icon, MaterialIcon } from '../components/core/Icon'
 import { ModalSheet, type ModalCenteredGeometry, type ModalSheetSize } from '../components/core/ModalSheet'
+import { useModalSheetPresentation } from '../components/core/modalSheetPresentation'
 import { Separator } from '../components/core/Separator'
 import { SectionHeader } from '../components/core/SectionHeader'
 import { SurfaceAccessory } from '../components/core/SurfaceAccessory'
@@ -446,6 +447,7 @@ function SettingsPreviewSheet({ closeHash, onNavigate }: { closeHash: () => void
 
 function CameraSheet({ hash, live = true }: { hash: string; live?: boolean }) {
   const camera = CAMERA_ITEMS.find((item) => item.hash === hash)
+  const presentation = useModalSheetPresentation()
   const recordingEntity = useEntity(asEntityName(camera?.recordingEntityId ?? 'input_boolean.unknown'), { returnNullIfNotFound: true })
   const callService = useHass((state) => state.helpers.callService)
   const targetId = camera?.popupCardId ?? ''
@@ -486,9 +488,9 @@ function CameraSheet({ hash, live = true }: { hash: string; live?: boolean }) {
   const isRecording = recordingEntity?.state === 'on'
 
   return (
-    <div className={styles.cameraSheet}>
-      <div className={styles.cameraFocus}>
-        {live ? <WebRtcCamera camera={camera} controls minHeight={310} variant="modal" /> : <div style={{ minHeight: 310 }} />}
+    <div className={styles.cameraSheet} data-modal-landscape-layout="media-split">
+      <div className={styles.cameraFocus} style={{ '--camera-aspect-ratio': camera.aspectRatio } as CSSProperties}>
+        {live ? <WebRtcCamera camera={camera} controls fill={presentation !== 'sheet'} minHeight={310} variant="modal" /> : <div style={{ minHeight: 310 }} />}
       </div>
       <div className={styles.cameraControls} aria-label={`${camera.title} camera controls`}>
         <ActionPill active={snapshotPulse} label="Snapshot" onClick={takeSnapshot} pulse={snapshotPulse}>

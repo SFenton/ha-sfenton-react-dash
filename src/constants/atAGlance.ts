@@ -119,6 +119,7 @@ export interface CameraConfig {
   entityId: `camera.${string}`
   streamId: string
   popupCardId: string
+  aspectRatio: number
   recordingEntityId?: string
   recordingScriptEntityId?: string
 }
@@ -283,6 +284,7 @@ export const CAMERA_ITEMS: CameraConfig[] = [
     entityId: 'camera.doorbell_camera',
     streamId: 'front_door',
     popupCardId: 'front-door-popup-home',
+    aspectRatio: 4 / 3,
     recordingEntityId: 'input_boolean.is_front_door_recording',
     recordingScriptEntityId: 'script.front_door_manual_recording',
   },
@@ -292,6 +294,7 @@ export const CAMERA_ITEMS: CameraConfig[] = [
     entityId: 'camera.garage_camera',
     streamId: 'garage_camera',
     popupCardId: 'driveway-popup-home',
+    aspectRatio: 10 / 3,
     recordingEntityId: 'input_boolean.is_driveway_recording',
     recordingScriptEntityId: 'script.driveway_manual_recording',
   },
@@ -301,6 +304,7 @@ export const CAMERA_ITEMS: CameraConfig[] = [
     entityId: 'camera.upper_deck_camera_2',
     streamId: 'upper_deck',
     popupCardId: 'upper-deck-popup-home',
+    aspectRatio: 16 / 9,
     recordingEntityId: 'input_boolean.is_upper_deck_recording',
     recordingScriptEntityId: 'script.upper_deck_manual_recording',
   },
@@ -310,6 +314,7 @@ export const CAMERA_ITEMS: CameraConfig[] = [
     entityId: 'camera.lower_deck_camera',
     streamId: 'lower_deck',
     popupCardId: 'lower-deck-popup-home',
+    aspectRatio: 16 / 9,
     recordingEntityId: 'input_boolean.is_lower_deck_recording',
     recordingScriptEntityId: 'script.lower_deck_manual_recording',
   },

@@ -1,10 +1,11 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import { useEntity, useHass } from '@hakit/core'
 import type { CameraConfig } from '../../constants/atAGlance'
 import { ActionPill } from '../core/ActionPill'
 import { MaterialIcon } from '../core/Icon'
 import { asEntityName } from './entityState'
 import { WebRtcCamera } from './WebRtcCamera'
+import { useModalSheetPresentation } from '../core/modalSheetPresentation'
 import { useCopy } from '../../i18n'
 import styles from './CameraModalContent.module.css'
 
@@ -27,6 +28,7 @@ function getMuteState(targetId: string) {
 
 export function CameraModalContent({ camera, live = true }: { camera: CameraConfig; live?: boolean }) {
   const copy = useCopy('modalCamera')
+  const presentation = useModalSheetPresentation()
   const recordingEntity = useEntity(asEntityName(camera.recordingEntityId ?? 'input_boolean.unknown'), { returnNullIfNotFound: true })
   const callService = useHass((state) => state.helpers.callService) as unknown as CallService
   const [isMuted, setIsMuted] = useState(() => getMuteState(camera.popupCardId))
@@ -72,9 +74,9 @@ export function CameraModalContent({ camera, live = true }: { camera: CameraConf
   const isRecording = recordingEntity?.state === 'on'
 
   return (
-    <div className={styles.cameraSheet}>
-      <div className={styles.cameraFocus}>
-        {live ? <WebRtcCamera camera={camera} controls minHeight={310} variant="modal" /> : <div style={{ minHeight: 310 }} />}
+    <div className={styles.cameraSheet} data-modal-landscape-layout="media-split">
+      <div className={styles.cameraFocus} style={{ '--camera-aspect-ratio': camera.aspectRatio } as CSSProperties}>
+        {live ? <WebRtcCamera camera={camera} controls fill={presentation !== 'sheet'} minHeight={310} variant="modal" /> : <div style={{ minHeight: 310 }} />}
       </div>
       <div className={styles.cameraControls} aria-label={copy('controls', { title: camera.title })} data-security-camera-controls="true">
         <ActionPill active={snapshotPulse} label={copy('actions.snapshot')} onClick={takeSnapshot} pulse={snapshotPulse}>
