@@ -812,6 +812,7 @@
 
 .autoCleanCheckbox {
   display: grid;
+  width: 100%;
   grid-template-columns: 38px minmax(0, 1fr);
   gap: 8px;
   align-items: center;
@@ -857,9 +858,12 @@
 @media (max-width: 420px) {
   .settingGrid,
   .actionGrid,
-  .zones,
-  .autoCleanCheckboxGrid {
+  .zones {
     grid-template-columns: 1fr;
+  }
+
+  .autoCleanCheckboxGrid {
+    --dynamic-grid-columns: 1;
   }
 }
 
