@@ -52,7 +52,8 @@
     "test:e2e": "playwright test",
     "test:e2e:mobile-parity": "tsx scripts/required-mobile-parity.ts",
     "test:emulator": "tsx e2e/emulator/run.ts",
-    "test:emulator:list": "tsx e2e/emulator/run.ts --list"
+    "test:emulator:list": "tsx e2e/emulator/run.ts --list",
+    "playwright:mcp:install": "node scripts/playwright-mcp-lifecycle/install.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",
