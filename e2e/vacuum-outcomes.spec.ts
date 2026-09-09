@@ -25,6 +25,7 @@ async function openVacuum(page: Page) {
   await page.getByRole('button', { name: /Main Floor Docked/i }).click()
   const dialog = page.getByRole('dialog')
   await expect(dialog).toBeVisible()
+  await expect(dialog.locator('[data-layout-preparation-phase]')).toHaveAttribute('data-layout-preparation-phase', 'content', { timeout: 15_000 })
   return dialog
 }
 
@@ -230,8 +231,10 @@ test.describe('fine-pointer outcome details', () => {
         overflowY: getComputedStyle(element).overflowY,
         scrollHeight: element.scrollHeight,
       }))
+      const mapStatusLayout = await mapPane.getAttribute('data-map-status-layout')
       expect(bodyGeometry.overflowY).toBe('hidden')
-      expect(mapPaneGeometry.overflowY).toBe('auto')
+      // A split left pane fits the map and Locate exactly, so it must never become a second scroller.
+      expect(mapPaneGeometry.overflowY).toBe(mapStatusLayout === 'split' ? 'hidden' : 'auto')
       expect(await panel.evaluate((element) => getComputedStyle(element).overflowY)).toBe('auto')
       await summary.scrollIntoViewIfNeeded()
       await expect(summary).toBeInViewport()

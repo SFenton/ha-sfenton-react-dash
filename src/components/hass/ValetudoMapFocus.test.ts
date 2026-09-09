@@ -125,9 +125,20 @@ describe('Valetudo map focus', () => {
     expect(result.viewBounds).toEqual(result.rawBounds)
   })
 
-  it('keeps an unnamed helper segment that touches the intended graph diagonally', () => {
+  it('drops an unnamed helper segment that touches the intended graph diagonally', () => {
     const map = createFocusedMap()
     map.layers.push(layer('segment', rectanglePixels(36, 36, 36, 36), { segmentId: '6' }))
+
+    const result = resolveValetudoMapFocus(map, focusPolicy)
+
+    expect(result.mode).toBe('focused')
+    expect(result.acceptedSegmentIds.has('6')).toBe(false)
+    expect(result.excludedSegmentIds).toEqual(['4', '6'])
+  })
+
+  it('keeps a named neighbour that touches the intended graph diagonally', () => {
+    const map = createFocusedMap()
+    map.layers.push(layer('segment', rectanglePixels(36, 36, 36, 36), { name: 'Pantry', segmentId: '6' }))
 
     const result = resolveValetudoMapFocus(map, focusPolicy)
 

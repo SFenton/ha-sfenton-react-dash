@@ -10,6 +10,7 @@ import {
   mapGridRectFromPoints,
   mapGridRectToServiceData,
   mapGridRectToZonePoints,
+  mapStageAspectRatio,
   mapViewportMatrix,
   resizeMapGridRect,
   resizeMapGridRectCorner,
@@ -55,6 +56,17 @@ describe('Valetudo map geometry', () => {
       expect(roundTripped.y).toBeCloseTo(point.y, 10)
     }
     expect(affineScale(matrix)).toBeGreaterThan(0)
+  })
+
+  it('reports the rotated stage aspect ratio so fitted frames show the whole map', () => {
+    expect(mapStageAspectRatio(geometry, 0)).toBeCloseTo(geometry.width / geometry.height, 10)
+    expect(mapStageAspectRatio(geometry, 90)).toBeCloseTo(geometry.height / geometry.width, 10)
+
+    const aspectFrame = { width: 200 * mapStageAspectRatio(geometry, 0), height: 200 }
+    const matrix = mapViewportMatrix(geometry, aspectFrame, { panX: 0, panY: 0, zoom: 1 }, 0)
+
+    expect(geometry.width * affineScale(matrix)).toBeCloseTo(aspectFrame.width)
+    expect(geometry.height * affineScale(matrix)).toBeCloseTo(aspectFrame.height)
   })
 
   it('keeps world coordinates and service payloads exact with focused display bounds', () => {

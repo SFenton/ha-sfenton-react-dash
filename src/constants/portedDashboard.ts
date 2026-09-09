@@ -108,6 +108,7 @@ export interface VacuumConfig {
   fanEntityId?: string
   hash: string
   mapFocus?: VacuumMapFocusConfig
+  mapRoomSelection?: boolean
   mapRotationDegrees?: number
   mapScale: number
   modeEntityId?: string
@@ -158,6 +159,9 @@ export interface VacuumConsumableConfig {
 export interface VacuumZoneConfig {
   entityId: string
   icon: string
+  mapName?: string
+  mopRequired?: boolean
+  mopRequiredEntityId?: string
   title: string
 }
 
@@ -371,6 +375,16 @@ function mainFloorAutoCleanDisabledRoom(title: string, roomId: string, icon: str
   }
 }
 
+function mainFloorVacuumZone(title: string, roomId: string, entityId: string, icon: string, mapName = title): VacuumZoneConfig {
+  return {
+    entityId,
+    icon,
+    mapName,
+    mopRequiredEntityId: `sensor.main_floor_vacuum_coordinator_${roomId}_last_cleaned`,
+    title,
+  }
+}
+
 export const GUEST_CONTROL_ITEMS: EntityTileConfig[] = [
   { title: 'Guest Room', entityId: GUEST_ROOM_GUEST_MODE_ENTITY_ID, icon: 'mdi:bed', color: SWITCH_ACTIVE_COLOR, action: { type: 'toggle' }, showSubtitle: true },
   { title: 'Music Room', entityId: 'input_boolean.guests_staying_in_music_room', icon: 'mdi:guitar-electric', color: SWITCH_ACTIVE_COLOR, action: { type: 'toggle' }, showSubtitle: true },
@@ -524,6 +538,7 @@ export const VACUUMS: VacuumConfig[] = [
       ],
       wallAssociationCm: 20,
     },
+    mapRoomSelection: true,
     mapScale: 2.4,
     modeEntityId: 'select.valetudo_elatedusedram_mode',
     modeTextEntityId: 'input_text.music_room_vacuum_mode',
@@ -537,9 +552,9 @@ export const VACUUMS: VacuumConfig[] = [
       'Zones are not selectable or changeable while cleaning is ongoing.',
     ],
     zones: [
-      { title: 'Clean Music Room', entityId: 'input_boolean.clean_music_room', icon: 'mdi:guitar-electric' },
-      { title: 'Clean Downstairs Hallway', entityId: 'input_boolean.clean_downstairs_hallway', icon: 'mdi:wardrobe' },
-      { title: 'Clean Downstairs Bathroom', entityId: 'input_boolean.clean_downstairs_bathroom', icon: 'mdi:shower-head' },
+      { title: 'Clean Music Room', entityId: 'input_boolean.clean_music_room', icon: 'mdi:guitar-electric', mapName: 'Music Room', mopRequired: true },
+      { title: 'Clean Downstairs Hallway', entityId: 'input_boolean.clean_downstairs_hallway', icon: 'mdi:wardrobe', mapName: 'Downstairs Hallway', mopRequired: true },
+      { title: 'Clean Downstairs Bathroom', entityId: 'input_boolean.clean_downstairs_bathroom', icon: 'mdi:shower-head', mapName: 'Downstairs Bathroom', mopRequired: true },
     ],
   },
   {
@@ -592,6 +607,7 @@ export const VACUUMS: VacuumConfig[] = [
     errorEntityId: 'sensor.valetudo_exaltedsneakydeer_error',
     fanEntityId: 'select.valetudo_exaltedsneakydeer_fan',
     hash: 'main-floor-robot-vacuum',
+    mapRoomSelection: true,
     mapRotationDegrees: 180,
     mapScale: 1.2,
     modeEntityId: 'select.valetudo_exaltedsneakydeer_mode',
@@ -632,17 +648,17 @@ export const VACUUMS: VacuumConfig[] = [
       'Zones are not selectable or changeable while cleaning is ongoing.',
     ],
     zones: [
-      { title: 'Living Room', entityId: 'input_boolean.roborock_living_room_toggle', icon: 'mdi:sofa' },
-      { title: 'Master Bedroom', entityId: 'input_boolean.roborock_master_bedroom_toggle', icon: 'mdi:bed-double' },
-      { title: 'Kitchen', entityId: 'input_boolean.roborock_kitchen_toggle', icon: 'mdi:fridge' },
-      { title: 'Office', entityId: 'input_boolean.roborock_office_toggle', icon: 'mdi:laptop' },
-      { title: 'Hallway', entityId: 'input_boolean.roborock_hallway_toggle', icon: 'mdi:wardrobe' },
-      { title: 'Guest Room', entityId: 'input_boolean.roborock_guest_room_toggle', icon: 'mdi:bed' },
-      { title: 'Master Bathroom', entityId: 'input_boolean.roborock_master_bathroom_toggle', icon: 'mdi:shower' },
-      { title: 'Guest Bathroom', entityId: 'input_boolean.roborock_guest_bathroom_toggle', icon: 'mdi:shower' },
-      { title: 'Gym', entityId: 'input_boolean.roborock_gym_toggle', icon: 'mdi:weight-lifter' },
-      { title: 'Closet', entityId: 'input_boolean.roborock_master_bedroom_closet_toggle', icon: 'mdi:wardrobe' },
-      { title: 'Dining Room', entityId: 'input_boolean.roborock_dining_room_toggle', icon: 'mdi:silverware-fork-knife' },
+      mainFloorVacuumZone('Living Room', 'living_room', 'input_boolean.roborock_living_room_toggle', 'mdi:sofa'),
+      mainFloorVacuumZone('Master Bedroom', 'master_bedroom', 'input_boolean.roborock_master_bedroom_toggle', 'mdi:bed-double'),
+      mainFloorVacuumZone('Kitchen', 'kitchen', 'input_boolean.roborock_kitchen_toggle', 'mdi:fridge'),
+      mainFloorVacuumZone('Office', 'office', 'input_boolean.roborock_office_toggle', 'mdi:laptop'),
+      mainFloorVacuumZone('Hallway', 'hallway', 'input_boolean.roborock_hallway_toggle', 'mdi:wardrobe'),
+      mainFloorVacuumZone('Guest Room', 'guest_room', 'input_boolean.roborock_guest_room_toggle', 'mdi:bed'),
+      mainFloorVacuumZone('Master Bathroom', 'master_bathroom', 'input_boolean.roborock_master_bathroom_toggle', 'mdi:shower'),
+      mainFloorVacuumZone('Guest Bathroom', 'guest_bathroom', 'input_boolean.roborock_guest_bathroom_toggle', 'mdi:shower'),
+      mainFloorVacuumZone('Gym', 'gym', 'input_boolean.roborock_gym_toggle', 'mdi:weight-lifter'),
+      mainFloorVacuumZone('Closet', 'master_bedroom_closet', 'input_boolean.roborock_master_bedroom_closet_toggle', 'mdi:wardrobe', 'Master Bedroom Closet'),
+      mainFloorVacuumZone('Dining Room', 'dining_room', 'input_boolean.roborock_dining_room_toggle', 'mdi:silverware-fork-knife'),
     ],
   },
 ]

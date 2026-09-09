@@ -100,6 +100,9 @@ export const BATHROOM_FAN_COPY_KEYS = {
 export const VACUUM_COPY_KEYS = {
   cleaned: 'cleaned',
   issues: 'issues',
+  layout: {
+    roomSelector: 'layout.roomSelector',
+  },
   tile: {
     subtitleWithBattery: 'tile.subtitleWithBattery',
   },
@@ -227,7 +230,16 @@ export const VACUUM_COPY_KEYS = {
       roomsNeedAttention: 'outcomes.summary.roomsNeedAttention',
     },
   },
+  confirmations: {
+    switchToArea: 'confirmations.switchToArea',
+    switchToRooms: 'confirmations.switchToRooms',
+  },
   selectedRooms: 'selectedRooms',
+  fullClean: 'fullClean',
+  fullCleanHelp: 'fullCleanHelp',
+  roomsSection: 'roomsSection',
+  statusGridLabel: 'statusGridLabel',
+  autoCleanGridLabel: 'autoCleanGridLabel',
 } as const
 
 export const HUMIDIFIER_COPY_KEYS = {

@@ -354,6 +354,13 @@ export function resolveValetudoMapFocus(
     }
   }
 
+  // Only named or active segments can expand the focus. Unnamed segments are
+  // stray exploration that must stay hidden even when it touches a real room.
+  const expandableSegmentIds = new Set(
+    [...segmentsById.entries()]
+      .filter(([, layers]) => layers.some((segment) => segment.name || segment.active))
+      .map(([id]) => id),
+  )
   const acceptedSegmentIds = new Set<string>()
   for (const required of policy.requiredSegments) {
     const queue = [required.id]
@@ -361,7 +368,7 @@ export function resolveValetudoMapFocus(
     for (let index = 0; index < queue.length; index += 1) {
       const current = queue[index]
       for (const neighbor of graph.get(current) ?? []) {
-        if (acceptedSegmentIds.has(neighbor)) continue
+        if (acceptedSegmentIds.has(neighbor) || !expandableSegmentIds.has(neighbor)) continue
         acceptedSegmentIds.add(neighbor)
         queue.push(neighbor)
       }

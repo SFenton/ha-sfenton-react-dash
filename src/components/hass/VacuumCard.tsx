@@ -3,15 +3,19 @@ import { useEntity, useHass } from '@hakit/core'
 import { Description } from '../core/Description'
 import { InlineAlert } from '../core/InlineAlert'
 import { InfoBox } from '../core/InfoBox'
+import { DynamicGrid } from '../core/DynamicGrid'
 import { MaterialIcon } from '../core/Icon'
 import { ModalActionButton, type ModalActionTone } from '../core/ModalActionFooter'
 import { ModalIconTabNav } from '../core/ModalTabNav'
 import { modalTabId, modalTabPanelId } from '../core/modalTabIds'
 import { ModalSheet, type ModalCenteredGeometry } from '../core/ModalSheet'
+import { useModalSheetPresentation } from '../core/modalSheetPresentation'
 import { NativeSelectField } from '../core/NativeSelectField'
+import { DashboardPageLoading } from '../shell/DashboardPageLoading'
 import { StatusPill } from '../core/StatusPill'
 import { type VacuumAutoCleanDisabledRoomConfig, type VacuumConfig, type VacuumConsumableConfig, type VacuumZoneConfig } from '../../constants/portedDashboard'
 import { VACUUM_MODAL_TABS, type VacuumModalTab } from '../../constants/surfaceSemantics'
+import { DASHBOARD_PAGE_LOAD_TIMEOUT_MS } from '../../constants/loading'
 import { DASHBOARD_ROUTE_CHANGE_EVENT, dashboardEventTargets, dashboardHash, dashboardPathWithSearch, replaceDashboardUrl } from '../../hooks/dashboardLocation'
 import { useModalDetailPageScroll } from '../../hooks/useModalDetailPageScroll'
 import { useSmoothDisplayedModalTab } from '../../hooks/useSmoothDisplayedModalTab'
@@ -24,6 +28,7 @@ import {
   VALETUDO_MAP_PROVENANCE_REPORTED,
   VALETUDO_MAP_SCOPE_FULL,
   ValetudoMapCard,
+  ValetudoReportedMapNotice,
   type ValetudoMapEditorMeta,
   type ValetudoMapProvenance,
 } from './ValetudoMapCard'
@@ -60,6 +65,17 @@ const VACUUM_CENTERED_GEOMETRY = {
 } satisfies ModalCenteredGeometry
 
 type VacuumCleanTarget = 'rooms' | 'area'
+type VacuumMapStatusLayout = 'stacked' | 'split'
+type VacuumLayoutPreparationPhase = 'content' | 'exiting' | 'loading'
+type VacuumViewportLayout = 'portrait' | 'short-landscape' | 'tall-landscape'
+
+const VACUUM_LAYOUT_LOADING_MIN_MS = 120
+const VACUUM_LAYOUT_LOADING_EXIT_MS = 500
+
+function vacuumViewportLayout(mapStatusLayout: VacuumMapStatusLayout): VacuumViewportLayout {
+  if (typeof window === 'undefined' || window.innerWidth <= window.innerHeight) return 'portrait'
+  return mapStatusLayout === 'split' ? 'short-landscape' : 'tall-landscape'
+}
 const CLEANING_SETUP_DESCRIPTION = 'Choose how many passes the vacuum should make, then start cleaning with the selected rooms.'
 const AUTO_CLEAN_DISABLED_DESCRIPTION = 'Check rooms that should be skipped when the coordinator starts an automatic away clean. Use this for closed doors, guests, or projects on the floor; manual selected-room cleans still use the Zones tab.'
 const MODE_DESCRIPTION = 'Choose whether the robot vacuums, mops, or combines both for the next run.'
@@ -594,27 +610,31 @@ function ActionButton({
 }
 
 function VacuumCleanTargetSelector({
+  areaSelected,
   disabled,
-  onChange,
-  value,
+  onSelectArea,
+  onSelectRooms,
+  roomsSelected,
 }: {
+  areaSelected: boolean
   disabled: boolean
-  onChange: (target: VacuumCleanTarget) => void
-  value: VacuumCleanTarget
+  onSelectArea: () => void
+  onSelectRooms: () => void
+  roomsSelected: boolean
 }) {
   return (
     <div aria-label="Cleaning target" className={styles.cleanTargetSelector} role="group">
       {([
-        { icon: 'mdi:floor-plan', label: 'Rooms', value: 'rooms' },
-        { icon: 'mdi:selection-drag', label: 'Area', value: 'area' },
+        { icon: 'mdi:floor-plan', label: 'Rooms', onSelect: onSelectRooms, selected: roomsSelected, value: 'rooms' },
+        { icon: 'mdi:selection-drag', label: 'Area', onSelect: onSelectArea, selected: areaSelected, value: 'area' },
       ] as const).map((option) => (
         <button
-          aria-pressed={value === option.value}
+          aria-pressed={option.selected}
           className={styles.cleanTargetButton}
-          data-active={value === option.value ? 'true' : 'false'}
+          data-active={option.selected ? 'true' : 'false'}
           disabled={disabled}
           key={option.value}
-          onClick={() => onChange(option.value)}
+          onClick={option.onSelect}
           type="button"
         >
           <MaterialIcon name={option.icon} size={20} />
@@ -749,24 +769,15 @@ function SelectSetting({
   )
 }
 
-function ZoneButton({ disabled, onIntent, order, zone }: { disabled: boolean; onIntent: (entityId: string, expectedState: string) => void; order?: number; zone: VacuumZoneConfig }) {
-  const callService = useHass((state) => state.helpers.callService) as unknown as CallService
-  const entity = useEntity(asEntityName(zone.entityId), { returnNullIfNotFound: true })
-  const liveActive = entity?.state === 'on'
-  const [active, commitActive] = useOptimisticState(liveActive, { clearOn: 'confirmation', revertMs: VACUUM_OPTIMISTIC_REVERT_MS })
-  const nextActive = !active
-
+function ZoneButton({ active, disabled, onToggle, order, zone }: { active: boolean; disabled: boolean; onToggle: (zone: VacuumZoneConfig) => void; order?: number; zone: VacuumZoneConfig }) {
   return (
     <button
       aria-label={order ? `${zone.title}, cleaning order ${order}` : zone.title}
+      aria-pressed={active}
       className={styles.zoneButton}
       data-active={active}
       disabled={disabled}
-      onClick={() => {
-        commitActive(nextActive)
-        onIntent(zone.entityId, nextActive ? 'on' : 'off')
-        callService({ domain: 'input_boolean', service: nextActive ? 'turn_on' : 'turn_off', target: zone.entityId })
-      }}
+      onClick={() => onToggle(zone)}
       type="button"
     >
       <MaterialIcon name={zone.icon} size={22} />
@@ -799,8 +810,8 @@ function AutoCleanDisabledRoomCheckbox({ room }: { room: VacuumAutoCleanDisabled
       type="button"
     >
       <MaterialIcon name={disabledForAutoClean ? 'mdi:checkbox-marked-outline' : 'mdi:checkbox-blank-outline'} size={34} />
-      <span>
-        <strong>{room.title}</strong>
+      <span data-dynamic-grid-label-container="true">
+        <strong data-dynamic-grid-label="true">{room.title}</strong>
       </span>
     </button>
   )
@@ -862,13 +873,13 @@ function VacuumStatusSummary({
 
   return (
     <section className={styles.statusPanel}>
-      <InfoPill icon={visual.icon} label="Status" tone={visual.tone} value={stateLabel} />
-      <InfoPill icon="mdi:battery" label="Battery" tone={status.primaryAvailable ? undefined : 'unavailable'} value={batteryLabel} />
-      {vacuum.dockControls && (
-        <div className={styles.dockStatusChip}>
-          <InfoPill grouped icon={dockVisual.icon} label="Dock Status" tone={status.primaryAvailable ? dockVisual.tone : 'unavailable'} value={dockStatusLabel} />
-        </div>
-      )}
+      <DynamicGrid ariaLabel={copy(VACUUM_COPY_KEYS.statusGridLabel)} className={styles.statusPills} columns={2} gap={8}>
+        <InfoPill icon={visual.icon} label="Status" tone={visual.tone} value={stateLabel} />
+        <InfoPill icon="mdi:battery" label="Battery" tone={status.primaryAvailable ? undefined : 'unavailable'} value={batteryLabel} />
+        {vacuum.dockControls
+          ? <InfoPill grouped icon={dockVisual.icon} label="Dock Status" tone={status.primaryAvailable ? dockVisual.tone : 'unavailable'} value={dockStatusLabel} />
+          : null}
+      </DynamicGrid>
       {!status.primaryAvailable && mapProvenance !== VALETUDO_MAP_PROVENANCE_REPORTED && (
         <div className={styles.statusNoticeWide}>
           <VacuumStatusNotice role="note" title={stateLabel}>
@@ -907,7 +918,7 @@ function VacuumStatusSummary({
           </VacuumStatusNotice>
         </div>
       )}
-      <span aria-atomic="true" aria-live="polite" className={styles.visuallyHidden} role="status">
+      <span aria-atomic="true" aria-live="polite" className={styles.visuallyHidden} data-vacuum-live-status="true" role="status">
         <span>{liveStatusText}</span>
         {status.activeConditions.length > 0 && (
           <ul>
@@ -999,23 +1010,36 @@ function orderedSelectedVacuumZones(zones: VacuumZoneConfig[], entities: Record<
     .sort((left, right) => left.orderAt - right.orderAt || left.index - right.index)
 }
 
-function VacuumSelectedRoomsSummary({ coordinator, vacuum }: { coordinator: VacuumCommandCoordinator; vacuum: VacuumConfig }) {
+function vacuumZoneSelected(zone: VacuumZoneConfig, entities: Record<string, EntityLike | undefined>, coordinator: VacuumCommandCoordinator) {
+  return (coordinator.pendingIntentState(zone.entityId) ?? entities[zone.entityId]?.state) === 'on'
+}
+
+function vacuumZoneRequiresMop(zone: VacuumZoneConfig, entities: Record<string, EntityLike | undefined>) {
+  if (zone.mopRequiredEntityId) {
+    const mopRequired = entities[zone.mopRequiredEntityId]?.attributes.mop_required
+    if (typeof mopRequired === 'boolean') return mopRequired
+  }
+  return zone.mopRequired ?? true
+}
+
+function VacuumSelectedRoomsSummary({ areaSelected = false, coordinator, vacuum }: { areaSelected?: boolean; coordinator: VacuumCommandCoordinator; vacuum: VacuumConfig }) {
   const copy = useCopy(VACUUM_COPY_NAMESPACE)
   const entities = useHass((state) => state.entities) as unknown as Record<string, EntityLike | undefined>
   if (vacuum.zones.length === 0) return null
 
   const selectedRooms = orderedSelectedVacuumZones(vacuum.zones, entities, coordinator)
+  const fullClean = selectedRooms.length === 0 && !areaSelected
 
   return (
     <div className={styles.awaySummary}>
-      <InfoBox title={copy(VACUUM_COPY_KEYS.selectedRooms)} tone={selectedRooms.length > 0 ? 'success' : 'neutral'}>
+      <InfoBox title={copy(fullClean ? VACUUM_COPY_KEYS.fullClean : VACUUM_COPY_KEYS.selectedRooms)} tone={fullClean ? 'warning' : 'success'}>
         {selectedRooms.length > 0 ? (
           <ol>
             {selectedRooms.map(({ zone }) => <li key={zone.entityId}>{zone.title}</li>)}
           </ol>
         ) : (
           <Description className={styles.selectedRoomsEmpty}>
-            No rooms are selected. If you begin cleaning, the robot vacuum will attempt to clean every mapped area.
+            {copy(VACUUM_COPY_KEYS.fullCleanHelp)}
           </Description>
         )}
       </InfoBox>
@@ -1030,7 +1054,7 @@ function VacuumStateActions({
   commandPolicyMode,
   coordinator,
   onAreaSelectionChange,
-  onCleanTargetChange,
+  onOpenRoomsTab,
   onEditArea,
   optimisticState,
   vacuum,
@@ -1041,13 +1065,15 @@ function VacuumStateActions({
   commandPolicyMode: VacuumCommandPolicyMode
   coordinator: VacuumCommandCoordinator
   onAreaSelectionChange: (selection: MapGridRect | null) => void
-  onCleanTargetChange: (target: VacuumCleanTarget) => void
+  onOpenRoomsTab: () => void
   onEditArea?: () => void
   optimisticState: OptimisticVacuumState
   vacuum: VacuumConfig
 }) {
   const callService = useHass((state) => state.helpers.callService) as unknown as CallService
   const services = useHass((state) => state.services)
+  const entities = useHass((state) => state.entities) as unknown as Record<string, EntityLike | undefined>
+  const roomsSelected = orderedSelectedVacuumZones(vacuum.zones, entities, coordinator).length > 0
   const statusFlag = useEntity(asEntityName(vacuum.statusFlagEntityId), { returnNullIfNotFound: true })
   const error = useEntity(asEntityName(vacuum.errorEntityId), { returnNullIfNotFound: true })
   const passes = useEntity(asEntityName(vacuum.passesEntityId), { returnNullIfNotFound: true }) as EntityLike | null
@@ -1096,7 +1122,7 @@ function VacuumStateActions({
   const roomsCleaningSetup = (
     <>
       <Description>{CLEANING_SETUP_DESCRIPTION}</Description>
-      <VacuumSelectedRoomsSummary coordinator={coordinator} vacuum={vacuum} />
+      <VacuumSelectedRoomsSummary areaSelected={Boolean(areaSelection)} coordinator={coordinator} vacuum={vacuum} />
       <div className={styles.cleaningActionGrid} data-layout="cleaning">
         <SelectSetting disabled={normalCommandsDisabled} entity={passes} entityId={vacuum.passesEntityId} formatOptionLabel={formatPassCount} hideLabel icon="mdi:numeric" label="Cleaning Passes" onIntent={coordinator.registerIntent} valueLabel={formatPassCount(passes?.state)} variant="sub" />
         <ActionButton disabled={normalCommandsDisabled} icon="mdi:play" label="Clean" onClick={clean} tone="primary" />
@@ -1132,7 +1158,13 @@ function VacuumStateActions({
   ) : roomsCleaningSetup
   const cleaningSetupControls = areaCleaning ? (
     <>
-      <VacuumCleanTargetSelector disabled={normalCommandsDisabled} onChange={onCleanTargetChange} value={cleanTarget} />
+      <VacuumCleanTargetSelector
+        areaSelected={Boolean(areaSelection)}
+        disabled={normalCommandsDisabled}
+        onSelectArea={() => onEditArea?.()}
+        onSelectRooms={onOpenRoomsTab}
+        roomsSelected={roomsSelected}
+      />
       {cleanTarget === 'area' ? areaCleaningSetup : showCleaningSetup ? roomsCleaningSetup : null}
     </>
   ) : showCleaningSetup ? roomsCleaningSetup : null
@@ -1251,22 +1283,20 @@ function VacuumDockControlsSection({
 function VacuumControlsSection({
   areaEditorMeta,
   areaSelection,
-  cleanTarget,
   commandPolicyMode,
   coordinator,
   onAreaSelectionChange,
-  onCleanTargetChange,
+  onOpenRoomsTab,
   onEditArea,
   optimisticState,
   vacuum,
 }: {
   areaEditorMeta: ValetudoMapEditorMeta
   areaSelection: MapGridRect | null
-  cleanTarget: VacuumCleanTarget
   commandPolicyMode: VacuumCommandPolicyMode
   coordinator: VacuumCommandCoordinator
   onAreaSelectionChange: (selection: MapGridRect | null) => void
-  onCleanTargetChange: (target: VacuumCleanTarget) => void
+  onOpenRoomsTab: () => void
   onEditArea?: () => void
   optimisticState: OptimisticVacuumState
   vacuum: VacuumConfig
@@ -1276,11 +1306,11 @@ function VacuumControlsSection({
       <VacuumStateActions
         areaEditorMeta={areaEditorMeta}
         areaSelection={areaSelection}
-        cleanTarget={cleanTarget}
+        cleanTarget={areaSelection ? 'area' : 'rooms'}
         commandPolicyMode={commandPolicyMode}
         coordinator={coordinator}
         onAreaSelectionChange={onAreaSelectionChange}
-        onCleanTargetChange={onCleanTargetChange}
+        onOpenRoomsTab={onOpenRoomsTab}
         onEditArea={onEditArea}
         optimisticState={optimisticState}
         vacuum={vacuum}
@@ -1335,14 +1365,17 @@ function VacuumWhileAwaySection({
 function VacuumZones({
   commandPolicyMode,
   coordinator,
+  onToggleZone,
   optimisticState,
   vacuum,
 }: {
   commandPolicyMode: VacuumCommandPolicyMode
   coordinator: VacuumCommandCoordinator
+  onToggleZone: (zone: VacuumZoneConfig) => void
   optimisticState: OptimisticVacuumState
   vacuum: VacuumConfig
 }) {
+  const copy = useCopy(VACUUM_COPY_NAMESPACE)
   const entities = useHass((hass) => hass.entities) as unknown as Record<string, EntityLike | undefined>
   const statusFlag = useEntity(asEntityName(vacuum.statusFlagEntityId), { returnNullIfNotFound: true })
   const error = useEntity(asEntityName(vacuum.errorEntityId), { returnNullIfNotFound: true })
@@ -1354,17 +1387,18 @@ function VacuumZones({
 
   return (
     <section className={styles.section}>
-      <SectionHeader title="Zones" />
+      <SectionHeader title={copy(VACUUM_COPY_KEYS.roomsSection)} />
       <SectionText lines={vacuum.zoneDescription} />
       <Description>{ROOM_ORDER_DESCRIPTION}</Description>
       <div className={styles.zones}>
-        {vacuum.zones.map((zone) => <ZoneButton disabled={!editableZones || coordinator.controlsDisabled} key={zone.entityId} onIntent={coordinator.registerIntent} order={cleaningOrder.get(zone.entityId)} zone={zone} />)}
+        {vacuum.zones.map((zone) => <ZoneButton active={vacuumZoneSelected(zone, entities, coordinator)} disabled={!editableZones || coordinator.controlsDisabled} key={zone.entityId} onToggle={onToggleZone} order={cleaningOrder.get(zone.entityId)} zone={zone} />)}
       </div>
     </section>
   )
 }
 
 function VacuumAutoCleanDisabledRooms({ vacuum }: { vacuum: VacuumConfig }) {
+  const copy = useCopy(VACUUM_COPY_NAMESPACE)
   const rooms = vacuum.autoCleanDisabledRooms ?? []
 
   if (rooms.length === 0) return null
@@ -1373,9 +1407,9 @@ function VacuumAutoCleanDisabledRooms({ vacuum }: { vacuum: VacuumConfig }) {
     <section className={styles.section}>
       <SectionHeader title="Disabled Auto-Clean Rooms" />
       <Description className={styles.autoCleanDescription}>{AUTO_CLEAN_DISABLED_DESCRIPTION}</Description>
-      <div className={styles.autoCleanCheckboxGrid}>
+      <DynamicGrid ariaLabel={copy(VACUUM_COPY_KEYS.autoCleanGridLabel)} className={styles.autoCleanCheckboxGrid} columns={2} gap={8}>
         {rooms.map((room) => <AutoCleanDisabledRoomCheckbox key={room.entityId} room={room} />)}
-      </div>
+      </DynamicGrid>
     </section>
   )
 }
@@ -1407,7 +1441,7 @@ function VacuumModalTabContent({
   drawMode,
   onAreaEditorMetaChange,
   onAreaSelectionChange,
-  onCleanTargetChange,
+  onOpenRoomsTab,
   onDrawModeChange,
   onEditArea,
   onFinishAreaEditing,
@@ -1425,7 +1459,7 @@ function VacuumModalTabContent({
   drawMode: boolean
   onAreaEditorMetaChange: (meta: ValetudoMapEditorMeta) => void
   onAreaSelectionChange: (selection: MapGridRect | null) => void
-  onCleanTargetChange: (target: VacuumCleanTarget) => void
+  onOpenRoomsTab: () => void
   onDrawModeChange: (drawMode: boolean) => void
   onEditArea?: () => void
   onFinishAreaEditing: () => void
@@ -1435,15 +1469,32 @@ function VacuumModalTabContent({
   resetAreaViewRevision: number
   vacuum: VacuumConfig
 }) {
+  const copy = useCopy(VACUUM_COPY_NAMESPACE)
   const entity = useEntity(asEntityName(vacuum.entityId), { returnNullIfNotFound: true })
   const liveState = entity?.state
   const primaryState = liveState ?? VACUUM_AVAILABILITY_UNKNOWN
   const [displayState, commitDisplayState] = useOptimisticState(primaryState, { clearOn: 'live-change', revertMs: VACUUM_OPTIMISTIC_REVERT_MS })
   const modalBodyRef = useRef<HTMLDivElement | null>(null)
   const modalPanelRef = useRef<HTMLDivElement | null>(null)
+  const leftPaneRef = useRef<HTMLDivElement | null>(null)
   const tabs = vacuumModalTabs(vacuum)
   const targetTab = tabs.some((tab) => tab.tab === activeTab) ? activeTab : 'controls'
   const { displayedTab: effectiveActiveTab, transitionState } = useSmoothDisplayedModalTab(targetTab)
+  const [requestedMapStatusLayout, setRequestedMapStatusLayout] = useState<VacuumMapStatusLayout>(() => (
+    typeof window !== 'undefined' && window.innerWidth >= 760 && window.innerHeight < 560 ? 'split' : 'stacked'
+  ))
+  const {
+    displayedTab: displayedMapStatusLayout,
+    transitionState: mapStatusTransitionState,
+  } = useSmoothDisplayedModalTab(requestedMapStatusLayout)
+  const [layoutMeasured, setLayoutMeasured] = useState(false)
+  const [layoutPreparationPhase, setLayoutPreparationPhase] = useState<VacuumLayoutPreparationPhase>('loading')
+  const [viewportLayout, setViewportLayout] = useState<VacuumViewportLayout>(() => vacuumViewportLayout(requestedMapStatusLayout))
+  const layoutLoadingStartedAtRef = useRef(0)
+  const stackedStatusHeightRef = useRef(0)
+  const viewportLayoutRef = useRef<VacuumViewportLayout>(viewportLayout)
+  const previousAreaEditorOpenRef = useRef(areaEditorOpen)
+  const mapLoaded = areaEditorMeta.isLoaded
   const tabIdPrefix = `vacuum-${vacuum.vacuumMapId}`
   const panelSections = [
     'controls',
@@ -1456,7 +1507,44 @@ function VacuumModalTabContent({
   const optimisticState = useMemo<OptimisticVacuumState>(() => ({ commitState: commitDisplayState, liveState: primaryState, state: displayState }), [commitDisplayState, displayState, primaryState])
   const status = useResolvedVacuumDetails(vacuum, liveState, Boolean(entity), entity?.last_changed)
   const coordinator = useVacuumCommandCoordinator(primaryState, status.commandPolicyMode, commitDisplayState)
+  const callService = useHass((state) => state.helpers.callService) as unknown as CallService
+  const entities = useHass((state) => state.entities) as unknown as Record<string, EntityLike | undefined>
+  const selectedRooms = orderedSelectedVacuumZones(vacuum.zones, entities, coordinator)
+  const selectedRoomMarkers = selectedRooms.map(({ zone }, index) => ({ entityId: zone.entityId, order: index + 1 }))
   useVacuumSettingIntentConfirmations(vacuum, coordinator.confirmIntent)
+
+  const setRoomMode = useCallback((zones: VacuumZoneConfig[]) => {
+    if (!vacuum.modeEntityId || zones.length === 0) return
+    const option = zones.every((zone) => !vacuumZoneRequiresMop(zone, entities)) ? 'vacuum' : 'vacuum_and_mop'
+    const modeEntity = entities[vacuum.modeEntityId]
+    const options = entityOptions(modeEntity)
+    if (!options.includes(option) || (coordinator.pendingIntentState(vacuum.modeEntityId) ?? modeEntity?.state) === option) return
+    coordinator.registerIntent(vacuum.modeEntityId, option)
+    callService({ domain: 'select', service: 'select_option', target: vacuum.modeEntityId, serviceData: { option } })
+  }, [callService, coordinator, entities, vacuum.modeEntityId])
+
+  const toggleRoom = useCallback((zone: VacuumZoneConfig) => {
+    const active = vacuumZoneSelected(zone, entities, coordinator)
+    if (!active && areaSelection && !window.confirm(copy(VACUUM_COPY_KEYS.confirmations.switchToRooms))) return
+    if (!active && areaSelection) onAreaSelectionChange(null)
+    const nextActive = !active
+    coordinator.registerIntent(zone.entityId, nextActive ? 'on' : 'off')
+    callService({ domain: 'input_boolean', service: nextActive ? 'turn_on' : 'turn_off', target: zone.entityId })
+    const nextSelectedRooms = vacuum.zones.filter((candidate) => (
+      candidate.entityId === zone.entityId ? nextActive : vacuumZoneSelected(candidate, entities, coordinator)
+    ))
+    setRoomMode(nextSelectedRooms)
+  }, [areaSelection, callService, coordinator, copy, entities, onAreaSelectionChange, setRoomMode, vacuum.zones])
+
+  const editArea = useCallback(() => {
+    if (!onEditArea) return
+    if (selectedRooms.length > 0 && !window.confirm(copy(VACUUM_COPY_KEYS.confirmations.switchToArea))) return
+    for (const { zone } of selectedRooms) {
+      coordinator.registerIntent(zone.entityId, 'off')
+      callService({ domain: 'input_boolean', service: 'turn_off', target: zone.entityId })
+    }
+    onEditArea()
+  }, [callService, coordinator, copy, onEditArea, selectedRooms])
 
   const resetTabScroll = useCallback(() => {
     const scrollContainers = [
@@ -1478,12 +1566,185 @@ function VacuumModalTabContent({
     resetTabScroll()
   }, [effectiveActiveTab, resetTabScroll, targetTab, transitionState])
 
+  const beginLayoutPreparation = useCallback(() => {
+    layoutLoadingStartedAtRef.current = Date.now()
+    setLayoutMeasured(false)
+    setLayoutPreparationPhase('loading')
+  }, [])
+
+  useLayoutEffect(() => {
+    if (previousAreaEditorOpenRef.current && !areaEditorOpen) beginLayoutPreparation()
+    previousAreaEditorOpenRef.current = areaEditorOpen
+  }, [areaEditorOpen, beginLayoutPreparation])
+
+  useLayoutEffect(() => {
+    const pane = leftPaneRef.current
+    const modalGrid = modalBodyRef.current
+    const sheetBody = modalGrid?.closest<HTMLElement>('[data-modal-sheet-body="true"]')
+    if (!pane || !modalGrid || !sheetBody) return undefined
+    if (areaEditorOpen) {
+      pane.style.removeProperty('--vacuum-map-available-height')
+      delete modalGrid.dataset.mapStatusLayout
+      return undefined
+    }
+
+    const measure = () => {
+        const gridColumns = getComputedStyle(modalGrid).gridTemplateColumns.split(' ').filter(Boolean)
+        if (gridColumns.length < 2) {
+          pane.style.removeProperty('--vacuum-map-available-height')
+          delete modalGrid.dataset.mapStatusLayout
+          setRequestedMapStatusLayout('stacked')
+          setLayoutMeasured(true)
+          return 'stacked' as const
+        }
+
+        const modalShell = modalGrid.parentElement
+        const modalNav = modalGrid.nextElementSibling as HTMLElement | null
+        const shellGap = modalShell ? Number.parseFloat(getComputedStyle(modalShell).rowGap) || 0 : 0
+        const modalGridStyle = getComputedStyle(modalGrid)
+        const sheetContentHeight = Number.parseFloat(getComputedStyle(sheetBody).getPropertyValue('--modal-body-content-height'))
+        const gridHeight = modalNav && modalShell
+          ? Math.max(0, modalShell.clientHeight - modalNav.offsetHeight - shellGap)
+          : Number.isFinite(sheetContentHeight) ? sheetContentHeight : sheetBody.clientHeight
+        const gridBlockPadding = (Number.parseFloat(modalGridStyle.paddingTop) || 0) + (Number.parseFloat(modalGridStyle.paddingBottom) || 0)
+        const availableHeight = Math.max(0, gridHeight - gridBlockPadding)
+        const paneHeight = `${availableHeight}px`
+        if (modalGrid.style.getPropertyValue('--vacuum-pane-height') !== paneHeight) {
+          modalGrid.style.setProperty('--vacuum-pane-height', paneHeight)
+        }
+        const mapStage = pane.querySelector<HTMLElement>('[data-vacuum-map-stage="true"]')
+        const mapFrame = pane.querySelector<HTMLElement>('[data-valetudo-map-frame="true"]')
+        const statusDetails = modalGrid.querySelector<HTMLElement>('[data-vacuum-status-details="true"]')
+        if (!mapStage || !mapFrame || availableHeight <= 0) return
+        if (statusDetails) stackedStatusHeightRef.current = statusDetails.scrollHeight
+
+        const paneStyle = getComputedStyle(pane)
+        const gap = Number.parseFloat(paneStyle.rowGap || paneStyle.gap) || 0
+        const statusControls = pane.querySelector<HTMLElement>('[data-vacuum-map-status-controls="true"]')
+        if (statusControls && pane.dataset.mapStatusLayout === 'split') {
+          const paneGap = Number.parseFloat(getComputedStyle(pane).rowGap) || 0
+          const mapHeightPx = Math.max(0, availableHeight - statusControls.offsetHeight - paneGap)
+          const mapHeight = `${mapHeightPx}px`
+          if (pane.style.getPropertyValue('--vacuum-map-available-height') !== mapHeight) {
+            pane.style.setProperty('--vacuum-map-available-height', mapHeight)
+          }
+          modalGrid.dataset.mapStatusLayout = 'split'
+        } else {
+          pane.style.removeProperty('--vacuum-map-available-height')
+          delete modalGrid.dataset.mapStatusLayout
+        }
+
+        const mapMinimumHeight = Number.parseFloat(getComputedStyle(mapFrame).getPropertyValue('--map-min-height')) || 0
+        const naturalMapHeight = Math.min(mapMinimumHeight, availableHeight * 0.75)
+        const mapSupplementHeight = Math.max(0, mapStage.scrollHeight - mapFrame.clientHeight)
+        const estimatedStackedHeight = naturalMapHeight + mapSupplementHeight + stackedStatusHeightRef.current + gap
+        const nextLayout = estimatedStackedHeight > availableHeight + 1 ? 'split' : 'stacked'
+        setRequestedMapStatusLayout(nextLayout)
+        setLayoutMeasured(true)
+        return nextLayout
+    }
+
+    const handleViewportResize = () => {
+      const nextLayout = measure()
+      if (!nextLayout) return
+      const nextViewportLayout = vacuumViewportLayout(nextLayout)
+      if (nextViewportLayout !== viewportLayoutRef.current) {
+        beginLayoutPreparation()
+        setLayoutMeasured(true)
+      }
+      viewportLayoutRef.current = nextViewportLayout
+      setViewportLayout(nextViewportLayout)
+    }
+
+    const initialLayout = measure()
+    if (initialLayout) {
+      const initialViewportLayout = vacuumViewportLayout(initialLayout)
+      viewportLayoutRef.current = initialViewportLayout
+      setViewportLayout(initialViewportLayout)
+    }
+    const ResizeObserverConstructor = window.ResizeObserver
+    if (typeof ResizeObserverConstructor === 'undefined') {
+      window.addEventListener('resize', handleViewportResize)
+      return () => window.removeEventListener('resize', handleViewportResize)
+    }
+
+    const observer = new ResizeObserverConstructor(measure)
+    observer.observe(modalGrid)
+    observer.observe(sheetBody)
+    observer.observe(pane)
+    if (modalGrid.parentElement) observer.observe(modalGrid.parentElement)
+    if (modalGrid.nextElementSibling) observer.observe(modalGrid.nextElementSibling)
+    const statusDetails = pane.querySelector<HTMLElement>('[data-vacuum-status-details="true"]')
+    if (statusDetails) observer.observe(statusDetails)
+    window.addEventListener('resize', handleViewportResize)
+    return () => {
+      observer.disconnect()
+      window.removeEventListener('resize', handleViewportResize)
+    }
+  }, [areaEditorOpen, beginLayoutPreparation, displayedMapStatusLayout])
+
+  useEffect(() => {
+    if (areaEditorOpen || !layoutMeasured || requestedMapStatusLayout !== displayedMapStatusLayout || mapStatusTransitionState !== 'idle') return undefined
+
+    if (layoutPreparationPhase === 'loading') {
+      if (layoutLoadingStartedAtRef.current === 0) layoutLoadingStartedAtRef.current = Date.now()
+      const elapsed = Date.now() - layoutLoadingStartedAtRef.current
+      const readyDelay = mapLoaded ? VACUUM_LAYOUT_LOADING_MIN_MS : DASHBOARD_PAGE_LOAD_TIMEOUT_MS
+      const timer = window.setTimeout(
+        () => setLayoutPreparationPhase('exiting'),
+        Math.max(0, readyDelay - elapsed),
+      )
+      return () => window.clearTimeout(timer)
+    }
+
+    if (layoutPreparationPhase === 'exiting') {
+      const timer = window.setTimeout(() => setLayoutPreparationPhase('content'), VACUUM_LAYOUT_LOADING_EXIT_MS)
+      return () => window.clearTimeout(timer)
+    }
+
+    return undefined
+  }, [areaEditorOpen, displayedMapStatusLayout, layoutMeasured, layoutPreparationPhase, mapLoaded, mapStatusTransitionState, requestedMapStatusLayout])
+
+  const compactMapStatusLayout = !areaEditorOpen && displayedMapStatusLayout === 'split'
+  const tallLandscapeLayout = !areaEditorOpen && viewportLayout === 'tall-landscape'
+  const modalPresentation = useModalSheetPresentation()
+  const landscapeViewport = !areaEditorOpen && (viewportLayout !== 'portrait'
+    || modalPresentation !== 'sheet'
+    || (typeof window !== 'undefined' && window.innerWidth > window.innerHeight))
+  const reportedStatusInRightPane = !areaEditorOpen
+    && !status.primaryAvailable
+    && landscapeViewport
+  const cleaningReportInRightPane = !areaEditorOpen
+    && (compactMapStatusLayout || tallLandscapeLayout || modalPresentation !== 'sheet')
+  const effectiveMapStatusTransitionState = requestedMapStatusLayout !== displayedMapStatusLayout && mapStatusTransitionState === 'idle'
+    ? 'exiting'
+    : mapStatusTransitionState
+  const visibleLayoutPreparationPhase = areaEditorOpen ? 'content' : layoutPreparationPhase
+  const layoutLoadingVisible = !areaEditorOpen && visibleLayoutPreparationPhase !== 'content'
+  const layoutLoadingPhase = visibleLayoutPreparationPhase === 'exiting' ? 'exiting' : 'loading'
+
   return (
-    <div className={[styles.modalBody, areaEditorOpen ? styles.areaEditorModalBody : ''].filter(Boolean).join(' ')} data-area-editor={areaEditorOpen ? 'true' : 'false'} ref={modalBodyRef}>
+    <div
+      className={[styles.modalBody, areaEditorOpen ? styles.areaEditorModalBody : ''].filter(Boolean).join(' ')}
+      data-area-editor={areaEditorOpen ? 'true' : 'false'}
+      data-layout-preparation-phase={visibleLayoutPreparationPhase}
+      data-map-status-layout={areaEditorOpen ? 'editor' : displayedMapStatusLayout}
+      data-map-status-layout-transition={areaEditorOpen ? 'idle' : effectiveMapStatusTransitionState}
+      data-reported-status-pane={reportedStatusInRightPane ? 'right' : 'inline'}
+      ref={modalBodyRef}
+    >
       <VacuumIntentConfirmationTrackers coordinator={coordinator} vacuum={vacuum} />
-      <div aria-label={`${vacuum.title} map and status`} className={[styles.leftPane, areaEditorOpen ? styles.areaEditorPane : ''].filter(Boolean).join(' ')} role="group">
+      <div
+        aria-label={`${vacuum.title} map and status`}
+        className={[styles.leftPane, areaEditorOpen ? styles.areaEditorPane : ''].filter(Boolean).join(' ')}
+        data-map-status-layout={areaEditorOpen ? 'editor' : displayedMapStatusLayout}
+        data-map-status-layout-transition={areaEditorOpen ? 'idle' : effectiveMapStatusTransitionState}
+        ref={leftPaneRef}
+        role="group"
+      >
         <VacuumMapAndStatus
           areaEditorOpen={areaEditorOpen}
+          compactLayout={compactMapStatusLayout}
           areaSelection={areaSelection}
           drawMode={drawMode}
           editorMetaChange={onAreaEditorMetaChange}
@@ -1492,10 +1753,15 @@ function VacuumModalTabContent({
           onFinishAreaEditing={onFinishAreaEditing}
           onOpenOutcomes={onOpenOutcomes}
           onResetAreaView={onResetAreaView}
+          onRoomToggle={toggleRoom}
           optimisticState={optimisticState}
           outcomePresentation={outcomePresentation}
           resetAreaViewRevision={resetAreaViewRevision}
+          selectedRooms={selectedRoomMarkers}
           showAreaSelection={cleanTarget === 'area'}
+          showCleaningReport={!cleaningReportInRightPane}
+          showReportedNotice={!reportedStatusInRightPane}
+          showStatusDetails={!reportedStatusInRightPane}
           status={status}
           vacuum={vacuum}
         />
@@ -1504,25 +1770,47 @@ function VacuumModalTabContent({
         <div aria-label={panelLabel} className={styles.rightPane} data-modal-tab-transition-state={transitionState} data-scroll-region="vacuum-panel" data-tab={effectiveActiveTab} ref={modalPanelRef} role="group">
           <div aria-labelledby={modalTabId(tabIdPrefix, effectiveActiveTab)} className={styles.rightPaneContent} id={modalTabPanelId(tabIdPrefix, 'content')} role="tabpanel">
             {effectiveActiveTab === 'controls' && (
-              <VacuumControlsSection
+              <>
+                {reportedStatusInRightPane ? (
+                  <div className={styles.compactStatusStack} data-vacuum-reported-status="true" data-vacuum-status-details="true">
+                    <ValetudoReportedMapNotice reportedPositionPresent={areaEditorMeta.reportedPositionPresent} />
+                    <VacuumStatusSummary displayState={optimisticState.state} liveState={optimisticState.liveState} mapProvenance={areaEditorMeta.provenance} status={status} vacuum={vacuum} />
+                    <VacuumWhileAwaySection onOpenOutcomes={onOpenOutcomes} presentation={outcomePresentation} vacuum={vacuum} />
+                  </div>
+                ) : compactMapStatusLayout ? (
+                  <div className={styles.compactStatusStack} data-vacuum-status-details="true">
+                    <VacuumStatusSummary displayState={optimisticState.state} liveState={optimisticState.liveState} mapProvenance={areaEditorMeta.provenance} status={status} vacuum={vacuum} />
+                    <VacuumWhileAwaySection onOpenOutcomes={onOpenOutcomes} presentation={outcomePresentation} vacuum={vacuum} />
+                  </div>
+                ) : cleaningReportInRightPane ? (
+                  <VacuumWhileAwaySection onOpenOutcomes={onOpenOutcomes} presentation={outcomePresentation} vacuum={vacuum} />
+                ) : null}
+                <VacuumControlsSection
                 areaEditorMeta={areaEditorMeta}
                 areaSelection={areaSelection}
-                cleanTarget={cleanTarget}
                 commandPolicyMode={status.commandPolicyMode}
                 coordinator={coordinator}
                 onAreaSelectionChange={onAreaSelectionChange}
-                onCleanTargetChange={onCleanTargetChange}
-                onEditArea={onEditArea}
-                optimisticState={optimisticState}
-                vacuum={vacuum}
-              />
+                onOpenRoomsTab={onOpenRoomsTab}
+                  onEditArea={editArea}
+                  optimisticState={optimisticState}
+                  vacuum={vacuum}
+                />
+              </>
             )}
-            {effectiveActiveTab === 'zones' && <VacuumZones commandPolicyMode={status.commandPolicyMode} coordinator={coordinator} optimisticState={optimisticState} vacuum={vacuum} />}
+            {effectiveActiveTab === 'zones' && <VacuumZones commandPolicyMode={status.commandPolicyMode} coordinator={coordinator} onToggleZone={toggleRoom} optimisticState={optimisticState} vacuum={vacuum} />}
             {effectiveActiveTab === 'autoClean' && <VacuumAutoCleanDisabledRooms vacuum={vacuum} />}
             {effectiveActiveTab === 'more' && <VacuumDockControlsSection commandPolicyMode={status.commandPolicyMode} coordinator={coordinator} optimisticState={optimisticState} vacuum={vacuum} />}
             {effectiveActiveTab === 'info' && <VacuumInfoSection vacuum={vacuum} />}
           </div>
         </div>
+      )}
+      {layoutLoadingVisible && (
+        <DashboardPageLoading
+          className={styles.vacuumLayoutLoading}
+          label={copy('layout.loading')}
+          phase={layoutLoadingPhase}
+        />
       )}
     </div>
   )
@@ -1530,6 +1818,7 @@ function VacuumModalTabContent({
 
 function VacuumMapAndStatus({
   areaEditorOpen,
+  compactLayout,
   areaSelection,
   drawMode,
   editorMetaChange,
@@ -1538,14 +1827,20 @@ function VacuumMapAndStatus({
   onFinishAreaEditing,
   onOpenOutcomes,
   onResetAreaView,
+  onRoomToggle,
   optimisticState,
   outcomePresentation,
   resetAreaViewRevision,
+  selectedRooms,
   showAreaSelection,
+  showCleaningReport,
+  showReportedNotice,
+  showStatusDetails,
   status,
   vacuum,
 }: {
   areaEditorOpen: boolean
+  compactLayout: boolean
   areaSelection: MapGridRect | null
   drawMode: boolean
   editorMetaChange: (meta: ValetudoMapEditorMeta) => void
@@ -1554,16 +1849,23 @@ function VacuumMapAndStatus({
   onFinishAreaEditing: () => void
   onOpenOutcomes?: () => void
   onResetAreaView: () => void
+  onRoomToggle: (zone: VacuumZoneConfig) => void
   optimisticState: OptimisticVacuumState
   outcomePresentation: VacuumWhileAwayPresentation
   resetAreaViewRevision: number
+  selectedRooms: Array<{ entityId: string; order: number }>
   showAreaSelection: boolean
+  showCleaningReport: boolean
+  showReportedNotice: boolean
+  showStatusDetails: boolean
   status: ResolvedVacuumStatus
   vacuum: VacuumConfig
 }) {
+  const copy = useCopy(VACUUM_COPY_NAMESPACE)
   const callService = useHass((state) => state.helpers.callService) as unknown as CallService
   const locate = useCallback(() => callServiceAction(callService, 'vacuum.locate', vacuum.entityId), [callService, vacuum.entityId])
   const deviceCommandsAllowed = status.primaryAvailable && status.commandPolicyMode === VACUUM_COMMAND_NORMAL
+  const locateAllowed = status.primaryAvailable
   const [editorMeta, setEditorMeta] = useState<ValetudoMapEditorMeta>({
     displayScope: VALETUDO_MAP_SCOPE_FULL,
     error: null,
@@ -1571,6 +1873,7 @@ function VacuumMapAndStatus({
     geometry: null,
     isLoaded: false,
     provenance: VALETUDO_MAP_PROVENANCE_NONE,
+    reportedPositionPresent: false,
     selectionAllowed: true,
   })
   const mapCommandsAllowed = deviceCommandsAllowed && editorMeta.isLoaded
@@ -1617,25 +1920,32 @@ function VacuumMapAndStatus({
           </button>
         </div>
       )}
-      <div className={[styles.mapStage, areaEditorOpen ? styles.areaEditorMapStage : ''].filter(Boolean).join(' ')} key="vacuum-map">
+      <div className={[styles.mapStage, areaEditorOpen ? styles.areaEditorMapStage : ''].filter(Boolean).join(' ')} data-vacuum-map-stage="true" key="vacuum-map">
         <ValetudoMapCard
           available={status.primaryAvailable}
+          displayMode={compactLayout ? 'fitted' : 'contained'}
           drawMode={drawMode}
           expanded={areaEditorOpen}
           interactive={areaEditorOpen && mapCommandsAllowed}
           minimumSizeCm={vacuum.areaCleaning?.minimumSizeCm}
           onDrawModeChange={onDrawModeChange}
           onEditorMetaChange={handleEditorMetaChange}
+          onRoomToggle={areaEditorOpen ? undefined : (entityId) => {
+            const zone = vacuum.zones.find((candidate) => candidate.entityId === entityId)
+            if (zone) onRoomToggle(zone)
+          }}
           onSelectionChange={onAreaSelectionChange}
           resetViewRevision={resetAreaViewRevision}
+          selectedRooms={selectedRooms}
           selection={areaEditorOpen || showAreaSelection ? areaSelection : null}
+          showReportedNotice={showReportedNotice}
           sourceRevision={status.primaryRevision}
           vacuum={vacuum}
         />
-        {!areaEditorOpen && mapCommandsAllowed && (
+        {!areaEditorOpen && !compactLayout && locateAllowed && (
           <button className={styles.locateButton} data-icon="mdi:map-marker" data-tone="neutral" onClick={locate} type="button">
             <MaterialIcon name="mdi:map-marker" size={18} />
-            Locate
+            {copy('layout.locate')}
           </button>
         )}
         {areaEditorOpen && (
@@ -1662,10 +1972,20 @@ function VacuumMapAndStatus({
           />
         </div>
       ) : (
-        <>
-          <VacuumStatusSummary displayState={optimisticState.state} liveState={optimisticState.liveState} mapProvenance={editorMeta.provenance} status={status} vacuum={vacuum} />
-          <VacuumWhileAwaySection onOpenOutcomes={onOpenOutcomes} presentation={outcomePresentation} vacuum={vacuum} />
-        </>
+        <div className={styles.mapStatusControls} data-vacuum-map-status-controls="true">
+          {compactLayout ? (
+            <div className={styles.compactLocateSection}>
+              <ActionButton disabled={!locateAllowed} icon="mdi:map-marker" label={copy('layout.locate')} onClick={locate} tone="primary" />
+            </div>
+          ) : showStatusDetails ? (
+            <div className={styles.mapStatusDetails} data-vacuum-status-details="true">
+              <VacuumStatusSummary displayState={optimisticState.state} liveState={optimisticState.liveState} mapProvenance={editorMeta.provenance} status={status} vacuum={vacuum} />
+              {showCleaningReport && (
+                <VacuumWhileAwaySection onOpenOutcomes={onOpenOutcomes} presentation={outcomePresentation} vacuum={vacuum} />
+              )}
+            </div>
+          ) : null}
+        </div>
       )}
     </>
   )
@@ -1677,7 +1997,6 @@ export function VacuumRoomSourceModalContent({ vacuum }: VacuumCardProps) {
   const [activeTab, setActiveTab] = useState<VacuumModalTab>('controls')
   const [areaEditorOpen, setAreaEditorOpen] = useState(false)
   const [areaSelection, setAreaSelection] = useState<MapGridRect | null>(null)
-  const [cleanTarget, setCleanTarget] = useState<VacuumCleanTarget>('rooms')
   const [drawMode, setDrawMode] = useState(false)
   const [editorMeta, setEditorMeta] = useState<ValetudoMapEditorMeta>({
     displayScope: VALETUDO_MAP_SCOPE_FULL,
@@ -1686,6 +2005,7 @@ export function VacuumRoomSourceModalContent({ vacuum }: VacuumCardProps) {
     geometry: null,
     isLoaded: false,
     provenance: VALETUDO_MAP_PROVENANCE_NONE,
+    reportedPositionPresent: false,
     selectionAllowed: true,
   })
   const [resetAreaViewRevision, setResetAreaViewRevision] = useState(0)
@@ -1697,14 +2017,13 @@ export function VacuumRoomSourceModalContent({ vacuum }: VacuumCardProps) {
         areaEditorMeta={editorMeta}
         areaEditorOpen={areaEditorOpen}
         areaSelection={areaSelection}
-        cleanTarget={cleanTarget}
+        cleanTarget={areaSelection ? 'area' : 'rooms'}
         drawMode={drawMode}
         onAreaEditorMetaChange={setEditorMeta}
         onAreaSelectionChange={setAreaSelection}
-        onCleanTargetChange={setCleanTarget}
+        onOpenRoomsTab={() => setActiveTab('zones')}
         onDrawModeChange={setDrawMode}
         onEditArea={() => {
-          setCleanTarget('area')
           setDrawMode(!areaSelection)
           setAreaEditorOpen(true)
         }}
@@ -1715,7 +2034,6 @@ export function VacuumRoomSourceModalContent({ vacuum }: VacuumCardProps) {
         vacuum={vacuum}
       />
       {!areaEditorOpen && <VacuumModalNav activeTab={activeTab} onTabChange={(tab) => {
-        if (tab === 'zones') setCleanTarget('rooms')
         setActiveTab(tab)
       }} vacuum={vacuum} />}
     </div>
@@ -1742,7 +2060,6 @@ export function VacuumModal({
   const [areaEditorOpen, setAreaEditorOpen] = useState(false)
   const [outcomeDetailContract, setOutcomeDetailContract] = useState<VacuumOutcomeContract | null>(null)
   const [areaSelection, setAreaSelection] = useState<MapGridRect | null>(null)
-  const [cleanTarget, setCleanTarget] = useState<VacuumCleanTarget>('rooms')
   const [drawMode, setDrawMode] = useState(false)
   const [editorMeta, setEditorMeta] = useState<ValetudoMapEditorMeta>({
     displayScope: VALETUDO_MAP_SCOPE_FULL,
@@ -1751,6 +2068,7 @@ export function VacuumModal({
     geometry: null,
     isLoaded: false,
     provenance: VALETUDO_MAP_PROVENANCE_NONE,
+    reportedPositionPresent: false,
     selectionAllowed: true,
   })
   const [resetAreaViewRevision, setResetAreaViewRevision] = useState(0)
@@ -1777,10 +2095,9 @@ export function VacuumModal({
     enterDetailPage('vacuum-area-editor')
     setOutcomeDetailContract(null)
     setActiveTab('controls')
-    setCleanTarget('area')
     setDrawMode(!areaSelection)
     setAreaEditorOpen(true)
-  }, [areaSelection, enterDetailPage, setActiveTab, setAreaEditorOpen, setCleanTarget, setDrawMode, setOutcomeDetailContract])
+  }, [areaSelection, enterDetailPage, setActiveTab, setAreaEditorOpen, setDrawMode, setOutcomeDetailContract])
   const openOutcomes = useCallback(() => {
     if (outcomePresentation.kind !== 'typed') return
     enterDetailPage('vacuum-outcomes')
@@ -1795,7 +2112,6 @@ export function VacuumModal({
       setAreaEditorOpen(false)
       setOutcomeDetailContract(null)
       setAreaSelection(null)
-      setCleanTarget('rooms')
       setDrawMode(false)
       setEditorMeta({
         displayScope: VALETUDO_MAP_SCOPE_FULL,
@@ -1804,6 +2120,7 @@ export function VacuumModal({
         geometry: null,
         isLoaded: false,
         provenance: VALETUDO_MAP_PROVENANCE_NONE,
+        reportedPositionPresent: false,
         selectionAllowed: true,
       })
       setResetAreaViewRevision((revision) => revision + 1)
@@ -1818,7 +2135,6 @@ export function VacuumModal({
       bodyElementRef={bodyElementRef}
       centeredGeometry={VACUUM_CENTERED_GEOMETRY}
       navigation={areaEditorOpen || showOutcomes ? undefined : <VacuumModalNav activeTab={activeTab} onTabChange={(tab) => {
-        if (tab === 'zones') setCleanTarget('rooms')
         setActiveTab(tab)
       }} vacuum={vacuum} />}
       onBack={areaEditorOpen ? closeAreaEditor : showOutcomes ? closeOutcomes : undefined}
@@ -1838,11 +2154,11 @@ export function VacuumModal({
           areaEditorMeta={editorMeta}
           areaEditorOpen={areaEditorOpen}
           areaSelection={areaSelection}
-          cleanTarget={cleanTarget}
+          cleanTarget={areaSelection ? 'area' : 'rooms'}
           drawMode={drawMode}
           onAreaEditorMetaChange={setEditorMeta}
           onAreaSelectionChange={setAreaSelection}
-          onCleanTargetChange={setCleanTarget}
+          onOpenRoomsTab={() => setActiveTab('zones')}
           onDrawModeChange={setDrawMode}
           onEditArea={openAreaEditor}
           onFinishAreaEditing={closeAreaEditor}
