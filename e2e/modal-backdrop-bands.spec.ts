@@ -375,7 +375,7 @@ test('descendant modal transitions do not disable settled bands', async ({ page 
   await expect(overlay).toHaveAttribute('data-exposed-backdrop-bands', 'true')
 
   const monitor = monitorBandUptime(overlay, 2_400)
-  for (const name of ['Zones', 'Auto-Clean', 'Actions', 'Info']) {
+  for (const name of ['Rooms', 'Auto-Clean', 'Actions', 'Info']) {
     await dialog.getByRole('tab', { name }).evaluate((element) => (element as HTMLElement).click())
     await page.waitForTimeout(320)
   }
@@ -392,7 +392,7 @@ test('trusted tab taps and clicks recover automatic bands without transition chu
   const overlay = page.locator('[data-modal-sheet-overlay="true"]').last()
   await expect(overlay).toHaveAttribute('data-exposed-backdrop-bands', 'true')
   const monitor = monitorBandUptime(overlay, 3_400)
-  for (const name of ['Zones', 'Auto-Clean', 'Actions', 'Info']) {
+  for (const name of ['Rooms', 'Auto-Clean', 'Actions', 'Info']) {
     const tab = dialog.getByRole('tab', { name })
     if (testInfo.project.use.hasTouch) await tab.tap()
     else await tab.click()

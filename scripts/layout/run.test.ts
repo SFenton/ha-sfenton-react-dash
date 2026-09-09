@@ -1,10 +1,16 @@
 import { createServer } from 'node:http'
 import { readFileSync } from 'node:fs'
 import { hash, stableHash } from './shared'
-import { isBaselineBuildInput, stopOwnedProcess, verifyServedBuild } from './run'
+import { isBaselineBuildInput, layoutWorkerCount, stopOwnedProcess, verifyServedBuild } from './run'
 import type { ChildProcess } from 'node:child_process'
 
 describe('owned build verification', () => {
+  it('uses two layout workers by default and accepts an explicit positive override', () => {
+    expect(layoutWorkerCount(undefined)).toBe(2)
+    expect(layoutWorkerCount('1')).toBe(1)
+    expect(() => layoutWorkerCount('0')).toThrow(/positive integer/)
+    expect(() => layoutWorkerCount('two')).toThrow(/positive integer/)
+  })
   it('exports every referenced root TypeScript configuration without including environment files', () => {
     const config = JSON.parse(readFileSync('tsconfig.json', 'utf8')) as { references: { path: string }[] }
     expect(config.references.length).toBeGreaterThan(0)

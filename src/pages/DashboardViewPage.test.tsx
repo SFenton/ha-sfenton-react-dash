@@ -5855,7 +5855,7 @@ describe('DashboardViewPage', () => {
     const controlsPane = within(dialog).getByRole('group', { name: 'Main Floor controls, zones, auto-clean, actions, info' })
     const modalNav = within(dialog).getByRole('tablist', { name: 'Main Floor modal sections' })
     const modalNavButtons = within(modalNav).getAllByRole('tab')
-    expect(modalNavButtons.map((button) => button.getAttribute('aria-label'))).toEqual(['Controls', 'Zones', 'Auto-Clean', 'Actions', 'Info'])
+    expect(modalNavButtons.map((button) => button.getAttribute('aria-label'))).toEqual(['Controls', 'Rooms', 'Auto-Clean', 'Actions', 'Info'])
     expect(modalNavButtons[2].querySelector('path')).toHaveAttribute('d', materialIconPath('mdi:robot-vacuum-off'))
     expect(modalNavButtons[3].querySelector('path')).toHaveAttribute('d', materialIconPath('mdi:flash'))
     expect(modalNavButtons[4].querySelector('path')).toHaveAttribute('d', materialIconPath('mdi:information-outline'))
@@ -5868,7 +5868,7 @@ describe('DashboardViewPage', () => {
     expect(within(mapPane).queryByRole('heading', { name: 'Bin State' })).not.toBeInTheDocument()
     expect(screen.queryByText('No error')).not.toBeInTheDocument()
     expect(within(controlsPane).queryByRole('heading', { name: 'Vacuum Controls' })).not.toBeInTheDocument()
-    expect(within(controlsPane).getAllByRole('heading').map((heading) => heading.textContent)).toEqual(['Docked', 'Selected Rooms', 'Power Settings'])
+    expect(within(controlsPane).getAllByRole('heading').map((heading) => heading.textContent)).toEqual(['Docked', 'Full Clean', 'Power Settings'])
     expect(screen.queryByRole('button', { name: 'Empty Bin' })).not.toBeInTheDocument()
     expect(screen.queryByRole('group', { name: 'Mode options' })).not.toBeInTheDocument()
     const modeSelect = screen.getByRole('combobox', { name: /Mode Vacuum/i })
@@ -5905,16 +5905,16 @@ describe('DashboardViewPage', () => {
     expect(screen.queryByRole('dialog', { name: 'Cleaning Passes' })).not.toBeInTheDocument()
     const cleanButton = screen.getByRole('button', { name: 'Clean' })
     expect(cleaningSetupDescription.compareDocumentPosition(cleanButton) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
-    const selectedRoomsSummary = screen.getByText('Selected Rooms').closest('div') as HTMLElement
-    expect(within(selectedRoomsSummary).getByText('No rooms are selected. If you begin cleaning, the robot vacuum will attempt to clean every mapped area.')).toBeInTheDocument()
+    const selectedRoomsSummary = screen.getByText('Full Clean').closest('div') as HTMLElement
+    expect(within(selectedRoomsSummary).getByText('No rooms are selected, and no areas are drawn. If you begin cleaning, the robot vacuum will attempt to clean every mapped area.')).toBeInTheDocument()
     expect(cleanButton).toHaveAttribute('data-icon', 'mdi:play')
     expect(cleanButton).toHaveAttribute('data-modal-action-button', 'true')
     expect(cleanButton).toHaveAttribute('data-tone', 'primary')
     const cleaningTarget = within(dialog).getByRole('group', { name: 'Cleaning target' })
-    expect(within(cleaningTarget).getByRole('button', { name: 'Rooms' })).toHaveAttribute('aria-pressed', 'true')
+    expect(within(cleaningTarget).getByRole('button', { name: 'Rooms' })).toHaveAttribute('aria-pressed', 'false')
     expect(within(cleaningTarget).getByRole('button', { name: 'Area' })).toHaveAttribute('aria-pressed', 'false')
-    await clickModalTab(within(dialog), 'Zones')
-    const zonesHeading = within(controlsPane).getByRole('heading', { name: 'Zones' })
+    await clickModalTab(within(dialog), 'Rooms')
+    const zonesHeading = within(controlsPane).getByRole('heading', { name: 'Rooms' })
     expect(screen.getByText('Select any zones to focus cleaning in those areas. If you press clean and no zones are selected, we will clean all zones on the Main Floor.')).toBeInTheDocument()
     expect(screen.getByText('Zones are not selectable or changeable while cleaning is ongoing.')).toBeInTheDocument()
     expect(screen.getByText('Rooms are cleaned in the order you select them. The numbered badges show the current cleaning sequence.')).toBeInTheDocument()
@@ -5961,7 +5961,7 @@ describe('DashboardViewPage', () => {
     const controlsPane = within(dialog).getByRole('group', { name: 'Main Floor controls, zones, auto-clean, actions, info' })
     expect(within(controlsPane).getByRole('heading', { name: heading })).toBeInTheDocument()
     expect(within(dialog).getByLabelText('Home Assistant Condition')).toHaveTextContent('Kept for Later')
-    expect(within(dialog).getByRole('status')).toHaveTextContent('Kept for Later')
+    expect(dialog.querySelector('[data-vacuum-live-status="true"]')).toHaveTextContent('Kept for Later')
     expect(within(controlsPane).queryByRole('button', { name: 'Clean' })).not.toBeInTheDocument()
     expect(within(controlsPane).queryByRole('group', { name: 'Cleaning target' })).not.toBeInTheDocument()
     if (state === 'idle') {
@@ -5972,7 +5972,7 @@ describe('DashboardViewPage', () => {
     for (const action of actions) expect(within(controlsPane).getByRole('button', { name: action })).toBeEnabled()
 
     if (state === 'idle') {
-      await clickModalTab(within(dialog), 'Zones')
+      await clickModalTab(within(dialog), 'Rooms')
       expect(within(controlsPane).getByRole('button', { name: 'Living Room' })).toBeDisabled()
     }
   })
@@ -6031,11 +6031,6 @@ describe('DashboardViewPage', () => {
     const dialog = await screen.findByRole('dialog')
     fireEvent.click(within(within(dialog).getByRole('group', { name: 'Cleaning target' })).getByRole('button', { name: 'Area' }))
 
-    expect(within(dialog).queryByText('No area selected')).not.toBeInTheDocument()
-    expect(within(dialog).getByRole('button', { name: 'Start Area Clean' })).toBeDisabled()
-
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Draw Area' }))
-
     expect(within(dialog).getByRole('heading', { name: 'Main Floor Cleaning Area' })).toBeInTheDocument()
     expect(within(dialog).getByRole('button', { name: 'Back to controls' })).toBeInTheDocument()
     expect(within(dialog).getByRole('button', { name: 'Draw' })).toHaveAttribute('data-active', 'true')
@@ -6046,7 +6041,34 @@ describe('DashboardViewPage', () => {
 
     expect(within(dialog).getByRole('heading', { name: 'Living Room: Robot Vacuum' })).toBeInTheDocument()
     expect(within(dialog).getByRole('tablist', { name: 'Main Floor modal sections' })).toBeInTheDocument()
-    expect(within(dialog).getByRole('button', { name: 'Area' })).toHaveAttribute('aria-pressed', 'true')
+    expect(within(dialog).getByRole('button', { name: 'Area' })).toHaveAttribute('aria-pressed', 'false')
+    expect(within(dialog).getByRole('button', { name: 'Rooms' })).toHaveAttribute('aria-pressed', 'false')
+  })
+
+  it('confirms before replacing selected rooms with area drawing', async () => {
+    mockEntities['input_boolean.roborock_living_room_toggle'].state = 'on'
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValueOnce(false).mockReturnValueOnce(true)
+
+    try {
+      render(<DashboardViewPage activePath="living-room" onNavigate={() => undefined} path="living-room" />)
+      fireEvent.click(screen.getByRole('button', { name: /Main Floor Docked/i }))
+      const dialog = await screen.findByRole('dialog')
+      const areaButton = within(within(dialog).getByRole('group', { name: 'Cleaning target' })).getByRole('button', { name: 'Area' })
+
+      fireEvent.click(areaButton)
+      expect(confirm).toHaveBeenLastCalledWith('Switch to Area? Continuing clears your selected rooms and opens area drawing.')
+      expect(within(dialog).queryByRole('heading', { name: 'Main Floor Cleaning Area' })).not.toBeInTheDocument()
+      expect(mockCallServiceCalls).toEqual([])
+
+      fireEvent.click(areaButton)
+      expect(within(dialog).getByRole('heading', { name: 'Main Floor Cleaning Area' })).toBeInTheDocument()
+      expect(mockCallServiceCalls).toEqual([
+        { domain: 'input_boolean', service: 'turn_off', target: 'input_boolean.roborock_living_room_toggle' },
+      ])
+    } finally {
+      confirm.mockRestore()
+      mockEntities['input_boolean.roborock_living_room_toggle'].state = 'off'
+    }
   })
 
   it('closes the area editor when the vacuum becomes unavailable', async () => {
@@ -6055,7 +6077,6 @@ describe('DashboardViewPage', () => {
     fireEvent.click(screen.getByRole('button', { name: /Main Floor Docked/i }))
     const dialog = await screen.findByRole('dialog')
     fireEvent.click(within(within(dialog).getByRole('group', { name: 'Cleaning target' })).getByRole('button', { name: 'Area' }))
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Draw Area' }))
     expect(within(dialog).getByRole('heading', { name: 'Main Floor Cleaning Area' })).toBeInTheDocument()
 
     act(() => setMockEntityState('vacuum.valetudo_exaltedsneakydeer', 'unavailable'))
@@ -6077,7 +6098,7 @@ describe('DashboardViewPage', () => {
     await clickModalTab(within(screen.getByRole('dialog')), 'Actions')
     fireEvent.click(screen.getByRole('button', { name: 'Empty Bin' }))
     fireEvent.click(screen.getByRole('button', { name: 'Clean Mop Dock' }))
-    await clickModalTab(within(screen.getByRole('dialog')), 'Zones')
+    await clickModalTab(within(screen.getByRole('dialog')), 'Rooms')
     fireEvent.click(screen.getByRole('button', { name: 'Living Room' }))
     await clickModalTab(within(screen.getByRole('dialog')), 'Auto-Clean')
     fireEvent.click(screen.getByRole('button', { name: 'Office auto-clean enabled' }))
@@ -6157,7 +6178,7 @@ describe('DashboardViewPage', () => {
     expect(statusPill).toHaveAttribute('data-icon', 'mdi:alert-circle')
     expect(statusPill).toHaveAttribute('data-tone', 'danger')
     expect(statusPill?.querySelector('path')).toHaveAttribute('d', materialIconPath('mdi:alert-circle'))
-    expect(screen.queryByRole('button', { name: 'Locate' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Locate' })).toBeEnabled()
     expect(screen.getByRole('button', { name: 'Stop' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Dock' })).toBeInTheDocument()
   })
@@ -6174,11 +6195,11 @@ describe('DashboardViewPage', () => {
     expect(screen.getByRole('tab', { name: 'Controls' })).toHaveAttribute('aria-selected', 'true')
     expect(screen.getByRole('tab', { name: 'Actions' })).toBeInTheDocument()
     expect(screen.getByRole('tab', { name: 'Info' })).toBeInTheDocument()
-    expect(screen.queryByRole('tab', { name: 'Zones' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('tab', { name: 'Rooms' })).not.toBeInTheDocument()
     const cleaningTarget = screen.getByRole('group', { name: 'Cleaning target' })
-    expect(within(cleaningTarget).getByRole('button', { name: 'Rooms' })).toHaveAttribute('aria-pressed', 'true')
+    expect(within(cleaningTarget).getByRole('button', { name: 'Rooms' })).toHaveAttribute('aria-pressed', 'false')
     expect(within(cleaningTarget).getByRole('button', { name: 'Area' })).toHaveAttribute('aria-pressed', 'false')
-    expect(screen.queryByText('No rooms are selected. If you begin cleaning, the robot vacuum will attempt to clean every mapped area.')).not.toBeInTheDocument()
+    expect(screen.queryByText('No rooms are selected, and no areas are drawn. If you begin cleaning, the robot vacuum will attempt to clean every mapped area.')).not.toBeInTheDocument()
     expect(screen.getByRole('combobox', { name: /Mode Vacuum/i })).toHaveValue('vacuum')
     expect(screen.queryByRole('dialog', { name: 'Mode' })).not.toBeInTheDocument()
     expect(screen.getByRole('combobox', { name: /Fan Balanced/i })).toHaveValue('balanced')
@@ -7867,7 +7888,7 @@ describe('DashboardViewPage', () => {
     expect(within(controlsPane).getByRole('button', { name: 'Stop' })).toHaveAttribute('data-tone', 'destructive')
     expect(within(controlsPane).getByRole('button', { name: 'Stop' })).toBeDisabled()
 
-    await clickModalTab(within(dialog), 'Zones')
+    await clickModalTab(within(dialog), 'Rooms')
     const livingRoomZone = screen.getByRole('button', { name: 'Living Room' })
     expect(livingRoomZone).toBeDisabled()
 
@@ -7944,8 +7965,7 @@ describe('DashboardViewPage', () => {
     render(<DashboardViewPage activePath="living-room" onNavigate={() => undefined} path="living-room" />)
 
     fireEvent.click(screen.getByRole('button', { name: /Main Floor Docked/i }))
-    const dialog = await screen.findByRole('dialog')
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Area' }))
+    await screen.findByRole('dialog')
 
     vi.useFakeTimers()
     try {
@@ -8052,7 +8072,7 @@ describe('DashboardViewPage', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /Main Floor Docked/i }))
     const dialog = await screen.findByRole('dialog')
-    await clickModalTab(within(dialog), 'Zones')
+    await clickModalTab(within(dialog), 'Rooms')
 
     const livingRoomZone = screen.getByRole('button', { name: 'Living Room' })
     const kitchenZone = screen.getByRole('button', { name: 'Kitchen' })
@@ -8071,13 +8091,37 @@ describe('DashboardViewPage', () => {
     expect(within(livingRoomZone).getByText('2')).toHaveAttribute('class', expect.stringContaining('zoneOrder'))
     expect(mockCallServiceCalls).toEqual([
       { domain: 'input_boolean', service: 'turn_on', target: 'input_boolean.roborock_kitchen_toggle' },
+      { domain: 'select', service: 'select_option', target: 'select.valetudo_exaltedsneakydeer_mode', serviceData: { option: 'vacuum_and_mop' } },
       { domain: 'input_boolean', service: 'turn_on', target: 'input_boolean.roborock_living_room_toggle' },
     ])
 
     await clickModalTab(within(dialog), 'Controls')
     const selectedRoomsSummary = screen.getByText('Selected Rooms').closest('div') as HTMLElement
     expect(within(selectedRoomsSummary).getAllByRole('listitem').map((item) => item.textContent)).toEqual(['Kitchen', 'Living Room'])
-    expect(within(selectedRoomsSummary).queryByText('No rooms are selected. If you begin cleaning, the robot vacuum will attempt to clean every mapped area.')).not.toBeInTheDocument()
+    expect(within(selectedRoomsSummary).queryByText('No rooms are selected, and no areas are drawn. If you begin cleaning, the robot vacuum will attempt to clean every mapped area.')).not.toBeInTheDocument()
+  })
+
+  it('selects vacuum mode for vacuum-only rooms and leaves mode unchanged when the last room is removed', async () => {
+    mockEntities['select.valetudo_exaltedsneakydeer_mode'].state = 'vacuum_and_mop'
+
+    try {
+      render(<DashboardViewPage activePath="living-room" onNavigate={() => undefined} path="living-room" />)
+      fireEvent.click(screen.getByRole('button', { name: /Main Floor Docked/i }))
+      const dialog = await screen.findByRole('dialog')
+      await clickModalTab(within(dialog), 'Rooms')
+
+      const livingRoomZone = screen.getByRole('button', { name: 'Living Room' })
+      fireEvent.click(livingRoomZone)
+      fireEvent.click(livingRoomZone)
+
+      expect(mockCallServiceCalls).toEqual([
+        { domain: 'input_boolean', service: 'turn_on', target: 'input_boolean.roborock_living_room_toggle' },
+        { domain: 'select', service: 'select_option', target: 'select.valetudo_exaltedsneakydeer_mode', serviceData: { option: 'vacuum' } },
+        { domain: 'input_boolean', service: 'turn_off', target: 'input_boolean.roborock_living_room_toggle' },
+      ])
+    } finally {
+      mockEntities['select.valetudo_exaltedsneakydeer_mode'].state = 'vacuum'
+    }
   })
 
   it('opens available vacuum cards as modal controls', async () => {
@@ -8101,7 +8145,7 @@ describe('DashboardViewPage', () => {
     expect(within(mapPane).getByText('Battery')).toBeInTheDocument()
     expect(within(mapPane).getByRole('group', { name: 'Dock Status Idle' })).toBeInTheDocument()
     expect(screen.queryByText('No error')).not.toBeInTheDocument()
-    expect(within(controlsPane).getAllByRole('heading').map((heading) => heading.textContent)).toEqual(['Docked', 'Selected Rooms', 'Power Settings'])
+    expect(within(controlsPane).getAllByRole('heading').map((heading) => heading.textContent)).toEqual(['Docked', 'Full Clean', 'Power Settings'])
     const fanSelect = screen.getByRole('combobox', { name: /Fan Balanced/i })
     expect(fanSelect).toHaveValue('balanced')
     expect(fanSelect.closest('[data-layout]')).toHaveAttribute('data-layout', 'default')
@@ -8113,7 +8157,7 @@ describe('DashboardViewPage', () => {
     expect(screen.queryByText('Set the cleaning mode, suction, and water level before starting the next run.')).not.toBeInTheDocument()
     expect(screen.queryByRole('dialog', { name: 'Fan' })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Clean' })).toBeInTheDocument()
-    await clickModalTab(within(dialog), 'Zones')
+    await clickModalTab(within(dialog), 'Rooms')
     expect(screen.getByRole('button', { name: /living room/i })).toBeInTheDocument()
     await clickModalTab(within(dialog), 'Auto-Clean')
     expect(screen.getByRole('button', { name: 'Dining Room auto-clean enabled' })).toBeInTheDocument()
@@ -8250,7 +8294,7 @@ describe('DashboardViewPage', () => {
     const dialog = await screen.findByRole('dialog')
     expect(within(dialog).getByLabelText('Error Source Unavailable')).toHaveTextContent('The current vacuum error status cannot be confirmed because its error source is unavailable.')
     expect(within(dialog).queryByRole('alert')).not.toBeInTheDocument()
-    expect(within(dialog).queryByRole('button', { name: 'Locate' })).not.toBeInTheDocument()
+    expect(within(dialog).getByRole('button', { name: 'Locate' })).toBeEnabled()
     expect(within(dialog).queryByRole('button', { name: 'Clean' })).not.toBeInTheDocument()
     expect(mockCallServiceCalls).toEqual([])
   })
@@ -8285,7 +8329,7 @@ describe('DashboardViewPage', () => {
     const dialog = await screen.findByRole('dialog')
     expect(within(dialog).getByLabelText('Error Source Unavailable')).toBeInTheDocument()
     expect(within(dialog).getByLabelText('Previous Issue')).toHaveTextContent('Robot stuck or trapped')
-    expect(within(dialog).queryByRole('button', { name: 'Locate' })).not.toBeInTheDocument()
+    expect(within(dialog).getByRole('button', { name: 'Locate' })).toBeEnabled()
   })
 
   it('keeps an open vacuum status modal mounted when the vacuum goes offline', async () => {

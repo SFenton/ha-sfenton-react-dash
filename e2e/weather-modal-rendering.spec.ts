@@ -155,6 +155,9 @@ test('half-occluded weather panels keep the atmosphere visually continuous', asy
   const { dialog } = await openWeather(page)
   const body = dialog.locator('[data-modal-sheet-body="true"]')
   const panel = dialog.locator('[class*="currentPanel"]')
+  const narrative = panel.locator('[class*="currentNarrative"]')
+  await expect(narrative).toHaveCSS('color', 'rgb(255, 255, 255)')
+  await expect(narrative.locator('li')).toHaveCount(4)
 
   const geometry = await body.evaluate((element) => {
     const target = element.querySelector<HTMLElement>('[class*="currentPanel"]')

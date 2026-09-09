@@ -2,6 +2,17 @@
   "cleaned": "Cleaned",
   "issues": "Issues",
   "selectedRooms": "Selected Rooms",
+  "fullClean": "Full Clean",
+  "fullCleanHelp": "No rooms are selected, and no areas are drawn. If you begin cleaning, the robot vacuum will attempt to clean every mapped area.",
+  "confirmations": {
+    "switchToRooms": "Switch to Rooms\n\nYou have an area drawn right now. Switching to Rooms will discard that area. Are you sure you want to continue?",
+    "switchToArea": "Switch to Area? Continuing clears your selected rooms and opens area drawing."
+  },
+  "layout": {
+    "locate": "Locate",
+    "loading": "Loading vacuum controls",
+    "roomSelector": "{{title}} room selector"
+  },
   "tile": {
     "subtitleWithBattery": "{{state}} • {{battery}}%"
   },
@@ -132,5 +143,8 @@
       "dockUnreachable": "The vacuum could not reach its dock.",
       "unknown": "The vacuum outcome reason was not recognized."
     }
-  }
+  },
+  "roomsSection": "Rooms",
+  "statusGridLabel": "Vacuum status",
+  "autoCleanGridLabel": "Disabled auto-clean rooms"
 }

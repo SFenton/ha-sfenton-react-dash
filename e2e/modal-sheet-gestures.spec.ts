@@ -684,7 +684,6 @@ test.describe('mobile ModalSheet gestures', () => {
     const dialog = page.getByRole('dialog')
     await expect(dialog).toBeVisible()
     await dialog.getByRole('group', { name: 'Cleaning target' }).getByRole('button', { name: 'Area' }).click()
-    await dialog.getByRole('button', { name: 'Draw Area' }).click()
     await expect(dialog.getByRole('heading', { name: 'Main Floor Cleaning Area' })).toBeVisible()
     const overlay = dialog.locator('[data-map-editor-overlay="true"]')
     await expect(overlay).toBeVisible()

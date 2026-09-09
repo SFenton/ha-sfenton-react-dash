@@ -146,6 +146,12 @@ function rotatedStageSize(geometry: ValetudoMapStageGeometry, rotationDegrees: n
   }
 }
 
+export function mapStageAspectRatio(geometry: ValetudoMapStageGeometry, rotationDegrees: number): number {
+  const rotated = rotatedStageSize(geometry, rotationDegrees)
+  if (rotated.width <= 0 || rotated.height <= 0) return 1
+  return rotated.width / rotated.height
+}
+
 export function mapViewportMatrix(
   geometry: ValetudoMapStageGeometry,
   frame: MapFrameSize,

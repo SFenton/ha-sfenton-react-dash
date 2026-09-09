@@ -249,8 +249,69 @@ function createMockMusicRoomMap(): ValetudoMap {
   }
 }
 
+function createMockMainFloorMap(): ValetudoMap {
+  const bounds = MOCK_MAP_BOUNDS.valetudo_exaltedsneakydeer
+  const roomNames = [
+    ['Dining Room', '1'],
+    ['Living Room', '3'],
+    ['Kitchen', '4'],
+    ['Guest Bathroom', '5'],
+    ['Gym', '7'],
+    ['Master Bathroom', '8'],
+    ['Master Bedroom Closet', '9'],
+    ['Guest Room', '11'],
+    ['Hallway', '12'],
+    ['Master Bedroom', '13'],
+    ['Office', '14'],
+  ] as const
+  const inset = 5
+  const columns = 4
+  const rows = 3
+  const roomWidth = Math.floor((bounds.maxX - bounds.minX - inset * 2) / columns)
+  const roomHeight = Math.floor((bounds.maxY - bounds.minY - inset * 2) / rows)
+  const rooms = roomNames.map(([name, id], index) => {
+    const column = index % columns
+    const row = Math.floor(index / columns)
+    const minX = bounds.minX + inset + column * roomWidth
+    const minY = bounds.minY + inset + row * roomHeight
+    return {
+      id,
+      name,
+      minX,
+      minY,
+      maxX: column === columns - 1 ? bounds.maxX - inset : minX + roomWidth - 1,
+      maxY: row === rows - 1 ? bounds.maxY - inset : minY + roomHeight - 1,
+    }
+  })
+
+  return {
+    __class: 'ValetudoMap',
+    entities: [
+      { type: 'charger_location', points: [(bounds.minX + inset + 4) * 5, (bounds.minY + inset + 4) * 5] },
+      { type: 'robot_position', points: [Math.round((bounds.minX + bounds.maxX) * 2.5), Math.round((bounds.minY + bounds.maxY) * 2.5)], metaData: { angle: 90 } },
+    ],
+    layers: [
+      ...rooms.map((room) => ({
+        type: 'segment',
+        dimensions: { x: { min: room.minX, max: room.maxX }, y: { min: room.minY, max: room.maxY } },
+        compressedPixels: mockCompressedRows(room.minX, room.maxX, room.minY, room.maxY),
+        metaData: { name: room.name, segmentId: room.id },
+      })),
+      {
+        type: 'wall',
+        dimensions: { x: { min: bounds.minX, max: bounds.maxX }, y: { min: bounds.minY, max: bounds.maxY } },
+        compressedPixels: mockOutlineRows(bounds.minX, bounds.maxX, bounds.minY, bounds.maxY),
+      },
+    ],
+    metaData: { nonce: 'mock-main-floor-rooms', version: 2 },
+    pixelSize: 5,
+    size: { x: 6554, y: 6554 },
+  }
+}
+
 export function createMockValetudoMap(vacuumMapId: string): ValetudoMap {
   if (vacuumMapId === 'valetudo_elatedusedram') return createMockMusicRoomMap()
+  if (vacuumMapId === 'valetudo_exaltedsneakydeer') return createMockMainFloorMap()
 
   const bounds = MOCK_MAP_BOUNDS[vacuumMapId] ?? MOCK_MAP_BOUNDS.valetudo_exaltedsneakydeer
   const width = bounds.maxX - bounds.minX
@@ -370,6 +431,75 @@ export function expandValetudoLayerPixels(layer: ValetudoMapLayer) {
 
   EXPANDED_PIXEL_CACHE.set(layer, pixels)
   return pixels
+}
+
+export interface ValetudoMapRoomTarget {
+  entityId: string
+  mapName: string
+  title: string
+}
+
+export interface ValetudoSelectableRoom extends ValetudoMapRoomTarget {
+  centroid: { x: number; y: number }
+  pixelKeys: ReadonlySet<string>
+  segmentId: string | null
+}
+
+function normalizedRoomName(value: string) {
+  return value.trim().toLocaleLowerCase().replace(/\s+/g, ' ')
+}
+
+function pixelKey(x: number, y: number) {
+  return `${x}:${y}`
+}
+
+export function selectableValetudoRooms(map: ValetudoMap, targets: ValetudoMapRoomTarget[]): ValetudoSelectableRoom[] {
+  const targetsByName = new Map(targets.map((target) => [normalizedRoomName(target.mapName), target]))
+
+  return map.layers.flatMap((layer) => {
+    if (layer.type !== 'segment' || typeof layer.metaData?.name !== 'string') return []
+    const target = targetsByName.get(normalizedRoomName(layer.metaData.name))
+    if (!target) return []
+    const pixels = expandValetudoLayerPixels(layer)
+    if (pixels.length < 2) return []
+
+    let sumX = 0
+    let sumY = 0
+    const pixelKeys = new Set<string>()
+    for (let index = 0; index + 1 < pixels.length; index += 2) {
+      const x = pixels[index] ?? 0
+      const y = pixels[index + 1] ?? 0
+      sumX += x
+      sumY += y
+      pixelKeys.add(pixelKey(x, y))
+    }
+    const count = pixels.length / 2
+    const meanX = sumX / count
+    const meanY = sumY / count
+    let centroid = { x: pixels[0] ?? 0, y: pixels[1] ?? 0 }
+    let centroidDistance = Number.POSITIVE_INFINITY
+    for (let index = 0; index + 1 < pixels.length; index += 2) {
+      const x = pixels[index] ?? 0
+      const y = pixels[index + 1] ?? 0
+      const distance = (x - meanX) ** 2 + (y - meanY) ** 2
+      if (distance >= centroidDistance) continue
+      centroid = { x, y }
+      centroidDistance = distance
+    }
+
+    const segmentId = typeof layer.metaData.segmentId === 'string' || typeof layer.metaData.segmentId === 'number'
+      ? String(layer.metaData.segmentId)
+      : null
+    return [{ ...target, centroid, pixelKeys, segmentId }]
+  })
+}
+
+export function valetudoRoomAtGridPoint(rooms: ValetudoSelectableRoom[], point: { x: number; y: number }) {
+  const candidates = [
+    [Math.floor(point.x), Math.floor(point.y)],
+    [Math.round(point.x), Math.round(point.y)],
+  ] as const
+  return rooms.find((room) => candidates.some(([x, y]) => room.pixelKeys.has(pixelKey(x, y)))) ?? null
 }
 
 export function valetudoMapBounds(map: ValetudoMap): ValetudoMapBounds {

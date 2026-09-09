@@ -309,7 +309,7 @@ export const PLAYWRIGHT_SPEC_COVERAGE = [
   },
 ] as const satisfies readonly PlaywrightSpecCoverage[]
 
-export const SCENARIO_IDS = ['quick-links', 'chat', 'summary', 'filters', 'form', 'remote', 'weather', 'navigation', 'host', 'preload'] as const
+export const SCENARIO_IDS = ['quick-links', 'chat', 'summary', 'filters', 'form', 'remote', 'vacuum', 'weather', 'navigation', 'host', 'preload'] as const
 export type ScenarioId = typeof SCENARIO_IDS[number]
 export type ContextId = 'touch-chromium' | 'fine-chromium' | 'touch-webkit'
 export const CONTEXTS: Record<ContextId, { browser: 'chromium' | 'webkit'; touch: boolean; project: string }> = {
@@ -365,12 +365,18 @@ export const SURFACE_CONTRACTS: Record<ScenarioId, {
     legacy: ['modal-rotation-regressions.spec.ts', 'react-dash.spec.ts'],
     question: 'Is the complete active direction pad visible without auto-scroll, operable, and unchanged on portrait return?',
   },
+  vacuum: {
+    family: 'modal', states: ['docked'],
+    owners: ['src/components/hass/VacuumCard', 'src/components/hass/ValetudoMap', 'src/i18n/locales/en/modals/vacuum.json'],
+    legacy: ['vacuum-status.spec.ts', 'modal-rotation-regressions.spec.ts'],
+    question: 'Does the vacuum map remain fully usable without a second left-pane scroller, using a proportionally fitted map with a visible Locate action, moving status detail to the Controls tab, only when height is constrained?',
+  },
   weather: {
     family: 'modal',
     states: ['condition', 'precipitation', 'wind', 'pressure-unavailable', 'pressure-long', 'forecast-error-stale', 'forecast-empty', 'forecast-error-empty'],
-    owners: ['src/components/hass/Weather', 'src/components/hass/weather', 'src/components/hass/precipitationTimeline', 'src/components/hass/useWeatherForecasts', 'src/hooks/useForecastWindMotion'],
+    owners: ['src/components/hass/Weather', 'src/components/hass/weather', 'src/components/hass/precipitationTimeline', 'src/components/hass/useWeatherDayBriefing', 'src/components/hass/useWeatherForecasts', 'src/hooks/useForecastWindMotion', 'src/hooks/useHorizontalScrollControls', 'src/i18n/locales/en/modals/weather.json'],
     legacy: ['weather-scenes.spec.ts', 'weather-atmosphere-scenes.spec.ts', 'weather-carousel.spec.ts', 'weather-data.spec.ts', 'weather-motion.spec.ts', 'weather-modal-rendering.spec.ts'],
-    question: 'Are forecast modes, stale/empty/error states, missing and long Pressure readings readable and reachable after rotation, with equal small-tile heights, no preview dropdown and unchanged return geometry?',
+    question: 'Are forecast modes, stale/empty/error states, missing and long Pressure readings readable and reachable after rotation, with complete carousel pages centered and incomplete final pages aligned left, equal small-tile heights, no preview dropdown and unchanged return geometry?',
   },
   navigation: {
     family: 'page-shell-grid', states: ['home', 'back-page'],

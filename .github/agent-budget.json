@@ -1,6 +1,14 @@
 {
   "version": 1,
   "project": "ha-react",
+  "opportunityPolicy": ".github/agent-opportunities.json",
+  "toolRegistry": ".github/agent-tools.json",
+  "releaseMachine": ".github/release-machine.json",
+  "opportunityEvaluation": ".github/evals/agent-opportunity-cases.json",
+  "workerEvaluation": ".github/evals/agent-worker-cases.json",
+  "capabilityEvaluation": ".github/evals/capability-qualification.json",
+  "sandboxProfiles": ".github/sandbox-profiles.json",
+  "learningPolicy": ".github/agent-learning.json",
   "instructions": [".github/copilot-instructions.md", ".github/skills/ha-budget-workflow/SKILL.md"],
   "riskTerms": ["alarm", "lock", "garage", "physical", "reconnect", "authentication", "service ownership"],
   "gates": [
@@ -10,13 +18,18 @@
     "Ports: Lovelace config/action mapping plus authorized real-browser parity",
     "No production release without explicit authorization; preserve both HA hosts"
   ],
+  "delegation": {
+    "allowedClasses": ["test-generation"],
+    "requireCleanTargets": true,
+    "requireDeterministicValidator": true
+  },
   "evidencePolicy": {
     "always": ["Keep secrets out of evidence and preserve user changes.", "Home Assistant owns state changes and cascading effects; research grants no live-operation authority."],
     "phases": {
       "research": ["Use actual shared components and HA service boundaries as evidence; do not infer runtime/browser behavior from source alone.", "EverShelf access belongs behind HA services, with ranking/filtering owned by its backend."],
       "implementation": ["Read the full dashboard contract and matching scoped instructions before changes."],
       "validation": ["Use the affected tests and executable layout plan; required manual image/state review is not replaceable by source inspection."],
-      "release": ["Explicit release-dashboard authorization and both HA hosts remain required."]
+      "release": ["Explicit release-dashboard scope review and both HA hosts remain required; the disabled version 3 machine permits no GitHub, HA, or deployment execution."]
     },
     "content": {
       "allowPaths": ["src", "scripts", "docs", ".github/copilot-instructions.md", ".github/reference", ".github/instructions"],
@@ -28,6 +41,6 @@
     "unit": "npm run test:run -- <affected test files>",
     "layout": "npm run layout:check; use docs/ux/layouts.md for plan/run/verify arguments",
     "build": "npm run build",
-    "release": "Explicit release-dashboard skill only"
+    "release": "Explicit release-dashboard preflight only while the deterministic machine is disabled"
   }
 }

@@ -10,6 +10,9 @@ const cases = await readJson('.github/skills/simulated-user-panel/evals/cases.js
 const plan = await readJson('.github/skills/simulated-user-panel/evals/baseline-plan.json')
 const skillText = await readFile(resolve(root, '.github/skills/simulated-user-panel/SKILL.md'), 'utf8')
 const previewText = await readFile(resolve(evalRoot, 'preview.no-proxy.config.mjs'), 'utf8')
+const delegatedPreviewText = previewText.includes('e2e/mock-preview.config.ts')
+  ? await readFile(resolve(root, 'e2e/mock-preview.config.ts'), 'utf8')
+  : ''
 
 const errors = []
 const warnings = []
@@ -31,6 +34,26 @@ const expectedCore = [
   ['power-user', 'gpt-5.5', 'xhigh', 'long_context', 'P'],
   ['accessibility-auditor', 'claude-sonnet-4.6', 'high', 'long_context', 'P'],
 ]
+
+check(
+  personas.coordinator.model === 'gpt-5.6-sol'
+    && personas.coordinator.effort === 'medium'
+    && personas.coordinator.context === 'default',
+  'Routine panel coordinator uses Sol medium/default.',
+)
+check(
+  personas.coordinator.conditionalCriticalProfile?.model === 'gpt-5.6-sol'
+    && personas.coordinator.conditionalCriticalProfile?.effort === 'max'
+    && personas.coordinator.conditionalCriticalProfile?.context === 'long_context'
+    && personas.coordinator.conditionalCriticalProfile?.requiresTriggerReceipt === true
+    && personas.coordinator.conditionalCriticalProfile?.triggerIds?.includes(
+      'panel-deep-safety-adjudication',
+    )
+    && personas.coordinator.conditionalCriticalProfile?.triggerIds?.includes(
+      'panel-material-disagreement-adjudication',
+    ),
+  'Panel max/long profile is conditional on concrete adjudication triggers.',
+)
 
 check(personas.core.length === expectedCore.length, 'Core panel has exactly nine slots.')
 for (const [id, model, effort, context, tier] of expectedCore) {
@@ -60,7 +83,7 @@ check(
   'Skill makes participant tool requests a hard failure.',
 )
 check(
-  (previewText.match(/proxy:\s*\{\}/g) ?? []).length >= 2,
+  (`${previewText}\n${delegatedPreviewText}`.match(/proxy:\s*\{\}/g) ?? []).length >= 2,
   'Eval preview config clears both server and preview proxies.',
 )
 

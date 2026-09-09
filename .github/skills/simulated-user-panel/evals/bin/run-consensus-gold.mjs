@@ -35,7 +35,7 @@ const fixtures = fixtureData.fixtures.map(({ expected, ...fixture }) => fixture)
 const expected = Object.fromEntries(fixtureData.fixtures.map((fixture) => [fixture.id, fixture.expected]))
 const consensusSection = skill.match(/## Consensus and adjudication[\s\S]*?## Cross-critique/)?.[0] ?? skill
 
-const prompt = `You are the GPT-5.6 Sol coordinator applying the simulated-user-panel consensus rules.
+const prompt = `You are the routine GPT-5.6 Sol medium/default coordinator applying the simulated-user-panel consensus rules.
 
 Rules:
 ${consensusSection}
@@ -67,9 +67,9 @@ const child = spawn('copilot', [
   '--model',
   'gpt-5.6-sol',
   '--effort',
-  'max',
+  'medium',
   '--context',
-  'long_context',
+  'default',
   '--available-tools=fetch_copilot_cli_documentation',
   '--allow-all-tools',
   '--deny-tool=shell',

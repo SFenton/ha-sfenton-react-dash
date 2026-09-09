@@ -1,6 +1,10 @@
 ---
 name: dashboard-ux-authoring
 description: Authors or reviews the current dashboard UX with typed interaction semantics, one Home Assistant behavior layer, shared primitives, design checks, i18n, and mobile-first validation.
+metadata:
+  model: claude-sonnet-5
+  reasoning_effort: medium
+  context_tier: default
 ---
 
 # Dashboard UX Authoring
@@ -74,10 +78,10 @@ updates and cascading side effects; React uses one shared command path and
   overrides.
 - Treat both centered frames as presentation-owned: landscape fills the same
   padded safe rectangle; tablet/desktop shares the 1100x760px preferred frame.
-  Preserve family reading measures inside the common frame. Tabs, new intent
-  ids, pickers, and direct entry must not produce different outer sizes.
-  Use `contentWidth="full"` for control collections such as Security that
-  should fill the padded body instead of inheriting a prose/form width cap.
+  Desktop body, body-header, and footer regions fill the padded frame while tabs
+  retain family reading measures. New intent ids, pickers, and direct entry must
+  not produce different outer sizes. Use `contentWidth="full"` when tab navigation,
+  such as Security controls, should also fill the padded width.
 - Keep modal tiles presentation-specific: fluid standard cards in portrait,
   equal-width 132px-minimum tracks in phone landscape, and 168px squares in
   tablet/desktop. Full landscape rows consume all usable width; incomplete

@@ -501,7 +501,7 @@ const MODAL_CASES: ModalCase[] = [
     id: 'vacuum',
     open: (page) => openButtonModal(page, 'vacuums', /Main Floor Docked/i),
     physicalCallsite: 'src/components/hass/VacuumCard.tsx:VacuumModal',
-    selectTabs: ['Controls', 'Zones', 'Auto-Clean', 'Actions', 'Info'],
+    selectTabs: ['Controls', 'Rooms', 'Auto-Clean', 'Actions', 'Info'],
   },
   {
     expectedScrollMode: 'body',

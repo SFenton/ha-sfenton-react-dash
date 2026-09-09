@@ -87,6 +87,13 @@ function carouselPages(items: readonly HTMLElement[], viewportWidth: number) {
     startIndex = nextIndex
   }
 
+  const pageCapacity = Math.max(...pages.map((page) => page.endIndex - page.startIndex + 1))
+  const finalPage = pages.at(-1)
+  if (pages.length > 1 && finalPage && finalPage.endIndex - finalPage.startIndex + 1 < pageCapacity) {
+    finalPage.trailingSpace += finalPage.leadingSpace
+    finalPage.leadingSpace = 0
+  }
+
   return pages
 }
 

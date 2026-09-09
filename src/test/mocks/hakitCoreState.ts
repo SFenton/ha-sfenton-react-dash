@@ -1090,6 +1090,14 @@ function mainFloorAutoCleanDisabledMockEntities() {
   }))
 }
 
+function mainFloorRoomLedgerMockEntities() {
+  const mopRequiredRooms = new Set(['kitchen', 'master_bathroom', 'guest_bathroom', 'dining_room'])
+  return Object.fromEntries(mainFloorAutoCleanDisabledRoomIds.map((roomId) => {
+    const entityId = `sensor.main_floor_vacuum_coordinator_${roomId}_last_cleaned`
+    return [entityId, entity(entityId, 'unknown', { mop_required: mopRequiredRooms.has(roomId) })]
+  }))
+}
+
 // The source inventory also sees typed fallback IDs and service-shaped strings.
 // Keep those inert and explicit instead of deriving fixture values from live HA.
 function nonLiveReferenceMockEntities() {
@@ -1601,6 +1609,7 @@ export const explicitMockEntities: Record<string, MockEntity> = {
   'input_boolean.roborock_master_bedroom_closet_toggle': entity('input_boolean.roborock_master_bedroom_closet_toggle', 'off'),
   'input_boolean.roborock_dining_room_toggle': entity('input_boolean.roborock_dining_room_toggle', 'off'),
   ...mainFloorAutoCleanDisabledMockEntities(),
+  ...mainFloorRoomLedgerMockEntities(),
   ...thermostatMockEntities(),
   'button.valetudo_exaltedsneakydeer_trigger_auto_empty_dock': entity('button.valetudo_exaltedsneakydeer_trigger_auto_empty_dock', 'unknown'),
   'camera.valetudo_exaltedsneakydeer_map_data': entity('camera.valetudo_exaltedsneakydeer_map_data', 'idle'),

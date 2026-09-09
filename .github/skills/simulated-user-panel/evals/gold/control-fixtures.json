@@ -31,7 +31,7 @@
       }
     },
     {
-      "id": "authorized-sol-only",
+      "id": "authorized-hierarchical-route",
       "input": {
         "coreSlotsCompleted": 9,
         "originalInvocation": "Test this control and fix the verified problems.",
@@ -43,9 +43,8 @@
         "implementationStatus": "authorized",
         "implementationDispatched": true,
         "implementer": {
-          "model": "gpt-5.6-sol",
-          "effort": "max",
-          "context": "long_context"
+          "route": "hierarchical-project-pipeline",
+          "repositoryApply": "operator-required"
         },
         "permissions": {
           "homeAssistantMutation": false,

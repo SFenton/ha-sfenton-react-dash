@@ -1,5 +1,5 @@
 export { copy, copyRef, resolveCopy, type CopyKey, type CopyRef, type CopyText, type CopyValues } from './copy'
-export { APP_LANGUAGE, APP_LOCALE, formatDate, formatList, formatNumber } from './formatters'
+export { APP_LANGUAGE, APP_LOCALE, formatClockTime, formatDate, formatHourLabel, formatList, formatNumber, zonedDateParts } from './formatters'
 export { copyNamespaces, resources, type CopyNamespace, type CopyResources } from './resources'
 export { useCopy } from './useCopy'
 
@@ -100,6 +100,9 @@ export const BATHROOM_FAN_COPY_KEYS = {
 export const VACUUM_COPY_KEYS = {
   cleaned: 'cleaned',
   issues: 'issues',
+  layout: {
+    roomSelector: 'layout.roomSelector',
+  },
   tile: {
     subtitleWithBattery: 'tile.subtitleWithBattery',
   },
@@ -227,7 +230,16 @@ export const VACUUM_COPY_KEYS = {
       roomsNeedAttention: 'outcomes.summary.roomsNeedAttention',
     },
   },
+  confirmations: {
+    switchToArea: 'confirmations.switchToArea',
+    switchToRooms: 'confirmations.switchToRooms',
+  },
   selectedRooms: 'selectedRooms',
+  fullClean: 'fullClean',
+  fullCleanHelp: 'fullCleanHelp',
+  roomsSection: 'roomsSection',
+  statusGridLabel: 'statusGridLabel',
+  autoCleanGridLabel: 'autoCleanGridLabel',
 } as const
 
 export const HUMIDIFIER_COPY_KEYS = {
@@ -243,6 +255,124 @@ export const HUMIDIFIER_COPY_KEYS = {
 } as const
 
 export const WEATHER_COPY_KEYS = {
+  condition: {
+    'clear-night': 'condition.clear-night',
+    cloudy: 'condition.cloudy',
+    exceptional: 'condition.exceptional',
+    fog: 'condition.fog',
+    hail: 'condition.hail',
+    lightning: 'condition.lightning',
+    'lightning-rainy': 'condition.lightning-rainy',
+    partlycloudy: 'condition.partlycloudy',
+    pouring: 'condition.pouring',
+    rainy: 'condition.rainy',
+    snowy: 'condition.snowy',
+    'snowy-rainy': 'condition.snowy-rainy',
+    sunny: 'condition.sunny',
+    unavailable: 'condition.unavailable',
+    windy: 'condition.windy',
+    'windy-variant': 'condition.windy-variant',
+  },
+  briefing: {
+    direction: {
+      north: 'briefing.direction.north',
+      northeast: 'briefing.direction.northeast',
+      east: 'briefing.direction.east',
+      southeast: 'briefing.direction.southeast',
+      south: 'briefing.direction.south',
+      southwest: 'briefing.direction.southwest',
+      west: 'briefing.direction.west',
+      northwest: 'briefing.direction.northwest',
+    },
+    hazard: {
+      damagingWind: 'briefing.hazard.damagingWind',
+      denseFog: 'briefing.hazard.denseFog',
+      extremeCold: 'briefing.hazard.extremeCold',
+      extremeHeat: 'briefing.hazard.extremeHeat',
+      freeze: 'briefing.hazard.freeze',
+      hail: 'briefing.hazard.hail',
+      heat: 'briefing.hazard.heat',
+      heavyRain: 'briefing.hazard.heavyRain',
+      heavySnow: 'briefing.hazard.heavySnow',
+      highUv: 'briefing.hazard.highUv',
+      ice: 'briefing.hazard.ice',
+      poorAir: 'briefing.hazard.poorAir',
+      severeStorms: 'briefing.hazard.severeStorms',
+      snow: 'briefing.hazard.snow',
+      wind: 'briefing.hazard.wind',
+    },
+    overview: {
+      improving: 'briefing.overview.improving',
+      steady: 'briefing.overview.steady',
+      threePart: 'briefing.overview.threePart',
+      twoPart: 'briefing.overview.twoPart',
+      unknown: 'briefing.overview.unknown',
+    },
+    phrase: {
+      'clear-night': 'briefing.phrase.clear-night',
+      cloudy: 'briefing.phrase.cloudy',
+      exceptional: 'briefing.phrase.exceptional',
+      fog: 'briefing.phrase.fog',
+      hail: 'briefing.phrase.hail',
+      lightning: 'briefing.phrase.lightning',
+      'lightning-rainy': 'briefing.phrase.lightning-rainy',
+      partlycloudy: 'briefing.phrase.partlycloudy',
+      pouring: 'briefing.phrase.pouring',
+      rainy: 'briefing.phrase.rainy',
+      snowy: 'briefing.phrase.snowy',
+      'snowy-rainy': 'briefing.phrase.snowy-rainy',
+      sunny: 'briefing.phrase.sunny',
+      windy: 'briefing.phrase.windy',
+      'windy-variant': 'briefing.phrase.windy-variant',
+    },
+    precipitation: {
+      allDay: 'briefing.precipitation.allDay',
+      allDayAmount: 'briefing.precipitation.allDayAmount',
+      none: 'briefing.precipitation.none',
+      slight: 'briefing.precipitation.slight',
+      window: 'briefing.precipitation.window',
+      windowAmount: 'briefing.precipitation.windowAmount',
+    },
+    precipitationType: {
+      precipitation: 'briefing.precipitationType.precipitation',
+      rain: 'briefing.precipitationType.rain',
+      snow: 'briefing.precipitationType.snow',
+      thunderstorms: 'briefing.precipitationType.thunderstorms',
+      wintryMix: 'briefing.precipitationType.wintryMix',
+    },
+    sun: {
+      daylight: 'briefing.sun.daylight',
+      daylightWhole: 'briefing.sun.daylightWhole',
+    },
+    temperature: {
+      falling: 'briefing.temperature.falling',
+      feelsCooler: 'briefing.temperature.feelsCooler',
+      feelsWarmer: 'briefing.temperature.feelsWarmer',
+      flat: 'briefing.temperature.flat',
+      range: 'briefing.temperature.range',
+      single: 'briefing.temperature.single',
+      windChill: 'briefing.temperature.windChill',
+    },
+    unavailable: 'briefing.unavailable',
+    wind: {
+      calm: 'briefing.wind.calm',
+      gusty: 'briefing.wind.gusty',
+      gustyDirected: 'briefing.wind.gustyDirected',
+      gustsOnly: 'briefing.wind.gustsOnly',
+      steady: 'briefing.wind.steady',
+      steadyDirected: 'briefing.wind.steadyDirected',
+    },
+    window: {
+      after: 'briefing.window.after',
+      afternoon: 'briefing.window.afternoon',
+      before: 'briefing.window.before',
+      around: 'briefing.window.around',
+      between: 'briefing.window.between',
+      evening: 'briefing.window.evening',
+      morning: 'briefing.window.morning',
+      overnight: 'briefing.window.overnight',
+    },
+  },
   aqi: {
     ariaLabel: 'aqi.ariaLabel',
     categories: {

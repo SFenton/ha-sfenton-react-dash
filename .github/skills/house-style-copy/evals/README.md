@@ -13,8 +13,10 @@ mutation, Home Assistant access, network tools, or participant file writes.
 - `../assets/corpus/qualified/<snapshot-id>.jsonl` and
   `<snapshot-id>.manifest.json`: hash-versioned corpus plus clean-input
   provenance.
-- `model-pin.json`: launcher-enforced profile. It is provisional until the
-  benchmark passes.
+- `runtime-routing.json`: current provisional default plus the trigger-gated
+  critical adjudicator.
+- `model-pin.json`: preserved historical validated max/long selection evidence;
+  it is not the routine launcher profile.
 - `plans/`: calibration, rule-tuning, frozen public qualification, holdout, and
   singleton-latency plans.
 - `schemas/`: request, response, and case contracts.
@@ -182,21 +184,20 @@ node .github/skills/house-style-copy/evals/bin/select-model.mjs \
 # --write-pin
 
 node .github/skills/house-style-copy/scripts/check-pin.mjs \
-  --model <selected-model> --effort <selected-effort-or-none> \
-  --context <selected-context>
+  --model gpt-5.6-terra --effort low --context default
 ```
 
-`--pinned` runs fail while `model-pin.json` is provisional. The escape hatch
-`--allow-provisional-pin` exists only for an explicit launcher test and must
-not be used as release evidence.
+For conditional copy-safety adjudication, pass an exact
+`copy-safety-conflict` trigger receipt and the historical max/long profile.
+Routine generation never selects the historical pin.
 
 ## Latest qualification
 
-The machine-readable result is
-[`latest-results.json`](latest-results.json). It is excluded from the
-execution hash so recording a completed benchmark does not invalidate the
-evidence it describes. `model-pin.json` remains the launcher authority and
-stays provisional whenever the latest result has no qualified profile.
+The machine-readable historical result is
+[`latest-results.json`](latest-results.json). It remains paired with
+`model-pin.json` as evidence of the prior validated selection.
+`runtime-routing.json` is the current launcher authority and explicitly makes
+no new qualification claim for the measured non-max finalist.
 
 ## Reproducibility
 

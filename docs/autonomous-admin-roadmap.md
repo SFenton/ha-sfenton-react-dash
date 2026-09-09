@@ -6,8 +6,12 @@ This is the canonical autonomous execution plan for the Home Assistant Admin To-
 plan_id: hass-admin-todo-2026-07-11
 final_task_id: A13-vacation-home-away
 model: gpt-5.6-sol
-reasoning_effort: max
-context_tier: long_context
+reasoning_effort: medium
+context_tier: default
+critical_model: gpt-5.6-sol
+critical_reasoning_effort: max
+critical_context_tier: long_context
+critical_trigger_ids: ha-physical-action-conflict,ha-credential-exposure-conflict,ha-release-rollback-or-host-conflict
 required_skills: autonomous-hass-admin-executor
 todo_entity_id: todo.groceries
 completion_script: script.complete_admin_todo_item

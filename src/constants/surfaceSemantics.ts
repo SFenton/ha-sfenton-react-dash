@@ -100,7 +100,7 @@ export const VACUUM_MODAL_TABS: readonly ModalTabDefinition<VacuumModalTab>[] = 
   {
     description: 'Selects mapped rooms in cleaning order; the tab is omitted on robots without configured room zones.',
     icon: 'mdi:floor-plan',
-    label: 'Zones',
+    label: 'Rooms',
     tab: 'zones',
   },
   {

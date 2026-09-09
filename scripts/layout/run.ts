@@ -134,6 +134,12 @@ function extractBaseline(root: string, directory: string, base: string) {
   return destination
 }
 
+export function layoutWorkerCount(value = process.env.LAYOUT_WORKERS) {
+  if (value === undefined) return 2
+  if (!/^[1-9]\d*$/.test(value)) throw new Error('LAYOUT_WORKERS must be a positive integer')
+  return Number(value)
+}
+
 export function isBaselineBuildInput(file: string) {
   return file.startsWith('src/')
     || file.startsWith('public/')
@@ -228,7 +234,7 @@ export async function runPlan(root: string, input: string, review = false) {
     let executionError: unknown
     try {
       await command(root, [playwrightCli, 'test', '--test-list', resolve(directory, 'selected-tests.txt'), '--forbid-only',
-        '--workers=2', '--retries=0', '--reporter=./e2e/layout/reporter.ts,list', '--output', resolve(directory, 'playwright')],
+        `--workers=${layoutWorkerCount()}`, '--retries=0', '--reporter=./e2e/layout/reporter.ts,list', '--output', resolve(directory, 'playwright')],
       childEnv, resolve(directory, 'execution.log'))
     } catch (error) { executionError = error }
     const ledger = readJson<ExecutionLedger>(resolve(directory, 'execution.json'))
