@@ -58,6 +58,12 @@ binding the app on `0.0.0.0`, choosing an available port, and verifying the
 live backend connection without exposing secrets. The default LAN host is the
 Vite development server with HMR/React Fast Refresh; use production preview
 only when explicitly requested.
+Treat ordinary requests to start, run, serve, host, open, or preview the app as
+`host-web-app` requests even when the operator does not mention LAN access,
+`0.0.0.0`, or a port. Before handing off user-visible dashboard or UX work that
+the operator would reasonably review on a browser, phone, or tablet, start or
+verify a compliant runtime unless the operator opts out. Do not substitute a
+bare `npm run dev` or a loopback-only listener.
 When operating the host, launch from the requested worktree path explicitly
 and verify both process cwd and a non-HTML feature-module response from that
 worktree, not just `index.html`, before calling the runtime valid.
