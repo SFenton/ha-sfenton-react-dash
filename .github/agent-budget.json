@@ -3,7 +3,6 @@
   "project": "ha-react",
   "opportunityPolicy": ".github/agent-opportunities.json",
   "toolRegistry": ".github/agent-tools.json",
-  "releaseMachine": ".github/release-machine.json",
   "opportunityEvaluation": ".github/evals/agent-opportunity-cases.json",
   "workerEvaluation": ".github/evals/agent-worker-cases.json",
   "capabilityEvaluation": ".github/evals/capability-qualification.json",
@@ -29,7 +28,7 @@
       "research": ["Use actual shared components and HA service boundaries as evidence; do not infer runtime/browser behavior from source alone.", "EverShelf access belongs behind HA services, with ranking/filtering owned by its backend."],
       "implementation": ["Read the full dashboard contract and matching scoped instructions before changes."],
       "validation": ["Use the affected tests and executable layout plan; required manual image/state review is not replaceable by source inspection."],
-      "release": ["Explicit release-dashboard scope review and both HA hosts remain required; the disabled version 3 machine permits no GitHub, HA, or deployment execution."]
+      "release": ["Explicit release-dashboard authorization and both HA hosts remain required. The disabled release machine is an experimental replacement, not a gate on the established operator-authorized workflow."]
     },
     "content": {
       "allowPaths": ["src", "scripts", "docs", ".github/copilot-instructions.md", ".github/reference", ".github/instructions"],
@@ -41,6 +40,6 @@
     "unit": "npm run test:run -- <affected test files>",
     "layout": "npm run layout:check; use docs/ux/layouts.md for plan/run/verify arguments",
     "build": "npm run build",
-    "release": "Explicit release-dashboard preflight only while the deterministic machine is disabled"
+    "release": "Explicit release-dashboard skill only"
   }
 }

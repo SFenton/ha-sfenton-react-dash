@@ -52,11 +52,9 @@ visual parity, device state or measured rendering cost.
 5. Revise once from a concrete reviewer defect receipt; a second revision fails
    closed. Critical max/long review requires the opportunity's named trigger.
 6. Release only when explicitly requested, through `release-dashboard`.
-   While the deterministic machine is disabled, the skill stops after local
-   review/preflight and reports the blocked driver state; it never falls back
-   to model-executed GitHub or deployment steps. Medium review plus explicit
-   operator authorization precedes any future enabled machine. Max/long is reserved for
-   `ha-release-rollback-or-host-conflict`; preserve both HA hosts.
+   The disabled deterministic release machine remains experimental and does not
+   replace or block the established operator-authorized release skill. Preserve
+   its exact scope, validation, rollback, cleanup, and both-host requirements.
 
 The overall interactive model may be Sol, HydraFusion, or another model. It
 never bypasses exact project pins: a matching qualified model may fill the
