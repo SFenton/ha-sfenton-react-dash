@@ -204,8 +204,13 @@ test('Pressure matches small highlight peers without clipping across units and m
     await measure()
     await pressure.scrollIntoViewIfNeeded()
     const reachable = await pressure.evaluate((element) => {
-      const tile = element.getBoundingClientRect()
-      const body = element.closest('[data-modal-sheet-body]')!.getBoundingClientRect()
+      const bodyElement = element.closest<HTMLElement>('[data-modal-sheet-body]')!
+      let tile = element.getBoundingClientRect()
+      const body = bodyElement.getBoundingClientRect()
+      if (tile.bottom > body.bottom) {
+        bodyElement.scrollTop += tile.bottom - body.bottom
+        tile = element.getBoundingClientRect()
+      }
       return tile.top >= body.top - 1 && tile.bottom <= body.bottom + 1
     })
     expect(reachable).toBe(true)
