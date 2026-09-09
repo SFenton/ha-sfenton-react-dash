@@ -2,6 +2,10 @@ import { readFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import {
   AUTONOMOUS_ADMIN_CONTEXT_TIER,
+  AUTONOMOUS_ADMIN_CRITICAL_CONTEXT_TIER,
+  AUTONOMOUS_ADMIN_CRITICAL_MODEL,
+  AUTONOMOUS_ADMIN_CRITICAL_REASONING_EFFORT,
+  AUTONOMOUS_ADMIN_CRITICAL_TRIGGER_IDS,
   AUTONOMOUS_ADMIN_MODEL,
   AUTONOMOUS_ADMIN_REASONING_EFFORT,
   auditAutonomousAdminRoadmap,
@@ -28,6 +32,10 @@ describe('autonomous Admin roadmap', () => {
     expect(audit.counts).toMatchObject({ accepted: 8, hard_blocked: 4, superseded: 1 })
     expect(audit.profile).toMatchObject({
       contextTier: AUTONOMOUS_ADMIN_CONTEXT_TIER,
+      criticalContextTier: AUTONOMOUS_ADMIN_CRITICAL_CONTEXT_TIER,
+      criticalModel: AUTONOMOUS_ADMIN_CRITICAL_MODEL,
+      criticalReasoningEffort: AUTONOMOUS_ADMIN_CRITICAL_REASONING_EFFORT,
+      criticalTriggerIds: AUTONOMOUS_ADMIN_CRITICAL_TRIGGER_IDS,
       model: AUTONOMOUS_ADMIN_MODEL,
       reasoningEffort: AUTONOMOUS_ADMIN_REASONING_EFFORT,
       todoEntityId: 'todo.groceries',
@@ -77,6 +85,18 @@ describe('autonomous Admin roadmap', () => {
     const audit = auditAutonomousAdminRoadmap(markdown.replace('model: gpt-5.6-sol', 'model: auto'))
 
     expect(audit.errors).toContain('Execution profile model is "auto", expected "gpt-5.6-sol".')
+  })
+
+  it('fails closed when a critical trigger is removed', async () => {
+    const markdown = await readFile(resolve(process.cwd(), 'docs/autonomous-admin-roadmap.md'), 'utf8')
+    const audit = auditAutonomousAdminRoadmap(markdown.replace(
+      ',ha-release-rollback-or-host-conflict',
+      '',
+    ))
+
+    expect(audit.errors).toContain(
+      'Critical profile trigger ids must be exactly "ha-physical-action-conflict,ha-credential-exposure-conflict,ha-release-rollback-or-host-conflict".',
+    )
   })
 
   it('rejects a phase that changes any roadmap row beyond its selected terminal status', async () => {

@@ -8,6 +8,16 @@ description: Thin HA React adapter for budget-aware research, implementation, te
 Use the global `budget-workflow` skill if installed; its executable tools live
 under `$HOME/.copilot/skills/budget-workflow/scripts/`. If unavailable, use the
 same direct, bounded workflow below without installing an external service.
+Resolve substantive retained-owner work through
+`.github/agent-opportunities.json` and the shared `opportunities.mjs` planner.
+Registered zero-model validation commands are declared in
+`.github/agent-tools.json`. All opportunities use hierarchical version 3
+definitions. The version 3 release machine remains disabled while GitHub, HA,
+production verification, rollback and cleanup drivers are unavailable.
+Use one exact opportunity ID when trigger matches overlap. The deterministic
+router/evidence/tools run first with zero model calls, followed by the exact
+routine or sensitive medium coordinator. External research, binding-spec, and
+critical Sol profiles require named trigger receipts.
 
 Research uses `evidence/research.mjs plan` and the adapter's `evidencePolicy`.
 Choose repository-only for local component/service logic, hybrid for external
@@ -23,16 +33,39 @@ visual parity, device state or measured rendering cost.
 2. Classify the task before research. Known local fixes use exact source and
    tests; novel runtime behavior or physical-device semantics need primary
    evidence and frontier reasoning. Do not spawn the simulated panel or tandem.
+   The adapter permits one provisional staged cheap-model result only for low-risk focused tests
+   with complete bounded evidence, clean exact targets, and a
+   qualified Docker-isolated deterministic validator with read-only dependencies
+   and isolated Vite cache writes.    The current provisional pin has no application authority. A medium reviewer
+   may request one exact defect-bound revision. Reviewed application would
+   require separate operator apply authorization and identical pre/post
+   validation; only unattended application has the 30-case promotion floor.
+   Dashboard UX, interactions, service mappings,
+   debugging, visual work, scaffolds, and existing-file transformations stay
+   with the owner.
 3. Reuse existing components, HA action mappings, and targeted tests.
    For UI work invoke `dashboard-ux-authoring`, including house-style copy when
    relevant. Do not replace actual browser inspection with model confidence.
 4. Run the smallest relevant Vitest selectors together. UX work uses the
    executable layout plan and its mandatory manual review. Treat inaccessible
    evidence as blocked. A non-UX tooling change does not need a full UI suite.
-5. Revise once from concrete failures, then escalate an unresolved reasoning
-   issue once. Do not rerun broad suites or regenerate screenshots speculatively.
+5. Revise once from a concrete reviewer defect receipt; a second revision fails
+   closed. Critical max/long review requires the opportunity's named trigger.
 6. Release only when explicitly requested, through `release-dashboard`.
-   Preserve its current model contract and both HA hosts.
+   While the deterministic machine is disabled, the skill stops after local
+   review/preflight and reports the blocked driver state; it never falls back
+   to model-executed GitHub or deployment steps. Medium review plus explicit
+   operator authorization precedes any future enabled machine. Max/long is reserved for
+   `ha-release-rollback-or-host-conflict`; preserve both HA hosts.
 
-The project adapter selects evidence and commands; it does not grant permissions
-or certify a cheaper model as equivalent to independent frontier research.
+The overall interactive model may be Sol, HydraFusion, or another model. It
+never bypasses exact project pins: a matching qualified model may fill the
+role; otherwise it can orchestrate/read but gains no semantic, apply, live, or
+release authority.
+
+The default learning observer uses `.github/agent-learning.json` to mine only
+sanitized prompt-scoped workflow subgraphs. `automaticBuild: true` may request
+one exact local incubation delegated to the selected opportunity's medium
+coordinator; `automaticPromotion: false` remains unchanged. Visual judgment,
+physical actions, live HA, cameras, WebRTC, deployment and release can never
+become automatically promoted executors.

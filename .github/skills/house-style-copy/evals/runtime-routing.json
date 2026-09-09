@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "status": "provisional",
+  "default": {
+    "candidateId": "gpt-5.6-terra-low",
+    "model": "gpt-5.6-terra",
+    "effort": "low",
+    "context": "default",
+    "evidenceStatus": "measured-finalist-provisional",
+    "qualificationClaim": false,
+    "evidenceSource": "evals/latest-results.json",
+    "rationale": "Existing measured finalist evidence recorded zero hard failures and strong public, holdout, and latency results. It was not the validated winner, so this route remains explicitly provisional and deterministic response gates remain unchanged."
+  },
+  "conditionalAdjudicator": {
+    "candidateId": "gpt-5.6-sol-max-long",
+    "model": "gpt-5.6-sol",
+    "effort": "max",
+    "context": "long_context",
+    "triggerIds": ["copy-safety-conflict"],
+    "requiresTriggerReceipt": true,
+    "historicalEvidence": "evals/model-pin.json",
+    "qualificationClaim": "historical-only"
+  }
+}

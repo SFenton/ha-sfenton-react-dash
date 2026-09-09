@@ -57,7 +57,18 @@ corpus, and `npm run check` for the design, lint, unit, i18n, and build gates.
 
 The repository includes an explicit `autonomous-hass-admin-executor` skill and a canonical 13-phase roadmap at `docs/autonomous-admin-roadmap.md`. Each phase maps to one immutable Home Assistant item UID from `todo.groceries`.
 
-The launcher fails closed unless Copilot runs with `gpt-5.6-sol`, `max` reasoning effort, and `long_context`. It holds an exclusive repository run lock, runs one phase per Copilot session, sends the phase report by SMTP, then calls the HA-owned `script.complete_admin_todo_item` for accepted work. Home Assistant completes the item without a phone notification and records the task UID in `input_text.admin_todo_completion_receipt`; the runner requires both completion and receipt before advancing. Rejected or blocked phases are emailed but remain open.
+The launcher fails closed unless routine coordination runs with
+`gpt-5.6-sol`, `medium` reasoning effort, and `default` context. Sol
+`max`/`long_context` is conditional on an evidence-bound trigger receipt for
+`ha-physical-action-conflict`, `ha-credential-exposure-conflict`, or
+`ha-release-rollback-or-host-conflict` receipt; it is not normal phase
+residency. The launcher holds an exclusive repository run lock, runs one phase
+per Copilot session, sends the phase report by SMTP, then calls the HA-owned
+`script.complete_admin_todo_item` for accepted work. Home Assistant completes
+the item without a phone notification and records the task UID in
+`input_text.admin_todo_completion_receipt`; the runner requires both completion
+and receipt before advancing. Rejected or blocked phases are emailed but remain
+open.
 
 ```bash
 npm run autonomous:admin:audit

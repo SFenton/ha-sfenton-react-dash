@@ -246,6 +246,352 @@ export function valueHash(value) {
   return createHash('sha256').update(JSON.stringify(value)).digest('hex')
 }
 
+function canonicalReceiptValue(value) {
+  if (Array.isArray(value)) return value.map(canonicalReceiptValue)
+  if (!value || typeof value !== 'object') return value
+  return Object.fromEntries(Object.keys(value).sort()
+    .map((key) => [key, canonicalReceiptValue(value[key])]))
+}
+
+export function canonicalReceiptHash(value) {
+  return createHash('sha256')
+    .update(JSON.stringify(canonicalReceiptValue(value)))
+    .digest('hex')
+}
+
+function routedProfile(opportunity, reference) {
+  if (reference === 'coordinator') return opportunity.team.coordinator.profile
+  if (reference === 'reviewer') return opportunity.team.reviewer.profile
+  if (reference === 'worker-candidate') return opportunity.team.workerCandidate.profile
+  if (reference?.startsWith('conditional:')) {
+    const id = reference.slice('conditional:'.length)
+    return opportunity.conditionalProfiles.find((entry) => entry.id === id)?.profile
+  }
+  return null
+}
+
+export function routedPipelinePhaseContracts(opportunity, registry) {
+  const toolById = (id) => {
+    const tool = registry.tools.find((entry) => entry.id === id)
+    if (!tool) throw new Error(`Unknown routed tool: ${id}`)
+    return tool
+  }
+  const contractFor = (phase) => {
+    if (phase.kind === 'deterministic') {
+      const tool = phase.tool ? toolById(phase.tool) : null
+      return {
+        id: phase.id,
+        kind: phase.kind,
+        role: phase.builtin === 'deterministic-router'
+          ? 'deterministic-router'
+          : phase.builtin === 'bounded-evidence-collector'
+            ? 'deterministic-evidence'
+            : 'deterministic-tool',
+        authority: 'deterministic-local',
+        profile: null,
+        tool: phase.tool ?? null,
+        builtin: phase.builtin ?? null,
+        sideEffect: phase.sideEffect ?? 'none',
+        toolContract: tool
+          ? {
+              id: tool.id,
+              kind: tool.kind,
+              sideEffect: tool.sideEffect,
+              toolHash: canonicalReceiptHash(tool),
+              argvHash: tool.kind === 'command'
+                ? canonicalReceiptHash(tool.argv)
+                : null,
+            }
+          : null,
+      }
+    }
+    const definitions = {
+      'research-frontier': ['research-frontier', 'semantic-research-only'],
+      'spec-planner': ['spec-planner', 'semantic-specification-only'],
+      'medium-coordinator': ['medium-coordinator', 'semantic-coordination'],
+      'cheap-worker': ['cheap-worker', 'staging-only'],
+      'medium-review': ['medium-review', 'semantic-review-only'],
+      'risk-triggered-frontier-review': [
+        'risk-triggered-frontier-review',
+        'semantic-review-only',
+      ],
+    }
+    const [role, authority] = definitions[phase.kind]
+    return {
+      id: phase.id,
+      kind: phase.kind,
+      role,
+      authority,
+      profile: routedProfile(opportunity, phase.profileRef),
+      condition: phase.condition ?? null,
+    }
+  }
+  return [
+    contractFor({
+      id: 'route-opportunity',
+      kind: 'deterministic',
+      builtin: 'deterministic-router',
+    }),
+    contractFor({
+      id: 'collect-evidence',
+      kind: 'deterministic',
+      builtin: 'bounded-evidence-collector',
+    }),
+    ...opportunity.phases.map(contractFor),
+  ]
+}
+
+export function routedPipelineContractHash(project, opportunity, registry) {
+  return canonicalReceiptHash({
+    version: 3,
+    project,
+    variant: null,
+    opportunity,
+    phaseContracts: routedPipelinePhaseContracts(opportunity, registry),
+  })
+}
+
+function validateNestedTrigger(receipt, expected, precedingReceiptHash) {
+  if (
+    !receipt
+    || receipt.version !== 1
+    || receipt.kind !== 'trigger-receipt'
+    || receipt.project !== expected.project
+    || receipt.opportunityId !== expected.opportunityId
+    || !expected.triggerIds.includes(receipt.triggerId)
+    || receipt.precedingReceiptHash !== precedingReceiptHash
+    || !/^[a-f0-9]{64}$/.test(receipt.evidenceHash ?? '')
+  ) {
+    throw new Error('Nested pipeline trigger receipt is invalid.')
+  }
+  const { receiptHash, ...unsigned } = receipt
+  if (receiptHash !== canonicalReceiptHash(unsigned)) {
+    throw new Error('Nested pipeline trigger receipt hash is invalid.')
+  }
+}
+
+export function validateBoundTriggerReceipt(receipt, pipelineState, expected) {
+  const fail = (message) => {
+    throw new Error(message)
+  }
+  if (!receipt || receipt.version !== 1 || receipt.kind !== 'trigger-receipt') {
+    fail('Trigger receipt is invalid.')
+  }
+  if (
+    receipt.project !== expected.project
+    || receipt.opportunityId !== expected.opportunityId
+    || !expected.triggerIds.includes(receipt.triggerId)
+    || !/^[a-f0-9]{64}$/.test(receipt.evidenceHash ?? '')
+    || !/^[a-f0-9]{64}$/.test(expected.requestHash ?? '')
+  ) {
+    fail('Trigger receipt scope or evidence is invalid.')
+  }
+  const observedAt = Date.parse(receipt.observedAt)
+  const now = expected.now ?? Date.now()
+  const maxAgeMs = expected.maxAgeMs ?? 15 * 60 * 1000
+  if (
+    !Number.isFinite(observedAt)
+    || observedAt > now + 60_000
+    || observedAt < now - maxAgeMs
+  ) {
+    fail('Trigger receipt is outside the allowed freshness window.')
+  }
+  if (
+    expected.policy?.version !== 3
+    || expected.policy.project !== expected.project
+    || expected.registry?.project !== expected.project
+    || !Array.isArray(expected.registry.tools)
+  ) {
+    fail('Current pipeline policy is invalid.')
+  }
+  const opportunity = expected.policy.opportunities.find((entry) =>
+    entry.id === expected.opportunityId)
+  if (!opportunity) fail('Current pipeline opportunity is unavailable.')
+  const contracts = routedPipelinePhaseContracts(opportunity, expected.registry)
+  const criticalIndex = contracts.findIndex((phase) =>
+    phase.kind === 'risk-triggered-frontier-review'
+    && phase.condition?.triggerIds?.includes(receipt.triggerId))
+  const pipelineHash = routedPipelineContractHash(
+    expected.project,
+    opportunity,
+    expected.registry,
+  )
+  const requestBindingHash = canonicalReceiptHash({
+    requestHash: expected.requestHash,
+    pipelineHash,
+    workflowId: pipelineState?.workflowId,
+    repository: pipelineState?.repository,
+    baseRevision: pipelineState?.baseRevision,
+    scopeHash: pipelineState?.scopeHash,
+  })
+  if (
+    criticalIndex < 0
+    || !pipelineState
+    || pipelineState.version !== 1
+    || pipelineState.pipelineHash !== pipelineHash
+    || pipelineState.requestHash !== expected.requestHash
+    || pipelineState.requestBindingHash !== requestBindingHash
+    || receipt.requestHash !== expected.requestHash
+    || receipt.requestBindingHash !== requestBindingHash
+    || !Array.isArray(pipelineState.receipts)
+    || pipelineState.receipts.length !== criticalIndex
+  ) {
+    fail('Complete current pipeline state is required for copy adjudication.')
+  }
+  const bindingKeys = [
+    'workflowId',
+    'pipelineId',
+    'teamId',
+    'repository',
+    'baseRevision',
+    'scopeHash',
+  ]
+  if (!bindingKeys.every((key) =>
+    typeof pipelineState[key] === 'string' && pipelineState[key].length > 0)) {
+    fail('Pipeline state binding is incomplete.')
+  }
+  if (
+    pipelineState.pipelineId !== `${expected.project}-${expected.opportunityId}`
+    || pipelineState.teamId !== opportunity.team.id
+    || pipelineState.repository !== repositoryRoot
+    || !/^[a-f0-9]{40,64}$/.test(pipelineState.baseRevision)
+    || !/^[a-f0-9]{64}$/.test(pipelineState.scopeHash)
+  ) {
+    fail('Pipeline state is not bound to the current repository contract.')
+  }
+  const currentRevision = spawnSync(
+    'git',
+    ['-C', repositoryRoot, 'rev-parse', 'HEAD'],
+    { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] },
+  )
+  if (
+    currentRevision.status !== 0
+    || currentRevision.stdout.trim() !== pipelineState.baseRevision
+  ) {
+    fail('Pipeline state revision does not match the current repository.')
+  }
+  let precedingHash = null
+  for (const [index, pipelineReceipt] of pipelineState.receipts.entries()) {
+    const contract = contracts[index]
+    const { receiptHash, ...unsigned } = pipelineReceipt
+    if (
+      receiptHash !== canonicalReceiptHash(unsigned)
+      || pipelineReceipt.kind !== 'team-pipeline-leg'
+      || pipelineReceipt.version !== 1
+      || pipelineReceipt.project !== expected.project
+      || pipelineReceipt.opportunityId !== expected.opportunityId
+      || pipelineReceipt.pipelineHash !== pipelineHash
+      || pipelineReceipt.previousReceiptHash !== precedingHash
+      || !bindingKeys.every((key) =>
+        pipelineReceipt[key] === pipelineState[key])
+      || pipelineReceipt.phaseId !== contract.id
+      || pipelineReceipt.phaseKind !== contract.kind
+      || pipelineReceipt.role !== contract.role
+      || pipelineReceipt.trustTier !== opportunity.team.trustTier
+      || pipelineReceipt.authority !== contract.authority
+      || pipelineReceipt.authorizationHash !== null
+      || canonicalReceiptHash(pipelineReceipt.profile) !==
+        canonicalReceiptHash(contract.profile)
+      || pipelineReceipt.attempt !== 1
+      || pipelineReceipt.revisionParent !== null
+      || pipelineReceipt.defectReceipt !== null
+      || typeof pipelineReceipt.startedAt !== 'string'
+      || typeof pipelineReceipt.completedAt !== 'string'
+      || ['failed', 'blocked', 'unreconciled'].includes(pipelineReceipt.state)
+    ) {
+      fail('Pipeline receipt does not match the current canonical contract.')
+    }
+    const modelPhase = !['deterministic', 'deterministic-release']
+      .includes(contract.kind)
+    if (!modelPhase) {
+      if (
+        pipelineReceipt.profile !== null
+        || pipelineReceipt.configurationEvidence !== null
+        || pipelineReceipt.usage?.state !== 'deterministic'
+        || pipelineReceipt.usage?.modelCalls !== 0
+        || pipelineReceipt.usage?.credits !== 0
+      ) {
+        fail('Deterministic pipeline receipt carries model evidence.')
+      }
+    } else if (pipelineReceipt.state === 'executed') {
+      if (
+        !/^[a-f0-9]{64}$/.test(
+          pipelineReceipt.configurationEvidence ?? '',
+        )
+        || !['measured', 'unreconciled'].includes(
+          pipelineReceipt.usage?.state,
+        )
+        || !Number.isInteger(pipelineReceipt.usage?.modelCalls)
+        || pipelineReceipt.usage.modelCalls < 1
+      ) {
+        fail('Executed model receipt lacks resolved usage evidence.')
+      }
+    } else if (
+      pipelineReceipt.configurationEvidence !== null
+      || pipelineReceipt.usage?.state !== 'not-run'
+      || pipelineReceipt.usage?.modelCalls !== 0
+      || pipelineReceipt.usage?.credits !== 0
+    ) {
+      fail('Skipped model receipt has invalid usage evidence.')
+    }
+    if (contract.kind === 'deterministic') {
+      if (contract.builtin) {
+        if (pipelineReceipt.toolEvidence?.builtin !== contract.builtin) {
+          fail('Pipeline builtin receipt does not match the current contract.')
+        }
+      } else if (
+        pipelineReceipt.toolEvidence?.toolId !== contract.tool
+        || pipelineReceipt.toolEvidence?.toolHash !==
+          contract.toolContract.toolHash
+        || pipelineReceipt.toolEvidence?.sideEffect !==
+          contract.toolContract.sideEffect
+        || (contract.toolContract.argvHash !== null
+          && pipelineReceipt.toolEvidence?.argvHash !==
+            contract.toolContract.argvHash)
+      ) {
+        fail('Pipeline tool receipt does not match the current contract.')
+      }
+    }
+    if (contract.condition) {
+      if (pipelineReceipt.state === 'executed') {
+        if (pipelineReceipt.outcome !== 'accepted') {
+          fail('Executed conditional pipeline phase was not accepted.')
+        }
+        validateNestedTrigger(
+          pipelineReceipt.conditionReceipt,
+          {
+            project: expected.project,
+            opportunityId: expected.opportunityId,
+            triggerIds: contract.condition.triggerIds,
+          },
+          precedingHash,
+        )
+      } else if (
+        !['condition-false', 'not-run'].includes(pipelineReceipt.state)
+        || pipelineReceipt.conditionReceipt?.matched !== false
+      ) {
+        fail('Conditional pipeline phase is unresolved.')
+      }
+    } else {
+      const acceptedOutcome = contract.kind === 'medium-coordinator'
+        ? ['accepted', 'dispatch-approved'].includes(pipelineReceipt.outcome)
+        : pipelineReceipt.outcome === 'accepted'
+      if (pipelineReceipt.state !== 'executed' || !acceptedOutcome) {
+        fail('Mandatory pipeline phase is not accepted.')
+      }
+    }
+    precedingHash = receiptHash
+  }
+  const { receiptHash, ...unsigned } = receipt
+  if (
+    receipt.precedingReceiptHash !== precedingHash
+    || receiptHash !== canonicalReceiptHash(unsigned)
+  ) {
+    fail('Trigger receipt is not bound to the exact preceding pipeline receipt.')
+  }
+  return true
+}
+
 export function canonicalValue(value) {
   if (Array.isArray(value)) {
     return value
