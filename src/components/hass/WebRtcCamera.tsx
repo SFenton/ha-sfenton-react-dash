@@ -60,6 +60,18 @@ function hideWebRtcChrome(element: HTMLElement) {
       :host([data-dashboard-variant='tile']) video {
         object-fit: cover !important;
       }
+
+      :host([data-dashboard-fill='true']) ha-card,
+      :host([data-dashboard-fill='true']) .player,
+      :host([data-dashboard-fill='true']) .ptz-transform,
+      :host([data-dashboard-fill='true']) video {
+        width: 100% !important;
+        height: 100% !important;
+      }
+
+      :host([data-dashboard-fill='true']) video {
+        object-fit: contain !important;
+      }
     `
     shadowRoot.appendChild(style)
   }
@@ -112,9 +124,10 @@ interface WebRtcCameraProps {
   variant: 'tile' | 'modal'
   minHeight: number
   controls?: boolean
+  fill?: boolean
   onStatusChange?: (status: WebRtcStatus) => void
 }
-export function WebRtcCamera({ camera, variant, minHeight, controls = false, onStatusChange }: WebRtcCameraProps) {
+export function WebRtcCamera({ camera, variant, minHeight, controls = false, fill = false, onStatusChange }: WebRtcCameraProps) {
   const hostRef = useRef<HTMLDivElement | null>(null)
   const webRtcElementRef = useRef<WebRtcElement | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -175,6 +188,7 @@ export function WebRtcCamera({ camera, variant, minHeight, controls = false, onS
         webRtcElement.style.display = 'block'
         webRtcElement.style.width = '100%'
         webRtcElement.dataset.dashboardVariant = variant
+        webRtcElement.dataset.dashboardFill = fill ? 'true' : 'false'
         webRtcElement.setConfig({
           card_id: cardId,
           id: cardId,
@@ -217,12 +231,13 @@ export function WebRtcCamera({ camera, variant, minHeight, controls = false, onS
       webRtcElementRef.current = null
       if (host) host.textContent = ''
     }
-  }, [camera.streamId, camera.title, cardId, connection, controls, hassUrl, variant])
+  }, [camera.streamId, camera.title, cardId, connection, controls, fill, hassUrl, variant])
 
   return (
     <div
       className={styles.frame}
       data-loaded={isLoaded ? 'true' : 'false'}
+      data-fill={fill ? 'true' : 'false'}
       data-variant={variant}
       style={{ '--camera-min-height': `${minHeight}px` } as CSSProperties}
     >

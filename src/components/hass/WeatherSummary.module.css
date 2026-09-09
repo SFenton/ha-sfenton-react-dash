@@ -276,7 +276,7 @@
 .currentPanel {
   display: grid;
   min-height: 124px;
-  gap: 16px;
+  gap: 12px;
   padding: 18px;
 }
 
@@ -284,6 +284,10 @@
   display: flex;
   gap: 14px;
   align-items: center;
+}
+
+.currentHero .currentCopy strong {
+  min-height: 0;
 }
 
 .currentIcon {
@@ -300,6 +304,27 @@
   font-size: 0.8rem;
   font-weight: 680;
   line-height: 1.25;
+}
+
+.currentNarrative {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding-inline-start: 1.25rem;
+  color: var(--rd-weather-marker);
+  font-size: 0.82rem;
+  font-weight: 560;
+  letter-spacing: 0.005em;
+  line-height: 1.5;
+  text-wrap: pretty;
+}
+
+.currentIcon[data-severity='caution'] {
+  color: var(--color-timer);
+}
+
+.currentIcon[data-severity='alert'] {
+  color: var(--color-warning);
 }
 
 .currentCopy strong {

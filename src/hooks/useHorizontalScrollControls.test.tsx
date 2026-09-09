@@ -108,8 +108,8 @@ describe('useHorizontalScrollControls', () => {
     expect(screen.getByTestId('item-1').style.getPropertyValue('--weather-carousel-page-trailing-space')).toBe('5px')
     expect(screen.getByTestId('item-2').style.getPropertyValue('--weather-carousel-page-leading-space')).toBe('15px')
     expect(screen.getByTestId('item-3').style.getPropertyValue('--weather-carousel-page-trailing-space')).toBe('5px')
-    expect(screen.getByTestId('item-4').style.getPropertyValue('--weather-carousel-page-leading-space')).toBe('60px')
-    expect(screen.getByTestId('item-4').style.getPropertyValue('--weather-carousel-page-trailing-space')).toBe('60px')
+    expect(screen.getByTestId('item-4').style.getPropertyValue('--weather-carousel-page-leading-space')).toBe('')
+    expect(screen.getByTestId('item-4').style.getPropertyValue('--weather-carousel-page-trailing-space')).toBe('120px')
 
     fireEvent.click(screen.getByTestId('next'))
     expect(scroller.scrollTo).toHaveBeenLastCalledWith({ behavior: 'smooth', left: 200 })

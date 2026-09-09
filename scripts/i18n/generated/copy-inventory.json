@@ -247,18 +247,18 @@
       "words": 2
     },
     {
-      "characters": 19,
+      "characters": 13,
       "context": "catalog-copy",
       "file": "src/i18n/locales/en/modals/weather.json",
-      "id": "dccf9439ab1eaba5",
+      "id": "0342eb91e947a99e",
       "lines": [],
       "occurrences": 1,
       "origin": "catalog",
       "placeholders": [
         "condition"
       ],
-      "value": "{{condition}} today",
-      "words": 2
+      "value": "{{condition}}",
+      "words": 1
     },
     {
       "characters": 23,
@@ -834,6 +834,30 @@
       "words": 11
     },
     {
+      "characters": 23,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/weather.json",
+      "id": "044d777f3f813fc5",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "a mix of sun and clouds",
+      "words": 6
+    },
+    {
+      "characters": 12,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/weather.json",
+      "id": "ec51c4bf6442f68d",
+      "lines": [],
+      "occurrences": 2,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "a wintry mix",
+      "words": 3
+    },
+    {
       "characters": 12,
       "context": "catalog-copy",
       "file": "src/i18n/locales/en/modals/weather.json",
@@ -990,6 +1014,20 @@
       "words": 1
     },
     {
+      "characters": 15,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/weather.json",
+      "id": "807b7a9396b7e305",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [
+        "time"
+      ],
+      "value": "around {{time}}",
+      "words": 2
+    },
+    {
       "characters": 51,
       "context": "catalog-copy",
       "file": "src/i18n/locales/en/modals/chat.json",
@@ -1134,6 +1172,35 @@
       "placeholders": [],
       "value": "Bed",
       "words": 1
+    },
+    {
+      "characters": 14,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/weather.json",
+      "id": "0a8a724afca2a4bc",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [
+        "end"
+      ],
+      "value": "before {{end}}",
+      "words": 2
+    },
+    {
+      "characters": 29,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/weather.json",
+      "id": "96fc59c9412ec278",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [
+        "end",
+        "start"
+      ],
+      "value": "between {{start}} and {{end}}",
+      "words": 4
     },
     {
       "characters": 10,
@@ -1285,6 +1352,30 @@
       "characters": 11,
       "context": "catalog-copy",
       "file": "src/i18n/locales/en/modals/weather.json",
+      "id": "c1b0b56cc5c05d04",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Clear Night",
+      "words": 2
+    },
+    {
+      "characters": 11,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/weather.json",
+      "id": "66c1c0a26d498c27",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "clear skies",
+      "words": 2
+    },
+    {
+      "characters": 11,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/weather.json",
       "id": "165775f416f62b58",
       "lines": [],
       "occurrences": 1,
@@ -1292,6 +1383,18 @@
       "placeholders": [],
       "value": "Cloud Cover",
       "words": 2
+    },
+    {
+      "characters": 6,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/weather.json",
+      "id": "42c0f11b046b0089",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Cloudy",
+      "words": 1
     },
     {
       "characters": 42,
@@ -1316,6 +1419,18 @@
       "placeholders": [],
       "value": "Completed",
       "words": 1
+    },
+    {
+      "characters": 70,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/weather.json",
+      "id": "a032c3924d90f7cc",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Conditions look mixed, with limited hourly detail from Pirate Weather.",
+      "words": 10
     },
     {
       "characters": 16,
@@ -1453,6 +1568,18 @@
       "words": 7
     },
     {
+      "characters": 13,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/weather.json",
+      "id": "ca8b4b3b2186ce60",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Damaging Wind",
+      "words": 2
+    },
+    {
       "characters": 4,
       "context": "catalog-copy",
       "file": "src/i18n/locales/en.json",
@@ -1499,6 +1626,18 @@
       "placeholders": [],
       "value": "Decrease watering budget",
       "words": 3
+    },
+    {
+      "characters": 9,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/weather.json",
+      "id": "7d3e6dc90c630ff0",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Dense Fog",
+      "words": 2
     },
     {
       "characters": 7,
@@ -1558,6 +1697,18 @@
       "origin": "catalog",
       "placeholders": [],
       "value": "Down",
+      "words": 1
+    },
+    {
+      "characters": 4,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/weather.json",
+      "id": "38d10fcccb5798a0",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "east",
       "words": 1
     },
     {
@@ -1636,6 +1787,63 @@
       "words": 2
     },
     {
+      "characters": 11,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/weather.json",
+      "id": "f947e9b6f21ab9be",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Exceptional",
+      "words": 1
+    },
+    {
+      "characters": 41,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/weather.json",
+      "id": "abe481f1f3eb1804",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [
+        "condition"
+      ],
+      "value": "Expect {{condition}} for most of the day.",
+      "words": 7
+    },
+    {
+      "characters": 104,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/weather.json",
+      "id": "dd379940d1ac008b",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [
+        "amount",
+        "chance",
+        "type"
+      ],
+      "value": "Expect {{type}} on and off through the day, with chances near {{chance}} and about {{amount}} adding up.",
+      "words": 17
+    },
+    {
+      "characters": 73,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/weather.json",
+      "id": "70d543a6095830e8",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [
+        "chance",
+        "type"
+      ],
+      "value": "Expect {{type}} on and off through the day, with chances near {{chance}}.",
+      "words": 12
+    },
+    {
       "characters": 7,
       "context": "catalog-copy",
       "file": "src/i18n/locales/en/modals/weather.json",
@@ -1646,6 +1854,30 @@
       "placeholders": [],
       "value": "Extreme",
       "words": 1
+    },
+    {
+      "characters": 12,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/weather.json",
+      "id": "731c7241454a8458",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Extreme Cold",
+      "words": 2
+    },
+    {
+      "characters": 12,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/weather.json",
+      "id": "6182fe4cdd485647",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Extreme Heat",
+      "words": 2
     },
     {
       "characters": 6,
@@ -1684,6 +1916,30 @@
       "words": 1
     },
     {
+      "characters": 3,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/weather.json",
+      "id": "ea060ffec31d0b0a",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "fog",
+      "words": 1
+    },
+    {
+      "characters": 3,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/weather.json",
+      "id": "4d9f3e21e58229c1",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Fog",
+      "words": 1
+    },
+    {
       "characters": 8,
       "context": "catalog-copy",
       "file": "src/i18n/locales/en/pages/media.json",
@@ -1693,6 +1949,18 @@
       "origin": "catalog",
       "placeholders": [],
       "value": "Fortnite",
+      "words": 1
+    },
+    {
+      "characters": 8,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/weather.json",
+      "id": "0437a25b387e196c",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Freezing",
       "words": 1
     },
     {
@@ -1756,6 +2024,20 @@
       "words": 1
     },
     {
+      "characters": 21,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/weather.json",
+      "id": "c93ecb17b82910e2",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [
+        "start"
+      ],
+      "value": "from {{start}} onward",
+      "words": 3
+    },
+    {
       "characters": 10,
       "context": "catalog-copy",
       "file": "src/i18n/locales/en/pages/customLights.json",
@@ -1777,6 +2059,18 @@
       "origin": "catalog",
       "placeholders": [],
       "value": "Full Clean",
+      "words": 2
+    },
+    {
+      "characters": 8,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/weather.json",
+      "id": "c899ff2ab5a1e03f",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "full sun",
       "words": 2
     },
     {
@@ -1827,6 +2121,68 @@
       "origin": "catalog",
       "placeholders": [],
       "value": "Gusts",
+      "words": 1
+    },
+    {
+      "characters": 21,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/weather.json",
+      "id": "f39802b1b7fc0765",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [
+        "gust"
+      ],
+      "value": "Gusts reach {{gust}}.",
+      "words": 3
+    },
+    {
+      "characters": 10,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/weather.json",
+      "id": "a9884d6c3bd939e4",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "gusty wind",
+      "words": 2
+    },
+    {
+      "characters": 28,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/weather.json",
+      "id": "ae29c2a2ac5f9a4d",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "gusty wind under thick cloud",
+      "words": 5
+    },
+    {
+      "characters": 4,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/weather.json",
+      "id": "d087d66fb2d9b03a",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "hail",
+      "words": 1
+    },
+    {
+      "characters": 4,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/weather.json",
+      "id": "a94aada78f59477a",
+      "lines": [],
+      "occurrences": 2,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Hail",
       "words": 1
     },
     {
@@ -1904,6 +2260,42 @@
       "words": 6
     },
     {
+      "characters": 10,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/weather.json",
+      "id": "ad685ca8cc5cbe3c",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "heavy rain",
+      "words": 2
+    },
+    {
+      "characters": 10,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/weather.json",
+      "id": "92bc5e7e8d5af130",
+      "lines": [],
+      "occurrences": 2,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Heavy Rain",
+      "words": 2
+    },
+    {
+      "characters": 10,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/weather.json",
+      "id": "db63dfec68f6f348",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Heavy Snow",
+      "words": 2
+    },
+    {
       "characters": 21,
       "context": "catalog-copy",
       "file": "src/i18n/locales/en/modals/vacuum.json",
@@ -1944,6 +2336,18 @@
       "words": 1
     },
     {
+      "characters": 7,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/weather.json",
+      "id": "27ce51a09f0331dc",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "High UV",
+      "words": 2
+    },
+    {
       "characters": 14,
       "context": "catalog-copy",
       "file": "src/i18n/locales/en/modals/weather.json",
@@ -1971,6 +2375,69 @@
       ],
       "value": "High: {{high}}  Low: {{low}}",
       "words": 4
+    },
+    {
+      "characters": 62,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/weather.json",
+      "id": "89b2ae3bddeaed76",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [
+        "high",
+        "low"
+      ],
+      "value": "Highs reach {{high}} before falling back to {{low}} overnight.",
+      "words": 9
+    },
+    {
+      "characters": 78,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/weather.json",
+      "id": "207b9de46d1c76bb",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [
+        "feelsLike",
+        "high",
+        "low"
+      ],
+      "value": "Highs reach {{high}} but feel closer to {{feelsLike}}, with lows near {{low}}.",
+      "words": 12
+    },
+    {
+      "characters": 85,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/weather.json",
+      "id": "f23ab8ae30c8e981",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [
+        "feelsLike",
+        "high",
+        "low"
+      ],
+      "value": "Highs reach {{high}}, and lows near {{low}} feel closer to {{feelsLike}} in the wind.",
+      "words": 14
+    },
+    {
+      "characters": 86,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/weather.json",
+      "id": "71b825c2416a0e1a",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [
+        "feelsLike",
+        "high",
+        "low"
+      ],
+      "value": "Highs reach {{high}}, though it feels more like {{feelsLike}}, with lows near {{low}}.",
+      "words": 13
     },
     {
       "characters": 4,
@@ -2069,6 +2536,18 @@
       "words": 24
     },
     {
+      "characters": 3,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/weather.json",
+      "id": "26687dfa5951d07d",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Hot",
+      "words": 1
+    },
+    {
       "characters": 24,
       "context": "catalog-copy",
       "file": "src/i18n/locales/en/modals/sleepypod.json",
@@ -2164,6 +2643,18 @@
       "words": 1
     },
     {
+      "characters": 8,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/weather.json",
+      "id": "960cf604fa3265f8",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Ice Risk",
+      "words": 2
+    },
+    {
       "characters": 209,
       "context": "catalog-copy",
       "file": "src/i18n/locales/en/pages/admin.json",
@@ -2186,6 +2677,18 @@
       "placeholders": [],
       "value": "In inventory",
       "words": 2
+    },
+    {
+      "characters": 14,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/weather.json",
+      "id": "0d937fc1fa07bc51",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "in the evening",
+      "words": 3
     },
     {
       "characters": 18,
@@ -2368,6 +2871,18 @@
       "words": 2
     },
     {
+      "characters": 9,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/weather.json",
+      "id": "f9755847e763a339",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Lightning",
+      "words": 1
+    },
+    {
       "characters": 18,
       "context": "catalog-copy",
       "file": "src/i18n/locales/en/pages/media.json",
@@ -2402,6 +2917,39 @@
       "placeholders": [],
       "value": "Lock",
       "words": 1
+    },
+    {
+      "characters": 90,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/weather.json",
+      "id": "a512239fe9a009a7",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [
+        "amount",
+        "chance",
+        "type",
+        "window"
+      ],
+      "value": "Look for {{type}} {{window}}, with chances near {{chance}} and about {{amount}} adding up.",
+      "words": 13
+    },
+    {
+      "characters": 59,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/weather.json",
+      "id": "d29d7755692b0056",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [
+        "chance",
+        "type",
+        "window"
+      ],
+      "value": "Look for {{type}} {{window}}, with chances near {{chance}}.",
+      "words": 8
     },
     {
       "characters": 3,
@@ -2634,6 +3182,20 @@
       "words": 4
     },
     {
+      "characters": 35,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/weather.json",
+      "id": "7ba19aacaa71a1b3",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [
+        "type"
+      ],
+      "value": "No meaningful {{type}} is expected.",
+      "words": 5
+    },
+    {
       "characters": 127,
       "context": "catalog-copy",
       "file": "src/i18n/locales/en/modals/vacuum.json",
@@ -2656,6 +3218,42 @@
       "placeholders": [],
       "value": "No Stored Chats for This Account",
       "words": 6
+    },
+    {
+      "characters": 5,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/weather.json",
+      "id": "b96865812519bf8d",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "north",
+      "words": 1
+    },
+    {
+      "characters": 9,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/weather.json",
+      "id": "f3fd5fd095caeb6f",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "northeast",
+      "words": 1
+    },
+    {
+      "characters": 9,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/weather.json",
+      "id": "05322bd4bb8ef5b5",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "northwest",
+      "words": 1
     },
     {
       "characters": 13,
@@ -2724,6 +3322,21 @@
       ],
       "value": "Observed cleaning was dominated by {{dominantRoom}} for {{dominantSeconds}} seconds instead of the requested {{commandedRoom}} for {{commandedSeconds}} seconds.",
       "words": 17
+    },
+    {
+      "characters": 58,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/weather.json",
+      "id": "0b8311e08cefd3a9",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [
+        "chance",
+        "type"
+      ],
+      "value": "Only a slight chance of {{type}}, peaking near {{chance}}.",
+      "words": 9
     },
     {
       "characters": 50,
@@ -2887,6 +3500,30 @@
       "words": 4
     },
     {
+      "characters": 14,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/weather.json",
+      "id": "feeaae3b913168de",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "overcast skies",
+      "words": 2
+    },
+    {
+      "characters": 9,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/weather.json",
+      "id": "6303b3891cac914c",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "overnight",
+      "words": 1
+    },
+    {
       "characters": 26,
       "context": "catalog-copy",
       "file": "src/i18n/locales/en/core.json",
@@ -2914,6 +3551,18 @@
       "words": 2
     },
     {
+      "characters": 13,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/weather.json",
+      "id": "7024bd50eaffe6b9",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Partly Cloudy",
+      "words": 2
+    },
+    {
       "characters": 5,
       "context": "catalog-copy",
       "file": "src/i18n/locales/en/pages/media.json",
@@ -2936,6 +3585,18 @@
       "placeholders": [],
       "value": "Play",
       "words": 1
+    },
+    {
+      "characters": 16,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/weather.json",
+      "id": "a82b94f41e4d23f3",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Poor Air Quality",
+      "words": 3
     },
     {
       "characters": 5,
@@ -2972,6 +3633,18 @@
       "placeholders": [],
       "value": "Power and Sync",
       "words": 3
+    },
+    {
+      "characters": 13,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/weather.json",
+      "id": "53c1cfe4cc59d40c",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "precipitation",
+      "words": 1
     },
     {
       "characters": 9,
@@ -3022,6 +3695,30 @@
       "placeholders": [],
       "value": "Quick App Launch",
       "words": 3
+    },
+    {
+      "characters": 4,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/weather.json",
+      "id": "bf48f66a5ca97a2d",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "rain",
+      "words": 1
+    },
+    {
+      "characters": 4,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/weather.json",
+      "id": "49552fe1577328bd",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Rain",
+      "words": 1
     },
     {
       "characters": 21,
@@ -3453,6 +4150,18 @@
       "words": 5
     },
     {
+      "characters": 13,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/weather.json",
+      "id": "aecf4e289942dcfb",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Severe Storms",
+      "words": 2
+    },
+    {
       "characters": 21,
       "context": "catalog-copy",
       "file": "src/i18n/locales/en/modals/vacuum.json",
@@ -3545,6 +4254,30 @@
       "words": 2
     },
     {
+      "characters": 4,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/weather.json",
+      "id": "d58b531f2ee97de4",
+      "lines": [],
+      "occurrences": 2,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "snow",
+      "words": 1
+    },
+    {
+      "characters": 4,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/weather.json",
+      "id": "27ebb4486d1a9483",
+      "lines": [],
+      "occurrences": 2,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Snow",
+      "words": 1
+    },
+    {
       "characters": 126,
       "context": "catalog-copy",
       "file": "src/i18n/locales/en/modals/chat.json",
@@ -3605,6 +4338,42 @@
       "words": 3
     },
     {
+      "characters": 5,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/weather.json",
+      "id": "7d3d78e127a33cd0",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "south",
+      "words": 1
+    },
+    {
+      "characters": 9,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/weather.json",
+      "id": "a9aac1d67f1ecb47",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "southeast",
+      "words": 1
+    },
+    {
+      "characters": 9,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/weather.json",
+      "id": "f57618b2c2aa0f89",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "southwest",
+      "words": 1
+    },
+    {
       "characters": 16,
       "context": "catalog-copy",
       "file": "src/i18n/locales/en/pages/sprinklers.json",
@@ -3643,6 +4412,30 @@
       "words": 3
     },
     {
+      "characters": 11,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/weather.json",
+      "id": "cc637ec8524772be",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "steady rain",
+      "words": 2
+    },
+    {
+      "characters": 6,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/weather.json",
+      "id": "f43fa0009f54c5b4",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Storms",
+      "words": 1
+    },
+    {
       "characters": 6,
       "context": "catalog-copy",
       "file": "src/i18n/locales/en/pages/sprinklers.json",
@@ -3652,6 +4445,18 @@
       "origin": "catalog",
       "placeholders": [],
       "value": "Sunday",
+      "words": 1
+    },
+    {
+      "characters": 5,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/weather.json",
+      "id": "5e14a386606d85da",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Sunny",
       "words": 1
     },
     {
@@ -3665,6 +4470,72 @@
       "placeholders": [],
       "value": "Sunrise",
       "words": 1
+    },
+    {
+      "characters": 110,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/weather.json",
+      "id": "b85a93416a53f96c",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [
+        "count",
+        "minutes",
+        "sunrise",
+        "sunset"
+      ],
+      "value": "Sunrise is at {{sunrise}} and sunset at {{sunset}}, giving {{count}} hour and {{minutes}} minutes of daylight.",
+      "words": 16
+    },
+    {
+      "characters": 86,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/weather.json",
+      "id": "44db6e95e31b6cae",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [
+        "count",
+        "sunrise",
+        "sunset"
+      ],
+      "value": "Sunrise is at {{sunrise}} and sunset at {{sunset}}, giving {{count}} hour of daylight.",
+      "words": 13
+    },
+    {
+      "characters": 111,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/weather.json",
+      "id": "63ed90d69ca6cb33",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [
+        "count",
+        "minutes",
+        "sunrise",
+        "sunset"
+      ],
+      "value": "Sunrise is at {{sunrise}} and sunset at {{sunset}}, giving {{count}} hours and {{minutes}} minutes of daylight.",
+      "words": 16
+    },
+    {
+      "characters": 87,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/weather.json",
+      "id": "925ae5998a8a0b35",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [
+        "count",
+        "sunrise",
+        "sunset"
+      ],
+      "value": "Sunrise is at {{sunrise}} and sunset at {{sunset}}, giving {{count}} hours of daylight.",
+      "words": 13
     },
     {
       "characters": 6,
@@ -3742,6 +4613,50 @@
       "words": 5
     },
     {
+      "characters": 62,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/weather.json",
+      "id": "7dd0ac19b04588ae",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [
+        "high",
+        "low"
+      ],
+      "value": "Temperatures hold steady between {{low}} and {{high}} all day.",
+      "words": 9
+    },
+    {
+      "characters": 84,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/weather.json",
+      "id": "457d4eff6bade96c",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [
+        "high",
+        "low"
+      ],
+      "value": "Temperatures peak near {{high}} early, then slide toward {{low}} as the day goes on.",
+      "words": 14
+    },
+    {
+      "characters": 39,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/weather.json",
+      "id": "6731205e566adff5",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [
+        "temperature"
+      ],
+      "value": "Temperatures stay near {{temperature}}.",
+      "words": 4
+    },
+    {
       "characters": 114,
       "context": "catalog-copy",
       "file": "src/i18n/locales/en/modals/chat.json",
@@ -3776,6 +4691,52 @@
       "placeholders": [],
       "value": "The cleaned area of the room was below the required minimum.",
       "words": 11
+    },
+    {
+      "characters": 86,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/weather.json",
+      "id": "c862db3eba5631c2",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [
+        "afternoon",
+        "evening",
+        "morning"
+      ],
+      "value": "The day opens with {{morning}}, shifts to {{afternoon}}, and settles into {{evening}}.",
+      "words": 12
+    },
+    {
+      "characters": 56,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/weather.json",
+      "id": "ef722aac3ba7e8fd",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [
+        "later",
+        "start"
+      ],
+      "value": "The day opens with {{start}}, then eases into {{later}}.",
+      "words": 9
+    },
+    {
+      "characters": 54,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/weather.json",
+      "id": "1f0e24a7eb9e32a5",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [
+        "later",
+        "start"
+      ],
+      "value": "The day opens with {{start}}, then turns to {{later}}.",
+      "words": 9
     },
     {
       "characters": 62,
@@ -4142,6 +5103,54 @@
       "words": 51
     },
     {
+      "characters": 21,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/weather.json",
+      "id": "73afc1b6da6db420",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "through the afternoon",
+      "words": 3
+    },
+    {
+      "characters": 19,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/weather.json",
+      "id": "942b1a3da27b226d",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "through the morning",
+      "words": 3
+    },
+    {
+      "characters": 7,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/weather.json",
+      "id": "54087d738eeb4928",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "thunder",
+      "words": 1
+    },
+    {
+      "characters": 13,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/weather.json",
+      "id": "6e529a2a14e42c4a",
+      "lines": [],
+      "occurrences": 2,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "thunderstorms",
+      "words": 1
+    },
+    {
       "characters": 8,
       "context": "catalog-copy",
       "file": "src/i18n/locales/en/pages/sprinklers.json",
@@ -4200,6 +5209,18 @@
       "placeholders": [],
       "value": "Today's gust",
       "words": 2
+    },
+    {
+      "characters": 66,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/weather.json",
+      "id": "57ec679c70dec473",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Today's outlook appears once Pirate Weather returns forecast data.",
+      "words": 9
     },
     {
       "characters": 10,
@@ -4356,6 +5377,18 @@
       "placeholders": [],
       "value": "Unhealthy for Sensitive Groups",
       "words": 4
+    },
+    {
+      "characters": 20,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/weather.json",
+      "id": "2161762c881c7bc7",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "unsettled conditions",
+      "words": 2
     },
     {
       "characters": 2,
@@ -4636,6 +5669,18 @@
       "words": 2
     },
     {
+      "characters": 19,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/weather.json",
+      "id": "80d1bf48f29623e5",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Weather Unavailable",
+      "words": 2
+    },
+    {
       "characters": 9,
       "context": "catalog-copy",
       "file": "src/i18n/locales/en/pages/sprinklers.json",
@@ -4645,6 +5690,18 @@
       "origin": "catalog",
       "placeholders": [],
       "value": "Wednesday",
+      "words": 1
+    },
+    {
+      "characters": 4,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/weather.json",
+      "id": "f4283aa7a6c4a3b6",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "west",
       "words": 1
     },
     {
@@ -4676,6 +5733,114 @@
       ],
       "value": "Wind {{speed}}; {{gustLabel}} {{gust}}; {{directionLabel}} {{direction}}",
       "words": 6
+    },
+    {
+      "characters": 38,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/weather.json",
+      "id": "fd18e2680e668ad5",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [
+        "gust",
+        "speed"
+      ],
+      "value": "Winds near {{speed}} gust to {{gust}}.",
+      "words": 6
+    },
+    {
+      "characters": 63,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/weather.json",
+      "id": "590ee6b47f0999d7",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [
+        "direction",
+        "gust",
+        "speed"
+      ],
+      "value": "Winds out of the {{direction}} near {{speed}} gust to {{gust}}.",
+      "words": 10
+    },
+    {
+      "characters": 25,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/weather.json",
+      "id": "8e18a2251a474b5d",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [
+        "speed"
+      ],
+      "value": "Winds run near {{speed}}.",
+      "words": 4
+    },
+    {
+      "characters": 50,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/weather.json",
+      "id": "259d273b4f9312c6",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [
+        "direction",
+        "speed"
+      ],
+      "value": "Winds run out of the {{direction}} near {{speed}}.",
+      "words": 8
+    },
+    {
+      "characters": 25,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/weather.json",
+      "id": "181b817c4ea501be",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Winds stay light all day.",
+      "words": 5
+    },
+    {
+      "characters": 5,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/weather.json",
+      "id": "e2cdb286c5e55999",
+      "lines": [],
+      "occurrences": 2,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Windy",
+      "words": 1
+    },
+    {
+      "characters": 12,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/weather.json",
+      "id": "e34263e4aae58c84",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Windy Clouds",
+      "words": 2
+    },
+    {
+      "characters": 10,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/weather.json",
+      "id": "6560ad3f6c50068c",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Wintry Mix",
+      "words": 2
     },
     {
       "characters": 12,
@@ -6882,7 +8047,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "0c589bfb2b7c7f7a",
       "lines": [
-        492
+        495
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -6963,7 +8128,7 @@
       "file": "src/components/hass/WeatherSummary.tsx",
       "id": "09d976ef3fbebfa1",
       "lines": [
-        751
+        711
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -6980,7 +8145,7 @@
       "file": "src/components/hass/WeatherSummary.tsx",
       "id": "0e1162aa87f074c4",
       "lines": [
-        723
+        683
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -6997,7 +8162,7 @@
       "file": "src/components/hass/WeatherSummary.tsx",
       "id": "bb80ae6d94cfb04e",
       "lines": [
-        740
+        700
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -7027,7 +8192,7 @@
       "file": "src/components/hass/WeatherSummary.tsx",
       "id": "c7118b53d05ec488",
       "lines": [
-        1316
+        1278
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -7059,7 +8224,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "ecaa0a41e8b1eed6",
       "lines": [
-        417
+        419
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -7210,7 +8375,7 @@
       "file": "src/components/hass/WeatherSummary.tsx",
       "id": "7b02274ecd5fb675",
       "lines": [
-        1382
+        1344
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -7294,7 +8459,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "ca0d38c63a2797e0",
       "lines": [
-        1098
+        1101
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -7393,7 +8558,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "8685ce5204254271",
       "lines": [
-        560
+        563
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -7523,7 +8688,7 @@
       "file": "src/components/hass/WeatherSummary.tsx",
       "id": "4b34e65da67b823e",
       "lines": [
-        1125
+        1085
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -7541,7 +8706,7 @@
       "file": "src/components/hass/WeatherSummary.tsx",
       "id": "fc2688cdba706497",
       "lines": [
-        1090
+        1050
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -7558,7 +8723,7 @@
       "file": "src/components/hass/WeatherSummary.tsx",
       "id": "8ee6b87436c99629",
       "lines": [
-        1106
+        1066
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -8207,7 +9372,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "40c9e0d8a261ada5",
       "lines": [
-        1121
+        1124
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -8235,7 +9400,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "be34a68d8069ef7e",
       "lines": [
-        743
+        746
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -8249,7 +9414,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "c2d3eda3f52dc143",
       "lines": [
-        992
+        995
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -8263,7 +9428,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "42a63305dd94bb35",
       "lines": [
-        609
+        612
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -8277,7 +9442,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "250af659602b406b",
       "lines": [
-        880
+        883
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -8377,7 +9542,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "3f0e0c16b1c0d32b",
       "lines": [
-        841
+        844
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -8391,7 +9556,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "3c988b23986cd995",
       "lines": [
-        1062
+        1065
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -8405,7 +9570,7 @@
       "file": "src/components/hass/CameraModalContent.tsx",
       "id": "0cde4edb315c1a09",
       "lines": [
-        79
+        81
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -8461,7 +9626,7 @@
       "file": "src/components/hass/WeatherSummary.tsx",
       "id": "695214d673579ddd",
       "lines": [
-        1544
+        1506
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -8671,7 +9836,7 @@
       "file": "src/components/hass/WeatherSummary.tsx",
       "id": "e1470c6c878996f3",
       "lines": [
-        1106
+        1066
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -8731,7 +9896,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "4acb84f8e4717e3a",
       "lines": [
-        696
+        699
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -8773,7 +9938,7 @@
       "file": "src/components/hass/WeatherSummary.tsx",
       "id": "0524c9694470dffd",
       "lines": [
-        1397
+        1359
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -8829,7 +9994,7 @@
       "file": "src/components/hass/WeatherSummary.tsx",
       "id": "b97ee027b5be3d2b",
       "lines": [
-        1454
+        1416
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -8927,7 +10092,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "527bc279f11dea12",
       "lines": [
-        948
+        951
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -8971,10 +10136,10 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "b312f15247196295",
       "lines": [
-        583,
-        723,
-        864,
-        975
+        586,
+        726,
+        867,
+        978
       ],
       "occurrences": 4,
       "origin": "legacy",
@@ -9054,7 +10219,7 @@
       "file": "src/components/hass/WeatherSummary.tsx",
       "id": "b3a51e2e8c350cfd",
       "lines": [
-        1661
+        1635
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -9413,7 +10578,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "b07b6f9376590923",
       "lines": [
-        440
+        442
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -9441,7 +10606,7 @@
       "file": "src/components/hass/WeatherSummary.tsx",
       "id": "05ef85e7237c294d",
       "lines": [
-        1565
+        1529
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -9629,7 +10794,7 @@
       "file": "src/components/hass/WeatherSummary.tsx",
       "id": "dbb2f48e36861558",
       "lines": [
-        1267
+        1228
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -9645,7 +10810,7 @@
       "file": "src/components/hass/WeatherSummary.tsx",
       "id": "8d855e8364a7e041",
       "lines": [
-        1550
+        1512
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -9659,7 +10824,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "4c4fbf4b5fb12679",
       "lines": [
-        626
+        629
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -9848,7 +11013,7 @@
       "file": "src/components/hass/WeatherSummary.tsx",
       "id": "3e9f6f91b3fa0b1e",
       "lines": [
-        1577
+        1541
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -10327,7 +11492,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "6aa44a5a725dd7ba",
       "lines": [
-        1099
+        1102
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -11283,7 +12448,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "663538042e81e9dc",
       "lines": [
-        748
+        751
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -11297,7 +12462,7 @@
       "file": "src/components/hass/WeatherSummary.tsx",
       "id": "da6ddf7d100c21ad",
       "lines": [
-        240
+        226
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -11311,7 +12476,7 @@
       "file": "src/components/hass/WeatherSummary.tsx",
       "id": "288f824e0f7d9f8c",
       "lines": [
-        1378
+        1340
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -11339,7 +12504,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "cd8797635fd622b2",
       "lines": [
-        997
+        1000
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -11691,7 +12856,7 @@
       "file": "src/components/hass/WeatherSummary.tsx",
       "id": "8408797d80638155",
       "lines": [
-        241
+        227
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -11777,7 +12942,7 @@
       "file": "src/components/hass/WeatherSummary.tsx",
       "id": "fa318dae21481cd9",
       "lines": [
-        247
+        233
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -11903,7 +13068,7 @@
       "file": "src/components/hass/WeatherSummary.tsx",
       "id": "bc7bb8e49d8e8e70",
       "lines": [
-        253
+        239
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -11931,7 +13096,7 @@
       "file": "src/components/hass/WeatherSummary.tsx",
       "id": "f528d9535ef9ec12",
       "lines": [
-        803
+        763
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -11945,7 +13110,7 @@
       "file": "src/components/hass/WeatherSummary.tsx",
       "id": "4548bd37fa3c9f1d",
       "lines": [
-        1578
+        1542
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -12216,7 +13381,7 @@
       "file": "src/components/hass/WeatherSummary.tsx",
       "id": "59ddc68c1f0382ec",
       "lines": [
-        259
+        245
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -12230,7 +13395,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "8b6ee9f4ca1fb8f9",
       "lines": [
-        615
+        618
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -12258,7 +13423,7 @@
       "file": "src/components/hass/WeatherSummary.tsx",
       "id": "d821e862fa52627f",
       "lines": [
-        802
+        762
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -12370,7 +13535,7 @@
       "file": "src/components/hass/WeatherSummary.tsx",
       "id": "6b73d4c017c13880",
       "lines": [
-        1566
+        1530
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -12398,7 +13563,7 @@
       "file": "src/components/hass/WeatherSummary.tsx",
       "id": "c562598a6d798eee",
       "lines": [
-        1570
+        1534
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -12412,7 +13577,7 @@
       "file": "src/components/hass/WeatherSummary.tsx",
       "id": "6add8b63cf64fd5b",
       "lines": [
-        1404
+        1366
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -12470,7 +13635,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "4872ad701daac4f6",
       "lines": [
-        885
+        888
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -12568,7 +13733,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "ed5cbd7b05581652",
       "lines": [
-        390
+        392
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -12668,7 +13833,7 @@
       "file": "src/components/hass/WeatherSummary.tsx",
       "id": "4a1096e64c508980",
       "lines": [
-        272
+        258
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -12697,7 +13862,7 @@
       "file": "src/components/hass/WeatherSummary.tsx",
       "id": "417e72f1d0eaf177",
       "lines": [
-        278
+        264
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -12739,7 +13904,7 @@
       "file": "src/components/hass/WeatherSummary.tsx",
       "id": "979f76d317c4d138",
       "lines": [
-        1011
+        971
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -12809,7 +13974,7 @@
       "file": "src/components/hass/WeatherSummary.tsx",
       "id": "d8e106ea3d938596",
       "lines": [
-        284
+        270
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -13137,7 +14302,7 @@
       "file": "src/components/hass/WeatherSummary.tsx",
       "id": "f20b3632a8b2d5c9",
       "lines": [
-        290
+        276
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -13307,7 +14472,7 @@
       "file": "src/components/hass/WeatherSummary.tsx",
       "id": "c5b9e1c95faf2b57",
       "lines": [
-        302
+        288
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -13420,7 +14585,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "f0c638fb56acc69e",
       "lines": [
-        777
+        780
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -13434,7 +14599,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "49fe4bea1e56e161",
       "lines": [
-        777
+        780
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -13574,7 +14739,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "56a5667b44a308df",
       "lines": [
-        1185
+        1188
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -13858,7 +15023,7 @@
       "file": "src/components/hass/WeatherSummary.tsx",
       "id": "ce3724f8bacbee8a",
       "lines": [
-        303
+        289
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -13943,7 +15108,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "0fb9ad1dea970b63",
       "lines": [
-        496
+        499
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -14338,7 +15503,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "fbf1ad6d230fed88",
       "lines": [
-        496
+        499
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -14381,7 +15546,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "24d73094d4d772b7",
       "lines": [
-        500
+        503
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -14395,7 +15560,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "e3a27ce34d06fe1b",
       "lines": [
-        500
+        503
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -14564,7 +15729,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "ed0dfd460b6cb5f4",
       "lines": [
-        493
+        496
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -16611,7 +17776,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "997357c49ac49200",
       "lines": [
-        247
+        249
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -16625,7 +17790,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "63c80e407960ceed",
       "lines": [
-        239
+        241
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -16641,7 +17806,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "25d4d194d402dd60",
       "lines": [
-        71
+        73
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -16669,7 +17834,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "646d51f94e0bd83a",
       "lines": [
-        210
+        212
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -16683,7 +17848,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "0baff9c64f7af9c9",
       "lines": [
-        211
+        213
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -16697,7 +17862,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "c6be39aa5d9aeb11",
       "lines": [
-        211
+        213
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -16739,7 +17904,7 @@
       "file": "src/components/hass/WeatherSummary.tsx",
       "id": "6172ae377b405b08",
       "lines": [
-        481
+        457
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -16755,7 +17920,7 @@
       "file": "src/components/hass/WeatherSummary.tsx",
       "id": "157ba2608886e120",
       "lines": [
-        482
+        458
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -16772,7 +17937,7 @@
       "file": "src/components/hass/WeatherSummary.tsx",
       "id": "a829f97aaadb50c0",
       "lines": [
-        480
+        456
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -16788,7 +17953,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "2395383d8ccd13df",
       "lines": [
-        341
+        343
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -16802,7 +17967,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "d31112e9f914507b",
       "lines": [
-        330
+        332
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -16816,7 +17981,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "e1ddcfb579868c98",
       "lines": [
-        330
+        332
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -16830,7 +17995,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "1bd8a523ca1d6b10",
       "lines": [
-        306
+        308
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -16844,7 +18009,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "f59a4d04e23aab98",
       "lines": [
-        306
+        308
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -16858,7 +18023,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "4f7780484d680fc3",
       "lines": [
-        305
+        307
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -16872,7 +18037,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "31afc4febd8d56c2",
       "lines": [
-        305
+        307
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -16886,7 +18051,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "e245031d1b6b5d26",
       "lines": [
-        305
+        307
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -16900,7 +18065,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "4cfe01836cb3cbba",
       "lines": [
-        310
+        312
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -16914,7 +18079,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "9e44fa06ae60ab6e",
       "lines": [
-        313
+        315
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -16930,7 +18095,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "5ca376c4d43100f1",
       "lines": [
-        311
+        313
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -16944,7 +18109,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "ba23d932329b85c3",
       "lines": [
-        312
+        314
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -16958,7 +18123,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "8149977a2168a473",
       "lines": [
-        310
+        312
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -16972,7 +18137,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "9459397f42a3a8c8",
       "lines": [
-        310
+        312
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -16986,7 +18151,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "2003961013d5ddd4",
       "lines": [
-        73
+        75
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -17014,7 +18179,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "8438343a46b5ba2d",
       "lines": [
-        301
+        303
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -17030,7 +18195,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "b0b056597c861e40",
       "lines": [
-        301
+        303
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -17218,8 +18383,8 @@
       "file": "src/components/hass/WeatherSummary.tsx",
       "id": "f6fa370b2ad98694",
       "lines": [
-        460,
-        462
+        436,
+        438
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -17233,7 +18398,7 @@
       "file": "src/components/hass/WeatherSummary.tsx",
       "id": "d4aea0190a24d80f",
       "lines": [
-        464
+        440
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -17247,77 +18412,15 @@
       "file": "src/components/hass/WeatherSummary.tsx",
       "id": "c9119acbd674f719",
       "lines": [
-        460,
-        462,
-        463
+        436,
+        438,
+        439
       ],
       "occurrences": 3,
       "origin": "legacy",
       "placeholders": [],
       "value": "Today",
       "words": 1
-    },
-    {
-      "characters": 84,
-      "context": "function-forecastSummary",
-      "file": "src/components/hass/WeatherSummary.tsx",
-      "id": "8180c2b5e89b83a8",
-      "lines": [
-        496
-      ],
-      "occurrences": 1,
-      "origin": "legacy",
-      "placeholders": [],
-      "value": "Daily Pirate Weather forecast will appear when Home Assistant returns forecast data.",
-      "words": 12
-    },
-    {
-      "characters": 27,
-      "context": "function-forecastSummary",
-      "file": "src/components/hass/WeatherSummary.tsx",
-      "id": "c10c820e466ae724",
-      "lines": [
-        504
-      ],
-      "occurrences": 1,
-      "origin": "legacy",
-      "placeholders": [
-        "warmestLabel"
-      ],
-      "value": "peaks near {{warmestLabel}}",
-      "words": 3
-    },
-    {
-      "characters": 37,
-      "context": "function-forecastSummary",
-      "file": "src/components/hass/WeatherSummary.tsx",
-      "id": "a1b0e0340219c5da",
-      "lines": [
-        504
-      ],
-      "occurrences": 1,
-      "origin": "legacy",
-      "placeholders": [
-        "rainLabel"
-      ],
-      "value": "rain chance tops out at {{rainLabel}}",
-      "words": 6
-    },
-    {
-      "characters": 24,
-      "context": "function-forecastSummary",
-      "file": "src/components/hass/WeatherSummary.tsx",
-      "id": "8c64292c85cf1835",
-      "lines": [
-        504
-      ],
-      "occurrences": 1,
-      "origin": "legacy",
-      "placeholders": [
-        "first"
-      ],
-      "value": "The week opens {{first}}",
-      "words": 4
     },
     {
       "characters": 18,
@@ -18248,7 +19351,7 @@
       "file": "src/components/hass/CameraModalContent.tsx",
       "id": "d35090daf7cd45e7",
       "lines": [
-        39
+        41
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -18262,7 +19365,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "ae70eb0cccc8683c",
       "lines": [
-        459
+        462
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -18304,8 +19407,8 @@
       "file": "src/components/hass/WeatherSummary.tsx",
       "id": "fb47c3c6d92944ef",
       "lines": [
-        469,
-        471
+        445,
+        447
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -18321,7 +19424,7 @@
       "file": "src/components/hass/WeatherSummary.tsx",
       "id": "d4a883d0706ff17a",
       "lines": [
-        468
+        444
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -18335,7 +19438,7 @@
       "file": "src/components/hass/WeatherSummary.tsx",
       "id": "80a6715d2ba91583",
       "lines": [
-        472
+        448
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -19224,7 +20327,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "fd1fa12dd2a8b80d",
       "lines": [
-        135
+        137
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -19240,7 +20343,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "a17681c208f4a2d5",
       "lines": [
-        134
+        136
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -19254,7 +20357,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "2a745229a576535c",
       "lines": [
-        265
+        267
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -19270,7 +20373,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "0f1fa7caac241c47",
       "lines": [
-        268
+        270
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -19284,7 +20387,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "de78b9718103dc6b",
       "lines": [
-        265
+        267
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -19326,7 +20429,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "69decc06994cc98a",
       "lines": [
-        130
+        132
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -19498,7 +20601,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "0693c6fb76f8b44a",
       "lines": [
-        231
+        233
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -19512,7 +20615,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "add4d839e9861875",
       "lines": [
-        231
+        233
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -19666,7 +20769,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "f03050dc188feb11",
       "lines": [
-        293
+        295
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -19682,7 +20785,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "ecc0613961be67ba",
       "lines": [
-        288
+        290
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -19696,7 +20799,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "4c2089379b81fdd6",
       "lines": [
-        288
+        290
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -19710,7 +20813,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "96e3a7d200dccc0f",
       "lines": [
-        72
+        74
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -20158,7 +21261,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "09687ad2ebef6f10",
       "lines": [
-        126
+        128
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -21423,34 +22526,6 @@
       "words": 2
     },
     {
-      "characters": 11,
-      "context": "label",
-      "file": "src/components/hass/WeatherSummary.tsx",
-      "id": "e47241b96e4d0119",
-      "lines": [
-        102
-      ],
-      "occurrences": 1,
-      "origin": "legacy",
-      "placeholders": [],
-      "value": "Clear Night",
-      "words": 2
-    },
-    {
-      "characters": 6,
-      "context": "label",
-      "file": "src/components/hass/WeatherSummary.tsx",
-      "id": "56f8abf6fc53d3a2",
-      "lines": [
-        103
-      ],
-      "occurrences": 1,
-      "origin": "legacy",
-      "placeholders": [],
-      "value": "Cloudy",
-      "words": 1
-    },
-    {
       "characters": 12,
       "context": "label",
       "file": "src/pages/DashboardViewPage.tsx",
@@ -21933,20 +23008,6 @@
       "words": 2
     },
     {
-      "characters": 11,
-      "context": "label",
-      "file": "src/components/hass/WeatherSummary.tsx",
-      "id": "57aeeda051d29d63",
-      "lines": [
-        104
-      ],
-      "occurrences": 1,
-      "origin": "legacy",
-      "placeholders": [],
-      "value": "Exceptional",
-      "words": 1
-    },
-    {
       "characters": 10,
       "context": "label",
       "file": "src/constants/surfaceSemantics.ts",
@@ -22116,20 +23177,6 @@
       "words": 1
     },
     {
-      "characters": 3,
-      "context": "label",
-      "file": "src/components/hass/WeatherSummary.tsx",
-      "id": "ff41434fe0b60153",
-      "lines": [
-        105
-      ],
-      "occurrences": 1,
-      "origin": "legacy",
-      "placeholders": [],
-      "value": "Fog",
-      "words": 1
-    },
-    {
       "characters": 8,
       "context": "label",
       "file": "src/pages/DashboardViewPage.tsx",
@@ -22226,34 +23273,6 @@
       "placeholders": [],
       "value": "General",
       "words": 1
-    },
-    {
-      "characters": 4,
-      "context": "label",
-      "file": "src/components/hass/WeatherSummary.tsx",
-      "id": "8c04725234afeb3a",
-      "lines": [
-        106
-      ],
-      "occurrences": 1,
-      "origin": "legacy",
-      "placeholders": [],
-      "value": "Hail",
-      "words": 1
-    },
-    {
-      "characters": 10,
-      "context": "label",
-      "file": "src/components/hass/WeatherSummary.tsx",
-      "id": "6dbc46053a080d1d",
-      "lines": [
-        110
-      ],
-      "occurrences": 1,
-      "origin": "legacy",
-      "placeholders": [],
-      "value": "Heavy Rain",
-      "words": 2
     },
     {
       "characters": 4,
@@ -22517,20 +23536,6 @@
       "words": 1
     },
     {
-      "characters": 9,
-      "context": "label",
-      "file": "src/components/hass/WeatherSummary.tsx",
-      "id": "9e83b4ab473ba5b9",
-      "lines": [
-        107
-      ],
-      "occurrences": 1,
-      "origin": "legacy",
-      "placeholders": [],
-      "value": "Lightning",
-      "words": 1
-    },
-    {
       "characters": 7,
       "context": "label",
       "file": "src/pages/FoodHubPage.tsx",
@@ -22566,7 +23571,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "786b7c1c444b5b8c",
       "lines": [
-        1265
+        1268
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -23000,20 +24005,6 @@
       "words": 1
     },
     {
-      "characters": 13,
-      "context": "label",
-      "file": "src/components/hass/WeatherSummary.tsx",
-      "id": "c8c1e0f0893f2b1f",
-      "lines": [
-        109
-      ],
-      "occurrences": 1,
-      "origin": "legacy",
-      "placeholders": [],
-      "value": "Partly Cloudy",
-      "words": 2
-    },
-    {
       "characters": 5,
       "context": "label",
       "file": "src/constants/mediaRemotes.ts",
@@ -23159,20 +24150,6 @@
       "origin": "legacy",
       "placeholders": [],
       "value": "Quieted",
-      "words": 1
-    },
-    {
-      "characters": 4,
-      "context": "label",
-      "file": "src/components/hass/WeatherSummary.tsx",
-      "id": "936d066426c42404",
-      "lines": [
-        111
-      ],
-      "occurrences": 1,
-      "origin": "legacy",
-      "placeholders": [],
-      "value": "Rain",
       "words": 1
     },
     {
@@ -23535,20 +24512,6 @@
       "words": 2
     },
     {
-      "characters": 4,
-      "context": "label",
-      "file": "src/components/hass/WeatherSummary.tsx",
-      "id": "08fab04e7c2591bd",
-      "lines": [
-        112
-      ],
-      "occurrences": 1,
-      "origin": "legacy",
-      "placeholders": [],
-      "value": "Snow",
-      "words": 1
-    },
-    {
       "characters": 6,
       "context": "label",
       "file": "src/components/hass/recipes/RecipeDetailModal.tsx",
@@ -23693,20 +24656,6 @@
     {
       "characters": 6,
       "context": "label",
-      "file": "src/components/hass/WeatherSummary.tsx",
-      "id": "bec8d41fc45d1054",
-      "lines": [
-        108
-      ],
-      "occurrences": 1,
-      "origin": "legacy",
-      "placeholders": [],
-      "value": "Storms",
-      "words": 1
-    },
-    {
-      "characters": 6,
-      "context": "label",
       "file": "src/components/hass/humidifierSchedule.ts",
       "id": "946fef79ea86e917",
       "lines": [
@@ -23744,20 +24693,6 @@
       "origin": "legacy",
       "placeholders": [],
       "value": "Sunday",
-      "words": 1
-    },
-    {
-      "characters": 5,
-      "context": "label",
-      "file": "src/components/hass/WeatherSummary.tsx",
-      "id": "f5a588f761b410aa",
-      "lines": [
-        114
-      ],
-      "occurrences": 1,
-      "origin": "legacy",
-      "placeholders": [],
-      "value": "Sunny",
       "words": 1
     },
     {
@@ -24051,20 +24986,6 @@
       "words": 1
     },
     {
-      "characters": 19,
-      "context": "label",
-      "file": "src/components/hass/WeatherSummary.tsx",
-      "id": "c91ff7a5d0413dc2",
-      "lines": [
-        360
-      ],
-      "occurrences": 1,
-      "origin": "legacy",
-      "placeholders": [],
-      "value": "Weather Unavailable",
-      "words": 2
-    },
-    {
       "characters": 9,
       "context": "label",
       "file": "src/components/hass/DonetickTaskFormPage.tsx",
@@ -24162,48 +25083,6 @@
       "placeholders": [],
       "value": "Wind",
       "words": 1
-    },
-    {
-      "characters": 5,
-      "context": "label",
-      "file": "src/components/hass/WeatherSummary.tsx",
-      "id": "e6c07b3febab6858",
-      "lines": [
-        115
-      ],
-      "occurrences": 1,
-      "origin": "legacy",
-      "placeholders": [],
-      "value": "Windy",
-      "words": 1
-    },
-    {
-      "characters": 12,
-      "context": "label",
-      "file": "src/components/hass/WeatherSummary.tsx",
-      "id": "243822f8381bc9f6",
-      "lines": [
-        116
-      ],
-      "occurrences": 1,
-      "origin": "legacy",
-      "placeholders": [],
-      "value": "Windy Clouds",
-      "words": 2
-    },
-    {
-      "characters": 10,
-      "context": "label",
-      "file": "src/components/hass/WeatherSummary.tsx",
-      "id": "2ee5b44857b71c3e",
-      "lines": [
-        113
-      ],
-      "occurrences": 1,
-      "origin": "legacy",
-      "placeholders": [],
-      "value": "Wintry Mix",
-      "words": 2
     },
     {
       "characters": 6,
@@ -24495,7 +25374,7 @@
       "file": "src/components/hass/WeatherSummary.tsx",
       "id": "320d69bbe695dd72",
       "lines": [
-        1721
+        1695
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -24509,7 +25388,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "98b89c4aecd81289",
       "lines": [
-        1254
+        1257
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -24665,7 +25544,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "bf6240e368e0bd57",
       "lines": [
-        1274
+        1277
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -25864,7 +26743,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "8e51bb5b8de6f3dc",
       "lines": [
-        168
+        169
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -26109,7 +26988,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "3caa1046486d605b",
       "lines": [
-        755
+        760
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -26137,7 +27016,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "df92f5d33582a56f",
       "lines": [
-        329
+        334
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -26179,7 +27058,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "59ef70630146d8b9",
       "lines": [
-        409
+        414
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -26193,7 +27072,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "9961d2c8292aad20",
       "lines": [
-        344
+        349
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -26207,7 +27086,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "ee0554248ca60f50",
       "lines": [
-        345
+        350
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -26221,8 +27100,8 @@
       "file": "src/constants/atAGlance.ts",
       "id": "de1ff9eedd036b2a",
       "lines": [
-        477,
-        612
+        482,
+        617
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -26236,8 +27115,8 @@
       "file": "src/constants/atAGlance.ts",
       "id": "67e7a7aa13add478",
       "lines": [
-        478,
-        613
+        483,
+        618
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -26251,9 +27130,9 @@
       "file": "src/constants/atAGlance.ts",
       "id": "61347449de0524fd",
       "lines": [
-        501,
-        622,
-        653
+        506,
+        627,
+        658
       ],
       "occurrences": 3,
       "origin": "legacy",
@@ -26267,8 +27146,8 @@
       "file": "src/constants/atAGlance.ts",
       "id": "917c7e79e7592c8d",
       "lines": [
-        361,
-        424
+        366,
+        429
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -26296,7 +27175,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "cb649a23ec6207d9",
       "lines": [
-        353
+        358
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -26605,7 +27484,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "fa665436bf0ceab7",
       "lines": [
-        955
+        958
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -26619,7 +27498,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "b4eb01569adaee3d",
       "lines": [
-        144
+        145
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -26699,13 +27578,13 @@
       "file": "src/constants/atAGlance.ts",
       "id": "d881a60835ead3c9",
       "lines": [
-        490,
-        502,
-        533,
-        634,
-        645,
-        654,
-        659
+        495,
+        507,
+        538,
+        639,
+        650,
+        659,
+        664
       ],
       "occurrences": 7,
       "origin": "legacy",
@@ -26719,8 +27598,8 @@
       "file": "src/constants/atAGlance.ts",
       "id": "ec23cc822198bfda",
       "lines": [
-        365,
-        371
+        370,
+        376
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -26762,7 +27641,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "eac200f5adbc00c7",
       "lines": [
-        160
+        161
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -26804,7 +27683,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "85dcf8d9549008ab",
       "lines": [
-        425
+        430
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -26818,7 +27697,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "38773671fda29589",
       "lines": [
-        413
+        418
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -26832,7 +27711,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "be943749928cc517",
       "lines": [
-        399
+        404
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -26875,7 +27754,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "c7adb1b827d09b92",
       "lines": [
-        265
+        266
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -26962,8 +27841,8 @@
       "file": "src/constants/atAGlance.ts",
       "id": "ac0899d157b3ce97",
       "lines": [
-        333,
-        682
+        338,
+        687
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -27019,7 +27898,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "e170af3c637634b2",
       "lines": [
-        547
+        552
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -27033,7 +27912,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "fecd4f018efb95cb",
       "lines": [
-        726
+        731
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -27047,7 +27926,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "ebcc00fcbe3135d1",
       "lines": [
-        727
+        732
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -27061,8 +27940,8 @@
       "file": "src/constants/atAGlance.ts",
       "id": "5913f634415fe5f0",
       "lines": [
-        404,
-        406
+        409,
+        411
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -27076,7 +27955,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "61020f3a7292489f",
       "lines": [
-        681
+        686
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -27090,7 +27969,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "2242c015afa5bcac",
       "lines": [
-        757
+        762
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -27174,10 +28053,10 @@
       "file": "src/constants/atAGlance.ts",
       "id": "449fcf10042cc110",
       "lines": [
-        512,
-        531,
-        562,
-        677
+        517,
+        536,
+        567,
+        682
       ],
       "occurrences": 4,
       "origin": "legacy",
@@ -27224,8 +28103,8 @@
       "file": "src/constants/atAGlance.ts",
       "id": "bca59477442c6360",
       "lines": [
-        362,
-        398
+        367,
+        403
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -27282,8 +28161,8 @@
       "file": "src/constants/atAGlance.ts",
       "id": "2e7065c7385e0781",
       "lines": [
-        330,
-        697
+        335,
+        702
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -27325,7 +28204,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "1e6a72bb5ece2220",
       "lines": [
-        576
+        581
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -27339,8 +28218,8 @@
       "file": "src/constants/atAGlance.ts",
       "id": "f24cd163e40482e9",
       "lines": [
-        445,
-        447
+        450,
+        452
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -27354,7 +28233,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "3eb5ec23a178efb9",
       "lines": [
-        696
+        701
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -27382,7 +28261,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "ebba93d9ee8a364e",
       "lines": [
-        290
+        292
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -27396,7 +28275,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "a2c422ef26c926bd",
       "lines": [
-        465
+        470
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -27424,7 +28303,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "73e54926c48a3163",
       "lines": [
-        423
+        428
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -27568,9 +28447,9 @@
       "file": "src/constants/atAGlance.ts",
       "id": "626f388014d5d9c0",
       "lines": [
-        521,
-        587,
-        665
+        526,
+        592,
+        670
       ],
       "occurrences": 3,
       "origin": "legacy",
@@ -27584,8 +28463,8 @@
       "file": "src/constants/atAGlance.ts",
       "id": "29ee0b2688b51523",
       "lines": [
-        382,
-        422
+        387,
+        427
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -27599,8 +28478,8 @@
       "file": "src/constants/atAGlance.ts",
       "id": "8dc2b4fb41234004",
       "lines": [
-        334,
-        621
+        339,
+        626
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -27642,7 +28521,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "bf92eb998eb572a8",
       "lines": [
-        601
+        606
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -27656,7 +28535,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "4178d1584adc6c94",
       "lines": [
-        703
+        708
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -27670,8 +28549,8 @@
       "file": "src/constants/atAGlance.ts",
       "id": "413dbd36bbeb297c",
       "lines": [
-        460,
-        462
+        465,
+        467
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -27685,8 +28564,8 @@
       "file": "src/constants/atAGlance.ts",
       "id": "9227658736f68b12",
       "lines": [
-        689,
-        691
+        694,
+        696
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -27800,7 +28679,7 @@
       "file": "src/components/hass/WeatherSummary.tsx",
       "id": "0d1bd6a7992c498f",
       "lines": [
-        617
+        577
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -27828,8 +28707,8 @@
       "file": "src/constants/atAGlance.ts",
       "id": "d02c2178f72b9a39",
       "lines": [
-        480,
-        615
+        485,
+        620
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -27843,7 +28722,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "c744e8cbe6290491",
       "lines": [
-        420
+        425
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -27857,7 +28736,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "0d349d5367aec284",
       "lines": [
-        467
+        472
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -27885,7 +28764,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "5bf86bda62ee75b3",
       "lines": [
-        242
+        243
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -28011,7 +28890,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "a347b35f25240764",
       "lines": [
-        438
+        443
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -28039,10 +28918,10 @@
       "file": "src/constants/atAGlance.ts",
       "id": "e420f9d0ad33335d",
       "lines": [
-        281,
-        604,
-        692,
-        704
+        282,
+        609,
+        697,
+        709
       ],
       "occurrences": 4,
       "origin": "legacy",
@@ -28112,7 +28991,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "2af4710ff8ff4283",
       "lines": [
-        342
+        347
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -28126,8 +29005,8 @@
       "file": "src/constants/atAGlance.ts",
       "id": "593a83ea65e0d2bd",
       "lines": [
-        343,
-        437
+        348,
+        442
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -28141,7 +29020,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "0cc393c9397118f8",
       "lines": [
-        436
+        441
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -28169,7 +29048,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "79c3d4bc7fae58ab",
       "lines": [
-        327
+        332
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -28225,7 +29104,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "bd904fabd5b59653",
       "lines": [
-        718
+        723
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -28239,7 +29118,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "7ae75f4703ab025c",
       "lines": [
-        719
+        724
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -28295,7 +29174,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "2cec065c704e210c",
       "lines": [
-        412
+        417
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -28395,8 +29274,8 @@
       "file": "src/constants/atAGlance.ts",
       "id": "ee891ef324665ea6",
       "lines": [
-        331,
-        664
+        336,
+        669
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -28452,7 +29331,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "3b0c4237bc831e02",
       "lines": [
-        582
+        587
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -28466,8 +29345,8 @@
       "file": "src/constants/atAGlance.ts",
       "id": "f3095b7880cd3bf6",
       "lines": [
-        450,
-        452
+        455,
+        457
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -28481,7 +29360,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "539c5a51a1faf2cd",
       "lines": [
-        662
+        667
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -28509,10 +29388,10 @@
       "file": "src/constants/atAGlance.ts",
       "id": "e269d7dcdef9287f",
       "lines": [
-        187,
-        320,
-        522,
-        633
+        188,
+        325,
+        527,
+        638
       ],
       "occurrences": 4,
       "origin": "legacy",
@@ -28569,7 +29448,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "d5e890fe5f2232f5",
       "lines": [
-        485
+        490
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -28583,7 +29462,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "790857ac021a477d",
       "lines": [
-        742
+        747
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -28597,7 +29476,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "3b9baa9db1426b3d",
       "lines": [
-        384
+        389
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -28611,7 +29490,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "2c0567ba272e6121",
       "lines": [
-        349
+        354
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -28625,7 +29504,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "b05aad9fe2af0e85",
       "lines": [
-        631
+        636
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -28653,8 +29532,8 @@
       "file": "src/constants/atAGlance.ts",
       "id": "af86c03f879f53e0",
       "lines": [
-        321,
-        639
+        326,
+        644
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -28710,7 +29589,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "8758808193e8a50f",
       "lines": [
-        507
+        512
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -28724,7 +29603,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "627bf981c23ad27d",
       "lines": [
-        746
+        751
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -28738,9 +29617,9 @@
       "file": "src/constants/atAGlance.ts",
       "id": "75aa49387e7d6620",
       "lines": [
-        374,
-        376,
-        383
+        379,
+        381,
+        388
       ],
       "occurrences": 3,
       "origin": "legacy",
@@ -28754,7 +29633,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "36fe44024ec28f86",
       "lines": [
-        638
+        643
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -28782,7 +29661,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "01ae4f4b068e4e4d",
       "lines": [
-        324
+        329
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -28824,7 +29703,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "4ff8362a21f3f26d",
       "lines": [
-        517
+        522
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -28838,7 +29717,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "deb341db56a688bb",
       "lines": [
-        379
+        384
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -28852,7 +29731,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "d0205f59770efea0",
       "lines": [
-        619
+        624
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -28894,7 +29773,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "730438e01f16f3aa",
       "lines": [
-        754
+        759
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -29090,9 +29969,9 @@
       "file": "src/constants/atAGlance.ts",
       "id": "cebc7f033655cc58",
       "lines": [
-        325,
-        542,
-        628
+        330,
+        547,
+        633
       ],
       "occurrences": 3,
       "origin": "legacy",
@@ -29148,7 +30027,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "8ee8e7ebd57c9ed3",
       "lines": [
-        538
+        543
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -29162,7 +30041,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "c8ea9569a05ef1f4",
       "lines": [
-        730
+        735
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -29176,7 +30055,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "d2e358e763bff2d0",
       "lines": [
-        731
+        736
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -29190,7 +30069,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "2be160ec6fa4a846",
       "lines": [
-        394
+        399
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -29204,7 +30083,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "d70694674a19ef04",
       "lines": [
-        627
+        632
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -29218,8 +30097,8 @@
       "file": "src/constants/atAGlance.ts",
       "id": "31af4efc072764df",
       "lines": [
-        479,
-        614
+        484,
+        619
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -29233,8 +30112,8 @@
       "file": "src/constants/atAGlance.ts",
       "id": "ebe418193bcadb42",
       "lines": [
-        560,
-        676
+        565,
+        681
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -29310,7 +30189,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "cbe48c3654392d91",
       "lines": [
-        128
+        129
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -29359,7 +30238,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "70093affdfed2e6d",
       "lines": [
-        703
+        706
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -29373,7 +30252,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "043d1ba541b29f71",
       "lines": [
-        699
+        702
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -29387,8 +30266,8 @@
       "file": "src/constants/atAGlance.ts",
       "id": "e4d38b4eb2c1b367",
       "lines": [
-        181,
-        319
+        182,
+        324
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -29459,7 +30338,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "a883a9597e8553a2",
       "lines": [
-        473
+        478
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -29473,7 +30352,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "8ff347ac31fd22b6",
       "lines": [
-        714
+        719
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -29487,7 +30366,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "015354ae92294e74",
       "lines": [
-        339
+        344
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -29501,7 +30380,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "d2624cd372d43bf4",
       "lines": [
-        610
+        615
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -29571,7 +30450,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "03de57bd474930be",
       "lines": [
-        308
+        312
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -29753,8 +30632,8 @@
       "file": "src/constants/atAGlance.ts",
       "id": "da3122dfb21d6487",
       "lines": [
-        332,
-        670
+        337,
+        675
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -29810,7 +30689,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "f6c91897de594a78",
       "lines": [
-        592
+        597
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -29824,8 +30703,8 @@
       "file": "src/constants/atAGlance.ts",
       "id": "2751dcc57552d3db",
       "lines": [
-        455,
-        457
+        460,
+        462
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -29839,7 +30718,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "61208d396fd74242",
       "lines": [
-        669
+        674
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -29853,9 +30732,9 @@
       "file": "src/constants/atAGlance.ts",
       "id": "16700faa3c0e8af9",
       "lines": [
-        199,
-        322,
-        651
+        200,
+        327,
+        656
       ],
       "occurrences": 3,
       "origin": "legacy",
@@ -29925,7 +30804,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "42b32594fe76d675",
       "lines": [
-        495
+        500
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -29939,7 +30818,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "393b8be746ec73b7",
       "lines": [
-        369
+        374
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -29953,7 +30832,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "471f3c9ad420b0fc",
       "lines": [
-        658
+        663
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -29967,7 +30846,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "f61842a4297910f5",
       "lines": [
-        722
+        727
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -29995,7 +30874,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "3aaf00ac600e8f1c",
       "lines": [
-        357
+        362
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -30009,7 +30888,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "d2b5cf41d2ce1c25",
       "lines": [
-        649
+        654
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -30023,7 +30902,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "a15ce31850d975ef",
       "lines": [
-        258
+        259
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -30109,8 +30988,8 @@
       "file": "src/constants/atAGlance.ts",
       "id": "3f32ad6066127acb",
       "lines": [
-        205,
-        326
+        206,
+        331
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -30168,7 +31047,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "af97f0db9deb75f5",
       "lines": [
-        556
+        561
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -30182,7 +31061,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "706997df35b66874",
       "lines": [
-        734
+        739
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -30196,7 +31075,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "787b9f1dc5749823",
       "lines": [
-        735
+        740
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -30210,7 +31089,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "2f808ead70cf1105",
       "lines": [
-        417
+        422
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -30224,7 +31103,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "2d5add1884d5a583",
       "lines": [
-        673
+        678
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -30252,7 +31131,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "4e7d3dd8a266e7ae",
       "lines": [
-        756
+        761
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -30471,8 +31350,8 @@
       "file": "src/constants/atAGlance.ts",
       "id": "657bb6c40ac69d0d",
       "lines": [
-        561,
-        675
+        566,
+        680
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -30486,7 +31365,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "ecd555ab98feb1ab",
       "lines": [
-        152
+        153
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -30542,7 +31421,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "21cbc146742a623d",
       "lines": [
-        951
+        954
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -30570,11 +31449,11 @@
       "file": "src/constants/atAGlance.ts",
       "id": "73d08bcbb716f2bb",
       "lines": [
-        193,
-        323,
-        523,
-        623,
-        644
+        194,
+        328,
+        528,
+        628,
+        649
       ],
       "occurrences": 5,
       "origin": "legacy",
@@ -30630,7 +31509,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "66ad6b889d6b5c39",
       "lines": [
-        527
+        532
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -30644,7 +31523,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "c18a5d14e35c9bb8",
       "lines": [
-        707
+        712
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -30658,9 +31537,9 @@
       "file": "src/constants/atAGlance.ts",
       "id": "feb4e44459008b37",
       "lines": [
-        385,
-        389,
-        391
+        390,
+        394,
+        396
       ],
       "occurrences": 3,
       "origin": "legacy",
@@ -30674,7 +31553,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "7da6ac7b42187049",
       "lines": [
-        642
+        647
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -30907,7 +31786,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "97aa09a3d7aa060e",
       "lines": [
-        709
+        714
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -31062,14 +31941,14 @@
       "file": "src/constants/atAGlance.ts",
       "id": "2a97b20ccf1b39d0",
       "lines": [
-        489,
-        511,
-        532,
-        551,
-        571,
-        579,
-        586,
-        596
+        494,
+        516,
+        537,
+        556,
+        576,
+        584,
+        591,
+        601
       ],
       "occurrences": 8,
       "origin": "legacy",
@@ -31097,7 +31976,7 @@
       "file": "src/components/hass/WeatherSummary.tsx",
       "id": "53b17800ed69e396",
       "lines": [
-        672
+        632
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -31224,7 +32103,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "41c9adb562b3f93a",
       "lines": [
-        440
+        445
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -31238,7 +32117,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "3e3e563e3ab87e70",
       "lines": [
-        439
+        444
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -31252,7 +32131,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "c2d63f453781437e",
       "lines": [
-        441
+        446
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -31481,7 +32360,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "1d25e3e5c49ce51b",
       "lines": [
-        519
+        522
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -31537,7 +32416,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "b0c769cad965c57a",
       "lines": [
-        136
+        137
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -31607,7 +32486,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "2a0b1cf609d6b614",
       "lines": [
-        221
+        222
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -31663,7 +32542,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "ebdfd0e61878c4d6",
       "lines": [
-        426
+        431
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -31705,7 +32584,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "5c9948eb41892f19",
       "lines": [
-        400
+        405
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -31845,7 +32724,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "2bbbec4f2b663af4",
       "lines": [
-        364
+        369
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -31971,7 +32850,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "51d038ae98fb3aaf",
       "lines": [
-        363
+        368
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -32139,7 +33018,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "241f46cdf7f4923a",
       "lines": [
-        723
+        728
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -32181,7 +33060,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "20b5cfe05e4ea644",
       "lines": [
-        397
+        402
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -32209,9 +33088,9 @@
       "file": "src/constants/atAGlance.ts",
       "id": "8bcec9a83f4a4fbc",
       "lines": [
-        211,
-        328,
-        686
+        212,
+        333,
+        691
       ],
       "occurrences": 3,
       "origin": "legacy",
@@ -32300,7 +33179,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "69ec300ac233bb90",
       "lines": [
-        567
+        572
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -32314,7 +33193,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "93c4e6fe83d1b107",
       "lines": [
-        738
+        743
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -32328,7 +33207,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "bc9cc65fa30cd2ce",
       "lines": [
-        739
+        744
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -32342,7 +33221,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "9af76073ffbd3f21",
       "lines": [
-        433
+        438
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -32356,7 +33235,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "de81b1cac118645c",
       "lines": [
-        685
+        690
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -32625,7 +33504,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "8080177f6689a74a",
       "lines": [
-        428
+        433
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -32639,8 +33518,8 @@
       "file": "src/constants/atAGlance.ts",
       "id": "70814e248e27cea3",
       "lines": [
-        352,
-        427
+        357,
+        432
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -32654,7 +33533,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "9752222e4f595b9a",
       "lines": [
-        429
+        434
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -32801,7 +33680,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "a3344e23cfec8387",
       "lines": [
-        299
+        302
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -32829,7 +33708,7 @@
       "file": "src/components/hass/WeatherSummary.tsx",
       "id": "0bf67e47d9a36e93",
       "lines": [
-        626
+        586
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -32901,7 +33780,7 @@
       "file": "src/constants/atAGlance.ts",
       "id": "633af9f8f33d2668",
       "lines": [
-        251
+        252
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -32929,14 +33808,14 @@
       "file": "src/constants/atAGlance.ts",
       "id": "0491b1009b1f2006",
       "lines": [
-        491,
-        513,
-        534,
-        543,
-        552,
-        563,
-        588,
-        597
+        496,
+        518,
+        539,
+        548,
+        557,
+        568,
+        593,
+        602
       ],
       "occurrences": 8,
       "origin": "legacy",
@@ -33031,9 +33910,9 @@
       "file": "src/constants/atAGlance.ts",
       "id": "a0826f1fd28a48c7",
       "lines": [
-        481,
-        503,
-        572
+        486,
+        508,
+        577
       ],
       "occurrences": 3,
       "origin": "legacy",
@@ -33064,7 +33943,7 @@
       "file": "src/components/hass/WeatherSummary.tsx",
       "id": "0989654578d40c0e",
       "lines": [
-        663
+        623
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -33176,7 +34055,7 @@
       "file": "src/components/hass/WeatherSummary.tsx",
       "id": "6186aa8b846d62ee",
       "lines": [
-        634
+        594
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -33190,11 +34069,11 @@
       "file": "src/constants/atAGlance.ts",
       "id": "816422b3d89d919c",
       "lines": [
-        499,
-        710,
+        504,
         715,
-        743,
-        747
+        720,
+        748,
+        752
       ],
       "occurrences": 5,
       "origin": "legacy",
@@ -33225,8 +34104,8 @@
       "file": "src/constants/atAGlance.ts",
       "id": "2e7cc535b77e5fac",
       "lines": [
-        360,
-        421
+        365,
+        426
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -33338,7 +34217,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "fc2fae585a5141c6",
       "lines": [
-        1217
+        1220
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -33923,7 +34802,7 @@
       "file": "src/components/hass/CameraModalContent.tsx",
       "id": "501419d2d9015977",
       "lines": [
-        29
+        30
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -35762,7 +36641,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "12e7fd220a8305c4",
       "lines": [
-        604
+        607
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -35776,7 +36655,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "7d924af527e49d84",
       "lines": [
-        604
+        607
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -36394,7 +37273,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "dcf8dbdbc3f234cd",
       "lines": [
-        369
+        371
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -37046,11 +37925,11 @@
     }
   ],
   "summary": {
-    "catalogRecords": 549,
+    "catalogRecords": 638,
     "documentRecords": 1,
-    "legacyOccurrences": 2529,
-    "legacyRecords": 2096,
-    "totalRecords": 2646
+    "legacyOccurrences": 2509,
+    "legacyRecords": 2076,
+    "totalRecords": 2715
   },
   "version": 1
 }

@@ -22,6 +22,36 @@ async function openButtonModal(page: Page, path: string, name: string | RegExp) 
   return dialog
 }
 
+async function cameraSplitMetrics(dialog: Locator) {
+  return dialog.locator('[data-modal-landscape-layout="media-split"]').evaluate((sheet) => {
+    const body = sheet.closest('[data-modal-sheet-body="true"]') as HTMLElement
+    const media = sheet.firstElementChild!.getBoundingClientRect()
+    const controlsElement = sheet.querySelector('[class*="cameraControls"]')!
+    const controls = controlsElement.getBoundingClientRect()
+    const columns = getComputedStyle(sheet).gridTemplateColumns.split(' ').filter(Boolean).map(Number.parseFloat)
+    return {
+      columns: columns.length,
+      controlColumns: getComputedStyle(controlsElement).gridTemplateColumns.split(' ').filter(Boolean).length,
+      equalHalves: columns.length === 2 && Math.abs(columns[0] - columns[1]) <= 1,
+      fits: media.height <= body.clientHeight && body.scrollHeight <= body.clientHeight + 1,
+      mediaFillsLeftHalf: Math.abs(media.width - columns[0]) <= 1,
+      mediaLeftOfControls: media.right <= controls.left + 1,
+      mediaWidth: media.width,
+      topAligned: Math.abs(controls.top - media.top) <= 1,
+    }
+  })
+}
+
+const CAMERA_SPLIT_CONTRACT = {
+  columns: 2,
+  controlColumns: 1,
+  equalHalves: true,
+  fits: true,
+  mediaFillsLeftHalf: true,
+  mediaLeftOfControls: true,
+  topAligned: true,
+}
+
 const CASES: AdaptiveModalCase[] = [
   {
     id: 'media-remote',
@@ -133,7 +163,7 @@ test.describe('non-room landscape modal adaptation', () => {
     })
   }
 
-  test('compacts chrome, reveals fitting tab labels, and caps landscape media', async ({ page }) => {
+  test('compacts chrome, reveals fitting tab labels, splits camera modals, and caps landscape media', async ({ page }) => {
     await page.setViewportSize({ height: 393, width: 852 })
     await setSafeAreaInsets(page, { bottom: 21, left: 59, right: 44, top: 0 })
 
@@ -159,11 +189,45 @@ test.describe('non-room landscape modal adaptation', () => {
     await dialog.getByRole('button', { exact: true, name: 'Close' }).click()
     await expect(dialog).toHaveCount(0, { timeout: 700 })
 
-    dialog = await openButtonModal(page, 'overview', /Open Front Door camera/i)
-    const cameraFrame = dialog.locator('[data-variant="modal"]')
-    await expect.poll(async () => Math.round((await cameraFrame.boundingBox())?.height ?? 0)).toBeLessThanOrEqual(200)
-    await dialog.getByRole('button', { exact: true, name: 'Close' }).click()
-    await expect(dialog).toHaveCount(0, { timeout: 700 })
+    for (const path of ['overview', 'security']) {
+      await page.setViewportSize({ height: 393, width: 852 })
+      dialog = await openButtonModal(page, path, /Open Front Door camera/i)
+      await expect(dialog).toHaveAttribute('data-modal-presentation', 'landscape-dialog')
+      await expect(dialog.locator('[data-variant="modal"]')).toHaveAttribute('data-fill', 'true')
+      await expect.poll(async () => {
+        const { mediaWidth, ...contract } = await cameraSplitMetrics(dialog)
+        void mediaWidth
+        return contract
+      }).toEqual(CAMERA_SPLIT_CONTRACT)
+      const narrowMedia = (await cameraSplitMetrics(dialog)).mediaWidth
+      await page.setViewportSize({ height: 393, width: 1024 })
+      await expect.poll(async () => (await cameraSplitMetrics(dialog)).mediaWidth > narrowMedia).toBe(true)
+      await dialog.getByRole('button', { exact: true, name: 'Close' }).click()
+      await expect(dialog).toHaveCount(0, { timeout: 700 })
+
+      await page.setViewportSize({ height: 820, width: 1180 })
+      dialog = await openButtonModal(page, path, /Open Front Door camera/i)
+      await expect(dialog).toHaveAttribute('data-modal-presentation', 'dialog')
+      await expect(dialog.locator('[data-variant="modal"]')).toHaveAttribute('data-fill', 'true')
+      await expect.poll(async () => {
+        const { mediaWidth, ...contract } = await cameraSplitMetrics(dialog)
+        void mediaWidth
+        return contract
+      }).toEqual(CAMERA_SPLIT_CONTRACT)
+      await dialog.getByRole('button', { exact: true, name: 'Close' }).click()
+      await expect(dialog).toHaveCount(0, { timeout: 700 })
+    }
+
+    await page.setViewportSize({ height: 393, width: 852 })
+    for (const path of ['overview', 'security']) {
+      dialog = await openButtonModal(page, path, /Open Driveway camera/i)
+      await expect.poll(() => dialog.locator('[data-modal-landscape-layout="media-split"] > :first-child').evaluate((media) => {
+        const box = media.getBoundingClientRect()
+        return box.width / box.height
+      })).toBeCloseTo(10 / 3, 2)
+      await dialog.getByRole('button', { exact: true, name: 'Close' }).click()
+      await expect(dialog).toHaveCount(0, { timeout: 700 })
+    }
 
     await gotoRoute(page, 'food')
     await expect(page.getByRole('heading', { name: 'Suggested Recipes' })).toBeVisible({ timeout: 15_000 })
@@ -171,6 +235,34 @@ test.describe('non-room landscape modal adaptation', () => {
     dialog = page.getByRole('dialog')
     const recipeHero = dialog.locator('[class*="hero"]').first()
     await expect.poll(async () => Math.round((await recipeHero.boundingBox())?.height ?? 0)).toBeLessThanOrEqual(200)
+  })
+
+  test('keeps the initial camera loading frame flush with its landscape wrapper', async ({ page }) => {
+    await page.setViewportSize({ height: 820, width: 1180 })
+    let releaseModule!: () => void
+    const moduleGate = new Promise<void>((resolve) => { releaseModule = resolve })
+    await page.route('**/webrtc/webrtc-camera.js**', async (route) => {
+      await moduleGate
+      await route.abort()
+    })
+
+    const dialog = await openButtonModal(page, 'overview', /Open Upper Deck camera/i)
+    const frame = dialog.locator('[data-variant="modal"]')
+    await expect(frame).toHaveAttribute('data-fill', 'true')
+    await expect(frame).toHaveAttribute('data-loaded', 'false')
+    await expect.poll(() => dialog.evaluate((element) => {
+      const focus = element.querySelector<HTMLElement>('[class*="cameraFocus"]')!.getBoundingClientRect()
+      const cameraFrame = element.querySelector<HTMLElement>('[data-variant="modal"]')!.getBoundingClientRect()
+      const host = element.querySelector<HTMLElement>('[data-variant="modal"] > div')!.getBoundingClientRect()
+      return {
+        frameFlush: Math.abs(cameraFrame.width - focus.width) <= 1 && Math.abs(cameraFrame.height - focus.height) <= 1,
+        hostFlush: Math.abs(host.width - focus.width) <= 1 && Math.abs(host.height - focus.height) <= 1,
+      }
+    })).toEqual({ frameFlush: true, hostFlush: true })
+
+    releaseModule()
+    await dialog.getByRole('button', { exact: true, name: 'Close' }).click()
+    await expect(dialog).toHaveCount(0, { timeout: 700 })
   })
 
   test('uses paired landscape forms and option grids without changing portrait', async ({ page }) => {
