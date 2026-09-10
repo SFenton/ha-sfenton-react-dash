@@ -1407,7 +1407,7 @@ function VacuumAutoCleanDisabledRooms({ vacuum }: { vacuum: VacuumConfig }) {
     <section className={styles.section}>
       <SectionHeader title="Disabled Auto-Clean Rooms" />
       <Description className={styles.autoCleanDescription}>{AUTO_CLEAN_DISABLED_DESCRIPTION}</Description>
-      <DynamicGrid ariaLabel={copy(VACUUM_COPY_KEYS.autoCleanGridLabel)} className={styles.autoCleanCheckboxGrid} columns={2} gap={8}>
+      <DynamicGrid ariaLabel={copy(VACUUM_COPY_KEYS.autoCleanGridLabel)} className={styles.autoCleanCheckboxGrid} columns={2} forceEquivalentColumnCount gap={8}>
         {rooms.map((room) => <AutoCleanDisabledRoomCheckbox key={room.entityId} room={room} />)}
       </DynamicGrid>
     </section>

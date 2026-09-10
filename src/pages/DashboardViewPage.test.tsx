@@ -5922,6 +5922,8 @@ describe('DashboardViewPage', () => {
     await clickModalTab(within(dialog), 'Auto-Clean')
     const autoCleanHeading = within(controlsPane).getByRole('heading', { name: 'Disabled Auto-Clean Rooms' })
     expect(autoCleanHeading).toBeInTheDocument()
+    const autoCleanGrid = autoCleanHeading.closest('section')?.querySelector('[data-dynamic-grid]')
+    expect(autoCleanGrid).toHaveAttribute('data-dynamic-grid-force-equivalent-column-count', 'true')
     expect(screen.getByText('Check rooms that should be skipped when the coordinator starts an automatic away clean. Use this for closed doors, guests, or projects on the floor; manual selected-room cleans still use the Zones tab.')).toBeInTheDocument()
     const livingRoomAutoClean = screen.getByRole('button', { name: 'Living Room auto-clean enabled' })
     expect(livingRoomAutoClean).toHaveAttribute('aria-pressed', 'false')
