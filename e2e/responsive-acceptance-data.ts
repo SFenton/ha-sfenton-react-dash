@@ -174,6 +174,9 @@ export const LAYOUT_PROFILES: Record<string, { viewport: { width: number; height
   'rail-below': { viewport: { width: 1119, height: 819 }, insets: { top: 0, right: 0, bottom: 0, left: 0 } },
   'rail-at': { viewport: { width: 1120, height: 820 }, insets: { top: 0, right: 0, bottom: 0, left: 0 } },
   'rail-above': { viewport: { width: 1121, height: 821 }, insets: { top: 0, right: 0, bottom: 0, left: 0 } },
+  'dialog-block-798': { viewport: { width: 1152, height: 798 }, insets: { top: 0, right: 0, bottom: 0, left: 0 } },
+  'dialog-block-799': { viewport: { width: 1152, height: 799 }, insets: { top: 0, right: 0, bottom: 0, left: 0 } },
+  'dialog-block-800': { viewport: { width: 1152, height: 800 }, insets: { top: 0, right: 0, bottom: 0, left: 0 } },
 }
 
 export function layoutProfile(name: string) {

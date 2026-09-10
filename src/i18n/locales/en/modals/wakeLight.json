@@ -1,0 +1,127 @@
+{
+  "title": "Wake-Light Alarms",
+  "modalTitle": "{{room}} Wake-Light Alarms",
+  "roomSection": "Sleep & Wake",
+  "description": "Home Assistant gradually brightens the room lights so they reach full brightness at the chosen wake time.",
+  "active": {
+    "title": "Active Wake-Light Controls",
+    "stopEpisode": "Stop Wake-Light Episode",
+    "cancelledByUser": "You Cancelled Wake Light"
+  },
+  "tile": {
+    "next": "Next Alarm: {{date}} {{time}}",
+    "nextAndRamp": "Next Alarm: {{date}} {{time}} • {{duration}} ramp",
+    "activeProgress": "Active • {{progress}}%",
+    "vacationBlocked": "Vacation Mode · Runs Blocked",
+    "unavailable": "Setup · Unavailable",
+    "noneEnabled": "Alarms · None Enabled",
+    "noActive": "No Active Wake-Light Alarms"
+  },
+  "tabs": {
+    "alarms": "Wake Alarms",
+    "defaults": "Defaults"
+  },
+  "sections": {
+    "alarms": "Wake Alarm Schedule",
+    "defaults": "Wake-Light Defaults"
+  },
+  "schedule": {
+    "empty": "No wake alarms yet. Add one with a time, days or date, and ramp settings.",
+    "loading": "Loading Wake Alarms…",
+    "add": "Add Wake Alarm",
+    "adminOnly": "Only Home Assistant administrators can edit wake alarms.",
+    "count_one": "{{count}} Wake Alarm",
+    "count_other": "{{count}} Wake Alarms"
+  },
+  "editor": {
+    "alarmType": "Alarm Type",
+    "wakeTime": "Wake Time",
+    "save": "Save",
+    "delete": "Delete",
+    "daysRequired": "A recurring alarm requires at least one weekday.",
+    "futureDateRequired": "A one-time alarm requires a future date.",
+    "alarmName": "Alarm Name",
+    "alarmDate": "Alarm Date",
+    "scheduled": "Scheduled",
+    "oneTime": "One-Time",
+    "nameRequired": "Wake alarm name is required. Enter a name.",
+    "timeInvalid": "Wake time is invalid. Choose a valid time.",
+    "rampRequired": "Choose a supported light ramp duration before saving.",
+    "addTitle": "Add Wake Alarm · {{room}}",
+    "editTitle": "{{name}} · {{room}}",
+    "defaultName": "Morning Alarm",
+    "enabled": "Wake Alarm Enabled",
+    "addToBed": "Add to {{bed}}",
+    "addToBedUpdateHint": "Update the Wake Light integration to add temporary bed alarms for one-time wake alarms.",
+    "back": "Back to Wake Alarms"
+  },
+  "summary": {
+    "everyDay": "Every Day",
+    "weekdays": "Weekdays",
+    "weekends": "Weekends",
+    "scheduleAndTime": "{{schedule}} · {{time}}",
+    "ramp": "{{duration}} min"
+  },
+  "settings": {
+    "description": "The selected room default sets how long lights brighten before a new alarm, including no gradual ramp.",
+    "ramp": "Light Ramp Duration",
+    "hold": "Post-Wake Hold Time",
+    "holdDescription": "After full brightness, Wake Light prevents ordinary presence lighting from changing the room for {{duration}}. Any manual or Siri light command ends the hold immediately.",
+    "holdUpdateHint": "Update the Wake Light integration to change post-wake hold time."
+  },
+  "ramp": {
+    "none": "None",
+    "fiveMinutes": "5 Minutes",
+    "tenMinutes": "10 Minutes",
+    "fifteenMinutes": "15 Minutes",
+    "thirtyMinutes": "30 Minutes"
+  },
+  "binding": {
+    "label": "Use Room Wake Lights",
+    "alarmToggle": "Use room wake lights for the {{alarm}} alarm"
+  },
+  "errors": {
+    "unavailable": "Wake-light controls are unavailable. Check Home Assistant, then try again.",
+    "commandFailed": "The wake light change was rejected. Review the settings, then try again."
+  },
+  "progress": {
+    "stopping": "Stopping Wake Lights…"
+  },
+  "feedback": {
+    "conflict": "Alarm configuration changed elsewhere. Review the latest settings before retrying.",
+    "episodeLimit": "Connected alarms exceed 105 minutes. Reduce their ramps or separate their execution windows.",
+    "inactive": "That wake episode ended or changed. Review the active episode before retrying.",
+    "transport": "Home Assistant did not confirm the change. Check the connection before retrying."
+  },
+  "actions": {
+    "sourceEditor": "Open Linked-Device Alarm Editor",
+    "reloadAlarm": "Open Latest Alarm, Replace Draft"
+  },
+  "phases": {
+    "idle": "Idle",
+    "scheduled": "Wake Scheduled",
+    "ramping": "Brightening Gradually",
+    "holding": "Holding Brightness",
+    "snoozed": "Brightness-Preserving Snooze",
+    "recovering": "Waiting to Resume",
+    "blocked": "Execution Blocked",
+    "unavailable": "Unavailable",
+    "stopped": "Wake Episode Stopped",
+    "completed": "Post-Wake Hold Completed"
+  },
+  "blockers": {
+    "source": "The linked alarm schedule or scheduled wake is unavailable, so the wake light cannot start. Check the device connection and integration compatibility.",
+    "presence": "Presence lighting is not ready to hand control to the wake light, so the wake cannot start safely. Check presence lighting before trying again.",
+    "blocker": "Another lighting controller is active or its status is unknown, so the wake cannot start. Ensure the wake light has exclusive control, then try again.",
+    "legacy": "The room's older lighting behavior is not confirmed compatible with wake-light control, so the wake light cannot start. Complete setup before trying again.",
+    "target": "A required room light is unavailable, so the wake light cannot start. Check the light's connection, then try again."
+  },
+  "behavior": {
+    "activeStop": "Stop ends the connected wake-light episode. Manual or Siri light commands take control immediately.",
+    "dropout": "A safety or ownership interruption ends the active light episode. Control will not be reclaimed automatically, and the episode will not retry.",
+    "protocol": "Editing wake light alarms requires an integration update. Saved alarms remain available to view."
+  },
+  "preview": {
+    "title": "Local Mock Dashboard · Sample Data Only"
+  }
+}

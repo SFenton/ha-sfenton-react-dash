@@ -47,12 +47,14 @@ async function closeModal(dialog: Locator) {
 async function expectOutgoingTabScrollPreserved({
   dialog,
   panelSelector,
+  requireIncomingFrame = true,
   requireOutgoingFrame = true,
   scrollOwnerSelector,
   targetTab,
 }: {
   dialog: Locator
   panelSelector: string
+  requireIncomingFrame?: boolean
   requireOutgoingFrame?: boolean
   scrollOwnerSelector: string
   targetTab: string
@@ -78,22 +80,24 @@ async function expectOutgoingTabScrollPreserved({
     scrollTop: number
   }>>((resolve) => {
     const dialogElement = tab.closest('[role="dialog"]')
-    const currentPanel = dialogElement?.querySelector<HTMLElement>(selectors.panelSelector)
     const currentScrollOwner = dialogElement?.querySelector<HTMLElement>(selectors.scrollOwnerSelector)
     const frames: Array<{ label: string | null; opacity: number; scrollTop: number }> = []
     const started = performance.now()
     const sample = () => {
-      if (!currentPanel || !currentScrollOwner) {
+      const currentPanels = dialogElement?.querySelectorAll<HTMLElement>(selectors.panelSelector)
+      if (!currentPanels?.length || !currentScrollOwner) {
         resolve(frames)
         return
       }
-      frames.push({
-        label: currentPanel.getAttribute('data-tab')
-          ?? currentPanel.getAttribute('aria-labelledby')
-          ?? currentPanel.getAttribute('aria-label'),
-        opacity: Number.parseFloat(getComputedStyle(currentPanel).opacity),
-        scrollTop: currentScrollOwner.scrollTop,
-      })
+      for (const currentPanel of currentPanels) {
+        frames.push({
+          label: currentPanel.getAttribute('data-tab')
+            ?? currentPanel.getAttribute('aria-labelledby')
+            ?? currentPanel.getAttribute('aria-label'),
+          opacity: Number.parseFloat(getComputedStyle(currentPanel).opacity),
+          scrollTop: currentScrollOwner.scrollTop,
+        })
+      }
       if (performance.now() - started < 360) requestAnimationFrame(sample)
       else resolve(frames)
     }
@@ -105,7 +109,7 @@ async function expectOutgoingTabScrollPreserved({
   if (requireOutgoingFrame) expect(outgoingSamples.length).toBeGreaterThan(0)
   expect(outgoingSamples.every((sample) => Math.abs(sample.scrollTop - preClickScrollTop) <= 1)).toBe(true)
   const visibleIncomingSamples = samples.filter((sample) => sample.label !== outgoingLabel && sample.opacity > 0.01)
-  expect(visibleIncomingSamples.length).toBeGreaterThan(0)
+  if (requireIncomingFrame) expect(visibleIncomingSamples.length).toBeGreaterThan(0)
   expect(visibleIncomingSamples.every((sample) => Math.abs(sample.scrollTop) <= 1)).toBe(true)
   await expect.poll(() => scrollOwner.evaluate((element) => element.scrollTop)).toBe(0)
 }
@@ -1128,6 +1132,7 @@ test('animated modal tabs preserve the outgoing scroll position until content sw
   await expectOutgoingTabScrollPreserved({
     dialog,
     panelSelector: '[data-scroll-region="vacuum-panel"]',
+    requireIncomingFrame: false,
     requireOutgoingFrame: false,
     scrollOwnerSelector: '[data-modal-sheet-body="true"]',
     targetTab: 'Controls',

@@ -163,6 +163,7 @@ const EXPECTED_PHYSICAL_MODAL_CALLSITES = {
   'src/components/hass/SprinklerController.tsx:SprinklerController': 1,
   'src/components/hass/VacuumCard.tsx:VacuumModal': 1,
   'src/components/hass/WeatherSummary.tsx:WeatherSummary': 1,
+  'src/components/hass/wakeLights/WakeLightModalContent.tsx:WakeLightModal': 1,
   'src/components/hass/recipes/RecipeDetailModal.tsx:RecipeDetailModal': 1,
   'src/components/hass/recipes/RecipeFloatingActions.tsx:RecipeFilterSheet': 1,
   'src/components/hass/recipes/RecipeFloatingActions.tsx:RecipeSortSheet': 1,
@@ -299,6 +300,25 @@ async function openHarness(page: Page, harness: string, values: string[]) {
 }
 
 const MODAL_CASES: ModalCase[] = [
+  {
+    expectedScrollMode: 'panes',
+    expectedSize: 'workspace',
+    id: 'wake-light',
+    open: page => openButtonModal(page, 'master-bedroom', /Wake-Light Alarms Next/i, 'Master Bedroom Wake-Light Alarms'),
+    physicalCallsite: 'src/components/hass/wakeLights/WakeLightModalContent.tsx:WakeLightModal',
+    selectTabs: ['Wake Alarms', 'Defaults'],
+  },
+  {
+    expectedScrollMode: 'body',
+    expectedSize: 'workspace',
+    id: 'wake-light-editor',
+    open: async page => {
+      const dialog = await openButtonModal(page, 'master-bedroom', /Wake-Light Alarms Next/i, 'Master Bedroom Wake-Light Alarms')
+      await dialog.getByRole('button', { name: 'Add Wake Alarm', exact: true }).click()
+      return page.getByRole('dialog', { name: 'Add Wake Alarm · Master Bedroom' })
+    },
+    physicalCallsite: 'src/components/hass/wakeLights/WakeLightModalContent.tsx:WakeLightModal',
+  },
   {
     expectedScrollMode: 'body',
     expectedSize: 'media',
@@ -1085,15 +1105,15 @@ test.describe('complete ModalSheet inventory acceptance', () => {
 
   test('reconciles physical ModalSheet nodes with expanded review surfaces', () => {
     expect(modalInventoryCounts()).toEqual({
-      directModalSheetJsxCallsites: 29,
-      expandedReviewRows: 31,
+      directModalSheetJsxCallsites: 30,
+      expandedReviewRows: 32,
       missingCenteredGeometryCallsites: [],
       optionPickerConsumerCallsites: EXPECTED_OPTION_PICKER_CONSUMERS,
       optionPickerSheetConsumers: 2,
       physicalCallsiteCounts: EXPECTED_PHYSICAL_MODAL_CALLSITES,
     })
-    expect(MODAL_CASES).toHaveLength(32)
-    expect(LANDSCAPE_INTENT_CASES).toHaveLength(51)
+    expect(MODAL_CASES).toHaveLength(34)
+    expect(LANDSCAPE_INTENT_CASES).toHaveLength(53)
     expect([...new Set(MODAL_CASES.map((modalCase) => modalCase.physicalCallsite))].sort()).toEqual(
       Object.keys(EXPECTED_PHYSICAL_MODAL_CALLSITES).sort(),
     )

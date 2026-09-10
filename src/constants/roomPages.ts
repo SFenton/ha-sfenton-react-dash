@@ -3,6 +3,7 @@ import type { ControlSemanticsResolver } from '../components/core/controlSemanti
 import { BATHROOM_FANS } from './bathroomFans'
 import { GARAGE_DOOR_ENTITY_IDS } from './garageDoors'
 import { MASTER_BEDROOM_HUMIDIFIER } from './humidifiers'
+import { MASTER_BEDROOM_WAKE_LIGHT } from './wakeLights'
 import {
   MEDIA_REMOTE_CONFIGS,
   MUSIC_ROOM_ACTIVE_MEDIA_SOURCE_ENTITY_ID,
@@ -18,7 +19,7 @@ import {
 } from './mediaRemotes'
 import { MEDIA_COPY_KEYS, MEDIA_COPY_NAMESPACE, copy } from '../i18n'
 
-export type RoomSourceKind = 'air' | 'appliance' | 'climate' | 'contact' | 'fan' | 'grill' | 'humidifier' | 'laundry' | 'light' | 'media' | 'occupancy' | 'power' | 'vacuum' | 'vent'
+export type RoomSourceKind = 'air' | 'appliance' | 'climate' | 'contact' | 'fan' | 'grill' | 'humidifier' | 'laundry' | 'light' | 'media' | 'occupancy' | 'power' | 'vacuum' | 'vent' | 'wake-light'
 type RoomSourceBaseAction = Exclude<EntityBasicAction, { type: 'navigate' }>
 export type RoomSourceCardAction = RoomSourceBaseAction | EntityStateAction<RoomSourceBaseAction>
 
@@ -66,13 +67,15 @@ export interface RoomSourceModalItem {
 }
 
 // `app-launch` keeps square branded tiles in a responsive grid.
-// `lead-row` renders the first card as a full-width row above a responsive grid of the remaining cards.
-export type RoomSourceSectionLayout = 'app-launch' | 'lead-row'
+// `lead-row` renders the first card above the remaining controls.
+// `two-column-fill` keeps a section at two responsive columns and consumes all of its available width.
+export type RoomSourceSectionLayout = 'app-launch' | 'lead-row' | 'two-column-fill'
 
 export interface RoomSourceSectionConfig {
   cards: RoomSourceCardConfig[]
   layout?: RoomSourceSectionLayout
   showOnRoomPage?: boolean
+  span?: 'full'
   title: string
 }
 
@@ -205,7 +208,18 @@ export const ROOM_PAGE_CONFIGS: Record<string, RoomPageSourceConfig> = {
       { title: 'Air Quality', entityId: 'sensor.master_bedroom_air_purifier_pm2_5', icon: 'mdi:air-purifier', kind: 'air', hash: '#air-purifier', showState: true },
     ],
     sourceSections: [
-      { title: 'SleepyPod', cards: [
+      { title: MASTER_BEDROOM_WAKE_LIGHT.roomSectionTitle, layout: 'two-column-fill', cards: [
+        {
+          title: MASTER_BEDROOM_WAKE_LIGHT.title,
+          entityId: MASTER_BEDROOM_WAKE_LIGHT.statusEntityId,
+          icon: 'mdi:weather-sunset-up',
+          kind: 'wake-light',
+          hash: MASTER_BEDROOM_WAKE_LIGHT.hash,
+          semantics: modalSemantics,
+          showState: true,
+        },
+      ] },
+      { title: 'SleepyPod', layout: 'two-column-fill', cards: [
         { title: "Stephen's Bed", entityId: 'climate.sleepypod_eight_pod_left_side', icon: 'mdi:bed', kind: 'climate', hash: '#stephens-bed', showState: true, stateTone: 'climate-action' },
         { title: "Steph's Bed", entityId: 'climate.sleepypod_eight_pod_right_side', icon: 'mdi:bed', kind: 'climate', hash: '#stephs-bed', showState: true, stateTone: 'climate-action' },
       ] },

@@ -7,6 +7,7 @@ import modalHumidifier from './locales/en/modals/humidifier.json' with { type: '
 import modalRecipe from './locales/en/modals/recipe.json' with { type: 'json' }
 import modalSleepypod from './locales/en/modals/sleepypod.json' with { type: 'json' }
 import modalVacuum from './locales/en/modals/vacuum.json' with { type: 'json' }
+import modalWakeLight from './locales/en/modals/wakeLight.json' with { type: 'json' }
 import modalWeather from './locales/en/modals/weather.json' with { type: 'json' }
 import pageAdmin from './locales/en/pages/admin.json' with { type: 'json' }
 import pageCustomLights from './locales/en/pages/customLights.json' with { type: 'json' }
@@ -31,6 +32,7 @@ export const resources = {
     modalRecipe,
     modalSleepypod,
     modalVacuum,
+    modalWakeLight,
     modalWeather,
     pageAdmin,
     pageCustomLights,

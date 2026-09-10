@@ -1,6 +1,7 @@
 import { mockEntitiesFixture } from './appEntities'
 import { BATHROOM_FAN_CONFIGS } from '../../constants/bathroomFans'
 import { isChatMockCommand, MOCK_CHAT_AGENT, mockChatMessages, mockChatRequest, mockChatServer, mockChatSubscribe } from './chatServer'
+import { applyMockWakeCommand, resetMockWakeCommands, setMockWakeResponse } from './wakeLightCommand'
 
 export interface MockEntity {
   attributes: Record<string, unknown>
@@ -50,6 +51,25 @@ const mockConnectionListeners = new Map<string, Set<() => void>>()
 let mockHassRevision = 0
 let mockDonetickTaskLoadDelayMs = 0
 let mockRecipeQueryDelayMs = 0
+const pendingWakeCommands: { request: Record<string, unknown>; resolve: (value: unknown) => void; reject: (reason: Error) => void }[] = []
+let mockWakeEpisodeSequence = 0
+
+function finishMockWakeCommand(request: Record<string, unknown>) {
+  const result = applyMockWakeCommand(
+    mockEntities['sensor.master_bedroom_wake_light'],
+    isRecord(request.serviceData) ? request.serviceData : {},
+  )
+  if (result.outcome === 'accepted') notifyMockHass()
+  return { response: result }
+}
+
+export function resolvePendingMockWakeCommands() {
+  for (const pending of pendingWakeCommands.splice(0)) pending.resolve(finishMockWakeCommand(pending.request))
+}
+
+export function rejectPendingMockWakeCommands() {
+  for (const pending of pendingWakeCommands.splice(0)) pending.reject(new Error('Mock wake rejection'))
+}
 
 export function getMockHassRevision() {
   return mockHassRevision
@@ -95,6 +115,11 @@ export function setMockEntityAttribute(entityId: string, attribute: string, valu
   const target = mockEntities[entityId]
   if (!target) return
   target.attributes = { ...target.attributes, [attribute]: value }
+  if (entityId === 'sensor.master_bedroom_wake_light' && attribute === 'active_occurrences') {
+    target.attributes.episode_ref = Array.isArray(value) && value.length
+      ? target.attributes.episode_ref ?? `mock-wake-episode-${++mockWakeEpisodeSequence}`
+      : null
+  }
   target.last_updated = new Date().toISOString()
   notifyMockHass()
 }
@@ -169,6 +194,71 @@ function emptyHumidifierSchedule() {
 }
 
 let mockHumidifierSchedule = emptyHumidifierSchedule()
+
+function mockWakeLightAttributes() {
+  return {
+    contract_version: 6,
+    command_available: true,
+    episode_ref: null,
+    current_blockers: [],
+    last_failure: null,
+    next_ramp_minutes: 30,
+    limits: { maximum_episode_minutes: 120, interruption_policy: 'fail_closed' },
+    active_occurrences: [],
+    alarms: [
+      {
+        date: null,
+        enabled: true,
+        id: 'weekday-wake',
+        kind: 'weekly',
+        label: 'Weekday Wake',
+        local_time: '06:30',
+        ramp_minutes: 30,
+        revision: 1,
+        source: 'native',
+        source_label: null,
+        source_ref: null,
+        weekdays: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'],
+      },
+      {
+        date: '2030-06-15',
+        enabled: true,
+        id: 'early-flight',
+        kind: 'once',
+        label: 'Early Flight',
+        local_time: '04:45',
+        ramp_minutes: 15,
+        revision: 1,
+        source: 'native',
+        source_label: null,
+        source_ref: null,
+        weekdays: [],
+      },
+    ],
+    auto_relight_blocked_until: null,
+    available: true,
+    commanded_brightness_pct: 0,
+    defaults: {
+      post_wake_hold_minutes: 5,
+      ramp_minutes: 30,
+    },
+    failures: [],
+    last_cancellation: null,
+    last_outcome: null,
+    next_wake_at: '2030-06-10T06:30:00-07:00',
+    profile_id: 'master-bedroom',
+    progress: 0,
+    revision: 3,
+    safety: {
+      light_state: 'ready',
+      light_target_name: 'Master Bedroom Lights',
+      occupancy_state: 'off',
+      pbl_state: 'ready',
+      vacation_state: 'off',
+    },
+    alarm_links: {},
+  }
+}
 
 const initialMockDailyWeatherForecast = [
   { datetime: '2026-06-10T07:00:00+00:00', condition: 'sunny', temperature: 65, templow: 48, precipitation_probability: 0, precipitation: 0, humidity: 74, dew_point: 48, cloud_coverage: 57, wind_speed: 3.56, wind_gust_speed: 7.97, wind_bearing: 185, uv_index: 6.7 },
@@ -893,6 +983,10 @@ export type MockHassDebugApi = {
   setRecipeQueryDelay: (delayMs: number) => void
   setInventoryItems: (location: string, items: Record<string, unknown>[]) => void
   setTodoItems: (entityId: string, items: MockTodoItem[]) => void
+  resolveWakeCommands: () => void
+  rejectWakeCommands: () => void
+  setWakeResponse: (outcome: string | null) => void
+  getEntity: (entityId: string) => MockEntity | null
 }
 
 function exposeMockHassDebugApi() {
@@ -936,6 +1030,10 @@ function exposeMockHassDebugApi() {
       subscriptions: () => [...mockChatServer.subscriptions.values()].reduce((count, subscribers) => count + subscribers.size, 0),
     },
     freeSleepSchedules: () => cloneRecord(mockEntities['sensor.nightcanvasrestful_schedules'].attributes),
+    resolveWakeCommands: resolvePendingMockWakeCommands,
+    rejectWakeCommands: rejectPendingMockWakeCommands,
+    setWakeResponse: setMockWakeResponse,
+    getEntity: entityId => mockEntities[entityId] ? structuredClone(mockEntities[entityId]) : null,
     setCallServiceOutcome: setMockCallServiceOutcome,
     setConnectionStatus: setMockConnectionStatus,
     setDailyWeatherForecast: setMockDailyWeatherForecast,
@@ -1155,6 +1253,7 @@ export const explicitMockEntities: Record<string, MockEntity> = {
   'climate.sleepypod_eight_pod_right_side': entity('climate.sleepypod_eight_pod_right_side', 'unavailable', { current_temperature: 77, hvac_modes: ['off', 'heat'], max_temp: 110, min_temp: 55, target_temp_step: 1, temperature: null }),
   'number.master_bedroom_sleepypod_eight_pod_left_target_level': entity('number.master_bedroom_sleepypod_eight_pod_left_target_level', 'unavailable', { max: 10, min: -10, step: 1 }),
   'number.master_bedroom_sleepypod_eight_pod_right_target_level': entity('number.master_bedroom_sleepypod_eight_pod_right_target_level', 'unavailable', { max: 10, min: -10, step: 1 }),
+  'sensor.master_bedroom_wake_light': entity('sensor.master_bedroom_wake_light', 'scheduled', mockWakeLightAttributes()),
   'number.nightcanvasrestful_left_target_temperature': entity('number.nightcanvasrestful_left_target_temperature', '-1', { ...freeSleepLevelAttributes }),
   'number.nightcanvasrestful_right_target_temperature': entity('number.nightcanvasrestful_right_target_temperature', '0', { ...freeSleepLevelAttributes }),
   'number.nightcanvasrestful_left_bedtime_temperature': entity('number.nightcanvasrestful_left_bedtime_temperature', '0', { ...freeSleepLevelAttributes }),
@@ -1680,6 +1779,8 @@ export function resetMockHass() {
   mockCallServiceCalls.length = 0
   mockChatMessages.length = 0
   mockChatServer.reset()
+  rejectPendingMockWakeCommands()
+  resetMockWakeCommands()
   mockCallServiceOutcomes.clear()
   mockScheduleMessages.length = 0
   mockTodoUpdateMessages.length = 0
@@ -1736,6 +1837,8 @@ export function resetMockHass() {
   mockEntities['sensor.master_bedroom_sleepypod_eight_pod_left_alarm_state'].attributes.snoozed_until = null
   mockEntities['sensor.master_bedroom_sleepypod_eight_pod_right_alarm_state'].state = 'idle'
   mockEntities['sensor.master_bedroom_sleepypod_eight_pod_right_alarm_state'].attributes.snoozed_until = null
+  mockEntities['sensor.master_bedroom_wake_light'].state = 'scheduled'
+  mockEntities['sensor.master_bedroom_wake_light'].attributes = mockWakeLightAttributes()
   for (const room of thermostatRoomMockData) {
     mockEntities[`switch.living_room_thermostat_contact_sensors_${room.key}_track_only_when_occupied`].state = 'trackOnlyWhenOccupied' in room ? room.trackOnlyWhenOccupied : 'off'
     mockEntities[room.climate].attributes.away_mode_active = false
@@ -1911,6 +2014,12 @@ export const mockState: MockHassState = {
   helpers: {
     callService: (params) => {
       mockCallServiceCalls.push(params)
+      if (params.domain === 'wake_light' && params.service === 'command' && params.returnResponse === true) {
+        const outcome = mockCallServiceOutcomes.get(mockCallServiceOutcomeKey('wake_light', 'command')) ?? 'resolve'
+        if (outcome === 'reject') return Promise.reject(new Error('Mock wake rejection'))
+        if (outcome === 'pending') return new Promise((resolve, reject) => pendingWakeCommands.push({ request: params, resolve, reject }))
+        return Promise.resolve(finishMockWakeCommand(params))
+      }
       const outcome = typeof params.domain === 'string' && typeof params.service === 'string'
         ? mockCallServiceOutcomes.get(mockCallServiceOutcomeKey(params.domain, params.service))
         : undefined

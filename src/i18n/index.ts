@@ -60,6 +60,122 @@ export const HUMIDIFIER_COPY_NAMESPACE = 'modalHumidifier' as const
 export const MEDIA_COPY_NAMESPACE = 'pageMedia' as const
 export const VACUUM_COPY_NAMESPACE = 'modalVacuum' as const
 export const WEATHER_COPY_NAMESPACE = 'modalWeather' as const
+export const WAKE_LIGHT_COPY_NAMESPACE = 'modalWakeLight' as const
+export const WAKE_LIGHT_COPY_KEYS = {
+  progress: { stopping: 'progress.stopping' },
+  feedback: {
+    conflict: 'feedback.conflict', episodeLimit: 'feedback.episodeLimit',
+    inactive: 'feedback.inactive', transport: 'feedback.transport',
+  },
+  actions: {
+    sourceEditor: 'actions.sourceEditor', reloadAlarm: 'actions.reloadAlarm',
+  },
+  phases: {
+    idle: 'phases.idle', scheduled: 'phases.scheduled', ramping: 'phases.ramping',
+    holding: 'phases.holding', snoozed: 'phases.snoozed', recovering: 'phases.recovering',
+    blocked: 'phases.blocked', unavailable: 'phases.unavailable', stopped: 'phases.stopped', completed: 'phases.completed',
+  },
+  blockers: {
+    source: 'blockers.source', presence: 'blockers.presence', blocker: 'blockers.blocker',
+    legacy: 'blockers.legacy', target: 'blockers.target',
+  },
+  behavior: { activeStop: 'behavior.activeStop', dropout: 'behavior.dropout', protocol: 'behavior.protocol' },
+  active: {
+    cancelledByUser: 'active.cancelledByUser',
+    stopEpisode: 'active.stopEpisode',
+    title: 'active.title',
+  },
+  binding: {
+    alarmToggle: 'binding.alarmToggle',
+    label: 'binding.label',
+  },
+  description: 'description',
+  editor: {
+    addTitle: 'editor.addTitle',
+    addToBed: 'editor.addToBed',
+    addToBedUpdateHint: 'editor.addToBedUpdateHint',
+    alarmDate: 'editor.alarmDate',
+    alarmName: 'editor.alarmName',
+    alarmType: 'editor.alarmType',
+    back: 'editor.back',
+    daysRequired: 'editor.daysRequired',
+    defaultName: 'editor.defaultName',
+    delete: 'editor.delete',
+    enabled: 'editor.enabled',
+    futureDateRequired: 'editor.futureDateRequired',
+    nameRequired: 'editor.nameRequired',
+    oneTime: 'editor.oneTime',
+    rampRequired: 'editor.rampRequired',
+    save: 'editor.save',
+    scheduled: 'editor.scheduled',
+    timeInvalid: 'editor.timeInvalid',
+    wakeTime: 'editor.wakeTime',
+    editTitle: 'editor.editTitle',
+  },
+  errors: {
+    commandFailed: 'errors.commandFailed',
+    unavailable: 'errors.unavailable',
+  },
+  modalTitle: 'modalTitle',
+  roomSection: 'roomSection',
+  title: 'title',
+  schedule: {
+    add: 'schedule.add',
+    adminOnly: 'schedule.adminOnly',
+    count: 'schedule.count',
+    empty: 'schedule.empty',
+    loading: 'schedule.loading',
+  },
+  sections: {
+    alarms: 'sections.alarms',
+    defaults: 'sections.defaults',
+  },
+  settings: {
+    description: 'settings.description',
+    hold: 'settings.hold',
+    holdDescription: 'settings.holdDescription',
+    holdUpdateHint: 'settings.holdUpdateHint',
+    ramp: 'settings.ramp',
+  },
+  ramp: {
+    none: 'ramp.none',
+    fiveMinutes: 'ramp.fiveMinutes',
+    tenMinutes: 'ramp.tenMinutes',
+    fifteenMinutes: 'ramp.fifteenMinutes',
+    thirtyMinutes: 'ramp.thirtyMinutes',
+  },
+  summary: {
+    everyDay: 'summary.everyDay',
+    ramp: 'summary.ramp',
+    scheduleAndTime: 'summary.scheduleAndTime',
+    weekdays: 'summary.weekdays',
+    weekends: 'summary.weekends',
+  },
+  tabs: {
+    alarms: 'tabs.alarms',
+    defaults: 'tabs.defaults',
+  },
+  tile: {
+    activeProgress: 'tile.activeProgress',
+    next: 'tile.next',
+    nextAndRamp: 'tile.nextAndRamp',
+    noActive: 'tile.noActive',
+    noneEnabled: 'tile.noneEnabled',
+    unavailable: 'tile.unavailable',
+    vacationBlocked: 'tile.vacationBlocked',
+  },
+} as const
+export const WAKE_LIGHT_PHASE_COPY_KEYS = {
+  idle: WAKE_LIGHT_COPY_KEYS.phases.idle,
+  scheduled: WAKE_LIGHT_COPY_KEYS.phases.scheduled,
+  ramping: WAKE_LIGHT_COPY_KEYS.phases.ramping,
+  holding: WAKE_LIGHT_COPY_KEYS.phases.holding,
+  snoozed: WAKE_LIGHT_COPY_KEYS.phases.snoozed,
+  recovering: WAKE_LIGHT_COPY_KEYS.phases.recovering,
+  unavailable: WAKE_LIGHT_COPY_KEYS.phases.unavailable,
+  degraded: WAKE_LIGHT_COPY_KEYS.phases.blocked,
+  blocked_vacation: WAKE_LIGHT_COPY_KEYS.phases.blocked,
+} as const
 export const GARAGE_DOOR_COPY_KEYS = {
   sendingClose: 'garageDoor.sendingClose',
   sendingOpen: 'garageDoor.sendingOpen',

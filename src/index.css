@@ -82,6 +82,24 @@ button:focus {
   outline: none;
 }
 
+@media (forced-colors: none) {
+  html[data-rd-quiet-focus] :where(
+    button,
+    a[href],
+    [role='button'],
+    [role='link'],
+    [role='switch'],
+    summary,
+    input,
+    textarea,
+    select,
+    [tabindex]
+  ):focus {
+    outline: none !important;
+    outline-offset: 0 !important;
+  }
+}
+
 @media (hover: none), (pointer: coarse) {
   button:focus,
   button:focus-visible,

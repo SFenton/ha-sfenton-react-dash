@@ -52,7 +52,10 @@ authorize a live browser, arbitrary service, or external destination.
   bodies retain strict actual end inset and finite terminal-control clearance even
   when pane mode is preferred or content fits. Bounded normal-dialog panes require
   a hidden/clip body and a real eligible inner pane. Missing controls are failures,
-  never a success-shaped geometry fallback. Failures remain failed.
+  never a success-shaped geometry fallback. Explicit registry-owned read-only
+  states instead require one visible, named, noninteractive state terminal and
+  zero body controls; their content clearance is recorded separately. Failures
+  remain failed.
 - An incoming panel must exist and settle before its screenshot. Never freeze
   elapsed Date.now time or fix production animation to satisfy the harness.
   The source-declared empty vacuum state and recipe same-sheet details use named
@@ -66,6 +69,10 @@ authorize a live browser, arbitrary service, or external destination.
   `src/test/mocks` is overlaid into the exported baseline inputs so both builds
   use identical backend fixtures; the overlay and both asset digests are recorded.
   No clean baseline worktree or production source is changed.
+- A registry-owned route addition is not a whole-page parity exclusion. Its exact
+  new geometry/semantics and all inherited sections are asserted first, with the
+  added section visible in separate captures. Only that validated section may be
+  removed for inherited-content pixel comparison; all original thresholds remain.
 - No commit, push, deployment, live service call, or external-system mutation is
   authorized by validation. Preserve one React tree, optimistic path and HA owner.
 
@@ -99,8 +106,12 @@ dimensions to positional arrays or confuse a resize with native input emulation.
 | navigation | page-shell-grid | home, back-page | Do content, grid, fixed controls, Back/menu and focus remain usable across the named form-factor and stretch-return journey? |
 | host | host | legacy, panel | Does the actual product bridge preserve its app during synthetic resizing and forward independent outer safe edges to the correctly sized inner viewport? |
 | preload | preload | inert | Is the hidden preload geometry inert while the visible app remains usable? |
+| wake-room | page-shell-grid | ready, no-enabled, unavailable, active | Does the standard room tile convey ready, no-enabled, unavailable and active state without moving, and open useful controls without issuing a command? |
+| wake-light | modal | alarms, defaults, empty, source-only, no-enabled, vacation, unavailable, incompatible, blocked, active, source-snoozed, recovering, spent-once, legacy-ramp | Are alarm controls, current blockers, source ownership, ramp choices and active Stop truthful, readable and reachable without changing the shared frame? |
+| wake-editor | modal | one-time, scheduled, unchanged, dirty, reverted, pending, rejected, revision-conflict, legacy-ramp | Does the one-time-first editor preserve exact dirty state, ramp selection and rejected/conflicting drafts while acceptance remains required before closing? |
+| wake-source | modal | pod-editor, pod-alarm-detail, back | Does source navigation close the old sheet before opening the authoritative Pod editor, preserve execution weekdays and linked-room meaning, and return without duplicate writes? |
 
-Source-derived inventory: 45 routes; 87
+Source-derived inventory: 45 routes; 88
 configured room/hash openers. These are not unique modal or backend-state counts.
 
 ## Device-only / outside local certification

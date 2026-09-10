@@ -1,7 +1,9 @@
+// @covers scripts/layout/plan.ts
+// @covers scripts/layout/review.ts
 import { createServer } from 'node:http'
 import { readFileSync } from 'node:fs'
 import { hash, stableHash } from './shared'
-import { isBaselineBuildInput, layoutWorkerCount, stopOwnedProcess, verifyServedBuild } from './run'
+import { executionWorkerCount, isBaselineBuildInput, layoutWorkerCount, stopOwnedProcess, verifyServedBuild } from './run'
 import type { ChildProcess } from 'node:child_process'
 
 describe('owned build verification', () => {
@@ -25,6 +27,10 @@ describe('owned build verification', () => {
     const kill = vi.fn()
     await stopOwnedProcess({ exitCode: null, signalCode: 'SIGTERM', kill } as unknown as ChildProcess)
     expect(kill).not.toHaveBeenCalled()
+  })
+  it('serializes evidence runs that require the WPE WebKit context', () => {
+    expect(executionWorkerCount(['touch-chromium', 'fine-chromium', 'touch-webkit'])).toBe(1)
+    expect(executionWorkerCount(['touch-chromium', 'fine-chromium'])).toBe(2)
   })
   it('rejects a merely reachable identical build when the owned server nonce is wrong', async () => {
     const body = '<!doctype html><title>Controlled local fixture</title>'

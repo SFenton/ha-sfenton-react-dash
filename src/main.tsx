@@ -4,10 +4,15 @@ import './i18n/init'
 import './index.css'
 import App from './App.tsx'
 import { installReactDashboardLifecycle } from './lifecycle/reactDashboardLifecycle'
+import { installFocusAppearance } from './utils/focusAppearance'
 
 const root = createRoot(document.getElementById('root')!)
+const disposeFocusAppearance = installFocusAppearance()
 installReactDashboardLifecycle({
-  onDispose: () => root.unmount(),
+  onDispose: () => {
+    disposeFocusAppearance()
+    root.unmount()
+  },
 })
 
 root.render(

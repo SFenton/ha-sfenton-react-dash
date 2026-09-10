@@ -98,8 +98,8 @@ export default defineConfig({
       ? [{
           name: 'webkit',
           testMatch: managedRun
-            ? /(?:chat-ux|iframe-lifecycle|weather-(?:data|scenes|atmosphere-scenes)|modal-(?:backdrop-bands|rotation-regressions|sheet-(?:lifecycle|performance|webkit))|layout-acceptance)\.spec\.ts/
-            : /(?:chat-ux|iframe-lifecycle|weather-(?:data|scenes|atmosphere-scenes)|modal-(?:backdrop-bands|rotation-regressions|sheet-(?:lifecycle|performance|webkit)))\.spec\.ts/,
+            ? /(?:chat-ux|iframe-lifecycle|wake-light-alarms|weather-(?:data|scenes|atmosphere-scenes)|modal-(?:backdrop-bands|rotation-regressions|sheet-(?:lifecycle|performance|webkit))|layout-acceptance)\.spec\.ts/
+            : /(?:chat-ux|iframe-lifecycle|wake-light-alarms|weather-(?:data|scenes|atmosphere-scenes)|modal-(?:backdrop-bands|rotation-regressions|sheet-(?:lifecycle|performance|webkit)))\.spec\.ts/,
           use: {
             ...devices['iPhone 13'],
             browserName: 'webkit' as const,

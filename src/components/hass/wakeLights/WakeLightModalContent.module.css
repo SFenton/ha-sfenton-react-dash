@@ -1,0 +1,181 @@
+.modalSheetPage,
+.modalBody,
+.modalPanel,
+.panelStack,
+.section,
+.editorStack {
+  display: grid;
+  min-width: 0;
+  align-content: start;
+}
+
+.modalSheetPage {
+  min-height: 0;
+}
+
+.modalBody {
+  min-height: 0;
+  gap: 18px;
+  padding-top: 2px;
+  overflow: visible;
+}
+
+.modalPanel {
+  min-height: 0;
+  gap: 18px;
+  overflow-anchor: none;
+  opacity: 1;
+  transform: translate3d(0, 0, 0);
+  transition:
+    opacity 170ms ease,
+    transform 170ms ease;
+}
+
+.modalPanel[data-modal-tab-transition-state='exiting'] {
+  opacity: 0;
+  transform: translate3d(0, 5px, 0);
+  transition-duration: 130ms;
+}
+
+.modalPanel[data-modal-tab-transition-state='pre-entering'] {
+  opacity: 0;
+  transform: translate3d(0, 5px, 0);
+  transition: none;
+}
+
+/* WebKit can retain stale grid track heights after an alert and viewport change. */
+:global([data-modal-presentation='sheet']) .modalPanel,
+:global([data-modal-presentation='landscape-dialog']) .modalPanel {
+  display: flex;
+  flex-direction: column;
+}
+
+:global([data-modal-presentation='sheet']) .modalSheetPage,
+:global([data-modal-presentation='landscape-dialog']) .modalSheetPage {
+  display: block;
+}
+
+:global([data-modal-presentation='sheet']) .modalBody,
+:global([data-modal-presentation='landscape-dialog']) .modalBody {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+}
+
+:global([data-modal-presentation='sheet']) .modalBody > *,
+:global([data-modal-presentation='landscape-dialog']) .modalBody > * {
+  flex: 0 0 auto;
+}
+
+.panelStack {
+  gap: 22px;
+}
+
+.section,
+.editorStack {
+  gap: 10px;
+}
+
+.rampField {
+  display: grid;
+  min-width: 0;
+  gap: 8px;
+  margin: 0;
+  border: 0;
+  padding: 0;
+}
+
+.rampField legend {
+  padding: 0;
+  color: var(--color-text-muted);
+  font-size: 0.78rem;
+  font-weight: 780;
+}
+
+.rampGrid {
+  width: 100%;
+}
+
+.activeOccurrences,
+.activeOccurrence {
+  display: grid;
+  gap: 10px;
+}
+
+.activeOccurrence {
+  padding: 14px;
+  border: 1px solid var(--color-glass-soft);
+  border-radius: 18px;
+  background: var(--color-glass-soft);
+}
+
+.activeOccurrenceSummary {
+  display: grid;
+  gap: 3px;
+}
+
+.activeOccurrenceSummary strong {
+  font-size: 0.98rem;
+}
+
+.activeOccurrenceSummary span {
+  color: var(--color-text-muted);
+  font-size: 0.82rem;
+}
+
+.preload {
+  display: grid;
+  min-height: 420px;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 14px;
+}
+
+.preload > span {
+  min-height: 72px;
+  border-radius: 22px;
+}
+
+:global([data-modal-presentation='dialog']) .modalSheetPage {
+  height: 100%;
+}
+
+:global([data-modal-presentation='dialog']) .modalBody {
+  grid-template-columns: minmax(0, 1fr);
+  height: 100%;
+  overflow: hidden;
+}
+
+:global([data-modal-presentation='dialog']) .modalPanel {
+  height: 100%;
+  min-height: 0;
+  max-height: 100%;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+}
+
+:global([data-modal-presentation='dialog']) .modalPanel::-webkit-scrollbar {
+  display: none;
+}
+
+:global([data-modal-presentation='landscape-dialog']) .modalBody {
+  gap: 12px;
+  padding-top: 0;
+}
+
+:global([data-modal-presentation='landscape-dialog']) .panelStack {
+  gap: 10px;
+}
+
+:global([data-modal-presentation='landscape-dialog']) .modalPanel {
+  height: auto;
+  max-height: none;
+  overflow: visible;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .modalPanel {
+    transition: none;
+  }
+}

@@ -4,11 +4,13 @@ import { layoutProfile } from '../responsive-acceptance-data'
 import type { ScenarioId } from './contracts'
 import { applyProfile, waitForModalReady, waitForRoute } from './evidence'
 import { openQuickLinksTab } from '../quick-links'
+import { enterWakeState, isWakeScenario } from './wakeLight'
 
 export async function openSurface(page: Page, scenario: ScenarioId): Promise<Locator> {
-  const route = scenario === 'filters' ? 'recipes' : scenario === 'form' ? 'to-do' : scenario === 'remote' ? 'music-room' : scenario === 'vacuum' ? 'vacuums' : 'overview'
+  const route = isWakeScenario(scenario) ? 'master-bedroom' : scenario === 'filters' ? 'recipes' : scenario === 'form' ? 'to-do' : scenario === 'remote' ? 'music-room' : scenario === 'vacuum' ? 'vacuums' : 'overview'
   await page.goto(`/index.html?path=${route}${scenario === 'summary' ? '&user=stephen#daily-report' : ''}`)
   await waitForRoute(page, route, scenario === 'summary')
+  if (isWakeScenario(scenario)) await page.getByRole('button', { name: /Wake-Light Alarms/ }).click()
   if (scenario === 'quick-links') await openQuickLinksTab(page)
   if (scenario === 'weather') await page.getByRole('button', { name: /Open seven-day weather forecast/ }).click()
   if (scenario === 'filters') await page.locator('[data-floating-action-dock]').getByRole('button', { name: 'Filter', exact: true }).click()
@@ -30,6 +32,10 @@ export async function openSurface(page: Page, scenario: ScenarioId): Promise<Loc
 }
 
 export async function enterState(dialog: Locator, scenario: ScenarioId, state: string) {
+  if (isWakeScenario(scenario)) {
+    await enterWakeState(dialog, scenario, state)
+    return
+  }
   if (scenario === 'quick-links' && (state === 'rooms' || state === 'back')) {
     await dialog.getByRole('button', { name: 'Rooms', exact: true }).click()
     if (state === 'back') await dialog.getByRole('button', { name: 'Back', exact: true }).click()

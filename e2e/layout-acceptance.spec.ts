@@ -7,8 +7,10 @@ import { layoutProfile } from './responsive-acceptance-data'
 import { openQuickLinksTab, quickLinksLayout } from './quick-links'
 import { MUSIC_ROOM_REMOTE_ENTITY_ID } from '../src/constants/mediaRemotes'
 import { chatStateFacts, openChatState } from './chat-layout'
+import { isWakeScenario, openWakeRoomState, wakeRoomFacts, wakeStateFacts } from './layout/wakeLight'
 
 async function stateFacts(page: Page, dialog: Locator, scenario: ScenarioId, state: string) {
+  if (isWakeScenario(scenario)) return wakeStateFacts(dialog, scenario, state)
   const preferredScrollMode = scenario === 'remote' || scenario === 'vacuum' || (scenario === 'quick-links' && state === 'rooms') ? 'panes' : 'body'
   const facts: Record<string, unknown> = await modalFacts(dialog, preferredScrollMode)
   await expect(dialog).toHaveAttribute('data-layout-mounted', 'original')
@@ -227,6 +229,17 @@ for (const scenario of SCENARIO_IDS) {
     expect(obligations.length, 'Required runtime loop is nonempty').toBeGreaterThan(0)
     await page.setViewportSize(layoutProfile(journey(scenario, context)[0]).viewport)
     const capabilities = await actualCapabilities(page, browserName, browser.version(), isMobile, hasTouch)
+    if (scenario === 'wake-room') {
+      for (const state of SURFACE_CONTRACTS[scenario].states) {
+        await openWakeRoomState(page, state)
+        for (const obligation of obligations.filter(entry => entry.state === state)) {
+          await applyProfile(page, obligation.profile)
+          const facts = await wakeRoomFacts(page, state)
+          await checkpoint(page, page, testInfo, obligation, capabilities, facts)
+        }
+      }
+      return
+    }
     if (scenario === 'form' && isMobile) await page.addInitScript(() => {
       Object.defineProperty(navigator, 'maxTouchPoints', { configurable: true, value: 1 })
       const viewport = Object.assign(new EventTarget(), { layoutSynthetic: true, width: innerWidth, height: innerHeight, offsetTop: 0, offsetLeft: 0, pageTop: 0, pageLeft: 0, scale: 1 })
@@ -313,12 +326,18 @@ for (const scenario of SCENARIO_IDS) {
       }
       return
     }
-    const dialog = await openSurface(page, scenario)
+    let dialog = await openSurface(page, scenario)
     const tabs = SURFACE_CONTRACTS[scenario].tabs
     if (tabs) assertDeclaredTabs(await dialog.getByRole('tab').evaluateAll((elements) =>
       elements.map((element) => element.getAttribute('aria-label') ?? element.textContent?.trim() ?? '')), tabs)
     for (const state of SURFACE_CONTRACTS[scenario].states) {
-      if (scenario === 'weather') await enterState(dialog, scenario, state)
+      if (isWakeScenario(scenario)) {
+        if (state !== SURFACE_CONTRACTS[scenario].states[0]) {
+          await closeMounted(dialog)
+          dialog = await openSurface(page, scenario)
+        }
+        await enterState(dialog, scenario, state)
+      } else if (scenario === 'weather') await enterState(dialog, scenario, state)
       if (scenario === 'quick-links' && state === 'rooms') await dialog.getByRole('button', { name: 'Rooms', exact: true }).click()
       if (scenario === 'quick-links' && state === 'back') await dialog.getByRole('button', { name: 'Back', exact: true }).click()
       if (scenario === 'summary') await dialog.getByRole('tab', { name: state === 'overdue' ? /^Overdue Chores/ : state === 'upcoming' ? 'Upcoming Chores' : /^Expired Food/ }).click()

@@ -15,6 +15,11 @@ The install hook applies a fail-closed compatibility patch to `home-assistant-js
 
 The experimental custom panel keeps Home Assistant's native sidebar on desktop; mobile remains full-viewport. This avoids unsupported top-window styling while the two hosts are evaluated in parallel.
 
+The production `wake_light` custom integration, config-flow prerequisites,
+PBL lease contract, Master Bedroom target evidence, service API, sensor schema,
+and local validation steps are documented in
+[`docs/wake-light-integration.md`](docs/wake-light-integration.md).
+
 ### Home Assistant chat retention
 
 The repo-owned `sfenton_react_chat` service and daily automation clear eligible

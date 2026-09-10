@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test'
 import { assertGuardedContext, guardContext, test as guardedTest } from './layout/fixture'
 import { modalFacts, waitForModalReady } from './layout/evidence'
+import { inspectRouteAddition, normalizeInspectedAddition } from './layout/routeAdditions'
 import { createServer } from 'node:http'
 
 guardedTest('built-in Playwright page and context receive the isolation fixture', async ({ page, context }) => {
@@ -8,6 +9,36 @@ guardedTest('built-in Playwright page and context receive the isolation fixture'
   expect(() => assertGuardedContext(context)).not.toThrow()
   await page.goto('about:blank')
   expect(await page.evaluate(() => '__layoutWorkerAttempt' in window)).toBe(true)
+})
+
+guardedTest('declared route additions cannot conceal changed inherited cards or extra sections', async ({ context }) => {
+  const baseline = await context.newPage()
+  const candidate = await context.newPage()
+  const inherited = ['sleepypod', 'media', 'climate'].map(name => `<section id="section-${name}" style="height:80px">
+    <h2 style="margin:0;line-height:20px;font-size:16px">${name}</h2>
+    <button data-variant="card" style="width:361px;height:60px;box-sizing:border-box">Existing ${name}</button>
+  </section>`).join('')
+  const addition = `<div data-responsive-section-item="true"><section id="section-sleep-&-wake" style="height:184px">
+    <h2 style="margin:0;line-height:64px;font-size:16px">Sleep & Wake</h2>
+    <button data-variant="card" data-action-kind="modal" style="width:361px;height:120px;border-radius:32px;box-sizing:border-box">Wake</button>
+  </section></div>`
+  const document = (content: string) => `<main style="display:grid;gap:18px;width:361px">${content}</main>`
+  await baseline.setContent(document(inherited))
+  await candidate.setContent(document(addition + inherited))
+  const inspected = await inspectRouteAddition(baseline, candidate, 'master-bedroom', 'phone-portrait')
+  expect(inspected).not.toBeNull()
+  const restore = await normalizeInspectedAddition(candidate, inspected!)
+  await expect(candidate.locator('[id="section-sleep-&-wake"]')).not.toBeVisible()
+  await restore()
+  await expect(candidate.locator('[id="section-sleep-&-wake"]')).toBeVisible()
+  await candidate.locator('#section-climate button').evaluate(button => { button.style.width = '320px' })
+  await expect(inspectRouteAddition(baseline, candidate, 'master-bedroom', 'phone-portrait')).rejects.toThrow()
+  await candidate.setContent(document(addition + inherited + '<section id="unclassified">Extra</section>'))
+  await expect(inspectRouteAddition(baseline, candidate, 'master-bedroom', 'phone-portrait')).rejects.toThrow()
+  await candidate.setContent(document(addition.replace('height:120px', 'height:119px') + inherited))
+  await expect(inspectRouteAddition(baseline, candidate, 'master-bedroom', 'phone-portrait')).rejects.toThrow()
+  await baseline.close()
+  await candidate.close()
 })
 
 test('readiness rejects missing and outgoing selected panels, then accepts the actual incoming panel', async ({ page }) => {
@@ -178,6 +209,35 @@ for (const overflow of ['auto', 'scroll'] as const) {
     await expect(modalFacts(dialog, 'panes')).rejects.toThrow('terminal geometry must be finite')
   })
 }
+
+guardedTest('declared read-only body requires one real noninteractive state terminal', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await page.setContent(`<div role="dialog" data-state="open" data-modal-presentation="dialog"
+    data-modal-geometry-intent="readonly-guard" data-scroll-mode="body"
+    style="position:fixed;left:170px;top:70px;width:1100px;height:760px">
+    <button aria-label="Close">Close</button>
+    <div data-modal-sheet-body style="height:160px;box-sizing:border-box;padding-bottom:10px;overflow:auto">
+      <div data-modal-content-measure style="position:relative;height:100%;display:flow-root">
+        <div id="state-terminal" role="group" aria-label="Read-only state" style="position:absolute;bottom:0">Observed state</div>
+      </div>
+    </div>
+  </div>`)
+  const dialog = page.getByRole('dialog')
+  await expect(modalFacts(dialog, 'body')).rejects.toThrow('requires terminal controls')
+  const facts = await modalFacts(dialog, 'body', '#state-terminal')
+  expect(facts.terminalKind).toBe('read-only-content')
+  expect(facts.terminalControlCount).toBe(0)
+  expect(facts.terminalControlGap).toBeNull()
+  expect(facts.terminalContentCount).toBe(1)
+  expect(facts.terminalContentGap).toBe(10)
+  await expect(modalFacts(dialog, 'body', '#missing')).rejects.toThrow('one state terminal')
+  await page.locator('#state-terminal').evaluate(node => { node.style.opacity = '0' })
+  await expect(modalFacts(dialog, 'body', '#state-terminal')).rejects.toThrow('visible, named, noninteractive')
+  await page.locator('#state-terminal').evaluate(node => { node.style.opacity = '1'; node.setAttribute('tabindex', '0') })
+  await expect(modalFacts(dialog, 'body', '#state-terminal')).rejects.toThrow('visible, named, noninteractive')
+  await page.locator('#state-terminal').evaluate(node => { node.removeAttribute('tabindex'); node.innerHTML = '<button>Unclassified action</button>' })
+  await expect(modalFacts(dialog, 'body', '#state-terminal')).rejects.toThrow('one state terminal and no controls')
+})
 
 for (const overflow of ['hidden', 'clip'] as const) {
   guardedTest(`bounded ${overflow} body requires a real eligible inner pane even when it fits`, async ({ page }) => {

@@ -147,6 +147,10 @@ export function isBaselineBuildInput(file: string) {
     || /^tsconfig(?:\.[a-zA-Z0-9_-]+)*\.json$/.test(file)
 }
 
+export function executionWorkerCount(contexts: LayoutPlan['contexts']) {
+  return contexts.includes('touch-webkit') ? 1 : 2
+}
+
 async function build(root: string, sourceRoot: string, directory: string, name: string, env: NodeJS.ProcessEnv) {
   const dist = resolve(directory, `${name}-dist`)
   const options = { mode: 'test', configLoader: 'native', cacheDir: resolve(directory, `${name}-cache`), build: { outDir: dist, emptyOutDir: true } }
@@ -232,9 +236,10 @@ export async function runPlan(root: string, input: string, review = false) {
     writeJson(resolve(directory, 'selection.json'), selection)
     writeFileSync(resolve(directory, 'selected-tests.txt'), testList(selection))
     let executionError: unknown
+    const workers = Math.min(layoutWorkerCount(), executionWorkerCount(plan.contexts))
     try {
       await command(root, [playwrightCli, 'test', '--test-list', resolve(directory, 'selected-tests.txt'), '--forbid-only',
-        `--workers=${layoutWorkerCount()}`, '--retries=0', '--reporter=./e2e/layout/reporter.ts,list', '--output', resolve(directory, 'playwright')],
+        `--workers=${workers}`, '--retries=0', '--reporter=./e2e/layout/reporter.ts,list', '--output', resolve(directory, 'playwright')],
       childEnv, resolve(directory, 'execution.log'))
     } catch (error) { executionError = error }
     const ledger = readJson<ExecutionLedger>(resolve(directory, 'execution.json'))
