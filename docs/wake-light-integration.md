@@ -178,7 +178,7 @@ Wake Light:
   settle window, then samples the explicit wake leaves before the next step;
 - does not set color temperature in version 1;
 - sends an explicit 100% dispatch at the wake deadline;
-- holds 100% for exactly five minutes, then releases with
+- holds 100% for the configured post-wake duration, then releases with
   `completed`/`hold_complete`.
 
 The final dispatch is issued at the deadline, but Home Assistant, the network,
@@ -338,9 +338,10 @@ per-source link and schedule synchronization path.
 
 Defaults use `ramp_minutes` and `post_wake_hold_minutes`. New writes accept
 exactly `0`, `5`, `10`, `15`, or `30` for the ramp; `0` means no pre-wake
-fade, so the room is commanded to 100% at the wake deadline. The fixed
-post-wake hold is five minutes. Legacy 45- or 60-minute values remain readable
-but must be replaced with a supported choice before saving.
+fade, so the room is commanded to 100% at the wake deadline. New post-wake hold
+writes accept exactly `5`, `10`, `15`, or `30` minutes. Legacy 45- or 60-minute
+ramp values remain readable but must be replaced with a supported choice before
+saving.
 
 Stable service outcomes include `accepted`, `no_change`,
 `revision_conflict`, `request_id_conflict`, `invalid_request`, `not_found`,
@@ -370,7 +371,7 @@ editable field changes, and disables again when every edit is reverted.
 | Add or edit native alarm | Modal command | `upsert_alarm` | Insert or replace the draft alarm | Backend rejects stale profile/alarm revisions and source-owned records |
 | Add a one-time alarm to either bed | Toggle + modal command | `upsert_alarm` with `bed_sides` | Show the selected side while HA creates a temporary dated bed alarm | Contract 5 required; unavailable schedules reject the save without creating an unmanaged recurring alarm |
 | Delete native alarm | Destructive command | `delete_alarm` | Remove the selected alarm | Backend returns `not_found` or a revision conflict without mutation |
-| Ramp default | Radio selection | `update_defaults` | Show the selected 0, 5, 10, 15, or 30-minute duration | Backend rejects unsupported new values; hold remains fixed at five minutes |
+| Ramp and post-wake hold defaults | Radio selections | `update_defaults` | Show the selected supported durations | Backend rejects unsupported new values |
 | Per-alarm wake-light link | Toggle | `link_alarm` | Show requested link state | Links default to enabled; backend accepts only configured source sides and well-formed link keys |
 | Stop wake-light episode | Command | `end_episode` | Retain live state until HA confirms the stop | Ends the connected episode, preserves asleep PBL, and blocks auto-relight through the episode end |
 | Summary unavailable | Modal/state | None until available | None | Modal remains a useful setup/status entry point |
