@@ -33,6 +33,11 @@ import { BathroomFanCommandProvider } from '../components/hass/BathroomFanComman
 import { GrillModalContent } from '../components/hass/GrillModalContent'
 import { HumidifierModal, HumidifierModalContent } from '../components/hass/HumidifierModalContent'
 import { MediaRemoteModalContent, MediaRemoteModalNav } from '../components/hass/MediaRemoteModalContent'
+import { SleepypodAlarmWakeLightToggle, WakeLightModal, WakeLightModalPreload, WakeLightTile } from '../components/hass/wakeLights/WakeLightModalContent'
+import { normalizedBedAlarmTime, type WakeLightBedProvisioning } from '../components/hass/wakeLights/bedAlarmProvisioning'
+import { useWakeLightController } from '../components/hass/wakeLights/useWakeLightController'
+import { wakeLightAlarmLinkKey } from '../components/hass/wakeLights/wakeLightContract'
+import { alarmExecutionDay, alarmSourceDay, type AlarmDaySemantics } from '../components/hass/scheduleExecutionDay'
 import { BedTemperatureScopePrompt } from '../components/hass/BedTemperatureScopePrompt'
 import {
   EIGHT_SLEEP_MODAL_TABS,
@@ -166,6 +171,7 @@ import { ROOM_PAGE_CONFIGS, type RoomSourceCardAction, type RoomSourceCardConfig
 import { bathroomFanForPowerEntity } from '../constants/bathroomFans'
 import { humidifierForPowerEntity, type HumidifierConfig } from '../constants/humidifiers'
 import { MEDIA_REMOTE_CONFIGS, MUSIC_ROOM_MEDIA_LIVE_CHANGE_OPTIMISTIC_ENTITY_IDS, MUSIC_ROOM_MEDIA_OPTIMISTIC_ENTITY_IDS, type MediaRemoteConfig } from '../constants/mediaRemotes'
+import { wakeLightForStatusEntity, wakeLightSourceForSide, type WakeLightConfig } from '../constants/wakeLights'
 import { VACUUM_AUTO_CLEAN_CONTROLS } from '../constants/vacuumAutoClean'
 import {
   THERMOSTAT_MODAL_DIAL_GUTTER_PX,
@@ -182,6 +188,7 @@ import { RecipesPage } from './RecipesPage'
 import styles from './DashboardViewPage.module.css'
 
 const SLEEPYPOD_COPY_NAMESPACE = 'modalSleepypod' as const
+const BED_CONTROL_MODE = { CLIMATE: 'climate', LEGACY: 'legacy' } as const
 const SLEEPYPOD_DIAL_KEYS = {
   summaryWithCurrent: 'dial.summaryWithCurrent',
 } as const
@@ -270,6 +277,15 @@ function RoomGrid({ ariaLabel, children, itemSizing, layout }: { ariaLabel: stri
 
   if (layout === 'lead-row') {
     return <DynamicGrid ariaLabel={ariaLabel} className={styles.roomGrid} columns={2} itemSizing={itemSizing}>{children}</DynamicGrid>
+  }
+
+  if (layout === 'two-column-fill') {
+    return (
+      <DynamicGrid ariaLabel={ariaLabel} className={styles.roomGrid} columns={2}
+        itemSizing={itemSizing} lastRow="fill" layout="fill">
+        {children}
+      </DynamicGrid>
+    )
   }
 
   return (
@@ -444,7 +460,7 @@ function setRoomHash(hash: string) {
 }
 
 function toneForSourceKind(kind: RoomSourceKind): StatusRailChip['tone'] {
-  if (kind === 'light') return 'light'
+  if (kind === 'light' || kind === 'wake-light') return 'light'
   if (kind === 'air') return 'air'
   if (kind === 'climate' || kind === 'vent' || kind === 'fan' || kind === 'humidifier') return 'climate'
   if (kind === 'occupancy') return 'presence'
@@ -679,6 +695,12 @@ function roomOccupancyGroup(roomTitle: string) {
 
 function roomContactGroup(roomTitle: string) {
   return CONTACT_GROUPS.find((group) => contactRoomTitle(group) === roomTitle)
+}
+
+function wakeLightForRoomTitle(roomTitle: string) {
+  const room = Object.values(ROOM_PAGE_CONFIGS).find(candidate => candidate.title === roomTitle)
+  const card = room?.sourceSections.flatMap(section => section.cards).find(candidate => candidate.kind === 'wake-light')
+  return card ? wakeLightForStatusEntity(card.entityId) : undefined
 }
 
 function occupancySensorSubtitleForRoom(roomTitle: string, entities: Record<string, HassEntity | undefined>) {
@@ -995,6 +1017,7 @@ function RoomSourceCard(props: RoomSourceCardProps) {
   if (isDishwasherSourceCard(props.card)) return <DishwasherRoomSourceCard {...props} />
   if (props.card.control === 'bathroom-fan') return <BathroomFanRoomSourceCard {...props} />
   if (props.card.kind === 'humidifier') return <HumidifierRoomSourceCard {...props} />
+  if (props.card.kind === 'wake-light') return <WakeLightRoomSourceCard {...props} />
   if (props.card.control === 'garage-door') return <GarageDoorRoomSourceCard {...props} />
   if (props.card.kind === 'vacuum') return <VacuumRoomSourceCard {...props} />
   return <DefaultRoomSourceCard {...props} />
@@ -1007,6 +1030,16 @@ function BathroomFanRoomSourceCard({ card, onOpen, preload }: RoomSourceCardProp
   const content = <BathroomFanTile config={config} onOpen={() => onOpen(card)} preload={preload} />
   if (card.span === 'full') return <div className={styles.fullSpan}>{content}</div>
   return content
+}
+
+function WakeLightRoomSourceCard({ card, onOpen, preload }: RoomSourceCardProps) {
+  const config = wakeLightForStatusEntity(card.entityId)
+  if (!config) return <DefaultRoomSourceCard card={card} onOpen={onOpen} preload={preload} />
+  return (
+    <div className={card.span === 'full' ? styles.fullSpan : undefined}>
+      <WakeLightTile config={config} onOpen={() => onOpen(card)} preload={preload} />
+    </div>
+  )
 }
 
 function GarageDoorRoomSourceCard({ card }: RoomSourceCardProps) {
@@ -1178,9 +1211,31 @@ function MediaRoomSourceModal({ config, onClose, open, title }: { config: MediaR
 }
 
 function RoomSourceModal({ card, eightSleepModalStates, onClose, preload = false, preloadCard, roomTitle }: { card: RoomSourceCardConfig | null; eightSleepModalStates?: Partial<Record<string, EightSleepBedModalState>>; onClose: () => void; preload?: boolean; preloadCard?: RoomSourceCardConfig | null; roomTitle: string }) {
+  const destinationRef = useRef<{ hash: string; tab?: EightSleepModalTab } | null>(null)
+  const [bedEntry, setBedEntry] = useState<{ hash: string; tab?: EightSleepModalTab } | null>(null)
+  useEffect(() => {
+    if (card?.hash && destinationRef.current && card.hash !== destinationRef.current.hash) {
+      destinationRef.current = null
+    }
+  }, [card?.hash])
+  const requestDestination = (hash: string, tab?: EightSleepModalTab) => {
+    destinationRef.current = { hash, tab }
+    onClose()
+  }
+  const finishDestination = () => {
+    const destination = destinationRef.current
+    destinationRef.current = null
+    if (!destination) return
+    setBedEntry(destination)
+    setRoomHash(destination.hash)
+  }
   const currentRenderCard = card ?? preloadCard ?? null
   const [retainedCard, setRetainedCard] = useState(currentRenderCard)
   if (currentRenderCard && currentRenderCard !== retainedCard) setRetainedCard(currentRenderCard)
+  if (bedEntry && (
+    (card && card.hash !== bedEntry.hash)
+    || (!currentRenderCard && retainedCard?.hash === bedEntry.hash)
+  )) setBedEntry(null)
 
   const renderCard = currentRenderCard ?? retainedCard
   const eightSleepSide = renderCard ? eightSleepSideForHash(renderCard.hash) : undefined
@@ -1202,10 +1257,20 @@ function RoomSourceModal({ card, eightSleepModalStates, onClose, preload = false
     return renderCard && plainTitle && renderCard.kind !== 'contact' && renderCard.kind !== 'light' ? roomSourceModalSubtitle(renderCard, roomTitle, state.entities) : undefined
   })
   const modalSize = renderCard && SECURITY_SIZED_ROOM_SOURCE_KINDS.has(renderCard.kind) ? 'compact' : 'standard'
+  const roomWakeLight = wakeLightForRoomTitle(roomTitle)
 
-  if (renderCard && eightSleepSide && eightSleepModalState) {
+  if (renderCard && eightSleepSide && eightSleepModalState && roomWakeLight) {
     return (
-      <EightSleepBedModal key={eightSleepSide.hash} modalState={eightSleepModalState} onClose={onClose} open={Boolean(card)} side={eightSleepSide} />
+      <EightSleepBedModal
+        initialTab={bedEntry?.hash === eightSleepSide.hash ? bedEntry.tab : undefined}
+        key={eightSleepSide.hash}
+        modalState={eightSleepModalState}
+        onClose={onClose}
+        onCloseComplete={finishDestination}
+        open={Boolean(card)}
+        side={eightSleepSide}
+        wakeLightConfig={roomWakeLight}
+      />
     )
   }
 
@@ -1232,6 +1297,19 @@ function RoomSourceModal({ card, eightSleepModalStates, onClose, preload = false
     return <VacuumModal onClose={onClose} open={Boolean(card)} subtitle={subtitle} title={title} vacuum={vacuum} />
   }
 
+  const wakeLight = renderCard?.kind === 'wake-light' ? wakeLightForStatusEntity(renderCard.entityId) : undefined
+  if (wakeLight) {
+    if (preload) return <WakeLightModalPreload config={wakeLight} />
+    return (
+      <WakeLightModalWithBedAlarms config={wakeLight} onClose={onClose} onCloseComplete={finishDestination}
+        onOpenSource={(sourceRef) => {
+          const source = wakeLight.sourceBindings.find(item => item.id === sourceRef)
+          if (source) requestDestination(source.editorHash, 'alarms')
+        }}
+        open={Boolean(card)} roomTitle={roomTitle} />
+    )
+  }
+
   return (
     <ModalSheet
       centeredGeometry={modalSize === 'compact' ? ROOM_SOURCE_COMPACT_CENTERED_GEOMETRY : ROOM_SOURCE_STANDARD_CENTERED_GEOMETRY}
@@ -1247,6 +1325,8 @@ function RoomSourceModal({ card, eightSleepModalStates, onClose, preload = false
 }
 
 function RoomSourcePreloadContent({ card, eightSleepModalState, roomTitle }: { card: RoomSourceCardConfig; eightSleepModalState?: EightSleepBedModalState; roomTitle: string }) {
+  const wakeLight = card.kind === 'wake-light' ? wakeLightForStatusEntity(card.entityId) : undefined
+  if (wakeLight) return <WakeLightModalPreload config={wakeLight} />
   const eightSleepSide = eightSleepSideForHash(card.hash)
   if (eightSleepSide && eightSleepModalState) {
     return <EightSleepBedModalContentView activeTab="schedule" alarmPage={null} modalState={eightSleepModalState} side={eightSleepSide} />
@@ -1338,7 +1418,7 @@ function SourceRoomPage({ onNavigate, preload = false, preloadHash, preloadHashe
             )
 
             return (
-              <ResponsiveSectionItem key={`${room.path}-${section.title}`} span={section.layout === 'app-launch' || pageSectionCount === 1 ? 'full' : 'auto'}>
+              <ResponsiveSectionItem key={`${room.path}-${section.title}`} span={section.span === 'full' || section.layout === 'app-launch' || pageSectionCount === 1 ? 'full' : 'auto'}>
                 <section className={styles.section} id={sectionId(section.title)}>
                   <SectionHeader title={section.title} />
                   <RoomGrid ariaLabel={`${room.title} ${section.title}`} layout={section.layout}>
@@ -2809,6 +2889,7 @@ interface EightSleepAlarmEditorDraft {
   enabled: boolean
   time: string
   title: string
+  wakeLightEnabled: boolean
 }
 
 interface EightSleepAlarmDayPage {
@@ -3114,30 +3195,11 @@ function alarmsFromDailySchedule(daySchedule: FreeSleepDailySchedule | undefined
   return legacyAlarm?.enabled ? [legacyAlarm] : []
 }
 
-function alarmDayOffset(day: FreeSleepAlarmDay, offset: number) {
-  const index = FREE_SLEEP_ALARM_DAY_KEYS.indexOf(day)
-  const nextIndex = (index + offset + FREE_SLEEP_ALARM_DAY_KEYS.length) % FREE_SLEEP_ALARM_DAY_KEYS.length
-  return FREE_SLEEP_ALARM_DAY_KEYS[nextIndex]
-}
-
-function alarmExecutesNextMorning(daySchedule: FreeSleepDailySchedule | undefined) {
-  const powerOff = parsedInputTime(daySchedule?.power?.off, '09:00')
-  return Number(powerOff.split(':')[0]) <= 12
-}
-
-function wakeDayFromFreeSleepScheduleDay(scheduleDay: FreeSleepAlarmDay, daySchedule: FreeSleepDailySchedule | undefined) {
-  return alarmExecutesNextMorning(daySchedule) ? alarmDayOffset(scheduleDay, 1) : scheduleDay
-}
-
-function freeSleepScheduleDayFromWakeDay(wakeDay: FreeSleepAlarmDay, sideSchedule: FreeSleepSideSchedule | undefined) {
-  return FREE_SLEEP_ALARM_DAY_KEYS.find((scheduleDay) => wakeDayFromFreeSleepScheduleDay(scheduleDay, sideSchedule?.[scheduleDay]) === wakeDay) ?? alarmDayOffset(wakeDay, -1)
-}
-
-function alarmRecordsFromSchedule(schedule: FreeSleepSchedulesState, side: EightSleepSideConfig): FreeSleepAlarmRecord[] {
+function alarmRecordsFromSchedule(schedule: FreeSleepSchedulesState, side: EightSleepSideConfig, semantics: AlarmDaySemantics): FreeSleepAlarmRecord[] {
   const sideSchedule = schedule[side.scheduleSide]
   return FREE_SLEEP_ALARM_DAYS.flatMap((scheduleDay) =>
     alarmsFromDailySchedule(sideSchedule?.[scheduleDay.key]).map((alarm, index) => {
-      const wakeDay = wakeDayFromFreeSleepScheduleDay(scheduleDay.key, sideSchedule?.[scheduleDay.key])
+      const wakeDay = alarmExecutionDay(scheduleDay.key, sideSchedule?.[scheduleDay.key]?.power?.off, semantics)
       return {
         ...alarm,
         day: wakeDay,
@@ -3193,13 +3255,13 @@ function sameAlarmRecord(a: FreeSleepAlarmRecord, b: FreeSleepAlarmRecord) {
     && a.vibrationPattern === b.vibrationPattern
 }
 
-function alarmSchedulePayload(records: FreeSleepAlarmRecord[], side: EightSleepSideConfig, schedule: FreeSleepSchedulesState | null) {
+function alarmSchedulePayload(records: FreeSleepAlarmRecord[], side: EightSleepSideConfig, schedule: FreeSleepSchedulesState | null, semantics: AlarmDaySemantics) {
   const sideSchedule = schedule?.[side.scheduleSide]
   const sidePayload = Object.fromEntries(FREE_SLEEP_ALARM_DAYS.map((day) => [
     day.key,
     {
       alarms: records
-        .filter((alarm) => freeSleepScheduleDayFromWakeDay(alarm.day, sideSchedule) === day.key)
+        .filter((alarm) => alarmSourceDay(alarm.day, sideSchedule, semantics) === day.key)
         .sort(compareAlarmRecordSourceOrder)
         .map(({ alarmTemperature, duration, enabled, time, vibrationIntensity, vibrationPattern }) => ({
           alarmTemperature,
@@ -4251,6 +4313,7 @@ function useEightSleepAlarmsController({
     [scheduleEntity],
   )
   const scheduleSideAvailable = Boolean(schedule?.[side.scheduleSide])
+  const alarmDaySemantics: AlarmDaySemantics = scheduleEntityId === SLEEPYPOD_SCHEDULE_SENSOR_ENTITY_ID ? 'execution' : 'bedtime'
   const legacyAlarmAvailable = scheduleEntityId === FREE_SLEEP_SCHEDULE_SENSOR_ENTITY_ID && FREE_SLEEP_ALARM_DAY_KEYS.every((day) => (
     [eightSleepAlarmConfiguredEntityId(side.alarmOwner, day), eightSleepAlarmEnabledEntityId(side.alarmOwner, day), eightSleepAlarmTimeEntityId(side.alarmOwner, day)]
       .every((entityId) => {
@@ -4268,10 +4331,10 @@ function useEightSleepAlarmsController({
     ]).join('|')
     : ''
   const sourceRecords = useMemo(() => {
-    if (scheduleSideAvailable && schedule) return alarmRecordsFromSchedule(schedule, side)
+    if (scheduleSideAvailable && schedule) return alarmRecordsFromSchedule(schedule, side, alarmDaySemantics)
     if (legacyAlarmAvailable && legacyAlarmSourceKey) return legacyAlarmRecords(side.alarmOwner, entities)
     return []
-  }, [entities, legacyAlarmAvailable, legacyAlarmSourceKey, schedule, scheduleSideAvailable, side])
+  }, [alarmDaySemantics, entities, legacyAlarmAvailable, legacyAlarmSourceKey, schedule, scheduleSideAvailable, side])
   const sourceRecordKey = alarmRecordsStateKey(sourceRecords)
   const alarmSyncSourceKey = [scheduleEntityId, scheduleSetTopic, side.scheduleSide, sourceRecordKey].join('|')
   const [optimisticRecords, setOptimisticRecords] = useState<FreeSleepAlarmRecord[] | null>(null)
@@ -4372,7 +4435,7 @@ function useEightSleepAlarmsController({
       return
     }
 
-    const payload = alarmSchedulePayload(sortedRecords, side, schedule)
+    const payload = alarmSchedulePayload(sortedRecords, side, schedule, alarmDaySemantics)
     debugFreeSleepAlarm(callService, 'section-sync-mqtt-publish', {
       payload,
       records: compactAlarmRecordsForDebug(sortedRecords),
@@ -4387,7 +4450,7 @@ function useEightSleepAlarmsController({
         topic: scheduleSetTopic,
       },
     })
-  }, [callService, legacyAlarmAvailable, schedule, scheduleSetTopic, scheduleSideAvailable, side])
+  }, [alarmDaySemantics, callService, legacyAlarmAvailable, schedule, scheduleSetTopic, scheduleSideAvailable, side])
 
   useLayoutEffect(() => {
     syncAlarmRecordsRef.current = syncAlarmRecords
@@ -4548,6 +4611,79 @@ function useEightSleepAlarmsController({
     setAlarmEnabled,
     supportsMultiplePerDay,
   }
+}
+
+/**
+ * Expose the master bedroom bed schedule to the wake light modal.
+ *
+ * The wake light modal can add a wake time to either side of the bed. Home Assistant still owns
+ * the resulting schedule: React only publishes one side-scoped set-schedules payload per side and
+ * signals wake-light link changes through the wake_light command service.
+ */
+function useWakeLightBedProvisioning(config: WakeLightConfig): WakeLightBedProvisioning {
+  const callService = useCallService()
+  const scheduleEntity = useEntity(asEntityName(config.sleepypodScheduleEntityId), { returnNullIfNotFound: true })
+  const schedule = useMemo(
+    () => scheduleEntity && !isUnavailable(scheduleEntity)
+      ? scheduleFromEntityAttributes(scheduleEntity.attributes as Record<string, unknown> | undefined)
+      : null,
+    [scheduleEntity],
+  )
+  const targets = useMemo(() => config.sourceBindings.map((binding) => {
+    const sideConfig = EIGHT_SLEEP_SIDE_CONFIGS.find((candidate) => candidate.scheduleSide === binding.side)
+    const available = Boolean(sideConfig && schedule?.[binding.side])
+    return {
+      available,
+      side: binding.side,
+      slots: available && sideConfig && schedule
+        ? alarmRecordsFromSchedule(schedule, sideConfig, 'execution').map(({ day, time }) => ({ day, time }))
+        : [],
+      title: sideConfig?.title ?? '',
+    }
+  }), [config.sourceBindings, schedule])
+
+  const createAlarms: WakeLightBedProvisioning['createAlarms'] = (side, days, time) => {
+    const sideConfig = EIGHT_SLEEP_SIDE_CONFIGS.find((candidate) => candidate.scheduleSide === side)
+    const normalizedTime = normalizedBedAlarmTime(time)
+    if (!sideConfig || !schedule?.[side] || !normalizedTime || !days.length) return
+    const createdAt = Date.now()
+    const nextRecords = normalizeAlarmRecordIndexes([
+      ...alarmRecordsFromSchedule(schedule, sideConfig, 'execution'),
+      ...days.map((day, offset) => ({
+        ...FREE_SLEEP_DEFAULT_ALARM,
+        day,
+        enabled: true,
+        id: `wake-light-${createdAt}-${offset}-${day}`,
+        index: 0,
+        time: normalizedTime,
+      })),
+    ])
+    callService({
+      domain: 'mqtt',
+      service: 'publish',
+      serviceData: {
+        payload: JSON.stringify(alarmSchedulePayload(nextRecords, sideConfig, schedule, 'execution')),
+        topic: SLEEPYPOD_SCHEDULE_SET_TOPIC,
+      },
+    })
+  }
+
+  return { createAlarms, targets }
+}
+
+function WakeLightModalWithBedAlarms({ config, onClose, onCloseComplete, onOpenSource, open, roomTitle }: {
+  config: WakeLightConfig
+  onClose: () => void
+  onCloseComplete?: () => void
+  onOpenSource?: (sourceRef: string) => void
+  open: boolean
+  roomTitle: string
+}) {
+  const bedProvisioning = useWakeLightBedProvisioning(config)
+  return (
+    <WakeLightModal bedProvisioning={bedProvisioning} config={config} onClose={onClose}
+      onCloseComplete={onCloseComplete} onOpenSource={onOpenSource} open={open} roomTitle={roomTitle} />
+  )
 }
 
 function EightSleepAlarmToggle({
@@ -4813,9 +4949,18 @@ function EightSleepHotFlashButton({ modalState, side }: { modalState: EightSleep
   )
 }
 
-function EightSleepBedModal({ modalState, onClose, open, side }: { modalState: EightSleepBedModalState; onClose: () => void; open: boolean; side: EightSleepSideConfig }) {
+function EightSleepBedModal({ initialTab, modalState, onClose, onCloseComplete, open, side, wakeLightConfig }: {
+  initialTab?: EightSleepModalTab
+  modalState: EightSleepBedModalState
+  onClose: () => void
+  onCloseComplete?: () => void
+  open: boolean
+  side: EightSleepSideConfig
+  wakeLightConfig: WakeLightConfig
+}) {
   const callService = useCallService()
-  const [activeTab, setActiveTab] = useState<EightSleepModalTab>('schedule')
+  const wakeLightController = useWakeLightController(wakeLightConfig)
+  const [activeTab, setActiveTab] = useState<EightSleepModalTab>(initialTab ?? 'schedule')
   const [alarmPage, setAlarmPage] = useState<EightSleepAlarmDetailPage | null>(null)
   const alarmController = useEightSleepAlarmsController({
     scheduleEntityId: modalState.controlMode === 'climate' ? SLEEPYPOD_SCHEDULE_SENSOR_ENTITY_ID : FREE_SLEEP_SCHEDULE_SENSOR_ENTITY_ID,
@@ -4905,6 +5050,7 @@ function EightSleepBedModal({ modalState, onClose, open, side }: { modalState: E
     enabled: true,
     time: FREE_SLEEP_DEFAULT_ALARM.time,
     title,
+    wakeLightEnabled: true,
   })
 
   const openAlarmDay = (day: FreeSleepAlarmDay) => {
@@ -4931,6 +5077,8 @@ function EightSleepBedModal({ modalState, onClose, open, side }: { modalState: E
   }
 
   const openAlarmEditor = (alarm: FreeSleepAlarmRecord) => {
+    const source = wakeLightSourceForSide(wakeLightConfig, side.scheduleSide)
+    const linkKey = source ? wakeLightAlarmLinkKey(source.id, alarm.day, alarm.time) : null
     openDetailPage({
       draft: {
         days: [alarm.day],
@@ -4938,6 +5086,7 @@ function EightSleepBedModal({ modalState, onClose, open, side }: { modalState: E
         enabled: alarm.enabled,
         time: alarm.time,
         title: `${side.title} ${alarmDayLabel(alarm.day)} Alarm`,
+        wakeLightEnabled: linkKey === null ? false : wakeLightController.snapshot.alarmLinks[linkKey] !== false,
       },
       kind: 'editor',
       lockedDay: alarm.day,
@@ -4948,8 +5097,12 @@ function EightSleepBedModal({ modalState, onClose, open, side }: { modalState: E
     setAlarmPage((current) => current?.kind === 'editor' ? { ...current, draft } : current)
   }
 
-  const saveAlarm = () => {
+  const saveAlarm = async () => {
     if (!alarmEditor || alarmEditorInvalid) return
+    const source = wakeLightSourceForSide(wakeLightConfig, side.scheduleSide)
+    if (!source) return
+    const linkKeys = alarmEditor.days.map(day => wakeLightAlarmLinkKey(source.id, day, alarmEditor.time))
+    if (!await wakeLightController.setAlarmLink(linkKeys, alarmEditor.wakeLightEnabled)) return
     if (alarmController.saveAlarm(alarmEditor)) closeDetailPage()
   }
 
@@ -5010,12 +5163,18 @@ function EightSleepBedModal({ modalState, onClose, open, side }: { modalState: E
         footer={alarmEditor ? (
           <ScheduleDetailFooter
             deleteAction={alarmEditor.editingId ? { disabled: !alarmController.available || alarmEditorStale, icon: 'mdi:delete', label: 'Delete Alarm', onClick: deleteAlarm } : undefined}
-            primaryAction={{ disabled: alarmEditorInvalid, icon: alarmEditor.editingId ? 'mdi:content-save' : 'mdi:plus', label: alarmEditor.editingId ? 'Save Alarm' : 'Add Alarm', onClick: saveAlarm }}
+            primaryAction={{
+              disabled: alarmEditorInvalid || !wakeLightController.snapshot.available || wakeLightController.configurationPending,
+              icon: alarmEditor.editingId ? 'mdi:content-save' : 'mdi:plus',
+              label: alarmEditor.editingId ? 'Save Alarm' : 'Add Alarm',
+              onClick: () => void saveAlarm(),
+            }}
           />
         ) : undefined}
         navigation={alarmPage ? undefined : <EightSleepModalNav activeTab={renderedActiveTab} onTabChange={setActiveTab} sideTitle={side.title} tabs={tabs} />}
         onBack={alarmDetailPage ? closeDetailPage : undefined}
         onClose={closeBedModal}
+        onCloseComplete={onCloseComplete}
         open={open}
         scrollMode={alarmDetailPage ? 'body' : 'panes'}
         size="workspace"
@@ -5033,12 +5192,14 @@ function EightSleepBedModal({ modalState, onClose, open, side }: { modalState: E
             onAlarmEditorChange={updateAlarmEditor}
             alarmEditorLegacyConflict={alarmEditorLegacyConflict}
             alarmEditorStale={alarmEditorStale}
+            wakeLightError={wakeLightController.error}
             onEditAlarm={openAlarmEditor}
             onOpenAlarmDay={openAlarmDay}
             onPanelElementChange={setAlarmPanelElement}
             onRequestTemperatureScope={requestTemperatureScope}
             side={side}
             tabs={tabs}
+            wakeLightConfig={wakeLightConfig}
           />
         ) : (
           <EightSleepBedModalContentView
@@ -5125,6 +5286,8 @@ interface EightSleepBedModalContentProps {
   onRequestTemperatureScope?: (value: number, phase: SleepypodSchedulePhase, returnFocus: HTMLElement | null) => void
   side: EightSleepSideConfig
   tabs?: typeof EIGHT_SLEEP_MODAL_TABS
+  wakeLightConfig?: WakeLightConfig
+  wakeLightError?: string | null
 }
 
 function EightSleepBedModalContentView({
@@ -5143,6 +5306,8 @@ function EightSleepBedModalContentView({
   onRequestTemperatureScope,
   side,
   tabs,
+  wakeLightConfig,
+  wakeLightError,
 }: EightSleepBedModalContentProps) {
   const modalBodyRef = useRef<HTMLDivElement | null>(null)
   const modalPanelRef = useRef<HTMLDivElement | null>(null)
@@ -5209,6 +5374,18 @@ function EightSleepBedModalContentView({
               onChange={(enabled) => onAlarmEditorChange?.({ ...alarmEditor, enabled })}
             />
           )}
+          {wakeLightConfig && modalState.controlMode === BED_CONTROL_MODE.CLIMATE && alarmEditor.days[0] && (
+            <SleepypodAlarmWakeLightToggle
+              checked={alarmEditor.wakeLightEnabled}
+              config={wakeLightConfig}
+              disabled={alarmEditorStale}
+              localTime={alarmEditor.time}
+              onChange={(wakeLightEnabled) => onAlarmEditorChange?.({ ...alarmEditor, wakeLightEnabled })}
+              side={side.scheduleSide}
+              weekday={alarmEditor.days[0]}
+            />
+          )}
+          {wakeLightError && <InlineAlert>{wakeLightError}</InlineAlert>}
           {!alarmController?.available && <InlineAlert>Home Assistant alarm schedule data is unavailable.</InlineAlert>}
           {alarmEditorStale && <InlineAlert>This alarm changed in Home Assistant. Go back and reopen it.</InlineAlert>}
           {alarmEditorLegacyConflict && <InlineAlert>Fallback alarm helpers support one alarm per day. Choose a day without an alarm.</InlineAlert>}

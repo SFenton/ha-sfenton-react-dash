@@ -120,6 +120,27 @@ describe('ModalSheet mounted orientation', () => {
 })
 
 describe('ModalSheet', () => {
+  it('preserves the latest detail snapshot on controlled close and completes navigation after exit', async () => {
+    const complete = vi.fn()
+    const view = render(<ModalSheet onClose={() => undefined} onCloseComplete={complete} open retainLatestOnControlledClose title="Overview">Overview content</ModalSheet>)
+    view.rerender(<ModalSheet onClose={() => undefined} onCloseComplete={complete} open retainLatestOnControlledClose title="Latest detail"><input aria-label="Retained draft" defaultValue="Draft" /></ModalSheet>)
+    view.rerender(<ModalSheet onClose={() => undefined} onCloseComplete={complete} open={false} retainLatestOnControlledClose title="Overview">Overview content</ModalSheet>)
+    expect(screen.getByRole('dialog')).toHaveAccessibleName('Latest detail')
+    expect(screen.getByLabelText('Retained draft')).toHaveValue('Draft')
+    expect(complete).not.toHaveBeenCalled()
+    await waitFor(() => expect(complete).toHaveBeenCalledTimes(1))
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+  })
+
+  it('cancels close completion when the same sheet is reopened', async () => {
+    const complete = vi.fn()
+    const view = render(<ModalSheet onClose={() => undefined} onCloseComplete={complete} open title="Reopen">Content</ModalSheet>)
+    view.rerender(<ModalSheet onClose={() => undefined} onCloseComplete={complete} open={false} title="Reopen">Content</ModalSheet>)
+    view.rerender(<ModalSheet onClose={() => undefined} onCloseComplete={complete} open title="Reopen">Content</ModalSheet>)
+    await new Promise(resolve => window.setTimeout(resolve, 560))
+    expect(complete).not.toHaveBeenCalled()
+    expect(screen.getByRole('dialog')).toHaveAttribute('data-state', 'open')
+  })
   it('keeps the current header actions outside the body and mounted through close', () => {
     const view = render(
       <ModalSheet headerActions={<button type="button">First header action</button>} onClose={() => undefined} open title="Header actions">

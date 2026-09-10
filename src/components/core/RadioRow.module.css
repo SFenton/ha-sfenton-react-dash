@@ -25,6 +25,10 @@
   box-shadow: inset 0 0 0 3px rgba(255, 255, 255, 0.58);
 }
 
+:global(html[data-rd-quiet-focus]) .radioRow:focus-visible {
+  box-shadow: none;
+}
+
 .copy {
   display: grid;
   min-width: 0;

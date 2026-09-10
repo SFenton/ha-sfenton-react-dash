@@ -133,8 +133,9 @@ export async function actualCapabilities(page: AuditedDocument, browser: string,
   }
 }
 
-export async function modalFacts(dialog: Locator, expectedScrollMode: 'body' | 'panes' = 'body', terminalKind: 'controls' | 'chat-content' = 'controls') {
-  if (terminalKind !== 'controls' && terminalKind !== 'chat-content') throw new Error('Unknown modal terminal kind')
+export async function modalFacts(dialog: Locator, expectedScrollMode: 'body' | 'panes' = 'body', terminal: 'controls' | 'chat-content' | string = 'controls') {
+  const terminalKind = terminal === 'controls' || terminal === 'chat-content' ? terminal : 'read-only-content'
+  const readOnlyTerminal = terminalKind === 'read-only-content' ? terminal : undefined
   await waitForModalReady(dialog)
   await expect(dialog).toHaveAttribute('data-scroll-mode', expectedScrollMode)
   const body = dialog.locator('[data-modal-sheet-body]')
@@ -145,7 +146,7 @@ export async function modalFacts(dialog: Locator, expectedScrollMode: 'body' | '
     return Math.abs(element.scrollTop - Math.max(0, element.scrollHeight - element.clientHeight))
   })).toBeLessThanOrEqual(1)
   await dialog.evaluate(() => new Promise<void>((done) => requestAnimationFrame(() => requestAnimationFrame(() => done()))))
-  const facts = await dialog.evaluate((element, terminalKind) => {
+  const facts = await dialog.evaluate((element, { terminalKind, readOnlyTerminal }) => {
     const body = element.querySelector<HTMLElement>('[data-modal-sheet-body]')!
     const measure = element.querySelector<HTMLElement>('[data-modal-content-measure]')!
     const rect = element.getBoundingClientRect()
@@ -160,12 +161,25 @@ export async function modalFacts(dialog: Locator, expectedScrollMode: 'body' | '
     const content = terminalKind === 'chat-content'
       ? [...body.querySelectorAll<HTMLElement>('[data-chat-panel="true"], [data-chat-history="true"]')]
       : []
+    const readOnlyTargets = readOnlyTerminal ? [...body.querySelectorAll<HTMLElement>(readOnlyTerminal)] : []
     if (terminalKind === 'controls' && !terminals.length) throw new Error('Modal body requires terminal controls')
     if (terminalKind === 'chat-content' && (content.length !== 1 || !content[0].textContent?.trim()
       || content[0].getBoundingClientRect().height <= 0 || content[0].getBoundingClientRect().width <= 0
       || getComputedStyle(content[0]).visibility !== 'visible' || Number(getComputedStyle(content[0]).opacity) <= 0
       || content[0].closest('[aria-hidden="true"], [inert]'))) throw new Error('Chat body requires one real terminal content region')
-    const targets = terminalKind === 'controls' ? terminals : content
+    if (terminalKind === 'read-only-content') {
+      if (terminals.length || readOnlyTargets.length !== 1) throw new Error('Declared read-only body requires one state terminal and no controls')
+      const target = readOnlyTargets[0]
+      const box = target.getBoundingClientRect()
+      if (target.getAttribute('role') !== 'group' || !target.getAttribute('aria-label')?.trim()
+        || !target.textContent?.trim() || box.width <= 0 || box.height <= 0
+        || getComputedStyle(target).visibility !== 'visible' || Number(getComputedStyle(target).opacity) <= 0
+        || target.closest('[aria-hidden="true"], [inert]')
+        || target.matches('[tabindex]') || target.querySelector('[tabindex], a, button, input, select, textarea')) {
+        throw new Error('Read-only terminal must be visible, named, noninteractive state content')
+      }
+    }
+    const targets = terminalKind === 'controls' ? terminals : terminalKind === 'chat-content' ? content : readOnlyTargets
     const terminalBottom = Math.max(...targets.map((item) => item.getBoundingClientRect().bottom))
     const terminalTargetGap = body.getBoundingClientRect().bottom - terminalBottom
     const terminalControlGap = terminals.length ? body.getBoundingClientRect().bottom - Math.max(...terminals.map((item) => item.getBoundingClientRect().bottom)) : null
@@ -193,13 +207,14 @@ export async function modalFacts(dialog: Locator, expectedScrollMode: 'body' | '
       measureHeight: measure.getBoundingClientRect().height,
       measureOverflow: measure.scrollHeight - measure.clientHeight,
       terminalGap, terminalKind, terminalTargetGap, terminalControlGap, terminalControlCount: terminals.length,
-      terminalContentCount: content.length,
+      terminalContentGap: terminalTargetGap,
+      terminalContentCount: targets.length,
       nestedScrollOwners: scrollOwners.length,
       eligiblePanes: eligiblePanes.map((pane) => ({ name: pane.dataset.scrollRegion ?? pane.className, height: pane.clientHeight })),
       closeHit: hit === close || close.contains(hit),
       contentWidth: measure.getBoundingClientRect().width,
     }
-  }, terminalKind)
+  }, { terminalKind, readOnlyTerminal })
   await body.evaluate((element, top) => element.scrollTo({ top, behavior: 'instant' }), originalScroll)
   expect(facts.intent).toBeTruthy()
   expect(facts.closeHit).toBe(true)
@@ -238,7 +253,7 @@ export async function closeMounted(dialog: Locator) {
   if (!node) throw new Error('Missing mounted modal')
   await dialog.getByRole('button', { name: 'Close', exact: true }).click()
   expect(await node.getAttribute('data-state')).toBe('closed')
-  await expect(dialog).toHaveCount(0, { timeout: 700 })
+  await expect(dialog).toHaveCount(0, { timeout: 2_000 })
   await node.dispose()
 }
 

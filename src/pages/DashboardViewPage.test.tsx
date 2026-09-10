@@ -77,6 +77,10 @@ async function openThermostatControls() {
   return screen.findByRole('dialog', { name: 'Thermostat · Advanced Controls' })
 }
 
+function mqttPublishCalls() {
+  return mockCallServiceCalls.filter(call => call.domain === 'mqtt' && call.service === 'publish')
+}
+
 function restoreProperty(target: object, property: PropertyKey, descriptor: PropertyDescriptor | undefined) {
   if (descriptor) {
     Object.defineProperty(target, property, descriptor)
@@ -422,6 +426,10 @@ describe('DashboardViewPage', () => {
           expect(grid).toHaveAttribute('data-dynamic-grid-last-row', 'center')
         } else if (section.layout === 'lead-row') {
           expect(grid).not.toHaveAttribute('data-dynamic-grid-max-cell-width')
+          expect(grid).toHaveAttribute('data-dynamic-grid-layout', 'fill')
+        } else if (section.layout === 'two-column-fill') {
+          expect(grid).not.toHaveAttribute('data-dynamic-grid-max-cell-width')
+          expect(grid).toHaveAttribute('data-dynamic-grid-last-row', 'fill')
           expect(grid).toHaveAttribute('data-dynamic-grid-layout', 'fill')
         } else {
           expect(grid).toHaveAttribute('data-dynamic-grid-max-cell-width', '280')
@@ -3492,21 +3500,50 @@ describe('DashboardViewPage', () => {
     const dayPage = await screen.findByRole('dialog', { name: "Stephen's Bed Monday Alarms" })
     fireEvent.click(within(dayPage).getByRole('button', { name: /Stephen's Bed Monday alarm at 6:30 AM, Enabled/i }))
     const editor = await screen.findByRole('dialog', { name: "Stephen's Bed Monday Alarm" })
+    expect(within(editor).getByRole('switch', { name: 'Turn off Use Room Wake Lights' })).toBeInTheDocument()
     fireEvent.click(within(editor).getByRole('switch', { name: 'Turn off Alarm Enabled' }))
     fireEvent.change(within(editor).getByLabelText('Alarm time'), { target: { value: '06:40' } })
     fireEvent.click(within(editor).getByRole('button', { name: 'Save Alarm' }))
 
-    await waitFor(() => expect(mockCallServiceCalls).toHaveLength(1))
-    expect(mockCallServiceCalls[0]).toMatchObject({
+    await waitFor(() => expect(mqttPublishCalls()).toHaveLength(1))
+    expect(mqttPublishCalls()[0]).toMatchObject({
       domain: 'mqtt',
       service: 'publish',
       serviceData: { topic: 'sleepypod/eight-pod/cmd/set-schedules' },
     })
-    const payload = JSON.parse(String((mockCallServiceCalls[0].serviceData as { payload: string }).payload))
+    const payload = JSON.parse(String((mqttPublishCalls()[0].serviceData as { payload: string }).payload))
     expect(payload.left.monday.alarms).toEqual([
       { alarmTemperature: 78, duration: 30, enabled: false, time: '06:40', vibrationIntensity: 75, vibrationPattern: 'double' },
       { alarmTemperature: 82, duration: 45, enabled: true, time: '07:15', vibrationIntensity: 100, vibrationPattern: 'rise' },
     ])
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Back to alarms' }))
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Add Alarm' }))
+    const addEditor = await screen.findByRole('dialog', { name: "Add Stephen's Bed Alarm" })
+    const wakeLightToggle = within(addEditor).getByRole('switch', { name: 'Turn off Use Room Wake Lights' })
+    expect(wakeLightToggle).toHaveAttribute('aria-checked', 'true')
+    fireEvent.click(wakeLightToggle)
+    fireEvent.change(within(addEditor).getByLabelText('Alarm time'), { target: { value: '08:00' } })
+    fireEvent.click(within(addEditor).getByRole('button', { name: 'Add Alarm' }))
+
+    await waitFor(() => expect(mqttPublishCalls()).toHaveLength(2))
+    const wakeLightCalls = mockCallServiceCalls.filter(call => (
+      call.domain === 'wake_light'
+      && call.service === 'command'
+      && (call.serviceData as { operation?: string } | undefined)?.operation === 'link_alarm'
+    ))
+    expect(wakeLightCalls.at(-1)).toMatchObject({
+      serviceData: {
+        enabled: false,
+        link_keys: [
+          'sleepypod:left#monday#08:00',
+          'sleepypod:left#tuesday#08:00',
+          'sleepypod:left#wednesday#08:00',
+          'sleepypod:left#thursday#08:00',
+          'sleepypod:left#friday#08:00',
+        ],
+      },
+    })
   })
 
 
@@ -4323,7 +4360,9 @@ describe('DashboardViewPage', () => {
       "Steph's Bed Saturday Alarm Enabled",
     ])
     expect(within(dialog).queryByText('Sunday Alarm 2')).not.toBeInTheDocument()
-    expect(within(dialog).getAllByRole('switch').map((toggle) => toggle.getAttribute('aria-label'))).toEqual([
+    expect(within(dialog).queryByRole('heading', { name: 'Wake Light' })).not.toBeInTheDocument()
+    expect(within(dialog).queryByRole('switch', { name: /Use Room Wake Lights/ })).not.toBeInTheDocument()
+    expect(within(dialog).getAllByRole('switch').map(toggle => toggle.getAttribute('aria-label'))).toEqual([
       "Turn off Steph's Bed Monday alarm at 6:45 AM",
       "Turn off Steph's Bed Saturday alarm at 9:00 AM",
     ])
@@ -4345,6 +4384,7 @@ describe('DashboardViewPage', () => {
     const row = within(dialog).getByRole('button', { name: rowName })
     const disableToggle = within(dialog).getByRole('switch', { name: 'Turn off ' + toggleLabel })
     expect(row).not.toContainElement(disableToggle)
+    expect(within(dialog).queryByRole('switch', { name: /Use Room Wake Lights/ })).not.toBeInTheDocument()
     expect(within(dialog).getAllByRole('switch')).toHaveLength(1)
 
     fireEvent.click(disableToggle)
@@ -4404,8 +4444,8 @@ describe('DashboardViewPage', () => {
     expect(dialog).toHaveAccessibleName('Steph\u0027s Bed Sunday Alarms')
     expect(within(dialog).getByRole('button', { name: /Steph.s Bed Sunday alarm at 6:30 AM, Disabled/i })).toHaveAttribute('data-active', 'false')
     expect(within(dialog).queryByText('Alarm Enabled')).not.toBeInTheDocument()
-    await waitFor(() => expect(mockCallServiceCalls).toHaveLength(1))
-    const payload = JSON.parse(String((mockCallServiceCalls[0].serviceData as { payload: string }).payload))
+    await waitFor(() => expect(mqttPublishCalls()).toHaveLength(1))
+    const payload = JSON.parse(String((mqttPublishCalls()[0].serviceData as { payload: string }).payload))
     expect(Object.keys(payload)).toEqual(['right'])
     expect(payload.right.saturday.alarms).toEqual([
       { ...firstAlarm, enabled: false },
@@ -4469,8 +4509,8 @@ describe('DashboardViewPage', () => {
     fireEvent.change(within(editor).getByLabelText('Alarm time'), { target: { value: time } })
     fireEvent.click(within(editor).getByRole('button', { name: 'Add Alarm' }))
 
-    await waitFor(() => expect(mockCallServiceCalls).toHaveLength(1))
-    const payload = JSON.parse(String((mockCallServiceCalls[0].serviceData as { payload: string }).payload))
+    await waitFor(() => expect(mqttPublishCalls()).toHaveLength(1))
+    const payload = JSON.parse(String((mqttPublishCalls()[0].serviceData as { payload: string }).payload))
     for (const scheduleDay of ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday']) {
       expect(payload[side][scheduleDay].alarms).toEqual(expect.arrayContaining([expect.objectContaining({ enabled: true, time })]))
     }
@@ -4525,10 +4565,10 @@ describe('DashboardViewPage', () => {
     fireEvent.change(within(dialog).getByLabelText('Alarm time'), { target: { value: time } })
     fireEvent.click(within(dialog).getByRole('button', { name: 'Add Alarm' }))
 
-    await waitFor(() => expect(mockCallServiceCalls).toHaveLength(1))
+    await waitFor(() => expect(mqttPublishCalls()).toHaveLength(1))
     expect(dialog).toHaveAccessibleName(`${sideTitle} Sunday Alarms`)
     expect(within(dialog).getAllByRole('button', { name: new RegExp(`${sideTitle} Sunday alarm at`, 'i') })).toHaveLength(3)
-    const payload = JSON.parse(String((mockCallServiceCalls[0].serviceData as { payload: string }).payload))
+    const payload = JSON.parse(String((mqttPublishCalls()[0].serviceData as { payload: string }).payload))
     expect(payload[side].saturday.alarms).toEqual(expect.arrayContaining([expect.objectContaining({ enabled: true, time })]))
   })
 
@@ -4555,11 +4595,11 @@ describe('DashboardViewPage', () => {
     fireEvent.change(within(editor).getByLabelText('Alarm time'), { target: { value: '06:50' } })
     fireEvent.click(within(editor).getByRole('button', { name: 'Save Alarm' }))
 
-    await waitFor(() => expect(mockCallServiceCalls).toHaveLength(1))
+    await waitFor(() => expect(mqttPublishCalls()).toHaveLength(1))
     expect(dialog).toHaveAccessibleName(`${sideTitle} Sunday Alarms`)
     const disabledAlarm = within(dialog).getByRole('button', { name: new RegExp(`${sideTitle} Sunday alarm at 6:50 AM, Disabled`, 'i') })
     expect(disabledAlarm).toHaveAttribute('data-active', 'false')
-    const editPayload = JSON.parse(String((mockCallServiceCalls[0].serviceData as { payload: string }).payload))
+    const editPayload = JSON.parse(String((mqttPublishCalls()[0].serviceData as { payload: string }).payload))
     expect(editPayload[side].saturday.alarms).toEqual([
       expect.objectContaining({ enabled: false, time: '06:50' }),
       expect.objectContaining({ enabled: true, time: '07:15' }),
@@ -4569,22 +4609,22 @@ describe('DashboardViewPage', () => {
     const firstDeleteButton = within(dialog).getByRole('button', { name: 'Delete Alarm' })
     fireEvent.click(firstDeleteButton)
     expect(confirm).toHaveBeenLastCalledWith('Delete alarm set for 6:50 AM on Sunday?')
-    expect(mockCallServiceCalls).toHaveLength(1)
+    expect(mqttPublishCalls()).toHaveLength(1)
     expect(dialog).toHaveAccessibleName(`${sideTitle} Sunday Alarm`)
     fireEvent.click(firstDeleteButton)
-    await waitFor(() => expect(mockCallServiceCalls).toHaveLength(2))
+    await waitFor(() => expect(mqttPublishCalls()).toHaveLength(2))
     expect(dialog).toHaveAccessibleName(`${sideTitle} Sunday Alarm`)
     expect(within(dialog).getByRole('button', { name: new RegExp(`${sideTitle} Sunday alarm at 7:15 AM, Enabled`, 'i') })).toBeInTheDocument()
-    const firstDeletePayload = JSON.parse(String((mockCallServiceCalls[1].serviceData as { payload: string }).payload))
+    const firstDeletePayload = JSON.parse(String((mqttPublishCalls()[1].serviceData as { payload: string }).payload))
     expect(firstDeletePayload[side].saturday.alarms).toEqual([expect.objectContaining({ enabled: true, time: '07:15' })])
 
     fireEvent.click(within(dialog).getByRole('button', { name: new RegExp(`${sideTitle} Sunday alarm at 7:15 AM, Enabled`, 'i') }))
     fireEvent.click(within(dialog).getByRole('button', { name: 'Delete Alarm' }))
-    await waitFor(() => expect(mockCallServiceCalls).toHaveLength(3))
+    await waitFor(() => expect(mqttPublishCalls()).toHaveLength(3))
     expect(dialog).toHaveAccessibleName(sideTitle)
     expect(within(dialog).queryByRole('button', { name: new RegExp(`${sideTitle} Sunday Alarm`, 'i') })).not.toBeInTheDocument()
     expect(within(dialog).getByRole('button', { name: 'Add Alarm' })).toHaveFocus()
-    const finalPayload = JSON.parse(String((mockCallServiceCalls[2].serviceData as { payload: string }).payload))
+    const finalPayload = JSON.parse(String((mqttPublishCalls()[2].serviceData as { payload: string }).payload))
     expect(finalPayload[side].saturday.alarms).toEqual([])
     expect(confirm).toHaveBeenNthCalledWith(2, 'Delete alarm set for 6:50 AM on Sunday?')
     expect(confirm).toHaveBeenNthCalledWith(3, 'Delete alarm set for 7:15 AM on Sunday?')
@@ -4745,8 +4785,8 @@ describe('DashboardViewPage', () => {
     fireEvent.click(screen.getByRole('button', { name: /Stephen.s Bed Cooling • -2/i }))
     const dialog = await screen.findByRole('dialog', { name: 'Stephen\u0027s Bed' })
     await clickModalTab(within(dialog), 'Alarms')
-    fireEvent.click(within(dialog).getByRole('button', { name: /Stephen.s Bed Sunday Alarms 2 Enabled/i }))
-    fireEvent.click(within(dialog).getByRole('switch', { name: 'Turn off Stephen\u0027s Bed Sunday alarm at 6:30 AM' }))
+    fireEvent.click(within(dialog).getByRole('button', { name: /Stephen.s Bed Saturday Alarms 2 Enabled/i }))
+    fireEvent.click(within(dialog).getByRole('switch', { name: 'Turn off Stephen\u0027s Bed Saturday alarm at 6:30 AM' }))
 
     act(() => {
       mockEntities['sensor.master_bedroom_sleepypod_eight_pod_schedules'] = entity(
@@ -4756,7 +4796,7 @@ describe('DashboardViewPage', () => {
       view.rerender(<DashboardViewPage activePath='master-bedroom' onNavigate={() => undefined} path='master-bedroom' />)
     })
 
-    expect(dialog).toHaveAccessibleName('Stephen\u0027s Bed Sunday Alarms')
+    expect(dialog).toHaveAccessibleName('Stephen\u0027s Bed Saturday Alarms')
     expect(within(dialog).queryByRole('switch')).not.toBeInTheDocument()
 
     await act(async () => {
@@ -4958,18 +4998,18 @@ describe('DashboardViewPage', () => {
     fireEvent.click(screen.getByRole('button', { name: /Steph.s Bed Off/i }))
     const dialog = await screen.findByRole('dialog', { name: "Steph's Bed" })
     await clickModalTab(within(dialog), 'Alarms')
-    fireEvent.click(within(dialog).getByRole('button', { name: /Steph's Bed Sunday Alarms 2 Enabled/i }))
-    expect(dialog).toHaveAccessibleName("Steph's Bed Sunday Alarms")
+    fireEvent.click(within(dialog).getByRole('button', { name: /Steph's Bed Saturday Alarms 2 Enabled/i }))
+    expect(dialog).toHaveAccessibleName("Steph's Bed Saturday Alarms")
 
     act(() => {
       mockEntities['sensor.master_bedroom_sleepypod_eight_pod_schedules'] = entity('sensor.master_bedroom_sleepypod_eight_pod_schedules', 'unavailable')
       view.rerender(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
     })
 
-    expect(dialog).toHaveAccessibleName("Steph's Bed Sunday Alarms")
+    expect(dialog).toHaveAccessibleName("Steph's Bed Saturday Alarms")
     expect(within(dialog).getByRole('alert')).toHaveTextContent('Home Assistant alarm schedule data is unavailable.')
     expect(within(dialog).getByRole('button', { name: 'Add Alarm' })).toBeDisabled()
-    expect(within(dialog).queryByRole('button', { name: /Sunday alarm at/i })).not.toBeInTheDocument()
+    expect(within(dialog).queryByRole('button', { name: /Saturday alarm at/i })).not.toBeInTheDocument()
     fireEvent.click(within(dialog).getByRole('button', { name: 'Back to alarms' }))
     expect(dialog).toHaveAccessibleName("Steph's Bed")
     expect(within(dialog).getByRole('alert')).toHaveTextContent('Home Assistant alarm schedule data is unavailable.')
@@ -5000,9 +5040,9 @@ describe('DashboardViewPage', () => {
     fireEvent.click(screen.getByRole('button', { name: /Steph's Bed Off/i }))
     const dialog = await screen.findByRole('dialog', { name: "Steph's Bed" })
     await clickModalTab(within(dialog), 'Alarms')
-    fireEvent.click(within(dialog).getByRole('button', { name: /Steph's Bed Sunday Alarms 2 Enabled/i }))
-    fireEvent.click(within(dialog).getByRole('button', { name: /Steph's Bed Sunday alarm at 6:30 AM, Enabled/i }))
-    const editor = await screen.findByRole('dialog', { name: "Steph's Bed Sunday Alarm" })
+    fireEvent.click(within(dialog).getByRole('button', { name: /Steph's Bed Saturday Alarms 2 Enabled/i }))
+    fireEvent.click(within(dialog).getByRole('button', { name: /Steph's Bed Saturday alarm at 6:30 AM, Enabled/i }))
+    const editor = await screen.findByRole('dialog', { name: "Steph's Bed Saturday Alarm" })
 
     act(() => {
       mockEntities['sensor.master_bedroom_sleepypod_eight_pod_schedules'] = entity('sensor.master_bedroom_sleepypod_eight_pod_schedules', 'unavailable')
@@ -5013,7 +5053,7 @@ describe('DashboardViewPage', () => {
     expect(within(editor).getByRole('switch', { name: 'Turn off Alarm Enabled' })).toHaveAttribute('data-disabled', 'true')
     expect(within(editor).getByRole('button', { name: 'Save Alarm' })).toBeDisabled()
     expect(within(editor).getByRole('button', { name: 'Delete Alarm' })).toBeDisabled()
-    expect(editor).toHaveAccessibleName("Steph's Bed Sunday Alarm")
+    expect(editor).toHaveAccessibleName("Steph's Bed Saturday Alarm")
     expect(mockCallServiceCalls).toEqual([])
   })
 
@@ -5042,9 +5082,9 @@ describe('DashboardViewPage', () => {
     fireEvent.click(screen.getByRole('button', { name: /Steph's Bed Off/i }))
     const dialog = await screen.findByRole('dialog', { name: "Steph's Bed" })
     await clickModalTab(within(dialog), 'Alarms')
-    fireEvent.click(within(dialog).getByRole('button', { name: /Steph's Bed Sunday Alarms 2 Enabled/i }))
-    fireEvent.click(within(dialog).getByRole('button', { name: /Steph's Bed Sunday alarm at 6:30 AM, Enabled/i }))
-    const editor = await screen.findByRole('dialog', { name: "Steph's Bed Sunday Alarm" })
+    fireEvent.click(within(dialog).getByRole('button', { name: /Steph's Bed Saturday Alarms 2 Enabled/i }))
+    fireEvent.click(within(dialog).getByRole('button', { name: /Steph's Bed Saturday alarm at 6:30 AM, Enabled/i }))
+    const editor = await screen.findByRole('dialog', { name: "Steph's Bed Saturday Alarm" })
 
     const updatedSchedules = mockFreeSleepScheduleAttributes()
     const rightSchedule = updatedSchedules.right as Record<string, Record<string, unknown>>

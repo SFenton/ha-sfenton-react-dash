@@ -24,6 +24,7 @@
 }
 
 .pickerShell {
+  --native-picker-border-color: rgba(255, 255, 255, 0.16);
   position: relative;
   display: grid;
   width: 100%;
@@ -31,7 +32,7 @@
   max-width: 100%;
   min-height: var(--native-picker-min-height, 48px);
   align-items: center;
-  border: 1px solid rgba(255, 255, 255, 0.16);
+  border: 1px solid var(--native-picker-border-color);
   border-radius: 16px;
   box-sizing: border-box;
   padding: 12px 13px;
@@ -86,9 +87,14 @@
   outline: 3px solid rgba(255, 255, 255, 0.1);
 }
 
+:global(html[data-rd-quiet-focus]) .pickerShell:focus-within {
+  border-color: var(--native-picker-border-color);
+  outline: none;
+}
+
 @media (hover: none), (pointer: coarse) {
   .pickerShell:focus-within {
-    border-color: rgba(255, 255, 255, 0.16);
+    border-color: var(--native-picker-border-color);
     outline: none;
   }
 }

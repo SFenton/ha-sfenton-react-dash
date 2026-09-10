@@ -1,0 +1,18 @@
+{
+  "domain": "wake_light",
+  "name": "Wake Light",
+  "codeowners": [
+    "@SFenton"
+  ],
+  "config_flow": true,
+  "dependencies": [
+    "mqtt",
+    "presence_based_lighting"
+  ],
+  "documentation": "https://github.com/SFenton/ha-wake-light",
+  "integration_type": "service",
+  "iot_class": "local_push",
+  "issue_tracker": "https://github.com/SFenton/ha-wake-light/issues",
+  "requirements": [],
+  "version": "1.4.0"
+}

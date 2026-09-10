@@ -53,6 +53,8 @@ export interface ModalSheetProps {
   title: string
   onClose: () => void
   backdropPolicy?: ModalSheetBackdropPolicy
+  onCloseComplete?: () => void
+  retainLatestOnControlledClose?: boolean
   children: ReactNode
   backLabel?: string
   bodyElementRef?: Ref<HTMLDivElement>
@@ -137,6 +139,8 @@ export function ModalSheet({
   open,
   title,
   onClose,
+  onCloseComplete,
+  retainLatestOnControlledClose = false,
   children,
   backLabel,
   backdropPolicy = 'auto',
@@ -159,6 +163,10 @@ export function ModalSheet({
 }: ModalSheetProps) {
   const copy = useCopy('core')
   const bodyRef = useRef<HTMLDivElement | null>(null)
+  const closeCompleteRef = useRef(onCloseComplete)
+  useLayoutEffect(() => {
+    closeCompleteRef.current = onCloseComplete
+  }, [onCloseComplete])
   const [bodyRefVersion, setBodyRefVersion] = useState(0)
   const currentSnapshot: ModalSheetSnapshot = {
     backLabel: backLabel ?? copy('modal.back'),
@@ -222,6 +230,10 @@ export function ModalSheet({
     }
   }
   if (geometryIdentityChanged) setOpenCenteredGeometrySnapshot(currentCenteredGeometrySnapshot)
+  if (retainLatestOnControlledClose && open && (Object.keys(currentSnapshot) as (keyof ModalSheetSnapshot)[])
+    .some(key => !Object.is(currentSnapshot[key], lastOpenSnapshot[key]))) {
+    setLastOpenSnapshot(currentSnapshot)
+  }
   const rendered = open ? currentSnapshot : lastOpenSnapshot
   const renderedHasFooter = Boolean(rendered.footer)
   const renderedHasNavigation = Boolean(rendered.navigation)
@@ -284,14 +296,15 @@ export function ModalSheet({
   }
 
   useLayoutEffect(() => {
-    if (open) return undefined
+    if (open || !mounted) return undefined
     const timeout = window.setTimeout(() => {
       setRapidReopen(false)
       setRapidReopenPending(false)
       setMounted(false)
+      closeCompleteRef.current?.()
     }, MODAL_SHEET_EXIT_ANIMATION_MS)
     return () => window.clearTimeout(timeout)
-  }, [open])
+  }, [mounted, open])
 
   useLayoutEffect(() => {
     if (!open || !rapidReopen) return undefined

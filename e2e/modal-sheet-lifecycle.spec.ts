@@ -84,6 +84,10 @@ async function waitForModalOpenSettled(page: Page) {
       && Number(getComputedStyle(overlay).opacity) >= 0.99
     )
   }), { timeout: 5_000 }).toBe(true)
+  // Let the rAF probe record the settled style before its snapshot stops sampling.
+  await page.evaluate(() => new Promise<void>(resolve => {
+    requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+  }))
 }
 
 test.describe('thermostat modal close lifecycle', () => {

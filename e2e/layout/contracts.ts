@@ -20,6 +20,27 @@ export const PLAYWRIGHT_SPEC_COVERAGE = [
     spec: 'chat-ux.spec.ts',
   },
   {
+    area: 'Wake states, shared-frame geometry, scroll ownership, pending outcomes and source navigation',
+    landscape: 'direct',
+    safeArea: 'direct',
+    spec: 'wake-light-alarms.spec.ts',
+  },
+  {
+    area: 'Native phone, foldable, tablet and fine-pointer Wake commands and source-editor round trips',
+    landscape: 'direct',
+    safeArea: 'owned',
+    safeAreaOwner: 'wake-light-alarms.spec.ts',
+    spec: 'wake-light-adaptive-navigation.spec.ts',
+  },
+  {
+    area: 'Fine-pointer Wake editor and accepted-save frame stability',
+    landscape: 'owned',
+    landscapeOwner: 'wake-light-alarms.spec.ts',
+    safeArea: 'owned',
+    safeAreaOwner: 'wake-light-alarms.spec.ts',
+    spec: 'wake-light-desktop-responsive.spec.ts',
+  },
+  {
     area: 'Contract-certified mock page, shell, modal, grid, form, remote, host and preload journeys',
     landscape: 'direct',
     safeArea: 'direct',
@@ -309,7 +330,7 @@ export const PLAYWRIGHT_SPEC_COVERAGE = [
   },
 ] as const satisfies readonly PlaywrightSpecCoverage[]
 
-export const SCENARIO_IDS = ['quick-links', 'chat', 'summary', 'filters', 'form', 'remote', 'vacuum', 'weather', 'navigation', 'host', 'preload'] as const
+export const SCENARIO_IDS = ['quick-links', 'chat', 'summary', 'filters', 'form', 'remote', 'vacuum', 'weather', 'navigation', 'host', 'preload', 'wake-room', 'wake-light', 'wake-editor', 'wake-source'] as const
 export type ScenarioId = typeof SCENARIO_IDS[number]
 export type ContextId = 'touch-chromium' | 'fine-chromium' | 'touch-webkit'
 export const CONTEXTS: Record<ContextId, { browser: 'chromium' | 'webkit'; touch: boolean; project: string }> = {
@@ -325,6 +346,7 @@ export const SURFACE_CONTRACTS: Record<ScenarioId, {
   legacy: readonly string[]
   question: string
   tabs?: readonly string[]
+  readOnlyTerminals?: Readonly<Record<string, string>>
 }> = {
   'quick-links': {
     family: 'modal', states: ['root', 'rooms', 'back'],
@@ -396,6 +418,35 @@ export const SURFACE_CONTRACTS: Record<ScenarioId, {
     legacy: ['preload-inert.spec.ts', 'home-route-hydration.spec.ts', 'home-route-hydration-desktop.spec.ts'],
     question: 'Is the hidden preload geometry inert while the visible app remains usable?',
   },
+  'wake-light': {
+    family: 'modal',
+    states: ['alarms', 'defaults', 'empty', 'source-only', 'no-enabled', 'vacation', 'unavailable', 'incompatible', 'blocked', 'active', 'source-snoozed', 'recovering', 'spent-once', 'legacy-ramp'],
+    tabs: ['^Wake Alarms$', '^Defaults$'],
+    owners: ['src/components/hass/wakeLights/', 'src/constants/wakeLights', 'src/i18n/locales/en/modals/wakeLight.json'],
+    legacy: ['wake-light-alarms.spec.ts', 'wake-light-desktop-responsive.spec.ts', 'responsive-modal-inventory.spec.ts'],
+    question: 'Are alarm controls, current blockers, source ownership, ramp choices and active Stop truthful, readable and reachable without changing the shared frame?',
+  },
+  'wake-room': {
+    family: 'page-shell-grid',
+    states: ['ready', 'no-enabled', 'unavailable', 'active'],
+    owners: ['src/components/hass/wakeLights/WakeLightModalContent', 'src/constants/wakeLights'],
+    legacy: ['wake-light-alarms.spec.ts', 'responsive-pages-all.spec.ts'],
+    question: 'Does the standard room tile convey ready, no-enabled, unavailable and active state without moving, and open useful controls without issuing a command?',
+  },
+  'wake-editor': {
+    family: 'modal',
+    states: ['one-time', 'scheduled', 'unchanged', 'dirty', 'reverted', 'pending', 'rejected', 'revision-conflict', 'legacy-ramp'],
+    owners: ['src/components/hass/wakeLights/WakeLightModalContent', 'src/components/hass/wakeLights/useWakeLightController'],
+    legacy: ['wake-light-alarms.spec.ts', 'wake-light-adaptive-navigation.spec.ts'],
+    question: 'Does the one-time-first editor preserve exact dirty state, ramp selection and rejected/conflicting drafts while acceptance remains required before closing?',
+  },
+  'wake-source': {
+    family: 'modal',
+    states: ['pod-editor', 'pod-alarm-detail', 'back'],
+    owners: ['src/components/hass/scheduleExecutionDay', 'src/components/hass/wakeLights/WakeLightModalContent', 'src/constants/wakeLights'],
+    legacy: ['wake-light-adaptive-navigation.spec.ts', 'wake-light-alarms.spec.ts', 'modal-geometry-stability.spec.ts'],
+    question: 'Does source navigation close the old sheet before opening the authoritative Pod editor, preserve execution weekdays and linked-room meaning, and return without duplicate writes?',
+  },
 }
 
 export const DEVICE_ONLY_GAPS = [
@@ -404,12 +455,53 @@ export const DEVICE_ONLY_GAPS = [
   'Actual Home Assistant/companion-app three-frame inset delivery and host lifecycle',
 ] as const
 
+export const INTENTIONAL_ROUTE_ADDITIONS: Record<string, {
+  owner: ScenarioId
+  section: string
+  inherited: string[]
+  viewports: Record<string, {
+    height: number
+    shifts: Record<string, { x: number; y: number }>
+    tileWidth: number
+    width: number
+  }>
+}> = {
+  'master-bedroom': {
+    owner: 'wake-light',
+    section: 'section-sleep-&-wake',
+    inherited: ['section-sleepypod', 'section-media', 'section-climate'],
+    viewports: {
+      'phone-portrait': {
+        height: 184,
+        width: 361,
+        tileWidth: 361,
+        shifts: {
+          'section-sleepypod': { x: 0, y: 202 },
+          'section-media': { x: 0, y: 202 },
+          'section-climate': { x: 0, y: 202 },
+        },
+      },
+      'phone-landscape': {
+        height: 186,
+        width: 401,
+        tileWidth: 401,
+        shifts: {
+          'section-sleepypod': { x: 419, y: 0 },
+          'section-media': { x: -419, y: 334 },
+          'section-climate': { x: 419, y: 0 },
+        },
+      },
+    },
+  },
+}
+
 export const SHARED_OWNER_ROOTS = [
   'src/pages/Page.', 'src/components/core/ModalSheet', 'src/components/core/modalSheet',
   'src/components/core/DynamicGrid', 'src/components/core/dynamicGrid', 'src/components/core/modalSquareGrid',
   'src/components/shell/AppShell', 'src/styles/', 'src/constants/routes',
   'src/hooks/useDashboardViewport', 'src/hooks/useAdaptiveNavigationLayout',
   'src/hooks/useModalBackdropBands',
+  'src/utils/focusAppearance',
   'public/', 'index.html',
 ] as const
 

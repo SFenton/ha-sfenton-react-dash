@@ -8,6 +8,7 @@ import { applyProfile, actualCapabilities, waitForModalReady, waitForRoute } fro
 import { guardContext } from '../../e2e/layout/fixture'
 import { openChatState } from '../../e2e/chat-layout'
 import { openQuickLinksTab } from '../../e2e/quick-links'
+import { openWakeRoomState, wakeRoomFacts } from '../../e2e/layout/wakeLight'
 import { layoutProfile } from '../../e2e/responsive-acceptance-data'
 import type { BuildIdentity, LayoutPlan, RunIdentity } from '../../e2e/layout/types'
 import { assertCurrentPlan } from './plan'
@@ -60,7 +61,10 @@ export async function review(args: string[], root: string) {
     })
     let frame: Frame | undefined
     let dialog: Locator | undefined
-    if (scenario === 'host') {
+    if (scenario === 'wake-room') {
+      await openWakeRoomState(page, state)
+      actions.push(`Opened the source room and selected the ${state} tile state`)
+    } else if (scenario === 'host') {
       frame = await openHost(page, state)
       await openQuickLinksTab(frame)
       dialog = frame.getByRole('dialog')
@@ -99,6 +103,42 @@ export async function review(args: string[], root: string) {
       if (dialog) await waitForModalReady(dialog)
       actions.push(`Mounted resize to ${profile}`)
       if (args.includes('--interact')) {
+        if (scenario === 'wake-room') {
+          await wakeRoomFacts(page, state)
+          actions.push('Opened and closed the Wake modal from its room tile; verified unchanged tile geometry and no command')
+        }
+        if (scenario === 'wake-light' && dialog) {
+          const selected = dialog.getByRole('tab', { selected: true })
+          const label = await selected.getAttribute('aria-label')
+          const alternative = dialog.getByRole('tab', { name: label === 'Defaults' ? 'Wake Alarms' : 'Defaults', exact: true })
+          await alternative.click()
+          await waitForModalReady(dialog)
+          await dialog.getByRole('tab', { name: label!, exact: true }).click()
+          await waitForModalReady(dialog)
+          actions.push(`Visited an alternate Wake tab and restored ${label}`)
+        }
+        if (scenario === 'wake-editor' && dialog) {
+          const input = dialog.getByLabel('Alarm Name', { exact: true })
+          if (state === 'pending') {
+            await expect(input).toBeDisabled()
+            await expect(dialog.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
+            actions.push('Observed the retained draft and disabled pending editor/save controls; no duplicate submission')
+          } else {
+            const original = await input.inputValue()
+            await input.fill('Inspected wake draft')
+            await input.fill(original)
+            await input.blur()
+            actions.push('Edited and restored the Wake draft through its actual field without saving')
+          }
+        }
+        if (scenario === 'wake-source' && state === 'pod-alarm-detail' && dialog) {
+          await expect(dialog).toHaveAccessibleName("Steph's Bed Sunday Alarm")
+          const time = dialog.getByLabel('Alarm time', { exact: true })
+          await time.fill('07:05')
+          await time.fill('07:00')
+          await time.blur()
+          actions.push('Edited and restored the Sunday alarm time within the authoritative day-locked editor without publishing a schedule')
+        }
         if (scenario === 'weather' && dialog) {
           const selected = state === 'wind' ? 'Wind conditions' : state === 'precipitation' ? 'Precipitation conditions' : 'Conditions conditions'
           const alternative = selected === 'Wind conditions' ? 'Conditions conditions' : 'Wind conditions'

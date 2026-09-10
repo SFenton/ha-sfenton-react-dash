@@ -5,6 +5,7 @@ import { expect, test, type Browser, type Page } from './layout/fixture'
 import { RESPONSIVE_ROUTES, type ResponsiveRoute } from './responsive-acceptance-data'
 import { APPROVED_WEATHER_RENDER_MIGRATION_BASE, restoreSourceDeclaredBackdropFilters, selectedParityRoutes } from '../scripts/required-mobile-parity'
 import type { RunIdentity } from './layout/types'
+import { inspectRouteAddition, normalizeInspectedAddition } from './layout/routeAdditions'
 
 type PixelRegion = { x: number; y: number; width: number; height: number }
 
@@ -31,6 +32,7 @@ type RouteParityResult = {
   maxChannelDelta: number
   meanChannelDelta: number
   intendedBackMenuRemoval: boolean
+  intentionalAddition: Awaited<ReturnType<typeof inspectRouteAddition>>
   route: ResponsiveRoute
   signatureCount: number
   viewport: string
@@ -439,6 +441,17 @@ for (const parityViewport of PHONE_PARITY_VIEWPORTS) {
           const oldBackMenuSelector = `${backHeaderSelector} button[aria-label="Open navigation menu"]`
           const baselineBackMenus = await baseline.page.locator(oldBackMenuSelector).count()
           await expect(candidate.page.locator(oldBackMenuSelector), `${route}: Back replaces the menu in the DOM`).toHaveCount(0)
+          const intentionalAddition = await inspectRouteAddition(baseline.page, candidate.page, route, parityViewport.name)
+          if (intentionalAddition && screenshotDirectory) {
+            await candidate.page.screenshot({
+              path: path.join(screenshotDirectory, `${sanitizeRoute(route)}-with-declared-addition.png`),
+              animations: 'disabled',
+            })
+          }
+          const restoreAddition = intentionalAddition
+            ? await normalizeInspectedAddition(candidate.page, intentionalAddition)
+            : null
+          try {
           const [baselineSignature, candidateSignature] = await Promise.all([
             pageSignature(baseline.page),
             pageSignature(candidate.page),
@@ -470,6 +483,7 @@ for (const parityViewport of PHONE_PARITY_VIEWPORTS) {
             geometryMatches,
             geometryDifferences,
             intendedBackMenuRemoval: baselineBackMenus > 0,
+            intentionalAddition,
             signatureCount: baselineSignature.length,
             viewport: parityViewport.name,
             rawDifferentPixelRatio: rawDifference.differentPixels / (parityViewport.width * parityViewport.height),
@@ -477,6 +491,9 @@ for (const parityViewport of PHONE_PARITY_VIEWPORTS) {
             approvedHeroRailRegion: railRegion,
             ...difference,
           })
+          } finally {
+            await restoreAddition?.()
+          }
         })
       }
 
@@ -489,7 +506,7 @@ for (const parityViewport of PHONE_PARITY_VIEWPORTS) {
           baselineURL: BASELINE_URL,
           candidateURL: CANDIDATE_URL,
           generatedAt: new Date().toISOString(),
-          screenshotNormalization: 'Obsolete Back-page menu glyphs are hidden without changing layout. Only for the attested ab84f9a approved rendering migration, baseline-browser CSS replays its source-declared filters and the approved decorative hero rail region is compared by unchanged geometry/labels plus focused rail guards. Raw baseline/candidate PNGs and raw deltas are retained. No candidate filter is repaired and numeric parity tolerances are unchanged.',
+          screenshotNormalization: 'Obsolete Back-page menu glyphs are hidden without changing layout. Only for the attested ab84f9a approved rendering migration, baseline-browser CSS replays its source-declared filters and the approved decorative hero rail region is compared by unchanged geometry/labels plus focused rail guards. A registry-declared added section is hidden only after its exact geometry/semantics and every inherited section are asserted; its visible layout is captured separately. Raw baseline/candidate PNGs and raw deltas are retained. No candidate filter is repaired and numeric parity tolerances are unchanged.',
           baselineFilterRepairs: baseline.filterRepairs,
           routeCount: SELECTED_ROUTES.length,
           results,

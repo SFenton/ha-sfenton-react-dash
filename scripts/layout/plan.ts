@@ -143,7 +143,10 @@ authorize a live browser, arbitrary service, or external destination.
   bodies retain strict actual end inset and finite terminal-control clearance even
   when pane mode is preferred or content fits. Bounded normal-dialog panes require
   a hidden/clip body and a real eligible inner pane. Missing controls are failures,
-  never a success-shaped geometry fallback. Failures remain failed.
+  never a success-shaped geometry fallback. Explicit registry-owned read-only
+  states instead require one visible, named, noninteractive state terminal and
+  zero body controls; their content clearance is recorded separately. Failures
+  remain failed.
 - An incoming panel must exist and settle before its screenshot. Never freeze
   elapsed Date.now time or fix production animation to satisfy the harness.
   The source-declared empty vacuum state and recipe same-sheet details use named
@@ -157,6 +160,10 @@ authorize a live browser, arbitrary service, or external destination.
   \`src/test/mocks\` is overlaid into the exported baseline inputs so both builds
   use identical backend fixtures; the overlay and both asset digests are recorded.
   No clean baseline worktree or production source is changed.
+- A registry-owned route addition is not a whole-page parity exclusion. Its exact
+  new geometry/semantics and all inherited sections are asserted first, with the
+  added section visible in separate captures. Only that validated section may be
+  removed for inherited-content pixel comparison; all original thresholds remain.
 - No commit, push, deployment, live service call, or external-system mutation is
   authorized by validation. Preserve one React tree, optimistic path and HA owner.
 
