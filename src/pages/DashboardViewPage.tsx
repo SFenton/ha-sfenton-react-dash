@@ -114,7 +114,7 @@ import {
   OCCUPANCY_GROUPS,
   type EntityGroupConfig,
 } from '../constants/atAGlance'
-import { DASHBOARD_ROUTES, HOME_ALL_FOOD_ROUTE_PATH, HOME_CABINET_ROUTE_PATH, HOME_FOOD_ROUTE_PATH, HOME_FREEZER_ROUTE_PATH, HOME_FRIDGE_ROUTE_PATH, HOME_GROCERY_LIST_ROUTE_PATH, HOME_PANTRY_ROUTE_PATH, HOME_RECIPES_ROUTE_PATH, HOME_SPICE_RACK_ROUTE_PATH, HOME_SPRINKLERS_ROUTE_PATH, fallbackBackPathForRoute } from '../constants/routes'
+import { DASHBOARD_ROUTES, HOME_ALL_FOOD_ROUTE_PATH, HOME_CABINET_ROUTE_PATH, HOME_FOOD_ROUTE_PATH, HOME_FREEZER_ROUTE_PATH, HOME_FRIDGE_ROUTE_PATH, HOME_GROCERY_LIST_ROUTE_PATH, HOME_PANTRY_ROUTE_PATH, HOME_RECIPES_ROUTE_PATH, HOME_SPICE_RACK_ROUTE_PATH, HOME_SPRINKLERS_ROUTE_PATH, THERMOSTAT_ROUTE_PATH, fallbackBackPathForRoute } from '../constants/routes'
 import {
   ADMIN_AUTO_REENABLE_ITEMS,
   CHORE_QUICK_LINKS,
@@ -6598,27 +6598,27 @@ function ThermostatPage({ preload = false, preloadHash, preloadHashes = [] }: { 
       <ThermostatPageEntries onOpen={openHash} />
       {!preload && <ThermostatModal hash={hash} onClose={closeHash} open={modalOpen} />}
       {(preloadTargets.includes(THERMOSTAT_MODAL_HASH) || preloadTargets.includes(THERMOSTAT_ROOMS_HASH)) && (
-        <div data-preload-modal={`ecobee${preloadTargets.includes(THERMOSTAT_ROOMS_HASH) ? THERMOSTAT_ROOMS_HASH : THERMOSTAT_MODAL_HASH}`}>
+        <div data-preload-modal={`${THERMOSTAT_ROUTE_PATH}${preloadTargets.includes(THERMOSTAT_ROOMS_HASH) ? THERMOSTAT_ROOMS_HASH : THERMOSTAT_MODAL_HASH}`}>
           <ThermostatModalRootContent displayedTab="rooms" onOpenDetail={() => undefined} onOpenRoom={() => undefined} />
         </div>
       )}
       {preloadTargets.includes(THERMOSTAT_AUTOMATION_HASH) && (
-        <div data-preload-modal={`ecobee${THERMOSTAT_AUTOMATION_HASH}`}>
+        <div data-preload-modal={`${THERMOSTAT_ROUTE_PATH}${THERMOSTAT_AUTOMATION_HASH}`}>
           <ThermostatModalRootContent displayedTab="automation" onOpenDetail={() => undefined} onOpenRoom={() => undefined} />
         </div>
       )}
       {preloadTargets.includes(THERMOSTAT_TRACKING_HASH) && (
-        <div data-preload-modal={`ecobee${THERMOSTAT_TRACKING_HASH}`}>
+        <div data-preload-modal={`${THERMOSTAT_ROUTE_PATH}${THERMOSTAT_TRACKING_HASH}`}>
           <ThermostatModalRootContent displayedTab="tracking" onOpenDetail={() => undefined} onOpenRoom={() => undefined} />
         </div>
       )}
       {preloadTargets.includes(PREDICTIVE_COMFORT_HASH) && (
-        <div data-preload-modal={`ecobee${PREDICTIVE_COMFORT_HASH}`}>
+        <div data-preload-modal={`${THERMOSTAT_ROUTE_PATH}${PREDICTIVE_COMFORT_HASH}`}>
           <PredictiveComfortModalContent />
         </div>
       )}
       {preloadRooms.map((room) => (
-        <div data-preload-modal={`ecobee${room.hash}`} key={`ecobee-preload-${room.hash}`}>
+        <div data-preload-modal={`${THERMOSTAT_ROUTE_PATH}${room.hash}`} key={`thermostat-preload-${room.hash}`}>
           <ThermostatRoomModalContent room={room} />
         </div>
       ))}
@@ -6654,7 +6654,7 @@ function Content({ inventoryControls, onNavigate, onRecipesInitialResolved, onSc
   if (path === 'vacuums') return <VacuumPage preload={preload} />
   if (path === 'media') return <MediaPage preload={preload} preloadHash={preloadHash} preloadHashes={preloadHashes} />
   if (path === 'admin') return <AdminPage onNavigate={onNavigate} preload={preload} preloadHash={preloadHash} preloadHashes={preloadHashes} />
-  if (path === 'ecobee') return <ThermostatPage preload={preload} preloadHash={preloadHash} preloadHashes={preloadHashes} />
+  if (path === THERMOSTAT_ROUTE_PATH) return <ThermostatPage preload={preload} preloadHash={preloadHash} preloadHashes={preloadHashes} />
   if (path === 'custom-lights') return <CustomLightsPage />
   if (path === HOME_SPRINKLERS_ROUTE_PATH) return <SprinklersPage preload={preload} />
   if (path === HOME_FOOD_ROUTE_PATH) return <FoodHubPage onNavigate={onNavigate} preload={preload} />

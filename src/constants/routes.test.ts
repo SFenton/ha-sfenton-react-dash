@@ -1,4 +1,4 @@
-import { HOME_RECIPES_ROUTE_PATH, HOME_SPRINKLERS_ROUTE_PATH, fallbackBackPathForRoute, primaryNavPathForRoute, primaryNavRouteActive, routePathFromUrl, routeUrl } from './routes'
+import { HOME_RECIPES_ROUTE_PATH, HOME_SPRINKLERS_ROUTE_PATH, THERMOSTAT_ROUTE_PATH, fallbackBackPathForRoute, primaryNavPathForRoute, primaryNavRouteActive, routePathFromUrl, routeUrl } from './routes'
 
 describe('routes', () => {
   it('extracts at-a-glance route paths', () => {
@@ -28,6 +28,7 @@ describe('routes', () => {
 
   it('builds at-a-glance URLs', () => {
     expect(routeUrl('vacuums')).toBe('/at-a-glance/vacuums')
+    expect(routeUrl(THERMOSTAT_ROUTE_PATH)).toBe('/at-a-glance/thermostat')
     expect(routeUrl('')).toBe('/at-a-glance/overview')
   })
 

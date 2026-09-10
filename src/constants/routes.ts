@@ -21,6 +21,7 @@ export const HOME_FREEZER_ROUTE_PATH = 'freezer'
 export const HOME_SPICE_RACK_ROUTE_PATH = 'spice-rack'
 export const HOME_CABINET_ROUTE_PATH = 'cabinet'
 export const HOME_SPRINKLERS_ROUTE_PATH = 'sprinklers'
+export const THERMOSTAT_ROUTE_PATH = 'thermostat'
 const specialDeviceModesRouteName = copy('pageSettings', 'items.specialDeviceModes.title')
 const sprinklersRouteName = copy('pageSprinklers', 'title')
 
@@ -58,7 +59,7 @@ export const DASHBOARD_ROUTES: DashboardRouteConfig[] = [
   { title: 'Entryway', path: 'entryway', icon: 'mdi:door' },
   { title: 'Settings', path: 'settings', icon: 'mdi:cog' },
   { title: 'To-Do', path: 'to-do', icon: 'mdi:clipboard-list' },
-  { title: 'Thermostat', path: 'ecobee', icon: 'mdi:thermostat' },
+  { title: 'Thermostat', path: THERMOSTAT_ROUTE_PATH, icon: 'mdi:thermostat' },
   { title: 'Groceries', path: 'groceries', icon: 'mdi:cart' },
   { title: "Stephen's Chores", path: 'stephens-chores', icon: 'mdi:account-check' },
   { title: "Steph's Chores", path: 'stephs-chores', icon: 'mdi:account-check' },
@@ -75,7 +76,7 @@ export const DASHBOARD_ROUTES: DashboardRouteConfig[] = [
 export const PRIMARY_NAV_ROUTES = [
   { label: copy('shell', 'navigation.items.home'), path: 'overview', icon: 'mdi:home' },
   { label: copy('shell', 'navigation.items.security'), path: 'security', icon: 'mdi:shield' },
-  { label: copy('shell', 'navigation.items.climate'), path: 'ecobee', icon: 'mdi:thermostat' },
+  { label: copy('shell', 'navigation.items.climate'), path: THERMOSTAT_ROUTE_PATH, icon: 'mdi:thermostat' },
   { label: copy('shell', 'navigation.items.chores'), path: 'chores', icon: 'mdi:clipboard-list' },
   { label: copy('shell', 'navigation.items.settings'), path: 'settings', icon: 'mdi:cog' },
 ]

@@ -1025,7 +1025,7 @@ test('short-landscape dialog pickers use compact fixed tracks', async ({ page })
   await expect.poll(() => options.evaluate((element) => getComputedStyle(element).gridTemplateColumns)).toBe('220px 220px')
   await closeModal(dialog)
 
-  await page.goto('/index.html?path=ecobee')
+  await page.goto('/index.html?path=thermostat')
   await page.getByRole('button', { name: /Thermostat Hub Mode Off/i }).click()
   dialog = page.getByRole('dialog', { name: 'Thermostat Hub Mode' })
   await expect(dialog).toBeVisible()
@@ -1114,7 +1114,7 @@ test('animated modal tabs preserve the outgoing scroll position until content sw
   })
   await closeModal(dialog)
 
-  await page.goto('/at-a-glance/ecobee#thermostat-automation')
+  await page.goto('/at-a-glance/thermostat#thermostat-automation')
   dialog = page.getByRole('dialog', { name: 'Thermostat · Advanced Controls' })
   await expect(dialog.getByRole('tabpanel', { name: 'Automation' })).toBeVisible()
   await expectOutgoingTabScrollPreserved({

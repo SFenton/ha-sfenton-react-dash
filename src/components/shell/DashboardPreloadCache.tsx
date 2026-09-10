@@ -1,5 +1,5 @@
 import { CAMERA_ITEMS } from '../../constants/atAGlance'
-import { DASHBOARD_ROUTES } from '../../constants/routes'
+import { DASHBOARD_ROUTES, THERMOSTAT_ROUTE_PATH } from '../../constants/routes'
 import { ROOM_PAGE_CONFIGS } from '../../constants/roomPages'
 import { MUSIC_ROOM_REMOTE_HASH } from '../../constants/mediaRemotes'
 import { THERMOSTAT_ROOMS } from '../../constants/portedDashboard'
@@ -54,7 +54,7 @@ const MODAL_PRELOAD_TARGETS = [
   ...SECURITY_PRELOAD_HASHES.map((hash) => ({ hash, path: 'security' })),
   ...ADMIN_PRELOAD_HASHES.map((hash) => ({ hash, path: 'admin' })),
   ...MEDIA_PRELOAD_HASHES.map((hash) => ({ hash, path: 'media' })),
-  ...THERMOSTAT_PRELOAD_HASHES.map((hash) => ({ hash, path: 'ecobee' })),
+  ...THERMOSTAT_PRELOAD_HASHES.map((hash) => ({ hash, path: THERMOSTAT_ROUTE_PATH })),
   ...ROOM_MODAL_TARGETS,
 ]
 
