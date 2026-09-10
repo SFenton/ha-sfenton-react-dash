@@ -34,6 +34,11 @@ release path.
 4. Confirm the task's required validation is complete. Re-run `npm run check`
    and the smallest affected Playwright release gates if the working tree
    changed after the last successful run.
+   Require `npm run test:change-policy` to pass for the exact release scope:
+   behavior-bearing implementation changes must include a changed or added
+   domain-appropriate test, and every changed Playwright spec must be included
+   in the executed affected-spec set. Test ownership must be established by a
+   same-stem path or exact `@covers` declaration.
    Require a successful current `layout:verify` assessment for the release-owned
    changes, including actual manual image/interaction review. Check source,
    fixture, build and served-asset fingerprints; replan when they changed.
@@ -56,7 +61,9 @@ release path.
 
 4. Push the branch with upstream tracking.
 5. Create a pull request targeting `master`, including behavior and validation
-   evidence, then merge it with a merge commit through `gh`.
+   evidence. Wait for its checks with `gh pr checks --watch --fail-fast`; do
+   not merge while the changed-test policy or another required workflow check
+   is pending or failing. Then merge it with a merge commit through `gh`.
 6. Fetch `origin/master` and prove the release commit is an ancestor of the
    merged branch. Do not force-push, amend, or delete a checked-out branch that
    still carries unrelated work.

@@ -12,6 +12,15 @@
       "environment": []
     },
     {
+      "id": "check-test-change-policy",
+      "kind": "command",
+      "argv": ["npm", "run", "test:change-policy"],
+      "cwd": ".",
+      "timeoutSeconds": 120,
+      "sideEffect": "workspace",
+      "environment": []
+    },
+    {
       "id": "test-focused-pure",
       "kind": "command",
       "argv": ["npm", "run", "test:run", "--", "src/constants/routes.test.ts", "src/components/core/DynamicGrid.test.tsx", "src/components/core/ScheduleEditorFields.test.tsx"],
@@ -73,6 +82,15 @@
       "environment": []
     },
     {
+      "id": "release-verify-layout",
+      "kind": "command",
+      "argv": ["node", "--import", "tsx", "scripts/release-machine/driver.ts", "verify-layout"],
+      "cwd": ".",
+      "timeoutSeconds": 1800,
+      "sideEffect": "workspace",
+      "environment": ["HOME", "DASHBOARD_RELEASE_CONTEXT", "RELEASE_AUTHORIZATION_HASH", "RELEASE_AUTHORIZED_BASE_REVISION", "RELEASE_AUTHORIZED_PLAN_HASH", "RELEASE_AUTHORIZED_REPOSITORY", "RELEASE_AUTHORIZED_SCOPE_HASH", "RELEASE_AUTHORIZED_VARIANT", "RELEASE_AUTHORIZED_WORKFLOW_ID"]
+    },
+    {
       "id": "build-release",
       "kind": "command",
       "argv": ["npm", "run", "build:release"],
@@ -82,52 +100,180 @@
       "environment": []
     },
     {
-      "id": "git-release-disabled",
-      "kind": "disabled",
-      "reason": "Exact Git and GitHub release driver is not implemented",
+      "id": "release-shadow-plan",
+      "kind": "command",
+      "argv": ["npm", "run", "release:shadow", "--"],
+      "cwd": ".",
+      "timeoutSeconds": 120,
+      "sideEffect": "workspace",
+      "environment": ["DASHBOARD_RELEASE_CONTEXT", "RELEASE_AUTHORIZATION_HASH", "RELEASE_AUTHORIZED_BASE_REVISION", "RELEASE_AUTHORIZED_PLAN_HASH", "RELEASE_AUTHORIZED_REPOSITORY", "RELEASE_AUTHORIZED_SCOPE_HASH", "RELEASE_AUTHORIZED_VARIANT", "RELEASE_AUTHORIZED_WORKFLOW_ID"]
+    },
+    {
+      "id": "release-validate-scope",
+      "kind": "command",
+      "argv": ["node", "--import", "tsx", "scripts/release-machine/driver.ts", "validate-scope"],
+      "cwd": ".",
+      "timeoutSeconds": 120,
+      "sideEffect": "workspace",
+      "environment": ["HOME", "DASHBOARD_RELEASE_CONTEXT", "RELEASE_AUTHORIZATION_HASH", "RELEASE_AUTHORIZED_BASE_REVISION", "RELEASE_AUTHORIZED_PLAN_HASH", "RELEASE_AUTHORIZED_REPOSITORY", "RELEASE_AUTHORIZED_SCOPE_HASH", "RELEASE_AUTHORIZED_VARIANT", "RELEASE_AUTHORIZED_WORKFLOW_ID"]
+    },
+    {
+      "id": "release-validate-change",
+      "kind": "command",
+      "argv": ["node", "--import", "tsx", "scripts/release-machine/driver.ts", "validate-change"],
+      "cwd": ".",
+      "timeoutSeconds": 3600,
+      "sideEffect": "workspace",
+      "environment": ["HOME", "DASHBOARD_RELEASE_CONTEXT", "RELEASE_AUTHORIZATION_HASH", "RELEASE_AUTHORIZED_BASE_REVISION", "RELEASE_AUTHORIZED_PLAN_HASH", "RELEASE_AUTHORIZED_REPOSITORY", "RELEASE_AUTHORIZED_SCOPE_HASH", "RELEASE_AUTHORIZED_VARIANT", "RELEASE_AUTHORIZED_WORKFLOW_ID"]
+    },
+    {
+      "id": "release-git-driver",
+      "kind": "command",
+      "argv": ["node", "--import", "tsx", "scripts/release-machine/driver.ts", "git-release"],
+      "cwd": ".",
+      "timeoutSeconds": 1800,
       "sideEffect": "github",
+      "environment": ["HOME", "DASHBOARD_RELEASE_CONTEXT", "RELEASE_AUTHORIZATION_HASH", "RELEASE_AUTHORIZED_BASE_REVISION", "RELEASE_AUTHORIZED_PLAN_HASH", "RELEASE_AUTHORIZED_REPOSITORY", "RELEASE_AUTHORIZED_SCOPE_HASH", "RELEASE_AUTHORIZED_VARIANT", "RELEASE_AUTHORIZED_WORKFLOW_ID"]
+    },
+    {
+      "id": "release-build-merged",
+      "kind": "command",
+      "argv": ["node", "--import", "tsx", "scripts/release-machine/driver.ts", "build-merged"],
+      "cwd": ".",
+      "timeoutSeconds": 1800,
+      "sideEffect": "workspace",
+      "environment": ["HOME", "DASHBOARD_RELEASE_CONTEXT", "RELEASE_AUTHORIZATION_HASH", "RELEASE_AUTHORIZED_BASE_REVISION", "RELEASE_AUTHORIZED_PLAN_HASH", "RELEASE_AUTHORIZED_REPOSITORY", "RELEASE_AUTHORIZED_SCOPE_HASH", "RELEASE_AUTHORIZED_VARIANT", "RELEASE_AUTHORIZED_WORKFLOW_ID"]
+    },
+    {
+      "id": "release-rollback-git",
+      "kind": "command",
+      "argv": ["node", "--import", "tsx", "scripts/release-machine/driver.ts", "rollback-git"],
+      "cwd": ".",
+      "timeoutSeconds": 1800,
+      "sideEffect": "github",
+      "environment": ["HOME", "DASHBOARD_RELEASE_CONTEXT", "RELEASE_AUTHORIZATION_HASH", "RELEASE_AUTHORIZED_BASE_REVISION", "RELEASE_AUTHORIZED_PLAN_HASH", "RELEASE_AUTHORIZED_REPOSITORY", "RELEASE_AUTHORIZED_SCOPE_HASH", "RELEASE_AUTHORIZED_VARIANT", "RELEASE_AUTHORIZED_WORKFLOW_ID"]
+    },
+    {
+      "id": "release-verify-git-rollback",
+      "kind": "command",
+      "argv": ["node", "--import", "tsx", "scripts/release-machine/driver.ts", "verify-git-rollback"],
+      "cwd": ".",
+      "timeoutSeconds": 120,
+      "sideEffect": "workspace",
+      "environment": ["HOME", "DASHBOARD_RELEASE_CONTEXT", "RELEASE_AUTHORIZATION_HASH", "RELEASE_AUTHORIZED_BASE_REVISION", "RELEASE_AUTHORIZED_PLAN_HASH", "RELEASE_AUTHORIZED_REPOSITORY", "RELEASE_AUTHORIZED_SCOPE_HASH", "RELEASE_AUTHORIZED_VARIANT", "RELEASE_AUTHORIZED_WORKFLOW_ID"]
+    },
+    {
+      "id": "release-cleanup",
+      "kind": "command",
+      "argv": ["node", "--import", "tsx", "scripts/release-machine/driver.ts", "cleanup"],
+      "cwd": ".",
+      "timeoutSeconds": 300,
+      "sideEffect": "workspace",
+      "environment": ["HOME", "DASHBOARD_RELEASE_CONTEXT", "RELEASE_AUTHORIZATION_HASH", "RELEASE_AUTHORIZED_BASE_REVISION", "RELEASE_AUTHORIZED_PLAN_HASH", "RELEASE_AUTHORIZED_REPOSITORY", "RELEASE_AUTHORIZED_SCOPE_HASH", "RELEASE_AUTHORIZED_VARIANT", "RELEASE_AUTHORIZED_WORKFLOW_ID"]
+    },
+    {
+      "id": "release-affected-playwright",
+      "kind": "command",
+      "argv": ["node", "--import", "tsx", "scripts/release-machine/driver.ts", "verify-playwright"],
+      "cwd": ".",
+      "timeoutSeconds": 3600,
+      "sideEffect": "workspace",
+      "environment": ["HOME", "DASHBOARD_RELEASE_CONTEXT", "RELEASE_AUTHORIZATION_HASH", "RELEASE_AUTHORIZED_BASE_REVISION", "RELEASE_AUTHORIZED_PLAN_HASH", "RELEASE_AUTHORIZED_REPOSITORY", "RELEASE_AUTHORIZED_SCOPE_HASH", "RELEASE_AUTHORIZED_VARIANT", "RELEASE_AUTHORIZED_WORKFLOW_ID"]
+    },
+    {
+      "id": "capture-production-disabled",
+      "kind": "disabled",
+      "reason": "The transactional capture candidate is implemented but not qualified against an authorized Home Assistant fixture",
+      "sideEffect": "production",
       "environment": []
     },
     {
-      "id": "affected-playwright-disabled",
-      "kind": "disabled",
-      "reason": "Affected Playwright execution requires exact scope and an owned server",
-      "sideEffect": "workspace",
-      "environment": []
+      "id": "capture-production-candidate",
+      "kind": "command",
+      "argv": ["node", "--import", "tsx", "scripts/release-machine/productionDriver.ts", "capture"],
+      "cwd": ".",
+      "timeoutSeconds": 1800,
+      "sideEffect": "production",
+      "environment": ["DASHBOARD_RELEASE_CONTEXT", "RELEASE_AUTHORIZATION_HASH", "RELEASE_AUTHORIZED_BASE_REVISION", "RELEASE_AUTHORIZED_PLAN_HASH", "RELEASE_AUTHORIZED_REPOSITORY", "RELEASE_AUTHORIZED_SCOPE_HASH", "RELEASE_AUTHORIZED_VARIANT", "RELEASE_AUTHORIZED_WORKFLOW_ID", "VITE_FOLDER_NAME", "VITE_HA_TOKEN", "VITE_HA_URL", "VITE_SSH_HOSTNAME", "VITE_SSH_HOST_KEY_SHA256", "VITE_SSH_PASSWORD", "VITE_SSH_PORT", "VITE_SSH_PRIVATE_KEY", "VITE_SSH_USERNAME"]
     },
     {
-      "id": "build-merged-master-disabled",
-      "kind": "disabled",
-      "reason": "Post-merge build requires an exact detached origin/master worktree",
-      "sideEffect": "workspace",
-      "environment": []
+      "id": "deploy-dashboard-candidate",
+      "kind": "command",
+      "argv": ["node", "--import", "tsx", "scripts/release-machine/productionDriver.ts", "deploy"],
+      "cwd": ".",
+      "timeoutSeconds": 1800,
+      "sideEffect": "production",
+      "environment": ["DASHBOARD_RELEASE_CONTEXT", "RELEASE_AUTHORIZATION_HASH", "RELEASE_AUTHORIZED_BASE_REVISION", "RELEASE_AUTHORIZED_PLAN_HASH", "RELEASE_AUTHORIZED_REPOSITORY", "RELEASE_AUTHORIZED_SCOPE_HASH", "RELEASE_AUTHORIZED_VARIANT", "RELEASE_AUTHORIZED_WORKFLOW_ID", "VITE_FOLDER_NAME", "VITE_HA_TOKEN", "VITE_HA_URL", "VITE_SSH_HOSTNAME", "VITE_SSH_HOST_KEY_SHA256", "VITE_SSH_PASSWORD", "VITE_SSH_PORT", "VITE_SSH_PRIVATE_KEY", "VITE_SSH_USERNAME"]
+    },
+    {
+      "id": "verify-production-candidate",
+      "kind": "command",
+      "argv": ["node", "--import", "tsx", "scripts/release-machine/productionDriver.ts", "verify"],
+      "cwd": ".",
+      "timeoutSeconds": 1800,
+      "sideEffect": "production",
+      "environment": ["DASHBOARD_RELEASE_ATTESTATION", "DASHBOARD_RELEASE_ATTESTATION_PUBLIC_KEY", "DASHBOARD_RELEASE_ATTESTATION_SHA256", "DASHBOARD_RELEASE_ATTESTATION_SIGNATURE", "DASHBOARD_RELEASE_CONTEXT", "RELEASE_AUTHORIZATION_HASH", "RELEASE_AUTHORIZED_BASE_REVISION", "RELEASE_AUTHORIZED_PLAN_HASH", "RELEASE_AUTHORIZED_REPOSITORY", "RELEASE_AUTHORIZED_SCOPE_HASH", "RELEASE_AUTHORIZED_VARIANT", "RELEASE_AUTHORIZED_WORKFLOW_ID", "VITE_FOLDER_NAME", "VITE_HA_TOKEN", "VITE_HA_URL", "VITE_SSH_HOSTNAME", "VITE_SSH_HOST_KEY_SHA256", "VITE_SSH_PASSWORD", "VITE_SSH_PORT", "VITE_SSH_PRIVATE_KEY", "VITE_SSH_USERNAME"]
+    },
+    {
+      "id": "rollback-dashboard-candidate",
+      "kind": "command",
+      "argv": ["node", "--import", "tsx", "scripts/release-machine/productionDriver.ts", "rollback"],
+      "cwd": ".",
+      "timeoutSeconds": 1800,
+      "sideEffect": "production",
+      "environment": ["DASHBOARD_RELEASE_CONTEXT", "RELEASE_AUTHORIZATION_HASH", "RELEASE_AUTHORIZED_BASE_REVISION", "RELEASE_AUTHORIZED_PLAN_HASH", "RELEASE_AUTHORIZED_REPOSITORY", "RELEASE_AUTHORIZED_SCOPE_HASH", "RELEASE_AUTHORIZED_VARIANT", "RELEASE_AUTHORIZED_WORKFLOW_ID", "VITE_FOLDER_NAME", "VITE_HA_TOKEN", "VITE_HA_URL", "VITE_SSH_HOSTNAME", "VITE_SSH_HOST_KEY_SHA256", "VITE_SSH_PASSWORD", "VITE_SSH_PORT", "VITE_SSH_PRIVATE_KEY", "VITE_SSH_USERNAME"]
+    },
+    {
+      "id": "verify-production-rollback-candidate",
+      "kind": "command",
+      "argv": ["node", "--import", "tsx", "scripts/release-machine/productionDriver.ts", "verify-rollback"],
+      "cwd": ".",
+      "timeoutSeconds": 1800,
+      "sideEffect": "production",
+      "environment": ["DASHBOARD_RELEASE_CONTEXT", "RELEASE_AUTHORIZATION_HASH", "RELEASE_AUTHORIZED_BASE_REVISION", "RELEASE_AUTHORIZED_PLAN_HASH", "RELEASE_AUTHORIZED_REPOSITORY", "RELEASE_AUTHORIZED_SCOPE_HASH", "RELEASE_AUTHORIZED_VARIANT", "RELEASE_AUTHORIZED_WORKFLOW_ID", "VITE_FOLDER_NAME", "VITE_HA_TOKEN", "VITE_HA_URL", "VITE_SSH_HOSTNAME", "VITE_SSH_HOST_KEY_SHA256", "VITE_SSH_PASSWORD", "VITE_SSH_PORT", "VITE_SSH_PRIVATE_KEY", "VITE_SSH_USERNAME"]
+    },
+    {
+      "id": "release-dashboard-cleanup-candidate",
+      "kind": "command",
+      "argv": ["node", "--import", "tsx", "scripts/release-machine/productionDriver.ts", "finalize"],
+      "cwd": ".",
+      "timeoutSeconds": 1800,
+      "sideEffect": "production",
+      "environment": ["DASHBOARD_RELEASE_CONTEXT", "RELEASE_AUTHORIZATION_HASH", "RELEASE_AUTHORIZED_BASE_REVISION", "RELEASE_AUTHORIZED_PLAN_HASH", "RELEASE_AUTHORIZED_REPOSITORY", "RELEASE_AUTHORIZED_SCOPE_HASH", "RELEASE_AUTHORIZED_VARIANT", "RELEASE_AUTHORIZED_WORKFLOW_ID", "VITE_FOLDER_NAME", "VITE_HA_TOKEN", "VITE_HA_URL", "VITE_SSH_HOSTNAME", "VITE_SSH_HOST_KEY_SHA256", "VITE_SSH_PASSWORD", "VITE_SSH_PORT", "VITE_SSH_PRIVATE_KEY", "VITE_SSH_USERNAME"]
     },
     {
       "id": "deploy-dashboard-disabled",
       "kind": "disabled",
-      "reason": "Home Assistant deployment driver is not implemented",
+      "reason": "The deployment candidate is implemented but lacks authorized fixture qualification and configuration-restart support",
       "sideEffect": "production",
       "environment": []
     },
     {
       "id": "verify-production-disabled",
       "kind": "disabled",
-      "reason": "Production browser and host verification driver is not implemented",
+      "reason": "Production browser verification and real-phone attestation have not completed qualification",
       "sideEffect": "production",
       "environment": []
     },
     {
       "id": "rollback-dashboard-disabled",
       "kind": "disabled",
-      "reason": "Production bundle and wrapper rollback driver is not implemented",
+      "reason": "The rollback candidate is implemented but not fault-tested against an authorized Home Assistant fixture",
       "sideEffect": "production",
       "environment": []
     },
     {
-      "id": "cleanup-release-disabled",
+      "id": "verify-production-rollback-disabled",
       "kind": "disabled",
-      "reason": "Release worktree cleanup driver is not implemented",
-      "sideEffect": "workspace",
+      "reason": "Production rollback verification is not qualified against an authorized Home Assistant fixture",
+      "sideEffect": "production",
+      "environment": []
+    },
+    {
+      "id": "release-dashboard-cleanup-disabled",
+      "kind": "disabled",
+      "reason": "Production lease finalization and repository cleanup are not qualified against an authorized Home Assistant fixture",
+      "sideEffect": "production",
       "environment": []
     }
   ]

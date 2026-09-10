@@ -42,6 +42,19 @@ executor unless explicitly requested. Unknown or consequential architectural
 questions need frontier evidence, not a cheap summary. A model route never
 changes repository safety or release requirements.
 
+Behavior-bearing implementation changes must include a changed or added test
+in the same change set. Application behavior accepts a changed `src/**/*.test`
+or Playwright spec; CSS behavior requires a changed Playwright spec; tooling
+requires a changed `scripts/**/*.test`; Home Assistant behavior requires a
+changed HA or scripts test. Documentation-only and test-only changes are
+exempt. `npm run test:change-policy` is authoritative; do not edit an unrelated
+test merely to satisfy it.
+The test must either share the implementation file's repository-relative stem
+(`Widget.tsx` / `Widget.test.tsx`, including `module.css`) or contain an exact
+`@covers path/to/implementation` declaration. Non-colocated Playwright and HA
+coverage must use `@covers`; the declaration is an auditable ownership claim,
+not permission to cite an unrelated assertion.
+
 The version 3 budget route is deterministic first. The interactive model may be
 Sol, HydraFusion, or another model; identity never bypasses the exact
 opportunity pin. A matching qualified model may fill the resolved role,

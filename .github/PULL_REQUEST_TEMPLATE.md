@@ -6,6 +6,7 @@
 
 <!-- Tests, build, Playwright, and live Home Assistant evidence as applicable. -->
 
+- Changed-test policy result and same-stem/`@covers` ownership:
 - Layout classification and affected owners/states:
 - Plan/run/source/build fingerprints and assessment path:
 - Selected/executed/passed/failed/skipped/not-run counts:

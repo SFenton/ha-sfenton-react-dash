@@ -14,11 +14,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
       - run: npm ci
+      - name: Require changed tests for implementation changes
+        if: github.event_name == 'pull_request'
+        run: npm run test:change-policy -- --base ${{ github.event.pull_request.base.sha }}
       - name: Build mock dashboard
         run: npx vite build --mode test --configLoader native --outDir .playwright-dist
       - uses: actions/upload-artifact@v4
