@@ -46,7 +46,12 @@ visual parity, device state or measured rendering cost.
 3. Reuse existing components, HA action mappings, and targeted tests.
    For UI work invoke `dashboard-ux-authoring`, including house-style copy when
    relevant. Do not replace actual browser inspection with model confidence.
-4. Run the smallest relevant Vitest selectors together. UX work uses the
+4. Include a changed or added domain-appropriate test with every
+   behavior-bearing implementation change; documentation-only and test-only
+   changes are exempt. Use a same-stem test or an exact
+   `@covers repository/relative/implementation-path` declaration for
+   non-colocated coverage. Run `npm run test:change-policy`, then run the smallest
+   relevant Vitest selectors together. UX work uses the
    executable layout plan and its mandatory manual review. Treat inaccessible
    evidence as blocked. A non-UX tooling change does not need a full UI suite.
 5. Revise once from a concrete reviewer defect receipt; a second revision fails

@@ -1,0 +1,27 @@
+{
+  "version": 3,
+  "project": "ha-react",
+  "opportunity": "repository-release",
+  "variant": "repository-only",
+  "enabled": false,
+  "operatorAuthorizationRequired": true,
+  "reviewer": {
+    "role": "medium-review",
+    "profile": { "model": "gpt-5.6-sol", "effort": "medium", "context": "default" },
+    "authority": "review-only"
+  },
+  "exception": {
+    "role": "risk-triggered-frontier-review",
+    "profile": { "model": "gpt-5.6-sol", "effort": "max", "context": "long_context" },
+    "triggerIds": ["repository-release-rollback-conflict"],
+    "requiresTriggerReceipt": true
+  },
+  "steps": [
+    { "id": "validate-scope", "label": "Validate exact patch, scope, and changed-test ownership", "executor": "deterministic", "operation": "verify", "tool": "release-validate-scope", "failure": "rejected", "evidence": ["base revision", "scope paths", "changed test paths", "patch hash"] },
+    { "id": "validate-change", "label": "Run complete repository validation", "executor": "deterministic", "operation": "command", "tool": "release-validate-change", "failure": "rejected", "evidence": ["test, lint and build results"] },
+    { "id": "create-merge-pr", "label": "Create and merge exact pull request", "executor": "deterministic", "operation": "git-release", "tool": "release-git-driver", "failure": "rollback-git", "evidence": ["branch", "commit", "pull request", "merge commit"] },
+    { "id": "build-merged-master", "label": "Build isolated merged master", "executor": "deterministic", "operation": "command", "tool": "release-build-merged", "failure": "rollback-git", "evidence": ["merged revision", "build manifest"] },
+    { "id": "rollback-git", "label": "Close or revert release", "executor": "deterministic", "operation": "rollback", "tool": "release-rollback-git", "rollbackOnly": true, "rollbackVerificationTool": "release-verify-git-rollback", "failure": "abnormal", "evidence": ["closed pull request or merged revert"] },
+    { "id": "cleanup-release", "label": "Remove machine-owned artifacts", "executor": "deterministic", "operation": "cleanup", "tool": "release-cleanup", "failure": "abnormal", "evidence": ["removed worktrees", "preserved primary worktree"] }
+  ]
+}

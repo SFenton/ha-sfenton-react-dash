@@ -18,6 +18,7 @@
     { "id": "i18n-inventory", "opportunity": "transforms", "class": "deterministic-tool", "description": "Inventory changed user-visible strings and locale coverage.", "validators": ["test-core-transforms"], "destination": "tools" },
     { "id": "preload-io-check", "opportunity": "debugging", "class": "deterministic-tool", "description": "Detect runtime I/O introduced into preload rendering.", "validators": ["test-runtime-debugging"], "destination": "tools" },
     { "id": "route-synchronization", "opportunity": "transforms", "class": "deterministic-tool", "description": "Keep route constants, navigation and route tests synchronized.", "validators": ["test-core-transforms"], "destination": "tools" },
+    { "id": "changed-test-enforcement", "opportunity": "focused-tests", "class": "deterministic-tool", "description": "Require behavior-bearing implementation changes to include changed domain-appropriate tests.", "validators": ["check-test-change-policy"], "destination": "tools" },
     { "id": "bundle-fingerprint", "opportunity": "release", "class": "qualification-fixture", "description": "Record local build fingerprints without deployment or production claims.", "validators": ["build-release"], "destination": "fixtures" }
   ],
   "destinations": {
@@ -34,9 +35,10 @@
     { "id": "verify-layout", "targets": ["layout-test-selection"] },
     { "id": "test-core-transforms", "targets": ["i18n-inventory", "route-synchronization"] },
     { "id": "test-runtime-debugging", "targets": ["preload-io-check"] },
+    { "id": "check-test-change-policy", "targets": ["changed-test-enforcement"] },
     { "id": "build-release", "targets": ["bundle-fingerprint"] }
   ],
-  "knownTools": ["check-dashboard", "test-focused-pure", "test-interactions", "test-ha-service-mappings", "test-core-scaffolds", "test-core-transforms", "test-runtime-debugging", "verify-layout", "build-release"],
+  "knownTools": ["check-dashboard", "check-test-change-policy", "test-focused-pure", "test-interactions", "test-ha-service-mappings", "test-core-scaffolds", "test-core-transforms", "test-runtime-debugging", "verify-layout", "build-release", "release-shadow-plan"],
   "knownSkills": ["ha-budget-workflow", "dashboard-ux-authoring", "release-dashboard", "house-style-copy", "simulated-user-panel"],
   "automaticBuild": true,
   "automaticPromotion": false,

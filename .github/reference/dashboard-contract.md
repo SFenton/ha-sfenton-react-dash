@@ -301,6 +301,19 @@ When implementing camera sections or modals:
 
 Add tests as features are implemented.
 
+- Every behavior-bearing implementation change must include a changed or added
+  domain-appropriate test in the same change set. Application TypeScript may
+  use a changed `src/**/*.test` or `e2e/**/*.spec.ts`; CSS behavior requires a
+  changed Playwright spec; tooling requires a changed `scripts/**/*.test`; Home
+  Assistant behavior requires a changed HA or scripts test. Documentation-only
+  and test-only changes are exempt.
+- Ownership must be explicit: use a same-stem test where one exists, otherwise
+  add `@covers repository/relative/implementation-path` to the changed test.
+  CSS coverage therefore uses an exact `@covers` declaration in the changed
+  Playwright spec. Do not make a false ownership declaration.
+- Run `npm run test:change-policy` before completion. The deterministic check
+  evaluates the actual Git change set and rejects implementation-only patches.
+  Do not touch an unrelated test solely to make the gate pass.
 - Unit tests: component rendering, hooks, entity formatting, service-call behavior, modal open/close behavior, navigation state.
 - Playwright tests: page routing, bottom nav behavior, expected visible sections, modal open/close, core entity controls, WebRTC/camera containers.
 - UX completion requires the canonical responsive matrix in
