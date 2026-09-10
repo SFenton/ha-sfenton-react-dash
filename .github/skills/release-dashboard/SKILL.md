@@ -31,9 +31,14 @@ release path.
 3. Identify the exact release-owned files and hunks from the completed task.
    Preserve all unrelated staged, unstaged, and untracked work. When a file
    contains mixed changes, stage an exact patch rather than the whole file.
-4. Confirm the task's required validation is complete. Re-run `npm run check`
-   and the smallest affected Playwright release gates if the working tree
-   changed after the last successful run.
+4. Confirm the task's required focused validation is complete. Before pushing,
+   run every test file changed or added by the release scope after its final
+   edit, using its owning runner and exact file paths. Use
+   `npm run test:run -- <paths>` for Vitest files and
+   `npm run test:e2e -- <paths>` for Playwright files. Re-run `npm run check` if
+   the working tree changed after the last successful run. Do not run the
+   unchanged full Playwright suite locally as a release or merge gate; the
+   pull-request workflow owns that full-suite validation.
    Require `npm run test:change-policy` to pass for the exact release scope:
    behavior-bearing implementation changes must include a changed or added
    domain-appropriate test, and every changed Playwright spec must be included
@@ -62,11 +67,17 @@ release path.
 4. Push the branch with upstream tracking.
 5. Create a pull request targeting `master`, including behavior and validation
    evidence. Wait for its checks with `gh pr checks --watch --fail-fast`; do
-   not merge while the changed-test policy or another required workflow check
-   is pending or failing. Then merge it with a merge commit through `gh`.
+   not merge while the changed-test policy or the `Playwright gate` check is
+   pending or failing. Then merge it with a merge commit through `gh`.
 6. Fetch `origin/master` and prove the release commit is an ancestor of the
    merged branch. Do not force-push, amend, or delete a checked-out branch that
    still carries unrelated work.
+
+GitHub currently does not expose protected branches or required status checks
+for this private repository's account plan. Until that changes, the release
+workflow's explicit check wait is mandatory. If protected branches become
+available, require the uniquely named `Playwright gate` status check on
+`master`.
 
 ## Build the merged commit
 
