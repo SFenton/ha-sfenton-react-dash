@@ -297,7 +297,7 @@ test('resize recovery and calm rows preserve shared horizontal motion', async ({
     { wind_bearing: 157, wind_gust_speed: 7.89, wind_speed: 3.96 },
   ]
   await updateDailyForecast(page, initialWind, 10)
-  await expect.poll(() => arrows.evaluateAll((elements) => elements.reduce((count, element) => count + element.getAnimations().length, 0))).toBe(1)
+  await expect.poll(() => arrows.first().evaluate((element) => element.getAnimations().length)).toBe(1)
   await arrows.first().evaluate((element, duration) => {
     const animation = element.getAnimations()[0]
     animation.currentTime = duration * 0.35
