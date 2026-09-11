@@ -1257,7 +1257,7 @@ test('music room focused map survives mounted viewport transitions', async ({ pa
   }
 })
 
-test('vacuum short landscape uses one body scroller with a fixed navigation footer', async ({ page }) => {
+test('vacuum short landscape uses a fixed map pane and scrolling controls with a fixed navigation footer', async ({ page }) => {
   await page.setViewportSize({ height: 393, width: 852 })
   const dialog = await openMainFloorVacuum(page)
   await page.waitForTimeout(520)
@@ -1266,13 +1266,17 @@ test('vacuum short landscape uses one body scroller with a fixed navigation foot
   await expect(dialog).toHaveAttribute('data-centered-layout', 'true')
   await expect(dialog.locator('[data-mobile-drag-handle="true"]')).toHaveCount(0)
   const body = dialog.locator('[data-modal-sheet-body="true"]')
-  await expect(body).toHaveCSS('overflow-y', 'auto')
-  await expect.poll(() => body.evaluate((element) => element.scrollHeight > element.clientHeight)).toBe(true)
+  const mapPane = dialog.getByRole('group', { name: 'Main Floor map and status' })
+  const controlsPane = dialog.locator('[data-scroll-region="vacuum-panel"]')
+  await expect(body).toHaveCSS('overflow-y', 'hidden')
+  await expect(mapPane).toHaveCSS('overflow-y', 'hidden')
+  await expect(controlsPane).toHaveCSS('overflow-y', 'auto')
+  await expect.poll(() => controlsPane.evaluate((element) => element.scrollHeight > element.clientHeight)).toBe(true)
   await expectScrollSafe(dialog)
 
   const navigation = dialog.locator('[data-modal-sheet-navigation="true"]')
   const before = await navigation.boundingBox()
-  await body.evaluate((element) => {
+  await controlsPane.evaluate((element) => {
     element.scrollTop = element.scrollHeight
   })
   const after = await navigation.boundingBox()

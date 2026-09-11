@@ -624,7 +624,9 @@ for (const room of CONFIGURED_ROOM_MODALS) {
             await expect(dialog).toHaveAttribute('data-configured-modal-node', 'original')
             if (tab) await expect(tab).toHaveAttribute('aria-selected', 'true')
             const body = dialog.locator('[data-modal-sheet-body]')
-            await expect(body).toHaveCSS('overflow-y', 'auto')
+            const paneOwned = opener.kind === 'vacuum'
+            await expect(body).toHaveCSS('overflow-y', paneOwned ? 'hidden' : 'auto')
+            if (paneOwned) await expect(dialog.locator('[data-scroll-region="vacuum-panel"]')).toHaveCSS('overflow-y', 'auto')
             if (profile === LANDSCAPES[0] && testInfo.project.name === 'mobile') {
               await page.screenshot({ path: testInfo.outputPath(`${artifact}-landscape.png`), scale: 'css' })
             }

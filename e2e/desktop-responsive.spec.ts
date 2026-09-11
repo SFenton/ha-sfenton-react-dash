@@ -360,7 +360,7 @@ for (const route of [
     await expect(dialog.getByLabel('Unavailable')).toHaveCount(0)
     await expect(dialog.getByText('Battery').locator('xpath=ancestor::*[@data-icon][1]')).toHaveAttribute('data-tone', 'unavailable')
     await expect(dialog.getByRole('region', { name: 'Music Room Valetudo map' })).toHaveAttribute('data-source-available', 'false')
-    await expect(dialog.getByRole('button', { name: 'Locate' })).toHaveCount(0)
+    await expect(dialog.getByRole('button', { name: 'Locate' })).toBeDisabled()
     await expect(dialog.getByRole('alert')).toHaveCount(0)
     await expect(dialog.getByText(/battery is critically low/i)).toHaveCount(0)
     expect(await page.evaluate(() => window.__mockHass?.calls ?? [])).toEqual([])

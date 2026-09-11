@@ -254,7 +254,11 @@ Keep synthetic viewport/capability fixtures explicitly labeled as such.
 
 For non-grid modals, assert compact landscape chrome, the measured
 `data-modal-body-tier`, expected stacked/split structure, visible named panes,
-and exactly one vertical body owner. Validate media/hero caps, tab-label
+and exactly one declared vertical scroll owner. For explicitly scoped
+pane-scrolling workspaces, prove this at every supported landscape tier and
+also prove the body and primary pane cannot scroll or move during secondary-pane
+endpoint overscroll without suppressing the secondary pane's platform-native
+elastic response. Validate media/hero caps, tab-label
 containment, fixed navigation/footer position, terminal content, mirrored safe
 areas, paired form/option layouts, and exact portrait geometry after mounted
 portrait -> landscape -> portrait rotation. Square-grid flows remain on regular
