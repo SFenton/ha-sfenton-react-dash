@@ -27,22 +27,30 @@ export function useModalDetailPageScroll(pageKey: DetailPageKey, additionalScrol
     if (pendingRestore) {
       if (bodyElementRef.current) bodyElementRef.current.scrollTop = pendingRestore.bodyScrollTop
       if (additionalScrollRef?.current) additionalScrollRef.current.scrollTop = pendingRestore.additionalScrollTop
-      const focusScope = bodyElementRef.current?.closest('[role="dialog"]') ?? bodyElementRef.current
-      const detailTriggers = [...(focusScope?.querySelectorAll<HTMLElement>('[data-modal-detail-trigger]') ?? [])]
-      const returnTarget = pendingRestore.focusKey
-        ? detailTriggers.find((element) => element.dataset.modalDetailTrigger === pendingRestore.focusKey) ?? detailTriggers.at(-1)
-        : pendingRestore.focusElement
-      const focusTarget = modalDetailFocusTarget(returnTarget)
-      if (focusTarget?.isConnected) focusTarget.focus({ preventScroll: true })
+      const resolveFocusTarget = () => {
+        if (!pendingRestore.focusKey) return modalDetailFocusTarget(pendingRestore.focusElement)
+        const focusScope = bodyElementRef.current?.closest('[role="dialog"]') ?? bodyElementRef.current
+        const detailTriggers = [...(focusScope?.querySelectorAll<HTMLElement>('[data-modal-detail-trigger]') ?? [])]
+        return modalDetailFocusTarget(
+          detailTriggers.find((element) => element.dataset.modalDetailTrigger === pendingRestore.focusKey)
+            ?? detailTriggers.at(-1),
+        )
+      }
+      const restoreFocus = () => {
+        const focusTarget = resolveFocusTarget()
+        if (focusTarget?.isConnected) focusTarget.focus({ preventScroll: true })
+      }
+      restoreFocus()
       pendingRestoreRef.current = null
       let settleFrame = 0
-      const frame = window.requestAnimationFrame(() => {
-        settleFrame = window.requestAnimationFrame(() => {
-          if (focusTarget?.isConnected && document.activeElement !== focusTarget) focusTarget.focus({ preventScroll: true })
-        })
-      })
+      let remainingFrames = 3
+      const settle = () => {
+        restoreFocus()
+        remainingFrames -= 1
+        if (remainingFrames > 0) settleFrame = window.requestAnimationFrame(settle)
+      }
+      settleFrame = window.requestAnimationFrame(settle)
       return () => {
-        window.cancelAnimationFrame(frame)
         if (settleFrame) window.cancelAnimationFrame(settleFrame)
       }
     }
