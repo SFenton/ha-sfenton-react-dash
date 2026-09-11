@@ -41,6 +41,13 @@ export const PLAYWRIGHT_SPEC_COVERAGE = [
     spec: 'wake-light-desktop-responsive.spec.ts',
   },
   {
+    area: 'App chat routing through the authenticated household Home MCP endpoint',
+    landscape: 'not-applicable',
+    note: 'Transport routing has no viewport or safe-area-specific behavior.',
+    safeArea: 'not-applicable',
+    spec: 'home-mcp.spec.ts',
+  },
+  {
     area: 'Contract-certified mock page, shell, modal, grid, form, remote, host and preload journeys',
     landscape: 'direct',
     safeArea: 'direct',
@@ -358,9 +365,9 @@ export const SURFACE_CONTRACTS: Record<ScenarioId, {
   chat: {
     family: 'modal', states: CHAT_LAYOUT_STATES,
     tabs: ['^Home Assistant$', '^Quick Links$'],
-    owners: ['src/components/hass/chat/', 'src/components/shell/GlobalQuickLinksAction', 'src/i18n/locales/en/modals/chat.json'],
+    owners: ['src/components/hass/chat/', 'src/components/hass/LightColorPicker', 'src/components/hass/lightColor', 'src/components/shell/GlobalQuickLinksAction', 'src/i18n/locales/en/modals/chat.json'],
     legacy: ['chat-ux.spec.ts', 'modal-rotation-regressions.spec.ts'],
-    question: 'Are roles, genuine pending dots, history/resume warnings, errors and long messages clear, with a usable composer above bottom tabs and one safe scroll owner?',
+    question: 'Are roles, genuine pending dots, 14-day history visibility, versioned Chat Settings, embedded room/color/brightness controls and same-sheet custom color details using the shared exterior-light picker clear, with resume warnings, errors, long messages, a usable composer above bottom tabs and one safe scroll owner?',
   },
   summary: {
     family: 'modal', states: ['overdue', 'upcoming', 'expired'],
@@ -402,7 +409,7 @@ export const SURFACE_CONTRACTS: Record<ScenarioId, {
   },
   navigation: {
     family: 'page-shell-grid', states: ['home', 'back-page'],
-    owners: ['src/pages/Page.', 'src/components/shell/AdaptiveNavigation', 'src/components/shell/AppHeader', 'src/constants/navigationLayout'],
+    owners: ['src/pages/Page.', 'src/pages/ControlShowcasePage', 'src/i18n/locales/en/pages/controlShowcase.json', 'src/components/shell/AdaptiveNavigation', 'src/components/shell/AppHeader', 'src/constants/navigationLayout'],
     legacy: ['adaptive-navigation.spec.ts', 'responsive-pages-all.spec.ts', 'desktop-responsive.spec.ts', 'safe-area-responsive.spec.ts'],
     question: 'Do content, grid, fixed controls, Back/menu and focus remain usable across the named form-factor and stretch-return journey?',
   },
@@ -454,6 +461,36 @@ export const DEVICE_ONLY_GAPS = [
   'Native iOS text autosizing and native keyboard behavior',
   'Actual Home Assistant/companion-app three-frame inset delivery and host lifecycle',
 ] as const
+
+export const INTENTIONAL_NEW_ROUTES: Record<string, {
+  backLabel: string
+  heading: string
+  owner: ScenarioId
+  referenceRoute: string
+  root: string
+  expected: {
+    actionCount: number
+    colorPickers: number
+    rgbChannels: number
+    sectionHeadings: string[]
+    temperaturePickers: number
+  }
+}> = {
+  'light-controls': {
+    backLabel: 'Light Controls',
+    heading: 'Light Controls',
+    owner: 'navigation',
+    referenceRoute: 'custom-lights',
+    root: '[data-control-showcase="true"]',
+    expected: {
+      actionCount: 0,
+      colorPickers: 1,
+      rgbChannels: 3,
+      sectionHeadings: ['Full Color', 'White Temperature'],
+      temperaturePickers: 1,
+    },
+  },
+}
 
 export const INTENTIONAL_ROUTE_ADDITIONS: Record<string, {
   owner: ScenarioId
@@ -521,6 +558,7 @@ export const LEGACY_ENGINE_SKIPS = [
   { spec: 'modal-sheet-lifecycle.spec.ts', title: 'keeps a synthetic WebKit top-edge swipe terminal through the mounted exit window', browser: 'chromium', reason: 'Constructed TouchEvent coverage targets the WebKit project' },
   { spec: 'modal-sheet-lifecycle.spec.ts', title: 'keeps a synthetic WebKit top-edge swipe terminal through the mounted exit window', browser: 'webkit', reason: 'Playwright WebKit exposes no trusted touch-drag injection; constructed TouchEvents are untrusted and cannot drive Base UI dismissal. Chromium CDP covers trusted swipe dismissal.' },
   { spec: 'modal-sheet-performance.spec.ts', title: 'keeps page glass blurred while removing nested modal glass blur in WebKit', browser: 'chromium', reason: 'Backdrop-filter computed styles are validated in WebKit' },
+  { spec: 'weather-atmosphere-scenes.spec.ts', title: 'new atmospheric elements follow CSS-owned close, reduced-motion and forced-color lifecycle', browser: 'webkit', reason: 'The pinned baseline remounts the scene during rapid close/reopen in Linux WebKit; Chromium and desktop retain node-identity coverage, while other WebKit weather tests remain required.' },
   { spec: 'modal-sheet-performance.spec.ts', title: 'compares automatic and full backdrop policies under throttled idle and trusted dismissal', browser: 'webkit', reason: 'CPU throttling and trusted touch injection are Chromium-only' },
 ] as const
 

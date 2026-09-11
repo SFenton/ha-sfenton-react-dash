@@ -1,4 +1,4 @@
-import { HOME_RECIPES_ROUTE_PATH, HOME_SPRINKLERS_ROUTE_PATH, THERMOSTAT_ROUTE_PATH, fallbackBackPathForRoute, primaryNavPathForRoute, primaryNavRouteActive, routePathFromUrl, routeUrl } from './routes'
+import { HOME_RECIPES_ROUTE_PATH, HOME_SPRINKLERS_ROUTE_PATH, LIGHT_CONTROLS_SHOWCASE_ROUTE_PATH, THERMOSTAT_ROUTE_PATH, fallbackBackPathForRoute, primaryNavPathForRoute, primaryNavRouteActive, routePathFromUrl, routeUrl } from './routes'
 
 describe('routes', () => {
   it('extracts at-a-glance route paths', () => {
@@ -13,6 +13,7 @@ describe('routes', () => {
     expect(routePathFromUrl('/at-a-glance/cabinet')).toBe('cabinet')
     expect(routePathFromUrl('/at-a-glance/special-device-modes')).toBe('special-device-modes')
     expect(routePathFromUrl('/at-a-glance/sprinklers')).toBe(HOME_SPRINKLERS_ROUTE_PATH)
+    expect(routePathFromUrl('/at-a-glance/light-controls')).toBe(LIGHT_CONTROLS_SHOWCASE_ROUTE_PATH)
     expect(routePathFromUrl('/at-a-glance/manual')).toBe('overview')
     expect(routePathFromUrl('/at-a-glance')).toBe('overview')
     expect(routePathFromUrl('/local/ha-sfenton-react-dash/index.html')).toBe('overview')
@@ -68,6 +69,7 @@ describe('routes', () => {
     expect(primaryNavPathForRoute('vacuums')).toBe('overview')
     expect(primaryNavPathForRoute('media')).toBe('overview')
     expect(primaryNavPathForRoute('custom-lights')).toBe('overview')
+    expect(primaryNavPathForRoute(LIGHT_CONTROLS_SHOWCASE_ROUTE_PATH)).toBe('overview')
     expect(primaryNavPathForRoute(HOME_SPRINKLERS_ROUTE_PATH)).toBe('overview')
     expect(primaryNavPathForRoute('grocery-list')).toBe('overview')
     expect(primaryNavPathForRoute('food')).toBe('overview')
@@ -89,6 +91,7 @@ describe('routes', () => {
     expect(primaryNavRouteActive('vacuums', 'overview')).toBe(true)
     expect(primaryNavRouteActive('media', 'overview')).toBe(true)
     expect(primaryNavRouteActive('custom-lights', 'overview')).toBe(true)
+    expect(primaryNavRouteActive(LIGHT_CONTROLS_SHOWCASE_ROUTE_PATH, 'overview')).toBe(true)
     expect(primaryNavRouteActive(HOME_SPRINKLERS_ROUTE_PATH, 'overview')).toBe(true)
     expect(primaryNavRouteActive('living-room', 'chores')).toBe(false)
     expect(primaryNavRouteActive('vacuums', 'chores')).toBe(false)
@@ -113,6 +116,7 @@ describe('routes', () => {
     expect(fallbackBackPathForRoute('all-food')).toBe('food')
     expect(fallbackBackPathForRoute('recipes')).toBe('food')
     expect(fallbackBackPathForRoute('master-bedroom')).toBe('overview')
+    expect(fallbackBackPathForRoute(LIGHT_CONTROLS_SHOWCASE_ROUTE_PATH)).toBe('overview')
     expect(fallbackBackPathForRoute('food')).toBe('overview')
     expect(fallbackBackPathForRoute(HOME_SPRINKLERS_ROUTE_PATH)).toBe('overview')
     expect(fallbackBackPathForRoute('stephs-chores')).toBe('chores')

@@ -3,10 +3,10 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
-export type TestChangeRequirement = 'app' | 'browser' | 'ha' | 'tooling'
+export type TestChangeRequirement = 'app' | 'browser' | 'ha' | 'mcp' | 'tooling'
 
 const TEST_PATH =
-  /(?:^|\/)(?:[^/]+\.(?:test|spec)\.[cm]?[jt]sx?|(?:test_[^/]+|[^/]+\.(?:test|spec))\.py)$/
+  /(?:^|\/)(?:[^/]+\.(?:test|spec)\.[cm]?[jt]sx?|(?:test_[^/]+|[^/]+\.(?:test|spec))\.py|home-mcp\/improvement\/regressions\/[^/]+\.json)$/
 
 function isTestPath(path: string) {
   return TEST_PATH.test(path)
@@ -21,6 +21,8 @@ export function implementationRequirement(
   if (/^src\/i18n\/locales\/.+\.json$/.test(path)) return 'app'
   if (/^src\/.+\.[jt]sx?$/.test(path)) return 'app'
   if (/^scripts\/.+\.(?:[cm]?[jt]sx?|sh)$/.test(path)) return 'tooling'
+  if (/^home-mcp\/.+\/types\.ts$/.test(path)) return undefined
+  if (/^home-mcp\/.+\.[cm]?[jt]s$/.test(path)) return 'mcp'
   if (/^home-assistant\/.+\.(?:json|py|[cm]?[jt]sx?|ya?ml)$/.test(path)) {
     return 'ha'
   }
@@ -37,6 +39,7 @@ function eligibleTest(requirement: TestChangeRequirement, path: string) {
     return path.startsWith('src/') || path.startsWith('e2e/')
   }
   if (requirement === 'tooling') return path.startsWith('scripts/')
+  if (requirement === 'mcp') return path.startsWith('home-mcp/')
   return path.startsWith('home-assistant/') || path.startsWith('scripts/')
 }
 
@@ -57,14 +60,27 @@ function testStem(path: string) {
 function annotations(root: string | undefined, tests: readonly string[]) {
   const covered = new Set<string>()
   if (!root) return covered
+  const record = (test: string, source: string) => {
+    if (test.endsWith('.json')) {
+      const value = JSON.parse(source) as { coveredPaths?: unknown }
+      if (Array.isArray(value.coveredPaths)) {
+        for (const path of value.coveredPaths) if (typeof path === 'string') covered.add(path.replaceAll('\\', '/'))
+      }
+    }
+    for (const match of source.matchAll(/@covers\s+([^\s*]+)/g)) {
+      if (match[1]) covered.add(match[1].replaceAll('\\', '/'))
+    }
+  }
   for (const test of tests) {
     try {
       const source = readFileSync(resolve(root, test), 'utf8')
-      for (const match of source.matchAll(/@covers\s+([^\s*]+)/g)) {
-        if (match[1]) covered.add(match[1].replaceAll('\\', '/'))
-      }
+      record(test, source)
     } catch {
-      // Deleted tests can still match a deleted implementation by path stem.
+      try {
+        record(test, execFileSync('git', ['-C', root, 'show', `origin/master:${test}`], { encoding: 'utf8' }))
+      } catch {
+        // Deleted tests can still match a deleted implementation by path stem.
+      }
     }
   }
   return covered
@@ -74,6 +90,7 @@ const REQUIREMENT_COPY: Record<TestChangeRequirement, string> = {
   app: 'application behavior requires a changed src unit test or e2e Playwright spec',
   browser: 'CSS behavior requires a changed e2e Playwright spec',
   ha: 'Home Assistant behavior requires a changed HA or scripts test',
+  mcp: 'Home MCP behavior requires a changed Home MCP test or learned regression fixture',
   tooling: 'tooling behavior requires a changed scripts test',
 }
 

@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { LightMoreInfoSheet } from './LightMoreInfoSheet'
 import { mockCallServiceCalls, mockEntities, resetMockHass } from '../../test/mocks/hakitCoreState'
 
+// @covers src/components/hass/lightColor.ts
 const OPEN = 'light.front_door_bollard_1'
 const OTHER = 'light.front_door_bollard_2'
 
@@ -39,6 +40,7 @@ describe('LightMoreInfoSheet', () => {
 
   it('shows the color picker and RGB inputs seeded from the live color', () => {
     render(<LightMoreInfoSheet entityId={OPEN} lights={LIGHTS} onClose={() => {}} open title="Bollard 1" />)
+    expect(screen.getByRole('slider', { name: 'Bollard 1' }).closest('[data-light-color-picker="true"]')).toBeInTheDocument()
     expect(screen.getByTestId('color-picker')).toBeInTheDocument()
     expect((screen.getByLabelText('Bollard 1 R channel') as HTMLInputElement).value).toBe('10')
     expect((screen.getByLabelText('Bollard 1 G channel') as HTMLInputElement).value).toBe('20')

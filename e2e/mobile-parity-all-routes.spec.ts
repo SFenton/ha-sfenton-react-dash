@@ -5,6 +5,7 @@ import { expect, test, type Browser, type Page } from './layout/fixture'
 import { RESPONSIVE_ROUTES, type ResponsiveRoute } from './responsive-acceptance-data'
 import { APPROVED_WEATHER_RENDER_MIGRATION_BASE, restoreSourceDeclaredBackdropFilters, selectedParityRoutes } from '../scripts/required-mobile-parity'
 import type { RunIdentity } from './layout/types'
+import { INTENTIONAL_NEW_ROUTES } from './layout/contracts'
 import { inspectRouteAddition, normalizeInspectedAddition } from './layout/routeAdditions'
 
 type PixelRegion = { x: number; y: number; width: number; height: number }
@@ -39,6 +40,17 @@ type RouteParityResult = {
   rawDifferentPixelRatio: number
   rawMaxChannelDelta: number
   approvedHeroRailRegion?: PixelRegion
+  intentionalNewRoute: null | {
+    owner: string
+    referenceRoute: string
+    facts: {
+      actionCount: number
+      colorPickers: number
+      rgbChannels: number
+      sectionHeadings: string[]
+      temperaturePickers: number
+    }
+  }
 }
 
 const BASELINE_URL = process.env.RESPONSIVE_BASELINE_URL
@@ -439,7 +451,7 @@ async function approvedHeroRailRegion(baseline: Page, candidate: Page): Promise<
 }
 
 for (const parityViewport of PHONE_PARITY_VIEWPORTS) {
-  test(`all 45 routes preserve the clean ${parityViewport.width}x${parityViewport.height} ${parityViewport.name} presentation`, async ({ browser }) => {
+  test(`all ${SELECTED_ROUTES.length} routes preserve the clean ${parityViewport.width}x${parityViewport.height} ${parityViewport.name} presentation`, async ({ browser }) => {
     if (!BASELINE_URL || !CANDIDATE_URL) {
       test.skip(!PARITY_REQUIRED, 'Set responsive baseline and candidate URLs')
       throw new Error('Required mobile parity needs RESPONSIVE_BASELINE_URL and RESPONSIVE_CANDIDATE_URL')
@@ -461,15 +473,17 @@ for (const parityViewport of PHONE_PARITY_VIEWPORTS) {
     try {
       for (const route of SELECTED_ROUTES) {
         await test.step(route, async () => {
+          const newRouteContract = INTENTIONAL_NEW_ROUTES[route]
+          const baselineRoute = (newRouteContract?.referenceRoute ?? route) as ResponsiveRoute
           if (rawBaseline) {
-            await openBaselineRoute(rawBaseline.page, route)
-            await ensureRouteContent(rawBaseline.page, route)
-            await ensureInventoryContent(rawBaseline.page, route)
+            await openBaselineRoute(rawBaseline.page, baselineRoute)
+            await ensureRouteContent(rawBaseline.page, baselineRoute)
+            await ensureInventoryContent(rawBaseline.page, baselineRoute)
             await settleStableVisual(rawBaseline.page)
           }
-          await openBaselineRoute(baseline.page, route)
-          await ensureRouteContent(baseline.page, route)
-          await ensureInventoryContent(baseline.page, route)
+          await openBaselineRoute(baseline.page, baselineRoute)
+          await ensureRouteContent(baseline.page, baselineRoute)
+          await ensureInventoryContent(baseline.page, baselineRoute)
           await settleStableVisual(baseline.page)
           await openRoute(candidate.page, route)
           await ensureRouteContent(candidate.page, route)
@@ -490,10 +504,37 @@ for (const parityViewport of PHONE_PARITY_VIEWPORTS) {
             ? await normalizeInspectedAddition(candidate.page, intentionalAddition)
             : null
           try {
-          const [baselineSignature, candidateSignature] = await Promise.all([
+          const [rawBaselineSignature, rawCandidateSignature] = await Promise.all([
             pageSignature(baseline.page),
             pageSignature(candidate.page),
           ])
+          let intentionalNewRoute: RouteParityResult['intentionalNewRoute'] = null
+          let baselineSignature = rawBaselineSignature
+          let candidateSignature = rawCandidateSignature
+          if (newRouteContract) {
+            const root = candidate.page.locator(newRouteContract.root)
+            await expect(root).toHaveCount(1)
+            await expect(candidate.page.getByRole('heading', { level: 1, name: newRouteContract.heading })).toHaveCount(1)
+            const back = candidate.page.locator('main header button[aria-label="Go back"]')
+            await expect(back).toContainText(newRouteContract.backLabel)
+            expect((await back.boundingBox())?.height).toBeGreaterThanOrEqual(24)
+            const facts = await root.evaluate((element) => ({
+              actionCount: element.querySelectorAll('button, a, [role="button"]').length,
+              colorPickers: element.querySelectorAll('[data-light-color-picker="true"]').length,
+              rgbChannels: element.querySelectorAll('input[aria-label$=" channel"]').length,
+              sectionHeadings: [...element.querySelectorAll('h2')].map((heading) => heading.textContent?.trim() ?? ''),
+              temperaturePickers: element.querySelectorAll('[data-light-temperature-picker="true"]').length,
+            }))
+            expect(facts, `${route}: declared new-route controls`).toEqual(newRouteContract.expected)
+            const sharedShell = (entry: ElementSignature) => !/^H[1-3]:/.test(entry.key) && entry.key !== 'BUTTON::Go back:0'
+            baselineSignature = rawBaselineSignature.filter(sharedShell)
+            candidateSignature = rawCandidateSignature.filter(sharedShell)
+            intentionalNewRoute = {
+              owner: newRouteContract.owner,
+              referenceRoute: newRouteContract.referenceRoute,
+              facts,
+            }
+          }
           const geometryMatches = JSON.stringify(candidateSignature) === JSON.stringify(baselineSignature)
           const geometryDifferences = Array.from(
             { length: Math.max(baselineSignature.length, candidateSignature.length) },
@@ -527,6 +568,7 @@ for (const parityViewport of PHONE_PARITY_VIEWPORTS) {
             rawDifferentPixelRatio: rawDifference.differentPixels / (parityViewport.width * parityViewport.height),
             rawMaxChannelDelta: rawDifference.maxChannelDelta,
             approvedHeroRailRegion: railRegion,
+            intentionalNewRoute,
             ...difference,
           })
           } finally {
@@ -556,8 +598,9 @@ for (const parityViewport of PHONE_PARITY_VIEWPORTS) {
       if (rawBaseline) expect(rawBaseline.errors).toEqual([])
       expect(candidate.errors).toEqual([])
       expect(results.filter((result) => !result.geometryMatches).map((result) => result.route), 'geometry/style parity').toEqual([])
+      const comparableResults = results.filter((result) => result.intentionalNewRoute === null)
       expect(
-        results.filter((result) => result.differentPixelRatio > 0.12 || result.meanChannelDelta > 2)
+        comparableResults.filter((result) => result.differentPixelRatio > 0.12 || result.meanChannelDelta > 2)
           .map((result) => ({
             differentPixelRatio: result.differentPixelRatio,
             meanChannelDelta: result.meanChannelDelta,
@@ -565,7 +608,7 @@ for (const parityViewport of PHONE_PARITY_VIEWPORTS) {
           })),
         'screenshot perceptual parity',
       ).toEqual([])
-      expect(results.filter((result) => result.maxChannelDelta > 128).map((result) => ({
+      expect(comparableResults.filter((result) => result.maxChannelDelta > 128).map((result) => ({
         maxChannelDelta: result.maxChannelDelta,
         route: result.route,
       })), 'screenshot maximum channel parity').toEqual([])

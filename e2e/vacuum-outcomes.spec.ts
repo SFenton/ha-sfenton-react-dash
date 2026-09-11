@@ -3,6 +3,7 @@ import { expect, test, type Locator, type Page } from './layout/fixture'
 import { LEGACY_VACUUM_OUTCOMES, NINE_ROOM_VACUUM_OUTCOME_CONTRACT } from '../src/test/fixtures/vacuumOutcomes'
 import { setSafeAreaInsets } from './safe-area'
 
+// @covers src/hooks/useModalDetailPageScroll.ts
 const SESSION_ENTITY_ID = 'sensor.main_floor_vacuum_coordinator_session_state'
 const EVIDENCE_DIRECTORY = 'artifacts/vacuum-outcomes'
 

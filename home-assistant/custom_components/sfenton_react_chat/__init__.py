@@ -1,4 +1,4 @@
-"""HA-owned retention for React dashboard conversation history."""
+"""Optional manual cleanup for React dashboard conversation history."""
 
 import asyncio
 import logging
@@ -20,7 +20,7 @@ _LOGGER = logging.getLogger(__name__)
 
 
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
-    """Register the fixed-policy service; the package owns the daily schedule."""
+    """Register the manual cleanup service; the package does not schedule it."""
     lock = asyncio.Lock()
 
     async def purge_expired_history(call: ServiceCall) -> None:

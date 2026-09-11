@@ -1,14 +1,16 @@
 import {
-  CHAT_BYTE_LIMIT, CHAT_CONTEXT_IDLE_MS, CHAT_MESSAGE_LIMIT, CHAT_PENDING_MS, CHAT_RECORD_LIMIT,
-  CHAT_REPLY_LIMIT, CHAT_THREAD_LIMIT, chatAvailability, chatRecordBytes, chatRecordKey,
-  deriveChatThreads, parseChatRecord, readChatData, sameChatRecord,
-  type ChatAvailability, type ChatRecord, type ChatRequestRecord, type ChatResultRecord,
-  type ChatStatusRecord, type ChatThread, type ChatThreadRecord,
+  CHAT_BYTE_LIMIT, CHAT_CONTEXT_IDLE_MS, CHAT_HISTORY_VISIBLE_MS, CHAT_MESSAGE_LIMIT, CHAT_PENDING_MS,
+  CHAT_RECORD_LIMIT, CHAT_REPLY_LIMIT, CHAT_THREAD_LIMIT, chatAvailability, chatRecordBytes, chatRecordKey,
+  chatImprovementConversation, deriveChatThreads, parseChatRecord, readChatData, sameChatRecord, visibleChatHistoryThreads,
+  type ChatAvailability, type ChatRecord, type ChatRequestRecord, type ChatResponseControl, type ChatResultRecord,
+  type ChatSkillContext, type ChatStatusRecord, type ChatThread, type ChatThreadRecord,
 } from './chatRecords'
 import { createChatId } from './chatId'
+import { HomeMcpRequestRejected, type HomeMcpClient } from './homeMcpClient'
 
 export interface ChatConnection {
   connected?: boolean
+  options?: { auth?: { accessToken?: string } }
   sendMessagePromise: <T>(message: Record<string, unknown>) => Promise<T>
   subscribeMessage: <T>(callback: (value: T) => void, message: Record<string, unknown>, options?: { resubscribe?: boolean }) => Promise<() => void | Promise<void>>
   addEventListener?: (event: 'ready' | 'disconnected', listener: () => void) => void
@@ -28,6 +30,7 @@ export interface ChatSnapshot {
   agents: ChatAgent[]
   agentId: string
   threads: ChatThread[]
+  historyThreads: ChatThread[]
   selectedId: string | null
   draft: string
   busy: boolean
@@ -36,6 +39,7 @@ export interface ChatSnapshot {
   consented: boolean
   issue: ChatIssue
   unsavedKeys: ReadonlySet<string>
+  improvementIssue: boolean
 }
 
 class ChatFailure extends Error {
@@ -50,6 +54,7 @@ class ChatBlocked extends Error {}
 
 const isObject = (value: unknown): value is Record<string, unknown> => value !== null && typeof value === 'object' && !Array.isArray(value)
 const GEMINI_PLATFORM = 'google_generative_ai_conversation'
+export const HOME_MCP_AGENT: ChatAgent = { id: 'conversation.home_mcp', name: 'Home Assistant' }
 export const CHAT_METADATA_TIMEOUT_MS = 30_000
 
 async function discoverAgents(connection: Pick<ChatConnection, 'sendMessagePromise'>): Promise<ChatAgent[]> {
@@ -69,24 +74,47 @@ async function discoverAgents(connection: Pick<ChatConnection, 'sendMessagePromi
   }).map(({ id, name }) => ({ id, name }))
 }
 
+function instanceControls(value: unknown, requestId: string) {
+  if (!Array.isArray(value)) return []
+  return value.map((control, index) => isObject(control)
+    ? { ...control, id: `control-${requestId}-${index}` }
+    : control) as ChatResponseControl[]
+}
+
 function conversationResult(response: unknown, request: ChatRequestRecord, now: number): ChatResultRecord {
-  if (!isObject(response) || !isObject(response.response)) throw new ChatFailure('load')
+  if (!isObject(response)) throw new ChatFailure('load')
+  const conversationId = typeof response.conversation_id === 'string' && response.conversation_id ? response.conversation_id : null
+  if (typeof response.text === 'string' && response.text.trim()) {
+    const candidate = parseChatRecord({
+      version: 1, kind: 'result', id: request.id, threadId: request.threadId, createdAt: now,
+      text: response.text, conversationId, response: 'answer',
+      contextReset: request.conversationId !== null && conversationId !== request.conversationId,
+      controls: instanceControls(response.controls, request.id),
+      skillContext: isObject(response.context) ? response.context as unknown as ChatSkillContext : null,
+    })
+    if (!candidate || candidate.kind !== 'result') throw new ChatFailure('load')
+    return candidate
+  }
+  if (!isObject(response.response)) throw new ChatFailure('load')
   const result = response.response
   const speech = isObject(result.speech) && isObject(result.speech.plain) ? result.speech.plain.speech : null
   const plainSpeech = typeof speech === 'string' && speech.trim() ? speech : null
-  const conversationId = typeof response.conversation_id === 'string' && response.conversation_id ? response.conversation_id : null
-  return {
+  const candidate = parseChatRecord({
     version: 1, kind: 'result', id: request.id, threadId: request.threadId, createdAt: now,
     text: plainSpeech, conversationId, response: result.response_type === 'error' ? 'error' : plainSpeech ? 'answer' : 'empty',
     contextReset: request.conversationId !== null && conversationId !== request.conversationId,
-  }
+    controls: [], skillContext: isObject(response.context) ? response.context : null,
+  })
+  if (!candidate || candidate.kind !== 'result') throw new ChatFailure('load')
+  return candidate
 }
 
 /** Owns requests independently of modal content; all persistent records are HA-user scoped. */
 export class ChatClient {
   private state: ChatSnapshot = {
-    status: 'idle', connected: true, agents: [], agentId: '', threads: [], selectedId: null,
+    status: 'idle', connected: true, agents: [], agentId: '', threads: [], historyThreads: [], selectedId: null,
     draft: '', busy: false, waitingId: null, availability: 'fresh', consented: false, issue: null, unsavedKeys: new Set(),
+    improvementIssue: false,
   }
   private readonly listeners = new Set<() => void>()
   private readonly records = new Map<string, ChatRecord>()
@@ -109,22 +137,28 @@ export class ChatClient {
   private observedBytes = 0
   private observedCount = 0
   private pendingRequest?: ChatRequestRecord
+  private pendingControlId: string | null = null
+  private pendingControlOwnerResultId: string | null = null
+  private readonly pendingControlKeys = new Set<string>()
   private readonly pendingMetadata = new Set<() => void>()
   private readonly connection: ChatConnection
   private readonly userId: string
   private readonly now: () => number
   private readonly newId: () => string
+  private readonly homeMcp?: HomeMcpClient
 
   constructor(
     connection: ChatConnection,
     userId: string,
     now = Date.now,
     newId = createChatId,
+    homeMcp?: HomeMcpClient,
   ) {
     this.connection = connection
     this.userId = userId
     this.now = now
     this.newId = newId
+    this.homeMcp = homeMcp
   }
 
   getSnapshot = () => this.state
@@ -181,10 +215,11 @@ export class ChatClient {
   private publish(patch: Partial<ChatSnapshot> = {}) {
     this.state = { ...this.state, ...patch }
     const combined = new Map([...this.records, ...this.unsaved])
-    const threads = deriveChatThreads(combined, this.activated ? this.now() : 0)
+    const now = this.activated ? this.now() : 0
+    const threads = deriveChatThreads(combined, now)
     const selected = threads.find((thread) => thread.record.id === this.state.selectedId)
     this.state = {
-      ...this.state, threads,
+      ...this.state, threads, historyThreads: visibleChatHistoryThreads(threads, now),
       draft: this.drafts.get(this.draftKey()) ?? '',
       waitingId: this.pendingRequest?.id ?? null,
       availability: chatAvailability(selected, this.activated ? this.now() : 0, this.knownTurns, this.state.agents),
@@ -203,6 +238,10 @@ export class ChatClient {
       const deadline = record.createdAt + (record.kind === 'result' ? CHAT_CONTEXT_IDLE_MS : CHAT_PENDING_MS)
       return deadline > now ? [deadline] : []
     })
+    deadlines.push(...this.state.historyThreads.flatMap((thread) => {
+      const deadline = thread.updatedAt + CHAT_HISTORY_VISIBLE_MS + 1
+      return deadline > now ? [deadline] : []
+    }))
     if (deadlines.length) this.expiryTimer = setTimeout(() => this.publish(), Math.min(...deadlines) - now + 1)
   }
 
@@ -309,7 +348,10 @@ export class ChatClient {
     this.publish({ status: 'loading', connected: this.connection.connected !== false, issue: this.recordIssue })
     try {
       await this.verifyUser(generation)
-      const [agents] = await Promise.all([discoverAgents({ sendMessagePromise: this.rpc }), this.read(generation, true)])
+      const agents = this.homeMcp
+        ? [HOME_MCP_AGENT]
+        : await discoverAgents({ sendMessagePromise: this.rpc })
+      await this.read(generation, true)
       if (!this.current(generation) || loadGeneration !== this.loadGeneration) return
       const unsubscribe = await this.connection.subscribeMessage<unknown>((response) => {
         if (!this.current(generation) || loadGeneration !== this.loadGeneration) return
@@ -346,9 +388,26 @@ export class ChatClient {
   }
 
   newChat() {
+    void this.finishConversation()
     this.selectionGeneration += 1
     this.drafts.delete('draft')
     this.publish({ selectedId: null })
+  }
+
+  async finishConversation() {
+    const thread = this.state.threads.find((item) => item.record.id === this.state.selectedId)
+    const conversation = thread ? chatImprovementConversation(thread) : null
+    if (!this.homeMcp?.endConversation || !conversation) return
+    try {
+      await this.homeMcp.endConversation(conversation.threadId)
+      if (this.state.improvementIssue) this.publish({ improvementIssue: false })
+    } catch {
+      this.publish({ improvementIssue: true })
+    }
+  }
+
+  async systemInfo() {
+    return this.homeMcp?.info?.() ?? null
   }
 
   allowResume() {
@@ -414,14 +473,40 @@ export class ChatClient {
     finally { if (this.current(generation)) this.finishOperation(operation) }
   }
 
+  controlUsed(controlId: string, ownerResultId?: string) {
+    return this.state.threads.some((thread) => thread.turns.some((turn) =>
+      turn.request.sourceControlId === controlId && (!ownerResultId
+        || turn.request.sourceResultId === ownerResultId
+        || (!turn.request.sourceResultId && turn.request.parentId === ownerResultId))))
+  }
+
+  async sendControl(controlId: string, text: string, ownerResultId?: string) {
+    const pendingKey = `${ownerResultId ?? ''}:${controlId}`
+    if (this.state.busy || !controlId || this.pendingControlKeys.has(pendingKey) || this.controlUsed(controlId, ownerResultId)
+      || text.length > CHAT_MESSAGE_LIMIT || !text.trim()) return
+    this.pendingControlKeys.add(pendingKey)
+    this.pendingControlId = controlId
+    this.pendingControlOwnerResultId = ownerResultId ?? null
+    this.publish()
+    try { await this.dispatchRequest(text, this.draftKey(), false) }
+    finally {
+      this.pendingControlId = null
+      this.pendingControlOwnerResultId = null
+      this.pendingControlKeys.delete(pendingKey)
+      this.publish()
+    }
+  }
+
   async send() {
-    if (!this.activated || this.state.status !== 'ready' || this.state.busy || !this.state.draft.trim()) return
-    if (this.state.draft.length > CHAT_MESSAGE_LIMIT) { this.publish({ issue: 'message-limit' }); return }
+    return this.dispatchRequest(this.state.draft, this.draftKey(), true)
+  }
+
+  private async dispatchRequest(text: string, draftKey: string, clearDraft: boolean) {
+    if (!this.activated || this.state.status !== 'ready' || this.state.busy || !text.trim()) return
+    if (text.length > CHAT_MESSAGE_LIMIT) { this.publish({ issue: 'message-limit' }); return }
     const generation = this.generation
     const selectionGeneration = this.selectionGeneration
     const selectedId = this.state.selectedId
-    const draftKey = this.draftKey()
-    const text = this.state.draft
     let request: ChatRequestRecord | undefined
     let dispatched = false
     let received = false
@@ -440,7 +525,8 @@ export class ChatClient {
       request = {
         version: 1, kind: 'request', id: this.newId(), threadId: threadRecord.id, createdAt: this.now(),
         parentId: thread?.turns.at(-1)?.request.id ?? null, conversationId: thread?.tail?.conversationId ?? null,
-        clientId: this.clientId, text,
+        clientId: this.clientId, text, sourceControlId: this.pendingControlId,
+        sourceResultId: this.pendingControlOwnerResultId,
       }
       if (!thread) await this.persist(threadRecord, generation)
       if (this.selectionGeneration === selectionGeneration) this.publish({ selectedId: threadRecord.id })
@@ -449,7 +535,7 @@ export class ChatClient {
       const currentThread = this.state.threads.find((item) => item.record.id === request?.threadId)
       if (currentThread?.conflict || currentThread?.unreadable) throw new ChatBlocked()
       if (!this.state.connected || this.connection.connected === false) throw new ChatFailure('load')
-      if (this.drafts.get(draftKey) === text) this.drafts.delete(draftKey)
+      if (clearDraft && this.drafts.get(draftKey) === text) this.drafts.delete(draftKey)
       this.pendingRequest = request
       const waiting = request
       this.replyOperation = operation
@@ -462,9 +548,15 @@ export class ChatClient {
       }, CHAT_PENDING_MS)
       dispatched = true
       this.publish()
-      const responsePromise = this.connection.sendMessagePromise<unknown>({
-        type: 'conversation/process', agent_id: agent.id, text, conversation_id: request.conversationId,
-      })
+      const responsePromise = this.homeMcp
+        ? this.homeMcp.request(text, request.conversationId, thread?.tail?.skillContext ?? null, {
+            threadId: request.threadId,
+            turnId: request.id,
+            ...(request.sourceControlId ? { controlId: request.sourceControlId } : {}),
+          })
+        : this.connection.sendMessagePromise<unknown>({
+            type: 'conversation/process', agent_id: agent.id, text, conversation_id: request.conversationId,
+          })
       void this.persist(this.statusRecord(request, 'pending'), generation).catch(() => undefined)
       const response = await responsePromise
       if (!this.current(generation)) return
@@ -477,7 +569,7 @@ export class ChatClient {
       if (!this.current(generation)) return
       this.finishWaiting(operation, request)
       if (request && !received && (this.records.has(chatRecordKey(request)) || this.unsaved.has(chatRecordKey(request)))) {
-        const outcome = this.statusRecord(request, dispatched ? 'unknown' : 'not-sent')
+        const outcome = this.statusRecord(request, dispatched && !(error instanceof HomeMcpRequestRejected) ? 'unknown' : 'not-sent')
         if (!this.records.has(chatRecordKey(request))) {
           this.unsaved.set(chatRecordKey(outcome), outcome)
         } else {
@@ -515,9 +607,12 @@ export class ChatClient {
     this.unsaved.clear()
     this.drafts.clear()
     this.pendingRequest = undefined
+    this.pendingControlId = null
+    this.pendingControlOwnerResultId = null
+    this.pendingControlKeys.clear()
     this.recordIssue = null
     this.observedBytes = 0
     this.observedCount = 0
-    this.publish({ status: 'idle', connected: false, agents: [], agentId: '', selectedId: null, busy: false, issue: null })
+    this.publish({ status: 'idle', connected: false, agents: [], agentId: '', selectedId: null, busy: false, issue: null, improvementIssue: false })
   }
 }

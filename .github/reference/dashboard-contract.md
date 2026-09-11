@@ -130,24 +130,20 @@ Its stable `sfenton-react-panel.js` bridge adds a fresh cache-busting query to t
 
 During this parallel-host experiment, the custom panel intentionally retains Home Assistant's native desktop sidebar because `panel_custom` has no supported per-panel kiosk option. Mobile uses HA's narrow layout and fills the viewport. Do not inject top-window CSS or persist global kiosk-mode preferences to hide the desktop sidebar; keep that temporary divergence explicit until the user chooses the final host architecture.
 
-For an SSH deployment, `npm run deploy:both` builds the app, uploads `dist/`, stages changed panel and `sfenton_react_chat` package/component files with backups, validates Home Assistant configuration, and synchronizes the legacy wrapper URL. Failed staging/validation attempts to restore the prior configuration files. The script does not restart HA or verify retention activation. It supports the configured password or `VITE_SSH_PRIVATE_KEY`; on this workstation it defaults to `~/.ssh/ha-sfenton-react-dash-deploy`.
+For an SSH deployment, `npm run deploy:both` builds the app and compares the panel, chat-history, and authenticated Home MCP proxy files first. Changed HA package/component files are backed up, staged, and configuration-checked before any React asset is replaced. When those files changed, the command stops after staging with exit status 2; restart Home Assistant with separate approval, verify the proxy and chat package, then rerun to upload `dist/` and synchronize the legacy wrapper URL. Failed staging/validation attempts to restore the prior configuration files. It supports the configured password or `VITE_SSH_PRIVATE_KEY`; on this workstation it defaults to `~/.ssh/ha-sfenton-react-dash-deploy`.
 
 For the preferred SMB flow:
 
 1. Run `npm run build`.
 2. Copy `dist/` to `\\192.168.1.22\config\www\ha-sfenton-react-dash`.
 3. Copy `home-assistant/packages/sfenton_react_panel.yaml` to `\\192.168.1.22\config\packages\sfenton_react_panel.yaml` if it changed.
-4. Back up and copy changed `home-assistant/custom_components/sfenton_react_chat/` files to `\\192.168.1.22\config\custom_components\sfenton_react_chat\`, and `home-assistant/packages/sfenton_react_chat.yaml` to `\\192.168.1.22\config\packages\sfenton_react_chat.yaml`.
+4. Back up and copy changed `home-assistant/custom_components/sfenton_react_chat/` files and `home-assistant/packages/sfenton_react_chat.yaml`, plus `home-assistant/custom_components/sfenton_home_mcp_proxy/` and `home-assistant/packages/sfenton_home_mcp_proxy.yaml`.
 5. Configuration-check HA after staging package/component changes. On failure, restore prior files and remove only newly introduced files; do not restart invalid configuration.
-6. Run `npm run deploy:sync` to bump the legacy wrapper URL and verify the custom panel registration.
-7. Restart Home Assistant only with explicit approval when the panel package/bridge or chat retention component/package changed.
-8. After restart, verify `sfenton_react_chat.purge_expired_history` is registered and its daily automation is loaded and enabled. Never invoke the purge service during verification without explicit deletion authorization.
+6. Restart Home Assistant only with explicit approval when the panel package/bridge, chat history, or Home MCP proxy changed.
+7. Verify the prior daily chat purge automation is absent, and verify authenticated `/api/sfenton_home_mcp` requests reach the pinned-TLS MCP container. The manual purge service may remain registered, but never invoke it during release verification without explicit deletion authorization.
+8. Build with `VITE_HOME_MCP_ENABLED=true` only after that proxy check passes, copy `dist/`, then run `npm run deploy:sync`.
 
-React assets, `deploy:sync`, and HMR do not activate chat retention. Do not claim
-retention active until the component/package installation, approved restart,
-and service/automation verification are complete. See `docs/chat.md` and
-`home-assistant/custom_components/sfenton_react_chat/README.md` for the fixed
-14-day policy, storage limitations, and detailed installation/rollback steps.
+React assets, `deploy:sync`, and HMR do not remove a previously loaded purge automation or activate a newly installed proxy. Do not enable production Home MCP routing until the pinned-TLS container and authenticated HA proxy are both healthy. See `docs/chat.md`, `home-mcp/README.md`, and the chat component README for the complete rollout and rollback contracts.
 
 The app is served by Home Assistant at:
 

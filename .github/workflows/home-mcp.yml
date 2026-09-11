@@ -1,0 +1,33 @@
+name: Home MCP
+
+on:
+  pull_request:
+    paths:
+      - 'home-mcp/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'scripts/test-change-policy.ts'
+      - '.github/workflows/home-mcp.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  home-mcp:
+    name: Home MCP regression gates
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: npm run test:change-policy -- --base origin/${{ github.base_ref }}
+      - run: npm run home-mcp:check
+      - run: npm run test:run -- home-mcp
+      - run: npm run home-mcp:regressions:validate
+      - run: npm run home-mcp:corpus:lights:validate -- --utterances-per-family 10000

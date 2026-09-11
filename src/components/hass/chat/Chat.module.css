@@ -340,6 +340,122 @@
   text-align: center;
 }
 
+.responseControls,
+.responseControl {
+  display: grid;
+  min-width: 0;
+  gap: 10px;
+}
+
+.responseControls {
+  margin-top: 12px;
+}
+
+.responseControl {
+  border-top: 1px solid var(--color-line);
+  padding-top: 12px;
+}
+
+.roomCarousel,
+.colorChoices,
+.suggestions {
+  display: flex;
+  min-width: 0;
+  gap: 8px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  scroll-snap-type: x proximity;
+}
+
+.roomCarousel::-webkit-scrollbar,
+.colorChoices::-webkit-scrollbar,
+.suggestions::-webkit-scrollbar {
+  display: none;
+}
+
+.roomChoice,
+.colorChoice,
+.suggestion,
+.controlSend {
+  min-height: 44px;
+  border: 1px solid var(--color-line);
+  border-radius: 16px;
+  padding: 9px 12px;
+  color: var(--color-text);
+  background: var(--color-glass-soft);
+  font: inherit;
+  font-size: 0.78rem;
+  cursor: pointer;
+  -webkit-tap-highlight-color: var(--color-modal-footer-transparent);
+}
+
+.roomChoice,
+.colorChoice,
+.suggestion {
+  flex: 0 0 auto;
+  scroll-snap-align: start;
+}
+
+.roomChoice[aria-selected='true'],
+.colorChoice[aria-pressed='true'] {
+  border-color: var(--color-security);
+  background: var(--color-glass-strong);
+}
+
+.controlSend {
+  justify-self: start;
+  min-width: 116px;
+  background: var(--color-security);
+  font-weight: 750;
+}
+
+.controlSend:disabled,
+.suggestion:disabled {
+  color: var(--color-text-muted);
+  background: var(--color-glass-soft);
+  cursor: default;
+}
+
+.controlTitle {
+  color: var(--color-text-muted);
+  font-size: 0.76rem;
+}
+
+.customColorChoice {
+  position: relative;
+  overflow: hidden;
+  background: var(--chat-custom-color, var(--color-glass-soft));
+  font-weight: 750;
+  text-shadow: var(--shadow-chat-choice-text);
+}
+
+.customColorChoice::after {
+  position: absolute;
+  top: 5px;
+  bottom: 5px;
+  left: var(--chat-custom-position, -10px);
+  width: 3px;
+  border-radius: 999px;
+  background: var(--color-text);
+  content: '';
+  transform: translateX(-50%);
+}
+
+.roomChoice:focus,
+.colorChoice:focus,
+.suggestion:focus,
+.controlSend:focus {
+  outline: none;
+}
+
+.roomChoice:focus-visible,
+.colorChoice:focus-visible,
+.suggestion:focus-visible,
+.controlSend:focus-visible {
+  outline: 2px solid var(--color-text);
+  outline-offset: 2px;
+}
+
 .srOnly {
   position: absolute;
   overflow: hidden;
@@ -369,7 +485,11 @@
   .headerAction:focus-visible,
   .historyRow:focus-visible,
   .send:focus-visible,
-  .input:focus-visible {
+  .input:focus-visible,
+  .roomChoice:focus-visible,
+  .colorChoice:focus-visible,
+  .suggestion:focus-visible,
+  .controlSend:focus-visible {
     outline: none;
   }
 }

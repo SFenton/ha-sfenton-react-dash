@@ -1,0 +1,14 @@
+{
+  "serverVersion": "0.2.0",
+  "improvements": [
+    {
+      "version": "0.2.0",
+      "publishedAt": "2026-09-10T14:00:00.000Z",
+      "summary": [
+        "Learns from completed light conversations one at a time.",
+        "Keeps existing light requests working before publishing an improvement.",
+        "Reports the active chat model and recent improvements in Chat Settings."
+      ]
+    }
+  ]
+}

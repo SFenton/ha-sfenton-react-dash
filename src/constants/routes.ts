@@ -24,6 +24,9 @@ export const HOME_SPRINKLERS_ROUTE_PATH = 'sprinklers'
 export const THERMOSTAT_ROUTE_PATH = 'thermostat'
 const specialDeviceModesRouteName = copy('pageSettings', 'items.specialDeviceModes.title')
 const sprinklersRouteName = copy('pageSprinklers', 'title')
+const controlShowcaseRouteName = copy('pageControlShowcase', 'title')
+
+export const LIGHT_CONTROLS_SHOWCASE_ROUTE_PATH = 'light-controls'
 
 export const DASHBOARD_ROUTES: DashboardRouteConfig[] = [
   { title: 'Overview', path: 'overview', icon: 'mdi:home' },
@@ -70,6 +73,7 @@ export const DASHBOARD_ROUTES: DashboardRouteConfig[] = [
   { title: 'Vacation', path: 'vacation', icon: 'mdi:airplane' },
   { title: 'Media', path: 'media', icon: 'mdi:remote' },
   { title: 'Custom Lights', path: 'custom-lights', icon: 'mdi:lightbulb-group' },
+  { title: controlShowcaseRouteName, path: LIGHT_CONTROLS_SHOWCASE_ROUTE_PATH, icon: 'mdi:palette' },
   { title: sprinklersRouteName, path: HOME_SPRINKLERS_ROUTE_PATH, icon: 'mdi:sprinkler-variant' },
 ]
 
@@ -84,6 +88,7 @@ export const PRIMARY_NAV_ROUTES = [
 const HOME_SUB_ROUTE_PATHS = new Set([
   'back-deck',
   'custom-lights',
+  LIGHT_CONTROLS_SHOWCASE_ROUTE_PATH,
   'dining-room',
   'downstairs-hallway',
   'entryway',
