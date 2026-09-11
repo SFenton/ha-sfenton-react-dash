@@ -7,8 +7,11 @@ same-sheet Quick Links details, with their original destinations and grids.
 
 Chat history is another page inside this sheet. Opening history, selecting a
 conversation, switching tabs, and starting an empty draft send no prompt.
-History and New Chat are compact, labelled icon actions in the shared modal
-header, independent of transcript scroll position. History Back restores the
+Settings, History and New Chat are compact, labelled icon actions in the
+shared modal header, independent of transcript scroll position. Settings opens
+a same-sheet detail containing the instrumented Gemini model, Chat UX version,
+Home MCP server version, improvement queue state, and up to five recent
+nontechnical improvement summaries. History Back restores the
 reading position and header trigger focus. This deliberately moves these
 first-class actions out of the body flow without adding a tall fixed row.
 The composer is above the bottom tab navigator. Enter sends; Shift+Enter
@@ -51,16 +54,36 @@ navigating the dashboard does not cancel or detach an outstanding turn.
 Changing connection/account ownership disposes subscriptions, cancels metadata
 deadlines, clears private in-memory content, and ignores stale completions.
 
-Activation discovers agents through `conversation/agent/list` and reads
-registry entries only for the returned conversation entities. Eligible agents
-must belong to `google_generative_ai_conversation` and not be disabled.
-One eligible agent is selected; multiple eligible agents require an explicit
-choice in the empty-chat assistant selector. There is no guessed entity ID, default-agent fallback,
-provider API key, direct Gemini request, or frontend HASS MCP bridge.
+Production activation uses the curated Home MCP route at
+`/api/sfenton_home_mcp`. Local development uses `/__home-mcp`, which Vite
+proxies to the separately running `npm run home-mcp` server. Development
+defaults to Home MCP. Production requires `VITE_HOME_MCP_ENABLED=true` only
+after the authenticated proxy has been installed, Home Assistant restarted,
+and the proxy verified. Test mode remains mocked. The authenticated HA proxy
+pins the Home MCP TLS certificate and forwards the inherited user session to
+the separate Home MCP container, and React calls only its
+`home_chat` tool. The container handles supported household light intents through
+its curated `home_lights` capability before delegating other conversation
+processing to HA. It also exposes bounded `home_state` and `home_history` tools.
+The administrative HA MCP remains separate and is never exposed to frontend chat.
+
+Light replies may include typed room, color, brightness, or suggested-response
+controls. A control remains adjustable after use, but its send action is locked
+after one persisted continuation request. Each reply also carries compact semantic context: the named room or fixture plus optional prior action, bounded result state, and history boundary. This supports follow-ups such as “Which ones?”, “What about now?”, bare “why?”, and “before that?” without replaying stored transcript contents to Home MCP. Context remains thread-scoped and fixture-specific controls retain their exact target.
+
+When Home MCP is explicitly disabled, activation retains the native fallback:
+it discovers agents through `conversation/agent/list` and verifies returned
+conversation entities belong to `google_generative_ai_conversation`. There is
+no guessed entity ID, provider API key, or direct Gemini request.
 
 Agent identity stays fixed for an existing thread. Chat does not discover
 provider model metadata, read the device registry, offer model switching, or
-change integration options. Requests use the thread's native `agent_id`.
+change integration options. Requests use either the thread's native `agent_id`
+or the single synthetic Home MCP agent identity.
+
+Native Gemini threads created before the Home MCP cutover remain readable in
+history but cannot resume through the synthetic Home MCP identity. Start a new
+chat for curated light support; earlier prompts are never replayed into it.
 
 The reverted experimental `model-change` record is unsupported, like other
 unknown record kinds. If such records exist in an account, the existing
@@ -69,21 +92,48 @@ records may still be displayed, but no model separator is rendered. The
 records remain untouched in HA. This is not a migration, deletion, replay or
 silent downgrade of the switched conversation.
 
-The agent's tools and entity exposure remain configured and authorized by HA.
-Agent identity discovery does not audit or change its configured LLM tools.
-Production integration review should confirm those exposures are appropriate;
-administrative MCP and a future house-specific orchestrator are separate work.
+The inherited HA user session remains the authorization boundary. Home MCP
+revalidates the bearer token with HA over its WebSocket API, derives the stable
+HA user ID for queue ownership, requires an administrator for retained-history
+backfill, and forwards HA calls with that same token over certificate-validated
+HTTPS. The administrative MCP remains a separate operator/debugging surface.
+
+### Completed-conversation improvement queue
+
+Each Home MCP request carries its dashboard thread and turn IDs. Home MCP keeps
+a sanitized, bounded turn record for light conversations only. Starting a new
+chat or closing the modal submits the complete answered thread; a five-minute
+quiet-time sweep covers browser exits that cannot send that final signal.
+Duplicate content hashes are ignored.
+
+Conversations that include unsupported requests are rejected locally before any
+Copilot SDK call. The current supported set contains only lights. Retained
+history can be backfilled in a bounded batch, and the same classification and
+deduplication rules apply.
+
+One host worker processes the queue serially. Copilot first assesses completion
+and inferred intent. For an unmet need, the host freezes a replay fixture, then
+allows Copilot only bounded reads/searches and exact replacements in the
+production light parser. Copilot cannot change tests, corpora, policies, skills,
+queue/version/release code, run shell commands, use Git or network tools,
+contact Home Assistant, or publish.
+The complete light corpus, learned replays, focused tests, type-check, and a
+separate Copilot diff review must all pass before a patch release can be merged
+and the MCP container can be rebuilt. Failed jobs retry twice and never block a
+new chat request.
 
 | User action / state | Behavior |
 | --- | --- |
 | Unopened or preload | No Chat requests, subscriptions, identity generation, timers or observers. |
-| First authenticated activation | Read current user, eligible agents and user data; subscribe to account updates. |
-| Send in a new/current chat | Preflight the saved tail; record the request; call `conversation/process` once with explicit agent and native conversation ID. |
-| Choose an assistant before a chat | Select an offered native agent, preserving the unsent draft; send no prompt. Existing threads retain their original agent. |
+| First authenticated activation | Read current user and user data; select Home MCP in production or discover eligible native agents when explicitly disabled; subscribe to account updates. |
+| Send in a new/current chat | Preflight the saved tail; record the request; call Home MCP `home_chat` once, or native `conversation/process` when MCP is disabled. |
+| Choose an assistant before a chat | Native fallback only: select an offered agent, preserving the unsent draft; send no prompt. Existing threads retain their original agent. |
 | Recent chat from another session | Require the visible continuation choice before enabling submission. |
 | Expired, reset, conflicting or uncertain context | Keep the transcript readable; do not continue it implicitly. |
 | Retry saving | Retry the exact immutable record; never submit the prompt again. |
 | Close/tab/route change | Retain the request owner and attach any later reply to its original thread. |
+| Close or New Chat after a complete light thread | Queue one sanitized, content-hashed improvement review without delaying the UI. |
+| Chat Settings | Read model/version/queue metadata only; send no prompt and call no HA service. |
 | Account/connection ownership change | Clear private presentation state and invalidate old work. |
 
 Only the native response's plain speech becomes an assistant message. System
@@ -130,45 +180,37 @@ history restores assistant memory. Malformed/orphaned branches have
 deterministic presentation order but remain read-only; ordering never resolves
 a causal conflict.
 
-Bounds are explicit: 4,000 input characters, 64,000 reply characters, 100 thread
+Bounds are explicit: 180 input characters, 64,000 reply characters, 100 thread
 records, 2,000 records and a 1,500,000-byte history admission budget, with reply
 headroom reserved before dispatch. Concurrent clients can exceed an admission
 threshold because the native API has no CAS/quota transaction. Existing records
-are never pruned to make space. An oversized reply remains visible and marked
+are never pruned to make space. Reaching any cap disables new sends until an
+explicitly authorized cleanup creates room. An oversized reply remains visible and marked
 save-unconfirmed instead of being truncated. Its session-only loss warning
 follows the actual reply, so reaching the reply tail also reaches the warning.
-### Fourteen-day HA-owned retention
+### Fourteen-day history visibility without deletion
 
-The local `sfenton_react_chat` custom integration registers
-`sfenton_react_chat.purge_expired_history`. Its package invokes it daily at
-03:15 HA local time. **Not active until the component and package are deployed,
-HA is restarted, and service/automation registration is confirmed.** HMR,
-React asset deployment, and `deploy:sync` alone do not activate retention.
+The Chat History page shows only conversations whose latest stored activity is
+no more than 14 days old. The comparison uses each derived thread's `updatedAt`
+value; a thread exactly at the cutoff remains visible. Older threads remain in
+the authenticated user's Home Assistant frontend store and continue to count
+toward the existing record, thread, and byte admission limits. Filtering is a
+presentation rule only: it does not write tombstones, prune records, or send
+conversation contents to Home MCP.
 
-The fixed cutoff uses HA time and the thread's creation age, not recent
-activity: `createdAt <= now - 14 days`. Each HA user's frontend store is
-processed sequentially, even if that user never reopens the dashboard.
-All valid v1 records belonging to an expired thread are cleared, including
-pending/unknown outcomes. This does not replay or cancel requests. Normal daily
-runs purge within 24 hours after the threshold; downtime/failures delay cleanup.
-
-Only exact valid `react-dash.chat.v1.` records qualify. Unknown schemas,
-malformed records and unrelated preferences remain untouched. Safely identified
-orphans with missing/null threads expire by their own creation age. The service
-uses `async_user_store` and public `async_set_item(key, None)`, never direct
-storage-file writes or private-store mutation. Payloads are removed, but **null
-key tombstones remain** and the frontend excludes them from history and quotas.
-
-The API provides no atomic deletion/write barrier. Concurrent or late client
-writes can reintroduce records until a later eligible sweep; a newly timestamped
-orphan waits for its own cutoff. This is scheduled retention, not a continuous
-TTL or guaranteed erasure of backups/provider data. Exposed save errors fail
-the service; HA Store's internally swallowed disk-write errors remain an
-inherited durability limitation.
+The `sfenton_react_chat` package no longer schedules deletion. The custom
+integration retains its manual `sfenton_react_chat.purge_expired_history`
+service for an explicitly authorized cleanup, but normal deployment and runtime
+must not invoke it. If an earlier package version loaded the daily purge
+automation, changing the package does not remove that live automation until Home
+Assistant is restarted or the relevant YAML integrations are reloaded. Verify
+the old automation is absent before claiming stored conversations are protected
+from scheduled deletion.
 
 See the [component installation and rollback checklist](../home-assistant/custom_components/sfenton_react_chat/README.md)
-for SMB paths, SSH staging support, restart requirements and operating limits.
-No real histories were read or deleted to implement or test this component.
+for SMB paths, SSH staging support, restart requirements, and the manual service's
+operating limits. No real histories were read or deleted to implement or test
+this behavior.
 
 Transport, authentication, schema and reported save failures surface in the UI.
 Metadata requests have a 30-second deadline. HA Core's storage helper can log a

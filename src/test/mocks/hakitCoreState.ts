@@ -16,6 +16,7 @@ export interface MockHassState {
   config: Record<string, unknown>
   connection: {
     readonly connected: boolean
+    options?: { auth?: { accessToken?: string } }
     sendMessagePromise: <T>(message: Record<string, unknown>) => Promise<T>
     subscribeMessage: <T>(callback: (value: T) => void, message: Record<string, unknown>) => Promise<() => void | Promise<void>>
     addEventListener: (event: 'ready' | 'disconnected', listener: () => void) => void
@@ -1950,6 +1951,7 @@ export const mockState: MockHassState = {
   config: {},
   connection: {
     get connected() { return mockState.connectionStatus === 'connected' },
+    options: { auth: { accessToken: 'mock-ha-access-token' } },
     addEventListener: (name, listener) => {
       const listeners = mockConnectionListeners.get(name) ?? new Set()
       listeners.add(listener)

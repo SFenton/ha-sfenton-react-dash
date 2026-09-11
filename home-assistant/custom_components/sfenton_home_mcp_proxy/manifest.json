@@ -1,0 +1,10 @@
+{
+  "domain": "sfenton_home_mcp_proxy",
+  "name": "Sfenton Home MCP Proxy",
+  "codeowners": ["@SFenton"],
+  "dependencies": ["http"],
+  "documentation": "https://github.com/SFenton/ha-sfenton-react-dash/blob/master/home-mcp/README.md",
+  "integration_type": "service",
+  "iot_class": "local_push",
+  "version": "1.1.0"
+}

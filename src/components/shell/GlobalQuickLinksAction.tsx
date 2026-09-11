@@ -15,6 +15,10 @@ import { RoomNavigationGrid } from '../hass/RoomNavigationGrid'
 import { SecurityControls } from '../hass/SecurityControls'
 import { securitySystemModalSubtitle } from '../hass/securityControlsConfig'
 import { ChatHistory, ChatPanel, ChatUnavailable } from '../hass/chat/ChatPanel'
+import { ChatColorEditor } from '../hass/chat/ChatColorEditor'
+import type { ChatColorDraft } from '../hass/chat/chatColorDraft'
+import { ChatSettingsPanel } from '../hass/chat/ChatSettingsPanel'
+import type { ChatResponseControl } from '../hass/chat/chatRecords'
 import { ChatComposer } from '../hass/chat/ChatComposer'
 import { ChatHeaderActions } from '../hass/chat/ChatHeaderActions'
 import { useDashboardChat } from '../hass/chat/useDashboardChat'
@@ -33,7 +37,8 @@ import styles from './GlobalQuickLinksAction.module.css'
 import chatStyles from '../hass/chat/Chat.module.css'
 
 type GlobalTab = 'chat' | 'links'
-type GlobalDetailPage = QuickAccessModalPage | 'chat-history'
+type GlobalDetailPage = QuickAccessModalPage | 'chat-history' | 'chat-custom-color' | 'chat-settings'
+type ColorControl = Extract<ChatResponseControl, { kind: 'color-picker' }>
 const TAB_ID_PREFIX = 'global-quick-links'
 const TAB_PANEL_ID = modalTabPanelId(TAB_ID_PREFIX, 'content')
 
@@ -56,6 +61,8 @@ export function GlobalQuickLinksAction({ onNavigate }: GlobalQuickLinksActionPro
   const [open, setOpen] = useState(false)
   const [activeTab, setActiveTab] = useState<GlobalTab>('chat')
   const [detailPage, setDetailPage] = useState<GlobalDetailPage | null>(null)
+  const [colorDrafts, setColorDrafts] = useState<Map<string, ChatColorDraft>>(() => new Map())
+  const [colorControl, setColorControl] = useState<ColorControl | null>(null)
   const chatTab = activeTab === 'chat'
   const historyPage = detailPage === 'chat-history'
   const chat = useDashboardChat(open && chatTab)
@@ -84,7 +91,11 @@ export function GlobalQuickLinksAction({ onNavigate }: GlobalQuickLinksActionPro
       ? SECURITY_QUICK_ACCESS_ITEM.title
       : detailPage === 'chat-history'
         ? chatCopy(chatKeys.historyTitle)
-        : chatTab ? commonCopy('app.title') : quickLinksName
+        : detailPage === 'chat-custom-color'
+          ? chatCopy(chatKeys.customColor)
+          : detailPage === 'chat-settings'
+            ? chatCopy(chatKeys.settingsTitle)
+            : chatTab ? commonCopy('app.title') : quickLinksName
 
   const handleOpen = () => {
     resetDetailPageScroll()
@@ -107,6 +118,16 @@ export function GlobalQuickLinksAction({ onNavigate }: GlobalQuickLinksActionPro
     setDetailPage(null)
   }
 
+  const handleColorDraftChange = (controlId: string, draft: ChatColorDraft) => {
+    setColorDrafts((current) => new Map(current).set(controlId, draft))
+  }
+
+  const handleOpenCustomColor = (control: ColorControl, draft: ChatColorDraft) => {
+    handleColorDraftChange(control.id, draft)
+    setColorControl(control)
+    handleOpenDetail('chat-custom-color', `chat-color-${control.id}`)
+  }
+
   const handleTabChange = (tab: GlobalTab) => {
     if (tab === activeTab) return
     resetDetailPageScroll()
@@ -118,6 +139,11 @@ export function GlobalQuickLinksAction({ onNavigate }: GlobalQuickLinksActionPro
     resetDetailPageScroll()
     chat?.newChat()
     setDetailPage(null)
+  }
+
+  const handleClose = () => {
+    void chat?.finishConversation()
+    setOpen(false)
   }
 
   return (
@@ -137,11 +163,12 @@ export function GlobalQuickLinksAction({ onNavigate }: GlobalQuickLinksActionPro
         bodyElementRef={bodyElementRef}
         centeredGeometry={QUICK_LINKS_CENTERED_GEOMETRY}
         contentWidth={detailPage === 'security-system' ? 'full' : 'readable'}
-        headerActions={chatTab && chat ? (
+        headerActions={chatTab && chat && detailPage !== 'chat-custom-color' && detailPage !== 'chat-settings' ? (
           <ChatHeaderActions
             history={historyPage}
             onHistory={() => handleOpenDetail('chat-history', 'chat-history')}
             onNewChat={handleNewChat}
+            onSettings={() => handleOpenDetail('chat-settings', 'chat-settings')}
           />
         ) : undefined}
         landscapeDensity={detailPage === roomsPage ? 'regular' : 'compact'}
@@ -159,7 +186,7 @@ export function GlobalQuickLinksAction({ onNavigate }: GlobalQuickLinksActionPro
           </div>
         )}
         onBack={detailPage === null ? undefined : handleBack}
-        onClose={() => setOpen(false)}
+        onClose={handleClose}
         open={open}
         scrollMode={detailPage === roomsPage ? 'panes' : 'body'}
         scrollResetKey={`${activeTab}:${detailPage ?? 'root'}`}
@@ -169,10 +196,14 @@ export function GlobalQuickLinksAction({ onNavigate }: GlobalQuickLinksActionPro
       >
         <div aria-labelledby={modalTabId(TAB_ID_PREFIX, activeTab)} className={detailPage === roomsPage ? styles.panePanel : undefined} data-tab={activeTab} id={TAB_PANEL_ID} role="tabpanel">
         {chatTab ? (
-          chat ? historyPage ? (
+          detailPage === 'chat-custom-color' && colorControl ? (
+            <ChatColorEditor control={colorControl} draft={colorDrafts.get(colorControl.id) ?? { kind: 'named', name: colorControl.palette[0] ?? 'warm white' }} onChange={(draft) => handleColorDraftChange(colorControl.id, draft)} />
+          ) : detailPage === 'chat-settings' && chat ? (
+            <ChatSettingsPanel client={chat} />
+          ) : chat ? historyPage ? (
             <ChatHistory client={chat} onSelect={handleBack} />
           ) : (
-            <ChatPanel active={open} bodyElementRef={bodyElementRef} client={chat} />
+            <ChatPanel active={open} bodyElementRef={bodyElementRef} client={chat} colorDrafts={colorDrafts} onColorDraftChange={handleColorDraftChange} onOpenCustomColor={handleOpenCustomColor} />
           ) : <ChatUnavailable />
         ) : detailPage === null ? (
           <DynamicGrid

@@ -111,17 +111,28 @@ The deployment must:
 - avoid a Home Assistant restart when the panel package and bridge are
   unchanged.
 
-Chat retention is a separate HA runtime dependency. Deploy the exact
+For a Home MCP or proxy change, publish the exact merged Home MCP commit first.
+The container must use its pinned TLS certificate, validate each inherited HA
+token, and report the expected MCP version. Stage and configuration-check the
+HA proxy before replacing React assets. If the proxy is new or changed, stop
+after staging and obtain the separately required HA restart approval. After the
+restart, verify an authenticated `/api/sfenton_home_mcp` `home_info` call. Only
+then build with `VITE_HOME_MCP_ENABLED=true` and deploy the dashboard assets.
+Never leave a build that defaults to a missing proxy in either dashboard host.
+The SSH deploy command exits with status 2 after successful config staging so
+automation cannot mistake the pre-restart phase for an asset deployment.
+
+Chat history and the Home MCP proxy are separate HA runtime dependencies. Deploy the exact
 `home-assistant/custom_components/sfenton_react_chat/` files and
 `home-assistant/packages/sfenton_react_chat.yaml` following the component README.
 SSH deployment compares/backs up those files and validates after staging, with
 rollback on staging/validation failure; SMB requires the documented manual
 backup, copy, validation and rollback steps. Changed component/package files
-require a separately approved HA restart. Do not claim retention is active
-until `sfenton_react_chat.purge_expired_history` is registered and its daily
-automation is loaded/enabled. Asset deployment and `deploy:sync` do not prove
-this. Do not invoke the purge service during release verification without
-explicit deletion authorization.
+require a separately approved HA restart. After restart, verify the prior daily
+purge automation is absent; asset deployment and `deploy:sync` do not remove an
+already loaded automation. The manual purge service may remain registered, but
+do not invoke it during release verification without explicit deletion
+authorization.
 
 ## Production verification
 

@@ -1,6 +1,7 @@
 import {
-  CHAT_CONTEXT_IDLE_MS, CHAT_STORAGE_PREFIX, chatAvailability, chatRecordKey, deriveChatThreads,
-  readChatData, type ChatRecord, type ChatRequestRecord, type ChatResultRecord, type ChatThreadRecord,
+  CHAT_CONTEXT_IDLE_MS, CHAT_HISTORY_VISIBLE_MS, CHAT_STORAGE_PREFIX, chatAvailability, chatRecordKey,
+  deriveChatThreads, parseChatRecord, readChatData, visibleChatHistoryThreads,
+  type ChatRecord, type ChatRequestRecord, type ChatResultRecord, type ChatThreadRecord,
 } from './chatRecords'
 
 const thread: ChatThreadRecord = { version: 1, kind: 'thread', id: 'thread', agentId: 'conversation.test', agentName: 'Test Agent', createdAt: 1000 }
@@ -15,6 +16,17 @@ const result: ChatResultRecord = {
 const data = (...records: ChatRecord[]) => Object.fromEntries(records.map((record) => [chatRecordKey(record), record]))
 
 describe('chat records', () => {
+  it('persists a control owner separately from causal conversation ordering', () => {
+    expect(parseChatRecord({
+      ...request,
+      sourceControlId: 'control-one',
+      sourceResultId: 'result-one',
+    })).toMatchObject({
+      sourceControlId: 'control-one',
+      sourceResultId: 'result-one',
+    })
+  })
+
   it('ignores owned retention tombstones without admitting unknown schemas', () => {
     const parsed = readChatData({ value: {
       ...data(thread), [chatRecordKey(request)]: null, [chatRecordKey(result)]: null,
@@ -83,6 +95,35 @@ describe('chat records', () => {
     expect(first.unreadable).toBe(true)
     expect(first.conflict).toBe(true)
     expect(chatAvailability(first, 4000, new Set(['one']), [{ id: thread.agentId }])).toBe('conflict')
+  })
+
+  it('hides inactive history older than fourteen days without removing stored records', () => {
+    const now = 30 * 24 * 60 * 60_000
+    const recentThread = { ...thread, id: 'recent-thread', createdAt: now - CHAT_HISTORY_VISIBLE_MS }
+    const recentRequest = { ...request, id: 'recent-turn', threadId: recentThread.id, createdAt: now - CHAT_HISTORY_VISIBLE_MS }
+    const recentResult = { ...result, id: recentRequest.id, threadId: recentThread.id, createdAt: recentRequest.createdAt }
+    const oldThread = { ...thread, id: 'old-thread', createdAt: now - CHAT_HISTORY_VISIBLE_MS - 1 }
+    const oldRequest = { ...request, id: 'old-turn', threadId: oldThread.id, createdAt: now - CHAT_HISTORY_VISIBLE_MS - 1 }
+    const oldResult = { ...result, id: oldRequest.id, threadId: oldThread.id, createdAt: oldRequest.createdAt }
+    const records = readChatData({ value: data(recentThread, recentRequest, recentResult, oldThread, oldRequest, oldResult) }).records
+    const threads = deriveChatThreads(records, now)
+
+    expect(threads.map((item) => item.record.id)).toEqual(['recent-thread', 'old-thread'])
+    expect(visibleChatHistoryThreads(threads, now).map((item) => item.record.id)).toEqual(['recent-thread'])
+    expect(records.size).toBe(6)
+  })
+
+  it('retains optional operation and result context while accepting older records', () => {
+    const contextual = {
+      ...result,
+      skillContext: {
+        domain: 'lights', roomId: 'living-room', entityIds: [], lightNames: [],
+        lastAction: 'history', lastState: 'off', targetState: 'on', historyBefore: '2026-09-08T12:00:00Z',
+      },
+    } satisfies ChatResultRecord
+    const parsed = readChatData({ value: data(thread, request, contextual) })
+    expect(parsed.records.get(chatRecordKey(contextual))).toMatchObject({ skillContext: contextual.skillContext })
+    expect(readChatData({ value: data(thread, request, result) }).issue).toBeNull()
   })
 
   it('requires deliberate remote continuation and archives expired or reset contexts', () => {

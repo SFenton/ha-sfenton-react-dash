@@ -12,6 +12,8 @@ dist
 dist-ssr
 .certs
 *.local
+*.pyc
+__pycache__/
 .hass-porting/
 .playwright-mcp/
 .playwright-dist/
@@ -19,6 +21,9 @@ dist-ssr
 .autonomous/
 .outbox/
 artifacts/
+home-mcp/.data/
+home-mcp/.tls/
+home-mcp/tls/
 playwright-report
 test-results
 test-results.xml

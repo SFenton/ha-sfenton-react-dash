@@ -140,6 +140,7 @@ const TECHNICAL_PATTERNS = [
   /^(?:--|rgba?\(|#[0-9a-f]{3,8}$|\d+(?:\.\d+)?(?:ms|px|rem|s|vh|vw|%)?)$/i,
   /^[A-Z0-9_]+$/,
   /^[a-z0-9]+(?:[._/-][a-z0-9]+)+$/,
+  /^(?:string|number|boolean|undefined|object|function|symbol|null|bigint)$/,
 ] as const
 
 type CopyOrigin = 'catalog' | 'document' | 'legacy'

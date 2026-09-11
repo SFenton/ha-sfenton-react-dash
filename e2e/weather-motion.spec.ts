@@ -55,7 +55,7 @@ async function updateDailyForecastAndFreezeAnimations(
   updates: ForecastPatch[],
   revision: number,
   expectedAnimations: number,
-  expectedDestinationBearing: string,
+  expectedDestinationBearing: string | null,
 ) {
   await page.evaluate(({ entityId, forecastUpdates, nextRevision, expectedAnimations, expectedDestinationBearing }) => new Promise<void>((resolve, reject) => {
     const api = (window as unknown as {
@@ -71,10 +71,10 @@ async function updateDailyForecastAndFreezeAnimations(
     const capture = () => {
       const arrows = [...document.querySelectorAll<HTMLElement>('[data-forecast-wind-arrow]')]
       const animations = arrows.flatMap((element) => element.getAnimations())
-      if (
-        arrows[0]?.dataset.windDestinationBearing === expectedDestinationBearing
-        && animations.length === expectedAnimations
-      ) {
+      const destinationReady = expectedDestinationBearing === null
+        ? arrows[0] !== undefined && arrows[0].dataset.windDestinationBearing === undefined
+        : arrows[0]?.dataset.windDestinationBearing === expectedDestinationBearing
+      if (destinationReady && animations.length === expectedAnimations) {
         animations.forEach((animation) => animation.pause())
         resolve()
         return
@@ -296,8 +296,7 @@ test('resize recovery and calm rows preserve shared horizontal motion', async ({
     { wind_bearing: 149, wind_gust_speed: 5.09, wind_speed: 2.31 },
     { wind_bearing: 157, wind_gust_speed: 7.89, wind_speed: 3.96 },
   ]
-  await updateDailyForecast(page, initialWind, 10)
-  await expect.poll(() => arrows.evaluateAll((elements) => elements.reduce((count, element) => count + element.getAnimations().length, 0))).toBe(1)
+  await updateDailyForecastAndFreezeAnimations(page, initialWind, 10, 1, '20')
   await arrows.first().evaluate((element, duration) => {
     const animation = element.getAnimations()[0]
     animation.currentTime = duration * 0.35
@@ -308,11 +307,10 @@ test('resize recovery and calm rows preserve shared horizontal motion', async ({
   await arrows.first().evaluate((element) => element.getAnimations()[0]?.finish())
 
   await page.waitForTimeout(10)
-  await updateDailyForecast(page, [
+  await updateDailyForecastAndFreezeAnimations(page, [
     { ...initialWind[0], wind_gust_speed: 1000, wind_speed: 100 },
     ...initialWind.slice(1),
-  ], 11)
-  await expect.poll(() => arrows.evaluateAll((elements) => elements.reduce((count, element) => count + element.getAnimations().length, 0))).toBe(7)
+  ], 11, 7, '20')
   const translatedStarts = await arrows.evaluateAll((elements) => elements.map((element) => {
     const firstFrame = element.getAnimations()[0]?.effect?.getKeyframes()[0]
     return Number(String(firstFrame?.transform ?? '').match(/translateX\((-?[\d.]+)px\)/)?.[1])
@@ -321,12 +319,11 @@ test('resize recovery and calm rows preserve shared horizontal motion', async ({
   await arrows.evaluateAll((elements) => elements.forEach((element) => element.getAnimations()[0]?.finish()))
 
   await page.waitForTimeout(10)
-  await updateDailyForecast(page, [
+  await updateDailyForecastAndFreezeAnimations(page, [
     { wind_bearing: null, wind_gust_speed: 8, wind_speed: 4 },
     ...initialWind.slice(1),
-  ], 12)
+  ], 12, 7, null)
   await expect(arrows.first()).not.toHaveAttribute('data-wind-destination-bearing')
-  await expect.poll(() => arrows.evaluateAll((elements) => elements.reduce((count, element) => count + element.getAnimations().length, 0))).toBe(7)
   const calmFrames = await arrows.first().evaluate((element) => (
     element.getAnimations()[0]?.effect?.getKeyframes().map((frame) => String(frame.transform)) ?? []
   ))
