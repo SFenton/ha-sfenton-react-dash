@@ -35,7 +35,16 @@ export function useModalDetailPageScroll(pageKey: DetailPageKey, additionalScrol
       const focusTarget = modalDetailFocusTarget(returnTarget)
       if (focusTarget?.isConnected) focusTarget.focus({ preventScroll: true })
       pendingRestoreRef.current = null
-      return
+      let settleFrame = 0
+      const frame = window.requestAnimationFrame(() => {
+        settleFrame = window.requestAnimationFrame(() => {
+          if (focusTarget?.isConnected && document.activeElement !== focusTarget) focusTarget.focus({ preventScroll: true })
+        })
+      })
+      return () => {
+        window.cancelAnimationFrame(frame)
+        if (settleFrame) window.cancelAnimationFrame(settleFrame)
+      }
     }
 
     if (!pendingEnterRef.current) return
