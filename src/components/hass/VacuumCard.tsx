@@ -649,6 +649,17 @@ function InfoPill({ grouped = false, icon, label, tone, value }: { grouped?: boo
   return <StatusPill grouped={grouped} icon={icon} label={label} tone={tone} value={value} />
 }
 
+function LocateStatusPill({ disabled, onClick }: { disabled: boolean; onClick: () => void }) {
+  const copy = useCopy(VACUUM_COPY_NAMESPACE)
+  const label = copy('layout.locate')
+
+  return (
+    <button aria-label={label} className={styles.statusPillCommand} disabled={disabled} onClick={onClick} type="button">
+      <StatusPill icon="mdi:map-marker" label="" tone={disabled ? 'unavailable' : 'active'} value={label} />
+    </button>
+  )
+}
+
 function formatHours(hours: number) {
   const rounded = hours < 10 ? Math.round(hours * 10) / 10 : Math.round(hours)
   return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1)
@@ -839,13 +850,17 @@ function VacuumStatusNotice({
 function VacuumStatusSummary({
   displayState,
   liveState,
+  locate,
   mapProvenance,
+  showLocate = false,
   status,
   vacuum,
 }: {
   displayState: string
   liveState: string
+  locate?: () => void
   mapProvenance: ValetudoMapProvenance
+  showLocate?: boolean
   status: ResolvedVacuumStatus
   vacuum: VacuumConfig
 }) {
@@ -879,6 +894,7 @@ function VacuumStatusSummary({
         {vacuum.dockControls
           ? <InfoPill grouped icon={dockVisual.icon} label="Dock Status" tone={status.primaryAvailable ? dockVisual.tone : 'unavailable'} value={dockStatusLabel} />
           : null}
+        {showLocate && locate ? <LocateStatusPill disabled={!status.primaryAvailable} onClick={locate} /> : null}
       </DynamicGrid>
       {!status.primaryAvailable && mapProvenance !== VALETUDO_MAP_PROVENANCE_REPORTED && (
         <div className={styles.statusNoticeWide}>
@@ -1508,6 +1524,7 @@ function VacuumModalTabContent({
   const status = useResolvedVacuumDetails(vacuum, liveState, Boolean(entity), entity?.last_changed)
   const coordinator = useVacuumCommandCoordinator(primaryState, status.commandPolicyMode, commitDisplayState)
   const callService = useHass((state) => state.helpers.callService) as unknown as CallService
+  const locate = useCallback(() => callServiceAction(callService, 'vacuum.locate', vacuum.entityId), [callService, vacuum.entityId])
   const entities = useHass((state) => state.entities) as unknown as Record<string, EntityLike | undefined>
   const selectedRooms = orderedSelectedVacuumZones(vacuum.zones, entities, coordinator)
   const selectedRoomMarkers = selectedRooms.map(({ zone }, index) => ({ entityId: zone.entityId, order: index + 1 }))
@@ -1707,6 +1724,7 @@ function VacuumModalTabContent({
 
   const compactMapStatusLayout = !areaEditorOpen && displayedMapStatusLayout === 'split'
   const tallLandscapeLayout = !areaEditorOpen && viewportLayout === 'tall-landscape'
+  const compactMapPresentation = compactMapStatusLayout || tallLandscapeLayout
   const modalPresentation = useModalSheetPresentation()
   const landscapeViewport = !areaEditorOpen && (viewportLayout !== 'portrait'
     || modalPresentation !== 'sheet'
@@ -1731,6 +1749,7 @@ function VacuumModalTabContent({
       data-map-status-layout={areaEditorOpen ? 'editor' : displayedMapStatusLayout}
       data-map-status-layout-transition={areaEditorOpen ? 'idle' : effectiveMapStatusTransitionState}
       data-reported-status-pane={reportedStatusInRightPane ? 'right' : 'inline'}
+      data-vacuum-viewport-layout={areaEditorOpen ? 'editor' : viewportLayout}
       ref={modalBodyRef}
     >
       <VacuumIntentConfirmationTrackers coordinator={coordinator} vacuum={vacuum} />
@@ -1739,18 +1758,20 @@ function VacuumModalTabContent({
         className={[styles.leftPane, areaEditorOpen ? styles.areaEditorPane : ''].filter(Boolean).join(' ')}
         data-map-status-layout={areaEditorOpen ? 'editor' : displayedMapStatusLayout}
         data-map-status-layout-transition={areaEditorOpen ? 'idle' : effectiveMapStatusTransitionState}
+        data-vacuum-viewport-layout={areaEditorOpen ? 'editor' : viewportLayout}
         ref={leftPaneRef}
         role="group"
       >
         <VacuumMapAndStatus
           areaEditorOpen={areaEditorOpen}
-          compactLayout={compactMapStatusLayout}
+          compactLayout={compactMapPresentation}
           areaSelection={areaSelection}
           drawMode={drawMode}
           editorMetaChange={onAreaEditorMetaChange}
           onAreaSelectionChange={onAreaSelectionChange}
           onDrawModeChange={onDrawModeChange}
           onFinishAreaEditing={onFinishAreaEditing}
+          onLocate={locate}
           onOpenOutcomes={onOpenOutcomes}
           onResetAreaView={onResetAreaView}
           onRoomToggle={toggleRoom}
@@ -1774,12 +1795,12 @@ function VacuumModalTabContent({
                 {reportedStatusInRightPane ? (
                   <div className={styles.compactStatusStack} data-vacuum-reported-status="true" data-vacuum-status-details="true">
                     <ValetudoReportedMapNotice reportedPositionPresent={areaEditorMeta.reportedPositionPresent} />
-                    <VacuumStatusSummary displayState={optimisticState.state} liveState={optimisticState.liveState} mapProvenance={areaEditorMeta.provenance} status={status} vacuum={vacuum} />
+                    <VacuumStatusSummary displayState={optimisticState.state} liveState={optimisticState.liveState} locate={locate} mapProvenance={areaEditorMeta.provenance} showLocate={compactMapPresentation} status={status} vacuum={vacuum} />
                     <VacuumWhileAwaySection onOpenOutcomes={onOpenOutcomes} presentation={outcomePresentation} vacuum={vacuum} />
                   </div>
-                ) : compactMapStatusLayout ? (
+                ) : compactMapPresentation ? (
                   <div className={styles.compactStatusStack} data-vacuum-status-details="true">
-                    <VacuumStatusSummary displayState={optimisticState.state} liveState={optimisticState.liveState} mapProvenance={areaEditorMeta.provenance} status={status} vacuum={vacuum} />
+                    <VacuumStatusSummary displayState={optimisticState.state} liveState={optimisticState.liveState} locate={locate} mapProvenance={areaEditorMeta.provenance} showLocate status={status} vacuum={vacuum} />
                     <VacuumWhileAwaySection onOpenOutcomes={onOpenOutcomes} presentation={outcomePresentation} vacuum={vacuum} />
                   </div>
                 ) : cleaningReportInRightPane ? (
@@ -1825,6 +1846,7 @@ function VacuumMapAndStatus({
   onAreaSelectionChange,
   onDrawModeChange,
   onFinishAreaEditing,
+  onLocate,
   onOpenOutcomes,
   onResetAreaView,
   onRoomToggle,
@@ -1847,6 +1869,7 @@ function VacuumMapAndStatus({
   onAreaSelectionChange: (selection: MapGridRect | null) => void
   onDrawModeChange: (drawMode: boolean) => void
   onFinishAreaEditing: () => void
+  onLocate: () => void
   onOpenOutcomes?: () => void
   onResetAreaView: () => void
   onRoomToggle: (zone: VacuumZoneConfig) => void
@@ -1862,8 +1885,6 @@ function VacuumMapAndStatus({
   vacuum: VacuumConfig
 }) {
   const copy = useCopy(VACUUM_COPY_NAMESPACE)
-  const callService = useHass((state) => state.helpers.callService) as unknown as CallService
-  const locate = useCallback(() => callServiceAction(callService, 'vacuum.locate', vacuum.entityId), [callService, vacuum.entityId])
   const deviceCommandsAllowed = status.primaryAvailable && status.commandPolicyMode === VACUUM_COMMAND_NORMAL
   const locateAllowed = status.primaryAvailable
   const [editorMeta, setEditorMeta] = useState<ValetudoMapEditorMeta>({
@@ -1943,7 +1964,7 @@ function VacuumMapAndStatus({
           vacuum={vacuum}
         />
         {!areaEditorOpen && !compactLayout && locateAllowed && (
-          <button className={styles.locateButton} data-icon="mdi:map-marker" data-tone="neutral" onClick={locate} type="button">
+          <button className={styles.locateButton} data-icon="mdi:map-marker" data-tone="neutral" onClick={onLocate} type="button">
             <MaterialIcon name="mdi:map-marker" size={18} />
             {copy('layout.locate')}
           </button>
@@ -1973,11 +1994,7 @@ function VacuumMapAndStatus({
         </div>
       ) : (
         <div className={styles.mapStatusControls} data-vacuum-map-status-controls="true">
-          {compactLayout ? (
-            <div className={styles.compactLocateSection}>
-              <ActionButton disabled={!locateAllowed} icon="mdi:map-marker" label={copy('layout.locate')} onClick={locate} tone="primary" />
-            </div>
-          ) : showStatusDetails ? (
+          {!compactLayout && showStatusDetails ? (
             <div className={styles.mapStatusDetails} data-vacuum-status-details="true">
               <VacuumStatusSummary displayState={optimisticState.state} liveState={optimisticState.liveState} mapProvenance={editorMeta.provenance} status={status} vacuum={vacuum} />
               {showCleaningReport && (
@@ -2090,7 +2107,13 @@ export function VacuumModal({
   const closeOutcomes = useCallback(() => {
     leaveDetailPage()
     setOutcomeDetailContract(null)
-  }, [leaveDetailPage, setOutcomeDetailContract])
+    window.requestAnimationFrame(() => {
+      bodyElementRef.current
+        ?.closest('[role="dialog"]')
+        ?.querySelector<HTMLElement>('[data-modal-detail-trigger="vacuum-outcomes"] button')
+        ?.focus({ preventScroll: true })
+    })
+  }, [bodyElementRef, leaveDetailPage, setOutcomeDetailContract])
   const openAreaEditor = useCallback(() => {
     enterDetailPage('vacuum-area-editor')
     setOutcomeDetailContract(null)

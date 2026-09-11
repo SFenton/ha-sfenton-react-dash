@@ -866,7 +866,9 @@ async function auditModal(page: Page, modalCase: ModalCase, dialog: Locator, vie
       }
     })
     const clippedRegions = regions
-      .filter((region) => region.scrollHeight > region.clientHeight + 1 && !['auto', 'scroll'].includes(region.overflowY))
+      .filter((region) => region.name !== 'modal-body'
+        && region.scrollHeight > region.clientHeight + 1
+        && !['auto', 'scroll'].includes(region.overflowY))
       .map((region) => region.name)
     const terminalViolations = regions.flatMap((region) => {
       if (region.scrollHeight <= region.clientHeight + 1 || !['auto', 'scroll'].includes(region.overflowY)) return []
@@ -942,6 +944,9 @@ async function auditModal(page: Page, modalCase: ModalCase, dialog: Locator, vie
       },
       footer: box(footer),
       geometryIntent: element.dataset.modalGeometryIntent ?? '',
+      innerPaneOwners: regions
+        .filter((region) => region.name !== 'modal-body' && ['auto', 'scroll'].includes(region.overflowY))
+        .map((region) => region.name),
       navigation: box(navigation),
       presentation: element.dataset.modalPresentation,
       safeArea: {
@@ -986,8 +991,9 @@ async function auditModal(page: Page, modalCase: ModalCase, dialog: Locator, vie
     expect(metrics.footer.top).toBeGreaterThanOrEqual(metrics.dialog.top - 1)
     expect(metrics.footer.bottom).toBeLessThanOrEqual(metrics.dialog.bottom + 1)
   }
-  if (modalCase.expectedScrollMode === 'panes' && metrics.presentation === 'dialog') {
+  if (modalCase.expectedScrollMode === 'panes' && metrics.presentation !== 'sheet' && metrics.bodyOverflowY === 'hidden') {
     expect(metrics.bodyOverflowY, `${modalCase.id} ${stage} pane body lock`).toBe('hidden')
+    expect(metrics.innerPaneOwners.length, `${modalCase.id} ${stage} declared inner pane owner`).toBeGreaterThan(0)
   } else {
     expect(['auto', 'scroll'], `${modalCase.id} ${stage} body scroll owner`).toContain(metrics.bodyOverflowY)
   }

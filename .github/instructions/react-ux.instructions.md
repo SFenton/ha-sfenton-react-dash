@@ -84,7 +84,9 @@ applyTo: "src/pages/**/*.tsx,src/components/**/*.tsx,src/pages/**/*.module.css,s
 - Non-grid `landscape-dialog` surfaces use the shared compact density and
   measured `data-modal-body-tier` thresholds from `ModalSheet`. Reuse desktop
   splits only through those tiers, keep named panes visible, and retain the
-  modal body as the sole landscape scroll owner. Do not put
+  modal body as the default sole landscape scroll owner. An explicitly scoped
+  split workspace may instead keep one primary pane immobile while one named
+  secondary pane owns vertical scrolling at every landscape tier it supports. Do not put
   `container-type` on the shared modal body or add page-local viewport
   breakpoints for modal structure. Square room/admin tile flows retain regular
   density.

@@ -1,3 +1,5 @@
+// @covers src/components/hass/VacuumCard.module.css
+// @covers src/components/hass/VacuumCard.tsx
 import { expect, test, type Page } from './layout/fixture'
 import { waitForModalReady } from './layout/evidence'
 import { NINE_ROOM_VACUUM_OUTCOME_CONTRACT } from '../src/test/fixtures/vacuumOutcomes'
@@ -23,8 +25,12 @@ async function waitForVacuumLayoutReady(dialog: ReturnType<Page['getByRole']>) {
 
 async function expectLocateUnavailable(dialog: ReturnType<Page['getByRole']>, mapPaneName: string) {
   const locate = dialog.getByRole('button', { name: 'Locate' })
-  const layout = await dialog.getByRole('group', { name: mapPaneName }).getAttribute('data-map-status-layout')
-  if (layout === 'split') {
+  const mapPane = dialog.getByRole('group', { name: mapPaneName })
+  const [layout, viewportLayout] = await Promise.all([
+    mapPane.getAttribute('data-map-status-layout'),
+    mapPane.getAttribute('data-vacuum-viewport-layout'),
+  ])
+  if (layout === 'split' || viewportLayout === 'tall-landscape') {
     await expect(locate).toBeDisabled()
     return
   }
@@ -299,10 +305,28 @@ test('vacuum map and status reflow through a fade when modal height becomes cons
   const controlsPane = dialog.getByRole('group', { name: /Main Floor controls/ })
   const map = dialog.getByRole('region', { name: 'Main Floor Valetudo map' })
   await expect(mapPane).toHaveAttribute('data-map-status-layout', 'stacked')
-  await expect(map).toHaveAttribute('data-map-display', 'contained')
+  await expect(map).toHaveAttribute('data-map-display', 'fitted')
   await expect(mapPane.getByRole('heading', { name: 'Status' })).toHaveCount(0)
   await expect(mapPane.getByRole('heading', { name: 'Actions' })).toHaveCount(0)
-  await expect(mapPane.getByRole('button', { name: 'Locate' })).toHaveCount(1)
+  await expect(mapPane.locator('[data-vacuum-map-status-controls="true"]')).toBeHidden()
+  await expect(mapPane.getByRole('button', { name: 'Locate' })).toHaveCount(0)
+  await expect(controlsPane.getByRole('button', { name: 'Locate' })).toBeVisible()
+  const tallGeometry = await mapPane.evaluate((element) => {
+    const map = element.querySelector<HTMLElement>('[data-valetudo-map-frame="true"]')
+    const paneRect = element.getBoundingClientRect()
+    const mapRect = map?.getBoundingClientRect()
+    return {
+      mapCenterDelta: mapRect
+        ? Math.abs((mapRect.left + mapRect.width / 2) - (paneRect.left + paneRect.width / 2))
+        : Number.POSITIVE_INFINITY,
+      mapHeight: mapRect?.height ?? 0,
+      paneHeight: paneRect.height,
+      scrollOverflow: element.scrollHeight - element.clientHeight,
+    }
+  })
+  expect(tallGeometry.mapCenterDelta).toBeLessThanOrEqual(1)
+  expect(tallGeometry.mapHeight).toBeGreaterThanOrEqual(tallGeometry.paneHeight - 1)
+  expect(tallGeometry.scrollOverflow).toBeLessThanOrEqual(1)
 
   await mapPane.evaluate((element) => {
     const target = element as HTMLElement
@@ -331,25 +355,29 @@ test('vacuum map and status reflow through a fade when modal height becomes cons
   await expect(map).toHaveAttribute('data-map-display', 'fitted')
   await expect(mapPane.getByRole('heading', { name: 'Status' })).toHaveCount(0)
   await expect(mapPane.getByRole('heading', { name: 'Actions' })).toHaveCount(0)
-  const compactLocate = mapPane.getByRole('button', { name: 'Locate' })
+  const compactLocate = controlsPane.getByRole('button', { name: 'Locate' })
   await expect(compactLocate).toHaveCount(1)
+  await expect(mapPane.getByRole('button', { name: 'Locate' })).toHaveCount(0)
   await expect(mapPane.getByRole('group', { name: 'Dock Status Idle' })).toHaveCount(0)
-  await expect(controlsPane.getByRole('group', { name: 'Dock Status Idle' })).toBeVisible()
+  const compactDockStatus = controlsPane.getByRole('group', { name: 'Dock Status Idle' })
+  await expect(compactDockStatus).toBeVisible()
   await expect(controlsPane).toBeVisible()
+  await expect(mapPane.locator('[data-vacuum-map-status-controls="true"]')).toBeHidden()
+  await page.evaluate(() => {
+    (window as unknown as { __mockHass: { calls: Record<string, unknown>[] } }).__mockHass.calls.splice(0)
+  })
+  await compactLocate.click()
+  await expect.poll(() => page.evaluate(() => (
+    (window as unknown as { __mockHass: { calls: Record<string, unknown>[] } }).__mockHass.calls
+      .some((call) => call.domain === 'vacuum' && call.service === 'locate' && call.target === 'vacuum.valetudo_exaltedsneakydeer')
+  ))).toBe(true)
   const compactGeometry = await mapPane.evaluate((element) => {
     const map = element.querySelector<HTMLElement>('[data-valetudo-map-frame="true"]')
-    const status = element.querySelector<HTMLElement>('[data-vacuum-map-status-controls="true"]')
-    const statusGrid = element.querySelector<HTMLElement>('section[class*="statusPanel"]')
-    const locate = element.querySelector<HTMLElement>('[data-modal-action-button="true"]')
     const paneRect = element.getBoundingClientRect()
     const mapRect = map?.getBoundingClientRect()
     const mapStageRect = element.querySelector<HTMLElement>('[data-vacuum-map-stage="true"]')?.getBoundingClientRect()
-    const statusRect = status?.getBoundingClientRect()
-    const statusGridRect = statusGrid?.getBoundingClientRect()
-    const locateRect = locate?.getBoundingClientRect()
     const naturalAspect = map ? Number.parseFloat(getComputedStyle(map).getPropertyValue('--map-aspect-ratio')) : 0
     return {
-      locateBottom: locateRect?.bottom,
       mapAspect: mapRect ? mapRect.width / mapRect.height : 0,
       mapCenterDelta: mapRect && mapStageRect
         ? Math.abs((mapRect.left + mapRect.width / 2) - (mapStageRect.left + mapStageRect.width / 2))
@@ -357,18 +385,19 @@ test('vacuum map and status reflow through a fade when modal height becomes cons
       naturalAspect,
       mapHeight: mapRect?.height,
       mapWidth: mapRect?.width,
+      paneHeight: paneRect.height,
+      paneWidth: paneRect.width,
       paneBottom: paneRect.bottom,
       scrollOverflow: element.scrollHeight - element.clientHeight,
-      statusGridWidth: statusGridRect?.width,
-      statusWidth: statusRect?.width,
     }
   })
   expect(compactGeometry.scrollOverflow).toBeLessThanOrEqual(1)
   expect(compactGeometry.naturalAspect).toBeGreaterThan(0)
   expect(compactGeometry.mapAspect).toBeCloseTo(compactGeometry.naturalAspect, 1)
   expect(compactGeometry.mapCenterDelta).toBeLessThanOrEqual(1)
-  expect(compactGeometry.mapWidth).toBeLessThanOrEqual((compactGeometry.statusWidth ?? 0) + 1)
-  expect(compactGeometry.locateBottom).toBeLessThanOrEqual((compactGeometry.paneBottom ?? 0) + 1)
+  expect(compactGeometry.mapHeight).toBeGreaterThanOrEqual((compactGeometry.paneHeight ?? 0) - 1)
+  expect(compactGeometry.mapWidth).toBeLessThanOrEqual((compactGeometry.paneWidth ?? 0) + 1)
+  expect(tallGeometry.mapHeight).toBeGreaterThan(compactGeometry.mapHeight ?? 0)
 
   await page.setViewportSize({ height: 343, width: 852 })
   await expect(mapPane).toHaveAttribute('data-map-status-layout', 'split')
@@ -431,10 +460,43 @@ test('vacuum map and status reflow through a fade when modal height becomes cons
   await page.setViewportSize({ height: 900, width: 1440 })
   await expect(mapPane).toHaveAttribute('data-map-status-layout', 'stacked')
   await expect(mapPane).toHaveAttribute('data-map-status-layout-transition', 'idle')
-  await expect(map).toHaveAttribute('data-map-display', 'contained')
+  await expect(map).toHaveAttribute('data-map-display', 'fitted')
   await expect(mapPane.getByRole('heading', { name: 'Status' })).toHaveCount(0)
   await expect(mapPane.getByRole('heading', { name: 'Actions' })).toHaveCount(0)
-  await expect(mapPane.getByRole('button', { name: 'Locate' })).toHaveCount(1)
+  await expect(mapPane.locator('[data-vacuum-map-status-controls="true"]')).toBeHidden()
+  await expect(mapPane.getByRole('button', { name: 'Locate' })).toHaveCount(0)
+  await expect(controlsPane.getByRole('button', { name: 'Locate' })).toBeVisible()
+})
+
+test('compact near-square landscape gives the empty status row back to the vacuum map', async ({ page }) => {
+  await page.setViewportSize({ height: 682, width: 776 })
+  await page.goto('/at-a-glance/vacuums')
+  await page.getByRole('button', { name: /Main Floor Docked/i }).click()
+
+  const dialog = page.getByRole('dialog')
+  await waitForModalReady(dialog, undefined, 'vacuum-tabs')
+  await expect(dialog).toHaveAttribute('data-modal-presentation', 'dialog')
+  await expect(dialog).toHaveAttribute('data-landscape-density', 'compact')
+  await expect(dialog).toHaveAttribute('data-modal-body-tier', 'standard')
+
+  const mapPane = dialog.getByRole('group', { name: 'Main Floor map and status' })
+  const statusControls = mapPane.locator('[data-vacuum-map-status-controls="true"]')
+  await expect(mapPane).toHaveAttribute('data-map-status-layout', 'split')
+  await expect(statusControls).toBeHidden()
+  await expect(dialog.getByRole('group', { name: /Main Floor controls/ }).getByRole('button', { name: 'Locate' })).toBeVisible()
+
+  const geometry = await mapPane.evaluate((element) => {
+    const map = element.querySelector<HTMLElement>('[data-valetudo-map-frame="true"]')
+    const paneRect = element.getBoundingClientRect()
+    const mapRect = map?.getBoundingClientRect()
+    return {
+      mapHeight: mapRect?.height ?? 0,
+      paneHeight: paneRect.height,
+      scrollOverflow: element.scrollHeight - element.clientHeight,
+    }
+  })
+  expect(geometry.mapHeight).toBeGreaterThanOrEqual(geometry.paneHeight - 1)
+  expect(geometry.scrollOverflow).toBeLessThanOrEqual(1)
 })
 
 test('a short landscape vacuum modal opens without overlap and keeps its layout after Area', async ({ page }) => {
@@ -450,12 +512,12 @@ test('a short landscape vacuum modal opens without overlap and keeps its layout 
 
   const openingOverlap = await mapPane.evaluate((element) => {
     const mapRect = element.querySelector<HTMLElement>('[data-valetudo-map-frame="true"]')?.getBoundingClientRect()
-    const locateRect = [...element.querySelectorAll<HTMLElement>('button')]
-      .find((button) => button.textContent?.includes('Locate'))
-      ?.getBoundingClientRect()
-    return mapRect && locateRect ? mapRect.bottom - locateRect.top : Number.POSITIVE_INFINITY
+    const paneRect = element.getBoundingClientRect()
+    return mapRect ? mapRect.bottom - paneRect.bottom : Number.POSITIVE_INFINITY
   })
   expect(openingOverlap).toBeLessThanOrEqual(0)
+  await expect(mapPane.getByRole('button', { name: 'Locate' })).toHaveCount(0)
+  await expect(dialog.getByRole('group', { name: /Main Floor controls/ }).getByRole('button', { name: 'Locate' })).toBeVisible()
 
   await dialog.getByRole('group', { name: 'Cleaning target' }).getByRole('button', { name: 'Area' }).click()
   await expect(dialog.getByRole('application', { name: 'Main Floor cleaning area editor' })).toBeVisible()

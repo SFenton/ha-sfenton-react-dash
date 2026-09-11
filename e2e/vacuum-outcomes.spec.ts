@@ -233,8 +233,8 @@ test.describe('fine-pointer outcome details', () => {
       }))
       const mapStatusLayout = await mapPane.getAttribute('data-map-status-layout')
       expect(bodyGeometry.overflowY).toBe('hidden')
-      // A split left pane fits the map and Locate exactly, so it must never become a second scroller.
-      expect(mapPaneGeometry.overflowY).toBe(mapStatusLayout === 'split' ? 'hidden' : 'auto')
+      // Landscape always anchors the map; portrait keeps the existing measured split behavior.
+      expect(mapPaneGeometry.overflowY).toBe(viewport.width > viewport.height || mapStatusLayout === 'split' ? 'hidden' : 'auto')
       expect(await panel.evaluate((element) => getComputedStyle(element).overflowY)).toBe('auto')
       await summary.scrollIntoViewIfNeeded()
       await expect(summary).toBeInViewport()
