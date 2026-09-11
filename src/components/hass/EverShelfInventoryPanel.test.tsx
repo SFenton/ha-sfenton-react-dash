@@ -148,59 +148,75 @@ describe('EverShelfInventoryPanel item edit modal', () => {
 
   it('asks how many items to delete when the batch holds more than one', async () => {
     const dialog = await openCannedBeansEditModal()
-    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true)
-    const promptSpy = vi.spyOn(window, 'prompt').mockReturnValue('1')
 
     mockCallServiceCalls.length = 0
-    await clickAndFlush(within(dialog).getByRole('button', { name: `Delete Canned Beans ${SOON_BATCH}` }))
+    fireEvent.click(within(dialog).getByRole('button', { name: `Delete Canned Beans ${SOON_BATCH}` }))
+    const confirmation = screen.getByRole('alertdialog', { name: `Delete Canned Beans ${SOON_BATCH}?` })
 
-    expect(promptSpy).toHaveBeenCalledWith(`Quantity of Canned Beans ${SOON_BATCH} to delete (available: 2).`, '1')
-    expect(confirmSpy).not.toHaveBeenCalled()
+    expect(within(confirmation).getByRole('button', { name: 'Cancel' })).toBeInTheDocument()
+    expect(within(confirmation).getByRole('button', { name: 'OK' })).toBeInTheDocument()
+    expect(within(confirmation).getByRole('spinbutton', { name: `Quantity to delete for Canned Beans ${SOON_BATCH}` })).toHaveValue(1)
+    await clickAndFlush(within(confirmation).getByRole('button', { name: 'OK' }))
     expect(inventoryServiceCalls()).toEqual([
       { domain: 'evershelf', service: 'delete_inventory', serviceData: { inventory_id: 102 } },
     ])
-    promptSpy.mockRestore()
-    confirmSpy.mockRestore()
   })
 
   it('deletes only the selected batch when its full quantity is confirmed', async () => {
     const dialog = await openCannedBeansEditModal()
-    const promptSpy = vi.spyOn(window, 'prompt').mockReturnValue('2')
 
     mockCallServiceCalls.length = 0
-    await clickAndFlush(within(dialog).getByRole('button', { name: `Delete Canned Beans ${SOON_BATCH}` }))
+    fireEvent.click(within(dialog).getByRole('button', { name: `Delete Canned Beans ${SOON_BATCH}` }))
+    const confirmation = screen.getByRole('alertdialog', { name: `Delete Canned Beans ${SOON_BATCH}?` })
+    fireEvent.change(within(confirmation).getByRole('spinbutton', { name: `Quantity to delete for Canned Beans ${SOON_BATCH}` }), { target: { value: '2' } })
+    await clickAndFlush(within(confirmation).getByRole('button', { name: 'OK' }))
 
     expect(inventoryServiceCalls()).toEqual([
       { domain: 'evershelf', service: 'delete_inventory', serviceData: { inventory_id: 102 } },
       { domain: 'evershelf', service: 'delete_inventory', serviceData: { inventory_id: 106 } },
     ])
-    promptSpy.mockRestore()
   })
 
   it('rejects a delete quantity outside the batch amount', async () => {
     const dialog = await openCannedBeansEditModal()
-    const promptSpy = vi.spyOn(window, 'prompt').mockReturnValue('5')
 
     mockCallServiceCalls.length = 0
-    await clickAndFlush(within(dialog).getByRole('button', { name: `Delete Canned Beans ${SOON_BATCH}` }))
+    fireEvent.click(within(dialog).getByRole('button', { name: `Delete Canned Beans ${SOON_BATCH}` }))
+    const confirmation = screen.getByRole('alertdialog', { name: `Delete Canned Beans ${SOON_BATCH}?` })
+    fireEvent.change(within(confirmation).getByRole('spinbutton', { name: `Quantity to delete for Canned Beans ${SOON_BATCH}` }), { target: { value: '5' } })
+    fireEvent.click(within(confirmation).getByRole('button', { name: 'OK' }))
 
     expect(inventoryServiceCalls()).toEqual([])
-    expect(within(dialog).getByRole('alert')).toHaveTextContent('Enter a number from 1 to 2.')
-    promptSpy.mockRestore()
+    expect(within(confirmation).getByRole('alert')).toHaveTextContent('Enter a number from 1 to 2.')
   })
 
   it('confirms before deleting a food item that only holds one item', async () => {
     const dialog = await openEditModal({ itemName: 'Milk', listLabel: 'Fridge inventory list', location: 'frigo', quantityLabel: 'Expired', title: 'Fridge' })
-    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true)
 
     mockCallServiceCalls.length = 0
-    await clickAndFlush(within(dialog).getByRole('button', { name: 'Delete Milk' }))
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Delete Milk' }))
+    const confirmation = screen.getByRole('alertdialog', { name: 'Delete Milk?' })
 
-    expect(confirmSpy).toHaveBeenCalledWith('Delete Milk from the fridge?')
+    expect(within(confirmation).getByText('Delete Milk from the fridge?')).toBeInTheDocument()
+    expect(within(confirmation).getByRole('button', { name: 'Cancel' })).toBeInTheDocument()
+    expect(within(confirmation).getByRole('button', { name: 'OK' })).toBeInTheDocument()
+    expect(within(confirmation).queryByRole('spinbutton')).not.toBeInTheDocument()
+    await clickAndFlush(within(confirmation).getByRole('button', { name: 'OK' }))
     expect(inventoryServiceCalls()).toEqual([
       { domain: 'evershelf', service: 'delete_inventory', serviceData: { inventory_id: 205 } },
     ])
-    confirmSpy.mockRestore()
+  })
+
+  it('cancels a multi-item delete without changing EverShelf', async () => {
+    const dialog = await openCannedBeansEditModal()
+
+    mockCallServiceCalls.length = 0
+    fireEvent.click(within(dialog).getByRole('button', { name: `Delete Canned Beans ${SOON_BATCH}` }))
+    const confirmation = screen.getByRole('alertdialog', { name: `Delete Canned Beans ${SOON_BATCH}?` })
+    fireEvent.click(within(confirmation).getByRole('button', { name: 'Cancel' }))
+
+    expect(screen.queryByRole('alertdialog', { name: `Delete Canned Beans ${SOON_BATCH}?` })).not.toBeInTheDocument()
+    expect(inventoryServiceCalls()).toEqual([])
   })
 
   it('moves the whole batch to the new expiration before adding extra items', async () => {

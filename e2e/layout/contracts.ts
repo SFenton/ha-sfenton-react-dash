@@ -372,7 +372,7 @@ export const SURFACE_CONTRACTS: Record<ScenarioId, {
   summary: {
     family: 'modal', states: ['overdue', 'upcoming', 'expired'],
     tabs: ['^Overdue Chores(?:,|\\s|$)', '^Upcoming Chores(?:,|\\s|$)', '^Expired Food(?:,|\\s|$)'],
-    owners: ['src/components/hass/DailyReport', 'src/constants/dailyReport'],
+    owners: ['src/components/hass/DailyReport', 'src/components/hass/EverShelfInventoryPanel', 'src/constants/dailyReport', 'src/i18n/index.ts', 'src/i18n/locales/en/pages/food.json'],
     legacy: ['modal-rotation-regressions.spec.ts', 'feedback-regressions.spec.ts'],
     question: 'Does the selected incoming Summary content retain readable type and columns on rotation before refreshing a tab?',
   },

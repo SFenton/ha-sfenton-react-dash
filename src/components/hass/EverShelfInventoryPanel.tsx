@@ -16,6 +16,7 @@ import { SurfaceAccessory } from '../core/SurfaceAccessory'
 import { DashboardPageLoading } from '../shell/DashboardPageLoading'
 import type { EverShelfInventoryControls, InventoryFilterMode, InventorySortDirection, InventorySortMode } from './EverShelfInventoryControls'
 import { daysUntilDate, parseIsoDateOnly } from './expiryDate'
+import { PAGE_FOOD_COPY_KEYS, PAGE_FOOD_COPY_NAMESPACE, useCopy } from '../../i18n'
 import styles from './EverShelfInventoryPanel.module.css'
 
 export type EverShelfInventoryLocation = 'all' | 'dispensa' | 'frigo' | 'freezer' | 'spice_rack' | 'cabinet'
@@ -498,17 +499,6 @@ function promptShoppingQuantity(title: string) {
   return Number.isFinite(parsedValue) && parsedValue >= 1 ? parsedValue : null
 }
 
-function promptDeleteQuantity(title: string, quantity: number) {
-  const value = window.prompt(`Quantity of ${title} to delete (available: ${formatQuantity(quantity)}).`, '1')
-  if (value === null) return { status: 'cancelled' } satisfies DeleteQuantityPromptResult
-  const normalizedValue = value.trim().replace(',', '.')
-  if (!/^(?:\d+|\d*\.\d+)$/.test(normalizedValue)) return { status: 'invalid' } satisfies DeleteQuantityPromptResult
-  const parsedValue = Number(normalizedValue)
-  return Number.isFinite(parsedValue) && parsedValue >= 1 && parsedValue <= quantity
-    ? { quantity: parsedValue, status: 'valid' } satisfies DeleteQuantityPromptResult
-    : { status: 'invalid' } satisfies DeleteQuantityPromptResult
-}
-
 function promptPreparedQuantity(title: string, quantity: number, enabling: boolean) {
   const verb = enabling ? 'mark as prepared' : 'unmark as prepared'
   const value = window.prompt(`How many of ${title} to ${verb}? (available: ${formatQuantity(quantity)})`, formatQuantity(quantity))
@@ -519,6 +509,87 @@ function promptPreparedQuantity(title: string, quantity: number, enabling: boole
   return Number.isFinite(parsedValue) && parsedValue >= 1 && parsedValue <= quantity
     ? { quantity: parsedValue, status: 'valid' } satisfies DeleteQuantityPromptResult
     : { status: 'invalid' } satisfies DeleteQuantityPromptResult
+}
+
+type InventoryDeleteRequest = {
+  actionKey?: string
+  availableQuantity: number
+  locationLabel: string
+  qualifier?: string
+  rows: InventoryBatchRow[]
+  title: string
+}
+
+function InventoryDeleteDialog({ onCancel, onConfirm, request }: { onCancel: () => void; onConfirm: (quantity: number) => void; request: InventoryDeleteRequest }) {
+  const foodCopy = useCopy(PAGE_FOOD_COPY_NAMESPACE)
+  const multiple = request.availableQuantity > 1
+  const displayTitle = request.qualifier
+    ? foodCopy(PAGE_FOOD_COPY_KEYS.delete.itemWithQualifier, { qualifier: request.qualifier, title: request.title })
+    : request.title
+  const [quantityDraft, setQuantityDraft] = useState(multiple ? '1' : formatQuantity(request.availableQuantity))
+  const [error, setError] = useState<string | null>(null)
+
+  const confirmDelete = () => {
+    const normalizedValue = quantityDraft.trim().replace(',', '.')
+    const parsedValue = Number(normalizedValue)
+    if (!/^(?:\d+|\d*\.\d+)$/.test(normalizedValue) || !Number.isFinite(parsedValue) || parsedValue < 1 || parsedValue > request.availableQuantity) {
+      setError(foodCopy(PAGE_FOOD_COPY_KEYS.delete.quantityError, { quantity: formatQuantity(request.availableQuantity) }))
+      return
+    }
+    onConfirm(parsedValue)
+  }
+
+  return (
+    <div
+      className={styles.deleteDialogOverlay}
+      onClick={(event) => event.stopPropagation()}
+      onKeyDown={(event) => {
+        if (event.key !== 'Escape') return
+        event.preventDefault()
+        event.stopPropagation()
+        onCancel()
+      }}
+      onPointerDown={(event) => {
+        event.stopPropagation()
+        if (event.currentTarget === event.target) onCancel()
+      }}
+    >
+      <section aria-label={foodCopy(PAGE_FOOD_COPY_KEYS.delete.title, { title: displayTitle })} aria-modal="true" className={styles.deleteDialog} data-inventory-delete-dialog="true" role="alertdialog">
+        <div className={styles.deleteDialogCopy}>
+          <h2>{foodCopy(PAGE_FOOD_COPY_KEYS.delete.title, { title: displayTitle })}</h2>
+          <Description>
+            {multiple
+              ? foodCopy(PAGE_FOOD_COPY_KEYS.delete.multipleDescription, { location: request.locationLabel, title: displayTitle })
+              : foodCopy(PAGE_FOOD_COPY_KEYS.delete.description, { location: request.locationLabel, title: displayTitle })}
+          </Description>
+        </div>
+        {multiple && (
+          <label className={styles.deleteQuantityField}>
+            <span>{foodCopy(PAGE_FOOD_COPY_KEYS.delete.quantity)}</span>
+            <input
+              aria-label={foodCopy(PAGE_FOOD_COPY_KEYS.delete.quantityLabel, { title: displayTitle })}
+              autoComplete="off"
+              inputMode="decimal"
+              max={request.availableQuantity}
+              min="1"
+              onChange={(event) => {
+                setQuantityDraft(event.target.value)
+                setError(null)
+              }}
+              step="any"
+              type="number"
+              value={quantityDraft}
+            />
+          </label>
+        )}
+        {error && <p className={styles.error} role="alert">{error}</p>}
+        <div className={styles.deleteDialogActions}>
+          <button autoFocus className={styles.deleteDialogCancel} onClick={onCancel} type="button">{foodCopy(PAGE_FOOD_COPY_KEYS.delete.cancel)}</button>
+          <button className={styles.deleteDialogConfirm} onClick={confirmDelete} type="button">{foodCopy(PAGE_FOOD_COPY_KEYS.delete.confirm)}</button>
+        </div>
+      </section>
+    </div>
+  )
 }
 
 // Spreads the requested unit count across the rows backing a batch, smallest row first so whole
@@ -541,6 +612,7 @@ function validExpiryInput(value: string) {
 
 function PantryRow({ expiry, extraBatchCount, locationLabel, multiItem, onDeleted, onOpenDetails, quantity, rows, title }: { expiry: ExpiryInfo; extraBatchCount: number; locationLabel: string; multiItem: boolean; onDeleted: (steps: InventoryDeleteStep[]) => void; onOpenDetails: () => void; quantity: number | null; rows: (InventoryBatchRow | null)[]; title: string }) {
   const callService = useHass((state) => state.helpers.callService) as unknown as CallService
+  const [deleteRequest, setDeleteRequest] = useState<InventoryDeleteRequest | null>(null)
   const [deleteState, setDeleteState] = useState<PantryRowDeleteState>('idle')
   const [shoppingState, setShoppingState] = useState<PantryRowShoppingState>('idle')
   const [rowError, setRowError] = useState<string | null>(null)
@@ -549,7 +621,7 @@ function PantryRow({ expiry, extraBatchCount, locationLabel, multiItem, onDelete
   const deletableRows = rows.filter((row): row is InventoryBatchRow => row !== null)
   const deletable = rows.length > 0 && deletableRows.length === rows.length
   const stockedQuantity = deletableRows.reduce((total, row) => total + row.quantity, 0)
-  const deleteButtonDisabled = deleteState === 'deleting' || !deletable
+  const deleteButtonDisabled = deleteState === 'deleting' || deleteRequest !== null || !deletable
   const deleteButtonLabel = deleteState === 'deleting' ? `Deleting ${title}` : `Delete ${title}`
   const shoppingButtonDisabled = shoppingState === 'adding' || shoppingState === 'added'
   const shoppingButtonLabel = shoppingState === 'adding' ? `Adding ${title} to shopping list` : shoppingState === 'added' ? `Added ${title} to shopping list` : `Add ${title} to shopping list`
@@ -607,17 +679,15 @@ function PantryRow({ expiry, extraBatchCount, locationLabel, multiItem, onDelete
   const deleteFromEverShelf = (event?: MouseEvent<HTMLButtonElement>) => {
     event?.stopPropagation()
     if (deleteButtonDisabled || !deletable) return
-    let deleteSteps: InventoryDeleteStep[] = deletableRows.map((row) => ({ inventoryId: row.inventoryId }))
-    if (stockedQuantity > 1) {
-      const promptResult = promptDeleteQuantity(title, stockedQuantity)
-      if (promptResult.status === 'cancelled') return
-      if (promptResult.status === 'invalid') {
-        setRowError(`Enter a number from 1 to ${formatQuantity(stockedQuantity)}.`)
-        return
-      }
-      if (promptResult.quantity < stockedQuantity) deleteSteps = inventoryDecreaseSteps(deletableRows, promptResult.quantity).steps
-    } else if (!window.confirm(`Delete ${title} from the ${locationLabel}?`)) return
+    setDeleteRequest({ availableQuantity: stockedQuantity, locationLabel, rows: deletableRows, title })
+  }
 
+  const confirmDelete = (quantityToDelete: number) => {
+    if (!deleteRequest) return
+    const deleteSteps: InventoryDeleteStep[] = quantityToDelete < deleteRequest.availableQuantity
+      ? inventoryDecreaseSteps(deleteRequest.rows, quantityToDelete).steps
+      : deleteRequest.rows.map((row) => ({ inventoryId: row.inventoryId }))
+    setDeleteRequest(null)
     setDeleteState('deleting')
     setRowError(null)
     void deleteSteps
@@ -645,48 +715,51 @@ function PantryRow({ expiry, extraBatchCount, locationLabel, multiItem, onDelete
   }
 
   return (
-    <div aria-label={`${title} ${subtitle}`} className={styles.pantryRow} data-clickable={multiItem ? 'true' : undefined} data-expiry-tone={expiry.tone} onClick={openDetails} role="group">
-      <span className={styles.pantryRowCopy}>
-        <strong>{title}</strong>
-        <small>{subtitle}</small>
-        {rowError && <small className={styles.error} role="alert">{rowError}</small>}
-      </span>
-      <span aria-label={`${title} actions`} className={styles.pantryRowActions} role="group">
-        <button aria-busy={shoppingState === 'adding' ? 'true' : undefined} aria-label={shoppingButtonLabel} className={styles.rowAction} data-shopping-state={shoppingState} disabled={shoppingButtonDisabled} onClick={addToShoppingList} type="button">
-          <span aria-hidden="true" className={styles.shoppingIconStack}>
-            <span className={styles.shoppingIconLayer} data-icon-state="cart">
-              <MaterialIcon name="mdi:cart-plus" size={22} />
+    <>
+      <div aria-label={`${title} ${subtitle}`} className={styles.pantryRow} data-clickable={multiItem ? 'true' : undefined} data-expiry-tone={expiry.tone} onClick={openDetails} role="group">
+        <span className={styles.pantryRowCopy}>
+          <strong>{title}</strong>
+          <small>{subtitle}</small>
+          {rowError && <small className={styles.error} role="alert">{rowError}</small>}
+        </span>
+        <span aria-label={`${title} actions`} className={styles.pantryRowActions} role="group">
+          <button aria-busy={shoppingState === 'adding' ? 'true' : undefined} aria-label={shoppingButtonLabel} className={styles.rowAction} data-shopping-state={shoppingState} disabled={shoppingButtonDisabled} onClick={addToShoppingList} type="button">
+            <span aria-hidden="true" className={styles.shoppingIconStack}>
+              <span className={styles.shoppingIconLayer} data-icon-state="cart">
+                <MaterialIcon name="mdi:cart-plus" size={22} />
+              </span>
+              <span className={styles.shoppingIconLayer} data-icon-state="spinner">
+                <span className={styles.shoppingSpinner} />
+              </span>
+              <span className={styles.shoppingIconLayer} data-icon-state="check">
+                <MaterialIcon name="mdi:check" size={22} />
+              </span>
             </span>
-            <span className={styles.shoppingIconLayer} data-icon-state="spinner">
-              <span className={styles.shoppingSpinner} />
-            </span>
-            <span className={styles.shoppingIconLayer} data-icon-state="check">
-              <MaterialIcon name="mdi:check" size={22} />
-            </span>
-          </span>
-        </button>
-        {multiItem ? (
-          <button aria-label={`Edit ${title}`} className={styles.rowAction} data-modal-disclosure-button="true" onClick={(event) => {
-            event.stopPropagation()
-            onOpenDetails()
-          }} type="button">
-            <SurfaceAccessory semantics={{ kind: 'modal' }} />
           </button>
-        ) : (
-          <>
-            <button aria-label={`Edit ${title}`} className={styles.rowAction} disabled={!deletable} onClick={(event) => {
+          {multiItem ? (
+            <button aria-label={`Edit ${title}`} className={styles.rowAction} data-modal-disclosure-button="true" onClick={(event) => {
               event.stopPropagation()
               onOpenDetails()
             }} type="button">
-              <MaterialIcon name="mdi:pencil" size={22} />
+              <SurfaceAccessory semantics={{ kind: 'modal' }} />
             </button>
-            <button aria-busy={deleteState === 'deleting' ? 'true' : undefined} aria-label={deleteButtonLabel} className={`${styles.rowAction} ${styles.deleteAction}`} data-delete-state={deleteState} disabled={deleteButtonDisabled} onClick={deleteFromEverShelf} type="button">
-              <MaterialIcon name="mdi:delete" size={22} />
-            </button>
-          </>
-        )}
-      </span>
-    </div>
+          ) : (
+            <>
+              <button aria-label={`Edit ${title}`} className={styles.rowAction} disabled={!deletable} onClick={(event) => {
+                event.stopPropagation()
+                onOpenDetails()
+              }} type="button">
+                <MaterialIcon name="mdi:pencil" size={22} />
+              </button>
+              <button aria-busy={deleteState === 'deleting' ? 'true' : undefined} aria-label={deleteButtonLabel} className={`${styles.rowAction} ${styles.deleteAction}`} data-delete-state={deleteState} disabled={deleteButtonDisabled} onClick={deleteFromEverShelf} type="button">
+                <MaterialIcon name="mdi:delete" size={22} />
+              </button>
+            </>
+          )}
+        </span>
+      </div>
+      {deleteRequest && <InventoryDeleteDialog key={`${deleteRequest.title}-${deleteRequest.availableQuantity}`} onCancel={() => setDeleteRequest(null)} onConfirm={confirmDelete} request={deleteRequest} />}
+    </>
   )
 }
 
@@ -708,7 +781,10 @@ export interface EverShelfInventoryDetailsController {
   batches: InventoryBatch[]
   busy: boolean
   busyAction: string | null
+  cancelDelete: () => void
+  confirmDelete: (quantity: number) => void
   deleteBatch: (batch: InventoryBatch) => void
+  deleteRequest: InventoryDeleteRequest | null
   error: string | null
   expiryDrafts: Record<string, string>
   multipleBatches: boolean
@@ -799,6 +875,7 @@ function inventoryDecreaseSteps(rows: InventoryBatchRow[], amount: number) {
 function useInventoryItemDetails({ active, item, locationLabel, onBusyChange, onComplete, onErrorChange, onInventoryChanged }: { active: boolean; item: EverShelfInventoryDisplayItem | null; locationLabel: string; onBusyChange?: (busy: boolean) => void; onComplete: () => void; onErrorChange?: (error: string | null) => void; onInventoryChanged: () => void }): EverShelfInventoryDetailsController {
   const callService = useHass((state) => state.helpers.callService) as unknown as CallService
   const [busyAction, setBusyAction] = useState<string | null>(null)
+  const [deleteRequest, setDeleteRequest] = useState<InventoryDeleteRequest | null>(null)
   const [error, setError] = useState<string | null>(null)
   const title = item ? itemName(item) : 'Inventory Item'
   const batches = useMemo(() => inventoryBatches(item, locationLabel), [item, locationLabel])
@@ -818,6 +895,7 @@ function useInventoryItemDetails({ active, item, locationLabel, onBusyChange, on
     setAppliedDraftKey(draftKey)
     if (active) {
       setBusyAction(null)
+      setDeleteRequest(null)
       setError(null)
       setExpiryDrafts(Object.fromEntries(batches.map((batch) => [batch.key, batch.expiryDate])))
       setQuantityDrafts(Object.fromEntries(batches.map((batch) => [batch.key, batch.quantity])))
@@ -939,20 +1017,27 @@ function useInventoryItemDetails({ active, item, locationLabel, onBusyChange, on
       .finally(() => onBusyChange?.(false))
   }
 
-  const deleteBatch = (batch: InventoryBatch) => {    if (!batch.addressable) return
+  const deleteBatch = (batch: InventoryBatch) => {
+    if (!batch.addressable) return
     const qualifier = batchQualifier(batch.expiryDate, multipleBatches, batch.preparedFood)
-    let deleteSteps: InventoryDeleteStep[] = batch.rows.map((row) => ({ inventoryId: row.inventoryId }))
-    if (batch.quantity > 1) {
-      const promptResult = promptDeleteQuantity(`${title}${qualifier}`, batch.quantity)
-      if (promptResult.status === 'cancelled') return
-      if (promptResult.status === 'invalid') {
-        updateError(`Enter a number from 1 to ${formatQuantity(batch.quantity)}.`)
-        return
-      }
-      if (promptResult.quantity < batch.quantity) deleteSteps = inventoryDecreaseSteps(batch.rows, promptResult.quantity).steps
-    } else if (!window.confirm(`Delete ${title}${qualifier} from the ${batch.locationLabel}?`)) return
+    setDeleteRequest({
+      actionKey: batch.key,
+      availableQuantity: batch.quantity,
+      locationLabel: batch.locationLabel,
+      qualifier,
+      rows: batch.rows,
+      title,
+    })
+  }
 
-    setBusyAction(`delete-${batch.key}`)
+  const confirmDelete = (quantityToDelete: number) => {
+    if (!deleteRequest) return
+    const deleteSteps: InventoryDeleteStep[] = quantityToDelete < deleteRequest.availableQuantity
+      ? inventoryDecreaseSteps(deleteRequest.rows, quantityToDelete).steps
+      : deleteRequest.rows.map((row) => ({ inventoryId: row.inventoryId }))
+    const actionKey = deleteRequest.actionKey ?? deleteRequest.rows.map((row) => row.inventoryId).join('-')
+    setDeleteRequest(null)
+    setBusyAction(`delete-${actionKey}`)
     onBusyChange?.(true)
     updateError(null)
     void runDeleteSteps(deleteSteps)
@@ -968,7 +1053,10 @@ function useInventoryItemDetails({ active, item, locationLabel, onBusyChange, on
     batches,
     busy,
     busyAction,
+    cancelDelete: () => setDeleteRequest(null),
+    confirmDelete,
     deleteBatch,
+    deleteRequest,
     error,
     expiryDrafts,
     multipleBatches,
@@ -987,7 +1075,10 @@ export function EverShelfInventoryDetailsPage({ controller }: { controller: Ever
     batches,
     busy,
     busyAction,
+    cancelDelete,
+    confirmDelete,
     deleteBatch,
+    deleteRequest,
     error,
     expiryDrafts,
     multipleBatches,
@@ -1059,6 +1150,7 @@ export function EverShelfInventoryDetailsPage({ controller }: { controller: Ever
           )
         })}
       </ul>
+      {deleteRequest && <InventoryDeleteDialog key={`${deleteRequest.title}-${deleteRequest.availableQuantity}`} onCancel={cancelDelete} onConfirm={confirmDelete} request={deleteRequest} />}
     </div>
   )
 }
