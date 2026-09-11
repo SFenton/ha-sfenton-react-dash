@@ -114,7 +114,7 @@ import {
   OCCUPANCY_GROUPS,
   type EntityGroupConfig,
 } from '../constants/atAGlance'
-import { DASHBOARD_ROUTES, HOME_ALL_FOOD_ROUTE_PATH, HOME_CABINET_ROUTE_PATH, HOME_FOOD_ROUTE_PATH, HOME_FREEZER_ROUTE_PATH, HOME_FRIDGE_ROUTE_PATH, HOME_GROCERY_LIST_ROUTE_PATH, HOME_PANTRY_ROUTE_PATH, HOME_RECIPES_ROUTE_PATH, HOME_SPICE_RACK_ROUTE_PATH, HOME_SPRINKLERS_ROUTE_PATH, fallbackBackPathForRoute } from '../constants/routes'
+import { DASHBOARD_ROUTES, HOME_ALL_FOOD_ROUTE_PATH, HOME_CABINET_ROUTE_PATH, HOME_FOOD_ROUTE_PATH, HOME_FREEZER_ROUTE_PATH, HOME_FRIDGE_ROUTE_PATH, HOME_GROCERY_LIST_ROUTE_PATH, HOME_PANTRY_ROUTE_PATH, HOME_RECIPES_ROUTE_PATH, HOME_SPICE_RACK_ROUTE_PATH, HOME_SPRINKLERS_ROUTE_PATH, LIGHT_CONTROLS_SHOWCASE_ROUTE_PATH, fallbackBackPathForRoute } from '../constants/routes'
 import {
   ADMIN_AUTO_REENABLE_ITEMS,
   CHORE_QUICK_LINKS,
@@ -182,6 +182,7 @@ import {
 import { Page } from './Page'
 import { ClimateSheet, ContactSheet, LightsSheet, OccupancySheet } from './AtAGlancePage'
 import { CustomLightsPage } from './CustomLightsPage'
+import { ControlShowcasePage } from './ControlShowcasePage'
 import { FoodHubPage } from './FoodHubPage'
 import { SprinklersPage } from './SprinklersPage'
 import { RecipesPage } from './RecipesPage'
@@ -6661,6 +6662,7 @@ function Content({ inventoryControls, onNavigate, onRecipesInitialResolved, onSc
   if (path === 'admin') return <AdminPage onNavigate={onNavigate} preload={preload} preloadHash={preloadHash} preloadHashes={preloadHashes} />
   if (path === 'ecobee') return <ThermostatPage preload={preload} preloadHash={preloadHash} preloadHashes={preloadHashes} />
   if (path === 'custom-lights') return <CustomLightsPage />
+  if (path === LIGHT_CONTROLS_SHOWCASE_ROUTE_PATH) return <ControlShowcasePage />
   if (path === HOME_SPRINKLERS_ROUTE_PATH) return <SprinklersPage preload={preload} />
   if (path === HOME_FOOD_ROUTE_PATH) return <FoodHubPage onNavigate={onNavigate} preload={preload} />
   if (path === HOME_RECIPES_ROUTE_PATH) return <RecipesPage controls={recipeControls} initiallyAppGated={recipesInitiallyAppGated} onInitialResolved={onRecipesInitialResolved} preload={preload} />

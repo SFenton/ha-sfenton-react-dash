@@ -89,7 +89,7 @@ inventory; it does not mean that every functional/error branch was rotated.
 | `iframe-lifecycle.spec.ts` | 5 | 5 | Wrapper/panel iframe disposal and recreated-frame Home hydration |
 | `landscape-modal-adaptation.spec.ts` | 9 | 0 | Measured tiers, split panes, chrome, media and portrait restoration |
 | `mobile-device-smoke.spec.ts` | 8 | 0 | Named iPhone/Android descriptors with synthetic insets |
-| `mobile-parity-all-routes.spec.ts` | 3 | 0 | All 45 routes against an explicit baseline at both phone orientations |
+| `mobile-parity-all-routes.spec.ts` | 3 | 0 | All 46 routes against an explicit baseline at both phone orientations |
 | `modal-geometry-stability.spec.ts` | 7 | 0 | Same-sheet tabs, details, loading, editors, identities and resize |
 | `modal-rotation-regressions.spec.ts` | 78 | 39 | Mounted typography, left-aligned growing tiles, full-width Security, common frames, configured room openers/tabs, keyboard geometry, filters, active remotes, recipe detail pages and Weather modes |
 | `modal-sheet-gestures.spec.ts` | 19 | 0 | Native scrolling, drag ownership, cancellation and dismissal |

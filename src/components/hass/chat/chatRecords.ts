@@ -1,12 +1,15 @@
 export const CHAT_STORAGE_PREFIX = 'react-dash.chat.'
 export const CHAT_STORAGE_VERSION = 1
-export const CHAT_MESSAGE_LIMIT = 4000
+export const CHAT_MESSAGE_LIMIT = 180
 export const CHAT_REPLY_LIMIT = 64_000
 export const CHAT_RECORD_LIMIT = 2000
 export const CHAT_THREAD_LIMIT = 100
 export const CHAT_BYTE_LIMIT = 1_500_000
 export const CHAT_CONTEXT_IDLE_MS = 5 * 60_000
 export const CHAT_PENDING_MS = 2 * 60_000
+export const CHAT_HISTORY_VISIBLE_MS = 14 * 24 * 60 * 60_000
+const LIGHT_POLARITIES = new Set(['on', 'off'])
+type LightPolarity = 'on' | 'off'
 
 interface RecordBase {
   version: 1
@@ -20,6 +23,23 @@ export interface ChatThreadRecord extends RecordBase {
   agentName: string
 }
 
+export interface ChatSkillContext {
+  domain: string
+  roomId: string | null
+  entityIds: string[]
+  lightNames: string[]
+  lastAction?: 'on' | 'off' | 'up' | 'down' | 'brightness' | 'color' | 'state' | 'count' | 'list' | 'rooms-on' | 'color-state' | 'brightness-state' | 'history' | 'reason' | 'pbl' | 'pbl-rules' | 'set'
+  lastState?: 'on' | 'off' | 'mixed' | 'unavailable'
+  targetState?: LightPolarity
+  historyBefore?: string
+}
+
+export type ChatResponseControl =
+  | { id: string; kind: 'room-picker'; options: Array<{ label: string; value: string; message: string }> }
+  | { id: string; kind: 'color-picker'; room: string; rooms: string[]; palette: string[]; supportsCustomRgb: boolean; colorMode: 'rgb' | 'temperature'; entityIds: string[]; subject?: string; currentRgb?: [number, number, number]; currentTemperatureKelvin?: number; minTemperatureKelvin: number; maxTemperatureKelvin: number }
+  | { id: string; kind: 'brightness-slider'; room: string; value: number; min: number; max: number; step: number; subject?: string }
+  | { id: string; kind: 'suggestions'; options: Array<{ label: string; message: string }> }
+
 export interface ChatRequestRecord extends RecordBase {
   kind: 'request'
   threadId: string
@@ -27,6 +47,8 @@ export interface ChatRequestRecord extends RecordBase {
   clientId: string
   text: string
   conversationId: string | null
+  sourceControlId?: string | null
+  sourceResultId?: string | null
 }
 
 export interface ChatResultRecord extends RecordBase {
@@ -36,6 +58,8 @@ export interface ChatResultRecord extends RecordBase {
   conversationId: string | null
   response: 'answer' | 'error' | 'empty'
   contextReset: boolean
+  controls?: ChatResponseControl[]
+  skillContext?: ChatSkillContext | null
 }
 
 export interface ChatStatusRecord extends RecordBase {
@@ -70,10 +94,87 @@ export interface ChatThread {
   unreadable: boolean
 }
 
+export interface ChatImprovementConversation {
+  version: 1
+  threadId: string
+  createdAt: number
+  updatedAt: number
+  turns: Array<{
+    id: string
+    createdAt: number
+    userText: string
+    assistantText: string | null
+    outcome: 'answer' | 'error' | 'empty'
+    parsedAsLights: boolean
+    contextBefore: ChatSkillContext | null
+    contextAfter: ChatSkillContext | null
+  }>
+}
+
 const identifier = (value: unknown): value is string => typeof value === 'string' && /^[a-zA-Z0-9_-]{1,100}$/.test(value)
 const nullableString = (value: unknown): value is string | null => value === null || typeof value === 'string'
 const object = (value: unknown): value is Record<string, unknown> => value !== null && typeof value === 'object' && !Array.isArray(value)
 const compareId = (left: string, right: string) => left < right ? -1 : left > right ? 1 : 0
+
+function stringArray(value: unknown, max = 100): string[] | null {
+  return Array.isArray(value) && value.length <= max && value.every((item) => typeof item === 'string') ? value : null
+}
+
+function parseSkillContext(value: unknown): ChatSkillContext | null {
+  if (value === null || value === undefined) return null
+  if (!object(value) || typeof value.domain !== 'string' || !(value.roomId === null || typeof value.roomId === 'string')) return null
+  const entityIds = stringArray(value.entityIds)
+  const lightNames = stringArray(value.lightNames)
+  if (!entityIds || !lightNames) return null
+  const lastAction = typeof value.lastAction === 'string' && /^(?:on|off|up|down|brightness|color|state|count|list|rooms-on|color-state|brightness-state|history|reason|pbl|pbl-rules|set)$/.test(value.lastAction)
+    ? value.lastAction : undefined
+  const lastState = typeof value.lastState === 'string' && /^(?:on|off|mixed|unavailable)$/.test(value.lastState)
+    ? value.lastState : undefined
+  const requestedPolarity = typeof value.targetState === 'string' && LIGHT_POLARITIES.has(value.targetState)
+    ? value.targetState as LightPolarity : undefined
+  const historyBefore = typeof value.historyBefore === 'string' ? value.historyBefore : undefined
+  return {
+    domain: value.domain,
+    roomId: value.roomId,
+    entityIds,
+    lightNames,
+    ...(lastAction ? { lastAction } : {}),
+    ...(lastState ? { lastState } : {}),
+    ...(requestedPolarity ? { targetState: requestedPolarity } : {}),
+    ...(historyBefore ? { historyBefore } : {}),
+  } as ChatSkillContext
+}
+
+function parseControls(value: unknown): ChatResponseControl[] | null {
+  if (value === undefined) return []
+  if (!Array.isArray(value) || value.length > 8) return null
+  const controls: ChatResponseControl[] = []
+  for (const item of value) {
+    if (!object(item) || !identifier(item.id) || typeof item.kind !== 'string') return null
+    if (item.kind === 'room-picker') {
+      if (!Array.isArray(item.options) || item.options.length > 30 || !item.options.every((option) => object(option) && typeof option.label === 'string' && typeof option.value === 'string' && typeof option.message === 'string' && option.message.length <= CHAT_MESSAGE_LIMIT)) return null
+      controls.push({ id: item.id, kind: item.kind, options: item.options.map((option) => ({ label: String(option.label), value: String(option.value), message: String(option.message) })) })
+    } else if (item.kind === 'color-picker') {
+      const palette = stringArray(item.palette, 30)
+      const rooms = stringArray(item.rooms, 30) ?? (typeof item.room === 'string' ? [item.room] : null)
+      const entityIds = stringArray(item.entityIds, 100) ?? []
+      const colorMode = item.colorMode === 'rgb' || item.colorMode === 'temperature' ? item.colorMode : item.supportsCustomRgb === true ? 'rgb' : 'temperature'
+      const minTemperatureKelvin = typeof item.minTemperatureKelvin === 'number' ? item.minTemperatureKelvin : 2000
+      const maxTemperatureKelvin = typeof item.maxTemperatureKelvin === 'number' ? item.maxTemperatureKelvin : 6500
+      const currentRgb = Array.isArray(item.currentRgb) && item.currentRgb.length === 3 && item.currentRgb.every((channel) => typeof channel === 'number' && Number.isFinite(channel))
+        ? item.currentRgb as [number, number, number] : undefined
+      if (typeof item.room !== 'string' || !rooms || !palette || typeof item.supportsCustomRgb !== 'boolean' || !Number.isFinite(minTemperatureKelvin) || !Number.isFinite(maxTemperatureKelvin)) return null
+      controls.push({ id: item.id, kind: item.kind, room: item.room, rooms, palette, supportsCustomRgb: item.supportsCustomRgb, colorMode, entityIds, minTemperatureKelvin, maxTemperatureKelvin, ...(typeof item.subject === 'string' ? { subject: item.subject } : {}), ...(currentRgb ? { currentRgb } : {}), ...(typeof item.currentTemperatureKelvin === 'number' && Number.isFinite(item.currentTemperatureKelvin) ? { currentTemperatureKelvin: item.currentTemperatureKelvin } : {}) })
+    } else if (item.kind === 'brightness-slider') {
+      if (typeof item.room !== 'string' || ![item.value, item.min, item.max, item.step].every((number) => typeof number === 'number' && Number.isFinite(number))) return null
+      controls.push({ id: item.id, kind: item.kind, room: item.room, value: item.value as number, min: item.min as number, max: item.max as number, step: item.step as number, ...(typeof item.subject === 'string' ? { subject: item.subject } : {}) })
+    } else if (item.kind === 'suggestions') {
+      if (!Array.isArray(item.options) || item.options.length > 12 || !item.options.every((option) => object(option) && typeof option.label === 'string' && typeof option.message === 'string' && option.message.length <= CHAT_MESSAGE_LIMIT)) return null
+      controls.push({ id: item.id, kind: item.kind, options: item.options.map((option) => ({ label: String(option.label), message: String(option.message) })) })
+    } else return null
+  }
+  return controls
+}
 
 export function chatRecordKey(record: Pick<ChatRecord, 'kind' | 'id'>) {
   return `${CHAT_STORAGE_PREFIX}v${CHAT_STORAGE_VERSION}.${record.kind}.${record.id}`
@@ -96,13 +197,26 @@ export function parseChatRecord(value: unknown): ChatRecord | null {
   const scoped = { ...base, threadId: value.threadId }
   if (value.kind === 'request') {
     if (!(value.parentId === null || identifier(value.parentId)) || !identifier(value.clientId)
-      || typeof value.text !== 'string' || !value.text.trim() || !nullableString(value.conversationId)) return null
-    return { ...scoped, kind: 'request', parentId: value.parentId, clientId: value.clientId, text: value.text, conversationId: value.conversationId }
+      || typeof value.text !== 'string' || !value.text.trim() || !nullableString(value.conversationId)
+      || !(value.sourceControlId === undefined || value.sourceControlId === null || identifier(value.sourceControlId))
+      || !(value.sourceResultId === undefined || value.sourceResultId === null || identifier(value.sourceResultId))) return null
+    return {
+      ...scoped, kind: 'request', parentId: value.parentId, clientId: value.clientId, text: value.text,
+      conversationId: value.conversationId, sourceControlId: value.sourceControlId ?? null,
+      sourceResultId: value.sourceResultId ?? null,
+    }
   }
   if (value.kind === 'result') {
-    if (!nullableString(value.text) || !nullableString(value.conversationId)
+    const controls = parseControls(value.controls)
+    const skillContext = parseSkillContext(value.skillContext)
+    if (!nullableString(value.text) || !nullableString(value.conversationId) || controls === null
+      || (value.skillContext !== undefined && value.skillContext !== null && skillContext === null)
       || !['answer', 'error', 'empty'].includes(String(value.response)) || typeof value.contextReset !== 'boolean') return null
-    return { ...scoped, kind: 'result', text: value.text, conversationId: value.conversationId, response: value.response as ChatResultRecord['response'], contextReset: value.contextReset }
+    return {
+      ...scoped, kind: 'result', text: value.text, conversationId: value.conversationId,
+      response: value.response as ChatResultRecord['response'], contextReset: value.contextReset,
+      controls, skillContext,
+    }
   }
   if (value.kind === 'pending' || value.kind === 'unknown' || value.kind === 'not-sent') {
     return { ...scoped, kind: value.kind }
@@ -188,6 +302,31 @@ export function deriveChatThreads(records: ReadonlyMap<string, ChatRecord>, now:
       updatedAt: Math.max(record.createdAt, ...ordered.map((item) => item.createdAt), ...turns.map((turn) => turn.result?.createdAt ?? turn.request.createdAt)),
     }
   }).sort((left, right) => right.updatedAt - left.updatedAt || compareId(left.record.id, right.record.id))
+}
+
+export function visibleChatHistoryThreads(threads: readonly ChatThread[], now: number) {
+  const cutoff = now - CHAT_HISTORY_VISIBLE_MS
+  return threads.filter((thread) => thread.turns.length > 0 && thread.updatedAt >= cutoff)
+}
+
+export function chatImprovementConversation(thread: ChatThread): ChatImprovementConversation | null {
+  if (!thread.turns.length || thread.turns.some((turn) => !turn.result || turn.state !== 'answered')) return null
+  return {
+    version: 1,
+    threadId: thread.record.id,
+    createdAt: thread.record.createdAt,
+    updatedAt: thread.updatedAt,
+    turns: thread.turns.map((turn, index) => ({
+      id: turn.request.id,
+      createdAt: turn.request.createdAt,
+      userText: turn.request.text,
+      assistantText: turn.result?.text ?? null,
+      outcome: turn.result?.response ?? 'empty',
+      parsedAsLights: turn.result?.skillContext?.domain === 'lights',
+      contextBefore: index > 0 ? thread.turns[index - 1].result?.skillContext ?? null : null,
+      contextAfter: turn.result?.skillContext ?? null,
+    })),
+  }
 }
 
 export type ChatAvailability = 'fresh' | 'current' | 'confirm' | 'expired' | 'conflict' | 'unknown' | 'pending' | 'not-sent' | 'unavailable'

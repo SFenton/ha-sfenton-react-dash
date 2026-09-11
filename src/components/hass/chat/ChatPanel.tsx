@@ -7,8 +7,10 @@ import { NativeSelectField } from '../../core/NativeSelectField'
 import { SurfaceAccessory } from '../../core/SurfaceAccessory'
 import type { ControlSemantics } from '../../core/controlSemantics'
 import { CHAT_COPY_KEYS as chatKeys, CHAT_COPY_NAMESPACE, formatDate, useCopy } from '../../../i18n'
-import { CHAT_MESSAGE_LIMIT, CHAT_REPLY_LIMIT, chatRecordKey, type ChatThread, type ChatTurn } from './chatRecords'
+import { CHAT_MESSAGE_LIMIT, CHAT_REPLY_LIMIT, chatRecordKey, type ChatResponseControl, type ChatThread, type ChatTurn } from './chatRecords'
 import type { ChatClient, ChatSnapshot } from './chatClient'
+import { ChatResponseControls } from './ChatResponseControls'
+import type { ChatColorDraft } from './chatColorDraft'
 import { useChatSnapshot } from './useDashboardChat'
 import styles from './Chat.module.css'
 
@@ -58,7 +60,15 @@ function ThinkingBubble({ remote = false }: { remote?: boolean }) {
   )
 }
 
-function ChatTurnBubbles({ turn, thread, state }: { turn: ChatTurn; thread: ChatThread; state: ChatSnapshot }) {
+function ChatTurnBubbles({ client, colorDrafts, onColorDraftChange, onOpenCustomColor, turn, thread, state }: {
+  client: ChatClient
+  colorDrafts?: ReadonlyMap<string, ChatColorDraft>
+  onColorDraftChange?: (controlId: string, draft: ChatColorDraft) => void
+  onOpenCustomColor?: (control: Extract<ChatResponseControl, { kind: 'color-picker' }>, draft: ChatColorDraft) => void
+  turn: ChatTurn
+  thread: ChatThread
+  state: ChatSnapshot
+}) {
   const copy = useCopy(CHAT_COPY_NAMESPACE)
   const result = turn.result
   const speaker = displayAgentName(thread.record.agentName, thread.record.agentId, copy(chatKeys.assistant))
@@ -75,6 +85,7 @@ function ChatTurnBubbles({ turn, thread, state }: { turn: ChatTurn; thread: Chat
       {result?.text && (
         <article aria-label={speaker} className={styles.bubble} data-chat-role="assistant">
           <div className={styles.message}>{result.text}</div>
+          <ChatResponseControls client={client} colorDrafts={colorDrafts} controls={result.controls} onColorDraftChange={onColorDraftChange} onOpenCustomColor={onOpenCustomColor} ownerResultId={result.id} />
           {state.unsavedKeys.has(chatRecordKey(result)) && <span className={styles.messageState}>{copy(chatKeys.unsaved)}</span>}
         </article>
       )}
@@ -84,10 +95,13 @@ function ChatTurnBubbles({ turn, thread, state }: { turn: ChatTurn; thread: Chat
   )
 }
 
-export function ChatPanel({ client, bodyElementRef, active, showLatestAction = false }: {
+export function ChatPanel({ client, bodyElementRef, active, colorDrafts, onColorDraftChange, onOpenCustomColor, showLatestAction = false }: {
   client: ChatClient
   bodyElementRef: RefObject<HTMLDivElement | null>
   active: boolean
+  colorDrafts?: ReadonlyMap<string, ChatColorDraft>
+  onColorDraftChange?: (controlId: string, draft: ChatColorDraft) => void
+  onOpenCustomColor?: (control: Extract<ChatResponseControl, { kind: 'color-picker' }>, draft: ChatColorDraft) => void
   showLatestAction?: boolean
 }) {
   const copy = useCopy(CHAT_COPY_NAMESPACE)
@@ -148,6 +162,7 @@ export function ChatPanel({ client, bodyElementRef, active, showLatestAction = f
   return (
     <div aria-busy={loading} className={styles.panel} data-chat-panel="true">
       <ChatErrors client={client} state={state} inlineOversizedReply={oversizedReply} />
+      {state.improvementIssue && <InlineAlert>{copy(chatKeys.queueSubmissionError)}</InlineAlert>}
       {state.waitingId && !thread?.turns.some((turn) => turn.request.id === state.waitingId) && (
         <div className={styles.loading} role="status">{copy(chatKeys.thinking)}</div>
       )}
@@ -180,7 +195,7 @@ export function ChatPanel({ client, bodyElementRef, active, showLatestAction = f
           <div className={styles.threadContent} data-chat-end="true">
           <div aria-label={copy(chatKeys.transcript)} aria-live="polite" aria-relevant="additions text" role="log">
             <ol className={styles.transcript} data-chat-transcript="true">
-              {thread.turns.map((turn) => <ChatTurnBubbles key={turn.request.id} state={state} thread={thread} turn={turn} />)}
+              {thread.turns.map((turn) => <ChatTurnBubbles client={client} colorDrafts={colorDrafts} key={turn.request.id} onColorDraftChange={onColorDraftChange} onOpenCustomColor={onOpenCustomColor} state={state} thread={thread} turn={turn} />)}
             </ol>
           </div>
           {oversizedReply && <InlineAlert>{copy(chatKeys.replyTooLarge)}</InlineAlert>}
@@ -215,7 +230,7 @@ export function ChatHistory({ client, onSelect }: { client: ChatClient; onSelect
   const copy = useCopy(CHAT_COPY_NAMESPACE)
   const state = useChatSnapshot(client)
   const loading = state.status === 'idle' || state.status === 'loading'
-  const threads = state.threads.filter((thread) => thread.turns.length > 0)
+  const threads = state.historyThreads
   const empty = state.status === 'ready' && !threads.length && !state.issue
   return (
     <div className={styles.panel} data-chat-history="true" data-modal-detail-autofocus="true" tabIndex={-1}>

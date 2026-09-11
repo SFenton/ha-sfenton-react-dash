@@ -1,0 +1,44 @@
+.page {
+  display: grid;
+  gap: 22px;
+}
+
+.grid {
+  align-items: start;
+}
+
+.controlSurface {
+  display: grid;
+  min-width: 0;
+  gap: 16px;
+  border-radius: 26px;
+  padding: 18px;
+  background: var(--color-glass-soft);
+  box-shadow: var(--shadow-glass);
+}
+
+.preview {
+  display: flex;
+  min-height: 48px;
+  align-items: center;
+  gap: 12px;
+  color: var(--color-text-muted);
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+
+.swatch {
+  width: 42px;
+  height: 42px;
+  flex: 0 0 42px;
+  border: 2px solid var(--color-line);
+  border-radius: 50%;
+  background: var(--showcase-preview-color);
+  box-shadow: var(--shadow-picker-marker);
+}
+
+@container page-content (min-width: 720px) {
+  .controlSurface {
+    padding: 24px;
+  }
+}

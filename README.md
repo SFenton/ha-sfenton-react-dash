@@ -7,7 +7,7 @@ The production build currently ships to two Home Assistant sidebar hosts:
 - `/sfenton-react-dash/home` — the existing storage-mode Lovelace wrapper.
 - `/sfenton-react-panel` — an embedded `panel_custom` host that keeps the React iframe outside Lovelace card rebuilds.
 
-Both hosts use the same files under `/local/ha-sfenton-react-dash/`. Use `npm run deploy:both` for the SSH build/deploy/sync flow, or copy `dist/` over SMB and then run `npm run deploy:sync`. Include the chat retention component/package installation below in either flow. Deployment sync also keeps the legacy `sfenton-react-app-card` resource on the repository-owned, versioned module instead of an out-of-band inline resource. The custom-panel registration is versioned in `home-assistant/packages/sfenton_react_panel.yaml`; changes to that package/bridge or the chat retention component/package require an explicitly approved Home Assistant restart, unlike asset-only updates.
+Both hosts use the same files under `/local/ha-sfenton-react-dash/`. Use `npm run deploy:both` for the SSH build/deploy/sync flow, or copy `dist/` over SMB and then run `npm run deploy:sync`. Include the chat history component/package installation below in either flow. Deployment sync also keeps the legacy `sfenton-react-app-card` resource on the repository-owned, versioned module instead of an out-of-band inline resource. The custom-panel registration is versioned in `home-assistant/packages/sfenton_react_panel.yaml`; changes to that package/bridge or the chat history component/package require an explicitly approved Home Assistant restart, unlike asset-only updates.
 
 Both iframe hosts explicitly dispose the React root before replacing an app frame. Frame removal normally cleans up through non-BFCache `pagehide`; host `disconnectedCallback` is a best-effort fallback, and a newly mounted frame disposes any stale prior generation if the browser skipped teardown. Current lifecycle state is exposed on `window.top.__sfentonReactDashboardLifecycle`; the bounded primitive-only event history is stored as JSON in `window.top.__sfentonReactDashboardLifecycleHistory` for device diagnostics.
 
@@ -20,26 +20,29 @@ PBL lease contract, Master Bedroom target evidence, service API, sensor schema,
 and local validation steps are documented in
 [`docs/wake-light-integration.md`](docs/wake-light-integration.md).
 
-### Home Assistant chat retention
+### Home Assistant chat history
 
-The repo-owned `sfenton_react_chat` service and daily automation clear eligible
-conversation payloads for all HA users after 14 days of creation age. For the
-preferred SMB flow, back up and copy `home-assistant/custom_components/sfenton_react_chat/`
-to `\\192.168.1.22\config\custom_components\sfenton_react_chat\`, and
+The dashboard hides conversations whose latest activity is older than 14 days,
+but keeps their records in each authenticated user's Home Assistant frontend
+store. The `sfenton_react_chat` package no longer schedules deletion. Its manual
+purge service remains available only for a separately authorized cleanup.
+
+For the preferred SMB flow, back up and copy
+`home-assistant/custom_components/sfenton_react_chat/` to
+`\\192.168.1.22\config\custom_components\sfenton_react_chat\`, and
 `home-assistant/packages/sfenton_react_chat.yaml` to
-`\\192.168.1.22\config\packages\sfenton_react_chat.yaml`.
-The SSH deployment script stages these files with backups alongside the panel.
-Configuration-check after staging; restore prior files on failure. When either
-chat component or package changes, restart HA only with explicit approval.
-After restart, verify `sfenton_react_chat.purge_expired_history` is registered
-and its daily automation is loaded and enabled. Never invoke the purge service
-during verification without explicit deletion authorization.
+`\\192.168.1.22\config\packages\sfenton_react_chat.yaml`. The SSH deployment
+script stages these files with backups alongside the panel. Configuration-check
+after staging; restore prior files on failure. When either chat component or
+package changes, restart HA only with explicit approval. After restart, verify
+the prior daily purge automation is absent. Never invoke the manual purge
+service during verification without explicit deletion authorization.
 
-**React assets, `deploy:sync`, and HMR do not activate retention.** Preserve both
-dashboard hosts and their existing deployment/cache-busting rules. See
-[Chat](docs/chat.md) and the
+**React assets, `deploy:sync`, and HMR do not remove a previously loaded purge
+automation.** Preserve both dashboard hosts and their existing deployment and
+cache-busting rules. See [Chat](docs/chat.md) and the
 [installation/rollback checklist](home-assistant/custom_components/sfenton_react_chat/README.md)
-for activation requirements, null tombstones and HA storage durability limits.
+for visibility, storage, and activation details.
 
 ## UX review and governance
 
@@ -54,9 +57,12 @@ Then open `http://127.0.0.1:5176/at-a-glance/overview`. See
 `.github/instructions/interaction-semantics.instructions.md`, and
 `docs/ux/validation-matrix.md` before changing shared UX. The complete
 Playwright spec corpus and responsive ownership map are documented in
-`docs/ux/playwright-coverage.md`. Run `npm run test:e2e:coverage` to detect
-inventory drift, `npm run test:e2e:responsive` for the responsive release
-corpus, and `npm run check` for the design, lint, unit, i18n, and build gates.
+`docs/ux/playwright-coverage.md`. Run `npm run test:e2e:fast` for the complete
+mobile-project pass, or `npm run test:e2e:changed` while iterating on changed
+test files. Run `npm run test:e2e:coverage` to detect inventory drift,
+`npm run test:e2e:responsive` for the responsive release corpus, and
+`npm run check` for the design, lint, unit, i18n, and build gates. The full
+Playwright suite runs as four parallel shards in GitHub Actions.
 
 ## Autonomous Admin executor
 

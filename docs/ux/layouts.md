@@ -96,7 +96,7 @@ dimensions to positional arrays or confuse a resize with native input emulation.
 | Scenario | Family | States | Manual question |
 | --- | --- | --- | --- |
 | quick-links | modal | root, rooms, back | Are text-aware links and left-aligned room tracks readable, with real end clearance and unchanged return geometry? |
-| chat | modal | empty, history-empty, conversation, history, loading, unavailable, load-error, request-save-error, save-error, pending, archive, resume, resume-ready, removed-agent, conflict, unknown, long, reset, empty-reply, agent-error, not-sent, oversized-reply, multiple-agents, unreadable, limit | Are roles, genuine pending dots, history/resume warnings, errors and long messages clear, with a usable composer above bottom tabs and one safe scroll owner? |
+| chat | modal | empty, history-empty, conversation, history, loading, unavailable, load-error, request-save-error, save-error, pending, archive, resume, resume-ready, removed-agent, conflict, unknown, long, reset, empty-reply, agent-error, not-sent, oversized-reply, multiple-agents, unreadable, limit, history-retained, light-room-control, light-color-control, light-custom-color-control, light-brightness-control, settings | Are roles, genuine pending dots, 14-day history visibility, versioned Chat Settings, embedded room/color/brightness controls and same-sheet custom color details using the shared exterior-light picker clear, with resume warnings, errors, long messages, a usable composer above bottom tabs and one safe scroll owner? |
 | summary | modal | overdue, upcoming, expired | Does the selected incoming Summary content retain readable type and columns on rotation before refreshing a tab? |
 | filters | modal | choices | Are filter descriptions readable at the actual column width, and are options and footer usable? |
 | form | modal | draft | Does the draft survive resizing, and are input, close and footer controls usable during synthetic keyboard contraction? |
@@ -111,7 +111,7 @@ dimensions to positional arrays or confuse a resize with native input emulation.
 | wake-editor | modal | one-time, scheduled, unchanged, dirty, reverted, pending, rejected, revision-conflict, legacy-ramp | Does the one-time-first editor preserve exact dirty state, ramp selection and rejected/conflicting drafts while acceptance remains required before closing? |
 | wake-source | modal | pod-editor, pod-alarm-detail, back | Does source navigation close the old sheet before opening the authoritative Pod editor, preserve execution weekdays and linked-room meaning, and return without duplicate writes? |
 
-Source-derived inventory: 45 routes; 88
+Source-derived inventory: 46 routes; 88
 configured room/hash openers. These are not unique modal or backend-state counts.
 
 ## Device-only / outside local certification
