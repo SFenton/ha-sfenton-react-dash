@@ -51,6 +51,7 @@
     "editTitle": "{{name}} · {{room}}",
     "defaultName": "Morning Alarm",
     "enabled": "Wake Alarm Enabled",
+    "deleteConfirmation": "Delete alarm set for {{time}} on {{schedule}}?",
     "addToBed": "Add to {{bed}}",
     "addToBedUpdateHint": "Update the Wake Light integration to add temporary bed alarms for one-time wake alarms.",
     "back": "Back to Wake Alarms"

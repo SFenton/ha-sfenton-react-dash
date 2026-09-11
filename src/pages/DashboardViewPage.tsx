@@ -5106,11 +5106,16 @@ function EightSleepBedModal({ initialTab, modalState, onClose, onCloseComplete, 
     if (alarmController.saveAlarm(alarmEditor)) closeDetailPage()
   }
 
-  const deleteAlarm = () => {
+  const deleteAlarm = async () => {
     if (!alarmEditor?.editingId) return
     const alarmToDelete = alarmController.alarmRecords.find((alarm) => alarm.id === alarmEditor.editingId)
     if (!alarmToDelete) return
     if (!window.confirm(`Delete alarm set for ${formatClockTime(alarmToDelete.time)} on ${alarmDayLabel(alarmToDelete.day)}?`)) return
+    const source = wakeLightSourceForSide(wakeLightConfig, side.scheduleSide)
+    if (source) {
+      const linkKey = wakeLightAlarmLinkKey(source.id, alarmToDelete.day, alarmToDelete.time)
+      if (!await wakeLightController.setAlarmLink([linkKey], false)) return
+    }
     const alarmDay = alarmToDelete.day
     const deletingLastAlarmForDay = alarmController.alarmRecords.filter((alarm) => alarm.day === alarmDay).length <= 1
     if (!alarmController.removeAlarm(alarmEditor)) return
@@ -5162,7 +5167,7 @@ function EightSleepBedModal({ initialTab, modalState, onClose, onCloseComplete, 
         centeredGeometry={EIGHT_SLEEP_CENTERED_GEOMETRY}
         footer={alarmEditor ? (
           <ScheduleDetailFooter
-            deleteAction={alarmEditor.editingId ? { disabled: !alarmController.available || alarmEditorStale, icon: 'mdi:delete', label: 'Delete Alarm', onClick: deleteAlarm } : undefined}
+            deleteAction={alarmEditor.editingId ? { disabled: !alarmController.available || alarmEditorStale, icon: 'mdi:delete', label: 'Delete Alarm', onClick: () => void deleteAlarm() } : undefined}
             primaryAction={{
               disabled: alarmEditorInvalid || !wakeLightController.snapshot.available || wakeLightController.configurationPending,
               icon: alarmEditor.editingId ? 'mdi:content-save' : 'mdi:plus',
