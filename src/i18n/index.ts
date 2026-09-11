@@ -24,6 +24,8 @@ export const CHAT_COPY_KEYS = {
   navigation: 'navigation',
   historyTitle: 'historyTitle',
   historyAction: 'historyAction',
+  settingsAction: 'settingsAction',
+  settingsTitle: 'settingsTitle',
   newChat: 'newChat',
   send: 'send',
   message: 'message',
@@ -65,10 +67,47 @@ export const CHAT_COPY_KEYS = {
   notSent: 'notSent',
   notSentDescription: 'notSentDescription',
   replyTooLarge: 'replyTooLarge',
+  modelVersionsTitle: 'modelVersionsTitle',
+  chatModel: 'chatModel',
+  chatUxVersion: 'chatUxVersion',
+  chatMcpVersion: 'chatMcpVersion',
+  improvementQueue: 'improvementQueue',
+  queueIdle: 'queueIdle',
+  queueWaiting: 'queueWaiting',
+  queueProcessing: 'queueProcessing',
+  queueError: 'queueError',
+  queueSubmissionError: 'queueSubmissionError',
+  recentImprovementsTitle: 'recentImprovementsTitle',
+  noImprovements: 'noImprovements',
+  improvedVersion: 'improvedVersion',
+  settingsLoading: 'settingsLoading',
+  settingsError: 'settingsError',
   unsaved: 'unsaved',
+  rooms: 'controls.rooms',
+  color: 'controls.color',
+  customColor: 'controls.customColor',
+  colorTemperature: 'controls.colorTemperature',
+  kelvinValue: 'controls.kelvinValue',
+  rgbChannel: 'controls.rgbChannel',
+  rgbValue: 'controls.rgbValue',
+  brightness: 'controls.brightness',
+  sendSelection: 'controls.sendSelection',
+  sendColor: 'controls.sendColor',
+  sendBrightness: 'controls.sendBrightness',
+  suggestedResponses: 'controls.suggestedResponses',
+  controlAlreadySent: 'controls.controlAlreadySent',
+  turnLightsToColor: 'controls.turnLightsToColor',
+  turnLightsToRgb: 'controls.turnLightsToRgb',
+  turnLightsToBrightness: 'controls.turnLightsToBrightness',
+  turnTargetToColor: 'controls.turnTargetToColor',
+  turnTargetToRgb: 'controls.turnTargetToRgb',
+  turnLightsToKelvin: 'controls.turnLightsToKelvin',
+  turnTargetToKelvin: 'controls.turnTargetToKelvin',
+  turnTargetToBrightness: 'controls.turnTargetToBrightness',
 } as const
 export const CORE_COPY_NAMESPACE = 'core' as const
 export const CUSTOM_LIGHTS_COPY_NAMESPACE = 'pageCustomLights' as const
+export const CONTROL_SHOWCASE_COPY_NAMESPACE = 'pageControlShowcase' as const
 export const BATHROOM_FAN_COPY_NAMESPACE = 'modalBathroomFan' as const
 export const HUMIDIFIER_COPY_NAMESPACE = 'modalHumidifier' as const
 export const MEDIA_COPY_NAMESPACE = 'pageMedia' as const
@@ -672,4 +711,18 @@ export const CORE_COPY_KEYS = {
 export const CUSTOM_LIGHTS_COPY_KEYS = {
   frontYard: 'frontYard',
   lightingMode: 'lightingMode',
+} as const
+
+export const CONTROL_SHOWCASE_COPY_KEYS = {
+  description: 'description',
+  kelvinValue: 'kelvinValue',
+  rgbChannel: 'rgbChannel',
+  rgbControl: 'rgbControl',
+  rgbDescription: 'rgbDescription',
+  rgbTitle: 'rgbTitle',
+  rgbValue: 'rgbValue',
+  temperatureControl: 'temperatureControl',
+  temperatureDescription: 'temperatureDescription',
+  temperatureTitle: 'temperatureTitle',
+  title: 'title',
 } as const

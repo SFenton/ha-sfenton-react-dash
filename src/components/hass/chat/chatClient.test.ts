@@ -1,6 +1,11 @@
 import { MockChatServer, MOCK_CHAT_AGENT } from '../../../test/mocks/chatServer'
 import { CHAT_METADATA_TIMEOUT_MS, ChatClient } from './chatClient'
-import { CHAT_MESSAGE_LIMIT, CHAT_PENDING_MS, CHAT_REPLY_LIMIT, CHAT_STORAGE_PREFIX, CHAT_THREAD_LIMIT, chatRecordKey, type ChatRecord, type ChatThreadRecord } from './chatRecords'
+import { HomeMcpRequestRejected } from './homeMcpClient'
+import {
+  CHAT_HISTORY_VISIBLE_MS, CHAT_MESSAGE_LIMIT, CHAT_PENDING_MS, CHAT_REPLY_LIMIT, CHAT_STORAGE_PREFIX,
+  CHAT_THREAD_LIMIT, chatRecordKey,
+  type ChatRecord, type ChatRequestRecord, type ChatResultRecord, type ChatThreadRecord,
+} from './chatRecords'
 
 function deferred<T>() {
   let resolve!: (value: T) => void
@@ -38,7 +43,26 @@ describe('native chat client', () => {
     timers.mockRestore()
   })
 
-  it('removes acknowledged history on retention events without replay or rewriting tombstones', async () => {
+  it('updates history visibility at the fourteen-day boundary without deleting records', async () => {
+    vi.useFakeTimers()
+    let now = 1_000_000
+    const thread: ChatThreadRecord = { version: 1, kind: 'thread', id: 'retained-thread', agentId: MOCK_CHAT_AGENT.id, agentName: MOCK_CHAT_AGENT.name, createdAt: now }
+    const request: ChatRequestRecord = { version: 1, kind: 'request', id: 'retained-turn', threadId: thread.id, parentId: null, clientId: 'seed', text: 'Retain this conversation', conversationId: null, createdAt: now }
+    const result: ChatResultRecord = { version: 1, kind: 'result', id: request.id, threadId: thread.id, text: 'Retained reply', conversationId: 'native-retained', response: 'answer', contextReset: false, createdAt: now }
+    server.seed('user-a', Object.fromEntries([thread, request, result].map((record) => [chatRecordKey(record), record])))
+    const client = clientFor('user-a', server.connect('user-a'), () => now)
+    await client.activate()
+    expect(client.getSnapshot().historyThreads).toHaveLength(1)
+
+    now += CHAT_HISTORY_VISIBLE_MS + 1
+    await vi.advanceTimersByTimeAsync(CHAT_HISTORY_VISIBLE_MS + 1)
+
+    expect(client.getSnapshot().historyThreads).toHaveLength(0)
+    expect(client.getSnapshot().threads).toHaveLength(1)
+    expect(Object.keys(server.data('user-a'))).toHaveLength(3)
+  })
+
+  it('removes acknowledged history on external tombstone events without replay or rewriting tombstones', async () => {
     const connection = server.connect('user-a')
     const client = clientFor('user-a', connection)
     await client.activate()
@@ -239,6 +263,19 @@ describe('native chat client', () => {
     expect(JSON.stringify(server.data('user-b'))).not.toContain('Private')
     expect(server.subscriptions.get('user-a')?.size).toBe(0)
     expect(Object.values(server.data('user-a')).some((record) => (record as ChatRecord).kind === 'result')).toBe(false)
+  })
+
+  it('marks a definite Home MCP proxy rejection not sent instead of unknown', async () => {
+    const homeMcp = { request: async () => { throw new HomeMcpRequestRejected('origin-not-allowed') } }
+    const client = new ChatClient(server.connect('user-a'), 'user-a', Date.now, undefined, homeMcp)
+    clients.push(client)
+    await client.activate()
+    client.setDraft('Are the Living Room lights on?')
+
+    await client.send()
+
+    expect(client.getSnapshot().threads[0].turns[0].state).toBe('not-sent')
+    expect(Object.values(server.data('user-a')).some((record) => (record as ChatRecord).kind === 'unknown')).toBe(false)
   })
 
   it('does not retry uncertain native outcomes after a disconnect', async () => {
@@ -537,6 +574,152 @@ describe('native chat client', () => {
     await activation
     expect(server.subscriptions.get('user-a')?.size).toBe(0)
     expect(nativeCalls()).toHaveLength(0)
+  })
+
+  it('persists structured controls, carries semantic context, and lets each control submit only once', async () => {
+    const requests: Array<{ text: string; context: unknown }> = []
+    const homeMcp = {
+      request: async (text: string, conversationId: string | null, context: unknown) => {
+        requests.push({ text, context })
+        if (requests.length === 1) return {
+          status: 'clarify', text: 'Which room?', conversation_id: conversationId ?? 'home-mcp-lights:pending',
+          controls: [{ id: 'lights-room-picker', kind: 'room-picker', options: [{ label: 'Living Room', value: 'Living Room', message: 'Turn on the Living Room lights.' }] }],
+          context: { domain: 'lights', roomId: null, entityIds: [], lightNames: [] },
+        }
+        return {
+          status: 'success', text: 'I turned on the Living Room lights.', conversation_id: 'home-mcp-thread', controls: [],
+          context: { domain: 'lights', roomId: 'living-room', entityIds: [], lightNames: [] },
+        }
+      },
+    }
+    const client = new ChatClient(server.connect('user-a'), 'user-a', Date.now, undefined, homeMcp)
+    clients.push(client)
+    await client.activate()
+    client.setDraft('Turn on the lights')
+    await client.send()
+    const control = client.getSnapshot().threads[0].tail?.controls?.[0]
+    expect(control).toMatchObject({ kind: 'room-picker' })
+    expect(control?.id).toMatch(/^control-[a-zA-Z0-9_-]+-0$/)
+
+    client.setDraft('Keep this composer draft')
+    await client.sendControl(control!.id, 'Use the Living Room.')
+    await client.sendControl(control!.id, 'Use the Kitchen.')
+
+    expect(requests).toHaveLength(2)
+    expect(requests[1].context).toMatchObject({ domain: 'lights', roomId: null })
+    expect(client.controlUsed(control!.id)).toBe(true)
+    expect(client.getSnapshot().threads[0].turns[1].request).toMatchObject({
+      text: 'Use the Living Room.', sourceControlId: control!.id,
+    })
+    expect(client.getSnapshot().threads[0].tail?.skillContext).toMatchObject({ roomId: 'living-room' })
+    expect(client.getSnapshot().draft).toBe('Keep this composer draft')
+  })
+
+  it('queues a complete light conversation when starting a new chat', async () => {
+    const ended = vi.fn(async () => ({ status: 'queued' }))
+    const homeMcp = {
+      endConversation: ended,
+      request: async () => ({
+        status: 'answer',
+        text: 'The Living Room lights are off.',
+        conversation_id: 'home-mcp-thread',
+        controls: [],
+        context: { domain: 'lights', roomId: 'living-room', entityIds: [], lightNames: [], lastAction: 'state', lastState: 'off' },
+      }),
+    }
+    const client = new ChatClient(server.connect('user-a'), 'user-a', Date.now, undefined, homeMcp)
+    clients.push(client)
+    await client.activate()
+    client.setDraft('Are the Living Room lights on?')
+    await client.send()
+
+    client.newChat()
+
+    await vi.waitFor(() => expect(ended).toHaveBeenCalledOnce())
+    expect(ended).toHaveBeenCalledWith(expect.stringMatching(/^[a-zA-Z0-9_-]+$/))
+    expect(client.getSnapshot().selectedId).toBeNull()
+  })
+
+  it('keeps a failed Home MCP command conversationally resumable', async () => {
+    const requests: string[] = []
+    const homeMcp = {
+      request: async (text: string, conversationId: string | null) => {
+        requests.push(text)
+        return requests.length === 1
+          ? { status: 'failed', text: 'I was unable to turn on the Living Room lights. Would you like me to try again?', conversation_id: conversationId ?? 'home-mcp-lights:living-room', controls: [], context: { domain: 'lights', roomId: 'living-room', entityIds: [], lightNames: [], lastAction: 'on' } }
+          : { status: 'answer', text: 'The Living Room lights are on.', conversation_id: conversationId, controls: [], context: { domain: 'lights', roomId: 'living-room', entityIds: [], lightNames: [], lastAction: 'state', lastState: 'on' } }
+      },
+    }
+    const client = new ChatClient(server.connect('user-a'), 'user-a', Date.now, undefined, homeMcp)
+    clients.push(client)
+    await client.activate()
+    client.setDraft('Turn on the Living Room lights')
+    await client.send()
+    expect(client.getSnapshot().threads[0].tail?.response).toBe('answer')
+    expect(client.getSnapshot().availability).toBe('current')
+
+    client.setDraft('Are they on?')
+    await client.send()
+    expect(requests).toEqual(['Turn on the Living Room lights', 'Are they on?'])
+    expect(client.getSnapshot().threads[0].tail?.text).toBe('The Living Room lights are on.')
+  })
+
+  it('locks legacy repeated control ids only for the reply that submitted them', async () => {
+    const thread: ChatThreadRecord = { version: 1, kind: 'thread', id: 'thread-legacy', agentId: MOCK_CHAT_AGENT.id, agentName: MOCK_CHAT_AGENT.name, createdAt: 1 }
+    const requestOne: ChatRequestRecord = { version: 1, kind: 'request', id: 'request-one', threadId: thread.id, createdAt: 2, parentId: null, clientId: 'legacy', text: 'Turn on the lights', conversationId: null }
+    const resultOne: ChatResultRecord = { version: 1, kind: 'result', id: requestOne.id, threadId: thread.id, createdAt: 3, text: 'Which room?', conversationId: 'legacy', response: 'answer', contextReset: false, controls: [] }
+    const requestTwo: ChatRequestRecord = { version: 1, kind: 'request', id: 'request-two', threadId: thread.id, createdAt: 4, parentId: resultOne.id, clientId: 'legacy', text: 'Living Room', conversationId: 'legacy', sourceControlId: 'lights-room-picker-state' }
+    const resultTwo: ChatResultRecord = { version: 1, kind: 'result', id: requestTwo.id, threadId: thread.id, createdAt: 5, text: 'Which room?', conversationId: 'legacy', response: 'answer', contextReset: false, controls: [] }
+    server.seed('user-a', Object.fromEntries([thread, requestOne, resultOne, requestTwo, resultTwo].map((record) => [chatRecordKey(record), record])))
+    const client = clientFor()
+    await client.activate()
+
+    expect(client.controlUsed('lights-room-picker-state', resultOne.id)).toBe(true)
+    expect(client.controlUsed('lights-room-picker-state', resultTwo.id)).toBe(false)
+  })
+
+  it('instances repeated server control ids per reply and chat', async () => {
+    const requests: string[] = []
+    const homeMcp = {
+      request: async (text: string, conversationId: string | null) => {
+        requests.push(text)
+        return {
+          status: 'clarify', text: 'Which room?', conversation_id: conversationId ?? `conversation-${requests.length}`,
+          controls: [{ id: 'lights-room-picker-state', kind: 'room-picker', options: [{ label: 'Living Room', value: 'Living Room', message: 'Turn on the Living Room lights.' }] }],
+          context: { domain: 'lights', roomId: null, entityIds: [], lightNames: [] },
+        }
+      },
+    }
+    const client = new ChatClient(server.connect('user-a'), 'user-a', Date.now, undefined, homeMcp)
+    clients.push(client)
+    await client.activate()
+
+    client.setDraft('Turn on the lights')
+    await client.send()
+    const firstThreadId = client.getSnapshot().selectedId!
+    const firstControlId = client.getSnapshot().threads[0].tail!.controls![0].id
+    await client.sendControl(firstControlId, 'Turn on the Living Room lights.')
+    const repeatedControlId = client.getSnapshot().threads[0].tail!.controls![0].id
+
+    expect(repeatedControlId).not.toBe(firstControlId)
+    expect(client.controlUsed(firstControlId)).toBe(true)
+    expect(client.controlUsed(repeatedControlId)).toBe(false)
+    await client.sendControl(repeatedControlId, 'Turn on the Living Room lights.')
+    await client.sendControl(firstControlId, 'Turn on the Kitchen lights.', client.getSnapshot().threads[0].turns[0].result!.id)
+    expect(requests).toHaveLength(3)
+
+    client.newChat()
+    client.setDraft('Turn on the lights')
+    await client.send()
+    const newChatControlId = client.getSnapshot().threads.find((thread) => thread.record.id === client.getSnapshot().selectedId)!.tail!.controls![0].id
+    expect(newChatControlId).not.toBe(firstControlId)
+    expect(client.controlUsed(newChatControlId)).toBe(false)
+    await client.sendControl(newChatControlId, 'Turn on the Living Room lights.')
+
+    client.selectThread(firstThreadId)
+    expect(client.controlUsed(firstControlId)).toBe(true)
+    expect(client.controlUsed(repeatedControlId)).toBe(true)
+    expect(requests).toHaveLength(5)
   })
 
   it('retains an oversized reply visibly unconfirmed rather than truncating or resending it', async () => {

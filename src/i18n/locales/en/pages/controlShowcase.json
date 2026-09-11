@@ -1,0 +1,13 @@
+{
+  "title": "Light Controls",
+  "description": "Try the shared light controls here. Changes stay on this page and do not send a chat message or change a Home Assistant device.",
+  "rgbTitle": "Full Color",
+  "rgbDescription": "Use the same color wheel and RGB fields as the exterior-light and chat controls.",
+  "temperatureTitle": "White Temperature",
+  "temperatureDescription": "Use the warm-to-cool bar or enter a Kelvin value directly.",
+  "rgbControl": "Choose a full-color light value",
+  "rgbChannel": "{{channel}} channel",
+  "rgbValue": "RGB {{red}}, {{green}}, {{blue}}",
+  "temperatureControl": "Choose a white temperature",
+  "kelvinValue": "{{kelvin}} kelvin"
+}

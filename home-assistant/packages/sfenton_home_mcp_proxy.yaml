@@ -1,0 +1,2 @@
+sfenton_home_mcp_proxy:
+  url: https://192.168.1.155:8787/mcp

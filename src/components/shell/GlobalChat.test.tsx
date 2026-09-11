@@ -2,8 +2,21 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import { GlobalQuickLinksAction } from './GlobalQuickLinksAction'
 import { mockState, resetMockHass, setMockUser } from '../../test/mocks/hakitCoreState'
 import { mockChatMessages, mockChatServer } from '../../test/mocks/chatServer'
-import { CHAT_STORAGE_PREFIX } from '../hass/chat/chatRecords'
+import { chatFixtureRecords } from '../../test/fixtures/chat'
+import {
+  CHAT_STORAGE_PREFIX, chatRecordKey,
+  type ChatRecord, type ChatRequestRecord, type ChatResultRecord, type ChatThreadRecord,
+} from '../hass/chat/chatRecords'
 
+// @covers src/components/hass/chat/ChatHeaderActions.tsx
+// @covers src/components/hass/chat/ChatPanel.tsx
+// @covers src/components/hass/chat/useDashboardChat.ts
+// @covers src/components/shell/GlobalQuickLinksAction.tsx
+// @covers src/i18n/index.ts
+// @covers src/i18n/resources.ts
+// @covers src/i18n/locales/en/modals/chat.json
+// @covers src/test/fixtures/chat.ts
+// @covers src/test/mocks/hakitCoreState.ts
 const nativeCalls = () => mockChatServer.calls.filter((call) => call.message.type === 'conversation/process')
 const reply = (text: string) => ({
   conversation_id: 'native-chat-test',
@@ -19,6 +32,10 @@ async function openChat() {
 
 describe('global chat UX', () => {
   beforeEach(() => { resetMockHass() })
+  afterEach(() => {
+    delete window.__homeMcpUrl
+    vi.unstubAllGlobals()
+  })
 
   it('is inert before opening and defaults to Home Assistant with bottommost ordered tabs', async () => {
     render(<GlobalQuickLinksAction onNavigate={() => undefined} />)
@@ -34,6 +51,7 @@ describe('global chat UX', () => {
     expect(dialog.querySelector('[data-modal-sheet-footer]')).toBeNull()
     const headerActions = dialog.querySelector('[data-modal-sheet-header-actions]')!
     expect(headerActions).toContainElement(within(dialog).getByRole('button', { name: 'View History' }))
+    expect(headerActions).toContainElement(within(dialog).getByRole('button', { name: 'Open Chat Settings' }))
     expect(headerActions).toContainElement(within(dialog).getByRole('button', { name: 'Start New Chat' }))
     expect(dialog.querySelector('[data-modal-sheet-body]')).not.toContainElement(headerActions)
     expect(nativeCalls()).toHaveLength(0)
@@ -48,6 +66,36 @@ describe('global chat UX', () => {
     expect(within(dialog).queryByText('Google AI Conversation')).not.toBeInTheDocument()
     expect(within(dialog).queryByText(/Chats are shared with other devices/)).not.toBeInTheDocument()
     expect(within(dialog).queryByText('conversation.mock_gemini')).not.toBeInTheDocument()
+  })
+
+  it('opens instrumented Chat Settings in the same sheet', async () => {
+    window.__homeMcpUrl = '/api/sfenton_home_mcp'
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
+      result: {
+        structuredContent: {
+          chatModel: 'Gemini 3.1 Flash Lite',
+          mcpVersion: '0.2.0',
+          supportedTools: ['lights'],
+          queue: { enabled: true, autoPublish: true, pending: 0, processing: false, lastError: null },
+          improvements: [{
+            version: '0.2.0',
+            publishedAt: '2026-09-10T14:00:00.000Z',
+            summary: ['Learns from completed light conversations one at a time.'],
+          }],
+        },
+      },
+    }), { status: 200, headers: { 'content-type': 'application/json' } })))
+    render(<GlobalQuickLinksAction onNavigate={() => undefined} />)
+    const dialog = await openChat()
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Open Chat Settings' }))
+
+    expect(await screen.findByRole('dialog', { name: 'Chat Settings' })).toBe(dialog)
+    expect(within(dialog).getByText('Gemini 3.1 Flash Lite')).toBeVisible()
+    expect(within(dialog).getByText('1.0.0')).toBeVisible()
+    expect(within(dialog).getByText('0.2.0')).toBeVisible()
+    expect(within(dialog).getByText('Queue · Idle • 0 Waiting')).toBeVisible()
+    expect(within(dialog).queryByRole('textbox', { name: 'Chat Message' })).not.toBeInTheDocument()
   })
 
   it('submits only an explicit IME-safe action and preserves pending work through tabs and close', async () => {
@@ -93,6 +141,25 @@ describe('global chat UX', () => {
     expect(nativeCalls()).toHaveLength(1)
   })
 
+  it('opens custom color in the same sheet and retains the chosen RGB value on Back', async () => {
+    mockChatServer.seed(mockState.user!.id, chatFixtureRecords('light-color-control', Date.now()))
+    render(<GlobalQuickLinksAction onNavigate={() => undefined} />)
+    const dialog = await openChat()
+    fireEvent.click(within(dialog).getByRole('button', { name: 'View History' }))
+    fireEvent.click(within(dialog).getByRole('button', { name: /Change the Music Room lights/ }))
+    const custom = within(dialog).getByRole('button', { name: 'Custom' })
+    fireEvent.click(custom)
+    expect(await screen.findByRole('dialog', { name: 'Custom' })).toBe(dialog)
+    fireEvent.change(within(dialog).getByRole('spinbutton', { name: 'R channel' }), { target: { value: '12' } })
+    fireEvent.change(within(dialog).getByRole('spinbutton', { name: 'G channel' }), { target: { value: '34' } })
+    fireEvent.change(within(dialog).getByRole('spinbutton', { name: 'B channel' }), { target: { value: '56' } })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Back', exact: true }))
+    expect(await screen.findByRole('dialog', { name: 'Home Assistant' })).toBe(dialog)
+    const retainedCustom = within(dialog).getByRole('button', { name: 'Custom' })
+    expect(retainedCustom).toHaveAttribute('aria-pressed', 'true')
+    expect(retainedCustom.style.getPropertyValue('--chat-custom-color')).toBe('rgb(12 34 56)')
+  })
+
   it('opens history in the same sheet without sending and starts a genuinely empty new chat', async () => {
     render(<GlobalQuickLinksAction onNavigate={() => undefined} />)
     const dialog = await openChat()
@@ -108,6 +175,26 @@ describe('global chat UX', () => {
     expect(within(dialog).getByRole('textbox')).toHaveValue('')
     expect(dialog.querySelector('[data-chat-role]')).toBeNull()
     expect(nativeCalls()).toHaveLength(1)
+  })
+
+  it('hides conversations older than fourteen days while retaining their stored records', async () => {
+    const now = Date.now()
+    const records = (id: string, ageDays: number, text: string): ChatRecord[] => {
+      const createdAt = now - ageDays * 24 * 60 * 60_000
+      const thread: ChatThreadRecord = { version: 1, kind: 'thread', id, agentId: 'conversation.mock_gemini', agentName: 'Google Gemini', createdAt }
+      const request: ChatRequestRecord = { version: 1, kind: 'request', id: `${id}-turn`, threadId: id, parentId: null, clientId: 'seed', text, conversationId: null, createdAt }
+      const result: ChatResultRecord = { version: 1, kind: 'result', id: request.id, threadId: id, text: `${text} reply`, conversationId: `native-${id}`, response: 'answer', contextReset: false, createdAt: createdAt + 1000 }
+      return [thread, request, result]
+    }
+    const stored = [...records('recent-chat', 13, 'Recent retained chat'), ...records('old-chat', 15, 'Old retained chat')]
+    mockChatServer.seed(mockState.user!.id, Object.fromEntries(stored.map((record) => [chatRecordKey(record), record])))
+    render(<GlobalQuickLinksAction onNavigate={() => undefined} />)
+    const dialog = await openChat()
+    fireEvent.click(within(dialog).getByRole('button', { name: 'View History' }))
+
+    expect(within(dialog).getByRole('button', { name: /Recent retained chat/ })).toBeVisible()
+    expect(within(dialog).queryByRole('button', { name: /Old retained chat/ })).not.toBeInTheDocument()
+    expect(Object.keys(mockChatServer.data(mockState.user!.id)).filter((key) => key.startsWith(CHAT_STORAGE_PREFIX))).toHaveLength(6)
   })
 
   it('restores the header history trigger and transcript scroll position on Back', async () => {
@@ -232,7 +319,7 @@ describe('global chat UX', () => {
     const oversized = 'x'.repeat(4001)
     fireEvent.change(within(dialog).getByRole('textbox'), { target: { value: oversized } })
     expect(within(dialog).getByRole('textbox')).toHaveValue(oversized)
-    expect(within(dialog).getByRole('alert')).toHaveTextContent('at most 4000 characters')
+    expect(within(dialog).getByRole('alert')).toHaveTextContent('at most 180 characters')
     expect(within(dialog).getByRole('button', { name: 'Send Chat Message' })).toBeDisabled()
   })
 })

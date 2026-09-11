@@ -11,6 +11,7 @@ import modalWakeLight from './locales/en/modals/wakeLight.json' with { type: 'js
 import modalWeather from './locales/en/modals/weather.json' with { type: 'json' }
 import pageAdmin from './locales/en/pages/admin.json' with { type: 'json' }
 import pageCustomLights from './locales/en/pages/customLights.json' with { type: 'json' }
+import pageControlShowcase from './locales/en/pages/controlShowcase.json' with { type: 'json' }
 import pageFood from './locales/en/pages/food.json' with { type: 'json' }
 import pageGuests from './locales/en/pages/guests.json' with { type: 'json' }
 import pageMedia from './locales/en/pages/media.json' with { type: 'json' }
@@ -35,6 +36,7 @@ export const resources = {
     modalWakeLight,
     modalWeather,
     pageAdmin,
+    pageControlShowcase,
     pageCustomLights,
     pageFood,
     pageGuests,

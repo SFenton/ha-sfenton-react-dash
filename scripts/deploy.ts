@@ -21,6 +21,12 @@ const REMOTE_FOLDER_NAME = process.env.VITE_FOLDER_NAME
 const LOCAL_DIRECTORY = './dist'
 const PANEL_PACKAGE_PATH = resolve('home-assistant/packages/sfenton_react_panel.yaml')
 const CHAT_COMPONENT_FILES = ['__init__.py', 'manifest.json', 'services.yaml', 'retention.py', 'README.md']
+const HOME_MCP_PROXY_PATHS = [
+  'packages/sfenton_home_mcp_proxy.yaml',
+  'custom_components/sfenton_home_mcp_proxy/__init__.py',
+  'custom_components/sfenton_home_mcp_proxy/home-mcp-server.crt',
+  'custom_components/sfenton_home_mcp_proxy/manifest.json',
+]
 const REMOTE_PATH = `/www/${REMOTE_FOLDER_NAME}`
 const AUTO_CONFIRM = process.argv.includes('--yes')
 
@@ -85,22 +91,21 @@ async function deploy() {
       'packages/sfenton_react_chat.yaml',
       ...CHAT_COMPONENT_FILES.map((file) => `custom_components/sfenton_react_chat/${file}`),
     ]
+    const managedPaths = [...chatPaths, ...HOME_MCP_PROXY_PATHS]
     const changedConfig = []
     if (packageChanged) changedConfig.push({ path: remotePackage, content: packageContent, previous: currentPackage })
-    for (const path of chatPaths) {
+    for (const path of managedPaths) {
       const content = await readFile(resolve('home-assistant', path))
       const previous = await readRemoteFile(client, `${configRoot}/${path}`)
       if (!previous?.equals(content)) changedConfig.push({ path: `${configRoot}/${path}`, content, previous })
     }
-    const chatChanged = changedConfig.some((file) => file.path !== remotePackage)
-
-    if (await client.exists(remote)) await client.rmdir(remote)
-    console.info(chalk.blue('Uploading', `"${LOCAL_DIRECTORY}"`, 'to', `"${remote}"`))
-    await client.uploadDir(LOCAL_DIRECTORY, remote)
+    const chatChanged = changedConfig.some((file) => chatPaths.some((path) => file.path.endsWith(`/${path}`)))
+    const homeMcpProxyChanged = changedConfig.some((file) => HOME_MCP_PROXY_PATHS.some((path) => file.path.endsWith(`/${path}`)))
 
     if (changedConfig.length) {
       await client.mkdir(`${configRoot}/packages`, undefined, { recursive: true })
       await client.mkdir(`${configRoot}/custom_components/sfenton_react_chat`, undefined, { recursive: true })
+      await client.mkdir(`${configRoot}/custom_components/sfenton_home_mcp_proxy`, undefined, { recursive: true })
       for (const file of changedConfig) {
         if (file.previous) await client.writeFile(`${file.path}.bak`, file.previous)
       }
@@ -120,7 +125,18 @@ async function deploy() {
         if (failures.length > 1) throw new AggregateError(failures, 'Configuration staging failed and rollback was incomplete; restore the .bak files before restarting HA.', { cause: error })
         throw error
       }
+      console.info(chalk.green('\nHome Assistant package/component files were staged and configuration-checked.'))
+      if (packageChanged) console.info(chalk.yellow('Restart Home Assistant with approval before deploying the React assets.'))
+      if (chatChanged) console.info(chalk.yellow('Restart Home Assistant with approval, then verify the prior daily chat purge automation is absent.'))
+      if (homeMcpProxyChanged) console.info(chalk.yellow('Restart Home Assistant with approval, then verify /api/sfenton_home_mcp before enabling Home MCP in the production build.'))
+      console.info(chalk.yellow('React assets were not uploaded. Rerun deployment after the required restart and proxy verification.'))
+      process.exitCode = 2
+      return
     }
+
+    if (await client.exists(remote)) await client.rmdir(remote)
+    console.info(chalk.blue('Uploading', `"${LOCAL_DIRECTORY}"`, 'to', `"${remote}"`))
+    await client.uploadDir(LOCAL_DIRECTORY, remote)
 
     const version = await resolveDeploymentVersion()
     const syncResult = await syncDashboardDeployment({
@@ -137,14 +153,7 @@ async function deploy() {
     console.info(chalk.blue(new URL('/sfenton-react-dash/home', HA_URL).href))
     console.info(chalk.blue(new URL('/sfenton-react-panel', HA_URL).href))
     console.info(chalk.blue(`Legacy wrapper URL: ${syncResult.legacyDashboardUrl}`))
-    if (packageChanged) {
-      console.info(chalk.yellow('The panel_custom package changed; restart Home Assistant before using sfenton-react-panel.'))
-    }
-    if (chatChanged) {
-      console.info(chalk.yellow('Chat retention component/package changes are staged. Restart Home Assistant with approval, then verify sfenton_react_chat.purge_expired_history and the daily automation; retention is not yet confirmed active.'))
-    } else {
-      console.info(chalk.yellow('Chat retention files match; runtime service/automation activation is not verified by asset deployment.'))
-    }
+    console.info(chalk.yellow('Chat history and Home MCP proxy files already match the validated Home Assistant configuration.'))
   } finally {
     client.close()
   }

@@ -1,0 +1,9 @@
+**
+!package.json
+!package-lock.json
+!home-mcp/
+!home-mcp/**
+home-mcp/.data/
+!scripts/
+!scripts/lib/
+!scripts/lib/runtimeEnv.ts

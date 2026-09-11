@@ -1,6 +1,6 @@
 import { LAYOUT_JOURNEYS, RESPONSIVE_ROUTES } from '../responsive-acceptance-data'
 import { ROOM_PAGE_CONFIGS } from '../../src/constants/roomPages'
-import { CONTEXTS, INTENTIONAL_ROUTE_ADDITIONS, SCENARIO_IDS, SURFACE_CONTRACTS, type ContextId, type ScenarioId } from './contracts'
+import { CONTEXTS, INTENTIONAL_NEW_ROUTES, INTENTIONAL_ROUTE_ADDITIONS, SCENARIO_IDS, SURFACE_CONTRACTS, type ContextId, type ScenarioId } from './contracts'
 import type { Obligation } from './types'
 
 export const SOURCE_ROUTES = RESPONSIVE_ROUTES
@@ -61,6 +61,20 @@ export function validateRegistry() {
     }
   }
   if (Object.keys(CONTEXTS).length !== 3) throw new Error('Unexpected context inventory')
+  for (const [route, addition] of Object.entries(INTENTIONAL_NEW_ROUTES)) {
+    if (!SOURCE_ROUTES.includes(route as typeof SOURCE_ROUTES[number])
+      || !SOURCE_ROUTES.includes(addition.referenceRoute as typeof SOURCE_ROUTES[number])
+      || route === addition.referenceRoute
+      || !SCENARIO_IDS.includes(addition.owner)
+      || !addition.backLabel.trim()
+      || !addition.heading.trim()
+      || !addition.root.trim()
+      || !addition.expected.sectionHeadings.length
+      || new Set(addition.expected.sectionHeadings).size !== addition.expected.sectionHeadings.length
+      || Object.values(addition.expected).some((value) => typeof value === 'number' && (!Number.isInteger(value) || value < 0))) {
+      throw new Error(`Unbound intentional new route: ${route}`)
+    }
+  }
   for (const [route, addition] of Object.entries(INTENTIONAL_ROUTE_ADDITIONS)) {
     if (!SOURCE_ROUTES.includes(route as typeof SOURCE_ROUTES[number]) || !SCENARIO_IDS.includes(addition.owner)
       || !addition.section || !addition.inherited.length || new Set(addition.inherited).size !== addition.inherited.length) {
