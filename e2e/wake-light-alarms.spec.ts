@@ -80,6 +80,38 @@ test('Add Wake Alarm supports bed toggles for one-time naps and scheduled alarms
   await expect(editor.getByText(/Adds this wake time/)).toHaveCount(0)
 })
 
+test('deleting a wake alarm requires the native browser confirmation', async ({ page }) => {
+  await page.setViewportSize(wakeProfile('phone-portrait'))
+  const dialog = await openWake(page)
+  await dialog.getByRole('button', { name: /Weekday Wake Weekdays/ }).click()
+  const editor = page.getByRole('dialog', { name: 'Weekday Wake · Master Bedroom' })
+  const deleteButton = editor.getByRole('button', { name: 'Delete', exact: true })
+
+  let cancelledMessage = ''
+  let cancelledType = ''
+  page.once('dialog', async nativeDialog => {
+    cancelledMessage = nativeDialog.message()
+    cancelledType = nativeDialog.type()
+    await nativeDialog.dismiss()
+  })
+  await deleteButton.click()
+  expect(cancelledType).toBe('confirm')
+  expect(cancelledMessage).toBe('Delete alarm set for 6:30 AM on Weekdays?')
+  await expect(editor).toBeVisible()
+  expect(await page.evaluate(() => (window as unknown as { __mockHass: WakeMockApi }).__mockHass.calls
+    .filter(call => call.domain === 'wake_light'))).toEqual([])
+
+  let confirmedMessage = ''
+  page.once('dialog', async nativeDialog => {
+    confirmedMessage = nativeDialog.message()
+    await nativeDialog.accept()
+  })
+  await deleteButton.click()
+  expect(confirmedMessage).toBe('Delete alarm set for 6:30 AM on Weekdays?')
+  await expect.poll(() => page.evaluate(() => (window as unknown as { __mockHass: WakeMockApi }).__mockHass.calls
+    .filter(call => call.domain === 'wake_light' && call.serviceData?.operation === 'delete_alarm').length)).toBe(1)
+})
+
 test('mounted rotations preserve the wake intent, selected tab, detail frame and portrait geometry', async ({ page }) => {
   test.setTimeout(90_000)
   await page.setViewportSize(wakeProfile('phone-portrait'))
