@@ -196,9 +196,14 @@ Security uses it for its responsive section grid. Security mode choices keep
 their 74px height and use 160px-minimum auto-fit tracks.
 Desktop readable tab navigation retains the declared family width less 50px of
 chrome while body content and footer regions fill their padded width; landscape
-retains the compact/form/standard measure caps. The modal
-body is the sole landscape vertical scroll owner, including 568px and 667px
-windows. Body tiers are measured from the capped content, not the outer frame.
+retains the compact/form/standard measure caps. The modal body is the default
+and sole landscape vertical scroll owner, including 568px and 667px windows.
+An explicitly scoped split workspace may instead keep its primary pane
+immobile and make one named secondary pane the sole vertical scroll owner at
+every supported landscape tier; the body and primary pane must be
+non-scrollable, endpoint overscroll must not move the primary pane, and the
+secondary pane may retain platform-native elastic overscroll. Body tiers are
+measured from the capped content, not the outer frame.
 
 `content-fit` is reserved for classified single-view surfaces whose rendered
 structure does not change while open. Tabbed, async, hash-driven, multi-step,
@@ -213,9 +218,13 @@ publishes `data-modal-body-tier="compact|fields|standard|wide"` at
 tier remains frozen during close.
 
 Landscape side-by-side layouts must key from the measured body tier, not
-viewport width. They reuse the existing DOM, keep named panes
-`overflow-y: visible`, and leave the modal body as the sole vertical scroll
-owner. Normal desktop dialogs retain their existing pane scroll owners.
+viewport width. They reuse the existing DOM and default to named panes with
+`overflow-y: visible` while the modal body remains the sole vertical scroll
+owner. An explicitly scoped split workspace may opt into one bounded secondary
+pane scroll owner at each supported landscape tier when its primary pane must
+remain completely stationary; the body and primary pane stay
+`overflow-y: hidden`, and no second pane may scroll.
+Normal desktop dialogs retain their existing pane scroll owners.
 Container queries are allowed on isolated wrappers such as modal navigation,
 but not on the shared modal body.
 

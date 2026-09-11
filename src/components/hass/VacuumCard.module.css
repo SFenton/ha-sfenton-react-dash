@@ -70,9 +70,33 @@
   gap: 12px;
 }
 
-.compactSectionHeader,
-.compactLocateSection {
+.compactSectionHeader {
   display: none;
+}
+
+.statusPillCommand {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  color: inherit;
+  text-align: inherit;
+  background: none;
+  cursor: pointer;
+}
+
+.statusPillCommand > * {
+  height: 100%;
+}
+
+.statusPillCommand [data-dynamic-grid-label='true']:empty {
+  display: none;
+}
+
+.statusPillCommand:disabled {
+  cursor: default;
 }
 
 .leftPane {
@@ -278,13 +302,15 @@
   outline: none;
 }
 
-.locateButton:focus-visible {
+.locateButton:focus-visible,
+.statusPillCommand:focus-visible {
   outline: 2px solid rgba(255, 255, 255, 0.58);
   outline-offset: 2px;
 }
 
 @media (hover: none), (pointer: coarse) {
   .locateButton:focus-visible,
+  .statusPillCommand:focus-visible,
   .areaEditorTool:focus-visible,
   .cleanTargetButton:focus-visible {
     outline: none;
@@ -979,6 +1005,38 @@
   padding-bottom: 0;
 }
 
+:global([data-landscape-density='compact']) .leftPane[data-map-status-layout='split']:not(.areaEditorPane):has(> .mapStatusControls:empty) {
+  grid-template-areas: 'map';
+  grid-template-rows: minmax(0, 1fr);
+  gap: 0;
+}
+
+.mapStatusControls:empty {
+  display: none;
+}
+
+.leftPane[data-vacuum-viewport-layout='tall-landscape']:not(.areaEditorPane) {
+  grid-template-rows: minmax(0, 1fr);
+  align-content: stretch;
+  padding-bottom: 0;
+  overflow: hidden;
+}
+
+.leftPane[data-vacuum-viewport-layout='tall-landscape']:not(.areaEditorPane) .mapStage {
+  display: grid;
+  width: 100%;
+  height: 100%;
+  place-items: center;
+  overflow: hidden;
+}
+
+.leftPane[data-vacuum-viewport-layout='tall-landscape']:not(.areaEditorPane) .mapStage [data-valetudo-map-frame='true'] {
+  width: auto;
+  height: 100%;
+  max-width: 100%;
+  max-height: 100%;
+}
+
 .leftPane[data-map-status-layout='split'] .mapStage {
   grid-area: map;
   --map-available-height: var(--vacuum-map-available-height, var(--vacuum-pane-height, 100%));
@@ -990,6 +1048,56 @@
   justify-self: center;
   place-items: center;
   overflow: hidden;
+}
+
+/* Landscape vacuums keep the map immobile while controls own scrolling. */
+@media (orientation: landscape) {
+  :global([data-centered-layout='true'][data-modal-geometry-intent='vacuum'][data-scroll-mode='panes']):has(.modalBody:not(.areaEditorModalBody)) :global([data-modal-sheet-body='true']) {
+    overflow-y: hidden;
+  }
+
+  :global([data-centered-layout='true'][data-modal-geometry-intent='vacuum'][data-scroll-mode='panes']):has(.modalBody:not(.areaEditorModalBody)) :global([data-modal-content-measure='true']) {
+    display: block;
+    height: 100%;
+    min-height: 0;
+  }
+
+  :global([data-centered-layout='true'][data-modal-geometry-intent='vacuum'][data-scroll-mode='panes']) .modalBody:not(.areaEditorModalBody) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-rows: minmax(0, 1fr);
+    height: 100%;
+    max-height: 100%;
+    overflow: hidden;
+  }
+
+  :global([data-centered-layout='true'][data-modal-geometry-intent='vacuum'][data-scroll-mode='panes']) .leftPane:not(.areaEditorPane) {
+    height: 100%;
+    max-height: 100%;
+    overflow: hidden;
+  }
+
+  :global([data-centered-layout='true'][data-modal-geometry-intent='vacuum'][data-scroll-mode='panes']) .leftPane:not(.areaEditorPane) .mapStage {
+    height: 100%;
+  }
+
+  :global([data-centered-layout='true'][data-modal-geometry-intent='vacuum'][data-scroll-mode='panes']) .leftPane:not(.areaEditorPane) .mapStage [data-valetudo-map-frame='true'] {
+    width: auto;
+    height: 100%;
+    max-width: 100%;
+    max-height: 100%;
+  }
+
+  :global([data-centered-layout='true'][data-modal-geometry-intent='vacuum'][data-scroll-mode='panes']) .rightPane {
+    box-sizing: border-box;
+    height: 100%;
+    max-height: 100%;
+    padding-bottom: 12px;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior-y: auto;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
 }
 
 .leftPane[data-map-status-layout='split'] .mapStatusControls {
@@ -1007,16 +1115,9 @@
   gap: 8px;
 }
 
-.leftPane[data-map-status-layout='split'] .compactSectionHeader,
-.leftPane[data-map-status-layout='split'] .compactLocateSection {
+.leftPane[data-map-status-layout='split'] .compactSectionHeader {
   display: grid;
   gap: 8px;
-}
-
-.leftPane[data-map-status-layout='split'] .compactLocateSection {
-  width: 100%;
-  max-width: 260px;
-  justify-self: center;
 }
 
 .leftPane[data-map-status-layout='split'] .statusNoticeWide {

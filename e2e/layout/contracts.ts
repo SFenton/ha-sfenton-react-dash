@@ -391,7 +391,7 @@ export const SURFACE_CONTRACTS: Record<ScenarioId, {
     family: 'modal', states: ['docked'],
     owners: ['src/components/hass/VacuumCard', 'src/components/hass/ValetudoMap', 'src/i18n/locales/en/modals/vacuum.json'],
     legacy: ['vacuum-status.spec.ts', 'modal-rotation-regressions.spec.ts'],
-    question: 'Does the vacuum map remain fully usable without a second left-pane scroller, using a proportionally fitted map with a visible Locate action, moving status detail to the Controls tab, only when height is constrained?',
+    question: 'Does the fitted vacuum map fill the stationary left pane in short and tall landscape while the right pane scrolls naturally, with Locate immediately after Dock Status in the landscape status grid?',
   },
   weather: {
     family: 'modal',

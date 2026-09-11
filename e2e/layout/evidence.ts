@@ -231,13 +231,13 @@ export async function modalFacts(dialog: Locator, expectedScrollMode: 'body' | '
       : null
   if (expected) for (const key of ['x', 'y', 'width', 'height'] as const) expect(Math.abs(facts.frame[key] - expected[key]), `Independent frame oracle: ${key}`).toBeLessThanOrEqual(1)
   const bodyOwned = ['auto', 'scroll'].includes(facts.bodyOverflow)
-  const paneOwned = facts.presentation === 'dialog' && ['hidden', 'clip'].includes(facts.bodyOverflow) && facts.eligiblePanes.length > 0
+  const paneOwned = facts.presentation !== 'sheet' && ['hidden', 'clip'].includes(facts.bodyOverflow) && facts.eligiblePanes.length > 0
   expect(bodyOwned || paneOwned, 'Effective ownership requires a scrolling body or a locked body with a real inner pane').toBe(true)
   const effectiveScrollOwner = bodyOwned ? 'body' : 'panes'
   if (paneOwned) {
     expect(expectedScrollMode, 'A bounded inner pane must be declared').toBe('panes')
     expect(facts.bodyScrolls, 'A pane-owned body must not acquire its own scroll range').toBe(false)
-    expect(Math.abs(facts.measureHeight - facts.bodyContentHeight), 'Normal-dialog pane measure remains bounded').toBeLessThanOrEqual(1)
+    expect(Math.abs(facts.measureHeight - facts.bodyContentHeight), 'Pane-owned measure remains bounded').toBeLessThanOrEqual(1)
     for (const pane of facts.eligiblePanes) expect(pane.height, 'Inner pane remains inside the bounded body').toBeLessThanOrEqual(facts.bodyContentHeight + 1)
   } else {
     expect(facts.nestedScrollOwners, 'Body-owned content must not introduce a nested vertical scroller').toBe(0)
