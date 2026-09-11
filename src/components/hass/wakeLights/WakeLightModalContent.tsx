@@ -566,6 +566,12 @@ export function WakeLightModal({ bedProvisioning, config, onClose, onCloseComple
   }
   const remove = async () => {
     if (!editingId) return
+    const alarmToDelete = controller.liveAlarms.find(alarm => alarm.id === editingId)
+    if (!alarmToDelete) return
+    if (!window.confirm(copy(C.editor.deleteConfirmation, {
+      schedule: scheduleLabel(alarmToDelete, copy),
+      time: formatWakeLightTime(alarmToDelete.localTime),
+    }))) return
     const current = operation.current
     if (await controller.deleteAlarm(editingId) && current === operation.current) closeEditor()
   }

@@ -4651,9 +4651,19 @@ describe('DashboardViewPage', () => {
     expect(mockCallServiceCalls).toEqual([])
 
     fireEvent.click(deleteButton)
-    await waitFor(() => expect(mockCallServiceCalls).toHaveLength(1))
+    await waitFor(() => expect(mqttPublishCalls()).toHaveLength(1))
     expect(confirm).toHaveBeenLastCalledWith('Delete alarm set for 6:30 AM on Sunday?')
-    const payload = JSON.parse(String((mockCallServiceCalls[0].serviceData as { payload: string }).payload))
+    expect(mockCallServiceCalls.find(call => call.serviceData?.operation === 'link_alarm')).toMatchObject({
+      domain: 'wake_light',
+      service: 'command',
+      serviceData: {
+        enabled: false,
+        link_keys: ['sleepypod:right#sunday#06:30'],
+        operation: 'link_alarm',
+      },
+    })
+    expect(JSON.stringify(mockCallServiceCalls)).not.toContain('sleepypod:left#sunday#06:30')
+    const payload = JSON.parse(String((mqttPublishCalls()[0].serviceData as { payload: string }).payload))
     expect(payload.right.saturday.alarms).toEqual([expect.objectContaining({ enabled: true, time: '07:15' })])
     confirm.mockRestore()
   })

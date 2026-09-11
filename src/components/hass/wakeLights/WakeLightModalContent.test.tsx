@@ -426,6 +426,44 @@ describe('WakeLightModalContent', () => {
     await waitFor(() => expect(within(editor).getByRole('button', { name: 'Save' })).toBeDisabled())
   })
 
+  it('requires native confirmation before deleting the saved wake alarm', async () => {
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValueOnce(false).mockReturnValueOnce(true)
+    render(
+      <WakeLightModal
+        config={MASTER_BEDROOM_WAKE_LIGHT}
+        onClose={() => undefined}
+        open
+        roomTitle="Master Bedroom"
+      />,
+    )
+
+    const dialog = await screen.findByRole('dialog', { name: 'Master Bedroom Wake-Light Alarms' })
+    fireEvent.click(within(dialog).getByText('Weekday Wake'))
+    const editor = await screen.findByRole('dialog', { name: 'Weekday Wake · Master Bedroom' })
+    const deleteButton = within(editor).getByRole('button', { name: 'Delete' })
+    fireEvent.change(within(editor).getByLabelText('Wake Time'), { target: { value: '06:40' } })
+
+    fireEvent.click(deleteButton)
+    expect(confirm).toHaveBeenCalledWith('Delete alarm set for 6:30 AM on Weekdays?')
+    expect(mockCallServiceCalls).toEqual([])
+    expect(editor).toHaveAccessibleName('Weekday Wake · Master Bedroom')
+    expect(within(editor).getByLabelText('Wake Time')).toHaveValue('06:40')
+
+    fireEvent.click(deleteButton)
+    await waitFor(() => expect(mockCallServiceCalls).toHaveLength(1))
+    expect(mockCallServiceCalls[0]).toMatchObject({
+      domain: 'wake_light',
+      service: 'command',
+      serviceData: {
+        alarm_id: 'weekday-wake',
+        operation: 'delete_alarm',
+        profile_id: 'master-bedroom',
+      },
+    })
+    expect(confirm).toHaveBeenCalledTimes(2)
+    confirm.mockRestore()
+  })
+
   it('shows the integration-unavailable recovery alert only once', async () => {
     mockEntities['sensor.master_bedroom_wake_light'].state = 'unavailable'
     setMockEntityAttribute('sensor.master_bedroom_wake_light', 'command_available', false)

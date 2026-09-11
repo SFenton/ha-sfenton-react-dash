@@ -101,6 +101,7 @@ export const WAKE_LIGHT_COPY_KEYS = {
     daysRequired: 'editor.daysRequired',
     defaultName: 'editor.defaultName',
     delete: 'editor.delete',
+    deleteConfirmation: 'editor.deleteConfirmation',
     enabled: 'editor.enabled',
     futureDateRequired: 'editor.futureDateRequired',
     nameRequired: 'editor.nameRequired',

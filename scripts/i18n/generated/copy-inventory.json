@@ -2017,6 +2017,21 @@
       "words": 1
     },
     {
+      "characters": 46,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/wakeLight.json",
+      "id": "732c37e3e97ad2fa",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [
+        "schedule",
+        "time"
+      ],
+      "value": "Delete alarm set for {{time}} on {{schedule}}?",
+      "words": 7
+    },
+    {
       "characters": 9,
       "context": "catalog-copy",
       "file": "src/i18n/locales/en/modals/weather.json",
@@ -9114,7 +9129,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "a3c13ddaedef6f99",
       "lines": [
-        5803
+        5808
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -9162,7 +9177,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "c55c2fdcc7f38021",
       "lines": [
-        5648
+        5653
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -9195,7 +9210,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "6d47d402367e6e87",
       "lines": [
-        5676
+        5681
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -9277,7 +9292,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "27fa92773d84330c",
       "lines": [
-        5705
+        5710
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -9440,7 +9455,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "7c6efae12651a3b5",
       "lines": [
-        6261
+        6266
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -9490,7 +9505,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "bf3a83e2d94f093d",
       "lines": [
-        6268
+        6273
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -9541,7 +9556,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "aaea1f635ecf02ef",
       "lines": [
-        5710
+        5715
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -9592,7 +9607,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "a2ab9586c4c5eae8",
       "lines": [
-        6272
+        6277
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -9673,7 +9688,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "0772450ffebbf46b",
       "lines": [
-        5427
+        5432
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -9839,7 +9854,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "4dcb3ac021789ab0",
       "lines": [
-        6041
+        6046
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -9871,7 +9886,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "ec03173642110d24",
       "lines": [
-        5575
+        5580
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -9921,8 +9936,8 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "2fafd559f83442c3",
       "lines": [
-        5737,
-        6219
+        5742,
+        6224
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -9991,7 +10006,7 @@
       "id": "f734d3f80c453cf3",
       "lines": [
         2706,
-        6110
+        6115
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -10217,7 +10232,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "b0621b1b9bb2ebd1",
       "lines": [
-        5803
+        5808
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -10711,7 +10726,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "4740698311a175f6",
       "lines": [
-        6195
+        6200
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -11205,7 +11220,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "051a09a67db3593c",
       "lines": [
-        6207
+        6212
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -11302,7 +11317,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "cb724ad50541f65b",
       "lines": [
-        5850
+        5855
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -11630,7 +11645,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "15dc7327fc8e1ad6",
       "lines": [
-        6181
+        6186
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -11644,7 +11659,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "7f1240e9aea6b193",
       "lines": [
-        5684
+        5689
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -11863,7 +11878,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "3ffe7e503995e57a",
       "lines": [
-        5780
+        5785
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -11879,7 +11894,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "7542f1b1b48fb6c1",
       "lines": [
-        6291
+        6296
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -11983,7 +11998,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "3eaffc0130f0b183",
       "lines": [
-        5803
+        5808
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -11997,7 +12012,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "9ef7dbe2601f61fb",
       "lines": [
-        5863
+        5868
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -12025,7 +12040,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "8ce95cecbaee8433",
       "lines": [
-        5803
+        5808
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -12039,7 +12054,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "9cd2b50fe2c9fdf8",
       "lines": [
-        5850
+        5855
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -12068,7 +12083,7 @@
       "id": "8d06c3b62a0795ac",
       "lines": [
         743,
-        6041
+        6046
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -12608,7 +12623,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "08ee8ed774a3b4df",
       "lines": [
-        5705
+        5710
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -12657,7 +12672,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "bd639d5d746b2cf0",
       "lines": [
-        6155
+        6160
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -12673,7 +12688,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "82b4957f7c928b0d",
       "lines": [
-        6163
+        6168
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -12690,7 +12705,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "ad7a71bdba4e196c",
       "lines": [
-        6146
+        6151
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -12707,8 +12722,8 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "fe12b0f9a09c0541",
       "lines": [
-        6146,
-        6155
+        6151,
+        6160
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -12810,7 +12825,7 @@
       "lines": [
         749,
         2634,
-        6045
+        6050
       ],
       "occurrences": 3,
       "origin": "legacy",
@@ -12954,7 +12969,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "a46e03cbd24c5af9",
       "lines": [
-        5448
+        5453
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -12982,7 +12997,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "31eb2785f8fbbda8",
       "lines": [
-        5448
+        5453
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -13068,8 +13083,8 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "d49ae41ebf61b396",
       "lines": [
-        5184,
-        5452
+        5189,
+        5457
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -13097,7 +13112,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "602054a441bdff80",
       "lines": [
-        5991
+        5996
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -13111,7 +13126,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "ecbe43ed410874b4",
       "lines": [
-        5995
+        6000
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -13125,7 +13140,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "6aca1bd9c0de2d7c",
       "lines": [
-        5999
+        6004
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -13237,7 +13252,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "9b9a624dee3e84d5",
       "lines": [
-        6506
+        6511
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -13251,7 +13266,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "349c7436cdf9091a",
       "lines": [
-        6347
+        6352
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -13294,7 +13309,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "d1c6bd7d2ba1e898",
       "lines": [
-        5441
+        5446
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -13406,7 +13421,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "ea81cec6709e7f98",
       "lines": [
-        5393
+        5398
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -13462,7 +13477,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "ca7b725d9a067833",
       "lines": [
-        5471
+        5476
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -13533,7 +13548,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "4359dba2d4c2b3f0",
       "lines": [
-        5455
+        5460
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -13855,7 +13870,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "071c7af6a2e9c097",
       "lines": [
-        6177
+        6182
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -14013,7 +14028,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "bf4b2f0b50f62ab0",
       "lines": [
-        5391
+        5396
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -14083,7 +14098,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "f7256c5ae6762fa0",
       "lines": [
-        5448
+        5453
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -14223,7 +14238,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "5ff29a28a60fd67e",
       "lines": [
-        5389
+        5394
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -14409,7 +14424,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "5307e34ad0f61a9e",
       "lines": [
-        6642
+        6647
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -14437,7 +14452,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "396596ba584c843c",
       "lines": [
-        5670
+        5675
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -14465,8 +14480,8 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "2e7408a3d23d9baf",
       "lines": [
-        5456,
-        5467
+        5461,
+        5472
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -14606,7 +14621,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "e13eb78cd58ddd54",
       "lines": [
-        5445
+        5450
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -14776,7 +14791,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "71daae8d5e6c179d",
       "lines": [
-        6197
+        6202
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -14975,7 +14990,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "9d505ca42a86056c",
       "lines": [
-        6488
+        6493
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -15215,7 +15230,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "c21eac83f8067f6a",
       "lines": [
-        6487
+        6492
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -15229,8 +15244,8 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "4ead7715bec881ab",
       "lines": [
-        6290,
-        6346
+        6295,
+        6351
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -15272,7 +15287,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "4f321d73958cc3e1",
       "lines": [
-        5444
+        5449
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -15314,7 +15329,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "acffa1037ce555cf",
       "lines": [
-        5392
+        5397
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -15328,7 +15343,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "4e23199e42d7b2de",
       "lines": [
-        6190
+        6195
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -15371,7 +15386,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "cb6de3f73d5423cd",
       "lines": [
-        5467
+        5472
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -15513,8 +15528,8 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "4bd77c7a849d5282",
       "lines": [
-        5455,
-        5456
+        5460,
+        5461
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -15670,7 +15685,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "4c9282db588f4a20",
       "lines": [
-        5448
+        5453
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -15796,7 +15811,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "c580cc8052704ccc",
       "lines": [
-        5390
+        5395
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -15880,8 +15895,8 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "cc0d0256667658f0",
       "lines": [
-        6132,
-        6348
+        6137,
+        6353
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -16108,7 +16123,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "abf289e60455854b",
       "lines": [
-        6015
+        6020
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -16193,7 +16208,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "586ccc7cd565dc5d",
       "lines": [
-        5373
+        5378
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -17041,7 +17056,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "b0c7d5e82e87002a",
       "lines": [
-        6559
+        6564
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -17097,7 +17112,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "6f6bf812b1cebbe8",
       "lines": [
-        6159
+        6164
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -17111,7 +17126,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "b154c8bbda615f2e",
       "lines": [
-        6141
+        6146
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -17125,7 +17140,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "6d370f6d0fe7a8e3",
       "lines": [
-        6150
+        6155
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -17265,7 +17280,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "e58de535ee79e62f",
       "lines": [
-        5608
+        5613
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -17434,7 +17449,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "69a6a019f7fbee8e",
       "lines": [
-        5612
+        5617
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -17645,7 +17660,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "f44ce8226f5d6089",
       "lines": [
-        5616
+        5621
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -17659,7 +17674,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "6b555d87c04fc034",
       "lines": [
-        5620
+        5625
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -17772,7 +17787,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "dfb4048404384f6e",
       "lines": [
-        6549
+        6554
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -18222,7 +18237,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "4d6e9184fb93b437",
       "lines": [
-        6569
+        6574
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -18264,7 +18279,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "7d72016d1e463b9f",
       "lines": [
-        5604
+        5609
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -18349,7 +18364,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "56c4656db90e5bdb",
       "lines": [
-        5624
+        5629
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -20233,7 +20248,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "ba3e52259b55bd6b",
       "lines": [
-        5888
+        5893
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -20247,7 +20262,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "f7807ca3853870b1",
       "lines": [
-        5888
+        5893
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -20261,7 +20276,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "89b0c7d36098eaaf",
       "lines": [
-        5882
+        5887
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -20275,7 +20290,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "1ead355c64755e4c",
       "lines": [
-        5882
+        5887
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -22614,7 +22629,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "285645798b9f33e6",
       "lines": [
-        6393
+        6398
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -22628,7 +22643,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "7269f94220e64e9f",
       "lines": [
-        6392
+        6397
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -22642,7 +22657,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "841831b41695e9b0",
       "lines": [
-        6394
+        6399
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -22656,7 +22671,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "cd72888e874f153c",
       "lines": [
-        6393
+        6398
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -22670,7 +22685,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "8b9b3b3280b30fd5",
       "lines": [
-        6392
+        6397
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -22684,7 +22699,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "6c649cf3e7731020",
       "lines": [
-        6387
+        6392
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -22698,7 +22713,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "a53c4100633d81f2",
       "lines": [
-        6388
+        6393
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -22712,7 +22727,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "0c52711daf66118a",
       "lines": [
-        6383
+        6388
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -22726,7 +22741,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "df1a3dca412c456d",
       "lines": [
-        6383
+        6388
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -22740,7 +22755,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "88bb73b2309588b2",
       "lines": [
-        6382
+        6387
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -22754,7 +22769,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "e5b4b6ffec4a6f6e",
       "lines": [
-        6386
+        6391
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -23038,7 +23053,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "0a52b2939b8ec934",
       "lines": [
-        5754
+        5759
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -23052,7 +23067,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "75778294377da7ac",
       "lines": [
-        5751
+        5756
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -23066,7 +23081,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "bb8fd733623e5c16",
       "lines": [
-        6075
+        6080
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -23080,8 +23095,8 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "3d18f28e6fa37b4d",
       "lines": [
-        6075,
-        6076
+        6080,
+        6081
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -23095,7 +23110,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "2c7ced50e2f81d6f",
       "lines": [
-        6077
+        6082
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -23109,7 +23124,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "a47860001ff57afd",
       "lines": [
-        6082
+        6087
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -23290,7 +23305,7 @@
       "lines": [
         4725,
         4786,
-        5169
+        5174
       ],
       "occurrences": 3,
       "origin": "legacy",
@@ -23332,7 +23347,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "0662e78cc333271a",
       "lines": [
-        6012
+        6017
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -23346,7 +23361,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "63e1c1f20551d1ee",
       "lines": [
-        5362
+        5367
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -23630,7 +23645,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "3fb8eecac1881c81",
       "lines": [
-        6009
+        6014
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -23842,7 +23857,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "48fcd8a2ac08765f",
       "lines": [
-        5165
+        5170
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -24281,7 +24296,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "accf9244dfc3fe51",
       "lines": [
-        6010
+        6015
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -24508,7 +24523,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "f3f04532f362c181",
       "lines": [
-        6007
+        6012
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -25200,7 +25215,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "e7cff7421a156446",
       "lines": [
-        6008
+        6013
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -25358,7 +25373,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "e6e132ef40ac83dc",
       "lines": [
-        5169
+        5174
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -25814,7 +25829,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "e3e3781124e5657b",
       "lines": [
-        6466
+        6471
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -25856,7 +25871,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "9150bb0bbf61cc3d",
       "lines": [
-        5363
+        5368
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -26076,7 +26091,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "00ec9e6d8512f1d4",
       "lines": [
-        6011
+        6016
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -26161,7 +26176,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "d62481a77db38af3",
       "lines": [
-        6594
+        6599
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -26543,7 +26558,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "d1c274f2d95fb114",
       "lines": [
-        6268
+        6273
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -26601,7 +26616,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "1437c35ae009e0cf",
       "lines": [
-        6302
+        6307
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -26629,7 +26644,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "226a590a28d18f6c",
       "lines": [
-        5470
+        5475
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -26699,8 +26714,8 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "e92bf010304edfe8",
       "lines": [
-        5475,
-        5988
+        5480,
+        5993
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -26714,7 +26729,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "6e00631cb14afb8b",
       "lines": [
-        6005
+        6010
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -26799,7 +26814,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "5c43a1350dafe059",
       "lines": [
-        6308
+        6313
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -26995,7 +27010,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "8786787fdc4d4719",
       "lines": [
-        6228
+        6233
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -27037,7 +27052,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "ce852ab0a215cb30",
       "lines": [
-        6318
+        6323
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -27093,7 +27108,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "df270ffb9ceb046e",
       "lines": [
-        6138
+        6143
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -27107,7 +27122,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "882736cd69d0151d",
       "lines": [
-        6131
+        6136
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -27121,7 +27136,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "be1c7bd5bd0b6c92",
       "lines": [
-        6289
+        6294
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -27191,7 +27206,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "2a000939bd53438b",
       "lines": [
-        5447
+        5452
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -27206,8 +27221,8 @@
       "id": "adfa476337cf6a97",
       "lines": [
         2761,
-        5259,
-        5458
+        5264,
+        5463
       ],
       "occurrences": 3,
       "origin": "legacy",
@@ -27307,7 +27322,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "6ae37fd459b6e37b",
       "lines": [
-        6591
+        6596
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -27764,8 +27779,8 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "3c58ec863bd73d42",
       "lines": [
-        6563,
-        6564
+        6568,
+        6569
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -27889,7 +27904,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "750fc84c2d40b2ce",
       "lines": [
-        5463
+        5468
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -28059,7 +28074,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "d2a745c4348db4ee",
       "lines": [
-        5992
+        5997
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -28073,7 +28088,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "90a2f99cb5de8537",
       "lines": [
-        6304
+        6309
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -28400,7 +28415,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "db1f08fd9d86d371",
       "lines": [
-        5266
+        5271
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -28824,7 +28839,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "6764ca000baf98f2",
       "lines": [
-        6156
+        6161
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -28838,8 +28853,8 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "3072bec6ca88eeae",
       "lines": [
-        5261,
-        5460
+        5266,
+        5465
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -29490,7 +29505,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "a7f7726743966ade",
       "lines": [
-        5595
+        5600
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -29504,7 +29519,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "cb5ba8e758d47c49",
       "lines": [
-        6310
+        6315
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -29518,7 +29533,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "6a1faf19067e3def",
       "lines": [
-        5588
+        5593
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -30844,7 +30859,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "d68bbe55314fedf2",
       "lines": [
-        5265
+        5270
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -30970,7 +30985,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "786a204855bcbfb4",
       "lines": [
-        5996
+        6001
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -31535,7 +31550,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "9e961f78ddd61064",
       "lines": [
-        5263
+        5268
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -32534,7 +32549,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "b4b43041d54d37f7",
       "lines": [
-        6164
+        6169
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -32984,7 +32999,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "27c6c539394ad62f",
       "lines": [
-        5858
+        5863
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -32998,7 +33013,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "396c3773e55ad69d",
       "lines": [
-        6000
+        6005
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -33061,7 +33076,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "a2effb31497beab5",
       "lines": [
-        5461
+        5466
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -33159,7 +33174,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "083054812f68e6d1",
       "lines": [
-        5264
+        5269
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -33173,7 +33188,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "f9eed1774ab883ea",
       "lines": [
-        5262
+        5267
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -33429,8 +33444,8 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "67dc4641095b7e7b",
       "lines": [
-        6553,
-        6554
+        6558,
+        6559
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -33444,8 +33459,8 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "4c906a9960289428",
       "lines": [
-        6573,
-        6574
+        6578,
+        6579
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -33613,7 +33628,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "83bf0f711190cba3",
       "lines": [
-        6147
+        6152
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -34462,7 +34477,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "6782f944f1fb76ee",
       "lines": [
-        5780
+        5785
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -34476,7 +34491,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "ae2359f9c326357a",
       "lines": [
-        5782
+        5787
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -34490,7 +34505,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "b7c2f3f7c1d6ecef",
       "lines": [
-        5781
+        5786
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -34504,7 +34519,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "39f17e50b120c59b",
       "lines": [
-        5462
+        5467
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -34561,7 +34576,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "6d275a17a522939e",
       "lines": [
-        6134
+        6139
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -34949,7 +34964,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "2cf521376bc1b54c",
       "lines": [
-        6278
+        6283
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -34963,7 +34978,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "52270afc6f68576d",
       "lines": [
-        6278
+        6283
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -35126,7 +35141,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "acb0c22b694a382e",
       "lines": [
-        5769
+        5774
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -35417,7 +35432,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "656e3c410091772e",
       "lines": [
-        5154
+        5159
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -35431,7 +35446,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "e82a303e8f55c7b4",
       "lines": [
-        5155
+        5160
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -35473,7 +35488,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "34098ed6ecf973e9",
       "lines": [
-        5153
+        5158
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -36076,7 +36091,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "a681c064d38ef827",
       "lines": [
-        5642
+        5647
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -36090,7 +36105,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "0cd886c31df2a432",
       "lines": [
-        5666
+        5671
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -36104,7 +36119,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "ad00e436d6ade5b6",
       "lines": [
-        5667
+        5672
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -36118,7 +36133,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "fd10fa2b6c5049ab",
       "lines": [
-        5643
+        5648
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -37115,7 +37130,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "14bdc617ea98aef4",
       "lines": [
-        5152
+        5157
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -37159,7 +37174,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "163762d2e6bf190c",
       "lines": [
-        6253
+        6258
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -37173,7 +37188,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "1f9ea56a00aaf008",
       "lines": [
-        6253
+        6258
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -37187,7 +37202,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "0406070467365206",
       "lines": [
-        6253
+        6258
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -37459,7 +37474,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "dd3ccc80b416032b",
       "lines": [
-        5320
+        5325
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -37473,7 +37488,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "abf9de50efbbc83a",
       "lines": [
-        5320
+        5325
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -37487,7 +37502,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "1b8da476bb5f3ce7",
       "lines": [
-        5320
+        5325
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -37501,7 +37516,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "eaab27dc2a53180f",
       "lines": [
-        5320
+        5325
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -37515,7 +37530,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "944cac98743a8594",
       "lines": [
-        5320
+        5325
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -37543,7 +37558,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "c6fd3a4ceeccaf1d",
       "lines": [
-        5255
+        5260
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -37557,7 +37572,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "6094d387109491c0",
       "lines": [
-        5255
+        5260
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -37726,7 +37741,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "69535c5f35f16fd1",
       "lines": [
-        5324
+        5329
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -37984,7 +37999,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "ba5e59c882f1f6bc",
       "lines": [
-        5826
+        5831
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -38055,11 +38070,11 @@
       "id": "3fb1fe142b631bed",
       "lines": [
         4921,
-        5247,
-        5777,
-        5793,
-        5826,
-        5827
+        5252,
+        5782,
+        5798,
+        5831,
+        5832
       ],
       "occurrences": 6,
       "origin": "legacy",
@@ -38185,7 +38200,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "055d0419b5140c92",
       "lines": [
-        5705
+        5710
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -38526,7 +38541,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "0a10356e6fc5f88d",
       "lines": [
-        6459
+        6464
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -38772,7 +38787,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "c5ff434ddf778cea",
       "lines": [
-        6670
+        6675
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -38970,7 +38985,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "17460750fae90844",
       "lines": [
-        6268
+        6273
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -38986,7 +39001,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "254b877eca26373d",
       "lines": [
-        6268
+        6273
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -39000,7 +39015,7 @@
       "file": "src/pages/DashboardViewPage.tsx",
       "id": "a72f859e1fd9580f",
       "lines": [
-        6268
+        6273
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -39024,11 +39039,11 @@
     }
   ],
   "summary": {
-    "catalogRecords": 727,
+    "catalogRecords": 728,
     "documentRecords": 1,
     "legacyOccurrences": 2509,
     "legacyRecords": 2076,
-    "totalRecords": 2804
+    "totalRecords": 2805
   },
   "version": 1
 }
