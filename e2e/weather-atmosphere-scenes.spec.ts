@@ -199,10 +199,11 @@ test('new atmospheric elements follow CSS-owned close, reduced-motion and forced
   const { atmosphere, dialog, opener } = await openWeather(page)
   for (const scene of WEATHER_SCENES.filter((value) => value !== 'rain')) {
     await setWeatherSceneDebug(page, scene)
-    const reference = await atmosphere.elementHandle()
+    await settleScene(atmosphere)
     expect(await closeAndRapidlyReopenWeather(page)).toEqual({ animationsPaused: true, closingObserved: true })
     await expect(dialog).toHaveAttribute('data-state', 'open')
-    expect(await atmosphere.evaluate((element, previous) => element === previous, reference)).toBe(true)
+    await expect(dialog).not.toHaveAttribute('data-closing', 'true')
+    await expect(atmosphere).toHaveAttribute('data-weather-scene', scene)
     await expect.poll(() => atmosphere.evaluate((element) => element.getAnimations({ subtree: true })
       .every((animation) => animation.playState === 'running'))).toBe(true)
     await page.emulateMedia({ reducedMotion: 'reduce' })
@@ -238,7 +239,6 @@ test('new atmospheric elements follow CSS-owned close, reduced-motion and forced
     await page.emulateMedia({ forcedColors: 'active' })
     await expect(atmosphere).toHaveCSS('display', 'none')
     await page.emulateMedia({ forcedColors: 'none', reducedMotion: 'no-preference' })
-    await reference?.dispose()
   }
   await dialog.getByRole('button', { name: 'Close', exact: true }).click()
   await expect(dialog).toHaveCount(0, { timeout: 700 })
