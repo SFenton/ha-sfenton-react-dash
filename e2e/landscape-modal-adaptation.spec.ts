@@ -1,3 +1,4 @@
+// @covers src/components/core/ModalSheet.module.css
 import { expect, test, type Locator, type Page } from './layout/fixture'
 import type { ModalBodyTier } from '../src/components/core/modalSheetPresentation'
 import { setSafeAreaInsets } from './safe-area'
@@ -75,7 +76,7 @@ const CASES: AdaptiveModalCase[] = [
     id: 'vacuum',
     open: (page) => openButtonModal(page, 'vacuums', /Main Floor Docked/i),
     splitPair: ['[aria-label$="map and status"]', '[data-scroll-region="vacuum-panel"]'],
-    splitTiers: ['wide'],
+    splitTiers: ['fields', 'standard', 'wide'],
   },
   {
     id: 'thermostat-room',
@@ -125,7 +126,7 @@ test.describe('non-room landscape modal adaptation', () => {
     { expectedTier: 'standard' as const, height: 343, width: 734 },
     { expectedTier: 'wide' as const, height: 393, width: 852 },
   ]) {
-    test(`uses measured tiers and one body scroll owner at ${viewport.width}x${viewport.height}`, async ({ page }) => {
+    test(`uses measured tiers and one vertical scroll owner at ${viewport.width}x${viewport.height}`, async ({ page }) => {
       test.setTimeout(120_000)
       for (const modalCase of CASES) {
         await page.setViewportSize(viewport)
@@ -137,9 +138,17 @@ test.describe('non-room landscape modal adaptation', () => {
         expect(body).not.toBeNull()
         const expectedTier = viewport.expectedTier
         expect(body?.tier).toBe(expectedTier)
-        expect(['auto', 'scroll']).toContain(body?.bodyOverflow)
-        for (const region of await dialog.locator('[data-scroll-region]').all()) {
-          await expect(region).toHaveCSS('overflow-y', 'visible')
+        const usesVacuumPaneScroll = modalCase.id === 'vacuum'
+        if (usesVacuumPaneScroll) {
+          expect(body?.bodyOverflow).toBe('hidden')
+          const rightPane = dialog.locator('[data-scroll-region="vacuum-panel"]')
+          await expect(rightPane).toHaveCSS('overflow-y', 'auto')
+          await expect(rightPane).toHaveCSS('overscroll-behavior-y', 'auto')
+        } else {
+          expect(['auto', 'scroll']).toContain(body?.bodyOverflow)
+          for (const region of await dialog.locator('[data-scroll-region]').all()) {
+            await expect(region).toHaveCSS('overflow-y', 'visible')
+          }
         }
 
         if (modalCase.splitPair) {
@@ -151,7 +160,12 @@ test.describe('non-room landscape modal adaptation', () => {
           expect(split, `${modalCase.id} ${expectedTier} split state`).toBe(modalCase.splitTiers?.includes(expectedTier) ?? false)
         }
 
-        if ((body?.bodyScrollHeight ?? 0) > (body?.bodyClientHeight ?? 0) + 1) {
+        if (usesVacuumPaneScroll) {
+          await expect.poll(() => dialog.locator('[data-scroll-region="vacuum-panel"]').evaluate((element) => {
+            element.scrollTop = element.scrollHeight
+            return element.scrollTop
+          })).toBeGreaterThan(0)
+        } else if ((body?.bodyScrollHeight ?? 0) > (body?.bodyClientHeight ?? 0) + 1) {
           await expect.poll(() => dialog.locator('[data-modal-sheet-body="true"]').evaluate((element) => {
             element.scrollTop = element.scrollHeight
             return element.scrollTop
@@ -345,6 +359,87 @@ test.describe('non-room landscape modal adaptation', () => {
       expect(geometry.bottom).toBeLessThanOrEqual(geometry.safeBottom - 7)
       expect(geometry.bodyOverflow).toBeLessThanOrEqual(1)
       expect(geometry.panesSplit).toBe(true)
+      await dialog.getByRole('button', { exact: true, name: 'Close' }).click()
+      await expect(dialog).toHaveCount(0, { timeout: 700 })
+    }
+  })
+
+  test('keeps the vacuum map stationary while right-side locate and controls scroll', async ({ page }) => {
+    for (const viewport of [
+      { height: 393, insets: { bottom: 21, left: 59, right: 44, top: 0 }, width: 852 },
+      { height: 393, insets: { bottom: 21, left: 44, right: 59, top: 0 }, width: 852 },
+      { height: 393, insets: { bottom: 0, left: 0, right: 0, top: 0 }, width: 852 },
+      { height: 682, insets: { bottom: 0, left: 0, right: 0, top: 0 }, width: 776 },
+      { height: 343, insets: { bottom: 0, left: 0, right: 0, top: 0 }, width: 734 },
+      { height: 375, insets: { bottom: 0, left: 0, right: 0, top: 0 }, width: 667 },
+      { height: 320, insets: { bottom: 0, left: 0, right: 0, top: 0 }, width: 568 },
+    ]) {
+      await page.setViewportSize({ height: viewport.height, width: viewport.width })
+      const dialog = await CASES[3].open(page)
+      await setSafeAreaInsets(page, viewport.insets)
+      await expect(dialog).toHaveAttribute('data-modal-presentation', /^(?:dialog|landscape-dialog)$/)
+
+      const body = dialog.locator('[data-modal-sheet-body="true"]')
+      const leftPane = dialog.locator('[aria-label$="map and status"]')
+      const rightPane = dialog.locator('[data-scroll-region="vacuum-panel"]')
+      const map = dialog.getByRole('region', { name: 'Main Floor Valetudo map' })
+      const locate = rightPane.getByRole('button', { name: 'Locate' })
+      const rightContent = rightPane.locator(':scope > *')
+      const dockStatus = rightPane.getByRole('group', { name: /^Dock Status/ })
+      await expect(map).toBeVisible()
+      await expect(locate).toBeVisible()
+      await expect(dockStatus).toBeVisible()
+      await expect(body).toHaveCSS('overflow-y', 'hidden')
+      await expect(leftPane).toHaveCSS('overflow-y', 'hidden')
+      await expect(leftPane.locator('[data-vacuum-map-status-controls="true"]')).toBeHidden()
+      await expect(rightPane).toHaveCSS('overflow-y', 'auto')
+      await expect(rightPane).toHaveCSS('overscroll-behavior-y', 'auto')
+      const statusGridItems = await dockStatus.locator('..').locator('..').locator(':scope > *').evaluateAll((elements) =>
+        elements.map((element) => element.querySelector('[aria-label]')?.getAttribute('aria-label') ?? element.textContent?.trim() ?? ''))
+      const dockStatusIndex = statusGridItems.findIndex((item) => item.startsWith('Dock Status'))
+      expect(dockStatusIndex).toBeGreaterThanOrEqual(0)
+      expect(statusGridItems.indexOf('Locate')).toBe(dockStatusIndex + 1)
+
+      const scrollRanges = await Promise.all([
+        body.evaluate((element) => element.scrollHeight - element.clientHeight),
+        leftPane.evaluate((element) => element.scrollHeight - element.clientHeight),
+        rightPane.evaluate((element) => element.scrollHeight - element.clientHeight),
+      ])
+      expect(scrollRanges[0]).toBeLessThanOrEqual(1)
+      expect(scrollRanges[1]).toBeLessThanOrEqual(1)
+      expect(scrollRanges[2]).toBeGreaterThan(1)
+
+      const before = await Promise.all([map.boundingBox(), locate.boundingBox(), rightContent.boundingBox()])
+      await expect.poll(() => rightPane.evaluate((element) => {
+        element.scrollTop = element.scrollHeight
+        return element.scrollTop
+      })).toBeGreaterThan(0)
+      const atBottom = await Promise.all([map.boundingBox(), locate.boundingBox(), rightContent.boundingBox()])
+
+      expect(Math.abs((atBottom[0]?.y ?? 0) - (before[0]?.y ?? 0))).toBeLessThanOrEqual(1)
+      expect((atBottom[1]?.y ?? 0)).toBeLessThan((before[1]?.y ?? 0) - 1)
+      expect((atBottom[2]?.y ?? 0)).toBeLessThan((before[2]?.y ?? 0) - 1)
+      expect(await body.evaluate((element) => element.scrollTop)).toBe(0)
+      expect(await leftPane.evaluate((element) => element.scrollTop)).toBe(0)
+
+      const rightBox = await rightPane.boundingBox()
+      expect(rightBox).not.toBeNull()
+      await page.mouse.move((rightBox?.x ?? 0) + (rightBox?.width ?? 0) / 2, (rightBox?.y ?? 0) + (rightBox?.height ?? 0) / 2)
+      await page.mouse.wheel(0, 1_000)
+      await dialog.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))))
+      const beyondBottom = await map.boundingBox()
+      expect(Math.abs((beyondBottom?.y ?? 0) - (before[0]?.y ?? 0))).toBeLessThanOrEqual(1)
+
+      await rightPane.evaluate((element) => { element.scrollTop = 0 })
+      await expect.poll(() => rightPane.evaluate((element) => element.scrollTop)).toBe(0)
+      await page.mouse.wheel(0, -1_000)
+      await dialog.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))))
+      const beyondTop = await Promise.all([map.boundingBox(), locate.boundingBox()])
+      expect(Math.abs((beyondTop[0]?.y ?? 0) - (before[0]?.y ?? 0))).toBeLessThanOrEqual(1)
+      expect(Math.abs((beyondTop[1]?.y ?? 0) - (before[1]?.y ?? 0))).toBeLessThanOrEqual(1)
+      expect(await body.evaluate((element) => element.scrollTop)).toBe(0)
+      expect(await leftPane.evaluate((element) => element.scrollTop)).toBe(0)
+
       await dialog.getByRole('button', { exact: true, name: 'Close' }).click()
       await expect(dialog).toHaveCount(0, { timeout: 700 })
     }

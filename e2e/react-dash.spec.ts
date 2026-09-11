@@ -4284,7 +4284,10 @@ test('vacuum area editor draws, moves, resizes, zooms, and sends exact script ge
   await expect(mainMapOverlay).toBeVisible()
   await expect(mainMapOverlay.locator('[data-map-rect="true"]')).toHaveAttribute('data-x0', String(resizedRect.x0))
   await expect(mainMapOverlay.locator('[data-map-rect="true"]')).toHaveAttribute('data-y1', String(resizedRect.y1))
-  await dialog.getByRole('group', { name: 'Cleaning target' }).getByRole('button', { name: 'Rooms' }).click()
+  const targetGroup = dialog.getByRole('group', { name: 'Cleaning target' })
+  await targetGroup.getByRole('button', { name: 'Rooms' }).click()
+  await expect(dialog.getByRole('tab', { name: 'Rooms' })).toHaveAttribute('aria-selected', 'true')
+  await dialog.getByRole('tab', { name: 'Controls' }).click()
   await dialog.getByRole('group', { name: 'Cleaning target' }).getByRole('button', { name: 'Area' }).click()
   await expect(dialog.locator('[data-map-editor-overlay="true"] [data-map-rect="true"]')).toBeVisible()
   await dialog.getByRole('button', { name: 'Use This Area' }).click()
@@ -4354,7 +4357,7 @@ test('vacuum area controls remain usable at the narrow mobile target', async ({ 
   expect(editorGeometry.mapHeight).toBeGreaterThanOrEqual(200)
 })
 
-test('vacuum map keeps stable desktop dimensions across targets and tabs', async ({ page }) => {
+test('vacuum map restores stable desktop dimensions after area editing and across tabs', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 760 })
   await page.goto('/at-a-glance/vacuums')
   await page.getByRole('button', { name: /Main Floor Docked/i }).click()
@@ -4365,12 +4368,16 @@ test('vacuum map keeps stable desktop dimensions across targets and tabs', async
 
   await dialog.getByRole('group', { name: 'Cleaning target' }).getByRole('button', { name: 'Area' }).click()
   const areaBox = await map.boundingBox()
+  await expect(dialog.getByRole('heading', { name: 'Main Floor Cleaning Area' })).toBeVisible()
   await dialog.getByRole('button', { name: 'Back to controls' }).click()
+  await expect(dialog.getByRole('heading', { name: 'Docked' })).toBeVisible()
+  const restoredBox = await map.boundingBox()
   await dialog.getByRole('tab', { name: 'Rooms' }).click()
   const zonesBox = await map.boundingBox()
-
   expect(areaBox?.width ?? 0).toBeGreaterThan(roomsBox?.width ?? 0)
-  expect(areaBox?.height ?? 0).toBeGreaterThan(roomsBox?.height ?? 0)
+  expect(areaBox?.width ?? 0).toBeGreaterThan(roomsBox?.width ?? 0)
+  expect(Math.abs((restoredBox?.width ?? 0) - (roomsBox?.width ?? 0))).toBeLessThanOrEqual(1)
+  expect(Math.abs((restoredBox?.height ?? 0) - (roomsBox?.height ?? 0))).toBeLessThanOrEqual(1)
   expect(Math.abs((zonesBox?.width ?? 0) - (roomsBox?.width ?? 0))).toBeLessThanOrEqual(1)
   expect(Math.abs((zonesBox?.height ?? 0) - (roomsBox?.height ?? 0))).toBeLessThanOrEqual(1)
 })

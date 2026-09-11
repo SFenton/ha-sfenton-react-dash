@@ -120,16 +120,18 @@ async function stateFacts(page: Page, dialog: Locator, scenario: ScenarioId, sta
     const modalBody = dialog.locator('[data-area-editor="false"]')
     const canShowTwoPanes = await modalBody.evaluate((element) => getComputedStyle(element).gridTemplateColumns.split(' ').filter(Boolean).length >= 2)
     const constrained = facts.presentation === 'landscape-dialog' && canShowTwoPanes
+    const viewportLayout = await pane.getAttribute('data-vacuum-viewport-layout')
+    const landscapeMap = viewportLayout === 'short-landscape' || viewportLayout === 'tall-landscape'
     await expect(pane).toHaveAttribute('data-map-status-layout', constrained ? 'split' : 'stacked')
-    await expect(map).toHaveAttribute('data-map-display', constrained ? 'fitted' : 'contained')
-    if (constrained) {
+    await expect(map).toHaveAttribute('data-map-display', landscapeMap ? 'fitted' : 'contained')
+    if (landscapeMap) {
       await expect(pane.getByRole('heading', { name: 'Status' })).toHaveCount(0)
       await expect(pane.getByRole('heading', { name: 'Actions' })).toHaveCount(0)
-      await expect(pane.getByRole('button', { name: 'Locate' })).toBeVisible()
+      await expect(pane.getByRole('button', { name: 'Locate' })).toHaveCount(0)
+      await expect(dialog.locator('[data-scroll-region="vacuum-panel"]').getByRole('button', { name: 'Locate' })).toBeVisible()
       const geometry = await pane.evaluate((element) => {
         const mapFrame = element.querySelector<HTMLElement>('[data-valetudo-map-frame="true"]')
         const mapStage = element.querySelector<HTMLElement>('[data-vacuum-map-stage="true"]')
-        const status = element.querySelector<HTMLElement>('[data-vacuum-map-status-controls="true"]')
         const mapRect = mapFrame?.getBoundingClientRect()
         const naturalAspect = mapFrame ? Number.parseFloat(getComputedStyle(mapFrame).getPropertyValue('--map-aspect-ratio')) : 0
         return {
@@ -141,14 +143,14 @@ async function stateFacts(page: Page, dialog: Locator, scenario: ScenarioId, sta
             const controls = element.querySelector<HTMLElement>('[data-vacuum-map-status-controls="true"]')
             return controls ? controls.scrollHeight - controls.clientHeight : 0
           })(),
-          statusWidth: status?.getBoundingClientRect().width,
+          paneWidth: element.getBoundingClientRect().width,
         }
       })
       expect(geometry.overflow).toBeLessThanOrEqual(1)
       expect(geometry.statusOverflow).toBeLessThanOrEqual(1)
       expect(geometry.naturalAspect).toBeGreaterThan(0)
       expect(geometry.mapAspect).toBeCloseTo(geometry.naturalAspect, 1)
-      expect(geometry.mapStageWidth).toBeLessThanOrEqual((geometry.statusWidth ?? 0) + 1)
+      expect(geometry.mapStageWidth).toBeLessThanOrEqual((geometry.paneWidth ?? 0) + 1)
       facts.vacuum = geometry
     } else {
       await expect(pane.getByRole('heading', { name: 'Status' })).toHaveCount(0)
