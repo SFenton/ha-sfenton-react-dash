@@ -1,4 +1,7 @@
 {
+  "groceries": {
+    "emptyDescription": "Add some groceries to see them appear."
+  },
   "delete": {
     "cancel": "Cancel",
     "confirm": "OK",

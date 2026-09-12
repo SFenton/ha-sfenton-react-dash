@@ -1,6 +1,6 @@
 import type { CardColor } from '../components/core/Card'
 import { MASTER_BEDROOM_HUMIDIFIER } from './humidifiers'
-import { copy } from '../i18n'
+import { copy, PAGE_FOOD_COPY_KEYS, PAGE_FOOD_COPY_NAMESPACE } from '../i18n'
 import type { OptimisticActionMetadata } from './actionIntents'
 
 export type EntityBasicAction =
@@ -451,7 +451,7 @@ export const TODO_PAGES: Record<string, TodoPageConfig> = {
   groceries: {
     title: 'Groceries',
     emptyTitle: 'No Groceries Listed',
-    emptyDescription: 'Add some groceries via the YAML app for now to see them appear here.',
+    emptyDescription: copy(PAGE_FOOD_COPY_NAMESPACE, PAGE_FOOD_COPY_KEYS.groceries.emptyDescription),
     lists: [{ title: 'Grocery List', entityId: 'todo.shopping_list' }],
   },
   'stephens-chores': {

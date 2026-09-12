@@ -13,6 +13,10 @@ import { ROOM_PAGE_CONFIGS, ROOM_PAGE_ORDER } from '../constants/roomPages'
 import { LEGACY_VACUUM_OUTCOMES, NINE_ROOM_VACUUM_OUTCOME_CONTRACT } from '../test/fixtures/vacuumOutcomes'
 import { entity, mockCallServiceCalls, mockDonetickTasksById, mockEntities, mockFreeSleepScheduleAttributes, mockScheduleMessages, mockState, mockTodoItemsByEntity, resetMockHass, setMockEntityState } from '../test/mocks/hakitCoreState'
 
+// @covers src/constants/portedDashboard.ts
+// @covers src/i18n/index.ts
+// @covers src/i18n/locales/en/pages/food.json
+
 type MockDecodeCallback = (
   result: { getText: () => string } | undefined,
   error: { message?: string, name?: string } | undefined,
@@ -7569,7 +7573,7 @@ describe('DashboardViewPage', () => {
 
     await waitFor(() => expect(screen.queryByRole('heading', { name: 'Grocery List' })).not.toBeInTheDocument())
     expect(await screen.findByRole('heading', { name: 'No Groceries Listed' })).toBeInTheDocument()
-    expect(screen.getByText('Add some groceries via the YAML app for now to see them appear here.')).toBeInTheDocument()
+    expect(screen.getByText('Add some groceries to see them appear.')).toBeInTheDocument()
     await waitFor(() => expect(scroller).toHaveAttribute('data-scroll-lock', 'true'))
     expect(screen.getByRole('heading', { name: 'No Groceries Listed' }).closest('[data-empty-todo-page]')).toHaveAttribute('data-empty-todo-page', 'true')
   })
