@@ -160,9 +160,12 @@ describe('EverShelfInventoryPanel item edit modal', () => {
     expect(inventoryServiceCalls()).toEqual([
       { domain: 'evershelf', service: 'delete_inventory', serviceData: { inventory_id: 102 } },
     ])
+    expect(screen.getByRole('dialog', { name: 'Canned Beans' })).toBeInTheDocument()
+    expect(within(dialog).getByRole('spinbutton', { name: `Quantity for Canned Beans ${SOON_BATCH}` })).toHaveTextContent('1')
+    expect(within(dialog).getByRole('button', { name: `Delete Canned Beans ${SOON_BATCH}` })).toBeEnabled()
   })
 
-  it('deletes only the selected batch when its full quantity is confirmed', async () => {
+  it('keeps the details modal open when another batch remains after deletion', async () => {
     const dialog = await openCannedBeansEditModal()
 
     mockCallServiceCalls.length = 0
@@ -175,6 +178,9 @@ describe('EverShelfInventoryPanel item edit modal', () => {
       { domain: 'evershelf', service: 'delete_inventory', serviceData: { inventory_id: 102 } },
       { domain: 'evershelf', service: 'delete_inventory', serviceData: { inventory_id: 106 } },
     ])
+    expect(screen.getByRole('dialog', { name: 'Canned Beans' })).toBeInTheDocument()
+    expect(within(dialog).queryByRole('spinbutton', { name: `Quantity for Canned Beans ${SOON_BATCH}` })).not.toBeInTheDocument()
+    expect(within(dialog).getByRole('spinbutton', { name: 'Quantity for Canned Beans' })).toHaveTextContent('3')
   })
 
   it('rejects a delete quantity outside the batch amount', async () => {
@@ -205,6 +211,7 @@ describe('EverShelfInventoryPanel item edit modal', () => {
     expect(inventoryServiceCalls()).toEqual([
       { domain: 'evershelf', service: 'delete_inventory', serviceData: { inventory_id: 205 } },
     ])
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Milk' })).not.toBeInTheDocument())
   })
 
   it('cancels a multi-item delete without changing EverShelf', async () => {

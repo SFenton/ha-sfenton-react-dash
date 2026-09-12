@@ -872,13 +872,30 @@ function inventoryDecreaseSteps(rows: InventoryBatchRow[], amount: number) {
   return { remainingRows, steps }
 }
 
+function inventoryBatchesAfterDelete(batches: InventoryBatch[], steps: InventoryDeleteStep[]) {
+  const stepsById = new Map(steps.map((step) => [step.inventoryId, step]))
+  return batches.flatMap((batch) => {
+    const rows = batch.rows.flatMap((row) => {
+      const step = stepsById.get(row.inventoryId)
+      if (!step) return [row]
+      if (step.quantity === undefined) return []
+      const quantity = row.quantity - step.quantity
+      return quantity > 0 ? [{ ...row, quantity }] : []
+    })
+    if (!rows.length) return []
+    return [{ ...batch, quantity: rows.reduce((total, row) => total + row.quantity, 0), rows }]
+  })
+}
+
 function useInventoryItemDetails({ active, item, locationLabel, onBusyChange, onComplete, onErrorChange, onInventoryChanged }: { active: boolean; item: EverShelfInventoryDisplayItem | null; locationLabel: string; onBusyChange?: (busy: boolean) => void; onComplete: () => void; onErrorChange?: (error: string | null) => void; onInventoryChanged: () => void }): EverShelfInventoryDetailsController {
   const callService = useHass((state) => state.helpers.callService) as unknown as CallService
   const [busyAction, setBusyAction] = useState<string | null>(null)
   const [deleteRequest, setDeleteRequest] = useState<InventoryDeleteRequest | null>(null)
   const [error, setError] = useState<string | null>(null)
   const title = item ? itemName(item) : 'Inventory Item'
-  const batches = useMemo(() => inventoryBatches(item, locationLabel), [item, locationLabel])
+  const sourceBatches = useMemo(() => inventoryBatches(item, locationLabel), [item, locationLabel])
+  const [optimisticBatches, setOptimisticBatches] = useState<InventoryBatch[] | null>(null)
+  const batches = optimisticBatches ?? sourceBatches
   const multipleBatches = batches.length > 1
   const [expiryDrafts, setExpiryDrafts] = useState<Record<string, string>>({})
   const [quantityDrafts, setQuantityDrafts] = useState<Record<string, number>>({})
@@ -889,7 +906,7 @@ function useInventoryItemDetails({ active, item, locationLabel, onBusyChange, on
 
   // Reopening the same item keeps this component mounted, so every batch draft and the busy/error
   // state is rebuilt from the latest Home Assistant data whenever the sheet opens.
-  const draftKey = active ? `${itemInstancesKey(item)}|${batches.map((batch) => `${batch.key}:${batch.quantity}`).join('|')}` : 'closed'
+  const draftKey = active ? `${itemInstancesKey(item)}|${sourceBatches.map((batch) => `${batch.key}:${batch.quantity}`).join('|')}` : 'closed'
   const [appliedDraftKey, setAppliedDraftKey] = useState(draftKey)
   if (appliedDraftKey !== draftKey) {
     setAppliedDraftKey(draftKey)
@@ -897,8 +914,9 @@ function useInventoryItemDetails({ active, item, locationLabel, onBusyChange, on
       setBusyAction(null)
       setDeleteRequest(null)
       setError(null)
-      setExpiryDrafts(Object.fromEntries(batches.map((batch) => [batch.key, batch.expiryDate])))
-      setQuantityDrafts(Object.fromEntries(batches.map((batch) => [batch.key, batch.quantity])))
+      setOptimisticBatches(null)
+      setExpiryDrafts(Object.fromEntries(sourceBatches.map((batch) => [batch.key, batch.expiryDate])))
+      setQuantityDrafts(Object.fromEntries(sourceBatches.map((batch) => [batch.key, batch.quantity])))
     }
   }
 
@@ -1032,6 +1050,7 @@ function useInventoryItemDetails({ active, item, locationLabel, onBusyChange, on
 
   const confirmDelete = (quantityToDelete: number) => {
     if (!deleteRequest) return
+    const totalQuantity = batches.reduce((total, batch) => total + batch.quantity, 0)
     const deleteSteps: InventoryDeleteStep[] = quantityToDelete < deleteRequest.availableQuantity
       ? inventoryDecreaseSteps(deleteRequest.rows, quantityToDelete).steps
       : deleteRequest.rows.map((row) => ({ inventoryId: row.inventoryId }))
@@ -1041,7 +1060,18 @@ function useInventoryItemDetails({ active, item, locationLabel, onBusyChange, on
     onBusyChange?.(true)
     updateError(null)
     void runDeleteSteps(deleteSteps)
-      .then(finishAction)
+      .then(() => {
+        onInventoryChanged()
+        if (quantityToDelete >= totalQuantity) {
+          onComplete()
+          return
+        }
+        const nextBatches = inventoryBatchesAfterDelete(batches, deleteSteps)
+        setOptimisticBatches(nextBatches)
+        setExpiryDrafts(Object.fromEntries(nextBatches.map((batch) => [batch.key, batch.expiryDate])))
+        setQuantityDrafts(Object.fromEntries(nextBatches.map((batch) => [batch.key, batch.quantity])))
+        setBusyAction(null)
+      })
       .catch((caughtError: unknown) => {
         setBusyAction(null)
         updateError(caughtError instanceof Error ? caughtError.message : 'Unable to delete item')
