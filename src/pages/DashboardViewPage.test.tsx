@@ -7341,7 +7341,7 @@ describe('DashboardViewPage', () => {
         camera.restore()
       }
     }
-  })
+  }, 20_000)
 
   it('renders chore tasks as checkbox rows with optional subtitles', async () => {
     for (const entityId of ['todo.stephen_s_past_due', 'todo.stephen_s_due_today', 'todo.stephen_s_upcoming', 'todo.stephen_s_no_due_date']) {

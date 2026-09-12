@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto'
 import { writeFile } from 'node:fs/promises'
 import { expect, test, type Locator, type Page } from './layout/fixture'
+import { LEGACY_ENGINE_SKIPS } from './layout/contracts'
 import { WEATHER_SCENES } from '../src/components/hass/weatherPresentation'
 import { setWeatherSceneDebug } from './weather-scene-debug'
 
@@ -195,7 +196,15 @@ test('Snow is a bounded scene-local SVG field across the canonical layouts', asy
   }
 })
 
-test('new atmospheric elements follow CSS-owned close, reduced-motion and forced-color lifecycle', async ({ page }) => {
+const WEBKIT_LIFECYCLE_RESTRICTION = LEGACY_ENGINE_SKIPS.find((rule) =>
+  rule.spec === 'weather-atmosphere-scenes.spec.ts'
+  && rule.title === 'new atmospheric elements follow CSS-owned close, reduced-motion and forced-color lifecycle'
+  && rule.browser === 'webkit')
+
+if (!WEBKIT_LIFECYCLE_RESTRICTION) throw new Error('Missing declared WebKit weather lifecycle restriction')
+
+test('new atmospheric elements follow CSS-owned close, reduced-motion and forced-color lifecycle', async ({ browserName, page }) => {
+  test.skip(browserName === WEBKIT_LIFECYCLE_RESTRICTION.browser, WEBKIT_LIFECYCLE_RESTRICTION.reason)
   const { atmosphere, dialog, opener } = await openWeather(page)
   for (const scene of WEATHER_SCENES.filter((value) => value !== 'rain')) {
     await setWeatherSceneDebug(page, scene)
