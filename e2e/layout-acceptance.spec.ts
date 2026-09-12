@@ -9,6 +9,33 @@ import { MUSIC_ROOM_REMOTE_ENTITY_ID } from '../src/constants/mediaRemotes'
 import { chatStateFacts, openChatState } from './chat-layout'
 import { isWakeScenario, openWakeRoomState, wakeRoomFacts, wakeStateFacts } from './layout/wakeLight'
 
+// @covers e2e/layout/app.ts
+// @covers e2e/layout/contracts.ts
+// @covers e2e/layout/scenarios.ts
+
+async function recipeGroceryFacts(dialog: Locator, state: string) {
+  const command = dialog.locator('[data-recipe-grocery-phase]')
+  if (state === 'ready') {
+    await expect(dialog.getByRole('button', { name: 'Add Missing Ingredients to Groceries' })).toBeEnabled()
+    await expect(command).toHaveAttribute('data-recipe-grocery-phase', '0')
+  } else if (state === 'loading') {
+    await expect(dialog.locator('[data-recipe-grocery-spinner="true"]')).toBeVisible()
+    await expect(command).toHaveAttribute('data-recipe-grocery-phase', '1')
+  } else {
+    await expect(dialog.locator('[data-recipe-grocery-check="true"]')).toBeVisible()
+    await expect(command).toHaveAttribute('data-recipe-grocery-phase', '3')
+    await expect(dialog.getByText('Missing ingredients were submitted.')).toHaveCount(0)
+  }
+  const facts = {
+    state,
+    commandHeight: await command.evaluate((element) => element.getBoundingClientRect().height),
+    visibleStatusCopy: await dialog.locator('[data-recipe-grocery-success="true"]:not([class*="visuallyHidden"])').count(),
+  }
+  expect(facts.commandHeight).toBeCloseTo(50, 0)
+  expect(facts.visibleStatusCopy).toBe(0)
+  return facts
+}
+
 async function stateFacts(page: Page, dialog: Locator, scenario: ScenarioId, state: string) {
   if (isWakeScenario(scenario)) return wakeStateFacts(dialog, scenario, state)
   const preferredScrollMode = scenario === 'remote' || scenario === 'vacuum' || (scenario === 'quick-links' && state === 'rooms') ? 'panes' : 'body'
@@ -94,6 +121,9 @@ async function stateFacts(page: Page, dialog: Locator, scenario: ScenarioId, sta
       facts.clippedDescriptions = clipped
     }
     facts.choiceCount = await choices.count()
+  }
+  if (scenario === 'recipe-grocery') {
+    facts.recipeGrocery = await recipeGroceryFacts(dialog, state)
   }
   if (scenario === 'form') {
     await expect(dialog.getByRole('textbox', { name: 'Task' })).toHaveValue('Layout validation draft')
@@ -324,6 +354,26 @@ for (const scenario of SCENARIO_IDS) {
         if (state === 'back-page') {
           await page.getByRole('button', { name: 'Go back' }).click()
           await waitForRoute(page, 'overview')
+        }
+      }
+      return
+    }
+    if (scenario === 'recipe-grocery') {
+      for (const state of SURFACE_CONTRACTS[scenario].states) {
+        for (const obligation of obligations.filter((entry) => entry.state === state)) {
+          const dialog = await openSurface(page, scenario, state)
+          await applyProfile(page, obligation.profile)
+          let facts: Record<string, unknown>
+          if (state === 'success') {
+            facts = await stateFacts(page, dialog, scenario, 'ready')
+            await enterState(dialog, scenario, state)
+            facts.recipeGrocery = await recipeGroceryFacts(dialog, state)
+          } else {
+            await enterState(dialog, scenario, state)
+            facts = await stateFacts(page, dialog, scenario, state)
+          }
+          await checkpoint(page, page, testInfo, obligation, capabilities, facts)
+          await closeMounted(dialog)
         }
       }
       return

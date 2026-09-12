@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState, type RefObject } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react'
 import { CheckboxRow } from '../../core/CheckboxRow'
 import { EmptyState } from '../../core/EmptyState'
 import { ExpandingSearchAction } from '../../core/ExpandingSearchAction'
@@ -18,9 +18,10 @@ import {
   type RecipeInstructionGroup,
 } from './recipeTypes'
 import { formatRecipeDuration, formatRecipeNumber, formatRecipeYield } from './recipeDetailFormatting'
-import { recipeGroceryDisabledReason } from './recipeGroceryState'
+import { recipeGroceryDisabledReason, recipeGroceryRequestIsLoading } from './recipeGroceryState'
 import type { RecipeDetailModalController, RecipeInventoryProduct } from './useRecipeDetailModal'
 import { RECIPE_DETAIL_TABS, type RecipeDetailTab } from '../../../constants/surfaceSemantics'
+import scanItemStyles from '../ScanItemCameraSheet.module.css'
 import styles from './RecipeDetailModal.module.css'
 
 type GroceryState = RecipeDetailModalController['groceryState']
@@ -38,6 +39,19 @@ const RECIPE_DETAIL_CENTERED_GEOMETRY = {
 
 const RECIPE_DETAIL_TAB_ID_PREFIX = 'recipe-detail'
 const RECIPE_DETAIL_TAB_PANEL_ID = modalTabPanelId(RECIPE_DETAIL_TAB_ID_PREFIX, 'content')
+const GROCERY_FEEDBACK_FADE_MS = 220
+const GROCERY_SUCCESS_HOLD_MS = 3000
+const GROCERY_COLLAPSE_MS = 320
+const GROCERY_ACTION_PHASE = {
+  BUTTON: 0,
+  LOADING: 1,
+  SUCCESS_ENTERING: 2,
+  SUCCESS: 3,
+  SUCCESS_EXITING: 4,
+  COLLAPSING: 5,
+  COLLAPSED: 6,
+  ERROR_RECOVERY: 7,
+} as const
 const RECIPE_I18N = { namespace: 'modalRecipe' } as const
 const RECIPE_COPY_KEYS = {
   activateChooseProduct: 'activateChooseProduct',
@@ -502,6 +516,181 @@ function recipeSectionHeading(
   return { label: `Section ${sectionIndex + 1}`, subdued: true }
 }
 
+type GroceryActionPhase = typeof GROCERY_ACTION_PHASE[keyof typeof GROCERY_ACTION_PHASE]
+
+function groceryRequestSucceeded(
+  groceryState: GroceryState,
+): groceryState is Extract<GroceryState, { completedAt: number }> {
+  return 'completedAt' in groceryState
+}
+
+function grocerySuccessPhaseAt(completedAt: number, now: number): GroceryActionPhase {
+  const elapsed = Math.max(0, now - completedAt)
+  if (elapsed < GROCERY_FEEDBACK_FADE_MS) return GROCERY_ACTION_PHASE.SUCCESS_ENTERING
+  const successExitAt = GROCERY_FEEDBACK_FADE_MS + GROCERY_SUCCESS_HOLD_MS
+  if (elapsed < successExitAt) return GROCERY_ACTION_PHASE.SUCCESS
+  if (elapsed < successExitAt + GROCERY_FEEDBACK_FADE_MS) return GROCERY_ACTION_PHASE.SUCCESS_EXITING
+  if (elapsed < successExitAt + GROCERY_FEEDBACK_FADE_MS + GROCERY_COLLAPSE_MS) return GROCERY_ACTION_PHASE.COLLAPSING
+  return GROCERY_ACTION_PHASE.COLLAPSED
+}
+
+function GroceryCommandStage({
+  disabled,
+  loading,
+  grocerySubmitted,
+  onAddMissing,
+  phase,
+}: {
+  disabled: boolean
+  loading: boolean
+  grocerySubmitted: boolean
+  onAddMissing: () => void
+  phase: GroceryActionPhase
+}) {
+  const collapsed = phase === GROCERY_ACTION_PHASE.COLLAPSED
+
+  return (
+    <div
+      aria-hidden={collapsed || undefined}
+      className={styles.groceryCommandStage}
+      data-recipe-grocery-complete={collapsed ? 'true' : undefined}
+      data-recipe-grocery-phase={collapsed ? undefined : phase}
+    >
+      <button
+        aria-busy={loading || undefined}
+        className={`${styles.primaryAction} ${styles.groceryCommandLayer}`}
+        data-preserve-disabled-visual={loading || grocerySubmitted ? 'true' : undefined}
+        disabled={disabled}
+        onClick={onAddMissing}
+        type="button"
+      >
+        <MaterialIcon name="mdi:plus" size={20} />
+        <span>Add Missing Ingredients to Groceries</span>
+      </button>
+      <span
+        aria-hidden="true"
+        className={`${styles.groceryCommandLayer} ${styles.grocerySpinnerLayer}`}
+        data-recipe-grocery-spinner="true"
+      >
+        <span className={styles.grocerySpinner} />
+      </span>
+      <span
+        aria-hidden="true"
+        className={`${styles.groceryCommandLayer} ${styles.groceryCheckLayer}`}
+        data-recipe-grocery-check="true"
+      >
+        <span className={`${scanItemStyles.successIcon} ${styles.grocerySuccessCheck}`}>
+          <MaterialIcon name="mdi:check" size={30} />
+        </span>
+      </span>
+    </div>
+  )
+}
+
+function GrocerySuccessStage({
+  completedAt,
+  disabled,
+  onAddMissing,
+}: {
+  completedAt: number
+  disabled: boolean
+  onAddMissing: () => void
+}) {
+  const [phase, setPhase] = useState<GroceryActionPhase>(() => grocerySuccessPhaseAt(completedAt, Date.now()))
+
+  useEffect(() => {
+    const now = Date.now()
+    const timers: number[] = []
+    const successAt = completedAt + GROCERY_FEEDBACK_FADE_MS
+    const successExitAt = successAt + GROCERY_SUCCESS_HOLD_MS
+    const collapseAt = successExitAt + GROCERY_FEEDBACK_FADE_MS
+    const collapsedAt = collapseAt + GROCERY_COLLAPSE_MS
+    const schedule = (at: number, nextPhase: GroceryActionPhase) => {
+      if (at <= now) return
+      timers.push(window.setTimeout(() => setPhase(nextPhase), at - now))
+    }
+    schedule(successAt, GROCERY_ACTION_PHASE.SUCCESS)
+    schedule(successExitAt, GROCERY_ACTION_PHASE.SUCCESS_EXITING)
+    schedule(collapseAt, GROCERY_ACTION_PHASE.COLLAPSING)
+    schedule(collapsedAt, GROCERY_ACTION_PHASE.COLLAPSED)
+    return () => timers.forEach((timer) => window.clearTimeout(timer))
+  }, [completedAt])
+
+  return (
+    <GroceryCommandStage
+      disabled={disabled}
+      grocerySubmitted
+      loading={false}
+      onAddMissing={onAddMissing}
+      phase={phase}
+    />
+  )
+}
+
+function RecipeGroceryAction({
+  disabledReason,
+  feedbackMessage,
+  groceryState,
+  grocerySubmitted,
+  onAddMissing,
+}: {
+  disabledReason: string | null
+  feedbackMessage: string | null
+  groceryState: GroceryState
+  grocerySubmitted: boolean
+  onAddMissing: () => void
+}) {
+
+  const requestLoading = recipeGroceryRequestIsLoading(groceryState.status)
+  const requestSucceeded = groceryRequestSucceeded(groceryState)
+  const requestFailed = !requestLoading && !requestSucceeded && 'message' in groceryState
+  const statusMessage = requestLoading
+    ? disabledReason
+    : requestSucceeded
+      ? groceryState.message
+      : null
+
+  return (
+    <div className={styles.groceryAction}>
+      {requestSucceeded ? (
+        <GrocerySuccessStage
+          completedAt={groceryState.completedAt}
+          disabled
+          onAddMissing={onAddMissing}
+        />
+      ) : (
+        <GroceryCommandStage
+          disabled={grocerySubmitted || Boolean(disabledReason)}
+          grocerySubmitted={grocerySubmitted}
+          loading={requestLoading}
+          onAddMissing={onAddMissing}
+          phase={requestLoading
+            ? GROCERY_ACTION_PHASE.LOADING
+            : requestFailed
+              ? GROCERY_ACTION_PHASE.ERROR_RECOVERY
+              : GROCERY_ACTION_PHASE.BUTTON}
+        />
+      )}
+      {disabledReason && !requestLoading && !grocerySubmitted && (
+        <p className={styles.actionHint}>{disabledReason}</p>
+      )}
+      {statusMessage && (
+        <p
+          aria-atomic="true"
+          className={styles.visuallyHidden}
+          data-recipe-grocery-success={requestSucceeded ? 'true' : undefined}
+          data-recipe-grocery-status="true"
+          role="status"
+        >
+          {statusMessage}
+        </p>
+      )}
+      {groceryState.status === 'error' && <p className={styles.errorFeedback} role="alert">{groceryState.message}</p>}
+      {feedbackMessage && <p className={styles.actionHint} role="status">{feedbackMessage}</p>}
+    </div>
+  )
+}
+
 function IngredientsTab({
   detail,
   feedbackMessage,
@@ -523,7 +712,7 @@ function IngredientsTab({
 }) {
   const copy = useCopy('modalRecipe')
   const ingredientDetailsAvailable = detail.capabilities.ingredients !== 'none'
-  const disabledReason = recipeGroceryDisabledReason(detail, groceryState.status, grocerySubmitted)
+  const disabledReason = recipeGroceryDisabledReason(detail, groceryState.status)
   const sections = recipeIngredientSections(detail)
 
   return (
@@ -637,21 +826,13 @@ function IngredientsTab({
       {(!ingredientDetailsAvailable || detail.ingredients.length === 0) && (
         <EmptyState description="Ingredient details are not available for this recipe." layout="modal" title="No Ingredients Available" />
       )}
-      <div className={styles.groceryAction}>
-        <button
-          className={styles.primaryAction}
-          disabled={Boolean(disabledReason)}
-          onClick={onAddMissing}
-          type="button"
-        >
-          <MaterialIcon name="mdi:plus" size={20} />
-          <span>Add Missing Ingredients to Groceries</span>
-        </button>
-        {disabledReason && <p className={styles.actionHint}>{disabledReason}</p>}
-        {groceryState.status === 'success' && <p className={styles.successFeedback} role="status">{groceryState.message}</p>}
-        {groceryState.status === 'error' && <p className={styles.errorFeedback} role="alert">{groceryState.message}</p>}
-        {feedbackMessage && <p className={styles.actionHint} role="status">{feedbackMessage}</p>}
-      </div>
+      <RecipeGroceryAction
+        disabledReason={disabledReason}
+        feedbackMessage={feedbackMessage}
+        groceryState={groceryState}
+        grocerySubmitted={grocerySubmitted}
+        onAddMissing={onAddMissing}
+      />
     </div>
   )
 }

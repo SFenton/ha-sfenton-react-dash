@@ -6,14 +6,19 @@ import { applyProfile, waitForModalReady, waitForRoute } from './evidence'
 import { openQuickLinksTab } from '../quick-links'
 import { enterWakeState, isWakeScenario } from './wakeLight'
 
-export async function openSurface(page: Page, scenario: ScenarioId): Promise<Locator> {
-  const route = isWakeScenario(scenario) ? 'master-bedroom' : scenario === 'filters' ? 'recipes' : scenario === 'form' ? 'to-do' : scenario === 'remote' ? 'music-room' : scenario === 'vacuum' ? 'vacuums' : 'overview'
-  await page.goto(`/index.html?path=${route}${scenario === 'summary' ? '&user=stephen#daily-report' : ''}`)
+export async function openSurface(page: Page, scenario: ScenarioId, state?: string): Promise<Locator> {
+  const route = isWakeScenario(scenario) ? 'master-bedroom' : scenario === 'filters' || scenario === 'recipe-grocery' ? 'recipes' : scenario === 'form' ? 'to-do' : scenario === 'remote' ? 'music-room' : scenario === 'vacuum' ? 'vacuums' : 'overview'
+  const recipeDelay = scenario === 'recipe-grocery' ? `&__mockRecipeGroceryDelayMs=${state === 'loading' ? 60000 : 300}` : ''
+  await page.goto(`/index.html?path=${route}${recipeDelay}${scenario === 'summary' ? '&user=stephen#daily-report' : ''}`)
   await waitForRoute(page, route, scenario === 'summary')
   if (isWakeScenario(scenario)) await page.getByRole('button', { name: /Wake-Light Alarms/ }).click()
   if (scenario === 'quick-links') await openQuickLinksTab(page)
   if (scenario === 'weather') await page.getByRole('button', { name: /Open seven-day weather forecast/ }).click()
   if (scenario === 'filters') await page.locator('[data-floating-action-dock]').getByRole('button', { name: 'Filter', exact: true }).click()
+  if (scenario === 'recipe-grocery') {
+    await page.getByRole('button', { name: 'Open Catalog Recipe 1 recipe details' }).click()
+    await page.getByRole('dialog', { name: 'Catalog Recipe 1' }).getByRole('tab', { name: 'Ingredients' }).click()
+  }
   if (scenario === 'form') {
     await page.getByRole('button', { name: 'Add Task', exact: true }).click()
     await page.getByRole('textbox', { name: 'Task', exact: true }).fill('Layout validation draft')
@@ -43,6 +48,10 @@ export async function enterState(dialog: Locator, scenario: ScenarioId, state: s
   if (scenario === 'summary') await dialog.getByRole('tab', {
     name: state === 'overdue' ? /^Overdue Chores/ : state === 'upcoming' ? 'Upcoming Chores' : /^Expired Food/,
   }).click()
+  if (scenario === 'recipe-grocery' && state !== 'ready') {
+    await dialog.getByRole('button', { name: 'Add Missing Ingredients to Groceries' }).click()
+    await expect(dialog.locator(`[data-recipe-grocery-phase="${state === 'loading' ? '1' : '3'}"]`)).toBeVisible()
+  }
   if (scenario === 'weather') {
     const page = dialog.page()
     await page.evaluate((nextState) => {

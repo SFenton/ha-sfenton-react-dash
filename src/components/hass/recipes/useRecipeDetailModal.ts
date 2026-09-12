@@ -40,7 +40,8 @@ type DetailLoadState =
 
 type GroceryState =
   | { status: 'idle' | 'loading' }
-  | { status: 'error' | 'success'; message: string }
+  | { status: 'error'; message: string }
+  | { status: 'success'; completedAt: number; message: string }
 
 type IngredientPickerLoadState =
   | { status: 'idle' }
@@ -995,7 +996,7 @@ export function useRecipeDetailModalController({ enabled = true }: { enabled?: b
       || detailState.status !== 'ready'
       || detailState.session !== modalSessionRef.current
     ) return
-    if (recipeGroceryDisabledReason(detailState.detail, 'idle', false)) return
+    if (recipeGroceryDisabledReason(detailState.detail, 'idle')) return
     const missing = recipeActionableMissingIngredients(
       detailState.detail,
     )
@@ -1047,7 +1048,9 @@ export function useRecipeDetailModalController({ enabled = true }: { enabled?: b
         grocerySubmittedRef.current = true
         groceryCommandKeyRef.current = null
       }
-      setGroceryState({ status: feedback.success ? 'success' : 'error', message: feedback.message })
+      setGroceryState(feedback.success
+        ? { status: 'success', completedAt: Date.now(), message: feedback.message }
+        : { status: 'error', message: feedback.message })
       setGrocerySubmitted(feedback.success)
     }).catch((error: unknown) => {
       if (groceryRequest !== groceryRequestRef.current) return

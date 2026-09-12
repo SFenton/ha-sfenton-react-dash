@@ -337,7 +337,7 @@ export const PLAYWRIGHT_SPEC_COVERAGE = [
   },
 ] as const satisfies readonly PlaywrightSpecCoverage[]
 
-export const SCENARIO_IDS = ['quick-links', 'chat', 'summary', 'filters', 'form', 'remote', 'vacuum', 'weather', 'navigation', 'host', 'preload', 'wake-room', 'wake-light', 'wake-editor', 'wake-source'] as const
+export const SCENARIO_IDS = ['quick-links', 'chat', 'summary', 'filters', 'recipe-grocery', 'form', 'remote', 'vacuum', 'weather', 'navigation', 'host', 'preload', 'wake-room', 'wake-light', 'wake-editor', 'wake-source'] as const
 export type ScenarioId = typeof SCENARIO_IDS[number]
 export type ContextId = 'touch-chromium' | 'fine-chromium' | 'touch-webkit'
 export const CONTEXTS: Record<ContextId, { browser: 'chromium' | 'webkit'; touch: boolean; project: string }> = {
@@ -381,6 +381,17 @@ export const SURFACE_CONTRACTS: Record<ScenarioId, {
     owners: ['src/components/hass/recipes/RecipeFloatingActions', 'src/components/core/RadioRow', 'src/components/core/FilterSheetFooter'],
     legacy: ['responsive-modal-inventory.spec.ts', 'recipe-keyboard-focus.spec.ts'],
     question: 'Are filter descriptions readable at the actual column width, and are options and footer usable?',
+  },
+  'recipe-grocery': {
+    family: 'modal', states: ['ready', 'loading', 'success'],
+    tabs: ['^Overview$', '^Ingredients$', '^Instructions$', '^Nutrition$'],
+    owners: [
+      'src/components/hass/recipes/RecipeDetailModal',
+      'src/components/hass/recipes/recipeGroceryState',
+      'src/components/hass/recipes/useRecipeDetailModal',
+    ],
+    legacy: [],
+    question: 'Does the missing-ingredients action retain one stable command area while the button, spinner and success check transition, then collapse without exposing redundant visible copy?',
   },
   form: {
     family: 'modal', states: ['draft'],

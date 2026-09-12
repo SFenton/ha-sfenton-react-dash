@@ -145,6 +145,12 @@ function configuredRecipeDetailDelayMs() {
   return Number.isFinite(configured) ? Math.max(0, configured) : 0
 }
 
+function configuredRecipeGroceryDelayMs() {
+  if (typeof window === 'undefined') return 0
+  const configured = Number(new URLSearchParams(window.location.search).get('__mockRecipeGroceryDelayMs') ?? 0)
+  return Number.isFinite(configured) ? Math.max(0, configured) : 0
+}
+
 function configuredScanItemDelayMs() {
   if (typeof window === 'undefined') return 0
   const configured = Number(new URLSearchParams(window.location.search).get('__mockScanItemDelayMs') ?? 0)
@@ -2191,7 +2197,7 @@ export const mockState: MockHassState = {
           normalized_name: `Synthetic ingredient ${index + 1}`,
           amount_text: null,
         }))
-        return Promise.resolve({
+        const groceryResponse = {
           response: {
             success: !partialFailure,
             partial_failure: partialFailure || undefined,
@@ -2232,7 +2238,11 @@ export const mockState: MockHassState = {
               },
             },
           },
-        })
+        }
+        const groceryDelay = configuredRecipeGroceryDelayMs()
+        return groceryDelay > 0
+          ? new Promise((resolve) => window.setTimeout(() => resolve(groceryResponse), groceryDelay))
+          : Promise.resolve(groceryResponse)
       }
       if (
         params.domain === 'evershelf'

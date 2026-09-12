@@ -1,10 +1,15 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { vi } from 'vitest'
 import { mockState, resetMockHass } from '../../../test/mocks/hakitCoreState'
 import { RecipeDetailModal } from './RecipeDetailModal'
 import { formatRecipeDuration, formatRecipeYield } from './recipeDetailFormatting'
 import { recipeGroceryDisabledReason } from './recipeGroceryState'
 import { normalizeRecipeDetailServiceResult, type RecipeCardSummary, type RecipeDetail } from './recipeTypes'
 import { useRecipeDetailModalController } from './useRecipeDetailModal'
+
+// @covers src/components/hass/recipes/RecipeDetailModal.module.css
+// @covers src/components/hass/recipes/recipeGroceryState.ts
+// @covers src/components/hass/recipes/useRecipeDetailModal.ts
 
 const recipe: RecipeCardSummary = {
   id: 42,
@@ -586,7 +591,11 @@ describe('RecipeDetailModal', () => {
       expect(groceryButton).toBeEnabled()
       fireEvent.click(groceryButton)
       expect(groceryButton).toBeDisabled()
-      expect(within(dialog).getByText('Adding missing ingredients…')).toBeInTheDocument()
+      expect(groceryButton).toHaveAttribute('aria-busy', 'true')
+      expect(groceryButton).toHaveAttribute('data-preserve-disabled-visual', 'true')
+      expect(dialog.querySelector('[data-recipe-grocery-phase="1"]')).toBeInTheDocument()
+      expect(dialog.querySelector('[data-recipe-grocery-spinner="true"]')).toBeInTheDocument()
+      expect(within(dialog).getByRole('status')).toHaveClass(/visuallyHidden/)
       fireEvent.click(groceryButton)
       expect(calls.filter((call) => call.service === 'recipe_grocery_add')).toHaveLength(1)
       await act(async () => resolveGrocery?.({
@@ -604,9 +613,13 @@ describe('RecipeDetailModal', () => {
           },
         },
       }))
-      await within(dialog).findByText(/EverShelf: 1 added\./)
+      const grocerySuccess = await within(dialog).findByRole('status')
+      expect(grocerySuccess).toHaveTextContent('EverShelf: 1 added.')
+      expect(grocerySuccess).toHaveClass(/visuallyHidden/)
       expect(groceryButton).toBeDisabled()
-      expect(within(dialog).getByText('Missing ingredients were submitted.')).toBeInTheDocument()
+      expect(dialog.querySelector('[data-recipe-grocery-phase="2"]')).toBeInTheDocument()
+      expect(dialog.querySelector('[data-recipe-grocery-check="true"]')).toBeInTheDocument()
+      expect(within(dialog).queryByText('Missing ingredients were submitted.')).not.toBeInTheDocument()
       fireEvent.click(groceryButton)
 
       const groceryCalls = calls.filter((call) => call.service === 'recipe_grocery_add')
@@ -625,6 +638,45 @@ describe('RecipeDetailModal', () => {
         /^[A-Za-z0-9._:-]{1,128}$/,
       )
     } finally {
+      mockState.helpers.callService = originalCallService
+    }
+  })
+
+  it('holds the grocery success check for three seconds, fades it, then collapses the command stage', async () => {
+    const originalCallService = mockState.helpers.callService
+    mockState.helpers.callService = (params) => {
+      if (params.domain === 'evershelf' && params.service === 'recipe_detail') return Promise.resolve(detailResponse())
+      if (params.domain === 'evershelf' && params.service === 'recipe_grocery_add') {
+        return Promise.resolve(grocerySuccessResponse())
+      }
+      return originalCallService(params)
+    }
+
+    try {
+      render(<Harness />)
+      const dialog = await openRecipe()
+      await openTab(dialog, 'Ingredients')
+      vi.useFakeTimers()
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Add Missing Ingredients to Groceries' }))
+      await act(async () => {
+        await Promise.resolve()
+        await Promise.resolve()
+      })
+
+      expect(dialog.querySelector('[data-recipe-grocery-phase="2"]')).toBeInTheDocument()
+      act(() => vi.advanceTimersByTime(219))
+      expect(dialog.querySelector('[data-recipe-grocery-phase="2"]')).toBeInTheDocument()
+      act(() => vi.advanceTimersByTime(1))
+      expect(dialog.querySelector('[data-recipe-grocery-phase="3"]')).toBeInTheDocument()
+      act(() => vi.advanceTimersByTime(3_000))
+      expect(dialog.querySelector('[data-recipe-grocery-phase="4"]')).toBeInTheDocument()
+      act(() => vi.advanceTimersByTime(220))
+      expect(dialog.querySelector('[data-recipe-grocery-phase="5"]')).toBeInTheDocument()
+      act(() => vi.advanceTimersByTime(320))
+      expect(dialog.querySelector('[data-recipe-grocery-phase]')).not.toBeInTheDocument()
+      expect(dialog.querySelector('[data-recipe-grocery-complete="true"]')).toBeInTheDocument()
+    } finally {
+      vi.useRealTimers()
       mockState.helpers.callService = originalCallService
     }
   })
@@ -654,6 +706,7 @@ describe('RecipeDetailModal', () => {
     try {
       render(<Harness />)
       const dialog = await openRecipe()
+      await within(dialog).findByRole('heading', { name: 'Additional Equipment' })
       expect(within(dialog).queryByRole('group', { name: /Prep Time/ })).not.toBeInTheDocument()
       expect(within(dialog).queryByRole('group', { name: /Cook Time/ })).not.toBeInTheDocument()
       expect(within(dialog).queryByRole('group', { name: /Inactive\/Rest Time/ })).not.toBeInTheDocument()
@@ -1243,12 +1296,14 @@ describe('RecipeDetailModal', () => {
       const groceryButton = within(dialog).getByRole('button', { name: 'Add Missing Ingredients to Groceries' })
       fireEvent.click(groceryButton)
 
-      expect(await within(dialog).findByRole('status')).toHaveTextContent(
+      const successStatus = await within(dialog).findByRole('status')
+      expect(successStatus).toHaveTextContent(
         'EverShelf: 1 added, 2 already listed, 3 now in stock. '
           + 'Home Assistant mirror: 4 added, 1 already present, 2 skipped.',
       )
+      expect(successStatus).toHaveClass(/visuallyHidden/)
       expect(groceryButton).toBeDisabled()
-      expect(within(dialog).getByText('Missing ingredients were submitted.')).toBeInTheDocument()
+      expect(within(dialog).queryByText('Missing ingredients were submitted.')).not.toBeInTheDocument()
     } finally {
       mockState.helpers.callService = originalCallService
     }
@@ -1274,6 +1329,7 @@ describe('RecipeDetailModal', () => {
         },
       },
       role: 'status',
+      visuallyHidden: true,
     },
     {
       absentCopy: [
@@ -1291,6 +1347,7 @@ describe('RecipeDetailModal', () => {
         summary: { added: 1, already_listed: 0, now_in_stock: 0, unresolved: 0, failed: 0 },
       },
       role: 'status',
+      visuallyHidden: true,
     },
     {
       absentCopy: [
@@ -1312,6 +1369,7 @@ describe('RecipeDetailModal', () => {
         },
       },
       role: 'alert',
+      visuallyHidden: false,
     },
     {
       absentCopy: [
@@ -1333,6 +1391,7 @@ describe('RecipeDetailModal', () => {
         },
       },
       role: 'alert',
+      visuallyHidden: false,
     },
     {
       absentCopy: [
@@ -1356,12 +1415,14 @@ describe('RecipeDetailModal', () => {
         },
       },
       role: 'alert',
+      visuallyHidden: false,
     },
   ])('attributes $label grocery feedback without blaming the wrong system', async ({
     absentCopy,
     expectedCopy,
     response,
     role,
+    visuallyHidden,
   }) => {
     const originalCallService = mockState.helpers.callService
     mockState.helpers.callService = (params) => {
@@ -1377,8 +1438,15 @@ describe('RecipeDetailModal', () => {
       await openTab(dialog, 'Ingredients')
       fireEvent.click(within(dialog).getByRole('button', { name: 'Add Missing Ingredients to Groceries' }))
       const feedback = await within(dialog).findByRole(role)
-      expectedCopy.forEach((copy) => expect(feedback).toHaveTextContent(copy))
-      absentCopy.forEach((copy) => expect(feedback).not.toHaveTextContent(copy))
+      await waitFor(() => {
+        expectedCopy.forEach((copy) => expect(feedback).toHaveTextContent(copy))
+        absentCopy.forEach((copy) => expect(feedback).not.toHaveTextContent(copy))
+      })
+      if (visuallyHidden) {
+        expect(feedback).toHaveClass(/visuallyHidden/)
+      } else {
+        expect(feedback).not.toHaveClass(/visuallyHidden/)
+      }
     } finally {
       mockState.helpers.callService = originalCallService
     }
@@ -1775,8 +1843,7 @@ describe('RecipeDetailModal', () => {
     const idle = { status: 'idle' } as const
     const detail = normalizedDetail()
 
-    expect(recipeGroceryDisabledReason(detail, 'loading', true)).toBe('Adding missing ingredients…')
-    expect(recipeGroceryDisabledReason(detail, idle.status, true)).toBe('Missing ingredients were submitted.')
+    expect(recipeGroceryDisabledReason(detail, 'loading')).toBe('Adding missing ingredients…')
     expect(recipeGroceryDisabledReason({
       ...detail,
       capabilities: {
@@ -1786,13 +1853,13 @@ describe('RecipeDetailModal', () => {
         groceryAddState: 'unavailable',
       },
       grocery: { ...detail.grocery, blockedReason: 'ingredients_truncated' },
-    }, idle.status, false)).toBe('Ingredients are truncated, so groceries cannot be added safely.')
+    }, idle.status)).toBe('Ingredients are truncated, so groceries cannot be added safely.')
     expect(recipeGroceryDisabledReason({
       ...detail,
       capabilities: { ...detail.capabilities, groceryAdd: false, groceryAddState: 'unavailable' },
       grocery: { ...detail.grocery, blockedReason: 'no_ingredients' },
       ingredientsTruncated: true,
-    }, idle.status, false)).toBe('No ingredient data is available, so groceries cannot be added.')
+    }, idle.status)).toBe('No ingredient data is available, so groceries cannot be added.')
     expect(recipeGroceryDisabledReason({
       ...detail,
       capabilities: {
@@ -1802,35 +1869,35 @@ describe('RecipeDetailModal', () => {
         groceryAddState: 'unavailable',
         ingredients: 'none',
       },
-    }, idle.status, false)).toBe('Adding missing ingredients is temporarily unavailable. Try again later.')
+    }, idle.status)).toBe('Adding missing ingredients is temporarily unavailable. Try again later.')
     expect(recipeGroceryDisabledReason({
       ...detail,
       capabilities: { ...detail.capabilities, groceryAdd: false, groceryAddState: 'unsupported' },
-    }, idle.status, false)).toBe(
+    }, idle.status)).toBe(
       'The installed EverShelf/ha-evershelf version does not support recipe grocery adding yet.',
     )
     expect(recipeGroceryDisabledReason({
       ...detail,
       capabilities: { ...detail.capabilities, groceryAdd: false, groceryAddReason: 'unsupported' },
-    }, idle.status, false)).toBe(
+    }, idle.status)).toBe(
       'The installed EverShelf/ha-evershelf version does not support recipe grocery adding yet.',
     )
     expect(recipeGroceryDisabledReason({
       ...detail,
       capabilities: { ...detail.capabilities, groceryAdd: false },
-    }, idle.status, false)).toBe('Adding missing ingredients is unavailable for this recipe.')
+    }, idle.status)).toBe('Adding missing ingredients is unavailable for this recipe.')
     expect(recipeGroceryDisabledReason({
       ...detail,
       grocery: { ...detail.grocery, confirmedMissingCount: 101 },
-    }, idle.status, false)).toBe('Too many missing ingredients to add in one request.')
+    }, idle.status)).toBe('Too many missing ingredients to add in one request.')
     expect(recipeGroceryDisabledReason({
       ...detail,
       grocery: { ...detail.grocery, confirmedMissingCount: 0, uncertainCount: 3 },
-    }, idle.status, false)).toBe("EverShelf can't yet tell which of these 3 ingredients you're missing.")
+    }, idle.status)).toBe("EverShelf can't yet tell which of these 3 ingredients you're missing.")
     expect(recipeGroceryDisabledReason({
       ...detail,
       grocery: { ...detail.grocery, confirmedMissingCount: 0, uncertainCount: 0 },
-    }, idle.status, false)).toBe('No missing ingredients to add.')
+    }, idle.status)).toBe('No missing ingredients to add.')
     expect(recipeGroceryDisabledReason({
       ...detail,
       ingredients: detail.ingredients.map((ingredient) => (
@@ -1844,10 +1911,10 @@ describe('RecipeDetailModal', () => {
             }
           : ingredient
       )),
-    }, idle.status, false)).toBe(
+    }, idle.status)).toBe(
       'All confirmed missing ingredients are marked as available by your overrides.',
     )
-    expect(recipeGroceryDisabledReason(detail, idle.status, false)).toBeNull()
+    expect(recipeGroceryDisabledReason(detail, idle.status)).toBeNull()
   })
 
   it('maps recipe freshness to warning and unavailable status-pill tones', async () => {
