@@ -1894,6 +1894,7 @@ test('inventory item edit modal adds and removes EverShelf stock from the quanti
     service: 'add_scanned_item',
     serviceData: {
       expiry_date: expect.any(String),
+      inventory_prepared_food: false,
       location: 'frigo',
       name: 'Greek Yogurt',
       product_id: 2003,

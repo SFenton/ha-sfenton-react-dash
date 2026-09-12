@@ -90,6 +90,7 @@ describe('EverShelfInventoryPanel item edit modal', () => {
         service: 'add_scanned_item',
         serviceData: {
           expiry_date: expect.any(String),
+          inventory_prepared_food: false,
           location: 'frigo',
           name: 'Greek Yogurt',
           product_id: 2003,
@@ -236,6 +237,7 @@ describe('EverShelfInventoryPanel item edit modal', () => {
         service: 'add_scanned_item',
         serviceData: {
           expiry_date: '2026-09-30',
+          inventory_prepared_food: false,
           location: 'frigo',
           name: 'Greek Yogurt',
           product_id: 2003,
@@ -322,6 +324,7 @@ describe('EverShelfInventoryPanel item edit modal', () => {
         service: 'add_scanned_item',
         serviceData: {
           expiry_date: offsetIsoDate(200),
+          inventory_prepared_food: false,
           location: 'dispensa',
           name: 'Canned Beans',
           product_id: 1002,
@@ -343,6 +346,49 @@ describe('EverShelfInventoryPanel item edit modal', () => {
     expect(within(dialog).getByRole('spinbutton', { name: 'Quantity for Greek Yogurt' })).toHaveTextContent('2')
     expect(within(dialog).queryByRole('button', { name: 'Save Greek Yogurt' })).not.toBeInTheDocument()
     expect(mockCallServiceCalls).toEqual([])
+  })
+
+  it('keeps added stock prepared when editing a prepared batch', async () => {
+    const mockHass = (window as unknown as {
+      __mockHass: { setInventoryItems: (location: string, items: Record<string, unknown>[]) => void }
+    }).__mockHass
+    mockHass.setInventoryItems('dispensa', [
+      {
+        expiry_date: '2020-01-01',
+        id: 101,
+        location: 'dispensa',
+        name: 'Almond Flour',
+        prepared_food: true,
+        product_id: 1001,
+        quantity: 1,
+        unit: 'pz',
+        vacuum_sealed: false,
+      },
+    ])
+    const dialog = await openEditModal({ itemName: 'Almond Flour', listLabel: 'Pantry inventory list', location: 'dispensa', quantityLabel: 'Expired', title: 'Pantry' })
+
+    expect(within(dialog).getByRole('button', { name: 'Prepared Food Item for Almond Flour prepared' })).toHaveAttribute('aria-pressed', 'true')
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Add one Almond Flour prepared' }))
+
+    mockCallServiceCalls.length = 0
+    await clickAndFlush(within(dialog).getByRole('button', { name: 'Save Almond Flour prepared' }))
+
+    expect(inventoryServiceCalls()).toEqual([
+      {
+        domain: 'evershelf',
+        service: 'add_scanned_item',
+        serviceData: {
+          expiry_date: expect.any(String),
+          inventory_prepared_food: true,
+          location: 'dispensa',
+          name: 'Almond Flour',
+          product_id: 1001,
+          quantity: 1,
+          unit: 'pz',
+          vacuum_sealed: false,
+        },
+      },
+    ])
   })
 })
 
