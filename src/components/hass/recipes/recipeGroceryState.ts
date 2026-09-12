@@ -5,6 +5,10 @@ export const RECIPE_GROCERY_UNSUPPORTED_MESSAGE = 'The installed EverShelf/ha-ev
 
 export type RecipeGroceryRequestStatus = 'error' | 'idle' | 'loading' | 'success'
 
+export function recipeGroceryRequestIsLoading(status: RecipeGroceryRequestStatus) {
+  return status === 'loading'
+}
+
 export function recipeActionableMissingIngredients(detail: RecipeDetail) {
   return detail.ingredients.filter((ingredient) => (
     ingredient.inventory.state === 'missing'
@@ -15,7 +19,6 @@ export function recipeActionableMissingIngredients(detail: RecipeDetail) {
 export function recipeGroceryDisabledReason(
   detail: RecipeDetail,
   groceryStatus: RecipeGroceryRequestStatus,
-  grocerySubmitted: boolean,
 ) {
   const overrideSuppressedCount = detail.ingredients.filter(
     (ingredient) => ingredient.inventory.state === 'missing'
@@ -25,8 +28,7 @@ export function recipeGroceryDisabledReason(
     0,
     detail.grocery.confirmedMissingCount - overrideSuppressedCount,
   )
-  if (groceryStatus === 'loading') return 'Adding missing ingredients…'
-  if (grocerySubmitted) return 'Missing ingredients were submitted.'
+  if (recipeGroceryRequestIsLoading(groceryStatus)) return 'Adding missing ingredients…'
   if (
     detail.grocery.blockedReason === 'ingredients_truncated'
     || (detail.grocery.blockedReason !== 'no_ingredients' && detail.ingredientsTruncated)
