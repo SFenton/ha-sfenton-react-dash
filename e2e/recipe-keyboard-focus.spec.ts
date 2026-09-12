@@ -1,5 +1,6 @@
 import { expect, test, type Locator, type Page } from './layout/fixture'
 
+// @covers src/hooks/useModalDetailPageScroll.ts
 type FocusIndicator = {
   boxShadow: string
   outlineColor: string
@@ -237,6 +238,8 @@ async function verifyRecipeKeyboardFocus(page: Page) {
   await page.keyboard.press('ArrowRight')
   await expect(dialog.getByRole('tabpanel', { name: 'Instructions' })).toBeVisible()
   await expectCurrentKeyboardFocusIndicator(instructionsTab, instructionsTab, instructionsBaseline)
+  await page.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))))
+  await expect(instructionsTab).toBeFocused()
   await expectKeyboardFocusIndicator(page, dialog.getByRole('link', { name: 'Open in Cookidoo' }))
   return dialog
 }

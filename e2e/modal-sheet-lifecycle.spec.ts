@@ -9,7 +9,7 @@ import {
   type ModalLifecycleTrace,
 } from './modal-sheet-lifecycle'
 
-const THERMOSTAT_PATH = '/at-a-glance/ecobee#thermostat-automation'
+const THERMOSTAT_PATH = '/at-a-glance/thermostat#thermostat-automation'
 const THERMOSTAT_TITLE = 'Thermostat · Advanced Controls'
 
 async function openThermostatAdvancedControls(page: Page) {
@@ -98,7 +98,7 @@ test.describe('thermostat modal close lifecycle', () => {
   })
 
   test('animates its first open from offscreen to the settled modal position', async ({ page }) => {
-    await page.goto('/at-a-glance/ecobee')
+    await page.goto('/at-a-glance/thermostat')
     await startModalLifecycleProbe(page)
 
     await page.getByRole('button', { exact: true, name: 'Advanced Configuration' }).click()
@@ -184,7 +184,7 @@ test.describe('desktop thermostat modal open lifecycle', () => {
 
   test('fades its first open without moving the centered dialog', async ({ page }) => {
     await installModalLifecycleProbe(page)
-    await page.goto('/at-a-glance/ecobee')
+    await page.goto('/at-a-glance/thermostat')
     await startModalLifecycleProbe(page)
 
     await page.getByRole('button', { exact: true, name: 'Advanced Configuration' }).click()

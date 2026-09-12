@@ -36,12 +36,22 @@ export function useModalDetailPageScroll(pageKey: DetailPageKey, additionalScrol
             ?? detailTriggers.at(-1),
         )
       }
-      const restoreFocus = () => {
+      let restoredTarget: HTMLElement | null = null
+      let focusMoved = false
+      const restoreFocus = (initial = false) => {
         const focusTarget = resolveFocusTarget()
-        if (focusTarget?.isConnected) focusTarget.focus({ preventScroll: true })
+        const activeElement = document.activeElement
+        const focusWasLost = activeElement === document.body || !activeElement?.isConnected || activeElement === restoredTarget
+        restoredTarget = focusTarget
+        if (focusTarget?.isConnected && !focusMoved && (initial || focusWasLost)) focusTarget.focus({ preventScroll: true })
       }
-      restoreFocus()
+      restoreFocus(true)
       pendingRestoreRef.current = null
+      const focusScope = bodyElementRef.current?.closest('[role="dialog"]') ?? bodyElementRef.current
+      const onFocusIn = (event: Event) => {
+        if (event.target !== restoredTarget) focusMoved = true
+      }
+      focusScope?.addEventListener('focusin', onFocusIn)
       let settleFrame = 0
       let remainingFrames = 3
       const settle = () => {
@@ -51,6 +61,7 @@ export function useModalDetailPageScroll(pageKey: DetailPageKey, additionalScrol
       }
       settleFrame = window.requestAnimationFrame(settle)
       return () => {
+        focusScope?.removeEventListener('focusin', onFocusIn)
         if (settleFrame) window.cancelAnimationFrame(settleFrame)
       }
     }

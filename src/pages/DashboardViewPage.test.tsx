@@ -2129,7 +2129,7 @@ describe('DashboardViewPage', () => {
   })
 
   it('uses the no-gap dynamic grid for thermostat room selection', async () => {
-    render(<DashboardViewPage activePath="ecobee" onNavigate={() => undefined} path="ecobee" />)
+    render(<DashboardViewPage activePath="thermostat" onNavigate={() => undefined} path="thermostat" />)
 
     const dialog = await openThermostatControls()
     expect(within(dialog).getByRole('heading', { name: 'Thermostat · Advanced Controls' })).toBeInTheDocument()
@@ -2144,7 +2144,7 @@ describe('DashboardViewPage', () => {
     const occupancy = mockEntities['sensor.thermostat_contact_sensors_living_room_occupancy']
     const previousState = occupancy.state
     occupancy.state = 'occupied'
-    const view = render(<DashboardViewPage activePath="ecobee" onNavigate={() => undefined} path="ecobee" />)
+    const view = render(<DashboardViewPage activePath="thermostat" onNavigate={() => undefined} path="thermostat" />)
 
     const dialog = await openThermostatControls()
     const livingRoom = within(dialog).getByRole('button', { name: 'Living Room 70.2°F · Occupied' })
@@ -2154,7 +2154,7 @@ describe('DashboardViewPage', () => {
   })
 
   it('keeps the Whole Home thermostat range colors visible while the aggregate climate is off', () => {
-    render(<DashboardViewPage activePath="ecobee" onNavigate={() => undefined} path="ecobee" />)
+    render(<DashboardViewPage activePath="thermostat" onNavigate={() => undefined} path="thermostat" />)
 
     expect(screen.getByRole('region', { name: /Whole Home thermostat Idle 71.0°F 72.0 · 74.0/i })).toBeInTheDocument()
     expect(screen.getAllByTestId('control-slider-circular')[0]).toHaveStyle({ '--ha-control-slider-color': 'rgba(255, 255, 255, 0.78)', '--ha-control-slider-high-color': '#2c8e98', '--ha-control-slider-low-color': '#cd5401' })
@@ -2162,7 +2162,7 @@ describe('DashboardViewPage', () => {
   })
 
   it('drags a thermostat range handle and commits the final value once', () => {
-    render(<DashboardViewPage activePath="ecobee" onNavigate={() => undefined} path="ecobee" />)
+    render(<DashboardViewPage activePath="thermostat" onNavigate={() => undefined} path="thermostat" />)
 
     const dial = screen.getByRole('region', { name: /Whole Home thermostat Idle 71.0°F 72.0 · 74.0/i })
     const lowHandle = dial.querySelector<HTMLElement>('[data-target="low"]')
@@ -2206,7 +2206,7 @@ describe('DashboardViewPage', () => {
   })
 
   it('renders HA-owned vacation, non-vacation, and guest home-away transitions without inferring from raw inputs', async () => {
-    const view = render(<DashboardViewPage activePath="ecobee" onNavigate={() => undefined} path="ecobee" />)
+    const view = render(<DashboardViewPage activePath="thermostat" onNavigate={() => undefined} path="thermostat" />)
 
     expect(screen.queryByLabelText(/Whole Home (?:Away|Vacation) Mode/)).not.toBeInTheDocument()
     expect(screen.getByRole('region', { name: /Whole Home thermostat Idle 71.0°F 72.0 · 74.0/i })).toBeInTheDocument()
@@ -2215,7 +2215,7 @@ describe('DashboardViewPage', () => {
     mockEntities['binary_sensor.thermostat_contact_sensors_away_mode_active'].state = 'on'
     mockEntities['sensor.thermostat_effective_home_away'].state = 'Away'
     mockEntities['sensor.thermostat_home_away_reason'].state = 'Vacation Mode is active and everyone is away; TCS is using Eco Away targets.'
-    view.rerender(<DashboardViewPage activePath="ecobee" onNavigate={() => undefined} path="ecobee" />)
+    view.rerender(<DashboardViewPage activePath="thermostat" onNavigate={() => undefined} path="thermostat" />)
 
     const hero = screen.getByRole('region', { name: /Whole Home thermostat Idle 71.0°F 62.0 · 78.0/i })
     expect(hero.querySelector('[data-marker="current"]')).toHaveAttribute('data-value', '71')
@@ -2237,7 +2237,7 @@ describe('DashboardViewPage', () => {
 
     mockEntities['input_boolean.vacation_mode'].state = 'off'
     mockEntities['sensor.thermostat_home_away_reason'].state = 'Everyone is away; TCS is keeping Eco active without heating or cooling.'
-    view.rerender(<DashboardViewPage activePath="ecobee" onNavigate={() => undefined} path="ecobee" />)
+    view.rerender(<DashboardViewPage activePath="thermostat" onNavigate={() => undefined} path="thermostat" />)
 
     expect(screen.getByRole('region', { name: /Whole Home thermostat Idle 71.0°F 63.0 · 78.0/i })).toBeInTheDocument()
     expect(screen.getByLabelText('Whole Home Away Mode')).toBeInTheDocument()
@@ -2247,7 +2247,7 @@ describe('DashboardViewPage', () => {
     mockEntities['sensor.thermostat_effective_home_away'].state = 'Home'
     mockEntities['sensor.thermostat_home_away_reason'].state = 'Guest stay protection is active during Vacation Mode, so TCS is enforcing home-style temperatures.'
     mockEntities['climate.thermostat_contact_sensors_living_room_virtual_thermostat'].attributes.away_mode_active = false
-    view.rerender(<DashboardViewPage activePath="ecobee" onNavigate={() => undefined} path="ecobee" />)
+    view.rerender(<DashboardViewPage activePath="thermostat" onNavigate={() => undefined} path="thermostat" />)
 
     expect(screen.queryByLabelText(/Whole Home (?:Away|Vacation) Mode/)).not.toBeInTheDocument()
     expect(screen.getByRole('region', { name: /Whole Home thermostat Idle 71.0°F 72.0 · 74.0/i })).toBeInTheDocument()
@@ -2282,7 +2282,7 @@ describe('DashboardViewPage', () => {
     mockEntities['sensor.thermostat_effective_home_away'].state = 'Away'
     mockEntities['sensor.thermostat_home_away_reason'].state = 'Vacation Mode is active and everyone is away; TCS is keeping Eco active without heating or cooling.'
     mockEntities['climate.thermostat_contact_sensors_living_room_virtual_thermostat'].attributes.away_mode_active = true
-    const view = render(<DashboardViewPage activePath="ecobee" onNavigate={() => undefined} path="ecobee" />)
+    const view = render(<DashboardViewPage activePath="thermostat" onNavigate={() => undefined} path="thermostat" />)
 
     let wholeHomeDial = screen.getByRole('region', { name: /Whole Home thermostat Idle 71.0°F 62.0 · 78.0/i })
     expectRangeHandlePositions(wholeHomeDial, 62, 78)
@@ -2297,7 +2297,7 @@ describe('DashboardViewPage', () => {
 
     mockEntities['input_boolean.vacation_mode'].state = 'off'
     mockEntities['sensor.thermostat_home_away_reason'].state = 'Everyone is away; TCS is keeping Eco active without heating or cooling.'
-    view.rerender(<DashboardViewPage activePath="ecobee" onNavigate={() => undefined} path="ecobee" />)
+    view.rerender(<DashboardViewPage activePath="thermostat" onNavigate={() => undefined} path="thermostat" />)
 
     wholeHomeDial = screen.getByRole('region', { hidden: true, name: /Whole Home thermostat Idle 71.0°F 62.0 · 78.0/i })
     roomDial = within(dialog).getByRole('region', { name: /Living Room thermostat Idle 70.2°F 72.0 · 74.0/i })
@@ -2310,7 +2310,7 @@ describe('DashboardViewPage', () => {
     mockEntities['sensor.thermostat_effective_home_away'].state = 'Home'
     mockEntities['sensor.thermostat_home_away_reason'].state = 'A resident is home, so TCS is using home behavior.'
     mockEntities['climate.thermostat_contact_sensors_living_room_virtual_thermostat'].attributes.away_mode_active = false
-    view.rerender(<DashboardViewPage activePath="ecobee" onNavigate={() => undefined} path="ecobee" />)
+    view.rerender(<DashboardViewPage activePath="thermostat" onNavigate={() => undefined} path="thermostat" />)
 
     wholeHomeDial = screen.getByRole('region', { hidden: true, name: /Whole Home thermostat Idle 71.0°F 72.0 · 74.0/i })
     roomDial = within(dialog).getByRole('region', { name: /Living Room thermostat Idle 70.2°F 72.0 · 74.0/i })
@@ -2326,7 +2326,7 @@ describe('DashboardViewPage', () => {
     mockEntities['sensor.thermostat_effective_home_away'].state = 'Away'
     mockEntities['sensor.thermostat_home_away_reason'].state = 'Vacation Mode is active and everyone is away; TCS is keeping Eco active without heating or cooling.'
     mockEntities['climate.thermostat_contact_sensors_living_room_virtual_thermostat'].attributes.away_mode_active = true
-    render(<DashboardViewPage activePath="ecobee" onNavigate={() => undefined} path="ecobee" />)
+    render(<DashboardViewPage activePath="thermostat" onNavigate={() => undefined} path="thermostat" />)
 
     const thermostatDialog = await openThermostatControls()
     fireEvent.click(within(thermostatDialog).getByRole('button', { name: 'Living Room 70.2°F · Inactive' }))
@@ -2345,9 +2345,9 @@ describe('DashboardViewPage', () => {
     const previousHigh = climateEntity.attributes.target_temp_high
     climateEntity.attributes.target_temp_low = 70
     climateEntity.attributes.target_temp_high = 72
-    window.history.replaceState(null, '', '/at-a-glance/ecobee#living-room')
+    window.history.replaceState(null, '', '/at-a-glance/thermostat#living-room')
 
-    const view = render(<DashboardViewPage activePath="ecobee" onNavigate={() => undefined} path="ecobee" />)
+    const view = render(<DashboardViewPage activePath="thermostat" onNavigate={() => undefined} path="thermostat" />)
 
     const dialog = await screen.findByRole('dialog', { name: 'Living Room' })
     const shell = within(dialog).getByRole('region', { name: 'Living Room thermostat control' })
@@ -2365,13 +2365,13 @@ describe('DashboardViewPage', () => {
 
   it('colors the Thermostat Hub glass card from active heat and cool status', () => {
     mockEntities['climate.thermostat_hub_w200'].attributes.hvac_action = 'cooling'
-    const view = render(<DashboardViewPage activePath="ecobee" onNavigate={() => undefined} path="ecobee" />)
+    const view = render(<DashboardViewPage activePath="thermostat" onNavigate={() => undefined} path="thermostat" />)
 
     expect(screen.getByLabelText(/Thermostat Hub Off/i)).toHaveAttribute('data-thermal-status', 'cool')
 
     view.unmount()
     mockEntities['climate.thermostat_hub_w200'].attributes.hvac_action = 'heating'
-    render(<DashboardViewPage activePath="ecobee" onNavigate={() => undefined} path="ecobee" />)
+    render(<DashboardViewPage activePath="thermostat" onNavigate={() => undefined} path="thermostat" />)
 
     expect(screen.getByLabelText(/Thermostat Hub Off/i)).toHaveAttribute('data-thermal-status', 'heat')
   })
@@ -2379,7 +2379,7 @@ describe('DashboardViewPage', () => {
   it('uses HASS climate dropdowns for Thermostat Hub mode and fan mode when exposed', async () => {
     mockEntities['climate.thermostat_hub_w200'].attributes.fan_modes = ['auto', 'off']
     mockEntities['climate.thermostat_hub_w200'].attributes.fan_mode = 'auto'
-    render(<DashboardViewPage activePath="ecobee" onNavigate={() => undefined} path="ecobee" />)
+    render(<DashboardViewPage activePath="thermostat" onNavigate={() => undefined} path="thermostat" />)
 
     fireEvent.click(screen.getByLabelText(/Thermostat Hub Mode Off/i))
     let pickerSheet = await screen.findByRole('dialog')
@@ -2392,12 +2392,12 @@ describe('DashboardViewPage', () => {
     expect(mockCallServiceCalls).toContainEqual({ domain: 'climate', service: 'set_fan_mode', target: 'climate.thermostat_hub_w200', serviceData: { fan_mode: 'off' } })
   })
 
-  it('renders open Ecobee contact sensors as thermostat glass cards', () => {
+  it('renders open thermostat contact sensors as glass cards', () => {
     mockEntities['binary_sensor.contact_sensors'].state = 'on'
     mockEntities['binary_sensor.office_window_contact_sensor_contact'].state = 'on'
     mockEntities['binary_sensor.master_bedroom_street_window_contact_sensor_contact'].state = 'on'
 
-    render(<DashboardViewPage activePath="ecobee" onNavigate={() => undefined} path="ecobee" />)
+    render(<DashboardViewPage activePath="thermostat" onNavigate={() => undefined} path="thermostat" />)
 
     const openSensor = screen.getByLabelText(/^Office Window Open$/i)
     const masterBedroomSensor = screen.getByLabelText(/^Master Bedroom Street Windows Open$/i)
@@ -2410,7 +2410,7 @@ describe('DashboardViewPage', () => {
   })
 
   it('renders Thermostat Hub as a mode-only card without temperature and humidity chips', () => {
-    render(<DashboardViewPage activePath="ecobee" onNavigate={() => undefined} path="ecobee" />)
+    render(<DashboardViewPage activePath="thermostat" onNavigate={() => undefined} path="thermostat" />)
 
     expect(screen.getByLabelText(/Thermostat Hub Off/i)).toBeInTheDocument()
     expect(screen.getByLabelText(/Thermostat Hub Mode Off/i)).toBeInTheDocument()
@@ -2418,10 +2418,10 @@ describe('DashboardViewPage', () => {
     expect(screen.queryByText('38.0%')).not.toBeInTheDocument()
   })
 
-  it('ports the Ecobee thermostat page with source controls and room popups', async () => {
+  it('renders the thermostat page with source controls and room popups', async () => {
     mockEntities['climate.thermostat_contact_sensors_global_virtual_thermostat'].attributes.hvac_action = 'heating'
     mockEntities['climate.thermostat_contact_sensors_living_room_virtual_thermostat'].attributes.current_temperature = null
-    render(<DashboardViewPage activePath="ecobee" onNavigate={() => undefined} path="ecobee" />)
+    render(<DashboardViewPage activePath="thermostat" onNavigate={() => undefined} path="thermostat" />)
 
     expect(screen.getByRole('heading', { name: 'Thermostat' })).toBeInTheDocument()
     expect(screen.queryByText(/not available in the React dashboard yet/i)).not.toBeInTheDocument()
@@ -2542,7 +2542,7 @@ describe('DashboardViewPage', () => {
   })
 
   it('toggles occupancy-only thermostat rooms from the Thermostat tracking page', async () => {
-    render(<DashboardViewPage activePath="ecobee" onNavigate={() => undefined} path="ecobee" />)
+    render(<DashboardViewPage activePath="thermostat" onNavigate={() => undefined} path="thermostat" />)
 
     const dialog = await openThermostatControls()
     await clickIconModalTab(within(dialog), 'Tracking')
@@ -2565,7 +2565,7 @@ describe('DashboardViewPage', () => {
   })
 
   it('keeps selected-room and critical-protection controls mapped to their HA switches', async () => {
-    render(<DashboardViewPage activePath="ecobee" onNavigate={() => undefined} path="ecobee" />)
+    render(<DashboardViewPage activePath="thermostat" onNavigate={() => undefined} path="thermostat" />)
 
     const dialog = await openThermostatControls()
     await clickIconModalTab(within(dialog), 'Tracking')
@@ -2588,8 +2588,8 @@ describe('DashboardViewPage', () => {
     ])
   })
 
-  it('keeps the Ecobee room modal title stable while closing', async () => {
-    render(<DashboardViewPage activePath="ecobee" onNavigate={() => undefined} path="ecobee" />)
+  it('keeps the thermostat room modal title stable while closing', async () => {
+    render(<DashboardViewPage activePath="thermostat" onNavigate={() => undefined} path="thermostat" />)
 
     const thermostatDialog = await openThermostatControls()
     fireEvent.click(within(thermostatDialog).getByRole('button', { name: 'Living Room 70.2°F · Inactive' }))
@@ -2610,7 +2610,7 @@ describe('DashboardViewPage', () => {
     tracking.state = 'unavailable'
 
     try {
-      render(<DashboardViewPage activePath="ecobee" onNavigate={() => undefined} path="ecobee" />)
+      render(<DashboardViewPage activePath="thermostat" onNavigate={() => undefined} path="thermostat" />)
       for (const label of ['Room Thermostats', 'Advanced Configuration', 'Room Tracking']) {
         const tile = screen.getByRole('button', { name: label })
         expect(tile).toHaveAttribute('data-tone', 'switch')
@@ -2625,7 +2625,7 @@ describe('DashboardViewPage', () => {
 
   it('opens Predictive Comfort controls when active and powers it off from the card action', async () => {
     mockEntities['switch.thermostat_contact_sensors_predictive_comfort_mode'].state = 'on'
-    render(<DashboardViewPage activePath="climate" onNavigate={() => undefined} path="ecobee" />)
+    render(<DashboardViewPage activePath="climate" onNavigate={() => undefined} path="thermostat" />)
 
     const dialog = await openThermostatControls()
     await clickIconModalTab(within(dialog), 'Automation')
@@ -2679,7 +2679,7 @@ describe('DashboardViewPage', () => {
   it('renders the Pre-Cool recommendation consistently from the HA state', async () => {
     mockEntities['switch.thermostat_contact_sensors_predictive_comfort_mode'].state = 'on'
     mockEntities['sensor.living_room_thermostat_contact_sensors_predictive_comfort_mode'].state = 'pre_cool'
-    render(<DashboardViewPage activePath="climate" onNavigate={() => undefined} path="ecobee" />)
+    render(<DashboardViewPage activePath="climate" onNavigate={() => undefined} path="thermostat" />)
 
     const dialog = await openThermostatControls()
     await clickIconModalTab(within(dialog), 'Automation')
@@ -2693,7 +2693,7 @@ describe('DashboardViewPage', () => {
 
   it('turns Predictive Comfort off from the active card power action', async () => {
     mockEntities['switch.thermostat_contact_sensors_predictive_comfort_mode'].state = 'on'
-    render(<DashboardViewPage activePath="climate" onNavigate={() => undefined} path="ecobee" />)
+    render(<DashboardViewPage activePath="climate" onNavigate={() => undefined} path="thermostat" />)
 
     const dialog = await openThermostatControls()
     await clickIconModalTab(within(dialog), 'Automation')
@@ -7341,9 +7341,9 @@ describe('DashboardViewPage', () => {
         camera.restore()
       }
     }
-  })
+  }, 20_000)
 
-  it('renders chore tasks as Ecobee-style checkbox rows with optional subtitles', async () => {
+  it('renders chore tasks as checkbox rows with optional subtitles', async () => {
     for (const entityId of ['todo.stephen_s_past_due', 'todo.stephen_s_due_today', 'todo.stephen_s_upcoming', 'todo.stephen_s_no_due_date']) {
       mockTodoItemsByEntity[entityId] = []
     }
@@ -7887,8 +7887,8 @@ describe('DashboardViewPage', () => {
     expect(screen.queryByLabelText('Admin To-Do todo list')).not.toBeInTheDocument()
   })
 
-  it('renders the thermostat route as a dedicated Ecobee port', () => {
-    render(<DashboardViewPage activePath="ecobee" onNavigate={() => undefined} path="ecobee" />)
+  it('renders the dedicated thermostat route', () => {
+    render(<DashboardViewPage activePath="thermostat" onNavigate={() => undefined} path="thermostat" />)
 
     expect(screen.getByRole('heading', { name: 'Thermostat' })).toBeInTheDocument()
     expect(screen.queryByText(/not available in the React dashboard yet/i)).not.toBeInTheDocument()

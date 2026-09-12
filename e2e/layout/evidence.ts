@@ -159,7 +159,7 @@ export async function modalFacts(dialog: Locator, expectedScrollMode: 'body' | '
         return rect.width > 0 && rect.height > 0 && !item.closest('[aria-hidden="true"]')
       })
     const content = terminalKind === 'chat-content'
-      ? [...body.querySelectorAll<HTMLElement>('[data-chat-panel="true"], [data-chat-history="true"]')]
+      ? [...body.querySelectorAll<HTMLElement>('[data-chat-panel="true"], [data-chat-history="true"], [data-chat-settings="true"]')]
       : []
     const readOnlyTargets = readOnlyTerminal ? [...body.querySelectorAll<HTMLElement>(readOnlyTerminal)] : []
     if (terminalKind === 'controls' && !terminals.length) throw new Error('Modal body requires terminal controls')

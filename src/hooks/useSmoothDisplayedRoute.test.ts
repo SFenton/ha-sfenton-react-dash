@@ -113,7 +113,7 @@ describe('useSmoothDisplayedRoute', () => {
 
     act(() => {
       vi.advanceTimersByTime(40)
-      rerender({ path: 'ecobee' })
+      rerender({ path: 'thermostat' })
     })
 
     act(() => {
@@ -132,7 +132,7 @@ describe('useSmoothDisplayedRoute', () => {
       vi.advanceTimersByTime(30)
     })
 
-    expect(result.current).toEqual({ displayedPath: 'ecobee', transitionSourcePath: 'overview', transitionState: 'pre-entering' })
+    expect(result.current).toEqual({ displayedPath: 'thermostat', transitionSourcePath: 'overview', transitionState: 'pre-entering' })
   })
 
   it('waits briefly for rapid taps to settle before showing the pending route', () => {
@@ -163,7 +163,7 @@ describe('useSmoothDisplayedRoute', () => {
 
     act(() => {
       vi.advanceTimersByTime(22)
-      rerender({ path: 'ecobee' })
+      rerender({ path: 'thermostat' })
     })
 
     act(() => {
@@ -176,7 +176,7 @@ describe('useSmoothDisplayedRoute', () => {
       vi.advanceTimersByTime(1)
     })
 
-    expect(result.current).toEqual({ displayedPath: 'ecobee', transitionSourcePath: 'overview', transitionState: 'pre-entering' })
+    expect(result.current).toEqual({ displayedPath: 'thermostat', transitionSourcePath: 'overview', transitionState: 'pre-entering' })
   })
 
   it('retargets directly while a pending route is entering', () => {
@@ -195,22 +195,22 @@ describe('useSmoothDisplayedRoute', () => {
     expect(result.current).toEqual({ displayedPath: 'security', transitionSourcePath: 'overview', transitionState: 'pre-entering' })
 
     act(() => {
-      rerender({ path: 'ecobee' })
+      rerender({ path: 'thermostat' })
     })
 
-    expect(result.current).toEqual({ displayedPath: 'ecobee', transitionSourcePath: 'overview', transitionState: 'pre-entering' })
+    expect(result.current).toEqual({ displayedPath: 'thermostat', transitionSourcePath: 'overview', transitionState: 'pre-entering' })
 
     act(() => {
       vi.advanceTimersByTime(16)
     })
 
-    expect(result.current).toEqual({ displayedPath: 'ecobee', transitionSourcePath: 'overview', transitionState: 'entering' })
+    expect(result.current).toEqual({ displayedPath: 'thermostat', transitionSourcePath: 'overview', transitionState: 'entering' })
 
     act(() => {
       vi.advanceTimersByTime(170)
     })
 
-    expect(result.current).toEqual({ displayedPath: 'ecobee', transitionSourcePath: 'ecobee', transitionState: 'idle' })
+    expect(result.current).toEqual({ displayedPath: 'thermostat', transitionSourcePath: 'thermostat', transitionState: 'idle' })
   })
 
   it('preserves the source route while the target route enters', () => {

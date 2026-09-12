@@ -43,7 +43,7 @@ const HASH_MODAL_CASES = [
   { hash: '#security-system', id: 'security-dashboard', route: 'security' },
   { hash: '#lights-master-bedroom', id: 'master-bedroom-lights', route: 'master-bedroom' },
   { hash: '#master-bedroom-occupancy', id: 'master-bedroom-occupancy', route: 'master-bedroom' },
-  { hash: '#thermostat-controls', id: 'thermostat-controls', route: 'ecobee' },
+  { hash: '#thermostat-controls', id: 'thermostat-controls', route: 'thermostat' },
 ] as const
 
 const BUTTON_MODAL_CASES = [
