@@ -4,6 +4,106 @@
   color: var(--color-text);
 }
 
+.deleteDialogOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: grid;
+  place-items: center;
+  padding:
+    max(22px, var(--rd-safe-top))
+    max(22px, var(--rd-safe-right))
+    max(22px, var(--rd-safe-bottom))
+    max(22px, var(--rd-safe-left));
+  background: var(--color-modal-overlay);
+  -webkit-backdrop-filter: var(--blur-modal);
+  backdrop-filter: var(--blur-modal);
+  pointer-events: auto;
+}
+
+.deleteDialog {
+  display: grid;
+  width: min(360px, calc(100vw - 36px));
+  gap: 18px;
+  border: 0;
+  border-radius: 26px;
+  padding: 20px;
+  color: var(--color-text);
+  background: var(--color-modal-surface);
+  box-shadow: var(--shadow-glass);
+}
+
+.deleteDialogCopy {
+  display: grid;
+  gap: 8px;
+}
+
+.deleteDialogCopy h2 {
+  margin: 0;
+  font-size: 1.08rem;
+  font-weight: 820;
+  letter-spacing: 0;
+}
+
+.deleteQuantityField {
+  display: grid;
+  gap: 8px;
+  color: var(--color-text-muted);
+  font-size: 0.78rem;
+  font-weight: 760;
+}
+
+.deleteQuantityField input {
+  width: 100%;
+  min-height: 48px;
+  border: 1px solid var(--color-text-muted);
+  border-radius: 16px;
+  padding: 0 14px;
+  color: var(--color-text);
+  background: var(--color-glass-soft);
+  font: inherit;
+  font-size: 1rem;
+  font-weight: 760;
+}
+
+.deleteQuantityField input:focus {
+  outline: none;
+}
+
+.deleteDialogActions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.deleteDialogActions button {
+  min-height: 48px;
+  border: 0;
+  border-radius: 16px;
+  color: var(--color-text);
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 820;
+  cursor: pointer;
+}
+
+.deleteDialogCancel {
+  background: var(--color-glass-soft);
+}
+
+.deleteDialogConfirm {
+  background: var(--color-action-destructive);
+}
+
+.deleteDialogActions button:focus {
+  outline: none;
+}
+
+.deleteDialogActions button:focus-visible {
+  outline: 2px solid var(--color-text-muted);
+  outline-offset: 2px;
+}
+
 .items {
   display: grid;
   gap: 2px;

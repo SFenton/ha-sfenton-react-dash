@@ -1899,6 +1899,54 @@ test('inventory item edit modal adds and removes EverShelf stock from the quanti
   })
 })
 
+/**
+ * @covers src/components/hass/EverShelfInventoryPanel.module.css
+ * @covers src/i18n/index.ts
+ * @covers src/i18n/locales/en.json
+ * @covers src/i18n/locales/en/pages/food.json
+ */
+test('grocery delete confirmations consistently provide Cancel and OK', async ({ page }) => {
+  await page.setViewportSize({ width: 393, height: 852 })
+  const expectConfirmationActions = async (confirmation: ReturnType<Page['getByRole']>) => {
+    await expect(confirmation).toBeVisible()
+    await expect(confirmation).toHaveAttribute('data-inventory-delete-dialog', 'true')
+    expect(await confirmation.getByRole('button').allTextContents()).toEqual(['Cancel', 'OK'])
+  }
+
+  await page.goto('/at-a-glance/fridge')
+  const fridgeList = inventoryList(page, 'Fridge inventory list')
+  await expect.poll(() => inventoryRowLabels(page, 'Fridge inventory list')).toHaveLength(3)
+  await fridgeList.getByRole('group', { name: /Milk Expired/i }).getByRole('button', { name: 'Delete Milk' }).click()
+  const rowConfirmation = page.getByRole('alertdialog', { name: 'Delete Milk?' })
+  await expectConfirmationActions(rowConfirmation)
+  await expect(rowConfirmation.getByRole('spinbutton')).toHaveCount(0)
+  await rowConfirmation.getByRole('button', { name: 'Cancel' }).click()
+  await expect(rowConfirmation).toHaveCount(0)
+
+  await page.goto('/at-a-glance/pantry')
+  await expect.poll(() => inventoryRowLabels(page, 'Pantry inventory list')).toHaveLength(3)
+  await inventoryList(page, 'Pantry inventory list').getByRole('group', { name: /Canned Beans Quantity 5/i }).getByRole('button', { name: 'Edit Canned Beans' }).click()
+  const pantryDetails = page.getByRole('dialog', { name: 'Canned Beans' })
+  const multiDelete = pantryDetails.getByRole('button', { name: /^Delete Canned Beans expiring / }).first()
+  await multiDelete.click()
+  const multiConfirmation = page.getByRole('alertdialog', { name: /^Delete Canned Beans expiring .+\\?$/ })
+  await expectConfirmationActions(multiConfirmation)
+  await expect(multiConfirmation.getByRole('spinbutton', { name: /^Quantity to delete for Canned Beans expiring / })).toHaveValue('1')
+  await multiConfirmation.getByRole('button', { name: 'Cancel' }).click()
+  await expect(multiConfirmation).toHaveCount(0)
+
+  await page.goto('/index.html?path=overview&user=stephen#daily-report')
+  const summary = page.getByRole('dialog', { name: "Stephen's Summary" })
+  await summary.getByRole('tab', { name: /^Expired Food/ }).click()
+  await summary.getByRole('button', { name: 'Edit Milk' }).click()
+  const quickProfile = page.getByRole('dialog', { name: 'Milk' })
+  await quickProfile.getByRole('button', { name: 'Delete Milk' }).click()
+  const quickProfileConfirmation = page.getByRole('alertdialog', { name: 'Delete Milk?' })
+  await expectConfirmationActions(quickProfileConfirmation)
+  await quickProfileConfirmation.getByRole('button', { name: 'Cancel' }).click()
+  await expect(quickProfileConfirmation).toHaveCount(0)
+})
+
 test('thermostat room grid uses one equivalent column when any room label overflows', async ({ page }) => {
   await page.setViewportSize({ width: 393, height: 852 })
   await page.goto('/at-a-glance/thermostat')

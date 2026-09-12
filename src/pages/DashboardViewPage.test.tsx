@@ -6917,15 +6917,13 @@ describe('DashboardViewPage', () => {
     expect(screen.queryByRole('button', { name: 'Reset' })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: `Delete Canned Beans ${cannedBeansBatch}` })).toHaveClass(/deleteAction/)
 
-    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false)
-    const deletePromptSpy = vi.spyOn(window, 'prompt').mockReturnValue(null)
     const callCountBeforeDeniedDelete = mockCallServiceCalls.length
     fireEvent.click(screen.getByRole('button', { name: `Delete Canned Beans ${cannedBeansBatch}` }))
-    expect(deletePromptSpy).toHaveBeenCalledWith(`Quantity of Canned Beans ${cannedBeansBatch} to delete (available: 2).`, '1')
-    expect(confirmSpy).not.toHaveBeenCalled()
+    const batchDeleteConfirmation = screen.getByRole('alertdialog', { name: `Delete Canned Beans ${cannedBeansBatch}?` })
+    expect(within(batchDeleteConfirmation).getByRole('button', { name: 'Cancel' })).toBeInTheDocument()
+    expect(within(batchDeleteConfirmation).getByRole('button', { name: 'OK' })).toBeInTheDocument()
+    fireEvent.click(within(batchDeleteConfirmation).getByRole('button', { name: 'Cancel' }))
     expect(mockCallServiceCalls).toHaveLength(callCountBeforeDeniedDelete)
-    deletePromptSpy.mockRestore()
-    confirmSpy.mockRestore()
 
     fireEvent.change(expirationInput, { target: { value: '2026-09-30' } })
     expect(screen.getByRole('button', { name: `Save Canned Beans ${cannedBeansBatch}` })).toBeEnabled()
@@ -6975,19 +6973,18 @@ describe('DashboardViewPage', () => {
       serviceData: { location: 'frigo' },
     })
     mockCallServiceCalls.length = 0
-    const deleteQuantityPromptSpy = vi.spyOn(window, 'prompt').mockReturnValue('1')
-    const deleteConfirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true)
     fireEvent.click(within(greekYogurtRow).getByRole('button', { name: 'Delete Greek Yogurt' }))
-    expect(deleteQuantityPromptSpy).toHaveBeenCalledWith('Quantity of Greek Yogurt to delete (available: 2).', '1')
-    expect(deleteConfirmSpy).not.toHaveBeenCalled()
+    const rowDeleteConfirmation = screen.getByRole('alertdialog', { name: 'Delete Greek Yogurt?' })
+    expect(within(rowDeleteConfirmation).getByRole('button', { name: 'Cancel' })).toBeInTheDocument()
+    expect(within(rowDeleteConfirmation).getByRole('button', { name: 'OK' })).toBeInTheDocument()
+    fireEvent.change(within(rowDeleteConfirmation).getByRole('spinbutton', { name: 'Quantity to delete for Greek Yogurt' }), { target: { value: '1' } })
+    fireEvent.click(within(rowDeleteConfirmation).getByRole('button', { name: 'OK' }))
     await waitFor(() => expect(mockCallServiceCalls).toContainEqual({
       domain: 'evershelf',
       service: 'delete_inventory',
       serviceData: { inventory_id: 203, quantity: 1 },
     }))
     await waitFor(() => expect(within(fridgeList).getByRole('group', { name: `Greek Yogurt ${testExpiryLabel(5)}` })).toBeInTheDocument())
-    deleteQuantityPromptSpy.mockRestore()
-    deleteConfirmSpy.mockRestore()
 
     mockCallServiceCalls.length = 0
     fridgeView.unmount()

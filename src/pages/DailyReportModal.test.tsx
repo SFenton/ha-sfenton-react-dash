@@ -276,7 +276,6 @@ describe('Daily summary modal', () => {
   })
 
   it('keeps the modal empty state stable while the expired sensor catches up after the last delete', async () => {
-    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true)
     renderHome()
 
     const dialog = await screen.findByRole('dialog')
@@ -284,14 +283,15 @@ describe('Daily summary modal', () => {
     fireEvent.click(within(nav).getByRole('tab', { name: /^Expired Food/ }))
 
     fireEvent.click(await within(dialog).findByRole('button', { name: 'Delete Almond Flour' }, { timeout: 3000 }))
+    fireEvent.click(within(screen.getByRole('alertdialog', { name: 'Delete Almond Flour?' })).getByRole('button', { name: 'OK' }))
     await waitFor(() => expect(within(dialog).queryByRole('button', { name: 'Delete Almond Flour' })).not.toBeInTheDocument())
     fireEvent.click(within(dialog).getByRole('button', { name: 'Delete Milk' }))
+    fireEvent.click(within(screen.getByRole('alertdialog', { name: 'Delete Milk?' })).getByRole('button', { name: 'OK' }))
 
     const empty = await within(dialog).findByRole('heading', { level: 2, name: 'No Expired Food' })
     expect(empty.closest('section')).toHaveAttribute('data-empty-layout', 'modal')
     expect(within(dialog).getByText('Everything in the kitchen is still within date.')).toBeInTheDocument()
     expect(within(dialog).getByLabelText('Expired Food inventory list')).toBeInTheDocument()
-    confirmSpy.mockRestore()
   })
 
   it('opens expired food details as a page in the same summary modal', async () => {
@@ -310,6 +310,13 @@ describe('Daily summary modal', () => {
     expect(within(inventoryPage).getByRole('button', { name: 'Back to expired food' })).toBeInTheDocument()
     expect(within(inventoryPage).getByRole('button', { name: 'Delete Milk' })).toBeInTheDocument()
     expect(within(inventoryPage).queryByRole('tablist', { name: 'Daily report sections' })).not.toBeInTheDocument()
+
+    fireEvent.click(within(inventoryPage).getByRole('button', { name: 'Delete Milk' }))
+    const deleteConfirmation = screen.getByRole('alertdialog', { name: 'Delete Milk?' })
+    expect(within(deleteConfirmation).getByRole('button', { name: 'Cancel' })).toBeInTheDocument()
+    expect(within(deleteConfirmation).getByRole('button', { name: 'OK' })).toBeInTheDocument()
+    fireEvent.click(within(deleteConfirmation).getByRole('button', { name: 'Cancel' }))
+    expect(screen.queryByRole('alertdialog', { name: 'Delete Milk?' })).not.toBeInTheDocument()
 
     fireEvent.click(within(inventoryPage).getByRole('button', { name: 'Back to expired food' }))
     await waitFor(() => expect(within(summaryDialog).getByRole('heading', { name: "Stephen's Summary" })).toBeInTheDocument())
