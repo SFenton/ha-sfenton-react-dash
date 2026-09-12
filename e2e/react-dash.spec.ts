@@ -1258,7 +1258,7 @@ test('weather modal renders a live atmosphere and outdoor AQI without motion-onl
   const weatherRails = page.locator('[data-weather-rail]')
   await expect(weatherRails).toHaveCount(12)
   await expect(page.locator('[data-weather-rail="temperature"]')).toHaveCount(8)
-  const weatherRailGeometry = await weatherRails.evaluateAll((rails) => ({
+  await expect.poll(() => weatherRails.evaluateAll((rails) => ({
     classCount: new Set(rails.map((rail) => rail.className)).size,
     fillsMatch: rails.every((rail) => rail.querySelector<HTMLElement>('[data-weather-rail-fill]')?.getBoundingClientRect().height === 10),
     markersMatch: rails.every((rail) => {
@@ -1276,8 +1276,7 @@ test('weather modal renders a live atmosphere and outdoor AQI without motion-onl
         && style.boxShadow === 'none'
     }),
     railsMatch: rails.every((rail) => rail.getBoundingClientRect().height === 10),
-  }))
-  expect(weatherRailGeometry).toEqual({
+  }))).toEqual({
     classCount: 1,
     fillsMatch: true,
     markersMatch: true,
@@ -5244,12 +5243,12 @@ test('daily summary keeps the last expired-food empty state centred while the se
   const dialog = page.getByRole('dialog')
   await dialog.getByRole('tablist', { name: 'Daily report sections' }).getByRole('tab', { name: /^Expired Food/ }).click()
 
-  page.once('dialog', (confirmation) => void confirmation.accept())
   await dialog.getByRole('button', { name: 'Delete Almond Flour' }).click()
+  await page.getByRole('alertdialog', { name: 'Delete Almond Flour?' }).getByRole('button', { name: 'OK' }).click()
   await expect(dialog.getByRole('button', { name: 'Delete Almond Flour' })).toHaveCount(0)
 
-  page.once('dialog', (confirmation) => void confirmation.accept())
   await dialog.getByRole('button', { name: 'Delete Milk' }).click()
+  await page.getByRole('alertdialog', { name: 'Delete Milk?' }).getByRole('button', { name: 'OK' }).click()
   await expect(dialog.getByLabel('Expired Food inventory list')).toBeVisible()
   await expect(dialog.getByRole('heading', { level: 2, name: 'No Expired Food' })).toBeVisible()
 
