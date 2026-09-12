@@ -1180,6 +1180,18 @@
       "words": 2
     },
     {
+      "characters": 38,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/pages/food.json",
+      "id": "16d018eaae034977",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Add some groceries to see them appear.",
+      "words": 7
+    },
+    {
       "characters": 14,
       "context": "catalog-copy",
       "file": "src/i18n/locales/en/modals/wakeLight.json",
@@ -17734,20 +17746,6 @@
       "placeholders": [],
       "value": "Water",
       "words": 1
-    },
-    {
-      "characters": 68,
-      "context": "description",
-      "file": "src/constants/portedDashboard.ts",
-      "id": "2e7f91ff04e49564",
-      "lines": [
-        454
-      ],
-      "occurrences": 1,
-      "origin": "legacy",
-      "placeholders": [],
-      "value": "Add some groceries via the YAML app for now to see them appear here.",
-      "words": 14
     },
     {
       "characters": 71,
@@ -39442,10 +39440,10 @@
     }
   ],
   "summary": {
-    "catalogRecords": 787,
+    "catalogRecords": 788,
     "documentRecords": 1,
-    "legacyOccurrences": 2480,
-    "legacyRecords": 2050,
+    "legacyOccurrences": 2479,
+    "legacyRecords": 2049,
     "totalRecords": 2838
   },
   "version": 1

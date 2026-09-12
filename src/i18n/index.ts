@@ -6,6 +6,9 @@ export { useCopy } from './useCopy'
 export const COMMON_COPY_NAMESPACE = 'common' as const
 export const PAGE_FOOD_COPY_NAMESPACE = 'pageFood' as const
 export const PAGE_FOOD_COPY_KEYS = {
+  groceries: {
+    emptyDescription: 'groceries.emptyDescription',
+  },
   delete: {
     cancel: 'delete.cancel',
     confirm: 'delete.confirm',
