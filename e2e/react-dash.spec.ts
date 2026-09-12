@@ -584,9 +584,11 @@ test('recipe detail never renders a high-confidence taxonomy-rule closest match'
   await expect(dialog.getByText(/^Matched as /)).toHaveCount(0)
 })
 
+// @covers src/styles/tokens.css
+// @covers src/test/mocks/hakitCoreState.ts
 test('desktop browse recipe navigates all detail tabs and submits one missing-only grocery service call', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 900 })
-  await page.goto('/at-a-glance/recipes')
+  await page.goto('/at-a-glance/recipes?__mockRecipeGroceryDelayMs=600')
   await expect(page.getByRole('button', { name: 'Open Catalog Recipe 1 recipe details' })).toBeVisible({ timeout: 12_000 })
   await clearMockHassCalls(page)
 
@@ -612,8 +614,26 @@ test('desktop browse recipe navigates all detail tabs and submits one missing-on
   await expect(dialog.getByRole('heading', { name: 'Bowl Ingredients' })).toBeVisible()
   await expect(dialog.getByRole('heading', { name: 'Finishing Ingredients' })).toBeVisible()
   await expect(dialog.getByText('Canned tomatoes · 1 can', { exact: true })).toBeVisible()
-  await dialog.getByRole('button', { name: 'Add Missing Ingredients to Groceries' }).click()
-  await expect(dialog.getByText(/EverShelf: 2 added\./)).toBeVisible()
+  const groceryButton = dialog.getByRole('button', { name: 'Add Missing Ingredients to Groceries' })
+  const enabledBackground = await groceryButton.evaluate((button) => getComputedStyle(button).backgroundColor)
+  await groceryButton.click()
+  await expect(groceryButton).toBeDisabled()
+  await expect(groceryButton).toHaveAttribute('data-preserve-disabled-visual', 'true')
+  expect(await groceryButton.evaluate((button) => getComputedStyle(button).backgroundColor)).toBe(enabledBackground)
+  await expect(dialog.locator('[data-recipe-grocery-phase="1"]')).toBeVisible()
+  await expect(dialog.locator('[data-recipe-grocery-spinner="true"]')).toBeVisible()
+  const grocerySuccess = dialog.locator('[data-recipe-grocery-success="true"]')
+  await expect(grocerySuccess).toContainText('EverShelf: 2 added.')
+  await expect(grocerySuccess).toHaveClass(/visuallyHidden/)
+  await expect(groceryButton).toBeDisabled()
+  const groceryCheck = dialog.locator('[data-recipe-grocery-check="true"]')
+  await expect(dialog.locator('[data-recipe-grocery-phase="3"]')).toBeVisible()
+  await expect(groceryCheck).toBeVisible()
+  await page.waitForTimeout(2_500)
+  await expect(groceryCheck).toBeVisible()
+  await expect(dialog.locator('[data-recipe-grocery-phase]')).toHaveCount(0, { timeout: 1_500 })
+  await expect(dialog.locator('[data-recipe-grocery-complete="true"]')).toBeAttached()
+  await expect(dialog.getByText('Missing ingredients were submitted.')).toHaveCount(0)
 
   const groceryCalls = await page.evaluate(() => (
     (window as unknown as { __mockHass: { calls: Record<string, unknown>[] } }).__mockHass.calls

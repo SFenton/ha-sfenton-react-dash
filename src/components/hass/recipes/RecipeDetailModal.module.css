@@ -315,6 +315,76 @@
   padding-top: 4px;
 }
 
+.groceryCommandStage {
+  display: grid;
+  width: 100%;
+  height: 50px;
+  overflow: hidden;
+  place-items: center;
+  transition: height 320ms ease;
+}
+
+.groceryCommandStage[data-recipe-grocery-phase='5'],
+.groceryCommandStage[data-recipe-grocery-complete='true'] {
+  height: 0;
+}
+
+.groceryCommandLayer {
+  grid-area: 1 / 1;
+  opacity: 0;
+  transform: scale(0.96);
+  transition:
+    opacity 220ms ease,
+    transform 220ms ease;
+}
+
+.groceryCommandStage[data-recipe-grocery-phase='0'] > .primaryAction,
+.groceryCommandStage[data-recipe-grocery-phase='1'] > .grocerySpinnerLayer,
+.groceryCommandStage[data-recipe-grocery-phase='2'] > .grocerySpinnerLayer,
+.groceryCommandStage[data-recipe-grocery-phase='3'] > .groceryCheckLayer {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.groceryCommandStage[data-recipe-grocery-phase='2'] > .grocerySpinnerLayer {
+  animation: groceryLayerFadeOut 220ms ease forwards;
+}
+
+.groceryCommandStage[data-recipe-grocery-phase='2'] > .groceryCheckLayer {
+  animation: groceryLayerFadeIn 220ms ease forwards;
+}
+
+.groceryCommandStage[data-recipe-grocery-phase='7'] > .primaryAction {
+  animation: groceryLayerFadeIn 220ms ease forwards;
+}
+
+.groceryCommandStage[data-recipe-grocery-phase='7'] > .grocerySpinnerLayer {
+  animation: groceryLayerFadeOut 220ms ease forwards;
+}
+
+.grocerySpinnerLayer,
+.groceryCheckLayer {
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+}
+
+.grocerySpinner {
+  display: block;
+  width: 30px;
+  height: 30px;
+  box-sizing: border-box;
+  border: 3px solid var(--color-line);
+  border-top-color: var(--color-text);
+  border-radius: 999px;
+  animation: recipeDetailSpin 720ms linear infinite;
+}
+
+.grocerySuccessCheck {
+  width: 46px;
+  height: 46px;
+}
+
 .generalActions,
 .plannerStack,
 .pickerStack {
@@ -424,7 +494,8 @@
   gap: 8px;
 }
 
-.primaryAction {
+.primaryAction,
+.primaryAction[data-preserve-disabled-visual='true']:disabled {
   display: inline-flex;
   width: 100%;
   min-height: 50px;
@@ -469,6 +540,18 @@
   color: rgba(147, 226, 168, 0.94);
 }
 
+.visuallyHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 .errorFeedback {
   color: rgba(255, 166, 166, 0.96);
 }
@@ -507,6 +590,30 @@
   }
 }
 
+@keyframes groceryLayerFadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes groceryLayerFadeOut {
+  from {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  to {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+}
+
 @media (min-width: 760px) and (min-height: 560px) {
   .hero {
     aspect-ratio: 16 / 7;
@@ -529,6 +636,17 @@
 @media (prefers-reduced-motion: reduce) {
   .tabPanel {
     transition: none;
+  }
+
+  .groceryCommandLayer,
+  .groceryCommandStage {
+    transition-duration: 1ms;
+  }
+
+  .groceryCommandStage[data-recipe-grocery-phase='2'] > .groceryCommandLayer,
+  .groceryCommandStage[data-recipe-grocery-phase='7'] > .groceryCommandLayer,
+  .grocerySpinner {
+    animation-duration: 1ms;
   }
 
   .loader > span {
