@@ -1,7 +1,7 @@
 import { expect, test, type Browser, type Page } from './layout/fixture'
 import { waitForModalReady } from './layout/evidence'
 
-const BASE_URL_PATH = '/at-a-glance/ecobee'
+const BASE_URL_PATH = '/at-a-glance/thermostat'
 const MODAL_TITLE = 'Thermostat · Advanced Controls'
 interface FrameMetrics {
   frames: number

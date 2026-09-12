@@ -151,7 +151,7 @@ test.describe('centered modal geometry stability', () => {
 
   test('keeps Thermostat room details and Recipe loading geometry stable', async ({ page }) => {
     for (const viewport of CENTERED_VIEWPORTS) {
-      await gotoPath(page, 'ecobee#thermostat-controls', viewport)
+      await gotoPath(page, 'thermostat#thermostat-controls', viewport)
       let dialog = page.getByRole('dialog', { name: 'Thermostat · Advanced Controls' })
       const thermostatBaseline = await markGeometry(dialog, `thermostat-${viewport.name}`)
       await dialog.getByRole('button', { name: /^Living Room/ }).click()

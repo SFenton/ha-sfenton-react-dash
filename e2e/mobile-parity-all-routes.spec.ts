@@ -66,6 +66,9 @@ const PHONE_PARITY_VIEWPORTS = [
   { height: 852, name: 'phone-portrait', width: 393 },
   { height: 393, name: 'phone-landscape', width: 852 },
 ] as const
+const BASELINE_NAVIGATION_LABELS = {
+  thermostat: 'Climate',
+} satisfies Partial<Record<ResponsiveRoute, string>>
 const MOBILE_VIEWPORT = PHONE_PARITY_VIEWPORTS[0]
 const SCREENSHOT_STYLE = `
   *, *::before, *::after {
@@ -160,6 +163,25 @@ async function preparePage(
   return { context, errors, page, filterRepairs }
 }
 
+async function settleOpenedRoute(page: Page) {
+  await page.addStyleTag({ content: SCREENSHOT_STYLE })
+  await page.evaluate(() => document.fonts.ready)
+  await page.evaluate(() => {
+    for (const element of document.querySelectorAll<HTMLElement>('[aria-hidden="true"]')) {
+      const rect = element.getBoundingClientRect()
+      if (getComputedStyle(element).position === 'fixed' && rect.width >= innerWidth && rect.height >= innerHeight) {
+        element.dataset.parityBackground = 'true'
+      }
+    }
+    for (const animation of document.getAnimations()) animation.finish()
+  })
+  await page.waitForTimeout(900)
+  await page.evaluate(() => {
+    for (const animation of document.getAnimations()) animation.finish()
+  })
+  await page.waitForTimeout(50)
+}
+
 async function openRoute(page: Page, route: ResponsiveRoute) {
   let ready = false
   for (let attempt = 0; attempt < 3 && !ready; attempt += 1) {
@@ -178,22 +200,38 @@ async function openRoute(page: Page, route: ResponsiveRoute) {
       await page.reload()
     }
   }
-  await page.addStyleTag({ content: SCREENSHOT_STYLE })
-  await page.evaluate(() => document.fonts.ready)
-  await page.evaluate(() => {
-    for (const element of document.querySelectorAll<HTMLElement>('[aria-hidden="true"]')) {
-      const rect = element.getBoundingClientRect()
-      if (getComputedStyle(element).position === 'fixed' && rect.width >= innerWidth && rect.height >= innerHeight) {
-        element.dataset.parityBackground = 'true'
-      }
-    }
-    for (const animation of document.getAnimations()) animation.finish()
-  })
-  await page.waitForTimeout(900)
-  await page.evaluate(() => {
-    for (const animation of document.getAnimations()) animation.finish()
-  })
-  await page.waitForTimeout(50)
+  await settleOpenedRoute(page)
+}
+
+async function openBaselineRoute(page: Page, route: ResponsiveRoute) {
+  const navigationLabel = BASELINE_NAVIGATION_LABELS[route]
+  if (!navigationLabel) {
+    await openRoute(page, route)
+    return
+  }
+
+  await openRoute(page, 'overview')
+  const navigationButtons = page.getByRole('button', { name: navigationLabel, exact: true })
+  for (let index = 0; index < await navigationButtons.count(); index += 1) {
+    const button = navigationButtons.nth(index)
+    if (!await button.isVisible()) continue
+    await button.click()
+    await waitForPrimaryNavigation(page)
+    await settleOpenedRoute(page)
+    return
+  }
+
+  const menuButton = page.getByRole('button', { name: 'Open navigation menu' })
+  if (await menuButton.isVisible()) {
+    await menuButton.click()
+    const drawer = page.locator('[data-adaptive-navigation="drawer"][data-state="open"]')
+    await drawer.getByRole('menuitem', { name: navigationLabel, exact: true }).click()
+    await waitForPrimaryNavigation(page)
+    await settleOpenedRoute(page)
+    return
+  }
+
+  throw new Error(`No visible baseline navigation button found for ${route}`)
 }
 
 async function ensureInventoryContent(page: Page, route: ResponsiveRoute) {
@@ -438,12 +476,12 @@ for (const parityViewport of PHONE_PARITY_VIEWPORTS) {
           const newRouteContract = INTENTIONAL_NEW_ROUTES[route]
           const baselineRoute = (newRouteContract?.referenceRoute ?? route) as ResponsiveRoute
           if (rawBaseline) {
-            await openRoute(rawBaseline.page, baselineRoute)
+            await openBaselineRoute(rawBaseline.page, baselineRoute)
             await ensureRouteContent(rawBaseline.page, baselineRoute)
             await ensureInventoryContent(rawBaseline.page, baselineRoute)
             await settleStableVisual(rawBaseline.page)
           }
-          await openRoute(baseline.page, baselineRoute)
+          await openBaselineRoute(baseline.page, baselineRoute)
           await ensureRouteContent(baseline.page, baselineRoute)
           await ensureInventoryContent(baseline.page, baselineRoute)
           await settleStableVisual(baseline.page)
