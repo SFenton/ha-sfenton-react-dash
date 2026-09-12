@@ -10859,7 +10859,7 @@
       "file": "src/components/hass/EverShelfInventoryPanel.tsx",
       "id": "36da0d10512b3b68",
       "lines": [
-        1551
+        1581
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -11510,7 +11510,7 @@
       "file": "src/components/hass/EverShelfInventoryPanel.tsx",
       "id": "4430cb8226f89656",
       "lines": [
-        1112
+        1142
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -11603,7 +11603,7 @@
       "file": "src/components/hass/EverShelfInventoryPanel.tsx",
       "id": "dac8b1f415c5a9b1",
       "lines": [
-        1129
+        1159
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -11650,7 +11650,7 @@
       "file": "src/components/hass/EverShelfInventoryPanel.tsx",
       "id": "e63fa4e9611ee02a",
       "lines": [
-        1304
+        1334
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -11678,7 +11678,7 @@
       "file": "src/components/hass/EverShelfInventoryPanel.tsx",
       "id": "baabbf4b2e3179f4",
       "lines": [
-        1267
+        1297
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -12133,7 +12133,7 @@
       "file": "src/components/hass/EverShelfInventoryPanel.tsx",
       "id": "9f37e27de69bd0a0",
       "lines": [
-        1134
+        1164
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -12193,7 +12193,7 @@
       "file": "src/components/hass/EverShelfInventoryPanel.tsx",
       "id": "a977f7a76bbd14ff",
       "lines": [
-        1118
+        1148
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -12268,7 +12268,7 @@
       "file": "src/components/hass/EverShelfInventoryPanel.tsx",
       "id": "4be146be0226d209",
       "lines": [
-        1145
+        1175
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -12331,7 +12331,7 @@
       "file": "src/components/hass/EverShelfInventoryPanel.tsx",
       "id": "c4c6e949d5d35e59",
       "lines": [
-        1280
+        1310
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -12359,7 +12359,7 @@
       "file": "src/components/hass/EverShelfInventoryPanel.tsx",
       "id": "ee910ab7fd6d7b3d",
       "lines": [
-        1583
+        1613
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -12520,7 +12520,7 @@
       "file": "src/components/hass/EverShelfInventoryPanel.tsx",
       "id": "a93c750ec1917d73",
       "lines": [
-        1301
+        1331
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -12548,7 +12548,7 @@
       "file": "src/components/hass/EverShelfInventoryPanel.tsx",
       "id": "89092085c4fb20c1",
       "lines": [
-        1210
+        1240
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -12562,7 +12562,7 @@
       "file": "src/components/hass/EverShelfInventoryPanel.tsx",
       "id": "379667d4ce4d5ea3",
       "lines": [
-        1216
+        1246
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -13028,7 +13028,7 @@
       "file": "src/components/hass/EverShelfInventoryPanel.tsx",
       "id": "6a2810d69ac61eae",
       "lines": [
-        1119
+        1149
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -13045,7 +13045,7 @@
       "file": "src/components/hass/EverShelfInventoryPanel.tsx",
       "id": "04280d4b23c2c13c",
       "lines": [
-        1129
+        1159
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -13216,7 +13216,7 @@
       "file": "src/components/hass/EverShelfInventoryPanel.tsx",
       "id": "4ca275a55de7c33a",
       "lines": [
-        1122
+        1152
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -13493,7 +13493,7 @@
       "file": "src/components/hass/EverShelfInventoryPanel.tsx",
       "id": "0154fd2ba7fec6b8",
       "lines": [
-        1138
+        1168
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -14388,7 +14388,7 @@
       "file": "src/components/hass/EverShelfInventoryPanel.tsx",
       "id": "f913b0534a6f5926",
       "lines": [
-        1552
+        1582
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -14798,7 +14798,7 @@
       "file": "src/components/hass/EverShelfInventoryPanel.tsx",
       "id": "a343bae0c1c70423",
       "lines": [
-        1266
+        1296
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -15036,7 +15036,7 @@
       "file": "src/components/hass/EverShelfInventoryPanel.tsx",
       "id": "020e2bcedba6dba7",
       "lines": [
-        1110
+        1140
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -15052,7 +15052,7 @@
       "file": "src/components/hass/EverShelfInventoryPanel.tsx",
       "id": "9adfc7039f08ddd2",
       "lines": [
-        1110
+        1140
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -15461,7 +15461,7 @@
       "file": "src/components/hass/EverShelfInventoryPanel.tsx",
       "id": "c4a82ae1bc9beb21",
       "lines": [
-        1561
+        1591
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -15475,9 +15475,9 @@
       "file": "src/components/hass/EverShelfInventoryPanel.tsx",
       "id": "bcfca18e55044265",
       "lines": [
-        1561,
-        1563,
-        1564
+        1591,
+        1593,
+        1594
       ],
       "occurrences": 3,
       "origin": "legacy",
@@ -16029,7 +16029,7 @@
       "file": "src/components/hass/EverShelfInventoryPanel.tsx",
       "id": "b6678f4df8f701ab",
       "lines": [
-        1561
+        1591
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -16186,7 +16186,7 @@
       "file": "src/components/hass/EverShelfInventoryPanel.tsx",
       "id": "73510028e59cacf4",
       "lines": [
-        1209
+        1239
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -16214,7 +16214,7 @@
       "file": "src/components/hass/EverShelfInventoryPanel.tsx",
       "id": "1e90590adc145dd1",
       "lines": [
-        1218
+        1248
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -16637,7 +16637,7 @@
       "file": "src/components/hass/EverShelfInventoryPanel.tsx",
       "id": "1b984f8f36986081",
       "lines": [
-        1564
+        1594
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -17443,7 +17443,7 @@
       "file": "src/components/hass/EverShelfInventoryPanel.tsx",
       "id": "2db34eaf35615276",
       "lines": [
-        1144
+        1174
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -17528,7 +17528,7 @@
       "file": "src/components/hass/EverShelfInventoryPanel.tsx",
       "id": "98b6cfb779e58e01",
       "lines": [
-        1145
+        1175
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -24573,7 +24573,7 @@
       "id": "ccdf38c20b4094eb",
       "lines": [
         109,
-        1129
+        1159
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -25100,7 +25100,7 @@
       "file": "src/components/hass/EverShelfInventoryPanel.tsx",
       "id": "d308725feeae65e1",
       "lines": [
-        1553
+        1583
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -25660,7 +25660,7 @@
       "file": "src/components/hass/EverShelfInventoryPanel.tsx",
       "id": "0b4f54001b7e315a",
       "lines": [
-        1123
+        1153
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -26807,7 +26807,7 @@
       "file": "src/components/hass/EverShelfInventoryPanel.tsx",
       "id": "8c1cb94784573e2f",
       "lines": [
-        1263
+        1293
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -26877,7 +26877,7 @@
       "file": "src/components/hass/EverShelfInventoryPanel.tsx",
       "id": "56aa7655cef0dfdb",
       "lines": [
-        1205
+        1235
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -26947,7 +26947,7 @@
       "file": "src/components/hass/EverShelfInventoryPanel.tsx",
       "id": "fe7b8805e3988867",
       "lines": [
-        1286
+        1316
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -33444,7 +33444,7 @@
       "file": "src/components/hass/EverShelfInventoryPanel.tsx",
       "id": "d119b43c3c6b09fc",
       "lines": [
-        1139
+        1169
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -35078,7 +35078,7 @@
       "file": "src/components/hass/EverShelfInventoryPanel.tsx",
       "id": "4dda2ec93f310bc2",
       "lines": [
-        1559
+        1589
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -37491,7 +37491,7 @@
       "file": "src/components/hass/EverShelfInventoryPanel.tsx",
       "id": "32eef58d73d713d4",
       "lines": [
-        1486
+        1516
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -39204,7 +39204,7 @@
       "file": "src/components/hass/EverShelfInventoryPanel.tsx",
       "id": "971e02ea524d7d52",
       "lines": [
-        880
+        895
       ],
       "occurrences": 1,
       "origin": "legacy",

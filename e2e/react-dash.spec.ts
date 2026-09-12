@@ -1954,6 +1954,18 @@ test('grocery delete confirmations consistently provide Cancel and OK', async ({
   await multiConfirmation.getByRole('button', { name: 'Cancel' }).click()
   await expect(multiConfirmation).toHaveCount(0)
 
+  await clearMockHassCalls(page)
+  await multiDelete.click()
+  await page.getByRole('alertdialog', { name: /^Delete Canned Beans expiring .+\\?$/ }).getByRole('button', { name: 'OK' }).click()
+  await expect(multiConfirmation).toHaveCount(0)
+  await expect(pantryDetails).toBeVisible()
+  await expect(pantryDetails.getByRole('spinbutton', { name: /^Quantity for Canned Beans expiring / }).first()).toHaveText('1')
+  await expect.poll(() => everShelfInventoryCalls(page)).toContainEqual({
+    domain: 'evershelf',
+    service: 'delete_inventory',
+    serviceData: { inventory_id: 102 },
+  })
+
   await page.goto('/index.html?path=overview&user=stephen#daily-report')
   const summary = page.getByRole('dialog', { name: "Stephen's Summary" })
   await summary.getByRole('tab', { name: /^Expired Food/ }).click()
