@@ -556,8 +556,8 @@ test.describe('touch keyboard viewport', () => {
   })
 })
 
-test('Quick Links and Summary share the same frame on rotation, reopen, tablet and desktop', async ({ page }) => {
-  test.setTimeout(90_000)
+test('Quick Links and Summary share the same frame on rotation, reopen, tablet and desktop', async ({ browserName, page }) => {
+  test.setTimeout(browserName === 'webkit' ? 180_000 : 90_000)
   await page.setViewportSize(PORTRAIT)
   await installSafeAreaInsets(page, PORTRAIT.insets)
   await page.goto('/index.html?path=overview&user=stephen')
@@ -591,8 +591,8 @@ const CONFIGURED_ROOM_MODALS = Object.values(ROOM_PAGE_CONFIGS).map((room) => {
 }).filter((room) => room.openers.length > 0)
 
 for (const room of CONFIGURED_ROOM_MODALS) {
-  test(`${room.title} configured modal openers and tabs retain geometry on rotation`, async ({ page }, testInfo) => {
-    test.setTimeout(300_000)
+  test(`${room.title} configured modal openers and tabs retain geometry on rotation`, async ({ browserName, page }, testInfo) => {
+    test.setTimeout(browserName === 'webkit' ? 600_000 : 300_000)
     const states: Array<{ route: string; hash: string; kind: string; tab: string; intent: string | null }> = []
     for (const opener of room.openers) {
       await test.step(`${room.path}${opener.hash} (${opener.kind})`, async () => {

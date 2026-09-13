@@ -1205,7 +1205,7 @@ test('mobile modal opener families use shared disclosures and explicit action ex
   await expect(homeAssistantSettings).toHaveAttribute('data-action-kind', 'external')
   await expect(homeAssistantSettings.locator('[data-surface-accessory="external"]')).toHaveCount(1)
 
-  await page.goto('/at-a-glance/ecobee')
+  await page.goto('/at-a-glance/thermostat')
   await expectRightChevron(page.getByRole('button', { exact: true, name: 'Room Thermostats' }))
   await expectRightChevron(page.getByRole('button', { exact: true, name: 'Advanced Configuration' }))
   await expectRightChevron(page.getByRole('button', { exact: true, name: 'Room Tracking' }))
@@ -1278,7 +1278,7 @@ test('weather modal renders a live atmosphere and outdoor AQI without motion-onl
   const weatherRails = page.locator('[data-weather-rail]')
   await expect(weatherRails).toHaveCount(12)
   await expect(page.locator('[data-weather-rail="temperature"]')).toHaveCount(8)
-  const weatherRailGeometry = await weatherRails.evaluateAll((rails) => ({
+  await expect.poll(() => weatherRails.evaluateAll((rails) => ({
     classCount: new Set(rails.map((rail) => rail.className)).size,
     fillsMatch: rails.every((rail) => rail.querySelector<HTMLElement>('[data-weather-rail-fill]')?.getBoundingClientRect().height === 10),
     markersMatch: rails.every((rail) => {
@@ -1296,8 +1296,7 @@ test('weather modal renders a live atmosphere and outdoor AQI without motion-onl
         && style.boxShadow === 'none'
     }),
     railsMatch: rails.every((rail) => rail.getBoundingClientRect().height === 10),
-  }))
-  expect(weatherRailGeometry).toEqual({
+  }))).toEqual({
     classCount: 1,
     fillsMatch: true,
     markersMatch: true,
@@ -1466,7 +1465,7 @@ test('weather modal renders a live atmosphere and outdoor AQI without motion-onl
 test('mobile navigation chevrons stay vertically centered in their opener', async ({ page }) => {
   await page.setViewportSize({ width: 393, height: 852 })
 
-  for (const path of ['overview', 'security', 'living-room', 'master-bedroom', 'ecobee', 'vacuums', 'admin', 'pantry']) {
+  for (const path of ['overview', 'security', 'living-room', 'master-bedroom', 'thermostat', 'vacuums', 'admin', 'pantry']) {
     await page.goto(`/at-a-glance/${path}`)
     await waitForRoute(page, path)
     const chevrons = page.locator('[data-modal-disclosure="right-chevron"]')
@@ -1956,6 +1955,18 @@ test('grocery delete confirmations consistently provide Cancel and OK', async ({
   await multiConfirmation.getByRole('button', { name: 'Cancel' }).click()
   await expect(multiConfirmation).toHaveCount(0)
 
+  await clearMockHassCalls(page)
+  await multiDelete.click()
+  await page.getByRole('alertdialog', { name: /^Delete Canned Beans expiring .+\\?$/ }).getByRole('button', { name: 'OK' }).click()
+  await expect(multiConfirmation).toHaveCount(0)
+  await expect(pantryDetails).toBeVisible()
+  await expect(pantryDetails.getByRole('spinbutton', { name: /^Quantity for Canned Beans expiring / }).first()).toHaveText('1')
+  await expect.poll(() => everShelfInventoryCalls(page)).toContainEqual({
+    domain: 'evershelf',
+    service: 'delete_inventory',
+    serviceData: { inventory_id: 102 },
+  })
+
   await page.goto('/index.html?path=overview&user=stephen#daily-report')
   const summary = page.getByRole('dialog', { name: "Stephen's Summary" })
   await summary.getByRole('tab', { name: /^Expired Food/ }).click()
@@ -1970,7 +1981,7 @@ test('grocery delete confirmations consistently provide Cancel and OK', async ({
 
 test('thermostat room grid uses one equivalent column when any room label overflows', async ({ page }) => {
   await page.setViewportSize({ width: 393, height: 852 })
-  await page.goto('/at-a-glance/ecobee')
+  await page.goto('/at-a-glance/thermostat')
 
   const dialog = await openThermostatControls(page)
   const grid = dialog.getByRole('group', { name: 'Thermostat rooms' })
@@ -1993,7 +2004,7 @@ test('thermostat room grid uses one equivalent column when any room label overfl
 
 test('thermostat page keeps primary controls and three explained modal entry points compact', async ({ page }) => {
   await page.setViewportSize({ width: 393, height: 852 })
-  await page.goto('/at-a-glance/ecobee')
+  await page.goto('/at-a-glance/thermostat')
 
   const scroller = page.locator('main > div').nth(1)
   const dimensions = await scroller.evaluate((element) => ({
@@ -2023,8 +2034,8 @@ test('thermostat page entry points deep link to their matching modal tabs', asyn
   ]
 
   for (const entry of cases) {
-    await page.goto('/at-a-glance/ecobee')
-    await waitForRoute(page, 'ecobee')
+    await page.goto('/at-a-glance/thermostat')
+    await waitForRoute(page, 'thermostat')
     const dialog = await openThermostatControls(page, entry.tab)
     await expect(page).toHaveURL(new RegExp(`${entry.hash}$`))
     await expect(dialog.getByRole('tab', { name: entry.tab })).toHaveAttribute('aria-selected', 'true')
@@ -2033,19 +2044,19 @@ test('thermostat page entry points deep link to their matching modal tabs', asyn
   }
 
   for (const entry of cases) {
-    await page.goto(`/at-a-glance/ecobee${entry.hash}`)
+    await page.goto(`/at-a-glance/thermostat${entry.hash}`)
     const dialog = page.getByRole('dialog', { name: 'Thermostat · Advanced Controls' })
     await expect(dialog).toBeVisible()
     await expect(dialog.getByRole('tab', { name: entry.tab })).toHaveAttribute('aria-selected', 'true')
   }
 
-  await page.goto('/at-a-glance/ecobee')
+  await page.goto('/at-a-glance/thermostat')
   const dialog = await openThermostatControls(page, 'Automation')
   await dialog.getByRole('tab', { name: 'Tracking' }).click()
   await expect(page).toHaveURL(/#thermostat-tracking$/)
   await page.goBack()
   await expect(page.getByRole('dialog')).toHaveCount(0)
-  await expect(page).toHaveURL(/\/at-a-glance\/ecobee$/)
+  await expect(page).toHaveURL(/\/at-a-glance\/thermostat$/)
   await page.goForward()
   await expect(page.getByRole('dialog', { name: 'Thermostat · Advanced Controls' })).toBeVisible()
   await expect(page.getByRole('tab', { name: 'Tracking' })).toHaveAttribute('aria-selected', 'true')
@@ -2053,7 +2064,7 @@ test('thermostat page entry points deep link to their matching modal tabs', asyn
 
 test('thermostat modal uses root tabs and same-sheet detail pages', async ({ page }) => {
   await page.setViewportSize({ width: 393, height: 852 })
-  await page.goto('/at-a-glance/ecobee')
+  await page.goto('/at-a-glance/thermostat')
 
   const dialog = await openThermostatControls(page)
   await expect(dialog.getByText(/11 rooms/i)).toHaveCount(0)
@@ -2151,7 +2162,7 @@ test('thermostat modal uses root tabs and same-sheet detail pages', async ({ pag
 })
 
 test('thermostat page accepts the first mobile scroll gesture after closing a room modal', async ({ page }) => {
-  await page.goto('/at-a-glance/ecobee')
+  await page.goto('/at-a-glance/thermostat')
 
   const dialog = await openThermostatControls(page)
   await dialog.getByRole('button', { name: 'Living Room 70.2°F · Inactive' }).click()
@@ -2170,7 +2181,7 @@ test('thermostat page accepts the first mobile scroll gesture after closing a ro
     maxScrollTop: element.scrollHeight - element.clientHeight,
   }))
   const scrollerBox = await scroller.boundingBox()
-  if (!scrollerBox) throw new Error('Ecobee page scroller was not measurable')
+  if (!scrollerBox) throw new Error('Thermostat page scroller was not measurable')
   const canScrollDown = before < maxScrollTop - 20
   const swipeX = scrollerBox.x + scrollerBox.width / 2
   const lowerSwipeY = scrollerBox.y + scrollerBox.height * 0.72
@@ -2731,7 +2742,7 @@ test.describe('desktop modal layout', () => {
   })
 
   test('thermostat room modal keeps its reading measure inside the shared desktop frame', async ({ page }) => {
-    await page.goto('/at-a-glance/ecobee#living-room')
+    await page.goto('/at-a-glance/thermostat#living-room')
 
     const dialog = page.getByRole('dialog', { name: 'Living Room' })
     await expect(dialog).toBeVisible()
@@ -2763,7 +2774,7 @@ test.describe('desktop modal layout', () => {
   })
 
   test('thermostat hub mode uses security-style desktop picker without separator', async ({ page }) => {
-    await page.goto('/at-a-glance/ecobee')
+    await page.goto('/at-a-glance/thermostat')
 
     await page.getByLabel(/Thermostat Hub Mode Off/i).click()
     const dialog = page.getByRole('dialog', { name: 'Thermostat Hub Mode' })
@@ -2785,7 +2796,7 @@ test.describe('desktop modal layout', () => {
   })
 
   test('eco mode pickers use vertical GlassTile stacks without separators', async ({ page }) => {
-    await page.goto('/at-a-glance/ecobee')
+    await page.goto('/at-a-glance/thermostat')
     const dialog = await openThermostatControls(page)
     await dialog.getByRole('tab', { name: 'Automation' }).click()
 
@@ -4606,7 +4617,7 @@ test('thermostat modal contains full-size heat and cool markers at all mobile ta
 
   for (const viewport of viewportCases) {
     await page.setViewportSize(viewport)
-    await page.goto('/at-a-glance/ecobee#living-room')
+    await page.goto('/at-a-glance/thermostat#living-room')
 
     const dialog = page.getByRole('dialog', { name: 'Living Room' })
     const body = dialog.locator('[data-modal-sheet-body="true"]')
@@ -4918,7 +4929,7 @@ test('thermostat Vacation end transitions to Away or Home with correct dial rang
   }
 
   await page.setViewportSize({ width: 393, height: 852 })
-  await page.goto('/at-a-glance/ecobee')
+  await page.goto('/at-a-glance/thermostat')
   await page.evaluate(() => {
     const mock = (window as unknown as { __mockHass: {
       calls: Record<string, unknown>[]
@@ -5010,7 +5021,7 @@ test('thermostat Vacation end transitions to Away or Home with correct dial rang
 })
 
 test('thermostat hero dial allows vertical swipe scrolling', async ({ page, browserName }) => {
-  await page.goto('/at-a-glance/ecobee')
+  await page.goto('/at-a-glance/thermostat')
 
   await expect(page.getByRole('heading', { level: 1, name: 'Thermostat' })).toBeVisible()
   await expect(page.getByText(/manually reviewed/i)).toHaveCount(0)
@@ -5265,12 +5276,12 @@ test('daily summary keeps the last expired-food empty state centred while the se
   const dialog = page.getByRole('dialog')
   await dialog.getByRole('tablist', { name: 'Daily report sections' }).getByRole('tab', { name: /^Expired Food/ }).click()
 
-  page.once('dialog', (confirmation) => void confirmation.accept())
   await dialog.getByRole('button', { name: 'Delete Almond Flour' }).click()
+  await page.getByRole('alertdialog', { name: 'Delete Almond Flour?' }).getByRole('button', { name: 'OK' }).click()
   await expect(dialog.getByRole('button', { name: 'Delete Almond Flour' })).toHaveCount(0)
 
-  page.once('dialog', (confirmation) => void confirmation.accept())
   await dialog.getByRole('button', { name: 'Delete Milk' }).click()
+  await page.getByRole('alertdialog', { name: 'Delete Milk?' }).getByRole('button', { name: 'OK' }).click()
   await expect(dialog.getByLabel('Expired Food inventory list')).toBeVisible()
   await expect(dialog.getByRole('heading', { level: 2, name: 'No Expired Food' })).toBeVisible()
 

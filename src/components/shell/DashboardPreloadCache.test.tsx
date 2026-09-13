@@ -1,5 +1,5 @@
 import { render } from '@testing-library/react'
-import { DASHBOARD_ROUTES } from '../../constants/routes'
+import { DASHBOARD_ROUTES, THERMOSTAT_ROUTE_PATH } from '../../constants/routes'
 import { mockCallServiceCalls, mockState, resetMockHass } from '../../test/mocks/hakitCoreState'
 import { DashboardPreloadCache } from './DashboardPreloadCache'
 
@@ -60,6 +60,7 @@ describe('DashboardPreloadCache', () => {
 
       expect(container.querySelectorAll('[data-preload-route]')).toHaveLength(DASHBOARD_ROUTES.length)
       expect(container.querySelectorAll('[data-preload-geometry="modal"]').length).toBeGreaterThan(0)
+      expect(container.querySelector(`[data-preload-modal="${THERMOSTAT_ROUTE_PATH}#thermostat-controls"]`)).toBeInTheDocument()
       expect(container.querySelector('[data-dynamic-grid="true"]')).toBeNull()
       expect(container.querySelector('img, video, audio, source, iframe, object, embed, script, link, canvas')).toBeNull()
       expect(mockCallServiceCalls).toEqual([])

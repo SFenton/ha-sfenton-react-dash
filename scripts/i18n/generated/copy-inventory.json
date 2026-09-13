@@ -1180,6 +1180,18 @@
       "words": 2
     },
     {
+      "characters": 38,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/pages/food.json",
+      "id": "16d018eaae034977",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Add some groceries to see them appear.",
+      "words": 7
+    },
+    {
       "characters": 14,
       "context": "catalog-copy",
       "file": "src/i18n/locales/en/modals/wakeLight.json",
@@ -10859,7 +10871,7 @@
       "file": "src/components/hass/EverShelfInventoryPanel.tsx",
       "id": "36da0d10512b3b68",
       "lines": [
-        1553
+        1583
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -11510,7 +11522,7 @@
       "file": "src/components/hass/EverShelfInventoryPanel.tsx",
       "id": "4430cb8226f89656",
       "lines": [
-        1114
+        1144
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -11603,7 +11615,7 @@
       "file": "src/components/hass/EverShelfInventoryPanel.tsx",
       "id": "dac8b1f415c5a9b1",
       "lines": [
-        1131
+        1161
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -11650,7 +11662,7 @@
       "file": "src/components/hass/EverShelfInventoryPanel.tsx",
       "id": "e63fa4e9611ee02a",
       "lines": [
-        1306
+        1336
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -11678,7 +11690,7 @@
       "file": "src/components/hass/EverShelfInventoryPanel.tsx",
       "id": "baabbf4b2e3179f4",
       "lines": [
-        1269
+        1299
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -12133,7 +12145,7 @@
       "file": "src/components/hass/EverShelfInventoryPanel.tsx",
       "id": "9f37e27de69bd0a0",
       "lines": [
-        1136
+        1166
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -12193,7 +12205,7 @@
       "file": "src/components/hass/EverShelfInventoryPanel.tsx",
       "id": "a977f7a76bbd14ff",
       "lines": [
-        1120
+        1150
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -12268,7 +12280,7 @@
       "file": "src/components/hass/EverShelfInventoryPanel.tsx",
       "id": "4be146be0226d209",
       "lines": [
-        1147
+        1177
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -12331,7 +12343,7 @@
       "file": "src/components/hass/EverShelfInventoryPanel.tsx",
       "id": "c4c6e949d5d35e59",
       "lines": [
-        1282
+        1312
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -12359,7 +12371,7 @@
       "file": "src/components/hass/EverShelfInventoryPanel.tsx",
       "id": "ee910ab7fd6d7b3d",
       "lines": [
-        1585
+        1615
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -12520,7 +12532,7 @@
       "file": "src/components/hass/EverShelfInventoryPanel.tsx",
       "id": "a93c750ec1917d73",
       "lines": [
-        1303
+        1333
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -12548,7 +12560,7 @@
       "file": "src/components/hass/EverShelfInventoryPanel.tsx",
       "id": "89092085c4fb20c1",
       "lines": [
-        1212
+        1242
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -12562,7 +12574,7 @@
       "file": "src/components/hass/EverShelfInventoryPanel.tsx",
       "id": "379667d4ce4d5ea3",
       "lines": [
-        1218
+        1248
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -13028,7 +13040,7 @@
       "file": "src/components/hass/EverShelfInventoryPanel.tsx",
       "id": "6a2810d69ac61eae",
       "lines": [
-        1121
+        1151
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -13045,7 +13057,7 @@
       "file": "src/components/hass/EverShelfInventoryPanel.tsx",
       "id": "04280d4b23c2c13c",
       "lines": [
-        1131
+        1161
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -13216,7 +13228,7 @@
       "file": "src/components/hass/EverShelfInventoryPanel.tsx",
       "id": "4ca275a55de7c33a",
       "lines": [
-        1124
+        1154
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -13493,7 +13505,7 @@
       "file": "src/components/hass/EverShelfInventoryPanel.tsx",
       "id": "0154fd2ba7fec6b8",
       "lines": [
-        1140
+        1170
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -14388,7 +14400,7 @@
       "file": "src/components/hass/EverShelfInventoryPanel.tsx",
       "id": "f913b0534a6f5926",
       "lines": [
-        1554
+        1584
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -14798,7 +14810,7 @@
       "file": "src/components/hass/EverShelfInventoryPanel.tsx",
       "id": "a343bae0c1c70423",
       "lines": [
-        1268
+        1298
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -15036,7 +15048,7 @@
       "file": "src/components/hass/EverShelfInventoryPanel.tsx",
       "id": "020e2bcedba6dba7",
       "lines": [
-        1112
+        1142
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -15052,7 +15064,7 @@
       "file": "src/components/hass/EverShelfInventoryPanel.tsx",
       "id": "9adfc7039f08ddd2",
       "lines": [
-        1112
+        1142
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -15461,7 +15473,7 @@
       "file": "src/components/hass/EverShelfInventoryPanel.tsx",
       "id": "c4a82ae1bc9beb21",
       "lines": [
-        1563
+        1593
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -15475,9 +15487,9 @@
       "file": "src/components/hass/EverShelfInventoryPanel.tsx",
       "id": "bcfca18e55044265",
       "lines": [
-        1563,
-        1565,
-        1566
+        1593,
+        1595,
+        1596
       ],
       "occurrences": 3,
       "origin": "legacy",
@@ -16029,7 +16041,7 @@
       "file": "src/components/hass/EverShelfInventoryPanel.tsx",
       "id": "b6678f4df8f701ab",
       "lines": [
-        1563
+        1593
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -16186,7 +16198,7 @@
       "file": "src/components/hass/EverShelfInventoryPanel.tsx",
       "id": "73510028e59cacf4",
       "lines": [
-        1211
+        1241
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -16214,7 +16226,7 @@
       "file": "src/components/hass/EverShelfInventoryPanel.tsx",
       "id": "1e90590adc145dd1",
       "lines": [
-        1220
+        1250
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -16637,7 +16649,7 @@
       "file": "src/components/hass/EverShelfInventoryPanel.tsx",
       "id": "1b984f8f36986081",
       "lines": [
-        1566
+        1596
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -17443,7 +17455,7 @@
       "file": "src/components/hass/EverShelfInventoryPanel.tsx",
       "id": "2db34eaf35615276",
       "lines": [
-        1146
+        1176
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -17528,7 +17540,7 @@
       "file": "src/components/hass/EverShelfInventoryPanel.tsx",
       "id": "98b6cfb779e58e01",
       "lines": [
-        1147
+        1177
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -17734,20 +17746,6 @@
       "placeholders": [],
       "value": "Water",
       "words": 1
-    },
-    {
-      "characters": 68,
-      "context": "description",
-      "file": "src/constants/portedDashboard.ts",
-      "id": "2e7f91ff04e49564",
-      "lines": [
-        454
-      ],
-      "occurrences": 1,
-      "origin": "legacy",
-      "placeholders": [],
-      "value": "Add some groceries via the YAML app for now to see them appear here.",
-      "words": 14
     },
     {
       "characters": 71,
@@ -24573,7 +24571,7 @@
       "id": "ccdf38c20b4094eb",
       "lines": [
         110,
-        1131
+        1161
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -25100,7 +25098,7 @@
       "file": "src/components/hass/EverShelfInventoryPanel.tsx",
       "id": "d308725feeae65e1",
       "lines": [
-        1555
+        1585
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -25660,7 +25658,7 @@
       "file": "src/components/hass/EverShelfInventoryPanel.tsx",
       "id": "0b4f54001b7e315a",
       "lines": [
-        1125
+        1155
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -26002,11 +26000,11 @@
       "file": "src/constants/routes.ts",
       "id": "182c5ef27f1c6cf1",
       "lines": [
-        80,
         81,
         82,
         83,
-        84
+        84,
+        85
       ],
       "occurrences": 5,
       "origin": "legacy",
@@ -26807,7 +26805,7 @@
       "file": "src/components/hass/EverShelfInventoryPanel.tsx",
       "id": "8c1cb94784573e2f",
       "lines": [
-        1265
+        1295
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -26877,7 +26875,7 @@
       "file": "src/components/hass/EverShelfInventoryPanel.tsx",
       "id": "56aa7655cef0dfdb",
       "lines": [
-        1207
+        1237
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -26947,7 +26945,7 @@
       "file": "src/components/hass/EverShelfInventoryPanel.tsx",
       "id": "fe7b8805e3988867",
       "lines": [
-        1288
+        1318
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -28168,7 +28166,7 @@
       "file": "src/constants/routes.ts",
       "id": "2f418da272905de0",
       "lines": [
-        59
+        60
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -28350,7 +28348,7 @@
       "file": "src/constants/routes.ts",
       "id": "ec2651d4abeb2f6c",
       "lines": [
-        44
+        45
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -28575,7 +28573,7 @@
       "file": "src/constants/routes.ts",
       "id": "55bbfca1fd31aae1",
       "lines": [
-        51
+        52
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -28860,7 +28858,7 @@
       "file": "src/constants/routes.ts",
       "id": "7cb9830be16bb1ed",
       "lines": [
-        49
+        50
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -28931,7 +28929,7 @@
       "file": "src/constants/routes.ts",
       "id": "99d071a3fef69da6",
       "lines": [
-        33
+        34
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -29313,7 +29311,7 @@
       "file": "src/constants/routes.ts",
       "id": "5f8af12e9f722844",
       "lines": [
-        74
+        75
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -29415,7 +29413,7 @@
       "file": "src/constants/routes.ts",
       "id": "a0611275da0a99cc",
       "lines": [
-        50
+        51
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -29721,7 +29719,7 @@
       "file": "src/constants/routes.ts",
       "id": "9389c244b36a2199",
       "lines": [
-        54
+        55
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -30038,7 +30036,7 @@
       "file": "src/constants/routes.ts",
       "id": "3508318bfaa77b1b",
       "lines": [
-        61
+        62
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -30309,7 +30307,7 @@
       "file": "src/constants/routes.ts",
       "id": "1b19bf4a03254dc4",
       "lines": [
-        42
+        43
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -30337,7 +30335,7 @@
       "file": "src/constants/routes.ts",
       "id": "0605ed7e20e4de6f",
       "lines": [
-        47
+        48
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -30393,7 +30391,7 @@
       "file": "src/constants/routes.ts",
       "id": "e86c9735fb38cc7f",
       "lines": [
-        46
+        47
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -30621,7 +30619,7 @@
       "file": "src/constants/routes.ts",
       "id": "d34532e6edc11d47",
       "lines": [
-        55
+        56
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -30748,8 +30746,8 @@
       "file": "src/constants/routes.ts",
       "id": "9a6a5113c5a86c33",
       "lines": [
-        41,
-        65
+        42,
+        66
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -30848,7 +30846,7 @@
       "file": "src/constants/routes.ts",
       "id": "cf975d88bbb412db",
       "lines": [
-        56
+        57
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -30965,7 +30963,7 @@
       "file": "src/constants/routes.ts",
       "id": "411590e4fa4928b3",
       "lines": [
-        35
+        36
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -31049,7 +31047,7 @@
       "file": "src/constants/routes.ts",
       "id": "ab963f8ea613d0f2",
       "lines": [
-        71
+        72
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -31106,7 +31104,7 @@
       "file": "src/constants/routes.ts",
       "id": "443ba5e31c2ed5a1",
       "lines": [
-        37
+        38
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -31220,7 +31218,7 @@
       "file": "src/constants/routes.ts",
       "id": "5db7a0549129ab4f",
       "lines": [
-        38
+        39
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -31332,7 +31330,7 @@
       "file": "src/constants/routes.ts",
       "id": "783803985add42c9",
       "lines": [
-        69
+        70
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -31544,7 +31542,7 @@
       "file": "src/constants/routes.ts",
       "id": "bb8afb2a0c89ee3f",
       "lines": [
-        40
+        41
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -31855,7 +31853,7 @@
       "file": "src/constants/routes.ts",
       "id": "94936e4904eca551",
       "lines": [
-        34
+        35
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -32023,7 +32021,7 @@
       "file": "src/constants/routes.ts",
       "id": "1c71d46dfeb2888e",
       "lines": [
-        58
+        59
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -32206,7 +32204,7 @@
       "file": "src/constants/routes.ts",
       "id": "d2935994c61208ca",
       "lines": [
-        57
+        58
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -32321,7 +32319,7 @@
       "file": "src/constants/routes.ts",
       "id": "c29cbd4efc8aa557",
       "lines": [
-        36
+        37
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -32476,7 +32474,7 @@
       "file": "src/constants/routes.ts",
       "id": "2fb5b44c3e81711b",
       "lines": [
-        73
+        74
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -32550,7 +32548,7 @@
       "file": "src/constants/routes.ts",
       "id": "688db91493632aca",
       "lines": [
-        52
+        53
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -33026,7 +33024,7 @@
       "file": "src/constants/routes.ts",
       "id": "d88cbbdbe14d69b8",
       "lines": [
-        39
+        40
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -33196,7 +33194,7 @@
       "file": "src/constants/routes.ts",
       "id": "0aaac2921882a294",
       "lines": [
-        31
+        32
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -33243,7 +33241,7 @@
       "file": "src/constants/routes.ts",
       "id": "e775c6ac3430a55d",
       "lines": [
-        45
+        46
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -33444,7 +33442,7 @@
       "file": "src/components/hass/EverShelfInventoryPanel.tsx",
       "id": "d119b43c3c6b09fc",
       "lines": [
-        1141
+        1171
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -33690,7 +33688,7 @@
       "file": "src/constants/routes.ts",
       "id": "005db227c2770a84",
       "lines": [
-        43
+        44
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -33975,7 +33973,7 @@
       "file": "src/constants/routes.ts",
       "id": "d6045c8a7bd06b48",
       "lines": [
-        32
+        33
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -34087,7 +34085,7 @@
       "file": "src/constants/routes.ts",
       "id": "b6d83187dace9ab1",
       "lines": [
-        62
+        63
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -34213,7 +34211,7 @@
       "file": "src/constants/routes.ts",
       "id": "47a0485f0dd11dde",
       "lines": [
-        48
+        49
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -34325,7 +34323,7 @@
       "file": "src/constants/routes.ts",
       "id": "4da15304d0fdbec6",
       "lines": [
-        67
+        68
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -34451,7 +34449,7 @@
       "file": "src/constants/routes.ts",
       "id": "1ad039bd84f01842",
       "lines": [
-        66
+        67
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -34682,7 +34680,7 @@
       "file": "src/constants/routes.ts",
       "id": "2a6297df6418a5ac",
       "lines": [
-        53
+        54
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -34880,7 +34878,7 @@
       "file": "src/constants/routes.ts",
       "id": "51b88ed95508d638",
       "lines": [
-        64
+        65
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -34964,7 +34962,7 @@
       "file": "src/constants/routes.ts",
       "id": "c28ae8066ac4ca24",
       "lines": [
-        63
+        64
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -35078,7 +35076,7 @@
       "file": "src/components/hass/EverShelfInventoryPanel.tsx",
       "id": "4dda2ec93f310bc2",
       "lines": [
-        1561
+        1591
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -35136,7 +35134,7 @@
       "file": "src/constants/routes.ts",
       "id": "67eb6f23be769849",
       "lines": [
-        68
+        69
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -35253,7 +35251,7 @@
       "file": "src/constants/routes.ts",
       "id": "6159ee85b8fd5ac8",
       "lines": [
-        72
+        73
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -35325,7 +35323,7 @@
       "file": "src/constants/routes.ts",
       "id": "6a4edc38df1a2fde",
       "lines": [
-        70
+        71
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -37491,7 +37489,7 @@
       "file": "src/components/hass/EverShelfInventoryPanel.tsx",
       "id": "32eef58d73d713d4",
       "lines": [
-        1488
+        1518
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -39204,7 +39202,7 @@
       "file": "src/components/hass/EverShelfInventoryPanel.tsx",
       "id": "971e02ea524d7d52",
       "lines": [
-        882
+        897
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -39442,10 +39440,10 @@
     }
   ],
   "summary": {
-    "catalogRecords": 787,
+    "catalogRecords": 788,
     "documentRecords": 1,
-    "legacyOccurrences": 2480,
-    "legacyRecords": 2050,
+    "legacyOccurrences": 2479,
+    "legacyRecords": 2049,
     "totalRecords": 2838
   },
   "version": 1
