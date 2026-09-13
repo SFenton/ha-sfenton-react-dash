@@ -145,6 +145,94 @@
   border-bottom: 0;
 }
 
+.ingredientRow {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.ingredientRowContent {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.ingredientGroceryAction {
+  display: inline-grid;
+  flex: 0 0 auto;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  border: 0;
+  border-radius: 999px;
+  padding: 0;
+  color: var(--color-text-muted);
+  background: none;
+  cursor: pointer;
+  -webkit-tap-highlight-color: var(--color-modal-footer-transparent);
+}
+
+.ingredientGroceryAction:disabled {
+  cursor: default;
+  opacity: 1;
+}
+
+.ingredientGroceryAction:focus {
+  outline: none;
+}
+
+.ingredientGroceryAction:focus-visible {
+  outline: 2px solid var(--color-text);
+  outline-offset: 1px;
+}
+
+.ingredientGroceryRemove {
+  color: var(--color-warning);
+}
+
+.ingredientGroceryPlaceholder {
+  flex: 0 0 auto;
+  width: 44px;
+  height: 44px;
+}
+
+.ingredientGroceryIconStack {
+  position: relative;
+  display: grid;
+  width: 22px;
+  height: 22px;
+  place-items: center;
+}
+
+.ingredientGroceryIconLayer {
+  grid-area: 1 / 1;
+  display: grid;
+  place-items: center;
+  opacity: 0;
+  transform: scale(0.9);
+  transition:
+    opacity 180ms ease,
+    transform 180ms ease;
+}
+
+.ingredientGroceryAction[data-ingredient-grocery-state='0'] .ingredientGroceryIconLayer[data-icon-state='cart'],
+.ingredientGroceryAction[data-ingredient-grocery-state='1'] .ingredientGroceryIconLayer[data-icon-state='spinner'],
+.ingredientGroceryAction[data-ingredient-grocery-state='2'] .ingredientGroceryIconLayer[data-icon-state='trash'],
+.ingredientGroceryAction[data-ingredient-grocery-state='4'] .ingredientGroceryIconLayer[data-icon-state='spinner'] {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.ingredientGrocerySpinner {
+  display: block;
+  width: 18px;
+  height: 18px;
+  border: 2px solid var(--color-line);
+  border-top-color: var(--color-text);
+  border-radius: 999px;
+  animation: recipeDetailSpin 720ms linear infinite;
+  box-sizing: border-box;
+}
+
 .ingredientName {
   display: grid;
   min-height: 66px;

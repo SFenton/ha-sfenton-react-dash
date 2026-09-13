@@ -300,6 +300,12 @@ export interface RecipeGroceryMirrorSummary {
   failed: number
 }
 
+export interface RecipeGroceryMirrorOutcome {
+  key: string
+  name: string
+  outcome: 'added' | 'already_present' | 'failed' | 'skipped'
+}
+
 export interface RecipeGroceryResult {
   kind: 'result'
   success: boolean
@@ -309,6 +315,7 @@ export interface RecipeGroceryResult {
   backend: RecipeGroceryBackendSummary
   backendMessage: string | null
   haMirror: RecipeGroceryMirrorSummary | null
+  haMirrorOutcomes: RecipeGroceryMirrorOutcome[]
   haMirrorMessage: string | null
 }
 
@@ -1305,6 +1312,22 @@ function normalizeRecipeGroceryMirrorSummary(record: UnknownRecord): RecipeGroce
   }
 }
 
+function normalizeRecipeGroceryMirrorOutcomes(value: unknown): RecipeGroceryMirrorOutcome[] {
+  if (!Array.isArray(value)) return []
+  return value.slice(0, RECIPE_MAX_INGREDIENTS).flatMap((candidate) => {
+    if (!isRecord(candidate)) return []
+    const key = boundedText(firstValue(candidate, 'key'), 128)
+    const name = boundedText(firstValue(candidate, 'name'), 200)
+    const outcome = firstValue(candidate, 'outcome')
+    if (
+      !RECIPE_SAFE_KEY_PATTERN.test(key)
+      || !name
+      || (outcome !== 'added' && outcome !== 'already_present' && outcome !== 'failed' && outcome !== 'skipped')
+    ) return []
+    return [{ key, name, outcome }]
+  })
+}
+
 export function normalizeRecipeGroceryServiceResult(result: unknown): RecipeGroceryServiceResult {
   const response = recipeServiceResponse(result)
   if (!isRecord(response)) {
@@ -1351,6 +1374,7 @@ export function normalizeRecipeGroceryServiceResult(result: unknown): RecipeGroc
       500,
     ),
     haMirror: hasMirror ? normalizeRecipeGroceryMirrorSummary(rawMirror) : null,
+    haMirrorOutcomes: normalizeRecipeGroceryMirrorOutcomes(firstValue(haMirrorRecord, 'outcomes')),
     haMirrorMessage: boundedNullableText(
       firstValue(haMirrorRecord, 'message', 'error')
         ?? firstValue(rawMirror, 'message', 'error')

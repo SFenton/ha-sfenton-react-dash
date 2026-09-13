@@ -231,6 +231,14 @@ export const PLAYWRIGHT_SPEC_COVERAGE = [
     spec: 'recipe-keyboard-focus.spec.ts',
   },
   {
+    area: 'Per-ingredient add/remove grocery row controls, bulk-action exclusion, and command-stage reopen',
+    landscape: 'owned',
+    landscapeOwner: 'responsive-modal-inventory.spec.ts',
+    safeArea: 'owned',
+    safeAreaOwner: 'safe-area-responsive.spec.ts',
+    spec: 'recipe-ingredient-cart.spec.ts',
+  },
+  {
     area: 'Exact shell and navigation breakpoints',
     landscape: 'direct',
     safeArea: 'direct',
@@ -390,7 +398,7 @@ export const SURFACE_CONTRACTS: Record<ScenarioId, {
       'src/components/hass/recipes/recipeGroceryState',
       'src/components/hass/recipes/useRecipeDetailModal',
     ],
-    legacy: [],
+    legacy: ['recipe-ingredient-cart.spec.ts'],
     question: 'Does the missing-ingredients action retain one stable command area while the button, spinner and success check transition, then collapse without exposing redundant visible copy?',
   },
   form: {

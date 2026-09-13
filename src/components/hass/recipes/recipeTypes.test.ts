@@ -1008,7 +1008,21 @@ describe('recipe response normalization', () => {
             backend: { added: 2, already_listed: 1, failed: 0 },
             ha_mirror: { added: 1, already_present: 1, skipped: 0, failed: 1 },
           },
-          ha_mirror: { message: 'One mirror failed' },
+          ha_mirror: {
+            message: 'One mirror failed',
+            outcomes: [
+              {
+                key: 'ri:2:0123456789abcdef',
+                name: 'Yellow onion',
+                outcome: 'already_present',
+              },
+              {
+                key: '!invalid',
+                name: 'Ignored',
+                outcome: 'added',
+              },
+            ],
+          },
         },
       })).toEqual({
         kind: 'result',
@@ -1030,6 +1044,11 @@ describe('recipe response normalization', () => {
           skipped: 0,
           failed: 1,
         },
+        haMirrorOutcomes: [{
+          key: 'ri:2:0123456789abcdef',
+          name: 'Yellow onion',
+          outcome: 'already_present',
+        }],
         haMirrorMessage: 'One mirror failed',
       })
 

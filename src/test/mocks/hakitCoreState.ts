@@ -678,6 +678,14 @@ function mockRecipeDetail(recipeId: number) {
   }
 }
 
+// The recipe_grocery_add mock must mirror the same ingredient display text a real HA-owned
+// `todo.shopping_list` mirror would use, so trash-control removal can resolve the same item by name.
+function mockRecipeIngredientDisplayName(recipeId: number, key: string, fallback: string) {
+  const ingredients = mockRecipeDetail(recipeId).detail.ingredients as { key?: string; name?: string; display_name?: string }[]
+  const match = ingredients.find((candidate) => candidate.key === key)
+  return match?.display_name ?? match?.name ?? fallback
+}
+
 interface MockTodoItem {
   description?: string
   due?: string
@@ -2188,15 +2196,34 @@ export const mockState: MockHassState = {
           selections?: { key?: string; position?: number }[]
         } | undefined
         const selections = Array.isArray(serviceData?.selections) ? serviceData.selections : []
+        const recipeId = Number(serviceData?.recipe_id)
         const partialFailure = typeof window !== 'undefined'
           && new URLSearchParams(window.location.search).get('__mockRecipeGroceryPartial') === 'true'
-        const outcomes = selections.map((selection, index) => ({
-          key: String(selection.key ?? ''),
-          position: Number(selection.position ?? index),
-          outcome: 'added',
-          normalized_name: `Synthetic ingredient ${index + 1}`,
-          amount_text: null,
-        }))
+        const outcomes = selections.map((selection, index) => {
+          const key = String(selection.key ?? '')
+          return {
+            key,
+            position: Number(selection.position ?? index),
+            outcome: 'added',
+            normalized_name: mockRecipeIngredientDisplayName(recipeId, key, `Synthetic ingredient ${index + 1}`),
+            amount_text: null,
+          }
+        })
+        // Mirror successfully-added outcomes into the same `todo.shopping_list` mock state that
+        // `todo/item/list` reads, matching the real HA mirror so removal can resolve a real UID.
+        const existingTodoItems = mockTodoItemsByEntity['todo.shopping_list'] ?? []
+        const nextTodoItems = [...existingTodoItems]
+        outcomes.forEach((outcome, index) => {
+          if (partialFailure && index === 0) return
+          const alreadyListed = nextTodoItems.some((item) => item.summary === outcome.normalized_name)
+          if (alreadyListed) return
+          nextTodoItems.push({
+            uid: `mock-grocery-${outcome.key}-${nextTodoItems.length}`,
+            summary: outcome.normalized_name,
+            status: 'needs_action',
+          })
+        })
+        mockTodoItemsByEntity['todo.shopping_list'] = nextTodoItems
         const groceryResponse = {
           response: {
             success: !partialFailure,
