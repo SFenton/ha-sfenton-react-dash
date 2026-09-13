@@ -5,14 +5,15 @@ import metadataJson from './metadata.json' with { type: 'json' }
 import { ConversationImprovementStore } from './improvement/store'
 import type { HomeMcpMetadata, ImprovementConversationTurn } from './improvement/types'
 import { createHassUserAuthenticator, HassAuthenticationError, type AuthenticatedHassUser } from './hass-auth'
+import { canonicalizeLightContext } from './light-context'
 import { HOUSE_LIGHT_ROOMS, RGB_COLORS, WHITE_COLORS, type HouseLightRoom } from './lights-config'
 import {
   HOME_CHAT_USER_LIMIT,
   buildLightPlan,
   formatNames,
   parseLightUtterance,
+  SINGLE_ROOM_DETAIL_RESPONSE,
   type LightAction,
-  type LightContext,
   type LightOperation,
   type LightSkillResponse,
 } from './light-skill'
@@ -124,12 +125,23 @@ interface HassState {
   attributes?: Record<string, unknown>
 }
 
+interface LightOperationResult {
+  operation: LightOperation
+  states: HassState[]
+  succeeded: string[]
+  failed: string[]
+  unsupported?: boolean
+  history?: unknown
+  logbook?: unknown
+  resultingBrightness?: number[]
+}
+
 const LIGHT_ACTIONS = new Set<LightAction>([
-  'on', 'off', 'set', 'up', 'down', 'color', 'state', 'count', 'list', 'rooms-on',
+  'on', 'off', 'set', 'up', 'down', 'color', 'state', 'count', 'list', 'rooms-on', 'lights-on',
   'color-state', 'brightness-state', 'history', 'reason', 'pbl', 'pbl-rules',
 ])
 const READ_LIGHT_ACTIONS = new Set<LightAction>([
-  'state', 'count', 'list', 'rooms-on', 'color-state', 'brightness-state', 'history', 'reason', 'pbl', 'pbl-rules',
+  'state', 'count', 'list', 'rooms-on', 'lights-on', 'color-state', 'brightness-state', 'history', 'reason', 'pbl', 'pbl-rules',
 ])
 const EXECUTION_LIGHT_ROOMS = Object.freeze(HOUSE_LIGHT_ROOMS.map((room) => Object.freeze({
   ...room,
@@ -231,6 +243,25 @@ function canonicalOperation(value: unknown): LightOperation | null {
     ? operation.targetState
     : undefined
   if (targetState === undefined) return null
+  const hasBrightness = brightnessPct !== null
+  const hasRgb = rgbColor !== null
+  const hasKelvin = colorTemperatureKelvin !== null
+  const hasColorName = colorName !== null
+  const hasHistory = historyBefore !== null
+  const hasTargetState = targetState !== null
+  if ((operation.action === 'on' || operation.action === 'off')
+    && (hasBrightness || hasRgb || hasKelvin || hasColorName || hasHistory || hasTargetState)) return null
+  if (operation.action === 'set'
+    && (!hasBrightness || hasRgb || hasKelvin || hasColorName || hasHistory || hasTargetState)) return null
+  if ((operation.action === 'up' || operation.action === 'down')
+    && (hasRgb || hasKelvin || hasColorName || hasHistory || hasTargetState)) return null
+  if (operation.action === 'color'
+    && (hasBrightness || hasHistory || hasTargetState || hasRgb === hasKelvin || !hasColorName)) return null
+  if (operation.action === 'state' && (hasBrightness || hasRgb || hasKelvin || hasColorName || hasHistory)) return null
+  if (['count', 'list', 'color-state', 'brightness-state', 'pbl', 'pbl-rules'].includes(operation.action)
+    && (hasBrightness || hasRgb || hasKelvin || hasColorName || hasHistory || hasTargetState)) return null
+  if ((operation.action === 'history' || operation.action === 'reason')
+    && (hasBrightness || hasRgb || hasKelvin || hasColorName)) return null
   return {
     action: operation.action as LightAction,
     room,
@@ -247,7 +278,8 @@ function canonicalOperation(value: unknown): LightOperation | null {
 
 export function validateLightPlanForExecution(plan: LightSkillResponse) {
   if (plan.status !== 'ready') return plan
-  if (!Array.isArray(plan.operations) || plan.operations.length < 1 || plan.operations.length > 12) {
+  if (!Array.isArray(plan.operations) || plan.operations.length < 1
+    || plan.operations.length > Math.max(12, EXECUTION_LIGHT_ROOMS.length)) {
     const text = 'That light request did not match the configured controls.'
     return responseWithContext({ status: 'unsupported', text, controls: [], context: null })
   }
@@ -256,45 +288,64 @@ export function validateLightPlanForExecution(plan: LightSkillResponse) {
     const text = 'That light request did not match the configured controls.'
     return responseWithContext({ status: 'unsupported', text, controls: [], context: null })
   }
-  const operationKinds = new Set(operations.map((operation) => READ_LIGHT_ACTIONS.has(operation!.action) ? 'read' : 'write'))
-  const readActions = new Set(operations.filter((operation) => READ_LIGHT_ACTIONS.has(operation!.action)).map((operation) => operation!.action))
+  const canonicalOperations = operations as LightOperation[]
+  const globalAction = canonicalOperations[0]?.action
+  const globalRead = Boolean(globalAction && (globalAction === 'rooms-on' || globalAction === 'lights-on')
+    && canonicalOperations.length === EXECUTION_LIGHT_ROOMS.length
+    && canonicalOperations.every((operation, index) => operation.action === globalAction
+      && operation.room.id === EXECUTION_LIGHT_ROOMS[index].id
+      && operation.entityIds.length === 0
+      && operation.lightNames.length === 0
+      && operation.brightnessPct === null
+      && operation.rgbColor === null
+      && operation.colorName === null
+      && operation.colorTemperatureKelvin === null
+      && operation.historyBefore === null
+      && operation.targetState === null))
+  if (canonicalOperations.some((operation) => operation.action === 'rooms-on' || operation.action === 'lights-on')
+    && !globalRead) {
+    const text = 'Whole-home light reads must include every configured room exactly once without fixture targets.'
+    return responseWithContext({ status: 'unsupported', text, controls: [], context: null })
+  }
+  if (canonicalOperations.length > 12 && !globalRead) {
+    const text = 'That light request did not match the configured controls.'
+    return responseWithContext({ status: 'unsupported', text, controls: [], context: null })
+  }
+  const operationKinds = new Set(canonicalOperations.map((operation) => READ_LIGHT_ACTIONS.has(operation.action) ? 'read' : 'write'))
+  const readActions = new Set(canonicalOperations.filter((operation) => READ_LIGHT_ACTIONS.has(operation.action)).map((operation) => operation.action))
   if (operationKinds.size > 1 || readActions.size > 1) {
     const text = 'Read and control requests must be sent as separate light requests.'
     return responseWithContext({ status: 'unsupported', text, controls: [], context: null })
   }
-  const last = operations.at(-1)!
+  if (canonicalOperations.length > 1
+    && readActions.size === 1
+    && !['state', 'list', 'rooms-on', 'lights-on'].includes(canonicalOperations[0].action)) {
+    return responseWithContext({
+      status: 'unsupported',
+      text: SINGLE_ROOM_DETAIL_RESPONSE,
+      controls: [],
+      context: null,
+    })
+  }
+  const last = canonicalOperations.at(-1)!
+  const contextAction = globalRead ? last.action : null
   return {
     ...plan,
-    operations: operations as LightOperation[],
+    operations: canonicalOperations,
     context: {
       domain: 'lights' as const,
-      roomId: last.room.id,
-      entityIds: last.entityIds,
-      lightNames: last.lightNames,
-      lastAction: last.action,
-      ...(last.targetState ? { targetState: last.targetState } : {}),
+      roomId: contextAction ? null : last.room.id,
+      entityIds: contextAction ? [] : last.entityIds,
+      lightNames: contextAction ? [] : last.lightNames,
+      lastAction: contextAction ?? last.action,
+      ...(!contextAction && last.targetState ? { targetState: last.targetState } : {}),
     },
   }
 }
 
-const isLightContext = (value: unknown): value is LightContext => {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return false
-  const context = value as LightContext
-  const actions = ['on', 'off', 'up', 'down', 'brightness', 'color', 'state', 'count', 'list', 'rooms-on', 'color-state', 'brightness-state', 'history', 'reason', 'pbl', 'pbl-rules', 'set']
-  const states = ['on', 'off', 'mixed', 'unavailable']
-  return context.domain === 'lights'
-    && (context.roomId === null || typeof context.roomId === 'string')
-    && Array.isArray(context.entityIds) && context.entityIds.every((id) => typeof id === 'string')
-    && Array.isArray(context.lightNames) && context.lightNames.every((name) => typeof name === 'string')
-    && (context.lastAction === undefined || actions.includes(context.lastAction))
-    && (context.lastState === undefined || states.includes(context.lastState))
-    && (context.targetState === undefined || context.targetState === 'on' || context.targetState === 'off')
-    && (context.historyBefore === undefined || typeof context.historyBefore === 'string')
-}
-
 function operationTargets(operation: LightOperation) {
   if (operation.entityIds.length) return operation.entityIds
-  if (['count', 'list', 'rooms-on', 'color-state', 'brightness-state'].includes(operation.action)) return operation.room.lights.map((light) => light.entityId)
+  if (['up', 'down', 'count', 'list', 'rooms-on', 'lights-on', 'color-state', 'brightness-state'].includes(operation.action)) return operation.room.lights.map((light) => light.entityId)
   return [operation.room.groupEntityId]
 }
 
@@ -316,9 +367,9 @@ function responseWithContext(response: Omit<LightSkillResponse, 'response'> & { 
   return { ...response, response: response.response ?? response.text }
 }
 
-async function executeLightOperation(fetchImpl: typeof fetch, hassUrl: string, token: string, operation: LightOperation) {
+async function executeLightOperation(fetchImpl: typeof fetch, hassUrl: string, token: string, operation: LightOperation): Promise<LightOperationResult> {
   const targets = operationTargets(operation)
-  if (['state', 'count', 'list', 'rooms-on', 'color-state', 'brightness-state'].includes(operation.action)) {
+  if (['state', 'count', 'list', 'rooms-on', 'lights-on', 'color-state', 'brightness-state'].includes(operation.action)) {
     const states = await readStates(fetchImpl, hassUrl, token, targets)
     return { operation, states, succeeded: states.filter(readableState).map((state) => state.entity_id), failed: states.filter((state) => !readableState(state)).map((state) => state.entity_id) }
   }
@@ -367,9 +418,25 @@ async function executeLightOperation(fetchImpl: typeof fetch, hassUrl: string, t
   if (!available.length) return { operation, states: before, succeeded: [], failed }
 
   const calls: Array<{ domain: string; ids: string[]; service: 'turn_on' | 'turn_off'; data: Record<string, unknown> }> = []
+  let resultingBrightness: number[] | undefined
   const grouped = (ids: string[]) => [...new Set(ids.map((id) => id.split('.')[0]))].map((domain) => ({ domain, ids: ids.filter((id) => id.startsWith(`${domain}.`)) }))
   if (operation.action === 'off') grouped(available).forEach((target) => calls.push({ ...target, service: 'turn_off', data: {} }))
   else if (operation.action === 'on') grouped(available).forEach((target) => calls.push({ ...target, service: 'turn_on', data: {} }))
+  else if (operation.action === 'up' || operation.action === 'down') {
+    const deltas = Array.isArray(operation.brightnessPct)
+      ? operation.brightnessPct
+      : [operation.brightnessPct ?? 10]
+    const values: number[] = []
+    available.forEach((id) => {
+      const targetIndex = Math.max(0, targets.indexOf(id))
+      const delta = deltas[Math.min(targetIndex, deltas.length - 1)]
+      const current = brightnessFromState(before.find((state) => state.entity_id === id)!)!
+      const brightness = Math.max(0, Math.min(100, current + (operation.action === 'up' ? delta : -delta)))
+      values.push(brightness)
+      calls.push({ domain: id.split('.')[0], ids: [id], service: 'turn_on', data: { brightness_pct: brightness } })
+    })
+    resultingBrightness = values
+  }
   else if (Array.isArray(operation.brightnessPct) && operation.brightnessPct.length > 1) {
     const values = operation.brightnessPct
     available.forEach((id) => {
@@ -377,13 +444,7 @@ async function executeLightOperation(fetchImpl: typeof fetch, hassUrl: string, t
       calls.push({ domain: id.split('.')[0], ids: [id], service: 'turn_on', data: { brightness_pct: values[Math.min(targetIndex, values.length - 1)] } })
     })
   } else {
-    let brightness = Array.isArray(operation.brightnessPct) ? operation.brightnessPct[0] : operation.brightnessPct
-    if (operation.action === 'up' || operation.action === 'down') {
-      const average = before.filter((state) => available.includes(state.entity_id))
-        .reduce((sum, state) => sum + brightnessFromState(state)!, 0) / available.length
-      brightness = Math.max(0, Math.min(100, Math.round(average) + (operation.action === 'up' ? 10 : -10)))
-      operation.brightnessPct = brightness
-    }
+    const brightness = Array.isArray(operation.brightnessPct) ? operation.brightnessPct[0] : operation.brightnessPct
     const data: Record<string, unknown> = {}
     if (brightness !== null && brightness !== undefined) data.brightness_pct = brightness
     if (operation.rgbColor) data.rgb_color = operation.rgbColor
@@ -399,15 +460,27 @@ async function executeLightOperation(fetchImpl: typeof fetch, hassUrl: string, t
       succeeded.push(...call.ids)
     } catch { failed.push(...call.ids) }
   }
-  return { operation, states: before, succeeded: [...new Set(succeeded)], failed: [...new Set(failed)] }
+  return { operation, states: before, succeeded: [...new Set(succeeded)], failed: [...new Set(failed)], resultingBrightness }
 }
 
-function operationSuccessText(operation: LightOperation) {
+function operationSuccessText(operation: LightOperation, resultingBrightness?: number[]) {
   const selected = operation.lightNames.length ? formatNames(operation.lightNames) : `${operation.room.name} lights`
   const roomSuffix = operation.lightNames.length ? ` in the ${operation.room.name}` : ''
   if (operation.action === 'on') return `I turned on the ${selected}${roomSuffix}.`
   if (operation.action === 'off') return `I turned off the ${selected}${roomSuffix}.`
-  if (operation.action === 'up' || operation.action === 'down') return `I turned the ${selected} ${operation.action} to ${operation.brightnessPct}%. You can ask me to set specific brightness and I can set them there as well.`
+  if (operation.action === 'up' || operation.action === 'down') {
+    const values = resultingBrightness?.length
+      ? resultingBrightness
+      : Array.isArray(operation.brightnessPct) ? operation.brightnessPct : [operation.brightnessPct]
+    const distinct = new Set(values)
+    const result = values.length > 1 && operation.lightNames.length === values.length
+      ? operation.lightNames.map((name, index) => `${name} ${operation.action} to ${values[index]}%`)
+        .join(', ').replace(/, ([^,]+)$/, ', and $1')
+      : distinct.size === 1
+        ? `${selected} ${operation.action} to ${values[0]}%`
+        : `${selected} ${operation.action}`
+    return `I turned the ${result}. You can ask me to set specific brightness and I can set them there as well.`
+  }
   if (operation.action === 'color') return `I turned the ${selected}${roomSuffix} to ${operation.colorName}.`
   const values = Array.isArray(operation.brightnessPct) ? operation.brightnessPct : [operation.brightnessPct]
   if (values.filter((value) => value !== null).length > 1 && operation.lightNames.length === values.length) {
@@ -442,8 +515,16 @@ function operationRetryMessage(operation: LightOperation) {
     : `${operation.room.name} lights`
   if (operation.action === 'on') return `Turn on the ${selected}.`
   if (operation.action === 'off') return `Turn off the ${selected}.`
-  if (operation.action === 'up') return `Turn up the ${selected}.`
-  if (operation.action === 'down') return `Turn down the ${selected}.`
+  if (operation.action === 'up' || operation.action === 'down') {
+    const values = Array.isArray(operation.brightnessPct) ? operation.brightnessPct : [operation.brightnessPct]
+    if (values.length > 1 && operation.lightNames.length === values.length) {
+      return operation.lightNames
+        .map((name, index) => `Turn the ${name} in the ${operation.room.name} ${operation.action} by ${values[index]}%`)
+        .join(' and ') + '.'
+    }
+    const delta = values[0] ?? 10
+    return `Turn the ${selected} ${operation.action} by ${delta}%.`
+  }
   if (operation.action === 'color') {
     if (operation.rgbColor) return `Turn the ${selected} to rgb(${operation.rgbColor.join(', ')}).`
     if (operation.colorTemperatureKelvin) return `Turn the ${selected} to ${operation.colorTemperatureKelvin}K.`
@@ -547,14 +628,46 @@ async function executeLightPlan(fetchImpl: typeof fetch, hassUrl: string, token:
   const failures = results.flatMap((result) => result.failed)
   const successes = results.flatMap((result) => result.succeeded)
   const first = results[0]
+  if (first.operation.action === 'lights-on') {
+    const active = results.flatMap((result) => {
+      const names = result.states.filter((state) => state.state === 'on').map((state) =>
+        result.operation.room.lights.find((light) => light.entityId === state.entity_id)?.name ?? state.entity_id)
+      return names.length ? [{ room: result.operation.room.name, names }] : []
+    })
+    const unavailableCount = results.reduce((count, result) =>
+      count + result.states.filter((state) => !readableState(state)).length, 0)
+    const clauses = active.map(({ room, names }) =>
+      `${formatNames(names)} ${names.length === 1 ? 'is' : 'are'} on in the ${room}.`)
+    const availableText = clauses.length ? clauses.join(' ') : 'No readable configured lights are on.'
+    const text = unavailableCount
+      ? `${availableText} I could not read ${unavailableCount} ${unavailableCount === 1 ? 'other light' : 'other lights'}.`
+      : availableText
+    return responseWithContext({
+      status: 'answer',
+      text,
+      controls: [],
+      context: { domain: 'lights', roomId: null, entityIds: [], lightNames: [], lastAction: 'lights-on' },
+      data: { lights: active, unavailableCount },
+    })
+  }
   if (first.operation.action === 'rooms-on') {
     const activeRooms = results.filter((result) => result.states.some((state) => state.state === 'on')).map((result) => result.operation.room.name)
-    const unavailableRooms = results.filter((result) => result.states.every((state) => !readableState(state))).map((result) => result.operation.room.name)
-    const availableText = activeRooms.length ? `${formatNames(activeRooms)} ${activeRooms.length === 1 ? 'has' : 'have'} lights on.` : 'No available configured rooms have lights on.'
-    const text = unavailableRooms.length
-      ? `${availableText} I could not read ${formatNames(unavailableRooms)}.`
+    const uncertainRooms = results.filter((result) =>
+      !result.states.some((state) => state.state === 'on')
+      && result.states.some((state) => !readableState(state))).map((result) => result.operation.room.name)
+    const availableText = activeRooms.length
+      ? `${formatNames(activeRooms)} ${activeRooms.length === 1 ? 'has' : 'have'} lights on.`
+      : 'No readable configured rooms have lights on.'
+    const text = uncertainRooms.length
+      ? `${availableText} ${formatNames(uncertainRooms)} could not be fully checked because some light states could not be read. Try again.`
       : availableText
-    return responseWithContext({ status: 'answer', text, controls: [], context: { domain: 'lights', roomId: null, entityIds: [], lightNames: [], lastAction: 'rooms-on' }, data: { rooms: activeRooms } })
+    return responseWithContext({
+      status: 'answer',
+      text,
+      controls: [],
+      context: { domain: 'lights', roomId: null, entityIds: [], lightNames: [], lastAction: 'rooms-on' },
+      data: { rooms: activeRooms, uncertainRooms },
+    })
   }
   if (first.operation.action === 'state') {
     const summaries = results.map((result) => {
@@ -579,20 +692,74 @@ async function executeLightPlan(fetchImpl: typeof fetch, hassUrl: string, token:
               return `${single.state === expected ? 'Yes' : 'No'}, the ${subject} ${verb} ${single.state}.`
             })()
       : roomStateText(summaries)
-    const context = { ...plan.context!, lastAction: 'state' as const, lastState: summaries.length === 1 ? summaries[0].state : undefined }
+    const context = summaries.length === 1
+      ? { ...plan.context!, lastAction: 'state' as const, lastState: summaries[0].state }
+      : { domain: 'lights' as const, roomId: null, entityIds: [], lightNames: [], lastAction: 'state' as const }
     return responseWithContext({ status: 'answer', text, controls: [], context, data: { states: results.map((result) => result.states) } })
   }
   if (first.operation.action === 'count' || first.operation.action === 'list') {
+    if (first.operation.action === 'list' && results.length > 1) {
+      const summaries = results.map((result) => {
+        const available = result.states.filter(readableState)
+        if (!available.length) return {
+          room: result.operation.room.name,
+          names: [] as string[],
+          text: unavailableText(result.operation.room.name),
+          unavailableCount: result.states.length,
+        }
+        const onStates = available.filter((state) => state.state === 'on')
+        const names = onStates.map((state) =>
+          result.operation.room.lights.find((light) => light.entityId === state.entity_id)?.name ?? state.entity_id)
+        const unavailableCount = result.states.length - available.length
+        const base = names.length
+          ? `${formatNames(names)} ${names.length === 1 ? 'is' : 'are'} on in the ${result.operation.room.name}.`
+          : result.operation.lightNames.length
+            ? unavailableCount
+              ? `No readable selected lights in the ${result.operation.room.name} are on.`
+              : result.operation.lightNames.length === 1
+                ? `The ${result.operation.lightNames[0]} in the ${result.operation.room.name} is off.`
+                : `${formatNames(result.operation.lightNames)} in the ${result.operation.room.name} are off.`
+            : unavailableCount
+              ? `No readable ${result.operation.room.name} lights are on.`
+              : `No ${result.operation.room.name} lights are on.`
+        return {
+          room: result.operation.room.name,
+          names,
+          text: unavailableCount
+            ? `${base} I could not read ${unavailableCount} other ${unavailableCount === 1 ? 'light' : 'lights'}.`
+            : base,
+          unavailableCount,
+        }
+      })
+      return responseWithContext({
+        status: 'answer',
+        text: summaries.map((summary) => summary.text).join(' '),
+        controls: [],
+        context: { domain: 'lights', roomId: null, entityIds: [], lightNames: [], lastAction: 'list' },
+        data: { rooms: summaries },
+      })
+    }
     const available = first.states.filter(readableState)
     if (!available.length) {
       return responseWithContext({ status: 'answer', text: unavailableText(first.operation.room.name), controls: [], context: { ...plan.context!, lastAction: first.operation.action, lastState: 'unavailable' }, data: { states: first.states } })
     }
     const onStates = available.filter((state) => state.state === 'on')
     const names = onStates.map((state) => first.operation.room.lights.find((light) => light.entityId === state.entity_id)?.name ?? state.entity_id)
+    const unavailableCount = first.states.length - available.length
+    const listText = names.length
+      ? `${formatNames(names)} ${names.length === 1 ? 'is' : 'are'} on in the ${first.operation.room.name}.`
+      : first.operation.lightNames.length
+        ? unavailableCount
+          ? `No readable selected lights in the ${first.operation.room.name} are on.`
+          : first.operation.lightNames.length === 1
+            ? `The ${first.operation.lightNames[0]} in the ${first.operation.room.name} is off.`
+            : `${formatNames(first.operation.lightNames)} in the ${first.operation.room.name} are off.`
+        : unavailableCount
+          ? `No readable ${first.operation.room.name} lights are on.`
+          : `No ${first.operation.room.name} lights are on.`
     const text = first.operation.action === 'count'
       ? `${onStates.length} of ${available.length} ${first.operation.room.name} lights ${onStates.length === 1 ? 'is' : 'are'} on.`
-      : names.length ? `${formatNames(names)} ${names.length === 1 ? 'is' : 'are'} on in the ${first.operation.room.name}.` : `No ${first.operation.room.name} lights are on.`
-    const unavailableCount = first.states.length - available.length
+      : listText
     const completeText = unavailableCount ? `${text} I could not read ${unavailableCount} other ${unavailableCount === 1 ? 'light' : 'lights'}.` : text
     const context = { ...plan.context!, lastAction: first.operation.action, lastState: unavailableCount ? 'unavailable' as const : onStates.length === 0 ? 'off' as const : onStates.length === available.length ? 'on' as const : 'mixed' as const }
     return responseWithContext({ status: 'answer', text: completeText, controls: [], context, data: { states: first.states, on: names } })
@@ -679,9 +846,13 @@ async function executeLightPlan(fetchImpl: typeof fetch, hassUrl: string, token:
     const text = 'Some requested light changes completed, but others did not. Would you like me to try again?'
     return responseWithContext({ status: 'partial', text, controls: retryControls(results), context: plan.context, data: { successes, failures } })
   }
-  const text = results.map((result) => operationSuccessText(result.operation)).join(' ')
-  const last = results.at(-1)!.operation
-  const brightness = Array.isArray(last.brightnessPct) ? last.brightnessPct[0] : last.brightnessPct
+  const text = results.map((result) => operationSuccessText(result.operation, result.resultingBrightness)).join(' ')
+  const lastResult = results.at(-1)!
+  const last = lastResult.operation
+  const brightnessValues = lastResult.resultingBrightness?.length
+    ? lastResult.resultingBrightness
+    : Array.isArray(last.brightnessPct) ? last.brightnessPct : [last.brightnessPct]
+  const brightness = new Set(brightnessValues).size === 1 ? brightnessValues[0] : null
   const controls = brightness !== null && brightness !== undefined
     ? [{
         id: `brightness-${last.room.id}-${Date.now()}`,
@@ -740,57 +911,76 @@ async function callTool(
     if (args.thread_id !== undefined && !isIdentifier(args.thread_id)) throw new Error('home_chat thread_id must be a valid identifier')
     if (args.turn_id !== undefined && !isIdentifier(args.turn_id)) throw new Error('home_chat turn_id must be a valid identifier')
     if (args.control_id !== undefined && !isIdentifier(args.control_id)) throw new Error('home_chat control_id must be a valid identifier')
-    const context = isLightContext(args.context) ? args.context : null
-    const lightPlan = parseLightUtterance(args.text, context)
-    let result: unknown
-    if (lightPlan) {
-      const prepared = lightPlan.status === 'clarify' ? await enrichColorPicker(fetchImpl, hassUrl, token, lightPlan) : lightPlan
-      const executed = await executeLightPlan(fetchImpl, hassUrl, token, prepared)
-      result = { ...executed, conversation_id: args.conversation_id ?? `home-mcp-lights:${args.thread_id ?? randomUUID()}` }
-    } else if (args.control_id) {
-      const text = 'That follow-up is not a supported light request.'
-      result = responseWithContext({
-        status: 'unsupported',
-        text,
-        controls: [],
-        context,
-      })
-    } else {
-      const response = await hassRequest(fetchImpl, hassUrl, token, '/api/conversation/process', {
-        method: 'POST',
-        body: JSON.stringify({
-          text: args.text,
-          ...(agentId ? { agent_id: agentId } : {}),
-          ...(args.conversation_id ? { conversation_id: args.conversation_id } : {}),
-        }),
-      })
-      result = isLightContext(context) && response && typeof response === 'object'
-        ? { ...(response as Record<string, unknown>), context }
-        : response
-    }
+    let activity: Awaited<ReturnType<ConversationImprovementStore['beginConversationActivity']>> | null = null
     if (args.thread_id) {
-      const resultContext = result && typeof result === 'object' && !Array.isArray(result)
-        && isLightContext((result as Record<string, unknown>).context)
-        ? (result as Record<string, unknown>).context as LightContext
-        : context
-      await improvementStore.recordTurn({
-        userScope,
-        threadId: args.thread_id,
-        turn: {
+      try {
+        activity = await improvementStore.beginConversationActivity(userScope, args.thread_id)
+      } catch (error) {
+        console.error('Home MCP could not initialize conversation improvement recording:', error instanceof Error ? error.message : error)
+      }
+    }
+    try {
+      const context = canonicalizeLightContext(args.context)
+      const invalidContext = args.context !== undefined && args.context !== null && !context
+      const lightPlan = invalidContext ? null : parseLightUtterance(args.text, context)
+      let result: unknown
+      let handledByHomeMcp = false
+      if (invalidContext) {
+        const text = 'The earlier light context is no longer valid. Name the light or room again.'
+        result = responseWithContext({ status: 'unsupported', text, controls: [], context: null })
+        handledByHomeMcp = true
+      } else if (lightPlan) {
+        const prepared = lightPlan.status === 'clarify' ? await enrichColorPicker(fetchImpl, hassUrl, token, lightPlan) : lightPlan
+        const executed = await executeLightPlan(fetchImpl, hassUrl, token, prepared)
+        result = { ...executed, conversation_id: args.conversation_id ?? `home-mcp-lights:${args.thread_id ?? randomUUID()}` }
+        handledByHomeMcp = true
+      } else if (args.control_id) {
+        const text = 'That follow-up is not a supported light request.'
+        result = responseWithContext({
+          status: 'unsupported',
+          text,
+          controls: [],
+          context,
+        })
+        handledByHomeMcp = true
+      } else {
+        const response = await hassRequest(fetchImpl, hassUrl, token, '/api/conversation/process', {
+          method: 'POST',
+          body: JSON.stringify({
+            text: args.text,
+            ...(agentId ? { agent_id: agentId } : {}),
+            ...(args.conversation_id ? { conversation_id: args.conversation_id } : {}),
+          }),
+        })
+        result = context && response && typeof response === 'object'
+          ? { ...(response as Record<string, unknown>), context }
+          : response
+      }
+      if (result && typeof result === 'object' && !Array.isArray(result)) {
+        result = { ...(result as Record<string, unknown>), handled_by_home_mcp: handledByHomeMcp }
+      }
+      if (activity) {
+        const resultContext = result && typeof result === 'object' && !Array.isArray(result)
+          ? canonicalizeLightContext((result as Record<string, unknown>).context) ?? context
+          : context
+        await activity.recordTurn({
           id: args.turn_id ?? `turn-${Date.now()}`,
           createdAt: Date.now(),
           userText: args.text,
           assistantText: assistantText(result),
           outcome: turnOutcome(result),
-          parsedAsLights: Boolean(lightPlan),
+          parsedAsLights: Boolean(lightPlan) || invalidContext,
+          handledByHomeMcp,
           contextBefore: context,
           contextAfter: resultContext,
-        },
-      }).catch((error) => {
-        console.error('Home MCP could not record the conversation improvement turn:', error instanceof Error ? error.message : error)
-      })
+        }).catch((error) => {
+          console.error('Home MCP could not record the conversation improvement turn:', error instanceof Error ? error.message : error)
+        })
+      }
+      return result
+    } finally {
+      activity?.release()
     }
-    return result
   }
 
   if (name === 'home_chat_end') {
@@ -833,25 +1023,59 @@ async function callTool(
   }
 
   if (name === 'home_lights') {
-    const plan = buildLightPlan({
-      action: args.action,
-      room: args.room,
-      rooms: args.rooms,
-      entity_ids: args.entity_ids,
-      light_names: args.light_names,
-      brightness_pct: args.brightness_pct,
-      color_name: args.color_name,
-      rgb_color: args.rgb_color,
-      color_temperature_kelvin: args.color_temperature_kelvin,
-      history_before: args.history_before,
-      target_state: args.target_state,
-      operations: args.operations,
-    })
+    const plan = buildLightPlan(args)
     return executeLightPlan(fetchImpl, hassUrl, token, plan)
   }
 
   throw new Error('Unknown Home MCP tool')
 }
+
+const schemaRequires = (field: string) => ({ required: [field] })
+const schemaForbids = (fields: string[]) => ({ not: { anyOf: fields.map(schemaRequires) } })
+const LIGHT_OPERATION_CONSTRAINTS = [
+  {
+    if: { properties: { action: { enum: ['on', 'off'] } }, required: ['action'] },
+    then: schemaForbids(['brightness_pct', 'color_name', 'rgb_color', 'color_temperature_kelvin', 'history_before', 'target_state']),
+  },
+  {
+    if: { properties: { action: { const: 'set' } }, required: ['action'] },
+    then: { required: ['brightness_pct'], ...schemaForbids(['color_name', 'rgb_color', 'color_temperature_kelvin', 'history_before', 'target_state']) },
+  },
+  {
+    if: { properties: { action: { enum: ['up', 'down'] } }, required: ['action'] },
+    then: schemaForbids(['color_name', 'rgb_color', 'color_temperature_kelvin', 'history_before', 'target_state']),
+  },
+  {
+    if: { properties: { action: { const: 'color' } }, required: ['action'] },
+    then: {
+      ...schemaForbids(['brightness_pct', 'history_before', 'target_state']),
+      allOf: [
+        { not: { required: ['color_name', 'rgb_color'] } },
+        { not: { required: ['color_name', 'color_temperature_kelvin'] } },
+        { not: { required: ['rgb_color', 'color_temperature_kelvin'] } },
+      ],
+    },
+  },
+  {
+    if: { properties: { action: { enum: ['count', 'list', 'color-state', 'brightness-state'] } }, required: ['action'] },
+    then: schemaForbids(['brightness_pct', 'color_name', 'rgb_color', 'color_temperature_kelvin', 'history_before', 'target_state']),
+  },
+  {
+    if: { properties: { action: { const: 'state' } }, required: ['action'] },
+    then: schemaForbids(['brightness_pct', 'color_name', 'rgb_color', 'color_temperature_kelvin', 'history_before']),
+  },
+  {
+    if: { properties: { action: { enum: ['history', 'reason'] } }, required: ['action'] },
+    then: schemaForbids(['brightness_pct', 'color_name', 'rgb_color', 'color_temperature_kelvin']),
+  },
+  {
+    if: { properties: { action: { enum: ['pbl', 'pbl-rules', 'rooms-on', 'lights-on'] } }, required: ['action'] },
+    then: schemaForbids([
+      'entity_ids', 'light_names', 'brightness_pct', 'color_name', 'rgb_color',
+      'color_temperature_kelvin', 'history_before', 'target_state',
+    ]),
+  },
+]
 
 const tools = [
   {
@@ -920,11 +1144,11 @@ const tools = [
   },
   {
     name: 'home_lights',
-    description: 'Control or inspect household lights by room and named fixture, including compound operations, brightness, supported colors, history, cause evidence, and Presence-Based Lighting status.',
+    description: 'Control or inspect household lights by room and named fixture, including compound operations, brightness, supported colors, whole-home reads, history, cause evidence, and Presence-Based Lighting status. Whole-home reads cover every configured room exactly once.',
     inputSchema: {
       type: 'object',
       properties: {
-        action: { type: 'string', enum: ['on', 'off', 'set', 'up', 'down', 'color', 'state', 'count', 'list', 'rooms-on', 'color-state', 'brightness-state', 'history', 'reason', 'pbl', 'pbl-rules'] },
+        action: { type: 'string', enum: ['on', 'off', 'set', 'up', 'down', 'color', 'state', 'count', 'list', 'rooms-on', 'lights-on', 'color-state', 'brightness-state', 'history', 'reason', 'pbl', 'pbl-rules'] },
         room: { type: 'string' },
         entity_ids: { type: 'array', items: { type: 'string' }, minItems: 1 },
         light_names: { type: 'array', items: { type: 'string' }, minItems: 1 },
@@ -935,16 +1159,30 @@ const tools = [
         history_before: { type: 'string' },
         target_state: { type: 'string', enum: ['on', 'off'] },
         operations: {
-          type: 'array', minItems: 1, maxItems: 12,
+          type: 'array', minItems: 1, maxItems: Math.max(12, HOUSE_LIGHT_ROOMS.length),
           items: { type: 'object', additionalProperties: false, properties: {
-            action: { type: 'string', enum: ['on', 'off', 'set', 'up', 'down', 'color', 'state', 'count', 'list', 'rooms-on', 'color-state', 'brightness-state', 'history', 'reason', 'pbl', 'pbl-rules'] },
-            room: { type: 'string' }, entity_ids: { type: 'array', items: { type: 'string' } },
-            light_names: { type: 'array', items: { type: 'string' } }, brightness_pct: {}, color_name: { type: 'string' }, rgb_color: { type: 'array' },
+            action: { type: 'string', enum: ['on', 'off', 'set', 'up', 'down', 'color', 'state', 'count', 'list', 'rooms-on', 'lights-on', 'color-state', 'brightness-state', 'history', 'reason', 'pbl', 'pbl-rules'] },
+            room: { type: 'string' }, entity_ids: { type: 'array', items: { type: 'string' }, minItems: 1 },
+            light_names: { type: 'array', items: { type: 'string' }, minItems: 1 },
+            brightness_pct: { oneOf: [{ type: 'number', minimum: 0, maximum: 100 }, { type: 'array', items: { type: 'number', minimum: 0, maximum: 100 }, minItems: 1 }] },
+            color_name: { type: 'string' }, rgb_color: { type: 'array', items: { type: 'number', minimum: 0, maximum: 255 }, minItems: 3, maxItems: 3 },
             color_temperature_kelvin: { type: 'number', minimum: 2000, maximum: 6500 }, history_before: { type: 'string' }, target_state: { type: 'string', enum: ['on', 'off'] },
-          }, required: ['action', 'room'] },
+          }, required: ['action', 'room'], allOf: LIGHT_OPERATION_CONSTRAINTS },
         },
       },
-      anyOf: [{ required: ['operations'] }, { required: ['action'] }],
+      allOf: LIGHT_OPERATION_CONSTRAINTS,
+      oneOf: [
+        {
+          required: ['operations'],
+          not: {
+            anyOf: [
+              'action', 'room', 'entity_ids', 'light_names', 'brightness_pct', 'color_name',
+              'rgb_color', 'color_temperature_kelvin', 'history_before', 'target_state',
+            ].map((property) => ({ required: [property] })),
+          },
+        },
+        { required: ['action'], not: { required: ['operations'] } },
+      ],
       additionalProperties: false,
     },
   },

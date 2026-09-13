@@ -29,26 +29,32 @@ function expectedRooms(family: string) {
 function validateOperation(example: CorpusExample, actual: LightOperation, expected: Record<string, unknown>) {
   if (actual.action !== expected.action) fail(example, `expected action ${String(expected.action)}, received ${actual.action}`)
   if (actual.room.name !== expected.room) fail(example, `expected room ${String(expected.room)}, received ${actual.room.name}`)
-  if (expected.light_names !== undefined && comparable(actual.lightNames) !== comparable(expected.light_names)) {
-    fail(example, `expected lights ${comparable(expected.light_names)}, received ${comparable(actual.lightNames)}`)
+  const expectedRoom = HOUSE_LIGHT_ROOMS.find((room) => room.name === expected.room)
+  const expectedLightNames = Array.isArray(expected.light_names) ? expected.light_names.map(String) : []
+  const expectedEntityIds = expectedLightNames.map((name) => expectedRoom?.lights.find((light) => light.name === name)?.entityId)
+  if (expectedEntityIds.some((id) => !id) || comparable(actual.entityIds) !== comparable(expectedEntityIds)) {
+    fail(example, `expected entity targets ${comparable(expectedEntityIds)}, received ${comparable(actual.entityIds)}`)
   }
-  if (expected.brightness_pct !== undefined && comparable(actual.brightnessPct) !== comparable(expected.brightness_pct)) {
-    fail(example, `expected brightness ${comparable(expected.brightness_pct)}, received ${comparable(actual.brightnessPct)}`)
+  const expectedShape = {
+    lightNames: expectedLightNames,
+    brightnessPct: expected.brightness_pct ?? null,
+    colorName: expected.color_name ?? null,
+    rgbColor: expected.rgb_color ?? null,
+    colorTemperatureKelvin: expected.color_temperature_kelvin ?? null,
+    historyBefore: expected.history_before ?? null,
+    targetState: expected.target_state ?? null,
   }
-  if (expected.color_name !== undefined && actual.colorName !== expected.color_name) {
-    fail(example, `expected color ${String(expected.color_name)}, received ${String(actual.colorName)}`)
+  const actualShape = {
+    lightNames: actual.lightNames,
+    brightnessPct: actual.brightnessPct,
+    colorName: actual.colorName,
+    rgbColor: actual.rgbColor,
+    colorTemperatureKelvin: actual.colorTemperatureKelvin,
+    historyBefore: actual.historyBefore,
+    targetState: actual.targetState,
   }
-  if (expected.rgb_color !== undefined && comparable(actual.rgbColor) !== comparable(expected.rgb_color)) {
-    fail(example, `expected RGB ${comparable(expected.rgb_color)}, received ${comparable(actual.rgbColor)}`)
-  }
-  if (expected.color_temperature_kelvin !== undefined && actual.colorTemperatureKelvin !== expected.color_temperature_kelvin) {
-    fail(example, `expected Kelvin ${String(expected.color_temperature_kelvin)}, received ${String(actual.colorTemperatureKelvin)}`)
-  }
-  if (expected.history_before !== undefined && actual.historyBefore !== expected.history_before) {
-    fail(example, `expected history boundary ${String(expected.history_before)}, received ${String(actual.historyBefore)}`)
-  }
-  if (expected.target_state !== undefined && actual.targetState !== expected.target_state) {
-    fail(example, `expected target state ${String(expected.target_state)}, received ${String(actual.targetState)}`)
+  if (comparable(actualShape) !== comparable(expectedShape)) {
+    fail(example, `expected operation shape ${comparable(expectedShape)}, received ${comparable(actualShape)}`)
   }
 }
 

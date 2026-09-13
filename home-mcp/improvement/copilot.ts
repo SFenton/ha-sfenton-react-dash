@@ -4,6 +4,7 @@ import { isAbsolute, relative, resolve, sep } from 'node:path'
 import { CopilotClient, ToolSet, defineTool, type SessionConfig } from '@github/copilot-sdk'
 import type { LightAction, LightContext } from '../light-skill'
 import { HOUSE_LIGHT_ROOMS, RGB_COLORS, WHITE_COLORS } from '../lights-config'
+import { validateLightPlanForExecution } from '../app'
 import { improvementTextNeedsRedaction } from './scope'
 import type { ImprovementAnalysis, ImprovementJob } from './types'
 
@@ -14,14 +15,14 @@ const ALLOWED_READ_PREFIXES = ['home-mcp/', '.github/skills/home-mcp-capability-
 const MAX_READ_LINES = 350
 const MAX_REPLACEMENT_CHARS = 20_000
 const LIGHT_ACTIONS = new Set<LightAction>([
-  'on', 'off', 'set', 'up', 'down', 'color', 'state', 'count', 'list', 'rooms-on',
+  'on', 'off', 'set', 'up', 'down', 'color', 'state', 'count', 'list', 'rooms-on', 'lights-on',
   'color-state', 'brightness-state', 'history', 'reason', 'pbl', 'pbl-rules',
 ])
 const CONTROL_KINDS = new Set(['room-picker', 'color-picker', 'brightness-slider', 'suggestions'])
 const UNSAFE_SUMMARY = /(?:https?:\/\/|[a-z0-9_]+\.[a-z0-9_]+|gh[opsu]_|github_pat_)/i
 const PRIVATE_DETAIL = /\b(?:medical|health|diagnosis|appointment|address|email|phone number|social security|ssn|credit card|bank account|wi-?fi|wireless network|password|passcode)\b/i
 const REGRESSION_WORDS = new Set([
-  ...`a about active adjust again all and are arent at before both brighter brighten brightness by cancel change check choose color colour could decrease default did dim dimmer do does dont down each explain for from had has have higher how i in inactive increase is it its k kelvin lamp lamps light lighting lights lower make many mean never no now of off on one or percent pick please presence raise respectively rgb room rooms same set should status switch than that the their them these they those three to turn two up was were what whats when which white why would you`.split(' '),
+  ...`a about across active adjust again all and any are arent as at been before both brighter brighten brightness by cancel change check choose color colour configured could currently decrease default did dim dimmer do does dont down each explain for from had has have higher home house how i if in inactive increase is it its k kelvin lamp lamps latest left light lighting lights lower make many me mean never no now of off on one or overview percent pick please presence quick raise respectively rgb room rooms same set should show state status switch switched than that the their them these they those three throughout to turn two up was we were what whats when whether which white whole why would you`.split(' '),
   ...HOUSE_LIGHT_ROOMS.flatMap((room) => [
     room.id, room.name, ...room.aliases,
     ...room.lights.flatMap((light) => [light.name, ...(light.aliases ?? [])]),
@@ -225,6 +226,22 @@ export function parseImprovementAnalysis(content: string, job: ImprovementJob): 
         targetState,
       }
     })
+    const aggregateAction = operations[0]?.action
+    const completeWholeHomeRead = Boolean(aggregateAction && (aggregateAction === 'rooms-on' || aggregateAction === 'lights-on')
+      && operations.length === HOUSE_LIGHT_ROOMS.length
+      && operations.every((operation, index) => operation.action === aggregateAction
+        && operation.roomId === HOUSE_LIGHT_ROOMS[index].id
+        && operation.lightNames.length === 0
+        && operation.brightnessPct === null
+        && operation.rgbColor === null
+        && operation.colorName === null
+        && operation.colorTemperatureKelvin === null
+        && operation.historyBefore === null
+        && operation.targetState === null))
+    if (operations.some((operation) => operation.action === 'rooms-on' || operation.action === 'lights-on')
+      && !completeWholeHomeRead) {
+      throw new Error('Copilot whole-home regressions must include every configured room exactly once without fixture targets')
+    }
     const controlKinds = item.controlKinds.map(String)
     if (!controlKinds.every((kind) => CONTROL_KINDS.has(kind))) {
       throw new Error(`Copilot returned an invalid control kind: ${JSON.stringify(controlKinds).slice(0, 300)}`)
@@ -232,6 +249,31 @@ export function parseImprovementAnalysis(content: string, job: ImprovementJob): 
     if (item.textIncludes.length) throw new Error('Copilot regression textIncludes must remain empty')
     if ((item.status === 'ready') !== (operations.length > 0)) {
       throw new Error('Copilot ready regressions require operations and non-ready regressions must not include them')
+    }
+    if (item.status === 'ready') {
+      const plan = validateLightPlanForExecution({
+        status: 'ready',
+        text: 'Ready.',
+        response: 'Ready.',
+        controls: [],
+        context: null,
+        operations: operations.map((operation) => {
+          const room = HOUSE_LIGHT_ROOMS.find((candidate) => candidate.id === operation.roomId)!
+          return {
+            action: operation.action,
+            room,
+            entityIds: operation.lightNames.map((name) => room.lights.find((light) => light.name === name)!.entityId),
+            lightNames: operation.lightNames,
+            brightnessPct: operation.brightnessPct,
+            rgbColor: operation.rgbColor,
+            colorName: operation.colorName,
+            colorTemperatureKelvin: operation.colorTemperatureKelvin,
+            historyBefore: operation.historyBefore,
+            targetState: operation.targetState as 'on' | 'off' | null,
+          }
+        }),
+      })
+      if (plan.status !== 'ready') throw new Error(`Copilot regression is rejected by runtime execution policy: ${plan.text}`)
     }
     return {
       turnIndex: Number(item.turnIndex),
@@ -293,26 +335,7 @@ export async function analyzeImprovementJob(job: ImprovementJob, options: Copilo
     })
     try {
       const response = await session.sendAndWait({
-        prompt: `Determine whether the assistant met the user's light-control or light-query needs. Infer the intended behavior when it did not. Use only the supplied transcript and its light context.
-
-Return exactly:
-{"version":1,"outcome":"met-needs"|"needs-improvement","inferredIntent":"plain English","issues":["plain English"],"summary":["one to three nontechnical release bullets"],"regressions":[{"turnIndex":0,"input":"new generalized regression utterance","context":null|{"domain":"lights","roomId":string|null,"entityIds":[],"lightNames":string[],"lastAction"?:string,"lastState"?:string,"targetState"?:"on"|"off","historyBefore"?:string},"status":"ready"|"clarify"|"unsupported","operations":[{"action":string,"roomId":string,"lightNames":string[],"brightnessPct":number|number[]|null,"rgbColor":[number,number,number]|null,"colorName":string|null,"colorTemperatureKelvin":number|null,"historyBefore":string|null,"targetState":"on"|"off"|null}],"controlKinds":string[],"textIncludes":[]}]}
-
-Rules:
-- If every user request was satisfied clearly and consistently, use outcome "met-needs" and an empty regressions array.
-- For an unmet need, include one regression entry for each failed user turn, using its zero-based turnIndex.
-- Each regression input must be a new generalized utterance that reproduces the language pattern without copying the private user message.
-- Expected operations describe the deterministic parser result before Home Assistant execution.
-- Every expected operation field is required, including empty arrays and null values.
-- Operation action must be one of: ${[...LIGHT_ACTIONS].join(', ')}.
-- Operation roomId must be one of: ${HOUSE_LIGHT_ROOMS.map((room) => room.id).join(', ')}.
-- controlKinds must be empty or contain only: ${[...CONTROL_KINDS].join(', ')}.
-- Regression inputs may contain only generalized light-control language, configured room/fixture names, colors, and numbers.
-- textIncludes must always be an empty array; the host validates structured parser results instead of model-authored response excerpts.
-- Summaries must be nontechnical, under 140 characters each, and must not quote the user.
-
-Transcript:
-${JSON.stringify(job.conversation)}`,
+        prompt: improvementAnalysisPrompt(job),
       }, 180_000)
       return parseImprovementAnalysis(responseContent(response), job)
     } finally {
@@ -320,6 +343,40 @@ ${JSON.stringify(job.conversation)}`,
       await client.deleteSession(sessionId).catch(() => undefined)
     }
   })
+}
+
+export function improvementAnalysisPrompt(job: ImprovementJob) {
+  if (!job.conversation) throw new Error('Improvement analysis requires a conversation')
+  const inventory = HOUSE_LIGHT_ROOMS.map((room) => ({
+    roomId: room.id,
+    room: room.name,
+    lights: room.lights.map((light) => light.name),
+  }))
+  return `Determine whether the assistant met the user's light-control or light-query needs. Infer the intended behavior when it did not. Use only the supplied transcript, routing provenance, light context, and configured inventory.
+
+Return exactly:
+{"version":1,"outcome":"met-needs"|"needs-improvement","inferredIntent":"plain English","issues":["plain English"],"summary":["one to three nontechnical release bullets"],"regressions":[{"turnIndex":0,"input":"new generalized regression utterance","context":null|{"domain":"lights","roomId":string|null,"entityIds":[],"lightNames":string[],"lastAction"?:string,"lastState"?:string,"targetState"?:"on"|"off","historyBefore"?:string},"status":"ready"|"clarify"|"unsupported","operations":[{"action":string,"roomId":string,"lightNames":string[],"brightnessPct":number|number[]|null,"rgbColor":[number,number,number]|null,"colorName":string|null,"colorTemperatureKelvin":number|null,"historyBefore":string|null,"targetState":"on"|"off"|null}],"controlKinds":string[],"textIncludes":[]}]}
+
+Rules:
+- If every user request was satisfied clearly and consistently, use outcome "met-needs" and an empty regressions array.
+- handledByHomeMcp=false means the response bypassed the current curated light capability. Do not accept unrelated devices, indicators, decorative entities, or names absent from the configured inventory as a correct light answer.
+- For an unmet need, include one regression entry for each failed user turn, using its zero-based turnIndex.
+- Each regression input must be a new generalized utterance that reproduces the language pattern without copying the private user message.
+- Expected operations describe the deterministic parser result before Home Assistant execution.
+- Every expected operation field is required, including empty arrays and null values.
+- Operation action must be one of: ${[...LIGHT_ACTIONS].join(', ')}.
+- Operation roomId must be one of: ${HOUSE_LIGHT_ROOMS.map((room) => room.id).join(', ')}.
+- rooms-on and lights-on regressions must include every configured room exactly once in inventory order, with empty lightNames and all value fields null.
+- controlKinds must be empty or contain only: ${[...CONTROL_KINDS].join(', ')}.
+- Regression inputs may contain only generalized light-control language, configured room/fixture names, colors, and numbers.
+- textIncludes must always be an empty array; the host validates structured parser results instead of model-authored response excerpts.
+- Summaries must be nontechnical, under 140 characters each, and must not quote the user.
+
+Configured light inventory:
+${JSON.stringify(inventory)}
+
+Transcript:
+${JSON.stringify(job.conversation)}`
 }
 
 function repositoryPath(root: string, requested: string, mode: 'read' | 'edit') {

@@ -19,6 +19,7 @@ export const AUTOMATIC_VALIDATION_COMMANDS = [
   ['npm', ['run', 'test:change-policy']],
   ['npm', ['run', 'home-mcp:check']],
   ['npm', ['run', 'test:run', '--',
+    'home-mcp/light-context.test.ts',
     'home-mcp/light-skill.test.ts',
     'home-mcp/app.test.ts',
     'home-mcp/corpus/generate-lights.test.ts',
@@ -281,6 +282,22 @@ export function assertLearnedRegressionFailsBase(job: ImprovementJob, analysis: 
   return failures
 }
 
+export async function assertLearnedRegressionFailsInWorktree(worktree: string, job: ImprovementJob, analysis: ImprovementAnalysis) {
+  const probePath = resolve(worktree, `.home-mcp-regression-probe-${job.id}.json`)
+  await writeFile(probePath, `${JSON.stringify(fixtureFromAnalysis(job, analysis), null, 2)}\n`, 'utf8')
+  try {
+    await run('npx', [
+      '--no-install',
+      'tsx',
+      'home-mcp/improvement/validate-regressions.ts',
+      '--fixture',
+      probePath,
+    ], worktree)
+  } finally {
+    await rm(probePath, { force: true })
+  }
+}
+
 async function validateCandidate(worktree: string, fixturePath: string, fixtureDigest: string) {
   const paths = await changedPaths(worktree)
   const fixtureRelative = relative(worktree, fixturePath).replaceAll('\\', '/')
@@ -506,6 +523,22 @@ async function writeStatus(store: ConversationImprovementStore, state: Improveme
   await store.writeWorkerStatus({ state, jobId, message, updatedAt: new Date().toISOString() })
 }
 
+export function conversationRequiresClientRefresh(job: ImprovementJob) {
+  return Boolean(job.conversation?.turns.some((turn) => turn.parsedAsLights && !turn.handledByHomeMcp))
+}
+
+export function hasRoutingVerification(job: ImprovementJob) {
+  return job.routingVerification?.version === 1
+    && job.routingVerification.conversationHash === job.conversationHash
+    && !Number.isNaN(Date.parse(job.routingVerification.verifiedAt))
+}
+
+export function assertRoutingVerifiedForRelease(job: ImprovementJob) {
+  if ((job.stage === 'pr-open' || job.stage === 'merged') && !hasRoutingVerification(job)) {
+    throw new Error('Improvement release is missing its routing-verification receipt')
+  }
+}
+
 export async function processImprovementJob(
   job: ImprovementJob,
   processingPath: string,
@@ -534,6 +567,31 @@ export async function processImprovementJob(
     })
     await writeStatus(store, 'idle', null, null)
     return
+  }
+  assertRoutingVerifiedForRelease(currentJob)
+  if (currentJob.stage !== 'pr-open' && currentJob.stage !== 'merged') {
+    if (conversationRequiresClientRefresh(currentJob)) {
+      await store.completeJob(processingPath, {
+        status: 'client-refresh-required',
+        processedAt: new Date().toISOString(),
+        inferredIntent: currentJob.analysis?.inferredIntent
+          ?? 'Use the current Home MCP client for this supported light request.',
+      })
+      await writeStatus(store, 'idle', null, null)
+      return
+    }
+    if (!currentJob.conversation) throw new Error('Improvement job is missing its routing evidence')
+    if (!hasRoutingVerification(currentJob)) {
+      currentJob = {
+        ...currentJob,
+        routingVerification: {
+          version: 1,
+          conversationHash: currentJob.conversationHash,
+          verifiedAt: new Date().toISOString(),
+        },
+      }
+      await store.updateProcessingJob(processingPath, currentJob)
+    }
   }
   if (currentJob.stage === 'pr-open') {
     const pullRequest = await openOrFindImprovementPullRequest(options, currentJob)
@@ -597,7 +655,7 @@ export async function processImprovementJob(
 
   const { branch, worktree } = await createWorktree(options, currentJob)
   try {
-    assertLearnedRegressionFailsBase(currentJob, analysis)
+    await assertLearnedRegressionFailsInWorktree(worktree, currentJob, analysis)
     const fixturePath = await writeRegressionFixture(worktree, currentJob, analysis)
     const fixtureDigest = await fileDigest(fixturePath)
     await implementImprovement(currentJob, analysis, worktree, copilotOptions)

@@ -365,6 +365,7 @@ export const SURFACE_CONTRACTS: Record<ScenarioId, {
   chat: {
     family: 'modal', states: CHAT_LAYOUT_STATES,
     tabs: ['^Home Assistant$', '^Quick Links$'],
+    readOnlyTerminals: { settings: '[data-chat-settings="true"]' },
     owners: ['src/components/hass/chat/', 'src/components/hass/LightColorPicker', 'src/components/hass/lightColor', 'src/components/shell/GlobalQuickLinksAction', 'src/i18n/locales/en/modals/chat.json'],
     legacy: ['chat-ux.spec.ts', 'modal-rotation-regressions.spec.ts'],
     question: 'Are roles, genuine pending dots, 14-day history visibility, versioned Chat Settings, embedded room/color/brightness controls and same-sheet custom color details using the shared exterior-light picker clear, with resume warnings, errors, long messages, a usable composer above bottom tabs and one safe scroll owner?',

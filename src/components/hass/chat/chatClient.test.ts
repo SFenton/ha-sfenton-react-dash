@@ -583,11 +583,13 @@ describe('native chat client', () => {
         requests.push({ text, context })
         if (requests.length === 1) return {
           status: 'clarify', text: 'Which room?', conversation_id: conversationId ?? 'home-mcp-lights:pending',
+          handled_by_home_mcp: true,
           controls: [{ id: 'lights-room-picker', kind: 'room-picker', options: [{ label: 'Living Room', value: 'Living Room', message: 'Turn on the Living Room lights.' }] }],
           context: { domain: 'lights', roomId: null, entityIds: [], lightNames: [] },
         }
         return {
           status: 'success', text: 'I turned on the Living Room lights.', conversation_id: 'home-mcp-thread', controls: [],
+          handled_by_home_mcp: true,
           context: { domain: 'lights', roomId: 'living-room', entityIds: [], lightNames: [] },
         }
       },
@@ -612,6 +614,8 @@ describe('native chat client', () => {
       text: 'Use the Living Room.', sourceControlId: control!.id,
     })
     expect(client.getSnapshot().threads[0].tail?.skillContext).toMatchObject({ roomId: 'living-room' })
+    expect(client.getSnapshot().threads[0].tail?.handledByHomeMcp).toBe(true)
+    expect(client.getSnapshot().threads[0].tail?.homeMcpStatus).toBe('success')
     expect(client.getSnapshot().draft).toBe('Keep this composer draft')
   })
 
@@ -638,6 +642,30 @@ describe('native chat client', () => {
     await vi.waitFor(() => expect(ended).toHaveBeenCalledOnce())
     expect(ended).toHaveBeenCalledWith(expect.stringMatching(/^[a-zA-Z0-9_-]+$/))
     expect(client.getSnapshot().selectedId).toBeNull()
+  })
+
+  it('persists failed Home MCP status for improvement deduplication', async () => {
+    const homeMcp = {
+      request: async () => ({
+        status: 'failed',
+        text: 'The light change failed.',
+        conversation_id: 'home-mcp-thread',
+        controls: [],
+        context: { domain: 'lights', roomId: 'living-room', entityIds: [], lightNames: [], lastAction: 'off' },
+        handled_by_home_mcp: true,
+      }),
+    }
+    const client = new ChatClient(server.connect('user-a'), 'user-a', Date.now, undefined, homeMcp)
+    clients.push(client)
+    await client.activate()
+    client.setDraft('Turn off the Living Room lights.')
+    await client.send()
+
+    expect(client.getSnapshot().threads[0].tail).toMatchObject({
+      response: 'answer',
+      handledByHomeMcp: true,
+      homeMcpStatus: 'failed',
+    })
   })
 
   it('keeps a failed Home MCP command conversationally resumable', async () => {
