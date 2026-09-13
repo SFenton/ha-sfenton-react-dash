@@ -44,6 +44,7 @@ export interface EverShelfInventoryItem {
   inventory_ids?: (number | string)[] | null
   location?: string | null
   name?: string | null
+  prepared_food?: boolean | number | string | null
   product_id?: number | string | null
   quantity?: number | string | null
   unit?: string | null
@@ -191,6 +192,7 @@ function inventoryAddServiceData(item: EverShelfInventoryItem, quantity: number,
   const location = itemLocation(item)
   const unit = compactText(item.unit)
   const serviceData: Record<string, unknown> = {
+    inventory_prepared_food: itemPreparedFood(item),
     name: itemName(item),
     quantity,
     vacuum_sealed: itemVacuumSealed(item),
@@ -219,7 +221,7 @@ function itemGroupingKey(item: EverShelfInventoryItem) {
 // Prepared units are stored as their own inventory rows, so they form their own batch rather
 // than merging with unprepared stock that happens to share an expiration date.
 function itemPreparedFood(item: EverShelfInventoryItem) {
-  const value = (item as { prepared_food?: unknown }).prepared_food
+  const value = item.prepared_food
   return value === true || value === 1 || value === '1'
 }
 
