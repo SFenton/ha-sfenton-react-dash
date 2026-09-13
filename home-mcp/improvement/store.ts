@@ -57,6 +57,7 @@ export class ConversationImprovementStore {
   readonly enabled: boolean
   readonly autoPublish: boolean
   readonly quietMs: number
+  private readonly conversationLocks = new Map<string, Promise<void>>()
 
   constructor(options: { root?: string; enabled?: boolean; autoPublish?: boolean; quietMs?: number }) {
     this.root = resolve(options.root ?? '.home-mcp-improvements')
@@ -104,14 +105,36 @@ export class ConversationImprovementStore {
     return join(this.directory('conversations'), `${safeId(userScope)}-${safeId(threadId)}.json`)
   }
 
-  async recordTurn(input: {
+  private async acquireConversationLock(path: string) {
+    const previous = this.conversationLocks.get(path) ?? Promise.resolve()
+    let release = () => {}
+    const pending = new Promise<void>((resolvePending) => { release = resolvePending })
+    const tail = previous.catch(() => undefined).then(() => pending)
+    this.conversationLocks.set(path, tail)
+    await previous.catch(() => undefined)
+    let released = false
+    return () => {
+      if (released) return
+      released = true
+      release()
+      if (this.conversationLocks.get(path) === tail) this.conversationLocks.delete(path)
+    }
+  }
+
+  private async withConversationLock<T>(path: string, task: () => Promise<T>): Promise<T> {
+    const release = await this.acquireConversationLock(path)
+    try {
+      return await task()
+    } finally {
+      release()
+    }
+  }
+
+  private async recordTurnAtPath(path: string, input: {
     userScope: string
     threadId: string
     turn: ImprovementConversationTurn
   }) {
-    if (!this.enabled) return
-    await this.prepare()
-    const path = this.conversationPath(input.userScope, input.threadId)
     const existing = await readJson<ImprovementConversation>(path)
     const normalized = normalizeImprovementConversation(existing, input.userScope)
     const turns = normalized?.turns ?? []
@@ -139,13 +162,43 @@ export class ConversationImprovementStore {
     await atomicWrite(path, conversation)
   }
 
+  async beginConversationActivity(userScope: string, threadId: string) {
+    if (!this.enabled) return {
+      recordTurn: async () => {},
+      release: () => {},
+    }
+    await this.prepare()
+    const path = this.conversationPath(userScope, threadId)
+    const release = await this.acquireConversationLock(path)
+    return {
+      recordTurn: (turn: ImprovementConversationTurn) => this.recordTurnAtPath(path, { userScope, threadId, turn }),
+      release,
+    }
+  }
+
+  async recordTurn(input: {
+    userScope: string
+    threadId: string
+    turn: ImprovementConversationTurn
+  }) {
+    if (!this.enabled) return
+    await this.prepare()
+    const path = this.conversationPath(input.userScope, input.threadId)
+    await this.withConversationLock(path, () => this.recordTurnAtPath(path, input))
+  }
+
   async queueConversation(userScope: string, threadId: string, source: ImprovementJob['source']) {
     if (!this.enabled) return { status: 'disabled' as const }
     await this.prepare()
     const path = this.conversationPath(userScope, threadId)
+    return this.withConversationLock(path, () => this.queueConversationAtPath(path, userScope, source))
+  }
+
+  private async queueConversationAtPath(path: string, userScope: string, source: ImprovementJob['source'], idleBefore?: number) {
     const raw = await readJson<ImprovementConversation>(path)
     const conversation = normalizeImprovementConversation(raw, userScope)
     if (!conversation) return { status: 'missing' as const }
+    if (idleBefore !== undefined && conversation.updatedAt > idleBefore) return { status: 'active' as const }
     if (!conversationIsSupportedLights(conversation)) {
       await this.writeResult(conversationHash(conversation), {
         status: 'unsupported',
@@ -181,8 +234,10 @@ export class ConversationImprovementStore {
     if (!parsed) return { status: 'invalid' as const }
     const conversation = { ...parsed, userScope }
     const path = this.conversationPath(userScope, conversation.threadId)
-    await atomicWrite(path, conversation)
-    return this.queueConversation(userScope, conversation.threadId, source)
+    return this.withConversationLock(path, async () => {
+      await atomicWrite(path, conversation)
+      return this.queueConversationAtPath(path, userScope, source)
+    })
   }
 
   async queueIdleConversations(now = Date.now()) {
@@ -192,9 +247,12 @@ export class ConversationImprovementStore {
     const queued = []
     for (const file of await jsonFiles(this.directory('conversations'))) {
       const path = join(this.directory('conversations'), file)
-      const conversation = normalizeImprovementConversation(await readJson(path))
-      if (!conversation || now - conversation.updatedAt < this.quietMs) continue
-      queued.push(await this.queueConversation(conversation.userScope, conversation.threadId, 'runtime'))
+      const result = await this.withConversationLock(path, async () => {
+        const conversation = normalizeImprovementConversation(await readJson(path))
+        if (!conversation || now - conversation.updatedAt < this.quietMs) return null
+        return this.queueConversationAtPath(path, conversation.userScope, 'runtime', now - this.quietMs)
+      })
+      if (result) queued.push(result)
     }
     return queued
   }

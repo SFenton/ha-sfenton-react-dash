@@ -1,4 +1,5 @@
-import { parseImprovementAnalysis } from './copilot'
+import { improvementAnalysisPrompt, parseImprovementAnalysis } from './copilot'
+import { HOUSE_LIGHT_ROOMS } from '../lights-config'
 import type { ImprovementJob } from './types'
 
 const job: ImprovementJob = {
@@ -22,6 +23,7 @@ const job: ImprovementJob = {
       assistantText: 'Which room?',
       outcome: 'answer',
       parsedAsLights: true,
+      handledByHomeMcp: true,
       contextBefore: null,
       contextAfter: { domain: 'lights', roomId: null, entityIds: [], lightNames: [] },
     }],
@@ -64,6 +66,93 @@ describe('Copilot improvement analysis', () => {
     expect(result.regressions[0].operations[0]).toMatchObject({ action: 'up', roomId: 'living-room' })
     expect(result.inferredIntent).not.toContain('Alice')
     expect(result.summary.join(' ')).not.toContain('Alice')
+  })
+
+  it('grounds analysis in routing provenance and configured light inventory', () => {
+    const staleJob = {
+      ...job,
+      conversation: {
+        ...job.conversation!,
+        turns: [{
+          ...job.conversation!.turns[0],
+          userText: 'What lights are on?',
+          assistantText: 'Christmas Lights and transit indicators are on.',
+          handledByHomeMcp: false,
+        }],
+      },
+    }
+    const prompt = improvementAnalysisPrompt(staleJob)
+    expect(prompt).toContain('"handledByHomeMcp":false')
+    expect(prompt).toContain('"room":"Living Room"')
+    expect(prompt).toContain('"lights":["Front Left"')
+    expect(prompt).toContain('names absent from the configured inventory')
+  })
+
+  it('accepts generalized whole-home regression wording', () => {
+    const result = parseImprovementAnalysis(JSON.stringify({
+      version: 1,
+      outcome: 'needs-improvement',
+      inferredIntent: 'List configured lights that are on.',
+      issues: ['The assistant did not return the configured light inventory.'],
+      summary: ['Lists configured lights that are currently on.'],
+      regressions: [{
+        turnIndex: 0,
+        input: 'Show me which configured lights are currently on across the home.',
+        context: null,
+        status: 'ready',
+        operations: HOUSE_LIGHT_ROOMS.map((room) => ({
+          ...operation({ action: 'lights-on' }),
+          roomId: room.id,
+        })),
+        controlKinds: [],
+        textIncludes: [],
+      }],
+    }), job)
+
+    expect(result.regressions[0].input).toBe('Show me which configured lights are currently on across the home.')
+    expect(result.regressions[0].operations[0]).toMatchObject({ action: 'lights-on', roomId: 'living-room' })
+    expect(result.regressions[0].operations).toHaveLength(HOUSE_LIGHT_ROOMS.length)
+  })
+
+  it('rejects partial whole-home regression expectations', () => {
+    expect(() => parseImprovementAnalysis(JSON.stringify({
+      version: 1,
+      outcome: 'needs-improvement',
+      inferredIntent: 'List configured lights that are on.',
+      issues: ['The assistant did not return the configured light inventory.'],
+      summary: ['Lists configured lights that are currently on.'],
+      regressions: [{
+        turnIndex: 0,
+        input: 'Show me which configured lights are currently on across the home.',
+        context: null,
+        status: 'ready',
+        operations: [{ ...operation({ action: 'lights-on' }), roomId: 'living-room' }],
+        controlKinds: [],
+        textIncludes: [],
+      }],
+    }), job)).toThrow(/every configured room/)
+  })
+
+  it('rejects model-authored plans that runtime execution policy will reject', () => {
+    expect(() => parseImprovementAnalysis(JSON.stringify({
+      version: 1,
+      outcome: 'needs-improvement',
+      inferredIntent: 'Count lights across two rooms.',
+      issues: ['The assistant missed a count request.'],
+      summary: ['Handles another count request.'],
+      regressions: [{
+        turnIndex: 0,
+        input: 'How many lights are on in the Kitchen and Living Room?',
+        context: null,
+        status: 'ready',
+        operations: [
+          { ...operation({ action: 'count' }), roomId: 'kitchen' },
+          { ...operation({ action: 'count' }), roomId: 'living-room' },
+        ],
+        controlKinds: [],
+        textIncludes: [],
+      }],
+    }), job)).toThrow(/runtime execution policy/)
   })
 
   it('rejects an unmet analysis without a regression fixture', () => {

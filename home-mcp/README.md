@@ -39,7 +39,7 @@ Vite proxies `/__home-mcp` to `/mcp`. Production uses `/api/sfenton_home_mcp`, r
 - `home_info`: read the configured model, MCP version, queue state, and five latest improvements.
 - `home_state`: bounded current-state reads for up to 50 entity IDs.
 - `home_history`: recorder history for up to 20 entity IDs and at most seven days.
-- `home_lights`: household room/group/fixture-aware light actions and queries. It supports ordered compound operations, on/off, exact or relative brightness, configured RGB/white-temperature colors, current state, seven-day last-off history, cautious cause evidence, and Presence-Based Lighting status.
+- `home_lights`: household room/group/fixture-aware light actions and queries. It supports ordered compound operations, on/off, exact or relative brightness, configured RGB/white-temperature colors, whole-home lists of configured lights that are on, current state, seven-day last-off history, cautious cause evidence, and Presence-Based Lighting status.
 
 `home_chat` recognizes supported light requests before falling back to the configured Gemini conversation agent. Light responses use a structured envelope containing `text`, optional embedded `controls`, compact semantic `context`, and diagnostic `data`. The React chat persists the context and source control ID. This preserves named room/fixture references across long conversations without replaying the transcript and prevents an old embedded control from submitting twice.
 
@@ -52,6 +52,17 @@ tokens, entity IDs, URLs, service data, history payloads, and diagnostic data
 are not written to the queue. A deterministic scope check rejects conversations
 outside the currently supported lights capability before the Copilot SDK is
 called.
+
+Each Home MCP chat response carries an explicit routing marker, and each
+retained turn records whether it was actually handled by Home MCP. Semantic
+light context is not routing evidence; older records without the marker default
+to not handled. The SDK receives that provenance plus the configured
+room/fixture inventory. A supported turn from an older client that bypassed
+Home MCP is classified as requiring a client refresh rather than being accepted
+as a successful capability response or used to authorize a parser edit. Before
+the transcript is removed from an improvement job, the worker persists a
+conversation-hash-bound routing receipt; resumed merge or publish stages fail
+closed when that receipt is absent or invalid.
 
 Completed chats enter the queue when the user starts a new chat or closes the
 modal. The server also queues a completed thread after the configured quiet
@@ -122,7 +133,7 @@ npm run home-mcp:corpus:lights -- \
   --utterances-per-family 10000
 ```
 
-The generated corpus covers 21 interaction families: prefix and postfix room/fixture on/off phrasing, aliases across every applicable room, exact and relative brightness, unsupported brightness, same-value and “respectively” multi-light brightness, supported/unsupported color, state/history/reason/PBL queries, ambiguity controls, compound rooms, and reference retention after 100 intervening messages. At 10,000 user utterances per family it contains 210,098 user utterances.
+The generated corpus covers 34 interaction families: prefix and postfix room/fixture on/off phrasing, aliases across every applicable room, exact and relative brightness, unsupported brightness, same-value and “respectively” multi-light brightness, supported/unsupported color, room and whole-home state/history/reason/PBL queries, ambiguity controls, compound rooms, and reference retention after 100 intervening messages. At 10,000 user utterances per family it contains 340,098 user utterances.
 
 Validate every generated example against the deterministic light parser/planner, including expected actions, rooms, fixtures, brightness, colors, clarification controls, unsupported responses, room coverage, unique IDs, and the 180-character limit:
 

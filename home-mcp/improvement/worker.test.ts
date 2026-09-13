@@ -1,4 +1,13 @@
-import { AUTOMATIC_EDIT_PATHS, AUTOMATIC_VALIDATION_COMMANDS, assertLearnedRegressionFailsBase, validateAutomaticParserChange } from './worker'
+import {
+  AUTOMATIC_EDIT_PATHS,
+  AUTOMATIC_VALIDATION_COMMANDS,
+  assertLearnedRegressionFailsBase,
+  assertLearnedRegressionFailsInWorktree,
+  assertRoutingVerifiedForRelease,
+  conversationRequiresClientRefresh,
+  hasRoutingVerification,
+  validateAutomaticParserChange,
+} from './worker'
 import { readFileSync } from 'node:fs'
 
 describe('automatic Home MCP release policy', () => {
@@ -99,6 +108,7 @@ describe('automatic Home MCP release policy', () => {
           assistantText: 'Which room?',
           outcome: 'answer' as const,
           parsedAsLights: true,
+          handledByHomeMcp: true,
           contextBefore: null,
           contextAfter: null,
         }],
@@ -132,5 +142,152 @@ describe('automatic Home MCP release policy', () => {
     }
 
     expect(() => assertLearnedRegressionFailsBase(job, analysis)).toThrow(/already passes/)
+  })
+
+  it('checks the parser from the synchronized worktree in a separate process', async () => {
+    const job = {
+      version: 1 as const,
+      id: 'worktree-parser',
+      conversationHash: 'hash',
+      enqueuedAt: 1,
+      attempts: 0,
+      stage: 'queued' as const,
+      source: 'runtime' as const,
+      conversation: {
+        version: 1 as const,
+        threadId: 'thread-one',
+        userScope: 'user-one',
+        createdAt: 1,
+        updatedAt: 2,
+        turns: [{
+          id: 'turn-one',
+          createdAt: 2,
+          userText: 'Turn on the Living Room lights.',
+          assistantText: 'Which room?',
+          outcome: 'answer' as const,
+          parsedAsLights: true,
+          handledByHomeMcp: true,
+          contextBefore: null,
+          contextAfter: null,
+        }],
+      },
+    }
+    const operation = {
+      action: 'on' as const,
+      roomId: 'living-room',
+      lightNames: [],
+      brightnessPct: null,
+      rgbColor: null,
+      colorName: null,
+      colorTemperatureKelvin: null,
+      historyBefore: null,
+      targetState: null,
+    }
+    const passing = {
+      version: 1 as const,
+      outcome: 'needs-improvement' as const,
+      inferredIntent: 'Handle a supported light request involving on.',
+      issues: ['The stored light response did not match the expected supported behavior.'],
+      summary: ['Understands more ways to request on for supported lights.'],
+      regressions: [{
+        turnIndex: 0,
+        input: 'Turn on the Living Room lights.',
+        context: null,
+        status: 'ready' as const,
+        operations: [operation],
+        controlKinds: [],
+        textIncludes: [],
+      }],
+    }
+    await expect(assertLearnedRegressionFailsInWorktree(process.cwd(), job, passing)).rejects.toThrow(/already passes/)
+    await expect(assertLearnedRegressionFailsInWorktree(process.cwd(), job, {
+      ...passing,
+      regressions: [{
+        ...passing.regressions[0],
+        input: 'Engage photons in the Living Room.',
+      }],
+    })).resolves.toBeUndefined()
+    const source = readFileSync('home-mcp/improvement/worker.ts', 'utf8')
+    expect(source).toContain('await assertLearnedRegressionFailsInWorktree(worktree, currentJob, analysis)')
+    expect(source).not.toContain('assertLearnedRegressionFailsBase(currentJob, analysis)')
+  }, 30_000)
+
+  it('marks supported turns that bypassed Home MCP as requiring a client refresh', () => {
+    const job = {
+      version: 1 as const,
+      id: 'stale-client',
+      conversationHash: 'hash',
+      enqueuedAt: 1,
+      attempts: 0,
+      stage: 'queued' as const,
+      source: 'history' as const,
+      conversation: {
+        version: 1 as const,
+        threadId: 'thread-one',
+        userScope: 'user-one',
+        createdAt: 1,
+        updatedAt: 2,
+        turns: [{
+          id: 'turn-one',
+          createdAt: 2,
+          userText: 'What lights are on?',
+          assistantText: 'Unrelated indicators are on.',
+          outcome: 'answer' as const,
+          parsedAsLights: true,
+          handledByHomeMcp: false,
+          contextBefore: null,
+          contextAfter: null,
+        }],
+      },
+    }
+    expect(conversationRequiresClientRefresh(job)).toBe(true)
+    expect(conversationRequiresClientRefresh({
+      ...job,
+      conversation: {
+        ...job.conversation,
+        turns: [{ ...job.conversation.turns[0], handledByHomeMcp: true }],
+      },
+    })).toBe(false)
+    const source = readFileSync('home-mcp/improvement/worker.ts', 'utf8')
+    expect(source.indexOf('if (conversationRequiresClientRefresh(currentJob))')).toBeLessThan(
+      source.indexOf('await analyzeImprovementJob(currentJob, copilotOptions)'),
+    )
+  })
+
+  it('requires a bound routing receipt before resuming merge or publish stages', () => {
+    const job = {
+      version: 1 as const,
+      id: 'resume-release',
+      conversationHash: 'conversation-hash',
+      enqueuedAt: 1,
+      attempts: 0,
+      stage: 'pr-open' as const,
+      source: 'history' as const,
+    }
+    expect(hasRoutingVerification(job)).toBe(false)
+    expect(() => assertRoutingVerifiedForRelease(job)).toThrow(/routing-verification receipt/)
+
+    const verified = {
+      ...job,
+      routingVerification: {
+        version: 1 as const,
+        conversationHash: job.conversationHash,
+        verifiedAt: '2026-09-11T12:00:00.000Z',
+      },
+    }
+    expect(hasRoutingVerification(verified)).toBe(true)
+    expect(() => assertRoutingVerifiedForRelease(verified)).not.toThrow()
+    expect(hasRoutingVerification({
+      ...verified,
+      routingVerification: { ...verified.routingVerification, conversationHash: 'other-hash' },
+    })).toBe(false)
+
+    const source = readFileSync('home-mcp/improvement/worker.ts', 'utf8')
+    expect(source.indexOf('assertRoutingVerifiedForRelease(currentJob)')).toBeLessThan(
+      source.indexOf("if (currentJob.stage === 'pr-open')"),
+    )
+    expect(source.indexOf('assertRoutingVerifiedForRelease(currentJob)')).toBeLessThan(
+      source.indexOf("if (currentJob.stage === 'merged')"),
+    )
   })
 })

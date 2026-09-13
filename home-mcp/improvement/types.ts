@@ -13,6 +13,7 @@ export interface ImprovementConversationTurn {
   assistantText: string | null
   outcome: ConversationTurnOutcome
   parsedAsLights: boolean
+  handledByHomeMcp: boolean
   contextBefore: LightContext | null
   contextAfter: LightContext | null
 }
@@ -37,6 +38,11 @@ export interface ImprovementJob {
   stage: 'queued' | 'analyzed' | 'pr-open' | 'merged' | 'published'
   source: 'runtime' | 'history'
   conversation?: ImprovementConversation
+  routingVerification?: {
+    version: typeof IMPROVEMENT_SCHEMA_VERSION
+    conversationHash: string
+    verifiedAt: string
+  }
   analysis?: ImprovementAnalysis
   branch?: string
   headCommit?: string

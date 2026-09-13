@@ -71,4 +71,35 @@ describe('learned light regression fixtures', () => {
 
     expect(validateRegressionFixture(fixture)).toContain('fixture contains private or credential-like text')
   })
+
+  it('derives and verifies canonical entity targets for named fixtures', () => {
+    const fixture: LightRegressionFixture = {
+      version: 1,
+      id: 'conversation-named-fixture',
+      conversationHash: 'hash',
+      coveredPaths: ['home-mcp/light-skill.ts'],
+      summary: 'Keep a named light target.',
+      turns: [{
+        turnIndex: 0,
+        input: 'Turn on the Front Left light in the Living Room.',
+        context: null,
+        status: 'ready',
+        operations: [{
+          action: 'on',
+          roomId: 'living-room',
+          lightNames: ['Front Left'],
+          brightnessPct: null,
+          rgbColor: null,
+          colorName: null,
+          colorTemperatureKelvin: null,
+          historyBefore: null,
+          targetState: null,
+        }],
+        controlKinds: [],
+        textIncludes: [],
+      }],
+    }
+
+    expect(validateRegressionFixture(fixture)).toEqual([])
+  })
 })
