@@ -51,7 +51,14 @@ export function ChatSettingsPanel({ client }: { client: ChatSystemInfoClient }) 
   }, [client])
 
   return (
-    <div className={styles.panel} data-chat-settings="true" data-modal-detail-autofocus="true" tabIndex={-1}>
+    <div
+      aria-label={copy(chatKeys.settingsTitle)}
+      className={styles.panel}
+      data-chat-settings="true"
+      data-modal-detail-autofocus="true"
+      role="group"
+      tabIndex={-1}
+    >
       {state.status === INFO_LOADING && <div role="status">{copy(chatKeys.settingsLoading)}</div>}
       {state.status === INFO_ERROR && (
         <>

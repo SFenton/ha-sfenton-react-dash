@@ -1,4 +1,5 @@
 import { expect, type Locator, type Page } from './layout/fixture'
+import { SURFACE_CONTRACTS } from './layout/contracts'
 import { modalFacts, waitForModalReady, waitForRoute } from './layout/evidence'
 import { chatFixtureRecords, CHAT_FIXTURE_PROMPT, CHAT_LAYOUT_STATES } from '../src/test/fixtures/chat'
 export type ChatLayoutState = typeof CHAT_LAYOUT_STATES[number]
@@ -74,7 +75,10 @@ export async function openChatState(page: Page, state: string) {
 
 export async function chatStateFacts(dialog: Locator, state: string) {
     await assertChatState(dialog, state)
-    const facts = await modalFacts(dialog, 'body', state === 'light-custom-color-control' ? 'controls' : 'chat-content')
+    const terminal = state === 'light-custom-color-control'
+      ? 'controls'
+      : SURFACE_CONTRACTS.chat.readOnlyTerminals?.[state] ?? 'chat-content'
+    const facts = await modalFacts(dialog, 'body', terminal)
     await expect(dialog).toHaveAttribute('data-layout-mounted', 'original')
     await expect(dialog.getByRole('tab', { name: 'Home Assistant', exact: true })).toHaveAttribute('aria-selected', 'true')
     const geometry = await dialog.evaluate((element) => {

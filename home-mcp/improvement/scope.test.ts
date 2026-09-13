@@ -15,12 +15,13 @@ describe('conversation improvement privacy and scope', () => {
         assistantText: 'They are off.',
         outcome: 'answer',
         parsedAsLights: true,
+        handledByHomeMcp: true,
         contextBefore: null,
         contextAfter: {
           domain: 'lights',
           roomId: 'living-room',
-          entityIds: ['light.living_room'],
-          lightNames: [],
+          entityIds: ['light.living_room_front_left_light'],
+          lightNames: ['Front Left'],
           lastAction: 'state',
         },
       }, {
@@ -30,18 +31,19 @@ describe('conversation improvement privacy and scope', () => {
         assistantText: 'I can help.',
         outcome: 'answer',
         parsedAsLights: true,
+        handledByHomeMcp: false,
         contextBefore: {
           domain: 'lights',
           roomId: 'living-room',
-          entityIds: ['light.living_room'],
-          lightNames: [],
+          entityIds: ['light.living_room_front_left_light'],
+          lightNames: ['Front Left'],
           lastAction: 'state',
         },
         contextAfter: {
           domain: 'lights',
           roomId: 'living-room',
-          entityIds: ['light.living_room'],
-          lightNames: [],
+          entityIds: ['light.living_room_front_left_light'],
+          lightNames: ['Front Left'],
           lastAction: 'state',
         },
       }],
@@ -52,7 +54,40 @@ describe('conversation improvement privacy and scope', () => {
     expect(conversation!.turns[1].userText).not.toContain('CorrectHorseBatteryStaple123')
     expect(conversation!.turns[1].userText).not.toContain('sensor.private_state')
     expect(conversation!.turns[1].parsedAsLights).toBe(false)
+    expect(conversation!.turns[0].handledByHomeMcp).toBe(true)
+    expect(conversation!.turns[1].handledByHomeMcp).toBe(false)
     expect(conversationIsSupportedLights(conversation!)).toBe(false)
+  })
+
+  it('drops unconfigured or private context fields before persistence', () => {
+    const conversation = normalizeImprovementConversation({
+      version: 1,
+      threadId: 'thread-invalid-context',
+      userScope: 'stable-user',
+      createdAt: 1,
+      updatedAt: 2,
+      turns: [{
+        id: 'turn-invalid-context',
+        createdAt: 2,
+        userText: 'Turn it off.',
+        assistantText: 'Which room?',
+        outcome: 'answer',
+        parsedAsLights: true,
+        handledByHomeMcp: false,
+        contextBefore: {
+          domain: 'lights',
+          roomId: 'living-room',
+          entityIds: ['switch.garage_door'],
+          lightNames: ['password=SecretValue123456789'],
+          historyBefore: 'private medical appointment',
+        },
+        contextAfter: null,
+      }],
+    }, 'stable-user')
+
+    expect(conversation?.turns[0].contextBefore).toBeNull()
+    expect(JSON.stringify(conversation)).not.toContain('SecretValue123456789')
+    expect(JSON.stringify(conversation)).not.toContain('private medical appointment')
   })
 
   it('redacts credentials expressed as natural language', () => {

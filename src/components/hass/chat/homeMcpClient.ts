@@ -30,8 +30,9 @@ export interface HomeMcpConversation {
     createdAt: number
     userText: string
     assistantText: string | null
-    outcome: 'answer' | 'error' | 'empty'
+    outcome: 'answer' | 'error' | 'empty' | 'failed'
     parsedAsLights: boolean
+    handledByHomeMcp: boolean
     contextBefore: ChatSkillContext | null
     contextAfter: ChatSkillContext | null
   }>

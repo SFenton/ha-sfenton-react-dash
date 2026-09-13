@@ -56,6 +56,7 @@ describe('Home MCP client', () => {
         assistantText: 'Which room?',
         outcome: 'answer' as const,
         parsedAsLights: true,
+        handledByHomeMcp: true,
         contextBefore: null,
         contextAfter: { domain: 'lights', roomId: null, entityIds: [], lightNames: [] },
       }],

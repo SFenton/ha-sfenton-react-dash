@@ -28,7 +28,7 @@ export interface ChatSkillContext {
   roomId: string | null
   entityIds: string[]
   lightNames: string[]
-  lastAction?: 'on' | 'off' | 'up' | 'down' | 'brightness' | 'color' | 'state' | 'count' | 'list' | 'rooms-on' | 'color-state' | 'brightness-state' | 'history' | 'reason' | 'pbl' | 'pbl-rules' | 'set'
+  lastAction?: 'on' | 'off' | 'up' | 'down' | 'brightness' | 'color' | 'state' | 'count' | 'list' | 'rooms-on' | 'lights-on' | 'color-state' | 'brightness-state' | 'history' | 'reason' | 'pbl' | 'pbl-rules' | 'set'
   lastState?: 'on' | 'off' | 'mixed' | 'unavailable'
   targetState?: LightPolarity
   historyBefore?: string
@@ -60,6 +60,8 @@ export interface ChatResultRecord extends RecordBase {
   contextReset: boolean
   controls?: ChatResponseControl[]
   skillContext?: ChatSkillContext | null
+  handledByHomeMcp?: boolean
+  homeMcpStatus?: 'success' | 'answer' | 'clarify' | 'unsupported' | 'failed' | 'partial'
 }
 
 export interface ChatStatusRecord extends RecordBase {
@@ -104,8 +106,9 @@ export interface ChatImprovementConversation {
     createdAt: number
     userText: string
     assistantText: string | null
-    outcome: 'answer' | 'error' | 'empty'
+    outcome: 'answer' | 'error' | 'empty' | 'failed'
     parsedAsLights: boolean
+    handledByHomeMcp: boolean
     contextBefore: ChatSkillContext | null
     contextAfter: ChatSkillContext | null
   }>
@@ -126,7 +129,7 @@ function parseSkillContext(value: unknown): ChatSkillContext | null {
   const entityIds = stringArray(value.entityIds)
   const lightNames = stringArray(value.lightNames)
   if (!entityIds || !lightNames) return null
-  const lastAction = typeof value.lastAction === 'string' && /^(?:on|off|up|down|brightness|color|state|count|list|rooms-on|color-state|brightness-state|history|reason|pbl|pbl-rules|set)$/.test(value.lastAction)
+  const lastAction = typeof value.lastAction === 'string' && /^(?:on|off|up|down|brightness|color|state|count|list|rooms-on|lights-on|color-state|brightness-state|history|reason|pbl|pbl-rules|set)$/.test(value.lastAction)
     ? value.lastAction : undefined
   const lastState = typeof value.lastState === 'string' && /^(?:on|off|mixed|unavailable)$/.test(value.lastState)
     ? value.lastState : undefined
@@ -211,11 +214,16 @@ export function parseChatRecord(value: unknown): ChatRecord | null {
     const skillContext = parseSkillContext(value.skillContext)
     if (!nullableString(value.text) || !nullableString(value.conversationId) || controls === null
       || (value.skillContext !== undefined && value.skillContext !== null && skillContext === null)
+      || !(value.handledByHomeMcp === undefined || typeof value.handledByHomeMcp === 'boolean')
+      || !(value.homeMcpStatus === undefined || ['success', 'answer', 'clarify', 'unsupported', 'failed', 'partial'].includes(String(value.homeMcpStatus)))
       || !['answer', 'error', 'empty'].includes(String(value.response)) || typeof value.contextReset !== 'boolean') return null
     return {
       ...scoped, kind: 'result', text: value.text, conversationId: value.conversationId,
       response: value.response as ChatResultRecord['response'], contextReset: value.contextReset,
-      controls, skillContext,
+      controls, skillContext, handledByHomeMcp: value.handledByHomeMcp === true,
+      ...(typeof value.homeMcpStatus === 'string'
+        ? { homeMcpStatus: value.homeMcpStatus as NonNullable<ChatResultRecord['homeMcpStatus']> }
+        : {}),
     }
   }
   if (value.kind === 'pending' || value.kind === 'unknown' || value.kind === 'not-sent') {
@@ -321,8 +329,12 @@ export function chatImprovementConversation(thread: ChatThread): ChatImprovement
       createdAt: turn.request.createdAt,
       userText: turn.request.text,
       assistantText: turn.result?.text ?? null,
-      outcome: turn.result?.response ?? 'empty',
+      outcome: turn.result?.handledByHomeMcp
+        && (turn.result.homeMcpStatus === 'failed' || turn.result.homeMcpStatus === 'partial')
+        ? 'failed'
+        : turn.result?.response ?? 'empty',
       parsedAsLights: turn.result?.skillContext?.domain === 'lights',
+      handledByHomeMcp: turn.result?.handledByHomeMcp === true,
       contextBefore: index > 0 ? thread.turns[index - 1].result?.skillContext ?? null : null,
       contextAfter: turn.result?.skillContext ?? null,
     })),

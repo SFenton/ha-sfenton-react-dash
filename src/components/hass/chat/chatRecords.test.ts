@@ -1,6 +1,6 @@
 import {
   CHAT_CONTEXT_IDLE_MS, CHAT_HISTORY_VISIBLE_MS, CHAT_STORAGE_PREFIX, chatAvailability, chatRecordKey,
-  deriveChatThreads, parseChatRecord, readChatData, visibleChatHistoryThreads,
+  chatImprovementConversation, deriveChatThreads, parseChatRecord, readChatData, visibleChatHistoryThreads,
   type ChatRecord, type ChatRequestRecord, type ChatResultRecord, type ChatThreadRecord,
 } from './chatRecords'
 
@@ -116,6 +116,7 @@ describe('chat records', () => {
   it('retains optional operation and result context while accepting older records', () => {
     const contextual = {
       ...result,
+      handledByHomeMcp: true,
       skillContext: {
         domain: 'lights', roomId: 'living-room', entityIds: [], lightNames: [],
         lastAction: 'history', lastState: 'off', targetState: 'on', historyBefore: '2026-09-08T12:00:00Z',
@@ -123,7 +124,26 @@ describe('chat records', () => {
     } satisfies ChatResultRecord
     const parsed = readChatData({ value: data(thread, request, contextual) })
     expect(parsed.records.get(chatRecordKey(contextual))).toMatchObject({ skillContext: contextual.skillContext })
+    expect(chatImprovementConversation(deriveChatThreads(parsed.records, 4000)[0])?.turns[0].handledByHomeMcp).toBe(true)
+    const legacyContextual = { ...contextual, handledByHomeMcp: undefined }
+    expect(chatImprovementConversation(deriveChatThreads(
+      readChatData({ value: data(thread, request, legacyContextual) }).records,
+      4000,
+    )[0])?.turns[0].handledByHomeMcp).toBe(false)
     expect(readChatData({ value: data(thread, request, result) }).issue).toBeNull()
+    expect(chatImprovementConversation(deriveChatThreads(readChatData({ value: data(thread, request, result) }).records, 4000)[0])?.turns[0].handledByHomeMcp).toBe(false)
+    expect(parseChatRecord({ ...result, handledByHomeMcp: 'yes' })).toBeNull()
+  })
+
+  it('uses the Home MCP status for retained failed-turn outcomes', () => {
+    const failed = {
+      ...result,
+      handledByHomeMcp: true,
+      homeMcpStatus: 'failed' as const,
+      skillContext: { domain: 'lights', roomId: 'living-room', entityIds: [], lightNames: [] },
+    }
+    const [projected] = deriveChatThreads(readChatData({ value: data(thread, request, failed) }).records, 4000)
+    expect(chatImprovementConversation(projected)?.turns[0].outcome).toBe('failed')
   })
 
   it('requires deliberate remote continuation and archives expired or reset contexts', () => {

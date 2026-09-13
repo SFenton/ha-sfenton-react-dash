@@ -1,5 +1,7 @@
 import { mkdir, readFile, readdir, writeFile } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
+import { HOUSE_LIGHT_ROOMS } from '../lights-config'
+import { validateLightPlanForExecution } from '../app'
 import { parseLightUtterance } from '../light-skill'
 import { improvementTextNeedsRedaction } from './scope'
 import {
@@ -24,6 +26,7 @@ function regressionPrivacySafe(value: unknown): boolean {
 function operationMatches(actual: {
   action: string
   room: { id: string }
+  entityIds: string[]
   lightNames: string[]
   brightnessPct: number | number[] | null
   rgbColor: [number, number, number] | null
@@ -32,8 +35,12 @@ function operationMatches(actual: {
   historyBefore: string | null
   targetState: 'on' | 'off' | null
 }, expected: ExpectedLightOperation) {
+  const room = HOUSE_LIGHT_ROOMS.find((candidate) => candidate.id === expected.roomId)
+  const expectedEntityIds = expected.lightNames.map((name) => room?.lights.find((light) => light.name === name)?.entityId)
   return actual.action === expected.action
     && actual.room.id === expected.roomId
+    && expectedEntityIds.every((id) => Boolean(id))
+    && sameValue(actual.entityIds, expectedEntityIds)
     && sameValue(actual.lightNames, expected.lightNames)
     && sameValue(actual.brightnessPct, expected.brightnessPct)
     && sameValue(actual.rgbColor, expected.rgbColor)
@@ -74,6 +81,9 @@ export function validateRegressionFixture(fixture: LightRegressionFixture) {
       continue
     }
     if (actual.status !== expected.status) errors.push(`turn ${expected.turnIndex}: expected status ${expected.status}, got ${actual.status}`)
+    if (actual.status === 'ready' && validateLightPlanForExecution(actual).status !== 'ready') {
+      errors.push(`turn ${expected.turnIndex}: parser plan is rejected by runtime execution policy`)
+    }
     const controlKinds = actual.controls.map((control) => control.kind)
     if (!sameValue(controlKinds, expected.controlKinds)) {
       errors.push(`turn ${expected.turnIndex}: expected controls ${expected.controlKinds.join(',')}, got ${controlKinds.join(',')}`)

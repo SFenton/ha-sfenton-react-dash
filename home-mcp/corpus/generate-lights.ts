@@ -44,7 +44,8 @@ function phrase(opener: string, body: string, ending: string) {
   const temporalBody = /\b(for now|for this evening|for the next hour|in a moment|before dinner|before we leave|when you can)$/i.test(body)
   const repeatedFor = /\bfor now$/i.test(body) && /^\s+for me/i.test(ending)
   const repeatedWhen = /\bwhen you can$/i.test(body) && /^\s+when you can/i.test(ending)
-  const safeEnding = (temporalBody && /^\s+(right now|when you can|for me)/i.test(ending)) || repeatedFor || repeatedWhen ? '' : ending
+  const conflictingEnding = (temporalBody && /^\s+(right now|when you can|for me)/i.test(ending)) || repeatedFor || repeatedWhen
+  const safeEnding = conflictingEnding ? ending.match(/[.!?]$/)?.[0] ?? '' : ending
   const composed = `${opener}${body}${safeEnding}`.replace(/\s+/g, ' ').trim()
   return composed.charAt(0).toUpperCase() + composed.slice(1)
 }
@@ -192,9 +193,67 @@ function* queries(family: string) {
   ].find(([name]) => name === family)
   if (!variant) return
   const [, template, action] = variant
+  const targetState = family === 'state-query' || family === 'reason-query'
+    ? 'on'
+    : family === 'history-query'
+      ? 'off'
+      : undefined
   for (const opener of openers) for (const context of queryContexts) for (const ending of endings) for (const room of HOUSE_LIGHT_ROOMS) for (const roomName of roomReferences(room)) {
     const rendered = template.replace('{room}', roomName).replace(`in the ${roomName}`, roomScope(room, roomName))
-    yield example(family, [{ role: 'user', text: phrase(opener, `${rendered.replace(/[?.]$/, '')}${context}`, ending || '?') }], { tool: 'home_lights', operations: [{ action, room: room.name }] })
+    yield example(family, [{ role: 'user', text: phrase(opener, `${rendered.replace(/[?.]$/, '')}${context}`, ending || '?') }], {
+      tool: 'home_lights',
+      operations: [{ action, room: room.name, ...(targetState ? { target_state: targetState } : {}) }],
+    })
+  }
+}
+
+function* wholeHomeLightsOn() {
+  const wrappers = [
+    '', 'Please tell me ', 'Can you tell me ', 'Could you tell me ', 'Would you tell me ',
+    'Hey, tell me ', 'Quickly tell me ', 'For me, tell me ', 'When you can, tell me ',
+    'I need to know ', 'I want to know ', 'Let me know ', 'Check and tell me ', 'Take a look and tell me ',
+  ]
+  const bodies = [
+    'what lights are on',
+    'which lights are on',
+    'what configured lights are on',
+    'which configured lights are on',
+    'what lights are currently on',
+    'which lights are currently on',
+    'what lights have been left on',
+    'which lights have been left on',
+    'what lights are switched on',
+    'which lights are switched on',
+  ]
+  const yesNoBodies = [
+    { direct: 'are any lights on', indirect: 'whether any lights are on' },
+    { direct: 'do we have any lights on', indirect: 'whether we have any lights on' },
+  ]
+  const contexts = [
+    '', ' right now', ' at the moment', ' in the house', ' throughout the house', ' across the home',
+    ' before I change anything', ' based on the latest state', ' according to Home Assistant',
+    ' while I am checking', ' as a quick status check', ' at present', ' currently',
+    ' before we leave', ' while we are home', ' for a quick overview',
+  ]
+  const operations = HOUSE_LIGHT_ROOMS.map((room) => ({ action: 'lights-on', room: room.name }))
+  for (const wrapper of wrappers) {
+    const requests = [
+      ...bodies.map((body) => `${wrapper}${body}`),
+      ...yesNoBodies.map((body) => wrapper ? `${wrapper}${body.indirect}` : body.direct),
+    ]
+    for (const request of requests) for (const context of contexts) for (const ending of endings) {
+      const candidate = `${request}${context}${ending}`.toLowerCase()
+      const temporalMarkers = ['currently', 'right now', 'at the moment', 'at present']
+        .reduce((count, marker) => count + candidate.split(marker).length - 1, 0)
+      if ((candidate.match(/\bplease\b/g)?.length ?? 0) > 1
+        || (candidate.match(/\bwhen you can\b/g)?.length ?? 0) > 1
+        || (candidate.match(/\bfor me\b/g)?.length ?? 0) > 1
+        || temporalMarkers > 1) continue
+      yield example('whole-home-lights-on', [{ role: 'user', text: phrase('', `${request}${context}`, ending || '?') }], {
+        tool: 'home_lights',
+        operations,
+      })
+    }
   }
 }
 
@@ -280,6 +339,7 @@ export const CORPUS_FAMILIES = [
   ['state-query', () => queries('state-query')], ['count-query', () => queries('count-query')], ['list-query', () => queries('list-query')],
   ['brightness-query', () => queries('brightness-query')], ['color-state-query', () => queries('color-state-query')],
   ['history-query', () => queries('history-query')], ['reason-query', () => queries('reason-query')], ['pbl-query', () => queries('pbl-query')],
+  ['whole-home-lights-on', wholeHomeLightsOn],
   ['clarify-room', () => clarification('clarify-room')], ['clarify-color', () => clarification('clarify-color')],
   ['fixture-color-clarify', () => replayConversations('fixture-color-clarify')],
   ['followup-which-ones', () => replayConversations('followup-which-ones')], ['followup-repeat-now', () => replayConversations('followup-repeat-now')],
