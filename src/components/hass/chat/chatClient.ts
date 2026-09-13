@@ -91,6 +91,10 @@ function conversationResult(response: unknown, request: ChatRequestRecord, now: 
       contextReset: request.conversationId !== null && conversationId !== request.conversationId,
       controls: instanceControls(response.controls, request.id),
       skillContext: isObject(response.context) ? response.context as unknown as ChatSkillContext : null,
+      handledByHomeMcp: response.handled_by_home_mcp === true,
+      homeMcpStatus: response.handled_by_home_mcp === true && typeof response.status === 'string'
+        ? response.status
+        : undefined,
     })
     if (!candidate || candidate.kind !== 'result') throw new ChatFailure('load')
     return candidate
@@ -104,6 +108,10 @@ function conversationResult(response: unknown, request: ChatRequestRecord, now: 
     text: plainSpeech, conversationId, response: result.response_type === 'error' ? 'error' : plainSpeech ? 'answer' : 'empty',
     contextReset: request.conversationId !== null && conversationId !== request.conversationId,
     controls: [], skillContext: isObject(response.context) ? response.context : null,
+    handledByHomeMcp: response.handled_by_home_mcp === true,
+    homeMcpStatus: response.handled_by_home_mcp === true && typeof response.status === 'string'
+      ? response.status
+      : undefined,
   })
   if (!candidate || candidate.kind !== 'result') throw new ChatFailure('load')
   return candidate

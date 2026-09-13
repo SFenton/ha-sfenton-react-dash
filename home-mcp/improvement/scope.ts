@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto'
+import { canonicalizeLightContext } from '../light-context'
 import { parseLightUtterance, type LightContext } from '../light-skill'
 import {
   IMPROVEMENT_SCHEMA_VERSION,
@@ -55,20 +56,7 @@ export function improvementTextNeedsRedaction(value: string) {
 }
 
 function parseContext(value: unknown): LightContext | null {
-  if (!object(value) || value.domain !== 'lights'
-    || !(value.roomId === null || typeof value.roomId === 'string')
-    || !Array.isArray(value.entityIds) || !value.entityIds.every((item) => typeof item === 'string')
-    || !Array.isArray(value.lightNames) || !value.lightNames.every((item) => typeof item === 'string')) return null
-  return {
-    domain: 'lights',
-    roomId: value.roomId,
-    entityIds: [],
-    lightNames: value.lightNames,
-    ...(typeof value.lastAction === 'string' ? { lastAction: value.lastAction as LightContext['lastAction'] } : {}),
-    ...(typeof value.lastState === 'string' ? { lastState: value.lastState as LightContext['lastState'] } : {}),
-    ...(value.targetState === 'on' || value.targetState === 'off' ? { targetState: value.targetState } : {}),
-    ...(typeof value.historyBefore === 'string' ? { historyBefore: value.historyBefore } : {}),
-  }
+  return canonicalizeLightContext(value, { retainEntityIds: false })
 }
 
 function parseTurn(value: unknown, index: number): ImprovementConversationTurn | null {
@@ -90,6 +78,7 @@ function parseTurn(value: unknown, index: number): ImprovementConversationTurn |
     assistantText,
     outcome,
     parsedAsLights: false,
+    handledByHomeMcp: value.handledByHomeMcp === true,
     contextBefore: parseContext(value.contextBefore),
     contextAfter: parseContext(value.contextAfter),
   }
@@ -152,6 +141,7 @@ export function conversationHash(conversation: ImprovementConversation) {
       userText: turn.userText,
       assistantText: turn.assistantText,
       outcome: turn.outcome,
+      handledByHomeMcp: turn.handledByHomeMcp,
       contextBefore: turn.contextBefore,
       contextAfter: turn.contextAfter,
     })),

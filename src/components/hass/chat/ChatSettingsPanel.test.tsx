@@ -20,6 +20,7 @@ describe('ChatSettingsPanel', () => {
 
     render(<ChatSettingsPanel client={client} />)
 
+    expect(await screen.findByRole('group', { name: 'Chat Settings' })).toHaveAttribute('tabindex', '-1')
     expect(await screen.findByText('Gemini 3.1 Flash Lite')).toBeVisible()
     expect(screen.getByText('1.0.0')).toBeVisible()
     expect(screen.getByText('0.2.4')).toBeVisible()

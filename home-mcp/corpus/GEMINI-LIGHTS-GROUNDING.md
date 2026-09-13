@@ -6,7 +6,7 @@ This grounding targets the Home Assistant Google Generative AI conversation agen
 
 For a light request, produce one `home_lights` call. Use `operations` for compound requests. Every operation has:
 
-- `action`: `on`, `off`, `set`, `up`, `down`, `color`, `state`, `count`, `list`, `rooms-on`, `color-state`, `brightness-state`, `history`, `reason`, `pbl`, or `pbl-rules`
+- `action`: `on`, `off`, `set`, `up`, `down`, `color`, `state`, `count`, `list`, `rooms-on`, `lights-on`, `color-state`, `brightness-state`, `history`, `reason`, `pbl`, or `pbl-rules`
 - `room`: one configured room name
 - optional `light_names`: configured friendly fixture names in spoken order
 - optional `brightness_pct`: one number or an ordered list for “respectively”
@@ -21,7 +21,9 @@ Never send raw entity IDs unless Home MCP supplied them. Never translate “turn
 - Preserve target order for “respectively.”
 - Ask “Which room?” when no room or prior light context exists. Return a `room-picker` control.
 - Ask for a color when a room is known but no color is given. Return a `color-picker` control that preserves any exact fixture targets.
-- Keep whole-home and room aggregate reads deterministic: counts, lists, rooms with lights on, current brightness, and current color must never be delegated as an action.
+- Keep whole-home and room aggregate reads deterministic: counts, lists, rooms with lights on, configured fixtures that are on, current brightness, and current color must never be delegated as an action. “Which rooms have lights on?” returns configured room names; “What lights are on?” returns configured fixture names grouped by room.
+- `rooms-on` and `lights-on` are complete whole-home reads. Prefer one top-level action with no room, fixture, or value fields; Home MCP expands it to every configured room. If operations are supplied, they must contain every configured room exactly once in inventory order with no selector or value fields.
+- A phrase scoped to an unknown location is not whole-home merely because no configured room matched. Ask the user to choose a configured room instead of widening the request.
 - “Default” is undefined unless a verified HA scene or behavior is configured. Ask for explicit color or brightness instead of guessing.
 - Full RGB: Front Yard/exterior, Back Deck, and Music Room.
 - All other color-capable Hue rooms accept warm/cool white temperatures only. Garage and Entryway have no color support in this capability.

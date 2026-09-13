@@ -17,6 +17,7 @@ const lightConversation = (threadId = 'thread-one'): ImprovementConversation => 
     assistantText: 'I turned on the Living Room lights.',
     outcome: 'answer',
     parsedAsLights: true,
+    handledByHomeMcp: true,
     contextBefore: null,
     contextAfter: { domain: 'lights', roomId: 'living-room', entityIds: [], lightNames: [], lastAction: 'on' },
   }],
@@ -47,6 +48,7 @@ describe('ConversationImprovementStore', () => {
         assistantText: 'Used light.living_room.',
         outcome: 'answer',
         parsedAsLights: true,
+        handledByHomeMcp: true,
         contextBefore: null,
         contextAfter: { domain: 'lights', roomId: 'living-room', entityIds: ['light.living_room'], lightNames: [], lastAction: 'on' },
       },
@@ -59,6 +61,64 @@ describe('ConversationImprovementStore', () => {
     expect(persisted).toContain('[entity]')
   })
 
+  it('serializes concurrent writes and queueing without losing turns', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'home-mcp-improvements-'))
+    const store = new ConversationImprovementStore({ root, enabled: true })
+    const first = lightConversation().turns[0]
+    const second = {
+      ...first,
+      id: 'turn-two',
+      createdAt: 3,
+      userText: 'Are the Living Room lights on?',
+      assistantText: 'The Living Room lights are on.',
+      contextAfter: { ...first.contextAfter!, lastAction: 'state' as const },
+    }
+
+    await Promise.all([
+      store.recordTurn({ userScope: 'user-one', threadId: 'thread-one', turn: first }),
+      store.recordTurn({ userScope: 'user-one', threadId: 'thread-one', turn: second }),
+    ])
+    const [conversationFile] = await readdir(join(root, 'conversations'))
+    const conversation = JSON.parse(await readFile(join(root, 'conversations', conversationFile), 'utf8')) as ImprovementConversation
+    expect(conversation.turns.map((turn) => turn.id).sort()).toEqual(['turn-one', 'turn-two'])
+
+    const third = { ...second, id: 'turn-three', createdAt: 4 }
+    await Promise.all([
+      store.queueConversation('user-one', 'thread-one', 'runtime'),
+      store.recordTurn({ userScope: 'user-one', threadId: 'thread-one', turn: third }),
+    ])
+    const queuedFiles = await readdir(join(root, 'inbox'))
+    const queued = await Promise.all(queuedFiles.map(async (file) =>
+      JSON.parse(await readFile(join(root, 'inbox', file), 'utf8')) as { conversation?: ImprovementConversation }))
+    const remainingFiles = await readdir(join(root, 'conversations'))
+    const remaining = await Promise.all(remainingFiles.map(async (file) =>
+      JSON.parse(await readFile(join(root, 'conversations', file), 'utf8')) as ImprovementConversation))
+    const retainedIds = [...queued.flatMap((job) => job.conversation?.turns.map((turn) => turn.id) ?? []),
+      ...remaining.flatMap((item) => item.turns.map((turn) => turn.id))]
+    expect(new Set(retainedIds)).toEqual(new Set(['turn-one', 'turn-two', 'turn-three']))
+  })
+
+  it('does not idle-queue a thread while a request is active', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'home-mcp-improvements-'))
+    const store = new ConversationImprovementStore({ root, enabled: true, quietMs: 100 })
+    await store.recordTurn({ userScope: 'user-one', threadId: 'thread-one', turn: lightConversation().turns[0] })
+    const activity = await store.beginConversationActivity('user-one', 'thread-one')
+    const queueing = store.queueIdleConversations(1_000)
+    await activity.recordTurn({
+      ...lightConversation().turns[0],
+      id: 'turn-two',
+      createdAt: 1_000,
+      userText: 'Are the Living Room lights on?',
+      assistantText: 'The Living Room lights are on.',
+    })
+    activity.release()
+
+    expect(await queueing).toEqual([])
+    const [file] = await readdir(join(root, 'conversations'))
+    const conversation = JSON.parse(await readFile(join(root, 'conversations', file), 'utf8')) as ImprovementConversation
+    expect(conversation.turns.map((turn) => turn.id)).toEqual(['turn-one', 'turn-two'])
+  })
+
   it('keeps unsupported conversations out of the Copilot queue', async () => {
     const root = await mkdtemp(join(tmpdir(), 'home-mcp-improvements-'))
     const store = new ConversationImprovementStore({ root, enabled: true })
@@ -68,6 +128,7 @@ describe('ConversationImprovementStore', () => {
       userText: 'What is the weather?',
       assistantText: 'It is sunny.',
       parsedAsLights: false,
+      handledByHomeMcp: false,
       contextAfter: null,
     }
 

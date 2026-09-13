@@ -171,11 +171,16 @@ export async function modalFacts(dialog: Locator, expectedScrollMode: 'body' | '
       if (terminals.length || readOnlyTargets.length !== 1) throw new Error('Declared read-only body requires one state terminal and no controls')
       const target = readOnlyTargets[0]
       const box = target.getBoundingClientRect()
+      const descendantTabStop = [...target.querySelectorAll<HTMLElement>('[tabindex]')]
+        .some((item) => item.tabIndex >= 0)
+      const implicitTabStop = target.querySelector(
+        'a[href], area[href], summary, [contenteditable]:not([contenteditable="false"]), iframe, object, embed, audio[controls], video[controls]',
+      )
       if (target.getAttribute('role') !== 'group' || !target.getAttribute('aria-label')?.trim()
         || !target.textContent?.trim() || box.width <= 0 || box.height <= 0
         || getComputedStyle(target).visibility !== 'visible' || Number(getComputedStyle(target).opacity) <= 0
         || target.closest('[aria-hidden="true"], [inert]')
-        || target.matches('[tabindex]') || target.querySelector('[tabindex], a, button, input, select, textarea')) {
+        || target.tabIndex >= 0 || descendantTabStop || implicitTabStop || target.querySelector('button, input, select, textarea')) {
         throw new Error('Read-only terminal must be visible, named, noninteractive state content')
       }
     }
