@@ -38,6 +38,11 @@ async function recipeGroceryFacts(dialog: Locator, state: string) {
 
 async function stateFacts(page: Page, dialog: Locator, scenario: ScenarioId, state: string) {
   if (isWakeScenario(scenario)) return wakeStateFacts(dialog, scenario, state)
+  if (scenario === 'vacuum') {
+    await waitForModalReady(dialog, undefined, 'vacuum-tabs')
+    await expect(dialog.locator('[data-layout-preparation-phase="content"]')).toHaveCount(1)
+    await expect(dialog.locator('[class*="vacuumLayoutLoading"]')).toHaveCount(0)
+  }
   const preferredScrollMode = scenario === 'remote' || scenario === 'vacuum' || (scenario === 'quick-links' && state === 'rooms') ? 'panes' : 'body'
   const facts: Record<string, unknown> = await modalFacts(dialog, preferredScrollMode)
   await expect(dialog).toHaveAttribute('data-layout-mounted', 'original')
@@ -114,12 +119,10 @@ async function stateFacts(page: Page, dialog: Locator, scenario: ScenarioId, sta
   if (scenario === 'filters') {
     const choices = dialog.getByRole('radio')
     expect(await choices.count()).toBeGreaterThan(0)
-    if (facts.presentation !== 'sheet') {
-      const clipped = await choices.locator('strong, small').evaluateAll((elements) =>
-        elements.filter((element) => element.scrollWidth > element.clientWidth + 1 || element.scrollHeight > element.clientHeight + 1).length)
-      expect(clipped).toBe(0)
-      facts.clippedDescriptions = clipped
-    }
+    const clipped = await choices.locator('strong, small').evaluateAll((elements) =>
+      elements.filter((element) => element.scrollWidth > element.clientWidth + 1 || element.scrollHeight > element.clientHeight + 1).length)
+    expect(clipped).toBe(0)
+    facts.clippedDescriptions = clipped
     facts.choiceCount = await choices.count()
   }
   if (scenario === 'recipe-grocery') {
@@ -383,18 +386,21 @@ for (const scenario of SCENARIO_IDS) {
     if (tabs) assertDeclaredTabs(await dialog.getByRole('tab').evaluateAll((elements) =>
       elements.map((element) => element.getAttribute('aria-label') ?? element.textContent?.trim() ?? '')), tabs)
     for (const state of SURFACE_CONTRACTS[scenario].states) {
+      const stateObligations = obligations.filter((entry) => entry.state === state)
       if (isWakeScenario(scenario)) {
         if (state !== SURFACE_CONTRACTS[scenario].states[0]) {
           await closeMounted(dialog)
           dialog = await openSurface(page, scenario)
         }
+        const initialProfile = stateObligations[0]?.profile
+        if (initialProfile) await applyProfile(page, initialProfile)
         await enterState(dialog, scenario, state)
       } else if (scenario === 'weather') await enterState(dialog, scenario, state)
       if (scenario === 'quick-links' && state === 'rooms') await dialog.getByRole('button', { name: 'Rooms', exact: true }).click()
       if (scenario === 'quick-links' && state === 'back') await dialog.getByRole('button', { name: 'Back', exact: true }).click()
       if (scenario === 'summary') await dialog.getByRole('tab', { name: state === 'overdue' ? /^Overdue Chores/ : state === 'upcoming' ? 'Upcoming Chores' : /^Expired Food/ }).click()
       let firstFrame: unknown
-      for (const obligation of obligations.filter((entry) => entry.state === state)) {
+      for (const obligation of stateObligations) {
         await applyProfile(page, obligation.profile)
         try {
         const facts = await stateFacts(page, dialog, scenario, state)

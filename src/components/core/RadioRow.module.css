@@ -48,19 +48,18 @@
 }
 
 .copy small {
-  overflow: hidden;
   color: rgba(255, 255, 255, 0.66);
   font-size: 0.78rem;
   font-weight: 720;
   letter-spacing: 0;
   line-height: 1.16;
+  overflow-wrap: anywhere;
   padding-bottom: 1px;
-  text-overflow: clip;
-  white-space: nowrap;
+  white-space: normal;
 }
 
-:global([data-modal-presentation='landscape-dialog']) .copy :is(strong, small),
-:global([data-modal-presentation='dialog']) .copy :is(strong, small) {
+:global([data-modal-presentation='landscape-dialog']) .copy strong,
+:global([data-modal-presentation='dialog']) .copy strong {
   overflow-wrap: anywhere;
   white-space: normal;
 }
