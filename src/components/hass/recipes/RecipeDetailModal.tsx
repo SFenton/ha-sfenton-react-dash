@@ -18,7 +18,13 @@ import {
   type RecipeInstructionGroup,
 } from './recipeTypes'
 import { formatRecipeDuration, formatRecipeNumber, formatRecipeYield } from './recipeDetailFormatting'
-import { recipeGroceryDisabledReason, recipeGroceryRequestIsLoading } from './recipeGroceryState'
+import {
+  RECIPE_INGREDIENT_GROCERY_ROW_STATE,
+  recipeGroceryDisabledReason,
+  recipeGroceryRequestIsLoading,
+  recipeIngredientGroceryRowState,
+  type RecipeIngredientGroceryRowState,
+} from './recipeGroceryState'
 import type { RecipeDetailModalController, RecipeInventoryProduct } from './useRecipeDetailModal'
 import { RECIPE_DETAIL_TABS, type RecipeDetailTab } from '../../../constants/surfaceSemantics'
 import scanItemStyles from '../ScanItemCameraSheet.module.css'
@@ -63,6 +69,10 @@ const RECIPE_COPY_KEYS = {
   chooseProductTitle: 'chooseProductTitle',
   cookTime: 'cookTime',
   devices: 'devices',
+  groceryRowAdd: 'groceryRowAdd',
+  groceryRowAdding: 'groceryRowAdding',
+  groceryRowRemove: 'groceryRowRemove',
+  groceryRowRemoving: 'groceryRowRemoving',
   inactiveRestTime: 'inactiveRestTime',
   inventoryChoices: 'inventoryChoices',
   inventoryPickerEmpty: 'inventoryPickerEmpty',
@@ -632,12 +642,14 @@ function RecipeGroceryAction({
   feedbackMessage,
   groceryState,
   grocerySubmitted,
+  interactionPending,
   onAddMissing,
 }: {
   disabledReason: string | null
   feedbackMessage: string | null
   groceryState: GroceryState
   grocerySubmitted: boolean
+  interactionPending: boolean
   onAddMissing: () => void
 }) {
 
@@ -660,7 +672,7 @@ function RecipeGroceryAction({
         />
       ) : (
         <GroceryCommandStage
-          disabled={grocerySubmitted || Boolean(disabledReason)}
+          disabled={grocerySubmitted || interactionPending || Boolean(disabledReason)}
           grocerySubmitted={grocerySubmitted}
           loading={requestLoading}
           onAddMissing={onAddMissing}
@@ -691,28 +703,111 @@ function RecipeGroceryAction({
   )
 }
 
+function IngredientGroceryRowAction({
+  disabled = false,
+  ingredient,
+  onAdd,
+  onRemove,
+  rowState,
+}: {
+  disabled?: boolean
+  ingredient: RecipeDetailIngredient
+  onAdd: (ingredient: RecipeDetailIngredient) => void
+  onRemove: (ingredientKey: string) => void
+  rowState: RecipeIngredientGroceryRowState
+}) {
+  const copy = useCopy(RECIPE_I18N.namespace)
+  const title = ingredientTitle(ingredient)
+
+  if (rowState === RECIPE_INGREDIENT_GROCERY_ROW_STATE.INELIGIBLE) {
+    return <span aria-hidden="true" className={styles.ingredientGroceryPlaceholder} />
+  }
+
+  if (rowState === RECIPE_INGREDIENT_GROCERY_ROW_STATE.ADDED || rowState === RECIPE_INGREDIENT_GROCERY_ROW_STATE.REMOVING) {
+    const removing = rowState === RECIPE_INGREDIENT_GROCERY_ROW_STATE.REMOVING
+    const removeLabel = removing
+      ? copy(RECIPE_COPY_KEYS.groceryRowRemoving, { title })
+      : copy(RECIPE_COPY_KEYS.groceryRowRemove, { title })
+    return (
+      <button
+        aria-busy={removing || undefined}
+        aria-label={removeLabel}
+        className={`${styles.ingredientGroceryAction} ${styles.ingredientGroceryRemove}`}
+        data-ingredient-grocery-state={rowState}
+        disabled={removing || disabled}
+        onClick={() => onRemove(ingredient.key)}
+        type="button"
+      >
+        <span aria-hidden="true" className={styles.ingredientGroceryIconStack}>
+          <span className={styles.ingredientGroceryIconLayer} data-icon-state="trash">
+            <MaterialIcon name="mdi:delete" size={22} />
+          </span>
+          <span className={styles.ingredientGroceryIconLayer} data-icon-state="spinner">
+            <span className={styles.ingredientGrocerySpinner} />
+          </span>
+        </span>
+      </button>
+    )
+  }
+
+  const adding = rowState === RECIPE_INGREDIENT_GROCERY_ROW_STATE.ADDING
+  const addLabel = adding ? copy(RECIPE_COPY_KEYS.groceryRowAdding, { title }) : copy(RECIPE_COPY_KEYS.groceryRowAdd, { title })
+  return (
+    <button
+      aria-busy={adding || undefined}
+      aria-label={addLabel}
+      className={styles.ingredientGroceryAction}
+      data-ingredient-grocery-state={rowState}
+      disabled={adding || disabled}
+      onClick={() => onAdd(ingredient)}
+      type="button"
+    >
+      <span aria-hidden="true" className={styles.ingredientGroceryIconStack}>
+        <span className={styles.ingredientGroceryIconLayer} data-icon-state="cart">
+          <MaterialIcon name="mdi:cart-plus" size={22} />
+        </span>
+        <span className={styles.ingredientGroceryIconLayer} data-icon-state="spinner">
+          <span className={styles.ingredientGrocerySpinner} />
+        </span>
+      </span>
+    </button>
+  )
+}
+
 function IngredientsTab({
+  addedIngredientKeys,
   detail,
   feedbackMessage,
   feedbackPending,
   groceryState,
   grocerySubmitted,
+  individualGroceryErrors,
+  individualGroceryPendingKeys,
+  individualGroceryRemovingKeys,
+  onAddIndividualIngredient,
   onAddMissing,
   onOpenIngredientPicker,
   onRejectIngredientMatch,
+  onRemoveIndividualIngredient,
 }: {
+  addedIngredientKeys: ReadonlySet<string>
   detail: RecipeDetail
   feedbackMessage: string | null
   feedbackPending: ReadonlySet<string>
   groceryState: GroceryState
   grocerySubmitted: boolean
+  individualGroceryErrors: ReadonlyMap<string, string>
+  individualGroceryPendingKeys: ReadonlySet<string>
+  individualGroceryRemovingKeys: ReadonlySet<string>
+  onAddIndividualIngredient: (ingredient: RecipeDetailIngredient) => void
   onAddMissing: () => void
   onOpenIngredientPicker: (ingredient: RecipeDetailIngredient) => void
   onRejectIngredientMatch: (ingredient: RecipeDetailIngredient) => void
+  onRemoveIndividualIngredient: (ingredientKey: string) => void
 }) {
   const copy = useCopy('modalRecipe')
   const ingredientDetailsAvailable = detail.capabilities.ingredients !== 'none'
-  const disabledReason = recipeGroceryDisabledReason(detail, groceryState.status)
+  const disabledReason = recipeGroceryDisabledReason(detail, groceryState.status, addedIngredientKeys)
   const sections = recipeIngredientSections(detail)
 
   return (
@@ -775,45 +870,66 @@ function IngredientsTab({
                       ].filter(Boolean).join('. '),
                       title: ingredientTitle(ingredient),
                     })
+                    const rowState = recipeIngredientGroceryRowState(
+                      ingredient,
+                      detail,
+                      groceryState.status,
+                      addedIngredientKeys,
+                      individualGroceryPendingKeys,
+                      individualGroceryRemovingKeys,
+                    )
+                    const rowError = individualGroceryErrors.get(ingredient.key) ?? null
                     return (
                       <li key={ingredient.key}>
-                        {detail.capabilities.ingredients === 'checklist' ? (
-                          canActivate ? (
-                            <CheckboxRow
-                              active={ingredientStatusChecked(status)}
-                              alignWrappedToIconTop
-                              aria-label={label}
-                              disabled={pending}
-                              data-modal-detail-trigger={ingredient.key}
-                              mode="status-control"
-                              onClick={() => {
-                                if (canOpenPicker) onOpenIngredientPicker(ingredient)
-                                else onRejectIngredientMatch(ingredient)
-                              }}
-                              status={status}
-                              subtitle={<IngredientSubtitle detail={detail} ingredient={ingredient} />}
-                              title={ingredientTitle(ingredient)}
-                            />
-                          ) : (
-                            <CheckboxRow
-                              active={ingredientStatusChecked(status)}
-                              alignWrappedToIconTop
-                              aria-label={label}
-                              mode="status"
-                              status={status}
-                              subtitle={<IngredientSubtitle detail={detail} ingredient={ingredient} />}
-                              title={ingredientTitle(ingredient)}
-                            />
-                          )
-                        ) : (
-                          <span className={styles.ingredientName}>
-                            <strong>{ingredientTitle(ingredient)}</strong>
-                            {ingredient.optional === true && <small>Optional</small>}
-                            {ingredientQuantityExplanation(detail, ingredient) && (
-                              <small>{ingredientQuantityExplanation(detail, ingredient)}</small>
+                        <div className={styles.ingredientRow}>
+                          <div className={styles.ingredientRowContent}>
+                            {detail.capabilities.ingredients === 'checklist' ? (
+                              canActivate ? (
+                                <CheckboxRow
+                                  active={ingredientStatusChecked(status)}
+                                  alignWrappedToIconTop
+                                  aria-label={label}
+                                  disabled={pending}
+                                  data-modal-detail-trigger={ingredient.key}
+                                  mode="status-control"
+                                  onClick={() => {
+                                    if (canOpenPicker) onOpenIngredientPicker(ingredient)
+                                    else onRejectIngredientMatch(ingredient)
+                                  }}
+                                  status={status}
+                                  subtitle={<IngredientSubtitle detail={detail} ingredient={ingredient} />}
+                                  title={ingredientTitle(ingredient)}
+                                />
+                              ) : (
+                                <CheckboxRow
+                                  active={ingredientStatusChecked(status)}
+                                  alignWrappedToIconTop
+                                  aria-label={label}
+                                  mode="status"
+                                  status={status}
+                                  subtitle={<IngredientSubtitle detail={detail} ingredient={ingredient} />}
+                                  title={ingredientTitle(ingredient)}
+                                />
+                              )
+                            ) : (
+                              <span className={styles.ingredientName}>
+                                <strong>{ingredientTitle(ingredient)}</strong>
+                                {ingredient.optional === true && <small>Optional</small>}
+                                {ingredientQuantityExplanation(detail, ingredient) && (
+                                  <small>{ingredientQuantityExplanation(detail, ingredient)}</small>
+                                )}
+                              </span>
                             )}
-                          </span>
-                        )}
+                          </div>
+                          <IngredientGroceryRowAction
+                            disabled={recipeGroceryRequestIsLoading(groceryState.status)}
+                            ingredient={ingredient}
+                            onAdd={onAddIndividualIngredient}
+                            onRemove={onRemoveIndividualIngredient}
+                            rowState={rowState}
+                          />
+                        </div>
+                        {rowError && <p className={styles.errorFeedback} role="alert">{rowError}</p>}
                       </li>
                     )
                   })}
@@ -831,6 +947,7 @@ function IngredientsTab({
         feedbackMessage={feedbackMessage}
         groceryState={groceryState}
         grocerySubmitted={grocerySubmitted}
+        interactionPending={individualGroceryPendingKeys.size > 0 || individualGroceryRemovingKeys.size > 0}
         onAddMissing={onAddMissing}
       />
     </div>
@@ -1028,6 +1145,7 @@ function PlannerPage({ controller }: { controller: RecipeDetailModalController }
 
 function RecipeDetailTabContent({
   activeTab,
+  addedIngredientKeys,
   bodyElementRef,
   detail,
   fallbackImageUrl,
@@ -1035,12 +1153,18 @@ function RecipeDetailTabContent({
   feedbackPending,
   groceryState,
   grocerySubmitted,
+  individualGroceryErrors,
+  individualGroceryPendingKeys,
+  individualGroceryRemovingKeys,
+  onAddIndividualIngredient,
   onAddMissing,
   onOpenIngredientPicker,
   onOpenPlanner,
   onRejectIngredientMatch,
+  onRemoveIndividualIngredient,
 }: {
   activeTab: RecipeDetailTab
+  addedIngredientKeys: ReadonlySet<string>
   bodyElementRef: RefObject<HTMLDivElement | null>
   detail: RecipeDetail
   fallbackImageUrl?: string | null
@@ -1048,10 +1172,15 @@ function RecipeDetailTabContent({
   feedbackPending: ReadonlySet<string>
   groceryState: GroceryState
   grocerySubmitted: boolean
+  individualGroceryErrors: ReadonlyMap<string, string>
+  individualGroceryPendingKeys: ReadonlySet<string>
+  individualGroceryRemovingKeys: ReadonlySet<string>
+  onAddIndividualIngredient: (ingredient: RecipeDetailIngredient) => void
   onAddMissing: () => void
   onOpenIngredientPicker: (ingredient: RecipeDetailIngredient) => void
   onOpenPlanner: () => void
   onRejectIngredientMatch: (ingredient: RecipeDetailIngredient) => void
+  onRemoveIndividualIngredient: (ingredientKey: string) => void
 }) {
   const { displayedTab, transitionState } = useSmoothDisplayedModalTab(activeTab)
   const previousDisplayedTabRef = useRef(displayedTab)
@@ -1084,14 +1213,20 @@ function RecipeDetailTabContent({
       )}
       {displayedTab === 'ingredients' && (
         <IngredientsTab
+          addedIngredientKeys={addedIngredientKeys}
           detail={detail}
           feedbackMessage={feedbackMessage}
           feedbackPending={feedbackPending}
           groceryState={groceryState}
           grocerySubmitted={grocerySubmitted}
+          individualGroceryErrors={individualGroceryErrors}
+          individualGroceryPendingKeys={individualGroceryPendingKeys}
+          individualGroceryRemovingKeys={individualGroceryRemovingKeys}
+          onAddIndividualIngredient={onAddIndividualIngredient}
           onAddMissing={onAddMissing}
           onOpenIngredientPicker={onOpenIngredientPicker}
           onRejectIngredientMatch={onRejectIngredientMatch}
+          onRemoveIndividualIngredient={onRemoveIndividualIngredient}
         />
       )}
       {displayedTab === 'instructions' && <InstructionsTab detail={detail} />}
@@ -1235,6 +1370,7 @@ export function RecipeDetailModal({ controller }: { controller: RecipeDetailModa
       return (
         <RecipeDetailTabContent
           activeTab={controller.activeTab}
+          addedIngredientKeys={controller.addedIngredientKeys}
           bodyElementRef={bodyElementRef}
           detail={controller.detailState.detail}
           fallbackImageUrl={controller.selectedRecipe?.imageUrl ?? controller.selectedRecipe?.thumbnailUrl}
@@ -1242,10 +1378,15 @@ export function RecipeDetailModal({ controller }: { controller: RecipeDetailModa
           feedbackPending={controller.ingredientFeedbackPending}
           groceryState={controller.groceryState}
           grocerySubmitted={controller.grocerySubmitted}
+          individualGroceryErrors={controller.individualGroceryErrors}
+          individualGroceryPendingKeys={controller.individualGroceryPendingKeys}
+          individualGroceryRemovingKeys={controller.individualGroceryRemovingKeys}
+          onAddIndividualIngredient={controller.addIndividualIngredient}
           onAddMissing={controller.addMissingIngredients}
           onOpenIngredientPicker={openIngredientPicker}
           onOpenPlanner={openPlanner}
           onRejectIngredientMatch={controller.rejectIngredientMatch}
+          onRemoveIndividualIngredient={controller.removeIndividualIngredient}
         />
       )
     }

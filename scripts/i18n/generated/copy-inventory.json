@@ -1180,6 +1180,20 @@
       "words": 2
     },
     {
+      "characters": 26,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/recipe.json",
+      "id": "c5a2e1a82d895462",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [
+        "title"
+      ],
+      "value": "Add {{title}} to groceries",
+      "words": 4
+    },
+    {
       "characters": 38,
       "context": "catalog-copy",
       "file": "src/i18n/locales/en/pages/food.json",
@@ -1242,6 +1256,20 @@
       ],
       "value": "Add Wake Alarm · {{room}}",
       "words": 5
+    },
+    {
+      "characters": 29,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/recipe.json",
+      "id": "ec1aed50a527c67f",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [
+        "title"
+      ],
+      "value": "Adding {{title}} to groceries",
+      "words": 4
     },
     {
       "characters": 7,
@@ -4838,6 +4866,34 @@
       "placeholders": [],
       "value": "Remote",
       "words": 1
+    },
+    {
+      "characters": 31,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/recipe.json",
+      "id": "4ec6ce9bc2d9231a",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [
+        "title"
+      ],
+      "value": "Remove {{title}} from groceries",
+      "words": 4
+    },
+    {
+      "characters": 34,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/recipe.json",
+      "id": "6b6e17ee3aa15b83",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [
+        "title"
+      ],
+      "value": "Removing {{title}} from groceries…",
+      "words": 4
     },
     {
       "characters": 30,
@@ -11848,7 +11904,7 @@
       "file": "src/components/hass/recipes/RecipeDetailModal.tsx",
       "id": "cfcd4870c31624d0",
       "lines": [
-        1223
+        1358
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -13751,7 +13807,7 @@
       "file": "src/components/hass/recipes/RecipeDetailModal.tsx",
       "id": "f4d9a60269281779",
       "lines": [
-        769
+        864
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -13779,7 +13835,7 @@
       "file": "src/components/hass/recipes/RecipeDetailModal.tsx",
       "id": "656ca3d21924b4a3",
       "lines": [
-        568
+        578
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -14161,7 +14217,7 @@
       "file": "src/components/hass/recipes/RecipeDetailModal.tsx",
       "id": "350569184f774e8d",
       "lines": [
-        780
+        886
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -14484,7 +14540,7 @@
       "file": "src/components/hass/recipes/RecipeDetailModal.tsx",
       "id": "624041ca4ada5fbd",
       "lines": [
-        239
+        249
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -14680,7 +14736,7 @@
       "file": "src/components/hass/recipes/RecipeDetailModal.tsx",
       "id": "e1a3d15d4006822a",
       "lines": [
-        688
+        700
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -14894,7 +14950,7 @@
       "file": "src/components/hass/recipes/RecipeDetailModal.tsx",
       "id": "5efde08cf19460c0",
       "lines": [
-        1078
+        1207
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -15122,7 +15178,7 @@
       "file": "src/components/hass/recipes/RecipeDetailModal.tsx",
       "id": "6ac910b4c31589ea",
       "lines": [
-        771
+        866
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -15136,7 +15192,7 @@
       "file": "src/components/hass/recipes/RecipeDetailModal.tsx",
       "id": "8133c6485bb606d4",
       "lines": [
-        1085
+        1214
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -15150,7 +15206,7 @@
       "file": "src/components/hass/recipes/RecipeDetailModal.tsx",
       "id": "256bb8e76df7d0b0",
       "lines": [
-        1097
+        1232
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -15164,7 +15220,7 @@
       "file": "src/components/hass/recipes/RecipeDetailModal.tsx",
       "id": "1e9c04171f4a542f",
       "lines": [
-        867
+        984
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -15347,7 +15403,7 @@
       "file": "src/components/hass/recipes/RecipeDetailModal.tsx",
       "id": "e6b87fd5e63a174f",
       "lines": [
-        450
+        460
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -15361,7 +15417,7 @@
       "file": "src/components/hass/recipes/RecipeDetailModal.tsx",
       "id": "6ee7146ed53e42b5",
       "lines": [
-        206
+        216
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -15545,7 +15601,7 @@
       "file": "src/components/hass/recipes/RecipeDetailModal.tsx",
       "id": "4dcd4b7dd8ff56b2",
       "lines": [
-        868
+        985
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -15629,7 +15685,7 @@
       "file": "src/components/hass/recipes/RecipeDetailModal.tsx",
       "id": "a3bea9dcf95f8162",
       "lines": [
-        877
+        994
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -15643,7 +15699,7 @@
       "file": "src/components/hass/recipes/RecipeDetailModal.tsx",
       "id": "e39602b6c3a15a4b",
       "lines": [
-        241
+        251
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -15657,8 +15713,8 @@
       "file": "src/components/hass/recipes/RecipeDetailModal.tsx",
       "id": "1c3cafef50bfc7c4",
       "lines": [
-        420,
-        811
+        430,
+        917
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -15700,8 +15756,8 @@
       "file": "src/components/hass/recipes/RecipeDetailModal.tsx",
       "id": "11f061eff1eabb73",
       "lines": [
-        437,
-        755
+        447,
+        850
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -16254,7 +16310,7 @@
       "file": "src/components/hass/recipes/RecipeDetailModal.tsx",
       "id": "a1c9d109a862896d",
       "lines": [
-        447
+        457
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -16522,7 +16578,7 @@
       "file": "src/components/hass/recipes/RecipeDetailModal.tsx",
       "id": "f2bdaf20ada560ca",
       "lines": [
-        887
+        1004
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -16564,7 +16620,7 @@
       "file": "src/components/hass/recipes/RecipeDetailModal.tsx",
       "id": "30fbefc3a70cfa5a",
       "lines": [
-        721
+        816
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -18019,7 +18075,7 @@
       "file": "src/components/hass/recipes/recipeTypes.ts",
       "id": "8c32d60775ce49d5",
       "lines": [
-        1050
+        1057
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -18033,7 +18089,7 @@
       "file": "src/components/hass/recipes/recipeTypes.ts",
       "id": "9bc595ef3ff1d0b9",
       "lines": [
-        1054
+        1061
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -18047,7 +18103,7 @@
       "file": "src/components/hass/recipes/recipeTypes.ts",
       "id": "0463d15c1a278dc3",
       "lines": [
-        1315
+        1338
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -18061,8 +18117,8 @@
       "file": "src/components/hass/recipes/recipeTypes.ts",
       "id": "baaec0f562a4d081",
       "lines": [
-        1269,
-        1280
+        1276,
+        1287
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -18076,7 +18132,7 @@
       "file": "src/components/hass/recipes/useRecipeDetailModal.ts",
       "id": "4ca33899bcf65f6b",
       "lines": [
-        390
+        450
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -18118,7 +18174,7 @@
       "file": "src/components/hass/recipes/useRecipeDetailModal.ts",
       "id": "8f6ec202852dccad",
       "lines": [
-        236
+        252
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -18146,7 +18202,7 @@
       "file": "src/components/hass/recipes/RecipeDetailModal.tsx",
       "id": "24187eafb9486850",
       "lines": [
-        827
+        943
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -18160,7 +18216,7 @@
       "file": "src/components/hass/recipes/RecipeDetailModal.tsx",
       "id": "a24faaf5ad70e232",
       "lines": [
-        917
+        1034
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -18287,7 +18343,7 @@
       "file": "src/components/hass/recipes/recipeTypes.ts",
       "id": "fefd63099422a196",
       "lines": [
-        1050
+        1057
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -18315,7 +18371,7 @@
       "file": "src/components/hass/recipes/recipeTypes.ts",
       "id": "b7e4e906b5c5c103",
       "lines": [
-        1206
+        1213
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -18469,7 +18525,7 @@
       "file": "src/components/hass/recipes/useRecipeDetailModal.ts",
       "id": "9ad8f4fc8efb57ec",
       "lines": [
-        132
+        148
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -18864,7 +18920,7 @@
       "file": "src/components/hass/recipes/RecipeDetailModal.tsx",
       "id": "e7cd5fd74ad3637e",
       "lines": [
-        860
+        977
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -18878,7 +18934,7 @@
       "file": "src/components/hass/recipes/useRecipeDetailModal.ts",
       "id": "6280e71d37efd0e9",
       "lines": [
-        101
+        117
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -18892,7 +18948,7 @@
       "file": "src/components/hass/recipes/recipeTypes.ts",
       "id": "741becc1c6e291f2",
       "lines": [
-        1053
+        1060
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -19018,7 +19074,7 @@
       "file": "src/components/hass/recipes/useRecipeDetailModal.ts",
       "id": "906a2b30bc992528",
       "lines": [
-        1061
+        1137
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -19046,7 +19102,7 @@
       "file": "src/components/hass/recipes/useRecipeDetailModal.ts",
       "id": "1c02c54d33b7cbfa",
       "lines": [
-        402
+        462
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -19060,8 +19116,8 @@
       "file": "src/components/hass/recipes/useRecipeDetailModal.ts",
       "id": "6cfe555e331ecd51",
       "lines": [
-        395,
-        1039
+        455,
+        1102
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -19430,7 +19486,7 @@
       "file": "src/components/hass/recipes/useRecipeDetailModal.ts",
       "id": "2ffa2036a73ba9da",
       "lines": [
-        117
+        133
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -21289,7 +21345,7 @@
       "file": "src/components/hass/recipes/RecipeDetailModal.tsx",
       "id": "6ab1c37e8d1e77a8",
       "lines": [
-        276
+        286
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -21303,7 +21359,7 @@
       "file": "src/components/hass/recipes/RecipeDetailModal.tsx",
       "id": "cfc30bd6903cd7d6",
       "lines": [
-        277
+        287
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -21317,7 +21373,7 @@
       "file": "src/components/hass/recipes/RecipeDetailModal.tsx",
       "id": "d25208f7ad0ceb9c",
       "lines": [
-        312
+        322
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -21406,7 +21462,7 @@
       "file": "src/components/hass/recipes/RecipeDetailModal.tsx",
       "id": "2fbcc504a7b8323f",
       "lines": [
-        261
+        271
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -21420,7 +21476,7 @@
       "file": "src/components/hass/recipes/RecipeDetailModal.tsx",
       "id": "d38b12651d973902",
       "lines": [
-        261
+        271
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -21434,7 +21490,7 @@
       "file": "src/components/hass/recipes/RecipeDetailModal.tsx",
       "id": "19a72c3eeb694e7d",
       "lines": [
-        262
+        272
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -21448,7 +21504,7 @@
       "file": "src/components/hass/recipes/RecipeDetailModal.tsx",
       "id": "8009da7a8cde697b",
       "lines": [
-        259
+        269
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -21462,7 +21518,7 @@
       "file": "src/components/hass/recipes/RecipeDetailModal.tsx",
       "id": "debae0bb811c0787",
       "lines": [
-        258
+        268
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -21476,7 +21532,7 @@
       "file": "src/components/hass/recipes/RecipeDetailModal.tsx",
       "id": "9bc38d9127d90085",
       "lines": [
-        258
+        268
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -21490,7 +21546,7 @@
       "file": "src/components/hass/recipes/RecipeDetailModal.tsx",
       "id": "b0580b816600b832",
       "lines": [
-        257
+        267
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -21504,7 +21560,7 @@
       "file": "src/components/hass/recipes/RecipeDetailModal.tsx",
       "id": "08a471525735376b",
       "lines": [
-        257
+        267
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -21518,7 +21574,7 @@
       "file": "src/components/hass/recipes/RecipeDetailModal.tsx",
       "id": "1356b02438250c58",
       "lines": [
-        259
+        269
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -21532,7 +21588,7 @@
       "file": "src/components/hass/recipes/RecipeDetailModal.tsx",
       "id": "45b8cf5cde7dd29f",
       "lines": [
-        268
+        278
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -21546,7 +21602,7 @@
       "file": "src/components/hass/recipes/RecipeDetailModal.tsx",
       "id": "f53b6735d765eb1c",
       "lines": [
-        266
+        276
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -21560,7 +21616,7 @@
       "file": "src/components/hass/recipes/RecipeDetailModal.tsx",
       "id": "adbcea8c42187e00",
       "lines": [
-        267
+        277
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -21574,7 +21630,7 @@
       "file": "src/components/hass/recipes/RecipeDetailModal.tsx",
       "id": "5a885199c676e854",
       "lines": [
-        266
+        276
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -22228,7 +22284,7 @@
       "file": "src/components/hass/recipes/recipeTypes.ts",
       "id": "045877df505506cb",
       "lines": [
-        1291
+        1298
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -22242,7 +22298,7 @@
       "file": "src/components/hass/recipes/recipeTypes.ts",
       "id": "ef6c01c06ba6abc8",
       "lines": [
-        1292
+        1299
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -22256,7 +22312,7 @@
       "file": "src/components/hass/recipes/recipeTypes.ts",
       "id": "58eee008b029bef1",
       "lines": [
-        1295
+        1302
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -22270,7 +22326,7 @@
       "file": "src/components/hass/recipes/recipeTypes.ts",
       "id": "69486b929af7cbf6",
       "lines": [
-        1293
+        1300
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -22284,7 +22340,7 @@
       "file": "src/components/hass/recipes/recipeTypes.ts",
       "id": "78f519b80f878bbf",
       "lines": [
-        1294
+        1301
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -22298,7 +22354,7 @@
       "file": "src/components/hass/recipes/recipeTypes.ts",
       "id": "e8504bc70ddc87ac",
       "lines": [
-        1301
+        1308
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -22312,7 +22368,7 @@
       "file": "src/components/hass/recipes/recipeTypes.ts",
       "id": "0f6749455f971abd",
       "lines": [
-        1302
+        1309
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -22326,7 +22382,7 @@
       "file": "src/components/hass/recipes/recipeTypes.ts",
       "id": "cf92cd1851f8f435",
       "lines": [
-        1304
+        1311
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -22340,7 +22396,7 @@
       "file": "src/components/hass/recipes/recipeTypes.ts",
       "id": "c3ae115a87f5c42e",
       "lines": [
-        1303
+        1310
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -22554,7 +22610,7 @@
       "file": "src/components/hass/recipes/RecipeDetailModal.tsx",
       "id": "aa4d3414cc748870",
       "lines": [
-        305
+        315
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -22568,7 +22624,7 @@
       "file": "src/components/hass/recipes/RecipeDetailModal.tsx",
       "id": "e7e47fadc05cdaaf",
       "lines": [
-        307
+        317
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -22584,7 +22640,7 @@
       "file": "src/components/hass/recipes/RecipeDetailModal.tsx",
       "id": "056962fe1a8eb52c",
       "lines": [
-        307
+        317
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -24045,7 +24101,7 @@
       "file": "src/components/hass/recipes/RecipeDetailModal.tsx",
       "id": "0e85cbc3cef9b4b5",
       "lines": [
-        192
+        202
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -24356,7 +24412,7 @@
       "file": "src/components/hass/recipes/RecipeDetailModal.tsx",
       "id": "5a2bb81f7b36cd97",
       "lines": [
-        191
+        201
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -24753,7 +24809,7 @@
       "file": "src/components/hass/recipes/RecipeDetailModal.tsx",
       "id": "5de840bc4aa4f6b1",
       "lines": [
-        199
+        209
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -25038,9 +25094,9 @@
       "file": "src/components/hass/recipes/recipeTypes.ts",
       "id": "b92ef4dcc0a699c6",
       "lines": [
-        881,
-        992,
-        1138
+        888,
+        999,
+        1145
       ],
       "occurrences": 3,
       "origin": "legacy",
@@ -25156,7 +25212,7 @@
       "file": "src/components/hass/recipes/RecipeDetailModal.tsx",
       "id": "73ddbda36fac22a7",
       "lines": [
-        194
+        204
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -25511,7 +25567,7 @@
       "file": "src/components/hass/recipes/RecipeDetailModal.tsx",
       "id": "b7490a4550a6be3c",
       "lines": [
-        514
+        524
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -25928,7 +25984,7 @@
       "file": "src/components/hass/recipes/RecipeDetailModal.tsx",
       "id": "eaac8f03a6841077",
       "lines": [
-        516
+        526
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -26060,7 +26116,7 @@
       "file": "src/components/hass/recipes/RecipeDetailModal.tsx",
       "id": "460b011523dc0baf",
       "lines": [
-        193
+        203
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -26300,8 +26356,8 @@
       "file": "src/components/hass/recipes/recipeTypes.ts",
       "id": "6c76c9efedae49d4",
       "lines": [
-        881,
-        992
+        888,
+        999
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -26647,7 +26703,7 @@
       "file": "src/components/hass/recipes/RecipeDetailModal.tsx",
       "id": "547321d059a2000c",
       "lines": [
-        185
+        195
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -28108,7 +28164,7 @@
       "file": "src/components/hass/recipes/recipeTypes.ts",
       "id": "a7f587974615ebf2",
       "lines": [
-        781
+        788
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -31428,7 +31484,7 @@
       "file": "src/components/hass/recipes/RecipeDetailModal.tsx",
       "id": "743bbd62f259b24b",
       "lines": [
-        860
+        977
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -32809,7 +32865,7 @@
       "file": "src/components/hass/recipes/RecipeDetailModal.tsx",
       "id": "34797c2f75b5272a",
       "lines": [
-        827
+        943
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -32823,7 +32879,7 @@
       "file": "src/components/hass/recipes/RecipeDetailModal.tsx",
       "id": "038c93c2e285aa7b",
       "lines": [
-        917
+        1034
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -33674,7 +33730,7 @@
       "file": "src/components/hass/recipes/RecipeDetailModal.tsx",
       "id": "c88bbe2485a8ff59",
       "lines": [
-        1229
+        1364
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -35092,7 +35148,7 @@
       "file": "src/components/hass/recipes/RecipeDetailModal.tsx",
       "id": "f8fc910e255286bb",
       "lines": [
-        1232
+        1367
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -35819,7 +35875,7 @@
       "file": "src/components/hass/recipes/useRecipeDetailModal.ts",
       "id": "428cbc0af895d850",
       "lines": [
-        204
+        220
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -35833,7 +35889,7 @@
       "file": "src/components/hass/recipes/useRecipeDetailModal.ts",
       "id": "a020d08e4521e18a",
       "lines": [
-        205
+        221
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -36345,9 +36401,9 @@
       "file": "src/components/hass/recipes/RecipeDetailModal.tsx",
       "id": "4bc65bf293240001",
       "lines": [
-        170,
-        412,
-        713
+        180,
+        422,
+        808
       ],
       "occurrences": 3,
       "origin": "legacy",
@@ -37203,7 +37259,7 @@
       "file": "src/components/hass/recipes/recipeTypes.ts",
       "id": "6178c02d6a853c20",
       "lines": [
-        607
+        614
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -37475,7 +37531,7 @@
       "file": "src/components/hass/recipes/useRecipeDetailModal.ts",
       "id": "82f5318b0a9f7e33",
       "lines": [
-        129
+        145
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -37503,7 +37559,7 @@
       "file": "src/components/hass/recipes/useRecipeDetailModal.ts",
       "id": "2dd4e6d4a3d2143a",
       "lines": [
-        249
+        265
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -37517,7 +37573,7 @@
       "file": "src/components/hass/recipes/useRecipeDetailModal.ts",
       "id": "af2ed4873646487a",
       "lines": [
-        250
+        266
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -38001,8 +38057,8 @@
       "file": "src/components/hass/recipes/recipeTypes.ts",
       "id": "3a9ddc89a085b3a0",
       "lines": [
-        896,
-        970
+        903,
+        977
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -39216,8 +39272,8 @@
       "file": "src/components/hass/recipes/recipeTypes.ts",
       "id": "7b1982e14a5e41af",
       "lines": [
-        513,
-        1063
+        520,
+        1070
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -39231,7 +39287,7 @@
       "file": "src/components/hass/recipes/RecipeDetailModal.tsx",
       "id": "205a85a6635be806",
       "lines": [
-        1117
+        1252
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -39245,8 +39301,8 @@
       "file": "src/components/hass/recipes/recipeTypes.ts",
       "id": "7908df98ac4af996",
       "lines": [
-        513,
-        1063
+        520,
+        1070
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -39440,11 +39496,11 @@
     }
   ],
   "summary": {
-    "catalogRecords": 788,
+    "catalogRecords": 792,
     "documentRecords": 1,
     "legacyOccurrences": 2479,
     "legacyRecords": 2049,
-    "totalRecords": 2838
+    "totalRecords": 2842
   },
   "version": 1
 }

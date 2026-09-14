@@ -1,15 +1,16 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { vi } from 'vitest'
-import { mockState, resetMockHass } from '../../../test/mocks/hakitCoreState'
+import { mockCallServiceCalls, mockState, mockTodoItemsByEntity, resetMockHass } from '../../../test/mocks/hakitCoreState'
 import { RecipeDetailModal } from './RecipeDetailModal'
 import { formatRecipeDuration, formatRecipeYield } from './recipeDetailFormatting'
-import { recipeGroceryDisabledReason } from './recipeGroceryState'
+import { findMatchingGroceryTodoItem, recipeGroceryDisabledReason } from './recipeGroceryState'
 import { normalizeRecipeDetailServiceResult, type RecipeCardSummary, type RecipeDetail } from './recipeTypes'
 import { useRecipeDetailModalController } from './useRecipeDetailModal'
 
 // @covers src/components/hass/recipes/RecipeDetailModal.module.css
 // @covers src/components/hass/recipes/recipeGroceryState.ts
 // @covers src/components/hass/recipes/useRecipeDetailModal.ts
+// @covers src/i18n/locales/en/modals/recipe.json
 
 const recipe: RecipeCardSummary = {
   id: 42,
@@ -637,6 +638,397 @@ describe('RecipeDetailModal', () => {
       expect((groceryCalls[0].serviceData as { idempotency_key: string }).idempotency_key).toMatch(
         /^[A-Za-z0-9._:-]{1,128}$/,
       )
+    } finally {
+      mockState.helpers.callService = originalCallService
+    }
+  })
+
+  it('shows a per-row grocery control only for actionable missing ingredients and adds one individually without the bulk selections', async () => {
+    const originalCallService = mockState.helpers.callService
+    const calls: Record<string, unknown>[] = []
+    mockState.helpers.callService = (params) => {
+      calls.push(params)
+      if (params.domain === 'evershelf' && params.service === 'recipe_detail') return Promise.resolve(detailResponse())
+      if (params.domain === 'evershelf' && params.service === 'recipe_grocery_add') return Promise.resolve(grocerySuccessResponse())
+      return originalCallService(params)
+    }
+
+    try {
+      render(<Harness />)
+      const dialog = await openRecipe()
+      await within(dialog).findByText('Serves 4')
+      await openTab(dialog, 'Ingredients')
+
+      expect(within(dialog).getAllByRole('button', { name: /^Add .+ to groceries$/ })).toHaveLength(1)
+      expect(within(dialog).queryAllByRole('button', { name: /^Remove .+ from groceries$/ })).toHaveLength(0)
+      const addButton = within(dialog).getByRole('button', { name: 'Add Diced Tomatoes · 1 can to groceries' })
+
+      fireEvent.click(addButton)
+      await waitFor(() => expect(within(dialog).getByRole('button', { name: 'Remove Diced Tomatoes · 1 can from groceries' })).toBeInTheDocument())
+
+      const individualCalls = calls.filter((call) => call.service === 'recipe_grocery_add')
+      expect(individualCalls).toHaveLength(1)
+      expect(individualCalls[0]).toMatchObject({
+        domain: 'evershelf',
+        service: 'recipe_grocery_add',
+        serviceData: {
+          recipe_id: 42,
+          selections: [{ key: 'ri:0:0000000000000001', position: 0 }],
+        },
+      })
+
+      const groceryButton = within(dialog).getByRole('button', { name: 'Add Missing Ingredients to Groceries' })
+      expect(groceryButton).toBeDisabled()
+      expect(within(dialog).getByText('All missing ingredients have already been added to groceries.')).toBeInTheDocument()
+      fireEvent.click(groceryButton)
+      expect(calls.filter((call) => call.service === 'recipe_grocery_add')).toHaveLength(1)
+    } finally {
+      mockState.helpers.callService = originalCallService
+    }
+  })
+
+  it('shows the trash control for a confirmed mirrored item even when the aggregate add reports a partial failure', async () => {
+    const originalCallService = mockState.helpers.callService
+    mockState.helpers.callService = (params) => {
+      if (params.domain === 'evershelf' && params.service === 'recipe_detail') return Promise.resolve(detailResponse())
+      if (params.domain === 'evershelf' && params.service === 'recipe_grocery_add') {
+        return Promise.resolve({
+          response: {
+            success: false,
+            partial_failure: true,
+            backend_message: 'Replay persistence unavailable',
+            ha_mirror: {
+              outcomes: [{
+                key: 'ri:0:0000000000000001',
+                name: 'Tomatoes, diced',
+                outcome: 'added',
+              }],
+              summary: { added: 1, already_present: 0, skipped: 0, failed: 0 },
+            },
+            summary: {
+              backend: { added: 1, already_listed: 0, now_in_stock: 0, unresolved: 0, failed: 0 },
+              ha_mirror: { added: 1, already_present: 0, skipped: 0, failed: 0 },
+            },
+          },
+        })
+      }
+      return originalCallService(params)
+    }
+
+    try {
+      render(<Harness />)
+      const dialog = await openRecipe()
+      await within(dialog).findByText('Serves 4')
+      await openTab(dialog, 'Ingredients')
+
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Add Diced Tomatoes · 1 can to groceries' }))
+
+      expect(await within(dialog).findByRole('button', { name: 'Remove Diced Tomatoes · 1 can from groceries' })).toBeInTheDocument()
+      expect(within(dialog).getByRole('alert')).toHaveTextContent('Replay persistence unavailable')
+    } finally {
+      mockState.helpers.callService = originalCallService
+    }
+  })
+
+  it('removes the Home Assistant grocery item, re-enables the bulk action, and restores the cart control when an individually added ingredient is removed', async () => {
+    const originalCallService = mockState.helpers.callService
+    mockState.helpers.callService = (params) => {
+      if (params.domain === 'evershelf' && params.service === 'recipe_detail') return Promise.resolve(detailResponse())
+      if (params.domain === 'evershelf' && params.service === 'recipe_grocery_add') {
+        return Promise.resolve({
+          response: {
+            success: true,
+            replayed: false,
+            outcomes: [],
+            ha_mirror: {
+              success: true,
+              outcomes: [{
+                key: 'ri:0:0000000000000001',
+                name: 'Tomatoes, diced',
+                outcome: 'added',
+              }],
+              summary: { added: 1, already_present: 0, skipped: 0, failed: 0 },
+            },
+            summary: {
+              backend: { added: 1, already_listed: 0, now_in_stock: 0, unresolved: 0, failed: 0 },
+              ha_mirror: { added: 1, already_present: 0, skipped: 0, failed: 0 },
+            },
+          },
+        })
+      }
+      return originalCallService(params)
+    }
+    mockTodoItemsByEntity['todo.shopping_list'] = [
+      { uid: 'wrong-grocery-item', summary: 'Diced Tomatoes with Basil', status: 'needs_action' },
+      { uid: 'grocery-tomatoes', summary: 'Tomatoes, diced', status: 'needs_action' },
+    ]
+
+    try {
+      render(<Harness />)
+      const dialog = await openRecipe()
+      await within(dialog).findByText('Serves 4')
+      await openTab(dialog, 'Ingredients')
+
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Add Diced Tomatoes · 1 can to groceries' }))
+      const removeButton = await within(dialog).findByRole('button', { name: 'Remove Diced Tomatoes · 1 can from groceries' })
+      expect(within(dialog).getByRole('button', { name: 'Add Missing Ingredients to Groceries' })).toBeDisabled()
+
+      fireEvent.click(removeButton)
+      await waitFor(() => expect(within(dialog).getByRole('button', { name: 'Add Diced Tomatoes · 1 can to groceries' })).toBeInTheDocument())
+      expect(within(dialog).queryByRole('button', { name: 'Remove Diced Tomatoes · 1 can from groceries' })).not.toBeInTheDocument()
+      expect(within(dialog).getByRole('button', { name: 'Add Missing Ingredients to Groceries' })).toBeEnabled()
+      expect(within(dialog).queryByText('All missing ingredients have already been added to groceries.')).not.toBeInTheDocument()
+
+      const removeCalls = mockCallServiceCalls.filter((call) => call.domain === 'todo' && call.service === 'remove_item')
+      expect(removeCalls).toHaveLength(1)
+      expect(removeCalls[0]).toMatchObject({
+        domain: 'todo',
+        service: 'remove_item',
+        target: 'todo.shopping_list',
+        serviceData: { item: 'grocery-tomatoes' },
+      })
+    } finally {
+      mockState.helpers.callService = originalCallService
+    }
+  })
+
+  it('does not match a different grocery item whose name merely contains the ingredient name', () => {
+    const normalized = normalizeRecipeDetailServiceResult(detailResponse())
+    expect(normalized.kind).toBe('detail')
+    if (normalized.kind !== 'detail') return
+    const detailIngredient = normalized.detail.ingredients[0]
+
+    expect(findMatchingGroceryTodoItem([
+      { uid: 'wrong', summary: 'Diced Tomatoes with Basil', status: 'needs_action' },
+      { uid: 'right', summary: 'DICED   TOMATOES', status: 'needs_action' },
+    ], detailIngredient)).toMatchObject({ uid: 'right' })
+    expect(findMatchingGroceryTodoItem([
+      { uid: 'wrong', summary: 'Diced Tomatoes with Basil', status: 'needs_action' },
+    ], detailIngredient)).toBeNull()
+  })
+
+  it('ignores duplicate trash clicks while a removal is pending and only issues one todo.remove_item call', async () => {
+    const originalCallService = mockState.helpers.callService
+    let resolveRemove: (() => void) | null = null
+    mockState.helpers.callService = (params) => {
+      if (params.domain === 'evershelf' && params.service === 'recipe_detail') return Promise.resolve(detailResponse())
+      if (params.domain === 'evershelf' && params.service === 'recipe_grocery_add') return Promise.resolve(grocerySuccessResponse())
+      if (params.domain === 'todo' && params.service === 'remove_item') {
+        return new Promise((resolve) => {
+          resolveRemove = () => resolve(originalCallService(params))
+        })
+      }
+      return originalCallService(params)
+    }
+    mockTodoItemsByEntity['todo.shopping_list'] = [
+      { uid: 'grocery-tomatoes', summary: 'Diced Tomatoes', status: 'needs_action' },
+    ]
+
+    try {
+      render(<Harness />)
+      const dialog = await openRecipe()
+      await within(dialog).findByText('Serves 4')
+      await openTab(dialog, 'Ingredients')
+
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Add Diced Tomatoes · 1 can to groceries' }))
+      const removeButton = await within(dialog).findByRole('button', { name: 'Remove Diced Tomatoes · 1 can from groceries' })
+      fireEvent.click(removeButton)
+      const removingButton = await within(dialog).findByRole('button', { name: 'Removing Diced Tomatoes · 1 can from groceries…' })
+      expect(removingButton).toBeDisabled()
+      fireEvent.click(removingButton)
+      fireEvent.click(removingButton)
+
+      expect(resolveRemove).not.toBeNull()
+      await act(async () => {
+        resolveRemove?.()
+      })
+      await waitFor(() => expect(within(dialog).getByRole('button', { name: 'Add Diced Tomatoes · 1 can to groceries' })).toBeInTheDocument())
+
+      const removeCalls = mockCallServiceCalls.filter((call) => call.domain === 'todo' && call.service === 'remove_item')
+      expect(removeCalls).toHaveLength(1)
+    } finally {
+      mockState.helpers.callService = originalCallService
+    }
+  })
+
+  it('surfaces a row error and keeps the trash control when the grocery item cannot be found on the Grocery List', async () => {
+    const originalCallService = mockState.helpers.callService
+    mockState.helpers.callService = (params) => {
+      if (params.domain === 'evershelf' && params.service === 'recipe_detail') return Promise.resolve(detailResponse())
+      if (params.domain === 'evershelf' && params.service === 'recipe_grocery_add') return Promise.resolve(grocerySuccessResponse())
+      return originalCallService(params)
+    }
+    // No matching todo item is seeded, so the mock Grocery List only has unrelated tasks.
+    mockTodoItemsByEntity['todo.shopping_list'] = []
+
+    try {
+      render(<Harness />)
+      const dialog = await openRecipe()
+      await within(dialog).findByText('Serves 4')
+      await openTab(dialog, 'Ingredients')
+
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Add Diced Tomatoes · 1 can to groceries' }))
+      const removeButton = await within(dialog).findByRole('button', { name: 'Remove Diced Tomatoes · 1 can from groceries' })
+      fireEvent.click(removeButton)
+
+      await within(dialog).findByRole('alert')
+      expect(within(dialog).getByRole('button', { name: 'Remove Diced Tomatoes · 1 can from groceries' })).toBeInTheDocument()
+      expect(within(dialog).queryByRole('button', { name: 'Add Diced Tomatoes · 1 can to groceries' })).not.toBeInTheDocument()
+
+      const removeCalls = mockCallServiceCalls.filter((call) => call.domain === 'todo' && call.service === 'remove_item')
+      expect(removeCalls).toHaveLength(0)
+    } finally {
+      mockState.helpers.callService = originalCallService
+    }
+  })
+
+  it('surfaces a row error and keeps the trash control when todo.remove_item fails', async () => {
+    const originalCallService = mockState.helpers.callService
+    mockState.helpers.callService = (params) => {
+      if (params.domain === 'evershelf' && params.service === 'recipe_detail') return Promise.resolve(detailResponse())
+      if (params.domain === 'evershelf' && params.service === 'recipe_grocery_add') return Promise.resolve(grocerySuccessResponse())
+      if (params.domain === 'todo' && params.service === 'remove_item') return Promise.reject(new Error('Home Assistant rejected the removal.'))
+      return originalCallService(params)
+    }
+    mockTodoItemsByEntity['todo.shopping_list'] = [
+      { uid: 'grocery-tomatoes', summary: 'Diced Tomatoes', status: 'needs_action' },
+    ]
+
+    try {
+      render(<Harness />)
+      const dialog = await openRecipe()
+      await within(dialog).findByText('Serves 4')
+      await openTab(dialog, 'Ingredients')
+
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Add Diced Tomatoes · 1 can to groceries' }))
+      const removeButton = await within(dialog).findByRole('button', { name: 'Remove Diced Tomatoes · 1 can from groceries' })
+      fireEvent.click(removeButton)
+
+      await within(dialog).findByRole('alert')
+      expect(within(dialog).getByText('Home Assistant rejected the removal.')).toBeInTheDocument()
+      expect(within(dialog).getByRole('button', { name: 'Remove Diced Tomatoes · 1 can from groceries' })).toBeInTheDocument()
+    } finally {
+      mockState.helpers.callService = originalCallService
+    }
+  })
+
+  it('rejects a stale removal when the modal closes before Home Assistant confirms it', async () => {
+    const originalCallService = mockState.helpers.callService
+    let resolveRemove: ((value: unknown) => void) | undefined
+    mockState.helpers.callService = (params) => {
+      if (params.domain === 'evershelf' && params.service === 'recipe_detail') return Promise.resolve(detailResponse())
+      if (params.domain === 'evershelf' && params.service === 'recipe_grocery_add') return Promise.resolve(grocerySuccessResponse())
+      if (params.domain === 'todo' && params.service === 'remove_item') {
+        return new Promise((resolve) => {
+          resolveRemove = resolve
+        })
+      }
+      return originalCallService(params)
+    }
+    mockTodoItemsByEntity['todo.shopping_list'] = [
+      { uid: 'grocery-tomatoes', summary: 'Diced Tomatoes', status: 'needs_action' },
+    ]
+
+    try {
+      render(<Harness />)
+      const firstDialog = await openRecipe()
+      await within(firstDialog).findByText('Serves 4')
+      await openTab(firstDialog, 'Ingredients')
+
+      fireEvent.click(within(firstDialog).getByRole('button', { name: 'Add Diced Tomatoes · 1 can to groceries' }))
+      const removeButton = await within(firstDialog).findByRole('button', { name: 'Remove Diced Tomatoes · 1 can from groceries' })
+      fireEvent.click(removeButton)
+      await within(firstDialog).findByRole('button', { name: 'Removing Diced Tomatoes · 1 can from groceries…' })
+
+      fireEvent.click(within(firstDialog).getByRole('button', { name: 'Close' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Open test recipe', hidden: true }))
+      const reopenedDialog = await screen.findByRole('dialog')
+      await within(reopenedDialog).findByText('Serves 4')
+      await openTab(reopenedDialog, 'Ingredients')
+
+      // Resolving the stale removal after reopening must not touch the fresh session's state.
+      expect(resolveRemove).toBeDefined()
+      await act(async () => {
+        resolveRemove?.({})
+        await Promise.resolve()
+      })
+      expect(within(reopenedDialog).getByRole('button', { name: 'Add Diced Tomatoes · 1 can to groceries' })).toBeInTheDocument()
+      expect(within(reopenedDialog).queryByRole('button', { name: 'Remove Diced Tomatoes · 1 can from groceries' })).not.toBeInTheDocument()
+    } finally {
+      mockState.helpers.callService = originalCallService
+    }
+  })
+
+  it('re-adds an ingredient after removal with a fresh recipe_grocery_add call even after a bulk add', async () => {
+    const originalCallService = mockState.helpers.callService
+    const groceryAddCalls: Record<string, unknown>[] = []
+    mockState.helpers.callService = (params) => {
+      if (params.domain === 'evershelf' && params.service === 'recipe_detail') return Promise.resolve(detailResponse())
+      if (params.domain === 'evershelf' && params.service === 'recipe_grocery_add') {
+        groceryAddCalls.push(params)
+        return Promise.resolve(grocerySuccessResponse())
+      }
+      return originalCallService(params)
+    }
+    mockTodoItemsByEntity['todo.shopping_list'] = [
+      { uid: 'grocery-tomatoes', summary: 'Diced Tomatoes', status: 'needs_action' },
+    ]
+
+    try {
+      render(<Harness />)
+      const dialog = await openRecipe()
+      await within(dialog).findByText('Serves 4')
+      await openTab(dialog, 'Ingredients')
+
+      // Bulk add then remove.
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Add Missing Ingredients to Groceries' }))
+      const removeButton = await within(dialog).findByRole('button', { name: 'Remove Diced Tomatoes · 1 can from groceries' })
+      fireEvent.click(removeButton)
+      await waitFor(() => expect(within(dialog).getByRole('button', { name: 'Add Diced Tomatoes · 1 can to groceries' })).toBeInTheDocument())
+
+      // Individual re-add after removal must issue its own bounded selection with a fresh idempotency key.
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Add Diced Tomatoes · 1 can to groceries' }))
+      await within(dialog).findByRole('button', { name: 'Remove Diced Tomatoes · 1 can from groceries' })
+
+      expect(groceryAddCalls).toHaveLength(2)
+      const [bulkCall, reAddCall] = groceryAddCalls as { serviceData: { idempotency_key: string, selections: unknown[] } }[]
+      expect(bulkCall.serviceData.selections).toHaveLength(1)
+      expect(reAddCall.serviceData.selections).toEqual([{ key: 'ri:0:0000000000000001', position: 0 }])
+      expect(reAddCall.serviceData.idempotency_key).not.toEqual(bulkCall.serviceData.idempotency_key)
+    } finally {
+      mockState.helpers.callService = originalCallService
+    }
+  })
+
+  it('surfaces a per-row error and keeps the cart control when an individual grocery add fails', async () => {
+    const originalCallService = mockState.helpers.callService
+    mockState.helpers.callService = (params) => {
+      if (params.domain === 'evershelf' && params.service === 'recipe_detail') return Promise.resolve(detailResponse())
+      if (params.domain === 'evershelf' && params.service === 'recipe_grocery_add') {
+        return Promise.resolve({
+          response: {
+            success: false,
+            replayed: false,
+            outcomes: [],
+            summary: {
+              backend: { added: 0, already_listed: 0, now_in_stock: 0, unresolved: 0, failed: 1 },
+            },
+          },
+        })
+      }
+      return originalCallService(params)
+    }
+
+    try {
+      render(<Harness />)
+      const dialog = await openRecipe()
+      await within(dialog).findByText('Serves 4')
+      await openTab(dialog, 'Ingredients')
+
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Add Diced Tomatoes · 1 can to groceries' }))
+      await within(dialog).findByRole('alert')
+      expect(within(dialog).getByRole('button', { name: 'Add Diced Tomatoes · 1 can to groceries' })).toBeInTheDocument()
+      expect(within(dialog).queryByRole('button', { name: 'Remove Diced Tomatoes · 1 can from groceries' })).not.toBeInTheDocument()
     } finally {
       mockState.helpers.callService = originalCallService
     }
