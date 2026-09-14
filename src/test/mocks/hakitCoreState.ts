@@ -54,6 +54,20 @@ let mockDonetickTaskLoadDelayMs = 0
 let mockRecipeQueryDelayMs = 0
 const pendingWakeCommands: { request: Record<string, unknown>; resolve: (value: unknown) => void; reject: (reason: Error) => void }[] = []
 let mockWakeEpisodeSequence = 0
+// Generic deferred queue for any domain/service held with a 'pending' outcome so a test can
+// deterministically hold a request (e.g. todo.remove_item) and resolve it on its own schedule,
+// unlike the permanently-hanging `new Promise(() => undefined)` used elsewhere for pending outcomes.
+const pendingGenericCallServices: { domain: string; service: string; request: Record<string, unknown>; resolve: (value: unknown) => void }[] = []
+
+export function resolvePendingMockCallServices(domain: string, service: string) {
+  const matching = pendingGenericCallServices.filter((pending) => pending.domain === domain && pending.service === service)
+  for (const pending of matching) {
+    const index = pendingGenericCallServices.indexOf(pending)
+    if (index !== -1) pendingGenericCallServices.splice(index, 1)
+    applyMockCallServiceSideEffects(pending.request)
+    pending.resolve({})
+  }
+}
 
 function finishMockWakeCommand(request: Record<string, unknown>) {
   const result = applyMockWakeCommand(
@@ -1001,6 +1015,7 @@ export type MockHassDebugApi = {
   resolveWakeCommands: () => void
   rejectWakeCommands: () => void
   setWakeResponse: (outcome: string | null) => void
+  resolveCallService: (domain: string, service: string) => void
   getEntity: (entityId: string) => MockEntity | null
 }
 
@@ -1048,6 +1063,7 @@ function exposeMockHassDebugApi() {
     resolveWakeCommands: resolvePendingMockWakeCommands,
     rejectWakeCommands: rejectPendingMockWakeCommands,
     setWakeResponse: setMockWakeResponse,
+    resolveCallService: resolvePendingMockCallServices,
     getEntity: entityId => mockEntities[entityId] ? structuredClone(mockEntities[entityId]) : null,
     setCallServiceOutcome: setMockCallServiceOutcome,
     setConnectionStatus: setMockConnectionStatus,
@@ -1797,6 +1813,7 @@ export function resetMockHass() {
   rejectPendingMockWakeCommands()
   resetMockWakeCommands()
   mockCallServiceOutcomes.clear()
+  pendingGenericCallServices.length = 0
   mockScheduleMessages.length = 0
   mockTodoUpdateMessages.length = 0
   for (const entityId of Object.keys(mockTodoItemsByEntity)) delete mockTodoItemsByEntity[entityId]
@@ -2039,7 +2056,14 @@ export const mockState: MockHassState = {
       const outcome = typeof params.domain === 'string' && typeof params.service === 'string'
         ? mockCallServiceOutcomes.get(mockCallServiceOutcomeKey(params.domain, params.service))
         : undefined
-      if (outcome === 'pending') return new Promise(() => undefined)
+      if (outcome === 'pending') {
+        return new Promise((resolve) => pendingGenericCallServices.push({
+          domain: params.domain as string,
+          service: params.service as string,
+          request: params,
+          resolve,
+        }))
+      }
       if (outcome === 'reject') return Promise.reject(new Error('Mock service rejection'))
       applyMockCallServiceSideEffects(params)
       if (params.domain === 'weather' && params.service === 'get_forecasts' && params.returnResponse === true) {
