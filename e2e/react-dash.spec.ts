@@ -1945,8 +1945,21 @@ test('grocery deletes use native browser confirmations and prompts', async ({ pa
   await inventoryList(page, 'Pantry inventory list').getByRole('group', { name: /Canned Beans Quantity 5/i }).getByRole('button', { name: 'Edit Canned Beans' }).click()
   const pantryDetails = page.getByRole('dialog', { name: 'Canned Beans' })
   const multiDelete = pantryDetails.getByRole('button', { name: /^Delete Canned Beans expiring / }).first()
-  const dismissedPromptPromise = page.waitForEvent('dialog')
+  const dismissedConfirmationPromise = page.waitForEvent('dialog')
+  const dismissedConfirmationClick = multiDelete.click()
+  const dismissedConfirmation = await dismissedConfirmationPromise
+  expect(dismissedConfirmation.type()).toBe('confirm')
+  expect(dismissedConfirmation.message()).toMatch(/^Delete Canned Beans expiring .+ from the pantry\?$/)
+  await dismissedConfirmation.dismiss()
+  await dismissedConfirmationClick
+  await expect(page.getByRole('alertdialog')).toHaveCount(0)
+
+  const acceptedConfirmationPromise = page.waitForEvent('dialog')
   const dismissedPromptClick = multiDelete.click()
+  const acceptedConfirmation = await acceptedConfirmationPromise
+  expect(acceptedConfirmation.type()).toBe('confirm')
+  const dismissedPromptPromise = page.waitForEvent('dialog')
+  await acceptedConfirmation.accept()
   const dismissedPrompt = await dismissedPromptPromise
   expect(dismissedPrompt.type()).toBe('prompt')
   expect(dismissedPrompt.message()).toMatch(/^Choose how many Canned Beans expiring .+ to delete from the pantry\. Enter a number from 1 to 2\.$/)
@@ -1956,8 +1969,12 @@ test('grocery deletes use native browser confirmations and prompts', async ({ pa
   await expect(page.getByRole('alertdialog')).toHaveCount(0)
 
   await clearMockHassCalls(page)
-  const acceptedPromptPromise = page.waitForEvent('dialog')
+  const deleteConfirmationPromise = page.waitForEvent('dialog')
   const acceptedPromptClick = multiDelete.click()
+  const deleteConfirmation = await deleteConfirmationPromise
+  expect(deleteConfirmation.type()).toBe('confirm')
+  const acceptedPromptPromise = page.waitForEvent('dialog')
+  await deleteConfirmation.accept()
   const acceptedPrompt = await acceptedPromptPromise
   expect(acceptedPrompt.type()).toBe('prompt')
   await acceptedPrompt.accept('1')

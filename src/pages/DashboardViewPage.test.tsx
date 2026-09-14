@@ -6922,14 +6922,14 @@ describe('DashboardViewPage', () => {
     expect(screen.getByRole('button', { name: `Delete Canned Beans ${cannedBeansBatch}` })).toHaveClass(/deleteAction/)
 
     const callCountBeforeDeniedDelete = mockCallServiceCalls.length
-    const batchDeletePrompt = vi.spyOn(window, 'prompt').mockReturnValue(null)
+    const batchDeleteConfirm = vi.spyOn(window, 'confirm').mockReturnValue(false)
+    const batchDeletePrompt = vi.spyOn(window, 'prompt')
     fireEvent.click(screen.getByRole('button', { name: `Delete Canned Beans ${cannedBeansBatch}` }))
-    expect(batchDeletePrompt).toHaveBeenCalledWith(
-      `Choose how many Canned Beans ${cannedBeansBatch} to delete from the pantry. Enter a number from 1 to 2.`,
-      '1',
-    )
+    expect(batchDeleteConfirm).toHaveBeenCalledWith(`Delete Canned Beans ${cannedBeansBatch} from the pantry?`)
+    expect(batchDeletePrompt).not.toHaveBeenCalled()
     expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
     expect(mockCallServiceCalls).toHaveLength(callCountBeforeDeniedDelete)
+    batchDeleteConfirm.mockRestore()
     batchDeletePrompt.mockRestore()
 
     fireEvent.change(expirationInput, { target: { value: '2026-09-30' } })
@@ -6980,8 +6980,10 @@ describe('DashboardViewPage', () => {
       serviceData: { location: 'frigo' },
     })
     mockCallServiceCalls.length = 0
+    const rowDeleteConfirm = vi.spyOn(window, 'confirm').mockReturnValue(true)
     const rowDeletePrompt = vi.spyOn(window, 'prompt').mockReturnValue('1')
     fireEvent.click(within(greekYogurtRow).getByRole('button', { name: 'Delete Greek Yogurt' }))
+    expect(rowDeleteConfirm).toHaveBeenCalledWith('Delete Greek Yogurt from the fridge?')
     expect(rowDeletePrompt).toHaveBeenCalledWith(
       'Choose how many Greek Yogurt to delete from the fridge. Enter a number from 1 to 2.',
       '1',
@@ -6993,6 +6995,7 @@ describe('DashboardViewPage', () => {
       serviceData: { inventory_id: 203, quantity: 1 },
     }))
     await waitFor(() => expect(within(fridgeList).getByRole('group', { name: `Greek Yogurt ${testExpiryLabel(5)}` })).toBeInTheDocument())
+    rowDeleteConfirm.mockRestore()
     rowDeletePrompt.mockRestore()
 
     mockCallServiceCalls.length = 0
