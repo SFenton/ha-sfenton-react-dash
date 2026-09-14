@@ -14,6 +14,7 @@ import {
   type RecipeCardSummary,
   type RecipeDetail,
   type RecipeDetailIngredient,
+  type RecipeGroceryMirrorOutcome,
   type RecipeGroceryResult,
   type RecipeIngredientIdentityVerdict,
   type RecipeIngredientFeedbackTarget,
@@ -23,15 +24,24 @@ import { callRecipeService, recipeServiceErrorIsUnavailable } from './recipeServ
 import { recipeDetailIdempotencyKey } from './recipeDetailFormatting'
 import {
   RECIPE_GROCERY_MAX_SELECTIONS,
+  RECIPE_GROCERY_TODO_ENTITY_ID,
   RECIPE_GROCERY_UNSUPPORTED_MESSAGE,
+  findMatchingGroceryTodoItem,
   recipeActionableMissingIngredients,
+  recipeGroceryCapabilityBlockedReason,
   recipeGroceryDisabledReason,
+  recipeIngredientIsGroceryEligible,
+  type RecipeGroceryTodoItem,
 } from './recipeGroceryState'
 import type { RecipeDetailTab } from '../../../constants/surfaceSemantics'
 import { useEverShelfInventoryControls } from '../EverShelfInventoryControls'
 import { useCopy } from '../../../i18n/useCopy'
 
 type CallService = (params: Record<string, unknown>) => Promise<unknown> | unknown
+
+interface HassConnection {
+  sendMessagePromise?: <T>(message: Record<string, unknown>) => Promise<T>
+}
 
 type DetailLoadState =
   | { status: 'idle' | 'loading' }
@@ -62,16 +72,21 @@ export interface RecipeInventoryProduct {
 
 export interface RecipeDetailModalController {
   activeTab: RecipeDetailTab
+  addedIngredientKeys: ReadonlySet<string>
+  addIndividualIngredient: (ingredient: RecipeDetailIngredient) => void
   addMissingIngredients: () => void
   close: () => void
   detailState: DetailLoadState
   groceryState: GroceryState
   grocerySubmitted: boolean
+  individualGroceryErrors: ReadonlyMap<string, string>
+  individualGroceryPendingKeys: ReadonlySet<string>
   ingredientFeedbackMessage: string | null
   ingredientFeedbackPending: ReadonlySet<string>
   ingredientPickerIngredient: RecipeDetailIngredient | null
   ingredientPickerLoadState: IngredientPickerLoadState
   ingredientPickerQuery: string
+  individualGroceryRemovingKeys: ReadonlySet<string>
   open: boolean
   openRecipe: (recipe: RecipeCardSummary) => void
   openIngredientPicker: (ingredient: RecipeDetailIngredient) => void
@@ -87,6 +102,7 @@ export interface RecipeDetailModalController {
     verdict: RecipeIngredientIdentityVerdict,
     targetKind: RecipeIngredientFeedbackTarget,
   ) => void
+  removeIndividualIngredient: (ingredientKey: string) => void
   selectedRecipe: RecipeCardSummary | null
   setActiveTab: (tab: RecipeDetailTab) => void
   plannerOpen: boolean
@@ -260,8 +276,28 @@ function groceryFeedback(result: RecipeGroceryResult) {
   }
 }
 
+function successfulGroceryMirrors(
+  result: RecipeGroceryResult,
+  ingredients: readonly RecipeDetailIngredient[],
+) {
+  const ingredientByKey = new Map(ingredients.map((ingredient) => [ingredient.key, ingredient]))
+  const successfulOutcomes = result.haMirrorOutcomes.filter(
+    (outcome): outcome is RecipeGroceryMirrorOutcome => (
+      outcome.outcome === 'added' || outcome.outcome === 'already_present'
+    ),
+  )
+  if (successfulOutcomes.length > 0) {
+    return successfulOutcomes.flatMap((outcome) => (
+      ingredientByKey.has(outcome.key) ? [[outcome.key, outcome.name] as const] : []
+    ))
+  }
+  if (!groceryFeedback(result).success) return []
+  return ingredients.map((ingredient) => [ingredient.key, ingredient.displayName] as const)
+}
+
 export function useRecipeDetailModalController({ enabled = true }: { enabled?: boolean } = {}): RecipeDetailModalController {
   const callService = useHass((state) => state.helpers.callService) as unknown as CallService
+  const connection = useHass((state) => state.connection) as unknown as HassConnection | undefined
   const copy = useCopy(RECIPE_I18N.namespace)
   const [selectedRecipe, setSelectedRecipe] = useState<RecipeCardSummary | null>(null)
   const [open, setOpen] = useState(false)
@@ -269,6 +305,11 @@ export function useRecipeDetailModalController({ enabled = true }: { enabled?: b
   const [detailState, setDetailState] = useState<DetailLoadState>({ status: 'idle' })
   const [groceryState, setGroceryState] = useState<GroceryState>({ status: 'idle' })
   const [grocerySubmitted, setGrocerySubmitted] = useState(false)
+  const [addedIngredientKeys, setAddedIngredientKeys] = useState<ReadonlySet<string>>(() => new Set())
+  const [addedIngredientTodoNames, setAddedIngredientTodoNames] = useState<ReadonlyMap<string, string>>(() => new Map())
+  const [individualGroceryPendingKeys, setIndividualGroceryPendingKeys] = useState<ReadonlySet<string>>(() => new Set())
+  const [individualGroceryRemovingKeys, setIndividualGroceryRemovingKeys] = useState<ReadonlySet<string>>(() => new Set())
+  const [individualGroceryErrors, setIndividualGroceryErrors] = useState<ReadonlyMap<string, string>>(() => new Map())
   const [ingredientFeedbackMessage, setIngredientFeedbackMessage] = useState<string | null>(null)
   const [ingredientFeedbackPending, setIngredientFeedbackPending] = useState<ReadonlySet<string>>(() => new Set())
   const [ingredientPickerIngredient, setIngredientPickerIngredient] = useState<RecipeDetailIngredient | null>(null)
@@ -288,6 +329,9 @@ export function useRecipeDetailModalController({ enabled = true }: { enabled?: b
   const groceryInFlightRef = useRef(false)
   const groceryRequestRef = useRef(0)
   const grocerySubmittedRef = useRef(false)
+  const individualGroceryRequestRef = useRef<Map<string, number>>(new Map())
+  const individualGroceryCommandKeysRef = useRef<Map<string, string>>(new Map())
+  const individualGroceryRemoveRequestRef = useRef<Map<string, number>>(new Map())
   const returnFocusRef = useRef<HTMLElement | null>(null)
   const feedbackCommandKeysRef = useRef<Map<string, string>>(new Map())
   const ingredientPickerRequestRef = useRef(0)
@@ -312,11 +356,19 @@ export function useRecipeDetailModalController({ enabled = true }: { enabled?: b
     grocerySelectionFingerprintRef.current = null
     groceryInFlightRef.current = false
     grocerySubmittedRef.current = false
+    individualGroceryRequestRef.current.clear()
+    individualGroceryCommandKeysRef.current.clear()
+    individualGroceryRemoveRequestRef.current.clear()
     setSelectedRecipe({ ...recipe })
     setActiveTab('general')
     setDetailState({ status: 'loading' })
     setGroceryState({ status: 'idle' })
     setGrocerySubmitted(false)
+    setAddedIngredientKeys(new Set())
+    setAddedIngredientTodoNames(new Map())
+    setIndividualGroceryPendingKeys(new Set())
+    setIndividualGroceryRemovingKeys(new Set())
+    setIndividualGroceryErrors(new Map())
     setIngredientFeedbackMessage(null)
     setIngredientFeedbackPending(new Set())
     setIngredientPickerIngredient(null)
@@ -342,6 +394,9 @@ export function useRecipeDetailModalController({ enabled = true }: { enabled?: b
     grocerySelectionFingerprintRef.current = null
     groceryInFlightRef.current = false
     grocerySubmittedRef.current = false
+    individualGroceryRequestRef.current.clear()
+    individualGroceryCommandKeysRef.current.clear()
+    individualGroceryRemoveRequestRef.current.clear()
     ingredientPickerRequestRef.current += 1
     setIngredientPickerIngredient(null)
     setIngredientPickerLoadState({ status: 'idle' })
@@ -355,6 +410,11 @@ export function useRecipeDetailModalController({ enabled = true }: { enabled?: b
       setDetailState({ status: 'idle' })
       setGroceryState({ status: 'idle' })
       setGrocerySubmitted(false)
+      setAddedIngredientKeys(new Set())
+      setAddedIngredientTodoNames(new Map())
+      setIndividualGroceryPendingKeys(new Set())
+      setIndividualGroceryRemovingKeys(new Set())
+      setIndividualGroceryErrors(new Map())
       setIngredientFeedbackMessage(null)
       setIngredientFeedbackPending(new Set())
       setIngredientPickerIngredient(null)
@@ -993,12 +1053,15 @@ export function useRecipeDetailModalController({ enabled = true }: { enabled?: b
     if (
       groceryInFlightRef.current
       || grocerySubmittedRef.current
+      || individualGroceryPendingKeys.size > 0
+      || individualGroceryRemovingKeys.size > 0
       || detailState.status !== 'ready'
       || detailState.session !== modalSessionRef.current
     ) return
-    if (recipeGroceryDisabledReason(detailState.detail, 'idle')) return
+    if (recipeGroceryDisabledReason(detailState.detail, 'idle', addedIngredientKeys)) return
     const missing = recipeActionableMissingIngredients(
       detailState.detail,
+      addedIngredientKeys,
     )
     if (missing.length === 0 || missing.length > RECIPE_GROCERY_MAX_SELECTIONS) return
 
@@ -1044,6 +1107,19 @@ export function useRecipeDetailModalController({ enabled = true }: { enabled?: b
         groceryCommandKeyRef.current = null
       }
       const feedback = groceryFeedback(normalized)
+      const addedEntries = successfulGroceryMirrors(normalized, missing)
+      if (addedEntries.length > 0) {
+        setAddedIngredientKeys((current) => {
+          const next = new Set(current)
+          for (const [key] of addedEntries) next.add(key)
+          return next
+        })
+        setAddedIngredientTodoNames((current) => {
+          const next = new Map(current)
+          for (const [key, name] of addedEntries) next.set(key, name)
+          return next
+        })
+      }
       if (feedback.success) {
         grocerySubmittedRef.current = true
         groceryCommandKeyRef.current = null
@@ -1063,15 +1139,217 @@ export function useRecipeDetailModalController({ enabled = true }: { enabled?: b
     }).finally(() => {
       if (groceryRequest === groceryRequestRef.current) groceryInFlightRef.current = false
     })
-  }, [callService, detailState])
+  }, [
+    addedIngredientKeys,
+    callService,
+    detailState,
+    individualGroceryPendingKeys,
+    individualGroceryRemovingKeys,
+  ])
+
+  const addIndividualIngredient = useCallback((ingredient: RecipeDetailIngredient) => {
+    if (
+      detailState.status !== 'ready'
+      || detailState.session !== modalSessionRef.current
+      || groceryInFlightRef.current
+      || individualGroceryPendingKeys.has(ingredient.key)
+      || addedIngredientKeys.has(ingredient.key)
+      || !recipeIngredientIsGroceryEligible(ingredient)
+      || recipeGroceryCapabilityBlockedReason(detailState.detail, 'idle')
+    ) return
+
+    const modalSession = modalSessionRef.current
+    const ingredientKey = ingredient.key
+    const requestGeneration = (individualGroceryRequestRef.current.get(ingredientKey) ?? 0) + 1
+    individualGroceryRequestRef.current.set(ingredientKey, requestGeneration)
+    const idempotencyKey = individualGroceryCommandKeysRef.current.get(ingredientKey)
+      ?? `${recipeDetailIdempotencyKey(detailState.detail.id)}:${ingredientKey}`
+    individualGroceryCommandKeysRef.current.set(ingredientKey, idempotencyKey)
+    setIndividualGroceryPendingKeys((current) => new Set(current).add(ingredientKey))
+    setIndividualGroceryErrors((current) => {
+      if (!current.has(ingredientKey)) return current
+      const next = new Map(current)
+      next.delete(ingredientKey)
+      return next
+    })
+
+    const detail = detailState.detail
+    void callRecipeService(
+      callService,
+      'recipe_grocery_add',
+      recipeGroceryServiceData(
+        detail.id,
+        [{ key: ingredientKey, position: ingredient.position }],
+        idempotencyKey,
+      ),
+    ).then((result) => {
+      if (
+        modalSession !== modalSessionRef.current
+        || individualGroceryRequestRef.current.get(ingredientKey) !== requestGeneration
+      ) return
+      const normalized = normalizeRecipeGroceryServiceResult(result)
+      if (normalized.kind !== 'result') {
+        setIndividualGroceryErrors((current) => new Map(current).set(
+          ingredientKey,
+          normalized.kind === 'unsupported' ? RECIPE_GROCERY_UNSUPPORTED_MESSAGE : normalized.message,
+        ))
+        return
+      }
+      const feedback = groceryFeedback(normalized)
+      const [addedEntry] = successfulGroceryMirrors(normalized, [ingredient])
+      if (addedEntry) {
+        const [addedKey, todoName] = addedEntry
+        individualGroceryCommandKeysRef.current.delete(ingredientKey)
+        setAddedIngredientKeys((current) => new Set(current).add(addedKey))
+        setAddedIngredientTodoNames((current) => new Map(current).set(addedKey, todoName))
+        resetGroceryCommandState()
+      }
+      if (!feedback.success) {
+        setIndividualGroceryErrors((current) => new Map(current).set(ingredientKey, feedback.message))
+        return
+      }
+    }).catch((error: unknown) => {
+      if (
+        modalSession !== modalSessionRef.current
+        || individualGroceryRequestRef.current.get(ingredientKey) !== requestGeneration
+      ) return
+      setIndividualGroceryErrors((current) => new Map(current).set(
+        ingredientKey,
+        recipeServiceErrorIsUnavailable(error, 'recipe_grocery_add')
+          ? RECIPE_GROCERY_UNSUPPORTED_MESSAGE
+          : caughtMessage(error, 'Unable to add this ingredient to groceries.'),
+      ))
+    }).finally(() => {
+      if (modalSession !== modalSessionRef.current) return
+      setIndividualGroceryPendingKeys((current) => {
+        if (!current.has(ingredientKey)) return current
+        const next = new Set(current)
+        next.delete(ingredientKey)
+        return next
+      })
+    })
+  }, [addedIngredientKeys, callService, detailState, individualGroceryPendingKeys, resetGroceryCommandState])
+
+  const removeIndividualIngredient = useCallback((ingredientKey: string) => {
+    if (
+      detailState.status !== 'ready'
+      || detailState.session !== modalSessionRef.current
+      || groceryInFlightRef.current
+      || individualGroceryRemovingKeys.has(ingredientKey)
+      || !addedIngredientKeys.has(ingredientKey)
+    ) return
+    const ingredient = detailState.detail.ingredients.find((candidate) => candidate.key === ingredientKey)
+    if (!ingredient) return
+
+    const modalSession = modalSessionRef.current
+    const requestGeneration = (individualGroceryRemoveRequestRef.current.get(ingredientKey) ?? 0) + 1
+    individualGroceryRemoveRequestRef.current.set(ingredientKey, requestGeneration)
+    const stale = () => (
+      modalSession !== modalSessionRef.current
+      || individualGroceryRemoveRequestRef.current.get(ingredientKey) !== requestGeneration
+    )
+
+    setIndividualGroceryRemovingKeys((current) => new Set(current).add(ingredientKey))
+    setIndividualGroceryErrors((current) => {
+      if (!current.has(ingredientKey)) return current
+      const next = new Map(current)
+      next.delete(ingredientKey)
+      return next
+    })
+
+    if (!connection?.sendMessagePromise) {
+      setIndividualGroceryErrors((current) => new Map(current).set(
+        ingredientKey,
+        'Unable to reach Home Assistant to remove this item from the Grocery List.',
+      ))
+      setIndividualGroceryRemovingKeys((current) => {
+        if (!current.has(ingredientKey)) return current
+        const next = new Set(current)
+        next.delete(ingredientKey)
+        return next
+      })
+      return
+    }
+
+    void connection.sendMessagePromise<{ items?: RecipeGroceryTodoItem[] }>({
+      type: 'todo/item/list',
+      entity_id: RECIPE_GROCERY_TODO_ENTITY_ID,
+    }).then((response) => {
+      if (stale()) return
+      const items = Array.isArray(response?.items) ? response.items : []
+      const match = findMatchingGroceryTodoItem(
+        items,
+        ingredient,
+        addedIngredientTodoNames.get(ingredientKey),
+      )
+      const identity = match?.uid ?? match?.summary
+      if (!match || !identity) {
+        throw new Error(`${ingredient.displayName} was not found on the Grocery List.`)
+      }
+      return Promise.resolve(callService({
+        domain: 'todo',
+        service: 'remove_item',
+        target: RECIPE_GROCERY_TODO_ENTITY_ID,
+        serviceData: { item: identity },
+      })).then(() => {
+        if (stale()) return
+        // Clear the idempotency key/request bookkeeping so a later re-add issues a fresh
+        // `recipe_grocery_add` call instead of relying on a stale replay of the earlier add.
+        individualGroceryCommandKeysRef.current.delete(ingredientKey)
+        individualGroceryRequestRef.current.delete(ingredientKey)
+        setAddedIngredientKeys((current) => {
+          if (!current.has(ingredientKey)) return current
+          const next = new Set(current)
+          next.delete(ingredientKey)
+          return next
+        })
+        setAddedIngredientTodoNames((current) => {
+          if (!current.has(ingredientKey)) return current
+          const next = new Map(current)
+          next.delete(ingredientKey)
+          return next
+        })
+        // Re-adding this key back to the actionable pool must let the bulk action reappear/re-fade in
+        // rather than staying collapsed from an earlier success.
+        resetGroceryCommandState()
+      })
+    }).catch((error: unknown) => {
+      if (stale()) return
+      setIndividualGroceryErrors((current) => new Map(current).set(
+        ingredientKey,
+        caughtMessage(error, 'Unable to remove this ingredient from the Grocery List.'),
+      ))
+    }).finally(() => {
+      if (stale()) return
+      setIndividualGroceryRemovingKeys((current) => {
+        if (!current.has(ingredientKey)) return current
+        const next = new Set(current)
+        next.delete(ingredientKey)
+        return next
+      })
+    })
+  }, [
+    addedIngredientKeys,
+    addedIngredientTodoNames,
+    callService,
+    connection,
+    detailState,
+    individualGroceryRemovingKeys,
+    resetGroceryCommandState,
+  ])
 
   return {
     activeTab,
+    addedIngredientKeys,
+    addIndividualIngredient,
     addMissingIngredients,
     close,
     detailState,
     groceryState,
     grocerySubmitted,
+    individualGroceryErrors,
+    individualGroceryPendingKeys,
+    individualGroceryRemovingKeys,
     ingredientFeedbackMessage,
     ingredientFeedbackPending,
     ingredientPickerIngredient,
@@ -1088,6 +1366,7 @@ export function useRecipeDetailModalController({ enabled = true }: { enabled?: b
     cycleIngredientOverride,
     clearIngredientOverride,
     recordIdentityFeedback,
+    removeIndividualIngredient,
     selectedRecipe,
     setActiveTab,
     plannerOpen,
