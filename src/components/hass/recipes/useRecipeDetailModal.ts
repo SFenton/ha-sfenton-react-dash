@@ -1202,7 +1202,11 @@ export function useRecipeDetailModalController({ enabled = true }: { enabled?: b
         individualGroceryCommandKeysRef.current.delete(ingredientKey)
         setAddedIngredientKeys((current) => new Set(current).add(addedKey))
         setAddedIngredientTodoNames((current) => new Map(current).set(addedKey, todoName))
-        resetGroceryCommandState()
+        // Do not reset the bulk command area's success/collapse state here: an individual add only
+        // shrinks the actionable pool, so the bulk "Add Missing Ingredients" action (idle, in-flight,
+        // or already collapsed after its own success) must stay visually stable. `addMissingIngredients`
+        // already invalidates its own stale idempotency key/selection fingerprint the next time it runs,
+        // by comparing the recomputed actionable selection against the previous one.
       }
       if (!feedback.success) {
         setIndividualGroceryErrors((current) => new Map(current).set(ingredientKey, feedback.message))
@@ -1228,7 +1232,7 @@ export function useRecipeDetailModalController({ enabled = true }: { enabled?: b
         return next
       })
     })
-  }, [addedIngredientKeys, callService, detailState, individualGroceryPendingKeys, resetGroceryCommandState])
+  }, [addedIngredientKeys, callService, detailState, individualGroceryPendingKeys])
 
   const removeIndividualIngredient = useCallback((ingredientKey: string) => {
     if (
