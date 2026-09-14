@@ -1925,40 +1925,43 @@ test('inventory item edit modal adds and removes EverShelf stock from the quanti
  * @covers src/i18n/locales/en.json
  * @covers src/i18n/locales/en/pages/food.json
  */
-test('grocery delete confirmations consistently provide Cancel and OK', async ({ page }) => {
+test('grocery deletes use native browser confirmations and prompts', async ({ page }) => {
   await page.setViewportSize({ width: 393, height: 852 })
-  const expectConfirmationActions = async (confirmation: ReturnType<Page['getByRole']>) => {
-    await expect(confirmation).toBeVisible()
-    await expect(confirmation).toHaveAttribute('data-inventory-delete-dialog', 'true')
-    expect(await confirmation.getByRole('button').allTextContents()).toEqual(['Cancel', 'OK'])
-  }
 
   await page.goto('/at-a-glance/fridge')
   const fridgeList = inventoryList(page, 'Fridge inventory list')
   await expect.poll(() => inventoryRowLabels(page, 'Fridge inventory list')).toHaveLength(3)
-  await fridgeList.getByRole('group', { name: /Milk Expired/i }).getByRole('button', { name: 'Delete Milk' }).click()
-  const rowConfirmation = page.getByRole('alertdialog', { name: 'Delete Milk?' })
-  await expectConfirmationActions(rowConfirmation)
-  await expect(rowConfirmation.getByRole('spinbutton')).toHaveCount(0)
-  await rowConfirmation.getByRole('button', { name: 'Cancel' }).click()
-  await expect(rowConfirmation).toHaveCount(0)
+  const rowDialogPromise = page.waitForEvent('dialog')
+  const rowClick = fridgeList.getByRole('group', { name: /Milk Expired/i }).getByRole('button', { name: 'Delete Milk' }).click()
+  const rowDialog = await rowDialogPromise
+  expect(rowDialog.type()).toBe('confirm')
+  expect(rowDialog.message()).toBe('Delete Milk from the fridge?')
+  await rowDialog.dismiss()
+  await rowClick
+  await expect(page.getByRole('alertdialog')).toHaveCount(0)
 
   await page.goto('/at-a-glance/pantry')
   await expect.poll(() => inventoryRowLabels(page, 'Pantry inventory list')).toHaveLength(3)
   await inventoryList(page, 'Pantry inventory list').getByRole('group', { name: /Canned Beans Quantity 5/i }).getByRole('button', { name: 'Edit Canned Beans' }).click()
   const pantryDetails = page.getByRole('dialog', { name: 'Canned Beans' })
   const multiDelete = pantryDetails.getByRole('button', { name: /^Delete Canned Beans expiring / }).first()
-  await multiDelete.click()
-  const multiConfirmation = page.getByRole('alertdialog', { name: /^Delete Canned Beans expiring .+\\?$/ })
-  await expectConfirmationActions(multiConfirmation)
-  await expect(multiConfirmation.getByRole('spinbutton', { name: /^Quantity to delete for Canned Beans expiring / })).toHaveValue('1')
-  await multiConfirmation.getByRole('button', { name: 'Cancel' }).click()
-  await expect(multiConfirmation).toHaveCount(0)
+  const dismissedPromptPromise = page.waitForEvent('dialog')
+  const dismissedPromptClick = multiDelete.click()
+  const dismissedPrompt = await dismissedPromptPromise
+  expect(dismissedPrompt.type()).toBe('prompt')
+  expect(dismissedPrompt.message()).toMatch(/^Choose how many Canned Beans expiring .+ to delete from the pantry\. Enter a number from 1 to 2\.$/)
+  expect(dismissedPrompt.defaultValue()).toBe('1')
+  await dismissedPrompt.dismiss()
+  await dismissedPromptClick
+  await expect(page.getByRole('alertdialog')).toHaveCount(0)
 
   await clearMockHassCalls(page)
-  await multiDelete.click()
-  await page.getByRole('alertdialog', { name: /^Delete Canned Beans expiring .+\\?$/ }).getByRole('button', { name: 'OK' }).click()
-  await expect(multiConfirmation).toHaveCount(0)
+  const acceptedPromptPromise = page.waitForEvent('dialog')
+  const acceptedPromptClick = multiDelete.click()
+  const acceptedPrompt = await acceptedPromptPromise
+  expect(acceptedPrompt.type()).toBe('prompt')
+  await acceptedPrompt.accept('1')
+  await acceptedPromptClick
   await expect(pantryDetails).toBeVisible()
   await expect(pantryDetails.getByRole('spinbutton', { name: /^Quantity for Canned Beans expiring / }).first()).toHaveText('1')
   await expect.poll(() => everShelfInventoryCalls(page)).toContainEqual({
@@ -1972,11 +1975,14 @@ test('grocery delete confirmations consistently provide Cancel and OK', async ({
   await summary.getByRole('tab', { name: /^Expired Food/ }).click()
   await summary.getByRole('button', { name: 'Edit Milk' }).click()
   const quickProfile = page.getByRole('dialog', { name: 'Milk' })
-  await quickProfile.getByRole('button', { name: 'Delete Milk' }).click()
-  const quickProfileConfirmation = page.getByRole('alertdialog', { name: 'Delete Milk?' })
-  await expectConfirmationActions(quickProfileConfirmation)
-  await quickProfileConfirmation.getByRole('button', { name: 'Cancel' }).click()
-  await expect(quickProfileConfirmation).toHaveCount(0)
+  const quickProfileDialogPromise = page.waitForEvent('dialog')
+  const quickProfileClick = quickProfile.getByRole('button', { name: 'Delete Milk' }).click()
+  const quickProfileDialog = await quickProfileDialogPromise
+  expect(quickProfileDialog.type()).toBe('confirm')
+  expect(quickProfileDialog.message()).toBe('Delete Milk from the fridge?')
+  await quickProfileDialog.dismiss()
+  await quickProfileClick
+  await expect(page.getByRole('alertdialog')).toHaveCount(0)
 })
 
 test('thermostat room grid uses one equivalent column when any room label overflows', async ({ page }) => {
@@ -5277,12 +5283,20 @@ test('daily summary keeps the last expired-food empty state centred while the se
   const dialog = page.getByRole('dialog')
   await dialog.getByRole('tablist', { name: 'Daily report sections' }).getByRole('tab', { name: /^Expired Food/ }).click()
 
-  await dialog.getByRole('button', { name: 'Delete Almond Flour' }).click()
-  await page.getByRole('alertdialog', { name: 'Delete Almond Flour?' }).getByRole('button', { name: 'OK' }).click()
+  const almondFlourDialogPromise = page.waitForEvent('dialog')
+  const almondFlourClick = dialog.getByRole('button', { name: 'Delete Almond Flour' }).click()
+  const almondFlourDialog = await almondFlourDialogPromise
+  expect(almondFlourDialog.type()).toBe('confirm')
+  await almondFlourDialog.accept()
+  await almondFlourClick
   await expect(dialog.getByRole('button', { name: 'Delete Almond Flour' })).toHaveCount(0)
 
-  await dialog.getByRole('button', { name: 'Delete Milk' }).click()
-  await page.getByRole('alertdialog', { name: 'Delete Milk?' }).getByRole('button', { name: 'OK' }).click()
+  const milkDialogPromise = page.waitForEvent('dialog')
+  const milkClick = dialog.getByRole('button', { name: 'Delete Milk' }).click()
+  const milkDialog = await milkDialogPromise
+  expect(milkDialog.type()).toBe('confirm')
+  await milkDialog.accept()
+  await milkClick
   await expect(dialog.getByLabel('Expired Food inventory list')).toBeVisible()
   await expect(dialog.getByRole('heading', { level: 2, name: 'No Expired Food' })).toBeVisible()
 

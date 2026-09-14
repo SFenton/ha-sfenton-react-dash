@@ -3,15 +3,10 @@
     "emptyDescription": "Add some groceries to see them appear."
   },
   "delete": {
-    "cancel": "Cancel",
-    "confirm": "OK",
     "description": "Delete {{title}} from the {{location}}?",
     "itemWithQualifier": "{{title}}{{qualifier}}",
     "multipleDescription": "Choose how many {{title}} to delete from the {{location}}.",
-    "quantity": "Quantity",
-    "quantityError": "Enter a number from 1 to {{quantity}}.",
-    "quantityLabel": "Quantity to delete for {{title}}",
-    "title": "Delete {{title}}?"
+    "quantityError": "Enter a number from 1 to {{quantity}}."
   },
   "inventory": {
     "expiringSoon_one": "{{count}} Expiring Soon",

@@ -10,15 +10,10 @@ export const PAGE_FOOD_COPY_KEYS = {
     emptyDescription: 'groceries.emptyDescription',
   },
   delete: {
-    cancel: 'delete.cancel',
-    confirm: 'delete.confirm',
     description: 'delete.description',
     itemWithQualifier: 'delete.itemWithQualifier',
     multipleDescription: 'delete.multipleDescription',
-    quantity: 'delete.quantity',
     quantityError: 'delete.quantityError',
-    quantityLabel: 'delete.quantityLabel',
-    title: 'delete.title',
   },
 } as const
 export const CHAT_COPY_NAMESPACE = 'modalChat' as const
