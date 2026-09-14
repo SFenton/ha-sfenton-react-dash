@@ -1073,6 +1073,130 @@ describe('RecipeDetailModal', () => {
     }
   })
 
+  it('does not reopen or flicker the collapsed bulk command area when an unrelated individual ingredient add succeeds afterward', async () => {
+    const originalCallService = mockState.helpers.callService
+    mockState.helpers.callService = (params) => {
+      if (params.domain === 'evershelf' && params.service === 'recipe_detail') {
+        const response = detailResponse({ confirmedMissingCount: 2 })
+        response.response.detail.ingredients[1].inventory.state = 'missing'
+        return Promise.resolve(response)
+      }
+      if (params.domain === 'evershelf' && params.service === 'recipe_grocery_add') {
+        const selections = (params.serviceData as { selections: { key: string }[] }).selections
+        if (selections.length === 2) {
+          // The bulk request reports overall success, but only mirrors Tomatoes; Rice remains
+          // actionable (no matching ha_mirror outcome), matching a real backend edge case where
+          // one selection is not confirmed even though the aggregate call succeeds.
+          return Promise.resolve({
+            response: {
+              success: true,
+              replayed: false,
+              outcomes: [],
+              ha_mirror: {
+                success: true,
+                outcomes: [{ key: 'ri:0:0000000000000001', name: 'Tomatoes, diced', outcome: 'added' }],
+                summary: { added: 1, already_present: 0, skipped: 0, failed: 0 },
+              },
+              summary: {
+                backend: { added: 2, already_listed: 0, now_in_stock: 0, unresolved: 0, failed: 0 },
+                ha_mirror: { added: 1, already_present: 0, skipped: 0, failed: 0 },
+              },
+            },
+          })
+        }
+        return Promise.resolve(grocerySuccessResponse())
+      }
+      return originalCallService(params)
+    }
+
+    try {
+      render(<Harness />)
+      const dialog = await openRecipe()
+      await within(dialog).findByText('Serves 4')
+      await openTab(dialog, 'Ingredients')
+
+      vi.useFakeTimers()
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Add Missing Ingredients to Groceries' }))
+      await act(async () => {
+        await Promise.resolve()
+        await Promise.resolve()
+      })
+      act(() => vi.advanceTimersByTime(4_000))
+      expect(dialog.querySelector('[data-recipe-grocery-phase]')).not.toBeInTheDocument()
+      expect(dialog.querySelector('[data-recipe-grocery-complete="true"]')).toBeInTheDocument()
+      vi.useRealTimers()
+
+      const addRice = within(dialog).getByRole('button', { name: 'Add Rice · 2 cups to groceries' })
+      fireEvent.click(addRice)
+      await waitFor(() => expect(within(dialog).getByRole('button', { name: 'Remove Rice · 2 cups from groceries' })).toBeInTheDocument())
+
+      // Root-cause regression: adding Rice individually must not reset/reopen the bulk command
+      // area's already-collapsed success state (previously `resetGroceryCommandState()` fired here
+      // unconditionally and flickered the command area back to a plain, non-collapsed button).
+      expect(dialog.querySelector('[data-recipe-grocery-phase]')).not.toBeInTheDocument()
+      expect(dialog.querySelector('[data-recipe-grocery-complete="true"]')).toBeInTheDocument()
+      expect(within(dialog).queryByRole('button', { name: 'Add Missing Ingredients to Groceries' })).not.toBeInTheDocument()
+    } finally {
+      vi.useRealTimers()
+      mockState.helpers.callService = originalCallService
+    }
+  })
+
+  it('disables the bulk action and avoids a duplicate recipe_grocery_add call while an individual row add is in flight', async () => {
+    const originalCallService = mockState.helpers.callService
+    const calls: Record<string, unknown>[] = []
+    let resolveIndividual: ((value: unknown) => void) | undefined
+    mockState.helpers.callService = (params) => {
+      calls.push(params)
+      if (params.domain === 'evershelf' && params.service === 'recipe_detail') {
+        const response = detailResponse({ confirmedMissingCount: 2 })
+        response.response.detail.ingredients[1].inventory.state = 'missing'
+        return Promise.resolve(response)
+      }
+      if (params.domain === 'evershelf' && params.service === 'recipe_grocery_add') {
+        const selections = (params.serviceData as { selections: { key: string }[] }).selections
+        if (selections.length === 1 && selections[0].key === 'ri:0:0000000000000001') {
+          return new Promise((resolve) => { resolveIndividual = resolve })
+        }
+        return Promise.resolve(grocerySuccessResponse())
+      }
+      return originalCallService(params)
+    }
+
+    try {
+      render(<Harness />)
+      const dialog = await openRecipe()
+      await within(dialog).findByText('Serves 4')
+      await openTab(dialog, 'Ingredients')
+
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Add Diced Tomatoes · 1 can to groceries' }))
+      await waitFor(() => expect(resolveIndividual).toBeDefined())
+
+      const groceryButton = within(dialog).getByRole('button', { name: 'Add Missing Ingredients to Groceries' })
+      expect(groceryButton).toBeDisabled()
+      fireEvent.click(groceryButton)
+      expect(calls.filter((call) => call.service === 'recipe_grocery_add')).toHaveLength(1)
+
+      await act(async () => resolveIndividual?.(grocerySuccessResponse()))
+      await waitFor(() => expect(within(dialog).getByRole('button', { name: 'Remove Diced Tomatoes · 1 can from groceries' })).toBeInTheDocument())
+
+      expect(within(dialog).getByRole('button', { name: 'Add Missing Ingredients to Groceries' })).toBeEnabled()
+      await act(async () => {
+        fireEvent.click(within(dialog).getByRole('button', { name: 'Add Missing Ingredients to Groceries' }))
+        await Promise.resolve()
+        await Promise.resolve()
+      })
+
+      const groceryCalls = calls.filter((call) => call.service === 'recipe_grocery_add')
+      expect(groceryCalls).toHaveLength(2)
+      expect(groceryCalls[1]).toMatchObject({
+        serviceData: { selections: [{ key: 'ri:1:0000000000000002', position: 1 }] },
+      })
+    } finally {
+      mockState.helpers.callService = originalCallService
+    }
+  })
+
   it('omits unavailable time and device facts while preserving available equipment', async () => {
     const originalCallService = mockState.helpers.callService
     const response = detailResponse() as unknown as {
