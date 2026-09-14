@@ -508,6 +508,9 @@ function deleteDisplayTitle(title: string, qualifier?: string) {
 }
 
 function promptDeleteQuantity(title: string, locationLabel: string, quantity: number) {
+  if (!confirmInventoryDelete(title, locationLabel)) {
+    return { status: 'cancelled' } satisfies DeleteQuantityPromptResult
+  }
   const message = [
     copy(PAGE_FOOD_COPY_NAMESPACE, PAGE_FOOD_COPY_KEYS.delete.multipleDescription, { location: locationLabel, title }),
     copy(PAGE_FOOD_COPY_NAMESPACE, PAGE_FOOD_COPY_KEYS.delete.quantityError, { quantity: formatQuantity(quantity) }),
