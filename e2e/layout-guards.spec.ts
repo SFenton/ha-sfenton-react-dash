@@ -277,7 +277,7 @@ for (const overflow of ['hidden', 'clip'] as const) {
 guardedTest('declared vacuum readiness permits only an actually empty unavailable panel', async ({ page }) => {
   await page.setContent(`<div role="dialog" data-state="open">
     <button id="selected" role="tab" aria-selected="true" aria-controls="panel">Controls</button>
-    <div id="region" data-scroll-region="vacuum-panel" data-modal-tab-transition-state="idle">
+    <div id="region" data-layout-preparation-phase="content" data-scroll-region="vacuum-panel" data-modal-tab-transition-state="idle">
       <div id="panel" role="tabpanel" aria-labelledby="selected"><div></div></div>
     </div>
   </div>`)
@@ -300,6 +300,10 @@ guardedTest('declared vacuum readiness permits only an actually empty unavailabl
   await page.locator('#region').evaluate((region) => region.removeAttribute('data-scroll-region'))
   await expect(waitForModalReady(dialog, 150, 'vacuum-tabs')).rejects.toThrow()
   await page.locator('#region').evaluate((region) => region.setAttribute('data-scroll-region', 'vacuum-panel'))
+  await waitForModalReady(dialog, 500, 'vacuum-tabs')
+  await page.locator('#region').evaluate((region) => region.setAttribute('data-layout-preparation-phase', 'loading'))
+  await expect(waitForModalReady(dialog, 150, 'vacuum-tabs')).rejects.toThrow()
+  await page.locator('#region').evaluate((region) => region.setAttribute('data-layout-preparation-phase', 'content'))
   await waitForModalReady(dialog, 500, 'vacuum-tabs')
   await page.locator('#panel').evaluate((panel) => panel.remove())
   await expect(waitForModalReady(dialog, 150, 'vacuum-tabs')).rejects.toThrow()

@@ -232,10 +232,18 @@ async function verifyRecipeKeyboardFocus(page: Page) {
   await expect(dialog.getByRole('button', {
     name: /Fresh herbs: Inventory match uncertain.*Activate to mark missing/,
   })).toBeFocused()
+  await page.evaluate(() => new Promise<void>((resolve) => {
+    let frames = 4
+    const next = () => {
+      frames -= 1
+      if (frames === 0) resolve()
+      else requestAnimationFrame(next)
+    }
+    requestAnimationFrame(next)
+  }))
 
   const instructionsBaseline = await focusIndicator(instructionsTab)
-  await ingredientsTab.focus()
-  await page.keyboard.press('ArrowRight')
+  await ingredientsTab.press('ArrowRight')
   await expect(dialog.getByRole('tabpanel', { name: 'Instructions' })).toBeVisible()
   await expectCurrentKeyboardFocusIndicator(instructionsTab, instructionsTab, instructionsBaseline)
   await page.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))))

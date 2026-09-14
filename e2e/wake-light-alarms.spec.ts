@@ -8,7 +8,7 @@ import { applyProfile } from './layout/evidence'
 import { journey } from './layout/scenarios'
 import { wakeStateFacts } from './layout/wakeLight'
 import {
-  auditWake, expectSameBox, openWake, resizeWake, seedWake, settleWake,
+  auditWake, expectSameBox, expectWakeTargetAboveFooter, openWake, resizeWake, seedWake, settleWake,
   terminalVisible, WAKE_ENTITY, WAKE_PROFILES, WAKE_TITLE, wakeProfile, type WakeMockApi,
 } from './wake-light-support'
 
@@ -181,11 +181,44 @@ test('pending and rejected saves retain drafts and do not resize the sheet', asy
     await expect(dialog.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
     expectSameBox(await auditWake(page, dialog, profile), original)
     await page.evaluate(() => (window as unknown as { __mockHass: WakeMockApi }).__mockHass.rejectWakeCommands())
-    await expect(dialog.getByRole('alert')).toContainText('Home Assistant did not confirm')
+    const alert = dialog.getByRole('alert')
+    await expect(alert).toContainText('Home Assistant did not confirm')
     await expect(dialog.getByLabel('Alarm Name', { exact: true })).toHaveValue('Retain This Draft')
-    await terminalVisible(dialog, dialog.getByRole('alert'))
+    await expectWakeTargetAboveFooter(dialog, alert)
+    await terminalVisible(dialog, alert)
     expectSameBox(await auditWake(page, dialog, profile), original)
   }
+})
+
+test('revision conflict recovery remains above the footer through rotation', async ({ page }) => {
+  test.setTimeout(90_000)
+  const portrait = wakeProfile('phone-portrait')
+  await page.setViewportSize(portrait)
+  let dialog = await openWake(page)
+  const original = await auditWake(page, dialog, portrait)
+  await dialog.getByRole('button', { name: /^Weekday Wake/ }).click()
+  dialog = page.getByRole('dialog', { name: 'Weekday Wake · Master Bedroom', exact: true })
+  await dialog.getByLabel('Alarm Name', { exact: true }).fill('Conflict Draft')
+  dialog = page.getByRole('dialog', { name: 'Conflict Draft · Master Bedroom', exact: true })
+  await page.evaluate((entity) => {
+    const api = (window as unknown as { __mockHass: WakeMockApi }).__mockHass
+    const snapshot = api.getEntity(entity)!
+    const alarms = snapshot.attributes.alarms as Array<Record<string, unknown>>
+    api.setEntityAttribute(entity, 'alarms', alarms.map((alarm) => alarm.id === 'weekday-wake'
+      ? { ...alarm, label: 'Latest saved wake', revision: Number(alarm.revision) + 1 }
+      : alarm))
+    api.setEntityAttribute(entity, 'revision', Number(snapshot.attributes.revision) + 1)
+  }, WAKE_ENTITY)
+  await dialog.getByRole('button', { name: 'Save', exact: true }).click()
+  const reload = dialog.getByRole('button', { name: 'Open Latest Alarm, Replace Draft', exact: true })
+  await expect(reload).toBeVisible()
+  for (const profile of [portrait, wakeProfile('island-phone-landscape-left'), portrait]) {
+    await resizeWake(page, profile)
+    await expectWakeTargetAboveFooter(dialog, reload)
+    const frame = await auditWake(page, dialog, profile)
+    if (profile.name === portrait.name) expectSameBox(frame, original)
+  }
+  await expect(dialog.getByLabel('Alarm Name', { exact: true })).toHaveValue('Conflict Draft')
 })
 
 test('a pending alarm toggle leaves other wake alarms operable and queues their commands', async ({ page }) => {

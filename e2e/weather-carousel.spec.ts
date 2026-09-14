@@ -65,6 +65,18 @@ async function expectFirstPageSettled(scroller: Locator) {
   })).toEqual([0, 0, 0])
 }
 
+async function expectPageSettled(scroller: Locator) {
+  await expectAtPageBoundary(scroller)
+  await expect.poll(() => scroller.evaluate(async (element) => {
+    const offsets = [element.scrollLeft]
+    for (let frame = 0; frame < 2; frame += 1) {
+      await new Promise<void>((done) => requestAnimationFrame(() => done()))
+      offsets.push(element.scrollLeft)
+    }
+    return Math.max(...offsets) - Math.min(...offsets)
+  })).toBeLessThanOrEqual(0.5)
+}
+
 async function expectCompleteItemsOnly(scroller: Locator) {
   await expect.poll(() => scroller.evaluate((element) => {
     const bounds = element.getBoundingClientRect()
@@ -336,6 +348,7 @@ test('incomplete desktop hero page aligns left while complete modal pages stay c
     const modalFirstPageCount = await visibleItemCount(modalScroller)
     await modalPagination.locator('[data-weather-carousel-page="2"]').click()
     await expect(modalPagination.locator('[aria-current="page"]')).toHaveAttribute('data-weather-carousel-page', '2')
+    await expectPageSettled(modalScroller)
     await expectCompleteItemsOnly(modalScroller)
     expect(await visibleItemCount(modalScroller)).toBe(modalFirstPageCount)
     await expectPageCentered(modalScroller)

@@ -42,6 +42,9 @@ export async function waitForModalReady(dialog: Locator, timeout = 5_000, readin
     const style = getComputedStyle(element)
     const selected = Array.from(element.querySelectorAll('[role="tab"][aria-selected="true"]'))
     const tabCount = element.querySelectorAll('[role="tab"]').length
+    const vacuumPreparation = readiness === 'vacuum-tabs'
+      ? [...element.querySelectorAll('[data-layout-preparation-phase]')]
+      : []
     const detailControls = detail ? [...element.querySelectorAll(detail.control)] : []
     const detailBack = detail ? [...element.querySelectorAll('button')].filter((button) => button.getAttribute('aria-label') === detail.backLabel) : []
     const detailReady = detailControls.length === 1 && detailBack.length === 1 && [...detailControls, ...detailBack].every((control) => {
@@ -68,6 +71,9 @@ export async function waitForModalReady(dialog: Locator, timeout = 5_000, readin
       tabsValid: readiness === 'tabs' ? tabCount === 0 || selected.length === 1 : selected.length === 1,
       incoming: Array.from(element.querySelectorAll('[data-modal-tab-transition-state]'))
         .every((panel) => panel.getAttribute('data-modal-tab-transition-state') === 'idle'),
+      vacuumPrepared: readiness !== 'vacuum-tabs'
+        || (vacuumPreparation.length === 1
+          && vacuumPreparation[0].getAttribute('data-layout-preparation-phase') === 'content'),
       panelsMatch: detail ? detailReady : selected.every((tab) => {
         const id = tab.getAttribute('aria-controls')
         const panel = id ? element.ownerDocument.getElementById(id) : null
@@ -90,7 +96,7 @@ export async function waitForModalReady(dialog: Locator, timeout = 5_000, readin
       }),
     }
   }, { readiness, detail }), { timeout, message: 'Wait for actual incoming content, not merely selected-tab chrome' }).toEqual({
-    opacity: 1, starting: false, running: [], tabsValid: true, incoming: true, panelsMatch: true,
+    opacity: 1, starting: false, running: [], tabsValid: true, incoming: true, vacuumPrepared: true, panelsMatch: true,
   })
   await dialog.evaluate(() => document.fonts.ready)
   await dialog.evaluate(() => new Promise<void>((done) => requestAnimationFrame(() => requestAnimationFrame(() => done()))))

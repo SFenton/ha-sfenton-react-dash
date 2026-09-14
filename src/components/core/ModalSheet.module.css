@@ -148,10 +148,25 @@
   bottom: auto;
   z-index: 41;
   display: flex;
-  height: min(100%, calc(100dvh - var(--dashboard-keyboard-overlay-inset, 0px)));
+  height: min(100%, 100vh);
+  height: min(100%, 100dvh);
   align-items: flex-end;
   justify-content: center;
   pointer-events: none;
+}
+
+:global(html[data-dashboard-keyboard='open']) .viewport,
+:global(html[data-dashboard-kb-arming='true']) .viewport {
+  /* Some WebViews shrink dvh without resizing the iframe; cap both paths instead of subtracting twice. */
+  height: min(
+    100%,
+    calc(var(--dashboard-viewport-height, 100vh) - var(--dashboard-keyboard-overlay-inset, 0px))
+  );
+  height: min(
+    100%,
+    100dvh,
+    calc(var(--dashboard-viewport-height, 100dvh) - var(--dashboard-keyboard-overlay-inset, 0px))
+  );
 }
 
 .content {
