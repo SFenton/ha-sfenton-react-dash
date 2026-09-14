@@ -1313,7 +1313,7 @@ export function useRecipeDetailModalController({ enabled = true }: { enabled?: b
           next.delete(ingredientKey)
           return next
         })
-        // Re-adding this key back to the actionable pool must let the bulk action reappear/re-fade in
+        // Re-adding this key back to the actionable pool must let the bulk action restore/reappear
         // rather than staying collapsed from an earlier success.
         resetGroceryCommandState()
       })

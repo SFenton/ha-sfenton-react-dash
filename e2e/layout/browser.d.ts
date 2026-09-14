@@ -24,6 +24,7 @@ export interface LayoutMockController {
   resolveWakeCommands: () => void
   rejectWakeCommands: () => void
   setWakeResponse: (outcome: string | null) => void
+  resolveCallService: (domain: string, service: string) => void
 }
 
 declare global {

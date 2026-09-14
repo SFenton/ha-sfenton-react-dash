@@ -792,6 +792,85 @@ describe('RecipeDetailModal', () => {
     }
   })
 
+  it('keeps an already-visible bulk command on the same phase-0 DOM node when an individual ingredient is removed', async () => {
+    const originalCallService = mockState.helpers.callService
+    const calls: Record<string, unknown>[] = []
+    let resolveRemove: (() => void) | undefined
+    mockState.helpers.callService = (params) => {
+      calls.push(params)
+      if (params.domain === 'evershelf' && params.service === 'recipe_detail') {
+        const response = detailResponse({ confirmedMissingCount: 2 })
+        response.response.detail.ingredients[1].inventory.state = 'missing'
+        return Promise.resolve(response)
+      }
+      if (params.domain === 'evershelf' && params.service === 'recipe_grocery_add') {
+        return Promise.resolve(grocerySuccessResponse())
+      }
+      if (params.domain === 'todo' && params.service === 'remove_item') {
+        return new Promise((resolve) => {
+          resolveRemove = () => resolve({})
+        })
+      }
+      return originalCallService(params)
+    }
+    mockTodoItemsByEntity['todo.shopping_list'] = [
+      { uid: 'grocery-tomatoes', summary: 'Diced Tomatoes', status: 'needs_action' },
+    ]
+
+    try {
+      render(<Harness />)
+      const dialog = await openRecipe()
+      await within(dialog).findByText('Serves 4')
+      await openTab(dialog, 'Ingredients')
+
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Add Diced Tomatoes · 1 can to groceries' }))
+      const removeButton = await within(dialog).findByRole('button', { name: 'Remove Diced Tomatoes · 1 can from groceries' })
+      const bulkButton = within(dialog).getByRole('button', { name: 'Add Missing Ingredients to Groceries' })
+      const bulkStage = dialog.querySelector('[data-recipe-grocery-phase="0"]')
+
+      expect(bulkStage).toBeInTheDocument()
+      expect(bulkStage).toContainElement(bulkButton)
+      expect(dialog.querySelector('[data-recipe-grocery-phase="7"]')).not.toBeInTheDocument()
+      // Initially visible/idle: enabled, no residual "preserve disabled visual" attribute, and no
+      // busy indicator, until removal starts.
+      expect(bulkButton).toBeEnabled()
+      expect(bulkButton).not.toHaveAttribute('data-preserve-disabled-visual')
+      expect(bulkButton).not.toHaveAttribute('aria-busy')
+
+      fireEvent.click(removeButton)
+      await within(dialog).findByRole('button', { name: 'Removing Diced Tomatoes · 1 can from groceries…' })
+
+      expect(dialog.querySelector('[data-recipe-grocery-phase="0"]')).toBe(bulkStage)
+      expect(within(dialog).getByRole('button', { name: 'Add Missing Ingredients to Groceries' })).toBe(bulkButton)
+      expect(dialog.querySelector('[data-recipe-grocery-phase="7"]')).not.toBeInTheDocument()
+      // The row removal is a temporary interlock, not a real disabled reason: the bulk button must
+      // stay natively disabled (so it cannot be clicked) while visually preserving its enabled
+      // look via the preserve-disabled-visual attribute, with no bulk aria-busy of its own.
+      expect(bulkButton).toBeDisabled()
+      expect(bulkButton).toHaveAttribute('data-preserve-disabled-visual', 'true')
+      expect(bulkButton).not.toHaveAttribute('aria-busy')
+      expect(calls.filter((call) => call.service === 'recipe_grocery_add')).toHaveLength(1)
+
+      await act(async () => resolveRemove?.())
+      await waitFor(() => expect(within(dialog).getByRole('button', { name: 'Add Diced Tomatoes · 1 can to groceries' })).toBeInTheDocument())
+
+      expect(dialog.querySelector('[data-recipe-grocery-phase="0"]')).toBe(bulkStage)
+      expect(within(dialog).getByRole('button', { name: 'Add Missing Ingredients to Groceries' })).toBe(bulkButton)
+      expect(bulkButton).toBeEnabled()
+      expect(bulkButton).not.toHaveAttribute('data-preserve-disabled-visual')
+      expect(dialog.querySelector('[data-recipe-grocery-phase="7"]')).not.toBeInTheDocument()
+
+      fireEvent.click(bulkButton)
+      await waitFor(() => expect(calls.filter((call) => call.service === 'recipe_grocery_add')).toHaveLength(2))
+      const bulkCall = calls.filter((call) => call.service === 'recipe_grocery_add')[1]
+      const bulkKeys = (bulkCall.serviceData as { selections: { key: string }[] }).selections.map((selection) => selection.key)
+      expect(bulkKeys.filter((key) => key === 'ri:0:0000000000000001')).toHaveLength(1)
+      expect(bulkKeys).toContain('ri:1:0000000000000002')
+    } finally {
+      mockState.helpers.callService = originalCallService
+    }
+  })
+
   it('does not match a different grocery item whose name merely contains the ingredient name', () => {
     const normalized = normalizeRecipeDetailServiceResult(detailResponse())
     expect(normalized.kind).toBe('detail')
@@ -1073,6 +1152,125 @@ describe('RecipeDetailModal', () => {
     }
   })
 
+  it('replaces a collapsed bulk-success stage with a fresh phase-0 command stage when removal grows the actionable pool', async () => {
+    const originalCallService = mockState.helpers.callService
+    let resolveRemove: (() => void) | undefined
+    mockState.helpers.callService = (params) => {
+      if (params.domain === 'evershelf' && params.service === 'recipe_detail') {
+        const response = detailResponse({ confirmedMissingCount: 2 })
+        response.response.detail.ingredients[1].inventory.state = 'missing'
+        return Promise.resolve(response)
+      }
+      if (params.domain === 'evershelf' && params.service === 'recipe_grocery_add') {
+        return Promise.resolve(grocerySuccessResponse())
+      }
+      if (params.domain === 'todo' && params.service === 'remove_item') {
+        return new Promise((resolve) => {
+          resolveRemove = () => resolve(originalCallService(params))
+        })
+      }
+      return originalCallService(params)
+    }
+    mockTodoItemsByEntity['todo.shopping_list'] = [
+      { uid: 'grocery-tomatoes', summary: 'Diced Tomatoes', status: 'needs_action' },
+      { uid: 'grocery-rice', summary: 'Rice', status: 'needs_action' },
+    ]
+
+    try {
+      render(<Harness />)
+      const dialog = await openRecipe()
+      await within(dialog).findByText('Serves 4')
+      await openTab(dialog, 'Ingredients')
+
+      vi.useFakeTimers()
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Add Missing Ingredients to Groceries' }))
+      await act(async () => {
+        await Promise.resolve()
+        await Promise.resolve()
+      })
+      act(() => vi.advanceTimersByTime(4_000))
+
+      const collapsedStage = dialog.querySelector('[data-recipe-grocery-complete="true"]')
+      expect(collapsedStage).toBeInTheDocument()
+      expect(dialog.querySelector('[data-recipe-grocery-phase]')).not.toBeInTheDocument()
+      vi.useRealTimers()
+
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Remove Rice · 2 cups from groceries' }))
+      await waitFor(() => expect(resolveRemove).toBeDefined())
+
+      // The todo removal is still pending (deferred above): the collapsed stage must not be
+      // replaced/reopened until Home Assistant actually confirms the removal.
+      expect(dialog.querySelector('[data-recipe-grocery-complete="true"]')).toBe(collapsedStage)
+      expect(dialog.querySelector('[data-recipe-grocery-phase]')).not.toBeInTheDocument()
+      expect(within(dialog).queryByRole('button', { name: 'Add Rice · 2 cups to groceries' })).not.toBeInTheDocument()
+
+      await act(async () => resolveRemove?.())
+      await waitFor(() => expect(within(dialog).getByRole('button', { name: 'Add Rice · 2 cups to groceries' })).toBeInTheDocument())
+
+      const reopenedStage = dialog.querySelector('[data-recipe-grocery-phase="0"]')
+      expect(reopenedStage).toBeInTheDocument()
+      expect(reopenedStage).not.toBe(collapsedStage)
+      expect(dialog.querySelector('[data-recipe-grocery-complete="true"]')).not.toBeInTheDocument()
+      expect(dialog.querySelector('[data-recipe-grocery-phase="7"]')).not.toBeInTheDocument()
+      const reopenedButton = within(dialog).getByRole('button', { name: 'Add Missing Ingredients to Groceries' })
+      expect(reopenedButton).toBeEnabled()
+      expect(reopenedButton).not.toHaveAttribute('data-preserve-disabled-visual')
+    } finally {
+      vi.useRealTimers()
+      mockState.helpers.callService = originalCallService
+    }
+  })
+
+  it('keeps the collapsed bulk-success stage in place when a removal fails', async () => {
+    const originalCallService = mockState.helpers.callService
+    mockState.helpers.callService = (params) => {
+      if (params.domain === 'evershelf' && params.service === 'recipe_detail') {
+        const response = detailResponse({ confirmedMissingCount: 2 })
+        response.response.detail.ingredients[1].inventory.state = 'missing'
+        return Promise.resolve(response)
+      }
+      if (params.domain === 'evershelf' && params.service === 'recipe_grocery_add') {
+        return Promise.resolve(grocerySuccessResponse())
+      }
+      if (params.domain === 'todo' && params.service === 'remove_item') {
+        return Promise.reject(new Error('Mock removal failure'))
+      }
+      return originalCallService(params)
+    }
+    mockTodoItemsByEntity['todo.shopping_list'] = [
+      { uid: 'grocery-tomatoes', summary: 'Diced Tomatoes', status: 'needs_action' },
+      { uid: 'grocery-rice', summary: 'Rice', status: 'needs_action' },
+    ]
+
+    try {
+      render(<Harness />)
+      const dialog = await openRecipe()
+      await within(dialog).findByText('Serves 4')
+      await openTab(dialog, 'Ingredients')
+
+      vi.useFakeTimers()
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Add Missing Ingredients to Groceries' }))
+      await act(async () => {
+        await Promise.resolve()
+        await Promise.resolve()
+      })
+      act(() => vi.advanceTimersByTime(4_000))
+
+      const collapsedStage = dialog.querySelector('[data-recipe-grocery-complete="true"]')
+      expect(collapsedStage).toBeInTheDocument()
+      vi.useRealTimers()
+
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Remove Rice · 2 cups from groceries' }))
+      await waitFor(() => expect(within(dialog).getByRole('alert')).toBeInTheDocument())
+
+      expect(dialog.querySelector('[data-recipe-grocery-complete="true"]')).toBe(collapsedStage)
+      expect(dialog.querySelector('[data-recipe-grocery-phase]')).not.toBeInTheDocument()
+    } finally {
+      vi.useRealTimers()
+      mockState.helpers.callService = originalCallService
+    }
+  })
+
   it('does not reopen or flicker the collapsed bulk command area when an unrelated individual ingredient add succeeds afterward', async () => {
     const originalCallService = mockState.helpers.callService
     mockState.helpers.callService = (params) => {
@@ -1169,18 +1367,35 @@ describe('RecipeDetailModal', () => {
       await within(dialog).findByText('Serves 4')
       await openTab(dialog, 'Ingredients')
 
+      const groceryButton = within(dialog).getByRole('button', { name: 'Add Missing Ingredients to Groceries' })
+      const groceryStage = dialog.querySelector('[data-recipe-grocery-phase="0"]')
+      // Initially visible/idle: enabled with no preserve or busy markers before any individual
+      // add starts.
+      expect(groceryButton).toBeEnabled()
+      expect(groceryButton).not.toHaveAttribute('data-preserve-disabled-visual')
+      expect(groceryButton).not.toHaveAttribute('aria-busy')
+
       fireEvent.click(within(dialog).getByRole('button', { name: 'Add Diced Tomatoes · 1 can to groceries' }))
       await waitFor(() => expect(resolveIndividual).toBeDefined())
 
-      const groceryButton = within(dialog).getByRole('button', { name: 'Add Missing Ingredients to Groceries' })
+      // Same phase-0 stage/button node throughout the pending individual add.
+      expect(dialog.querySelector('[data-recipe-grocery-phase="0"]')).toBe(groceryStage)
+      expect(within(dialog).getByRole('button', { name: 'Add Missing Ingredients to Groceries' })).toBe(groceryButton)
       expect(groceryButton).toBeDisabled()
+      // A pending sibling row add is not the bulk action's own request, so it must not carry the
+      // bulk aria-busy semantic, only the preserved enabled look via the interlock attribute.
+      expect(groceryButton).not.toHaveAttribute('aria-busy')
+      expect(groceryButton).toHaveAttribute('data-preserve-disabled-visual', 'true')
       fireEvent.click(groceryButton)
       expect(calls.filter((call) => call.service === 'recipe_grocery_add')).toHaveLength(1)
 
       await act(async () => resolveIndividual?.(grocerySuccessResponse()))
       await waitFor(() => expect(within(dialog).getByRole('button', { name: 'Remove Diced Tomatoes · 1 can from groceries' })).toBeInTheDocument())
 
-      expect(within(dialog).getByRole('button', { name: 'Add Missing Ingredients to Groceries' })).toBeEnabled()
+      expect(dialog.querySelector('[data-recipe-grocery-phase="0"]')).toBe(groceryStage)
+      expect(within(dialog).getByRole('button', { name: 'Add Missing Ingredients to Groceries' })).toBe(groceryButton)
+      expect(groceryButton).toBeEnabled()
+      expect(groceryButton).not.toHaveAttribute('data-preserve-disabled-visual')
       await act(async () => {
         fireEvent.click(within(dialog).getByRole('button', { name: 'Add Missing Ingredients to Groceries' }))
         await Promise.resolve()
@@ -1192,6 +1407,59 @@ describe('RecipeDetailModal', () => {
       expect(groceryCalls[1]).toMatchObject({
         serviceData: { selections: [{ key: 'ri:1:0000000000000002', position: 1 }] },
       })
+    } finally {
+      mockState.helpers.callService = originalCallService
+    }
+  })
+
+  it('keeps the bulk action semantically disabled without the preserve-visual attribute while a genuine disabledReason applies during a pending removal', async () => {
+    const originalCallService = mockState.helpers.callService
+    let resolveRemove: (() => void) | undefined
+    mockState.helpers.callService = (params) => {
+      if (params.domain === 'evershelf' && params.service === 'recipe_detail') return Promise.resolve(detailResponse())
+      if (params.domain === 'evershelf' && params.service === 'recipe_grocery_add') return Promise.resolve(grocerySuccessResponse())
+      if (params.domain === 'todo' && params.service === 'remove_item') {
+        return new Promise((resolve) => {
+          resolveRemove = () => resolve({})
+        })
+      }
+      return originalCallService(params)
+    }
+    mockTodoItemsByEntity['todo.shopping_list'] = [
+      { uid: 'grocery-tomatoes', summary: 'Diced Tomatoes', status: 'needs_action' },
+    ]
+
+    try {
+      render(<Harness />)
+      const dialog = await openRecipe()
+      await within(dialog).findByText('Serves 4')
+      await openTab(dialog, 'Ingredients')
+
+      // The default fixture has only one actionable missing ingredient; adding it individually
+      // exhausts the actionable pool and produces a real, semantic disabledReason.
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Add Diced Tomatoes · 1 can to groceries' }))
+      const removeButton = await within(dialog).findByRole('button', { name: 'Remove Diced Tomatoes · 1 can from groceries' })
+      const groceryButton = within(dialog).getByRole('button', { name: 'Add Missing Ingredients to Groceries' })
+      expect(groceryButton).toBeDisabled()
+      expect(groceryButton).not.toHaveAttribute('data-preserve-disabled-visual')
+      expect(within(dialog).getByText('All missing ingredients have already been added to groceries.')).toBeInTheDocument()
+
+      fireEvent.click(removeButton)
+      await within(dialog).findByRole('button', { name: 'Removing Diced Tomatoes · 1 can from groceries…' })
+
+      // Removal is pending (interactionPending is true), but the ingredient is still counted as
+      // added until Home Assistant confirms the removal, so the genuine disabledReason still
+      // applies and must win: stay disabled, no preserve-visual attribute, hint still shown.
+      expect(groceryButton).toBeDisabled()
+      expect(groceryButton).not.toHaveAttribute('data-preserve-disabled-visual')
+      expect(within(dialog).getByText('All missing ingredients have already been added to groceries.')).toBeInTheDocument()
+
+      await act(async () => resolveRemove?.())
+      await waitFor(() => expect(within(dialog).getByRole('button', { name: 'Add Diced Tomatoes · 1 can to groceries' })).toBeInTheDocument())
+
+      // Only the successful removal restores the actionable pool and enables the bulk action.
+      expect(within(dialog).getByRole('button', { name: 'Add Missing Ingredients to Groceries' })).toBeEnabled()
+      expect(within(dialog).queryByText('All missing ingredients have already been added to groceries.')).not.toBeInTheDocument()
     } finally {
       mockState.helpers.callService = originalCallService
     }

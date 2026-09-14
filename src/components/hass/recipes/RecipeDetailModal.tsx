@@ -550,12 +550,14 @@ function GroceryCommandStage({
   grocerySubmitted,
   onAddMissing,
   phase,
+  preserveDisabledVisual = false,
 }: {
   disabled: boolean
   loading: boolean
   grocerySubmitted: boolean
   onAddMissing: () => void
   phase: GroceryActionPhase
+  preserveDisabledVisual?: boolean
 }) {
   const collapsed = phase === GROCERY_ACTION_PHASE.COLLAPSED
 
@@ -569,7 +571,7 @@ function GroceryCommandStage({
       <button
         aria-busy={loading || undefined}
         className={`${styles.primaryAction} ${styles.groceryCommandLayer}`}
-        data-preserve-disabled-visual={loading || grocerySubmitted ? 'true' : undefined}
+        data-preserve-disabled-visual={loading || grocerySubmitted || preserveDisabledVisual ? 'true' : undefined}
         disabled={disabled}
         onClick={onAddMissing}
         type="button"
@@ -681,6 +683,7 @@ function RecipeGroceryAction({
             : requestFailed
               ? GROCERY_ACTION_PHASE.ERROR_RECOVERY
               : GROCERY_ACTION_PHASE.BUTTON}
+          preserveDisabledVisual={interactionPending && !disabledReason}
         />
       )}
       {disabledReason && !requestLoading && !grocerySubmitted && (
