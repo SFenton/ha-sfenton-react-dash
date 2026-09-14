@@ -1,6 +1,7 @@
 import { expect, type Locator, type Page } from './fixture'
 import { closeMounted, modalFacts, waitForModalReady, waitForRoute } from './evidence'
 import type { ScenarioId } from './contracts'
+import { expectWakeTargetAboveFooter } from '../wake-light-support'
 import sourceSchedules from '../../home-assistant/tests/fixtures/sleepypod-alarm-v2.json' with { type: 'json' }
 
 export const WAKE_LAYOUT_ENTITY = 'sensor.master_bedroom_wake_light'
@@ -201,6 +202,15 @@ export async function enterWakeState(dialog: Locator, scenario: ScenarioId, stat
 
 export async function wakeStateFacts(dialog: Locator, scenario: ScenarioId, state: string) {
   const editor = scenario === 'wake-editor' || (scenario === 'wake-source' && state === 'pod-alarm-detail')
+  if (scenario === 'wake-editor' && state === 'rejected') {
+    await expectWakeTargetAboveFooter(dialog, dialog.getByRole('alert'))
+  }
+  if (scenario === 'wake-editor' && state === 'revision-conflict') {
+    await expectWakeTargetAboveFooter(
+      dialog,
+      dialog.getByRole('button', { name: 'Open Latest Alarm, Replace Draft', exact: true }),
+    )
+  }
   const facts: Record<string, unknown> = await modalFacts(dialog, editor ? 'body' : 'panes')
   await expect(dialog).toHaveAttribute('data-layout-mounted', 'original')
   await expect(dialog.page().getByRole('dialog')).toHaveCount(1)
@@ -217,8 +227,18 @@ export async function wakeStateFacts(dialog: Locator, scenario: ScenarioId, stat
     if (pending) await expect(dialog.getByLabel('Alarm Name', { exact: true })).toBeDisabled()
     else await expect(dialog.getByLabel('Alarm Name', { exact: true })).toBeEnabled()
     if (pending) await expect(dialog.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
-    if (state === 'rejected') await expect(dialog.getByRole('alert')).toContainText('Home Assistant did not confirm')
-    if (state === 'revision-conflict') await expect(dialog.getByRole('button', { name: 'Open Latest Alarm, Replace Draft', exact: true })).toBeVisible()
+    if (state === 'rejected') {
+      const alert = dialog.getByRole('alert')
+      await expect(alert).toContainText('Home Assistant did not confirm')
+      await expectWakeTargetAboveFooter(dialog, alert)
+      facts.feedback = { fullyVisibleAboveFooter: true, state }
+    }
+    if (state === 'revision-conflict') {
+      const reload = dialog.getByRole('button', { name: 'Open Latest Alarm, Replace Draft', exact: true })
+      await expect(reload).toBeVisible()
+      await expectWakeTargetAboveFooter(dialog, reload)
+      facts.feedback = { fullyVisibleAboveFooter: true, state }
+    }
     if (state === 'one-time') {
       await expect(dialog.getByLabel('Alarm Type', { exact: true })).toHaveValue('once')
       await expect(dialog.getByLabel('Alarm Date', { exact: true })).toBeVisible()

@@ -385,6 +385,17 @@ interface BedTargetChoice {
   side: BedAlarmSide
 }
 
+function revealEditorFeedback(feedback: HTMLDivElement) {
+  if (!feedback.isConnected) return
+  feedback.scrollIntoView?.({ block: 'nearest' })
+  const body = feedback.closest<HTMLElement>('[data-modal-sheet-body]')
+  const footer = feedback.closest<HTMLElement>('[role="dialog"]')
+    ?.querySelector<HTMLElement>('[data-modal-sheet-footer="true"]')
+  if (!body || !footer) return
+  const overlap = feedback.getBoundingClientRect().bottom - footer.getBoundingClientRect().top
+  if (overlap > 1) body.scrollTop += overlap
+}
+
 function AlarmEditor({ bedTargets, controller, draft, onBedTargetChange, onChange, onReload }: {
   bedTargets?: readonly BedTargetChoice[]
   controller: WakeLightController
@@ -394,12 +405,51 @@ function AlarmEditor({ bedTargets, controller, draft, onBedTargetChange, onChang
   onReload: () => void
 }) {
   const copy = useCopy(WAKE_LIGHT_COPY_NAMESPACE)
+  const feedbackRef = useRef<HTMLDivElement>(null)
   const valid = validateWakeLightAlarm(draft)
   const disabled = !controller.canEdit || !controller.snapshot.available || controller.configurationPending
   const latest = controller.liveAlarms.find(alarm => alarm.id === draft.id)
   const stale = controller.errorCode === 'revision_conflict'
     && (controller.requiresAlarmReload || Boolean(latest && latest.revision !== draft.revision))
   const change = (value: Partial<WakeLightAlarm>) => onChange({ ...draft, ...value })
+  useLayoutEffect(() => {
+    const feedback = feedbackRef.current
+    if ((!controller.error && !stale) || !feedback) return
+    const view = feedback.ownerDocument.defaultView
+    if (!view) {
+      revealEditorFeedback(feedback)
+      return
+    }
+    let frame = 0
+    const queueReveal = () => {
+      view.cancelAnimationFrame(frame)
+      frame = view.requestAnimationFrame(() => {
+        revealEditorFeedback(feedback)
+        frame = view.requestAnimationFrame(() => revealEditorFeedback(feedback))
+      })
+    }
+    const body = feedback.closest<HTMLElement>('[data-modal-sheet-body]')
+    const footer = feedback.closest<HTMLElement>('[role="dialog"]')
+      ?.querySelector<HTMLElement>('[data-modal-sheet-footer="true"]')
+    const content = body?.querySelector<HTMLElement>('[data-modal-content-measure="true"]')
+    const observer = typeof view.ResizeObserver === 'undefined'
+      ? null
+      : new view.ResizeObserver(queueReveal)
+    if (body) observer?.observe(body)
+    if (content) observer?.observe(content)
+    if (footer) observer?.observe(footer)
+    observer?.observe(feedback)
+    revealEditorFeedback(feedback)
+    queueReveal()
+    view.addEventListener('resize', queueReveal)
+    view.visualViewport?.addEventListener('resize', queueReveal)
+    return () => {
+      view.cancelAnimationFrame(frame)
+      observer?.disconnect()
+      view.removeEventListener('resize', queueReveal)
+      view.visualViewport?.removeEventListener('resize', queueReveal)
+    }
+  }, [controller.error, stale])
   const setKind = (kind: WakeLightAlarmKind) => {
     const fallback = createWakeLightAlarm(draft.id, draft.label)
     change({
@@ -443,9 +493,13 @@ function AlarmEditor({ bedTargets, controller, draft, onBedTargetChange, onChang
         {!valid.rampValid && <InlineAlert>{copy(C.editor.rampRequired)}</InlineAlert>}
         {!valid.daysValid && <InlineAlert>{copy(C.editor.daysRequired)}</InlineAlert>}
         {!valid.dateValid && <InlineAlert>{copy(C.editor.futureDateRequired)}</InlineAlert>}
-        {controller.error && <InlineAlert>{controller.error}</InlineAlert>}
-        {stale && (
-          <FieldActionButton disabled={controller.configurationPending} label={copy(C.actions.reloadAlarm)} onClick={onReload} />
+        {(controller.error || stale) && (
+          <div className={styles.editorFeedback} ref={feedbackRef}>
+            {controller.error && <InlineAlert>{controller.error}</InlineAlert>}
+            {stale && (
+              <FieldActionButton disabled={controller.configurationPending} label={copy(C.actions.reloadAlarm)} onClick={onReload} />
+            )}
+          </div>
         )}
       </ScheduleEditorFields>
     </div>

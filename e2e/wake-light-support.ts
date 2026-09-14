@@ -66,6 +66,17 @@ export function expectSameBox(actual: Box, expected: Box) {
   }
 }
 
+export async function expectWakeTargetAboveFooter(dialog: Locator, target: Locator) {
+  await expect.poll(async () => {
+    const [targetBox, footerBox] = await Promise.all([
+      target.boundingBox(),
+      dialog.locator('[data-modal-sheet-footer="true"]').boundingBox(),
+    ])
+    if (!targetBox || !footerBox) return Number.POSITIVE_INFINITY
+    return targetBox.y + targetBox.height - footerBox.y
+  }).toBeLessThanOrEqual(1)
+}
+
 export async function auditWake(page: Page, dialog: Locator, profile: WakeProfile) {
   await settleWake(dialog)
   await expect(dialog).toHaveAttribute('data-modal-geometry-intent', 'wake-light')

@@ -1,3 +1,4 @@
+// @covers src/components/core/ModalSheet.module.css
 import { expect, test, type Locator, type Page } from './layout/fixture'
 import { waitForModalReady, type ModalReadiness } from './layout/evidence'
 import { writeFileSync } from 'node:fs'
@@ -518,6 +519,74 @@ test.describe('touch keyboard viewport', () => {
     expect(composer!.y + composer!.height).toBeLessThanOrEqual(520)
   })
 
+  test('portrait sheets do not double-apply the inset when dynamic viewport units already contract', async ({ page }) => {
+    await page.setViewportSize(PORTRAIT)
+    await installSafeAreaInsets(page, PORTRAIT.insets)
+    await page.addInitScript(() => {
+      Object.defineProperty(navigator, 'maxTouchPoints', { configurable: true, value: 1 })
+    })
+    await page.goto('/index.html?path=to-do')
+    await page.getByRole('button', { name: 'Add Task', exact: true }).click()
+    const dialog = page.getByRole('dialog', { name: 'Add Task', exact: true })
+    await dialog.getByRole('textbox').focus()
+    await page.evaluate((layoutHeight) => {
+      Object.defineProperty(window, 'innerHeight', {
+        configurable: true,
+        get: () => layoutHeight,
+      })
+    }, PORTRAIT.height)
+
+    await page.setViewportSize({ width: PORTRAIT.width, height: 520 })
+    await expect.poll(() => page.evaluate(() => {
+      const probe = document.createElement('div')
+      probe.style.cssText = 'position:fixed;height:100dvh;pointer-events:none'
+      document.body.append(probe)
+      const dynamicHeight = probe.getBoundingClientRect().height
+      probe.remove()
+      return {
+        dynamicHeight,
+        innerHeight: window.innerHeight,
+        overlayInset: document.documentElement.style.getPropertyValue('--dashboard-keyboard-overlay-inset'),
+        visualHeight: window.visualViewport?.height,
+      }
+    })).toEqual({
+      dynamicHeight: 520,
+      innerHeight: PORTRAIT.height,
+      overlayInset: '332px',
+      visualHeight: 520,
+    })
+
+    expectBox(await outerBox(dialog), { x: 0, y: 59, width: 393, height: 461 }, 'contracted-dvh portrait form')
+    const footer = await dialog.locator('[data-modal-sheet-footer="true"]').boundingBox()
+    expect(Math.abs(footer!.y + footer!.height - 520)).toBeLessThanOrEqual(1)
+    await close(dialog)
+  })
+
+  test('closed keyboard ignores a stale viewport height after a mounted resize', async ({ page }) => {
+    await page.setViewportSize(PORTRAIT)
+    await installSafeAreaInsets(page, PORTRAIT.insets)
+    await page.goto('/index.html?path=to-do')
+    await page.getByRole('button', { name: 'Add Task', exact: true }).click()
+    const dialog = page.getByRole('dialog', { name: 'Add Task', exact: true })
+    const tablet = { width: 820, height: 1180, insets: { top: 0, right: 0, bottom: 0, left: 0 } }
+    await resize(page, tablet)
+    await expect(dialog).toHaveAttribute('data-modal-presentation', 'dialog')
+    const expected = { x: 32, y: 210, width: 756, height: 760 }
+    expectBox(await outerBox(dialog), expected, 'settled tablet form')
+
+    const staleViewportBox = await dialog.evaluate((element) => {
+      const root = document.documentElement
+      root.style.setProperty('--dashboard-viewport-height', '343px')
+      root.style.setProperty('--dashboard-keyboard-overlay-inset', '0px')
+      root.removeAttribute('data-dashboard-keyboard')
+      root.removeAttribute('data-dashboard-kb-arming')
+      const box = element.getBoundingClientRect()
+      return { x: box.x, y: box.y, width: box.width, height: box.height }
+    })
+    expectBox(staleViewportBox, expected, 'keyboard-closed tablet form with stale viewport height')
+    await close(dialog)
+  })
+
   test('landscape frames follow the keyboard overlay below the page minimum height', async ({ page }) => {
     const profile = LANDSCAPES[0]
     await page.setViewportSize(profile)
@@ -658,14 +727,17 @@ for (const filter of [
   { route: 'recipes', title: 'Filter Recipes' },
   { route: 'fridge', title: 'Filter Inventory' },
 ]) {
-  test(`${filter.title} explanations wrap fully in centered layouts without altering portrait`, async ({ page }) => {
+  test(`${filter.title} explanations wrap fully in every presentation`, async ({ page }) => {
     await page.setViewportSize(PORTRAIT)
     await page.goto(`/index.html?path=${filter.route}`)
     await setSafeAreaInsets(page, PORTRAIT.insets)
     await page.locator('[data-floating-action-dock="true"]').getByRole('button', { name: 'Filter', exact: true }).click()
     const dialog = page.getByRole('dialog', { name: filter.title })
     const descriptions = dialog.getByRole('radio').locator('small')
-    await expect(descriptions.first()).toHaveCSS('white-space', 'nowrap')
+    await expect(descriptions.first()).toHaveCSS('white-space', 'normal')
+    expect(await descriptions.evaluateAll((elements) =>
+      elements.filter((element) => element.scrollWidth > element.clientWidth + 1 || element.scrollHeight > element.clientHeight + 1)
+        .map((element) => element.textContent)), `${filter.title}: readable portrait choices`).toEqual([])
     const portrait = await outerBox(dialog)
     for (const profile of [
       LANDSCAPES[0], LANDSCAPES[2], LANDSCAPES[3],
@@ -686,7 +758,10 @@ for (const filter of [
     }
     await resize(page, PORTRAIT)
     await expect(dialog).toHaveAttribute('data-modal-presentation', 'sheet')
-    await expect(descriptions.first()).toHaveCSS('white-space', 'nowrap')
+    await expect(descriptions.first()).toHaveCSS('white-space', 'normal')
+    expect(await descriptions.evaluateAll((elements) =>
+      elements.filter((element) => element.scrollWidth > element.clientWidth + 1 || element.scrollHeight > element.clientHeight + 1)
+        .map((element) => element.textContent)), `${filter.title}: readable restored portrait choices`).toEqual([])
     expectBox(await outerBox(dialog), portrait, `${filter.title}: portrait preservation`)
     await close(dialog)
   })

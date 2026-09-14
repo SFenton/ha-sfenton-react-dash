@@ -76,6 +76,11 @@
   gap: 10px;
 }
 
+.editorFeedback {
+  display: grid;
+  gap: 10px;
+}
+
 .rampField {
   display: grid;
   min-width: 0;

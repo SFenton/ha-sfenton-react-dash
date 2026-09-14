@@ -1,7 +1,7 @@
 import { expect, test } from './layout/fixture'
 import {
-  auditWake, expectSameBox, openWake, resizeWake,
-  wakeProfile, WAKE_TITLE, type WakeMockApi,
+  auditWake, expectSameBox, expectWakeTargetAboveFooter, openWake, resizeWake,
+  wakeProfile, WAKE_ENTITY, WAKE_TITLE, type WakeMockApi,
 } from './wake-light-support'
 
 test.use({ hasTouch: false, isMobile: false })
@@ -77,13 +77,40 @@ for (const profile of ['desktop', 'wide-desktop'].map(wakeProfile)) {
     await dialog.getByRole('button', { name: 'Save', exact: true }).click()
     expectSameBox(await auditWake(page, dialog, profile), original)
     await page.evaluate(() => (window as unknown as { __mockHass: WakeMockApi }).__mockHass.rejectWakeCommands())
-    await expect(dialog.getByRole('alert')).toContainText('Home Assistant did not confirm')
+    const alert = dialog.getByRole('alert')
+    await expect(alert).toContainText('Home Assistant did not confirm')
+    await expectWakeTargetAboveFooter(dialog, alert)
     await expect(dialog.getByLabel('Alarm Name')).toHaveValue('Desktop Draft')
+    expectSameBox(await auditWake(page, dialog, profile), original)
+
+    await dialog.getByRole('button', { name: 'Close', exact: true }).click()
+    await expect(dialog).toHaveCount(0, { timeout: 2_000 })
+    dialog = await openWake(page)
+    await resizeWake(page, profile)
+    await dialog.getByRole('button', { name: /^Weekday Wake/ }).click()
+    dialog = page.getByRole('dialog', { name: 'Weekday Wake · Master Bedroom', exact: true })
+    await dialog.getByLabel('Alarm Name', { exact: true }).fill('Desktop Conflict Draft')
+    dialog = page.getByRole('dialog', { name: 'Desktop Conflict Draft · Master Bedroom', exact: true })
+    await page.evaluate((entity) => {
+      const api = (window as unknown as { __mockHass: WakeMockApi }).__mockHass
+      const snapshot = api.getEntity(entity)!
+      const alarms = snapshot.attributes.alarms as Array<Record<string, unknown>>
+      api.setEntityAttribute(entity, 'alarms', alarms.map((alarm) => alarm.id === 'weekday-wake'
+        ? { ...alarm, label: 'Latest saved wake', revision: Number(alarm.revision) + 1 }
+        : alarm))
+      api.setEntityAttribute(entity, 'revision', Number(snapshot.attributes.revision) + 1)
+    }, WAKE_ENTITY)
+    await dialog.getByRole('button', { name: 'Save', exact: true }).click()
+    const reload = dialog.getByRole('button', { name: 'Open Latest Alarm, Replace Draft', exact: true })
+    await expect(reload).toBeVisible()
+    await expectWakeTargetAboveFooter(dialog, reload)
+    await expect(dialog.getByLabel('Alarm Name')).toHaveValue('Desktop Conflict Draft')
     expectSameBox(await auditWake(page, dialog, profile), original)
   })
 }
 // @covers src/components/core/NativePickerField.module.css
 // @covers src/components/core/RadioRow.module.css
+// @covers src/components/hass/wakeLights/WakeLightModalContent.tsx
 // @covers src/components/hass/wakeLights/WakeLightModalContent.module.css
 // @covers src/index.css
 // @covers src/pages/DashboardViewPage.module.css
