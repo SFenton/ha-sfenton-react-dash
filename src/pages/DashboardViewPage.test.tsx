@@ -6923,10 +6923,13 @@ describe('DashboardViewPage', () => {
 
     const callCountBeforeDeniedDelete = mockCallServiceCalls.length
     const batchDeleteConfirm = vi.spyOn(window, 'confirm').mockReturnValue(false)
-    const batchDeletePrompt = vi.spyOn(window, 'prompt')
+    const batchDeletePrompt = vi.spyOn(window, 'prompt').mockReturnValue(null)
     fireEvent.click(screen.getByRole('button', { name: `Delete Canned Beans ${cannedBeansBatch}` }))
-    expect(batchDeleteConfirm).toHaveBeenCalledWith(`Delete Canned Beans ${cannedBeansBatch} from the pantry?`)
-    expect(batchDeletePrompt).not.toHaveBeenCalled()
+    expect(batchDeletePrompt).toHaveBeenCalledWith(
+      `Choose how many Canned Beans ${cannedBeansBatch} to delete from the pantry. Enter a number from 1 to 2.`,
+      '1',
+    )
+    expect(batchDeleteConfirm).not.toHaveBeenCalled()
     expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
     expect(mockCallServiceCalls).toHaveLength(callCountBeforeDeniedDelete)
     batchDeleteConfirm.mockRestore()
@@ -6980,14 +6983,28 @@ describe('DashboardViewPage', () => {
       serviceData: { location: 'frigo' },
     })
     mockCallServiceCalls.length = 0
-    const rowDeleteConfirm = vi.spyOn(window, 'confirm').mockReturnValue(true)
+    const rowDeleteConfirmCancelled = vi.spyOn(window, 'confirm').mockReturnValue(false)
+    const rowDeletePromptCancelled = vi.spyOn(window, 'prompt').mockReturnValue(null)
+    const callCountBeforeCancelledRowDelete = mockCallServiceCalls.length
+    fireEvent.click(within(greekYogurtRow).getByRole('button', { name: 'Delete Greek Yogurt' }))
+    expect(rowDeletePromptCancelled).toHaveBeenCalledWith(
+      'Choose how many Greek Yogurt to delete from the fridge. Enter a number from 1 to 2.',
+      '1',
+    )
+    expect(rowDeleteConfirmCancelled).not.toHaveBeenCalled()
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
+    expect(mockCallServiceCalls).toHaveLength(callCountBeforeCancelledRowDelete)
+    rowDeleteConfirmCancelled.mockRestore()
+    rowDeletePromptCancelled.mockRestore()
+
+    const rowDeleteConfirm = vi.spyOn(window, 'confirm').mockReturnValue(false)
     const rowDeletePrompt = vi.spyOn(window, 'prompt').mockReturnValue('1')
     fireEvent.click(within(greekYogurtRow).getByRole('button', { name: 'Delete Greek Yogurt' }))
-    expect(rowDeleteConfirm).toHaveBeenCalledWith('Delete Greek Yogurt from the fridge?')
     expect(rowDeletePrompt).toHaveBeenCalledWith(
       'Choose how many Greek Yogurt to delete from the fridge. Enter a number from 1 to 2.',
       '1',
     )
+    expect(rowDeleteConfirm).not.toHaveBeenCalled()
     expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
     await waitFor(() => expect(mockCallServiceCalls).toContainEqual({
       domain: 'evershelf',

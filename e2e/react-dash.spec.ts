@@ -1945,21 +1945,16 @@ test('grocery deletes use native browser confirmations and prompts', async ({ pa
   await inventoryList(page, 'Pantry inventory list').getByRole('group', { name: /Canned Beans Quantity 5/i }).getByRole('button', { name: 'Edit Canned Beans' }).click()
   const pantryDetails = page.getByRole('dialog', { name: 'Canned Beans' })
   const multiDelete = pantryDetails.getByRole('button', { name: /^Delete Canned Beans expiring / }).first()
-  const dismissedConfirmationPromise = page.waitForEvent('dialog')
-  const dismissedConfirmationClick = multiDelete.click()
-  const dismissedConfirmation = await dismissedConfirmationPromise
-  expect(dismissedConfirmation.type()).toBe('confirm')
-  expect(dismissedConfirmation.message()).toMatch(/^Delete Canned Beans expiring .+ from the pantry\?$/)
-  await dismissedConfirmation.dismiss()
-  await dismissedConfirmationClick
-  await expect(page.getByRole('alertdialog')).toHaveCount(0)
 
-  const acceptedConfirmationPromise = page.waitForEvent('dialog')
-  const dismissedPromptClick = multiDelete.click()
-  const acceptedConfirmation = await acceptedConfirmationPromise
-  expect(acceptedConfirmation.type()).toBe('confirm')
+  let multiDeleteDialogCount = 0
+  const countMultiDeleteDialogs = () => {
+    multiDeleteDialogCount += 1
+  }
+  page.on('dialog', countMultiDeleteDialogs)
+
+  await clearMockHassCalls(page)
   const dismissedPromptPromise = page.waitForEvent('dialog')
-  await acceptedConfirmation.accept()
+  const dismissedPromptClick = multiDelete.click()
   const dismissedPrompt = await dismissedPromptPromise
   expect(dismissedPrompt.type()).toBe('prompt')
   expect(dismissedPrompt.message()).toMatch(/^Choose how many Canned Beans expiring .+ to delete from the pantry\. Enter a number from 1 to 2\.$/)
@@ -1967,14 +1962,29 @@ test('grocery deletes use native browser confirmations and prompts', async ({ pa
   await dismissedPrompt.dismiss()
   await dismissedPromptClick
   await expect(page.getByRole('alertdialog')).toHaveCount(0)
+  expect(multiDeleteDialogCount).toBe(1)
+  expect(await everShelfInventoryCalls(page)).not.toContainEqual(
+    expect.objectContaining({ domain: 'evershelf', service: 'delete_inventory' }),
+  )
 
   await clearMockHassCalls(page)
-  const deleteConfirmationPromise = page.waitForEvent('dialog')
-  const acceptedPromptClick = multiDelete.click()
-  const deleteConfirmation = await deleteConfirmationPromise
-  expect(deleteConfirmation.type()).toBe('confirm')
+  multiDeleteDialogCount = 0
+  const invalidPromptPromise = page.waitForEvent('dialog')
+  const invalidPromptClick = multiDelete.click()
+  const invalidPrompt = await invalidPromptPromise
+  expect(invalidPrompt.type()).toBe('prompt')
+  await invalidPrompt.accept('0')
+  await invalidPromptClick
+  await expect(pantryDetails.getByRole('alert')).toHaveText('Enter a number from 1 to 2.')
+  expect(multiDeleteDialogCount).toBe(1)
+  expect(await everShelfInventoryCalls(page)).not.toContainEqual(
+    expect.objectContaining({ domain: 'evershelf', service: 'delete_inventory' }),
+  )
+
+  await clearMockHassCalls(page)
+  multiDeleteDialogCount = 0
   const acceptedPromptPromise = page.waitForEvent('dialog')
-  await deleteConfirmation.accept()
+  const acceptedPromptClick = multiDelete.click()
   const acceptedPrompt = await acceptedPromptPromise
   expect(acceptedPrompt.type()).toBe('prompt')
   await acceptedPrompt.accept('1')
@@ -1986,6 +1996,8 @@ test('grocery deletes use native browser confirmations and prompts', async ({ pa
     service: 'delete_inventory',
     serviceData: { inventory_id: 102 },
   })
+  expect(multiDeleteDialogCount).toBe(1)
+  page.off('dialog', countMultiDeleteDialogs)
 
   await page.goto('/index.html?path=overview&user=stephen#daily-report')
   const summary = page.getByRole('dialog', { name: "Stephen's Summary" })
