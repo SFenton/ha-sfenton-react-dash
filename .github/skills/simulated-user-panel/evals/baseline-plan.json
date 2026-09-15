@@ -19,16 +19,20 @@
     },
     {
       "caseId": "specialist-overload",
-      "personaIds": ["household-safety", "media-privacy", "situational-impairment"]
+      "personaIds": [
+        "household-safety",
+        "media-privacy",
+        "situational-impairment"
+      ]
     },
     {
       "caseId": "settings-next-tap",
       "personaId": "young-novice",
       "variant": "reference-model",
       "modelOverride": {
-        "model": "claude-opus-4.6",
-        "effort": "high",
-        "context": "long_context"
+        "model": "gpt-5.4",
+        "effort": "medium",
+        "context": "default"
       }
     },
     {
@@ -36,9 +40,9 @@
       "personaId": "power-user",
       "variant": "reference-model",
       "modelOverride": {
-        "model": "claude-opus-4.6",
-        "effort": "high",
-        "context": "long_context"
+        "model": "gpt-5.4",
+        "effort": "medium",
+        "context": "default"
       }
     },
     {
@@ -46,9 +50,9 @@
       "personaId": "accessibility-auditor",
       "variant": "reference-model",
       "modelOverride": {
-        "model": "claude-opus-4.6",
-        "effort": "high",
-        "context": "long_context"
+        "model": "gpt-5.4",
+        "effort": "medium",
+        "context": "default"
       }
     },
     {

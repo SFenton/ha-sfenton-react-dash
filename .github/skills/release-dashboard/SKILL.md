@@ -2,9 +2,9 @@
 name: release-dashboard
 description: Explicitly invoked dashboard release workflow that commits only the approved change, pushes and merges a PR to master, builds merged master, deploys both Home Assistant hosts, and verifies the production release.
 metadata:
-  model: gpt-5.6-sol
-  reasoning_effort: max
-  context_tier: long_context
+  model: gpt-5.4
+  reasoning_effort: medium
+  context_tier: default
 ---
 
 # Release Dashboard

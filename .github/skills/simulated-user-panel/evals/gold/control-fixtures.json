@@ -43,8 +43,9 @@
         "implementationStatus": "authorized",
         "implementationDispatched": true,
         "implementer": {
-          "route": "hierarchical-project-pipeline",
-          "repositoryApply": "operator-required"
+          "model": "gpt-5.4",
+          "effort": "medium",
+          "context": "default"
         },
         "permissions": {
           "homeAssistantMutation": false,

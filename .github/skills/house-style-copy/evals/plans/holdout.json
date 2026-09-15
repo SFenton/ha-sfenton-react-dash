@@ -6,9 +6,9 @@
   "expectedCandidateCount": 3,
   "requiresModelsArgument": true,
   "projectionCandidateIds": [
-    "claude-sonnet-5-low",
+    "gpt-5-mini-low",
     "gpt-5.6-terra-low",
-    "gpt-5.6-sol-max-long"
+    "gpt-5.4-mini-low"
   ],
   "repeats": 3,
   "batchSize": 6,

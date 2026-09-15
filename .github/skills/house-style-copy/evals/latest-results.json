@@ -1,13 +1,13 @@
 {
   "version": 1,
   "evaluatedAt": "2026-08-21",
-  "status": "validated",
+  "status": "blocked",
   "runs": [
     "artifacts/house-style-copy-evals/durable2-qualification-20260821",
     "artifacts/house-style-copy-evals/durable2-holdout-20260821",
     "artifacts/house-style-copy-evals/durable2-latency-20260821"
   ],
-  "winner": "gpt-5.6-sol-max-long",
+  "winner": null,
   "finalists": [
     {
       "candidateId": "gpt-5.6-sol-max-long",
@@ -62,5 +62,5 @@
       }
     }
   ],
-  "decision": "gpt-5.6-sol-max-long passed every quality gate and was selected by the deterministic cost, latency, and variance rule."
+  "decision": "No existing non-frontier non-Claude candidate passed the full quality gate, so the launcher now fails closed instead of pinning Sol or Claude for house-style copy generation."
 }

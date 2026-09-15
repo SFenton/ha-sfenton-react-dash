@@ -85,7 +85,7 @@ plans pack multiple logical batches into one model invocation to reduce calls
 without mixing cases inside a logical context. Every logical batch contains one
 exact context and at most six cases. Singleton latency plans do not pack calls.
 
-Projected model calls for the documented five-plan benchmark: **211**. This
+Projected model calls for the documented five-plan benchmark: **210**. This
 planner-derived total includes availability preflights, every configured
 candidate and repeat, model-bound packed launch units, and singleton controls.
 Local mandatory refusals consume no model call.
@@ -97,7 +97,7 @@ Pass a small explicit candidate list:
 ```bash
 node .github/skills/house-style-copy/evals/bin/run.mjs \
   --plan .github/skills/house-style-copy/evals/plans/rule-tuning.json \
-  --models gpt-5.6-terra-low,gpt-5.6-sol-max-long \
+  --models gpt-5.6-terra-low,gpt-5-mini-low \
   --out artifacts/house-style-copy-evals/rule-tuning-<run-id>
 ```
 
@@ -112,7 +112,7 @@ evidence.
 ```bash
 node .github/skills/house-style-copy/evals/bin/run.mjs \
   --plan .github/skills/house-style-copy/evals/plans/qualification.json \
-  --models claude-sonnet-5-low,gpt-5.6-terra-low,gpt-5.6-sol-max-long \
+  --models gpt-5-mini-low,gpt-5.6-terra-low,gpt-5.4-mini-low \
   --out artifacts/house-style-copy-evals/qualification-<run-id>
 ```
 
@@ -159,21 +159,21 @@ For the current exact finalist plans, run and score:
 ```bash
 node .github/skills/house-style-copy/evals/bin/run.mjs \
   --plan .github/skills/house-style-copy/evals/plans/qualification.json \
-  --models claude-sonnet-5-low,gpt-5.6-terra-low,gpt-5.6-sol-max-long \
+  --models gpt-5-mini-low,gpt-5.6-terra-low,gpt-5.4-mini-low \
   --out artifacts/house-style-copy-evals/qualification-<run-id>
 node .github/skills/house-style-copy/evals/bin/score.mjs \
   --run artifacts/house-style-copy-evals/qualification-<run-id>
 
 node .github/skills/house-style-copy/evals/bin/run.mjs \
   --plan .github/skills/house-style-copy/evals/plans/holdout.json \
-  --models claude-sonnet-5-low,gpt-5.6-terra-low,gpt-5.6-sol-max-long \
+  --models gpt-5-mini-low,gpt-5.6-terra-low,gpt-5.4-mini-low \
   --out artifacts/house-style-copy-evals/holdout-<run-id>
 node .github/skills/house-style-copy/evals/bin/score.mjs \
   --run artifacts/house-style-copy-evals/holdout-<run-id>
 
 node .github/skills/house-style-copy/evals/bin/run.mjs \
   --plan .github/skills/house-style-copy/evals/plans/latency.json \
-  --models gpt-5.6-terra-low,gpt-5.6-sol-max-long \
+  --models gpt-5.6-terra-low,gpt-5-mini-low \
   --out artifacts/house-style-copy-evals/latency-<run-id>
 node .github/skills/house-style-copy/evals/bin/score.mjs \
   --run artifacts/house-style-copy-evals/latency-<run-id>

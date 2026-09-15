@@ -10,9 +10,9 @@
       "personaId": "young-novice",
       "variant": "calibration-reference",
       "modelOverride": {
-        "model": "claude-opus-4.6",
-        "effort": "high",
-        "context": "long_context"
+        "model": "gpt-5.4",
+        "effort": "medium",
+        "context": "default"
       }
     }
   ]

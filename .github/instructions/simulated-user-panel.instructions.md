@@ -5,10 +5,8 @@ applyTo: ".github/skills/simulated-user-panel/SKILL.md,.github/skills/simulated-
 
 # Simulated user panel instructions
 
-- Keep routine/standard coordination pinned to `gpt-5.6-sol`, reasoning effort
-  `medium`, and context tier `default`. Sol `max`/`long_context` is conditional
-  on an evidence-bound `panel-deep-safety-adjudication` or
-  `panel-material-disagreement-adjudication` receipt.
+- Keep the coordinator pinned to `gpt-5.4`, reasoning effort `medium`, and
+  context tier `default`.
 - Keep all operator-requested core personas in the default panel and preserve
   the exact model, effort, and context settings unless a change is supported by
   measured panel calibration.
@@ -28,8 +26,8 @@ applyTo: ".github/skills/simulated-user-panel/SKILL.md,.github/skills/simulated-
   generalize capabilities or preferences to real groups. Require interface
   properties and mechanisms instead of demographic capability claims.
 - Keep independent first passes, evidence-backed consensus, adversarial
-  cross-critique, calibration of model-sensitive findings, and trigger-scaled
-  Sol adjudication.
+  cross-critique, calibration of model-sensitive findings, and gpt-5.4
+  adjudication.
 - Keep participant output strict JSON with exact allowlisted surface ids,
   non-empty evidence for every finding, lens attestation, severity
   justification, and explicit out-of-scope notes.
@@ -38,9 +36,9 @@ applyTo: ".github/skills/simulated-user-panel/SKILL.md,.github/skills/simulated-
 - Keep calibration and adversarial review cross-vendor when practical, and keep
   specialist selection deterministic with omitted-trigger reporting.
 - Keep implementation closed unless the original invocation explicitly asks
-  for changes. Follow-on work resolves through the hierarchical project
-  pipeline and does not imply permission for Home Assistant mutation, commit,
-  push, deployment, or restart.
+  for changes. Implementation is delegated through an explicit `gpt-5.4`
+  medium/default dispatch and does not imply permission for Home Assistant
+  mutation, commit, push, deployment, or restart.
 - Keep reports privacy-sanitized. Never print or persist tokens, credentials,
   live camera images, household task text, names, URLs, coordinates, or volatile
   entity attributes.
