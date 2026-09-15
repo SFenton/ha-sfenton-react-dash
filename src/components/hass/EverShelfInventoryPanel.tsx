@@ -17,6 +17,11 @@ import { DashboardPageLoading } from '../shell/DashboardPageLoading'
 import type { EverShelfInventoryControls, InventoryFilterMode, InventorySortDirection, InventorySortMode } from './EverShelfInventoryControls'
 import { daysUntilDate, parseIsoDateOnly } from './expiryDate'
 import { copy, PAGE_FOOD_COPY_KEYS, PAGE_FOOD_COPY_NAMESPACE } from '../../i18n'
+import {
+  recordGroceryDeletePromptParsing,
+  runGroceryDeleteConfirm,
+  runGroceryDeletePrompt,
+} from './EverShelfInventoryPanelDiagnostics'
 import styles from './EverShelfInventoryPanel.module.css'
 
 export type EverShelfInventoryLocation = 'all' | 'dispensa' | 'frigo' | 'freezer' | 'spice_rack' | 'cabinet'
@@ -508,28 +513,32 @@ function deleteDisplayTitle(title: string, qualifier?: string) {
 }
 
 function promptDeleteQuantity(title: string, locationLabel: string, quantity: number) {
-  if (!confirmInventoryDelete(title, locationLabel)) {
-    return { status: 'cancelled' } satisfies DeleteQuantityPromptResult
-  }
   const message = [
     copy(PAGE_FOOD_COPY_NAMESPACE, PAGE_FOOD_COPY_KEYS.delete.multipleDescription, { location: locationLabel, title }),
     copy(PAGE_FOOD_COPY_NAMESPACE, PAGE_FOOD_COPY_KEYS.delete.quantityError, { quantity: formatQuantity(quantity) }),
   ].join(' ')
-  const value = window.prompt(message, '1')
+  const value = runGroceryDeletePrompt(quantity, () => window.prompt(message, '1'))
   if (value === null) return { status: 'cancelled' } satisfies DeleteQuantityPromptResult
   const normalizedValue = value.trim().replace(',', '.')
-  if (!/^(?:\d+|\d*\.\d+)$/.test(normalizedValue)) return { status: 'invalid' } satisfies DeleteQuantityPromptResult
+  if (!/^(?:\d+|\d*\.\d+)$/.test(normalizedValue)) {
+    recordGroceryDeletePromptParsing(quantity, false)
+    return { status: 'invalid' } satisfies DeleteQuantityPromptResult
+  }
   const parsedValue = Number(normalizedValue)
-  return Number.isFinite(parsedValue) && parsedValue >= 1 && parsedValue <= quantity
+  const valid = Number.isFinite(parsedValue) && parsedValue >= 1 && parsedValue <= quantity
+  recordGroceryDeletePromptParsing(quantity, valid)
+  return valid
     ? { quantity: parsedValue, status: 'valid' } satisfies DeleteQuantityPromptResult
     : { status: 'invalid' } satisfies DeleteQuantityPromptResult
 }
 
 function confirmInventoryDelete(title: string, locationLabel: string) {
-  return window.confirm(copy(PAGE_FOOD_COPY_NAMESPACE, PAGE_FOOD_COPY_KEYS.delete.description, {
-    location: locationLabel,
-    title,
-  }))
+  return runGroceryDeleteConfirm(() => window.confirm(
+    copy(PAGE_FOOD_COPY_NAMESPACE, PAGE_FOOD_COPY_KEYS.delete.description, {
+      location: locationLabel,
+      title,
+    }),
+  ))
 }
 
 function promptPreparedQuantity(title: string, quantity: number, enabling: boolean) {

@@ -2,6 +2,10 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import { EverShelfInventoryFloatingActions, EverShelfInventoryPanel, type EverShelfInventoryLocation } from './EverShelfInventoryPanel'
 import { useEverShelfInventoryControls } from './EverShelfInventoryControls'
 import { mockCallServiceCalls, resetMockHass } from '../../test/mocks/hakitCoreState'
+import {
+  GROCERY_DELETE_DIALOG_DIAGNOSTICS_PROPERTY,
+  readGroceryDeleteDialogDiagnostics,
+} from './EverShelfInventoryPanelDiagnostics'
 
 function InventoryPanelHarness({ location, title }: { location: EverShelfInventoryLocation; title: string }) {
   const controls = useEverShelfInventoryControls(location)
@@ -67,6 +71,7 @@ function inventoryServiceCalls() {
 describe('EverShelfInventoryPanel item edit modal', () => {
   beforeEach(() => {
     resetMockHass()
+    delete (window as unknown as Record<string, unknown>)[GROCERY_DELETE_DIALOG_DIAGNOSTICS_PROPERTY]
   })
 
   it('adds the extra items to EverShelf when the quantity is increased', async () => {
@@ -147,7 +152,7 @@ describe('EverShelfInventoryPanel item edit modal', () => {
     ])
   })
 
-  it('uses native confirmation before prompting for a multi-item delete quantity', async () => {
+  it('prompts directly for an accepted multi-item delete quantity', async () => {
     const dialog = await openCannedBeansEditModal()
     const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true)
     const promptSpy = vi.spyOn(window, 'prompt').mockReturnValue('1')
@@ -155,7 +160,7 @@ describe('EverShelfInventoryPanel item edit modal', () => {
     mockCallServiceCalls.length = 0
     await clickAndFlush(within(dialog).getByRole('button', { name: `Delete Canned Beans ${SOON_BATCH}` }))
 
-    expect(confirmSpy).toHaveBeenCalledWith(`Delete Canned Beans ${SOON_BATCH} from the pantry?`)
+    expect(confirmSpy).not.toHaveBeenCalled()
     expect(promptSpy).toHaveBeenCalledWith(
       `Choose how many Canned Beans ${SOON_BATCH} to delete from the pantry. Enter a number from 1 to 2.`,
       '1',
@@ -167,6 +172,13 @@ describe('EverShelfInventoryPanel item edit modal', () => {
     expect(screen.getByRole('dialog', { name: 'Canned Beans' })).toBeInTheDocument()
     expect(within(dialog).getByRole('spinbutton', { name: `Quantity for Canned Beans ${SOON_BATCH}` })).toHaveTextContent('1')
     expect(within(dialog).getByRole('button', { name: `Delete Canned Beans ${SOON_BATCH}` })).toBeEnabled()
+    expect(readGroceryDeleteDialogDiagnostics().map(
+      ({ event, maximumQuantity, result }) => ({ event, maximumQuantity, result }),
+    )).toEqual([
+      { event: 'prompt-opened', maximumQuantity: 2, result: undefined },
+      { event: 'prompt-resolved', maximumQuantity: 2, result: 'value' },
+      { event: 'prompt-parsed', maximumQuantity: 2, result: 'valid' },
+    ])
     confirmSpy.mockRestore()
     promptSpy.mockRestore()
   })
@@ -186,6 +198,7 @@ describe('EverShelfInventoryPanel item edit modal', () => {
     expect(screen.getByRole('dialog', { name: 'Canned Beans' })).toBeInTheDocument()
     expect(within(dialog).queryByRole('spinbutton', { name: `Quantity for Canned Beans ${SOON_BATCH}` })).not.toBeInTheDocument()
     expect(within(dialog).getByRole('spinbutton', { name: 'Quantity for Canned Beans' })).toHaveTextContent('3')
+    expect(confirmSpy).not.toHaveBeenCalled()
     confirmSpy.mockRestore()
     promptSpy.mockRestore()
   })
@@ -198,9 +211,19 @@ describe('EverShelfInventoryPanel item edit modal', () => {
     mockCallServiceCalls.length = 0
     fireEvent.click(within(dialog).getByRole('button', { name: `Delete Canned Beans ${SOON_BATCH}` }))
 
+    expect(confirmSpy).not.toHaveBeenCalled()
+    expect(promptSpy).toHaveBeenCalledWith(
+      `Choose how many Canned Beans ${SOON_BATCH} to delete from the pantry. Enter a number from 1 to 2.`,
+      '1',
+    )
     expect(inventoryServiceCalls()).toEqual([])
     expect(within(dialog).getByRole('alert')).toHaveTextContent('Enter a number from 1 to 2.')
     expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
+    expect(readGroceryDeleteDialogDiagnostics().map(({ event, result }) => ({ event, result }))).toEqual([
+      { event: 'prompt-opened', result: undefined },
+      { event: 'prompt-resolved', result: 'value' },
+      { event: 'prompt-parsed', result: 'invalid' },
+    ])
     confirmSpy.mockRestore()
     promptSpy.mockRestore()
   })
@@ -217,24 +240,12 @@ describe('EverShelfInventoryPanel item edit modal', () => {
     expect(inventoryServiceCalls()).toEqual([
       { domain: 'evershelf', service: 'delete_inventory', serviceData: { inventory_id: 205 } },
     ])
+    expect(readGroceryDeleteDialogDiagnostics().map(({ event, result }) => ({ event, result }))).toEqual([
+      { event: 'confirm-opened', result: undefined },
+      { event: 'confirm-resolved', result: 'accepted' },
+    ])
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Milk' })).not.toBeInTheDocument())
     confirmSpy.mockRestore()
-  })
-
-  it('cancels a multi-item delete before opening the quantity prompt', async () => {
-    const dialog = await openCannedBeansEditModal()
-    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false)
-    const promptSpy = vi.spyOn(window, 'prompt')
-
-    mockCallServiceCalls.length = 0
-    fireEvent.click(within(dialog).getByRole('button', { name: `Delete Canned Beans ${SOON_BATCH}` }))
-
-    expect(confirmSpy).toHaveBeenCalledWith(`Delete Canned Beans ${SOON_BATCH} from the pantry?`)
-    expect(promptSpy).not.toHaveBeenCalled()
-    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
-    expect(inventoryServiceCalls()).toEqual([])
-    confirmSpy.mockRestore()
-    promptSpy.mockRestore()
   })
 
   it('cancels a native multi-item prompt without changing EverShelf', async () => {
@@ -245,10 +256,21 @@ describe('EverShelfInventoryPanel item edit modal', () => {
     mockCallServiceCalls.length = 0
     fireEvent.click(within(dialog).getByRole('button', { name: `Delete Canned Beans ${SOON_BATCH}` }))
 
-    expect(confirmSpy).toHaveBeenCalledOnce()
-    expect(promptSpy).toHaveBeenCalledOnce()
+    expect(confirmSpy).not.toHaveBeenCalled()
+    expect(promptSpy).toHaveBeenCalledWith(
+      `Choose how many Canned Beans ${SOON_BATCH} to delete from the pantry. Enter a number from 1 to 2.`,
+      '1',
+    )
     expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
     expect(inventoryServiceCalls()).toEqual([])
+    expect(readGroceryDeleteDialogDiagnostics().map(({ elapsedMs, event, result }) => ({
+      elapsedMs,
+      event,
+      result,
+    }))).toEqual([
+      { elapsedMs: undefined, event: 'prompt-opened', result: undefined },
+      { elapsedMs: expect.any(Number), event: 'prompt-resolved', result: 'cancelled' },
+    ])
     confirmSpy.mockRestore()
     promptSpy.mockRestore()
   })
