@@ -7,7 +7,7 @@
   "requiresModelsArgument": true,
   "projectionCandidateIds": [
     "gpt-5.6-terra-low",
-    "gpt-5.6-sol-max-long"
+    "gpt-5-mini-low"
   ],
   "repeats": 2,
   "batchSize": 1,

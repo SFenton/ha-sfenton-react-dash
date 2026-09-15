@@ -34,9 +34,9 @@ const fixtureData = JSON.parse(await readFile(resolve(root, '.github/skills/simu
 const fixtures = fixtureData.fixtures.map(({ expected, ...fixture }) => fixture)
 const expected = Object.fromEntries(fixtureData.fixtures.map((fixture) => [fixture.id, fixture.expected]))
 const failureSection = skill.match(/## Failure and budget handling[\s\S]*?## Panel self-check/)?.[0] ?? ''
-const implementationSection = skill.match(/## Hierarchical implementation gate[\s\S]*?## Completion boundary/)?.[0] ?? ''
+const implementationSection = skill.match(/## gpt-5\.4 implementation gate[\s\S]*?## Completion boundary/)?.[0] ?? ''
 
-const prompt = `You are the routine GPT-5.6 Sol medium/default coordinator applying the simulated-user-panel failure and implementation rules.
+const prompt = `You are the gpt-5.4 medium/default coordinator applying the simulated-user-panel failure and implementation rules.
 
 Rules:
 ${failureSection}
@@ -68,7 +68,7 @@ Return strict JSON only:
 }
 
 When implementation is dispatched, implementer must instead be:
-{"route":"hierarchical-project-pipeline","repositoryApply":"operator-required"}.
+{"model":"gpt-5.4","effort":"medium","context":"default"}.
 
 Fixtures:
 ${JSON.stringify(fixtures, null, 2)}`
@@ -79,7 +79,7 @@ const child = spawn('copilot', [
   '-p',
   prompt,
   '--model',
-  'gpt-5.6-sol',
+  'gpt-5.4',
   '--effort',
   'medium',
   '--context',

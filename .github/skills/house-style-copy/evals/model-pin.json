@@ -1,15 +1,15 @@
 {
   "version": 1,
-  "status": "validated",
-  "model": "gpt-5.6-sol",
-  "effort": "max",
-  "context": "long_context",
-  "candidateId": "gpt-5.6-sol-max-long",
-  "selectionBasis": "Passed deterministic quality gate, then minimized accepted-output cost, p95 singleton latency, and variance risk.",
+  "status": "blocked",
+  "model": null,
+  "effort": null,
+  "context": null,
+  "candidateId": null,
+  "selectionBasis": "No existing non-frontier non-Claude candidate passed the full quality gate; generation remains blocked instead of retaining a Sol or Claude pin.",
   "evalRun": "artifacts/house-style-copy-evals/durable2-qualification-20260821,artifacts/house-style-copy-evals/durable2-holdout-20260821,artifacts/house-style-copy-evals/durable2-latency-20260821",
   "pricingAsOf": "2026-08-11",
   "expiresAfterDays": 90,
-  "selectedAt": "2026-08-21T18:53:08.314Z",
+  "selectedAt": null,
   "autoSelectionAllowed": false,
   "evidence": {
     "qualificationHashes": {
@@ -22,66 +22,12 @@
       "abd66eb8382c98091f455b2074e2dca466b79847ffb0c644707fbf6462d6235e",
       "6f57c1802384e8f1ea46f94e7a79cd6390dcf25d5c09d15f986b31d2aa5fb81f"
     ],
-    "metrics": {
-      "accepted": 99,
-      "batchMeanScore": 98.36144578313252,
-      "calibrationMeanScore": 99.63414634146342,
-      "contextFloor": 94,
-      "contextMeans": {
-        "empty-body": 94,
-        "form-validation": 99.25,
-        "description": 98.5,
-        "destructive-action": 100,
-        "section-title": 97,
-        "form-hint": 100,
-        "compound-metric": 98.2,
-        "page-title": 97,
-        "modal-action": 100,
-        "status": 100,
-        "tab": 100,
-        "loading": 97.75,
-        "notification-action": 100,
-        "modal-title": 100,
-        "separator": 100,
-        "notification-title": 100,
-        "modal-description": 100,
-        "form-placeholder": 100,
-        "empty-title": 100,
-        "confirmation": 96,
-        "action": 100,
-        "card-title": 100,
-        "a11y": 94.6,
-        "form-label": 100,
-        "notification-body": 100,
-        "chip": 100,
-        "success": 100,
-        "button": 98.2,
-        "help": 97.6,
-        "error": 96.4
-      },
-      "estimatedAiCredits": 196.06300000000005,
-      "estimatedAiCreditsPerAcceptedOutput": 1.9804343434343439,
-      "hardFailureCount": 0,
-      "holdoutDrop": 1.874887082204168,
-      "holdoutMeanScore": 97.75925925925925,
-      "holdoutRepeatMeans": [
-        97.38888888888889,
-        97.61111111111111,
-        98.27777777777777
-      ],
-      "meanScore": 98.56842105263158,
-      "notificationAndSafetyPassRate": 1,
-      "latencyPassRate": 1,
-      "p95SingletonLatencyMs": 14182,
-      "passRate": 1,
-      "profileId": "gpt-5.6-sol-max-long",
-      "scoreStandardDeviation": 2.6423778429323725,
-      "selectionMeanScore": 98.56842105263158,
-      "singletonMeanScore": 97.5,
-      "singletonScoreDelta": -0.861445783132524,
-      "singletonEvidenceSelected": false,
-      "totalCases": 95
-    },
-    "selectionScore": 0
-  }
+    "finalistsReviewed": [
+      "gpt-5.6-terra-low",
+      "gpt-5.6-sol-max-long",
+      "claude-sonnet-5-low"
+    ],
+    "blockedBecause": "Existing qualification evidence has no fully qualified non-frontier non-Claude winner."
+  },
+  "blockedReason": "Await new qualification evidence for a non-frontier non-Claude model."
 }

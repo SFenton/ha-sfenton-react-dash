@@ -1,8 +1,8 @@
 ---
 name: simulated-user-panel
-description: Explicitly invoked simulated user-research panel for ha-sfenton-react-dash. Runs diverse read-only persona agents, cross-critiques evidence, and routes authorized improvements through the project pipeline.
+description: Explicitly invoked simulated user-research panel for ha-sfenton-react-dash. Runs diverse read-only persona agents against a page, control, workflow, or instruction, cross-critiques evidence, and gates any improvements to an explicit gpt-5.4 implementation dispatch.
 metadata:
-  model: gpt-5.6-sol
+  model: gpt-5.4
   reasoning_effort: medium
   context_tier: default
 ---
@@ -13,16 +13,10 @@ Use this skill when the operator invokes `simulated-user-panel`, requests
 multi-persona user testing, or asks a diverse simulated panel to assess or
 improve this Home Assistant dashboard.
 
-The routine coordinator must be `gpt-5.6-sol` with reasoning effort `medium`
-and context tier `default`. If the current coordinator does not match, launch a
+The coordinator must be `gpt-5.4` with reasoning effort `medium` and context
+tier `default`. If the current coordinator does not match, launch a
 `general-purpose` coordinator with that exact profile or stop before running
 the panel.
-
-Sol `max` / `long_context` may adjudicate only an evidence-bound
-`panel-deep-safety-adjudication` or
-`panel-material-disagreement-adjudication` trigger linked to the preceding
-panel receipt. `budget: deep`, panel size, or task terminology alone is not a
-trigger.
 
 This panel produces synthetic usability evidence and hypotheses. It is not a
 substitute for research with real people and must never be presented as
@@ -166,7 +160,7 @@ silently widen the scope.
     conflicts. Agreement is never proof.
 15. Produce the final panel report and stop unless implementation was
     authorized by the original invocation.
-16. If implementation is authorized, follow the hierarchical implementation gate,
+16. If implementation is authorized, follow the gpt-5.4 implementation gate,
     validate the result, and re-run the affected personas against the changed
     experience.
 
@@ -179,15 +173,15 @@ about human intelligence.
 
 | Persona id | Simulated usage lens | Model | Effort | Context | Evidence tier |
 | --- | --- | --- | --- | --- | --- |
-| `young-novice` | Young child newly introduced to technology; test literal labels, concise disambiguation, consequence clarity, accidental activation, and recovery as interface properties. Do not claim what children understand or how long they pay attention. | `claude-haiku-4.5` | not supported; do not pass the effort flag | `default` | U |
+| `young-novice` | Young child newly introduced to technology; test literal labels, concise disambiguation, consequence clarity, accidental activation, and recovery as interface properties. Do not claim what children understand or how long they pay attention. | `gpt-5.4-mini` | `low` | `default` | U |
 | `tech-teen` | Technology-fluent teen; test first-action clarity, supported gesture expectations, latency feedback, navigation depth, and hierarchy. Do not infer speed or gesture preferences from age. | `gpt-5-mini` | `low` | `default` | U |
-| `ha-engineer` | Home Assistant frontend/backend engineer; test supplied entity/service ownership, optimistic versus confirmed state, automations, unavailable states, and failure handling. Mark dimensions unassessable instead of substituting generic UX claims when technical evidence is absent. | `gpt-5.6-terra` | `high` | `long_context` | E |
-| `cautious-elder` | Elderly novice lens expressed as a cautious first-time household user unfamiliar with apps; test legibility, confidence, reversibility, touch tolerance, and recovery without assuming impairment or inability. | `gemini-3.5-flash` | `minimal` | `default` | U |
-| `visual-texter` | Artist who mainly uses messaging apps; test hierarchy, icon meaning, tone, labels, and jargon when visual evidence is supplied. Mark visual claims unassessable for text-only packets. | `gemini-3.6-flash` | `low` | `default` | U |
-| `ux-designer` | Current mobile UX specialist; native iOS patterns, accessibility, hierarchy, density, motion, and interaction cost | `claude-opus-5` | `max` | `long_context` | P |
-| `occasional-partner` | Tech-literate household partner who uses the app infrequently; findability, naming, and memorability | `grok-4.5` | `medium` | `default` | U |
-| `power-user` | Frequent user; speed, density, shortcuts, bulk actions, deep links, and unnecessary steps | `gpt-5.5` | `xhigh` | `long_context` | P |
-| `accessibility-auditor` | Assistive-technology and situational-access lens; accessible names, focus order, contrast, target size, reduced motion, one-handed use | `claude-sonnet-4.6` | `high` | `long_context` | P |
+| `ha-engineer` | Home Assistant frontend/backend engineer; test supplied entity/service ownership, optimistic versus confirmed state, automations, unavailable states, and failure handling. Mark dimensions unassessable instead of substituting generic UX claims when technical evidence is absent. | `gpt-5.4` | `medium` | `default` | E |
+| `cautious-elder` | Elderly novice lens expressed as a cautious first-time household user unfamiliar with apps; test legibility, confidence, reversibility, touch tolerance, and recovery without assuming impairment or inability. | `gemini-3.7-flash` | `medium` | `default` | U |
+| `visual-texter` | Artist who mainly uses messaging apps; test hierarchy, icon meaning, tone, labels, and jargon when visual evidence is supplied. Mark visual claims unassessable for text-only packets. | `gemini-3.7-flash` | `medium` | `default` | U |
+| `ux-designer` | Current mobile UX specialist; native iOS patterns, accessibility, hierarchy, density, motion, and interaction cost | `gpt-5.4` | `medium` | `default` | P |
+| `occasional-partner` | Tech-literate household partner who uses the app infrequently; findability, naming, and memorability | `mai-code-1-flash-picker` | `low` | `default` | U |
+| `power-user` | Frequent user; speed, density, shortcuts, bulk actions, deep links, and unnecessary steps | `gpt-5.4` | `medium` | `default` | P |
+| `accessibility-auditor` | Assistive-technology and situational-access lens; accessible names, focus order, contrast, target size, reduced motion, one-handed use | `gpt-5.4` | `medium` | `default` | P |
 
 Evidence tiers:
 
@@ -210,11 +204,11 @@ triggers:
 
 | Trigger | Specialist | Model | Effort | Context | Tier |
 | --- | --- | --- | --- | --- | --- |
-| Locks, alarm, garage, cameras, covers, climate, vacuums, or physical risk | Household safety and privacy | `claude-opus-4.8` | `high` | `long_context` | E |
+| Locks, alarm, garage, cameras, covers, climate, vacuums, or physical risk | Household safety and privacy | `gpt-5.4` | `medium` | `default` | E |
 | Written instructions, wizards, or setup | Plain-language task verifier | `mai-code-1-flash-picker` | `low` | `default` | U |
 | Sliders, drag, carousel, kitchen, entry, or one-handed use | Situational impairment | `gpt-5.4-mini` | `medium` | `default` | P |
-| Camera, WebRTC, audio, or media | Media privacy specialist | `claude-sonnet-5` | `high` | `long_context` | E |
-| Tablet or desktop explicitly requested | Cross-device reviewer | `gemini-3.1-pro-preview` | `medium` | `long_context` | P |
+| Camera, WebRTC, audio, or media | Media privacy specialist | `gpt-5.4` | `medium` | `default` | E |
+| Tablet or desktop explicitly requested | Cross-device reviewer | `gemini-3.7-flash` | `medium` | `default` | P |
 
 When more than three specialists trigger, select in this order:
 
@@ -405,9 +399,8 @@ safety, privacy, or accessibility defect may outrank majority preference.
 For any blocker/high **factual or technical claim** originating from a
 low-cost or low-effort slot, run a same-lens replay on a different model vendor:
 
-- use `claude-opus-4.6`, effort `high`, `long_context` for OpenAI, Google, or
-  xAI-origin claims;
-- use `gpt-5.6-luna`, effort `high`, `long_context` for Anthropic-origin claims.
+- use `gpt-5.4`, effort `medium`, `default` for Google or xAI-origin claims;
+- use `gemini-3.7-flash`, effort `medium`, `default` for OpenAI-origin claims.
 
 Use the replay to test the explanation, not to erase an observed mock
 transcript. A wrong tap, abandonment, or confusion sequence remains behavioral
@@ -422,9 +415,9 @@ After the independent pass:
 1. Build an anonymized claim matrix containing the evidence, support,
    opposition, severity, and confidence for every material finding.
 2. Launch one adversarial reviewer from a different vendor than the dominant
-   supporting vendor. Use `claude-opus-4.8`, effort `high`, `long_context`
-   unless Anthropic dominates the supporting claims; then use
-   `gpt-5.6-luna`, effort `high`, `long_context`. Ask it to find false
+   supporting vendor. Use `gpt-5.4`, effort `medium`, `default`
+   unless OpenAI dominates the supporting claims; then use
+   `gemini-3.7-flash`, effort `medium`, `default`. Ask it to find false
    consensus, stereotype-driven claims, hidden assumptions, missing evidence,
    severity inflation, and recommendations that conflict with repository
    instructions.
@@ -522,7 +515,7 @@ Use this order:
 4. **Strengths to preserve**.
 5. **Strong and moderate consensus findings**.
 6. **Material minority and persona-specific findings**.
-7. **Disagreements and Sol adjudication**.
+7. **Disagreements and gpt-5.4 adjudication**.
 8. **Calibration and adversary results**.
 9. **Rejected hypotheses**.
 10. **Prioritized changes** - impact, cost, risk, affected surfaces, tests, and
@@ -532,18 +525,16 @@ Use this order:
     secret exposure, each marked verified, violated, or unverified.
 13. **Implementation gate** - approved, not requested, blocked, or completed.
 
-## Hierarchical implementation gate
+## gpt-5.4 implementation gate
 
 Implementation is closed unless the original invocation explicitly requests a
 fix, change, improvement, or implementation.
 
 When open:
 
-1. Resolve the exact implementation opportunity through
-   `.github/agent-opportunities.json`. The project medium coordinator owns
-   known-pattern work; any cheap worker is staged-only and requires medium
-   review. Panel max/long adjudication does not become implementation
-   residency.
+1. The main coordinator owns edits, or delegates them only to a
+   `general-purpose` agent using `gpt-5.4`, effort `medium`, and
+   `default`.
 2. Persona, research, explore, critique, and review agents remain read-only.
 3. Implement only reproduced Strong, Moderate, and in-scope Material Minority
    findings that answer the original question. Do not implement Unverified or
@@ -557,15 +548,12 @@ When open:
    required code/config comparison, mobile-first Playwright comparison, and
    focused tests.
    Also require the current layout plan's external assessment, with actual
-   coordinator image/interaction inspection. Preserve participant isolation,
-   mock-first evidence and every external-authorization boundary.
-8. Repository apply is separate operator authority. Panel implementation
-   authorization never grants Home Assistant, GitHub, production, release, or
-   destructive authority.
-9. Re-run the personas that reported each implemented finding and one
+   coordinator image/interaction inspection. Preserve all existing explicit-dispatch,
+   participant-isolation, mock-first and external-authorization boundaries.
+8. Re-run the personas that reported each implemented finding and one
    independent critic against the changed experience. Confirm the complaint is
    gone without creating a new higher-severity issue.
-10. Report each proposed change as implemented, deferred, or rejected with the
+9. Report each proposed change as implemented, deferred, or rejected with the
    evidence-based reason.
 
 ## Completion boundary
