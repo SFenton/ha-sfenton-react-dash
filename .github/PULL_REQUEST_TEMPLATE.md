@@ -7,10 +7,11 @@
 <!-- Tests, build, Playwright, and live Home Assistant evidence as applicable. -->
 
 - Changed-test policy result and same-stem/`@covers` ownership:
-- Layout classification and affected owners/states:
-- Plan/run/source/build fingerprints and assessment path:
+- `Quality checks`, `Automated layout`, and `Playwright gate` results:
+- Layout classification, affected owners/states, and `layout-automation` artifact:
+- Automated plan/run/source/build fingerprints and assessment path:
 - Selected/executed/passed/failed/skipped/not-run counts:
-- Actual manual interaction and inspected screenshot/checkpoint references:
+- Post-push manual interaction and inspected screenshot/checkpoint references:
 - Coarse legacy coverage, device-only gaps, and blocked/access-unavailable evidence:
 
 <!-- Non-layout changes explain the classification. Captures and schema completion

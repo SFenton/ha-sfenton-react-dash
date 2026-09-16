@@ -17,6 +17,10 @@ services. Keep entity IDs in constants and pages declarative.
   state, provenance, configuration, or deployment gate to reduce token usage.
 - Use the smallest existing validation that covers the change. Do not install
   dependencies merely to inspect instructions or route a task.
+- Before a release push, require only changed-test policy and every changed or
+  added test file locally. The protected pull-request workflow owns broad lint,
+  unit, build, automated layout, and full Playwright gates. Human layout review
+  for affected UX is post-push release acceptance, not a pre-push gate.
 - Treat any request to start, run, serve, host, open, or preview the React app
   as a `/host-web-app` trigger even when LAN or `0.0.0.0` is not mentioned.
   Before handing off user-visible dashboard or UX work for operator review,

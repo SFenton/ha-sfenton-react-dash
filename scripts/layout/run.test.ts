@@ -3,7 +3,7 @@
 import { createServer } from 'node:http'
 import { readFileSync } from 'node:fs'
 import { hash, stableHash } from './shared'
-import { executionWorkerCount, isBaselineBuildInput, layoutWorkerCount, stopOwnedProcess, verifyServedBuild } from './run'
+import { executionWorkerCount, isBaselineBuildInput, layoutWorkerCount, manualReviewMessage, stopOwnedProcess, verifyServedBuild } from './run'
 import type { ChildProcess } from 'node:child_process'
 
 describe('owned build verification', () => {
@@ -31,6 +31,14 @@ describe('owned build verification', () => {
   it('serializes evidence runs that require the WPE WebKit context', () => {
     expect(executionWorkerCount(['touch-chromium', 'fine-chromium', 'touch-webkit'])).toBe(1)
     expect(executionWorkerCount(['touch-chromium', 'fine-chromium'])).toBe(2)
+  })
+  it('does not request manual review when the plan has no review worklist', () => {
+    expect(manualReviewMessage(0, '/tmp/layout')).toBe(
+      'No manual layout review is required for this classification.',
+    )
+    expect(manualReviewMessage(1, '/tmp/layout')).toContain(
+      '/tmp/layout/manual-worklist.json',
+    )
   })
   it('rejects a merely reachable identical build when the owned server nonce is wrong', async () => {
     const body = '<!doctype html><title>Controlled local fixture</title>'

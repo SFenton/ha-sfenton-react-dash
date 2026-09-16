@@ -26,6 +26,10 @@ export function capabilityMatches(actual: Capabilities, context: keyof typeof CO
       : actual.fine && !actual.coarse && actual.hover && actual.touchPoints === 0)
 }
 
+export function canClaimFullAcceptance(mode: LayoutPlan['mode'], includeManual: boolean, accepted: boolean) {
+  return includeManual && accepted && (mode === 'focused' || mode === 'full-known-mock')
+}
+
 export function verifyEvidence(
   plan: LayoutPlan,
   run: RunIdentity,
@@ -109,8 +113,10 @@ export function verifyEvidence(
     }
   }
   if (manual?.reviews.some((review) => !plan.obligations.some((obligation) => obligation.review && obligation.id === review.checkpointId))) failures.push('Manual review cites an unrequested checkpoint')
+  const accepted = failures.length === 0
   return {
-    accepted: failures.length === 0, failures,
+    accepted, failures,
+    fullAcceptance: canClaimFullAcceptance(plan.mode, includeManual, accepted),
     counts: {
       plannedCheckpoints: plan.obligations.length, selectedTests: selection.length,
       attempts: ledger.attempts.length, executedCheckpoints: checkpoints.length,
@@ -126,13 +132,29 @@ export function verifyEvidence(
   }
 }
 
-export function verifyRun(root: string, input: string) {
+export function verificationOutputName(includeManual: boolean) {
+  return includeManual ? 'assessment.json' : 'automated-verification.json'
+}
+
+export function parseVerificationArgs(args: string[]) {
+  assertOptions(args, ['--run'], ['--automated-only'])
+  const run = option(args, '--run')
+  if (!run) throw new Error('Usage: layout:verify -- --run artifacts/layout/<run-id> [--automated-only]')
+  return { run, includeManual: !args.includes('--automated-only') }
+}
+
+export function verifyRun(root: string, input: string, includeManual = true) {
   const directory = artifactPath(root, input, true)
   const plan = readJson<LayoutPlan>(resolve(directory, 'plan.json'))
+  const output = resolve(directory, verificationOutputName(includeManual))
   assertCurrentPlan(root, plan)
   if (plan.mode === 'non-layout') {
-    const result = { accepted: true, scope: 'Non-layout classification only; no UI or visual evidence claimed' }
-    writeJson(resolve(directory, 'assessment.json'), result)
+    const result = {
+      accepted: true,
+      fullAcceptance: canClaimFullAcceptance(plan.mode, includeManual, true),
+      scope: 'Non-layout classification only; no UI or visual evidence claimed',
+    }
+    writeJson(output, result)
     console.log(JSON.stringify(result))
     return result
   }
@@ -151,9 +173,19 @@ export function verifyRun(root: string, input: string) {
   if (run.collectionDigest !== stableHash(registered) || run.selectionDigest !== stableHash(selection)) throw new Error('Collection/selection artifacts changed after execution')
   assertExactSelection(selectTests(plan, registered), selection)
   let manual: ManualLedger | null = null
-  try { manual = readJson<ManualLedger>(resolve(directory, 'manual.json')) } catch { /* Missing/inaccessible reviews remain blocked. */ }
-  const report = verifyEvidence(plan, run, selection, ledger, manual, (file) => readFileSync(artifactPath(root, file, true)))
-  writeJson(resolve(directory, 'assessment.json'), report)
+  if (includeManual) {
+    try { manual = readJson<ManualLedger>(resolve(directory, 'manual.json')) } catch { /* Missing/inaccessible reviews remain blocked. */ }
+  }
+  const report = verifyEvidence(
+    plan,
+    run,
+    selection,
+    ledger,
+    manual,
+    (file) => readFileSync(artifactPath(root, file, true)),
+    includeManual,
+  )
+  writeJson(output, report)
   if (!report.accepted) throw new Error(report.failures.join('\n'))
   console.log(JSON.stringify(report, null, 2))
   return report
@@ -188,10 +220,7 @@ export function testList(tests: CollectedTest[]) {
 
 if (isEntry(import.meta.url)) {
   try {
-    const args = process.argv.slice(2)
-    assertOptions(args, ['--run'])
-    const run = option(args, '--run')
-    if (!run) throw new Error('Usage: layout:verify -- --run artifacts/layout/<run-id>')
-    verifyRun(process.cwd(), run)
+    const request = parseVerificationArgs(process.argv.slice(2))
+    verifyRun(process.cwd(), request.run, request.includeManual)
   } catch (error) { console.error(String(error)); process.exitCode = 1 }
 }

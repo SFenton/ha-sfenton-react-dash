@@ -3,7 +3,8 @@
 The established, explicitly invoked `release-dashboard` workflow remains the
 production release path. Version 3 is developed in shadow mode until every
 side-effecting driver is implemented, fault-tested, and compared against real
-manual releases.
+manual releases. Its disabled state never blocks an explicitly authorized
+manual release and does not add local pre-push validation requirements.
 
 ## Variants
 

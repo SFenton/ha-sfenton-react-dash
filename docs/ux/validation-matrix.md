@@ -19,6 +19,15 @@ but are not a mandatory full Cartesian product with every backend state.
 Declared journeys and scoped applicability determine execution; native fine-
 pointer evidence cannot be inferred from a project name or resized phone.
 
+Pull requests run the automated portion in the protected `Automated layout`
+job and publish the `layout-automation` artifact. That job uses
+`layout:verify --automated-only`, which cannot claim manual or full visual
+acceptance. Do not rerun the broad automated corpus locally merely to permit a
+push. For a layout-sensitive release, inspect the Action artifact and perform
+its requested interactions against an owned preview of the exact pull-request
+head before merge or deployment. A `non-layout` classification or zero-item
+manual worklist requires no human layout review.
+
 Use normal elapsed clocks for transition readiness. Missing selected panels,
 outgoing content, merely reachable servers, empty route filters and screenshots
 that were never viewed must not produce acceptance. Artifacts must be reachable

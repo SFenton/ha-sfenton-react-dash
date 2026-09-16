@@ -10,8 +10,10 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build-mock:
+  quality:
+    name: Quality checks
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
         with:
@@ -24,6 +26,76 @@ jobs:
       - name: Require changed tests for implementation changes
         if: github.event_name == 'pull_request'
         run: npm run test:change-policy -- --base ${{ github.event.pull_request.base.sha }}
+      - name: Run lint, unit, contract, and production-build checks
+        run: npm run check:ci
+
+  layout:
+    name: Automated layout
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Resolve comparison base
+        id: base
+        env:
+          PULL_REQUEST_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PUSH_BASE_SHA: ${{ github.event.before }}
+        run: |
+          base="$PULL_REQUEST_BASE_SHA"
+          if [[ -z "$base" ]]; then
+            base="$PUSH_BASE_SHA"
+          fi
+          if [[ -z "$base" || "$base" =~ ^0+$ ]]; then
+            base="$(git rev-parse HEAD^)"
+          fi
+          git cat-file -e "${base}^{commit}"
+          echo "sha=$base" >> "$GITHUB_OUTPUT"
+      - name: Plan affected layout evidence
+        run: npm run layout:plan -- --base "${{ steps.base.outputs.sha }}" --out artifacts/layout/ci/plan.json
+      - name: Read layout classification
+        id: classification
+        run: |
+          node --input-type=module -e "import fs from 'node:fs'; const plan = JSON.parse(fs.readFileSync('artifacts/layout/ci/plan.json', 'utf8')); const browsers = plan.mode === 'tooling' ? 'chromium' : 'chromium webkit'; fs.appendFileSync(process.env.GITHUB_OUTPUT, 'required=' + (plan.mode !== 'non-layout') + '\nbrowsers=' + browsers + '\n')"
+      - name: Install layout browsers
+        if: steps.classification.outputs.required == 'true'
+        env:
+          LAYOUT_BROWSERS: ${{ steps.classification.outputs.browsers }}
+        run: npx playwright install --with-deps $LAYOUT_BROWSERS
+      - name: Run automated layout evidence
+        run: npm run layout:run -- --plan artifacts/layout/ci/plan.json
+      - name: Verify automated layout evidence
+        run: npm run layout:verify -- --run artifacts/layout/ci --automated-only
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: layout-automation
+          path: |
+            artifacts/layout/ci
+            !artifacts/layout/ci/baseline-source/node_modules
+            !artifacts/layout/ci/baseline-cache
+            !artifacts/layout/ci/candidate-cache
+            !artifacts/layout/ci/scratch
+          include-hidden-files: true
+          retention-days: 14
+
+  build-mock:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
       - name: Build mock dashboard
         run: npx vite build --mode test --configLoader native --outDir .playwright-dist
       - uses: actions/upload-artifact@v4
@@ -68,7 +140,7 @@ jobs:
   report:
     name: Playwright gate
     if: always()
-    needs: test
+    needs: [quality, layout, test]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -90,12 +162,14 @@ jobs:
           name: playwright-report
           path: playwright-report/
           retention-days: 14
-      - name: Enforce successful Playwright shards
+      - name: Enforce successful dashboard CI
         if: always()
         env:
+          QUALITY_RESULT: ${{ needs.quality.result }}
+          LAYOUT_RESULT: ${{ needs.layout.result }}
           TEST_RESULT: ${{ needs.test.result }}
         run: |
-          if [[ "$TEST_RESULT" != "success" ]]; then
-            echo "::error::At least one Playwright shard did not pass (result: $TEST_RESULT)."
+          if [[ "$QUALITY_RESULT" != "success" || "$LAYOUT_RESULT" != "success" || "$TEST_RESULT" != "success" ]]; then
+            echo "::error::Dashboard CI did not pass (quality: $QUALITY_RESULT, layout: $LAYOUT_RESULT, Playwright: $TEST_RESULT)."
             exit 1
           fi
