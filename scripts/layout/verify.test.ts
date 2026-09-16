@@ -1,5 +1,16 @@
+// @covers scripts/layout/plan.ts
 import type { Checkpoint, CollectedTest, ExecutionLedger, LayoutPlan, ManualLedger, RunIdentity } from '../../e2e/layout/types'
-import { capabilityMatches, assertExactSelection, selectTests, testList, verifyEvidence } from './verify'
+import { SURFACE_CONTRACTS } from '../../e2e/layout/contracts'
+import {
+  capabilityMatches,
+  canClaimFullAcceptance,
+  assertExactSelection,
+  parseVerificationArgs,
+  selectTests,
+  testList,
+  verificationOutputName,
+  verifyEvidence,
+} from './verify'
 import { classifyChanges, runtimeConfigurationChanged } from './plan'
 import { hash, stableHash } from './shared'
 import { networkDecision } from '../../e2e/layout/fixture'
@@ -49,8 +60,18 @@ describe('layout scope and selection', () => {
   })
   it('keeps a known leaf focused and treats tooling separately', () => {
     expect(classifyChanges(['src/components/hass/CreateTodoItemSheet.tsx']).scenarios).toEqual(['form'])
-    expect(classifyChanges(['scripts/layout/verify.ts']).mode).toBe('tooling')
+    expect(classifyChanges(['scripts/layout/verify.ts'])).toMatchObject({ mode: 'tooling', scenarios: [] })
+    expect(classifyChanges(['.github/workflows/playwright.yml'])).toMatchObject({ mode: 'non-layout', scenarios: [] })
     expect(classifyChanges(['README.md']).mode).toBe('non-layout')
+  })
+  it('limits shared modal navigation changes to modal surface families', () => {
+    const result = classifyChanges(['src/components/core/ModalTabNav.tsx'])
+    const modalScenarios = Object.entries(SURFACE_CONTRACTS)
+      .filter(([, contract]) => contract.family === 'modal')
+      .map(([id]) => id)
+    expect(result.mode).toBe('focused')
+    expect(result.scenarios).toEqual(modalScenarios)
+    expect(result.reasons.join()).toContain('Shared modal owner')
   })
   it('does not classify dependency/build behavior changes as harmless validation scripts', () => {
     expect(runtimeConfigurationChanged('package.json', '{"scripts":{}}', '{"scripts":{"layout:check":"check"}}')).toBe(false)
@@ -91,10 +112,28 @@ describe('layout evidence assessment', () => {
     const f = fixture()
     const automatic = verifyEvidence(f.plan, f.run, f.selection, f.ledger, null, () => f.png, false)
     expect(automatic.accepted).toBe(true)
+    expect(automatic.fullAcceptance).toBe(false)
     expect(automatic.scope).toContain('No manual judgment')
+    expect(verifyEvidence(f.plan, f.run, f.selection, f.ledger, f.manual, () => f.png).fullAcceptance).toBe(true)
     f.checkpoint.viewport.width = 980
     expect(verifyEvidence(f.plan, f.run, f.selection, f.ledger, null, () => f.png, false).failures.join()).toContain('actual viewport/insets')
     expect(verifyEvidence(f.plan, f.run, f.selection, f.ledger, null, () => f.png).accepted).toBe(false)
+  })
+  it('parses distinct automated and manual verification modes', () => {
+    expect(parseVerificationArgs(['--run', 'artifacts/layout/run'])).toEqual({
+      run: 'artifacts/layout/run',
+      includeManual: true,
+    })
+    expect(parseVerificationArgs(['--run', 'artifacts/layout/run', '--automated-only'])).toEqual({
+      run: 'artifacts/layout/run',
+      includeManual: false,
+    })
+    expect(verificationOutputName(true)).toBe('assessment.json')
+    expect(verificationOutputName(false)).toBe('automated-verification.json')
+    expect(canClaimFullAcceptance('focused', true, true)).toBe(true)
+    expect(canClaimFullAcceptance('full-known-mock', true, true)).toBe(true)
+    expect(canClaimFullAcceptance('tooling', true, true)).toBe(false)
+    expect(canClaimFullAcceptance('non-layout', true, true)).toBe(false)
   })
   it.each(['skipped', 'failed', 'timedOut', 'interrupted'])('rejects required %s attempts', (status) => {
     const f = fixture()

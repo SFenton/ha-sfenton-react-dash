@@ -1,6 +1,6 @@
 ---
 name: release-dashboard
-description: Explicitly invoked dashboard release scope-review workflow for the operator-authorized deterministic release machine; it does not itself commit, push, merge, deploy, or mutate Home Assistant.
+description: Explicitly invoked dashboard release workflow that commits only the approved change, waits for protected CI, merges to master, builds merged master, deploys both Home Assistant hosts, and verifies production.
 metadata:
   model: gpt-5.6-luna
   reasoning_effort: medium
@@ -9,120 +9,151 @@ metadata:
 
 # Release Dashboard
 
-Use this skill only when the operator invokes `release-dashboard` directly.
-That invocation requests release scope review. It does not itself create the
-operator authorization receipt required by the deterministic release machine
-and never grants a model permission to commit, push, merge, deploy, mutate Home
-Assistant, or restart it.
+Use this skill only when the operator invokes `release-dashboard` directly or
+explicitly instructs the agent to commit, push, merge, and deploy the completed
+dashboard change. That instruction authorizes those release operations for the
+current approved scope. It does not authorize unrelated work, history rewrites,
+deleting either Home Assistant host, actuating devices, or restarting Home
+Assistant unless changed HA runtime files require separately approved restart.
 
-The invariant is exact: the version 3 `release-machine.json` is disabled and
-remains `enabled: false`; invoking `release-dashboard` never authorizes release;
-and external, GitHub, production, deployment, rollback, verification, and
-other mutation drivers remain disabled or otherwise unavailable until they are
-separately qualified and operator-authorized. GitHub mutation and rollback drivers stay disabled.
-Registered deterministic local validation and build tools may remain active in
-`.github/agent-tools.json` for workspace-only preflight and shadow planning,
-but their presence never grants a model permission to commit, push, merge,
-deploy, mutate Home Assistant, or restart it. GitHub mutation steps stay unavailable
-while the machine is disabled and review-only invocation never authorizes
-release. Actual release prerequisites that reach Home Assistant, production
-capture, deployment, production verification, production rollback, rollback
-verification, cleanup, or other provider-backed side effects must remain
-disabled or otherwise unavailable until they are separately operator-authorized
-and qualified.
-Routine scope review uses the release opportunity's `gpt-5.6-luna` medium/default
-reviewer. `gpt-5.6-sol` high/default research may review only an evidence-
-bound `ha-release-rollback-or-host-conflict` trigger after the preceding
-release receipt. No model runs build, Git/PR, deployment, verification,
-rollback, or cleanup steps on behalf of the deterministic machine.
+The disabled version 3 release machine is an experimental shadow replacement
+for this workflow. It must remain disabled until every registered driver is
+implemented and fault-tested, but it does not replace or block this established
+operator-authorized release path.
 
 ## Required preflight
 
 1. Read the repository instructions, `docs/ux/layouts.md`,
-   `docs/ux/validation-matrix.md`, and every
-   instruction file matching the release-owned files.
-2. Inspect local `git status`, the complete diff, and the current branch.
-   Remote, GitHub, Home Assistant, and production reads remain machine-owned.
-3. Identify the exact release-owned files and hunks from the completed task.
-   Preserve all unrelated staged, unstaged, and untracked work. Record exact
-   patch boundaries for mixed files without changing the index or worktree.
-4. Confirm the task's required validation is complete. Re-run `npm run check`
-   and the smallest affected Playwright release gates if the working tree
-   changed after the last successful run.
-   Require a successful current `layout:verify` assessment for the release-owned
-   changes, including actual manual image/interaction review. Check source,
-   fixture, build and served-asset fingerprints; replan when they changed.
-   Release tests must own their build/server and must not enable
-   `reuseExistingServer` or borrow an unowned port. Local mock acceptance does
-   not satisfy real-device or production-host verification.
-5. Never print tokens, passwords, private keys, or environment-file contents.
+   `docs/ux/validation-matrix.md`, and every instruction file matching the
+   release-owned files.
+2. Inspect `git status`, the complete diff, the current branch, `origin/master`,
+   GitHub CLI authentication, and open pull requests.
+3. Identify the exact release-owned files and hunks. Preserve all unrelated
+   staged, unstaged, and untracked work. When a file contains mixed changes,
+   stage an exact patch rather than the whole file.
+4. Before pushing, run `npm run test:change-policy` for the exact release scope
+   and run every changed or added test file after its final edit using exact
+   paths. Use `npm run test:run -- <paths>` for Vitest files and
+   `npm run test:e2e -- <paths>` for Playwright files.
+5. Do not make `npm run check`, unchanged tests, full Playwright, production
+   builds, or layout automation local pre-push gates. The protected pull-request
+   workflow owns broad deterministic validation. Task-specific development
+   evidence may already include additional focused checks; do not rerun it
+   merely because release started.
+6. Never print tokens, passwords, private keys, or environment-file contents.
 
-## Disabled-machine stop gate
+## Git, pull request, and CI
 
-The checked-in machine is currently disabled. After the preflight above:
+1. Create a descriptive `copilot/<topic>-release-<date>` branch without
+   discarding local changes.
+2. Stage only the approved release scope. Review both `git diff --cached` and
+   `git diff --cached --check`.
+3. Commit with a concise message and this trailer:
 
-1. Confirm `release-machine.json` is version 3 and `enabled` is `false`.
-2. Confirm every release-machine tool reference still resolves through
-   `.github/agent-tools.json`. Deterministic validation, build, and
-   Git-orchestration command tools may remain registered, but `enabled: false`
-   keeps the full release flow unavailable and never authorizes GitHub
-   mutation. Every production capture, deploy, verification, rollback,
-   rollback-verification, cleanup, or other provider-backed driver required
-   for an actual release must still resolve to disabled tooling until
-   separately qualified and operator-authorized.
-3. Record the exact reviewed scope and validation evidence without staging,
-   committing, contacting GitHub or Home Assistant, or changing production.
-4. Return `blocked: release-machine-disabled`.
+   ```text
+   Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
+   ```
 
-Do not fall back to the former manual Git/PR/deploy procedure. A medium model
-cannot substitute for a disabled deterministic driver.
+4. Push the branch with upstream tracking.
+5. Create a pull request targeting `master` with the changed-test and focused
+   validation evidence.
+6. Wait with `gh pr checks --watch --fail-fast`. Do not merge while any check
+   is pending or failing. The protected `Playwright gate` aggregate includes:
+   changed-test policy, lint, unit and contract checks, a production build,
+   automated affected-layout evidence, and the sharded full Playwright suite.
+7. For a layout-sensitive release, inspect the `layout-automation` Action
+   artifact after the automated gate passes. View its requested unnormalized
+   screenshots with an image-capable tool, perform the listed interactions
+   against an owned preview of the exact pull-request head, and record truthful
+   observations tied to the artifact checkpoints and hashes. This human review
+   is a post-push release acceptance gate, not a pre-push local gate. A
+   `non-layout` Action classification or a zero-item manual worklist requires
+   no manual layout review.
+8. Merge with a merge commit through `gh`, fetch `origin/master`, and prove the
+   release commit is an ancestor of the merged branch. Do not force-push,
+   amend, or delete a checked-out branch that still carries unrelated work.
 
-## Enabled deterministic-machine contract
+`master` is protected for administrators and requires the strict
+`Playwright gate`. Force-push and branch deletion remain disabled.
 
-Only a separately reviewed change may enable the machine after every actual
-release prerequisite driver is implemented, fake-driver fault-tested,
-qualified, and covered by exact rollback and cleanup receipts. The enabled
-machine, not this model, must then:
+## Build the merged commit
 
-- validate and stage only the authorized scope while preserving unrelated
-  staged, unstaged, and untracked work;
-- create and merge the exact `master` pull request through registered GitHub
-  drivers without force-push or history rewrite;
-- build the merged `origin/master` revision in an isolated temporary worktree
-  that reuses installed `node_modules` and links local env files only inside
-  that temporary tree when deployment requires them;
-- deploy the same production bundle to the raw app, legacy wrapper, and custom
-  panel while preserving both Home Assistant hosts and updating the legacy
-  wrapper cache-busting version;
-- prefer the documented SMB copy path and use the configured SSH fallback only
-  when the share is unavailable;
-- stage changed `home-assistant/packages/sfenton_react_panel.yaml`,
-  `home-assistant/custom_components/sfenton_react_chat/`, and
-  `home-assistant/packages/sfenton_react_chat.yaml` with documented backup,
-  validation, rollback, and separate restart approval gates;
-- avoid a Home Assistant restart when the panel package, bridge, and chat
-  runtime files are unchanged;
-- after any separately approved restart, verify the prior daily chat purge
-  automation is absent without invoking the manual purge service;
-- verify the affected route at `393x852`, `852x393`, mirrored landscape inset
-  profiles, zero-inset rectangular-phone, desktop/fine-pointer surfaces, and
-  real-phone raw app, legacy wrapper, and custom panel behavior without live
-  device-service calls;
-- compare deployed asset identity to the clean merged build, record the outer
-  document, bridge document, and React document safe-area variables, and then
-  remove exact temporary release artifacts.
+Build and deploy from an isolated, detached worktree at the merged
+`origin/master` commit so unrelated local changes cannot enter production.
 
-Every run requires a separate operator authorization receipt bound to the
-project, release opportunity, repository, exact revision, scope, side-effect
-class, and registered tool IDs. A failed rollback or contradictory host
-evidence may request receipt-bound Sol research only through
-`ha-release-rollback-or-host-conflict`.
+1. Resolve and record one exact temporary worktree path.
+2. Add the detached worktree at the merged `origin/master` revision.
+3. Reuse the primary worktree's installed `node_modules`. Link local env files
+   only inside the temporary worktree when deployment needs them; never add
+   them to Git.
+4. Run `npm run build` in the detached worktree and verify the generated app
+   bundle and `dist/index.html`.
+
+## Deploy both Home Assistant hosts
+
+Prefer the repository's documented SMB copy when the share is available.
+Otherwise use the configured SSH fallback from the clean worktree:
+
+```bash
+npm run deploy:both
+```
+
+The deployment must:
+
+- upload the production `dist/` contents;
+- keep both `/sfenton-react-dash/home` and `/sfenton-react-panel`;
+- update the legacy wrapper URL with a unique merged-commit version;
+- verify the custom panel remains registered;
+- configuration-check a changed panel package before staging it;
+- avoid a Home Assistant restart when the panel package and bridge are
+  unchanged.
+
+For a Home MCP or proxy change, publish the exact merged Home MCP commit first.
+The container must use its pinned TLS certificate, validate each inherited HA
+token, and report the expected MCP version. Stage and configuration-check the
+HA proxy before replacing React assets. If the proxy is new or changed, stop
+after staging and obtain the separately required HA restart approval. After
+the restart, verify an authenticated `/api/sfenton_home_mcp` `home_info` call.
+Only then build with `VITE_HOME_MCP_ENABLED=true` and deploy the dashboard
+assets. Never leave a build that defaults to a missing proxy in either host.
+The SSH deploy command exits with status 2 after successful config staging so
+automation cannot mistake the pre-restart phase for asset deployment.
+
+Chat history and the Home MCP proxy are separate HA runtime dependencies.
+Deploy the exact `home-assistant/custom_components/sfenton_react_chat/` files
+and `home-assistant/packages/sfenton_react_chat.yaml` following the component
+README. SSH deployment compares and backs up those files and validates after
+staging, with rollback on staging or validation failure; SMB requires the
+documented manual backup, copy, validation, and rollback steps. Changed
+component or package files require a separately approved HA restart. After a
+restart, verify the prior daily purge automation is absent. The manual purge
+service may remain registered, but do not invoke it during release verification
+without explicit deletion authorization.
+
+## Production verification
+
+1. Confirm the raw app, legacy wrapper, and custom panel load the merged
+   production bundle.
+2. Open the affected route at `393x852`, rotate to `852x393`, and verify the
+   relevant desktop/fine-pointer surface. For shell, grid, modal, or fixed-edge
+   changes, inspect both mirrored landscape inset profiles and a zero-inset
+   rectangular-phone profile before the real-device smoke.
+3. Confirm the released behavior and modal access without calling live device
+   services. For phone-landscape modals, confirm every affected intent uses the
+   same exact padded safe rectangle. Within one intent, walk tabs, details,
+   loading, and result states and confirm no outer size drift.
+4. Compare the remote asset name or content to the clean merged build and
+   confirm the legacy wrapper cache-busting version is the merge commit.
+5. On a real phone, confirm the raw app, legacy wrapper, and custom panel
+   deliver non-obscured controls in both rotations. Record the outer document,
+   bridge document, and React document safe-area variables without changing
+   Home Assistant state.
+6. Remove the exact temporary worktree and local-only links after verification.
 
 ## Completion report
 
-While the machine is disabled, report the reviewed scope, local validation,
-the disabled machine state, the disabled or unavailable release-driver IDs that
-block actual side effects, preserved changes, and the exact blocked reason.
-After a future authorized deterministic run, report only receipt-backed branch,
-commit, PR, merge, bundle, deployment, host verification, restart, rollback,
-and cleanup outcomes. Never claim completion from model prose.
+Report the branch, commit, pull request, merge commit, production bundle,
+deployment method, all three verified host URLs, whether Home Assistant was
+restarted, the CI and manual layout evidence used, and any intentionally
+preserved local changes. If a required step fails, state the blocker and do not
+claim the release completed.

@@ -2,6 +2,8 @@ import { defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 import { fileURLToPath, URL } from 'node:url'
 
+process.env.TZ = 'America/Los_Angeles'
+
 export default defineConfig({
   cacheDir: '.cache/vitest',
   plugins: [react()],
