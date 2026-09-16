@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "canonicalContract": "team-pipeline/pipeline-contract-hash@v1",
+  "project": "ha-react",
+  "vectors": [
+    {
+      "id": "focused-tests",
+      "opportunityId": "focused-tests",
+      "expectedHash": "3b895cfc58b585d3e37b94bc8ce5ac69846d92539729a9ca4ba9a581a83ecaea"
+    },
+    {
+      "id": "ux",
+      "opportunityId": "ux",
+      "expectedHash": "c9b80d7ddd7a257fb01a7756f60e90a4245b7925b88c662bc56f19be461cde1d"
+    },
+    {
+      "id": "release",
+      "opportunityId": "release",
+      "expectedHash": "492c70b5e4b487f978d5d78104bc9209cf60f14d2c6892c55a55e062a4dc5b57"
+    }
+  ]
+}
