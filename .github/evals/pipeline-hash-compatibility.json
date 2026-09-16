@@ -6,17 +6,17 @@
     {
       "id": "focused-tests",
       "opportunityId": "focused-tests",
-      "expectedHash": "3b895cfc58b585d3e37b94bc8ce5ac69846d92539729a9ca4ba9a581a83ecaea"
+      "expectedHash": "f2b8d81ec7a47a2a2948eb92f491168f1f502747e1ccee6bcdca1c57adeacbde"
     },
     {
       "id": "ux",
       "opportunityId": "ux",
-      "expectedHash": "c9b80d7ddd7a257fb01a7756f60e90a4245b7925b88c662bc56f19be461cde1d"
+      "expectedHash": "981243e5b6e64f41e3c3fc091f9e81a6f3c750983f57c39ca98c939c69613369"
     },
     {
       "id": "release",
       "opportunityId": "release",
-      "expectedHash": "492c70b5e4b487f978d5d78104bc9209cf60f14d2c6892c55a55e062a4dc5b57"
+      "expectedHash": "77630ee9870974deaaa6097b65e2b2f5bd7cdd033717f2aab0efa018d4917483"
     }
   ]
 }

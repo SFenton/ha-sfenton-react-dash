@@ -21,15 +21,15 @@ const check = (condition, message, detail = undefined) => {
 }
 
 const expectedCore = [
-  ['young-novice', 'gpt-5.4-mini', 'low', 'default', 'U'],
+  ['young-novice', 'gpt-5.6-luna', 'low', 'default', 'U'],
   ['tech-teen', 'gpt-5-mini', 'low', 'default', 'U'],
-  ['ha-engineer', 'gpt-5.4', 'medium', 'default', 'E'],
+  ['ha-engineer', 'gpt-5.6-luna', 'medium', 'default', 'E'],
   ['cautious-elder', 'gemini-3.7-flash', 'medium', 'default', 'U'],
   ['visual-texter', 'gemini-3.7-flash', 'medium', 'default', 'U'],
-  ['ux-designer', 'gpt-5.4', 'medium', 'default', 'P'],
+  ['ux-designer', 'gpt-5.6-luna', 'medium', 'default', 'P'],
   ['occasional-partner', 'mai-code-1-flash-picker', 'low', 'default', 'U'],
-  ['power-user', 'gpt-5.4', 'medium', 'default', 'P'],
-  ['accessibility-auditor', 'gpt-5.4', 'medium', 'default', 'P'],
+  ['power-user', 'gpt-5.6-luna', 'medium', 'default', 'P'],
+  ['accessibility-auditor', 'gpt-5.6-luna', 'medium', 'default', 'P'],
 ]
 
 check(personas.core.length === expectedCore.length, 'Core panel has exactly nine slots.')

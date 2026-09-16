@@ -82,7 +82,7 @@
         "coordinator": {
           "role": "medium-coordinator",
           "profile": {
-            "model": "gpt-5.4",
+            "model": "gpt-5.6-luna",
             "effort": "medium",
             "context": "default"
           },
@@ -91,7 +91,7 @@
         "reviewer": {
           "role": "medium-review",
           "profile": {
-            "model": "gpt-5.4",
+            "model": "gpt-5.6-luna",
             "effort": "medium",
             "context": "default"
           },
@@ -138,7 +138,7 @@
           "id": "binding-spec",
           "kind": "spec-planner",
           "profile": {
-            "model": "gpt-5.4",
+            "model": "gpt-5.6-luna",
             "effort": "medium",
             "context": "default"
           },
@@ -221,7 +221,7 @@
         "coordinator": {
           "role": "medium-coordinator",
           "profile": {
-            "model": "gpt-5.4",
+            "model": "gpt-5.6-luna",
             "effort": "medium",
             "context": "default"
           },
@@ -230,7 +230,7 @@
         "reviewer": {
           "role": "medium-review",
           "profile": {
-            "model": "gpt-5.4",
+            "model": "gpt-5.6-luna",
             "effort": "medium",
             "context": "default"
           },
@@ -271,7 +271,7 @@
           "id": "binding-spec",
           "kind": "spec-planner",
           "profile": {
-            "model": "gpt-5.4",
+            "model": "gpt-5.6-luna",
             "effort": "medium",
             "context": "default"
           },
@@ -373,7 +373,7 @@
         "coordinator": {
           "role": "medium-coordinator",
           "profile": {
-            "model": "gpt-5.4",
+            "model": "gpt-5.6-luna",
             "effort": "medium",
             "context": "default"
           },
@@ -382,7 +382,7 @@
         "reviewer": {
           "role": "medium-review",
           "profile": {
-            "model": "gpt-5.4",
+            "model": "gpt-5.6-luna",
             "effort": "medium",
             "context": "default"
           },
@@ -423,7 +423,7 @@
           "id": "binding-spec",
           "kind": "spec-planner",
           "profile": {
-            "model": "gpt-5.4",
+            "model": "gpt-5.6-luna",
             "effort": "medium",
             "context": "default"
           },
@@ -497,7 +497,7 @@
         "coordinator": {
           "role": "medium-coordinator",
           "profile": {
-            "model": "gpt-5.4",
+            "model": "gpt-5.6-luna",
             "effort": "medium",
             "context": "default"
           },
@@ -506,7 +506,7 @@
         "reviewer": {
           "role": "medium-review",
           "profile": {
-            "model": "gpt-5.4",
+            "model": "gpt-5.6-luna",
             "effort": "medium",
             "context": "default"
           },
@@ -547,7 +547,7 @@
           "id": "binding-spec",
           "kind": "spec-planner",
           "profile": {
-            "model": "gpt-5.4",
+            "model": "gpt-5.6-luna",
             "effort": "medium",
             "context": "default"
           },
@@ -620,7 +620,7 @@
         "coordinator": {
           "role": "medium-coordinator",
           "profile": {
-            "model": "gpt-5.4",
+            "model": "gpt-5.6-luna",
             "effort": "medium",
             "context": "default"
           },
@@ -629,7 +629,7 @@
         "reviewer": {
           "role": "medium-review",
           "profile": {
-            "model": "gpt-5.4",
+            "model": "gpt-5.6-luna",
             "effort": "medium",
             "context": "default"
           },
@@ -670,7 +670,7 @@
           "id": "binding-spec",
           "kind": "spec-planner",
           "profile": {
-            "model": "gpt-5.4",
+            "model": "gpt-5.6-luna",
             "effort": "medium",
             "context": "default"
           },
@@ -770,7 +770,7 @@
         "coordinator": {
           "role": "medium-coordinator",
           "profile": {
-            "model": "gpt-5.4",
+            "model": "gpt-5.6-luna",
             "effort": "medium",
             "context": "default"
           },
@@ -779,7 +779,7 @@
         "reviewer": {
           "role": "medium-review",
           "profile": {
-            "model": "gpt-5.4",
+            "model": "gpt-5.6-luna",
             "effort": "medium",
             "context": "default"
           },
@@ -820,7 +820,7 @@
           "id": "binding-spec",
           "kind": "spec-planner",
           "profile": {
-            "model": "gpt-5.4",
+            "model": "gpt-5.6-luna",
             "effort": "medium",
             "context": "default"
           },
@@ -891,7 +891,7 @@
         "coordinator": {
           "role": "medium-coordinator",
           "profile": {
-            "model": "gpt-5.4",
+            "model": "gpt-5.6-luna",
             "effort": "medium",
             "context": "default"
           },
@@ -900,7 +900,7 @@
         "reviewer": {
           "role": "medium-review",
           "profile": {
-            "model": "gpt-5.4",
+            "model": "gpt-5.6-luna",
             "effort": "medium",
             "context": "default"
           },
@@ -941,7 +941,7 @@
           "id": "binding-spec",
           "kind": "spec-planner",
           "profile": {
-            "model": "gpt-5.4",
+            "model": "gpt-5.6-luna",
             "effort": "medium",
             "context": "default"
           },
@@ -1014,7 +1014,7 @@
         "coordinator": {
           "role": "medium-coordinator",
           "profile": {
-            "model": "gpt-5.4",
+            "model": "gpt-5.6-luna",
             "effort": "medium",
             "context": "default"
           },
@@ -1023,7 +1023,7 @@
         "reviewer": {
           "role": "medium-review",
           "profile": {
-            "model": "gpt-5.4",
+            "model": "gpt-5.6-luna",
             "effort": "medium",
             "context": "default"
           },
@@ -1064,7 +1064,7 @@
           "id": "binding-spec",
           "kind": "spec-planner",
           "profile": {
-            "model": "gpt-5.4",
+            "model": "gpt-5.6-luna",
             "effort": "medium",
             "context": "default"
           },
@@ -1162,7 +1162,7 @@
         "coordinator": {
           "role": "medium-coordinator",
           "profile": {
-            "model": "gpt-5.4",
+            "model": "gpt-5.6-luna",
             "effort": "medium",
             "context": "default"
           },
@@ -1171,7 +1171,7 @@
         "reviewer": {
           "role": "medium-review",
           "profile": {
-            "model": "gpt-5.4",
+            "model": "gpt-5.6-luna",
             "effort": "medium",
             "context": "default"
           },
@@ -1212,7 +1212,7 @@
           "id": "binding-spec",
           "kind": "spec-planner",
           "profile": {
-            "model": "gpt-5.4",
+            "model": "gpt-5.6-luna",
             "effort": "medium",
             "context": "default"
           },
@@ -1282,7 +1282,7 @@
         "coordinator": {
           "role": "medium-coordinator",
           "profile": {
-            "model": "gpt-5.4",
+            "model": "gpt-5.6-luna",
             "effort": "medium",
             "context": "default"
           },
@@ -1291,7 +1291,7 @@
         "reviewer": {
           "role": "medium-review",
           "profile": {
-            "model": "gpt-5.4",
+            "model": "gpt-5.6-luna",
             "effort": "medium",
             "context": "default"
           },
@@ -1332,7 +1332,7 @@
           "id": "binding-spec",
           "kind": "spec-planner",
           "profile": {
-            "model": "gpt-5.4",
+            "model": "gpt-5.6-luna",
             "effort": "medium",
             "context": "default"
           },
@@ -1432,7 +1432,7 @@
         "coordinator": {
           "role": "medium-coordinator",
           "profile": {
-            "model": "gpt-5.4",
+            "model": "gpt-5.6-luna",
             "effort": "medium",
             "context": "default"
           },
@@ -1441,7 +1441,7 @@
         "reviewer": {
           "role": "medium-review",
           "profile": {
-            "model": "gpt-5.4",
+            "model": "gpt-5.6-luna",
             "effort": "medium",
             "context": "default"
           },
@@ -1482,7 +1482,7 @@
           "id": "binding-spec",
           "kind": "spec-planner",
           "profile": {
-            "model": "gpt-5.4",
+            "model": "gpt-5.6-luna",
             "effort": "medium",
             "context": "default"
           },

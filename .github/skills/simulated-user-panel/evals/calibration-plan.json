@@ -10,7 +10,7 @@
       "personaId": "young-novice",
       "variant": "calibration-reference",
       "modelOverride": {
-        "model": "gpt-5.4",
+        "model": "gpt-5.6-luna",
         "effort": "medium",
         "context": "default"
       }
