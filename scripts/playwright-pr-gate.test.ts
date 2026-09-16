@@ -1,5 +1,6 @@
 // @covers .github/workflows/playwright.yml
 // @covers .github/skills/release-dashboard/SKILL.md
+// @covers vitest.config.ts
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
@@ -33,6 +34,7 @@ describe('protected dashboard pull-request gate', () => {
   it('aggregates quality, automated layout, and full Playwright in the protected check', () => {
     const workflow = read('.github/workflows/playwright.yml')
     const packageJson = readJson<PackageJson>('package.json')
+    const vitestConfig = read('vitest.config.ts')
 
     expect(workflow).toContain('pull_request:')
     expect(workflow).toContain('name: Quality checks')
@@ -55,6 +57,7 @@ describe('protected dashboard pull-request gate', () => {
     expect(packageJson.scripts['check:ci']).toContain('npm run lint')
     expect(packageJson.scripts['check:ci']).toContain('npm run test:run')
     expect(packageJson.scripts['check:ci']).toContain('npm run build')
+    expect(vitestConfig).toContain("process.env.TZ = 'America/Los_Angeles'")
   })
 
   it('keeps release machine v3 shadow-only without blocking the manual release', () => {
