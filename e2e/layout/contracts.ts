@@ -415,10 +415,10 @@ export const SURFACE_CONTRACTS: Record<ScenarioId, {
     question: 'Is the complete active direction pad visible without auto-scroll, operable, and unchanged on portrait return?',
   },
   vacuum: {
-    family: 'modal', states: ['docked'],
+    family: 'modal', states: ['docked', 'cleaning', 'dock-cleaning', 'resumable', 'low-battery'],
     owners: ['src/components/hass/VacuumCard', 'src/components/hass/ValetudoMap', 'src/i18n/locales/en/modals/vacuum.json'],
     legacy: ['vacuum-status.spec.ts', 'modal-rotation-regressions.spec.ts'],
-    question: 'Does the fitted vacuum map fill the stationary left pane in short and tall landscape while the right pane scrolls naturally, with Locate immediately after Dock Status in the landscape status grid?',
+    question: 'Does the fitted vacuum map fill the stationary left pane in short and tall landscape while the right pane scrolls naturally, while runtime-driven minimal states immediately trim tabs, keep Controls non-empty, surface only the active dock stop action, close the area editor, and preserve the correct selected tab?',
   },
   weather: {
     family: 'modal',

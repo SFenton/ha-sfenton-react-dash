@@ -3,6 +3,13 @@
 export {}
 
 declare global {
+  type VacuumModalPreviewMode = 'live' | 'full' | 'minimal'
+
+  interface VacuumModalPreviewApi {
+    getMode: () => VacuumModalPreviewMode
+    setMode: (mode: VacuumModalPreviewMode) => void
+  }
+
   interface ImportMetaEnv {
     readonly VITE_HA_URL: string
     readonly VITE_HOME_MCP_ENABLED?: string
@@ -20,5 +27,6 @@ declare global {
 
   interface Window {
     __homeMcpUrl?: string
+    __vacuumModalPreview?: VacuumModalPreviewApi
   }
 }

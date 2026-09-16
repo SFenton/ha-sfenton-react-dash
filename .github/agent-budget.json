@@ -3,6 +3,7 @@
   "project": "ha-react",
   "opportunityPolicy": ".github/agent-opportunities.json",
   "toolRegistry": ".github/agent-tools.json",
+  "releaseMachine": ".github/release-machine.json",
   "opportunityEvaluation": ".github/evals/agent-opportunity-cases.json",
   "workerEvaluation": ".github/evals/agent-worker-cases.json",
   "capabilityEvaluation": ".github/evals/capability-qualification.json",

@@ -55,6 +55,38 @@ async function setMusicVacuumUnavailable(page: Page) {  await page.evaluate(() =
   })
 }
 
+async function setMainFloorVacuumRuntime(page: Page, {
+  error = 'No error',
+  state,
+  statusFlag = 'none',
+}: {
+  error?: string
+  state: string
+  statusFlag?: string
+}) {
+  await page.evaluate(({ error, state, statusFlag }) => {
+    const mock = window.__mockHass
+    if (!mock) throw new Error('Mock Home Assistant API is unavailable')
+    mock.setEntityState('vacuum.valetudo_exaltedsneakydeer', state)
+    mock.setEntityState('sensor.valetudo_exaltedsneakydeer_error', error)
+    mock.setEntityState('sensor.valetudo_exaltedsneakydeer_status_flag', statusFlag)
+    mock.calls.splice(0, mock.calls.length)
+  }, { error, state, statusFlag })
+}
+
+async function setMainFloorDockStatus(page: Page, dockStatus: string) {
+  await page.evaluate((state) => {
+    const mock = window.__mockHass
+    if (!mock) throw new Error('Mock Home Assistant API is unavailable')
+    mock.setEntityState('sensor.valetudo_exaltedsneakydeer_dock_status', state)
+    mock.calls.splice(0, mock.calls.length)
+  }, dockStatus)
+}
+
+async function mainFloorTabLabels(dialog: ReturnType<Page['getByRole']>) {
+  return dialog.getByRole('tab').evaluateAll((tabs) => tabs.map((tab) => tab.getAttribute('aria-label')))
+}
+
 async function openUnavailableMusicVacuum(page: Page, path = '/at-a-glance/vacuums') {
   await page.goto(path)
   await setMusicVacuumUnavailable(page)
@@ -597,6 +629,130 @@ test('room map taps preserve cleaning order and confirm Rooms-Area conflicts', a
     service: 'turn_on',
     target: 'input_boolean.roborock_living_room_toggle',
   })
+})
+
+test('runtime mode changes immediately retarget hidden tabs and preserve auto-clean selection', async ({ page }) => {
+  await page.goto('/at-a-glance/vacuums')
+  await page.getByRole('button', { name: /Main Floor Docked/i }).click()
+
+  const dialog = page.getByRole('dialog')
+  await waitForModalReady(dialog, undefined, 'vacuum-tabs')
+  await waitForVacuumLayoutReady(dialog)
+  const dialogId = await dialog.getAttribute('id')
+
+  await expect.poll(async () => mainFloorTabLabels(dialog)).toEqual(['Controls', 'Rooms', 'Auto-Clean', 'Actions', 'Info'])
+  await dialog.getByRole('tab', { name: 'Rooms' }).click()
+  await expect(dialog.getByRole('tab', { name: 'Rooms', selected: true })).toBeVisible()
+
+  await setMainFloorVacuumRuntime(page, { state: 'cleaning' })
+
+  await expect(page.getByRole('dialog')).toHaveAttribute('id', dialogId ?? '')
+  await expect.poll(async () => mainFloorTabLabels(dialog)).toEqual(['Controls', 'Auto-Clean', 'Info'])
+  await expect(dialog.getByRole('tab', { name: 'Controls', selected: true })).toBeVisible()
+  await expect(dialog.getByRole('tab', { name: 'Rooms' })).toHaveCount(0)
+  await expect(dialog.getByRole('tab', { name: 'Actions' })).toHaveCount(0)
+  await expect(dialog.getByRole('tab', { name: 'Info' })).toBeVisible()
+  await expect(dialog.getByRole('group', { name: 'Cleaning target' })).toHaveCount(0)
+  await expect(dialog.getByRole('button', { name: 'Pause' })).toBeVisible()
+  await expect(dialog.getByRole('button', { name: 'Stop' })).toBeVisible()
+
+  await setMainFloorVacuumRuntime(page, { state: 'docked' })
+  await expect.poll(async () => mainFloorTabLabels(dialog)).toEqual(['Controls', 'Rooms', 'Auto-Clean', 'Actions', 'Info'])
+  await expect(dialog.getByRole('tab', { name: 'Controls', selected: true })).toBeVisible()
+  await expect(dialog.getByRole('tab', { name: 'Rooms', selected: true })).toHaveCount(0)
+
+  await dialog.getByRole('tab', { name: 'Auto-Clean' }).click()
+  await expect(dialog.getByRole('tab', { name: 'Auto-Clean', selected: true })).toBeVisible()
+
+  await setMainFloorVacuumRuntime(page, { state: 'returning' })
+  await expect.poll(async () => mainFloorTabLabels(dialog)).toEqual(['Controls', 'Auto-Clean', 'Info'])
+  await expect(dialog.getByRole('tab', { name: 'Auto-Clean', selected: true })).toBeVisible()
+
+  await dialog.getByRole('tab', { name: 'Info' }).click()
+  await expect(dialog.getByRole('tab', { name: 'Info', selected: true })).toBeVisible()
+
+  await setMainFloorVacuumRuntime(page, { state: 'docked' })
+  await expect.poll(async () => mainFloorTabLabels(dialog)).toEqual(['Controls', 'Rooms', 'Auto-Clean', 'Actions', 'Info'])
+  await expect(dialog.getByRole('tab', { name: 'Info', selected: true })).toBeVisible()
+})
+
+test('busy dock minimal mode shows Actions only for the active dock stop control', async ({ page }) => {
+  await page.goto('/at-a-glance/vacuums')
+  await page.getByRole('button', { name: /Main Floor Docked/i }).click()
+
+  const dialog = page.getByRole('dialog')
+  await waitForModalReady(dialog, undefined, 'vacuum-tabs')
+  await waitForVacuumLayoutReady(dialog)
+
+  await setMainFloorDockStatus(page, 'cleaning')
+
+  await expect.poll(async () => mainFloorTabLabels(dialog)).toEqual(['Controls', 'Auto-Clean', 'Actions', 'Info'])
+  const controlsPane = dialog.getByRole('group', { name: 'Main Floor controls, auto-clean, actions, info' })
+  await expect(controlsPane.getByRole('button', { name: 'Stop Dock Clean' })).toHaveCount(0)
+  await expect(controlsPane.getByRole('button', { name: 'Clean Mop Dock' })).toHaveCount(0)
+  await expect(controlsPane.getByRole('button', { name: 'Dry Mops' })).toHaveCount(0)
+  await expect(controlsPane.getByRole('button', { name: 'Empty Bin' })).toHaveCount(0)
+
+  await dialog.getByRole('tab', { name: 'Actions' }).click()
+  await expect(controlsPane.getByRole('button', { name: 'Stop Dock Clean' })).toBeVisible()
+  await controlsPane.getByRole('button', { name: 'Stop Dock Clean' }).click()
+  await expect.poll(() => page.evaluate(() => window.__mockHass?.calls ?? [])).toContainEqual({
+    domain: 'script',
+    service: 'main_floor_vacuum_mop_dock_clean',
+  })
+})
+
+test('minimal short landscape controls keep a visible status fallback and close the area editor', async ({ page }) => {
+  await page.setViewportSize({ height: 393, width: 852 })
+  await page.goto('/at-a-glance/vacuums')
+  await page.getByRole('button', { name: /Main Floor Docked/i }).click()
+
+  const dialog = page.getByRole('dialog')
+  await waitForModalReady(dialog, undefined, 'vacuum-tabs')
+  await waitForVacuumLayoutReady(dialog)
+
+  await dialog.getByRole('group', { name: 'Cleaning target' }).getByRole('button', { name: 'Area' }).click()
+  await expect(dialog.getByRole('application', { name: 'Main Floor cleaning area editor' })).toBeVisible()
+
+  await setMainFloorVacuumRuntime(page, { error: 'Low battery', state: 'error' })
+
+  await expect(dialog.getByRole('application', { name: 'Main Floor cleaning area editor' })).toHaveCount(0)
+  await expect.poll(async () => mainFloorTabLabels(dialog)).toEqual(['Controls', 'Auto-Clean', 'Info'])
+  const controlsPane = dialog.getByRole('group', { name: 'Main Floor controls, auto-clean, info' })
+  const statusSummary = controlsPane.getByRole('group', { name: 'Vacuum status' })
+  await expect(statusSummary).toContainText('Error')
+  await expect(statusSummary).toContainText('Battery')
+  const currentIssue = controlsPane.getByRole('region', { name: 'Current Issue' })
+  await expect(currentIssue).toBeVisible()
+  await expect(currentIssue).toContainText('Low battery')
+  await expect(controlsPane.getByRole('status')).toContainText('Low battery')
+  await expect(controlsPane.getByRole('button', { name: 'Clean' })).toHaveCount(0)
+  await expect(controlsPane.getByRole('button', { name: 'Pause' })).toHaveCount(0)
+  await expect(controlsPane.getByRole('button', { name: 'Stop' })).toHaveCount(0)
+})
+
+test('unknown consumable sensors stay visible with unknown values in Info', async ({ page }) => {
+  await page.goto('/at-a-glance/vacuums')
+  await page.evaluate(() => {
+    const mock = window.__mockHass
+    if (!mock) throw new Error('Mock Home Assistant API is unavailable')
+    mock.setEntityState('sensor.valetudo_exaltedsneakydeer_freshwater_dock_component', 'unknown')
+    mock.setEntityState('sensor.valetudo_exaltedsneakydeer_wastewater_dock_component', 'unavailable')
+    mock.calls.splice(0, mock.calls.length)
+  })
+  await page.getByRole('button', { name: /Main Floor Docked/i }).click()
+
+  const dialog = page.getByRole('dialog')
+  await waitForModalReady(dialog, undefined, 'vacuum-tabs')
+  await waitForVacuumLayoutReady(dialog)
+  await dialog.getByRole('tab', { name: 'Info' }).click()
+
+  for (const name of ['Fresh Water Unknown', 'Waste Water Unknown']) {
+    const item = dialog.getByRole('group', { name })
+    await expect(item).toBeVisible()
+    await expect(item).toHaveAttribute('data-icon', 'mdi:help-circle-outline')
+    await expect(item).toHaveAttribute('data-tone', 'unavailable')
+  }
 })
 
 test('a camera-only outage hides cached position and map-linked commands', async ({ page }) => {

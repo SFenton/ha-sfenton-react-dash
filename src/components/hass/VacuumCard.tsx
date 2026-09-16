@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
 import { useEntity, useHass } from '@hakit/core'
 import { Description } from '../core/Description'
 import { InlineAlert } from '../core/InlineAlert'
@@ -53,6 +53,11 @@ import {
   type VacuumCurrentIssue,
   type VacuumLastIssue,
 } from './vacuumStatus'
+import {
+  vacuumModalTabsForMode,
+  vacuumRuntimeMode,
+  type VacuumRuntimeMode,
+} from './vacuumModalRuntime'
 import { isUnavailableVacuumState, vacuumConsumableVisual, vacuumStateVisual, type VacuumVisualTone } from './vacuumVisualState'
 import { VacuumTile } from './VacuumTile'
 import styles from './VacuumCard.module.css'
@@ -155,6 +160,17 @@ interface ResolvedVacuumStatus {
   primaryRevision?: string
 }
 
+const VACUUM_MODAL_PREVIEW_EVENT = 'react-dash:vacuum-modal-preview-mode'
+let vacuumModalPreviewMode: VacuumModalPreviewMode = 'live'
+let vacuumModalPreviewRegistrations = 0
+
+interface VacuumModalRuntime {
+  optimisticState: OptimisticVacuumState
+  runtimeMode: VacuumRuntimeMode
+  status: ResolvedVacuumStatus
+  visibleTabs: readonly (typeof VACUUM_MODAL_TABS)[number][]
+}
+
 function isUnavailableState(state: string | undefined) {
   return isUnavailableVacuumState(state)
 }
@@ -163,19 +179,47 @@ function isResumable(statusFlag: string | undefined) {
   return statusFlag === 'resumable'
 }
 
-function canStartVacuumCleaning(state: string, statusFlag: string | undefined, error: string | undefined) {
-  const resumable = isResumable(statusFlag)
-  const lowBattery = error === 'Low battery'
-  return !resumable && (state === 'docked' || state === 'idle' || (state === 'error' && !lowBattery))
+function installVacuumModalPreviewApi() {
+  if (!import.meta.env.DEV || typeof window === 'undefined') return () => undefined
+
+  vacuumModalPreviewRegistrations += 1
+  window.__vacuumModalPreview ??= {
+    getMode: () => vacuumModalPreviewMode,
+    setMode: (mode) => {
+      vacuumModalPreviewMode = mode
+      window.dispatchEvent(new CustomEvent(VACUUM_MODAL_PREVIEW_EVENT, { detail: { mode } }))
+    },
+  }
+
+  return () => {
+    vacuumModalPreviewRegistrations = Math.max(0, vacuumModalPreviewRegistrations - 1)
+    if (vacuumModalPreviewRegistrations > 0) return
+    vacuumModalPreviewMode = 'live'
+    delete window.__vacuumModalPreview
+  }
 }
 
-function vacuumModalTabs(vacuum: VacuumConfig) {
-  return VACUUM_MODAL_TABS.filter((tab) => {
-    if (tab.tab === 'zones') return vacuum.zones.length > 0
-    if (tab.tab === 'autoClean') return Boolean(vacuum.autoCleanDisabledRooms?.length)
-    if (tab.tab === 'info') return vacuum.consumables.length > 0
-    return true
-  })
+function currentVacuumModalPreviewMode(): VacuumModalPreviewMode {
+  if (!import.meta.env.DEV || typeof window === 'undefined') return 'live'
+  return window.__vacuumModalPreview?.getMode() ?? vacuumModalPreviewMode
+}
+
+function subscribeVacuumModalPreviewMode(onStoreChange: () => void) {
+  if (!import.meta.env.DEV || typeof window === 'undefined') return () => undefined
+  const dispose = installVacuumModalPreviewApi()
+  window.addEventListener(VACUUM_MODAL_PREVIEW_EVENT, onStoreChange)
+  return () => {
+    window.removeEventListener(VACUUM_MODAL_PREVIEW_EVENT, onStoreChange)
+    dispose()
+  }
+}
+
+function useVacuumModalPreviewMode() {
+  return useSyncExternalStore<VacuumModalPreviewMode>(
+    subscribeVacuumModalPreviewMode,
+    currentVacuumModalPreviewMode,
+    () => 'live',
+  )
 }
 
 function isMeaningfulText(value: string | undefined) {
@@ -294,6 +338,81 @@ function useResolvedVacuumDetails(
     primaryAvailable,
     primaryRevision,
   }
+}
+
+function useVacuumModalRuntime(vacuum: VacuumConfig): VacuumModalRuntime {
+  const entity = useEntity(asEntityName(vacuum.entityId), { returnNullIfNotFound: true })
+  const dockStatus = useOptionalEntity(vacuum.dockControls?.dockStatusEntityId)
+  const liveState = entity?.state
+  const primaryState = liveState ?? VACUUM_AVAILABILITY_UNKNOWN
+  const [displayState, commitDisplayState] = useOptimisticState(primaryState, { clearOn: 'live-change', revertMs: VACUUM_OPTIMISTIC_REVERT_MS })
+  const status = useResolvedVacuumDetails(vacuum, liveState, Boolean(entity), entity?.last_changed)
+  const error = useEntity(asEntityName(vacuum.errorEntityId), { returnNullIfNotFound: true })
+  const statusFlag = useEntity(asEntityName(vacuum.statusFlagEntityId), { returnNullIfNotFound: true })
+  const previewMode = useVacuumModalPreviewMode()
+  const liveRuntimeMode = vacuumRuntimeMode({
+    commandPolicyMode: status.commandPolicyMode,
+    displayState,
+    liveError: error?.state,
+    liveStatusFlag: statusFlag?.state,
+  })
+  const runtimeMode = previewMode === 'live' ? liveRuntimeMode : previewMode
+  const optimisticState = useMemo<OptimisticVacuumState>(() => ({
+    commitState: commitDisplayState,
+    liveState: primaryState,
+    state: displayState,
+  }), [commitDisplayState, displayState, primaryState])
+  const visibleTabs = useMemo(
+    () => vacuumModalTabsForMode(vacuum, runtimeMode, dockStatus?.state),
+    [dockStatus?.state, runtimeMode, vacuum],
+  )
+
+  return { optimisticState, runtimeMode, status, visibleTabs }
+}
+
+function useVacuumActiveTab({
+  activeTab,
+  areaEditorOpen,
+  idPrefix,
+  onActiveTabChange,
+  visibleTabs,
+}: {
+  activeTab: VacuumModalTab
+  areaEditorOpen: boolean
+  idPrefix: string
+  onActiveTabChange: (tab: VacuumModalTab) => void
+  visibleTabs: readonly (typeof VACUUM_MODAL_TABS)[number][]
+}) {
+  const focusControlsRef = useRef(false)
+  const effectiveActiveTab = visibleTabs.some((tab) => tab.tab === activeTab) ? activeTab : 'controls'
+
+  useLayoutEffect(() => {
+    if (activeTab === effectiveActiveTab) return
+    const activeElement = document.activeElement instanceof HTMLElement ? document.activeElement : null
+    const hiddenTab = document.getElementById(modalTabId(idPrefix, activeTab))
+    const hiddenPanel = document.getElementById(modalTabPanelId(idPrefix, 'content'))
+    focusControlsRef.current = Boolean(activeElement) && (
+      hiddenTab === activeElement
+      || Boolean(hiddenTab?.contains(activeElement))
+      || Boolean(hiddenPanel?.contains(activeElement))
+    )
+    onActiveTabChange('controls')
+  }, [activeTab, effectiveActiveTab, idPrefix, onActiveTabChange])
+
+  useLayoutEffect(() => {
+    if (!focusControlsRef.current || areaEditorOpen || effectiveActiveTab !== 'controls') return
+    focusControlsRef.current = false
+    const focusControls = () => {
+      document.getElementById(modalTabId(idPrefix, 'controls'))?.focus({ preventScroll: true })
+    }
+    focusControls()
+    const frame = window.requestAnimationFrame(() => {
+      if (document.activeElement === document.body) focusControls()
+    })
+    return () => window.cancelAnimationFrame(frame)
+  }, [areaEditorOpen, effectiveActiveTab, idPrefix, visibleTabs])
+
+  return effectiveActiveTab
 }
 
 function formatPassCount(value: string | undefined) {
@@ -522,6 +641,100 @@ function useOptionalEntity(entityId: string | undefined) {
   return useEntity(asEntityName(entityId ?? 'sensor.react_dash_optional_entity_not_configured'), { returnNullIfNotFound: true }) as EntityLike | null
 }
 
+interface VacuumAreaEditorSession {
+  areaEditorOpen: boolean
+  closeAreaEditor: () => void
+  drawMode: boolean
+  openAreaEditor: (drawMode: boolean) => void
+}
+
+class VacuumAreaEditorSessionStore {
+  private snapshot: { areaEditorOpen: boolean; drawMode: boolean; runtimeMode: VacuumRuntimeMode }
+
+  private readonly listeners = new Set<() => void>()
+
+  constructor(runtimeMode: VacuumRuntimeMode) {
+    this.snapshot = {
+      areaEditorOpen: false,
+      drawMode: false,
+      runtimeMode,
+    }
+  }
+
+  subscribe = (listener: () => void) => {
+    this.listeners.add(listener)
+    return () => {
+      this.listeners.delete(listener)
+    }
+  }
+
+  getSnapshot = () => this.snapshot
+
+  setRuntimeMode(runtimeMode: VacuumRuntimeMode) {
+    const next =
+      runtimeMode === 'full'
+        ? { ...this.snapshot, runtimeMode }
+        : { areaEditorOpen: false, drawMode: false, runtimeMode }
+
+    if (
+      next.runtimeMode === this.snapshot.runtimeMode
+      && next.areaEditorOpen === this.snapshot.areaEditorOpen
+      && next.drawMode === this.snapshot.drawMode
+    ) return
+
+    this.snapshot = next
+    this.emit()
+  }
+
+  open(drawMode: boolean) {
+    if (this.snapshot.runtimeMode !== 'full') return
+    if (this.snapshot.areaEditorOpen && this.snapshot.drawMode === drawMode) return
+    this.snapshot = {
+      ...this.snapshot,
+      areaEditorOpen: true,
+      drawMode,
+    }
+    this.emit()
+  }
+
+  close() {
+    if (!this.snapshot.areaEditorOpen && !this.snapshot.drawMode) return
+    this.snapshot = {
+      ...this.snapshot,
+      areaEditorOpen: false,
+      drawMode: false,
+    }
+    this.emit()
+  }
+
+  private emit() {
+    for (const listener of this.listeners) listener()
+  }
+}
+
+function useVacuumAreaEditorSession(runtimeMode: VacuumRuntimeMode): VacuumAreaEditorSession {
+  const [store] = useState(() => new VacuumAreaEditorSessionStore(runtimeMode))
+  useLayoutEffect(() => {
+    store.setRuntimeMode(runtimeMode)
+  }, [runtimeMode, store])
+  const snapshot = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot)
+
+  const openAreaEditor = useCallback((drawMode: boolean) => {
+    store.open(drawMode)
+  }, [store])
+
+  const closeAreaEditor = useCallback(() => {
+    store.close()
+  }, [store])
+
+  return {
+    areaEditorOpen: snapshot.areaEditorOpen,
+    closeAreaEditor,
+    drawMode: snapshot.drawMode,
+    openAreaEditor,
+  }
+}
+
 function useVacuumSettingIntentConfirmations(vacuum: VacuumConfig, onLiveState: (entityId: string, liveState: string | undefined) => void) {
   const mode = useOptionalEntity(vacuum.modeEntityId)
   const fan = useOptionalEntity(vacuum.fanEntityId)
@@ -677,7 +890,7 @@ function formatConsumableDuration(entity: EntityLike) {
 }
 
 function formatConsumableValue(consumable: VacuumConsumableConfig, entity: EntityLike | null | undefined) {
-  if (!entity || isUnavailableState(entity.state)) return 'Unavailable'
+  if (!entity || isUnavailableState(entity.state)) return 'Unknown'
   if (consumable.valueKind === 'duration') return formatConsumableDuration(entity)
   const value = formatStateValue(entity.state)
   return value.toLowerCase() === 'ok' ? 'OK' : value
@@ -976,12 +1189,12 @@ function VacuumInfoSection({ vacuum }: { vacuum: VacuumConfig }) {
 }
 
 function VacuumPowerSettings({
-  commandPolicyMode,
   coordinator,
+  runtimeMode,
   vacuum,
 }: {
-  commandPolicyMode: VacuumCommandPolicyMode
   coordinator: VacuumCommandCoordinator
+  runtimeMode: VacuumRuntimeMode
   vacuum: VacuumConfig
 }) {
   const mode = useOptionalEntity(vacuum.modeEntityId)
@@ -995,9 +1208,9 @@ function VacuumPowerSettings({
   const showFan = Boolean(vacuum.fanEntityId && fan && !isUnavailableState(fan.state) && optimisticModeState !== 'mop')
   const showWater = Boolean(vacuum.waterEntityId && water && !isUnavailableState(water.state) && (!hasMode || optimisticModeState !== 'vacuum'))
   const modeLabel = optimisticModeState === modeState && isMeaningfulText(modeText?.state) ? modeText?.state : formatStateValue(optimisticModeState, 'Mode')
-  const disabled = coordinator.controlsDisabled || commandPolicyMode !== VACUUM_COMMAND_NORMAL
+  const disabled = coordinator.controlsDisabled || runtimeMode !== 'full'
 
-  if (!hasMode && !showFan && !showWater) return null
+  if (runtimeMode !== 'full' || (!hasMode && !showFan && !showWater)) return null
 
   return (
     <ControlSection title="Power Settings">
@@ -1069,6 +1282,7 @@ function VacuumStateActions({
   cleanTarget,
   commandPolicyMode,
   coordinator,
+  runtimeMode,
   onAreaSelectionChange,
   onOpenRoomsTab,
   onEditArea,
@@ -1080,6 +1294,7 @@ function VacuumStateActions({
   cleanTarget: VacuumCleanTarget
   commandPolicyMode: VacuumCommandPolicyMode
   coordinator: VacuumCommandCoordinator
+  runtimeMode: VacuumRuntimeMode
   onAreaSelectionChange: (selection: MapGridRect | null) => void
   onOpenRoomsTab: () => void
   onEditArea?: () => void
@@ -1105,7 +1320,7 @@ function VacuumStateActions({
   const lowBattery = error?.state === 'Low battery'
   const resumeReady = resumable && (state === 'docked' || state === 'idle')
   const cancelResumeVisible = resumable && ['docked', 'error', 'idle', 'returning'].includes(state)
-  const showCleaningSetup = commandPolicyMode === VACUUM_COMMAND_NORMAL && canStartVacuumCleaning(state, statusFlag?.state, error?.state)
+  const showCleaningSetup = runtimeMode === 'full'
   const sectionTitle = formatStateValue(state, 'Vacuum')
   const mapReady = areaEditorMeta.isLoaded && Boolean(areaEditorMeta.geometry) && !areaEditorMeta.error
   const servicesLoaded = isRecord(services) && Object.keys(services).length > 0
@@ -1184,9 +1399,16 @@ function VacuumStateActions({
       {cleanTarget === 'area' ? areaCleaningSetup : showCleaningSetup ? roomsCleaningSetup : null}
     </>
   ) : showCleaningSetup ? roomsCleaningSetup : null
-  const visibleCleaningSetupControls = resumable ? null : cleaningSetupControls
+  const visibleCleaningSetupControls = runtimeMode === 'full' && !resumable ? cleaningSetupControls : null
+  const hasRuntimeActions = state === 'idle'
+    || (state === 'error' && !resumable && !lowBattery)
+    || resumeReady
+    || cancelResumeVisible
+    || state === 'cleaning'
+    || state === 'paused'
+    || state === 'returning'
 
-  if (isUnavailableState(state)) return null
+  if (isUnavailableState(state) || (!visibleCleaningSetupControls && !hasRuntimeActions && !coordinator.cleanError)) return null
 
   return (
     <ControlSection title={sectionTitle}>
@@ -1207,11 +1429,13 @@ function VacuumStateActions({
 }
 
 function VacuumDockControlsSection({
+  activeRuntimeOnly = false,
   commandPolicyMode,
   coordinator,
   optimisticState,
   vacuum,
 }: {
+  activeRuntimeOnly?: boolean
   commandPolicyMode: VacuumCommandPolicyMode
   coordinator: VacuumCommandCoordinator
   optimisticState: OptimisticVacuumState
@@ -1257,11 +1481,15 @@ function VacuumDockControlsSection({
   }
 
   if (!vacuum.dockButtonEntityId && !vacuum.dockControls) return null
+  const showCleanAction = Boolean(vacuum.dockControls && (!activeRuntimeOnly || cleanActive))
+  const showDryAction = Boolean(vacuum.dockControls && (!activeRuntimeOnly || dryActive))
+  const showEmptyAction = Boolean(vacuum.dockButtonEntityId && !activeRuntimeOnly)
+  if (!showCleanAction && !showDryAction && !showEmptyAction) return null
 
   return (
     <ControlSection title="Dock Controls">
       <div className={styles.dockActionGrid}>
-        {vacuum.dockControls && (
+        {showCleanAction && vacuum.dockControls && (
           <ActionButton
             description={cleanActive ? 'Finish the dock-cleaning phase and drain the wash tray into the dirty-water tank.' : 'Start the mop-dock cleaning phase. Use Stop Dock Clean when finished so the dock drains the wash tray.'}
             disabled={!cleanAllowed}
@@ -1271,7 +1499,7 @@ function VacuumDockControlsSection({
             tone={cleanActive ? 'warning' : 'neutral'}
           />
         )}
-        {vacuum.dockControls && (
+        {showDryAction && vacuum.dockControls && (
           <ActionButton
             description={dryActive ? 'Stop the current mop-drying cycle.' : 'Start drying the attached mop pads.'}
             disabled={!dryAllowed}
@@ -1280,7 +1508,7 @@ function VacuumDockControlsSection({
             onClick={dryMops}
           />
         )}
-        {vacuum.dockButtonEntityId && (
+        {showEmptyAction && vacuum.dockButtonEntityId && (
           <ActionButton
             description="Trigger the dock to empty the robot dustbin into its dust bag."
             disabled={!emptyAllowed}
@@ -1301,22 +1529,48 @@ function VacuumControlsSection({
   areaSelection,
   commandPolicyMode,
   coordinator,
+  panelStatusVisible,
   onAreaSelectionChange,
   onOpenRoomsTab,
   onEditArea,
   optimisticState,
+  runtimeMode,
+  status,
   vacuum,
 }: {
   areaEditorMeta: ValetudoMapEditorMeta
   areaSelection: MapGridRect | null
   commandPolicyMode: VacuumCommandPolicyMode
   coordinator: VacuumCommandCoordinator
+  panelStatusVisible: boolean
   onAreaSelectionChange: (selection: MapGridRect | null) => void
   onOpenRoomsTab: () => void
   onEditArea?: () => void
   optimisticState: OptimisticVacuumState
+  runtimeMode: VacuumRuntimeMode
+  status: ResolvedVacuumStatus
   vacuum: VacuumConfig
 }) {
+  const copy = useCopy(VACUUM_COPY_NAMESPACE)
+  const statusFlag = useEntity(asEntityName(vacuum.statusFlagEntityId), { returnNullIfNotFound: true })
+  const error = useEntity(asEntityName(vacuum.errorEntityId), { returnNullIfNotFound: true })
+  const resumable = isResumable(statusFlag?.state)
+  const lowBattery = error?.state === 'Low battery'
+  const runtimeActionsVisible = !isUnavailableState(optimisticState.state)
+    && (
+      runtimeMode === 'full'
+      || optimisticState.state === 'idle'
+      || (optimisticState.state === 'error' && !resumable && !lowBattery)
+      || (resumable && (optimisticState.state === 'docked' || optimisticState.state === 'error' || optimisticState.state === 'idle' || optimisticState.state === 'returning'))
+      || (resumable && (optimisticState.state === 'docked' || optimisticState.state === 'idle'))
+      || optimisticState.state === 'cleaning'
+      || optimisticState.state === 'paused'
+      || optimisticState.state === 'returning'
+    )
+  const fallbackMessage = status.primaryAvailable
+    ? status.currentIssue.raw ?? formatStateValue(optimisticState.state)
+    : copy(VACUUM_COPY_KEYS.status.unavailableHelp)
+
   return (
     <div className={styles.controlStack}>
       <VacuumStateActions
@@ -1325,13 +1579,19 @@ function VacuumControlsSection({
         cleanTarget={areaSelection ? 'area' : 'rooms'}
         commandPolicyMode={commandPolicyMode}
         coordinator={coordinator}
+        runtimeMode={runtimeMode}
         onAreaSelectionChange={onAreaSelectionChange}
         onOpenRoomsTab={onOpenRoomsTab}
         onEditArea={onEditArea}
         optimisticState={optimisticState}
         vacuum={vacuum}
       />
-      <VacuumPowerSettings commandPolicyMode={commandPolicyMode} coordinator={coordinator} vacuum={vacuum} />
+      {!panelStatusVisible && !runtimeActionsVisible && (
+        <ControlSection title={formatStateValue(optimisticState.state)}>
+          <Description>{fallbackMessage}</Description>
+        </ControlSection>
+      )}
+      <VacuumPowerSettings coordinator={coordinator} runtimeMode={runtimeMode} vacuum={vacuum} />
     </div>
   )
 }
@@ -1379,24 +1639,19 @@ function VacuumWhileAwaySection({
 }
 
 function VacuumZones({
-  commandPolicyMode,
   coordinator,
   onToggleZone,
-  optimisticState,
+  runtimeMode,
   vacuum,
 }: {
-  commandPolicyMode: VacuumCommandPolicyMode
   coordinator: VacuumCommandCoordinator
   onToggleZone: (zone: VacuumZoneConfig) => void
-  optimisticState: OptimisticVacuumState
+  runtimeMode: VacuumRuntimeMode
   vacuum: VacuumConfig
 }) {
   const copy = useCopy(VACUUM_COPY_NAMESPACE)
   const entities = useHass((hass) => hass.entities) as unknown as Record<string, EntityLike | undefined>
-  const statusFlag = useEntity(asEntityName(vacuum.statusFlagEntityId), { returnNullIfNotFound: true })
-  const error = useEntity(asEntityName(vacuum.errorEntityId), { returnNullIfNotFound: true })
-  const state = optimisticState.state
-  const editableZones = commandPolicyMode === VACUUM_COMMAND_NORMAL && canStartVacuumCleaning(state, statusFlag?.state, error?.state)
+  const editableZones = runtimeMode === 'full'
 
   if (vacuum.zones.length === 0) return null
   const cleaningOrder = new Map(orderedSelectedVacuumZones(vacuum.zones, entities, coordinator).map(({ zone }, index) => [zone.entityId, index + 1]))
@@ -1430,15 +1685,24 @@ function VacuumAutoCleanDisabledRooms({ vacuum }: { vacuum: VacuumConfig }) {
   )
 }
 
-function VacuumModalNav({ activeTab, onTabChange, vacuum }: { activeTab: VacuumModalTab; onTabChange: (tab: VacuumModalTab) => void; vacuum: VacuumConfig }) {
+function VacuumModalNav({
+  activeTab,
+  onTabChange,
+  tabs,
+  vacuum,
+}: {
+  activeTab: VacuumModalTab
+  onTabChange: (tab: VacuumModalTab) => void
+  tabs: readonly (typeof VACUUM_MODAL_TABS)[number][]
+  vacuum: VacuumConfig
+}) {
   const copy = useCopy(CORE_COPY_NAMESPACE)
-  const tabs = vacuumModalTabs(vacuum)
-  const effectiveActiveTab = tabs.some((tab) => tab.tab === activeTab) ? activeTab : 'controls'
   const idPrefix = `vacuum-${vacuum.vacuumMapId}`
 
   return (
     <ModalIconTabNav
-      activeTab={effectiveActiveTab}
+      activeTab={activeTab}
+      animateMembership
       idPrefix={idPrefix}
       label={copy(CORE_COPY_KEYS.modal.sectionNavigation, { title: vacuum.title })}
       onTabChange={onTabChange}
@@ -1455,16 +1719,20 @@ function VacuumModalTabContent({
   areaSelection,
   cleanTarget,
   drawMode,
+  onActiveTabChange,
   onAreaEditorMetaChange,
   onAreaSelectionChange,
-  onOpenRoomsTab,
   onDrawModeChange,
   onEditArea,
   onFinishAreaEditing,
   onOpenOutcomes,
   onResetAreaView,
   outcomePresentation,
+  optimisticState,
   resetAreaViewRevision,
+  runtimeMode,
+  status,
+  visibleTabs,
   vacuum,
 }: {
   activeTab: VacuumModalTab
@@ -1473,29 +1741,28 @@ function VacuumModalTabContent({
   areaSelection: MapGridRect | null
   cleanTarget: VacuumCleanTarget
   drawMode: boolean
+  onActiveTabChange: (tab: VacuumModalTab) => void
   onAreaEditorMetaChange: (meta: ValetudoMapEditorMeta) => void
   onAreaSelectionChange: (selection: MapGridRect | null) => void
-  onOpenRoomsTab: () => void
   onDrawModeChange: (drawMode: boolean) => void
   onEditArea?: () => void
   onFinishAreaEditing: () => void
   onOpenOutcomes?: () => void
   onResetAreaView: () => void
   outcomePresentation: VacuumWhileAwayPresentation
+  optimisticState: OptimisticVacuumState
   resetAreaViewRevision: number
+  runtimeMode: VacuumRuntimeMode
+  status: ResolvedVacuumStatus
+  visibleTabs: readonly (typeof VACUUM_MODAL_TABS)[number][]
   vacuum: VacuumConfig
 }) {
   const copy = useCopy(VACUUM_COPY_NAMESPACE)
-  const entity = useEntity(asEntityName(vacuum.entityId), { returnNullIfNotFound: true })
-  const liveState = entity?.state
-  const primaryState = liveState ?? VACUUM_AVAILABILITY_UNKNOWN
-  const [displayState, commitDisplayState] = useOptimisticState(primaryState, { clearOn: 'live-change', revertMs: VACUUM_OPTIMISTIC_REVERT_MS })
   const modalBodyRef = useRef<HTMLDivElement | null>(null)
   const modalPanelRef = useRef<HTMLDivElement | null>(null)
   const leftPaneRef = useRef<HTMLDivElement | null>(null)
-  const tabs = vacuumModalTabs(vacuum)
-  const targetTab = tabs.some((tab) => tab.tab === activeTab) ? activeTab : 'controls'
-  const { displayedTab: effectiveActiveTab, transitionState } = useSmoothDisplayedModalTab(targetTab)
+  const tabIdPrefix = `vacuum-${vacuum.vacuumMapId}`
+  const { displayedTab: displayedActiveTab, transitionState } = useSmoothDisplayedModalTab(activeTab)
   const [requestedMapStatusLayout, setRequestedMapStatusLayout] = useState<VacuumMapStatusLayout>(() => (
     typeof window !== 'undefined' && window.innerWidth >= 760 && window.innerHeight < 560 ? 'split' : 'stacked'
   ))
@@ -1511,18 +1778,9 @@ function VacuumModalTabContent({
   const viewportLayoutRef = useRef<VacuumViewportLayout>(viewportLayout)
   const previousAreaEditorOpenRef = useRef(areaEditorOpen)
   const mapLoaded = areaEditorMeta.isLoaded
-  const tabIdPrefix = `vacuum-${vacuum.vacuumMapId}`
-  const panelSections = [
-    'controls',
-    vacuum.zones.length > 0 ? 'zones' : null,
-    vacuum.autoCleanDisabledRooms?.length ? 'auto-clean' : null,
-    'actions',
-    'info',
-  ].filter(Boolean)
+  const panelSections = visibleTabs.map((tab) => tab.label.toLowerCase())
   const panelLabel = `${vacuum.title} ${panelSections.join(', ')}`
-  const optimisticState = useMemo<OptimisticVacuumState>(() => ({ commitState: commitDisplayState, liveState: primaryState, state: displayState }), [commitDisplayState, displayState, primaryState])
-  const status = useResolvedVacuumDetails(vacuum, liveState, Boolean(entity), entity?.last_changed)
-  const coordinator = useVacuumCommandCoordinator(primaryState, status.commandPolicyMode, commitDisplayState)
+  const coordinator = useVacuumCommandCoordinator(optimisticState.liveState, status.commandPolicyMode, optimisticState.commitState)
   const callService = useHass((state) => state.helpers.callService) as unknown as CallService
   const locate = useCallback(() => callServiceAction(callService, 'vacuum.locate', vacuum.entityId), [callService, vacuum.entityId])
   const entities = useHass((state) => state.entities) as unknown as Record<string, EntityLike | undefined>
@@ -1541,6 +1799,7 @@ function VacuumModalTabContent({
   }, [callService, coordinator, entities, vacuum.modeEntityId])
 
   const toggleRoom = useCallback((zone: VacuumZoneConfig) => {
+    if (runtimeMode !== 'full') return
     const active = vacuumZoneSelected(zone, entities, coordinator)
     if (!active && areaSelection && !window.confirm(copy(VACUUM_COPY_KEYS.confirmations.switchToRooms))) return
     if (!active && areaSelection) onAreaSelectionChange(null)
@@ -1551,17 +1810,21 @@ function VacuumModalTabContent({
       candidate.entityId === zone.entityId ? nextActive : vacuumZoneSelected(candidate, entities, coordinator)
     ))
     setRoomMode(nextSelectedRooms)
-  }, [areaSelection, callService, coordinator, copy, entities, onAreaSelectionChange, setRoomMode, vacuum.zones])
+  }, [areaSelection, callService, coordinator, copy, entities, onAreaSelectionChange, runtimeMode, setRoomMode, vacuum.zones])
 
   const editArea = useCallback(() => {
-    if (!onEditArea) return
+    if (!onEditArea || runtimeMode !== 'full') return
     if (selectedRooms.length > 0 && !window.confirm(copy(VACUUM_COPY_KEYS.confirmations.switchToArea))) return
     for (const { zone } of selectedRooms) {
       coordinator.registerIntent(zone.entityId, 'off')
       callService({ domain: 'input_boolean', service: 'turn_off', target: zone.entityId })
     }
     onEditArea()
-  }, [callService, coordinator, copy, onEditArea, selectedRooms])
+  }, [callService, coordinator, copy, onEditArea, runtimeMode, selectedRooms])
+  const openRoomsTab = useCallback(() => {
+    if (!visibleTabs.some((tab) => tab.tab === 'zones')) return
+    onActiveTabChange('zones')
+  }, [onActiveTabChange, visibleTabs])
 
   const resetTabScroll = useCallback(() => {
     const scrollContainers = [
@@ -1576,12 +1839,12 @@ function VacuumModalTabContent({
 
   useLayoutEffect(() => {
     resetTabScroll()
-  }, [effectiveActiveTab, resetTabScroll])
+  }, [displayedActiveTab, resetTabScroll])
 
   useLayoutEffect(() => {
-    if (targetTab !== effectiveActiveTab || transitionState !== 'idle') return
+    if (activeTab !== displayedActiveTab || transitionState !== 'idle') return
     resetTabScroll()
-  }, [effectiveActiveTab, resetTabScroll, targetTab, transitionState])
+  }, [activeTab, displayedActiveTab, resetTabScroll, transitionState])
 
   const beginLayoutPreparation = useCallback(() => {
     layoutLoadingStartedAtRef.current = Date.now()
@@ -1740,6 +2003,9 @@ function VacuumModalTabContent({
   const visibleLayoutPreparationPhase = areaEditorOpen ? 'content' : layoutPreparationPhase
   const layoutLoadingVisible = !areaEditorOpen && visibleLayoutPreparationPhase !== 'content'
   const layoutLoadingPhase = visibleLayoutPreparationPhase === 'exiting' ? 'exiting' : 'loading'
+  const controlsPanelStatusVisible = reportedStatusInRightPane
+    || compactMapPresentation
+    || (cleaningReportInRightPane && outcomePresentation.kind !== 'empty')
 
   return (
     <div
@@ -1774,7 +2040,7 @@ function VacuumModalTabContent({
           onLocate={locate}
           onOpenOutcomes={onOpenOutcomes}
           onResetAreaView={onResetAreaView}
-          onRoomToggle={toggleRoom}
+          onRoomToggle={runtimeMode === 'full' ? toggleRoom : undefined}
           optimisticState={optimisticState}
           outcomePresentation={outcomePresentation}
           resetAreaViewRevision={resetAreaViewRevision}
@@ -1788,9 +2054,9 @@ function VacuumModalTabContent({
         />
       </div>
       {!areaEditorOpen && (
-        <div aria-label={panelLabel} className={styles.rightPane} data-modal-tab-transition-state={transitionState} data-scroll-region="vacuum-panel" data-tab={effectiveActiveTab} ref={modalPanelRef} role="group">
-          <div aria-labelledby={modalTabId(tabIdPrefix, effectiveActiveTab)} className={styles.rightPaneContent} id={modalTabPanelId(tabIdPrefix, 'content')} role="tabpanel">
-            {effectiveActiveTab === 'controls' && (
+        <div aria-label={panelLabel} className={styles.rightPane} data-modal-tab-transition-state={transitionState} data-scroll-region="vacuum-panel" data-tab={displayedActiveTab} ref={modalPanelRef} role="group">
+          <div aria-labelledby={modalTabId(tabIdPrefix, activeTab)} className={styles.rightPaneContent} id={modalTabPanelId(tabIdPrefix, 'content')} role="tabpanel">
+            {displayedActiveTab === 'controls' && (
               <>
                 {reportedStatusInRightPane ? (
                   <div className={styles.compactStatusStack} data-vacuum-reported-status="true" data-vacuum-status-details="true">
@@ -1807,22 +2073,33 @@ function VacuumModalTabContent({
                   <VacuumWhileAwaySection onOpenOutcomes={onOpenOutcomes} presentation={outcomePresentation} vacuum={vacuum} />
                 ) : null}
                 <VacuumControlsSection
-                areaEditorMeta={areaEditorMeta}
-                areaSelection={areaSelection}
-                commandPolicyMode={status.commandPolicyMode}
-                coordinator={coordinator}
-                onAreaSelectionChange={onAreaSelectionChange}
-                onOpenRoomsTab={onOpenRoomsTab}
+                  areaEditorMeta={areaEditorMeta}
+                  areaSelection={areaSelection}
+                  commandPolicyMode={status.commandPolicyMode}
+                  coordinator={coordinator}
+                  onAreaSelectionChange={onAreaSelectionChange}
+                  onOpenRoomsTab={openRoomsTab}
                   onEditArea={editArea}
+                  panelStatusVisible={controlsPanelStatusVisible}
                   optimisticState={optimisticState}
+                  runtimeMode={runtimeMode}
+                  status={status}
                   vacuum={vacuum}
                 />
               </>
             )}
-            {effectiveActiveTab === 'zones' && <VacuumZones commandPolicyMode={status.commandPolicyMode} coordinator={coordinator} onToggleZone={toggleRoom} optimisticState={optimisticState} vacuum={vacuum} />}
-            {effectiveActiveTab === 'autoClean' && <VacuumAutoCleanDisabledRooms vacuum={vacuum} />}
-            {effectiveActiveTab === 'more' && <VacuumDockControlsSection commandPolicyMode={status.commandPolicyMode} coordinator={coordinator} optimisticState={optimisticState} vacuum={vacuum} />}
-            {effectiveActiveTab === 'info' && <VacuumInfoSection vacuum={vacuum} />}
+            {displayedActiveTab === 'zones' && <VacuumZones coordinator={coordinator} onToggleZone={toggleRoom} runtimeMode={runtimeMode} vacuum={vacuum} />}
+            {displayedActiveTab === 'autoClean' && <VacuumAutoCleanDisabledRooms vacuum={vacuum} />}
+            {displayedActiveTab === 'more' && (
+              <VacuumDockControlsSection
+                activeRuntimeOnly={runtimeMode === 'minimal'}
+                commandPolicyMode={status.commandPolicyMode}
+                coordinator={coordinator}
+                optimisticState={optimisticState}
+                vacuum={vacuum}
+              />
+            )}
+            {displayedActiveTab === 'info' && <VacuumInfoSection vacuum={vacuum} />}
           </div>
         </div>
       )}
@@ -1872,7 +2149,7 @@ function VacuumMapAndStatus({
   onLocate: () => void
   onOpenOutcomes?: () => void
   onResetAreaView: () => void
-  onRoomToggle: (zone: VacuumZoneConfig) => void
+  onRoomToggle?: (zone: VacuumZoneConfig) => void
   optimisticState: OptimisticVacuumState
   outcomePresentation: VacuumWhileAwayPresentation
   resetAreaViewRevision: number
@@ -1951,7 +2228,7 @@ function VacuumMapAndStatus({
           minimumSizeCm={vacuum.areaCleaning?.minimumSizeCm}
           onDrawModeChange={onDrawModeChange}
           onEditorMetaChange={handleEditorMetaChange}
-          onRoomToggle={areaEditorOpen ? undefined : (entityId) => {
+          onRoomToggle={areaEditorOpen || !onRoomToggle ? undefined : (entityId) => {
             const zone = vacuum.zones.find((candidate) => candidate.entityId === entityId)
             if (zone) onRoomToggle(zone)
           }}
@@ -2010,11 +2287,11 @@ function VacuumMapAndStatus({
 
 export function VacuumRoomSourceModalContent({ vacuum }: VacuumCardProps) {
   const session = useOptionalEntity(vacuum.coordinatorSessionEntityId)
+  const { optimisticState, runtimeMode, status, visibleTabs } = useVacuumModalRuntime(vacuum)
   const outcomePresentation = vacuumWhileAwayPresentation(session?.attributes)
   const [activeTab, setActiveTab] = useState<VacuumModalTab>('controls')
-  const [areaEditorOpen, setAreaEditorOpen] = useState(false)
+  const areaEditorSession = useVacuumAreaEditorSession(runtimeMode)
   const [areaSelection, setAreaSelection] = useState<MapGridRect | null>(null)
-  const [drawMode, setDrawMode] = useState(false)
   const [editorMeta, setEditorMeta] = useState<ValetudoMapEditorMeta>({
     displayScope: VALETUDO_MAP_SCOPE_FULL,
     error: null,
@@ -2026,33 +2303,41 @@ export function VacuumRoomSourceModalContent({ vacuum }: VacuumCardProps) {
     selectionAllowed: true,
   })
   const [resetAreaViewRevision, setResetAreaViewRevision] = useState(0)
+  const effectiveActiveTab = useVacuumActiveTab({
+    activeTab,
+    areaEditorOpen: areaEditorSession.areaEditorOpen,
+    idPrefix: `vacuum-${vacuum.vacuumMapId}`,
+    onActiveTabChange: setActiveTab,
+    visibleTabs,
+  })
 
   return (
     <div className={styles.roomSourceModalShell}>
       <VacuumModalTabContent
-        activeTab={activeTab}
+        activeTab={effectiveActiveTab}
         areaEditorMeta={editorMeta}
-        areaEditorOpen={areaEditorOpen}
+        areaEditorOpen={areaEditorSession.areaEditorOpen}
         areaSelection={areaSelection}
         cleanTarget={areaSelection ? 'area' : 'rooms'}
-        drawMode={drawMode}
+        drawMode={areaEditorSession.drawMode}
+        onActiveTabChange={setActiveTab}
         onAreaEditorMetaChange={setEditorMeta}
         onAreaSelectionChange={setAreaSelection}
-        onOpenRoomsTab={() => setActiveTab('zones')}
-        onDrawModeChange={setDrawMode}
-        onEditArea={() => {
-          setDrawMode(!areaSelection)
-          setAreaEditorOpen(true)
-        }}
-        onFinishAreaEditing={() => setAreaEditorOpen(false)}
+        onDrawModeChange={(drawMode) => areaEditorSession.openAreaEditor(drawMode)}
+        onEditArea={() => areaEditorSession.openAreaEditor(!areaSelection)}
+        onFinishAreaEditing={areaEditorSession.closeAreaEditor}
         onResetAreaView={() => setResetAreaViewRevision((revision) => revision + 1)}
         outcomePresentation={outcomePresentation}
+        optimisticState={optimisticState}
         resetAreaViewRevision={resetAreaViewRevision}
+        runtimeMode={runtimeMode}
+        status={status}
+        visibleTabs={visibleTabs}
         vacuum={vacuum}
       />
-      {!areaEditorOpen && <VacuumModalNav activeTab={activeTab} onTabChange={(tab) => {
+      {!areaEditorSession.areaEditorOpen && <VacuumModalNav activeTab={effectiveActiveTab} onTabChange={(tab) => {
         setActiveTab(tab)
-      }} vacuum={vacuum} />}
+      }} tabs={visibleTabs} vacuum={vacuum} />}
     </div>
   )
 }
@@ -2072,12 +2357,12 @@ export function VacuumModal({
 }) {
   const copy = useCopy(VACUUM_COPY_NAMESPACE)
   const session = useOptionalEntity(vacuum.coordinatorSessionEntityId)
+  const { optimisticState, runtimeMode, status, visibleTabs } = useVacuumModalRuntime(vacuum)
   const outcomePresentation = vacuumWhileAwayPresentation(session?.attributes)
   const [activeTab, setActiveTab] = useState<VacuumModalTab>('controls')
-  const [areaEditorOpen, setAreaEditorOpen] = useState(false)
+  const areaEditorSession = useVacuumAreaEditorSession(runtimeMode)
   const [outcomeDetailContract, setOutcomeDetailContract] = useState<VacuumOutcomeContract | null>(null)
   const [areaSelection, setAreaSelection] = useState<MapGridRect | null>(null)
-  const [drawMode, setDrawMode] = useState(false)
   const [editorMeta, setEditorMeta] = useState<ValetudoMapEditorMeta>({
     displayScope: VALETUDO_MAP_SCOPE_FULL,
     error: null,
@@ -2092,18 +2377,17 @@ export function VacuumModal({
   const previousOpenRef = useRef(open)
   const renderedOutcomeContract = outcomeDetailContract
   const showOutcomes = renderedOutcomeContract !== null
-  const detailPageKey = areaEditorOpen ? 'vacuum-area-editor' : showOutcomes ? 'vacuum-outcomes' : activeTab
+  const detailPageKey = areaEditorSession.areaEditorOpen ? 'vacuum-area-editor' : showOutcomes ? 'vacuum-outcomes' : activeTab
   const { bodyElementRef, enterDetailPage, leaveDetailPage, resetDetailPageScroll } = useModalDetailPageScroll(detailPageKey)
-  const title = areaEditorOpen
+  const title = areaEditorSession.areaEditorOpen
     ? `${vacuum.title} Cleaning Area`
     : showOutcomes
       ? copy(VACUUM_COPY_KEYS.outcomes.detailTitle, { room: vacuum.title })
       : titleOverride ?? `${vacuum.title} Robot Vacuum`
   const closeAreaEditor = useCallback(() => {
     leaveDetailPage()
-    setDrawMode(false)
-    setAreaEditorOpen(false)
-  }, [leaveDetailPage, setAreaEditorOpen, setDrawMode])
+    areaEditorSession.closeAreaEditor()
+  }, [areaEditorSession, leaveDetailPage])
   const closeOutcomes = useCallback(() => {
     leaveDetailPage()
     setOutcomeDetailContract(null)
@@ -2118,24 +2402,22 @@ export function VacuumModal({
     enterDetailPage('vacuum-area-editor')
     setOutcomeDetailContract(null)
     setActiveTab('controls')
-    setDrawMode(!areaSelection)
-    setAreaEditorOpen(true)
-  }, [areaSelection, enterDetailPage, setActiveTab, setAreaEditorOpen, setDrawMode, setOutcomeDetailContract])
+    areaEditorSession.openAreaEditor(!areaSelection)
+  }, [areaEditorSession, areaSelection, enterDetailPage, setOutcomeDetailContract])
   const openOutcomes = useCallback(() => {
     if (outcomePresentation.kind !== 'typed') return
     enterDetailPage('vacuum-outcomes')
-    setAreaEditorOpen(false)
+    areaEditorSession.closeAreaEditor()
     setOutcomeDetailContract(outcomePresentation.contract)
-  }, [enterDetailPage, outcomePresentation, setAreaEditorOpen, setOutcomeDetailContract])
+  }, [areaEditorSession, enterDetailPage, outcomePresentation])
 
   useEffect(() => {
     const wasOpen = previousOpenRef.current
     if (open && !wasOpen) {
       setActiveTab('controls')
-      setAreaEditorOpen(false)
+      areaEditorSession.closeAreaEditor()
       setOutcomeDetailContract(null)
       setAreaSelection(null)
-      setDrawMode(false)
       setEditorMeta({
         displayScope: VALETUDO_MAP_SCOPE_FULL,
         error: null,
@@ -2150,45 +2432,56 @@ export function VacuumModal({
       resetDetailPageScroll()
     }
     previousOpenRef.current = open
-  }, [open, resetDetailPageScroll])
+  }, [areaEditorSession, open, resetDetailPageScroll])
+  const effectiveActiveTab = useVacuumActiveTab({
+    activeTab,
+    areaEditorOpen: areaEditorSession.areaEditorOpen,
+    idPrefix: `vacuum-${vacuum.vacuumMapId}`,
+    onActiveTabChange: setActiveTab,
+    visibleTabs,
+  })
 
   return (
     <ModalSheet
       backLabel={showOutcomes ? copy(VACUUM_COPY_KEYS.outcomes.backToControls) : 'Back to controls'}
       bodyElementRef={bodyElementRef}
       centeredGeometry={VACUUM_CENTERED_GEOMETRY}
-      navigation={areaEditorOpen || showOutcomes ? undefined : <VacuumModalNav activeTab={activeTab} onTabChange={(tab) => {
+      navigation={areaEditorSession.areaEditorOpen || showOutcomes ? undefined : <VacuumModalNav activeTab={effectiveActiveTab} onTabChange={(tab) => {
         setActiveTab(tab)
-      }} vacuum={vacuum} />}
-      onBack={areaEditorOpen ? closeAreaEditor : showOutcomes ? closeOutcomes : undefined}
+      }} tabs={visibleTabs} vacuum={vacuum} />}
+      onBack={areaEditorSession.areaEditorOpen ? closeAreaEditor : showOutcomes ? closeOutcomes : undefined}
       onClose={onClose}
       open={open}
       scrollMode={showOutcomes ? 'body' : 'panes'}
-      scrollResetKey={areaEditorOpen || showOutcomes ? detailPageKey : 'vacuum-root'}
+      scrollResetKey={areaEditorSession.areaEditorOpen || showOutcomes ? detailPageKey : 'vacuum-root'}
       size="workspace"
-      subtitle={areaEditorOpen || showOutcomes ? undefined : subtitle}
+      subtitle={areaEditorSession.areaEditorOpen || showOutcomes ? undefined : subtitle}
       title={title}
     >
       {showOutcomes ? (
         <VacuumOutcomeDetail contract={renderedOutcomeContract} vacuum={vacuum} />
       ) : (
         <VacuumModalTabContent
-          activeTab={activeTab}
+          activeTab={effectiveActiveTab}
           areaEditorMeta={editorMeta}
-          areaEditorOpen={areaEditorOpen}
+          areaEditorOpen={areaEditorSession.areaEditorOpen}
           areaSelection={areaSelection}
           cleanTarget={areaSelection ? 'area' : 'rooms'}
-          drawMode={drawMode}
+          drawMode={areaEditorSession.drawMode}
+          onActiveTabChange={setActiveTab}
           onAreaEditorMetaChange={setEditorMeta}
           onAreaSelectionChange={setAreaSelection}
-          onOpenRoomsTab={() => setActiveTab('zones')}
-          onDrawModeChange={setDrawMode}
+          onDrawModeChange={(drawMode) => areaEditorSession.openAreaEditor(drawMode)}
           onEditArea={openAreaEditor}
           onFinishAreaEditing={closeAreaEditor}
           onOpenOutcomes={openOutcomes}
           onResetAreaView={() => setResetAreaViewRevision((revision) => revision + 1)}
           outcomePresentation={outcomePresentation}
+          optimisticState={optimisticState}
           resetAreaViewRevision={resetAreaViewRevision}
+          runtimeMode={runtimeMode}
+          status={status}
+          visibleTabs={visibleTabs}
           vacuum={vacuum}
         />
       )}

@@ -1,3 +1,4 @@
+// @covers src/components/core/ModalTabNav.tsx
 import { fireEvent, render, screen, within } from '@testing-library/react'
 import { act } from 'react'
 import { HUE_SYNC_OPTIMISTIC_REVERT_MS, MEDIA_REMOTE_CONFIGS, MUSIC_ROOM_ACTIVE_MEDIA_SOURCE_ENTITY_ID, MUSIC_ROOM_COMMAND_REVERT_MS, MUSIC_ROOM_HUE_SYNC_HDMI_INPUT_ENTITY_ID, MUSIC_ROOM_HUE_SYNC_POWER_ENTITY_ID, MUSIC_ROOM_MEDIA_ACTIONS, MUSIC_ROOM_XBOX_ACTIVE_HOLD_MS, MUSIC_ROOM_XBOX_HDMI_STATUS_ENTITY_ID, MUSIC_ROOM_XBOX_OFF_REVERT_MS } from '../../constants/mediaRemotes'

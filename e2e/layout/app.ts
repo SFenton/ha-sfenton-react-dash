@@ -83,6 +83,28 @@ export async function enterState(dialog: Locator, scenario: ScenarioId, state: s
     ))).toBe(true)
     await dialog.locator('[data-modal-sheet-body]').evaluate((element) => { element.scrollTop = 0 })
   }
+  if (scenario === 'vacuum') {
+    const page = dialog.page()
+    await page.evaluate((nextState) => {
+      const mock = window.__mockHass
+      if (!mock) throw new Error('Mock Home Assistant API is unavailable')
+      const setMainFloorRuntime = (vacuumState: string, statusFlag: string, error: string) => {
+        mock.setEntityState('vacuum.valetudo_exaltedsneakydeer', vacuumState)
+        mock.setEntityState('sensor.valetudo_exaltedsneakydeer_status_flag', statusFlag)
+        mock.setEntityState('sensor.valetudo_exaltedsneakydeer_error', error)
+        mock.setEntityState('sensor.valetudo_exaltedsneakydeer_dock_status', 'idle')
+      }
+      if (nextState === 'cleaning') setMainFloorRuntime('cleaning', 'none', 'No error')
+      else if (nextState === 'dock-cleaning') {
+        setMainFloorRuntime('docked', 'none', 'No error')
+        mock.setEntityState('sensor.valetudo_exaltedsneakydeer_dock_status', 'cleaning')
+      }
+      else if (nextState === 'resumable') setMainFloorRuntime('docked', 'resumable', 'No error')
+      else if (nextState === 'low-battery') setMainFloorRuntime('error', 'none', 'Low battery')
+      else setMainFloorRuntime('docked', 'none', 'No error')
+      mock.calls.splice(0, mock.calls.length)
+    }, state)
+  }
   await waitForModalReady(dialog)
 }
 
