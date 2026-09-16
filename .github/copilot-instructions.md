@@ -33,7 +33,7 @@ services. Keep entity IDs in constants and pages declarative.
 | Dashboard code, HA services, ports, cameras, lifecycle, release | [.github/reference/dashboard-contract.md](reference/dashboard-contract.md), in full |
 | UX, styling, visible copy, responsive behavior | Matching `.github/instructions/` files, `docs/ux/layouts.md`, and its executable plan |
 | Port from Lovelace | `dashboard-ux-authoring` / HASS Porting; source config and real browser parity remain required |
-| Release explicitly requested | `release-dashboard`; explicit authorization gates remain unchanged and the coordinating profile is `gpt-5.4` medium/default |
+| Release explicitly requested | `release-dashboard`; explicit authorization gates remain unchanged and the coordinating profile is `gpt-5.6-luna` medium/default |
 | Generic research/implementation/testing | `.github/agent-budget.json` and `ha-budget-workflow` |
 
 Local layout validation is mock-only and provenance-bound. It does not

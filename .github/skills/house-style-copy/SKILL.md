@@ -13,7 +13,7 @@ read-only by default. It does not edit source, catalogs, Home Assistant, or
 external systems.
 
 Any later implementation requires separate explicit operator authorization
-and is owned by `gpt-5.4`; generated copy is not implementation approval.
+and is owned by `gpt-5.6-luna`; generated copy is not implementation approval.
 
 ## Activation gate
 

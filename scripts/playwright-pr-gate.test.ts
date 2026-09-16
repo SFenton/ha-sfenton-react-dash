@@ -116,7 +116,7 @@ describe('protected dashboard pull-request gate', () => {
     expect(releaseSkill).toContain('gh pr checks --watch --fail-fast')
     expect(releaseSkill).toContain('/sfenton-react-dash/home')
     expect(releaseSkill).toContain('/sfenton-react-panel')
-    expect(releaseSkill).toContain('model: gpt-5.4')
+    expect(releaseSkill).toContain('model: gpt-5.6-luna')
     expect(releaseSkill).not.toContain('blocked: release-machine-disabled')
     expect(releaseSkill).not.toContain('Do not fall back to the former manual')
 

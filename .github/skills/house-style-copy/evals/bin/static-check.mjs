@@ -92,7 +92,7 @@ for (const relativePath of requiredFiles) {
 const skillText = await readFile(resolve(skillRoot, 'SKILL.md'), 'utf8')
 check(/^---\nname: house-style-copy\n/m.test(skillText), 'Skill name is house-style-copy.')
 check(/read-only by default/i.test(skillText), 'Skill states its read-only default.')
-check(/owned by `gpt-5\.4`/.test(skillText), 'Skill keeps later implementation gpt-5.4-owned.')
+check(/owned by `gpt-5\.6-luna`/.test(skillText), 'Skill keeps later implementation Luna-owned.')
 check(/model_pin: evals\/model-pin\.json/.test(skillText), 'Skill metadata points to the enforced model-pin file.')
 check(/Never generate copy directly under the host model/.test(skillText), 'Skill requires the enforced activation gate.')
 check(/check-pin\.mjs/.test(skillText), 'Skill invokes the pin guard before generation.')

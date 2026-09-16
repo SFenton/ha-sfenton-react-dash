@@ -2,7 +2,7 @@
 name: release-dashboard
 description: Explicitly invoked dashboard release workflow that commits only the approved change, waits for protected CI, merges to master, builds merged master, deploys both Home Assistant hosts, and verifies production.
 metadata:
-  model: gpt-5.4
+  model: gpt-5.6-luna
   reasoning_effort: medium
   context_tier: default
 ---
