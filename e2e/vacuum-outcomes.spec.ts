@@ -219,7 +219,7 @@ test.describe('fine-pointer outcome details', () => {
       const body = dialog.locator('[data-modal-sheet-body="true"]')
       const summary = dialog.getByRole('button', { name: 'Open Main Floor Automatic Cleaning Report for Aug 19, 2026' })
       const mapPane = dialog.getByRole('group', { name: 'Main Floor map and status' })
-      const panel = dialog.getByRole('group', { name: 'Main Floor controls, zones, auto-clean, actions, info' })
+      const panel = dialog.getByRole('group', { name: 'Main Floor controls, rooms, auto-clean, actions, info' })
 
       await expect(summary).toBeVisible()
       const bodyGeometry = await body.evaluate((element) => ({

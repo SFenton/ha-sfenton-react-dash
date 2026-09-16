@@ -5906,7 +5906,7 @@ describe('DashboardViewPage', () => {
     expect(screen.getByRole('heading', { name: 'Living Room: Robot Vacuum' })).toBeInTheDocument()
     expect(screen.queryByText('Main Floor Robot Vacuum')).not.toBeInTheDocument()
     const mapPane = within(dialog).getByRole('group', { name: 'Main Floor map and status' })
-    const controlsPane = within(dialog).getByRole('group', { name: 'Main Floor controls, zones, auto-clean, actions, info' })
+    const controlsPane = within(dialog).getByRole('group', { name: 'Main Floor controls, rooms, auto-clean, actions, info' })
     const modalNav = within(dialog).getByRole('tablist', { name: 'Main Floor modal sections' })
     const modalNavButtons = within(modalNav).getAllByRole('tab')
     expect(modalNavButtons.map((button) => button.getAttribute('aria-label'))).toEqual(['Controls', 'Rooms', 'Auto-Clean', 'Actions', 'Info'])
@@ -6013,7 +6013,7 @@ describe('DashboardViewPage', () => {
     fireEvent.click(screen.getByRole('button', { name: new RegExp(`Main Floor ${stateLabel}`, 'i') }))
 
     const dialog = await screen.findByRole('dialog')
-    const controlsPane = within(dialog).getByRole('group', { name: 'Main Floor controls, zones, auto-clean, actions, info' })
+    const controlsPane = within(dialog).getByRole('group', { name: 'Main Floor controls, auto-clean, info' })
     expect(within(controlsPane).getByRole('heading', { name: heading })).toBeInTheDocument()
     expect(within(dialog).getByLabelText('Home Assistant Condition')).toHaveTextContent('Kept for Later')
     expect(dialog.querySelector('[data-vacuum-live-status="true"]')).toHaveTextContent('Kept for Later')
@@ -6026,10 +6026,7 @@ describe('DashboardViewPage', () => {
     }
     for (const action of actions) expect(within(controlsPane).getByRole('button', { name: action })).toBeEnabled()
 
-    if (state === 'idle') {
-      await clickModalTab(within(dialog), 'Rooms')
-      expect(within(controlsPane).getByRole('button', { name: 'Living Room' })).toBeDisabled()
-    }
+    expect(within(dialog).queryByRole('tab', { name: 'Rooms' })).not.toBeInTheDocument()
   })
 
   it.each(['docked', 'idle', 'returning'])('cancels a %s resumable run with vacuum.stop', async (state) => {
@@ -6040,7 +6037,7 @@ describe('DashboardViewPage', () => {
     const stateLabel = state[0].toUpperCase() + state.slice(1)
     fireEvent.click(screen.getByRole('button', { name: new RegExp(`Main Floor ${stateLabel}`, 'i') }))
     const dialog = await screen.findByRole('dialog')
-    const controlsPane = within(dialog).getByRole('group', { name: 'Main Floor controls, zones, auto-clean, actions, info' })
+    const controlsPane = within(dialog).getByRole('group', { name: 'Main Floor controls, auto-clean, info' })
     fireEvent.click(within(controlsPane).getByRole('button', { name: 'Cancel' }))
 
     expect(mockCallServiceCalls).toEqual([
@@ -6073,8 +6070,14 @@ describe('DashboardViewPage', () => {
     fireEvent.click(screen.getByRole('button', { name: new RegExp(`Main Floor ${stateLabel}`, 'i') }))
 
     const dialog = await screen.findByRole('dialog')
-    const controlsPane = within(dialog).getByRole('group', { name: 'Main Floor controls, zones, auto-clean, actions, info' })
-    expect(within(controlsPane).getByRole('group', { name: 'Cleaning target' })).toBeInTheDocument()
+    const controlsPane = within(dialog).getByRole('group', {
+      name: state === 'idle' ? 'Main Floor controls, rooms, auto-clean, actions, info' : 'Main Floor controls, auto-clean, info',
+    })
+    if (state === 'idle') {
+      expect(within(controlsPane).getByRole('group', { name: 'Cleaning target' })).toBeInTheDocument()
+    } else {
+      expect(within(controlsPane).queryByRole('group', { name: 'Cleaning target' })).not.toBeInTheDocument()
+    }
     expect(within(controlsPane).queryByRole('button', { name: 'Cancel' })).not.toBeInTheDocument()
     for (const action of actions) expect(within(controlsPane).getByRole('button', { name: action })).toBeEnabled()
   })
@@ -6184,7 +6187,7 @@ describe('DashboardViewPage', () => {
     ]), { timeout: 1500 })
   })
 
-  it('shows the dock-clean stop action while the dock is cleaning', async () => {
+  it('keeps dock-cleaning state in minimal mode with an Actions stop command and Info visible', async () => {
     mockEntities['sensor.valetudo_exaltedsneakydeer_dock_status'].state = 'cleaning'
     try {
       render(<DashboardViewPage activePath="living-room" onNavigate={() => undefined} path="living-room" />)
@@ -6193,15 +6196,20 @@ describe('DashboardViewPage', () => {
       const dockStatus = await within(dialog).findByRole('group', { name: 'Dock Status Cleaning' })
       expect(dockStatus).toHaveAttribute('data-icon', 'mdi:water')
       expect(dockStatus).toHaveAttribute('data-tone', 'active')
-      await clickModalTab(within(dialog), 'Actions')
-      expect(screen.getByRole('button', { name: 'Stop Dock Clean' })).toBeEnabled()
-      expect(screen.getByRole('button', { name: 'Dry Mops' })).toBeDisabled()
-      expect(screen.getByRole('button', { name: 'Empty Bin' })).toBeDisabled()
-
-      fireEvent.click(screen.getByRole('button', { name: 'Stop Dock Clean' }))
-      expect(mockCallServiceCalls).toEqual([
-        { domain: 'script', service: 'main_floor_vacuum_mop_dock_clean' },
-      ])
+      expect(within(dialog).getAllByRole('tab').map((tab) => tab.getAttribute('aria-label'))).toEqual(['Controls', 'Auto-Clean', 'Actions', 'Info'])
+      const controlsPane = within(dialog).getByRole('group', { name: 'Main Floor controls, auto-clean, actions, info' })
+      expect(within(controlsPane).queryByRole('button', { name: 'Stop Dock Clean' })).not.toBeInTheDocument()
+      expect(within(controlsPane).queryByRole('button', { name: 'Clean Mop Dock' })).not.toBeInTheDocument()
+      expect(within(controlsPane).queryByRole('button', { name: 'Dry Mops' })).not.toBeInTheDocument()
+      expect(within(controlsPane).queryByRole('button', { name: 'Empty Bin' })).not.toBeInTheDocument()
+      fireEvent.click(within(dialog).getByRole('tab', { name: 'Actions' }))
+      await waitFor(() => expect(within(dialog).getByRole('tab', { name: 'Actions' })).toHaveAttribute('aria-selected', 'true'))
+      expect(await within(controlsPane).findByRole('button', { name: 'Stop Dock Clean' })).toBeInTheDocument()
+      fireEvent.click(within(dialog).getByRole('tab', { name: 'Info' }))
+      await waitFor(() => expect(within(dialog).getByRole('tab', { name: 'Info' })).toHaveAttribute('aria-selected', 'true'))
+      expect(within(controlsPane).getByRole('group', { name: 'Fresh Water OK' })).toBeInTheDocument()
+      expect(within(controlsPane).getByRole('group', { name: 'Waste Water OK' })).toBeInTheDocument()
+      expect(mockCallServiceCalls).toEqual([])
     } finally {
       mockEntities['sensor.valetudo_exaltedsneakydeer_dock_status'].state = 'idle'
     }
@@ -7933,7 +7941,7 @@ describe('DashboardViewPage', () => {
     fireEvent.click(screen.getByRole('button', { name: /Main Floor Docked/i }))
 
     const dialog = await screen.findByRole('dialog')
-    const controlsPane = within(dialog).getByRole('group', { name: 'Main Floor controls, zones, auto-clean, actions, info' })
+    const controlsPane = within(dialog).getByRole('group', { name: 'Main Floor controls, rooms, auto-clean, actions, info' })
     const modeSelect = screen.getByRole('combobox', { name: /Mode Vacuum/i })
     modeSelect.focus()
     expect(modeSelect).toHaveFocus()
@@ -7965,9 +7973,9 @@ describe('DashboardViewPage', () => {
     expect(within(controlsPane).getByRole('button', { name: 'Stop' })).toHaveAttribute('data-tone', 'destructive')
     expect(within(controlsPane).getByRole('button', { name: 'Stop' })).toBeDisabled()
 
-    await clickModalTab(within(dialog), 'Rooms')
-    const livingRoomZone = screen.getByRole('button', { name: 'Living Room' })
-    expect(livingRoomZone).toBeDisabled()
+    expect(within(dialog).queryByRole('tab', { name: 'Rooms' })).not.toBeInTheDocument()
+    expect(within(dialog).getByRole('tab', { name: 'Auto-Clean' })).toBeInTheDocument()
+    expect(within(dialog).getByRole('tab', { name: 'Info' })).toBeInTheDocument()
 
     expect(mockCallServiceCalls).toEqual([
       { domain: 'select', service: 'select_option', target: 'select.valetudo_exaltedsneakydeer_mode', serviceData: { option: 'mop' } },
@@ -8001,7 +8009,7 @@ describe('DashboardViewPage', () => {
     render(<DashboardViewPage activePath="living-room" onNavigate={() => undefined} path="living-room" />)
     fireEvent.click(screen.getByRole('button', { name: /Main Floor Idle/i }))
     const dialog = await screen.findByRole('dialog')
-    const controlsPane = within(dialog).getByRole('group', { name: 'Main Floor controls, zones, auto-clean, actions, info' })
+    const controlsPane = within(dialog).getByRole('group', { name: 'Main Floor controls, rooms, auto-clean, actions, info' })
 
     fireEvent.click(within(controlsPane).getByRole('button', { name: 'Dock' }))
     expect(within(controlsPane).getByRole('heading', { name: 'Returning' })).toBeInTheDocument()
@@ -8217,7 +8225,7 @@ describe('DashboardViewPage', () => {
     expect(dialog).toHaveAttribute('data-scroll-mode', 'panes')
     expect(screen.getByRole('heading', { name: 'Main Floor Robot Vacuum' })).toBeInTheDocument()
     const mapPane = within(dialog).getByRole('group', { name: 'Main Floor map and status' })
-    const controlsPane = within(dialog).getByRole('group', { name: 'Main Floor controls, zones, auto-clean, actions, info' })
+    const controlsPane = within(dialog).getByRole('group', { name: 'Main Floor controls, rooms, auto-clean, actions, info' })
     expect(within(mapPane).getByRole('region', { name: 'Main Floor Valetudo map' })).toBeInTheDocument()
     expect(within(controlsPane).getByText('Battery')).toBeInTheDocument()
     expect(within(controlsPane).getByRole('group', { name: 'Dock Status Idle' })).toBeInTheDocument()

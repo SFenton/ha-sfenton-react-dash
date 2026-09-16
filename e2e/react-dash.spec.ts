@@ -2542,7 +2542,7 @@ test.describe('desktop modal layout', () => {
     await expect(dialog.getByRole('heading', { name: 'Rooms' })).toBeVisible()
     await waitForModalReady(dialog, 15_000, 'vacuum-tabs')
 
-    const zonesPane = dialog.getByRole('group', { name: 'Main Floor controls, zones, auto-clean, actions, info' })
+    const zonesPane = dialog.getByRole('group', { name: 'Main Floor controls, rooms, auto-clean, actions, info' })
     const modalNav = dialog.getByRole('tablist', { name: 'Main Floor modal sections' })
     const diningRoomZone = dialog.getByRole('button', { name: 'Dining Room' })
     await expect.poll(async () => zonesPane.evaluate((element) => {
