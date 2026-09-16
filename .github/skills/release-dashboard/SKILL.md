@@ -2,7 +2,7 @@
 name: release-dashboard
 description: Explicitly invoked dashboard release scope-review workflow for the operator-authorized deterministic release machine; it does not itself commit, push, merge, deploy, or mutate Home Assistant.
 metadata:
-  model: gpt-5.4
+  model: gpt-5.6-luna
   reasoning_effort: medium
   context_tier: default
 ---
@@ -30,7 +30,7 @@ capture, deployment, production verification, production rollback, rollback
 verification, cleanup, or other provider-backed side effects must remain
 disabled or otherwise unavailable until they are separately operator-authorized
 and qualified.
-Routine scope review uses the release opportunity's `gpt-5.4` medium/default
+Routine scope review uses the release opportunity's `gpt-5.6-luna` medium/default
 reviewer. `gpt-5.6-sol` high/default research may review only an evidence-
 bound `ha-release-rollback-or-host-conflict` trigger after the preceding
 release receipt. No model runs build, Git/PR, deployment, verification,

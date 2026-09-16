@@ -31,7 +31,7 @@ visual parity, device state or measured rendering cost.
    read `.github/reference/dashboard-contract.md` in full and matching scoped
    instructions. Pure tooling/documentation work need not load camera/UX prose.
 2. Classify the task before research. Known local fixes use exact source and
-   tests with the project's exact `gpt-5.4` medium/default implementation or
+   tests with the project's exact `gpt-5.6-luna` medium/default implementation or
    review owner, or a repository-qualified cheaper worker when bounded
    delegation evidence exists. Novel runtime behavior or physical-device
    semantics need primary evidence and receipt-bound Sol research. Do not spawn
@@ -62,7 +62,7 @@ visual parity, device state or measured rendering cost.
 6. Release only when explicitly requested, through `release-dashboard`.
    The disabled deterministic release machine remains experimental and does not
    replace or block the established operator-authorized release skill. Preserve
-   both HA hosts, deterministic release steps, and its `gpt-5.4`
+   both HA hosts, deterministic release steps, and its `gpt-5.6-luna`
    medium/default coordination contract.
 
 The overall interactive model may be Sol, HydraFusion, or another model. It

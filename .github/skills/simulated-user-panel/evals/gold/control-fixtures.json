@@ -43,7 +43,7 @@
         "implementationStatus": "authorized",
         "implementationDispatched": true,
         "implementer": {
-          "model": "gpt-5.4",
+          "model": "gpt-5.6-luna",
           "effort": "medium",
           "context": "default"
         },

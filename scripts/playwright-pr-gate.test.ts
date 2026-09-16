@@ -94,7 +94,7 @@ describe('Playwright pull-request gate', () => {
     expect(releaseSkill).toContain('must still resolve to disabled tooling')
     expect(releaseSkill).toContain('Return `blocked: release-machine-disabled`')
     expect(releaseSkill).toContain('Do not fall back to the former manual Git/PR/deploy procedure')
-    expect(releaseSkill).toContain('`gpt-5.4` medium/default')
+    expect(releaseSkill).toContain('`gpt-5.6-luna` medium/default')
     expect(releaseSkill).toContain('`ha-release-rollback-or-host-conflict`')
 
     expect(machine.version).toBe(3)
