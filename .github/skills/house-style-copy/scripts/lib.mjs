@@ -305,6 +305,20 @@ export function routedPipelinePhaseContracts(opportunity, registry) {
           : null,
       }
     }
+    if (phase.kind === 'deterministic-release') {
+      return {
+        id: phase.id,
+        kind: phase.kind,
+        role: 'deterministic-release',
+        authority: 'operator-authorization-required',
+        profile: null,
+        machine: phase.machine,
+        variant: phase.variant ?? null,
+        sideEffect: phase.sideEffect ?? null,
+        operatorAuthorizationRequired:
+          phase.operatorAuthorizationRequired === true,
+      }
+    }
     const definitions = {
       'research-frontier': ['research-frontier', 'semantic-research-only'],
       'spec-planner': ['spec-planner', 'semantic-specification-only'],
