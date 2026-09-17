@@ -49,8 +49,15 @@ export async function enterState(dialog: Locator, scenario: ScenarioId, state: s
     name: state === 'overdue' ? /^Overdue Chores/ : state === 'upcoming' ? 'Upcoming Chores' : /^Expired Food/,
   }).click()
   if (scenario === 'recipe-grocery' && state !== 'ready') {
-    await dialog.getByRole('button', { name: 'Add Missing Ingredients to Groceries' }).click()
-    await expect(dialog.locator(`[data-recipe-grocery-phase="${state === 'loading' ? '1' : '3'}"]`)).toBeVisible()
+    if (state === 'exhausted') {
+      await dialog.getByRole('button', { name: 'Add Canned tomatoes · 1 can to groceries' }).click()
+      await expect(dialog.getByRole('button', { name: 'Remove Canned tomatoes · 1 can from groceries' })).toBeVisible()
+      await dialog.getByRole('button', { name: 'Add Yellow Onion · 1 small to groceries' }).click()
+      await expect(dialog.locator('[data-recipe-grocery-exhausted="true"]')).toHaveCount(1)
+    } else {
+      await dialog.getByRole('button', { name: 'Add Missing Ingredients to Groceries' }).click()
+      await expect(dialog.locator(`[data-recipe-grocery-phase="${state === 'loading' ? '1' : '3'}"]`)).toBeVisible()
+    }
   }
   if (scenario === 'weather') {
     const page = dialog.page()

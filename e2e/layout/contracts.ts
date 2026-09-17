@@ -392,7 +392,7 @@ export const SURFACE_CONTRACTS: Record<ScenarioId, {
     question: 'Are filter descriptions readable at the actual column width, and are options and footer usable?',
   },
   'recipe-grocery': {
-    family: 'modal', states: ['ready', 'loading', 'success'],
+    family: 'modal', states: ['ready', 'loading', 'success', 'exhausted'],
     tabs: ['^Overview$', '^Ingredients$', '^Instructions$', '^Nutrition$'],
     owners: [
       'src/components/hass/recipes/RecipeDetailModal',
@@ -400,7 +400,7 @@ export const SURFACE_CONTRACTS: Record<ScenarioId, {
       'src/components/hass/recipes/useRecipeDetailModal',
     ],
     legacy: ['recipe-ingredient-cart.spec.ts'],
-    question: 'Does the missing-ingredients action retain one stable command area while the button, spinner and success check transition, then collapse without exposing redundant visible copy?',
+    question: 'Does the missing-ingredients action retain one stable command area while the button, spinner and success check transition, and does an exhausting individual add hide that command without redundant visible copy until removal restores it?',
   },
   form: {
     family: 'modal', states: ['draft'],

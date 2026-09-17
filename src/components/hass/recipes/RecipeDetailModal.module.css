@@ -413,7 +413,8 @@
 }
 
 .groceryCommandStage[data-recipe-grocery-phase='5'],
-.groceryCommandStage[data-recipe-grocery-complete='true'] {
+.groceryCommandStage[data-recipe-grocery-complete='true'],
+.groceryCommandStage[data-recipe-grocery-exhausted='true'] {
   height: 0;
 }
 
