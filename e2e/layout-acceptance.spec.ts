@@ -147,15 +147,25 @@ async function stateFacts(page: Page, dialog: Locator, scenario: ScenarioId, sta
     facts.weather = { state, pressureHeights: heights, previewControls: 0, selectedMode: label }
   }
   if (scenario === 'vacuum') {
+    const visibleTabs = await dialog.getByRole('tab').evaluateAll((elements) => (
+      elements.map((element) => element.getAttribute('aria-label') ?? element.textContent?.trim() ?? '')
+    ))
+    const expectedTabs = state === 'docked'
+      ? ['Controls', 'Rooms', 'Auto-Clean', 'Actions', 'Info']
+      : state === 'dock-cleaning'
+        ? ['Controls', 'Auto-Clean', 'Actions', 'Info']
+        : ['Controls', 'Auto-Clean', 'Info']
+    expect(visibleTabs).toEqual(expectedTabs)
+    await expect(dialog.getByRole('tab', { name: 'Controls' })).toHaveAttribute('aria-selected', 'true')
+    facts.vacuumTabs = { state, visibleTabs }
+
     const pane = dialog.getByRole('group', { name: 'Main Floor map and status' })
     const map = pane.getByRole('region', { name: 'Main Floor Valetudo map' })
     await expect(pane).toHaveAttribute('data-map-status-layout-transition', 'idle')
-    const modalBody = dialog.locator('[data-area-editor="false"]')
-    const canShowTwoPanes = await modalBody.evaluate((element) => getComputedStyle(element).gridTemplateColumns.split(' ').filter(Boolean).length >= 2)
-    const constrained = facts.presentation === 'landscape-dialog' && canShowTwoPanes
+    const splitMapStatus = await pane.evaluate((element) => getComputedStyle(element).gridTemplateAreas !== 'none')
     const viewportLayout = await pane.getAttribute('data-vacuum-viewport-layout')
     const landscapeMap = viewportLayout === 'short-landscape' || viewportLayout === 'tall-landscape'
-    await expect(pane).toHaveAttribute('data-map-status-layout', constrained ? 'split' : 'stacked')
+    await expect(pane).toHaveAttribute('data-map-status-layout', splitMapStatus ? 'split' : 'stacked')
     await expect(map).toHaveAttribute('data-map-display', landscapeMap ? 'fitted' : 'contained')
     if (landscapeMap) {
       await expect(pane.getByRole('heading', { name: 'Status' })).toHaveCount(0)
@@ -395,7 +405,7 @@ for (const scenario of SCENARIO_IDS) {
         const initialProfile = stateObligations[0]?.profile
         if (initialProfile) await applyProfile(page, initialProfile)
         await enterState(dialog, scenario, state)
-      } else if (scenario === 'weather') await enterState(dialog, scenario, state)
+      } else if (scenario === 'weather' || scenario === 'vacuum') await enterState(dialog, scenario, state)
       if (scenario === 'quick-links' && state === 'rooms') await dialog.getByRole('button', { name: 'Rooms', exact: true }).click()
       if (scenario === 'quick-links' && state === 'back') await dialog.getByRole('button', { name: 'Back', exact: true }).click()
       if (scenario === 'summary') await dialog.getByRole('tab', { name: state === 'overdue' ? /^Overdue Chores/ : state === 'upcoming' ? 'Upcoming Chores' : /^Expired Food/ }).click()
