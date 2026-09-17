@@ -1,14 +1,14 @@
 {
   "version": 1,
   "coordinator": {
-    "model": "gpt-5.4",
+    "model": "gpt-5.6-luna",
     "effort": "medium",
     "context": "default"
   },
   "core": [
     {
       "id": "young-novice",
-      "model": "gpt-5.4-mini",
+      "model": "gpt-5.6-luna",
       "effort": "low",
       "context": "default",
       "tier": "U",
@@ -49,7 +49,7 @@
     },
     {
       "id": "ha-engineer",
-      "model": "gpt-5.4",
+      "model": "gpt-5.6-luna",
       "effort": "medium",
       "context": "default",
       "tier": "E",
@@ -111,7 +111,7 @@
     },
     {
       "id": "ux-designer",
-      "model": "gpt-5.4",
+      "model": "gpt-5.6-luna",
       "effort": "medium",
       "context": "default",
       "tier": "P",
@@ -152,7 +152,7 @@
     },
     {
       "id": "power-user",
-      "model": "gpt-5.4",
+      "model": "gpt-5.6-luna",
       "effort": "medium",
       "context": "default",
       "tier": "P",
@@ -172,7 +172,7 @@
     },
     {
       "id": "accessibility-auditor",
-      "model": "gpt-5.4",
+      "model": "gpt-5.6-luna",
       "effort": "medium",
       "context": "default",
       "tier": "P",
@@ -195,7 +195,7 @@
   "specialists": [
     {
       "id": "household-safety",
-      "model": "gpt-5.4",
+      "model": "gpt-5.6-luna",
       "effort": "medium",
       "context": "default",
       "tier": "E",
@@ -233,7 +233,7 @@
     },
     {
       "id": "situational-impairment",
-      "model": "gpt-5.4-mini",
+      "model": "gpt-5.6-luna",
       "effort": "medium",
       "context": "default",
       "tier": "P",
@@ -252,7 +252,7 @@
     },
     {
       "id": "media-privacy",
-      "model": "gpt-5.4",
+      "model": "gpt-5.6-luna",
       "effort": "medium",
       "context": "default",
       "tier": "E",
@@ -291,7 +291,7 @@
   "controls": [
     {
       "id": "calibration-reference",
-      "model": "gpt-5.4",
+      "model": "gpt-5.6-luna",
       "effort": "medium",
       "context": "default"
     },

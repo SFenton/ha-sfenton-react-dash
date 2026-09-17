@@ -1,3 +1,6 @@
+// @covers .github/workflows/playwright.yml
+// @covers .github/skills/release-dashboard/SKILL.md
+// @covers vitest.config.ts
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
@@ -23,17 +26,41 @@ type AgentToolRegistry = {
   }>
 }
 
-describe('Playwright pull-request gate', () => {
-  it('exposes one aggregate check that fails when any shard does not pass', () => {
+type PackageJson = {
+  scripts: Record<string, string>
+}
+
+describe('protected dashboard pull-request gate', () => {
+  it('aggregates quality, automated layout, and full Playwright in the protected check', () => {
     const workflow = read('.github/workflows/playwright.yml')
+    const packageJson = readJson<PackageJson>('package.json')
+    const vitestConfig = read('vitest.config.ts')
 
     expect(workflow).toContain('pull_request:')
+    expect(workflow).toContain('name: Quality checks')
+    expect(workflow).toContain('run: npm run check:ci')
+    expect(workflow).toContain('name: Automated layout')
+    expect(workflow).toContain('layout:verify -- --run artifacts/layout/ci --automated-only')
+    expect(workflow).toContain("plan.mode === 'tooling' ? 'chromium' : 'chromium webkit'")
+    expect(workflow).toContain('name: layout-automation')
+    expect(workflow.match(/Require changed tests for implementation changes/g)).toHaveLength(1)
     expect(workflow).toContain('name: Playwright gate')
+    expect(workflow).toContain('needs: [quality, layout, test]')
+    expect(workflow).toContain('QUALITY_RESULT: ${{ needs.quality.result }}')
+    expect(workflow).toContain('LAYOUT_RESULT: ${{ needs.layout.result }}')
     expect(workflow).toContain('TEST_RESULT: ${{ needs.test.result }}')
-    expect(workflow).toContain('if [[ "$TEST_RESULT" != "success" ]]')
+    expect(workflow).toContain('Dashboard CI did not pass')
+
+    expect(packageJson.scripts.check).toBe(
+      'npm run test:change-policy && npm run check:ci',
+    )
+    expect(packageJson.scripts['check:ci']).toContain('npm run lint')
+    expect(packageJson.scripts['check:ci']).toContain('npm run test:run')
+    expect(packageJson.scripts['check:ci']).toContain('npm run build')
+    expect(vitestConfig).toContain("process.env.TZ = 'America/Los_Angeles'")
   })
 
-  it('treats release-dashboard as disabled-machine scope review only', () => {
+  it('keeps release machine v3 shadow-only without blocking the manual release', () => {
     const releaseSkill = read('.github/skills/release-dashboard/SKILL.md')
     const machine = readJson<ReleaseMachine>('.github/release-machine.json')
     const toolRegistry = readJson<AgentToolRegistry>('.github/agent-tools.json')
@@ -74,7 +101,6 @@ describe('Playwright pull-request gate', () => {
       'verify-production-rollback-candidate': 'production',
       'release-dashboard-cleanup-candidate': 'production',
     } as const
-
     const disabledRepositoryAndProductionSteps = {
       'create-merge-pr': 'release-git-driver',
       'rollback-git': 'release-rollback-git',
@@ -85,17 +111,17 @@ describe('Playwright pull-request gate', () => {
       'cleanup-release': 'release-dashboard-cleanup-disabled',
     } as const
 
-    expect(releaseSkill).toContain('requests release scope review')
-    expect(releaseSkill).toContain(
-      'Registered deterministic local validation and build',
-    )
-    expect(releaseSkill).toContain('GitHub mutation and rollback drivers stay disabled')
-    expect(releaseSkill).toContain('GitHub mutation steps stay unavailable')
-    expect(releaseSkill).toContain('must still resolve to disabled tooling')
-    expect(releaseSkill).toContain('Return `blocked: release-machine-disabled`')
-    expect(releaseSkill).toContain('Do not fall back to the former manual Git/PR/deploy procedure')
-    expect(releaseSkill).toContain('`gpt-5.4` medium/default')
-    expect(releaseSkill).toContain('`ha-release-rollback-or-host-conflict`')
+    expect(releaseSkill).toContain('authorizes those release operations')
+    expect(releaseSkill).toContain('does not replace or block')
+    expect(releaseSkill).toContain('Do not make `npm run check`')
+    expect(releaseSkill).toContain('layout-automation')
+    expect(releaseSkill).toContain('zero-item manual worklist')
+    expect(releaseSkill).toContain('gh pr checks --watch --fail-fast')
+    expect(releaseSkill).toContain('/sfenton-react-dash/home')
+    expect(releaseSkill).toContain('/sfenton-react-panel')
+    expect(releaseSkill).toContain('model: gpt-5.6-luna')
+    expect(releaseSkill).not.toContain('blocked: release-machine-disabled')
+    expect(releaseSkill).not.toContain('Do not fall back to the former manual')
 
     expect(machine.version).toBe(3)
     expect(machine.enabled).toBe(false)

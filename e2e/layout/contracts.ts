@@ -562,6 +562,10 @@ export const SHARED_OWNER_ROOTS = [
   'public/', 'index.html',
 ] as const
 
+export const SHARED_MODAL_OWNER_ROOTS = [
+  'src/components/core/ModalTabNav',
+] as const
+
 export const EXTERNAL_SPECS = new Set(['real-hakit-dials.spec.ts', 'iframe-lifecycle-real-hakit.spec.ts'])
 export const PARITY_SPEC = 'mobile-parity-all-routes.spec.ts'
 export const LAYOUT_UNIT_GATES = [

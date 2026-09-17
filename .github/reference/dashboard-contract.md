@@ -17,17 +17,22 @@ fine-pointer desktop, preload-I/O, and mobile-baseline gates in
 
 Start with `docs/ux/layouts.md` and the executable layout plan. Resolve a clean
 base commit and an explicit working tree; never substitute a stale/dirty checkout
-or an already-running unowned server. Run `layout:check`, `layout:plan`,
-`layout:run`, and `layout:verify` as documented. The plan selects affected
-scenarios or a conservative full-known-mock fallback; it does not require every
-test for every non-layout change. Changed copy is layout-sensitive even when its
-character/word counts are unchanged.
+or an already-running unowned server. The protected pull-request workflow runs
+`layout:check`, `layout:plan`, `layout:run`, and automated-only
+`layout:verify` as documented. Do not duplicate that broad automated corpus as
+a local pre-push gate. The plan selects affected scenarios or a conservative
+full-known-mock fallback; it does not require every test for every non-layout
+change. Changed copy is layout-sensitive even when its character/word counts
+are unchanged.
 
 Actual manual Playwright interaction and image inspection remain mandatory for
-the plan's review items. Captured files, tags, registration counts and filled
-review schemas are not visual judgment. Record missing or inaccessible evidence
-as blocked; never bypass access restrictions. Local validation is mock-only,
-no-proxy and provenance-bound, and grants no HA or deployment authority.
+the plan's review items before merging or deploying a layout-sensitive release.
+Use the current pull-request `layout-automation` artifact and an owned preview
+of the exact pull-request head. Captured files, tags, registration counts and
+filled review schemas are not visual judgment. Record missing or inaccessible
+evidence as blocked; never bypass access restrictions. Local validation is
+mock-only, no-proxy and provenance-bound, and grants no HA or deployment
+authority.
 
 ## Current Stack
 

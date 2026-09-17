@@ -170,6 +170,12 @@ export function manualWorklist(plan: LayoutPlan, run: RunIdentity, ledger: Execu
   }))
 }
 
+export function manualReviewMessage(count: number, directory: string) {
+  return count
+    ? `Manual inspection is still required: ${directory}/manual-worklist.json`
+    : 'No manual layout review is required for this classification.'
+}
+
 export async function runPlan(root: string, input: string, review = false) {
   const planPath = artifactPath(root, input, true)
   const directory = dirname(planPath)
@@ -248,14 +254,15 @@ export async function runPlan(root: string, input: string, review = false) {
       plan, run, selection, ledger, null, (file) => readFileSync(artifactPath(root, file, true)), false,
     )
     writeJson(resolve(directory, 'automated-assessment.json'), { ...automated, automatedPassed, fullAcceptance: false })
-    writeJson(resolve(directory, 'manual-worklist.json'), manualWorklist(plan, run, ledger))
+    const worklist = manualWorklist(plan, run, ledger)
+    writeJson(resolve(directory, 'manual-worklist.json'), worklist)
     const manual: ManualLedger = { version: 1, runId: run.runId, planId: plan.id, reviewer: '', reviews: [] }
     writeJson(resolve(directory, 'manual.json'), manual)
     await verifyServedBuild(run.candidate)
     if (snapshot(root, plan.source.base).digest !== plan.source.digest) throw new Error('Source changed during execution; evidence is historical, not current')
     if (executionError) throw executionError
     if (!automatedPassed) throw new Error(`Runtime evidence assessment failed; inspect ${directory}/automated-assessment.json before manual review`)
-    console.log(`Selected ${selection.length} tests; recorded ${ledger.attempts.length} attempts (${ledger.attempts.filter((attempt) => attempt.status === 'passed').length} passed, ${ledger.attempts.filter((attempt) => attempt.status === 'skipped').length} skipped). Manual inspection is still required: ${directory}/manual-worklist.json`)
+    console.log(`Selected ${selection.length} tests; recorded ${ledger.attempts.length} attempts (${ledger.attempts.filter((attempt) => attempt.status === 'passed').length} passed, ${ledger.attempts.filter((attempt) => attempt.status === 'skipped').length} skipped). ${manualReviewMessage(worklist.length, directory)}`)
   } finally {
     await Promise.all(servers.map(stopOwnedProcess))
   }

@@ -65,7 +65,7 @@ const child = spawn('copilot', [
   '-p',
   prompt,
   '--model',
-  'gpt-5.4',
+  'gpt-5.6-luna',
   '--effort',
   'medium',
   '--context',

@@ -876,18 +876,18 @@
             },
             {
               "file": "src/components/hass/LightMoreInfoSheet.tsx",
-              "start": 82,
-              "end": 88
+              "start": 96,
+              "end": 103
+            },
+            {
+              "file": "src/components/hass/LightColorPicker.tsx",
+              "start": 183,
+              "end": 231
             },
             {
               "file": "src/components/hass/LightMoreInfoSheet.tsx",
-              "start": 98,
-              "end": 107
-            },
-            {
-              "file": "src/components/hass/LightMoreInfoSheet.tsx",
-              "start": 159,
-              "end": 229
+              "start": 135,
+              "end": 137
             },
             {
               "file": "src/components/hass/LightMoreInfoSheet.test.tsx",
