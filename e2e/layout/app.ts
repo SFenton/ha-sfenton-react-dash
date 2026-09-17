@@ -7,7 +7,7 @@ import { openQuickLinksTab } from '../quick-links'
 import { enterWakeState, isWakeScenario } from './wakeLight'
 
 export async function openSurface(page: Page, scenario: ScenarioId, state?: string): Promise<Locator> {
-  const route = isWakeScenario(scenario) ? 'master-bedroom' : scenario === 'filters' || scenario === 'recipe-grocery' ? 'recipes' : scenario === 'form' ? 'to-do' : scenario === 'remote' ? 'music-room' : scenario === 'vacuum' ? 'vacuums' : 'overview'
+  const route = isWakeScenario(scenario) ? 'master-bedroom' : scenario === 'filters' || scenario === 'recipe-grocery' ? 'recipes' : scenario === 'form' || scenario === 'admin-todo-edit' ? 'to-do' : scenario === 'remote' ? 'music-room' : scenario === 'vacuum' ? 'vacuums' : 'overview'
   const recipeDelay = scenario === 'recipe-grocery' ? `&__mockRecipeGroceryDelayMs=${state === 'loading' ? 60000 : 300}` : ''
   await page.goto(`/index.html?path=${route}${recipeDelay}${scenario === 'summary' ? '&user=stephen#daily-report' : ''}`)
   await waitForRoute(page, route, scenario === 'summary')
@@ -23,6 +23,16 @@ export async function openSurface(page: Page, scenario: ScenarioId, state?: stri
     await page.getByRole('button', { name: 'Add Task', exact: true }).click()
     await page.getByRole('textbox', { name: 'Task', exact: true }).fill('Layout validation draft')
     await page.getByRole('textbox', { name: 'Task', exact: true }).blur()
+  }
+  if (scenario === 'admin-todo-edit') {
+    await page.evaluate(() => {
+      const mock = window.__mockHass!
+      mock.setEntityState('todo.groceries', '1')
+      mock.setTodoItems('todo.groceries', [
+        { status: 'needs_action', summary: 'Layout validation task', uid: 'layout-admin-task' },
+      ])
+    })
+    await page.getByLabel('Admin To-Do todo list').getByRole('button', { name: 'Edit Layout validation task' }).click()
   }
   if (scenario === 'remote') await page.evaluate(({ entity, hash }) => {
     if (!window.__mockHass) throw new Error('Mock preflight failed')
@@ -58,6 +68,17 @@ export async function enterState(dialog: Locator, scenario: ScenarioId, state: s
       await dialog.getByRole('button', { name: 'Add Missing Ingredients to Groceries' }).click()
       await expect(dialog.locator(`[data-recipe-grocery-phase="${state === 'loading' ? '1' : '3'}"]`)).toBeVisible()
     }
+  }
+  if (scenario === 'admin-todo-edit') {
+  const input = dialog.getByRole('textbox', { name: 'Task Name' })
+  if (state === 'dirty') {
+    await input.fill('Layout validation renamed task')
+  } else if (state === 'failure') {
+    await input.fill('Layout validation failed task')
+    await dialog.page().evaluate(() => window.__mockHass!.setCallServiceOutcome('todo', 'update_item', 'reject'))
+    await dialog.getByRole('button', { name: 'Save' }).click()
+    await expect(dialog.getByRole('alert')).toHaveText('Mock service rejection')
+  }
   }
   if (scenario === 'weather') {
     const page = dialog.page()

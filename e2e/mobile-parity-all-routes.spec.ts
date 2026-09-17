@@ -234,6 +234,33 @@ async function openBaselineRoute(page: Page, route: ResponsiveRoute) {
   throw new Error(`No visible baseline navigation button found for ${route}`)
 }
 
+async function normalizeAdminTodoEditAddition(page: Page, route: ResponsiveRoute) {
+  if (route !== 'to-do') return null
+  const list = page.getByLabel('Admin To-Do todo list')
+  const rows = list.locator('li > [data-editable="true"]')
+  const controls = rows.locator('button[data-action-kind="modal"][aria-label^="Edit "]')
+  const rowCount = await rows.count()
+  if (rowCount === 0) return null
+  await expect(controls).toHaveCount(rowCount)
+  for (let index = 0; index < rowCount; index += 1) {
+    await expect(rows.nth(index).locator('button[data-action-kind="modal"][aria-label^="Edit "]')).toHaveCount(1)
+  }
+  const originalStyles = await controls.evaluateAll(elements => elements.map(element => element.getAttribute('style')))
+  await controls.evaluateAll(elements => {
+    for (const element of elements) (element as HTMLElement).style.visibility = 'hidden'
+  })
+  await page.evaluate(() => new Promise<void>(done => requestAnimationFrame(() => requestAnimationFrame(() => done()))))
+  return async () => {
+    await controls.evaluateAll((elements, styles) => {
+      elements.forEach((element, index) => {
+        const style = styles[index]
+        if (style === null || style === undefined) element.removeAttribute('style')
+        else element.setAttribute('style', style)
+      })
+    }, originalStyles)
+  }
+}
+
 async function ensureInventoryContent(page: Page, route: ResponsiveRoute) {
   if (!['all-food', 'pantry', 'fridge', 'freezer', 'spice-rack', 'cabinet'].includes(route)) return
   for (let attempt = 0; attempt < 5; attempt += 1) {
@@ -503,6 +530,7 @@ for (const parityViewport of PHONE_PARITY_VIEWPORTS) {
           const restoreAddition = intentionalAddition
             ? await normalizeInspectedAddition(candidate.page, intentionalAddition)
             : null
+          const restoreAdminTodoEditAddition = await normalizeAdminTodoEditAddition(candidate.page, route)
           try {
           const [rawBaselineSignature, rawCandidateSignature] = await Promise.all([
             pageSignature(baseline.page),
@@ -573,6 +601,7 @@ for (const parityViewport of PHONE_PARITY_VIEWPORTS) {
           })
           } finally {
             await restoreAddition?.()
+            await restoreAdminTodoEditAddition?.()
           }
         })
       }

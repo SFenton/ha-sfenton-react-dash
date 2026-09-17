@@ -18,6 +18,8 @@ import { SpecialDeviceModeCard } from '../components/hass/SpecialDeviceModeCard'
 import { StatusRail, type StatusRailChip } from '../components/hass/StatusRail'
 import { TodoListPanel } from '../components/hass/TodoListPanel'
 import { CreateDonetickTaskSheet } from '../components/hass/CreateDonetickTaskSheet'
+import { EditTodoItemSheet } from '../components/hass/EditTodoItemSheet'
+import type { AdminTodoEditTarget } from '../components/hass/adminTodoEdit'
 import type { DonetickTaskEditTarget } from '../components/hass/donetickTaskForm'
 import { EverShelfInventoryPanel, type EverShelfInventoryLocation } from '../components/hass/EverShelfInventoryPanel'
 import { useEverShelfInventoryControls, type EverShelfInventoryControls } from '../components/hass/EverShelfInventoryControls'
@@ -143,6 +145,8 @@ import {
   TODO_PAGES,
   UNAVAILABLE_COLOR,
   SWITCH_ACTIVE_COLOR,
+  ADMIN_TODO_COMPLETION_SCRIPT,
+  ADMIN_TODO_ENTITY_ID,
   RELAY_CONTROL_MODE_ENTITY_ID,
   VACATION_DATE_RANGE_ERROR,
   VACATION_DATES_DESCRIPTION,
@@ -1557,7 +1561,9 @@ function TodoPageContent({ config, configPath, onNavigate, onScrollLockChange, p
   const entities = useHass((state) => state.entities) as unknown as EntityActionStateMap
   const [sectionStates, setSectionStates] = useState<Record<string, { loaded: boolean; visible: boolean } | undefined>>({})
   const [editingTask, setEditingTask] = useState<DonetickTaskEditTarget | null>(null)
+  const [editingTodoItem, setEditingTodoItem] = useState<AdminTodoEditTarget | null>(null)
   const [editSheetOpen, setEditSheetOpen] = useState(false)
+  const [todoEditSheetOpen, setTodoEditSheetOpen] = useState(false)
   const [todoReloadVersion, setTodoReloadVersion] = useState(0)
   const hideEmptyTodoSections = config.showEmptyStateWhenEmpty ?? isChoreTodoPage(configPath)
   // Donetick empties these lists during vacation, so "nice job" would take credit for hidden chores.
@@ -1570,6 +1576,7 @@ function TodoPageContent({ config, configPath, onNavigate, onScrollLockChange, p
   const showTodoEmptyState = hideEmptyTodoSections && (visibleLists.length === 0 || (allSectionsLoaded && !hasRenderedTaskSection))
   const lockPageScroll = path !== 'chores' && showTodoEmptyState
   const editableDonetickTasks = config.taskSource === 'donetick'
+  const editableAdminTodo = isAdminTodoSurface(configPath, config)
 
   const handleTodoSectionState = (entityId: string, state: { loaded: boolean; visible: boolean }) => {
     setSectionStates((current) => {
@@ -1589,6 +1596,11 @@ function TodoPageContent({ config, configPath, onNavigate, onScrollLockChange, p
     setEditSheetOpen(true)
   }
 
+  const openTodoItemEditor = (target: AdminTodoEditTarget) => {
+    setEditingTodoItem(target)
+    setTodoEditSheetOpen(true)
+  }
+
   const refreshTodoLists = () => {
     setTodoReloadVersion((current) => current + 1)
   }
@@ -1600,7 +1612,7 @@ function TodoPageContent({ config, configPath, onNavigate, onScrollLockChange, p
       {visibleLists.map((list) => {
         const entity = entities[list.entityId] as (typeof entities)[string] & { last_changed?: string; last_updated?: string }
         const entityVersion = `${entity?.state ?? ''}:${entity?.last_changed ?? ''}:${entity?.last_updated ?? ''}`
-        return <TodoSection entityVersion={entityVersion} hideListHeader={config.hideListHeaders} hideWhenEmpty={hideEmptyTodoSections} key={list.entityId} list={list} mayHaveItems={todoEntityMayHaveItems(entity)} onEditTask={editableDonetickTasks ? openTaskEditor : undefined} onSectionStateChange={handleTodoSectionState} reloadVersion={todoReloadVersion} responsiveItems={editableDonetickTasks} rowVariant={configPath === 'to-do' ? 'settings' : undefined} />
+        return <TodoSection entityVersion={entityVersion} hideListHeader={config.hideListHeaders} hideWhenEmpty={hideEmptyTodoSections} key={list.entityId} list={list} mayHaveItems={todoEntityMayHaveItems(entity)} onEditTask={editableDonetickTasks ? openTaskEditor : undefined} onEditTodoItem={editableAdminTodo ? openTodoItemEditor : undefined} onSectionStateChange={handleTodoSectionState} reloadVersion={todoReloadVersion} responsiveItems={editableDonetickTasks} rowVariant={configPath === 'to-do' ? 'settings' : undefined} />
       })}
       {editingTask && (
         <CreateDonetickTaskSheet
@@ -1611,8 +1623,23 @@ function TodoPageContent({ config, configPath, onNavigate, onScrollLockChange, p
           open={editSheetOpen}
         />
       )}
+      {editingTodoItem && (
+        <EditTodoItemSheet
+          editTarget={editingTodoItem}
+          onClose={() => setTodoEditSheetOpen(false)}
+          onSaved={refreshTodoLists}
+          open={todoEditSheetOpen}
+        />
+      )}
     </div>
   )
+}
+
+function isAdminTodoSurface(configPath: string, config: TodoPageConfig) {
+  return configPath === 'to-do'
+    && config.lists.length === 1
+    && config.lists[0]?.entityId === ADMIN_TODO_ENTITY_ID
+    && config.lists[0]?.completionScript === ADMIN_TODO_COMPLETION_SCRIPT
 }
 
 function isChoreTodoPage(path: string) {
@@ -1624,7 +1651,7 @@ function todoEntityMayHaveItems(entity: EntityActionStateMap[string] & { state?:
   return Number(entity.state) > 0
 }
 
-function TodoSection({ entityVersion, hideListHeader = false, hideWhenEmpty, list, mayHaveItems, onEditTask, onSectionStateChange, reloadVersion, responsiveItems = false, rowVariant }: { entityVersion: string; hideListHeader?: boolean; hideWhenEmpty: boolean | undefined; list: TodoListConfig; mayHaveItems: boolean; onEditTask?: (target: DonetickTaskEditTarget) => void; onSectionStateChange?: (entityId: string, state: { loaded: boolean; visible: boolean }) => void; reloadVersion?: number; responsiveItems?: boolean; rowVariant?: 'settings' }) {
+function TodoSection({ entityVersion, hideListHeader = false, hideWhenEmpty, list, mayHaveItems, onEditTask, onEditTodoItem, onSectionStateChange, reloadVersion, responsiveItems = false, rowVariant }: { entityVersion: string; hideListHeader?: boolean; hideWhenEmpty: boolean | undefined; list: TodoListConfig; mayHaveItems: boolean; onEditTask?: (target: DonetickTaskEditTarget) => void; onEditTodoItem?: (target: AdminTodoEditTarget) => void; onSectionStateChange?: (entityId: string, state: { loaded: boolean; visible: boolean }) => void; reloadVersion?: number; responsiveItems?: boolean; rowVariant?: 'settings' }) {
   const [visibleItemState, setVisibleItemState] = useState<{ entityVersion: string; value: number | null }>({ entityVersion, value: hideWhenEmpty && !mayHaveItems ? 0 : null })
   const visibleItemCount = visibleItemState.entityVersion !== entityVersion && hideWhenEmpty && mayHaveItems && visibleItemState.value === 0
     ? null
@@ -1644,7 +1671,7 @@ function TodoSection({ entityVersion, hideListHeader = false, hideWhenEmpty, lis
   return (
     <section className={styles.section}>
       {!hideListHeader && <SectionHeader title={list.title} />}
-      <TodoListPanel completionScript={list.completionScript} entityId={list.entityId} hideCompleted={list.hideCompleted} layout={responsiveItems ? 'responsive-grid' : 'list'} onEditTask={onEditTask} onVisibleItemsChange={hideWhenEmpty ? handleVisibleItemsChange : undefined} optimisticStatuses={todoOptimisticStatuses} reloadVersion={reloadVersion} rowVariant={rowVariant} title={list.title} />
+      <TodoListPanel completionScript={list.completionScript} entityId={list.entityId} hideCompleted={list.hideCompleted} layout={responsiveItems ? 'responsive-grid' : 'list'} onEditTask={onEditTask} onEditTodoItem={onEditTodoItem} onVisibleItemsChange={hideWhenEmpty ? handleVisibleItemsChange : undefined} optimisticStatuses={todoOptimisticStatuses} reloadVersion={reloadVersion} rowVariant={rowVariant} title={list.title} />
     </section>
   )
 }
