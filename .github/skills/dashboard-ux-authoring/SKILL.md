@@ -1,17 +1,15 @@
 ---
 name: dashboard-ux-authoring
-description: Authors or reviews the current dashboard UX with typed interaction semantics, one Home Assistant behavior layer, shared primitives, design checks, i18n, and mobile-first validation.
-metadata:
-  model: claude-sonnet-5
-  reasoning_effort: medium
-  context_tier: default
+description: Authors or reviews confirmed React dashboard UX implementations after behavior ownership is established; not for initial device or Home Assistant diagnosis.
 ---
 
 # Dashboard UX Authoring
 
-Use this skill for current dashboard components, pages, modals, and shared
-primitives. The app has one current visual experience; do not introduce a mode
-switch, root experience selector, or parallel component or service path.
+Use this skill only after evidence establishes that the task belongs to React
+dashboard UX. Do not load it to interpret an ambiguous symptom, determine
+whether feedback comes from the app or a physical device, or diagnose Home
+Assistant behavior. The app has one current visual experience; do not introduce
+a mode switch, root experience selector, or parallel component or service path.
 
 This skill does not authorize deployment, Home Assistant mutation, live device
 service calls, wrapper/dashboard updates, commits, or pushes. Those actions

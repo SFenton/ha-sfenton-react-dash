@@ -40,9 +40,9 @@
   ],
   "knownTools": ["check-dashboard", "check-test-change-policy", "test-focused-pure", "test-interactions", "test-ha-service-mappings", "test-core-scaffolds", "test-core-transforms", "test-runtime-debugging", "verify-layout", "build-release", "release-shadow-plan"],
   "knownSkills": ["ha-budget-workflow", "dashboard-ux-authoring", "release-dashboard", "house-style-copy", "simulated-user-panel"],
-  "automaticBuild": true,
+  "automaticBuild": false,
   "automaticPromotion": false,
-  "continuation": { "enabled": true },
+  "continuation": { "enabled": false },
   "promotion": {
     "allowedSideEffects": ["none", "workspace"],
     "requireReplay": true,
