@@ -333,7 +333,7 @@ async function openRecipe() {
 }
 
 async function openTab(dialog: HTMLElement, name: 'General' | 'Ingredients' | 'Instructions') {
-  fireEvent.click(within(dialog).getByRole('tab', { name }))
+  fireEvent.click(await within(dialog).findByRole('tab', { name }))
   await waitFor(() => expect(within(dialog).getByRole('tab', { name })).toHaveAttribute('aria-selected', 'true'))
   await waitFor(() => expect(within(dialog).getByRole('tabpanel', { name })).toBeInTheDocument())
 }
