@@ -1564,6 +1564,7 @@ function TodoPageContent({ config, configPath, onNavigate, onScrollLockChange, p
   const [editingTodoItem, setEditingTodoItem] = useState<AdminTodoEditTarget | null>(null)
   const [editSheetOpen, setEditSheetOpen] = useState(false)
   const [todoEditSheetOpen, setTodoEditSheetOpen] = useState(false)
+  const [todoEditSession, setTodoEditSession] = useState(0)
   const [todoReloadVersion, setTodoReloadVersion] = useState(0)
   const hideEmptyTodoSections = config.showEmptyStateWhenEmpty ?? isChoreTodoPage(configPath)
   // Donetick empties these lists during vacation, so "nice job" would take credit for hidden chores.
@@ -1598,6 +1599,7 @@ function TodoPageContent({ config, configPath, onNavigate, onScrollLockChange, p
 
   const openTodoItemEditor = (target: AdminTodoEditTarget) => {
     setEditingTodoItem(target)
+    setTodoEditSession((current) => current + 1)
     setTodoEditSheetOpen(true)
   }
 
@@ -1626,6 +1628,7 @@ function TodoPageContent({ config, configPath, onNavigate, onScrollLockChange, p
       {editingTodoItem && (
         <EditTodoItemSheet
           editTarget={editingTodoItem}
+          key={todoEditSession}
           onClose={() => setTodoEditSheetOpen(false)}
           onSaved={refreshTodoLists}
           open={todoEditSheetOpen}

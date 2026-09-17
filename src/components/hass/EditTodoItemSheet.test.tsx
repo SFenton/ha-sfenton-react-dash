@@ -144,12 +144,12 @@ describe('EditTodoItemSheet', () => {
   })
 
   it('reseeds the draft when the same item is reopened', async () => {
-    const view = render(<EditTodoItemSheet editTarget={target} onClose={vi.fn()} onSaved={vi.fn()} open />)
+    const view = render(<EditTodoItemSheet editTarget={target} key="session-1" onClose={vi.fn()} onSaved={vi.fn()} open />)
     const input = await screen.findByRole('textbox', { name: 'Task Name' })
     fireEvent.change(input, { target: { value: 'Unsaved draft' } })
 
-    view.rerender(<EditTodoItemSheet editTarget={target} onClose={vi.fn()} onSaved={vi.fn()} open={false} />)
-    view.rerender(<EditTodoItemSheet editTarget={target} onClose={vi.fn()} onSaved={vi.fn()} open />)
+    view.rerender(<EditTodoItemSheet editTarget={target} key="session-1" onClose={vi.fn()} onSaved={vi.fn()} open={false} />)
+    view.rerender(<EditTodoItemSheet editTarget={target} key="session-2" onClose={vi.fn()} onSaved={vi.fn()} open />)
 
     await waitFor(() => expect(screen.getByRole('textbox', { name: 'Task Name' })).toHaveValue('  Raw task title  '))
   })

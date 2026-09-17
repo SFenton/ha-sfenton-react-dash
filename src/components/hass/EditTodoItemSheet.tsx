@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { useRef, useState, type FormEvent } from 'react'
 import { useHass } from '@hakit/core'
 import { MaterialIcon } from '../core/Icon'
 import { ModalSheet, type ModalCenteredGeometry } from '../core/ModalSheet'
@@ -34,14 +34,6 @@ export function EditTodoItemSheet({ editTarget, onClose, onSaved, open }: EditTo
   const trimmedDraft = draft.trim()
   const canReset = !submitting && (draft !== editTarget.originalTitle || Boolean(error))
   const canSave = Boolean(editTarget.itemUid) && Boolean(trimmedDraft) && trimmedDraft !== editTarget.originalTitle.trim() && !submitting
-
-  useEffect(() => {
-    if (!open) return
-    setDraft(editTarget.originalTitle)
-    setError(null)
-    setSubmitting(false)
-    submittingRef.current = false
-  }, [editTarget, open])
 
   const handleClose = () => {
     if (submitting || submittingRef.current) return
