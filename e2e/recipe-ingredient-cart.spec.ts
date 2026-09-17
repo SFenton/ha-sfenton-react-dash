@@ -64,12 +64,14 @@ test.beforeEach(async ({ page }) => {
   await page.evaluate(() => window.__mockHass?.calls.splice(0))
 })
 
-test('every ingredient row exposes an add-to-groceries control only for actionable missing ingredients', async ({ page }) => {
+test('every ingredient row exposes add-to-groceries controls for individual-actionable missing and uncertain ingredients', async ({ page }) => {
   const dialog = await openIngredientsTab(page)
 
-  await expect(dialog.getByRole('button', { name: /^Add .+ to groceries$/ })).toHaveCount(2)
+  await expect(dialog.getByRole('button', { name: /^Add .+ to groceries$/ })).toHaveCount(4)
   await expect(dialog.getByRole('button', { name: 'Add Canned tomatoes · 1 can to groceries' })).toBeVisible()
   await expect(dialog.getByRole('button', { name: 'Add Yellow Onion · 1 small to groceries' })).toBeVisible()
+  await expect(dialog.getByRole('button', { name: 'Add Fresh herbs to groceries' })).toBeVisible()
+  await expect(dialog.getByRole('button', { name: 'Add Lemon · 1 to groceries' })).toBeVisible()
   await expect(dialog.getByRole('button', { name: /^Remove .+ from groceries$/ })).toHaveCount(0)
 })
 
@@ -105,6 +107,93 @@ test('adding a single ingredient shows its trash control, skips it from the bulk
   await removeTomato.click()
   await expect(dialog.getByRole('button', { name: 'Add Canned tomatoes · 1 can to groceries' })).toBeVisible()
   await expect(dialog.getByRole('button', { name: 'Remove Canned tomatoes · 1 can from groceries' })).toHaveCount(0)
+})
+
+test('an uncertain ingredient can be added and removed individually while bulk add stays conservative', async ({ page }) => {
+  const dialog = await openIngredientsTab(page)
+
+  const addHerbs = dialog.getByRole('button', { name: 'Add Fresh herbs to groceries' })
+  await addHerbs.click()
+  const removeHerbs = dialog.getByRole('button', { name: 'Remove Fresh herbs from groceries' })
+  await expect(removeHerbs).toBeVisible()
+
+  const individualCalls = await groceryAddCalls(page)
+  expect(individualCalls).toHaveLength(1)
+  expect((individualCalls[0] as { serviceData?: { selections?: unknown[] } }).serviceData?.selections).toEqual([
+    expect.objectContaining({ key: expect.stringContaining('ri:3:'), position: 3 }),
+  ])
+
+  const bulkButton = dialog.getByRole('button', { name: 'Add Missing Ingredients to Groceries' })
+  const callCountBeforeBulk = await groceryAddCallCount(page)
+  await bulkButton.click()
+  await expect(dialog.getByRole('button', { name: 'Remove Canned tomatoes · 1 can from groceries' })).toBeVisible()
+  await expect(dialog.getByRole('button', { name: 'Remove Yellow Onion · 1 small from groceries' })).toBeVisible()
+
+  const callsAfterBulk = await groceryAddCalls(page)
+  const bulkCalls = callsAfterBulk.slice(callCountBeforeBulk)
+  expect(bulkCalls).toHaveLength(1)
+  const bulkKeys = ((bulkCalls[0] as { serviceData?: { selections?: { key?: string }[] } }).serviceData?.selections ?? [])
+    .map((selection) => selection.key)
+  expect(bulkKeys.some((key) => key?.startsWith('ri:0:'))).toBe(true)
+  expect(bulkKeys.some((key) => key?.startsWith('ri:5:'))).toBe(true)
+  expect(bulkKeys.some((key) => key?.startsWith('ri:3:'))).toBe(false)
+  expect(bulkKeys.some((key) => key?.startsWith('ri:6:'))).toBe(false)
+
+  await removeHerbs.click()
+  await expect(dialog.getByRole('button', { name: 'Add Fresh herbs to groceries' })).toBeVisible()
+  await expect(dialog.getByRole('button', { name: 'Remove Fresh herbs from groceries' })).toHaveCount(0)
+})
+
+test('individually exhausting every missing ingredient collapses the bulk command until removal restores it', async ({ page }) => {
+  const dialog = await openIngredientsTab(page)
+  const exhaustedCopy = 'All missing ingredients have already been added to groceries.'
+
+  await dialog.getByRole('button', { name: 'Add Canned tomatoes · 1 can to groceries' }).click()
+  await expect(dialog.getByRole('button', { name: 'Remove Canned tomatoes · 1 can from groceries' })).toBeVisible()
+  await dialog.getByRole('button', { name: 'Add Yellow Onion · 1 small to groceries' }).click()
+  await expect(dialog.getByRole('button', { name: 'Remove Yellow Onion · 1 small from groceries' })).toBeVisible()
+
+  await expect(dialog.getByRole('button', { name: 'Add Missing Ingredients to Groceries' })).toHaveCount(0)
+  await expect(dialog.locator('[data-recipe-grocery-exhausted="true"]')).toHaveCount(1)
+  await expect(dialog.locator('[data-recipe-grocery-status="true"]')).toHaveText(exhaustedCopy)
+  await expect(dialog.getByText(exhaustedCopy, { exact: true })).toHaveClass(/visuallyHidden/)
+
+  await dialog.getByRole('button', { name: 'Remove Yellow Onion · 1 small from groceries' }).click()
+  await expect(dialog.getByRole('button', { name: 'Add Yellow Onion · 1 small to groceries' })).toBeVisible()
+  await expect(dialog.locator('[data-recipe-grocery-exhausted="true"]')).toHaveCount(0)
+  await expect(dialog.getByRole('button', { name: 'Add Missing Ingredients to Groceries' })).toBeEnabled()
+})
+
+test('marking an in-stock ingredient missing restores row and bulk actionability after individual exhaustion', async ({ page }) => {
+  const dialog = await openIngredientsTab(page)
+
+  await dialog.getByRole('button', { name: 'Add Canned tomatoes · 1 can to groceries' }).click()
+  await expect(dialog.getByRole('button', { name: 'Remove Canned tomatoes · 1 can from groceries' })).toBeVisible()
+  await dialog.getByRole('button', { name: 'Add Yellow Onion · 1 small to groceries' }).click()
+  await expect(dialog.getByRole('button', { name: 'Remove Yellow Onion · 1 small from groceries' })).toBeVisible()
+
+  await expect(dialog.getByRole('button', { name: 'Add Missing Ingredients to Groceries' })).toHaveCount(0)
+  await expect(dialog.locator('[data-recipe-grocery-exhausted="true"]')).toHaveCount(1)
+
+  await dialog.getByRole('button', {
+    name: /Long-grain rice · 2 cups: Exact inventory match.*Activate to mark missing/,
+  }).click()
+
+  await expect(dialog.getByRole('button', { name: 'Add Long-grain rice · 2 cups to groceries' })).toBeVisible()
+  await expect(dialog.locator('[data-recipe-grocery-exhausted="true"]')).toHaveCount(0)
+  const bulkButton = dialog.getByRole('button', { name: 'Add Missing Ingredients to Groceries' })
+  await expect(bulkButton).toBeEnabled()
+
+  const callCountBeforeBulk = await groceryAddCallCount(page)
+  await bulkButton.click()
+  await expect(dialog.getByRole('button', { name: 'Remove Long-grain rice · 2 cups from groceries' })).toBeVisible()
+
+  const callsAfterBulk = await groceryAddCalls(page)
+  const bulkCalls = callsAfterBulk.slice(callCountBeforeBulk)
+  expect(bulkCalls).toHaveLength(1)
+  expect((bulkCalls[0] as { serviceData?: { selections?: { key?: string }[] } }).serviceData?.selections).toEqual([
+    expect.objectContaining({ key: expect.stringContaining('ri:1:') }),
+  ])
 })
 
 test('removing every added ingredient restores the bulk action after a completed bulk add', async ({ page }) => {

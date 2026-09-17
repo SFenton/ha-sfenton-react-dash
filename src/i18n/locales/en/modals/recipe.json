@@ -10,7 +10,6 @@
   "chooseProductTitle": "Choose Product for {{ingredient}}",
   "cookTime": "Cook Time",
   "decisionAssumeSaved": "Ingredient marked available without AI evidence.",
-  "decisionRejectSaved": "Ingredient marked missing; exact match feedback was queued when available.",
   "decisionSaveError": "Unable to save ingredient decision.",
   "decisionSelectSaved": "Inventory product correction saved and queued for ontology review.",
   "devices": "Devices",
