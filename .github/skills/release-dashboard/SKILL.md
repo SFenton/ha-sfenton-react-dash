@@ -59,19 +59,22 @@ operator-authorized release path.
    validation evidence.
 6. Wait with `gh pr checks --watch --fail-fast`. Do not merge while any check
    is pending or failing. The protected `Playwright gate` aggregate includes:
-   changed-test policy, lint, unit and contract checks, a production build,
-   automated affected-layout evidence, and the sharded full Playwright suite.
-7. For a layout-sensitive release, inspect the `layout-automation` Action
-   artifact after the automated gate passes. View its requested unnormalized
-   screenshots with an image-capable tool, perform the listed interactions
-   against an owned preview of the exact pull-request head, and record truthful
-   observations tied to the artifact checkpoints and hashes. This human review
-   is a post-push release acceptance gate, not a pre-push local gate. A
-   `non-layout` Action classification or a zero-item manual worklist requires
-   no manual layout review.
-8. Merge with a merge commit through `gh`, fetch `origin/master`, and prove the
+   changed-test policy, lint, unit and contract checks, a production build, and
+   the sharded full Playwright suite. Automated layout runs after the merge on
+   protected `master`.
+7. Merge with a merge commit through `gh`, fetch `origin/master`, and prove the
    release commit is an ancestor of the merged branch. Do not force-push,
    amend, or delete a checked-out branch that still carries unrelated work.
+8. Wait for the post-merge `master` workflow to complete with
+   `gh run watch <run-id> --exit-status`, then inspect its `layout-automation`
+   artifact with `gh run download <run-id> --name layout-automation` before
+   building or deploying. For a layout-sensitive release, view its requested
+   unnormalized screenshots with an image-capable tool, perform the listed
+   interactions against an owned preview of the exact merged head, and record
+   truthful observations tied to the artifact checkpoints and hashes. This
+   manual visual review is a required pre-deployment release acceptance gate,
+   not a pre-push local gate. A `non-layout` Action classification or a
+   zero-item manual worklist requires no manual layout review.
 
 `master` is protected for administrators and requires the strict
 `Playwright gate`. Force-push and branch deletion remain disabled.
