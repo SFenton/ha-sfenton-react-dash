@@ -5,6 +5,9 @@ on:
   push:
     branches: [master]
 
+permissions:
+  contents: read
+
 concurrency:
   group: playwright-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -31,6 +34,7 @@ jobs:
 
   layout:
     name: Automated layout
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
     timeout-minutes: 360
     steps:
@@ -84,6 +88,54 @@ jobs:
             !artifacts/layout/ci/scratch
           include-hidden-files: true
           retention-days: 14
+
+  layout-failure:
+    name: Report automated layout failure
+    if: ${{ always() && needs.layout.result == 'failure' }}
+    needs: layout
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - name: Create investigation issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          COMMIT_SHA: ${{ github.sha }}
+          ISSUE_MARKER: layout-failure-commit-${{ github.sha }}
+          REF_NAME: ${{ github.ref }}
+          WORKFLOW_NAME: ${{ github.workflow }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          ARTIFACT_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}#artifacts
+        run: |
+          existing_issues=$(gh issue list \
+            --repo "$GITHUB_REPOSITORY" \
+            --state open \
+            --search "$ISSUE_MARKER in:body" \
+            --json number \
+            --limit 1)
+          if [[ "$existing_issues" != "[]" ]]; then
+            echo "An open layout failure issue already exists for $COMMIT_SHA; skipping creation."
+            exit 0
+          fi
+          cat > "$RUNNER_TEMP/layout-failure.md" <<EOF
+          <!-- $ISSUE_MARKER -->
+          ## Automated layout failure
+
+          The post-merge automated layout job failed and needs investigation.
+
+          - Commit: \`$COMMIT_SHA\`
+          - Workflow: \`$WORKFLOW_NAME\`
+          - Ref: \`$REF_NAME\`
+          - Run: [$RUN_URL]($RUN_URL)
+          - Artifacts: [$ARTIFACT_URL]($ARTIFACT_URL)
+
+          Review the failed **Automated layout** job logs and uploaded artifacts before closing this issue.
+          EOF
+          gh issue create \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "Automated layout failure on ${COMMIT_SHA:0:12}" \
+            --body-file "$RUNNER_TEMP/layout-failure.md"
 
   build-mock:
     runs-on: ubuntu-latest
@@ -165,11 +217,16 @@ jobs:
       - name: Enforce successful dashboard CI
         if: always()
         env:
+          EVENT_NAME: ${{ github.event_name }}
           QUALITY_RESULT: ${{ needs.quality.result }}
           LAYOUT_RESULT: ${{ needs.layout.result }}
           TEST_RESULT: ${{ needs.test.result }}
         run: |
-          if [[ "$QUALITY_RESULT" != "success" || "$LAYOUT_RESULT" != "success" || "$TEST_RESULT" != "success" ]]; then
+          if [[ "$QUALITY_RESULT" != "success" || "$TEST_RESULT" != "success" ]]; then
             echo "::error::Dashboard CI did not pass (quality: $QUALITY_RESULT, layout: $LAYOUT_RESULT, Playwright: $TEST_RESULT)."
+            exit 1
+          fi
+          if [[ "$EVENT_NAME" == "push" && "$LAYOUT_RESULT" != "success" ]]; then
+            echo "::error::Post-merge dashboard CI did not pass automated layout (layout: $LAYOUT_RESULT)."
             exit 1
           fi
