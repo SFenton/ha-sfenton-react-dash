@@ -30,7 +30,7 @@ import {
   recipeActionableMissingIngredients,
   recipeGroceryCapabilityBlockedReason,
   recipeGroceryDisabledReason,
-  recipeIngredientIsGroceryEligible,
+  recipeIngredientIsIndividualGroceryEligible,
   type RecipeGroceryTodoItem,
 } from './recipeGroceryState'
 import type { RecipeDetailTab } from '../../../constants/surfaceSemantics'
@@ -79,6 +79,7 @@ export interface RecipeDetailModalController {
   detailState: DetailLoadState
   groceryState: GroceryState
   grocerySubmitted: boolean
+  groceryExhaustedByIndividualAdd: boolean
   individualGroceryErrors: ReadonlyMap<string, string>
   individualGroceryPendingKeys: ReadonlySet<string>
   ingredientFeedbackMessage: string | null
@@ -119,7 +120,6 @@ const MODAL_STATE_CLEAR_DELAY_MS = MODAL_SHEET_EXIT_ANIMATION_MS + 20
 const RECIPE_I18N = { namespace: 'modalRecipe' } as const
 const RECIPE_CONTROLLER_COPY_KEYS = {
   decisionAssumeSaved: 'decisionAssumeSaved',
-  decisionRejectSaved: 'decisionRejectSaved',
   decisionSaveError: 'decisionSaveError',
   decisionSelectSaved: 'decisionSelectSaved',
   inventoryPickerSearchError: 'inventoryPickerSearchError',
@@ -305,6 +305,7 @@ export function useRecipeDetailModalController({ enabled = true }: { enabled?: b
   const [detailState, setDetailState] = useState<DetailLoadState>({ status: 'idle' })
   const [groceryState, setGroceryState] = useState<GroceryState>({ status: 'idle' })
   const [grocerySubmitted, setGrocerySubmitted] = useState(false)
+  const [groceryExhaustedByIndividualAdd, setGroceryExhaustedByIndividualAdd] = useState(false)
   const [addedIngredientKeys, setAddedIngredientKeys] = useState<ReadonlySet<string>>(() => new Set())
   const [addedIngredientTodoNames, setAddedIngredientTodoNames] = useState<ReadonlyMap<string, string>>(() => new Map())
   const [individualGroceryPendingKeys, setIndividualGroceryPendingKeys] = useState<ReadonlySet<string>>(() => new Set())
@@ -364,6 +365,7 @@ export function useRecipeDetailModalController({ enabled = true }: { enabled?: b
     setDetailState({ status: 'loading' })
     setGroceryState({ status: 'idle' })
     setGrocerySubmitted(false)
+    setGroceryExhaustedByIndividualAdd(false)
     setAddedIngredientKeys(new Set())
     setAddedIngredientTodoNames(new Map())
     setIndividualGroceryPendingKeys(new Set())
@@ -410,6 +412,7 @@ export function useRecipeDetailModalController({ enabled = true }: { enabled?: b
       setDetailState({ status: 'idle' })
       setGroceryState({ status: 'idle' })
       setGrocerySubmitted(false)
+      setGroceryExhaustedByIndividualAdd(false)
       setAddedIngredientKeys(new Set())
       setAddedIngredientTodoNames(new Map())
       setIndividualGroceryPendingKeys(new Set())
@@ -574,6 +577,7 @@ export function useRecipeDetailModalController({ enabled = true }: { enabled?: b
     grocerySubmittedRef.current = false
     setGroceryState({ status: 'idle' })
     setGrocerySubmitted(false)
+    setGroceryExhaustedByIndividualAdd(false)
   }, [])
 
   const cancelIngredientPicker = useCallback(() => {
@@ -664,7 +668,7 @@ export function useRecipeDetailModalController({ enabled = true }: { enabled?: b
         action === 'select_inventory_product'
           ? copy(RECIPE_CONTROLLER_COPY_KEYS.decisionSelectSaved)
           : action === 'reject_current_match'
-            ? copy(RECIPE_CONTROLLER_COPY_KEYS.decisionRejectSaved)
+            ? null
             : copy(RECIPE_CONTROLLER_COPY_KEYS.decisionAssumeSaved),
       )
     }).catch((error: unknown) => {
@@ -1154,7 +1158,7 @@ export function useRecipeDetailModalController({ enabled = true }: { enabled?: b
       || groceryInFlightRef.current
       || individualGroceryPendingKeys.has(ingredient.key)
       || addedIngredientKeys.has(ingredient.key)
-      || !recipeIngredientIsGroceryEligible(ingredient)
+      || !recipeIngredientIsIndividualGroceryEligible(ingredient)
       || recipeGroceryCapabilityBlockedReason(detailState.detail, 'idle')
     ) return
 
@@ -1202,6 +1206,7 @@ export function useRecipeDetailModalController({ enabled = true }: { enabled?: b
         individualGroceryCommandKeysRef.current.delete(ingredientKey)
         setAddedIngredientKeys((current) => new Set(current).add(addedKey))
         setAddedIngredientTodoNames((current) => new Map(current).set(addedKey, todoName))
+        setGroceryExhaustedByIndividualAdd(true)
         // Do not reset the bulk command area's success/collapse state here: an individual add only
         // shrinks the actionable pool, so the bulk "Add Missing Ingredients" action (idle, in-flight,
         // or already collapsed after its own success) must stay visually stable. `addMissingIngredients`
@@ -1351,6 +1356,7 @@ export function useRecipeDetailModalController({ enabled = true }: { enabled?: b
     detailState,
     groceryState,
     grocerySubmitted,
+    groceryExhaustedByIndividualAdd,
     individualGroceryErrors,
     individualGroceryPendingKeys,
     individualGroceryRemovingKeys,

@@ -643,7 +643,7 @@ describe('RecipeDetailModal', () => {
     }
   })
 
-  it('shows a per-row grocery control only for actionable missing ingredients and adds one individually without the bulk selections', async () => {
+  it('shows per-row grocery controls for individually actionable ingredients and adds one missing row without broadening the bulk selections', async () => {
     const originalCallService = mockState.helpers.callService
     const calls: Record<string, unknown>[] = []
     mockState.helpers.callService = (params) => {
@@ -659,9 +659,10 @@ describe('RecipeDetailModal', () => {
       await within(dialog).findByText('Serves 4')
       await openTab(dialog, 'Ingredients')
 
-      expect(within(dialog).getAllByRole('button', { name: /^Add .+ to groceries$/ })).toHaveLength(1)
+      expect(within(dialog).getAllByRole('button', { name: /^Add .+ to groceries$/ })).toHaveLength(2)
       expect(within(dialog).queryAllByRole('button', { name: /^Remove .+ from groceries$/ })).toHaveLength(0)
       const addButton = within(dialog).getByRole('button', { name: 'Add Diced Tomatoes · 1 can to groceries' })
+      expect(within(dialog).getByRole('button', { name: 'Add Fresh herbs to groceries' })).toBeInTheDocument()
 
       fireEvent.click(addButton)
       await waitFor(() => expect(within(dialog).getByRole('button', { name: 'Remove Diced Tomatoes · 1 can from groceries' })).toBeInTheDocument())
@@ -677,10 +678,18 @@ describe('RecipeDetailModal', () => {
         },
       })
 
-      const groceryButton = within(dialog).getByRole('button', { name: 'Add Missing Ingredients to Groceries' })
-      expect(groceryButton).toBeDisabled()
-      expect(within(dialog).getByText('All missing ingredients have already been added to groceries.')).toBeInTheDocument()
-      fireEvent.click(groceryButton)
+      await waitFor(() => {
+        const exhaustedStage = dialog.querySelector('[data-recipe-grocery-exhausted="true"]')
+        expect(exhaustedStage).toHaveAttribute('aria-hidden', 'true')
+        expect(exhaustedStage?.querySelector('button')).toBeDisabled()
+      })
+      const exhaustedCopy = 'All missing ingredients have already been added to groceries.'
+      const exhaustedStatus = within(dialog).getByRole('status')
+      expect(exhaustedStatus).toHaveTextContent(exhaustedCopy)
+      expect(exhaustedStatus).toHaveClass(/visuallyHidden/)
+      const exhaustedMatches = within(dialog).queryAllByText(exhaustedCopy, { exact: true })
+      expect(exhaustedMatches).toHaveLength(1)
+      expect(exhaustedMatches[0]).toBe(exhaustedStatus)
       expect(calls.filter((call) => call.service === 'recipe_grocery_add')).toHaveLength(1)
     } finally {
       mockState.helpers.callService = originalCallService
@@ -771,11 +780,16 @@ describe('RecipeDetailModal', () => {
 
       fireEvent.click(within(dialog).getByRole('button', { name: 'Add Diced Tomatoes · 1 can to groceries' }))
       const removeButton = await within(dialog).findByRole('button', { name: 'Remove Diced Tomatoes · 1 can from groceries' })
-      expect(within(dialog).getByRole('button', { name: 'Add Missing Ingredients to Groceries' })).toBeDisabled()
+      await waitFor(() => {
+        const exhaustedStage = dialog.querySelector('[data-recipe-grocery-exhausted="true"]')
+        expect(exhaustedStage).toHaveAttribute('aria-hidden', 'true')
+        expect(exhaustedStage?.querySelector('button')).toBeDisabled()
+      })
 
       fireEvent.click(removeButton)
       await waitFor(() => expect(within(dialog).getByRole('button', { name: 'Add Diced Tomatoes · 1 can to groceries' })).toBeInTheDocument())
       expect(within(dialog).queryByRole('button', { name: 'Remove Diced Tomatoes · 1 can from groceries' })).not.toBeInTheDocument()
+      expect(dialog.querySelector('[data-recipe-grocery-exhausted="true"]')).not.toBeInTheDocument()
       expect(within(dialog).getByRole('button', { name: 'Add Missing Ingredients to Groceries' })).toBeEnabled()
       expect(within(dialog).queryByText('All missing ingredients have already been added to groceries.')).not.toBeInTheDocument()
 
@@ -787,6 +801,61 @@ describe('RecipeDetailModal', () => {
         target: 'todo.shopping_list',
         serviceData: { item: 'grocery-tomatoes' },
       })
+    } finally {
+      mockState.helpers.callService = originalCallService
+    }
+  })
+
+  it('allows uncertain ingredients to be added and removed individually without broadening the bulk selection', async () => {
+    const originalCallService = mockState.helpers.callService
+    const calls: Record<string, unknown>[] = []
+    mockState.helpers.callService = (params) => {
+      calls.push(params)
+      if (params.domain === 'evershelf' && params.service === 'recipe_detail') return Promise.resolve(detailResponse())
+      if (params.domain === 'evershelf' && params.service === 'recipe_grocery_add') return Promise.resolve(grocerySuccessResponse())
+      return originalCallService(params)
+    }
+    mockTodoItemsByEntity['todo.shopping_list'] = [
+      { uid: 'grocery-herbs', summary: 'Fresh herbs', status: 'needs_action' },
+      { uid: 'grocery-tomatoes', summary: 'Diced Tomatoes', status: 'needs_action' },
+    ]
+
+    try {
+      render(<Harness />)
+      const dialog = await openRecipe()
+      await within(dialog).findByText('Serves 4')
+      await openTab(dialog, 'Ingredients')
+
+      const addHerbs = within(dialog).getByRole('button', { name: 'Add Fresh herbs to groceries' })
+      expect(addHerbs).toBeInTheDocument()
+
+      fireEvent.click(addHerbs)
+      const removeHerbs = await within(dialog).findByRole('button', { name: 'Remove Fresh herbs from groceries' })
+      expect(removeHerbs).toBeInTheDocument()
+
+      const groceryCalls = calls.filter((call) => call.service === 'recipe_grocery_add')
+      expect(groceryCalls).toHaveLength(1)
+      expect(groceryCalls[0]).toMatchObject({
+        serviceData: {
+          selections: [{ key: 'ri:3:0000000000000004', position: 3 }],
+        },
+      })
+
+      const bulkButton = within(dialog).getByRole('button', { name: 'Add Missing Ingredients to Groceries' })
+      expect(bulkButton).toBeEnabled()
+      fireEvent.click(bulkButton)
+      await waitFor(() => expect(within(dialog).getByRole('button', { name: 'Remove Diced Tomatoes · 1 can from groceries' })).toBeInTheDocument())
+
+      const bulkCall = calls.filter((call) => call.service === 'recipe_grocery_add')[1]
+      expect(bulkCall).toMatchObject({
+        serviceData: {
+          selections: [{ key: 'ri:0:0000000000000001', position: 0 }],
+        },
+      })
+
+      fireEvent.click(removeHerbs)
+      await waitFor(() => expect(within(dialog).getByRole('button', { name: 'Add Fresh herbs to groceries' })).toBeInTheDocument())
+      expect(within(dialog).queryByRole('button', { name: 'Remove Fresh herbs from groceries' })).not.toBeInTheDocument()
     } finally {
       mockState.helpers.callService = originalCallService
     }
@@ -1126,6 +1195,7 @@ describe('RecipeDetailModal', () => {
     try {
       render(<Harness />)
       const dialog = await openRecipe()
+      await within(dialog).findByText('Serves 4')
       await openTab(dialog, 'Ingredients')
       vi.useFakeTimers()
       fireEvent.click(within(dialog).getByRole('button', { name: 'Add Missing Ingredients to Groceries' }))
@@ -1412,7 +1482,92 @@ describe('RecipeDetailModal', () => {
     }
   })
 
-  it('keeps the bulk action semantically disabled without the preserve-visual attribute while a genuine disabledReason applies during a pending removal', async () => {
+  it.each([
+    {
+      name: 'when the first request confirms before the second',
+      resolveOrder: ['ri:0:0000000000000001', 'ri:1:0000000000000002'] as const,
+    },
+    {
+      name: 'when the second request confirms before the first',
+      resolveOrder: ['ri:1:0000000000000002', 'ri:0:0000000000000001'] as const,
+    },
+  ])('merges overlapping individual add confirmations $name', async ({ resolveOrder }) => {
+    const originalCallService = mockState.helpers.callService
+    const pendingAdds = new Map<string, (value: unknown) => void>()
+    mockState.helpers.callService = (params) => {
+      if (params.domain === 'evershelf' && params.service === 'recipe_detail') {
+        const response = detailResponse({ confirmedMissingCount: 2 })
+        response.response.detail.ingredients[1].inventory.state = 'missing'
+        return Promise.resolve(response)
+      }
+      if (params.domain === 'evershelf' && params.service === 'recipe_grocery_add') {
+        const selections = (params.serviceData as { selections: { key: string }[] }).selections
+        const ingredientKey = selections[0]?.key
+        return new Promise((resolve) => {
+          pendingAdds.set(ingredientKey, resolve)
+        })
+      }
+      return originalCallService(params)
+    }
+
+    const ingredientLabels = {
+      'ri:0:0000000000000001': {
+        add: 'Add Diced Tomatoes · 1 can to groceries',
+        adding: 'Adding Diced Tomatoes · 1 can to groceries',
+        remove: 'Remove Diced Tomatoes · 1 can from groceries',
+      },
+      'ri:1:0000000000000002': {
+        add: 'Add Rice · 2 cups to groceries',
+        adding: 'Adding Rice · 2 cups to groceries',
+        remove: 'Remove Rice · 2 cups from groceries',
+      },
+    } as const
+    const exhaustedCopy = 'All missing ingredients have already been added to groceries.'
+
+    try {
+      render(<Harness />)
+      const dialog = await openRecipe()
+      await within(dialog).findByText('Serves 4')
+      await openTab(dialog, 'Ingredients')
+
+      fireEvent.click(within(dialog).getByRole('button', { name: ingredientLabels['ri:0:0000000000000001'].add }))
+      fireEvent.click(within(dialog).getByRole('button', { name: ingredientLabels['ri:1:0000000000000002'].add }))
+
+      await waitFor(() => expect(pendingAdds.size).toBe(2))
+      expect(within(dialog).getByRole('button', { name: 'Add Missing Ingredients to Groceries' })).toBeDisabled()
+      expect(dialog.querySelector('[data-recipe-grocery-exhausted="true"]')).not.toBeInTheDocument()
+
+      const [firstResolvedKey, secondResolvedKey] = resolveOrder
+      await act(async () => pendingAdds.get(firstResolvedKey)?.(grocerySuccessResponse()))
+      await waitFor(() => {
+        expect(within(dialog).getByRole('button', { name: ingredientLabels[firstResolvedKey].remove })).toBeInTheDocument()
+      })
+
+      expect(within(dialog).getByRole('button', { name: ingredientLabels[secondResolvedKey].adding })).toBeInTheDocument()
+      expect(within(dialog).getByRole('button', { name: 'Add Missing Ingredients to Groceries' })).toBeDisabled()
+      expect(dialog.querySelector('[data-recipe-grocery-exhausted="true"]')).not.toBeInTheDocument()
+      expect(within(dialog).queryByText(exhaustedCopy, { exact: true })).not.toBeInTheDocument()
+
+      await act(async () => pendingAdds.get(secondResolvedKey)?.(grocerySuccessResponse()))
+      await waitFor(() => {
+        expect(within(dialog).getByRole('button', { name: ingredientLabels['ri:0:0000000000000001'].remove })).toBeInTheDocument()
+        expect(within(dialog).getByRole('button', { name: ingredientLabels['ri:1:0000000000000002'].remove })).toBeInTheDocument()
+      })
+      await waitFor(() => {
+        const exhaustedStage = dialog.querySelector('[data-recipe-grocery-exhausted="true"]')
+        expect(exhaustedStage).toHaveAttribute('aria-hidden', 'true')
+        expect(exhaustedStage?.querySelector('button')).toBeDisabled()
+      })
+      const exhaustedStatus = within(dialog).getByRole('status')
+      expect(exhaustedStatus).toHaveTextContent(exhaustedCopy)
+      expect(exhaustedStatus).toHaveClass(/visuallyHidden/)
+      expect(within(dialog).queryByRole('button', { name: 'Add Missing Ingredients to Groceries' })).not.toBeInTheDocument()
+    } finally {
+      mockState.helpers.callService = originalCallService
+    }
+  })
+
+  it('keeps the bulk command collapsed after an exhausting individual add until removal is confirmed', async () => {
     const originalCallService = mockState.helpers.callService
     let resolveRemove: (() => void) | undefined
     mockState.helpers.callService = (params) => {
@@ -1439,25 +1594,41 @@ describe('RecipeDetailModal', () => {
       // exhausts the actionable pool and produces a real, semantic disabledReason.
       fireEvent.click(within(dialog).getByRole('button', { name: 'Add Diced Tomatoes · 1 can to groceries' }))
       const removeButton = await within(dialog).findByRole('button', { name: 'Remove Diced Tomatoes · 1 can from groceries' })
-      const groceryButton = within(dialog).getByRole('button', { name: 'Add Missing Ingredients to Groceries' })
-      expect(groceryButton).toBeDisabled()
-      expect(groceryButton).not.toHaveAttribute('data-preserve-disabled-visual')
-      expect(within(dialog).getByText('All missing ingredients have already been added to groceries.')).toBeInTheDocument()
+      await waitFor(() => {
+        const exhaustedStage = dialog.querySelector('[data-recipe-grocery-exhausted="true"]')
+        expect(exhaustedStage).toHaveAttribute('aria-hidden', 'true')
+        expect(exhaustedStage?.querySelector('button')).toBeDisabled()
+      })
+      const exhaustedCopy = 'All missing ingredients have already been added to groceries.'
+      const exhaustedStatus = within(dialog).getByRole('status')
+      expect(exhaustedStatus).toHaveTextContent(exhaustedCopy)
+      expect(exhaustedStatus).toHaveClass(/visuallyHidden/)
+      const exhaustedMatches = within(dialog).queryAllByText(exhaustedCopy, { exact: true })
+      expect(exhaustedMatches).toHaveLength(1)
+      expect(exhaustedMatches[0]).toBe(exhaustedStatus)
 
       fireEvent.click(removeButton)
       await within(dialog).findByRole('button', { name: 'Removing Diced Tomatoes · 1 can from groceries…' })
 
-      // Removal is pending (interactionPending is true), but the ingredient is still counted as
-      // added until Home Assistant confirms the removal, so the genuine disabledReason still
-      // applies and must win: stay disabled, no preserve-visual attribute, hint still shown.
-      expect(groceryButton).toBeDisabled()
-      expect(groceryButton).not.toHaveAttribute('data-preserve-disabled-visual')
-      expect(within(dialog).getByText('All missing ingredients have already been added to groceries.')).toBeInTheDocument()
+      // Removal stays pending against the same exhausted provenance until Home Assistant confirms
+      // the delete, so the bulk command must remain collapsed instead of reappearing early.
+      await waitFor(() => {
+        const pendingExhaustedStage = dialog.querySelector('[data-recipe-grocery-exhausted="true"]')
+        expect(pendingExhaustedStage).toHaveAttribute('aria-hidden', 'true')
+        expect(pendingExhaustedStage?.querySelector('button')).toBeDisabled()
+      })
+      const pendingExhaustedStatus = within(dialog).getByRole('status')
+      expect(pendingExhaustedStatus).toHaveTextContent(exhaustedCopy)
+      expect(pendingExhaustedStatus).toHaveClass(/visuallyHidden/)
+      const pendingExhaustedMatches = within(dialog).queryAllByText(exhaustedCopy, { exact: true })
+      expect(pendingExhaustedMatches).toHaveLength(1)
+      expect(pendingExhaustedMatches[0]).toBe(pendingExhaustedStatus)
 
       await act(async () => resolveRemove?.())
       await waitFor(() => expect(within(dialog).getByRole('button', { name: 'Add Diced Tomatoes · 1 can to groceries' })).toBeInTheDocument())
 
-      // Only the successful removal restores the actionable pool and enables the bulk action.
+      // Only the successful removal restores the actionable pool and the visible bulk command.
+      expect(dialog.querySelector('[data-recipe-grocery-exhausted="true"]')).not.toBeInTheDocument()
       expect(within(dialog).getByRole('button', { name: 'Add Missing Ingredients to Groceries' })).toBeEnabled()
       expect(within(dialog).queryByText('All missing ingredients have already been added to groceries.')).not.toBeInTheDocument()
     } finally {
@@ -1526,6 +1697,7 @@ describe('RecipeDetailModal', () => {
     try {
       render(<Harness />)
       const dialog = await openRecipe()
+      await within(dialog).findByText('Serves 4')
       await openTab(dialog, 'Ingredients')
       const uncertain = await within(dialog).findByRole('button', {
         name: /Fresh herbs: Inventory match uncertain.*Activate to choose an inventory product/,
@@ -1701,7 +1873,7 @@ describe('RecipeDetailModal', () => {
       fireEvent.click(await within(dialog).findByRole('button', {
         name: /Rice · 2 cups: Exact inventory match.*Activate to mark missing/,
       }))
-      await within(dialog).findByText(/exact match feedback was queued/)
+      await within(dialog).findByRole('button', { name: 'Add Rice · 2 cups to groceries' })
       fireEvent.click(within(dialog).getByRole('button', {
         name: /Salt · to taste: Staple.*Activate to mark missing/,
       }))
@@ -1712,6 +1884,206 @@ describe('RecipeDetailModal', () => {
       })
       expect(decisions[1]).toMatchObject({ action: 'reject_current_match' })
       expect(decisions[1]).not.toHaveProperty('expected_target_product_id')
+    } finally {
+      mockState.helpers.callService = originalCallService
+    }
+  })
+
+  it('restores row and bulk grocery actionability after mark-have then mark-missing on a missing ingredient', async () => {
+    const originalCallService = mockState.helpers.callService
+    const decisions: Record<string, unknown>[] = []
+    mockState.helpers.callService = (params) => {
+      if (params.service === 'recipe_detail') return Promise.resolve(detailResponse({ feedbackEnabled: true }))
+      if (params.service === 'list_inventory') return Promise.resolve({ response: { inventory: [] } })
+      if (params.service === 'recipe_ingredient_decision') {
+        decisions.push(params.serviceData as Record<string, unknown>)
+        return Promise.resolve({ response: { success: true } })
+      }
+      return originalCallService(params)
+    }
+
+    try {
+      render(<Harness />)
+      const dialog = await openRecipe()
+      await openTab(dialog, 'Ingredients')
+
+      fireEvent.click(await within(dialog).findByRole('button', {
+        name: /Diced Tomatoes · 1 can: Missing from inventory.*Activate to choose an inventory product/,
+      }))
+      fireEvent.click(await within(dialog).findByRole('button', { name: 'Back and mark ingredient available' }))
+      expect(await within(dialog).findByText('Ingredient marked available without AI evidence.')).toBeInTheDocument()
+      expect(within(dialog).queryByRole('button', { name: 'Add Diced Tomatoes · 1 can to groceries' })).not.toBeInTheDocument()
+      expect(within(dialog).getByRole('button', { name: 'Add Missing Ingredients to Groceries' })).toBeDisabled()
+
+      fireEvent.click(within(dialog).getByRole('button', {
+        name: /Diced Tomatoes · 1 can: Missing from inventory.*Activate to mark missing/,
+      }))
+
+      const addTomatoes = await within(dialog).findByRole('button', { name: 'Add Diced Tomatoes · 1 can to groceries' })
+      expect(addTomatoes).toBeInTheDocument()
+      expect(within(dialog).getByRole('button', { name: 'Add Missing Ingredients to Groceries' })).toBeEnabled()
+      expect(within(dialog).queryByText(/Ingredient marked missing/)).not.toBeInTheDocument()
+      expect(decisions).toHaveLength(2)
+      expect(decisions[0]).toMatchObject({ action: 'assume_have', ingredient_key: 'ri:0:0000000000000001' })
+      expect(decisions[1]).toMatchObject({ action: 'reject_current_match', ingredient_key: 'ri:0:0000000000000001' })
+      await act(async () => {
+        await Promise.resolve()
+        await Promise.resolve()
+      })
+    } finally {
+      mockState.helpers.callService = originalCallService
+    }
+  })
+
+  it('restores row and bulk grocery actionability after marking an in-stock ingredient missing', async () => {
+    const originalCallService = mockState.helpers.callService
+    const calls: Record<string, unknown>[] = []
+    mockState.helpers.callService = (params) => {
+      calls.push(params)
+      if (params.service === 'recipe_detail') return Promise.resolve(detailResponse({ feedbackEnabled: true }))
+      if (params.service === 'recipe_ingredient_decision') {
+        return Promise.resolve({ response: { success: true } })
+      }
+      if (params.service === 'recipe_grocery_add') {
+        return Promise.resolve(grocerySuccessResponse())
+      }
+      return originalCallService(params)
+    }
+
+    try {
+      render(<Harness />)
+      const dialog = await openRecipe()
+      await openTab(dialog, 'Ingredients')
+
+      fireEvent.click(await within(dialog).findByRole('button', {
+        name: /Rice · 2 cups: Exact inventory match.*Activate to mark missing/,
+      }))
+
+      const addRice = await within(dialog).findByRole('button', { name: 'Add Rice · 2 cups to groceries' })
+      expect(addRice).toBeInTheDocument()
+      const bulkButton = within(dialog).getByRole('button', { name: 'Add Missing Ingredients to Groceries' })
+      expect(bulkButton).toBeEnabled()
+      expect(dialog.querySelector('[data-recipe-grocery-phase="0"]')).toBeInTheDocument()
+
+      fireEvent.click(addRice)
+      await waitFor(() => expect(within(dialog).getByRole('button', { name: 'Remove Rice · 2 cups from groceries' })).toBeInTheDocument())
+
+      const groceryCall = calls.find((call) => call.service === 'recipe_grocery_add')
+      expect(groceryCall).toMatchObject({
+        serviceData: {
+          selections: [{ key: 'ri:1:0000000000000002', position: 1 }],
+        },
+      })
+      await act(async () => {
+        await Promise.resolve()
+        await Promise.resolve()
+      })
+    } finally {
+      mockState.helpers.callService = originalCallService
+    }
+  })
+
+  it('restores the exhausted bulk stage with only newly-missing ingredients after prior individual adds', async () => {
+    const originalCallService = mockState.helpers.callService
+    const calls: Record<string, unknown>[] = []
+    mockState.helpers.callService = (params) => {
+      calls.push(params)
+      if (params.service === 'recipe_detail') return Promise.resolve(detailResponse({ feedbackEnabled: true }))
+      if (params.service === 'recipe_ingredient_decision') {
+        return Promise.resolve({ response: { success: true } })
+      }
+      if (params.service === 'recipe_grocery_add') {
+        return Promise.resolve(grocerySuccessResponse())
+      }
+      return originalCallService(params)
+    }
+
+    try {
+      render(<Harness />)
+      const dialog = await openRecipe()
+      await openTab(dialog, 'Ingredients')
+
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Add Diced Tomatoes · 1 can to groceries' }))
+      await waitFor(() => expect(within(dialog).getByRole('button', { name: 'Remove Diced Tomatoes · 1 can from groceries' })).toBeInTheDocument())
+      expect(within(dialog).queryByRole('button', { name: 'Add Missing Ingredients to Groceries' })).not.toBeInTheDocument()
+      expect(dialog.querySelector('[data-recipe-grocery-exhausted="true"]')).toBeInTheDocument()
+
+      fireEvent.click(within(dialog).getByRole('button', {
+        name: /Rice · 2 cups: Exact inventory match.*Activate to mark missing/,
+      }))
+
+      const addRice = await within(dialog).findByRole('button', { name: 'Add Rice · 2 cups to groceries' })
+      expect(addRice).toBeInTheDocument()
+      expect(dialog.querySelector('[data-recipe-grocery-exhausted="true"]')).not.toBeInTheDocument()
+      const bulkButton = within(dialog).getByRole('button', { name: 'Add Missing Ingredients to Groceries' })
+      expect(bulkButton).toBeEnabled()
+      expect(dialog.querySelector('[data-recipe-grocery-phase="0"]')).toBeInTheDocument()
+
+      await act(async () => {
+        fireEvent.click(bulkButton)
+        await Promise.resolve()
+        await Promise.resolve()
+      })
+      const groceryCalls = calls.filter((call) => call.service === 'recipe_grocery_add')
+      expect(groceryCalls).toHaveLength(2)
+      expect(groceryCalls[1]).toMatchObject({
+        serviceData: {
+          selections: [{ key: 'ri:1:0000000000000002', position: 1 }],
+        },
+      })
+      await act(async () => {
+        await Promise.resolve()
+        await Promise.resolve()
+      })
+    } finally {
+      mockState.helpers.callService = originalCallService
+    }
+  })
+
+  it('keeps the bulk command exhausted while uncertain rows still add and remove individually', async () => {
+    const originalCallService = mockState.helpers.callService
+    mockState.helpers.callService = (params) => {
+      if (params.domain === 'evershelf' && params.service === 'recipe_detail') {
+        const response = detailResponse({ confirmedMissingCount: 2 })
+        response.response.detail.ingredients[1].inventory.state = 'missing'
+        return Promise.resolve(response)
+      }
+      if (params.domain === 'evershelf' && params.service === 'recipe_grocery_add') return Promise.resolve(grocerySuccessResponse())
+      return originalCallService(params)
+    }
+    mockTodoItemsByEntity['todo.shopping_list'] = [
+      { uid: 'grocery-tomatoes', summary: 'Diced Tomatoes', status: 'needs_action' },
+      { uid: 'grocery-rice', summary: 'Rice', status: 'needs_action' },
+      { uid: 'grocery-herbs', summary: 'Fresh herbs', status: 'needs_action' },
+    ]
+
+    try {
+      render(<Harness />)
+      const dialog = await openRecipe()
+      await openTab(dialog, 'Ingredients')
+
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Add Diced Tomatoes · 1 can to groceries' }))
+      await waitFor(() => expect(within(dialog).getByRole('button', { name: 'Remove Diced Tomatoes · 1 can from groceries' })).toBeInTheDocument())
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Add Rice · 2 cups to groceries' }))
+      await waitFor(() => expect(within(dialog).getByRole('button', { name: 'Remove Rice · 2 cups from groceries' })).toBeInTheDocument())
+
+      await waitFor(() => {
+        const exhaustedStage = dialog.querySelector('[data-recipe-grocery-exhausted="true"]')
+        expect(exhaustedStage).toHaveAttribute('aria-hidden', 'true')
+      })
+      expect(within(dialog).queryByRole('button', { name: 'Add Missing Ingredients to Groceries' })).not.toBeInTheDocument()
+
+      const addHerbs = within(dialog).getByRole('button', { name: 'Add Fresh herbs to groceries' })
+      fireEvent.click(addHerbs)
+      const removeHerbs = await within(dialog).findByRole('button', { name: 'Remove Fresh herbs from groceries' })
+      expect(removeHerbs).toBeInTheDocument()
+      expect(dialog.querySelector('[data-recipe-grocery-exhausted="true"]')).toBeInTheDocument()
+      expect(within(dialog).queryByRole('button', { name: 'Add Missing Ingredients to Groceries' })).not.toBeInTheDocument()
+
+      fireEvent.click(removeHerbs)
+      await waitFor(() => expect(within(dialog).getByRole('button', { name: 'Add Fresh herbs to groceries' })).toBeInTheDocument())
+      expect(dialog.querySelector('[data-recipe-grocery-exhausted="true"]')).toBeInTheDocument()
+      expect(within(dialog).queryByRole('button', { name: 'Add Missing Ingredients to Groceries' })).not.toBeInTheDocument()
     } finally {
       mockState.helpers.callService = originalCallService
     }
@@ -1747,7 +2119,7 @@ describe('RecipeDetailModal', () => {
       fireEvent.click(await within(dialog).findByRole('button', {
         name: /Rice · 2 cups: Exact inventory match.*Activate to mark missing/,
       }))
-      await within(dialog).findByText(/exact match feedback was queued/)
+      await within(dialog).findByRole('button', { name: 'Add Rice · 2 cups to groceries' })
 
       const rejected = within(dialog).getByRole('button', {
         name: /Rice · 2 cups:.*Activate to choose an inventory product/,

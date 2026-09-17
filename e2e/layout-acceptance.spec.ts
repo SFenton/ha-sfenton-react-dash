@@ -14,24 +14,33 @@ import { isWakeScenario, openWakeRoomState, wakeRoomFacts, wakeStateFacts } from
 // @covers e2e/layout/scenarios.ts
 
 async function recipeGroceryFacts(dialog: Locator, state: string) {
-  const command = dialog.locator('[data-recipe-grocery-phase]')
+  const exhaustedCopy = 'All missing ingredients have already been added to groceries.'
+  const command = state === 'exhausted'
+    ? dialog.locator('[data-recipe-grocery-exhausted="true"]')
+    : dialog.locator('[data-recipe-grocery-phase], [data-recipe-grocery-complete="true"]')
   if (state === 'ready') {
     await expect(dialog.getByRole('button', { name: 'Add Missing Ingredients to Groceries' })).toBeEnabled()
     await expect(command).toHaveAttribute('data-recipe-grocery-phase', '0')
   } else if (state === 'loading') {
     await expect(dialog.locator('[data-recipe-grocery-spinner="true"]')).toBeVisible()
     await expect(command).toHaveAttribute('data-recipe-grocery-phase', '1')
-  } else {
+  } else if (state === 'success') {
     await expect(dialog.locator('[data-recipe-grocery-check="true"]')).toBeVisible()
     await expect(command).toHaveAttribute('data-recipe-grocery-phase', '3')
     await expect(dialog.getByText('Missing ingredients were submitted.')).toHaveCount(0)
+  } else {
+    await expect(command).toHaveAttribute('data-recipe-grocery-exhausted', 'true')
+    await expect(command).toHaveAttribute('aria-hidden', 'true')
+    await expect(dialog.locator('[data-recipe-grocery-phase]')).toHaveCount(0)
+    await expect(dialog.locator('[data-recipe-grocery-status="true"]')).toHaveText(exhaustedCopy)
+    await expect(dialog.getByText(exhaustedCopy, { exact: true })).toHaveClass(/visuallyHidden/)
   }
   const facts = {
     state,
     commandHeight: await command.evaluate((element) => element.getBoundingClientRect().height),
-    visibleStatusCopy: await dialog.locator('[data-recipe-grocery-success="true"]:not([class*="visuallyHidden"])').count(),
+    visibleStatusCopy: await dialog.locator('[data-recipe-grocery-status="true"]:not([class*="visuallyHidden"])').count(),
   }
-  expect(facts.commandHeight).toBeCloseTo(50, 0)
+  expect(facts.commandHeight).toBeCloseTo(state === 'exhausted' ? 0 : 50, 0)
   expect(facts.visibleStatusCopy).toBe(0)
   return facts
 }

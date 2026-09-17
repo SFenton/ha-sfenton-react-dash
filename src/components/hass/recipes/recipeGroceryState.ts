@@ -10,14 +10,30 @@ export type RecipeGroceryRequestStatus = 'error' | 'idle' | 'loading' | 'success
 
 const EMPTY_ADDED_KEYS: ReadonlySet<string> = new Set()
 
+interface RecipeGroceryActionableCounts {
+  actionableMissingCount: number
+  addedSuppressedCount: number
+  effectiveMissingCount: number
+  overrideSuppressedCount: number
+}
+
 export function recipeGroceryRequestIsLoading(status: RecipeGroceryRequestStatus) {
   return status === 'loading'
 }
 
-// An ingredient can be added to groceries (individually or in bulk) only while EverShelf still
-// considers it missing and the user has not overridden it as already available.
+// An ingredient can be added to groceries (individually or in bulk) when the effective UI state
+// says it is missing: either EverShelf marked it missing or the user explicitly overrode it back
+// to missing. A "have" override always suppresses grocery actions until that state is cleared.
 export function recipeIngredientIsGroceryEligible(ingredient: RecipeDetailIngredient) {
-  return ingredient.inventory.state === 'missing' && ingredient.userOverride?.availability !== 'have'
+  if (ingredient.userOverride?.availability === 'have') return false
+  if (ingredient.userOverride?.availability === 'missing') return true
+  return ingredient.inventory.state === 'missing'
+}
+
+export function recipeIngredientIsIndividualGroceryEligible(ingredient: RecipeDetailIngredient) {
+  if (ingredient.userOverride?.availability === 'have') return false
+  if (ingredient.userOverride?.availability === 'missing') return true
+  return ingredient.inventory.state === 'missing' || ingredient.inventory.state === 'uncertain'
 }
 
 export function recipeActionableMissingIngredients(
@@ -67,19 +83,9 @@ export function recipeGroceryDisabledReason(
   const capabilityBlocked = recipeGroceryCapabilityBlockedReason(detail, groceryStatus)
   if (capabilityBlocked) return capabilityBlocked
 
-  const missingIngredients = detail.ingredients.filter((ingredient) => ingredient.inventory.state === 'missing')
-  const overrideSuppressedCount = missingIngredients.filter(
-    (ingredient) => ingredient.userOverride?.availability === 'have',
-  ).length
-  const addedSuppressedCount = missingIngredients.filter(
-    (ingredient) => ingredient.userOverride?.availability !== 'have' && addedIngredientKeys.has(ingredient.key),
-  ).length
-  const actionableMissingCount = Math.max(
-    0,
-    detail.grocery.confirmedMissingCount - overrideSuppressedCount - addedSuppressedCount,
-  )
+  const { actionableMissingCount } = recipeGroceryActionableCounts(detail, addedIngredientKeys)
   if (actionableMissingCount > RECIPE_GROCERY_MAX_SELECTIONS) return 'Too many missing ingredients to add in one request.'
-  if (detail.grocery.confirmedMissingCount > 0 && actionableMissingCount === 0 && addedSuppressedCount > 0 && overrideSuppressedCount === 0) {
+  if (recipeGroceryAddedIngredientsExhausted(detail, addedIngredientKeys)) {
     return 'All missing ingredients have already been added to groceries.'
   }
   if (detail.grocery.confirmedMissingCount > 0 && actionableMissingCount === 0) {
@@ -92,6 +98,54 @@ export function recipeGroceryDisabledReason(
   return null
 }
 
+function recipeGroceryActionableCounts(
+  detail: RecipeDetail,
+  addedIngredientKeys: ReadonlySet<string>,
+): RecipeGroceryActionableCounts {
+  const confirmedMissingIngredients = detail.ingredients.filter((ingredient) => ingredient.inventory.state === 'missing')
+  const derivedEffectiveMissingIngredients = detail.ingredients.filter(recipeIngredientIsGroceryEligible)
+  const overrideSuppressedCount = confirmedMissingIngredients.filter(
+    (ingredient) => ingredient.userOverride?.availability === 'have',
+  ).length
+  const overridePromotedCount = detail.ingredients.filter((ingredient) => (
+    ingredient.inventory.state !== 'missing'
+    && ingredient.userOverride?.availability === 'missing'
+  )).length
+  const effectiveMissingCount = Math.max(0, detail.grocery.confirmedMissingCount - overrideSuppressedCount)
+    + overridePromotedCount
+  const addedSuppressedCount = derivedEffectiveMissingIngredients.filter(
+    (ingredient) => addedIngredientKeys.has(ingredient.key),
+  ).length
+  const actionableMissingCount = Math.max(
+    0,
+    effectiveMissingCount - addedSuppressedCount,
+  )
+  return {
+    actionableMissingCount,
+    addedSuppressedCount,
+    effectiveMissingCount,
+    overrideSuppressedCount,
+  }
+}
+
+export function recipeGroceryAddedIngredientsExhausted(
+  detail: RecipeDetail,
+  addedIngredientKeys: ReadonlySet<string> = EMPTY_ADDED_KEYS,
+) {
+  const {
+    actionableMissingCount,
+    addedSuppressedCount,
+    effectiveMissingCount,
+    overrideSuppressedCount,
+  } = recipeGroceryActionableCounts(detail, addedIngredientKeys)
+  return (
+    effectiveMissingCount > 0
+    && actionableMissingCount === 0
+    && addedSuppressedCount > 0
+    && overrideSuppressedCount === 0
+  )
+}
+
 export type RecipeIngredientGroceryRowState = 0 | 1 | 2 | 3 | 4
 export const RECIPE_INGREDIENT_GROCERY_ROW_STATE = {
   IDLE: 0,
@@ -102,8 +156,8 @@ export const RECIPE_INGREDIENT_GROCERY_ROW_STATE = {
 } as const satisfies Record<string, RecipeIngredientGroceryRowState>
 
 // Every ingredient row gets a slot for the add/remove control, but the control is only
-// interactive while the ingredient is actually missing and the recipe-wide grocery feature is
-// not blocked (bulk request in flight, unsupported/blocked capability, and so on).
+// interactive while the row-level policy allows it (confirmed/override-missing plus uncertain
+// matches) and the recipe-wide grocery capability is not blocked.
 export function recipeIngredientGroceryRowState(
   ingredient: RecipeDetailIngredient,
   detail: RecipeDetail,
@@ -117,7 +171,7 @@ export function recipeIngredientGroceryRowState(
   if (individualGroceryRemovingKeys.has(ingredient.key)) return RECIPE_INGREDIENT_GROCERY_ROW_STATE.REMOVING
   if (addedIngredientKeys.has(ingredient.key)) return RECIPE_INGREDIENT_GROCERY_ROW_STATE.ADDED
   if (individualGroceryPendingKeys.has(ingredient.key)) return RECIPE_INGREDIENT_GROCERY_ROW_STATE.ADDING
-  if (!recipeIngredientIsGroceryEligible(ingredient)) return RECIPE_INGREDIENT_GROCERY_ROW_STATE.INELIGIBLE
+  if (!recipeIngredientIsIndividualGroceryEligible(ingredient)) return RECIPE_INGREDIENT_GROCERY_ROW_STATE.INELIGIBLE
   if (recipeGroceryCapabilityBlockedReason(detail, groceryStatus)) return RECIPE_INGREDIENT_GROCERY_ROW_STATE.INELIGIBLE
   return RECIPE_INGREDIENT_GROCERY_ROW_STATE.IDLE
 }

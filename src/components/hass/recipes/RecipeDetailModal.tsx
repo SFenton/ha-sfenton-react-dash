@@ -20,6 +20,7 @@ import {
 import { formatRecipeDuration, formatRecipeNumber, formatRecipeYield } from './recipeDetailFormatting'
 import {
   RECIPE_INGREDIENT_GROCERY_ROW_STATE,
+  recipeGroceryAddedIngredientsExhausted,
   recipeGroceryDisabledReason,
   recipeGroceryRequestIsLoading,
   recipeIngredientGroceryRowState,
@@ -551,6 +552,7 @@ function GroceryCommandStage({
   onAddMissing,
   phase,
   preserveDisabledVisual = false,
+  exhausted = false,
 }: {
   disabled: boolean
   loading: boolean
@@ -558,15 +560,19 @@ function GroceryCommandStage({
   onAddMissing: () => void
   phase: GroceryActionPhase
   preserveDisabledVisual?: boolean
+  exhausted?: boolean
 }) {
   const collapsed = phase === GROCERY_ACTION_PHASE.COLLAPSED
+  const hidden = collapsed || exhausted
 
   return (
     <div
-      aria-hidden={collapsed || undefined}
+      aria-hidden={hidden || undefined}
       className={styles.groceryCommandStage}
       data-recipe-grocery-complete={collapsed ? 'true' : undefined}
-      data-recipe-grocery-phase={collapsed ? undefined : phase}
+      data-recipe-grocery-exhausted={exhausted ? 'true' : undefined}
+      data-recipe-grocery-phase={hidden ? undefined : phase}
+      inert={hidden ? true : undefined}
     >
       <button
         aria-busy={loading || undefined}
@@ -642,6 +648,7 @@ function GrocerySuccessStage({
 function RecipeGroceryAction({
   disabledReason,
   feedbackMessage,
+  groceryExhaustedByIndividualAdd,
   groceryState,
   grocerySubmitted,
   interactionPending,
@@ -649,6 +656,7 @@ function RecipeGroceryAction({
 }: {
   disabledReason: string | null
   feedbackMessage: string | null
+  groceryExhaustedByIndividualAdd: boolean
   groceryState: GroceryState
   grocerySubmitted: boolean
   interactionPending: boolean
@@ -658,11 +666,19 @@ function RecipeGroceryAction({
   const requestLoading = recipeGroceryRequestIsLoading(groceryState.status)
   const requestSucceeded = groceryRequestSucceeded(groceryState)
   const requestFailed = !requestLoading && !requestSucceeded && 'message' in groceryState
+  const commandHiddenAfterIndividualAdd = (
+    groceryExhaustedByIndividualAdd
+    && !requestLoading
+    && !requestSucceeded
+    && disabledReason === 'All missing ingredients have already been added to groceries.'
+  )
   const statusMessage = requestLoading
     ? disabledReason
     : requestSucceeded
       ? groceryState.message
-      : null
+      : commandHiddenAfterIndividualAdd
+        ? disabledReason
+        : null
 
   return (
     <div className={styles.groceryAction}>
@@ -674,7 +690,8 @@ function RecipeGroceryAction({
         />
       ) : (
         <GroceryCommandStage
-          disabled={grocerySubmitted || interactionPending || Boolean(disabledReason)}
+          disabled={commandHiddenAfterIndividualAdd || grocerySubmitted || interactionPending || Boolean(disabledReason)}
+          exhausted={commandHiddenAfterIndividualAdd}
           grocerySubmitted={grocerySubmitted}
           loading={requestLoading}
           onAddMissing={onAddMissing}
@@ -686,7 +703,7 @@ function RecipeGroceryAction({
           preserveDisabledVisual={interactionPending && !disabledReason}
         />
       )}
-      {disabledReason && !requestLoading && !grocerySubmitted && (
+      {disabledReason && !requestLoading && !grocerySubmitted && !commandHiddenAfterIndividualAdd && (
         <p className={styles.actionHint}>{disabledReason}</p>
       )}
       {statusMessage && (
@@ -782,6 +799,7 @@ function IngredientsTab({
   detail,
   feedbackMessage,
   feedbackPending,
+  groceryExhaustedByIndividualAdd,
   groceryState,
   grocerySubmitted,
   individualGroceryErrors,
@@ -797,6 +815,7 @@ function IngredientsTab({
   detail: RecipeDetail
   feedbackMessage: string | null
   feedbackPending: ReadonlySet<string>
+  groceryExhaustedByIndividualAdd: boolean
   groceryState: GroceryState
   grocerySubmitted: boolean
   individualGroceryErrors: ReadonlyMap<string, string>
@@ -811,6 +830,11 @@ function IngredientsTab({
   const copy = useCopy('modalRecipe')
   const ingredientDetailsAvailable = detail.capabilities.ingredients !== 'none'
   const disabledReason = recipeGroceryDisabledReason(detail, groceryState.status, addedIngredientKeys)
+  const commandExhaustedByIndividualAdd = (
+    recipeGroceryAddedIngredientsExhausted(detail, addedIngredientKeys)
+    && !grocerySubmitted
+    && (groceryExhaustedByIndividualAdd || groceryState.status === 'idle')
+  )
   const sections = recipeIngredientSections(detail)
 
   return (
@@ -948,6 +972,7 @@ function IngredientsTab({
       <RecipeGroceryAction
         disabledReason={disabledReason}
         feedbackMessage={feedbackMessage}
+        groceryExhaustedByIndividualAdd={commandExhaustedByIndividualAdd}
         groceryState={groceryState}
         grocerySubmitted={grocerySubmitted}
         interactionPending={individualGroceryPendingKeys.size > 0 || individualGroceryRemovingKeys.size > 0}
@@ -1154,6 +1179,7 @@ function RecipeDetailTabContent({
   fallbackImageUrl,
   feedbackMessage,
   feedbackPending,
+  groceryExhaustedByIndividualAdd,
   groceryState,
   grocerySubmitted,
   individualGroceryErrors,
@@ -1173,6 +1199,7 @@ function RecipeDetailTabContent({
   fallbackImageUrl?: string | null
   feedbackMessage: string | null
   feedbackPending: ReadonlySet<string>
+  groceryExhaustedByIndividualAdd: boolean
   groceryState: GroceryState
   grocerySubmitted: boolean
   individualGroceryErrors: ReadonlyMap<string, string>
@@ -1220,6 +1247,7 @@ function RecipeDetailTabContent({
           detail={detail}
           feedbackMessage={feedbackMessage}
           feedbackPending={feedbackPending}
+          groceryExhaustedByIndividualAdd={groceryExhaustedByIndividualAdd}
           groceryState={groceryState}
           grocerySubmitted={grocerySubmitted}
           individualGroceryErrors={individualGroceryErrors}
@@ -1379,6 +1407,7 @@ export function RecipeDetailModal({ controller }: { controller: RecipeDetailModa
           fallbackImageUrl={controller.selectedRecipe?.imageUrl ?? controller.selectedRecipe?.thumbnailUrl}
           feedbackMessage={controller.ingredientFeedbackMessage}
           feedbackPending={controller.ingredientFeedbackPending}
+          groceryExhaustedByIndividualAdd={controller.groceryExhaustedByIndividualAdd}
           groceryState={controller.groceryState}
           grocerySubmitted={controller.grocerySubmitted}
           individualGroceryErrors={controller.individualGroceryErrors}
