@@ -1,5 +1,6 @@
 // @covers .github/workflows/playwright.yml
 // @covers .github/skills/release-dashboard/SKILL.md
+// @covers scripts/layout/plan.ts
 // @covers vitest.config.ts
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
@@ -30,13 +31,26 @@ type PackageJson = {
   scripts: Record<string, string>
 }
 
-describe('protected dashboard pull-request gate', () => {
-  it('aggregates quality, automated layout, and full Playwright in the protected check', () => {
+describe('dashboard Playwright workflow policy', () => {
+  it('runs automated layout only after pushes to protected master', () => {
+    const workflow = read('.github/workflows/playwright.yml')
+    const layoutPlan = read('scripts/layout/plan.ts')
+
+    expect(workflow).toContain('pull_request:')
+    expect(workflow).toContain('push:')
+    expect(workflow).toContain('branches: [master]')
+    expect(workflow).toContain("if: github.event_name == 'push' && github.ref == 'refs/heads/master'")
+    expect(workflow).toContain('permissions:')
+    expect(workflow).toContain('contents: read')
+    expect(layoutPlan).toContain('After merge, the protected \\`master\\` workflow')
+    expect(layoutPlan).toContain('Pull requests retain the quality and full')
+  })
+
+  it('aggregates PR quality and full Playwright without requiring skipped layout', () => {
     const workflow = read('.github/workflows/playwright.yml')
     const packageJson = readJson<PackageJson>('package.json')
     const vitestConfig = read('vitest.config.ts')
 
-    expect(workflow).toContain('pull_request:')
     expect(workflow).toContain('name: Quality checks')
     expect(workflow).toContain('run: npm run check:ci')
     expect(workflow).toContain('name: Automated layout')
@@ -46,9 +60,12 @@ describe('protected dashboard pull-request gate', () => {
     expect(workflow.match(/Require changed tests for implementation changes/g)).toHaveLength(1)
     expect(workflow).toContain('name: Playwright gate')
     expect(workflow).toContain('needs: [quality, layout, test]')
+    expect(workflow).toContain('EVENT_NAME: ${{ github.event_name }}')
     expect(workflow).toContain('QUALITY_RESULT: ${{ needs.quality.result }}')
     expect(workflow).toContain('LAYOUT_RESULT: ${{ needs.layout.result }}')
     expect(workflow).toContain('TEST_RESULT: ${{ needs.test.result }}')
+    expect(workflow).toContain('if [[ "$QUALITY_RESULT" != "success" || "$TEST_RESULT" != "success" ]]')
+    expect(workflow).toContain('if [[ "$EVENT_NAME" == "push" && "$LAYOUT_RESULT" != "success" ]]')
     expect(workflow).toContain('Dashboard CI did not pass')
 
     expect(packageJson.scripts.check).toBe(
@@ -60,10 +77,39 @@ describe('protected dashboard pull-request gate', () => {
     expect(vitestConfig).toContain("process.env.TZ = 'America/Los_Angeles'")
   })
 
+  it('reports only failed post-merge layout runs with least-privilege issue access', () => {
+    const workflow = read('.github/workflows/playwright.yml')
+
+    expect(workflow).toContain('name: Report automated layout failure')
+    expect(workflow).toContain("if: ${{ always() && needs.layout.result == 'failure' }}")
+    expect(workflow).toContain('needs: layout')
+    expect(workflow).toContain('issues: write')
+    expect(workflow).toContain('GH_TOKEN: ${{ github.token }}')
+    expect(workflow).toContain('COMMIT_SHA: ${{ github.sha }}')
+    expect(workflow).toContain('ISSUE_MARKER: layout-failure-commit-${{ github.sha }}')
+    expect(workflow).toContain('WORKFLOW_NAME: ${{ github.workflow }}')
+    expect(workflow).toContain('RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}')
+    expect(workflow).toContain('ARTIFACT_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}#artifacts')
+    expect(workflow).toContain('gh issue list')
+    expect(workflow).toContain('--state open')
+    expect(workflow).toContain('--search "$ISSUE_MARKER in:body"')
+    expect(workflow).toContain('if [[ "$existing_issues" != "[]" ]]')
+    expect(workflow).toContain('<!-- $ISSUE_MARKER -->')
+    expect(workflow).toContain('gh issue create')
+    expect(workflow).not.toContain('--label')
+  })
+
   it('keeps release machine v3 shadow-only without blocking the manual release', () => {
     const releaseSkill = read('.github/skills/release-dashboard/SKILL.md')
     const machine = readJson<ReleaseMachine>('.github/release-machine.json')
     const toolRegistry = readJson<AgentToolRegistry>('.github/agent-tools.json')
+    const mergeProofIndex = releaseSkill.indexOf(
+      'Merge with a merge commit through `gh`, fetch `origin/master`, and prove',
+    )
+    const postMergeEvidenceIndex = releaseSkill.indexOf(
+      'Wait for the post-merge `master` workflow to complete',
+    )
+    const buildIndex = releaseSkill.indexOf('## Build the merged commit')
     const tools = new Map(toolRegistry.tools.map((tool) => [tool.id, tool]))
     const referencedToolIds = Array.from(
       new Set(
@@ -117,6 +163,12 @@ describe('protected dashboard pull-request gate', () => {
     expect(releaseSkill).toContain('layout-automation')
     expect(releaseSkill).toContain('zero-item manual worklist')
     expect(releaseSkill).toContain('gh pr checks --watch --fail-fast')
+    expect(mergeProofIndex).toBeGreaterThan(-1)
+    expect(postMergeEvidenceIndex).toBeGreaterThan(mergeProofIndex)
+    expect(buildIndex).toBeGreaterThan(postMergeEvidenceIndex)
+    expect(releaseSkill).toContain('gh run watch <run-id> --exit-status')
+    expect(releaseSkill).toContain('gh run download <run-id> --name layout-automation')
+    expect(releaseSkill).toContain('manual visual review is a required pre-deployment release acceptance gate')
     expect(releaseSkill).toContain('/sfenton-react-dash/home')
     expect(releaseSkill).toContain('/sfenton-react-panel')
     expect(releaseSkill).toContain('model: gpt-5.6-luna')
