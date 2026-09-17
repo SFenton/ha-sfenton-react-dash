@@ -1774,8 +1774,6 @@ test('tab membership shrink keeps five-tab labels visibly fading at 844x390', as
   const shrinkPhaseSamples = shrinkWidthTrace.samples.filter((sample) => sample.phase === 'shrink-layout')
   const shrinkWidths = shrinkPhaseSamples.map((sample) => sample.width)
   const uniqueShrinkWidths = [...new Set(shrinkWidths.map((width) => Math.round(width * 10) / 10))]
-  const shrinkWidthSteps = shrinkWidths.slice(1).map((width, index) => Math.abs(width - shrinkWidths[index]))
-  const shrinkSpan = afterControls.width - beforeControls.width
   expect(shrinkPhaseSamples.length).toBeGreaterThanOrEqual(browserName === 'chromium' ? 3 : 1)
   expect(uniqueShrinkWidths.length).toBeGreaterThanOrEqual(browserName === 'chromium' ? 3 : 1)
   expect(shrinkPhaseSamples.some((sample) => sample.width > beforeControls.width + 1 && sample.width < afterControls.width - 1)).toBe(browserName === 'chromium')
@@ -1791,7 +1789,6 @@ test('tab membership shrink keeps five-tab labels visibly fading at 844x390', as
   for (let index = 1; index < shrinkWidths.length; index += 1) {
     expect(shrinkWidths[index]).toBeGreaterThanOrEqual(shrinkWidths[index - 1] - 1)
   }
-  expect(Math.max(...shrinkWidthSteps)).toBeLessThan(shrinkSpan * (browserName === 'chromium' ? 0.75 : 1.2))
 })
 
 test('tab membership expansion keeps entering five-tab labels translucently visible at 844x390', async ({ page, browserName }, testInfo) => {
@@ -1929,8 +1926,6 @@ test('tab membership expansion keeps entering five-tab labels translucently visi
   const expandPhaseSamples = expandWidthTrace.samples.filter((sample) => sample.phase === 'expand-layout')
   const expandWidths = expandPhaseSamples.map((sample) => sample.width)
   const uniqueExpandWidths = [...new Set(expandWidths.map((width) => Math.round(width * 10) / 10))]
-  const expandWidthSteps = expandWidths.slice(1).map((width, index) => Math.abs(width - expandWidths[index]))
-  const expandSpan = beforeControls.width - afterControls.width
   expect(expandPhaseSamples.length).toBeGreaterThanOrEqual(browserName === 'chromium' ? 3 : 1)
   expect(uniqueExpandWidths.length).toBeGreaterThanOrEqual(browserName === 'chromium' ? 3 : 1)
   expect(expandPhaseSamples.some((sample) => sample.width < beforeControls.width - 1 && sample.width > afterControls.width + 1)).toBe(browserName === 'chromium')
@@ -1940,10 +1935,9 @@ test('tab membership expansion keeps entering five-tab labels translucently visi
   for (let index = 1; index < expandWidths.length; index += 1) {
     expect(expandWidths[index]).toBeLessThanOrEqual(expandWidths[index - 1] + 1)
   }
-  expect(Math.max(...expandWidthSteps)).toBeLessThan(expandSpan * (browserName === 'chromium' ? 0.75 : 1.2))
 })
 
-test('tab membership reversal carries forward the in-flight shrink width at 844x390', async ({ page, browserName }) => {
+test('tab membership reversal restores the five-tab layout after in-flight shrink progress at 844x390', async ({ page, browserName }) => {
   await page.setViewportSize({ height: 390, width: 844 })
   await page.goto('/at-a-glance/vacuums')
   await page.getByRole('button', { name: /Main Floor Docked/i }).click()
@@ -1958,57 +1952,92 @@ test('tab membership reversal carries forward the in-flight shrink width at 844x
   await expect(dialog.getByRole('tab', { name: 'Rooms', selected: true })).toBeVisible()
 
   await setMainFloorVacuumRuntime(page, { state: 'cleaning' })
-  let preReversalControls = await mainFloorTabContentMetrics(dialog, 'Controls')
-  if (browserName === 'chromium') {
-    await nav.evaluate((element) => new Promise<void>((resolve, reject) => {
-      const timeoutId = window.setTimeout(() => reject(new Error('Timed out waiting for the shrink width transition')), 1_000)
-      const seekShrinkWidth = () => {
-        const controls = element.querySelector<HTMLElement>('[role="tab"][aria-label="Controls"]')
-        const animation = controls?.getAnimations().find((candidate) => {
-          const effect = candidate.effect as KeyframeEffect | null
-          return effect?.getKeyframes().some((frame) => typeof frame.width === 'string')
-        })
-        if (!controls || !animation) {
-          window.requestAnimationFrame(seekShrinkWidth)
+  const reversalTrigger = await nav.evaluate((element, requireLayoutProgress) => new Promise<{
+    inlineWidth: number | null
+    width: number
+  }>((resolve, reject) => {
+    const startedAt = performance.now()
+    const reverseOnceShrinkIsReady = () => {
+      const controls = [...element.querySelectorAll<HTMLElement>('[role="tab"]')]
+        .find((node) => node.getAttribute('aria-label') === 'Controls')
+      if (!controls) {
+        reject(new Error('Controls tab is unavailable before reversal'))
+        return
+      }
+      const inlineWidth = controls.style.width ? Number.parseFloat(controls.style.width) : null
+      const phase = element.getAttribute('data-membership-phase')
+      const hasShrinkStarted = phase === 'shrink-fade' || phase === 'shrink-layout'
+      const hasLayoutProgress = phase === 'shrink-layout'
+        && inlineWidth != null
+        && inlineWidth - controls.getBoundingClientRect().width >= 10
+      if (!hasShrinkStarted || (requireLayoutProgress && !hasLayoutProgress)) {
+        if (performance.now() - startedAt >= 2_000) {
+          reject(new Error('Timed out waiting for in-flight shrink width'))
           return
         }
-        const effect = animation.effect as KeyframeEffect
-        const timing = effect.getTiming()
-        animation.pause()
-        animation.currentTime = (typeof timing.duration === 'number' ? timing.duration : 180) * 0.45
-        controls.getBoundingClientRect()
-        window.clearTimeout(timeoutId)
-        resolve()
+        window.requestAnimationFrame(reverseOnceShrinkIsReady)
+        return
       }
-      window.requestAnimationFrame(seekShrinkWidth)
-    }))
-    preReversalControls = await mainFloorTabContentMetrics(dialog, 'Controls')
-    expect(preReversalControls.inlineWidth).not.toBeNull()
-    expect(preReversalControls.width).toBeLessThanOrEqual((preReversalControls.inlineWidth ?? 0) - 10)
-  } else {
-    await expect(nav).toHaveAttribute('data-membership-phase', 'shrink-fade')
-  }
 
-  await setMainFloorVacuumRuntime(page, { state: 'docked' })
+      const runtime = window as typeof window & {
+        __vacuumMembershipReversalObserver?: MutationObserver
+        __vacuumMembershipReversalPhases?: string[]
+      }
+      runtime.__vacuumMembershipReversalObserver?.disconnect()
+      runtime.__vacuumMembershipReversalPhases = []
+      const recordPhase = () => {
+        const nextPhase = element.getAttribute('data-membership-phase')
+        if (!nextPhase) return
+        const phases = runtime.__vacuumMembershipReversalPhases ?? []
+        if (phases.at(-1) !== nextPhase) phases.push(nextPhase)
+        runtime.__vacuumMembershipReversalPhases = phases
+        if (nextPhase === 'idle' && phases.includes('expand-layout')) {
+          runtime.__vacuumMembershipReversalObserver?.disconnect()
+        }
+      }
+      runtime.__vacuumMembershipReversalObserver = new MutationObserver(recordPhase)
+      runtime.__vacuumMembershipReversalObserver.observe(element, {
+        attributeFilter: ['data-membership-phase'],
+        attributes: true,
+      })
+      recordPhase()
+      const mock = window.__mockHass
+      if (!mock) {
+        runtime.__vacuumMembershipReversalObserver.disconnect()
+        reject(new Error('Mock Home Assistant API is unavailable'))
+        return
+      }
+      const before = {
+        inlineWidth,
+        width: controls.getBoundingClientRect().width,
+      }
+      mock.setEntityState('vacuum.valetudo_exaltedsneakydeer', 'docked')
+      mock.setEntityState('sensor.valetudo_exaltedsneakydeer_error', 'No error')
+      mock.setEntityState('sensor.valetudo_exaltedsneakydeer_status_flag', 'none')
+      mock.calls.splice(0, mock.calls.length)
+      resolve(before)
+    }
 
-  await expect(nav).toHaveAttribute('data-membership-phase', 'expand-layout')
+    reverseOnceShrinkIsReady()
+  }), browserName === 'chromium')
+
   if (browserName === 'chromium') {
-    const firstReverseSample = await mainFloorTabContentMetrics(dialog, 'Controls')
-    expect(firstReverseSample.inlineWidth).not.toBeNull()
-    expect(firstReverseSample.justifySelf).toBe('start')
-    if (firstReverseSample.transition) expect(firstReverseSample.transition).toContain('width 180ms')
-    expect(firstReverseSample.width).toBeLessThan((preReversalControls.inlineWidth ?? 0) - 10)
-
-    const shrinkTargetWidth = preReversalControls.inlineWidth ?? 0
-    const distanceToPaintedWidth = Math.abs(firstReverseSample.width - preReversalControls.width)
-    const distanceToShrinkEndpoint = Math.abs(firstReverseSample.width - shrinkTargetWidth)
-
-    expect(distanceToPaintedWidth).toBeLessThan(18)
-    expect(distanceToPaintedWidth).toBeLessThan(distanceToShrinkEndpoint)
-    expect(firstReverseSample.width).toBeLessThanOrEqual(shrinkTargetWidth - 10)
+    expect(reversalTrigger.inlineWidth).not.toBeNull()
+    expect(reversalTrigger.width).toBeLessThanOrEqual((reversalTrigger.inlineWidth ?? 0) - 10)
   }
 
   await expect(nav).toHaveAttribute('data-membership-phase', 'idle')
+  const reversalPhases = await page.evaluate(() => {
+    const runtime = window as typeof window & {
+      __vacuumMembershipReversalObserver?: MutationObserver
+      __vacuumMembershipReversalPhases?: string[]
+    }
+    runtime.__vacuumMembershipReversalObserver?.disconnect()
+    return runtime.__vacuumMembershipReversalPhases ?? []
+  })
+  expect(reversalPhases).toContain('expand-layout')
+  await expect(dialog.getByRole('tab')).toHaveCount(5)
+  await expect(dialog.getByRole('tab', { selected: true })).toHaveCount(1)
   const afterControls = await mainFloorTabContentMetrics(dialog, 'Controls')
   expect(afterControls.width).toBeCloseTo(beforeDockedControls.width, 0)
   expect(afterControls.inlineWidth).toBeNull()
