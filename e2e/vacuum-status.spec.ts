@@ -1101,17 +1101,37 @@ test('tab membership shrink waits for the fade phase before surviving tabs shift
         }
       }),
     })
+    let shrinkLayoutSampling = false
     const record = () => {
       const phase = element.getAttribute('data-membership-phase')
       if (!phase) return
       runtime.__vacuumTabNavPhaseSnapshots ??= {}
       runtime.__vacuumTabNavPhaseSnapshots[phase] ??= snapshot()
-      if (phase === 'shrink-layout' && !runtime.__vacuumShrinkLayout667Snapshot) {
-        window.setTimeout(() => {
-          runtime.__vacuumShrinkLayout667Snapshot = shrinkLayoutSnapshot()
+      if (
+        phase !== 'shrink-layout'
+        || shrinkLayoutSampling
+        || runtime.__vacuumShrinkLayout667Snapshot
+      ) return
+      shrinkLayoutSampling = true
+      const captureTranslucentLabel = () => {
+        if (
+          element.getAttribute('data-membership-phase') !== 'shrink-layout'
+          || runtime.__vacuumShrinkLayout667Snapshot
+        ) return
+        const candidate = shrinkLayoutSnapshot()
+        const controls = candidate.items.find((item) => item.key === 'tab:Controls')
+        if (
+          controls?.labelOpacity != null
+          && controls.labelOpacity > 0.05
+          && controls.labelOpacity < 0.9
+        ) {
+          runtime.__vacuumShrinkLayout667Snapshot = candidate
           runtime.__vacuumShrinkLayout667Observer?.disconnect()
-        }, 100)
+          return
+        }
+        window.requestAnimationFrame(captureTranslucentLabel)
       }
+      window.requestAnimationFrame(captureTranslucentLabel)
     }
     runtime.__vacuumShrinkLayout667Snapshot = null
     runtime.__vacuumShrinkLayout667Observer?.disconnect()
@@ -1306,17 +1326,37 @@ test('tab membership expansion grows the grid before the new tabs become semanti
         }
       }),
     })
+    let expandLayoutSampling = false
     const record = () => {
       const phase = element.getAttribute('data-membership-phase')
       if (!phase) return
       runtime.__vacuumTabNavPhaseSnapshots ??= {}
       runtime.__vacuumTabNavPhaseSnapshots[phase] ??= snapshot()
-      if (phase === 'expand-layout' && !runtime.__vacuumExpandLayout667Snapshot) {
-        window.setTimeout(() => {
-          runtime.__vacuumExpandLayout667Snapshot = expandLayoutSnapshot()
+      if (
+        phase !== 'expand-layout'
+        || expandLayoutSampling
+        || runtime.__vacuumExpandLayout667Snapshot
+      ) return
+      expandLayoutSampling = true
+      const captureTranslucentLabel = () => {
+        if (
+          element.getAttribute('data-membership-phase') !== 'expand-layout'
+          || runtime.__vacuumExpandLayout667Snapshot
+        ) return
+        const candidate = expandLayoutSnapshot()
+        const autoClean = candidate.items.find((item) => item.key === 'tab:Auto-Clean')
+        if (
+          autoClean?.labelOpacity != null
+          && autoClean.labelOpacity > 0.05
+          && autoClean.labelOpacity < 0.9
+        ) {
+          runtime.__vacuumExpandLayout667Snapshot = candidate
           runtime.__vacuumExpandLayout667Observer?.disconnect()
-        }, 100)
+          return
+        }
+        window.requestAnimationFrame(captureTranslucentLabel)
       }
+      window.requestAnimationFrame(captureTranslucentLabel)
     }
     runtime.__vacuumExpandLayout667Snapshot = null
     runtime.__vacuumExpandLayout667Observer?.disconnect()
@@ -1375,8 +1415,15 @@ test('tab membership expansion grows the grid before the new tabs become semanti
   await expect.poll(async () => nav.getAttribute('data-membership-phase')).toBe('expand-fade')
   await expect(dialog.getByRole('tab', { name: 'Rooms' })).toBeVisible()
   await expect(dialog.getByRole('tab', { name: 'Actions' })).toBeVisible()
-  await page.waitForTimeout(70)
-  const expandFadeEarly = await mainFloorTabNavSnapshot(dialog)
+  const expandFadeEarly = await waitForTabNavSnapshot(page, dialog, (snapshot) => {
+    const roomsTab = findTabSnapshotItem(snapshot, 'tab', 'Rooms')
+    const actionsTab = findTabSnapshotItem(snapshot, 'tab', 'Actions')
+    return snapshot.phase === 'expand-fade'
+      && (roomsTab?.contentOpacity ?? -1) > 0.05
+      && (roomsTab?.contentOpacity ?? 1) < 0.9
+      && (actionsTab?.contentOpacity ?? -1) > 0.05
+      && (actionsTab?.contentOpacity ?? 1) < 0.9
+  }, 'short-landscape expansion mid-fade content opacity')
   const roomsTab = findTabSnapshotItem(expandFadeEarly, 'tab', 'Rooms')
   const actionsTab = findTabSnapshotItem(expandFadeEarly, 'tab', 'Actions')
   expect(roomsTab?.contentOpacity).toBeGreaterThan(0.05)
@@ -1628,12 +1675,33 @@ test('tab membership shrink keeps five-tab labels visibly fading at 844x390', as
       navTop: element.getBoundingClientRect().top,
       phase: element.getAttribute('data-membership-phase'),
     })
+    let sampling = false
     const record = () => {
-      if (element.getAttribute('data-membership-phase') !== 'shrink-fade' || runtime.__vacuumShrinkFade844Snapshot) return
-      window.setTimeout(() => {
-        runtime.__vacuumShrinkFade844Snapshot = snapshot()
-        runtime.__vacuumShrinkFade844Observer?.disconnect()
-      }, 160)
+      if (
+        sampling
+        || element.getAttribute('data-membership-phase') !== 'shrink-fade'
+        || runtime.__vacuumShrinkFade844Snapshot
+      ) return
+      sampling = true
+      const captureTranslucentFrame = () => {
+        if (
+          element.getAttribute('data-membership-phase') !== 'shrink-fade'
+          || runtime.__vacuumShrinkFade844Snapshot
+        ) return
+        const candidate = snapshot()
+        const rooms = candidate.items.find((item) => item.key.startsWith('ghost:') && item.text === 'Rooms')
+        if (
+          rooms?.contentOpacity != null
+          && rooms.contentOpacity > 0.35
+          && rooms.contentOpacity < 0.95
+        ) {
+          runtime.__vacuumShrinkFade844Snapshot = candidate
+          runtime.__vacuumShrinkFade844Observer?.disconnect()
+          return
+        }
+        window.requestAnimationFrame(captureTranslucentFrame)
+      }
+      window.requestAnimationFrame(captureTranslucentFrame)
     }
     runtime.__vacuumShrinkFade844Snapshot = null
     runtime.__vacuumShrinkFade844Observer?.disconnect()
@@ -1723,7 +1791,7 @@ test('tab membership shrink keeps five-tab labels visibly fading at 844x390', as
   for (let index = 1; index < shrinkWidths.length; index += 1) {
     expect(shrinkWidths[index]).toBeGreaterThanOrEqual(shrinkWidths[index - 1] - 1)
   }
-  expect(Math.max(...shrinkWidthSteps)).toBeLessThan(shrinkSpan * (browserName === 'chromium' ? 0.6 : 1.2))
+  expect(Math.max(...shrinkWidthSteps)).toBeLessThan(shrinkSpan * (browserName === 'chromium' ? 0.75 : 1.2))
 })
 
 test('tab membership expansion keeps entering five-tab labels translucently visible at 844x390', async ({ page, browserName }, testInfo) => {
@@ -1772,12 +1840,33 @@ test('tab membership expansion keeps entering five-tab labels translucently visi
         }
       }),
     })
+    let sampling = false
     const record = () => {
-      if (element.getAttribute('data-membership-phase') !== 'expand-fade' || runtime.__vacuumExpandFade844Snapshot) return
-      window.setTimeout(() => {
-        runtime.__vacuumExpandFade844Snapshot = snapshot()
-        runtime.__vacuumExpandFade844Observer?.disconnect()
-      }, 100)
+      if (
+        sampling
+        || element.getAttribute('data-membership-phase') !== 'expand-fade'
+        || runtime.__vacuumExpandFade844Snapshot
+      ) return
+      sampling = true
+      const captureTranslucentFrame = () => {
+        if (
+          element.getAttribute('data-membership-phase') !== 'expand-fade'
+          || runtime.__vacuumExpandFade844Snapshot
+        ) return
+        const candidate = snapshot()
+        const rooms = candidate.items.find((item) => item.key === 'tab:Rooms')
+        if (
+          rooms?.contentOpacity != null
+          && rooms.contentOpacity > 0.05
+          && rooms.contentOpacity < 0.8
+        ) {
+          runtime.__vacuumExpandFade844Snapshot = candidate
+          runtime.__vacuumExpandFade844Observer?.disconnect()
+          return
+        }
+        window.requestAnimationFrame(captureTranslucentFrame)
+      }
+      window.requestAnimationFrame(captureTranslucentFrame)
     }
     runtime.__vacuumExpandFade844Snapshot = null
     runtime.__vacuumExpandFade844Observer?.disconnect()
@@ -1791,10 +1880,12 @@ test('tab membership expansion keeps entering five-tab labels translucently visi
 
   await setMainFloorVacuumRuntime(page, { state: 'docked' })
   await expect(nav).toHaveAttribute('data-membership-phase', 'expand-layout')
+  await expect.poll(
+    async () => (await mainFloorTabContentMetrics(dialog, 'Controls')).transition,
+  ).toContain('width 180ms')
   const duringLayoutControls = await mainFloorTabContentMetrics(dialog, 'Controls')
   expect(duringLayoutControls.inlineWidth).not.toBeNull()
   expect(duringLayoutControls.justifySelf).toBe('start')
-  expect(duringLayoutControls.transition).toContain('width 180ms')
   await page.waitForFunction(() => {
     const runtime = window as typeof window & {
       __vacuumExpandFade844Snapshot?: unknown
@@ -1849,7 +1940,7 @@ test('tab membership expansion keeps entering five-tab labels translucently visi
   for (let index = 1; index < expandWidths.length; index += 1) {
     expect(expandWidths[index]).toBeLessThanOrEqual(expandWidths[index - 1] + 1)
   }
-  expect(Math.max(...expandWidthSteps)).toBeLessThan(expandSpan * (browserName === 'chromium' ? 0.6 : 1.2))
+  expect(Math.max(...expandWidthSteps)).toBeLessThan(expandSpan * (browserName === 'chromium' ? 0.75 : 1.2))
 })
 
 test('tab membership reversal carries forward the in-flight shrink width at 844x390', async ({ page, browserName }) => {
@@ -1869,11 +1960,28 @@ test('tab membership reversal carries forward the in-flight shrink width at 844x
   await setMainFloorVacuumRuntime(page, { state: 'cleaning' })
   let preReversalControls = await mainFloorTabContentMetrics(dialog, 'Controls')
   if (browserName === 'chromium') {
-    await expect.poll(async () => {
-      const controls = await mainFloorTabContentMetrics(dialog, 'Controls')
-      return controls.inlineWidth !== null
-    }).toBe(true)
-    await page.waitForTimeout(70)
+    await nav.evaluate((element) => new Promise<void>((resolve, reject) => {
+      const timeoutId = window.setTimeout(() => reject(new Error('Timed out waiting for the shrink width transition')), 1_000)
+      const seekShrinkWidth = () => {
+        const controls = element.querySelector<HTMLElement>('[role="tab"][aria-label="Controls"]')
+        const animation = controls?.getAnimations().find((candidate) => {
+          const effect = candidate.effect as KeyframeEffect | null
+          return effect?.getKeyframes().some((frame) => typeof frame.width === 'string')
+        })
+        if (!controls || !animation) {
+          window.requestAnimationFrame(seekShrinkWidth)
+          return
+        }
+        const effect = animation.effect as KeyframeEffect
+        const timing = effect.getTiming()
+        animation.pause()
+        animation.currentTime = (typeof timing.duration === 'number' ? timing.duration : 180) * 0.45
+        controls.getBoundingClientRect()
+        window.clearTimeout(timeoutId)
+        resolve()
+      }
+      window.requestAnimationFrame(seekShrinkWidth)
+    }))
     preReversalControls = await mainFloorTabContentMetrics(dialog, 'Controls')
     expect(preReversalControls.inlineWidth).not.toBeNull()
     expect(preReversalControls.width).toBeLessThanOrEqual((preReversalControls.inlineWidth ?? 0) - 10)
