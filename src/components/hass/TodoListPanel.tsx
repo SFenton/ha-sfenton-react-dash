@@ -2,8 +2,10 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useEntity, useHass } from '@hakit/core'
 import { CheckboxRow } from '../core/CheckboxRow'
 import { MaterialIcon } from '../core/Icon'
+import type { ControlSemantics } from '../core/controlSemantics'
 import { useTodoOptimisticStatuses, type TodoOptimisticStatuses } from '../../hooks/useTodoOptimisticStatuses'
 import { useCopy } from '../../i18n'
+import type { AdminTodoEditTarget } from './adminTodoEdit'
 import { donetickTaskIdFromUid, type DonetickTaskEditTarget } from './donetickTaskForm'
 import { asEntityName } from './entityState'
 import styles from './TodoListPanel.module.css'
@@ -26,12 +28,15 @@ interface TodoListPanelProps {
   hideCompleted?: boolean
   layout?: 'list' | 'responsive-grid'
   onEditTask?: (target: DonetickTaskEditTarget) => void
+  onEditTodoItem?: (target: AdminTodoEditTarget) => void
   onVisibleItemsChange?: (count: number) => void
   optimisticStatuses?: TodoOptimisticStatuses
   reloadVersion?: number
   rowVariant?: 'settings' | 'summary'
   title: string
 }
+
+const EDIT_MODAL_SEMANTICS = { kind: 'modal' } satisfies ControlSemantics
 
 interface HassConnection {
   sendMessagePromise?: <T>(message: Record<string, unknown>) => Promise<T>
@@ -114,7 +119,7 @@ function applyPendingTodoStatuses(items: TodoItem[], pendingStatuses: TodoOptimi
   })
 }
 
-export function TodoListPanel({ completionScript, entityId, hideCompleted = true, layout = 'list', onEditTask, onVisibleItemsChange, optimisticStatuses, reloadVersion = 0, rowVariant, title }: TodoListPanelProps) {
+export function TodoListPanel({ completionScript, entityId, hideCompleted = true, layout = 'list', onEditTask, onEditTodoItem, onVisibleItemsChange, optimisticStatuses, reloadVersion = 0, rowVariant, title }: TodoListPanelProps) {
   const copy = useCopy(TODO_LIST_I18N.namespace)
   const entity = useEntity(asEntityName(entityId), { returnNullIfNotFound: true })
   const connection = useHass((state) => state.connection) as unknown as HassConnection | undefined
@@ -221,9 +226,12 @@ export function TodoListPanel({ completionScript, entityId, hideCompleted = true
             const editTarget = onEditTask && taskId && item.uid
               ? { itemUid: item.uid, taskId, todoEntityId: entityId }
               : null
+            const todoEditTarget = onEditTodoItem
+              ? { itemUid: item.uid, originalTitle: item.summary ?? '', todoEntityId: entityId }
+              : null
             return (
               <li className={styles.item} key={item.uid ?? `${entityId}-${index}`}>
-                <div aria-label={`${titleText} task`} className={styles.itemRow} data-editable={editTarget ? 'true' : 'false'} role="group">
+                <div aria-label={`${titleText} task`} className={styles.itemRow} data-editable={editTarget || todoEditTarget ? 'true' : 'false'} role="group">
                   <CheckboxRow
                     active={item.status === 'completed'}
                     alignWrappedToIconTop={rowVariant === 'settings' || rowVariant === 'summary'}
@@ -234,11 +242,15 @@ export function TodoListPanel({ completionScript, entityId, hideCompleted = true
                     subtitle={subtitle}
                     title={titleText}
                   />
-                  {editTarget && (
+                  {(editTarget || todoEditTarget) && (
                     <button
-                      aria-label={`Edit ${titleText}`}
+                      aria-label={copy('todo.editAccessibleName', { title: titleText })}
+                      data-action-kind={EDIT_MODAL_SEMANTICS.kind}
                       className={styles.editAction}
-                      onClick={() => onEditTask?.(editTarget)}
+                      onClick={() => {
+                        if (todoEditTarget) onEditTodoItem?.(todoEditTarget)
+                        else if (editTarget) onEditTask?.(editTarget)
+                      }}
                       type="button"
                     >
                       <MaterialIcon name="mdi:pencil" size={22} />

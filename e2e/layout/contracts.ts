@@ -345,7 +345,7 @@ export const PLAYWRIGHT_SPEC_COVERAGE = [
   },
 ] as const satisfies readonly PlaywrightSpecCoverage[]
 
-export const SCENARIO_IDS = ['quick-links', 'chat', 'summary', 'filters', 'recipe-grocery', 'form', 'remote', 'vacuum', 'weather', 'navigation', 'host', 'preload', 'wake-room', 'wake-light', 'wake-editor', 'wake-source'] as const
+export const SCENARIO_IDS = ['quick-links', 'chat', 'summary', 'filters', 'recipe-grocery', 'form', 'admin-todo-edit', 'remote', 'vacuum', 'weather', 'navigation', 'host', 'preload', 'wake-room', 'wake-light', 'wake-editor', 'wake-source'] as const
 export type ScenarioId = typeof SCENARIO_IDS[number]
 export type ContextId = 'touch-chromium' | 'fine-chromium' | 'touch-webkit'
 export const CONTEXTS: Record<ContextId, { browser: 'chromium' | 'webkit'; touch: boolean; project: string }> = {
@@ -407,6 +407,20 @@ export const SURFACE_CONTRACTS: Record<ScenarioId, {
     owners: ['src/components/hass/CreateTodoItemSheet', 'src/components/core/NativePickerField'],
     legacy: ['modal-geometry-stability.spec.ts', 'react-dash.spec.ts'],
     question: 'Does the draft survive resizing, and are input, close and footer controls usable during synthetic keyboard contraction?',
+  },
+  'admin-todo-edit': {
+    family: 'modal',
+    states: ['pristine', 'dirty', 'failure'],
+    owners: [
+      'src/pages/DashboardViewPage.tsx',
+      'src/components/hass/TodoListPanel.tsx',
+      'src/components/hass/EditTodoItemSheet.tsx',
+      'src/components/hass/EditTodoItemSheet.module.css',
+      'src/components/hass/adminTodoEdit.ts',
+      'src/i18n/locales/en/core.json',
+    ],
+    legacy: ['feedback-regressions.spec.ts'],
+    question: 'Does the Admin To-Do editor open from the mock-backed todo.groceries route, retain pristine and failed drafts, keep Reset/Save and the footer reachable across phone portrait/landscape and centered desktop, and preserve overflow and safe-area clearance?',
   },
   remote: {
     family: 'modal', states: ['active'],

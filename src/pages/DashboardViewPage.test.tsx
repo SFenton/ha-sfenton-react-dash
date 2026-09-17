@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { act } from 'react'
 import { vi } from 'vitest'
 import { materialIconPath } from '../components/core/iconPaths'
@@ -7887,7 +7887,7 @@ describe('DashboardViewPage', () => {
     expect(screen.queryByRole('heading', { name: 'Admin To-Do' })).not.toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: 'Groceries' })).not.toBeInTheDocument()
     expect(list).toHaveAttribute('data-row-variant', 'settings')
-    expect(within(list).getByRole('button', { name: /Review reminders/i })).toBeInTheDocument()
+    expect(within(list).getByRole('button', { name: 'Review reminders' })).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: 'Add Task' }))
     const dialog = await screen.findByRole('dialog')
@@ -7909,6 +7909,29 @@ describe('DashboardViewPage', () => {
         serviceData: { item: 'Renew parking permit' },
       },
     ]))
+  })
+
+  it('opens the title-only editor only on the Settings Admin To-Do surface', async () => {
+    mockTodoItemsByEntity['todo.groceries'] = [
+      { uid: 'admin-task-1', summary: 'Raw admin title', status: 'needs_action' },
+    ]
+    render(<DashboardViewPage activePath="settings" onNavigate={() => undefined} path="to-do" />)
+
+    const list = await screen.findByLabelText('Admin To-Do todo list')
+    fireEvent.click(within(list).getByRole('button', { name: 'Edit Raw admin title' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Edit Task' })
+
+    expect(within(dialog).getByLabelText('Task Name')).toHaveValue('Raw admin title')
+    expect(within(dialog).getByRole('button', { name: 'Reset' })).toBeInTheDocument()
+    expect(within(dialog).getByRole('button', { name: 'Save' })).toBeInTheDocument()
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Close' }))
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Edit Task' })).not.toBeInTheDocument())
+
+    cleanup()
+    mockTodoItemsByEntity['todo.shopping_list'] = [{ uid: 'grocery-1', summary: 'Milk', status: 'needs_action' }]
+    render(<DashboardViewPage activePath="chores" onNavigate={() => undefined} path="groceries" />)
+    const groceryList = await screen.findByLabelText('Grocery List todo list')
+    expect(within(groceryList).queryByRole('button', { name: 'Edit Milk' })).not.toBeInTheDocument()
   })
 
   it('renders the shared empty state when the Settings To-Do list is empty', async () => {

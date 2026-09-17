@@ -146,6 +146,33 @@ async function stateFacts(page: Page, dialog: Locator, scenario: ScenarioId, sta
     await expect(dialog.getByRole('textbox', { name: 'Task' })).toHaveValue('Layout validation draft')
     facts.draft = 'preserved'
   }
+  if (scenario === 'admin-todo-edit') {
+    await expect(dialog.getByRole('textbox', { name: 'Task Name' })).toHaveValue(
+      state === 'pristine' ? 'Layout validation task' : state === 'dirty' ? 'Layout validation renamed task' : 'Layout validation failed task',
+    )
+    const reset = dialog.getByRole('button', { name: 'Reset' })
+    const save = dialog.getByRole('button', { name: 'Save' })
+    await expect(reset).toBeVisible()
+    await expect(save).toBeVisible()
+    if (state === 'pristine') {
+      await expect(reset).toBeDisabled()
+      await expect(save).toBeDisabled()
+    } else if (state === 'dirty') {
+      await expect(reset).toBeEnabled()
+      await expect(save).toBeEnabled()
+    } else {
+      await expect(reset).toBeEnabled()
+      await expect(save).toBeEnabled()
+      await expect(dialog.getByRole('alert')).toHaveText('Mock service rejection')
+    }
+    facts.adminTodoEdit = {
+      state,
+      footer: ['Reset', 'Save'],
+      route: 'to-do',
+      entity: 'todo.groceries',
+      overflow: await page.locator('body').evaluate((body) => body.scrollWidth <= window.innerWidth),
+    }
+  }
   if (scenario === 'weather') {
     await expect(dialog.locator('[data-weather-scene-preview], select')).toHaveCount(0)
     const pressure = dialog.locator('[data-kind="pressure"]')
@@ -419,7 +446,7 @@ for (const scenario of SCENARIO_IDS) {
         const initialProfile = stateObligations[0]?.profile
         if (initialProfile) await applyProfile(page, initialProfile)
         await enterState(dialog, scenario, state)
-      } else if (scenario === 'weather' || scenario === 'vacuum') await enterState(dialog, scenario, state)
+      } else if (scenario === 'weather' || scenario === 'vacuum' || scenario === 'admin-todo-edit') await enterState(dialog, scenario, state)
       if (scenario === 'quick-links' && state === 'rooms') await dialog.getByRole('button', { name: 'Rooms', exact: true }).click()
       if (scenario === 'quick-links' && state === 'back') await dialog.getByRole('button', { name: 'Back', exact: true }).click()
       if (scenario === 'summary') await dialog.getByRole('tab', { name: state === 'overdue' ? /^Overdue Chores/ : state === 'upcoming' ? 'Upcoming Chores' : /^Expired Food/ }).click()

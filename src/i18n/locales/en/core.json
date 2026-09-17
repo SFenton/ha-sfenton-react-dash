@@ -33,6 +33,14 @@
     "collapsed": "Search"
   },
   "todo": {
-    "batteryTaskTitle": "{{title}} · {{percentage}}"
+    "batteryTaskTitle": "{{title}} · {{percentage}}",
+    "editAccessibleName": "Edit {{title}}",
+    "editServiceError": "Unable to update task.",
+    "editTitle": "Edit Task",
+    "identityUnavailable": "This task cannot be edited because its Home Assistant identity is unavailable.",
+    "reset": "Reset",
+    "save": "Save",
+    "saving": "Saving…",
+    "taskName": "Task Name"
   }
 }

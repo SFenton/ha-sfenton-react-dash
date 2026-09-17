@@ -1,3 +1,7 @@
+// @covers src/pages/DashboardViewPage.tsx
+// @covers src/components/hass/TodoListPanel.tsx
+// @covers src/components/hass/EditTodoItemSheet.tsx
+// @covers src/components/hass/EditTodoItemSheet.module.css
 import { expect, test, type Locator, type Page } from './layout/fixture'
 import { navigationLayoutForViewport } from '../src/constants/navigationLayout'
 import { installSafeAreaInsets, setSafeAreaInsets } from './safe-area'
@@ -28,6 +32,199 @@ async function openQuickLinks(page: Page) {
   await expect(dialog).toBeVisible()
   return { dialog, menuBox }
 }
+
+test('Admin To-Do edits by UID with a title-only responsive modal', async ({ page }) => {
+  await page.setViewportSize(PHONE)
+  await page.goto('/index.html?path=to-do')
+  await page.evaluate(() => {
+    const mock = window.__mockHass!
+    mock.setEntityState('todo.groceries', '2')
+    mock.setTodoItems('todo.groceries', [
+      { status: 'needs_action', summary: 'Duplicate title', uid: 'admin-one' },
+      { status: 'needs_action', summary: 'Duplicate title', uid: 'admin-two' },
+    ])
+  })
+
+  const list = page.getByLabel('Admin To-Do todo list')
+  await expect(list.getByRole('button', { name: 'Edit Duplicate title' })).toHaveCount(2)
+  await list.getByRole('button', { name: 'Edit Duplicate title' }).nth(1).click()
+
+  const dialog = page.getByRole('dialog', { name: 'Edit Task' })
+  await expect(dialog.getByLabel('Task Name')).toHaveValue('Duplicate title')
+  await expect(dialog.getByRole('button', { name: 'Reset' })).toBeDisabled()
+  await expect(dialog.getByRole('button', { name: 'Save' })).toBeDisabled()
+  await dialog.getByLabel('Task Name').fill('  Renamed task  ')
+  await expect(dialog.getByRole('button', { name: 'Reset' })).toBeEnabled()
+  await expect(dialog.getByRole('button', { name: 'Save' })).toBeEnabled()
+  const box = await dialog.boundingBox()
+  expect(box?.width).toBeLessThanOrEqual(PHONE.width)
+  expect(await page.locator('body').evaluate((body) => body.scrollWidth <= window.innerWidth)).toBe(true)
+
+  await dialog.getByRole('button', { name: 'Save' }).click()
+  await expect.poll(() => page.evaluate(() => window.__mockHass!.calls.filter((call) => call.domain === 'todo' && call.service === 'update_item'))).toEqual([
+    {
+      domain: 'todo',
+      service: 'update_item',
+      target: 'todo.groceries',
+      serviceData: { item: 'admin-two', rename: 'Renamed task' },
+    },
+  ])
+  await expect(dialog).toHaveAttribute('data-state', 'closed')
+})
+
+test('Admin To-Do preserves modal semantics, failure retry, and responsive action geometry', async ({ page }) => {
+  const viewports = [
+    { height: 852, name: 'phone portrait', width: 393 },
+    { height: 393, name: 'phone landscape', width: 852 },
+    { height: 900, name: 'centered desktop', width: 1440 },
+  ] as const
+
+  for (const viewport of viewports) {
+    await page.setViewportSize({ height: viewport.height, width: viewport.width })
+    await page.goto(`/index.html?path=to-do&feedback-admin-edit=${viewport.name.replaceAll(' ', '-')}`)
+    await page.evaluate(() => {
+      const mock = window.__mockHass!
+      mock.setEntityState('todo.groceries', '1')
+      mock.setTodoItems('todo.groceries', [
+        { status: 'needs_action', summary: 'Responsive admin task', uid: 'admin-responsive' },
+      ])
+    })
+
+    const list = page.getByLabel('Admin To-Do todo list')
+    const opener = list.getByRole('button', { name: 'Edit Responsive admin task' })
+    await expect(opener).toBeVisible()
+    const rowGeometry = await list.locator('li').evaluateAll((rows) => rows.map((row) => {
+      const rowBox = row.getBoundingClientRect()
+      const trigger = row.querySelector<HTMLElement>('button[data-action-kind="modal"][aria-label^="Edit "]')
+      const triggerBox = trigger?.getBoundingClientRect()
+      const task = row.querySelector<HTMLElement>('button[aria-pressed]')
+      const taskBox = task?.getBoundingClientRect()
+      return {
+        row: { left: rowBox.left, right: rowBox.right, top: rowBox.top, bottom: rowBox.bottom },
+        trigger: triggerBox
+          ? { left: triggerBox.left, right: triggerBox.right, top: triggerBox.top, bottom: triggerBox.bottom, width: triggerBox.width, height: triggerBox.height }
+          : null,
+        task: taskBox
+          ? { left: taskBox.left, right: taskBox.right, top: taskBox.top, bottom: taskBox.bottom }
+          : null,
+        triggerCount: row.querySelectorAll('button[data-action-kind="modal"][aria-label^="Edit "]').length,
+        rowScrollWidth: row.scrollWidth,
+        rowClientWidth: row.clientWidth,
+        triggerScrollWidth: trigger?.scrollWidth ?? null,
+        triggerClientWidth: trigger?.clientWidth ?? null,
+      }
+    }))
+    expect(rowGeometry).toHaveLength(1)
+    for (const geometry of rowGeometry) {
+      expect(geometry.triggerCount).toBe(1)
+      expect(geometry.trigger).not.toBeNull()
+      expect(Math.round(geometry.trigger!.width)).toBeGreaterThanOrEqual(44)
+      expect(Math.round(geometry.trigger!.height)).toBeGreaterThanOrEqual(44)
+      expect(geometry.trigger!.right).toBeLessThanOrEqual(geometry.row.right + 1)
+      expect(Math.abs(geometry.trigger!.right - geometry.row.right)).toBeLessThanOrEqual(1)
+      expect(geometry.trigger!.bottom).toBeLessThanOrEqual(geometry.row.bottom + 1)
+      expect(geometry.trigger!.left).toBeGreaterThanOrEqual(geometry.row.left - 1)
+      expect(geometry.trigger!.top).toBeGreaterThanOrEqual(geometry.row.top - 1)
+      expect(geometry.rowScrollWidth).toBeLessThanOrEqual(geometry.rowClientWidth + 1)
+      expect(geometry.triggerScrollWidth).toBeLessThanOrEqual(geometry.triggerClientWidth! + 1)
+      expect(geometry.task).not.toBeNull()
+      expect(geometry.task!.right).toBeLessThanOrEqual(geometry.trigger!.left + 1)
+      expect(geometry.task!.bottom).toBeLessThanOrEqual(geometry.row.bottom + 1)
+    }
+    await opener.focus()
+    await page.keyboard.press('Enter')
+
+    const dialog = page.getByRole('dialog', { name: 'Edit Task' })
+    const input = dialog.getByLabel('Task Name')
+    await expect(input).toHaveValue('Responsive admin task')
+    await expect(dialog.getByRole('button', { name: 'Reset' })).toBeDisabled()
+    await expect(dialog.getByRole('button', { name: 'Save' })).toBeDisabled()
+    await input.focus()
+    await page.keyboard.press('Tab')
+    await expect.poll(() => dialog.evaluate((element) => element.contains(document.activeElement))).toBe(true)
+
+    await input.fill('Retry responsive task')
+    await input.press('Enter')
+    await expect.poll(() => page.evaluate(() => window.__mockHass!.calls.filter((call) => call.domain === 'todo'))).toHaveLength(1)
+    await expect.poll(() => page.evaluate(() => window.__mockHass!.calls.filter((call) => call.domain === 'todo' && call.service === 'update_item'))).toEqual([
+      {
+        domain: 'todo',
+        service: 'update_item',
+        target: 'todo.groceries',
+        serviceData: { item: 'admin-responsive', rename: 'Retry responsive task' },
+      },
+    ])
+    await expect.poll(() => page.evaluate(() => window.__mockHass!.calls.filter((call) => call.domain === 'script'))).toHaveLength(0)
+    await expect(dialog).toHaveAttribute('data-state', 'closed')
+
+    await opener.focus()
+    await opener.click()
+    await expect(dialog).toBeVisible()
+    await page.keyboard.press('Escape')
+    await expect(dialog).toHaveAttribute('data-state', 'closed')
+    await expect(opener).toBeFocused()
+
+    await opener.click()
+    await expect(dialog).toBeVisible()
+    const box = await dialog.boundingBox()
+    expect(box?.width).toBeLessThanOrEqual(viewport.width)
+    expect(await page.locator('body').evaluate((body) => body.scrollWidth <= window.innerWidth)).toBe(true)
+    await expect(dialog.getByRole('button', { name: 'Reset' })).toBeVisible()
+    await expect(dialog.getByRole('button', { name: 'Save' })).toBeVisible()
+    const resetBox = await dialog.getByRole('button', { name: 'Reset' }).boundingBox()
+    const saveBox = await dialog.getByRole('button', { name: 'Save' }).boundingBox()
+    expect(resetBox?.height).toBeGreaterThanOrEqual(48)
+    expect(saveBox?.height).toBeGreaterThanOrEqual(48)
+  }
+})
+
+test('Admin To-Do failure retains the draft and retries through the same update service', async ({ page }) => {
+  await page.setViewportSize(PHONE)
+  await page.goto('/index.html?path=to-do&feedback-admin-edit=failure')
+  await page.evaluate(() => {
+    const mock = window.__mockHass!
+    mock.setEntityState('todo.groceries', '1')
+    mock.setTodoItems('todo.groceries', [
+      { status: 'needs_action', summary: 'Failure task', uid: 'admin-failure' },
+    ])
+    mock.setCallServiceOutcome('todo', 'update_item', 'reject')
+  })
+
+  const opener = page.getByLabel('Admin To-Do todo list').getByRole('button', { name: 'Edit Failure task' })
+  await opener.click()
+  const dialog = page.getByRole('dialog', { name: 'Edit Task' })
+  const input = dialog.getByLabel('Task Name')
+  await input.fill('Retained failure draft')
+  await dialog.getByRole('button', { name: 'Save' }).click()
+  await expect(dialog.getByRole('alert')).toHaveText('Mock service rejection')
+  await expect(input).toHaveValue('Retained failure draft')
+  await expect(dialog).toBeVisible()
+
+  await page.evaluate(() => window.__mockHass!.setCallServiceOutcome('todo', 'update_item', 'resolve'))
+  await dialog.getByRole('button', { name: 'Save' }).click()
+  await expect(dialog).toHaveAttribute('data-state', 'closed')
+  await expect.poll(() => page.evaluate(() => window.__mockHass!.calls.filter((call) => call.domain === 'todo' && call.service === 'update_item'))).toHaveLength(2)
+})
+
+test('Admin To-Do without a UID has no update or completion call', async ({ page }) => {
+  await page.setViewportSize(PHONE)
+  await page.goto('/index.html?path=to-do&feedback-admin-edit=missing-uid')
+  await page.evaluate(() => {
+    const mock = window.__mockHass!
+    mock.setEntityState('todo.groceries', '1')
+    mock.setTodoItems('todo.groceries', [
+      { status: 'needs_action', summary: 'Missing identity' },
+    ])
+  })
+
+  const opener = page.getByLabel('Admin To-Do todo list').getByRole('button', { name: 'Edit Missing identity' })
+  await opener.click()
+  const dialog = page.getByRole('dialog', { name: 'Edit Task' })
+  await expect(dialog.getByRole('alert')).toHaveText(/identity is unavailable/)
+  await dialog.getByLabel('Task Name').fill('Should not save')
+  await expect(dialog.getByRole('button', { name: 'Save' })).toBeDisabled()
+  expect(await page.evaluate(() => window.__mockHass!.calls)).toEqual([])
+})
 
 async function waitForAppReady(page: Page) {
   await expect(page.locator('[data-page-scroller="true"]:visible').last()).toBeVisible({ timeout: 15_000 })
@@ -281,6 +478,9 @@ test('Home cameras match the Security dynamic grid at every tier', async ({ page
   }
 })
 
+// @covers src/components/hass/EditTodoItemSheet.tsx
+// @covers src/components/hass/EditTodoItemSheet.module.css
+// @covers src/components/hass/TodoListPanel.tsx
 test('Chores keeps uniform Quick Links and reflows task rows without reordering', async ({ page }) => {
   test.setTimeout(120_000)
   for (const viewport of PAGE_LAYOUT_VIEWPORTS) {
