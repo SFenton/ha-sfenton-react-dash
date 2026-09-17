@@ -162,8 +162,26 @@ describe('VacuumRoomSourceModalContent', () => {
     expect(within(controlsPane).queryByRole('combobox', { name: /Fan /i })).not.toBeInTheDocument()
     expect(within(controlsPane).queryByRole('combobox', { name: /Water /i })).not.toBeInTheDocument()
     expect(within(controlsPane).queryByRole('heading', { name: 'Power Settings' })).not.toBeInTheDocument()
+    expect(within(controlsPane).getByRole('heading', { name: 'Cleaning' })).toBeInTheDocument()
     expect(within(controlsPane).getByRole('button', { name: 'Pause' })).toBeInTheDocument()
     expect(within(controlsPane).getByRole('button', { name: 'Stop' })).toBeInTheDocument()
+  })
+
+  it.each([
+    ['cleaning', 'none', 'Cleaning', ['Pause', 'Stop']],
+    ['paused', 'none', 'Paused', ['Resume', 'Stop']],
+    ['returning', 'none', 'Returning', ['Pause']],
+    ['docked', 'resumable', 'Docked', ['Resume', 'Cancel']],
+    ['idle', 'resumable', 'Idle', ['Resume', 'Cancel']],
+  ])('keeps the %s runtime separator only with its applicable actions', (state, statusFlag, heading, actions) => {
+    setMainFloorRuntime({ state, statusFlag })
+    renderMainFloorRoomSource()
+
+    const controlsPane = screen.getByRole('group', { name: /Main Floor controls/ })
+    expect(within(controlsPane).getByRole('heading', { name: heading })).toBeInTheDocument()
+    for (const action of actions) {
+      expect(within(controlsPane).getByRole('button', { name: action })).toBeInTheDocument()
+    }
   })
 
   it('adds minimal Actions only for an active dock runtime action', () => {
@@ -239,6 +257,67 @@ describe('VacuumRoomSourceModalContent', () => {
     expect(selectedTab()).toHaveAttribute('aria-label', 'Controls')
   })
 
+  it('redirects to Controls before the shrink fade begins when the selected tab disappears', () => {
+    renderMainFloorRoomSource()
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Rooms' }))
+    expect(selectedTab()).toHaveAttribute('aria-label', 'Rooms')
+
+    act(() => {
+      setMockEntityState(mainFloorVacuum.entityId, 'cleaning')
+    })
+
+    const tabList = screen.getByRole('tablist', { name: 'Main Floor modal sections' })
+    expect(tabList).toHaveAttribute('data-membership-phase', 'shrink-fade')
+    expect(tabList).toHaveAttribute('data-visual-count', '5')
+    expect(tabList).toHaveAttribute('data-semantic-count', '3')
+    expect(selectedTab()).toHaveAttribute('aria-label', 'Controls')
+    expect(screen.queryByRole('tab', { name: 'Rooms' })).not.toBeInTheDocument()
+  })
+
+  it('keeps the outgoing Docked controls mounted through the shrink fade and fades them back after expansion', async () => {
+    renderMainFloorRoomSource()
+
+    const runtimeContent = document.querySelector<HTMLElement>('[data-vacuum-runtime-content-transition="true"]')
+    if (!runtimeContent) throw new Error('Expected vacuum runtime content transition wrapper')
+    expect(screen.getByRole('heading', { name: 'Docked' })).toBeInTheDocument()
+
+    act(() => {
+      setMockEntityState(mainFloorVacuum.entityId, 'cleaning')
+    })
+
+    expect(runtimeContent).toHaveAttribute('data-vacuum-runtime-content-phase', 'shrink-fade')
+    expect(screen.getByRole('heading', { name: 'Docked' })).toBeInTheDocument()
+
+    await waitFor(() => expect(screen.queryByRole('heading', { name: 'Docked' })).not.toBeInTheDocument())
+    expect(screen.getByRole('heading', { name: 'Cleaning' })).toBeInTheDocument()
+
+    act(() => {
+      setMockEntityState(mainFloorVacuum.entityId, 'docked')
+    })
+
+    expect(runtimeContent).toHaveAttribute('data-vacuum-runtime-content-phase', 'expand-layout')
+    expect(screen.queryByRole('heading', { name: 'Docked' })).not.toBeInTheDocument()
+    await waitFor(() => expect(runtimeContent).toHaveAttribute('data-vacuum-runtime-content-phase', 'expand-fade'))
+    expect(screen.getByRole('heading', { name: 'Docked' })).toBeInTheDocument()
+  })
+
+  it('does not render a redundant Docked fallback when a clear docked vacuum is restricted', () => {
+    const battery = mockEntities[mainFloorVacuum.batteryEntityId]
+    const originalBatteryState = battery.state
+    battery.state = 'unavailable'
+    try {
+      renderMainFloorRoomSource()
+
+      const runtimeContent = document.querySelector<HTMLElement>('[data-vacuum-runtime-content-transition="true"]')
+      if (!runtimeContent) throw new Error('Expected vacuum runtime content transition wrapper')
+      expect(within(runtimeContent).queryByRole('heading', { name: 'Docked' })).not.toBeInTheDocument()
+      expect(within(runtimeContent).queryByText('Docked')).not.toBeInTheDocument()
+    } finally {
+      battery.state = originalBatteryState
+    }
+  })
+
   it('preserves Auto-Clean when it remains visible across full and minimal mode changes', async () => {
     renderMainFloorRoomSource()
 
@@ -285,7 +364,9 @@ describe('VacuumRoomSourceModalContent', () => {
     renderMainFloorRoomSource()
 
     const actionsTab = screen.getByRole('tab', { name: 'Actions' })
+    fireEvent.click(actionsTab)
     actionsTab.focus()
+    expect(selectedTab()).toHaveAttribute('aria-label', 'Actions')
     expect(actionsTab).toHaveFocus()
 
     act(() => {
@@ -294,7 +375,9 @@ describe('VacuumRoomSourceModalContent', () => {
     await settleAnimationFrame()
 
     await waitFor(() => expect(selectedTab()).toHaveAttribute('aria-label', 'Controls'))
-    expect(screen.getByRole('tab', { name: 'Controls' })).toHaveAttribute('tabindex', '0')
+    const controlsTab = screen.getByRole('tab', { name: 'Controls' })
+    expect(controlsTab).toHaveAttribute('tabindex', '0')
+    expect(controlsTab).toHaveFocus()
   })
 
   it('closes the area editor when runtime mode becomes minimal', async () => {
@@ -310,7 +393,7 @@ describe('VacuumRoomSourceModalContent', () => {
 
     await waitFor(() => expect(screen.queryByRole('button', { name: 'Draw' })).not.toBeInTheDocument())
     expect(screen.getByRole('tablist', { name: 'Main Floor modal sections' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Pause' })).toBeInTheDocument()
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Pause' })).toBeInTheDocument())
   })
 
   it('keeps one selected tab, visible keyboard order, and valid ARIA links through rapid mode changes', async () => {
@@ -383,6 +466,10 @@ describe('VacuumRoomSourceModalContent', () => {
 
       await settleAnimationFrame()
       expect(visibleTabs()).toEqual(['Controls', 'Auto-Clean', 'Info'])
+      expect(screen.getByRole('tablist', { name: 'Main Floor modal sections' })).toHaveAttribute('data-membership-phase', 'idle')
+      expect(document.querySelector('[data-vacuum-runtime-content-transition="true"]')).toHaveAttribute('data-vacuum-runtime-content-phase', 'idle')
+      expect(screen.queryByRole('heading', { name: 'Docked' })).not.toBeInTheDocument()
+      expect(screen.getByRole('heading', { name: 'Cleaning' })).toBeInTheDocument()
       for (const tab of screen.getAllByRole('tab')) {
         expect(tab).not.toHaveStyle({ opacity: '0' })
         expect(tab).not.toHaveStyle({ transform: expect.stringMatching(/translate/) })
@@ -442,6 +529,9 @@ describe('VacuumRoomSourceModalContent', () => {
 
     expect(visibleTabs()).toEqual(['Controls', 'Auto-Clean', 'Info'])
     expect(selectedTab()).toHaveAttribute('aria-label', 'Controls')
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Cleaning' })).toBeInTheDocument())
+    expect(screen.getByRole('button', { name: 'Pause' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Stop' })).toBeInTheDocument()
 
     act(() => {
       window.__vacuumModalPreview?.setMode('full')
@@ -495,7 +585,7 @@ describe('VacuumRoomSourceModalContent', () => {
 
     expect(screen.queryByRole('tab', { name: 'Rooms' })).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('tab', { name: 'Controls' }))
-    expect(screen.queryByText('Selected Rooms')).not.toBeInTheDocument()
+    await waitFor(() => expect(screen.queryByText('Selected Rooms')).not.toBeInTheDocument())
 
     act(() => {
       setMockEntityState(mainFloorVacuum.entityId, 'docked')

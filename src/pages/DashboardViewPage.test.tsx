@@ -7965,7 +7965,7 @@ describe('DashboardViewPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Clean' }))
 
     expect(mockEntities['vacuum.valetudo_exaltedsneakydeer'].state).toBe('docked')
-    expect(within(controlsPane).getByRole('heading', { name: 'Cleaning' })).toBeInTheDocument()
+    expect(await within(controlsPane).findByRole('heading', { name: 'Cleaning' })).toBeInTheDocument()
     expect(within(controlsPane).queryByRole('button', { name: 'Clean' })).not.toBeInTheDocument()
     expect(within(controlsPane).getByRole('button', { name: 'Pause' })).toHaveAttribute('data-modal-action-button', 'true')
     expect(within(controlsPane).getByRole('button', { name: 'Pause' })).toHaveAttribute('data-tone', 'warning')
@@ -8012,7 +8012,7 @@ describe('DashboardViewPage', () => {
     const controlsPane = within(dialog).getByRole('group', { name: 'Main Floor controls, rooms, auto-clean, actions, info' })
 
     fireEvent.click(within(controlsPane).getByRole('button', { name: 'Dock' }))
-    expect(within(controlsPane).getByRole('heading', { name: 'Returning' })).toBeInTheDocument()
+    expect(await within(controlsPane).findByRole('heading', { name: 'Returning' })).toBeInTheDocument()
 
     act(() => {
       setMockEntityState('sensor.valetudo_exaltedsneakydeer_error', 'Brush stuck')
@@ -8079,6 +8079,9 @@ describe('DashboardViewPage', () => {
       fireEvent.click(screen.getByRole('button', { name: 'Clean' }))
 
       expect(mockEntities['vacuum.valetudo_politefatherlykingfisher'].state).toBe('docked')
+      act(() => {
+        vi.advanceTimersByTime(MODAL_TAB_TEST_SETTLE_MS)
+      })
       expect(within(controlsPane).getByRole('heading', { name: 'Cleaning' })).toBeInTheDocument()
       expect(within(controlsPane).queryByRole('button', { name: 'Clean' })).not.toBeInTheDocument()
       expect(within(controlsPane).getByRole('button', { name: 'Pause' })).toBeDisabled()
