@@ -53,7 +53,12 @@ async function stateFacts(page: Page, dialog: Locator, scenario: ScenarioId, sta
     await expect(dialog.locator('[class*="vacuumLayoutLoading"]')).toHaveCount(0)
   }
   const preferredScrollMode = scenario === 'remote' || scenario === 'vacuum' || (scenario === 'quick-links' && state === 'rooms') ? 'panes' : 'body'
-  const facts: Record<string, unknown> = await modalFacts(dialog, preferredScrollMode)
+  const facts: Record<string, unknown> = await modalFacts(
+    dialog,
+    preferredScrollMode,
+    'controls',
+    scenario === 'vacuum' ? 'vacuum-tabs' : 'tabs',
+  )
   await expect(dialog).toHaveAttribute('data-layout-mounted', 'original')
   if (scenario === 'quick-links' && state !== 'rooms') {
     const layout = await quickLinksLayout(dialog)

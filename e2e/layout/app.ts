@@ -112,7 +112,7 @@ export async function enterState(dialog: Locator, scenario: ScenarioId, state: s
       mock.calls.splice(0, mock.calls.length)
     }, state)
   }
-  await waitForModalReady(dialog)
+  await waitForModalReady(dialog, undefined, scenario === 'vacuum' ? 'vacuum-tabs' : 'tabs')
 }
 
 export async function openHost(page: Page, state: string) {
