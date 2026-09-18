@@ -64,13 +64,13 @@ describe('MediaRemoteModalNav', () => {
 })
 
 describe('MediaRemoteModalContent', () => {
-  it('renders Theater devices in the shared uniform DynamicGrid without calling services', () => {
+  it('renders Theater devices in the shared content-aware DynamicGrid without calling services', () => {
     render(<MediaRemoteModalContent activeTab="devices" config={theaterRemote} onTabChange={() => undefined} />)
 
     expect(screen.getByRole('group', { name: 'Theater Room SHIELD remote controls' })).toBeInTheDocument()
     const projector = screen.getByRole('button', { name: /Projector Off/i })
     const grid = projector.closest('[data-dynamic-grid="true"]')
-    expect(grid).toHaveAttribute('data-dynamic-grid-item-sizing', 'uniform')
+    expect(grid).toHaveAttribute('data-dynamic-grid-item-sizing', 'content-aware')
     expect(grid).toHaveAttribute('data-dynamic-grid-max-cell-width', '260')
     expect(grid).toHaveAttribute('data-dynamic-grid-max-columns', '4')
     expect(mockCallServiceCalls).toEqual([])

@@ -55,6 +55,7 @@ describe('GarageDoorTile', () => {
     const closed = screen.getByRole('button', { name: 'Left Door Closed' })
     expect(closed).toHaveAttribute('data-action-kind', 'command')
     expect(closed).not.toHaveAttribute('aria-pressed')
+    expect(closed.querySelectorAll('[data-dynamic-grid-measure-only="true"]')).toHaveLength(2)
 
     fireEvent.click(closed)
 

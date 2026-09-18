@@ -2014,27 +2014,27 @@ test('grocery deletes use native browser confirmations and prompts', async ({ pa
   await expect(page.getByRole('alertdialog')).toHaveCount(0)
 })
 
-test('thermostat room grid uses one equivalent column when any room label overflows', async ({ page }) => {
+test('thermostat room grid expands each room tile enough for its labels', async ({ page }) => {
   await page.setViewportSize({ width: 393, height: 852 })
   await page.goto('/at-a-glance/thermostat')
 
   const dialog = await openThermostatControls(page)
   const grid = dialog.getByRole('group', { name: 'Thermostat rooms' })
   const cells = grid.locator('[data-dynamic-grid-cell="true"]')
-  await expect(grid).toHaveAttribute('data-dynamic-grid-columns', '1')
+  await expect(grid).toHaveAttribute('data-dynamic-grid-columns', '2')
+  await expect(grid).toHaveAttribute('data-dynamic-grid-item-sizing', 'content-aware')
   await expect(cells).toHaveCount(11)
 
   const layout = await cells.evaluateAll((elements) => elements.map((element) => {
-    const bounds = element.getBoundingClientRect()
     return {
-      left: Math.round(bounds.left),
-      span: element.getAttribute('data-dynamic-grid-span'),
-      width: Math.round(bounds.width),
+      labelsFit: Array.from(element.querySelectorAll<HTMLElement>('[data-dynamic-grid-label="true"]'))
+        .every((label) => label.scrollWidth <= label.clientWidth + 1),
+      span: Number(element.getAttribute('data-dynamic-grid-span')),
     }
   }))
-  expect(new Set(layout.map(({ left }) => left)).size).toBe(1)
-  expect(new Set(layout.map(({ width }) => width)).size).toBe(1)
-  expect(layout.every(({ span }) => span === '1')).toBe(true)
+  expect(layout.some(({ span }) => span === 2)).toBe(true)
+  expect(layout.every(({ span }) => span === 1 || span === 2)).toBe(true)
+  expect(layout.every(({ labelsFit }) => labelsFit)).toBe(true)
 })
 
 test('thermostat page keeps primary controls and three explained modal entry points compact', async ({ page }) => {

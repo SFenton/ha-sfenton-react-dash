@@ -49,7 +49,6 @@ interface ScheduleListRowProps {
   active?: boolean
   disabled?: boolean
   disclosure?: boolean
-  dynamicGridLabel?: boolean
   focusKey: string
   icon?: string
   iconSurface?: boolean
@@ -148,7 +147,6 @@ export function ScheduleListRow({
   autoFocus = false,
   disabled = false,
   disclosure = true,
-  dynamicGridLabel = false,
   focusKey,
   icon = 'mdi:calendar',
   iconSurface = true,
@@ -191,10 +189,10 @@ export function ScheduleListRow({
         <span className={styles.rowIcon}>
           <MaterialIcon name={icon} size={22} />
         </span>
-        <span className={styles.rowText} data-dynamic-grid-label-container={dynamicGridLabel ? 'true' : undefined}>
-          <strong data-dynamic-grid-label={dynamicGridLabel ? 'true' : undefined}>{primary}</strong>
-          {secondary && <span>{secondary}</span>}
-          {tertiary && <small>{tertiary}</small>}
+        <span className={styles.rowText} data-dynamic-grid-label-container="true">
+          <strong data-dynamic-grid-label="true">{primary}</strong>
+          {secondary && <span data-dynamic-grid-label="true">{secondary}</span>}
+          {tertiary && <small data-dynamic-grid-label="true">{tertiary}</small>}
         </span>
         {trailingControl && <span aria-hidden className={styles.rowTrailingSpacer} />}
         {!disabled && showDisclosure && (

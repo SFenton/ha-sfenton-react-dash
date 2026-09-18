@@ -16,6 +16,7 @@ describe('LightBrightnessCard modal disclosure', () => {
 
     const details = screen.getByRole('button', { name: 'Open Test Light details' })
     expect(details.parentElement?.querySelector('[data-modal-disclosure="right-chevron"]')).toBeInTheDocument()
+    expect(details.parentElement?.querySelectorAll('[data-dynamic-grid-label="true"]')).toHaveLength(2)
     fireEvent.click(details)
 
     expect(onMoreInfo).toHaveBeenCalledWith(LIGHT_ID, 'Test Light')

@@ -40,6 +40,7 @@ interface GlassTileBaseProps {
   controlRole?: 'switch'
   detailAutoFocus?: boolean
   disabled?: boolean
+  dynamicGridMeasurementLabels?: readonly string[]
   iconColor?: string
   subtitle?: string
   semantics?: ControlSemantics
@@ -75,6 +76,7 @@ export function GlassTile({
   controlRole,
   detailAutoFocus = false,
   disabled = false,
+  dynamicGridMeasurementLabels,
   iconColor,
   subtitle,
   semantics,
@@ -136,13 +138,24 @@ export function GlassTile({
   const content = (
     <>
       {progressValue !== undefined && <span aria-hidden="true" className={styles.progressFill} />}
-      <span className={styles.content}>
+      <span className={styles.content} data-glass-tile-content="true">
         <span aria-hidden="true" className={styles.icon} style={iconColor ? { color: iconColor } : undefined}>
           {iconContent}
         </span>
         <span className={styles.labelGroup} data-dynamic-grid-label-container="true">
           <span className={styles.title} data-dynamic-grid-label="true">{title}</span>
           {subtitle && <span className={styles.subtitle} data-dynamic-grid-label="true">{subtitle}</span>}
+          {dynamicGridMeasurementLabels?.map((label) => (
+            <span
+              aria-hidden="true"
+              className={`${styles.subtitle} ${styles.measurementLabel}`}
+              data-dynamic-grid-label="true"
+              data-dynamic-grid-measure-only="true"
+              key={label}
+            >
+              {label}
+            </span>
+          ))}
         </span>
       </span>
       {showDisclosure && accessorySemantics && <SurfaceAccessory semantics={accessorySemantics} size={variant === 'header' ? 'compact' : 'standard'} />}
