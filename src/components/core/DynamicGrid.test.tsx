@@ -1,6 +1,7 @@
+// @covers src/components/core/dynamicGridLayout.ts
 import { act, render, screen, waitFor } from '@testing-library/react'
 import { DynamicGrid } from './DynamicGrid'
-import { centeredDynamicGridStarts, equivalentDynamicGridColumnCount, packDynamicGridSpans, responsiveDynamicGridColumnCount } from './dynamicGridLayout'
+import { centeredDynamicGridStarts, packDynamicGridSpans, responsiveDynamicGridColumnCount, uniformDynamicGridColumnCount } from './dynamicGridLayout'
 
 describe('text-aware leading-row fill', () => {
   it('gives spare tracks to narrower tiles and leaves the final row at its minimum', () => {
@@ -36,11 +37,12 @@ describe('packDynamicGridSpans', () => {
   })
 })
 
-describe('equivalentDynamicGridColumnCount', () => {
-  it('uses the widest item to choose one shared column count', () => {
-    expect(equivalentDynamicGridColumnCount([1, 1, 1], 3)).toBe(3)
-    expect(equivalentDynamicGridColumnCount([1, 2, 1], 4)).toBe(2)
-    expect(equivalentDynamicGridColumnCount([1, 2, 1], 2)).toBe(1)
+describe('uniformDynamicGridColumnCount', () => {
+  it('reduces one column at a time until every item fits', () => {
+    expect(uniformDynamicGridColumnCount([240, 220], 1_000, 10, 4)).toBe(4)
+    expect(uniformDynamicGridColumnCount([260, 220], 1_000, 10, 4)).toBe(3)
+    expect(uniformDynamicGridColumnCount([400, 220], 1_000, 10, 4)).toBe(2)
+    expect(uniformDynamicGridColumnCount([700, 220], 1_000, 10, 4)).toBe(1)
   })
 
   describe('responsiveDynamicGridColumnCount', () => {
@@ -101,8 +103,36 @@ describe('DynamicGrid', () => {
     })
   })
 
-  it('forces every item into the same measured column count when requested', async () => {
-    const gridWidth = 210
+  it('measures horizontal title and value groups as one intrinsic row', async () => {
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockImplementation(function () {
+      if (this.dataset.dynamicGrid === 'true') return 320
+      if (this.dataset.dynamicGridCell === 'true') return 100
+      if (this.dataset.dynamicGridLabelContainer === 'true') return 80
+      return 0
+    })
+    vi.spyOn(HTMLElement.prototype, 'scrollWidth', 'get').mockImplementation(function () {
+      return Number(this.dataset.naturalContainerWidth ?? this.dataset.naturalWidth ?? 0)
+    })
+
+    render(
+      <DynamicGrid ariaLabel="Camera links" columns={3} fillRows={false}>
+        <button type="button">
+          <span data-dynamic-grid-label-container="true" data-natural-container-width="180">
+            <span data-dynamic-grid-label="true" data-natural-width="100">Front Door</span>
+            <span data-dynamic-grid-label="true" data-natural-width="70">Streaming</span>
+          </span>
+        </button>
+      </DynamicGrid>,
+    )
+
+    const grid = screen.getByRole('group', { name: 'Camera links' })
+    await waitFor(() => {
+      expect(grid.firstElementChild).toHaveAttribute('data-dynamic-grid-span', '2')
+    })
+  })
+
+  it('reduces uniform grids recursively while keeping every item one track wide', async () => {
+    let gridWidth = 1_000
     const gap = 10
     const clientWidth = (element: HTMLElement) => {
       if (element.dataset.dynamicGrid === 'true') return gridWidth
@@ -111,7 +141,7 @@ describe('DynamicGrid', () => {
         ? element
         : element.closest<HTMLElement>('[data-dynamic-grid-cell="true"]')
       const grid = cell?.closest<HTMLElement>('[data-dynamic-grid="true"]')
-      const columns = Number(grid?.dataset.dynamicGridColumns ?? 2)
+      const columns = Number(grid?.dataset.dynamicGridColumns ?? 4)
       const span = Number(cell?.dataset.dynamicGridSpan ?? 1)
       const columnWidth = (gridWidth - gap * (columns - 1)) / columns
       const cellWidth = span * columnWidth + (span - 1) * gap
@@ -128,41 +158,45 @@ describe('DynamicGrid', () => {
       return Number(this.dataset.naturalWidth ?? 0)
     })
 
-    const items = [60, 60, 130, 60].map((naturalWidth, index) => (
+    const items = [200, 200, 280, 200].map((naturalWidth, index) => (
       <button key={naturalWidth + index} type="button">
         <span data-dynamic-grid-label-container="true">
           <span data-dynamic-grid-label="true" data-natural-width={naturalWidth}>Link {index + 1}</span>
         </span>
       </button>
     ))
-    const { rerender } = render(
-      <DynamicGrid ariaLabel="Equivalent links" columns={2}>
+    render(
+      <DynamicGrid ariaLabel="Uniform links" columns={4} fillRows={false} itemSizing="uniform">
         {items}
       </DynamicGrid>,
     )
 
-    const grid = screen.getByRole('group', { name: 'Equivalent links' })
+    const grid = screen.getByRole('group', { name: 'Uniform links' })
     await waitFor(() => {
-      expect(grid).toHaveAttribute('data-dynamic-grid-columns', '2')
-      expect(Array.from(grid.children).map((cell) => cell.getAttribute('data-dynamic-grid-span'))).toEqual(['1', '1', '2', '2'])
+      expect(grid).toHaveAttribute('data-dynamic-grid-available-columns', '4')
+      expect(grid).toHaveAttribute('data-dynamic-grid-columns', '3')
+      expect(Array.from(grid.children).map((cell) => cell.getAttribute('data-dynamic-grid-span'))).toEqual(['1', '1', '1', '1'])
     })
 
-    rerender(
-      <DynamicGrid ariaLabel="Equivalent links" columns={2} forceEquivalentColumnCount>
-        {items}
-      </DynamicGrid>,
-    )
-
+    gridWidth = 500
+    act(() => window.dispatchEvent(new Event('resize')))
     await waitFor(() => {
       expect(grid).toHaveAttribute('data-dynamic-grid-columns', '1')
       expect(Array.from(grid.children).map((cell) => cell.getAttribute('data-dynamic-grid-span'))).toEqual(['1', '1', '1', '1'])
     })
   })
 
-  it('keeps uniform cells equal without overriding each child component label layout', async () => {
-    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockImplementation(function () {
-      if (this.dataset.dynamicGrid === 'true') return 210
+  it('wraps only after a uniform grid reaches one column', async () => {
+    const gridWidth = 210
+    const clientWidth = (element: HTMLElement) => {
+      if (element.dataset.dynamicGrid === 'true') return gridWidth
+      const cellWidth = gridWidth
+      if (element.dataset.dynamicGridCell === 'true') return cellWidth
+      if (element.dataset.dynamicGridLabelContainer === 'true') return cellWidth - 20
       return 0
+    }
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockImplementation(function () {
+      return clientWidth(this)
     })
     vi.spyOn(HTMLElement.prototype, 'scrollWidth', 'get').mockImplementation(function () {
       return Number(this.dataset.naturalWidth ?? 0)
@@ -186,16 +220,19 @@ describe('DynamicGrid', () => {
     const grid = screen.getByRole('group', { name: 'Uniform links' })
     await waitFor(() => {
       expect(grid).toHaveAttribute('data-dynamic-grid-item-sizing', 'uniform')
+      expect(grid).toHaveAttribute('data-dynamic-grid-columns', '1')
       expect(Array.from(grid.children).map((cell) => cell.getAttribute('data-dynamic-grid-span'))).toEqual(['1', '1'])
-      expect(Array.from(grid.children).map((cell) => cell.getAttribute('data-dynamic-grid-wrap'))).toEqual([null, null])
+      expect(Array.from(grid.children).map((cell) => cell.getAttribute('data-dynamic-grid-wrap'))).toEqual(['true', null])
     })
   })
 
-  it('activates uniform sizing only after the measured width threshold', async () => {
-    let gridWidth = 400
+  it('keeps the bounded grid width while uniform text reduces its column count', async () => {
+    const gridWidth = 1_408
     vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockImplementation(function () {
-      if (this.dataset.dynamicGrid === 'true') return gridWidth
-      if (this.dataset.dynamicGridLabelContainer === 'true') return 80
+      if (this.querySelector?.('[data-dynamic-grid="true"]')) return gridWidth
+      if (this.dataset.dynamicGrid === 'true') return 1_156
+      if (this.dataset.dynamicGridCell === 'true') return 280
+      if (this.dataset.dynamicGridLabelContainer === 'true') return 260
       return 0
     })
     vi.spyOn(HTMLElement.prototype, 'scrollWidth', 'get').mockImplementation(function () {
@@ -203,7 +240,16 @@ describe('DynamicGrid', () => {
     })
 
     render(
-      <DynamicGrid ariaLabel="Adaptive uniform links" columns={2} fillRows={false} itemSizing="uniform" itemSizingMinWidth={560}>
+      <DynamicGrid
+        ariaLabel="Bounded uniform links"
+        columns={2}
+        fillRows={false}
+        gap={12}
+        itemSizing="uniform"
+        layout="bounded"
+        maxCellWidth={280}
+        maxColumns={4}
+      >
         <button type="button">
           <span data-dynamic-grid-label-container="true">
             <span data-dynamic-grid-label="true" data-natural-width="300">A very long first link</span>
@@ -214,19 +260,25 @@ describe('DynamicGrid', () => {
             <span data-dynamic-grid-label="true" data-natural-width="40">Short</span>
           </span>
         </button>
+        <button type="button">
+          <span data-dynamic-grid-label-container="true">
+            <span data-dynamic-grid-label="true" data-natural-width="40">Third</span>
+          </span>
+        </button>
+        <button type="button">
+          <span data-dynamic-grid-label-container="true">
+            <span data-dynamic-grid-label="true" data-natural-width="40">Fourth</span>
+          </span>
+        </button>
       </DynamicGrid>,
     )
 
-    const grid = screen.getByRole('group', { name: 'Adaptive uniform links' })
-    await waitFor(() => {
-      expect(grid).toHaveAttribute('data-dynamic-grid-item-sizing', 'content-aware')
-    })
-
-    gridWidth = 800
-    act(() => window.dispatchEvent(new Event('resize')))
+    const grid = screen.getByRole('group', { name: 'Bounded uniform links' })
     await waitFor(() => {
       expect(grid).toHaveAttribute('data-dynamic-grid-item-sizing', 'uniform')
-      expect(Array.from(grid.children).map((cell) => cell.getAttribute('data-dynamic-grid-span'))).toEqual(['1', '1'])
+      expect(grid).toHaveAttribute('data-dynamic-grid-available-columns', '4')
+      expect(grid).toHaveAttribute('data-dynamic-grid-columns', '3')
+      expect(grid.style.getPropertyValue('--dynamic-grid-max-width')).toBe('1156px')
     })
   })
 

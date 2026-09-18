@@ -65,7 +65,7 @@ import {
 import { Card, type CardColor } from '../components/core/Card'
 import { CheckboxRow } from '../components/core/CheckboxRow'
 import { Description } from '../components/core/Description'
-import { DynamicGrid, type DynamicGridItemSizing } from '../components/core/DynamicGrid'
+import { DynamicGrid } from '../components/core/DynamicGrid'
 import { EmptyState } from '../components/core/EmptyState'
 import { GlassTile } from '../components/core/GlassTile'
 import { MaterialIcon } from '../components/core/Icon'
@@ -261,7 +261,7 @@ const APP_LAUNCH_MAX_COLUMNS = 6
 // controls keep the standard responsive room grid underneath it.
 const LEAD_ROW_GRID_LABEL_SUFFIX = 'Controls'
 
-function RoomGrid({ ariaLabel, children, itemSizing, layout }: { ariaLabel: string; children: ReactNode; itemSizing?: DynamicGridItemSizing; layout?: RoomSourceSectionLayout }) {
+function RoomGrid({ ariaLabel, children, layout }: { ariaLabel: string; children: ReactNode; layout?: RoomSourceSectionLayout }) {
   if (layout === 'app-launch') {
     return (
       <DynamicGrid
@@ -281,13 +281,13 @@ function RoomGrid({ ariaLabel, children, itemSizing, layout }: { ariaLabel: stri
   }
 
   if (layout === 'lead-row') {
-    return <DynamicGrid ariaLabel={ariaLabel} className={styles.roomGrid} columns={2} itemSizing={itemSizing}>{children}</DynamicGrid>
+    return <DynamicGrid ariaLabel={ariaLabel} className={styles.roomGrid} columns={2}>{children}</DynamicGrid>
   }
 
   if (layout === 'two-column-fill') {
     return (
       <DynamicGrid ariaLabel={ariaLabel} className={styles.roomGrid} columns={2}
-        itemSizing={itemSizing} lastRow="fill" layout="fill">
+        lastRow="fill" layout="fill">
         {children}
       </DynamicGrid>
     )
@@ -298,7 +298,6 @@ function RoomGrid({ ariaLabel, children, itemSizing, layout }: { ariaLabel: stri
       ariaLabel={ariaLabel}
       className={styles.roomGrid}
       columns={2}
-      itemSizing={itemSizing}
       lastRow="fill-minimum"
       layout="bounded"
       maxCellWidth={280}
@@ -1689,7 +1688,7 @@ function ChoresIntro({ onNavigate }: { onNavigate: (path: string) => void }) {
   return (
     <section className={styles.section}>
       <SectionHeader title="Quick Links" />
-      <DynamicGrid ariaLabel="Chore quick links" className={styles.choreQuickGrid} columns={2} itemSizing="uniform" itemSizingMinWidth={560} lastRow="fill-minimum" layout="bounded" maxCellWidth={380} maxColumns={3}>
+      <DynamicGrid ariaLabel="Chore quick links" className={styles.choreQuickGrid} columns={2} lastRow="fill-minimum" layout="bounded" maxCellWidth={380} maxColumns={3}>
         {CHORE_QUICK_LINKS.map((item) => (
           <ChoreQuickLink item={item} key={item.path} onNavigate={onNavigate} />
         ))}
@@ -2327,11 +2326,11 @@ function MediaPage({ preload = false, preloadHash, preloadHashes = [] }: { prelo
 
           return (
             <Section className={styles.section} key={section.title} title={section.title}>
-              <DynamicGrid ariaLabel={section.title} className={styles.mediaLeadGrid} columns={1} fillRows={false} itemSizing="uniform">
+              <DynamicGrid ariaLabel={section.title} className={styles.mediaLeadGrid} columns={1} fillRows={false}>
                 {leadCards.map(renderCard)}
               </DynamicGrid>
               {followUpCards.length > 0 && (
-                <RoomGrid ariaLabel={coreCopy(CORE_COPY_KEYS.groups.controls, { title: section.title })} itemSizing="uniform" layout="lead-row">
+                <RoomGrid ariaLabel={coreCopy(CORE_COPY_KEYS.groups.controls, { title: section.title })} layout="lead-row">
                   {followUpCards.map(renderCard)}
                 </RoomGrid>
               )}
@@ -6214,7 +6213,7 @@ function ThermostatTrackingDetailPage({ detailType }: { detailType: 'critical-pr
     return (
       <section className={styles.section}>
         <Description>{THERMOSTAT_SECTION_DESCRIPTIONS.trackSelected}</Description>
-        <DynamicGrid ariaLabel="Selected thermostat rooms" className={styles.thermostatTrackingGrid} columns={2} gap={8}>
+        <DynamicGrid ariaLabel="Selected thermostat rooms" className={styles.thermostatTrackingGrid} columns={2} gap={8} itemSizing="uniform">
           {THERMOSTAT_ROOM_VIEWS.map((room, index) => <ThermostatTrackCheckbox detailAutoFocus={index === 0} key={room.key} room={room} />)}
         </DynamicGrid>
       </section>
@@ -6228,7 +6227,7 @@ function ThermostatTrackingDetailPage({ detailType }: { detailType: 'critical-pr
     return (
       <section className={styles.section}>
         <Description>{THERMOSTAT_SECTION_DESCRIPTIONS.forceCritical}</Description>
-        <DynamicGrid ariaLabel="Critical protection thermostat rooms" className={styles.thermostatTrackingGrid} columns={2} gap={8}>
+        <DynamicGrid ariaLabel="Critical protection thermostat rooms" className={styles.thermostatTrackingGrid} columns={2} gap={8} itemSizing="uniform">
           {THERMOSTAT_ROOM_VIEWS
             .filter((room) => entities[thermostatTrackEntityId(room)]?.state !== 'on')
             .map((room, index) => <ThermostatForceCheckbox detailAutoFocus={index === 0} key={room.key} room={room} />)}
@@ -6240,7 +6239,7 @@ function ThermostatTrackingDetailPage({ detailType }: { detailType: 'critical-pr
   return (
     <section className={styles.section}>
       <Description>{THERMOSTAT_SECTION_DESCRIPTIONS.trackOnlyWhenOccupied}</Description>
-      <DynamicGrid ariaLabel="Occupied-only thermostat rooms" className={styles.thermostatTrackingGrid} columns={2} gap={8}>
+      <DynamicGrid ariaLabel="Occupied-only thermostat rooms" className={styles.thermostatTrackingGrid} columns={2} gap={8} itemSizing="uniform">
         {THERMOSTAT_ROOM_VIEWS.map((room, index) => <ThermostatTrackOnlyWhenOccupiedCheckbox detailAutoFocus={index === 0} key={room.key} room={room} />)}
       </DynamicGrid>
     </section>
@@ -6324,7 +6323,7 @@ function ThermostatRoomsRoot({ onOpenRoom }: { onOpenRoom: (room: ThermostatRoom
     <section className={styles.section}>
       <SectionHeader title="Rooms" />
       <Description>{THERMOSTAT_MODAL_TABS.find((tab) => tab.tab === 'rooms')?.description}</Description>
-      <DynamicGrid ariaLabel="Thermostat rooms" className={styles.thermostatRoomGrid} columns={2} forceEquivalentColumnCount gap={8}>
+      <DynamicGrid ariaLabel="Thermostat rooms" className={styles.thermostatRoomGrid} columns={2} gap={8}>
         {THERMOSTAT_ROOM_VIEWS.map((room) => <ThermostatRoomRow key={room.key} onOpen={() => onOpenRoom(room)} room={room} />)}
       </DynamicGrid>
     </section>

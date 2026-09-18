@@ -26,8 +26,10 @@ export function GarageDoorTile({
   const liveState = entity?.state ?? 'unavailable'
   const command = useGarageDoorCommand(entityId, liveState)
   const unavailable = !command.available
+  const sendingOpen = copy(GARAGE_DOOR_COPY_KEYS.sendingOpen)
+  const sendingClose = copy(GARAGE_DOOR_COPY_KEYS.sendingClose)
   const subtitle = command.phase === GarageDoorCommandPhase.Sending
-    ? command.opens ? copy(GARAGE_DOOR_COPY_KEYS.sendingOpen) : copy(GARAGE_DOOR_COPY_KEYS.sendingClose)
+    ? command.opens ? sendingOpen : sendingClose
     : command.phase === GarageDoorCommandPhase.Error
       ? copy('states.error')
       : formatCompactEntityState(entity, copy('states.unavailable'), command.displayState)
@@ -41,6 +43,7 @@ export function GarageDoorTile({
       announcement={announcement}
       ariaDisabled={command.interactionLocked}
       backgroundColor={unavailable ? undefined : backgroundColor}
+      dynamicGridMeasurementLabels={[sendingOpen, sendingClose]}
       icon={icon}
       isOff={unavailable}
       onClick={unavailable ? undefined : command.sendCommand}

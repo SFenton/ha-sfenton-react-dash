@@ -73,6 +73,14 @@ the shared behavior layer rather than duplicating HA-owned side effects.
   without shrinking their text-required spans or changing order. Ties go to
   the later item. The final row retains its required spans and aligns left.
   On a four-track layout the ordinary six-link example is `2+2`, `2+1+1`, `2`.
+- Every shared `DynamicGrid` declares its text strategy through `itemSizing`.
+  Tile/card grids use `content-aware`, so each tile can independently claim the
+  tracks required by any marked title, subtitle, or secondary label. Row,
+  status, and option grids use `uniform`: if any marked label does not fit on
+  one line, the whole grid reduces from N columns to N-1 and remeasures until
+  all labels fit or one column remains. Only an overlong one-column label may
+  wrap. For bounded uniform grids, `maxCellWidth` controls when columns are
+  added; text fitting may widen the remaining columns after a reduction.
 - Daily Summary uses the shared centered frame and fills the padded desktop body,
   while its tab navigator retains the family reading measure. It keeps the documented
   16px title and compact row typography. It reflows chore

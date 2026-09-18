@@ -193,6 +193,17 @@
   line-height: 1.25;
 }
 
+.measurementLabel {
+  position: absolute;
+  inset: 0 auto auto 0;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  pointer-events: none;
+  white-space: nowrap;
+}
+
 .visuallyHidden {
   position: absolute;
   width: 1px;

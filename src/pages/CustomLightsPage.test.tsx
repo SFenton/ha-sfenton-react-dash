@@ -69,7 +69,7 @@ describe('CustomLightsPage', () => {
     expect(screen.getByRole('group', { name: /Left Door Light/ })).toBeInTheDocument()
     expect(screen.getByRole('group', { name: /Right Door Light/ })).toBeInTheDocument()
     const lightGrid = screen.getByRole('group', { name: /Left Door Light/ }).closest('[data-dynamic-grid="true"]')
-    expect(lightGrid).toHaveAttribute('data-dynamic-grid-item-sizing', 'uniform')
+    expect(lightGrid).toHaveAttribute('data-dynamic-grid-item-sizing', 'content-aware')
     expect(lightGrid).toHaveAttribute('data-dynamic-grid-max-cell-width', '280')
     expect(lightGrid?.querySelectorAll('[data-dynamic-grid-cell="true"]')).toHaveLength(8)
     for (let i = 1; i <= 6; i += 1) {

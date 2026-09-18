@@ -45,8 +45,10 @@ describe('ScheduleFlow', () => {
     expect(onToggle).toHaveBeenCalledOnce()
     expect(onEdit).toHaveBeenCalledOnce()
     expect(onAdd).toHaveBeenCalledOnce()
-    expect(screen.getByRole('button', { name: 'Monday alarm enabled' })).toHaveAttribute('data-active', 'true')
-    expect(screen.getByRole('button', { name: 'Monday alarm enabled' })).toHaveAttribute('data-modal-detail-trigger', 'monday-alarm')
+    const row = screen.getByRole('button', { name: 'Monday alarm enabled' })
+    expect(row).toHaveAttribute('data-active', 'true')
+    expect(row).toHaveAttribute('data-modal-detail-trigger', 'monday-alarm')
+    expect(row.querySelectorAll('[data-dynamic-grid-label="true"]')).toHaveLength(3)
     expect(materialIconPath('mdi:alarm-check')).not.toBe(materialIconPath('mdi:unregistered-schedule-icon'))
   })
 

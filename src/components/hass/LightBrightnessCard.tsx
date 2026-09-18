@@ -178,9 +178,9 @@ export function LightBrightnessCard({ entityId, title, tapAction = 'toggle', sho
       <span aria-hidden="true" className={styles.icon}>
         <MaterialIcon name={icon} size={22} />
       </span>
-      <span className={styles.copy}>
-        <span className={styles.title}>{title}</span>
-        {showStatus && isOn && <span className={styles.subtitle}>{`${Math.floor(displayPct)}%`}</span>}
+      <span className={styles.copy} data-dynamic-grid-label-container="true">
+        <span className={styles.title} data-dynamic-grid-label="true">{title}</span>
+        {showStatus && isOn && <span className={styles.subtitle} data-dynamic-grid-label="true">{`${Math.floor(displayPct)}%`}</span>}
       </span>
       {tapAction === 'more-info' && <SurfaceAccessory className={styles.disclosure} semantics={{ kind: 'modal' }} size="compact" />}
       <button aria-label={`Toggle ${title}`} className={styles.power} onClick={togglePower} onPointerDown={handlePower} type="button">

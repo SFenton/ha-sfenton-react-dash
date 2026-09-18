@@ -42,10 +42,10 @@ export function CameraTile({ camera, live = true, onOpen }: CameraTileProps) {
         </>
       )}
       <button className={styles.button} onClick={() => onOpen(camera.hash)} type="button" aria-label={`Open ${camera.title} camera`}>
-        <span className={styles.label}>
-          <span className={styles.title}>{camera.title}</span>
+        <span className={styles.label} data-dynamic-grid-label-container="true">
+          <span className={styles.title} data-dynamic-grid-label="true">{camera.title}</span>
           <span className={styles.trailing}>
-            <span className={styles.state}>{tileStateLabel(entity?.state, streamStatus)}</span>
+            <span className={styles.state} data-dynamic-grid-label="true">{tileStateLabel(entity?.state, streamStatus)}</span>
           </span>
         </span>
       </button>

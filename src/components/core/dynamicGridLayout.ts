@@ -23,14 +23,26 @@ function normalizedSpan(span: number, columns: number) {
   return Math.min(columns, Math.max(1, Math.ceil(span)))
 }
 
-export function equivalentDynamicGridColumnCount(minimumSpans: readonly number[], columnCount: number) {
+export function uniformDynamicGridColumnCount(
+  requiredCellWidths: readonly number[],
+  containerWidth: number,
+  gap: number,
+  columnCount: number,
+  tolerance = 0,
+) {
   const columns = normalizedDynamicGridColumns(columnCount)
-  const widestSpan = minimumSpans.reduce(
-    (widest, span) => Math.max(widest, normalizedSpan(span, columns)),
-    1,
-  )
+  if (containerWidth <= 0 || requiredCellWidths.length === 0) return columns
 
-  return Math.max(1, Math.floor(columns / widestSpan))
+  for (let candidateColumns = columns; candidateColumns > 1; candidateColumns -= 1) {
+    const cellWidth = (
+      containerWidth - Math.max(0, gap) * (candidateColumns - 1)
+    ) / candidateColumns
+    if (requiredCellWidths.every((requiredWidth) => requiredWidth <= cellWidth + tolerance)) {
+      return candidateColumns
+    }
+  }
+
+  return 1
 }
 
 export function packDynamicGridSpans(minimumSpans: readonly number[], columnCount: number, fill: 'all' | 'except-last' = 'all') {
