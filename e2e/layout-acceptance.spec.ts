@@ -165,9 +165,24 @@ async function stateFacts(page: Page, dialog: Locator, scenario: ScenarioId, sta
       await expect(save).toBeEnabled()
       await expect(dialog.getByRole('alert')).toHaveText('Mock service rejection')
     }
+    const [resetBox, saveBox] = await Promise.all([reset.boundingBox(), save.boundingBox()])
+    expect(resetBox).not.toBeNull()
+    expect(saveBox).not.toBeNull()
+    const actionGap = saveBox!.x - (resetBox!.x + resetBox!.width)
+    expect(Math.abs(resetBox!.y - saveBox!.y)).toBeLessThanOrEqual(1)
+    expect(Math.abs(resetBox!.height - saveBox!.height)).toBeLessThanOrEqual(1)
+    expect(actionGap).toBeGreaterThanOrEqual(9)
+    expect(actionGap).toBeLessThanOrEqual(11)
+    expect(saveBox!.width).toBeGreaterThan(resetBox!.width)
     facts.adminTodoEdit = {
       state,
       footer: ['Reset', 'Save'],
+      footerGeometry: {
+        actionGap,
+        orientation: 'horizontal',
+        resetWidth: resetBox!.width,
+        saveWidth: saveBox!.width,
+      },
       route: 'to-do',
       entity: 'todo.groceries',
       overflow: await page.locator('body').evaluate((body) => body.scrollWidth <= window.innerWidth),

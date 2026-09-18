@@ -91,9 +91,3 @@
   font-weight: 760;
   overflow-wrap: anywhere;
 }
-
-@media (max-width: 420px) {
-  .footer {
-    grid-template-columns: minmax(0, 1fr);
-  }
-}

@@ -173,8 +173,15 @@ test('Admin To-Do preserves modal semantics, failure retry, and responsive actio
     await expect(dialog.getByRole('button', { name: 'Save' })).toBeVisible()
     const resetBox = await dialog.getByRole('button', { name: 'Reset' }).boundingBox()
     const saveBox = await dialog.getByRole('button', { name: 'Save' }).boundingBox()
-    expect(resetBox?.height).toBeGreaterThanOrEqual(48)
-    expect(saveBox?.height).toBeGreaterThanOrEqual(48)
+    expect(resetBox).not.toBeNull()
+    expect(saveBox).not.toBeNull()
+    expect(resetBox!.height).toBeGreaterThanOrEqual(48)
+    expect(saveBox!.height).toBeGreaterThanOrEqual(48)
+    expect(Math.abs(resetBox!.y - saveBox!.y)).toBeLessThanOrEqual(1)
+    expect(Math.abs(resetBox!.height - saveBox!.height)).toBeLessThanOrEqual(1)
+    expect(saveBox!.x - (resetBox!.x + resetBox!.width)).toBeGreaterThanOrEqual(9)
+    expect(saveBox!.x - (resetBox!.x + resetBox!.width)).toBeLessThanOrEqual(11)
+    expect(saveBox!.width).toBeGreaterThan(resetBox!.width)
   }
 })
 

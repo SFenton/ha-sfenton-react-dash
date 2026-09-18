@@ -420,7 +420,7 @@ export const SURFACE_CONTRACTS: Record<ScenarioId, {
       'src/i18n/locales/en/core.json',
     ],
     legacy: ['feedback-regressions.spec.ts'],
-    question: 'Does the Admin To-Do editor open from the mock-backed todo.groceries route, retain pristine and failed drafts, keep Reset/Save and the footer reachable across phone portrait/landscape and centered desktop, and preserve overflow and safe-area clearance?',
+    question: 'Does the Admin To-Do editor open from the mock-backed todo.groceries route, retain pristine and failed drafts, keep Reset and Save aligned in one reachable horizontal footer row across phone portrait/landscape and centered desktop, and preserve overflow and safe-area clearance?',
   },
   remote: {
     family: 'modal', states: ['active'],
