@@ -55,6 +55,7 @@
     "deploy:ios-test-dashboard": "tsx scripts/deploy-ios-test-dashboard.ts",
     "deploy:sync": "tsx scripts/sync-dashboard-deployment.ts",
     "ha:front-door": "tsx scripts/sync-front-door-unsecured.ts",
+    "ha:hot-flash": "tsx scripts/sync-hot-flash-recovery.ts",
     "test": "vitest",
     "test:run": "vitest run",
     "test:i18n": "vitest run src/i18n scripts/i18n",
