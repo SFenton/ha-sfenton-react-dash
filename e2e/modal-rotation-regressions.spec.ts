@@ -1,4 +1,7 @@
 // @covers src/components/core/ModalSheet.module.css
+// @covers src/components/core/GlassTile.module.css
+// @covers src/components/core/GlassTile.tsx
+// @covers src/components/shell/GlobalQuickLinksAction.module.css
 import { expect, test, type Locator, type Page } from './layout/fixture'
 import { waitForModalReady, type ModalReadiness } from './layout/evidence'
 import { writeFileSync } from 'node:fs'
@@ -201,7 +204,7 @@ for (const family of TILE_FAMILIES) {
   })
 }
 
-test('Quick Links matches production portrait and resizes landscape tiles for their text', async ({ page }) => {
+test('Quick Links gives portrait and landscape tiles enough width for their text', async ({ page }) => {
   test.setTimeout(90_000)
   await page.setViewportSize(PORTRAIT)
   await installSafeAreaInsets(page, PORTRAIT.insets)
@@ -212,7 +215,7 @@ test('Quick Links matches production portrait and resizes landscape tiles for th
   const grid = dialog.getByRole('group', { name: 'Quick Links', exact: true })
   const rooms = grid.getByRole('button', { name: 'Rooms', exact: true })
   await rooms.evaluate((element) => { element.dataset.quickLinksNode = 'original' })
-  const expectProductionPortrait = async () => {
+  const expectTextAwarePortrait = async () => {
     await expect(dialog).toHaveAttribute('data-modal-presentation', 'sheet')
     await expect(grid).toHaveAttribute('data-dynamic-grid-item-sizing', 'content-aware')
     await expect(grid).toHaveAttribute('data-dynamic-grid-last-row', 'fill')
@@ -235,7 +238,7 @@ test('Quick Links matches production portrait and resizes landscape tiles for th
       expect(card.copyFits).toBe(true)
     }
   }
-  await expectProductionPortrait()
+  await expectTextAwarePortrait()
 
   for (const profile of [LANDSCAPES[0], LANDSCAPES[1], LANDSCAPES[2], LANDSCAPES[3], LANDSCAPES[5], LANDSCAPES[8]]) {
     await resize(page, profile)
@@ -261,9 +264,7 @@ test('Quick Links matches production portrait and resizes landscape tiles for th
     }
     await expect(rooms).toHaveAttribute('data-quick-links-node', 'original')
     if (profile === LANDSCAPES[0]) {
-      const food = layout.cards.find((card) => card.name?.startsWith('Food & Recipes'))
       expect(layout.cards.map((card) => card.span)).toEqual([2, 2, 2, 1, 1, 2])
-      expect(food!.width).toBeGreaterThan(layout.cards[3].width + 10)
       const label = rooms.locator('[data-dynamic-grid-label="true"]').first()
       await label.evaluate((element) => { element.textContent = 'Open every room, light, and environmental control throughout the house' })
       await expect.poll(async () => (await rooms.boundingBox())?.width ?? 0).toBeGreaterThan(layout.cards[0].width + 10)
@@ -273,7 +274,7 @@ test('Quick Links matches production portrait and resizes landscape tiles for th
     }
   }
   await resize(page, PORTRAIT)
-  await expectProductionPortrait()
+  await expectTextAwarePortrait()
   await expect(rooms).toHaveAttribute('data-quick-links-node', 'original')
   await close(dialog)
 })

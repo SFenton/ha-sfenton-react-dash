@@ -84,6 +84,7 @@ describe('CameraTile', () => {
     mockEntities['camera.garage_camera'].state = 'idle'
     rerender(<CameraTile camera={driveway} onOpen={() => undefined} />)
     expect(screen.getByText('Live')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Open Driveway camera' }).querySelectorAll('[data-dynamic-grid-label="true"]')).toHaveLength(2)
   })
 
   it('falls back to the Home Assistant entity state when the stream is not playing', () => {

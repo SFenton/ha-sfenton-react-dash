@@ -1263,7 +1263,7 @@ function VacuumStatusSummary({
 
   return (
     <section className={styles.statusPanel}>
-      <DynamicGrid ariaLabel={copy(VACUUM_COPY_KEYS.statusGridLabel)} className={styles.statusPills} columns={2} gap={8}>
+      <DynamicGrid ariaLabel={copy(VACUUM_COPY_KEYS.statusGridLabel)} className={styles.statusPills} columns={2} gap={8} itemSizing="uniform">
         <InfoPill icon={visual.icon} label="Status" tone={visual.tone} value={stateLabel} />
         <InfoPill icon="mdi:battery" label="Battery" tone={status.primaryAvailable ? undefined : 'unavailable'} value={batteryLabel} />
         {vacuum.dockControls
@@ -1844,7 +1844,7 @@ function VacuumAutoCleanDisabledRooms({ vacuum }: { vacuum: VacuumConfig }) {
     <section className={styles.section}>
       <SectionHeader title="Disabled Auto-Clean Rooms" />
       <Description className={styles.autoCleanDescription}>{AUTO_CLEAN_DISABLED_DESCRIPTION}</Description>
-      <DynamicGrid ariaLabel={copy(VACUUM_COPY_KEYS.autoCleanGridLabel)} className={styles.autoCleanCheckboxGrid} columns={2} forceEquivalentColumnCount gap={8}>
+      <DynamicGrid ariaLabel={copy(VACUUM_COPY_KEYS.autoCleanGridLabel)} className={styles.autoCleanCheckboxGrid} columns={2} gap={8} itemSizing="uniform">
         {rooms.map((room) => <AutoCleanDisabledRoomCheckbox key={room.entityId} room={room} />)}
       </DynamicGrid>
     </section>

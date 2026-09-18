@@ -426,7 +426,7 @@ async function openTheaterRemote(page: Page) {
   return dialog
 }
 
-test('Home cameras match the Security dynamic grid at every tier', async ({ page }) => {
+test('Home cameras and Security tiles use content-aware spans at every tier', async ({ page }) => {
   test.setTimeout(120_000)
   for (const viewport of PAGE_LAYOUT_VIEWPORTS) {
     await page.setViewportSize(viewport)
@@ -440,8 +440,8 @@ test('Home cameras match the Security dynamic grid at every tier', async ({ page
       .locator('xpath=ancestor::*[@data-dynamic-grid="true"][1]')
     await expect(controlGrid).toHaveAttribute('data-dynamic-grid-columns', String(viewport.cameraColumns))
     await expect(cameraGrid).toHaveAttribute('data-dynamic-grid-columns', String(viewport.cameraColumns))
-    await expect(controlGrid).toHaveAttribute('data-dynamic-grid-item-sizing', 'uniform')
-    await expect(cameraGrid).toHaveAttribute('data-dynamic-grid-item-sizing', 'uniform')
+    await expect(controlGrid).toHaveAttribute('data-dynamic-grid-item-sizing', 'content-aware')
+    await expect(cameraGrid).toHaveAttribute('data-dynamic-grid-item-sizing', 'content-aware')
     await expect(controlGrid).toHaveAttribute('data-dynamic-grid-layout', 'fill')
     await expect(cameraGrid).toHaveAttribute('data-dynamic-grid-layout', 'fill')
 
@@ -455,10 +455,16 @@ test('Home cameras match the Security dynamic grid at every tier', async ({ page
       expect(Math.abs((geometry[0]?.width ?? 0) - (geometry[1]?.width ?? 0))).toBeLessThanOrEqual(1)
       expect(Math.abs((geometry[0]?.width ?? 0) - (geometry[2]?.width ?? 0))).toBeLessThanOrEqual(1)
       expect(Math.abs((geometry[0]?.x ?? 0) + (geometry[0]?.width ?? 0) - ((geometry[1]?.x ?? 0) + (geometry[1]?.width ?? 0)))).toBeLessThanOrEqual(1)
-      const widths = await grid.locator(':scope > [data-dynamic-grid-cell]').evaluateAll((cells) =>
-        cells.map((cell) => cell.getBoundingClientRect().width),
+      const cells = await grid.locator(':scope > [data-dynamic-grid-cell]').evaluateAll((elements) =>
+        elements.map((cell) => ({
+          span: Number(cell.getAttribute('data-dynamic-grid-span')),
+          width: cell.getBoundingClientRect().width,
+        })),
       )
-      for (const width of widths) expect(Math.abs(width - viewport.securityCellWidth)).toBeLessThanOrEqual(1)
+      for (const cell of cells) {
+        const expectedWidth = viewport.securityCellWidth * cell.span + 10 * (cell.span - 1)
+        expect(Math.abs(cell.width - expectedWidth)).toBeLessThanOrEqual(1)
+      }
     }
 
     if (viewport.width === 820) {
@@ -474,21 +480,27 @@ test('Home cameras match the Security dynamic grid at every tier', async ({ page
     const homeCameraGrid = homeRoot.getByRole('button', { name: 'Open Front Door camera' })
       .locator('xpath=ancestor::*[@data-dynamic-grid="true"][1]')
     await expect(homeCameraGrid).toHaveAttribute('data-dynamic-grid-columns', String(viewport.cameraColumns))
-    await expect(homeCameraGrid).toHaveAttribute('data-dynamic-grid-item-sizing', 'uniform')
+    await expect(homeCameraGrid).toHaveAttribute('data-dynamic-grid-item-sizing', 'content-aware')
     await expect(homeCameraGrid).toHaveAttribute('data-dynamic-grid-layout', 'fill')
     await expect(homeCameraGrid).toHaveAttribute('data-dynamic-grid-max-cell-width', '280')
     await expect(homeCameraGrid).toHaveAttribute('data-dynamic-grid-max-columns', '4')
-    const homeWidths = await homeCameraGrid.locator(':scope > [data-dynamic-grid-cell]').evaluateAll((cells) =>
-      cells.map((cell) => cell.getBoundingClientRect().width),
+    const homeCells = await homeCameraGrid.locator(':scope > [data-dynamic-grid-cell]').evaluateAll((cells) =>
+      cells.map((cell) => ({
+        span: Number(cell.getAttribute('data-dynamic-grid-span')),
+        width: cell.getBoundingClientRect().width,
+      })),
     )
-    for (const width of homeWidths) expect(Math.abs(width - viewport.securityCellWidth)).toBeLessThanOrEqual(1)
+    for (const cell of homeCells) {
+      const expectedWidth = viewport.securityCellWidth * cell.span + 10 * (cell.span - 1)
+      expect(Math.abs(cell.width - expectedWidth)).toBeLessThanOrEqual(1)
+    }
   }
 })
 
 // @covers src/components/hass/EditTodoItemSheet.tsx
 // @covers src/components/hass/EditTodoItemSheet.module.css
 // @covers src/components/hass/TodoListPanel.tsx
-test('Chores keeps uniform Quick Links and reflows task rows without reordering', async ({ page }) => {
+test('Chores uses content-aware Quick Links and reflows task rows without reordering', async ({ page }) => {
   test.setTimeout(120_000)
   for (const viewport of PAGE_LAYOUT_VIEWPORTS) {
     await page.setViewportSize(viewport)
@@ -516,10 +528,17 @@ test('Chores keeps uniform Quick Links and reflows task rows without reordering'
     await expect(root.getByRole('heading', { level: 1, name: 'Chores' })).toBeVisible()
     const quickLinks = root.getByRole('group', { name: 'Chore quick links' })
     await expect(quickLinks).toHaveAttribute('data-dynamic-grid-columns', String(viewport.choreColumns))
-    await expect(quickLinks).toHaveAttribute('data-dynamic-grid-item-sizing', viewport.width === 393 ? 'content-aware' : 'uniform')
-    expect(await quickLinks.locator(':scope > [data-dynamic-grid-cell]').evaluateAll((cells) =>
-      cells.map((cell) => cell.getAttribute('data-dynamic-grid-span')),
-    )).toEqual(Array.from({ length: 5 }, () => viewport.width === 393 ? '2' : '1'))
+    await expect(quickLinks).toHaveAttribute('data-dynamic-grid-item-sizing', 'content-aware')
+    const quickLinkLayout = await quickLinks.locator(':scope > [data-dynamic-grid-cell]').evaluateAll((cells) =>
+      cells.map((cell) => ({
+        labelsFit: Array.from(cell.querySelectorAll<HTMLElement>('[data-dynamic-grid-label="true"]'))
+          .every((label) => label.scrollWidth <= label.clientWidth + 1),
+        span: Number(cell.getAttribute('data-dynamic-grid-span')),
+      })),
+    )
+    expect(quickLinkLayout).toHaveLength(5)
+    expect(quickLinkLayout.every(({ labelsFit, span }) => labelsFit && span >= 1 && span <= viewport.choreColumns)).toBe(true)
+    if (viewport.width === 393) expect(quickLinkLayout.every(({ span }) => span === 2)).toBe(true)
 
     const list = root.getByLabel('Past Due todo list')
     await expect(list).toHaveAttribute('data-layout', 'responsive-grid')
@@ -627,7 +646,7 @@ test('long battery task titles remain fully visible across dashboard viewports',
   }
 })
 
-test('Custom Lights keeps two phone columns and uses bounded uniform wider grids', async ({ page }) => {
+test('Custom Lights keeps two phone columns and uses bounded content-aware wider grids', async ({ page }) => {
   test.setTimeout(120_000)
   for (const viewport of PAGE_LAYOUT_VIEWPORTS) {
     await page.setViewportSize(viewport)
@@ -641,7 +660,7 @@ test('Custom Lights keeps two phone columns and uses bounded uniform wider grids
     await expect(firstLight).toBeVisible()
     const grid = firstLight.locator('xpath=ancestor::*[@data-dynamic-grid="true"][1]')
     await expect(grid).toHaveAttribute('data-dynamic-grid-columns', String(viewport.customColumns))
-    await expect(grid).toHaveAttribute('data-dynamic-grid-item-sizing', 'uniform')
+    await expect(grid).toHaveAttribute('data-dynamic-grid-item-sizing', 'content-aware')
 
     const modeToggle = root.getByRole('button', { name: 'Manually control front yard lights' })
     const modeCard = modeToggle.locator('..')
@@ -696,7 +715,7 @@ test('Media source groups preserve order and fill the Theater follow-up row', as
     if (viewport.width === 393) {
       expect(Math.round(livingBox?.x ?? 0)).toBe(16)
       expect(Math.round(livingBox?.width ?? 0)).toBe(361)
-      expect(Math.round(theaterBox?.height ?? 0)).toBe(314)
+      expect(Math.round(theaterBox?.height ?? 0)).toBe(444)
       expect(musicBox?.y ?? 0).toBeGreaterThan((livingBox?.y ?? 0) + (livingBox?.height ?? 0))
       expect(theaterBox?.y ?? 0).toBeGreaterThan((musicBox?.y ?? 0) + (musicBox?.height ?? 0))
     } else {
@@ -754,7 +773,7 @@ test('Theater Remote stays visible while Apps and Devices use their available pa
     const deviceGrid = dialog.getByRole('button', { name: /Projector Off/i })
       .locator('xpath=ancestor::*[@data-dynamic-grid="true"][1]')
     await expect(deviceGrid).toHaveAttribute('data-dynamic-grid-columns', String(viewport.remoteColumns))
-    await expect(deviceGrid).toHaveAttribute('data-dynamic-grid-item-sizing', 'uniform')
+    await expect(deviceGrid).toHaveAttribute('data-dynamic-grid-item-sizing', 'content-aware')
     const gridBox = await deviceGrid.boundingBox()
     expect(gridBox).not.toBeNull()
 

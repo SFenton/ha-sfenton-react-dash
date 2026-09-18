@@ -4,7 +4,10 @@ import { CheckboxRow } from './CheckboxRow'
 describe('CheckboxRow', () => {
   it('keeps interactive controls on aria-pressed semantics', () => {
     render(<CheckboxRow active aria-label="Interactive option" title="Interactive option" />)
-    expect(screen.getByRole('button', { name: 'Interactive option' })).toHaveAttribute('aria-pressed', 'true')
+    const control = screen.getByRole('button', { name: 'Interactive option' })
+    expect(control).toHaveAttribute('aria-pressed', 'true')
+    expect(control.querySelector('[data-dynamic-grid-label-container="true"]')).toBeInTheDocument()
+    expect(control.querySelector('[data-dynamic-grid-label="true"]')).toHaveTextContent('Interactive option')
   })
 
   it('renders immutable inventory state as labelled status without checkbox semantics', () => {

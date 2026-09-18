@@ -192,8 +192,11 @@ test('bounds representative dashboard, settings, room and reading layouts on wid
 
   await setRoute(page, 'living-room')
   const roomGridWidths = await page.locator('[data-dynamic-grid-layout="bounded"]').evaluateAll((grids) =>
-    grids.flatMap((grid) => Array.from(grid.querySelectorAll(':scope > [data-dynamic-grid-cell]')).map((cell) => Math.round(cell.getBoundingClientRect().width))),
+    grids.flatMap((grid) => Array.from(grid.querySelectorAll<HTMLElement>(':scope > [data-dynamic-grid-cell]'))
+      .filter((cell) => Number(cell.dataset.dynamicGridSpan) === 1)
+      .map((cell) => Math.round(cell.getBoundingClientRect().width))),
   )
+  expect(roomGridWidths.length).toBeGreaterThan(0)
   expect(Math.max(...roomGridWidths)).toBeLessThanOrEqual(280)
 
   await setRoute(page, 'groceries')
