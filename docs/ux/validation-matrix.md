@@ -258,9 +258,12 @@ owner. Exercise Security System
 through Home, Security and Quick Links, plus Guest Presence Security through
 both routes, and retain their portrait card dimensions.
 
-The centered frame consumes live `100dvh` minus the shared keyboard overlay
-inset. Test a synthetic keyboard contraction below 320px; the page's minimum
-height must not push close or footer controls below the visible viewport.
+The popup frame remains anchored to the layout viewport and paints behind the
+keyboard. Its internal content layout consumes the shared keyboard overlay
+inset and keeps close/footer/composer controls inside the visible region. Test
+a synthetic keyboard contraction below 320px, frozen close geometry, and an
+embedded outer-window pan; the page's minimum height must not push controls
+below the visible viewport.
 Keep synthetic viewport/capability fixtures explicitly labeled as such.
 
 For non-grid modals, assert compact landscape chrome, the measured

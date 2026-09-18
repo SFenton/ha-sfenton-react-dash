@@ -15,6 +15,19 @@ The install hook applies a fail-closed compatibility patch to `home-assistant-js
 
 The experimental custom panel keeps Home Assistant's native sidebar on desktop; mobile remains full-viewport. This avoids unsupported top-window styling while the two hosts are evaluated in parallel.
 
+For iOS Companion testing without adding another sidebar item, run
+`npm run prepare:ios-test-dashboard`. It builds and stages isolated assets plus
+the exact storage-dashboard WebSocket payloads under
+`.deploy/ios-simulator-dashboard/`. The prepared dashboard uses
+`/sfenton-react-ios-test/home`, requires an administrator, and sets
+`show_in_sidebar: false`. Preparation is network-free and does not deploy or
+mutate Home Assistant. After explicit live-deployment authorization, place a
+Home Assistant long-lived access token in `.env.ios-test.local`, rerun the
+preparation command, and run
+`npm run deploy:ios-test-dashboard -- --yes`. The deploy command atomically
+swaps only the isolated test assets and rolls them back if dashboard
+registration or verification fails.
+
 The production `wake_light` custom integration, config-flow prerequisites,
 PBL lease contract, Master Bedroom target evidence, service API, sensor schema,
 and local validation steps are documented in

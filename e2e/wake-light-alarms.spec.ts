@@ -1,6 +1,7 @@
 // @covers src/test/mocks/hakitCoreState.ts
 // @covers src/test/mocks/hakitCoreWithRealControls.ts
 // @covers src/test/mocks/realControlsIcons.ts
+// @covers src/components/core/ModalSheet.module.css
 import { expect, test } from './layout/fixture'
 import { LAYOUT_JOURNEYS } from './responsive-acceptance-data'
 import { openSurface, enterState } from './layout/app'
@@ -310,7 +311,7 @@ test('keyboard-reduced landscape keeps the focused editor and fixed actions insi
   })
   await expect.poll(() => page.evaluate(() => document.documentElement.style.getPropertyValue('--dashboard-keyboard-overlay-inset'))).toBe('130px')
   await settleWake(dialog)
-  expectSameBox((await dialog.boundingBox())!, { x: 71, y: 8, width: 725, height: 226 })
+  expectSameBox((await dialog.boundingBox())!, { x: 71, y: 8, width: 725, height: 356 })
   for (const name of ['Close', 'Save']) {
     const box = await dialog.getByRole('button', { name, exact: true }).boundingBox()
     expect(box!.y + box!.height).toBeLessThanOrEqual(242)

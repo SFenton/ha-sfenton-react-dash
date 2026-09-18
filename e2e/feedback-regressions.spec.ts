@@ -2,6 +2,7 @@
 // @covers src/components/hass/TodoListPanel.tsx
 // @covers src/components/hass/EditTodoItemSheet.tsx
 // @covers src/components/hass/EditTodoItemSheet.module.css
+// @covers src/components/core/ModalSheet.tsx
 import { expect, test, type Locator, type Page } from './layout/fixture'
 import { navigationLayoutForViewport } from '../src/constants/navigationLayout'
 import { installSafeAreaInsets, setSafeAreaInsets } from './safe-area'
@@ -156,12 +157,14 @@ test('Admin To-Do preserves modal semantics, failure retry, and responsive actio
     ])
     await expect.poll(() => page.evaluate(() => window.__mockHass!.calls.filter((call) => call.domain === 'script'))).toHaveLength(0)
     await expect(dialog).toHaveAttribute('data-state', 'closed')
+    await expect(dialog).toHaveCount(0, { timeout: 700 })
 
     await opener.focus()
     await opener.click()
     await expect(dialog).toBeVisible()
     await page.keyboard.press('Escape')
     await expect(dialog).toHaveAttribute('data-state', 'closed')
+    await expect(dialog).toHaveCount(0, { timeout: 700 })
     await expect(opener).toBeFocused()
 
     await opener.click()

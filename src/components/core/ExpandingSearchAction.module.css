@@ -7,11 +7,6 @@
   transition: opacity 100ms ease-out;
 }
 
-:global(html[data-dashboard-kb-masked='true']) .slot {
-  opacity: 0;
-  transition: none;
-}
-
 .button,
 .bar {
   width: 100%;
