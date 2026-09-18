@@ -22,9 +22,11 @@ describe('routes', () => {
     expect(routePathFromUrl('/sfenton-react-dash/home?path=security#security-system')).toBe('security')
     expect(routePathFromUrl('/sfenton-react-dash/home?path=/at-a-glance/living-room#lights-living-room')).toBe('living-room')
     expect(routePathFromUrl('/sfenton-react-panel?path=security#security-system')).toBe('security')
+    expect(routePathFromUrl('/sfenton-react-ios-test/home?path=security#security-system')).toBe('security')
     expect(routePathFromUrl('/local/ha-sfenton-react-dash/index.html?v=20260530&path=vacuums')).toBe('vacuums')
     expect(routePathFromUrl('/sfenton-react-dash/home')).toBe('overview')
     expect(routePathFromUrl('/sfenton-react-panel')).toBe('overview')
+    expect(routePathFromUrl('/sfenton-react-ios-test/home')).toBe('overview')
   })
 
   it('builds at-a-glance URLs', () => {
@@ -37,6 +39,7 @@ describe('routes', () => {
     expect(routeUrl('security', '/sfenton-react-dash/home?path=overview')).toBe('/sfenton-react-dash/home?path=security')
     expect(routeUrl('living-room', '/sfenton-react-dash/home?v=20260530', '#lights-living-room')).toBe('/sfenton-react-dash/home?v=20260530&path=living-room#lights-living-room')
     expect(routeUrl('living-room', '/sfenton-react-panel', '#lights-living-room')).toBe('/sfenton-react-panel?path=living-room#lights-living-room')
+    expect(routeUrl('living-room', '/sfenton-react-ios-test/home', '#lights-living-room')).toBe('/sfenton-react-ios-test/home?path=living-room#lights-living-room')
     expect(routeUrl('vacuums', '/local/ha-sfenton-react-dash/index.html?v=20260530#old-popup')).toBe('/local/ha-sfenton-react-dash/index.html?v=20260530&path=vacuums')
     expect(routeUrl('vacation', '/at-a-glance/settings')).toBe('/at-a-glance/settings?path=vacation')
     expect(routeUrl('special-device-modes', '/at-a-glance/settings')).toBe('/at-a-glance/settings?path=special-device-modes')

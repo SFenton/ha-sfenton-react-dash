@@ -1,3 +1,5 @@
+// @covers src/components/shell/AppShell.module.css
+// @covers src/components/core/ExpandingSearchAction.module.css
 import { expect, test, type FrameLocator, type Locator, type Page } from './layout/fixture'
 import { valueToThermostatPoint } from '../src/components/hass/thermostatDialGeometry'
 import { globalQuickLinksAction, openQuickLinksTab, selectQuickLinksTab } from './quick-links'
@@ -26,6 +28,7 @@ declare global {
     __setDashboardFakeKeyboardHeight?: (height: number, notify?: boolean) => void
     __setDashboardFakeViewport?: (height: number, offsetTop?: number, notify?: boolean) => void
     __setInventoryFakeKeyboardHeight?: (height: number) => void
+    __dashboardEmbeddedScrollResetCount?: number
   }
 }
 
@@ -261,6 +264,15 @@ async function installFakeVisualViewport(page: Page) {
     fakeVisualViewport.pageTop = 0
     fakeVisualViewport.scale = 1
     Object.defineProperty(window, 'visualViewport', { configurable: true, value: fakeVisualViewport })
+    const nativeScrollTo = window.scrollTo.bind(window)
+    window.__dashboardEmbeddedScrollResetCount = 0
+    window.scrollTo = (...args: Parameters<typeof window.scrollTo>) => {
+      const first = args[0]
+      const left = typeof first === 'object' ? first.left ?? window.scrollX : first
+      const top = typeof first === 'object' ? first.top ?? window.scrollY : args[1]
+      if (left === 0 && top === 0) window.__dashboardEmbeddedScrollResetCount! += 1
+      nativeScrollTo(...args)
+    }
     window.__setDashboardFakeViewport = (height: number, offsetTop = 0, notify = true) => {
       fakeVisualViewport.width = window.innerWidth
       fakeVisualViewport.height = height
@@ -1617,7 +1629,7 @@ test('kitchen restores full height after closing the keyboard and reopening by t
   })
 })
 
-test('embedded inventory search follows the top visual viewport without a guessed-position jump', async ({ page }) => {
+test('embedded inventory search stays put until the keyboard starts and then follows its viewport', async ({ page }) => {
   await installFakeVisualViewport(page)
   await page.goto('/sfenton-react-dash/home?path=fridge')
   const topViewportHeight = await page.evaluate(() => window.innerHeight)
@@ -1656,7 +1668,7 @@ test('embedded inventory search follows the top visual viewport without a guesse
     const frameTop = frameRect?.top ?? 0
     const frameBottom = frameRect?.bottom ?? window.innerHeight
     const visibleBottom = viewport?.height ?? window.innerHeight
-    const targetBottom = Math.min(frameBottom, visibleBottom) - 14
+    const targetBottom = Math.min(frameBottom, visibleBottom) - 8
     return {
       bottom: frameTop + dockRect.bottom,
       keyboard: document.documentElement.getAttribute('data-dashboard-keyboard'),
@@ -1669,7 +1681,9 @@ test('embedded inventory search follows the top visual viewport without a guesse
   await searchButton.click()
   await expect(app.getByLabel('Search inventory')).toBeFocused()
   const armed = await dockMetrics()
-  expect(Math.abs(armed.y - before.y)).toBeGreaterThan(20)
+  expect(Math.abs(armed.y - before.y)).toBeLessThanOrEqual(1)
+  await expect(dock).toHaveCSS('transition-duration', '0.3s')
+  await expect(dock).toHaveCSS('transition-timing-function', 'cubic-bezier(0.32, 0.72, 0, 1)')
 
   const input = app.getByLabel('Search inventory')
   await page.evaluate((height) => window.__setDashboardFakeViewport?.(height, 0), keyboardViewportHeight)
@@ -1679,7 +1693,10 @@ test('embedded inventory search follows the top visual viewport without a guesse
     const metrics = await dockMetrics()
     return Math.abs(metrics.bottom - metrics.targetBottom)
   }, { timeout: 500 }).toBeLessThanOrEqual(4)
-  await expect.poll(async () => Math.abs((await dockMetrics()).y - armed.y), { timeout: 500 }).toBeLessThanOrEqual(1)
+  expect(Math.abs((await dockMetrics()).y - armed.y)).toBeGreaterThan(20)
+  await page.evaluate((height) => window.__setDashboardFakeViewport?.(height, 240), keyboardViewportHeight)
+  await expect.poll(() => page.evaluate(() => window.__dashboardEmbeddedScrollResetCount)).toBeGreaterThan(0)
+  await page.evaluate((height) => window.__setDashboardFakeViewport?.(height, 0), keyboardViewportHeight)
 
   await input.press('Enter')
   await page.evaluate(() => window.__setDashboardFakeViewport?.(window.innerHeight, 0))

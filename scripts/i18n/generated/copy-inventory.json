@@ -15425,7 +15425,7 @@
       "file": "src/components/core/ModalSheet.tsx",
       "id": "22323f3f09a98ce0",
       "lines": [
-        475
+        547
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -22854,7 +22854,7 @@
       "file": "src/hooks/useDashboardViewport.ts",
       "id": "78894dfb7cb0e15e",
       "lines": [
-        210
+        232
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -36353,7 +36353,7 @@
       "file": "src/components/core/ModalSheet.tsx",
       "id": "f311f1d9068e6067",
       "lines": [
-        164
+        204
       ],
       "occurrences": 1,
       "origin": "legacy",

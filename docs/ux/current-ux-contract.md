@@ -181,9 +181,19 @@ clamped to the viewport after `max(32px, safe-edge)` padding on each edge.
 These values reuse the established media width and workspace height rather
 than making compact text or forms span that entire width.
 
-Centered viewport height comes directly from `100dvh` minus the existing
-keyboard overlay inset, not from a stale JS height captured before rotation.
-Do not apply the page's 320px minimum height to a keyboard-reduced dialog.
+The modal popup surface remains anchored to the layout viewport while a
+software keyboard is open and continues behind the keyboard's rounded corners
+and suggestion bar. The shared content layout, not the popup, lifts by the
+keyboard overlay inset. This keeps every modal's top edge and backing stable
+while controls remain inside the visible region. Do not apply the page's 320px
+minimum height to the keyboard-visible content region.
+
+`ModalSheet` captures its open block size before text focus, uses one shared
+keyboard curve, and freezes the resolved inset during mounted close. Embedded
+Home Assistant hosts may pan their outer document to reveal a bottom input;
+`useDashboardViewport` resets only that embedded keyboard pan after the focused
+control has moved into the visible region. Product modals must not add local
+viewport listeners, keyboard offsets, or focus-scroll corrections.
 Desktop modal bodies fill the padded frame so their content can use the available
 space; readable tab navigation retains the family measure.
 `contentWidth="full"` opts navigation out of that cap without changing

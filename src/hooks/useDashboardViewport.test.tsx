@@ -1,7 +1,13 @@
 import { act, cleanup, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { DASHBOARD_ROUTE_CHANGE_EVENT } from './dashboardLocation'
-import { armDashboardKeyboardPrediction, clearDashboardKeyboardPrediction, useDashboardViewport } from './useDashboardViewport'
+import {
+  armDashboardKeyboardPrediction,
+  clearDashboardKeyboardPrediction,
+  isDashboardKeyboardInput,
+  shouldResetDashboardViewportPan,
+  useDashboardViewport,
+} from './useDashboardViewport'
 
 type FakeVisualViewport = EventTarget & {
   height: number
@@ -88,6 +94,51 @@ describe('useDashboardViewport', () => {
     expect(document.documentElement.style.getPropertyValue('--dashboard-keyboard-inset')).toBe('0px')
     expect(document.documentElement.style.getPropertyValue('--dashboard-keyboard-overlay-inset')).toBe('0px')
     expect(document.documentElement).not.toHaveAttribute('data-dashboard-keyboard')
+  })
+
+  it('identifies only editable controls that can summon the software keyboard', () => {
+    const text = document.createElement('input')
+    const button = document.createElement('input')
+    const textarea = document.createElement('textarea')
+    const select = document.createElement('select')
+    const editable = document.createElement('div')
+    button.type = 'button'
+    editable.setAttribute('contenteditable', 'true')
+
+    expect(isDashboardKeyboardInput(text)).toBe(true)
+    expect(isDashboardKeyboardInput(textarea)).toBe(true)
+    expect(isDashboardKeyboardInput(select)).toBe(true)
+    expect(isDashboardKeyboardInput(editable)).toBe(true)
+    expect(isDashboardKeyboardInput(button)).toBe(false)
+    text.readOnly = true
+    expect(isDashboardKeyboardInput(text)).toBe(false)
+  })
+
+  it('resets only embedded outer-window keyboard pans', () => {
+    expect(shouldResetDashboardViewportPan({
+      embedded: true,
+      keyboardInset: 369,
+      scrollY: 369,
+      visualOffsetTop: 369,
+    })).toBe(true)
+    expect(shouldResetDashboardViewportPan({
+      embedded: false,
+      keyboardInset: 369,
+      scrollY: 369,
+      visualOffsetTop: 369,
+    })).toBe(false)
+    expect(shouldResetDashboardViewportPan({
+      embedded: true,
+      keyboardInset: 0,
+      scrollY: 369,
+      visualOffsetTop: 369,
+    })).toBe(false)
+    expect(shouldResetDashboardViewportPan({
+      embedded: true,
+      keyboardInset: 369,
+      scrollY: 0,
+      visualOffsetTop: 0,
+    })).toBe(false)
   })
 
   it('uses a masked conservative prediction until the first keyboard measurement is cached', () => {
